@@ -25,6 +25,7 @@
 #include "whisper_params.h"
 #include "fireredpunc.h"
 #include "truecaser.h"
+#include "truecaser_crf.h"
 #include "pcs.h"
 #include "titanet.h"
 #include "speaker_db.h"
@@ -81,6 +82,19 @@ static void apply_truecase_model(truecaser_context* tc_ctx, std::vector<crispasr
         return;
     for (auto& seg : segs) {
         char* result = truecaser_process(tc_ctx, seg.text.c_str());
+        if (result) {
+            seg.text = result;
+            free(result);
+        }
+    }
+}
+
+// Apply CRF truecaser to all segments.
+static void apply_truecase_crf_model(truecaser_crf_context* tc_crf_ctx, std::vector<crispasr_segment>& segs) {
+    if (!tc_crf_ctx)
+        return;
+    for (auto& seg : segs) {
+        char* result = truecaser_crf_process(tc_crf_ctx, seg.text.c_str());
         if (result) {
             seg.text = result;
             free(result);
@@ -155,7 +169,8 @@ std::mutex g_stdout_mutex;
 // failure.
 int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, const std::string& fname_out,
                       whisper_params params, fireredpunc_context* punc_ctx = nullptr,
-                      truecaser_context* tc_ctx = nullptr, pcs_context* pcs_ctx = nullptr) {
+                      truecaser_context* tc_ctx = nullptr, pcs_context* pcs_ctx = nullptr,
+                      truecaser_crf_context* tc_crf_ctx = nullptr) {
     // Resolve the output path base for this input. -of FNAME (passed via
     // `fname_out`) wins; otherwise we strip the audio extension off the
     // input path and append the format extension. Mirrors the whisper
@@ -397,6 +412,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
 
         apply_punc_model(punc_ctx, all_segs);
         apply_truecase_model(tc_ctx, all_segs);
+        apply_truecase_crf_model(tc_crf_ctx, all_segs);
         apply_pcs_model(pcs_ctx, all_segs);
         if (!params.punctuation) {
             for (auto& seg : all_segs)
@@ -577,6 +593,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             auto slice_segs = std::move(per_slice[i]);
             apply_punc_model(punc_ctx, slice_segs);
             apply_truecase_model(tc_ctx, slice_segs);
+            apply_truecase_crf_model(tc_crf_ctx, slice_segs);
             apply_pcs_model(pcs_ctx, slice_segs);
             if (!params.punctuation) {
                 for (auto& seg : slice_segs)
@@ -631,6 +648,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             auto all_segs = merge_segments(std::move(per_slice_redo), slices);
             apply_punc_model(punc_ctx, all_segs);
             apply_truecase_model(tc_ctx, all_segs);
+            apply_truecase_crf_model(tc_crf_ctx, all_segs);
             apply_pcs_model(pcs_ctx, all_segs);
             if (!params.punctuation)
                 for (auto& seg : all_segs)
@@ -661,6 +679,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
 
     apply_punc_model(punc_ctx, all_segs);
     apply_truecase_model(tc_ctx, all_segs);
+    apply_truecase_crf_model(tc_crf_ctx, all_segs);
     apply_pcs_model(pcs_ctx, all_segs);
     if (!params.punctuation) {
         for (auto& seg : all_segs) {
@@ -1097,12 +1116,42 @@ int crispasr_run_backend(const whisper_params& params_in) {
     }
 
     // Optional truecaser post-processor.
-    // `--truecase-model auto` → auto-download German truecaser (~11 MB).
+    // `--truecase-model auto` → statistical German truecaser (~9 MB).
+    // `--truecase-model crf`  → CRF German truecaser with context (~few MB).
     std::unique_ptr<truecaser_context, decltype(&truecaser_free)> tc_ctx(nullptr, truecaser_free);
+    std::unique_ptr<truecaser_crf_context, decltype(&truecaser_crf_free)> tc_crf_ctx(nullptr, truecaser_crf_free);
     {
         std::string tc_path = params.truecase_model;
         if (tc_path == "none" || tc_path == "off")
             tc_path.clear();
+        if (tc_path == "crf" || tc_path == "crf-de") {
+            tc_path = crispasr_cache::ensure_cached_file(
+                "truecaser-crf-de.bin", "https://huggingface.co/cstr/truecaser-de/resolve/main/truecaser-crf-de.bin",
+                params.no_prints, "crispasr[tc]", params.cache_dir);
+            if (!tc_path.empty()) {
+                tc_crf_ctx.reset(truecaser_crf_init(tc_path.c_str()));
+                if (!tc_crf_ctx) {
+                    fprintf(stderr, "crispasr: warning: failed to load CRF truecaser '%s'\n", tc_path.c_str());
+                } else if (!params.no_prints) {
+                    fprintf(stderr, "crispasr: loaded CRF truecaser '%s'\n", tc_path.c_str());
+                }
+            }
+            tc_path.clear(); // Don't also load statistical
+        } else if (!tc_path.empty() && tc_path != "auto" && tc_path != "de") {
+            // Direct path — detect CRF by magic bytes "CRF1"
+            FILE* probe = fopen(tc_path.c_str(), "rb");
+            if (probe) {
+                char magic[4] = {};
+                fread(magic, 1, 4, probe);
+                fclose(probe);
+                if (memcmp(magic, "CRF1", 4) == 0) {
+                    tc_crf_ctx.reset(truecaser_crf_init(tc_path.c_str()));
+                    if (tc_crf_ctx && !params.no_prints)
+                        fprintf(stderr, "crispasr: loaded CRF truecaser '%s'\n", tc_path.c_str());
+                    tc_path.clear(); // Don't also load statistical
+                }
+            }
+        }
         if (tc_path == "auto" || tc_path == "de") {
             tc_path = crispasr_cache::ensure_cached_file(
                 "truecaser-de.bin", "https://huggingface.co/cstr/truecaser-de/resolve/main/truecaser-de.bin",
@@ -1388,6 +1437,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                         }
                         apply_punc_model(punc_ctx.get(), sl_for_text);
                         apply_truecase_model(tc_ctx.get(), sl_for_text);
+                        apply_truecase_crf_model(tc_crf_ctx.get(), sl_for_text);
                         apply_pcs_model(pcs_ctx.get(), sl_for_text);
                         if (!params.punctuation) {
                             for (auto& seg : sl_for_text)
@@ -1407,6 +1457,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
             apply_punc_model(punc_ctx.get(), segs);
             apply_truecase_model(tc_ctx.get(), segs);
+            apply_truecase_crf_model(tc_crf_ctx.get(), segs);
             apply_pcs_model(pcs_ctx.get(), segs);
             if (!params.punctuation) {
                 for (auto& seg : segs) {
@@ -1489,6 +1540,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                                 backend->transcribe(utterance_pcm.data(), (int)utterance_pcm.size(), 0, decode_params);
                             apply_punc_model(punc_ctx.get(), utt_segs);
                             apply_truecase_model(tc_ctx.get(), utt_segs);
+                            apply_truecase_crf_model(tc_crf_ctx.get(), utt_segs);
                             apply_pcs_model(pcs_ctx.get(), utt_segs);
                             if (!params.punctuation) {
                                 for (auto& seg : utt_segs)
@@ -1781,6 +1833,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                         backend->transcribe(utterance_pcm.data(), (int)utterance_pcm.size(), 0, decode_params);
                     apply_punc_model(punc_ctx.get(), utt_segs);
                     apply_truecase_model(tc_ctx.get(), utt_segs);
+                    apply_truecase_crf_model(tc_crf_ctx.get(), utt_segs);
                     apply_pcs_model(pcs_ctx.get(), utt_segs);
                     if (!params.punctuation) {
                         for (auto& seg : utt_segs)
@@ -1863,7 +1916,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     const std::string fout =
                         (idx < (int)params.fname_out.size()) ? params.fname_out[idx] : std::string{};
                     const int file_rc = process_one_input(be, params.fname_inp[idx], fout, params, punc_ctx.get(),
-                                                          tc_ctx.get(), pcs_ctx.get());
+                                                          tc_ctx.get(), pcs_ctx.get(), tc_crf_ctx.get());
                     if (file_rc != 0)
                         agg_rc.store(file_rc);
                 }
@@ -1881,8 +1934,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
     for (size_t i = 0; i < params.fname_inp.size(); i++) {
         const std::string& fname_inp = params.fname_inp[i];
         const std::string fout = (i < params.fname_out.size()) ? params.fname_out[i] : std::string{};
-        const int file_rc =
-            process_one_input(*backend, fname_inp, fout, params, punc_ctx.get(), tc_ctx.get(), pcs_ctx.get());
+        const int file_rc = process_one_input(*backend, fname_inp, fout, params, punc_ctx.get(), tc_ctx.get(),
+                                              pcs_ctx.get(), tc_crf_ctx.get());
         if (file_rc != 0)
             rc = file_rc;
     }
@@ -2065,6 +2118,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
         apply_punc_model(punc_ctx, all_segs);
         apply_truecase_model(tc_ctx, all_segs);
+        apply_truecase_crf_model(tc_crf_ctx, all_segs);
         apply_pcs_model(pcs_ctx, all_segs);
 
         // Optional post-processing: strip punctuation when --no-punctuation
