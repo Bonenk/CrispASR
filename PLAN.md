@@ -71,6 +71,7 @@ Convert + upload to HuggingFace:
 - `moonshine-streaming-tiny/small/medium` — different architecture, needs new runtime
 - ~~`moonshine-tiny-{ja,ar,ko,zh,vi,uk}` (multilingual)~~ **DONE** (12 repos on HF)
 - ~~`moonshine-base-{ja,uk,vi,zh,ar,ko}` (multilingual)~~ **DONE** (12 repos on HF)
+- ~~`moonshine-{base,tiny}-de` German fine-tunes~~ **DONE** — fidoriel (6.9%/11.4% WER, NC-SA) + dattazigzag (MIT)
 
 Converter fix: 1D tensors (norms, biases) forced to F32; conv_1d_f32 mul_mat
 argument order fixed for F16 kernels.
@@ -941,8 +942,11 @@ Probable kickoff: mid-to-late May 2026 if the queue clears.
 | Model | License | Type | Priority |
 |---|---|---|---|
 | FireRedPunc | Apache-2.0 | BERT punct (zh+en) | **DONE** |
-| fullstop-multilingual | MIT | XLM-R punct (en/de/fr/it) | Medium |
-| bert-restore-punctuation | MIT | BERT punct+truecase (en) | Medium |
+| fullstop-multilingual | MIT | XLM-R punct (en/de/fr/it) | **DONE** — runtime in fireredpunc.cpp |
+| punctuate-all (kredor) | MIT | XLM-R-base punct (12 langs) | **DONE** — `--punc-model punctuate-all` |
+| 1-800-BAD-CODE PCS | Apache-2.0 | XLM-R punc+truecase+SBD (47 langs) | **DONE** — `--punc-model pcs` |
+| truecaser-de (statistical) | MIT | Wikipedia word-freq (452K entries) | **DONE** — `--truecase-model auto` |
+| bert-restore-punctuation | MIT | BERT punct+truecase (en) | Low |
 | xashru/punctuation | Apache-2.0 | XLM-R+BiLSTM-CRF (40+ langs) | Low |
 
 ### Optimizations (cross-cutting, from survey + CrispEmbed comparison)

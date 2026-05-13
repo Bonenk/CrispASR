@@ -156,6 +156,9 @@ Work with all backends.
 |---|---|---|---|---|---|
 | **FireRedPunc** | Punctuation restoration | BERT-base (12L, d=768), 5 classes | Chinese + English | Apache-2.0 | [`cstr/fireredpunc-GGUF`](https://huggingface.co/cstr/fireredpunc-GGUF) |
 | **fullstop-punc** | Punctuation restoration | XLM-RoBERTa-large (24L, d=1024), 6 classes | EN, DE, FR, IT | MIT | [`cstr/fullstop-punc-multilang-GGUF`](https://huggingface.co/cstr/fullstop-punc-multilang-GGUF) |
+| **punctuate-all** | Punctuation restoration | XLM-RoBERTa-base (12L, d=768), 6 classes | 12 languages | MIT | [`cstr/punctuate-all-GGUF`](https://huggingface.co/cstr/punctuate-all-GGUF) |
+| **PCS** | Punc + truecase + SBD | XLM-RoBERTa-base (12L), 4 heads | 47 languages | Apache-2.0 | `--punc-model pcs` |
+| **truecaser-de** | German truecasing | Statistical word-frequency (452K entries) | German | MIT | [`cstr/truecaser-de`](https://huggingface.co/cstr/truecaser-de) |
 | **CLD3** | Text language ID | Embedding-bag → FC + ReLU → softmax (~1.5 MB F32) | 109 ISO 639-1 | Apache-2.0 | [`cstr/cld3-GGUF`](https://huggingface.co/cstr/cld3-GGUF) |
 | **GlotLID-V3** | Text language ID | fastText supervised, flat softmax | 2102 ISO 639-3 + script | Apache-2.0 | [`cstr/glotlid-GGUF`](https://huggingface.co/cstr/glotlid-GGUF) |
 | **LID-176** | Text language ID | fastText supervised, hierarchical softmax | 176 ISO 639-1 | CC-BY-SA-3.0 | [`cstr/fasttext-lid176-GGUF`](https://huggingface.co/cstr/fasttext-lid176-GGUF) |
@@ -209,7 +212,9 @@ The matrix above covers ASR backends. **TTS-only backends** (`kokoro`, `qwen3-tt
 
 **Voice activity detection**: `--vad` uses the default Silero VAD (~885 KB, auto-downloaded). Each VAD segment is transcribed independently, producing separate SRT/VTT entries with correct timestamps. Use `--vad --split-on-punct` for best subtitle output. Four VAD backends: Silero (default), FireRedVAD (`-vm firered`, recommended), MarbleNet (`-vm marblenet`, 439 KB, 6 languages), Whisper-VAD-EncDec (`-vm whisper-vad`, experimental).
 
-**Punctuation restoration** (`--punc-model`): CTC-based backends output lowercase without punctuation. Add `--punc-model fireredpunc-q8_0.gguf` (or `fullstop-punc-q4_k.gguf` for DE/FR/IT) to restore punctuation and capitalization. See the post-processing table above for model details. Also available via Python/Rust/Dart wrappers (`crispasr.PuncModel`).
+**Punctuation restoration** (`--punc-model`): CTC-based backends output lowercase without punctuation. Named shortcuts: `auto`/`firered` (Chinese+English), `fullstop` (EN/DE/FR/IT, XLM-R-large), `punctuate-all` (12 languages, XLM-R-base), `pcs` (47 languages, punc + truecasing + sentence boundary detection in one model). Or pass a GGUF path directly. Also available via Python/Rust/Dart wrappers (`crispasr.PuncModel`).
+
+**Truecasing** (`--truecase-model`): Restore German noun/name capitalization in lowercase ASR output. `--truecase-model auto` downloads a statistical truecaser (11 MB, 452K German words from Wikipedia). For neural truecasing, use `--punc-model pcs` instead — it handles punctuation + truecasing + sentence boundaries in one pass for 47 languages.
 
 <details>
 <summary>Which backends produce punctuation natively?</summary>

@@ -333,6 +333,16 @@ Moved here once shipped. See git history for code diffs.
 - **Qwen Omni ASR** — NOT PLANNED (split GGUF, too large, already in llama.cpp).
 - **#30 PazaBench assessment** — 16 model families assessed. 7 already covered, 4 easy wins identified.
 
+### v0.6.7 (May 2026)
+
+**German Moonshine ASR + text post-processing:**
+- **moonshine-de** / **moonshine-tiny-de**: fidoriel German fine-tunes (6.9% / 11.4% WER, CC-BY-NC-SA-4.0) wired as registered backends with `-m auto` support. Also converted dattazigzag/moonshine-tiny-de (MIT, 36.7% WER)
+- **punctuate-all**: kredor/punctuate-all (XLM-RoBERTa-base, 12 languages, MIT, 154 MB Q4_K) — `--punc-model punctuate-all`
+- **PCS model**: 1-800-BAD-CODE XLM-RoBERTa punc+truecase+SBD (47 languages, Apache-2.0) — ONNX→GGUF converter + 4-head C++ runtime: post-punc, pre-punc, sentence boundary, per-character truecasing. `--punc-model pcs`
+- **truecaser-de**: Statistical German truecaser (452K words from Wikipedia, 11 MB, MIT) — `--truecase-model auto`
+- **License field**: Registry entries carry optional license tag; NC models emit a stderr note on download
+- **--punc-model** shortcuts: `auto`/`firered`/`fullstop`/`punctuate-all`/`pcs`
+
 ### v0.5.4 (April 2026)
 
 **Maintenance:**
