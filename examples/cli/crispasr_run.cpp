@@ -1148,10 +1148,20 @@ int crispasr_run_backend(const whisper_params& params_in) {
         std::string tc_path = params.truecase_model;
         if (tc_path == "none" || tc_path == "off")
             tc_path.clear();
-        if (tc_path == "lstm" || tc_path == "lstm-de") {
-            tc_path = crispasr_cache::ensure_cached_file(
-                "truecaser-lstm-de.bin", "https://huggingface.co/cstr/truecaser-de/resolve/main/truecaser-lstm-de.bin",
-                params.no_prints, "crispasr[tc]", params.cache_dir);
+        if (tc_path == "lstm" || tc_path == "lstm-de" || tc_path == "lstm-en" || tc_path == "lstm-es" ||
+            tc_path == "lstm-ru") {
+            // Map language suffix to filename
+            std::string lang = "de";
+            if (tc_path == "lstm-en")
+                lang = "en";
+            else if (tc_path == "lstm-es")
+                lang = "es";
+            else if (tc_path == "lstm-ru")
+                lang = "ru";
+            std::string fname = "truecaser-lstm-" + lang + ".bin";
+            std::string url = "https://huggingface.co/cstr/truecaser-de/resolve/main/" + fname;
+            tc_path =
+                crispasr_cache::ensure_cached_file(fname, url, params.no_prints, "crispasr[tc]", params.cache_dir);
             if (!tc_path.empty()) {
                 tc_lstm_ctx.reset(truecaser_lstm_init(tc_path.c_str()));
                 if (tc_lstm_ctx && !params.no_prints)

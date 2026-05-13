@@ -12,15 +12,18 @@ tags:
 pipeline_tag: token-classification
 ---
 
-# German Truecaser Models
+# Truecaser Models
 
-Three truecasing models for restoring proper German capitalization in lowercase ASR output. Used by [CrispASR](https://github.com/CrispStrobe/CrispASR) via `--truecase-model`.
+Truecasing models for restoring proper capitalization in lowercase ASR output. Used by [CrispASR](https://github.com/CrispStrobe/CrispASR) via `--truecase-model`.
 
 ## Available Models
 
-| File | Type | Size | F1 | License | Recommended |
-|------|------|------|-----|---------|-------------|
-| `truecaser-lstm-de.bin` | BiLSTM char-level | 3.2 MB | 97.9% | Apache-2.0 | **Yes** |
+| File | Type | Language | Size | F1 | License | Flag |
+|------|------|----------|------|-----|---------|------|
+| `truecaser-lstm-de.bin` | BiLSTM char-level | German | 3.2 MB | 97.9% | Apache-2.0 | `lstm` or `lstm-de` |
+| `truecaser-lstm-en.bin` | BiLSTM char-level | English | 3.2 MB | 93.0% | Apache-2.0 | `lstm-en` |
+| `truecaser-lstm-es.bin` | BiLSTM char-level | Spanish | 3.2 MB | — | Apache-2.0 | `lstm-es` |
+| `truecaser-lstm-ru.bin` | BiLSTM char-level | Russian | 4.1 MB | — | Apache-2.0 | `lstm-ru` |
 | `truecaser-crf-de.bin` | CRF + context | 24 MB | ~95% | MIT | |
 | `truecaser-de.bin` | Statistical freq | 9.2 MB | ~93% | MIT | |
 
@@ -30,7 +33,7 @@ Converted from [mayhewsw/pytorch-truecaser](https://github.com/mayhewsw/pytorch-
 
 - **Architecture**: Embedding(202, 50) → BiLSTM(50→150, 2 layers) → Linear(300, 2)
 - **Labels**: L (lowercase), U (uppercase) — per character
-- **Training**: 2.6M tokens of WMT German monolingual text, 97.86% F1
+- **Training**: WMT monolingual text (de: 2.6M tokens, 97.86% F1; en: Wikipedia, 93.01% F1; es: WMT; ru: LORELEI)
 - **Original paper**: Mayhew et al., "NER and POS When Nothing is Capitalized" (2019)
 - **Source**: [mayhewsw/pytorch-truecaser v1.0](https://github.com/mayhewsw/pytorch-truecaser/releases/tag/v1.0) — `wmt-truecaser-model-de.tar.gz`
 
@@ -48,11 +51,11 @@ Correctly handles:
 
 ## CRF Truecaser
 
-Trained on 860K German Wikipedia sentences using [python-crfsuite](https://github.com/scrapinghub/python-crfsuite).
+Trained on 245K sentences of WMT News Crawl German using [python-crfsuite](https://github.com/scrapinghub/python-crfsuite).
 
 - **Features**: word identity, 3-char suffix, noun suffixes, previous/next word, article context
 - **Decode**: Viterbi over linear-chain CRF (3 labels: lc, u1, uc)
-- **Training data**: German Wikipedia (CC-BY-SA), model released under MIT
+- **Training data**: WMT News Crawl 2023 German (8.5 MB model, MIT license)
 
 ## Statistical Truecaser
 
