@@ -1015,6 +1015,17 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# truecaser_lstm — BiLSTM character-level truecaser (mayhewsw/pytorch-truecaser)
+# ---------------------------------------------------------------------------
+add_library(truecaser_lstm STATIC truecaser_lstm.h truecaser_lstm.cpp)
+set_target_properties(truecaser_lstm PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(truecaser_lstm PUBLIC .)
+target_compile_features   (truecaser_lstm PUBLIC cxx_std_17)
+if(NOT MSVC)
+    target_compile_options(truecaser_lstm PRIVATE -O3)
+endif()
+
+# ---------------------------------------------------------------------------
 # pcs — Punctuation + Capitalization + Segmentation (1-800-BAD-CODE XLM-R)
 # ---------------------------------------------------------------------------
 add_library(pcs STATIC pcs.h pcs.cpp)
@@ -1188,6 +1199,9 @@ if (TARGET truecaser)
 endif()
 if (TARGET truecaser_crf)
     target_link_libraries(crispasr PUBLIC truecaser_crf)
+endif()
+if (TARGET truecaser_lstm)
+    target_link_libraries(crispasr PUBLIC truecaser_lstm)
 endif()
 if (TARGET pcs)
     target_link_libraries(crispasr PUBLIC pcs)
