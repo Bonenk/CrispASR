@@ -923,6 +923,22 @@ struct crispasr_session {
     // follow-up: "expose per-call beam_size on session-API backends."
     int beam_size = 1;
 
+    // Whisper decoder-fallback thresholds (whisper-only — none of
+    // these fields exist on the other backends' wparams equivalent).
+    //
+    // Defaults are the same as `whisper_full_default_params` so an
+    // unmodified session matches whisper.cpp's stock behaviour. The
+    // values get written into wparams.{entropy,logprob,no_speech}
+    // _thold + wparams.temperature_inc on every whisper transcribe
+    // dispatch — same shape as the other sticky setters.
+    //
+    // Set `temperature_inc = 0.0f` to disable the temperature-
+    // fallback loop entirely (= the CLI's `--no-fallback`).
+    float entropy_thold = 2.4f;
+    float logprob_thold = -1.0f;
+    float no_speech_thold = 0.6f;
+    float temperature_inc = 0.2f;
+
     // GBNF grammar-constrained sampling state (whisper backend only —
     // wparams.grammar_rules lives in whisper_full_params, no analog
     // on other backends today).
@@ -2071,6 +2087,16 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         // wparams.translate also activates the EN target language.
         if (s->translate)
             wparams.translate = true;
+        // Decoder-fallback thresholds — write the sticky session
+        // values into wparams on every dispatch so a slider tweak
+        // takes effect on the next transcribe. Defaults match
+        // whisper_full_default_params, so a user who never touches
+        // the AdvancedOptions UI sees identical behaviour to the
+        // stock library.
+        wparams.entropy_thold = s->entropy_thold;
+        wparams.logprob_thold = s->logprob_thold;
+        wparams.no_speech_thold = s->no_speech_thold;
+        wparams.temperature_inc = s->temperature_inc;
         // GBNF grammar-constrained sampling (whisper-only). The
         // `grammar_rules_ptrs` vector and the parsed rules it points
         // into both live on the session struct so they outlive the
@@ -4498,6 +4524,44 @@ CA_EXPORT int crispasr_session_set_grammar_text(crispasr_session* s,
     s->grammar_root_rule_id = it->second;
     s->grammar_penalty = penalty > 0.0f ? penalty : 100.0f;
     s->grammar_active = true;
+    return 0;
+}
+
+// Whisper decoder-fallback thresholds. All four are written into
+// the session struct here and applied to wparams on every whisper
+// transcribe dispatch. Non-whisper backends silently ignore — the
+// fields have no analog in their wparams equivalent.
+//
+// Defaults from whisper_full_default_params (the values the
+// session struct ships with):
+//   entropy_thold     = 2.4f   (per-token entropy fallback trigger)
+//   logprob_thold     = -1.0f  (avg-logprob fallback trigger)
+//   no_speech_thold   = 0.6f   (silence detector cutoff)
+//   temperature_inc   = 0.2f   (temperature step per fallback pass;
+//                                0.0 disables fallback entirely =
+//                                the CLI's `--no-fallback`)
+//
+// Caller passes whatever values they want — there's no "leave
+// default" sentinel because every value in this set is a real
+// float with meaningful semantics, not a presence flag.
+CA_EXPORT int crispasr_session_set_fallback_thresholds(crispasr_session* s,
+                                                       float entropy_thold,
+                                                       float logprob_thold,
+                                                       float no_speech_thold,
+                                                       float temperature_inc) {
+    if (!s)
+        return -1;
+    s->entropy_thold = entropy_thold;
+    s->logprob_thold = logprob_thold;
+    s->no_speech_thold = no_speech_thold;
+    // Clamp temperature_inc to [0, 1] — values outside that range
+    // either disable fallback (= 0, fine) or cause the fallback
+    // loop to never terminate in some versions of whisper.cpp.
+    if (temperature_inc < 0.0f)
+        temperature_inc = 0.0f;
+    if (temperature_inc > 1.0f)
+        temperature_inc = 1.0f;
+    s->temperature_inc = temperature_inc;
     return 0;
 }
 

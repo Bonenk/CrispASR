@@ -2140,6 +2140,58 @@ class CrispasrSession {
   /// transcribe call decodes unconstrained again.
   void clearGrammar() => setGrammar('');
 
+  /// Whisper decoder-fallback thresholds (whisper-only). Each
+  /// value is written into `whisper_full_params` on every
+  /// transcribe dispatch; non-whisper backends silently ignore
+  /// because their wparams have no analog. Effective on
+  /// CrispASR 0.5.10+.
+  ///
+  /// Parameters (all optional — omit to keep the session's
+  /// current value):
+  ///
+  /// * [entropyThold] — per-token entropy that triggers a
+  ///   fallback pass. Default 2.4. Lower = stricter
+  ///   (fallback fires more often); raise for hard audio to
+  ///   suppress repeated fallbacks.
+  /// * [logprobThold] — avg log-probability cutoff that
+  ///   triggers a fallback pass. Default -1.0 (= "any
+  ///   decoding worse than -1 logprob retries"). Set more
+  ///   negative to be tolerant of noisy decoding.
+  /// * [noSpeechThold] — silence detector cutoff. Default
+  ///   0.6. Higher = more conservative (less likely to drop
+  ///   real speech as silence); lower = aggressive silence
+  ///   gating.
+  /// * [temperatureInc] — temperature step per fallback
+  ///   pass. Default 0.2. Set to 0.0 to disable the
+  ///   fallback loop entirely (= the CLI's `--no-fallback`).
+  ///
+  /// Throws [UnsupportedError] when the loaded dylib
+  /// predates 0.5.10 (no `crispasr_session_set_fallback_thresholds`
+  /// symbol). Callers should catch and downgrade gracefully —
+  /// the C side wouldn't have honoured the values anyway.
+  void setFallbackThresholds({
+    double entropyThold = 2.4,
+    double logprobThold = -1.0,
+    double noSpeechThold = 0.6,
+    double temperatureInc = 0.2,
+  }) {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_set_fallback_thresholds')) {
+      throw UnsupportedError(
+          'crispasr_session_set_fallback_thresholds not present in this libcrispasr build — '
+          'rebuild against CrispASR 0.5.10+');
+    }
+    final fn = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Float, Float, Float, Float),
+        int Function(Pointer<Void>, double, double, double,
+            double)>('crispasr_session_set_fallback_thresholds');
+    final rc = fn(_handle, entropyThold, logprobThold, noSpeechThold,
+        temperatureInc);
+    if (rc != 0) {
+      throw Exception('setFallbackThresholds failed (rc=$rc)');
+    }
+  }
+
   /// Set decoder temperature on backends that support runtime control
   /// (canary, cohere, parakeet, moonshine). Other backends silently no-op.
   /// `seed` is the RNG seed; pass 0 for time-based.

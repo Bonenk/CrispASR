@@ -203,6 +203,19 @@ void main() {
         reason: 'rebuild libcrispasr — 0.5.9 grammar setter is missing');
   });
 
+  test('0.5.10 whisper decoder-fallback thresholds setter resolves', () {
+    // crispasr_session_set_fallback_thresholds writes the four
+    // wparams.*_thold fields + wparams.temperature_inc on every
+    // whisper transcribe. Pre-0.5.10 dylibs don't have the
+    // symbol; the Dart wrapper raises UnsupportedError so apps
+    // can graceful-degrade.
+    expect(
+        () => lib.lookup('crispasr_session_set_fallback_thresholds'),
+        returnsNormally,
+        reason: 'rebuild libcrispasr — 0.5.10 fallback-threshold '
+            'setter is missing');
+  });
+
   test('LidMethod enum indexes match the C-side CrispasrLidMethod', () {
     // crispasr_detect_language_pcm dispatches on the int value of
     // `method.index`; the C side's `enum class CrispasrLidMethod`
