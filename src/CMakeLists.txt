@@ -176,12 +176,14 @@ add_library(crispasr
 # RNNoise's C sources predate the strict implicit-decl errors that
 # clang 16+ defaults to. Silence those warnings on a per-file basis
 # rather than relaxing global -Werror policy.
-set_source_files_properties(
-    rnnoise/denoise.c rnnoise/rnn.c rnnoise/rnn_data.c
-    rnnoise/pitch.c rnnoise/celt_lpc.c rnnoise/kiss_fft.c
-    PROPERTIES
-        COMPILE_FLAGS "-Wno-implicit-function-declaration -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable"
-)
+if (NOT MSVC)
+    set_source_files_properties(
+        rnnoise/denoise.c rnnoise/rnn.c rnnoise/rnn_data.c
+        rnnoise/pitch.c rnnoise/celt_lpc.c rnnoise/kiss_fft.c
+        PROPERTIES
+            COMPILE_FLAGS "-Wno-implicit-function-declaration -Wno-unused-but-set-variable -Wno-unused-function -Wno-unused-variable"
+    )
+endif()
 add_library(whisper ALIAS crispasr)
 
 # miniaudio.h on Apple includes <AVFoundation/AVFoundation.h> which
