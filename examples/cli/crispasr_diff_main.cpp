@@ -58,6 +58,7 @@
 #include "lid_cld3.h"
 #include "lid_fasttext.h"
 #include "moonshine.h"
+#include "moonshine_streaming.h"
 
 #include "common-crispasr.h"
 
@@ -733,7 +734,7 @@ int main(int argc, char** argv) {
                 "  backend       one of: voxtral, voxtral4b, qwen3, qwen3-tts, qwen3-tts-codec, kokoro, granite, "
                 "granite-4.1, "
                 "granite-nle, parakeet, chatterbox, "
-                "canary, cohere, gemma4, mimo-tokenizer, mimo-asr, orpheus, moonshine\n"
+                "canary, cohere, gemma4, mimo-tokenizer, mimo-asr, orpheus, moonshine, moonshine-streaming\n"
                 "  model.gguf    crispasr-compatible model weights\n"
                 "  reference.gguf  archive produced by tools/dump_reference.py\n"
                 "  audio.wav     16 kHz mono WAV\n",
@@ -2563,10 +2564,8 @@ int main(int argc, char** argv) {
             free(our_data);
         }
         snac_decoder_free(ctx);
-    } else if (backend_name == "moonshine" || backend_name == "moonshine-streaming") {
-        // Moonshine (UsefulSensors tiny/base). Streaming variant uses the same
-        // encoder API, so both map here. The diff harness only checks the
-        // encoder output stage; transcript regression is in the nightly matrix.
+    } else if (backend_name == "moonshine") {
+        // Moonshine (UsefulSensors tiny/base). Non-streaming variant.
         moonshine_init_params mp{};
         mp.model_path = model_path.c_str();
         mp.tokenizer_path = nullptr;
@@ -2588,6 +2587,35 @@ int main(int argc, char** argv) {
         }
 
         moonshine_free(ctx);
+    } else if (backend_name == "moonshine-streaming") {
+        // Moonshine-Streaming (sliding-window encoder variant).
+        // Uses a separate GGUF with moonshine_streaming.* keys.
+        moonshine_streaming_context_params mp = moonshine_streaming_context_default_params();
+        mp.n_threads = 4;
+        moonshine_streaming_context* ctx = moonshine_streaming_init_from_file(model_path.c_str(), mp);
+        if (!ctx) {
+            fprintf(stderr, "failed to load moonshine-streaming model '%s'\n", model_path.c_str());
+            return 4;
+        }
+
+        StageResult enc_r;
+        float* out = nullptr;
+        int seq_len = 0, hidden_dim = 0;
+        if (moonshine_streaming_encode(ctx, samples.data(), (int)samples.size(), &out, &seq_len, &hidden_dim) == 0 &&
+            out) {
+            enc_r.shape = {seq_len, hidden_dim};
+            enc_r.data.assign(out, out + (size_t)seq_len * hidden_dim);
+            free(out);
+            enc_r.ok = true;
+            auto rep = ref.compare("encoder_output", enc_r.data.data(), enc_r.data.size());
+            print_row("encoder_output", rep, COS_THRESHOLD);
+            record(rep);
+        } else {
+            printf("[ERR ] encoder_output          moonshine_streaming_encode failed\n");
+            n_fail++;
+        }
+
+        moonshine_streaming_free(ctx);
     } else if (backend_name == "lid-cld3") {
         // CLD3 text-LID. Input text rides in ref metadata under "input_text"
         // (set by tools/reference_backends/lid_cld3.py from LID_TEXT or
@@ -2637,12 +2665,12 @@ int main(int argc, char** argv) {
         }
         lid_cld3_free(ctx);
     } else {
-        fprintf(
-            stderr,
-            "crispasr-diff: backend '%s' is not recognised. "
-            "Supported: voxtral, voxtral4b, qwen3, qwen3-tts, qwen3-tts-codec, kokoro, granite, granite-4.1, "
-            "granite-nle, parakeet, canary, cohere, gemma4, mimo-tokenizer, mimo-asr, orpheus, moonshine, lid-cld3.\n",
-            backend_name.c_str());
+        fprintf(stderr,
+                "crispasr-diff: backend '%s' is not recognised. "
+                "Supported: voxtral, voxtral4b, qwen3, qwen3-tts, qwen3-tts-codec, kokoro, granite, granite-4.1, "
+                "granite-nle, parakeet, canary, cohere, gemma4, mimo-tokenizer, mimo-asr, orpheus, moonshine, "
+                "moonshine-streaming, lid-cld3.\n",
+                backend_name.c_str());
         return 5;
     }
 

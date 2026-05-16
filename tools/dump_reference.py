@@ -178,6 +178,10 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # mono WAV. Captures encoder_output (T_enc, hidden_dim) matching moonshine_encode().
     "moonshine":       "reference_backends.moonshine",
     "moonshine-base":  "reference_backends.moonshine",
+    # Moonshine-Streaming (ONNX variant from usefulsensors/moonshine).
+    # model_dir = root of the cloned repo (onnx/tiny/{preprocess,encode}.onnx).
+    # Captures encoder_output (T, 288) matching moonshine_encode() streaming path.
+    "moonshine-streaming": "reference_backends.moonshine_streaming",
 }
 
 DEFAULT_STAGES_BY_BACKEND: Dict[str, List[str]] = {}  # populated at import
