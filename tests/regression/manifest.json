@@ -204,7 +204,7 @@
       "name": "granite-speech-4.1-2b",
       "backend_id": "granite",
       "skip_diff": true,
-      "_skip_diff_note": "Awaiting Kaggle rebake. Note: IBM Granite NLE outputs lowercase without punctuation.",
+      "_skip_diff_note": "mel passes (cos=0.999997) but encoder diverges (cos_min=-0.077, all 16 conformer layers fail). Needs per-layer investigation. Granite NLE outputs lowercase without punctuation.",
       "gguf": {
         "repo": "cstr/granite-speech-4.1-2b-GGUF",
         "revision": "7ee888f67b68fd6a25af5903ca5b3829ca32c215",
