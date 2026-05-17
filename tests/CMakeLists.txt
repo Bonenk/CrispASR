@@ -539,6 +539,30 @@ catch_discover_tests(test-chat-ggml
     PROPERTIES LABELS "chat;integration"
 )
 
+# ─── test_metal_norm_repro — ggml_norm Metal vs CPU bit-exactness ────────────
+# Standalone repro for the kernel_norm cross-simdgroup reduction bug
+# (see tools/upstream-prs/08-metal-norm-cross-simdgroup). Sweeps a
+# range of T values around the failure boundary and asserts CPU and
+# Metal outputs match bit-exactly. Guards against ggml bumps reverting
+# the patch.
+if(APPLE)
+    add_executable(test_metal_norm_repro test_metal_norm_repro.cpp)
+    target_link_libraries(test_metal_norm_repro PRIVATE
+        ggml
+        ggml-base
+        ggml-cpu
+        ggml-metal
+    )
+    # T values that triggered the original bug; each must return rc=0.
+    foreach(T 33 65 66 67 97 129 130 131 132 257)
+        add_test(NAME metal_norm_T${T}
+            COMMAND test_metal_norm_repro ${T} 512)
+        set_tests_properties(metal_norm_T${T} PROPERTIES
+            LABELS "unit;metal"
+            TIMEOUT 30)
+    endforeach()
+endif()
+
 # ─── test - backends — integration tests for all CrispASR backends ────────────
 #Requires network(downloads models).Not run in CI by default.
 #Usage : ctest - L integration-- output - on - failure

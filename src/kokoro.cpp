@@ -717,38 +717,28 @@ static inline ggml_tensor* kokoro_adain1d(ggml_context* ctx, ggml_tensor* x, ggm
                                           ggml_tensor* fc_b, const char* dbg_prefix = nullptr) {
     const int C = (int)x->ne[0];
 
-    // Instance norm: per-channel mean+var across T. We used to use
-    // ggml_norm on the (T, C) transposed tensor, but ggml-metal's
-    // kernel_norm_fuse_impl (kernel_norm_f32 path, ne00 not divisible
-    // by 4) computes WRONG mean/variance for the short-T predictor F0/N
-    // case (T=65). CPU norm gives every row mean≈0, std≈1; Metal norm
-    // scatters means up to ±0.26 and stds up to 2.7 across many rows.
-    // The cascade through AdaIN1d × LeakyReLU × Conv1d × AdaIN1d ×
-    // LeakyReLU × Conv1d destroys the predictor's f0_curve/n_curve and
-    // the downstream decoder, producing garbage audio.
-    //
-    // Manual mean → sub → variance → sqrt(var+eps) → div mirrors the
-    // semantics of ggml_norm but routes through well-exercised
-    // primitive ops (sum_rows, scale_bias, sub, sqr, sqrt, div) that
-    // do not exhibit the Metal regression. The ggml_norm op itself
-    // should be fixed upstream, but this restores correctness without
-    // a ggml-metal patch.
-    ggml_tensor* xt = ggml_cont(ctx, ggml_transpose(ctx, x)); // (T, C)
+    // Instance norm: transpose (C, T) → (T, C); ggml_norm normalises
+    // along ne[0]=T per other dim ⇒ per-channel mean+var along T;
+    // transpose back. NOTE: ggml-metal's kernel_norm_fuse_impl had a
+    // cross-simdgroup reduction bug that produced wrong per-row mean
+    // and variance for short T (specifically T values where the last
+    // simdgroup ended up with ≤ a few active threads in the prior
+    // parallel-sum loop, e.g. T=65 in the kokoro AdaIN1d). The bug
+    // cascaded through AdaIN → conv → AdaIN into garbage audio for
+    // short utterances ("hello world"). Fixed by the CrispASR patch
+    // in ggml/src/ggml-metal/ggml-metal.metal (search for
+    // "serial reduction by thread 0") — that patch MUST stay
+    // co-versioned with this code; if you bump ggml without
+    // re-applying it, kokoro short-input audio on Metal regresses.
+    // See tests/test_metal_norm_repro.cpp for a standalone repro.
+    ggml_tensor* xt = ggml_cont(ctx, ggml_transpose(ctx, x));
     if (dbg_prefix) {
         char nm[64];
         std::snprintf(nm, sizeof(nm), "%s_pre_norm_TC", dbg_prefix);
         ggml_set_name(xt, nm);
         ggml_set_output(xt);
     }
-    const int T = (int)xt->ne[0];
-    const float inv_T = 1.0f / (float)T;
-    ggml_tensor* mean = ggml_scale(ctx, ggml_sum_rows(ctx, xt), inv_T); // (1, C)
-    ggml_tensor* centered = ggml_sub(ctx, xt, mean);                    // (T, C)
-    ggml_tensor* var = ggml_scale(ctx, ggml_sum_rows(ctx, ggml_sqr(ctx, centered)),
-                                  inv_T); // (1, C)
-    ggml_tensor* std_val = ggml_sqrt(ctx, ggml_scale_bias(ctx, var, 1.0f,
-                                                          kAdaIn1dEps)); // (1, C)
-    xt = ggml_div(ctx, centered, std_val);                               // (T, C)
+    xt = ggml_norm(ctx, xt, kAdaIn1dEps);
     if (dbg_prefix) {
         char nm[64];
         std::snprintf(nm, sizeof(nm), "%s_post_norm_TC", dbg_prefix);
