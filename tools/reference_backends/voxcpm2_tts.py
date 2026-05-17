@@ -37,14 +37,15 @@ Usage:
 
 from __future__ import annotations
 
+import gc
 import os
+import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, Set
 
 import numpy as np
 import torch
-
-from . import _hooks
 
 DEFAULT_STAGES = [
     "text_input_ids",
@@ -66,47 +67,86 @@ DEFAULT_STAGES = [
     "decoded_audio",
 ]
 
+# Stages that require the manual prefill path (hook-based intermediate capture)
+_PREFILL_STAGES = {
+    "locenc_in", "locenc_out", "enc_to_lm",
+    "tslm_prefill_out", "tslm_layer_0_out", "tslm_layer_27_out",
+    "ralm_prefill_out",
+    "lm_to_dit_hidden", "res_to_dit_hidden",
+    "cfm_step0_z", "cfm_step0_result",
+    "stop_logits_step0",
+}
+
+# Stages that require model.generate() (full AR loop + VAE decode)
+_GENERATE_STAGES = {"decoded_audio", "generated_latent"}
+
 # Default synth text
 DEFAULT_SYN_TEXT = "Hello, this is a test of the VoxCPM2 text to speech system."
 
 
+def _write_wav_16k(pcm_f32: np.ndarray, path: str) -> None:
+    """Write float32 PCM to a 16 kHz mono 16-bit WAV file."""
+    import wave
+    pcm_i16 = np.clip(pcm_f32 * 32767, -32768, 32767).astype(np.int16)
+    with wave.open(path, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(16000)
+        wf.writeframes(pcm_i16.tobytes())
+
+
 def dump(
-    model_dir: str,
-    audio=None,
-    audio_path: str = "",
-    stages: Set[str] | None = None,
-    device: str = "cpu",
-    **kwargs: Any,
+    *,
+    model_dir: Path,
+    audio: np.ndarray,
+    stages: Set[str],
+    max_new_tokens: int = 20,
 ) -> Dict[str, np.ndarray]:
     """Run VoxCPM2 inference and capture intermediate activations.
 
     Args:
         model_dir: Path to local VoxCPM2 model directory.
-        audio_path: Path to reference audio (16 kHz mono WAV) for voice cloning.
-        stages: Set of stage names to capture (None = all DEFAULT_STAGES).
-        device: "cpu" or "cuda".
+        audio: 16 kHz mono float32 PCM (used as voice-clone reference).
+        stages: Set of stage names to capture.
+        max_new_tokens: Max AR generation steps.
 
     Returns:
         Dict mapping stage name → numpy array.
     """
-    if stages is None:
-        stages = set(DEFAULT_STAGES)
+    # Ensure voxcpm is importable (installed at /tmp/voxcpm_src)
+    voxcpm_path = "/tmp/voxcpm_src"
+    if voxcpm_path not in sys.path:
+        sys.path.insert(0, voxcpm_path)
 
-    # Import voxcpm
     try:
         from voxcpm.model.voxcpm2 import VoxCPM2Model
     except ImportError:
-        raise ImportError("pip install voxcpm  (needed for VoxCPM2 reference backend)")
+        raise ImportError(
+            "pip install --no-deps --target=/tmp/voxcpm_src voxcpm  "
+            "(needed for VoxCPM2 reference backend)"
+        )
 
-    if not audio_path:
-        audio_path = ""
     syn_text = os.environ.get("VOXCPM2_SYN_TEXT", DEFAULT_SYN_TEXT)
+    use_ref = os.environ.get("VOXCPM2_USE_REF", "0") == "1"
+    seed = int(os.environ.get("VOXCPM2_SEED", "42"))
     print(f"  synth text: {syn_text!r}")
-    print(f"  ref audio:  {audio_path}")
+    print(f"  use ref audio: {use_ref}")
 
-    # Load model (disable torch.compile for hook compatibility)
+    # Write audio to temp WAV if we need voice cloning
+    ref_wav_path = ""
+    if use_ref and audio is not None and len(audio) > 0:
+        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        _write_wav_16k(audio, tmp.name)
+        ref_wav_path = tmp.name
+        print(f"  ref audio written to: {ref_wav_path}")
+
+    device = "cpu"
+    use_f32 = os.environ.get("VOXCPM2_F32", "0") == "1"
     print(f"  loading model from {model_dir} ...")
-    model = VoxCPM2Model.from_local(model_dir, optimize=False, device=device)
+    model = VoxCPM2Model.from_local(str(model_dir), optimize=False, device=device)
+    if use_f32:
+        model = model.float()
+        print("  forced F32 inference mode (VOXCPM2_F32=1)")
     model.eval()
 
     results: Dict[str, np.ndarray] = {}
@@ -116,10 +156,76 @@ def dump(
         ids = model.text_tokenizer(syn_text)
         results["text_input_ids"] = np.array(ids, dtype=np.int32)
 
-    # --- Prepare inputs (zero-shot or voice clone) ---
-    use_ref = audio_path and os.path.exists(audio_path)
+    # Decide which paths to run
+    need_prefill = bool(stages & _PREFILL_STAGES)
+    need_generate = bool(stages & _GENERATE_STAGES)
 
-    # Build the input tensors manually to capture intermediates
+    # --- Manual prefill path: capture intermediate activations via hooks ---
+    if need_prefill:
+        print(f"  running manual prefill for {len(stages & _PREFILL_STAGES)} stages...")
+        _run_prefill(model, syn_text, use_ref, ref_wav_path, device, seed, stages, results)
+
+        # Free prefill intermediates before full generation
+        if need_generate:
+            gc.collect()
+
+    # --- Full generation path: model.generate() for end-to-end audio ---
+    if need_generate:
+        max_steps = int(os.environ.get("VOXCPM2_MAX_STEPS", str(max_new_tokens)))
+        print(f"  running full generation (max {max_steps} steps)...")
+
+        # Re-init KV caches (prefill may have filled them, or they need fresh init)
+        cache_dtype = next(model.parameters()).dtype
+        model.base_lm.setup_cache(1, model.config.max_length, device, cache_dtype)
+        model.residual_lm.setup_cache(1, model.config.max_length, device, cache_dtype)
+
+        with torch.inference_mode():
+            torch.manual_seed(seed)
+            if use_ref and ref_wav_path:
+                wav = model.generate(
+                    target_text=syn_text,
+                    reference_wav_path=ref_wav_path,
+                    max_len=max_steps,
+                    inference_timesteps=10,
+                    cfg_value=2.0,
+                )
+            else:
+                wav = model.generate(
+                    target_text=syn_text,
+                    max_len=max_steps,
+                    inference_timesteps=10,
+                    cfg_value=2.0,
+                )
+
+            if "decoded_audio" in stages and wav is not None:
+                wav_1d = wav.squeeze()
+                audio_np = wav_1d[:48000].numpy().astype(np.float32)
+                results["decoded_audio"] = audio_np
+
+    # Cleanup temp WAV
+    if ref_wav_path:
+        try:
+            os.unlink(ref_wav_path)
+        except OSError:
+            pass
+
+    print(f"  captured {len(results)} stages")
+    return results
+
+
+def _run_prefill(
+    model,
+    syn_text: str,
+    use_ref: bool,
+    ref_wav_path: str,
+    device: str,
+    seed: int,
+    stages: Set[str],
+    results: Dict[str, np.ndarray],
+) -> None:
+    """Manual prefill with hooks to capture intermediate activations."""
+
+    # Build input tensors (mirrors _generate zero-shot / ref-only path)
     text_token = torch.LongTensor(model.text_tokenizer(syn_text))
     text_token = torch.cat([
         text_token,
@@ -127,8 +233,8 @@ def dump(
     ], dim=-1)
     text_length = text_token.shape[0]
 
-    if use_ref:
-        ref_feat = model._encode_wav(audio_path, padding_mode="right")
+    if use_ref and ref_wav_path:
+        ref_feat = model._encode_wav(ref_wav_path, padding_mode="right")
         ref_tokens, ref_feats, ref_t_mask, ref_a_mask = model._make_ref_prefix(
             ref_feat, text_token.device
         )
@@ -157,12 +263,11 @@ def dump(
     # Add batch dim and move to device
     text_token = text_token.unsqueeze(0).to(device)
     text_mask = text_mask.unsqueeze(0).to(device)
-    audio_feat = audio_feat.unsqueeze(0).to(device).to(torch.bfloat16 if device == "cuda" else torch.float32)
+    audio_feat = audio_feat.unsqueeze(0).to(device)
     audio_mask = audio_mask.unsqueeze(0).to(device)
 
     dtype = next(model.parameters()).dtype
 
-    # --- Run inference with hooks ---
     with torch.inference_mode():
         B, T, P, D = audio_feat.shape
 
@@ -185,17 +290,17 @@ def dump(
 
         # Hook layer 0 and last layer
         layer0_out = [None]
-        layer27_out = [None]
+        layer_last_out = [None]
 
         def hook_layer0(module, input, output):
-            layer0_out[0] = output[0].detach()
+            layer0_out[0] = output[0].detach() if isinstance(output, tuple) else output.detach()
 
-        def hook_layer27(module, input, output):
-            layer27_out[0] = output[0].detach()
+        def hook_layer_last(module, input, output):
+            layer_last_out[0] = output[0].detach() if isinstance(output, tuple) else output.detach()
 
         h0 = model.base_lm.layers[0].register_forward_hook(hook_layer0)
         n_layers = len(model.base_lm.layers)
-        h27 = model.base_lm.layers[n_layers - 1].register_forward_hook(hook_layer27)
+        h_last = model.base_lm.layers[n_layers - 1].register_forward_hook(hook_layer_last)
 
         enc_outputs, kv_cache_tuple = model.base_lm(
             inputs_embeds=combined_embed.to(dtype), is_causal=True
@@ -203,12 +308,15 @@ def dump(
         model.base_lm.kv_cache.fill_caches(kv_cache_tuple)
 
         h0.remove()
-        h27.remove()
+        h_last.remove()
 
         if "tslm_layer_0_out" in stages and layer0_out[0] is not None:
             results["tslm_layer_0_out"] = layer0_out[0][0, :8].cpu().float().numpy()
-        if "tslm_layer_27_out" in stages and layer27_out[0] is not None:
-            results["tslm_layer_27_out"] = layer27_out[0][0, :8].cpu().float().numpy()
+        if "tslm_layer_27_out" in stages and layer_last_out[0] is not None:
+            results["tslm_layer_27_out"] = layer_last_out[0][0, :8].cpu().float().numpy()
+
+        # Free hook captures
+        del layer0_out, layer_last_out, kv_cache_tuple
 
         enc_outputs = enc_outputs.to(dtype)
         enc_outputs = model.fsq_layer(enc_outputs) * audio_mask.unsqueeze(-1) + enc_outputs * text_mask.unsqueeze(-1)
@@ -230,6 +338,9 @@ def dump(
         if "ralm_prefill_out" in stages:
             results["ralm_prefill_out"] = residual_enc_outputs[0, :8].cpu().float().numpy()
 
+        # Free large intermediates
+        del enc_outputs, residual_enc_inputs, residual_enc_outputs, residual_kv
+
         # First AR step — DiT + CFM
         dit_hidden_1 = model.lm_to_dit_proj(lm_hidden)
         dit_hidden_2 = model.res_to_dit_proj(residual_hidden)
@@ -242,21 +353,24 @@ def dump(
 
         # CFM solve (manually to capture internals)
         prefix_feat_cond = audio_feat[:, -1, ...].to(dtype)
-        patch_size = model.patch_size
         cfm = model.feat_decoder
 
-        # Initial noise
+        # Initial noise — use fixed seed for reproducibility
+        rng = torch.Generator(device=device)
+        rng.manual_seed(seed)
         z = torch.randn(
-            (B, cfm.in_channels, patch_size),
-            device=dit_hidden.device, dtype=dit_hidden.dtype,
+            (B, cfm.in_channels, model.patch_size),
+            device=device, dtype=dit_hidden.dtype,
+            generator=rng,
         )
         if "cfm_step0_z" in stages:
             results["cfm_step0_z"] = z[0].cpu().float().numpy()
 
-        # Run one full CFM solve for step 0
+        # Run CFM solve for step 0
+        torch.manual_seed(seed)
         pred_feat = cfm(
             mu=dit_hidden,
-            patch_size=patch_size,
+            patch_size=model.patch_size,
             cond=prefix_feat_cond.transpose(1, 2).contiguous(),
             n_timesteps=10,
             cfg_value=2.0,
@@ -269,37 +383,3 @@ def dump(
         stop_logits = model.stop_head(model.stop_actn(model.stop_proj(lm_hidden)))
         if "stop_logits_step0" in stages:
             results["stop_logits_step0"] = stop_logits[0].cpu().float().numpy()
-
-    # --- Full generation (limited length for reference) ---
-    max_steps = int(os.environ.get("VOXCPM2_MAX_STEPS", "20"))
-    print(f"  running full generation (max {max_steps} steps)...")
-
-    with torch.inference_mode():
-        # Reset KV caches
-        model.base_lm.kv_cache.reset()
-        model.residual_lm.kv_cache.reset()
-
-        # Use the model's generate method with limited length
-        if use_ref:
-            wav = model.generate(
-                target_text=syn_text,
-                reference_wav_path=audio_path,
-                max_len=max_steps,
-                inference_timesteps=10,
-                cfg_value=2.0,
-            )
-        else:
-            wav = model.generate(
-                target_text=syn_text,
-                max_len=max_steps,
-                inference_timesteps=10,
-                cfg_value=2.0,
-            )
-
-        if "decoded_audio" in stages and wav is not None:
-            # Capture first 48000 samples (1 second at 48kHz)
-            audio_np = wav[0, :48000].numpy().astype(np.float32)
-            results["decoded_audio"] = audio_np
-
-    print(f"  captured {len(results)} stages")
-    return results

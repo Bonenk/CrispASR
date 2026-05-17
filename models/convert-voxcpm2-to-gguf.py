@@ -483,6 +483,7 @@ def convert(input_dir: Path, out_path: Path) -> None:
     writer.add_uint32("voxcpm2.locenc.d_model", enc_cfg.get("hidden_dim", 1024))
     writer.add_uint32("voxcpm2.locenc.ff_dim", enc_cfg.get("ffn_dim", 4096))
     writer.add_uint32("voxcpm2.locenc.n_heads", enc_cfg.get("num_heads", 16))
+    writer.add_uint32("voxcpm2.locenc.n_kv_heads", enc_cfg.get("num_key_value_heads", 2))
     writer.add_uint32("voxcpm2.locenc.head_dim", enc_cfg.get("kv_channels", 128))
 
     # Local DiT (LocDiT)
@@ -490,6 +491,7 @@ def convert(input_dir: Path, out_path: Path) -> None:
     writer.add_uint32("voxcpm2.locdit.d_model", dit_cfg.get("hidden_dim", 1024))
     writer.add_uint32("voxcpm2.locdit.ff_dim", dit_cfg.get("ffn_dim", 4096))
     writer.add_uint32("voxcpm2.locdit.n_heads", dit_cfg.get("num_heads", 16))
+    writer.add_uint32("voxcpm2.locdit.n_kv_heads", dit_cfg.get("num_key_value_heads", 2))
     writer.add_uint32("voxcpm2.locdit.head_dim", dit_cfg.get("kv_channels", 128))
 
     # CFM parameters
