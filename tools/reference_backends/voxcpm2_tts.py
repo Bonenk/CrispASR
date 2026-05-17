@@ -72,7 +72,7 @@ _PREFILL_STAGES = {
     "tslm_prefill_out", "tslm_layer_0_out", "tslm_layer_27_out",
     "ralm_prefill_out",
     "lm_to_dit_hidden", "res_to_dit_hidden", "cfm_mu",
-    "cfm_step0_z", "cfm_step0_result",
+    "dit_input_seq", "cfm_step0_z", "cfm_step0_result",
     "stop_logits_step0",
 }
 
@@ -351,6 +351,35 @@ def _run_prefill(
             results["res_to_dit_hidden"] = dit_hidden_2[0].cpu().float().numpy()
         if "cfm_mu" in stages:
             results["cfm_mu"] = dit_hidden[0].cpu().float().numpy()
+
+        # Dump the full LocDiT input sequence (for debugging transformer layers)
+        if "dit_input_seq" in stages:
+            # Generate z (same as cfm_step0_z) if not already done
+            rng_dit = torch.Generator(device=device)
+            rng_dit.manual_seed(seed)
+            cfm = model.feat_decoder
+            z_dit = torch.randn(
+                (1, cfm.in_channels, model.patch_size),
+                device=device, dtype=dit_hidden.dtype, generator=rng_dit,
+            )
+            # Build the full input sequence at the FIRST real LocDiT step
+            t_span_local = torch.linspace(1, 0, 11, device=device, dtype=dtype)
+            t_span_local = t_span_local + 1.0 * (torch.cos(torch.pi / 2 * t_span_local) - 1 + t_span_local)
+            t_val = t_span_local[1:2]  # First real step (after zero-init)
+            dt_val_local = torch.tensor([0.0], device=device, dtype=dtype)
+            cfm_est = model.feat_decoder.estimator
+            x_proj = cfm_est.in_proj(z_dit.transpose(1, 2).contiguous())
+            # For zero-shot first step, cond is the last position's audio_feat = zeros
+            zero_cond = torch.zeros(1, cfm.in_channels, model.patch_size, device=device, dtype=dtype)
+            cond_proj_dit = cfm_est.cond_proj(zero_cond.transpose(1, 2).contiguous())
+            t_emb_dit = cfm_est.time_embeddings(t_val).to(dtype)
+            t_emb_dit = cfm_est.time_mlp(t_emb_dit)
+            dt_emb_dit = cfm_est.time_embeddings(dt_val_local).to(dtype)
+            dt_emb_dit = cfm_est.delta_time_mlp(dt_emb_dit)
+            t_emb_dit = t_emb_dit + dt_emb_dit
+            mu_reshaped = dit_hidden.view(1, -1, x_proj.size(-1))
+            dit_seq = torch.cat([mu_reshaped, t_emb_dit.unsqueeze(1), cond_proj_dit, x_proj], dim=1)
+            results["dit_input_seq"] = dit_seq[0].cpu().float().numpy()
 
         # CFM solve (manually to capture internals)
         prefix_feat_cond = audio_feat[:, -1, ...].to(dtype)

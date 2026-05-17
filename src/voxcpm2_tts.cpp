@@ -962,22 +962,32 @@ static std::vector<float> locenc_forward(voxcpm2_context* ctx, const float* patc
 // Sinusoidal time embedding
 // ---------------------------------------------------------------------------
 
+// BF16 round-trip: simulate bfloat16 precision for a float value
+static inline float bf16_round(float x) {
+    ggml_bf16_t bf = ggml_fp32_to_bf16(x);
+    return ggml_bf16_to_fp32(bf);
+}
+
 static std::vector<float> sinusoidal_time_emb(float t_scalar, int dim) {
-    // Matches Python SinusoidalPosEmb(dim).forward(x, scale=1000):
+    // Matches Python SinusoidalPosEmb(dim).forward(x, scale=1000) in BF16:
     //   half_dim = dim // 2
     //   emb = log(10000) / (half_dim - 1)
-    //   emb = exp(arange(half_dim) * -emb)
-    //   emb = scale * x * emb
-    //   return cat(sin(emb), cos(emb))    ← [sin_0..sin_hd-1, cos_0..cos_hd-1]
+    //   emb = exp(arange(half_dim) * -emb)        ← computed in BF16
+    //   emb = scale * x.unsqueeze(1) * emb        ← BF16 multiply chain
+    //   return cat(sin(emb), cos(emb))
+    // The model runs in BF16, so intermediate values are BF16-rounded.
     int half_dim = dim / 2;
     float log_base = std::log(10000.0f) / (float)(half_dim - 1);
-    float scale = 1000.0f;
+    float scale_val = bf16_round(1000.0f);
+    float x_val = bf16_round(t_scalar);
     std::vector<float> emb(dim, 0.0f);
     for (int i = 0; i < half_dim; i++) {
-        float freq = std::exp(-(float)i * log_base);
-        float val = scale * t_scalar * freq;
-        emb[i] = std::sin(val);            // first half: sin
-        emb[i + half_dim] = std::cos(val); // second half: cos
+        // freq = exp(-(float)i * log_base) computed & stored as BF16
+        float freq = bf16_round(std::exp(bf16_round(-(float)i * bf16_round(log_base))));
+        // val = scale * x * freq (BF16 multiply chain: each intermediate rounded)
+        float val = bf16_round(bf16_round(scale_val * x_val) * freq);
+        emb[i] = bf16_round(std::sin(val));            // first half: sin
+        emb[i + half_dim] = bf16_round(std::cos(val)); // second half: cos
     }
     return emb;
 }
@@ -1160,7 +1170,8 @@ static std::vector<float> cfm_euler_solve(voxcpm2_context* ctx, const float* mu,
     int P = (int)ctx->hp.patch_frames; // 4
     int state_size = feat_dim * P;     // 256
 
-    // Start from initial_noise if provided, otherwise zeros
+    // Internal state x is [C=feat_dim, T=P] channels-first (matching Python).
+    // initial_noise from reference is also [C, T] channels-first.
     std::vector<float> x(state_size, 0.0f);
     if (initial_noise) {
         std::memcpy(x.data(), initial_noise, (size_t)state_size * sizeof(float));
@@ -1191,12 +1202,24 @@ static std::vector<float> cfm_euler_solve(voxcpm2_context* ctx, const float* mu,
             // dphi_dt stays zero
         } else if (cfg > 1.0f) {
             // CFG with zero-star scaling:
-            // Run conditioned (mu, cond) and unconditioned (zeros, cond) forward passes
-            std::vector<float> v_cond = locdit_forward(ctx, x.data(), mu, t_cur, cond_raw, dt_scalar, cpu_be);
+            // Transpose x from [C, T] (internal) to [T, C] for locdit_forward
+            std::vector<float> x_tc(state_size);
+            for (int t = 0; t < P; t++)
+                for (int c = 0; c < feat_dim; c++)
+                    x_tc[t * feat_dim + c] = x[c * P + t];
 
+            std::vector<float> v_cond_tc = locdit_forward(ctx, x_tc.data(), mu, t_cur, cond_raw, dt_scalar, cpu_be);
             std::vector<float> zero_mu(ctx->hp.tslm_d_model, 0.0f);
-            std::vector<float> v_uncond =
-                locdit_forward(ctx, x.data(), zero_mu.data(), t_cur, cond_raw, dt_scalar, cpu_be);
+            std::vector<float> v_uncond_tc =
+                locdit_forward(ctx, x_tc.data(), zero_mu.data(), t_cur, cond_raw, dt_scalar, cpu_be);
+
+            // Transpose velocities from [T, C] back to [C, T]
+            std::vector<float> v_cond(state_size), v_uncond(state_size);
+            for (int t = 0; t < P; t++)
+                for (int c = 0; c < feat_dim; c++) {
+                    v_cond[c * P + t] = v_cond_tc[t * feat_dim + c];
+                    v_uncond[c * P + t] = v_uncond_tc[t * feat_dim + c];
+                }
 
             // CFG zero-star: st_star = dot(pos, neg) / (||neg||^2 + 1e-8)
             // pos = v_cond, neg = v_uncond (cfg branch)
@@ -1213,7 +1236,16 @@ static std::vector<float> cfm_euler_solve(voxcpm2_context* ctx, const float* mu,
                 dphi_dt[i] = neg_scaled + cfg * (v_cond[i] - neg_scaled);
             }
         } else {
-            dphi_dt = locdit_forward(ctx, x.data(), mu, t_cur, cond_raw, dt_scalar, cpu_be);
+            // Transpose x [C, T] → [T, C] for locdit
+            std::vector<float> x_tc(state_size);
+            for (int t = 0; t < P; t++)
+                for (int c = 0; c < feat_dim; c++)
+                    x_tc[t * feat_dim + c] = x[c * P + t];
+            auto v_tc = locdit_forward(ctx, x_tc.data(), mu, t_cur, cond_raw, dt_scalar, cpu_be);
+            // Transpose velocity [T, C] → [C, T]
+            for (int t = 0; t < P; t++)
+                for (int c = 0; c < feat_dim; c++)
+                    dphi_dt[c * P + t] = v_tc[t * feat_dim + c];
         }
 
         // Euler step: x = x - dt * dphi_dt
@@ -3050,6 +3082,93 @@ float* voxcpm2_extract_stage(struct voxcpm2_context* ctx, const char* text, cons
         float* out = (float*)std::malloc(2 * sizeof(float));
         out[0] = logits[0];
         out[1] = logits[1];
+        return out;
+    }
+
+    if (stage == "dit_input_seq") {
+        // Build the LocDiT input sequence [T=11, d=1024] matching locdit_forward
+        // Uses reference mu (from ref_samples) if available for exact conditioning.
+        int d_dit = (int)ctx->hp.locdit_d_model; // 1024
+        int P_fr = (int)ctx->hp.patch_frames;    // 4
+        int feat_dim = 64;
+        int mu_size = 2 * d_dit; // 2048
+        int state_size = feat_dim * P_fr;
+        int mu_toks = 2, t_tok = 1;
+        int T_seq = mu_toks + t_tok + P_fr + P_fr; // 11
+
+        // Get mu and noise from ref_samples if packed [mu..., noise...]
+        const float* mu_data = nullptr;
+        const float* noise_data = nullptr;
+        if (ref_samples && ref_n_samples >= mu_size + state_size) {
+            mu_data = ref_samples;
+            noise_data = ref_samples + mu_size;
+        }
+
+        // Build sequence
+        std::vector<float> seq((size_t)T_seq * d_dit, 0.0f);
+
+        // Tokens 0-1: mu [2048] split into 2 x [1024]
+        if (mu_data) {
+            std::memcpy(seq.data(), mu_data, (size_t)d_dit * sizeof(float));
+            std::memcpy(seq.data() + d_dit, mu_data + d_dit, (size_t)d_dit * sizeof(float));
+        }
+
+        // Token 2: time embedding (sinusoidal → MLP)
+        // t value at sway step 2 (first real LocDiT step)
+        float t_raw = 1.0f - 1.0f / 10.0f; // 0.9
+        float sway = std::cos((float)M_PI / 2.0f * t_raw) - 1.0f + t_raw;
+        float t_val = t_raw + sway;
+        auto t_sin = sinusoidal_time_emb(t_val, d_dit);
+        const vox_weights& W = ctx->weights;
+        std::vector<float> t_emb(d_dit), dt_emb(d_dit);
+        // time MLP
+        if (W.locdit_time_mlp_0_w && W.locdit_time_mlp_1_w) {
+            std::vector<float> h0(d_dit);
+            matmul_mv_bias(cpu_be, W.locdit_time_mlp_0_w, W.locdit_time_mlp_0_b, t_sin.data(), d_dit, h0.data(), d_dit);
+            for (int i = 0; i < d_dit; i++)
+                h0[i] = h0[i] / (1.0f + std::exp(-h0[i]));
+            matmul_mv_bias(cpu_be, W.locdit_time_mlp_1_w, W.locdit_time_mlp_1_b, h0.data(), d_dit, t_emb.data(), d_dit);
+        }
+        // dt MLP (dt=0)
+        auto dt_sin = sinusoidal_time_emb(0.0f, d_dit);
+        if (W.locdit_dt_mlp_0_w && W.locdit_dt_mlp_1_w) {
+            std::vector<float> h0(d_dit);
+            matmul_mv_bias(cpu_be, W.locdit_dt_mlp_0_w, W.locdit_dt_mlp_0_b, dt_sin.data(), d_dit, h0.data(), d_dit);
+            for (int i = 0; i < d_dit; i++)
+                h0[i] = h0[i] / (1.0f + std::exp(-h0[i]));
+            matmul_mv_bias(cpu_be, W.locdit_dt_mlp_1_w, W.locdit_dt_mlp_1_b, h0.data(), d_dit, dt_emb.data(), d_dit);
+        }
+        for (int i = 0; i < d_dit; i++)
+            t_emb[i] += dt_emb[i];
+        std::memcpy(seq.data() + (size_t)2 * d_dit, t_emb.data(), (size_t)d_dit * sizeof(float));
+
+        // Tokens 3-6: cond_proj (zeros for first step)
+        std::vector<float> zero_feat(feat_dim, 0.0f);
+        for (int p = 0; p < P_fr; p++) {
+            float* dst = seq.data() + (size_t)(mu_toks + t_tok + p) * d_dit;
+            if (W.locdit_cond_proj_w && W.locdit_cond_proj_b) {
+                matmul_mv_bias(cpu_be, W.locdit_cond_proj_w, W.locdit_cond_proj_b, zero_feat.data(), feat_dim, dst,
+                               d_dit);
+            }
+        }
+
+        // Tokens 7-10: in_proj applied to noise frames
+        if (noise_data) {
+            for (int p = 0; p < P_fr; p++) {
+                float* dst = seq.data() + (size_t)(mu_toks + t_tok + P_fr + p) * d_dit;
+                // Noise is [C=64, T=4] in GGUF: data[c*4 + t]. Frame p = data[c*4 + p] for c=0..63
+                std::vector<float> frame(feat_dim);
+                for (int c = 0; c < feat_dim; c++)
+                    frame[c] = noise_data[c * P_fr + p];
+                if (W.locdit_in_proj_w && W.locdit_in_proj_b) {
+                    matmul_mv_bias(cpu_be, W.locdit_in_proj_w, W.locdit_in_proj_b, frame.data(), feat_dim, dst, d_dit);
+                }
+            }
+        }
+
+        *out_n = T_seq * d_dit;
+        float* out = (float*)std::malloc((size_t)*out_n * sizeof(float));
+        std::memcpy(out, seq.data(), (size_t)*out_n * sizeof(float));
         return out;
     }
 

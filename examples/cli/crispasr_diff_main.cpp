@@ -3067,6 +3067,7 @@ int main(int argc, char** argv) {
             "locenc_out",
             "tslm_prefill_out",
             "ralm_prefill_out",
+            "dit_input_seq",
             "cfm_step0_result",
             "decoded_audio",
             // Stages not yet implemented in C++ — will gracefully skip:
@@ -3095,7 +3096,7 @@ int main(int argc, char** argv) {
             const float* stage_ref = ref_audio;
             int stage_ref_n = ref_n_audio;
             std::vector<float> cfm_ref_buf;
-            if (strcmp(stage, "cfm_step0_result") == 0) {
+            if (strcmp(stage, "cfm_step0_result") == 0 || strcmp(stage, "dit_input_seq") == 0) {
                 auto mu_pair = ref.get_f32("cfm_mu");
                 auto noise_pair = ref.get_f32("cfm_step0_z");
                 if (mu_pair.first && noise_pair.first) {
@@ -3134,7 +3135,8 @@ int main(int argc, char** argv) {
                 strcmp(stage, "tslm_layer_27_out") == 0 || strcmp(stage, "ralm_prefill_out") == 0 ||
                 strcmp(stage, "lm_to_dit_hidden") == 0 || strcmp(stage, "res_to_dit_hidden") == 0 ||
                 strcmp(stage, "locenc_out") == 0 || strcmp(stage, "enc_to_lm") == 0 ||
-                strcmp(stage, "cfm_step0_result") == 0 || strcmp(stage, "cfm_step0_z") == 0;
+                strcmp(stage, "cfm_step0_result") == 0 || strcmp(stage, "cfm_step0_z") == 0 ||
+                strcmp(stage, "dit_input_seq") == 0;
             if (is_deep_stage) {
                 // Tiered thresholds: locenc/enc_to_lm use 0.90, projections use 0.10
                 if (strcmp(stage, "locenc_out") == 0 || strcmp(stage, "enc_to_lm") == 0)
