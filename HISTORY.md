@@ -6,6 +6,97 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-17 PRs #92 + #95 — streaming JSON+VAD merge policy
+
+Two @CKwasd PRs accepted as a pair:
+
+- **PR #92** — `perf(stream): skip aggregate segs in JSON VAD path`.
+  Drops the unused aggregate `segs` build-and-postprocess work from
+  the live `--stream-json --vad` path, since it's not consumed by the
+  JSON state machine. Adds an explicit `decoded_segments_this_step`
+  flag for stream-monitor silence detection (the aggregate `segs`
+  is intentionally empty in JSON+VAD mode now). Equivalent commit
+  had landed in main as 6318884c earlier; the PR merge records the
+  formal accept and credit. Our `StreamJsonVadRoutingTests` follow-up
+  (42494f23) sits on top.
+
+- **PR #95** — `Rewrite streaming JSON VAD merge policy`. Adds a
+  `crispasr_vad_post_merge_policy` enum (`offline` vs
+  `streaming_json`) and a new `--stream-vad-merge-gap-ms` CLI flag.
+  Offline / file VAD path keeps the historical short/close merge.
+  JSON streaming gets a narrower close-gap-only policy that never
+  exceeds `--stream-final-on-silence-ms - 1` (so the merger can't
+  hide a silence gap that should finalize an utterance). Includes
+  a Catch2 unit test for the policy helper
+  (`tests/test-stream-vad-merge-policy.cpp`) and a `docs/streaming.md`
+  entry.
+
+Verified pre-merge: `test-stream-vad-merge-policy` (18/7),
+`test-stream-vad-skip` (20/7), `test-stream-finalize` (11/8, our PR
+#92 invariants test) all pass; live smoke with `--stream-json --vad
+--stream-vad-merge-gap-ms 250` + parakeet on `samples/jfk.wav` emits
+clean utterance-level JSON.
+
+The pair landed via the open-PR audit on 2026-05-17 after we
+realised PR #92's diff had been integrated into main without the
+GitHub merge button being pressed — bad style on our end. Both PRs
+now show as merged with proper credit on @CKwasd's profile.
+
+---
+
+## 2026-05-17 Kokoro short-input Metal regression — ggml-metal kernel_norm fix
+
+CrisperWeaver reported kokoro on Apple Silicon Metal producing
+garbage audio for short utterances ("hello world" → ~6× lower
+amplitude, transcribed as "Mm-hmm." by parakeet). Long utterances
+worked. CPU worked. Five-step bisect via the ground-truth diff
+harness localised the divergence to the first AdainResBlk1d in
+F0Ntrain, then to `ggml_norm` Metal itself.
+
+Root cause: `kernel_norm_fuse_impl`, `kernel_rms_norm_fuse_impl`,
+and `kernel_l2_norm_impl` end their parallel reduction with a
+cross-simdgroup `simd_sum(shmem[tiisg])` pattern that produces wrong
+totals on Apple Silicon when the LAST active simdgroup had only a
+few lanes participate in the prior loop body. Sweep of `ne00_t` ∈
+{32..320} confirms the bug strikes at {33, 65, 66, 97, 129-132, 257}
+— exactly the cases where `nth` doubles past `ne00_t` and the
+trailing simdgroup is sparsely populated. Most LLM workloads escape
+because their hidden-size aligns on multiples of 4 (float4 kernel
+variant, `ne00_t = ne00/4` lands on "good" boundaries); audio
+backends with per-frame normalisation (kokoro AdaIN1d at
+T_frames=65) sit exactly in the bug's strike zone.
+
+Fix in `ggml/src/ggml-metal/ggml-metal.metal`: replace the
+cross-simdgroup `simd_sum` with a serial reduction by thread 0 of
+sg0 that sums `shmem[0..n_sg-1]` and broadcasts via `shmem[31]`
+(unused by the original — initialized to 0 by sg0 and never written
+by any sg). Applied at four sites. Also adds explicit per-T
+overloads (`crispasr_vec_sum` / `crispasr_vec_sqsum`) to replace
+`dot(scalar, scalar)` calls — `dot()` is only spec-defined for
+vector types and the kernel_norm_f32 (scalar T) instantiation
+should not rely on it.
+
+`tests/test_metal_norm_repro.cpp` wired into ctest as a regression
+guard (one test per bug-pattern T value). Draft upstream PR at
+`tools/upstream-prs/08-metal-norm-cross-simdgroup.{md,patch}`.
+
+The kokoro-side primitive-op workaround landed earlier the same
+day (`d1fdd476`) was reverted — kokoro now uses `ggml_norm` again
+since the underlying bug is fixed at the source.
+
+Earlier in the chain:
+- `ef2f79c0`, `4e9c6ba8` — mmap loader Metal-side fixes (cleared
+  the "buffer is nil" spam from issue #94's default-on flip).
+- `98488dcb` — bisect infrastructure: extends
+  `tools/dump_reference.py` + `kokoro_extract_stage` +
+  `crispasr-diff` to capture per-op intermediates inside F0Ntrain.
+- `d2266229` — gated the bisect intermediates behind
+  `KOKORO_DEBUG_INTERMEDIATES=1` so production builds pay no cost
+  but the bisect path stays available for the next per-op Metal
+  kernel issue.
+
+---
+
 ## 2026-05-16 Issue #94 — chatterbox-turbo slow / failing init on macOS
 
 External report from `niksedk` (SubtitleEdit ships `crispasr` for
