@@ -2783,56 +2783,64 @@ float* voxcpm2_extract_stage(struct voxcpm2_context* ctx, const char* text, cons
     }
 
     if (stage == "cfm_step0_result") {
-        // Full pipeline: TSLM → norm → FSQ → fusion → RALM → norm → projections → CFM
-        // Matches Python: dit_hidden = cat(lm_to_dit(lm_hidden), res_to_dit(residual_hidden))
+        // CFM Euler solve using reference mu + noise when available.
+        // ref_samples layout (packed by diff handler):
+        //   [mu_data (2*d_dit floats), noise_data (state_size floats)]
+        // If ref has both cfm_mu and cfm_step0_z, uses exact Python values.
+        // Otherwise computes mu from TSLM+RALM and uses seeded F32 noise.
         int d = (int)ctx->hp.tslm_d_model;
         int d_dit = (int)ctx->hp.locdit_d_model;
         int d_ralm = (int)ctx->hp.ralm_d_model;
-
-        // 1. TSLM prefill → last token hidden → norm
-        std::vector<float> tslm_h = tslm_prefill(ctx, token_ids, cpu_be);
-        {
-            std::vector<float> normed(d);
-            rms_norm_cpu(tslm_h.data(), tensor_data_f32(ctx->weights.tslm_output_norm), normed.data(), d,
-                         ctx->hp.rms_norm_eps);
-            tslm_h = normed;
-        }
-
-        // 2. FSQ masking: for zero-shot last token (text_mask=1), no FSQ applied
-        // 3. fusion_concat_proj(cat(tslm_h, zeros)) for single-token RALM input
-        int in_dim = 2 * d;
-        std::vector<float> cat_buf(in_dim, 0.0f);
-        std::memcpy(cat_buf.data(), tslm_h.data(), (size_t)d * sizeof(float));
-        std::vector<float> ralm_input(d);
-        matmul_mv_bias(cpu_be, ctx->weights.fusion_w, ctx->weights.fusion_b, cat_buf.data(), in_dim, ralm_input.data(),
-                       d);
-
-        // 4. RALM prefill (single token)
-        std::vector<float> ralm_h = ralm_prefill(ctx, ralm_input, cpu_be);
-        {
-            std::vector<float> normed(d_ralm);
-            rms_norm_cpu(ralm_h.data(), tensor_data_f32(ctx->weights.ralm_output_norm), normed.data(), d_ralm,
-                         ctx->hp.rms_norm_eps);
-            ralm_h = normed;
-        }
-
-        // 5. Build mu = cat(lm_to_dit(tslm_h), res_to_dit(ralm_h))
-        std::vector<float> mu(2 * d_dit, 0.0f);
-        if (ctx->weights.lm_to_dit_w && ctx->weights.lm_to_dit_b) {
-            matmul_mv_bias(cpu_be, ctx->weights.lm_to_dit_w, ctx->weights.lm_to_dit_b, tslm_h.data(), d, mu.data(),
-                           d_dit);
-        }
-        if (ctx->weights.res_to_dit_w && ctx->weights.res_to_dit_b) {
-            matmul_mv_bias(cpu_be, ctx->weights.res_to_dit_w, ctx->weights.res_to_dit_b, ralm_h.data(), d_ralm,
-                           mu.data() + d_dit, d_dit);
-        }
-
-        // 6. CFM Euler solve (10 steps, seeded noise)
         int P_fr = (int)ctx->hp.patch_frames;
         int state_size = 64 * P_fr;
-        std::vector<float> zero_cond(state_size, 0.0f);
+        int mu_size = 2 * d_dit;
+
+        std::vector<float> mu(mu_size, 0.0f);
         std::vector<float> noise(state_size);
-        fill_gaussian_noise(noise.data(), state_size, 42);
+        bool have_ref_mu = (ref_samples && ref_n_samples >= mu_size + state_size);
+
+        if (have_ref_mu) {
+            // Unpack reference mu + noise (exact Python values)
+            std::memcpy(mu.data(), ref_samples, (size_t)mu_size * sizeof(float));
+            std::memcpy(noise.data(), ref_samples + mu_size, (size_t)state_size * sizeof(float));
+        } else {
+            // Compute mu from scratch (F16/F32 precision gap expected)
+            std::vector<float> tslm_h = tslm_prefill(ctx, token_ids, cpu_be);
+            {
+                std::vector<float> normed(d);
+                rms_norm_cpu(tslm_h.data(), tensor_data_f32(ctx->weights.tslm_output_norm),
+                             normed.data(), d, ctx->hp.rms_norm_eps);
+                tslm_h = normed;
+            }
+            int in_dim = 2 * d;
+            std::vector<float> cat_buf(in_dim, 0.0f);
+            std::memcpy(cat_buf.data(), tslm_h.data(), (size_t)d * sizeof(float));
+            std::vector<float> ralm_input(d);
+            matmul_mv_bias(cpu_be, ctx->weights.fusion_w, ctx->weights.fusion_b,
+                           cat_buf.data(), in_dim, ralm_input.data(), d);
+            std::vector<float> ralm_h = ralm_prefill(ctx, ralm_input, cpu_be);
+            {
+                std::vector<float> normed(d_ralm);
+                rms_norm_cpu(ralm_h.data(), tensor_data_f32(ctx->weights.ralm_output_norm),
+                             normed.data(), d_ralm, ctx->hp.rms_norm_eps);
+                ralm_h = normed;
+            }
+            if (ctx->weights.lm_to_dit_w && ctx->weights.lm_to_dit_b)
+                matmul_mv_bias(cpu_be, ctx->weights.lm_to_dit_w, ctx->weights.lm_to_dit_b,
+                               tslm_h.data(), d, mu.data(), d_dit);
+            if (ctx->weights.res_to_dit_w && ctx->weights.res_to_dit_b)
+                matmul_mv_bias(cpu_be, ctx->weights.res_to_dit_w, ctx->weights.res_to_dit_b,
+                               ralm_h.data(), d_ralm, mu.data() + d_dit, d_dit);
+
+            // Use ref noise if provided (just noise, no mu)
+            if (ref_samples && ref_n_samples >= state_size) {
+                std::memcpy(noise.data(), ref_samples, (size_t)state_size * sizeof(float));
+            } else {
+                fill_gaussian_noise(noise.data(), state_size, 42);
+            }
+        }
+
+        std::vector<float> zero_cond(state_size, 0.0f);
         std::vector<float> patch =
             cfm_euler_solve(ctx, mu.data(), zero_cond.data(), 10, ctx->cfg_value, cpu_be, noise.data());
         *out_n = (int)patch.size();

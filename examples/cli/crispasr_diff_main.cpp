@@ -3090,7 +3090,28 @@ int main(int argc, char** argv) {
             }
 
             int n_out = 0;
-            float* buf = voxcpm2_extract_stage(ctx, syn_text.c_str(), ref_audio, ref_n_audio, stage, &n_out);
+            // For cfm_step0_result: pass reference cfm_mu + cfm_step0_z concatenated
+            // via ref_samples so C++ uses exact same conditioning + noise as Python.
+            const float* stage_ref = ref_audio;
+            int stage_ref_n = ref_n_audio;
+            std::vector<float> cfm_ref_buf;
+            if (strcmp(stage, "cfm_step0_result") == 0) {
+                auto mu_pair = ref.get_f32("cfm_mu");
+                auto noise_pair = ref.get_f32("cfm_step0_z");
+                if (mu_pair.first && noise_pair.first) {
+                    // Pack as [mu..., noise...] so the stage extractor can use both
+                    cfm_ref_buf.resize(mu_pair.second + noise_pair.second);
+                    std::memcpy(cfm_ref_buf.data(), mu_pair.first, mu_pair.second * sizeof(float));
+                    std::memcpy(cfm_ref_buf.data() + mu_pair.second, noise_pair.first,
+                                noise_pair.second * sizeof(float));
+                    stage_ref = cfm_ref_buf.data();
+                    stage_ref_n = (int)cfm_ref_buf.size();
+                } else if (noise_pair.first && noise_pair.second > 0) {
+                    stage_ref = noise_pair.first;
+                    stage_ref_n = (int)noise_pair.second;
+                }
+            }
+            float* buf = voxcpm2_extract_stage(ctx, syn_text.c_str(), stage_ref, stage_ref_n, stage, &n_out);
             if (!buf || n_out == 0) {
                 printf("[SKIP] %-22s (C++ stage not implemented)\n", stage);
                 n_skip++;

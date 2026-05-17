@@ -58,8 +58,7 @@ DEFAULT_STAGES = [
     "ralm_prefill_out",
     "lm_to_dit_hidden",
     "res_to_dit_hidden",
-    "dit_step0_input",
-    "dit_step0_output",
+    "cfm_mu",
     "cfm_step0_z",
     "cfm_step0_result",
     "stop_logits_step0",
@@ -72,7 +71,7 @@ _PREFILL_STAGES = {
     "locenc_in", "locenc_out", "enc_to_lm",
     "tslm_prefill_out", "tslm_layer_0_out", "tslm_layer_27_out",
     "ralm_prefill_out",
-    "lm_to_dit_hidden", "res_to_dit_hidden",
+    "lm_to_dit_hidden", "res_to_dit_hidden", "cfm_mu",
     "cfm_step0_z", "cfm_step0_result",
     "stop_logits_step0",
 }
@@ -350,6 +349,8 @@ def _run_prefill(
             results["lm_to_dit_hidden"] = dit_hidden_1[0].cpu().float().numpy()
         if "res_to_dit_hidden" in stages:
             results["res_to_dit_hidden"] = dit_hidden_2[0].cpu().float().numpy()
+        if "cfm_mu" in stages:
+            results["cfm_mu"] = dit_hidden[0].cpu().float().numpy()
 
         # CFM solve (manually to capture internals)
         prefix_feat_cond = audio_feat[:, -1, ...].to(dtype)
