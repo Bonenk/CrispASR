@@ -33,12 +33,17 @@ public:
 
 /// Build a speaker embedder from a CLI-supplied model spec.
 ///
-/// `model_spec` accepts:
+/// `model_spec` accepts (case-insensitive):
 ///   * an empty string -> returns nullptr (caller falls back to
 ///     pyannote-only diarization)
-///   * `"auto"` -> auto-downloads / locates the canonical TitaNet GGUF
-///   * a path ending in `.gguf` -> currently always loaded as TitaNet
-///     (future adapters can dispatch on GGUF general.architecture)
+///   * `"auto"` or `"titanet"` -> auto-downloads / locates
+///     titanet-large.gguf (192-d, NVIDIA TitaNet-Large)
+///   * `"indextts"`, `"indextts-bigvgan"`, `"indextts-ecapa"`, or
+///     `"ecapa"` -> auto-downloads / locates indextts-bigvgan.gguf
+///     and uses its embedded ECAPA-TDNN (512-d)
+///   * a path ending in `.gguf` -> if the filename contains
+///     "indextts", loaded via the IndexTTS adapter; otherwise via
+///     TitaNet
 ///   * any other value -> nullptr with a warning to stderr
 ///
 /// `n_threads` controls the embedder's compute parallelism.

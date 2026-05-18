@@ -821,9 +821,11 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(stderr, "                                             sherpa/ecapa: external sherpa-onnx subprocess with "
                     "segmentation + speaker embedding + clustering\n");
     fprintf(stderr,
-            "  --diarize-embedder MODEL          [%-7s] speaker-embedding model (path or 'auto') used to cluster "
-            "pyannote local tracks into globally stable speaker IDs. Pluggable; currently dispatches to "
-            "TitaNet-Large. When unset, --diarize-method pyannote labels are local to each forward pass (#107).\n",
+            "  --diarize-embedder MODEL          [%-7s] speaker-embedding model used to cluster pyannote local "
+            "tracks into globally stable speaker IDs. Pluggable; known aliases: 'auto' / 'titanet' (192-d "
+            "TitaNet-Large) and 'indextts' / 'indextts-bigvgan' / 'ecapa' (512-d IndexTTS-BigVGAN ECAPA-TDNN). "
+            "Pass a .gguf path to load directly. When unset, --diarize-method pyannote labels are local to each "
+            "forward pass (#107).\n",
             params.diarize_embedder.empty() ? "off" : params.diarize_embedder.c_str());
     fprintf(stderr,
             "  --diarize-cluster-threshold X     [%-7.2f] cosine merge threshold for --diarize-embedder clustering "
