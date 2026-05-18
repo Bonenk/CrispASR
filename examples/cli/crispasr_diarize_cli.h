@@ -19,7 +19,8 @@
 
 #include <vector>
 
-struct whisper_params; // fwd decl
+struct whisper_params;         // fwd decl
+class CrispasrSpeakerEmbedder; // fwd decl (crispasr_speaker_embedder.h)
 
 /// Cached pyannote-seg posteriors over a full audio buffer. Built once
 /// at the start of a run (issue #107 — avoids per-slice pyannote runs
@@ -67,3 +68,22 @@ bool crispasr_compute_pyannote_cache(const float* full_audio, int n_samples, con
 bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<float>& right, bool is_stereo,
                             int64_t slice_t0_cs, std::vector<crispasr_segment>& segs, const whisper_params& params,
                             const CrispasrPyannoteCache* pyannote_cache = nullptr);
+
+/// Re-label each segment's speaker by clustering speaker embeddings
+/// extracted from `full_audio`. Operates over the WHOLE finalized
+/// segment list (after per-slice diarize + segment splitting), so it
+/// gives globally stable speaker IDs across the entire file.
+///
+/// `embedder` is the pluggable model (TitaNet today; any other adapter
+/// later). `full_audio` is the mono 16 kHz buffer; `params` carries
+/// the merge threshold and max-speakers settings. Segments shorter
+/// than ~250 ms are skipped (embedders generally produce noisy
+/// vectors below that), so their existing (pyannote-local) speaker
+/// label is left in place.
+///
+/// No-op when `embedder` is null, `segs` is empty, or `full_audio` is
+/// empty / too short — the pyannote-only labels survive unchanged in
+/// those cases, which is what makes the system "work sufficiently
+/// well without an embedder" (#107 P3).
+void crispasr_remap_speakers_via_embeddings(std::vector<crispasr_segment>& segs, const float* full_audio, int n_samples,
+                                            CrispasrSpeakerEmbedder* embedder, const whisper_params& params);

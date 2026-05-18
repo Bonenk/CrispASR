@@ -3,10 +3,11 @@
 
 #include "crispasr.h"
 #include "grammar-parser.h"
-#include "whisper_params.h"       // struct whisper_params (shared with crispasr_*)
-#include "crispasr_backend.h"     // crispasr_run_backend() dispatch entry point
-#include "crispasr_diagnostics.h" // --version / --diagnostics + verbose banner (#31)
-#include "crispasr_diarize_cli.h" // crispasr_apply_diarize / pyannote cache (#107)
+#include "whisper_params.h"            // struct whisper_params (shared with crispasr_*)
+#include "crispasr_backend.h"          // crispasr_run_backend() dispatch entry point
+#include "crispasr_diagnostics.h"      // --version / --diagnostics + verbose banner (#31)
+#include "crispasr_diarize_cli.h"      // crispasr_apply_diarize / pyannote cache (#107)
+#include "crispasr_speaker_embedder.h" // pluggable speaker embedder (#107 P3)
 #include "crispasr_model_mgr_cli.h"
 #include "crispasr_model_registry.h"
 #include "crispasr_output.h"   // crispasr_make_disp_segments — split-on-punct (#29)
@@ -412,6 +413,12 @@ static bool whisper_params_parse_arg_backend_vad(int argc, char** argv, int& i, 
         params.titanet_model = ARGV_NEXT;
     } else if (arg == "--speaker-threshold" || arg == "-st") {
         params.speaker_threshold = std::stof(ARGV_NEXT);
+    } else if (arg == "--diarize-embedder") {
+        params.diarize_embedder = ARGV_NEXT;
+    } else if (arg == "--diarize-cluster-threshold") {
+        params.diarize_cluster_threshold = std::stof(ARGV_NEXT);
+    } else if (arg == "--diarize-max-speakers") {
+        params.diarize_max_speakers = std::stoi(ARGV_NEXT);
     } else if (arg == "--cache-dir") {
         params.cache_dir = ARGV_NEXT;
     } else if (arg == "--alt") {
@@ -813,6 +820,17 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "use sherpa/ecapa)\n");
     fprintf(stderr, "                                             sherpa/ecapa: external sherpa-onnx subprocess with "
                     "segmentation + speaker embedding + clustering\n");
+    fprintf(stderr,
+            "  --diarize-embedder MODEL          [%-7s] speaker-embedding model (path or 'auto') used to cluster "
+            "pyannote local tracks into globally stable speaker IDs. Pluggable; currently dispatches to "
+            "TitaNet-Large. When unset, --diarize-method pyannote labels are local to each forward pass (#107).\n",
+            params.diarize_embedder.empty() ? "off" : params.diarize_embedder.c_str());
+    fprintf(stderr,
+            "  --diarize-cluster-threshold X     [%-7.2f] cosine merge threshold for --diarize-embedder clustering "
+            "(higher = more distinct clusters, lower = more merged)\n",
+            params.diarize_cluster_threshold);
+    fprintf(stderr, "  --diarize-max-speakers N          [%-7d] hard cap on cluster count for --diarize-embedder\n",
+            params.diarize_max_speakers);
     fprintf(stderr,
             "  --sherpa-bin PATH                 [%-7s] sherpa-onnx-offline-speaker-diarization binary (default: in "
             "PATH)\n",
@@ -2205,6 +2223,21 @@ int main(int argc, char** argv) {
                 const std::vector<float>& right = is_stereo ? pcmf32s[1] : pcmf32;
                 crispasr_apply_diarize(left, right, is_stereo, /*slice_t0_cs=*/0, segs, params,
                                        pyannote_cache.valid() ? &pyannote_cache : nullptr);
+
+                // Optional embedding-based clustering (#107 P3). When
+                // --diarize-embedder is set, build the pluggable
+                // embedder (TitaNet today, others later) and rewrite
+                // each segment's speaker label with its global cluster
+                // ID. Failure to build the embedder is a warning, not
+                // an error — the pyannote-local labels above survive.
+                if (!params.diarize_embedder.empty() && !pcmf32.empty()) {
+                    auto embedder =
+                        crispasr_make_speaker_embedder(params.diarize_embedder, params.n_threads, params.cache_dir);
+                    if (embedder) {
+                        crispasr_remap_speakers_via_embeddings(segs, pcmf32.data(), (int)pcmf32.size(), embedder.get(),
+                                                               params);
+                    }
+                }
             }
 
             // macros to stringify function name

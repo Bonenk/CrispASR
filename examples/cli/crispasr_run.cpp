@@ -20,6 +20,7 @@
 #include "crispasr_lid_cli.h"
 #include "crispasr_lid.h" // crispasr_lid_free_cache()
 #include "crispasr_diarize_cli.h"
+#include "crispasr_speaker_embedder.h"
 #include "crispasr_mem.h"
 #include "crispasr_stream_finalize.h"
 #include "whisper_params.h"
@@ -713,6 +714,17 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                 per_slice_redo[i] = std::move(per_slice[i]);
             }
             auto all_segs = merge_segments(std::move(per_slice_redo), slices);
+            // Mirror the embedding-based remap from the sequential
+            // path above so file outputs in the parallel/output-redo
+            // path get globally stable speaker IDs too (#107 P3).
+            if (params.diarize && !params.diarize_embedder.empty() && !all_segs.empty() && !samples.empty()) {
+                auto embedder =
+                    crispasr_make_speaker_embedder(params.diarize_embedder, params.n_threads, params.cache_dir);
+                if (embedder) {
+                    crispasr_remap_speakers_via_embeddings(all_segs, samples.data(), (int)samples.size(),
+                                                           embedder.get(), params);
+                }
+            }
             apply_punc_model(punc_ctx, all_segs);
             apply_truecase_model(tc_ctx, all_segs);
             apply_truecase_crf_model(tc_crf_ctx, all_segs);
@@ -745,6 +757,19 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             process_slice(i, backend);
     }
     auto all_segs = merge_segments(std::move(per_slice), slices);
+
+    // Optional embedding-based clustering (#107 P3). When the user
+    // supplied --diarize-embedder, anchor speaker IDs globally across
+    // all slices by embedding each finalized segment and clustering
+    // on cosine similarity. The pluggable embedder dispatches to
+    // TitaNet today; future adapters drop in via the same factory.
+    if (params.diarize && !params.diarize_embedder.empty() && !all_segs.empty() && !samples.empty()) {
+        auto embedder = crispasr_make_speaker_embedder(params.diarize_embedder, params.n_threads, params.cache_dir);
+        if (embedder) {
+            crispasr_remap_speakers_via_embeddings(all_segs, samples.data(), (int)samples.size(), embedder.get(),
+                                                   params);
+        }
+    }
 
     apply_punc_model(punc_ctx, all_segs);
     apply_truecase_model(tc_ctx, all_segs);

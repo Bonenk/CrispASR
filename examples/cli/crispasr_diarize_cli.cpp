@@ -9,6 +9,8 @@
 #include "crispasr_diarize_cli.h"
 #include "crispasr_cache.h"
 #include "crispasr_diarize_internal.h"
+#include "crispasr_speaker_cluster.h"
+#include "crispasr_speaker_embedder.h"
 #include "pyannote_seg.h"
 #include "whisper_params.h"
 
@@ -603,4 +605,64 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
             "vad-turns, pyannote, sherpa. Defaulting to '%s'.\n",
             method.c_str(), is_stereo ? "energy" : "vad-turns");
     return false;
+}
+
+void crispasr_remap_speakers_via_embeddings(std::vector<crispasr_segment>& segs, const float* full_audio, int n_samples,
+                                            CrispasrSpeakerEmbedder* embedder, const whisper_params& params) {
+    if (!embedder || segs.empty() || !full_audio || n_samples <= 0)
+        return;
+
+    // Skip very short segments — TitaNet (and similar) need ~250 ms+
+    // of speech to produce a reliable embedding. Shorter segments
+    // keep their existing pyannote-local label; clustering then
+    // ignores them.
+    constexpr int64_t MIN_EMBED_CS = 25; // 0.25 s
+
+    const int d = embedder->dim();
+    if (d <= 0)
+        return;
+
+    std::vector<size_t> embed_idx;
+    std::vector<float> embeddings;
+    embed_idx.reserve(segs.size());
+    embeddings.reserve((size_t)segs.size() * (size_t)d);
+
+    std::vector<float> tmp(d);
+    for (size_t i = 0; i < segs.size(); i++) {
+        const auto& seg = segs[i];
+        if ((seg.t1 - seg.t0) < MIN_EMBED_CS)
+            continue;
+        // Convert cs (1/100 s) → 16 kHz samples. full_audio is mono 16k.
+        const int64_t s0 = std::max<int64_t>(0, seg.t0 * 160);
+        const int64_t s1 = std::min<int64_t>(n_samples, seg.t1 * 160);
+        if (s1 - s0 < 4000) // <250 ms after clamping
+            continue;
+        if (!embedder->embed(full_audio + s0, (int)(s1 - s0), tmp.data()))
+            continue;
+        embed_idx.push_back(i);
+        embeddings.insert(embeddings.end(), tmp.begin(), tmp.end());
+    }
+    if (embed_idx.size() < 2) {
+        // Nothing to cluster — either zero or one usable segment.
+        if (embed_idx.size() == 1) {
+            // Force the one embeddable segment to (speaker 0) so the
+            // global label exists even on single-speaker inputs.
+            segs[embed_idx[0]].speaker = "(speaker 0) ";
+        }
+        return;
+    }
+
+    const float thr = params.diarize_cluster_threshold;
+    const int max_spk = params.diarize_max_speakers > 0 ? params.diarize_max_speakers : 8;
+    std::vector<int> labels = crispasr_agglomerative_cluster(embeddings, (int)embed_idx.size(), d, thr, max_spk);
+
+    // Rewrite segment speakers from clustering output. Segments that
+    // couldn't be embedded (too short) keep their existing pyannote-
+    // local label as a best-effort fallback.
+    for (size_t k = 0; k < embed_idx.size(); k++) {
+        const int spk = labels[k];
+        if (spk < 0)
+            continue;
+        segs[embed_idx[k]].speaker = "(speaker " + std::to_string(spk) + ") ";
+    }
 }

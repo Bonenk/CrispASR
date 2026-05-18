@@ -273,6 +273,23 @@ catch_discover_tests(test-diarize-pyannote-live
     PROPERTIES LABELS "live;diarize"
 )
 
+# Agglomerative cosine clustering used by --diarize-embedder (#107 P3b).
+# Pure arithmetic on synthetic embeddings; no model, no audio.
+add_executable(test-speaker-cluster
+    test-speaker-cluster.cpp
+    ${PROJECT_SOURCE_DIR}/examples/cli/crispasr_speaker_cluster.cpp
+)
+target_include_directories(test-speaker-cluster PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-speaker-cluster PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-speaker-cluster
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;diarize"
+)
+
 # ─── test - punctuation - policy — Catch2 unit tests for punctuation auto - enable
 #policy.Pure logic, no model load.
 add_executable(test-punctuation-policy

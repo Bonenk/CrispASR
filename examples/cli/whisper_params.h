@@ -151,6 +151,16 @@ struct whisper_params {
     std::string enroll_speaker;     // enrollment mode: save embedding as this name
     std::string titanet_model;      // TitaNet GGUF path or "auto"
     float speaker_threshold = 0.7f; // cosine similarity threshold for matching
+
+    // Embedding-based diarization clustering (issue #107 P3). When set,
+    // after --diarize-method pyannote runs, each speech segment is
+    // embedded by this model and clustered on cosine similarity to
+    // produce globally stable speaker IDs (independent of pyannote's
+    // local track indices). Path, "auto", or empty for no clustering.
+    // Currently dispatches to the TitaNet adapter; pluggable.
+    std::string diarize_embedder;           // model path or "auto"
+    float diarize_cluster_threshold = 0.5f; // cosine merge threshold
+    int diarize_max_speakers = 8;           // upper bound for cluster count
     bool stream = false;
     bool mic = false;
     bool stream_continuous = false;
