@@ -162,6 +162,69 @@ Semantics:
 Recommended starting values: `cer_max: 0.02`, `wer_max: 0.05`. Tune
 downward as the backend matures.
 
+## TTS->ASR roundtrip (`tts_backends`)
+
+The standard manifest backends are ASR-only. Silent TTS regressions
+(e.g. the voxcpm2 BF16 noise generation bug in `a2324c59`) wouldn't
+trip the encoder/mel diff harness — the audio comes out *different*,
+not corrupted. To catch them, the `tts_backends` section adds a
+TTS→ASR roundtrip:
+
+```json
+"tts_backends": [
+  {
+    "name": "kokoro-82m-en",
+    "backend_id": "kokoro",
+    "gguf": {
+      "repo": "cstr/kokoro-82m-GGUF",
+      "revision": "<sha>",
+      "file": "kokoro-82m-q8_0.gguf",
+      "approx_size_mb": 90
+    },
+    "voice": {
+      "repo": "cstr/kokoro-voices-GGUF",
+      "revision": "<sha>",
+      "file": "kokoro-voice-af_heart.gguf"
+    },
+    "tts_phrase": "The quick brown fox jumps over the lazy dog",
+    "roundtrip_asr_backend": "parakeet-tdt-0.6b-en",
+    "wer_max": 0.10
+  }
+]
+```
+
+What `run_one.py` does for a TTS entry:
+
+1. Download the TTS GGUF + the voice GGUF at their pinned revisions.
+2. Download the ASR ground-truth model — `roundtrip_asr_backend`
+   references an existing entry in `manifest.backends` (typically
+   `parakeet-tdt-0.6b-en` — high-accuracy English ASR with
+   ~0% baseline error on clean read speech).
+3. Synthesize `tts_phrase` via the TTS backend's `--tts` flow.
+4. Transcribe the synthesised WAV with the ASR backend.
+5. Compute WER (lowercase + strip ASCII punctuation), assert
+   `wer ≤ wer_max`.
+
+`wer_max` recommendations (start tight, loosen if needed):
+
+* `0.05` — high-quality English TTS on a clean pangram (kokoro, orpheus
+  EN, qwen3-tts EN). Kokoro 82M Q8_0 routinely lands at WER 0.0.
+* `0.10` — default headroom for prosody artefacts + parakeet's
+  ~0% baseline drift across runner-image upgrades.
+* `0.15-0.20` — heavier TTS backends, multilingual cases, or backends
+  that emit additional cosmetic content (`.` insertions, prosody
+  markers stripped post-ASR).
+
+Why per-backend rather than a single global threshold? Voice quality
+varies enormously across backends; a 5% bar that's strict for kokoro
+would be impractical for vibevoice on long-form text.
+
+Naming convention: `<tts-backend-id>-<voice-or-variant>`, e.g.
+`kokoro-82m-en` (kokoro 82M + English voice), `orpheus-tara-en`.
+`run_one.py` dispatches on the name across both lists, so TTS entries
+must not collide with ASR entry names — `test_driver_smoke.py`
+enforces this.
+
 ## Adding a new backend (full diff entry)
 
 1. **Dump the reference** on a known-good commit:

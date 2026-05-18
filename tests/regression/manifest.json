@@ -220,5 +220,28 @@
       "expected_transcript": "and so my fellow americans ask not what your country can do for you ask what you can do for your country",
       "expected_transcript_source": "captured 2026-05-15 with HF revision 7ee888f, CPU-only, samples/jfk.wav. IBM Granite NLE outputs normalised lowercase without punctuation."
     }
+  ],
+
+  "tts_backends_note": "TTS->ASR roundtrip regression. Each entry synthesises tts_phrase via the TTS backend, transcribes the output with the pinned ASR backend (parakeet by default — high-accuracy English ground truth), and asserts WER <= wer_max. Catches silent decode regressions like the voxcpm2 BF16 noise bug that the encoder/mel diff harness can miss. WER ignores punctuation and case after normalisation, so a kokoro tts_phrase that comes back as 'the quick brown fox jumps over the lazy dog.' is still WER=0.",
+  "tts_backends": [
+    {
+      "name": "kokoro-82m-en",
+      "backend_id": "kokoro",
+      "gguf": {
+        "repo": "cstr/kokoro-82m-GGUF",
+        "revision": "f20291b3a27d0900af358ea1c87d63c76183b223",
+        "file": "kokoro-82m-q8_0.gguf",
+        "approx_size_mb": 90
+      },
+      "voice": {
+        "repo": "cstr/kokoro-voices-GGUF",
+        "revision": "d6435f2e72f28392c36051c832714815382d36bd",
+        "file": "kokoro-voice-af_heart.gguf"
+      },
+      "tts_phrase": "The quick brown fox jumps over the lazy dog",
+      "roundtrip_asr_backend": "parakeet-tdt-0.6b-en",
+      "wer_max": 0.10,
+      "wer_max_note": "Kokoro 82M Q8_0 on a clean pangram routinely lands at WER 0.0 in local roundtrip via parakeet. 10% gives headroom for prosody artefacts + parakeet's own ~0% baseline drift on the CI runner image."
+    }
   ]
 }

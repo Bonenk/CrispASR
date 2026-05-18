@@ -375,6 +375,131 @@ def regression_for(name: str, manifest: dict, work_dir: Path,
     return failures
 
 
+def tts_roundtrip_for(name: str, manifest: dict, work_dir: Path,
+                      crispasr_bin: Path) -> int:
+    """Run one TTS backend's TTS->ASR roundtrip regression.
+
+    1. Download the TTS GGUF + companion voice file at pinned revision.
+    2. Download the pinned ASR backend's GGUF (parakeet by default —
+       it's the high-accuracy English ground-truth ASR the team's TTS
+       validation policy uses).
+    3. Synthesize the manifest's `tts_phrase` with the TTS backend.
+    4. Transcribe the synth output with the ASR backend.
+    5. Compute WER (lowercase + strip punctuation), assert below
+       `wer_max`.
+
+    Returns the number of failures (0 on success). Mirrors the cost
+    accounting from `regression_for(...)` so the matrix log looks
+    uniform.
+    """
+    entry = next((b for b in manifest.get("tts_backends", [])
+                  if b["name"] == name), None)
+    if entry is None:
+        die(f"tts backend '{name}' not in manifest.tts_backends")
+
+    # ---- 1. Download TTS GGUF + voice GGUF ----
+    gguf_local = hf_download(
+        entry["gguf"]["repo"],
+        entry["gguf"]["file"],
+        entry["gguf"]["revision"],
+        work_dir,
+    )
+    # `voice` is its own pinned-repo block (kokoro voices live in
+    # cstr/kokoro-voices-GGUF, not the kokoro-82m repo). Backends that
+    # have no separate voice asset can omit the block entirely.
+    voice_local: Path | None = None
+    if "voice" in entry:
+        voice_local = hf_download(
+            entry["voice"]["repo"],
+            entry["voice"]["file"],
+            entry["voice"]["revision"],
+            work_dir,
+        )
+
+    # Optional `companion_files` for backends whose voice / codec is in
+    # the same repo as the main GGUF. Place each next to gguf_local so
+    # the backend can resolve them by sibling path.
+    for companion in entry["gguf"].get("companion_files", []):
+        c_local = hf_download(
+            entry["gguf"]["repo"],
+            companion,
+            entry["gguf"]["revision"],
+            work_dir,
+        )
+        dest = gguf_local.parent / Path(companion).name
+        if not dest.exists():
+            shutil.copy2(c_local, dest)
+
+    if voice_local is None or not voice_local.is_file():
+        die(f"{name}: no voice file resolved (entry needs a `voice` block)")
+
+    # ---- 2. Download ASR ground-truth model ----
+    asr_name = entry["roundtrip_asr_backend"]
+    asr_entry = next((b for b in manifest["backends"] if b["name"] == asr_name), None)
+    if asr_entry is None:
+        die(f"{name}: roundtrip_asr_backend={asr_name!r} not in manifest.backends")
+    asr_gguf_local = hf_download(
+        asr_entry["gguf"]["repo"],
+        asr_entry["gguf"]["file"],
+        asr_entry["gguf"]["revision"],
+        work_dir,
+    )
+
+    # ---- 3. Synthesize ----
+    tts_phrase = entry["tts_phrase"]
+    out_wav = work_dir / f"tts_{name}.wav"
+    print(f"\n[tts-roundtrip] {name}")
+    print(f"  synth     {asr_name} -> {tts_phrase!r}")
+    syn_cmd = [
+        str(crispasr_bin), "-m", str(gguf_local),
+        "--voice", str(voice_local),
+        "--tts", tts_phrase,
+        "--tts-output", str(out_wav),
+        "--no-prints",
+    ]
+    syn_cmd += list(entry.get("tts_extra_args", []))
+    try:
+        proc = subprocess.run(syn_cmd, capture_output=True, text=True,
+                              timeout=300)
+    except subprocess.TimeoutExpired:
+        die(f"{name}: TTS synth timed out after 300 s")
+    if proc.returncode != 0:
+        print(f"\033[31m  FAIL\033[0m  TTS synth crashed (rc={proc.returncode})")
+        print(f"    stderr tail: ...{(proc.stderr or '')[-300:]}")
+        return 1
+    if not out_wav.is_file() or out_wav.stat().st_size < 1000:
+        print(f"\033[31m  FAIL\033[0m  TTS produced no usable output: {out_wav}")
+        return 1
+
+    # ---- 4. Transcribe with parakeet (or whichever ASR is pinned) ----
+    asr_cmd = [str(crispasr_bin),
+               "--backend", asr_entry["backend_id"],
+               "-m", str(asr_gguf_local),
+               "-f", str(out_wav),
+               "--no-prints"]
+    try:
+        proc = subprocess.run(asr_cmd, capture_output=True, text=True,
+                              timeout=180)
+    except subprocess.TimeoutExpired:
+        die(f"{name}: ASR roundtrip timed out after 180 s")
+    if proc.returncode != 0:
+        print(f"\033[31m  FAIL\033[0m  ASR roundtrip crashed (rc={proc.returncode})")
+        print(f"    stderr tail: ...{(proc.stderr or '')[-300:]}")
+        return 1
+    text_lines = [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
+    transcript = text_lines[-1] if text_lines else ""
+
+    # ---- 5. WER ----
+    wer_max = float(entry["wer_max"])
+    _, wer = compute_transcript_metrics(tts_phrase, transcript)
+    ok = wer <= wer_max
+    verdict = "\033[32m  PASS\033[0m" if ok else "\033[31m  FAIL\033[0m"
+    print(f"{verdict}  wer={wer:.4f} (max {wer_max})")
+    print(f"    phrase:     {tts_phrase!r}")
+    print(f"    transcript: {transcript!r}")
+    return 0 if ok else 1
+
+
 def dry_run(manifest: dict, backend_filter: str | None = None) -> int:
     """HEAD-check every pinned HF object referenced by the manifest
     (or just one backend's entries). No downloads, no binary needed.
@@ -413,13 +538,17 @@ def dry_run(manifest: dict, backend_filter: str | None = None) -> int:
 
     failures = 0
     backends = manifest["backends"]
+    tts_backends = manifest.get("tts_backends", [])
     if backend_filter:
-        backends = [b for b in backends if b["name"] == backend_filter]
-        if not backends:
+        filt_asr = [b for b in backends if b["name"] == backend_filter]
+        filt_tts = [b for b in tts_backends if b["name"] == backend_filter]
+        if not filt_asr and not filt_tts:
             die(f"backend '{backend_filter}' not in manifest")
+        backends = filt_asr
+        tts_backends = filt_tts
 
     print(f"dry-run: fixtures {fx_repo}@{fx_rev[:8]} has {len(fx_files)} files")
-    print(f"dry-run: checking {len(backends)} backend(s)")
+    print(f"dry-run: checking {len(backends)} ASR + {len(tts_backends)} TTS backend(s)")
 
     for entry in backends:
         name = entry["name"]
@@ -469,8 +598,60 @@ def dry_run(manifest: dict, backend_filter: str | None = None) -> int:
 
         print(f"  \033[32mPASS\033[0m {name}")
 
+    # TTS backends — check the TTS GGUF + the voice GGUF (separate
+    # repo/revision since kokoro voices live in cstr/kokoro-voices-GGUF
+    # rather than the kokoro-82m repo) + optional companion files. The
+    # `roundtrip_asr_backend` reference must resolve to a real ASR
+    # entry in `manifest.backends`.
+    def _check_pinned_file(label: str, name: str, repo: str, rev: str, f: str) -> bool:
+        try:
+            ok = api.file_exists(repo_id=repo, repo_type="model",
+                                 revision=rev, filename=f)
+        except HfHubHTTPError as exc:
+            print(f"  \033[31mFAIL\033[0m {name}: {label} repo {repo}@"
+                  f"{rev[:8]} not reachable: {exc}")
+            return False
+        if not ok:
+            print(f"  \033[31mFAIL\033[0m {name}: {label} {repo}@"
+                  f"{rev[:8]}::{f} not found")
+            return False
+        return True
+
+    for entry in tts_backends:
+        name = entry["name"]
+        all_ok = True
+        # TTS GGUF.
+        all_ok &= _check_pinned_file(
+            "tts gguf", name, entry["gguf"]["repo"],
+            entry["gguf"]["revision"], entry["gguf"]["file"])
+        # Optional voice GGUF in its own pinned repo.
+        if all_ok and "voice" in entry:
+            v = entry["voice"]
+            all_ok &= _check_pinned_file(
+                "voice gguf", name, v["repo"], v["revision"], v["file"])
+        # Optional companion files in the same repo as the TTS GGUF.
+        if all_ok:
+            for cf in entry["gguf"].get("companion_files", []):
+                if not _check_pinned_file(
+                        "companion", name, entry["gguf"]["repo"],
+                        entry["gguf"]["revision"], cf):
+                    all_ok = False
+                    break
+        if not all_ok:
+            failures += 1
+            continue
+        # roundtrip_asr_backend must point to a real ASR entry.
+        asr_ref = entry["roundtrip_asr_backend"]
+        if not any(b["name"] == asr_ref for b in manifest["backends"]):
+            print(f"  \033[31mFAIL\033[0m {name}: roundtrip_asr_backend "
+                  f"{asr_ref!r} not in manifest.backends")
+            failures += 1
+            continue
+        print(f"  \033[32mPASS\033[0m {name}  (TTS roundtrip via {asr_ref})")
+
+    total = len(backends) + len(tts_backends)
     if failures == 0:
-        print(f"\n\033[32mOK\033[0m  dry-run: all {len(backends)} backend(s) "
+        print(f"\n\033[32mOK\033[0m  dry-run: all {total} backend(s) "
               f"have their pinned artifacts on HF")
     else:
         print(f"\n\033[31mFAIL\033[0m  dry-run: {failures} missing artifact(s)")
@@ -514,9 +695,22 @@ def main() -> int:
     if not crispasr_bin.exists():
         die(f"crispasr binary not found at {crispasr_bin}. "
             f"Build it first or set CRISPASR_BIN.")
-    # crispasr-diff is only needed for full diff entries (skip_diff=false).
-    entry = next((b for b in manifest["backends"] if b["name"] == backend_name), None)
-    if entry and not entry.get("skip_diff", False) and not diff_bin.exists():
+
+    # `backend_name` can match either an ASR backend (manifest.backends)
+    # or a TTS backend (manifest.tts_backends). Route on which list
+    # holds it. ASR entries are looked up first (their schema is the
+    # historical default).
+    asr_entry = next((b for b in manifest["backends"] if b["name"] == backend_name), None)
+    tts_entry = next((b for b in manifest.get("tts_backends", [])
+                      if b["name"] == backend_name), None) if asr_entry is None else None
+
+    if asr_entry is None and tts_entry is None:
+        die(f"backend '{backend_name}' not in manifest.backends or "
+            f"manifest.tts_backends")
+
+    # crispasr-diff is only needed for full ASR diff entries
+    # (skip_diff=false). TTS roundtrip doesn't use it.
+    if asr_entry and not asr_entry.get("skip_diff", False) and not diff_bin.exists():
         die(f"crispasr-diff binary not found at {diff_bin}. "
             f"Build it first or set DIFF_BIN. "
             f"(Not needed for skip_diff=true entries.)")
@@ -527,8 +721,12 @@ def main() -> int:
     keep_work = os.environ.get("KEEP_WORK") == "1"
 
     try:
-        failures = regression_for(
-            backend_name, manifest, work_root, crispasr_bin, diff_bin)
+        if tts_entry is not None:
+            failures = tts_roundtrip_for(
+                backend_name, manifest, work_root, crispasr_bin)
+        else:
+            failures = regression_for(
+                backend_name, manifest, work_root, crispasr_bin, diff_bin)
         if failures == 0:
             print(f"\n\033[32mOK\033[0m  {backend_name}: all checks passed")
             return 0

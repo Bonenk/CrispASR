@@ -536,6 +536,84 @@ class StreamJsonVadRoutingTests(unittest.TestCase):
         self.assertFalse(r["silence_dot"])
 
 
+class TtsBackendsSchemaTests(unittest.TestCase):
+    """Schema checks for the optional `tts_backends` section of
+    `manifest.json` introduced by PLAN #12 (TTS->ASR roundtrip nightly).
+
+    The section is opt-in (omitted entirely on older manifests), so
+    these checks short-circuit when absent. When present, every entry
+    must declare a pinned TTS gguf, a pinned voice gguf, a phrase, a
+    `roundtrip_asr_backend` referencing a real ASR entry, and a
+    numeric `wer_max` in [0, 1].
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        with (HERE / "manifest.json").open() as f:
+            cls.manifest = json.load(f)
+
+    def test_tts_backends_field_is_optional(self):
+        # tts_backends should be either absent or a list. Tolerate
+        # older manifests that haven't enabled the roundtrip path.
+        section = self.manifest.get("tts_backends", [])
+        self.assertIsInstance(section, list)
+
+    def test_tts_entries_have_required_keys(self):
+        required = {"name", "backend_id", "gguf", "voice",
+                    "tts_phrase", "roundtrip_asr_backend", "wer_max"}
+        gguf_required = {"repo", "revision", "file"}
+        voice_required = {"repo", "revision", "file"}
+        names_seen: set[str] = set()
+        asr_names = {b["name"] for b in self.manifest["backends"]}
+
+        for entry in self.manifest.get("tts_backends", []):
+            missing = required - set(entry)
+            self.assertEqual(missing, set(),
+                f"tts backend missing keys: {missing} in {entry.get('name', '?')}")
+            name = entry["name"]
+            self.assertNotIn(name, names_seen,
+                f"duplicate tts backend name: {name}")
+            names_seen.add(name)
+
+            # Pinned revisions: SHA only, never a branch.
+            for label, block, req in [
+                ("gguf", entry["gguf"], gguf_required),
+                ("voice", entry["voice"], voice_required),
+            ]:
+                self.assertEqual(req - set(block), set(),
+                    f"{name}.{label} missing keys")
+                self.assertRegex(
+                    block["revision"], r"^[0-9a-f]{7,40}$",
+                    f"{name}.{label}.revision must be a SHA, got {block['revision']!r}")
+
+            # roundtrip_asr_backend must reference a real ASR entry.
+            asr_ref = entry["roundtrip_asr_backend"]
+            self.assertIn(asr_ref, asr_names,
+                f"{name}.roundtrip_asr_backend={asr_ref!r} not in manifest.backends")
+
+            # wer_max must be a numeric in [0, 1].
+            wer_max = entry["wer_max"]
+            self.assertIsInstance(wer_max, (int, float),
+                f"{name}.wer_max must be numeric")
+            self.assertTrue(0.0 <= wer_max <= 1.0,
+                f"{name}.wer_max = {wer_max} out of [0,1]")
+
+            # tts_phrase must be a non-empty string.
+            self.assertIsInstance(entry["tts_phrase"], str,
+                f"{name}.tts_phrase must be a string")
+            self.assertGreater(len(entry["tts_phrase"].strip()), 0,
+                f"{name}.tts_phrase must be non-empty")
+
+    def test_tts_entries_name_is_unique_against_asr_entries(self):
+        # `run_one.py main()` dispatches on name across both lists.
+        # A duplicate name would collide ambiguously.
+        asr_names = {b["name"] for b in self.manifest["backends"]}
+        tts_names = {b["name"] for b in self.manifest.get("tts_backends", [])}
+        overlap = asr_names & tts_names
+        self.assertEqual(overlap, set(),
+            f"tts_backends names collide with asr backend names: {overlap}")
+
+
 class TranscriptToleranceTests(unittest.TestCase):
     """CER/WER metric for the optional transcript_tolerance field.
 

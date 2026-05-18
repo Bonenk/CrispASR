@@ -138,6 +138,14 @@ jobs:
           # is hitting HF private-repo storage limit (403). Re-add once the
           # repo is made public or space is freed on the HF account.
           - granite-speech-4.1-2b
+          # TTS->ASR roundtrip entries (manifest.tts_backends). Each
+          # synthesises a fixed phrase via the TTS backend, transcribes
+          # it back with parakeet, and asserts WER under the manifest's
+          # wer_max. Catches silent decode regressions the diff harness
+          # can miss (e.g. the voxcpm2 BF16 noise bug). Cheap-tier:
+          # kokoro is ~90 MB + the 466 MB parakeet ground-truth model;
+          # roundtrip wall-clock is ~30 s on the GH runner.
+          - kokoro-82m-en
     steps:
       - uses: actions/checkout@v4
 
