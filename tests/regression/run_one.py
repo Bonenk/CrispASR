@@ -94,6 +94,60 @@ def hf_download(repo: str, file_in_repo: str, revision: str, dest_dir: Path) -> 
     return Path(local)
 
 
+def _levenshtein(a: list, b: list) -> int:
+    """Standard Wagner-Fischer edit distance over two sequences.
+
+    Sequences can be characters (for CER) or tokens (for WER). Uses
+    O(min(len(a), len(b))) extra space.
+    """
+    if len(a) < len(b):
+        a, b = b, a
+    if not b:
+        return len(a)
+    prev = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        cur = [i] + [0] * len(b)
+        for j, cb in enumerate(b, start=1):
+            cur[j] = min(
+                cur[j - 1] + 1,           # insertion
+                prev[j] + 1,              # deletion
+                prev[j - 1] + (ca != cb), # substitution
+            )
+        prev = cur
+    return prev[-1]
+
+
+def _normalize_for_wer(text: str) -> list[str]:
+    """Lowercase, strip punctuation, split on whitespace.
+
+    Standard ASR WER normalization: ignore case + punctuation differences
+    so the metric reflects semantic word substitution, not cosmetic drift.
+    """
+    import re
+    return re.sub(r"[^\w\s]", " ", text.lower()).split()
+
+
+def compute_transcript_metrics(expected: str, actual: str) -> tuple[float, float]:
+    """Return (CER, WER) for an expected/actual transcript pair.
+
+    * **CER** — character-level edit distance / len(expected). Counts
+      punctuation, case, and spacing. CER = 0 means byte-equal.
+    * **WER** — token-level edit distance / word_count(expected),
+      after lowercasing and stripping ASCII punctuation. Reflects
+      semantic word substitution.
+
+    A degenerate empty expected string yields 0.0 if actual is empty
+    and inf otherwise.
+    """
+    if not expected:
+        return (0.0, 0.0) if not actual else (float("inf"), float("inf"))
+    cer = _levenshtein(list(expected), list(actual)) / len(expected)
+    e_words = _normalize_for_wer(expected)
+    a_words = _normalize_for_wer(actual)
+    wer = _levenshtein(e_words, a_words) / max(1, len(e_words))
+    return cer, wer
+
+
 def run_transcript(crispasr_bin: Path, gguf: Path, sample: Path) -> str:
     """Run `crispasr -m gguf -f sample`, return the transcript line.
 
@@ -265,14 +319,33 @@ def regression_for(name: str, manifest: dict, work_dir: Path,
     print(f"\n[transcript] {name}")
     actual = run_transcript(crispasr_bin, gguf_local, sample)
     expected = entry["expected_transcript"]
-    if actual != expected:
+    tol = entry.get("transcript_tolerance")
+    if actual == expected:
+        print("\033[32m  PASS\033[0m  (byte-equal)")
+        print(f"    {actual!r}")
+    elif tol is not None:
+        # Byte-equal failed but the manifest opts this backend into a
+        # CER/WER tolerance. Pass if both metrics are within their
+        # configured maxes. Reflects the ASR-regression contract
+        # users actually care about: meaning preservation, not byte
+        # equality. Per-backend opt-in so other backends keep the
+        # tighter byte-equal bar.
+        cer, wer = compute_transcript_metrics(expected, actual)
+        cer_max = float(tol.get("cer_max", 0.0))
+        wer_max = float(tol.get("wer_max", 0.0))
+        ok = cer <= cer_max and wer <= wer_max
+        verdict = "\033[32m  PASS\033[0m" if ok else "\033[31m  FAIL\033[0m"
+        suffix = " (within tolerance)" if ok else " (over tolerance)"
+        print(f"{verdict}  cer={cer:.4f} (max {cer_max})  wer={wer:.4f} (max {wer_max}){suffix}")
+        print(f"    expected: {expected!r}")
+        print(f"    actual:   {actual!r}")
+        if not ok:
+            failures += 1
+    else:
         print("\033[31m  FAIL\033[0m")
         print(f"    expected: {expected!r}")
         print(f"    actual:   {actual!r}")
         failures += 1
-    else:
-        print("\033[32m  PASS\033[0m")
-        print(f"    {actual!r}")
 
     # ----- 2. Diff harness -----
     if skip_diff:

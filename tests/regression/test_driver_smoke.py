@@ -136,6 +136,27 @@ class ManifestSchemaTests(unittest.TestCase):
                     f"{entry['name']}: skip_diff=true but fixture_ref_path is also set — "
                     f"remove skip_diff once the ref dump is in cstr/crispasr-regression-fixtures")
 
+            # Optional transcript_tolerance block — opt-in WER/CER bar
+            # for backends whose decoder ties on punctuation/case
+            # boundaries (e.g. glm-asr-nano). Schema:
+            #   { "cer_max": 0..1, "wer_max": 0..1 } both required when present.
+            if "transcript_tolerance" in entry:
+                tol = entry["transcript_tolerance"]
+                self.assertIsInstance(tol, dict,
+                    f"{entry['name']}: transcript_tolerance must be an object")
+                required_tol = {"cer_max", "wer_max"}
+                missing_tol = required_tol - set(tol)
+                self.assertEqual(missing_tol, set(),
+                    f"{entry['name']}.transcript_tolerance missing keys: {missing_tol}")
+                for k in required_tol:
+                    v = tol[k]
+                    self.assertIsInstance(v, (int, float),
+                        f"{entry['name']}.transcript_tolerance.{k} must be numeric")
+                    self.assertTrue(
+                        0.0 <= v <= 1.0,
+                        f"{entry['name']}.transcript_tolerance.{k} = {v} out of [0,1]",
+                    )
+
     def test_sample_source_declared(self):
         """Every backend must declare its sample source: either a
         repo-relative `sample` (in-tree, must exist) or a
@@ -513,6 +534,91 @@ class StreamJsonVadRoutingTests(unittest.TestCase):
         r = self._simulate_step(stream_json=False, vad_model="",
                                 backend_returns=["speech"])
         self.assertFalse(r["silence_dot"])
+
+
+class TranscriptToleranceTests(unittest.TestCase):
+    """CER/WER metric for the optional transcript_tolerance field.
+
+    The metric only kicks in when byte-equal fails AND the manifest
+    entry opts in via ``transcript_tolerance``. Per-backend opt-in so
+    backends with truly deterministic output keep the strict bar.
+    """
+
+    def test_levenshtein_empty(self):
+        self.assertEqual(run_one._levenshtein([], []), 0)
+        self.assertEqual(run_one._levenshtein(["a"], []), 1)
+        self.assertEqual(run_one._levenshtein([], ["a", "b"]), 2)
+
+    def test_levenshtein_identical(self):
+        self.assertEqual(run_one._levenshtein(list("hello"), list("hello")), 0)
+
+    def test_levenshtein_substitution(self):
+        self.assertEqual(run_one._levenshtein(list("cat"), list("bat")), 1)
+
+    def test_levenshtein_mixed_ops(self):
+        # kitten -> sitting: substitute k->s, e->i, insert g => 3 ops
+        self.assertEqual(run_one._levenshtein(list("kitten"), list("sitting")), 3)
+
+    def test_metrics_identical_strings(self):
+        cer, wer = run_one.compute_transcript_metrics("hello world", "hello world")
+        self.assertEqual(cer, 0.0)
+        self.assertEqual(wer, 0.0)
+
+    def test_metrics_punctuation_only_diff(self):
+        # The exact glm-asr-nano failure mode: 'you. Ask' vs 'you, ask'.
+        # Two character substitutions ('.'→',' AND 'A'→'a'); zero word
+        # edits after WER normalization (lowercase + strip punc).
+        expected = "And so, my fellow Americans, ask not what your country can do for you. Ask what you can do for your country."
+        actual = "And so, my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
+        cer, wer = run_one.compute_transcript_metrics(expected, actual)
+        # 2 character diffs over 108 chars = ~0.0185 CER.
+        self.assertAlmostEqual(cer, 2.0 / len(expected), places=4)
+        # 'Ask' vs 'ask' is a case-only difference and the leading
+        # punctuation diffs are stripped, so WER = 0.
+        self.assertEqual(wer, 0.0)
+        # The configured 2% CER / 5% WER tolerance covers it:
+        self.assertLessEqual(cer, 0.02)
+        self.assertLessEqual(wer, 0.05)
+
+    def test_metrics_one_word_substitution(self):
+        cer, wer = run_one.compute_transcript_metrics("hello world", "hello earth")
+        # 'world' -> 'earth' is one word substitution after lowercase+split.
+        self.assertEqual(wer, 0.5)  # 1 substitution / 2 expected words
+        self.assertGreater(cer, 0.0)
+
+    def test_metrics_inserted_word(self):
+        cer, wer = run_one.compute_transcript_metrics("hello world", "hello there world")
+        # 1 inserted word out of 2 expected words.
+        self.assertEqual(wer, 0.5)
+
+    def test_metrics_deleted_word(self):
+        cer, wer = run_one.compute_transcript_metrics("hello there world", "hello world")
+        # 1 deleted word out of 3 expected words.
+        self.assertAlmostEqual(wer, 1.0 / 3, places=4)
+
+    def test_metrics_empty_expected(self):
+        cer, wer = run_one.compute_transcript_metrics("", "")
+        self.assertEqual(cer, 0.0)
+        self.assertEqual(wer, 0.0)
+        # Non-empty actual against empty expected -> infinite (cannot divide).
+        cer, wer = run_one.compute_transcript_metrics("", "something")
+        self.assertEqual(cer, float("inf"))
+        self.assertEqual(wer, float("inf"))
+
+    def test_metrics_case_normalization(self):
+        cer, wer = run_one.compute_transcript_metrics("Hello World", "hello world")
+        # CER counts the case differences as substitutions; WER does not
+        # (normalization lowercases first).
+        self.assertGreater(cer, 0.0)
+        self.assertEqual(wer, 0.0)
+
+    def test_metrics_punctuation_normalization(self):
+        cer, wer = run_one.compute_transcript_metrics(
+            "hello, world!", "hello world"
+        )
+        # CER counts the dropped comma + exclamation; WER ignores them.
+        self.assertGreater(cer, 0.0)
+        self.assertEqual(wer, 0.0)
 
 
 if __name__ == "__main__":

@@ -113,6 +113,55 @@ test enforces their absence. The nightly matrix will run the transcript
 check immediately; once the Kaggle rebake produces a `ref.gguf`, remove
 `skip_diff` and fill in the full fields.
 
+## Transcript tolerance (`transcript_tolerance`) — opt-in WER/CER
+
+By default the transcript check is byte-for-byte exact — no tolerance.
+Most backends have deterministic greedy decode and reproduce their
+captured transcript bit-perfectly across runner upgrades.
+
+A few backends (currently `glm-asr-nano`) have LLM-style decoders that
+tie on score-boundary punctuation/case choices — `you. Ask` vs
+`you, ask` is the same English with a 1e-7 softmax-score difference
+underneath. The encoder + mel diff checks both stay at `cos=1.000`
+(model weights identical) but the decoded transcript shifts a comma.
+
+For such backends, add a `transcript_tolerance` block to opt into a
+relaxed metric:
+
+```json
+{
+  "name": "glm-asr-nano",
+  ...
+  "expected_transcript": "And so, my fellow Americans, ask not ...",
+  "transcript_tolerance": {
+    "cer_max": 0.02,
+    "wer_max": 0.05
+  }
+}
+```
+
+Semantics:
+
+* **Byte-equal fast path runs first.** If `actual == expected`, the
+  check passes with no metric computation. No change in behaviour for
+  backends without the field.
+* **On byte-equal failure**, if `transcript_tolerance` is set, compute
+  CER (Levenshtein over characters / `len(expected)`) and WER
+  (Levenshtein over whitespace-split tokens, after lowercasing +
+  stripping ASCII punctuation, / word count). Pass if BOTH are at or
+  under their maxes.
+* **`cer_max`** counts every character difference (case, punctuation,
+  spacing). Sensitive to cosmetic drift.
+* **`wer_max`** is the industry-standard ASR metric: ignores
+  punctuation + case so it reflects semantic word substitution.
+  Catches real regressions (missing/wrong words, language confusion)
+  without firing on commas.
+* **Per-backend opt-in.** Backends without the field keep the strict
+  byte-equal bar.
+
+Recommended starting values: `cer_max: 0.02`, `wer_max: 0.05`. Tune
+downward as the backend matures.
+
 ## Adding a new backend (full diff entry)
 
 1. **Dump the reference** on a known-good commit:
