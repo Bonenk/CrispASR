@@ -3068,6 +3068,7 @@ int main(int argc, char** argv) {
             "tslm_prefill_out",
             "ralm_prefill_out",
             "dit_input_seq",
+            "dit_single_fwd",
             "cfm_step0_result",
             "decoded_audio",
             // Stages not yet implemented in C++ — will gracefully skip:
@@ -3075,6 +3076,7 @@ int main(int argc, char** argv) {
             "enc_to_lm",
             "tslm_layer_0_out",
             "tslm_layer_27_out",
+            "tslm_last_hidden",
             "lm_to_dit_hidden",
             "res_to_dit_hidden",
             "cfm_step0_z",
@@ -3112,6 +3114,14 @@ int main(int argc, char** argv) {
                     stage_ref_n = (int)noise_pair.second;
                 }
             }
+            if (strcmp(stage, "dit_single_fwd") == 0) {
+                // Pass dit_input_seq reference as input to the single-step LocDiT test
+                auto seq_pair = ref.get_f32("dit_input_seq");
+                if (seq_pair.first && seq_pair.second > 0) {
+                    stage_ref = seq_pair.first;
+                    stage_ref_n = (int)seq_pair.second;
+                }
+            }
             float* buf = voxcpm2_extract_stage(ctx, syn_text.c_str(), stage_ref, stage_ref_n, stage, &n_out);
             if (!buf || n_out == 0) {
                 printf("[SKIP] %-22s (C++ stage not implemented)\n", stage);
@@ -3136,14 +3146,16 @@ int main(int argc, char** argv) {
                 strcmp(stage, "lm_to_dit_hidden") == 0 || strcmp(stage, "res_to_dit_hidden") == 0 ||
                 strcmp(stage, "locenc_out") == 0 || strcmp(stage, "enc_to_lm") == 0 ||
                 strcmp(stage, "cfm_step0_result") == 0 || strcmp(stage, "cfm_step0_z") == 0 ||
-                strcmp(stage, "dit_input_seq") == 0;
+                strcmp(stage, "dit_input_seq") == 0 || strcmp(stage, "dit_single_fwd") == 0 ||
+                strcmp(stage, "tslm_last_hidden") == 0;
             if (is_deep_stage) {
                 // Tiered thresholds: locenc/enc_to_lm use 0.90, projections use 0.10
                 if (strcmp(stage, "locenc_out") == 0 || strcmp(stage, "enc_to_lm") == 0)
                     threshold = 0.90f;
-                else if (strcmp(stage, "lm_to_dit_hidden") == 0 || strcmp(stage, "res_to_dit_hidden") == 0 ||
-                         strcmp(stage, "cfm_step0_result") == 0 || strcmp(stage, "ralm_prefill_out") == 0 ||
-                         strcmp(stage, "cfm_step0_z") == 0)
+                else if (strcmp(stage, "tslm_last_hidden") == 0 || strcmp(stage, "lm_to_dit_hidden") == 0 ||
+                         strcmp(stage, "res_to_dit_hidden") == 0 || strcmp(stage, "cfm_step0_result") == 0 ||
+                         strcmp(stage, "ralm_prefill_out") == 0 || strcmp(stage, "cfm_step0_z") == 0 ||
+                         strcmp(stage, "dit_single_fwd") == 0)
                     threshold = -2.0f; // Precision/RNG mismatch; informational only
                 else
                     threshold = 0.98f;

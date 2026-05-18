@@ -59,6 +59,8 @@ DEFAULT_STAGES = [
     "lm_to_dit_hidden",
     "res_to_dit_hidden",
     "cfm_mu",
+    "dit_input_seq",
+    "dit_single_fwd",
     "cfm_step0_z",
     "cfm_step0_result",
     "stop_logits_step0",
@@ -69,10 +71,10 @@ DEFAULT_STAGES = [
 # Stages that require the manual prefill path (hook-based intermediate capture)
 _PREFILL_STAGES = {
     "locenc_in", "locenc_out", "enc_to_lm",
-    "tslm_prefill_out", "tslm_layer_0_out", "tslm_layer_27_out",
+    "tslm_prefill_out", "tslm_last_hidden", "tslm_layer_0_out", "tslm_layer_27_out",
     "ralm_prefill_out",
     "lm_to_dit_hidden", "res_to_dit_hidden", "cfm_mu",
-    "dit_input_seq", "cfm_step0_z", "cfm_step0_result",
+    "dit_input_seq", "dit_single_fwd", "cfm_step0_z", "cfm_step0_result",
     "stop_logits_step0",
 }
 
@@ -323,6 +325,8 @@ def _run_prefill(
 
         if "tslm_prefill_out" in stages:
             results["tslm_prefill_out"] = enc_outputs[0, :8].cpu().float().numpy()
+        if "tslm_last_hidden" in stages:
+            results["tslm_last_hidden"] = lm_hidden[0].cpu().float().numpy()
 
         # RALM prefill
         residual_enc_inputs = model.fusion_concat_proj(
@@ -380,6 +384,27 @@ def _run_prefill(
             mu_reshaped = dit_hidden.view(1, -1, x_proj.size(-1))
             dit_seq = torch.cat([mu_reshaped, t_emb_dit.unsqueeze(1), cond_proj_dit, x_proj], dim=1)
             results["dit_input_seq"] = dit_seq[0].cpu().float().numpy()
+
+        # Single LocDiT forward pass (for debugging transformer layers in isolation)
+        if "dit_single_fwd" in stages:
+            # Use the same inputs as dit_input_seq but run through the full estimator
+            rng_sf = torch.Generator(device=device)
+            rng_sf.manual_seed(seed)
+            cfm = model.feat_decoder
+            z_sf = torch.randn(
+                (1, cfm.in_channels, model.patch_size),
+                device=device, dtype=dit_hidden.dtype, generator=rng_sf,
+            )
+            t_span_sf = torch.linspace(1, 0, 11, device=device, dtype=dtype)
+            t_span_sf = t_span_sf + 1.0 * (torch.cos(torch.pi / 2 * t_span_sf) - 1 + t_span_sf)
+            t_val_sf = t_span_sf[1:2]  # First real step (step 2, after zero-init)
+            dt_val_sf = torch.tensor([0.0], device=device, dtype=dtype)
+            # Zero cond for first step
+            zero_cond_sf = torch.zeros(1, cfm.in_channels, model.patch_size, device=device, dtype=dtype)
+            # Run the full estimator forward (this includes projections + 12 layers + out_proj)
+            vel_sf = cfm.estimator(z_sf, dit_hidden, t_val_sf, zero_cond_sf, dt_val_sf)
+            # vel_sf is [B, C=64, T=4] channels-first
+            results["dit_single_fwd"] = vel_sf[0].cpu().float().numpy()
 
         # CFM solve (manually to capture internals)
         prefix_feat_cond = audio_feat[:, -1, ...].to(dtype)

@@ -473,6 +473,10 @@ static void fill_gaussian_noise(float* data, int n, uint32_t seed) {
     fill_gaussian_noise(data, n, rng);
 }
 
+// BF16-compatible noise: forward-declared, defined after bf16_round (line ~1093)
+static void fill_gaussian_noise_bf16(float* data, int n, mt19937_state& rng);
+static void fill_gaussian_noise_bf16(float* data, int n, uint32_t seed);
+
 // ---------------------------------------------------------------------------
 // RMS Norm (CPU, in-place-safe: x and y may differ)
 // ---------------------------------------------------------------------------
@@ -1026,6 +1030,67 @@ static inline float bf16_round(float x) {
     ggml_bf16_t bf = ggml_fp32_to_bf16(x);
     return ggml_bf16_to_fp32(bf);
 }
+
+// ---------------------------------------------------------------------------
+// BF16-compatible Gaussian noise (matches torch.randn with dtype=bfloat16)
+//
+// PyTorch's BF16 randn uses a DIFFERENT bit extraction from MT19937 than F32:
+//   F32: (mt19937_next() & 0x00FFFFFF) / 16777216.0   (24-bit mantissa)
+//   BF16: (mt19937_next() & 0xFF)      / 256.0         (8-bit mantissa)
+// Then Box-Muller is applied with intermediate results rounded to BF16 precision.
+// Both consume the same number of MT19937 values but produce completely different sequences.
+// ---------------------------------------------------------------------------
+
+static inline float mt_uniform_bf16(mt19937_state& rng) {
+    return (float)(mt19937_next(rng) & 0xFFu) / 256.0f;
+}
+
+static void bf16_normal_fill_16(float* data) {
+    for (int j = 0; j < 8; j++) {
+        float u1 = bf16_round(1.0f - data[j]);
+        float u2 = data[j + 8];
+        float radius = bf16_round(sqrtf(bf16_round(-2.0f * bf16_round(logf(u1)))));
+        float theta = bf16_round(bf16_round(2.0f * (float)M_PI * u2));
+        data[j] = bf16_round(radius * bf16_round(cosf(theta)));
+        data[j + 8] = bf16_round(radius * bf16_round(sinf(theta)));
+    }
+}
+
+static void fill_gaussian_noise_bf16(float* data, int n, mt19937_state& rng) {
+    if (n <= 0)
+        return;
+
+    if (n < 16) {
+        float tmp[16];
+        for (int i = 0; i < 16; i++)
+            tmp[i] = mt_uniform_bf16(rng);
+        bf16_normal_fill_16(tmp);
+        std::memcpy(data, tmp, (size_t)n * sizeof(float));
+        return;
+    }
+
+    for (int i = 0; i < n; i++)
+        data[i] = mt_uniform_bf16(rng);
+
+    int i = 0;
+    for (; i <= n - 16; i += 16)
+        bf16_normal_fill_16(data + i);
+
+    if (i < n) {
+        float* tail = data + n - 16;
+        for (int j = 0; j < 16; j++)
+            tail[j] = mt_uniform_bf16(rng);
+        bf16_normal_fill_16(tail);
+    }
+}
+
+static void fill_gaussian_noise_bf16(float* data, int n, uint32_t seed) {
+    mt19937_state rng;
+    mt19937_seed(rng, seed);
+    fill_gaussian_noise_bf16(data, n, rng);
+}
+
+// ---------------------------------------------------------------------------
 
 static std::vector<float> sinusoidal_time_emb(float t_scalar, int dim) {
     // Matches Python SinusoidalPosEmb(dim).forward(x, scale=1000) in BF16:
@@ -2581,32 +2646,32 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
     float stop_thresh = 0.5f;
     int step = 0;
 
+    // Python AR loop order (from voxcpm2.py _inference, lines 1060-1108):
+    //   1. Build mu → CFM solve → LocEnc → enc_to_lm → collect patch
+    //   2. Stop check (on PREVIOUS lm_hidden, BEFORE TSLM step)
+    //   3. TSLM step → FSQ → Fusion → RALM step → update lm_hidden/mu
+    // Python min_len=2 by default (stop only if step > min_len).
+    int min_len = 2;
+
     while (step < ctx->max_len) {
         double t0_step = vox_now_ms();
 
-        // a. CFM Euler solve (LocDiT)
-        // patch is [feat_dim * patch_frames = 64 * 4 = 256] in latent space
-        // Generate Gaussian noise as initial state for diffusion
+        // 1a. CFM Euler solve (LocDiT)
         std::vector<float> noise(feat_dim_vae * P_frames);
-        fill_gaussian_noise(noise.data(), (int)noise.size(), ctx->rng);
+        fill_gaussian_noise_bf16(noise.data(), (int)noise.size(), ctx->rng);
         std::vector<float> patch = cfm_euler_solve(ctx, mu.data(), prev_patch_raw.data(), ctx->inference_steps,
                                                    ctx->cfg_value, cpu_be, noise.data());
 
-        // Transpose patch from [C=64, T=4] channels-first (CFM output) to [T=4, C=64] time-first
-        // Python: pred_feat = cfm(...).transpose(1, 2)  → [B, T, C]
+        // 1b. Transpose patch [C=64, T=4] → [T=4, C=64]
         std::vector<float> patch_tf(feat_dim_vae * P_frames);
         for (int t = 0; t < P_frames; t++)
             for (int c = 0; c < feat_dim_vae; c++)
                 patch_tf[t * feat_dim_vae + c] = patch[c * P_frames + t];
 
-        // Store transposed patch for VAE (time-first [T, C]) and for next step's cond
-        patches.push_back(patch_tf);
-        prev_patch_raw = patch_tf;
-
-        // b. LocEnc on predicted patch (time-first [T, C])
+        // 1c. LocEnc on predicted patch
         std::vector<float> enc_out = locenc_forward(ctx, patch_tf.data(), cpu_be);
 
-        // d. enc_to_lm_proj: locenc_d -> tslm_d
+        // 1d. enc_to_lm projection
         std::vector<float> enc_lm(d_lm, 0.0f);
         if (ctx->weights.enc_to_lm_w && ctx->weights.enc_to_lm_b) {
             matmul_mv_bias(cpu_be, ctx->weights.enc_to_lm_w, ctx->weights.enc_to_lm_b, enc_out.data(), d_dit,
@@ -2616,7 +2681,28 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
             std::memcpy(enc_lm.data(), enc_out.data(), (size_t)copy_d * sizeof(float));
         }
 
-        // e. TSLM step (single audio token position)
+        // 1e. Collect patch + update cond for next step
+        patches.push_back(patch_tf);
+        prev_patch_raw = patch_tf;
+
+        // 2. Stop check — BEFORE TSLM step, using PREVIOUS tslm_hidden
+        // Python: stop_head(stop_actn(stop_proj(lm_hidden))).argmax() == 1
+        // At step 0, tslm_hidden is the normed prefill output (not FSQ'd).
+        // At step >0, tslm_hidden is the FSQ'd output from the previous step.
+        {
+            float sp = stop_score(ctx, tslm_hidden.data(), cpu_be);
+            if (ctx->verbosity >= 2) {
+                fprintf(stderr, "voxcpm2: step %d stop=%.3f (%.1f ms)\n", step, sp, vox_now_ms() - t0_step);
+            }
+            if (sp > stop_thresh && step > min_len) {
+                if (ctx->verbosity >= 1) {
+                    fprintf(stderr, "voxcpm2: stopped at step %d (stop=%.3f)\n", step + 1, sp);
+                }
+                break;
+            }
+        }
+
+        // 3a. TSLM step (single audio token position)
         {
             int tslm_pos = ctx->tslm_kv.n_past;
             std::vector<float> h = enc_lm;
@@ -2625,33 +2711,16 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
             }
             ctx->tslm_kv.n_past++;
 
-            // Output norm
             std::vector<float> normed(d_lm);
             rms_norm_cpu(h.data(), tensor_data_f32(ctx->weights.tslm_output_norm), normed.data(), d_lm,
                          ctx->hp.rms_norm_eps);
             tslm_hidden = normed;
         }
 
-        // c. Stop check (after TSLM step, using updated lm_hidden)
-        {
-            float sp = stop_score(ctx, tslm_hidden.data(), cpu_be);
-            if (ctx->verbosity >= 2) {
-                fprintf(stderr, "voxcpm2: step %d stop=%.3f (%.1f ms)\n", step, sp, vox_now_ms() - t0_step);
-            }
-            if (sp > stop_thresh && step > 0) {
-                if (ctx->verbosity >= 1) {
-                    fprintf(stderr, "voxcpm2: stopped at step %d (stop=%.3f)\n", step + 1, sp);
-                }
-                break;
-            }
-        }
-
-        // f. FSQ
+        // 3b. FSQ
         fsq_out = fsq_forward(ctx, tslm_hidden.data(), cpu_be);
 
-        // g. proj.fusion(cat(fsq_out, enc_lm)) [4096 -> 2048]
-        // Python: fusion_concat_proj(cat(enc_outputs, audio_mask * feat_embed))
-        // For audio positions: enc_outputs = FSQ(tslm_output), feat_embed = enc_to_lm(locenc_out)
+        // 3c. Fusion: cat(fsq_out, enc_lm) → fusion_proj
         std::vector<float> fusion_in((size_t)(d_lm + d_lm));
         std::memcpy(fusion_in.data(), fsq_out.data(), (size_t)d_lm * sizeof(float));
         std::memcpy(fusion_in.data() + d_lm, enc_lm.data(), (size_t)d_lm * sizeof(float));
@@ -2661,15 +2730,12 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
             matmul_mv_bias(cpu_be, ctx->weights.fusion_w, ctx->weights.fusion_b, fusion_in.data(), 2 * d_lm,
                            fusion_out.data(), d_ralm);
         } else {
-            // Fallback: pass fsq_out directly
             fusion_out = fsq_out;
         }
 
-        // h. RALM step
+        // 3d. RALM step
         {
             std::vector<float> h = fusion_out;
-            int ralm_pos = ctx->ralm_kv.n_past;
-            (void)ralm_pos;
             for (int l = 0; l < (int)ctx->hp.ralm_n_layers; l++) {
                 ralm_layer_step(ctx, l, h.data(), cpu_be);
             }
@@ -2681,10 +2747,8 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
             ralm_hidden = normed;
         }
 
-        // Update mu conditioning for next step.
-        // Python: lm_hidden is FSQ'd before being used for lm_to_dit_proj at next iteration.
-        // In the AR loop, all new positions are audio positions → FSQ IS applied.
-        tslm_hidden = fsq_out; // Use FSQ'd output for lm_to_dit projection
+        // 3e. Update: tslm_hidden = FSQ'd for next step's mu + stop check
+        tslm_hidden = fsq_out;
         mu = build_mu(tslm_hidden, ralm_hidden);
         step++;
     }
@@ -3398,7 +3462,7 @@ float* voxcpm2_extract_stage(struct voxcpm2_context* ctx, const char* text, cons
         int state_size = in_ch * P_fr; // 256
         *out_n = state_size;
         float* out = (float*)std::malloc((size_t)state_size * sizeof(float));
-        fill_gaussian_noise(out, state_size, 42);
+        fill_gaussian_noise_bf16(out, state_size, 42);
         return out;
     }
 
