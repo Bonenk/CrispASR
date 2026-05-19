@@ -551,26 +551,87 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         }
     }
 
-    // Each slice is transcribed with its own audio only. Boundaries are placed
-    // by audio_chunking::split_at_energy_minima at the quietest 100 ms within
-    // each chunk window, so chunk seams already fall in pauses; we don't need
-    // to extend the slice with neighbour audio.
+    // Issue #89 overlap-save chunking: when slicing is active, extend
+    // each chunk by context_s seconds on each side so the bidirectional
+    // encoder has left/right context at chunk boundaries. Only the
+    // center region (the original slice range) is committed; words in
+    // the extension zones are discarded via word-level filtering.
     //
-    // Issue #89 history: an earlier round (617cd02) added ±2 s of context to
-    // every slice and then filtered the result back to the original window by
-    // word timestamp. Two failure modes surfaced on parakeet-tdt-0.6b-ja: (1)
-    // the TDT decoder's emission frame for the same audio shifts by 1–2
-    // frames between context windows, so words at the boundary could land
-    // outside *both* slices' ranges and be silently dropped; (2) the trim's
-    // segment-text rebuild inserted a space before every word that didn't
-    // start with one, which for Japanese (no-space tokenizer) split every
-    // kana with a space. Both bugs disappear when each slice is fed the bare
-    // audio.
+    // Earlier attempt (617cd02) failed because (a) TDT emission frames
+    // shift ±1-2 frames between contexts, dropping boundary words when
+    // strict t0 filtering is used, and (b) segment text rebuild
+    // inserted spaces before every word, breaking Japanese. Fixes:
+    // (a) use a tolerance margin of 200 ms at boundaries so shifted
+    // frames aren't lost; (b) concatenate word texts without inserting
+    // spaces (the tokenizer already includes leading spaces where
+    // appropriate).
+    const float kChunkContextS = params.chunk_overlap_seconds;
+    constexpr int64_t kBoundaryToleranceCs = 20; // 200 ms tolerance for TDT frame shift
+    const bool use_chunk_context = slices.size() > 1 && kChunkContextS > 0.0f;
+
     auto process_slice = [&](size_t i, CrispasrBackend& be) {
         const auto& sl = slices[i];
 
+        // Optionally extend the slice with acoustic context.
+        int ext_start = sl.start;
+        int ext_end = sl.end;
+        if (use_chunk_context) {
+            const int ctx_samples = (int)(kChunkContextS * SR);
+            ext_start = std::max(0, sl.start - ctx_samples);
+            ext_end = std::min((int)samples.size(), sl.end + ctx_samples);
+        }
+        const int64_t ext_t0_cs = (int64_t)((double)ext_start / SR * 100.0);
+
         std::vector<crispasr_segment> segs =
-            be.transcribe(samples.data() + sl.start, sl.end - sl.start, sl.t0_cs, params);
+            be.transcribe(samples.data() + ext_start, ext_end - ext_start, ext_t0_cs, params);
+
+        // Trim back to the original slice range when context was added.
+        if (use_chunk_context && !segs.empty()) {
+            const bool is_first = (i == 0);
+            const bool is_last = (i == slices.size() - 1);
+            // Left boundary: first slice keeps everything, others trim.
+            const int64_t left_cs = is_first ? 0 : (sl.t0_cs - kBoundaryToleranceCs);
+            // Right boundary: last slice keeps everything, others trim.
+            const int64_t right_cs = is_last ? INT64_MAX : (sl.t1_cs + kBoundaryToleranceCs);
+
+            for (auto& seg : segs) {
+                if (seg.words.empty()) {
+                    // No word-level data — filter at segment level.
+                    // Keep the segment if its center is in range.
+                    const int64_t mid = (seg.t0 + seg.t1) / 2;
+                    if (mid < left_cs || mid >= right_cs)
+                        seg.text.clear();
+                    continue;
+                }
+                // Word-level filtering: keep words whose t0 is in range.
+                std::vector<crispasr_word> kept;
+                for (auto& w : seg.words) {
+                    if (w.t0 >= left_cs && w.t0 < right_cs)
+                        kept.push_back(std::move(w));
+                }
+                // Rebuild segment text from surviving words without
+                // inserting spaces (fixes the JA kana-spacing bug from
+                // 617cd02). The tokenizer already includes leading
+                // spaces in word text where appropriate (Latin style).
+                std::string rebuilt;
+                for (const auto& w : kept)
+                    rebuilt += w.text;
+                // Strip leading space if present (first word of segment
+                // may have a leading space from BPE convention).
+                if (!rebuilt.empty() && rebuilt[0] == ' ')
+                    rebuilt = rebuilt.substr(1);
+                seg.text = std::move(rebuilt);
+                seg.words = std::move(kept);
+                if (!seg.words.empty()) {
+                    seg.t0 = seg.words.front().t0;
+                    seg.t1 = seg.words.back().t1;
+                }
+            }
+            // Remove empty segments.
+            segs.erase(std::remove_if(segs.begin(), segs.end(),
+                                       [](const crispasr_segment& s) { return s.text.empty(); }),
+                        segs.end());
+        }
 
         if (params.diarize && !segs.empty()) {
             const CrispasrPyannoteCache* cache_ptr = pyannote_cache.valid() ? &pyannote_cache : nullptr;
