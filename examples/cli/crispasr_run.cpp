@@ -357,8 +357,25 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     // the ASR backend allocates its own model + KV cache (#35 OOM fix).
     crispasr_lid_free_cache();
 
+    // Issue #89: non-whisper backends (parakeet, canary, moonshine, …) use
+    // bidirectional encoders that lose context at fixed chunk boundaries,
+    // causing text loss at the start of each chunk. Whisper needs 30 s
+    // chunks because its positional-encoding encoder is trained on exactly
+    // 30 s windows; every other backend can handle arbitrary-length input.
+    // When the user didn't explicitly pass --chunk-seconds, disable
+    // chunking for non-whisper backends so the full audio is processed in
+    // one encoder pass.
+    int effective_chunk_seconds = params.chunk_seconds;
+    if (!params.chunk_seconds_explicit && !(backend.capabilities() & CAP_VAD_INTERNAL)) {
+        effective_chunk_seconds = 0;
+        if (!params.no_prints && (int)samples.size() > params.chunk_seconds * SR) {
+            fprintf(stderr, "crispasr: %s backend — processing full audio without chunking "
+                            "(use --chunk-seconds N to override)\n", backend.name());
+        }
+    }
+
     const auto slices =
-        crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, params.chunk_seconds, params);
+        crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, effective_chunk_seconds, params);
 
     if (slices.empty()) {
         fprintf(stderr, "crispasr: warning: no speech detected in '%s'\n", fname_inp.c_str());
@@ -1578,8 +1595,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
                                 decode_params.vad = false;
                                 decode_params.vad_model.clear();
                                 partial_decode_attempted_this_step = true;
+                                const int64_t abs_offset_cs = (window_start_sample_now + (int64_t)sub_start) * 100 / SR;
                                 sl_for_text =
-                                    backend->transcribe(pcm_window.data() + sub_start, sub_len, 0, decode_params);
+                                    backend->transcribe(pcm_window.data() + sub_start, sub_len, abs_offset_cs, decode_params);
                             }
                             // else: sl_for_text stays empty → empty
                             // partial text for this slice, which
@@ -1590,8 +1608,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
                             // step once the subrange exceeds the min.
                         } else {
                             partial_decode_attempted_this_step = true;
+                            const int64_t abs_t0_cs = window_start_sample_now * 100 / SR + sl.t0_cs;
                             sl_for_text =
-                                backend->transcribe(pcm_window.data() + sl.start, sl.end - sl.start, sl.t0_cs, params);
+                                backend->transcribe(pcm_window.data() + sl.start, sl.end - sl.start, abs_t0_cs, params);
                         }
                         if (!sl_for_text.empty())
                             decoded_segments_this_step = true;
@@ -1610,8 +1629,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
                             sl_text += s.text;
                         step_slice_text.emplace_back(sl, std::move(sl_text));
                     } else {
+                        const int64_t abs_t0_cs = window_start_sample_now * 100 / SR + sl.t0_cs;
                         auto slice_segs =
-                            backend->transcribe(pcm_window.data() + sl.start, sl.end - sl.start, sl.t0_cs, params);
+                            backend->transcribe(pcm_window.data() + sl.start, sl.end - sl.start, abs_t0_cs, params);
                         if (!slice_segs.empty())
                             decoded_segments_this_step = true;
                         segs.insert(segs.end(), std::make_move_iterator(slice_segs.begin()),
@@ -1621,7 +1641,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 if (partial_decode_attempted_this_step)
                     last_partial_decode_sample = cumulative_samples;
             } else {
-                segs = backend->transcribe(pcm_window.data(), (int)pcm_window.size(), 0, params);
+                const int64_t no_vad_window_start_cs =
+                    (cumulative_samples - (int64_t)pcm_window.size()) * 100 / SR;
+                segs = backend->transcribe(pcm_window.data(), (int)pcm_window.size(), no_vad_window_start_cs, params);
                 if (!segs.empty())
                     decoded_segments_this_step = true;
             }

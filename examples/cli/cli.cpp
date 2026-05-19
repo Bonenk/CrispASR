@@ -390,6 +390,7 @@ static bool whisper_params_parse_arg_backend_vad(int argc, char** argv, int& i, 
         params.max_new_tokens = std::stoi(ARGV_NEXT);
     } else if (arg == "-ck" || arg == "--chunk-seconds") {
         params.chunk_seconds = std::stoi(ARGV_NEXT);
+        params.chunk_seconds_explicit = true;
     } else if (arg == "--lid-backend") {
         params.lid_backend = ARGV_NEXT;
     } else if (arg == "--lid-model") {

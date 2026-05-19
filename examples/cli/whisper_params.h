@@ -133,6 +133,7 @@ struct whisper_params {
     bool no_auto_aligner = false;
     int32_t max_new_tokens = 512;
     int32_t chunk_seconds = 30;
+    bool    chunk_seconds_explicit = false; // true when user passed --chunk-seconds
     std::string lid_backend;
     std::string lid_model;
     // Post-ASR text LID: when set, after transcription completes, run
