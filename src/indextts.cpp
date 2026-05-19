@@ -46,6 +46,20 @@
 
 #include <unistd.h> // unlink, close, write (external normalizer hook)
 
+// system() is unavailable on iOS (sandbox restriction). Same guard pattern
+// as src/crispasr_mic.cpp and src/crispasr_audio.cpp — the external
+// text-normalizer hook compiles to a pass-through on iOS-family platforms
+// (iOS, tvOS, watchOS, visionOS); the full implementation is available on
+// macOS, Linux, and Windows.
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+#define INDEXTTS_HAS_SUBPROCESS 0
+#else
+#define INDEXTTS_HAS_SUBPROCESS 1
+#endif
+
 namespace {
 
 // ── Hyperparameters ──────────────────────────────────────────────
@@ -272,6 +286,17 @@ static uint32_t normalize_cjk_punct(uint32_t cp) {
 //
 // Security: the env var IS executed via system() — the user is the one
 // setting it. Don't expose this hook to untrusted input sources.
+//
+// iOS-family platforms (iOS, tvOS, watchOS, visionOS) cannot fork/exec
+// from a sandboxed app — system() is __API_UNAVAILABLE(ios) in the SDK
+// and the static-library build fails to link if we reference it. On
+// those platforms maybe_external_normalize collapses to a pass-through;
+// the env var, if set, is silently ignored.
+#if !INDEXTTS_HAS_SUBPROCESS
+static std::string maybe_external_normalize(const std::string& text) {
+    return text;
+}
+#else
 static std::string maybe_external_normalize(const std::string& text) {
     const char* cmd = getenv("INDEXTTS_TEXT_NORMALIZER");
     if (!cmd || !cmd[0]) {
@@ -333,6 +358,7 @@ static std::string maybe_external_normalize(const std::string& text) {
     }
     return out;
 }
+#endif // INDEXTTS_HAS_SUBPROCESS
 
 // Match Python upstream order: punct map → tokenize_by_CJK_char → upper().
 static std::string preprocess_indextts_text(const std::string& text) {
