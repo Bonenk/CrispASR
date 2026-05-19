@@ -212,6 +212,94 @@ share enough that landing one substantially de-risks the other.
 
 ---
 
+## 96. voxcpm2-tts perf — switch to per-step ggml graph (Metal-ready) — open
+
+### Where we are (2026-05-19)
+
+Voice cloning is **structurally correct** end-to-end. The CLI sample-rate
+bug (24 kHz header on 48 kHz PCM, which sounded like half-speed
+distortion) is fixed (`0321fa5e`). Q4_K cloning of "Hello world" with the
+JFK reference now ASR-roundtrips to "Hello world." Diff harness verifies
+every prefill stage matches Python upstream at cos_mean ≥ 0.98 under
+`VOXCPM2_USE_REF=1`.
+
+### Why this is the next priority
+
+Synthesis is slow: 19 s wall-clock for 0.8 s of audio on M1 CPU (Q4_K,
+"Hi", no ref). `VOXCPM2_BENCH=1` (added in `a3dcdd21`) shows the
+per-AR-step breakdown:
+
+  - **cfm (LocDiT × 20 calls)**     63.7%   (1186 ms / step)
+  - **tslm_step (28 layers)**       25.3%   (471 ms / step)
+  - locenc (12 layers × 5 tokens)   10.1%
+  - everything else                 <1% each
+
+Inside `cfm_euler_solve`, `locdit_forward` accounts for ~100% of CFM
+time. Per call it does ~30 `matmul_mv_ggml` invocations, each of which
+builds + computes + frees its own tiny ggml graph (`ggml_init` /
+`ggml_new_graph` / `ggml_backend_graph_compute` / `ggml_free`). That's
+~600 graph builds per AR step just for CFM.
+
+### Why we can't just flip the backend
+
+Tried `g_cpu_backend = ggml_backend_init_best()` (Metal) in `1635e4fa`
+— SIGSEGV on first kernel dispatch. The input tensors in
+`matmul_mv_ggml` live in a CPU-side mem buffer (`ggml_init` with nullptr
+mem_buffer) that the Metal backend can't read directly.
+
+### Right fix: per-step graph
+
+Build a single `ggml_cgraph` per `locdit_forward` call. Inputs flow in
+via `ggml_backend_tensor_set(named_input, host_data)`, outputs read out
+via `ggml_backend_tensor_get`. With that pattern, weights can also live
+on the Metal buffer (load via `load_weights(path, ctx->backend, ...)`)
+and the whole pipeline runs on GPU.
+
+Same shape for `tslm_layer_step` and `ralm_layer_step` (the #2 hotspot,
+25% of AR-step time).
+
+Reference patterns: `qwen3_tts.cpp:1019 build_graph_talker_kv`,
+`chatterbox.cpp:1168 build_graph_t3_kv`, `vibevoice.cpp` — they all do
+this: backend pool (`c->backend`, `c->backend_cpu`), pre-allocated
+`compute_meta` arena, one `build_graph_*` per forward, single
+`ggml_backend_graph_compute`.
+
+### Estimated scope
+
+- `voxcpm2_context`: add `backend`, `backend_cpu`, `compute_meta`,
+  `galloc` (~30 LOC).
+- `build_locdit_graph` (~300 LOC): in_proj / cond_proj / time_mlp /
+  delta_time_mlp / concat / 12 × (RMSNorm / GQA attention with RoPE /
+  SwiGLU FFN / residuals) / final norm / out_proj.
+- `locdit_forward_graph` wrapper (~100 LOC) that compiles t_sin /
+  dt_sin inputs in C++, sets all named inputs, computes, reads out the
+  velocity.
+- `build_tslm_step_graph` (~250 LOC) similar pattern with KV cache as a
+  backend tensor that the graph updates in-place.
+- Gate behind `VOXCPM2_USE_GRAPH=1` initially so both paths coexist
+  during validation. Verify via diff harness (`cfm_step0_result` cosine
+  must stay ≥ 0.93 vs Python, matching current zero-shot). Once
+  verified, swap defaults + remove the per-matmul path.
+
+### Expected speedup
+
+- CPU-only: 2-5× on CFM (cross-op scheduling, no malloc/free churn).
+  Per-AR-step drops from ~1.9 s to ~0.7-1.0 s.
+- Metal: 10-50× on CFM (the actual compute moves to GPU). Per-AR-step
+  under 200 ms.
+
+### Validation gate
+
+The existing diff harness (`build-ninja-compile/bin/crispasr-diff
+voxcpm2-tts ...`) already prints `cfm_step0_result cos_mean`. The graph
+rewrite must keep that number at ≥ 0.93 (current value with
+Python-supplied mu+noise). If it drops, the graph has a numerical bug —
+bisect by stage. Re-run `VOXCPM2_BENCH=1` to confirm the per-AR-step
+times collapse to the targets above.
+
+---
+
+
 ## 54-follow-up. granite-speech-4.1 plus speaker labels + word timestamps — open
 
 Variants 4.1 / 4.1-plus / 4.1-nar shipped bit-exact on JFK → HISTORY
