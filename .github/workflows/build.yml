@@ -153,6 +153,9 @@ jobs:
             export DEBIAN_FRONTEND=noninteractive
             sed -i "s|archive.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
             sed -i "s|security.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
+            # Foreign-arch Ubuntu pulls from ports.ubuntu.com which has
+            # been timing out in QEMU runners; redirect that mirror too.
+            sed -i "s|ports.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
 
             apt update
             apt install -y build-essential libsdl2-dev cmake git
@@ -185,6 +188,9 @@ jobs:
             export DEBIAN_FRONTEND=noninteractive
             sed -i "s|archive.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
             sed -i "s|security.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
+            # Foreign-arch Ubuntu pulls from ports.ubuntu.com which has
+            # been timing out in QEMU runners; redirect that mirror too.
+            sed -i "s|ports.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
 
             apt update
             apt install -y build-essential libsdl2-dev cmake git
@@ -217,6 +223,9 @@ jobs:
             export DEBIAN_FRONTEND=noninteractive
             sed -i "s|archive.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
             sed -i "s|security.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
+            # Foreign-arch Ubuntu pulls from ports.ubuntu.com which has
+            # been timing out in QEMU runners; redirect that mirror too.
+            sed -i "s|ports.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
 
             apt update
             apt install -y build-essential libsdl2-dev cmake git
@@ -307,6 +316,9 @@ jobs:
             export DEBIAN_FRONTEND=noninteractive
             sed -i "s|archive.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
             sed -i "s|security.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
+            # Foreign-arch Ubuntu pulls from ports.ubuntu.com which has
+            # been timing out in QEMU runners; redirect that mirror too.
+            sed -i "s|ports.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
 
             apt update
             apt install -y build-essential cmake libsdl2-dev git
@@ -341,6 +353,9 @@ jobs:
             export DEBIAN_FRONTEND=noninteractive
             sed -i "s|archive.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
             sed -i "s|security.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
+            # Foreign-arch Ubuntu pulls from ports.ubuntu.com which has
+            # been timing out in QEMU runners; redirect that mirror too.
+            sed -i "s|ports.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
 
             apt update
             apt install -y build-essential cmake libsdl2-dev git
@@ -375,6 +390,9 @@ jobs:
             export DEBIAN_FRONTEND=noninteractive
             sed -i "s|archive.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
             sed -i "s|security.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
+            # Foreign-arch Ubuntu pulls from ports.ubuntu.com which has
+            # been timing out in QEMU runners; redirect that mirror too.
+            sed -i "s|ports.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
 
             apt update
             apt install -y build-essential cmake libsdl2-dev git
@@ -412,6 +430,9 @@ jobs:
             export DEBIAN_FRONTEND=noninteractive
             sed -i "s|archive.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
             sed -i "s|security.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
+            # Foreign-arch Ubuntu pulls from ports.ubuntu.com which has
+            # been timing out in QEMU runners; redirect that mirror too.
+            sed -i "s|ports.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
 
             apt update
             apt install -y clang build-essential cmake libsdl2-dev git
@@ -446,6 +467,9 @@ jobs:
             export DEBIAN_FRONTEND=noninteractive
             sed -i "s|archive.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
             sed -i "s|security.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
+            # Foreign-arch Ubuntu pulls from ports.ubuntu.com which has
+            # been timing out in QEMU runners; redirect that mirror too.
+            sed -i "s|ports.ubuntu.com|mirrors.kernel.org|g" /etc/apt/sources.list
 
             apt update
             apt install -y build-essential cmake git
