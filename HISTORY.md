@@ -6,6 +6,79 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-20 sensevoice: FunAudioLLM/SenseVoiceSmall — multi-task ASR + LID + emotion + audio-event
+
+**Change.** Encoder-only sibling of Fun-ASR-Nano: same
+`SenseVoiceEncoderSmall` topology (1 entry block @ 560→512 + 49 main
++ 20 tp = 70 SANM blocks), but the LLM decoder is replaced by a
+4-query-embed prepend + CTC head (25055 SentencePiece pieces). One
+forward pass emits transcript + spoken language + emotion + audio-event
+class through reserved positions in the same CTC vocab — no AR loop,
+no KV cache.
+
+  audio (16 kHz)
+    → kaldi-fbank (hamming) + LFR(7, 6)           → (T_lfr, 560)
+    → prepend 4 query embeds
+        [lang_id, event_q=1, emo_q=2, textnorm_q]  → (T_lfr+4, 560)
+    → SenseVoiceEncoderSmall (70 SANM blocks)     → (T_lfr+4, 512)
+    → CTC head (Linear 512→25055)                  → (T_lfr+4, 25055)
+    → greedy CTC + SentencePiece detokenize
+
+Output carries the multi-task prefix as readable special tokens
+followed by the SentencePiece-detokenised transcript:
+
+  <|en|><|ANGRY|><|Speech|><|withitn|>And so my fellow Americans...
+  <|zh|><|NEUTRAL|><|Speech|><|withitn|>开饭时间早上9点至下午5点。
+
+**Reuse.** All the infrastructure from the funasr port carries over
+unchanged — `src/core/sanm.h`, `src/core/lfr.h`, and the Hamming
+window knob on `src/core/kaldi_fbank` were built generically enough
+that the new runtime is ~800 LOC of mostly glue: loader, query-embed
+gather + concat, CTC head + greedy decode, ▁→space SentencePiece
+detokenize. No new core helpers needed.
+
+**Verification.** `crispasr-diff sensevoice` is 76/76 PASS on
+`zh.mp3` (byte-identical `generated_text`) and 75/76 on
+`samples/jfk.wav` — the single jfk miss is the emotion-tag argmax
+flipping `<|ANGRY|>` ↔ `<|EMO_UNKNOWN|>` at cos=0.999846 (F16 +
+flash-attn op-order noise on a near-tied logit; the actual transcript
+text is byte-identical and upstream Python is itself inconsistent on
+this clip). All 5 example mp3s (zh / yue / en / ja / ko) produce
+correct LID + correct script transcripts.
+
+**Perf.** Apple M1 Metal F16:
+
+| Clip | T_lfr | Wall | Realtime |
+| --- | ---: | ---: | ---: |
+| `example/zh.mp3`  (5.6 s) | 94  | 0.58 s | 9.8× |
+| `example/en.mp3`  (7.2 s) | 121 | 0.46 s | 15.6× |
+| `example/ja.mp3`  (7.2 s) | 121 | 0.45 s | 16.2× |
+| `example/ko.mp3`  (4.6 s) | 77  | 0.41 s | 11.4× |
+| `example/yue.mp3` (5.2 s) | 87  | 0.37 s | 13.9× |
+| `samples/jfk.wav` (11 s)  | 183 | 0.50 s | 21.8× |
+
+Matches upstream's "15× faster than Whisper-Large" claim and is
+3-4× faster than the funasr port on the same clips (because there's
+no Qwen3-0.6B AR decode — every position runs in parallel through
+the CTC head).
+
+**Files.** New `src/sensevoice.{h,cpp}` (~800 LOC),
+`examples/cli/crispasr_backend_sensevoice.cpp`,
+`models/convert-sensevoice-to-gguf.py`,
+`tools/reference_backends/sensevoice.py`,
+`hf_readmes/sensevoice-small-GGUF.md`. Edited `src/CMakeLists.txt`,
+`examples/cli/CMakeLists.txt`, `examples/cli/crispasr_backend.cpp`
+(dispatch + filename + GGUF-arch auto-routes),
+`examples/cli/crispasr_diff_main.cpp` (per-backend `sensevoice` branch),
+`src/crispasr_model_registry.cpp` (+1 entry with FunASR Model License
+v1.1 attribution), `tools/dump_reference.py` (REGISTERED_BACKENDS).
+
+**HF.** `cstr/sensevoice-small-GGUF` uploaded (F16, 0.47 GB — four
+times smaller than funasr-nano-2512 because no LLM half). Wired
+into `-m auto` with the license note printed on first download.
+README adds the row, the feature-matrix column, the
+multilingual-recipe entry.
+
 ## 2026-05-20 parakeet-ja long-audio collapse on no-VAD path (issue #89)
 
 `lenhone` reported that parakeet-tdt-0.6b-ja stopped transcribing past

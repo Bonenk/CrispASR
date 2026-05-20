@@ -5616,3 +5616,163 @@ the VAE. Not the deep transformer body.
 
 Cross-ref: [[project_voxcpm2_vae_kwargs_bug]] (real bug fix earlier
 in the same session, contrasts with this non-bug).
+
+---
+
+## SANM-encoder family (FunASR / SenseVoice / CosyVoice)
+
+### The same `SenseVoiceEncoderSmall` ships in at least three FunAudioLLM products
+
+Fun-ASR-Nano-2512, Fun-ASR-MLT-Nano-2512, and SenseVoiceSmall all use
+the identical 70-block `SenseVoiceEncoderSmall` topology (1 entry
+block @ 560→512 with `encoders0`, 49 main blocks via `encoders`,
+20 tp blocks via `tp_encoders`, `after_norm` between, `tp_norm` at
+end; 512-dim, 4 heads, kernel 11). The encoder weights ARE different
+across the three releases (each is fine-tuned for its product) but
+the C++ runtime is shared: factor everything that touches a SANM
+block into `src/core/sanm.h` (`core_sanm::BlockWeights`,
+`BlockParams`, `build_block`) and reuse it from each per-model `*.cpp`.
+
+If we ever port CosyVoice2 / CosyVoice3 the same encoder is in there
+too (it's the text-to-codec semantic-encoder bottleneck). One
+helper, three+ consumers.
+
+### config.yaml advertises CTC; Fun-ASR's `model.pt` ships none of it
+
+Upstream `config.yaml` and `funasr/models/fun_asr_nano/model.py`
+declare a `ctc_decoder` + a `CTC` head; the published checkpoint for
+Fun-ASR-Nano-2512 and Fun-ASR-MLT-Nano-2512 ships **only**
+`audio_encoder.* + audio_adaptor.* + llm.*` (1261 tensors total, zero
+`ctc_decoder.*` / `ctc.ctc_lo.*` keys). If you trust the config you'll
+spend a day chasing a CTC path that isn't there. Verify by enumerating
+the state-dict prefixes before writing converter code.
+
+The CTC weights live in **SenseVoiceSmall** instead — same encoder
+shape, but the published `model.pt` carries `encoder.* + embed.*
++ ctc.*` and skips the LLM. That's the model to use when you want
+fast non-AR multi-task ASR; Fun-ASR-Nano is the one to use when you
+want LLM-quality text output (and can pay the AR cost).
+
+### Adaptor `MultiHeadedAttention` default heads is 8, not 16 (Fun-ASR)
+
+`funasr.models.llm_asr.adaptor.Transformer` builds the per-block
+attention as `MultiHeadedAttention(kwargs.get("attention_heads", 8),
+llm_dim, ...)` and `config.yaml`'s `audio_adaptor_conf` does NOT pass
+`attention_heads`. So the adaptor's two transformer blocks run at
+**8 heads (head_dim = 128)**, not the 16 you'd guess from
+`llm_dim / 64`. The CrispASR converter wrote 16 into the GGUF
+`funasr.ada_n_heads` KV by mistake; the runtime ignores that KV
+and hard-codes 8. Mis-counting drops the adaptor's cosine similarity
+to ~0.6 (vs cos=1.0 on the 70-layer encoder which is bit-near-exact)
+and produces a one-character-off Chinese transcript (`开放` instead of
+`开饭`). The diff harness catches this immediately, but only if you
+run it.
+
+### EncoderLayerSANM drops the attn residual when `in_size != size`
+
+```python
+if self.in_size == self.size:
+    x = residual + dropout(self_attn(x, mask))     # standard
+else:
+    x = dropout(self_attn(x, mask))                # no residual
+```
+
+`encoders0[0]` (the entry block, `in_size=560, size=512`) is the
+only one of the 70 blocks that hits this branch. The C++ encoder
+block builder needs an `apply_attn_residual` flag (or two code
+paths). Forgetting to special-case it produces a 560-dim residual
+being added to a 512-dim output, which won't even compile in ggml —
+but if you silently pad / project the residual to 512, you get a
+model that "works" but has subtly wrong activations from layer 0
+onward.
+
+### SANM FSMN memory branch has its own pre-conv-V residual
+
+```python
+def forward_fsmn(self, inputs, mask, ...):
+    x = inputs.transpose(1, 2)
+    x = self.pad_fn(x)
+    x = self.fsmn_block(x)               # depthwise Conv1d, no bias
+    x = x.transpose(1, 2)
+    x += inputs                          # ← residual to PRE-conv V
+    return x
+```
+
+The full SANM block output is `att_out + fsmn_memory`. Two
+non-obvious things: (1) FSMN convolves over **V only** (not Q or K,
+and not the post-MHA result), (2) the FSMN branch carries its own
+residual to V **before** joining the MHA path. Drawing the dataflow
+with one arrow fewer or one arrow more both produce a network that
+compiles fine but yields ~cos 0.5 vs the reference.
+
+### `use_low_frame_rate=true` shrinks the prompt placeholder count (Fun-ASR)
+
+config.yaml `audio_adaptor_conf.use_low_frame_rate: true` triggers
+a 3× `(x-1)//2+1` reduction in `fake_token_len_i` inside
+`FunASRNano.data_load_speech`, even though the adaptor itself has
+`downsample_rate: 1` (no actual downsample in the forward graph).
+The prompt builder reserves the reduced number of placeholder slots,
+and only `adaptor_out[:fake_token_len_i]` gets spliced — the rest
+of the adaptor frames are discarded. Looks like a vestige of an
+earlier adaptor design; mirror it verbatim and the model still
+produces correct transcripts.
+
+### funasr 1.3.1 packaging bug — `from ctc import CTC` is absolute
+
+`funasr/models/fun_asr_nano/model.py` line 20 imports CTC with an
+unqualified name; on a clean install this fails with
+`ModuleNotFoundError: No module named 'ctc'`. Workaround in
+`tools/reference_backends/funasr.py`
+(`_ensure_fun_asr_nano_importable`): prepend the `fun_asr_nano/`
+directory to `sys.path` before importing. Don't try to upstream-fix
+this on user machines.
+
+### Flash-attn crossover sits at ~T_lfr=100-150 (~6 s audio)
+
+`FUNASR_NO_FA=1` (and the same shape `SENSEVOICE_NO_FA=1`) reverts the
+SANM + adaptor MHA from `ggml_flash_attn_ext` back to the unfused
+`mul_mat + soft_max_ext + mul_mat` path. On Apple M1 Metal:
+
+| Clip | T_lfr | FA ON | FA OFF | Total Δ |
+| --- | ---: | ---: | ---: | --- |
+| zh.mp3 (5.6 s) | 94 | 196 ms | 166 ms | FA OFF wins 6 % |
+| samples/jfk.wav (11 s) | 183 | 258 ms | 370 ms | FA ON wins 7 % |
+
+Below T≈100 the FA kernel-launch overhead eats the win; above T≈150
+the fused-softmax+matmul kernel pulls clearly ahead. Default ON is
+right for typical ASR workloads (most utterances ≥6 s); realtime
+users splitting on tight VAD windows may want the opt-out.
+
+### SenseVoice query-embed pattern — multi-task output via prepended tokens, not separate heads
+
+SenseVoiceSmall's "4 outputs in one CTC pass" trick is **not** four
+classifier heads — it's a 16-row embedding table (`embed.weight`,
+`(16, 560)`) prepended to the LFR fbank features. The first 4
+positions of the encoder output go through the same CTC head as the
+rest of the sequence, but the CTC vocab reserves slot ranges for
+language IDs (24884-24992), emotions (25001-25009), audio events,
+and ITN flags (25016-25017). So the model "writes" the multi-task
+predictions to the first 4 positions via the standard CTC argmax,
+and the transcript follows from position 4 onward.
+
+This means the C++ runtime needs zero per-task classifier code —
+just one CTC head + the query-embed prepend. The runtime decides
+which of the 4 query rows to prepend (language hint, ITN flag) at
+inference time; the model uses them as the implicit "channel
+selector" for the encoder output positions.
+
+If the upstream model adds a new task (e.g. speaker ID) the
+infrastructure on our side stays exactly the same — they extend
+the query-embed table + the CTC vocab; we just read whichever new
+special-token IDs get emitted from position 0..3.
+
+### SentencePiece detokenise without linking libsentencepiece
+
+For CTC-decode-only consumers, we don't need full SentencePiece —
+just a piece-ID → piece-string table. Extract the table once at
+convert time via `sp.id_to_piece(i)` for i in range(vocab_size),
+write it as `tokenizer.ggml.tokens`, and detokenise at runtime by
+looking up each ID and replacing the SentencePiece leading-space
+marker `▁` (U+2581, "\xE2\x96\x81") with an ASCII space. ~20 LOC
+of C++, no link-time dep. Same pattern canary-ctc / firered-asr
+already use.
