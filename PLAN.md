@@ -41,6 +41,7 @@ test-all-backends.py passes 18/18 transcribe + 51/54 feature tests (3 stream ski
 | **MEDIUM** | [#86 Per-backend flash-attention wiring](#86-per-backend-flash-attention-wiring-crisperweaver-driven) | 2–3 days | Plumbing shipped 0.6.2; kernel-level wiring per backend is the remaining work. Whisper done; orpheus/chatterbox-T3 are the next-best pickings. |
 | **LOW** | [#87 `gpu_backend` runtime selector](#87-gpu_backend-runtime-selector-multi-backend-ggml-build) | ~1 week | Needs ggml-side multi-backend dispatch to land first. CrisperWeaver UI placeholder ready when the C-side is. |
 | **LOW** | [#95 IndexTTS Chinese TN binary alternative](#95-indextts-15-chinese-tn--binary-alternative-to-the-python-wetext-hook) | survey only | Python `INDEXTTS_TEXT_NORMALIZER` hook shipped 2026-05-19. Hand-roll (#95a) is the right next step *when* a user reports a digit/date prompt that breaks; OpenFST vendoring (#95b) only after #95a grows past ~5 cases. |
+| **LOW** | [#97 More Parakeet variants](#97-more-parakeet-variants) | Small per-variant | Converter-only for TDT / TDT+CTC variants (v2, tdt-1.1b, tdt_ctc-{110m,1.1b}); RNNT / realtime-EOU / unified-en deferred (need new decoder code or arch survey). |
 
 **Recently completed** (full write-ups in HISTORY.md): **SenseVoiceSmall → HISTORY 2026-05-20** (encoder-only multi-task ASR: transcript + LID + emotion + audio-event in one CTC pass; 50+ langs; 9.8-21.8× realtime on M1 Metal; reuses the SANM block helper from the funasr port unchanged; `cstr/sensevoice-small-GGUF` 0.47 GB F16, wired into `-m auto`). **Fun-ASR-Nano + MLT-Nano → HISTORY 2026-05-20** (full LLM-decoder runtime — 70-block SANM encoder + 2-block Transformer adaptor + Qwen3-0.6B AR decode; 77/77 PASS byte-identical on Chinese + English diffs; ~9× realtime on M1 Metal with FA-default-on; both GGUFs at `cstr/funasr-{nano,mlt-nano}-GGUF`). **#57 chatterbox native voice clone → §82** (six-commit sprint shipping all four upstream cond extractors — VoiceEncoder LSTM, S3Tokenizer V2, CAMPPlus, 24 kHz Matcha mel — plus a Kaiser-windowed sinc resampler and atomic 5-cond install in `chatterbox_set_voice_from_wav`'s `.wav` branch; `--voice ref_24k.wav` produces real cloned speech without any python). **#69 + #72 + #73 cap-honesty + KV/layer offload knobs → §79** (14-commit session shipping `CRISPASR_KV_QUANT_K/_V` + `KV_ON_CPU` on 14 backends, `N_GPU_LAYERS` on 10 backends, gemma4/mimo GPU-residency 2.2x / 22 % faster, plus cap-honesty cleanup on parakeet/glm-asr/qwen3/gemma4/omniasr). **vibevoice #69a follow-up → §79b** (mode-aware `tts_lm.layers.` / `lm.layers.` prefix predicate). #78 Chatterbox vocoder → §78. #11 WebSocket server → §76, #63 Feature matrix parity → §72, #59 binding parity → §73, gemma4 #49 + Docker #31 → §74, tests + KV Q8_0 + cleanup → §75. Earlier: #5→§63, #16→§55, #51→§56, #51b→§60, #53→§63, #54→§61, #55→§54, #56→§63, #60d→§64.
 
@@ -86,6 +87,58 @@ GPU inference on very long audio (100+ tokens), where the encoder
 speedup from GPU is already the dominant improvement.
 
 **Effort:** ~150 LOC. Small gain.
+
+---
+
+## 97. More Parakeet variants
+
+The runtime in `src/parakeet.cpp` already dispatches TDT vs CTC via the
+`has_ctc` GGUF flag (line 1669), and `models/convert-parakeet-to-gguf.py`
+reads every hparam from `model_config.yaml` + cross-checks against actual
+tensor shapes (line 314+). So most NVIDIA Parakeet checkpoints that share
+the FastConformer-encoder + TDT-or-CTC-decoder shape should be
+converter-runs with no new C++.
+
+### In progress — TDT / TDT+CTC (no new runtime code expected)
+
+- [ ] `nvidia/parakeet-tdt-0.6b-v2` — English-only TDT, same arch as v3.
+  Cheapest English-quality win; baseline `parakeet-tdt-0.6b-v2 vs -v3`
+  WER head-to-head before any hotword work.
+- [ ] `nvidia/parakeet-tdt-1.1b` — larger pure TDT. May surface
+  hardcoded-d_model assumptions; cross-checks at converter:314+ should
+  catch them.
+- [ ] `nvidia/parakeet-tdt_ctc-110m` — smallest hybrid. Useful for low-RAM
+  hosts; validates the C++ `has_ctc` dispatch on a non-`-ja` hybrid.
+- [ ] `nvidia/parakeet-tdt_ctc-1.1b` — largest hybrid; bench against
+  canary-1b-v2 for the "big multilingual ASR" slot.
+
+Per-variant work:
+1. Download `.nemo` from HF (`huggingface-cli download nvidia/<id>`).
+2. `python models/convert-parakeet-to-gguf.py --nemo <…>.nemo --output …`
+   then `--quant q4_k` / `q8_0` passes.
+3. Smoke test: `build-ninja-compile/bin/crispasr -m <gguf> <wav>`.
+4. If smoke OK, upload to `cstr/<id>-GGUF` per the
+   `hf upload-large-folder` recipe in `.claude/CLAUDE.md`.
+
+### Deferred — needs new decoder code or arch survey
+
+- **`nvidia/parakeet-rnnt-0.6b`** + **`nvidia/parakeet-rnnt-1.1b`** —
+  standard RNN-Transducer (no duration head). `parakeet_tdt_decode` in
+  `src/parakeet.cpp:999` is the template; an RNNT decoder is "TDT minus
+  the duration argmax." Estimated ~80–150 LOC + a converter branch that
+  doesn't write `parakeet.n_tdt_durations` / `parakeet.tdt_durations`.
+- **`nvidia/parakeet_realtime_eou_120m-v1`** — streaming + end-of-utterance
+  head. Needs cache-aware FastConformer streaming (cf. PLAN #81 Nemotron),
+  plus an EOU head. Not a converter-only job.
+- **`nvidia/parakeet-unified-en-0.6b`** — recent "unified" variant; needs
+  a model-card / architecture read before scoping. Likely shares the
+  FastConformer encoder; "unified" suggests joint TDT+CTC+attention or
+  joint streaming+offline. Decide after reading the card.
+
+### Won't do
+
+- `parakeet-ctc-0.6b-Vietnamese` — already runtime-supported (CTC); ship
+  if a Vietnamese user asks. Tracked as a known gap, not active work.
 
 ---
 
