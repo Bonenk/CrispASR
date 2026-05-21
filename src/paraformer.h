@@ -26,7 +26,7 @@ struct paraformer_context;
 
 struct paraformer_context_params {
     int n_threads;
-    int verbosity;       // 0 = silent, 1 = normal, 2 = debug
+    int verbosity; // 0 = silent, 1 = normal, 2 = debug
     bool flash_attn;
 };
 
@@ -39,8 +39,8 @@ void paraformer_free(paraformer_context* ctx);
 char* paraformer_transcribe(paraformer_context* ctx, const float* samples, int n_samples);
 
 // Stage-capture API for the diff harness.
-float* paraformer_extract_stage(paraformer_context* ctx, const float* samples, int n_samples,
-                                const char* stage_name, int* n_out);
+float* paraformer_extract_stage(paraformer_context* ctx, const float* samples, int n_samples, const char* stage_name,
+                                int* n_out);
 
 #ifdef __cplusplus
 }

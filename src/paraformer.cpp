@@ -36,11 +36,11 @@ struct paraformer_decoder_block {
     // FFN: w_1 → relu → internal LN → w_2 (no w_2 bias)
     ggml_tensor *ffn_l1_w = nullptr, *ffn_l1_b = nullptr;
     ggml_tensor *ffn_norm_w = nullptr, *ffn_norm_b = nullptr;
-    ggml_tensor *ffn_l2_w = nullptr;
+    ggml_tensor* ffn_l2_w = nullptr;
     // norm2 (before FSMN)
     ggml_tensor *norm2_w = nullptr, *norm2_b = nullptr;
     // FSMN depthwise conv (self-attn substitute)
-    ggml_tensor *fsmn_w = nullptr;  // (n_feat, K)
+    ggml_tensor* fsmn_w = nullptr; // (n_feat, K)
     // norm3 (before cross-attention)
     ggml_tensor *norm3_w = nullptr, *norm3_b = nullptr;
     // Cross-attention: Q from decoder, fused K+V from encoder
@@ -53,7 +53,7 @@ struct paraformer_decoder_post {
     ggml_tensor *norm1_w = nullptr, *norm1_b = nullptr;
     ggml_tensor *ffn_l1_w = nullptr, *ffn_l1_b = nullptr;
     ggml_tensor *ffn_norm_w = nullptr, *ffn_norm_b = nullptr;
-    ggml_tensor *ffn_l2_w = nullptr;
+    ggml_tensor* ffn_l2_w = nullptr;
 };
 
 struct paraformer_model {
@@ -88,7 +88,7 @@ struct paraformer_model {
     paraformer_decoder_post dec_post;
     ggml_tensor *dec_after_norm_w = nullptr, *dec_after_norm_b = nullptr;
     ggml_tensor *dec_output_w = nullptr, *dec_output_b = nullptr;
-    ggml_tensor *dec_embed_w = nullptr;  // (vocab, d_model)
+    ggml_tensor* dec_embed_w = nullptr; // (vocab, d_model)
 };
 
 struct paraformer_context {
@@ -99,7 +99,7 @@ struct paraformer_context {
     int n_threads = 4;
     bool flash_attn = true;
     int verbosity = 0;
-    std::vector<std::string> vocab;  // token strings
+    std::vector<std::string> vocab; // token strings
     std::vector<char> compute_meta;
 };
 
@@ -121,7 +121,9 @@ static bool paraformer_load_model(paraformer_context* ctx) {
     auto& m = ctx->model;
     auto& hp = m.hp;
     // Keep a reference to wl for require()
-    struct { core_gguf::WeightLoad* tensors_ref; } wl_wrapper;
+    struct {
+        core_gguf::WeightLoad* tensors_ref;
+    } wl_wrapper;
 
     auto get = [&](const char* name) -> ggml_tensor* {
         auto it = ctx->wl.tensors.find(name);
@@ -159,13 +161,19 @@ static bool paraformer_load_model(paraformer_context* ctx) {
             std::snprintf(buf, sizeof(buf), "paraformer.enc0.blk.%u.%s", i, suf);
             return get(buf);
         };
-        b.norm1_w = g("norm1.w");    b.norm1_b = g("norm1.b");
-        b.norm2_w = g("norm2.w");    b.norm2_b = g("norm2.b");
-        b.attn_qkv_w = g("attn.qkv.w"); b.attn_qkv_b = g("attn.qkv.b");
-        b.attn_out_w = g("attn.out.w"); b.attn_out_b = g("attn.out.b");
+        b.norm1_w = g("norm1.w");
+        b.norm1_b = g("norm1.b");
+        b.norm2_w = g("norm2.w");
+        b.norm2_b = g("norm2.b");
+        b.attn_qkv_w = g("attn.qkv.w");
+        b.attn_qkv_b = g("attn.qkv.b");
+        b.attn_out_w = g("attn.out.w");
+        b.attn_out_b = g("attn.out.b");
         b.attn_fsmn_w = g("attn.fsmn.w");
-        b.ffn_l1_w = g("ffn.l1.w");  b.ffn_l1_b = g("ffn.l1.b");
-        b.ffn_l2_w = g("ffn.l2.w");  b.ffn_l2_b = g("ffn.l2.b");
+        b.ffn_l1_w = g("ffn.l1.w");
+        b.ffn_l1_b = g("ffn.l1.b");
+        b.ffn_l2_w = g("ffn.l2.w");
+        b.ffn_l2_b = g("ffn.l2.b");
     }
 
     // Encoder: main blocks
@@ -177,13 +185,19 @@ static bool paraformer_load_model(paraformer_context* ctx) {
             std::snprintf(buf, sizeof(buf), "paraformer.enc.blk.%u.%s", i, suf);
             return get(buf);
         };
-        b.norm1_w = g("norm1.w");    b.norm1_b = g("norm1.b");
-        b.norm2_w = g("norm2.w");    b.norm2_b = g("norm2.b");
-        b.attn_qkv_w = g("attn.qkv.w"); b.attn_qkv_b = g("attn.qkv.b");
-        b.attn_out_w = g("attn.out.w"); b.attn_out_b = g("attn.out.b");
+        b.norm1_w = g("norm1.w");
+        b.norm1_b = g("norm1.b");
+        b.norm2_w = g("norm2.w");
+        b.norm2_b = g("norm2.b");
+        b.attn_qkv_w = g("attn.qkv.w");
+        b.attn_qkv_b = g("attn.qkv.b");
+        b.attn_out_w = g("attn.out.w");
+        b.attn_out_b = g("attn.out.b");
         b.attn_fsmn_w = g("attn.fsmn.w");
-        b.ffn_l1_w = g("ffn.l1.w");  b.ffn_l1_b = g("ffn.l1.b");
-        b.ffn_l2_w = g("ffn.l2.w");  b.ffn_l2_b = g("ffn.l2.b");
+        b.ffn_l1_w = g("ffn.l1.w");
+        b.ffn_l1_b = g("ffn.l1.b");
+        b.ffn_l2_w = g("ffn.l2.w");
+        b.ffn_l2_b = g("ffn.l2.b");
     }
 
     m.enc_after_norm_w = get("paraformer.enc.after_norm.w");
@@ -204,15 +218,23 @@ static bool paraformer_load_model(paraformer_context* ctx) {
             std::snprintf(buf, sizeof(buf), "paraformer.dec.blk.%u.%s", i, suf);
             return get(buf);
         };
-        b.norm1_w = g("norm1.w");    b.norm1_b = g("norm1.b");
+        b.norm1_w = g("norm1.w");
+        b.norm1_b = g("norm1.b");
         b.fsmn_w = g("fsmn.w");
-        b.norm2_w = g("norm2.w");    b.norm2_b = g("norm2.b");
-        b.cross_q_w = g("cross.q.w");   b.cross_q_b = g("cross.q.b");
-        b.cross_kv_w = g("cross.kv.w"); b.cross_kv_b = g("cross.kv.b");
-        b.cross_out_w = g("cross.out.w"); b.cross_out_b = g("cross.out.b");
-        b.norm3_w = g("norm3.w");    b.norm3_b = g("norm3.b");
-        b.ffn_l1_w = g("ffn.l1.w");  b.ffn_l1_b = g("ffn.l1.b");
-        b.ffn_norm_w = g("ffn.norm.w"); b.ffn_norm_b = g("ffn.norm.b");
+        b.norm2_w = g("norm2.w");
+        b.norm2_b = g("norm2.b");
+        b.cross_q_w = g("cross.q.w");
+        b.cross_q_b = g("cross.q.b");
+        b.cross_kv_w = g("cross.kv.w");
+        b.cross_kv_b = g("cross.kv.b");
+        b.cross_out_w = g("cross.out.w");
+        b.cross_out_b = g("cross.out.b");
+        b.norm3_w = g("norm3.w");
+        b.norm3_b = g("norm3.b");
+        b.ffn_l1_w = g("ffn.l1.w");
+        b.ffn_l1_b = g("ffn.l1.b");
+        b.ffn_norm_w = g("ffn.norm.w");
+        b.ffn_norm_b = g("ffn.norm.b");
         b.ffn_l2_w = g("ffn.l2.w");
     }
 
@@ -223,9 +245,12 @@ static bool paraformer_load_model(paraformer_context* ctx) {
             std::snprintf(buf, sizeof(buf), "paraformer.dec.post.%s", suf);
             return get(buf);
         };
-        m.dec_post.norm1_w = g("norm1.w"); m.dec_post.norm1_b = g("norm1.b");
-        m.dec_post.ffn_l1_w = g("ffn.l1.w"); m.dec_post.ffn_l1_b = g("ffn.l1.b");
-        m.dec_post.ffn_norm_w = g("ffn.norm.w"); m.dec_post.ffn_norm_b = g("ffn.norm.b");
+        m.dec_post.norm1_w = g("norm1.w");
+        m.dec_post.norm1_b = g("norm1.b");
+        m.dec_post.ffn_l1_w = g("ffn.l1.w");
+        m.dec_post.ffn_l1_b = g("ffn.l1.b");
+        m.dec_post.ffn_norm_w = g("ffn.norm.w");
+        m.dec_post.ffn_norm_b = g("ffn.norm.b");
         m.dec_post.ffn_l2_w = g("ffn.l2.w");
     }
 
@@ -243,7 +268,7 @@ static bool paraformer_load_model(paraformer_context* ctx) {
 // ===========================================================================
 
 static std::vector<float> paraformer_compute_features(paraformer_context* ctx, const float* pcm, int n_samples,
-                                                       int& T_lfr, int& D_lfr) {
+                                                      int& T_lfr, int& D_lfr) {
     const auto& hp = ctx->model.hp;
 
     // Kaldi fbank
@@ -262,13 +287,13 @@ static std::vector<float> paraformer_compute_features(paraformer_context* ctx, c
 
     // LFR (stack lfr_m frames with stride lfr_n)
     auto lfr = core_lfr::stack(fbank.data(), T_raw, (int)hp.n_mels, (int)hp.lfr_m, (int)hp.lfr_n, T_lfr);
-    D_lfr = (int)hp.n_mels * (int)hp.lfr_m;  // 80*7 = 560
+    D_lfr = (int)hp.n_mels * (int)hp.lfr_m; // 80*7 = 560
 
     // CMVN: x = (x + shift) * scale (AddShift + Rescale)
     if (ctx->model.cmvn_shift && ctx->model.cmvn_scale) {
         const size_t cmvn_sz = ggml_nbytes(ctx->model.cmvn_shift);
-        fprintf(stderr, "paraformer: CMVN shift nbytes=%zu, D_lfr=%d, expect=%zu\n",
-                cmvn_sz, D_lfr, (size_t)D_lfr * sizeof(float));
+        fprintf(stderr, "paraformer: CMVN shift nbytes=%zu, D_lfr=%d, expect=%zu\n", cmvn_sz, D_lfr,
+                (size_t)D_lfr * sizeof(float));
         std::vector<float> shift_v((size_t)D_lfr);
         std::vector<float> scale_v((size_t)D_lfr);
         ggml_backend_tensor_get(ctx->model.cmvn_shift, shift_v.data(), 0, D_lfr * sizeof(float));
@@ -325,14 +350,15 @@ static void cif_predict(paraformer_context* ctx, const float* enc_out, int T, in
         for (int o = 0; o < D; o++) {
             float val = conv_b[o];
             for (int k = 0; k < 3; k++) {
-                int ti = t - 1 + k;  // padding=1: shift by 1
-                if (ti < 0 || ti >= T) continue;
+                int ti = t - 1 + k; // padding=1: shift by 1
+                if (ti < 0 || ti >= T)
+                    continue;
                 for (int d = 0; d < D; d++) {
                     // conv_w layout: (out_ch, in_ch, K) → w[o * D * 3 + d * 3 + k]
                     val += conv_w[(size_t)o * D * 3 + (size_t)d * 3 + k] * enc_out[(size_t)ti * D + d];
                 }
             }
-            conv_out[(size_t)t * D + o] = val > 0.0f ? val : 0.0f;  // ReLU
+            conv_out[(size_t)t * D + o] = val > 0.0f ? val : 0.0f; // ReLU
         }
     }
 
@@ -343,13 +369,13 @@ static void cif_predict(paraformer_context* ctx, const float* enc_out, int T, in
         for (int d = 0; d < D; d++) {
             val += out_w[d] * conv_out[(size_t)t * D + d];
         }
-        alphas[t] = 1.0f / (1.0f + std::exp(-val));  // sigmoid
+        alphas[t] = 1.0f / (1.0f + std::exp(-val)); // sigmoid
     }
 
     // CIF accumulation: integrate alphas, fire when ≥ 1.0
     const float tail_threshold = 0.45f;
     float accum = 0.0f;
-    std::vector<float> fired;   // (D,) vectors, one per fired token
+    std::vector<float> fired; // (D,) vectors, one per fired token
     std::vector<float> partial((size_t)D, 0.0f);
 
     for (int t = 0; t < T; t++) {
@@ -387,9 +413,9 @@ static void cif_predict(paraformer_context* ctx, const float* enc_out, int T, in
 // Decoder graph build (FSMN + cross-attention + FFN-with-LN)
 // ===========================================================================
 
-static ggml_tensor* build_decoder_block(ggml_context* ctx0, ggml_tensor* cur, ggml_tensor* enc_out,
-                                         int N, int T_enc, const paraformer_decoder_block& b,
-                                         int D, int n_heads, int head_dim, float eps, bool flash_attn) {
+static ggml_tensor* build_decoder_block(ggml_context* ctx0, ggml_tensor* cur, ggml_tensor* enc_out, int N, int T_enc,
+                                        const paraformer_decoder_block& b, int D, int n_heads, int head_dim, float eps,
+                                        bool flash_attn) {
     // Upstream order (DecoderLayerSANM.forward):
     //   1. norm1 → FFN (no residual yet)
     //   2. norm2 → FSMN (with internal conv+identity residual) → add original input
@@ -398,10 +424,10 @@ static ggml_tensor* build_decoder_block(ggml_context* ctx0, ggml_tensor* cur, gg
     // 1. FFN: norm1 → w_1 → relu → internal LN → w_2
     ggml_tensor* residual = cur;
     ggml_tensor* x = ggml_norm_affine(ctx0, cur, b.norm1_w, b.norm1_b, eps);
-    x = mm_bias(ctx0, b.ffn_l1_w, x, b.ffn_l1_b);     // (ffn_dim, N)
+    x = mm_bias(ctx0, b.ffn_l1_w, x, b.ffn_l1_b); // (ffn_dim, N)
     x = ggml_relu(ctx0, x);
-    x = ggml_norm_affine(ctx0, x, b.ffn_norm_w, b.ffn_norm_b, eps);  // internal LN after activation
-    x = ggml_mul_mat(ctx0, b.ffn_l2_w, x);              // no bias on w_2
+    x = ggml_norm_affine(ctx0, x, b.ffn_norm_w, b.ffn_norm_b, eps); // internal LN after activation
+    x = ggml_mul_mat(ctx0, b.ffn_l2_w, x);                          // no bias on w_2
     // No residual addition here — residual spans FFN + FSMN together.
 
     // 2. FSMN self-attention: norm2 → depthwise conv + internal residual → add original input
@@ -413,14 +439,14 @@ static ggml_tensor* build_decoder_block(ggml_context* ctx0, ggml_tensor* cur, gg
         ggml_tensor* w4 = ggml_cast(ctx0, b.fsmn_w, GGML_TYPE_F32);
         w4 = ggml_reshape_4d(ctx0, w4, K, 1, 1, D);
 
-        ggml_tensor* v4 = ggml_cont(ctx0, ggml_transpose(ctx0, normed));  // (N, D)
+        ggml_tensor* v4 = ggml_cont(ctx0, ggml_transpose(ctx0, normed)); // (N, D)
         v4 = ggml_reshape_4d(ctx0, v4, N, 1, D, 1);
         ggml_tensor* y = ggml_conv_2d_dw_direct(ctx0, w4, v4, 1, 1, (K - 1) / 2, 0, 1, 1);
         y = ggml_cont(ctx0, ggml_permute(ctx0, y, 1, 2, 0, 3));
         y = ggml_reshape_2d(ctx0, y, D, N);
-        x = ggml_add(ctx0, y, normed);  // FSMN internal residual: conv(normed) + normed
+        x = ggml_add(ctx0, y, normed); // FSMN internal residual: conv(normed) + normed
     }
-    cur = ggml_add(ctx0, residual, x);  // add original input residual
+    cur = ggml_add(ctx0, residual, x); // add original input residual
 
     // 3. Cross-attention: norm3 → Q from decoder, K+V from encoder
     residual = cur;
@@ -431,17 +457,17 @@ static ggml_tensor* build_decoder_block(ggml_context* ctx0, ggml_tensor* cur, gg
         ggml_tensor* Q = mm_bias(ctx0, b.cross_q_w, x, b.cross_q_b);
 
         // K, V = split(linear_k_v(encoder_out), D): (2D, T_enc) → K (D, T), V (D, T)
-        ggml_tensor* kv = mm_bias(ctx0, b.cross_kv_w, enc_out, b.cross_kv_b);  // (2D, T_enc)
+        ggml_tensor* kv = mm_bias(ctx0, b.cross_kv_w, enc_out, b.cross_kv_b); // (2D, T_enc)
         const size_t row_bytes = kv->nb[1];
         ggml_tensor* K_ = ggml_cont(ctx0, ggml_view_2d(ctx0, kv, D, T_enc, row_bytes, 0));
-        ggml_tensor* V  = ggml_cont(ctx0, ggml_view_2d(ctx0, kv, D, T_enc, row_bytes, (size_t)D * sizeof(float)));
+        ggml_tensor* V = ggml_cont(ctx0, ggml_view_2d(ctx0, kv, D, T_enc, row_bytes, (size_t)D * sizeof(float)));
 
         // Reshape for multi-head attention
-        Q  = ggml_reshape_3d(ctx0, Q, head_dim, n_heads, N);
+        Q = ggml_reshape_3d(ctx0, Q, head_dim, n_heads, N);
         K_ = ggml_reshape_3d(ctx0, K_, head_dim, n_heads, T_enc);
-        V  = ggml_reshape_3d(ctx0, V, head_dim, n_heads, T_enc);
-        Q  = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));   // (hd, N, n_heads)
-        K_ = ggml_cont(ctx0, ggml_permute(ctx0, K_, 0, 2, 1, 3));  // (hd, T_enc, n_heads)
+        V = ggml_reshape_3d(ctx0, V, head_dim, n_heads, T_enc);
+        Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));   // (hd, N, n_heads)
+        K_ = ggml_cont(ctx0, ggml_permute(ctx0, K_, 0, 2, 1, 3)); // (hd, T_enc, n_heads)
         ggml_tensor* V_h = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
 
         const float scale = 1.0f / std::sqrt((float)head_dim);
@@ -451,7 +477,7 @@ static ggml_tensor* build_decoder_block(ggml_context* ctx0, ggml_tensor* cur, gg
             attn = ggml_flash_attn_ext(ctx0, Q, K_, V_h, nullptr, scale, 0.0f, 0.0f);
             attn = ggml_reshape_2d(ctx0, attn, D, N);
         } else {
-            ggml_tensor* scores = ggml_mul_mat(ctx0, K_, Q);  // (T_enc, N, n_heads)
+            ggml_tensor* scores = ggml_mul_mat(ctx0, K_, Q); // (T_enc, N, n_heads)
             scores = ggml_soft_max_ext(ctx0, scores, nullptr, scale, 0.0f);
             ggml_tensor* V_p = ggml_cont(ctx0, ggml_permute(ctx0, V_h, 1, 0, 2, 3));
             attn = ggml_mul_mat(ctx0, V_p, scores);
@@ -467,14 +493,14 @@ static ggml_tensor* build_decoder_block(ggml_context* ctx0, ggml_tensor* cur, gg
 
 // Post-processing block (decoders3): norm1 → w_1 → relu → LN → w_2
 // Upstream: self_attn=None, src_attn=None, so no residual addition.
-static ggml_tensor* build_decoder_post(ggml_context* ctx0, ggml_tensor* cur,
-                                        const paraformer_decoder_post& b, float eps) {
+static ggml_tensor* build_decoder_post(ggml_context* ctx0, ggml_tensor* cur, const paraformer_decoder_post& b,
+                                       float eps) {
     ggml_tensor* x = ggml_norm_affine(ctx0, cur, b.norm1_w, b.norm1_b, eps);
     x = mm_bias(ctx0, b.ffn_l1_w, x, b.ffn_l1_b);
     x = ggml_relu(ctx0, x);
-    x = ggml_norm_affine(ctx0, x, b.ffn_norm_w, b.ffn_norm_b, eps);  // LN after activation
+    x = ggml_norm_affine(ctx0, x, b.ffn_norm_w, b.ffn_norm_b, eps); // LN after activation
     x = ggml_mul_mat(ctx0, b.ffn_l2_w, x);
-    return x;  // no residual — upstream decoders3 has no self_attn so residual is never added
+    return x; // no residual — upstream decoders3 has no self_attn so residual is never added
 }
 
 // ===========================================================================
@@ -482,18 +508,18 @@ static ggml_tensor* build_decoder_post(ggml_context* ctx0, ggml_tensor* cur,
 // ===========================================================================
 
 static std::string paraformer_transcribe_impl(paraformer_context* ctx, const float* pcm, int n_samples,
-                                               std::vector<float>* staged_out = nullptr,
-                                               const char* stage = nullptr) {
+                                              std::vector<float>* staged_out = nullptr, const char* stage = nullptr) {
     const auto& hp = ctx->model.hp;
     const int D = (int)hp.d_model;
 
     // 1. Feature extraction
     int T_lfr = 0, D_lfr_actual = 0;
     auto lfr = paraformer_compute_features(ctx, pcm, n_samples, T_lfr, D_lfr_actual);
-    if (lfr.empty()) return "";
+    if (lfr.empty())
+        return "";
 
     // 2. Build and run encoder graph
-    const size_t meta_sz = 256 * 1024 * 1024;  // 256 MB compute buffer
+    const size_t meta_sz = 256 * 1024 * 1024; // 256 MB compute buffer
     if (ctx->compute_meta.empty())
         ctx->compute_meta.resize(meta_sz);
 
@@ -521,8 +547,10 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
         p.flash_attn = ctx->flash_attn;
         cur = core_sanm::build_block(ctx0, cur, T_lfr, ctx->model.enc0[i], p, /*apply_attn_residual=*/false);
         if (stage) {
-            char nm[64]; std::snprintf(nm, sizeof(nm), "encoder_layer_%d", enc_layer_idx);
-            ggml_set_name(cur, nm); ggml_set_output(cur);
+            char nm[64];
+            std::snprintf(nm, sizeof(nm), "encoder_layer_%d", enc_layer_idx);
+            ggml_set_name(cur, nm);
+            ggml_set_output(cur);
         }
         enc_layer_idx++;
     }
@@ -539,8 +567,10 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
         p.flash_attn = ctx->flash_attn;
         cur = core_sanm::build_block(ctx0, cur, T_lfr, ctx->model.enc[i], p, /*apply_attn_residual=*/true);
         if (stage) {
-            char nm[64]; std::snprintf(nm, sizeof(nm), "encoder_layer_%d", enc_layer_idx);
-            ggml_set_name(cur, nm); ggml_set_output(cur);
+            char nm[64];
+            std::snprintf(nm, sizeof(nm), "encoder_layer_%d", enc_layer_idx);
+            ggml_set_name(cur, nm);
+            ggml_set_output(cur);
         }
         enc_layer_idx++;
     }
@@ -559,13 +589,14 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
         const size_t inp_bytes = ggml_nbytes(inp);
         const size_t lfr_bytes = lfr.size() * sizeof(float);
         if (lfr_bytes > inp_bytes) {
-            fprintf(stderr, "paraformer: input tensor too small: %zu bytes vs %zu lfr bytes (T=%d, D=%d)\n",
-                    inp_bytes, lfr_bytes, T_lfr, D_lfr_actual);
+            fprintf(stderr, "paraformer: input tensor too small: %zu bytes vs %zu lfr bytes (T=%d, D=%d)\n", inp_bytes,
+                    lfr_bytes, T_lfr, D_lfr_actual);
             ggml_gallocr_free(alloc);
             ggml_free(ctx0);
             return "";
         }
-        fprintf(stderr, "paraformer: encoder input OK: T_lfr=%d, D_lfr=%d, bytes=%zu\n", T_lfr, D_lfr_actual, lfr_bytes);
+        fprintf(stderr, "paraformer: encoder input OK: T_lfr=%d, D_lfr=%d, bytes=%zu\n", T_lfr, D_lfr_actual,
+                lfr_bytes);
         ggml_backend_tensor_set(inp, lfr.data(), 0, lfr_bytes);
     }
     ggml_backend_cpu_set_n_threads(ctx->backend, ctx->n_threads);
@@ -586,8 +617,8 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
     fprintf(stderr, "paraformer: enc_result ne=(%lld, %lld), type=%d, nbytes=%zu, expect=%zu\n",
             (long long)enc_result->ne[0], (long long)enc_result->ne[1], (int)enc_result->type, enc_bytes, enc_expect);
     if (enc_bytes < enc_expect) {
-        fprintf(stderr, "paraformer: encoder_output size mismatch: got %zu, expected %zu (D=%d, T=%d)\n",
-                enc_bytes, enc_expect, D, T_lfr);
+        fprintf(stderr, "paraformer: encoder_output size mismatch: got %zu, expected %zu (D=%d, T=%d)\n", enc_bytes,
+                enc_expect, D, T_lfr);
         ggml_gallocr_free(alloc);
         ggml_free(ctx0);
         return "";
@@ -601,12 +632,14 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
         if (sn == "mel_features") {
             // lfr is the post-LFR feature vector (T_lfr, D_lfr=560) in row-major
             *staged_out = lfr;
-            ggml_gallocr_free(alloc); ggml_free(ctx0);
+            ggml_gallocr_free(alloc);
+            ggml_free(ctx0);
             return "";
         }
         if (sn == "encoder_output") {
             *staged_out = enc_out;
-            ggml_gallocr_free(alloc); ggml_free(ctx0);
+            ggml_gallocr_free(alloc);
+            ggml_free(ctx0);
             return "";
         }
         if (sn.rfind("encoder_layer_", 0) == 0) {
@@ -615,7 +648,8 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
                 staged_out->resize(ggml_nelements(t));
                 ggml_backend_tensor_get(t, staged_out->data(), 0, ggml_nbytes(t));
             }
-            ggml_gallocr_free(alloc); ggml_free(ctx0);
+            ggml_gallocr_free(alloc);
+            ggml_free(ctx0);
             return "";
         }
     }
@@ -631,7 +665,8 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
     cif_predict(ctx, enc_out.data(), T_lfr, D, acoustic_embeds, N_tokens);
 
     fprintf(stderr, "paraformer: CIF predicted %d tokens from T_lfr=%d\n", N_tokens, T_lfr);
-    if (N_tokens <= 0) return "";
+    if (N_tokens <= 0)
+        return "";
 
     // Stage capture: acoustic_embeds (row-major (N, D))
     if (stage && staged_out && std::strcmp(stage, "acoustic_embeds") == 0) {
@@ -657,11 +692,13 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
     const int head_dim = D / n_heads;
 
     for (uint32_t i = 0; i < hp.n_dec_blocks; i++) {
-        cur = build_decoder_block(ctx0, cur, enc_tensor, N_tokens, T_lfr,
-                                   ctx->model.dec[i], D, n_heads, head_dim, hp.ln_eps, ctx->flash_attn);
+        cur = build_decoder_block(ctx0, cur, enc_tensor, N_tokens, T_lfr, ctx->model.dec[i], D, n_heads, head_dim,
+                                  hp.ln_eps, ctx->flash_attn);
         if (stage) {
-            char nm[64]; std::snprintf(nm, sizeof(nm), "decoder_layer_%u", i);
-            ggml_set_name(cur, nm); ggml_set_output(cur);
+            char nm[64];
+            std::snprintf(nm, sizeof(nm), "decoder_layer_%u", i);
+            ggml_set_name(cur, nm);
+            ggml_set_output(cur);
         }
     }
 
@@ -673,9 +710,10 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
     // after_norm → output_layer
     cur = ggml_norm_affine(ctx0, cur, ctx->model.dec_after_norm_w, ctx->model.dec_after_norm_b, hp.ln_eps);
     if (stage) {
-        ggml_set_name(cur, "decoder_output"); ggml_set_output(cur);
+        ggml_set_name(cur, "decoder_output");
+        ggml_set_output(cur);
     }
-    cur = mm_bias(ctx0, ctx->model.dec_output_w, cur, ctx->model.dec_output_b);  // (vocab, N)
+    cur = mm_bias(ctx0, ctx->model.dec_output_w, cur, ctx->model.dec_output_b); // (vocab, N)
     ggml_set_name(cur, "logits");
     ggml_build_forward_expand(gf, cur);
 
@@ -700,7 +738,8 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
                 staged_out->resize(ggml_nelements(t));
                 ggml_backend_tensor_get(t, staged_out->data(), 0, ggml_nbytes(t));
             }
-            ggml_gallocr_free(alloc); ggml_free(ctx0);
+            ggml_gallocr_free(alloc);
+            ggml_free(ctx0);
             return "";
         }
     }
@@ -712,7 +751,7 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
     ggml_backend_tensor_get(logits, logits_data.data(), 0, logits_data.size() * sizeof(float));
 
     std::string result;
-    bool prev_was_bpe_cont = false;  // true if previous token ended with @@
+    bool prev_was_bpe_cont = false; // true if previous token ended with @@
     for (int n = 0; n < N_tokens; n++) {
         int best = 0;
         float best_val = -1e30f;
@@ -724,7 +763,8 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
             }
         }
         // Skip special tokens: 0=<blank>, 1=<s>, 2=</s>, last=<unk>
-        if (best <= 2 || best == V - 1) continue;
+        if (best <= 2 || best == V - 1)
+            continue;
         if ((size_t)best < ctx->vocab.size()) {
             std::string tok = ctx->vocab[best];
             bool is_bpe_cont = (tok.size() >= 2 && tok.substr(tok.size() - 2) == "@@");
@@ -735,10 +775,9 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
             if (!result.empty() && !prev_was_bpe_cont) {
                 unsigned char first_byte = (unsigned char)tok[0];
                 unsigned char last_byte = (unsigned char)result.back();
-                bool cur_is_latin = (first_byte >= 'a' && first_byte <= 'z') ||
-                                    (first_byte >= 'A' && first_byte <= 'Z');
-                bool prev_is_latin = (last_byte >= 'a' && last_byte <= 'z') ||
-                                     (last_byte >= 'A' && last_byte <= 'Z');
+                bool cur_is_latin =
+                    (first_byte >= 'a' && first_byte <= 'z') || (first_byte >= 'A' && first_byte <= 'Z');
+                bool prev_is_latin = (last_byte >= 'a' && last_byte <= 'z') || (last_byte >= 'A' && last_byte <= 'Z');
                 if (cur_is_latin && prev_is_latin) {
                     result += ' ';
                 }
@@ -806,8 +845,7 @@ paraformer_context* paraformer_init_from_file(const char* path, paraformer_conte
 
     if (ctx->verbosity >= 1) {
         fprintf(stderr, "paraformer: loaded %zu tensors, vocab %zu, enc %u+%u blocks, dec %u blocks\n",
-                ctx->wl.tensors.size(), ctx->vocab.size(),
-                ctx->model.hp.n_enc_blocks0, ctx->model.hp.n_enc_blocks,
+                ctx->wl.tensors.size(), ctx->vocab.size(), ctx->model.hp.n_enc_blocks0, ctx->model.hp.n_enc_blocks,
                 ctx->model.hp.n_dec_blocks);
     }
 
@@ -815,7 +853,8 @@ paraformer_context* paraformer_init_from_file(const char* path, paraformer_conte
 }
 
 void paraformer_free(paraformer_context* ctx) {
-    if (!ctx) return;
+    if (!ctx)
+        return;
     core_gguf::free_weights(ctx->wl);
     if (ctx->backend)
         ggml_backend_free(ctx->backend);
@@ -823,7 +862,8 @@ void paraformer_free(paraformer_context* ctx) {
 }
 
 char* paraformer_transcribe(paraformer_context* ctx, const float* samples, int n_samples) {
-    if (!ctx || !samples || n_samples <= 0) return nullptr;
+    if (!ctx || !samples || n_samples <= 0)
+        return nullptr;
     std::string s = paraformer_transcribe_impl(ctx, samples, n_samples);
     char* buf = (char*)std::malloc(s.size() + 1);
     if (buf) {
@@ -833,19 +873,22 @@ char* paraformer_transcribe(paraformer_context* ctx, const float* samples, int n
     return buf;
 }
 
-float* paraformer_extract_stage(paraformer_context* ctx, const float* samples, int n_samples,
-                                const char* stage_name, int* n_out) {
-    if (n_out) *n_out = 0;
+float* paraformer_extract_stage(paraformer_context* ctx, const float* samples, int n_samples, const char* stage_name,
+                                int* n_out) {
+    if (n_out)
+        *n_out = 0;
     if (!ctx || !samples || n_samples <= 0 || !stage_name)
         return nullptr;
 
     if (std::strcmp(stage_name, "generated_text") == 0) {
         std::string txt = paraformer_transcribe_impl(ctx, samples, n_samples);
         char* buf = (char*)std::malloc(txt.size() + 1);
-        if (!buf) return nullptr;
+        if (!buf)
+            return nullptr;
         std::memcpy(buf, txt.data(), txt.size());
         buf[txt.size()] = '\0';
-        if (n_out) *n_out = (int)txt.size();
+        if (n_out)
+            *n_out = (int)txt.size();
         return (float*)buf;
     }
 
@@ -854,8 +897,10 @@ float* paraformer_extract_stage(paraformer_context* ctx, const float* samples, i
     if (staged.empty())
         return nullptr;
     float* out = (float*)std::malloc(staged.size() * sizeof(float));
-    if (!out) return nullptr;
+    if (!out)
+        return nullptr;
     std::memcpy(out, staged.data(), staged.size() * sizeof(float));
-    if (n_out) *n_out = (int)staged.size();
+    if (n_out)
+        *n_out = (int)staged.size();
     return out;
 }
