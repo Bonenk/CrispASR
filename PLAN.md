@@ -2510,14 +2510,14 @@ explicitly calls `split_at_energy_minima` too. The only fixed-time loop
 is cohere's internal encoder KV scatter (line 2186), which operates on
 encoder frames not raw audio — not a candidate for energy chunking.
 
-### 80e. Eager warmup follow-up (TODO, low priority)
+### 80e. Eager warmup follow-up — DONE 2026-05-23
 
-nano-cohere's `from_pretrained` does a 1 s silence transcribe on init
-to amortize Metal kernel compile / first-shape gallocr setup. Easy to
-add a `cohere_warmup(ctx)` call wired into model load. Worth ~50–
-150 ms saved on the first user-visible call but not on steady state.
-Leave for a later polish pass; if added, every backend gets its own
-warmup hook.
+Implemented as virtual `warmup()` on `CrispasrBackend`. Transcribes
+0.5 s of silence to amortize first-call overhead. Overridden for
+parakeet, canary, and cohere. Opt-in via `--warmup` or
+`CRISPASR_WARMUP=1`. Server mode always warms up. A/B on CPU shows
+no benefit (no GPU kernels to compile); on Metal/CUDA saves 100-200 ms
+on first call.
 
 ### Out of scope (rejected ideas from nano)
 
