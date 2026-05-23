@@ -20,6 +20,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_wav2vec2_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_vibevoice_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_vibevoice_1p5b_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_qwen3_tts_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_qwen3_tts_base_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_orpheus_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_chatterbox_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_indextts_backend();
@@ -80,10 +81,12 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_vibevoice_backend();
     if (name == "vibevoice-1.5b" || name == "vibevoice-tts-1.5b" || name == "vibevoice-tts-base")
         return crispasr_make_vibevoice_1p5b_backend();
-    if (name == "qwen3-tts" || name == "qwen3_tts" || name == "qwen3tts" || name == "qwen3-tts-customvoice" ||
-        name == "qwen3tts-customvoice" || name == "qwen3-tts-cv" || name == "qwen3-tts-1.7b-base" ||
-        name == "qwen3-tts-1.7b" || name == "qwen3-tts-1.7b-customvoice" || name == "qwen3-tts-1.7b-cv" ||
-        name == "qwen3-tts-1.7b-voicedesign" || name == "qwen3-tts-voicedesign" || name == "qwen3-tts-vd")
+    if (name == "qwen3-tts" || name == "qwen3_tts" || name == "qwen3tts" || name == "qwen3-tts-1.7b-base" ||
+        name == "qwen3-tts-1.7b")
+        return crispasr_make_qwen3_tts_base_backend();
+    if (name == "qwen3-tts-customvoice" || name == "qwen3tts-customvoice" || name == "qwen3-tts-cv" ||
+        name == "qwen3-tts-1.7b-customvoice" || name == "qwen3-tts-1.7b-cv" || name == "qwen3-tts-1.7b-voicedesign" ||
+        name == "qwen3-tts-voicedesign" || name == "qwen3-tts-vd")
         return crispasr_make_qwen3_tts_backend();
     if (name == "orpheus" || name == "orpheus-tts" || name == "orpheus3b" || name == "kartoffel-orpheus" ||
         name == "kartoffel_orpheus" || name == "kartoffel-orpheus-de-natural" ||
