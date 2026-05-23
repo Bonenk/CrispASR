@@ -69,8 +69,8 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_voxtral_backend();
     if (name == "voxtral4b")
         return crispasr_make_voxtral4b_backend();
-    if (name == "qwen3" || name == "qwen3-1.7b" || name == "qwen3_1.7b" || name == "qwen3_17b" ||
-        name == "mega-asr" || name == "mega_asr" || name == "megaasr")
+    if (name == "qwen3" || name == "qwen3-1.7b" || name == "qwen3_1.7b" || name == "qwen3_17b" || name == "mega-asr" ||
+        name == "mega_asr" || name == "megaasr")
         return crispasr_make_qwen3_backend();
     if (name == "fastconformer-ctc")
         return crispasr_make_fastconformer_ctc_backend();
