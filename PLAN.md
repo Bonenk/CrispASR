@@ -42,7 +42,7 @@ test-all-backends.py passes 18/18 transcribe + 51/54 feature tests (3 stream ski
 | **DONE** | [#86 Per-backend flash-attention wiring](#86-per-backend-flash-attention-wiring-crisperweaver-driven) | — | All backends now route through core helpers (`core_attn`, `core_sanm`, `core_conformer`) that unconditionally use `ggml_flash_attn_ext`. Only t5_translate excluded (T5 rel-pos bias incompatible). |
 | **LOW** | [#87 `gpu_backend` runtime selector](#87-gpu_backend-runtime-selector-multi-backend-ggml-build) | ~1 week | Needs ggml-side multi-backend dispatch to land first. CrisperWeaver UI placeholder ready when the C-side is. |
 | **LOW** | [#95 IndexTTS Chinese TN binary alternative](#95-indextts-15-chinese-tn--binary-alternative-to-the-python-wetext-hook) | survey only | Python `INDEXTTS_TEXT_NORMALIZER` hook shipped 2026-05-19. Hand-roll (#95a) is the right next step *when* a user reports a digit/date prompt that breaks; OpenFST vendoring (#95b) only after #95a grows past ~5 cases. |
-| **IN PROGRESS** | [#97 More Parakeet variants](#97-more-parakeet-variants) | Small per-variant | TDT/TDT+CTC DONE; **parakeet-rnnt-0.6b DONE 2026-05-24** — RNNT decoder + Q4_K GGUF (~447 MB) smoke-tested, uploaded to `cstr/parakeet-rnnt-0.6b-GGUF`, committed to main. 1.1b + other variants pending. |
+| **IN PROGRESS** | [#97 More Parakeet variants](#97-more-parakeet-variants) | Small per-variant | TDT/TDT+CTC DONE; **parakeet-rnnt 0.6b+1.1b DONE 2026-05-24** — RNNT decoder + Q4_K GGUFs (447 MB / 770 MB) uploaded to `cstr/parakeet-rnnt-{0.6b,1.1b}-GGUF`. realtime-EOU + unified-en still open. |
 | **DONE** | [#98 Hotwords / contextual biasing](#98-hotwords--contextual-biasing) | Phased | **Phase A+B DONE.** CTC-WS Aho-Corasick trie wired into parakeet CTC + TDT; LLM prompt injection for qwen3-asr + voxtral. `--hotwords` / `--hotwords-file` / `--hotwords-boost` CLI. 13+4 tests. Phase C deferred. → HISTORY 2026-05-23. |
 | **DONE** | [#110 Global diarization timeline](#110-global-diarization-timeline) | Medium | Sherpa/ecapa now runs once on the full audio (not per-slice). `CrispasrSherpaCache` mirrors the pyannote global-cache pattern. Segments split at speaker-turn boundaries via word-level overlap scoring. 13+8 tests. → HISTORY 2026-05-23. |
 | **LOW** | [#106 TEN-VAD](#106-ten-vad--low-latency-cross-platform-vad) | Small | Technically feasible VAD backend: C-compatible, 16 kHz / 10-16 ms frames, prebuilt libs + ONNX path. License is the gate: Apache 2.0 plus extra no-compete / own-app-only conditions from Agora. |
@@ -133,20 +133,20 @@ Filename-heuristic dispatch in `crispasr_backend.cpp:370-372`
 unchanged — `parakeet-tdt_ctc-*.gguf` matches "parakeet" with the
 `!contains_ci("tdt")` guard preventing accidental fc-ctc routing.
 
-### Done — parakeet-rnnt-0.6b (2026-05-24)
+### Done — parakeet-rnnt 0.6b + 1.1b (2026-05-24)
 
-- **`nvidia/parakeet-rnnt-0.6b`** — standard RNN-Transducer (no duration head).
+- **`nvidia/parakeet-rnnt-0.6b`** + **`nvidia/parakeet-rnnt-1.1b`** — standard RNN-Transducer (no duration head).
   - `parakeet_rnnt_decode` in `src/parakeet.cpp` — blank→advance t by 1,
     real token→stay on same frame, `max_per_step=10` anti-loop cap; hotword
     biasing wired.
   - Converter RNNT detection: `joint.joint_net.2.weight` key detection → sets
     `n_tdt_durations=0`; runtime dispatches via `use_rnnt = !use_ctc && n_tdt_durations==0`.
   - In-memory nemo loading avoids disk extraction (BytesIO + torch.load).
-  - Q4_K GGUF 447 MB; `cstr/parakeet-rnnt-0.6b-GGUF`; smoke-tested on JFK.
-  - Registry entry added. Committed to main, pushed.
+  - 0.6b: 24-layer encoder, Q4_K 447 MB; `cstr/parakeet-rnnt-0.6b-GGUF`.
+  - 1.1b: 42-layer encoder, Q4_K 770 MB; `cstr/parakeet-rnnt-1.1b-GGUF`.
+  - Both smoke-tested on JFK (correct transcript). Registry entries added. Committed + pushed.
 
 **Still open:**
-- **`nvidia/parakeet-rnnt-1.1b`** — same RNNT class; needs its own nemo download + convert + upload. Defer until external disk has space.
 - **`nvidia/parakeet_realtime_eou_120m-v1`** — streaming + end-of-utterance head. Needs cache-aware FastConformer streaming (cf. PLAN #81 Nemotron), plus an EOU head. Not a converter-only job.
 - **`nvidia/parakeet-unified-en-0.6b`** — recent "unified" variant; needs a model-card / architecture read before scoping.
 

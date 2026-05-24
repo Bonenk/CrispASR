@@ -173,7 +173,9 @@ Converted to F16 (1235 MB) then `crispasr-quantize` to Q4_K (447 MB).
 
 Committed `48ac6f06` to main. Worktree `CrispASR-parakeet-rnnt` (branch `parakeet-rnnt`) rebased + fast-forwarded into main.
 
-**Still open in #97:** parakeet-rnnt-1.1b (needs disk space on external); realtime-EOU; unified-en-0.6b.
+**Follow-up — parakeet-rnnt-1.1b (same day):** External disk freed after the 0.6b cleanup; downloaded 1.1b nemo (4.0 GB), converted to F16 (2144 MB) + Q4_K (770 MB) with the same converter (42-layer encoder vs 24 for 0.6b — auto-handled by `n_layers` lookup). Smoke test on JFK: correct transcript at 5.4× realtime (caches warm). Uploaded to `cstr/parakeet-rnnt-1.1b-GGUF`; registry entry added. Committed `b9509548`.
+
+**Still open in #97:** realtime-EOU; unified-en-0.6b.
 
 ---
 
