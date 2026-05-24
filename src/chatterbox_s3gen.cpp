@@ -265,6 +265,11 @@ struct chatterbox_s3gen_context {
     ggml_backend_t backend_cpu = nullptr;
     ggml_context* ctx_w = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
+    // PLAN #83 r9: when backend != backend_cpu, UNet weights (s3.fd.*) are
+    // loaded into a separate CPU buffer so the ggml scheduler auto-routes
+    // the 396 mul_mat calls in the CFM denoiser to CPU. Avoids the GPU FP16
+    // accumulator drift that compounds 1000× through 10 Euler steps.
+    ggml_backend_buffer_t buf_cpu_w = nullptr;
     std::map<std::string, ggml_tensor*> tensors;
 
     ggml_backend_sched_t sched = nullptr;
@@ -292,6 +297,8 @@ struct chatterbox_s3gen_context {
             ggml_free(ctx_w);
         if (buf_w)
             ggml_backend_buffer_free(buf_w);
+        if (buf_cpu_w)
+            ggml_backend_buffer_free(buf_cpu_w);
         if (backend && backend != backend_cpu)
             ggml_backend_free(backend);
         if (backend_cpu)
@@ -535,12 +542,44 @@ extern "C" struct chatterbox_s3gen_context* chatterbox_s3gen_init_from_file(cons
         std::fflush(stderr);
     }
     core_gguf::WeightLoad wl;
-    if (!core_gguf::load_weights(path, c->backend, "s3gen", wl)) {
+    bool loaded = false;
+    // PLAN #83 r9 (2026-05-23): two layered fixes for GPU FP16 compound drift
+    // through the 10-step CFM Euler solver (cos_min 0.858 on CUDA P100,
+    // 0.923 on M1 Metal vs 1.000 on CPU — see LEARNINGS Rounds 7 + 8).
+    //
+    //   1. Default: load ConditionalDecoder weights (s3.fd.*) on the CPU
+    //      backend buffer. The ggml scheduler routes ops to the backend
+    //      where weights live, so the UNet runs entirely on CPU
+    //      (genuine F32 dequant + F32 accumulation). Encoder (s3.fe.*),
+    //      flow front-end (s3.flow.*), tokenizer (s3.tok.*), speaker
+    //      encoder (s3.se.*), and HiFT vocoder (s3.v.*) keep GPU residency.
+    //
+    //   2. CRISPASR_S3GEN_UNET_GPU_RESIDENCY=1 opts out of #1: all weights
+    //      go on GPU, and the UNet relies instead on the per-op
+    //      GGML_PREC_F32 hints set by mul_mat_hp() (above). Validates
+    //      the kernel-level high-precision path (Metal: _hp kernels;
+    //      CUDA cuBLAS: CUBLAS_COMPUTE_32F).
+    const char* gpu_res_env = std::getenv("CRISPASR_S3GEN_UNET_GPU_RESIDENCY");
+    const bool unet_on_gpu = gpu_res_env && (gpu_res_env[0] == '1' || gpu_res_env[0] == 'y' || gpu_res_env[0] == 'Y');
+    if (c->backend != c->backend_cpu && !unet_on_gpu) {
+        auto is_gpu = [](const char* name, void*) -> bool {
+            return std::strncmp(name, "s3.fd.", 6) != 0;
+        };
+        loaded = core_gguf::load_weights_split(path, c->backend, c->backend_cpu, is_gpu, nullptr, "s3gen", wl);
+    } else {
+        if (c->backend != c->backend_cpu && verbosity >= 1) {
+            fprintf(stderr, "s3gen: CRISPASR_S3GEN_UNET_GPU_RESIDENCY=1 — UNet weights on GPU; "
+                            "relying on GGML_PREC_F32 mul_mat hints\n");
+        }
+        loaded = core_gguf::load_weights(path, c->backend, "s3gen", wl);
+    }
+    if (!loaded) {
         delete c;
         return nullptr;
     }
     c->ctx_w = wl.ctx;
     c->buf_w = wl.buf;
+    c->buf_cpu_w = wl.buf_cpu;
     c->tensors = std::move(wl.tensors);
 
     if (verbosity >= 1) {
@@ -1504,6 +1543,17 @@ static ggml_tensor* causal_block1d(ggml_context* ctx, ggml_tensor* x, // (C, T)
     return x;
 }
 
+// PLAN #83 r9: F32-precision mul_mat for the UNet1D denoiser. The CFM solver
+// runs 10 Euler steps × 396 mul_mats through the UNet; the ~1e-4 per-element
+// drift from FP16 GPU accumulators compounds 1000× into garbled audio. Setting
+// GGML_PREC_F32 on each call dispatches to the high-precision kernel variant
+// (Metal: kernel_mul_mm_*_hp; CUDA cuBLAS path: CUBLAS_COMPUTE_32F).
+static ggml_tensor* mul_mat_hp(ggml_context* ctx, ggml_tensor* a, ggml_tensor* b) {
+    ggml_tensor* r = ggml_mul_mat(ctx, a, b);
+    ggml_mul_mat_set_prec(r, GGML_PREC_F32);
+    return r;
+}
+
 // Helper: CausalResnetBlock1D — block1 + time_mlp + block2 + residual.
 static ggml_tensor* causal_resnet_block(ggml_context* ctx, ggml_tensor* x, ggml_tensor* t_emb,
                                         chatterbox_s3gen_context* c, const char* prefix, ggml_tensor* mask) {
@@ -1520,7 +1570,7 @@ static ggml_tensor* causal_resnet_block(ggml_context* ctx, ggml_tensor* x, ggml_
 
     // Time MLP: Mish → linear(1024 → C_out) → add broadcast over T
     ggml_tensor* t_proj_in = ggml_mish(ctx, t_emb);
-    ggml_tensor* t_proj = ggml_mul_mat(ctx, W("mlp.1.weight"), t_proj_in);
+    ggml_tensor* t_proj = mul_mat_hp(ctx, W("mlp.1.weight"), t_proj_in);
     ggml_tensor* t_b = W("mlp.1.bias");
     if (t_b)
         t_proj = ggml_add(ctx, t_proj, t_b);
@@ -1570,9 +1620,9 @@ static ggml_tensor* basic_transformer_block(ggml_context* ctx, ggml_tensor* x, /
         xn = ggml_add(ctx, xn, n1b);
 
     // Q/K/V projections (no bias on Q/K/V, bias on output)
-    ggml_tensor* Q = ggml_mul_mat(ctx, W("attn1.q.weight"), xn);
-    ggml_tensor* K = ggml_mul_mat(ctx, W("attn1.k.weight"), xn);
-    ggml_tensor* V = ggml_mul_mat(ctx, W("attn1.v.weight"), xn);
+    ggml_tensor* Q = mul_mat_hp(ctx, W("attn1.q.weight"), xn);
+    ggml_tensor* K = mul_mat_hp(ctx, W("attn1.k.weight"), xn);
+    ggml_tensor* V = mul_mat_hp(ctx, W("attn1.v.weight"), xn);
 
     // Multi-head attention: reshape (T, n_heads*2*hd) → (2*hd, T, n_heads)
     // Wait: Q/K/V are (T, 512) where 512 = n_heads(8) * head_dim(64)
@@ -1590,7 +1640,7 @@ static ggml_tensor* basic_transformer_block(ggml_context* ctx, ggml_tensor* x, /
     attn = ggml_reshape_2d(ctx, attn, proj_dim, TT); // (T, 512)
 
     // Output projection
-    attn = ggml_mul_mat(ctx, W("attn1.o.weight"), attn);
+    attn = mul_mat_hp(ctx, W("attn1.o.weight"), attn);
     ggml_tensor* o_b = W("attn1.o.bias");
     if (o_b)
         attn = ggml_add(ctx, attn, o_b);
@@ -1608,14 +1658,14 @@ static ggml_tensor* basic_transformer_block(ggml_context* ctx, ggml_tensor* x, /
         xn = ggml_add(ctx, xn, n3b);
 
     // FF up: Linear(C → 4C) + GELU (not GEGLU — decoder uses act_fn="gelu")
-    ggml_tensor* ff_up = ggml_mul_mat(ctx, W("ff.up.weight"), xn);
+    ggml_tensor* ff_up = mul_mat_hp(ctx, W("ff.up.weight"), xn);
     ggml_tensor* ff_up_b = W("ff.up.bias");
     if (ff_up_b)
         ff_up = ggml_add(ctx, ff_up, ff_up_b);
     ff_up = ggml_gelu(ctx, ff_up);
 
     // FF down: Linear(4C → C)
-    ggml_tensor* ff_out = ggml_mul_mat(ctx, W("ff.down.weight"), ff_up);
+    ggml_tensor* ff_out = mul_mat_hp(ctx, W("ff.down.weight"), ff_up);
     ggml_tensor* ff_down_b = W("ff.down.bias");
     if (ff_down_b)
         ff_out = ggml_add(ctx, ff_out, ff_down_b);
