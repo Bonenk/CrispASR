@@ -1651,6 +1651,16 @@ static ggml_tensor* causal_resnet_block(ggml_context* ctx, ggml_tensor* x, ggml_
             residual = ggml_add(ctx, residual, ggml_reshape_2d(ctx, rc_b, 1, (int)rc_b->ne[0]));
     }
 
+    // PLAN #83 r9 follow-up #5: probe the residual conv (rc) output specifically.
+    // Bug B investigation showed dump_db_resnet diverges between Path X and Y
+    // while b1/b2 outputs are identical, implicating the residual conv path.
+    // CRISPASR_S3GEN_UNET_PROBE_RC_OUT=1 marks rc's output as a dump tensor.
+    if (std::strcmp(prefix, "s3.fd.db.0.0") == 0 && rc_w &&
+        std::getenv("CRISPASR_S3GEN_UNET_PROBE_RC_OUT") != nullptr) {
+        ggml_set_name(residual, "dump_rc_out_db00");
+        ggml_set_output(residual);
+    }
+
     return ggml_add(ctx, x, residual);
 }
 

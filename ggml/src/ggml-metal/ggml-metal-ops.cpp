@@ -218,10 +218,20 @@ static int ggml_metal_op_encode_impl(ggml_metal_op_t ctx, int idx) {
     // otherwise, we add the new ranges to the encoding context and process the node concurrently
     //
     {
-        const bool is_concurrent = ggml_metal_op_concurrency_check(ctx, node);
-
-        if (!is_concurrent) {
+        // CrispASR debug (#83 r9 follow-up #5): force a memory barrier
+        // before every op to test if any unrecognised concurrency hazard
+        // is the cause of Bug B. CRISPASR_METAL_FORCE_BARRIER=1.
+        static const char * dbg_barrier = std::getenv("CRISPASR_METAL_FORCE_BARRIER");
+        const bool force_barrier = dbg_barrier && dbg_barrier[0] == '1';
+        bool is_concurrent;
+        if (force_barrier) {
             ggml_metal_op_concurrency_reset(ctx);
+            is_concurrent = false;
+        } else {
+            is_concurrent = ggml_metal_op_concurrency_check(ctx, node);
+            if (!is_concurrent) {
+                ggml_metal_op_concurrency_reset(ctx);
+            }
         }
 
         if (ctx->debug_graph > 0) {
