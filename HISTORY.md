@@ -6,6 +6,85 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-24 PLAN #83 Round 9 — S3Gen UNet weight-residency ships; Metal kernel bisect
+
+Production fix for the chatterbox S3Gen UNet GPU drift (see PLAN #83
+rounds 7–8 for the prior bisects) plus an upstream-PR-quality bisect
+of the residual drift on M1 Metal.
+
+**What shipped:**
+
+1. **Weight residency split** (commit `b84af324`) —
+   `src/chatterbox_s3gen.cpp` loads the 910 `s3.fd.*` UNet weight
+   tensors (79 MiB) on the CPU backend buffer via
+   `core_gguf::load_weights_split`; the encoder (`s3.fe.*`), flow
+   front-end (`s3.flow.*`), tokenizer (`s3.tok.*`), speaker encoder
+   (`s3.se.*`), and HiFT vocoder (`s3.v.*`) keep GPU residency. The
+   ggml scheduler auto-routes UNet ops to CPU based on weight residency
+   — no per-op pinning, no GPU↔CPU sync inside the UNet graph (which
+   is what caused the Round 8 NaN at T_mel ≥ 200). M1 Metal:
+   `s3gen_mel cos_min 0.940 → 0.999980` in diff harness; intelligible
+   audio in smoke at all T. Wall-time on M1 is comparable to pure CPU
+   (the encoder/vocoder are a small fraction of total time, UNet does
+   the same work).
+
+   Two layered fixes: `CRISPASR_S3GEN_UNET_GPU_RESIDENCY=1` opts out
+   of the split and falls back to a per-op `mul_mat_hp` helper that
+   tags every UNet `mul_mat` with `GGML_PREC_F32`. Used as the
+   testbed for the kernel-level path.
+
+2. **Q8_0 × F32 bit-match Metal kernel** (commit `752baecf`) —
+   `ggml/src/ggml-metal/ggml-metal.metal` gains `kernel_quantize_q8_0_f32`
+   (mirrors `quantize_row_q8_0` ARM NEON path bit-for-bit) +
+   `kernel_mul_mv_q8_0_q8_0` (mirrors `ggml_vec_dot_q8_0_q8_0_generic`).
+   Same dispatch pattern as the existing Q4_K × Q8_K
+   `GGML_PREC_F32` path. Verified bit-identical to CPU mul_mat for
+   all 350 UNet Q8_0 mul_mats. Drafted as upstream PR 09 at
+   `tools/upstream-prs/09-metal-q8_0-bit-match.{md,patch}`.
+
+3. **Three upstream-PR drafts** (commit `d7d859a2`) in
+   `tools/upstream-prs/`:
+   - **09** Q8_0 × F32 bit-match kernel (concrete patch).
+   - **10** ggml-alloc buffer-reuse drift report (no patch — bug
+     report with bisect evidence). Expanded in commit `b6a0b610` with
+     all 11 fix attempts and the diff-vs-smoke divergence finding.
+   - **11** Scheduler NaN at T_mel ≥ 200 with mixed CPU+GPU ops (no
+     patch — bug report).
+   All three strip CrispASR-internal markers (no `(#83)` refs, no
+   internal language).
+
+4. **Per-segment dump hook + PRESERVE_INTERMEDIATES bisect knob**
+   (commits `c00c1493`, `2daf2a19`) — env-gated debug instrumentation
+   in `src/chatterbox_s3gen.cpp`. `CRISPASR_S3GEN_DUMP_UNET=<tag>`
+   dumps step-0 intermediates from each sub-block to
+   `/tmp/cb-unet-dump-<tag>-<name>.bin` for per-block diff.
+   `CRISPASR_S3GEN_UNET_PRESERVE_INTERMEDIATES=1` forces `set_output`
+   on 14 block-level intermediates (subset of dump points). Neither
+   affects default behavior.
+
+**The unresolved finding** (now in PR 10): `set_output` on **all 62**
+UNet sub-block intermediates restores **bit-perfect** parity
+(`cos_min = 1.000`, `max_abs = 0`) in the diff-harness call context
+but produces NaN in the smoke call context with the *exact same*
+model, graph topology, and seed. The diff-vs-smoke divergence is
+invariant against: random seed, T_mel value, S3-tokenizer presence,
+Metal concurrency on/off, `GGML_NO_INPLACE=1`, F32-tile Q in
+flash_attn. Something structural in `ggml-alloc`'s state across
+multi-graph sched invocations differs between the two call paths in
+a way the bisect couldn't isolate within this session. Standalone
+handover prompt prepared for further investigation.
+
+**Linux CPU smoke** validated on Hetzner VPS (`168.119.190.252`,
+no GPU): build clean, `s3gen_mel cos_min = 0.918695,
+cos_mean = 0.992655` in diff harness; intelligible TTS in smoke. The
+production fix runs the same on Linux as on macOS. Branch
+`plan-83-r9-s3gen-gpu-prec-hints` on the VPS at
+`/mnt/storage/whisper.cpp`.
+
+Updated: PLAN.md #57/#83 status, LEARNINGS Round 9.
+
+---
+
 ## 2026-05-23 PLAN #52 — Qwen3-TTS perf bench (FUSED_QKV Q8_0 decision)
 
 Ran interleaved A/B bench for `QWEN3_TTS_FUSED_QKV=1` on M1 Metal,
