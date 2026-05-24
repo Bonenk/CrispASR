@@ -6544,3 +6544,113 @@ shader-level investigation against the address pattern the
 allocator produces for this graph — out of scope for a normal
 chatterbox session. Until then: `CRISPASR_S3GEN_UNET_GPU_RESIDENCY`
 remains an investigation-only knob, not a user-facing option.
+
+### Round 9 follow-up #4 (2026-05-24, late) — root cause: sched-internal CPU→GPU copy of inputs fails silently
+
+R9 follow-up #3's "address-dependent Metal kernel bug" conclusion
+was wrong. The actual root cause is much simpler and tractable.
+
+**Method.** Captured CPU vs GPU bytes at every probe point in the
+first `causal_block1d` (`s3.fd.db.0.0.b1`) using
+`CRISPASR_S3GEN_UNET_PROBE_BLOCK1=0` + `DUMP_UNET=<tag>` +
+`DUMP_UNET_NO_AUTO_MARK=1`. The probe path's `after_im2col` already
+showed cos=-0.085 between the two runs — the VERY first GPU kernel
+of the UNet was producing structurally wrong output.
+
+A by-hand inspection (`tools/inspect_im2col_dump.py`) confirmed the
+kernel's causal-padding shape was correct (first 2 of every 3 floats
+zero, third populated). The bug was the VALUES being populated:
+CPU read `x[0,0]=1.93` (the first Gaussian noise sample), GPU read
+`x[0,0]=-4.05` (a mel-scale value). The im2col kernel arithmetic
+was fine; it was reading the wrong source.
+
+A short diagnostic logged the host-side `unet_input[0..7]` values
+before upload and a `ggml_backend_tensor_get` readback right after.
+Both bit-identical between CPU and GPU runs. So the host array was
+the same and the upload landed correctly.
+`ggml_backend_sched_get_tensor_backend(sched, unet_input)` returned
+`CPU` even under `GPU_RESIDENCY=1` — confirming sched put the
+input on CPU and the existing gallocr trace's `MTL0#unet_input#0`
+copy was the data path GPU kernels actually read from.
+
+**Root cause.** With UNet weights GPU-resident, the three runtime
+inputs (`unet_input`, `time_emb`, `mask`) auto-assigned to the CPU
+backend. The scheduler creates an auto-copy
+(`{backend_name}#{input}#{copy_idx}`) for the first Metal split that
+consumes them; that copy lives in
+`ggml_backend_sched_compute_splits` at `ggml-backend.cpp:1555-1567`.
+In this 29-split graph, the copy does NOT correctly deliver the
+user's uploaded data to the Metal kernel — the kernel reads stale
+content at the destination offset. Under certain `set_output`
+layouts (the 2-mark trigger from follow-ups #1–#3) the stale
+values turn into NaN.
+
+**Fix.** One conditional pin in `cfm_euler_solve::run_denoiser`:
+
+```cpp
+if (c->unet_on_gpu) {
+    ggml_backend_sched_set_tensor_backend(c->sched, unet_input, c->backend);
+    ggml_backend_sched_set_tensor_backend(c->sched, time_emb,   c->backend);
+    ggml_backend_sched_set_tensor_backend(c->sched, mask,       c->backend);
+}
+```
+
+`c->unet_on_gpu` is set once at init from the
+`CRISPASR_S3GEN_UNET_GPU_RESIDENCY` env. Production CPU-residency
+path is unchanged.
+
+**Verification matrix (M1 Metal):**
+
+| Configuration | Before | After |
+| - | - | - |
+| Baseline GPU residency, `--tts "Hello."` smoke | `rms=13.938` | `rms=5.143` (ref 5.115) |
+| 2-mark NaN trigger | `rms=NaN` | `rms=5.143` |
+| Long text (~9 s) | `rms=13.045` | `rms=4.741` |
+| Diff harness `s3gen_mel` | `cos_min=0.940` | `cos_min=0.999976` |
+| Production CPU residency (default) | `rms=5.139` | `rms=5.139` (no change) |
+
+`cos_min=0.999976` matches the production weight-residency split's
+0.999980 (parity within FP16/F32 round-off). The GPU-residency
+path is now correct AND faster (~30% on M1 because the encoder /
+vocoder no longer need a backend split).
+
+**Replaces lessons 2'/2''/2'''/3 about Metal kernel debug:**
+
+2''''. **For mixed-residency GPU graphs, pin runtime inputs to the
+GPU backend explicitly.** ggml's scheduler prefers CPU for tensors
+with `GGML_TENSOR_FLAG_INPUT` to minimise upload overhead. The
+auto-generated CPU→GPU copy works for short graphs but fails
+silently in long F32 graphs with many backend splits (this case:
+29 splits). Explicit pinning is a one-line fix and removes the
+failure mode. Diagnostic: call
+`ggml_backend_sched_get_tensor_backend(sched, input_tensor)` after
+`alloc_graph` — if it's `CPU` when you expect `GPU`, pin it.
+
+3'. **First bisect step for "GPU output differs from CPU" should be
+"compare bytes at the FIRST kernel's output."** If they already
+differ, the bug is in the input pipeline (upload, sched
+placement, sched copy), not in the kernel chain. Three rounds of
+shader-level investigation were wasted on what turned out to be
+an input-routing issue. The fast diagnostic is:
+
+```
+CRISPASR_S3GEN_UNET_PROBE_BLOCK1=0 \
+CRISPASR_S3GEN_DUMP_UNET=cpu+gpu-probe \
+CRISPASR_S3GEN_DUMP_UNET_NO_AUTO_MARK=1
+```
+
+then diff `dump_probe_after_im2col.bin` between CPU and GPU runs.
+If cos<<1 from the very first probe, look at sched, not at
+shaders.
+
+**Upstream story.** The bug is in `ggml_backend_sched_compute_splits`'s
+copy of input-flagged tensors at `ggml-backend.cpp:1555-1567`. The
+copy is supposed to be synchronous (`ggml_backend_tensor_copy` with
+a prior `ggml_backend_synchronize`), but in this graph topology
+(29 splits, ~2700 nodes, mixed CPU+Metal residency, F32 throughout)
+something doesn't honour the synchronisation. Doesn't reproduce
+in short graphs. Upstream PR draft updated at
+`tools/upstream-prs/10`.
+
+`tools/compare_probe_dumps.py` + `tools/inspect_im2col_dump.py`
+are the diagnostic scripts.

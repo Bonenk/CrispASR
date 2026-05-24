@@ -261,6 +261,16 @@ struct chatterbox_s3gen_context {
     // Use CRISPASR_S3GEN_UNET_PIN_CPU_OP=mul_mat to opt in for testing.
     bool unet_pin_mm_cpu = false;
 
+    // True when the UNet weights are GPU-resident (opt-in via
+    // CRISPASR_S3GEN_UNET_GPU_RESIDENCY=1). In that mode the entire UNet
+    // sub-graph runs on the GPU backend, so the three runtime inputs
+    // (unet_input, time_emb, mask) are also pinned to that backend.
+    // Without the pin the inputs land on CPU and the sched-internal
+    // CPU→GPU copy reads stale data on the first kernel of every CFM
+    // step, producing structurally wrong (and NaN under certain layouts)
+    // GPU output. See LEARNINGS round 9 follow-up #4.
+    bool unet_on_gpu = false;
+
     ggml_backend_t backend = nullptr;
     ggml_backend_t backend_cpu = nullptr;
     ggml_context* ctx_w = nullptr;
@@ -561,10 +571,9 @@ extern "C" struct chatterbox_s3gen_context* chatterbox_s3gen_init_from_file(cons
     //      CUDA cuBLAS: CUBLAS_COMPUTE_32F).
     const char* gpu_res_env = std::getenv("CRISPASR_S3GEN_UNET_GPU_RESIDENCY");
     const bool unet_on_gpu = gpu_res_env && (gpu_res_env[0] == '1' || gpu_res_env[0] == 'y' || gpu_res_env[0] == 'Y');
+    c->unet_on_gpu = unet_on_gpu && (c->backend != c->backend_cpu);
     if (c->backend != c->backend_cpu && !unet_on_gpu) {
-        auto is_gpu = [](const char* name, void*) -> bool {
-            return std::strncmp(name, "s3.fd.", 6) != 0;
-        };
+        auto is_gpu = [](const char* name, void*) -> bool { return std::strncmp(name, "s3.fd.", 6) != 0; };
         loaded = core_gguf::load_weights_split(path, c->backend, c->backend_cpu, is_gpu, nullptr, "s3gen", wl);
     } else {
         if (c->backend != c->backend_cpu && verbosity >= 1) {
@@ -1541,7 +1550,8 @@ static ggml_tensor* causal_block1d(ggml_context* ctx, ggml_tensor* x, // (C, T)
     s_block1d_call_idx++;
 
     auto probe_name = [&](ggml_tensor* t, const char* stage) {
-        if (!probe_this) return;
+        if (!probe_this)
+            return;
         char nm[64];
         std::snprintf(nm, sizeof(nm), "dump_probe_%s", stage);
         ggml_set_name(t, nm);
@@ -1550,7 +1560,7 @@ static ggml_tensor* causal_block1d(ggml_context* ctx, ggml_tensor* x, // (C, T)
 
     if (probe_this) {
         // Inline causal_conv1d's body to expose im2col + mul_mat intermediates.
-        int K   = (int) conv_w->ne[0];
+        int K = (int)conv_w->ne[0];
         int pad = K - 1;
         const enum ggml_type im2col_type =
             (conv_w->type == GGML_TYPE_F32 || x->type == GGML_TYPE_F32) ? GGML_TYPE_F32 : GGML_TYPE_F16;
@@ -1563,15 +1573,15 @@ static ggml_tensor* causal_block1d(ggml_context* ctx, ggml_tensor* x, // (C, T)
                                        ggml_reshape_2d(ctx, a_mat, a_mat->ne[0] * a_mat->ne[1], a_mat->ne[2]));
         probe_name(mm, "after_mul_mat");
         ggml_tensor* y = ggml_reshape_3d(ctx, mm, im2col->ne[1], conv_w->ne[2], im2col->ne[2]);
-        int T_out  = (int) y->ne[0];
-        int T_want = (int) x->ne[0];
+        int T_out = (int)y->ne[0];
+        int T_want = (int)x->ne[0];
         if (T_out > T_want) {
-            y = ggml_view_2d(ctx, y, T_want, (int) y->ne[1], y->nb[1], 0);
+            y = ggml_view_2d(ctx, y, T_want, (int)y->ne[1], y->nb[1], 0);
             y = ggml_cont(ctx, y);
         }
         if (conv_b) {
-            ggml_tensor* b2d = ggml_reshape_2d(ctx, conv_b, 1, (int) conv_b->ne[0]);
-            y                = ggml_add(ctx, y, b2d);
+            ggml_tensor* b2d = ggml_reshape_2d(ctx, conv_b, 1, (int)conv_b->ne[0]);
+            y = ggml_add(ctx, y, b2d);
         }
         x = y;
     } else {
@@ -1767,19 +1777,18 @@ static ggml_cgraph* build_graph_unet1d(chatterbox_s3gen_context* c, int T_mel) {
     // tensors that other MARK_* knobs (or PRESERVE_INTERMEDIATES) have kept
     // live. Useful for narrowing which marks cause the Metal NaN — without
     // this, DUMP_UNET implicitly marks all 62 dump points and triggers it.
-    const bool dump_unet_auto_mark = dump_unet &&
-                                     std::getenv("CRISPASR_S3GEN_DUMP_UNET_NO_AUTO_MARK") == nullptr;
-    const bool mark_output_all = dump_unet_auto_mark;  // every dump point
+    const bool dump_unet_auto_mark = dump_unet && std::getenv("CRISPASR_S3GEN_DUMP_UNET_NO_AUTO_MARK") == nullptr;
+    const bool mark_output_all = dump_unet_auto_mark; // every dump point
     // PLAN #83 r9 sub-bisect (May 2026 session): the 17 extra marks DUMP_UNET adds
     // on top of PRESERVE_INTERMEDIATES tip smoke into NaN. Split everything into
     // 5 groups gated independently to find the minimum trigger set.
     const bool mark_db_resnet = mark_output_all || std::getenv("CRISPASR_S3GEN_UNET_MARK_DB_RESNET") != nullptr;
-    const bool mark_db_tb     = mark_output_all || std::getenv("CRISPASR_S3GEN_UNET_MARK_DB_TB")     != nullptr;
+    const bool mark_db_tb = mark_output_all || std::getenv("CRISPASR_S3GEN_UNET_MARK_DB_TB") != nullptr;
     const bool mark_mb_resnet = mark_output_all || std::getenv("CRISPASR_S3GEN_UNET_MARK_MB_RESNET") != nullptr;
-    const bool mark_db_out    = mark_output_all || preserve_intermediates ||
-                                std::getenv("CRISPASR_S3GEN_UNET_MARK_DB_OUT") != nullptr;
-    const bool mark_mb_out    = mark_output_all || preserve_intermediates ||
-                                std::getenv("CRISPASR_S3GEN_UNET_MARK_MB_OUT") != nullptr;
+    const bool mark_db_out =
+        mark_output_all || preserve_intermediates || std::getenv("CRISPASR_S3GEN_UNET_MARK_DB_OUT") != nullptr;
+    const bool mark_mb_out =
+        mark_output_all || preserve_intermediates || std::getenv("CRISPASR_S3GEN_UNET_MARK_MB_OUT") != nullptr;
     // PLAN #83 r9 sub-bisect: how many / which of the 12 mb_*_out marks tips
     // into NaN when combined with MARK_DB_RESNET. MAX takes priority over INDEX.
     int mb_out_max = -1;
@@ -1791,15 +1800,18 @@ static ggml_cgraph* build_graph_unet1d(chatterbox_s3gen_context* c, int T_mel) {
         mb_out_index = std::atoi(env);
     }
     auto should_mark_mb_out = [&](int i) -> bool {
-        if (mb_out_max >= 0) return i < mb_out_max;
-        if (mb_out_index >= 0) return i == mb_out_index;
+        if (mb_out_max >= 0)
+            return i < mb_out_max;
+        if (mb_out_index >= 0)
+            return i == mb_out_index;
         return mark_mb_out;
     };
     ggml_tensor* hidden = nullptr;
     {
         x = causal_resnet_block(ctx0, x, t_emb, c, "s3.fd.db.0.0", mask);
         ggml_set_name(x, "dump_db_resnet");
-        if (mark_db_resnet) ggml_set_output(x);
+        if (mark_db_resnet)
+            ggml_set_output(x);
         // 4 transformer blocks
         ggml_tensor* xt = ggml_cont(ctx0, ggml_transpose(ctx0, x));
         for (int j = 0; j < 4; j++) {
@@ -1809,7 +1821,8 @@ static ggml_cgraph* build_graph_unet1d(chatterbox_s3gen_context* c, int T_mel) {
             char dump_name[32];
             std::snprintf(dump_name, sizeof(dump_name), "dump_db_tb_%d", j);
             ggml_set_name(x, dump_name);
-            if (mark_db_tb) ggml_set_output(x);
+            if (mark_db_tb)
+                ggml_set_output(x);
         }
         hidden = x; // save for skip connection
         // Downsample: CausalConv1d(k=3) — halves T
@@ -1818,7 +1831,8 @@ static ggml_cgraph* build_graph_unet1d(chatterbox_s3gen_context* c, int T_mel) {
         if (ds_w)
             x = causal_conv1d(ctx0, x, ds_w, ds_b);
         ggml_set_name(x, "dump_db_out");
-        if (mark_db_out) ggml_set_output(x);
+        if (mark_db_out)
+            ggml_set_output(x);
         // Note: the Python code uses Downsample1D which actually halves T
         // For CausalConv1d with stride=1, T stays the same
         // The actual downsample uses mask[:, :, ::2] to halve
@@ -1833,7 +1847,8 @@ static ggml_cgraph* build_graph_unet1d(chatterbox_s3gen_context* c, int T_mel) {
         char dump_resnet[32];
         std::snprintf(dump_resnet, sizeof(dump_resnet), "dump_mb_%d_resnet", i);
         ggml_set_name(x, dump_resnet);
-        if (mark_mb_resnet) ggml_set_output(x);
+        if (mark_mb_resnet)
+            ggml_set_output(x);
 
         for (int j = 0; j < 4; j++) {
             char tb_prefix[48];
@@ -1843,7 +1858,8 @@ static ggml_cgraph* build_graph_unet1d(chatterbox_s3gen_context* c, int T_mel) {
         char dump_block[32];
         std::snprintf(dump_block, sizeof(dump_block), "dump_mb_%d_out", i);
         ggml_set_name(x, dump_block);
-        if (should_mark_mb_out(i)) ggml_set_output(x);
+        if (should_mark_mb_out(i))
+            ggml_set_output(x);
     }
 
     // ---- Up blocks (1 block) ----
@@ -2034,6 +2050,25 @@ static std::vector<float> cfm_euler_solve(chatterbox_s3gen_context* c,
         auto run_denoiser = [&](const std::vector<float>& input) -> std::vector<float> {
             ggml_backend_sched_reset(c->sched);
             s3gen_maybe_pin_graph_to_cpu(c, gf, s3gen_subgraph::unet);
+            // PLAN #83 r9 follow-up #4: when the UNet runs GPU-resident, pin
+            // the three runtime inputs (unet_input, time_emb, mask) to the
+            // GPU backend so the scheduler skips the CPU→GPU copy. Without
+            // the pin, sched places the inputs on CPU and the auto-generated
+            // copy node feeds stale data to the first Metal kernel of every
+            // CFM step, producing structurally wrong (and NaN under certain
+            // set_output layouts) output. Reproducible diff cos_min lifts
+            // from 0.94 to 0.999976 with the pin.
+            if (c->unet_on_gpu) {
+                ggml_tensor* ui = ggml_graph_get_tensor(gf, "unet_input");
+                ggml_tensor* te = ggml_graph_get_tensor(gf, "time_emb");
+                ggml_tensor* mk = ggml_graph_get_tensor(gf, "mask");
+                if (ui)
+                    ggml_backend_sched_set_tensor_backend(c->sched, ui, c->backend);
+                if (te)
+                    ggml_backend_sched_set_tensor_backend(c->sched, te, c->backend);
+                if (mk)
+                    ggml_backend_sched_set_tensor_backend(c->sched, mk, c->backend);
+            }
             if (!ggml_backend_sched_alloc_graph(c->sched, gf)) {
                 fprintf(stderr, "s3gen: failed to alloc UNet1D graph\n");
                 return {};
@@ -2060,9 +2095,10 @@ static std::vector<float> cfm_euler_solve(chatterbox_s3gen_context* c,
                     fprintf(stderr, "s3gen: [DUMP_UNET_ADDR=%s] %d nodes\n", dump_addr, n_nodes_addr);
                     for (int i = 0; i < n_nodes_addr; ++i) {
                         ggml_tensor* node = ggml_graph_node(gf, i);
-                        if (!node) continue;
-                        fprintf(stderr, "s3gen: [addr] %4d  %p  %8zu  %s\n",
-                                i, node->data, ggml_nbytes(node), node->name);
+                        if (!node)
+                            continue;
+                        fprintf(stderr, "s3gen: [addr] %4d  %p  %8zu  %s\n", i, node->data, ggml_nbytes(node),
+                                node->name);
                     }
                 }
             }
@@ -2081,7 +2117,8 @@ static std::vector<float> cfm_euler_solve(chatterbox_s3gen_context* c,
                     int n_dumped = 0;
                     for (int i = 0; i < n_nodes; ++i) {
                         ggml_tensor* node = ggml_graph_node(gf, i);
-                        if (!node || std::strncmp(node->name, "dump_", 5) != 0) continue;
+                        if (!node || std::strncmp(node->name, "dump_", 5) != 0)
+                            continue;
                         const size_t nb_node = ggml_nbytes(node);
                         std::vector<char> buf(nb_node);
                         ggml_backend_tensor_get(node, buf.data(), 0, nb_node);

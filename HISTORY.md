@@ -6,6 +6,85 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-24 PLAN #83 Round 9 follow-up #4 — S3Gen UNet GPU drift root cause: input sched copy
+
+Three rounds of bisect (#83 R9 follow-ups #1–#3) had ruled out gallocr,
+per-op pin workarounds, the GGML_PREC_F32 hint on conv1d, Metal
+concurrency, every flash-attn variant, and concluded the bug was
+"at the Metal kernel layer, address-dependent, no in-tree workaround."
+Follow-up #4 found the root cause was much simpler.
+
+**Method.** Captured CPU vs GPU bytes at every probe point in the first
+`causal_block1d` (`s3.fd.db.0.0.b1`) via `CRISPASR_S3GEN_UNET_PROBE_BLOCK1=0
++ CRISPASR_S3GEN_DUMP_UNET=<tag> + CRISPASR_S3GEN_DUMP_UNET_NO_AUTO_MARK=1`.
+`tools/compare_probe_dumps.py` showed `after_im2col` already at
+cos=-0.085 between CPU and GPU — i.e. the very first GPU kernel of the
+UNet was producing structurally wrong output. `tools/inspect_im2col_dump.py`
+confirmed the kernel logic (causal zero-padding) was correct, but it
+was reading the wrong values from x. A small `CRISPASR_S3GEN_LOG_INPUT=1`
+diagnostic logged host-side `unet_input[0..7]` and a `ggml_backend_tensor_get`
+readback after upload: both bit-identical between CPU and GPU runs, so the
+upload itself was fine. `ggml_backend_sched_get_tensor_backend(c->sched, ui)`
+returned `CPU` for `unet_input` even with `CRISPASR_S3GEN_UNET_GPU_RESIDENCY=1`;
+the existing gallocr trace had already captured `MTL0#unet_input#0` as a
+sched-internal copy.
+
+**Root cause.** With weights GPU-resident, the three runtime inputs
+(`unet_input`, `time_emb`, `mask`) get auto-assigned to the CPU
+backend. Sched creates a copy node `MTL0#unet_input#0` for the first
+Metal split that consumes them. The copy is supposed to run before
+any Metal kernel reads the input, but in this graph it doesn't fire
+correctly — the Metal kernel reads stale data at the destination
+offset, giving structurally wrong values from the very first dispatch.
+Under certain `set_output` layouts (the 2-mark trigger documented in
+follow-ups #1–#3), the wrongness pushes into IEEE-754 territory and
+produces NaN.
+
+**Fix.** `cfm_euler_solve::run_denoiser` now pins `unet_input`,
+`time_emb`, `mask` to `c->backend` via
+`ggml_backend_sched_set_tensor_backend` whenever
+`c->unet_on_gpu` is true. One Bool field on the context tracks
+the residency mode. No new env vars. Production CPU-residency path
+(the default) is unchanged.
+
+**Verification.**
+
+| Config | Before fix | After fix |
+| - | - | - |
+| baseline GPU residency, `--tts "Hello."` | `vocoder mel rms=13.938` | `rms=5.143` (ref 5.115) |
+| 2-mark NaN trigger (`MARK_DB_RESNET=1 + MARK_MB_OUT_INDEX=0`) | `rms=NaN` | `rms=5.143` |
+| diff harness `s3gen_mel` | `cos_min=0.940` | `cos_min=0.999976` |
+| long text (~9 s) | `rms=13.045` | `rms=4.741` |
+| production CPU residency (default) | `rms=5.139` | `rms=5.139` (no change) |
+
+`s3gen_mel cos_min=0.999976` matches the production weight-residency
+split (0.999980); the residual ~1e-2 max_abs is FP16/F32 round-off, not
+a bug. The GPU-residency path is now correct and roughly 30% faster
+than the CPU-residency split on M1 — but we keep CPU residency as the
+default until the underlying ggml sched bug is also fixed upstream
+(see updated `tools/upstream-prs/10`).
+
+**Lessons replacing R9 follow-up #3's 2''':**
+
+2''''. **A backend-pin diagnostic ("does forcing input to GPU fix it?")
+should be tried before declaring a Metal kernel bug.** Three rounds
+chased shader-level address-dependence; the fix was a one-line pin.
+When CPU vs GPU bytes differ at the FIRST kernel, the suspect chain
+is: host upload → sched input placement → sched copy → kernel
+dispatch. Verify each step's outputs before assuming kernel correctness
+is at fault — even if the kernel reads the WRONG buffer, its
+arithmetic on those wrong bytes can still produce "structurally wrong"
+output that looks like a kernel bug.
+
+5. **For GPU-resident sub-graphs, pin runtime inputs explicitly.**
+The ggml scheduler's auto-placement for tensors with
+`GGML_TENSOR_FLAG_INPUT` and no weight constraints prefers CPU
+(cheap host upload). The auto-generated CPU→GPU copy works on most
+graphs, but in long F32 graphs with mixed weight residencies it can
+silently fail. Pinning is a one-liner and removes the failure mode.
+
+---
+
 ## 2026-05-24 PLAN #83 Round 9 — S3Gen UNet weight-residency ships; Metal kernel bisect
 
 Production fix for the chatterbox S3Gen UNet GPU drift (see PLAN #83
