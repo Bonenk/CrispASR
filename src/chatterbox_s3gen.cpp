@@ -1701,15 +1701,22 @@ static ggml_cgraph* build_graph_unet1d(chatterbox_s3gen_context* c, int T_mel) {
     ggml_tensor* x = x_in;
 
     // ---- Down blocks (1 block) ----
+    const bool dump_unet = std::getenv("CRISPASR_S3GEN_DUMP_UNET") != nullptr;
     ggml_tensor* hidden = nullptr;
     {
         x = causal_resnet_block(ctx0, x, t_emb, c, "s3.fd.db.0.0", mask);
+        ggml_set_name(x, "dump_db_resnet");
+        if (dump_unet) ggml_set_output(x);
         // 4 transformer blocks
         ggml_tensor* xt = ggml_cont(ctx0, ggml_transpose(ctx0, x));
         for (int j = 0; j < 4; j++) {
             char prefix[48];
             std::snprintf(prefix, sizeof(prefix), "s3.fd.db.0.1.%d", j);
             x = basic_transformer_block(ctx0, x, c, prefix, nullptr, 8, 64);
+            char dump_name[32];
+            std::snprintf(dump_name, sizeof(dump_name), "dump_db_tb_%d", j);
+            ggml_set_name(x, dump_name);
+            if (dump_unet) ggml_set_output(x);
         }
         hidden = x; // save for skip connection
         // Downsample: CausalConv1d(k=3) — halves T
@@ -1717,6 +1724,8 @@ static ggml_cgraph* build_graph_unet1d(chatterbox_s3gen_context* c, int T_mel) {
         ggml_tensor* ds_b = T(c, "s3.fd.db.0.2.bias");
         if (ds_w)
             x = causal_conv1d(ctx0, x, ds_w, ds_b);
+        ggml_set_name(x, "dump_db_out");
+        if (dump_unet) ggml_set_output(x);
         // Note: the Python code uses Downsample1D which actually halves T
         // For CausalConv1d with stride=1, T stays the same
         // The actual downsample uses mask[:, :, ::2] to halve
@@ -1728,12 +1737,20 @@ static ggml_cgraph* build_graph_unet1d(chatterbox_s3gen_context* c, int T_mel) {
         char prefix[48];
         std::snprintf(prefix, sizeof(prefix), "s3.fd.mb.%d.0", i);
         x = causal_resnet_block(ctx0, x, t_emb, c, prefix, mask);
+        char dump_resnet[32];
+        std::snprintf(dump_resnet, sizeof(dump_resnet), "dump_mb_%d_resnet", i);
+        ggml_set_name(x, dump_resnet);
+        if (dump_unet) ggml_set_output(x);
 
         for (int j = 0; j < 4; j++) {
             char tb_prefix[48];
             std::snprintf(tb_prefix, sizeof(tb_prefix), "s3.fd.mb.%d.1.%d", i, j);
             x = basic_transformer_block(ctx0, x, c, tb_prefix, nullptr, 8, 64);
         }
+        char dump_block[32];
+        std::snprintf(dump_block, sizeof(dump_block), "dump_mb_%d_out", i);
+        ggml_set_name(x, dump_block);
+        if (dump_unet) ggml_set_output(x);
     }
 
     // ---- Up blocks (1 block) ----
@@ -1943,6 +1960,34 @@ static std::vector<float> cfm_euler_solve(chatterbox_s3gen_context* c,
             if (ggml_backend_sched_graph_compute(c->sched, gf) != GGML_STATUS_SUCCESS) {
                 fprintf(stderr, "s3gen: UNet1D compute failed\n");
                 return {};
+            }
+            // PLAN #83 r9 per-segment drift bisect: when CRISPASR_S3GEN_DUMP_UNET=<tag>
+            // is set, dump every "dump_*" named intermediate from step 0 to
+            // /tmp/cb-unet-dump-<tag>-<name>.bin. Run twice (weight-residency
+            // vs gpu-residency), compare per-block.
+            if (step == 0) {
+                const char* dump_tag = std::getenv("CRISPASR_S3GEN_DUMP_UNET");
+                if (dump_tag && *dump_tag) {
+                    const int n_nodes = ggml_graph_n_nodes(gf);
+                    int n_dumped = 0;
+                    for (int i = 0; i < n_nodes; ++i) {
+                        ggml_tensor* node = ggml_graph_node(gf, i);
+                        if (!node || std::strncmp(node->name, "dump_", 5) != 0) continue;
+                        const size_t nb_node = ggml_nbytes(node);
+                        std::vector<char> buf(nb_node);
+                        ggml_backend_tensor_get(node, buf.data(), 0, nb_node);
+                        char path[256];
+                        std::snprintf(path, sizeof(path), "/tmp/cb-unet-dump-%s-%s.bin", dump_tag, node->name);
+                        FILE* fp = std::fopen(path, "wb");
+                        if (fp) {
+                            std::fwrite(buf.data(), 1, nb_node, fp);
+                            std::fclose(fp);
+                            n_dumped++;
+                        }
+                    }
+                    fprintf(stderr, "s3gen: [DUMP_UNET=%s] dumped %d intermediates to /tmp/cb-unet-dump-%s-*.bin\n",
+                            dump_tag, n_dumped, dump_tag);
+                }
             }
             ggml_tensor* out = ggml_graph_get_tensor(gf, "denoiser_out");
             if (step == 0 && c->verbosity >= 1) {
