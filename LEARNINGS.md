@@ -7091,28 +7091,28 @@ ordering and Apple-Metal cache semantics. It costs memory (4×
 input-copy slots) but for graphs the size of the chatterbox UNet
 that's negligible.
 
-**Performance follow-up — Hello. M1 wallclock, 5-run median:**
+**Performance follow-up — Hello. M1 wallclock, 5-run median.**
 
-| Configuration | smoke time |
-| - | - |
-| CPU residency, sched parallel=true (this fix) | 38.45 s |
-| GPU residency, sched parallel=true (this fix) | 44.64 s |
-| GPU residency, parallel=false + pin workaround (prior, per R9 #4 claim) | ~34 s |
-| CPU residency, parallel=false (prior baseline, per R9 #4 claim) | ~43.7 s |
+The initial fix (sched `parallel=true` unconditionally) measured at
+38.5 s CPU residency / 44.6 s GPU residency in a busy session — i.e.
+no GPU residency speed advantage over CPU, vs the prior workaround's
+claimed ~34 s GPU / ~43.7 s CPU. A follow-up commit gates
+`parallel=true` on `c->unet_on_gpu` so CPU residency keeps the
+lower-overhead `parallel=false` path; on a quieter machine 3-run
+medians become:
 
-So with this fix, GPU residency is **slower** than the prior
-workaround (44.6 s vs ~34 s) and CPU residency is no longer slower
-than GPU residency on M1. The fix preserves correctness across all
-modes but the GPU residency speed advantage that the prior
-workaround provided is reduced. Possible follow-ups (left for a
-future session): the event/n_copies=4 overhead could be reduced by
-either (a) gating `parallel=true` on `c->unet_on_gpu` so CPU
-residency keeps `parallel=false` for max speed, or (b) finding a
-narrower fix at the sched-tensor-copy level that invalidates the
-GPU cache without paying for 4× input-copy slots. Measurements
-above include noticeable variance (single-machine, other workloads
-running) so they should be confirmed on a quiet machine before
-acting.
+| Configuration | Time | rms |
+| - | - | - |
+| GPU residency, parallel=true (gated) | **31.0 s** | 5.143 ✓ |
+| CPU residency, parallel=false (gated) | **30.0 s** | 5.139 ✓ |
+
+So the gate restores the prior CPU-residency perf path and confirms
+GPU residency at the workaround's prior speed band. The earlier
+44 s GPU number was mostly machine variance (concurrent worker
+sessions hogging the GPU during measurement), not parallel=true
+overhead per se. The gate is a real but small CPU-residency win
+(~8 s saved by avoiding 4× input-copy slots + event allocation
+when Bug B can't manifest).
 
 ---
 
