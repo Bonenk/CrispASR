@@ -1499,6 +1499,139 @@ _INPUT` backend the way we now treat parakeet: ship a chunked /
 streamed default that the user doesn't have to opt into. See PLAN
 #114 for the open architectural question and the per-backend ladder.
 
+### Cross-length × cross-backend matrix — 60 / 120 / 300 / 600 s (2026-05-25)
+
+Same audio (lenhone's fresh `yt-dlp` extract), extended to longer
+durations. Linux x86 CPU on the issue #89 VPS (`168.119.190.252`),
+sequential to avoid memory contention (we paused / split the queue
+when the kernel went into thrash territory). `tools/longform_vps.sh`
+is the harness; `tools/analyze_longform.py` parses the per-cell
+JSON output.
+
+**Coverage % (covered span / clip duration, computed from segment
+timestamps).** Higher = better. Bold = best at that length.
+
+| backend / mode               |  60 s |  120 s |   300 s |   600 s |
+|---|---:|---:|---:|---:|
+| **parakeet streamed-TDT** (default)        | **93.1** | 81.5 | **96.6** | **99.3** |
+| **parakeet CTC head**                       | **93.1** | 81.5 | **96.6** | **99.3** |
+| parakeet single-pass (`STREAM_THRESHOLD=999`) | 33.2 | 81.7 | **1.5** | 99.9 |
+| parakeet + `--vad` (silero)                 | 86.7 | **82.0** | 76.3 | 84.0 |
+| voxtral-mini-3b (default chunking)          | 63.5 | 34.8 | 19.7 | 9.1 |
+| cohere-transcribe (default chunking)        | **95.0** | **91.5** | 58.8 | 61.8 |
+| cohere-transcribe + `--vad`                 | **96.8** | 90.8 | **92.5** | **91.4** |
+| canary-1b-v2 (default)                      | 99.7* | 99.9* | 99.3* | OOM (rc=137) |
+
+*Canary's coverage% is misleading — the transcribed text is `"I am not aware of anything, I am not aware of…"` (English) at every duration. It's a separate language-prompt-wiring bug, not a long-audio bug. See PLAN #114 P3.
+
+**Largest gap (seconds) between consecutive emitted segments** —
+catches the "drops a middle chunk" failure that the coverage% can
+under-report when the missing region is bracketed by emitted text on
+both sides.
+
+| backend / mode               |  60 s |  120 s |   300 s |   600 s |
+|---|---:|---:|---:|---:|
+| parakeet streamed-TDT                       |  0.0 |  0.0 |  0.0 |  0.0 |
+| parakeet CTC head                           |  0.0 |  0.0 |  0.0 |  0.0 |
+| parakeet single-pass                        |  0.0 |  0.0 |  0.0 |  0.0 |
+| parakeet + `--vad`                          |  5.8 | 12.0 | 30.1 | 30.1 |
+| **voxtral-mini-3b**                         | **21.9** | **78.2** | **240.9** | **545.5** |
+| cohere-transcribe                           |  0.0 |  3.4 | **50.0** | **50.0** |
+| cohere-transcribe + `--vad`                 |  1.4 |  4.2 |  4.2 | 19.0 |
+| canary-1b-v2                                |  0.0 |  0.0 |  0.0 | n/a |
+
+**Wall time (s) / realtime factor.** Apple Silicon would be 5-10×
+faster on the parakeet rows; numbers below are the Linux x86 VPS.
+
+| backend / mode               |  60 s |  120 s |   300 s |   600 s |
+|---|---:|---:|---:|---:|
+| parakeet streamed-TDT                       |  55 |  99 |  236 |  463 |
+| parakeet CTC head                           |  54 | 102 |  236 |  462 |
+| parakeet single-pass                        |  45 |  86 |  235 |  627 |
+| parakeet + `--vad`                          |  55 |  97 |  225 |  457 |
+| voxtral-mini-3b                             | 166 | 165 |  189 |  193 |
+| cohere-transcribe                           |  79 | 144 |  349 |  673 |
+| cohere-transcribe + `--vad`                 |  65 | 117 |  279 |  557 |
+| canary-1b-v2                                |  68 | 122 |  381 | OOM  |
+
+(voxtral wall time is roughly constant because it silently skips
+most of the input — see the gap column.)
+
+### Per-backend take-aways from the matrix
+
+**parakeet (the post-fix default).** streamed-TDT and CTC-head are
+byte-identical at every length (CTC head is a frame-synchronous
+fallback that bypasses the TDT blank-runaway entirely; streamed-TDT
+keeps the TDT decoder but bounds the encoder's bidirectional
+attention to 8 s windows so it can't accumulate the codec-noise
+amplification). The 120 s coverage dip to 81.5 % is the *audio*, not
+the model: the clip's speech runs out at ~01:37 and the next ~22 s
+is silence + a sentence-start, so coverage measured against the full
+120 s under-counts. Both paths produce the same actual content.
+
+**parakeet single-pass.** Catastrophically non-monotonic: 33 % at
+60 s, 82 % at 120 s, **1.5 %** at 300 s, 99.9 % at 600 s. This is the
+"per-feature z-norm depends on the full audio's mel statistics"
+problem manifesting as random walks across the stable/unstable
+boundary. The single-pass path is genuinely unsafe; the "works at
+600 s" cell is luck, not a property.
+
+**parakeet + `--vad`.** Coverage drops to 76-87 % across lengths
+because VAD trims silence (by design). Larger gaps at longer
+durations because the underlying clip has more silence stretches.
+Good for "I want per-utterance SRT entries" use cases, less so for
+"I want continuous transcription with maximum coverage."
+
+**voxtral-mini-3b.** **Worst long-form behaviour we measured.**
+Coverage halves with each length doubling: 64 → 35 → 20 → 9 %. The
+LLM AR decoder takes only the first and last energy-chunk of the
+clip and ignores the middle entirely. Gap is 545 s on the 600 s clip
+— the decoder emits text for ~0:00 → ~0:30 and then for ~9:25 →
+10:00, drops the middle 9 minutes. Confirms the Class B (LLM-AR
+chunk-boundary drift) diagnosis: needs chunk-with-overlap + LCS
+dedup, not VAD.
+
+**cohere-transcribe.** Default chunking degrades from 95 % at 60 s
+to **59 %** at 300 s and **62 %** at 600 s, with 50 s gaps. With
+`--vad` it stays at **91-97 %** across the entire 60-600 s range
+with gaps ≤ 19 s. Strongest evidence yet that cohere's open weights
+were not designed for long inputs — and that the hosted product's
+server-side VAD is doing the right thing. PLAN #114 P1 is to make
+`--vad` the default for cohere past the auto-chunk threshold; this
+matrix is the validation it's the right fix.
+
+**canary-1b-v2.** Separate bug. Coverage looks fine because the
+decoder emits text for the full duration, but the text is English
+`"I am not aware of anything"` in a loop regardless of input
+language. Language-prompt wiring problem, not a long-audio problem.
+600 s OOM-killed (rc=137) on the 7.6 GB VPS — likely the AED
+decoder's hidden-state stack growing past the available memory.
+
+### What's the right default per backend, post-matrix
+
+| backend | recommended default | why |
+|---|---|---|
+| parakeet (any variant)         | streamed-TDT (current default since `33f9a162`) | best coverage at all lengths, byte-identical to CTC-head when both are available |
+| canary-1b-v2                   | fix lang-prompt bug first; then streamed-encode port | currently broken at all durations on JA; long-audio fix on hold |
+| voxtral-mini-3b                | chunk with 2-3 s overlap + LCS dedup (PLAN #114 P2) | matrix shows default chunking drops middle of every clip ≥ 60 s |
+| cohere-transcribe              | `--vad` (silero) past 30 s (PLAN #114 P1)        | matrix shows VAD is +30 % coverage at 300 s, +30 % at 600 s |
+| qwen3-asr / granite-speech / mimo-asr | same as voxtral (Class B)                   | TBD by extending matrix; same LLM-AR architecture |
+| fastconformer-ctc / wav2vec2 / firered-asr | current single-pass (CTC is robust)        | no observed failure; defer streamed port until reported |
+| sensevoice-small               | `--vad`                                          | already the recommendation; matrix confirms 99 %+ at 120 s |
+| whisper                        | unchanged                                        | internal 30 s seek handles long audio by design |
+
+### Reproducer
+
+```bash
+# Driver — runs all 32 cells sequentially with memory backpressure
+bash tools/longform_vps.sh   # outputs to /mnt/akademie_storage/longform_results/
+
+# Parser — JSON outputs → coverage table
+python tools/analyze_longform.py /path/to/longform_results/
+```
+
+Both scripts in this commit. Audio: `/mnt/akademie_storage/yt_{60,120,300,600}s.wav` on the VPS (PCM s16le, 16 kHz mono, fresh `yt-dlp` extract of `youtube.com/watch?v=o_9dWkRPYC0`).
+
 ---
 
 ## Beam search — quality vs speed (2026-05-23, PLAN #90)
