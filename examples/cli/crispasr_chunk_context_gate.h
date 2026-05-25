@@ -30,14 +30,14 @@ namespace crispasr_chunk_context {
 // ~30 s boundary. Wrapping their fallback chunks in extra acoustic context
 // pushes the per-call input over that boundary, with backend-specific bad
 // outcomes: cohere drops follow-up chunks via word-timestamp trimming;
-// gemma4-e2b and glm-asr blow past a 15 min wallclock on a 5 min clip
-// (LLM-decode retry loop on the over-long buffer). All three were caught
-// by the A/B sweep in tools/check-overlap-save-bug.sh.
+// gemma4-e2b, glm-asr, and kyutai-stt blow past a 15 min wallclock on a
+// 5 min clip (LLM-decode retry loop on the over-long buffer). All four
+// were caught by the A/B sweep in tools/check-overlap-save-bug.sh.
 inline bool backend_allows_chunk_context(const char* backend_name) {
     if (backend_name == nullptr) {
         return true;
     }
-    static const char* const kBlocked[] = {"cohere", "gemma4-e2b", "glm-asr"};
+    static const char* const kBlocked[] = {"cohere", "gemma4-e2b", "glm-asr", "kyutai-stt"};
     for (const char* b : kBlocked) {
         if (std::strcmp(backend_name, b) == 0) {
             return false;

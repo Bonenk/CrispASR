@@ -57,6 +57,7 @@ TEST_CASE("backend_allows_chunk_context: known offenders opt out, others do not"
     REQUIRE_FALSE(backend_allows_chunk_context("cohere"));
     REQUIRE_FALSE(backend_allows_chunk_context("gemma4-e2b"));
     REQUIRE_FALSE(backend_allows_chunk_context("glm-asr"));
+    REQUIRE_FALSE(backend_allows_chunk_context("kyutai-stt"));
 
     // Spot-check a few known-safe ASR backends from --list-backends-json.
     REQUIRE(backend_allows_chunk_context("whisper"));
