@@ -2755,6 +2755,36 @@ suspecting precision. The handover's Hypothesis C ("a structural
 bug we missed") was right; it just lived in the harness's input
 binding, not the resblock chain.
 
+#### Harness coverage hardening 2026-05-25
+
+Three follow-up changes so the next bug of this class lands faster:
+
+- **`voc_si_{0,1,2}` + `voc_rb_input_{0,1,2}` stages.** Source fusion
+  is now diffed independently of the main resblock chain. A
+  layout/structural bug in `source_downs[i]` or `source_resblocks[i]`
+  now flags at `voc_si_i` instead of at `voc_rb_i` — the prior
+  investigations spent days narrowing "drift starts at voc_rb_0" to
+  source fusion; the new probe makes that one harness run.
+  `tools/extend_chatterbox_ref_si_stages.py` computes the new
+  reference stages from `voc_ups_*` + `hift_source_stft` + the F32
+  weights in the s3gen GGUF (no need to re-run the (pruned)
+  chatterbox-ref-venv); the python ref backends were also updated
+  for future re-dumps from scratch.
+- **Two-tier threshold on vocoder stages.** Pure-fp32 stages now
+  require `cos_min >= 0.999` in addition to the existing
+  `cos_mean >= 0.95`. With the bug, `voc_rb_0` sat at
+  `cos_min 0.937 cos_mean 0.998` — passed the loose check while
+  visibly broken. The strict floor flips that to `[FAIL]`.
+- **`hift_pcm(internal_src)` self-consistency check.** Re-runs the
+  vocoder with `source_stft_cf=NULL` so it uses internal F0/SineGen/
+  STFT instead of the python-archive feed, then compares the wav
+  against the reference (loose `cos_mean >= 0.80` to allow for
+  C++ vs torch source-gen drift). Catches future regressions in
+  the internal source-gen path that the external-feed-only diff
+  would miss. On JFK 11 s with the runtime in its current state,
+  this passes at `cos = 0.9998` — internal source gen tracks torch
+  surprisingly closely despite being independently implemented.
+
 ## Chatterbox voice cloning — bake to GGUF, load via `--voice` (May 2026)
 
 Voice cloning uses the same baker-→-voice-GGUF pattern as vibevoice

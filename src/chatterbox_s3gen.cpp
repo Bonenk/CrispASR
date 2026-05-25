@@ -2588,7 +2588,24 @@ static std::vector<float> hift_vocoder_cpu(chatterbox_s3gen_context* c,
                 x = ggml_view_2d(ctx0, x, T_min, (int)x->ne[1], x->nb[1], 0);
                 x = ggml_cont(ctx0, x);
             }
+            // Expose final source-fusion result and post-fusion resblock input so
+            // the diff harness can localise drift between source_downs + source_resblocks
+            // and the main resblock chain. Cheap to dump (single ggml_set_output per
+            // upsample stage) and the only reliable way to catch source_stft layout
+            // bugs of the kind fixed in 73ef0d10.
+            if (stage_dump) {
+                char sname[32];
+                std::snprintf(sname, sizeof(sname), "voc_si_%d", stage);
+                ggml_set_name(si, sname);
+                ggml_set_output(si);
+            }
             x = ggml_add(ctx0, x, si);
+            if (stage_dump) {
+                char rname[32];
+                std::snprintf(rname, sizeof(rname), "voc_rb_input_%d", stage);
+                ggml_set_name(x, rname);
+                ggml_set_output(x);
+            }
         }
 
         // ResBlocks: 3 per stage, each run INDEPENDENTLY on the same input,
@@ -2937,10 +2954,16 @@ static std::vector<float> hift_vocoder_cpu(chatterbox_s3gen_context* c,
         const char* dump_names[] = {
             "voc_conv_pre",
             "voc_ups_0",
+            "voc_si_0",
+            "voc_rb_input_0",
             "voc_rb_0",
             "voc_ups_1",
+            "voc_si_1",
+            "voc_rb_input_1",
             "voc_rb_1",
             "voc_ups_2",
+            "voc_si_2",
+            "voc_rb_input_2",
             "voc_rb_2",
             "voc_conv_post",
             "voc_rb0k0_snake1_d0",

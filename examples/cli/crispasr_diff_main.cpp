@@ -893,6 +893,12 @@ int main(int argc, char** argv) {
         voxtral4b_free(ctx);
     } else if (backend_name == "chatterbox") {
         constexpr float CHATTERBOX_MEAN_THRESHOLD = 0.95f;
+        // Tighter floor for pure-fp32 vocoder stages (no quantization in the path,
+        // weights are F32 in the s3gen GGUF). Drift above this level is structural
+        // and worth surfacing — the 2026-05-25 hift_source_stft layout bug had
+        // voc_rb_0 sitting at cos_min 0.937 cos_mean 0.998, which passed the 0.95
+        // mean check but was already structurally broken.
+        constexpr float CHATTERBOX_VOC_STRICT_MIN = 0.999f;
         auto print_row_mean = [&](const char* name, const crispasr_diff::Report& r, float cos_threshold,
                                   const char* extra = "") {
             const bool pass = r.found && r.n_nonfinite == 0 && r.cos_mean >= cos_threshold;
@@ -922,6 +928,44 @@ int main(int argc, char** argv) {
             if (!r.found) {
                 n_skip++;
             } else if (r.cos_mean >= cos_threshold) {
+                n_pass++;
+            } else {
+                n_fail++;
+            }
+        };
+        // Strict variant: PASS requires cos_mean above the regular threshold AND
+        // cos_min above the strict floor. Use for pure-fp32 stages where the only
+        // expected divergence is fp32-ULP rounding.
+        auto print_row_strict = [&](const char* name, const crispasr_diff::Report& r, float cos_mean_threshold,
+                                    float cos_min_threshold, const char* extra = "") {
+            const bool pass =
+                r.found && r.n_nonfinite == 0 && r.cos_mean >= cos_mean_threshold && r.cos_min >= cos_min_threshold;
+            const char* tag = r.found ? (pass ? "[PASS]" : "[FAIL]") : "[SKIP]";
+            std::string shape_str = "[";
+            for (size_t i = 0; i < r.shape.size(); i++) {
+                shape_str += std::to_string(r.shape[i]);
+                if (i + 1 < r.shape.size())
+                    shape_str += ",";
+            }
+            shape_str += "]";
+            if (!r.found) {
+                printf("%s %-22s %s  (reference not in archive)%s%s\n", tag, name, shape_str.c_str(),
+                       *extra ? "  " : "", extra);
+                return pass;
+            }
+            if (r.n_nonfinite > 0) {
+                printf("%s %-22s shape=%-16s non_finite=%zu/%zu  (cos/max_abs unreliable when data has NaN/Inf)%s%s\n",
+                       tag, name, shape_str.c_str(), r.n_nonfinite, r.n_elem, *extra ? "  " : "", extra);
+                return pass;
+            }
+            printf("%s %-22s shape=%-16s cos_min=%.6f  cos_mean=%.6f  max_abs=%.2e  rms=%.2e%s%s\n", tag, name,
+                   shape_str.c_str(), r.cos_min, r.cos_mean, r.max_abs, r.rms, *extra ? "  " : "", extra);
+            return pass;
+        };
+        auto record_strict = [&](const crispasr_diff::Report& r, float cos_mean_threshold, float cos_min_threshold) {
+            if (!r.found) {
+                n_skip++;
+            } else if (r.cos_mean >= cos_mean_threshold && r.cos_min >= cos_min_threshold) {
                 n_pass++;
             } else {
                 n_fail++;
@@ -1316,9 +1360,17 @@ int main(int argc, char** argv) {
                             const char* name;
                             int row_width;
                         };
+                        // Per-stage row width is the channel count. voc_si_i and
+                        // voc_rb_input_i carry the same channel count as voc_ups_i /
+                        // voc_rb_i at the same upsample stage. voc_si_i is the output
+                        // of source_resblocks[i] (catches source_downs/source_resblocks
+                        // bugs in isolation); voc_rb_input_i is the post-fusion x fed
+                        // into the resblock chain (catches the x+si add).
                         static const VocStage voc_stages[] = {
-                            {"voc_conv_pre", 512}, {"voc_ups_0", 256}, {"voc_rb_0", 256}, {"voc_ups_1", 128},
-                            {"voc_rb_1", 128},     {"voc_ups_2", 64},  {"voc_rb_2", 64},  {"voc_conv_post", 18},
+                            {"voc_conv_pre", 512}, {"voc_ups_0", 256},    {"voc_si_0", 256}, {"voc_rb_input_0", 256},
+                            {"voc_rb_0", 256},     {"voc_ups_1", 128},    {"voc_si_1", 128}, {"voc_rb_input_1", 128},
+                            {"voc_rb_1", 128},     {"voc_ups_2", 64},     {"voc_si_2", 64},  {"voc_rb_input_2", 64},
+                            {"voc_rb_2", 64},      {"voc_conv_post", 18},
                         };
                         for (const auto& s : voc_stages) {
                             if (ref.shape(s.name).empty()) {
@@ -1335,8 +1387,12 @@ int main(int argc, char** argv) {
                             }
                             auto rep = compare_with_row_width(ref, s.name, stage_r.data.data(), stage_r.data.size(),
                                                               s.row_width);
-                            print_row_mean(s.name, rep, CHATTERBOX_MEAN_THRESHOLD, "criterion=cos_mean>=0.95");
-                            record_mean(rep, CHATTERBOX_MEAN_THRESHOLD);
+                            // Pure-fp32 vocoder path — strict per-row floor catches
+                            // structural bugs (layout mismatches, wrong padding, etc.)
+                            // that the looser cos_mean check would let through.
+                            print_row_strict(s.name, rep, CHATTERBOX_MEAN_THRESHOLD, CHATTERBOX_VOC_STRICT_MIN,
+                                             "criterion=cos_mean>=0.95 & cos_min>=0.999");
+                            record_strict(rep, CHATTERBOX_MEAN_THRESHOLD, CHATTERBOX_VOC_STRICT_MIN);
 
                             // Per-row cosine dump for the worst-K rows + boundary rows. Gated on
                             // CHATTERBOX_DEBUG so the normal diff output stays compact. Helps localize
@@ -1418,6 +1474,31 @@ int main(int argc, char** argv) {
                         auto rep = ref.compare("hift_pcm", voc_r.data.data(), voc_r.data.size());
                         print_row_mean("hift_pcm(ref_mel)", rep, CHATTERBOX_MEAN_THRESHOLD, "criterion=cos_mean>=0.95");
                         record_mean(rep, CHATTERBOX_MEAN_THRESHOLD);
+
+                        // Self-consistency: re-run the vocoder with source_stft_cf=NULL so
+                        // it generates source_stft internally (F0 predictor → SineGen →
+                        // STFT), then compare the resulting wav against the reference.
+                        // Looser threshold than hift_pcm(ref_mel) because internal source
+                        // generation drifts from torch's f0/sine (~10 % per-element typical).
+                        // Catches: grossly broken internal source generation, any future
+                        // divergence between the internal-feed and external-feed code paths
+                        // (the layout bug fixed in 73ef0d10 would have surfaced here too —
+                        // wav_external would have been broken while wav_internal stayed clean,
+                        // and the resulting wav-vs-wav diff against ref would have diverged
+                        // wildly on only one of the two).
+                        auto voc_internal_r =
+                            chatterbox_vocode_mel_with_source_stft_r(ctx, mel_cf.data(), T_mel, nullptr, 0);
+                        if (voc_internal_r.ok) {
+                            auto rep_int =
+                                ref.compare("hift_pcm", voc_internal_r.data.data(), voc_internal_r.data.size());
+                            constexpr float CHATTERBOX_INTERNAL_SOURCE_THRESHOLD = 0.80f;
+                            print_row_mean("hift_pcm(internal_src)", rep_int, CHATTERBOX_INTERNAL_SOURCE_THRESHOLD,
+                                           "criterion=cos_mean>=0.80  internal_source_stft_self_check");
+                            record_mean(rep_int, CHATTERBOX_INTERNAL_SOURCE_THRESHOLD);
+                        } else {
+                            printf("[ERR ] hift_pcm(internal_src) %s\n", voc_internal_r.note.c_str());
+                            n_fail++;
+                        }
                     } else {
                         printf("[ERR ] hift_pcm(ref_mel)      %s\n", voc_r.note.c_str());
                         n_fail++;
