@@ -6,6 +6,27 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-25 CI cleanup — build.yml trim, test #148 rename, GG_BUILD_NO_AVX512 knob
+
+Three small CI fixes landing together — each pre-existing latent failure that surfaced once the issue #89 push cadence let `build.yml` run to completion for the first time in 30+ commits.
+
+**Test #148 rename (`4fda4be5`).** `test-issue-114-chunk-context-gate` had a Catch2 `TEST_CASE("--chunk-overlap 0 disables overlap-save", ...)` whose name was passed verbatim by `catch_discover_tests` as the positional argv to the binary. Catch2's CLI parser then read `--chunk-overlap` as an unknown option and exited with `Unrecognised token: --chunk-overlap`. The test had been failing in CI on every push since it was added. Renamed to `"chunk-overlap=0 disables overlap-save"` with an inline comment about the catch_discover_tests / CLI-parser interaction so the next contributor doesn't reintroduce a `--`-prefixed name. All 6 cases / 307 assertions in the binary still pass; ctest now reports 303/303 unit-test PASS where it had been stuck at 302/303 for weeks.
+
+**build.yml trim (`80ac00d1`).** Inherited from whisper.cpp upstream and grown to 1610 lines / 59 jobs across a matrix CrispASR doesn't actually ship for. Two long-latent failures surfaced when the file finally ran to completion: `ubuntu-22-gcc-arm64 (Release)` failed at 3 m on `qemu: uncaught target signal 11` inside libc-bin's post-install in the emulated arm64 docker guest (a known [`docker/setup-qemu-action@v3` regression](https://github.com/docker/setup-qemu-action/issues)), and `ggml-ci-x64-cpu-high-perf` failed with `crispasr-bench` SIGILL (exit 132) on first AVX512 instruction because GitHub's `ubuntu-22.04` runner pool is CPU-heterogeneous and the bench landed on a non-AVX512 VM after the build picked up AVX512 from a host that had it. Trim:
+
+- **Removed** (not shipping targets): `ubuntu-22-arm-v7`, `ubuntu-22-gcc-arm-v7`, `ubuntu-22-cmake-sycl`, `ubuntu-22-cmake-sycl-fp16`, plus 5 ggml-ci jobs that target ggml-org's self-hosted runner pool (`-x64-nvidia-cuda`, `-x64-nvidia-vulkan-{cm,cm2}`, `-mac-metal`, `-mac-vulkan`) — they'd never schedule on this fork.
+- **Switched to native runners** (no QEMU): `ubuntu-22-arm64`, `ubuntu-22-gcc-arm64` now use `runs-on: ubuntu-22.04-arm` (GitHub-hosted native ARM64, ~5-10× faster + structurally cannot hit the QEMU/libc-bin segfault). `ubuntu-22-clang` matrix expanded to cover both amd64 and native arm64 in one job (drops ppc64le).
+- **Dropped ppc64le** from remaining linux jobs (`ubuntu-22`, `ubuntu-22-gcc`) — we don't ship for PowerPC, removing the docker wrapper also drops 3-5 min of emulation overhead per cell.
+- **Kept** (we ship these + we modify their ggml backends per `tools/upstream-prs/01-12`): the 5 GitHub-hosted CPU `ggml-ci-{x64,arm64}-cpu-{low,high}-perf{,-sve}` jobs. They catch regressions in our ggml patches without needing self-hosted infra.
+
+Net: 1610 → 1324 lines (−286), 59 → 32 jobs.
+
+**GG_BUILD_NO_AVX512 knob (`565b16af`).** Actual fix for `ggml-ci-x64-cpu-high-perf` rather than the interim `continue-on-error: true` from the trim commit. The `.github/workflows/build.yml` job now sets `GG_BUILD_NO_AVX512=1` on the `ci/run.sh` invocation; a new env-var stanza in `ci/run.sh` (mirrors the existing `GG_BUILD_NO_SVE` pattern) appends `-DGGML_NATIVE=OFF -DGGML_AVX512=OFF -DGGML_AVX512_VBMI=OFF -DGGML_AVX512_VNNI=OFF -DGGML_AVX2=ON -DGGML_FMA=ON` to `CMAKE_EXTRA` when set. Pins a uniform AVX2 + FMA baseline that every GitHub-hosted x86_64 runner can execute (Skylake floor). Documented as `tools/upstream-prs/13-ci-no-avx512-knob.{md,patch}` for upstream submission to `ggml-org/llama.cpp` once we have a measured multi-run stability window. Default-OFF, opt-in; bit-identical to upstream when the env var is unset.
+
+**Why these were latent for so long.** `build.yml`'s top-level `concurrency: cancel-in-progress: true` cancels in-flight runs on every new push. Its matrix takes ~30 min to complete; pushes have averaged every ~15 min during the active #83 + #89 + #97 work. So `build.yml` has been getting cancelled on 30+ consecutive commits and the failures never had time to surface. They have nothing to do with the code on any of those commits.
+
+---
+
 ## 2026-05-24 PLAN #83 Round 9 follow-up #5 — Bug B FIXED via sched parallel=true
 
 After eliminating ~10 hypotheses (cache barriers, blit copies,
@@ -542,6 +563,47 @@ byte-match, Q4_K==F16 parity).
 | `examples/cli/crispasr_backend_{parakeet,qwen3,voxtral}.cpp` | Wire hotwords into each backend |
 | `tests/test_context_bias.cpp` | 13 unit tests |
 | `tests/test_paraformer.cpp` | 4 live integration tests |
+
+---
+
+## 2026-05-24 Issue #89 reopened — parakeet streamed-encode is now the default for all audio
+
+**Reporter (lenhone) was correct that the 2026-05-23 "99.5 % on 60 s" claim didn't hold.** End-to-end repro of their pipeline:
+
+```
+yt-dlp -f 'bestaudio/best' -x --audio-format wav <url>
+ffmpeg -i <wav> -ar 16000 -ac 1 -t 60 -c:a pcm_s16le yt60.wav
+crispasr -m parakeet-tdt-0.6b-ja.gguf -l ja -f yt60.wav -osrt
+  → output stops at 00:00:20.080 (33 % coverage, not 99.5 %)
+```
+
+Same crispasr binary on `/mnt/storage/test-audio/ja/yt_60s.wav` (the file the 2026-05-23 benchmark was actually run against, cached on the VPS): full 60 s coverage. Both WAVs have identical duration, 16 kHz mono pcm_s16le, ~0.3 % RMS difference, **0.9977 zero-lag waveform correlation**. The "99.5 %" benchmark was run against the cached MP3-derived copy, not a fresh `yt-dlp` extract of the same YouTube video; the doc wording was misleading.
+
+**Diff harness against NeMo on the bad audio:** our pipeline tracks NeMo bit-for-bit through the entire encoder.
+
+```
+[PASS] mel_spectrogram     cos_min=1.000000  max_abs=3.00e-04
+[PASS] pre_encode_output   cos_min=0.999999  max_abs=1.04e-02
+[PASS] encoder_layer_0..22 cos_min≈1.000000  max_abs ≤ 3.3e-02
+[PASS] encoder_output      cos_min=0.999995  max_abs=2.14e-03
+```
+
+So this is **not a port-fidelity bug.** It's a model-level numerical instability in TDT single-pass over the full utterance. To prove it: NeMo's own `nvidia/parakeet-tdt_ctc-0.6b-ja` via stock `model.transcribe()` on lenhone's WAV produces 47 chars stopping at ~20 s; on the cached MP3 WAV it produces 294 chars covering the full 60 s. Same model weights, same `transcribe()` call, different audio derivation, same failure pattern as ours. Upstream defaults aren't safe on this audio either — and NeMo ships `BatchedFrameASRTDT` / `FrameBatchChunkedCTC` / `get_buffered_pred_feat_rnnt` in `streaming_utils.py` as the *separate* long-form path that stock `transcribe()` doesn't use.
+
+**Mechanism (from per-frame trace).** With single-pass encoding over 60 s, the bidirectional FastConformer encoder's attention amplifies the 0.3 % audio-level codec quantisation difference into a 14 % shift in encoder output std (0.2069 vs 0.2415 on the two audio variants). That shift is enough to flip the TDT joint network's argmax from real-token to blank starting at frame ~250 (~20 s @ 100 Hz mel / 8× subsampling). Once blank dominates, the decoder stays in that regime for the rest of the utterance. The streamed path (overlapping 8 s encoder chunks → concatenate → single TDT decode) keeps the attention window short enough that the noise doesn't amplify; the decoder still sees one contiguous encoder sequence so there's no LSTM cold-start.
+
+**Fix (`33f9a162`).** Make the streamed path the default for any duration. `examples/cli/crispasr_backend_parakeet.cpp`: `stream_threshold_s` default 60 → 0; condition flipped so 0 means "always streamed" (matching what the docs at `docs/cli.md:147` had already claimed). Single-pass is preserved as an opt-in escape hatch via `CRISPASR_PARAKEET_STREAM_THRESHOLD=999` for callers that want bit-exact NeMo reproduction on test data.
+
+**Verified** on Apple Silicon Metal and Linux x86 CPU, on both audio variants, identical transcription content:
+
+> このチャンネルでは日本語や日本文化について紹介しています。…年末年始に何をするかという話をしたいと思います。お正月を迎えるためのことをするということが大事です。
+
+**120 s multi-backend sweep (`7a14879f`)** added to PERFORMANCE.md confirms this isn't parakeet-specific. On the same fresh `yt-dlp` audio, voxtral-mini-3b drops 0:27 → 1:47 (~80 s lost in the middle), cohere-transcribe emits only 4 segments across 120 s with multi-tens-of-seconds gaps, canary-1b-v2 hallucinates English ("I am not aware of anything" loop). Parakeet was loudest because lenhone happened to hit it, not because the other backends are safe. Filed as PLAN #114 for follow-up — open architectural question: VAD-default for everyone vs parakeet-style streamed-encode trick per backend vs LLM-decoder chunking + LCS dedup.
+
+**Doc updates landing with this fix:**
+- `README.md`: corrected the "99.5 % coverage" claim to "model-level numerical fragility; streamed encode is the default workaround"
+- `docs/cli.md`: rewrote the parakeet streaming section + fixed the `CRISPASR_PARAKEET_STREAM_THRESHOLD=0` semantic mismatch (doc said "always streamed", code said "never streamed" — fix flipped the code to match the doc)
+- `PERFORMANCE.md`: corrected the issue #89 fix-verification table to show both audio variants side-by-side, annotated the earlier byte-identical-streamed-vs-single-pass claim as "only on the cached MP3 derivation"
 
 ---
 

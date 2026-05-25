@@ -7385,3 +7385,88 @@ on Windows + laptop NVIDIA is racing the WDDM idle timer. Treat
 the cross-process probe-then-bench pattern as "works iff GPU was
 already warm", and use a single-process keepalive when starting
 cold.
+
+---
+
+## TDT single-pass over a full long utterance is numerically fragile to codec-level audio noise (issue #89, 2026-05-24)
+
+Reporter (lenhone) ran the canonical pipeline on a 60 s clip of a YouTube podcast:
+
+```
+yt-dlp -x --audio-format wav <url>
+ffmpeg -i ... -ar 16000 -ac 1 -t 60 -c:a pcm_s16le yt60.wav
+crispasr -m parakeet-tdt-0.6b-ja.gguf -l ja -f yt60.wav -osrt
+```
+
+→ output stops at 00:00:20.080. Same binary on our internal cached WAV of the same 60 s of audio produced 99.5 % coverage. The two WAVs:
+
+- identical duration (60.000 s), 16 kHz mono pcm_s16le
+- **0.9977 zero-lag waveform correlation**
+- ~0.003 RMS difference in normalised [-1, 1] units (≈0.3 % RMS)
+- per-second RMS ratio within ~3 % everywhere
+
+Perceptually indistinguishable. The only difference is the codec round-trip: ours had been YouTube → MP3 (saved on the VPS) → WAV, lenhone's was YouTube → Opus/WebM → WAV (a fresh `yt-dlp -x --audio-format wav`).
+
+### Three things that aren't the cause (ruled out by the diff harness against NeMo)
+
+Running `tools/dump_reference.py --backend parakeet --audio <bad WAV>` and `crispasr-diff parakeet …` showed **every** intermediate matched NeMo bit-for-bit on the bad audio:
+
+```
+[PASS] mel_spectrogram     cos_min=1.000000  max_abs=3.00e-04
+[PASS] pre_encode_output   cos_min=0.999999  max_abs=1.04e-02
+[PASS] encoder_layer_0..22 cos_min≈1.000000  max_abs ≤ 3.3e-02
+[PASS] encoder_output      cos_min=0.999995  max_abs=2.14e-03
+```
+
+So:
+
+1. **Not our mel preprocessing.** Per-feature z-norm on our side gives the same mel as NeMo's `AudioToMelSpectrogramPreprocessor`.
+2. **Not our encoder port.** Every conformer layer through layer 23 matches NeMo at cos ≥ 0.999999.
+3. **Not our TDT decoder logic.** NeMo's stock `nvidia/parakeet-tdt_ctc-0.6b-ja` via `model.transcribe()` produces 47 chars / stops at ~20 s on the same bad audio. Same model weights, same call shape, same collapse pattern.
+
+### What it actually is — full-utterance bidirectional attention amplifies the codec noise
+
+Per-frame TDT trace on the bad audio:
+
+| frame range (~time) | LOCAL (bad audio) | VPS (good audio) |
+|---|---:|---:|
+| frames 0-50 (0-4 s) | 12 blank / 21 steps | 10 / 44 |
+| frames 50-100 (4-8 s) | 12 / 12 (all blank) | 1 / 19 |
+| frames 100-150 (8-12 s) | 13 / 13 (all blank) | 2 / 17 |
+| frames 200-250 (16-20 s) | 0 / 20 (all real) | 0 / 18 |
+| frames 250-750 (20-60 s) | **13 / 13, 13 / 13, … forever** | 1-6 / 15 each window |
+
+Encoder output stats on the same audio pair (no per-band z-norm shenanigans — same global per-feature z-norm, same encoder weights):
+
+| | bad audio | good audio |
+|---|---:|---:|
+| `enc.std()` over 750 frames | **0.2069** | **0.2415** (+14 %) |
+| TDT tokens emitted | 42 | 211 |
+
+A **0.3 % RMS** audio diff is amplified by full-utterance bidirectional attention into a **14 %** shift in encoder activation magnitude, which is enough to flip the TDT joint network's argmax from real-token to blank past frame ~250. Once blank wins, the predictor doesn't advance, so the next frame's joint sees the same predictor output + a similar encoder output → blank wins again. The decoder stays in that regime for the rest of the utterance.
+
+### Why the streamed path (overlapping 8 s encoder chunks + concat + single TDT decode) dodges this
+
+Two reasons:
+
+1. **Each encoder forward sees only 8 s of bidirectional attention context**, so the attention can't accumulate noise across the whole utterance. The window is short enough that the codec-level perturbation doesn't get amplified into a 14 % activation-magnitude shift.
+2. **Global z-norm computed across the whole audio** keeps the input distribution to each encoder chunk consistent with what the encoder weights were trained on. The chunk doesn't see "just this 8 s normalised by its own stats" — it sees "this 8 s normalised by the same per-feature mean/std the trained model expects."
+
+The decoder still sees one contiguous encoder output (concatenated from all chunks, with overlap-skip), so the predictor LSTM doesn't cold-start mid-utterance.
+
+### Lessons
+
+**Lesson 1: when the same binary on two perceptually-identical WAVs produces wildly different output, the problem is model fragility, not implementation.** A 0.3 % RMS audio diff should not be detectable through 24 conformer layers + a TDT joint, but it is, because (a) bidirectional attention has unbounded receptive field which lets numerical instabilities accumulate, and (b) the TDT blank-vs-token decision is a knife-edge argmax that small joint-logit shifts can flip.
+
+**Lesson 2: the diff harness is the right first move when an end-to-end-symptom can be characterised as "two outputs diverge from a known-good reference."** It nailed "encoder is fine, problem is elsewhere" in ~10 minutes of capture + crispasr-diff, replacing what would otherwise have been hours of speculation about z-norm bugs, mel filterbank precision, BN folding, etc.
+
+**Lesson 3: upstream `model.transcribe()` is not necessarily robust on long audio either.** NeMo ships `BatchedFrameASRTDT` / `FrameBatchChunkedCTC` / `get_buffered_pred_feat_rnnt` in `streaming_utils.py` precisely because the default `transcribe()` is single-pass and falls into the same trap. "Stock upstream behaviour" is not the same as "stock upstream behaviour is correct." When the diff harness shows we match upstream bit-for-bit, the next question is whether *upstream* is correct on the input.
+
+**Lesson 4: "byte-identical streamed = single-pass on the test data" is not the same as "streamed = single-pass on all data."** Our 2026-05-23 PERFORMANCE.md "Robustness validation" table claimed streamed and single-pass produce byte-identical output across every chunk/overlap config. That was true on the cached audio we tested — both paths land in the stable regime there. On lenhone's audio they diverge by 200+ characters because single-pass is in the unstable regime and streamed isn't. Whenever a claim is "X always equals Y," look for the input axis we haven't varied yet.
+
+### Cross-refs
+
+- `33f9a162` — flip `CRISPASR_PARAKEET_STREAM_THRESHOLD` default 60 → 0 (always streamed); single-pass becomes an opt-in escape hatch
+- HISTORY 2026-05-24 "Issue #89 reopened — parakeet streamed-encode is now the default for all audio"
+- PERFORMANCE.md "Multi-backend long-form Japanese — 120 s sweep" (voxtral/cohere/canary hit the same class of issue; PLAN #114 tracks the per-backend follow-up)
+- `[[feedback_methodology]]` — the diff-harness stage-by-stage protocol; this is exactly the use case it was built for
