@@ -7192,6 +7192,77 @@ than gating CI on it. Recommended follow-up:
   `crispasr.ref.chatterbox_syn_text` metadata key from the ref
   archive so the default text matches the reference.
 
+### Resolution — patched the legacy GGUF, BPE path now matches python exactly (2026-05-25)
+
+After re-examining python's `EnTokenizer.encode` in
+`resemble-ai/chatterbox/src/chatterbox/models/tokenizers/tokenizer.py`,
+the algorithm is literally:
+
+```python
+def encode(self, txt: str):
+    txt = txt.replace(' ', SPACE)        # ' ' → '[SPACE]'
+    code = self.tokenizer.encode(txt)
+    return code.ids
+```
+
+i.e. swap each ASCII space for the literal multi-char token `[SPACE]`
+(id 2 in the vocab) BEFORE the underlying HF tokenizer's Whitespace
+pre-tokenizer + BPE runs. The C++ `tokenize_text_hf_bpe` already
+implemented exactly this algorithm — the gap was the GGUF, not the
+tokenizer code:
+
+- The chatterbox-base converter
+  (`models/convert-chatterbox-to-gguf.py`) didn't write
+  `tokenizer.ggml.merges` until commit `372127f4 fix chatterbox`
+  (2026-05-08).
+- The auto-downloaded `chatterbox-t3-q8_0.gguf` on HF
+  (`cstr/chatterbox-GGUF`) was uploaded 2026-05-07, BEFORE that
+  commit. So users hitting the auto-download get a vocab-only
+  GGUF (`chatterbox.t3.text_tokens` only, no
+  `tokenizer.ggml.merges`).
+- With no merges in the GGUF, `cb_tokenizer::has_bpe` is false and
+  `chatterbox_dump_t3_prefill_emb` falls through to the legacy
+  char-level `tokenize_text` (which silently drops uppercase
+  letters and spaces because the vocab is lowercase + uses
+  `[SPACE]`, not `' '`).
+
+Patching the existing GGUF in place with a fresh export of the
+tokenizer.json's merges (`models/patch-chatterbox-gguf-add-merges.py`,
+added 2026-05-25) makes the BPE path active and the diff harness
+result jumps from `[FAIL] cos_mean=0.55` to
+`[PASS] cos_min=0.999940 cos_mean=0.999985` — i.e. the C++
+tokenization is bit-identical to python's for both `"Hello world."`
+and `"Hello there, this is chatterbox speaking."`.
+
+Production rollout: re-upload `chatterbox-t3-q8_0.gguf` (and
+`chatterbox-t3-f16.gguf`) to `cstr/chatterbox-GGUF` after running
+the converter from current `main`, OR upload the patched file under
+a different name and update `crispasr_model_registry.cpp` to point
+at it. The C++ side is already correct. The patched GGUF was
+verified locally as `chatterbox-t3-q8_0-bpe.gguf`.
+
+### Operational note — the regen variants already have merges
+
+The `chatterbox-t3-q8_0-regen.gguf` and `chatterbox-t3-q4_k-regen.gguf`
+in `/Volumes/backups/ai/crispasr/` (dated 2026-05-08) DO contain
+`tokenizer.ggml.tokens` + `tokenizer.ggml.merges` — they were
+generated from the converter after `372127f4`. Only the auto-download
+target (`cstr/chatterbox-GGUF/chatterbox-t3-q8_0.gguf` from 2026-05-07)
+is missing them. All other BPE-using models in the codebase
+(chatterbox-turbo, funasr-mlt-nano, qwen3-asr, mimo-asr) export
+merges correctly.
+
+### Lesson 9. When a "tokenizer mismatch" hypothesis explains the symptom but the algorithm looks right, check the GGUF for missing tokenizer keys before rewriting C++.
+
+We almost rewrote the C++ tokenizer to use whitespace pre-tokenization
+without `[SPACE]`. That was wrong (python's chatterbox-specific
+wrapper inserts `[SPACE]` before invoking HF). The right diagnosis
+was "the existing C++ code matches python exactly but is gated on
+`has_bpe` which is false because the GGUF doesn't have
+`tokenizer.ggml.merges`." A 30-second `python -c "open(gguf).read()
+.find(b'tokenizer.ggml.merges')"` check would have saved several
+hours of speculative tokenizer rewriting.
+
 ---
 
 ## FA per-head additive mask CUDA kernel — what the upstream signature already gave us (issue #81 #06, May 2026)

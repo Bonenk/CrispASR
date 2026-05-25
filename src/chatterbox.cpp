@@ -299,6 +299,16 @@ static std::vector<int32_t> tokenize_text_bpe(const cb_tokenizer& tok, const std
 }
 
 // Plain HF BPE tokenization used by base Chatterbox.
+//
+// The python `EnTokenizer.encode` (resemble-ai/chatterbox) does
+// `txt.replace(' ', '[SPACE]')` BEFORE calling the underlying HF
+// tokenizer. So spaces DO produce `[SPACE]` tokens in the output, and
+// the BPE merges per non-space chunk. We replicate that: replace
+// ' ' → "[SPACE]" eagerly, then split into pieces at every
+// "[SPACE]" marker (each marker emits its own token directly via
+// vocab lookup) plus at punctuation/alnum boundaries (so "there,"
+// becomes "there" + "," — python's HF tokenizer also splits this way
+// via the merges table since 'there,' is not in vocab).
 static std::vector<int32_t> tokenize_text_hf_bpe(const cb_tokenizer& tok, const std::string& text) {
     if (!tok.has_bpe) {
         return tokenize_text(tok, text);
