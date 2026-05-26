@@ -1950,3 +1950,47 @@ $B --backend parakeet -m $V3 -f $EN60 -np -nt
 $B --backend parakeet -m $V3 -f $EN60 -np -nt --chunk-seconds 30 --chunk-overlap 3
 # (etc)
 ```
+
+### Coverage parity check vs cohere / canary on 300 s — 2026-05-26
+
+User direction: "are these after-numbers complete? compare to what
+other models deliver". Right — char-count delta vs the previous parakeet
+default proves we *improved*, but says nothing about *complete*. Real
+test: how does parakeet's new default compare against the best
+long-form-capable backends on the same audio.
+
+Ran parakeet (post-`98381810` default) vs cohere vs canary on the
+300 s FLEURS clips. Voxtral skipped — its mem-thrash failure mode on
+M1 with the 300 s clip is documented in
+[`feedback_torch_omp_deadlock`](../memory/feedback_torch_omp_deadlock.md);
+sat at 5 s CPU / 30 min wall and was killed.
+
+**EN FLEURS 300 s:**
+
+| Backend | chars | wall (s) | × RT | vs cohere |
+|---|---|---|---|---|
+| parakeet (default) | **3865** | 66 | 5.0× | -3 % |
+| cohere | 3994 | 94 | 3.2× | (ref) |
+| canary | 2971 | 74 | 4.1× | -26 % |
+
+**DE FLEURS 300 s:**
+
+| Backend | chars | wall (s) | × RT | vs cohere |
+|---|---|---|---|---|
+| parakeet (default) | **3288** | 69 | 4.3× | -0.3 % |
+| cohere | 3299 | 87 | 3.4× | (ref) |
+| canary | 3532 | 273 | 1.1× | +7 %, 3.1× slower |
+
+**Headline.** Parakeet's post-fix default is now within **3 % of cohere
+on EN 300 s and within 0.3 % on DE 300 s** at higher throughput
+(66 / 69 s wall vs cohere's 94 / 87 s). The numbers are complete in
+the same sense as cohere — coverage parity with the best long-form
+backend, at faster wallclock. The previous default (CAP_INTERNAL_CHUNKING
+set) was 60 % below cohere on EN 300 s; the fix closes that gap.
+
+Canary on DE wins on coverage (3532 chars) but pays 4× the wall time
+(273 s) — a different trade-off. For German-only workflows where wall
+time is bounded, canary's per-chunk AED decode produces slightly more
+content; for general use, parakeet's faster path with coverage-parity
+is the recommended default.
+
