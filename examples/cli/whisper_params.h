@@ -243,6 +243,15 @@ struct whisper_params {
     bool dry_run_resolve = false;
     bool dry_run_ignore_cache = false;
     std::string cache_dir;
+    // Issue #128 — llama-server-style convenience flags. `--hf-repo
+    // OWNER/REPO[:FILE]` synthesises the HF resolve URL and fetches the
+    // model into the auto-download cache, then runs the rest of the
+    // pipeline as if the user had passed `-m <cached-path>`. `--hf-file
+    // FILE` overrides the FILE part when the user prefers two flags.
+    // Empty = not requested; the existing -m / --auto-download paths
+    // run unchanged.
+    std::string hf_repo;
+    std::string hf_file;
     std::string tts_text;
     std::string tts_output;
     std::string tts_voice;

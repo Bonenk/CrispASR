@@ -9,6 +9,7 @@
 #include "crispasr_diarize_cli.h"      // crispasr_apply_diarize / pyannote cache (#107)
 #include "crispasr_speaker_embedder.h" // pluggable speaker embedder (#107 P3)
 #include "crispasr_stream_punc.h"      // streaming punctuation mode helpers (#112)
+#include "crispasr_cache.h"            // crispasr_cache::ensure_cached_file (for --hf-repo, #128)
 #include "crispasr_model_mgr_cli.h"
 #include "crispasr_model_registry.h"
 #include "crispasr_output.h"   // crispasr_make_disp_segments — split-on-punct (#29)
@@ -557,6 +558,21 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.translate_target_lang = whisper_param_turn_lowercase(ARGV_NEXT);
     } else if (arg == "--auto-download") {
         params.auto_download = true;
+    } else if (arg == "--hf-repo" || arg == "-hfr") {
+        // Issue #128 — llama-server-compatible convenience. Accept
+        // either "OWNER/REPO" alone or "OWNER/REPO:FILE" shorthand.
+        std::string raw = ARGV_NEXT;
+        auto colon = raw.find(':');
+        if (colon != std::string::npos) {
+            params.hf_repo = raw.substr(0, colon);
+            params.hf_file = raw.substr(colon + 1);
+        } else {
+            params.hf_repo = raw;
+        }
+        params.auto_download = true; // --hf-repo implies auto-download
+    } else if (arg == "--hf-file" || arg == "-hff") {
+        params.hf_file = ARGV_NEXT;
+        params.auto_download = true;
     } else if (arg == "--dry-run-resolve") {
         params.dry_run_resolve = true;
     } else if (arg == "--dry-run-ignore-cache") {
@@ -910,6 +926,14 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.cache_dir.empty() ? "default" : params.cache_dir.c_str());
     fprintf(stderr, "  --auto-download                   [%-7s] auto-download missing models without prompting\n",
             params.auto_download ? "true" : "false");
+    fprintf(stderr, "  -hfr REPO, --hf-repo OWNER/REPO[:FILE]    fetch model from arbitrary HuggingFace repo "
+                    "(llama-server-compatible). e.g. --hf-repo cstr/parakeet-tdt-0.6b-v3-GGUF -m "
+                    "parakeet-tdt-0.6b-v3-q4_k.gguf, or the shorthand --hf-repo "
+                    "cstr/parakeet-tdt-0.6b-v3-GGUF:parakeet-tdt-0.6b-v3-q4_k.gguf. Implies --auto-download.\n");
+    fprintf(stderr,
+            "  -hff FNAME, --hf-file FNAME       %-7s   filename within --hf-repo (alternative to "
+            "the OWNER/REPO:FILE shorthand)\n",
+            "");
     fprintf(stderr, "  --dry-run-resolve                 [%-7s] print resolved model / companion paths and exit\n",
             params.dry_run_resolve ? "true" : "false");
     fprintf(stderr, "  --dry-run-ignore-cache            [%-7s] dry-run as if cache were empty\n",
@@ -1847,6 +1871,42 @@ int main(int argc, char** argv) {
 
     if (params.use_gpu && params.gpu_backend != "cpu") {
         ggml_backend_load_all();
+    }
+
+    // Issue #128 — resolve --hf-repo / --hf-file early, before any
+    // model-path interpretation downstream. Synthesise the HF resolve
+    // URL, fetch via the existing cache, then rewrite params.model
+    // to the cached path so the rest of the pipeline treats it as a
+    // local file.
+    if (!params.hf_repo.empty()) {
+        std::string file = params.hf_file;
+        if (file.empty()) {
+            // The -m value is the second source of truth for the
+            // filename (matches llama-server's `--hf-repo R --model
+            // -m F` shape). If -m is "auto"/"default"/empty we have
+            // no filename to use — fail loudly.
+            if (!params.model.empty() && !is_auto_model_arg(params.model)) {
+                const auto sep = params.model.find_last_of('/');
+                file = sep == std::string::npos ? params.model : params.model.substr(sep + 1);
+            }
+        }
+        if (file.empty()) {
+            fprintf(stderr,
+                    "error: --hf-repo '%s' needs a filename: either pass "
+                    "--hf-file FILE or -m FILE, or use the shorthand "
+                    "--hf-repo OWNER/REPO:FILE\n",
+                    params.hf_repo.c_str());
+            return 2;
+        }
+        const std::string url = "https://huggingface.co/" + params.hf_repo + "/resolve/main/" + file;
+        const std::string label = "hf-repo[" + params.hf_repo + "]";
+        const std::string cached =
+            crispasr_cache::ensure_cached_file(file, url, params.no_prints, label.c_str(), params.cache_dir);
+        if (cached.empty()) {
+            fprintf(stderr, "error: --hf-repo fetch failed for %s/%s\n", params.hf_repo.c_str(), file.c_str());
+            return 1;
+        }
+        params.model = cached;
     }
 
     // remove non-existent files
