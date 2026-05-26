@@ -7752,3 +7752,53 @@ The cleanest end-to-end shape is: rebake → upload immediately from the same Py
 - `tools/kaggle/crispasr-regression.py` commits `1b62776e` (heartbeat) → `8cf7e931` (KeyError fix + sort) → `eba52bac` (Popen streamer) → `0f4de5b9` (cache cleanup) → `2ff4f1ba` (Dataset auth) → `c11e0648` (partial upload)
 - `${KAGGLE_ACCOUNT}/qwen3-export` Kaggle notebook for the canonical Popen+iter pattern that the fix lifts
 - The private Kaggle Dataset `${KAGGLE_ACCOUNT}/crispasr-hf-token` is the auth-fallback infrastructure
+
+---
+
+## Cross-backend bug-sweep methodology — pair the cap survey with an empirical A/B (2026-05-26)
+
+When a per-backend fix lands (e.g. PR #124's cohere opt-out from external overlap-save context), the obvious next question is *which other backends are in the same bucket?* A pure capability-table survey gets you to the candidate list — for the overlap-save bug, *14 of 22 ASR backends* lacked both `CAP_UNBOUNDED_INPUT` and `CAP_INTERNAL_CHUNKING` so all were on-paper at-risk — but only the empirical A/B distinguishes "lacks the cap" from "actually exhibits the failure mode".
+
+The harness shape that worked (`tools/check-overlap-save-bug.sh`): for each at-risk backend, run the *same* long audio twice — once with the default knob, once with the knob disabled — and emit a single table row with `last_ts`, `n_segs`, `n_chars` for each arm + a verdict.
+
+```
+BACKEND     DEF_LAST DEF_SEGS DEF_CHRS NO_LAST NO_SEGS NO_CHRS VERDICT
+voxtral     300      2        284      300     11      1294    *** SUSPECTED BUG ***
+voxtral4b   300      11       1527     300     11      1305    OK
+```
+
+This catches three distinct symptom shapes that all come from the same root cause:
+
+1. **Truncation** (cohere, voxtral, qwen3): output stops early, default has fewer chars than nooverlap.
+2. **LLM runaway** (gemma4-e2b, glm-asr, kyutai-stt): default times out past wallclock budget, nooverlap finishes.
+3. **Clean** (funasr, moonshine, sensevoice, vibevoice, voxtral4b): default ≈ nooverlap, no bug.
+
+Five new offenders found and fixed in one session because the harness made the bug-shape comparable across backends. A two-phase sweep (5 min audio first, then 90 s re-run for the inconclusive-because-too-slow backends) is the right pattern for an M1 box — pure-Python LLM ASR backends like granite-4.1-2b time out at 15 min on a 5 min clip but finish in 5 min on a 90 s clip.
+
+**Reuse pattern.** When the next per-backend fix lands, copy `tools/check-overlap-save-bug.sh`, swap the knob, swap the model list, run. The cost is one afternoon; the upside is fixing all sibling backends in one session instead of dragging the same bug class out across N follow-up issues.
+
+### Cross-refs
+
+- HISTORY 2026-05-25 / -26 "Overlap-save bug sweep — five new opt-outs + a reusable A/B harness" for the chronological summary
+- `examples/cli/crispasr_chunk_context_gate.h` for the opt-out registry that the harness drives
+- `tests/test-issue-114-chunk-context-gate.cpp` for the unit test that pins the opt-out list
+
+---
+
+## ggml scheduler tightened cross-backend tensor resolution between §56 and 2026-05-26 (PLAN #115)
+
+mimo-asr's working configuration in HISTORY §56 was CPU-resident weights + Metal compute backend. The implicit assumption was that the ggml scheduler would auto-copy a CPU-buffer tensor to GPU on first read. That implicit copy no longer happens — `ggml_metal_buffer_get_id: error: tensor 'llm.embed.weight' buffer is nil` is the symptom when current ggml encounters a compute op that touches a tensor whose backend buffer doesn't match the op's backend.
+
+Implications for porting any backend that mixes CPU + GPU buffers:
+
+1. **Per-tensor backend tagging is now mandatory.** The graph builder has to call `ggml_backend_sched_set_tensor_backend` (or use `core_gguf::load_weights_split` with a proper `LayerSplitConfig`) so sched knows where each tensor lives and can insert the copy nodes. Hand-built graphs that just `ggml_get_rows(embed_weight_on_cpu, ...)` from inside a Metal-target graph will silently fail at runtime.
+2. **The historical PLAN #56 → §56 chronology is misleading.** The §56 working ref doesn't run on current ggml without modification; the regression timing makes it look like mimo-specific code broke, but the actual change was inside the ggml scheduler. Useful when bisecting: try the failing config against the §56 commit's ggml submodule, not just the §56 mimo source — that isolates "mimo regression" from "ggml regression".
+3. **The cheap workaround is "ignore use_gpu and force everything to CPU".** What PLAN #115 option A shipped. It's slow (pure CPU LLM = 297 s for 11 s JFK on M1) but correct. The proper fix (option C) is to either tag the embed weight for the GPU backend explicitly + insert the copy node, OR rebuild the prefill graph so its inputs all live where the compute happens.
+4. **PLAN #72-shaped "perf wins by moving weights to GPU" are now fragile.** The same move that gave gemma4-e2b a 2.2× speedup silently broke mimo-asr's prefill graph emission. Any backend that ported in pre-2026-05-26-ggml and gets a "move weights to GPU" perf pass needs a roundtrip transcription test on the actual deployment platform before the perf claim ships.
+
+### Cross-refs
+
+- HISTORY 2026-05-26 "PLAN #115 — mimo-asr M1 Metal silent-empty fix (option A)" for the bisect + fix chronology
+- PLAN #115 for option C scope (per-tensor backend tagging in `mimo_asr_build_prefill_graph`)
+- [[project_chatterbox_gpu_bug_s3gen]] for a different shape of the same general problem (sched parallel=true fixed it there)
+- `src/mimo_asr.cpp` commit `c887881e` for the option A landing

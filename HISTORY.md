@@ -6,6 +6,68 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-26 PLAN #115 — mimo-asr M1 Metal silent-empty fix (option A)
+
+Distinct bug from PLAN #125 P0 (montvid's Blackwell segfault), same backend. Discovered via the overlap-save A/B sweep two days earlier (mimo flagged `BOTH_EMPTY`, the only backend out of 16 that failed both arms — meaning the bug wasn't in the overlap-save path, it was in the backend itself).
+
+**Bisect.** Bypassed `git bisect` by inspection — only ~7 commits touched `src/mimo_asr.cpp` since HISTORY §56 shipped the working baseline (`dae361f2`), and `89111260` ("perf #72: load weights to GPU when use_gpu=true") was the standout candidate: it flipped `core_gguf::load_weights(..., ctx->backend_cpu, ...)` to `..., ctx->backend, ...`. The commit message itself anticipated the regression — *"If a platform regresses, add a CRISPASR_FORCE_CPU_WEIGHTS=1 escape hatch — none seen yet"*.
+
+**Verification.** Couldn't safely build + load on the local M1 box (4.5 GB Q4_K + active 90 s overlap-save sweep + ~1 GB free), so pushed the build to Kaggle following the patterns in [[project_kaggle_rebake_fragilities]]. The first attempt (`${KAGGLE_ACCOUNT}/crispasr-mimo-asr-cpu-vs-gpu-bisect-plan-115`) used a GPU kernel and queue-blocked for 14+ hours on exhausted GPU quota. Switched to a CPU notebook (`${KAGGLE_ACCOUNT}/crispasr-mimo-asr-cpu-validate`) — RUNNING immediately, completed in ~8 min, JFK transcript matches HISTORY §56 reference verbatim. Confirms the regression is GPU-path specific.
+
+**Independence from PLAN #125 P0 / `a5a518c8` sched hardening.** Verified empirically on M1 Metal after rebuilding on HEAD with the sched-restore patch: same silent-empty symptom. Two different mimo-asr bugs surfacing as the same observable on different platforms (Blackwell sm_120 segfault vs M1 Metal silent-empty).
+
+**Fix train.**
+
+1. `5a570b7b` — first pass pinned only the weight load (`backend → backend_cpu`). Local M1 retest exposed a second failure mode: `ggml_metal_buffer_get_id: error: tensor 'llm.embed.weight' buffer is nil`. The §56 working config (CPU weights + Metal compute) no longer holds because the ggml scheduler tightened cross-backend tensor resolution since then.
+2. `c887881e` — complete fix: force `ctx->backend = ctx->backend_cpu` unconditionally, ignoring `params.use_gpu`. Verified locally on M1 Metal: JFK transcribes correctly in 297 s, "ANd so, my fellow Americans, ask not what your country can do for you.." Slow — pure CPU LLM on M1 — but correct. Verified again on Kaggle CPU `b85698670`: prefill 15.8 s, decode 7.0 s over 26 steps, total_lm 22.8 s.
+
+**Cost.** Loses the documented 22 % M1 Metal speedup from PLAN #72. Acceptable because the alternative was shipping a backend that produces no output at all.
+
+**Open.** Option C — proper GPU graph fix in `mimo_asr_build_prefill_graph` via per-tensor backend tagging so `ggml_backend_sched` can route weight reads correctly. Similar shape to chatterbox Bug B from issue #83 R9 #4 (see [[project_chatterbox_gpu_bug_s3gen]]) which took ten candidate hypotheses to land on the real cause. Needs Kaggle GPU run with the patched binary, currently quota-blocked.
+
+---
+
+## 2026-05-25 / -26 Overlap-save bug sweep — five new opt-outs + a reusable A/B harness
+
+Generalised PR #124 (CKwasd's cohere fix). The PR landed during this session; while reviewing it I noticed the strcmp-on-backend-name pattern in `crispasr_run.cpp` was hard-coded for cohere alone and the test gate (`should_use_chunk_context`) had no test exercising the new opt-out arg. The question "are other backends in the same bucket?" turned into an A/B sweep that surfaced five more offenders.
+
+**Harness.** `tools/check-overlap-save-bug.sh` runs each at-risk ASR backend twice on a long clip — once with default `--chunk-overlap 3.0` and once with `--chunk-overlap 0` — and prints last-timestamp + char delta side by side. Backends flagged AT-RISK by the static survey (no `CAP_UNBOUNDED_INPUT`, no `CAP_INTERNAL_CHUNKING`): 14 of the 22 ASR backends. The empirical sweep then narrows that to the actual offenders.
+
+**Found: 5 new backends with the cohere-class bug.**
+
+| backend | symptom (5 min Japanese clip unless noted) |
+|---|---|
+| cohere | already fixed by PR #124 (regression control: default == nooverlap) |
+| voxtral | truncation: default 2 segs / 284 chars ending at 30 s; nooverlap 11 segs / 1294 chars full coverage |
+| qwen3 | truncation on 90 s clip: default cuts mid-sentence after chunk 1 (1 seg / 173 chars); nooverlap 4 segs / 448 chars |
+| gemma4-e2b | LLM-decode runaway: default times out past 15 min wallclock; nooverlap finishes in 13 min with 3572 chars |
+| glm-asr | same runaway shape as gemma4-e2b |
+| kyutai-stt | same runaway shape; nooverlap produces 3519 chars in 10 min |
+
+voxtral4b was **not** affected even though it's the same name family — different model architecture under the hood. canary / fastconformer-ctc / firered-asr / granite-4.1-nar / parakeet / wav2vec2 already declare `CAP_UNBOUNDED_INPUT` or `CAP_INTERNAL_CHUNKING` so the gate skips them by design. funasr / moonshine / moonshine-streaming / omniasr / sensevoice / vibevoice / voxtral4b all PASSed the A/B cleanly. granite-4.1 / omniasr-llm / mimo-asr came back inconclusive (granite/omniasr-llm just too slow on M1 in the 20 min per-run budget; mimo-asr is the separate PLAN #115 baseline regression).
+
+**Fix shape.** Pulled the per-name strcmp out of `crispasr_run.cpp` into `backend_allows_chunk_context(const char* backend_name)` in `examples/cli/crispasr_chunk_context_gate.h` (the same header that already housed `should_use_chunk_context` for unit-test reasons). The opt-out list is now the testable thing — `tests/test-issue-114-chunk-context-gate.cpp` grew from 7 to 11 test cases including a 5-dimension exhaustive sweep over the new param, an opt-out-is-master-gate test, and a default-arg parity check.
+
+**Fix train (in push order).**
+
+- PR #124 hardened: `79313c3a` style+test (clang-format fix that was failing CI, plus three new test cases for the opt-out arg). PR merged as `242aaea5`.
+- `46f6848d` — gemma4-e2b + glm-asr opt-out (the first two empirically confirmed offenders).
+- `eaee2319` — kyutai-stt opt-out.
+- `6fef8790` — voxtral opt-out.
+- `e7dfb93f` — qwen3 opt-out (caught by re-running the inconclusive backends on a 90 s clip after the 5 min run was timing out).
+
+**Tooling notes.** First Kaggle kernel attempt for the bisect went wrong because I didn't read the existing `tools/kaggle/crispasr-regression.py` first — it has the `step()` / `progress.jsonl` + HF mirror / `sh_with_progress()` Popen build streamer / `build_heartbeat()` ticker patterns that [[project_kaggle_rebake_fragilities]] documents as the seven fragilities the script defends against. The second kernel (`${KAGGLE_ACCOUNT}/crispasr-mimo-asr-cpu-validate`) applied those patterns end-to-end and ran cleanly.
+
+---
+
+## 2026-05-25 Registry — cohere-asr-ja-v0.1 added (issue #123)
+
+Two `{"cohere", ...}` rows added to `src/crispasr_model_registry.cpp` pointing at `TransWithAI/cohere-transcribe-ja-v0.1-GGUF` (`-q4_k`, `-q8_0`). Same backend code as the English `cohere-transcribe-03-2026` entry — Japanese fine-tune of the same base, Apache-2.0. Dropped straight in. `--model-quant` resolves the other quants in that repo (`F16/Q6/Q5`) from the registered Q4_K row. Issue closed with a thank-you to the requester (rikimtasu) and CKwasd (who published the GGUF mirror).
+
+Verified locally: `crispasr --backend cohere -m cohere-asr-ja-v0.1-q4_k.gguf --dry-run-resolve` returns the correct upstream URL. Commit `e3ded251` registry, `50b6dfda` README row alongside the English cohere entry.
+
+---
+
 ## 2026-05-26 (P1-P6 fix train) PLAN #125 — six issue-#125 findings shipped in one session
 
 Built on the P0 scheduler hardening from earlier in the day. Six commits land six of montvid's twelve issue-#125 findings; the remaining items (P0 external Blackwell retest, P6b/c kyutai-stt long-audio dispatcher chunking, gemma4-e2b auto-chunk-vs-abort decision) are queued for followup.
