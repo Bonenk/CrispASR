@@ -1326,6 +1326,11 @@ static std::string funasr_transcribe_impl(funasr_context* ctx, const float* pcm,
     const int fake_token_len = compute_fake_token_len(T_lfr, hp.use_low_frame_rate);
     const int fbank_beg = (int)prefix_ids.size();
     const int total_prompt = (int)prefix_ids.size() + fake_token_len + (int)suffix_ids.size();
+    if (std::getenv("CRISPASR_VERBOSE")) {
+        std::fprintf(
+            stderr, "funasr: T_lfr=%d use_low_frame_rate=%d fake_token_len=%d (prefix=%zu suffix=%zu prompt=%d)\n",
+            T_lfr, (int)hp.use_low_frame_rate, fake_token_len, prefix_ids.size(), suffix_ids.size(), total_prompt);
+    }
     std::vector<int32_t> ids((size_t)total_prompt, 0);
     std::copy(prefix_ids.begin(), prefix_ids.end(), ids.begin());
     std::copy(suffix_ids.begin(), suffix_ids.end(), ids.begin() + fbank_beg + fake_token_len);
@@ -1386,8 +1391,24 @@ static std::string funasr_transcribe_impl(funasr_context* ctx, const float* pcm,
     std::vector<int32_t> generated;
     int next_id = argmax(logits);
     int n_past = total_prompt;
+    int prev_id = -1;
+    int repeat_run = 0;
     auto decode_t0 = std::chrono::steady_clock::now();
     for (int step = 0; step < max_new_tokens && next_id != (int)hp.eos_token_id; step++) {
+        if (next_id == prev_id) {
+            if (++repeat_run >= 20) {
+                std::fprintf(stderr,
+                             "funasr: greedy decode degenerated (token %d repeated >%d times). "
+                             "Aborting at step %d. This usually means the audio adaptor / encoder "
+                             "produced unusable embeddings — re-run with CRISPASR_VERBOSE=1 to "
+                             "inspect frames_spliced.\n",
+                             next_id, repeat_run, step);
+                break;
+            }
+        } else {
+            repeat_run = 0;
+            prev_id = next_id;
+        }
         generated.push_back(next_id);
         std::vector<float> step_embed = funasr_embed_tokens(ctx, {next_id});
         if (step_embed.empty())

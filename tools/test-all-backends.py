@@ -248,6 +248,32 @@ REGISTRY: tuple[Backend, ...] = (
             capabilities=("transcribe", "json-output", "temperature",
                           "word-timestamps")),
 
+    # FunASR LLM-decoder family (70-block SANM encoder + 2-block adaptor
+    # + Qwen3-0.6B AR decode). Same runtime path; mlt-nano is the
+    # multilingual fine-tune. Both were ported 2026-05-20 (HISTORY) but
+    # never landed in this registry, so the !-loop regression in v0.6.10
+    # shipped silent (issue #125 reports 01/07/08/09).
+    Backend("funasr",     "FunASR Nano 2512",        "funasr-nano-2512-f16.gguf",
+            "cstr/funasr-nano-GGUF", "funasr-nano-2512-f16.gguf",
+            timeout_s=120, approx_size_mb=1980,
+            capabilities=("transcribe", "json-output")),
+    Backend("fun-asr-mlt-nano", "FunASR MLT-Nano 2512",
+            "funasr-mlt-nano-2512-f16.gguf",
+            "cstr/funasr-mlt-nano-GGUF", "funasr-mlt-nano-2512-f16.gguf",
+            timeout_s=120, approx_size_mb=1980,
+            capabilities=("transcribe", "json-output")),
+    # SenseVoice + paraformer-zh share the SANM block helper with funasr
+    # but ship as encoder-only / NAR backends. Missing from the registry
+    # in parallel with funasr; same coverage gap.
+    Backend("sensevoice", "SenseVoice Small (CTC)", "sensevoice-small-q4_k.gguf",
+            "cstr/sensevoice-small-GGUF", "sensevoice-small-q4_k.gguf",
+            timeout_s=60, approx_size_mb=470,
+            capabilities=("transcribe", "json-output", "lid")),
+    Backend("paraformer", "Paraformer-zh (NAR)",     "paraformer-zh-q4_k.gguf",
+            "cstr/paraformer-zh-GGUF", "paraformer-zh-q4_k.gguf",
+            timeout_s=60, approx_size_mb=130,
+            capabilities=("transcribe", "json-output")),
+
     # granite-4.1-plus: 2B speech-LLM with translate + src/tgt language.
     # Same runtime path as granite-4.1; -plus adds bigger LM head + extra
     # capability declarations (translate, src-tgt-language).
