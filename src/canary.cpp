@@ -150,6 +150,18 @@ struct canary_model {
 struct canary_vocab {
     std::vector<std::string> id_to_token;
     std::unordered_map<std::string, int> token_to_id;
+    // PLAN #114 P3 polish — case-insensitive LCS support.
+    // `id_to_canonical_lc[i]` is the smallest token id whose
+    // lowercase-ASCII text matches token `i`. Used by
+    // canary_transcribe_streamed when looking for boundary-overlap
+    // matches across chunks where the AED re-emits the same audio with
+    // different capitalization (e.g. "world's say for" in chunk 1 vs
+    // "World's Save for" in chunk 2 — different raw ids but the LCS
+    // should still match them). Populated once at vocab load; ASCII-only
+    // (UTF-8 case folding would need libicu and DE/FR/ES chunk-boundary
+    // capitalization is rare enough that ASCII is sufficient for the
+    // present polish).
+    std::vector<int32_t> id_to_canonical_lc;
 };
 
 struct canary_context {
@@ -247,6 +259,29 @@ static bool canary_load_model(canary_model& model, canary_vocab& vocab, const ch
             vocab.id_to_token = std::move(tokens);
             for (int i = 0; i < (int)vocab.id_to_token.size(); i++) {
                 vocab.token_to_id[vocab.id_to_token[i]] = i;
+            }
+            // PLAN #114 P3 polish — build the case-insensitive canonical
+            // mapping. ASCII lowercase only; non-ASCII bytes (UTF-8) pass
+            // through unchanged, so DE-umlaut tokens still match their
+            // own variants but not cross-case. Sufficient for the
+            // observed EN FLEURS chunk-boundary capitalization artifacts.
+            const int n_vocab = (int)vocab.id_to_token.size();
+            vocab.id_to_canonical_lc.assign((size_t)n_vocab, 0);
+            std::unordered_map<std::string, int> first_id_for_lc;
+            first_id_for_lc.reserve((size_t)n_vocab);
+            for (int i = 0; i < n_vocab; i++) {
+                std::string lc = vocab.id_to_token[i];
+                for (char& c : lc) {
+                    if (c >= 'A' && c <= 'Z')
+                        c = (char)(c + ('a' - 'A'));
+                }
+                auto it = first_id_for_lc.find(lc);
+                if (it == first_id_for_lc.end()) {
+                    first_id_for_lc.emplace(std::move(lc), i);
+                    vocab.id_to_canonical_lc[(size_t)i] = i;
+                } else {
+                    vocab.id_to_canonical_lc[(size_t)i] = it->second;
+                }
             }
         }
 
@@ -1490,14 +1525,29 @@ extern "C" struct canary_result* canary_transcribe_streamed(struct canary_contex
         int n_skip = 0;
         if (chunks_processed > 0 && part->n_tokens > 0 && !all_tokens.empty()) {
             const int tail_size = std::min(delay_tokens, (int)all_tokens.size());
+            // PLAN #114 P3 polish — case-insensitive LCS. The AED can
+            // re-emit the same audio with different capitalization at
+            // chunk boundaries (e.g. "world's say for" in chunk 1 vs
+            // "World's Save for" in chunk 2 — different raw ids but
+            // semantically duplicate). Look up each id via
+            // vocab.id_to_canonical_lc[id] (smallest id whose
+            // lowercase-ASCII text matches) before running LCS. Indices
+            // line up with the raw token vectors, so the returned
+            // slice_count is still the right number of leading raw
+            // tokens to drop.
+            auto canon = [&](int32_t id) -> int32_t {
+                if (id < 0 || id >= (int32_t)ctx->vocab.id_to_canonical_lc.size())
+                    return id;
+                return ctx->vocab.id_to_canonical_lc[(size_t)id];
+            };
             std::vector<int32_t> prev_tail;
             prev_tail.reserve((size_t)tail_size);
             for (int i = (int)all_tokens.size() - tail_size; i < (int)all_tokens.size(); i++)
-                prev_tail.push_back(all_tokens[(size_t)i].id);
+                prev_tail.push_back(canon(all_tokens[(size_t)i].id));
             std::vector<int32_t> curr_ids;
             curr_ids.reserve((size_t)part->n_tokens);
             for (int i = 0; i < part->n_tokens; i++)
-                curr_ids.push_back(part->tokens[i].id);
+                curr_ids.push_back(canon(part->tokens[i].id));
             n_skip = crispasr_lcs::lcs_dedup_prefix_count(prev_tail, curr_ids);
         }
 

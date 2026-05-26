@@ -353,6 +353,13 @@ std::vector<crispasr_segment> crispasr_run_voxtral_style_pipeline_streamed(typen
         free(audio_embeds);
     }
 
+    // cppcheck guard: the loop runs at least once when n_samples > 0
+    // (checked at function entry), but the static analyser can't prove
+    // per_chunk_dim was assigned. Bail explicitly on the impossible case.
+    if (per_chunk_dim <= 0) {
+        fprintf(stderr, "crispasr[%s][streamed]: no chunks emitted (per_chunk_dim=0)\n", BE);
+        return out;
+    }
     const int N_enc_total = (int)(audio_embeds_all.size() / (size_t)per_chunk_dim);
 
     if (!params.no_prints) {
@@ -421,9 +428,8 @@ std::vector<crispasr_segment> crispasr_run_voxtral_style_pipeline_streamed(typen
     const int max_new_scaled = std::max(512, audio_seconds * 8);
     const int max_new = std::max(params.max_new_tokens, max_new_scaled);
     if (!params.no_prints && max_new > params.max_new_tokens) {
-        fprintf(stderr,
-                "crispasr[%s][streamed]: scaling max_new_tokens %d -> %d for %d s of audio\n",
-                BE, params.max_new_tokens, max_new, audio_seconds);
+        fprintf(stderr, "crispasr[%s][streamed]: scaling max_new_tokens %d -> %d for %d s of audio\n", BE,
+                params.max_new_tokens, max_new, audio_seconds);
     }
     const int kv_budget = T_prompt + max_new + 64;
     if (!Ops::kv_init(ctx, kv_budget)) {
@@ -461,8 +467,8 @@ std::vector<crispasr_segment> crispasr_run_voxtral_style_pipeline_streamed(typen
     next_p = core_greedy_decode::softmax_of(logits, vocab, next, logits[next]);
     free(logits);
 
-    auto dec = core_greedy_decode::run_with_probs(ctx, next, next_p, T_prompt, Ops::embed_tokens, Ops::run_llm_kv,
-                                                  dec_cfg);
+    auto dec =
+        core_greedy_decode::run_with_probs(ctx, next, next_p, T_prompt, Ops::embed_tokens, Ops::run_llm_kv, dec_cfg);
     free(text_embeds);
 
     // ---- Detokenize ----------------------------------------------------------
