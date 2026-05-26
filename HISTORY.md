@@ -6,6 +6,26 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-26 (P114-P3 NeMo analogon) canary per-chunk prompt re-injection + real long-audio validation
+
+`63fdbe46` replaces the first cut of `canary_transcribe_streamed` (which had the documented AED-boundary truncation) with the NeMo `FrameBatchMultiTaskAED` analogon: per-chunk AED decode with the language/task prompt re-injected, results concatenated text-wise. Closes the boundary-`<eos>` bug because each chunk's decoder sees a fresh prompt and doesn't carry "we just finished an utterance" state across the splice.
+
+**Live test fixtures fetched from VPS.** The local Mac had no >30 s English/de/fr/es clips for validation. The VPS at `168.119.190.252:/mnt/akademie_storage/` has the issue #89 long-audio set (`yt_{60,120,300,600}s.wav` — actually all 16 kHz mono PCM extracted from a Japanese podcast yt-dlp pull). SCP'd `yt_60s.wav` (60 s, ~2 MB) and `yt_120s.wav` (120 s, ~4 MB) into `/Volumes/backups/ai/long-clips/` for the smoke tests. Path is documented; not committed to the repo because the clips are large and YouTube-derived.
+
+**Per-chunk vs concat vs single-pass on M1 Metal:**
+
+| input | single-pass | first cut concat (`7177c931`) | per-chunk (`63fdbe46`) |
+|---|---|---|---|
+| JFK 11 s default | ✓ canonical | (single-pass, unchanged) | (single-pass, unchanged) |
+| JFK 11 s forced streamed | n/a | "...for you." (truncated) | "...for you, Country can do for you. Ask what you can do for your country." (boundary-overlap dup) |
+| yt_60s.wav (Japanese, `-l en`) | empty | one short hallucination | mix of romanized JA + "yeah" loops (60 s → 11 s wall = 5.3× RT) |
+
+The 60 s test uses Japanese audio with `-l en` because that's what we have on this hardware. canary-1b-v2 doesn't handle Japanese (lang whitelist would reject `-l ja` at `dfe1af3b`); the `-l en` invocation exercises the model's behaviour on out-of-distribution audio. The per-chunk path produces meaningful output for chunks the AED can make sense of and degenerates into token-repeat loops on chunks where it can't — strictly more useful than empty (single-pass) or one-short-hallucination (first-cut concat).
+
+**Lesson — AED streaming pattern.** Frame-synchronous decoders (RNN-T, TDT) stream cleanly because there's no "end of utterance" token; the blank-runaway is the same-class failure on the other end. AED decoders carry implicit utterance-end semantics: emitting EOS means "the utterance is over", and a chunk-encode splice can look like utterance end if the decoder sees the same prompt context across chunks. NeMo solves this in `FrameBatchMultiTaskAED` by re-running the decoder per chunk with the prompt re-injected. Our port mirrors that shape one-to-one. The remaining polish is boundary-overlap dedup (LCS-merge from `core/lcs_merge`, already wired in for voxtral PLAN #114 P2) and a no-repetition-penalty token-loop guard (matching the funasr fix in PLAN #125 P1).
+
+---
+
 ## 2026-05-26 (P114-P3 second half) `canary_transcribe_streamed` lands
 
 `7177c931` ships the parakeet-pattern long-audio path for canary. Refactor extracts the post-encode body of `canary_transcribe_ex` (cross-KV + prompt + greedy decode + DTW timestamps + word grouping, ~300 lines) into a static `canary_finish_from_encoder` helper. The existing `canary_transcribe_ex` becomes a thin shim (mel + single-pass encode + helper) and the new `canary_transcribe_streamed` is a parallel shim (full-mel + 8 s/2 s chunked encode + concat + helper). Zero duplication; both entry points share the decoder.
