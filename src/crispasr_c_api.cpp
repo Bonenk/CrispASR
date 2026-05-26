@@ -1927,7 +1927,7 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
     list += ",cohere";
 #endif
 #ifdef CA_HAVE_GRANITE
-    list += ",granite,granite-4.1,granite-4.1-plus";
+    list += ",granite,granite-4.1,granite-4.1-plus,granite-4.1-nar";
 #endif
 #ifdef CA_HAVE_CTC
     list += ",fastconformer-ctc,canary-ctc";
@@ -1958,6 +1958,12 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_MOONSHINE
     list += ",moonshine";
+#endif
+#ifdef CA_HAVE_MOONSHINE_STREAMING
+    list += ",moonshine-streaming";
+#endif
+#ifdef CA_HAVE_GEMMA4_E2B
+    list += ",gemma4-e2b";
 #endif
 #ifdef CA_HAVE_OMNIASR
     list += ",omniasr";
