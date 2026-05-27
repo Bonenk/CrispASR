@@ -63,6 +63,18 @@
 #include "granite_nle.h"
 #define CA_HAVE_GRANITE_NLE 1
 #endif
+#if __has_include("funasr.h")
+#include "funasr.h"
+#define CA_HAVE_FUNASR 1
+#endif
+#if __has_include("paraformer.h")
+#include "paraformer.h"
+#define CA_HAVE_PARAFORMER 1
+#endif
+#if __has_include("sensevoice.h")
+#include "sensevoice.h"
+#define CA_HAVE_SENSEVOICE 1
+#endif
 #if __has_include("canary_ctc.h")
 #include "canary_ctc.h"
 #define CA_HAVE_CTC 1
@@ -1177,6 +1189,15 @@ struct crispasr_session {
     // need to mirror the granite_speech multi-step plumbing.
     granite_nle_context* granite_nle_ctx = nullptr;
 #endif
+#ifdef CA_HAVE_FUNASR
+    funasr_context* funasr_ctx = nullptr;
+#endif
+#ifdef CA_HAVE_PARAFORMER
+    paraformer_context* paraformer_ctx = nullptr;
+#endif
+#ifdef CA_HAVE_SENSEVOICE
+    sensevoice_context* sensevoice_ctx = nullptr;
+#endif
 #ifdef CA_HAVE_CTC
     // Shared between the fastconformer-ctc and canary-ctc backends — they
     // load different GGUFs but go through the same canary_ctc_* compute
@@ -1542,6 +1563,48 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.use_gpu = g_open_use_gpu_tls;
         s->granite_nle_ctx = granite_nle_init_from_file(model_path, p);
         if (!s->granite_nle_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_FUNASR
+    if (s->backend == "funasr") {
+        funasr_context_params p = funasr_context_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
+        s->funasr_ctx = funasr_init_from_file(model_path, p);
+        if (!s->funasr_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_PARAFORMER
+    if (s->backend == "paraformer") {
+        paraformer_context_params p = paraformer_context_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.flash_attn = g_open_flash_attn_tls;
+        s->paraformer_ctx = paraformer_init_from_file(model_path, p);
+        if (!s->paraformer_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_SENSEVOICE
+    if (s->backend == "sensevoice") {
+        sensevoice_context_params p = sensevoice_context_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
+        s->sensevoice_ctx = sensevoice_init_from_file(model_path, p);
+        if (!s->sensevoice_ctx) {
             delete s;
             return nullptr;
         }
@@ -2013,6 +2076,15 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_MIMO_ASR
     list += ",mimo-asr";
+#endif
+#ifdef CA_HAVE_FUNASR
+    list += ",funasr";
+#endif
+#ifdef CA_HAVE_PARAFORMER
+    list += ",paraformer";
+#endif
+#ifdef CA_HAVE_SENSEVOICE
+    list += ",sensevoice";
 #endif
     std::strncpy(out_csv, list.c_str(), out_cap - 1);
     out_csv[out_cap - 1] = '\0';
@@ -3378,7 +3450,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         char* text = nullptr;
         bool need_free = true;
 #ifdef CA_HAVE_GRANITE_NLE
-        if (!text && (s->backend == "granite-4.1-nar" || s->backend == "granite-nle" || s->backend == "granite_nle") &&
+        if (!text &&
+            (s->backend == "granite-4.1-nar" || s->backend == "granite-nle" ||
+                s->backend == "granite_nle") &&
             s->granite_nle_ctx) {
             // granite_nle_transcribe is the single high-level entry point —
             // returns malloc'd UTF-8, caller frees. Token-prob accessors
@@ -3386,6 +3460,28 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             // doesn't emit per-token p values the same way greedy decoders
             // do), so text-only is the right shape for now.
             text = granite_nle_transcribe(s->granite_nle_ctx, pcm, n_samples);
+            need_free = true;
+        }
+#endif
+#ifdef CA_HAVE_FUNASR
+        if (!text && s->backend == "funasr" && s->funasr_ctx) {
+            text = funasr_transcribe(s->funasr_ctx, pcm, n_samples);
+            need_free = true;
+        }
+#endif
+#ifdef CA_HAVE_PARAFORMER
+        if (!text && s->backend == "paraformer" && s->paraformer_ctx) {
+            text = paraformer_transcribe(s->paraformer_ctx, pcm, n_samples);
+            need_free = true;
+        }
+#endif
+#ifdef CA_HAVE_SENSEVOICE
+        if (!text && s->backend == "sensevoice" && s->sensevoice_ctx) {
+            // sensevoice takes a language hint (uses it for its built-in
+            // lid-tag prefix). Pass the session's source-language setter
+            // through; null/empty means "auto" on the sensevoice side.
+            const char* lang = s->source_language.empty() ? nullptr : s->source_language.c_str();
+            text = sensevoice_transcribe(s->sensevoice_ctx, pcm, n_samples, lang, /*use_itn=*/true);
             need_free = true;
         }
 #endif
@@ -4470,6 +4566,18 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_GRANITE_NLE
     if (s->granite_nle_ctx)
         granite_nle_free(s->granite_nle_ctx);
+#endif
+#ifdef CA_HAVE_FUNASR
+    if (s->funasr_ctx)
+        funasr_free(s->funasr_ctx);
+#endif
+#ifdef CA_HAVE_PARAFORMER
+    if (s->paraformer_ctx)
+        paraformer_free(s->paraformer_ctx);
+#endif
+#ifdef CA_HAVE_SENSEVOICE
+    if (s->sensevoice_ctx)
+        sensevoice_free(s->sensevoice_ctx);
 #endif
 #ifdef CA_HAVE_CTC
     if (s->ctc_ctx)
