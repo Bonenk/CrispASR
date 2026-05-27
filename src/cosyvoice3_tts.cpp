@@ -33,12 +33,14 @@
 #include "ggml.h"
 #include "gguf.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -113,6 +115,11 @@ struct cosyvoice3_tts_context {
     // the same plan via skip_plan.
     ggml_cgraph* step_t1_gf = nullptr;
     int step_t1_fixed_kv_len = 0;
+
+    // RAS sampler RNG. Seeded once at init from params.seed (or 42);
+    // re-seedable via cosyvoice3_tts_set_seed. Advances through every
+    // RAS sample so repeated generate() calls don't replay.
+    std::mt19937_64 rng{42};
 };
 
 namespace {
@@ -304,6 +311,11 @@ ggml_cgraph* cv3_build_embed_graph(cosyvoice3_tts_context* ctx, ggml_tensor* tab
 float* cv3_run_embed(cosyvoice3_tts_context* ctx, ggml_tensor* table, const int32_t* ids, int n_tokens) {
     if (!table || !ids || n_tokens <= 0)
         return nullptr;
+    // Building any other graph in `ctx->compute_meta` overwrites the
+    // cached step graph's tensor metadata in place, so the next
+    // `step_t1_gf` re-use would read garbage. Invalidate the cache.
+    ctx->step_t1_gf = nullptr;
+    ctx->step_t1_fixed_kv_len = 0;
     ggml_cgraph* gf = cv3_build_embed_graph(ctx, table, n_tokens);
     ggml_backend_sched_reset(ctx->sched);
     if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
@@ -355,6 +367,7 @@ extern "C" struct cosyvoice3_tts_context* cosyvoice3_tts_init_from_file(const ch
     ctx->params = params;
     ctx->n_threads = params.n_threads > 0 ? params.n_threads : 4;
     ctx->seed = params.seed ? params.seed : 42;
+    ctx->rng.seed(ctx->seed);
 
     // ---- Metadata pass ----
     ggml_context* gctx_dummy = nullptr;
@@ -511,6 +524,7 @@ extern "C" void cosyvoice3_tts_set_seed(struct cosyvoice3_tts_context* ctx, uint
     if (!ctx)
         return;
     ctx->seed = seed ? seed : 42;
+    ctx->rng.seed(ctx->seed);
 }
 
 extern "C" void cosyvoice3_tts_set_temperature(struct cosyvoice3_tts_context* ctx, float temperature) {
@@ -713,6 +727,218 @@ extern "C" float* cosyvoice3_tts_step_speech(struct cosyvoice3_tts_context* ctx,
         return nullptr;
     ggml_backend_tensor_get(logits_t, out, 0, n_log * sizeof(float));
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// Sampling — Repetition-Aware Sampling (RAS), ported from upstream
+// CosyVoice/cosyvoice/utils/common.py::ras_sampling.
+//
+// nucleus_sampling: softmax(logits) → stable-sort descending → take
+//   while cum_prob < top_p AND count < top_k → multinomial-sample over
+//   the kept (non-renormalised) probabilities.
+//
+// ras_sampling: nucleus sample → if the picked token appears in
+//   decoded_history[-win_size:] ≥ win_size·tau_r times, suppress it
+//   (logits[id] = -INF) and re-sample via plain softmax-multinomial
+//   over the modified logits.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Stable-softmax: subtract max to avoid overflow.
+void softmax_inplace(std::vector<float>& v) {
+    float vmax = v.empty() ? 0.0f : v[0];
+    for (float x : v)
+        if (x > vmax)
+            vmax = x;
+    double s = 0.0;
+    for (auto& x : v) {
+        x = std::exp(x - vmax);
+        s += x;
+    }
+    if (s > 0.0) {
+        const float inv = (float)(1.0 / s);
+        for (auto& x : v)
+            x *= inv;
+    }
+}
+
+// Multinomial sample given an unnormalised positive weight vector. Mirrors
+// torch.multinomial(weights, 1, replacement=True): treat weights / sum as
+// the categorical distribution, draw one via inverse-CDF. Returns -1 if
+// weights are all zero / NaN / negative.
+int32_t multinomial_pick(const std::vector<float>& weights, std::mt19937_64& rng) {
+    double sum = 0.0;
+    for (float w : weights) {
+        if (!(w > 0.0f) || std::isnan(w))
+            continue;
+        sum += w;
+    }
+    if (!(sum > 0.0))
+        return -1;
+    std::uniform_real_distribution<double> U(0.0, sum);
+    double r = U(rng);
+    double acc = 0.0;
+    for (size_t i = 0; i < weights.size(); i++) {
+        if (!(weights[i] > 0.0f) || std::isnan(weights[i]))
+            continue;
+        acc += weights[i];
+        if (r <= acc)
+            return (int32_t)i;
+    }
+    return (int32_t)weights.size() - 1; // floating-point tail
+}
+
+// Upstream `nucleus_sampling`: select top tokens until cum_prob >= top_p
+// or count >= top_k (whichever comes first), then multinomial-sample
+// over the kept (unrenormalised) probabilities.
+int32_t nucleus_sample(const float* logits, int n_vocab, float top_p, int top_k, std::mt19937_64& rng) {
+    std::vector<float> probs((size_t)n_vocab);
+    std::memcpy(probs.data(), logits, (size_t)n_vocab * sizeof(float));
+    softmax_inplace(probs);
+    // Stable-sort indices by descending prob. std::stable_sort matches
+    // PyTorch's `sort(stable=True)` ordering for ties.
+    std::vector<int32_t> idx((size_t)n_vocab);
+    for (int i = 0; i < n_vocab; i++)
+        idx[i] = i;
+    std::stable_sort(idx.begin(), idx.end(),
+                     [&](int32_t a, int32_t b) { return probs[a] > probs[b]; });
+    std::vector<float> kept;
+    std::vector<int32_t> kept_ids;
+    double cum = 0.0;
+    for (int i = 0; i < n_vocab; i++) {
+        // Upstream guard: stop when cum_prob >= top_p OR count >= top_k.
+        if (cum >= (double)top_p || (int)kept.size() >= top_k)
+            break;
+        const float p = probs[idx[i]];
+        cum += (double)p;
+        kept.push_back(p);
+        kept_ids.push_back(idx[i]);
+    }
+    if (kept.empty())
+        return -1;
+    int32_t pick = multinomial_pick(kept, rng);
+    if (pick < 0)
+        return -1;
+    return kept_ids[(size_t)pick];
+}
+
+} // namespace
+
+extern "C" int32_t cosyvoice3_tts_sample_ras(struct cosyvoice3_tts_context* ctx, const float* logits,
+                                             const int32_t* decoded_history, int n_history) {
+    if (!ctx || !logits)
+        return -1;
+    const auto& hp = ctx->hp;
+    const int n_vocab = (int)hp.speech_vocab;
+    const auto& sp = ctx->params;
+    const float top_p = sp.ras_top_p > 0.0f ? sp.ras_top_p : 0.8f;
+    const int top_k = sp.ras_top_k > 0 ? sp.ras_top_k : 25;
+    const int win_size = sp.ras_win_size > 0 ? sp.ras_win_size : 10;
+    const float tau_r = sp.ras_tau_r > 0.0f ? sp.ras_tau_r : 0.1f;
+
+    int32_t pick = nucleus_sample(logits, n_vocab, top_p, top_k, ctx->rng);
+    if (pick < 0)
+        return -1;
+
+    if (!decoded_history || n_history <= 0)
+        return pick;
+
+    // Repetition check over the trailing `win_size` of decoded_history.
+    // `pick` is counted in the suffix; if it appears ≥ win_size·tau_r
+    // times, suppress and re-sample via plain softmax-multinomial over
+    // the FULL distribution (matches upstream `random_sampling`).
+    int rep = 0;
+    const int start = std::max(0, n_history - win_size);
+    for (int i = start; i < n_history; i++) {
+        if (decoded_history[i] == pick)
+            rep++;
+    }
+    const float thresh = (float)win_size * tau_r;
+    if ((float)rep >= thresh) {
+        std::vector<float> mod((size_t)n_vocab);
+        std::memcpy(mod.data(), logits, (size_t)n_vocab * sizeof(float));
+        mod[(size_t)pick] = -INFINITY;
+        softmax_inplace(mod);
+        pick = multinomial_pick(mod, ctx->rng);
+    }
+    return pick;
+}
+
+extern "C" int32_t* cosyvoice3_tts_generate_tokens_from_embeds(struct cosyvoice3_tts_context* ctx, const float* embeds,
+                                                              int n_tokens, int max_tokens, int stop_token_id,
+                                                              int* out_n) {
+    if (!ctx || !embeds || n_tokens <= 0 || !out_n)
+        return nullptr;
+    *out_n = 0;
+    const auto& hp = ctx->hp;
+    const int speech_vocab = (int)hp.speech_vocab;
+    const int max_steps = max_tokens > 0
+                              ? max_tokens
+                              : (ctx->params.max_tokens > 0 ? ctx->params.max_tokens : 1500);
+
+    cosyvoice3_tts_reset_kv(ctx);
+    float* logits = cosyvoice3_tts_prefill_with_embeds(ctx, embeds, n_tokens, /*n_past*/ 0);
+    if (!logits)
+        return nullptr;
+
+    std::vector<int32_t> out;
+    out.reserve((size_t)max_steps);
+    const bool greedy = !(ctx->params.temperature > 0.0f);
+
+    int n_past = n_tokens;
+    for (int step = 0; step < max_steps; step++) {
+        int32_t pick;
+        if (greedy) {
+            // Greedy argmax. Restrict to the codebook range so we never
+            // emit special-token rows that lie past index speech_codebook.
+            int n_pick_range = (int)hp.speech_codebook > 0 ? (int)hp.speech_codebook : speech_vocab;
+            float bv = logits[0];
+            pick = 0;
+            for (int i = 1; i < n_pick_range; i++)
+                if (logits[i] > bv) {
+                    bv = logits[i];
+                    pick = i;
+                }
+        } else {
+            pick = cosyvoice3_tts_sample_ras(ctx, logits, out.empty() ? nullptr : out.data(), (int)out.size());
+            if (pick < 0) {
+                free(logits);
+                *out_n = 0;
+                return nullptr;
+            }
+        }
+        free(logits);
+        if (stop_token_id >= 0 && pick == stop_token_id)
+            break;
+        out.push_back(pick);
+        if (n_past + 1 > ctx->kv_max_ctx) {
+            fprintf(stderr, "cosyvoice3_tts: generate_tokens: kv overflow at step %d\n", step);
+            break;
+        }
+        logits = cosyvoice3_tts_step_speech(ctx, pick, n_past);
+        if (!logits) {
+            fprintf(stderr, "cosyvoice3_tts: generate_tokens: step %d failed\n", step);
+            *out_n = (int)out.size();
+            int32_t* dup = (int32_t*)malloc(out.size() * sizeof(int32_t));
+            if (!dup)
+                return nullptr;
+            std::memcpy(dup, out.data(), out.size() * sizeof(int32_t));
+            return dup;
+        }
+        n_past++;
+    }
+    // The trailing logits buffer is freed inside the loop on success;
+    // we only get here after the break, where logits is already freed.
+
+    *out_n = (int)out.size();
+    if (out.empty())
+        return (int32_t*)malloc(0); // benign 0-length pointer
+    int32_t* arr = (int32_t*)malloc(out.size() * sizeof(int32_t));
+    if (!arr)
+        return nullptr;
+    std::memcpy(arr, out.data(), out.size() * sizeof(int32_t));
+    return arr;
 }
 
 extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ctx, const char* stage_name,

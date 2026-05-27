@@ -42,7 +42,11 @@ int main(int argc, char** argv) {
     const char* path = argv[1];
     const char* embeds_bin = nullptr;
     const char* logits_bin = nullptr;
+    const char* tokens_bin = nullptr;
     int diff_n_tokens = 0;
+    int gen_n_steps = 0;
+    bool gen_ras = false;
+    uint64_t gen_seed = 42;
     for (int i = 2; i + 1 < argc; i++) {
         if (!strcmp(argv[i], "--embeds-bin"))
             embeds_bin = argv[++i];
@@ -50,6 +54,14 @@ int main(int argc, char** argv) {
             logits_bin = argv[++i];
         else if (!strcmp(argv[i], "--n-tokens"))
             diff_n_tokens = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--tokens-bin"))
+            tokens_bin = argv[++i];
+        else if (!strcmp(argv[i], "--gen-steps"))
+            gen_n_steps = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "--gen-ras"))
+            gen_ras = atoi(argv[++i]) != 0;
+        else if (!strcmp(argv[i], "--seed"))
+            gen_seed = (uint64_t)strtoull(argv[++i], nullptr, 10);
     }
 
     auto p = cosyvoice3_tts_context_default_params();
@@ -78,6 +90,52 @@ int main(int argc, char** argv) {
         fprintf(stderr, "FAIL: unexpected speech vocab (expected 6761 / 6561)\n");
         cosyvoice3_tts_free(ctx);
         return 1;
+    }
+
+    // ---- Generate mode: prefill + AR loop, dump tokens ----
+    if (embeds_bin && tokens_bin && diff_n_tokens > 0 && gen_n_steps > 0) {
+        std::vector<float> in_embeds((size_t)diff_n_tokens * (size_t)d_model);
+        FILE* fi = fopen(embeds_bin, "rb");
+        if (!fi) {
+            fprintf(stderr, "FAIL: cannot open embeds bin '%s'\n", embeds_bin);
+            cosyvoice3_tts_free(ctx);
+            return 1;
+        }
+        size_t read = fread(in_embeds.data(), sizeof(float), in_embeds.size(), fi);
+        fclose(fi);
+        if (read != in_embeds.size()) {
+            fprintf(stderr, "FAIL: short read from embeds bin (%zu of %zu)\n", read, in_embeds.size());
+            cosyvoice3_tts_free(ctx);
+            return 1;
+        }
+        cosyvoice3_tts_set_seed(ctx, gen_seed);
+        cosyvoice3_tts_set_temperature(ctx, gen_ras ? 1.0f : 0.0f);
+        fprintf(stderr, "gen: T=%d steps=%d mode=%s seed=%llu\n", diff_n_tokens, gen_n_steps,
+                gen_ras ? "ras" : "greedy", (unsigned long long)gen_seed);
+        int n_out = 0;
+        int32_t* tokens = cosyvoice3_tts_generate_tokens_from_embeds(ctx, in_embeds.data(), diff_n_tokens, gen_n_steps,
+                                                                    /*stop_token_id*/ -1, &n_out);
+        if (!tokens) {
+            fprintf(stderr, "FAIL: generate_tokens returned nullptr\n");
+            cosyvoice3_tts_free(ctx);
+            return 1;
+        }
+        FILE* fo = fopen(tokens_bin, "wb");
+        if (!fo) {
+            fprintf(stderr, "FAIL: cannot open tokens bin '%s'\n", tokens_bin);
+            free(tokens);
+            cosyvoice3_tts_free(ctx);
+            return 1;
+        }
+        fwrite(tokens, sizeof(int32_t), (size_t)n_out, fo);
+        fclose(fo);
+        fprintf(stderr, "gen: produced %d tokens, first 8:", n_out);
+        for (int i = 0; i < n_out && i < 8; i++)
+            fprintf(stderr, " %d", tokens[i]);
+        fprintf(stderr, "\n");
+        free(tokens);
+        cosyvoice3_tts_free(ctx);
+        return 0;
     }
 
     // ---- Diff-runner mode: take caller-supplied embeds, write logits ----

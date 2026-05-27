@@ -89,6 +89,39 @@ float* cosyvoice3_tts_step_speech(struct cosyvoice3_tts_context* ctx, int32_t sp
 // Reset the persistent KV cache so the next prefill starts from n_past=0.
 void cosyvoice3_tts_reset_kv(struct cosyvoice3_tts_context* ctx);
 
+// Repetition-Aware Sampling — port of upstream
+// `CosyVoice/cosyvoice/utils/common.py::ras_sampling`. Samples ONE
+// speech token from `logits[speech_vocab]` using nucleus sampling
+// (top_p, top_k from ctx->params); if the sampled token already
+// appears in the last `win_size` entries of `decoded_history` at
+// least `win_size * tau_r` times, suppresses it and falls back to
+// random sampling over the full distribution.
+//
+// `decoded_history` may be NULL (e.g. for the first AR step); in
+// that case the repetition check is skipped and the function reduces
+// to nucleus sampling.
+//
+// Modifies the RNG state on the context (advances ctx->seed via
+// std::mt19937).  Returns -1 on failure (e.g. logits all -INF).
+int32_t cosyvoice3_tts_sample_ras(struct cosyvoice3_tts_context* ctx, const float* logits,
+                                  const int32_t* decoded_history, int n_history);
+
+// End-to-end speech-token AR loop: caller supplies an [n_tokens, d_model]
+// embedding tensor (built externally — typically text token_embd lookups
+// plus optionally a speech-token prompt), the runtime prefills, then
+// AR-samples up to `max_tokens` speech tokens via RAS (when
+// ctx->params.temperature > 0) or greedy argmax (temperature == 0)
+// until `stop_token_id` is sampled.
+//
+// Returns malloc'd int32_t[*out_n] of speech token ids. Caller frees
+// with free(). Returns nullptr on failure.
+//
+// `stop_token_id < 0` disables the stop check (runs to max_tokens).
+// `max_tokens <= 0` uses the context's default (params.max_tokens or
+// the built-in 1500).
+int32_t* cosyvoice3_tts_generate_tokens_from_embeds(struct cosyvoice3_tts_context* ctx, const float* embeds,
+                                                    int n_tokens, int max_tokens, int stop_token_id, int* out_n);
+
 // Diff-harness stage extractor. Returns malloc'd float[*out_n].
 // Phase 2 supports:
 //   "lm_step0_logits"   — single-step logits after prefilling on

@@ -6,6 +6,48 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-27 cosyvoice3: Phase 2 closeout — RAS sampler + greedy AR byte-identical
+
+Two follow-ups on top of `137670d1`:
+
+- **RAS sampler** ported from
+  `CosyVoice/cosyvoice/utils/common.py::ras_sampling` —
+  `cosyvoice3_tts_sample_ras(logits, history, n_history)` returns a
+  single speech token via nucleus_sampling (top_p=0.8, top_k=25,
+  stable-sort + multinomial over unrenormalised kept probs) and
+  re-samples via plain softmax-multinomial when the picked token
+  exceeds `win_size·tau_r = 1` repeats in the last 10. `std::mt19937_64`
+  seeded from `ctx->seed`; advances per sample. PyTorch
+  `torch.multinomial` bit-identity is **not** in scope (different PRNG
+  internals) — the algorithm matches semantically.
+
+- **`generate_tokens_from_embeds`** end-to-end AR loop: prefill on
+  caller-supplied embeds + AR loop (greedy when temperature=0, else
+  RAS) up to `max_tokens` or `stop_token_id`.
+
+- **Cached step graph clobber bug fixed.** `cv3_run_embed` shares
+  `compute_meta` with the step graph; its `ggml_init` overwrites
+  the cached `step_t1_gf`'s tensor metadata in place, so reusing
+  the cached graph on step 2 read garbage. Now invalidate the
+  cache at the top of every embed run; the cache only stays warm
+  across consecutive step_speech calls (no embed-in-between).
+  Symptom before fix: greedy gen emitted 2 tokens then crashed.
+
+Greedy diff against PyTorch ref on "Hello, this is a test." (7 tokens
+prefill, 8 AR steps): C++ `[4512, 4512, 4512, 4512, 4512, 4512, 4512, 4512]`
+== PyTorch `[4512, 4512, 4512, 4512, 4512, 4512, 4512, 4512]`. The
+all-`4512` collapse is the model's expected behaviour without a voice
+prompt; RAS (seed=42, 24 steps) breaks it to varied tokens
+`[2729, 4432, 4431, 5890, 5889, 6154, 5899, 58, ...]`, exercising
+both the nucleus branch and the repetition-suppression fallback.
+
+**Phase 2 greedy diff gate is formally PASSING** (step0 logits cos=1.0,
+8-step argmax sequence byte-identical to PyTorch). Seeded-RAS
+bit-identity is left for a later session once
+`torch.multinomial` PRNG-matching is in scope.
+
+---
+
 ## 2026-05-27 cosyvoice3: Fun-CosyVoice3-0.5B-2512 TTS port — Phase 2 (LLM runtime + diff)
 
 CosyVoice3 LLM scaffolding for the C++ runtime — loader, Qwen2-0.5B

@@ -532,9 +532,17 @@ work in 4 phases**.
     `cosine = 1.000000`, `max |Δ| = 0.0149` (0.08% of max),
     top-5 indices byte-exact `[4512, 2322, 2325, 0, 4916]` on both
     sides — the delta is consistent with F16 weight storage vs F32
-    ref. **Remaining**: RAS sampler (~50 LOC, port
-    `CosyVoice/cosyvoice/utils/common.py::ras_sampling`) + seeded-RAS
-    diff parity. Greedy LLM diff gate is essentially passing.
+    ref. **RAS sampler landed 2026-05-27 (follow-up commit)**: ported
+    `nucleus_sampling` + `ras_sampling` from upstream
+    `CosyVoice/cosyvoice/utils/common.py`, top_p=0.8 / top_k=25 /
+    win_size=10 / tau_r=0.1, plus `generate_tokens_from_embeds`
+    end-to-end AR loop. Greedy 8-step AR sequence is byte-identical
+    to PyTorch (`[4512]*8` on both sides — the model's expected
+    no-prompt collapse, broken by RAS into varied tokens spanning
+    the codebook). **Phase 2 greedy LLM diff gate is formally
+    PASSING.** Seeded-RAS bit-identity vs PyTorch's
+    `torch.multinomial` is not yet in scope (would require porting
+    ATen's PRNG); deferred.
 - **Phase 3 — DiT-based flow-matching estimator + CausalConditionalCFM**.
   Open. New AdaLN-Zero block (~150 LOC). Wire to
   `chatterbox_s3gen::cfm_euler_solve`. Diff-gate: mel cos ≥ 0.99
