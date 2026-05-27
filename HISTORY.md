@@ -6,6 +6,39 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-27 cosyvoice3: Phase 3a — flow loader + DiT block scaffold
+
+Extends `src/cosyvoice3_tts.{h,cpp}` with Phase 3 flow-side support:
+
+- `cosyvoice3_tts_init_flow_from_file()` loads
+  `cosyvoice3-flow-f16.gguf` (~670 MB, 330 tensors) into the existing
+  context. Hparams from `cosyvoice3.flow.*` keys: 22-block DiT @
+  dim=1024, heads=16, head_dim=64, ff_dim=2048, input_dim=320,
+  mel_dim=80, spk 192→80, 10-step CFM Euler, cfg=0.70.
+- `cv3_flow_hp` + `cv3_dit_block` + `cv3_flow` structs. Each DiT block
+  binds (adaln_w 6×1024, attn_q/k/v/o w+b, ffn_l1/l2 w+b). Top-level
+  tensors: input_embd (80,6561), pre_la conv1/conv2, spk_affine,
+  dit_in_proj, conv_pos c1/c2 (grouped conv1d-31), time_mlp 0/2,
+  rope_inv_freq, norm_out, proj_out.
+- `cosyvoice3_tts_get_flow_hparams()` + a `"flow_inventory"` diff
+  stage for harness validation. Flow GGUF + LM GGUF coexist on the
+  same backend; separate `flow.ctx_w` / `flow.buf_w`.
+
+Smoke test (smoke binary now accepts `--flow <path>`) confirms:
+  cosyvoice3_tts:flow loaded 330 tensors
+  dit=22L d=1024 h=16/hd=64 ff=2048 in_dim=320 mel=80 spk=192/80
+  cfm_steps=10 cfg=0.70
+  flow_inventory stage returned 10 floats
+
+The DiT forward graph (AdaLN-Zero modulation per block), pre-lookahead
+conv pipeline, conv_pos_embed, time_mlp evaluation, and CFM Euler ODE
+driver are deferred to Phase 3b/c/d. Chatterbox `cfm_euler_solve` is
+NOT directly reusable — it bakes chatterbox-specific tensor names into
+the time-MLP path, so the Euler step loop will be re-implemented
+locally for cosyvoice3.
+
+---
+
 ## 2026-05-27 cosyvoice3: Phase 2 closeout — RAS sampler + greedy AR byte-identical
 
 Two follow-ups on top of `137670d1`:

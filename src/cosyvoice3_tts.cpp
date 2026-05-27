@@ -85,6 +85,88 @@ struct cv3_lm {
     std::vector<cv3_qwen2_block> blocks;
 };
 
+// ---------------------------------------------------------------------------
+// Phase 3 — Flow (DiT-CFM) hparams + tensor binding
+// ---------------------------------------------------------------------------
+
+struct cv3_flow_hp {
+    uint32_t n_dit_layers = 22;
+    uint32_t dit_dim = 1024;
+    uint32_t dit_heads = 16;
+    uint32_t dit_head_dim = 64;
+    uint32_t dit_ff_dim = 2048;
+    uint32_t dit_input_dim = 320;
+    uint32_t mel_dim = 80;
+    uint32_t spk_dim_in = 192;
+    uint32_t spk_dim_out = 80;
+    uint32_t speech_codebook = 6561;
+    uint32_t pre_lookahead_len = 3;
+    uint32_t token_mel_ratio = 2;
+    uint32_t input_frame_rate = 25;
+    uint32_t cfm_n_steps = 10;
+    float cfm_inference_cfg_rate = 0.7f;
+    float cfm_sigma_min = 1e-6f;
+    float rope_theta = 10000.0f;
+};
+
+// One DiT block — AdaLN-Zero modulation (6×dim split for γ/β/gate × 2)
+// projected from time-embed, followed by MHA (with RoPE inside) and an
+// FFN (l1 → SiLU → l2).
+struct cv3_dit_block {
+    ggml_tensor* adaln_w = nullptr; // [dit_dim, 6*dit_dim]
+    ggml_tensor* adaln_b = nullptr; // [6*dit_dim] F32
+    ggml_tensor* attn_q_w = nullptr;
+    ggml_tensor* attn_q_b = nullptr;
+    ggml_tensor* attn_k_w = nullptr;
+    ggml_tensor* attn_k_b = nullptr;
+    ggml_tensor* attn_v_w = nullptr;
+    ggml_tensor* attn_v_b = nullptr;
+    ggml_tensor* attn_o_w = nullptr;
+    ggml_tensor* attn_o_b = nullptr;
+    ggml_tensor* ffn_l1_w = nullptr; // [dit_dim, ff_dim]
+    ggml_tensor* ffn_l1_b = nullptr;
+    ggml_tensor* ffn_l2_w = nullptr; // [ff_dim, dit_dim]
+    ggml_tensor* ffn_l2_b = nullptr;
+};
+
+struct cv3_flow {
+    bool loaded = false;
+    cv3_flow_hp hp;
+
+    // Top-level
+    ggml_tensor* input_embd_w = nullptr; // (mel_dim=80, speech_codebook=6561)
+    ggml_tensor* pre_la_c1_w = nullptr;  // (K=4, 80, 1024) ggml ne
+    ggml_tensor* pre_la_c1_b = nullptr;
+    ggml_tensor* pre_la_c2_w = nullptr;  // (K=3, 1024, 80)
+    ggml_tensor* pre_la_c2_b = nullptr;
+    ggml_tensor* spk_affine_w = nullptr; // (spk_dim_in=192, spk_dim_out=80)
+    ggml_tensor* spk_affine_b = nullptr;
+
+    // DiT input / time / position / output
+    ggml_tensor* dit_in_proj_w = nullptr;     // (320, 1024)
+    ggml_tensor* dit_in_proj_b = nullptr;
+    ggml_tensor* dit_conv_pos_c1_w = nullptr; // grouped conv1d-31 (K, in_per_grp, out)
+    ggml_tensor* dit_conv_pos_c1_b = nullptr;
+    ggml_tensor* dit_conv_pos_c2_w = nullptr;
+    ggml_tensor* dit_conv_pos_c2_b = nullptr;
+    ggml_tensor* dit_time_mlp_0_w = nullptr;  // (256, 1024)
+    ggml_tensor* dit_time_mlp_0_b = nullptr;
+    ggml_tensor* dit_time_mlp_2_w = nullptr;  // (1024, 1024)
+    ggml_tensor* dit_time_mlp_2_b = nullptr;
+    ggml_tensor* dit_rope_inv_freq = nullptr; // (head_dim/2,)
+    ggml_tensor* dit_norm_out_w = nullptr;
+    ggml_tensor* dit_norm_out_b = nullptr;
+    ggml_tensor* dit_proj_out_w = nullptr;
+    ggml_tensor* dit_proj_out_b = nullptr;
+
+    std::vector<cv3_dit_block> blocks;
+
+    // Flow-side ggml context + buffer (separate from the LM's).
+    ggml_context* ctx_w = nullptr;
+    ggml_backend_buffer_t buf_w = nullptr;
+    std::map<std::string, ggml_tensor*> tensors;
+};
+
 } // namespace
 
 struct cosyvoice3_tts_context {
@@ -120,6 +202,11 @@ struct cosyvoice3_tts_context {
     // re-seedable via cosyvoice3_tts_set_seed. Advances through every
     // RAS sample so repeated generate() calls don't replay.
     std::mt19937_64 rng{42};
+
+    // Phase 3 — Flow sub-model (DiT-CFM). Populated by
+    // cosyvoice3_tts_init_flow_from_file(). Stays empty if only the
+    // LM was loaded (`flow.loaded == false`).
+    cv3_flow flow{};
 };
 
 namespace {
@@ -505,6 +592,10 @@ extern "C" void cosyvoice3_tts_free(struct cosyvoice3_tts_context* ctx) {
         ggml_backend_buffer_free(ctx->buf_w_cpu);
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
+    if (ctx->flow.buf_w)
+        ggml_backend_buffer_free(ctx->flow.buf_w);
+    if (ctx->flow.ctx_w)
+        ggml_free(ctx->flow.ctx_w);
     if (ctx->backend && ctx->backend != ctx->backend_cpu)
         ggml_backend_free(ctx->backend);
     if (ctx->backend_cpu)
@@ -976,6 +1067,190 @@ extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ct
         *out_n = (int)hp.speech_vocab;
         return out;
     }
+    if (strcmp(stage_name, "flow_inventory") == 0) {
+        if (!ctx->flow.loaded) {
+            fprintf(stderr, "cosyvoice3_tts: flow_inventory requested but flow not loaded\n");
+            return nullptr;
+        }
+        // Return a small sentinel buffer encoding (n_dit_layers, dit_dim,
+        // dit_heads, head_dim, ff_dim, input_dim, mel_dim, spk_dim_in,
+        // spk_dim_out, n_steps) — useful for the diff harness to verify
+        // it sees the flow GGUF.
+        float* out = (float*)malloc(10 * sizeof(float));
+        if (!out)
+            return nullptr;
+        const auto& fh = ctx->flow.hp;
+        out[0] = (float)fh.n_dit_layers;
+        out[1] = (float)fh.dit_dim;
+        out[2] = (float)fh.dit_heads;
+        out[3] = (float)fh.dit_head_dim;
+        out[4] = (float)fh.dit_ff_dim;
+        out[5] = (float)fh.dit_input_dim;
+        out[6] = (float)fh.mel_dim;
+        out[7] = (float)fh.spk_dim_in;
+        out[8] = (float)fh.spk_dim_out;
+        out[9] = (float)fh.cfm_n_steps;
+        *out_n = 10;
+        return out;
+    }
     fprintf(stderr, "cosyvoice3_tts: unknown stage '%s'\n", stage_name);
     return nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Flow loader + hparam reader
+// ---------------------------------------------------------------------------
+
+extern "C" int cosyvoice3_tts_init_flow_from_file(struct cosyvoice3_tts_context* ctx, const char* path) {
+    if (!ctx || !path) {
+        fprintf(stderr, "cosyvoice3_tts: init_flow: bad args\n");
+        return -1;
+    }
+    if (ctx->flow.loaded) {
+        fprintf(stderr, "cosyvoice3_tts: flow already loaded\n");
+        return 0;
+    }
+
+    // ---- Metadata pass ----
+    ggml_context* gctx_dummy = nullptr;
+    gguf_init_params gp = {/*no_alloc=*/true, &gctx_dummy};
+    gguf_context* gctx = gguf_init_from_file(path, gp);
+    if (!gctx) {
+        fprintf(stderr, "cosyvoice3_tts: init_flow: failed to read GGUF '%s'\n", path);
+        return -1;
+    }
+
+    auto& fh = ctx->flow.hp;
+    fh.n_dit_layers = cv3_kv_u32(gctx, "cosyvoice3.flow.n_dit_layers", fh.n_dit_layers);
+    fh.dit_dim = cv3_kv_u32(gctx, "cosyvoice3.flow.dit_dim", fh.dit_dim);
+    fh.dit_heads = cv3_kv_u32(gctx, "cosyvoice3.flow.dit_heads", fh.dit_heads);
+    fh.dit_head_dim = cv3_kv_u32(gctx, "cosyvoice3.flow.dit_head_dim", fh.dit_head_dim);
+    fh.dit_ff_dim = cv3_kv_u32(gctx, "cosyvoice3.flow.dit_ff_dim", fh.dit_ff_dim);
+    fh.dit_input_dim = cv3_kv_u32(gctx, "cosyvoice3.flow.dit_input_dim", fh.dit_input_dim);
+    fh.mel_dim = cv3_kv_u32(gctx, "cosyvoice3.flow.mel_dim", fh.mel_dim);
+    fh.spk_dim_in = cv3_kv_u32(gctx, "cosyvoice3.flow.spk_dim_in", fh.spk_dim_in);
+    fh.spk_dim_out = cv3_kv_u32(gctx, "cosyvoice3.flow.spk_dim_out", fh.spk_dim_out);
+    fh.speech_codebook = cv3_kv_u32(gctx, "cosyvoice3.flow.speech_codebook", fh.speech_codebook);
+    fh.pre_lookahead_len = cv3_kv_u32(gctx, "cosyvoice3.flow.pre_lookahead_len", fh.pre_lookahead_len);
+    fh.token_mel_ratio = cv3_kv_u32(gctx, "cosyvoice3.flow.token_mel_ratio", fh.token_mel_ratio);
+    fh.input_frame_rate = cv3_kv_u32(gctx, "cosyvoice3.flow.input_frame_rate", fh.input_frame_rate);
+    fh.cfm_n_steps = cv3_kv_u32(gctx, "cosyvoice3.flow.cfm_n_steps", fh.cfm_n_steps);
+    fh.cfm_inference_cfg_rate =
+        cv3_kv_f32(gctx, "cosyvoice3.flow.cfm_inference_cfg_rate", fh.cfm_inference_cfg_rate);
+    fh.cfm_sigma_min = cv3_kv_f32(gctx, "cosyvoice3.flow.cfm_sigma_min", fh.cfm_sigma_min);
+    fh.rope_theta = cv3_kv_f32(gctx, "cosyvoice3.flow.rope_theta", fh.rope_theta);
+    gguf_free(gctx);
+
+    // ---- Weight pass ----
+    core_gguf::WeightLoad wl;
+    if (!core_gguf::load_weights(path, ctx->backend, "cosyvoice3_tts:flow", wl)) {
+        fprintf(stderr, "cosyvoice3_tts: init_flow: load_weights failed for '%s'\n", path);
+        return -1;
+    }
+    ctx->flow.ctx_w = wl.ctx;
+    ctx->flow.buf_w = wl.buf;
+    ctx->flow.tensors = std::move(wl.tensors);
+
+    auto require_t = [&](const std::string& name) -> ggml_tensor* {
+        return core_gguf::require(ctx->flow.tensors, name.c_str(), "cosyvoice3_tts:flow");
+    };
+
+    auto& f = ctx->flow;
+    f.input_embd_w = require_t("cosyvoice3.flow.input_embd.w");
+    f.pre_la_c1_w = require_t("cosyvoice3.flow.pre_la.conv1.w");
+    f.pre_la_c1_b = require_t("cosyvoice3.flow.pre_la.conv1.b");
+    f.pre_la_c2_w = require_t("cosyvoice3.flow.pre_la.conv2.w");
+    f.pre_la_c2_b = require_t("cosyvoice3.flow.pre_la.conv2.b");
+    f.spk_affine_w = require_t("cosyvoice3.flow.spk_affine.w");
+    f.spk_affine_b = require_t("cosyvoice3.flow.spk_affine.b");
+    f.dit_in_proj_w = require_t("cosyvoice3.flow.dit.in_proj.w");
+    f.dit_in_proj_b = require_t("cosyvoice3.flow.dit.in_proj.b");
+    f.dit_conv_pos_c1_w = require_t("cosyvoice3.flow.dit.conv_pos.c1.w");
+    f.dit_conv_pos_c1_b = require_t("cosyvoice3.flow.dit.conv_pos.c1.b");
+    f.dit_conv_pos_c2_w = require_t("cosyvoice3.flow.dit.conv_pos.c2.w");
+    f.dit_conv_pos_c2_b = require_t("cosyvoice3.flow.dit.conv_pos.c2.b");
+    f.dit_time_mlp_0_w = require_t("cosyvoice3.flow.dit.time_mlp.0.w");
+    f.dit_time_mlp_0_b = require_t("cosyvoice3.flow.dit.time_mlp.0.b");
+    f.dit_time_mlp_2_w = require_t("cosyvoice3.flow.dit.time_mlp.2.w");
+    f.dit_time_mlp_2_b = require_t("cosyvoice3.flow.dit.time_mlp.2.b");
+    f.dit_rope_inv_freq = require_t("cosyvoice3.flow.dit.rope_inv_freq");
+    f.dit_norm_out_w = require_t("cosyvoice3.flow.dit.norm_out.w");
+    f.dit_norm_out_b = require_t("cosyvoice3.flow.dit.norm_out.b");
+    f.dit_proj_out_w = require_t("cosyvoice3.flow.dit.proj_out.w");
+    f.dit_proj_out_b = require_t("cosyvoice3.flow.dit.proj_out.b");
+
+    f.blocks.resize(fh.n_dit_layers);
+    for (uint32_t L = 0; L < fh.n_dit_layers; L++) {
+        char prefix[48];
+        snprintf(prefix, sizeof(prefix), "cosyvoice3.flow.dit.blk.%u", L);
+        auto& b = f.blocks[L];
+        std::string p = prefix;
+        b.adaln_w = require_t(p + ".adaln.w");
+        b.adaln_b = require_t(p + ".adaln.b");
+        b.attn_q_w = require_t(p + ".attn.q.w");
+        b.attn_q_b = require_t(p + ".attn.q.b");
+        b.attn_k_w = require_t(p + ".attn.k.w");
+        b.attn_k_b = require_t(p + ".attn.k.b");
+        b.attn_v_w = require_t(p + ".attn.v.w");
+        b.attn_v_b = require_t(p + ".attn.v.b");
+        b.attn_o_w = require_t(p + ".attn.o.w");
+        b.attn_o_b = require_t(p + ".attn.o.b");
+        b.ffn_l1_w = require_t(p + ".ffn.l1.w");
+        b.ffn_l1_b = require_t(p + ".ffn.l1.b");
+        b.ffn_l2_w = require_t(p + ".ffn.l2.w");
+        b.ffn_l2_b = require_t(p + ".ffn.l2.b");
+        if (!b.adaln_w || !b.attn_q_w || !b.ffn_l1_w) {
+            fprintf(stderr, "cosyvoice3_tts: init_flow: missing tensors in %s.*\n", prefix);
+            return -1;
+        }
+    }
+
+    if (!f.input_embd_w || !f.dit_in_proj_w || !f.dit_proj_out_w) {
+        fprintf(stderr, "cosyvoice3_tts: init_flow: missing top-level flow tensors\n");
+        return -1;
+    }
+
+    f.loaded = true;
+    if (ctx->params.verbosity >= 1) {
+        fprintf(stderr,
+                "cosyvoice3_tts:flow loaded %zu tensors  dit=%uL d=%u h=%u/hd=%u ff=%u "
+                "in_dim=%u mel=%u spk=%u/%u codebook=%u cfm_steps=%u cfg=%.2f\n",
+                f.tensors.size(), fh.n_dit_layers, fh.dit_dim, fh.dit_heads, fh.dit_head_dim, fh.dit_ff_dim,
+                fh.dit_input_dim, fh.mel_dim, fh.spk_dim_in, fh.spk_dim_out, fh.speech_codebook, fh.cfm_n_steps,
+                (double)fh.cfm_inference_cfg_rate);
+    }
+    return 0;
+}
+
+extern "C" int cosyvoice3_tts_get_flow_hparams(struct cosyvoice3_tts_context* ctx, uint32_t* n_dit_layers,
+                                              uint32_t* dit_dim, uint32_t* dit_heads, uint32_t* dit_head_dim,
+                                              uint32_t* dit_ff_dim, uint32_t* dit_input_dim, uint32_t* mel_dim,
+                                              uint32_t* spk_dim_in, uint32_t* spk_dim_out, uint32_t* cfm_n_steps,
+                                              float* cfm_cfg_rate) {
+    if (!ctx || !ctx->flow.loaded)
+        return -1;
+    const auto& fh = ctx->flow.hp;
+    if (n_dit_layers)
+        *n_dit_layers = fh.n_dit_layers;
+    if (dit_dim)
+        *dit_dim = fh.dit_dim;
+    if (dit_heads)
+        *dit_heads = fh.dit_heads;
+    if (dit_head_dim)
+        *dit_head_dim = fh.dit_head_dim;
+    if (dit_ff_dim)
+        *dit_ff_dim = fh.dit_ff_dim;
+    if (dit_input_dim)
+        *dit_input_dim = fh.dit_input_dim;
+    if (mel_dim)
+        *mel_dim = fh.mel_dim;
+    if (spk_dim_in)
+        *spk_dim_in = fh.spk_dim_in;
+    if (spk_dim_out)
+        *spk_dim_out = fh.spk_dim_out;
+    if (cfm_n_steps)
+        *cfm_n_steps = fh.cfm_n_steps;
+    if (cfm_cfg_rate)
+        *cfm_cfg_rate = fh.cfm_inference_cfg_rate;
+    return 0;
 }

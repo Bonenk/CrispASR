@@ -43,6 +43,7 @@ int main(int argc, char** argv) {
     const char* embeds_bin = nullptr;
     const char* logits_bin = nullptr;
     const char* tokens_bin = nullptr;
+    const char* flow_path = nullptr;
     int diff_n_tokens = 0;
     int gen_n_steps = 0;
     bool gen_ras = false;
@@ -62,6 +63,8 @@ int main(int argc, char** argv) {
             gen_ras = atoi(argv[++i]) != 0;
         else if (!strcmp(argv[i], "--seed"))
             gen_seed = (uint64_t)strtoull(argv[++i], nullptr, 10);
+        else if (!strcmp(argv[i], "--flow"))
+            flow_path = argv[++i];
     }
 
     auto p = cosyvoice3_tts_context_default_params();
@@ -90,6 +93,41 @@ int main(int argc, char** argv) {
         fprintf(stderr, "FAIL: unexpected speech vocab (expected 6761 / 6561)\n");
         cosyvoice3_tts_free(ctx);
         return 1;
+    }
+
+    // ---- Optional: load Phase 3 flow GGUF + print hparams ----
+    if (flow_path) {
+        int rc = cosyvoice3_tts_init_flow_from_file(ctx, flow_path);
+        if (rc != 0) {
+            fprintf(stderr, "FAIL: init_flow_from_file('%s')\n", flow_path);
+            cosyvoice3_tts_free(ctx);
+            return 1;
+        }
+        uint32_t fn_layers = 0, fdim = 0, fheads = 0, fhead_dim = 0, fff = 0, finput = 0;
+        uint32_t fmel = 0, fspk_in = 0, fspk_out = 0, fcfm_steps = 0;
+        float fcfg = 0;
+        cosyvoice3_tts_get_flow_hparams(ctx, &fn_layers, &fdim, &fheads, &fhead_dim, &fff, &finput,
+                                        &fmel, &fspk_in, &fspk_out, &fcfm_steps, &fcfg);
+        fprintf(stderr,
+                "OK: flow loaded — dit=%uL d=%u h=%u/hd=%u ff=%u in_dim=%u mel=%u spk=%u/%u "
+                "cfm_steps=%u cfg=%.2f\n",
+                fn_layers, fdim, fheads, fhead_dim, fff, finput, fmel, fspk_in, fspk_out, fcfm_steps,
+                (double)fcfg);
+        if (fn_layers != 22 || fdim != 1024 || fheads != 16 || fhead_dim != 64) {
+            fprintf(stderr, "FAIL: unexpected flow hparams\n");
+            cosyvoice3_tts_free(ctx);
+            return 1;
+        }
+        int n_inv = 0;
+        float* inv = cosyvoice3_tts_extract_stage(ctx, "flow_inventory", nullptr, 0, nullptr, 0, &n_inv);
+        if (!inv || n_inv != 10) {
+            fprintf(stderr, "FAIL: flow_inventory stage\n");
+            free(inv);
+            cosyvoice3_tts_free(ctx);
+            return 1;
+        }
+        free(inv);
+        fprintf(stderr, "OK: flow_inventory stage returned 10 floats\n");
     }
 
     // ---- Generate mode: prefill + AR loop, dump tokens ----

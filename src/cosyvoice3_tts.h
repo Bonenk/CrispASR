@@ -122,6 +122,32 @@ int32_t cosyvoice3_tts_sample_ras(struct cosyvoice3_tts_context* ctx, const floa
 int32_t* cosyvoice3_tts_generate_tokens_from_embeds(struct cosyvoice3_tts_context* ctx, const float* embeds,
                                                     int n_tokens, int max_tokens, int stop_token_id, int* out_n);
 
+// ---------------------------------------------------------------------------
+// Phase 3 — Flow (DiT-CFM) sub-model API
+// ---------------------------------------------------------------------------
+//
+// The flow sub-model converts speech tokens (T_tok,) + a 192-dim
+// speaker embedding into a (T_mel = 2·T_tok, 80) log-mel via:
+//   input_embd(speech_tokens) → pre_lookahead causal conv (k=4 then k=3)
+//   → concat [pre_la, spk_affine(spk_emb), 0-cond] → (T_tok, 320)
+//   → CausalConditionalCFM (10-step Euler ODE, cosine t-schedule):
+//       22-block DiT estimator @ dim=1024, heads=16, head_dim=64,
+//       ff_mult=2, AdaLN-Zero modulation projected from
+//       sinusoidal time-embed via 2-layer MLP. RoPE inside MHA.
+//   → mel
+//
+// Load the flow GGUF (cosyvoice3-flow-f16.gguf, ~670 MB) into an
+// already-initialised context AFTER the LLM init. Returns 0 on
+// success, -1 on failure (missing tensors, …).
+
+int cosyvoice3_tts_init_flow_from_file(struct cosyvoice3_tts_context* ctx, const char* path);
+
+// Read flow-side hparams. Each pointer may be NULL.
+int cosyvoice3_tts_get_flow_hparams(struct cosyvoice3_tts_context* ctx, uint32_t* n_dit_layers, uint32_t* dit_dim,
+                                    uint32_t* dit_heads, uint32_t* dit_head_dim, uint32_t* dit_ff_dim,
+                                    uint32_t* dit_input_dim, uint32_t* mel_dim, uint32_t* spk_dim_in,
+                                    uint32_t* spk_dim_out, uint32_t* cfm_n_steps, float* cfm_cfg_rate);
+
 // Diff-harness stage extractor. Returns malloc'd float[*out_n].
 // Phase 2 supports:
 //   "lm_step0_logits"   — single-step logits after prefilling on
@@ -129,7 +155,9 @@ int32_t* cosyvoice3_tts_generate_tokens_from_embeds(struct cosyvoice3_tts_contex
 //                          `embeds_in` buffer of length n_tokens*d_model
 //   "lm_token_embd"     — token_embd[ids] lookup verification
 //   "lm_speech_embd"    — speech_embd[ids] lookup verification
-// Other stages (flow / hift) land in their phases.
+// Phase 3 (partial):
+//   "flow_inventory"    — returns sentinel buffer; verifies flow GGUF
+//                          is loaded and binds.
 float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ctx, const char* stage_name, const int32_t* ids,
                                     int n_ids, const float* embeds_in, int n_embed_tokens, int* out_n);
 

@@ -544,9 +544,27 @@ work in 4 phases**.
     `torch.multinomial` is not yet in scope (would require porting
     ATen's PRNG); deferred.
 - **Phase 3 — DiT-based flow-matching estimator + CausalConditionalCFM**.
-  Open. New AdaLN-Zero block (~150 LOC). Wire to
-  `chatterbox_s3gen::cfm_euler_solve`. Diff-gate: mel cos ≥ 0.99
-  after 10-step Euler ODE.
+  - **3a (2026-05-27): loader + DiT block scaffold — landed.**
+    `cosyvoice3_tts_init_flow_from_file` binds all 330 flow GGUF
+    tensors; hparams + `cv3_flow_hp` + `cv3_dit_block` + `cv3_flow`
+    structs live alongside the LM in the same context. Smoke test
+    validates 22-block DiT layout. Note: `chatterbox_s3gen::cfm_euler_solve`
+    is NOT directly reusable (chatterbox-specific tensor lookups
+    baked into time-MLP path); the Euler loop will be re-implemented
+    locally for cosyvoice3 in 3d.
+  - **3b — AdaLN-Zero modulation + per-block DiT forward — open.**
+    Per-block γ₁/β₁/gate₁/γ₂/β₂/gate₂ from `time_mlp(t)`'s 6×dim
+    output. Apply: `x = x + gate · MHA(LN(x)·(1+γ) + β)` and same
+    for FFN. NEOX RoPE inside MHA (head_dim=64).
+  - **3c — pre-lookahead conv + input pipeline — open.**
+    Pre-lookahead causal conv (k=4 then k=3, 3-frame future window).
+    Concat [pre_la, spk_affine(spk_emb), 0-cond] → (T_tok, 320).
+    conv_pos_embed (2× grouped conv1d-31).
+  - **3d — local Euler ODE + mel output — open.**
+    Re-implement cosine-schedule Euler ODE, sigma_min=1e-6,
+    inference_cfg_rate=0.7, 10 steps. Output mel [T_mel=2·T_tok, 80].
+  - **3e — Python ref dumper for flow + diff — open.**
+    Diff-gate: mel cos_min ≥ 0.99 after 10-step Euler.
 - **Phase 4 — CausalHiFTGenerator + F0 predictor + Snake +
   iSTFT**. Open. Mostly chatterbox_s3gen helpers + Snake +
   causal-mode upsample. Diff-gate: waveform cos ≥ 0.95 (vocoders
