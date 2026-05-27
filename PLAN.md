@@ -580,9 +580,19 @@ work in 4 phases**.
     `crispasr-diff cosyvoice3-tts`. Grouped causal conv1d implemented
     as a per-group loop (no native ggml op) reusing the
     `chatterbox_s3gen::causal_conv1d` symmetric-pad + trim-right trick.
-  - **3d — local Euler ODE + mel output — open.**
-    Re-implement cosine-schedule Euler ODE, sigma_min=1e-6,
-    inference_cfg_rate=0.7, 10 steps. Output mel [T_mel=2·T_tok, 80].
+  - **3d — local Euler ODE + mel output — partial (3d-A landed
+    2026-05-27).**
+    - **3d-A**: full 22-block DiT estimator forward + `norm_out`
+      (`AdaLayerNormZero_Final`, 2-chunk `(scale, shift)`) + `proj_out`
+      (`Linear(1024, 80)`). Loops the per-block helper extracted from
+      phase 3b across all 22 layers with shared `silu(t_emb)`. Stages
+      `flow_dit_full_norm`, `flow_dit_full` exercised via
+      `crispasr-diff cosyvoice3-tts` and PASS at cos=1.0 / max|Δ|≤3.6e-3
+      on a seeded (T_mel=12, dim=1024, t=0.5) fixture. This is the
+      function the Euler ODE will call inside its 10-step loop.
+    - **3d-B (open)**: cosine-schedule Euler driver, `sigma_min=1e-6`,
+      `inference_cfg_rate=0.7`, 10 steps, classifier-free guidance.
+      Output mel [T_mel=2·T_tok, 80].
   - **3e — Python ref dumper for flow + diff — open.**
     Diff-gate: mel cos_min ≥ 0.99 after 10-step Euler.
 - **Phase 4 — CausalHiFTGenerator + F0 predictor + Snake +

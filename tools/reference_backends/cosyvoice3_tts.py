@@ -81,6 +81,11 @@ DEFAULT_STAGES = [
     "flow_in_pipe_proj",        # in_proj                       (T_mel, 1024)
     "flow_in_pipe_pos",         # conv_pos_embed(proj)          (T_mel, 1024)
     "flow_in_pipe",             # proj + conv_pos_embed         (T_mel, 1024)
+    # Phase 3d-A — full 22-block DiT estimator forward
+    "flow_dit_full_x_in",       # seeded post-input-pipeline input    (T_mel, 1024)
+    "flow_dit_full_t_emb",      # time_mlp(sin_emb(t=0.5))            (1024,)
+    "flow_dit_full_norm",       # after AdaLayerNormZero_Final        (T_mel, 1024)
+    "flow_dit_full",            # final mel output (post proj_out)    (T_mel, 80)
 ]
 
 # Fixed test-vector parameters for the Phase 3b dumps. Pinned so the
@@ -89,6 +94,11 @@ DIT_T = 8
 DIT_DIM = 1024
 DIT_SEED = 1234
 DIT_TIMESTEP = 0.5
+
+# Phase 3d-A full-stack diff vector. Independent seed, T_mel small but
+# >= 2 so RoPE rotates non-trivially.
+DIT_FULL_T_MEL = 12
+DIT_FULL_SEED = 30303
 
 # Phase 3c test vector — independent seeded fixture. T_tok small enough
 # to keep dumps fast; T_mel = 2 · T_tok per token_mel_ratio. Mel/spk dims
@@ -522,6 +532,87 @@ def _capture_in_pipe_stages(model_dir: Path, T_tok: int = PRE_LA_T_TOK,
 
 
 # ---------------------------------------------------------------------------
+# Phase 3d-A — full 22-block DiT estimator capture
+# ---------------------------------------------------------------------------
+
+def _capture_dit_full_stages(model_dir: Path, T_mel: int = DIT_FULL_T_MEL,
+                             seed: int = DIT_FULL_SEED,
+                             timestep: float = DIT_TIMESTEP) -> Dict[str, "torch.Tensor"]:
+    """Run upstream's 22-block transformer_blocks + norm_out + proj_out
+    on a seeded post-input-pipeline fixture and return the named stage
+    activations.
+    """
+    _ensure_upstream_on_path()
+    import torch
+    from cosyvoice.flow.DiT.modules import DiTBlock, TimestepEmbedding, AdaLayerNormZero_Final
+    from x_transformers.x_transformers import RotaryEmbedding
+
+    sd = _load_flow_state(model_dir)
+    L = 22
+    dim, heads, head_dim, ff_mult = DIT_DIM, 16, 64, 2
+
+    # Build all 22 blocks.
+    blocks = []
+    for i in range(L):
+        block = DiTBlock(dim=dim, heads=heads, dim_head=head_dim, ff_mult=ff_mult, dropout=0.0)
+        prefix = f"decoder.estimator.transformer_blocks.{i}."
+        bsd = {k[len(prefix):]: v for k, v in sd.items() if k.startswith(prefix)}
+        block.load_state_dict(bsd, strict=False)
+        block.eval()
+        blocks.append(block)
+
+    # Build TimestepEmbedding for the t_emb input.
+    time_embed = TimestepEmbedding(dim, freq_embed_dim=256)
+    time_sd = {k[len("decoder.estimator.time_embed."):]: v
+               for k, v in sd.items() if k.startswith("decoder.estimator.time_embed.")}
+    time_embed.load_state_dict(time_sd, strict=False)
+    time_embed.eval()
+
+    # AdaLayerNormZero_Final from the same flow state-dict.
+    norm_out = AdaLayerNormZero_Final(dim)
+    nsd = {k[len("decoder.estimator.norm_out."):]: v
+           for k, v in sd.items() if k.startswith("decoder.estimator.norm_out.")}
+    norm_out.load_state_dict(nsd, strict=False)
+    norm_out.eval()
+
+    # proj_out: Linear(1024, 80).
+    proj_out = torch.nn.Linear(dim, 80)
+    proj_out.load_state_dict({
+        "weight": sd["decoder.estimator.proj_out.weight"],
+        "bias": sd["decoder.estimator.proj_out.bias"],
+    }, strict=True)
+    proj_out.eval()
+
+    # Seeded inputs.
+    gen = torch.Generator().manual_seed(seed)
+    x = torch.randn(1, T_mel, dim, generator=gen, dtype=torch.float32)
+    t_scalar = torch.tensor([timestep], dtype=torch.float32)
+    with torch.no_grad():
+        t_emb = time_embed(t_scalar)  # (1, 1024)
+
+    rotary = RotaryEmbedding(head_dim)
+    with torch.no_grad():
+        rope = rotary.forward_from_seq_len(T_mel)
+    # Full-True mask in the (B, 1, T, T) shape upstream uses.
+    mask = torch.ones(1, T_mel, T_mel, dtype=torch.bool).unsqueeze(1)
+
+    # Loop all 22 blocks, then norm_out + proj_out.
+    with torch.no_grad():
+        h = x
+        for b in blocks:
+            h = b(h, t_emb, mask=mask, rope=rope)
+        h_norm = norm_out(h, t_emb)            # (1, T_mel, 1024)
+        mel = proj_out(h_norm)                  # (1, T_mel, 80)
+
+    return {
+        "x_in": x.squeeze(0).contiguous(),         # (T_mel, 1024)
+        "t_emb": t_emb.squeeze(0).contiguous(),    # (1024,)
+        "norm": h_norm.squeeze(0).contiguous(),    # (T_mel, 1024)
+        "": mel.squeeze(0).contiguous(),           # (T_mel, 80)
+    }
+
+
+# ---------------------------------------------------------------------------
 # dump_reference.py entry point.
 # ---------------------------------------------------------------------------
 
@@ -567,6 +658,15 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         in_pipe_stages = _capture_in_pipe_stages(model_dir)
         for short, t in in_pipe_stages.items():
             name = "flow_in_pipe" + (("_" + short) if short else "")
+            if name not in requested:
+                continue
+            out[name] = t.detach().cpu().numpy().astype(np.float32)
+
+    # ---- Phase 3d-A full DiT estimator stages ----
+    if any(s.startswith("flow_dit_full") for s in requested):
+        full_stages = _capture_dit_full_stages(model_dir)
+        for short, t in full_stages.items():
+            name = "flow_dit_full" + (("_" + short) if short else "")
             if name not in requested:
                 continue
             out[name] = t.detach().cpu().numpy().astype(np.float32)

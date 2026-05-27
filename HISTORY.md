@@ -6,6 +6,61 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-27 cosyvoice3: Phase 3d-A — full 22-block DiT estimator (cos=1.0)
+
+Composes the per-block forward (phase 3b) into the full 22-layer DiT
+estimator stack + `AdaLayerNormZero_Final` (`norm_out`) +
+`Linear(1024, 80)` (`proj_out`). This is the function the CFM Euler
+solver (phase 3d-B) will call inside its 10-step loop.
+
+Implementation:
+
+- Factor a small `cv3_dit_block_apply()` helper inside the anon namespace
+  — mirror of `cv3_build_flow_dit_block_graph` but without the debug
+  `dbg_*` named outputs and parameterised on a shared `silu(t_emb)`
+  tensor (computed once for the whole 22-layer stack, not 22 times).
+- `cv3_build_dit_full_graph()` loops the helper across all 22 blocks,
+  applies `norm_out` (chunk order is `(scale, shift)` — opposite of
+  the per-block AdaLN's `(shift, scale, gate)` ×2) + `proj_out`, and
+  emits two named outputs: `dit_full_norm` (pre-proj, T_mel×1024) and
+  `dit_full_out` (post-proj, T_mel×80).
+- `cv3_extract_dit_full_stage()` drives the graph from the post-
+  input-pipeline x + t_emb that the diff harness packs from the
+  reference archive.
+- New stage names `flow_dit_full_norm` and `flow_dit_full` in
+  `cosyvoice3_tts_extract_stage` (input layout: packed `[x | t_emb]`
+  = T_mel·dit_dim + dit_dim floats, n_embed_tokens = T_mel).
+
+Wiring:
+
+- `tools/reference_backends/cosyvoice3_tts.py::dump()` learns
+  `_capture_dit_full_stages()`, which instantiates the upstream's 22
+  `DiTBlock` modules + `AdaLayerNormZero_Final` + `Linear(1024, 80)`
+  from `flow.pt`, runs them on a seeded (T_mel=12, t=0.5) fixture,
+  and emits `flow_dit_full_{x_in, t_emb, norm, …}` ndarrays.
+- `examples/cli/crispasr_diff_main.cpp` cosyvoice3-tts handler unpacks
+  `flow_dit_full_x_in` + `flow_dit_full_t_emb` from the reference,
+  packs `[x | t_emb]`, and compares both stages at threshold 0.99
+  (relaxed for the depth-22 accumulated F16 noise — same convention
+  as voxcpm2-tts for deep-stage stages).
+
+Per-stage diff result (post phase 3b + phase 3c + phase 3d-A — 23/23 PASS):
+
+  flow_dit_full_norm    cos=0.999996  max|Δ|=3.3e-03
+  flow_dit_full         cos=1.000000  max|Δ|=3.6e-03
+
+The 22-deep accumulation only buys ~30× more max|Δ| vs the 1-deep
+per-block diff (block-21 was max|Δ|=8.7e-02; full-stack is 3.6e-03 —
+the deeper-stack output norm is actually SMALLER because norm_out
+re-normalises, suppressing the per-block growth). cos remains 1.0
+across the entire stack.
+
+Remaining phase 3 work: 3d-B local CFM Euler ODE (cosine t-schedule,
+sigma_min=1e-6, inference_cfg_rate=0.7, 10 steps, classifier-free
+guidance), 3e end-to-end mel diff.
+
+---
+
 ## 2026-05-27 cosyvoice3: Phase 3c — pre-lookahead conv + InputEmbedding (cos=1.0)
 
 Input pipeline that turns raw speech tokens + speaker embedding into

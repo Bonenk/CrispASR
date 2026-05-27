@@ -1036,6 +1036,8 @@ float* cv3_extract_flow_dit_stage(cosyvoice3_tts_context* ctx, int block_idx, co
 float* cv3_extract_pre_la_stage(cosyvoice3_tts_context* ctx, const int32_t* ids, int T_tok, const char* tensor_name);
 float* cv3_extract_in_pipe_stage(cosyvoice3_tts_context* ctx, const float* pre_la_out, int T_mel, const float* spk_emb,
                                  const float* x_noisy, const float* cond, const char* tensor_name);
+float* cv3_extract_dit_full_stage(cosyvoice3_tts_context* ctx, const float* x, int T_mel, const float* t_emb,
+                                  const char* tensor_name);
 } // namespace
 
 extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ctx, const char* stage_name,
@@ -1224,6 +1226,43 @@ extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ct
         else
             out_n_local = T_mel * dit_dim;
         *out_n = out_n_local;
+        return out;
+    }
+    // Full DiT estimator forward — the entire 22-block stack +
+    // AdaLayerNormZero_Final + proj_out. Inputs are post-input-pipeline
+    // (validated by the `flow_in_pipe*` stages):
+    //
+    //   "flow_dit_full_norm"  — output of AdaLN-Final, pre-proj_out
+    //                            [T_mel, dit_dim]
+    //   "flow_dit_full"       — final mel output (post proj_out)
+    //                            [T_mel, mel_dim]
+    //
+    // `embeds_in` packs [x | t_emb] = T_mel*dit_dim + dit_dim floats.
+    // n_embed_tokens = T_mel.
+    if (strncmp(stage_name, "flow_dit_full", 13) == 0) {
+        if (!ctx->flow.loaded || !embeds_in || n_embed_tokens <= 0)
+            return nullptr;
+        const auto& fh = ctx->flow.hp;
+        const int d = (int)fh.dit_dim;
+        const int mel = (int)fh.mel_dim;
+        const int T_mel = n_embed_tokens;
+        const char* sfx = stage_name + 13;
+        const char* tensor_name = nullptr;
+        if (*sfx == 0)
+            tensor_name = "dit_full_out";
+        else if (strcmp(sfx, "_norm") == 0)
+            tensor_name = "dit_full_norm";
+        else {
+            fprintf(stderr, "cosyvoice3_tts: unknown flow_dit_full stage suffix '%s'\n", sfx);
+            return nullptr;
+        }
+        const float* x = embeds_in;
+        const float* t_emb = embeds_in + (size_t)T_mel * d;
+        float* out = cv3_extract_dit_full_stage(ctx, x, T_mel, t_emb, tensor_name);
+        if (!out)
+            return nullptr;
+        const int out_dim = (strcmp(tensor_name, "dit_full_out") == 0) ? mel : d;
+        *out_n = T_mel * out_dim;
         return out;
     }
     if (strcmp(stage_name, "flow_inventory") == 0) {
@@ -2045,6 +2084,195 @@ float* cv3_extract_in_pipe_stage(cosyvoice3_tts_context* ctx, const float* pre_l
     ggml_tensor* out_t = ggml_graph_get_tensor(gf, tensor_name);
     if (!out_t) {
         fprintf(stderr, "cosyvoice3_tts: tensor '%s' not in in_pipe graph\n", tensor_name);
+        return nullptr;
+    }
+    const size_t n = (size_t)ggml_nelements(out_t);
+    float* out = (float*)malloc(n * sizeof(float));
+    if (!out)
+        return nullptr;
+    ggml_backend_tensor_get(out_t, out, 0, n * sizeof(float));
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3d-A — full 22-block DiT estimator forward + norm_out + proj_out
+// ---------------------------------------------------------------------------
+//
+// Composes the per-block forward (phase 3b) into the full 22-layer stack,
+// then applies `AdaLayerNormZero_Final` (norm_out: 2-chunk scale/shift) and
+// `Linear(1024, 80)` (proj_out). This is exactly the function the CFM Euler
+// solver calls inside its 10-step loop.
+//
+// Upstream ref (`cosyvoice/flow/DiT/dit.py::DiT.forward`, post-input-embed):
+//
+//     for block in self.transformer_blocks:
+//         x = block(x, t, mask=attn_mask.bool(), rope=rope)
+//     x = self.norm_out(x, t)                # AdaLayerNormZero_Final
+//     output = self.proj_out(x).transpose(1, 2)
+//
+// AdaLayerNormZero_Final (`modules.py::AdaLayerNormZero_Final`):
+//     emb = self.linear(self.silu(emb))      # (B, 2*dim)
+//     scale, shift = torch.chunk(emb, 2, dim=1)  # scale FIRST
+//     x = self.norm(x) * (1 + scale)[:, None, :] + shift[:, None, :]
+//
+// Note: AdaLN-Final's chunk order is (scale, shift) — opposite of the
+// per-block AdaLN which is (shift, scale, gate) × {msa, mlp}.
+
+// Inline per-block forward (matches cv3_build_flow_dit_block_graph but
+// without the debug `dbg_*` named outputs). Takes pre-computed
+// `silu(t_emb)` so we don't recompute the silu 22 times.
+ggml_tensor* cv3_dit_block_apply(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* t_silu, ggml_tensor* positions,
+                                 const cv3_dit_block& b, int d, int n_h, int hd, float rope_theta) {
+    const float ln_eps = 1e-6f;
+    const float attn_scale = 1.0f / std::sqrt((float)hd);
+    const int T = (int)x->ne[1];
+
+    ggml_tensor* mod = ggml_mul_mat(ctx0, b.adaln_w, t_silu); // (6d,)
+    mod = ggml_add(ctx0, mod, b.adaln_b);
+    const size_t fs = sizeof(float);
+    auto chunk = [&](int idx) { return ggml_view_1d(ctx0, mod, d, (size_t)(idx * d) * fs); };
+    ggml_tensor* shift_msa = chunk(0);
+    ggml_tensor* scale_msa = chunk(1);
+    ggml_tensor* gate_msa = chunk(2);
+    ggml_tensor* shift_mlp = chunk(3);
+    ggml_tensor* scale_mlp = chunk(4);
+    ggml_tensor* gate_mlp = chunk(5);
+
+    ggml_tensor* lnx_a = ggml_norm(ctx0, x, ln_eps);
+    ggml_tensor* h_a = ggml_add(ctx0, lnx_a, ggml_mul(ctx0, lnx_a, scale_msa));
+    h_a = ggml_add(ctx0, h_a, shift_msa);
+
+    ggml_tensor* Q = ggml_add(ctx0, ggml_mul_mat(ctx0, b.attn_q_w, h_a), b.attn_q_b);
+    ggml_tensor* K = ggml_add(ctx0, ggml_mul_mat(ctx0, b.attn_k_w, h_a), b.attn_k_b);
+    ggml_tensor* V = ggml_add(ctx0, ggml_mul_mat(ctx0, b.attn_v_w, h_a), b.attn_v_b);
+    Q = ggml_reshape_3d(ctx0, Q, d, 1, T);
+    K = ggml_reshape_3d(ctx0, K, d, 1, T);
+    Q = ggml_rope_ext(ctx0, Q, positions, nullptr, hd, GGML_ROPE_TYPE_NORMAL, 0, rope_theta, 1.0f, 0.0f, 1.0f, 0.0f,
+                      0.0f);
+    K = ggml_rope_ext(ctx0, K, positions, nullptr, hd, GGML_ROPE_TYPE_NORMAL, 0, rope_theta, 1.0f, 0.0f, 1.0f, 0.0f,
+                      0.0f);
+    Q = ggml_reshape_3d(ctx0, Q, hd, n_h, T);
+    K = ggml_reshape_3d(ctx0, K, hd, n_h, T);
+    V = ggml_reshape_3d(ctx0, V, hd, n_h, T);
+    Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
+    K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
+    V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
+    ggml_tensor* attn = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, attn_scale, 0.0f, 0.0f);
+    attn = ggml_reshape_2d(ctx0, attn, d, T);
+    attn = ggml_add(ctx0, ggml_mul_mat(ctx0, b.attn_o_w, attn), b.attn_o_b);
+    ggml_tensor* x_after_attn = ggml_add(ctx0, x, ggml_mul(ctx0, attn, gate_msa));
+
+    ggml_tensor* lnx_f = ggml_norm(ctx0, x_after_attn, ln_eps);
+    ggml_tensor* h_f = ggml_add(ctx0, lnx_f, ggml_mul(ctx0, lnx_f, scale_mlp));
+    h_f = ggml_add(ctx0, h_f, shift_mlp);
+    ggml_tensor* ff = ggml_add(ctx0, ggml_mul_mat(ctx0, b.ffn_l1_w, h_f), b.ffn_l1_b);
+    ff = ggml_gelu(ctx0, ff);
+    ff = ggml_add(ctx0, ggml_mul_mat(ctx0, b.ffn_l2_w, ff), b.ffn_l2_b);
+    return ggml_add(ctx0, x_after_attn, ggml_mul(ctx0, ff, gate_mlp));
+}
+
+ggml_cgraph* cv3_build_dit_full_graph(cosyvoice3_tts_context* ctx, int T_mel) {
+    const auto& fh = ctx->flow.hp;
+    const auto& f = ctx->flow;
+    const int d = (int)fh.dit_dim;
+    const int n_h = (int)fh.dit_heads;
+    const int hd = (int)fh.dit_head_dim;
+    const int L = (int)fh.n_dit_layers;
+    const float rope_theta = fh.rope_theta;
+    const float ln_eps = 1e-6f;
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    // 22 blocks * ~40 ops + norm_out + proj_out + intermediates ⇒ a few
+    // thousand nodes. 8192 leaves ample headroom.
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 8192, false);
+
+    ggml_tensor* x = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, d, T_mel);
+    ggml_set_input(x);
+    ggml_set_name(x, "dit_full_x_in");
+    ggml_tensor* t_emb = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, d);
+    ggml_set_input(t_emb);
+    ggml_set_name(t_emb, "dit_full_t_emb_in");
+    ggml_tensor* positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T_mel);
+    ggml_set_input(positions);
+    ggml_set_name(positions, "dit_full_positions");
+
+    // Shared silu(t_emb) — used by every block AND by norm_out.
+    ggml_tensor* t_silu = ggml_silu(ctx0, t_emb);
+
+    for (int il = 0; il < L; il++) {
+        x = cv3_dit_block_apply(ctx0, x, t_silu, positions, f.blocks[il], d, n_h, hd, rope_theta);
+    }
+
+    // norm_out: AdaLayerNormZero_Final — chunk(emb, 2) yields (scale, shift)
+    // in THIS order (per upstream `AdaLayerNormZero_Final.forward`).
+    ggml_tensor* nmod = ggml_mul_mat(ctx0, f.dit_norm_out_w, t_silu); // (2d,)
+    nmod = ggml_add(ctx0, nmod, f.dit_norm_out_b);
+    const size_t fs = sizeof(float);
+    ggml_tensor* nscale = ggml_view_1d(ctx0, nmod, d, 0);
+    ggml_tensor* nshift = ggml_view_1d(ctx0, nmod, d, (size_t)d * fs);
+    ggml_tensor* lnx = ggml_norm(ctx0, x, ln_eps);
+    ggml_tensor* normed = ggml_add(ctx0, lnx, ggml_mul(ctx0, lnx, nscale));
+    normed = ggml_add(ctx0, normed, nshift);
+    ggml_set_name(normed, "dit_full_norm");
+    ggml_set_output(normed);
+
+    // proj_out: Linear(dit_dim, mel_dim).
+    ggml_tensor* mel_out = ggml_mul_mat(ctx0, f.dit_proj_out_w, normed); // (mel_dim, T_mel)
+    mel_out = ggml_add(ctx0, mel_out, f.dit_proj_out_b);
+    ggml_set_name(mel_out, "dit_full_out");
+    ggml_set_output(mel_out);
+    ggml_build_forward_expand(gf, mel_out);
+    ggml_build_forward_expand(gf, normed); // side branch — keep it alive in the executed graph
+
+    ggml_free(ctx0);
+    return gf;
+}
+
+float* cv3_extract_dit_full_stage(cosyvoice3_tts_context* ctx, const float* x, int T_mel, const float* t_emb,
+                                  const char* tensor_name) {
+    if (!ctx || !ctx->flow.loaded || !x || !t_emb || T_mel <= 0 || !tensor_name)
+        return nullptr;
+    const auto& fh = ctx->flow.hp;
+    const int d = (int)fh.dit_dim;
+
+    ctx->step_t1_gf = nullptr;
+    ctx->step_t1_fixed_kv_len = 0;
+
+    ggml_cgraph* gf = cv3_build_dit_full_graph(ctx, T_mel);
+    if (!gf)
+        return nullptr;
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        fprintf(stderr, "cosyvoice3_tts: dit_full alloc_graph failed\n");
+        return nullptr;
+    }
+
+    auto set_t = [&](const char* nm, const void* data, size_t bytes) {
+        ggml_tensor* t = ggml_graph_get_tensor(gf, nm);
+        if (!t)
+            return false;
+        ggml_backend_tensor_set(t, data, 0, bytes);
+        return true;
+    };
+    if (!set_t("dit_full_x_in", x, (size_t)d * T_mel * sizeof(float)))
+        return nullptr;
+    if (!set_t("dit_full_t_emb_in", t_emb, (size_t)d * sizeof(float)))
+        return nullptr;
+    std::vector<int32_t> pos((size_t)T_mel);
+    for (int i = 0; i < T_mel; i++)
+        pos[i] = i;
+    if (!set_t("dit_full_positions", pos.data(), pos.size() * sizeof(int32_t)))
+        return nullptr;
+
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        fprintf(stderr, "cosyvoice3_tts: dit_full compute failed\n");
+        return nullptr;
+    }
+
+    ggml_tensor* out_t = ggml_graph_get_tensor(gf, tensor_name);
+    if (!out_t) {
+        fprintf(stderr, "cosyvoice3_tts: tensor '%s' not in dit_full graph\n", tensor_name);
         return nullptr;
     }
     const size_t n = (size_t)ggml_nelements(out_t);

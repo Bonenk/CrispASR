@@ -3945,6 +3945,48 @@ int main(int argc, char** argv) {
                 n_skip++;
             }
         }
+
+        // ---- Phase 3d-A — full 22-block DiT estimator forward ----
+        // Inputs from ref: x [T_mel, dit_dim] + t_emb [dit_dim].
+        // Pack [x | t_emb] for cosyvoice3_tts_extract_stage and drive
+        // the post-norm and post-proj outputs.
+        {
+            auto xf_pair = ref.get_f32("flow_dit_full_x_in");
+            auto tf_pair = ref.get_f32("flow_dit_full_t_emb");
+            uint32_t dit_dim = 0;
+            cosyvoice3_tts_get_flow_hparams(ctx, nullptr, &dit_dim, nullptr, nullptr, nullptr, nullptr, nullptr,
+                                            nullptr, nullptr, nullptr, nullptr);
+            if (xf_pair.first && tf_pair.first && dit_dim > 0 && tf_pair.second == dit_dim &&
+                xf_pair.second % dit_dim == 0) {
+                const int T_mel = (int)(xf_pair.second / dit_dim);
+                std::vector<float> packed(xf_pair.second + tf_pair.second);
+                std::memcpy(packed.data(), xf_pair.first, xf_pair.second * sizeof(float));
+                std::memcpy(packed.data() + xf_pair.second, tf_pair.first, tf_pair.second * sizeof(float));
+                static const char* full_stages[] = {"flow_dit_full_norm", "flow_dit_full"};
+                for (const char* sname : full_stages) {
+                    int n_out = 0;
+                    float* buf = cosyvoice3_tts_extract_stage(ctx, sname, /*ids*/ nullptr, /*n_ids*/ 0, packed.data(),
+                                                              /*n_embed_tokens*/ T_mel, &n_out);
+                    if (!buf || n_out <= 0) {
+                        printf("[SKIP] %-30s  cosyvoice3_tts_extract_stage returned no data\n", sname);
+                        if (buf)
+                            free(buf);
+                        n_skip++;
+                        continue;
+                    }
+                    auto rep = ref.compare(sname, buf, (size_t)n_out);
+                    // Depth-22 stack accumulates F16 weight error — use cos_min
+                    // ≥ 0.99 (relaxed) per the established F16-floor convention.
+                    print_row(sname, rep, 0.99f);
+                    record(rep);
+                    free(buf);
+                }
+            } else {
+                printf("[SKIP] %-30s  (dit_full inputs missing in reference)\n", "flow_dit_full_*");
+                n_skip++;
+            }
+        }
+
         cosyvoice3_tts_free(ctx);
     } else {
         fprintf(stderr,
