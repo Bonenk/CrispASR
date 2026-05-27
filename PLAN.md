@@ -567,10 +567,19 @@ work in 4 phases**.
     Block-0 and block-21 diff against piecewise PyTorch reconstruction
     of `DiTBlock.forward` both PASS at cos_min ≥ 0.999994, max|Δ| ≤
     0.156 (well under the established F16 weight floor of ~0.08%).
-  - **3c — pre-lookahead conv + input pipeline — open.**
-    Pre-lookahead causal conv (k=4 then k=3, 3-frame future window).
-    Concat [pre_la, spk_affine(spk_emb), 0-cond] → (T_tok, 320).
-    conv_pos_embed (2× grouped conv1d-31).
+  - **3c (2026-05-27): pre-lookahead conv + input pipeline — landed.**
+    `PreLookaheadLayer` (Conv1d 80→1024 k=4 right-pad-3 + LeakyReLU →
+    Conv1d 1024→80 k=3 left-pad-2 + residual) and `InputEmbedding`
+    (`F.normalize(spk) → spk_affine`, concat `[x, cond, mu, spk_bc]` →
+    (T_mel, 320), `Linear(320, 1024)`, then `+ CausalConvPositionEmbedding`
+    = 2× grouped causal conv1d-31 with groups=16 + Mish). Wired into
+    `cosyvoice3_tts_extract_stage` as
+    `flow_pre_la_{tok_emb,c1,c2,…}` and
+    `flow_in_pipe_{spk,cat,proj,pos,…}`. All 21 stages (12 phase-3b
+    DiT + 4 pre_la + 5 in_pipe) PASS at cos_min ≥ 0.999 through
+    `crispasr-diff cosyvoice3-tts`. Grouped causal conv1d implemented
+    as a per-group loop (no native ggml op) reusing the
+    `chatterbox_s3gen::causal_conv1d` symmetric-pad + trim-right trick.
   - **3d — local Euler ODE + mel output — open.**
     Re-implement cosine-schedule Euler ODE, sigma_min=1e-6,
     inference_cfg_rate=0.7, 10 steps. Output mel [T_mel=2·T_tok, 80].

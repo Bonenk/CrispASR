@@ -3840,6 +3840,111 @@ int main(int argc, char** argv) {
                 free(buf);
             }
         }
+
+        // ---- Phase 3c — pre-lookahead conv stages ----
+        // Input: ids from the ref archive. The C++ stage runs
+        // input_embedding + the two-conv stack and returns the named
+        // intermediate. The ids ref tensor is stored as int32 in the
+        // GGUF archive but `Ref::get_f32` promotes I32→F32 by value,
+        // so cast each element back through float→int32.
+        {
+            auto ids_pair = ref.get_f32("flow_pre_la_ids_in");
+            if (ids_pair.first && ids_pair.second > 0) {
+                const int T_tok = (int)ids_pair.second;
+                std::vector<int32_t> ids_buf((size_t)T_tok);
+                for (int i = 0; i < T_tok; i++)
+                    ids_buf[i] = (int32_t)ids_pair.first[i];
+                const int32_t* ids = ids_buf.data();
+                static const char* pre_la_stages[] = {
+                    "flow_pre_la_tok_emb",
+                    "flow_pre_la_c1",
+                    "flow_pre_la_c2",
+                    "flow_pre_la",
+                };
+                for (const char* sname : pre_la_stages) {
+                    int n_out = 0;
+                    float* buf = cosyvoice3_tts_extract_stage(ctx, sname, ids, T_tok,
+                                                              /*embeds_in*/ nullptr,
+                                                              /*n_embed_tokens*/ 0, &n_out);
+                    if (!buf || n_out <= 0) {
+                        printf("[SKIP] %-30s  cosyvoice3_tts_extract_stage returned no data\n", sname);
+                        if (buf)
+                            free(buf);
+                        n_skip++;
+                        continue;
+                    }
+                    auto rep = ref.compare(sname, buf, (size_t)n_out);
+                    print_row(sname, rep, COS_THRESHOLD);
+                    record(rep);
+                    free(buf);
+                }
+            } else {
+                printf("[SKIP] %-30s  (no flow_pre_la_ids_in in reference)\n", "flow_pre_la_*");
+                n_skip++;
+            }
+        }
+
+        // ---- Phase 3c — InputEmbedding (input pipeline) stages ----
+        // Pack [pre_la (T_mel, mel) | spk_raw (spk_in) | x (T_mel, mel) | cond (T_mel, mel)].
+        {
+            auto pre_la_pair = ref.get_f32("flow_in_pipe_pre_la_in");
+            auto spk_pair = ref.get_f32("flow_in_pipe_spk_in");
+            auto x_pair = ref.get_f32("flow_in_pipe_x_in");
+            auto cond_pair = ref.get_f32("flow_in_pipe_cond_in");
+            if (pre_la_pair.first && spk_pair.first && x_pair.first && cond_pair.first) {
+                const size_t pre_la_n = pre_la_pair.second;
+                const size_t spk_n = spk_pair.second;
+                const size_t x_n = x_pair.second;
+                const size_t cond_n = cond_pair.second;
+                uint32_t mel_dim = 0;
+                cosyvoice3_tts_get_flow_hparams(ctx, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &mel_dim,
+                                                nullptr, nullptr, nullptr, nullptr);
+                if (mel_dim == 0 || pre_la_n % mel_dim != 0) {
+                    printf("[SKIP] %-30s  unexpected pre_la dim alignment\n", "flow_in_pipe_*");
+                    n_skip++;
+                } else {
+                    const int T_mel = (int)(pre_la_n / mel_dim);
+                    if (x_n != pre_la_n || cond_n != pre_la_n) {
+                        printf("[SKIP] %-30s  x/cond don't match T_mel*mel\n", "flow_in_pipe_*");
+                        n_skip++;
+                    } else {
+                        std::vector<float> packed(pre_la_n + spk_n + x_n + cond_n);
+                        float* p = packed.data();
+                        std::memcpy(p, pre_la_pair.first, pre_la_n * sizeof(float));
+                        p += pre_la_n;
+                        std::memcpy(p, spk_pair.first, spk_n * sizeof(float));
+                        p += spk_n;
+                        std::memcpy(p, x_pair.first, x_n * sizeof(float));
+                        p += x_n;
+                        std::memcpy(p, cond_pair.first, cond_n * sizeof(float));
+                        static const char* in_pipe_stages[] = {
+                            "flow_in_pipe_spk", "flow_in_pipe_cat", "flow_in_pipe_proj",
+                            "flow_in_pipe_pos", "flow_in_pipe",
+                        };
+                        for (const char* sname : in_pipe_stages) {
+                            int n_out = 0;
+                            float* buf =
+                                cosyvoice3_tts_extract_stage(ctx, sname, /*ids*/ nullptr, /*n_ids*/ 0, packed.data(),
+                                                             /*n_embed_tokens*/ T_mel, &n_out);
+                            if (!buf || n_out <= 0) {
+                                printf("[SKIP] %-30s  cosyvoice3_tts_extract_stage returned no data\n", sname);
+                                if (buf)
+                                    free(buf);
+                                n_skip++;
+                                continue;
+                            }
+                            auto rep = ref.compare(sname, buf, (size_t)n_out);
+                            print_row(sname, rep, COS_THRESHOLD);
+                            record(rep);
+                            free(buf);
+                        }
+                    }
+                }
+            } else {
+                printf("[SKIP] %-30s  (in_pipe inputs missing in reference)\n", "flow_in_pipe_*");
+                n_skip++;
+            }
+        }
         cosyvoice3_tts_free(ctx);
     } else {
         fprintf(stderr,

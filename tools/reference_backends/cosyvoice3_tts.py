@@ -65,6 +65,22 @@ DEFAULT_STAGES = [
     "flow_dit_blk_21_xattn",
     "flow_dit_blk_21_ff",
     "flow_dit_blk_21_out",
+    # Phase 3c — pre-lookahead conv stack (PreLookaheadLayer)
+    "flow_pre_la_ids_in",       # speech token ids (T_tok,) int32
+    "flow_pre_la_tok_emb",      # input_embedding(ids)         (T_tok, mel_dim)
+    "flow_pre_la_c1",           # leaky_relu(conv1(right-pad)) (T_tok, 1024)
+    "flow_pre_la_c2",           # conv2(left-pad)              (T_tok, mel_dim)
+    "flow_pre_la",              # final + residual             (T_tok, mel_dim)
+    # Phase 3c — InputEmbedding (input pipeline)
+    "flow_in_pipe_pre_la_in",   # pre_la after repeat_interleave(token_mel_ratio)
+    "flow_in_pipe_spk_in",      # raw speaker embedding         (192,)
+    "flow_in_pipe_x_in",        # noised mel iterate            (T_mel, mel_dim)
+    "flow_in_pipe_cond_in",     # cond prefix                   (T_mel, mel_dim)
+    "flow_in_pipe_spk",         # normalize + spk_affine        (spk_dim_out,)
+    "flow_in_pipe_cat",         # cat[x, cond, mu, spk]         (T_mel, 320)
+    "flow_in_pipe_proj",        # in_proj                       (T_mel, 1024)
+    "flow_in_pipe_pos",         # conv_pos_embed(proj)          (T_mel, 1024)
+    "flow_in_pipe",             # proj + conv_pos_embed         (T_mel, 1024)
 ]
 
 # Fixed test-vector parameters for the Phase 3b dumps. Pinned so the
@@ -73,6 +89,15 @@ DIT_T = 8
 DIT_DIM = 1024
 DIT_SEED = 1234
 DIT_TIMESTEP = 0.5
+
+# Phase 3c test vector — independent seeded fixture. T_tok small enough
+# to keep dumps fast; T_mel = 2 · T_tok per token_mel_ratio. Mel/spk dims
+# are model-fixed.
+PRE_LA_T_TOK = 6
+PRE_LA_SEED = 5678
+IN_PIPE_SEED = 9012
+MEL_DIM = 80
+SPK_DIM_IN = 192
 
 
 # ---------------------------------------------------------------------------
@@ -320,6 +345,183 @@ def dump_flow_dit_block_bins(model_dir: Path, out_dir: Path,
 
 
 # ---------------------------------------------------------------------------
+# Phase 3c — pre-lookahead conv + InputEmbedding capture
+# ---------------------------------------------------------------------------
+
+def _load_flow_state(model_dir: Path):
+    import torch
+    state_path = model_dir / "flow.pt"
+    sd = torch.load(str(state_path), map_location="cpu", weights_only=False)
+    if isinstance(sd, dict) and "state_dict" in sd:
+        sd = sd["state_dict"]
+    return sd
+
+
+def _capture_pre_la_stages(model_dir: Path, T_tok: int = PRE_LA_T_TOK,
+                           seed: int = PRE_LA_SEED) -> Dict[str, "torch.Tensor"]:
+    """Run the upstream PreLookaheadLayer on seeded random speech-token
+    ids and return the named stage activations.
+
+    Stages match the C++ extract_stage names (without the `flow_pre_la_`
+    prefix added by the caller).
+    """
+    _ensure_upstream_on_path()
+    import torch
+    from cosyvoice.transformer.upsample_encoder import PreLookaheadLayer
+
+    sd = _load_flow_state(model_dir)
+
+    # Instantiate the matching modules (cv3 config: 80→1024 conv1, 1024→80 conv2).
+    embed = torch.nn.Embedding(6561, MEL_DIM)
+    embed.weight.data.copy_(sd["input_embedding.weight"].float())
+    embed.eval()
+    pre_la = PreLookaheadLayer(in_channels=MEL_DIM, channels=1024, pre_lookahead_len=3)
+    # The flow state-dict prefixes everything under "pre_lookahead_layer."
+    pre_la_sd = {k[len("pre_lookahead_layer."):]: v
+                 for k, v in sd.items() if k.startswith("pre_lookahead_layer.")}
+    pre_la.load_state_dict(pre_la_sd, strict=True)
+    pre_la.eval()
+
+    # Seeded random speech-token ids (uniform over [0, 6561))
+    rng = torch.Generator().manual_seed(seed)
+    ids = torch.randint(0, 6561, (1, T_tok), generator=rng, dtype=torch.long)
+
+    with torch.no_grad():
+        tok_emb = embed(ids)  # (1, T_tok, mel_dim)
+
+    # Piecewise rerun of PreLookaheadLayer.forward so we can grab the
+    # post-conv1 and post-conv2 intermediates without a forward hook.
+    import torch.nn.functional as F
+    with torch.no_grad():
+        x = tok_emb.transpose(1, 2).contiguous()                      # (1, mel, T_tok)
+        x = F.pad(x, (0, pre_la.pre_lookahead_len), value=0.0)        # right-pad 3
+        x = F.leaky_relu(pre_la.conv1(x))                             # (1, 1024, T_tok)
+        c1_t = x.clone()
+        x = F.pad(x, (pre_la.conv2.kernel_size[0] - 1, 0), value=0.0) # left-pad 2
+        x = pre_la.conv2(x)                                           # (1, mel, T_tok)
+        c2_t = x.clone()
+        x = x.transpose(1, 2).contiguous()                            # (1, T_tok, mel)
+        y_piece = x + tok_emb
+        # Sanity: piecewise matches the monolithic forward.
+        y_baseline = pre_la(tok_emb)
+        drift = (y_piece - y_baseline).abs().max().item()
+        assert drift < 1e-5, f"pre_la piecewise drift {drift}"
+
+    # PyTorch (T, C) row-major IS byte-identical to ggml ne=(C, T)
+    # col-major, so we keep the (T, C) shape and let the byte layout
+    # implicitly match the C++ side's channel-first ggml output.
+    # c1_t / c2_t are stored channel-first by upstream (B, C, T); transpose
+    # those to (T, C) for the same convention.
+    def tc(t):
+        if t.dim() == 3 and t.shape[2] in (MEL_DIM, 1024):
+            return t.squeeze(0).contiguous()                       # (T, C)
+        if t.dim() == 3:
+            return t.squeeze(0).transpose(0, 1).contiguous()        # (B, C, T) -> (T, C)
+        raise ValueError(f"unexpected tensor shape {tuple(t.shape)}")
+
+    return {
+        "ids_in": ids.squeeze(0).to(torch.int32),
+        "tok_emb": tc(tok_emb),
+        "c1": tc(c1_t),
+        "c2": tc(c2_t),
+        "": tc(y_piece),
+    }
+
+
+def _capture_in_pipe_stages(model_dir: Path, T_tok: int = PRE_LA_T_TOK,
+                            seed: int = IN_PIPE_SEED) -> Dict[str, "torch.Tensor"]:
+    """Run the upstream InputEmbedding on a seeded fixture and return the
+    named stage activations. Uses the pre_la dumper's output as the `mu`
+    input so we exercise the realistic upstream chain (pre_la -> interleave
+    -> InputEmbedding) but each part is independently reproducible.
+    """
+    _ensure_upstream_on_path()
+    import torch
+    import torch.nn.functional as F
+    from cosyvoice.flow.DiT.dit import InputEmbedding
+    from cosyvoice.transformer.upsample_encoder import PreLookaheadLayer
+
+    sd = _load_flow_state(model_dir)
+
+    # Re-run pre_la to get the (T_tok, mel) hidden state.
+    embed = torch.nn.Embedding(6561, MEL_DIM)
+    embed.weight.data.copy_(sd["input_embedding.weight"].float())
+    embed.eval()
+    pre_la = PreLookaheadLayer(in_channels=MEL_DIM, channels=1024, pre_lookahead_len=3)
+    pre_la_sd = {k[len("pre_lookahead_layer."):]: v
+                 for k, v in sd.items() if k.startswith("pre_lookahead_layer.")}
+    pre_la.load_state_dict(pre_la_sd, strict=True)
+    pre_la.eval()
+
+    rng = torch.Generator().manual_seed(seed)
+    ids = torch.randint(0, 6561, (1, T_tok), generator=rng, dtype=torch.long)
+    with torch.no_grad():
+        h = pre_la(embed(ids))  # (1, T_tok, mel)
+    # repeat_interleave by token_mel_ratio = 2 — gives (1, T_mel, mel).
+    h_mel = h.repeat_interleave(2, dim=1)
+    T_mel = h_mel.shape[1]
+
+    # Seeded random spk_emb, x_noisy, cond. These use the same `rng` so
+    # state advances deterministically.
+    spk_raw = torch.randn(1, SPK_DIM_IN, generator=rng, dtype=torch.float32)
+    x_noisy = torch.randn(1, T_mel, MEL_DIM, generator=rng, dtype=torch.float32)
+    cond = torch.randn(1, T_mel, MEL_DIM, generator=rng, dtype=torch.float32)
+
+    # Build the InputEmbedding module from the flow state-dict.
+    # The state-dict prefixes InputEmbedding tensors under
+    # "decoder.estimator.input_embed.*".
+    in_emb = InputEmbedding(mel_dim=MEL_DIM, text_dim=MEL_DIM, out_dim=1024, spk_dim=MEL_DIM)
+    in_emb_sd = {k[len("decoder.estimator.input_embed."):]: v
+                 for k, v in sd.items() if k.startswith("decoder.estimator.input_embed.")}
+    in_emb.load_state_dict(in_emb_sd, strict=True)
+    in_emb.eval()
+
+    # Speaker projection: F.normalize over dim=1 -> Linear(192, 80).
+    # spk_embed_affine_layer lives at the flow-wrapper level, NOT inside
+    # InputEmbedding. The state-dict has "spk_embed_affine_layer.weight/bias".
+    spk_affine = torch.nn.Linear(SPK_DIM_IN, MEL_DIM)
+    spk_affine.load_state_dict({
+        "weight": sd["spk_embed_affine_layer.weight"],
+        "bias": sd["spk_embed_affine_layer.bias"],
+    }, strict=True)
+    spk_affine.eval()
+
+    with torch.no_grad():
+        spk_norm = F.normalize(spk_raw, dim=1)
+        spk_proj = spk_affine(spk_norm)  # (1, 80)
+        # Piecewise reconstruct InputEmbedding.forward.
+        spks_bc = spk_proj.unsqueeze(1).expand(1, T_mel, MEL_DIM)         # (1, T_mel, 80)
+        catted = torch.cat([x_noisy, cond, h_mel, spks_bc], dim=-1)        # (1, T_mel, 320)
+        proj = in_emb.proj(catted)                                         # (1, T_mel, 1024)
+        pos = in_emb.conv_pos_embed(proj)                                  # (1, T_mel, 1024)
+        out_piece = pos + proj
+        # Sanity vs upstream's all-in-one forward.
+        out_baseline = in_emb(x_noisy, cond, h_mel, spk_proj)
+        drift = (out_piece - out_baseline).abs().max().item()
+        assert drift < 1e-5, f"in_pipe piecewise drift {drift}"
+
+    # Match the C++ side's ggml byte layout: keep PyTorch (T, C)
+    # row-major shapes, since that's byte-identical to ggml ne=(C, T)
+    # col-major. 1D tensors are squeezed of the batch dim only.
+    def tc(t):
+        if t.dim() == 3:
+            return t.squeeze(0).contiguous()                       # (T, C)
+        return t.contiguous()
+
+    return {
+        "pre_la_in": tc(h_mel),
+        "spk_in": spk_raw.squeeze(0).contiguous(),
+        "x_in": tc(x_noisy),
+        "cond_in": tc(cond),
+        "spk": spk_proj.squeeze(0).contiguous(),
+        "cat": tc(catted),
+        "proj": tc(proj),
+        "pos": tc(pos),
+        "": tc(out_piece),
+    }
+
+
+# ---------------------------------------------------------------------------
 # dump_reference.py entry point.
 # ---------------------------------------------------------------------------
 
@@ -333,22 +535,42 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     the unified diff grows past the DiT block.
     """
     requested = set(stages) if stages else set(DEFAULT_STAGES)
-    # Group requested flow_dit_blk_<N>_* stages by block index so we
-    # build the upstream block at most once per index.
+    out: Dict[str, np.ndarray] = {}
+
+    # ---- Phase 3b DiT block stages ----
     by_block: Dict[int, Set[str]] = {}
     for s in requested:
         if not s.startswith("flow_dit_blk_"):
             continue
-        # parse N from "flow_dit_blk_<N>_<suffix>"
         rest = s[len("flow_dit_blk_"):]
         n_str, _, _ = rest.partition("_")
         if not n_str.isdigit():
             continue
         by_block.setdefault(int(n_str), set()).add(s)
-
-    out: Dict[str, np.ndarray] = {}
     for block_idx, names in sorted(by_block.items()):
         out.update(_flow_dit_block_arrays(model_dir, block_idx, stages_wanted=names))
+
+    # ---- Phase 3c pre-lookahead stages ----
+    if any(s.startswith("flow_pre_la") for s in requested):
+        pre_la_stages = _capture_pre_la_stages(model_dir)
+        for short, t in pre_la_stages.items():
+            name = "flow_pre_la" + (("_" + short) if short else "")
+            if name not in requested:
+                continue
+            arr = t.detach().cpu().numpy()
+            if arr.dtype != np.int32 and arr.dtype != np.float32:
+                arr = arr.astype(np.float32)
+            out[name] = arr
+
+    # ---- Phase 3c InputEmbedding stages ----
+    if any(s.startswith("flow_in_pipe") for s in requested):
+        in_pipe_stages = _capture_in_pipe_stages(model_dir)
+        for short, t in in_pipe_stages.items():
+            name = "flow_in_pipe" + (("_" + short) if short else "")
+            if name not in requested:
+                continue
+            out[name] = t.detach().cpu().numpy().astype(np.float32)
+
     return out
 
 

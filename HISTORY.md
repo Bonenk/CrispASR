@@ -6,6 +6,82 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-27 cosyvoice3: Phase 3c — pre-lookahead conv + InputEmbedding (cos=1.0)
+
+Input pipeline that turns raw speech tokens + speaker embedding into
+the (T_mel, 1024) tensor fed into the DiT block stack. Validates
+against upstream PyTorch on a seeded fixture (T_tok=6 → T_mel=12,
+mel_dim=80, spk_dim=192).
+
+Implementation (all in `src/cosyvoice3_tts.cpp`):
+
+- `cv3_lookahead_conv1d` — right-padded dense conv1d (`F.pad(x, (0, K-1))`
+  + `conv1d(padding=0)`) via the symmetric-pad-K-1 + take-right-T
+  trick. Mirror of chatterbox's left-pad helper.
+- `cv3_causal_conv1d` — local copy of chatterbox's left-pad
+  conv1d, kept self-contained so phase 3c doesn't pull a static
+  helper into a shared header.
+- `cv3_causal_grouped_conv1d` — 16-group causal conv1d (k=31) via a
+  per-group loop + `ggml_concat` along channel dim (ggml has no
+  native grouped-conv op). Pattern taken from
+  `omniasr.cpp::build_grouped_pos_conv` and adapted for causal pad.
+- `cv3_build_pre_la_graph` + `cv3_extract_pre_la_stage` — wraps
+  embedding lookup + the two convs as a named-output graph.
+- `cv3_build_in_pipe_graph` + `cv3_extract_in_pipe_stage` — builds
+  the `InputEmbedding` pipeline. `F.normalize(spk, dim=1)`
+  implemented as `ggml_rms_norm(eps=0) * (1/sqrt(spk_in))` to convert
+  RMS denominator to L2 denominator.
+
+Wiring:
+- `cosyvoice3_tts_extract_stage` learns the `flow_pre_la_*` and
+  `flow_in_pipe_*` prefixes (input layout documented in the header).
+- `tools/reference_backends/cosyvoice3_tts.py::dump()` adds matching
+  captures via piecewise reconstruction of the upstream modules
+  (verified <1e-5 vs the monolithic forward each time).
+- `examples/cli/crispasr_diff_main.cpp::cosyvoice3-tts` handler
+  unpacks ref inputs (ids for pre_la, packed
+  `[pre_la | spk | x | cond]` for in_pipe) and drives each stage.
+
+Three gotchas worth recording:
+
+1. **Layout convention**: `Ref::get_f32` returns a flat float array
+   matching the GGUF byte layout. The C++ side produces tensors in
+   ggml `ne=(C, T)` col-major; **PyTorch `(T, C)` row-major is
+   byte-identical**, so the Python dump must NOT pre-transpose to
+   `(C, T)` before storing. Doing so silently inverts the comparison
+   (cos → −0.2). Fixed by collapsing the transpose helper into a
+   no-op `.squeeze(0).contiguous()`.
+2. **Side-output reachability**: `ggml_set_output` on a tensor that
+   isn't on the path to the final `build_forward_expand` root gets
+   pruned. Fix: `ggml_build_forward_expand` each named intermediate
+   explicitly. (Phase 3b avoided this because every named
+   intermediate was a parent of the block output.)
+3. **`set_output` on a view**: a `reshape_1d` view's output buffer
+   can end up sharing storage with the parent's pre-add result in a
+   way that breaks `tensor_get` (returns wrong values, cos≈−0.12
+   while downstream consumers PASS). Fix: `ggml_cont` after
+   `reshape_1d` so the named output owns its buffer.
+
+Per-stage diff (21/21 PASS at cos_min ≥ 0.999):
+
+  flow_pre_la_tok_emb   cos=1.000000  max|Δ|=4.4e-04
+  flow_pre_la_c1        cos=0.999891  max|Δ|=4.8e-04
+  flow_pre_la_c2        cos=1.000000  max|Δ|=6.0e-04
+  flow_pre_la           cos=1.000000  max|Δ|=6.2e-04
+  flow_in_pipe_spk      cos=1.000000  max|Δ|=1.2e-04
+  flow_in_pipe_cat      cos=1.000000  max|Δ|=1.2e-04
+  flow_in_pipe_proj     cos=1.000000  max|Δ|=5.5e-03
+  flow_in_pipe_pos      cos=0.999973  max|Δ|=4.7e-03
+  flow_in_pipe          cos=1.000000  max|Δ|=5.5e-03
+
+Max relative diff well under the F16 weight floor (~0.08%) — every
+stage in the input pipeline is at the numerical noise floor.
+
+Remaining phase 3 work: 3d local CFM Euler ODE + 22-block forward +
+mel output, 3e end-to-end mel diff.
+
+---
+
 ## 2026-05-27 cosyvoice3: Phase 3b — AdaLN-Zero DiT block forward (cos=1.0)
 
 Per-block DiT forward for the 22-block estimator in the

@@ -1029,10 +1029,13 @@ extern "C" int32_t* cosyvoice3_tts_generate_tokens_from_embeds(struct cosyvoice3
 }
 
 namespace {
-// Forward declaration; definition lives further down in this file (alongside
-// the per-block graph builder it depends on).
+// Forward declarations; definitions live further down in this file
+// (alongside the per-graph builders they depend on).
 float* cv3_extract_flow_dit_stage(cosyvoice3_tts_context* ctx, int block_idx, const float* x, int T, const float* t_emb,
                                   const char* tensor_name);
+float* cv3_extract_pre_la_stage(cosyvoice3_tts_context* ctx, const int32_t* ids, int T_tok, const char* tensor_name);
+float* cv3_extract_in_pipe_stage(cosyvoice3_tts_context* ctx, const float* pre_la_out, int T_mel, const float* spk_emb,
+                                 const float* x_noisy, const float* cond, const char* tensor_name);
 } // namespace
 
 extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ctx, const char* stage_name,
@@ -1124,6 +1127,103 @@ extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ct
         if (!out)
             return nullptr;
         *out_n = T * d;
+        return out;
+    }
+    // Flow Phase 3c pre-lookahead conv stack:
+    //   "flow_pre_la_tok_emb"  — input_embedding(speech_ids)  [T_tok, mel_dim]
+    //   "flow_pre_la_c1"       — leaky_relu(conv1(...))       [T_tok, 1024]
+    //   "flow_pre_la_c2"       — conv2(post-causal-pad)       [T_tok, mel_dim]
+    //   "flow_pre_la"          — final pre_la output (with residual)
+    //                                                          [T_tok, mel_dim]
+    //
+    // `ids` carries speech-token IDs (length n_ids = T_tok). The graph
+    // does the input_embedding lookup inside, so the diff harness
+    // exercises the embedding + conv stack as a single unit.
+    if (strncmp(stage_name, "flow_pre_la", 11) == 0) {
+        if (!ctx->flow.loaded || !ids || n_ids <= 0)
+            return nullptr;
+        const auto& fh = ctx->flow.hp;
+        const char* sfx = stage_name + 11;
+        const char* tensor_name = nullptr;
+        if (*sfx == 0)
+            tensor_name = "pre_la_out";
+        else if (strcmp(sfx, "_tok_emb") == 0)
+            tensor_name = "pre_la_tok_emb";
+        else if (strcmp(sfx, "_c1") == 0)
+            tensor_name = "pre_la_c1";
+        else if (strcmp(sfx, "_c2") == 0)
+            tensor_name = "pre_la_c2";
+        else {
+            fprintf(stderr, "cosyvoice3_tts: unknown flow_pre_la stage suffix '%s'\n", sfx);
+            return nullptr;
+        }
+        float* out = cv3_extract_pre_la_stage(ctx, ids, n_ids, tensor_name);
+        if (!out)
+            return nullptr;
+        // pre_la_tok_emb and pre_la / pre_la_c2 are (T_tok, mel_dim);
+        // pre_la_c1 is (T_tok, 1024).
+        const int out_dim = (strcmp(tensor_name, "pre_la_c1") == 0) ? 1024 : (int)fh.mel_dim;
+        *out_n = n_ids * out_dim;
+        return out;
+    }
+    // Flow Phase 3c InputEmbedding (input pipeline) stages:
+    //   "flow_in_pipe_spk"   — F.normalize(spk) -> spk_affine    [spk_dim_out]
+    //   "flow_in_pipe_cat"   — cat[x, cond, mu, spks]            [T_mel, 320]
+    //   "flow_in_pipe_proj"  — in_proj(cat)                      [T_mel, 1024]
+    //   "flow_in_pipe_pos"   — conv_pos_embed(proj)              [T_mel, 1024]
+    //   "flow_in_pipe"       — proj + conv_pos_embed(proj)       [T_mel, 1024]
+    //
+    // `embeds_in` packs (in this order):
+    //   pre_la_out          [T_mel, mel_dim]  F32 — already repeat-interleaved
+    //                                              upstream by token_mel_ratio,
+    //                                              so length is T_mel (= 2*T_tok)
+    //   spk_emb_raw         [spk_dim_in]      F32 — pre-normalize, pre-projection
+    //   x_noisy             [T_mel, mel_dim]  F32 — CFM solver iterate
+    //   cond                [T_mel, mel_dim]  F32 — prompt-prefix conditioning
+    //
+    // n_embed_tokens carries T_mel. The graph builder normalises spk and
+    // broadcasts it over T_mel internally.
+    if (strncmp(stage_name, "flow_in_pipe", 12) == 0) {
+        if (!ctx->flow.loaded || !embeds_in || n_embed_tokens <= 0)
+            return nullptr;
+        const auto& fh = ctx->flow.hp;
+        const int mel = (int)fh.mel_dim;
+        const int spk_in = (int)fh.spk_dim_in;
+        const int dit_dim = (int)fh.dit_dim;
+        const int dit_in_dim = (int)fh.dit_input_dim;
+        const int T_mel = n_embed_tokens;
+        const char* sfx = stage_name + 12;
+        const char* tensor_name = nullptr;
+        if (*sfx == 0)
+            tensor_name = "in_pipe_out";
+        else if (strcmp(sfx, "_spk") == 0)
+            tensor_name = "in_pipe_spk";
+        else if (strcmp(sfx, "_cat") == 0)
+            tensor_name = "in_pipe_cat";
+        else if (strcmp(sfx, "_proj") == 0)
+            tensor_name = "in_pipe_proj";
+        else if (strcmp(sfx, "_pos") == 0)
+            tensor_name = "in_pipe_pos";
+        else {
+            fprintf(stderr, "cosyvoice3_tts: unknown flow_in_pipe stage suffix '%s'\n", sfx);
+            return nullptr;
+        }
+        // embeds_in layout: pre_la (T_mel*mel) | spk_raw (spk_in) | x (T_mel*mel) | cond (T_mel*mel)
+        const float* pre_la = embeds_in;
+        const float* spk_raw = pre_la + (size_t)T_mel * mel;
+        const float* x_noisy = spk_raw + (size_t)spk_in;
+        const float* cond = x_noisy + (size_t)T_mel * mel;
+        float* out = cv3_extract_in_pipe_stage(ctx, pre_la, T_mel, spk_raw, x_noisy, cond, tensor_name);
+        if (!out)
+            return nullptr;
+        int out_n_local;
+        if (strcmp(tensor_name, "in_pipe_spk") == 0)
+            out_n_local = (int)fh.spk_dim_out;
+        else if (strcmp(tensor_name, "in_pipe_cat") == 0)
+            out_n_local = T_mel * dit_in_dim;
+        else
+            out_n_local = T_mel * dit_dim;
+        *out_n = out_n_local;
         return out;
     }
     if (strcmp(stage_name, "flow_inventory") == 0) {
@@ -1582,3 +1682,377 @@ extern "C" int cosyvoice3_tts_get_flow_hparams(struct cosyvoice3_tts_context* ct
         *cfm_cfg_rate = fh.cfm_inference_cfg_rate;
     return 0;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 3c — pre-lookahead conv stack + InputEmbedding (input pipeline)
+// ---------------------------------------------------------------------------
+//
+// Upstream refs:
+//   - PreLookaheadLayer (cosyvoice/transformer/upsample_encoder.py l. 66-103,
+//     instantiated for cv3 with in=80, channels=1024, pre_lookahead_len=3):
+//
+//       outputs = inputs.transpose(1, 2)                   # (B, C, T)
+//       outputs = F.pad(outputs, (0, pre_lookahead_len))   # right-pad 3 (lookahead)
+//       outputs = F.leaky_relu(conv1(outputs))             # Conv1d(80, 1024, k=4)
+//       outputs = F.pad(outputs, (K2 - 1, 0))              # left-pad 2 (causal)
+//       outputs = conv2(outputs)                            # Conv1d(1024, 80, k=3)
+//       outputs = outputs.transpose(1, 2)                  # (B, T, C)
+//       return outputs + inputs                            # residual
+//
+//   - InputEmbedding (cosyvoice/flow/DiT/dit.py l. 76-98):
+//
+//       to_cat = [x, cond, text_embed, spks_broadcast]    # 4 × mel_dim = 320
+//       x = self.proj(torch.cat(to_cat, dim=-1))          # Linear(320, 1024)
+//       x = self.conv_pos_embed(x) + x                    # grouped causal conv
+//
+//   - CausalConvPositionEmbedding (cosyvoice/flow/DiT/modules.py l. 115-144):
+//     2 × `nn.Conv1d(dim, dim, k=31, groups=16, padding=0)` + nn.Mish() with
+//     each conv preceded by `F.pad(x, (K-1, 0))` (causal). Note: the helper
+//     processes (B, C, T) — channel-first — and returns (B, T, C) after the
+//     final transpose.
+
+namespace {
+
+// Mish = x * tanh(softplus(x)). ggml has ggml_softplus + ggml_tanh; chatterbox
+// also exposes its own Mish helper but it's static to that .cpp. Local copy
+// is cheap and keeps phase 3c self-contained.
+ggml_tensor* cv3_mish(ggml_context* ctx, ggml_tensor* x) {
+    ggml_tensor* sp = ggml_softplus(ctx, x);
+    ggml_tensor* th = ggml_tanh(ctx, sp);
+    return ggml_mul(ctx, x, th);
+}
+
+// Causal grouped conv1d for conv_pos_embed.
+// h: (C, T) F32  — channel-first ggml layout, C inner / T outer.
+// w: (K, C_per_group, C) F16  — sub-group weights at offset c0 = g*C_per_group
+//                                 along the out dim.
+// b: (C,) F32 — per-channel bias.
+// Output: (C, T) with the same length T (left-pad K-1 on T, conv pad=0).
+ggml_tensor* cv3_causal_grouped_conv1d(ggml_context* ctx, ggml_tensor* h, ggml_tensor* w, ggml_tensor* b) {
+    const int K = (int)w->ne[0];
+    const int C_per_g = (int)w->ne[1];
+    const int C = (int)w->ne[2];
+    const int T = (int)h->ne[1];
+    const int G = C / C_per_g;
+    GGML_ASSERT(h->ne[0] == C);
+    GGML_ASSERT(G * C_per_g == C);
+
+    ggml_tensor* out = nullptr;
+    for (int g = 0; g < G; g++) {
+        const size_t c0 = (size_t)g * C_per_g;
+        // Per-group input slice: (C_per_g, T) — then transpose to (T, C_per_g)
+        // matching ggml_conv_1d's expected (T, C_in) data layout (see
+        // chatterbox_s3gen::causal_conv1d for the established convention).
+        ggml_tensor* h_g = ggml_view_2d(ctx, h, C_per_g, T, h->nb[1], c0 * h->nb[0]);
+        h_g = ggml_cont(ctx, ggml_transpose(ctx, h_g)); // (T, C_per_g)
+        // Per-group weight slice: (K, C_per_g, C_per_g).
+        ggml_tensor* w_g = ggml_view_3d(ctx, w, K, C_per_g, C_per_g, w->nb[1], w->nb[2], c0 * w->nb[2]);
+        w_g = ggml_cont(ctx, w_g);
+        // Left-pad K-1 (causal): ggml_conv_1d with symmetric pad=K-1 produces
+        // (T + K - 1, C_per_g); take the first T entries (drops K-1 from
+        // RIGHT) — which equals left-pad-only-by-K-1 conv. Same trick as
+        // chatterbox_s3gen::causal_conv1d.
+        ggml_tensor* y = ggml_conv_1d(ctx, w_g, h_g, /*stride*/ 1, /*pad*/ K - 1, /*dil*/ 1);
+        y = ggml_view_2d(ctx, y, T, C_per_g, y->nb[1], 0);
+        y = ggml_cont(ctx, y);
+        // Transpose back to (C_per_g, T) and add per-group bias slice.
+        y = ggml_cont(ctx, ggml_transpose(ctx, y));
+        ggml_tensor* b_g = ggml_view_1d(ctx, b, C_per_g, c0 * b->nb[0]);
+        y = ggml_add(ctx, y, b_g);
+        // Concatenate per-group outputs along channel dim (dim 0).
+        out = out ? ggml_concat(ctx, out, y, 0) : y;
+    }
+    return out;
+}
+
+// "Right-padded" dense conv1d — pads right by K-1 (lookahead), then conv
+// with stride 1 and zero padding. Output length matches input length.
+// Layout: x ne=(T, C_in); w ne=(K, C_in, C_out); b ne=(C_out).
+ggml_tensor* cv3_lookahead_conv1d(ggml_context* ctx, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b) {
+    const int K = (int)w->ne[0];
+    const int T = (int)x->ne[0];
+    // Symmetric pad K-1 produces output of length T + K - 1. Take the
+    // RIGHT T entries (drops K-1 from LEFT) — equivalent to right-pad
+    // only by K-1.
+    ggml_tensor* y = ggml_conv_1d(ctx, w, x, /*stride*/ 1, /*pad*/ K - 1, /*dil*/ 1);
+    y = ggml_view_2d(ctx, y, T, (int)y->ne[1], y->nb[1], (size_t)(K - 1) * y->nb[0]);
+    y = ggml_cont(ctx, y);
+    if (b) {
+        ggml_tensor* b2d = ggml_reshape_2d(ctx, b, 1, (int)b->ne[0]);
+        y = ggml_add(ctx, y, b2d);
+    }
+    return y;
+}
+
+// Mirror of chatterbox_s3gen::causal_conv1d (left-pad K-1) — local copy
+// to keep phase 3c self-contained.
+ggml_tensor* cv3_causal_conv1d(ggml_context* ctx, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b) {
+    const int K = (int)w->ne[0];
+    const int T = (int)x->ne[0];
+    ggml_tensor* y = ggml_conv_1d(ctx, w, x, /*stride*/ 1, /*pad*/ K - 1, /*dil*/ 1);
+    // Take the LEFT T entries (drops K-1 from RIGHT) → left-pad-only conv.
+    y = ggml_view_2d(ctx, y, T, (int)y->ne[1], y->nb[1], 0);
+    y = ggml_cont(ctx, y);
+    if (b) {
+        ggml_tensor* b2d = ggml_reshape_2d(ctx, b, 1, (int)b->ne[0]);
+        y = ggml_add(ctx, y, b2d);
+    }
+    return y;
+}
+
+// Build the pre-lookahead conv stack graph:
+//   ids (T_tok) -> input_embedding -> (T_tok, mel_dim)
+//                       └> right-pad 3, conv1 (k=4, 80→1024), leaky_relu
+//                                                 └> left-pad 2, conv2 (k=3, 1024→80)
+//                                                          └> + residual -> (T_tok, mel_dim)
+// Named graph outputs (settable via cv3_extract_pre_la_stage):
+//   pre_la_tok_emb, pre_la_c1, pre_la_c2, pre_la_out
+ggml_cgraph* cv3_build_pre_la_graph(cosyvoice3_tts_context* ctx, int T_tok) {
+    const auto& f = ctx->flow;
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 1024, false);
+
+    ggml_tensor* ids_t = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T_tok);
+    ggml_set_input(ids_t);
+    ggml_set_name(ids_t, "pre_la_ids_in");
+
+    // Embedding lookup. input_embd.w ne=(mel, vocab); get_rows result ne=(mel, T_tok) F32.
+    ggml_tensor* tok_emb = ggml_get_rows(ctx0, f.input_embd_w, ids_t);
+    tok_emb = ggml_cont(ctx0, tok_emb);
+    ggml_set_name(tok_emb, "pre_la_tok_emb");
+    ggml_set_output(tok_emb);
+
+    // Upstream wants (T, C) layout for the conv chain (transpose of get_rows).
+    ggml_tensor* x_tc = ggml_cont(ctx0, ggml_transpose(ctx0, tok_emb)); // (T_tok, mel)
+
+    // conv1: lookahead (right-pad K-1=3), kernel 4, in=80 out=1024, then LeakyReLU(0.01).
+    ggml_tensor* c1 = cv3_lookahead_conv1d(ctx0, x_tc, f.pre_la_c1_w, f.pre_la_c1_b); // (T_tok, 1024)
+    c1 = ggml_leaky_relu(ctx0, c1, 0.01f, /*inplace*/ false);
+    // Transpose back to (C, T) for the named-output dump (matches upstream's
+    // post-conv1 channel-first layout).
+    ggml_tensor* c1_out = ggml_cont(ctx0, ggml_transpose(ctx0, c1)); // (1024, T_tok)
+    ggml_set_name(c1_out, "pre_la_c1");
+    ggml_set_output(c1_out);
+
+    // conv2: causal (left-pad K-1=2), kernel 3, in=1024 out=80.
+    ggml_tensor* c2 = cv3_causal_conv1d(ctx0, c1, f.pre_la_c2_w, f.pre_la_c2_b); // (T_tok, mel)
+    ggml_tensor* c2_out = ggml_cont(ctx0, ggml_transpose(ctx0, c2));             // (mel, T_tok)
+    ggml_set_name(c2_out, "pre_la_c2");
+    ggml_set_output(c2_out);
+
+    // Residual: + tok_emb (channel-first).
+    ggml_tensor* y = ggml_add(ctx0, c2_out, tok_emb);
+    ggml_set_name(y, "pre_la_out");
+    ggml_set_output(y);
+    ggml_build_forward_expand(gf, y);
+    // c1_out and tok_emb are SIDE branches (not on the path to y after the
+    // transpose ops materialise them as cont-tensors). Expand them
+    // explicitly so they survive into the executed graph.
+    ggml_build_forward_expand(gf, tok_emb);
+    ggml_build_forward_expand(gf, c1_out);
+    ggml_build_forward_expand(gf, c2_out);
+
+    ggml_free(ctx0);
+    return gf;
+}
+
+float* cv3_extract_pre_la_stage(cosyvoice3_tts_context* ctx, const int32_t* ids, int T_tok, const char* tensor_name) {
+    if (!ctx || !ctx->flow.loaded || !ids || T_tok <= 0 || !tensor_name)
+        return nullptr;
+    ctx->step_t1_gf = nullptr;
+    ctx->step_t1_fixed_kv_len = 0;
+
+    ggml_cgraph* gf = cv3_build_pre_la_graph(ctx, T_tok);
+    if (!gf)
+        return nullptr;
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
+        return nullptr;
+
+    ggml_tensor* ids_t = ggml_graph_get_tensor(gf, "pre_la_ids_in");
+    if (!ids_t)
+        return nullptr;
+    ggml_backend_tensor_set(ids_t, ids, 0, (size_t)T_tok * sizeof(int32_t));
+
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        fprintf(stderr, "cosyvoice3_tts: pre_la compute failed\n");
+        return nullptr;
+    }
+
+    ggml_tensor* out_t = ggml_graph_get_tensor(gf, tensor_name);
+    if (!out_t) {
+        fprintf(stderr, "cosyvoice3_tts: tensor '%s' not in pre_la graph\n", tensor_name);
+        return nullptr;
+    }
+    const size_t n = (size_t)ggml_nelements(out_t);
+    float* out = (float*)malloc(n * sizeof(float));
+    if (!out)
+        return nullptr;
+    ggml_backend_tensor_get(out_t, out, 0, n * sizeof(float));
+    return out;
+}
+
+// Build the InputEmbedding (input pipeline) graph:
+//   spks_raw (spk_in)   ──F.normalize──> ─spk_affine─> spks_proj (spk_out=80)
+//                                                    └ broadcast to (T_mel, 80)
+//   pre_la (T_mel, 80) ┐
+//   x_noisy (T_mel, 80)├──cat dim=-1──> (T_mel, 320) ─in_proj(320→1024)─> proj
+//   cond    (T_mel, 80)│                                                    │
+//   spks_bc (T_mel, 80)┘                                                    │
+//                                                                          ├──+──> in_pipe_out
+//                                                            conv_pos_embed(proj)
+//                                                          (2× grouped causal
+//                                                           conv1d-31 + Mish)
+//
+// Cat order per upstream InputEmbedding.forward:
+//   to_cat = [x, cond, text_embed, spks] — x first.
+//
+// Named outputs (settable via cv3_extract_in_pipe_stage):
+//   in_pipe_spk    (spk_dim_out,)
+//   in_pipe_cat    (dit_input_dim, T_mel)  — channel-first
+//   in_pipe_proj   (dit_dim, T_mel)
+//   in_pipe_pos    (dit_dim, T_mel)  — conv_pos_embed(proj) without residual
+//   in_pipe_out    (dit_dim, T_mel)  — proj + conv_pos_embed(proj)
+ggml_cgraph* cv3_build_in_pipe_graph(cosyvoice3_tts_context* ctx, int T_mel) {
+    const auto& fh = ctx->flow.hp;
+    const auto& f = ctx->flow;
+    const int mel = (int)fh.mel_dim;
+    const int spk_in = (int)fh.spk_dim_in;
+    const int spk_out = (int)fh.spk_dim_out;
+    const int dit_in_dim = (int)fh.dit_input_dim;
+    GGML_ASSERT(spk_out == mel);
+    GGML_ASSERT(dit_in_dim == 4 * mel); // x + cond + mu + spks = 4 × mel_dim
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 2048, false);
+
+    // ---- Inputs ----
+    ggml_tensor* pre_la = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, mel, T_mel);
+    ggml_set_input(pre_la);
+    ggml_set_name(pre_la, "in_pipe_pre_la_in"); // (mel, T_mel)
+    ggml_tensor* spk = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, spk_in);
+    ggml_set_input(spk);
+    ggml_set_name(spk, "in_pipe_spk_in"); // (spk_in,)
+    ggml_tensor* x_noisy = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, mel, T_mel);
+    ggml_set_input(x_noisy);
+    ggml_set_name(x_noisy, "in_pipe_x_in"); // (mel, T_mel)
+    ggml_tensor* cond = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, mel, T_mel);
+    ggml_set_input(cond);
+    ggml_set_name(cond, "in_pipe_cond_in");
+
+    // ---- spk projection: F.normalize(spk, dim=1) -> spk_affine ----
+    // F.normalize: x / max(||x||_2, eps), default eps=1e-12.
+    ggml_tensor* spk_2d = ggml_reshape_2d(ctx0, spk, spk_in, 1); // (spk_in, 1)
+    ggml_tensor* spk_norm = ggml_rms_norm(ctx0, spk_2d, 0.0f);
+    // ggml_rms_norm divides by sqrt(mean(x^2) + eps) = sqrt(sum(x^2)/N + eps).
+    // F.normalize divides by sqrt(sum(x^2) + eps_l2). Compensate by
+    // multiplying with sqrt(N) to convert "RMS" → "L2 norm" denominator.
+    spk_norm = ggml_scale(ctx0, spk_norm, 1.0f / std::sqrt((float)spk_in));
+    ggml_tensor* spk_proj = ggml_mul_mat(ctx0, f.spk_affine_w, spk_norm); // (spk_out, 1)
+    spk_proj = ggml_add(ctx0, spk_proj, f.spk_affine_b);
+    // ggml_cont so the named output owns its buffer — set_output on a
+    // reshape view of an add result is fragile under sched allocation.
+    spk_proj = ggml_cont(ctx0, ggml_reshape_1d(ctx0, spk_proj, spk_out));
+    ggml_set_name(spk_proj, "in_pipe_spk");
+    ggml_set_output(spk_proj);
+
+    // ---- Broadcast spk over T_mel: (spk_out,) → (spk_out, T_mel) ----
+    // Use ggml_repeat with a same-shape target.
+    ggml_tensor* spk_template = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, spk_out, T_mel);
+    ggml_tensor* spk_bc = ggml_repeat(ctx0, spk_proj, spk_template);
+
+    // ---- Concat [x, cond, mu(=pre_la), spks] along channel dim ----
+    // Each piece is (mel, T_mel) col-major; concat along dim 0 stacks
+    // channels → (4*mel = dit_input_dim, T_mel).
+    ggml_tensor* cat01 = ggml_concat(ctx0, x_noisy, cond, 0);   // (2*mel, T)
+    ggml_tensor* cat012 = ggml_concat(ctx0, cat01, pre_la, 0);  // (3*mel, T)
+    ggml_tensor* catted = ggml_concat(ctx0, cat012, spk_bc, 0); // (4*mel = dit_in_dim, T)
+    ggml_set_name(catted, "in_pipe_cat");
+    ggml_set_output(catted);
+
+    // ---- in_proj: Linear(320, 1024) ----
+    ggml_tensor* proj = ggml_mul_mat(ctx0, f.dit_in_proj_w, catted); // (1024, T)
+    proj = ggml_add(ctx0, proj, f.dit_in_proj_b);
+    ggml_set_name(proj, "in_pipe_proj");
+    ggml_set_output(proj);
+
+    // ---- conv_pos_embed: 2× grouped causal conv1d (k=31, groups=16) + Mish ----
+    ggml_tensor* pos = cv3_causal_grouped_conv1d(ctx0, proj, f.dit_conv_pos_c1_w, f.dit_conv_pos_c1_b);
+    pos = cv3_mish(ctx0, pos);
+    pos = cv3_causal_grouped_conv1d(ctx0, pos, f.dit_conv_pos_c2_w, f.dit_conv_pos_c2_b);
+    pos = cv3_mish(ctx0, pos);
+    ggml_set_name(pos, "in_pipe_pos");
+    ggml_set_output(pos);
+
+    // ---- Residual: in_pipe_out = pos + proj ----
+    ggml_tensor* y = ggml_add(ctx0, pos, proj);
+    ggml_set_name(y, "in_pipe_out");
+    ggml_set_output(y);
+    ggml_build_forward_expand(gf, y);
+    // Side branches not directly on the path to y.
+    ggml_build_forward_expand(gf, spk_proj);
+    ggml_build_forward_expand(gf, catted);
+    ggml_build_forward_expand(gf, proj);
+    ggml_build_forward_expand(gf, pos);
+
+    ggml_free(ctx0);
+    return gf;
+}
+
+float* cv3_extract_in_pipe_stage(cosyvoice3_tts_context* ctx, const float* pre_la_out, int T_mel, const float* spk_emb,
+                                 const float* x_noisy, const float* cond, const char* tensor_name) {
+    if (!ctx || !ctx->flow.loaded || !pre_la_out || !spk_emb || !x_noisy || !cond || T_mel <= 0 || !tensor_name)
+        return nullptr;
+    const auto& fh = ctx->flow.hp;
+    const int mel = (int)fh.mel_dim;
+    const int spk_in = (int)fh.spk_dim_in;
+    ctx->step_t1_gf = nullptr;
+    ctx->step_t1_fixed_kv_len = 0;
+
+    ggml_cgraph* gf = cv3_build_in_pipe_graph(ctx, T_mel);
+    if (!gf)
+        return nullptr;
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        fprintf(stderr, "cosyvoice3_tts: in_pipe alloc_graph failed\n");
+        return nullptr;
+    }
+
+    auto set_t = [&](const char* nm, const void* data, size_t bytes) {
+        ggml_tensor* t = ggml_graph_get_tensor(gf, nm);
+        if (!t)
+            return false;
+        ggml_backend_tensor_set(t, data, 0, bytes);
+        return true;
+    };
+    if (!set_t("in_pipe_pre_la_in", pre_la_out, (size_t)mel * T_mel * sizeof(float)))
+        return nullptr;
+    if (!set_t("in_pipe_spk_in", spk_emb, (size_t)spk_in * sizeof(float)))
+        return nullptr;
+    if (!set_t("in_pipe_x_in", x_noisy, (size_t)mel * T_mel * sizeof(float)))
+        return nullptr;
+    if (!set_t("in_pipe_cond_in", cond, (size_t)mel * T_mel * sizeof(float)))
+        return nullptr;
+
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        fprintf(stderr, "cosyvoice3_tts: in_pipe compute failed\n");
+        return nullptr;
+    }
+
+    ggml_tensor* out_t = ggml_graph_get_tensor(gf, tensor_name);
+    if (!out_t) {
+        fprintf(stderr, "cosyvoice3_tts: tensor '%s' not in in_pipe graph\n", tensor_name);
+        return nullptr;
+    }
+    const size_t n = (size_t)ggml_nelements(out_t);
+    float* out = (float*)malloc(n * sizeof(float));
+    if (!out)
+        return nullptr;
+    ggml_backend_tensor_get(out_t, out, 0, n * sizeof(float));
+    return out;
+}
+
+} // namespace
