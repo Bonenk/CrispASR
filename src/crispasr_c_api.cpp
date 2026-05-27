@@ -1515,8 +1515,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
     // architecturally identical to qwen3, so it loads through the same
     // dispatch. Same alias set the CLI accepts in
     // examples/cli/crispasr_backend.cpp::resolve_make_fn().
-    if (s->backend == "qwen3" || s->backend == "mega-asr" ||
-        s->backend == "mega_asr" || s->backend == "megaasr") {
+    if (s->backend == "qwen3" || s->backend == "mega-asr" || s->backend == "mega_asr" || s->backend == "megaasr") {
         qwen3_asr_context_params p = qwen3_asr_context_default_params();
         p.n_threads = s->n_threads;
         p.verbosity = g_open_verbosity_tls;
@@ -2621,8 +2620,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
     // mega-asr is handled here too via the qwen3_ctx — it's just
     // qwen3 weights with a merged robustness LoRA. See the matching
     // alias set in crispasr_session_open_explicit.
-    if ((s->backend == "qwen3" || s->backend == "mega-asr" ||
-            s->backend == "mega_asr" || s->backend == "megaasr") &&
+    if ((s->backend == "qwen3" || s->backend == "mega-asr" || s->backend == "mega_asr" || s->backend == "megaasr") &&
         s->qwen3_ctx) {
         // qwen3-asr's runtime _transcribe() is a stub. Drive the building
         // blocks the CLI adapter uses (compute_mel → run_encoder → tokenize
@@ -3467,9 +3465,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         char* text = nullptr;
         bool need_free = true;
 #ifdef CA_HAVE_GRANITE_NLE
-        if (!text &&
-            (s->backend == "granite-4.1-nar" || s->backend == "granite-nle" ||
-                s->backend == "granite_nle") &&
+        if (!text && (s->backend == "granite-4.1-nar" || s->backend == "granite-nle" || s->backend == "granite_nle") &&
             s->granite_nle_ctx) {
             // granite_nle_transcribe is the single high-level entry point —
             // returns malloc'd UTF-8, caller frees. Token-prob accessors
