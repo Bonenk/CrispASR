@@ -4303,17 +4303,22 @@ extern "C" float* cosyvoice3_tts_synth(struct cosyvoice3_tts_context* ctx, const
         return nullptr;
     }
 
-    // ---- 1. Tokenise [prompt_text + " " + text] ----
-    // Upstream prepends prompt_text to the user text BEFORE BPE. The
-    // delimiter is a single space; the model has plenty of training
-    // signal for the concatenation pattern.
-    std::string full_text = voice->prompt_text;
-    if (!full_text.empty() && !text[0])
-        ; // empty user text — keep prompt only (unusual but harmless)
-    else if (!full_text.empty() && full_text.back() != ' ' && text[0] && text[0] != ' ')
-        full_text += ' ';
-    full_text += text;
-    std::vector<int32_t> text_ids = cv3_tokenise_prompt(ctx->vocab, full_text);
+    // ---- 1. Tokenise prompt_text + user_text ----
+    // Upstream Qwen2LM.inference does `text = torch.concat([prompt_text,
+    // text], dim=1)` — prompt_text and the user text are tokenised
+    // SEPARATELY then the id streams are concatenated. Joining the raw
+    // strings (even with a space) changes the BPE boundary token for
+    // the first word of the user text (e.g. " Hello" → 1 token vs
+    // "Hello" → 2 tokens), which subtly shifts what the LM hears and
+    // produces small but audible mispronunciations downstream
+    // (observed: "a test" → "our test" on the smoke prompt). Mirror
+    // upstream exactly.
+    std::vector<int32_t> prompt_ids = cv3_tokenise_prompt(ctx->vocab, voice->prompt_text);
+    std::vector<int32_t> user_ids = cv3_tokenise_prompt(ctx->vocab, std::string(text));
+    std::vector<int32_t> text_ids;
+    text_ids.reserve(prompt_ids.size() + user_ids.size());
+    text_ids.insert(text_ids.end(), prompt_ids.begin(), prompt_ids.end());
+    text_ids.insert(text_ids.end(), user_ids.begin(), user_ids.end());
     if (text_ids.empty()) {
         fprintf(stderr, "cosyvoice3_tts: synth: empty text after tokenisation\n");
         return nullptr;
