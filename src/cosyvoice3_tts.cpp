@@ -1122,6 +1122,8 @@ float* cv3_extract_euler_stage(cosyvoice3_tts_context* ctx, const float* mu, int
 float* cv3_run_solve_euler(cosyvoice3_tts_context* ctx, const float* mu, int T_mel, const float* spks_proj,
                            const float* cond, const float* x_init, int n_steps, float cfg_rate, float* dphi_step0_out);
 float* cv3_extract_hift_f0_stage(cosyvoice3_tts_context* ctx, const float* mel, int T_mel);
+float* cv3_extract_hift_decode_stage(cosyvoice3_tts_context* ctx, const float* mel, int T_mel, const float* s_stft_in,
+                                     const char* stage_name, int* out_n);
 } // namespace
 
 extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ctx, const char* stage_name,
@@ -1409,6 +1411,26 @@ extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ct
             return nullptr;
         *out_n = n_embed_tokens;
         return out;
+    }
+    // Phase 4-B — HiFT decode forward (Option B: caller supplies s_stft).
+    //   "hift_decode"                  — final 24 kHz audio (T_mel * 480 samples)
+    //   "hift_decode_s_stft"           — input round-trip (18, T_stft)
+    //   "hift_decode_conv_pre_out"     — (512, T_mel)
+    //   "hift_decode_post_stage_{0,1,2}_x"
+    //   "hift_decode_conv_post_out"    — (18,  T_stft)
+    //   "hift_decode_mag" / "_phase"   — (9,   T_stft)
+    //
+    // `embeds_in` packs [mel | s_stft] where:
+    //   mel:    n_embed_tokens * mel_dim   floats   ( T_mel = n_embed_tokens )
+    //   s_stft: T_stft * 18                floats   ( T_stft = T_mel * 120 + 1 )
+    if (strncmp(stage_name, "hift_decode", 11) == 0) {
+        if (!ctx->hift.loaded || !embeds_in || n_embed_tokens <= 0)
+            return nullptr;
+        const int T_mel = n_embed_tokens;
+        const int mel_dim = (int)ctx->hift.hp.mel_dim;
+        const float* mel = embeds_in;
+        const float* s_stft = embeds_in + (size_t)T_mel * mel_dim;
+        return cv3_extract_hift_decode_stage(ctx, mel, T_mel, s_stft, stage_name, out_n);
     }
     if (strcmp(stage_name, "flow_inventory") == 0) {
         if (!ctx->flow.loaded) {
@@ -2875,7 +2897,421 @@ float* cv3_extract_hift_f0_stage(cosyvoice3_tts_context* ctx, const float* mel, 
     return out;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 4-B — HiFT decode forward (mel + s_stft → 24 kHz audio)
+// ---------------------------------------------------------------------------
+//
+// Mirrors upstream `cosyvoice/hifigan/generator.py::CausalHiFTGenerator.decode`.
+// The caller supplies the pre-computed source STFT (real + imag concatenated
+// into (18, T_stft) at audio_rate / hop_len + 1 frames). This matches the
+// "Option B" handover plan — isolating the big main-path implementation from
+// the SineGen reproducibility question.
+//
+// Tensor layout: ggml (T, C) with T innermost matches PyTorch (B, C, T)
+// row-major memory exactly when B=1. So we can dump ggml outputs straight
+// to PyTorch (C, T) tensors for the diff.
+//
+// Stages exposed via cv3_extract_hift_decode_stage:
+//   hift_decode_s_stft         caller input → (18, T_stft)
+//   hift_decode_conv_pre_out   (512, T_mel)
+//   hift_decode_post_stage_0_x (256, T_mel*8)
+//   hift_decode_post_stage_1_x (128, T_mel*40)
+//   hift_decode_post_stage_2_x (64,  T_mel*120 + 1)
+//   hift_decode_conv_post_out  (18,  T_mel*120 + 1)
+//   hift_decode_mag            (9,   T_mel*120 + 1)
+//   hift_decode_phase          (9,   T_mel*120 + 1)
+//   hift_decode                (T_mel * 480,) — final 24 kHz audio
+
+// ResBlock causal conv with arbitrary dilation. Layout: x (T, C_in);
+// w (K, C_in, C_out); b (C_out,). Output (T, C_out). Left-pads by (K-1)*dil.
+ggml_tensor* cv3_causal_conv1d_dil(ggml_context* ctx, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b, int dilation) {
+    const int K = (int)w->ne[0];
+    const int T = (int)x->ne[0];
+    const int pad = (K - 1) * dilation;
+    ggml_tensor* y = ggml_conv_1d(ctx, w, x, /*stride*/ 1, /*pad*/ pad, /*dil*/ dilation);
+    // ggml_conv_1d with symmetric pad produces length T + (K-1)*dil. Take
+    // the LEFT T entries (drops causal pad from RIGHT) → causal conv.
+    y = ggml_view_2d(ctx, y, T, (int)y->ne[1], y->nb[1], 0);
+    y = ggml_cont(ctx, y);
+    if (b) {
+        ggml_tensor* b2d = ggml_reshape_2d(ctx, b, 1, (int)b->ne[0]);
+        y = ggml_add(ctx, y, b2d);
+    }
+    return y;
+}
+
+// CausalConv1dDownSample: stride > 1, kernel = K, causal_padding = stride - 1.
+// Pads LEFT by stride-1 with zeros, then strided unpadded conv. Layout
+// x (T_in, C_in) → output (T_out, C_out) with T_out = (T_in + stride - 1 - K) / stride + 1.
+ggml_tensor* cv3_causal_conv1d_downsample(ggml_context* ctx, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b,
+                                          int stride) {
+    const int lpad = stride - 1;
+    ggml_tensor* xp = lpad > 0 ? ggml_pad_ext(ctx, x, lpad, 0, 0, 0, 0, 0, 0, 0) : x;
+    ggml_tensor* y = ggml_conv_1d(ctx, w, xp, /*stride*/ stride, /*pad*/ 0, /*dil*/ 1);
+    if (b) {
+        ggml_tensor* b2d = ggml_reshape_2d(ctx, b, 1, (int)b->ne[0]);
+        y = ggml_add(ctx, y, b2d);
+    }
+    return y;
+}
+
+// Snake-Beta activation (alpha_logscale=False): y = x + sin²(α·x) / (α + ε).
+// Per-channel α. x (T, C); alpha (C,). Matches Python `Snake.no_div_by_zero=1e-9`.
+ggml_tensor* cv3_snake(ggml_context* ctx, ggml_tensor* x, ggml_tensor* alpha) {
+    ggml_tensor* a = ggml_reshape_2d(ctx, alpha, 1, (int)alpha->ne[0]); // (1, C) broadcast
+    ggml_tensor* ax = ggml_mul(ctx, x, a);
+    ggml_tensor* s = ggml_sin(ctx, ax);
+    ggml_tensor* s2 = ggml_mul(ctx, s, s);
+    ggml_tensor* a_safe = ggml_scale_bias(ctx, a, 1.0f, 1e-9f);
+    return ggml_add(ctx, x, ggml_div(ctx, s2, a_safe));
+}
+
+// Nearest-neighbor upsample along the T dimension by `scale`. x (T, C) → (T*scale, C).
+// Implementation: reshape (1, T, C), repeat to (scale, T, C), flatten dim 0+1.
+// Memory layout: ne=(scale, T, C) stores elements at offset = s + t*scale + c*T*scale,
+// which equals the desired (T*scale, C) layout where each input row gets replicated
+// `scale` times in sequence. Match torch.nn.Upsample(mode='nearest').
+ggml_tensor* cv3_nearest_upsample_t(ggml_context* ctx, ggml_tensor* x, int scale) {
+    if (scale <= 1)
+        return x;
+    const int T = (int)x->ne[0];
+    const int C = (int)x->ne[1];
+    ggml_tensor* r = ggml_reshape_3d(ctx, x, 1, T, C);
+    ggml_tensor* y = ggml_repeat_4d(ctx, r, scale, T, C, 1);
+    y = ggml_cont(ctx, y);
+    return ggml_reshape_2d(ctx, y, T * scale, C);
+}
+
+// HiFT main ResBlock forward. 3 sub-blocks (snake1 → c1@dil → snake2 → c2 → residual).
+// x (T, C). Returns (T, C). c1 uses per-sub-block dilation; c2 always dilation=1.
+ggml_tensor* cv3_hift_resblock_fwd(ggml_context* ctx, ggml_tensor* x, const cv3_hift_resblock& rb,
+                                   const int dilations[3]) {
+    for (int j = 0; j < 3; j++) {
+        ggml_tensor* xt = cv3_snake(ctx, x, rb.a1_alpha[j]);
+        xt = cv3_causal_conv1d_dil(ctx, xt, rb.c1_w[j], rb.c1_b[j], dilations[j]);
+        xt = cv3_snake(ctx, xt, rb.a2_alpha[j]);
+        xt = cv3_causal_conv1d(ctx, xt, rb.c2_w[j], rb.c2_b[j]);
+        x = ggml_add(ctx, x, xt);
+    }
+    return x;
+}
+
+// Overlap-add iSTFT (n_fft=16, hop_len=4, periodic Hann window). Matches
+// torch.istft(complex(mag·cos(phase), mag·sin(phase)), n_fft=16, hop=4,
+// window=hann(16, periodic=True), center=True). Output length = T_mel * 480
+// (with the standard COLA reconstruction trimmed by n_fft/2 from the head).
+//
+// Input layout: conv_post_out is (T_stft, 18) in ggml memory order, which
+// equals PyTorch (1, 18, T_stft) row-major. Bins 0..8 = log-magnitude raw;
+// bins 9..17 = phase argument. We clip exp(mag) to 1e2 (matching upstream
+// `_istft`).
+std::vector<float> cv3_hift_istft(const float* conv_post_out, int T_stft, int T_mel, float audio_limit) {
+    const int n_fft = 16;
+    const int hop = 4;
+    const int n_freq = n_fft / 2 + 1; // 9
+
+    const int n_samples = (T_stft - 1) * hop + n_fft;
+    std::vector<float> wav((size_t)n_samples, 0.0f);
+    std::vector<float> win_sum((size_t)n_samples, 0.0f);
+
+    std::vector<float> win(n_fft);
+    for (int i = 0; i < n_fft; i++) {
+        win[i] = 0.5f * (1.0f - std::cos(2.0f * (float)M_PI * (float)i / (float)n_fft));
+    }
+
+    for (int frame = 0; frame < T_stft; frame++) {
+        float re[9], im[9];
+        for (int f = 0; f < n_freq; f++) {
+            const float raw_mag = conv_post_out[(size_t)f * T_stft + (size_t)frame];
+            const float raw_ph = conv_post_out[(size_t)(n_freq + f) * T_stft + (size_t)frame];
+            const float mag = std::min(100.0f, std::exp(raw_mag));
+            const float ph = std::sin(raw_ph);
+            re[f] = mag * std::cos(ph);
+            im[f] = mag * std::sin(ph);
+        }
+        const int start = frame * hop;
+        // Half-spectrum IDFT with 2× factor on the interior bins. Exact for
+        // real-valued time-domain signal (the conjugate symmetry is implicit).
+        for (int n = 0; n < n_fft && (start + n) < n_samples; n++) {
+            float sample = re[0];
+            for (int f = 1; f < n_freq - 1; f++) {
+                const float angle = 2.0f * (float)M_PI * (float)f * (float)n / (float)n_fft;
+                sample += 2.0f * (re[f] * std::cos(angle) - im[f] * std::sin(angle));
+            }
+            const float angle_ny = 2.0f * (float)M_PI * (float)(n_freq - 1) * (float)n / (float)n_fft;
+            sample += re[n_freq - 1] * std::cos(angle_ny) - im[n_freq - 1] * std::sin(angle_ny);
+            sample /= (float)n_fft;
+            wav[start + n] += sample * win[n];
+            win_sum[start + n] += win[n] * win[n];
+        }
+    }
+    for (int i = 0; i < n_samples; i++) {
+        if (win_sum[i] > 1e-8f) {
+            wav[i] /= win_sum[i];
+        }
+    }
+    // center=True: trim n_fft/2 samples from the front.
+    const int center_pad = n_fft / 2;
+    const int final_len = T_mel * 480;
+    std::vector<float> out;
+    out.reserve((size_t)final_len);
+    for (int i = 0; i < final_len; i++) {
+        const int src = center_pad + i;
+        const float v = (src >= 0 && src < (int)wav.size()) ? wav[src] : 0.0f;
+        out.push_back(std::max(-audio_limit, std::min(audio_limit, v)));
+    }
+    return out;
+}
+
+// Build the HiFT decode graph. Inputs (set externally):
+//   hift_decode_mel_in    [mel_dim, T_mel]              F32
+//   hift_decode_s_stft_in [T_stft, 18]                  F32 — concat of real+imag
+// T_stft must equal T_mel * 120 + 1 (= T_audio/hop + 1 with center=True).
+//
+// The graph stops at conv_post (pre-iSTFT). iSTFT runs CPU-side because it's
+// a custom op not in ggml (overlap-add with window^2 normalization).
+ggml_cgraph* cv3_build_hift_decode_graph(cosyvoice3_tts_context* ctx, int T_mel) {
+    const auto& h = ctx->hift;
+    const int mel = (int)h.hp.mel_dim;
+    const int base = (int)h.hp.base_channels;
+    const float slope = h.hp.lrelu_slope;
+    const int n_fft = (int)h.hp.istft_n_fft;
+    const int n_freq = n_fft / 2 + 1; // 9
+    const int s_stft_ch = n_fft + 2;  // 18
+
+    // Derived shapes (verified against upstream + GGUF tensors):
+    //   T_audio   = T_mel * 480
+    //   T_stft    = T_audio / hop + 1 = T_mel * 120 + 1   (torch.stft center=True)
+    //   per-stage main T: T_mel*8, T_mel*40, T_mel*120 + 1 (last + reflection_pad)
+    const int T_audio = T_mel * 480;
+    const int T_stft = T_audio / (int)h.hp.istft_hop + 1; // = T_mel*120 + 1
+    const int up_rates[3] = {(int)h.hp.upsample_rates[0], (int)h.hp.upsample_rates[1], (int)h.hp.upsample_rates[2]};
+    const int down_strides[3] = {15, 3, 1}; // cumprod([3,5][::-1]) = [3,15] reversed → [15, 3], plus 1
+    // (downsample_rates = [1]+[3,5], cum=[1,3,15], reversed → [15,3,1])
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 32768, false);
+
+    ggml_tensor* mel_in = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, mel, T_mel);
+    ggml_set_input(mel_in);
+    ggml_set_name(mel_in, "hift_decode_mel_in");
+
+    ggml_tensor* s_stft = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, T_stft, s_stft_ch);
+    ggml_set_input(s_stft);
+    ggml_set_name(s_stft, "hift_decode_s_stft_in");
+    // Expose s_stft as a stage output for diff visibility.
+    ggml_tensor* s_stft_out = ggml_cont(ctx0, s_stft);
+    ggml_set_name(s_stft_out, "hift_decode_s_stft");
+    ggml_set_output(s_stft_out);
+    ggml_build_forward_expand(gf, s_stft_out);
+
+    // ---- conv_pre — CausalConv1d k=5 right-pad 4 (causal_type='right') ----
+    // Input (mel, T_mel) → transpose to (T_mel, mel) → lookahead conv (k=5,
+    // 80→512) → (T_mel, 512).
+    ggml_tensor* x = ggml_cont(ctx0, ggml_transpose(ctx0, mel_in)); // (T_mel, mel)
+    x = cv3_lookahead_conv1d(ctx0, x, h.conv_pre_w, h.conv_pre_b);  // (T_mel, 512)
+    {
+        // Dump in PyTorch (C, T) layout. ggml (T, C) memory order already
+        // matches PyTorch (C, T) byte-for-byte (T contiguous within each C).
+        ggml_tensor* dump = ggml_cont(ctx0, x);
+        ggml_set_name(dump, "hift_decode_conv_pre_out");
+        ggml_set_output(dump);
+        ggml_build_forward_expand(gf, dump);
+    }
+
+    // ---- 3-stage upsample tower with source fusion + main resblock fusion ----
+    const int rb_kernels[3] = {3, 7, 11};
+    const int dilations[3] = {1, 3, 5};
+    const int src_rb_kernels[3] = {7, 7, 11};
+
+    for (int i = 0; i < 3; i++) {
+        const int u = up_rates[i];
+        const int ch_out = base >> (i + 1); // 256, 128, 64
+
+        // LeakyReLU(slope=0.1) → CausalConv1dUpsample = Upsample(nearest, u) + CausalConv1d(K, left-pad K-1).
+        x = ggml_leaky_relu(ctx0, x, slope, /*inplace*/ false);
+        x = cv3_nearest_upsample_t(ctx0, x, u);
+        x = cv3_causal_conv1d(ctx0, x, h.ups_w[i], h.ups_b[i]); // (T*u, ch_out)
+
+        // ReflectionPad1d((1, 0)) only at the LAST stage. PyTorch reflects
+        // ACROSS the boundary: pad position -1 holds x[1], not x[0]. So new
+        // tensor T is T+1 with new[0]=x[1], new[1..T]=x[0..T-1].
+        if (i == 2) {
+            const int T_x = (int)x->ne[0];
+            const int C_x = (int)x->ne[1];
+            // Slice x[1:2, :] then prepend via concat along dim 0.
+            ggml_tensor* head = ggml_view_2d(ctx0, x, 1, C_x, x->nb[1], 1 * x->nb[0]);
+            head = ggml_cont(ctx0, head);
+            x = ggml_concat(ctx0, head, x, 0); // (T_x + 1, C_x)
+            (void)T_x;
+        }
+
+        // Source fusion: source_downs[i] → source_resblocks[i] → add.
+        ggml_tensor* si;
+        if (down_strides[i] > 1) {
+            si = cv3_causal_conv1d_downsample(ctx0, s_stft, h.src_down_w[i], h.src_down_b[i], down_strides[i]);
+        } else {
+            // CausalConv1d k=1 left-pad 0 — degenerate, no padding needed.
+            si = cv3_causal_conv1d(ctx0, s_stft, h.src_down_w[i], h.src_down_b[i]);
+        }
+        // Source resblock (single ResBlock per stage).
+        si = cv3_hift_resblock_fwd(ctx0, si, h.src_resblocks[i], dilations);
+        (void)src_rb_kernels; // kernels are baked into the loaded weights
+        // Align T (defensive — the dim math should already match).
+        {
+            const int T_x = (int)x->ne[0];
+            const int T_si = (int)si->ne[0];
+            const int T_min = T_x < T_si ? T_x : T_si;
+            if (T_si > T_min) {
+                si = ggml_cont(ctx0, ggml_view_2d(ctx0, si, T_min, (int)si->ne[1], si->nb[1], 0));
+            }
+            if (T_x > T_min) {
+                x = ggml_cont(ctx0, ggml_view_2d(ctx0, x, T_min, (int)x->ne[1], x->nb[1], 0));
+            }
+        }
+        x = ggml_add(ctx0, x, si);
+
+        // Main resblock fusion: 3 ResBlocks (kernel ∈ {3,7,11}), each applied
+        // INDEPENDENTLY to the same x, outputs averaged: x = mean_j rb_j(x).
+        ggml_tensor* xs = nullptr;
+        ggml_tensor* rb_in = x;
+        for (int j = 0; j < 3; j++) {
+            const int K = rb_kernels[j];
+            (void)K; // kernel baked into weights via cv3_causal_conv1d_dil
+            ggml_tensor* rj = cv3_hift_resblock_fwd(ctx0, rb_in, h.resblocks[i * 3 + j], dilations);
+            xs = xs ? ggml_add(ctx0, xs, rj) : rj;
+        }
+        x = ggml_scale(ctx0, xs, 1.0f / 3.0f);
+
+        {
+            ggml_tensor* dump = ggml_cont(ctx0, x);
+            char name[64];
+            std::snprintf(name, sizeof(name), "hift_decode_post_stage_%d_x", i);
+            ggml_set_name(dump, name);
+            ggml_set_output(dump);
+            ggml_build_forward_expand(gf, dump);
+        }
+    }
+
+    // ---- conv_post — CausalConv1d k=7 left-pad 6 ----
+    // Upstream calls plain F.leaky_relu (no explicit slope → default 0.01)
+    // BEFORE conv_post. The HiFT YAML lrelu_slope=0.1 is only used inside
+    // the upsample loop.
+    x = ggml_leaky_relu(ctx0, x, 0.01f, /*inplace*/ false);
+    x = cv3_causal_conv1d(ctx0, x, h.conv_post_w, h.conv_post_b); // (T_stft, 18)
+    ggml_tensor* conv_post_out = ggml_cont(ctx0, x);
+    ggml_set_name(conv_post_out, "hift_decode_conv_post_out");
+    ggml_set_output(conv_post_out);
+    ggml_build_forward_expand(gf, conv_post_out);
+
+    // Split out magnitude (first 9 channels) and phase (last 9). Dumped only
+    // for diff localisation — they're not used further inside the graph (the
+    // iSTFT runs CPU-side after compute).
+    {
+        const int T_out = (int)x->ne[0];
+        // Channels are dim 1. Slice [:, 0:9] and [:, 9:18].
+        ggml_tensor* mag_raw = ggml_view_2d(ctx0, x, T_out, n_freq, x->nb[1], 0);
+        mag_raw = ggml_cont(ctx0, mag_raw);
+        ggml_tensor* mag = ggml_exp(ctx0, mag_raw);
+        // Clip mag to 1e2 (match upstream `_istft`).
+        mag = ggml_clamp(ctx0, mag, 0.0f, 100.0f);
+        ggml_set_name(mag, "hift_decode_mag");
+        ggml_set_output(mag);
+        ggml_build_forward_expand(gf, mag);
+
+        ggml_tensor* phase_raw = ggml_view_2d(ctx0, x, T_out, n_freq, x->nb[1], (size_t)n_freq * x->nb[1]);
+        phase_raw = ggml_cont(ctx0, phase_raw);
+        ggml_tensor* phase = ggml_sin(ctx0, phase_raw);
+        ggml_set_name(phase, "hift_decode_phase");
+        ggml_set_output(phase);
+        ggml_build_forward_expand(gf, phase);
+    }
+
+    ggml_free(ctx0);
+    return gf;
+}
+
+// Run the HiFT decode graph + CPU iSTFT, returning the requested stage. For
+// "hift_decode" returns the final 24 kHz audio (T_mel * 480 samples). For any
+// of the named intermediates, returns the per-stage buffer.
+//
+// `s_stft_in` packs the 18-channel concatenation of STFT(real) + STFT(imag)
+// in (T_stft, 18) row-major (same byte layout as ggml (T_stft, 18)).
+float* cv3_extract_hift_decode_stage(cosyvoice3_tts_context* ctx, const float* mel, int T_mel, const float* s_stft_in,
+                                     const char* stage_name, int* out_n) {
+    if (!ctx || !ctx->hift.loaded || !mel || T_mel <= 0 || !s_stft_in || !stage_name || !out_n)
+        return nullptr;
+    *out_n = 0;
+    const auto& h = ctx->hift;
+    const int mel_dim = (int)h.hp.mel_dim;
+    const int s_stft_ch = (int)h.hp.istft_n_fft + 2;
+    const int T_stft = T_mel * 120 + 1;
+    const int T_audio = T_mel * 480;
+    const float audio_limit = h.hp.audio_limit;
+
+    ctx->step_t1_gf = nullptr;
+    ctx->step_t1_fixed_kv_len = 0;
+
+    ggml_cgraph* gf = cv3_build_hift_decode_graph(ctx, T_mel);
+    if (!gf)
+        return nullptr;
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        fprintf(stderr, "cosyvoice3_tts: hift_decode alloc_graph failed\n");
+        return nullptr;
+    }
+    ggml_tensor* mel_t = ggml_graph_get_tensor(gf, "hift_decode_mel_in");
+    ggml_tensor* s_t = ggml_graph_get_tensor(gf, "hift_decode_s_stft_in");
+    if (!mel_t || !s_t)
+        return nullptr;
+    ggml_backend_tensor_set(mel_t, mel, 0, (size_t)mel_dim * T_mel * sizeof(float));
+    ggml_backend_tensor_set(s_t, s_stft_in, 0, (size_t)T_stft * s_stft_ch * sizeof(float));
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        fprintf(stderr, "cosyvoice3_tts: hift_decode compute failed\n");
+        return nullptr;
+    }
+
+    // Final audio: run CPU iSTFT on conv_post output.
+    if (strcmp(stage_name, "hift_decode") == 0) {
+        ggml_tensor* cp = ggml_graph_get_tensor(gf, "hift_decode_conv_post_out");
+        if (!cp)
+            return nullptr;
+        std::vector<float> tmp((size_t)ggml_nelements(cp));
+        ggml_backend_tensor_get(cp, tmp.data(), 0, tmp.size() * sizeof(float));
+        std::vector<float> wav = cv3_hift_istft(tmp.data(), T_stft, T_mel, audio_limit);
+        float* out = (float*)malloc((size_t)T_audio * sizeof(float));
+        if (!out)
+            return nullptr;
+        std::memcpy(out, wav.data(), (size_t)T_audio * sizeof(float));
+        *out_n = T_audio;
+        return out;
+    }
+
+    // Otherwise: just return the named graph output.
+    ggml_tensor* out_t = ggml_graph_get_tensor(gf, stage_name);
+    if (!out_t) {
+        fprintf(stderr, "cosyvoice3_tts: hift_decode stage '%s' not found in graph\n", stage_name);
+        return nullptr;
+    }
+    const size_t n = (size_t)ggml_nelements(out_t);
+    float* out = (float*)malloc(n * sizeof(float));
+    if (!out)
+        return nullptr;
+    ggml_backend_tensor_get(out_t, out, 0, n * sizeof(float));
+    *out_n = (int)n;
+    return out;
+}
+
 } // namespace
+
+extern "C" float* cosyvoice3_tts_run_hift_decode(struct cosyvoice3_tts_context* ctx, const float* mel, int T_mel,
+                                                 const float* s_stft) {
+    if (!ctx || !ctx->hift.loaded || !mel || T_mel <= 0 || !s_stft)
+        return nullptr;
+    int out_n = 0;
+    return cv3_extract_hift_decode_stage(ctx, mel, T_mel, s_stft, "hift_decode", &out_n);
+}
 
 // Phase 4-A — HiFT loader. Binds the 246 hift GGUF tensors into ctx->hift
 // (or specifically: 2 conv_pre, 2 conv_post, 6 ups, 162 main resblocks,

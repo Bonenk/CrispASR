@@ -96,6 +96,17 @@ DEFAULT_STAGES = [
     # Phase 4-A — HiFT F0 predictor
     "hift_f0_mel_in",           # seeded random mel input             (T_mel, 80)
     "hift_f0",                  # CausalConvRNNF0Predictor output     (T_mel,)
+    # Phase 4-B — HiFT decode forward (Option B: caller supplies s_stft)
+    "hift_decode_mel_in",       # (mel_dim, T_mel)
+    "hift_decode_s_stft_in",    # (18, T_stft)
+    "hift_decode_conv_pre_out", # (base_channels, T_mel)
+    "hift_decode_post_stage_0_x",
+    "hift_decode_post_stage_1_x",
+    "hift_decode_post_stage_2_x",
+    "hift_decode_conv_post_out",
+    "hift_decode_mag",
+    "hift_decode_phase",
+    "hift_decode",              # (T_mel * 480,) 24 kHz audio
 ]
 
 # Fixed test-vector parameters for the Phase 3b dumps. Pinned so the
@@ -832,6 +843,149 @@ def _load_hift_state(model_dir: Path):
     return sd
 
 
+# Phase 4-B — HiFT decode forward (Option B fixture).
+# T_mel small enough to keep dumps fast; the test is purely numerical so
+# absolute values don't need to be speech-like. Independent seeds for the
+# mel input and the source waveform `s` (the latter fed straight to STFT;
+# we bypass SineGen/m_source via Option B's "caller supplies s_stft" route).
+HIFT_DECODE_T_MEL = 12
+HIFT_DECODE_MEL_SEED = 8888
+HIFT_DECODE_S_SEED = 9999
+
+
+def _build_causal_hift(model_dir: Path):
+    """Instantiate upstream CausalHiFTGenerator with cv3 yaml params and
+    load weights from hift.pt. Returns the eval-mode module."""
+    _ensure_upstream_on_path()
+    import torch
+    from cosyvoice.hifigan.generator import CausalHiFTGenerator
+    from cosyvoice.hifigan.f0_predictor import CausalConvRNNF0Predictor
+
+    f0 = CausalConvRNNF0Predictor(num_class=1, in_channels=MEL_DIM, cond_channels=512)
+    gen = CausalHiFTGenerator(
+        in_channels=80,
+        base_channels=512,
+        nb_harmonics=8,
+        sampling_rate=24000,
+        nsf_alpha=0.1,
+        nsf_sigma=0.003,
+        nsf_voiced_threshold=10,
+        upsample_rates=[8, 5, 3],
+        upsample_kernel_sizes=[16, 11, 7],
+        istft_params={"n_fft": 16, "hop_len": 4},
+        resblock_kernel_sizes=[3, 7, 11],
+        resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+        source_resblock_kernel_sizes=[7, 7, 11],
+        source_resblock_dilation_sizes=[[1, 3, 5], [1, 3, 5], [1, 3, 5]],
+        lrelu_slope=0.1,
+        audio_limit=0.99,
+        conv_pre_look_right=4,
+        f0_predictor=f0,
+    )
+    sd = _load_hift_state(model_dir)
+    missing, unexpected = gen.load_state_dict(sd, strict=False)
+    if missing or unexpected:
+        # Some keys are stored under weight-norm parametrisation prefixes
+        # (parametrizations.weight.original0/original1). PyTorch handles
+        # those automatically during load_state_dict for modules with
+        # weight_norm applied. Anything still unmapped here is informational.
+        print(f"  hift load missing={len(missing)} unexpected={len(unexpected)}")
+    gen.eval()
+    return gen
+
+
+def _capture_hift_decode_stages(model_dir: Path,
+                                T_mel: int = HIFT_DECODE_T_MEL,
+                                mel_seed: int = HIFT_DECODE_MEL_SEED,
+                                s_seed: int = HIFT_DECODE_S_SEED) -> Dict[str, "torch.Tensor"]:
+    """Run upstream `CausalHiFTGenerator.decode(mel, s, finalize=True)` on a
+    pair of seeded random inputs. The `s` waveform is provided directly
+    (bypassing the SineGen/m_source pre-stage) since this is the Option B
+    cut: we validate the decode forward in isolation from the deterministic
+    noise reproducibility question.
+
+    Returns intermediates keyed by the short name (so the dump() wrapper
+    can prefix `hift_decode_`):
+
+      mel_in            (mel_dim, T_mel)            F32 — input mel
+      s_stft_in         (18, T_stft)                F32 — caller s STFT (re+im concat)
+      conv_pre_out      (base_channels, T_mel)      F32
+      post_stage_0_x    (ch_0, T_mel*8)
+      post_stage_1_x    (ch_1, T_mel*40)
+      post_stage_2_x    (ch_2, T_mel*120 + 1)
+      conv_post_out     (n_fft+2, T_mel*120 + 1)
+      mag               (n_fft/2+1, T_mel*120 + 1)
+      phase             (n_fft/2+1, T_mel*120 + 1)
+      ""                (T_mel * 480,)              F32 — final 24 kHz audio
+    """
+    _ensure_upstream_on_path()
+    import torch
+    import torch.nn.functional as F
+
+    gen = _build_causal_hift(model_dir)
+
+    mel_gen = torch.Generator().manual_seed(mel_seed)
+    mel = torch.randn(1, MEL_DIM, T_mel, generator=mel_gen, dtype=torch.float32)
+    T_audio = T_mel * 480
+    s_gen = torch.Generator().manual_seed(s_seed)
+    s = torch.randn(1, 1, T_audio, generator=s_gen, dtype=torch.float32)
+
+    intermediates: Dict[str, "torch.Tensor"] = {}
+
+    with torch.no_grad():
+        # Replicate `CausalHiFTGenerator.decode(x=mel, s=s, finalize=True)` so
+        # we can intercept the intermediates.
+        s_stft_real, s_stft_imag = gen._stft(s.squeeze(1))
+        s_stft = torch.cat([s_stft_real, s_stft_imag], dim=1)
+        intermediates["s_stft_in"] = s_stft.squeeze(0).contiguous()       # (18, T_stft)
+
+        x = gen.conv_pre(mel)
+        intermediates["conv_pre_out"] = x.squeeze(0).contiguous()
+
+        for i in range(gen.num_upsamples):
+            x = F.leaky_relu(x, gen.lrelu_slope)
+            x = gen.ups[i](x)
+            if i == gen.num_upsamples - 1:
+                x = gen.reflection_pad(x)
+            si = gen.source_downs[i](s_stft)
+            si = gen.source_resblocks[i](si)
+            x = x + si
+            xs = None
+            for j in range(gen.num_kernels):
+                rj = gen.resblocks[i * gen.num_kernels + j](x)
+                xs = rj if xs is None else xs + rj
+            x = xs / gen.num_kernels
+            intermediates[f"post_stage_{i}_x"] = x.squeeze(0).contiguous()
+
+        x = F.leaky_relu(x)
+        x = gen.conv_post(x)
+        intermediates["conv_post_out"] = x.squeeze(0).contiguous()
+
+        magnitude = torch.exp(x[:, :gen.istft_params["n_fft"] // 2 + 1, :])
+        magnitude = torch.clip(magnitude, max=1e2)
+        phase = torch.sin(x[:, gen.istft_params["n_fft"] // 2 + 1:, :])
+        intermediates["mag"] = magnitude.squeeze(0).contiguous()
+        intermediates["phase"] = phase.squeeze(0).contiguous()
+
+        audio = gen._istft(magnitude, phase)
+        audio = torch.clamp(audio, -gen.audio_limit, gen.audio_limit)
+        # Final audio length should be T_mel * 480. torch.istft default
+        # length when center=True returns (T_stft - 1) * hop, which is one
+        # frame short of T_mel * 480. Pad with zeros to match if needed.
+        if audio.shape[-1] < T_audio:
+            audio = F.pad(audio, (0, T_audio - audio.shape[-1]))
+        else:
+            audio = audio[..., :T_audio]
+        intermediates[""] = audio.squeeze(0).contiguous()
+
+    # Transpose to (T_mel, mel_dim) row-major so its bytes line up with
+    # ggml ne=(mel_dim, T_mel) — matching the F0 ref convention. The C++
+    # graph allocates `hift_decode_mel_in` as ne=(mel_dim, T_mel) and
+    # reads the bytes straight in via `ggml_backend_tensor_set`.
+    intermediates["mel_in"] = mel.squeeze(0).transpose(0, 1).contiguous()  # (T_mel, mel_dim) bytes = ggml (mel_dim, T_mel)
+    return intermediates
+
+
 def _capture_hift_f0_stages(model_dir: Path, T_mel: int = HIFT_F0_T_MEL,
                             seed: int = HIFT_F0_SEED) -> Dict[str, "torch.Tensor"]:
     """Run upstream CausalConvRNNF0Predictor on a seeded random mel and
@@ -939,6 +1093,15 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         f0_stages = _capture_hift_f0_stages(model_dir)
         for short, t in f0_stages.items():
             name = "hift_f0" + (("_" + short) if short else "")
+            if name not in requested:
+                continue
+            out[name] = t.detach().cpu().numpy().astype(np.float32)
+
+    # ---- Phase 4-B HiFT decode forward ----
+    if any(s.startswith("hift_decode") for s in requested):
+        decode_stages = _capture_hift_decode_stages(model_dir)
+        for short, t in decode_stages.items():
+            name = "hift_decode" + (("_" + short) if short else "")
             if name not in requested:
                 continue
             out[name] = t.detach().cpu().numpy().astype(np.float32)

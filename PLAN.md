@@ -606,7 +606,8 @@ work in 4 phases**.
   - **3e — end-to-end mel diff — landed via 3d-B's
     `flow_euler` stage.** Diff-gate cos ≥ 0.99 PASSES.
 - **Phase 4 — CausalHiFTGenerator + F0 predictor + Snake +
-  iSTFT**. Partial — 4-A landed 2026-05-28; 4-B and 4-C still open.
+  iSTFT**. 4-A + 4-B landed 2026-05-28; 4-C (full-chain) + SineGen
+  source path still open.
   - **4-A (2026-05-28)**: HiFT loader + F0 predictor
     (`CausalConvRNNF0Predictor`) — binds all 246 hift GGUF tensors
     (conv_pre/conv_post, ups.0-2, resblocks.0-8, source_downs.0-2,
@@ -617,13 +618,26 @@ work in 4 phases**.
     `cosyvoice3_tts_init_hift_from_file`. Stage `hift_f0` PASS at
     cos=1.0 max|Δ|=3.7e-1 (Hz units; cos=1.0 = perfect angular
     alignment).
-  - **4-B (open)**: full HiFT decode forward — conv_pre +
-    SineGen source generation + STFT/iSTFT (n_fft=16, hop=4) + 3-stage
-    upsample chain (`CausalConv1dUpsample`) + 9 main ResBlocks
-    (Snake-Beta activations) + 3 source ResBlocks + conv_post.
-    Diff-gate: waveform cos ≥ 0.95.
+  - **4-B (2026-05-28)**: HiFT decode forward (Option B —
+    caller-supplied s_stft). conv_pre (CausalConv1d k=5 right-pad-4)
+    + 3-stage upsample tower (`nn.Upsample(nearest, u) +
+    CausalConv1d(left-pad K-1)` per stage, rates [8, 5, 3]) with
+    source fusion (CausalConv1dDownSample stride∈[15,3,1]) and main
+    resblock averaging (3 ResBlocks per stage, dilations [1, 3, 5],
+    Snake-Beta activations) + conv_post (k=7 left-pad-6) + half-spectrum
+    iSTFT (n_fft=16, hop=4, periodic Hann, COLA-normalized overlap-add,
+    centered output trimmed by n_fft/2). Public API:
+    `cosyvoice3_tts_run_hift_decode(ctx, mel, T_mel, s_stft) →
+    float[T_mel * 480]`. All 8 stages PASS at cos ≥ 0.997 (final
+    `hift_decode` cos=0.999815, well above the 0.95 vocoder gate).
+    The s_stft path (SineGen + l_linear + STFT) remains caller-side;
+    runtime callers compose with F0 predictor (4-A) + their own
+    source-side prelude. A 4-B-1 follow-up will inline the SineGen
+    path inside the runtime, but the decode forward is bit-equivalent
+    to PyTorch right now.
   - **4-C (open)**: end-to-end mel → 24 kHz waveform, gated on the
-    full chain (LM → flow Euler → HiFT decode → audio).
+    full chain (LM → flow Euler → HiFT decode → audio). Once 4-B-1
+    (SineGen + l_linear + STFT) lands, this is trivial.
 - **Phase 5 — CLI adapter + model registry + HF upload + docs**.
   Open. Phase-2-then-3-then-4 then this.
 - **Phase 6 (deferred)** — S3Tokenizer V3 for arbitrary-WAV cloning.

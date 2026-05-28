@@ -4087,6 +4087,73 @@ int main(int argc, char** argv) {
             }
         }
 
+        // ---- Phase 4-B — HiFT decode forward (Option B) ----
+        // Inputs from ref: mel (mel_dim, T_mel) + s_stft (18, T_stft).
+        // Pack [mel | s_stft] then extract each named hift_decode_* stage.
+        // Per-stage thresholds:
+        //   intermediates: cos ≥ 0.99 (HiFT vocoder phase-4-B handover gate)
+        //   final audio:   cos ≥ 0.95 (looser, vocoders are phase-sensitive)
+        {
+            auto mel_pair = ref.get_f32("hift_decode_mel_in");
+            auto s_pair = ref.get_f32("hift_decode_s_stft_in");
+            uint32_t mel_dim = 0;
+            cosyvoice3_tts_get_flow_hparams(ctx, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &mel_dim,
+                                            nullptr, nullptr, nullptr, nullptr);
+            if (mel_pair.first && s_pair.first && mel_dim > 0 && mel_pair.second % mel_dim == 0) {
+                const int T_mel = (int)(mel_pair.second / mel_dim);
+                const int T_stft = T_mel * 120 + 1;
+                const int s_stft_ch = 18;
+                if (s_pair.second != (size_t)T_stft * s_stft_ch) {
+                    printf("[SKIP] hift_decode  (s_stft expected %d × %d = %d floats, got %zu)\n", s_stft_ch, T_stft,
+                           T_stft * s_stft_ch, s_pair.second);
+                    n_skip++;
+                } else {
+                    std::vector<float> packed(mel_pair.second + s_pair.second);
+                    std::memcpy(packed.data(), mel_pair.first, mel_pair.second * sizeof(float));
+                    std::memcpy(packed.data() + mel_pair.second, s_pair.first, s_pair.second * sizeof(float));
+                    static const char* decode_stages[] = {
+                        "hift_decode_conv_pre_out",   "hift_decode_post_stage_0_x",
+                        "hift_decode_post_stage_1_x", "hift_decode_post_stage_2_x",
+                        "hift_decode_conv_post_out",  "hift_decode_mag",
+                        "hift_decode_phase",          "hift_decode",
+                    };
+                    for (const char* sname : decode_stages) {
+                        int n_out = 0;
+                        float* buf =
+                            cosyvoice3_tts_extract_stage(ctx, sname, /*ids*/ nullptr, /*n_ids*/ 0, packed.data(),
+                                                         /*n_embed_tokens*/ T_mel, &n_out);
+                        if (!buf || n_out <= 0) {
+                            printf("[SKIP] %-30s  cosyvoice3_tts_extract_stage returned no data\n", sname);
+                            if (buf)
+                                free(buf);
+                            n_skip++;
+                            continue;
+                        }
+                        auto rep = ref.compare(sname, buf, (size_t)n_out);
+                        // Vocoders are sensitive to phase reconstruction — use the
+                        // phase-4-B handover gate cos ≥ 0.95 for the final audio,
+                        // cos ≥ 0.99 for the named intermediates.
+                        const float thr = (strcmp(sname, "hift_decode") == 0) ? 0.95f : 0.99f;
+                        print_row(sname, rep, thr);
+                        // Use the per-stage threshold for the summary count too
+                        // (the global `record` lambda hardcodes 0.999, which is
+                        // too strict for the phase-4-B vocoder gates).
+                        if (!rep.found) {
+                            n_skip++;
+                        } else if (rep.is_pass(thr)) {
+                            n_pass++;
+                        } else {
+                            n_fail++;
+                        }
+                        free(buf);
+                    }
+                }
+            } else {
+                printf("[SKIP] %-30s  (hift_decode inputs missing in reference)\n", "hift_decode_*");
+                n_skip++;
+            }
+        }
+
         cosyvoice3_tts_free(ctx);
     } else {
         fprintf(stderr,

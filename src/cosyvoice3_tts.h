@@ -187,6 +187,18 @@ float* cosyvoice3_tts_solve_flow_euler(struct cosyvoice3_tts_context* ctx, const
                                        const float* spks_proj, const float* cond, const float* x_init, int n_steps,
                                        float cfg_rate);
 
+// HiFT decode forward — runs the main upsample tower + iSTFT to produce a
+// 24 kHz waveform. Inputs:
+//   mel        [T_mel, mel_dim=80]      F32 — typically `solve_flow_euler` output.
+//   s_stft     [T_stft, 18]             F32 — caller-supplied source-side STFT
+//                                              concatenation of real+imag bins,
+//                                              with T_stft = T_mel * 120 + 1
+//                                              (matches torch.stft center=True).
+// Returns malloc'd float[T_mel * 480] (caller frees) — 24 kHz mono audio.
+// Returns nullptr if the HiFT sub-model isn't loaded.
+float* cosyvoice3_tts_run_hift_decode(struct cosyvoice3_tts_context* ctx, const float* mel, int T_mel,
+                                      const float* s_stft);
+
 // Diff-harness stage extractor. Returns malloc'd float[*out_n].
 // Phase 2 supports:
 //   "lm_step0_logits"   — single-step logits after prefilling on
