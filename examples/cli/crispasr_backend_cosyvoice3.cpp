@@ -8,6 +8,8 @@
 
 #include "crispasr_backend.h"
 #include "crispasr_backend_utils.h"
+#include "crispasr_model_mgr_cli.h"
+#include "crispasr_model_registry.h"
 #include "whisper_params.h"
 
 #include "cosyvoice3_tts.h"
@@ -39,6 +41,46 @@ std::string discover_sibling(const std::string& base_dir, const std::vector<cons
             return p;
     }
     return "";
+}
+
+bool ends_with_ci(const std::string& s, const char* suffix) {
+    const size_t n = std::strlen(suffix);
+    if (s.size() < n)
+        return false;
+    const size_t off = s.size() - n;
+    for (size_t i = 0; i < n; i++) {
+        const unsigned char a = (unsigned char)std::tolower((unsigned char)s[off + i]);
+        const unsigned char b = (unsigned char)std::tolower((unsigned char)suffix[i]);
+        if (a != b)
+            return false;
+    }
+    return true;
+}
+
+std::string json_escape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (unsigned char c : s) {
+        switch (c) {
+        case '\\': out += "\\\\"; break;
+        case '"': out += "\\\""; break;
+        case '\b': out += "\\b"; break;
+        case '\f': out += "\\f"; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default:
+            if (c < 0x20) {
+                char buf[7];
+                std::snprintf(buf, sizeof(buf), "\\u%04x", (unsigned)c);
+                out += buf;
+            } else {
+                out.push_back((char)c);
+            }
+            break;
+        }
+    }
+    return out;
 }
 
 class CosyVoice3TtsBackend : public CrispasrBackend {
@@ -78,7 +120,6 @@ public:
             fprintf(stderr, "crispasr[cosyvoice3-tts]: failed to load LLM '%s'\n", p.model.c_str());
             return false;
         }
-
         const std::string base_dir = dir_of(p.model);
 
         // ---- Flow ----
@@ -90,6 +131,13 @@ public:
                                                    });
         }
         if (flow_path.empty()) {
+            CrispasrRegistryEntry entry;
+            if (crispasr_registry_lookup(p.backend, entry, p.tts_codec_quant) && !entry.companion_filename.empty()) {
+                flow_path = crispasr_resolve_model_cli(entry.companion_filename, p.backend, p.no_prints, p.cache_dir,
+                                                       p.auto_download, p.tts_codec_quant);
+            }
+        }
+        if (flow_path.empty()) {
             fprintf(stderr, "crispasr[cosyvoice3-tts]: no flow GGUF found. Place "
                             "cosyvoice3-flow-f16.gguf next to the LLM, or pass --codec-model PATH.\n");
             return false;
@@ -98,7 +146,6 @@ public:
             fprintf(stderr, "crispasr[cosyvoice3-tts]: failed to load flow '%s'\n", flow_path.c_str());
             return false;
         }
-
         // ---- HiFT ----
         std::string hift_path;
         const char* env_hift = getenv("COSYVOICE3_HIFT_PATH");
@@ -111,6 +158,10 @@ public:
                                                    });
         }
         if (hift_path.empty()) {
+            hift_path = crispasr_resolve_model_cli("cosyvoice3-hift-f16.gguf", p.backend, p.no_prints, p.cache_dir,
+                                                   p.auto_download, p.tts_codec_quant);
+        }
+        if (hift_path.empty()) {
             fprintf(stderr, "crispasr[cosyvoice3-tts]: no HiFT GGUF found. Place "
                             "cosyvoice3-hift-f16.gguf next to the LLM, or set "
                             "COSYVOICE3_HIFT_PATH.\n");
@@ -120,7 +171,6 @@ public:
             fprintf(stderr, "crispasr[cosyvoice3-tts]: failed to load HiFT '%s'\n", hift_path.c_str());
             return false;
         }
-
         // ---- Voices ----
         std::string voices_path;
         const char* env_voices = getenv("COSYVOICE3_VOICES_PATH");
@@ -131,6 +181,10 @@ public:
                                                          "cosyvoice3-voices.gguf",
                                                          "voices.gguf",
                                                      });
+        }
+        if (voices_path.empty()) {
+            voices_path = crispasr_resolve_model_cli("cosyvoice3-voices.gguf", p.backend, p.no_prints, p.cache_dir,
+                                                     p.auto_download, p.tts_codec_quant);
         }
         if (voices_path.empty()) {
             fprintf(stderr, "crispasr[cosyvoice3-tts]: no voices GGUF found. Run "
@@ -160,6 +214,21 @@ public:
         cosyvoice3_tts_set_seed(ctx_, (uint64_t)params.seed);
 
         const char* voice = params.tts_voice.empty() ? nullptr : params.tts_voice.c_str();
+        if (voice && ends_with_ci(params.tts_voice, ".wav")) {
+            if (params.tts_ref_text.empty()) {
+                fprintf(stderr, "crispasr[cosyvoice3-tts]: --ref-text is required when --voice is a WAV\n");
+                return {};
+            }
+            int n = 0;
+            float* pcm = cosyvoice3_tts_synth_from_wav(ctx_, text.c_str(), params.tts_voice.c_str(),
+                                                       params.tts_ref_text.c_str(), &n);
+            std::vector<float> out;
+            if (pcm && n > 0)
+                out.assign(pcm, pcm + n);
+            if (pcm)
+                free(pcm);
+            return out;
+        }
         int n = 0;
         float* pcm = cosyvoice3_tts_synth(ctx_, text.c_str(), voice, &n);
         if (!pcm || n <= 0) {
@@ -178,7 +247,6 @@ public:
             ctx_ = nullptr;
         }
     }
-
 private:
     struct cosyvoice3_tts_context* ctx_ = nullptr;
 };

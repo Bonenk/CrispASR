@@ -41,18 +41,126 @@
 #include "gguf.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <map>
+#include <sstream>
 #include <random>
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <sys/stat.h>
+#include <unistd.h>
 
 namespace {
+
+bool file_exists(const std::string& path) {
+    struct stat st;
+    return stat(path.c_str(), &st) == 0;
+}
+
+std::string dir_of(const std::string& path) {
+    auto sep = path.find_last_of("/\\");
+    return (sep == std::string::npos) ? std::string(".") : path.substr(0, sep);
+}
+
+std::string discover_sibling(const std::string& base_dir, const std::vector<const char*>& candidates) {
+    for (const char* name : candidates) {
+        std::string p = base_dir + "/" + name;
+        if (file_exists(p))
+            return p;
+    }
+    return "";
+}
+
+bool ends_with_ci(const std::string& s, const char* suffix) {
+    const size_t n = std::strlen(suffix);
+    if (s.size() < n)
+        return false;
+    const size_t off = s.size() - n;
+    for (size_t i = 0; i < n; i++) {
+        const unsigned char a = (unsigned char)std::tolower((unsigned char)s[off + i]);
+        const unsigned char b = (unsigned char)std::tolower((unsigned char)suffix[i]);
+        if (a != b)
+            return false;
+    }
+    return true;
+}
+
+std::string json_escape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (unsigned char c : s) {
+        switch (c) {
+        case '\\': out += "\\\\"; break;
+        case '"': out += "\\\""; break;
+        case '\b': out += "\\b"; break;
+        case '\f': out += "\\f"; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default:
+            if (c < 0x20) {
+                char buf[7];
+                std::snprintf(buf, sizeof(buf), "\\u%04x", (unsigned)c);
+                out += buf;
+            } else {
+                out.push_back((char)c);
+            }
+            break;
+        }
+    }
+    return out;
+}
+
+std::string default_upstream_base() {
+    const char* env = std::getenv("COSYVOICE3_UPSTREAM_BASE");
+    if (env && env[0])
+        return env;
+    const char* local = "/Volumes/backups/code/cosyvoice3-stash/CosyVoice-upstream";
+    if (file_exists(local))
+        return local;
+    return ".";
+}
+
+std::string default_onnx_cache() {
+    const char* env = std::getenv("COSYVOICE3_ONNX_CACHE");
+    if (env && env[0])
+        return env;
+    const char* home = std::getenv("HOME");
+    if (home && home[0])
+        return std::string(home) + "/.cache/crispasr/cosyvoice3-onnx";
+    return "/tmp/crispasr-cosyvoice3-onnx";
+}
+
+std::string default_python_exe() {
+    const char* env = std::getenv("COSYVOICE3_PYTHON");
+    if (env && env[0])
+        return env;
+    const char* conda_prefix = std::getenv("CONDA_PREFIX");
+    if (conda_prefix && conda_prefix[0])
+        return std::string(conda_prefix) + "/bin/python";
+    return "python";
+}
+
+bool write_text_file(const std::string& path, const std::string& contents) {
+    std::ofstream f(path, std::ios::binary);
+    if (!f.is_open())
+        return false;
+    f.write(contents.data(), (std::streamsize)contents.size());
+    return f.good();
+}
+
+std::string make_temp_path(const char* tag, const char* ext) {
+    char buf[256];
+    std::snprintf(buf, sizeof(buf), "/tmp/%s-%ld-%ld%s", tag, (long)getpid(), (long)std::rand(), ext);
+    return buf;
+}
 
 struct cv3_hp {
     uint32_t n_layers = 24;
@@ -325,6 +433,12 @@ struct cosyvoice3_tts_context {
     // table is populated separately via init_voices_from_file().
     cv3_vocab vocab{};
     cv3_voices voices{};
+
+    // Loaded GGUF paths. Needed by the temporary WAV voice-bake bridge.
+    std::string model_path;
+    std::string flow_path;
+    std::string hift_path;
+    std::string voices_path;
 };
 
 namespace {
@@ -666,6 +780,7 @@ extern "C" struct cosyvoice3_tts_context* cosyvoice3_tts_init_from_file(const ch
         delete ctx;
         return nullptr;
     }
+    ctx->model_path = path_model;
     ctx->ctx_w = wl.ctx;
     ctx->buf_w = wl.buf;
     ctx->buf_w_cpu = wl.buf_cpu;
@@ -1629,6 +1744,7 @@ extern "C" int cosyvoice3_tts_init_flow_from_file(struct cosyvoice3_tts_context*
         fprintf(stderr, "cosyvoice3_tts: init_flow: load_weights failed for '%s'\n", path);
         return -1;
     }
+    ctx->flow_path = path;
     ctx->flow.ctx_w = wl.ctx;
     ctx->flow.buf_w = wl.buf;
     ctx->flow.tensors = std::move(wl.tensors);
@@ -3824,6 +3940,7 @@ extern "C" int cosyvoice3_tts_init_hift_from_file(struct cosyvoice3_tts_context*
         fprintf(stderr, "cosyvoice3_tts: init_hift: load_weights failed for '%s'\n", path);
         return -1;
     }
+    ctx->hift_path = path;
     ctx->hift.ctx_w = wl.ctx;
     ctx->hift.buf_w = wl.buf;
     ctx->hift.tensors = std::move(wl.tensors);
@@ -4015,6 +4132,7 @@ extern "C" int cosyvoice3_tts_init_voices_from_file(struct cosyvoice3_tts_contex
         fprintf(stderr, "cosyvoice3_tts: init_voices: load_weights failed for '%s'\n", path);
         return -1;
     }
+    ctx->voices_path = path;
 
     ctx->voices.voices.clear();
     ctx->voices.by_name.clear();
@@ -4424,4 +4542,76 @@ extern "C" float* cosyvoice3_tts_synth(struct cosyvoice3_tts_context* ctx, const
 
     *out_n_samples = T_mel_out * 480;
     return audio;
+}
+
+extern "C" float* cosyvoice3_tts_synth_from_wav(struct cosyvoice3_tts_context* ctx, const char* text,
+                                                const char* wav_path, const char* ref_text, int* out_n_samples) {
+    if (!ctx || !text || !wav_path || !ref_text || !out_n_samples)
+        return nullptr;
+    *out_n_samples = 0;
+    if (!ctx->flow.loaded || !ctx->hift.loaded || !ctx->voices.loaded) {
+        fprintf(stderr, "cosyvoice3_tts: synth_from_wav requires LLM + flow + hift + voices to be loaded\n");
+        return nullptr;
+    }
+    if (ctx->model_path.empty() || ctx->flow_path.empty() || ctx->hift_path.empty()) {
+        fprintf(stderr, "cosyvoice3_tts: synth_from_wav: missing loaded model paths\n");
+        return nullptr;
+    }
+
+    const std::string manifest_path = make_temp_path("cosyvoice3-voice-manifest", ".json");
+    const std::string baked_voices_path = make_temp_path("cosyvoice3-voice-bake", ".gguf");
+
+    std::ostringstream manifest;
+    manifest << "[\n";
+    manifest << "  {\"name\":\"zero_shot\",\"wav\":\"" << json_escape(wav_path) << "\",";
+    manifest << "\"prompt_text\":\"" << json_escape(ref_text) << "\"}\n";
+    manifest << "]\n";
+    if (!write_text_file(manifest_path, manifest.str())) {
+        fprintf(stderr, "cosyvoice3_tts: synth_from_wav: failed to write temp manifest '%s'\n", manifest_path.c_str());
+        return nullptr;
+    }
+
+    std::ostringstream cmd;
+    cmd << default_python_exe() << " models/convert-cosyvoice3-voices-to-gguf.py"
+        << " --manifest " << manifest_path
+        << " --upstream-base " << default_upstream_base()
+        << " --onnx-cache " << default_onnx_cache()
+        << " --output " << baked_voices_path
+        << " >/dev/null 2>&1";
+
+    int rc = std::system(cmd.str().c_str());
+    std::remove(manifest_path.c_str());
+    if (rc != 0 || !file_exists(baked_voices_path)) {
+        fprintf(stderr, "cosyvoice3_tts: synth_from_wav: failed to bake temp voice from '%s'\n", wav_path);
+        return nullptr;
+    }
+
+    cosyvoice3_tts_context_params cp = ctx->params;
+    cp.n_threads = ctx->n_threads;
+    cp.seed = ctx->seed;
+
+    struct cosyvoice3_tts_context* tmp = cosyvoice3_tts_init_from_file(ctx->model_path.c_str(), cp);
+    if (!tmp) {
+        std::remove(baked_voices_path.c_str());
+        return nullptr;
+    }
+    if (cosyvoice3_tts_init_flow_from_file(tmp, ctx->flow_path.c_str()) != 0 ||
+        cosyvoice3_tts_init_hift_from_file(tmp, ctx->hift_path.c_str()) != 0 ||
+        cosyvoice3_tts_init_voices_from_file(tmp, baked_voices_path.c_str()) != 0) {
+        cosyvoice3_tts_free(tmp);
+        std::remove(baked_voices_path.c_str());
+        return nullptr;
+    }
+
+    cosyvoice3_tts_set_n_threads(tmp, ctx->n_threads);
+    cosyvoice3_tts_set_seed(tmp, ctx->seed);
+    cosyvoice3_tts_set_temperature(tmp, ctx->params.temperature);
+
+    int n = 0;
+    float* pcm = cosyvoice3_tts_synth(tmp, text, "zero_shot", &n);
+    if (pcm && n > 0)
+        *out_n_samples = n;
+    cosyvoice3_tts_free(tmp);
+    std::remove(baked_voices_path.c_str());
+    return pcm;
 }

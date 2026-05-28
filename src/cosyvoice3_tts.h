@@ -255,6 +255,12 @@ const char* cosyvoice3_tts_voice_name(struct cosyvoice3_tts_context* ctx, int id
 float* cosyvoice3_tts_synth(struct cosyvoice3_tts_context* ctx, const char* text, const char* voice_name,
                             int* out_n_samples);
 
+// Synthesise text from a reference WAV + transcript. This currently
+// bakes a temporary voice bundle internally, then reuses the existing
+// synth path.
+float* cosyvoice3_tts_synth_from_wav(struct cosyvoice3_tts_context* ctx, const char* text, const char* wav_path,
+                                     const char* ref_text, int* out_n_samples);
+
 // Diff-harness stage extractor. Returns malloc'd float[*out_n].
 // Phase 2 supports:
 //   "lm_step0_logits"   — single-step logits after prefilling on
