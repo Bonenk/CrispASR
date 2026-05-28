@@ -4154,6 +4154,107 @@ int main(int argc, char** argv) {
             }
         }
 
+        // ---- Phase 4-B-1 — HiFT source path ----
+        // Inputs from ref: f0_in (T_mel,) + noise_in (T_audio, 9).
+        // Pack [f0_mel | noise_buf] then extract each hift_source_* stage.
+        {
+            auto f0_pair = ref.get_f32("hift_source_f0_in");
+            auto noise_pair = ref.get_f32("hift_source_noise_in");
+            if (f0_pair.first && noise_pair.first && f0_pair.second > 0) {
+                const int T_mel = (int)f0_pair.second;
+                const int T_audio = T_mel * 480;
+                if (noise_pair.second != (size_t)T_audio * 9) {
+                    printf("[SKIP] hift_source  (noise expected %d × 9 = %d floats, got %zu)\n", T_audio, T_audio * 9,
+                           noise_pair.second);
+                    n_skip++;
+                } else {
+                    std::vector<float> packed(f0_pair.second + noise_pair.second);
+                    std::memcpy(packed.data(), f0_pair.first, f0_pair.second * sizeof(float));
+                    std::memcpy(packed.data() + f0_pair.second, noise_pair.first, noise_pair.second * sizeof(float));
+                    static const char* src_stages[] = {
+                        "hift_source_f0_up",
+                        "hift_source_sine_waves",
+                        "hift_source_sine_merge",
+                        "hift_source",
+                    };
+                    for (const char* sname : src_stages) {
+                        int n_out = 0;
+                        float* buf =
+                            cosyvoice3_tts_extract_stage(ctx, sname, /*ids*/ nullptr, /*n_ids*/ 0, packed.data(),
+                                                         /*n_embed_tokens*/ T_mel, &n_out);
+                        if (!buf || n_out <= 0) {
+                            printf("[SKIP] %-30s  cosyvoice3_tts_extract_stage returned no data\n", sname);
+                            if (buf)
+                                free(buf);
+                            n_skip++;
+                            continue;
+                        }
+                        auto rep = ref.compare(sname, buf, (size_t)n_out);
+                        print_row(sname, rep, 0.99f);
+                        if (!rep.found)
+                            n_skip++;
+                        else if (rep.is_pass(0.99f))
+                            n_pass++;
+                        else
+                            n_fail++;
+                        free(buf);
+                    }
+                }
+            } else {
+                printf("[SKIP] %-30s  (hift_source inputs missing in reference)\n", "hift_source_*");
+                n_skip++;
+            }
+        }
+
+        // ---- Phase 4-C — end-to-end inference (mel → audio) ----
+        // Inputs from ref: mel_in (mel_dim, T_mel) + noise_in (T_audio, 9).
+        // Pack [mel | noise_buf] then extract hift_inference.
+        {
+            auto mel_pair = ref.get_f32("hift_inference_mel_in");
+            auto noise_pair = ref.get_f32("hift_inference_noise_in");
+            uint32_t mel_dim = 0;
+            cosyvoice3_tts_get_flow_hparams(ctx, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, &mel_dim,
+                                            nullptr, nullptr, nullptr, nullptr);
+            if (mel_pair.first && noise_pair.first && mel_dim > 0 && mel_pair.second % mel_dim == 0) {
+                const int T_mel = (int)(mel_pair.second / mel_dim);
+                const int T_audio = T_mel * 480;
+                if (noise_pair.second != (size_t)T_audio * 9) {
+                    printf("[SKIP] hift_inference  (noise expected %d × 9 floats, got %zu)\n", T_audio,
+                           noise_pair.second);
+                    n_skip++;
+                } else {
+                    std::vector<float> packed(mel_pair.second + noise_pair.second);
+                    std::memcpy(packed.data(), mel_pair.first, mel_pair.second * sizeof(float));
+                    std::memcpy(packed.data() + mel_pair.second, noise_pair.first, noise_pair.second * sizeof(float));
+                    int n_out = 0;
+                    float* buf = cosyvoice3_tts_extract_stage(ctx, "hift_inference", /*ids*/ nullptr, /*n_ids*/ 0,
+                                                              packed.data(), /*n_embed_tokens*/ T_mel, &n_out);
+                    if (!buf || n_out <= 0) {
+                        printf("[SKIP] %-30s  cosyvoice3_tts_extract_stage returned no data\n", "hift_inference");
+                        if (buf)
+                            free(buf);
+                        n_skip++;
+                    } else {
+                        auto rep = ref.compare("hift_inference", buf, (size_t)n_out);
+                        // End-to-end vocoder gate: cos ≥ 0.95 (matches phase 4-B's
+                        // hift_decode gate; the source path adds at most one extra
+                        // STFT round-trip's worth of numerical drift).
+                        print_row("hift_inference", rep, 0.95f);
+                        if (!rep.found)
+                            n_skip++;
+                        else if (rep.is_pass(0.95f))
+                            n_pass++;
+                        else
+                            n_fail++;
+                        free(buf);
+                    }
+                }
+            } else {
+                printf("[SKIP] %-30s  (hift_inference inputs missing in reference)\n", "hift_inference");
+                n_skip++;
+            }
+        }
+
         cosyvoice3_tts_free(ctx);
     } else {
         fprintf(stderr,

@@ -199,6 +199,27 @@ float* cosyvoice3_tts_solve_flow_euler(struct cosyvoice3_tts_context* ctx, const
 float* cosyvoice3_tts_run_hift_decode(struct cosyvoice3_tts_context* ctx, const float* mel, int T_mel,
                                       const float* s_stft);
 
+// HiFT source path — runs f0_mel → nearest-upsample(×480) → SineGen2 →
+// m_source.l_linear(+tanh) → STFT → s_stft. CPU-only (per-sample loops;
+// the per-frame DFT is naive O(n_fft²) at n_fft=16). Caller supplies a
+// seeded `noise_buf` (T_audio * 9 floats, T_audio = T_mel * 480) of
+// uniform[0,1) samples that mirror upstream's `set_all_random_seed(0)`
+// SineGen2 noise buffer.
+//
+// Returns malloc'd float[(T_mel*120 + 1) * 18] (caller frees) holding the
+// concat of real+imag STFT bins in the byte layout the decode forward
+// expects. Returns nullptr if HiFT isn't loaded.
+float* cosyvoice3_tts_run_hift_source(struct cosyvoice3_tts_context* ctx, const float* f0_mel, int T_mel,
+                                      const float* noise_buf);
+
+// End-to-end HiFT inference — composes F0 predictor + source path + decode.
+//   mel        [T_mel, mel_dim=80]      F32 — post flow-Euler mel.
+//   noise_buf  [T_mel * 480 * 9]        F32 — seeded uniform[0,1) noise
+//                                              for SineGen2.
+// Returns malloc'd float[T_mel * 480] (caller frees) — 24 kHz mono audio.
+float* cosyvoice3_tts_run_hift_inference(struct cosyvoice3_tts_context* ctx, const float* mel, int T_mel,
+                                         const float* noise_buf);
+
 // Diff-harness stage extractor. Returns malloc'd float[*out_n].
 // Phase 2 supports:
 //   "lm_step0_logits"   — single-step logits after prefilling on

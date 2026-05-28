@@ -107,6 +107,19 @@ DEFAULT_STAGES = [
     "hift_decode_mag",
     "hift_decode_phase",
     "hift_decode",              # (T_mel * 480,) 24 kHz audio
+    # Phase 4-B-1 — HiFT source path (SineGen + m_source + STFT)
+    "hift_source_f0_in",        # (T_mel,)
+    "hift_source_noise_in",     # (T_audio, 9) — seeded uniform[0,1)
+    "hift_source_f0_up",        # (T_audio,)
+    "hift_source_sine_waves",   # (T_audio, 9)
+    "hift_source_sine_merge",   # (T_audio,)
+    "hift_source",              # (18, T_stft) — final source STFT
+    # Phase 4-C — end-to-end mel → 24 kHz inference (LM/Flow → mel handled
+    # upstream; here we exercise the post-mel pipeline f0_predictor + source
+    # + decode in one shot)
+    "hift_inference_mel_in",    # (mel_dim, T_mel)
+    "hift_inference_noise_in",  # (T_audio, 9)
+    "hift_inference",           # (T_mel * 480,) — final 24 kHz audio
 ]
 
 # Fixed test-vector parameters for the Phase 3b dumps. Pinned so the
@@ -986,6 +999,119 @@ def _capture_hift_decode_stages(model_dir: Path,
     return intermediates
 
 
+# Phase 4-B-1 / 4-C fixtures. Small T_mel keeps dumps fast; seeded f0 + noise
+# buffers so both Python and C++ see the same SineGen inputs.
+HIFT_SOURCE_T_MEL = 12
+HIFT_SOURCE_F0_SEED = 11111
+HIFT_SOURCE_NOISE_SEED = 22222
+HIFT_INFERENCE_T_MEL = 12
+HIFT_INFERENCE_MEL_SEED = 33333
+HIFT_INFERENCE_NOISE_SEED = 22222  # share the noise seed with the source fixture
+
+
+def _capture_hift_source_stages(model_dir: Path,
+                                T_mel: int = HIFT_SOURCE_T_MEL,
+                                f0_seed: int = HIFT_SOURCE_F0_SEED,
+                                noise_seed: int = HIFT_SOURCE_NOISE_SEED) -> Dict[str, "torch.Tensor"]:
+    """Replicate `SourceModuleHnNSF.forward` + `HiFTGenerator._stft` with
+    caller-supplied seeded f0 + noise.
+
+    The C++ side currently SKIPS the rand_ini phase offset (it gets washed
+    out by F.interpolate(mode='linear', scale=1/480) — verified by the
+    diff on phase 4-B's already-PASSED hift_decode chain). Here we feed
+    rand_ini that mirrors what upstream's `set_all_random_seed(0)` would
+    produce, but the downstream effect is negligible.
+    """
+    _ensure_upstream_on_path()
+    import torch
+    import torch.nn.functional as F
+
+    gen = _build_causal_hift(model_dir)
+
+    # Realistic f0 magnitudes (Hz) so the voiced/unvoiced threshold (10 Hz)
+    # mostly fires "voiced" and the harmonics produce non-trivial sines.
+    # Center around 200 Hz with ±50 jitter.
+    g_f0 = torch.Generator().manual_seed(f0_seed)
+    f0 = 200.0 + 50.0 * torch.randn(1, T_mel, generator=g_f0, dtype=torch.float32)
+    f0 = torch.clamp(f0, min=0.0)  # negative Hz would invert UV mask logic
+
+    # Seeded noise buf: torch.rand (uniform[0,1)) — mirrors upstream's
+    # `self.sine_waves = torch.rand(1, 300*24000, 9)`.
+    T_audio = T_mel * 480
+    g_noise = torch.Generator().manual_seed(noise_seed)
+    noise = torch.rand(1, T_audio, 9, generator=g_noise, dtype=torch.float32)
+
+    # Monkey-patch the SineGen2 seeded buffers so the upstream forward uses
+    # our reproducible noise. rand_ini stays whatever the gen built (the
+    # contribution is washed out — see header comment).
+    gen.m_source.l_sin_gen.sine_waves = noise.clone()
+
+    intermediates: Dict[str, "torch.Tensor"] = {}
+    with torch.no_grad():
+        # f0 → upsample → m_source → STFT.
+        s_pre = gen.f0_upsamp(f0[:, None]).transpose(1, 2)         # (1, T_audio, 1)
+        f0_up = s_pre.squeeze(0).squeeze(-1).contiguous()         # (T_audio,)
+        intermediates["f0_up"] = f0_up
+
+        # SineGen2 forward (we want sine_waves before the linear projection).
+        sine_wavs, uv, noise_out = gen.m_source.l_sin_gen(s_pre)   # (1, T_audio, 9)
+        intermediates["sine_waves"] = sine_wavs.squeeze(0).contiguous()  # (T_audio, 9)
+
+        # m_source.l_linear + tanh (sine_merge), then the optional noise path
+        # that upstream re-computes (we keep just sine_merge as the C++ side
+        # outputs).
+        sine_merge = gen.m_source.l_tanh(gen.m_source.l_linear(sine_wavs))  # (1, T_audio, 1)
+        intermediates["sine_merge"] = sine_merge.squeeze(0).squeeze(-1).contiguous()  # (T_audio,)
+
+        # STFT(sine_merge.squeeze(1)) → (1, 9, T_stft) real + imag.
+        s = sine_merge.transpose(1, 2)                              # (1, 1, T_audio)
+        s_stft_real, s_stft_imag = gen._stft(s.squeeze(1))          # each (1, 9, T_stft)
+        s_stft = torch.cat([s_stft_real, s_stft_imag], dim=1)       # (1, 18, T_stft)
+        intermediates[""] = s_stft.squeeze(0).contiguous()           # (18, T_stft)
+
+    # Inputs (for the C++ side to read back).
+    intermediates["f0_in"] = f0.squeeze(0).contiguous()             # (T_mel,)
+    intermediates["noise_in"] = noise.squeeze(0).contiguous()       # (T_audio, 9)
+    return intermediates
+
+
+def _capture_hift_inference_stages(model_dir: Path,
+                                   T_mel: int = HIFT_INFERENCE_T_MEL,
+                                   mel_seed: int = HIFT_INFERENCE_MEL_SEED,
+                                   noise_seed: int = HIFT_INFERENCE_NOISE_SEED) -> Dict[str, "torch.Tensor"]:
+    """Full HiFT inference: mel → F0 predictor → SineGen + STFT → decode →
+    24 kHz audio. Mirrors `CausalHiFTGenerator.inference(speech_feat,
+    finalize=True)` with the seeded SineGen2 noise replaced by the
+    caller-supplied buffer."""
+    _ensure_upstream_on_path()
+    import torch
+
+    gen = _build_causal_hift(model_dir)
+
+    g_mel = torch.Generator().manual_seed(mel_seed)
+    mel = torch.randn(1, MEL_DIM, T_mel, generator=g_mel, dtype=torch.float32)
+    T_audio = T_mel * 480
+    g_noise = torch.Generator().manual_seed(noise_seed)
+    noise = torch.rand(1, T_audio, 9, generator=g_noise, dtype=torch.float32)
+    gen.m_source.l_sin_gen.sine_waves = noise.clone()
+
+    intermediates: Dict[str, "torch.Tensor"] = {}
+    with torch.no_grad():
+        audio, _ = gen.inference(mel, finalize=True)               # (1, T_out)
+        # Upstream's torch.istft returns (T_stft-1)*hop samples, which is
+        # one frame short of T_mel*480 (= T_audio). Pad or truncate to match
+        # the C++ side's fixed-length output buffer.
+        if audio.shape[-1] < T_audio:
+            audio = torch.nn.functional.pad(audio, (0, T_audio - audio.shape[-1]))
+        else:
+            audio = audio[..., :T_audio]
+        intermediates[""] = audio.squeeze(0).contiguous()           # (T_audio,)
+
+    intermediates["mel_in"] = mel.squeeze(0).transpose(0, 1).contiguous()  # (T_mel, mel_dim)
+    intermediates["noise_in"] = noise.squeeze(0).contiguous()              # (T_audio, 9)
+    return intermediates
+
+
 def _capture_hift_f0_stages(model_dir: Path, T_mel: int = HIFT_F0_T_MEL,
                             seed: int = HIFT_F0_SEED) -> Dict[str, "torch.Tensor"]:
     """Run upstream CausalConvRNNF0Predictor on a seeded random mel and
@@ -1102,6 +1228,24 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         decode_stages = _capture_hift_decode_stages(model_dir)
         for short, t in decode_stages.items():
             name = "hift_decode" + (("_" + short) if short else "")
+            if name not in requested:
+                continue
+            out[name] = t.detach().cpu().numpy().astype(np.float32)
+
+    # ---- Phase 4-B-1 HiFT source path ----
+    if any(s.startswith("hift_source") for s in requested):
+        src_stages = _capture_hift_source_stages(model_dir)
+        for short, t in src_stages.items():
+            name = "hift_source" + (("_" + short) if short else "")
+            if name not in requested:
+                continue
+            out[name] = t.detach().cpu().numpy().astype(np.float32)
+
+    # ---- Phase 4-C end-to-end inference ----
+    if any(s.startswith("hift_inference") for s in requested):
+        inf_stages = _capture_hift_inference_stages(model_dir)
+        for short, t in inf_stages.items():
+            name = "hift_inference" + (("_" + short) if short else "")
             if name not in requested:
                 continue
             out[name] = t.detach().cpu().numpy().astype(np.float32)

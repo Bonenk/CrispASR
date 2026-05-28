@@ -606,8 +606,8 @@ work in 4 phases**.
   - **3e — end-to-end mel diff — landed via 3d-B's
     `flow_euler` stage.** Diff-gate cos ≥ 0.99 PASSES.
 - **Phase 4 — CausalHiFTGenerator + F0 predictor + Snake +
-  iSTFT**. 4-A + 4-B landed 2026-05-28; 4-C (full-chain) + SineGen
-  source path still open.
+  iSTFT — DONE 2026-05-28.** End-to-end `hift_inference`
+  (mel → F0 → SineGen → STFT → decode → audio) PASS at cos=0.999989.
   - **4-A (2026-05-28)**: HiFT loader + F0 predictor
     (`CausalConvRNNF0Predictor`) — binds all 246 hift GGUF tensors
     (conv_pre/conv_post, ups.0-2, resblocks.0-8, source_downs.0-2,
@@ -635,9 +635,24 @@ work in 4 phases**.
     source-side prelude. A 4-B-1 follow-up will inline the SineGen
     path inside the runtime, but the decode forward is bit-equivalent
     to PyTorch right now.
-  - **4-C (open)**: end-to-end mel → 24 kHz waveform, gated on the
-    full chain (LM → flow Euler → HiFT decode → audio). Once 4-B-1
-    (SineGen + l_linear + STFT) lands, this is trivial.
+  - **4-B-1 (2026-05-28)**: HiFT source path —
+    `cosyvoice3_tts_run_hift_source(ctx, f0_mel, T_mel, noise_buf)`
+    chains f0_mel → nearest-upsample(×480) → SineGen2 → m_source
+    (Linear(9,1) + Tanh) → STFT(n_fft=16, hop=4, periodic Hann,
+    center=True). Caller supplies seeded `noise_buf[T_audio, 9]` for
+    bit-equivalent diff. All four hift_source stages PASS at cos=1.0
+    max|Δ|≤4.7e-6. **Key correctness fix uncovered by the diff**:
+    upstream multiplies the post-cumsum phase by `upsample_scale=480`
+    BEFORE the nearest upsample (converting per-T_mel-frame integrated
+    phase to per-audio-sample units); missing this collapsed sine_waves
+    to cos=-0.08. Folded into the cumsum * 2π scalar.
+  - **4-C (2026-05-28)**: end-to-end inference —
+    `cosyvoice3_tts_run_hift_inference(ctx, mel, T_mel, noise_buf)`
+    composes F0 predictor + source path + decode forward. Stage
+    `hift_inference` PASS at cos=0.999989 max|Δ|=1.53e-2 (gate ≥ 0.95
+    for vocoder; we're well above). Together with the LM (phase 2) +
+    flow Euler (phase 3) this completes the full TTS pipeline modulo
+    audio-rate orchestration in the CLI adapter (phase 5).
 - **Phase 5 — CLI adapter + model registry + HF upload + docs**.
   Open. Phase-2-then-3-then-4 then this.
 - **Phase 6 (deferred)** — S3Tokenizer V3 for arbitrary-WAV cloning.

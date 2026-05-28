@@ -1124,6 +1124,10 @@ float* cv3_run_solve_euler(cosyvoice3_tts_context* ctx, const float* mu, int T_m
 float* cv3_extract_hift_f0_stage(cosyvoice3_tts_context* ctx, const float* mel, int T_mel);
 float* cv3_extract_hift_decode_stage(cosyvoice3_tts_context* ctx, const float* mel, int T_mel, const float* s_stft_in,
                                      const char* stage_name, int* out_n);
+float* cv3_extract_hift_source_stage(cosyvoice3_tts_context* ctx, const float* f0_mel, int T_mel,
+                                     const float* noise_buf, const char* stage_name, int* out_n);
+float* cv3_extract_hift_inference(cosyvoice3_tts_context* ctx, const float* mel, int T_mel, const float* noise_buf,
+                                  int* out_n);
 } // namespace
 
 extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ctx, const char* stage_name,
@@ -1431,6 +1435,32 @@ extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ct
         const float* mel = embeds_in;
         const float* s_stft = embeds_in + (size_t)T_mel * mel_dim;
         return cv3_extract_hift_decode_stage(ctx, mel, T_mel, s_stft, stage_name, out_n);
+    }
+    // Phase 4-B-1 — HiFT source path (SineGen + m_source + STFT).
+    //   embeds_in = [f0_mel | noise_buf] — f0_mel: T_mel floats; noise_buf:
+    //                                       T_audio*9 floats (T_audio=T_mel*480).
+    //   n_embed_tokens = T_mel.
+    // Stages: hift_source_f0_up, hift_source_sine_waves, hift_source_sine_merge,
+    //         hift_source (= s_stft).
+    if (strncmp(stage_name, "hift_source", 11) == 0) {
+        if (!ctx->hift.loaded || !embeds_in || n_embed_tokens <= 0)
+            return nullptr;
+        const int T_mel = n_embed_tokens;
+        const float* f0_mel = embeds_in;
+        const float* noise_buf = embeds_in + (size_t)T_mel;
+        return cv3_extract_hift_source_stage(ctx, f0_mel, T_mel, noise_buf, stage_name, out_n);
+    }
+    // Phase 4-C — end-to-end mel → 24 kHz audio inference.
+    //   embeds_in = [mel | noise_buf] — mel: T_mel*mel_dim; noise: T_audio*9.
+    //   n_embed_tokens = T_mel.
+    if (strcmp(stage_name, "hift_inference") == 0) {
+        if (!ctx->hift.loaded || !embeds_in || n_embed_tokens <= 0)
+            return nullptr;
+        const int T_mel = n_embed_tokens;
+        const int mel_dim = (int)ctx->hift.hp.mel_dim;
+        const float* mel = embeds_in;
+        const float* noise_buf = embeds_in + (size_t)T_mel * mel_dim;
+        return cv3_extract_hift_inference(ctx, mel, T_mel, noise_buf, out_n);
     }
     if (strcmp(stage_name, "flow_inventory") == 0) {
         if (!ctx->flow.loaded) {
@@ -3063,6 +3093,235 @@ std::vector<float> cv3_hift_istft(const float* conv_post_out, int T_stft, int T_
     return out;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 4-B-1 — HiFT source path (CPU): f0 → upsample → SineGen2 → m_source
+//                                        → STFT → s_stft (18, T_stft)
+// ---------------------------------------------------------------------------
+//
+// Mirrors upstream `CausalHiFTGenerator.inference`'s pre-decode chain:
+//
+//   f0 [T_mel] → f0_upsamp(scale=480, nearest)  → f0_up [T_audio]
+//             → SineGen2(f0_up):
+//                 fn[t,h]        = f0_up[t] * (h+1)
+//                 rad[t,h]       = (fn[t,h] / sr) % 1
+//                 rad[0,:]      += rand_ini[:] (causal=True, seeded)
+//                 rad_down       = interpolate(rad.T, scale=1/upsample_scale, mode=linear)
+//                 phase_down     = cumsum(rad_down, dim=T) * 2π
+//                 phase_up       = interpolate(phase_down*upsample_scale, scale=upsample_scale,
+//                                              mode=nearest if causal else linear)
+//                 sines          = sin(phase_up)
+//                 uv             = (f0_up > 10) ? 1 : 0
+//                 noise_amp      = uv*0.003 + (1-uv)*0.1/3
+//                 noise          = noise_amp * noise_buf[:T_audio]   ← seeded uniform[0,1)
+//                 sine_waves     = sines*0.1*uv + noise
+//             → l_linear(sine_waves) + tanh                            → sine_merge [T_audio]
+//             → STFT(sine_merge, n_fft=16, hop=4, win=hann_periodic,
+//                    center=True)                                       → (9, T_stft) complex
+//             → cat(real, imag, dim=0)                                  → s_stft (18, T_stft)
+//
+// All steps run CPU-side — the per-element work is small and threading is
+// trivial. Bit-exact diff to PyTorch requires the caller to supply
+// `rand_ini[9]` and `noise_buf[T_audio*9]` (deterministic uniform[0,1)
+// buffers seeded by torch's `set_all_random_seed(0)`).
+//
+// Note: PyTorch's `F.interpolate(mode='linear', scale=1/480)` samples
+// output index i at input position `(i+0.5)*480 - 0.5` (align_corners=False).
+// For our nearest-replicated f0_up, neighboring input samples within a
+// 480-block are identical, so the linear interpolation collapses to the
+// f0_mel value. `rad_ini[h]` is added at f0_up index 0 only — it gets
+// washed out by the centered linear interpolation (sampled at 239.5, never
+// touches t=0), so we skip applying it here. Phase 4-B's diff confirms
+// the residual error is below the cos ≥ 0.99 gate.
+
+constexpr int CV3_HIFT_HARMONICS = 9;
+constexpr int CV3_HIFT_UPSAMPLE_SCALE = 480;
+constexpr int CV3_HIFT_SR = 24000;
+constexpr float CV3_HIFT_SINE_AMP = 0.1f;
+constexpr float CV3_HIFT_NOISE_STD = 0.003f;
+constexpr float CV3_HIFT_VOICED_THR = 10.0f;
+constexpr int CV3_HIFT_NFFT = 16;
+constexpr int CV3_HIFT_HOP = 4;
+
+// SineGen2 + m_source.l_linear + tanh, all CPU. Outputs row-major:
+//   sine_waves_out  [T_audio, 9]  — post sin + noise mix (caller frees)
+//   sine_merge_out  [T_audio]     — tanh(linear)         (caller frees)
+//
+// `l_linear_w` is the m_source.l_linear weight read straight from the GGUF
+// (9 floats, row-major). `l_linear_b` is the scalar bias.
+void cv3_hift_sinegen_msource_cpu(const float* f0_mel, int T_mel,
+                                  const float* noise_buf, // [T_audio, 9]
+                                  const float* l_linear_w, float l_linear_b,
+                                  float* sine_waves_out, // [T_audio, 9]
+                                  float* sine_merge_out, // [T_audio]
+                                  float* f0_up_out)      // [T_audio] (optional, may be nullptr)
+{
+    const int T_audio = T_mel * CV3_HIFT_UPSAMPLE_SCALE;
+
+    // f0_upsamp (nearest replicate by 480).
+    std::vector<float> f0_up((size_t)T_audio);
+    for (int t = 0; t < T_audio; t++) {
+        f0_up[t] = f0_mel[t / CV3_HIFT_UPSAMPLE_SCALE];
+    }
+    if (f0_up_out) {
+        std::memcpy(f0_up_out, f0_up.data(), (size_t)T_audio * sizeof(float));
+    }
+
+    // Compute downsampled rad values directly at T_mel rate. With the
+    // nearest-replicated f0_up, linear-interpolate-downsample by 1/480
+    // collapses to f0_mel[t] for t>=1; for t=0 the linear interp centers
+    // at 239.5 — also f0_mel[0] (rand_ini contribution at f0_up[0] is
+    // washed out, see header comment).
+    std::vector<float> rad_down((size_t)T_mel * CV3_HIFT_HARMONICS);
+    for (int t = 0; t < T_mel; t++) {
+        const float f = f0_mel[t];
+        for (int h = 0; h < CV3_HIFT_HARMONICS; h++) {
+            float r = f * (float)(h + 1) / (float)CV3_HIFT_SR;
+            r -= std::floor(r);
+            rad_down[(size_t)t * CV3_HIFT_HARMONICS + h] = r;
+        }
+    }
+
+    // cumsum along T per harmonic. Upstream then multiplies by upsample_scale
+    // BEFORE the nearest upsample (`phase = phase * upsample_scale`), which
+    // converts "per-T_mel-frame integrated phase" into "per-audio-sample
+    // integrated phase up to that frame's start". We fold the * 480 in here.
+    std::vector<float> phase_down((size_t)T_mel * CV3_HIFT_HARMONICS);
+    const float two_pi_us = 2.0f * (float)M_PI * (float)CV3_HIFT_UPSAMPLE_SCALE;
+    for (int h = 0; h < CV3_HIFT_HARMONICS; h++) {
+        float acc = 0.0f;
+        for (int t = 0; t < T_mel; t++) {
+            acc += rad_down[(size_t)t * CV3_HIFT_HARMONICS + h];
+            phase_down[(size_t)t * CV3_HIFT_HARMONICS + h] = acc * two_pi_us;
+        }
+    }
+
+    // Upsample by 480 (nearest, causal=True) then sin. Compose with the
+    // sine_amp scaling, uv mask, and noise injection in a single pass.
+    for (int t = 0; t < T_audio; t++) {
+        const int t_mel = t / CV3_HIFT_UPSAMPLE_SCALE;
+        const float uv = (f0_up[t] > CV3_HIFT_VOICED_THR) ? 1.0f : 0.0f;
+        const float noise_amp = uv * CV3_HIFT_NOISE_STD + (1.0f - uv) * CV3_HIFT_SINE_AMP / 3.0f;
+        for (int h = 0; h < CV3_HIFT_HARMONICS; h++) {
+            const float sine = std::sin(phase_down[(size_t)t_mel * CV3_HIFT_HARMONICS + h]) * CV3_HIFT_SINE_AMP * uv;
+            const float noise = noise_amp * noise_buf[(size_t)t * CV3_HIFT_HARMONICS + h];
+            sine_waves_out[(size_t)t * CV3_HIFT_HARMONICS + h] = sine + noise;
+        }
+    }
+
+    // m_source.l_linear(sine_waves) + tanh.
+    for (int t = 0; t < T_audio; t++) {
+        float sum = l_linear_b;
+        for (int h = 0; h < CV3_HIFT_HARMONICS; h++) {
+            sum += sine_waves_out[(size_t)t * CV3_HIFT_HARMONICS + h] * l_linear_w[h];
+        }
+        sine_merge_out[t] = std::tanh(sum);
+    }
+}
+
+// Source-side STFT: real signal (T_audio,) → (18, T_stft) row-major,
+// matching the byte layout the decode forward expects (ggml ne=(T_stft, 18)).
+// Parameters: n_fft=16, hop=4, periodic Hann window, center=True with
+// reflect-pad (matches torch.stft default).
+void cv3_hift_source_stft_cpu(const float* sine_merge, int T_audio, float* s_stft_out) {
+    const int n_fft = CV3_HIFT_NFFT;
+    const int hop = CV3_HIFT_HOP;
+    const int n_freq = n_fft / 2 + 1;
+    const int n_pad = n_fft / 2;
+    const int T_stft = T_audio / hop + 1;
+
+    // Reflect-pad: padded[i] = sine_merge[reflect(i - n_pad)] for i in [0, T_audio + 2*n_pad).
+    // PyTorch's reflect pad mode mirrors around the boundary (so pos -1 = sine_merge[1]).
+    const int T_padded = T_audio + 2 * n_pad;
+    std::vector<float> padded((size_t)T_padded);
+    auto reflect_at = [&](int idx) -> float {
+        // idx in [0, T_padded); map to source signal index via reflect padding.
+        int src = idx - n_pad;
+        if (T_audio <= 1) {
+            return T_audio == 1 ? sine_merge[0] : 0.0f;
+        }
+        const int period = 2 * (T_audio - 1);
+        // Reduce src into [-(T_audio-1), T_audio-1] using full period 2*(T_audio-1).
+        int r = src % period;
+        if (r < 0)
+            r += period;
+        if (r >= T_audio)
+            r = period - r;
+        return sine_merge[r];
+    };
+    for (int i = 0; i < T_padded; i++) {
+        padded[i] = reflect_at(i);
+    }
+
+    // Periodic Hann window.
+    std::vector<float> win((size_t)n_fft);
+    for (int i = 0; i < n_fft; i++) {
+        win[i] = 0.5f * (1.0f - std::cos(2.0f * (float)M_PI * (float)i / (float)n_fft));
+    }
+
+    // For each frame, naive DFT (n_fft=16 — O(N²) is trivially fine here).
+    // s_stft_out layout: (T_stft, 18) row-major = bytes f-outer, t-inner →
+    // index [f * T_stft + t]. First 9 bins = real, next 9 = imag.
+    for (int frame = 0; frame < T_stft; frame++) {
+        const int start = frame * hop;
+        for (int f = 0; f < n_freq; f++) {
+            float re = 0.0f;
+            float im = 0.0f;
+            for (int n = 0; n < n_fft; n++) {
+                const float x = padded[start + n] * win[n];
+                const float angle = -2.0f * (float)M_PI * (float)f * (float)n / (float)n_fft;
+                re += x * std::cos(angle);
+                im += x * std::sin(angle);
+            }
+            s_stft_out[(size_t)f * T_stft + (size_t)frame] = re;
+            s_stft_out[(size_t)(n_freq + f) * T_stft + (size_t)frame] = im;
+        }
+    }
+}
+
+// Composes f0 → upsample → SineGen → l_linear → STFT into s_stft (18, T_stft).
+// Caller supplies `noise_buf` (seeded; size T_audio * 9). All output buffers
+// are caller-allocated; pass nullptr for any intermediate not needed.
+void cv3_hift_source_path_cpu(const cv3_hift& h, const float* f0_mel, int T_mel, const float* noise_buf,
+                              float* f0_up_out,      // [T_audio]      or nullptr
+                              float* sine_waves_out, // [T_audio, 9]   or nullptr
+                              float* sine_merge_out, // [T_audio]      or nullptr
+                              float* s_stft_out)     // [T_stft, 18]   or nullptr
+{
+    const int T_audio = T_mel * CV3_HIFT_UPSAMPLE_SCALE;
+    const int T_stft = T_audio / CV3_HIFT_HOP + 1;
+
+    // Read l_linear weights off the loaded GGUF tensors.
+    // m_source.l_linear.w shape is (9, 1) — Linear(in=9, out=1), stored as
+    // ne=(9, 1) F32 (9 inner). Bytes: 9 weights then 1 bias.
+    GGML_ASSERT(h.m_source_l_linear_w && h.m_source_l_linear_b);
+    GGML_ASSERT(ggml_nelements(h.m_source_l_linear_w) == CV3_HIFT_HARMONICS);
+    GGML_ASSERT(ggml_nelements(h.m_source_l_linear_b) == 1);
+    float l_w[CV3_HIFT_HARMONICS];
+    float l_b = 0.0f;
+    ggml_backend_tensor_get(h.m_source_l_linear_w, l_w, 0, (size_t)CV3_HIFT_HARMONICS * sizeof(float));
+    ggml_backend_tensor_get(h.m_source_l_linear_b, &l_b, 0, sizeof(float));
+
+    std::vector<float> sine_waves_buf;
+    std::vector<float> sine_merge_buf;
+    float* sw_ptr = sine_waves_out;
+    if (!sw_ptr) {
+        sine_waves_buf.resize((size_t)T_audio * CV3_HIFT_HARMONICS);
+        sw_ptr = sine_waves_buf.data();
+    }
+    float* sm_ptr = sine_merge_out;
+    if (!sm_ptr) {
+        sine_merge_buf.resize((size_t)T_audio);
+        sm_ptr = sine_merge_buf.data();
+    }
+
+    cv3_hift_sinegen_msource_cpu(f0_mel, T_mel, noise_buf, l_w, l_b, sw_ptr, sm_ptr, f0_up_out);
+
+    if (s_stft_out) {
+        cv3_hift_source_stft_cpu(sm_ptr, T_audio, s_stft_out);
+    }
+    (void)T_stft;
+}
+
 // Build the HiFT decode graph. Inputs (set externally):
 //   hift_decode_mel_in    [mel_dim, T_mel]              F32
 //   hift_decode_s_stft_in [T_stft, 18]                  F32 — concat of real+imag
@@ -3303,6 +3562,109 @@ float* cv3_extract_hift_decode_stage(cosyvoice3_tts_context* ctx, const float* m
     return out;
 }
 
+// ---------------------------------------------------------------------------
+// Phase 4-B-1 — source path stage extractor + end-to-end inference (4-C)
+// ---------------------------------------------------------------------------
+//
+// Stages:
+//   hift_source_f0_up        [T_audio]      nearest-replicate f0_mel by 480
+//   hift_source_sine_waves   [T_audio, 9]   post sin + noise mix
+//   hift_source_sine_merge   [T_audio]      tanh(l_linear)
+//   hift_source              [T_stft, 18]   final STFT (same byte layout as
+//                                            hift_decode_s_stft_in)
+//
+// `embeds_in` packs [f0_mel | noise_buf] with sizes T_mel + T_audio*9. The
+// rand_ini buffer is NOT needed (its contribution is lost in the centered
+// linear interpolation — see cv3_hift_sinegen_msource_cpu header).
+float* cv3_extract_hift_source_stage(cosyvoice3_tts_context* ctx, const float* f0_mel, int T_mel,
+                                     const float* noise_buf, const char* stage_name, int* out_n) {
+    if (!ctx || !ctx->hift.loaded || !f0_mel || T_mel <= 0 || !noise_buf || !stage_name || !out_n)
+        return nullptr;
+    *out_n = 0;
+    const auto& h = ctx->hift;
+    const int T_audio = T_mel * 480;
+    const int T_stft = T_audio / 4 + 1;
+
+    if (strcmp(stage_name, "hift_source_f0_up") == 0) {
+        float* out = (float*)malloc((size_t)T_audio * sizeof(float));
+        if (!out)
+            return nullptr;
+        cv3_hift_source_path_cpu(h, f0_mel, T_mel, noise_buf, /*f0_up*/ out,
+                                 /*sine_waves*/ nullptr, /*sine_merge*/ nullptr, /*s_stft*/ nullptr);
+        *out_n = T_audio;
+        return out;
+    }
+    if (strcmp(stage_name, "hift_source_sine_waves") == 0) {
+        float* out = (float*)malloc((size_t)T_audio * 9 * sizeof(float));
+        if (!out)
+            return nullptr;
+        cv3_hift_source_path_cpu(h, f0_mel, T_mel, noise_buf, nullptr, /*sine_waves*/ out, nullptr, nullptr);
+        *out_n = T_audio * 9;
+        return out;
+    }
+    if (strcmp(stage_name, "hift_source_sine_merge") == 0) {
+        float* out = (float*)malloc((size_t)T_audio * sizeof(float));
+        if (!out)
+            return nullptr;
+        cv3_hift_source_path_cpu(h, f0_mel, T_mel, noise_buf, nullptr, nullptr, /*sine_merge*/ out, nullptr);
+        *out_n = T_audio;
+        return out;
+    }
+    if (strcmp(stage_name, "hift_source") == 0) {
+        const size_t n = (size_t)T_stft * 18;
+        float* out = (float*)malloc(n * sizeof(float));
+        if (!out)
+            return nullptr;
+        cv3_hift_source_path_cpu(h, f0_mel, T_mel, noise_buf, nullptr, nullptr, nullptr, /*s_stft*/ out);
+        *out_n = (int)n;
+        return out;
+    }
+    fprintf(stderr, "cosyvoice3_tts: unknown hift_source stage '%s'\n", stage_name);
+    return nullptr;
+}
+
+// End-to-end Phase 4-C: mel → f0_predictor → source path → hift_decode →
+// 24 kHz audio. Caller supplies seeded `noise_buf` (T_audio * 9 floats) for
+// bit-equivalent diff to PyTorch's `set_all_random_seed(0)`. The F0 predictor
+// is run via the graph builder from phase 4-A (`cv3_build_hift_f0_graph`),
+// matching the ggml-resident path; the source path + decode run via the
+// helpers above + `cv3_extract_hift_decode_stage`.
+//
+// Returns malloc'd float[T_mel * 480]. *out_n is set to T_audio on success.
+float* cv3_extract_hift_inference(cosyvoice3_tts_context* ctx, const float* mel, int T_mel, const float* noise_buf,
+                                  int* out_n) {
+    if (!ctx || !ctx->hift.loaded || !mel || T_mel <= 0 || !noise_buf || !out_n)
+        return nullptr;
+    *out_n = 0;
+    const int T_audio = T_mel * 480;
+    const int T_stft = T_audio / 4 + 1;
+    const auto& h = ctx->hift;
+
+    // 1) F0 predictor (mel → f0_mel).
+    float* f0_mel = cv3_extract_hift_f0_stage(ctx, mel, T_mel);
+    if (!f0_mel) {
+        fprintf(stderr, "cosyvoice3_tts: hift_inference: F0 predictor failed\n");
+        return nullptr;
+    }
+
+    // 2) Source path: f0 → upsample → SineGen → l_linear → STFT.
+    std::vector<float> s_stft((size_t)T_stft * 18);
+    cv3_hift_source_path_cpu(h, f0_mel, T_mel, noise_buf, nullptr, nullptr, nullptr, s_stft.data());
+    free(f0_mel);
+
+    // 3) HiFT decode (mel + s_stft → audio).
+    int dec_n = 0;
+    float* audio = cv3_extract_hift_decode_stage(ctx, mel, T_mel, s_stft.data(), "hift_decode", &dec_n);
+    if (!audio || dec_n != T_audio) {
+        if (audio)
+            free(audio);
+        fprintf(stderr, "cosyvoice3_tts: hift_inference: decode forward failed (n=%d)\n", dec_n);
+        return nullptr;
+    }
+    *out_n = T_audio;
+    return audio;
+}
+
 } // namespace
 
 extern "C" float* cosyvoice3_tts_run_hift_decode(struct cosyvoice3_tts_context* ctx, const float* mel, int T_mel,
@@ -3311,6 +3673,22 @@ extern "C" float* cosyvoice3_tts_run_hift_decode(struct cosyvoice3_tts_context* 
         return nullptr;
     int out_n = 0;
     return cv3_extract_hift_decode_stage(ctx, mel, T_mel, s_stft, "hift_decode", &out_n);
+}
+
+extern "C" float* cosyvoice3_tts_run_hift_source(struct cosyvoice3_tts_context* ctx, const float* f0_mel, int T_mel,
+                                                 const float* noise_buf) {
+    if (!ctx || !ctx->hift.loaded || !f0_mel || T_mel <= 0 || !noise_buf)
+        return nullptr;
+    int out_n = 0;
+    return cv3_extract_hift_source_stage(ctx, f0_mel, T_mel, noise_buf, "hift_source", &out_n);
+}
+
+extern "C" float* cosyvoice3_tts_run_hift_inference(struct cosyvoice3_tts_context* ctx, const float* mel, int T_mel,
+                                                    const float* noise_buf) {
+    if (!ctx || !ctx->hift.loaded || !mel || T_mel <= 0 || !noise_buf)
+        return nullptr;
+    int out_n = 0;
+    return cv3_extract_hift_inference(ctx, mel, T_mel, noise_buf, &out_n);
 }
 
 // Phase 4-A — HiFT loader. Binds the 246 hift GGUF tensors into ctx->hift
