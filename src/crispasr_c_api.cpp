@@ -1295,6 +1295,9 @@ struct crispasr_session {
     indextts_context* indextts_ctx = nullptr;
     std::vector<float> indextts_ref_pcm; // 24 kHz mono cloning reference
 #endif
+#ifdef CA_HAVE_PIPER
+    piper_tts_context* piper_ctx = nullptr;
+#endif
 #ifdef CA_HAVE_M2M100
     m2m100_context* m2m100_ctx = nullptr;
 #endif
@@ -1992,6 +1995,24 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         return s;
     }
 #endif
+#ifdef CA_HAVE_PIPER
+    if (s->backend == "piper" || s->backend == "piper-tts") {
+        s->backend = "piper";
+        piper_tts_params p = piper_tts_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
+        s->piper_ctx = piper_tts_init_from_file(model_path, p);
+        if (!s->piper_ctx) {
+            delete s;
+            return nullptr;
+        }
+        // Single-file VITS: the phoneme-id map and the default espeak
+        // voice are baked into the GGUF, so it synthesises immediately
+        // after open — no codec / voice companion required.
+        return s;
+    }
+#endif
 #ifdef CA_HAVE_M2M100
     if (s->backend == "m2m100" || s->backend == "m2m-100" || s->backend == "translate" ||
         s->backend == "m2m100-wmt21") {
@@ -2260,6 +2281,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_INDEXTTS
     list += ",indextts";
+#endif
+#ifdef CA_HAVE_PIPER
+    list += ",piper";
 #endif
 #ifdef CA_HAVE_M2M100
     // m2m100-wmt21 routes through the same m2m100 engine (WMT21 Dense
@@ -4787,6 +4811,46 @@ CA_EXPORT float* crispasr_session_synthesize(crispasr_session* s, const char* te
         return indextts_synthesize(s->indextts_ctx, text, ref, refN, out_n_samples);
     }
 #endif
+#ifdef CA_HAVE_PIPER
+    if (s->piper_ctx) {
+        // Piper synthesises at 22.05 kHz mono; the session synth contract
+        // (and the Dart `synthesize` path) is a fixed 24 kHz. Resample with
+        // linear interpolation so the host's 24 kHz playback stays correct.
+        float* src = nullptr;
+        int sr = 0;
+        const int nIn = piper_tts_synthesize(s->piper_ctx, text, &src, &sr);
+        if (!src || nIn <= 0) {
+            if (src)
+                free(src);
+            return nullptr;
+        }
+        if (sr <= 0)
+            sr = 22050;
+        if (sr == 24000) {
+            if (out_n_samples)
+                *out_n_samples = nIn;
+            return src; // already the host rate — pass through
+        }
+        const int64_t nOut = (int64_t)nIn * 24000 / sr;
+        float* dst = (float*)malloc((size_t)(nOut > 0 ? nOut : 1) * sizeof(float));
+        if (!dst) {
+            free(src);
+            return nullptr;
+        }
+        const double ratio = (double)sr / 24000.0;
+        for (int64_t j = 0; j < nOut; ++j) {
+            const double pos = (double)j * ratio;
+            const int64_t i0 = (int64_t)pos;
+            const int64_t i1 = (i0 + 1 < nIn) ? i0 + 1 : nIn - 1;
+            const double frac = pos - (double)i0;
+            dst[j] = (float)((double)src[i0] * (1.0 - frac) + (double)src[i1] * frac);
+        }
+        free(src);
+        if (out_n_samples)
+            *out_n_samples = (int)nOut;
+        return dst;
+    }
+#endif
     return nullptr;
 }
 
@@ -5031,6 +5095,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_INDEXTTS
     if (s->indextts_ctx)
         indextts_free(s->indextts_ctx);
+#endif
+#ifdef CA_HAVE_PIPER
+    if (s->piper_ctx)
+        piper_tts_free(s->piper_ctx);
 #endif
 #ifdef CA_HAVE_M2M100
     if (s->m2m100_ctx)

@@ -39,7 +39,12 @@
 
 // espeak-ng phonemizer (shared with kokoro.cpp)
 #ifdef CRISPASR_HAVE_ESPEAK_NG
-#include <speak_lib.h>
+// Match kokoro.cpp: the CMake find_path locates `espeak-ng/speak_lib.h`,
+// so the resolved include dir is the PARENT — the header must be included
+// with its `espeak-ng/` prefix. A bare <speak_lib.h> fails on Homebrew
+// macOS (header under .../include/espeak-ng/) even though it happens to
+// resolve on some Linux layouts.
+#include <espeak-ng/speak_lib.h>
 #endif
 
 // ── JSON-lite parser for phoneme_id_map ────────────────────────────
