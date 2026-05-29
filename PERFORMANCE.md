@@ -1600,6 +1600,8 @@ faster on the parakeet rows; numbers below are the Linux x86 VPS.
 | voxtral-mini-3b                             | 166 | 165 |  189 |  193 |
 | cohere-transcribe                           |  79 | 144 |  349 |  673 |
 | cohere-transcribe + `--vad`                 |  65 | 117 |  279 |  557 |
+| cohere-asr-ja (Q4_K, JA audio)             |  31 | 140 |    — |    — |
+| cohere-asr-ja (Q4_K, EN audio)             |  39 | 104 |    — |    — |
 | canary-1b-v2                                |  68 | 122 |  381 | OOM  |
 
 (voxtral wall time is roughly constant because it silently skips
