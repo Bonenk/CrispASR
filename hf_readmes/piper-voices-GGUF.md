@@ -1,5 +1,5 @@
 ---
-license: cc0-1.0
+license: cc-by-4.0
 language:
 - de
 - en
@@ -42,11 +42,30 @@ research license; the CC BY-NC-SA voices) are **deliberately excluded**.
 | `piper-de_DE-thorsten-medium-f16.gguf` | thorsten | German (M) | medium | **CC0** |
 | `piper-de_DE-thorsten-high-f16.gguf` | thorsten | German (M) | high | **CC0** |
 | `piper-de_DE-thorsten_emotional-medium-f16.gguf` | thorsten (emotional) | German (M) | medium | **CC0** |
+| `piper-de_DE-kerstin-low-f16.gguf` | kerstin | German (F) | low | **CC0** |
+| `piper-de_DE-mls-medium-f16.gguf` | mls | German | medium | **CC-BY 4.0** † |
 | `piper-en_GB-cori-medium-f16.gguf` | cori | English (GB, F) | medium | **public domain** |
+| `piper-en_US-libritts_r-medium-f16.gguf` | libritts_r | English (US) | medium | **CC-BY 4.0** † |
 
-The German voices are [Thorsten-Voice](https://www.thorsten-voice.de/)
-(Thorsten Müller), released **CC0** (public domain dedication). `en_GB-cori`
-is released into the **public domain** per its upstream MODEL_CARD.
+The Thorsten + kerstin German voices are released **CC0** (public-domain
+dedication — [Thorsten-Voice](https://www.thorsten-voice.de/) /
+Thorsten Müller, and the kerstin set). `en_GB-cori` is **public domain**
+per its upstream MODEL_CARD.
+
+† **CC-BY 4.0 — attribution required.** `mls` is from
+[Multilingual LibriSpeech](https://www.openslr.org/94/) (MLS);
+`en_US-libritts_r` is from [LibriTTS-R](https://www.openslr.org/141/)
+(Koizumi et al., Google). When you ship audio from these voices, credit
+the dataset per CC-BY 4.0.
+
+### Excluded (license not redistributable)
+
+Deliberately **not** converted/hosted here:
+- `en_US-lessac` — Blizzard 2013 (CSTR Edinburgh), research/non-commercial.
+- `en_US-ryan`, `en_US-hfc_female/male`, `de_DE-pavoque` — CC BY-**NC**-SA.
+- `de_DE-eva_k`, `de_DE-karlsson`, `de_DE-ramona` — M-AILABS dataset whose
+  license URL (caito.de) is defunct/unverifiable. Re-add only after
+  confirming the terms.
 
 ## Licensing
 
