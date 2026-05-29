@@ -184,8 +184,22 @@ Conventional naming for all three GGUFs:
 
 ## License
 
-Apache-2.0 (inherited from the upstream model). Free for commercial
-use.
+The model weights are **Apache-2.0** (inherited from the upstream
+model). Free for commercial use. The `zero_shot` voice prompt is the
+`asset/zero_shot_prompt.wav` clip from the Apache-2.0 CosyVoice repo.
+
+The `fleurs-{en,de,zh,ja}` voice prompts are derived (trimmed +
+loudness-normalised) from Google's **FLEURS** corpus, licensed
+**[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)** —
+commercial use permitted, attribution required:
+
+> FLEURS (Few-shot Learning Evaluation of Universal Representations of
+> Speech), Conneau et al., 2022 — <https://huggingface.co/datasets/google/fleurs>,
+> licensed CC BY 4.0. The prompt clips here are trimmed excerpts,
+> loudness-normalised; no other modification.
+
+All five baked voices are therefore clean for commercial use under
+permissive licenses (Apache-2.0 / CC BY 4.0).
 
 ## Related links
 
