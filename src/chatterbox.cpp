@@ -2893,6 +2893,15 @@ extern "C" float* chatterbox_synthesize(struct chatterbox_context* ctx, const ch
         spk_emb = se_buf.data();
     }
 
+    if (!prompt_tokens && !spk_emb) {
+        const bool is_gpt2 = (ctx->hp.arch == "chatterbox_turbo" || ctx->hp.arch == "kartoffelbox");
+        if (is_gpt2) {
+            fprintf(stderr, "chatterbox-turbo: WARNING — no voice conditioning loaded. "
+                            "Audio will be unconditioned (noisy/quiet). Use --voice ref.wav or "
+                            "ensure the T3 GGUF includes baked conds.pt tensors.\n");
+        }
+    }
+
     float* pcm =
         chatterbox_s3gen_synthesize(ctx->s3gen_ctx, speech_tokens, n_tokens, prompt_tokens, n_prompt, prompt_feat,
                                     prompt_feat_len, spk_emb, ctx->params.cfm_steps, out_n_samples);
