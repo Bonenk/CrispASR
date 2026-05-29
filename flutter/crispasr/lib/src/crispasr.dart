@@ -149,6 +149,60 @@ DecodedAudio decodeAudioFile(String path, {String? libPath}) {
   }
 }
 
+/// Result of [detectTextLanguage]: the model's native language label
+/// (ISO 639-1 for CLD3; GlotLID emits `xxx_Script` codes) + a confidence
+/// in [0, 1].
+class TextLanguage {
+  final String code;
+  final double confidence;
+  const TextLanguage(this.code, this.confidence);
+  @override
+  String toString() => 'TextLanguage($code, ${confidence.toStringAsFixed(3)})';
+}
+
+/// Identify the language of [text] in-process via CrispASR's text-LID
+/// C-ABI (`crispasr_text_detect_language`, wrapping the CLD3 / GlotLID
+/// `text_lid_dispatch` façade). One-shot: loads [modelPath] (e.g. a
+/// `cld3-*.gguf`), predicts, frees — fine for the occasional
+/// "what language is this transcript?" call; open a persistent handle
+/// on the C side if you ever need high-throughput batch LID.
+///
+/// Returns null when the loaded library predates the symbol or detection
+/// fails (the C side returns a non-zero status). Distinct from
+/// [CrispASR.detectLanguage] / [LidService], which run AUDIO LID on PCM.
+TextLanguage? detectTextLanguage(
+  String text,
+  String modelPath, {
+  int nThreads = 1,
+  String? libPath,
+}) {
+  final lib = DynamicLibrary.open(libPath ?? CrispASR.defaultLibName());
+  if (!lib.providesSymbol('crispasr_text_detect_language')) return null;
+  final fn = lib.lookupFunction<
+      Int32 Function(
+          Pointer<Utf8>, Pointer<Utf8>, Int32, Pointer<Utf8>, Int32, Pointer<Float>),
+      int Function(Pointer<Utf8>, Pointer<Utf8>, int, Pointer<Utf8>, int,
+          Pointer<Float>)>('crispasr_text_detect_language');
+
+  final textPtr = text.toNativeUtf8();
+  final modelPtr = modelPath.toNativeUtf8();
+  const cap = 64; // a language label is a handful of bytes; 64 is ample
+  final labelBuf = calloc<Uint8>(cap);
+  final confOut = calloc<Float>();
+  try {
+    final rc = fn(textPtr, modelPtr, nThreads, labelBuf.cast<Utf8>(), cap, confOut);
+    if (rc != 0) return null;
+    final label = labelBuf.cast<Utf8>().toDartString();
+    if (label.isEmpty) return null;
+    return TextLanguage(label, confOut.value);
+  } finally {
+    calloc.free(textPtr);
+    calloc.free(modelPtr);
+    calloc.free(labelBuf);
+    calloc.free(confOut);
+  }
+}
+
 /// One ASR segment passed in to [diarizeSegments]. Callers fill [t0] and
 /// [t1] (seconds) from the upstream transcribe result; the diarizer
 /// writes the zero-based speaker index into [speaker] (`-1` means the
