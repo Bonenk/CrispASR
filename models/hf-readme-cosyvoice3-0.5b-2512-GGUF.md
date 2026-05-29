@@ -57,7 +57,7 @@ text (Qwen2 BPE) → CosyVoice3LM (Qwen2-0.5B + speech-token AR head)
 | `cosyvoice3-flow-f16.gguf` | F16 | 665 MB |
 | `cosyvoice3-flow-q8_0.gguf` | Q8_0 (input_embd + spk_affine stay F16) | 361 MB |
 | `cosyvoice3-hift-f16.gguf` | F16 — too small to benefit from quant | 42 MB |
-| `cosyvoice3-voices.gguf` | F32 voice-clone bank: 5 baked voices (zero_shot + en/de/zh/ja) | 413 KB |
+| `cosyvoice3-voices.gguf` | F32 voice-clone bank: 8 baked voices (zero_shot + en/de/zh/ja/fr/es/ko) | 665 KB |
 | `cosyvoice3-s3tok-f16.gguf` | F16 speech_tokenizer_v3 — **byte-exact vs ONNX** | 462 MB |
 | `cosyvoice3-s3tok-q4_k.gguf` | Q4_K s3tok (FSQ proj stays F16); ~0.6% token drift — optional smaller variant | 139 MB |
 | `cosyvoice3-campplus-f16.gguf` | F16 CAMPPlus 192-D speaker encoder | 13 MB |
@@ -125,6 +125,9 @@ the name to `--voice`:
 | `fleurs-de` | German | FLEURS de (CC BY 4.0) |
 | `fleurs-zh` | Mandarin | FLEURS zh (CC BY 4.0) |
 | `fleurs-ja` | Japanese | FLEURS ja (CC BY 4.0) |
+| `fleurs-fr` | French | FLEURS fr (CC BY 4.0) |
+| `fleurs-es` | Spanish | FLEURS es (CC BY 4.0) |
+| `fleurs-ko` | Korean | FLEURS ko (CC BY 4.0) |
 
 The `fleurs-*` prompts are ~4–6 s clips from Google's
 [FLEURS](https://huggingface.co/datasets/google/fleurs) corpus
@@ -188,7 +191,7 @@ The model weights are **Apache-2.0** (inherited from the upstream
 model). Free for commercial use. The `zero_shot` voice prompt is the
 `asset/zero_shot_prompt.wav` clip from the Apache-2.0 CosyVoice repo.
 
-The `fleurs-{en,de,zh,ja}` voice prompts are derived (trimmed +
+The `fleurs-{en,de,zh,ja,fr,es,ko}` voice prompts are derived (trimmed +
 loudness-normalised) from Google's **FLEURS** corpus, licensed
 **[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)** —
 commercial use permitted, attribution required:
@@ -198,7 +201,7 @@ commercial use permitted, attribution required:
 > licensed CC BY 4.0. The prompt clips here are trimmed excerpts,
 > loudness-normalised; no other modification.
 
-All five baked voices are therefore clean for commercial use under
+All eight baked voices are therefore clean for commercial use under
 permissive licenses (Apache-2.0 / CC BY 4.0).
 
 ## Related links
