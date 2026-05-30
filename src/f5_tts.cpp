@@ -831,7 +831,7 @@ static std::vector<float> dit_forward(f5_tts_context* ctx, const float* x_data, 
         // ggml_flash_attn_ext: Q(head_dim, T, n_heads), K(head_dim, T_k, n_heads), V(head_dim, T_k, n_heads)
         ggml_tensor* attn = ggml_flash_attn_ext(mg.ctx, q, k, v,
                                                 nullptr, // no mask (bidirectional)
-                                                1.0f,    // scale applied internally
+                                                1.0f / sqrtf((float)head_dim), // 1/sqrt(64)=0.125
                                                 0.0f,    // max_bias (no ALiBi)
                                                 0.0f);   // logit_softcap (none)
         // Output: (head_dim, T, n_heads)
