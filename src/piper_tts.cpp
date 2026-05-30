@@ -110,7 +110,7 @@ static bool parse_phoneme_id_map(const std::string& json, std::vector<phoneme_ma
         while (pos < json.size() && json[pos] != ']') {
             while (pos < json.size() && (json[pos] == ' ' || json[pos] == ','))
                 pos++;
-            if (json[pos] == ']')
+            if (pos >= json.size() || json[pos] == ']')
                 break;
             int val = 0;
             bool neg = false;
