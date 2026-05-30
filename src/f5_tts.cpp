@@ -897,9 +897,12 @@ static std::vector<float> dit_forward(f5_tts_context* ctx, const float* x_data, 
             std::vector<float> tmp(T * dim);
             ggml_backend_tensor_get(norm_x, tmp.data(), 0, tmp.size() * sizeof(float));
             dump_stage(ctx, "dit0_adaln_norm", tmp.data(), tmp.size());
-            // attn at this point includes O-proj; read from x_res - x_in to get gated attn
             ggml_backend_tensor_get(x_res, tmp.data(), 0, tmp.size() * sizeof(float));
             dump_stage(ctx, "dit0_post_attn", tmp.data(), tmp.size());
+            // Q after RoPE: (head_dim, n_heads, T) = (64, 16, 407)
+            std::vector<float> q_tmp(T * dim);
+            ggml_backend_tensor_get(q_after_rope, q_tmp.data(), 0, q_tmp.size() * sizeof(float));
+            dump_stage(ctx, "dit0_q_after_rope", q_tmp.data(), q_tmp.size());
         }
         if (step_idx == 0 && !drop_audio_cond) {
             char label[64];
