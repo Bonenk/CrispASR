@@ -7971,6 +7971,58 @@ aborts → empty/garbage `!!!!!` transcript → WER 100%. Confirmed on P100
    but uninitialized GPU memory could cause NaN if a graph scheduling race
    reads before write. Under investigation.
 
+### Root cause (confirmed 2026-05-31, Kaggle v13)
+
+The `ggml_backend_sched` with `[CUDA, CPU]` backends misroutes LLM decoder
+ops when tensors are split across backends. Specifically:
+
+- funasr's LLM decoder uses 3 **separate** Q/K/V `ggml_mul_mat` projections
+  (not fused QKV like qwen3-asr). This gives the sched more degrees of
+  freedom in backend assignment.
+- With all weights on GPU + KV cache on GPU, the sched routes some ops to
+  CUDA and others to CPU. The cross-backend data movement produces **Inf at
+  layer 2** (first8 diverge wildly from CPU reference), which cascades to
+  **all-NaN by layer 3** and poisons every subsequent layer + the logits.
+- The same `kv_self_attn` code works for qwen3-asr because it uses a
+  **fused QKV** projection — the sched sees one large matmul and keeps it
+  on one backend consistently.
+
+**Per-layer NaN scan (v11):**
+```
+llm_layer_0:  0 NaN, 0 Inf  — matches CPU ✓
+llm_layer_1:  0 NaN, 0 Inf  — matches CPU ✓
+llm_layer_2:  0 NaN, 1 Inf  — max=6973 vs CPU max=124512 ← DIVERGES
+llm_layer_3:  ALL NaN (47104/47104)
+llm_layer_4+: ALL NaN
+```
+
+### Fix (commit `bc04e263`)
+
+Split weights via `load_weights_split`: encoder/adaptor tensors (prefix
+`funasr.*`) → GPU, LLM decoder tensors (`blk.*`, `output.*`) → CPU. Force
+the KV cache to CPU when the split is active (`model.buf_cpu != nullptr`).
+The sched then naturally routes the entire LLM to CPU (all its data is
+there) while the 70-block SANM encoder stays GPU-accelerated.
+
+`FUNASR_LLM_GPU=1` overrides the split to all-GPU for future testing when
+the upstream `ggml_backend_sched` issue is fixed.
+
+**Kaggle v13 result:** CUDA P100, JFK 11s audio → correct transcript,
+0 NaN, 0 Inf, argmax=3976 (matches CPU baseline exactly).
+
+### What didn't work (so future investigators don't repeat)
+
+| Attempt | Result |
+|---|---|
+| Q8_0 model (instead of F16) | Still !-loops |
+| `FUNASR_NO_FA=1` (disable flash-attn) | Still all-NaN |
+| `CRISPASR_KV_READ_F32=1` (F32 KV reads) | Still all-NaN |
+| FA-off + KV_READ_F32 combined | Still all-NaN |
+| Single-backend GPU sched (remove CPU) | Crashes (ops need CPU fallback) |
+| `parallel=true` sched flag | Still all-NaN |
+| CPU-only `llm_sched` (weights on GPU) | Crashes (weights on wrong backend) |
+| Weight split but KV on GPU | Still NaN (layer 2 Inf → layer 3 all-NaN) |
+
 ### Diagnostic protocol that worked
 
 - `FUNASR_DUMP_STAGES=1` env-gated tensor stats at every 10th encoder
@@ -7978,11 +8030,12 @@ aborts → empty/garbage `!!!!!` transcript → WER 100%. Confirmed on P100
   to the LLM prefill in one Kaggle run instead of guessing.
 - Three-way CPU/CUDA-FA/CUDA-noFA comparison in a single kernel → ruled
   out flash-attn as the cause definitively.
-- Stage dumps confirmed to Kaggle's own P100 → no "works on my machine".
+- Full 28-layer LLM scan → pinpointed layer 2 as the first Inf source.
+- Stage dumps confirmed on Kaggle P100 → no "works on my machine".
 
 ### Cross-refs
 
-- `src/funasr.cpp` FUNASR_DUMP_STAGES instrumentation (commit `7dfe401d`)
-- `tools/kaggle/funasr-cuda-debug/` kernel (v3: encoder OK, v4: LLM snaps)
-- PLAN §136 for the fix plan
+- `src/funasr.cpp` weight-split fix (commit `bc04e263`)
+- `tools/kaggle/funasr-cuda-debug/` kernel (v3–v13 progression)
+- PLAN §136
 - issue #125 (original report)

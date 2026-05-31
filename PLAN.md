@@ -4627,40 +4627,18 @@ given orpheus/indextts coverage).
 
 ## §136 — funasr CUDA !-loop fix (issue #125)
 
-**Status:** IN PROGRESS — root-cause localized to LLM decoder (all-NaN
-prefill logits on CUDA), encoder/adaptor verified correct.
+**Status:** DONE — fix confirmed on Kaggle P100 (v13, 2026-05-31).
 
-**Problem:** funasr greedy decode degenerates on CUDA (P100, Blackwell) —
-token 0 repeats → `!!!!!` transcript. CPU and Metal are correct.
+**Root cause:** `ggml_backend_sched` with `[CUDA,CPU]` misroutes LLM
+decoder ops when funasr's 3 separate Q/K/V projections give it too many
+degrees of freedom. Inf at layer 2 → all-NaN by layer 3 → !-loop.
 
-**What's proven (Kaggle v3, 2026-05-31):**
-- Encoder/adaptor stages match CPU on CUDA (first8 max-diff < 0.05 across
-  all 70 SANM layers + 2 adaptor layers). The encoder is NOT the problem.
-- ALL 151936 prefill logits are NaN on CUDA (both FA-on and FA-off).
-- `FUNASR_NO_FA=1` does NOT fix it — the bug is not in the encoder FA.
-- The bug is in the Qwen2-0.6B LLM decoder's prefill graph on CUDA.
+**Fix:** `load_weights_split` puts encoder on GPU, LLM on CPU. KV cache
+forced to CPU when the split is active. Encoder stays GPU-accelerated
+(70 SANM blocks — the bottleneck). `FUNASR_LLM_GPU=1` overrides for
+future testing. See LEARNINGS §136 for the full investigation.
 
-**What's ruled out:**
-- F16-weight saturation (Q8_0 also fails, commit `868aabdf`)
-- Encoder flash-attn F16 accumulation (encoder output matches CPU)
-- `frames_spliced==0` / `fake_token_len==0` (T_lfr=183, fake_token_len=23)
-
-**Active leads (Kaggle v4 in flight):**
-1. **F16 KV cache + LLM flash-attn** — `CRISPASR_KV_READ_F32=1` test will
-   show if the F16→FA path in the decoder is the NaN source.
-2. **LLM layer snaps** — dumps at layers 0/12/23 will pinpoint the first
-   NaN-producing layer.
-3. **Graph scheduling race** — KV cache allocated but not zeroed on CUDA;
-   if ggml_cont (read) runs before ggml_cpy (write) for the same cache
-   region, garbage → NaN. Same code works for qwen3-asr though.
-
-**Fix plan (depends on v4 results):**
-- If KV_READ_F32 fixes it → force F32 KV reads for funasr on CUDA
-  (CRISPASR_KV_READ_F32 auto-set when backend is CUDA).
-- If layer 0 is already NaN → bug is in the very first attention/FFN on
-  CUDA, likely a weight loading or graph construction issue.
-- Fallback: force funasr LLM to CPU on CUDA builds (mimo-asr #115
-  precedent, `c887881e`). Slow but correct.
-
-**Verification:** JFK transcript on Kaggle CUDA (WER < 0.3), then full
-all-backends benchmark re-run.
+**Future improvement:** fuse Q/K/V into a single QKV projection (like
+qwen3-asr) so the sched can't split them across backends, then revert
+the weight split. This would give full GPU acceleration for the LLM
+decoder too.
