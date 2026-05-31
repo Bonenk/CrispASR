@@ -1059,6 +1059,20 @@ endif()
 endif()
 
 # ---------------------------------------------------------------------------
+# zonos-tts — Zyphra/Zonos-v0.1-transformer AR TTS + DAC 44.1 kHz codec
+# ---------------------------------------------------------------------------
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/zonos_tts.cpp")
+add_library(zonos-tts STATIC zonos_tts.h zonos_tts.cpp)
+set_target_properties(zonos-tts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(zonos-tts PUBLIC .)
+target_compile_features   (zonos-tts PUBLIC cxx_std_17)
+target_link_libraries     (zonos-tts PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(zonos-tts PRIVATE -O3)
+endif()
+endif()
+
+# ---------------------------------------------------------------------------
 # bark-tts — Suno Bark TTS (native ggml runtime)
 # ---------------------------------------------------------------------------
 add_library(bark-tts STATIC bark_tts.h bark_tts.cpp)
@@ -1482,6 +1496,9 @@ if (TARGET kokoro)
 endif()
 if (TARGET outetts)
     target_link_libraries(crispasr PUBLIC outetts)
+endif()
+if (TARGET zonos-tts)
+    target_link_libraries(crispasr PUBLIC zonos-tts)
 endif()
 if (TARGET f5-tts)
     target_link_libraries(crispasr PUBLIC f5-tts)

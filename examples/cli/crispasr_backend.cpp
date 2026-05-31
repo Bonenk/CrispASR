@@ -44,6 +44,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_piper_backend();
 #ifdef CRISPASR_HAVE_OUTETTS
 std::unique_ptr<CrispasrBackend> crispasr_make_outetts_backend();
 #endif
+std::unique_ptr<CrispasrBackend> crispasr_make_zonos_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_f5_tts_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_bark_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_pocket_tts_backend();
@@ -166,6 +167,8 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_dia_backend();
     if (name == "parler-tts" || name == "parler_tts" || name == "parler" || name == "parlertts")
         return crispasr_make_parler_tts_backend();
+    if (name == "zonos" || name == "zonos-tts" || name == "zonos_tts")
+        return crispasr_make_zonos_backend();
 
     fprintf(stderr, "crispasr: error: unknown backend '%s'\n", name.c_str());
     return nullptr;
@@ -237,6 +240,8 @@ std::vector<std::string> crispasr_list_backends() {
         "dia",
         "dia-tts",
         "parler-tts",
+        "zonos",
+        "zonos-tts",
     };
 }
 

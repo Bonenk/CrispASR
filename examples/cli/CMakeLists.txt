@@ -54,6 +54,7 @@ add_executable(${TARGET}
     crispasr_backend_paraformer.cpp
     crispasr_backend_sensevoice.cpp
     crispasr_backend_speecht5.cpp
+    crispasr_backend_zonos.cpp
     crispasr_aligner_cli.cpp
     crispasr_vad_cli.cpp
     crispasr_lid_cli.cpp
