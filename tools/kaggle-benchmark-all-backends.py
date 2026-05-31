@@ -220,8 +220,12 @@ elif cmake_ok and not need_reconfigure:
 # so cap CUDA at -j2 (still parallel, fits memory); CPU keeps full -j.
 build_jobs = kh.safe_build_jobs(gpu=has_gpu)
 with kh.build_heartbeat("cmake.build"):
+    # Target is `crispasr-cli` — it has OUTPUT_NAME crispasr, so it produces
+    # bin/crispasr. Target `crispasr` builds ONLY the library (libcrispasr),
+    # leaving bin/crispasr absent — which failed the assert below on every
+    # prior run (examples/cli/CMakeLists.txt:12,232).
     kh.sh_with_progress(f"stdbuf -oL -eL cmake --build {BUILD_DIR} "
-                        f"--target crispasr -j{build_jobs}")
+                        f"--target crispasr-cli -j{build_jobs}")
 
 assert os.path.isfile(CRISPASR), f"Build failed: {CRISPASR} not found"
 

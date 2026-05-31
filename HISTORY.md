@@ -6,6 +6,30 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-05-31 all-backends benchmark: green (26/27) — wrong build target was the blocker
+
+The benchmark failed three Kaggle runs in a row; the harness `.log`
+(fetchable via `kaggle kernels output --file-pattern`) finally showed
+why: the build completed to `[452/453]` (libcrispasr.so) then asserted
+`bin/crispasr not found`. The kernel built `--target crispasr` — which
+builds only the **library**; the CLI binary comes from target
+`crispasr-cli` (it carries `OUTPUT_NAME crispasr`, see
+examples/cli/CMakeLists.txt:12,232). All three failures were this, not
+the CUDA OOM I first assumed. (The arch-pin fix was still necessary and
+validated: run #4's box was a **P100 / sm_60**, not a T4 — a hard-coded
+75 would have produced an unrunnable binary; auto-detect pinned sm_60.)
+
+Fixed target → run #4 COMPLETE: **27 backends, 26 PASS**. Fastest
+SenseVoice 19.8× RT (WER 0); best-WER tier (0%) includes firered-asr,
+whisper, parakeet, cohere, wav2vec2, hubert, glm-asr, qwen3, paraformer,
+voxtral 3B/4B, granite 1B/4.1, kyutai, mimo (0.3× RT, CPU-forced per
+#115). The lone FAIL is **funasr** (ran at 6× RT but WER 100% — wrong
+transcript, a real GPU-path backend bug, consistent with its noted
+Blackwell `!`-loop caveat; surfaces on P100 too). Two non-fatal HF
+pre-download 401s (auth API was flaking) fell back to the C++ downloader.
+Note: `issue126`/`fusion-ab` keep `--target crispasr` correctly — they
+consume libcrispasr.so, not the CLI binary.
+
 ## 2026-05-31 Kaggle kernels: shared `kaggle_harness.py` (one gold standard)
 
 The all-backends benchmark OOM'd its CUDA build on a T4 (multi-arch nvcc
