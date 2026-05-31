@@ -128,13 +128,14 @@ static std::string transcribe_ref_audio(const std::vector<float>& pcm_16k, const
     }
 
     // Build minimal params for the ASR backend — just model + threads.
+    // Resolve the model path via the registry (handles auto-download).
     whisper_params asr_p = {};
     asr_p.n_threads = p.n_threads;
     asr_p.no_prints = true; // suppress ASR model load chatter
     asr_p.language = p.language.empty() ? "en" : p.language;
     asr_p.auto_download = true;
-    // Let the model resolver pick the default model for this backend.
-    asr_p.model = "auto";
+    asr_p.model = crispasr_resolve_model_cli("auto", asr_backend, /*quiet=*/true,
+                                             /*cache_dir=*/"", /*auto_download=*/true);
 
     if (!backend->init(asr_p)) {
         if (!p.no_prints)
