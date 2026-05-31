@@ -1028,7 +1028,13 @@ static std::vector<int32_t> generate_text_semantic(bark_context* ctx, const char
     out.reserve((size_t)max_steps);
     float temperature = ctx->params.temperature_semantic;
 
-    // 7. AR decode
+    // 7. AR decode — sample from logits[0:10000] + logits[SEMANTIC_PAD_TOKEN] as EOS
+    // This matches Python: relevant_logits = hstack([logits[:10000], logits[10000]])
+    const int sample_vocab = (int)pp.semantic_vocab_size + 1; // 10001: 10000 semantic + 1 EOS
+    std::vector<float> sample_logits((size_t)sample_vocab);
+
+    const float min_eos_p = 0.2f; // Match Python bark default: stop if EOS prob >= 0.2
+
     for (int step = 0; step < max_steps; step++) {
         // Sample from logits[0:semantic_vocab_size]
         int tok = sample_from_logits(logits, (int)pp.semantic_vocab_size, temperature, ctx->rng);
@@ -1039,6 +1045,32 @@ static std::vector<int32_t> generate_text_semantic(bark_context* ctx, const char
         if (tok == (int)pp.semantic_vocab_size) {
             break;
         }
+
+        // min_eos_p early stop: if EOS probability >= threshold, stop regardless of sampled token.
+        // This matches Python bark's `if min_eos_p is not None and probs[-1] >= min_eos_p: break`
+        if (min_eos_p > 0.0f && temperature > 0.0f) {
+            // Compute softmax probability of EOS token
+            float inv_t = 1.0f / temperature;
+            float mx = sample_logits[0] * inv_t;
+            for (int k = 1; k < sample_vocab; k++) {
+                float s = sample_logits[k] * inv_t;
+                if (s > mx)
+                    mx = s;
+            }
+            double sum = 0.0;
+            double eos_exp = std::exp((double)(sample_logits[(size_t)pp.semantic_vocab_size] * inv_t - mx));
+            for (int k = 0; k < sample_vocab; k++) {
+                sum += std::exp((double)(sample_logits[k] * inv_t - mx));
+            }
+            float eos_prob = (float)(eos_exp / sum);
+            if (eos_prob >= min_eos_p) {
+                if (ctx->params.verbosity >= 2) {
+                    fprintf(stderr, "bark: early stop at step %d (eos_prob=%.4f >= %.4f)\n", step, eos_prob, min_eos_p);
+                }
+                break;
+            }
+        }
+
         out.push_back(tok);
 
         // Check max context
@@ -1062,6 +1094,17 @@ static std::vector<int32_t> generate_text_semantic(bark_context* ctx, const char
 
     if (ctx->params.verbosity >= 1) {
         fprintf(stderr, "bark: stage 1 produced %d semantic tokens\n", (int)out.size());
+    }
+    if (ctx->params.verbosity >= 2 && !out.empty()) {
+        fprintf(stderr, "bark: semantic first 20:");
+        for (int i = 0; i < std::min(20, (int)out.size()); i++)
+            fprintf(stderr, " %d", out[(size_t)i]);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "bark: semantic last 20:");
+        int start = std::max(0, (int)out.size() - 20);
+        for (int i = start; i < (int)out.size(); i++)
+            fprintf(stderr, " %d", out[(size_t)i]);
+        fprintf(stderr, "\n");
     }
 
     return out;
@@ -1289,10 +1332,35 @@ static inline float elu_f(float x, float alpha = 1.0f) {
 // Uses weight-normalized convolutions (folded at decode time).
 // Architecture: pre_conv -> LSTM -> 4x(ELU + ConvTranspose + ResBlock) -> ELU + post_conv -> tanh
 
-// Helper: Conv1D with same-padding on CPU vectors. Layout: (C, T) row-major.
-static std::vector<float> cpu_conv1d(const float* input, int Cin, int T, const float* weight, const float* bias,
-                                     int Cout, int K, int stride, int padding, int dilation) {
-    int T_out = (T + 2 * padding - dilation * (K - 1) - 1) / stride + 1;
+// Apply reflect padding to a (C, T) tensor on the left and right.
+static std::vector<float> reflect_pad(const float* input, int C, int T, int pad_left, int pad_right) {
+    int T_out = T + pad_left + pad_right;
+    std::vector<float> out((size_t)(C * T_out));
+    for (int c = 0; c < C; c++) {
+        for (int t = 0; t < T_out; t++) {
+            int src_t = t - pad_left;
+            // Reflect: mirror at boundaries
+            if (src_t < 0)
+                src_t = -src_t;
+            if (src_t >= T)
+                src_t = 2 * (T - 1) - src_t;
+            // Clamp for safety (very short sequences)
+            if (src_t < 0)
+                src_t = 0;
+            if (src_t >= T)
+                src_t = T - 1;
+            out[(size_t)(c * T_out + t)] = input[(size_t)(c * T + src_t)];
+        }
+    }
+    return out;
+}
+
+// Helper: Conv1D on CPU vectors. Layout: (C, T) row-major. No internal padding (caller pads).
+static std::vector<float> cpu_conv1d_nopad(const float* input, int Cin, int T, const float* weight, const float* bias,
+                                           int Cout, int K, int stride, int dilation) {
+    int T_out = (T - dilation * (K - 1) - 1) / stride + 1;
+    if (T_out <= 0)
+        return std::vector<float>((size_t)Cout, 0.0f); // degenerate
     std::vector<float> out((size_t)(Cout * T_out), 0.0f);
 
     for (int co = 0; co < Cout; co++) {
@@ -1300,11 +1368,9 @@ static std::vector<float> cpu_conv1d(const float* input, int Cin, int T, const f
             float sum = bias ? bias[co] : 0.0f;
             for (int ci = 0; ci < Cin; ci++) {
                 for (int k = 0; k < K; k++) {
-                    int t_in = t * stride - padding + k * dilation;
-                    if (t_in >= 0 && t_in < T) {
-                        // weight layout: (K, Cin, Cout) — matching GGUF ne order
-                        sum += weight[(size_t)(co * Cin * K + ci * K + k)] * input[(size_t)(ci * T + t_in)];
-                    }
+                    int t_in = t * stride + k * dilation;
+                    // weight layout: (K, Cin, Cout) — matching GGUF ne order
+                    sum += weight[(size_t)(co * Cin * K + ci * K + k)] * input[(size_t)(ci * T + t_in)];
                 }
             }
             out[(size_t)(co * T_out + t)] = sum;
@@ -1313,10 +1379,30 @@ static std::vector<float> cpu_conv1d(const float* input, int Cin, int T, const f
     return out;
 }
 
-// ConvTranspose1d on CPU
-static std::vector<float> cpu_conv_transpose1d(const float* input, int Cin, int T, const float* weight,
-                                               const float* bias, int Cout, int K, int stride, int padding) {
-    int T_out = (T - 1) * stride + K - 2 * padding;
+// EnCodec causal Conv1d: left-pad with reflect, then conv with no padding.
+// padding_total = (K-1)*dilation for stride=1
+static std::vector<float> cpu_conv1d_causal(const float* input, int Cin, int T, const float* weight, const float* bias,
+                                            int Cout, int K, int stride, int dilation) {
+    int padding_total = (K - 1) * dilation;
+    // For causal: all padding on left
+    // extra_padding ensures output length = ceil(T / stride) -- for stride=1 it's 0
+    int ideal_T_out = (T + stride - 1) / stride;
+    int T_padded = T + padding_total;
+    int actual_T_out = (T_padded - dilation * (K - 1) - 1) / stride + 1;
+    int extra_padding = (ideal_T_out - actual_T_out) * stride;
+    if (extra_padding < 0)
+        extra_padding = 0;
+    int pad_left = padding_total;
+    int pad_right = extra_padding;
+    std::vector<float> padded = reflect_pad(input, Cin, T, pad_left, pad_right);
+    int T_p = T + pad_left + pad_right;
+    return cpu_conv1d_nopad(padded.data(), Cin, T_p, weight, bias, Cout, K, stride, dilation);
+}
+
+// ConvTranspose1d on CPU (no padding -- produces raw output)
+static std::vector<float> cpu_conv_transpose1d_raw(const float* input, int Cin, int T, const float* weight,
+                                                   const float* bias, int Cout, int K, int stride) {
+    int T_out = (T - 1) * stride + K;
     std::vector<float> out((size_t)(Cout * T_out), 0.0f);
 
     for (int co = 0; co < Cout; co++) {
@@ -1324,11 +1410,9 @@ static std::vector<float> cpu_conv_transpose1d(const float* input, int Cin, int 
             for (int ci = 0; ci < Cin; ci++) {
                 float val = input[(size_t)(ci * T + ti)];
                 for (int k = 0; k < K; k++) {
-                    int t_out = ti * stride + k - padding;
-                    if (t_out >= 0 && t_out < T_out) {
-                        // weight layout: (K, Cout, Cin) for ConvTranspose
-                        out[(size_t)(co * T_out + t_out)] += val * weight[(size_t)(ci * Cout * K + co * K + k)];
-                    }
+                    int t_out = ti * stride + k;
+                    // weight layout: (K, Cout, Cin) for ConvTranspose
+                    out[(size_t)(co * T_out + t_out)] += val * weight[(size_t)(ci * Cout * K + co * K + k)];
                 }
             }
         }
@@ -1337,6 +1421,28 @@ static std::vector<float> cpu_conv_transpose1d(const float* input, int Cin, int 
                 out[(size_t)(co * T_out + t)] += bias[co];
             }
         }
+    }
+    return out;
+}
+
+// EnCodec causal ConvTranspose1d: apply convtr, then trim (kernel-stride) from output.
+// For causal with trim_right_ratio=1.0: all trimming on the right.
+static std::vector<float> cpu_conv_transpose1d_causal(const float* input, int Cin, int T, const float* weight,
+                                                      const float* bias, int Cout, int K, int stride) {
+    std::vector<float> raw = cpu_conv_transpose1d_raw(input, Cin, T, weight, bias, Cout, K, stride);
+    int T_raw = (T - 1) * stride + K;
+    int padding_total = K - stride;
+    // Causal trim_right_ratio = 1.0: trim all from right
+    int padding_right = padding_total; // ceil(padding_total * 1.0) = padding_total
+    int padding_left = 0;              // padding_total - padding_right = 0
+    int T_out = T_raw - padding_left - padding_right;
+    if (T_out <= 0)
+        T_out = 1;
+
+    // Trim: remove padding_left from start, padding_right from end
+    std::vector<float> out((size_t)(Cout * T_out));
+    for (int c = 0; c < Cout; c++) {
+        std::memcpy(&out[(size_t)(c * T_out)], &raw[(size_t)(c * T_raw + padding_left)], (size_t)T_out * sizeof(float));
     }
     return out;
 }
@@ -1448,15 +1554,15 @@ static std::vector<float> encodec_decode(bark_context* ctx, const int32_t* fine_
         }
     }
 
-    // 2. Pre-conv (128 -> 512, k=7, p=3)
+    // 2. Pre-conv (128 -> 512, k=7, causal reflect-padded)
     std::vector<float> pre_w = fold_weight_norm(enc.pre_conv_w_g, enc.pre_conv_w_v);
     std::vector<float> pre_b((size_t)channels[0]);
     if (enc.pre_conv_b) {
         ggml_backend_tensor_get(enc.pre_conv_b, pre_b.data(), 0, (size_t)channels[0] * sizeof(float));
     }
     std::vector<float> h =
-        cpu_conv1d(z.data(), cb_dim, n_timesteps, pre_w.data(), pre_b.data(), channels[0], 7, 1, 3, 1);
-    int T = n_timesteps; // time dimension stays same after same-padding conv
+        cpu_conv1d_causal(z.data(), cb_dim, n_timesteps, pre_w.data(), pre_b.data(), channels[0], 7, 1, 1);
+    int T = (int)h.size() / channels[0];
 
     // 3. LSTM
     h = cpu_lstm_forward(h.data(), channels[0], T, enc);
@@ -1474,21 +1580,19 @@ static std::vector<float> encodec_decode(bark_context* ctx, const int32_t* fine_
             h[i] = elu_f(h[i]);
         }
 
-        // ConvTranspose1d (Cin -> Cout)
+        // ConvTranspose1d (Cin -> Cout) — causal: trim (K-stride) from right
         std::vector<float> up_w = fold_weight_norm(blk.convtr_w_g, blk.convtr_w_v);
         std::vector<float> up_b((size_t)Cout, 0.0f);
         if (blk.convtr_b) {
             ggml_backend_tensor_get(blk.convtr_b, up_b.data(), 0, (size_t)Cout * sizeof(float));
         }
-        // Symmetric padding: pad = stride/2
-        int pad = stride / 2;
-        h = cpu_conv_transpose1d(h.data(), Cin, T, up_w.data(), up_b.data(), Cout, K_up, stride, pad);
+        h = cpu_conv_transpose1d_causal(h.data(), Cin, T, up_w.data(), up_b.data(), Cout, K_up, stride);
         T = (int)h.size() / Cout;
 
         // ResBlock: ELU -> Conv(k=3, dilation=1) -> ELU -> Conv(k=1) + shortcut
         std::vector<float> residual = h;
 
-        // First conv (Cout -> Cout/2, k=3, dilation=1, same-pad)
+        // ResBlock: first conv (Cout -> Cout/2, k=3, causal reflect-padded)
         int Cmid = Cout / 2;
         for (size_t i = 0; i < h.size(); i++)
             h[i] = elu_f(h[i]);
@@ -1496,23 +1600,23 @@ static std::vector<float> encodec_decode(bark_context* ctx, const int32_t* fine_
         std::vector<float> rb0((size_t)Cmid, 0.0f);
         if (blk.res_conv0_b)
             ggml_backend_tensor_get(blk.res_conv0_b, rb0.data(), 0, (size_t)Cmid * sizeof(float));
-        h = cpu_conv1d(h.data(), Cout, T, rw0.data(), rb0.data(), Cmid, 3, 1, 1, 1);
+        h = cpu_conv1d_causal(h.data(), Cout, T, rw0.data(), rb0.data(), Cmid, 3, 1, 1);
 
-        // Second conv (Cout/2 -> Cout, k=1)
+        // Second conv (Cout/2 -> Cout, k=1, causal -- k=1 means no padding needed)
         for (size_t i = 0; i < h.size(); i++)
             h[i] = elu_f(h[i]);
         std::vector<float> rw1 = fold_weight_norm(blk.res_conv1_w_g, blk.res_conv1_w_v);
         std::vector<float> rb1((size_t)Cout, 0.0f);
         if (blk.res_conv1_b)
             ggml_backend_tensor_get(blk.res_conv1_b, rb1.data(), 0, (size_t)Cout * sizeof(float));
-        h = cpu_conv1d(h.data(), Cmid, T, rw1.data(), rb1.data(), Cout, 1, 1, 0, 1);
+        h = cpu_conv1d_causal(h.data(), Cmid, T, rw1.data(), rb1.data(), Cout, 1, 1, 1);
 
-        // Shortcut (Cout -> Cout, k=1)
+        // Shortcut (Cout -> Cout, k=1, causal)
         std::vector<float> sw = fold_weight_norm(blk.res_short_w_g, blk.res_short_w_v);
         std::vector<float> sb((size_t)Cout, 0.0f);
         if (blk.res_short_b)
             ggml_backend_tensor_get(blk.res_short_b, sb.data(), 0, (size_t)Cout * sizeof(float));
-        std::vector<float> shortcut = cpu_conv1d(residual.data(), Cout, T, sw.data(), sb.data(), Cout, 1, 1, 0, 1);
+        std::vector<float> shortcut = cpu_conv1d_causal(residual.data(), Cout, T, sw.data(), sb.data(), Cout, 1, 1, 1);
 
         // Add residual
         for (size_t i = 0; i < h.size(); i++) {
@@ -1520,7 +1624,7 @@ static std::vector<float> encodec_decode(bark_context* ctx, const int32_t* fine_
         }
     }
 
-    // 5. Final: ELU -> Conv1d(32, 1, k=7, p=3) -> tanh
+    // 5. Final: ELU -> Conv1d(32, 1, k=7, causal) -> tanh
     for (size_t i = 0; i < h.size(); i++)
         h[i] = elu_f(h[i]);
 
@@ -1528,7 +1632,7 @@ static std::vector<float> encodec_decode(bark_context* ctx, const int32_t* fine_
     std::vector<float> post_b(1, 0.0f);
     if (enc.post_conv_b)
         ggml_backend_tensor_get(enc.post_conv_b, post_b.data(), 0, sizeof(float));
-    std::vector<float> pcm = cpu_conv1d(h.data(), channels[4], T, post_w.data(), post_b.data(), 1, 7, 1, 3, 1);
+    std::vector<float> pcm = cpu_conv1d_causal(h.data(), channels[4], T, post_w.data(), post_b.data(), 1, 7, 1, 1);
 
     // tanh
     for (size_t i = 0; i < pcm.size(); i++) {
