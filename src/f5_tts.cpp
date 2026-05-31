@@ -1764,8 +1764,20 @@ int f5_tts_synthesize(struct f5_tts_context* ctx, const char* text, float** pcm_
     auto tokens = tokenize_text(ctx->vocab, flat_text);
 
     // ── Duration estimation ──
+    // The formula estimates speech rate from (ref_T / ref_text_len) mel frames
+    // per character, then applies it to gen_text. When ref_text is empty we
+    // have no transcript to derive the rate from, so we estimate the ref
+    // transcript length from audio duration at ~13 chars/sec (typical English
+    // including spaces — calibrated against F5-TTS upstream defaults).
     int ref_T = ctx->ref_mel_T;
-    int ref_text_len = std::max((int)ref_text.size(), 1);
+    int ref_text_len;
+    if (ref_text.empty()) {
+        float mel_fps = (float)ctx->hp.sample_rate / (float)ctx->hp.hop_length;
+        float ref_secs = (float)ref_T / mel_fps;
+        ref_text_len = std::max(1, (int)(ref_secs * 13.0f));
+    } else {
+        ref_text_len = (int)ref_text.size();
+    }
     int gen_text_len = (int)strlen(text);
     int duration = ref_T + (int)((float)ref_T / (float)ref_text_len * (float)gen_text_len / ctx->speed);
 
