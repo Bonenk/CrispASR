@@ -727,6 +727,65 @@ static std::vector<float> funasr_run_encoder_adaptor(funasr_context* ctx, const 
         return {};
     }
 
+    // ---- Per-stage tensor dump (FUNASR_DUMP_STAGES=1) ----
+    // Prints min/max/mean/L2/first-8 for key encoder stages so CPU-vs-CUDA
+    // divergence can be localised from Kaggle logs. Default OFF.
+    {
+        static int dump_flag = -1;
+        if (dump_flag < 0) {
+            const char* e = std::getenv("FUNASR_DUMP_STAGES");
+            dump_flag = (e && *e && *e != '0') ? 1 : 0;
+        }
+        if (dump_flag) {
+            // Stages to dump — every 10th encoder layer + boundaries + adaptor.
+            const char* names[] = {"encoder_layer_0",     "encoder_layer_9",       "encoder_layer_19",
+                                   "encoder_layer_29",    "encoder_layer_39",      "encoder_layer_49",
+                                   "encoder_layer_59",    "encoder_layer_69",      "encoder_main_out",
+                                   "encoder_output",      "audio_adaptor_layer_0", "audio_adaptor_layer_1",
+                                   "audio_adaptor_output"};
+            std::fprintf(stderr, "funasr_dump: ---- encoder/adaptor stage stats (T_lfr=%d) ----\n", T_lfr);
+            for (const char* nm : names) {
+                ggml_tensor* t = ggml_graph_get_tensor(gf, nm);
+                if (!t) {
+                    std::fprintf(stderr, "funasr_dump: %-28s [not found]\n", nm);
+                    continue;
+                }
+                const size_t n = ggml_nelements(t);
+                std::vector<float> buf(n, 0.0f);
+                ggml_backend_tensor_get(t, buf.data(), 0, n * sizeof(float));
+                float mn = buf[0], mx = buf[0], sm = 0.0f, sq = 0.0f;
+                int n_nan = 0, n_inf = 0;
+                for (size_t i = 0; i < n; i++) {
+                    float v = buf[i];
+                    if (std::isnan(v)) {
+                        n_nan++;
+                        continue;
+                    }
+                    if (std::isinf(v)) {
+                        n_inf++;
+                        continue;
+                    }
+                    if (v < mn)
+                        mn = v;
+                    if (v > mx)
+                        mx = v;
+                    sm += v;
+                    sq += v * v;
+                }
+                float mean = (n > 0) ? sm / (float)n : 0.0f;
+                float l2 = std::sqrt(sq);
+                std::fprintf(stderr,
+                             "funasr_dump: %-28s n=%-8zu min=%12.6f max=%12.6f mean=%12.6f L2=%12.4f nan=%d inf=%d "
+                             "first8=[",
+                             nm, n, mn, mx, mean, l2, n_nan, n_inf);
+                for (size_t i = 0; i < 8 && i < n; i++)
+                    std::fprintf(stderr, "%s%.6f", i ? "," : "", buf[i]);
+                std::fprintf(stderr, "]\n");
+            }
+            std::fprintf(stderr, "funasr_dump: ---- end ----\n");
+        }
+    }
+
     if (stage_out && stage_name && std::strcmp(stage_name, "mel_features") == 0) {
         stage_out->assign(lfr.begin(), lfr.begin() + (ptrdiff_t)D_lfr * T_lfr);
     } else if (stage_out && stage_name) {
@@ -1358,6 +1417,50 @@ static std::string funasr_transcribe_impl(funasr_context* ctx, const float* pcm,
     }
     const int d = (int)hp.llm_d_model;
 
+    // ---- Dump spliced embeddings (FUNASR_DUMP_STAGES=1) ----
+    {
+        static int dump_flag = -1;
+        if (dump_flag < 0) {
+            const char* e = std::getenv("FUNASR_DUMP_STAGES");
+            dump_flag = (e && *e && *e != '0') ? 1 : 0;
+        }
+        if (dump_flag) {
+            // Stats over the audio portion of the spliced embeddings.
+            const size_t audio_start = (size_t)fbank_beg * (size_t)d;
+            const size_t audio_len = (size_t)std::min(fake_token_len, T_lfr) * (size_t)d;
+            float mn = inputs_embeds[audio_start], mx = mn, sm = 0.0f, sq = 0.0f;
+            int n_nan = 0, n_inf = 0;
+            for (size_t i = 0; i < audio_len; i++) {
+                float v = inputs_embeds[audio_start + i];
+                if (std::isnan(v)) {
+                    n_nan++;
+                    continue;
+                }
+                if (std::isinf(v)) {
+                    n_inf++;
+                    continue;
+                }
+                if (v < mn)
+                    mn = v;
+                if (v > mx)
+                    mx = v;
+                sm += v;
+                sq += v * v;
+            }
+            float mean = audio_len > 0 ? sm / (float)audio_len : 0.0f;
+            float l2 = std::sqrt(sq);
+            std::fprintf(stderr,
+                         "funasr_dump: %-28s n=%-8zu min=%12.6f max=%12.6f mean=%12.6f L2=%12.4f nan=%d inf=%d "
+                         "first8=[",
+                         "spliced_audio_embeds", audio_len, mn, mx, mean, l2, n_nan, n_inf);
+            for (size_t i = 0; i < 8 && i < audio_len; i++)
+                std::fprintf(stderr, "%s%.6f", i ? "," : "", inputs_embeds[audio_start + i]);
+            std::fprintf(stderr, "]\n");
+
+            // Also dump the first prefill logits after they're computed.
+        }
+    }
+
     // KV cache sized for prompt + up to max_new_tokens.
     const int max_new_tokens = 512;
     {
@@ -1380,6 +1483,41 @@ static std::string funasr_transcribe_impl(funasr_context* ctx, const float* pcm,
     }
     if (logits.empty())
         return "";
+
+    // ---- Dump prefill logits (FUNASR_DUMP_STAGES=1) ----
+    {
+        static int dump_flag = -1;
+        if (dump_flag < 0) {
+            const char* e = std::getenv("FUNASR_DUMP_STAGES");
+            dump_flag = (e && *e && *e != '0') ? 1 : 0;
+        }
+        if (dump_flag) {
+            float mn = logits[0], mx = mn, sm = 0.0f;
+            int n_nan = 0, n_inf = 0;
+            for (float v : logits) {
+                if (std::isnan(v)) {
+                    n_nan++;
+                    continue;
+                }
+                if (std::isinf(v)) {
+                    n_inf++;
+                    continue;
+                }
+                if (v < mn)
+                    mn = v;
+                if (v > mx)
+                    mx = v;
+                sm += v;
+            }
+            int top = 0;
+            for (int i = 1; i < (int)logits.size(); i++)
+                if (logits[i] > logits[top])
+                    top = i;
+            std::fprintf(stderr,
+                         "funasr_dump: %-28s n=%-8zu min=%12.6f max=%12.6f mean=%12.6f argmax=%-6d nan=%d inf=%d\n",
+                         "prefill_logits", logits.size(), mn, mx, sm / (float)logits.size(), top, n_nan, n_inf);
+        }
+    }
 
     auto argmax = [](const std::vector<float>& v) {
         int best = 0;
