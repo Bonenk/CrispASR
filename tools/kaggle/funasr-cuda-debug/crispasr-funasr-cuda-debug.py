@@ -235,23 +235,33 @@ def run_funasr(label: str, extra_env: dict, timeout: int = 300) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Run the three experiments
+# Run the experiments
 # ──────────────────────────────────────────────────────────────────────────
 results = []
 
-# Run A: CUDA default (enc GPU, LLM+KV CPU via weight-split)
-r_cuda_fa = run_funasr("cuda_fa_on", {})
+# Run A: CUDA default (enc GPU, LLM+KV CPU via weight-split workaround)
+r_cuda_fa = run_funasr("cuda_workaround", {})
 results.append(r_cuda_fa)
 
-# v3-v4 proved: FA off and KV_READ_F32 do NOT fix it. LLM layer 0 is fine,
-# NaN appears somewhere in layers 1-27. v5 dumps ALL 28 layers to pinpoint.
-
 # Run B: CPU forced — ground truth
-# Force CPU by setting GGML_CUDA_NO_PEER_COPY and using a trick:
-# Build has CUDA but we can force CPU by setting the backend env.
-# Actually the cleanest way is CUDA_VISIBLE_DEVICES="" to hide GPUs.
 r_cpu = run_funasr("cpu_baseline", {"CUDA_VISIBLE_DEVICES": ""})
 results.append(r_cpu)
+
+# Run C: ALL-GPU (trigger the bug) — force LLM weights + KV on CUDA.
+# Uses only 3 layers + per-node NaN checker to pinpoint exact first bad op.
+r_allgpu = run_funasr("cuda_allgpu_nancheck", {
+    "FUNASR_LLM_GPU": "1",
+    "FUNASR_NAN_CHECK": "1",
+    "FUNASR_LLM_LAYERS": "4",   # only 4 layers — enough to trigger layer-2 NaN
+    "GGML_SCHED_DEBUG": "1",     # print split assignments (level 1 = concise)
+})
+results.append(r_allgpu)
+
+# Run D: ALL-GPU full model (no NaN check, for comparison dump)
+r_allgpu_full = run_funasr("cuda_allgpu_full", {
+    "FUNASR_LLM_GPU": "1",
+})
+results.append(r_allgpu_full)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -283,12 +293,14 @@ stage_names_ordered = [
     "encoder_layer_59", "encoder_layer_69",
     "encoder_main_out", "encoder_output",
     "audio_adaptor_layer_0", "audio_adaptor_layer_1",
-    "audio_adaptor_output", "spliced_audio_embeds", "prefill_logits",
+    "audio_adaptor_output", "spliced_audio_embeds",
+] + [f"llm_layer_{i}" for i in range(28)] + [
+    "llm_pre_lmhead", "prefill_logits",
 ]
 
 for sname in stage_names_ordered:
     cpu_raw = r_cpu["stages"].get(sname, "")
-    cuda_raw = r_cuda_fa["stages"].get(sname, "")
+    cuda_raw = r_allgpu_full["stages"].get(sname, r_cuda_fa["stages"].get(sname, ""))
 
     cpu_s = parse_stage_stats(cpu_raw)
     cuda_s = parse_stage_stats(cuda_raw)
@@ -348,15 +360,22 @@ for r in results:
     print(f"  {r['label']:20s} -> {status}: {r['transcript'][:80]!r}", flush=True)
 print("=" * 60, flush=True)
 
-# v7: testing the dual-sched fix (GPU-only llm_sched for the LLM decoder)
-if not r_cuda_fa["degenerated"] and "ask not" in r_cuda_fa["transcript"].lower():
-    print("\nFIX CONFIRMED: CUDA now produces correct JFK transcript.", flush=True)
-    print("Root cause: dual-backend sched [CUDA,CPU] was splitting LLM ops across backends.", flush=True)
-elif not r_cuda_fa["degenerated"]:
-    print("\nCUDA did not degenerate but transcript may be wrong. Check WER.", flush=True)
-elif r_cuda_fa["rc"] != 0:
-    print(f"\nCUDA CRASHED (rc={r_cuda_fa['rc']}). Check stderr for unsupported op.", flush=True)
-else:
-    print("\nCUDA still degenerates. Dual-sched fix did NOT help.", flush=True)
+# Verdict
+allgpu_nan = r_allgpu["stages"].get("prefill_logits", "")
+allgpu_nan_count = 0
+m = re.search(r"nan=(\d+)", allgpu_nan)
+if m:
+    allgpu_nan_count = int(m.group(1))
+
+print(f"\nWorkaround (enc GPU, LLM CPU): {'PASS' if 'ask not' in r_cuda_fa['transcript'].lower() else 'FAIL'}", flush=True)
+print(f"CPU baseline: {'PASS' if 'ask not' in r_cpu['transcript'].lower() else 'FAIL'}", flush=True)
+print(f"All-GPU NaN check: found_nan={r_allgpu.get('stages', {}).get('prefill_logits', 'N/A')}", flush=True)
+print(f"All-GPU full: logits_nan={allgpu_nan_count}", flush=True)
+
+# Print NaN checker output from stderr
+allgpu_stderr = (RESULTS / "cuda_allgpu_nancheck_stderr.txt").read_text()
+for line in allgpu_stderr.splitlines():
+    if "funasr_nan_check:" in line:
+        print(f"  {line.strip()}", flush=True)
 
 step("done", all_pass=all(not r["degenerated"] for r in results))

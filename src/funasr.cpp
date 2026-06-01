@@ -1062,7 +1062,21 @@ static ggml_cgraph* funasr_build_graph_llm_kv_impl(funasr_context* ctx, int n_pa
     ggml_tensor* const kv_indices = cached_step ? positions : nullptr;
     const int fixed_kv_len = cached_step ? ctx->kv_max_ctx : 0;
 
-    for (uint32_t il = 0; il < hp.llm_n_layers; il++) {
+    // FUNASR_LLM_LAYERS=N limits the number of LLM layers for debugging.
+    // Useful with FUNASR_NAN_CHECK=1 to isolate the failing layer faster.
+    uint32_t n_layers_eff = hp.llm_n_layers;
+    {
+        static int layers_override = -1;
+        if (layers_override < 0) {
+            const char* e = std::getenv("FUNASR_LLM_LAYERS");
+            layers_override = (e && *e) ? std::atoi(e) : 0;
+        }
+        if (layers_override > 0 && (uint32_t)layers_override < n_layers_eff) {
+            n_layers_eff = (uint32_t)layers_override;
+        }
+    }
+
+    for (uint32_t il = 0; il < n_layers_eff; il++) {
         const auto& b = m.llm.blocks[il];
         ggml_tensor* residual = cur;
 
@@ -1285,6 +1299,94 @@ static bool funasr_kv_init(funasr_context* ctx, int max_ctx) {
 }
 
 // ===========================================================================
+// Per-node NaN/Inf checker — FUNASR_NAN_CHECK=1
+//
+// Uses the sched eval_callback to inspect every graph node right after it
+// runs. Prints the FIRST node whose output contains NaN or Inf, then
+// turns itself off so the run completes without flooding the log. The
+// callback forces per-node synchronization (slow) — debug-only.
+// ===========================================================================
+
+struct funasr_nan_check_state {
+    bool found = false;
+    int node_idx = 0;
+};
+
+static bool funasr_nan_check_cb(struct ggml_tensor* t, bool ask, void* user_data) {
+    auto* st = (funasr_nan_check_state*)user_data;
+    if (st->found)
+        return false; // already found the culprit, stop asking
+
+    if (ask) {
+        // We want the data for every non-view node that has a float type.
+        if (t->view_src != nullptr)
+            return false;
+        if (t->type != GGML_TYPE_F32 && t->type != GGML_TYPE_F16)
+            return false;
+        return true; // yes, read this node back
+    }
+
+    // ask == false → data is ready, inspect it.
+    const size_t n = ggml_nelements(t);
+    if (n == 0) {
+        st->node_idx++;
+        return true;
+    }
+
+    std::vector<float> buf(n);
+    if (t->type == GGML_TYPE_F32) {
+        ggml_backend_tensor_get(t, buf.data(), 0, n * sizeof(float));
+    } else {
+        // F16 — read raw then convert
+        std::vector<ggml_fp16_t> h(n);
+        ggml_backend_tensor_get(t, h.data(), 0, n * sizeof(ggml_fp16_t));
+        for (size_t i = 0; i < n; i++)
+            buf[i] = ggml_fp16_to_fp32(h[i]);
+    }
+
+    int n_nan = 0, n_inf = 0;
+    float mx = -1e30f, mn = 1e30f;
+    for (size_t i = 0; i < n; i++) {
+        float v = buf[i];
+        if (std::isnan(v)) {
+            n_nan++;
+            continue;
+        }
+        if (std::isinf(v)) {
+            n_inf++;
+            continue;
+        }
+        if (v > mx)
+            mx = v;
+        if (v < mn)
+            mn = v;
+    }
+
+    if (n_nan > 0 || n_inf > 0) {
+        std::fprintf(stderr,
+                     "funasr_nan_check: FIRST BAD NODE #%d: op=%-12s name=%-30s "
+                     "type=%-4s ne=[%lld,%lld,%lld,%lld] nan=%d inf=%d min=%.6g max=%.6g\n",
+                     st->node_idx, ggml_op_name(t->op), t->name, ggml_type_name(t->type), (long long)t->ne[0],
+                     (long long)t->ne[1], (long long)t->ne[2], (long long)t->ne[3], n_nan, n_inf, (double)mn,
+                     (double)mx);
+        // Print sources
+        for (int j = 0; j < GGML_MAX_SRC; j++) {
+            if (!t->src[j])
+                continue;
+            std::fprintf(stderr, "  src[%d]: op=%-12s name=%-30s type=%-4s ne=[%lld,%lld,%lld,%lld]\n", j,
+                         ggml_op_name(t->src[j]->op), t->src[j]->name, ggml_type_name(t->src[j]->type),
+                         (long long)t->src[j]->ne[0], (long long)t->src[j]->ne[1], (long long)t->src[j]->ne[2],
+                         (long long)t->src[j]->ne[3]);
+        }
+        st->found = true;
+        return false; // stop processing further
+    }
+
+    st->node_idx++;
+    return true; // continue
+}
+
+// ===========================================================================
 // Run the LLM once. n_past=0 + n_tokens=T_prompt = prefill; subsequent
 // calls with n_tokens=1 are the per-step decode.
 // ===========================================================================
@@ -1376,9 +1478,34 @@ static std::vector<float> funasr_run_llm_step(funasr_context* ctx, const float* 
         ggml_tensor* mask_in = ggml_graph_get_tensor(gf, "causal_mask");
         ggml_backend_tensor_set(mask_in, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
     }
+
+    // Install per-node NaN checker when FUNASR_NAN_CHECK=1 (prefill only).
+    funasr_nan_check_state nan_state;
+    {
+        static int nan_check_flag = -1;
+        if (nan_check_flag < 0) {
+            const char* e = std::getenv("FUNASR_NAN_CHECK");
+            nan_check_flag = (e && *e && *e != '0') ? 1 : 0;
+        }
+        if (nan_check_flag && n_tokens > 1) {
+            std::fprintf(stderr, "funasr: NaN checker enabled — per-node sync (slow)\n");
+            ggml_backend_sched_set_eval_callback(ctx->sched, funasr_nan_check_cb, &nan_state);
+        }
+    }
+
     if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
         std::fprintf(stderr, "funasr: llm graph compute failed\n");
+        ggml_backend_sched_set_eval_callback(ctx->sched, nullptr, nullptr);
         return {};
+    }
+
+    // Clear callback after compute.
+    ggml_backend_sched_set_eval_callback(ctx->sched, nullptr, nullptr);
+    if (nan_state.found) {
+        std::fprintf(stderr,
+                     "funasr: NaN/Inf detected at node #%d (see above). "
+                     "Continuing to produce dump for comparison.\n",
+                     nan_state.node_idx);
     }
 
     // ---- LLM layer dump (FUNASR_DUMP_STAGES=1, prefill only) ----
