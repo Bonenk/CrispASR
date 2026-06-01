@@ -5,6 +5,7 @@
 #include "ggml-cpp.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
+#include "ggml-cpu.h"
 
 #ifdef CRISPASR_USE_COREML
 #include "coreml/whisper-encoder.h"
@@ -4762,7 +4763,9 @@ struct whisper_vad_context {
     struct ggml_tensor* h_state;
     struct ggml_tensor* c_state;
     std::vector<float> probs;
-    std::vector<float> window_buf; // pre-allocated per-chunk window (#132)
+    std::vector<float> window_buf;          // pre-allocated per-chunk window (#132)
+    std::vector<uint8_t> work_buf;          // pre-allocated ggml_cplan work buffer (#132)
+    ggml_threadpool_t threadpool = nullptr; // persistent 1-thread pool for inner loop (#132)
 };
 
 struct whisper_vad_context_params whisper_vad_default_context_params(void) {
@@ -5045,6 +5048,15 @@ static bool whisper_vad_init_context(whisper_vad_context* vctx) {
         }
 
         CRISPASR_LOG_INFO("%s: compute buffer (VAD)   = %7.2f MB\n", __func__, whisper_sched_size(vctx->sched) / 1e6);
+    }
+
+    // Create a persistent 1-thread pool used by the inner chunk loop.
+    // This avoids creating/destroying a disposable threadpool on every
+    // chunk (~250 per 8 s audio).  After many server requests the
+    // accumulated malloc/free fragmentation degrades performance (#132).
+    {
+        struct ggml_threadpool_params tpp = ggml_threadpool_params_default(1);
+        vctx->threadpool = ggml_threadpool_new(&tpp);
     }
 
     return true;
@@ -5434,7 +5446,27 @@ bool whisper_vad_detect_speech(struct whisper_vad_context* vctx, const float* sa
     struct ggml_tensor* frame = ggml_graph_get_tensor(gf, "frame");
     struct ggml_tensor* prob = ggml_graph_get_tensor(gf, "prob");
 
-    // we are going to reuse the graph multiple times for each chunk
+    // We reuse the same graph for all chunks.  The inner loop previously
+    // went through ggml_graph_compute_helper → ggml_backend_sched →
+    // ggml_backend_cpu_graph_compute, which created (and destroyed) a
+    // disposable ggml_threadpool on *every single chunk*.  With n_threads > 1
+    // that means n_chunks × (n_threads-1) pthread_create/join cycles per
+    // request.  After a few hundred server requests the accumulated glibc
+    // thread-stack mmap/munmap fragmentation degrades performance 5× (#132).
+    //
+    // Fix: pre-compute a ggml_cplan once (with n_threads=1 — the graph is
+    // tiny, multi-threading hurts), allocate its work buffer once, and call
+    // ggml_graph_compute directly per chunk.  This bypasses the scheduler
+    // overhead and all threadpool creation entirely.
+
+    struct ggml_cplan cplan = ggml_graph_plan(gf, /*n_threads=*/1, vctx->threadpool);
+
+    // Persistent work buffer — reused across calls via vctx member.
+    if (vctx->work_buf.size() < cplan.work_size) {
+        vctx->work_buf.resize(cplan.work_size);
+    }
+    cplan.work_data = vctx->work_buf.data();
+
     const int64_t t_start_vad_us = ggml_time_us();
 
     for (int i = 0; i < n_chunks; i++) {
@@ -5456,8 +5488,8 @@ bool whisper_vad_detect_speech(struct whisper_vad_context* vctx, const float* sa
         // Set the frame tensor data with the samples.
         ggml_backend_tensor_set(frame, window.data(), 0, ggml_nelements(frame) * sizeof(float));
 
-        // do not reset the scheduler - we will reuse the graph in the next chunk
-        if (!ggml_graph_compute_helper(sched, gf, vctx->n_threads, false)) {
+        // Direct graph compute — no scheduler, no threadpool churn.
+        if (ggml_graph_compute(gf, &cplan) != GGML_STATUS_SUCCESS) {
             CRISPASR_LOG_ERROR("%s: failed to compute VAD graph\n", __func__);
             break;
         }
@@ -5756,6 +5788,10 @@ void whisper_vad_free(whisper_vad_context* ctx) {
 
         for (auto& backend : ctx->backends) {
             ggml_backend_free(backend);
+        }
+
+        if (ctx->threadpool) {
+            ggml_threadpool_free(ctx->threadpool);
         }
 
         delete[] ctx->model.hparams.encoder_in_channels;
