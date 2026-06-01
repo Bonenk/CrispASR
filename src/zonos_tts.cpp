@@ -203,11 +203,11 @@ struct zonos_tts_params zonos_tts_default_params(void) {
     p.n_threads = 4;
     p.verbosity = 1;
     p.use_gpu = false;
-    p.temperature = 0.0f; // greedy by default; upstream uses min_p=0.1
+    p.temperature = 1.0f; // upstream uses raw logits + min_p=0.1 (equivalent to temp=1.0)
     p.seed = 0;
     p.max_audio_tokens = 0; // 0 = default (86*30=2580)
     p.flash_attn = false;
-    p.cfg_scale = 1.0f; // disable CFG by default (dual-prefill OOMs on <8 GB RAM)
+    p.cfg_scale = 2.0f; // Zonos requires CFG for meaningful output
     return p;
 }
 
