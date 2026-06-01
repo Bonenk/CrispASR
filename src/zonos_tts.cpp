@@ -179,11 +179,13 @@ struct zonos_tts_context {
     ggml_backend_sched_t sched = nullptr;
     std::vector<uint8_t> compute_meta;
 
-    // KV cache
+    // KV caches — conditioned (primary) and unconditioned (for CFG)
     ggml_context* kv_ctx = nullptr;
     ggml_backend_buffer_t kv_buf = nullptr;
     ggml_tensor* kv_k = nullptr; // (head_dim, max_ctx, n_kv_heads, n_layer)
-    ggml_tensor* kv_v = nullptr; // (head_dim, max_ctx, n_kv_heads, n_layer)
+    ggml_tensor* kv_v = nullptr;
+    ggml_tensor* kv_k_uncond = nullptr; // CFG unconditioned path
+    ggml_tensor* kv_v_uncond = nullptr;
     int kv_max_ctx = 0;
 
     // DAC codec path (loaded lazily)
@@ -403,12 +405,30 @@ struct zonos_tts_context* zonos_tts_init_from_file(const char* path_model, struc
     cw.proj_w = find_t("prefix_conditioner.project.weight");
     cw.proj_b = find_t("prefix_conditioner.project.bias");
 
-    // Set default speaker embedding (random, will be overwritten by set_voice)
-    ctx->cond_state.speaker_emb.resize(128, 0.0f);
-
-    // Initialize RNG
+    // Initialize RNG first (needed for speaker embedding)
     if (params.seed != 0) {
         ctx->rng_state = params.seed;
+    }
+
+    // Set default speaker embedding — random Gaussian (upstream generates
+    // torch.randn(1, 128) when no speaker is provided). Zero embedding
+    // gives the model no speaker identity and it degenerates.
+    ctx->cond_state.speaker_emb.resize(128);
+    {
+        uint64_t rng = ctx->rng_state;
+        for (int i = 0; i < 128; i++) {
+            // Box-Muller from xorshift64*
+            rng ^= rng >> 12;
+            rng ^= rng << 25;
+            rng ^= rng >> 27;
+            float u1 = (float)((rng * 0x2545F4914F6CDD1DULL) >> 11) / (float)(1ULL << 53);
+            rng ^= rng >> 12;
+            rng ^= rng << 25;
+            rng ^= rng >> 27;
+            float u2 = (float)((rng * 0x2545F4914F6CDD1DULL) >> 11) / (float)(1ULL << 53);
+            u1 = std::max(u1, 1e-7f);
+            ctx->cond_state.speaker_emb[i] = std::sqrt(-2.0f * std::log(u1)) * std::cos(2.0f * 3.14159265f * u2);
+        }
     }
 
     if (params.verbosity >= 1) {
@@ -717,17 +737,23 @@ static bool kv_alloc(zonos_tts_context* ctx, int max_ctx) {
     const int n_kv = (int)hp.n_kv_heads;
     const int nl = (int)hp.n_layer;
 
-    ggml_init_params kp = {ggml_tensor_overhead() * 4 + 1024, nullptr, true};
+    // Allocate 2 KV caches: conditioned (primary) + unconditioned (for CFG)
+    ggml_init_params kp = {ggml_tensor_overhead() * 8 + 1024, nullptr, true};
     ctx->kv_ctx = ggml_init(kp);
     const auto kv_pair = core_attn::kv_dtype_pair_from_env("zonos_tts");
     ctx->kv_k = ggml_new_tensor_4d(ctx->kv_ctx, kv_pair.k, hd, max_ctx, n_kv, nl);
     ctx->kv_v = ggml_new_tensor_4d(ctx->kv_ctx, kv_pair.v, hd, max_ctx, n_kv, nl);
+    ctx->kv_k_uncond = ggml_new_tensor_4d(ctx->kv_ctx, kv_pair.k, hd, max_ctx, n_kv, nl);
+    ctx->kv_v_uncond = ggml_new_tensor_4d(ctx->kv_ctx, kv_pair.v, hd, max_ctx, n_kv, nl);
     ggml_set_name(ctx->kv_k, "kv_k");
     ggml_set_name(ctx->kv_v, "kv_v");
+    ggml_set_name(ctx->kv_k_uncond, "kv_k_u");
+    ggml_set_name(ctx->kv_v_uncond, "kv_v_u");
 
     const size_t kb = ggml_nbytes(ctx->kv_k), vb = ggml_nbytes(ctx->kv_v);
+    const size_t total_kv = (kb + vb) * 2; // 2 caches
     ggml_backend_t kv_backend = core_attn::kv_backend_from_env(ctx->backend, ctx->backend_cpu, "zonos_tts");
-    ctx->kv_buf = ggml_backend_alloc_buffer(kv_backend, kb + vb);
+    ctx->kv_buf = ggml_backend_alloc_buffer(kv_backend, total_kv);
     if (!ctx->kv_buf) {
         fprintf(stderr, "zonos_tts: kv alloc failed\n");
         return false;
@@ -735,10 +761,12 @@ static bool kv_alloc(zonos_tts_context* ctx, int max_ctx) {
     char* base = (char*)ggml_backend_buffer_get_base(ctx->kv_buf);
     ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_k, base);
     ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_v, base + kb);
+    ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_k_uncond, base + kb + vb);
+    ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_v_uncond, base + 2 * kb + vb);
     ctx->kv_max_ctx = max_ctx;
 
     if (ctx->params.verbosity >= 1) {
-        fprintf(stderr, "zonos_tts: kv cache %d MiB (hd=%d max=%d n_kv=%d nl=%d)\n", (int)((kb + vb) / 1048576), hd,
+        fprintf(stderr, "zonos_tts: kv cache %d MiB x2 (hd=%d max=%d n_kv=%d nl=%d)\n", (int)((kb + vb) / 1048576), hd,
                 max_ctx, n_kv, nl);
     }
     return true;
@@ -978,7 +1006,8 @@ namespace {
 // Build a transformer decode graph for T tokens at position n_past.
 // Input: embeddings (d_model, T). Output: logits for all 9 codebooks
 // concatenated: (head_vocab_size * n_codebooks, 1) for the last token.
-static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int T) {
+static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int T, ggml_tensor* use_kv_k = nullptr,
+                                         ggml_tensor* use_kv_v = nullptr) {
     const auto& hp = ctx->hp;
     const int d = (int)hp.d_model;
     const int n_q = (int)hp.n_heads;
@@ -990,7 +1019,10 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
     const float attn_scale = 1.0f / std::sqrt((float)hd);
     const int Lk = n_past + T;
 
-    GGML_ASSERT(ctx->kv_k && ctx->kv_v && Lk <= ctx->kv_max_ctx);
+    // Use specified KV cache or default to ctx->kv_k/kv_v
+    ggml_tensor* kv_k_ptr = use_kv_k ? use_kv_k : ctx->kv_k;
+    ggml_tensor* kv_v_ptr = use_kv_v ? use_kv_v : ctx->kv_v;
+    GGML_ASSERT(kv_k_ptr && kv_v_ptr && Lk <= ctx->kv_max_ctx);
 
     ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
     ggml_context* ctx0 = ggml_init(ip);
@@ -1048,7 +1080,7 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
         // Self-attention with fused QKV and KV cache
         ggml_tensor* attn = core_attn::kv_self_attn(ctx0, gf, cur, nullptr, nullptr, nullptr, layer.attn_output_w,
                                                     nullptr, nullptr, positions, (T == 1) ? nullptr : causal_mask,
-                                                    ctx->kv_k, ctx->kv_v, (int)il, n_past, kvp, layer.attn_qkv_w);
+                                                    kv_k_ptr, kv_v_ptr, (int)il, n_past, kvp, layer.attn_qkv_w);
         cur = ggml_add(ctx0, residual, attn);
 
         // Pre-FFN LayerNorm (with bias)
@@ -1093,7 +1125,8 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
 
 // Run the backbone graph, return logits for all 9 codebooks at the last position.
 // Returns allocated float array of size (head_vocab_size * n_codebooks). Caller frees.
-static float* run_backbone(zonos_tts_context* ctx, const float* embeds, int T, int n_past) {
+static float* run_backbone(zonos_tts_context* ctx, const float* embeds, int T, int n_past,
+                           ggml_tensor* use_kv_k = nullptr, ggml_tensor* use_kv_v = nullptr) {
     if (n_past + T > ctx->kv_max_ctx) {
         fprintf(stderr, "zonos_tts: kv overflow (%d+%d > %d)\n", n_past, T, ctx->kv_max_ctx);
         return nullptr;
@@ -1119,7 +1152,7 @@ static float* run_backbone(zonos_tts_context* ctx, const float* embeds, int T, i
         }
     }
 
-    ggml_cgraph* gf = build_graph_backbone(ctx, n_past, T);
+    ggml_cgraph* gf = build_graph_backbone(ctx, n_past, T, use_kv_k, use_kv_v);
     ggml_backend_sched_reset(ctx->sched);
     if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
         fprintf(stderr, "zonos_tts: failed to alloc backbone graph\n");
@@ -1313,30 +1346,36 @@ int32_t* zonos_tts_synthesize_codes(struct zonos_tts_context* ctx, const char* t
         return nullptr;
     }
 
-    // Step 3: CFG prefill — run both conditioned and unconditioned prefixes.
-    // For prefix-only CFG, we save the unconditioned prefill logits as a static
-    // bias. The conditioned KV cache is kept for AR decode.
-    float* logits_uncond_static = nullptr;
+    // Step 3: Full dual-KV CFG prefill.
+    // Run uncond prefix → uncond KV cache. Run cond prefix → cond KV cache.
+    // During AR decode, each step runs the backbone TWICE (once per KV cache)
+    // and blends: logits = uncond + cfg_scale * (cond - uncond).
     float* logits_cond = nullptr;
+    float* logits_uncond = nullptr;
     int n_past = cond_len;
+    int n_past_uncond = uncond_len;
+    bool use_cfg = (cfg_scale != 1.0f);
 
-    if (cfg_scale != 1.0f && uncond_prefix) {
-        // First pass: unconditioned prefix → save logits
-        logits_uncond_static = run_backbone(ctx, uncond_prefix, uncond_len, 0);
-        if (!logits_uncond_static) {
+    // Clear both KV caches
+    ggml_backend_buffer_clear(ctx->kv_buf, 0);
+
+    if (use_cfg && uncond_prefix) {
+        // Prefill uncond path into uncond KV cache
+        logits_uncond = run_backbone(ctx, uncond_prefix, uncond_len, 0, ctx->kv_k_uncond, ctx->kv_v_uncond);
+        if (!logits_uncond) {
             fprintf(stderr, "zonos_tts: prefill (uncond) failed, disabling CFG\n");
+            use_cfg = false;
         }
-        // Clear KV cache and run conditioned prefix (its KV stays for AR)
-        ggml_backend_buffer_clear(ctx->kv_buf, 0);
     }
 
-    logits_cond = run_backbone(ctx, cond_prefix, cond_len, 0);
+    // Prefill cond path into cond KV cache (primary)
+    logits_cond = run_backbone(ctx, cond_prefix, cond_len, 0, ctx->kv_k, ctx->kv_v);
     free(cond_prefix);
     free(uncond_prefix);
     cond_prefix = nullptr;
     uncond_prefix = nullptr;
     if (!logits_cond) {
-        free(logits_uncond_static);
+        free(logits_uncond);
         fprintf(stderr, "zonos_tts: prefill (cond) failed\n");
         return nullptr;
     }
@@ -1361,9 +1400,9 @@ int32_t* zonos_tts_synthesize_codes(struct zonos_tts_context* ctx, const char* t
     for (int step = 0; step < max_steps && !eos_reached; step++) {
         // Apply CFG: blended = uncond + cfg_scale * (cond - uncond)
         float* sampling_logits = logits_cond;
-        if (logits_uncond_static && cfg_scale != 1.0f) {
+        if (use_cfg && logits_uncond) {
             for (int i = 0; i < n_cb * vocab; i++) {
-                cfg_logits_buf[i] = logits_uncond_static[i] + cfg_scale * (logits_cond[i] - logits_uncond_static[i]);
+                cfg_logits_buf[i] = logits_uncond[i] + cfg_scale * (logits_cond[i] - logits_uncond[i]);
             }
             // Mask padding tokens (index >= 1025) to -inf
             for (int k = 0; k < n_cb; k++) {
@@ -1434,9 +1473,17 @@ int32_t* zonos_tts_synthesize_codes(struct zonos_tts_context* ctx, const char* t
         std::vector<float> embed(d);
         embed_codebook_tokens(ctx, new_tokens.data(), embed.data());
 
-        // Run backbone for single token
-        logits_cond = run_backbone(ctx, embed.data(), 1, n_past);
+        // Run backbone for single token — conditioned path
+        logits_cond = run_backbone(ctx, embed.data(), 1, n_past, ctx->kv_k, ctx->kv_v);
         n_past++;
+
+        // Run backbone for single token — unconditioned path (same input, different KV)
+        if (use_cfg) {
+            free(logits_uncond);
+            logits_uncond = run_backbone(ctx, embed.data(), 1, n_past_uncond, ctx->kv_k_uncond, ctx->kv_v_uncond);
+            n_past_uncond++;
+        }
+
         if (!logits_cond) {
             fprintf(stderr, "zonos_tts: AR decode failed at step %d\n", step);
             break;
@@ -1445,7 +1492,7 @@ int32_t* zonos_tts_synthesize_codes(struct zonos_tts_context* ctx, const char* t
     if (logits_cond) {
         free(logits_cond);
     }
-    free(logits_uncond_static);
+    free(logits_uncond);
 
     if (ctx->params.verbosity >= 1) {
         fprintf(stderr, "zonos_tts: AR generated %d delayed steps (eos=%d)\n", n_decode_steps, eos_reached ? 1 : 0);
