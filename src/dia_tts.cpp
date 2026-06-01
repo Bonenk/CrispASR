@@ -1756,6 +1756,18 @@ float* dia_tts_synthesize(struct dia_tts_context* ctx, const char* text, int* ou
                 fprintf(stderr, "  Python ref:     -2.8282 -1.6599 -4.0806 -0.2944 argmax=568\n");
             }
 
+            // Dia logit masking (from Python _decoder_step):
+            // 1. Mask logits > audio_vocab_size (EOS/PAD/BOS region) to -inf for valid audio range
+            for (uint32_t i = m.audio_vocab_size + 1; i < m.output_vocab_size; i++) {
+                final_logits[i] = -INFINITY;
+            }
+            // 2. For channels 1-8: also mask EOS itself (only channel 0 can signal EOS)
+            if (h > 0) {
+                for (uint32_t i = m.audio_vocab_size; i < m.output_vocab_size; i++) {
+                    final_logits[i] = -INFINITY;
+                }
+            }
+
             // Sample token for this codebook
             uint32_t token =
                 dia_sample_token(final_logits.data(), m.output_vocab_size, p.temperature, p.top_p, p.top_k, ctx->rng);
