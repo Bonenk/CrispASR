@@ -410,24 +410,34 @@ struct zonos_tts_context* zonos_tts_init_from_file(const char* path_model, struc
         ctx->rng_state = params.seed;
     }
 
-    // Set default speaker embedding — random Gaussian (upstream generates
-    // torch.randn(1, 128) when no speaker is provided). Zero embedding
-    // gives the model no speaker identity and it degenerates.
+    // Try to load speaker embedding from file, else use random Gaussian.
     ctx->cond_state.speaker_emb.resize(128);
     {
-        uint64_t rng = ctx->rng_state;
-        for (int i = 0; i < 128; i++) {
-            // Box-Muller from xorshift64*
-            rng ^= rng >> 12;
-            rng ^= rng << 25;
-            rng ^= rng >> 27;
-            float u1 = (float)((rng * 0x2545F4914F6CDD1DULL) >> 11) / (float)(1ULL << 53);
-            rng ^= rng >> 12;
-            rng ^= rng << 25;
-            rng ^= rng >> 27;
-            float u2 = (float)((rng * 0x2545F4914F6CDD1DULL) >> 11) / (float)(1ULL << 53);
-            u1 = std::max(u1, 1e-7f);
-            ctx->cond_state.speaker_emb[i] = std::sqrt(-2.0f * std::log(u1)) * std::cos(2.0f * 3.14159265f * u2);
+        const char* spk_path = "/mnt/storage/zonos-tts/jfk_speaker_emb.bin";
+        FILE* sf = fopen(spk_path, "rb");
+        if (sf) {
+            int32_t dim = 0;
+            if (fread(&dim, sizeof(int32_t), 1, sf) == 1 && dim == 128) {
+                fread(ctx->cond_state.speaker_emb.data(), sizeof(float), 128, sf);
+                if (params.verbosity >= 1)
+                    fprintf(stderr, "zonos_tts: loaded speaker embedding from %s\n", spk_path);
+            }
+            fclose(sf);
+        } else {
+            // Random Gaussian fallback
+            uint64_t rng = ctx->rng_state;
+            for (int i = 0; i < 128; i++) {
+                rng ^= rng >> 12;
+                rng ^= rng << 25;
+                rng ^= rng >> 27;
+                float u1 = (float)((rng * 0x2545F4914F6CDD1DULL) >> 11) / (float)(1ULL << 53);
+                rng ^= rng >> 12;
+                rng ^= rng << 25;
+                rng ^= rng >> 27;
+                float u2 = (float)((rng * 0x2545F4914F6CDD1DULL) >> 11) / (float)(1ULL << 53);
+                u1 = std::max(u1, 1e-7f);
+                ctx->cond_state.speaker_emb[i] = std::sqrt(-2.0f * std::log(u1)) * std::cos(2.0f * 3.14159265f * u2);
+            }
         }
     }
 
