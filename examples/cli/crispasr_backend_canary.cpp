@@ -38,8 +38,8 @@ public:
         // to ~60 s; for longer audio, parakeet_transcribe_streamed-style
         // chunking can be added later if needed).  Issue #89 follow-up.
         return CAP_TIMESTAMPS_NATIVE | CAP_TIMESTAMPS_CTC | CAP_WORD_TIMESTAMPS | CAP_TOKEN_CONFIDENCE | CAP_TRANSLATE |
-               CAP_SRC_TGT_LANGUAGE | CAP_PUNCTUATION_TOGGLE | CAP_FLASH_ATTN | CAP_TEMPERATURE | CAP_DIARIZE |
-               CAP_PARALLEL_PROCESSORS | CAP_AUTO_DOWNLOAD | CAP_UNBOUNDED_INPUT | CAP_INTERNAL_CHUNKING;
+               CAP_SRC_TGT_LANGUAGE | CAP_PUNCTUATION_TOGGLE | CAP_FLASH_ATTN | CAP_TEMPERATURE | CAP_BEAM_SEARCH |
+               CAP_DIARIZE | CAP_PARALLEL_PROCESSORS | CAP_AUTO_DOWNLOAD | CAP_UNBOUNDED_INPUT | CAP_INTERNAL_CHUNKING;
     }
 
     bool init(const whisper_params& p) override {
@@ -74,6 +74,7 @@ public:
 
         // Sticky decode-time sampling controls.
         canary_set_temperature(ctx_, params.temperature, params.seed);
+        canary_set_beam_size(ctx_, params.beam_size > 0 ? params.beam_size : 1);
 
         // Resolve src/tgt language with the fallback chain:
         //   source_lang -> language

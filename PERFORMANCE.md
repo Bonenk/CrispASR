@@ -1770,10 +1770,12 @@ Both scripts in this commit. Audio: `/mnt/akademie_storage/yt_{60,120,300,600}s.
 
 **Knob:** `--beam-size N` (CLI) / `CRISPASR_BEAM_SIZE=N` (env) /
 `crispasr_session_set_beam_size(session, N)` (C API).
-Default N=1 (greedy). N > 1 activates `core_beam_decode::run_with_probs`
-on LLM-decoder backends: qwen3-asr, granite-speech, voxtral.
-Non-AR backends (parakeet, canary, fastconformer-ctc, etc.) ignore the
-flag — beam search only makes sense on autoregressive token decoders.
+Default N=1 (greedy). N > 1 activates beam search on supported backends.
+LLM-decoder backends (qwen3-asr, granite-speech, voxtral, gemma4-e2b) use
+`core_beam_decode::run_with_probs` (replay-from-prefix). Encoder-decoder
+backends (canary, cohere) use `core_beam_decode::run_with_probs_branched`
+(KV snapshots). Transducer backends (parakeet) use a dedicated TDT/RNNT
+label-looping beam search. CTC-only and NAR backends ignore the flag.
 
 Benchmark script: `tools/benchmark_vitw_beam.py` — runs against
 [`zhifeixie/Voices-in-the-Wild-Bench`](https://huggingface.co/datasets/zhifeixie/Voices-in-the-Wild-Bench)
@@ -1838,6 +1840,60 @@ python tools/benchmark_vitw_beam.py \
     --n 8 --beams 1,2,4 \
     --json tools/vitw_beam_results.json
 ```
+
+### Transducer + encoder-decoder beam search (2026-06-02, issue #136 + §139)
+
+Parakeet TDT/RNNT label-looping beam (`b3cdcebd`), canary + cohere
+AED branched-KV beam (§90 runtime, adapter wiring `§139`), gemma4-e2b
+replay-from-prefix beam (§139). All on VPS CPU-only (no GPU).
+
+**JFK 11 s — wall time (user time in parentheses)**
+
+| backend | model | beam=1 | beam=2 | beam=4 |
+|---|---|---|---|---|
+| parakeet | parakeet-tdt-0.6b-v3 F16 | 27 s (30 s) | 26 s (31 s) | 15 s (32 s) |
+| canary | canary-1b-v2 Q4_K | 27 s (37 s) | 32 s (50 s) | 42 s (68 s) |
+| cohere | cohere-transcribe F16 | 125 s (91 s) | 104 s (107 s) | 120 s (118 s) |
+
+Notes:
+- Parakeet beam adds ~7 % user time at beam=4 (LSTM predictor + joint
+  head are tiny; encoder dominates). Wall time variance is system load.
+- Canary beam=4 costs ~84 % more user time (8-layer decoder × KV
+  snapshot/restore per beam step).
+- Cohere F16 model is ~3 GB; beam=4 KV snapshots increase peak memory
+  substantially. beam=4 was OOM-killed on the FLEURS-10s test.
+- All backends produce identical text on JFK at beam=1/2/4.
+
+**FLEURS 10 s — canary beam=4 vs greedy**
+
+| beam | output |
+|---|---|
+| 1 | "…Styles in the West could lag behind by twenty five percent. 25 to 30 years." |
+| 4 | "…styles in the west could lag behind by twenty five percent. 25 to 30 years." |
+
+Minor capitalization difference (proper-noun casing on "Styles"/"West").
+
+**FLEURS 60 s — parakeet beam=4 vs greedy**
+
+| beam | output diff |
+|---|---|
+| 1 | "…, and which was made famous…" |
+| 4 | "… and which was made famous…" (comma dropped) |
+
+Both valid; stylistic punctuation variation.
+
+**Overhead summary (user time)**
+
+| backend | beam=2 | beam=4 | beam=8 |
+|---|---|---|---|
+| parakeet | ~3 % | ~7 % | ~20 % |
+| canary | ~35 % | ~84 % | — |
+| cohere | ~18 % | ~30 % | OOM (F16) |
+
+Parakeet beam search is nearly free because the decoder is a tiny
+LSTM (~10 KB state per beam). Canary and cohere have 8-layer
+transformer decoders with full KV snapshot/restore, so the cost
+scales with decoder depth × sequence length × beam width.
 
 ## Multi-backend long-form comparison — 2026-05-26 (PLAN #114 P3 closeout)
 

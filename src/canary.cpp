@@ -1797,8 +1797,9 @@ static canary_result* canary_finish_from_encoder(canary_context* ctx, const floa
             r->tokens[i].t1 = 0;
             const char* txt = canary_token_to_str(ctx, br.tokens[i]);
             if (txt) {
-                snprintf(r->tokens[i].text, sizeof(r->tokens[i].text), "%s", txt);
-                full_text += txt;
+                std::string vis = spiece_to_text(txt);
+                snprintf(r->tokens[i].text, sizeof(r->tokens[i].text), "%s", vis.c_str());
+                full_text += vis;
             }
         }
         r->text = strdup(full_text.c_str());

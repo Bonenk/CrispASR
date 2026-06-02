@@ -39,10 +39,9 @@ public:
         // Not yet declared (would need code changes elsewhere):
         //   CAP_TOKEN_CONFIDENCE — gemma4_e2b_transcribe_with_probs exists in
         //     the C-ABI but transcribe() below only calls the plain text variant
-        //   CAP_BEAM_SEARCH      — not implemented in the gemma4_e2b decode loop
         //   CAP_PUNCTUATION_TOGGLE — no toggle exposed
         return CAP_AUTO_DOWNLOAD | CAP_DIARIZE | CAP_TIMESTAMPS_CTC | CAP_FLASH_ATTN | CAP_PARALLEL_PROCESSORS |
-               CAP_TEMPERATURE | CAP_TRANSLATE | CAP_SRC_TGT_LANGUAGE;
+               CAP_TEMPERATURE | CAP_BEAM_SEARCH | CAP_TRANSLATE | CAP_SRC_TGT_LANGUAGE;
     }
 
     bool init(const whisper_params& params) override {
@@ -103,6 +102,7 @@ public:
     std::vector<crispasr_segment> transcribe_one(const float* samples, int n_samples, int64_t t_offset_cs,
                                                  const whisper_params& params) {
         std::vector<crispasr_segment> out;
+        gemma4_e2b_set_beam_size(ctx_, params.beam_size > 0 ? params.beam_size : 1);
         const std::string src =
             !params.source_lang.empty() ? params.source_lang : (!params.language.empty() ? params.language : "");
         const std::string tgt = !params.target_lang.empty() ? params.target_lang : std::string("en");

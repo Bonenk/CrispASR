@@ -57,6 +57,9 @@ void gemma4_e2b_free(struct gemma4_e2b_context* ctx);
 // Set thread count after init.
 void gemma4_e2b_set_n_threads(struct gemma4_e2b_context* ctx, int n_threads);
 
+// Beam search width. 1 = greedy (default); >1 = replay-from-prefix beam.
+void gemma4_e2b_set_beam_size(struct gemma4_e2b_context* ctx, int beam_size);
+
 // ── Stage hooks for crispasr-diff ───────────────────────────────────────────
 //
 // These mirror the parakeet/voxtral/canary stage API: each one runs a
