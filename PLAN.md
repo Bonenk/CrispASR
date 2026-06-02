@@ -3986,13 +3986,19 @@ function) then read a **GPU-resident Q4_K** weight's CUDA pointer as host
 memory → SIGSEGV. The prefill survived because none of its ops got
 CPU-routed; exactly one decode op does.
 
-**Fix applied (`3ef9f87e`).** When `force_gpu`, build the mimo-asr sched with
-the **GPU backend only** — no CPU backend means no op can be offloaded to
-read a GPU weight. CPU fallback is kept for the CPU-resident (option A)
-default. Validating on kernel run 3 (expect GPU JFK PASS). If green: flip
-`--gpu` to honour GPU residency by default (restore the 22% PLAN #72 win) and
-mark option C DONE. Lesson recorded in LEARNINGS §"ggml scheduler tightened
-cross-backend tensor resolution".
+**Run 3 (`3ef9f87e`) — single-GPU-backend sched is wrong.** Building the
+sched with `{CUDA}` only *aborts* in `ggml_backend_sched_new` (`signo=6`):
+ggml requires a CPU backend as the mandatory last/fallback entry. Reverted.
+So the real bug is a specific **decode op CUDA can't run**, which the sched
+then offloads to CPU where it dereferences a GPU-resident Q4_K weight. The
+decode step uses `ggml_set_rows` to scatter K/V into the cache
+(core/attention.h:611, fixed_kv_len path) — the prefill uses `ggml_cpy`
+(:618), which is why only decode crashes. CUDA's SET_ROWS supports_op
+(ggml-cuda.cu:5026) needs `src[0]` (the new K/V) F32 + idx I32/I64 + dst in
+{F16,Q*}; the permuted F32 K/V *should* qualify, so run 4 adds
+`GGML_SCHED_DEBUG=2` to name the exact CPU-assigned op before committing a
+fix. Once the real op is fixed + GPU JFK passes: flip `--gpu` to honour GPU
+residency by default (restore the 22% PLAN #72 win) and mark option C DONE.
 
 **Status (2026-05-26):** option A shipped, option C still open.
 
