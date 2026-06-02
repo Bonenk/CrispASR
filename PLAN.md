@@ -3975,7 +3975,24 @@ in the **decode step**. So option C is NOT in `mimo_asr_build_prefill_graph`;
 it's the per-token decode path (build_decode_graph + fresh-cgraph-per-token),
 same shape as #125 P0's sched src-mutation-on-re-laid-out-graph — which the
 `95d74455` hardening was supposed to fix but evidently doesn't on P100.
-Kernel run 2 wraps the GPU run in gdb to capture the crash backtrace.
+
+**Kernel run 2 (P100, gdb) — root cause.** The backtrace is
+`dequantize_row_q4_K` → `ggml_backend_cpu_graph_compute` →
+`mimo_asr_transcribe_impl`. So it is NOT the sched src-mutation class at all:
+with `force_gpu` the weights are GPU-resident, but the sched was still built
+with **both** `[CUDA, CPU]` backends, so its placement heuristic offloaded a
+**decode** op to the **CPU** backend — and `dequantize_row_q4_K` (a CPU
+function) then read a **GPU-resident Q4_K** weight's CUDA pointer as host
+memory → SIGSEGV. The prefill survived because none of its ops got
+CPU-routed; exactly one decode op does.
+
+**Fix applied (`3ef9f87e`).** When `force_gpu`, build the mimo-asr sched with
+the **GPU backend only** — no CPU backend means no op can be offloaded to
+read a GPU weight. CPU fallback is kept for the CPU-resident (option A)
+default. Validating on kernel run 3 (expect GPU JFK PASS). If green: flip
+`--gpu` to honour GPU residency by default (restore the 22% PLAN #72 win) and
+mark option C DONE. Lesson recorded in LEARNINGS §"ggml scheduler tightened
+cross-backend tensor resolution".
 
 **Status (2026-05-26):** option A shipped, option C still open.
 

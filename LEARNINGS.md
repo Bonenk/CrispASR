@@ -7925,6 +7925,34 @@ Implications for porting any backend that mixes CPU + GPU buffers:
 3. **The cheap workaround is "ignore use_gpu and force everything to CPU".** What PLAN #115 option A shipped. It's slow (pure CPU LLM = 297 s for 11 s JFK on M1) but correct. The proper fix (option C) is to either tag the embed weight for the GPU backend explicitly + insert the copy node, OR rebuild the prefill graph so its inputs all live where the compute happens.
 4. **PLAN #72-shaped "perf wins by moving weights to GPU" are now fragile.** The same move that gave gemma4-e2b a 2.2× speedup silently broke mimo-asr's prefill graph emission. Any backend that ported in pre-2026-05-26-ggml and gets a "move weights to GPU" perf pass needs a roundtrip transcription test on the actual deployment platform before the perf claim ships.
 
+### 2026-06-02 update — the real bug was NOT the prefill graph (Kaggle P100 diff)
+
+Points 1–3 above assumed the fix was per-tensor tagging *in the prefill
+graph*. A Kaggle CUDA stage-diff (`tools/kaggle/mimo-asr-gpu-diff/`, the
+funasr-cuda-debug pattern) proved otherwise, and is the canonical example of
+why you reproduce on the actual GPU before theorising:
+
+- A `MIMO_ASR_DUMP_STAGES=1` per-stage dump (mirrors `FUNASR_DUMP_STAGES`)
+  showed the **GPU prefill is correct** — all five stages match CPU with no
+  NaN/Inf when `CRISPASR_MIMO_FORCE_GPU=1` loads the weights GPU-resident.
+- The run instead **segfaulted in the *decode* step** (`rc=-11`). gdb:
+  `dequantize_row_q4_K` → `ggml_backend_cpu_graph_compute` →
+  `mimo_asr_transcribe_impl`.
+
+Root cause: with **GPU-resident quantized weights**, a multi-backend sched
+`[GPU, CPU]` will happily place *some* op on the **CPU** backend (its cost
+heuristic), and the CPU dequant kernel then reads the **GPU CUDA pointer as
+host memory** → SIGSEGV. It's not about copy-node insertion at all — it's
+about *never letting the CPU backend touch a GPU-resident weight*.
+
+**Rule: when weights are GPU-resident, the sched must be single-backend
+(GPU only).** Adding the CPU backend "as a fallback" is actively harmful with
+quantized GPU weights — a CPU-routed op dereferences device memory. Fix for
+mimo-asr (`3ef9f87e`): `ggml_backend_sched_new` with just `{ctx->backend}`
+when `force_gpu`. (The §56 *CPU-resident-weights + GPU-compute* config is the
+one that needs copy nodes / per-tensor tagging; *GPU-resident weights* just
+need a single-backend sched.)
+
 ### Cross-refs
 
 - HISTORY 2026-05-26 "PLAN #115 — mimo-asr M1 Metal silent-empty fix (option A)" for the bisect + fix chronology
