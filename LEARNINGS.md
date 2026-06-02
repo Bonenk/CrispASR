@@ -7945,13 +7945,18 @@ heuristic), and the CPU dequant kernel then reads the **GPU CUDA pointer as
 host memory** → SIGSEGV. It's not about copy-node insertion at all — it's
 about *never letting the CPU backend touch a GPU-resident weight*.
 
-**Rule: when weights are GPU-resident, the sched must be single-backend
-(GPU only).** Adding the CPU backend "as a fallback" is actively harmful with
-quantized GPU weights — a CPU-routed op dereferences device memory. Fix for
-mimo-asr (`3ef9f87e`): `ggml_backend_sched_new` with just `{ctx->backend}`
-when `force_gpu`. (The §56 *CPU-resident-weights + GPU-compute* config is the
-one that needs copy nodes / per-tensor tagging; *GPU-resident weights* just
-need a single-backend sched.)
+**Rule: with GPU-resident *quantized* weights, no op may be CPU-routed — a
+CPU-routed op dereferences device memory.** The tempting fix — build the
+sched GPU-only — does NOT work: `ggml_backend_sched_new` *requires* a CPU
+backend as the mandatory last/fallback entry and `abort()`s on a `{GPU}`-only
+list (verified, run 3 `3ef9f87e` reverted). So the real fix is to make the
+*specific* CPU-routed op CUDA-runnable (or keep its weight CPU-accessible),
+not to drop the CPU backend. The offending op is found via
+`GGML_SCHED_DEBUG=2` (prints the per-node backend assignment); in mimo-asr's
+decode it is in the `ggml_set_rows` KV-scatter path (core/attention.h:611,
+`fixed_kv_len`) — the prefill uses `ggml_cpy` (:618) and runs clean on GPU,
+so only the cached step graph trips it. [Investigation in progress — final op
++ fix pending kernel run 4.]
 
 ### Cross-refs
 
