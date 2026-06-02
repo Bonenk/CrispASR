@@ -188,6 +188,21 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
         }
     }
 
+    // Parler TTS: DAC audio codec weights are precision-sensitive. Audio
+    // codecs reconstruct waveforms from codebook embeddings and small
+    // conv stacks — quantization noise in the decoder produces audible
+    // artefacts (same reasoning as chatterbox vocoder skip). Keep all
+    // dac.* tensors at original precision; the T5 encoder and MusicGen
+    // decoder weights are safe to quantize.
+    const bool is_parler = (arch.find("parler") != std::string::npos);
+
+    // Dia TTS: 1.6B Llama-style encoder + AR decoder with DAC codec.
+    // Dia uses scale=1.0 attention (no 1/sqrt(d)) making it sensitive
+    // to quantization noise — similar to the OmniASR CTC drift issue.
+    // Quantize Q/K/V/O projections + MLP (gate/up/wo) + decoder heads.
+    // Keep embeddings, norms, and DAC codec at original precision.
+    const bool is_dia = (arch.find("dia") != std::string::npos);
+
     const int n_tensors = gguf_get_n_tensors(ctx_in);
     for (int i = 0; i < n_tensors; i++) {
         const char* name = gguf_get_tensor_name(ctx_in, i);
@@ -237,7 +252,14 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                          // (e.g. sensevoice.enc.blk.0.attn.qkv.w, funasr.enc.blk.0.ffn.l1.w).
                          // Without this branch, every encoder tensor falls through to the
                          // copy path and the quant is silently identical to F16.
-                         (sname.size() >= 2 && sname.substr(sname.size() - 2) == ".w");
+                         (sname.size() >= 2 && sname.substr(sname.size() - 2) == ".w") ||
+                         // Dia TTS: tensor names use _proj / gate / up / wo / heads suffixes
+                         // without "weight" (e.g. dia.encoder.layers.0.q_proj, dia.decoder.heads.0)
+                         (sname.find("_proj") != std::string::npos) ||
+                         (sname.find(".gate") != std::string::npos) ||
+                         (sname.find(".up") != std::string::npos) ||
+                         (sname.find(".wo") != std::string::npos) ||
+                         (sname.find(".heads.") != std::string::npos);
         // FireRedASR/LID: pw1/pw2 convs are stored as 3D [1,in,out] but are
         // effectively 2D matmuls — safe to quantize. Other architectures'
         // 3D conv weights may be actual spatial kernels, so keep the 2D-only
@@ -288,6 +310,12 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             // a user manually creates a quantized GGUF, but the quantizer
             // should not produce them.
             !is_f5tts &&
+            // Parler TTS: skip DAC codec tensors (audio codec, precision-sensitive)
+            !(is_parler && sname.find("dac.") == 0) &&
+            // Dia TTS: skip embeddings (codebook lookups, precision-sensitive)
+            // and DAC codec tensors (audio_encoder.* / dac.* if embedded)
+            !(is_dia && (sname.find("embedding") != std::string::npos ||
+                         sname.find("audio_encoder") == 0)) &&
             // Skip OmniASR-CTC encoder layers in head/tail bands.
             // Names look like "enc.<idx>.attn.*" / "enc.<idx>.ffn.*";
             // skip if idx in [0, head_cutoff) ∪ [tail_cutoff, n_enc).
