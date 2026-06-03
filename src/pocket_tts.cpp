@@ -1243,14 +1243,14 @@ static bool check_eos(pocket_tts_context* pctx, const float* backbone_out) {
 // Mimi decoder transformer: 2 layers with LayerScale, causal attention.
 // Operates on the full sequence (non-AR batch). We reuse the same eager
 // approach since sequence lengths are modest (< 2000 frames).
-static void mimi_dec_transformer(pocket_tts_context* pctx, float* seq, int T, int D) {
-    const auto& m = pctx->model;
-    const auto& mi = m.mimi_hp;
-    const int NH = (int)mi.xfmr_num_heads;
+// Mimi transformer: shared between encoder and decoder (same architecture, different weights).
+// Processes seq in-place: (T, D) with causal attention, RoPE, LayerScale, GELU FFN.
+static void mimi_transformer_forward(const std::vector<pocket_tts_transformer_layer>& layers, float* seq, int T, int D,
+                                     int num_heads, int dim_feedforward, int context_size) {
+    const int NH = num_heads;
     const int HD = D / NH;
-    const int FF = (int)mi.xfmr_dim_feedforward;
-    const int NL = (int)mi.xfmr_num_layers;
-    const int context_size = (int)mi.xfmr_context;
+    const int FF = dim_feedforward;
+    const int NL = (int)layers.size();
 
     std::vector<float> normed(D), qkv(3 * D), attn_out(D), proj_out(D);
     std::vector<float> ff_h(FF), ff_out(D), residual(D), scaled(D);
@@ -1261,7 +1261,7 @@ static void mimi_dec_transformer(pocket_tts_context* pctx, float* seq, int T, in
     std::vector<float> v_cache((size_t)NL * T * D);
 
     for (int l = 0; l < NL; l++) {
-        const auto& L = m.dec_transformer_layers[l];
+        const auto& L = layers[l];
         float* k_layer = &k_cache[(size_t)l * T * D];
         float* v_layer = &v_cache[(size_t)l * T * D];
 
@@ -1556,7 +1556,8 @@ static void mimi_decode(pocket_tts_context* pctx, const float* latent_seq, int n
         xfmr_seq = std::move(proj_seq);
     }
 
-    mimi_dec_transformer(pctx, xfmr_seq.data(), T_xfmr, OD);
+    mimi_transformer_forward(m.dec_transformer_layers, xfmr_seq.data(), T_xfmr, OD, (int)mi.xfmr_num_heads,
+                             (int)mi.xfmr_dim_feedforward, (int)mi.xfmr_context);
 
     // Apply output projection if present
     if (m.dec_xfmr_output_proj) {
@@ -1711,14 +1712,178 @@ static void mimi_decode(pocket_tts_context* pctx, const float* latent_seq, int n
 }
 
 // Mimi VAE encoder: 24 kHz PCM -> continuous latents (voice cloning only)
+// Mimi VAE encoder: 24 kHz PCM -> continuous 32-dim latents (for voice cloning)
+// Pipeline: pad → SEANet encoder → encoder transformer → downsample → latents
 static void mimi_encode(pocket_tts_context* pctx, const float* pcm, int n_samples, float** latent_out,
                         int* n_frames_out) {
-    // Voice cloning encoder — not implemented yet (requires encoder weights)
-    (void)pctx;
-    (void)pcm;
-    (void)n_samples;
+    const auto& m = pctx->model;
+    const auto& mi = m.mimi_hp;
+    const auto& se = m.seanet_enc;
+    const int OD = (int)mi.outer_dim; // 512
+    const int LD = (int)mi.inner_dim; // 32
+
     *latent_out = nullptr;
     *n_frames_out = 0;
+
+    if (!m.has_voice_cloning || !se.initial_conv_w) {
+        fprintf(stderr, "pocket_tts: mimi_encode requires voice-cloning encoder weights\n");
+        return;
+    }
+
+    // 1. Pad PCM to hop_length multiple
+    int hop = (int)mi.hop_length(); // 120
+    int n_padded = ((n_samples + hop - 1) / hop) * hop;
+    std::vector<float> pcm_padded(n_padded, 0.0f);
+    memcpy(pcm_padded.data(), pcm, n_samples * sizeof(float));
+
+    // 2. SEANet encoder (all convolutions are causal)
+    int T_cur = n_padded;
+    int C_cur = 1; // mono PCM
+
+    // Encoder ratios are reversed from decoder: [4, 5, 6]
+    std::vector<int> enc_ratios(mi.seanet_ratios.rbegin(), mi.seanet_ratios.rend());
+    int n_filters = (int)mi.seanet_n_filters;        // 64
+    int seanet_K = (int)mi.seanet_kernel_size;       // 7
+    int res_K = (int)mi.seanet_residual_kernel_size; // 3
+    uint32_t n_res = mi.seanet_n_residual_layers;    // 1
+
+    // Initial conv: (1 -> n_filters, kernel=7, causal)
+    int pad_init = seanet_K - 1; // causal left padding
+    int C_init = n_filters;
+    std::vector<float> enc_buf(C_init * T_cur);
+
+    // Input is single-channel: (1, T_cur)
+    conv1d_eager(enc_buf.data(), pcm_padded.data(), C_cur, T_cur, se.initial_conv_w, se.initial_conv_b, 1, pad_init, 0);
+    C_cur = C_init;
+
+    // Encoder stages: {ResBlock → ELU → stride_conv} × n_stages
+    int mult = 1;
+    for (size_t s = 0; s < enc_ratios.size(); s++) {
+        int ratio = enc_ratios[s];
+        const auto& stage = se.stages[s];
+
+        // Residual blocks
+        for (size_t r = 0; r < stage.resblocks.size(); r++) {
+            const auto& rb = stage.resblocks[r];
+            int dilation = 1;
+            for (uint32_t d = 0; d < r; d++)
+                dilation *= (int)mi.seanet_dilation_base;
+
+            if (rb.conv0_w && rb.conv1_w) {
+                int C_hidden = C_cur / (int)mi.seanet_compress;
+                // ELU → dilated conv → ELU → conv1 + residual
+                std::vector<float> act_buf(C_cur * T_cur);
+                for (int i = 0; i < C_cur * T_cur; i++)
+                    act_buf[i] = elu_f(enc_buf[i]);
+
+                int eff_K = (res_K - 1) * dilation + 1;
+                int pad_d = eff_K - 1; // causal
+                std::vector<float> h(C_hidden * T_cur);
+                conv1d_eager(h.data(), act_buf.data(), C_cur, T_cur, rb.conv0_w, rb.conv0_b, 1, pad_d, 0);
+                int C_h = (int)rb.conv0_w->ne[2];
+
+                for (int i = 0; i < C_h * T_cur; i++)
+                    h[i] = elu_f(h[i]);
+
+                int K1 = (int)rb.conv1_w->ne[0];
+                int pad1 = K1 - 1; // causal
+                std::vector<float> h2(C_cur * T_cur);
+                conv1d_eager(h2.data(), h.data(), C_h, T_cur, rb.conv1_w, rb.conv1_b, 1, pad1, 0);
+
+                // Residual add
+                for (int i = 0; i < C_cur * T_cur; i++)
+                    enc_buf[i] += h2[i];
+            }
+        }
+
+        // ELU
+        for (int i = 0; i < C_cur * T_cur; i++)
+            enc_buf[i] = elu_f(enc_buf[i]);
+
+        // Stride conv (downsample): causal padding
+        if (stage.conv_w) {
+            mult += 1;
+            int C_out = n_filters * (1 << (s + 1)); // 128, 256, 512
+            int K_s = (int)stage.conv_w->ne[0];
+            int pad_s = K_s - ratio; // causal pad for strided conv: kernel - stride
+            int T_new = (T_cur + pad_s - K_s) / ratio + 1;
+            std::vector<float> down_buf(C_out * T_new);
+            conv1d_eager(down_buf.data(), enc_buf.data(), C_cur, T_cur, stage.conv_w, stage.conv_b, ratio, pad_s, 0);
+            enc_buf = std::move(down_buf);
+            T_cur = T_new;
+            C_cur = C_out;
+        }
+    }
+
+    // Final: ELU → conv (C_cur → OD=512, kernel=last_kernel_size=3, causal)
+    for (int i = 0; i < C_cur * T_cur; i++)
+        enc_buf[i] = elu_f(enc_buf[i]);
+
+    int last_K = (int)mi.seanet_last_kernel_size;
+    int pad_last = last_K - 1; // causal
+    std::vector<float> enc_out(OD * T_cur);
+    if (se.final_conv_w) {
+        conv1d_eager(enc_out.data(), enc_buf.data(), C_cur, T_cur, se.final_conv_w, se.final_conv_b, 1, pad_last, 0);
+    }
+    int T_enc = T_cur; // encoder frame rate (200 Hz for 24kHz / 120 hop)
+
+    if (pctx->verbosity >= 2)
+        fprintf(stderr, "pocket_tts: seanet encode: %d samples → %d frames (C=%d)\n", n_samples, T_enc, OD);
+
+    // 3. Encoder transformer (2L, causal, RoPE, LayerScale)
+    // Convert to seq-first: (T_enc, OD)
+    std::vector<float> xfmr_seq(T_enc * OD);
+    for (int t = 0; t < T_enc; t++)
+        for (int c = 0; c < OD; c++)
+            xfmr_seq[t * OD + c] = enc_out[c * T_enc + t];
+
+    // Apply input projection if present
+    if (m.enc_xfmr_input_proj) {
+        std::vector<float> proj(T_enc * OD);
+        for (int t = 0; t < T_enc; t++)
+            linear_f32(&proj[t * OD], &xfmr_seq[t * OD], m.enc_xfmr_input_proj, nullptr, OD, OD);
+        xfmr_seq = std::move(proj);
+    }
+
+    mimi_transformer_forward(m.enc_transformer_layers, xfmr_seq.data(), T_enc, OD, (int)mi.xfmr_num_heads,
+                             (int)mi.xfmr_dim_feedforward, (int)mi.xfmr_context);
+
+    // Apply output projection if present
+    if (m.enc_xfmr_output_proj) {
+        std::vector<float> proj(T_enc * OD);
+        for (int t = 0; t < T_enc; t++)
+            linear_f32(&proj[t * OD], &xfmr_seq[t * OD], m.enc_xfmr_output_proj, nullptr, OD, OD);
+        xfmr_seq = std::move(proj);
+    }
+
+    // Convert back to channels-first: (OD, T_enc)
+    std::vector<float> enc_cf(OD * T_enc);
+    for (int t = 0; t < T_enc; t++)
+        for (int c = 0; c < OD; c++)
+            enc_cf[c * T_enc + t] = xfmr_seq[t * OD + c];
+
+    // 4. Downsample: Conv1d(OD→LD, kernel=downsample_stride*2, stride=downsample_stride)
+    // Causal: pad_left = kernel - stride, pad_right = 0
+    if (m.downsample_conv_w) {
+        int DS = (int)mi.downsample_stride();
+        int K_ds = (int)m.downsample_conv_w->ne[0];
+        int pad_ds = K_ds - DS; // causal
+        int T_down = (T_enc + pad_ds - K_ds) / DS + 1;
+        std::vector<float> down_buf(LD * T_down);
+        conv1d_eager(down_buf.data(), enc_cf.data(), OD, T_enc, m.downsample_conv_w, m.downsample_conv_b, DS, pad_ds,
+                     0);
+
+        // Output: (T_down, LD) — allocate and return
+        *n_frames_out = T_down;
+        *latent_out = (float*)malloc((size_t)T_down * LD * sizeof(float));
+        // Convert from channels-first (LD, T_down) to frame-major (T_down, LD)
+        for (int t = 0; t < T_down; t++)
+            for (int d = 0; d < LD; d++)
+                (*latent_out)[t * LD + d] = down_buf[d * T_down + t];
+
+        if (pctx->verbosity >= 1)
+            fprintf(stderr, "pocket_tts: mimi encode: %d samples → %d latent frames\n", n_samples, T_down);
+    }
 }
 
 // ── SentencePiece tokenizer ──────────────────────────────────────
@@ -1921,9 +2086,22 @@ float* pocket_tts_synthesize(struct pocket_tts_context* ctx, const char* text, i
     }
 
     // 2. Initialize KV cache for backbone
-    int max_seq = (int)tokens.size() + max_frames + 2; // text + BOS + audio frames
+    int n_voice = ctx->has_voice_state ? ctx->n_voice_frames : 0;
+    int max_seq = n_voice + (int)tokens.size() + max_frames + 2;
     kv_cache_init(ctx->backbone_kv, (int)hp.num_layers, max_seq, (int)hp.num_heads, (int)hp.head_dim());
     kv_cache_reset(ctx->backbone_kv);
+
+    // 2b. Voice conditioning prefill (if set via set_voice)
+    if (ctx->has_voice_state && n_voice > 0) {
+        for (int f = 0; f < n_voice; f++) {
+            const float* vc = &ctx->voice_conditioning[f * D];
+            std::vector<float> backbone_out(D);
+            backbone_forward_step(ctx, vc, backbone_out.data());
+            ctx->backbone_kv.offset++;
+        }
+        if (ctx->verbosity >= 1)
+            fprintf(stderr, "pocket_tts: voice conditioning prefill: %d frames\n", n_voice);
+    }
 
     // 3. Prefill: embed text tokens and run through backbone
     const float* embed_data = tensor_f32_data(m.conditioner_embed);

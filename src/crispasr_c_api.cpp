@@ -1140,6 +1140,8 @@ static thread_local bool g_open_use_gpu_tls = true;
 static thread_local int g_open_verbosity_tls = 0;
 static thread_local bool g_open_flash_attn_tls = true;
 static thread_local int g_open_n_gpu_layers_tls = -1;
+static thread_local float g_open_temperature_tls = 0.0f;
+static thread_local uint64_t g_open_seed_tls = 0;
 
 struct crispasr_session {
     std::string backend; // "whisper", "parakeet", ...
@@ -4942,6 +4944,24 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
         return s->voxcpm2_ref_pcm.empty() ? -1 : 0;
     }
 #endif
+#ifdef CA_HAVE_POCKET
+    if (s->pocket_tts_ctx) {
+        if (!ends_with_wav(path))
+            return -2;
+        float* pcm = nullptr;
+        int n = 0, sr = 0;
+        if (crispasr_audio_load(path, &pcm, &n, &sr) != 0 || !pcm || n <= 0) {
+            if (pcm)
+                free(pcm);
+            return -1;
+        }
+        // Pocket-tts needs 24 kHz mono — crispasr_audio_load already
+        // resamples to 24 kHz, so we can pass directly.
+        int rc = pocket_tts_set_voice(s->pocket_tts_ctx, pcm, n);
+        free(pcm);
+        return rc;
+    }
+#endif
     return -3;
 }
 
@@ -5227,8 +5247,7 @@ CA_EXPORT float* crispasr_session_synthesize(crispasr_session* s, const char* te
     if (s->parler_tts_ctx) {
         // Parler outputs 44.1 kHz mono. Resample to 24 kHz for the session
         // contract (Dart/Python playback path assumes 24 kHz).
-        parler_tts_set_temperature(s->parler_tts_ctx, s->temperature > 0.0f ? s->temperature : 1.0f);
-        parler_tts_set_seed(s->parler_tts_ctx, s->seed);
+        // Temperature/seed set at open time or via set_temperature/set_tts_seed
         int n44 = 0;
         float* pcm44 = parler_tts_synthesize(s->parler_tts_ctx, text, &n44);
         if (!pcm44 || n44 <= 0) {

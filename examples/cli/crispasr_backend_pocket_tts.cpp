@@ -17,6 +17,9 @@
 
 #include "pocket_tts.h"
 
+#include "core/audio_resample.h"
+#include "core/wav_reader.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -82,9 +85,20 @@ public:
         // Load voice conditioning if --voice points to a WAV file
         // (voice cloning requires encoder weights in the GGUF)
         if (!params.tts_voice.empty() && params.tts_voice != last_voice_key_) {
-            // For now, voice cloning is not yet implemented in the runtime
-            if (!params.no_prints) {
-                fprintf(stderr, "crispasr[pocket-tts]: voice cloning not yet implemented\n");
+            std::vector<float> ref_pcm;
+            int ref_sr = 0;
+            if (!crispasr::core::read_wav_mono_pcm16(params.tts_voice, ref_pcm, ref_sr)) {
+                fprintf(stderr, "crispasr[pocket-tts]: failed to read voice reference '%s'\n",
+                        params.tts_voice.c_str());
+            } else {
+                // Resample to 24 kHz if needed
+                if (ref_sr != 24000) {
+                    ref_pcm = core_audio::resample_polyphase(ref_pcm.data(), (int)ref_pcm.size(), ref_sr, 24000);
+                }
+                int rc = pocket_tts_set_voice(ctx_, ref_pcm.data(), (int)ref_pcm.size());
+                if (rc != 0 && !params.no_prints) {
+                    fprintf(stderr, "crispasr[pocket-tts]: voice cloning failed (rc=%d)\n", rc);
+                }
             }
             last_voice_key_ = params.tts_voice;
         }
