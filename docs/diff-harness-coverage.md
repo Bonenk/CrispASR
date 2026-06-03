@@ -43,6 +43,7 @@ at `tools/reference_backends/<name>.py`, add an env spec at
 | `orpheus` | `tools/reference_backends/orpheus_snac.py` | `/Volumes/backups/ai/crispasr/orpheus-snac-ref.gguf` | 2026-05-01 | yes | snac, torch |
 | `paraformer` | `tools/reference_backends/paraformer.py` | — | — | yes | funasr, torch |
 | `parakeet` | `tools/reference_backends/parakeet.py` | — | — | yes | nemo, torch |
+| `parakeet-maes` | `tools/reference_backends/parakeet_maes.py` | `/mnt/storage/parakeet-maes-ref.gguf` | 2026-06-03 | yes | nemo, torch |
 | `qwen3` | `tools/reference_backends/qwen3.py` | — | — | yes | torch |
 | `qwen3-tts` | `tools/reference_backends/qwen3_tts.py` | — | — | yes | soundfile, torch |
 | `qwen3-tts-cenc` | `tools/reference_backends/qwen3_tts_cenc.py` | — | — | yes | torch |

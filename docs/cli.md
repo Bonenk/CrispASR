@@ -133,6 +133,33 @@ per-token `tokens[]` arrays when the backend populates them.
 | `--parakeet-decoder ctc\|tdt\|maes` | Select decode strategy: `ctc` (CTC head), `tdt` (TDT greedy/beam, default), `maes` (MAES beam search — requires `-bs N` with N>1) |
 | `-bs N`, `--beam-size N` | Parakeet TDT/RNNT beam search width (default 1 = greedy). `2`–`4` recommended with hotwords or MAES. CTC decode is frame-synchronous and always greedy |
 
+### MAES beam search (§134)
+
+MAES (Modified Adaptive Expansion Search) is a transducer-specific beam
+search that processes one encoder frame at a time with adaptive expansion.
+More efficient than the label-looping beam for transducers.
+
+```bash
+# Via --parakeet-decoder maes:
+crispasr -m parakeet-tdt-0.6b-v3.gguf -f audio.wav --parakeet-decoder maes --beam-size 4
+
+# Via env var:
+CRISPASR_PARAKEET_MAES=1 crispasr -m model.gguf -f audio.wav --beam-size 4
+```
+
+**Tuning env vars:**
+
+| Variable | Default | Description |
+|---|---|---|
+| `CRISPASR_PARAKEET_MAES` | 0 | Set to 1 to enable MAES (alternative to `--parakeet-decoder maes`) |
+| `CRISPASR_MAES_NUM_STEPS` | 2 | Max non-blank expansions per frame |
+| `CRISPASR_MAES_GAMMA` | 2.3 | Pruning threshold (lower = more aggressive) |
+| `CRISPASR_MAES_BETA` | 2 | Extra candidates beyond beam_size |
+
+Works with both TDT and RNNT parakeet models. CTC beam search is
+separate (activated by `--beam-size N` with CTC models, uses shared
+`core_ctc::prefix_beam_search`).
+
 ### Parakeet streamed encoding (issue #89)
 
 Parakeet always encodes audio in overlapping 8 s windows (global

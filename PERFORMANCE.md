@@ -1897,6 +1897,52 @@ python tools/benchmark_vitw_beam.py \
     --json tools/vitw_beam_results.json
 ```
 
+### MAES beam search for transducers (2026-06-03, §134)
+
+MAES (Modified Adaptive Expansion Search) is a transducer-specific beam
+search that's more efficient than the label-looping beam above. It processes
+one encoder frame at a time with up to N adaptive non-blank expansions per
+frame, using gamma-threshold pruning to kill low-probability branches.
+
+**Knob:** `CRISPASR_PARAKEET_MAES=1` + `--beam-size N` (CLI), or
+`--parakeet-decoder maes` + `--beam-size N`, or
+`parakeet_set_maes(ctx, true, num_steps, gamma, beta)` (C API).
+Config: `CRISPASR_MAES_NUM_STEPS` (default 2), `CRISPASR_MAES_GAMMA` (2.3),
+`CRISPASR_MAES_BETA` (2).
+
+Supports both TDT (Token-and-Duration Transducer) and pure RNNT models.
+
+#### MAES vs greedy on FLEURS English (CPU, Hetzner CCX13, 4 threads)
+
+| Model | Audio | Greedy | MAES beam=4 | Speed cost |
+|---|---|---|---|---|
+| tdt-0.6b-v2 (1K vocab) | 10s | "...by 25%." | "...by 25 years." | — |
+| tdt-0.6b-v3 (8K vocab) | 10s | "...by 25-30 years." | "...by 25 to 30 years." | — |
+| tdt-0.6b-v2 | 60s | 5 sentences | 6 sentences (recovered full missing sentence) | +35% |
+| tdt-1.1b (8K vocab) | 10s | "...by twenty five to thirty years" | identical | — |
+| tdt_ctc-110m (1K vocab) | 10s | garbled | same garble | — |
+| rnnt-0.6b (8K vocab) | 10s | "...by twenty five to thirty years" | identical | — |
+| rnnt-1.1b (8K vocab) | 60s | truncated at "lettering" | identical | +25% |
+
+#### When to use MAES vs standard beam
+
+| scenario | recommendation |
+|---|---|
+| Parakeet TDT with small vocab (v2, 1K BPE) | MAES beam=4 — measurable quality gain |
+| Parakeet TDT/RNNT with large vocab (8K BPE) | greedy — already strong baseline, MAES matches but costs 25-35% |
+| Parakeet with hotwords (CTC-WS) | label-looping beam — hotword trie not yet wired into MAES |
+| Tiny model (110M) | neither — model capacity is the bottleneck |
+
+### CTC prefix beam search (2026-06-03, §134)
+
+Shared `core_ctc::prefix_beam_search()` with optional gamma-threshold
+pruning. Available for any CTC backend via `--beam-size N`.
+Currently wired into: parakeet-CTC, sensevoice, wav2vec2 (16 languages).
+
+CTC beam search has not yet been benchmarked for WER improvement — the
+primary benefit is expected to be on character-level CTC models (wav2vec2)
+where the small vocab makes greedy more error-prone than BPE models.
+
 ### Transducer + encoder-decoder beam search (2026-06-02, issue #136 + §139)
 
 Parakeet TDT/RNNT label-looping beam (`b3cdcebd`), canary + cohere
