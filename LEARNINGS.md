@@ -9057,6 +9057,27 @@ ggml lacks grouped transposed convolution. The Mimi upsample (`groups=512`,
 `stride=16`) stays CPU-side: per-channel scalar loop, then feed into the ggml
 graph as an input tensor.
 
+### ASR roundtrip validation (ggml graph path)
+
+The `-novc` model (`pocket-tts-english-novc-f16.gguf`) produces near-silence
+(RMS≈0.003) regardless of parameters — its encoder weights are untrained (all-zero
+output). **Voice cloning with the gated model is required for audible speech:**
+
+```
+crispasr --backend pocket-tts \
+    -m pocket-tts-english-f16.gguf \
+    --voice samples/jfk.wav \
+    --tts "Hello there, how are you doing today?" --seed 42
+```
+
+Result: RMS=0.170, abs_max=0.698. Whisper ASR roundtrip:
+`"Hello there, how are you doing today?"` → **exact match**.
+
+This validates the full ggml graph pipeline end-to-end: voice conditioning
+(Mimi encoder, manual) → backbone prefill (138 voice frames + 9 text tokens,
+ggml) → AR decode (25 frames, ggml backbone + manual flow net) → Mimi decode
+(ggml transformer + SEANet) → intelligible 24 kHz PCM.
+
 ### Why the flow net stays manual
 
 The flow net's "RMSNorm" uses `var(x)` with Bessel's correction (`N-1` divisor)
