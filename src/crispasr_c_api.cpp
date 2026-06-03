@@ -2219,6 +2219,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         f5_tts_params p = f5_tts_default_params();
         p.n_threads = s->n_threads;
         p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
         p.seed = 42;
         s->f5tts_ctx = f5_tts_init_from_file(model_path, p);
         if (!s->f5tts_ctx) {
