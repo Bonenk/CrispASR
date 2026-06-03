@@ -859,14 +859,23 @@ static void layer_norm(float* out, const float* x, int dim, const float* w, cons
     }
 }
 
-// RMSNorm (for timestep embedder)
-static void rms_norm(float* out, const float* x, const float* alpha, int dim, float eps = 1e-8f) {
-    float ss = 0.0f;
+// Pocket-tts "RMSNorm": x * alpha / sqrt(var(x) + eps).
+// NOTE: despite the name, this uses variance (mean-subtracted), NOT mean(x²),
+// matching the reference _rms_norm which calls torch.var(dim=-1, correction=1).
+static void rms_norm(float* out, const float* x, const float* alpha, int dim, float eps = 1e-5f) {
+    float mean = 0.0f;
     for (int i = 0; i < dim; i++)
-        ss += x[i] * x[i];
-    float inv_rms = 1.0f / std::sqrt(ss / dim + eps);
+        mean += x[i];
+    mean /= dim;
+    float var = 0.0f;
+    for (int i = 0; i < dim; i++) {
+        float d = x[i] - mean;
+        var += d * d;
+    }
+    var /= (dim - 1); // Bessel's correction (torch default)
+    float inv_std = 1.0f / std::sqrt(var + eps);
     for (int i = 0; i < dim; i++)
-        out[i] = x[i] * inv_rms * alpha[i];
+        out[i] = x[i] * inv_std * alpha[i];
 }
 
 // Linear: out = W @ x + b   (W is row-major: [out_dim, in_dim])
@@ -1100,6 +1109,18 @@ static void flow_net_eval(pocket_tts_context* pctx, const float* cond, // (d_mod
     std::vector<float> y(FD);
     vec_add(y.data(), t_combined.data(), c_emb.data(), FD);
 
+    // Dump y for diff
+    if (getenv("POCKET_DUMP_DIR")) {
+        float yn = 0, tcn = 0, cn = 0;
+        for (int i = 0; i < FD; i++) {
+            yn += y[i] * y[i];
+            tcn += t_combined[i] * t_combined[i];
+            cn += c_emb[i] * c_emb[i];
+        }
+        fprintf(stderr, "  flow_net y_norm=%.4f t_combined_norm=%.4f c_emb_norm=%.4f\n", std::sqrt(yn), std::sqrt(tcn),
+                std::sqrt(cn));
+    }
+
     // 5. ResBlocks with AdaLN
     std::vector<float> normed(FD), ada_out(3 * FD), h_mlp(FD), h_out(FD);
     for (int r = 0; r < (int)fh.flow_depth; r++) {
@@ -1114,8 +1135,8 @@ static void flow_net_eval(pocket_tts_context* pctx, const float* cond, // (d_mod
         float* scale = ada_out.data() + FD;
         float* gate = ada_out.data() + 2 * FD;
 
-        // LayerNorm(x) * (1 + scale) + shift
-        layer_norm(normed.data(), x.data(), FD, tensor_f32_data(rb.ln_w), tensor_f32_data(rb.ln_b));
+        // LayerNorm(x) * (1 + scale) + shift  (ResBlock uses eps=1e-6)
+        layer_norm(normed.data(), x.data(), FD, tensor_f32_data(rb.ln_w), tensor_f32_data(rb.ln_b), 1e-6f);
         for (int i = 0; i < FD; i++)
             normed[i] = normed[i] * (1.0f + scale[i]) + shift[i];
 
@@ -1128,6 +1149,17 @@ static void flow_net_eval(pocket_tts_context* pctx, const float* cond, // (d_mod
         // x = x + gate * h_out
         for (int i = 0; i < FD; i++)
             x[i] += gate[i] * h_out[i];
+
+        if (getenv("POCKET_DUMP_DIR")) {
+            float xn = 0, gn = 0, hn = 0;
+            for (int i = 0; i < FD; i++) {
+                xn += x[i] * x[i];
+                gn += gate[i] * gate[i];
+                hn += h_out[i] * h_out[i];
+            }
+            fprintf(stderr, "  flow_net ResBlock %d: x_norm=%.4f gate_norm=%.4f h_norm=%.4f\n", r, std::sqrt(xn),
+                    std::sqrt(gn), std::sqrt(hn));
+        }
     }
 
     // 6. FinalLayer: AdaLN (2-way) + linear
@@ -1140,7 +1172,28 @@ static void flow_net_eval(pocket_tts_context* pctx, const float* cond, // (d_mod
     float* f_scale = final_ada_out.data() + FD;
 
     // LN without affine + modulate
-    layer_norm(normed.data(), x.data(), FD, nullptr, nullptr);
+    layer_norm(normed.data(), x.data(), FD, nullptr, nullptr, 1e-6f);
+
+    // Dump pre-modulation x norm and post-modulation for debugging
+    if (getenv("POCKET_DUMP_DIR")) {
+        float x_norm = 0, normed_norm = 0;
+        for (int i = 0; i < FD; i++) {
+            x_norm += x[i] * x[i];
+            normed_norm += normed[i] * normed[i];
+        }
+        fprintf(stderr, "  flow_net pre-final x_norm=%.4f normed_norm=%.4f\n", std::sqrt(x_norm),
+                std::sqrt(normed_norm));
+        // Dump scale/shift stats
+        float scale_mean = 0, shift_mean = 0;
+        for (int i = 0; i < FD; i++) {
+            scale_mean += f_scale[i];
+            shift_mean += f_shift[i];
+        }
+        fprintf(stderr, "  flow_net final scale_mean=%.4f shift_mean=%.4f\n", scale_mean / FD, shift_mean / FD);
+        fprintf(stderr, "  flow_net final 1+scale first4: %.4f %.4f %.4f %.4f\n", 1.0f + f_scale[0], 1.0f + f_scale[1],
+                1.0f + f_scale[2], 1.0f + f_scale[3]);
+    }
+
     for (int i = 0; i < FD; i++)
         normed[i] = normed[i] * (1.0f + f_scale[i]) + f_shift[i];
 
