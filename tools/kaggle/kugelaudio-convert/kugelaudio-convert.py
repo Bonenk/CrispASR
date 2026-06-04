@@ -8,32 +8,29 @@ run separately when GPU quota is available.
 Push: python -m kaggle kernels push -p tools/kaggle/kugelaudio-convert
 """
 
-import os, sys, time
+import os, sys, subprocess, time
 from pathlib import Path
 
 REPO = Path("/kaggle/working/CrispASR")
 BUILD = Path("/kaggle/working/build")
 OUTPUT = Path("/kaggle/working/output")
 
-# ── Kaggle harness ──────────────────────────────────────────────────────────
+# ── Phase 0: Clone repo first (harness lives in repo) ─────────────────────
+print("=== Phase 0: clone repo ===", flush=True)
+if not REPO.exists():
+    subprocess.check_call(
+        ["git", "clone", "--depth", "1",
+         "https://github.com/CrispStrobe/CrispASR",
+         str(REPO)])
+
+# NOW import the harness (repo must exist first)
 sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
 import kaggle_harness as kh
 
 kh.init_progress()
 
-# ── Phase 0: Clone repo + install deps ──────────────────────────────────────
-kh.report_status("cloning repo")
-if not REPO.exists():
-    kh.sh_with_progress("git clone --depth 1 https://github.com/CrispStrobe/CrispASR /kaggle/working/CrispASR")
-
 kh.report_status("installing deps")
-kh.sh_with_progress("pip install -q safetensors gguf transformers huggingface_hub torch")
-
-# Try installing kugelaudio-open (may not be on PyPI)
-try:
-    kh.sh_with_progress("pip install -q kugelaudio-open 2>/dev/null || true")
-except Exception:
-    pass
+kh.sh_with_progress("pip install -q safetensors gguf transformers huggingface_hub")
 
 # ── Phase 1: Download model ────────────────────────────────────────────────
 kh.report_status("downloading model")
