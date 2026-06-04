@@ -29,11 +29,11 @@ import kaggle_harness as kh
 
 kh.init_progress()
 
-kh.report_status("installing deps")
+kh.step("installing deps")
 kh.sh_with_progress("pip install -q safetensors gguf transformers huggingface_hub")
 
 # ── Phase 1: Download model ────────────────────────────────────────────────
-kh.report_status("downloading model")
+kh.step("downloading model")
 MODEL_ID = "kugelaudio/kugelaudio-0-open"
 token = kh.resolve_hf_token()
 
@@ -46,7 +46,7 @@ model_dir = snapshot_download(
 print(f"model downloaded to: {model_dir}")
 
 # ── Phase 2: GGUF conversion ───────────────────────────────────────────────
-kh.report_status("converting to GGUF")
+kh.step("converting to GGUF")
 OUTPUT.mkdir(parents=True, exist_ok=True)
 gguf_path = OUTPUT / "kugelaudio-0-open-f16.gguf"
 
@@ -64,7 +64,7 @@ kh.sh_with_progress(
 print(f"GGUF written: {gguf_path} ({gguf_path.stat().st_size / 1e9:.2f} GB)")
 
 # ── Phase 3: Tensor map dump (CPU-safe, no inference) ─────────────────────
-kh.report_status("dumping tensor map")
+kh.step("dumping tensor map")
 ref_dir = OUTPUT / "reference"
 ref_script = str(REPO / "tools" / "reference_backends" / "kugelaudio.py")
 try:
@@ -79,10 +79,10 @@ except Exception as e:
     print(f"tensor map dump failed: {e}")
 
 # ── Phase 4: Upload artifacts ───────────────────────────────────────────────
-kh.report_status("listing outputs")
+kh.step("listing outputs")
 for f in sorted(OUTPUT.rglob("*")):
     if f.is_file():
         print(f"  {f.relative_to(OUTPUT)}: {f.stat().st_size / 1e6:.1f} MB")
 
-kh.report_status("done")
+kh.step("done")
 print("All done. Download GGUF from Kaggle output tab.")
