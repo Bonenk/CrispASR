@@ -2046,13 +2046,27 @@ rel_shift`) doesn't fit `ggml_flash_attn_ext` — the kernel has no
 rel-pos hook. Would need either a positional-encoding swap or a
 custom flash kernel. Reopen after PLAN #58 / Conformer rewrite.
 
-### 61j. Translate + source/target lang for voxtral4b / glm-asr / omniasr-llm — OPEN
+### 61j. Translate + source/target lang for voxtral4b / glm-asr / omniasr-llm — PARTIALLY DONE
 
 **Tier:** 3. **Effort:** ~100 LOC + empirical validation.
 **Cells:** 3-6.
 
 Try the translate template each model honours; ASR-roundtrip a
 known X→Y pair; if sensible, add `CAP_TRANSLATE | CAP_SRC_TGT_LANGUAGE`.
+
+**Status (2026-06-04):**
+- **glm-asr: DONE.** `CAP_TRANSLATE | CAP_SRC_TGT_LANGUAGE` added.
+  Implementation already existed in the C library (`glm_asr.cpp:580` —
+  injects `"Please translate the speech to {lang}."` into LLM prompt)
+  and the backend adapter (`cp.translate`, `cp.target_lang` already
+  wired). Only the capability flag was missing.
+- **voxtral4b: N/A.** Streaming-only model with no text instruction
+  mechanism (prompt is BOS + STREAMING_PAD tokens). No translate
+  support in C API (`voxtral4b.h`). Model not trained for translate.
+- **omniasr-llm: N/A.** No translate in C API (`omniasr.h`). Model
+  uses embedding-level language conditioning, not tokenized text
+  instructions. Would require C API struct changes + empirical
+  evidence the model supports it.
 
 ### 61k. Grammar (GBNF) — BLOCKED on PLAN #60k
 
@@ -3088,9 +3102,9 @@ the next minor (0.7.0).
 
 
 
-## 94. Auto-generate Go bindings `#cgo LDFLAGS` from CMake graphviz
+## 94. Auto-generate Go bindings `#cgo LDFLAGS` from CMake graphviz — DONE
 
-**Status:** open, ~half-day. Recommended before the v0.7.0 cycle.
+**Status:** **DONE.** `tools/sync_go_cgo_ldflags.py` + `tools/cmake_graphviz_targets.py` + CI drift guard (`cgo-ldflags-drift` job in `.github/workflows/bindings-go.yml`) all shipped. Audit 2026-06-04 confirmed PLAN was stale — scripts already existed.
 
 **Why:** the hand-maintained `#cgo LDFLAGS` in `bindings/go/whisper.go`
 has now bitten three releases in a row — v0.6.3 (`-ltitanet`
