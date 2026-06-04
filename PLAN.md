@@ -563,7 +563,7 @@ share enough that landing one substantially de-risks the other.
 
 ---
 
-## 96. voxcpm2-tts perf — switch to per-step ggml graph (Metal-ready) — Metal live, graph-default flip still open
+## 96. voxcpm2-tts perf — switch to per-step ggml graph (Metal-ready) — DONE (graph-default flipped 2026-06-04)
 
 ### Where we are (2026-05-19)
 
@@ -904,8 +904,20 @@ GGUF quant, not a code bug"). Near-zero effect, slight regression on
   at slightly different patches) plus residual VAE F16-vs-bf16
   drift. Low priority; both Q4_K and F16 sound natural and
   ASR-roundtrip cleanly in EN/DE/ZH.
-- Once the above is investigated (or accepted as inherent), flip
-  default to `VOXCPM2_USE_GRAPH=1`.
+- ~~Once the above is investigated (or accepted as inherent), flip
+  default to `VOXCPM2_USE_GRAPH=1`.~~ **DONE 2026-06-04.** Accepted
+  as inherent (Q4_K quant noise, not a code bug). Default flipped:
+  `vox_env_bool_default_on("VOXCPM2_USE_GRAPH")` — graph path is now
+  default, opt-out via `VOXCPM2_USE_GRAPH=0`. Validated on two
+  independent platforms:
+  - **VPS (Hetzner x86_64 CPU):** "Hello world" Q4_K — legacy 1062.8s
+    vs graph 670.8s (1.58x). Identical ASR roundtrip ("Hello world.").
+    WAV correlation 0.833 (expected: F16 simdgroup drift through
+    6-step AR + 20-step CFM Euler).
+  - **Kaggle (x86_64 CPU):** two prompts — "Hello world" 1.46x
+    (24.2→16.5s), long sentence 1.61x (88.7→55.2s). Perfect
+    ASR roundtrip on both, identical WAV sizes. Kernel:
+    `${KAGGLE_ACCOUNT}/crispasr-voxcpm2-graph-ab`.
 
 ---
 
