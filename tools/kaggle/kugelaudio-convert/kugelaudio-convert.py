@@ -13,7 +13,10 @@ from pathlib import Path
 
 WORK = Path("/kaggle/working")
 REPO = WORK / "CrispASR"
-BUILD = WORK / "build"
+# Use /kaggle/temp for large artifacts — /kaggle/working is capped at ~20 GB
+# and gets saved as kernel output. We upload to HF directly from temp.
+TEMP = Path("/kaggle/temp") if Path("/kaggle/temp").is_dir() else Path("/tmp")
+BUILD = TEMP / "build"
 
 # ── Phase 0: Clone repo (harness lives in it) ──────────────────────────────
 print("=== Phase 0: clone repo ===", flush=True)
@@ -66,7 +69,7 @@ print(f"  source dir: {src}")
 
 # ── Phase 4: Convert to F16 GGUF ───────────────────────────────────────────
 kh.step("convert F16 GGUF")
-f16_path = WORK / "kugelaudio-0-open-f16.gguf"
+f16_path = TEMP / "kugelaudio-0-open-f16.gguf"
 
 kh.sh_with_progress(
     f"python models/convert-kugelaudio-to-gguf.py "
@@ -75,7 +78,31 @@ kh.sh_with_progress(
 )
 print(f"  F16 GGUF: {f16_path} ({f16_path.stat().st_size / (1024**3):.1f} GiB)")
 
-# ── Phase 5: Build crispasr-quantize ────────────────────────────────────────
+# ── Phase 5: Upload F16 to HF (before quantize — free disk after) ──────────
+kh.step("upload F16 to HF")
+HF_REPO = "cstr/kugelaudio-0-open-GGUF"
+
+if hf_token:
+    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+    from huggingface_hub import HfApi
+    api = HfApi(token=hf_token)
+    try:
+        api.create_repo(repo_id=HF_REPO, repo_type="model", exist_ok=True)
+    except Exception as e:
+        print(f"  repo create: {e}")
+
+    print(f"  uploading F16 ({f16_path.stat().st_size / (1024**3):.1f} GiB)...")
+    api.upload_file(
+        path_or_fileobj=str(f16_path),
+        path_in_repo="kugelaudio-0-open-f16.gguf",
+        repo_id=HF_REPO, repo_type="model",
+        commit_message="Add F16 GGUF (KugelAudio-0-Open TTS, --no-encoders)",
+    )
+    print("  uploaded F16")
+else:
+    print("  no HF_TOKEN — skipping upload")
+
+# ── Phase 6: Build crispasr-quantize ────────────────────────────────────────
 kh.step("build quantizer")
 BUILD.mkdir(parents=True, exist_ok=True)
 flags = kh.cache_and_link_flags()
@@ -90,48 +117,31 @@ with kh.build_heartbeat("cmake.build"):
 quantize_bin = BUILD / "bin" / "crispasr-quantize"
 print(f"  quantizer: {quantize_bin}")
 
-# ── Phase 6: Quantize to Q4_K ──────────────────────────────────────────────
+# ── Phase 7: Quantize F16 → Q4_K ───────────────────────────────────────────
 kh.step("quantize Q4_K")
-q4k_path = WORK / "kugelaudio-0-open-q4_k.gguf"
+q4k_path = TEMP / "kugelaudio-0-open-q4_k.gguf"
 
 kh.sh_with_progress(f"{quantize_bin} {f16_path} {q4k_path} q4_k")
 print(f"  Q4_K GGUF: {q4k_path} ({q4k_path.stat().st_size / (1024**3):.1f} GiB)")
 
-# ── Phase 7: Upload to HF ──────────────────────────────────────────────────
-kh.step("upload to HF")
-HF_REPO = "cstr/kugelaudio-0-open-GGUF"
+# Delete F16 to free disk
+f16_path.unlink(missing_ok=True)
+print("  deleted F16 (uploaded already)")
 
+# ── Phase 8: Upload Q4_K to HF ─────────────────────────────────────────────
+kh.step("upload Q4_K to HF")
 if hf_token:
-    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
-    from huggingface_hub import HfApi
-    api = HfApi(token=hf_token)
-
-    try:
-        api.create_repo(repo_id=HF_REPO, repo_type="model", exist_ok=True)
-    except Exception as e:
-        print(f"  repo create: {e}")
-
-    for local_path, remote_name in [
-        (f16_path, "kugelaudio-0-open-f16.gguf"),
-        (q4k_path, "kugelaudio-0-open-q4_k.gguf"),
-    ]:
-        print(f"  uploading {remote_name} ({local_path.stat().st_size / (1024**3):.1f} GiB)...")
-        api.upload_file(
-            path_or_fileobj=str(local_path),
-            path_in_repo=remote_name,
-            repo_id=HF_REPO,
-            repo_type="model",
-            commit_message=f"Add {remote_name} (KugelAudio-0-Open TTS, --no-encoders)",
-        )
-        print(f"  uploaded {remote_name}")
-
+    print(f"  uploading Q4_K ({q4k_path.stat().st_size / (1024**3):.1f} GiB)...")
+    api.upload_file(
+        path_or_fileobj=str(q4k_path),
+        path_in_repo="kugelaudio-0-open-q4_k.gguf",
+        repo_id=HF_REPO, repo_type="model",
+        commit_message="Add Q4_K GGUF (KugelAudio-0-Open TTS, --no-encoders)",
+    )
+    print("  uploaded Q4_K")
     print(f"\n  All uploaded to https://huggingface.co/{HF_REPO}")
 else:
-    print(f"  No HF_TOKEN — staged for local pickup:")
-    print(f"    kaggle kernels output ${KAGGLE_ACCOUNT}/crispasr-kugelaudio-convert -p .")
-    for p in [f16_path, q4k_path]:
-        if p.exists():
-            print(f"    {p.name}: {p.stat().st_size / (1024**3):.1f} GiB")
+    print("  no HF_TOKEN — staged for local pickup")
 
 kh.step("done")
 print("=== All done ===")
