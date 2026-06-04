@@ -161,7 +161,7 @@ add_executable(crispasr-diff
 )
 target_link_libraries(crispasr-diff PRIVATE
     common
-    crispasr
+    crispasr-lib
     parakeet
     canary
     cohere
@@ -198,13 +198,13 @@ install(TARGETS crispasr-diff RUNTIME BUNDLE DESTINATION bin)
 # peeking the GGUF's general.architecture key at load time. One binary
 # for any text-LID GGUF.
 #
-# Link order: text-lid-dispatch BEFORE crispasr because the dispatch
+# Link order: text-lid-dispatch BEFORE crispasr-lib because the dispatch
 # static library has unresolved references to crispasr_registry_lookup
 # / crispasr_cache::ensure_cached_file (in crispasr_model_registry.cpp
-# / crispasr_cache.cpp inside the main `crispasr` library), and MinGW's
+# / crispasr_cache.cpp inside the main `crispasr-lib` library), and MinGW's
 # GNU ld processes static libraries strictly left-to-right — listing
 # the consumer first lets ld pick up the missing definitions when it
-# subsequently scans `crispasr`. Without this, msys2 UCRT64 build.yml
+# subsequently scans `crispasr-lib`. Without this, msys2 UCRT64 build.yml
 # fails with `undefined reference to crispasr_registry_lookup` etc.
 # (Windows MSVC and Linux gcc are forgiving here; only MinGW UCRT64
 # enforces order strictly enough to surface the bug.)
@@ -217,7 +217,7 @@ install(TARGETS crispasr-diff RUNTIME BUNDLE DESTINATION bin)
 add_executable(crispasr-lid crispasr_lid_main.cpp)
 target_link_libraries(crispasr-lid PRIVATE
     text-lid-dispatch
-    crispasr
+    crispasr-lib
     ${CMAKE_THREAD_LIBS_INIT}
     $<$<BOOL:${WIN32}>:winhttp>
     $<$<BOOL:${WIN32}>:ws2_32>
@@ -233,7 +233,7 @@ install(TARGETS crispasr-lid RUNTIME BUNDLE DESTINATION bin)
 add_executable(mimo-tokenizer-smoke mimo_tokenizer_smoke.cpp)
 target_link_libraries(mimo-tokenizer-smoke PRIVATE
     common
-    crispasr
+    crispasr-lib
     mimo_tokenizer
     ${FFMPEG_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
@@ -248,7 +248,7 @@ include(DefaultTargetOptions)
 
 target_link_libraries(${TARGET} PRIVATE
     common
-    crispasr
+    crispasr-lib
     parakeet
     canary
     cohere
@@ -351,7 +351,7 @@ add_executable(crispasr-chat
 )
 target_include_directories(crispasr-chat PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(crispasr-chat PRIVATE
-    crispasr
+    crispasr-lib
     ${CMAKE_THREAD_LIBS_INIT}
 )
 include(DefaultTargetOptions)

@@ -9,7 +9,7 @@ Example:
     cmake -S . -B /tmp/bg --graphviz=/tmp/crispasr.dot \
           -DBUILD_SHARED_LIBS=OFF -DCRISPASR_BUILD_TESTS=OFF \
           -DCRISPASR_BUILD_EXAMPLES=OFF -DCRISPASR_BUILD_SERVER=OFF
-    python tools/cmake_graphviz_targets.py crispasr /tmp/crispasr.dot
+    python tools/cmake_graphviz_targets.py crispasr-lib /tmp/crispasr.dot
 
 Prints one library name per line (no lib prefix, no .a suffix).
 """
