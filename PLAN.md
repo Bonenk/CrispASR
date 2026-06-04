@@ -10,15 +10,16 @@ effort estimate. Completed items have been moved to `HISTORY.md`.
 
 **Latest release: v0.6.12** (commit `345ecfdc`). Full notes in [`RELEASE_NOTES_v0.6.12.md`](RELEASE_NOTES_v0.6.12.md).
 
-> **Audit 2026-06-03** — code-verified every item previously flagged as NOT DONE. Results:
-> all confirmed still open except **O4** (beam search) which is actually DONE (§139/§61h),
-> **#96** voxcpm2 graph path which is MOSTLY DONE (code landed, 48.7→14.1s, but gated behind
-> `VOXCPM2_USE_GRAPH=1` — default flip still pending), and **#56** Mandarin tone strip which
-> landed (`strip_cmn_tone_numbers` + CJK warnings `5257e33d`). Still open: #52 perf pass,
-> #96 graph-default flip, #51c F16 (RAM-blocked), #56 JA kanji (needs MeCab/KaKaSi), #58 MOSS,
-> #115 Option C, #73 FA benchmark, #75 server round 2, #61j translate, #93 CMake rename, (DONE `11148b23`)
-> #94 Go auto-gen, #66 wrapper publishing, #103 Silero v6, O5/O6/O7 optimizations,
-> #100 MeloTTS, #101 OmniVoice, #102 RapidTP.
+> **Audit 2026-06-03 + follow-up 2026-06-04** — code-verified all items.
+> **Closed this session:** #96 graph-default flip (DONE), #73 FA benchmark
+> (DONE — crossover confirmed, cohere defaults to cast-on-read), #61j
+> glm-asr translate (DONE), #94 Go auto-gen (was already done), #93 CMake
+> rename (was already done `11148b23`), #103 Silero v6 (was already done,
+> v6.2.0), #100 MeloTTS Phase A (done `e65b8d82`), O4 beam search (done).
+> **Still open:** #52 perf pass, #51c F16 (RAM-blocked), #56 JA kanji
+> (needs MeCab/KaKaSi), #58 MOSS (in progress), #115 Option C, #75 server
+> round 2, #66 wrapper publishing, O5/O6/O7 (O6 GPU-only, O7 needs draft
+> models), #100 Phase B (OpenVoice2 cloning), #101 OmniVoice, #102 RapidTP.
 
 **Current state (May 2026, v0.6.11):** 20 ASR + 3 TTS + 1 speaker-verification backends (+ Chatterbox T3 in progress), unified CLI,
 OpenAI-compatible server + WebSocket streaming, shared `src/core/` library, FireRedPunc
@@ -3398,7 +3399,12 @@ deps" profile is a feature.
 
 ---
 
-## 100. MeloTTS + OpenVoice2 — multilingual TTS with native CJK + voice cloning
+## 100. MeloTTS + OpenVoice2 — multilingual TTS with native CJK + voice cloning — Phase A DONE
+
+**Status (2026-06-04):** Phase A (MeloTTS standalone) **DONE** — native
+ggml VITS2 runtime in `src/melotts.cpp`, committed as `e65b8d82`.
+Go LDFLAGS updated, clang-formatted, docs wired. OpenVoice2 voice
+cloning (Phase B) still open.
 
 Surveyed via RapidAI/RapidSpeech.cpp ("OpenVoice2: MeloTTS + voice
 cloning") and the upstream `myshell-ai/MeloTTS` + `myshell-ai/OpenVoice`
@@ -3590,7 +3596,11 @@ for the dominant use cases.
 
 ---
 
-## 103. Silero VAD version bump — verify and align with v6
+## 103. Silero VAD version bump — verify and align with v6 — DONE
+
+**Status:** DONE. Model `models/for-tests-silero-v6.2.0-ggml.bin` is
+in the repo. Tests, examples, Ruby bindings all reference v6.2.0.
+Confirmed 2026-06-04 audit.
 
 RapidSpeech.cpp documents shipping with Silero VAD **v6**. CrispASR
 ships Silero as the default VAD (`--vad`, auto-downloaded ~885 KB) —
