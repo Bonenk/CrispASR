@@ -67,19 +67,54 @@ print(f"  source: {src}", flush=True)
 kh.step("model_downloaded")
 
 # %% [code]
-print("[5] running reference dump", flush=True)
+print("[5] running reference dump inline", flush=True)
 os.environ["MOSS_AUDIO_DIR"] = src
 os.environ["MOSS_AUDIO_GITHUB"] = str(MOSS_GITHUB)
 os.environ["MOSS_AUDIO_PROMPT"] = "Transcribe this audio."
 os.environ["MOSS_AUDIO_MAX_NEW"] = "128"
 
-subprocess.check_call([
-    sys.executable, str(REPO / "tools" / "dump_reference.py"),
-    "--backend", "moss-audio",
-    "--model-dir", src,
-    "--audio", str(REPO / "samples" / "jfk.wav"),
-    "--output", str(OUT_REF),
-])
+# Run dump inline (not subprocess) so tracebacks are visible in the notebook
+sys.path.insert(0, str(REPO / "tools"))
+import importlib
+import reference_backends.moss_audio as moss_mod
+import numpy as np
+import wave
+
+# Load audio (16kHz mono PCM)
+wav_path = str(REPO / "samples" / "jfk.wav")
+with wave.open(wav_path, "rb") as w:
+    raw = w.readframes(w.getnframes())
+    audio = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
+    if w.getnchannels() > 1:
+        audio = audio.reshape(-1, w.getnchannels()).mean(axis=1)
+
+print(f"  audio: {len(audio)} samples ({len(audio)/16000:.1f}s)", flush=True)
+
+captures = moss_mod.dump(
+    model_dir=Path(src),
+    audio=audio,
+    stages=set(moss_mod.DEFAULT_STAGES),
+    max_new_tokens=128,
+)
+
+print(f"  captured {len(captures)} stages: {list(captures.keys())}", flush=True)
+
+# Write GGUF
+from gguf import GGUFWriter, GGMLQuantizationType
+writer = GGUFWriter(str(OUT_REF), "moss_audio_ref")
+writer.add_name("MOSS-Audio-4B-Instruct reference dump (jfk.wav)")
+for name, arr in captures.items():
+    if isinstance(arr, str):
+        writer.add_string(f"ref.{name}", arr)
+    elif isinstance(arr, np.ndarray):
+        arr_f32 = arr.astype(np.float32) if arr.dtype != np.float32 else arr
+        writer.add_tensor(f"ref.{name}", arr_f32, raw_dtype=GGMLQuantizationType.F32)
+        print(f"  {name}: shape={arr.shape} dtype={arr.dtype}", flush=True)
+writer.write_header_to_file()
+writer.write_kv_data_to_file()
+writer.write_tensors_to_file()
+writer.close()
+
 print(f"  ref GGUF: {OUT_REF} ({OUT_REF.stat().st_size / (1024**2):.1f} MiB)", flush=True)
 kh.step("refdump_done", size_mib=round(OUT_REF.stat().st_size / (1024**2), 1))
 
