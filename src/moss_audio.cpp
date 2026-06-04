@@ -585,18 +585,16 @@ static ggml_cgraph* moss_audio_build_encoder_graph(
     //   = PyTorch shape (B=1, C=480, F=F_down, T=T_down)
     //
     // Python: x.permute(0, 3, 1, 2).contiguous().flatten(2)
-    //   (B, C, F, T) → (B, T, C, F) → (B, T, C*F)
+    //   (B, C, F, T) → (B, T, C, F) → (B, T, C*F=7680)
     //
-    // ggml: ne=(T, F, C, B) → want ne=(C*F, T, B=1)
-    //   permute to ne=(F, C, T, B) then flatten F*C → stem_in
+    // ggml_permute semantics: output dim i reads from input dim ax_i.
+    // Source ne = (T, F, C, B). Target ne = (F, C, T, B) so flatten
+    // gives F*C with F fastest — matches PyTorch's c*F+f indexing.
+    //   permute(1, 2, 0, 3): out[0]=in[1](F), out[1]=in[2](C), out[2]=in[0](T)
     int F_down = conv_out_len(conv_out_len(conv_out_len(n_mels)));
     int C_out = (int)hp.enc_ds_hidden; // 480
-    int stem_in = C_out * F_down;      // 480 * 16 = 7680
-    // ggml_permute(src, ax0, ax1, ax2, ax3) rearranges so that
-    // output dim i reads from input dim ax_i. We want:
-    //   out[0]=src[1] (F), out[1]=src[2] (C), out[2]=src[0] (T), out[3]=src[3] (B)
-    x = ggml_permute(ctx0, x, 1, 2, 0, 3);
-    x = ggml_cont(ctx0, x);
+    int stem_in = F_down * C_out;      // 16 * 480 = 7680
+    x = ggml_cont(ctx0, ggml_permute(ctx0, x, 1, 2, 0, 3));
     x = ggml_reshape_2d(ctx0, x, stem_in, T_down);
 
     // stem_proj: Linear(7680, 1280)
@@ -609,8 +607,12 @@ static ggml_cgraph* moss_audio_build_encoder_graph(
     ggml_set_input(pe_in);
     x = ggml_add(ctx0, x, pe_in);
 
-    // Padding mask input (optional: T_down)
-    // For single-audio inference, no padding needed
+    // Padding mask: (T_down, T_down) F16. For key positions that are padded,
+    // the mask is -inf; for valid positions, 0. Used by flash_attn_ext.
+    // Bidirectional (encoder), so all valid positions attend to all valid positions.
+    ggml_tensor* attn_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T_down, T_down);
+    ggml_set_name(attn_mask, "attn_mask");
+    ggml_set_input(attn_mask);
 
     // 32 WhisperEncoderLayers
     ggml_tensor* ds_taps[3] = {nullptr, nullptr, nullptr};
@@ -638,10 +640,9 @@ static ggml_cgraph* moss_audio_build_encoder_graph(
         V = ggml_reshape_3d(ctx0, V, head_dim, n_heads, T_down);
         V = ggml_permute(ctx0, V, 0, 2, 1, 3);
 
-        // Bidirectional self-attention (no causal mask, encoder is bidirectional)
-        // Scale: 1/sqrt(head_dim)
+        // Bidirectional self-attention with padding mask
         float scale = 1.0f / std::sqrt((float)head_dim);
-        ggml_tensor* attn = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, scale, 0.0f, 0.0f);
+        ggml_tensor* attn = ggml_flash_attn_ext(ctx0, Q, K, V, attn_mask, scale, 0.0f, 0.0f);
         ggml_flash_attn_ext_set_prec(attn, GGML_PREC_F32);
 
         // Reshape back: (head_dim, T, n_heads) → (d, T)
@@ -754,66 +755,153 @@ extern "C" float* moss_audio_run_encoder(struct moss_audio_context* ctx,
     if (!ctx || !mel) return nullptr;
     const auto& hp = ctx->model.hparams;
     const int d = (int)hp.enc_d_model;
-    const int T_down = conv_out_len(conv_out_len(conv_out_len(T_mel)));
     const bool want_ds = (ds_tap_0 || ds_tap_1 || ds_tap_2);
 
-    ggml_cgraph* gf = moss_audio_build_encoder_graph(ctx, T_mel, want_ds);
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
-        fprintf(stderr, "moss_audio: encoder graph alloc failed\n");
-        return nullptr;
+    // ---- Chunked encoder processing ----
+    // The Python reference splits the mel into chunks of chunk_frames=400,
+    // pads each to chunk_frames, runs conv+transformer independently per
+    // chunk (no cross-chunk attention), then selects valid output tokens.
+    const int chunk_frames = 400; // n_window(200) * 2
+
+    // Compute chunk boundaries
+    int num_chunks = (T_mel + chunk_frames - 1) / chunk_frames;
+    std::vector<int> chunk_lengths(num_chunks, chunk_frames);
+    int tail = T_mel % chunk_frames;
+    if (tail > 0) chunk_lengths[num_chunks - 1] = tail;
+    // If tail == 0, last chunk is full (chunk_frames)
+
+    // For each chunk, compute valid output length after 3× stride-2 conv
+    std::vector<int> valid_lens(num_chunks);
+    int total_valid = 0;
+    for (int c = 0; c < num_chunks; c++) {
+        valid_lens[c] = conv_out_len(conv_out_len(conv_out_len(chunk_lengths[c])));
+        total_valid += valid_lens[c];
     }
 
-    // Set mel input — layout (n_mels, T_mel) row-major = ggml ne=(T_mel, n_mels)
-    ggml_tensor* mel_in = ggml_graph_get_tensor(gf, "mel_input");
-    ggml_backend_tensor_set(mel_in, mel, 0, (size_t)n_mels * T_mel * sizeof(float));
+    // Padded chunk conv output length (all chunks padded to chunk_frames)
+    const int T_chunk_down = conv_out_len(conv_out_len(conv_out_len(chunk_frames)));
 
-    // Set positional embedding
-    ggml_tensor* pe_in = ggml_graph_get_tensor(gf, "pos_embed");
-    if (pe_in) {
-        const size_t pe_bytes = (size_t)d * T_down * sizeof(float);
-        if ((size_t)T_down * d <= ctx->model.audio_pe.size()) {
-            ggml_backend_tensor_set(pe_in, ctx->model.audio_pe.data(), 0, pe_bytes);
-        } else {
-            // T_down exceeds max_pos — pad with zeros
-            std::vector<float> pe_buf((size_t)d * T_down, 0.0f);
-            size_t copy = std::min(ctx->model.audio_pe.size(), pe_buf.size());
-            memcpy(pe_buf.data(), ctx->model.audio_pe.data(), copy * sizeof(float));
-            ggml_backend_tensor_set(pe_in, pe_buf.data(), 0, pe_bytes);
-        }
-    }
+    if (ctx->params.verbosity >= 1)
+        fprintf(stderr, "moss_audio: encoder chunking: %d chunks of %d frames, "
+                "total_valid=%d tokens (T_chunk_down=%d)\n",
+                num_chunks, chunk_frames, total_valid, T_chunk_down);
 
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
-        fprintf(stderr, "moss_audio: encoder graph compute failed\n");
-        return nullptr;
-    }
-
-    // Extract encoder output
-    ggml_tensor* enc_out = ggml_graph_get_tensor(gf, "encoder_output");
-    if (!enc_out) { fprintf(stderr, "moss_audio: missing encoder_output\n"); return nullptr; }
-    const int T_enc = (int)enc_out->ne[1];
-    if (out_T_enc) *out_T_enc = T_enc;
-    if (out_d) *out_d = d;
-
-    float* result = (float*)malloc((size_t)d * T_enc * sizeof(float));
-    ggml_backend_tensor_get(enc_out, result, 0, (size_t)d * T_enc * sizeof(float));
-
-    // Extract deepstack taps
+    // Allocate output buffers
+    float* result = (float*)malloc((size_t)d * total_valid * sizeof(float));
+    float* ds_results[3] = {nullptr, nullptr, nullptr};
     if (want_ds) {
-        for (int t = 0; t < 3; t++) {
-            float** out_ptr = (t == 0) ? ds_tap_0 : (t == 1) ? ds_tap_1 : ds_tap_2;
-            if (!out_ptr) continue;
-            char name[32];
-            snprintf(name, sizeof(name), "ds_tap_%d", t);
-            ggml_tensor* tap = ggml_graph_get_tensor(gf, name);
-            if (tap) {
-                *out_ptr = (float*)malloc((size_t)d * T_enc * sizeof(float));
-                ggml_backend_tensor_get(tap, *out_ptr, 0, (size_t)d * T_enc * sizeof(float));
-            } else {
-                *out_ptr = nullptr;
+        if (ds_tap_0) ds_results[0] = (float*)malloc((size_t)d * total_valid * sizeof(float));
+        if (ds_tap_1) ds_results[1] = (float*)malloc((size_t)d * total_valid * sizeof(float));
+        if (ds_tap_2) ds_results[2] = (float*)malloc((size_t)d * total_valid * sizeof(float));
+    }
+
+    int out_offset = 0; // write position in output buffers
+
+    for (int c = 0; c < num_chunks; c++) {
+        // Prepare padded mel chunk: (n_mels, chunk_frames) zero-padded
+        std::vector<float> chunk_mel((size_t)n_mels * chunk_frames, 0.0f);
+        int t_start = c * chunk_frames;
+        int t_len = chunk_lengths[c]; // valid frames in this chunk
+        // mel is (n_mels, T_mel) row-major: mel[f * T_mel + t]
+        for (int f = 0; f < n_mels; f++) {
+            for (int t = 0; t < t_len; t++) {
+                chunk_mel[(size_t)f * chunk_frames + t] = mel[(size_t)f * T_mel + t_start + t];
             }
         }
+
+        // Build and run encoder graph for this chunk
+        ggml_cgraph* gf = moss_audio_build_encoder_graph(ctx, chunk_frames, want_ds);
+        ggml_backend_sched_reset(ctx->sched);
+        if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+            fprintf(stderr, "moss_audio: encoder graph alloc failed (chunk %d)\n", c);
+            free(result);
+            for (int t = 0; t < 3; t++) free(ds_results[t]);
+            return nullptr;
+        }
+
+        // Set mel input
+        ggml_tensor* mel_in = ggml_graph_get_tensor(gf, "mel_input");
+        ggml_backend_tensor_set(mel_in, chunk_mel.data(), 0,
+                                (size_t)n_mels * chunk_frames * sizeof(float));
+
+        // Set padding mask: bidirectional, but mask out padded positions
+        // Valid positions [0, valid_lens[c]) can attend to each other;
+        // padded positions [valid_lens[c], T_chunk_down) are masked with -inf.
+        ggml_tensor* mask_t = ggml_graph_get_tensor(gf, "attn_mask");
+        if (mask_t) {
+            int valid = valid_lens[c];
+            std::vector<ggml_fp16_t> mask_data((size_t)T_chunk_down * T_chunk_down);
+            const ggml_fp16_t zero_h = ggml_fp32_to_fp16(0.0f);
+            const ggml_fp16_t neginf_h = ggml_fp32_to_fp16(-INFINITY);
+            for (int q = 0; q < T_chunk_down; q++) {
+                for (int k = 0; k < T_chunk_down; k++) {
+                    // Both query and key must be valid (< valid)
+                    mask_data[(size_t)q * T_chunk_down + k] =
+                        (q < valid && k < valid) ? zero_h : neginf_h;
+                }
+            }
+            ggml_backend_tensor_set(mask_t, mask_data.data(), 0,
+                                    mask_data.size() * sizeof(ggml_fp16_t));
+        }
+
+        // Set positional embedding for this chunk
+        ggml_tensor* pe_in = ggml_graph_get_tensor(gf, "pos_embed");
+        if (pe_in) {
+            const size_t pe_bytes = (size_t)d * T_chunk_down * sizeof(float);
+            if ((size_t)T_chunk_down * d <= ctx->model.audio_pe.size()) {
+                ggml_backend_tensor_set(pe_in, ctx->model.audio_pe.data(), 0, pe_bytes);
+            } else {
+                std::vector<float> pe_buf((size_t)d * T_chunk_down, 0.0f);
+                size_t copy = std::min(ctx->model.audio_pe.size(), pe_buf.size());
+                memcpy(pe_buf.data(), ctx->model.audio_pe.data(), copy * sizeof(float));
+                ggml_backend_tensor_set(pe_in, pe_buf.data(), 0, pe_bytes);
+            }
+        }
+
+        if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+            fprintf(stderr, "moss_audio: encoder graph compute failed (chunk %d)\n", c);
+            free(result);
+            for (int t = 0; t < 3; t++) free(ds_results[t]);
+            return nullptr;
+        }
+
+        // Extract encoder output — only valid_lens[c] tokens (not padded ones)
+        ggml_tensor* enc_out = ggml_graph_get_tensor(gf, "encoder_output");
+        if (!enc_out) {
+            fprintf(stderr, "moss_audio: missing encoder_output (chunk %d)\n", c);
+            free(result);
+            for (int t = 0; t < 3; t++) free(ds_results[t]);
+            return nullptr;
+        }
+
+        int valid = valid_lens[c];
+        // enc_out shape: ne=(d, T_chunk_down). Copy only first `valid` rows.
+        // Row t starts at offset t * d (ggml ne[0]=d is the fast dim).
+        ggml_backend_tensor_get(enc_out, result + (size_t)out_offset * d,
+                                0, (size_t)valid * d * sizeof(float));
+
+        // Extract deepstack taps (same valid subset)
+        if (want_ds) {
+            for (int t = 0; t < 3; t++) {
+                if (!ds_results[t]) continue;
+                char name[32];
+                snprintf(name, sizeof(name), "ds_tap_%d", t);
+                ggml_tensor* tap = ggml_graph_get_tensor(gf, name);
+                if (tap) {
+                    ggml_backend_tensor_get(tap, ds_results[t] + (size_t)out_offset * d,
+                                            0, (size_t)valid * d * sizeof(float));
+                }
+            }
+        }
+
+        out_offset += valid;
     }
+
+    if (out_T_enc) *out_T_enc = total_valid;
+    if (out_d) *out_d = d;
+    if (ds_tap_0) *ds_tap_0 = ds_results[0];
+    if (ds_tap_1) *ds_tap_1 = ds_results[1];
+    if (ds_tap_2) *ds_tap_2 = ds_results[2];
 
     return result;
 }
