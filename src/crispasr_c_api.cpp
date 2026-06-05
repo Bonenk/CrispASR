@@ -99,6 +99,10 @@
 #include "kugelaudio.h"
 #define CA_HAVE_KUGELAUDIO 1
 #endif
+#if __has_include("zonos_tts.h")
+#include "zonos_tts.h"
+#define CA_HAVE_ZONOS 1
+#endif
 #if __has_include("qwen3_tts.h")
 #include "qwen3_tts.h"
 #define CA_HAVE_QWEN3_TTS 1
@@ -1121,6 +1125,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "moss-audio";
     else if (strcmp(arch, "kugelaudio") == 0 || strcmp(arch, "kugelaudio-tts") == 0)
         backend = "kugelaudio";
+    else if (strcmp(arch, "zonos") == 0 || strcmp(arch, "zonos-tts") == 0)
+        backend = "zonos";
 
     std::strncpy(out_name, backend, out_cap - 1);
     out_name[out_cap - 1] = '\0';
@@ -1334,6 +1340,9 @@ struct crispasr_session {
 #endif
 #ifdef CA_HAVE_KUGELAUDIO
     kugelaudio_context* kugelaudio_ctx = nullptr;
+#endif
+#ifdef CA_HAVE_ZONOS
+    zonos_tts_context* zonos_ctx = nullptr;
 #endif
 #ifdef CA_HAVE_QWEN3_TTS
     qwen3_tts_context* qwen3_tts_ctx = nullptr;
@@ -1844,7 +1853,9 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
     }
 #endif
 #ifdef CA_HAVE_VIBEVOICE
-    if (s->backend == "vibevoice" || s->backend == "vibevoice-tts") {
+    if (s->backend == "vibevoice" || s->backend == "vibevoice-tts" ||
+        s->backend == "vibevoice-1.5b" || s->backend == "vibevoice-tts-1.5b" ||
+        s->backend == "vibevoice-tts-base") {
         s->backend = "vibevoice";
         vibevoice_context_params p = vibevoice_context_default_params();
         p.n_threads = s->n_threads;
@@ -1875,8 +1886,25 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         return s;
     }
 #endif
+#ifdef CA_HAVE_ZONOS
+    if (s->backend == "zonos" || s->backend == "zonos-tts") {
+        s->backend = "zonos";
+        zonos_tts_params p = zonos_tts_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
+        s->zonos_ctx = zonos_tts_init_from_file(model_path, p);
+        if (!s->zonos_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
 #ifdef CA_HAVE_QWEN3_TTS
-    if (s->backend == "qwen3-tts" || s->backend == "qwen3_tts" || s->backend == "qwen3tts") {
+    if (s->backend == "qwen3-tts" || s->backend == "qwen3_tts" || s->backend == "qwen3tts" ||
+        s->backend == "qwen3-tts-base" || s->backend == "qwen3-tts-1.7b-base" ||
+        s->backend == "qwen3-tts-customvoice" || s->backend == "gwen-tts") {
         qwen3_tts_context_params p = qwen3_tts_context_default_params();
         p.n_threads = s->n_threads;
         p.verbosity = g_open_verbosity_tls;
@@ -2625,10 +2653,13 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
     list += ",wav2vec2";
 #endif
 #ifdef CA_HAVE_VIBEVOICE
-    list += ",vibevoice,vibevoice-tts";
+    list += ",vibevoice,vibevoice-tts,vibevoice-1.5b";
 #endif
 #ifdef CA_HAVE_KUGELAUDIO
     list += ",kugelaudio";
+#endif
+#ifdef CA_HAVE_ZONOS
+    list += ",zonos";
 #endif
 #ifdef CA_HAVE_QWEN3_TTS
     list += ",qwen3-tts";
@@ -5011,6 +5042,11 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
         return kugelaudio_load_voice(s->kugelaudio_ctx, path);
     }
 #endif
+#ifdef CA_HAVE_ZONOS
+    if (s->zonos_ctx) {
+        return zonos_tts_set_voice(s->zonos_ctx, path);
+    }
+#endif
 #ifdef CA_HAVE_QWEN3_TTS
     if (s->qwen3_tts_ctx) {
         if (ends_with_wav(path)) {
@@ -5310,6 +5346,11 @@ CA_EXPORT float* crispasr_session_synthesize(crispasr_session* s, const char* te
 #ifdef CA_HAVE_KUGELAUDIO
     if (s->kugelaudio_ctx) {
         return kugelaudio_synthesize(s->kugelaudio_ctx, text, out_n_samples);
+    }
+#endif
+#ifdef CA_HAVE_ZONOS
+    if (s->zonos_ctx) {
+        return zonos_tts_synthesize(s->zonos_ctx, text, out_n_samples);
     }
 #endif
 #ifdef CA_HAVE_QWEN3_TTS
@@ -5750,6 +5791,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_KUGELAUDIO
     if (s->kugelaudio_ctx)
         kugelaudio_free(s->kugelaudio_ctx);
+#endif
+#ifdef CA_HAVE_ZONOS
+    if (s->zonos_ctx)
+        zonos_tts_free(s->zonos_ctx);
 #endif
 #ifdef CA_HAVE_QWEN3_TTS
     if (s->qwen3_tts_ctx)
@@ -6324,6 +6369,12 @@ CA_EXPORT int crispasr_session_set_tts_seed(crispasr_session* s, uint64_t seed) 
 #ifdef CA_HAVE_MOSS_AUDIO
     if (s->moss_audio_ctx) {
         moss_audio_set_seed(s->moss_audio_ctx, (uint32_t)seed);
+        touched++;
+    }
+#endif
+#ifdef CA_HAVE_ZONOS
+    if (s->zonos_ctx) {
+        zonos_tts_set_seed(s->zonos_ctx, seed);
         touched++;
     }
 #endif
