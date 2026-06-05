@@ -1004,8 +1004,13 @@ static ggml_cgraph* build_lm_graph(kugelaudio_context* ctx, int n_tokens, int n_
     }
 
     // Final RMSNorm
+    fprintf(stderr, "kugelaudio: final_norm cur=[%lld,%lld]\n", (long long)cur->ne[0], (long long)cur->ne[1]);
     cur = ggml_rms_norm(ctx0, cur, hp.rms_norm_eps);
-    cur = ggml_mul(ctx0, cur, G("model.language_model.norm.weight"));
+    ggml_tensor* fnw = G("model.language_model.norm.weight");
+    fprintf(stderr, "kugelaudio: final_norm w=%p [%lld,%lld]\n", (void*)fnw,
+            fnw?(long long)fnw->ne[0]:-1, fnw?(long long)fnw->ne[1]:-1);
+    cur = ggml_mul(ctx0, cur, fnw);
+    fprintf(stderr, "kugelaudio: final_norm OK\n");
 
     // Output both hidden states and logits
     if (output_hidden) {
@@ -1031,10 +1036,16 @@ static ggml_cgraph* build_lm_graph(kugelaudio_context* ctx, int n_tokens, int n_
     } else {
         last_tok = cur;
     }
-    ggml_tensor* logits = ggml_mul_mat(ctx0, G("lm_head.weight"), last_tok);
+    ggml_tensor* lm_head_w = G("lm_head.weight");
+    fprintf(stderr, "kugelaudio: lm_head w=[%lld,%lld] last_tok=[%lld,%lld]\n",
+            lm_head_w?(long long)lm_head_w->ne[0]:-1, lm_head_w?(long long)lm_head_w->ne[1]:-1,
+            (long long)last_tok->ne[0], (long long)last_tok->ne[1]);
+    ggml_tensor* logits = ggml_mul_mat(ctx0, lm_head_w, last_tok);
+    fprintf(stderr, "kugelaudio: logits=[%lld,%lld] OK\n", (long long)logits->ne[0], (long long)logits->ne[1]);
     ggml_set_name(logits, "logits");
     ggml_set_output(logits);
     ggml_build_forward_expand(gf, logits);
+    fprintf(stderr, "kugelaudio: build_lm_graph done\n");
 
     return gf;
 }
