@@ -556,13 +556,28 @@ static ggml_cgraph* moss_audio_build_encoder_graph(
     ggml_context* ctx0 = ggml_init(gparams);
     ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 16384, false);
 
-    // Input: mel spectrogram (n_mels, T_mel) F32
+    // Input: mel spectrogram. Data is (n_mels, T_mel) row-major F32.
+    // PyTorch conv2d: input (N=1, IC=1, H=n_mels, W=T_mel).
+    // ggml conv2d: input ne=(IW, IH, IC, N) where IW=ne[0] is stride-s0 dim.
+    //
+    // The mel data layout: mel[f*T + t] = mel value at freq f, time t.
+    // ggml tensor ne=(T_mel, n_mels): element at (t, f) = mel[f*T + t]. ✓
+    // BUT: ggml_conv_2d im2col treats ne[0] as the FIRST spatial dim
+    // and ne[1] as the SECOND. The PyTorch kernel is (OC, IC, KH=freq, KW=time).
+    // In ggml ne: (KW=time, KH=freq, IC, OC). So:
+    //   - s0/p0/d0 apply to ne[0] = T_mel (time) via KW
+    //   - s1/p1/d1 apply to ne[1] = n_mels (freq) via KH
+    // This is correct.
+    //
+    // Alternative test: swap H and W to see if that fixes the values.
+    // If mel is stored as ne=(n_mels, T_mel), then:
+    //   - ne[0] = n_mels → s0 applies to freq
+    //   - ne[1] = T_mel → s1 applies to time
+    // This SWAPS the conv kernel directions. Only correct if the kernel
+    // is symmetric (it's 3×3 so it could be close but not identical).
     ggml_tensor* mel_in = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, T_mel, n_mels);
     ggml_set_name(mel_in, "mel_input");
     ggml_set_input(mel_in);
-
-    // Reshape to (1, n_mels, T_mel) → Conv2d expects (B, C_in, H, W)
-    // For our 2D conv: treat as (B=1, C_in=1, H=n_mels, W=T_mel)
     ggml_tensor* x = ggml_reshape_4d(ctx0, mel_in, T_mel, n_mels, 1, 1);
 
     // Conv1: (1, 1, n_mels, T) → (1, ds_hidden, n_mels/2, T/2)
@@ -810,14 +825,16 @@ extern "C" float* moss_audio_run_encoder(struct moss_audio_context* ctx,
     int out_offset = 0; // write position in output buffers
 
     for (int c = 0; c < num_chunks; c++) {
-        // Prepare padded mel chunk: (n_mels, chunk_frames) zero-padded
+        // Prepare padded mel chunk for ggml ne=(T=chunk_frames, n_mels).
+        // ggml ne[0]=T varies fastest: data[t + chunk_frames * f].
+        // Input mel is (n_mels, T_mel) row-major: mel[f * T_mel + t].
         std::vector<float> chunk_mel((size_t)n_mels * chunk_frames, 0.0f);
         int t_start = c * chunk_frames;
-        int t_len = chunk_lengths[c]; // valid frames in this chunk
-        // mel is (n_mels, T_mel) row-major: mel[f * T_mel + t]
+        int t_len = chunk_lengths[c];
         for (int f = 0; f < n_mels; f++) {
             for (int t = 0; t < t_len; t++) {
-                chunk_mel[(size_t)f * chunk_frames + t] = mel[(size_t)f * T_mel + t_start + t];
+                chunk_mel[(size_t)t + chunk_frames * (size_t)f] =
+                    mel[(size_t)f * T_mel + t_start + t];
             }
         }
 
@@ -835,6 +852,11 @@ extern "C" float* moss_audio_run_encoder(struct moss_audio_context* ctx,
         ggml_tensor* mel_in = ggml_graph_get_tensor(gf, "mel_input");
         ggml_backend_tensor_set(mel_in, chunk_mel.data(), 0,
                                 (size_t)n_mels * chunk_frames * sizeof(float));
+        if (c == 0 && ctx->params.verbosity >= 1) {
+            // Verify: chunk_mel[0] = mel(f=0,t=0), chunk_mel[T] = mel(f=1,t=0)
+            fprintf(stderr, "moss_audio: mel_pack check: [0]=%f [T=%d]=%f [1]=%f\n",
+                    chunk_mel[0], chunk_frames, chunk_mel[chunk_frames], chunk_mel[1]);
+        }
 
         // Set padding mask: bidirectional, but mask out padded positions
         // Valid positions [0, valid_lens[c]) can attend to each other;

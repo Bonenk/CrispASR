@@ -4744,12 +4744,6 @@ int main(int argc, char** argv) {
                                                      &T_enc, &d_enc, &ds0, &ds1, &ds2);
                 free(mel);
                 if (enc) {
-                    // enc_post_stem_proj: first chunk only (50 tokens × 1280)
-                    ggml_tensor* stem_t = ggml_graph_get_tensor(nullptr, "enc_post_stem_proj");
-                    // Can't get from graph after run — use run_encoder's graph.
-                    // For now, skip stem_proj in diff (need API extension).
-                    // TODO: expose stem_proj capture in moss_audio_run_encoder
-
                     auto rep = ref.compare("encoder_output", enc, (size_t)T_enc * d_enc);
                     print_row("encoder_output", rep, COS_THRESHOLD);
                     record(rep);
