@@ -883,7 +883,13 @@ static ggml_cgraph* build_lm_graph(kugelaudio_context* ctx, int n_tokens, int n_
 
         // Pre-RMSNorm
         cur = ggml_rms_norm(ctx0, cur, hp.rms_norm_eps);
-        cur = ggml_mul(ctx0, cur, G(std::string(p) + ".input_layernorm.weight"));
+        ggml_tensor* ln_w = G(std::string(p) + ".input_layernorm.weight");
+        if (il == 0) {
+            fprintf(stderr, "kugelaudio: layer0 cur=[%lld,%lld] ln_w=[%lld,%lld]\n",
+                    (long long)cur->ne[0], (long long)cur->ne[1],
+                    ln_w ? (long long)ln_w->ne[0] : -1, ln_w ? (long long)ln_w->ne[1] : -1);
+        }
+        cur = ggml_mul(ctx0, cur, ln_w);
 
         // Q/K/V with bias
         int T_cur = (int)cur->ne[1];
@@ -1257,6 +1263,13 @@ extern "C" float* kugelaudio_synthesize(struct kugelaudio_context* ctx,
     // ── Prefill ────────────────────────────────────────────────────────
     std::vector<float> logits;
     std::vector<float> hidden_state;
+    fprintf(stderr, "kugelaudio: prefill %d tokens, d_lm=%d, embeds size=%zu\n",
+            n_prompt, hp.d_lm, prompt_embeds.size());
+    fprintf(stderr, "kugelaudio: kv_k shape=[%lld,%lld,%lld,%lld] kv_v shape=[%lld,%lld,%lld,%lld]\n",
+            (long long)ctx->kv_k->ne[0], (long long)ctx->kv_k->ne[1],
+            (long long)ctx->kv_k->ne[2], (long long)ctx->kv_k->ne[3],
+            (long long)ctx->kv_v->ne[0], (long long)ctx->kv_v->ne[1],
+            (long long)ctx->kv_v->ne[2], (long long)ctx->kv_v->ne[3]);
     if (!run_lm_step(prompt_embeds.data(), n_prompt, 0, logits, &hidden_state)) {
         fprintf(stderr, "kugelaudio: LM prefill failed\n");
         return nullptr;
