@@ -101,7 +101,7 @@ public:
             std::string model_dir = p.model;
             size_t slash = model_dir.find_last_of("/\\");
             if (slash != std::string::npos)
-                model_dir = model_dir.substr(0, slash + 1);
+                model_dir.resize(slash + 1);
             else
                 model_dir = "./";
 
