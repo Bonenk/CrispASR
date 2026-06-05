@@ -38,6 +38,10 @@ DEFAULT_STAGES = [
     # Per-diffusion-step captures (diagnostic)
     "diff_step0_noisy",
     "diff_step0_denoised",
+    # Decoder intermediate (for isolating VAE bugs)
+    "dec_stem_out",
+    "dec_s0_b0_out",
+    "dec_full_out",
 ]
 
 
@@ -105,6 +109,18 @@ def dump(model_dir: Path, audio: np.ndarray, stages: set, **kwargs) -> dict:
     hooks.append(model.model.prediction_head.t_embedder.register_forward_hook(make_hook("t_embedder")))
     hooks.append(model.model.prediction_head.cond_proj.register_forward_hook(make_hook("cond_proj")))
     hooks.append(model.model.prediction_head.register_forward_hook(make_hook("pred_output")))
+
+    # Decoder hooks: capture stem conv output + first block output
+    if hasattr(model.model.acoustic_tokenizer, 'decoder'):
+        dec = model.model.acoustic_tokenizer.decoder
+        # Stem is upsample_layers[0] (SConv1d)
+        if hasattr(dec, 'upsample_layers') and len(dec.upsample_layers) > 0:
+            hooks.append(dec.upsample_layers[0].register_forward_hook(make_hook("dec_stem_out")))
+        # First block
+        if hasattr(dec, 'stages') and len(dec.stages) > 0 and len(dec.stages[0]) > 0:
+            hooks.append(dec.stages[0][0].register_forward_hook(make_hook("dec_s0_b0_out")))
+        # Full decoder output
+        hooks.append(dec.register_forward_hook(make_hook("dec_full_out")))
 
     # Intercept diffusion loop
     original_sample = model.sample_speech_tokens
@@ -219,6 +235,23 @@ def dump(model_dir: Path, audio: np.ndarray, stages: set, **kwargs) -> dict:
 
     if "decoded_audio" in stages and outputs.speech_outputs and outputs.speech_outputs[0] is not None:
         results["decoded_audio"] = outputs.speech_outputs[0].cpu().float().numpy().flatten()
+
+    # Decoder intermediate captures
+    if "dec_stem_out" in captures:
+        t = captures["dec_stem_out"]
+        if isinstance(t, torch.Tensor):
+            results["dec_stem_out"] = t.cpu().float().numpy().flatten()
+            print(f"  dec_stem_out: shape={list(t.shape)}")
+    if "dec_s0_b0_out" in captures:
+        t = captures["dec_s0_b0_out"]
+        if isinstance(t, torch.Tensor):
+            results["dec_s0_b0_out"] = t.cpu().float().numpy().flatten()
+            print(f"  dec_s0_b0_out: shape={list(t.shape)}")
+    if "dec_full_out" in captures:
+        t = captures["dec_full_out"]
+        if isinstance(t, torch.Tensor):
+            results["dec_full_out"] = t.cpu().float().numpy().flatten()
+            print(f"  dec_full_out: shape={list(t.shape)}")
 
     # Cleanup hooks
     for h in hooks:
