@@ -595,17 +595,19 @@ constexpr Entry k_registry[] = {
      "~1.4 GB", nullptr, nullptr},
 
     // MeloTTS: VITS2 52M param TTS (myshell-ai/MeloTTS). 44.1 kHz mono.
-    // MIT license. Single GGUF with embedded CMU dictionary for G2P.
+    // MIT license. Single GGUF with embedded CMU dictionary + neural G2P.
     // V2: 4 English speakers (US/BR/India/AU), 112 symbols, 11 tones.
     // V3: 1 speaker (EN-Newest), 219 symbols, 16 tones (newest checkpoint).
+    // Companion: bert-base-uncased Q4_K (52 MB) for BERT conditioning.
+    // Also available: F16 (227 MB), Q8_0 (97 MB) on the same HF repo.
     {"melotts", "melotts-en-v2-f16.gguf",
      "https://huggingface.co/cstr/melotts-en-v2-GGUF/resolve/main/melotts-en-v2-f16.gguf",
-     "~97 MB",
-     "bert-base-uncased.gguf",
-     "https://huggingface.co/cstr/melotts-en-v2-GGUF/resolve/main/bert-base-uncased.gguf"},
+     "~102+52 MB",
+     "bert-base-uncased-q4k.gguf",
+     "https://huggingface.co/cstr/melotts-en-v2-GGUF/resolve/main/bert-base-uncased-q4k.gguf"},
     {"melotts-v3", "melotts-en-v3-f16.gguf",
      "https://huggingface.co/cstr/melotts-en-v3-GGUF/resolve/main/melotts-en-v3-f16.gguf",
-     "~93 MB",
+     "~93+52 MB",
      "bert-base-uncased.gguf",
      "https://huggingface.co/cstr/melotts-en-v3-GGUF/resolve/main/bert-base-uncased.gguf"},
 

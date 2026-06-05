@@ -9297,3 +9297,24 @@ short sequences due to higher per-op overhead. Cohere with 30s auto-chunking
 always hits the short-form case. Measured: flash +13% slower at 60s,
 -26% faster at 300s. Crossover between 1-5 min. Default flipped to
 cast-on-read for cohere; `CRISPASR_COHERE_FLASH=1` for unchunked long-form.
+
+## MeloTTS + BERT quantization — what works and what doesn't
+
+**Main model (VITS2, 102 MB F16):** Only 9 of 853 tensors meet ggml's
+minimum block size for quantization, and those 9 are embeddings (phone,
+tone, language, speaker). Q8_0 saves 1 MB (98→97). Not worth it for size,
+but works correctly after fixing `read_emb` to dequantize via
+`ggml_get_type_traits()->to_float` (was blindly memcpy'ing Q8_0 bytes as
+F32). The same fix applies to the speaker embedding read in
+`melotts_synthesize` (replaced inline F16/F32 branch with `read_tensor_f32`).
+
+**BERT companion (bert-base-uncased, 227 MB F16):** All 141 MB of F16
+linear weights (768×768 attention, 768×3072 FFN) quantize successfully.
+Q8_0 = 97 MB, Q4_K = **52 MB** (77% smaller) with zero quality loss on
+ASR roundtrip. Required fixing `bert_encoder.cpp` to `ggml_cast(F32)`
+after `ggml_get_rows` on quantized embeddings, since `ggml_add` requires
+F32 operands.
+
+**Recommended deployment:** MeloTTS F16 (102 MB) + BERT Q4_K (52 MB) =
+**154 MB total**. All three BERT quants (F16/Q8/Q4K) uploaded to
+`cstr/melotts-en-v2-GGUF`. Registry companion points to Q4_K by default.
