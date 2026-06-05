@@ -1356,9 +1356,9 @@ extern "C" float* kugelaudio_synthesize(struct kugelaudio_context* ctx,
     for (int step = 0; step < max_tokens && !finished; step++) {
         int next_token = constrained_argmax(logits);
 
-        if (ctx->params.verbosity >= 2) {
-            fprintf(stderr, "  step %d: token %d\n", step, next_token);
-        }
+        fprintf(stderr, "  step %d: token %d (start=%d diff=%d end=%d eos=%d)\n",
+                step, next_token, hp.speech_start_id, hp.speech_diffusion_id,
+                hp.speech_end_id, hp.eos_token_id);
 
         if (next_token == hp.eos_token_id || next_token == hp.speech_end_id) {
             finished = true;
@@ -1366,6 +1366,7 @@ extern "C" float* kugelaudio_synthesize(struct kugelaudio_context* ctx,
         }
 
         if (next_token == hp.speech_diffusion_id) {
+            fprintf(stderr, "kugelaudio: diffusion path\n");
             // ── Run diffusion → decode → audio chunk ───────────────
             // Condition = last hidden state from LM
 
@@ -1510,9 +1511,11 @@ extern "C" float* kugelaudio_synthesize(struct kugelaudio_context* ctx,
                 ctx->kv_n_used++;
             }
         } else {
+            fprintf(stderr, "kugelaudio: embed token %d path\n", next_token);
             // speech_start or other token — embed and continue
             std::vector<float> tok_embed;
             if (!run_embed_lookup(&next_token, 1, tok_embed)) break;
+            fprintf(stderr, "kugelaudio: embed OK, running LM step n_past=%d\n", ctx->kv_n_used);
 
             if (!run_lm_step(tok_embed.data(), 1, ctx->kv_n_used, logits, &hidden_state)) {
                 fprintf(stderr, "kugelaudio: LM step failed\n");
