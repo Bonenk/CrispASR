@@ -575,23 +575,48 @@ static ggml_cgraph* moss_audio_build_encoder_graph(
     //   - ne[1] = T_mel → s1 applies to time
     // This SWAPS the conv kernel directions. Only correct if the kernel
     // is symmetric (it's 3×3 so it could be close but not identical).
-    ggml_tensor* mel_in = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, T_mel, n_mels);
+    // Input mel: ggml ne=(n_mels, T_mel, 1, 1).
+    // This means ne[0]=n_mels (freq) varies fastest.
+    // ggml conv2d applies kernel ne[0]=KW to data ne[0]=n_mels.
+    // PyTorch kernel: (OC, IC, KH, KW) stored as ggml ne=(KW, KH, IC, OC).
+    // PyTorch conv: KH applies to H=freq, KW applies to W=time.
+    // So to match: data ne[0] must be the KW direction.
+    // If KW=time and data ne[0]=n_mels=freq, the kernel is transposed.
+    // FIX: store data as ne=(n_mels, T) so KW (ne[0]) applies to freq.
+    // Then transpose the kernel to swap KH/KW...
+    // OR: keep kernel as-is and swap the input so ne[0]=freq, ne[1]=time.
+    // With the kernel's KW applying to freq (ne[0]) and KH to time (ne[1]):
+    //   effectively: KH_eff=KW_orig (time→freq), KW_eff=KH_orig (freq→time)
+    //   This is a transposition of the kernel's spatial dims.
+    // Since the Python kernel has KH=freq,KW=time, and ggml applies
+    // KW(ne[0]) to ne[0], we need data ne[0]=time to match.
+    // So ne=(T_mel, n_mels) is correct... unless ggml im2col transposes.
+    //
+    // Let's try ne=(n_mels, T_mel) to test the hypothesis:
+    ggml_tensor* mel_in = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_mels, T_mel);
     ggml_set_name(mel_in, "mel_input");
     ggml_set_input(mel_in);
-    ggml_tensor* x = ggml_reshape_4d(ctx0, mel_in, T_mel, n_mels, 1, 1);
+    ggml_tensor* x = ggml_reshape_4d(ctx0, mel_in, n_mels, T_mel, 1, 1);
 
-    // Conv1: (1, 1, n_mels, T) → (1, ds_hidden, n_mels/2, T/2)
-    x = ggml_conv_2d(ctx0, enc.conv1_w, x, 2, 2, 1, 1, 1, 1);
+    // Transpose conv kernels: GGUF stores (KW, KH, IC, OC) but with
+    // data ne[0]=freq we need (KH, KW, IC, OC) so KH (freq kernel)
+    // aligns with data ne[0].
+    auto conv_transpose_kernel = [&](ggml_tensor* w) -> ggml_tensor* {
+        return ggml_cont(ctx0, ggml_permute(ctx0, w, 1, 0, 2, 3));
+    };
+
+    // Conv1
+    x = ggml_conv_2d(ctx0, conv_transpose_kernel(enc.conv1_w), x, 2, 2, 1, 1, 1, 1);
     x = ggml_add(ctx0, x, ggml_reshape_4d(ctx0, enc.conv1_b, 1, 1, enc.conv1_b->ne[0], 1));
     x = ggml_gelu_erf(ctx0, x);
 
     // Conv2
-    x = ggml_conv_2d(ctx0, enc.conv2_w, x, 2, 2, 1, 1, 1, 1);
+    x = ggml_conv_2d(ctx0, conv_transpose_kernel(enc.conv2_w), x, 2, 2, 1, 1, 1, 1);
     x = ggml_add(ctx0, x, ggml_reshape_4d(ctx0, enc.conv2_b, 1, 1, enc.conv2_b->ne[0], 1));
     x = ggml_gelu_erf(ctx0, x);
 
     // Conv3
-    x = ggml_conv_2d(ctx0, enc.conv3_w, x, 2, 2, 1, 1, 1, 1);
+    x = ggml_conv_2d(ctx0, conv_transpose_kernel(enc.conv3_w), x, 2, 2, 1, 1, 1, 1);
     x = ggml_add(ctx0, x, ggml_reshape_4d(ctx0, enc.conv3_b, 1, 1, enc.conv3_b->ne[0], 1));
     x = ggml_gelu_erf(ctx0, x);
 
@@ -605,10 +630,23 @@ static ggml_cgraph* moss_audio_build_encoder_graph(
     // Source ne = (T, F, C, B). Target ne = (F, C, T, B) so flatten
     // gives F*C with F fastest — matches PyTorch's c*F+f indexing.
     //   permute(1, 2, 0, 3): out[0]=in[1](F), out[1]=in[2](C), out[2]=in[0](T)
+    // After conv3 with ne=(n_mels, T) input:
+    //   ne = (F_down=16, T_down=50, C=480, B=1)
+    // PyTorch: (B, C, T_down, F_down) → permute(0,2,1,3) → (B, F, C, T)...
+    // Actually: PyTorch conv output is (B, C, OH, OW). With input (B, IC, H=freq, W=time):
+    //   OH = freq_down, OW = time_down. So PyTorch output = (1, 480, F_down, T_down).
+    //
+    // Python: x.permute(0, 3, 1, 2) = (B, T_down, C, F_down) → flatten(2) = (B, T_down, C*F_down)
+    //
+    // Our ggml: ne = (F_down=16, T_down=50, C=480, B=1)
+    // Want: ne = (C*F_down=7680, T_down=50, B=1)
+    // Need to merge ne[0]=F_down and ne[2]=C with F_down fastest.
+    // Permute to (F_down, C, T_down, B): permute(x, 0, 2, 1, 3)
+    // Then cont+reshape to (F_down*C, T_down, B)
     int F_down = conv_out_len(conv_out_len(conv_out_len(n_mels)));
-    int C_out = (int)hp.enc_ds_hidden; // 480
-    int stem_in = F_down * C_out;      // 16 * 480 = 7680
-    x = ggml_cont(ctx0, ggml_permute(ctx0, x, 1, 2, 0, 3));
+    int C_out = (int)hp.enc_ds_hidden;
+    int stem_in = F_down * C_out;
+    x = ggml_cont(ctx0, ggml_permute(ctx0, x, 0, 2, 1, 3)); // (F, C, T, B)
     x = ggml_reshape_2d(ctx0, x, stem_in, T_down);
 
     // stem_proj: Linear(7680, 1280)
@@ -831,9 +869,13 @@ extern "C" float* moss_audio_run_encoder(struct moss_audio_context* ctx,
         std::vector<float> chunk_mel((size_t)n_mels * chunk_frames, 0.0f);
         int t_start = c * chunk_frames;
         int t_len = chunk_lengths[c];
-        for (int f = 0; f < n_mels; f++) {
-            for (int t = 0; t < t_len; t++) {
-                chunk_mel[(size_t)t + chunk_frames * (size_t)f] =
+        // Pack mel with freq (n_mels) as ne[0] (fastest) and time as ne[1].
+        // This transposes from (n_mels, T) row-major to (T, n_mels) ne-order
+        // = ggml ne=(n_mels, T). ggml conv2d applies KW (kernel ne[0]) along
+        // data ne[0]=n_mels and KH (ne[1]) along data ne[1]=T.
+        for (int t = 0; t < t_len; t++) {
+            for (int f = 0; f < n_mels; f++) {
+                chunk_mel[(size_t)f + n_mels * (size_t)t] =
                     mel[(size_t)f * T_mel + t_start + t];
             }
         }
