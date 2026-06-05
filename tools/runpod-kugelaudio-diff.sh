@@ -98,7 +98,8 @@ set -e
 export PATH=/usr/local/cuda/bin:\$PATH
 apt-get update -qq >/dev/null 2>&1
 apt-get install -y -qq ninja-build >/dev/null 2>&1
-pip3 install cmake huggingface_hub hf_transfer safetensors gguf transformers -q 2>/dev/null
+# Pin transformers<=4.51 to avoid float8_e8m0fnu on older PyTorch
+pip3 install cmake huggingface_hub hf_transfer safetensors gguf 'transformers<=4.51' -q 2>/dev/null
 
 export CMAKE=\$(find /usr -path '*/cmake/data/bin/cmake' 2>/dev/null | head -1)
 [ -z "\$CMAKE" ] && CMAKE=cmake
@@ -153,6 +154,7 @@ echo "=== Phase 3: Python reference dump ==="
 $SSH << 'REMOTE'
 set -e
 # Install kugelaudio-open from GitHub
+pip3 install diffusers -q 2>/dev/null
 pip3 install git+https://github.com/Kugelaudio/kugelaudio-open.git -q 2>/dev/null || {
     echo "WARNING: kugelaudio-open install failed, trying pip"
     pip3 install kugelaudio-open -q 2>/dev/null || echo "kugelaudio-open not available"
