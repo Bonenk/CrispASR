@@ -1250,7 +1250,7 @@ extern "C" void openvoice2_free(struct openvoice2_context* ctx) {
     delete ctx;
 }
 
-extern "C" void openvoice2_set_dump_dir(struct openvoice2_context * ctx, const char * dir) {
+extern "C" void openvoice2_set_dump_dir(struct openvoice2_context* ctx, const char* dir) {
     if (ctx)
         ctx->dump_dir = dir ? dir : "";
 }

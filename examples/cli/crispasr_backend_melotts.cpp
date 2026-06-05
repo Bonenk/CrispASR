@@ -14,15 +14,20 @@
 
 // Read a mono WAV file into float PCM + sample rate.
 // Handles WAVs with extra chunks before the data chunk.
-static bool read_wav_mono(const char * path, std::vector<float> & pcm, int & sr) {
-    FILE * f = fopen(path, "rb");
-    if (!f) return false;
+static bool read_wav_mono(const char* path, std::vector<float>& pcm, int& sr) {
+    FILE* f = fopen(path, "rb");
+    if (!f)
+        return false;
 
     // Read RIFF header (12 bytes)
     uint8_t riff[12];
-    if (fread(riff, 1, 12, f) != 12) { fclose(f); return false; }
+    if (fread(riff, 1, 12, f) != 12) {
+        fclose(f);
+        return false;
+    }
     if (memcmp(riff, "RIFF", 4) != 0 || memcmp(riff + 8, "WAVE", 4) != 0) {
-        fclose(f); return false;
+        fclose(f);
+        return false;
     }
 
     int bits = 16;
@@ -31,15 +36,19 @@ static bool read_wav_mono(const char * path, std::vector<float> & pcm, int & sr)
     // Walk chunks until we find "data"
     while (!feof(f)) {
         uint8_t chunk_hdr[8];
-        if (fread(chunk_hdr, 1, 8, f) != 8) break;
-        uint32_t chunk_size = *(uint32_t *)(chunk_hdr + 4);
+        if (fread(chunk_hdr, 1, 8, f) != 8)
+            break;
+        uint32_t chunk_size = *(uint32_t*)(chunk_hdr + 4);
 
         if (memcmp(chunk_hdr, "fmt ", 4) == 0) {
             uint8_t fmt[40] = {};
             size_t to_read = chunk_size < 40 ? chunk_size : 40;
-            if (fread(fmt, 1, to_read, f) != to_read) { fclose(f); return false; }
-            sr   = *(int32_t *)(fmt + 4);
-            bits = *(int16_t *)(fmt + 14);
+            if (fread(fmt, 1, to_read, f) != to_read) {
+                fclose(f);
+                return false;
+            }
+            sr = *(int32_t*)(fmt + 4);
+            bits = *(int16_t*)(fmt + 14);
             if (chunk_size > to_read)
                 fseek(f, (long)(chunk_size - to_read), SEEK_CUR);
         } else if (memcmp(chunk_hdr, "data", 4) == 0) {
@@ -71,9 +80,7 @@ class MelottsBackend : public CrispasrBackend {
 public:
     const char* name() const override { return "melotts"; }
 
-    uint32_t capabilities() const override {
-        return CAP_TTS | (ov2_ctx_ ? CAP_VOICE_CLONING : 0);
-    }
+    uint32_t capabilities() const override { return CAP_TTS | (ov2_ctx_ ? CAP_VOICE_CLONING : 0); }
 
     bool init(const whisper_params& p) override {
         struct melotts_params mp = melotts_default_params();
@@ -85,7 +92,8 @@ public:
             mp.seed = (uint32_t)p.seed;
 
         ctx_ = melotts_init_from_file(p.model.c_str(), mp);
-        if (!ctx_) return false;
+        if (!ctx_)
+            return false;
 
         // Try to load OpenVoice2 TCC model for voice cloning.
         // Look for openvoice2-tcc-*.gguf next to the melotts model.
@@ -98,11 +106,9 @@ public:
                 model_dir = "./";
 
             // Try common names
-            for (const char * name : {"openvoice2-tcc-f16.gguf",
-                                       "openvoice2-tcc-q4_k.gguf",
-                                       "openvoice2-tcc.gguf"}) {
+            for (const char* name : {"openvoice2-tcc-f16.gguf", "openvoice2-tcc-q4_k.gguf", "openvoice2-tcc.gguf"}) {
                 std::string tcc_path = model_dir + name;
-                FILE * test = fopen(tcc_path.c_str(), "rb");
+                FILE* test = fopen(tcc_path.c_str(), "rb");
                 if (test) {
                     fclose(test);
                     auto cp = openvoice2_context_default_params();
@@ -110,15 +116,14 @@ public:
                     cp.verbosity = p.no_prints ? 0 : 1;
                     ov2_ctx_ = openvoice2_init_from_file(tcc_path.c_str(), cp);
                     if (ov2_ctx_ && !p.no_prints)
-                        fprintf(stderr, "melotts: OpenVoice2 TCC loaded from '%s'\n",
-                                tcc_path.c_str());
+                        fprintf(stderr, "melotts: OpenVoice2 TCC loaded from '%s'\n", tcc_path.c_str());
                     break;
                 }
             }
 
             if (!ov2_ctx_) {
                 fprintf(stderr, "melotts: warning: --voice specified but no OpenVoice2 TCC "
-                        "model found. Place openvoice2-tcc-f16.gguf next to the melotts model.\n");
+                                "model found. Place openvoice2-tcc-f16.gguf next to the melotts model.\n");
             }
 
             // Load reference audio
@@ -126,11 +131,10 @@ public:
             if (read_wav_mono(p.tts_voice.c_str(), ref_pcm_, ref_sr)) {
                 ref_sr_ = ref_sr;
                 if (!p.no_prints)
-                    fprintf(stderr, "melotts: loaded ref voice '%s' (%d samples @ %d Hz)\n",
-                            p.tts_voice.c_str(), (int)ref_pcm_.size(), ref_sr_);
+                    fprintf(stderr, "melotts: loaded ref voice '%s' (%d samples @ %d Hz)\n", p.tts_voice.c_str(),
+                            (int)ref_pcm_.size(), ref_sr_);
             } else {
-                fprintf(stderr, "melotts: failed to read voice reference '%s'\n",
-                        p.tts_voice.c_str());
+                fprintf(stderr, "melotts: failed to read voice reference '%s'\n", p.tts_voice.c_str());
             }
         }
 
@@ -157,20 +161,18 @@ public:
         // Voice cloning via OpenVoice2 if reference audio provided
         if (ov2_ctx_ && !ref_pcm_.empty()) {
             int src_sr = ctx_ ? melotts_sample_rate(ctx_) : 44100;
-            float * cloned_pcm = nullptr;
+            float* cloned_pcm = nullptr;
             int n_cloned = 0;
 
-            if (openvoice2_convert(ov2_ctx_,
-                                    out.data(), (int)out.size(), src_sr,
-                                    ref_pcm_.data(), (int)ref_pcm_.size(), ref_sr_,
-                                    &cloned_pcm, &n_cloned)) {
+            if (openvoice2_convert(ov2_ctx_, out.data(), (int)out.size(), src_sr, ref_pcm_.data(), (int)ref_pcm_.size(),
+                                   ref_sr_, &cloned_pcm, &n_cloned)) {
                 out.assign(cloned_pcm, cloned_pcm + n_cloned);
                 free(cloned_pcm);
                 // Output sample rate changes to OpenVoice2's rate (22050)
                 ov2_output_sr_ = 22050;
             } else {
                 fprintf(stderr, "melotts: OpenVoice2 voice conversion failed, "
-                        "returning original audio\n");
+                                "returning original audio\n");
             }
         }
 
@@ -178,7 +180,8 @@ public:
     }
 
     int tts_sample_rate() const override {
-        if (ov2_output_sr_ > 0) return ov2_output_sr_;
+        if (ov2_output_sr_ > 0)
+            return ov2_output_sr_;
         return ctx_ ? melotts_sample_rate(ctx_) : 44100;
     }
 
@@ -198,8 +201,8 @@ public:
     }
 
 private:
-    melotts_context * ctx_ = nullptr;
-    openvoice2_context * ov2_ctx_ = nullptr;
+    melotts_context* ctx_ = nullptr;
+    openvoice2_context* ov2_ctx_ = nullptr;
     std::vector<float> ref_pcm_;
     int ref_sr_ = 0;
     int ov2_output_sr_ = 0;
