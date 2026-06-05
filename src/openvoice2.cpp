@@ -255,7 +255,11 @@ extern "C" struct openvoice2_context* openvoice2_init_from_file(const char* path
     auto* ctx = new openvoice2_context();
     ctx->verbosity = params.verbosity;
     ctx->tau = params.tau;
-    { const char* e = std::getenv("OV2_TAU"); if (e) ctx->tau = (float)std::atof(e); }
+    {
+        const char* e = std::getenv("OV2_TAU");
+        if (e)
+            ctx->tau = (float)std::atof(e);
+    }
     ctx->rng.seed(42);
 
     // Pass 1: metadata
@@ -1214,11 +1218,13 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
             float peak = 0.0f;
             for (auto v : pcm) {
                 float a = v < 0 ? -v : v;
-                if (a > peak) peak = a;
+                if (a > peak)
+                    peak = a;
             }
             if (peak > 0.01f) {
                 float gain = 0.95f / peak;
-                for (auto& v : pcm) v *= gain;
+                for (auto& v : pcm)
+                    v *= gain;
                 if (ctx->verbosity >= 1)
                     fprintf(stderr, "openvoice2: peak-normalized (gain=%.2f, peak was %.4f)\n", gain, peak);
             }
