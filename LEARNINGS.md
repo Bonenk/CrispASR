@@ -9257,3 +9257,43 @@ layers + GRU. Python processes the spectrogram as `(1, 1, T, freq)` but
 the C++ was transposing to `(1, 1, freq, T)` before Conv2d — convolving
 along the wrong spatial axes. Speaker embedding cos went from 0.17 to
 0.999999 after fixing to match Python's layout.
+
+
+## OpenVoice2 voice cloning — ggml data layout (2026-06-05)
+
+**The bug:** HiFi-GAN decoder produced completely wrong output (cos=0.002
+vs Python) despite identical z input. All upstream stages (STFT, ref_enc,
+enc_q, flow) matched at cos≥0.999996.
+
+**Root cause:** ggml tensor `(C, T)` has `ne[0]=C` as the fastest-changing
+dimension. Data in `(T, C)` row-major layout already has C as the fast
+dimension — it can be fed directly to `ggml_backend_tensor_set`. Adding a
+`C*T+t ↔ T*C+c` transpose before setting **reverses** the correct layout.
+
+**The lesson:** ggml's dimension ordering is the reverse of numpy/PyTorch.
+A ggml tensor with `ne = {C, T}` stores data as `[c + t*C]` — identical
+to C row-major `float data[T][C]`. When your CPU array is `(T, C)` row-major,
+set it directly. Only transpose when the CPU array is `(C, T)` column-major.
+
+**Debugging method:** Manual conv in Python using GGUF weights (bypassing
+ggml) proved the weights were correct. Then stage-by-stage diff harness
+(`OV2_DUMP_DIR` + `ggml_set_output` on intermediate tensors) isolated the
+divergence to the first ggml op (conv_pre). The manual conv matched PyTorch
+at cos=1.0 while ggml gave cos=0.002 — proving the data layout was wrong.
+
+## F16 precision loss in deep WaveNet stacks (2026-06-04)
+
+Storing WaveNet weights as F16 causes accumulated precision loss through
+16 sequential layers. For enc_q: F16 gave z std=1.53 (should be 0.77),
+completely wrong latent values → silent HiFi-GAN output. Fix: store
+enc_q/flow/ref_enc weights as F32 in the GGUF (converter flag
+`is_sensitive`). Decoder weights can stay F16 (only 4 upsample stages,
+less accumulation).
+
+## Cohere flash-attn crossover (2026-06-04)
+
+flash_attn_ext wins on long sequences (O(n) vs O(n²)) but loses on
+short sequences due to higher per-op overhead. Cohere with 30s auto-chunking
+always hits the short-form case. Measured: flash +13% slower at 60s,
+-26% faster at 300s. Crossover between 1-5 min. Default flipped to
+cast-on-read for cohere; `CRISPASR_COHERE_FLASH=1` for unchunked long-form.
