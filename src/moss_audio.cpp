@@ -1559,10 +1559,37 @@ static std::vector<int32_t> moss_audio_build_prompt(
     ids.push_back(151644);
     push_text("user\n");
 
-    // <|audio_bos|> <|AUDIO|>×N <|audio_eos|>
+    // <|audio_bos|> <|AUDIO|>×N with time markers <|audio_eos|>
+    // Time markers: every 2 seconds (25 audio tokens at 12.5 Hz),
+    // insert the second count as digit token IDs (0→15, ..., 9→24).
     ids.push_back((int32_t)hp.audio_start_id);
-    for (int i = 0; i < n_audio_tokens; i++)
-        ids.push_back((int32_t)hp.audio_token_id);
+    {
+        const int tokens_per_marker = 25; // 12.5 Hz × 2 seconds
+        const int marker_interval = 2;    // seconds
+        int audio_consumed = 0;
+        float total_duration = (float)n_audio_tokens / 12.5f;
+        int num_full_seconds = (int)total_duration;
+
+        for (int sec = marker_interval; sec <= num_full_seconds; sec += marker_interval) {
+            int marker_pos = (sec / marker_interval) * tokens_per_marker;
+            int segment_len = marker_pos - audio_consumed;
+            for (int i = 0; i < segment_len && audio_consumed < n_audio_tokens; i++) {
+                ids.push_back((int32_t)hp.audio_token_id);
+                audio_consumed++;
+            }
+            // Insert digit tokens for the second count
+            // Digit token IDs: '0'→15, '1'→16, ..., '9'→24
+            std::string sec_str = std::to_string(sec);
+            for (char c : sec_str) {
+                ids.push_back((int32_t)(15 + (c - '0')));
+            }
+        }
+        // Remaining audio tokens after last marker
+        while (audio_consumed < n_audio_tokens) {
+            ids.push_back((int32_t)hp.audio_token_id);
+            audio_consumed++;
+        }
+    }
     ids.push_back((int32_t)hp.audio_end_id);
 
     push_text("\n");
@@ -1734,7 +1761,7 @@ extern "C" char* moss_audio_process(struct moss_audio_context* ctx, const float*
 
     // 7. Build pre-scattered DeepStack tensors
     // DIAGNOSTIC: try without deepstack to isolate the issue
-    bool skip_deepstack = true; // TODO: remove after debugging for per-layer injection.
+    bool skip_deepstack = false;
     //    For each of the 3 injection layers, we build a (d_llm, n_prompt)
     //    tensor that is zero everywhere except at audio-token positions,
     //    where it contains the projected deepstack embeddings. The LLM
