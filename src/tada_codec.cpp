@@ -473,6 +473,12 @@ static ggml_cgraph* build_decode_graph(tada_codec_context* c, int n_frames) {
         cur = ggml_norm(ctx0, cur, eps);
         cur = ggml_mul(ctx0, cur, l.ffn_norm_w);
         if (l.ffn_norm_b) cur = ggml_add(ctx0, cur, l.ffn_norm_b);
+
+        if (il == 0) {
+            ggml_tensor* d_l0 = ggml_cont(ctx0, cur);
+            ggml_set_name(d_l0, "dump_layer0");
+            ggml_build_forward_expand(gf, d_l0);
+        }
     }
 
     // Final norm
@@ -657,6 +663,7 @@ float* tada_codec_decode(struct tada_codec_context* ctx,
     };
     dump("dump_proj");
     dump("dump_attn");
+    dump("dump_layer0");
     dump("dump_dac_in");
     dump("dump_blk0");
     dump("dump_blk1");
