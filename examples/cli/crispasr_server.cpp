@@ -33,7 +33,9 @@
 
 #include "common-crispasr.h" // read_audio_data
 #include "crispasr_chat.h"   // /v1/chat/completions
+#include "crispasr_c2pa.h"
 #include "crispasr_tts_chunking.h"
+#include "crispasr_tts_disclaimer.h"
 #include "crispasr_watermark.h"
 #include "crispasr_wav_writer.h"
 #include "../server/httplib.h"
@@ -628,6 +630,8 @@ static std::string crispasr_encode_opus(const float* pcm, int n_samples, int sam
 int crispasr_run_server(whisper_params& params, const std::string& host, int port) {
     using namespace httplib;
 
+    crispasr_c2pa_startup_check();
+
     std::vector<std::string> api_keys = split_api_keys(params.server_api_keys);
     if (const char* env_keys = getenv("CRISPASR_API_KEYS")) {
         std::vector<std::string> more = split_api_keys(env_keys);
@@ -1149,7 +1153,31 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         std::string requested_model = body.value("model", "");
 
         std::string voice_name = body.value("voice", "");
+        std::string consent_attestation = body.value("consent_attestation", "");
         std::string instructions = body.value("instructions", "");
+
+        // Voice-cloning consent gate: when the voice is a .wav reference
+        // (voice cloning), require an explicit consent_attestation field.
+        const bool is_voice_clone = voice_name.size() >= 4 &&
+                                    (voice_name.compare(voice_name.size() - 4, 4, ".wav") == 0 ||
+                                     voice_name.compare(voice_name.size() - 4, 4, ".WAV") == 0);
+        if (is_voice_clone && consent_attestation.empty()) {
+            json_error(res, 400,
+                       "voice cloning requires a 'consent_attestation' field in the request body. "
+                       "This field should contain a statement attesting that you have the consent "
+                       "of the speaker whose voice is being cloned, or that it is your own voice. "
+                       "Example: {\"consent_attestation\": \"I have the speaker's consent\"}",
+                       "consent_required", "consent_attestation");
+            return;
+        }
+        if (is_voice_clone) {
+            auto now = std::chrono::system_clock::now();
+            auto t = std::chrono::system_clock::to_time_t(now);
+            char ts[64];
+            std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+            fprintf(stderr, "[CONSENT] ts=%s voice=%s attestation=\"%s\"\n",
+                    ts, voice_name.c_str(), consent_attestation.c_str());
+        }
         std::string response_format = body.value("response_format", std::string("wav"));
         if (response_format != "wav" && response_format != "pcm" && response_format != "f32" &&
             response_format != "mp3" && response_format != "opus") {
@@ -1285,6 +1313,15 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             std::vector<std::string> pcm_chunks;
             {
                 std::lock_guard<std::mutex> lock(model_mutex);
+                // Prepend disclaimer as first chunk for voice-clone streams
+                if (is_voice_clone) {
+                    const auto& disc = crispasr_tts_get_disclaimer(backend.get(), rp);
+                    if (!disc.empty()) {
+                        pcm_chunks.push_back(crispasr_make_pcm_int16_le(disc.data(), (int)disc.size()));
+                        pcm_chunks.push_back(
+                            std::string((const char*)silence_s16.data(), silence_s16.size() * sizeof(short)));
+                    }
+                }
                 for (size_t i = 0; i < sentences.size(); i++) {
                     std::vector<float> chunk = backend->synthesize(sentences[i], rp);
                     if (chunk.empty())
@@ -1357,6 +1394,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             return;
         }
 
+        // Prepend spoken AI-disclosure for voice-cloned requests.
+        if (is_voice_clone) {
+            crispasr_tts_prepend_disclaimer(pcm, backend.get(), rp);
+        }
+
         // Apply speed via linear-interpolation resampler. speed=1.0 is a
         // no-op. Quality loss vs a sinc resampler is minimal at modest
         // speeds (0.5x .. 2.0x) for speech; backends that grow native
@@ -1421,6 +1463,9 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
 #endif
         } else {
             std::string wav = crispasr_make_wav_int16(pcm.data(), (int)pcm.size(), sr_out);
+            // C2PA Content Credentials signing (when c2pa-c is available
+            // and --c2pa-cert / --c2pa-key are configured)
+            crispasr_c2pa_sign_wav(wav, params.c2pa_cert, params.c2pa_key);
             res.set_content(std::move(wav), "audio/wav");
         }
     });

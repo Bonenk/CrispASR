@@ -263,6 +263,20 @@ struct whisper_params {
     std::string tts_instruct; // VoiceDesign: natural-language voice description
     bool tts_trim_silence = false;
 
+    // C2PA (Content Credentials) signing — compile-time gated on
+    // CRISPASR_HAVE_C2PA. Paths to self-signed or CA-issued X.509 cert
+    // and key. Generate with: scripts/generate-c2pa-cert.sh
+    std::string c2pa_cert;
+    std::string c2pa_key;
+
+    // Voice-cloning consent gate (EU AI Act / deepfake disclosure).
+    // CLI: --i-have-rights sets this to true. Without it, voice cloning
+    // (--voice <file.wav>) is refused.
+    // Server: the request body must include a non-empty
+    // `consent_attestation` string when voice ends in .wav.
+    bool tts_voice_clone_consent = false;
+    std::string tts_consent_attestation;
+
     // Server mode: directory containing voice profiles for /v1/audio/speech.
     // Each profile is a sibling pair: <name>.wav + <name>.txt (the WAV is
     // the reference audio, the TXT is its transcription used by Qwen3-TTS

@@ -37,6 +37,8 @@
 #include "titanet.h"
 #include "speaker_db.h"
 
+#include "crispasr_c2pa.h"
+#include "crispasr_tts_disclaimer.h"
 #include "crispasr_watermark.h"
 #include "crispasr_wav_writer.h"
 #include "common-crispasr.h" // read_audio_data
@@ -1364,6 +1366,33 @@ int crispasr_run_backend(const whisper_params& params_in) {
             return 14;
         }
 
+        // Voice-cloning consent gate: if the voice is a .wav reference
+        // (i.e. voice cloning), require --i-have-rights attestation.
+        const bool is_voice_clone = !params.tts_voice.empty() &&
+                                    params.tts_voice.size() >= 4 &&
+                                    (params.tts_voice.compare(params.tts_voice.size() - 4, 4, ".wav") == 0 ||
+                                     params.tts_voice.compare(params.tts_voice.size() - 4, 4, ".WAV") == 0);
+        if (is_voice_clone && !params.tts_voice_clone_consent) {
+            fprintf(stderr,
+                    "crispasr: error: voice cloning requires the --i-have-rights flag.\n"
+                    "\n"
+                    "  By passing --i-have-rights you attest:\n"
+                    "  \"I have the consent of the speaker whose voice this clones,\n"
+                    "   or it is my own voice.\"\n"
+                    "\n"
+                    "  Usage: crispasr --tts \"text\" --voice speaker.wav --i-have-rights\n");
+            return 17;
+        }
+        if (is_voice_clone) {
+            // Log consent attestation with timestamp for audit trail
+            auto now = std::chrono::system_clock::now();
+            auto t = std::chrono::system_clock::to_time_t(now);
+            char ts[64];
+            std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+            fprintf(stderr, "[CONSENT] ts=%s voice=%s attestation=\"%s\"\n",
+                    ts, params.tts_voice.c_str(), params.tts_consent_attestation.c_str());
+        }
+
         auto audio = backend->synthesize(params.tts_text, params);
         if (audio.empty()) {
             fprintf(stderr, "crispasr: error: TTS synthesis failed\n");
@@ -1374,6 +1403,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // backends emit 24 kHz; voxcpm2-tts emits 48 kHz. Hard-coding 24 kHz
         // here is why voxcpm2 output played at half-speed before this fix.
         const int sr_in = backend->tts_sample_rate();
+
+        // Prepend spoken AI-disclosure for voice-cloned output. The
+        // disclaimer is synthesized with the neutral/default voice (not
+        // the cloned voice) and cached. 300ms silence gap.
+        if (is_voice_clone) {
+            crispasr_tts_prepend_disclaimer(audio, backend.get(), params);
+        }
 
         // Optional leading-silence trim. RMS gate over a 20 ms window;
         // drop frames below -50 dBFS (≈ 0.0032 RMS) until the gate
@@ -1408,6 +1444,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // AI-provenance metadata (ISFT, ICMT).
         std::string out_path = params.tts_output.empty() ? "tts_output.wav" : params.tts_output;
         std::string wav = crispasr_make_wav_int16(audio.data(), (int)audio.size(), sr_in);
+        // C2PA Content Credentials signing (when available + configured)
+        crispasr_c2pa_sign_wav(wav, params.c2pa_cert, params.c2pa_key);
         FILE* fout = fopen(out_path.c_str(), "wb");
         if (!fout) {
             fprintf(stderr, "crispasr: error: cannot write '%s'\n", out_path.c_str());

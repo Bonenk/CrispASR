@@ -538,6 +538,17 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.tts_voice_dir = ARGV_NEXT;
     } else if (arg == "--tts-max-input-chars") {
         params.tts_max_input_chars = std::stoi(ARGV_NEXT);
+    } else if (arg == "--c2pa-cert") {
+        params.c2pa_cert = ARGV_NEXT;
+    } else if (arg == "--c2pa-key") {
+        params.c2pa_key = ARGV_NEXT;
+    } else if (arg == "--i-have-rights") {
+        // Voice-cloning consent attestation. Required when --voice points
+        // to a .wav reference file (i.e. voice cloning). By passing this
+        // flag the user attests: "I have the consent of the speaker whose
+        // voice this clones, or it is my own voice."
+        params.tts_voice_clone_consent = true;
+        params.tts_consent_attestation = "CLI --i-have-rights flag";
     } else if (arg == "--cors-origin") {
         params.server_cors_origin = ARGV_NEXT;
     } else if (arg == "--chat-model") {
@@ -1018,6 +1029,9 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "                                                 (.wav → 1.5B WAV cloning; .gguf → voice pack)\n",
             params.tts_voice.c_str());
     fprintf(stderr,
+            "             --i-have-rights                    required for voice cloning (.wav); attests consent\n"
+            "                                                 of the cloned speaker or that it is your own voice\n");
+    fprintf(stderr,
             "             --ref-text \"TEXT\"        reference transcription (qwen3-tts/f5-tts; auto-transcribed "
             "if omitted)\n");
     fprintf(stderr, "             --ref-asr BACKEND       [%-7s] ASR backend for auto-transcribing ref audio\n",
@@ -1034,6 +1048,10 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "             --tts-max-input-chars N  [%-7d] server: cap on /v1/audio/speech `input` "
             "length (0 = no cap)\n",
             params.tts_max_input_chars);
+    fprintf(stderr,
+            "             --c2pa-cert PATH                 X.509 cert for C2PA Content Credentials signing\n"
+            "             --c2pa-key PATH                  private key for C2PA signing "
+            "(generate both with scripts/generate-c2pa-cert.sh)\n");
     fprintf(stderr, "             --cors-origin ORIGIN     server: opt-in CORS for browser clients "
                     "('*' for any, or scheme://host[:port])\n");
     fprintf(stderr, "             --chat-model PATH        server: enable POST /v1/chat/completions backed by "

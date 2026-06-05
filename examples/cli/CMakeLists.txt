@@ -342,6 +342,18 @@ else()
     message(STATUS "Opus output disabled (libopus-dev not found)")
 endif()
 
+# Optional C2PA Content Credentials signing (c2pa-c library)
+find_library(C2PA_LIBRARY NAMES c2pa)
+find_path(C2PA_INCLUDE_DIR NAMES c2pa.h c2pa/c2pa.h)
+if (C2PA_LIBRARY AND C2PA_INCLUDE_DIR)
+    target_link_libraries(${TARGET} PRIVATE ${C2PA_LIBRARY})
+    target_include_directories(${TARGET} PRIVATE ${C2PA_INCLUDE_DIR})
+    target_compile_definitions(${TARGET} PRIVATE CRISPASR_HAVE_C2PA=1)
+    message(STATUS "C2PA signing enabled (c2pa-c)")
+else()
+    message(STATUS "C2PA signing disabled (c2pa-c not found; install from github.com/contentauth/c2pa-c)")
+endif()
+
 install(TARGETS ${TARGET} RUNTIME BUNDLE DESTINATION bin)
 
 # ---------------------------------------------------------------------------
