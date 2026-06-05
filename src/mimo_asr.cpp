@@ -342,28 +342,24 @@ extern "C" struct mimo_asr_context* mimo_asr_init_from_file(const char* path_mod
     // HISTORY §56 reference (prefill 15.8 s, decode 7.0 s over 26
     // steps). Force-CPU is the cheapest path to correctness; the
     // proper GPU graph fix is tracked as PLAN #115 option C and
-    // belongs in `mimo_asr_build_prefill_graph`.
-    // PLAN #115 option C diagnostic. Default is force-CPU (option A,
-    // verified correct on M1 Metal + Kaggle CPU). Setting
-    // CRISPASR_MIMO_FORCE_GPU=1 (with --gpu) re-enables the GPU-resident
-    // weights + GPU compute config (the `89111260` path) so the silent-empty
-    // bug can be reproduced and localised stage-by-stage on a Kaggle GPU box
-    // (the local M1 can't hold the 4.2 GB model). When this opt-in is OFF the
-    // behaviour is unchanged.
-    const bool force_gpu = params.use_gpu && std::getenv("CRISPASR_MIMO_FORCE_GPU") != nullptr;
-    if (force_gpu) {
+    // GPU default (PLAN #115 option B, validated on RTX 3090 + Kaggle P100).
+    // When use_gpu is true, weights are split: matmul weights on GPU, Q4_K
+    // embed tables on CPU (CUDA GET_ROWS doesn't support k-quants). Decode
+    // steps run via the prefill graph which handles cross-backend routing.
+    // Set CRISPASR_MIMO_FORCE_CPU=1 to override back to CPU-only.
+    const bool force_cpu = std::getenv("CRISPASR_MIMO_FORCE_CPU") != nullptr;
+    if (params.use_gpu && !force_cpu) {
         ctx->backend = ggml_backend_init_best();
         if (!ctx->backend) {
             fprintf(stderr, "mimo_asr: GPU backend init failed; falling back to CPU\n");
             ctx->backend = ctx->backend_cpu;
         } else if (params.verbosity >= 1) {
-            fprintf(stderr,
-                    "mimo_asr: CRISPASR_MIMO_FORCE_GPU=1 — weights + compute on GPU (PLAN #115 option C diag)\n");
+            fprintf(stderr, "mimo_asr: GPU backend active (embed split-load, decode via prefill graph)\n");
         }
     } else {
         ctx->backend = ctx->backend_cpu;
-        if (params.use_gpu && params.verbosity >= 1) {
-            fprintf(stderr, "mimo_asr: --gpu honored as CPU (PLAN #115 — set CRISPASR_MIMO_FORCE_GPU=1 to test GPU)\n");
+        if (force_cpu && params.verbosity >= 1) {
+            fprintf(stderr, "mimo_asr: CRISPASR_MIMO_FORCE_CPU=1 — forced CPU\n");
         }
     }
     // PLAN #69a: when CRISPASR_N_GPU_LAYERS is set and < total LLM
@@ -387,7 +383,7 @@ extern "C" struct mimo_asr_context* mimo_asr_init_from_file(const char* path_mod
             return nullptr;
         }
         fprintf(stderr, "mimo_asr: layer offload requested but pinned to CPU (PLAN #115 — GPU path broken)\n");
-    } else if (force_gpu) {
+    } else if (ctx->backend && ctx->backend != ctx->backend_cpu) {
         // PLAN #115 option C: CUDA's get_rows cannot gather Q4_K (ggml-cuda
         // GET_ROWS supports_op lists F16/F32/Q4_0/Q5_0/Q8_0 — NOT Q4_K), and
         // mimo's `llm.embed.weight` + `audio.emb.*` are Q4_K. If those sit on
