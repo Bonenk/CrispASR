@@ -750,7 +750,11 @@ static ggml_cgraph* build_pred_head_graph(kugelaudio_context* ctx, int n_frames)
         fprintf(stderr, "pred: L%d after swiglu OK\n", i);
 
         // gate * ffn + residual
+        fprintf(stderr, "pred: L%d gate_mul h=[%lld,%lld,%lld,%lld] gate=[%lld,%lld,%lld,%lld]\n", i,
+                (long long)h->ne[0],(long long)h->ne[1],(long long)h->ne[2],(long long)h->ne[3],
+                (long long)gate->ne[0],(long long)gate->ne[1],(long long)gate->ne[2],(long long)gate->ne[3]);
         h = ggml_mul(ctx0, h, gate);
+        fprintf(stderr, "pred: L%d gate_mul OK\n", i);
         x = ggml_add(ctx0, x, h);
     }
 
