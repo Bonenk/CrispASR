@@ -545,11 +545,12 @@ static std::vector<int32_t> tokenize_text_greedy(const kugelaudio_model& m, cons
 // ── ConvRMSNorm: transpose → rms_norm → mul(weight) → transpose ───────────
 
 static ggml_tensor* build_conv_rms_norm(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* w, float eps = 1e-5f) {
-    // x: [C, T] → transpose to [T, C] → rms_norm → mul(w) → transpose back
-    ggml_tensor* xt = ggml_cont(ctx0, ggml_transpose(ctx0, x)); // [T, C]
-    xt = ggml_rms_norm(ctx0, xt, eps);
-    xt = ggml_mul(ctx0, xt, w); // w broadcasts [C] over [T, C]
-    return ggml_cont(ctx0, ggml_transpose(ctx0, xt)); // [C, T]
+    // x: [C, T], w: [C]. ggml_rms_norm normalizes over ne[0]=C. OK.
+    // ggml_mul(x=[C,T], w=[C]): w broadcasts over T. OK.
+    // No transpose needed — ggml_rms_norm over ne[0] is what ConvRMSNorm does.
+    x = ggml_rms_norm(ctx0, x, eps);
+    if (w) x = ggml_mul(ctx0, x, w);
+    return x;
 }
 
 // ── Causal Conv1d ──────────────────────────────────────────────────────────
