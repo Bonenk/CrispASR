@@ -4486,6 +4486,21 @@ extern "C" void vibevoice_result_free(struct vibevoice_result* r) {
     free(r);
 }
 
+extern "C" bool vibevoice_has_asr(const struct vibevoice_context* ctx) {
+    if (!ctx)
+        return false;
+    bool has_at = false, has_st = false;
+    for (const auto& kv : ctx->model.tensors) {
+        if (!has_at && kv.first.rfind("at_enc.", 0) == 0)
+            has_at = true;
+        if (!has_st && kv.first.rfind("st_enc.", 0) == 0)
+            has_st = true;
+        if (has_at && has_st)
+            break;
+    }
+    return has_at && has_st;
+}
+
 extern "C" const char* vibevoice_token_text(struct vibevoice_context* ctx, int id) {
     if (!ctx || id < 0 || id >= (int)ctx->model.vocab.size())
         return "";

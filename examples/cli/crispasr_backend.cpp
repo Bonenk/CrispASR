@@ -18,6 +18,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_qwen3_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_fastconformer_ctc_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_wav2vec2_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_vibevoice_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_vibevoice_tts_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_vibevoice_1p5b_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_kugelaudio_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_qwen3_tts_backend();
@@ -95,8 +96,10 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_fastconformer_ctc_backend();
     if (name == "wav2vec2" || name == "hubert" || name == "data2vec")
         return crispasr_make_wav2vec2_backend();
-    if (name == "vibevoice" || name == "vibevoice-tts")
+    if (name == "vibevoice")
         return crispasr_make_vibevoice_backend();
+    if (name == "vibevoice-tts")
+        return crispasr_make_vibevoice_tts_backend();
     if (name == "kugelaudio" || name == "kugelaudio-tts" || name == "kugelaudio-0-open")
         return crispasr_make_kugelaudio_backend();
     if (name == "vibevoice-1.5b" || name == "vibevoice-tts-1.5b" || name == "vibevoice-tts-base")
