@@ -9318,3 +9318,34 @@ F32 operands.
 **Recommended deployment:** MeloTTS F16 (102 MB) + BERT Q4_K (52 MB) =
 **154 MB total**. All three BERT quants (F16/Q8/Q4K) uploaded to
 `cstr/melotts-en-v2-GGUF`. Registry companion points to Q4_K by default.
+
+## AudioSeal ggml port — ggml_pad_ext convention trap
+
+**The bug:** `ggml_pad_ext(ctx, x, lp0, rp0, ...)` has **reversed
+parameter semantics**: `lp0` is actually RIGHT padding of dim 0, `rp0`
+is LEFT padding. Only surfaces when padding is asymmetric (AudioSeal's
+ratio=5 downsample: K=10, stride=5 → pad_left=2, pad_right=3). With
+wrong convention, all subsequent encoder stages diverged (cos=1.0 →
+cos=0.36 at the first asymmetric layer).
+
+**How found:** Stage-by-stage binary dump comparison against PyTorch.
+Every layer before the asymmetric padding was cos=1.0. Swapping the
+`lp0`/`rp0` arguments immediately restored cos=1.0.
+
+**Decoder too:** `ggml_view_2d` crop offset for ConvTranspose1d output
+uses `pad_right * sizeof(float)` (not `pad_left`) because dim 0's
+start is at the "right" end in ggml's reversed convention.
+
+**Lesson:** Never trust parameter names in low-level tensor libraries.
+Always verify with a concrete asymmetric test case. The `ggml_pad()`
+wrapper masks the issue because it calls `ggml_pad_ext(ctx, a, 0, p0,
+...)` — passing right-pad as `rp0`, which is actually the LEFT slot.
+
+**LSTM unrolling:** Proper recurrent LSTM works in ggml by unrolling at
+graph construction. 50 steps × 12 ops × 2 layers = ~1200 nodes. Initial
+state via `ggml_scale(x[:,0], 0)`. Outputs concatenated via
+`ggml_concat(dim=1)`. Graph size must be ≥8192 (default 2048 insufficient).
+
+**F16 vs F32 red herring:** Weight quantization made zero difference to
+parity (both cos=1.0). When debugging divergence, always check runtime
+logic first — quantization error is almost never the cause.

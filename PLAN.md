@@ -4975,32 +4975,44 @@ disclosure and consent. This plan covers all five layers.
 - CLI flags: `--c2pa-cert`, `--c2pa-key`
 - Compile-time gated on `CRISPASR_HAVE_C2PA`; no-op + startup warning when absent
 
-### Phase 5: AudioSeal ggml port ✅ CODE MERGED, ⚠️ VALIDATION IN PROGRESS
+### Phase 5: AudioSeal ggml port ✅ COMPLETE — 100% cosine parity
 
 **What:** Meta AudioSeal (MIT) neural watermark — more robust than spread-spectrum
 against adversarial removal, lossy compression, time-stretching.
 
-**Shipped (5468ef0f):**
+**Parity metrics (16000 samples, F32 weights, verified 2026-06-06):**
+- Full output cosine:    **1.000000**
+- Watermark-only cosine: **1.000000**
+- Max absolute error:    0.000302
+- Watermark RMS ratio:   0.999
+
+**Shipped:**
 - `src/audioseal.h` / `src/audioseal.cpp`: ggml implementation of SEANet
   encoder-decoder. Generator embeds watermark; detector returns per-frame
   probability + decoded 16-bit message. C API: `audioseal_embed()`,
-  `audioseal_detect()`, `audioseal_init_from_file()`.
+  `audioseal_detect()`, `audioseal_embed_stage()`, `audioseal_init_from_file()`.
 - `models/convert-audioseal-to-gguf.py`: loads via `audioseal` package,
-  remaps state_dict keys, writes 113 tensors (44.6 MB combined GGUF).
-  Verified against live `facebook/audioseal` checkpoint.
-- `tools/reference_backends/audioseal_ref.py`: reference dump script for
-  `crispasr-diff audioseal` validation.
+  remaps state_dict keys, writes 113 tensors. F32 default (89 MB), `--f16`
+  for smaller (44.6 MB). Verified against live `facebook/audioseal`.
+- `tools/reference_backends/audioseal_ref.py`: reference dump script.
+- `tests/test_audioseal.cpp`: 10 unit + 3 live tests (53 total across suites).
+- `tests/test_audioseal_cosine.cpp`: standalone cosine comparison binary.
 - `--watermark-model` CLI flag to load AudioSeal GGUF as upgrade path.
+- Debug: `AUDIOSEAL_DEBUG=1` for shape traces, `AUDIOSEAL_DUMP_STAGES=1`
+  for per-stage binary dumps to `/tmp/`.
 
-**Known gaps (blocking production):**
-- **LSTM**: 2-layer bidirectional LSTM currently approximated as linear
-  projection + tanh. Needs proper gate computation (input/forget/cell/output)
-  with sequential time-step unrolling. This is the main parity blocker.
-- **Conv1d padding**: SEANet uses `constant` padding with `pad = (k-1)/2`.
-  Need to verify ggml `ggml_conv_1d` padding semantics match PyTorch exactly.
-- **Diff harness**: `crispasr-diff audioseal` mode not yet wired into
-  `crispasr_diff_main.cpp`. Once added, each stage can be compared against
-  `audioseal_ref.py` dumps.
+**Key implementation details:**
+- LSTM: proper recurrent gate computation with time-step unrolling
+  (~12 ops/step × 50 steps × 2 layers). Zero initial state via
+  `ggml_scale(x[:,0], 0)`. Outputs concatenated via `ggml_concat`.
+- Padding: all encoder downsampling uses `ggml_pad_ext` for external
+  padding (PyTorch F.pad semantics). NOTE: `ggml_pad_ext` has reversed
+  parameter convention — `lp0` = RIGHT padding, `rp0` = LEFT padding.
+- Decoder: ConvTranspose1d with manual output crop matching PyTorch's
+  padding removal. Crop offset also uses the reversed convention.
+- Message: `nn.Embedding(32, 128)` via `ggml_get_rows` + `ggml_sum_rows`,
+  broadcast via `ggml_repeat`.
+- Graph size: 8192 nodes (default 2048 insufficient for full model).
 
 **Architecture (verified against live model 2026-06-05):**
 
