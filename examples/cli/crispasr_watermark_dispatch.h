@@ -35,8 +35,9 @@ inline bool init(const std::string& model_path) {
     params.verbosity = 1;
     get_ctx() = audioseal_init_from_file(model_path.c_str(), params);
     if (!get_ctx()) {
-        fprintf(stderr, "crispasr: warning: could not load AudioSeal model '%s'; "
-                        "falling back to spread-spectrum watermark\n",
+        fprintf(stderr,
+                "crispasr: warning: could not load AudioSeal model '%s'; "
+                "falling back to spread-spectrum watermark\n",
                 model_path.c_str());
         return false;
     }
@@ -135,7 +136,8 @@ inline float detect(const float* pcm, int n_samples, int sample_rate = 24000) {
             std::free(probs);
             return (float)avg;
         }
-        if (probs) std::free(probs);
+        if (probs)
+            std::free(probs);
     }
     // Fallback: spread-spectrum
     return crispasr_watermark_detect_impl(pcm, n_samples);

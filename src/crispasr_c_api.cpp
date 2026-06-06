@@ -689,12 +689,14 @@ CA_EXPORT float crispasr_watermark_detect(const float* pcm, int n_samples) {
         float* probs = audioseal_detect(g_audioseal_ctx, pcm, n_samples, &n_frames, nullptr);
         if (probs && n_frames > 0) {
             double avg = 0.0;
-            for (int i = 0; i < n_frames; i++) avg += probs[i];
+            for (int i = 0; i < n_frames; i++)
+                avg += probs[i];
             avg /= (double)n_frames;
             free(probs);
             return (float)avg;
         }
-        if (probs) free(probs);
+        if (probs)
+            free(probs);
     }
     return ::crispasr_watermark_detect_impl(pcm, n_samples);
 }
