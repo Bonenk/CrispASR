@@ -6,9 +6,13 @@
 #include "core/g2p_de.h"
 #include "core/g2p_fr.h"
 #include "core/g2p_es.h"
-// Auto-download support — only available when linked with crispasr-lib
-#ifdef CRISPASR_HAS_CACHE
+// Auto-download support. crispasr_cache.h is available when compiled as
+// part of crispasr-lib (the full binary). When compiled standalone (unit
+// tests), the header isn't available — auto-download is skipped and dicts
+// load from local cache or env vars only.
+#if __has_include("crispasr_cache.h")
 #include "crispasr_cache.h"
+#define CRISPASR_HAS_CACHE 1
 #endif
 
 // OLaPh (MIT) and open-dict-data (CC-BY-SA) URL templates.
@@ -22,21 +26,23 @@ struct g2p_dict_urls {
     const char* opendict_url;
 };
 
+// Primary: HuggingFace cstr/g2p-dicts (fast CDN, our curated copy)
+// Fallback: original sources (OLaPh GitHub / open-dict-data GitHub)
 static const g2p_dict_urls G2P_URLS_DE = {
     "olaph_de.txt",
-    "https://raw.githubusercontent.com/iisys-hof/olaph/main/src/olaph/dictionaries/de/de.txt",
+    "https://huggingface.co/datasets/cstr/g2p-dicts/resolve/main/olaph_de.txt",
     "ipa_dict_de.txt",
     "https://raw.githubusercontent.com/open-dict-data/ipa-dict/refs/heads/master/data/de.txt",
 };
 static const g2p_dict_urls G2P_URLS_FR = {
     "olaph_fr.txt",
-    "https://raw.githubusercontent.com/iisys-hof/olaph/main/src/olaph/dictionaries/fr/fr.txt",
+    "https://huggingface.co/datasets/cstr/g2p-dicts/resolve/main/olaph_fr.txt",
     "ipa_dict_fr.txt",
     "https://raw.githubusercontent.com/open-dict-data/ipa-dict/refs/heads/master/data/fr.txt",
 };
 static const g2p_dict_urls G2P_URLS_ES = {
     "olaph_es.txt",
-    "https://raw.githubusercontent.com/iisys-hof/olaph/main/src/olaph/dictionaries/es/es.txt",
+    "https://huggingface.co/datasets/cstr/g2p-dicts/resolve/main/olaph_es.txt",
     "ipa_dict_es.txt",
     "https://raw.githubusercontent.com/open-dict-data/ipa-dict/refs/heads/master/data/es.txt",
 };
@@ -51,7 +57,6 @@ static const g2p_dict_urls G2P_URLS_NL = {
     nullptr, nullptr,
 };
 static const g2p_dict_urls G2P_URLS_PT = {
-    // OLaPh doesn't have Portuguese yet; open-dict-data does
     nullptr, nullptr,
     "ipa_dict_pt.txt",
     "https://raw.githubusercontent.com/open-dict-data/ipa-dict/refs/heads/master/data/pt.txt",

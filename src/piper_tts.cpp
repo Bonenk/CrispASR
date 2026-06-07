@@ -25,6 +25,7 @@
 #include "core/conv.h"
 #include "core/g2p_en.h"
 #include "core/gguf_loader.h"
+#include "crispasr_cache.h"
 
 #include <algorithm>
 #include <cassert>
@@ -291,6 +292,26 @@ static std::mutex g_g2p_mu;
 static g2p_en::context g_g2p_ctx;
 static bool g_g2p_tried = false;
 
+static void g2p_ensure_cmudict() {
+    if (g_g2p_ctx.dict.loaded) return;
+    // 1. Env var
+    const char* env = getenv("CRISPASR_CMUDICT_PATH");
+    if (env && *env && g2p_en::load_cmudict_file(g_g2p_ctx.dict, env) > 0) return;
+    // 2. Local cache
+    const char* home = getenv("HOME");
+    if (!home) home = getenv("USERPROFILE");
+    if (home) {
+        std::string base = std::string(home) + "/.cache/crispasr/";
+        if (g2p_en::load_cmudict_file(g_g2p_ctx.dict, base + "cmudict.dict") > 0) return;
+    }
+    // 3. Auto-download from HuggingFace
+    std::string path = crispasr_cache::ensure_cached_file(
+        "cmudict.dict",
+        "https://huggingface.co/datasets/cstr/g2p-dicts/resolve/main/cmudict.dict",
+        /*quiet=*/true, "crispasr", "");
+    if (!path.empty()) g2p_en::load_cmudict_file(g_g2p_ctx.dict, path);
+}
+
 static bool phonemize_builtin(const std::string& voice, const std::string& text, std::string& out) {
     // Only English for now
     if (!voice.empty() && voice.find("en") == std::string::npos)
@@ -299,18 +320,9 @@ static bool phonemize_builtin(const std::string& voice, const std::string& text,
         std::lock_guard<std::mutex> g(g_g2p_mu);
         if (!g_g2p_tried) {
             g_g2p_tried = true;
-            // Try to load CMUdict from common locations
-            const char* env = getenv("CRISPASR_CMUDICT_PATH");
-            if (env && *env) {
-                g2p_en::load_cmudict_file(g_g2p_ctx.dict, env);
-            }
-            if (!g_g2p_ctx.dict.loaded) {
-                const char* home = getenv("HOME");
-                if (!home) home = getenv("USERPROFILE");
-                if (home) {
-                    std::string p = std::string(home) + "/.cache/crispasr/cmudict.dict";
-                    g2p_en::load_cmudict_file(g_g2p_ctx.dict, p);
-                }
+            g2p_ensure_cmudict();
+            if (g_g2p_ctx.dict.loaded) {
+                fprintf(stderr, "piper_tts: CMUdict loaded (%zu entries)\n", g_g2p_ctx.dict.entries.size());
             }
         }
     }
