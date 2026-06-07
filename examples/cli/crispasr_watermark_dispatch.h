@@ -54,7 +54,11 @@ inline void shutdown() {
 // Embed watermark into float32 PCM. Modifies in-place.
 // If AudioSeal is loaded, resamples to 16kHz if needed, embeds, and
 // resamples back. Otherwise uses spread-spectrum.
+// Set CRISPASR_NO_WATERMARK=1 to disable (debug only).
 inline void embed(float* pcm, int n_samples, int sample_rate = 24000) {
+    if (std::getenv("CRISPASR_NO_WATERMARK")) {
+        return; // debug: skip watermarking entirely
+    }
     if (get_ctx()) {
         // AudioSeal operates at 16 kHz. If audio is at a different rate,
         // resample down, embed, resample back.
