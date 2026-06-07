@@ -1168,6 +1168,37 @@ target_include_directories(test-piper-tts PRIVATE
 )
 target_link_libraries(test-piper-tts PRIVATE piper-tts)
 
+# ─── test-espeak-phonemize — Catch2 tests for espeak-ng phonemization ───────
+# Tests espeak availability, piper text/IPA synthesis, input validation.
+# Requires PIPER_TEST_MODEL env var or -DPIPER_TEST_MODEL=... for live tests.
+add_executable(test-espeak-phonemize test-espeak-phonemize.cpp)
+target_include_directories(test-espeak-phonemize PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(test-espeak-phonemize PRIVATE
+    Catch2::Catch2WithMain
+    piper-tts
+)
+catch_discover_tests(test-espeak-phonemize
+    EXTRA_ARGS --colour-mode ansi
+    PROPERTIES LABELS "espeak;piper;tts"
+    PROPERTIES TIMEOUT 120
+)
+
+# ─── test-piper-roundtrip — live TTS→ASR integration test ───────────────────
+# Synthesizes text with piper, transcribes with whisper, checks output.
+if(TARGET crispasr-cli)
+add_test(NAME test-piper-roundtrip
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-piper-roundtrip.sh
+            $<TARGET_FILE:crispasr-cli>
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-piper-roundtrip PROPERTIES
+    LABELS "live;tts;piper;espeak;roundtrip"
+    TIMEOUT 300)
+endif()
+
 # ─── test-progress-output — live test: -pp/--print-progress emits per-slice
 # progress on stderr for unified backends (issue #130).
 add_test(NAME test-progress-output
