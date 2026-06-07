@@ -3,6 +3,7 @@
 #include "phonemizer.h"
 #include "espeak_dlopen.h"
 #include "core/g2p_en.h"
+#include "core/g2p_de.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -65,6 +66,40 @@ bool phonemize_builtin_en(const std::string& lang, const std::string& text, std:
         ensure_cmudict_loaded();
     }
     out = g2p_en::text_to_ipa(g_g2p_ctx, text);
+    return !out.empty();
+}
+
+// ── Built-in German G2P (LTS rules + optional IPA dictionary) ────────
+
+static g2p_de::context g_g2p_de_ctx;
+static std::mutex g_g2p_de_mu;
+static bool g_g2p_de_tried = false;
+
+static void ensure_de_dict_loaded() {
+    if (g_g2p_de_ctx.dict.loaded || g_g2p_de_tried) return;
+    g_g2p_de_tried = true;
+    const char* env = std::getenv("CRISPASR_DE_DICT_PATH");
+    if (env && *env) {
+        int n = g2p_de::load_ipa_dict_file(g_g2p_de_ctx.dict, env);
+        if (n > 0) { fprintf(stderr, "g2p: loaded German IPA dict (%d entries) from %s\n", n, env); return; }
+    }
+    const char* home = std::getenv("HOME");
+    if (!home) home = std::getenv("USERPROFILE");
+    if (home) {
+        std::string p = std::string(home) + "/.cache/crispasr/ipa_dict_de.txt";
+        int n = g2p_de::load_ipa_dict_file(g_g2p_de_ctx.dict, p);
+        if (n > 0) fprintf(stderr, "g2p: loaded German IPA dict (%d entries) from %s\n", n, p.c_str());
+    }
+}
+
+bool phonemize_builtin_de(const std::string& lang, const std::string& text, std::string& out) {
+    if (!lang.empty() && lang.find("de") == std::string::npos)
+        return false;
+    {
+        std::lock_guard<std::mutex> g(g_g2p_de_mu);
+        ensure_de_dict_loaded();
+    }
+    out = g2p_de::text_to_ipa(g_g2p_de_ctx, text);
     return !out.empty();
 }
 
