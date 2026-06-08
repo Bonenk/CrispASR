@@ -54,6 +54,22 @@ on RX 7900 XTX. Documented optimization approaches in PLAN.md.
 
 ### §115 mimo-asr GPU — CLOSED (from previous session, committed here)
 
+### §52 O15 — CONFIRMED BROKEN on CUDA
+Kernel v4 on P100: O15=OFF works (27.3 ms/frame, ASR OK), O15=ON crashes
+(rc=-6, CUDA error). Cross-architecture (sm_60 + sm_87). Stays default OFF.
+
+### CI fixes — 20 failures → 0
+- piper_tts.cpp: `crispasr_cache::ensure_cached_file` link error — guarded
+  behind `#ifdef CRISPASR_BUILD` + added define to CMake
+- clang-format-18: g2p_en.h, ipa_convert.h, piper_tts.cpp
+- bark-small: missing voice_preset in regression manifest
+
+### Kaggle harness HF token fix
+Kaggle changed dataset mount from `/kaggle/input/<slug>/` to
+`/kaggle/input/datasets/<owner>/<slug>/`. Fixed `kaggle_token_from_dataset()`
+to scan both roots. Also fixed kernel-metadata.json boolean→string.
+**Confirmed working:** v6 kernel log shows token loaded from new path.
+
 ## Build
 
 ```bash
@@ -61,15 +77,22 @@ cd /mnt/volume1/CrispASR
 cmake --build build --target crispasr-cli -j$(nproc)
 ```
 
-## Kaggle kernels in flight
+## Kaggle kernels
 
 ```bash
-PYTHONPATH=/tmp/kaggle_pkg python3 -m kaggle kernels status ${KAGGLE_ACCOUNT}/crispasr-qwen3-tts-o15-cuda
-PYTHONPATH=/tmp/kaggle_pkg python3 -m kaggle kernels status ${KAGGLE_ACCOUNT}/crispasr-zonos-tts-gpu-test
-
-# Fetch output:
-PYTHONPATH=/tmp/kaggle_pkg python3 -m kaggle kernels output ${KAGGLE_ACCOUNT}/crispasr-qwen3-tts-o15-cuda -p /tmp/o15-results
+# kernels status endpoint returns 500 — use kernels_output instead:
 PYTHONPATH=/tmp/kaggle_pkg python3 -m kaggle kernels output ${KAGGLE_ACCOUNT}/crispasr-zonos-tts-gpu-test -p /tmp/zonos-results
+PYTHONPATH=/tmp/kaggle_pkg python3 -m kaggle kernels output ${KAGGLE_ACCOUNT}/crispasr-zonos-diff -p /tmp/zonos-diff-results
+
+# Max 2 concurrent GPU sessions. Check running:
+PYTHONPATH=/tmp/kaggle_pkg python3 -c "
+import json
+from kaggle.api.kaggle_api_extended import KaggleApi
+api = KaggleApi(); api.authenticate()
+for r in api.kernels_list(user='${KAGGLE_ACCOUNT}', page_size=5):
+    d = json.loads(str(r))
+    print(d.get('ref'), d.get('lastRunTime'))
+"
 ```
 
 ## Key paths
@@ -85,15 +108,23 @@ PYTHONPATH=/tmp/kaggle_pkg python3 -m kaggle kernels output ${KAGGLE_ACCOUNT}/cr
 | Zonos converter | `models/convert-zonos-to-gguf.py` |
 | Zonos reference | `tools/reference_backends/zonos_tts_reference.py` |
 | Zonos CLI adapter | `examples/cli/crispasr_backend_zonos.cpp` |
-| O15 kernel | `tools/kaggle/qwen3-tts-o15-cuda/` |
-| Zonos kernel | `tools/kaggle/zonos-tts-gpu-test/` |
+| O15 kernel (done) | `tools/kaggle/qwen3-tts-o15-cuda/` |
+| Zonos test kernel | `tools/kaggle/zonos-tts-gpu-test/` |
+| Zonos diff kernel | `tools/kaggle/zonos-diff/` |
+| Kaggle harness | `tools/kaggle/kaggle_harness.py` |
 | PLAN | `PLAN.md` (§52, §130, §155) |
 | HISTORY | `HISTORY.md` (2026-06-08 entries) |
 
 ## What's next
 
-1. **Check O15 v4 results** — if PASS, flip default to ON in qwen3_tts.cpp.
-2. **Check Zonos kernel results** — if audio produced, verify ASR roundtrip.
-3. **Zonos speaker encoder** — port ResNet293 or accept pre-computed embeddings.
-4. **§155 optimization** — tiled conv_transpose_1d kernel or CPU-fallback policy.
-5. **§58 MOSS-Audio** — next large backend in queue.
+1. **Check Zonos v6 kernel** — has en-us fix + harness HF token fix.
+   If ASR still hallucinates, the diff kernel is the next step.
+2. **Zonos diff harness** — `tools/kaggle/zonos-diff/` kernel compares
+   Python reference vs C++ stage-by-stage. Push when GPU slot opens.
+3. **Zonos quality**: the `cb0 argmax=110` being identical across all
+   conditioning variants suggests the backbone may not be routing the
+   prefix conditioning through the KV cache correctly. Diff harness
+   will pinpoint where.
+4. **Zonos speaker encoder** — ResNet293 port or pre-computed embeddings.
+5. **§155 optimization** — tiled conv_transpose_1d kernel.
+6. **§58 MOSS-Audio** — next large backend.

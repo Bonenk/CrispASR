@@ -51,6 +51,38 @@ fread tensor loop + per-graph `gallocr` to `core_gguf::open_metadata` +
 `core_gguf::load_weights` (mmap) + `ggml_backend_sched`. Added `use_gpu`
 to both init params, wired via `g_open_use_gpu_tls` in C API.
 
+**§130 Zonos TTS — DAC decoder + end-to-end pipeline.** Major progress:
+- DAC decoder graph-building in `core/dac_decoder.h`: Snake1d, Conv1d,
+  ConvTranspose1d (via `core_convt::convt1d_crop`), ResidualUnit,
+  DecoderBlock, full `build_decode_graph`. 104 MB GGUF converted +
+  uploaded to `cstr/dac-44khz-GGUF`.
+- DAC wired into `zonos_tts_synthesize` (lazy load, replaces sine
+  placeholder). Fixed `ggml_view_2d` crash in ConvTranspose1d crop.
+- **Bug found: language_id off by one** — default 25 mapped to Esperanto
+  (eo) instead of en-us (index 24). espeak-ng phonemized in Esperanto,
+  producing wrong IPA. Fixed with name-based lookup at init + handle
+  "auto" language code.
+- Pre-computed JFK speaker embedding uploaded to HF.
+- Kaggle test kernel v2-v6 iterated through bugs. v6 running with
+  correct language + harness fix. DAC decoder runs without crash.
+  ASR roundtrip pending proper validation.
+
+**§155 CONV_TRANSPOSE_1D optimization** added to PLAN. Crash fixed
+(`f8fc8b8e`), kernel still 3× slower than CPU fallback for TTS codec.
+
+**CI fixes (20 platform failures → 0):**
+- `piper_tts.cpp` linked `crispasr_cache::ensure_cached_file` but
+  `libpiper-tts.a` doesn't link `crispasr_cache.o`. Guarded behind
+  `#ifdef CRISPASR_BUILD` + added define to CMakeLists.
+- `g2p_en.h`, `ipa_convert.h`, `piper_tts.cpp` clang-format-18 fixes.
+- `bark-small` missing `voice_preset` in regression manifest.
+
+**Kaggle harness HF token fix.** Kaggle changed the dataset mount path
+from `/kaggle/input/<slug>/` to `/kaggle/input/datasets/<owner>/<slug>/`.
+Updated `kaggle_token_from_dataset()` in `kaggle_harness.py` to scan
+both roots + added debug logging. Also fixed `kernel-metadata.json` to
+use string `"true"` instead of boolean `true` (matching working kernels).
+
 ---
 
 ## 2026-06-07 → 2026-06-08 Piper ASR roundtrip fix + permissive G2P phonemizer (§156)
