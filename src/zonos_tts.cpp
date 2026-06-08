@@ -417,7 +417,9 @@ struct zonos_tts_context* zonos_tts_init_from_file(const char* path_model, struc
     // Try to load speaker embedding from file, else use random Gaussian.
     ctx->cond_state.speaker_emb.resize(128);
     {
-        const char* spk_path = "/mnt/storage/zonos-tts/jfk_speaker_emb.bin";
+        const char* spk_path = getenv("ZONOS_SPEAKER_EMB_PATH");
+        if (!spk_path)
+            spk_path = "/mnt/storage/zonos-tts/jfk_speaker_emb.bin";
         FILE* sf = fopen(spk_path, "rb");
         if (sf) {
             int32_t dim = 0;
