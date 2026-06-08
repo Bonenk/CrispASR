@@ -2080,6 +2080,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
     if (s->backend == "moonshine-streaming") {
         moonshine_streaming_context_params p = moonshine_streaming_context_default_params();
         p.n_threads = s->n_threads;
+        p.use_gpu = g_open_use_gpu_tls;
         s->moonshine_streaming_ctx = moonshine_streaming_init_from_file(model_path, p);
         if (!s->moonshine_streaming_ctx) {
             delete s;

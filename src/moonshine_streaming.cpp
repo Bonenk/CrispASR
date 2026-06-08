@@ -13,6 +13,7 @@
 
 #include "moonshine_streaming.h"
 #include "core/beam_decode.h"
+#include "core/gguf_loader.h"
 #include "moonshine-tokenizer.h"
 
 #include "ggml.h"
@@ -25,6 +26,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -143,7 +145,9 @@ struct ms_kv_cache {
 struct moonshine_streaming_context {
     ms_model model;
     moonshine_tokenizer tokenizer;
-    ggml_backend_t backend = nullptr;
+    ggml_backend_t backend     = nullptr; // GPU or CPU (chosen at init)
+    ggml_backend_t backend_cpu = nullptr;
+    ggml_backend_sched_t sched = nullptr;
 
     // Per-layer KV caches for decoder
     std::vector<ms_kv_cache> kv_self;
@@ -151,6 +155,7 @@ struct moonshine_streaming_context {
 
     int n_threads = 4;
     int verbosity = 1;
+    bool use_gpu = false;
     float temperature = 0.0f;
     int beam_size = 1;
 };
@@ -189,8 +194,7 @@ extern "C" struct moonshine_streaming_context* moonshine_streaming_init_from_fil
     auto& hp = m.hp;
 
     // ── Pass 1: read GGUF metadata ──────────────────────────────────────
-    struct gguf_init_params gp = {/*.no_alloc=*/true, /*.ctx=*/&m.ctx_w};
-    gguf_context* gctx = gguf_init_from_file(path_model, gp);
+    gguf_context* gctx = core_gguf::open_metadata(path_model);
     if (!gctx) {
         fprintf(stderr, "moonshine_streaming: failed to open '%s'\n", path_model);
         delete ctx;
@@ -234,7 +238,7 @@ extern "C" struct moonshine_streaming_context* moonshine_streaming_init_from_fil
         hp.sliding_windows[i].second = gguf_get_u32(gctx, key, 4);
     }
 
-    gguf_free(gctx);
+    core_gguf::free_metadata(gctx);
 
     if (hp.enc_hidden == 0 || hp.dec_hidden == 0 || hp.vocab_size == 0) {
         fprintf(stderr, "moonshine_streaming: invalid model metadata\n");
@@ -243,56 +247,34 @@ extern "C" struct moonshine_streaming_context* moonshine_streaming_init_from_fil
     }
 
     // ── Allocate weight buffer ─────────────────────────────────��────────
-    ctx->backend = ggml_backend_cpu_init();
-    if (!ctx->backend) {
+    ctx->backend_cpu = ggml_backend_cpu_init();
+    if (!ctx->backend_cpu) {
         fprintf(stderr, "moonshine_streaming: failed to init CPU backend\n");
         delete ctx;
         return nullptr;
     }
-    ggml_backend_cpu_set_n_threads(ctx->backend, ctx->n_threads);
+    ggml_backend_cpu_set_n_threads(ctx->backend_cpu, ctx->n_threads);
 
-    m.buf_w = ggml_backend_alloc_ctx_tensors_from_buft(m.ctx_w, ggml_backend_cpu_buffer_type());
-    if (!m.buf_w) {
-        fprintf(stderr, "moonshine_streaming: failed to allocate tensor buffer\n");
+    ctx->backend = params.use_gpu ? ggml_backend_init_best() : ctx->backend_cpu;
+    if (!ctx->backend)
+        ctx->backend = ctx->backend_cpu;
+    ctx->use_gpu = (ctx->backend != ctx->backend_cpu);
+
+    // Load weights via core_gguf (mmap, backend buffer)
+    core_gguf::WeightLoad wl;
+    if (!core_gguf::load_weights(path_model, ctx->backend, "moonshine_streaming", wl)) {
+        fprintf(stderr, "moonshine_streaming: failed to load weights from '%s'\n", path_model);
         delete ctx;
         return nullptr;
     }
-
-    // Load tensor data from GGUF
-    {
-        FILE* f = fopen(path_model, "rb");
-        if (!f) {
-            fprintf(stderr, "moonshine_streaming: failed to open '%s' for reading\n", path_model);
-            delete ctx;
-            return nullptr;
-        }
-        struct gguf_init_params gp2 = {/*.no_alloc=*/false, /*.ctx=*/nullptr};
-        gguf_context* gctx2 = gguf_init_from_file(path_model, gp2);
-        // No ctx_w this time — just need tensor data offsets
-
-        // Copy tensor data by name
-        for (struct ggml_tensor* t = ggml_get_first_tensor(m.ctx_w); t; t = ggml_get_next_tensor(m.ctx_w, t)) {
-            const char* name = ggml_get_name(t);
-            int tidx = gguf_find_tensor(gctx2, name);
-            if (tidx < 0) {
-                fprintf(stderr, "moonshine_streaming: tensor '%s' not found in GGUF\n", name);
-                continue;
-            }
-            size_t offset = gguf_get_data_offset(gctx2) + gguf_get_tensor_offset(gctx2, tidx);
-            fseek(f, (long)offset, SEEK_SET);
-            size_t nbytes = ggml_nbytes(t);
-            std::vector<uint8_t> buf(nbytes);
-            if (fread(buf.data(), 1, nbytes, f) != nbytes) {
-                fprintf(stderr, "moonshine_streaming: short read for tensor '%s'\n", name);
-            }
-            ggml_backend_tensor_set(t, buf.data(), 0, nbytes);
-        }
-        fclose(f);
-        gguf_free(gctx2);
-    }
+    m.ctx_w = wl.ctx;
+    m.buf_w = wl.buf;
 
     // ── Bind tensor pointers ────────────────────────────────────────────
-    auto get = [&](const char* name) -> ggml_tensor* { return ggml_get_tensor(m.ctx_w, name); };
+    auto get = [&](const char* name) -> ggml_tensor* {
+        auto it = wl.tensors.find(name);
+        return (it != wl.tensors.end()) ? it->second : nullptr;
+    };
 
     // Audio frontend
     m.embedder_log_k = get("encoder.embedder.log_k");
@@ -372,6 +354,23 @@ extern "C" struct moonshine_streaming_context* moonshine_streaming_init_from_fil
     m.dec_output_norm_w = get("decoder.output_norm.weight");
     m.dec_output_w = get("decoder.output.weight");
 
+    // ── Create backend scheduler ──
+    {
+        ggml_backend_t backends[2];
+        int n_be = 0;
+        backends[n_be++] = ctx->backend;
+        if (ctx->backend_cpu != ctx->backend)
+            backends[n_be++] = ctx->backend_cpu;
+        ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be,
+                                            /*graph_size=*/16384,
+                                            /*parallel=*/false, /*op_offload=*/false);
+        if (!ctx->sched) {
+            fprintf(stderr, "moonshine_streaming: failed to create backend scheduler\n");
+            delete ctx;
+            return nullptr;
+        }
+    }
+
     // ── Load tokenizer ─────────────────────────────────────��────────────
     std::string tok_path = dir_of(path_model) + "/tokenizer.bin";
     if (!ctx->tokenizer.load(tok_path.c_str())) {
@@ -381,8 +380,9 @@ extern "C" struct moonshine_streaming_context* moonshine_streaming_init_from_fil
     }
 
     if (params.verbosity >= 1) {
-        fprintf(stderr, "moonshine_streaming: enc=%uL×%u dec=%uL×%u vocab=%u (enc_h=%u dec_h=%u)\n", hp.enc_n_layers,
-                hp.enc_hidden, hp.dec_n_layers, hp.dec_hidden, hp.vocab_size, hp.enc_hidden, hp.dec_hidden);
+        fprintf(stderr, "moonshine_streaming: loaded %zu tensors%s  enc=%uL×%u dec=%uL×%u vocab=%u\n",
+                wl.tensors.size(), ctx->use_gpu ? " (GPU)" : "",
+                hp.enc_n_layers, hp.enc_hidden, hp.dec_n_layers, hp.dec_hidden, hp.vocab_size);
     }
 
     return ctx;
@@ -543,8 +543,7 @@ static void audio_frontend_cpu(const float* pcm, int n_samples, const ms_model& 
 // Sliding-window transformer encoder. Uses ggml graphs with
 // ggml_graph_compute_with_ctx for CPU execution (model is small).
 
-// Build the full encoder as a single ggml graph (gallocr pattern from moonshine.cpp).
-// Build encoder as single ggml graph with gallocr (same pattern as moonshine.cpp).
+// Build the full encoder as a single ggml graph (sched pattern from moonshine.cpp).
 static int run_encoder(moonshine_streaming_context* ctx, const float* frontend_out, int T_enc,
                        std::vector<float>& enc_output) {
     auto& m = ctx->model;
@@ -637,19 +636,11 @@ static int run_encoder(moonshine_streaming_context* ctx, const float* frontend_o
     }
 
     // Allocate + set inputs
-    ggml_gallocr_t gallocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
-    if (!ggml_gallocr_alloc_graph(gallocr, gf)) {
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
         fprintf(stderr, "moonshine_streaming: encoder alloc failed\n");
-        ggml_gallocr_free(gallocr);
         ggml_free(ctx0);
         return -1;
-    }
-
-    // Check weight integrity after gallocr
-    if (verbose) {
-        float w0[4];
-        ggml_backend_tensor_get(m.enc[0].attn_q_w, w0, 0, 4 * sizeof(float));
-        fprintf(stderr, "  post-gallocr: enc.0.attn.q[0..3] = [%.6f,%.6f,%.6f,%.6f]\n", w0[0], w0[1], w0[2], w0[3]);
     }
 
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "enc_input"), frontend_out, 0, (size_t)T_enc * d * sizeof(float));
@@ -673,9 +664,8 @@ static int run_encoder(moonshine_streaming_context* ctx, const float* frontend_o
             ggml_backend_tensor_set(mt, mask_data.data(), 0, mask_sz * sizeof(ggml_fp16_t));
     }
 
-    if (ggml_backend_graph_compute(ctx->backend, gf) != GGML_STATUS_SUCCESS) {
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "moonshine_streaming: encoder compute failed\n");
-        ggml_gallocr_free(gallocr);
         ggml_free(ctx0);
         return -1;
     }
@@ -690,7 +680,6 @@ static int run_encoder(moonshine_streaming_context* ctx, const float* frontend_o
                 enc_output[2], enc_output[3], enc_output[4], enc_output[5], enc_output[6], enc_output[7]);
     }
 
-    ggml_gallocr_free(gallocr);
     ggml_free(ctx0);
     return 0;
 }
@@ -850,9 +839,8 @@ static char* moonshine_streaming_transcribe_impl(struct moonshine_streaming_cont
             ggml_build_forward_expand(xgf, V);
         }
 
-        ggml_gallocr_t xalloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
-        if (!ggml_gallocr_alloc_graph(xalloc, xgf)) {
-            ggml_gallocr_free(xalloc);
+        ggml_backend_sched_reset(ctx->sched);
+        if (!ggml_backend_sched_alloc_graph(ctx->sched, xgf)) {
             ggml_free(xctx);
             ggml_backend_buffer_free(kv_buf);
             ggml_free(kv_ctx);
@@ -869,14 +857,13 @@ static char* moonshine_streaming_transcribe_impl(struct moonshine_streaming_cont
                 ggml_backend_tensor_set(pt, pos_data.data(), 0, T_enc * sizeof(int32_t));
         }
 
-        ggml_backend_graph_compute(ctx->backend, xgf);
+        ggml_backend_sched_graph_compute(ctx->sched, xgf);
 
         size_t kv_bytes = (size_t)dec_head_dim * T_enc * dec_kv_heads * sizeof(float);
         for (int i = 0; i < dec_layers; i++) {
             ggml_backend_tensor_get(k_outs[i], kv[i].cross_k->data, 0, kv_bytes);
             ggml_backend_tensor_get(v_outs[i], kv[i].cross_v->data, 0, kv_bytes);
         }
-        ggml_gallocr_free(xalloc);
         ggml_free(xctx);
     }
 
@@ -886,8 +873,6 @@ static char* moonshine_streaming_transcribe_impl(struct moonshine_streaming_cont
     // ── Decoder step helper ──────────────────────────────────────────
     // Factored out of the loop so beam search can reuse the same
     // graph-build + compute path via a step callback.
-    ggml_gallocr_t dec_alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
-
     auto run_one_step = [&](int32_t tok, int pos) -> std::vector<float> {
         size_t dn = dec_layers * 60 + 50;
         size_t dmem = ggml_tensor_overhead() * dn + ggml_graph_overhead();
@@ -969,7 +954,8 @@ static char* moonshine_streaming_transcribe_impl(struct moonshine_streaming_cont
         ggml_set_output(logits_t);
         ggml_build_forward_expand(dgf, logits_t);
 
-        if (!ggml_gallocr_alloc_graph(dec_alloc, dgf)) {
+        ggml_backend_sched_reset(ctx->sched);
+        if (!ggml_backend_sched_alloc_graph(ctx->sched, dgf)) {
             ggml_free(dctx);
             return {};
         }
@@ -977,7 +963,7 @@ static char* moonshine_streaming_transcribe_impl(struct moonshine_streaming_cont
         int32_t pos_val = pos;
         ggml_backend_tensor_set(ggml_graph_get_tensor(dgf, "pos"), &pos_val, 0, sizeof(int32_t));
 
-        if (ggml_backend_graph_compute(ctx->backend, dgf) != GGML_STATUS_SUCCESS) {
+        if (ggml_backend_sched_graph_compute(ctx->sched, dgf) != GGML_STATUS_SUCCESS) {
             ggml_free(dctx);
             return {};
         }
@@ -994,7 +980,6 @@ static char* moonshine_streaming_transcribe_impl(struct moonshine_streaming_cont
     // BOS prefill — get initial logits
     auto bos_logits = run_one_step(cur_token, 0);
     if (bos_logits.empty()) {
-        ggml_gallocr_free(dec_alloc);
         ggml_backend_buffer_free(kv_buf);
         ggml_free(kv_ctx);
         return nullptr;
@@ -1086,8 +1071,6 @@ static char* moonshine_streaming_transcribe_impl(struct moonshine_streaming_cont
             kv_pos++;
         }
     }
-    ggml_gallocr_free(dec_alloc);
-
     if (ctx->verbosity >= 1)
         fprintf(stderr, "moonshine_streaming: decoder produced %d tokens\n", (int)tokens.size());
 
@@ -1105,20 +1088,24 @@ static char* moonshine_streaming_transcribe_impl(struct moonshine_streaming_cont
 extern "C" void moonshine_streaming_free(struct moonshine_streaming_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->sched)
+        ggml_backend_sched_free(ctx->sched);
     if (ctx->model.buf_w)
         ggml_backend_buffer_free(ctx->model.buf_w);
     if (ctx->model.ctx_w)
         ggml_free(ctx->model.ctx_w);
-    if (ctx->backend)
+    if (ctx->backend && ctx->backend != ctx->backend_cpu)
         ggml_backend_free(ctx->backend);
+    if (ctx->backend_cpu)
+        ggml_backend_free(ctx->backend_cpu);
     delete ctx;
 }
 
 extern "C" void moonshine_streaming_set_n_threads(struct moonshine_streaming_context* ctx, int n_threads) {
     if (ctx && n_threads > 0) {
         ctx->n_threads = n_threads;
-        if (ctx->backend)
-            ggml_backend_cpu_set_n_threads(ctx->backend, n_threads);
+        if (ctx->backend_cpu)
+            ggml_backend_cpu_set_n_threads(ctx->backend_cpu, n_threads);
     }
 }
 
