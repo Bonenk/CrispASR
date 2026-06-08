@@ -704,6 +704,68 @@ static std::string phonemize_espeak(const std::string& lang, const std::string& 
     // Trim trailing whitespace
     while (!out.empty() && (out.back() == '\n' || out.back() == '\r' || out.back() == ' '))
         out.pop_back();
+
+    // Python phonemizer uses preserve_punctuation=True with punctuation_marks from
+    // conditioning.py: ';:,.!?¡¿—…"«»""() *~-/\\&'. Non-space punctuation characters
+    // that appear at the TAIL of the original text are appended to the IPA so the
+    // token count matches. espeak-ng drops them; the phonemizer library keeps them.
+    static const uint8_t PUNCT_BYTES[] = {';',  ':',  ',',  '.', '!', '?', 0xc2, 0xa1, // ¡ (U+00A1)
+                                          0xc2, 0xbf,                                  // ¿ (U+00BF)
+                                          0xe2, 0x80, 0x94,                            // — (U+2014)
+                                          0xe2, 0x80, 0xa6,                            // … (U+2026)
+                                          '"',  ')',  '(',  '*', '~', '-', '/',  '\\', '&', 0};
+    // Build a set of punctuation bytes for fast lookup
+    static const std::string PUNCT_ASCII = ";:,.!?\"()*~-/\\&)";
+    // Scan the original text from the end, collecting non-space punctuation
+    std::string tail_punct;
+    size_t tpos = text.size();
+    while (tpos > 0) {
+        const uint8_t c = (uint8_t)text[tpos - 1];
+        // Quick ASCII check
+        bool is_punct = false;
+        if (c < 0x80) {
+            if (PUNCT_ASCII.find((char)c) != std::string::npos)
+                is_punct = true;
+        } else {
+            // Check multi-byte sequences against PUNCT_BYTES
+            for (const uint8_t* p = PUNCT_BYTES; *p;) {
+                if (*p >= 0x80) {
+                    // How many bytes does this sequence take?
+                    int seq = (*p & 0xE0) == 0xC0 ? 2 : (*p & 0xF0) == 0xE0 ? 3 : 4;
+                    if ((int)(tpos) >= seq) {
+                        bool match = true;
+                        for (int k = 0; k < seq && match; k++)
+                            match = (uint8_t)text[tpos - seq + k] == p[k];
+                        if (match) {
+                            is_punct = true;
+                            break;
+                        }
+                    }
+                    p += (*p & 0xE0) == 0xC0 ? 2 : (*p & 0xF0) == 0xE0 ? 3 : 4;
+                } else {
+                    p++;
+                }
+            }
+        }
+        if (!is_punct)
+            break;
+        // Collect this punctuation char/sequence
+        if (c < 0x80) {
+            tail_punct = std::string(1, (char)c) + tail_punct;
+            tpos--;
+        } else {
+            int seq = (c & 0xE0) == 0xC0 ? 2 : (c & 0xF0) == 0xE0 ? 3 : 4;
+            if ((int)tpos >= seq) {
+                tail_punct = text.substr(tpos - seq, seq) + tail_punct;
+                tpos -= seq;
+            } else {
+                break;
+            }
+        }
+    }
+    if (!tail_punct.empty())
+        out += tail_punct;
+
     return out;
 }
 
