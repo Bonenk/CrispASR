@@ -35,6 +35,7 @@ export CRISPASR_MODEL_COHERE="${CRISPASR_MODEL_COHERE:-$CRISPASR_MODELS_DIR/cohe
 # ── Paraformer ──
 export PARAFORMER_MODEL="${PARAFORMER_MODEL:-$CRISPASR_MODELS_DIR/paraformer-zh-f16.gguf}"
 export PARAFORMER_MODEL_Q4K="${PARAFORMER_MODEL_Q4K:-$CRISPASR_MODELS_DIR/paraformer-zh-q4_k.gguf}"
+export PARAFORMER_AUDIO_ZH="${PARAFORMER_AUDIO_ZH:-samples/paraformer_zh.wav}"
 
 # ── Diarization ──
 export CRISPASR_TEST_DIARIZE_MODEL="${CRISPASR_TEST_DIARIZE_MODEL:-$CRISPASR_MODELS_DIR/pyannote-seg-3.0.gguf}"
@@ -42,10 +43,14 @@ export CRISPASR_TEST_TITANET_MODEL="${CRISPASR_TEST_TITANET_MODEL:-$CRISPASR_MOD
 export CRISPASR_TEST_DIARIZE_WAV="${CRISPASR_TEST_DIARIZE_WAV:-samples/multispeaker.wav}"
 
 # ── Chat (LLM) — requires a llama.cpp-compatible chat model with a chat
-# template (e.g. qwen2.5-0.5b-instruct, smollm2-360m). Harrier is an
-# embedding model and won't work. Leave unset to skip the test.
+# template (e.g. smollm2-360m-instruct, qwen2.5-0.5b-instruct). Harrier
+# is an embedding model and won't work.
+_chat_default="$CRISPASR_MODELS_DIR/smollm2-360m-instruct-q4_k.gguf"
 if [ -n "${CRISPASR_CHAT_TEST_MODEL:-}" ]; then
     export CRISPASR_CHAT_TEST_MODEL
+elif [ -f "$_chat_default" ]; then
+    export CRISPASR_CHAT_TEST_MODEL="$_chat_default"
 fi
+unset _chat_default
 
 echo "Live test env configured (CRISPASR_MODELS_DIR=$CRISPASR_MODELS_DIR)"
