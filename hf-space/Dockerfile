@@ -29,9 +29,9 @@ RUN pip3 install --no-cache-dir --break-system-packages -r /space/requirements.t
 
 COPY app.py start.sh /space/
 RUN chmod +x /space/start.sh && \
-  useradd -m -u 1000 app && \
+  (useradd -m -u 1000 app 2>/dev/null || true) && \
   mkdir -p /models /cache && \
-  chown -R app:app /space /opt/crispasr /models /cache
+  chown -R 1000:1000 /space /opt/crispasr /models /cache
 
 ENV PATH=/opt/crispasr/build/bin:$PATH
 ENV CRISPASR_SERVER_URL=http://127.0.0.1:8080
