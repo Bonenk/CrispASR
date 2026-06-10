@@ -56,10 +56,13 @@ if (EMSCRIPTEN)
     set(CMAKE_CXX_STANDARD 17)
     set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-    option(CRISPASR_WASM_SINGLE_FILE "crispasr: embed WASM inside the generated crispasr.js" ON)
+    option(CRISPASR_WASM            "crispasr: build WASM/JS target (Emscripten)"              ON)
+    option(CRISPASR_WASM_SINGLE_FILE "crispasr: embed WASM inside the generated crispasr.js"   ON)
 
-    # TODO: without these, we get the following error:
-    #       wasm-ld: error: --shared-memory is disallowed by crispasr.o because it was not compiled with 'atomics' or 'bulk-memory' features.
+    # Multithreaded WASM: -pthread enables SharedArrayBuffer-based threading
+    # in the browser. The hosting page MUST set COOP/COEP headers:
+    #   Cross-Origin-Opener-Policy: same-origin
+    #   Cross-Origin-Embedder-Policy: require-corp
     set(CMAKE_C_FLAGS   "${CMAKE_C_FLAGS}   -pthread")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
@@ -217,6 +220,13 @@ if (NOT TARGET ggml)
     # ... otherwise assume ggml is added by a parent CMakeLists.txt
 endif()
 add_subdirectory(src)
+
+# ---------------------------------------------------------------------------
+# WASM / JS bindings (Emscripten only, all backends)
+# ---------------------------------------------------------------------------
+if(EMSCRIPTEN AND CRISPASR_WASM)
+    add_subdirectory(bindings/javascript)
+endif()
 
 #
 # install

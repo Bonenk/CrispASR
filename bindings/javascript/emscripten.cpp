@@ -15,27 +15,25 @@
 #include <thread>
 #include <vector>
 
-// Forward-declare the unified Session + kokoro routing C ABI exported
-// by libcrispasr. The full prototypes live in src/crispasr_c_api.cpp
-// and src/kokoro.h. Including those headers from emscripten would pull
-// in C++/STL declarations we don't need here.
+// The unified Session C-ABI is declared in crispasr.h (included above)
+// as `struct crispasr_session`. Legacy name alias for the Embind wrappers:
 extern "C" {
-struct CrispasrSession;
-struct CrispasrSession* crispasr_session_open(const char* model_path, int n_threads);
-void                    crispasr_session_close(struct CrispasrSession* s);
-int                     crispasr_session_set_codec_path(struct CrispasrSession* s, const char* path);
-int                     crispasr_session_set_voice(struct CrispasrSession* s, const char* path,
+typedef struct crispasr_session CrispasrSession;
+CrispasrSession* crispasr_session_open(const char* model_path, int n_threads);
+void                    crispasr_session_close(CrispasrSession* s);
+int                     crispasr_session_set_codec_path(CrispasrSession* s, const char* path);
+int                     crispasr_session_set_voice(CrispasrSession* s, const char* path,
                                                    const char* ref_text_or_null);
-int                     crispasr_session_set_speaker_name(struct CrispasrSession* s, const char* name);
-int                     crispasr_session_n_speakers(struct CrispasrSession* s);
-const char*             crispasr_session_get_speaker_name(struct CrispasrSession* s, int i);
-int                     crispasr_session_set_instruct(struct CrispasrSession* s, const char* instruct);
-int                     crispasr_session_is_custom_voice(struct CrispasrSession* s);
-int                     crispasr_session_is_voice_design(struct CrispasrSession* s);
-float*                  crispasr_session_synthesize(struct CrispasrSession* s, const char* text,
+int                     crispasr_session_set_speaker_name(CrispasrSession* s, const char* name);
+int                     crispasr_session_n_speakers(CrispasrSession* s);
+const char*             crispasr_session_get_speaker_name(CrispasrSession* s, int i);
+int                     crispasr_session_set_instruct(CrispasrSession* s, const char* instruct);
+int                     crispasr_session_is_custom_voice(CrispasrSession* s);
+int                     crispasr_session_is_voice_design(CrispasrSession* s);
+float*                  crispasr_session_synthesize(CrispasrSession* s, const char* text,
                                                     int* out_n_samples);
 void                    crispasr_pcm_free(float* pcm);
-int                     crispasr_session_kokoro_clear_phoneme_cache(struct CrispasrSession* s);
+int                     crispasr_session_kokoro_clear_phoneme_cache(CrispasrSession* s);
 int                     crispasr_kokoro_resolve_model_for_lang_abi(const char* model_path, const char* lang,
                                                                    char* out_path, int out_path_len);
 int                     crispasr_kokoro_resolve_fallback_voice_abi(const char* model_path, const char* lang,
@@ -45,48 +43,48 @@ int                     crispasr_kokoro_resolve_fallback_voice_abi(const char* m
 // --- Full C-ABI parity declarations ---
 // Session extras
 int          crispasr_session_available_backends(char* out_csv, int out_cap);
-struct CrispasrSession* crispasr_session_open_explicit(const char* model_path, const char* backend_name, int n_threads);
-struct CrispasrSession* crispasr_session_open_with_params(const char* model_path, const char* backend_name, const void* params);
-const char*  crispasr_session_backend(struct CrispasrSession* s);
-int          crispasr_session_set_source_language(struct CrispasrSession* s, const char* lang);
-int          crispasr_session_set_target_language(struct CrispasrSession* s, const char* lang);
-int          crispasr_session_set_punctuation(struct CrispasrSession* s, int enable);
-int          crispasr_session_set_translate(struct CrispasrSession* s, int enable);
-int          crispasr_session_set_temperature(struct CrispasrSession* s, float temperature, unsigned long long seed);
-int          crispasr_session_set_tts_seed(struct CrispasrSession* s, unsigned long long seed);
-int          crispasr_session_set_tts_steps(struct CrispasrSession* s, int steps);
-int          crispasr_session_set_max_new_tokens(struct CrispasrSession* s, int n);
-int          crispasr_session_set_frequency_penalty(struct CrispasrSession* s, float penalty);
-int          crispasr_session_set_top_p(struct CrispasrSession* s, float top_p);
-int          crispasr_session_set_min_p(struct CrispasrSession* s, float min_p);
-int          crispasr_session_set_repetition_penalty(struct CrispasrSession* s, float r);
-int          crispasr_session_set_cfg_weight(struct CrispasrSession* s, float cfg_weight);
-int          crispasr_session_set_exaggeration(struct CrispasrSession* s, float exaggeration);
-int          crispasr_session_set_max_speech_tokens(struct CrispasrSession* s, int n);
-int          crispasr_session_set_length_scale(struct CrispasrSession* s, float scale);
-int          crispasr_session_set_best_of(struct CrispasrSession* s, int n);
-int          crispasr_session_set_beam_size(struct CrispasrSession* s, int n);
-int          crispasr_session_set_grammar_text(struct CrispasrSession* s, const char* gbnf_text,
+CrispasrSession* crispasr_session_open_explicit(const char* model_path, const char* backend_name, int n_threads);
+CrispasrSession* crispasr_session_open_with_params(const char* model_path, const char* backend_name, const void* params);
+const char*  crispasr_session_backend(CrispasrSession* s);
+int          crispasr_session_set_source_language(CrispasrSession* s, const char* lang);
+int          crispasr_session_set_target_language(CrispasrSession* s, const char* lang);
+int          crispasr_session_set_punctuation(CrispasrSession* s, int enable);
+int          crispasr_session_set_translate(CrispasrSession* s, int enable);
+int          crispasr_session_set_temperature(CrispasrSession* s, float temperature, unsigned long long seed);
+int          crispasr_session_set_tts_seed(CrispasrSession* s, unsigned long long seed);
+int          crispasr_session_set_tts_steps(CrispasrSession* s, int steps);
+int          crispasr_session_set_max_new_tokens(CrispasrSession* s, int n);
+int          crispasr_session_set_frequency_penalty(CrispasrSession* s, float penalty);
+int          crispasr_session_set_top_p(CrispasrSession* s, float top_p);
+int          crispasr_session_set_min_p(CrispasrSession* s, float min_p);
+int          crispasr_session_set_repetition_penalty(CrispasrSession* s, float r);
+int          crispasr_session_set_cfg_weight(CrispasrSession* s, float cfg_weight);
+int          crispasr_session_set_exaggeration(CrispasrSession* s, float exaggeration);
+int          crispasr_session_set_max_speech_tokens(CrispasrSession* s, int n);
+int          crispasr_session_set_length_scale(CrispasrSession* s, float scale);
+int          crispasr_session_set_best_of(CrispasrSession* s, int n);
+int          crispasr_session_set_beam_size(CrispasrSession* s, int n);
+int          crispasr_session_set_grammar_text(CrispasrSession* s, const char* gbnf_text,
                                                const char* root_rule, float penalty);
-int          crispasr_session_set_fallback_thresholds(struct CrispasrSession* s, float entropy_thold,
+int          crispasr_session_set_fallback_thresholds(CrispasrSession* s, float entropy_thold,
                                                       float logprob_thold, float no_speech_thold,
                                                       float temperature_inc);
-int          crispasr_session_set_alt_n(struct CrispasrSession* s, int n);
-int          crispasr_session_set_whisper_decode_extras(struct CrispasrSession* s, int suppress_nst,
+int          crispasr_session_set_alt_n(CrispasrSession* s, int n);
+int          crispasr_session_set_whisper_decode_extras(CrispasrSession* s, int suppress_nst,
                                                         const char* suppress_regex, int carry_initial_prompt);
-int          crispasr_session_set_ask(struct CrispasrSession* s, const char* prompt);
-int          crispasr_session_detect_language(struct CrispasrSession* s, const float* pcm, int n_samples,
+int          crispasr_session_set_ask(CrispasrSession* s, const char* prompt);
+int          crispasr_session_detect_language(CrispasrSession* s, const float* pcm, int n_samples,
                                               const char* lid_model_path, int method,
                                               char* out_lang, int out_lang_cap, float* out_prob);
 
 // Session ASR transcription
 struct crispasr_session_result;
-struct crispasr_session_result* crispasr_session_transcribe(struct CrispasrSession* s, const float* pcm, int n_samples);
-struct crispasr_session_result* crispasr_session_transcribe_lang(struct CrispasrSession* s, const float* pcm, int n_samples,
+struct crispasr_session_result* crispasr_session_transcribe(CrispasrSession* s, const float* pcm, int n_samples);
+struct crispasr_session_result* crispasr_session_transcribe_lang(CrispasrSession* s, const float* pcm, int n_samples,
                                                                   const char* language);
-struct crispasr_session_result* crispasr_session_transcribe_vad(struct CrispasrSession* s, const float* pcm, int n_samples,
+struct crispasr_session_result* crispasr_session_transcribe_vad(CrispasrSession* s, const float* pcm, int n_samples,
                                                                  int sample_rate, const char* vad_model_path, void* opts);
-struct crispasr_session_result* crispasr_session_transcribe_vad_lang(struct CrispasrSession* s, const float* pcm, int n_samples,
+struct crispasr_session_result* crispasr_session_transcribe_vad_lang(CrispasrSession* s, const float* pcm, int n_samples,
                                                                       int sample_rate, const char* vad_model_path, void* opts,
                                                                       const char* language);
 int          crispasr_session_result_n_segments(struct crispasr_session_result* r);
@@ -102,13 +100,13 @@ int          crispasr_session_result_word_n_alts(struct crispasr_session_result*
 const char*  crispasr_session_result_word_alt_text(struct crispasr_session_result* r, int i_seg, int i_word, int i_alt);
 float        crispasr_session_result_word_alt_p(struct crispasr_session_result* r, int i_seg, int i_word, int i_alt);
 void         crispasr_session_result_free(struct crispasr_session_result* r);
-char*        crispasr_session_translate_text(struct CrispasrSession* s, const char* text, const char* src_lang,
+char*        crispasr_session_translate_text(CrispasrSession* s, const char* text, const char* src_lang,
                                              const char* tgt_lang, int max_tokens);
 void         crispasr_session_translate_text_free(char* text);
 
 // Streaming
 struct CrispasrStream;
-struct CrispasrStream* crispasr_session_stream_open(struct CrispasrSession* s, int n_threads, int step_ms,
+struct CrispasrStream* crispasr_session_stream_open(CrispasrSession* s, int n_threads, int step_ms,
                                                      int length_ms, int keep_ms, const char* language, int translate);
 struct CrispasrStream* crispasr_stream_open(void* ctx, int n_threads, int step_ms,
                                              int length_ms, int keep_ms, const char* language, int translate);
@@ -136,46 +134,13 @@ long long    crispasr_align_result_word_t0(struct crispasr_align_result* r, int 
 long long    crispasr_align_result_word_t1(struct crispasr_align_result* r, int i);
 void         crispasr_align_result_free(struct crispasr_align_result* r);
 
-// VAD
-int  crispasr_vad_segments(const char* vad_model_path, const float* pcm, int n_samples,
-                           int sample_rate, float threshold, int min_speech_ms, int min_silence_ms,
-                           int n_threads, int use_gpu, float** out_spans);
-int  crispasr_vad_slices(const char* vad_model_path, const float* pcm, int n_samples,
-                         int sample_rate, float threshold, int min_speech_ms, int min_silence_ms,
-                         int speech_pad_ms, float max_chunk_duration_s, int n_threads,
-                         float** out_spans);
-void crispasr_vad_free(float* spans);
+// VAD — declared in crispasr.h
 
 // LCS dedup
 int crispasr_lcs_dedup_prefix_count(const int* prev_tail_tokens, int n_prev,
                                     const int* curr_tokens, int n_curr, int min_lcs_length);
 
-// params_set_* on whisper_full_params
-void crispasr_params_set_language(void* p, const char* lang);
-void crispasr_params_set_translate(void* p, int v);
-void crispasr_params_set_detect_language(void* p, int v);
-void crispasr_params_set_token_timestamps(void* p, int v);
-void crispasr_params_set_n_threads(void* p, int n);
-void crispasr_params_set_max_len(void* p, int n);
-void crispasr_params_set_best_of(void* p, int n);
-void crispasr_params_set_split_on_word(void* p, int v);
-void crispasr_params_set_no_context(void* p, int v);
-void crispasr_params_set_single_segment(void* p, int v);
-void crispasr_params_set_print_realtime(void* p, int v);
-void crispasr_params_set_print_progress(void* p, int v);
-void crispasr_params_set_print_timestamps(void* p, int v);
-void crispasr_params_set_print_special(void* p, int v);
-void crispasr_params_set_suppress_blank(void* p, int v);
-void crispasr_params_set_temperature(void* p, float t);
-void crispasr_params_set_max_tokens(void* p, int n);
-void crispasr_params_set_initial_prompt(void* p, const char* prompt);
-void crispasr_params_set_alt_n(void* p, int n);
-void crispasr_params_set_vad(void* p, int v);
-void crispasr_params_set_vad_model_path(void* p, const char* path);
-void crispasr_params_set_vad_threshold(void* p, float t);
-void crispasr_params_set_vad_min_speech_ms(void* p, int ms);
-void crispasr_params_set_vad_min_silence_ms(void* p, int ms);
-void crispasr_params_set_tdrz(void* p, int v);
+// params_set_* — declared in crispasr.h (use whisper_full_params*, not void*)
 
 // Token-level accessors
 long long crispasr_token_t0(void* ctx, int i_seg, int i_tok);
@@ -268,7 +233,7 @@ int crispasr_diarize_segments_abi(const float* left_pcm, const float* right_pcm,
                                   int is_stereo, void* segs, int n_segs, const void* opts);
 }
 
-static struct CrispasrSession* g_tts_session = nullptr;
+static CrispasrSession* g_tts_session = nullptr;
 
 struct whisper_context* g_context;
 
