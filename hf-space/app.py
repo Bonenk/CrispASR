@@ -57,11 +57,25 @@ ASR_MODELS = [
      "Cohere Labs. Punctuation + casing. Slowest of the small set."),
     ("Qwen3 ASR 0.6B — 30 langs + 22 Chinese dialects",      "qwen3",              "auto", "auto", "~500 MB",
      "Speech-LLM (Whisper enc + Qwen3 0.6B). Native language ID."),
+    ("Canary — multilingual + translation",                   "canary",             "auto", "auto", "~800 MB",
+     "NVIDIA Canary 1B. Native speech translation. 25+ langs."),
+    ("HuBERT CTC — English",                                  "hubert",             "auto", "en",   "~380 MB",
+     "Self-supervised CTC. Lightweight encoder, no punctuation."),
+    ("Data2Vec CTC — English",                                "data2vec",           "auto", "en",   "~380 MB",
+     "Meta Data2Vec CTC. Similar to HuBERT."),
 ]
 
 TTS_MODELS = [
     ("Kokoro 82M — multilingual StyleTTS2",                  "kokoro",             "auto", "en",   "~85 MB",
      "9 langs (EN/ES/FR/HI/IT/JA/PT/ZH/DE). Apache-2.0. Only TTS realistic on free-tier CPU."),
+    ("VibeVoice 0.5B — EN/DE/ZH StyleTTS",                  "vibevoice",          "auto", "en",   "~200 MB",
+     "VibeVoice encoder-decoder TTS. EN/DE/ZH. Apache-2.0."),
+    ("Orpheus 0.5B — English expressive TTS",                "orpheus",            "auto", "en",   "~400 MB",
+     "SNAC codec + LLM decoder. Expressive speech with emotion tags."),
+    ("Chatterbox — English voice cloning",                   "chatterbox",         "auto", "en",   "~450 MB",
+     "Resemble AI. Zero-shot voice cloning from a reference clip. Apache-2.0."),
+    ("Chatterbox Turbo — faster voice cloning",              "chatterbox-turbo",   "auto", "en",   "~350 MB",
+     "Faster Chatterbox variant. Same voice cloning, 2× speed."),
 ]
 
 # (display, model arg passed to `-m`, blurb)
@@ -345,12 +359,20 @@ CAPABILITY_TABLE_MD = """### Free-tier ASR backends in this Space
 | `parakeet-ctc-0.6b` | | | | Fast English CTC |
 | `cohere` | ✔ | LID | | Lowest English WER |
 | `qwen3` | | ✔ | ✔ | 30 langs + 22 Chinese dialects |
+| `canary` | ✔ | ✔ | ✔ | Multilingual + translation |
+| `hubert` | | | | Self-supervised English CTC |
+| `data2vec` | | | | Meta English CTC |
 
 ### TTS
-* `kokoro` — 82M StyleTTS2, multilingual. The only TTS engine that's realistically usable on the free-tier CPU.
+* `kokoro` — 82M StyleTTS2, multilingual (9 langs). Apache-2.0. Only TTS realistic on free-tier CPU.
+* `vibevoice` — 0.5B encoder-decoder. EN/DE/ZH. Apache-2.0. ~200 MB.
+* `orpheus` — 0.5B SNAC + LLM. Expressive EN with emotion tags. ~400 MB.
+* `chatterbox` / `chatterbox-turbo` — Zero-shot voice cloning from a reference clip. Apache-2.0.
 
 ### Why not the big speech-LLMs?
-Voxtral (2.5 GB), MiMo-V2.5-ASR (4.5 GB), Granite-4.1 (3 GB) and friends all run in CrispASR but exceed the free-tier 16 GB ceiling once tokenizer / KV cache / Gradio overhead is accounted for. Run them locally:
+Voxtral (2.5 GB), MiMo-V2.5-ASR (4.5 GB), Granite-4.1 (3 GB), Qwen3-TTS (1.5 GB),
+IndexTTS (2 GB), CosyVoice3 (1.5 GB), and VoxCPM2-TTS (2 GB) all run in CrispASR
+but exceed the free-tier 16 GB ceiling. Run them locally:
 
 ```bash
 docker build -f hf-space/Dockerfile -t crispasr-hf-space .
