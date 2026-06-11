@@ -3164,7 +3164,23 @@ class CrispasrSession {
       final pcmPtr = synFn(_handle, textPtr, nPtr);
       final n = nPtr.value;
       if (pcmPtr == nullptr || n <= 0) {
-        throw Exception('synthesize returned no audio for backend $_backend');
+        // Query the C-side last_synth_error for a specific reason.
+        String reason = '';
+        if (_lib.providesSymbol('crispasr_session_last_synth_error')) {
+          final errFn = _lib.lookupFunction<
+              Pointer<Utf8> Function(Pointer<Void>),
+              Pointer<Utf8> Function(Pointer<Void>)>(
+            'crispasr_session_last_synth_error',
+          );
+          final errPtr = errFn(_handle);
+          if (errPtr != nullptr) {
+            final msg = errPtr.toDartString();
+            if (msg.isNotEmpty) reason = msg;
+          }
+        }
+        throw Exception(reason.isNotEmpty
+            ? reason
+            : 'synthesize returned no audio for backend $_backend');
       }
       try {
         // `asTypedList(n)` views the native buffer as a Float32List

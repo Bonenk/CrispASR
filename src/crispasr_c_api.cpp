@@ -1295,6 +1295,11 @@ struct crispasr_session {
     std::string model_path;
     int n_threads = 4;
 
+    // Last synthesize error — populated by synthesize_raw_impl when it
+    // returns nullptr so callers can surface a meaningful reason instead
+    // of the generic "no audio produced". Cleared on every synthesize call.
+    std::string last_synth_error;
+
     // Sticky session-level state (PLAN #59 partial unblock — the
     // capabilities matrix items that were previously CLI-only). Per-call
     // args still win when supplied; these are the fallback.
@@ -2514,7 +2519,11 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         piper_tts_params p = piper_tts_default_params();
         p.n_threads = s->n_threads;
         p.verbosity = g_open_verbosity_tls;
-        p.use_gpu = g_open_use_gpu_tls;
+        // Force CPU for piper. The HiFi-GAN decoder uses strided
+        // ConvTranspose1d which crashes on Android Vulkan and produces
+        // artifacts on some Metal backends. Piper models are small
+        // (15-60 MB) so CPU inference is fast enough for real-time.
+        p.use_gpu = false;
         s->piper_ctx = piper_tts_init_from_file(model_path, p);
         if (!s->piper_ctx) {
             delete s;
@@ -5143,12 +5152,13 @@ CA_EXPORT int crispasr_session_set_codec_path(crispasr_session* s, const char* p
     return 0; // not applicable
 }
 
-#if defined(CA_HAVE_INDEXTTS) || defined(CA_HAVE_VOXCPM2)
+#if defined(CA_HAVE_INDEXTTS) || defined(CA_HAVE_VOXCPM2) || defined(CA_HAVE_POCKET)
 // crispasr_audio_load lives in crispasr_audio.cpp (same shared lib);
 // forward-declare it so set_voice can decode a reference WAV without
-// pulling in the audio header. Always returns 16 kHz mono f32 — which is
-// exactly what voxcpm2's cloning reference wants (indextts needs 24 kHz,
-// upsampled below).
+// pulling in the audio header. Returns 16 kHz mono f32 — voxcpm2 uses it
+// directly; indextts upsamples to 24 kHz below; pocket-tts needs 24 kHz
+// (the Mimi encoder expects 24 kHz, but crispasr_audio_load returns 16 kHz
+// — pocket_tts_set_voice handles the resample internally if needed).
 extern "C" int crispasr_audio_load(const char* path, float** out_pcm, int* out_samples, int* out_sample_rate);
 #endif
 
@@ -5353,10 +5363,34 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
                 free(pcm);
             return -1;
         }
-        // Pocket-tts needs 24 kHz mono — crispasr_audio_load already
-        // resamples to 24 kHz, so we can pass directly.
-        int rc = pocket_tts_set_voice(s->pocket_tts_ctx, pcm, n);
-        free(pcm);
+        // crispasr_audio_load returns 16 kHz mono; pocket_tts_set_voice
+        // expects 24 kHz (Mimi encoder native rate). Resample 16→24 kHz
+        // with linear interpolation.
+        if (sr <= 0)
+            sr = 16000;
+        int rc;
+        if (sr != 24000) {
+            const int n24 = (int)((int64_t)n * 24000 / sr);
+            float* pcm24 = (float*)malloc((size_t)(n24 > 0 ? n24 : 1) * sizeof(float));
+            if (!pcm24) {
+                free(pcm);
+                return -1;
+            }
+            const double ratio = (double)sr / 24000.0;
+            for (int j = 0; j < n24; ++j) {
+                const double pos = (double)j * ratio;
+                const int i0 = (int)pos;
+                const int i1 = (i0 + 1 < n) ? i0 + 1 : n - 1;
+                const double frac = pos - (double)i0;
+                pcm24[j] = (float)((double)pcm[i0] * (1.0 - frac) + (double)pcm[i1] * frac);
+            }
+            free(pcm);
+            rc = pocket_tts_set_voice(s->pocket_tts_ctx, pcm24, n24);
+            free(pcm24);
+        } else {
+            rc = pocket_tts_set_voice(s->pocket_tts_ctx, pcm, n);
+            free(pcm);
+        }
         return rc;
     }
 #endif
@@ -5543,6 +5577,7 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
         *out_n_samples = 0;
     if (!s || !text)
         return nullptr;
+    s->last_synth_error.clear();
 #ifdef CA_HAVE_COSYVOICE3
     if (s->cosyvoice3_ctx) {
         // Voice is a bank name (default zero_shot) unless set_voice supplied a
@@ -5582,22 +5617,46 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
 #endif
 #ifdef CA_HAVE_QWEN3_TTS
     if (s->qwen3_tts_ctx) {
-        return qwen3_tts_synthesize(s->qwen3_tts_ctx, text, out_n_samples);
+        // Pre-flight: surface a clear error when the Base model is used
+        // without a voice reference — qwen3_tts_synthesize_codes prints
+        // to stderr (invisible on Android) and returns nullptr, which the
+        // Dart side can only report as a generic "no audio produced".
+        if (!s->qwen3_tts_voice_loaded) {
+            const bool is_cv = qwen3_tts_is_custom_voice(s->qwen3_tts_ctx);
+            const bool is_vd = qwen3_tts_is_voice_design(s->qwen3_tts_ctx);
+            if (!is_cv && !is_vd) {
+                s->last_synth_error = "qwen3-tts Base requires a voice — "
+                                      "select a voice pack or reference WAV in the voice picker";
+                return nullptr;
+            }
+        }
+        float* pcm = qwen3_tts_synthesize(s->qwen3_tts_ctx, text, out_n_samples);
+        if (!pcm && s->last_synth_error.empty()) {
+            s->last_synth_error = "qwen3-tts synthesis failed — "
+                                  "try q8_0 quantisation or a different model variant";
+        }
+        return pcm;
     }
 #endif
 #ifdef CA_HAVE_ORPHEUS
     if (s->orpheus_ctx) {
-        if (!s->orpheus_codec_loaded)
-            return nullptr; // SNAC must be loaded via set_codec_path first
+        if (!s->orpheus_codec_loaded) {
+            s->last_synth_error = "orpheus requires the SNAC codec — "
+                                  "download the codec companion model";
+            return nullptr;
+        }
         return orpheus_synthesize(s->orpheus_ctx, text, out_n_samples);
     }
 #endif
 #ifdef CA_HAVE_KOKORO
     if (s->kokoro_ctx) {
-        // Kokoro malloc's its PCM via the same allocator as
-        // crispasr_pcm_free. Output is 24 kHz mono float — same
-        // convention as vibevoice / qwen3-tts / orpheus.
-        return kokoro_synthesize(s->kokoro_ctx, text, out_n_samples);
+        float* pcm = kokoro_synthesize(s->kokoro_ctx, text, out_n_samples);
+        if (!pcm && s->last_synth_error.empty()) {
+            s->last_synth_error = "kokoro synthesis failed — "
+                                  "this is usually because the built-in phonemizer could not "
+                                  "process the text (check that a voice pack is loaded)";
+        }
+        return pcm;
     }
 #endif
 #ifdef CA_HAVE_CHATTERBOX
@@ -5850,6 +5909,16 @@ CA_EXPORT float* crispasr_session_synthesize(crispasr_session* s, const char* te
 
 CA_EXPORT void crispasr_pcm_free(float* pcm) {
     free(pcm);
+}
+
+// Returns a human-readable error description when the last synthesize call
+// returned nullptr. Empty string when the last call succeeded or no error
+// detail is available. The returned pointer is owned by the session — valid
+// until the next synthesize call or session close.
+CA_EXPORT const char* crispasr_session_last_synth_error(crispasr_session* s) {
+    if (!s)
+        return "";
+    return s->last_synth_error.c_str();
 }
 
 // =========================================================================
