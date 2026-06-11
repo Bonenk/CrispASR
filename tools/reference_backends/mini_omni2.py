@@ -222,7 +222,9 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
                 embeds = []
                 for ids in input_ids:
                     embeds.append(model.transformer.wte(ids))
-                for i in range(8):
+                # Audio features replace pad positions in audio streams
+                # (0..6) only — stream 7 (text) keeps its token embeddings.
+                for i in range(7):
                     embeds[i][:, 1:T_enc+1, :] = x_a
                 x = sum(embeds) / 8.0
                 out["input_embeds"] = x[0].numpy().astype(np.float32)

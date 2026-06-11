@@ -5618,6 +5618,18 @@ int main(int argc, char** argv) {
             n_skip++;
         }
 
+        // ---- end-to-end transcribe (always run as smoke test) ----
+        {
+            char* text = mini_omni2_transcribe(ctx, samples.data(), (int)samples.size());
+            if (text) {
+                printf("[INFO] transcribe              %s\n", text);
+                free(text);
+            } else {
+                printf("[ERR ] transcribe              mini_omni2_transcribe returned null\n");
+                n_fail++;
+            }
+        }
+
         mini_omni2_free(ctx);
 
     } else {

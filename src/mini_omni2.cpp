@@ -759,33 +759,436 @@ extern "C" void mini_omni2_kv_reset(struct mini_omni2_context* ctx) {
 }
 
 // ===========================================================================
-// LLM forward (stub — will be implemented after encoder/adapter validation)
+// Token embedding
 // ===========================================================================
 
-extern "C" float* mini_omni2_run_llm_kv(struct mini_omni2_context* ctx, const float* inputs_embeds, int n_tokens,
-                                        int n_past, int* out_n_tokens, int* out_vocab_size) {
-    // TODO: implement after encoder + adapter pass diff validation
-    (void)ctx;
-    (void)inputs_embeds;
-    (void)n_tokens;
-    (void)n_past;
-    if (out_n_tokens)
-        *out_n_tokens = 0;
-    if (out_vocab_size)
-        *out_vocab_size = 0;
-    fprintf(stderr, "mini_omni2: run_llm_kv not yet implemented\n");
-    return nullptr;
+static float* mo2_embed_tokens(mini_omni2_context* ctx, const int32_t* ids, int n_ids) {
+    if (!ctx || !ids || n_ids <= 0)
+        return nullptr;
+
+    const auto& m = ctx->model;
+    const int d = m.hp.llm_hidden;
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 64, false);
+
+    ggml_tensor* inp = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_ids);
+    ggml_set_name(inp, "token_ids");
+    ggml_set_input(inp);
+
+    ggml_tensor* emb = ggml_get_rows(ctx0, m.llm.token_embd_w, inp);
+    ggml_set_name(emb, "embeddings");
+    ggml_set_output(emb);
+    ggml_build_forward_expand(gf, emb);
+    ggml_free(ctx0);
+
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
+        return nullptr;
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "token_ids"), ids, 0, n_ids * sizeof(int32_t));
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS)
+        return nullptr;
+
+    ggml_tensor* out = ggml_graph_get_tensor(gf, "embeddings");
+    float* result = (float*)malloc((size_t)n_ids * d * sizeof(float));
+    if (!result)
+        return nullptr;
+    ggml_backend_tensor_get(out, result, 0, (size_t)n_ids * d * sizeof(float));
+    return result;
 }
 
 // ===========================================================================
-// Full transcribe (stub)
+// LLM forward (Qwen2-0.5B)
 // ===========================================================================
 
+static ggml_cgraph* mo2_build_llm_kv(mini_omni2_context* ctx, int n_past, int T, bool last_token_only) {
+    const auto& m = ctx->model;
+    const auto& hp = m.hp;
+    const int H = hp.llm_hidden;        // 896
+    const int n_heads = hp.llm_n_heads; // 14
+    const int n_kv = hp.llm_n_kv_heads; // 2
+    const int hd = hp.llm_head_dim;     // 64
+    const int grp = n_heads / n_kv;     // 7
+    const int L = hp.llm_n_layers;      // 24
+    const int V = hp.llm_vocab;         // 181120
+    const float eps = hp.rms_eps;       // 1e-6
+    const float scale = 1.0f / std::sqrt((float)hd);
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 16384, false);
+
+    ggml_tensor* cur = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, H, T);
+    ggml_set_name(cur, "llm_input");
+    ggml_set_input(cur);
+
+    ggml_tensor* positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
+    ggml_set_name(positions, "positions");
+    ggml_set_input(positions);
+
+    // Causal mask for prefill (T > 1)
+    const int Lk = n_past + T;
+    ggml_tensor* causal_mask = nullptr;
+    if (T > 1) {
+        causal_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, Lk, T);
+        ggml_set_name(causal_mask, "causal_mask");
+        ggml_set_input(causal_mask);
+    }
+
+    // 24 × Qwen2 layers with KV cache
+    for (int il = 0; il < L; il++) {
+        const auto& b = m.llm.blocks[il];
+
+        core_attn::KvSelfAttnParams ap = {};
+        ap.n_heads = n_heads;
+        ap.n_kv_heads = n_kv;
+        ap.head_dim = hd;
+        ap.n_kv_grp = grp;
+        ap.n_ctx_orig = hp.llm_max_pos;
+        ap.rope_theta = (float)hp.rope_base; // 1000000
+        ap.rope_beta_fast = 0.0f;
+        ap.rope_beta_slow = 0.0f;
+        ap.attn_scale = scale;
+        ap.qk_norm_eps = 0.0f;
+        ap.gqa_mode = core_attn::GQA_MANUAL_CONT;
+
+        ggml_tensor* residual = cur;
+
+        // Pre-attention RMSNorm
+        cur = ggml_rms_norm(ctx0, cur, eps);
+        cur = ggml_mul(ctx0, cur, b.attn_norm_w);
+
+        // KV-cached self-attention with Q/K/V biases (Qwen2)
+        cur = core_attn::kv_self_attn(
+            ctx0, gf, cur, b.attn_q_w, b.attn_k_w, b.attn_v_w, b.attn_out_w, nullptr, nullptr, // no Q/K norm
+            positions, causal_mask, ctx->kv_k, ctx->kv_v, il, n_past, ap, nullptr, 0, nullptr, // no fused QKV
+            b.attn_q_b, b.attn_k_b, b.attn_v_b,                                                // Qwen2 QKV biases
+            nullptr, nullptr); // no O bias, no fused QKV bias
+
+        cur = ggml_add(ctx0, residual, cur);
+
+        // Pre-FFN RMSNorm + SwiGLU
+        residual = cur;
+        cur = ggml_rms_norm(ctx0, cur, eps);
+        cur = ggml_mul(ctx0, cur, b.ffn_norm_w);
+        cur = core_ffn::swiglu(ctx0, cur, b.ffn_gate_w, b.ffn_up_w, b.ffn_down_w);
+        cur = ggml_add(ctx0, residual, cur);
+    }
+
+    // Final RMSNorm
+    cur = ggml_rms_norm(ctx0, cur, eps);
+    cur = ggml_mul(ctx0, cur, m.llm.output_norm_w);
+
+    // Last-token-only lm_head (for decode steps)
+    if (last_token_only && T > 1) {
+        cur = ggml_view_2d(ctx0, cur, H, 1, cur->nb[1], (size_t)(T - 1) * cur->nb[1]);
+    }
+
+    // LM head — text logits only (first text_vocab_size entries)
+    cur = ggml_mul_mat(ctx0, m.llm.lm_head_w, cur);
+
+    ggml_set_name(cur, "logits");
+    ggml_set_output(cur);
+    ggml_build_forward_expand(gf, cur);
+    ggml_free(ctx0);
+    return gf;
+}
+
+extern "C" float* mini_omni2_run_llm_kv(struct mini_omni2_context* ctx, const float* inputs_embeds, int n_tokens,
+                                        int n_past, int* out_n_tokens, int* out_vocab_size) {
+    if (!ctx || !inputs_embeds || n_tokens <= 0)
+        return nullptr;
+
+    const auto& hp = ctx->model.hp;
+    const int H = hp.llm_hidden;
+    const int V = hp.llm_vocab;
+
+    ggml_cgraph* gf = mo2_build_llm_kv(ctx, n_past, n_tokens, true);
+    if (!gf)
+        return nullptr;
+
+    ggml_backend_sched_reset(ctx->sched);
+    if (ctx->kv_k)
+        ggml_backend_sched_set_tensor_backend(ctx->sched, ctx->kv_k, ctx->backend);
+    if (ctx->kv_v)
+        ggml_backend_sched_set_tensor_backend(ctx->sched, ctx->kv_v, ctx->backend);
+
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
+        return nullptr;
+
+    // Set inputs
+    ggml_tensor* inp = ggml_graph_get_tensor(gf, "llm_input");
+    ggml_backend_tensor_set(inp, inputs_embeds, 0, (size_t)H * n_tokens * sizeof(float));
+
+    ggml_tensor* pos = ggml_graph_get_tensor(gf, "positions");
+    std::vector<int32_t> pos_data(n_tokens);
+    for (int i = 0; i < n_tokens; i++)
+        pos_data[i] = n_past + i;
+    ggml_backend_tensor_set(pos, pos_data.data(), 0, n_tokens * sizeof(int32_t));
+
+    // Causal mask (prefill only)
+    if (n_tokens > 1) {
+        const int Lk = n_past + n_tokens;
+        ggml_tensor* mask_t = ggml_graph_get_tensor(gf, "causal_mask");
+        if (mask_t) {
+            std::vector<ggml_fp16_t> mask_data((size_t)Lk * n_tokens);
+            const ggml_fp16_t zero = ggml_fp32_to_fp16(0.0f);
+            const ggml_fp16_t neg_inf = ggml_fp32_to_fp16(-INFINITY);
+            for (int q = 0; q < n_tokens; q++)
+                for (int k = 0; k < Lk; k++)
+                    mask_data[(size_t)q * Lk + k] = (k <= n_past + q) ? zero : neg_inf;
+            ggml_backend_tensor_set(mask_t, mask_data.data(), 0, mask_data.size() * sizeof(ggml_fp16_t));
+        }
+    }
+
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS)
+        return nullptr;
+
+    ggml_tensor* out = ggml_graph_get_tensor(gf, "logits");
+    int n_out = (int)out->ne[1]; // 1 for last-token-only
+    float* result = (float*)malloc((size_t)V * n_out * sizeof(float));
+    if (!result)
+        return nullptr;
+    ggml_backend_tensor_get(out, result, 0, (size_t)V * n_out * sizeof(float));
+
+    if (out_n_tokens)
+        *out_n_tokens = n_out;
+    if (out_vocab_size)
+        *out_vocab_size = V;
+    return result;
+}
+
+// ===========================================================================
+// Temperature-aware token selection
+// ===========================================================================
+
+static int mo2_sample_token(const float* logits, int vocab, float temperature) {
+    if (temperature <= 0.0f) {
+        int best = 0;
+        for (int i = 1; i < vocab; i++)
+            if (logits[i] > logits[best])
+                best = i;
+        return best;
+    }
+    float maxv = logits[0];
+    for (int i = 1; i < vocab; i++)
+        if (logits[i] > maxv)
+            maxv = logits[i];
+    float sum = 0;
+    std::vector<float> probs(vocab);
+    for (int i = 0; i < vocab; i++) {
+        probs[i] = expf((logits[i] - maxv) / temperature);
+        sum += probs[i];
+    }
+    for (int i = 0; i < vocab; i++)
+        probs[i] /= sum;
+    float r = ((float)rand() / (float)RAND_MAX);
+    float acc = 0;
+    for (int i = 0; i < vocab; i++) {
+        acc += probs[i];
+        if (acc >= r)
+            return i;
+    }
+    return vocab - 1;
+}
+
+// ===========================================================================
+// Full transcribe
+// ===========================================================================
+
+// Mini-Omni2 special token IDs
+static constexpr int MO2_TEXT_VOCAB = 151936;
+static constexpr int MO2_EOT = 151936; // end of text
+static constexpr int MO2_PAD_T = 151937;
+static constexpr int MO2_INPUT_T = 151938;
+static constexpr int MO2_ANSWER_T = 151939;
+
+static constexpr int MO2_AUDIO_VOCAB = 4096;
+static constexpr int MO2_EOA = 4096;
+static constexpr int MO2_PAD_A = 4097;
+static constexpr int MO2_INPUT_A = 4098;
+static constexpr int MO2_ANSWER_A = 4099;
+
+static constexpr int MO2_PADDED_TEXT = 152000;
+static constexpr int MO2_PADDED_AUDIO = 4160;
+
+static inline int mo2_layershift(int id, int layer) {
+    return id + MO2_PADDED_TEXT + layer * MO2_PADDED_AUDIO;
+}
+
 extern "C" char* mini_omni2_transcribe(struct mini_omni2_context* ctx, const float* samples, int n_samples) {
-    // TODO: implement after LLM path is validated
-    (void)ctx;
-    (void)samples;
-    (void)n_samples;
-    fprintf(stderr, "mini_omni2: transcribe not yet implemented\n");
-    return nullptr;
+    if (!ctx || !samples || n_samples <= 0)
+        return nullptr;
+
+    const auto& hp = ctx->model.hp;
+
+    // 1. Pad to 30s and compute mel
+    const int N30 = 480000;
+    std::vector<float> audio(N30, 0.0f);
+    memcpy(audio.data(), samples, std::min(n_samples, N30) * sizeof(float));
+
+    int n_mels = 0, T_mel = 0;
+    float* mel = mini_omni2_compute_mel(ctx, audio.data(), N30, &n_mels, &T_mel);
+    if (!mel)
+        return nullptr;
+
+    // 2. Run encoder
+    int T_enc = 0, enc_dim = 0;
+    float* enc = mini_omni2_run_encoder(ctx, mel, n_mels, T_mel, &T_enc, &enc_dim);
+    free(mel);
+    if (!enc)
+        return nullptr;
+
+    // Trim encoder output to actual audio length
+    const int audio_len = (int)((double)n_samples / 16000.0 * 1000.0 / 20.0) + 1;
+    T_enc = std::min(T_enc, audio_len);
+
+    // 3. Run adapter
+    int adap_T = 0, adap_dim = 0;
+    float* adapted = mini_omni2_run_adapter(ctx, enc, T_enc, enc_dim, &adap_T, &adap_dim);
+    free(enc);
+    if (!adapted)
+        return nullptr;
+
+    // 4. Build 8-stream input_ids and embed them
+    // T_total = 1 (input_a/t) + T_enc (pad) + 1 (eoa/eot) + 1 (answer) = T_enc + 3
+    const int T_total = T_enc + 3;
+    const int d = hp.llm_hidden; // 896
+
+    // Embed all 8 streams and average
+    std::vector<float> avg_emb((size_t)T_total * d, 0.0f);
+
+    for (int stream = 0; stream < 8; stream++) {
+        std::vector<int32_t> ids(T_total);
+        if (stream < 7) {
+            // Audio stream: [input_a, pad_a×T_enc, eoa, answer_a]
+            ids[0] = mo2_layershift(MO2_INPUT_A, stream);
+            for (int t = 0; t < T_enc; t++)
+                ids[1 + t] = mo2_layershift(MO2_PAD_A, stream);
+            ids[T_enc + 1] = mo2_layershift(MO2_EOA, stream);
+            ids[T_enc + 2] = mo2_layershift(MO2_ANSWER_A, stream);
+        } else {
+            // Text stream: [input_t, pad_t×T_enc, eot, answer_t]
+            ids[0] = MO2_INPUT_T;
+            for (int t = 0; t < T_enc; t++)
+                ids[1 + t] = MO2_PAD_T;
+            ids[T_enc + 1] = MO2_EOT;
+            ids[T_enc + 2] = MO2_ANSWER_T;
+        }
+
+        float* emb = mo2_embed_tokens(ctx, ids.data(), T_total);
+        if (!emb) {
+            free(adapted);
+            return nullptr;
+        }
+
+        // Replace pad positions [1..T_enc] with adapter output — audio
+        // streams (0..6) only. Stream 7 (text) keeps its token embeddings.
+        if (stream < 7) {
+            memcpy(emb + (size_t)1 * d, adapted, (size_t)T_enc * d * sizeof(float));
+        }
+
+        // Accumulate into average
+        for (size_t i = 0; i < (size_t)T_total * d; i++)
+            avg_emb[i] += emb[i];
+        free(emb);
+    }
+    free(adapted);
+
+    // Divide by 8 to get average
+    for (size_t i = 0; i < (size_t)T_total * d; i++)
+        avg_emb[i] /= 8.0f;
+
+    // 5. KV cache + prefill + greedy decode
+    if (!ctx->kv_ctx && !mini_omni2_kv_init(ctx, 4096)) {
+        return nullptr;
+    }
+    mini_omni2_kv_reset(ctx);
+
+    int n_t = 0, vocab = 0;
+    float* logits = mini_omni2_run_llm_kv(ctx, avg_emb.data(), T_total, 0, &n_t, &vocab);
+    if (!logits)
+        return nullptr;
+
+    // Greedy decode
+    const int max_tokens = 512;
+    std::vector<int32_t> gen_ids;
+
+    // Only look at text logits (first text_vocab_size)
+    int next = mo2_sample_token(logits, hp.text_vocab_size, ctx->params.temperature);
+    free(logits);
+    gen_ids.push_back(next);
+
+    int n_past = T_total;
+    for (int step = 0; step < max_tokens - 1; step++) {
+        if (next == MO2_EOT)
+            break;
+
+        // Build input: 7 audio pad streams + 1 text token, embed + average.
+        // Mini-Omni2 uses snac_config.end_of_audio=4097 (pad_a), not eoa=4096.
+        std::vector<float> step_emb(d, 0.0f);
+        for (int stream = 0; stream < 7; stream++) {
+            int32_t id = mo2_layershift(MO2_PAD_A, stream);
+            float* emb = mo2_embed_tokens(ctx, &id, 1);
+            if (emb) {
+                for (int i = 0; i < d; i++)
+                    step_emb[i] += emb[i];
+                free(emb);
+            }
+        }
+        {
+            int32_t id = next;
+            float* emb = mo2_embed_tokens(ctx, &id, 1);
+            if (emb) {
+                for (int i = 0; i < d; i++)
+                    step_emb[i] += emb[i];
+                free(emb);
+            }
+        }
+        for (int i = 0; i < d; i++)
+            step_emb[i] /= 8.0f;
+
+        float* lg = mini_omni2_run_llm_kv(ctx, step_emb.data(), 1, n_past, nullptr, nullptr);
+        if (!lg)
+            break;
+        n_past++;
+        next = mo2_sample_token(lg, hp.text_vocab_size, ctx->params.temperature);
+        free(lg);
+        gen_ids.push_back(next);
+    }
+
+    // Detokenize: GPT-2 byte-level BPE → UTF-8
+    std::string result;
+    for (int id : gen_ids) {
+        if (id == MO2_EOT)
+            break;
+        if (id < 0 || id >= (int)ctx->model.vocab.size())
+            continue;
+        const auto& tok = ctx->model.vocab[id];
+        if (tok.empty())
+            continue;
+        // Skip special tokens
+        if (tok.size() >= 2 && tok[0] == '<' && tok[1] == '|')
+            continue;
+        for (size_t ci = 0; ci < tok.size();) {
+            unsigned char c = (unsigned char)tok[ci];
+            if (c == 0xC4 && ci + 1 < tok.size()) {
+                unsigned char c2 = (unsigned char)tok[ci + 1];
+                if (c2 == 0xA0) {
+                    result += ' '; // Ġ = U+0120 = space
+                    ci += 2;
+                    continue;
+                } else if (c2 == 0x8A) {
+                    result += '\n'; // Ċ = U+010A = newline
+                    ci += 2;
+                    continue;
+                }
+            }
+            result += (char)c;
+            ci++;
+        }
+    }
+
+    return strdup(result.c_str());
 }
