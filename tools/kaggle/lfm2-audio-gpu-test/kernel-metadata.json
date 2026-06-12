@@ -1,5 +1,5 @@
 {
-  "id": "${KAGGLE_ACCOUNT}/crispasr-lfm2-audio-gpu-test",
+  "id": "${KAGGLE_ACCOUNT}/crispasr-lfm2-audio-gpu-test-asr-tts",
   "title": "CrispASR LFM2-Audio GPU Test (ASR + TTS)",
   "code_file": "lfm2-audio-gpu-test.py",
   "language": "python",
