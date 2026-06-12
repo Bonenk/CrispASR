@@ -16,6 +16,7 @@
 #endif
 
 #include "core/attention.h"
+#include "core/bpe.h"
 #include "core/ffn.h"
 #include "core/gguf_loader.h"
 #include "core/mel.h"
@@ -137,6 +138,8 @@ struct mo2_model {
 
     // Tokenizer
     std::vector<std::string> vocab;
+    std::unordered_map<std::string, int32_t> token_to_id;
+    std::unordered_map<std::string, int32_t> merge_rank;
 
     // GGUF context
     ggml_context* ctx = nullptr;
@@ -234,9 +237,16 @@ extern "C" struct mini_omni2_context* mini_omni2_init_from_file(const char* path
             const int n = gguf_get_arr_n(gctx, tok_key);
             for (int i = 0; i < n && i < hp.llm_vocab; i++) {
                 const char* s = gguf_get_arr_str(gctx, tok_key, i);
-                if (s)
+                if (s) {
                     m.vocab[i] = s;
+                    m.token_to_id[s] = i;
+                }
             }
+        }
+        // BPE merges (for TTS text encoding)
+        auto merges = core_gguf::kv_str_array(gctx, "tokenizer.ggml.merges");
+        for (int i = 0; i < (int)merges.size(); i++) {
+            m.merge_rank[merges[i]] = i;
         }
 
         gguf_free(gctx);
@@ -1050,6 +1060,17 @@ static inline int mo2_layershift(int id, int layer) {
     return id + MO2_PADDED_TEXT + layer * MO2_PADDED_AUDIO;
 }
 
+// GPT-2 BPE detokenize helper (shared by ASR/TTS/S2S). Truncates at EOT.
+static std::string mo2_detokenize(const mini_omni2_context* ctx, const std::vector<int32_t>& ids) {
+    std::vector<int32_t> trimmed;
+    for (int id : ids) {
+        if (id == MO2_EOT)
+            break;
+        trimmed.push_back(id);
+    }
+    return core_bpe::detokenize(ctx->model.vocab, trimmed.data(), trimmed.size());
+}
+
 extern "C" char* mini_omni2_transcribe(struct mini_omni2_context* ctx, const float* samples, int n_samples) {
     if (!ctx || !samples || n_samples <= 0)
         return nullptr;
@@ -1192,75 +1213,13 @@ extern "C" char* mini_omni2_transcribe(struct mini_omni2_context* ctx, const flo
     }
 
     // Detokenize: GPT-2 byte-level BPE → UTF-8
-    std::string result;
-    for (int id : gen_ids) {
-        if (id == MO2_EOT)
-            break;
-        if (id < 0 || id >= (int)ctx->model.vocab.size())
-            continue;
-        const auto& tok = ctx->model.vocab[id];
-        if (tok.empty())
-            continue;
-        // Skip special tokens
-        if (tok.size() >= 2 && tok[0] == '<' && tok[1] == '|')
-            continue;
-        for (size_t ci = 0; ci < tok.size();) {
-            unsigned char c = (unsigned char)tok[ci];
-            if (c == 0xC4 && ci + 1 < tok.size()) {
-                unsigned char c2 = (unsigned char)tok[ci + 1];
-                if (c2 == 0xA0) {
-                    result += ' '; // Ġ = U+0120 = space
-                    ci += 2;
-                    continue;
-                } else if (c2 == 0x8A) {
-                    result += '\n'; // Ċ = U+010A = newline
-                    ci += 2;
-                    continue;
-                }
-            }
-            result += (char)c;
-            ci++;
-        }
-    }
+    std::string result = mo2_detokenize(ctx, gen_ids);
 
-    return strdup(result.c_str());
-}
-
-// ===========================================================================
-// GPT-2 BPE detokenize helper (shared by ASR/TTS/S2S)
-// ===========================================================================
-
-static std::string mo2_detokenize(const mini_omni2_context* ctx, const std::vector<int32_t>& ids) {
-    std::string result;
-    for (int id : ids) {
-        if (id == MO2_EOT)
-            break;
-        if (id < 0 || id >= (int)ctx->model.vocab.size())
-            continue;
-        const auto& tok = ctx->model.vocab[id];
-        if (tok.empty())
-            continue;
-        if (tok.size() >= 2 && tok[0] == '<' && tok[1] == '|')
-            continue;
-        for (size_t ci = 0; ci < tok.size();) {
-            unsigned char c = (unsigned char)tok[ci];
-            if (c == 0xC4 && ci + 1 < tok.size()) {
-                unsigned char c2 = (unsigned char)tok[ci + 1];
-                if (c2 == 0xA0) {
-                    result += ' ';
-                    ci += 2;
-                    continue;
-                } else if (c2 == 0x8A) {
-                    result += '\n';
-                    ci += 2;
-                    continue;
-                }
-            }
-            result += (char)c;
-            ci++;
-        }
-    }
-    return result;
+    char* out = (char*)malloc(result.size() + 1);
+    if (!out)
+        return nullptr;
+    memcpy(out, result.c_str(), result.size() + 1);
+    return out;
 }
 
 // ===========================================================================
@@ -1406,19 +1365,62 @@ extern "C" float* mini_omni2_synthesize(struct mini_omni2_context* ctx, const ch
     }
 
     const auto& hp = ctx->model.hp;
+    const auto& m = ctx->model;
     const int d = hp.llm_hidden;
 
-    // Tokenize text
-    // Simple: look up each byte in the vocab. For proper tokenization we'd
-    // need BPE merge rules, but the GGUF doesn't store them. For now, use
-    // the token_embd to encode known tokens. This is a limitation — full
-    // BPE tokenization would require porting the tokenizer.
-    // TODO: implement proper BPE tokenizer from tokenizer.json
-    fprintf(stderr, "mini_omni2: TTS not yet fully implemented (needs BPE tokenizer)\n");
-    (void)d;
-    if (out_n_samples)
-        *out_n_samples = 0;
-    return nullptr;
+    // Tokenize text via GPT-2 byte-level BPE
+    std::vector<int32_t> text_tokens = core_bpe::tokenize_simple(m.token_to_id, m.merge_rank, text);
+    if (text_tokens.empty()) {
+        fprintf(stderr, "mini_omni2: tokenization produced 0 tokens\n");
+        return nullptr;
+    }
+
+    // Build T1_A2 input (text→audio): matches get_input_ids_TA from inference.py
+    // Audio streams: [pad_a × (len(text_tokens)+2), answer_a]
+    // Text stream:   [input_t, text_tokens..., eot, answer_t]
+    const int T_text = (int)text_tokens.size();
+    const int T_total_a = T_text + 2 + 1; // pad_a×(T_text+2) + answer_a
+    const int T_total_t = T_text + 3;     // input_t + text_tokens + eot + answer_t
+    // Audio and text streams must be same length for averaging
+    const int T_total = std::max(T_total_a, T_total_t);
+
+    std::vector<float> avg_emb((size_t)T_total * d, 0.0f);
+
+    for (int stream = 0; stream < 8; stream++) {
+        std::vector<int32_t> ids(T_total);
+        if (stream < 7) {
+            // Audio: [pad_a × (T_text+2), answer_a] left-padded to T_total
+            for (int t = 0; t < T_total - 1; t++)
+                ids[t] = mo2_layershift(MO2_PAD_A, stream);
+            ids[T_total - 1] = mo2_layershift(MO2_ANSWER_A, stream);
+        } else {
+            // Text: [input_t, text_tokens..., eot, answer_t] right-padded to T_total
+            ids[0] = MO2_INPUT_T;
+            for (int t = 0; t < T_text; t++)
+                ids[1 + t] = text_tokens[t];
+            ids[1 + T_text] = MO2_EOT;
+            ids[2 + T_text] = MO2_ANSWER_T;
+            for (int t = 3 + T_text; t < T_total; t++)
+                ids[t] = MO2_PAD_T;
+        }
+
+        float* emb = mo2_embed_tokens(ctx, ids.data(), T_total);
+        if (!emb)
+            return nullptr;
+        for (size_t i = 0; i < (size_t)T_total * d; i++)
+            avg_emb[i] += emb[i];
+        free(emb);
+    }
+    for (size_t i = 0; i < (size_t)T_total * d; i++)
+        avg_emb[i] /= 8.0f;
+
+    // Dual-stream generation
+    std::vector<int32_t> gen_text;
+    std::vector<std::vector<int32_t>> gen_audio;
+    mo2_generate_dual(ctx, avg_emb.data(), T_total, gen_text, gen_audio, 2048);
+
+    // Decode SNAC audio
+    return mo2_decode_snac(ctx, gen_audio, out_n_samples);
 }
 
 // ===========================================================================

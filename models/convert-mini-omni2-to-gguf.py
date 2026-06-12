@@ -134,6 +134,11 @@ def main():
                     vocab_list[idx] = token
             writer.add_array("tokenizer.ggml.tokens", vocab_list)
             print(f"  Tokenizer: {vocab_size} tokens")
+            # BPE merges (needed for TTS text encoding)
+            merges = tok_data.get("model", {}).get("merges", [])
+            if merges:
+                writer.add_array("tokenizer.ggml.merges", merges)
+                print(f"  Merges: {len(merges)} merge rules")
     else:
         print("  Warning: tokenizer.json not found")
 
