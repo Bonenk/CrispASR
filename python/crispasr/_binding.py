@@ -1795,7 +1795,13 @@ class Session:
             raise RuntimeError(f"set_whisper_decode_extras failed (rc={rc})")
 
     def set_ask(self, prompt: str) -> None:
-        """Set a free-form prompt passed to the backend on the next transcribe/synthesize call."""
+        """Set a free-form prompt passed to the backend on the next transcribe/synthesize call.
+
+        Supported by: granite, voxtral, qwen3-asr, glm-asr, gemma4-e2b,
+        mimo-asr, moss-audio, lfm2-audio, mini-omni2. For moss-audio this
+        enables audio understanding beyond ASR (e.g. "Describe the sounds
+        in this clip." or "What language is spoken?").
+        """
         if not hasattr(self._lib, "crispasr_session_set_ask"):
             return
         self._lib.crispasr_session_set_ask.argtypes = [ctypes.c_void_p, ctypes.c_char_p]

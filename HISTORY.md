@@ -6,6 +6,39 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-05 #58 MOSS-Audio-4B-Instruct — audio understanding + ASR backend
+
+New audio-understanding backend: 32-layer Whisper-style encoder (1280d,
+20 heads, 128-mel, sliding-window attention w=100) with DeepStack 3-tap
+cross-layer injection (taps at L8/16/24) + GatedMLP adapter (1280→8192→2560)
++ 36-layer Qwen3 LM (2560d, 32Q/8KV, SwiGLU, RoPE θ=1M). Apache-2.0.
+First backend that handles audio QA, scene description, and time-aware ASR
+in addition to plain transcription — prompt-driven via `--prompt` / `set_ask()`.
+
+Architecture highlights:
+- **Conv2d stem**: 3× Conv2d (stride 2 each) → 8× downsample → stem_proj
+  Linear(7680, 1280). Slaney mel filterbank with reflect padding.
+- **DeepStack**: encoder taps at layers 8, 16, 24 projected through
+  independent GatedMLP heads and injected as residual adds at LM blocks
+  0, 1, 2. Preserves multi-resolution features (prosody + semantics).
+- **Time markers**: explicit time-marker tokens inserted between audio
+  frame embeddings; supports word/sentence-level timestamp ASR.
+- **Tokenizer**: GPT-2 BPE via `core_bpe` (same as qwen3_asr).
+
+Key fixes during the port (20 commits, 2026-06-03 to 2026-06-05):
+1. Conv2d layout: transpose mel input ne=(freq,time) + kernel permute
+2. Slaney mel filterbank + reflect padding + 3000-frame padding
+3. Chunked encoder processing (400-frame chunks, per-chunk attention)
+4. Manual attention (Q@K^T → softmax → @V) with NaN-safe padding mask
+5. GPT-2 BPE tokenizer via core_bpe
+6. Time marker insertion in prompt
+7. DeepStack re-enabled (initially disabled for debugging)
+8. Selective quantization (encoder F16, LLM Q4_K)
+
+Diff-validated: all 6 stages PASS at cos ≥ 0.999. GGUFs at
+`cstr/MOSS-Audio-4B-Instruct-GGUF` (F16 + Q4_K). Model registry,
+auto-download, C-ABI, CLI backend, and diff harness all wired.
+
 ## 2026-06-12 §164 Mini-Omni2 — full ASR+TTS+S2S backend
 
 New multimodal speech backend: Whisper-small (80 mel, 12L, 768d) +

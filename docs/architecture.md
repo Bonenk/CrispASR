@@ -457,6 +457,30 @@ into `~/.cache/crispasr/`; the runtime auto-discovers
 `mimo-tokenizer-q4_k.gguf` next to the LM. Override with `--codec-model
 PATH/mimo-tokenizer-q4_k.gguf` if you keep the tokenizer elsewhere.
 
+### moss-audio
+
+32-layer Whisper-style audio encoder (1280d, 20 heads, 128-mel,
+sliding-window attention w=100) with **DeepStack** 3-tap cross-layer
+injection + 36-layer Qwen3 LM (2560d, 32Q/8KV, SwiGLU, RoPE θ=1M).
+Apache-2.0. First audio-understanding backend — supports transcription,
+audio QA, scene description, and time-aware ASR via prompt.
+
+**DeepStack architecture:** the encoder captures intermediate outputs at
+layers 8, 16, and 24. Each tap is projected through an independent
+GatedMLP (1280→8192→2560) into the LM embedding space. These projections
+are injected as residual adds at LM blocks 0, 1, and 2, preserving
+multi-resolution audio features (low-level prosody/transients alongside
+high-level semantics) through the LM's early layers.
+
+**Audio front-end:** 128-bin log-mel → 3×Conv2d (stride 2 each, 8×
+downsample total) → stem_proj Linear(7680, 1280) → sinusoidal position
+embeddings → 32 encoder blocks. Slaney mel filterbank normalization.
+Encoder output padded to 3000 frames (Whisper 30s convention).
+
+**Prompt format:** Qwen3 chat template with time-marker tokens inserted
+at fixed intervals between audio frame embeddings. Supports custom prompts
+via `--prompt` / `set_ask()` for audio understanding tasks beyond ASR.
+
 ### qwen3-tts
 
 Qwen3 talker LM + 12 Hz RVQ speech tokenizer. Three variants:

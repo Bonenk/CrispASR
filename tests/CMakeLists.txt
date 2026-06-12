@@ -482,6 +482,26 @@ catch_discover_tests(test-mini-omni2
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test - moss-audio — live integration tests for MOSS-Audio-4B audio understanding
+add_executable(test-moss-audio
+    test_moss_audio_live.cpp
+)
+target_include_directories(test-moss-audio PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+)
+target_link_libraries(test-moss-audio PRIVATE
+    Catch2::Catch2WithMain
+    moss_audio
+)
+catch_discover_tests(test-moss-audio
+    TEST_SPEC "[moss-audio]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test - context - bias — Catch2 unit tests for CTC-WS phrase-boost trie (PLAN #98)
 add_executable(test-context-bias
     test_context_bias.cpp
