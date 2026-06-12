@@ -62,8 +62,8 @@ TEST_CASE("whisper_params: best_of defaults to sensible value", "[unit]") {
     REQUIRE(kDefaults.best_of >= 1);
 }
 
-TEST_CASE("whisper_params: beam_size defaults to sensible value", "[unit]") {
-    REQUIRE(kDefaults.beam_size >= 1);
+TEST_CASE("whisper_params: beam_size defaults to greedy (-1)", "[unit]") {
+    REQUIRE(kDefaults.beam_size == -1);
 }
 
 TEST_CASE("whisper_params: n_threads defaults to sensible value", "[unit]") {

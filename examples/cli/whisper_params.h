@@ -27,7 +27,7 @@ struct whisper_params {
     int32_t max_len = 0;
     bool split_on_punct = false;
     int32_t best_of = whisper_full_default_params(CRISPASR_SAMPLING_GREEDY).greedy.best_of;
-    int32_t beam_size = whisper_full_default_params(CRISPASR_SAMPLING_BEAM_SEARCH).beam_search.beam_size;
+    int32_t beam_size = -1; // -1 = greedy; beam search only when explicitly set via -bs N
     int32_t audio_ctx = 0;
 
     float word_thold = 0.01f;

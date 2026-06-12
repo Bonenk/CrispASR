@@ -321,7 +321,7 @@ private:
                 wparams.audio_ctx = params.audio_ctx;
 
                 wparams.greedy.best_of = params.best_of;
-                wparams.beam_search.beam_size = params.beam_size;
+                wparams.beam_search.beam_size = params.beam_size > 0 ? params.beam_size : 5;
 
                 wparams.initial_prompt = params.prompt.c_str();
 
