@@ -4948,7 +4948,7 @@ int main(int argc, char** argv) {
             } else {
                 printf("[INFO] %-22s ref shape=[", stage);
                 for (size_t i = 0; i < ref_shape.size(); i++)
-                    printf("%s%d", i ? "," : "", ref_shape[i]);
+                    printf("%s%ld", i ? "," : "", (long)ref_shape[i]);
                 printf("]  (stage comparison not yet wired)\n");
             }
             n_skip++;
@@ -4981,7 +4981,7 @@ int main(int argc, char** argv) {
                 n_mels = 128;
                 T_mel = (int)(sz / sizeof(float) / n_mels);
                 mel = (float*)malloc(sz);
-                fread(mel, 1, sz, mf);
+                (void)!fread(mel, 1, sz, mf);
                 fclose(mf);
                 printf("  (mel override from %s: %d x %d)\n", mel_override, n_mels, T_mel);
             }

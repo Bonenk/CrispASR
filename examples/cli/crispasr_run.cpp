@@ -1740,7 +1740,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
             FILE* probe = fopen(tc_path.c_str(), "rb");
             if (probe) {
                 char magic[4] = {};
-                fread(magic, 1, 4, probe);
+                (void)!fread(magic, 1, 4, probe);
                 fclose(probe);
                 if (memcmp(magic, "LSTM", 4) == 0) {
                     tc_lstm_ctx.reset(truecaser_lstm_init(tc_path.c_str()));
