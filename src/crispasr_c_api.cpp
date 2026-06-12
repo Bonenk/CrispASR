@@ -3487,7 +3487,13 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
 #endif
 #ifdef CA_HAVE_LFM2_AUDIO
     if (s->backend == "lfm2-audio" && s->lfm2_audio_ctx) {
-        char* text = lfm2_audio_transcribe(s->lfm2_audio_ctx, pcm, n_samples, nullptr, 0);
+        // Forward language hint or ask prompt; fall back to the session language
+        const char* lfm2_prompt = nullptr;
+        if (!s->ask.empty())
+            lfm2_prompt = s->ask.c_str();
+        else if (lang_set)
+            lfm2_prompt = lang.c_str();
+        char* text = lfm2_audio_transcribe(s->lfm2_audio_ctx, pcm, n_samples, lfm2_prompt, 0);
         if (!text) {
             delete r;
             return nullptr;

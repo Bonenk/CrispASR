@@ -4,7 +4,7 @@ package whisper
 // CrispASR Session API for TTS-capable backends (kokoro, vibevoice,
 // qwen3-tts, orpheus, chatterbox, csm, dia, zonos-tts, speecht5, fastpitch,
 // melotts, piper, parler-tts, outetts, indextts, voxcpm2-tts,
-// cosyvoice3-tts, pocket-tts, f5-tts, bark, kugelaudio, tada, ...) plus the kokoro
+// cosyvoice3-tts, pocket-tts, f5-tts, bark, kugelaudio, tada, lfm2-audio, ...) plus the kokoro
 // per-language model + voice resolver (PLAN #56 opt 2b).
 
 /*
@@ -299,7 +299,7 @@ import (
 	"unsafe"
 )
 
-// CrispasrSession is a TTS-capable session (kokoro, vibevoice, qwen3-tts, orpheus, parler-tts, pocket-tts, tada).
+// CrispasrSession is a TTS-capable session (kokoro, vibevoice, qwen3-tts, orpheus, parler-tts, pocket-tts, tada, lfm2-audio).
 type CrispasrSession struct {
 	handle *C.CrispasrSession
 }

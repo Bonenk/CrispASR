@@ -743,6 +743,48 @@ Converts text + reference audio to mel spectrograms via ODE-based diffusion
 (typically 32 Euler steps), then vocodes with a shared vocoder. Zero-shot
 voice cloning.
 
+### lfm2-audio
+
+LiquidAI LFM2.5-Audio (LFM Open v1.0, 1.5B): end-to-end multimodal
+ASR + TTS + speech-to-speech in a single model.
+
+**ASR path:** 16 kHz mono PCM → 128-mel NeMo-style spectrogram (slaney
+filterbank, ln + per-feature-z normalization) → 17L FastConformer encoder
+(512-dim, 8 heads, rel-pos attention, dw-striding 8× subsampling) → audio
+adapter MLP (LayerNorm → Linear(512→2048) → GELU → Linear(2048→2048)) →
+16L LFM2 hybrid backbone (2048-dim, 10 ShortConv + 6 GQA attention layers,
+SwiGLU FFN, RoPE θ=1M, QK layernorm) → greedy text decode via tied
+embed_tokens weight.
+
+The LFM2 backbone interleaves two layer types:
+- **ShortConv** (10 of 16 layers): depthwise causal conv1d (kernel=3) with
+  gated in/out projections. `BCx = in_proj(h)`, `Bx = B * x`, conv(Bx),
+  `y = C * conv_out`, `out = out_proj(y)`. Conv state cache stores last
+  K-1=2 Bx columns per layer for incremental decode.
+- **GQA attention** (6 of 16 layers): 32 query heads, 8 KV heads, head_dim=64.
+  Per-head QK RMSNorm before RoPE. Flash attention with explicit causal mask.
+  Standard F16 KV cache for incremental decode.
+
+Layer types follow the pattern `ccaccaccacacacac` (c=conv, a=attn).
+
+**TTS path:** text tokenized via GPT-2 BPE → interleaved generation
+(6 text tokens + 9 audio frames alternating) → depthformer (6L transformer,
+1024-dim, fused QKV, 8-codebook Mimi code generation) → ISTFT detokenizer
+(separate 8L LFM2 512-dim + Linear(512→1282) + ISTFT → 24 kHz PCM).
+The detokenizer loads from a companion `*-detokenizer.gguf`.
+
+**Speech-to-speech:** combines the ASR conformer encoder (audio input) with
+interleaved generation (text + audio output). System prompt:
+"Respond with interleaved text and audio."
+
+GGUF: single file for the main model (encoder + backbone + depthformer + Mimi
+codec + audio embedding) + companion detokenizer. Quantization: Q5_K
+recommended for EN, Q4_K for JP. crispasr-quantize keeps encoder, adapter,
+embeddings, and Mimi codec at F16; only backbone + depthformer layers quantized.
+
+Variants: English (`LiquidAI/LFM2.5-Audio-1.5B`) and Japanese
+(`LiquidAI/LFM2.5-Audio-1.5B-JP`).
+
 ### bark
 
 Suno Bark (MIT, ~400M): three-stage GPT-2 pipeline — text → semantic tokens
