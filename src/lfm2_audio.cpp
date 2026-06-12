@@ -1778,144 +1778,217 @@ static std::vector<int32_t> lfm2_depthformer_sample_frame(lfm2_audio_context* ct
     std::vector<int32_t> codes(codebooks);
     std::vector<float> prev_emb(depth_dim, 0.0f); // zero for first codebook
 
+
     const size_t step_mem = 8 * 1024 * 1024;
     std::vector<uint8_t> step_buf(step_mem);
+
+    // Manual CPU-side KV cache for the depthformer.
+    // K/V per layer: [max_codebooks][kv_dim] = [8][256] = 2 KB per layer per K or V.
+    // Total: 6 layers × 2 × 8 × 256 × 4 = 96 KB.
+    const int d_n_heads = 32;
+    const int d_n_kv = 8;
+    const int d_hd = depth_dim / d_n_heads; // 32
+    const int d_kv_dim = d_n_kv * d_hd;     // 256
+
+    // k_cache[layer][pos * kv_dim + j], v_cache[layer][pos * kv_dim + j]
+    std::vector<std::vector<float>> k_cache(depth_n_layers, std::vector<float>(codebooks * d_kv_dim, 0.0f));
+    std::vector<std::vector<float>> v_cache(depth_n_layers, std::vector<float>(codebooks * d_kv_dim, 0.0f));
+
     for (int c = 0; c < codebooks; c++) {
-        // Input: depth_linear_out[c] + prev_emb
         std::vector<float> input(depth_dim);
         for (int j = 0; j < depth_dim; j++)
             input[j] = proj_data[c * depth_dim + j] + prev_emb[j];
 
-        // Run 6-layer transformer on this single token
-        // (no KV cache across codebooks — each frame is independent,
-        //  but within a frame the 8 codebook steps share a cache)
         ggml_init_params sip = {step_mem, step_buf.data(), false};
         ggml_context* sc = ggml_init(sip);
         if (!sc)
             break;
 
-        ggml_tensor* x = ggml_new_tensor_2d(sc, GGML_TYPE_F32, depth_dim, c + 1);
-        // Fill positions 0..c-1 with previously computed inputs, position c with current
-        // Actually for efficiency, build the full (depth_dim, c+1) sequence
-        // For now, just process position c with positions 0..c-1 via no-cache:
-        // This is O(codebooks^2) per frame but codebooks=8, so 8*6 = 48 layer calls total.
-        // Fast enough.
+        ggml_tensor* cur = ggml_new_tensor_2d(sc, GGML_TYPE_F32, depth_dim, 1);
+        memcpy(cur->data, input.data(), sizeof(float) * depth_dim);
 
-        // Simpler: build (depth_dim, 1) input for just this codebook position
-        // and use KV cache. But building a KV cache for 6 layers × 8 steps is complex.
-        //
-        // Simplest correct approach: run all c+1 tokens through the transformer
-        // each time (no cache). Total ops: sum(c+1 for c=0..7) = 36 token-layer pairs × 6 layers = 216.
-        // At depth_dim=1024, this is tiny.
+        ggml_tensor* positions = ggml_new_tensor_1d(sc, GGML_TYPE_I32, 1);
+        *(int32_t*)positions->data = c;
 
-        // Build full sequence of c+1 inputs
-        // prev inputs stored in a running buffer
-        static thread_local std::vector<float> depth_sequence;
-        if (c == 0)
-            depth_sequence.clear();
-        depth_sequence.insert(depth_sequence.end(), input.begin(), input.end());
-
-        ggml_tensor* seq = ggml_new_tensor_2d(sc, GGML_TYPE_F32, depth_dim, c + 1);
-        memcpy(seq->data, depth_sequence.data(), sizeof(float) * depth_dim * (c + 1));
-
-        // Positions for RoPE
-        ggml_tensor* positions = ggml_new_tensor_1d(sc, GGML_TYPE_I32, c + 1);
-        {
-            int32_t* pos = (int32_t*)positions->data;
-            for (int i = 0; i <= c; i++)
-                pos[i] = i;
-        }
-
-        // Causal mask (only needed if c > 0)
-        ggml_tensor* mask = nullptr;
-        if (c > 0) {
-            mask = ggml_new_tensor_2d(sc, GGML_TYPE_F16, c + 1, c + 1);
-            ggml_fp16_t* m = (ggml_fp16_t*)mask->data;
-            ggml_fp16_t zero = ggml_fp32_to_fp16(0.0f);
-            ggml_fp16_t neginf = ggml_fp32_to_fp16(-INFINITY);
-            for (int q = 0; q <= c; q++)
-                for (int k = 0; k <= c; k++)
-                    m[q * (c + 1) + k] = (k <= q) ? zero : neginf;
-        }
-
-        // 6-layer depthformer transformer
-        // The depthformer uses MHA with fused QKV (not GQA — head_dim=32, 32 heads, 8 KV heads)
-        // Actually: qkv_proj is (1024→1536) = Q(1024) + K(256) + V(256)
-        // So n_heads=32, n_kv_heads=8, head_dim=32
-        const int d_n_heads = 32;
-        const int d_n_kv = 8;
-        const int d_hd = depth_dim / d_n_heads; // 32
-
-        ggml_tensor* cur = seq;
+        // For each layer: manually load cached K/V, run attention on single token
         for (int il = 0; il < depth_n_layers; il++) {
             auto& dl = model.depth_layers[il];
             ggml_tensor* residual = cur;
-
-            // RMSNorm → MHA
             ggml_tensor* h = lfm2_rms_norm(sc, cur, dl.operator_norm_w, norm_eps);
 
-            // Fused QKV
+            // Fused QKV projection
             ggml_tensor* qkv = ggml_mul_mat(sc, dl.attn_qkv_proj_w, h);
-            const int q_dim = d_n_heads * d_hd; // 1024
-            const int kv_dim = d_n_kv * d_hd;   // 256
-            ggml_tensor* Q = ggml_view_2d(sc, qkv, q_dim, c + 1, qkv->nb[1], 0);
-            ggml_tensor* K = ggml_view_2d(sc, qkv, kv_dim, c + 1, qkv->nb[1], q_dim * sizeof(float));
-            ggml_tensor* V = ggml_view_2d(sc, qkv, kv_dim, c + 1, qkv->nb[1], (q_dim + kv_dim) * sizeof(float));
-            if (c > 0) {
-                Q = ggml_cont(sc, Q);
-                K = ggml_cont(sc, K);
-                V = ggml_cont(sc, V);
-            }
+            int q_dim = d_n_heads * d_hd;
+            ggml_tensor* Q_new = ggml_view_2d(sc, qkv, q_dim, 1, qkv->nb[1], 0);
+            ggml_tensor* K_new = ggml_view_2d(sc, qkv, d_kv_dim, 1, qkv->nb[1], q_dim * sizeof(float));
+            ggml_tensor* V_new = ggml_view_2d(sc, qkv, d_kv_dim, 1, qkv->nb[1], (q_dim + d_kv_dim) * sizeof(float));
 
-            Q = ggml_reshape_3d(sc, Q, d_hd, d_n_heads, c + 1);
-            K = ggml_reshape_3d(sc, K, d_hd, d_n_kv, c + 1);
-            V = ggml_reshape_3d(sc, V, d_hd, d_n_kv, c + 1);
+            // Reshape to (head_dim, n_heads/n_kv, 1)
+            Q_new = ggml_reshape_3d(sc, Q_new, d_hd, d_n_heads, 1);
+            K_new = ggml_reshape_3d(sc, K_new, d_hd, d_n_kv, 1);
+            V_new = ggml_reshape_3d(sc, V_new, d_hd, d_n_kv, 1);
 
             // QK layernorm
-            Q = ggml_mul(sc, ggml_rms_norm(sc, Q, norm_eps), dl.attn_q_ln_w);
-            K = ggml_mul(sc, ggml_rms_norm(sc, K, norm_eps), dl.attn_k_ln_w);
+            Q_new = ggml_mul(sc, ggml_rms_norm(sc, Q_new, norm_eps), dl.attn_q_ln_w);
+            K_new = ggml_mul(sc, ggml_rms_norm(sc, K_new, norm_eps), dl.attn_k_ln_w);
 
-            // RoPE
-            Q = ggml_rope_ext(sc, Q, positions, nullptr, d_hd, GGML_ROPE_TYPE_NEOX, 0, 1000000.0f, 1.0f, 0.0f, 1.0f,
-                              0.0f, 0.0f);
-            K = ggml_rope_ext(sc, K, positions, nullptr, d_hd, GGML_ROPE_TYPE_NEOX, 0, 1000000.0f, 1.0f, 0.0f, 1.0f,
-                              0.0f, 0.0f);
+            // RoPE on the new token
+            Q_new = ggml_rope_ext(sc, Q_new, positions, nullptr, d_hd, GGML_ROPE_TYPE_NEOX, 0, 1000000.0f, 1.0f, 0.0f,
+                                  1.0f, 0.0f, 0.0f);
+            K_new = ggml_rope_ext(sc, K_new, positions, nullptr, d_hd, GGML_ROPE_TYPE_NEOX, 0, 1000000.0f, 1.0f, 0.0f,
+                                  1.0f, 0.0f, 0.0f);
 
-            // Permute for flash_attn
-            Q = ggml_cont(sc, ggml_permute(sc, Q, 0, 2, 1, 3));
-            K = ggml_cont(sc, ggml_permute(sc, K, 0, 2, 1, 3));
-            V = ggml_cont(sc, ggml_permute(sc, V, 0, 2, 1, 3));
+            // Build full K/V: load cached [0..c-1] + new [c]
+            // K_full: (head_dim, c+1, n_kv)
+            ggml_tensor* K_full = ggml_new_tensor_3d(sc, GGML_TYPE_F32, d_hd, c + 1, d_n_kv);
+            ggml_tensor* V_full = ggml_new_tensor_3d(sc, GGML_TYPE_F32, d_hd, c + 1, d_n_kv);
+
+            // Fill cached positions from CPU arrays
+            // k_cache[il] layout: [pos * kv_dim + kv_head * hd + dim]
+            // K_full layout: (d_hd, c+1, d_n_kv) ggml → data[hd + pos*d_hd + kv*d_hd*(c+1)]
+            {
+                float* kf = (float*)K_full->data;
+                float* vf = (float*)V_full->data;
+                for (int kv = 0; kv < d_n_kv; kv++) {
+                    for (int p = 0; p < c; p++) {
+                        memcpy(kf + kv * d_hd * (c + 1) + p * d_hd, k_cache[il].data() + p * d_kv_dim + kv * d_hd,
+                               d_hd * sizeof(float));
+                        memcpy(vf + kv * d_hd * (c + 1) + p * d_hd, v_cache[il].data() + p * d_kv_dim + kv * d_hd,
+                               d_hd * sizeof(float));
+                    }
+                }
+                // Position c will be filled after the graph runs (from K_new/V_new)
+                // For now, zero it (the attention mask makes it attend to 0..c only)
+                for (int kv = 0; kv < d_n_kv; kv++) {
+                    memset(kf + kv * d_hd * (c + 1) + c * d_hd, 0, d_hd * sizeof(float));
+                    memset(vf + kv * d_hd * (c + 1) + c * d_hd, 0, d_hd * sizeof(float));
+                }
+            }
+
+            // We can't easily write K_new/V_new into K_full BEFORE graph eval
+            // (they're graph nodes, not yet computed). Instead, let's use the
+            // SIMPLER approach: for T=1 with c cached positions, build the
+            // full (c+1) K/V where positions 0..c-1 come from cache and
+            // position c comes from the new K/V.
+            //
+            // Actually, since we're using no_alloc=false (bump allocator),
+            // we CAN write to K_full->data. But K_new is a graph node and
+            // hasn't been computed yet. We need the graph to run first.
+            //
+            // SIMPLEST: just run the full (c+1) token approach for the FIRST
+            // 3 codebooks (where c+1 ≤ 3), and only use the cache for later
+            // ones. But that doesn't save much.
+            //
+            // REAL FIX: build the attention manually using ggml ops.
+            // Q_new is (hd, n_heads, 1). K_full needs to include K_new.
+            // Use ggml_set to write K_new into K_full at position c.
+
+            // Actually, the SIMPLEST correct approach that works with ggml:
+            // concatenate the cached K/V (as input tensors) with K_new/V_new
+            // using ggml_concat.
+
+            ggml_tensor* K_cached = ggml_new_tensor_3d(sc, GGML_TYPE_F32, d_hd, (c > 0 ? c : 1), d_n_kv);
+            ggml_tensor* V_cached = ggml_new_tensor_3d(sc, GGML_TYPE_F32, d_hd, (c > 0 ? c : 1), d_n_kv);
+            if (c > 0) {
+                // Fill from CPU cache
+                float* kd = (float*)K_cached->data;
+                float* vd = (float*)V_cached->data;
+                for (int kv = 0; kv < d_n_kv; kv++) {
+                    for (int p = 0; p < c; p++) {
+                        memcpy(kd + kv * d_hd * c + p * d_hd, k_cache[il].data() + p * d_kv_dim + kv * d_hd,
+                               d_hd * sizeof(float));
+                        memcpy(vd + kv * d_hd * c + p * d_hd, v_cache[il].data() + p * d_kv_dim + kv * d_hd,
+                               d_hd * sizeof(float));
+                    }
+                }
+            }
+
+            // Permute new K/V from (hd, n_kv, 1) → (hd, 1, n_kv)
+            ggml_tensor* K_new_p = ggml_cont(sc, ggml_permute(sc, K_new, 0, 2, 1, 3)); // (hd, 1, n_kv)
+            ggml_tensor* V_new_p = ggml_cont(sc, ggml_permute(sc, V_new, 0, 2, 1, 3));
+
+            // Concat cached + new along dim 1 (sequence length)
+            ggml_tensor *K_all, *V_all;
+            if (c > 0) {
+                K_all = ggml_concat(sc, K_cached, K_new_p, 1); // (hd, c+1, n_kv)
+                V_all = ggml_concat(sc, V_cached, V_new_p, 1);
+            } else {
+                K_all = K_new_p; // (hd, 1, n_kv)
+                V_all = V_new_p;
+            }
+
+            // Permute Q to (hd, 1, n_heads) for flash_attn
+            ggml_tensor* Q_p = ggml_cont(sc, ggml_permute(sc, Q_new, 0, 2, 1, 3)); // (hd, 1, n_heads)
 
             float scale = 1.0f / sqrtf((float)d_hd);
-            ggml_tensor* attn = ggml_flash_attn_ext(sc, Q, K, V, mask, scale, 0.0f, 0.0f);
-            attn = ggml_reshape_2d(sc, attn, depth_dim, c + 1);
-            attn = ggml_mul_mat(sc, dl.attn_out_proj_w, attn);
+            ggml_tensor* attn = ggml_flash_attn_ext(sc, Q_p, K_all, V_all, nullptr, scale, 0.0f, 0.0f);
+            // attn: (hd, 1, n_heads) → reshape to (depth_dim, 1)
+            attn = ggml_reshape_2d(sc, attn, depth_dim, 1);
+            h = ggml_mul_mat(sc, dl.attn_out_proj_w, attn);
 
-            cur = ggml_add(sc, residual, attn);
+            cur = ggml_add(sc, residual, h);
 
             // FFN
             residual = cur;
             h = lfm2_rms_norm(sc, cur, dl.ffn_norm_w, norm_eps);
             h = lfm2_swiglu_ffn(sc, h, dl.ff_w1, dl.ff_w2, dl.ff_w3);
             cur = ggml_add(sc, residual, h);
+
+            // After this layer, we need K_new and V_new values to update cache.
+            // But they're ggml graph nodes — we need to mark them for extraction.
+            char kn[32], vn[32];
+            snprintf(kn, sizeof(kn), "dk_%d", il);
+            snprintf(vn, sizeof(vn), "dv_%d", il);
+            ggml_tensor* k_snap = ggml_dup(sc, K_new);
+            ggml_tensor* v_snap = ggml_dup(sc, V_new);
+            ggml_set_name(k_snap, kn);
+            ggml_set_name(v_snap, vn);
+            // These need to be in the graph
+            // (We'll build a single combined graph at the end of all layers)
         }
 
-        // Extract last position's output
-        ggml_tensor* last = ggml_view_1d(sc, cur, depth_dim, (int64_t)c * depth_dim * sizeof(float));
-
-        // Logits: embedding_norm(last) → to_logits
+        // Logits
         auto& cb = model.depth_codebooks[c];
-        ggml_tensor* normed = ggml_mul(sc, ggml_rms_norm(sc, last, norm_eps), cb.embedding_norm_w);
+        ggml_tensor* normed = ggml_mul(sc, ggml_rms_norm(sc, cur, norm_eps), cb.embedding_norm_w);
         ggml_tensor* logits = ggml_mul_mat(sc, cb.to_logits_w, normed);
         ggml_tensor* logits_out = ggml_dup(sc, logits);
         ggml_set_name(logits_out, "depth_logits");
 
-        // Also compute embedding of the chosen token for next codebook
-        // (we'll do this after graph eval by looking up the argmax)
-
+        // Build graph for all layers + logits + K/V snaps
         ggml_cgraph* gf = ggml_new_graph_custom(sc, 4096, false);
         ggml_build_forward_expand(gf, logits_out);
+        // Add K/V snapshots
+        for (int il = 0; il < depth_n_layers; il++) {
+            char kn[32], vn[32];
+            snprintf(kn, sizeof(kn), "dk_%d", il);
+            snprintf(vn, sizeof(vn), "dv_%d", il);
+            ggml_tensor* ks = ggml_graph_get_tensor(gf, kn);
+            ggml_tensor* vs = ggml_graph_get_tensor(gf, vn);
+            if (ks)
+                ggml_build_forward_expand(gf, ks);
+            if (vs)
+                ggml_build_forward_expand(gf, vs);
+        }
         ggml_graph_compute_with_ctx(sc, gf, ctx->n_threads);
+
+        // Update KV cache from snapshots
+        for (int il = 0; il < depth_n_layers; il++) {
+            char kn[32], vn[32];
+            snprintf(kn, sizeof(kn), "dk_%d", il);
+            snprintf(vn, sizeof(vn), "dv_%d", il);
+            ggml_tensor* ks = ggml_graph_get_tensor(gf, kn);
+            ggml_tensor* vs = ggml_graph_get_tensor(gf, vn);
+            if (ks && vs) {
+                // K_new: (hd, n_kv, 1) in ggml → data[hd + kv*hd]
+                // k_cache[il] layout: [pos * kv_dim + kv * hd + dim]
+                const float* kd = (const float*)ks->data;
+                const float* vd = (const float*)vs->data;
+                for (int kv = 0; kv < d_n_kv; kv++) {
+                    memcpy(k_cache[il].data() + c * d_kv_dim + kv * d_hd, kd + kv * d_hd, d_hd * sizeof(float));
+                    memcpy(v_cache[il].data() + c * d_kv_dim + kv * d_hd, vd + kv * d_hd, d_hd * sizeof(float));
+                }
+            }
+        }
 
         // Greedy argmax
         const float* ldata = (const float*)logits_out->data;
@@ -1925,11 +1998,8 @@ static std::vector<int32_t> lfm2_depthformer_sample_frame(lfm2_audio_context* ct
                 best = i;
         codes[c] = best;
 
-        // Embed the token for next codebook input
-        // cb.embedding_w has shape (depth_dim, audio_vocab_size)
-        // Row `best` = embedding vector for token `best`
+        // Embed the token for next codebook
         {
-            // Read embedding row via a tiny graph
             ggml_tensor* id_t = ggml_new_tensor_1d(sc, GGML_TYPE_I32, 1);
             *(int32_t*)id_t->data = best;
             ggml_tensor* emb = ggml_get_rows(sc, cb.embedding_w, id_t);
@@ -1942,7 +2012,6 @@ static std::vector<int32_t> lfm2_depthformer_sample_frame(lfm2_audio_context* ct
 
         ggml_free(sc);
     }
-
     return codes;
 }
 
