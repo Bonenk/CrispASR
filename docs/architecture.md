@@ -814,3 +814,29 @@ HumeAI TADA-3B-ML (`HumeAI/tada-3b-ml`). Two GGUFs: backbone talker + codec.
 Models: `HumeAI/tada-3b-ml` (backbone Q4_K ~2.2 GB) + companion codec GGUF
 (~1 GB). Pass `--codec-model <codec.gguf>`.
 
+### mini-omni2
+
+gpt-omni/mini-omni2 (`gpt-omni/mini-omni2`). Multimodal speech model
+supporting ASR, TTS, and speech-to-speech.
+
+- **Audio encoder**: Whisper-small (80 mel, 12 layers, 768-d, 12 heads,
+  sinusoidal positional embedding, LayerNorm with bias, GELU FFN).
+- **Adapter**: whisperMLP (SwiGLU gate: `fc_1(768,4864)`, `fc_2(768,4864)`
+  → `silu(fc_1) * fc_2` → `proj(4864,896)`). No bias (config.bias=false).
+- **LLM**: Qwen2-0.5B (896-d, 24 layers, 14 heads, 2 KV heads, GQA 7:1,
+  RoPE theta=1M, SwiGLU, RMSNorm eps=1e-6, QKV bias, no O/FFN bias).
+- **8-stream architecture**: 7 audio streams (SNAC codebooks, layershifted)
+  + 1 text stream, all embedded and averaged. Audio features replace pad
+  positions in streams 0-6 only (not text stream 7).
+- **Modes**: ASR uses `_asr` token (151940) for pure transcription. S2S
+  uses `_answer_a/_answer_t` for conversational audio response. TTS uses
+  text-only input with `_answer_a/_answer_t`.
+- **Audio output**: 7-stream SNAC tokens deinterleaved to 3 codebooks
+  (c0: stream 0, c1: streams 1+4, c2: streams 2+3+5+6) → SNAC 24kHz
+  decoder (separate GGUF, `hubertsiuzdak/snac_24khz`).
+- **Vocab**: text 152000 + 7x audio 4160 = 181120 padded. Tied word
+  embeddings (lm_head = token_embd).
+
+Models: single GGUF (F16 ~1.6 GB) converted from `lit_model.pth` + `small.pt`.
+For TTS/S2S, also needs SNAC codec GGUF (`--codec-model snac-24khz.gguf`).
+

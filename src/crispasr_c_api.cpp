@@ -3534,6 +3534,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
 #ifdef CA_HAVE_MINI_OMNI2
     if ((s->backend == "mini-omni2" || s->backend == "mini_omni2" || s->backend == "miniomni2") &&
         s->mini_omni2_ctx) {
+        mini_omni2_set_ask(s->mini_omni2_ctx, s->ask.empty() ? nullptr : s->ask.c_str());
         char* text = mini_omni2_transcribe(s->mini_omni2_ctx, pcm, n_samples);
         if (!text) {
             delete r;
@@ -5757,6 +5758,11 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
 #ifdef CA_HAVE_LFM2_AUDIO
     if (s->lfm2_audio_ctx) {
         return lfm2_audio_synthesize(s->lfm2_audio_ctx, text, nullptr, out_n_samples);
+    }
+#endif
+#ifdef CA_HAVE_MINI_OMNI2
+    if (s->mini_omni2_ctx) {
+        return mini_omni2_synthesize(s->mini_omni2_ctx, text, out_n_samples);
     }
 #endif
 #ifdef CA_HAVE_CSM
