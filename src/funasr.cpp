@@ -1726,7 +1726,7 @@ static std::string funasr_transcribe_impl(funasr_context* ctx, const float* pcm,
     {
         funasr_bench_stage s("prompt_tokenize");
         std::string prompt_prefix = funasr_build_prompt_prefix(ctx->language);
-        prefix_ids = funasr_bpe_encode(ctx->vocab, prompt_prefix.c_str());
+        prefix_ids = funasr_bpe_encode(ctx->vocab, prompt_prefix);
         suffix_ids = funasr_bpe_encode(ctx->vocab, PROMPT_SUFFIX);
     }
     const int fake_token_len = compute_fake_token_len(T_lfr, hp.use_low_frame_rate);

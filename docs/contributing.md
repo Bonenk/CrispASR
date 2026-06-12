@@ -188,6 +188,9 @@ Nine edit points, each mirroring the `CA_HAVE_CHATTERBOX` blocks:
    "yourmodel"`, build params + `yourmodel_init_from_file(model_path, p)`.
 4. **`crispasr_session_synthesize()`** (TTS) or transcribe dispatch:
    `if (s->yourmodel_ctx) return yourmodel_synthesize(s->yourmodel_ctx, text, out_n_samples);`.
+4b. **`crispasr_session_speech_to_speech()`** (S2S) — if the backend has
+   `CAP_S2S`. Dispatch to `yourmodel_speech_to_speech(ctx, in, n, lang, &text, &n_out)`.
+   The server exposes this via `POST /v1/audio/speech-to-speech`.
 5. **`crispasr_session_free()`:** free the ctx.
 6. **`crispasr_session_set_temperature()`** — if sampling-capable.
 7. **`crispasr_session_set_tts_seed()`** — if seedable.

@@ -10,6 +10,7 @@
 //   POST /inference                   — transcribe (native JSON)
 //   POST /v1/audio/transcriptions     — OpenAI-compatible endpoint
 //   POST /v1/audio/speech             — TTS (OpenAI-compatible; CAP_TTS only)
+//   POST /v1/audio/speech-to-speech   — S2S audio→audio (CAP_S2S only)
 //   POST /load                        — hot-swap model
 //   GET  /health                      — server status
 //   GET  /backends                    — list available backends
@@ -1483,6 +1484,144 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     });
 
     // -----------------------------------------------------------------------
+    // POST /v1/audio/speech-to-speech — S2S (audio in → audio out)
+    //
+    // Content-Type: multipart/form-data
+    //   file:            <audio file>                    (required)
+    //   language:        "ja"|"en"|...                   (optional)
+    //   response_format: "wav"|"pcm"|"f32"               (optional, default "wav")
+    //
+    // Returns:
+    //   200 audio/wav — output audio at backend's TTS sample rate (24 kHz mono)
+    //   Header X-Transcript: <URL-encoded intermediate ASR transcript>
+    //   400 — backend lacks CAP_S2S, missing file
+    //   500 — S2S returned empty audio
+    //   503 — model still loading
+    //
+    // Supported backends: lfm2-audio, mini-omni2
+    // -----------------------------------------------------------------------
+    svr.Post("/v1/audio/speech-to-speech", [&](const Request& req, Response& res) {
+        if (!require_auth(req, res))
+            return;
+        if (!ready.load()) {
+            json_error(res, 503, "model is still loading");
+            return;
+        }
+        if (!(backend->capabilities() & CAP_S2S)) {
+            json_error(res, 400,
+                       "loaded backend '" + backend_name +
+                           "' does not support speech-to-speech (no CAP_S2S); "
+                           "load lfm2-audio or mini-omni2 via POST /load");
+            return;
+        }
+
+        if (!req.has_file("file")) {
+            json_error(res, 400, "missing 'file' field (multipart audio upload)", "missing_required_field", "file");
+            return;
+        }
+        const auto& audio_file = req.get_file_value("file");
+
+        // Decode input audio to 16 kHz mono PCM.
+        std::string tmp_path = write_temp_audio(audio_file.content.data(), audio_file.content.size());
+        if (tmp_path.empty()) {
+            json_error(res, 500, "failed to create temporary file for audio");
+            return;
+        }
+        std::vector<float> pcmf32;
+        std::vector<std::vector<float>> pcmf32s;
+        if (!read_audio_data(tmp_path, pcmf32, pcmf32s, false)) {
+            std::remove(tmp_path.c_str());
+            json_error(res, 400, "failed to decode audio (unsupported format or corrupt file)");
+            return;
+        }
+        std::remove(tmp_path.c_str());
+        if (pcmf32.empty()) {
+            json_error(res, 400, "audio file contains no samples");
+            return;
+        }
+
+        std::string response_format = "wav";
+        if (req.has_file("response_format"))
+            response_format = req.get_file_value("response_format").content;
+
+        whisper_params rp = params;
+        if (req.has_file("language"))
+            rp.language = req.get_file_value("language").content;
+
+        const int sr_out = backend->tts_sample_rate();
+
+        // Run S2S under model lock.
+        std::string transcript;
+        std::vector<float> pcm;
+        {
+            std::lock_guard<std::mutex> lock(model_mutex);
+            auto t0 = std::chrono::steady_clock::now();
+            pcm = backend->speech_to_speech(pcmf32.data(), (int)pcmf32.size(), &transcript, rp);
+            auto t1 = std::chrono::steady_clock::now();
+            double elapsed_s = std::chrono::duration<double>(t1 - t0).count();
+            double in_dur_s = (double)pcmf32.size() / 16000.0;
+            double out_dur_s = pcm.empty() ? 0.0 : (double)pcm.size() / (double)sr_out;
+            fprintf(stderr, "crispasr-server: S2S %.1fs in → %.1fs out in %.2fs transcript='%s'\n", in_dur_s, out_dur_s,
+                    elapsed_s, transcript.empty() ? "<none>" : transcript.c_str());
+        }
+
+        if (pcm.empty()) {
+            json_error(res, 500, "speech-to-speech returned empty audio", "s2s_failed");
+            return;
+        }
+
+        // Watermark the output.
+        crispasr_wm_dispatch::embed(pcm.data(), (int)pcm.size(), sr_out);
+
+        // Return intermediate transcript as a header.
+        if (!transcript.empty()) {
+            // URL-encode for safe header transport.
+            std::string encoded;
+            for (char c : transcript) {
+                if (std::isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.' || c == '~' || c == ' ') {
+                    encoded += c;
+                } else {
+                    char hex[4];
+                    snprintf(hex, sizeof(hex), "%%%02X", (unsigned char)c);
+                    encoded += hex;
+                }
+            }
+            res.set_header("X-Transcript", encoded);
+        }
+
+        // Encode output audio.
+        if (response_format == "f32") {
+            std::string buf((const char*)pcm.data(), pcm.size() * sizeof(float));
+            res.set_content(std::move(buf), "application/octet-stream");
+        } else if (response_format == "pcm") {
+            std::string raw = crispasr_make_pcm_int16_le(pcm.data(), (int)pcm.size());
+            res.set_content(std::move(raw), "audio/pcm");
+#ifdef CRISPASR_HAVE_LAME
+        } else if (response_format == "mp3") {
+            std::string mp3 = crispasr_encode_mp3(pcm.data(), (int)pcm.size(), sr_out);
+            if (mp3.empty()) {
+                json_error(res, 500, "MP3 encoding failed", "encoding_failed");
+                return;
+            }
+            res.set_content(std::move(mp3), "audio/mpeg");
+#endif
+#ifdef CRISPASR_HAVE_OPUS
+        } else if (response_format == "opus") {
+            std::string opus = crispasr_encode_opus(pcm.data(), (int)pcm.size(), sr_out);
+            if (opus.empty()) {
+                json_error(res, 500, "Opus encoding failed", "encoding_failed");
+                return;
+            }
+            res.set_content(std::move(opus), "audio/opus");
+#endif
+        } else {
+            std::string wav = crispasr_make_wav_int16(pcm.data(), (int)pcm.size(), sr_out);
+            crispasr_c2pa_sign_wav(wav, params.c2pa_cert, params.c2pa_key);
+            res.set_content(std::move(wav), "audio/wav");
+        }
+    });
+
+    // -----------------------------------------------------------------------
     // GET /v1/voices — list voices in --voice-dir (CAP_TTS only)
     // Returns: {"voices": [{"name": "<stem>", "format": "wav"|"gguf"}, ...]}
     // -----------------------------------------------------------------------
@@ -1906,6 +2045,9 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     fprintf(stderr, "  POST /v1/audio/transcriptions    — OpenAI-compatible API\n");
     if (tts) {
         fprintf(stderr, "  POST /v1/audio/speech            — TTS (OpenAI-compatible)\n");
+    }
+    if (backend->capabilities() & CAP_S2S) {
+        fprintf(stderr, "  POST /v1/audio/speech-to-speech  — S2S audio→audio\n");
     }
     fprintf(stderr, "  POST /load                       — hot-swap model\n");
     fprintf(stderr, "  GET  /health                     — server status\n");

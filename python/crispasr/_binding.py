@@ -2072,6 +2072,51 @@ class Session:
             self._lib.crispasr_pcm_free(ptr)
         return arr
 
+    def speech_to_speech(self, input_pcm: "np.ndarray", language: str = None) -> tuple:
+        """Speech-to-speech: audio in → audio out via a single model pass.
+
+        Supported on backends with S2S capability (``lfm2-audio``,
+        ``mini-omni2``).  Input is 16 kHz mono float32 PCM.  Returns a
+        tuple ``(output_pcm, transcript)`` where *output_pcm* is a
+        float32 numpy array at the backend's TTS sample rate (typically
+        24 kHz) and *transcript* is the intermediate ASR text (may be
+        empty if the backend doesn't produce one).
+
+        Raises :class:`RuntimeError` if the C ABI lacks the symbol or
+        if the backend doesn't support S2S.
+        """
+        if not hasattr(self._lib, "crispasr_session_speech_to_speech"):
+            raise RuntimeError("S2S API not present in this libcrispasr build")
+        self._lib.crispasr_session_speech_to_speech.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_float), ctypes.c_int,
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.POINTER(ctypes.c_int),
+        ]
+        self._lib.crispasr_session_speech_to_speech.restype = ctypes.POINTER(ctypes.c_float)
+        self._lib.crispasr_pcm_free.argtypes = [ctypes.POINTER(ctypes.c_float)]
+        self._lib.crispasr_pcm_free.restype = None
+        import numpy as np
+        in_arr = np.ascontiguousarray(input_pcm, dtype=np.float32)
+        in_ptr = in_arr.ctypes.data_as(ctypes.POINTER(ctypes.c_float))
+        text_out = ctypes.c_char_p(None)
+        n_out = ctypes.c_int(0)
+        ptr = self._lib.crispasr_session_speech_to_speech(
+            self._handle, in_ptr, len(in_arr),
+            ctypes.byref(text_out), ctypes.byref(n_out))
+        if not ptr or n_out.value <= 0:
+            raise RuntimeError(f"speech_to_speech returned no audio for backend {self.backend!r}")
+        try:
+            arr = np.ctypeslib.as_array(ptr, shape=(n_out.value,)).copy()
+        finally:
+            self._lib.crispasr_pcm_free(ptr)
+        transcript = text_out.value.decode("utf-8") if text_out.value else ""
+        if text_out.value and hasattr(self._lib, "crispasr_session_translate_text_free"):
+            self._lib.crispasr_session_translate_text_free.argtypes = [ctypes.c_char_p]
+            self._lib.crispasr_session_translate_text_free.restype = None
+            self._lib.crispasr_session_translate_text_free(text_out)
+        return arr, transcript
+
     def close(self) -> None:
         if getattr(self, "_handle", None):
             self._lib.crispasr_session_close(self._handle)

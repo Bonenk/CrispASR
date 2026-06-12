@@ -2653,17 +2653,8 @@ float* lfm2_audio_synthesize(lfm2_audio_context* ctx, const char* text, const ch
 
 int lfm2_audio_synthesize_stream(lfm2_audio_context* ctx, const char* text, const char* language,
                                  lfm2_audio_stream_cb cb, void* userdata) {
-    // If no callback, just do batch synthesis
-    if (!cb) {
-        int n = 0;
-        float* pcm = lfm2_audio_synthesize(ctx, text, language, &n);
-        if (pcm) {
-            cb(pcm, n, userdata); // single chunk
-            free(pcm);
-            return 0;
-        }
+    if (!cb)
         return -1;
-    }
 
     // Use the batch synthesize to generate all codes, then detokenize
     // and stream chunks. True incremental detokenization (processing
