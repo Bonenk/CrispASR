@@ -19,6 +19,7 @@
 #include "core/ffn.h"
 #include "core/gguf_loader.h"
 #include "core/mel.h"
+#include "orpheus_snac.h"
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -159,6 +160,10 @@ struct mini_omni2_context {
     ggml_tensor* kv_v = nullptr;
 
     int n_threads = 4;
+    std::string ask; // custom instruction (empty = default)
+
+    // SNAC decoder for TTS/S2S output
+    void* snac_ctx = nullptr; // snac_decoder_ctx*
 };
 
 // ===========================================================================
@@ -383,6 +388,8 @@ extern "C" void mini_omni2_free(struct mini_omni2_context* ctx) {
         ggml_backend_free(ctx->backend_cpu);
     if (ctx->backend)
         ggml_backend_free(ctx->backend);
+    if (ctx->snac_ctx)
+        snac_decoder_free((snac_decoder_ctx*)ctx->snac_ctx);
     delete ctx;
 }
 
@@ -390,6 +397,31 @@ extern "C" const char* mini_omni2_token_text(struct mini_omni2_context* ctx, int
     if (!ctx || id < 0 || id >= (int)ctx->model.vocab.size())
         return "";
     return ctx->model.vocab[id].c_str();
+}
+
+extern "C" void mini_omni2_set_ask(struct mini_omni2_context* ctx, const char* prompt) {
+    if (!ctx)
+        return;
+    ctx->ask = (prompt && *prompt) ? prompt : "";
+}
+
+extern "C" bool mini_omni2_load_snac(struct mini_omni2_context* ctx, const char* snac_path) {
+    if (!ctx || !snac_path)
+        return false;
+    if (ctx->snac_ctx) {
+        snac_decoder_free((snac_decoder_ctx*)ctx->snac_ctx);
+        ctx->snac_ctx = nullptr;
+    }
+    snac_decoder_params sp = snac_decoder_default_params();
+    sp.n_threads = ctx->n_threads;
+    sp.verbosity = ctx->params.verbosity;
+    sp.use_gpu = ctx->params.use_gpu;
+    ctx->snac_ctx = snac_decoder_init_from_file(snac_path, sp);
+    if (!ctx->snac_ctx) {
+        fprintf(stderr, "mini_omni2: failed to load SNAC from '%s'\n", snac_path);
+        return false;
+    }
+    return true;
 }
 
 // ===========================================================================
@@ -1003,6 +1035,7 @@ static constexpr int MO2_EOT = 151936; // end of text
 static constexpr int MO2_PAD_T = 151937;
 static constexpr int MO2_INPUT_T = 151938;
 static constexpr int MO2_ANSWER_T = 151939;
+static constexpr int MO2_ASR = 151940; // ASR task token
 
 static constexpr int MO2_AUDIO_VOCAB = 4096;
 static constexpr int MO2_EOA = 4096;
@@ -1062,19 +1095,19 @@ extern "C" char* mini_omni2_transcribe(struct mini_omni2_context* ctx, const flo
     for (int stream = 0; stream < 8; stream++) {
         std::vector<int32_t> ids(T_total);
         if (stream < 7) {
-            // Audio stream: [input_a, pad_a×T_enc, eoa, answer_a]
+            // Audio stream: [input_a, pad_a×T_enc, eoa, pad_a] for ASR
             ids[0] = mo2_layershift(MO2_INPUT_A, stream);
             for (int t = 0; t < T_enc; t++)
                 ids[1 + t] = mo2_layershift(MO2_PAD_A, stream);
             ids[T_enc + 1] = mo2_layershift(MO2_EOA, stream);
-            ids[T_enc + 2] = mo2_layershift(MO2_ANSWER_A, stream);
+            ids[T_enc + 2] = mo2_layershift(MO2_PAD_A, stream); // pad_a for ASR
         } else {
-            // Text stream: [input_t, pad_t×T_enc, eot, answer_t]
+            // Text stream: [input_t, pad_t×T_enc, eot, _asr]
             ids[0] = MO2_INPUT_T;
             for (int t = 0; t < T_enc; t++)
                 ids[1 + t] = MO2_PAD_T;
             ids[T_enc + 1] = MO2_EOT;
-            ids[T_enc + 2] = MO2_ANSWER_T;
+            ids[T_enc + 2] = MO2_ASR; // ASR task token (not answer_t)
         }
 
         float* emb = mo2_embed_tokens(ctx, ids.data(), T_total);
@@ -1191,4 +1224,292 @@ extern "C" char* mini_omni2_transcribe(struct mini_omni2_context* ctx, const flo
     }
 
     return strdup(result.c_str());
+}
+
+// ===========================================================================
+// GPT-2 BPE detokenize helper (shared by ASR/TTS/S2S)
+// ===========================================================================
+
+static std::string mo2_detokenize(const mini_omni2_context* ctx, const std::vector<int32_t>& ids) {
+    std::string result;
+    for (int id : ids) {
+        if (id == MO2_EOT)
+            break;
+        if (id < 0 || id >= (int)ctx->model.vocab.size())
+            continue;
+        const auto& tok = ctx->model.vocab[id];
+        if (tok.empty())
+            continue;
+        if (tok.size() >= 2 && tok[0] == '<' && tok[1] == '|')
+            continue;
+        for (size_t ci = 0; ci < tok.size();) {
+            unsigned char c = (unsigned char)tok[ci];
+            if (c == 0xC4 && ci + 1 < tok.size()) {
+                unsigned char c2 = (unsigned char)tok[ci + 1];
+                if (c2 == 0xA0) {
+                    result += ' ';
+                    ci += 2;
+                    continue;
+                } else if (c2 == 0x8A) {
+                    result += '\n';
+                    ci += 2;
+                    continue;
+                }
+            }
+            result += (char)c;
+            ci++;
+        }
+    }
+    return result;
+}
+
+// ===========================================================================
+// Deinterleave 7 audio streams → 3 SNAC codebooks + decode to PCM
+// ===========================================================================
+
+// The 7 audio streams per timestep map to 3 SNAC codebooks:
+//   stream 0 → codebook 0 (1 code per step)
+//   stream 1, 4 → codebook 1 (2 codes per step)
+//   stream 2, 3, 5, 6 → codebook 2 (4 codes per step)
+static float* mo2_decode_snac(mini_omni2_context* ctx, const std::vector<std::vector<int32_t>>& audio_streams,
+                              int* out_n_samples) {
+    if (!ctx->snac_ctx) {
+        fprintf(stderr, "mini_omni2: SNAC decoder not loaded (call mini_omni2_load_snac first)\n");
+        return nullptr;
+    }
+
+    int n_steps = (int)audio_streams[0].size();
+    if (n_steps == 0)
+        return nullptr;
+
+    // Deinterleave: 7 streams → 3 codebooks per reconstruct_tensors pattern
+    std::vector<int32_t> c0, c1, c2;
+    for (int i = 0; i < n_steps; i++) {
+        c0.push_back(audio_streams[0][i]); // stream 0 → codebook 0
+        c1.push_back(audio_streams[1][i]); // stream 1 → codebook 1
+        c2.push_back(audio_streams[2][i]); // stream 2 → codebook 2
+        c2.push_back(audio_streams[3][i]); // stream 3 → codebook 2
+        c1.push_back(audio_streams[4][i]); // stream 4 → codebook 1
+        c2.push_back(audio_streams[5][i]); // stream 5 → codebook 2
+        c2.push_back(audio_streams[6][i]); // stream 6 → codebook 2
+    }
+
+    // c0: n_steps, c1: 2*n_steps, c2: 4*n_steps (matches SNAC vq_strides [4,2,1])
+    int n_pcm = 0;
+    float* pcm = snac_decoder_decode((snac_decoder_ctx*)ctx->snac_ctx, c0.data(), (int)c0.size(), c1.data(),
+                                     (int)c1.size(), c2.data(), (int)c2.size(), &n_pcm);
+    if (out_n_samples)
+        *out_n_samples = n_pcm;
+    return pcm;
+}
+
+// ===========================================================================
+// Dual-stream generation (text + 7 audio) — shared by TTS and S2S
+// ===========================================================================
+
+// Run LLM in dual-output mode: sample text token from logit_t (text vocab)
+// and 7 audio tokens from logits_a (audio vocab per stream).
+// The model produces all 8 logit streams in one forward pass — the full
+// vocab (181120) is: [text (152000)] [audio_stream0 (4160)] ... [audio_stream6 (4160)].
+static void mo2_generate_dual(mini_omni2_context* ctx, const float* input_embeds, int T_total,
+                              std::vector<int32_t>& out_text, std::vector<std::vector<int32_t>>& out_audio,
+                              int max_tokens) {
+    const auto& hp = ctx->model.hp;
+    const int d = hp.llm_hidden;
+    const int V = hp.llm_vocab;
+
+    if (!ctx->kv_ctx && !mini_omni2_kv_init(ctx, 4096))
+        return;
+    mini_omni2_kv_reset(ctx);
+
+    out_audio.resize(7);
+
+    // Prefill
+    int n_t = 0, vocab = 0;
+    float* logits = mini_omni2_run_llm_kv(ctx, input_embeds, T_total, 0, &n_t, &vocab);
+    if (!logits)
+        return;
+
+    // Sample text token
+    int text_tok = mo2_sample_token(logits, hp.text_vocab_size, ctx->params.temperature);
+    out_text.push_back(text_tok);
+
+    // Sample 7 audio tokens
+    std::vector<int32_t> audio_toks(7);
+    for (int s = 0; s < 7; s++) {
+        const float* a_logits = logits + MO2_PADDED_TEXT + s * MO2_PADDED_AUDIO;
+        audio_toks[s] = mo2_sample_token(a_logits, MO2_AUDIO_VOCAB, ctx->params.temperature);
+        out_audio[s].push_back(audio_toks[s]);
+    }
+    free(logits);
+
+    // Autoregressive decode
+    int n_past = T_total;
+    bool text_end = false;
+    for (int step = 0; step < max_tokens - 1; step++) {
+        if (audio_toks[6] == MO2_EOA)
+            break;
+        if (text_tok == MO2_EOT)
+            text_end = true;
+
+        // Build step input: 7 audio tokens (layershifted) + 1 text token
+        std::vector<float> step_emb(d, 0.0f);
+        for (int s = 0; s < 7; s++) {
+            int32_t id = mo2_layershift(audio_toks[s], s);
+            float* emb = mo2_embed_tokens(ctx, &id, 1);
+            if (emb) {
+                for (int i = 0; i < d; i++)
+                    step_emb[i] += emb[i];
+                free(emb);
+            }
+        }
+        {
+            int32_t id = text_end ? MO2_PAD_T : text_tok;
+            float* emb = mo2_embed_tokens(ctx, &id, 1);
+            if (emb) {
+                for (int i = 0; i < d; i++)
+                    step_emb[i] += emb[i];
+                free(emb);
+            }
+        }
+        for (int i = 0; i < d; i++)
+            step_emb[i] /= 8.0f;
+
+        float* lg = mini_omni2_run_llm_kv(ctx, step_emb.data(), 1, n_past, nullptr, nullptr);
+        if (!lg)
+            break;
+        n_past++;
+
+        text_tok = mo2_sample_token(lg, hp.text_vocab_size, ctx->params.temperature);
+        if (!text_end)
+            out_text.push_back(text_tok);
+
+        for (int s = 0; s < 7; s++) {
+            const float* a_logits = lg + MO2_PADDED_TEXT + s * MO2_PADDED_AUDIO;
+            audio_toks[s] = mo2_sample_token(a_logits, MO2_AUDIO_VOCAB, ctx->params.temperature);
+            out_audio[s].push_back(audio_toks[s]);
+        }
+        free(lg);
+    }
+}
+
+// ===========================================================================
+// TTS: text → audio
+// ===========================================================================
+
+extern "C" float* mini_omni2_synthesize(struct mini_omni2_context* ctx, const char* text, int* out_n_samples) {
+    if (!ctx || !text || !*text)
+        return nullptr;
+    if (!ctx->snac_ctx) {
+        fprintf(stderr, "mini_omni2: SNAC decoder required for TTS (call mini_omni2_load_snac)\n");
+        return nullptr;
+    }
+
+    const auto& hp = ctx->model.hp;
+    const int d = hp.llm_hidden;
+
+    // Tokenize text
+    // Simple: look up each byte in the vocab. For proper tokenization we'd
+    // need BPE merge rules, but the GGUF doesn't store them. For now, use
+    // the token_embd to encode known tokens. This is a limitation — full
+    // BPE tokenization would require porting the tokenizer.
+    // TODO: implement proper BPE tokenizer from tokenizer.json
+    fprintf(stderr, "mini_omni2: TTS not yet fully implemented (needs BPE tokenizer)\n");
+    (void)d;
+    if (out_n_samples)
+        *out_n_samples = 0;
+    return nullptr;
+}
+
+// ===========================================================================
+// S2S: audio → audio
+// ===========================================================================
+
+extern "C" float* mini_omni2_speech_to_speech(struct mini_omni2_context* ctx, const float* in_samples, int n_in_samples,
+                                              char** out_text, int* out_n_samples) {
+    if (!ctx || !in_samples || n_in_samples <= 0)
+        return nullptr;
+    if (!ctx->snac_ctx) {
+        fprintf(stderr, "mini_omni2: SNAC decoder required for S2S (call mini_omni2_load_snac)\n");
+        return nullptr;
+    }
+
+    const auto& hp = ctx->model.hp;
+    const int d = hp.llm_hidden;
+
+    // 1. Audio pipeline: mel → encoder → adapter
+    const int N30 = 480000;
+    std::vector<float> audio(N30, 0.0f);
+    memcpy(audio.data(), in_samples, std::min(n_in_samples, N30) * sizeof(float));
+
+    int n_mels = 0, T_mel = 0;
+    float* mel = mini_omni2_compute_mel(ctx, audio.data(), N30, &n_mels, &T_mel);
+    if (!mel)
+        return nullptr;
+
+    int T_enc = 0, enc_dim = 0;
+    float* enc = mini_omni2_run_encoder(ctx, mel, n_mels, T_mel, &T_enc, &enc_dim);
+    free(mel);
+    if (!enc)
+        return nullptr;
+
+    const int audio_len = (int)((double)n_in_samples / 16000.0 * 1000.0 / 20.0) + 1;
+    T_enc = std::min(T_enc, audio_len);
+
+    int adap_T = 0, adap_dim = 0;
+    float* adapted = mini_omni2_run_adapter(ctx, enc, T_enc, enc_dim, &adap_T, &adap_dim);
+    free(enc);
+    if (!adapted)
+        return nullptr;
+
+    // 2. Build 8-stream input (S2S mode: answer_a + answer_t tokens)
+    const int T_total = T_enc + 3;
+    std::vector<float> avg_emb((size_t)T_total * d, 0.0f);
+
+    for (int stream = 0; stream < 8; stream++) {
+        std::vector<int32_t> ids(T_total);
+        if (stream < 7) {
+            ids[0] = mo2_layershift(MO2_INPUT_A, stream);
+            for (int t = 0; t < T_enc; t++)
+                ids[1 + t] = mo2_layershift(MO2_PAD_A, stream);
+            ids[T_enc + 1] = mo2_layershift(MO2_EOA, stream);
+            ids[T_enc + 2] = mo2_layershift(MO2_ANSWER_A, stream); // answer_a for S2S
+        } else {
+            ids[0] = MO2_INPUT_T;
+            for (int t = 0; t < T_enc; t++)
+                ids[1 + t] = MO2_PAD_T;
+            ids[T_enc + 1] = MO2_EOT;
+            ids[T_enc + 2] = MO2_ANSWER_T; // answer_t for S2S
+        }
+
+        float* emb = mo2_embed_tokens(ctx, ids.data(), T_total);
+        if (!emb) {
+            free(adapted);
+            return nullptr;
+        }
+        if (stream < 7) {
+            memcpy(emb + (size_t)1 * d, adapted, (size_t)T_enc * d * sizeof(float));
+        }
+        for (size_t i = 0; i < (size_t)T_total * d; i++)
+            avg_emb[i] += emb[i];
+        free(emb);
+    }
+    free(adapted);
+
+    for (size_t i = 0; i < (size_t)T_total * d; i++)
+        avg_emb[i] /= 8.0f;
+
+    // 3. Dual-stream generation
+    std::vector<int32_t> gen_text;
+    std::vector<std::vector<int32_t>> gen_audio;
+    mo2_generate_dual(ctx, avg_emb.data(), T_total, gen_text, gen_audio, 2048);
+
+    // 4. Decode text
+    if (out_text) {
+        std::string text = mo2_detokenize(ctx, gen_text);
+        *out_text = strdup(text.c_str());
+    }
+
+    // 5. Decode SNAC audio
+    return mo2_decode_snac(ctx, gen_audio, out_n_samples);
 }

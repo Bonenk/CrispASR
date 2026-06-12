@@ -205,6 +205,7 @@ std::vector<std::string> crispasr_list_backends() {
         "parakeet",
         "canary",
         "lfm2-audio",
+        "mini-omni2",
         "cohere",
         "granite",
         "granite-4.1",
@@ -489,6 +490,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "canary";
     if (contains_ci("lfm2-audio") || contains_ci("lfm2_audio"))
         return "lfm2-audio";
+    if (contains_ci("mini-omni2") || contains_ci("mini_omni2") || contains_ci("miniomni2"))
+        return "mini-omni2";
     if (contains_ci("cohere"))
         return "cohere";
     if (contains_ci("mega-asr") || contains_ci("mega_asr") || contains_ci("megaasr"))
@@ -593,6 +596,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "canary";
             else if (a == "lfm2-audio")
                 result = "lfm2-audio";
+            else if (a == "mini-omni2")
+                result = "mini-omni2";
             else if (a == "canary-ctc")
                 result = "canary";
             else if (a == "cohere")
