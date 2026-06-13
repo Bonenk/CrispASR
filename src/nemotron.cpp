@@ -25,6 +25,12 @@
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
+#if defined(GGML_USE_METAL)
+#include "ggml-metal.h"
+#endif
+#if defined(GGML_USE_CUDA)
+#include "ggml-cuda.h"
+#endif
 #include "gguf.h"
 
 #include "core/fastconformer.h"
