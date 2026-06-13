@@ -418,6 +418,81 @@ for backend_name, repo, fname, extra in chunk_backends:
 summary["chunk_context_audit"] = chunk_results
 
 # =====================================================================
+# TEST 5: #125 — gemma4-e2b long-audio with CRISPASR_GEMMA4_AUTO_CHUNK=1
+# =====================================================================
+print("\n" + "=" * 70, flush=True)
+print("TEST 5: #125 — gemma4-e2b auto-chunk long audio", flush=True)
+print("=" * 70, flush=True)
+kh.step("test5.start")
+
+try:
+    # Reuse gemma_model from test 2 if available
+    if "gemma_model" not in dir():
+        gemma_model = download_model("cstr/gemma4-e2b-it-GGUF", "gemma4-e2b-it-q4_k.gguf", token)
+
+    if long_wav.exists():
+        # A: without auto-chunk (default — may degrade on long audio)
+        rc_a, out_a, el_a = run_crispasr([
+            "-m", str(gemma_model), "-f", str(long_wav), "-v",
+        ], timeout=600)
+        ta = extract_transcript(out_a)
+
+        # B: with CRISPASR_GEMMA4_AUTO_CHUNK=1
+        rc_b, out_b, el_b = run_crispasr([
+            "-m", str(gemma_model), "-f", str(long_wav), "-v",
+        ], env_extra={"CRISPASR_GEMMA4_AUTO_CHUNK": "1"}, timeout=600)
+        tb = extract_transcript(out_b)
+
+        summary["gemma4_auto_chunk"] = {
+            "default_rc": rc_a, "default_chars": len(ta), "default_elapsed": el_a,
+            "autochunk_rc": rc_b, "autochunk_chars": len(tb), "autochunk_elapsed": el_b,
+            "default_preview": ta[:120],
+            "autochunk_preview": tb[:120],
+        }
+        print(f"  default:   rc={rc_a} {len(ta)} chars {el_a}s", flush=True)
+        print(f"  autochunk: rc={rc_b} {len(tb)} chars {el_b}s", flush=True)
+        kh.step("test5.done", **summary["gemma4_auto_chunk"])
+    else:
+        print("  SKIP: no long wav", flush=True)
+        summary["gemma4_auto_chunk"] = {"skip": "no long wav"}
+
+except Exception as ex:
+    print(f"  ERROR: {ex}", flush=True)
+    summary["gemma4_auto_chunk"] = {"error": str(ex)}
+    kh.step("test5.error", error=str(ex))
+
+# =====================================================================
+# TEST 6: #127c — cohere-asr-ja perf (if model available)
+# =====================================================================
+print("\n" + "=" * 70, flush=True)
+print("TEST 6: #127c — cohere-asr-ja smoke", flush=True)
+print("=" * 70, flush=True)
+kh.step("test6.start")
+
+try:
+    cohere_ja_model = download_model("cstr/cohere-asr-ja-v0.1-GGUF", "cohere-asr-ja-v0.1-q4_k.gguf", token)
+    kh.step("test6.model_downloaded")
+
+    # JFK EN (should still produce something — model is JA-tuned but EN is in the base)
+    rc_en, out_en, el_en = run_crispasr([
+        "-m", str(cohere_ja_model), "-f", str(jfk_wav), "-v",
+    ], timeout=300)
+    t_en = extract_transcript(out_en)
+
+    summary["cohere_asr_ja"] = {
+        "en_rc": rc_en, "en_chars": len(t_en), "en_elapsed": el_en,
+        "en_preview": t_en[:120],
+    }
+    print(f"  cohere-ja EN: rc={rc_en} {len(t_en)} chars {el_en}s", flush=True)
+    print(f"  transcript: {t_en[:120]}", flush=True)
+    kh.step("test6.done", **summary["cohere_asr_ja"])
+
+except Exception as ex:
+    print(f"  ERROR: {ex}", flush=True)
+    summary["cohere_asr_ja"] = {"error": str(ex)}
+    kh.step("test6.error", error=str(ex))
+
+# =====================================================================
 # SUMMARY
 # =====================================================================
 print("\n\n" + "=" * 70, flush=True)
@@ -455,6 +530,18 @@ for bname, bdata in chunk_results.items():
         ratio = round(long_c / short_c, 2) if short_c > 0 else 0
         print(f"  {bname}: short={short_c} long={long_c} chunk={chunk_c} "
               f"(long/short={ratio}x)", flush=True)
+
+# Test 5: gemma4 auto-chunk
+t5 = summary.get("gemma4_auto_chunk", {})
+if "error" not in t5 and "skip" not in t5:
+    print(f"\n#125 gemma4 auto-chunk: default={t5.get('default_chars')} "
+          f"autochunk={t5.get('autochunk_chars')} chars", flush=True)
+
+# Test 6: cohere-asr-ja
+t6 = summary.get("cohere_asr_ja", {})
+if "error" not in t6:
+    print(f"\n#127c cohere-asr-ja: EN rc={t6.get('en_rc')} "
+          f"{t6.get('en_chars')} chars", flush=True)
 
 # Save full summary
 (RESULTS / "summary.json").write_text(json.dumps(summary, indent=2, default=str))
