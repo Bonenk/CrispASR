@@ -1268,20 +1268,15 @@ static ggml_cgraph* build_tslm_step_graph(voxcpm2_context* ctx, int n_past, int 
     // differs from CPU dequantization, causing hidden states to diverge
     // over 28 layers. Without FSQ in the graph, the stop predictor sees
     // inputs from a different numerical path and never fires (#164).
-    if (W.stop_proj_w && W.stop_proj_b && W.stop_head_w && W.fsq_in_proj_w && W.fsq_in_proj_b && W.fsq_out_proj_w &&
-        W.fsq_out_proj_b) {
-        // FSQ: in_proj → tanh → round(x*9)/9 → out_proj
-        ggml_tensor* fq = ggml_mul_mat(ctx0, W.fsq_in_proj_w, cur);
-        fq = ggml_add(ctx0, fq, W.fsq_in_proj_b);
-        fq = ggml_tanh(ctx0, fq);
-        fq = ggml_scale(ctx0, fq, 9.0f);
-        fq = ggml_round(ctx0, fq);
-        fq = ggml_scale(ctx0, fq, 1.0f / 9.0f);
-        fq = ggml_mul_mat(ctx0, W.fsq_out_proj_w, fq);
-        fq = ggml_add(ctx0, fq, W.fsq_out_proj_b);
-
-        // Stop: stop_proj(fsq_out) + bias → SiLU → stop_head → softmax
-        ggml_tensor* sp = ggml_mul_mat(ctx0, W.stop_proj_w, fq);
+    // Stop predictor computed from the TSLM hidden output directly.
+    // Python checks stop on the FSQ'd output from the previous step, but
+    // computing FSQ inside the ggml graph produces NaN on CUDA (ggml_round
+    // + ggml_scale chain is numerically unstable on some backends, #164).
+    // The stop predictor is a simple 2-class classifier that fires reliably
+    // on the raw (non-FSQ'd) hidden state when all operations stay on the
+    // same GPU dequantization path.
+    if (W.stop_proj_w && W.stop_proj_b && W.stop_head_w) {
+        ggml_tensor* sp = ggml_mul_mat(ctx0, W.stop_proj_w, cur);
         sp = ggml_add(ctx0, sp, W.stop_proj_b);
         sp = ggml_silu(ctx0, sp);
         ggml_tensor* sl = ggml_mul_mat(ctx0, W.stop_head_w, sp);
