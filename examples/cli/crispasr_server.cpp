@@ -1218,6 +1218,71 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     });
 
     // -----------------------------------------------------------------------
+    // POST /v1/translate — text-to-text translation (m2m100 / CAP_TRANSLATE)
+    //
+    // Body: application/json
+    //   {
+    //     "input":       "TEXT to translate",   (required; "text" also accepted)
+    //     "source_lang": "en",                  (optional; falls back to server default)
+    //     "target_lang": "de",                  (required unless a server default is set)
+    //     "max_tokens":  256                    (optional)
+    //   }
+    // Returns 200 {"text": "..."}. The HTTP analogue of the CLI `--text` mode;
+    // only meaningful when a translation backend (e.g. m2m100) is loaded.
+    // -----------------------------------------------------------------------
+    svr.Post("/v1/translate", [&](const Request& req, Response& res) {
+        if (!require_auth(req, res))
+            return;
+        if (!ready.load()) {
+            json_error(res, 503, "model is still loading");
+            return;
+        }
+        if (!(backend->capabilities() & CAP_TRANSLATE)) {
+            json_error(res, 400,
+                       "loaded backend '" + backend_name +
+                           "' does not support text translation (no CAP_TRANSLATE); load a "
+                           "translation backend (e.g. m2m100) via POST /load");
+            return;
+        }
+        nlohmann::json body;
+        try {
+            body = nlohmann::json::parse(req.body);
+        } catch (...) {
+            json_error(res, 400, "invalid JSON body", "invalid_json");
+            return;
+        }
+        std::string text = body.value("input", body.value("text", std::string()));
+        if (text.empty()) {
+            json_error(res, 400, "missing or empty 'input' field", "missing_required_field", "input");
+            return;
+        }
+        // Prefer the dedicated translator-stage langs, then the generic src/tgt,
+        // then the per-request override — same precedence as the CLI.
+        std::string src = body.value(
+            "source_lang", params.translate_source_lang.empty() ? params.source_lang : params.translate_source_lang);
+        std::string tgt = body.value(
+            "target_lang", params.translate_target_lang.empty() ? params.target_lang : params.translate_target_lang);
+        if (src.empty() || tgt.empty()) {
+            json_error(res, 400, "translation requires 'source_lang' and 'target_lang'", "missing_required_field");
+            return;
+        }
+        whisper_params rp = params;
+        rp.translate_max_tokens = body.value("max_tokens", rp.translate_max_tokens);
+        std::string out;
+        {
+            std::lock_guard<std::mutex> lock(model_mutex);
+            out = backend->translate_text(text, src, tgt, rp);
+        }
+        if (out.empty()) {
+            json_error(res, 500, "translation failed");
+            return;
+        }
+        std::ostringstream js;
+        js << "{\"text\": \"" << crispasr_json_escape(out) << "\"}";
+        res.set_content(js.str(), "application/json");
+    });
+
+    // -----------------------------------------------------------------------
     // POST /v1/audio/speech — OpenAI-compatible TTS endpoint
     //
     // Body: application/json
