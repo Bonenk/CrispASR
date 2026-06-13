@@ -1516,6 +1516,58 @@ extern "C" struct nemotron_result* nemotron_transcribe_ex(struct nemotron_contex
     if (T_enc <= 0)
         return nullptr;
 
+    // Apply prompt kernel (language conditioning) — CPU F32
+    // concat(enc_out[d_model], lang_onehot[n_prompts]) → Linear(in→mid) → ReLU → Linear(mid→d_model)
+    if (ctx->model.prompt_kernel.l0_w) {
+        const auto& pk = ctx->model.prompt_kernel;
+        const int n_prompts = (int)ctx->model.hparams.num_prompts;
+        const int pk_in = d_model + n_prompts;
+        const int pk_mid = (int)ctx->model.hparams.prompt_kernel_mid;
+        const int prompt_id = ctx->prompt_id;
+
+        // Load prompt kernel weights to CPU F32 (lazy)
+        auto l0_w = tensor_to_f32(pk.l0_w); // (pk_mid, pk_in)
+        auto l0_b = tensor_to_f32(pk.l0_b); // (pk_mid,)
+        auto l2_w = tensor_to_f32(pk.l2_w); // (d_model, pk_mid)
+        auto l2_b = tensor_to_f32(pk.l2_b); // (d_model,)
+
+        // Build language one-hot
+        std::vector<float> lang(n_prompts, 0.0f);
+        if (prompt_id >= 0 && prompt_id < n_prompts)
+            lang[prompt_id] = 1.0f;
+
+        // Apply per-frame: for each t, concat(enc[t], lang) → linear1 → relu → linear2
+        std::vector<float> prompted((size_t)T_enc * d_model);
+        for (int t = 0; t < T_enc; t++) {
+            // Concat: [enc[t][0..d_model], lang[0..n_prompts]]
+            std::vector<float> cat(pk_in);
+            memcpy(cat.data(), enc_out.data() + (size_t)t * d_model, d_model * sizeof(float));
+            memcpy(cat.data() + d_model, lang.data(), n_prompts * sizeof(float));
+
+            // Linear1 + ReLU
+            std::vector<float> mid(pk_mid);
+            for (int i = 0; i < pk_mid; i++) {
+                float s = l0_b[i];
+                const float* row = l0_w.data() + (size_t)i * pk_in;
+                for (int k = 0; k < pk_in; k++)
+                    s += row[k] * cat[k];
+                mid[i] = s > 0.0f ? s : 0.0f; // ReLU
+            }
+
+            // Linear2
+            float* out = prompted.data() + (size_t)t * d_model;
+            for (int i = 0; i < d_model; i++) {
+                float s = l2_b[i];
+                const float* row = l2_w.data() + (size_t)i * pk_mid;
+                for (int k = 0; k < pk_mid; k++)
+                    s += row[k] * mid[k];
+                out[i] = s;
+            }
+        }
+        enc_out = std::move(prompted);
+        fprintf(stderr, "nemotron: prompt kernel applied (prompt_id=%d)\n", prompt_id);
+    }
+
     // RNN-T decode
     auto emitted = nemotron_rnnt_decode(ctx, enc_out.data(), T_enc, d_model);
 
