@@ -1456,7 +1456,9 @@ static std::vector<float> tslm_step_graph(voxcpm2_context* ctx, const float* hid
             *out_stop_score = probs[1]; // p(stop) = softmax[1]
         } else {
             *out_stop_score = -1.0f; // signal: not available
-            fprintf(stderr, "voxcpm2: stop_probs tensor NOT found in graph (n_nodes=%d)\n", ggml_graph_n_nodes(gf));
+            if (ctx->verbosity >= 1) {
+                fprintf(stderr, "voxcpm2: stop_probs tensor NOT found in graph (n_nodes=%d)\n", ggml_graph_n_nodes(gf));
+            }
         }
     }
 
@@ -5354,15 +5356,11 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
             tb = bench ? vox_now_ms() : 0;
             const bool have_graph_stop = use_graph_tslm && graph_stop_score >= 0.0f;
             float sp = have_graph_stop ? graph_stop_score : stop_score(ctx, tslm_hidden.data(), cpu_be);
-            if (step < 5) {
-                fprintf(stderr, "voxcpm2: step %d stop=%.4f (%s) graph_raw=%.4f\n", step, sp,
-                        have_graph_stop ? "graph" : "cpu", graph_stop_score);
-            }
             if (bench)
                 sum_stop += vox_now_ms() - tb;
-            if (ctx->verbosity >= 2) {
-                fprintf(stderr, "voxcpm2: step %d stop=%.4f (%s) (%.1f ms)\n", step, sp,
-                        have_graph_stop ? "graph" : "cpu", vox_now_ms() - t0_step);
+            if (ctx->verbosity >= 2 || (step < 3 && ctx->verbosity >= 1)) {
+                fprintf(stderr, "voxcpm2: step %d stop=%.4f (%s, graph_raw=%.4f) (%.1f ms)\n", step, sp,
+                        have_graph_stop ? "graph" : "cpu", graph_stop_score, vox_now_ms() - t0_step);
             }
             if (sp > stop_thresh && step > min_len) {
                 if (ctx->verbosity >= 1) {
