@@ -61,8 +61,8 @@ CRISPASR_BIN = build_dir / "bin" / "crispasr"
 assert CRISPASR_BIN.exists(), f"Binary not found at {CRISPASR_BIN}"
 print(f"Binary: {CRISPASR_BIN} ({CRISPASR_BIN.stat().st_size / 1e6:.1f} MB)")
 
-# ── Download model ───────────────────────────────────────────────────
-hf_token = kh.kaggle_secret("HF_TOKEN", "hf_token.txt")
+# ── HF auth (3-tier: env → Kaggle Secret → dataset file) ────────────
+hf_token = kh.resolve_hf_token()
 model_dir = WORK / "models"
 model_dir.mkdir(exist_ok=True)
 
@@ -80,7 +80,6 @@ if not model_path.exists():
         repo_id=MODEL_REPO,
         filename=MODEL_FILE,
         local_dir=str(model_dir),
-        token=hf_token,
     )
 print(f"Model: {model_path} ({model_path.stat().st_size / 1e6:.1f} MB)")
 
@@ -96,7 +95,6 @@ if not fixture_path.exists():
         repo_id=FIXTURE_REPO,
         filename=FIXTURE_FILE,
         local_dir=str(model_dir),
-        token=hf_token,
     )
     # Move from nested path to flat
     nested = model_dir / FIXTURE_FILE
