@@ -6,6 +6,38 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-13 §166 cross-surface parity — round 2 (C-ABI punc-model, server truecase/diarize/LID, alias preview)
+
+Follow-up to the §166 audit: closed five of the open parity gaps.
+
+- **C-ABI `--punc-model` (gap 1).** Added `crispasr_session_set_punc_model(s,
+  alias|path)` — resolves + auto-downloads + loads a FireRedPunc or PCS context
+  onto the session and applies it per segment in `transcribe_lang` (covers
+  direct + VAD + best-of), gated on the session punctuation flag, freed in
+  `crispasr_session_close`. Moved the pure resolver to `src/crispasr_punc_model.h`
+  so the C-ABI shares it with the CLI/server (the CLI-layer
+  `examples/cli/crispasr_punc_loader.h` now re-exports it). Wrapped in Python
+  (`set_punc_model`), Go (`SetPuncModel`), Dart (`setPuncModel`). Binding-parity
+  manifest 149 → 150. Verified live: Python Session over parakeet,
+  `set_punc_model('fullstop')` rewrites segment text.
+- **Server truecase (gap 2).** Server now applies `--truecase-model` (previously
+  CLI-only). Extracted the 3-flavour (statistical/CRF/BiLSTM) resolution + apply
+  into a shared `examples/cli/crispasr_truecase_loader.h` used by both the CLI
+  (refactored to call it) and the server; applied after punctuation, skipped
+  when PCS is active.
+- **Server diarize knobs (gap 3)** + **LID (gap 6 half).** `diarize_embedder` /
+  `diarize_cluster_threshold` / `diarize_max_speakers` / `lid_backend` /
+  `lid_model` are now per-request form params on `/inference` and
+  `/v1/audio/transcriptions`.
+- **Dry-run alias bug.** `build_preview()` skipped the literal-arg backend-key
+  lookup that the real resolver does, so `-m parakeet-tdt_ctc-110m
+  --dry-run-resolve` previewed the 467 MB 0.6b default instead of the 91 MB 110m
+  entry (actual load was already correct — only the preview lied). Fixed +
+  offline regression `tests/test-dry-run-resolve.sh`.
+
+Remaining §166 items (streaming HTTP endpoint, node-addon session migration,
+m2m100 `/v1/translate`) are larger features, not parity plumbing — see PLAN §166.
+
 ## 2026-06-13 #166 server `--punc-model` parity + #165 Vulkan-server robustness
 
 **#166 — server honors `--punc-model` (+ PCS + CTC auto-enable).** The

@@ -10,6 +10,18 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## A dry-run "preview" must mirror the real resolver, or it lies (§166)
+
+`--dry-run-resolve` had its own `build_preview()` that re-implemented model
+resolution — and drifted: it skipped the literal-arg backend-key lookup the real
+`crispasr_resolve_model` does, so `-m parakeet-tdt_ctc-110m --dry-run-resolve`
+previewed the 0.6b default while an actual run loaded the correct 110m. Any
+preview/plan/dry-run that re-derives behavior instead of calling the real code
+path will eventually diverge from it. Prefer sharing the resolver; if you must
+duplicate, pin the duplicate against the original with a test (here:
+`tests/test-dry-run-resolve.sh`). Same lesson as the §166 punc-model resolver
+being shared across CLI/server/C-ABI rather than copied three times.
+
 ## Server warmup is the launch-time differentiator vs the CLI (#165)
 
 When "the CLI works but `--server` doesn't" on a given GPU/backend, suspect the

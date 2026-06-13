@@ -101,41 +101,33 @@ test-all-backends.py passes 18/18 transcribe + 51/54 feature tests (3 stream ski
 
 PR #166 ("honor `--punc-model` in server mode") fixed one instance of a wider
 pattern: a feature wired into the CLI (`examples/cli/crispasr_run.cpp`) but not
-into the other front-ends. Audited all four surfaces 2026-06-13 — the
-`--punc-model` server gap is now closed and the alias→model table is shared (see
-HISTORY 2026-06-13). The remaining gaps below are **open — we want these:**
+into the other front-ends. Audited all four surfaces 2026-06-13.
 
-1. **`--punc-model` selection missing from the C-ABI and all wrappers.** The
-   C-ABI exposes only `crispasr_session_set_punctuation(bool)` plus the raw
-   building blocks (`crispasr_punc_init/process`, `crispasr_pcs_init`,
-   `crispasr_truecase_*`). There is no session-level "select alias → auto-
-   download → apply per segment" — so Python/Go/Dart can toggle punctuation on a
-   PnC backend but cannot add FireRedPunc to a parakeet session the way the
-   CLI/server now do. **Fix:** add `crispasr_session_set_punc_model(s, "auto"|
-   "fullstop"|path)` in `crispasr_c_api.cpp` reusing the shared resolver
-   (`examples/cli/crispasr_punc_loader.h`), then wrap in Python/Go/Dart.
-2. **Truecase entirely absent from the server.** CLI applies `--truecase-model`;
-   `crispasr_server.cpp` has zero truecase references. Wire it the same way the
-   punc model was wired (resident context + per-segment apply).
-3. **Server diarization advanced knobs are startup-only.** `/inference` and
-   `/v1/audio/transcriptions` read `diarize` + `diarize_method` per request, but
-   `diarize_embedder` / `diarize_cluster_threshold` / `diarize_max_speakers` are
-   only inherited from CLI launch flags. Add them as form params.
-4. **No streaming-transcription HTTP endpoint.** The whole CLI `--stream` /
+**Closed 2026-06-13** (see HISTORY): gap 1 (`--punc-model` in the C-ABI via
+`crispasr_session_set_punc_model` + Python/Go/Dart wrappers, shared resolver
+moved to `src/crispasr_punc_model.h`), gap 2 (server truecase via shared
+`crispasr_truecase_loader.h`), gap 3 (server per-request diarize knobs), gap 6's
+LID half (`lid_backend`/`lid_model` form params), and the dry-run-resolve
+sub-variant alias bug.
+
+**Still open — we want these (each is a larger item, not a quick form-param
+plumbing fix):**
+1. **No streaming-transcription HTTP endpoint** (was gap 4). The CLI `--stream` /
    `--mic` / `--live` / `--stream-json` / `--stream-punc` surface has no server
-   equivalent (server streaming exists only for TTS / chat). Larger design item.
-5. **Node addon (`examples/addon.node/addon.cpp`) is the most threadbare
-   wrapper:** no punctuation, grammar, alt-n, decode-extras, or fallback
-   thresholds. Bring up to the Python/Go session surface.
-6. **Translator stage + post-ASR text LID are CLI-only.** `--translate-source/
-   target-lang` (m2m100), `--text`, `--lid-on-transcript`, `--lid-backend` have
-   no server/wrapper exposure.
-
-**Minor model-resolution bug found during the audit:** `-m parakeet-tdt_ctc-110m`
-(and `-m parakeet-tdt_ctc-110m-q4_k`) mis-resolve to the 467 MB
-`parakeet-tdt-0.6b-v3` default instead of the registered 91 MB 110m entry — the
-registry alias isn't matched by `-m`. Affects any small-variant alias that is a
-prefix-collision with the default.
+   equivalent (server streaming exists only for TTS / chat). Needs a WebSocket or
+   chunked-SSE endpoint with partial/final event framing — a design item, not a
+   parity one-liner.
+2. **Node addon is a separate whisper-only binding** (was gap 5).
+   `examples/addon.node/addon.cpp` calls `whisper_full` directly and never
+   touches the `crispasr_session` C-ABI, so it can't reach any non-whisper
+   backend or session feature (punctuation, grammar, alt-n, beam, fallback). True
+   parity = **rewrite the addon on top of the session C-ABI**, not adding a few
+   `whisper_full_params` fields. Substantial; lowest-used binding.
+3. **m2m100 text-translation endpoint** (was gap 6's other half). `--text` is a
+   standalone CLI mode (text in → text out, no audio) and there is no ASR→
+   translate 2-stage anywhere — so this is a *new* `POST /v1/translate` feature
+   (backed by `backend->translate_text`, only meaningful when the server runs an
+   m2m100/`CAP_TRANSLATE` backend), not transcription-path parity.
 
 ---
 
