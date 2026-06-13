@@ -1267,11 +1267,6 @@ static ggml_cgraph* build_tslm_step_graph(voxcpm2_context* ctx, int n_past, int 
     // hidden state. Without FSQ, the stop predictor sees out-of-distribution
     // inputs and never fires on Vulkan (#164). We implement round(x) as
     // floor(x + 0.5) to avoid ggml_round, which produces NaN on CUDA.
-    // The stop predictor weights were trained on FSQ'd inputs, so feeding raw
-    // hidden state is out-of-distribution and fails on Vulkan (#164).
-    // FSQ: round(tanh(in_proj(hidden)) * 9) / 9 → out_proj.
-    // We implement round(x) as floor(x + 0.5) to avoid ggml_round, which
-    // produces NaN on some CUDA backends.
     if (W.stop_proj_w && W.stop_proj_b && W.stop_head_w && W.fsq_in_proj_w && W.fsq_out_proj_w) {
         // FSQ path
         ggml_tensor* fsq_in = ggml_mul_mat(ctx0, W.fsq_in_proj_w, cur);
