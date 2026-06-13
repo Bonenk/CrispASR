@@ -43,6 +43,38 @@ Kaggle-validated on `reazon_baseball_14s` ×3 (42 s): auto-VAD recovers
 chunking gets 1/3 (596 chars of repetitive output). Short audio (14 s)
 unaffected — no auto-VAD triggered.
 
+## 2026-06-13 §166 cross-surface parity — round 3 (streaming endpoint, node-addon session migration, /v1/translate)
+
+Closed the three remaining §166 items (the larger features).
+
+- **Streaming-transcription HTTP endpoint.** Wired the existing ws_stream
+  listener (previously only in the standalone examples/server) into the main
+  OpenAI-compatible server: opt-in `--ws-port N` (-1 off default, 0 = http
+  port+1). Clients send binary 16 kHz mono float32 PCM, receive JSON
+  {text,t0,t1,counter[,final]} partial/final events via the streaming session
+  API — the server analogue of the CLI `--stream` path. **Fixed two pre-existing
+  ws_stream bugs** that made the handshake fail for every spec-compliant client
+  (browsers, the `websockets` lib): the RFC 6455 magic GUID was mistyped
+  (...5AB5DC11D585 vs correct ...C5AB0DC85B11), and the upgrade request was read
+  in a single recv() (truncating handshakes split across TCP segments). The
+  streaming server never actually worked with real clients until this fix. Test
+  tests/test-server-ws-stream.py (live, stdlib raw WS client) pins the handshake
+  accept + a streaming transcription.
+- **Node addon → session C-ABI.** examples/addon.node was whisper-only
+  (whisper_full). Added `transcribeSession(params, cb)` on the crispasr_session
+  C-ABI — reaches every backend (parakeet/canary/moonshine/…) + the session
+  post-processors (punctuation, --punc-model, beam, translate, src/tgt lang,
+  temperature), returning the same shape as whisper(). Additive; legacy whisper()
+  + its progress callback untouched. No CMakeLists change (the addon links the
+  `whisper` alias = crispasr-lib, which exports the session symbols). Verified on
+  M1 via node: whisper + moonshine backends transcribe jfk.wav.
+- **POST /v1/translate.** Text-to-text translation endpoint (the HTTP analogue
+  of the CLI `--text` mode) backed by `backend->translate_text` (CAP_TRANSLATE,
+  e.g. m2m100). Verified: m2m100-418m, 'Hello world…' → 'Hallo Welt, wie bist du
+  heute?'. Test tests/test-server-translate.sh.
+
+§166 is now fully closed.
+
 ## 2026-06-13 §166 cross-surface parity — round 2 (C-ABI punc-model, server truecase/diarize/LID, alias preview)
 
 Follow-up to the §166 audit: closed five of the open parity gaps.

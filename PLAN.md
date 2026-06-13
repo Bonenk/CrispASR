@@ -97,40 +97,6 @@ test-all-backends.py passes 18/18 transcribe + 51/54 feature tests (3 stream ski
 
 ---
 
-## §166 Cross-surface feature parity (CLI / server / C-ABI / wrappers)
-
-PR #166 ("honor `--punc-model` in server mode") fixed one instance of a wider
-pattern: a feature wired into the CLI (`examples/cli/crispasr_run.cpp`) but not
-into the other front-ends. Audited all four surfaces 2026-06-13.
-
-**Closed 2026-06-13** (see HISTORY): gap 1 (`--punc-model` in the C-ABI via
-`crispasr_session_set_punc_model` + Python/Go/Dart wrappers, shared resolver
-moved to `src/crispasr_punc_model.h`), gap 2 (server truecase via shared
-`crispasr_truecase_loader.h`), gap 3 (server per-request diarize knobs), gap 6's
-LID half (`lid_backend`/`lid_model` form params), and the dry-run-resolve
-sub-variant alias bug.
-
-**Still open — we want these (each is a larger item, not a quick form-param
-plumbing fix):**
-1. **No streaming-transcription HTTP endpoint** (was gap 4). The CLI `--stream` /
-   `--mic` / `--live` / `--stream-json` / `--stream-punc` surface has no server
-   equivalent (server streaming exists only for TTS / chat). Needs a WebSocket or
-   chunked-SSE endpoint with partial/final event framing — a design item, not a
-   parity one-liner.
-2. **Node addon is a separate whisper-only binding** (was gap 5).
-   `examples/addon.node/addon.cpp` calls `whisper_full` directly and never
-   touches the `crispasr_session` C-ABI, so it can't reach any non-whisper
-   backend or session feature (punctuation, grammar, alt-n, beam, fallback). True
-   parity = **rewrite the addon on top of the session C-ABI**, not adding a few
-   `whisper_full_params` fields. Substantial; lowest-used binding.
-3. **m2m100 text-translation endpoint** (was gap 6's other half). `--text` is a
-   standalone CLI mode (text in → text out, no audio) and there is no ASR→
-   translate 2-stage anywhere — so this is a *new* `POST /v1/translate` feature
-   (backed by `backend->translate_text`, only meaningful when the server runs an
-   m2m100/`CAP_TRANSLATE` backend), not transcription-path parity.
-
----
-
 ## §165 Server fails to launch on Vulkan build (GitHub #165) — OPEN tail
 
 `--no-warmup` opt-out + guarded warmup + two server-robustness fixes shipped

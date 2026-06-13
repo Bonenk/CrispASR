@@ -22,6 +22,20 @@ duplicate, pin the duplicate against the original with a test (here:
 `tests/test-dry-run-resolve.sh`). Same lesson as the §166 punc-model resolver
 being shared across CLI/server/C-ABI rather than copied three times.
 
+## A WebSocket server that "works in the browser" can still be RFC-broken (§166)
+
+ws_stream's handshake had the RFC 6455 magic GUID mistyped
+(`...5AB5DC11D585` vs correct `...C5AB0DC85B11`), so `Sec-WebSocket-Accept` was
+always wrong — yet it had shipped. Lesson: verify a WS handshake against a
+*spec-compliant* client (the `websockets` lib, a real browser), not a hand-rolled
+client that echoes your own (possibly wrong) accept. The fastest localization was
+the canonical RFC vector: key `dGhlIHNhbXBsZSBub25jZQ==` must yield accept
+`s3pPLMBiTxaQ9kYGzzhZRbK+xOo=`. Also: read the upgrade request in a loop until
+`\r\n\r\n` — a single recv() truncates handshakes split across TCP segments
+(works for a localhost one-shot client, fails for fragmented real ones). Both are
+"passes my own test, fails everyone else's" bugs — diff against the reference
+implementation, not a mirror of your own code.
+
 ## Server warmup is the launch-time differentiator vs the CLI (#165)
 
 When "the CLI works but `--server` doesn't" on a given GPU/backend, suspect the
