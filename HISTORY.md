@@ -6,6 +6,51 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-13 #166 server `--punc-model` parity + #165 Vulkan-server robustness
+
+**#166 — server honors `--punc-model` (+ PCS + CTC auto-enable).** The
+punctuation post-processor lived only in the CLI layer (`crispasr_run.cpp`), so a
+server started with `--punc-model fullstop` and a non-PnC backend (parakeet
+RNNT/CTC) returned lowercase, unpunctuated text. Cherry-picked the PR commit
+(`36f35f2a`; the PR branch was based on a stale main so a full merge would have
+reverted thousands of lines), then extended it (`8d803f04`):
+- Extracted the `--punc-model` alias → (cache filename, URL) table into a pure,
+  dependency-free resolver `examples/cli/crispasr_punc_loader.h`, now shared by
+  **both** CLI and server so they can't drift on which model an alias selects.
+  CLI's two inline resolution blocks now call the resolver.
+- Server: added the **PCS** model path and **auto-enable** of punctuation for
+  non-PnC CTC backends (`crispasr_should_auto_enable_punctuation`) — full CLI
+  parity. PCS takes precedence over FireRedPunc when loaded.
+- Tests: `tests/test_punc_resolve.cpp` (`[unit]`, 5 cases / 41 assertions — pins
+  every alias/direct-path/edge case); `tests/test-server-punc.sh` (`[live]`,
+  parakeet + `--punc-model fullstop`, asserts punctuated output and that
+  `punctuation=false` strips). Live-verified 3/3 on M1 Metal.
+
+**#165 — server fails to launch on a Vulkan build** (external reporter: Windows
+11, AMD Radeon 780M; CPU build + Vulkan file-transcription work, but `--server`
+stops right after parakeet init). Root cause: the server (unlike the CLI) always
+runs a warmup transcribe before `listen()`, and the reporter's log stops *before*
+`warmup completed` → warmup hangs/crashes in their Vulkan driver. **Could not
+reproduce on M1 + MoltenVK** (warmup completes ~893 ms, transcribes fine) — so
+it's specific to the AMD 780M driver. Shipped (`c04f70fb`):
+- `--no-warmup` flag (+ `CRISPASR_NO_WARMUP=1`) — the previously-missing escape
+  hatch — and wrapped the warmup call in try/catch so a soft failure degrades to
+  "no warmup" instead of preventing `listen()`.
+- **Two server-robustness bugs found while debugging, fixed:** (a) route-handler
+  exceptions became a bare 500 with empty body, which the error handler
+  mislabeled as "not found. Use POST /v1/audio/transcriptions" — added
+  `set_exception_handler` to log + return the real reason; (b) `scratch_dir()`
+  used the throwing `create_directories` on the per-request path, so an
+  unwritable/odd cache dir 500'd **every** transcription — now uses the
+  non-throwing overload with a system-temp fallback.
+- Test `tests/test-server-warmup.sh` (default warmup + `--no-warmup`), verified
+  on both Metal and Vulkan/MoltenVK builds; `whisper_params` default unit test.
+- Also unblocked a pre-existing nemotron Metal/CUDA build break (missing
+  `ggml-metal.h`/`ggml-cuda.h` includes in the #81 scaffold, `cb98d218`).
+
+See LEARNINGS "Server warmup is the launch-time differentiator vs the CLI" and
+PLAN §165/§166 for the open tails.
+
 ## 2026-06-05 #58 MOSS-Audio-4B-Instruct — audio understanding + ASR backend
 
 New audio-understanding backend: 32-layer Whisper-style encoder (1280d,

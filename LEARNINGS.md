@@ -10,6 +10,34 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Server warmup is the launch-time differentiator vs the CLI (#165)
+
+When "the CLI works but `--server` doesn't" on a given GPU/backend, suspect the
+**warmup** first. The server runs a dummy transcribe right after model load
+(`backend->warmup()` before `listen()`); the one-shot CLI does **not** warm up
+unless `--warmup` is passed. So a driver bug that only bites the warmup's
+input shape (e.g. parakeet's 0.5 s of silence) presents as "server hangs after
+model init, CLI transcribes fine." Diagnose by where the log stops: no
+`warmup completed in … ms` line ⇒ it died inside warmup. Fixes: an opt-out
+(`--no-warmup`) and a try/catch around the warmup call. A hard GPU device-lost
+won't be catchable, but the opt-out sidesteps it. Couldn't reproduce on
+M1/MoltenVK — Vulkan-driver bugs are RADV/AMD/proprietary-specific, not portable.
+
+## Don't throw on the per-request server path; surface the real error (#165)
+
+Two cpp-httplib server traps found together:
+- A route handler that **throws** becomes a bare 500 with an empty body.
+  cpp-httplib then invokes the *error* handler, which (if it fills empty bodies)
+  mislabels every exception as the generic "not found" 404 payload. Add
+  `svr.set_exception_handler` to log `e.what()` and return a structured 500 — a
+  thrown `std::filesystem_error` masquerading as "use POST /v1/..." cost real
+  debugging time here.
+- Anything on the per-request path that calls the **throwing**
+  `std::filesystem::create_directories` (e.g. a scratch/cache dir helper) will
+  500 *every* request when that dir is unwritable or odd (here: a dangling
+  `~/.cache/crispasr` symlink to an unmounted disk). Use the `std::error_code`
+  overload and fall back to `temp_directory_path()`.
+
 ## FFT size must match upstream exactly (Mini-Omni2 / Whisper mel)
 
 Whisper's `torch.stft(n_fft=400)` runs a 400-point DFT. Zero-padding to
