@@ -214,7 +214,7 @@ try:
 
     # Basic JFK transcribe — should not crash
     rc, out, elapsed = run_crispasr([
-        "-m", str(mimo_model), "--tokenizer-model", str(mimo_tok),
+        "-m", str(mimo_model), "--codec-model", str(mimo_tok),
         "-f", str(jfk_wav), "-v",
     ], timeout=300)
 
@@ -234,7 +234,7 @@ try:
     if long_wav.exists():
         kh.step("test1.long.start")
         rc2, out2, elapsed2 = run_crispasr([
-            "-m", str(mimo_model), "--tokenizer-model", str(mimo_tok),
+            "-m", str(mimo_model), "--codec-model", str(mimo_tok),
             "-f", str(long_wav), "-v",
         ], timeout=600)
         t2 = out2
