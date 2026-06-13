@@ -429,7 +429,10 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
             } else if (!rp.no_prints) {
                 fprintf(stderr, "crispasr-server: LID failed, falling back to language='%s'\n", rp.language.c_str());
             }
-            crispasr_lid_free_cache();
+            // Keep the LID model resident across requests (freed once at server
+            // shutdown, like the VAD cache). Previously freed here per request,
+            // which reloaded the whisper-LID model on every `language=auto`
+            // transcription (#165). Set `language` explicitly to skip LID entirely.
         }
         result.language = rp.language;
 
@@ -2343,10 +2346,12 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
 
     svr.listen(host, port);
 
-    // Clean up cached VAD context on shutdown (#132).
+    // Clean up cached VAD + LID contexts on shutdown (#132, #165). Both stay
+    // resident across requests; freed once here.
     if (ws_started)
         ws_stream_stop();
     crispasr_vad_free_cache();
+    crispasr_lid_free_cache();
 
     return 0;
 }
