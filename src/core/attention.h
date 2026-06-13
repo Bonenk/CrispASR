@@ -750,6 +750,11 @@ static inline ggml_tensor* kv_self_attn(ggml_context* ctx0, ggml_cgraph* gf, ggm
                           /*attn_factor*/ 1.0f, p.rope_beta_fast, p.rope_beta_slow);
         K = ggml_rope_ext(ctx0, K, positions, p.rope_freq_factors, n_rot, p.rope_type, p.n_ctx_orig, p.rope_theta, 1.0f,
                           0.0f, 1.0f, p.rope_beta_fast, p.rope_beta_slow);
+    } else {
+        // Ensure Q/K are contiguous — downstream permute + flash_attn
+        // expect contiguous inputs, which ggml_rope_ext would guarantee.
+        Q = ggml_cont(ctx0, Q);
+        K = ggml_cont(ctx0, K);
     }
 
     // ---- Permute new K/V to (hd, T, n_kv) for cache write ----
