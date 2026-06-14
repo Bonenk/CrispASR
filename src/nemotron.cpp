@@ -685,17 +685,24 @@ static ggml_tensor* nemotron_build_pre_encode(ggml_context* ctx0, ggml_tensor* m
 // conv_dw_b add with a proper LayerNorm using the conv_ln_w/conv_ln_b tensors.
 // ===========================================================================
 
-// Build a banded attention window mask (F16) for cache-aware streaming.
-// mask[k, q] = 0 if q-left <= k <= q+right, else -inf.
+// Build a chunked_limited attention mask (F16) matching NeMo's att_context_style.
+// Each frame belongs to a chunk of size (right+1). A frame can attend to frames
+// in its own chunk and up to left_chunks_num previous chunks.
+// mask[q, k] = 0 if visible, -inf if masked.
 // Shape: (T, T) broadcast across heads.
 static std::vector<ggml_fp16_t> build_window_mask(int T, int left, int right) {
+    const int chunk_size = right + 1;
+    const int left_chunks_num = left >= 0 ? left / chunk_size : 10000;
     std::vector<ggml_fp16_t> mask((size_t)T * T);
     const ggml_fp16_t neg_inf = ggml_fp32_to_fp16(-1e9f);
     const ggml_fp16_t zero = ggml_fp32_to_fp16(0.0f);
     for (int q = 0; q < T; q++) {
+        int q_chunk = q / chunk_size;
         for (int k = 0; k < T; k++) {
-            bool in_window = (k >= q - left) && (k <= q + right);
-            mask[(size_t)q * T + k] = in_window ? zero : neg_inf;
+            int k_chunk = k / chunk_size;
+            int diff = q_chunk - k_chunk;
+            bool visible = (diff >= 0) && (diff <= left_chunks_num);
+            mask[(size_t)q * T + k] = visible ? zero : neg_inf;
         }
     }
     return mask;
@@ -1637,6 +1644,13 @@ extern "C" struct nemotron_result* nemotron_transcribe_ex(struct nemotron_contex
     auto mel = nemotron_compute_mel_impl(ctx, samples, n_samples, T_mel);
     if (mel.empty() || T_mel <= 0)
         return nullptr;
+    {
+        float mmin = 1e30f, mmax = -1e30f;
+        for (auto v : mel) { if (v < mmin) mmin = v; if (v > mmax) mmax = v; }
+        fprintf(stderr, "nemotron: mel T=%d n_mels=%d min=%.2f max=%.2f mel[0:5]=[%.4f,%.4f,%.4f,%.4f,%.4f]\n",
+                T_mel, (int)ctx->model.hparams.n_mels, mmin, mmax,
+                mel[0], mel[1], mel[2], mel[3], mel[4]);
+    }
 
     // Run encoder — use cache-aware chunked path (NEMOTRON_BATCH=1 for old bidirectional path)
     std::vector<float> enc_out;
@@ -1733,6 +1747,10 @@ extern "C" struct nemotron_result* nemotron_transcribe_ex(struct nemotron_contex
     if (T_enc <= 0)
         return nullptr;
 
+    // Debug: encoder frame 0 before prompt
+    fprintf(stderr, "nemotron: enc frame0[0:5]=[%.4f,%.4f,%.4f,%.4f,%.4f]\n", enc_out[0], enc_out[1], enc_out[2],
+            enc_out[3], enc_out[4]);
+
     // Apply prompt kernel (language conditioning) — CPU F32
     // concat(enc_out[d_model], lang_onehot[n_prompts]) → Linear(in→mid) → ReLU → Linear(mid→d_model)
     if (ctx->model.prompt_kernel.l0_w) {
@@ -1782,7 +1800,21 @@ extern "C" struct nemotron_result* nemotron_transcribe_ex(struct nemotron_contex
             }
         }
         enc_out = std::move(prompted);
-        fprintf(stderr, "nemotron: prompt kernel applied (prompt_id=%d)\n", prompt_id);
+        {
+            float pmin = 1e30f, pmax = -1e30f;
+            for (size_t i = 0; i < enc_out.size(); i++) {
+                if (enc_out[i] < pmin)
+                    pmin = enc_out[i];
+                if (enc_out[i] > pmax)
+                    pmax = enc_out[i];
+            }
+            fprintf(stderr, "nemotron: prompt kernel applied (prompt_id=%d) min=%.4f max=%.4f\n", prompt_id, pmin,
+                    pmax);
+            // Debug: dump first 5 values of frame 0 and the lang one-hot
+            fprintf(stderr, "nemotron: prompt frame0[0:5]=[%.4f,%.4f,%.4f,%.4f,%.4f]\n", enc_out[0], enc_out[1],
+                    enc_out[2], enc_out[3], enc_out[4]);
+            fprintf(stderr, "nemotron: pk_in=%d pk_mid=%d d=%d n_prompts=%d\n", pk_in, pk_mid, d_model, n_prompts);
+        }
     }
 
     // RNN-T decode
