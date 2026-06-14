@@ -551,7 +551,7 @@ static std::vector<float> nemotron_compute_mel_impl(nemotron_context* ctx, const
     p.layout = core_mel::Layout::TimeMels;
     p.log_eps = (float)(1.0 / (1 << 24));
     p.center_pad = true;
-    p.drop_last_frame = true;
+    p.drop_last_frame = false; // NeMo default: keep all frames (1101 not 1100)
     p.preemph = 0.97f;
 
     auto mel = core_mel::compute(samples, n_samples, window_raw.data(), win, mel_fb.data(), n_freqs, nemotron_fft_r2c,
@@ -1646,10 +1646,14 @@ extern "C" struct nemotron_result* nemotron_transcribe_ex(struct nemotron_contex
         return nullptr;
     {
         float mmin = 1e30f, mmax = -1e30f;
-        for (auto v : mel) { if (v < mmin) mmin = v; if (v > mmax) mmax = v; }
-        fprintf(stderr, "nemotron: mel T=%d n_mels=%d min=%.2f max=%.2f mel[0:5]=[%.4f,%.4f,%.4f,%.4f,%.4f]\n",
-                T_mel, (int)ctx->model.hparams.n_mels, mmin, mmax,
-                mel[0], mel[1], mel[2], mel[3], mel[4]);
+        for (auto v : mel) {
+            if (v < mmin)
+                mmin = v;
+            if (v > mmax)
+                mmax = v;
+        }
+        fprintf(stderr, "nemotron: mel T=%d n_mels=%d min=%.2f max=%.2f mel[0:5]=[%.4f,%.4f,%.4f,%.4f,%.4f]\n", T_mel,
+                (int)ctx->model.hparams.n_mels, mmin, mmax, mel[0], mel[1], mel[2], mel[3], mel[4]);
     }
 
     // Run encoder — use cache-aware chunked path (NEMOTRON_BATCH=1 for old bidirectional path)
@@ -1747,9 +1751,14 @@ extern "C" struct nemotron_result* nemotron_transcribe_ex(struct nemotron_contex
     if (T_enc <= 0)
         return nullptr;
 
-    // Debug: encoder frame 0 before prompt
+    // Debug: encoder frames before prompt
     fprintf(stderr, "nemotron: enc frame0[0:5]=[%.4f,%.4f,%.4f,%.4f,%.4f]\n", enc_out[0], enc_out[1], enc_out[2],
             enc_out[3], enc_out[4]);
+    if (T_enc > 50) {
+        int off = 50 * d_model;
+        fprintf(stderr, "nemotron: enc frame50[0:5]=[%.4f,%.4f,%.4f,%.4f,%.4f]\n", enc_out[off], enc_out[off + 1],
+                enc_out[off + 2], enc_out[off + 3], enc_out[off + 4]);
+    }
 
     // Apply prompt kernel (language conditioning) — CPU F32
     // concat(enc_out[d_model], lang_onehot[n_prompts]) → Linear(in→mid) → ReLU → Linear(mid→d_model)
