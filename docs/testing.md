@@ -5,7 +5,7 @@ CrispASR has two tiers of tests: **unit tests** (no models, fast) and
 
 ## Unit tests
 
-435 unit tests run unconditionally in ~5 seconds with no model files:
+439 unit tests run unconditionally in ~5 seconds with no model files:
 
 ```bash
 ctest --test-dir build -L unit --timeout 30
