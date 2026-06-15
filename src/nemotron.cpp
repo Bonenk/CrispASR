@@ -1580,6 +1580,173 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
 }
 
 // ===========================================================================
+// RNN-T beam search decode
+// ===========================================================================
+// Same structure as greedy decode above but expands top-B hypotheses at
+// each step and prunes globally by cumulative log-probability.
+// When beam_size==1 produces bit-identical output to greedy.
+// LSTM state snapshots are plain vector copies (~few KB per beam).
+
+static std::vector<nemotron_emitted_token> nemotron_rnnt_beam_decode(nemotron_context* ctx, const float* enc, int T_enc,
+                                                                     int d_model, int beam_size) {
+    nemotron_init_pred_weights(ctx);
+    nemotron_init_joint_weights(ctx);
+
+    const auto& W = ctx->pred_w;
+    const auto& J = ctx->joint_w;
+    const int blank_id = (int)ctx->model.hparams.blank_id;
+    const int n_vocab = J.vocab_total; // vocab + blank
+    const int max_per_step = 10;
+    const int B = std::max(1, beam_size);
+
+    struct Hyp {
+        nemotron_lstm_state lstm;
+        std::vector<float> pred_out;
+        int t = 0;
+        int n_inner = 0;
+        double cum_logprob = 0.0;
+        std::vector<nemotron_emitted_token> emitted;
+        bool active = true;
+    };
+
+    // Seed: single hypothesis at t=0 with SOS predictor state
+    std::vector<Hyp> beam(1);
+    {
+        auto& h = beam[0];
+        h.lstm.init(W.H);
+        predictor_step(W, blank_id, h.lstm, h.pred_out);
+        h.emitted.reserve(256);
+    }
+
+    std::vector<float> proj_e(J.joint_hidden);
+    std::vector<float> logits(n_vocab);
+
+    for (;;) {
+        bool any_active = false;
+        for (const auto& h : beam)
+            if (h.active) {
+                any_active = true;
+                break;
+            }
+        if (!any_active)
+            break;
+
+        struct Candidate {
+            int parent;
+            int token;
+            double cum_logprob;
+            float tok_p;
+        };
+        std::vector<Candidate> cands;
+        cands.reserve((size_t)beam.size() * (size_t)(B + 1));
+
+        for (int bi = 0; bi < (int)beam.size(); bi++) {
+            auto& h = beam[bi];
+            if (!h.active) {
+                cands.push_back({bi, -1, h.cum_logprob, 0.0f});
+                continue;
+            }
+
+            joint_proj_enc(J, enc + (size_t)h.t * d_model, proj_e);
+            joint_step(J, proj_e.data(), h.pred_out.data(), logits);
+
+            // Log-partition (log-sum-exp) over all tokens
+            float max_logit = logits[0];
+            for (int v = 1; v < n_vocab; v++)
+                if (logits[v] > max_logit)
+                    max_logit = logits[v];
+            double logZ = 0.0;
+            for (int v = 0; v < n_vocab; v++)
+                logZ += std::exp((double)(logits[v] - max_logit));
+            logZ = (double)max_logit + std::log(logZ);
+
+            // Top-B tokens
+            std::vector<int> top_ids(std::min(B, n_vocab));
+            std::vector<float> top_vals(top_ids.size(), -1e30f);
+            for (int v = 0; v < n_vocab; v++) {
+                int mi = 0;
+                for (int j = 1; j < (int)top_ids.size(); j++)
+                    if (top_vals[j] < top_vals[mi])
+                        mi = j;
+                if (logits[v] > top_vals[mi]) {
+                    top_vals[mi] = logits[v];
+                    top_ids[mi] = v;
+                }
+            }
+            // Ensure blank is always a candidate
+            bool has_blank = false;
+            for (int id : top_ids)
+                if (id == blank_id) {
+                    has_blank = true;
+                    break;
+                }
+            if (!has_blank)
+                top_ids.push_back(blank_id);
+
+            for (int id : top_ids) {
+                double log_p = (double)logits[id] - logZ;
+                float tok_p = (float)std::exp(log_p);
+                cands.push_back({bi, id, h.cum_logprob + log_p, tok_p});
+            }
+        }
+
+        // Global prune: keep top-B
+        const size_t keep = std::min<size_t>((size_t)B, cands.size());
+        std::partial_sort(cands.begin(), cands.begin() + (ptrdiff_t)keep, cands.end(),
+                          [](const Candidate& a, const Candidate& b) { return a.cum_logprob > b.cum_logprob; });
+        cands.resize(keep);
+
+        std::vector<Hyp> next_beam;
+        next_beam.reserve(keep);
+
+        for (auto& c : cands) {
+            const auto& parent = beam[c.parent];
+
+            if (c.token < 0) {
+                next_beam.push_back(parent);
+                next_beam.back().active = false;
+                continue;
+            }
+
+            Hyp nh;
+            nh.lstm = parent.lstm;
+            nh.pred_out = parent.pred_out;
+            nh.cum_logprob = c.cum_logprob;
+            nh.emitted = parent.emitted;
+
+            if (c.token == blank_id) {
+                // Blank: advance frame by 1
+                nh.t = parent.t + 1;
+                nh.n_inner = 0;
+            } else {
+                // Real token: emit, advance predictor, stay on frame
+                nh.emitted.push_back({c.token, parent.t, parent.t + 1, c.tok_p});
+                predictor_step(W, c.token, nh.lstm, nh.pred_out);
+                nh.t = parent.t;
+                nh.n_inner = parent.n_inner + 1;
+                if (nh.n_inner >= max_per_step) {
+                    nh.t = parent.t + 1;
+                    nh.n_inner = 0;
+                }
+            }
+
+            nh.active = (nh.t < T_enc);
+            next_beam.push_back(std::move(nh));
+        }
+
+        beam = std::move(next_beam);
+    }
+
+    if (beam.empty())
+        return {};
+    int best = 0;
+    for (int i = 1; i < (int)beam.size(); i++)
+        if (beam[i].cum_logprob > beam[best].cum_logprob)
+            best = i;
+    return std::move(beam[best].emitted);
+}
+
+// ===========================================================================
 // Token → text conversion
 // ===========================================================================
 
@@ -1920,7 +2087,9 @@ extern "C" struct nemotron_result* nemotron_transcribe_ex(struct nemotron_contex
     }
 
     // RNN-T decode
-    auto emitted = nemotron_rnnt_decode(ctx, enc_out.data(), T_enc, d_model);
+    const int beam_sz = ctx->decode_beam_size;
+    auto emitted = (beam_sz > 1) ? nemotron_rnnt_beam_decode(ctx, enc_out.data(), T_enc, d_model, beam_sz)
+                                 : nemotron_rnnt_decode(ctx, enc_out.data(), T_enc, d_model);
 
     if (getenv("CRISPASR_NEMOTRON_DEBUG")) {
         fprintf(stderr, "nemotron: RNNT emitted %zu tokens\n", emitted.size());

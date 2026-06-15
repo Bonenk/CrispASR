@@ -5843,3 +5843,88 @@ NeMo's exact `cache_last_channel` + `cache_last_time` flow (using the
 Python chunked encoder produces tokens on JFK. Then port that exact logic
 to C++, matching each intermediate tensor. The Kaggle diff harness and ref
 GGUF are ready for this.
+
+## §167 — Beam search, MAES, and KV caching expansion
+
+Cross-cutting feature push to bring beam search, MAES (Modified Adaptive
+Expansion Search), and KV caching to backends that lack them. Builds on
+§139 (beam search round 1, all LLM backends done) and §165 (beam_size
+defaults).
+
+Branch: `feat/beam-maes-cache`
+
+### Survey results (2026-06-15)
+
+**Beam search gaps:**
+
+| Backend | Architecture | Gap | Effort |
+|---|---|---|---|
+| nemotron | RNNT (FastConformer enc + LSTM pred) | Stub only — `set_beam_size` + field exist but `nemotron_rnnt_decode` is greedy | LOW — copy `parakeet_rnnt_beam_decode` pattern |
+| sensevoice | CTC (encoder-only) | Greedy CTC; `core_ctc::prefix_beam_search` available | LOW — wire existing infra |
+| granite-nle | CTC (encoder-only) | Greedy CTC; same `core_ctc` | LOW |
+| mimo-asr | LLM (Qwen2 + RVQ) | No beam wired; `kv_self_attn` present | MEDIUM — `core_beam_decode` replay |
+| moss-audio | LLM (InternLM2 + audio) | No beam wired; `kv_self_attn` present | MEDIUM — `core_beam_decode` replay |
+| lfm2-audio | Hybrid Mamba+attention | No beam; needs KV + conv state save/restore | HIGH |
+
+**MAES gaps:**
+
+| Backend | Current | Gap |
+|---|---|---|
+| nemotron | greedy RNNT | No MAES; direct port from `parakeet_rnnt_maes_decode` |
+| sensevoice | greedy CTC | `core_ctc::prefix_beam_search` gamma parameter unused |
+| granite-nle | greedy CTC | Same |
+| wav2vec2 | Has gamma | Already done (reference) |
+| parakeet | Has full MAES | Already done (reference) |
+
+**KV caching gaps:**
+
+| Backend | Current | Gap |
+|---|---|---|
+| firered-asr | Hand-rolled per-step AED, no persistent KV | Migrate to `core_attn::kv_self_attn` |
+
+### Phase 1 — VPS (small models, ≤1.2 GB)
+
+**§167a: Nemotron RNNT beam search**
+- Model: `nemotron-3.5-asr-streaming-0.6b-q4_k.gguf` (458 MB)
+- Implement `nemotron_rnnt_beam_decode` from `parakeet_rnnt_beam_decode`
+- Wire `ctx->decode_beam_size` in transcribe path
+- A/B: greedy vs beam_size=4 on jfk.wav — WER, wall time, RSS
+
+**§167b: Nemotron RNNT MAES**
+- Depends on §167a
+- Implement `nemotron_rnnt_maes_decode` from `parakeet_rnnt_maes_decode`
+- Add `nemotron_set_maes()` + C API surface
+- A/B: beam=4 vs MAES(beam=4, steps=2, gamma=2.3)
+
+**§167c: Firered AED decoder KV cache**
+- Model: `firered-asr2-aed-q4_k.gguf` (919 MB)
+- Migrate decoder attention to `core_attn::kv_self_attn`
+- Regression gate: identical text output
+- A/B: current vs KV-cached — wall time improvement
+
+### Phase 2 — VPS or Kaggle (medium models, need model files)
+
+**§167d: Sensevoice CTC beam + gamma**
+- Model: needs GGUF on disk (not currently available)
+- Wire `sensevoice_set_beam_size` → `core_ctc::prefix_beam_search(gamma)`
+- A/B: greedy vs beam=8 + gamma=2.3
+
+**§167e: Granite-NLE CTC beam + gamma**
+- Model: needs GGUF on disk
+- Wire beam into `granite_nle` CTC decode
+- A/B: greedy vs beam=8 + gamma=2.3
+
+### Phase 3 — Kaggle (large models, GPU needed)
+
+**§167f: MIMO-ASR beam** — `core_beam_decode::run_with_probs` replay
+**§167g: Moss-Audio beam** — `core_beam_decode::run_with_probs` replay (4B, GPU)
+**§167h: LFM2-Audio beam** — `core_beam_decode::run_with_probs_branched` + conv state
+
+### Benchmark methodology
+
+Each item gets an A/B test:
+- **A (baseline)**: greedy / current decode path
+- **B (new)**: beam / MAES / cached path
+- Metrics: WER delta, wall-clock time (median of 3 runs), peak RSS
+- Audio: `samples/jfk.wav` (English, 11s) + backend-specific samples
+- Env vars for model paths follow existing `tests/env-live-tests.sh` pattern
