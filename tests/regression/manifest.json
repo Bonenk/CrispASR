@@ -346,8 +346,8 @@
         "approx_size_mb": 4308
       },
       "sample": "samples/jfk.wav",
-      "expected_transcript": "PLACEHOLDER — capture from first rebake run",
-      "expected_transcript_source": "TODO — capture once rebake produces the ref archive"
+      "expected_transcript": "ANd so, my fellow Americans, ask not what your country can do for you.. ASk what you can do for your country..",
+      "expected_transcript_source": "captured 2026-06-15 Kaggle T4 GPU (${KAGGLE_ACCOUNT}) with --codec-model mimo-tokenizer-q4_k"
     },
     {
       "name": "mimo-audio-tokenizer",
@@ -780,8 +780,8 @@
         "approx_size_mb": 5445
       },
       "sample": "samples/jfk.wav",
-      "expected_transcript": "TBD",
-      "expected_transcript_source": "not yet captured — skip_diff entry, transcript needs pinning",
+      "expected_transcript": "TTS/audio-understanding backend — not a direct ASR transcriber; use --tts or --prompt for audio QA",
+      "expected_transcript_source": "kugelaudio outputs a TTS-only message when invoked with -f; audio understanding needs --prompt",
       "skip_diff": true
     },
     {
