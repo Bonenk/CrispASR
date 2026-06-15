@@ -1,6 +1,6 @@
 {
-  "id": "${KAGGLE_ACCOUNT}/crispasr-beam-maes-ab-167",
-  "title": "CrispASR beam/MAES A/B benchmark (§167)",
+  "id": "${KAGGLE_ACCOUNT}/crispasr-beam-maes-a-b-benchmark-167",
+  "title": "CrispASR beam MAES A B benchmark 167",
   "code_file": "beam_maes_ab.py",
   "language": "python",
   "kernel_type": "script",
