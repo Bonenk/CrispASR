@@ -1083,16 +1083,18 @@ static bool nemotron_run_encoder_chunked(nemotron_context* ctx, const float* pre
     const auto& m = ctx->model;
     const int n_layers = (int)hp.n_layers;
     const int preset = ctx->att_context_preset;
-    const int L = hp.att_context_left[preset];  // left context frames
+    const int L = hp.att_context_left[preset];  // left context frames (cache_last_channel)
     const int R = hp.att_context_right[preset]; // right context frames
     const int chunk_size = R + 1;               // new frames per chunk
     const int K = (int)hp.conv_kernel;
     const int d = d_model;
 
-    fprintf(stderr, "nemotron: chunked encoder L=%d R=%d chunk=%d T_enc=%d layers=%d\n", L, R, chunk_size, T_enc,
-            n_layers);
+    fprintf(stderr, "nemotron: chunked encoder (streaming) L=%d R=%d chunk=%d T_enc=%d layers=%d\n", L, R, chunk_size,
+            T_enc, n_layers);
 
-    // Initialize per-layer caches
+    // Initialize per-layer caches.
+    // k_cache stores post-FFN1 output (NeMo's cache_last_channel): the input
+    // to the self-attention K/V projections.  Up to L frames per layer.
     ctx->enc_cache.resize(n_layers);
     for (int il = 0; il < n_layers; il++) {
         auto& c = ctx->enc_cache[il];
@@ -1103,16 +1105,8 @@ static bool nemotron_run_encoder_chunked(nemotron_context* ctx, const float* pre
         c.conv_cached = 0;
     }
 
-    // Split input into chunks
     int n_chunks = (T_enc + chunk_size - 1) / chunk_size;
     enc_out.resize((size_t)T_enc * d);
-
-    // Current layer input for the full sequence — starts as pre_enc, then
-    // gets overwritten layer by layer for each chunk
-    // We process chunk-by-chunk, and for each chunk all layers sequentially.
-    // layer_input[il] holds the output of layer il for all processed frames so far.
-    std::vector<std::vector<float>> layer_output(n_layers + 1);
-    layer_output[0].assign(pre_enc, pre_enc + (size_t)T_enc * d);
 
     core_conformer::BlockParams bp;
     bp.d = d;
@@ -1122,20 +1116,16 @@ static bool nemotron_run_encoder_chunked(nemotron_context* ctx, const float* pre
     bp.ln_eps = kLayerNormEps;
 
     // Streaming graph cache keyed by (layer, T_new, T_cache).
-    // Uses nemotron_build_block_streaming: FFN1 on new only, Q new / KV [cache,new],
-    // conv on new with causal pad, FFN2+LN on new. Caches post-FFN1 for next chunk.
+    // Uses nemotron_build_block_streaming: FFN1 on new only, Q from new,
+    // K/V from [cache_ch + new_post_ffn1], conv with causal pad, FFN2+LN on new.
     struct layer_graph {
         ggml_context* ctx0 = nullptr;
         ggml_cgraph* gf = nullptr;
     };
     std::map<std::tuple<int, int, int>, layer_graph> graph_cache;
 
-    // Use the non-streaming block (full window): pass [cached, new] through the
-    // complete conformer block. Simpler and includes rel-pos bias. The cached
-    // frames get re-processed through FFN1 but FFN1 is pointwise so this is
-    // mathematically equivalent to NeMo's cache_last_channel approach.
-    auto get_or_build = [&](int il, int T_win) -> layer_graph& {
-        auto key = std::make_tuple(il, T_win, 0);
+    auto get_or_build = [&](int il, int T_new, int T_cache) -> layer_graph& {
+        auto key = std::make_tuple(il, T_new, T_cache);
         auto it = graph_cache.find(key);
         if (it != graph_cache.end())
             return it->second;
@@ -1145,16 +1135,46 @@ static bool nemotron_run_encoder_chunked(nemotron_context* ctx, const float* pre
         layer_graph lg;
         lg.ctx0 = ggml_init(ip2);
         lg.gf = ggml_new_graph_custom(lg.ctx0, 2048, false);
-        ggml_tensor* inp2 = ggml_new_tensor_2d(lg.ctx0, GGML_TYPE_F32, d, T_win);
-        ggml_set_name(inp2, "block_in");
-        ggml_set_input(inp2);
-        ggml_tensor* pos2 = ggml_new_tensor_2d(lg.ctx0, GGML_TYPE_F32, d, 2 * T_win - 1);
+
+        // Input: new frames (pre-FFN1 input for this layer)
+        ggml_tensor* inp_new = ggml_new_tensor_2d(lg.ctx0, GGML_TYPE_F32, d, T_new);
+        ggml_set_name(inp_new, "block_in");
+        ggml_set_input(inp_new);
+
+        // Cache: post-FFN1 output from previous chunks (nullptr for first chunk)
+        ggml_tensor* cache_ch = nullptr;
+        if (T_cache > 0) {
+            cache_ch = ggml_new_tensor_2d(lg.ctx0, GGML_TYPE_F32, d, T_cache);
+            ggml_set_name(cache_ch, "cache_ch");
+            ggml_set_input(cache_ch);
+        }
+
+        // Pos enc covers the full attention window.
+        // NOTE: pos_enc is currently unused in the streaming block (rel-pos bias
+        // is skipped due to asymmetric Q/K — TODO: implement proper shift).
+        // We still pass it so the block signature is satisfied; it won't be
+        // connected to the output graph and won't be allocated.
+        int T_full = T_cache + T_new;
+        ggml_tensor* pos2 = ggml_new_tensor_2d(lg.ctx0, GGML_TYPE_F32, d, 2 * T_full - 1);
         ggml_set_name(pos2, "pos_enc");
         ggml_set_input(pos2);
-        ggml_tensor* out2 = nemotron_build_block(lg.ctx0, inp2, pos2, T_win, m.enc[il], bp, nullptr);
+
+        ggml_tensor* out2 =
+            nemotron_build_block_streaming(lg.ctx0, inp_new, cache_ch, pos2, T_new, T_cache, m.enc[il], bp);
         ggml_set_name(out2, "block_out");
         ggml_set_output(out2);
         ggml_build_forward_expand(lg.gf, out2);
+
+        // Also expand cache_ch_out (post-FFN1) — it's a ggml_dup inside the
+        // streaming block that's not reachable from block_out's dependency tree.
+        // Find it by scanning the ggml context's tensor list.
+        for (ggml_tensor* t = ggml_get_first_tensor(lg.ctx0); t; t = ggml_get_next_tensor(lg.ctx0, t)) {
+            if (t->name && std::string(t->name) == "cache_ch_out") {
+                ggml_build_forward_expand(lg.gf, t);
+                break;
+            }
+        }
+
         graph_cache[key] = lg;
         return graph_cache[key];
     };
@@ -1168,47 +1188,71 @@ static bool nemotron_run_encoder_chunked(nemotron_context* ctx, const float* pre
         int t_end = std::min(t_start + chunk_size, T_enc);
         int n_new = t_end - t_start;
 
+        // chunk_in: this chunk's input to each layer (starts as pre_enc slice,
+        // then gets replaced with each layer's output)
         std::vector<float> chunk_in(pre_enc + (size_t)t_start * d, pre_enc + (size_t)t_end * d);
 
         for (int il = 0; il < n_layers; il++) {
             auto& cache = ctx->enc_cache[il];
             int n_ctx = std::min(cache.n_cached, L);
-            int T_win = n_ctx + n_new;
 
-            // Assemble [cached, new] window
-            std::vector<float> win_input((size_t)T_win * d);
-            if (n_ctx > 0 && !cache.k_cache.empty()) {
-                int off = cache.n_cached - n_ctx;
-                memcpy(win_input.data(), cache.k_cache.data() + (size_t)off * d, (size_t)n_ctx * d * sizeof(float));
-            }
-            memcpy(win_input.data() + (size_t)n_ctx * d, chunk_in.data(), (size_t)n_new * d * sizeof(float));
-
-            auto& lg = get_or_build(il, T_win);
+            auto& lg = get_or_build(il, n_new, n_ctx);
 
             ggml_backend_sched_reset(ctx->sched);
             if (!ggml_backend_sched_alloc_graph(ctx->sched, lg.gf)) {
-                fprintf(stderr, "nemotron: sched alloc chunked layer %d failed\n", il);
+                fprintf(stderr, "nemotron: sched alloc streaming layer %d failed\n", il);
                 return false;
             }
 
+            // Set new frames input
             ggml_tensor* inp_t = ggml_graph_get_tensor(lg.gf, "block_in");
-            ggml_backend_tensor_set(inp_t, win_input.data(), 0, (size_t)T_win * d * sizeof(float));
+            if (!inp_t) {
+                fprintf(stderr, "nemotron: BUG block_in nil ci=%d il=%d n_new=%d n_ctx=%d\n", ci, il, n_new, n_ctx);
+                return false;
+            }
+            ggml_backend_tensor_set(inp_t, chunk_in.data(), 0, (size_t)n_new * d * sizeof(float));
 
-            auto pe = core_conformer::make_pos_enc(d, T_win);
-            ggml_tensor* pos_t = ggml_graph_get_tensor(lg.gf, "pos_enc");
-            ggml_backend_tensor_set(pos_t, pe.data(), 0, pe.size() * sizeof(float));
+            // Set cache_last_channel (post-FFN1 from previous chunks)
+            if (n_ctx > 0) {
+                ggml_tensor* cache_t = ggml_graph_get_tensor(lg.gf, "cache_ch");
+                if (!cache_t) {
+                    fprintf(stderr, "nemotron: BUG cache_ch nil ci=%d il=%d n_ctx=%d\n", ci, il, n_ctx);
+                    return false;
+                }
+                int off = cache.n_cached - n_ctx;
+                ggml_backend_tensor_set(cache_t, cache.k_cache.data() + (size_t)off * d, 0,
+                                        (size_t)n_ctx * d * sizeof(float));
+            }
+
+            // NOTE: pos_enc is not set — rel-pos bias is skipped in the
+            // streaming block (asymmetric Q/K makes rel_shift non-trivial).
+            // TODO: implement proper asymmetric rel-pos for streaming.
 
             if (ggml_backend_sched_graph_compute(ctx->sched, lg.gf) != GGML_STATUS_SUCCESS) {
-                fprintf(stderr, "nemotron: chunked layer %d compute failed\n", il);
+                fprintf(stderr, "nemotron: streaming layer %d compute failed\n", il);
                 return false;
             }
 
-            // Read full window output, extract last n_new frames
+            // Read block output (new frames only, shape (d, n_new))
             ggml_tensor* out_t = ggml_graph_get_tensor(lg.gf, "block_out");
-            std::vector<float> win_output((size_t)T_win * d);
-            ggml_backend_tensor_get(out_t, win_output.data(), 0, win_output.size() * sizeof(float));
+            chunk_in.resize((size_t)n_new * d);
+            ggml_backend_tensor_get(out_t, chunk_in.data(), 0, chunk_in.size() * sizeof(float));
 
-            chunk_in.assign(win_output.data() + (size_t)n_ctx * d, win_output.data() + (size_t)(n_ctx + n_new) * d);
+            // Read post-FFN1 output for cache update
+            ggml_tensor* cache_out = ggml_graph_get_tensor(lg.gf, "cache_ch_out");
+            if (cache_out) {
+                std::vector<float> new_cache((size_t)n_new * d);
+                ggml_backend_tensor_get(cache_out, new_cache.data(), 0, new_cache.size() * sizeof(float));
+
+                // Append to cache and trim to L frames
+                cache.k_cache.insert(cache.k_cache.end(), new_cache.begin(), new_cache.end());
+                cache.n_cached += n_new;
+                if (cache.n_cached > L) {
+                    int excess = cache.n_cached - L;
+                    cache.k_cache.erase(cache.k_cache.begin(), cache.k_cache.begin() + (size_t)excess * d);
+                    cache.n_cached = L;
+                }
+            }
 
             // Debug: print per-layer stats for first chunk
             if (ci == 0) {
@@ -1221,12 +1265,6 @@ static bool nemotron_run_encoder_chunked(nemotron_context* ctx, const float* pre
                 }
                 fprintf(stderr, "  layer %d output: min=%.2f max=%.2f\n", il, lmin, lmax);
             }
-
-            // Cache: keep last min(L, T_win) frames of block output
-            int keep = std::min(L, T_win);
-            int skip = T_win - keep;
-            cache.k_cache.assign(win_output.begin() + (size_t)skip * d, win_output.end());
-            cache.n_cached = keep;
         }
 
         memcpy(enc_out.data() + (size_t)t_start * d, chunk_in.data(), (size_t)n_new * d * sizeof(float));
@@ -1625,27 +1663,9 @@ extern "C" struct nemotron_result* nemotron_transcribe_ex(struct nemotron_contex
         if (!nemotron_run_encoder(ctx, mel.data(), (int)ctx->model.hparams.n_mels, T_mel, enc_out, T_enc, d_model))
             return nullptr;
     } else {
-        // Cache-aware chunked encoder (streaming-correct)
-        // Step 1: run pre-encode only (extract from the full graph)
-        if (!nemotron_run_encoder(ctx, mel.data(), (int)ctx->model.hparams.n_mels, T_mel, enc_out, T_enc, d_model))
-            return nullptr;
-        // enc_out now has the full bidirectional output — but we need the pre-encode output.
-        // TODO: extract pre-encode separately. For now, re-run with the pre-encode only.
-        // WORKAROUND: run the chunked encoder on the pre-encode output.
-        // We need to get the pre-encode output first. Let's add a tag for it.
-        // For now, we use the Kaggle-validated CPU pre-encode from the worktree approach.
-        // Actually — the simplest approach is to just run the chunked encoder directly
-        // on the mel, computing pre-encode first.
-
-        // For now, run the full-graph pre-encode and extract it
-        // The enc_out already has the bidirectional result; we need the pre-encode.
-        // Let's modify the graph to output pre-encode too... but that's complex.
-        // SIMPLER: just run chunked encoder on enc_out from the bidirectional path
-        // (won't work — the chunked encoder expects pre-encode input).
-
-        // The right fix: build a pre-encode-only graph, extract, then run chunked.
-        // For this first pass, let's build a separate pre-encode graph.
-        fprintf(stderr, "nemotron: running chunked encoder path\n");
+        // Cache-aware streaming encoder: pre-encode → chunked conformer layers.
+        // Step 1: run pre-encode only, step 2: chunked conformer with cache_last_channel.
+        fprintf(stderr, "nemotron: running streaming chunked encoder path\n");
 
         // Build pre-encode-only graph
         {
