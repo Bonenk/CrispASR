@@ -5103,41 +5103,35 @@ factored out. Standard `core_beam_decode::run_with_probs` replay.
 adapter frames at the correct offsets during suffix replay, matching
 the streaming pre_hook's behavior. No local model to benchmark.
 
-### Still open
+### Done — shipped 2026-06-15 (§167 batch)
 
-**mimo-asr** (MEDIUM, ~50 LOC — once the runtime is stable)
-- Qwen2 LLM decode after audio RVQ tokenizer. Same `core_beam_decode`
-  replay pattern. Currently semi-scaffold (PLAN #115); beam search
-  should land after the baseline is solid.
+**nemotron** — DONE (`641c701e`). RNNT beam search ported from
+parakeet's `parakeet_rnnt_beam_decode`. Also MAES (`ec6507d2`).
+Benchmarked: beam=4 2.16× decode time, identical text. MAES removes
+spurious `<en-US>` tags and improves punctuation.
 
-### Hard — architecture complications
+**moss-audio** — DONE (`5c437124`). Full `core_beam_decode::run_with_probs`
+replay wired. 4B model needs Kaggle for A/B testing.
 
-**voxtral4b** (~200 LOC)
-- Same LLM as voxtral but uses a streaming prompt path with
-  `delay_tokens=6` baked into adaptive RMSNorm. Not integrated
-  with `crispasr_llm_pipeline.h`. Would need refactoring the
-  direct decode loop to support beam replay, coordinating the
-  delay_tokens across beams.
-- Lower priority: voxtral (3B) already covers the family.
+**granite-nle** — DONE (`fe94e976`). CTC beam via
+`core_ctc::prefix_beam_search` with gamma in the BPE-CTC decode step.
+Compile-verified; no local model.
 
-**funasr** (~200 LOC)
-- ChatML prompt prefix is embedded in the monolithic
-  `funasr_transcribe_with_probs()` C ABI. Beam search requires
-  decomposing into sub-steps (prefill, embed, decode) to expose
-  a replay_fn. Significant refactoring.
+**mimo-asr** — API STUB (`5c437124`). `set_beam_size` setter + field;
+actual beam decode blocked on PLAN #115 runtime stability. 9-stream
+architecture needs KV snapshot/restore.
+
+**lfm2-audio** — API STUB (`9511dd5b`). Hybrid Mamba+attention needs
+both KV and conv state save/restore. Deferred to Kaggle session.
 
 ### Not applicable
 
 | Backend | Reason |
 |---|---|
-| wav2vec2, hubert, data2vec | CTC-only, no autoregressive component |
+| wav2vec2, hubert, data2vec | CTC beam via `core_ctc` (already has gamma) |
 | fastconformer-ctc | CTC-only |
-| sensevoice | Encoder-only CTC multi-task |
+| sensevoice | CTC beam via `core_ctc` (already wired: `sensevoice_set_beam_size`) |
 | paraformer | Non-autoregressive (CIF-based) |
-| granite-4.1-nar | Non-autoregressive |
-
-CTC beam search with an external language model is a different
-feature (LM shallow fusion) and out of scope for this item.
 
 ### Priority (remaining)
 
@@ -5149,11 +5143,15 @@ feature (LM shallow fusion) and out of scope for this item.
 6. ~~**moonshine-streaming**~~ — **DONE**
 7. ~~**funasr**~~ — **DONE** (was easier than expected)
 8. ~~**voxtral4b**~~ — **DONE** (adapter injection in replay lambda)
-9. **mimo-asr** — after PLAN #115 baseline is stable
+9. ~~**nemotron**~~ — **DONE** (RNNT beam + MAES, §167a/b)
+10. ~~**moss-audio**~~ — **DONE** (replay, §167g)
+11. ~~**granite-nle**~~ — **DONE** (CTC beam + gamma, §167e)
+12. **mimo-asr** — API stub, blocked on PLAN #115
+13. **lfm2-audio** — API stub, needs KV+conv save/restore
 
-**Score: 18 of 24 backends now support beam search** (was 10 at
-session start). Only mimo-asr remains feasible but blocked; the
-other 5 without beam are CTC-only or NAR (not applicable).
+**Score: 21 of 24 ASR backends now support beam search** (was 18 at
+§139 close). mimo-asr and lfm2-audio have API stubs, blocked on
+runtime issues. paraformer is NAR (not applicable).
 
 ## §140 GPU / ggml_backend_sched for CPU-only TTS backends — MOSTLY DONE
 
@@ -5920,11 +5918,24 @@ Branch: `feat/beam-maes-cache`
 **§167g: Moss-Audio beam** — `core_beam_decode::run_with_probs` replay (4B, GPU)
 **§167h: LFM2-Audio beam** — `core_beam_decode::run_with_probs_branched` + conv state
 
-### Benchmark methodology
+### Benchmark results (2026-06-15)
 
-Each item gets an A/B test:
-- **A (baseline)**: greedy / current decode path
-- **B (new)**: beam / MAES / cached path
-- Metrics: WER delta, wall-clock time (median of 3 runs), peak RSS
-- Audio: `samples/jfk.wav` (English, 11s) + backend-specific samples
-- Env vars for model paths follow existing `tests/env-live-tests.sh` pattern
+**§167a Nemotron beam** on jfk.wav (Q4_K, CPU, 4 threads, median of 3):
+
+| | Greedy (beam=1) | Beam (beam=4) |
+|---|---|---|
+| Decode time | 8.8s | 19.0s (2.16×) |
+| Text | `...ask not...for you. <en-US> Ask what...` | identical |
+| RSS | 679 MB | 679 MB |
+
+**§167b Nemotron MAES** on jfk.wav:
+
+| | Beam=4 | MAES(4,2,2.3) |
+|---|---|---|
+| Text | `...for you. <en-US> Ask what...country. <en-US>` | `...for you, ask what...country.` |
+| Quality | Spurious `<en-US>` tags, missing commas | Proper punctuation, no tags |
+| Overhead | baseline | +15% decode time |
+
+**§167c Firered KV cache**: Already implemented (sa_k/sa_v per beam).
+**§167d Sensevoice CTC beam**: Already implemented (core_ctc).
+**§167e–h**: Compile-verified; no local models for A/B testing.
