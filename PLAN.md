@@ -289,6 +289,11 @@ unchanged — `parakeet-tdt_ctc-*.gguf` matches "parakeet" with the
   `EncDecRNNTBPEModel` class, same weight naming. The C++ runtime needs
   `att_chunk_context_size` support in `core/fastconformer.h` (dynamic conv
   kernel selection per chunk, similar to nemotron's streaming conv cache).
+  **2026-06-16 v3 kernel hung** — monkey-patching ConformerEncoder to strip
+  `att_chunk_context_size` caused NeMo to hang during model init (param is
+  required for encoder graph construction, not optional). The .nemo file
+  uses NeMo 2.x format (torch `data.pkl`, no `model_config.yaml`).
+  **Next approach:** custom NeMo 2.x checkpoint extractor or NeMo >=2.8.
 
 ### Won't do
 
