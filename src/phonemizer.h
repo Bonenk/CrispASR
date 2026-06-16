@@ -70,6 +70,12 @@ inline bool phonemize(const std::string& lang, const std::string& text, std::str
     return false;
 }
 
+// Strip espeak-ng language-switch markers like (en), (it), (de-AT) from
+// IPA output. These parenthesized ISO 639 codes are inserted by espeak
+// when it detects a mid-sentence language switch. TTS backends don't
+// understand them and read them literally (#169).
+void strip_espeak_lang_markers(std::string& ipa);
+
 // Filter IPA output to only contain characters present in a model's
 // phoneme inventory. Silently drops unmapped chars (combining marks,
 // tie bars, etc.) that would cause garbled output.
