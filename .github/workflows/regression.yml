@@ -196,6 +196,11 @@ jobs:
           # and stored in HF, not regenerated.
           python -m pip install --upgrade pip
           pip install huggingface_hub
+      - name: Authenticate HuggingFace (avoids 429 rate limit)
+        if: env.HF_TOKEN != ''
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: huggingface-cli login --token "$HF_TOKEN" --add-to-git-credential 2>/dev/null || true
 
       - name: Configure + build crispasr-cli (+ crispasr-diff for full-diff backends)
         run: |
