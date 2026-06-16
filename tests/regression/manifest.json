@@ -385,46 +385,6 @@
       "expected_transcript_source": "captured 2026-06-15 VPS — LID output on JFK audio/text (expected: en)"
     },
     {
-      "name": "voxcpm2-tts-2b",
-      "backend_id": "voxcpm2-tts",
-      "skip_diff": true,
-      "_skip_diff_note": "Added 2026-05-25 — rebake-pending. VoxCPM2 TTS (LocEnc + TSLM + RALM + DiT + VAE). C++ harness wired at examples/cli/crispasr_diff_main.cpp:3340. Q4_K pinned to keep Kaggle slot under 2 GB; per the handover (open Q on quant choice) we may swap to voxcpm2-f16.gguf (~4.7 GB) once the first diff floor is known and q4_k drift is measured. The dump backend takes a reference WAV for voice cloning + VOXCPM2_SYN_TEXT env var for the phrase to synthesise.",
-      "source_model": "openbmb/VoxCPM2",
-      "source_model_note": "HF id for tools/reference_backends/voxcpm2_tts.py. The dumper expects model_dir to be a local snapshot of openbmb/VoxCPM2 (the voxcpm package is imported from /tmp/voxcpm_src at runtime; rebake needs `pip install voxcpm` + snapshot_download).",
-      "gguf": {
-        "repo": "cstr/voxcpm2-GGUF",
-        "revision": "11c5ad6b0a9b0b0f6876ec18b3c3b555d5b5cb44",
-        "file": "voxcpm2-q4_k.gguf",
-        "approx_size_mb": 1611
-      },
-      "sample": "samples/jfk.wav",
-      "_sample_note": "Reference audio for voice cloning. The synth text comes from VOXCPM2_SYN_TEXT (default in voxcpm2_tts.py).",
-      "expected_transcript": "TTS backend — regression via tts_backends roundtrip section",
-      "expected_transcript_source": "TTS-only; ASR roundtrip regression in tts_backends section"
-    },
-    {
-      "name": "indextts-1.5",
-      "backend_id": "indextts",
-      "skip_diff": true,
-      "_skip_diff_note": "Added 2026-05-25 — rebake-pending. IndexTTS-1.5 (GPT + BigVGAN). NOTE: no C++ harness branch yet (docs/diff-harness-coverage.md flags `indextts` as 'harness: no'); a future commit must add an `else if (backend_name == \"indextts\")` block in examples/cli/crispasr_diff_main.cpp before skip_diff can flip to false. The rebake itself only depends on tools/reference_backends/indextts.py, which exists.",
-      "source_model": "IndexTeam/IndexTTS-1.5",
-      "source_model_note": "HF id for tools/reference_backends/indextts.py. The dumper expects model_dir to contain bpe.model + gpt.pth from this repo (snapshot_download during rebake).",
-      "gguf": {
-        "repo": "cstr/indextts-1.5-GGUF",
-        "revision": "6e35d352cc95160054c662489fc7293341a1f0e4",
-        "file": "indextts-gpt.gguf",
-        "approx_size_mb": 2175,
-        "_file_note": "F32 GPT GGUF for diff regression. The runtime needs the companion BigVGAN vocoder (indextts-bigvgan.gguf, 256 MB) at the same path; q8_0 (612 MB) + q4_k (346 MB) variants are also in the repo and may replace the f32 file once the diff floor is calibrated.",
-        "companion_files": [
-          "indextts-bigvgan.gguf"
-        ]
-      },
-      "sample": "samples/jfk.wav",
-      "_sample_note": "Reference audio for voice cloning. The synth phrase is configurable in indextts.py at dump time.",
-      "expected_transcript": "TTS backend — regression via tts_backends roundtrip section",
-      "expected_transcript_source": "TTS-only; ASR roundtrip regression in tts_backends section"
-    },
-    {
       "name": "titanet-large",
       "backend_id": "titanet",
       "skip_diff": true,
@@ -441,25 +401,6 @@
       "_sample_note": "Single speaker utterance for embedding capture; the per-speaker 192-D vector is what gets dumped.",
       "expected_transcript": "192-dim speaker embedding (regression by L2 norm + cosine)",
       "expected_transcript_source": "titanet outputs embeddings, not transcripts — regression uses embedding similarity"
-    },
-    {
-      "name": "chatterbox-turbo-s3gen",
-      "backend_id": "chatterbox_turbo",
-      "skip_diff": true,
-      "_skip_diff_note": "Added 2026-05-25 — rebake-pending. ChatterboxTurbo TTS — T3 (GPT-2) + meanflow S3Gen + HiFT vocoder. Dispatch via the existing chatterbox C++ branch (examples/cli/crispasr_diff_main.cpp:894) which routes based on filename containing 'turbo' (see chatterbox_find_s3gen at line 660). The chatterbox-turbo-s3gen-f16-regen.gguf is the regenerated 2025-Q4 variant; chatterbox-turbo-s3gen-f16.gguf is the legacy file.",
-      "source_model": "ResembleAI/chatterbox-turbo",
-      "source_model_note": "HF id for tools/reference_backends/chatterbox_turbo.py. Imports from chatterbox.tts_turbo.ChatterboxTurboTTS at runtime; rebake needs `pip install chatterbox` + the turbo snapshot.",
-      "gguf": {
-        "repo": "cstr/chatterbox-turbo-GGUF",
-        "revision": "1c7e7f8886aed773fb12970edf4d4f65a67d4b85",
-        "file": "chatterbox-turbo-s3gen-f16-regen.gguf",
-        "approx_size_mb": 627,
-        "_file_note": "F16 GGUF for diff regression. The base ChatterboxTurbo also needs a companion T3 model (chatterbox-turbo-t3-f16.gguf); the chatterbox runtime auto-locates it via chatterbox_find_s3gen-like resolution. Confirm rebake downloads both companions."
-      },
-      "sample": "samples/jfk.wav",
-      "_sample_note": "Reference audio for voice cloning. The synth phrase is fixed inside chatterbox_turbo.py (deterministic seed).",
-      "expected_transcript": "TTS backend — regression via tts_backends roundtrip section",
-      "expected_transcript_source": "TTS-only; ASR roundtrip regression in tts_backends section"
     },
     {
       "name": "wav2vec2-xlsr-en",
