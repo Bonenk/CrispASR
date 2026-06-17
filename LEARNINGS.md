@@ -10014,3 +10014,38 @@ computation (stop prediction, scoring, etc.) should also be in the graph.
 The precision difference between `ggml_mul_mat` (SIMD/BLAS) and scalar
 loops is small per step but compounds exponentially across autoregressive
 decode steps.
+
+## VibeVoice TTS: missing BPE merges still need BPE behavior (issue #171, 2026-06-18)
+
+### Problem
+
+The VibeVoice Realtime GGUF in the local cache had `tokenizer.ggml.tokens` but
+no `tokenizer.ggml.merges`. Falling back to greedy longest-vocab matching is not
+equivalent to Qwen BPE: the issue text `1. La genèse : L’inversion des rôles
+parentaux` produced different token IDs from the official Python tokenizer,
+which shifted the positive TTS condition and surfaced as accented/garbled speech.
+
+### Fix
+
+Load `tokenizer.ggml.merges` when present and use the shared BPE tokenizer. For
+older GGUFs without merges, do a vocab-rank BPE fallback: split the byte-encoded
+word into Unicode byte symbols, repeatedly merge adjacent symbols whose
+concatenation exists in the vocab, and rank candidates by the merged token ID.
+Append VibeVoice's trailing newline token explicitly.
+
+Voice-conditioned Realtime also needs to match the official streaming loop: run
+the base LM over text in 5-token windows using the cached voice KV, and feed the
+next TTS text window before the following speech window. Processing all text at
+once or moving the text window after speech generation creates hidden-state drift.
+
+### Takeaway
+
+If TTS diffusion noise is exact and the first divergence is the positive TTS LM
+condition, don't start by chasing VAE ops such as `col2im_1d` or
+`conv_transpose_1d`. Check tokenizer parity, required sentinel tokens, and
+voice-cache scheduling first.
+
+On macOS, platform-specific tests must guard on the backend target they link
+against, not only `APPLE`. A Vulkan-on-MoltenVK build is still Apple, but it does
+not provide `ggml-metal`; Metal-only repro tests should use
+`if(APPLE AND TARGET ggml-metal)`.

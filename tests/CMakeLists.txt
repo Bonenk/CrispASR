@@ -1252,7 +1252,7 @@ catch_discover_tests(test-chat-ggml
 # range of T values around the failure boundary and asserts CPU and
 # Metal outputs match bit-exactly. Guards against ggml bumps reverting
 # the patch.
-if(APPLE)
+if(APPLE AND TARGET ggml-metal)
     add_executable(test_metal_norm_repro test_metal_norm_repro.cpp)
     target_link_libraries(test_metal_norm_repro PRIVATE
         ggml
