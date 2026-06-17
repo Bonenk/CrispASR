@@ -796,22 +796,11 @@ static bool qwen3_tts_codec_use_gpu_by_default(const qwen3_tts_context* c) {
     if (!c || !c->backend || c->backend == c->backend_cpu) {
         return false;
     }
-    // Use the backend registry name to detect Apple Metal. The Metal backend's
-    // ggml_backend_name() returns the GPU device name ("Apple M1"), not "Metal";
-    // the registry name is "MTL". Discrete GPU backends (CUDA, Vulkan, ROCm,
-    // SYCL, CANN) all have non-"MTL" registry names and are safe for codec GPU.
-    ggml_backend_dev_t dev = ggml_backend_get_device(c->backend);
-    if (!dev) {
-        return false;
-    }
-    ggml_backend_reg_t reg = ggml_backend_dev_backend_reg(dev);
-    if (!reg) {
-        return false;
-    }
-    const char* reg_name = ggml_backend_reg_name(reg);
-    // "MTL" is the Metal registry name — keep codec on CPU to avoid the
-    // transposed-conv hang on Apple Silicon.
-    return reg_name != nullptr && std::strcmp(reg_name, "MTL") != 0;
+    // All GPU backends are safe: the CONV_TRANSPOSE_1D hang that originally
+    // forced the codec to CPU on Metal (and crashed CUDA/HIP in #155) was
+    // fixed in f8fc8b8e, and the op itself was replaced by mul_mat+col2im_1d
+    // in 5f600f25 — no backend has a transposed-conv problem any more.
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -3698,16 +3687,12 @@ static bool load_codec(qwen3_tts_context* c, const char* path) {
     hp.rms_norm_eps = core_gguf::kv_f32(meta, "qwen3tts_codec.dec.rms_norm_eps", hp.rms_norm_eps);
     core_gguf::free_metadata(meta);
 
-    // Pass 2: weights — default to GPU on non-Metal GPU backends. Metal
-    // stays CPU-only by default to dodge the M1 codec hang. Env overrides:
-    //   QWEN3_TTS_CODEC_FORCE_METAL=1 — reproduces the M1 hang with per-op
-    //                                   tracing for instrumentation.
-    //   QWEN3_TTS_CODEC_GPU=1         — clean GPU path with no trace.
-    //                                   Use on CUDA / Vulkan where the
-    //                                   Metal hang does not apply. On
-    //                                   Jetson Orin AGX, codec on CPU is
-    //                                   ~50x slower than CUDA.
-    //   QWEN3_TTS_CODEC_CPU=1         — force CPU codec even on CUDA/Vulkan.
+    // Pass 2: weights — default to GPU on all GPU backends. Env overrides:
+    //   QWEN3_TTS_CODEC_FORCE_METAL=1 — force Metal GPU path with per-op
+    //                                   trace callback (instrumentation).
+    //   QWEN3_TTS_CODEC_GPU=1         — explicit GPU override (no-op when
+    //                                   GPU is already the default).
+    //   QWEN3_TTS_CODEC_CPU=1         — force CPU codec for A/B timing.
     const bool force_metal = std::getenv("QWEN3_TTS_CODEC_FORCE_METAL") != nullptr;
     const bool force_gpu = std::getenv("QWEN3_TTS_CODEC_GPU") != nullptr;
     const bool force_cpu = std::getenv("QWEN3_TTS_CODEC_CPU") != nullptr;
@@ -3716,10 +3701,10 @@ static bool load_codec(qwen3_tts_context* c, const char* path) {
     ggml_backend_t weight_backend = codec_gpu ? c->backend : c->backend_cpu;
     if (c->params.verbosity >= 1) {
         const char* why =
-            force_metal ? "QWEN3_TTS_CODEC_FORCE_METAL=1"
-                        : (force_gpu ? "QWEN3_TTS_CODEC_GPU=1"
-                                     : (force_cpu ? "QWEN3_TTS_CODEC_CPU=1"
-                                                  : (default_gpu ? "non-Metal GPU default" : "CPU/Metal default")));
+            force_metal
+                ? "QWEN3_TTS_CODEC_FORCE_METAL=1"
+                : (force_gpu ? "QWEN3_TTS_CODEC_GPU=1"
+                             : (force_cpu ? "QWEN3_TTS_CODEC_CPU=1" : (default_gpu ? "GPU default" : "CPU default")));
         fprintf(stderr, "qwen3_tts: codec: %s - loading weights onto %s\n", why, ggml_backend_name(weight_backend));
     }
     core_gguf::WeightLoad wl;
@@ -3925,12 +3910,12 @@ static bool codec_trace_eval_cb(struct ggml_tensor* t, bool ask, void* user_data
     return true;
 }
 
-// Returns the codec scheduler to use for compute. Defaults to GPU on non-Metal
-// GPU backends and CPU on Metal/CPU. Env overrides:
-//   QWEN3_TTS_CODEC_FORCE_METAL=1 — reproduces the M1 crash with tracing
-//                                   (see codec_decode_codes trace path).
-//   QWEN3_TTS_CODEC_GPU=1         — clean GPU codec path, no tracing.
-//   QWEN3_TTS_CODEC_CPU=1         — force CPU codec even on CUDA/Vulkan.
+// Returns the codec scheduler to use for compute. Defaults to GPU on all GPU
+// backends (Metal included — the conv_transpose_1d hang was fixed in f8fc8b8e
+// and the op replaced by mul_mat+col2im_1d in 5f600f25). Env overrides:
+//   QWEN3_TTS_CODEC_FORCE_METAL=1 — force Metal GPU path with per-op tracing.
+//   QWEN3_TTS_CODEC_GPU=1         — explicit GPU override (usually no-op).
+//   QWEN3_TTS_CODEC_CPU=1         — force CPU codec for A/B timing.
 static ggml_backend_sched_t codec_pick_sched(qwen3_tts_context* c) {
     const bool force_metal = std::getenv("QWEN3_TTS_CODEC_FORCE_METAL") != nullptr;
     const bool force_gpu = std::getenv("QWEN3_TTS_CODEC_GPU") != nullptr;
