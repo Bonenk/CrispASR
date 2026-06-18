@@ -3511,22 +3511,16 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
         }
 
         // With voice prompt: skip base LM splicing (voice KV already provides context)
-        // Without voice: splice base LM hidden states at text positions
+        // Without voice: compute base LM hidden for windowed text processing.
+        // The reference pipeline always uses interleaved text/speech windows (never a
+        // chat-template bulk prefill with a tail-splice). Storing all_base_hidden here
+        // lets process_text_window add type_emb correctly, matching forward_tts_lm.
         if (!has_voice) {
-            auto base_hidden = run_lm_hidden_states(ctx, text_ids.data(), (int)text_ids.size(), true);
-            vibevoice_dump_f32(dump_dir, "tts_base_lm_hidden", base_hidden.data(), base_hidden.size());
-            int n_text = (int)text_ids.size();
-            if ((int)base_hidden.size() == n_text * d_lm) {
-                int start_idx = prefix_len - n_text;
-                if (start_idx >= 0) {
-                    for (int i = 0; i < n_text; i++)
-                        memcpy(prefix_embeds.data() + (size_t)(start_idx + i) * d_lm,
-                               base_hidden.data() + (size_t)i * d_lm, d_lm * sizeof(float));
-                    if (verbosity >= 1)
-                        fprintf(stderr, "  spliced %d base LM hidden at tail positions %d-%d (after type embed)\n",
-                                n_text, start_idx, start_idx + n_text - 1);
-                }
-            }
+            all_base_hidden = run_lm_hidden_states(ctx, text_ids.data(), (int)text_ids.size(), true);
+            vibevoice_dump_f32(dump_dir, "tts_base_lm_hidden", all_base_hidden.data(), all_base_hidden.size());
+            if (verbosity >= 1 && !all_base_hidden.empty())
+                fprintf(stderr, "  base LM (no voice KV): %d text embeddings ready for windowed TTS\n",
+                        (int)text_ids.size());
         } else {
             // With voice: run base LM on text tokens WITH voice.lm KV cache.
             // The official pipeline: forward_lm(text_tokens) with voice.lm KV (74 tokens context)

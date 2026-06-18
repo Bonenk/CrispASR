@@ -45,6 +45,7 @@ Install:
   macOS:  brew install llvm@18
           (binary lands at /opt/homebrew/opt/llvm@18/bin/clang-format)
   Ubuntu: sudo apt install clang-format-18
+  Conda:  conda install -c conda-forge clang-format=18
 EOF
     exit 2
 fi
