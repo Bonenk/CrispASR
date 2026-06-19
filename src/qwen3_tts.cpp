@@ -359,6 +359,13 @@ struct g3t_hp {
     std::vector<std::string> spk_names;
     std::vector<uint32_t> spk_token_ids;
     std::vector<uint32_t> spk_dialect_token_ids;
+
+    // Output-language table: parallel arrays mapping a language name
+    // ("English", "Chinese", …) to its codec_language_id token. Emitted by
+    // convert-qwen3-tts-to-gguf.py as qwen3tts.codec_language_names /
+    // qwen3tts.codec_language_ids. Drives qwen3_tts_set_language_by_name.
+    std::vector<std::string> codec_language_names;
+    std::vector<uint32_t> codec_language_ids;
 };
 
 struct g3t_layer {
@@ -5121,6 +5128,18 @@ extern "C" struct qwen3_tts_context* qwen3_tts_init_from_file(const char* path_m
             }
         }
 
+        // Output-language table (name → codec_language_id) for
+        // qwen3_tts_set_language_by_name. Optional — older GGUFs lack it.
+        hp.codec_language_names = core_gguf::kv_str_array(g, "qwen3tts.codec_language_names");
+        {
+            int64_t k = gguf_find_key(g, "qwen3tts.codec_language_ids");
+            if (k >= 0) {
+                int n = gguf_get_arr_n(g, k);
+                const auto* d = (const uint32_t*)gguf_get_arr_data(g, k);
+                hp.codec_language_ids.assign(d, d + n);
+            }
+        }
+
         auto tok = core_gguf::kv_str_array(g, "tokenizer.ggml.tokens");
         if (!tok.empty()) {
             c->vocab.id_to_token = std::move(tok);
@@ -5665,6 +5684,33 @@ extern "C" int qwen3_tts_set_language(struct qwen3_tts_context* ctx, int codec_l
     }
     ctx->language_id = codec_language_id;
     return 0;
+}
+
+extern "C" int qwen3_tts_set_language_by_name(struct qwen3_tts_context* ctx, const char* name) {
+    if (!ctx || !name) {
+        return -1;
+    }
+    // "auto" (or empty) → -1 = no language hint (the "nothink" path).
+    std::string want = name;
+    std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+    if (want.empty() || want == "auto") {
+        ctx->language_id = -1;
+        return 0;
+    }
+    const auto& names = ctx->hp.codec_language_names;
+    const auto& ids = ctx->hp.codec_language_ids;
+    if (names.empty() || names.size() != ids.size()) {
+        return -2; // model has no language table (older GGUF)
+    }
+    for (size_t i = 0; i < names.size(); i++) {
+        std::string n = names[i];
+        std::transform(n.begin(), n.end(), n.begin(), [](unsigned char c) { return (char)std::tolower(c); });
+        if (n == want) {
+            ctx->language_id = (int)ids[i];
+            return 0;
+        }
+    }
+    return -3; // name not found in this model's table
 }
 
 extern "C" int qwen3_tts_is_custom_voice(struct qwen3_tts_context* ctx) {

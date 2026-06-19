@@ -5930,6 +5930,11 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
 #endif
 #ifdef CA_HAVE_ZONOS
     if (s->zonos_ctx) {
+        // Output language: target_language (intuitive for TTS) → source_language
+        // (mirror of the CLI -l flag). zonos takes an eSpeak code directly.
+        const std::string tts_lang = !s->target_language.empty() ? s->target_language : s->source_language;
+        if (!tts_lang.empty() && tts_lang != "auto")
+            zonos_tts_set_language(s->zonos_ctx, tts_lang.c_str());
         return zonos_tts_synthesize(s->zonos_ctx, text, out_n_samples);
     }
 #endif
@@ -5947,6 +5952,13 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
                                       "select a voice pack or reference WAV in the voice picker";
                 return nullptr;
             }
+        }
+        // Output language: target_language → source_language. qwen3-tts keys
+        // its codec_language_names table by English name ("German", ...).
+        {
+            const std::string tts_lang = !s->target_language.empty() ? s->target_language : s->source_language;
+            if (!tts_lang.empty() && tts_lang != "auto")
+                qwen3_tts_set_language_by_name(s->qwen3_tts_ctx, ca_iso_to_english_lang(tts_lang).c_str());
         }
         float* pcm = qwen3_tts_synthesize(s->qwen3_tts_ctx, text, out_n_samples);
         if (!pcm && s->last_synth_error.empty()) {
@@ -5968,6 +5980,11 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
 #endif
 #ifdef CA_HAVE_KOKORO
     if (s->kokoro_ctx) {
+        // Output language: target_language → source_language. kokoro takes an
+        // eSpeak language code directly (e.g. "de", "en-us").
+        const std::string tts_lang = !s->target_language.empty() ? s->target_language : s->source_language;
+        if (!tts_lang.empty() && tts_lang != "auto")
+            kokoro_set_language(s->kokoro_ctx, tts_lang.c_str());
         float* pcm = kokoro_synthesize(s->kokoro_ctx, text, out_n_samples);
         if (!pcm && s->last_synth_error.empty()) {
             s->last_synth_error = "kokoro synthesis failed — "

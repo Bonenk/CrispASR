@@ -153,6 +153,18 @@ public:
         qwen3_tts_set_temperature(ctx_, params.temperature);
         qwen3_tts_set_seed(ctx_, params.seed);
 
+        // Output language hint. Map the ISO-639-1 code to the English name
+        // qwen3tts.codec_language_names is keyed by ("German", "Chinese",
+        // …). "auto"/empty leaves the model's default ("nothink") path so
+        // behaviour is unchanged when the user doesn't ask for a language.
+        if (!params.language.empty() && params.language != "auto") {
+            const std::string lang_name = crispasr_iso_to_english_lang(params.language);
+            if (qwen3_tts_set_language_by_name(ctx_, lang_name.c_str()) != 0 && !params.no_prints)
+                fprintf(stderr,
+                        "crispasr[qwen3-tts]: language '%s' not in the model's codec_language table; using auto\n",
+                        lang_name.c_str());
+        }
+
         // Voice prompt: re-load only when the requested identity changes.
         // Four mutually-exclusive paths (gated by the loaded model variant):
         //   --voice <name>       → CustomVoice fixed-speaker selection
