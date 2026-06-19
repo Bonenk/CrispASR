@@ -32,6 +32,31 @@ strings in glm/moss/mimo.
 Validated on Kaggle (`tools/kaggle/lang-spec-sweep`): a disk-safe one-model-at-
 a-time sweep of 18 ASR backends × language flags on a P100, asserting rc=0 +
 non-empty transcript. Commits `ac97e712` (wiring), `30279278` (DRY helper).
+The sweep empirically confirmed steering works: `granite -l de` and
+`moss-audio -l de` emit German for English audio; the ASR fine-tunes
+(qwen3/glm/mimo) inject the instruction but transcribe the spoken source
+language on monolingual audio.
+
+**Session C ABI / bindings parity (`a63933f9`).** The CLI adapters honour
+`params.language`, but the session ABI (used by every binding + the HTTP
+server) *reimplements* each backend's transcribe inline and ignored
+`s->source_language` for qwen3, granite, glm-asr, moss-audio, mimo-asr
+(canary/cohere/gemma4 already used it). Wired all five session dispatch
+sites to inject the same instruction with identical `ask > language >
+default` precedence, via a C-ABI-local `ca_iso_to_english_lang()` mirror.
+`set_source_language()` was already exposed in every binding, so no
+binding-surface change was needed — this just makes that setter effective.
+
+**TTS output language (`90b2f64a`).** `qwen3_tts_set_language_by_name()` was
+a dead header declaration — no `codec_language_names` table was loaded even
+though `convert-qwen3-tts-to-gguf.py` emits it. Implemented the GGUF table
+load + case-insensitive name→`codec_language_id` lookup, wired the CLI
+adapter from `params.language`, and brought the session synthesize path for
+kokoro / zonos / qwen3-tts to parity (resolving `target_language` →
+`source_language`). Validated end-to-end locally on a real qwen3-tts-0.6b:
+CLI `-l de` and the Python `Session.set_target_language('de')` both produce
+clean German audio (peak 0.69, rms 0.096), with graceful `-2` degradation on
+older GGUFs that lack the language table.
 
 ## 2026-06-19 §172 Wyoming protocol server — Home Assistant Assist integration
 
