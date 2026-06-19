@@ -2016,6 +2016,57 @@ static bool vibevoice_vae_should_use_cpu(ggml_backend_t backend, ggml_backend_t 
     return backend_is_metal(backend) || backend_is_vulkan_intel_igpu(backend);
 }
 
+// Whether the TTS LM attention uses fused flash-attention (`ggml_flash_attn_ext`).
+//
+// Default: true (fused, fastest). Set VIBEVOICE_TTS_FLASH_ATTN=0 to fall back to
+// an explicit softmax(QKᵀ)·V attention instead. Motivation (issue #171): the
+// fused FA path on some Vulkan drivers — notably AMD RDNA4 (RX 9700 XT) via the
+// coopmat2 flash-attention shader — produces numerically-wrong hidden states.
+// That makes the binary EOS classifier misfire, so the model over-generates and
+// the speech rambles, repeats, or mixes voices. Metal/CUDA and Vulkan drivers
+// without coopmat2 (e.g. MoltenVK) are unaffected. The explicit path is bit-for-
+// bit equivalent in exact arithmetic and avoids the FA shader entirely; the TTS
+// attention tensors are tiny (T ≤ 6) so the fusion speedup is negligible here.
+//
+// This isolates the LM attention only. The σ-VAE decoder has no attention (pure
+// conv/col2im), so VIBEVOICE_VAE_BACKEND={cpu,gpu} independently isolates that
+// half of the graph — together the two knobs bisect the TTS compute on a GPU.
+static bool vibevoice_tts_use_flash_attn() {
+    static const bool v = []() {
+        const char* e = std::getenv("VIBEVOICE_TTS_FLASH_ATTN");
+        return !(e && (e[0] == '0' || e[0] == 'n' || e[0] == 'N' || e[0] == 'f' || e[0] == 'F'));
+    }();
+    return v;
+}
+
+// Scaled dot-product attention for the VibeVoice TTS LM, GQA-aware.
+//   Q:    [head_dim, T,  n_head]      (already permuted + contiguous)
+//   K, V: [head_dim, Lk, n_kv_head]   (contiguous; n_head % n_kv_head == 0)
+//   mask: [Lk, T] additive (F16/F32), -inf above the causal diagonal
+// Returns the attention output with the same element layout as
+// `ggml_flash_attn_ext` after `ggml_reshape_2d(out, n_head*head_dim, T)`, so
+// callers keep their existing reshape unchanged. See vibevoice_tts_use_flash_attn().
+static ggml_tensor* vibevoice_sdpa(ggml_context* ctx, ggml_tensor* Q, ggml_tensor* K, ggml_tensor* V, ggml_tensor* mask,
+                                   float scale, bool use_flash) {
+    if (use_flash)
+        return ggml_flash_attn_ext(ctx, Q, K, V, mask, scale, 0.0f, 0.0f);
+
+    const int64_t hd = Q->ne[0];
+    const int64_t T = Q->ne[1];
+    const int64_t nh = Q->ne[2];
+    // KQ = Kᵀ·Q with GQA broadcast over heads → [Lk, T, n_head]
+    ggml_tensor* kq = ggml_mul_mat(ctx, K, Q);
+    // softmax over Lk with the scale and additive causal mask folded in
+    kq = ggml_soft_max_ext(ctx, kq, mask, scale, 0.0f);
+    // KQV = Vᵀ·softmax → [head_dim, T, n_head]
+    ggml_tensor* v_t = ggml_cont(ctx, ggml_transpose(ctx, V)); // [Lk, head_dim, n_kv_head]
+    ggml_tensor* kqv = ggml_mul_mat(ctx, v_t, kq);             // [head_dim, T, n_head]
+    // → [head_dim, n_head, T] → [n_head*head_dim, T] (matches flash_attn_ext output)
+    kqv = ggml_permute(ctx, kqv, 0, 2, 1, 3);
+    kqv = ggml_cont_2d(ctx, kqv, hd * nh, T);
+    return kqv;
+}
+
 // Vulkan hits the same `GGML_ASSERT(src_backend_id != -1)` failure as Metal
 // when the cached pred-head graph is reused across `sched_reset()` — see
 // issue #47 (geneing). Both schedulers rebuild the view→buffer-id mapping
@@ -2489,7 +2540,7 @@ static std::vector<float> run_qwen2_prefill_no_kv(vibevoice_context* ctx, const 
             K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
             V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
             float scale = 1.0f / sqrtf((float)hp.head_dim);
-            ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, causal_mask, scale, 0.0f, 0.0f);
+            ggml_tensor* attn_out = vibevoice_sdpa(ctx0, Q, K, V, causal_mask, scale, vibevoice_tts_use_flash_attn());
             attn_out = ggml_reshape_2d(ctx0, attn_out, hp.d_lm, n_tokens);
             attn_out = ggml_mul_mat(ctx0, G(std::string(p) + ".attn.o_proj.weight"), attn_out);
             cur = ggml_add(ctx0, residual, attn_out);
@@ -2610,7 +2661,7 @@ static std::vector<float> run_lm_hidden_states(vibevoice_context* ctx, const int
             V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
 
             float scale = 1.0f / sqrtf((float)hp.head_dim);
-            ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, causal_mask, scale, 0.0f, 0.0f);
+            ggml_tensor* attn_out = vibevoice_sdpa(ctx0, Q, K, V, causal_mask, scale, vibevoice_tts_use_flash_attn());
             attn_out = ggml_reshape_2d(ctx0, attn_out, hp.d_lm, n_tokens);
             attn_out = ggml_mul_mat(ctx0, G(std::string(p) + ".attn.o_proj.weight"), attn_out);
             cur = ggml_add(ctx0, residual, attn_out);
@@ -3067,7 +3118,7 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
                                                      ctx->kv_v->nb[2], (size_t)il * ctx->kv_v->nb[3]));
                     Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
                     float scale = 1.0f / sqrtf((float)hp.head_dim);
-                    auto* attn = ggml_flash_attn_ext(ctx0, Q, Kf, Vf, causal_mask, scale, 0.0f, 0.0f);
+                    auto* attn = vibevoice_sdpa(ctx0, Q, Kf, Vf, causal_mask, scale, vibevoice_tts_use_flash_attn());
                     attn = ggml_reshape_2d(ctx0, attn, hp.d_lm, T_cur);
                     attn = ggml_mul_mat(ctx0, G(std::string(p) + ".attn.o_proj.weight"), attn);
                     cur = ggml_add(ctx0, residual, attn);
@@ -3645,7 +3696,8 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
                                                     base_kv_v->nb[2], (size_t)il * base_kv_v->nb[3]));
                             Q = ggml_cont(ctx_b, ggml_permute(ctx_b, Q, 0, 2, 1, 3));
                             float scale = 1.0f / sqrtf((float)hp.head_dim);
-                            ggml_tensor* attn = ggml_flash_attn_ext(ctx_b, Q, Kf, Vf, causal_mask, scale, 0.0f, 0.0f);
+                            ggml_tensor* attn =
+                                vibevoice_sdpa(ctx_b, Q, Kf, Vf, causal_mask, scale, vibevoice_tts_use_flash_attn());
                             attn = ggml_reshape_2d(ctx_b, attn, d_lm, win_len);
                             attn = ggml_mul_mat(ctx_b, G(std::string(p) + ".attn.o_proj.weight"), attn);
                             cur = ggml_add(ctx_b, residual, attn);
@@ -3930,7 +3982,8 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
 
                 Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
                 float scale = 1.0f / sqrtf((float)hp.head_dim);
-                ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, Kfull, Vfull, causal_mask, scale, 0.0f, 0.0f);
+                ggml_tensor* attn_out =
+                    vibevoice_sdpa(ctx0, Q, Kfull, Vfull, causal_mask, scale, vibevoice_tts_use_flash_attn());
                 attn_out = ggml_reshape_2d(ctx0, attn_out, hp.d_lm, T_cur);
                 attn_out = ggml_mul_mat(ctx0, G(std::string(p) + ".attn.o_proj.weight"), attn_out);
                 cur = ggml_add(ctx0, residual, attn_out);
