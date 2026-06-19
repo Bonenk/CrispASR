@@ -6,6 +6,33 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-19 §174 Output-language specification for audio-LLM ASR backends
+
+Seven backends ignored `params.language` entirely; `qwen3` injected a language
+hint only in `--translate` mode. Wired `-l <lang>` / `--language` into the
+prompt of every instruct-tuned audio-LLM ASR backend so the user can steer the
+*output* language:
+
+- `qwen3`, `granite` (v3 + v4 templates): added a `params.language` branch to
+  the system/user prompt next to the existing `params.ask` / `params.translate`
+  branches.
+- `glm-asr`: wired both `params.ask` (was only reachable from the C ABI, not the
+  CLI) and a `params.language` instruction, in the batch and streaming paths.
+- `moss-audio`: language-aware transcription prompt.
+- `mimo-asr`: `mimo_asr_set_ask()` with a language instruction.
+- `moonshine-streaming`, `kyutai-stt` (English-only): warn to stderr on a
+  non-EN request instead of silently ignoring it.
+
+A shared `crispasr_iso_to_english_lang()` helper (`crispasr_backend_utils.h`)
+maps ISO-639-1 → English language name; a bare two-letter code is unreliable in
+an LLM prompt (`de` reads as the English "of" and steers the model to Spanish).
+This replaced two duplicated per-backend maps (qwen3, granite) and the raw-code
+strings in glm/moss/mimo.
+
+Validated on Kaggle (`tools/kaggle/lang-spec-sweep`): a disk-safe one-model-at-
+a-time sweep of 18 ASR backends × language flags on a P100, asserting rc=0 +
+non-empty transcript. Commits `ac97e712` (wiring), `30279278` (DRY helper).
+
 ## 2026-06-19 §172 Wyoming protocol server — Home Assistant Assist integration
 
 `--wyoming-port N` starts a Wyoming peer-to-peer JSONL/TCP server alongside the
