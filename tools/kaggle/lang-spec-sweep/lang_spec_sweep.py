@@ -220,12 +220,24 @@ if not REPO.exists():
 else:
     subprocess.run(["git", "-C", str(REPO), "pull", "--ff-only"], check=False)
 
+# ── Install build toolchain (ninja + ccache) ─────────────────────────────────
+step("toolchain.install")
+subprocess.run(
+    "apt-get update -qq && apt-get install -y --no-install-recommends "
+    "cmake ninja-build ccache 2>&1 | tail -3",
+    shell=True, check=False,
+)
+_HAS_CCACHE = shutil.which("ccache") is not None
+_HAS_NINJA  = shutil.which("ninja")  is not None
+step("toolchain.done", ccache=_HAS_CCACHE, ninja=_HAS_NINJA)
+
 # ── Build ────────────────────────────────────────────────────────────────────
 step("build.configure", flavour=BUILD_FLAVOUR)
 BUILD.mkdir(exist_ok=True)
 
 # Warm ccache from dataset if present
 _ccache_dir = WORK / ".ccache"
+_ccache_dir.mkdir(parents=True, exist_ok=True)
 for candidate in [
     Path("/kaggle/input/crispasr-ccache/ccache.tar"),
     Path("/kaggle/input/datasets/${KAGGLE_ACCOUNT}/crispasr-ccache/ccache.tar"),
@@ -236,6 +248,7 @@ for candidate in [
         break
 
 os.environ["CCACHE_DIR"] = str(_ccache_dir)
+os.environ["CCACHE_MAXSIZE"] = "5G"
 
 if BUILD_FLAVOUR == "cuda":
     # Add CUDA stubs to LIBRARY_PATH so FindCUDAToolkit can find libcuda.so.
@@ -243,7 +256,7 @@ if BUILD_FLAVOUR == "cuda":
     _stubs = "/usr/local/cuda/lib64/stubs"
     if os.path.isdir(_stubs):
         os.environ["LIBRARY_PATH"] = f"{_stubs}:{os.environ.get('LIBRARY_PATH', '')}"
-    # Detect CUDA arch; fall back to T4=75 if nvidia-smi is not useful.
+    # Detect CUDA arch; fall back to P100=60 / T4=75 if nvidia-smi fails.
     try:
         _arch_out = subprocess.check_output(
             ["nvidia-smi", "--query-gpu=compute_cap", "--format=csv,noheader"],
@@ -261,18 +274,26 @@ if BUILD_FLAVOUR == "cuda":
 else:
     cmake_extra = ""
 
+# Only use ccache as launcher if it was actually installed.
+_ccache_flags = (
+    "-DCMAKE_C_COMPILER_LAUNCHER=ccache "
+    "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache "
+    "-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache "
+) if _HAS_CCACHE else ""
+
 with heartbeat("build.configure"):
     sh_stream(
-        f"cmake -G Ninja -B {BUILD} -S {REPO} "
+        f"cmake -G {'Ninja' if _HAS_NINJA else 'Unix Makefiles'} "
+        f"-B {BUILD} -S {REPO} "
         f"-DCMAKE_BUILD_TYPE=Release "
-        f"-DCMAKE_C_COMPILER_LAUNCHER=ccache "
-        f"-DCMAKE_CXX_COMPILER_LAUNCHER=ccache "
+        f"{_ccache_flags}"
         f"{cmake_extra}"
     )
 
 step("build.compile")
 # Cap CUDA builds at -j2 to avoid OOM (nvcc TUs are ~2 GB RAM each on Kaggle).
-_build_j = "2" if BUILD_FLAVOUR == "cuda" else str(int(subprocess.check_output(["nproc"]).strip()))
+_nproc = int(subprocess.check_output(["nproc"]).strip())
+_build_j = "2" if BUILD_FLAVOUR == "cuda" else str(_nproc)
 with heartbeat("build.compile", interval_s=30.0):
     sh_stream(f"cmake --build {BUILD} -j{_build_j}", cwd=BUILD)
 
