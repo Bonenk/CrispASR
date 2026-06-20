@@ -29,6 +29,29 @@
 #include <mutex>
 #include <string>
 
+// ---- FireRed VAD context cache (§176e) ----
+// Same pattern as MarbleNet/Silero: avoid init/free per call.
+// firered_vad_context holds only immutable model weights + backend —
+// no per-call mutable state — so the mutex is only needed to prevent
+// concurrent GPU backend access, not for state isolation.
+static std::mutex g_firered_cache_mtx;
+static firered_vad_context* g_firered_cache_ctx = nullptr;
+static std::string g_firered_cache_path;
+
+static firered_vad_context* firered_vad_get_cached_locked(const char* path) {
+    if (g_firered_cache_ctx && g_firered_cache_path == path)
+        return g_firered_cache_ctx;
+    if (g_firered_cache_ctx) {
+        firered_vad_free(g_firered_cache_ctx);
+        g_firered_cache_ctx = nullptr;
+        g_firered_cache_path.clear();
+    }
+    g_firered_cache_ctx = firered_vad_init(path);
+    if (g_firered_cache_ctx)
+        g_firered_cache_path = path;
+    return g_firered_cache_ctx;
+}
+
 // ---- MarbleNet VAD context cache (§176e) ----
 // Same pattern as Silero: avoid init/free per call.
 #ifdef CA_HAVE_MARBLENET_VAD
@@ -156,7 +179,8 @@ static std::vector<crispasr_audio_slice> compute_firered_vad_slices(const float*
                                                                     const crispasr_vad_options& opts) {
     std::vector<crispasr_audio_slice> slices;
 
-    firered_vad_context* vctx = firered_vad_init(vad_model_path);
+    std::unique_lock<std::mutex> lock(g_firered_cache_mtx);
+    firered_vad_context* vctx = firered_vad_get_cached_locked(vad_model_path);
     if (!vctx) {
         fprintf(stderr, "crispasr: warning: failed to load FireRedVAD model '%s'\n", vad_model_path);
         return slices;
@@ -179,8 +203,7 @@ static std::vector<crispasr_audio_slice> compute_firered_vad_slices(const float*
         }
     }
     free(segs);
-    firered_vad_free(vctx);
-    return slices;
+    return slices; // vctx stays cached; lock released here
 }
 
 std::vector<crispasr_audio_slice> crispasr_compute_vad_slices(const float* samples, int n_samples, int sample_rate,

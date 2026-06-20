@@ -6611,10 +6611,9 @@ runtimes and currently run as unvectorized nested loops.
 
 #### §176e Context caching for support runtimes
 
-**Status:** PARTIAL — WhisperEncDec + MarbleNet VAD DONE (`ccdd3af6`), Pyannote DONE (`afb651bf`)
+**Status:** PARTIAL — WhisperEncDec + MarbleNet VAD DONE (`ccdd3af6`), Pyannote DONE (`afb651bf`), FireRed VAD DONE (§196 2026-06-20), CTC aligner DONE (`39c8f966`)
 **Effort:** Small per backend (template: Silero VAD static cache)
-**Backends done:** WhisperEncDec VAD, MarbleNet VAD, Pyannote segmentation.
-**Remaining:** FireRed VAD, ECAPA-TDNN LID, RNNoise enhancement, CTC aligner, FireRedPunc (graph ctx)
+**Backends done:** WhisperEncDec VAD, MarbleNet VAD, Pyannote segmentation, FireRed VAD, CTC aligner. **Remaining:** ECAPA-TDNN LID, RNNoise enhancement, FireRedPunc (graph ctx)
 **Approach:** The Silero VAD `g_silero_cache_mtx` + static context
 pattern prevents 70× init/free regression. Replicate for each backend:
 static or per-pipeline cached context, mutex-guarded.

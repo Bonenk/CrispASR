@@ -6,6 +6,16 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-20 §196 FireRed VAD context cache (§176e)
+
+Added a static `g_firered_cache_ctx` + `g_firered_cache_mtx` cache in
+`crispasr_vad.cpp` following the MarbleNet/Silero pattern. `compute_firered_vad_slices`
+now holds the mutex and reuses the cached context across calls instead of
+calling `firered_vad_init` + `firered_vad_free` on every VAD invocation.
+`firered_vad_context` holds only immutable model weights + backend (no
+per-call mutable state), so the mutex guards concurrent GPU backend access only.
+699 unit tests pass.
+
 ## 2026-06-20 §194 Parakeet: Accelerate GEMV for LSTM predictor + joint head (§176d)
 
 Replaced scalar matrix-vector loops in three CPU hotpaths of `parakeet.cpp`
