@@ -9102,3 +9102,12 @@ TitaNet-Large's entire forward was hand-rolled CPU scalar. GEMM'd the pointwise
 test-titanet into CMake. GEMM == scalar (embeddings ~1e-5; cosine matrix
 identical, clean speaker discrimination). 11 s clip embed 49.05 s → 1.41 s
 (~35× wall). 484 unit tests pass. Family of §188/§190 (ecapa).
+
+## 2026-06-20 §192 silero-lid — Accelerate GEMM CPU-scalar forward (4.5×)
+
+Silero 95-language LID's entire forward was hand-rolled CPU scalar (96
+depthwise-separable conv blocks + per-stage transformers + stage projections).
+Added a silero_mm cblas_sgemm helper (scalar fallback; SILERO_FORCE_SCALAR=1)
+and routed the six matmul hotspots through it. GEMM == scalar (identical
+predictions + p-scores en/de/zh, all correct). detect_total 891 ms → 200 ms on
+an 11 s clip (4.5×). 551 unit tests pass. Family of §188/§190/§191.

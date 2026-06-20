@@ -6841,3 +6841,17 @@ cosine-sim matrix identical across jfk/de/en — cross-speaker 0.004/0.10/0.014)
 Embed of an 11 s clip 49.05 s → 1.41 s wall (~35×; forward ~50×). 484 unit
 tests pass. Same family/pattern as §188/§190 (ecapa). The encoder here was also
 scalar (ecapa's ran in a ggml graph), so the win is larger.
+
+## §192 silero-lid — Accelerate GEMM CPU-scalar forward — DONE 2026-06-20
+
+Silero language-id (95 langs) ran its whole forward as hand-rolled CPU scalar:
+8 stages × 12 depthwise-separable conv blocks (96 pointwise matmuls) +
+per-stage transformer (QKV/out-proj/FFN) + stage projections. Added a
+`silero_mm(A,B,C,M,N,K)` = A[M,K]@B[K,N] helper (cblas_sgemm, scalar fallback,
+SILERO_FORCE_SCALAR=1 bypass) and routed the six matmul hotspots through it;
+depthwise (k=5) + tiny per-head attention stay scalar.
+
+Validation (M1, silero-lid-95.gguf): GEMM == scalar — identical predictions
+and p-scores en (-0.795)/de (-2.369)/zh (-1.029), all correct. Forward
+(detect_total) 891 ms → 200 ms on an 11 s clip (4.5×). 551 unit tests pass.
+Accelerate-GEMM family of §188/§190 (ecapa) / §191 (titanet).
