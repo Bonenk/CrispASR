@@ -18,6 +18,18 @@
 #include <string>
 #include <vector>
 
+// §193 Accelerate cblas_sgemm for all cpu_linear calls.
+// Set FIRERED_VAD_FORCE_SCALAR=1 to validate scalar fallback.
+#if defined(HAVE_ACCELERATE)
+#include <Accelerate/Accelerate.h>
+static bool firered_vad_use_scalar() {
+    static int v = -1;
+    if (v < 0)
+        v = (getenv("FIRERED_VAD_FORCE_SCALAR") != nullptr) ? 1 : 0;
+    return v != 0;
+}
+#endif
+
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -100,7 +112,20 @@ static void read_f32(ggml_tensor* t, std::vector<float>& out) {
 }
 
 // Linear: out[i] = sum_j w[i*K+j] * x[j] + b[i], for each time step
+// out[T,N] = x[T,K] @ w[N,K]^T + b[N]  (w is row-major [N,K])
 static void cpu_linear(const float* x, const float* w, const float* b, float* out, int T, int K, int N) {
+#if defined(HAVE_ACCELERATE)
+    if (!firered_vad_use_scalar()) {
+        // w stored as [N,K] → CblasTrans to get x[T,K] @ w^T[K,N] → out[T,N]
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, T, N, K, 1.0f, x, K, w, K, 0.0f, out, N);
+        if (b) {
+            for (int t = 0; t < T; t++)
+                for (int n = 0; n < N; n++)
+                    out[t * N + n] += b[n];
+        }
+        return;
+    }
+#endif
     for (int t = 0; t < T; t++) {
         for (int n = 0; n < N; n++) {
             double s = 0;

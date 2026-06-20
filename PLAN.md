@@ -6564,10 +6564,9 @@ context_params structs. Wire the flag through and default it ON.
 
 #### §176b Lk-bucketed graph caching for AR decode steps
 
-**Status:** PARTIAL — Chatterbox T3 DONE (§186 2026-06-20), Orpheus DONE (§190 2026-06-20)
+**Status:** PARTIAL — Chatterbox T3 DONE (§186 2026-06-20), Orpheus DONE (§190 2026-06-20), OuteTTS DONE (already implemented pre-§192)
 **Effort:** Medium (template from qwen3-tts)
-**Backends done:** Chatterbox T3 (§186), Orpheus (§190). **Remaining:** OuteTTS (long
-codec sequences), Parler (9 codebooks), SpeechT5, Dia, Pocket-TTS,
+**Backends done:** Chatterbox T3 (§186), Orpheus (§190), OuteTTS (already had kBucketN/ar_buckets). **Remaining:** Parler (9 codebooks), SpeechT5, Dia, Pocket-TTS,
 Zonos, TADA, CosyVoice3, VoxCPM2, VibeVoice (pred head), LFM2 (VAE), KugelAudio
 (VAE + pred). F5-TTS DiT done differently (§183 single graph, 32-step CFG loop).
 **Approach:** Qwen3-TTS demonstrates with 5 pre-built graphs at fixed Lk
@@ -6592,12 +6591,12 @@ backends at long output sequences.
 
 #### §176d BLAS/ggml for scalar CPU matmul hotpaths
 
-**Status:** OPEN
+**Status:** PARTIAL — TitaNet ASP DONE (HAVE_ACCELERATE, prior), Silero LID DONE (§ e1a0725e 2026-06-20), FireRed VAD DONE (§193 2026-06-20)
 **Effort:** Medium-Large (per-backend refactor)
 **Targets (ordered by compute dominance):**
-- TitaNet ASP TDNN: 9216×T scalar matmul → ggml graph or cblas_sgemm
-- Silero LID: 8 stages × O(T²) scalar attention → ggml graph
-- FireRed VAD: 8 DFSMN blocks + linear layers → ggml graph
+- TitaNet ASP TDNN: DONE — cblas_sgemm under HAVE_ACCELERATE (prior)
+- Silero LID: DONE — cblas_sgemm (§ e1a0725e 2026-06-20, 4.5×)
+- FireRed VAD: DONE — cblas_sgemm for all DFSMN cpu_linear calls (§193 2026-06-20)
 - MeloTTS/Piper: `cpu_multihead_attention_relpos` O(H×T²×D) × 6 layers
   → ggml with flash_attn
 - OpenVoice2 WaveNet: 16 layers × T × K=5 × C=192 → ggml_conv_1d

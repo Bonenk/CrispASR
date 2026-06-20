@@ -6,6 +6,15 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-20 §193 FireRed VAD: Accelerate GEMM for DFSMN linear layers (§176d)
+
+Replaced the naive O(T·K·N) triple-loop `cpu_linear` in `firered_vad.cpp` with
+`cblas_sgemm` (Accelerate on Apple, scalar fallback elsewhere). All 10
+`cpu_linear` calls in the DFSMN forward (fc1/fc2 × 9 blocks + out) now go
+through the BLAS path on macOS. Weight matrices are [N,K] row-major → CblasTrans
+on the w argument. Set `FIRERED_VAD_FORCE_SCALAR=1` to validate the scalar path.
+653 unit tests pass.
+
 ## 2026-06-20 §192 CosyVoice3 CPU speech embed cache (§176g)
 
 Pre-dequantize `speech_embd_w` (6761×896 ≈ 24 MB F32) at init.
