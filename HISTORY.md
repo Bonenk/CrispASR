@@ -6,6 +6,16 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-20 §191 Zonos CPU codebook embed cache (§176g)
+
+Fixed `tensor_get_row_f32` for quantized types: was calling
+`tensor_to_float(t)` (dequant entire vocab×d matrix, O(vocab)) to extract
+one row; now uses single-row `ggml_backend_tensor_get` + `to_float` (same
+pattern as Orpheus §176o). Added `emb_w_cache`: all 9 codebook embedding
+tables pre-dequantized to F32 at init (~75 MB). Every AR step embed lookup
+and masked-token setup now uses direct CPU memcpy — no GPU round-trip or
+per-step quantized decode. 484 unit tests pass.
+
 ## 2026-06-20 §190 Orpheus Lk-bucketed AR decode graph cache
 
 Ported chatterbox §186 T3-bucket pattern to `orpheus.cpp`. Added

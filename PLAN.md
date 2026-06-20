@@ -6649,9 +6649,9 @@ thread count for that A/B. (The mel projection half of §176f is already done by
 
 #### §176g CPU embedding cache for AR TTS backends
 
-**Status:** PARTIAL — Chatterbox DONE (§188 2026-06-20)
+**Status:** PARTIAL — Chatterbox DONE (§188 2026-06-20), Zonos DONE (§191 2026-06-20)
 **Effort:** Small per backend (template: qwen3-tts `CpuEmbdCache`)
-**Backends done:** Chatterbox (§188). **Remaining:** Orpheus, OuteTTS, Zonos,
+**Backends done:** Chatterbox (§188), Zonos (§191). **Remaining:** Orpheus, OuteTTS,
 CosyVoice3, TADA, VibeVoice, Pocket-TTS
 **Approach:** Copy raw quantized embedding bytes from GPU buffer to CPU
 at init; `get_row_into` dequantizes via `ggml_get_type_traits(type)->
