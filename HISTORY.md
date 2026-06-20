@@ -6,6 +6,29 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-20 §176s Encoder graph caching — 6 more backends
+
+Applied the metadata-swap encoder graph caching pattern to 6 backends
+(in addition to sensevoice, funasr, canary already done by other
+sessions):
+
+- **Paraformer** — cache by T_lfr. 5/5 live tests pass.
+- **Nemotron** — cache by T_mel. 7/7 tests pass (3 live + 4 unit).
+- **Moonshine** — cache by n_samples. 4/4 unit tests pass.
+- **Canary-CTC** — cache by T_mel, both call sites patched.
+- **Parakeet** — cache by T_mel via `parakeet_encode_mel`.
+- **Qwen3-ASR** — cache by (T_chunk, num_chunks, T_chunk_out).
+
+Technique: swap `compute_meta` with a persistent `cached_enc_meta`
+before calling the graph builder, swap back after. The cached graph
+arena persists across calls. Invalidated when the topology key changes.
+
+§176s is now 9/15 backends done. Remaining: omniasr (fused enc+dec
+graph), moonshine_streaming (chunk state), moss/voxtral/granite/kyutai
+(>1.5 GB models, GPU-only benefit).
+
+---
+
 ## 2026-06-20 §196 FireRed VAD context cache (§176e)
 
 Added a static `g_firered_cache_ctx` + `g_firered_cache_mtx` cache in
