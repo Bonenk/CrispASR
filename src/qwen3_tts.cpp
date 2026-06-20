@@ -1981,13 +1981,22 @@ float* run_code_pred_kv(qwen3_tts_context* c, const float* embeds, int n_tokens,
     if (!use_slot && !code_pred_reserve_sched(c, sched)) {
         return nullptr;
     }
-    // The "skip reset+alloc on cache hit" optimisation is only safe on backends
-    // whose scheduler keeps a previous allocation valid across computes
-    // (Metal/CPU). On CUDA, computing a reused graph without re-allocating the
-    // scheduler triggers an illegal memory access (#56). So by default we
-    // re-alloc each step — we still keep the larger O15 win (the graph itself is
-    // built exactly once, no per-step rebuild). Metal/CPU users can opt back
-    // into the skip with QWEN3_TTS_O15_SKIP_REALLOC=1.
+    // The "skip reset+alloc on cache hit" optimisation reuses a previously
+    // allocated graph without re-allocating the scheduler. On CUDA this triggers
+    // an illegal memory access (#56). So by default we re-alloc each step — we
+    // still keep the larger O15 win (the graph itself is built exactly once, no
+    // per-step rebuild). The skip is opt-in via QWEN3_TTS_O15_SKIP_REALLOC=1.
+    //
+    // WARNING (verified on M1 Metal, 2026-06-20, qwen3-tts-0.6b): with the
+    // current ggml the skip is ALSO broken on Metal — the reused graph's named
+    // inputs (inputs_embeds/positions/causal_mask) resolve to nil buffers
+    // ("ggml_metal_buffer_get_id: tensor ... buffer is nil") and synthesis
+    // returns no audio (clean failure, no crash). This matches the ggml sched
+    // cross-backend tightening (no auto-copy / allocation across reuse). So the
+    // skip is currently unsafe on both CUDA and this Metal; it is left opt-in for
+    // CPU / older-ggml setups only. With the skip off, O15 on 0.6B Metal is
+    // ~5% slower than O15=0 (re-alloc cost > build-once saving at this size), so
+    // O15 stays default-OFF; its win is on CUDA 1.7B (the crash this PR fixes).
     const bool skip_realloc = can_skip && c->cp_t1_allocated && env_bool("QWEN3_TTS_O15_SKIP_REALLOC");
     const double t_reset0 = bench ? now_ms() : 0.0;
     if (!skip_realloc) {
