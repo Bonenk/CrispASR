@@ -1314,6 +1314,22 @@ catch_discover_tests(test-core-istft
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-core-mel-parallel — core/mel.cpp §176f parallel-STFT bit-identity ───
+# Asserts the OpenMP-parallel STFT (Params::allow_parallel_stft) is bit-identical
+# to the serial path. Links crispasr-core (core_mel::compute is not header-only).
+add_executable(test-core-mel-parallel test-core-mel-parallel.cpp)
+target_include_directories(test-core-mel-parallel PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-core-mel-parallel PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-core
+)
+catch_discover_tests(test-core-mel-parallel
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;mel"
+)
+
 # ─── test-core-cross-attn — core/cross_attn.h manual path (ggml graph) ────────
 # Computes the header's cross-attention graph and compares to a plain-C++ MHA
 # reference (verifies the bug-fixed V-transpose + unscaled T5 contract).

@@ -6647,6 +6647,19 @@ on a quiet machine; **`CRISPASR_MEL_TIMING=1`** prints per-call STFT ms +
 thread count for that A/B. (The mel projection half of §176f is already done by
 §189's `cblas_sgemm`; this STFT half stacks on top of it.)
 
+**fft re-entrancy AUDIT (2026-06-20) — all clear.** Read every `FftR2C`
+callable passed to `core_mel::compute`: `cohere/nemotron/parakeet/canary/
+canary_ctc` are byte-identical pure in-place Cooley-Tukey (stack-only locals,
+write only the caller's `out`); `glm_asr` is a captureless lambda; `qwen3_asr`
+recurses on the caller's buffer; `voxtral` uses `thread_local` scratch. **None
+use shared mutable static state → the parallel STFT is correctness-safe for every
+backend.** So the only remaining gate to flipping a backend default-on is a
+quiet-machine per-arch perf bench. Added `core_mel::Params::allow_parallel_stft`
+(default false) as the per-backend opt-in (env var still overrides globally), and
+`tests/test-core-mel-parallel.cpp` (unit, `[unit][mel]`) pins parallel ≡ serial
+bit-identity on an OpenMP build. No backend flipped yet (perf unproven on the
+loaded dev box).
+
 #### §176g CPU embedding cache for AR TTS backends
 
 **Status:** PARTIAL — Chatterbox DONE (§188 2026-06-20), Zonos DONE (§191 2026-06-20)

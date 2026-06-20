@@ -119,9 +119,11 @@ std::vector<float> compute(const float* samples, int n_samples, const float* win
     // OPT-IN (CRISPASR_MEL_PARALLEL=1, default serial) because the `fft` callable
     // is supplied per backend (cohere_fft_r2c, glm_fft, voxtral_fft_wrapper, …)
     // and the parallel path is only safe when that callable is re-entrant. Flip
-    // a backend to parallel-by-default once its fft is confirmed thread-safe.
+    // a backend to parallel-by-default once its fft is confirmed thread-safe
+    // (audit: see Params::allow_parallel_stft) AND benched faster on the arch.
     // Measured (cohere, M1, 8 cores): warm STFT ~2.4× (43→18 ms / 800 frames).
-    const bool mel_parallel = (std::getenv("CRISPASR_MEL_PARALLEL") != nullptr);
+    // Enabled by the global env var OR the per-backend Params flag.
+    const bool mel_parallel = (std::getenv("CRISPASR_MEL_PARALLEL") != nullptr) || p.allow_parallel_stft;
     const auto t_stft0 = std::chrono::steady_clock::now();
     bool ran_parallel = false;
 
