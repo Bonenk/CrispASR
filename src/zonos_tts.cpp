@@ -38,6 +38,7 @@
 #include "gguf.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -218,6 +219,18 @@ struct zonos_tts_context {
     ggml_tensor* kv_k_uncond = nullptr; // CFG unconditioned path
     ggml_tensor* kv_v_uncond = nullptr;
     int kv_max_ctx = 0;
+
+    // §176b: Lk-bucketed single-step AR graph cache.
+    struct ZonosBucket {
+        int lk = 0;
+        ggml_context* ctx = nullptr;
+        std::vector<uint8_t> meta;
+        ggml_cgraph* gf = nullptr;
+    };
+    static constexpr int kBucketN = 4;
+    static constexpr int kBucketLks[kBucketN] = {512, 1024, 2048, 4096};
+    std::array<ZonosBucket, kBucketN> ar_buckets{}; // conditioned KV
+    ggml_backend_sched_t ar_step_sched = nullptr;
 
     // DAC codec (loaded lazily on first synthesize call)
     std::string dac_codec_path;
@@ -1186,7 +1199,8 @@ namespace {
 // Input: embeddings (d_model, T). Output: logits for all 9 codebooks
 // concatenated: (head_vocab_size * n_codebooks, 1) for the last token.
 static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int T, ggml_tensor* use_kv_k = nullptr,
-                                         ggml_tensor* use_kv_v = nullptr) {
+                                         ggml_tensor* use_kv_v = nullptr, int fixed_kv_len = 0,
+                                         ggml_context* arena_ctx = nullptr) {
     const auto& hp = ctx->hp;
     const int d = (int)hp.d_model;
     const int n_q = (int)hp.n_heads;
@@ -1196,7 +1210,7 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
     const float eps = hp.norm_eps;
     const float theta = hp.rope_theta;
     const float attn_scale = 1.0f / std::sqrt((float)hd);
-    const int Lk = n_past + T;
+    const int Lk = fixed_kv_len > 0 ? fixed_kv_len : (n_past + T);
 
     // Use specified KV cache or default to ctx->kv_k/kv_v
     ggml_tensor* kv_k_ptr = use_kv_k ? use_kv_k : ctx->kv_k;
@@ -1204,7 +1218,7 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
     GGML_ASSERT(kv_k_ptr && kv_v_ptr && Lk <= ctx->kv_max_ctx);
 
     ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
-    ggml_context* ctx0 = ggml_init(ip);
+    ggml_context* ctx0 = arena_ctx ? arena_ctx : ggml_init(ip);
     ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 4096, false);
 
     ggml_tensor* embeds = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, d, T);
@@ -1214,7 +1228,7 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
     ggml_set_name(positions, "positions");
     ggml_set_input(positions);
     ggml_tensor* causal_mask = nullptr;
-    if (T > 1) {
+    if (T > 1 || fixed_kv_len > 0) {
         causal_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, Lk, T);
         ggml_set_name(causal_mask, "causal_mask");
         ggml_set_input(causal_mask);
@@ -1235,6 +1249,8 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
     };
     // Zonos uses consecutive-pair RoPE (x[2i],x[2i+1]) not half-split (x[i],x[i+d/2]).
     kvp.rope_type = GGML_ROPE_TYPE_NORMAL;
+
+    ggml_tensor* eff_kv_indices = fixed_kv_len > 0 ? positions : nullptr;
 
     // Helper to upcast F16 tensors to F32 for elementwise ops
     auto cast_f32 = [&](ggml_tensor* t) -> ggml_tensor* {
@@ -1257,9 +1273,12 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
         cur = ggml_add(ctx0, cur, cast_f32(layer.attn_norm_b));
 
         // Self-attention with fused QKV and KV cache
-        ggml_tensor* attn = core_attn::kv_self_attn(ctx0, gf, cur, nullptr, nullptr, nullptr, layer.attn_output_w,
-                                                    nullptr, nullptr, positions, (T == 1) ? nullptr : causal_mask,
-                                                    kv_k_ptr, kv_v_ptr, (int)il, n_past, kvp, layer.attn_qkv_w);
+        ggml_tensor* attn =
+            core_attn::kv_self_attn(ctx0, gf, cur, nullptr, nullptr, nullptr, layer.attn_output_w, nullptr, nullptr,
+                                    positions, (T == 1 && !fixed_kv_len) ? nullptr : causal_mask, kv_k_ptr, kv_v_ptr,
+                                    (int)il, n_past, kvp, layer.attn_qkv_w,
+                                    /*fixed_kv_len=*/fixed_kv_len,
+                                    /*kv_indices=*/eff_kv_indices);
         cur = ggml_add(ctx0, residual, attn);
 
         // Pre-FFN LayerNorm (with bias)
@@ -1309,8 +1328,83 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
     }
     ggml_set_name(all_logits, "logits");
     ggml_build_forward_expand(gf, all_logits);
-    ggml_free(ctx0);
+    if (!arena_ctx)
+        ggml_free(ctx0);
     return gf;
+}
+
+// §176b: Lk-bucketed single-step AR decode helpers.
+static int zonos_pick_bucket(zonos_tts_context* ctx, int needed_lk) {
+    for (int i = 0; i < zonos_tts_context::kBucketN; i++) {
+        const int bk_lk = zonos_tts_context::kBucketLks[i];
+        if (bk_lk >= needed_lk && bk_lk <= ctx->kv_max_ctx)
+            return i;
+    }
+    return -1;
+}
+
+static ggml_backend_sched_t zonos_step_sched_lazy(zonos_tts_context* ctx) {
+    if (ctx->ar_step_sched)
+        return ctx->ar_step_sched;
+    ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
+    int n_be = (ctx->backend && ctx->backend != ctx->backend_cpu) ? 2 : 1;
+    ctx->ar_step_sched = ggml_backend_sched_new(backends, nullptr, n_be, 4096, false, false);
+    return ctx->ar_step_sched;
+}
+
+static ggml_cgraph* zonos_get_or_build_bucket(zonos_tts_context* ctx, int idx) {
+    auto& bk = ctx->ar_buckets[idx];
+    if (bk.gf)
+        return bk.gf;
+    bk.lk = zonos_tts_context::kBucketLks[idx];
+    bk.meta.assign(ctx->compute_meta.size(), 0);
+    ggml_init_params ip = {bk.meta.size(), bk.meta.data(), true};
+    bk.ctx = ggml_init(ip);
+    if (!bk.ctx)
+        return nullptr;
+    bk.gf = build_graph_backbone(ctx, /*n_past=*/0, /*n_tokens=*/1,
+                                 /*use_kv_k=*/nullptr, /*use_kv_v=*/nullptr,
+                                 /*fixed_kv_len=*/bk.lk, /*arena_ctx=*/bk.ctx);
+    return bk.gf;
+}
+
+static float* run_backbone_bucket(zonos_tts_context* ctx, const float* embeds, int n_past) {
+    const int idx = zonos_pick_bucket(ctx, n_past + 1);
+    if (idx < 0)
+        return nullptr;
+
+    ggml_cgraph* gf = zonos_get_or_build_bucket(ctx, idx);
+    if (!gf)
+        return nullptr;
+
+    ggml_backend_sched_t step_sched = zonos_step_sched_lazy(ctx);
+    ggml_backend_sched_reset(step_sched);
+    if (!ggml_backend_sched_alloc_graph(step_sched, gf))
+        return nullptr;
+
+    const int d = (int)ctx->hp.d_model;
+    const int Lk = ctx->ar_buckets[idx].lk;
+    const int total_logits = (int)ctx->hp.head_vocab_size * (int)ctx->hp.n_codebooks;
+
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "inputs_embeds"), embeds, 0, (size_t)d * sizeof(float));
+    int32_t pos = n_past;
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "positions"), &pos, 0, sizeof(int32_t));
+
+    // Causal mask: allow [0..n_past], mask [n_past+1..Lk-1].
+    std::vector<ggml_fp16_t> mask((size_t)Lk);
+    const ggml_fp16_t zero_h = ggml_fp32_to_fp16(0.0f);
+    const ggml_fp16_t ninf_h = ggml_fp32_to_fp16(-INFINITY);
+    for (int k = 0; k < Lk; k++)
+        mask[k] = (k <= n_past) ? zero_h : ninf_h;
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "causal_mask"), mask.data(), 0,
+                            mask.size() * sizeof(ggml_fp16_t));
+
+    if (ggml_backend_sched_graph_compute(step_sched, gf) != GGML_STATUS_SUCCESS)
+        return nullptr;
+
+    float* r = (float*)malloc((size_t)total_logits * sizeof(float));
+    ggml_backend_tensor_get(ggml_graph_get_tensor(gf, "logits"), r, 0, (size_t)total_logits * sizeof(float));
+    return r;
 }
 
 // Run the backbone graph, return logits for all 9 codebooks at the last position.
@@ -1320,6 +1414,13 @@ static ggml_cgraph* build_graph_backbone(zonos_tts_context* ctx, int n_past, int
 static float* run_backbone(zonos_tts_context* ctx, const float* embeds, int T, int n_past,
                            ggml_tensor* use_kv_k = nullptr, ggml_tensor* use_kv_v = nullptr,
                            float* out_hidden = nullptr) {
+    // §176b: Lk-bucketed fast path for single-step decode on the default
+    // (conditioned) KV cache, when no hidden-state extraction is needed.
+    if (T == 1 && !use_kv_k && !use_kv_v && !out_hidden) {
+        if (float* r = run_backbone_bucket(ctx, embeds, n_past))
+            return r;
+    }
+
     if (n_past + T > ctx->kv_max_ctx) {
         fprintf(stderr, "zonos_tts: kv overflow (%d+%d > %d)\n", n_past, T, ctx->kv_max_ctx);
         return nullptr;
@@ -2524,6 +2625,12 @@ void zonos_tts_pcm_free(float* pcm) {
 void zonos_tts_free(struct zonos_tts_context* ctx) {
     if (!ctx)
         return;
+    // §176b bucket cleanup
+    if (ctx->ar_step_sched)
+        ggml_backend_sched_free(ctx->ar_step_sched);
+    for (auto& bk : ctx->ar_buckets)
+        if (bk.ctx)
+            ggml_free(bk.ctx);
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
     if (ctx->dac_buf_perm)
