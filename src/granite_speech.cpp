@@ -273,6 +273,13 @@ struct granite_speech_context {
 
     int n_threads = 4;
 
+    // §176s: cached encoder graph — reused when (T, with_rpe) matches.
+    ggml_cgraph* cached_enc_gf = nullptr;
+    ggml_context* cached_enc_ctx = nullptr;
+    std::vector<uint8_t> cached_enc_meta;
+    int cached_enc_T = 0;
+    bool cached_enc_rpe = false;
+
     // Precomputed relative position embedding lookup, per encoder block.
     // Layout: rpe_per_layer[il][c * C * hd + r * hd + d] = rel_pos_emb(attention_dists[c][r])[d]
     // granite-speech-4.1-2b stores DIFFERENT attn_rel_pos.weight per encoder
@@ -806,6 +813,8 @@ extern "C" struct granite_speech_context* granite_speech_init_from_file(const ch
 extern "C" void granite_speech_free(struct granite_speech_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->cached_enc_ctx)
+        ggml_free(ctx->cached_enc_ctx);
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
     if (ctx->kv_buf)
@@ -1005,7 +1014,8 @@ static void cpu_linear(granite_speech_context* /*ctx*/, float* out, const float*
 // from any caller; it stays in tree as a simpler baseline we can diff
 // against if the CPU path ever drifts. The unused-local casts below
 // keep the file warning-free without deleting the reference.
-static ggml_cgraph* granite_build_encoder(granite_speech_context* ctx, int T, bool with_rpe) {
+static ggml_cgraph* granite_build_encoder(granite_speech_context* ctx, int T, bool with_rpe,
+                                          ggml_context* arena_ctx = nullptr) {
     const auto& m = ctx->model;
     const auto& hp = m.hparams;
     const int d = (int)hp.enc_d_model;       // 1024
@@ -1018,8 +1028,13 @@ static ggml_cgraph* granite_build_encoder(granite_speech_context* ctx, int T, bo
     (void)d;
     (void)ff; // reserved for future use (see header comment)
 
-    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
-    ggml_context* ctx0 = ggml_init(ip);
+    ggml_context* ctx0;
+    if (arena_ctx) {
+        ctx0 = arena_ctx;
+    } else {
+        ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+        ctx0 = ggml_init(ip);
+    }
     ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 16384, false);
 
     // Input: (T, input_dim=160) stacked mel frames
@@ -1348,7 +1363,8 @@ static ggml_cgraph* granite_build_encoder(granite_speech_context* ctx, int T, bo
 
     ggml_set_name(cur, "enc_output");
     ggml_build_forward_expand(gf, cur);
-    ggml_free(ctx0);
+    if (!arena_ctx)
+        ggml_free(ctx0);
     return gf;
 }
 
@@ -1379,7 +1395,25 @@ static float* granite_run_encoder_graph(granite_speech_context* ctx, const float
     if (!with_rpe)
         fprintf(stderr, "granite_encoder_graph: rpe_per_layer missing entries — using approximate no-RPE path\n");
 
-    ggml_cgraph* gf = granite_build_encoder(ctx, T, with_rpe);
+    // §176s: reuse cached encoder graph when (T, with_rpe) matches.
+    ggml_cgraph* gf;
+    if (ctx->cached_enc_gf && ctx->cached_enc_T == T && ctx->cached_enc_rpe == with_rpe) {
+        gf = ctx->cached_enc_gf;
+    } else {
+        if (ctx->cached_enc_ctx) {
+            ggml_free(ctx->cached_enc_ctx);
+            ctx->cached_enc_ctx = nullptr;
+            ctx->cached_enc_gf = nullptr;
+        }
+        ctx->cached_enc_meta.assign(ctx->compute_meta.size(), 0);
+        ggml_init_params aip = {ctx->cached_enc_meta.size(), ctx->cached_enc_meta.data(), true};
+        ctx->cached_enc_ctx = ggml_init(aip);
+        gf = granite_build_encoder(ctx, T, with_rpe, ctx->cached_enc_ctx);
+        ctx->cached_enc_gf = gf;
+        ctx->cached_enc_T = T;
+        ctx->cached_enc_rpe = with_rpe;
+    }
+
     ggml_backend_sched_reset(ctx->sched);
     if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
         fprintf(stderr, "granite_encoder_graph: alloc failed\n");
