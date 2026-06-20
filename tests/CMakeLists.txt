@@ -768,6 +768,108 @@ catch_discover_tests(test-zonos-params
     PROPERTIES LABELS "unit;zonos"
 )
 
+# ─── test-bark-params — Catch2 unit tests for bark_context_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-bark-params
+    test-bark-params.cpp
+)
+target_include_directories(test-bark-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-bark-params PRIVATE
+    Catch2::Catch2WithMain
+    bark-tts
+)
+catch_discover_tests(test-bark-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;bark"
+)
+
+# ─── test-canaryctc-params — Catch2 unit tests for canary_ctc_context_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-canaryctc-params
+    test-canaryctc-params.cpp
+)
+target_include_directories(test-canaryctc-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-canaryctc-params PRIVATE
+    Catch2::Catch2WithMain
+    canary_ctc
+)
+catch_discover_tests(test-canaryctc-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;canary_ctc"
+)
+
+# ─── test-csm-params — Catch2 unit tests for csm_tts_context_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-csm-params
+    test-csm-params.cpp
+)
+target_include_directories(test-csm-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-csm-params PRIVATE
+    Catch2::Catch2WithMain
+    csm-tts
+)
+catch_discover_tests(test-csm-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;csm"
+)
+
+# ─── test-kokoro-params — Catch2 unit tests for kokoro_context_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-kokoro-params
+    test-kokoro-params.cpp
+)
+target_include_directories(test-kokoro-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-kokoro-params PRIVATE
+    Catch2::Catch2WithMain
+    kokoro
+)
+catch_discover_tests(test-kokoro-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;kokoro"
+)
+
+# ─── test-sensevoice-params — Catch2 unit tests for sensevoice_context_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-sensevoice-params
+    test-sensevoice-params.cpp
+)
+target_include_directories(test-sensevoice-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-sensevoice-params PRIVATE
+    Catch2::Catch2WithMain
+    sensevoice
+)
+catch_discover_tests(test-sensevoice-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;sensevoice"
+)
+
+# ─── test-speecht5-params — Catch2 unit tests for speecht5_tts_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-speecht5-params
+    test-speecht5-params.cpp
+)
+target_include_directories(test-speecht5-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-speecht5-params PRIVATE
+    Catch2::Catch2WithMain
+    speecht5-tts
+)
+catch_discover_tests(test-speecht5-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;speecht5"
+)
+
 # ─── test-qwen3-tts-cv-style — Catch2 unit tests for qwen3_tts_set_cv_style_instruct
 # (issue #91: --instruct silently ignored for CustomVoice models).
 # Exercises null-ctx guards and default-params sanity — no GGUF needed. ─────
