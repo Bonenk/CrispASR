@@ -606,6 +606,57 @@ catch_discover_tests(test-chatterbox-params
     PROPERTIES LABELS "unit;chatterbox"
 )
 
+# ─── test-parakeet-params — Catch2 unit tests for parakeet_context_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-parakeet-params
+    test-parakeet-params.cpp
+)
+target_include_directories(test-parakeet-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-parakeet-params PRIVATE
+    Catch2::Catch2WithMain
+    parakeet
+)
+catch_discover_tests(test-parakeet-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;parakeet"
+)
+
+# ─── test-piper-params — Catch2 unit tests for piper_tts_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-piper-params
+    test-piper-params.cpp
+)
+target_include_directories(test-piper-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-piper-params PRIVATE
+    Catch2::Catch2WithMain
+    piper-tts
+)
+catch_discover_tests(test-piper-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;piper"
+)
+
+# ─── test-canary-params — Catch2 unit tests for canary_context_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-canary-params
+    test-canary-params.cpp
+)
+target_include_directories(test-canary-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-canary-params PRIVATE
+    Catch2::Catch2WithMain
+    canary
+)
+catch_discover_tests(test-canary-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;canary"
+)
+
 # ─── test-orpheus-params — Catch2 unit tests for orpheus_context_params defaults
 # and null-guard coverage. No GGUF required. ───────────────────────────────────
 add_executable(test-orpheus-params
