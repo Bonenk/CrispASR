@@ -1414,6 +1414,14 @@ target_link_libraries     (piper-tts PUBLIC crispasr-core ggml ggml-base ggml-cp
 if(NOT MSVC)
     target_compile_options(piper-tts PRIVATE -O3)
 endif()
+if(APPLE)
+    # §176d Accelerate cblas_sgemm for QKV projections + per-head attention matmuls.
+    if(NOT ACCELERATE_LIB)
+        find_library(ACCELERATE_LIB Accelerate REQUIRED)
+    endif()
+    target_link_libraries(piper-tts PUBLIC ${ACCELERATE_LIB})
+    target_compile_definitions(piper-tts PRIVATE HAVE_ACCELERATE ACCELERATE_NEW_LAPACK)
+endif()
 
 # Piper reuses the same espeak-ng integration as kokoro.
 if(_espeak_found)

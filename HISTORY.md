@@ -9253,3 +9253,12 @@ stay scalar — not worth BLAS overhead at W=4.
 
 `MELOTTS_FORCE_SCALAR=1` bypasses the BLAS path for debugging.
 Scalar fallback unchanged on non-Apple. All 4 melotts unit tests pass.
+
+## 2026-06-20 §199 Piper-TTS — Accelerate cblas_sgemm for multi-head relative-position attention
+
+Same VITS2 architecture as MeloTTS: `cpu_multihead_attention_relpos` in
+`piper_tts.cpp` had identical O(C²×T) QKV projection loops and O(H×T²×D)
+attention loops. Applied the same three cblas_sgemm paths (QKV projections,
+per-head Q@K^T scores, per-head attn@V accumulation) with relative key/value
+biases staying scalar. `PIPER_FORCE_SCALAR=1` to bypass. All 4 piper unit
+tests pass.

@@ -5497,6 +5497,7 @@ backends at long output sequences.
 - FireRed VAD: DONE — cblas_sgemm for all DFSMN cpu_linear calls (§193 2026-06-20)
 - Parakeet LSTM+joint: DONE — cblas_sgemv for lstm_step_layer + joint_proj_enc + joint_step (§194 2026-06-20)
 - MeloTTS: `cpu_multihead_attention_relpos` O(H×T²×D) × 6 layers — DONE: QKV cblas_sgemm + per-head Q@K^T + attn@V cblas_sgemm (§198); rel-pos window stays scalar (O(T×2W×D)≪O(T²×D))
+- Piper-TTS: same `cpu_multihead_attention_relpos` — DONE: same cblas_sgemm pattern (§199)
 - OpenVoice2 WaveNet: 16 layers × T × K=5 × C=192 → ggml_conv_1d
 - Granite Speech `cpu_linear`: naive dequant matmul → ggml or OMP
 - Nemotron LSTM/joint: same pattern as Parakeet
