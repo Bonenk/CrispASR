@@ -6006,16 +6006,32 @@ extern "C" float* qwen3_tts_run_code_pred_step(struct qwen3_tts_context* ctx, co
     return logits;
 }
 
-extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, const char* text, int* out_n_codes) {
-    if (out_n_codes) {
-        *out_n_codes = 0;
-    }
-    if (!ctx || !text) {
-        return nullptr;
+// Shared talker AR generation loop used by both qwen3_tts_synthesize_codes
+// (whole-clip) and qwen3_tts_synthesize_streaming (windowed). Builds the
+// prefill, runs the talker prefill, then the per-frame loop (1 talker step + 15
+// code_predictor steps), appending each 16-codebook frame to `all_codes`.
+//
+// `on_frame(frame)` is invoked once per completed frame — AFTER that frame's
+// codes are in `all_codes` and the next talker input has been built, but BEFORE
+// the talker forward for the following frame. That is exactly where the
+// streaming path decodes and emits a PCM window. Return false from on_frame to
+// stop early; the caller distinguishes an intentional early stop from a hard
+// failure via its own captured state.
+//
+// Returns false only on hard failure (allocation / inference error); true on
+// any normal termination (EOS / max_frames / kv-full / on_frame-stop).
+// *out_frames receives the number of frames produced. The non-streaming path
+// passes a no-op on_frame, so this loop is byte-identical to the previous
+// inline qwen3_tts_synthesize_codes body for the codes it produces.
+template <typename OnFrame>
+static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text, std::vector<int32_t>& all_codes,
+                                        int* out_frames, OnFrame on_frame) {
+    if (out_frames) {
+        *out_frames = 0;
     }
     if (ctx->vocab.id_to_token.empty()) {
         fprintf(stderr, "qwen3_tts: vocab empty — re-convert with the updated converter\n");
-        return nullptr;
+        return false;
     }
     const bool is_custom_voice = (ctx->hp.tts_model_type == "custom_voice");
     const bool is_voice_design = (ctx->hp.tts_model_type == "voice_design");
@@ -6023,13 +6039,13 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
         // CustomVoice: need a fixed speaker selected via set_speaker_by_name.
         if ((int)ctx->runtime_spk_emb.size() != (int)ctx->hp.d_model) {
             fprintf(stderr, "qwen3_tts: no speaker — call qwen3_tts_set_speaker_by_name\n");
-            return nullptr;
+            return false;
         }
     } else if (is_voice_design) {
         // VoiceDesign: need a non-empty natural-language instruct.
         if (ctx->runtime_instruct.empty()) {
             fprintf(stderr, "qwen3_tts: VoiceDesign needs a voice description — call qwen3_tts_set_instruct\n");
-            return nullptr;
+            return false;
         }
     } else {
         // Base: need either a voice pack, a runtime voice prompt with ref_codes,
@@ -6037,7 +6053,7 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
         if (ctx->vp_active < 0 && ctx->runtime_ref_codes.empty() &&
             !(ctx->xvec_only && (int)ctx->runtime_spk_emb.size() == (int)ctx->hp.d_model)) {
             fprintf(stderr, "qwen3_tts: no voice — call qwen3_tts_load_voice_pack or qwen3_tts_set_voice_prompt\n");
-            return nullptr;
+            return false;
         }
     }
 
@@ -6069,11 +6085,11 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
     int T_pre = 0, M_trail = 0;
     if (is_custom_voice) {
         if (!build_customvoice_prefill_embeds(ctx, text, prefill, T_pre, trailing, M_trail)) {
-            return nullptr;
+            return false;
         }
     } else if (is_voice_design) {
         if (!build_voicedesign_prefill_embeds(ctx, ctx->runtime_instruct, text, prefill, T_pre, trailing, M_trail)) {
-            return nullptr;
+            return false;
         }
     } else {
         std::string ref_text;
@@ -6089,11 +6105,11 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
                 fprintf(
                     stderr,
                     "qwen3_tts: no ref_text — call qwen3_tts_set_voice_prompt with ref_text or load a voice pack\n");
-                return nullptr;
+                return false;
             }
         }
         if (!build_icl_prefill_embeds(ctx, text, ref_text, prefill, T_pre, trailing, M_trail)) {
-            return nullptr;
+            return false;
         }
     }
     if (bench) {
@@ -6111,7 +6127,7 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
     if (!logits || !past_hidden) {
         free(logits);
         free(past_hidden);
-        return nullptr;
+        return false;
     }
     if (bench) {
         fprintf(stderr, "qwen3_tts: talker_pre %7.1f ms\n", now_ms() - t1);
@@ -6133,10 +6149,10 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
         fprintf(stderr, "qwen3_tts: cp_kv allocation failed\n");
         free(logits);
         free(past_hidden);
-        return nullptr;
+        return false;
     }
 
-    std::vector<int32_t> all_codes; // flattened (T_frames, 16)
+    all_codes.clear();
     all_codes.reserve((size_t)max_frames * n_groups);
 
     double t_loop = bench ? now_ms() : 0.0;
@@ -6193,13 +6209,13 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
         if (embd_cache_enabled && ctx->token_embd_cache) {
             if (!ctx->token_embd_cache.get_row_into(cb0, last_id_hidden_buf.data())) {
                 free(past_hidden);
-                return nullptr;
+                return false;
             }
         } else {
             float* tmp = lookup_rows(ctx, ctx->talker.token_embd_w, &cb0, 1);
             if (!tmp) {
                 free(past_hidden);
-                return nullptr;
+                return false;
             }
             std::memcpy(last_id_hidden_buf.data(), tmp, (size_t)d * sizeof(float));
             free(tmp);
@@ -6212,7 +6228,7 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
         const double t_cp = bench ? now_ms() : 0.0;
         if (!code_pred_generate_15(ctx, past_hidden, last_id_hidden_buf.data(), cb1_15, &rng, frame)) {
             free(past_hidden);
-            return nullptr;
+            return false;
         }
         if (bench) {
             t_loop_code_pred += now_ms() - t_cp;
@@ -6251,7 +6267,7 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
                     }
                 }
                 if (!ok) {
-                    return nullptr;
+                    return false;
                 }
                 for (int j = 0; j < d; j++) {
                     next_emb[j] += next_emb_row_buf[j];
@@ -6279,6 +6295,13 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
                     next_emb[1], next_emb[2], next_emb[3], s);
         }
 
+        // Per-frame hook: the streaming path decodes + emits a PCM window here.
+        // A false return means "stop now" (e.g. the streaming decode failed);
+        // the caller inspects its own state to tell stop-vs-failure apart.
+        if (!on_frame(frame)) {
+            break;
+        }
+
         // 6. Talker forward on the (1, d) input → next logits + hidden_last.
         if (n_past >= ctx->kv_max_ctx - 1) {
             fprintf(stderr, "qwen3_tts: talker kv cache full at frame %d (n_past=%d)\n", frame, n_past);
@@ -6292,7 +6315,7 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
         if (!logits || !past_hidden) {
             free(logits);
             free(past_hidden);
-            return nullptr;
+            return false;
         }
         n_past += 1;
     }
@@ -6315,8 +6338,32 @@ extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, co
         dump_i32(dump_dir, "generated_codes", all_codes.data(), all_codes.size());
     }
 
-    *out_n_codes = (int)all_codes.size();
+    if (out_frames) {
+        *out_frames = frame;
+    }
+    return true;
+}
+
+extern "C" int32_t* qwen3_tts_synthesize_codes(struct qwen3_tts_context* ctx, const char* text, int* out_n_codes) {
+    if (out_n_codes) {
+        *out_n_codes = 0;
+    }
+    if (!ctx || !text) {
+        return nullptr;
+    }
+    std::vector<int32_t> all_codes;
+    int frames = 0;
+    // No-op per-frame hook: collect the whole clip, then return the codes.
+    if (!qwen3_tts_generate_codes_ar(ctx, text, all_codes, &frames, [](int) { return true; })) {
+        return nullptr;
+    }
+    if (out_n_codes) {
+        *out_n_codes = (int)all_codes.size();
+    }
     int32_t* out = (int32_t*)malloc(all_codes.size() * sizeof(int32_t));
+    if (!out) {
+        return nullptr;
+    }
     std::memcpy(out, all_codes.data(), all_codes.size() * sizeof(int32_t));
     return out;
 }
@@ -6562,116 +6609,16 @@ extern "C" float* qwen3_tts_synthesize_streaming(struct qwen3_tts_context* ctx, 
         overlap_frames = 96;
     }
 
-    const bool is_custom_voice = (ctx->hp.tts_model_type == "custom_voice");
-    const bool is_voice_design = (ctx->hp.tts_model_type == "voice_design");
-    if (is_custom_voice) {
-        if ((int)ctx->runtime_spk_emb.size() != (int)ctx->hp.d_model) {
-            fprintf(stderr, "qwen3_tts: no speaker — call qwen3_tts_set_speaker_by_name\n");
-            return nullptr;
-        }
-    } else if (is_voice_design) {
-        if (ctx->runtime_instruct.empty()) {
-            fprintf(stderr, "qwen3_tts: VoiceDesign needs a voice description — call qwen3_tts_set_instruct\n");
-            return nullptr;
-        }
-    } else {
-        if (ctx->vp_active < 0 && ctx->runtime_ref_codes.empty() &&
-            !(ctx->xvec_only && (int)ctx->runtime_spk_emb.size() == (int)ctx->hp.d_model)) {
-            fprintf(stderr, "qwen3_tts: no voice — call qwen3_tts_load_voice_pack or qwen3_tts_set_voice_prompt\n");
-            return nullptr;
-        }
-    }
-
     const bool bench = env_bool("QWEN3_TTS_BENCH");
-    const bool dbg = env_bool("QWEN3_TTS_DEBUG");
-    const char* dump_dir = env_str("QWEN3_TTS_DUMP_DIR");
     const auto& hp = ctx->hp;
-    const int d = (int)hp.d_model;
     const int n_groups = (int)hp.n_code_groups; // 16
     const int n_q = (int)ctx->codec.hp.n_q;
-    int max_frames = ctx->params.max_codec_steps > 0 ? ctx->params.max_codec_steps : 1500;
-    if (const char* mf = getenv("QWEN3_TTS_MAX_FRAMES")) {
-        const int v = std::atoi(mf);
-        if (v > 0)
-            max_frames = v;
-    }
-    const int eos = (int)hp.codec_eos_id;
 
-    uint64_t rng = 42;
-    if (const char* s = env_str("QWEN3_TTS_SEED")) {
-        rng = (uint64_t)std::strtoull(s, nullptr, 10);
-    }
-    if (ctx->params.seed != 0)
-        rng = ctx->params.seed;
-
-    // ---- prefill builder: identical to qwen3_tts_synthesize_codes ----
-    double t0 = bench ? now_ms() : 0.0;
-    std::vector<float> prefill, trailing;
-    int T_pre = 0, M_trail = 0;
-    if (is_custom_voice) {
-        if (!build_customvoice_prefill_embeds(ctx, text, prefill, T_pre, trailing, M_trail)) {
-            return nullptr;
-        }
-    } else if (is_voice_design) {
-        if (!build_voicedesign_prefill_embeds(ctx, ctx->runtime_instruct, text, prefill, T_pre, trailing, M_trail)) {
-            return nullptr;
-        }
-    } else {
-        std::string ref_text;
-        if (!ctx->runtime_ref_text.empty()) {
-            ref_text = ctx->runtime_ref_text;
-        } else if (ctx->vp_active >= 0) {
-            ref_text = ctx->vp_ref_texts[ctx->vp_active];
-        }
-        if (ref_text.empty()) {
-            if (ctx->xvec_only) {
-                ref_text = ".";
-            } else {
-                fprintf(stderr,
-                        "qwen3_tts: no ref_text — call qwen3_tts_set_voice_prompt with ref_text or load a voice pack\n");
-                return nullptr;
-            }
-        }
-        if (!build_icl_prefill_embeds(ctx, text, ref_text, prefill, T_pre, trailing, M_trail)) {
-            return nullptr;
-        }
-    }
-    if (bench) {
-        const char* label = is_custom_voice ? "customvoice" : (is_voice_design ? "voicedesign" : "icl");
-        fprintf(stderr, "qwen3_tts: [stream] prefill %7.1f ms (T=%d, %s)\n", now_ms() - t0, T_pre, label);
-    }
-
-    // ---- talker prefill: get logits + hidden_last ----
-    double t1 = bench ? now_ms() : 0.0;
-    float* past_hidden = nullptr;
-    float* logits = run_talker_kv(ctx, prefill.data(), T_pre, /*n_past=*/0, &past_hidden);
-    if (!logits || !past_hidden) {
-        free(logits);
-        free(past_hidden);
-        return nullptr;
-    }
-    if (bench) {
-        fprintf(stderr, "qwen3_tts: [stream] talker_pre %7.1f ms\n", now_ms() - t1);
-    }
-
-    int n_past = T_pre;
-    const bool embd_cache_enabled = !env_bool("QWEN3_TTS_NO_EMBD_CACHE");
-
-    if (!cp_kv_alloc(ctx)) {
-        fprintf(stderr, "qwen3_tts: cp_kv allocation failed\n");
-        free(logits);
-        free(past_hidden);
-        return nullptr;
-    }
-
+    // Streaming output state, shared with the per-frame emit hook below.
     std::vector<int32_t> all_codes; // flattened (T_frames, 16)
-    all_codes.reserve((size_t)max_frames * n_groups);
-
-    // Streaming output state.
-    std::vector<float> full_pcm;      // concatenated emitted PCM (return value)
-    int frames_emitted = 0;           // frames whose PCM has already been pushed
-    const int frame_samples = 1920;   // 24 kHz / 12.5 Hz codec rate
-    full_pcm.reserve((size_t)max_frames * frame_samples);
+    std::vector<float> full_pcm;    // concatenated emitted PCM (return value)
+    int frames_emitted = 0;         // frames whose PCM has already been pushed
+    const int frame_samples = 1920; // 24 kHz / 12.5 Hz codec rate
 
     // Decode the window [emit_lo .. n_frames) and emit the tail (frames
     // [frames_emitted .. n_frames)), discarding the left-context pre-roll.
@@ -6713,113 +6660,19 @@ extern "C" float* qwen3_tts_synthesize_streaming(struct qwen3_tts_context* ctx, 
         return true;
     };
 
-    double t_loop = bench ? now_ms() : 0.0;
+    // Per-frame hook driven by the shared AR loop: every chunk_frames new
+    // frames, decode + emit a window. Returns false to stop the loop on a
+    // decode failure (signalled to the caller via emit_failed).
+    double t0 = bench ? now_ms() : 0.0;
     double t_codec = 0.0;
     bool first_chunk_logged = false;
-    int frame = 0;
     bool emit_failed = false;
-    const int talker_top_k = 50;
-    const float talker_temp = 0.9f;
-    const float talker_repetition_penalty = 1.05f;
-    const int min_new_frames = 2;
-    const int suppress_lo = (int)hp.vocab_size - 1024;
-    std::vector<int32_t> talker_history;
-    talker_history.reserve((size_t)max_frames);
-    std::vector<float> last_id_hidden_buf(d);
-    std::vector<float> next_emb_row_buf(d);
-    std::vector<float> next_emb(d, 0.0f);
-    for (frame = 0; frame < max_frames; frame++) {
-        apply_repetition_penalty(logits, (int)hp.vocab_size, talker_history, talker_repetition_penalty);
-        for (int i = suppress_lo; i < (int)hp.vocab_size; i++) {
-            if (i != eos) {
-                logits[i] = -INFINITY;
-            }
-        }
-        if (frame < min_new_frames) {
-            logits[eos] = -INFINITY;
-        }
-        int cb0 = top_k_sample(logits, (int)hp.vocab_size, talker_top_k, talker_temp, &rng);
-        free(logits);
-        logits = nullptr;
-        if (cb0 == eos) {
-            if (dbg) {
-                fprintf(stderr, "qwen3_tts: [stream] codec_eos at frame %d\n", frame);
-            }
-            free(past_hidden);
-            past_hidden = nullptr;
-            break;
-        }
-        talker_history.push_back(cb0);
-        if (embd_cache_enabled && ctx->token_embd_cache) {
-            if (!ctx->token_embd_cache.get_row_into(cb0, last_id_hidden_buf.data())) {
-                free(past_hidden);
-                return nullptr;
-            }
-        } else {
-            float* tmp = lookup_rows(ctx, ctx->talker.token_embd_w, &cb0, 1);
-            if (!tmp) {
-                free(past_hidden);
-                return nullptr;
-            }
-            std::memcpy(last_id_hidden_buf.data(), tmp, (size_t)d * sizeof(float));
-            free(tmp);
-        }
-        int32_t cb1_15[15];
-        if (!code_pred_generate_15(ctx, past_hidden, last_id_hidden_buf.data(), cb1_15, &rng, frame)) {
-            free(past_hidden);
-            return nullptr;
-        }
-        free(past_hidden);
-        past_hidden = nullptr;
-
-        all_codes.push_back(cb0);
-        for (int i = 0; i < 15; i++) {
-            all_codes.push_back(cb1_15[i]);
-        }
-
-        std::fill(next_emb.data(), next_emb.data() + d, 0.0f);
-        {
-            for (int cb = 0; cb < n_groups; cb++) {
-                int32_t code = (cb == 0) ? cb0 : cb1_15[cb - 1];
-                bool ok = false;
-                if (embd_cache_enabled && cb == 0 && ctx->token_embd_cache) {
-                    ok = ctx->token_embd_cache.get_row_into(code, next_emb_row_buf.data());
-                } else if (embd_cache_enabled && cb > 0 && cb - 1 < (int)ctx->codec_embd_cache.size() &&
-                           ctx->codec_embd_cache[cb - 1]) {
-                    ok = ctx->codec_embd_cache[cb - 1].get_row_into(code, next_emb_row_buf.data());
-                } else {
-                    ggml_tensor* w = (cb == 0) ? ctx->talker.token_embd_w : ctx->code_pred.codec_embd[cb - 1];
-                    float* row = lookup_rows(ctx, w, &code, 1);
-                    if (row) {
-                        std::memcpy(next_emb_row_buf.data(), row, (size_t)d * sizeof(float));
-                        free(row);
-                        ok = true;
-                    }
-                }
-                if (!ok) {
-                    free(past_hidden);
-                    return nullptr;
-                }
-                for (int j = 0; j < d; j++) {
-                    next_emb[j] += next_emb_row_buf[j];
-                }
-            }
-        }
-
-        const int trail_idx = std::min(frame, M_trail - 1);
-        const float* trail = trailing.data() + (size_t)trail_idx * d;
-        for (int j = 0; j < d; j++) {
-            next_emb[j] += trail[j];
-        }
-
-        // ---- streaming emit: every chunk_frames new frames ----
+    auto on_frame = [&](int frame) -> bool {
         if ((frame + 1) - frames_emitted >= chunk_frames) {
             const double tc = bench ? now_ms() : 0.0;
             if (!emit_window(frame + 1, /*is_final=*/false)) {
                 emit_failed = true;
-                free(past_hidden);
-                past_hidden = nullptr;
-                break;
+                return false;
             }
             if (bench) {
                 t_codec += now_ms() - tc;
@@ -6830,22 +6683,13 @@ extern "C" float* qwen3_tts_synthesize_streaming(struct qwen3_tts_context* ctx, 
                 }
             }
         }
+        return true;
+    };
 
-        if (n_past >= ctx->kv_max_ctx - 1) {
-            fprintf(stderr, "qwen3_tts: [stream] talker kv cache full at frame %d (n_past=%d)\n", frame, n_past);
-            break;
-        }
-        logits = run_talker_kv(ctx, next_emb.data(), 1, n_past, &past_hidden);
-        if (!logits || !past_hidden) {
-            free(logits);
-            free(past_hidden);
-            return nullptr;
-        }
-        n_past += 1;
+    int frames = 0;
+    if (!qwen3_tts_generate_codes_ar(ctx, text, all_codes, &frames, on_frame)) {
+        return nullptr;
     }
-    free(logits);
-    free(past_hidden);
-
     if (emit_failed) {
         return nullptr;
     }
@@ -6859,19 +6703,13 @@ extern "C" float* qwen3_tts_synthesize_streaming(struct qwen3_tts_context* ctx, 
         }
         if (bench) {
             t_codec += now_ms() - tc;
+            fprintf(stderr, "qwen3_tts: [stream] codec %7.1f ms (final emit incl.)\n", t_codec);
         }
     }
 
-    if (bench) {
-        fprintf(stderr, "qwen3_tts: [stream] ar_loop %7.1f ms (%d frames)  codec %7.1f ms\n", now_ms() - t_loop, frame,
-                t_codec);
-    }
     if (ctx->params.verbosity >= 1) {
         fprintf(stderr, "qwen3_tts: [stream] produced %d frames × 16 codebooks → %zu samples\n", total_frames,
                 full_pcm.size());
-    }
-    if (dump_dir && !all_codes.empty()) {
-        dump_i32(dump_dir, "generated_codes", all_codes.data(), all_codes.size());
     }
 
     if (full_pcm.empty()) {

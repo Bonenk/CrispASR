@@ -1542,6 +1542,17 @@ set_tests_properties(test-server-wyoming PROPERTIES
     LABELS "live;server;wyoming"
     TIMEOUT 300)
 
+# ─── test-server-tts — live: /v1/audio/speech + /v1/voices smoke, incl. the
+# PR #177 streaming path (stream=true per-chunk PCM, mp3 rejection, log marker).
+# Needs a qwen3-tts CustomVoice GGUF + tokenizer (set CRISPASR_MODELS); SKIPs
+# (exit 0) otherwise.
+add_test(NAME test-server-tts
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-server-tts.sh
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-server-tts PROPERTIES
+    LABELS "live;server;tts"
+    TIMEOUT 600)
+
 # ─── test-release-workflow — validate release.yml targets (issue #131).
 # Static test: no binary or model needed, just parses YAML.
 add_test(NAME test-release-workflow
