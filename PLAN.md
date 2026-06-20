@@ -5688,15 +5688,14 @@ alloc per beam expansion step.
 
 #### §176s Encoder graph caching by shape
 
-**Status:** MOSTLY DONE — 9 backends cached.
+**Status:** MOSTLY DONE — 11 backends cached.
 **Effort:** Small-Medium
-**Backends done:** SenseVoice (`1c82bd0d`), Paraformer (`5854c11b`),
-FunASR (prior), Nemotron (`059bbe06`), Canary (prior), Canary-CTC
-(`6f88c0e0`), Moonshine (`095103d8`), Parakeet (`434df71c`), Qwen3-ASR
-(`69ad7d05`). GLM-ASR in progress (parallel agent).
-**Remaining:** OmniASR (encoder+decoder fused in one graph — complex),
-Moonshine-Streaming (per-chunk graph, streaming state), MOSS Audio,
-Voxtral/4B, Granite Speech, Kyutai STT (all >1.5 GB models, GPU-only benefit).
+**Backends done:** SenseVoice, Paraformer, FunASR, Nemotron, Canary,
+Canary-CTC, Moonshine, Moonshine-Streaming (`b0e6667b`), Parakeet,
+Qwen3-ASR, GLM-ASR.
+**Remaining:** OmniASR (encoder+decoder fused in one graph — needs
+refactor to split), MOSS Audio / Voxtral / Voxtral4B / Granite Speech /
+Kyutai STT (all >1.5 GB models, GPU-only benefit).
 **Approach:** Metadata-swap technique: swap `compute_meta` with a
 persistent `cached_enc_meta` before calling the graph builder, swap
 back after. The cached graph arena persists across calls. Invalidate
