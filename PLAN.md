@@ -6813,3 +6813,18 @@ Fix: `read_f32` now dequantizes any type via
 graph) already dequantized fine. q8 now matches F32: en 0.878 (F32 0.870), zh
 1.000 (=), de→lb 0.473 (0.481). q8 GGUF 24 MB vs 42 MB F32 (43% smaller), now
 usable — no quantizer change or model re-export needed. (Builds on §188.)
+
+## §191 titanet — Accelerate GEMM speaker-embedding forward — DONE 2026-06-20
+
+TitaNet-Large (diarization speaker embedder) ran its whole forward as
+hand-rolled CPU scalar loops. GEMM'd the three matmul hotspots with
+cblas_sgemm: the 1×1 pointwise convs (per sub-block + residual), the ASP TDNN
+(128×9216×T) and attention conv (3072×128×T). Scalar fallback kept;
+TITANET_FORCE_SCALAR=1 bypasses. Also wired the orphaned tests/test-titanet.cpp
+into CMake as a live smoke/equivalence check.
+
+Validation (M1, titanet-large.gguf): GEMM == scalar (embeddings ~1e-5;
+cosine-sim matrix identical across jfk/de/en — cross-speaker 0.004/0.10/0.014).
+Embed of an 11 s clip 49.05 s → 1.41 s wall (~35×; forward ~50×). 484 unit
+tests pass. Same family/pattern as §188/§190 (ecapa). The encoder here was also
+scalar (ecapa's ran in a ggml graph), so the win is larger.

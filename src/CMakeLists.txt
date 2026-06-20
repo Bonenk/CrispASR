@@ -1062,6 +1062,14 @@ set_target_properties(titanet PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(titanet PUBLIC .)
 target_compile_features   (titanet PUBLIC cxx_std_17)
 target_link_libraries     (titanet PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(APPLE)
+    # Accelerate cblas_sgemm for the (CPU-scalar) speaker-embedding forward.
+    if(NOT ACCELERATE_LIB)
+        find_library(ACCELERATE_LIB Accelerate REQUIRED)
+    endif()
+    target_link_libraries(titanet PUBLIC ${ACCELERATE_LIB})
+    target_compile_definitions(titanet PRIVATE HAVE_ACCELERATE ACCELERATE_NEW_LAPACK)
+endif()
 
 # ---------------------------------------------------------------------------
 # vibevoice — Microsoft VibeVoice-ASR (σ-VAE tokenizers + Qwen2 LM)

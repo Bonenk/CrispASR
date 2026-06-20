@@ -18,6 +18,10 @@
 #include "ggml.h"
 #include "gguf.h"
 
+#if defined(HAVE_ACCELERATE)
+#include <Accelerate/Accelerate.h>
+#endif
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -27,6 +31,19 @@
 #include <map>
 #include <string>
 #include <vector>
+
+// The TitaNet speaker-embedding forward is entirely hand-rolled CPU scalar
+// math. The pointwise convs (1×1 matmuls) + the ASP TDNN/attention matmuls are
+// the dominant cost. PLAN: Accelerate cblas_sgemm; set TITANET_FORCE_SCALAR=1
+// to validate scalar == GEMM or run on non-Apple.
+static bool titanet_use_scalar() {
+#if defined(HAVE_ACCELERATE)
+    static const bool force_scalar = std::getenv("TITANET_FORCE_SCALAR") != nullptr;
+    return force_scalar;
+#else
+    return true;
+#endif
+}
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -570,6 +587,14 @@ static std::vector<float> depthwise_conv1d(const float* input, int C, int T, con
 // Pointwise Conv1d (k=1): matmul. Input [C_in, T], weight [C_out, C_in] → [C_out, T]
 static std::vector<float> pointwise_conv1d(const float* input, int C_in, int T, const float* weight, int C_out) {
     std::vector<float> out((size_t)C_out * T, 0.0f);
+#if defined(HAVE_ACCELERATE)
+    if (!titanet_use_scalar()) {
+        // out[C_out, T] = W[C_out, C_in] @ input[C_in, T]
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, C_out, T, C_in, 1.0f, weight, C_in, input, T, 0.0f,
+                    out.data(), T);
+        return out;
+    }
+#endif
     for (int co = 0; co < C_out; co++) {
         const float* wrow = weight + (size_t)co * C_in;
         float* orow = out.data() + (size_t)co * T;
@@ -727,15 +752,42 @@ extern "C" int titanet_embed(struct titanet_context* ctx, const float* pcm_16k, 
     auto& asp = c.asp;
     int asp_in = C_enc * 3; // 9216
     std::vector<float> asp_h(128 * T, 0.0f);
-    for (int i = 0; i < 128; i++) {
-        for (int t = 0; t < T; t++) {
-            double s = asp.tdnn_b.empty() ? 0.0 : asp.tdnn_b[i];
-            for (int c_ = 0; c_ < C_enc; c_++) {
-                s += x[(size_t)c_ * T + t] * asp.tdnn_w[(size_t)i * asp_in + c_];
-                s += h_mean[c_] * asp.tdnn_w[(size_t)i * asp_in + C_enc + c_];
-                s += h_std[c_] * asp.tdnn_w[(size_t)i * asp_in + 2 * C_enc + c_];
+#if defined(HAVE_ACCELERATE)
+    if (!titanet_use_scalar()) {
+        // asp_h[128, T] = W[128, 9216] @ X[9216, T], X = [x; mean⊗1; std⊗1].
+        std::vector<float> X((size_t)asp_in * T);
+        std::memcpy(X.data(), x.data(), (size_t)C_enc * T * sizeof(float));
+        for (int c_ = 0; c_ < C_enc; c_++) {
+            float* rm = X.data() + (size_t)(C_enc + c_) * T;
+            float* rs = X.data() + (size_t)(2 * C_enc + c_) * T;
+            float vm = h_mean[c_], vs = h_std[c_];
+            for (int t = 0; t < T; t++) {
+                rm[t] = vm;
+                rs[t] = vs;
             }
-            asp_h[(size_t)i * T + t] = (float)s;
+        }
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 128, T, asp_in, 1.0f, asp.tdnn_w.data(), asp_in,
+                    X.data(), T, 0.0f, asp_h.data(), T);
+        if (!asp.tdnn_b.empty())
+            for (int i = 0; i < 128; i++) {
+                float b = asp.tdnn_b[i];
+                float* row = asp_h.data() + (size_t)i * T;
+                for (int t = 0; t < T; t++)
+                    row[t] += b;
+            }
+    } else
+#endif
+    {
+        for (int i = 0; i < 128; i++) {
+            for (int t = 0; t < T; t++) {
+                double s = asp.tdnn_b.empty() ? 0.0 : asp.tdnn_b[i];
+                for (int c_ = 0; c_ < C_enc; c_++) {
+                    s += x[(size_t)c_ * T + t] * asp.tdnn_w[(size_t)i * asp_in + c_];
+                    s += h_mean[c_] * asp.tdnn_w[(size_t)i * asp_in + C_enc + c_];
+                    s += h_std[c_] * asp.tdnn_w[(size_t)i * asp_in + 2 * C_enc + c_];
+                }
+                asp_h[(size_t)i * T + t] = (float)s;
+            }
         }
     }
 
@@ -748,12 +800,28 @@ extern "C" int titanet_embed(struct titanet_context* ctx, const float* pcm_16k, 
 
     // Attention conv: 128 → 3072
     std::vector<float> attn((size_t)C_enc * T, 0.0f);
-    for (int c_ = 0; c_ < C_enc; c_++) {
-        for (int t = 0; t < T; t++) {
-            double s = asp.conv_b.empty() ? 0.0 : asp.conv_b[c_];
-            for (int k = 0; k < 128; k++)
-                s += asp_h[(size_t)k * T + t] * asp.conv_w[(size_t)c_ * 128 + k];
-            attn[(size_t)c_ * T + t] = (float)s;
+#if defined(HAVE_ACCELERATE)
+    if (!titanet_use_scalar()) {
+        // attn[C_enc, T] = W[C_enc, 128] @ asp_h[128, T]
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, C_enc, T, 128, 1.0f, asp.conv_w.data(), 128,
+                    asp_h.data(), T, 0.0f, attn.data(), T);
+        if (!asp.conv_b.empty())
+            for (int c_ = 0; c_ < C_enc; c_++) {
+                float b = asp.conv_b[c_];
+                float* row = attn.data() + (size_t)c_ * T;
+                for (int t = 0; t < T; t++)
+                    row[t] += b;
+            }
+    } else
+#endif
+    {
+        for (int c_ = 0; c_ < C_enc; c_++) {
+            for (int t = 0; t < T; t++) {
+                double s = asp.conv_b.empty() ? 0.0 : asp.conv_b[c_];
+                for (int k = 0; k < 128; k++)
+                    s += asp_h[(size_t)k * T + t] * asp.conv_w[(size_t)c_ * 128 + k];
+                attn[(size_t)c_ * T + t] = (float)s;
+            }
         }
     }
 

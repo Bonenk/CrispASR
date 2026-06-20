@@ -9093,3 +9093,12 @@ CPU-resident Attentive Statistical Pooling head read its weights via a
 zeros → zero embedding → uniform softmax. Generalised `read_f32` to dequantize
 any type via `ggml_get_type_traits(type)->to_float`. q8 now matches F32
 (en/zh/de); 24 MB vs 42 MB F32, fully usable, no re-export. Follows §188.
+
+## 2026-06-20 §191 titanet — Accelerate GEMM speaker-embedding forward (~35×)
+
+TitaNet-Large's entire forward was hand-rolled CPU scalar. GEMM'd the pointwise
+1×1 convs + ASP TDNN (128×9216×T) + attention conv (3072×128×T) via cblas_sgemm
+(scalar fallback; TITANET_FORCE_SCALAR=1 bypass) and wired the orphaned
+test-titanet into CMake. GEMM == scalar (embeddings ~1e-5; cosine matrix
+identical, clean speaker discrimination). 11 s clip embed 49.05 s → 1.41 s
+(~35× wall). 484 unit tests pass. Family of §188/§190 (ecapa).

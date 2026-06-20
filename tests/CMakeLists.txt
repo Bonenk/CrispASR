@@ -356,6 +356,14 @@ catch_discover_tests(test-speaker-cluster
     PROPERTIES LABELS "unit;diarize"
 )
 
+# test-titanet — TitaNet speaker-embedding smoke/live tool. Plain main(); takes
+# <model.gguf> <audio...> and prints embeddings + a cosine-sim matrix. Builds
+# the orphaned smoke test so it can serve as a live check (same-speaker high /
+# cross-speaker low cosine; GEMM vs TITANET_FORCE_SCALAR equivalence).
+add_executable(test-titanet test-titanet.cpp)
+target_include_directories(test-titanet PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-titanet PRIVATE titanet crispasr-core ggml ggml-base ggml-cpu)
+
 # ─── test - punctuation - policy — Catch2 unit tests for punctuation auto - enable
 #policy.Pure logic, no model load.
 add_executable(test-punctuation-policy
