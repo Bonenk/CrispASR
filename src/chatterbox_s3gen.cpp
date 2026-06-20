@@ -2050,25 +2050,69 @@ static std::vector<float> cfm_euler_solve(chatterbox_s3gen_context* c,
     // Prepare mask (all ones)
     std::vector<float> mask_data(T_mel, 1.0f);
 
-    // Build and allocate the UNet graph once before the ODE loop.
-    // ggml_backend_sched_graph_compute_async checks sched->is_alloc: when true
-    // (already allocated) it skips reset+alloc entirely and goes straight to
-    // compute_splits. Calling reset inside run_denoiser would clear is_alloc and
-    // force a full re-alloc on the next call, which is what caused the prior
-    // SIGSEGV (stale backend_buffer pointers after reset on an already-alloc'd graph).
-    ggml_cgraph* gf = build_graph_unet1d(c, T_mel);
-    ggml_backend_sched_reset(c->sched);
-    s3gen_maybe_pin_graph_to_cpu(c, gf, s3gen_subgraph::unet);
-    if (!ggml_backend_sched_alloc_graph(c->sched, gf)) {
-        fprintf(stderr, "s3gen: failed to alloc UNet1D graph\n");
-        return {};
+    // Pre-compute time embeddings for all steps before the Euler loop to avoid
+    // 20× repeated Metal→CPU weight reads (1024×320 + 1024×1024 per call).
+    // For meanflow we also pre-compute r embeddings and the mixer output.
+    auto compute_time_emb = [&](float t) -> std::vector<float> {
+        std::vector<float> emb = sinusoidal_embedding(t, 320);
+        ggml_tensor* tm1_w = T(c, "s3.fd.tm.linear_1.weight");
+        ggml_tensor* tm1_b = T(c, "s3.fd.tm.linear_1.bias");
+        ggml_tensor* tm2_w = T(c, "s3.fd.tm.linear_2.weight");
+        ggml_tensor* tm2_b = T(c, "s3.fd.tm.linear_2.bias");
+        if (!tm1_w || !tm2_w)
+            return emb;
+        std::vector<float> w1(1024 * 320), b1(1024, 0.0f);
+        std::vector<float> w2(1024 * 1024), b2(1024, 0.0f);
+        tensor_get_f32(tm1_w, w1.data(), 0, w1.size());
+        if (tm1_b)
+            tensor_get_f32(tm1_b, b1.data(), 0, b1.size());
+        tensor_get_f32(tm2_w, w2.data(), 0, w2.size());
+        if (tm2_b)
+            tensor_get_f32(tm2_b, b2.data(), 0, b2.size());
+        std::vector<float> h1(1024);
+        for (int i = 0; i < 1024; i++) {
+            float sum = b1[i];
+            for (int j = 0; j < 320; j++)
+                sum += w1[i * 320 + j] * emb[j];
+            float sig = 1.0f / (1.0f + std::exp(-sum));
+            h1[i] = sum * sig;
+        }
+        emb.resize(1024);
+        for (int i = 0; i < 1024; i++) {
+            float sum = b2[i];
+            for (int j = 0; j < 1024; j++)
+                sum += w2[i * 1024 + j] * h1[j];
+            emb[i] = sum;
+        }
+        return emb;
+    };
+    // t_embs[step] = time embedding for t_span[step]; for meanflow also r_embs + mixed
+    std::vector<std::vector<float>> t_embs(n_steps);
+    std::vector<std::vector<float>> r_embs(meanflow ? n_steps : 0);
+    std::vector<std::vector<float>> mixed_embs(meanflow ? n_steps : 0);
+    // Load mixer weights once (meanflow only)
+    std::vector<float> tmx_w_data;
+    ggml_tensor* tmx_w_ptr = meanflow ? T(c, "s3.fd.tmx.weight") : nullptr;
+    if (tmx_w_ptr) {
+        tmx_w_data.resize(1024 * 2048);
+        tensor_get_f32(tmx_w_ptr, tmx_w_data.data(), 0, tmx_w_data.size());
     }
-    {
-        static int unet_diag_seen = 0;
-        if (!unet_diag_seen && (c->verbosity >= 2 || s3gen_env_force_cpu(s3gen_subgraph::unet))) {
-            fprintf(stderr, "s3gen: [unet post-alloc] n_splits=%d (pin=%d)\n",
-                    ggml_backend_sched_get_n_splits(c->sched), s3gen_env_force_cpu(s3gen_subgraph::unet) ? 1 : 0);
-            unet_diag_seen = 1;
+    for (int step = 0; step < n_steps; step++) {
+        t_embs[step] = compute_time_emb(t_span[step]);
+        if (meanflow) {
+            r_embs[step] = compute_time_emb(t_span[step + 1]);
+            std::vector<float> concat(2048);
+            std::memcpy(concat.data(), t_embs[step].data(), 1024 * sizeof(float));
+            std::memcpy(concat.data() + 1024, r_embs[step].data(), 1024 * sizeof(float));
+            mixed_embs[step].resize(1024, 0.0f);
+            if (!tmx_w_data.empty()) {
+                for (int i = 0; i < 1024; i++) {
+                    float sum = 0.0f;
+                    for (int j = 0; j < 2048; j++)
+                        sum += tmx_w_data[i * 2048 + j] * concat[j];
+                    mixed_embs[step][i] = sum;
+                }
+            }
         }
     }
 
@@ -2076,6 +2120,10 @@ static std::vector<float> cfm_euler_solve(chatterbox_s3gen_context* c,
     for (int step = 0; step < n_steps; step++) {
         float t_val = t_span[step];
         float r_val = t_span[step + 1];
+        // Rebuild the graph each step — gallocr's alloc state is tied to the
+        // tensor backend_buffer fields and cannot safely survive a reset on
+        // a previously-alloc'd graph (stale pointers crash the next alloc).
+        ggml_cgraph* gf = build_graph_unet1d(c, T_mel);
         float dt = r_val - t_val;
 
         // Build conditioned input: [x, mu, spks, cond] concatenated along channels
@@ -2101,74 +2149,23 @@ static std::vector<float> cfm_euler_solve(chatterbox_s3gen_context* c,
             }
         }
 
-        // Time embedding: sinusoidal(320) → MLP(320→1024→1024)
-        // For meanflow: also compute r embedding and mix via time_embed_mixer
-        std::vector<float> t_sin = sinusoidal_embedding(t_val, 320);
-        // Helper: run time MLP (shared for t and r)
-        auto time_mlp = [&](std::vector<float>& emb) {
-            ggml_tensor* tm1_w = T(c, "s3.fd.tm.linear_1.weight");
-            ggml_tensor* tm1_b = T(c, "s3.fd.tm.linear_1.bias");
-            ggml_tensor* tm2_w = T(c, "s3.fd.tm.linear_2.weight");
-            ggml_tensor* tm2_b = T(c, "s3.fd.tm.linear_2.bias");
-            if (!tm1_w || !tm2_w)
-                return;
-            std::vector<float> w1(1024 * 320), b1(1024, 0.0f);
-            std::vector<float> w2(1024 * 1024), b2(1024, 0.0f);
-            tensor_get_f32(tm1_w, w1.data(), 0, w1.size());
-            if (tm1_b)
-                tensor_get_f32(tm1_b, b1.data(), 0, b1.size());
-            tensor_get_f32(tm2_w, w2.data(), 0, w2.size());
-            if (tm2_b)
-                tensor_get_f32(tm2_b, b2.data(), 0, b2.size());
-            std::vector<float> h1(1024);
-            for (int i = 0; i < 1024; i++) {
-                float sum = b1[i];
-                for (int j = 0; j < 320; j++)
-                    sum += w1[i * 320 + j] * emb[j];
-                h1[i] = sum;
-            }
-            // SiLU: x * sigmoid(x)
-            for (int i = 0; i < 1024; i++) {
-                float sig = 1.0f / (1.0f + std::exp(-h1[i]));
-                h1[i] = h1[i] * sig;
-            }
-            emb.resize(1024);
-            for (int i = 0; i < 1024; i++) {
-                float sum = b2[i];
-                for (int j = 0; j < 1024; j++)
-                    sum += w2[i * 1024 + j] * h1[j];
-                emb[i] = sum;
-            }
-        };
-        time_mlp(t_sin); // t_sin is now (1024,) t embedding
-
-        if (meanflow) {
-            // Meanflow: compute r embedding, concat with t, mix
-            std::vector<float> r_emb = sinusoidal_embedding(r_val, 320);
-            time_mlp(r_emb); // r_emb is now (1024,) r embedding
-            // Concat [t_emb, r_emb] → (2048,)
-            std::vector<float> concat(2048);
-            std::memcpy(concat.data(), t_sin.data(), 1024 * sizeof(float));
-            std::memcpy(concat.data() + 1024, r_emb.data(), 1024 * sizeof(float));
-            // time_embed_mixer: linear(2048 → 1024)
-            ggml_tensor* tmx_w = T(c, "s3.fd.tmx.weight");
-            if (tmx_w) {
-                std::vector<float> w(1024 * 2048);
-                tensor_get_f32(tmx_w, w.data(), 0, w.size());
-                for (int i = 0; i < 1024; i++) {
-                    float sum = 0.0f;
-                    for (int j = 0; j < 2048; j++)
-                        sum += w[i * 2048 + j] * concat[j];
-                    t_sin[i] = sum;
-                }
-            }
-        }
+        // Time embedding — use pre-computed value (avoids 20× Metal→CPU weight reads).
+        std::vector<float> t_sin = meanflow ? mixed_embs[step] : t_embs[step];
 
         // Helper: run denoiser with given input, return velocity.
-        // Graph is pre-built and pre-allocated before this loop (sched->is_alloc=true).
-        // ggml_backend_sched_graph_compute_async detects is_alloc and skips reset+alloc,
-        // going directly to compute_splits. Only input tensor data is updated each call.
         auto run_denoiser = [&](const std::vector<float>& input) -> std::vector<float> {
+            ggml_backend_sched_reset(c->sched);
+            s3gen_maybe_pin_graph_to_cpu(c, gf, s3gen_subgraph::unet);
+            if (!ggml_backend_sched_alloc_graph(c->sched, gf)) {
+                fprintf(stderr, "s3gen: failed to alloc UNet1D graph\n");
+                return {};
+            }
+            static int unet_diag_seen = 0;
+            if (!unet_diag_seen && (c->verbosity >= 2 || s3gen_env_force_cpu(s3gen_subgraph::unet))) {
+                fprintf(stderr, "s3gen: [unet post-alloc] n_splits=%d (pin=%d)\n",
+                        ggml_backend_sched_get_n_splits(c->sched), s3gen_env_force_cpu(s3gen_subgraph::unet) ? 1 : 0);
+                unet_diag_seen = 1;
+            }
             ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "unet_input"), input.data(), 0,
                                     input.size() * sizeof(float));
             ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "time_emb"), t_sin.data(), 0,
@@ -2300,9 +2297,6 @@ static std::vector<float> cfm_euler_solve(chatterbox_s3gen_context* c,
             fprintf(stderr, "s3gen[dump]: velocity_rms=%.4f\n", v_rms);
         }
     }
-
-    // Release the graph allocation so subsequent sched users start clean.
-    ggml_backend_sched_reset(c->sched);
 
     return x;
 }
