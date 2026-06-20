@@ -144,6 +144,20 @@ struct vibevoice_context {
     ggml_cgraph* pred_graph = nullptr;
     int pred_graph_n_frames = 0;
     std::vector<uint8_t> pred_graph_meta;
+    // §201 Lk-bucketed TTS LM step graphs (positive + negative KV paths)
+    struct LmBucket {
+        int lk = 0;
+        ggml_context* ctx = nullptr;
+        std::vector<uint8_t> meta;
+        ggml_cgraph* gf = nullptr;
+    };
+    static constexpr int kLmNBuckets = 4;
+    static constexpr int kLmBucketLks[kLmNBuckets] = {128, 256, 512, 1024};
+    std::array<LmBucket, kLmNBuckets> lm_buckets_pos{};
+    std::array<LmBucket, kLmNBuckets> lm_buckets_neg{};
+    ggml_backend_sched_t lm_step_sched = nullptr;
+    int lm_active_bucket_pos = -1;
+    int lm_active_bucket_neg = -1;
 };
 
 // ===========================================================================
@@ -365,6 +379,14 @@ extern "C" void vibevoice_free(struct vibevoice_context* ctx) {
         return;
     if (ctx->pred_graph_ctx)
         ggml_free(ctx->pred_graph_ctx);
+    for (auto& bk : ctx->lm_buckets_pos)
+        if (bk.ctx)
+            ggml_free(bk.ctx);
+    for (auto& bk : ctx->lm_buckets_neg)
+        if (bk.ctx)
+            ggml_free(bk.ctx);
+    if (ctx->lm_step_sched)
+        ggml_backend_sched_free(ctx->lm_step_sched);
     if (ctx->kv_neg_buf)
         ggml_backend_buffer_free(ctx->kv_neg_buf);
     if (ctx->kv_neg_ctx)
@@ -3831,6 +3853,23 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
         ggml_backend_tensor_alloc(ctx->kv_neg_buf, ctx->kv_neg_k, base_neg);
         ggml_backend_tensor_alloc(ctx->kv_neg_buf, ctx->kv_neg_v, base_neg + k_size);
         ctx->kv_max_ctx = max_ctx;
+        // Bucket graphs embed kv_k/kv_v pointers — invalidate when KV is reallocated.
+        for (auto& bk : ctx->lm_buckets_pos) {
+            if (bk.ctx) {
+                ggml_free(bk.ctx);
+                bk.ctx = nullptr;
+            }
+            bk.gf = nullptr;
+        }
+        for (auto& bk : ctx->lm_buckets_neg) {
+            if (bk.ctx) {
+                ggml_free(bk.ctx);
+                bk.ctx = nullptr;
+            }
+            bk.gf = nullptr;
+        }
+        ctx->lm_active_bucket_pos = -1;
+        ctx->lm_active_bucket_neg = -1;
     }
     ggml_backend_buffer_clear(ctx->kv_buf, 0);
     ggml_backend_buffer_clear(ctx->kv_neg_buf, 0);
@@ -3921,6 +3960,153 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
         }
     }
 
+    // §201: lazy-init a dedicated scheduler for LM step bucket graphs.
+    // The main ctx->sched is used by pred head / DPM between LM steps, which
+    // would reset allocs; a separate sched keeps bucket allocations stable.
+    auto lm_step_sched_lazy = [&]() -> ggml_backend_sched_t {
+        if (ctx->lm_step_sched)
+            return ctx->lm_step_sched;
+        ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
+        int n_be = (ctx->backend && ctx->backend != ctx->backend_cpu) ? 2 : 1;
+        ctx->lm_step_sched = ggml_backend_sched_new(backends, nullptr, n_be, 65536, false, false);
+        return ctx->lm_step_sched;
+    };
+
+    // §201: pick smallest bucket whose Lk >= needed_lk.
+    auto lm_pick_bucket = [&](int needed_lk) -> int {
+        using C = vibevoice_context;
+        for (int i = 0; i < C::kLmNBuckets; i++)
+            if (C::kLmBucketLks[i] >= needed_lk && C::kLmBucketLks[i] <= ctx->kv_max_ctx)
+                return i;
+        return -1;
+    };
+
+    // §201: build an LM step bucket graph with fixed Lk (topology invariant).
+    // fixed_kv_len > 0: build with static Lk; positions/mask set at runtime.
+    // arena_ctx: must be a persistent ggml_context (bucket's own ctx).
+    auto build_lm_step_bucket_graph = [&](int kv_sel, int fixed_kv_len, ggml_context* arena_ctx) -> ggml_cgraph* {
+        ggml_tensor* cur_kv_k = (kv_sel == 0) ? ctx->kv_k : ctx->kv_neg_k;
+        ggml_tensor* cur_kv_v = (kv_sel == 0) ? ctx->kv_v : ctx->kv_neg_v;
+        if (!cur_kv_k || !cur_kv_v)
+            return nullptr;
+        const int T = 1; // bucket graphs always decode one token
+        const int Lk = fixed_kv_len;
+
+        ggml_cgraph* gf = ggml_new_graph_custom(arena_ctx, 65536, false);
+
+        ggml_tensor* emb_t = ggml_new_tensor_2d(arena_ctx, GGML_TYPE_F32, hp.d_lm, T);
+        ggml_set_name(emb_t, "tts_step_in");
+        ggml_set_input(emb_t);
+
+        ggml_tensor* positions = ggml_new_tensor_1d(arena_ctx, GGML_TYPE_I32, T);
+        ggml_set_name(positions, "tts_step_pos");
+        ggml_set_input(positions);
+
+        // Bucket mode always has a causal mask (tail slots must be -inf).
+        ggml_tensor* causal_mask = ggml_new_tensor_2d(arena_ctx, GGML_TYPE_F16, Lk, T);
+        ggml_set_name(causal_mask, "tts_step_mask");
+        ggml_set_input(causal_mask);
+
+        ggml_tensor* cur = emb_t;
+        for (int il = 0; il < lm_n_layers; il++) {
+            char p[64];
+            snprintf(p, sizeof(p), "%s.layers.%d", lm_prefix, il);
+            ggml_tensor* residual = cur;
+
+            cur = ggml_rms_norm(arena_ctx, cur, 1e-6f);
+            cur = ggml_mul(arena_ctx, cur, G(std::string(p) + ".attn_ln.weight"));
+
+            {
+                ggml_tensor* Q = ggml_mul_mat(arena_ctx, G(std::string(p) + ".attn.q_proj.weight"), cur);
+                ggml_tensor* q_b = G(std::string(p) + ".attn.q_proj.bias");
+                if (q_b)
+                    Q = ggml_add(arena_ctx, Q, q_b);
+                ggml_tensor* K = ggml_mul_mat(arena_ctx, G(std::string(p) + ".attn.k_proj.weight"), cur);
+                ggml_tensor* k_b = G(std::string(p) + ".attn.k_proj.bias");
+                if (k_b)
+                    K = ggml_add(arena_ctx, K, k_b);
+                ggml_tensor* V = ggml_mul_mat(arena_ctx, G(std::string(p) + ".attn.v_proj.weight"), cur);
+                ggml_tensor* v_b = G(std::string(p) + ".attn.v_proj.bias");
+                if (v_b)
+                    V = ggml_add(arena_ctx, V, v_b);
+
+                Q = ggml_reshape_3d(arena_ctx, Q, hp.head_dim, hp.n_heads, T);
+                K = ggml_reshape_3d(arena_ctx, K, hp.head_dim, hp.n_kv_heads, T);
+                V = ggml_reshape_3d(arena_ctx, V, hp.head_dim, hp.n_kv_heads, T);
+
+                Q = ggml_rope_ext(arena_ctx, Q, positions, nullptr, hp.head_dim, GGML_ROPE_TYPE_NEOX, 0, hp.rope_theta,
+                                  1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+                K = ggml_rope_ext(arena_ctx, K, positions, nullptr, hp.head_dim, GGML_ROPE_TYPE_NEOX, 0, hp.rope_theta,
+                                  1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+
+                ggml_tensor* K_perm = ggml_permute(arena_ctx, K, 0, 2, 1, 3);
+                ggml_tensor* V_perm = ggml_permute(arena_ctx, V, 0, 2, 1, 3);
+
+                // KV write via set_rows: position is runtime (from positions tensor).
+                ggml_tensor* k_layer = ggml_view_3d(arena_ctx, cur_kv_k, hp.head_dim, cur_kv_k->ne[1], hp.n_kv_heads,
+                                                    cur_kv_k->nb[1], cur_kv_k->nb[2], (size_t)il * cur_kv_k->nb[3]);
+                ggml_tensor* v_layer = ggml_view_3d(arena_ctx, cur_kv_v, hp.head_dim, cur_kv_v->ne[1], hp.n_kv_heads,
+                                                    cur_kv_v->nb[1], cur_kv_v->nb[2], (size_t)il * cur_kv_v->nb[3]);
+                ggml_build_forward_expand(gf, ggml_set_rows(arena_ctx, k_layer, K_perm, positions));
+                ggml_build_forward_expand(gf, ggml_set_rows(arena_ctx, v_layer, V_perm, positions));
+
+                // KV read with fixed Lk (bucket size).
+                ggml_tensor* Kfull =
+                    ggml_cont(arena_ctx, ggml_view_3d(arena_ctx, cur_kv_k, hp.head_dim, Lk, hp.n_kv_heads,
+                                                      cur_kv_k->nb[1], cur_kv_k->nb[2], (size_t)il * cur_kv_k->nb[3]));
+                ggml_tensor* Vfull =
+                    ggml_cont(arena_ctx, ggml_view_3d(arena_ctx, cur_kv_v, hp.head_dim, Lk, hp.n_kv_heads,
+                                                      cur_kv_v->nb[1], cur_kv_v->nb[2], (size_t)il * cur_kv_v->nb[3]));
+
+                Q = ggml_cont(arena_ctx, ggml_permute(arena_ctx, Q, 0, 2, 1, 3));
+                float scale = 1.0f / sqrtf((float)hp.head_dim);
+                ggml_tensor* attn_out =
+                    vibevoice_sdpa(arena_ctx, Q, Kfull, Vfull, causal_mask, scale, vibevoice_tts_use_flash_attn());
+                attn_out = ggml_reshape_2d(arena_ctx, attn_out, hp.d_lm, T);
+                attn_out = ggml_mul_mat(arena_ctx, G(std::string(p) + ".attn.o_proj.weight"), attn_out);
+                cur = ggml_add(arena_ctx, residual, attn_out);
+            }
+
+            residual = cur;
+            cur = ggml_rms_norm(arena_ctx, cur, 1e-6f);
+            cur = ggml_mul(arena_ctx, cur, G(std::string(p) + ".ffn_ln.weight"));
+            ggml_tensor* ffn =
+                core_ffn::swiglu(arena_ctx, cur, G(std::string(p) + ".ffn.gate.weight"),
+                                 G(std::string(p) + ".ffn.up.weight"), G(std::string(p) + ".ffn.down.weight"));
+            cur = ggml_add(arena_ctx, residual, ffn);
+        }
+
+        ggml_tensor* final_norm_w = G(std::string(lm_prefix) + ".norm.weight");
+        if (final_norm_w) {
+            cur = ggml_rms_norm(arena_ctx, cur, 1e-6f);
+            cur = ggml_mul(arena_ctx, cur, final_norm_w);
+        }
+
+        ggml_set_name(cur, "tts_hidden_out");
+        ggml_set_output(cur);
+        ggml_build_forward_expand(gf, cur);
+        return gf;
+    };
+
+    // §201: get or build bucket graph for kv_sel (0=pos, 1=neg), bucket index idx.
+    auto lm_get_or_build_bucket = [&](int kv_sel, int idx) -> ggml_cgraph* {
+        auto& bk = (kv_sel == 0) ? ctx->lm_buckets_pos[idx] : ctx->lm_buckets_neg[idx];
+        if (bk.gf)
+            return bk.gf;
+        bk.lk = vibevoice_context::kLmBucketLks[idx];
+        bk.meta.assign(ctx->compute_meta.size(), 0);
+        ggml_init_params ip = {bk.meta.size(), bk.meta.data(), true};
+        bk.ctx = ggml_init(ip);
+        if (!bk.ctx)
+            return nullptr;
+        bk.gf = build_lm_step_bucket_graph(kv_sel, bk.lk, bk.ctx);
+        if (!bk.gf) {
+            ggml_free(bk.ctx);
+            bk.ctx = nullptr;
+        }
+        return bk.gf;
+    };
+
     // Reuse the existing KV-cached decoder graph builder from ASR
     // (build_decoder_graph lambda is inside vibevoice_transcribe; let's inline a simpler version)
     // kv_sel: 0=positive (kv_k/kv_v), 1=negative (kv_neg_k/kv_neg_v)
@@ -3931,6 +4117,55 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
     auto run_lm_step = [&](const float* embeds, int n_tokens, int n_past, std::vector<float>& hidden_out,
                            int kv_sel = 0) -> bool {
         auto t_build0 = std::chrono::high_resolution_clock::now();
+
+        // §201: Lk-bucketed fast path for single-token decode (no debug env vars).
+        if (n_tokens == 1 && (!dump_dir || !dump_dir[0])) {
+            const int idx = lm_pick_bucket(n_past + 1);
+            if (idx >= 0) {
+                ggml_cgraph* gf = lm_get_or_build_bucket(kv_sel, idx);
+                if (gf) {
+                    ggml_backend_sched_t step_sched = lm_step_sched_lazy();
+                    if (!step_sched)
+                        goto dynamic_path;
+                    int& active_bk = (kv_sel == 0) ? ctx->lm_active_bucket_pos : ctx->lm_active_bucket_neg;
+                    if (active_bk != idx) {
+                        ggml_backend_sched_reset(step_sched);
+                        if (!ggml_backend_sched_alloc_graph(step_sched, gf)) {
+                            active_bk = -1;
+                            goto dynamic_path;
+                        }
+                        active_bk = idx;
+                    }
+                    const int Lk = vibevoice_context::kLmBucketLks[idx];
+                    int32_t pos = n_past;
+                    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "tts_step_pos"), &pos, 0, sizeof(int32_t));
+                    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "tts_step_in"), embeds, 0,
+                                            (size_t)hp.d_lm * sizeof(float));
+                    {
+                        // Mask: positions [0..n_past] visible, [n_past+1..Lk-1] = -inf.
+                        std::vector<ggml_fp16_t> mask(Lk, ggml_fp32_to_fp16(0.0f));
+                        const ggml_fp16_t neg_inf = ggml_fp32_to_fp16(-INFINITY);
+                        for (int k = n_past + 1; k < Lk; k++)
+                            mask[k] = neg_inf;
+                        ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "tts_step_mask"), mask.data(), 0,
+                                                (size_t)Lk * sizeof(ggml_fp16_t));
+                    }
+                    auto t_compute0 = std::chrono::high_resolution_clock::now();
+                    lm_build_ms += std::chrono::duration<double, std::milli>(t_compute0 - t_build0).count();
+                    if (ggml_backend_sched_graph_compute(step_sched, gf) != GGML_STATUS_SUCCESS)
+                        return false;
+                    auto t_compute1 = std::chrono::high_resolution_clock::now();
+                    lm_compute_ms += std::chrono::duration<double, std::milli>(t_compute1 - t_compute0).count();
+                    lm_step_count++;
+                    hidden_out.resize(hp.d_lm);
+                    ggml_backend_tensor_get(ggml_graph_get_tensor(gf, "tts_hidden_out"), hidden_out.data(), 0,
+                                            hp.d_lm * sizeof(float));
+                    return true;
+                }
+            }
+        }
+    dynamic_path:;
+
         ggml_tensor* cur_kv_k = (kv_sel == 0) ? ctx->kv_k : ctx->kv_neg_k;
         ggml_tensor* cur_kv_v = (kv_sel == 0) ? ctx->kv_v : ctx->kv_neg_v;
         if (!cur_kv_k || !cur_kv_v)

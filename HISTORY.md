@@ -9273,3 +9273,26 @@ uses the same weight layout — `W[n*K + k]` row-major — so the same substitut
 applies: replaced both scalar loops with `f5_linear` calls. Added a forward
 declaration before `compute_text_embed` since `f5_linear` is defined later in
 the file. All 699 unit tests pass.
+
+## 2026-06-20 §201 VibeVoice — Lk-bucketed TTS LM step graph caching
+
+`run_lm_step` in `vibevoice.cpp` rebuilt a full ggml graph on every call
+(ggml_init + ggml_new_graph_custom + layer loop + sched_reset + alloc).
+In steady-state TTS decode, 100-1000 single-token (n_tokens=1) LM steps
+are issued per synthesis, making this rebuild a dominant overhead source.
+
+Applied the Chatterbox T3 §186 bucket-caching pattern:
+- Added `LmBucket` struct (4 buckets: Lk=128/256/512/1024) for both
+  positive and negative KV paths to `vibevoice_context`.
+- Added `lm_step_sched` (dedicated scheduler, avoids collision with
+  the main sched used by pred head / DPM between LM steps).
+- `build_lm_step_bucket_graph` builds a topology-invariant graph with
+  fixed Lk: KV writes use `ggml_set_rows(layer_view, K_perm, positions)`
+  instead of `ggml_view_4d(n_past_offset)`, KV reads use a fixed-size
+  `Lk=bucket_size` view, causal mask supplied each call.
+- `run_lm_step` tries the bucket path first for n_tokens=1 (no debug
+  env); falls back to dynamic rebuild on first use per bucket, overflow
+  (n_past+1 > 1024), or debug mode.
+- Bucket graphs are invalidated when KV buffers are reallocated
+  (max_ctx change between synthesis calls).
+All 4 vibevoice unit tests pass.

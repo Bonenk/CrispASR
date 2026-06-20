@@ -5464,9 +5464,10 @@ context_params structs. Wire the flag through and default it ON.
 
 **Status:** PARTIAL — Chatterbox T3 DONE (§186), Orpheus DONE (§190), OuteTTS DONE, Zonos DONE, TADA DONE. F5-TTS DiT done differently (§183).
 **Effort:** Medium (template from qwen3-tts)
-**Backends done:** Chatterbox T3 (§186), Orpheus (§190), OuteTTS, Zonos, TADA, CosyVoice3 (step_t1_gf).
+**Backends done:** Chatterbox T3 (§186), Orpheus (§190), OuteTTS, Zonos, TADA, CosyVoice3 (step_t1_gf), VibeVoice TTS LM (§201 2026-06-20).
+**Note:** VoxCPM2 TSLM already has Lk-buckets (`get_or_build_tslm_step_graph`). VibeVoice pred head already cached by n_frames (`get_pred_head_graph`). Both can be removed from remaining.
 **Remaining:** Parler (9 codebooks), SpeechT5, Dia, Pocket-TTS,
-VoxCPM2, VibeVoice (pred head), LFM2 (VAE), KugelAudio (VAE + pred).
+LFM2 (VAE), KugelAudio (VAE + pred).
 **Approach:** Qwen3-TTS demonstrates with 5 pre-built graphs at fixed Lk
 sizes. MIMO has a simpler single-bucket `step_t1_gf`. FunASR has the
 infrastructure but disabled due to full-window attend; needs Lk-bucketing
