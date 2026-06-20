@@ -5211,11 +5211,14 @@ static vox_prefill_inputs build_prefill_inputs_impl(voxcpm2_context* ctx, const 
     out.have_ref =
         (ref_samples != nullptr && ref_n_samples > 0 && hp.ref_audio_start_token != 0 && hp.ref_audio_end_token != 0);
     if (out.have_ref) {
+        double t0_vae = vox_now_ms();
         out.ref_feat = vae_encode(ctx, ref_samples, ref_n_samples, &out.T_ref);
         if (out.T_ref <= 0) {
             fprintf(stderr, "voxcpm2: VAE encoder produced 0 patches — falling back to zero-shot\n");
             out.have_ref = false;
             out.ref_feat.clear();
+        } else if (ctx->verbosity >= 1) {
+            fprintf(stderr, "voxcpm2: prefill VAE encode %.1f ms (%d patches)\n", vox_now_ms() - t0_vae, out.T_ref);
         }
     }
 
@@ -5242,6 +5245,7 @@ static vox_prefill_inputs build_prefill_inputs_impl(voxcpm2_context* ctx, const 
     out.N_pos = (int)out.all_tokens.size();
 
     // 4. Per-position embed: combined_embed[t] = text_mask*embed_tokens + audio_mask*enc_to_lm(locenc(audio_feat[t])).
+    double t0_locenc = vox_now_ms();
     out.combined_embed.assign((size_t)out.N_pos * d_tslm, 0.0f);
     out.feat_embed_pos.assign((size_t)out.N_pos * d_tslm, 0.0f);
     for (int t = 0; t < out.N_pos; t++) {
@@ -5267,6 +5271,10 @@ static vox_prefill_inputs build_prefill_inputs_impl(voxcpm2_context* ctx, const 
             }
             get_row_f32(ctx->weights.tslm_token_embd, id, out.combined_embed.data() + (size_t)t * d_tslm);
         }
+    }
+    if (out.have_ref && ctx->verbosity >= 1) {
+        fprintf(stderr, "voxcpm2: prefill locenc %.1f ms (%d patches, %.1f ms/patch)\n", vox_now_ms() - t0_locenc,
+                out.T_ref, out.T_ref > 0 ? (vox_now_ms() - t0_locenc) / out.T_ref : 0.0);
     }
     return out;
 }
