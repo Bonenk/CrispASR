@@ -67,6 +67,7 @@
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <stdexcept>
 #include <thread>
 #include <string>
 #include <vector>
@@ -1714,8 +1715,21 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                     std::lock_guard<std::mutex> lk(sq->m);
                     return sq->cancelled;
                 };
-                {
+                // The worker is detached: any exception escaping this lambda would
+                // call std::terminate and kill the whole server (and leave `done`
+                // unset → a hung request). Catch everything, mark the stream
+                // failed+done, and let the provider end it cleanly. (model_mutex is
+                // released by RAII during unwind.)
+                try {
                     std::lock_guard<std::mutex> lock(model_mutex);
+                    // TEST-ONLY (CRISPASR_TEST_STREAM_THROW): force a worker
+                    // exception to verify the server survives it. Requires both the
+                    // env var AND the magic input, so it can never fire in prod.
+                    if (std::getenv("CRISPASR_TEST_STREAM_THROW")) {
+                        for (const auto& s : sentences)
+                            if (s == "__throw_test__")
+                                throw std::runtime_error("injected streaming worker exception (test)");
+                    }
                     if (is_voice_clone) {
                         const auto& disc = crispasr_tts_get_disclaimer(backend.get(), rp);
                         if (!disc.empty()) {
@@ -1740,6 +1754,14 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                             enqueue(std::string((const char*)silence_s16.data(), silence_s16.size() * sizeof(short)));
                         }
                     }
+                } catch (const std::exception& e) {
+                    fprintf(stderr, "crispasr-server: streaming worker exception: %s\n", e.what());
+                    std::lock_guard<std::mutex> lk(sq->m);
+                    sq->failed = true;
+                } catch (...) {
+                    fprintf(stderr, "crispasr-server: streaming worker unknown exception\n");
+                    std::lock_guard<std::mutex> lk(sq->m);
+                    sq->failed = true;
                 }
                 {
                     std::lock_guard<std::mutex> lk(sq->m);

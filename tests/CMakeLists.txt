@@ -1638,6 +1638,17 @@ set_tests_properties(test-server-tts PROPERTIES
     LABELS "live;server;tts"
     TIMEOUT 600)
 
+# ─── test-server-stream-resilience — live: the detached streaming-TTS worker
+# must not crash the server on an exception. Forces a worker throw
+# (CRISPASR_TEST_STREAM_THROW=1 + magic input) and asserts the server survives +
+# keeps serving. Auto-discovers a qwen3-tts GGUF; SKIPs otherwise.
+add_test(NAME test-server-stream-resilience
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-server-stream-resilience.sh
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-server-stream-resilience PROPERTIES
+    LABELS "live;server;tts;qwen3-tts"
+    TIMEOUT 400)
+
 # ─── test-qwen3-tts-codes-determinism — live: CLI whole-clip synthesis gates.
 # (1) two identical --tts runs are bit-identical (guards the shared talker AR
 # loop / streaming dedup); (2) QWEN3_TTS_O15=1 is byte-identical to O15=0
