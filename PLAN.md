@@ -5687,13 +5687,16 @@ alloc per beam expansion step.
 
 #### §176s Encoder graph caching by shape
 
-**Status:** PARTIAL — SenseVoice DONE (`1c82bd0d`)
+**Status:** MOSTLY DONE — 9 backends cached.
 **Effort:** Small-Medium
-**Backends done:** SenseVoice (cached arena when T_lfr matches).
-**Remaining:** Canary, Moonshine, Moonshine
-Streaming, FunASR, OmniASR, Qwen3 ASR, MOSS Audio, Voxtral/4B, GLM ASR,
-Granite Speech, Kyutai STT
-**Approach:** Nemotron demonstrates caching encoder graphs keyed by
-`(layer, T_new, T_cache)`. Most other encoders rebuild from scratch each
-call despite fixed topology for a given T_mel. Cache by T_mel (or use
-bucketed T values).
+**Backends done:** SenseVoice (`1c82bd0d`), Paraformer (`5854c11b`),
+FunASR (prior), Nemotron (`059bbe06`), Canary (prior), Canary-CTC
+(`6f88c0e0`), Moonshine (`095103d8`), Parakeet (`434df71c`), Qwen3-ASR
+(`69ad7d05`). GLM-ASR in progress (parallel agent).
+**Remaining:** OmniASR (encoder+decoder fused in one graph — complex),
+Moonshine-Streaming (per-chunk graph, streaming state), MOSS Audio,
+Voxtral/4B, Granite Speech, Kyutai STT (all >1.5 GB models, GPU-only benefit).
+**Approach:** Metadata-swap technique: swap `compute_meta` with a
+persistent `cached_enc_meta` before calling the graph builder, swap
+back after. The cached graph arena persists across calls. Invalidate
+when the topology key (T_mel, T_lfr, n_samples, etc.) changes.
