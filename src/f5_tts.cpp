@@ -202,6 +202,27 @@ struct f5_vocab {
     std::map<std::string, int> char_to_idx;
 };
 
+// ── Text and Vocos weight caches ─────────────────────────────────
+// Pre-dequantized F32 copies loaded once at init; avoids per-synthesis
+// read_tensor_f32 (and Q4_K dequantization) in compute_text_embed and
+// vocos_decode.
+
+struct f5_text_block_cache {
+    std::vector<float> dw_w, dw_b;
+    std::vector<float> norm_w, norm_b;
+    std::vector<float> pw_up_w, pw_up_b;
+    std::vector<float> pw_down_w, pw_down_b;
+    std::vector<float> grn_g, grn_b;
+};
+
+struct f5_voc_block_cache {
+    std::vector<float> dw_w, dw_b;
+    std::vector<float> norm_w, norm_b;
+    std::vector<float> pw_up_w, pw_up_b;
+    std::vector<float> pw_down_w, pw_down_b;
+    std::vector<float> layer_scale;
+};
+
 // ── DiT graph cache ───────────────────────────────────────────────
 // All 22 DiT blocks + final AdaLN/proj fused into one ggml graph,
 // built once per T and reused across ODE steps (and cond/uncond passes).
@@ -276,6 +297,21 @@ struct f5_tts_context {
         std::vector<float> conv_pos_1_w;
         std::vector<float> conv_pos_1_b;
     } emb_cache;
+
+    // Pre-dequantized text ConvNeXtV2 weights (4 blocks, ~21 MB F32).
+    struct {
+        std::vector<float> emb; // (text_num_embeds, text_dim)
+        std::vector<f5_text_block_cache> blocks;
+    } text_cache;
+
+    // Pre-dequantized Vocos vocoder weights (8 blocks, ~54 MB F32).
+    struct {
+        std::vector<float> embed_w, embed_b;
+        std::vector<float> norm_w, norm_b;
+        std::vector<f5_voc_block_cache> blocks;
+        std::vector<float> final_norm_w, final_norm_b;
+        std::vector<float> head_w, head_b;
+    } voc_cache;
 };
 
 // ── Diff dump helpers ────────────────────────────────────────────
@@ -501,7 +537,6 @@ static std::vector<std::string> convert_to_pinyin(const std::string& text) {
 
 static std::vector<float> compute_text_embed(f5_tts_context* ctx, const int32_t* tokens, int n_tokens, int seq_len) {
     const auto& hp = ctx->hp;
-    const auto& w = ctx->w;
 
     // tokens are in range [-1, vocab_size-1]. We add 1 to make 0 the filler.
     // Then pad/truncate to seq_len.
@@ -516,9 +551,8 @@ static std::vector<float> compute_text_embed(f5_tts_context* ctx, const int32_t*
         text_mask[i] = (padded[i] == 0) ? 1.0f : 0.0f;
     }
 
-    // Embedding lookup (done manually since ggml embedding is int-indexed)
-    std::vector<float> emb_weight;
-    read_tensor_f32(w.text_emb_weight, emb_weight);
+    // Embedding lookup — use pre-dequantized cache (loaded at init).
+    const std::vector<float>& emb_weight = ctx->text_cache.emb;
 
     std::vector<float> text_emb(seq_len * hp.text_dim, 0.0f);
     for (int t = 0; t < seq_len; t++) {
@@ -555,25 +589,23 @@ static std::vector<float> compute_text_embed(f5_tts_context* ctx, const int32_t*
     // ConvNeXtV2 blocks — implemented on CPU for exact semantics.
     // Each block: dwconv(k=7) → LN → pw_up → GELU → GRN → pw_down → residual
     for (int b = 0; b < hp.conv_layers; b++) {
-        const auto& blk = w.text_blocks[b];
+        const auto& bc = ctx->text_cache.blocks[b];
         int D = hp.text_dim;
         int T = seq_len;
         int K = 7, pad = 3;
         int inter_dim = D * 2; // intermediate_dim = text_dim * conv_mult = 512 * 2
 
-        // Read weights
-        std::vector<float> dw_w, dw_b, norm_w, norm_b, pw_up_w, pw_up_b;
-        std::vector<float> pw_down_w, pw_down_b, grn_g, grn_b_v;
-        read_tensor_f32(blk.dw_weight, dw_w); // (D, 1, K) → flat (D*K)
-        read_tensor_f32(blk.dw_bias, dw_b);
-        read_tensor_f32(blk.norm_weight, norm_w);
-        read_tensor_f32(blk.norm_bias, norm_b);
-        read_tensor_f32(blk.pw_up_weight, pw_up_w); // (inter_dim, D)
-        read_tensor_f32(blk.pw_up_bias, pw_up_b);
-        read_tensor_f32(blk.pw_down_weight, pw_down_w); // (D, inter_dim)
-        read_tensor_f32(blk.pw_down_bias, pw_down_b);
-        read_tensor_f32(blk.grn_gamma, grn_g); // (1,1,inter_dim)
-        read_tensor_f32(blk.grn_beta, grn_b_v);
+        // Use pre-dequantized cached weights.
+        const std::vector<float>& dw_w = bc.dw_w;
+        const std::vector<float>& dw_b = bc.dw_b;
+        const std::vector<float>& norm_w = bc.norm_w;
+        const std::vector<float>& norm_b = bc.norm_b;
+        const std::vector<float>& pw_up_w = bc.pw_up_w;
+        const std::vector<float>& pw_up_b = bc.pw_up_b;
+        const std::vector<float>& pw_down_w = bc.pw_down_w;
+        const std::vector<float>& pw_down_b = bc.pw_down_b;
+        const std::vector<float>& grn_g = bc.grn_g;
+        const std::vector<float>& grn_b_v = bc.grn_b;
 
         // text_emb is (T, D) row-major
         std::vector<float> residual_v = text_emb;
@@ -1263,7 +1295,6 @@ static void transpose_tc(const float* src, int T, int C, float* dst) {
 
 static std::vector<float> vocos_decode(f5_tts_context* ctx, const float* mel_data, int T_mel, int mel_dim) {
     const auto& hp = ctx->hp;
-    const auto& w = ctx->w;
     int D = hp.voc_dim; // 512
     int T = T_mel;
     int inter_dim = hp.voc_intermediate_dim; // 1536
@@ -1277,13 +1308,12 @@ static std::vector<float> vocos_decode(f5_tts_context* ctx, const float* mel_dat
     std::vector<float> x_ct(mel_dim * T);
     transpose_tc(mel_data, T, mel_dim, x_ct.data());
 
+    const auto& vc = ctx->voc_cache;
+
     // ── Embed: Conv1d(100, 512, k=7, pad=3) ──
     {
-        std::vector<float> emb_w, emb_b;
-        read_tensor_f32(w.voc_embed_weight, emb_w); // (512, 100, 7)
-        read_tensor_f32(w.voc_embed_bias, emb_b);
         std::vector<float> out(D * T, 0.0f);
-        cpu_conv1d(x_ct.data(), mel_dim, T, emb_w.data(), emb_b.data(), D, 7, 3, 1, out.data());
+        cpu_conv1d(x_ct.data(), mel_dim, T, vc.embed_w.data(), vc.embed_b.data(), D, 7, 3, 1, out.data());
         x_ct = std::move(out);
     }
 
@@ -1291,46 +1321,30 @@ static std::vector<float> vocos_decode(f5_tts_context* ctx, const float* mel_dat
     {
         std::vector<float> x_td(T * D);
         transpose_ct(x_ct.data(), D, T, x_td.data());
-        std::vector<float> norm_w, norm_b;
-        read_tensor_f32(w.voc_norm_weight, norm_w);
-        read_tensor_f32(w.voc_norm_bias, norm_b);
-        cpu_layer_norm(x_td.data(), T, D, norm_w.data(), norm_b.data(), 1e-6f);
+        cpu_layer_norm(x_td.data(), T, D, vc.norm_w.data(), vc.norm_b.data(), 1e-6f);
         transpose_tc(x_td.data(), T, D, x_ct.data());
     }
 
     // ── 8× ConvNeXt blocks ──
     for (int b = 0; b < hp.voc_num_layers; b++) {
-        const auto& blk = w.voc_blocks[b];
+        const auto& bc = vc.blocks[b];
         std::vector<float> residual = x_ct; // (D, T)
 
         // 1. Depthwise Conv1d(512, 512, k=7, pad=3, groups=512)
         {
-            std::vector<float> dw_w, dw_b;
-            read_tensor_f32(blk.dw_weight, dw_w); // (512, 1, 7)
-            read_tensor_f32(blk.dw_bias, dw_b);
             std::vector<float> out(D * T, 0.0f);
-            cpu_conv1d(x_ct.data(), D, T, dw_w.data(), dw_b.data(), D, 7, 3, D, out.data());
+            cpu_conv1d(x_ct.data(), D, T, bc.dw_w.data(), bc.dw_b.data(), D, 7, 3, D, out.data());
             x_ct = std::move(out);
         }
 
         // 2. Transpose to (T, D), LayerNorm
         std::vector<float> x_td(T * D);
         transpose_ct(x_ct.data(), D, T, x_td.data());
-        {
-            std::vector<float> norm_w, norm_b;
-            read_tensor_f32(blk.norm_weight, norm_w);
-            read_tensor_f32(blk.norm_bias, norm_b);
-            cpu_layer_norm(x_td.data(), T, D, norm_w.data(), norm_b.data(), 1e-6f);
-        }
+        cpu_layer_norm(x_td.data(), T, D, bc.norm_w.data(), bc.norm_b.data(), 1e-6f);
 
         // 3. Pointwise up: Linear(512, 1536)
         std::vector<float> up_out(T * inter_dim, 0.0f);
-        {
-            std::vector<float> pw_w, pw_b;
-            read_tensor_f32(blk.pw_up_weight, pw_w); // (1536, 512)
-            read_tensor_f32(blk.pw_up_bias, pw_b);
-            f5_linear(x_td.data(), pw_w.data(), pw_b.data(), up_out.data(), T, D, inter_dim);
-        }
+        f5_linear(x_td.data(), bc.pw_up_w.data(), bc.pw_up_b.data(), up_out.data(), T, D, inter_dim);
 
         // 4. GELU (exact: x * 0.5 * (1 + erf(x/sqrt(2))))
         for (auto& v : up_out) {
@@ -1339,21 +1353,12 @@ static std::vector<float> vocos_decode(f5_tts_context* ctx, const float* mel_dat
 
         // 5. Pointwise down: Linear(1536, 512)
         std::vector<float> down_out(T * D, 0.0f);
-        {
-            std::vector<float> pw_w, pw_b;
-            read_tensor_f32(blk.pw_down_weight, pw_w); // (512, 1536)
-            read_tensor_f32(blk.pw_down_bias, pw_b);
-            f5_linear(up_out.data(), pw_w.data(), pw_b.data(), down_out.data(), T, inter_dim, D);
-        }
+        f5_linear(up_out.data(), bc.pw_down_w.data(), bc.pw_down_b.data(), down_out.data(), T, inter_dim, D);
 
         // 6. Layer scale (gamma)
-        {
-            std::vector<float> gamma;
-            read_tensor_f32(blk.layer_scale, gamma); // (512,)
-            for (int t = 0; t < T; t++)
-                for (int d = 0; d < D; d++)
-                    down_out[t * D + d] *= gamma[d];
-        }
+        for (int t = 0; t < T; t++)
+            for (int d = 0; d < D; d++)
+                down_out[t * D + d] *= bc.layer_scale[d];
 
         // 7. Transpose back to (D, T) and add residual
         transpose_tc(down_out.data(), T, D, x_ct.data());
@@ -1364,12 +1369,7 @@ static std::vector<float> vocos_decode(f5_tts_context* ctx, const float* mel_dat
     // ── Final LayerNorm ──
     std::vector<float> x_td(T * D);
     transpose_ct(x_ct.data(), D, T, x_td.data());
-    {
-        std::vector<float> norm_w, norm_b;
-        read_tensor_f32(w.voc_final_norm_weight, norm_w);
-        read_tensor_f32(w.voc_final_norm_bias, norm_b);
-        cpu_layer_norm(x_td.data(), T, D, norm_w.data(), norm_b.data(), 1e-6f);
-    }
+    cpu_layer_norm(x_td.data(), T, D, vc.final_norm_w.data(), vc.final_norm_b.data(), 1e-6f);
     // x_td is now (T, D) = backbone output
 
     // ── ISTFTHead: Linear(512, 1026) → split mag/phase → iSTFT ──
@@ -1380,12 +1380,7 @@ static std::vector<float> vocos_decode(f5_tts_context* ctx, const float* mel_dat
 
     // Linear projection
     std::vector<float> head_out(T * out_dim);
-    {
-        std::vector<float> head_w, head_b;
-        read_tensor_f32(w.voc_head_weight, head_w); // (1026, 512)
-        read_tensor_f32(w.voc_head_bias, head_b);
-        f5_linear(x_td.data(), head_w.data(), head_b.data(), head_out.data(), T, D, out_dim);
-    }
+    f5_linear(x_td.data(), vc.head_w.data(), vc.head_b.data(), head_out.data(), T, D, out_dim);
 
     // Split into magnitude and phase, each (T, 513)
     // head_out is (T, 1026) row-major. First 513 = magnitude, last 513 = phase.
@@ -1808,16 +1803,66 @@ struct f5_tts_context* f5_tts_init_from_file(const char* path_model, struct f5_t
         return nullptr;
     }
 
-    // Pre-dequantize input-embedding weights once to avoid 64× reads per synthesis
+    // Pre-dequantize weights once at load time to avoid per-synthesis reads.
     {
-        auto& ec = ctx->emb_cache;
         const auto& w = ctx->w;
+
+        // §184: input-embedding weights (hot: 64× per synthesis)
+        auto& ec = ctx->emb_cache;
         read_tensor_f32(w.input_proj_weight, ec.input_proj_w);
         read_tensor_f32(w.input_proj_bias, ec.input_proj_b);
         read_tensor_f32(w.conv_pos_0_weight, ec.conv_pos_0_w);
         read_tensor_f32(w.conv_pos_0_bias, ec.conv_pos_0_b);
         read_tensor_f32(w.conv_pos_1_weight, ec.conv_pos_1_w);
         read_tensor_f32(w.conv_pos_1_bias, ec.conv_pos_1_b);
+
+        // §185: text ConvNeXtV2 weights (1× per synthesis, ~21 MB F32)
+        {
+            auto& tc = ctx->text_cache;
+            read_tensor_f32(w.text_emb_weight, tc.emb);
+            tc.blocks.resize(ctx->hp.conv_layers);
+            for (int b = 0; b < ctx->hp.conv_layers; b++) {
+                const auto& blk = w.text_blocks[b];
+                auto& bc = tc.blocks[b];
+                read_tensor_f32(blk.dw_weight, bc.dw_w);
+                read_tensor_f32(blk.dw_bias, bc.dw_b);
+                read_tensor_f32(blk.norm_weight, bc.norm_w);
+                read_tensor_f32(blk.norm_bias, bc.norm_b);
+                read_tensor_f32(blk.pw_up_weight, bc.pw_up_w);
+                read_tensor_f32(blk.pw_up_bias, bc.pw_up_b);
+                read_tensor_f32(blk.pw_down_weight, bc.pw_down_w);
+                read_tensor_f32(blk.pw_down_bias, bc.pw_down_b);
+                read_tensor_f32(blk.grn_gamma, bc.grn_g);
+                read_tensor_f32(blk.grn_beta, bc.grn_b);
+            }
+        }
+
+        // §185: Vocos vocoder weights (1× per synthesis, ~54 MB F32)
+        {
+            auto& vc = ctx->voc_cache;
+            read_tensor_f32(w.voc_embed_weight, vc.embed_w);
+            read_tensor_f32(w.voc_embed_bias, vc.embed_b);
+            read_tensor_f32(w.voc_norm_weight, vc.norm_w);
+            read_tensor_f32(w.voc_norm_bias, vc.norm_b);
+            vc.blocks.resize(ctx->hp.voc_num_layers);
+            for (int b = 0; b < ctx->hp.voc_num_layers; b++) {
+                const auto& blk = w.voc_blocks[b];
+                auto& bc = vc.blocks[b];
+                read_tensor_f32(blk.dw_weight, bc.dw_w);
+                read_tensor_f32(blk.dw_bias, bc.dw_b);
+                read_tensor_f32(blk.norm_weight, bc.norm_w);
+                read_tensor_f32(blk.norm_bias, bc.norm_b);
+                read_tensor_f32(blk.pw_up_weight, bc.pw_up_w);
+                read_tensor_f32(blk.pw_up_bias, bc.pw_up_b);
+                read_tensor_f32(blk.pw_down_weight, bc.pw_down_w);
+                read_tensor_f32(blk.pw_down_bias, bc.pw_down_b);
+                read_tensor_f32(blk.layer_scale, bc.layer_scale);
+            }
+            read_tensor_f32(w.voc_final_norm_weight, vc.final_norm_w);
+            read_tensor_f32(w.voc_final_norm_bias, vc.final_norm_b);
+            read_tensor_f32(w.voc_head_weight, vc.head_w);
+            read_tensor_f32(w.voc_head_bias, vc.head_b);
+        }
     }
 
     // Create backend scheduler

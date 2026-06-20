@@ -6,6 +6,14 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-20 §185 F5-TTS text + Vocos weight pre-cache
+
+Pre-dequantize all text ConvNeXtV2 and Vocos ConvNeXt weights once at model load.
+Eliminates 119 `read_tensor_f32` calls per synthesis (41 from text embed + 78 from
+Vocos), avoiding ~75 MB of memcpy (F32) or dequantization (Q4_K) per synthesis.
+Two new helper structs (`f5_text_block_cache`, `f5_voc_block_cache`) and two cache
+fields (`text_cache`, `voc_cache`) in `f5_tts_context`. Cost: ~75 MB resident.
+
 ## 2026-06-20 §184 F5-TTS input-embedding weight pre-cache
 
 Pre-dequantize the six input-embedding weights (input_proj + conv_pos_0/1

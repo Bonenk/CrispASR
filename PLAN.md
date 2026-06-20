@@ -6405,6 +6405,25 @@ For quantized models (Q4_K) this avoids repeated dequantization overhead.
 **Files:** `src/f5_tts.cpp` (`emb_cache` in `f5_tts_context`; `f5_tts_init`;
 `dit_forward` input-embedding section)
 
+## §185 F5-TTS text + Vocos weight pre-cache — DONE 2026-06-20
+
+**Problem:** `compute_text_embed` and `vocos_decode` each called `read_tensor_f32`
+on every synthesis invocation — 41 reads from text embed (1 emb_weight + 4 blocks ×
+10 weights) and 78 reads from Vocos (embed + norm + 8 blocks × 9 + final norm + head).
+For Q4_K models these dequantize ~21 MB (text) + ~54 MB (Vocos) on every synthesis.
+For F32 models: ~75 MB of memcpy per synthesis.
+
+**Fix:** Added `f5_text_block_cache` and `f5_voc_block_cache` helper structs;
+added `text_cache` and `voc_cache` fields to `f5_tts_context` populated once in
+`f5_tts_init`. Updated `compute_text_embed` and `vocos_decode` to use const
+references into the cached vectors — zero `read_tensor_f32` calls at synthesis time.
+
+**Cost:** ~75 MB resident (21 MB text + 54 MB Vocos) per loaded F5-TTS context.
+
+**Files:** `src/f5_tts.cpp` (`f5_text_block_cache`, `f5_voc_block_cache` structs;
+`text_cache`, `voc_cache` in `f5_tts_context`; `f5_tts_init`; `compute_text_embed`;
+`vocos_decode`)
+
 ---
 
 ## §176 Runtime optimization pass — 2026-06-20 audit
