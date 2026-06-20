@@ -6,6 +6,28 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-20 §178 VoxCPM2 — disclaimer voice-clone bug fixed
+
+Q4_K synthesis tested end-to-end (`/tmp/voxcpm2/voxcpm2-q4_k.gguf`).
+Zero-shot: 21 s, clean transcript. Voice-clone: `--voice jfk.wav
+--i-have-rights`. Bug found: `synthesize()` read `voice_path_` (init-time)
+instead of `params.tts_voice` (per-call); disclaimer code clears
+`tts_voice` to get zero-shot but backend ignored it → disclaimer
+synthesized as voice-clone (~242 s instead of ~21 s).
+
+Fix (`57549fba`): compute `ref_path = params.tts_voice.empty() ?
+(consent ? "" : voice_path_) : params.tts_voice`. Disclaimer path:
+tts_voice="" + consent=true → ref_path="" → zero-shot. Verified:
+"tokenized '…AI…' -> 9 positions" with no "(incl ref)" tag.
+
+Also diagnosed the first-run Metal JIT overhead: locenc prefill loop
+(69 patches) triggers all Metal shader compilations on first call (~188 s
+one-time), then the AR-loop locenc is fast because TSLM/LocDiT already
+compiled the kernel variants. Warm-cache: locenc prefill ~1 s.
+
+Timing diagnostics added: `voxcpm2: prefill VAE encode X ms (N patches)`
+and `voxcpm2: prefill locenc X ms (N patches, X ms/patch)` (verbosity≥1).
+
 ## 2026-06-19 §176 VibeVoice server chunking — name-guard mismatch (GH #171)
 
 GH #171 reporter saw the *same* sentence give clean audio from the CLI but
@@ -8846,3 +8868,21 @@ Mimi) → ISTFT detokenizer → 24 kHz PCM.
 - `ggml_backend_sched` migration for full GPU compute offload
 - Streaming Mimi decode
 - `causal_conv1d` CUDA kernel
+
+## 2026-06-20 §179 VoxCPM2 VAE encoder — Accelerate GEMM (175× speedup)
+
+VAE encode of 11 s reference audio took 672 s on M1: `x_in[ic * T_in + it]`
+strides up to 88 KB between ic accesses → near-100% cache miss rate → 0.14
+effective GFLOP/s.
+
+Fixed with im2col + `cblas_sgemm` in `causal_conv1d` (groups==1) and
+`vae_strided_conv1d`. Zero-allocation fast-path for ksize=1/stride=1/pad=0
+(uses `x_in` as B directly). `VOXCPM2_FORCE_SCALAR=1` env-gate reverts to
+scalar for comparison. CMake: Accelerate framework linked + `HAVE_ACCELERATE`
+defined for `voxcpm2_tts` on Apple.
+
+Timing (M1, Q4_K, jfk.wav 11 s → 69 patches):
+  VAE encode:   672 s → 3.85 s (175×)
+  locenc:       1.41 s (Metal, warm cache)
+  TSLM prefill: 6.01 s
+  Total (synthesis of "Hi."): 20.5 s

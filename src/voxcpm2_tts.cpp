@@ -30,6 +30,10 @@ static int g_cpu_n_threads = 4;
 #define M_PI 3.14159265358979323846
 #endif
 
+#if defined(HAVE_ACCELERATE)
+#include <Accelerate/Accelerate.h>
+#endif
+
 #include <algorithm>
 #include <array>
 #include <cassert>
@@ -60,6 +64,10 @@ static bool vox_env_bool_default_on(const char* k) {
         return true;                 // unset → on
     return std::strcmp(v, "0") != 0; // "0" → off, anything else → on
 }
+
+// VOXCPM2_FORCE_SCALAR=1  — bypass Accelerate GEMM paths in the VAE encoder
+// (useful for benchmarking or debugging on Apple without recompiling).
+static bool s_vox_force_scalar = vox_env_bool("VOXCPM2_FORCE_SCALAR");
 
 static double vox_now_ms() {
     using namespace std::chrono;
@@ -2923,14 +2931,45 @@ static void causal_conv1d(const float* weight, const float* bias, const float* x
     int in_per_grp = in_ch / groups;
     int out_per_grp = out_ch / groups;
 
-    // Depthwise (groups == in_ch == out_ch, in_per_grp == 1) gets the
-    // simple loop — there's nothing to vectorise on ic_inner. Same for
-    // 1x1 conv: weight stride across ic is 1 already, so the inner loop
-    // is contiguous in weight (x is still strided but transpose overhead
-    // dominates the small inner work). All other cases (the dilated k=7
-    // residual-unit convs at the deep upsample blocks) benefit from
-    // laying weight as [k, oc, ic_inner] + transposing x to [t, ic_inner]
-    // so the inner ic dot product is contiguous + NEON-auto-vectorisable.
+#if defined(HAVE_ACCELERATE)
+    // Dense (groups==1): im2col + SGEMM via Accelerate AMX (~100 GFLOP/s on M1).
+    // Override with VOXCPM2_FORCE_SCALAR=1 to benchmark the scalar path.
+    if (groups == 1 && !s_vox_force_scalar) {
+        int K = in_ch * ksize;
+        if (ksize == 1 && stride == 1 && pad == 0) {
+            // col == x_in: direct GEMM, zero allocation
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, out_ch, T_out, K, 1.0f, weight, K, x_in, T_out, 0.0f,
+                        x_out, T_out);
+        } else {
+            std::vector<float> col((size_t)K * T_out, 0.0f);
+            for (int ic = 0; ic < in_ch; ic++) {
+                for (int k = 0; k < ksize; k++) {
+                    const float* x_row = x_in + (size_t)ic * T_in;
+                    float* col_row = col.data() + (size_t)(ic * ksize + k) * T_out;
+                    for (int ot = 0; ot < T_out; ot++) {
+                        int it = ot * stride - pad + k * dilation;
+                        if (it >= 0 && it < T_in)
+                            col_row[ot] = x_row[it];
+                    }
+                }
+            }
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, out_ch, T_out, K, 1.0f, weight, K, col.data(), T_out,
+                        0.0f, x_out, T_out);
+        }
+        if (bias) {
+            for (int oc = 0; oc < out_ch; oc++) {
+                float b_val = bias[oc];
+                float* row = x_out + (size_t)oc * T_out;
+                for (int ot = 0; ot < T_out; ot++)
+                    row[ot] += b_val;
+            }
+        }
+        return;
+    }
+#endif
+
+    // Depthwise (in_per_grp == 1): simple scalar loop — nothing to vectorise.
+    // Grouped with in_per_grp > 1 and ksize > 1: transpose x+w for cache-friendly ic.
     const bool use_transpose = (in_per_grp > 1 && ksize > 1);
     if (!use_transpose) {
 #if defined(_OPENMP)
@@ -4303,22 +4342,55 @@ static std::vector<float> vae_decode(voxcpm2_context* ctx, const std::vector<std
 static void vae_strided_conv1d(const float* weight, const float* bias, const float* x_in, float* x_out, int in_ch,
                                int out_ch, int ksize, int T_in, int stride, int left_pad) {
     int T_out = (T_in + left_pad - ksize) / stride + 1;
+    if (T_out <= 0)
+        return;
+
+#if defined(HAVE_ACCELERATE)
+    // im2col + SGEMM via Accelerate AMX (~100 GFLOP/s on M1).
+    // Override with VOXCPM2_FORCE_SCALAR=1 to use the scalar fallback below.
+    if (!s_vox_force_scalar) {
+        int K = in_ch * ksize;
+        std::vector<float> col((size_t)K * T_out, 0.0f);
+        for (int ic = 0; ic < in_ch; ic++) {
+            for (int k = 0; k < ksize; k++) {
+                const float* x_row = x_in + (size_t)ic * T_in;
+                float* col_row = col.data() + (size_t)(ic * ksize + k) * T_out;
+                int it_base = k - left_pad;
+                for (int ot = 0; ot < T_out; ot++) {
+                    int it = it_base + ot * stride;
+                    if (it >= 0 && it < T_in)
+                        col_row[ot] = x_row[it];
+                }
+            }
+        }
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, out_ch, T_out, K, 1.0f, weight, K, col.data(), T_out,
+                    0.0f, x_out, T_out);
+        if (bias) {
+            for (int oc = 0; oc < out_ch; oc++) {
+                float b_val = bias[oc];
+                float* row = x_out + (size_t)oc * T_out;
+                for (int ot = 0; ot < T_out; ot++)
+                    row[ot] += b_val;
+            }
+        }
+        return;
+    }
+#endif
+
+    // Scalar fallback (cache-unfriendly for large in_ch but correct on all platforms).
 #if defined(_OPENMP)
 #pragma omp parallel for collapse(2) schedule(static)
 #endif
     for (int oc = 0; oc < out_ch; oc++) {
         for (int ot = 0; ot < T_out; ot++) {
-            float b_val = bias ? bias[oc] : 0.0f;
-            float acc = b_val;
+            float acc = bias ? bias[oc] : 0.0f;
             int it_start = ot * stride - left_pad;
             for (int k = 0; k < ksize; k++) {
                 int it = it_start + k;
                 if (it < 0 || it >= T_in)
                     continue;
                 for (int ic = 0; ic < in_ch; ic++) {
-                    float xv = x_in[(size_t)ic * T_in + it];
-                    float wv = weight[(size_t)oc * in_ch * ksize + (size_t)ic * ksize + k];
-                    acc += xv * wv;
+                    acc += x_in[(size_t)ic * T_in + it] * weight[(size_t)oc * in_ch * ksize + (size_t)ic * ksize + k];
                 }
             }
             x_out[(size_t)oc * T_out + ot] = acc;
