@@ -125,6 +125,66 @@ for the implementation write-up.
 
 ---
 
+## Kaggle GPU — full backend sweep — 2026-06-20
+
+Platform: Kaggle GPU worker (CUDA), `tools/kaggle-benchmark-all-backends.py`
+(kernel `${KAGGLE_ACCOUNT}/crispasr-full-backend-sweep`). Commit: latest `main`. **First
+full-coverage sweep** — every ASR + TTS backend plus the two text-MT backends,
+59 entries — with **per-backend results streamed live to an HF dataset**
+(`cstr/crispasr-kaggle-progress/full-backend-sweep/latest/`, resumable). Audio:
+jfk.wav (11 s). TTS phrase: "The quick brown fox…".
+
+**Headline: ASR 33/35 pass · TTS 14/22 pass · MT 2/2 pass.** (Per-backend JSON +
+`summary.json` in the dataset; model-size column is unreliable this run — the
+benchmark mis-detected several as ~55 MB — so it is omitted below.)
+
+### ASR — 33/35 pass (RTx, WER on JFK)
+
+| Backend | RTx | WER | Backend | RTx | WER |
+|---|---|---|---|---|---|
+| SenseVoice Small | 17.9x | 0.0% | Voxtral Mini 3B | 3.3x | 0.0% |
+| Canary 1B | 8.3x | 0.0% | Granite Speech 4.1 2B | 3.1x | 0.0% |
+| Data2Vec Base | 7.2x | 4.5% | Granite Speech 1B | 3.0x | 0.0% |
+| FastConformer CTC | 7.2x | 0.0% | Voxtral 4B Realtime | 2.2x | 0.0% |
+| Moonshine Tiny | 7.5x | 9.1% | Kyutai STT 1B | 2.3x | 0.0% |
+| Cohere Transcribe | 7.0x | 0.0% | VibeVoice ASR | 1.9x | 4.5% |
+| HuBERT Large | 6.8x | 0.0% | Nemotron Streaming | 1.6x | 9.1% |
+| Wav2Vec2 XLSR-EN | 6.9x | 0.0% | OmniASR LLM 300M | 1.4x | 4.5% |
+| OmniASR CTC 1B | 6.2x | 22.7% | Fun-ASR MLT Nano | 1.1x | 0.0% |
+| FunASR Nano | 6.1x | 0.0% | Gemma-4-E2B | 0.9x | 9.1% |
+| Parakeet TDT 0.6B | 5.9x | 0.0% | Granite 4.1 NAR | 0.8x | 0.0% |
+| Whisper (base) | 5.5x | 0.0% | Granite 4.1 2B+ | 0.7x | 0.0% |
+| Qwen3 ASR 0.6B | 5.3x | 0.0% | MOSS Audio | 0.6x | 0.0% |
+| GLM ASR Nano | 5.1x | 0.0% | FireRed ASR2 AED | 0.6x | 0.0% |
+| Paraformer-zh | 4.5x | 0.0% | MiMo-ASR (CPU #115) | 0.5x | 0.0% |
+| Mega-ASR 1.7B | 3.9x | 0.0% | mini-omni2 | 0.8x | 0.0% |
+| Granite Speech 4.1 2B | 3.1x | 0.0% | moonshine-streaming | 2.8x | 0.0% |
+
+**ASR failures (2):** `lfm2-audio` — **CRASH** mid-run (~9.8 s); `vibevoice-1.5b`
+— ran (~17 s) but produced **EMPTY** transcript. Both are newly-covered backends.
+
+### TTS — 14/22 pass
+
+| ✓ pass | ✗ fail (0-byte output) |
+|---|---|
+| piper, kokoro, pocket-tts, bark, csm, parler-tts, dia, qwen3-tts-customvoice, indextts, zonos, melotts, outetts, tada, voxcpm2-tts | speecht5, fastpitch, f5-tts, orpheus, vibevoice-tts, chatterbox, cosyvoice3, **kugelaudio (TIMEOUT 180 s)** |
+
+### MT — 2/2 pass
+
+m2m100 (3.7 s), madlad (12.5 s) — en→de translation produced output.
+
+### Notes
+
+- **Streaming + resume validated end-to-end.** All 59 per-backend JSONs landed in
+  the HF dataset as each backend finished; a re-push skips already-streamed
+  backends. Root cause of the earlier streaming failures (token unresolved on the
+  ${KAGGLE_ACCOUNT} nested mount path) fixed in `81826457`.
+- **10 backends fail on Kaggle CUDA** (2 ASR + 8 TTS) — tracked as TODOs in
+  PLAN.md (§201). Several pass on M1 Metal locally (e.g. cosyvoice3, chatterbox,
+  f5-tts, zonos), so these are CUDA-path-specific.
+- `cosyvoice3` dies in 0.1 s (immediate); `kugelaudio` hangs to the 180 s timeout
+  — distinct failure modes worth separating.
+
 ## Kaggle T4 GPU — 2026-06-03
 
 Platform: Tesla T4 (16 GB VRAM), 4 CPU threads, CUDA. Commit: latest

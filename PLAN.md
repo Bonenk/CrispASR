@@ -700,6 +700,45 @@ token embedding weight, skipping graph-build + sched overhead.
 
 ---
 
+## §201 Kaggle CUDA backend failures — full sweep 2026-06-20 (OPEN)
+
+The first full-coverage Kaggle GPU sweep (`tools/kaggle-benchmark-all-backends.py`,
+results streamed to `cstr/crispasr-kaggle-progress/full-backend-sweep/latest/`,
+see PERFORMANCE.md 2026-06-20) ran 59 backends: **ASR 33/35, TTS 14/22, MT 2/2
+pass**. 10 backends fail **on Kaggle CUDA** — several of these pass on M1 Metal
+locally, so they are CUDA-path-specific, not general breakage. Each is a TODO:
+
+**ASR (2):**
+- [ ] **lfm2-audio** — CRASHes mid-run (~9.8 s) on CUDA. (Hybrid conv+attn
+  backbone; direct-row embed path.) Repro: `--backend lfm2-audio -m auto` on a
+  CUDA box; capture the abort. Passes on Metal? — verify.
+- [ ] **vibevoice-1.5b** — runs (~17 s) but emits an **EMPTY** transcript on
+  CUDA (the 1.5B VibeVoice-ASR variant; the 7B `vibevoice` passes). Likely a
+  decoder/EOS or lm_head issue specific to the 1.5B head on CUDA.
+
+**TTS (8):** all produce **0-byte** output on CUDA.
+- [ ] **speecht5** — fails fast (~2.2 s). Encoder-decoder + HiFi-GAN.
+- [ ] **fastpitch** — fails fast (~1.7 s). Non-AR parallel TTS.
+- [ ] **f5-tts** — fails (~5 s) on CUDA; passes on M1 Metal. DiT flow-matching —
+  likely a CUDA-specific graph/kernel path (cf. the §183/§200 f5 fusion work).
+- [ ] **orpheus** — fails (~16.8 s) on CUDA. Llama-3.2 + SNAC; greedy-loop prone.
+- [ ] **vibevoice-tts** — fails fast (~7 s). Diffusion TTS.
+- [ ] **chatterbox** — fails (~6.3 s) on CUDA; the #83 S3Gen GPU fix was
+  Metal-validated — re-check the CUDA S3Gen path.
+- [ ] **cosyvoice3** — **dies in 0.1 s** (immediate crash) on CUDA; passes on M1
+  Metal. Flow-matching + HiFT — earliest/cheapest to bisect.
+- [ ] **kugelaudio** — **TIMEOUT at 180 s** (hangs, distinct from the crashes).
+  German TTS; likely an infinite/very-slow AR loop on CUDA.
+
+**Method:** the per-backend JSONs in the dataset have timing context; reproduce
+on a CUDA worker (Kaggle T4/P100 or the A1000) with `CRISPASR_VERBOSE=1` and the
+relevant `CRISPASR_<BACKEND>_DEBUG=1`. Group the fast-crashers (speecht5,
+fastpitch, cosyvoice3) separately from the hangs (kugelaudio) and the
+empty-output cases (vibevoice-1.5b). Cross-check each against M1 Metal to confirm
+it is CUDA-specific before deep-diving.
+
+---
+
 ## CosyVoice3-0.5B-2512 TTS — DONE
 
 _Done — see HISTORY.md + git log._
