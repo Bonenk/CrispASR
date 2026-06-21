@@ -65,6 +65,7 @@ archived at `cstr/chatterbox-GGUF/diff-harness-ref/`.
 | `moss-audio` | `tools/reference_backends/moss_audio.py` | — | — | yes | safetensors, torch, transformers |
 | `nemotron` | `tools/reference_backends/nemotron.py` | — | — | yes | gguf, nemo, soundfile, torch, torchaudio |
 | `orpheus` | `tools/reference_backends/orpheus_snac.py` | — | — | yes | snac, torch |
+| `orpheus-talker` | `tools/reference_backends/orpheus_talker.py` | — | — | yes | torch, transformers |
 | `paraformer` | `tools/reference_backends/paraformer.py` | — | — | yes | funasr, torch |
 | `parakeet` | `tools/reference_backends/parakeet.py` | — | — | yes | nemo, torch |
 | `parakeet-maes` | `tools/reference_backends/parakeet_maes.py` | — | — | **no** | nemo, torch |
@@ -115,6 +116,7 @@ code starts working.
 - `moss-audio` — `tools/bootstrap_ref_env.sh moss-audio` then `python tools/dump_reference.py --backend moss-audio --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/moss-audio-ref.gguf`
 - `nemotron` — `tools/bootstrap_ref_env.sh nemotron` then `python tools/dump_reference.py --backend nemotron --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/nemotron-ref.gguf`
 - `orpheus` — `tools/bootstrap_ref_env.sh orpheus` then `python tools/dump_reference.py --backend orpheus --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/orpheus-snac-ref.gguf`
+- `orpheus-talker` — talker (Llama-3.2-3B) AR-decode greedy codec stream. `ORPHEUS_TEXT/SPEAKER/REF_DTYPE` + `ORPHEUS_CUSTOM_OFFSET/COUNT` (match the GGUF), `--model-dir` = the talker LM HF snapshot (e.g. `unsloth/orpheus-3b-0.1-ft`). Run with `crispasr-diff orpheus-talker <talker.gguf> <ref.gguf> <audio>` (`ORPHEUS_DIFF_GPU=1` for the GPU AR loop; `ORPHEUS_DIFF_MAXGEN` caps it). Frozen ref at `hf.co/cstr/orpheus-3b-0.1-ft-GGUF/diff-harness-ref/orpheus-talker-ref.gguf`. Full build→quantize→diff→upload runs on Kaggle via `tools/kaggle/orpheus-talker-cuda/`.
 - `paraformer` — `tools/bootstrap_ref_env.sh paraformer` then `python tools/dump_reference.py --backend paraformer --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/paraformer-ref.gguf`
 - `parakeet` — `tools/bootstrap_ref_env.sh parakeet` then `python tools/dump_reference.py --backend parakeet --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/parakeet-ref.gguf`
 - `parler-tts` — `tools/bootstrap_ref_env.sh parler-tts` then `python tools/dump_reference.py --backend parler-tts --model-dir <dir> --audio samples/jfk.wav --output parler-tts-ref.gguf` (PARLER_TEXT/PARLER_DESC/PARLER_SEED env set desc/text/seed; needs transformers 4.46.x — newer trips parler's config repr). Frozen ref archived at `hf.co/cstr/parler-tts-mini-v1.1-GGUF/parler-mini-v1.1-ref.gguf`. Run with `crispasr-diff parler-tts <model.gguf> <ref.gguf> <audio.wav>` (cap steps via `PARLER_DIFF_MAXGEN`). F16: legacy + bucket both 108/108 vs F32 ground truth.

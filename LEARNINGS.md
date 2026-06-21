@@ -10,6 +10,34 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Kaggle: datasets are per-account, and the ccache dataset has a required shape (§213)
+
+Two traps cost a couple of cold ~25 min CUDA builds before they were caught:
+
+1. **Datasets can't be cross-used between accounts.** A kernel only attaches
+   datasets owned by the account it runs under — Kaggle silently drops a
+   cross-account `dataset_sources` entry (*"not valid dataset sources"*) and
+   pushes the kernel **without** it. So `${KAGGLE_ACCOUNT}/crispasr-ccache` cannot attach to
+   a `${KAGGLE_ACCOUNT}` kernel. The fix is a per-account **copy** of every dataset (both
+   accounts already keep their own `crispasr-hf-token`); make `crispasr-ccache`
+   exist under both too. (Don't switch the kernel's account to chase a dataset.)
+
+2. **The ccache dataset must be a `ccache.tar` (a tar of `.ccache/`) or a literal
+   `.ccache/` directory** at the mount root — that's all `kaggle_harness`
+   `_warm_ccache_from_dataset()` looks for. Both `crispasr-ccache` datasets had
+   the cache **shards (`0`–`f`) at the dataset root** instead, so the harness
+   printed `ccache: no seed dataset found (cold build)` and **every build had
+   been cold** (nobody noticed — cold builds still finish, just ~10 min slower).
+   Re-pack as `cd /kaggle/working && tar cf ccache.tar .ccache/` and
+   `datasets version -r tar` under **each** account's token. To refresh, pull a
+   completed build kernel's `/kaggle/working/.ccache` (or its `ccache.tar`) and
+   re-version both copies.
+
+Also: Kaggle GPU workers have ~20 GB RAM (the older "13 GB" note is stale), so a
+3B PyTorch reference fits in F32 on CPU even on a P100 — but the P100 is sm_60,
+which modern torch wheels don't support (`cuda.is_available()` returns True yet
+every GPU kernel fails), so gate GPU use on `get_device_capability()[0] >= 7`.
+
 ## DRY shared headers can exist for months before callers migrate (§175)
 
 Both `src/core/lang_names.h` (§175 item 1) and `src/core/bpe.h` (§175 item 2)

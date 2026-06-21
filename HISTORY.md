@@ -6,6 +6,39 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-21 §213 Orpheus talker diff harness — localizing the CUDA 0-byte
+
+Built talker-level diff coverage for Orpheus (the SNAC-only `orpheus` diff
+never touched the Llama-3.2-3B AR decode where the §201 CUDA 0-byte must
+live):
+
+- `ORPHEUS_PROMPT_IDS` override in `orpheus.cpp` (mirrors PARLER_PROMPT_IDS)
+  so the diff feeds the reference's exact prompt tokens.
+- `tools/reference_backends/orpheus_talker.py` — greedy codec-token stream
+  (`gen_codes`) from the PyTorch talker; codec-block range env-configurable
+  (orpheus-3b-0.1-ft ships offset=128256 count=28683, **not** 128266/28672).
+- `crispasr-diff orpheus-talker` branch (`ORPHEUS_DIFF_GPU` runs the AR loop
+  on the GPU; `ORPHEUS_DIFF_MAXGEN` caps it).
+- Kaggle pipeline `tools/kaggle/orpheus-talker-cuda/`: build (CUDA) →
+  convert → **crispasr-quantize** Q8_0/Q4_K → ref → talker+SNAC diffs (CPU vs
+  GPU) → HF upload → ccache save-back. Resilient (per-step `safe()`), so one
+  failing step never aborts the run.
+
+**Result (Kaggle P100):** the talker AR decode emits codes on CUDA, **GPU
+byte-identical to CPU** (the diff FAIL is bf16-vs-F32-ref precision, 47.6%,
+not a functional failure), and the **SNAC vocoder PASSES on GPU 8/8**. Both
+components work on CUDA → the 0-byte is the full-synthesize glue or already
+fixed; end-to-end CUDA test pending. F16/Q8_0/Q4_K GGUFs + the talker ref are
+published at `cstr/orpheus-3b-0.1-ft-GGUF`.
+
+Infra fix found along the way: both `crispasr-ccache` datasets were
+mis-formatted (cache shards at the dataset root, not a `ccache.tar` /
+`.ccache/` the harness recognizes) — so the ccache had **never** warmed any
+CUDA build. Re-packaged both as `ccache.tar`; builds are warm now. See
+LEARNINGS.
+
+---
+
 ## 2026-06-21 §212 Chatterbox — s3gen now honours the CPU thread env (+ optional gated cached-uncond T3 path)
 
 Two configurability items from the T3-CFG perf dig.

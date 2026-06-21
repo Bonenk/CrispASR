@@ -751,6 +751,15 @@ mistakes, not bugs**, leaving **7 genuine failures** (+1 pending). Of those 7,
 
 **GENUINE bugs — fail on CUDA even with correct args (TODO):**
 - [ ] **orpheus** (TTS) — 0-byte (~17 s) with `--voice tara`. Llama-3.2 + SNAC.
+  **§213 (2026-06-21):** built a talker-level diff (`crispasr-diff orpheus-talker`,
+  ref at `cstr/orpheus-3b-0.1-ft-GGUF/diff-harness-ref/`) and ran it on a Kaggle
+  P100 alongside the SNAC diff. Both components work on CUDA: the talker AR decode
+  **emits codes, GPU byte-identical to CPU** (the diff "FAIL" is bf16-vs-ref
+  precision only, 47.6%), and **SNAC vocoder PASSES on GPU 8/8**. So the 0-byte is
+  in neither component — it's the full `orpheus_synthesize` glue (undelay →
+  codes→SNAC, or the full-length *sampled* generation the 48-step greedy diff
+  doesn't exercise) **or already fixed** since §201. Next: one end-to-end
+  `orpheus_synthesize` on CUDA to confirm.
 - [ ] **chatterbox** (TTS) — 0-byte (~14 s) with `--voice <wav> --i-have-rights`;
   the #83 S3Gen GPU fix was Metal-validated — re-check the CUDA S3Gen path.
 - [ ] **cosyvoice3** (TTS) — **dies in 0.1 s** even with a reference voice; passes
