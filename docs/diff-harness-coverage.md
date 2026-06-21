@@ -17,6 +17,14 @@ at `tools/reference_backends/<name>.py`, add an env spec at
 `examples/cli/crispasr_diff_main.cpp`. Then `tools/bootstrap_ref_env.sh
 <name>` + `python tools/dump_reference.py --backend <name> ...`.
 
+Reference dumps are archived to HuggingFace: each `<name>-ref.gguf`
+lives under `diff-harness-ref/` in that model's GGUF repo (e.g.
+`cstr/chatterbox-GGUF/diff-harness-ref/chatterbox-ref.gguf`,
+`cstr/canary-1b-v2-GGUF`, `cstr/zonos-v0.1-transformer-GGUF`; the
+`orpheus` backend's ref is the SNAC decoder, archived in
+`cstr/snac-24khz-GGUF`). Fetch one to run the harness without
+regenerating (which needs the model download + a per-backend env).
+
 | backend | ref module | archive | mtime | harness | deps |
 |---|---|---|---|---|---|
 | `canary` | `tools/reference_backends/canary.py` | — | — | yes | nemo, torch |
