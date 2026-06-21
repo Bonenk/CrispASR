@@ -27,6 +27,7 @@
 #include "gguf.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <chrono>
 #include <cmath>
