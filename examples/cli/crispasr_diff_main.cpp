@@ -1100,6 +1100,15 @@ int main(int argc, char** argv) {
             chatterbox_free(ctx);
             return 4;
         }
+        // CHATTERBOX_LANG=<code> selects the multilingual path (prepends [lang]
+        // + enables NFKD normalization, #170). Required for the t3_text_tokens
+        // stage to match a multilingual reference archive. Empty = English.
+        if (const char* env_lang = std::getenv("CHATTERBOX_LANG")) {
+            if (*env_lang) {
+                chatterbox_set_language(ctx, env_lang);
+                fprintf(stderr, "[crispasr-diff] CHATTERBOX_LANG=%s -> multilingual path\n", env_lang);
+            }
+        }
         // ---- VE pipeline (Module 2 of native voice clone) ----
         // `samples` is the 16 kHz mono float32 PCM that the harness loaded.
         // Same buffer the python dumper feeds `model.ve.embeds_from_wavs([audio], 16000)`.
@@ -1277,6 +1286,45 @@ int main(int argc, char** argv) {
             }
             if (!syn_text || !*syn_text)
                 syn_text = "Hello world.";
+
+            // Deterministic text-token stage (issue #170): the ids fed into the
+            // T3 prefill (normalize + NFKD + BPE + [lang]) must match upstream
+            // MTLTokenizer.encode exactly. This is the locus of the Arabic
+            // letter-hallucination bug — unlike the stochastic AR decode below,
+            // it is fully deterministic and gets an exact integer-match check.
+            {
+                auto ref_txt = ref.get_f32("t3_text_tokens");
+                if (!ref_txt.first || ref_txt.second == 0) {
+                    printf("[SKIP] t3_text_tokens         not in reference archive\n");
+                    n_skip++;
+                } else {
+                    int nt = 0;
+                    int32_t* ctoks = chatterbox_dump_text_tokens(ctx, syn_text, &nt);
+                    if (!ctoks) {
+                        printf("[SKIP] t3_text_tokens         chatterbox_dump_text_tokens failed\n");
+                        n_skip++;
+                    } else {
+                        const size_t nref = ref_txt.second;
+                        const size_t ncmp = std::min((size_t)nt, nref);
+                        int n_mismatch =
+                            (int)((nt < 0 ? 0 : (size_t)nt) > nref ? (size_t)nt - nref : nref - (size_t)nt);
+                        for (size_t i = 0; i < ncmp; ++i) {
+                            if (ctoks[i] != (int32_t)std::lrint(ref_txt.first[i]))
+                                n_mismatch++;
+                        }
+                        const bool ok = ((size_t)nt == nref) && n_mismatch == 0;
+                        printf("[%s] t3_text_tokens         c++=%d ids  ref=%zu ids  mismatches=%d  "
+                               "criterion=exact-int-match deterministic (#170 NFKD)\n",
+                               ok ? "PASS" : "FAIL", nt, nref, n_mismatch);
+                        if (ok)
+                            n_pass++;
+                        else
+                            n_fail++;
+                        chatterbox_tokens_free(ctoks);
+                    }
+                }
+            }
+
             int pT = 0, pD = 0, pCondT = 0;
             float* pemb = chatterbox_dump_t3_prefill_emb(ctx, syn_text, &pT, &pD, &pCondT);
             if (!pemb) {

@@ -2686,6 +2686,34 @@ extern "C" int chatterbox_set_s3gen_path(struct chatterbox_context* ctx, const c
     return 0;
 }
 
+extern "C" int32_t* chatterbox_dump_text_tokens(struct chatterbox_context* ctx, const char* text, int* out_n) {
+    if (!ctx || !text || !out_n)
+        return nullptr;
+    *out_n = 0;
+
+    // Mirror the tokenization block of chatterbox_synthesize_tokens exactly:
+    // normalize (NFKD on the multilingual path, #170) → BPE tokenize →
+    // prepend [lang]. Deterministic — no AR sampling.
+    std::string norm_text = chatterbox_text_prep::normalize(text, !ctx->language.empty());
+    std::vector<int32_t> text_tokens;
+    if (ctx->tokenizer.has_bpe) {
+        text_tokens = ctx->tokenizer.bpe_byte_level ? tokenize_text_bpe(ctx->tokenizer, norm_text)
+                                                    : tokenize_text_hf_bpe(ctx->tokenizer, norm_text);
+    } else {
+        text_tokens = tokenize_text(ctx->tokenizer, norm_text);
+    }
+    prepend_language_token(ctx, text_tokens);
+
+    const int n = (int)text_tokens.size();
+    int32_t* out = (int32_t*)malloc((size_t)(n > 0 ? n : 1) * sizeof(int32_t));
+    if (!out)
+        return nullptr;
+    for (int i = 0; i < n; ++i)
+        out[i] = text_tokens[(size_t)i];
+    *out_n = n;
+    return out;
+}
+
 extern "C" int32_t* chatterbox_synthesize_tokens(struct chatterbox_context* ctx, const char* text, int* out_n) {
     if (!ctx || !text || !out_n)
         return nullptr;
