@@ -23,7 +23,16 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 
 ### What's new (v0.6.9+)
 
-- **Long-audio fix (issue #89):** NeMo-style streamed pipeline (global z-norm + 8 s chunked encode + single TDT decode) is now the default path for parakeet / canary / fastconformer-ctc at any duration. The single-pass-over-the-whole-clip encoder was numerically unstable to codec-level audio perturbations and could drop most of a 60 s clip; the streamed path is stable. Tuneable via `CRISPASR_PARAKEET_STREAM_THRESHOLD` (escape hatch back to single-pass) / `_CHUNK` / `_OVERLAP` env vars.
+- **Parakeet long-audio = NeMo-exact (issue #89 / §216):** non-JA parakeet models
+  (v3 / multilingual / EN) now default to a single full-attention pass, which is
+  byte-for-byte identical to upstream NeMo (`nvidia/parakeet-tdt-0.6b-v3`,
+  100.00 % word match 30 s→5 min); clips past a 300 s memory cap are silence-split
+  into single-pass pieces with **no boundary duplicates**, and `--vad` is fixed
+  too (each slice decodes single-pass). The JA-only model keeps the streamed
+  pipeline (its bidirectional encoder collapses on a full pass past ~20 s, #89).
+  Gates: `CRISPASR_PARAKEET_STREAM_THRESHOLD` / `_LONGFORM` / `_INTERNAL_CHUNKING`.
+  canary / fastconformer-ctc still use the NeMo-style streamed pipeline (global
+  z-norm + chunked encode + single decode) at any duration.
 - **Paraformer-zh:** non-autoregressive Mandarin+English ASR backend (220M params, single-pass CIF decode). `--backend paraformer -m auto`.
 - **Hotwords (PLAN #98):** `--hotwords "Tokyo,CrispASR"` for CTC/TDT contextual biasing + LLM prompt injection on supported backends.
 - **Global diarization (#110):** `--diarize-method sherpa` / `pyannote` now runs once on the full audio, producing consistent speaker IDs across the entire file.

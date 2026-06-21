@@ -10,6 +10,34 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Always A/B against the *upstream reference*, not just your own option matrix (§216)
+
+Parakeet long-form shipped a "streamed" (chunked-encode + single-decode) default
+because a 2026-05-26 option matrix found it beat the dispatcher's chunk-30+merge.
+Both were inferior: on the v3/multilingual model the streamed path *collapses*
+(5 min → 75 words), and chunk-30+merge duplicates a phrase at every boundary.
+The matrix never included the obvious third option — **one full-attention pass
+over the whole clip** — which turns out to be byte-for-byte identical to upstream
+NeMo (`nvidia/parakeet-tdt-0.6b-v3`, 706/706 words, 30 s→5 min, 100.00 %).
+
+Lessons:
+- When a model has a Python reference (NeMo here), make the reference output the
+  baseline for the A/B, not just internal variants of your own pipeline. A
+  length sweep (30/60/120/240/300 s) vs the reference localized the collapse
+  immediately and proved single-pass was exact. Run the reference on macOS by
+  stubbing `sys.modules["eventlet"]=None` before `import nemo` (else the
+  wandb→trio import dies with "unsupported platform").
+- "Complete output" ≠ "correct": chunk-30+merge produced *more* text than
+  streamed, which is exactly why it was picked — but the extra text was boundary
+  duplicates. Diff against the reference, don't count words.
+- Token-id-exact LCS dedup can't stitch overlap regions that two chunks
+  transcribe *differently* (different encoder context → different tokens). If
+  you must chunk, cut at silence and commit each piece by word timestamp at a
+  single shared cut — no overlap region to dedup.
+- Full self-attention is O(T²): ~5 min is memory-safe on 16 GB, ~28 min OOMs
+  (it crashed the dev M1). Cap single-pass and silence-split beyond the cap;
+  each piece stays bounded. See HISTORY §216.
+
 ## §214 Metal batched (B=2) quantized mat-vec ≠ the single-token PREC_F32 path
 
 When you batch a single-token decode into `B=2` (cond+uncond CFG, hidden

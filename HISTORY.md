@@ -49,7 +49,10 @@ non-bucket path on short utterances (97 s vs 75 s), the same reason parler's
 bucket is opt-in. It may still win on discrete GPU / CUDA, where the non-bucket
 path's per-step host↔device KV traffic dominates — kept available, not removed.
 
-## 2026-06-21 §215 Parakeet long-form — single-pass = NeMo-exact for non-JA (fixes boundary dups + VAD speech-drop)
+## 2026-06-21 §216 Parakeet long-form — single-pass = NeMo-exact for non-JA (fixes boundary dups + VAD speech-drop)
+
+(Numbered §216 to avoid a collision with the concurrent orpheus §215 above;
+the originating commits `1c8523cc`/`96abf039` say "§215" in their messages.)
 
 Reported symptom: parakeet on a 5-min German clip (and the 28-min ARD
 "Fünf Säulen des Islam") produced a duplicated phrase at every chunk

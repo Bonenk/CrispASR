@@ -216,37 +216,64 @@ CRISPASR_NEMOTRON_MAES=1 crispasr -m nemotron-3.5-asr-streaming-0.6b-q4_k.gguf \
   --backend nemotron --beam-size 4 -f audio.wav
 ```
 
-### Parakeet streamed encoding (issue #89)
+### Parakeet long-form encoding (issue #89 / §216)
 
-Parakeet always encodes audio in overlapping 8 s windows (global
-z-norm + chunked encode + single TDT decode pass). The bidirectional
-FastConformer encoder is numerically unstable when the attention spans
-the whole utterance: codec-level perturbations as small as 0.3 % RMS
-flipped the encoder output std by ~14 % on the issue #89 reporter's
-clip, driving the TDT decoder into emit-blank-forever past ~20 s. Local
-8 s attention windows do not amplify that noise.
+Parakeet's long-audio path is **model-dependent** — the JA-only model and the
+multilingual / v3 / EN models behave very differently:
 
-**Env vars for tuning:**
+- **Non-JA (v3 / multilingual / EN, vocab > 4096):** a single full-attention
+  pass is byte-for-byte identical to upstream NeMo (verified 100 % word match
+  vs `nvidia/parakeet-tdt-0.6b-v3`, 30 s → 5 min). The backend advertises
+  internal chunking so the dispatcher hands it the whole clip, then:
+  - **≤ cap** (default 300 s): one full-attention pass — NeMo-exact.
+  - **> cap:** split at silence into ≤cap single-pass pieces, each transcribed
+    with ±2 s acoustic context and committed by word timestamp at a single
+    shared cut — no overlap, no gap, **no boundary duplicates**, memory bounded
+    by the cap. (Full attention is O(T²): ~5 min is safe on 16 GB, ~28 min
+    OOMs, hence the cap + silence-split.)
+
+  This replaced the old forced `streamed` path, which *collapsed* on v3
+  (5 min → 75 words), and the dispatcher chunk-30 + LCS-merge fallback, which
+  duplicated a phrase at every 30 s boundary (token-id-exact LCS can't cancel
+  the divergent re-transcription of the overlap).
+- **JA-only (vocab ≤ 4096):** the bidirectional encoder is numerically unstable
+  when attention spans the whole utterance — codec-level perturbations as small
+  as 0.3 % RMS flipped the encoder output std by ~14 % on the #89 clip, driving
+  the TDT decoder into emit-blank-forever past ~20 s. JA therefore keeps the
+  **streamed** path (global z-norm + overlapping encoder windows + single TDT
+  decode) driven by the dispatcher's VAD / 30 s chunking — unchanged from
+  before §216.
+
+**Env vars for tuning (all override the per-model defaults):**
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CRISPASR_PARAKEET_STREAM_THRESHOLD` | 0 | Use single-pass (no chunked encode) for audio ≤ this duration (seconds).  `0` = always streamed.  `999` = single-pass for audio under ~16 minutes (escape hatch for bit-exact NeMo reproduction). |
-| `CRISPASR_PARAKEET_STREAM_CHUNK` | 8 | Encoder chunk size (seconds) |
-| `CRISPASR_PARAKEET_STREAM_OVERLAP` | 2 | Encoder overlap (seconds) between consecutive chunks |
+| `CRISPASR_PARAKEET_STREAM_THRESHOLD` | non-JA 300, JA 0 | Single-pass cap (seconds). Audio ≤ this gets one full-attention pass; `0` disables single-pass entirely (always streamed). |
+| `CRISPASR_PARAKEET_LONGFORM` | non-JA 1, JA 0 | `1` = silence-split single-pass above the cap; `0` = streamed fallback above the cap. |
+| `CRISPASR_PARAKEET_INTERNAL_CHUNKING` | non-JA on, JA off | `0` = revert to the dispatcher's chunk-30 + overlap-save + LCS-merge path (A/B). |
+| `CRISPASR_PARAKEET_STREAM_CHUNK` | 0 (auto: 8 JA / 30 non-JA) | Streamed-path encoder chunk size (seconds). |
+| `CRISPASR_PARAKEET_STREAM_OVERLAP` | 2 | Streamed-path encoder overlap (seconds). |
 
-**Example: transcribe a 5-minute Japanese podcast:**
+CLI escape hatches (no env needed): `--chunk-seconds N` forces the dispatcher's
+N-second chunk + merge; `--vad` forces the VAD path.
+
+**Examples:**
 
 ```bash
-# Default — streamed encoding for any length:
-crispasr -m parakeet-tdt-0.6b-ja.gguf -f podcast.wav -osrt
+# Non-JA (v3): default is NeMo-exact single-pass / silence-split longform —
+# no flags needed, any length:
+crispasr -m parakeet-tdt-0.6b-v3.gguf -f long_de.wav -osrt
 
-# Opt into single-pass for short audio (matches upstream NeMo bit-exactly
-# on clips where the encoder doesn't go unstable):
-CRISPASR_PARAKEET_STREAM_THRESHOLD=999 \
-  crispasr -m parakeet-tdt-0.6b-ja.gguf -f short_clip.wav -osrt
+# JA model — streamed by default (single-pass collapses past ~20 s):
+crispasr -m parakeet-tdt-0.6b-ja.gguf -f podcast_ja.wav --vad -osrt
 
-# With VAD for finest segmentation:
-crispasr -m parakeet-tdt-0.6b-ja.gguf -f podcast.wav --vad -osrt
+# Force the old dispatcher chunk+merge path for comparison:
+CRISPASR_PARAKEET_INTERNAL_CHUNKING=0 \
+  crispasr -m parakeet-tdt-0.6b-v3.gguf -f long_de.wav -osrt
+
+# Lower the single-pass cap on a memory-constrained box (splits sooner):
+CRISPASR_PARAKEET_STREAM_THRESHOLD=120 \
+  crispasr -m parakeet-tdt-0.6b-v3.gguf -f long_de.wav -osrt
 ```
 
 ### How VAD works
@@ -299,16 +326,14 @@ crispasr --backend parakeet -m parakeet.gguf -f long_audio.wav \
   `voxtral`, `voxtral4b`, `qwen3`): use a CTC aligner together with
   `--vad`. Without VAD, leading silence can throw off sentence
   starts, especially for the qwen3 forced aligner.
-- **Any length:** parakeet routes through the NeMo-style streamed
-  pipeline — global z-norm + overlapping 8 s encoder chunks + single
-  TDT decode pass — by default, regardless of duration. No manual
-  `--chunk-seconds` needed. Tune chunk/overlap with
-  `CRISPASR_PARAKEET_STREAM_CHUNK` (default 8) and
-  `CRISPASR_PARAKEET_STREAM_OVERLAP` (default 2). See the
-  "Parakeet streamed encoding" section above for details.
-- **If parakeet OOMs on very long audio:** lower the stream chunk size
-  with `CRISPASR_PARAKEET_STREAM_CHUNK=4`. The default 8 s chunks use
-  ~30 MB per chunk for the encoder; 4 s halves that.
+- **Any length (non-JA v3 / multilingual / EN):** a single full-attention
+  pass is NeMo-exact and the default; clips over the 300 s cap are
+  silence-split into single-pass pieces with no boundary duplicates. No
+  manual `--chunk-seconds` needed. JA-only models use the streamed path
+  instead. See the "Parakeet long-form encoding" section above.
+- **If parakeet OOMs on very long audio:** lower the single-pass cap with
+  `CRISPASR_PARAKEET_STREAM_THRESHOLD=120` so the silence-split longform
+  kicks in sooner (each piece is then ≤120 s of full attention).
 - **Hybrid TDT+CTC models** (e.g. `parakeet-tdt_ctc-0.6b-ja`): pass
   `--parakeet-decoder ctc` to use the CTC head. CTC decode is
   frame-synchronous and avoids TDT emission-frame-shift artifacts
