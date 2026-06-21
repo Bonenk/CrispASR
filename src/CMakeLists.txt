@@ -1955,17 +1955,20 @@ if (TARGET pcs AND NOT TARGET crisp_punc)
 endif()
 
 # crisp_punc / crisp_truecase / crisp_lid are pulled in via add_subdirectory
-# from sibling dirs, so under the Xcode generator they land in separate
-# sub-projects. Apple's ld-prime (Xcode 15/16) with -dead_strip then drops
-# their archive members from the libcrispasr shared-lib link even though
-# crispasr_c_api.cpp references them (fireredpunc_*/pcs_*/truecaser_lstm_*/
-# text_lid_*) — the ios-xcode-build job failed with exactly those 12 undefined
-# symbols. force_load guarantees the members are kept. Apple-only; the GNU/MSVC
-# linkers resolve these fine, and the normal target_link_libraries above still
-# provides the build-order dependency + include dirs.
+# from sibling dirs and define crispasr_c_api.cpp's fireredpunc_*/pcs_*/
+# truecaser_lstm_*/text_lid_* symbols. Under the Xcode generator the
+# target_link_libraries() dependency above is NOT honored as a hard build-order
+# constraint: the ios-xcode-build job's Ld of libcrispasr.dylib started ~9 ms
+# after `Libtool libcrisp_punc.a` *began*, i.e. it linked the archive before it
+# finished writing → those exact 12 symbols came up undefined (even with
+# -force_load, which then just force-loaded an empty archive).
+#   1. add_dependencies forces Xcode to finish archiving these before the link.
+#   2. -force_load keeps the now-complete archive members past -dead_strip.
+# Apple-only; the GNU/MSVC linkers resolve these fine.
 if(APPLE)
     foreach(_force_lib crisp_punc crisp_truecase crisp_lid)
         if(TARGET ${_force_lib})
+            add_dependencies(crispasr-lib ${_force_lib})
             target_link_options(crispasr-lib PRIVATE
                 "LINKER:-force_load,$<TARGET_FILE:${_force_lib}>")
         endif()
