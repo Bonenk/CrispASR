@@ -293,6 +293,16 @@ struct chatterbox_s3gen_context {
     // full GPU + GGML_PREC_F32 mul_mat hints; opt-out via CRISPASR_S3GEN_UNET_CPU=1).
     bool unet_on_gpu = false;
 
+    // Set at load time on Metal when the CFM (s3.fd.*) weights are quantized.
+    // The Metal q8 CFM compounds F16-precision error through the 10-step Euler
+    // solver into NaN (the GGML_PREC_F32 mul_mat hints are not enough — non-
+    // mul_mat ops still accumulate in F16). Routing the CFM to CPU restores
+    // finite, reference-matching mel (F16 s3gen stays GPU-resident). CUDA is
+    // not affected (PLAN #83 validated GPU+PREC_F32 to cos 1.0 on P100), so
+    // this is gated to Metal builds. Opt back onto GPU with
+    // CRISPASR_S3GEN_UNET_CPU=0.
+    bool force_unet_cpu = false;
+
 
     ggml_backend_t backend = nullptr;
     ggml_backend_t backend_cpu = nullptr;
@@ -373,6 +383,26 @@ struct chatterbox_s3gen_context {
 // scheduler then routes those compute ops to CPU; only the GPU-resident
 // weight tensors stay on GPU and get copied over as needed.
 enum class s3gen_subgraph { encoder, unet, vocoder };
+// True when the CFM denoiser weights (s3.fd.*) in the GGUF are quantized.
+// Peeks tensor types from the metadata without loading the weights, so the
+// residency decision can be made before the (split) load.
+static bool s3gen_cfm_is_quantized(const char* path) {
+    gguf_context* meta = core_gguf::open_metadata(path);
+    if (!meta)
+        return false;
+    bool quantized = false;
+    const int64_t n = gguf_get_n_tensors(meta);
+    for (int64_t i = 0; i < n; i++) {
+        const char* name = gguf_get_tensor_name(meta, i);
+        if (name && std::strncmp(name, "s3.fd.", 6) == 0 && ggml_is_quantized(gguf_get_tensor_type(meta, i))) {
+            quantized = true;
+            break;
+        }
+    }
+    core_gguf::free_metadata(meta);
+    return quantized;
+}
+
 static bool s3gen_env_force_cpu(s3gen_subgraph which) {
     const char* envname = nullptr;
     switch (which) {
@@ -452,7 +482,7 @@ static void s3gen_maybe_pin_graph_to_cpu(chatterbox_s3gen_context* c, ggml_cgrap
     // Override: set CRISPASR_S3GEN_UNET_PIN_CPU_OP, CRISPASR_S3GEN_UNET_KEEP_GPU_OP,
     // or CRISPASR_S3GEN_UNET_CPU=1 to take manual control.
     // force_cpu takes full priority — auto_pin_mm does not apply when UNET_CPU=1.
-    const bool force_cpu = s3gen_env_force_cpu(which);
+    const bool force_cpu = s3gen_env_force_cpu(which) || (is_unet && c->force_unet_cpu);
     const bool auto_pin_mm = is_unet && c->unet_pin_mm_cpu && !keep_mode && !pin_only_mode && !force_cpu;
 
     if (!force_cpu && !keep_mode && !pin_only_mode && !auto_pin_mm)
@@ -603,8 +633,26 @@ extern "C" struct chatterbox_s3gen_context* chatterbox_s3gen_init_from_file(cons
     // Opt-out: CRISPASR_S3GEN_UNET_CPU=1 reverts to CPU residency for debugging.
     {
         const char* unet_cpu_env = std::getenv("CRISPASR_S3GEN_UNET_CPU");
-        const bool unet_cpu_forced =
+        // Explicit env wins both ways: =1/y forces CPU, =0/n forces GPU (lets a
+        // user override the Metal-q8 auto-route below).
+        const bool unet_cpu_env_on =
             unet_cpu_env && (unet_cpu_env[0] == '1' || unet_cpu_env[0] == 'y' || unet_cpu_env[0] == 'Y');
+        const bool unet_cpu_env_off =
+            unet_cpu_env && (unet_cpu_env[0] == '0' || unet_cpu_env[0] == 'n' || unet_cpu_env[0] == 'N');
+#ifdef GGML_USE_METAL
+        // Auto-route a quantized CFM to CPU on Metal: the q8 s3.fd.* weights make
+        // the Metal CFM compound F16-precision error into NaN over the 10 Euler
+        // steps (mul_mat F32 hints are not enough). See force_unet_cpu comment.
+        if (!unet_cpu_env_off && c->backend != c->backend_cpu && s3gen_cfm_is_quantized(path)) {
+            c->force_unet_cpu = true;
+            if (verbosity >= 1) {
+                fprintf(stderr, "s3gen: quantized CFM on Metal → routing UNet1D to CPU "
+                                "(avoids Metal q8 F16-accumulation NaN; F16 s3gen stays GPU-resident; "
+                                "override with CRISPASR_S3GEN_UNET_CPU=0)\n");
+            }
+        }
+#endif
+        const bool unet_cpu_forced = unet_cpu_env_on || c->force_unet_cpu;
         c->unet_on_gpu = (c->backend != c->backend_cpu) && !unet_cpu_forced;
         if (c->backend != c->backend_cpu && unet_cpu_forced) {
             // Hybrid: UNet weights on CPU, rest on GPU (opt-out path).

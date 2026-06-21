@@ -43,11 +43,32 @@ S3Tokenizer / CAMPPlus / CosyVoice3 mels.
   (`conv_pre rms=3.53` vs ref 5.50); moonshine ASR roundtrip → "the quick
   brown fox jumps over the lazy dog" (recognizable).
 
-**Separate pre-existing issue (NOT this fix).** The **q8** s3gen vocoder
-NaNs on M1 Metal (`conv_pre rms=nan`, `STFT range [1e30,0]`) — present in the
-unfixed baseline too, and absent with F16 s3gen. May be Metal-specific; a
-Kaggle re-run with this fix is needed to confirm chatterbox q8 (the sweep
-default) produces good audio on CUDA. Tracked separately.
+### Second fix — q8 s3gen CFM NaN on Metal (`chatterbox_s3gen.cpp`)
+
+With the crash fixed, the **q8** s3gen path then produced **all-NaN audio on
+M1 Metal** (`conv_pre rms=nan`; the `STFT range [1e30,0]` is just the
+uninitialised `stft_min` sentinel — every vocoder value is NaN). Pre-existing
+(the unfixed baseline NaNs identically), absent with F16 s3gen.
+
+Bisected with the `CRISPASR_S3GEN_*_CPU` / `UNET_*_OP` levers:
+- It's the **CFM (UNet1D) Metal compute**, not the vocoder (`UNET_CPU=1` →
+  clean) and not the q8 *data* (CPU dequant → clean, reference-matching mel).
+- It's a **compound F16-precision** failure: `mul_mat` is already CPU-pinned
+  for F32 accumulation, yet it still NaNs; per-op bisects exonerate
+  `flash_attn_ext` and `mish` individually. The q8 quantisation noise inflates
+  intermediate magnitudes enough that the F16 accumulation in the remaining
+  Metal ops compounds to NaN across the 10-step Euler solver.
+
+Fix: `s3gen_cfm_is_quantized()` peeks GGUF tensor types for a quantized
+`s3.fd.*`; on **Metal builds** (`#ifdef GGML_USE_METAL`) a quantized CFM on GPU
+is auto-routed to CPU (`force_unet_cpu`) — the validated-clean residency. F16
+s3gen stays GPU-resident; CUDA is untouched (PLAN #83 validated GPU+PREC_F32 to
+cos 1.0 on P100, so the crash fix alone should let the q8 sweep pass there).
+Override with `CRISPASR_S3GEN_UNET_CPU=0`. Result: q8 default-config synth
+produces finite, reference-matching audio (`conv_pre rms≈3.4`).
+
+Open: confirm on a Kaggle CUDA re-run that q8 chatterbox (the sweep default)
+produces good audio there with the FFT fix (the Metal CFM route is M1-only).
 
 ## 2026-06-20 §176b+c handover prompts — remaining AR decode graph cache targets
 
