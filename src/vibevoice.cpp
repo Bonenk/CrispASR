@@ -783,85 +783,9 @@ static std::vector<float> run_token_embedding_lookup(vibevoice_context* ctx, con
     return embeds;
 }
 
-// GPT-2/Qwen-style byte decoder. Qwen2 tokenizer pieces are UTF-8 strings
-// that represent raw bytes through this remapping.
-static std::vector<int>& qwen_byte_decoder() {
-    static std::vector<int> dec(0x200, -1);
-    static bool initialized = false;
-    if (initialized)
-        return dec;
-
-    std::vector<int> bs, cs;
-    for (int b = 0x21; b <= 0x7e; ++b) {
-        bs.push_back(b);
-        cs.push_back(b);
-    }
-    for (int b = 0xa1; b <= 0xac; ++b) {
-        bs.push_back(b);
-        cs.push_back(b);
-    }
-    for (int b = 0xae; b <= 0xff; ++b) {
-        bs.push_back(b);
-        cs.push_back(b);
-    }
-
-    int n = 0;
-    for (int b = 0; b < 256; ++b) {
-        bool present = false;
-        for (int x : bs) {
-            if (x == b) {
-                present = true;
-                break;
-            }
-        }
-        if (!present) {
-            bs.push_back(b);
-            cs.push_back(256 + n);
-            ++n;
-        }
-    }
-
-    for (size_t i = 0; i < bs.size(); ++i) {
-        if ((size_t)cs[i] < dec.size())
-            dec[(size_t)cs[i]] = bs[i];
-    }
-    initialized = true;
-    return dec;
-}
-
+// Thin alias — delegates to core_bpe::token_bytes_to_utf8() (§175 DRY).
 static std::string decode_qwen_piece(const std::string& s) {
-    auto& dec = qwen_byte_decoder();
-    std::string out;
-    size_t i = 0;
-    while (i < s.size()) {
-        unsigned char c = (unsigned char)s[i];
-        int cp = 0;
-        int len = 1;
-        if (c < 0x80) {
-            cp = c;
-            len = 1;
-        } else if ((c & 0xE0) == 0xC0) {
-            cp = c & 0x1F;
-            len = 2;
-        } else if ((c & 0xF0) == 0xE0) {
-            cp = c & 0x0F;
-            len = 3;
-        } else if ((c & 0xF8) == 0xF0) {
-            cp = c & 0x07;
-            len = 4;
-        } else {
-            ++i;
-            continue;
-        }
-        if (i + (size_t)len > s.size())
-            break;
-        for (int k = 1; k < len; ++k)
-            cp = (cp << 6) | (s[i + (size_t)k] & 0x3F);
-        i += (size_t)len;
-        if (cp >= 0 && cp < (int)dec.size() && dec[(size_t)cp] >= 0)
-            out.push_back((char)dec[(size_t)cp]);
-    }
-    return out;
+    return core_bpe::token_bytes_to_utf8(s);
 }
 
 static void vibevoice_dump_i32(const char* dir, const char* name, const int32_t* data, size_t n) {

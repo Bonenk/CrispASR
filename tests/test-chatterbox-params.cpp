@@ -17,7 +17,7 @@ TEST_CASE("chatterbox_params: default values are sensible", "[unit][chatterbox]"
     REQUIRE(p.min_p == Catch::Approx(0.05f));
     REQUIRE(p.top_p == Catch::Approx(1.0f));
     REQUIRE(p.max_speech_tokens == 1000);
-    REQUIRE(p.cfm_steps == 10);
+    REQUIRE(p.cfm_steps == 6); // §207: default changed 10→6
 }
 
 // PLAN #89 plumbing — every backend with `use_gpu` now also carries

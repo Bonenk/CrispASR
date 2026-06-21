@@ -13,6 +13,7 @@
 // across all four consumers above.
 
 #include "crispasr_session.h"
+#include "core/bpe.h"
 
 #include <atomic>
 #include <cstdint>
@@ -1667,80 +1668,9 @@ struct ca_token_record {
     std::vector<crispasr_session_seg::word_alt> alts;
 };
 
-// GPT-2 byte-level BPE decoder. Mirrors HF's bytes_to_unicode reverse map.
-// Used by qwen3 / granite tokenizers and any GPT-2 / Llama-3 family.
-static const std::vector<int>& gpt2_byte_decoder() {
-    static std::vector<int> dec;
-    static bool initialized = false;
-    if (initialized)
-        return dec;
-    dec.assign(0x200, -1);
-    std::vector<int> bs, cs;
-    for (int b = 0x21; b <= 0x7e; b++) {
-        bs.push_back(b);
-        cs.push_back(b);
-    }
-    for (int b = 0xa1; b <= 0xac; b++) {
-        bs.push_back(b);
-        cs.push_back(b);
-    }
-    for (int b = 0xae; b <= 0xff; b++) {
-        bs.push_back(b);
-        cs.push_back(b);
-    }
-    int n = 0;
-    for (int b = 0; b < 256; b++) {
-        bool present = false;
-        for (int x : bs)
-            if (x == b) {
-                present = true;
-                break;
-            }
-        if (!present) {
-            bs.push_back(b);
-            cs.push_back(256 + n);
-            n++;
-        }
-    }
-    for (size_t i = 0; i < bs.size(); i++)
-        if ((size_t)cs[i] < dec.size())
-            dec[cs[i]] = bs[i];
-    initialized = true;
-    return dec;
-}
-
+// Thin alias — delegates to core_bpe::token_bytes_to_utf8() (§175 DRY).
 static std::string gpt2_byte_decode(const std::string& s) {
-    const auto& dec = gpt2_byte_decoder();
-    std::string out;
-    size_t i = 0;
-    while (i < s.size()) {
-        unsigned char c = (unsigned char)s[i];
-        int cp = 0, len = 1;
-        if (c < 0x80) {
-            cp = c;
-            len = 1;
-        } else if ((c & 0xE0) == 0xC0) {
-            cp = c & 0x1F;
-            len = 2;
-        } else if ((c & 0xF0) == 0xE0) {
-            cp = c & 0x0F;
-            len = 3;
-        } else if ((c & 0xF8) == 0xF0) {
-            cp = c & 0x07;
-            len = 4;
-        } else {
-            i++;
-            continue;
-        }
-        if (i + len > s.size())
-            break;
-        for (int k = 1; k < len; k++)
-            cp = (cp << 6) | (s[i + k] & 0x3F);
-        i += len;
-        if (cp >= 0 && cp < (int)dec.size() && dec[cp] >= 0)
-            out.push_back((char)dec[cp]);
-    }
-    return out;
+    return core_bpe::token_bytes_to_utf8(s);
 }
 
 // SentencePiece-style word grouping. Each token's `text` either starts with a

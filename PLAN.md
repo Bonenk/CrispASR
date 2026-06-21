@@ -149,14 +149,14 @@ Candidates (audited 2026-06-19):
    `crispasr_c_api.cpp` (`ca_iso_to_english_lang`), `gemma4_e2b.cpp`
    (`g4e_lang_name`). Unit test: `tests/test-core-lang-names.cpp`.
 
-2. **GPT-2 byte-level BPE decoder.** ~3+ cpp definitions plus header copies
-   across `examples/cli/crispasr_backend_{mimo_asr,glm_asr,qwen3,moss_audio,
-   granite}.cpp`, `cli.cpp`, and `src/{qwen3_asr,lfm2_audio}.cpp`,
-   `src/{granite_speech,qwen3_asr}.h`. **Audit carefully: two distinct
-   variants exist** — (a) the full 256-byte `byte_decoder()` printable-Unicode
-   inverse (qwen3/parakeet) and (b) the simpler `Ġ→space, Ċ→newline` piece
-   decoder (glm/mimo/moss). They are NOT interchangeable; consolidate each
-   family separately into `src/core/bpe_decode.h`. Medium risk.
+2. **GPT-2 byte-level BPE decoder — DONE (variant a).** 6 copies of the
+   full 256-byte `byte_decoder()` + `decode_token()` / `gpt2_byte_decode()`
+   now delegate to `core_bpe::token_bytes_to_utf8()` (already in
+   `src/core/bpe.h`): `crispasr_c_api.cpp`, `lfm2_audio.cpp`,
+   `vibevoice.cpp`, `crispasr_backend_{qwen3,moss_audio,mimo_asr}.cpp`.
+   Unit test: `tests/test-core-bpe.cpp`. Variant (b) — the simpler
+   `Ġ→space, Ċ→newline` inline replacements in glm_asr / c_api — is
+   2 call sites, not worth a helper.
 
 3. **Language-instruction prompt templates.** "Transcribe the speech in
    <lang>." now duplicated CLI↔C-ABI per backend (§174). Semantically coupled

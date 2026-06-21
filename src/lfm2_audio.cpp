@@ -830,21 +830,7 @@ static const std::vector<int32_t> kPrefixEn = {1,   6,     24131, 708, 8173, 119
 // <|im_end|>\n
 static const std::vector<int32_t> kSuffix = {7, 708};
 
-// GPT-2 byte decoder: reverse of bytes_to_unicode()
-// Maps unicode codepoints back to raw bytes.
-static const std::vector<int>& byte_decoder() {
-    static std::vector<int> bd(512, -1);
-    static bool init = false;
-    if (init)
-        return bd;
-    const auto& be = core_bpe::byte_encoder();
-    for (int b = 0; b < 256; b++)
-        bd[be[b]] = b;
-    init = true;
-    return bd;
-}
-
-// Decode a BPE token to raw UTF-8 bytes using the GPT-2 byte_decoder
+// Decode a BPE token to raw UTF-8 bytes using core_bpe (§175 DRY).
 static std::string decode_token(const lfm2_audio_model& model, int32_t id) {
     if (id < 0 || id >= (int32_t)model.vocab.size())
         return "";
@@ -852,48 +838,7 @@ static std::string decode_token(const lfm2_audio_model& model, int32_t id) {
     // Skip special tokens (they start with < and end with >)
     if (!piece.empty() && piece[0] == '<' && piece.back() == '>')
         return "";
-    const auto& bd = byte_decoder();
-    std::string result;
-    // Iterate over UTF-8 codepoints in the piece
-    size_t i = 0;
-    while (i < piece.size()) {
-        uint32_t cp = 0;
-        int len = 1;
-        uint8_t c = (uint8_t)piece[i];
-        if (c < 0x80) {
-            cp = c;
-            len = 1;
-        } else if ((c & 0xE0) == 0xC0) {
-            cp = c & 0x1F;
-            len = 2;
-        } else if ((c & 0xF0) == 0xE0) {
-            cp = c & 0x0F;
-            len = 3;
-        } else if ((c & 0xF8) == 0xF0) {
-            cp = c & 0x07;
-            len = 4;
-        }
-        for (int j = 1; j < len && i + j < piece.size(); j++)
-            cp = (cp << 6) | ((uint8_t)piece[i + j] & 0x3F);
-        i += len;
-        // Map codepoint back to byte via the GPT-2 byte_decoder
-        if (cp < (uint32_t)bd.size() && bd[cp] >= 0) {
-            result += (char)(uint8_t)bd[cp];
-        } else {
-            // Codepoint not in the byte_decoder — pass through as UTF-8
-            if (cp < 0x80) {
-                result += (char)cp;
-            } else if (cp < 0x800) {
-                result += (char)(0xC0 | (cp >> 6));
-                result += (char)(0x80 | (cp & 0x3F));
-            } else if (cp < 0x10000) {
-                result += (char)(0xE0 | (cp >> 12));
-                result += (char)(0x80 | ((cp >> 6) & 0x3F));
-                result += (char)(0x80 | (cp & 0x3F));
-            }
-        }
-    }
-    return result;
+    return core_bpe::token_bytes_to_utf8(piece);
 }
 
 // Build a ggml graph that runs one LFM backbone forward pass on the full
