@@ -122,7 +122,7 @@ run(["cmake", "-S", str(REPO), "-B", str(BUILD), "-DCMAKE_BUILD_TYPE=Release",
 step("cmake_done")
 with kh.build_heartbeat("cmake.build"):
     kh.sh_with_progress(
-        f"stdbuf -oL -eL cmake --build {BUILD} --target crispasr-diff crispasr-quantize "
+        f"stdbuf -oL -eL cmake --build {BUILD} --target crispasr-diff crispasr-quantize crispasr-cli "
         f"-j{kh.safe_build_jobs(gpu=True)}")
 step("build_done")
 
@@ -139,7 +139,8 @@ def _find(name):
 
 DIFF = _find("crispasr-diff")
 QUANT = _find("crispasr-quantize")
-step("binaries", diff=str(DIFF), quant=str(QUANT))
+CLI = _find("crispasr")  # crispasr-cli target -> OUTPUT_NAME crispasr
+step("binaries", diff=str(DIFF), quant=str(QUANT), cli=str(CLI))
 os.environ["LD_LIBRARY_PATH"] = f"{BUILD / 'src'}:{os.environ.get('LD_LIBRARY_PATH', '')}"
 
 # ── ccache save-back (snapshot the warm cache for dataset refresh) ──────────
@@ -240,17 +241,65 @@ if REF.exists():
          {"ORPHEUS_DIFF_MAXGEN": MAXGEN, "ORPHEUS_DIFF_GPU": "1"})
 
 
+SNAC = WORK / "snac-24khz.gguf"
+
+
 def do_snac():
     from huggingface_hub import hf_hub_download
     hf_hub_download("cstr/snac-24khz-GGUF", "snac-24khz.gguf", local_dir=str(WORK), token=hf_token)
     hf_hub_download("cstr/snac-24khz-GGUF", "diff-harness-ref/orpheus-snac-ref.gguf", local_dir=str(WORK), token=hf_token)
-    snac = WORK / "snac-24khz.gguf"
     snac_ref = WORK / "diff-harness-ref" / "orpheus-snac-ref.gguf"
-    run_diff("snac_cpu", "orpheus", snac, snac_ref, {})
-    run_diff("snac_gpu", "orpheus", snac, snac_ref, {"ORPHEUS_SNAC_GPU": "1"})
+    run_diff("snac_cpu", "orpheus", SNAC, snac_ref, {})
+    run_diff("snac_gpu", "orpheus", SNAC, snac_ref, {"ORPHEUS_SNAC_GPU": "1"})
 
 
 safe("snac", do_snac)
+
+
+# ── DECISIVE end-to-end synthesize: does the full orpheus pipeline emit a
+#    non-zero WAV on CUDA?  The sweep (§201) reported a 0-byte on CUDA while
+#    talker+SNAC both pass in isolation, so the bug (if any remains) lives in
+#    the full-synthesize glue. Runs the exact CLI path the sweep used:
+#    crispasr --backend orpheus -m <talker> --codec-model <snac> --voice tara
+#    GPU is on by default (cli.cpp use_gpu=true); --no-gpu forces CPU.
+def run_synth(label, model, gpu):
+    out = WORK / f"orpheus-e2e-{label}.wav"
+    if out.exists():
+        out.unlink()
+    cmd = [str(CLI), "--backend", "orpheus", "-m", str(model),
+           "--codec-model", str(SNAC), "--voice", SPEAKER,
+           "--tts-text", TEXT, "--tts-output", str(out)]
+    if not gpu:
+        cmd.append("--no-gpu")
+    step(f"{label}_start")
+    t0 = time.time()
+    try:
+        r = subprocess.run(cmd, timeout=900, stdout=subprocess.PIPE,
+                           stderr=subprocess.STDOUT, text=True)
+        rc, log = r.returncode, r.stdout
+    except subprocess.TimeoutExpired as ex:
+        rc = -1
+        log = ex.stdout.decode(errors="replace") if isinstance(ex.stdout, bytes) else (ex.stdout or "")
+    (RESULTS / f"{label}.txt").write_text(log or "")
+    print((log or "")[-3000:], flush=True)
+    size = out.stat().st_size if out.exists() else 0
+    verdict = "PASS" if size > 1000 else "ZERO_BYTE"  # >1KB WAV = real audio
+    res = {"label": label, "rc": rc, "wav_bytes": size, "elapsed": round(time.time() - t0, 2),
+           "verdict": verdict}
+    SUMMARY["results"].append(res)
+    step(f"{label}_done", **res)
+    return res
+
+
+def do_e2e():
+    if not SNAC.exists() or not F16.exists():
+        step("e2e_skip", reason="missing snac or talker gguf")
+        return
+    safe("e2e_cpu", run_synth, "e2e_cpu", F16, False)
+    safe("e2e_gpu", run_synth, "e2e_gpu", F16, True)
+
+
+safe("e2e", do_e2e)
 
 
 # ── Upload GGUFs + ref to HF (each file isolated) ──────────────────────────
