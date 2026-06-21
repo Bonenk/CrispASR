@@ -497,8 +497,8 @@ static bool alloc_cross_kv(m2m100_context* c, int T_enc) {
     c->cross_kv_k.resize(nl);
     c->cross_kv_v.resize(nl);
     for (int i = 0; i < nl; i++) {
-        c->cross_kv_k[i] = ggml_new_tensor_3d(c->cross_kv_ctx, GGML_TYPE_F32, hd, T_enc, nh);
-        c->cross_kv_v[i] = ggml_new_tensor_3d(c->cross_kv_ctx, GGML_TYPE_F32, hd, T_enc, nh);
+        c->cross_kv_k[i] = ggml_new_tensor_3d(c->cross_kv_ctx, GGML_TYPE_F16, hd, T_enc, nh);
+        c->cross_kv_v[i] = ggml_new_tensor_3d(c->cross_kv_ctx, GGML_TYPE_F16, hd, T_enc, nh);
         char name[64];
         snprintf(name, sizeof(name), "cross_k_%d", i);
         ggml_set_name(c->cross_kv_k[i], name);
@@ -658,12 +658,15 @@ static bool compute_cross_kv(m2m100_context* c, const float* enc_out, int T_enc)
         // Copy results to cross_kv tensors
         ggml_tensor* K_out = ggml_graph_get_tensor(gf, "cross_k");
         ggml_tensor* V_out = ggml_graph_get_tensor(gf, "cross_v");
-        size_t sz = (size_t)hd * T_enc * nh * sizeof(float);
-        std::vector<float> buf(hd * T_enc * nh);
-        ggml_backend_tensor_get(K_out, buf.data(), 0, sz);
-        ggml_backend_tensor_set(c->cross_kv_k[il], buf.data(), 0, sz);
-        ggml_backend_tensor_get(V_out, buf.data(), 0, sz);
-        ggml_backend_tensor_set(c->cross_kv_v[il], buf.data(), 0, sz);
+        const size_t n_elem = (size_t)hd * T_enc * nh;
+        std::vector<float> buf(n_elem);
+        std::vector<ggml_fp16_t> buf16(n_elem);
+        ggml_backend_tensor_get(K_out, buf.data(), 0, n_elem * sizeof(float));
+        ggml_fp32_to_fp16_row(buf.data(), buf16.data(), (int)n_elem);
+        ggml_backend_tensor_set(c->cross_kv_k[il], buf16.data(), 0, n_elem * sizeof(ggml_fp16_t));
+        ggml_backend_tensor_get(V_out, buf.data(), 0, n_elem * sizeof(float));
+        ggml_fp32_to_fp16_row(buf.data(), buf16.data(), (int)n_elem);
+        ggml_backend_tensor_set(c->cross_kv_v[il], buf16.data(), 0, n_elem * sizeof(ggml_fp16_t));
 
         ggml_free(ctx0);
     }

@@ -48,7 +48,7 @@ test-all-backends.py passes 18/18 transcribe + 51/54 feature tests (3 stream ski
 
 | Priority | Item | Effort | Status |
 |---|---|---|---|
-| **HIGH** | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | 20 sub-items (§176a–§176t). **15 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **5 OPEN**: §176c (device-resident KV), §176i (cross-KV F16), §176k (FireRed KV), §176l (Kyutai RVQ), §176n (VoxCPM2 Metal). |
+| **HIGH** | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | 20 sub-items (§176a–§176t). **16 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176i (cross-KV F16, 5 backends), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **4 OPEN**: §176c (device-resident KV), §176k (FireRed KV), §176l (Kyutai RVQ), §176n (VoxCPM2 Metal). |
 | **MEDIUM** | [#52 Qwen3-TTS](#52-qwen3-tts) — perf pass | Medium | talker + code_predictor + codec + ECAPA + codec_encoder all done; step-4 perf pass open (~137 ms/frame → real-time). **O15 broken on CUDA and default-OFF** (`61c42bfb`) — main perf lever disabled. **2026-06-13 Kaggle P100:** dedicated-sched fix (`baef21aa`) didn't help — O15=ON still rc=-6 SIGABRT at 6.0s. Crash is on the *first* code_pred call (not cached reuse), so root cause is `ggml_set_rows`-based KV scatter or the fixed-Lk causal mask on CUDA, not sched sharing. Baseline O15=OFF: 27.4 ms/frame, WAV OK. |
 | **HIGH** | [#57 Commercial-friendly TTS expansion](#57-commercial-friendly-tts-backend-expansion) | Phased | Phases 1–3 + Turbo + native voice cloning shipped (→ HISTORY §82). **#83 S3Gen production fix LANDED** — UNet weight-residency split + `parallel=true` sched cache-coherency fix; M1 Metal diff cos_min 0.940→0.999976, intelligible at all T. **Remaining:** Kartoffelbox_Turbo DE. → see HISTORY + upstream-prs/09–11. |
 | **MEDIUM** | [#51c MiMo-V2.5-ASR F16 step decode](#51c-f16-step-decode) | Small | F16 step-decode validation blocked behind ≥32 GB box (see PLAN #51c); base runtime + Q4_K shipped → HISTORY §56 |
@@ -116,7 +116,7 @@ parity is DONE (HISTORY).
 
 ---
 
-## §175 Surgical DRY — share pure helpers across the CLI/library boundary (OPEN)
+## §175 Surgical DRY — share pure helpers across the CLI/library boundary (MOSTLY DONE)
 
 **Context.** The `CrispasrBackend` adapter layer (`examples/cli/`) and the
 session C ABI (`src/crispasr_c_api.cpp`, the dylib every binding + the HTTP
@@ -143,12 +143,11 @@ stage harness, and `tests/regression/manifest.json` before and after.
 
 Candidates (audited 2026-06-19):
 
-1. **ISO-639-1 → English language-name map — DO FIRST.** Literally 4 full
-   copies (6-15 langs each): `examples/cli/crispasr_backend_utils.h`
-   (`crispasr_iso_to_english_lang`), `examples/cli/crispasr_backend_voxtral.cpp`,
-   `src/crispasr_c_api.cpp` (`ca_iso_to_english_lang`), `src/gemma4_e2b.cpp`.
-   → `src/core/lang_names.h`, header-only `inline`. Lowest risk (pure lookup,
-   trivially bit-identical), highest copy count. Unit test the table.
+1. **ISO-639-1 → English language-name map — DONE.** `src/core/lang_names.h`
+   header-only `inline core_lang::iso_to_english()`. All 4 former copies now
+   delegate: `crispasr_backend_utils.h` (`crispasr_iso_to_english_lang`),
+   `crispasr_c_api.cpp` (`ca_iso_to_english_lang`), `gemma4_e2b.cpp`
+   (`g4e_lang_name`). Unit test: `tests/test-core-lang-names.cpp`.
 
 2. **GPT-2 byte-level BPE decoder.** ~3+ cpp definitions plus header copies
    across `examples/cli/crispasr_backend_{mimo_asr,glm_asr,qwen3,moss_audio,
@@ -740,7 +739,10 @@ mistakes, not bugs**, leaving **7 genuine failures** (+1 pending). Of those 7,
 - [ ] **chatterbox** (TTS) — 0-byte (~14 s) with `--voice <wav> --i-have-rights`;
   the #83 S3Gen GPU fix was Metal-validated — re-check the CUDA S3Gen path.
 - [ ] **cosyvoice3** (TTS) — **dies in 0.1 s** even with a reference voice; passes
-  on M1 Metal. Flow-matching + HiFT — earliest/cheapest to bisect.
+  on M1 Metal. Flow-matching + HiFT — earliest/cheapest to bisect. **Note
+  (2026-06-21):** §205's mixed-radix FFT fix explicitly covers CosyVoice3's
+  `n_fft=400` mel (same heap overflow as chatterbox). Likely resolved — needs
+  Kaggle CUDA re-test to confirm.
 - [ ] **kugelaudio** (TTS) — ran to completion (~322 s, under the bumped 420 s
   timeout) but produced **0 bytes** → empty-output bug, not just slow. ~5.7 GB
   Q4_K, so also a big model.
@@ -5679,12 +5681,19 @@ scalar C++, blocks GPU dispatch).
 
 #### §176i Cross-KV in F16 (not F32)
 
-**Status:** OPEN
+**Status:** DONE (2026-06-21)
 **Effort:** Small
 **Backends:** M2M-100, T5, SpeechT5, Dia, Parler
 **Approach:** Cross-attention K/V is projected once from the encoder and
-read-only thereafter. F16 halves memory with no accuracy impact. Change
-the allocation dtype and adjust the view/write paths.
+read-only thereafter. F16 halves memory with no accuracy impact. Changed
+allocation dtype to `GGML_TYPE_F16` and added `ggml_fp32_to_fp16_row`
+conversion in the write path. All five backends updated:
+- `t5_translate.cpp`: alloc + write path
+- `m2m100.cpp`: alloc + write path
+- `speecht5_tts.cpp`: alloc only (uses `ggml_cpy` which auto-converts)
+- `dia_tts.cpp`: alloc + staging vectors + graph inputs + write path + dump
+- `parler_tts.cpp`: alloc + buffer size + staging vectors + graph inputs + write path (both bucket and legacy paths)
+Build + 688 unit tests pass. FireRed ASR cross-KV unchanged (separate architecture).
 
 #### §176j Replace recursive FFT (core/fft.h) with iterative
 

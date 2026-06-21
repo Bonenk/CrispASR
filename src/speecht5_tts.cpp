@@ -586,8 +586,8 @@ static void precompute_cross_kv(speecht5_tts_context* ctx, const std::vector<flo
         ctx->cross_kv_k.resize(n_layers);
         ctx->cross_kv_v.resize(n_layers);
         for (int l = 0; l < n_layers; l++) {
-            ctx->cross_kv_k[l] = ggml_new_tensor_2d(ctx->ctx_cross_kv, GGML_TYPE_F32, hp.hidden_size, T_enc);
-            ctx->cross_kv_v[l] = ggml_new_tensor_2d(ctx->ctx_cross_kv, GGML_TYPE_F32, hp.hidden_size, T_enc);
+            ctx->cross_kv_k[l] = ggml_new_tensor_2d(ctx->ctx_cross_kv, GGML_TYPE_F16, hp.hidden_size, T_enc);
+            ctx->cross_kv_v[l] = ggml_new_tensor_2d(ctx->ctx_cross_kv, GGML_TYPE_F16, hp.hidden_size, T_enc);
         }
         ctx->buf_cross_kv = ggml_backend_alloc_ctx_tensors(ctx->ctx_cross_kv, ctx->backend);
         ctx->cross_kv_T_enc = T_enc;

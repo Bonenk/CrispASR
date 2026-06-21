@@ -1365,12 +1365,12 @@ static ggml_cgraph* build_decoder_step_graph(parler_tts_context* c, int T_dec, i
             cross_k = c->cross_kv_k[il];
             cross_v = c->cross_kv_v[il];
         } else {
-            cross_k = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, D, T_enc);
+            cross_k = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, D, T_enc);
             snprintf(name_buf, sizeof(name_buf), "cross_k_%d", il);
             ggml_set_name(cross_k, name_buf);
             ggml_set_input(cross_k);
 
-            cross_v = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, D, T_enc);
+            cross_v = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, D, T_enc);
             snprintf(name_buf, sizeof(name_buf), "cross_v_%d", il);
             ggml_set_name(cross_v, name_buf);
             ggml_set_input(cross_v);
@@ -1579,8 +1579,9 @@ int32_t* parler_tts_synthesize_codes(struct parler_tts_context* ctx, const char*
     // Precompute cross-attention KV projections (one-time per description)
     // cross_k[layer] = K_proj @ enc_hidden, cross_v[layer] = V_proj @ enc_hidden
     // Each is (D, T_enc) stored flat
-    std::vector<std::vector<float>> cross_k_cache(n_layers);
-    std::vector<std::vector<float>> cross_v_cache(n_layers);
+    // §176i: cross-KV stored as F16 (read-only after projection, halves memory)
+    std::vector<std::vector<ggml_fp16_t>> cross_k_cache(n_layers);
+    std::vector<std::vector<ggml_fp16_t>> cross_v_cache(n_layers);
 
     {
         // Build a small graph for cross KV projection
@@ -1625,14 +1626,16 @@ int32_t* parler_tts_synthesize_codes(struct parler_tts_context* ctx, const char*
 
         for (int il = 0; il < n_layers; il++) {
             char buf[64];
-            cross_k_cache[il].resize(D * T_enc);
-            cross_v_cache[il].resize(D * T_enc);
+            const size_t n_elem = (size_t)D * T_enc;
+            std::vector<float> f32_buf(n_elem);
+            cross_k_cache[il].resize(n_elem);
+            cross_v_cache[il].resize(n_elem);
             snprintf(buf, sizeof(buf), "xk_%d", il);
-            ggml_backend_tensor_get(ggml_graph_get_tensor(gf, buf), cross_k_cache[il].data(), 0,
-                                    (size_t)D * T_enc * sizeof(float));
+            ggml_backend_tensor_get(ggml_graph_get_tensor(gf, buf), f32_buf.data(), 0, n_elem * sizeof(float));
+            ggml_fp32_to_fp16_row(f32_buf.data(), cross_k_cache[il].data(), (int)n_elem);
             snprintf(buf, sizeof(buf), "xv_%d", il);
-            ggml_backend_tensor_get(ggml_graph_get_tensor(gf, buf), cross_v_cache[il].data(), 0,
-                                    (size_t)D * T_enc * sizeof(float));
+            ggml_backend_tensor_get(ggml_graph_get_tensor(gf, buf), f32_buf.data(), 0, n_elem * sizeof(float));
+            ggml_fp32_to_fp16_row(f32_buf.data(), cross_v_cache[il].data(), (int)n_elem);
         }
     }
 
@@ -1773,11 +1776,11 @@ int32_t* parler_tts_synthesize_codes(struct parler_tts_context* ctx, const char*
             ctx->cross_kv_k.assign(n_layers, nullptr);
             ctx->cross_kv_v.assign(n_layers, nullptr);
             for (int il = 0; il < n_layers; il++) {
-                ctx->cross_kv_k[il] = ggml_new_tensor_2d(ctx->cross_kv_ctx, GGML_TYPE_F32, D, T_enc);
-                ctx->cross_kv_v[il] = ggml_new_tensor_2d(ctx->cross_kv_ctx, GGML_TYPE_F32, D, T_enc);
+                ctx->cross_kv_k[il] = ggml_new_tensor_2d(ctx->cross_kv_ctx, GGML_TYPE_F16, D, T_enc);
+                ctx->cross_kv_v[il] = ggml_new_tensor_2d(ctx->cross_kv_ctx, GGML_TYPE_F16, D, T_enc);
             }
             // Explicit backend buffer (Metal residency-set safe), one slab for all layers.
-            size_t ck_size = (size_t)ggml_type_size(GGML_TYPE_F32) * D * T_enc;
+            size_t ck_size = (size_t)ggml_type_size(GGML_TYPE_F16) * D * T_enc;
             ctx->cross_kv_buf = ggml_backend_alloc_buffer(ctx->backend, (size_t)2 * n_layers * ck_size);
             uint8_t* ck_base = (uint8_t*)ggml_backend_buffer_get_base(ctx->cross_kv_buf);
             size_t off = 0;
@@ -1793,9 +1796,9 @@ int32_t* parler_tts_synthesize_codes(struct parler_tts_context* ctx, const char*
             ggml_backend_buffer_clear(ctx->dkv_buf, 0); // unwritten tail slots = 0 (masked to -inf at read)
             for (int il = 0; il < n_layers; il++) {
                 ggml_backend_tensor_set(ctx->cross_kv_k[il], cross_k_cache[il].data(), 0,
-                                        (size_t)D * T_enc * sizeof(float));
+                                        (size_t)D * T_enc * sizeof(ggml_fp16_t));
                 ggml_backend_tensor_set(ctx->cross_kv_v[il], cross_v_cache[il].data(), 0,
-                                        (size_t)D * T_enc * sizeof(float));
+                                        (size_t)D * T_enc * sizeof(ggml_fp16_t));
             }
         } else {
             use_bucket = false; // allocation failed → legacy path
@@ -1860,9 +1863,9 @@ int32_t* parler_tts_synthesize_codes(struct parler_tts_context* ctx, const char*
         for (int il = 0; il < n_layers; il++) {
             char buf[64];
             snprintf(buf, sizeof(buf), "cross_k_%d", il);
-            safe_set(gf, buf, cross_k_cache[il].data(), (size_t)D * T_enc * sizeof(float));
+            safe_set(gf, buf, cross_k_cache[il].data(), (size_t)D * T_enc * sizeof(ggml_fp16_t));
             snprintf(buf, sizeof(buf), "cross_v_%d", il);
-            safe_set(gf, buf, cross_v_cache[il].data(), (size_t)D * T_enc * sizeof(float));
+            safe_set(gf, buf, cross_v_cache[il].data(), (size_t)D * T_enc * sizeof(ggml_fp16_t));
         }
 
         if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
@@ -2043,9 +2046,9 @@ int32_t* parler_tts_synthesize_codes(struct parler_tts_context* ctx, const char*
                 safe_set(gf, buf, ctx->kv_v.data() + (size_t)il * kv_capacity * D,
                          (size_t)past_len * D * sizeof(float));
                 snprintf(buf, sizeof(buf), "cross_k_%d", il);
-                safe_set(gf, buf, cross_k_cache[il].data(), (size_t)D * T_enc * sizeof(float));
+                safe_set(gf, buf, cross_k_cache[il].data(), (size_t)D * T_enc * sizeof(ggml_fp16_t));
                 snprintf(buf, sizeof(buf), "cross_v_%d", il);
-                safe_set(gf, buf, cross_v_cache[il].data(), (size_t)D * T_enc * sizeof(float));
+                safe_set(gf, buf, cross_v_cache[il].data(), (size_t)D * T_enc * sizeof(ggml_fp16_t));
             }
 
             if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
