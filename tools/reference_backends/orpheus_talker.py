@@ -65,15 +65,20 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
 
     print(f"orpheus_talker ref: loading {model_dir}", file=sys.stderr)
     tok = AutoTokenizer.from_pretrained(str(model_dir))
-    # 3B model: float32 (~12 GB) risks OOM on a 16 GB box; bf16 (~6 GB) is
-    # ample ground truth for a greedy-argmax token comparison (cf. F16 GGUF).
-    dtype = getattr(torch, os.environ.get("ORPHEUS_REF_DTYPE", "bfloat16"))
+    # Prefer GPU+F32 (clean ground truth, fits VRAM on a 16 GB GPU); on a
+    # CPU-only / low-RAM box fall back to bf16 (~6 GB). Override via
+    # ORPHEUS_REF_DTYPE (float32|bfloat16|float16).
+    cuda = torch.cuda.is_available()
+    default_dtype = "float32" if cuda else "bfloat16"
+    dtype = getattr(torch, os.environ.get("ORPHEUS_REF_DTYPE", default_dtype))
+    dev = "cuda" if cuda else "cpu"
     model = AutoModelForCausalLM.from_pretrained(
-        str(model_dir), torch_dtype=dtype, low_cpu_mem_usage=True).eval()
+        str(model_dir), torch_dtype=dtype, low_cpu_mem_usage=True).to(dev).eval()
+    print(f"orpheus_talker ref: device={dev} dtype={dtype}", file=sys.stderr)
 
     body = tok(f"{speaker}: {text}", return_tensors="pt").input_ids[0]  # incl. BOS 128000
     prompt = ([AUDIO_START] + body.tolist() + [EOT, AUDIO_EOT, AUDIO_EOM, AUDIO_END])
-    prompt_ids = torch.tensor([prompt], dtype=torch.long)
+    prompt_ids = torch.tensor([prompt], dtype=torch.long).to(dev)
 
     captures: Dict[str, Any] = {}
     if "prompt_ids" in stages:
@@ -92,7 +97,7 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
                 break
             if CUSTOM_TOKEN_OFFSET <= nxt < CUSTOM_TOKEN_OFFSET + CUSTOM_TOKEN_COUNT:
                 gen_codes.append(nxt)
-            step_in = torch.tensor([[nxt]], dtype=torch.long)
+            step_in = torch.tensor([[nxt]], dtype=torch.long).to(dev)
             out = model(input_ids=step_in, past_key_values=past, use_cache=True)
             logits = out.logits[:, -1, :]
             past = out.past_key_values
