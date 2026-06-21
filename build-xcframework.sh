@@ -268,7 +268,14 @@ combine_static_libraries() {
     local src_libs=()
     while IFS= read -r -d '' lib; do
         src_libs+=("$lib")
+    # crisp_lid / crisp_punc / crisp_truecase are STATIC libs added via
+    # add_subdirectory(.. ${CMAKE_BINARY_DIR}/crisp_<x>), so their .a lands
+    # under build/crisp_<x>/, NOT build/src/ — include those roots too or the
+    # iOS dylib link fails with undefined fireredpunc_*/pcs_*/text_lid_*/
+    # truecaser_lstm_* symbols. Missing roots are skipped (-print0 2>/dev/null).
     done < <(find "${base_dir}/${build_dir}/src" "${base_dir}/${build_dir}/crisp_audio" \
+                  "${base_dir}/${build_dir}/crisp_lid" "${base_dir}/${build_dir}/crisp_punc" \
+                  "${base_dir}/${build_dir}/crisp_truecase" \
                   -path "*/${release_dir}/*.a" -print0 2>/dev/null)
     if [ ${#src_libs[@]} -gt 0 ]; then
         echo "Auto-discovered ${#src_libs[@]} static backend libraries under src/${release_dir}/ + crisp_audio/${release_dir}/"
