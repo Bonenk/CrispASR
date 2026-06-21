@@ -1100,6 +1100,9 @@ int main(int argc, char** argv) {
             chatterbox_free(ctx);
             return 4;
         }
+        // The runtime default is 6 CFM steps (a perf default); the reference
+        // dump uses 10, so pin 10 here for an apples-to-apples mel/CFM diff.
+        chatterbox_set_cfm_steps(ctx, 10);
         // CHATTERBOX_LANG=<code> selects the multilingual path (prepends [lang]
         // + enables NFKD normalization, #170). Required for the t3_text_tokens
         // stage to match a multilingual reference archive. Empty = English.

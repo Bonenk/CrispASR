@@ -6,6 +6,31 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-21 §207 Chatterbox CFM default 10→6 Euler steps (perf, perceptual parity)
+
+Profiling the F16-dequant chatterbox path (§205) on M1 Metal: the S3Gen CFM
+Euler solver is ~54% of synthesis (10 steps × ~1.5–2.0 s/step). The 10-step
+graph **cannot be cached** — `ggml_backend_sched_alloc_graph` mutates the graph
+(inserts split-copy nodes), so reusing the same graph object across
+`sched_reset`+alloc corrupts it (deterministic crash at step ~4; reusing the
+*allocation* instead freezes the velocity output). This confirms the existing
+"gallocr state is not reusable" comment — the per-step rebuild is required. So
+the only lever is the step count.
+
+Flow-matching trajectories are nearly straight, so fewer Euler steps barely
+change the output. A fixed-seed sweep (same speech tokens + init noise, so the
+only variable is CFM precision) gave **identical ASR roundtrips at 10/8/6/4
+steps**, with log-magnitude-spectrogram correlation vs the 10-step output of
+0.986 (8), **0.981 (6)**, 0.950 (4), and CFM solver time of 15.5 s (10) →
+11.1 s (8) → **8.4 s (6, −46%)** → 4.7 s (4). 6 is the sweet spot — perceptually
+the same audio, CFM nearly halved (≈20–25% off total synthesis); 4 starts to
+diverge (waveform corr drops to 0.58).
+
+`p.cfm_steps` 10→6 (`src/chatterbox.cpp`). `--tts-steps N` overrides;
+`crispasr-diff` pins 10 (`chatterbox_set_cfm_steps(ctx, 10)`) to stay
+apples-to-apples with the 10-step reference dump. 10 remains the
+reference-exact setting.
+
 ## 2026-06-21 §206 LFM2-Audio — defaulted to CPU (GPU backbone diverges)
 
 The §201 CUDA sweep flagged lfm2-audio ASR as a ~9.8 s crash. Diffing the CPU
