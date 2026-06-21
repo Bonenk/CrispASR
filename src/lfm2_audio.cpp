@@ -806,8 +806,8 @@ static ggml_tensor* lfm2_gqa_attention(ggml_context* ctx, ggml_tensor* x, const 
                                        ggml_tensor* rope_freqs, int hidden, int n_heads, int n_kv_heads, int head_dim,
                                        int T);
 static ggml_tensor* lfm2_build_layer(ggml_context* ctx, ggml_tensor* x, const lfm2_layer_weights& w,
-                                     ggml_tensor* rope_freqs, int hidden, int n_heads, int n_kv_heads, int head_dim,
-                                     int T, float norm_eps);
+                                     ggml_tensor* positions, ggml_tensor* mask, int hidden, int n_heads, int n_kv_heads,
+                                     int head_dim, int T, float norm_eps);
 
 // ===========================================================================
 // Transcribe: full ASR pipeline
@@ -925,7 +925,7 @@ static std::vector<float> lfm2_run_backbone_logits(lfm2_audio_context* ctx, cons
 
     // Run all LFM2 layers
     for (uint32_t i = 0; i < hp.lfm_n_layers; i++) {
-        x = lfm2_build_layer(ctx0, x, model.lfm_layers[i], nullptr, hidden, n_heads, n_kv, hd, T, norm_eps);
+        x = lfm2_build_layer(ctx0, x, model.lfm_layers[i], nullptr, nullptr, hidden, n_heads, n_kv, hd, T, norm_eps);
     }
 
     // Final RMSNorm
@@ -1555,25 +1555,15 @@ static ggml_tensor* lfm2_short_conv(ggml_context* ctx, ggml_tensor* x, const lfm
     // Bx = B * x_inner (element-wise)
     ggml_tensor* Bx = ggml_mul(ctx, ggml_cont(ctx, B_part), ggml_cont(ctx, x_inner));
 
-    // Causal depthwise conv1d: kernel=3, pad_left=K-1=2 (causal)
-    // Uses ggml_conv_1d_dw which maps to im2col+mul_mat — has CUDA support.
-    // conv_w: (hidden, 1, K) in GGUF = ne[0]=K, ne[1]=1, ne[2]=hidden
-    // Bx: (hidden, T) = ne[0]=hidden, ne[1]=T
-    // conv_1d_dw expects: a=(K, 1, C), b=(T, C) → result=(T_out, C)
-    // With p0=K-1 (causal left-pad), T_out = T + 2*(K-1) - K + 1 = T + K - 1
-    // Take first T frames for causal output.
+    // Causal depthwise conv1d: kernel=3, pad_left=K-1=2 (causal) via ggml_conv_1d_dw.
     const int K = 3;
     ggml_tensor* conv_w = ggml_cast(ctx, w.conv_conv_w, GGML_TYPE_F32);
-    // Bx is (hidden, T). conv_1d_dw wants (T, hidden) input.
     ggml_tensor* Bx_t = ggml_cont(ctx, ggml_transpose(ctx, Bx)); // (T, hidden)
     ggml_tensor* conv_out = ggml_conv_1d_dw(ctx, conv_w, Bx_t, /*stride=*/1, /*pad=*/K - 1, /*dilation=*/1);
-    // conv_out: (T_out, hidden) where T_out = T + K - 1. Take first T.
     int T_conv = (int)conv_out->ne[0];
-    if (T_conv > T) {
+    if (T_conv > T)
         conv_out = ggml_view_2d(ctx, conv_out, T, hidden, conv_out->nb[1], 0);
-    }
-    // Transpose back to (hidden, T)
-    conv_out = ggml_cont(ctx, ggml_transpose(ctx, conv_out));
+    conv_out = ggml_cont(ctx, ggml_transpose(ctx, conv_out)); // (hidden, T)
 
     // y = C * conv_out (element-wise)
     ggml_tensor* y = ggml_mul(ctx, ggml_cont(ctx, C_part), ggml_cont(ctx, conv_out));
@@ -1590,9 +1580,10 @@ static ggml_tensor* lfm2_short_conv(ggml_context* ctx, ggml_tensor* x, const lfm
 //   Causal self-attention with GQA
 //   out = out_proj(attn_output)
 static ggml_tensor* lfm2_gqa_attention(ggml_context* ctx, ggml_tensor* x, const lfm2_layer_weights& w,
-                                       ggml_tensor* rope_freqs, int hidden, int n_heads, int n_kv_heads, int head_dim,
-                                       int T) {
-    // x: (hidden, T)
+                                       ggml_tensor* positions, ggml_tensor* mask, int hidden, int n_heads,
+                                       int n_kv_heads, int head_dim, int T) {
+    // x: (hidden, T). positions (I32, T) and mask (F16, T×T causal) are graph
+    // inputs filled by the caller — must NOT write ->data here (no_alloc graph).
 
     // Q, K, V projections
     ggml_tensor* Q = ggml_mul_mat(ctx, w.attn_q_proj_w, x); // (hidden, T) = (n_heads*hd, T)
@@ -1610,14 +1601,6 @@ static ggml_tensor* lfm2_gqa_attention(ggml_context* ctx, ggml_tensor* x, const 
     K = ggml_rms_norm(ctx, K, 1e-5f);
     K = ggml_mul(ctx, K, w.attn_k_ln_w);
 
-    // Create positions tensor [0, 1, 2, ..., T-1]
-    ggml_tensor* positions = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, T);
-    {
-        int32_t* pos = (int32_t*)positions->data;
-        for (int i = 0; i < T; i++)
-            pos[i] = i;
-    }
-
     // RoPE — LFM2 uses the standard HF rotate_half pattern.
     // ggml GGML_ROPE_TYPE_NEOX matches: split into halves, rotate, recombine.
     Q = ggml_rope_ext(ctx, Q, positions, /*freq_override=*/nullptr, head_dim, GGML_ROPE_TYPE_NEOX, 0, 1000000.0f, 1.0f,
@@ -1630,18 +1613,8 @@ static ggml_tensor* lfm2_gqa_attention(ggml_context* ctx, ggml_tensor* x, const 
     K = ggml_cont(ctx, ggml_permute(ctx, K, 0, 2, 1, 3));
     V = ggml_cont(ctx, ggml_permute(ctx, V, 0, 2, 1, 3));
 
-    // Causal self-attention with explicit causal mask
+    // Causal self-attention with the caller-provided causal mask (T×T F16).
     const float scale = 1.0f / sqrtf((float)head_dim);
-    // Build causal mask: (T, T) F16 with 0 for allowed and -inf for forbidden
-    ggml_tensor* mask = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, T, T);
-    {
-        ggml_fp16_t* m = (ggml_fp16_t*)mask->data;
-        const ggml_fp16_t zero = ggml_fp32_to_fp16(0.0f);
-        const ggml_fp16_t neginf = ggml_fp32_to_fp16(-INFINITY);
-        for (int i = 0; i < T; i++)
-            for (int j = 0; j < T; j++)
-                m[i * T + j] = (j <= i) ? zero : neginf;
-    }
     ggml_tensor* attn = ggml_flash_attn_ext(ctx, Q, K, V, mask, scale, 0.0f, 0.0f);
     // attn: (head_dim, T, n_heads) → reshape to (hidden, T)
     attn = ggml_reshape_2d(ctx, attn, hidden, T);
@@ -1652,15 +1625,15 @@ static ggml_tensor* lfm2_gqa_attention(ggml_context* ctx, ggml_tensor* x, const 
 
 // Build one LFM2 decoder layer: RMSNorm → operator → residual → RMSNorm → SwiGLU → residual
 static ggml_tensor* lfm2_build_layer(ggml_context* ctx, ggml_tensor* x, const lfm2_layer_weights& w,
-                                     ggml_tensor* rope_freqs, int hidden, int n_heads, int n_kv_heads, int head_dim,
-                                     int T, float norm_eps) {
+                                     ggml_tensor* positions, ggml_tensor* mask, int hidden, int n_heads, int n_kv_heads,
+                                     int head_dim, int T, float norm_eps) {
     ggml_tensor* residual = x;
 
     // RMSNorm → operator
     ggml_tensor* h = lfm2_rms_norm(ctx, x, w.operator_norm_w, norm_eps);
 
     if (w.is_attention) {
-        h = lfm2_gqa_attention(ctx, h, w, rope_freqs, hidden, n_heads, n_kv_heads, head_dim, T);
+        h = lfm2_gqa_attention(ctx, h, w, positions, mask, hidden, n_heads, n_kv_heads, head_dim, T);
     } else {
         h = lfm2_short_conv(ctx, h, w, hidden, T);
     }
@@ -1731,17 +1704,28 @@ float* lfm2_audio_run_lfm(lfm2_audio_context* ctx, const float* samples, int n_s
     // (simplified: no text tokens for now — just audio)
     const int T = T_enc; // just audio frames for now
 
-    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), false};
+    // Build with no_alloc so the graph runs on ctx->backend via the scheduler
+    // (GPU when use_gpu). The legacy ggml_graph_compute_with_ctx path computed on
+    // the CPU regardless of backend, so it could neither run on the GPU nor expose
+    // GPU-specific divergence in the diff harness.
+    ggml_init_params ip = {2048 * ggml_tensor_overhead() + ggml_graph_overhead_custom(65536, false), nullptr, true};
     ggml_context* ctx0 = ggml_init(ip);
     if (!ctx0) {
         free(adapted);
         return nullptr;
     }
 
-    // Input: adapted audio embeddings (T, hidden) → (hidden, T) in ggml
+    // Input: adapted audio embeddings (T, hidden) → (hidden, T) in ggml.
     ggml_tensor* x = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, hidden, T);
-    memcpy(x->data, adapted, sizeof(float) * T * hidden);
-    free(adapted);
+    ggml_set_name(x, "ao_in");
+    ggml_set_input(x);
+    // Shared RoPE positions + causal mask for all attention layers (graph inputs).
+    ggml_tensor* positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
+    ggml_set_name(positions, "ao_pos");
+    ggml_set_input(positions);
+    ggml_tensor* mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T);
+    ggml_set_name(mask, "ao_mask");
+    ggml_set_input(mask);
 
     // Verify critical LFM weights are loaded
     for (uint32_t i = 0; i < hp.lfm_n_layers; i++) {
@@ -1769,13 +1753,13 @@ float* lfm2_audio_run_lfm(lfm2_audio_context* ctx, const float* samples, int n_s
     bool do_snaps = (std::getenv("LFM2_SNAP_LAYERS") != nullptr);
 
     for (uint32_t i = 0; i < hp.lfm_n_layers; i++) {
-        x = lfm2_build_layer(ctx0, x, model.lfm_layers[i], /*rope_freqs=*/nullptr, hidden, n_heads, n_kv, hd, T,
-                             norm_eps);
+        x = lfm2_build_layer(ctx0, x, model.lfm_layers[i], positions, mask, hidden, n_heads, n_kv, hd, T, norm_eps);
         if (do_snaps) {
             layer_snaps[i] = ggml_dup(ctx0, x);
             char name[32];
             snprintf(name, sizeof(name), "lfm_ao_layer_%u", i);
             ggml_set_name(layer_snaps[i], name);
+            ggml_set_output(layer_snaps[i]);
         }
     }
 
@@ -1784,6 +1768,7 @@ float* lfm2_audio_run_lfm(lfm2_audio_context* ctx, const float* samples, int n_s
 
     ggml_tensor* out = ggml_dup(ctx0, x);
     ggml_set_name(out, "lfm_output");
+    ggml_set_output(out);
 
     ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 65536, false);
     for (auto* snap : layer_snaps)
@@ -1791,19 +1776,59 @@ float* lfm2_audio_run_lfm(lfm2_audio_context* ctx, const float* samples, int n_s
             ggml_build_forward_expand(gf, snap);
     ggml_build_forward_expand(gf, out);
 
-    ggml_graph_compute_with_ctx(ctx0, gf, ctx->n_threads);
+    // Allocate + compute via the scheduler (runs on ctx->backend).
+    if (!ctx->sched) {
+        ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
+        int n_be = (ctx->backend != ctx->backend_cpu) ? 2 : 1;
+        ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 16384, false, false);
+    }
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        fprintf(stderr, "lfm2-audio: run_lfm sched alloc failed\n");
+        free(adapted);
+        ggml_free(ctx0);
+        return nullptr;
+    }
+
+    // Fill graph inputs.
+    ggml_backend_tensor_set(x, adapted, 0, sizeof(float) * T * hidden);
+    free(adapted);
+    // positions/mask are only allocated by the scheduler when an attention layer
+    // references them; skip the upload if the graph has none (e.g. conv-only).
+    if (positions->buffer) {
+        std::vector<int32_t> pos(T);
+        for (int i = 0; i < T; i++)
+            pos[i] = i;
+        ggml_backend_tensor_set(positions, pos.data(), 0, T * sizeof(int32_t));
+    }
+    if (mask->buffer) {
+        std::vector<ggml_fp16_t> m((size_t)T * T);
+        const ggml_fp16_t zero = ggml_fp32_to_fp16(0.0f), neginf = ggml_fp32_to_fp16(-INFINITY);
+        for (int i = 0; i < T; i++)
+            for (int j = 0; j < T; j++)
+                m[(size_t)i * T + j] = (j <= i) ? zero : neginf;
+        ggml_backend_tensor_set(mask, m.data(), 0, m.size() * sizeof(ggml_fp16_t));
+    }
+
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        fprintf(stderr, "lfm2-audio: run_lfm compute failed\n");
+        ggml_free(ctx0);
+        return nullptr;
+    }
 
     float* result = (float*)malloc(sizeof(float) * T * hidden);
     if (result)
-        memcpy(result, out->data, sizeof(float) * T * hidden);
+        ggml_backend_tensor_get(out, result, 0, sizeof(float) * T * hidden);
 
     // Invoke staged callback for per-layer snapshots
     if (do_snaps && ctx->lfm_stage_cb) {
+        std::vector<float> snap_buf((size_t)T * hidden);
         for (uint32_t i = 0; i < hp.lfm_n_layers; i++) {
             if (layer_snaps[i]) {
+                ggml_backend_tensor_get(layer_snaps[i], snap_buf.data(), 0, sizeof(float) * T * hidden);
                 char name[32];
                 snprintf(name, sizeof(name), "lfm_ao_layer_%u", i);
-                ctx->lfm_stage_cb(name, (const float*)layer_snaps[i]->data, T, hidden, ctx->lfm_stage_ud);
+                ctx->lfm_stage_cb(name, snap_buf.data(), T, hidden, ctx->lfm_stage_ud);
             }
         }
     }
