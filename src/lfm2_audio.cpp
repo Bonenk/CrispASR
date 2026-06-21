@@ -579,7 +579,7 @@ lfm2_audio_context* lfm2_audio_init_from_file(const char* path_model, lfm2_audio
     // is bit-correct), and the embedding lookups crash on CUDA (device-pointer
     // deref). CPU output is verified correct, so default this backend to CPU
     // regardless of the global --gpu request. Set CRISPASR_LFM2_AUDIO_GPU=1 to
-    // opt into the experimental GPU path for debugging. See PLAN §201 / HISTORY §205.
+    // opt into the experimental GPU path for debugging. See PLAN §201 / HISTORY §206.
     if (params.use_gpu) {
         const char* e = std::getenv("CRISPASR_LFM2_AUDIO_GPU");
         if (!(e && *e && *e != '0')) {

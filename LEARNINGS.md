@@ -10,6 +10,36 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Localizing a GPU miscompute with CPU-vs-Metal diffing, and when to just default to CPU (§206)
+
+lfm2-audio transcribed garbage on Metal but was bit-correct on CPU. Technique to
+localize a "works on CPU, garbage on GPU" backend, entirely on an M1 (no CUDA):
+
+1. **Run the same input on `--no-gpu` and `--gpu-backend metal`.** CPU is your
+   ground truth. If CPU is correct, every divergence is a GPU bug.
+2. **Per-stage cosine dumps.** Env-gate a dump that marks intermediate tensors
+   `ggml_set_output` + `ggml_backend_tensor_get` into per-stage `.f32` files for
+   both backends, then compute cosine. The first stage with cos≪1 is the suspect.
+   Verify the *input* to that stage matches first (cos≈1) — otherwise the bug is
+   upstream (here the embeddings matched, the first backbone layer didn't).
+3. **`GGML_SCHED_DEBUG=2` to see backend placement.** It prints every node's
+   assigned backend and the split points. This distinguishes a *cross-backend
+   copy* bug (ops ping-pong CPU↔GPU) from a *single-backend miscompute* (the
+   whole subgraph is one Metal split, yet wrong). lfm2's backbone was entirely on
+   Metal with no splits → a real ggml-Metal op bug, not a copy issue.
+
+**Caveat on the dump itself:** marking intermediates `set_output` can perturb the
+sched's allocation; when a graph splits across backends, a `set_output`
+intermediate may read a stale split-buffer. Cross-check with `GGML_SCHED_DEBUG`
+that the region is single-backend before trusting a per-stage cos.
+
+**When you can't crack it: default to CPU.** If the GPU path is broken end-to-end
+and CPU is correct + fast enough, force the backend to CPU
+(`params.use_gpu = false`) behind an env opt-in (`CRISPASR_<X>_GPU=1`) rather than
+shipping garbage. On a CUDA box this runs on CPU → no crash, correct output, sweep
+passes — and the env flag preserves a path to debug the GPU bug later. Honest and
+reversible beats a fast wrong answer.
+
 ## A glibc-only crash reproduces on macOS under AddressSanitizer — and the bug is often a non-power-of-two FFT (§205)
 
 A backend that crashes on a Linux/CUDA host with `free(): corrupted unsorted

@@ -6,6 +6,34 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-06-21 §206 LFM2-Audio — defaulted to CPU (GPU backbone diverges)
+
+The §201 CUDA sweep flagged lfm2-audio ASR as a ~9.8 s crash. Diffing the CPU
+path (bit-correct: JFK transcribes verbatim) against Metal surfaced two separate
+GPU problems; commit `a046225a`.
+
+**Crash (CUDA).** The text-embedding lookups (`embed_text` in ASR/TTS/S2S) built
+a `ggml_get_rows` graph and ran it with `ggml_graph_compute_with_ctx` — a CPU
+compute — over the GPU-resident `lfm_embed_tokens_w`. That dereferences a device
+pointer: a no-op on unified-memory Metal, an illegal access on CUDA (same class
+as the fastpitch §204 bug). This is the ~9.8 s crash point.
+
+**Garbage (Metal + CUDA).** Even past the crash, the hybrid ShortConv+GQA
+backbone produces uncorrelated logits on Metal while CPU is exact. Localization
+(per-layer CPU-vs-Metal cosine dumps) showed divergence at the *first* backbone
+layer, and `GGML_SCHED_DEBUG` confirmed the entire backbone runs on one Metal
+split (no CPU fallback, so not a cross-backend-copy issue) — a genuine ggml-Metal
+miscompute in this hybrid graph, not yet pinned to a single op (rms_norm /
+Q5_K mul_mat / im2col-depthwise-conv all remain candidates).
+
+**Fix.** Since CPU is correct and the GPU path is broken end-to-end, default the
+backend to CPU regardless of the global `--gpu` request;
+`CRISPASR_LFM2_AUDIO_GPU=1` opts back into the experimental GPU path for
+debugging. On a CUDA box this now runs on CPU → no crash, correct output, so the
+sweep passes. Also fixed the CLI adapter, which hardcoded the transcribe prompt
+to `nullptr` (always Japanese) — it now forwards `-l en`/`params.language`.
+**Open:** the proper GPU-backbone miscompute fix (would restore GPU accel).
+
 ## 2026-06-21 §205 Chatterbox CUDA crash — non-power-of-two FFT heap overflow + q8/Metal CFM NaN
 
 Kaggle full-backend-sweep (Tesla P100, sm_60) crashed chatterbox TTS with

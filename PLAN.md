@@ -727,8 +727,15 @@ mistakes, not bugs**, leaving **7 genuine failures** (+1 pending). Of those 7,
   `backend_cpu`; channel-major `convt1d_decomp` on a time-major input). Both
   validated on M1 Metal. CUDA re-test pending. Full write-up in HISTORY §204.
 
+**RESOLVED — lfm2-audio defaulted to CPU (HISTORY §206):**
+- ✅ **lfm2-audio** (ASR) — fixed by `a046225a`. Two GPU bugs: embed lookups
+  crashed on CUDA (device-ptr deref, like §204), and the hybrid ShortConv+GQA
+  backbone produces garbage logits on Metal/CUDA (CPU is bit-correct). Not
+  localized to one op, so the backend now defaults to CPU (verified verbatim ASR;
+  `CRISPASR_LFM2_AUDIO_GPU=1` opts into the still-broken GPU path). On CUDA it now
+  runs on CPU → no crash, correct output. Proper GPU-backbone fix still open.
+
 **GENUINE bugs — fail on CUDA even with correct args (TODO):**
-- [ ] **lfm2-audio** (ASR) — CRASHes mid-run (~9.8 s). Hybrid conv+attn backbone.
 - [ ] **orpheus** (TTS) — 0-byte (~17 s) with `--voice tara`. Llama-3.2 + SNAC.
 - [ ] **chatterbox** (TTS) — 0-byte (~14 s) with `--voice <wav> --i-have-rights`;
   the #83 S3Gen GPU fix was Metal-validated — re-check the CUDA S3Gen path.
@@ -740,12 +747,13 @@ mistakes, not bugs**, leaving **7 genuine failures** (+1 pending). Of those 7,
 
 **Method:** per-backend JSONs in the dataset have timing context; reproduce on a
 CUDA worker (Kaggle T4/P100 or the A1000) with `CRISPASR_VERBOSE=1` +
-`CRISPASR_<BACKEND>_DEBUG=1`. Group fast-crashers (cosyvoice3, lfm2-audio) vs
-empty-output finishers (kugelaudio, orpheus, chatterbox). Several pass on M1
-Metal → CUDA-path-specific; cross-check Metal first. Note: the small ones
-(lfm2-audio ~1.6 GB) also fit the 8 GB CPU-only VPS, where the diff harness can
-drive the fix if the bug reproduces on CPU. The fastpitch+speecht5 fix (§204)
-came exactly this way — the HiFi-GAN layout bug reproduced on CPU locally.
+`CRISPASR_<BACKEND>_DEBUG=1`. Remaining open: orpheus, cosyvoice3, kugelaudio
+(empty-output finishers) — chatterbox fixed in §205, lfm2-audio in §206. Several
+pass on M1 Metal → CUDA-path-specific; cross-check Metal first. Small models also
+fit the 8 GB CPU-only VPS, where the diff harness can drive the fix if the bug
+reproduces on CPU. The fastpitch+speecht5 fix (§204) came exactly this way — the
+HiFi-GAN layout bug reproduced on CPU locally; lfm2-audio (§206) likewise (the
+backbone diverges identically on CPU-vs-Metal diffing).
 
 ---
 
