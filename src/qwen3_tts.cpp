@@ -1147,7 +1147,7 @@ ggml_cgraph* build_graph_code_pred_kv(qwen3_tts_context* c, int n_past, int n_to
     }
 
     const core_attn::KvSelfAttnParams kvp = {
-        n_q, n_kv, hd, n_kv_grp, (int)hp.max_pos, theta, 32.0f, 1.0f, attn_scale, eps, core_attn::GQA_MANUAL_CONT,
+        n_q, n_kv, hd, n_kv_grp, (int)hp.max_pos, theta, 32.0f, 1.0f, attn_scale, eps, core_attn::GQA_NATIVE,
     };
 
     ggml_tensor* cur = embeds;
@@ -1281,7 +1281,7 @@ ggml_cgraph* build_graph_talker_kv(qwen3_tts_context* c, int n_past, int n_token
         /*rope_beta_slow*/ 1.0f,
         /*attn_scale*/ attn_scale,
         /*qk_norm_eps*/ eps,
-        /*gqa_mode*/ core_attn::GQA_MANUAL_CONT,
+        /*gqa_mode*/ core_attn::GQA_NATIVE,
     };
 
     // Bucketed mode: pin K/V cache write index to runtime `positions` (via
@@ -4015,49 +4015,52 @@ static ggml_backend_sched_t codec_pick_sched(qwen3_tts_context* c) {
 }
 
 // ---------------------------------------------------------------------------
-// Execute codec decode: codes[T_codec × n_q] → malloc'd float32 PCM.
-// Input codes layout: [T_codec, n_q] row-major (T frames, each with n_q codes).
-// Output: [T_pcm] float32 @ 24 kHz, caller frees with free().
+// Decode ONE window of already-transposed codes_t[n_q, T_full].
+// Window = [window_start, window_start + window_len). Positions are ABSOLUTE
+// (window_start + i) so RoPE matches the full-sequence decode. The codec is
+// causal (sliding_window) with no rolling state, so a windowed decode with
+// enough left-context equals the matching slice of the full decode.
+// Output: malloc'd [1920 * window_len] float32 PCM @ 24 kHz.
 // ---------------------------------------------------------------------------
-static float* codec_decode_codes(qwen3_tts_context* c, const int32_t* codes, int T_codec, int* out_n_samples) {
+static float* codec_decode_window(qwen3_tts_context* c, const int32_t* codes_t, int n_q, int T_full, int window_start,
+                                  int window_len, int* out_n_samples) {
     if (out_n_samples) {
         *out_n_samples = 0;
     }
     const auto& codec = c->codec;
     const auto& hp = codec.hp;
-    const int n_q = (int)hp.n_q;
+    const int window = (int)hp.sliding_window;
 
-    // Transpose [T, n_q] → [n_q, T] so each codebook is a contiguous row.
-    std::vector<int32_t> codes_t((size_t)T_codec * n_q);
+    // Slice the window columns out of each codebook row → [n_q, window_len].
+    std::vector<int32_t> codes_w((size_t)window_len * n_q);
     for (int q = 0; q < n_q; q++) {
-        for (int t = 0; t < T_codec; t++) {
-            codes_t[(size_t)q * T_codec + t] = codes[(size_t)t * n_q + q];
+        for (int t = 0; t < window_len; t++) {
+            codes_w[(size_t)q * window_len + t] = codes_t[(size_t)q * T_full + window_start + t];
         }
     }
 
-    // Build sliding-window causal mask
-    const int window = (int)hp.sliding_window;
+    // Sliding-window causal mask [window_len × window_len].
     std::vector<ggml_fp16_t> mask_data;
-    if (T_codec > 1) {
+    if (window_len > 1) {
         const ggml_fp16_t zero_h = ggml_fp32_to_fp16(0.0f);
         const ggml_fp16_t neginf_h = ggml_fp32_to_fp16(-INFINITY);
-        mask_data.assign((size_t)T_codec * T_codec, neginf_h);
-        for (int q = 0; q < T_codec; q++) {
+        mask_data.assign((size_t)window_len * window_len, neginf_h);
+        for (int q = 0; q < window_len; q++) {
             for (int k = 0; k <= q; k++) {
                 if ((q - k) < window) {
-                    mask_data[(size_t)q * T_codec + k] = zero_h;
+                    mask_data[(size_t)q * window_len + k] = zero_h;
                 }
             }
         }
     }
 
-    // Build positions [0..T-1]
-    std::vector<int32_t> pos(T_codec);
-    for (int i = 0; i < T_codec; i++) {
-        pos[i] = i;
+    // ABSOLUTE positions [window_start .. window_start + window_len - 1] (RoPE match).
+    std::vector<int32_t> pos(window_len);
+    for (int i = 0; i < window_len; i++) {
+        pos[i] = window_start + i;
     }
 
-    ggml_cgraph* gf = build_graph_codec_decode(c, T_codec);
+    ggml_cgraph* gf = build_graph_codec_decode(c, window_len);
     ggml_backend_sched_t sched = codec_pick_sched(c);
 
     ggml_backend_sched_reset(sched);
@@ -4066,10 +4069,10 @@ static float* codec_decode_codes(qwen3_tts_context* c, const int32_t* codes, int
         return nullptr;
     }
 
-    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "codec_codes"), codes_t.data(), 0,
-                            codes_t.size() * sizeof(int32_t));
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "codec_codes"), codes_w.data(), 0,
+                            codes_w.size() * sizeof(int32_t));
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "codec_positions"), pos.data(), 0, pos.size() * sizeof(int32_t));
-    if (T_codec > 1) {
+    if (window_len > 1) {
         ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "codec_mask"), mask_data.data(), 0,
                                 mask_data.size() * sizeof(ggml_fp16_t));
     }
@@ -4083,8 +4086,7 @@ static float* codec_decode_codes(qwen3_tts_context* c, const int32_t* codes, int
     if (std::getenv("QWEN3_TTS_CODEC_TRACE")) {
         ggml_backend_sched_set_eval_callback(sched, nullptr, nullptr);
     }
-    // Sync GPU to drain the command queue before reading back; also prevents
-    // command-buffer pile-up across repeated Python interop cycles.
+    // Sync GPU to drain the command queue before reading back.
     {
         int n = ggml_backend_sched_get_n_backends(sched);
         if (n > 0)
@@ -4102,6 +4104,79 @@ static float* codec_decode_codes(qwen3_tts_context* c, const int32_t* codes, int
         return nullptr;
     }
     ggml_backend_tensor_get(out, pcm, 0, (size_t)n_samples * sizeof(float));
+    if (out_n_samples) {
+        *out_n_samples = n_samples;
+    }
+    return pcm;
+}
+
+// ---------------------------------------------------------------------------
+// Execute codec decode: codes[T_codec × n_q] → malloc'd float32 PCM.
+// Chunked decode (VRAM-constant): the codec is causal (sliding_window) with no
+// rolling state, so we decode in chunks of QWEN3_TTS_CODEC_CHUNK frames, each
+// prefixed with QWEN3_TTS_CODEC_CTX left-context frames whose PCM is discarded.
+// Peak VRAM depends on (ctx + chunk), not total length.
+// chunk <= 0 or T_codec <= chunk → single full-sequence pass (legacy path).
+// Env-tunable: QWEN3_TTS_CODEC_CHUNK (default 150), QWEN3_TTS_CODEC_CTX (default 128).
+// ---------------------------------------------------------------------------
+static float* codec_decode_codes(qwen3_tts_context* c, const int32_t* codes, int T_codec, int* out_n_samples) {
+    if (out_n_samples) {
+        *out_n_samples = 0;
+    }
+    const auto& codec = c->codec;
+    const auto& hp = codec.hp;
+    const int n_q = (int)hp.n_q;
+    const int window = (int)hp.sliding_window;
+
+    // Transpose [T, n_q] → [n_q, T] so each codebook is a contiguous row (once).
+    std::vector<int32_t> codes_t((size_t)T_codec * n_q);
+    for (int q = 0; q < n_q; q++) {
+        for (int t = 0; t < T_codec; t++) {
+            codes_t[(size_t)q * T_codec + t] = codes[(size_t)t * n_q + q];
+        }
+    }
+
+    // Chunk parameters (ENV-tunable). Defaults: chunk 150 frames, ctx 128 (> sliding_window 72).
+    int chunk = 150;
+    int ctx = 128;
+    if (const char* e = std::getenv("QWEN3_TTS_CODEC_CHUNK"))
+        chunk = atoi(e);
+    if (const char* e = std::getenv("QWEN3_TTS_CODEC_CTX"))
+        ctx = atoi(e);
+    if (ctx < window)
+        ctx = window;    // left-context must cover the sliding window
+    const int UP = 1920; // PCM samples per codec frame (24 kHz / 12.5 fps)
+
+    // Single-pass fallback: short sequence or chunking disabled.
+    if (chunk <= 0 || T_codec <= chunk) {
+        return codec_decode_window(c, codes_t.data(), n_q, T_codec, 0, T_codec, out_n_samples);
+    }
+
+    // Chunked: decode [window_start, chunk_end) per chunk, discard the left-context PCM.
+    std::vector<float> pcm_all;
+    pcm_all.reserve((size_t)T_codec * UP);
+    for (int chunk_start = 0; chunk_start < T_codec; chunk_start += chunk) {
+        const int chunk_end = std::min(chunk_start + chunk, T_codec);
+        const int window_start = std::max(0, chunk_start - ctx);
+        const int window_len = chunk_end - window_start;
+        int win_n = 0;
+        float* win_pcm = codec_decode_window(c, codes_t.data(), n_q, T_codec, window_start, window_len, &win_n);
+        if (!win_pcm) {
+            return nullptr;
+        }
+        const int discard = (chunk_start - window_start) * UP; // left-context samples to drop
+        if (discard >= 0 && discard <= win_n) {
+            pcm_all.insert(pcm_all.end(), win_pcm + discard, win_pcm + win_n);
+        }
+        free(win_pcm);
+    }
+
+    const int n_samples = (int)pcm_all.size();
+    float* pcm = (float*)malloc((size_t)n_samples * sizeof(float));
+    if (!pcm) {
+        return nullptr;
+    }
+    std::copy(pcm_all.begin(), pcm_all.end(), pcm);
     if (out_n_samples) {
         *out_n_samples = n_samples;
     }
@@ -6372,6 +6447,34 @@ extern "C" void qwen3_tts_codes_free(int32_t* codes) {
     free(codes);
 }
 
+// Free the length-dependent scratch compute buffers after each request so the
+// VRAM/RAM high-water-mark doesn't persist across requests. The codec's
+// codec_sched_gpu galloc buffer grows with sequence length (T_gen frames) and
+// was only freed at qwen3_tts_free. The main sched (talker/prefill/embed)
+// grows with Lk up to kv_max_ctx=4096. Both are pure scratch schedulers
+// (reset+alloc+compute per graph, no cached graph attached).
+static void qwen3_tts_reset_scratch_sched(qwen3_tts_context* c) {
+    if (!c)
+        return;
+    // Codec-decode scheduler (lazy-created in codec_pick_sched): free + nullptr
+    // so it's re-created fresh (small) on the next decode call.
+    if (c->codec_sched_gpu) {
+        ggml_backend_sched_free(c->codec_sched_gpu);
+        c->codec_sched_gpu = nullptr;
+    }
+    // Talker/prefill/embed scratch sched: not lazy → re-create with same
+    // backend list as at creation (qwen3_tts.cpp init: {backend, backend_cpu}).
+    if (c->sched) {
+        ggml_backend_sched_free(c->sched);
+        int n_be = 0;
+        ggml_backend_t backends[2];
+        backends[n_be++] = c->backend;
+        if (c->backend_cpu && c->backend_cpu != c->backend)
+            backends[n_be++] = c->backend_cpu;
+        c->sched = ggml_backend_sched_new(backends, nullptr, n_be, 16384, false, false);
+    }
+}
+
 extern "C" float* qwen3_tts_decode_codes(struct qwen3_tts_context* ctx, const int32_t* codes, int n_codes,
                                          int* out_n_samples) {
     if (out_n_samples) {
@@ -6567,6 +6670,9 @@ extern "C" float* qwen3_tts_synthesize(struct qwen3_tts_context* ctx, const char
                 "audio=%.1f s  rtf=%.3f\n",
                 code_ms, codec_ms, total_ms, dur, (total_ms / 1000.0) / dur);
     }
+    // Free the scratch compute buffers so the length-dependent galloc
+    // high-water-mark doesn't persist across requests (issue #183).
+    qwen3_tts_reset_scratch_sched(ctx);
     return pcm;
 }
 
@@ -6723,6 +6829,8 @@ extern "C" float* qwen3_tts_synthesize_streaming(struct qwen3_tts_context* ctx, 
     if (out_n_samples) {
         *out_n_samples = (int)full_pcm.size();
     }
+    // Free scratch compute buffers after streaming request (issue #183).
+    qwen3_tts_reset_scratch_sched(ctx);
     return out;
 }
 
