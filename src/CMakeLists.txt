@@ -267,6 +267,11 @@ if (CRISPASR_OPUS)
         endif()
         set(BUILD_TESTING       OFF CACHE BOOL "" FORCE)
         set(OPUS_BUILD_TESTING  OFF CACHE BOOL "" FORCE)
+        # Emscripten: Opus cmake auto-detects x86 and enables AVX2/FMA sources
+        # that fail under wasm32 clang. Disable all intrinsics.
+        if (EMSCRIPTEN)
+            set(OPUS_DISABLE_INTRINSICS ON CACHE BOOL "" FORCE)
+        endif()
         # libogg/opus ship pre-3.5 cmake_minimum_required, which CMake >= 4.0
         # rejects outright; loosen the floor just for these vendored subbuilds.
         set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
