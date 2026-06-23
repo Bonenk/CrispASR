@@ -672,6 +672,15 @@ struct qwen3_tts_context {
     ggml_tensor* talker_embd_cpu = nullptr;
     bool cp_cpu_pinned = false;
 
+    // Preferred 1.7B path: fold small_to_mtp INTO the code_pred graph as its
+    // first op so the projection runs on the same backend/kernel as the decoder
+    // (bit-consistent q8_0 realization — no separate per-step dispatch, no
+    // cross-backend precision shift). When true, run_code_pred_kv's input tensor
+    // is the raw (d_in) embedding and code_pred_generate_15 feeds it unprojected.
+    // Default ON for 1.7B; opt out with QWEN3_TTS_CP_MTP_NOFUSE=1. Disabled when
+    // code_pred is CPU-pinned (cp_cpu_pinned keeps the external projection).
+    bool cp_mtp_fused = false;
+
     // CPU-side embedding caches: raw quantized bytes copied from the Metal
     // weight tensors at init.  Used by the AR loop to dequantize embedding
     // rows directly on CPU, eliminating ~17 Metal command-buffer round-trips
@@ -1128,9 +1137,21 @@ ggml_cgraph* build_graph_code_pred_kv(qwen3_tts_context* c, int n_past, int n_to
     }
     ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 4096, false);
 
-    ggml_tensor* embeds = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, d, T);
+    // Fused small_to_mtp (1.7B): the graph receives the RAW (d_in) embedding
+    // and projects it here on the same backend as the decoder, eliminating the
+    // per-step external projection dispatch. Plain pass-through otherwise.
+    const bool fuse = c->cp_mtp_fused && c->code_pred.small_to_mtp_w;
+    const int d_in = fuse ? (int)c->code_pred.small_to_mtp_w->ne[0] : d;
+    ggml_tensor* embeds = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, d_in, T);
     ggml_set_name(embeds, "inputs_embeds");
     ggml_set_input(embeds);
+    ggml_tensor* embeds_proj = embeds;
+    if (fuse) {
+        embeds_proj = ggml_mul_mat(ctx0, c->code_pred.small_to_mtp_w, embeds); // (d, T)
+        if (c->code_pred.small_to_mtp_b) {
+            embeds_proj = ggml_add(ctx0, embeds_proj, c->code_pred.small_to_mtp_b);
+        }
+    }
 
     ggml_tensor* positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
     ggml_set_name(positions, "positions");
@@ -1150,7 +1171,7 @@ ggml_cgraph* build_graph_code_pred_kv(qwen3_tts_context* c, int n_past, int n_to
         n_q, n_kv, hd, n_kv_grp, (int)hp.max_pos, theta, 32.0f, 1.0f, attn_scale, eps, core_attn::GQA_NATIVE,
     };
 
-    ggml_tensor* cur = embeds;
+    ggml_tensor* cur = embeds_proj;
     for (uint32_t il = 0; il < hp.cp_n_layers; il++) {
         const auto& b = c->code_pred.blocks[il];
         ggml_tensor* residual = cur;
@@ -1826,6 +1847,9 @@ float* run_code_pred_kv(qwen3_tts_context* c, const float* embeds, int n_tokens,
     const auto& hp = c->hp;
     const int d = (int)hp.cp_d_model;
     const int vocab = (int)hp.cp_vocab_size;
+    // When the projection is fused into the graph, the caller passes raw
+    // (d_in) embeddings; otherwise it passes already-projected (d) ones.
+    const int d_in_eff = (c->cp_mtp_fused && c->code_pred.small_to_mtp_w) ? (int)c->code_pred.small_to_mtp_w->ne[0] : d;
 
     // Default OFF — see #56: ggml_set_rows-based reuse asserts on CUDA.
     const bool o15 = env_bool_default("QWEN3_TTS_O15", false);
@@ -1886,7 +1910,7 @@ float* run_code_pred_kv(qwen3_tts_context* c, const float* embeds, int n_tokens,
             }
             const double t_alloc = bench_s0 ? now_ms() : 0.0;
             ggml_backend_tensor_set(ggml_graph_get_tensor(s0_gf, "inputs_embeds"), embeds, 0,
-                                    (size_t)d * 2 * sizeof(float));
+                                    (size_t)d_in_eff * 2 * sizeof(float));
             ggml_backend_tensor_set(ggml_graph_get_tensor(s0_gf, "positions"), positions.data(), 0,
                                     positions.size() * sizeof(int32_t));
             ggml_backend_tensor_set(ggml_graph_get_tensor(s0_gf, "causal_mask"), mask.data(), 0,
@@ -2013,7 +2037,7 @@ float* run_code_pred_kv(qwen3_tts_context* c, const float* embeds, int n_tokens,
     }
     const double t_alloc1 = bench ? now_ms() : 0.0;
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "inputs_embeds"), embeds, 0,
-                            (size_t)d * n_tokens * sizeof(float));
+                            (size_t)d_in_eff * n_tokens * sizeof(float));
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "positions"), positions.data(), 0,
                             positions.size() * sizeof(int32_t));
     if (need_mask) {
@@ -2100,8 +2124,17 @@ bool code_pred_generate_15(qwen3_tts_context* c, const float* past_hidden_d, con
     // outputs need to flow through `small_to_mtp_projection` (Linear with
     // bias) before the code predictor consumes them. 0.6B variants have
     // matched dims and no projection in the GGUF — fall through to memcpy.
-    std::vector<float> step0((size_t)2 * d);
-    if (cp.small_to_mtp_w) {
+    // Fused path: feed the RAW (d_in) past_hidden/last_id_hidden; the code_pred
+    // graph applies small_to_mtp internally (same backend → no extra dispatch,
+    // no precision shift). Non-fused: project here as before.
+    const int cp_d_in = cp.small_to_mtp_w ? (int)cp.small_to_mtp_w->ne[0] : d;
+    std::vector<float> step0;
+    if (c->cp_mtp_fused && cp.small_to_mtp_w) {
+        step0.resize((size_t)2 * cp_d_in);
+        std::memcpy(step0.data(), past_hidden_d, (size_t)cp_d_in * sizeof(float));
+        std::memcpy(step0.data() + cp_d_in, last_id_hidden_d, (size_t)cp_d_in * sizeof(float));
+    } else if (cp.small_to_mtp_w) {
+        step0.resize((size_t)2 * d);
         if (!apply_small_to_mtp(c, past_hidden_d, step0.data())) {
             return false;
         }
@@ -2109,6 +2142,7 @@ bool code_pred_generate_15(qwen3_tts_context* c, const float* past_hidden_d, con
             return false;
         }
     } else {
+        step0.resize((size_t)2 * d);
         std::memcpy(step0.data(), past_hidden_d, (size_t)d * sizeof(float));
         std::memcpy(step0.data() + d, last_id_hidden_d, (size_t)d * sizeof(float));
     }
@@ -2201,19 +2235,24 @@ bool code_pred_generate_15(qwen3_tts_context* c, const float* past_hidden_d, con
         if (!ok) {
             return false;
         }
-        if (cp.small_to_mtp_w) {
+        const float* cp_in;
+        if (c->cp_mtp_fused && cp.small_to_mtp_w) {
+            cp_in = emb_in_buf.data(); // raw (d_in); graph projects internally
+        } else if (cp.small_to_mtp_w) {
             if (!apply_small_to_mtp(c, emb_in_buf.data(), emb_buf.data())) {
                 return false;
             }
+            cp_in = emb_buf.data();
         } else {
             std::memcpy(emb_buf.data(), emb_in_buf.data(), (size_t)d * sizeof(float));
+            cp_in = emb_buf.data();
         }
-        if (dump_dir && frame_idx >= 0) {
+        if (dump_dir && frame_idx >= 0 && !(c->cp_mtp_fused && cp.small_to_mtp_w)) {
             char name[64];
             snprintf(name, sizeof(name), "cp_f%03d_step%02d_embed", frame_idx, i);
             dump_f32(dump_dir, name, emb_buf.data(), d);
         }
-        float* logits = run_code_pred_kv(c, emb_buf.data(), 1, n_past, cp.lm_head[i], /*skip_plan=*/i >= 2);
+        float* logits = run_code_pred_kv(c, cp_in, 1, n_past, cp.lm_head[i], /*skip_plan=*/i >= 2);
         if (!logits) {
             return false;
         }
@@ -5419,6 +5458,21 @@ extern "C" struct qwen3_tts_context* qwen3_tts_init_from_file(const char* path_m
         if (!copy_cp_weights_to_cpu(c, code_pred_cpu_copy_type_from_env(cp_be))) {
             fprintf(stderr, "qwen3_tts: code_pred CPU pin requested but copy failed; using main backend\n");
         }
+    }
+
+    // 1.7B default: fold small_to_mtp into the code_pred graph (#161). The 1.7B
+    // talker→code_pred bridge projection otherwise runs as 16 separate
+    // single-matmul GPU graphs per frame (2 at step-0 + 14 in the cb loop), each
+    // with its own sched_reset + alloc_graph + compute + readback — and on
+    // discrete-VRAM backends (CUDA) those tiny dispatches/sync dominate the
+    // code_pred wall. Folding runs the projection as the first op of the
+    // code_pred graph, same backend/kernel as the decoder: a bit-consistent
+    // q8_0 realization with no extra dispatch and no precision shift. Skipped
+    // when code_pred is CPU-pinned (cp_cpu_pinned keeps the external
+    // projection), or via QWEN3_TTS_CP_MTP_NOFUSE=1 for A/B bisection.
+    c->cp_mtp_fused = c->code_pred.small_to_mtp_w && !c->cp_cpu_pinned && !env_bool("QWEN3_TTS_CP_MTP_NOFUSE");
+    if (c->cp_mtp_fused && c->params.verbosity >= 1) {
+        fprintf(stderr, "qwen3_tts: small_to_mtp fused into code_pred graph (no per-step projection dispatch)\n");
     }
 
     // Eagerly reserve the code_pred scheduler with a clean (empty) scheduler
