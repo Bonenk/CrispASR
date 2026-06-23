@@ -2176,9 +2176,15 @@ static ggml_cgraph* build_pred_head_graph_impl(vibevoice_context* ctx, int n_fra
         ggml_tensor* c_silu = ggml_silu(ctx0, c);
         ggml_tensor* adaln_out = ggml_mul_mat(ctx0, G(std::string(base) + ".adaln.weight"), c_silu);
         size_t nb1 = adaln_out->nb[1];
-        ggml_tensor* shift = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, 0);
-        ggml_tensor* scale = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, (size_t)d_lm * sizeof(float));
-        ggml_tensor* gate = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, (size_t)2 * d_lm * sizeof(float));
+        // ggml_cont: the views are non-contiguous (ne0 < nb1/sizeof) which
+        // causes segfaults on Vulkan/RDNA4 when used in ggml_mul/ggml_add
+        // (issue #184). The tensors are tiny ([d_lm, n_frames]) so the
+        // copy overhead is negligible.
+        ggml_tensor* shift = ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, 0));
+        ggml_tensor* scale =
+            ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, (size_t)d_lm * sizeof(float)));
+        ggml_tensor* gate =
+            ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, (size_t)2 * d_lm * sizeof(float)));
         ggml_tensor* h = ggml_rms_norm(ctx0, x, 1e-5f);
         h = ggml_mul(ctx0, h, G(std::string(base) + ".norm.weight"));
         ggml_tensor* h_scaled = ggml_mul(ctx0, h, scale);
@@ -2195,8 +2201,9 @@ static ggml_cgraph* build_pred_head_graph_impl(vibevoice_context* ctx, int n_fra
         ggml_tensor* c_silu_f = ggml_silu(ctx0, c);
         ggml_tensor* adaln_out = ggml_mul_mat(ctx0, G("pred.final.adaln.weight"), c_silu_f);
         size_t nb1_f = adaln_out->nb[1];
-        ggml_tensor* shift = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1_f, 0);
-        ggml_tensor* scale = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1_f, (size_t)d_lm * sizeof(float));
+        ggml_tensor* shift = ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1_f, 0));
+        ggml_tensor* scale =
+            ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1_f, (size_t)d_lm * sizeof(float)));
         ggml_tensor* h = ggml_rms_norm(ctx0, x, 1e-5f);
         ggml_tensor* h_scaled = ggml_mul(ctx0, h, scale);
         h = ggml_add(ctx0, h, h_scaled);
@@ -2265,11 +2272,13 @@ static ggml_cgraph* build_pred_head_graph(vibevoice_context* ctx, int n_frames) 
         // AdaLN modulation: SiLU(c) → adaln.w → [3*d_lm, n_frames]
         ggml_tensor* c_silu = ggml_silu(ctx0, c);
         ggml_tensor* adaln_out = ggml_mul_mat(ctx0, G(std::string(base) + ".adaln.weight"), c_silu);
-        // Split along ne[0]: shift=[d_lm, n_frames], scale=[d_lm, n_frames], gate=[d_lm, n_frames]
-        size_t nb1 = adaln_out->nb[1]; // stride between frames
-        ggml_tensor* shift = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, 0);
-        ggml_tensor* scale = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, (size_t)d_lm * sizeof(float));
-        ggml_tensor* gate = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, (size_t)2 * d_lm * sizeof(float));
+        // ggml_cont: non-contiguous views segfault on Vulkan/RDNA4 (issue #184).
+        size_t nb1 = adaln_out->nb[1];
+        ggml_tensor* shift = ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, 0));
+        ggml_tensor* scale =
+            ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, (size_t)d_lm * sizeof(float)));
+        ggml_tensor* gate =
+            ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1, (size_t)2 * d_lm * sizeof(float)));
 
         // RMSNorm + modulate: h = norm(x) * (1 + scale) + shift
         ggml_tensor* h = ggml_rms_norm(ctx0, x, 1e-6f);
@@ -2294,8 +2303,9 @@ static ggml_cgraph* build_pred_head_graph(vibevoice_context* ctx, int n_frames) 
         ggml_tensor* c_silu_f = ggml_silu(ctx0, c);
         ggml_tensor* adaln_out = ggml_mul_mat(ctx0, G("pred.final.adaln.weight"), c_silu_f);
         size_t nb1_f = adaln_out->nb[1];
-        ggml_tensor* shift = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1_f, 0);
-        ggml_tensor* scale = ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1_f, (size_t)d_lm * sizeof(float));
+        ggml_tensor* shift = ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1_f, 0));
+        ggml_tensor* scale =
+            ggml_cont(ctx0, ggml_view_2d(ctx0, adaln_out, d_lm, n_frames, nb1_f, (size_t)d_lm * sizeof(float)));
 
         ggml_tensor* h = ggml_rms_norm(ctx0, x, 1e-6f);
         ggml_tensor* h_scaled = ggml_mul(ctx0, h, scale);
