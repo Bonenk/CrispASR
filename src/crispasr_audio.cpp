@@ -13,6 +13,20 @@
 // below), and AAC/M4A/ALAC/CAF fall back to AudioToolbox on Apple. All
 // permissive-licensed; ffmpeg stays an optional dynamic fallback only.
 
+// On Windows, include <windows.h> early so that miniaudio (which also
+// pulls in windows.h) doesn't conflict with later Media Foundation
+// headers (mfapi.h uses UINT32/DWORD types that must be defined by the
+// Windows SDK before any other header clobbers them).
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 // stb_vorbis lives in examples/ — use relative path from src/
 #define STB_VORBIS_HEADER_ONLY
 #include "../examples/stb_vorbis.c"
