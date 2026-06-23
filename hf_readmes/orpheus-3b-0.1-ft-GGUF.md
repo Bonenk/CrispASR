@@ -1,5 +1,5 @@
 ---
-license: llama3.2
+license: apache-2.0
 language:
 - en
 base_model:
@@ -18,13 +18,11 @@ tags:
 library_name: ggml
 ---
 
-# [DEPRECATED] Orpheus 3B — GGUF (ggml-quantised)
-
-> **This repo is deprecated.** Use [`cstr/orpheus-3b-0.1-ft-GGUF`](https://huggingface.co/cstr/orpheus-3b-0.1-ft-GGUF) instead — it has F16 + Q8_0 + Q4_K quants plus the diff-harness reference file. CrispASR's model registry and auto-download now point there.
+# Orpheus 3B 0.1 ft — GGUF (ggml-quantised)
 
 GGUF / ggml conversion of [`canopylabs/orpheus-3b-0.1-ft`](https://huggingface.co/canopylabs/orpheus-3b-0.1-ft) (sourced via the non-gated [`unsloth/orpheus-3b-0.1-ft`](https://huggingface.co/unsloth/orpheus-3b-0.1-ft) mirror) for use with **[CrispStrobe/CrispASR](https://github.com/CrispStrobe/CrispASR)**.
 
-Orpheus 3B is a Llama-3.2-3B-Instruct talker finetuned to emit `<custom_token_N>` codec tokens that the SNAC 24 kHz codec decodes back to speech. Distributed under the **Llama-3.2 community license** ("Built with Llama"). 8 fixed English speakers (`tara, leah, jess, leo, dan, mia, zac, zoe`).
+Orpheus 3B is a Llama-3.2-3B-Instruct talker finetuned to emit `<custom_token_N>` codec tokens that the SNAC 24 kHz codec decodes back to speech. Key capabilities include human-like speech with natural intonation and emotion, zero-shot voice cloning, guided emotion/intonation via simple tags, and low-latency streaming (~200 ms). 8 fixed English speakers (`tara, leah, jess, leo, dan, mia, zac, zoe`).
 
 Pair this with the SNAC codec at [`cstr/snac-24khz-GGUF`](https://huggingface.co/cstr/snac-24khz-GGUF) — the talker outputs codec tokens but doesn't render audio without it.
 
@@ -32,10 +30,12 @@ Pair this with the SNAC codec at [`cstr/snac-24khz-GGUF`](https://huggingface.co
 
 | File | Quant | Size | Notes |
 |---|---|---:|---|
-| `orpheus-3b-base-f16.gguf`  | F16  | 6.2 GB | Reference quality |
-| `orpheus-3b-base-q8_0.gguf` | Q8_0 | 3.4 GB | **Recommended** — ASR roundtrip word-exact vs F16 |
+| `orpheus-3b-0.1-ft-f16.gguf`  | F16  | 6.16 GB | Reference quality |
+| `orpheus-3b-0.1-ft-q8_0.gguf` | Q8_0 | 3.70 GB | **Recommended** — ASR roundtrip word-exact vs F16 |
+| `orpheus-3b-0.1-ft-q4_k.gguf` | Q4_K | 2.38 GB | Smallest; smoke-tested but Q8_0 preferred |
+| `diff-harness-ref/orpheus-talker-ref.gguf` | — | 614 KB | Diff-harness reference checkpoint (not for inference) |
 
-The talker LM is sensitive to peaked codec distributions, so we ship F16 + Q8_0 only. Sub-Q8 quants tend to break the SNAC super-frame slot pattern and produce gibberish even when the LM perplexity remains plausible.
+The talker LM is sensitive to peaked codec distributions. Sub-Q8 quants tend to break the SNAC super-frame slot pattern and produce gibberish even when the LM perplexity remains plausible; Q4_K is provided for constrained-memory setups but Q8_0 is the safe default.
 
 ## Quick start
 
@@ -47,12 +47,12 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j --target crispasr-lib
 
 # 2. Pull the talker + the SNAC codec
-huggingface-cli download cstr/orpheus-3b-base-GGUF orpheus-3b-base-q8_0.gguf --local-dir .
+huggingface-cli download cstr/orpheus-3b-0.1-ft-GGUF orpheus-3b-0.1-ft-q8_0.gguf --local-dir .
 huggingface-cli download cstr/snac-24khz-GGUF snac-24khz.gguf --local-dir .
 
 # 3. Synthesise
 ./build/bin/crispasr --backend orpheus \
-    -m orpheus-3b-base-q8_0.gguf \
+    -m orpheus-3b-0.1-ft-q8_0.gguf \
     --codec-model snac-24khz.gguf \
     --voice tara \
     --temperature 0.6 \
@@ -69,25 +69,6 @@ For **auto-download** simply pass `-m auto`:
     --voice leo --temperature 0.6 \
     --tts "Auto-download fetches both files." \
     --tts-output out.wav
-```
-
-## Quality verification
-
-ASR roundtrip via [`cstr/parakeet-tdt-0.6b-v3-GGUF`](https://huggingface.co/cstr/parakeet-tdt-0.6b-v3-GGUF) on F16, voice `tara`:
-
-| Synthesised text | Parakeet output |
-|---|---|
-| `"Hello, my name is Tara."` | `"Hello, my name is Tara."` (verbatim) |
-
-Q8_0 produces ASR-identical output on the same prompt. Validation script:
-
-```bash
-crispasr --backend orpheus -m orpheus-3b-base-q8_0.gguf \
-    --codec-model snac-24khz.gguf --voice tara --temperature 0.6 \
-    --tts "Hello, my name is Tara." --tts-output orpheus_test.wav
-crispasr --backend parakeet -m parakeet-tdt-0.6b-v3-q4_k.gguf \
-    -f orpheus_test.wav --no-prints
-# → Hello, my name is Tara.
 ```
 
 ## Architecture
@@ -120,26 +101,25 @@ Stop on `audio_end=128257` **or** on >4 consecutive non-codec tokens. Don't stop
 ```bash
 python models/convert-orpheus-to-gguf.py \
     --input unsloth/orpheus-3b-0.1-ft \
-    --output orpheus-3b-ft-f16.gguf \
+    --output orpheus-3b-0.1-ft-f16.gguf \
     --outtype f16
 
-build/bin/crispasr-quantize orpheus-3b-ft-f16.gguf orpheus-3b-base-q8_0.gguf q8_0
+build/bin/crispasr-quantize orpheus-3b-0.1-ft-f16.gguf orpheus-3b-0.1-ft-q8_0.gguf q8_0
+build/bin/crispasr-quantize orpheus-3b-0.1-ft-f16.gguf orpheus-3b-0.1-ft-q4_k.gguf q4_k
 ```
-
-The converter sets `GGUFWriter(use_temp_file=False)` because the `True` path buffers tensor data via `tempfile.SpooledTemporaryFile` and collapses throughput on near-full external disks (`/Volumes/backups` at 100% saw multi-MB/s spooling). The direct write holds the full tensor list in RAM during emit but completes in ~30 s on the 6.6 GB f16.
 
 ## Drop-in checkpoint variants
 
-The `orpheus` runtime is checkpoint-agnostic — same arch, same prompt format, same SNAC codec. Future GGUF mirrors of:
+The `orpheus` runtime is checkpoint-agnostic — same arch, same prompt format, same SNAC codec. GGUF mirrors of:
 
-- `SebastianBodza/Kartoffel_Orpheus_*` (German finetunes, 26 fixed speakers)
-- `lex-au/Orpheus-3b-German-FT-Q8_0.gguf`
+- [`cstr/kartoffel-orpheus-3b-german-natural-GGUF`](https://huggingface.co/cstr/kartoffel-orpheus-3b-german-natural-GGUF) (German, natural speech, 19 speakers)
+- [`cstr/kartoffel-orpheus-3b-german-synthetic-GGUF`](https://huggingface.co/cstr/kartoffel-orpheus-3b-german-synthetic-GGUF) (German, synthetic data, 26 speakers)
 
-are checkpoint swaps. They reuse this same SNAC codec.
+are checkpoint swaps. They all reuse the same SNAC codec at [`cstr/snac-24khz-GGUF`](https://huggingface.co/cstr/snac-24khz-GGUF).
 
 ## Attribution
 
-- **Talker base model:** [`canopylabs/orpheus-3b-0.1-ft`](https://huggingface.co/canopylabs/orpheus-3b-0.1-ft) (Llama-3.2 community license). canopylabs / canopyai.
+- **Talker base model:** [`canopylabs/orpheus-3b-0.1-ft`](https://huggingface.co/canopylabs/orpheus-3b-0.1-ft) (Apache-2.0). canopylabs / canopyai.
 - **Non-gated mirror used for conversion:** [`unsloth/orpheus-3b-0.1-ft`](https://huggingface.co/unsloth/orpheus-3b-0.1-ft).
 - **Llama base:** [`meta-llama/Llama-3.2-3B-Instruct`](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) — Llama-3.2 community license.
 - **SNAC codec:** [`hubertsiuzdak/snac_24khz`](https://huggingface.co/hubertsiuzdak/snac_24khz) (MIT) — see [`cstr/snac-24khz-GGUF`](https://huggingface.co/cstr/snac-24khz-GGUF).
@@ -148,6 +128,6 @@ are checkpoint swaps. They reuse this same SNAC codec.
 
 ## License
 
-Llama-3.2 community license (inherited from the base talker). Includes the Acceptable Use Policy and the "Built with Llama" attribution requirement. Commercial use is permitted under the community license terms; review [`canopylabs/orpheus-3b-0.1-ft`](https://huggingface.co/canopylabs/orpheus-3b-0.1-ft) and [the Llama-3.2 license](https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/LICENSE) before redistribution.
+Apache-2.0 (as declared by [`canopylabs/orpheus-3b-0.1-ft`](https://huggingface.co/canopylabs/orpheus-3b-0.1-ft)). The underlying Llama-3.2-3B-Instruct weights carry the [Llama-3.2 community license](https://github.com/meta-llama/llama-models/blob/main/models/llama3_2/LICENSE) with its Acceptable Use Policy and "Built with Llama" attribution requirement — review both before redistribution.
 
 The SNAC codec is MIT and ships separately under [`cstr/snac-24khz-GGUF`](https://huggingface.co/cstr/snac-24khz-GGUF).

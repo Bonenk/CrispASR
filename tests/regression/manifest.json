@@ -1027,13 +1027,13 @@
       "voice_preset": "default"
     },
     {
-      "name": "orpheus-3b-base",
+      "name": "orpheus-3b-0.1-ft",
       "backend_id": "orpheus",
       "gguf": {
-        "repo": "cstr/orpheus-3b-base-GGUF",
-        "revision": "71a8f0c6b2fd083c11d523b950a231d90200d8a0",
-        "file": "orpheus-3b-base-q8_0.gguf",
-        "approx_size_mb": 3352
+        "repo": "cstr/orpheus-3b-0.1-ft-GGUF",
+        "revision": "93847c5f3b3ec45d9fc39e94a19b4fb46b9def4c",
+        "file": "orpheus-3b-0.1-ft-q8_0.gguf",
+        "approx_size_mb": 3700
       },
       "tts_phrase": "The quick brown fox jumps over the lazy dog",
       "roundtrip_asr_backend": "parakeet-tdt-0.6b-en",

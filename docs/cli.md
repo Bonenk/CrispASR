@@ -845,7 +845,7 @@ default quantized model for the selected backend into
 | kokoro | `cstr/kokoro-v1-GGUF` (Q8_0) | ~330 MB | German variant: `--backend kokoro-de` |
 | qwen3-tts | `cstr/qwen3-tts-0.6b-base-GGUF` (Q8_0) + F16 codec | ~690 MB + ~346 MB | Streaming-capable; codec auto-discovered |
 | qwen3-tts-1.7b-base | `cstr/qwen3-tts-1.7b-base-GGUF` (Q8_0) + F16 codec | ~1.9 GB + ~346 MB | Higher quality |
-| orpheus | `cstr/orpheus-3b-GGUF` (Q4_K) | ~1.9 GB | Llama-3 based; US-English |
+| orpheus | `cstr/orpheus-3b-0.1-ft-GGUF` (Q8_0) | ~3.7 GB | Llama-3 based; US-English |
 | chatterbox | `cstr/chatterbox-tts-GGUF` (Q4_K) | ~2 GB | S3Gen + T3; multilingual |
 | piper | `cstr/piper-en-hfc-medium-GGUF` | ~63 MB | Lightweight, many voices via `--voice` |
 

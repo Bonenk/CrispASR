@@ -441,9 +441,9 @@ constexpr Entry k_registry[] = {
     // ship-default (greedy loops in a 7-slot pattern). The companion
     // URL points at the cstr/snac-24khz-GGUF mirror that gets published
     // alongside the talker GGUF.
-    {"orpheus", "orpheus-3b-base-q8_0.gguf",
-     "https://huggingface.co/cstr/orpheus-3b-base-GGUF/resolve/main/orpheus-3b-base-q8_0.gguf",
-     "~3.5 GB",
+    {"orpheus", "orpheus-3b-0.1-ft-q8_0.gguf",
+     "https://huggingface.co/cstr/orpheus-3b-0.1-ft-GGUF/resolve/main/orpheus-3b-0.1-ft-q8_0.gguf",
+     "~3.7 GB",
      "snac-24khz.gguf",
      "https://huggingface.co/cstr/snac-24khz-GGUF/resolve/main/snac-24khz.gguf",
      "~80 MB"},
