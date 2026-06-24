@@ -3754,7 +3754,20 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
     int n_frames = std::max(12, (int)(text_ids.size() * 4.0f));
     n_frames = std::min(n_frames, 300);
     int voice_ctx = ctx->voice.tts_seq_len; // 0 if no voice loaded
-    int max_ctx = voice_ctx + prefix_len + n_frames + 16;
+    // The positive KV cache must budget *every* position written during
+    // generation: the prefilled voice context, ALL text tokens, and up to
+    // n_frames speech frames. In the voice/realtime path the interleaved loop
+    // feeds the whole of text_ids in 5-token windows (each advancing n_past),
+    // so the cache has to hold text_ids.size() text positions — not just
+    // prefix_len, which here is only the first window (<=5 tokens). With the old
+    // budget a long input whose EOS never fired would run speech to the full
+    // n_frames and the dynamic-path K/V write at n_past would run past the
+    // allocation (OOB write). Use max(prefix_len, text tokens) so both the
+    // windowed (realtime/voice) and the prefilled (1.5B/7B base, where text is
+    // not windowed) paths are covered. (Hardening related to issue #171; the
+    // primary crash there was the Lk-bucket fast path — see run_lm_step below.)
+    int text_kv = std::max(prefix_len, (int)text_ids.size());
+    int max_ctx = voice_ctx + text_kv + n_frames + 16;
     int num_steps = ctx->params.tts_steps > 0 ? ctx->params.tts_steps : 20;
 
     const ggml_type tts_kv_type = GGML_TYPE_F32;
@@ -4053,11 +4066,23 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
                            int kv_sel = 0) -> bool {
         auto t_build0 = std::chrono::high_resolution_clock::now();
 
-        // §201: Lk-bucketed fast path for single-token decode.
-        // Disabled by default — the bucket graph's ggml_set_rows + cached
-        // §201: Lk-bucketed fast path for single-token decode.
-        // Disable with CRISPASR_VIBEVOICE_NO_LM_BUCKETS=1.
-        const bool use_buckets = !std::getenv("CRISPASR_VIBEVOICE_NO_LM_BUCKETS");
+        // §201: Lk-bucketed fast path for single-token decode. It caches a
+        // fixed-topology graph per Lk bucket so the decode graph isn't rebuilt
+        // every token. On GPU backends the bucket graph (ggml_set_rows KV write
+        // + fixed-Lk ggml_cont reads) trips backend bugs that corrupt memory:
+        // a SIGSEGV on Vulkan (RDNA4) and a "CUDA error: invalid argument" in
+        // ggml_cuda_cpy on CUDA — both only for inputs long enough that
+        // kv_max_ctx >= 512 makes a bucket eligible, which is why short inputs
+        // looked fine and long ones crashed (issue #171). The dynamic path below
+        // is correct on every backend (and validated on CPU with buckets too),
+        // so restrict the fast path to the CPU backend by default. Override with
+        // CRISPASR_VIBEVOICE_LM_BUCKETS=0/1 (forces off/on); the legacy
+        // CRISPASR_VIBEVOICE_NO_LM_BUCKETS=1 still forces off.
+        bool use_buckets = !(ctx->backend && ctx->backend != ctx->backend_cpu);
+        if (const char* bk_env = std::getenv("CRISPASR_VIBEVOICE_LM_BUCKETS"))
+            use_buckets = (bk_env[0] == '1');
+        else if (std::getenv("CRISPASR_VIBEVOICE_NO_LM_BUCKETS"))
+            use_buckets = false;
         if (use_buckets && n_tokens == 1 && (!dump_dir || !dump_dir[0])) {
             const int idx = lm_pick_bucket(n_past + 1);
             if (idx >= 0) {
@@ -4620,7 +4645,20 @@ extern "C" float* vibevoice_synthesize(struct vibevoice_context* ctx, const char
                     speech_embed[j] += speech_type_emb[j];
             }
 
-            if (fi < n_frames - 1) { // skip last frame's LM step
+            // Safety net: never let the autoregressive KV writes run past the
+            // allocated cache. With the corrected max_ctx above this should not
+            // trigger, but a hard stop here turns any residual miscount into a
+            // graceful truncation (keep the audio generated so far) instead of
+            // the OOB KV write that crashed before (issue #171). Both the
+            // positive (n_past) and negative (neg_n_past) paths advance by one
+            // per frame, so guard both.
+            if (n_past + 1 > ctx->kv_max_ctx || neg_n_past + 1 > ctx->kv_max_ctx) {
+                if (verbosity >= 1)
+                    fprintf(stderr, "  KV cache limit reached (n_past=%d/%d) — stopping at frame %d\n", n_past,
+                            ctx->kv_max_ctx, fi);
+                finished = true;
+            }
+            if (fi < n_frames - 1 && !finished) { // skip last frame's LM step
                 // Update positive path
                 if (!run_lm_step(speech_embed.data(), 1, n_past, hidden, 0)) {
                     fprintf(stderr, "vibevoice TTS: LM step failed at frame %d\n", fi);
