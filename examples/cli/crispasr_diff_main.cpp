@@ -2329,7 +2329,11 @@ int main(int argc, char** argv) {
         if (synth_text.empty())
             synth_text = "Hello world.";
         std::string dump_path = dirname_of(ref_path) + "/.tada-diff-codec-input.bin";
+#ifdef _WIN32
+        _putenv_s("TADA_DUMP_FEATURES", dump_path.c_str());
+#else
         setenv("TADA_DUMP_FEATURES", dump_path.c_str(), 1);
+#endif
 
         tada_context_params tp = tada_context_default_params();
         tp.n_threads = 4;
