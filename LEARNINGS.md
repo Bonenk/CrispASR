@@ -10852,3 +10852,35 @@ that the EXACT same inputs (token, acoustic, time) are fed step-by-step as the
 model's batch prefill would use.  Run a diff harness that compares the hidden
 state after step 0, 1, prefix_len, and prefix_len+1 before chasing output
 divergence.
+
+### TADA TTS: time transition is one step earlier for time than for acoustic
+
+Python's TADA switches from reference-audio time → FM-predicted time one step
+earlier than it switches acoustic features.  Specifically:
+
+- **Acoustic** uses the reference prompt through `feat_idx < prompt_used_len`
+- **Time** (t_before/t_after) uses the reference prompt only through
+  `feat_idx < prompt_used_len - 1`; at `feat_idx = prompt_used_len - 1` the
+  time is already FM-predicted even though the acoustic is still from the
+  reference
+
+Python's condition: `step - shift_acoustic < prompt_time_len_before.shape[1] - 1`,
+where `shape[1] = prefix_len + n_prompt - transition_steps = prompt_used_len`.
+So `feat_idx < prompt_used_len - 1` for prompted time; predicted otherwise.
+
+**Bug pattern:** C++ `in_prompt` branch applied the same boundary for both
+acoustic and time (`feat_idx < prompt_used_len`), so the last `in_prompt` step
+used reference time where Python was already FM-predicted.  The single-step
+mismatch in `cur_t_before` at step `shift + prompt_used_len - 1` cascaded
+through all subsequent FM evaluations, inflating the last decoded
+`time_before` value from ~21 to 234 (= 4.68 s of trailing silence) and
+ballooning a 1.36 s synthesis to 9.90 s.
+
+**Fix:** `bool use_prompted_time = (feat_idx < prompt_used_len - 1)` inside
+the `in_prompt` branch.  Acoustic selection is unchanged; only the time
+variables (`tb`, `ta`, `cur_t_before`, `cur_t_after`) switch one step earlier.
+
+**Lesson:** when acoustic and time have separate "replay vs predict" boundaries,
+they must be tracked independently.  A single off-by-one in a time embedding
+several frames before the decoded zone can still corrupt all decoded frames via
+KV-state drift.
