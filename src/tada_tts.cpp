@@ -20,6 +20,7 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -61,6 +62,16 @@ struct tada_bench_stage {
         double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
         std::fprintf(stderr, "  tada_bench: %-22s %.2f ms\n", name, ms);
     }
+};
+
+struct tada_fm_dump_record {
+    int32_t step = 0;
+    int32_t feat_idx = 0;
+    std::vector<float> speech_in;
+    std::vector<float> cond;
+    std::vector<float> neg_cond;
+    std::vector<float> speech_out;
+    std::vector<float> time_bits;
 };
 
 struct tada_hp {
@@ -1944,6 +1955,11 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
 
     std::vector<std::vector<float>> acoustic_features;
     std::vector<int> time_before_list;
+    std::vector<tada_fm_dump_record> fm_dump_records;
+    const bool dump_fm_steps = []() {
+        const char* path = std::getenv("TADA_DUMP_FM_STEPS");
+        return path && path[0];
+    }();
 
     // State
     std::vector<float> cur_acoustic(ad, 0.0f);
@@ -2187,6 +2203,17 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
                 speech[j] *= noise_temp;
         }
 
+        tada_fm_dump_record fm_rec;
+        if (need_fm && dump_fm_steps) {
+            fm_rec.step = step;
+            fm_rec.feat_idx = step - shift;
+            fm_rec.speech_in = speech;
+            fm_rec.cond.assign(tr.hidden, tr.hidden + hp.fm_hidden);
+            fm_rec.neg_cond.resize(hp.fm_hidden, 0.0f);
+            if (neg_hidden)
+                fm_rec.neg_cond.assign(neg_hidden, neg_hidden + hp.fm_hidden);
+        }
+
         // Solve ODE with proper negative conditioning
         float noise_rms = 0;
         for (int j = 0; j < ad; j++)
@@ -2232,6 +2259,11 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
         int num_time_bits = (int)hp.num_time_bits;
         int pred_t_before = decode_gray_code(&speech[ad], num_time_bits);
         int pred_t_after = decode_gray_code(&speech[ad + num_time_bits], num_time_bits);
+        if (need_fm && dump_fm_steps) {
+            fm_rec.speech_out = speech;
+            fm_rec.time_bits.assign(speech.begin() + ad, speech.begin() + ad + (size_t)hp.time_dim);
+            fm_dump_records.push_back(std::move(fm_rec));
+        }
 
         // Next token prediction (greedy for now)
         if (step >= num_prompt - 1 && tr.logits) {
@@ -2313,6 +2345,36 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
     if (acoustic_features.empty()) {
         fprintf(stderr, "tada: no acoustic features generated\n");
         return nullptr;
+    }
+
+    if (dump_fm_steps) {
+        const char* dump_path = std::getenv("TADA_DUMP_FM_STEPS");
+        if (FILE* f = fopen(dump_path, "wb")) {
+            uint32_t hdr[4] = {(uint32_t)fm_dump_records.size(), (uint32_t)lat, (uint32_t)hp.fm_hidden,
+                               (uint32_t)hp.time_dim};
+            fwrite(hdr, sizeof(hdr), 1, f);
+            for (size_t i = 0; i < fm_dump_records.size(); i++) {
+                float idx[2] = {(float)i, (float)i};
+                fwrite(idx, sizeof(float), 2, f);
+            }
+            auto write_block = [&](const std::vector<float> tada_fm_dump_record::*field, uint32_t width) {
+                (void)width;
+                for (const auto& r : fm_dump_records) {
+                    const std::vector<float>& v = r.*field;
+                    fwrite(v.data(), sizeof(float), v.size(), f);
+                }
+            };
+            write_block(&tada_fm_dump_record::speech_in, (uint32_t)lat);
+            write_block(&tada_fm_dump_record::cond, (uint32_t)hp.fm_hidden);
+            write_block(&tada_fm_dump_record::neg_cond, (uint32_t)hp.fm_hidden);
+            write_block(&tada_fm_dump_record::speech_out, (uint32_t)lat);
+            write_block(&tada_fm_dump_record::time_bits, (uint32_t)hp.time_dim);
+            fclose(f);
+            if (ctx->params.verbosity >= 1)
+                fprintf(stderr, "tada: dumped %zu FM call records to %s\n", fm_dump_records.size(), dump_path);
+        } else {
+            fprintf(stderr, "tada: WARN: could not open TADA_DUMP_FM_STEPS=%s\n", dump_path);
+        }
     }
 
     if (ctx->params.verbosity >= 1) {

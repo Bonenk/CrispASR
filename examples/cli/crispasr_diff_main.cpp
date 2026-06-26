@@ -143,6 +143,102 @@ struct StageResult {
     std::string note;       // filled when ok=false to explain skip
 };
 
+struct TadaFmStepDump {
+    uint32_t n_steps = 0;
+    uint32_t latent_dim = 0;
+    uint32_t hidden_dim = 0;
+    uint32_t time_dim = 0;
+    std::vector<float> step_index; // (n_steps, 2): FM call ordinal, duplicated for exact compare
+    std::vector<float> speech_in;  // (n_steps, latent_dim)
+    std::vector<float> cond;       // (n_steps, hidden_dim)
+    std::vector<float> neg_cond;   // (n_steps, hidden_dim)
+    std::vector<float> speech_out; // (n_steps, latent_dim)
+    std::vector<float> time_bits;  // (n_steps, time_dim)
+};
+
+static bool read_tada_fm_step_dump(const std::string& path, TadaFmStepDump& dump) {
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f)
+        return false;
+    uint32_t hdr[4] = {0, 0, 0, 0};
+    bool ok = fread(hdr, sizeof(hdr), 1, f) == 1;
+    dump.n_steps = hdr[0];
+    dump.latent_dim = hdr[1];
+    dump.hidden_dim = hdr[2];
+    dump.time_dim = hdr[3];
+    if (ok && (dump.n_steps == 0 || dump.latent_dim == 0 || dump.hidden_dim == 0 || dump.time_dim == 0))
+        ok = false;
+    auto read_vec = [&](std::vector<float>& v, size_t n) {
+        v.resize(n);
+        if (n == 0)
+            return true;
+        return fread(v.data(), sizeof(float), n, f) == n;
+    };
+    if (ok)
+        ok = read_vec(dump.step_index, (size_t)dump.n_steps * 2);
+    if (ok)
+        ok = read_vec(dump.speech_in, (size_t)dump.n_steps * dump.latent_dim);
+    if (ok)
+        ok = read_vec(dump.cond, (size_t)dump.n_steps * dump.hidden_dim);
+    if (ok)
+        ok = read_vec(dump.neg_cond, (size_t)dump.n_steps * dump.hidden_dim);
+    if (ok)
+        ok = read_vec(dump.speech_out, (size_t)dump.n_steps * dump.latent_dim);
+    if (ok)
+        ok = read_vec(dump.time_bits, (size_t)dump.n_steps * dump.time_dim);
+    fclose(f);
+    return ok;
+}
+
+static void print_tada_fm_rows(const crispasr_diff::Ref& ref, const char* name, const std::vector<float>& data,
+                               size_t row_width, size_t max_rows = 6) {
+    auto ref_pair = ref.get_f32(name);
+    if (!ref_pair.first || row_width == 0)
+        return;
+    const size_t n = std::min(data.size(), ref_pair.second);
+    const size_t n_rows = n / row_width;
+    if (n_rows == 0)
+        return;
+    struct RowMetric {
+        size_t row = 0;
+        double cos = 1.0;
+        double max_abs = 0.0;
+        double rms = 0.0;
+    };
+    std::vector<RowMetric> rows;
+    rows.reserve(n_rows);
+    for (size_t r = 0; r < n_rows; r++) {
+        double dot = 0.0, na = 0.0, nb = 0.0, ss = 0.0, ma = 0.0;
+        for (size_t c = 0; c < row_width; c++) {
+            const size_t i = r * row_width + c;
+            const double a = data[i];
+            const double b = ref_pair.first[i];
+            const double d = a - b;
+            dot += a * b;
+            na += a * a;
+            nb += b * b;
+            ss += d * d;
+            ma = std::max(ma, std::fabs(d));
+        }
+        RowMetric m;
+        m.row = r;
+        m.cos = (na > 0.0 && nb > 0.0) ? dot / std::sqrt(na * nb) : 1.0;
+        m.max_abs = ma;
+        m.rms = std::sqrt(ss / (double)row_width);
+        rows.push_back(m);
+    }
+    std::sort(rows.begin(), rows.end(), [](const RowMetric& a, const RowMetric& b) {
+        if (a.cos != b.cos)
+            return a.cos < b.cos;
+        return a.max_abs > b.max_abs;
+    });
+    printf("  [FM-ROWS %-14s] worst %zu/%zu calls:", name, std::min(max_rows, rows.size()), rows.size());
+    for (size_t i = 0; i < rows.size() && i < max_rows; i++) {
+        printf(" #%zu cos=%.6f max=%.2e rms=%.2e", rows[i].row, rows[i].cos, rows[i].max_abs, rows[i].rms);
+    }
+    printf("\n");
+}
+
 // ---- voxtral 3B ----
 
 static StageResult voxtral_mel(voxtral_context* ctx, const float* samples, int n_samples) {
@@ -2331,14 +2427,17 @@ int main(int argc, char** argv) {
         std::string dump_path = dirname_of(ref_path) + "/.tada-diff-codec-input.bin";
         std::string acoustic_dump_path = dirname_of(ref_path) + "/.tada-diff-acoustic-features.bin";
         std::string time_dump_path = dirname_of(ref_path) + "/.tada-diff-time-before.bin";
+        std::string fm_dump_path = dirname_of(ref_path) + "/.tada-diff-fm-steps.bin";
 #ifdef _WIN32
         _putenv_s("TADA_DUMP_FEATURES", dump_path.c_str());
         _putenv_s("TADA_DUMP_ACOUSTIC_FEATURES", acoustic_dump_path.c_str());
         _putenv_s("TADA_DUMP_TIME_BEFORE", time_dump_path.c_str());
+        _putenv_s("TADA_DUMP_FM_STEPS", fm_dump_path.c_str());
 #else
         setenv("TADA_DUMP_FEATURES", dump_path.c_str(), 1);
         setenv("TADA_DUMP_ACOUSTIC_FEATURES", acoustic_dump_path.c_str(), 1);
         setenv("TADA_DUMP_TIME_BEFORE", time_dump_path.c_str(), 1);
+        setenv("TADA_DUMP_FM_STEPS", fm_dump_path.c_str(), 1);
 #endif
 
         tada_context_params tp = tada_context_default_params();
@@ -2412,6 +2511,51 @@ int main(int argc, char** argv) {
             n_fail++;
         }
         tada_free(tctx);
+
+        TadaFmStepDump fm_dump;
+        bool have_fm_dump = read_tada_fm_step_dump(fm_dump_path, fm_dump);
+        remove(fm_dump_path.c_str());
+        if (have_fm_dump) {
+            struct FmStage {
+                const char* name;
+                const std::vector<float> TadaFmStepDump::*data;
+                uint32_t TadaFmStepDump::*width;
+                float max_abs;
+            };
+            static const FmStage fm_stages[] = {
+                {"fm_step_index", &TadaFmStepDump::step_index, nullptr, 1e-3f},
+                {"fm_speech_in", &TadaFmStepDump::speech_in, &TadaFmStepDump::latent_dim, 1e-3f},
+                {"fm_cond", &TadaFmStepDump::cond, &TadaFmStepDump::hidden_dim, 1e-3f},
+                {"fm_neg_cond", &TadaFmStepDump::neg_cond, &TadaFmStepDump::hidden_dim, 1e-3f},
+                {"fm_speech_out", &TadaFmStepDump::speech_out, &TadaFmStepDump::latent_dim, 1e-3f},
+                {"fm_time_bits", &TadaFmStepDump::time_bits, &TadaFmStepDump::time_dim, 1e-3f},
+            };
+            for (const auto& s : fm_stages) {
+                if (!ref.has(s.name)) {
+                    printf("[SKIP] %-22s (not in reference archive)\n", s.name);
+                    n_skip++;
+                    continue;
+                }
+                const auto& data = fm_dump.*(s.data);
+                const size_t row_width = s.width ? (size_t)(fm_dump.*(s.width)) : 2;
+                auto rep = compare_with_row_width(ref, s.name, data.data(), data.size(), (int)row_width);
+                print_row_exact(s.name, rep, COS_THRESHOLD, s.max_abs);
+                if (rep.found && (rep.n_nonfinite != 0 || rep.cos_min < COS_THRESHOLD || rep.max_abs > s.max_abs)) {
+                    print_tada_fm_rows(ref, s.name, data, row_width);
+                }
+                if (!rep.found)
+                    n_skip++;
+                else if (rep.n_nonfinite == 0 && rep.cos_min >= COS_THRESHOLD && rep.max_abs <= s.max_abs)
+                    n_pass++;
+                else
+                    n_fail++;
+            }
+            printf("tada-tts: generated FM calls=%u latent=%u hidden=%u time=%u\n", fm_dump.n_steps, fm_dump.latent_dim,
+                   fm_dump.hidden_dim, fm_dump.time_dim);
+        } else {
+            printf("[SKIP] %-22s no generated FM-step dump\n", "fm_*");
+            n_skip++;
+        }
 
         std::vector<float> gen_acoustic_features;
         int gen_acoustic_frames = 0, gen_acoustic_dim = 0;

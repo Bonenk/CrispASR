@@ -34,6 +34,12 @@ DEFAULT_STAGES = [
     "prompt_time_after",
     "acoustic_features",
     "time_before",
+    "fm_step_index",
+    "fm_speech_in",
+    "fm_cond",
+    "fm_neg_cond",
+    "fm_speech_out",
+    "fm_time_bits",
     "codec_pcm",
 ]
 
@@ -62,6 +68,44 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     from tada.modules.tada import TadaForCausalLM, InferenceOptions
     from tada.modules.encoder import Encoder
     from tada.modules.decoder import Decoder
+
+    want_fm_debug = bool(stages & {
+        "fm_step_index",
+        "fm_speech_in",
+        "fm_cond",
+        "fm_neg_cond",
+        "fm_speech_out",
+        "fm_time_bits",
+    })
+    fm_debug = []
+    orig_solve_flow_matching = None
+    if want_fm_debug:
+        orig_solve_flow_matching = TadaForCausalLM._solve_flow_matching
+
+        def _capture(x: torch.Tensor) -> np.ndarray:
+            y = x.detach().cpu().float()
+            if y.ndim > 1 and y.shape[0] == 1:
+                y = y.squeeze(0)
+            if y.ndim > 1 and y.shape[0] == 1:
+                y = y.squeeze(0)
+            return y.numpy()
+
+        def _patched_solve(self, *args, **kwargs):
+            speech = kwargs.get("speech", args[0] if len(args) > 0 else None)
+            cond = kwargs.get("cond", args[1] if len(args) > 1 else None)
+            neg_cond = kwargs.get("neg_cond", args[2] if len(args) > 2 else None)
+            rec = {
+                "speech_in": _capture(speech),
+                "cond": _capture(cond),
+                "neg_cond": _capture(neg_cond) if neg_cond is not None else np.zeros_like(_capture(cond)),
+            }
+            result = orig_solve_flow_matching(self, *args, **kwargs)
+            rec["speech_out"] = _capture(result)
+            rec["time_bits"] = rec["speech_out"][-int(self.time_dim):]
+            fm_debug.append(rec)
+            return result
+
+        TadaForCausalLM._solve_flow_matching = _patched_solve
 
     # Patch tokenizer for gated Llama
     _orig = AutoTokenizer.from_pretrained.__func__
@@ -127,7 +171,9 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         out["prompt_token_positions"] = prompt.token_positions[0].cpu().float().numpy()
 
     # ── Tokenize synth text ──
-    text_tokens_raw = tokenizer.encode(syn_text, add_special_tokens=False)
+    from tada.utils.text import normalize_text
+    norm_syn_text = normalize_text(syn_text)
+    text_tokens_raw = tokenizer.encode(norm_syn_text, add_special_tokens=False)
     if "text_tokens" in stages:
         out["text_tokens"] = np.array(text_tokens_raw, dtype=np.float32)
 
@@ -144,13 +190,17 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         time_schedule="logsnr",
     )
 
-    with torch.no_grad():
-        gen_output = model.generate(
-            prompt=prompt,
-            text=syn_text,
-            inference_options=opts,
-            verbose=True,
-        )
+    try:
+        with torch.no_grad():
+            gen_output = model.generate(
+                prompt=prompt,
+                text=syn_text,
+                inference_options=opts,
+                verbose=True,
+            )
+    finally:
+        if orig_solve_flow_matching is not None:
+            TadaForCausalLM._solve_flow_matching = orig_solve_flow_matching
 
     # ── Extract intermediates ──
     if gen_output.input_text_ids is not None:
@@ -165,6 +215,19 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     if gen_output.time_before is not None and "time_before" in stages:
         tb = gen_output.time_before[0].cpu().float().numpy()
         out["time_before"] = tb
+
+    if fm_debug:
+        n = len(fm_debug)
+        if "fm_step_index" in stages:
+            out["fm_step_index"] = np.stack(
+                [np.array([float(i), float(i)], dtype=np.float32) for i in range(n)],
+                axis=0,
+            )
+        for name in ("speech_in", "cond", "neg_cond", "speech_out", "time_bits"):
+            stage_name = f"fm_{name}"
+            if stage_name in stages:
+                out[stage_name] = np.stack([rec[name].astype(np.float32) for rec in fm_debug], axis=0)
+        print(f"  captured FM calls: {n}")
 
     if gen_output.audio is not None and gen_output.audio[0] is not None:
         pcm = gen_output.audio[0].cpu().float().numpy()
