@@ -28,11 +28,32 @@ trade-off:
 | **`voxcpm2-tts`** | VoxCPM2: 2B Qwen2 backbone + flow matching + BigVGAN @ 48 kHz (decimated to 24 kHz). Zero-shot voice cloning via `--voice <ref.wav>`. | Yes | ~2.4 GB via `-m auto` |
 | **`pocket-tts`** | Kyutai Pocket TTS 100M: continuous-latent AR @ 12.5 Hz + one-step LSD flow head + Mimi VAE decoder → 24 kHz. MIT / CC-BY-4.0. Voice cloning via `--voice ref.wav`. | Yes (`--voice`) | ~220 MB via `-m auto` (F16 GGUF) |
 | **`kugelaudio`** | KugelAudio-0-Open: 7B Qwen2.5 backbone + 4-layer DiT diffusion head (20-step SDE-DPMSolver++) + acoustic VAE decoder → 24 kHz. 23 languages. MIT. | Pre-encoded voices (`--voice voice.gguf`) | ~5.3 GB Q4_K / ~16 GB F16 via `-m auto` |
-| **`tada` / `tada-1b`** | HumeAI TADA: Llama-3.2 backbone + per-token flow-matching diffusion head + TADA codec → 24 kHz. `tada-1b` is the smaller Q4_K auto-download target; `tada` / `tada-3b-ml` use the larger 3B variant. Voice cloning via reference audio prompt. Requires `--codec-model` for companion codec GGUF. | Yes (`--voice <ref.wav>`) | ~1.7 GB 1B Q4_K + ~1 GB codec GGUF; 3B also available |
+| **`tada` / `tada-1b`** | HumeAI TADA: Llama-3.2 backbone + per-token flow-matching diffusion head + TADA codec → 24 kHz. `tada-1b` is the smaller Q4_K auto-download target; `tada` / `tada-3b-ml` use the larger 3B variant. `-m auto` downloads and uses the default `tada-ref.gguf` prompt; custom voices are prompt GGUFs made with `models/convert-tada-ref-to-gguf.py`. | Yes (`--voice <tada-ref.gguf>`) | ~1.7 GB 1B Q4_K + ~1 GB codec GGUF; 3B also available |
 | **`lfm2-audio`** | LiquidAI LFM2.5-Audio 1.5B: FastConformer encoder + LFM2 hybrid conv+attention backbone + 6L depthformer (8-codebook Mimi) + ISTFT detokenizer → 24 kHz. Interleaved text+audio generation. Also does ASR and speech-to-speech. LFM Open License v1.0 ($10M revenue cap). | No | ~1.5 GB Q4_K (JP) / ~1.6 GB Q5_K (EN) + ~157 MB detokenizer companion |
 | **`mini-omni2`** | gpt-omni/mini-omni2: Whisper-small encoder + Qwen2-0.5B LLM with 8-stream architecture + SNAC 24 kHz decoder → 24 kHz. Also does ASR and speech-to-speech. MIT license. Requires `--codec-model snac-24khz.gguf` companion. | No | ~1.0 GB Q4_K + ~80 MB SNAC companion |
 
 All backends write mono WAV via `--tts-output` (22 kHz for piper/fastpitch, 16 kHz for speecht5, 24 kHz for most others, 44.1 kHz for melotts/dia/parler-tts/zonos-tts, 48 kHz for voxcpm2-tts).
+
+For TADA multilingual prompting, match the Python blueprint by encoding the
+reference audio with the language-specific aligner first:
+
+```bash
+python models/convert-tada-ref-to-gguf.py \
+    --audio french_reference.wav \
+    --transcript "Justice justice." \
+    --language fr \
+    --output tada-ref-fr.gguf
+
+./build/bin/crispasr --backend tada-1b -m auto \
+    --voice tada-ref-fr.gguf \
+    --tts "justice justice" \
+    --tts-output justice.wav
+```
+
+If `--voice` is omitted, the runtime looks for `tada-ref-<lang>.gguf` next
+to the model when `-l <lang>` is set, then falls back to `tada-ref.gguf`.
+The `-l` flag alone does not run alignment; it only selects a matching
+pre-encoded prompt GGUF when one is available.
 
 ### Reproducible / diverse generation (`--seed`)
 

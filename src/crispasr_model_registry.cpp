@@ -885,12 +885,29 @@ constexpr ExtraCompanion k_qwen3_tts_base_extras[] = {
     {nullptr, nullptr},
 };
 
+// TADA generation expects an aligned acoustic prompt, matching the official
+// model.generate(prompt=...) path. Ship the JFK prompt with auto-download so
+// `-m auto --backend tada[-1b] --tts ...` does not fall back to the unprompted
+// path with unstable timing.
+constexpr ExtraCompanion k_tada_1b_extras[] = {
+    {"tada-ref.gguf", "https://huggingface.co/cstr/tada-tts-1b-GGUF/resolve/main/tada-ref.gguf"},
+    {nullptr, nullptr},
+};
+
+constexpr ExtraCompanion k_tada_3b_extras[] = {
+    {"tada-ref.gguf", "https://huggingface.co/cstr/tada-tts-3b-ml-GGUF/resolve/main/tada-ref.gguf"},
+    {nullptr, nullptr},
+};
+
 constexpr ExtraList k_extras[] = {
     {"kokoro", k_kokoro_extras},
     {"vibevoice-tts", k_vibevoice_tts_extras},
     {"cosyvoice3-tts", k_cosyvoice3_tts_extras},
     {"qwen3-tts", k_qwen3_tts_base_extras},
     {"qwen3-tts-1.7b-base", k_qwen3_tts_base_extras},
+    {"tada", k_tada_3b_extras},
+    {"tada-1b", k_tada_1b_extras},
+    {"tada-tts-1b", k_tada_1b_extras},
     {nullptr, nullptr},
 };
 // clang-format on

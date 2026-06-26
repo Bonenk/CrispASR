@@ -15,7 +15,7 @@ For non-English, pass the language code and provide the transcript
         --language fr \
         --output tada-ref-fr.gguf
 
-Supported languages: ar, ch, de, es, fr, it, ja, pl, pt  (omit for English)
+Supported languages: ar, ch/zh, de, es, fr, it, ja, pl, pt  (omit or use en for English)
 
 The encoder weights are fetched from HumeAI/tada-codec on HuggingFace
 (requires a HF token if the repo is gated).
@@ -41,6 +41,14 @@ except ImportError:
     sys.exit("torch not found: pip install torch")
 
 SUPPORTED_LANGUAGES = {"ar", "ch", "de", "es", "fr", "it", "ja", "pl", "pt"}
+LANGUAGE_ALIASES = {"en": None, "eng": None, "zh": "ch", "zh-cn": "ch", "cn": "ch"}
+
+
+def normalize_language(lang: str | None) -> str | None:
+    if not lang:
+        return None
+    lang = lang.lower()
+    return LANGUAGE_ALIASES.get(lang, lang)
 
 def load_audio(path: str, target_sr: int = 24000):
     """Load WAV, resample if needed, return (1, T) float32 tensor + actual sample rate."""
@@ -71,7 +79,8 @@ def main():
     ap.add_argument("--device", default="cpu", help="Torch device (default: cpu)")
     args = ap.parse_args()
 
-    if args.language and args.language not in SUPPORTED_LANGUAGES:
+    language = normalize_language(args.language)
+    if language and language not in SUPPORTED_LANGUAGES:
         sys.exit(f"Unknown language '{args.language}'. Supported: {', '.join(sorted(SUPPORTED_LANGUAGES))}")
 
     print(f"Loading reference audio: {args.audio}")
@@ -89,15 +98,14 @@ def main():
         )
 
     encoder = Encoder.from_pretrained(args.codec_repo, subfolder="encoder",
-                                      language=args.language).to(args.device)
+                                      language=language).to(args.device)
     encoder.eval()
 
     waveform = waveform.to(args.device)
 
-    print(f"Encoding audio (language={args.language or 'en'}) …")
+    print(f"Encoding audio (language={language or 'en'}) …")
     with torch.no_grad():
-        text_arg = [args.transcript] if args.language else None
-        enc_out = encoder(waveform, text=text_arg, sample_rate=sr)
+        enc_out = encoder(waveform, text=[args.transcript], sample_rate=sr)
 
     vals = enc_out.token_values[0].cpu().float().numpy().astype(np.float32)    # (N, 512)
     pos  = enc_out.token_positions[0].cpu().float().numpy().astype(np.float32) # (N,)
@@ -108,8 +116,8 @@ def main():
     w = GGUFWriter(out_path, arch="crispasr.reference", use_temp_file=False)
     w.add_name(Path(out_path).stem)
     w.add_string("crispasr.ref.tada_tts_prompt_text", args.transcript)
-    if args.language:
-        w.add_string("crispasr.ref.tada_tts_language", args.language)
+    if language:
+        w.add_string("crispasr.ref.tada_tts_language", language)
     w.add_tensor("prompt_token_values",    np.ascontiguousarray(vals), raw_dtype=GGMLQuantizationType.F32)
     w.add_tensor("prompt_token_positions", np.ascontiguousarray(pos),  raw_dtype=GGMLQuantizationType.F32)
     w.write_header_to_file()

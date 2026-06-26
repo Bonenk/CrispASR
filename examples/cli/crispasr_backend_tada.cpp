@@ -12,6 +12,7 @@
 
 #include "tada_tts.h"
 
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -38,6 +39,39 @@ static std::string discover_codec(const std::string& model_path) {
         "tada-codec-q8_0.gguf",
     };
     for (const char* name : candidates) {
+        std::string p = dir + "/" + name;
+        if (file_exists(p))
+            return p;
+    }
+    return "";
+}
+
+static std::string tada_prompt_lang_suffix(std::string lang) {
+    for (char& c : lang)
+        c = (char)std::tolower((unsigned char)c);
+    if (lang == "auto" || lang == "en" || lang == "eng")
+        return "";
+    if (lang == "zh" || lang == "zh-cn" || lang == "cn")
+        return "ch";
+    if (lang == "ar" || lang == "ch" || lang == "de" || lang == "es" || lang == "fr" || lang == "it" || lang == "ja" ||
+        lang == "pl" || lang == "pt")
+        return lang;
+    return "";
+}
+
+static std::string discover_prompt(const std::string& model_path, const std::string& language) {
+    auto dir_of = [](const std::string& p) -> std::string {
+        auto sep = p.find_last_of("/\\");
+        return (sep == std::string::npos) ? std::string(".") : p.substr(0, sep);
+    };
+    const std::string dir = dir_of(model_path);
+    std::vector<std::string> candidates;
+    const std::string lang = tada_prompt_lang_suffix(language);
+    if (!lang.empty())
+        candidates.push_back("tada-ref-" + lang + ".gguf");
+    candidates.push_back("tada-ref.gguf");
+
+    for (const std::string& name : candidates) {
         std::string p = dir + "/" + name;
         if (file_exists(p))
             return p;
@@ -124,10 +158,14 @@ public:
             }
         } else if (const char* env = getenv("TADA_PROMPT_CACHE"); env && *env) {
             prompt_path = env;
+        } else {
+            prompt_path = discover_prompt(p.model, p.language);
         }
         if (!prompt_path.empty()) {
             if (tada_load_prompt(ctx_, prompt_path.c_str()) != 0) {
                 fprintf(stderr, "crispasr[tada]: failed to load prompt from '%s'\n", prompt_path.c_str());
+            } else if (!p.no_prints && (p.tts_voice.empty() || p.tts_voice == "default" || p.tts_voice == "auto")) {
+                fprintf(stderr, "crispasr[tada]: using default voice prompt '%s'\n", prompt_path.c_str());
             }
         }
         return true;
