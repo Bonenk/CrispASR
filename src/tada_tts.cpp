@@ -1177,10 +1177,11 @@ int tada_set_codec_path(struct tada_context* ctx, const char* path) {
     if (!ctx || !path)
         return -1;
     ctx->codec_path = path;
-    // Keep the codec on CPU by default. Creating a second Metal backend for
-    // the codec currently trips ggml-metal's residency-set shutdown assert on
-    // Apple M1 after a successful decode. The talker/FM path still uses GPU.
-    ctx->codec_ctx = tada_codec_init_from_file_ex(path, ctx->params.n_threads, false);
+    const bool share_gpu_backend =
+        ctx->params.use_gpu && ctx->backend && ctx->backend_cpu && ctx->backend != ctx->backend_cpu;
+    ctx->codec_ctx = share_gpu_backend ? tada_codec_init_from_file_with_backend(path, ctx->params.n_threads,
+                                                                                ctx->backend, ctx->backend_cpu)
+                                       : tada_codec_init_from_file(path, ctx->params.n_threads);
     if (!ctx->codec_ctx) {
         fprintf(stderr, "tada: failed to load codec from %s\n", path);
         return -1;

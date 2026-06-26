@@ -142,10 +142,13 @@ struct tada_codec_context {
     // ggml state
     ggml_backend_t backend = nullptr;
     ggml_backend_t backend_cpu = nullptr;
+    bool owns_backend = true;
     ggml_context* ctx_w = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
     ggml_context* ctx_perm = nullptr;
     ggml_backend_buffer_t buf_perm = nullptr;
+    ggml_context* ctx_inv = nullptr;
+    ggml_backend_buffer_t buf_inv = nullptr;
     std::map<std::string, ggml_tensor*> tensors;
     std::vector<uint8_t> compute_meta;
 };
@@ -294,9 +297,8 @@ static void precompute_all_inv_alphas(tada_codec_context* c) {
         ggml_backend_tensor_set(*p.dst, inv.data(), 0, n * sizeof(float));
     }
 
-    // Store ctx and buf for cleanup (leak for now — small, lives for process lifetime)
-    (void)inv_buf;
-    (void)inv_ctx;
+    c->ctx_inv = inv_ctx;
+    c->buf_inv = inv_buf;
 }
 
 // Get the materialized weight (pre-computed g*v/||v|| by the converter).
@@ -644,9 +646,9 @@ static ggml_cgraph* build_dac_only_graph(tada_codec_context* c, int n_frames) {
 
 // ──────────────────────── public API ────────────────────────────────
 
-extern "C" {
-
-struct tada_codec_context* tada_codec_init_from_file_ex(const char* path, int n_threads, bool use_gpu) {
+static tada_codec_context* tada_codec_init_from_file_impl(const char* path, int n_threads, bool use_gpu,
+                                                          ggml_backend_t shared_backend,
+                                                          ggml_backend_t shared_backend_cpu) {
     auto* c = new tada_codec_context();
     c->n_threads = n_threads;
     c->compute_meta.resize(32 * 1024 * 1024); // 32 MB for large graph
@@ -674,16 +676,22 @@ struct tada_codec_context* tada_codec_init_from_file_ex(const char* path, int n_
             c->n_attn_heads);
 
     // Backend
-    c->backend_cpu = ggml_backend_cpu_init();
-    if (!c->backend_cpu) {
-        fprintf(stderr, "tada-codec: failed to init CPU backend\n");
-        delete c;
-        return nullptr;
+    if (shared_backend && shared_backend_cpu) {
+        c->backend = shared_backend;
+        c->backend_cpu = shared_backend_cpu;
+        c->owns_backend = false;
+    } else {
+        c->backend_cpu = ggml_backend_cpu_init();
+        if (!c->backend_cpu) {
+            fprintf(stderr, "tada-codec: failed to init CPU backend\n");
+            delete c;
+            return nullptr;
+        }
+        ggml_backend_cpu_set_n_threads(c->backend_cpu, n_threads);
+        c->backend = use_gpu ? ggml_backend_init_best() : c->backend_cpu;
+        if (!c->backend)
+            c->backend = c->backend_cpu;
     }
-    ggml_backend_cpu_set_n_threads(c->backend_cpu, n_threads);
-    c->backend = use_gpu ? ggml_backend_init_best() : c->backend_cpu;
-    if (!c->backend)
-        c->backend = c->backend_cpu;
     fprintf(stderr, "tada-codec: backend=%s%s\n", ggml_backend_name(c->backend),
             (c->backend == c->backend_cpu) ? " (CPU)" : " + CPU fallback");
 
@@ -721,6 +729,17 @@ struct tada_codec_context* tada_codec_init_from_file_ex(const char* path, int n_
 
     fprintf(stderr, "tada-codec: loaded OK (%zu tensors)\n", c->tensors.size());
     return c;
+}
+
+extern "C" {
+
+struct tada_codec_context* tada_codec_init_from_file_ex(const char* path, int n_threads, bool use_gpu) {
+    return tada_codec_init_from_file_impl(path, n_threads, use_gpu, nullptr, nullptr);
+}
+
+struct tada_codec_context* tada_codec_init_from_file_with_backend(const char* path, int n_threads,
+                                                                  ggml_backend_t backend, ggml_backend_t backend_cpu) {
+    return tada_codec_init_from_file_impl(path, n_threads, false, backend, backend_cpu);
 }
 
 struct tada_codec_context* tada_codec_init_from_file(const char* path, int n_threads) {
@@ -997,6 +1016,10 @@ void tada_codec_pcm_free(float* pcm) {
 void tada_codec_free(struct tada_codec_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->buf_inv)
+        ggml_backend_buffer_free(ctx->buf_inv);
+    if (ctx->ctx_inv)
+        ggml_free(ctx->ctx_inv);
     if (ctx->buf_perm)
         ggml_backend_buffer_free(ctx->buf_perm);
     if (ctx->ctx_perm)
@@ -1005,10 +1028,12 @@ void tada_codec_free(struct tada_codec_context* ctx) {
         ggml_backend_buffer_free(ctx->buf_w);
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
-    if (ctx->backend && ctx->backend != ctx->backend_cpu)
-        ggml_backend_free(ctx->backend);
-    if (ctx->backend_cpu)
-        ggml_backend_free(ctx->backend_cpu);
+    if (ctx->owns_backend) {
+        if (ctx->backend && ctx->backend != ctx->backend_cpu)
+            ggml_backend_free(ctx->backend);
+        if (ctx->backend_cpu)
+            ggml_backend_free(ctx->backend_cpu);
+    }
     delete ctx;
 }
 

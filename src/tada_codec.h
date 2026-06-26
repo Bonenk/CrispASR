@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "ggml-backend.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -19,6 +21,8 @@ struct tada_codec_context;
 
 struct tada_codec_context* tada_codec_init_from_file(const char* path, int n_threads);
 struct tada_codec_context* tada_codec_init_from_file_ex(const char* path, int n_threads, bool use_gpu);
+struct tada_codec_context* tada_codec_init_from_file_with_backend(const char* path, int n_threads,
+                                                                  ggml_backend_t backend, ggml_backend_t backend_cpu);
 
 // Decode expanded features to PCM.
 // features: (n_frames, 512) float32 row-major
