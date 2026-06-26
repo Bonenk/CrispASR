@@ -18,6 +18,7 @@ extern "C" {
 struct tada_codec_context;
 
 struct tada_codec_context* tada_codec_init_from_file(const char* path, int n_threads);
+struct tada_codec_context* tada_codec_init_from_file_ex(const char* path, int n_threads, bool use_gpu);
 
 // Decode expanded features to PCM.
 // features: (n_frames, 512) float32 row-major

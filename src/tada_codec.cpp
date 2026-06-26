@@ -141,6 +141,7 @@ struct tada_codec_context {
 
     // ggml state
     ggml_backend_t backend = nullptr;
+    ggml_backend_t backend_cpu = nullptr;
     ggml_context* ctx_w = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
     ggml_context* ctx_perm = nullptr;
@@ -645,7 +646,7 @@ static ggml_cgraph* build_dac_only_graph(tada_codec_context* c, int n_frames) {
 
 extern "C" {
 
-struct tada_codec_context* tada_codec_init_from_file(const char* path, int n_threads) {
+struct tada_codec_context* tada_codec_init_from_file_ex(const char* path, int n_threads, bool use_gpu) {
     auto* c = new tada_codec_context();
     c->n_threads = n_threads;
     c->compute_meta.resize(32 * 1024 * 1024); // 32 MB for large graph
@@ -673,8 +674,18 @@ struct tada_codec_context* tada_codec_init_from_file(const char* path, int n_thr
             c->n_attn_heads);
 
     // Backend
-    c->backend = ggml_backend_cpu_init();
-    ggml_backend_cpu_set_n_threads(c->backend, n_threads);
+    c->backend_cpu = ggml_backend_cpu_init();
+    if (!c->backend_cpu) {
+        fprintf(stderr, "tada-codec: failed to init CPU backend\n");
+        delete c;
+        return nullptr;
+    }
+    ggml_backend_cpu_set_n_threads(c->backend_cpu, n_threads);
+    c->backend = use_gpu ? ggml_backend_init_best() : c->backend_cpu;
+    if (!c->backend)
+        c->backend = c->backend_cpu;
+    fprintf(stderr, "tada-codec: backend=%s%s\n", ggml_backend_name(c->backend),
+            (c->backend == c->backend_cpu) ? " (CPU)" : " + CPU fallback");
 
     // Weights
     core_gguf::WeightLoad wl;
@@ -712,6 +723,10 @@ struct tada_codec_context* tada_codec_init_from_file(const char* path, int n_thr
     return c;
 }
 
+struct tada_codec_context* tada_codec_init_from_file(const char* path, int n_threads) {
+    return tada_codec_init_from_file_ex(path, n_threads, false);
+}
+
 float* tada_codec_decode(struct tada_codec_context* ctx, const float* features, int n_frames,
                          const int32_t* token_masks, int* out_n_samples) {
     if (!ctx || !features || n_frames <= 0)
@@ -722,8 +737,9 @@ float* tada_codec_decode(struct tada_codec_context* ctx, const float* features, 
 
     ggml_cgraph* gf = build_decode_graph(ctx, n_frames);
 
-    ggml_backend_t backends[] = {ctx->backend};
-    ggml_backend_sched_t sched = ggml_backend_sched_new(backends, nullptr, 1, 32768, false, false);
+    ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
+    int n_be = (ctx->backend && ctx->backend != ctx->backend_cpu) ? 2 : 1;
+    ggml_backend_sched_t sched = ggml_backend_sched_new(backends, nullptr, n_be, 32768, false, false);
     ggml_backend_sched_reset(sched);
     if (!ggml_backend_sched_alloc_graph(sched, gf)) {
         fprintf(stderr, "tada-codec: failed to alloc graph\n");
@@ -842,8 +858,9 @@ float* tada_codec_extract_stage(struct tada_codec_context* ctx, const float* fea
     const int ed = ctx->embed_dim;
     ggml_cgraph* gf = build_decode_graph(ctx, n_frames);
 
-    ggml_backend_t backends[] = {ctx->backend};
-    ggml_backend_sched_t sched = ggml_backend_sched_new(backends, nullptr, 1, 32768, false, false);
+    ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
+    int n_be = (ctx->backend && ctx->backend != ctx->backend_cpu) ? 2 : 1;
+    ggml_backend_sched_t sched = ggml_backend_sched_new(backends, nullptr, n_be, 32768, false, false);
     ggml_backend_sched_reset(sched);
     if (!ggml_backend_sched_alloc_graph(sched, gf)) {
         fprintf(stderr, "tada-codec: failed to alloc graph for stage '%s'\n", stage);
@@ -915,8 +932,9 @@ float* tada_codec_decode_dac(struct tada_codec_context* ctx, const float* hidden
     const int d = ctx->hidden_dim;
 
     ggml_cgraph* gf = build_dac_only_graph(ctx, n_frames);
-    ggml_backend_t backends[] = {ctx->backend};
-    ggml_backend_sched_t sched = ggml_backend_sched_new(backends, nullptr, 1, 32768, false, false);
+    ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
+    int n_be = (ctx->backend && ctx->backend != ctx->backend_cpu) ? 2 : 1;
+    ggml_backend_sched_t sched = ggml_backend_sched_new(backends, nullptr, n_be, 32768, false, false);
     ggml_backend_sched_reset(sched);
     if (!ggml_backend_sched_alloc_graph(sched, gf)) {
         fprintf(stderr, "tada-codec: failed to alloc DAC graph\n");
@@ -987,8 +1005,10 @@ void tada_codec_free(struct tada_codec_context* ctx) {
         ggml_backend_buffer_free(ctx->buf_w);
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
-    if (ctx->backend)
+    if (ctx->backend && ctx->backend != ctx->backend_cpu)
         ggml_backend_free(ctx->backend);
+    if (ctx->backend_cpu)
+        ggml_backend_free(ctx->backend_cpu);
     delete ctx;
 }
 

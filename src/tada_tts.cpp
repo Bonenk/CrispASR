@@ -151,8 +151,8 @@ struct tada_vocab {
 
 struct mt19937_state_t {
     uint32_t mt[624];
-    int32_t  left;
-    int32_t  pos;
+    int32_t left;
+    int32_t pos;
 };
 
 struct tada_context {
@@ -690,27 +690,27 @@ static float rng_normal(uint64_t* state) {
 static void mt19937_init(mt19937_state_t* s, uint32_t seed) {
     s->mt[0] = seed;
     for (int j = 1; j < 624; j++) {
-        s->mt[j] = (1812433253u * (s->mt[j-1] ^ (s->mt[j-1] >> 30)) + (uint32_t)j) & 0xffffffffu;
+        s->mt[j] = (1812433253u * (s->mt[j - 1] ^ (s->mt[j - 1] >> 30)) + (uint32_t)j) & 0xffffffffu;
     }
     s->left = 1; // PyTorch CPUGeneratorImpl initial value → twist on first draw
-    s->pos  = 0;
+    s->pos = 0;
 }
 
 static void mt19937_twist(mt19937_state_t* s) {
     static const uint32_t A = 0x9908b0dfu;
     uint32_t* mt = s->mt;
     for (int j = 0; j < 227; j++) {
-        uint32_t y = (mt[j] & 0x80000000u) | (mt[j+1] & 0x7fffffffu);
-        mt[j] = mt[j+397] ^ (y >> 1) ^ ((y & 1u) ? A : 0u);
+        uint32_t y = (mt[j] & 0x80000000u) | (mt[j + 1] & 0x7fffffffu);
+        mt[j] = mt[j + 397] ^ (y >> 1) ^ ((y & 1u) ? A : 0u);
     }
     for (int j = 227; j < 623; j++) {
-        uint32_t y = (mt[j] & 0x80000000u) | (mt[j+1] & 0x7fffffffu);
-        mt[j] = mt[j-227] ^ (y >> 1) ^ ((y & 1u) ? A : 0u);
+        uint32_t y = (mt[j] & 0x80000000u) | (mt[j + 1] & 0x7fffffffu);
+        mt[j] = mt[j - 227] ^ (y >> 1) ^ ((y & 1u) ? A : 0u);
     }
     uint32_t y = (mt[623] & 0x80000000u) | (mt[0] & 0x7fffffffu);
     mt[623] = mt[396] ^ (y >> 1) ^ ((y & 1u) ? A : 0u);
     s->left = 624;
-    s->pos  = 0;
+    s->pos = 0;
 }
 
 static uint32_t mt19937_next(mt19937_state_t* s) {
@@ -719,7 +719,7 @@ static uint32_t mt19937_next(mt19937_state_t* s) {
         mt19937_twist(s);
     uint32_t y = s->mt[s->pos++];
     y ^= (y >> 11);
-    y ^= (y <<  7) & 0x9d2c5680u;
+    y ^= (y << 7) & 0x9d2c5680u;
     y ^= (y << 15) & 0xefc60000u;
     y ^= (y >> 18);
     return y;
@@ -732,35 +732,35 @@ static uint32_t mt19937_next(mt19937_state_t* s) {
 //      data[j]=r*cos(theta), data[j+8]=r*sin(theta)
 //   3. Re-draw last 16 if size%16≠0 and repeat
 static void mt19937_randn(mt19937_state_t* s, float* data, int N) {
-    static const uint32_t MASK24  = (1u << 24) - 1u;
-    static const float    DIV24   = 1.0f / (float)(1u << 24);
-    static const double   TWO_PI  = 2.0 * M_PI; // double precision, matches c10::pi<double>
+    static const uint32_t MASK24 = (1u << 24) - 1u;
+    static const float DIV24 = 1.0f / (float)(1u << 24);
+    static const double TWO_PI = 2.0 * M_PI; // double precision, matches c10::pi<double>
 
     for (int i = 0; i < N; i++)
         data[i] = (float)(mt19937_next(s) & MASK24) * DIV24;
 
     for (int i = 0; i <= N - 16; i += 16) {
         for (int j = 0; j < 8; j++) {
-            float u1 = 1.0f - data[i+j];
-            float u2 = data[i+j+8];
-            float r  = std::sqrt(-2.0f * std::log(u1));
+            float u1 = 1.0f - data[i + j];
+            float u2 = data[i + j + 8];
+            float r = std::sqrt(-2.0f * std::log(u1));
             double theta = TWO_PI * (double)u2;
-            data[i+j]   = (float)((double)r * std::cos(theta));
-            data[i+j+8] = (float)((double)r * std::sin(theta));
+            data[i + j] = (float)((double)r * std::cos(theta));
+            data[i + j + 8] = (float)((double)r * std::sin(theta));
         }
     }
 
     if (N % 16 != 0) {
         int tail = N - 16;
         for (int i = 0; i < 16; i++)
-            data[tail+i] = (float)(mt19937_next(s) & MASK24) * DIV24;
+            data[tail + i] = (float)(mt19937_next(s) & MASK24) * DIV24;
         for (int j = 0; j < 8; j++) {
-            float u1 = 1.0f - data[tail+j];
-            float u2 = data[tail+j+8];
-            float r  = std::sqrt(-2.0f * std::log(u1));
+            float u1 = 1.0f - data[tail + j];
+            float u2 = data[tail + j + 8];
+            float r = std::sqrt(-2.0f * std::log(u1));
             double theta = TWO_PI * (double)u2;
-            data[tail+j]   = (float)((double)r * std::cos(theta));
-            data[tail+j+8] = (float)((double)r * std::sin(theta));
+            data[tail + j] = (float)((double)r * std::cos(theta));
+            data[tail + j + 8] = (float)((double)r * std::sin(theta));
         }
     }
 }
@@ -1122,9 +1122,20 @@ struct tada_context* tada_init_from_file(const char* path_model, struct tada_con
     }
 
     // ── Backend init ──
-    c->backend = ggml_backend_cpu_init();
-    ggml_backend_cpu_set_n_threads(c->backend, params.n_threads);
-    c->backend_cpu = c->backend;
+    c->backend_cpu = ggml_backend_cpu_init();
+    if (!c->backend_cpu) {
+        fprintf(stderr, "tada: failed to init CPU backend\n");
+        delete c;
+        return nullptr;
+    }
+    ggml_backend_cpu_set_n_threads(c->backend_cpu, params.n_threads);
+    c->backend = params.use_gpu ? ggml_backend_init_best() : c->backend_cpu;
+    if (!c->backend)
+        c->backend = c->backend_cpu;
+    if (params.verbosity >= 1) {
+        fprintf(stderr, "tada: backend=%s%s\n", ggml_backend_name(c->backend),
+                (c->backend == c->backend_cpu) ? " (CPU)" : " + CPU fallback");
+    }
 
     // ── Pass 2: weights ──
     core_gguf::WeightLoad wl;
@@ -1145,8 +1156,9 @@ struct tada_context* tada_init_from_file(const char* path_model, struct tada_con
     }
 
     // ── Scheduler ──
-    ggml_backend_t backends[] = {c->backend};
-    c->sched = ggml_backend_sched_new(backends, nullptr, 1, 16384, false, false);
+    ggml_backend_t backends[2] = {c->backend, c->backend_cpu};
+    int n_be = (c->backend && c->backend != c->backend_cpu) ? 2 : 1;
+    c->sched = ggml_backend_sched_new(backends, nullptr, n_be, 16384, false, false);
 
     // ── KV cache ──
     int max_ctx = params.max_tokens > 0 ? params.max_tokens + 256 : 1024;
@@ -1165,7 +1177,10 @@ int tada_set_codec_path(struct tada_context* ctx, const char* path) {
     if (!ctx || !path)
         return -1;
     ctx->codec_path = path;
-    ctx->codec_ctx = tada_codec_init_from_file(path, ctx->params.n_threads);
+    // Keep the codec on CPU by default. Creating a second Metal backend for
+    // the codec currently trips ggml-metal's residency-set shutdown assert on
+    // Apple M1 after a successful decode. The talker/FM path still uses GPU.
+    ctx->codec_ctx = tada_codec_init_from_file_ex(path, ctx->params.n_threads, false);
     if (!ctx->codec_ctx) {
         fprintf(stderr, "tada: failed to load codec from %s\n", path);
         return -1;
@@ -2000,8 +2015,10 @@ void tada_free(struct tada_context* ctx) {
         ggml_backend_buffer_free(ctx->buf_w);
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
-    if (ctx->backend)
+    if (ctx->backend && ctx->backend != ctx->backend_cpu)
         ggml_backend_free(ctx->backend);
+    if (ctx->backend_cpu)
+        ggml_backend_free(ctx->backend_cpu);
     delete ctx;
 }
 
