@@ -1,4 +1,4 @@
-"""TADA-3B-ML TTS reference dump backend for crispasr-diff.
+"""TADA TTS reference dump backend for crispasr-diff.
 
 Uses the official model.generate() API with a reference audio prompt
 for voice conditioning. This produces audible, intelligible speech
@@ -15,12 +15,12 @@ Environment variables:
   TADA_DEVICE         — "cpu" or "cuda" (default: "cpu")
   TADA_SEED           — random seed (default: 42)
   TADA_CODEC_DIR      — local path to HumeAI/tada-codec (optional)
+  TADA_WAV_OUTPUT     — path for output WAV (default: /tmp/tada-ref-output.wav)
 """
 
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 from typing import Dict, Set
 
@@ -40,6 +40,13 @@ DEFAULT_STAGES = [
     "fm_neg_cond",
     "fm_speech_out",
     "fm_time_bits",
+    # codec stages — codec_input + codec_token_masks are required by the diff
+    # harness to drive codec extraction; codec_proj/codec_attn_out are optional
+    # intermediates inside the codec decoder
+    "codec_input",
+    "codec_token_masks",
+    "codec_proj",
+    "codec_attn_out",
     "codec_pcm",
 ]
 
@@ -177,6 +184,64 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     if "text_tokens" in stages:
         out["text_tokens"] = np.array(text_tokens_raw, dtype=np.float32)
 
+    # ── Patch _decode_wav to intercept expanded codec input ──
+    # Also patch Decoder.forward to capture proj and attn intermediates.
+    # We store results here so they're accessible after generate() returns.
+    _captured: Dict[str, np.ndarray] = {}
+
+    need_codec_input = any(s in stages for s in
+                           ("codec_input", "codec_token_masks",
+                            "codec_proj", "codec_attn_out"))
+
+    if need_codec_input:
+        from tada.modules.decoder import _create_segment_attention_mask
+
+        orig_decode_wav = TadaForCausalLM._decode_wav
+
+        def patched_decode_wav(self, encoded, time_before):
+            tb = time_before[: encoded.shape[0] + 1]
+            expanded = []
+            for pos in range(encoded.shape[0]):
+                expanded.append(
+                    torch.zeros(
+                        (tb[pos] - 1).clamp(min=0),
+                        encoded.shape[-1],
+                        device=self.device,
+                        dtype=encoded.dtype,
+                    )
+                )
+                expanded.append(encoded[pos].unsqueeze(0))
+            expanded.append(
+                torch.zeros(tb[-1], encoded.shape[-1], device=self.device, dtype=encoded.dtype)
+            )
+            encoded_expanded = torch.cat(expanded, dim=0).unsqueeze(0)  # (1, T, 512)
+            masks = (torch.norm(encoded_expanded, dim=-1) != 0).long()   # (1, T)
+            _captured["codec_input"] = encoded_expanded[0].detach().cpu().float().numpy()       # (T, 512)
+            _captured["codec_token_masks"] = masks[0].detach().cpu().float().numpy()           # (T,)
+            _captured["decode_time_before"] = tb.detach().cpu().float().numpy()
+            return orig_decode_wav(self, encoded, time_before)
+
+        TadaForCausalLM._decode_wav = patched_decode_wav
+
+        # Patch Decoder.forward to capture proj and attn outputs
+        orig_decoder_forward = Decoder.forward
+
+        def patched_decoder_forward(self, encoded_expanded, token_masks):
+            # proj: (1, T, 512) → (1, T, 1024)
+            decoder_proj_out = self.decoder_proj(encoded_expanded)
+            _captured["codec_proj"] = decoder_proj_out[0].detach().cpu().float().numpy()  # (T, 1024)
+
+            # Build attn mask same as original
+            attn_mask = _create_segment_attention_mask(token_masks, version="v2")
+            attn_out = self.local_attention_decoder(decoder_proj_out, mask=attn_mask)
+            _captured["codec_attn_out"] = attn_out[0].detach().cpu().float().numpy()      # (T, 1024)
+
+            # wav_decoder expects (B, C, T) — transpose before passing
+            x_rec = self.wav_decoder(attn_out.transpose(1, 2))
+            return x_rec
+
+        Decoder.forward = patched_decoder_forward
+
     # ── Generate with official API ──
     print(f"  generating: {syn_text!r}")
     opts = InferenceOptions(
@@ -202,19 +267,35 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         if orig_solve_flow_matching is not None:
             TadaForCausalLM._solve_flow_matching = orig_solve_flow_matching
 
-    # ── Extract intermediates ──
+    # Restore patches
+    if need_codec_input:
+        TadaForCausalLM._decode_wav = orig_decode_wav
+        Decoder.forward = orig_decoder_forward
+
+    # ── Extract codec intermediates from capture dict ──
+    for key in ("codec_input", "codec_token_masks", "codec_proj", "codec_attn_out",
+                "decode_time_before"):
+        if key in stages and key in _captured:
+            out[key] = _captured[key]
+        elif key in _captured:
+            out[key] = _captured[key]  # always include for harness alignment
+
+    if _captured.get("codec_input") is not None:
+        n_frames = _captured["codec_input"].shape[0]
+        n_voiced = int(_captured["codec_token_masks"].sum()) if "codec_token_masks" in _captured else "?"
+        print(f"  codec: {n_frames} expanded frames, {n_voiced} voiced")
+
+    # ── Extract generation outputs ──
     if gen_output.input_text_ids is not None:
         print(f"  input_ids: {gen_output.input_text_ids.shape}")
         if "input_ids" in stages:
             out["input_ids"] = gen_output.input_text_ids[0].cpu().float().numpy()
 
     if gen_output.acoustic_features is not None and "acoustic_features" in stages:
-        af = gen_output.acoustic_features[0].cpu().float().numpy()
-        out["acoustic_features"] = af
+        out["acoustic_features"] = gen_output.acoustic_features[0].cpu().float().numpy()
 
     if gen_output.time_before is not None and "time_before" in stages:
-        tb = gen_output.time_before[0].cpu().float().numpy()
-        out["time_before"] = tb
+        out["time_before"] = gen_output.time_before[0].cpu().float().numpy()
 
     if fm_debug:
         n = len(fm_debug)
@@ -233,17 +314,19 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         pcm = gen_output.audio[0].cpu().float().numpy()
         if "codec_pcm" in stages:
             out["codec_pcm"] = pcm
-        # Save WAV for ASR roundtrip
-        import wave, struct
         wav_path = Path(os.environ.get("TADA_WAV_OUTPUT", "/tmp/tada-ref-output.wav"))
+        import wave
         pcm16 = (pcm * 32767).clip(-32767, 32767).astype(np.int16)
         with wave.open(str(wav_path), "w") as w:
             w.setnchannels(1)
             w.setsampwidth(2)
             w.setframerate(24000)
             w.writeframes(pcm16.tobytes())
-        print(f"  WAV saved: {wav_path} ({len(pcm16)} samples, "
+        print(f"  WAV: {wav_path} ({len(pcm16)} samples, "
               f"RMS={np.sqrt(np.mean(pcm.astype(float)**2)):.4f})")
+
+    # Store synthesis text in metadata so diff harness can replay the same text
+    out["tada_tts_syn_text"] = syn_text  # routed to crispasr.ref.tada_tts_syn_text
 
     generated_text = ""
     if gen_output.output_str:
