@@ -22,6 +22,7 @@
 
 #include "tada_encoder.h"
 #include "wav2vec2-ggml.h"
+#include "core/bpe.h"
 #include "core/gguf_loader.h"
 
 #include "ggml.h"
@@ -868,10 +869,43 @@ int tada_encoder_encode_with_positions(tada_encoder_context* ctx, const float* a
     return 0;
 }
 
+// Text normalization matching tada/utils/text.py normalize_text().
+static std::string normalize_text(std::string text) {
+    auto replace_all = [](std::string& s, const std::string& from, const std::string& to) {
+        if (from.empty())
+            return;
+        size_t pos = 0;
+        while ((pos = s.find(from, pos)) != std::string::npos) {
+            s.replace(pos, from.size(), to);
+            pos += to.size();
+        }
+    };
+    replace_all(text, "; ", ". ");
+    replace_all(text, "\"", "");
+    replace_all(text, ":", ",");
+    replace_all(text, "(", "");
+    replace_all(text, ")", "");
+    replace_all(text, "--", "-");
+    replace_all(text, "-", ", ");
+    replace_all(text, ",,", ",");
+    replace_all(text, " '", " ");
+    replace_all(text, "' ", " ");
+    replace_all(text, "  ", " ");
+
+    std::string out;
+    out.reserve(text.size());
+    for (size_t i = 0; i < text.size(); i++) {
+        if (std::isspace((unsigned char)text[i]) && i + 1 < text.size() &&
+            (text[i + 1] == '.' || text[i + 1] == ',' || text[i + 1] == '?' || text[i + 1] == '!'))
+            continue;
+        out.push_back(text[i]);
+    }
+    return out;
+}
+
 int tada_encoder_encode(tada_encoder_context* ctx, const char* aligner_gguf, const float* audio_24k, int n_samples_24k,
                         const char* transcript, tada_encoder_result& result) {
     // Step 1: Resample 24kHz → 16kHz for aligner
-    // Simple linear interpolation resample
     int n_16k = (int)((int64_t)n_samples_24k * 16000 / 24000);
     std::vector<float> audio_16k(n_16k);
     for (int i = 0; i < n_16k; i++) {
@@ -887,6 +921,8 @@ int tada_encoder_encode(tada_encoder_context* ctx, const char* aligner_gguf, con
     }
 
     // Step 2: Load aligner (wav2vec2) and compute logits
+    if (ctx->params.verbosity > 0)
+        fprintf(stderr, "[tada-encoder] loading aligner from %s\n", aligner_gguf);
     wav2vec2_model aligner;
     if (!wav2vec2_load(aligner_gguf, aligner)) {
         fprintf(stderr, "[tada-encoder] failed to load aligner from %s\n", aligner_gguf);
@@ -902,19 +938,132 @@ int tada_encoder_encode(tada_encoder_context* ctx, const char* aligner_gguf, con
     int V = (int)aligner.hparams.vocab_size;
     int T_ctc = (int)(logits.size() / V);
 
-    // Step 3: Tokenize transcript
-    // For now, we need the tokenizer embedded in the aligner GGUF.
-    // The aligner vocab is the Llama tokenizer — use it to tokenize the transcript.
-    // TODO: implement proper BPE tokenization from embedded tokens+merges
-    // For now, use a simple lookup approach if vocab is available.
-    //
-    // This is a placeholder — full BPE tokenization will be needed.
-    fprintf(stderr, "[tada-encoder] tokenization not yet implemented in C++\n");
-    fprintf(stderr, "[tada-encoder] use the diff harness with pre-computed positions instead\n");
+    // Step 3: Tokenize transcript using BPE from the aligner GGUF
+    // The aligner GGUF embeds tokenizer.ggml.tokens + tokenizer.ggml.merges
+    // (same Llama-3.2 vocab used by tada_tts.cpp).
+    std::unordered_map<std::string, int32_t> token_to_id;
+    std::unordered_map<std::string, int32_t> merge_rank;
+    for (size_t i = 0; i < aligner.vocab.size(); i++)
+        token_to_id[aligner.vocab[i]] = (int32_t)i;
 
-    (void)transcript;
-    // aligner model is freed when it goes out of scope
-    return -10; // not yet implemented
+    // Load merges from the aligner GGUF metadata
+    {
+        gguf_init_params mp = {true, nullptr};
+        gguf_context* gctx = gguf_init_from_file(aligner_gguf, mp);
+        if (gctx) {
+            int midx = gguf_find_key(gctx, "tokenizer.ggml.merges");
+            if (midx >= 0) {
+                int n = (int)gguf_get_arr_n(gctx, midx);
+                for (int i = 0; i < n; i++) {
+                    const char* s = gguf_get_arr_str(gctx, midx, i);
+                    if (s)
+                        merge_rank[s] = i;
+                }
+                if (ctx->params.verbosity > 0)
+                    fprintf(stderr, "[tada-encoder] loaded %d BPE merges from aligner\n", n);
+            }
+            gguf_free(gctx);
+        }
+    }
+
+    if (token_to_id.empty()) {
+        fprintf(stderr, "[tada-encoder] aligner has no tokenizer vocab\n");
+        return -3;
+    }
+
+    std::string norm = normalize_text(std::string(transcript));
+    std::vector<int32_t> text_tokens = core_bpe::tokenize_simple(token_to_id, merge_rank, norm);
+
+    if (text_tokens.empty()) {
+        fprintf(stderr, "[tada-encoder] tokenization produced 0 tokens for '%s'\n", transcript);
+        return -4;
+    }
+    if (ctx->params.verbosity > 0)
+        fprintf(stderr, "[tada-encoder] tokenized '%s' → %zu tokens\n", norm.c_str(), text_tokens.size());
+
+    // Step 4: Softmax logits and run DP alignment
+    // Compute softmax per-frame (in-place on logits)
+    for (int t = 0; t < T_ctc; t++) {
+        float* row = logits.data() + (size_t)t * V;
+        float mx = *std::max_element(row, row + V);
+        float sum = 0.0f;
+        for (int v = 0; v < V; v++) {
+            row[v] = std::exp(row[v] - mx);
+            sum += row[v];
+        }
+        for (int v = 0; v < V; v++)
+            row[v] /= sum;
+    }
+
+    int N = (int)text_tokens.size();
+    // Prepend blank token (id=0) to match Python's
+    // valid_tokens = F.pad(text_tokens, (1, 0))
+    std::vector<int32_t> valid_tokens(N + 1);
+    valid_tokens[0] = 0; // blank / pad
+    std::memcpy(valid_tokens.data() + 1, text_tokens.data(), N * sizeof(int32_t));
+
+    // Build reduced probability matrix: only keep probs for valid_tokens
+    // to avoid the full T×V softmax matrix
+    // Actually, the DP operates on probs[T, valid_tokens_subset], but the
+    // Python code uses probs[:, valid_tokens] which is the full vocab filtered.
+    // Our DP function takes the full probs matrix, so just pass it directly.
+
+    // The Python aligns text_tokens (without the leading blank).
+    // Filter out eos tokens from text_tokens
+    int eos_id = (V > 128009) ? 128009 : (int)V - 1;
+    std::vector<int32_t> align_tokens;
+    for (int32_t tok : text_tokens) {
+        if (tok != eos_id)
+            align_tokens.push_back(tok);
+    }
+    N = (int)align_tokens.size();
+
+    std::vector<int32_t> positions(N);
+    int rc = tada_dp_align(logits.data(), T_ctc, V, align_tokens.data(), N, positions.data());
+    if (rc != 0) {
+        fprintf(stderr, "[tada-encoder] DP alignment failed (rc=%d)\n", rc);
+        return -5;
+    }
+
+    if (ctx->params.verbosity > 0)
+        fprintf(stderr, "[tada-encoder] aligned %d tokens to %d CTC frames\n", N, T_ctc);
+
+    // Step 5: Build token_masks from positions
+    // CTC frames → encoder frames: CTC operates at 50Hz (same as encoder)
+    // The aligner resamples 24kHz→16kHz internally, runs wav2vec2 at 16kHz.
+    // wav2vec2 output is at 50fps (16000 / stride_product = 16000/320 = 50).
+    // The encoder also outputs at 50Hz (24000 / 480 = 50). So positions map 1:1.
+    int padded_24k = n_samples_24k + 960;
+    int T_enc = padded_24k;
+    for (int b = 0; b < 4; b++) {
+        int s = ctx->strides[b];
+        int K = 2 * s;
+        int p = (s + 1) / 2;
+        T_enc = (T_enc + 2 * p - K) / s + 1;
+    }
+
+    // Convert CTC positions to 1-indexed (matching Python's selected_positions = 1 + positions)
+    std::vector<int32_t> positions_1idx(N);
+    for (int i = 0; i < N; i++)
+        positions_1idx[i] = positions[i] + 1;
+
+    // Build token_masks: 0 everywhere, 1 at position indices
+    // input_lengths = ceil(audio_length / sample_rate * 50)
+    int T_mask = std::max(T_ctc, T_enc);
+    std::vector<int32_t> token_masks(T_mask, 0);
+    for (int i = 0; i < N; i++) {
+        int p = positions[i];
+        if (p >= 0 && p < T_mask)
+            token_masks[p] = 1;
+    }
+
+    if (ctx->params.verbosity > 0)
+        fprintf(stderr, "[tada-encoder] masks: %d/%d voiced, encoder frames=%d\n",
+                (int)std::count(token_masks.begin(), token_masks.end(), 1), T_mask, T_enc);
+
+    // Step 6: Run encoder with positions
+    return tada_encoder_encode_with_positions(ctx, audio_24k, n_samples_24k, token_masks.data(), T_mask,
+                                              positions_1idx.data(), N, result);
 }
 
 float* tada_encoder_extract_stage(tada_encoder_context* ctx, const float* audio_24k, int n_samples_24k,
@@ -987,4 +1136,50 @@ float* tada_encoder_extract_stage(tada_encoder_context* ctx, const float* audio_
 
     ggml_gallocr_free(alloc);
     return data;
+}
+
+// ──────────── GGUF writer for voice reference ─────────────────────
+
+int tada_encoder_write_ref_gguf(const char* path, const tada_encoder_result& result, const char* transcript,
+                                const char* language) {
+    if (result.n_tokens <= 0 || result.token_values.empty())
+        return -1;
+
+    // Create ggml context for tensor descriptors (no_alloc — we just need metadata)
+    size_t ctx_size = ggml_tensor_overhead() * 4 + 4096;
+    ggml_init_params ip = {ctx_size, nullptr, true};
+    ggml_context* ctx = ggml_init(ip);
+    if (!ctx)
+        return -2;
+
+    gguf_context* gw = gguf_init_empty();
+    gguf_set_val_str(gw, "general.architecture", "crispasr.reference");
+    gguf_set_val_str(gw, "general.name", "tada-ref-custom");
+    if (transcript)
+        gguf_set_val_str(gw, "crispasr.ref.tada_tts_prompt_text", transcript);
+    if (language && language[0])
+        gguf_set_val_str(gw, "crispasr.ref.tada_tts_language", language);
+
+    // prompt_token_values: (n_tokens, embed_dim) F32
+    {
+        int64_t ne[2] = {result.embed_dim, result.n_tokens};
+        ggml_tensor* t = ggml_new_tensor(ctx, GGML_TYPE_F32, 2, ne);
+        ggml_set_name(t, "prompt_token_values");
+        t->data = (void*)result.token_values.data();
+        gguf_add_tensor(gw, t);
+    }
+
+    // prompt_token_positions: (n_tokens,) F32
+    {
+        int64_t ne[1] = {result.n_tokens};
+        ggml_tensor* t = ggml_new_tensor(ctx, GGML_TYPE_F32, 1, ne);
+        ggml_set_name(t, "prompt_token_positions");
+        t->data = (void*)result.token_positions.data();
+        gguf_add_tensor(gw, t);
+    }
+
+    gguf_write_to_file(gw, path, false);
+    gguf_free(gw);
+    ggml_free(ctx);
+    return 0;
 }

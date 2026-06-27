@@ -9,6 +9,9 @@
 
 #include "crispasr_backend.h"
 #include "crispasr_cache.h"
+#include "tada_encoder.h"
+
+#include <sys/stat.h>
 #include "crispasr_chunk_context_gate.h"
 #include "crispasr_lcs_dedup.h"
 #include "crispasr_long_audio_fallback.h"
@@ -1460,13 +1463,123 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
     // ---- make-ref mode: create TADA voice reference GGUF ----
     if (params.make_ref) {
-        fprintf(stderr, "crispasr[make-ref]: --make-ref mode\n");
-        fprintf(stderr, "crispasr[make-ref]: C++ tokenization not yet implemented.\n"
-                        "  Use the Python converter instead:\n"
-                        "    python models/convert-tada-ref-to-gguf.py \\\n"
-                        "      --audio <voice.wav> --transcript \"text\" --output ref.gguf\n"
-                        "  Or use the C++ diff harness with pre-computed positions for parity testing.\n");
-        return 20;
+        if (params.tts_voice.empty()) {
+            fprintf(stderr, "crispasr[make-ref]: --make-ref requires --voice <audio.wav>\n");
+            return 20;
+        }
+        if (params.tts_ref_text.empty()) {
+            fprintf(stderr, "crispasr[make-ref]: --make-ref requires --ref-text \"transcript of the audio\"\n");
+            return 20;
+        }
+
+        // Resolve paths
+        std::string encoder_path = params.make_ref_encoder;
+        std::string aligner_path = params.make_ref_aligner;
+        std::string out_path = params.make_ref_output.empty() ? "tada-ref-custom.gguf" : params.make_ref_output;
+
+        // Auto-discover encoder + aligner GGUFs from model dir or cache
+        if (encoder_path.empty()) {
+            auto dir_of = [](const std::string& p) -> std::string {
+                auto sep = p.find_last_of("/\\");
+                return (sep == std::string::npos) ? "." : p.substr(0, sep);
+            };
+            std::string dir = dir_of(params.model);
+            for (const char* name : {"tada-encoder-f16.gguf", "tada-encoder.gguf"}) {
+                std::string p = dir + "/" + name;
+                struct stat st;
+                if (stat(p.c_str(), &st) == 0) { encoder_path = p; break; }
+            }
+        }
+        if (aligner_path.empty()) {
+            auto dir_of = [](const std::string& p) -> std::string {
+                auto sep = p.find_last_of("/\\");
+                return (sep == std::string::npos) ? "." : p.substr(0, sep);
+            };
+            std::string dir = dir_of(params.model);
+            std::string lang_suffix = params.language.empty() ? "en" : params.language;
+            for (const char* fmt : {"tada-aligner-%s.gguf", "tada-aligner-en.gguf"}) {
+                char name[256];
+                snprintf(name, sizeof(name), fmt, lang_suffix.c_str());
+                std::string p = dir + "/" + name;
+                struct stat st;
+                if (stat(p.c_str(), &st) == 0) { aligner_path = p; break; }
+            }
+        }
+
+        if (encoder_path.empty()) {
+            fprintf(stderr, "crispasr[make-ref]: cannot find tada-encoder GGUF. "
+                            "Pass --make-ref-encoder <path> or place tada-encoder-f16.gguf next to the model.\n");
+            return 20;
+        }
+        if (aligner_path.empty()) {
+            fprintf(stderr, "crispasr[make-ref]: cannot find tada-aligner GGUF. "
+                            "Pass --make-ref-aligner <path> or place tada-aligner-en.gguf next to the model.\n");
+            return 20;
+        }
+
+        fprintf(stderr, "crispasr[make-ref]: encoder=%s\n", encoder_path.c_str());
+        fprintf(stderr, "crispasr[make-ref]: aligner=%s\n", aligner_path.c_str());
+        fprintf(stderr, "crispasr[make-ref]: voice=%s\n", params.tts_voice.c_str());
+        fprintf(stderr, "crispasr[make-ref]: text='%s'\n", params.tts_ref_text.c_str());
+
+        // Load audio
+        std::vector<float> ref_audio;
+        std::vector<std::vector<float>> stereo_dummy;
+        if (!read_audio_data(params.tts_voice, ref_audio, stereo_dummy, false)) {
+            fprintf(stderr, "crispasr[make-ref]: failed to load audio '%s'\n", params.tts_voice.c_str());
+            return 20;
+        }
+        // ref_audio is 16kHz from the loader — resample to 24kHz for the encoder
+        int n_16k = (int)ref_audio.size();
+        int n_24k = (int)((int64_t)n_16k * 24000 / 16000);
+        std::vector<float> audio_24k(n_24k);
+        for (int i = 0; i < n_24k; i++) {
+            float src = (float)i * 16000.0f / 24000.0f;
+            int idx = (int)src;
+            float frac = src - idx;
+            if (idx + 1 < n_16k)
+                audio_24k[i] = ref_audio[idx] * (1.0f - frac) + ref_audio[idx + 1] * frac;
+            else if (idx < n_16k)
+                audio_24k[i] = ref_audio[idx];
+        }
+        fprintf(stderr, "crispasr[make-ref]: audio %.2fs @ 24kHz (%d samples)\n",
+                n_24k / 24000.0f, n_24k);
+
+        // Init encoder
+        tada_encoder_params ep = tada_encoder_default_params();
+        ep.n_threads = params.n_threads;
+        ep.seed = params.seed;
+        ep.verbosity = params.no_prints ? 0 : 1;
+        tada_encoder_context* ectx = tada_encoder_init(encoder_path.c_str(), ep);
+        if (!ectx) {
+            fprintf(stderr, "crispasr[make-ref]: failed to load encoder '%s'\n", encoder_path.c_str());
+            return 20;
+        }
+
+        // Run full pipeline
+        tada_encoder_result result;
+        int rc = tada_encoder_encode(ectx, aligner_path.c_str(),
+                                     audio_24k.data(), n_24k,
+                                     params.tts_ref_text.c_str(), result);
+        tada_encoder_free(ectx);
+
+        if (rc != 0) {
+            fprintf(stderr, "crispasr[make-ref]: encode failed (rc=%d)\n", rc);
+            return 20;
+        }
+
+        // Write GGUF via tada_encoder helper
+        fprintf(stderr, "crispasr[make-ref]: %d tokens × %d-d → %s\n",
+                result.n_tokens, result.embed_dim, out_path.c_str());
+        rc = tada_encoder_write_ref_gguf(out_path.c_str(), result,
+                                         params.tts_ref_text.c_str(),
+                                         params.language.empty() ? nullptr : params.language.c_str());
+        if (rc != 0) {
+            fprintf(stderr, "crispasr[make-ref]: failed to write GGUF (rc=%d)\n", rc);
+            return 20;
+        }
+        fprintf(stderr, "crispasr[make-ref]: saved %s\n", out_path.c_str());
+        return 0;
     }
 
     // ---- TTS mode: synthesize speech from text ----

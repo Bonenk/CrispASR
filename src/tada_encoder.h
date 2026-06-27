@@ -115,3 +115,16 @@ float* tada_encoder_extract_stage(tada_encoder_context* ctx, const float* audio_
  * @return 0 on success
  */
 int tada_dp_align(const float* probs, int T, int V, const int32_t* tokens, int N, int32_t* positions);
+
+/**
+ * Write an encoder result as a voice reference GGUF file.
+ * Compatible with tada_load_prompt() in tada_tts.cpp.
+ *
+ * @param path       Output .gguf file path
+ * @param result     Encoder result with token_values and token_positions
+ * @param transcript Text spoken in the reference audio
+ * @param language   Language code (nullable, omit for English)
+ * @return 0 on success
+ */
+int tada_encoder_write_ref_gguf(const char* path, const tada_encoder_result& result, const char* transcript,
+                                const char* language);
