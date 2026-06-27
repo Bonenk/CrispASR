@@ -1013,19 +1013,19 @@ static std::string dirname_of(const std::string& path) {
 
 int main(int argc, char** argv) {
     if (argc < 5) {
-        fprintf(
-            stderr,
-            "usage: %s <backend> <model.gguf> <reference.gguf> <audio.wav>\n"
-            "\n"
-            "  backend       one of: voxtral, voxtral4b, qwen3, qwen3-tts, qwen3-tts-codec, tada-tts, tada-encoder, kokoro, granite, "
-            "granite-4.1, "
-            "granite-nle, parakeet, chatterbox, voxcpm2-tts, "
-            "canary, cohere, gemma4, mimo-tokenizer, mimo-asr, orpheus, moonshine, moonshine-streaming, "
-            "parler-tts, moss-audio\n"
-            "  model.gguf    crispasr-compatible model weights\n"
-            "  reference.gguf  archive produced by tools/dump_reference.py\n"
-            "  audio.wav     16 kHz mono WAV\n",
-            argv[0]);
+        fprintf(stderr,
+                "usage: %s <backend> <model.gguf> <reference.gguf> <audio.wav>\n"
+                "\n"
+                "  backend       one of: voxtral, voxtral4b, qwen3, qwen3-tts, qwen3-tts-codec, tada-tts, "
+                "tada-encoder, kokoro, granite, "
+                "granite-4.1, "
+                "granite-nle, parakeet, chatterbox, voxcpm2-tts, "
+                "canary, cohere, gemma4, mimo-tokenizer, mimo-asr, orpheus, moonshine, moonshine-streaming, "
+                "parler-tts, moss-audio\n"
+                "  model.gguf    crispasr-compatible model weights\n"
+                "  reference.gguf  archive produced by tools/dump_reference.py\n"
+                "  audio.wav     16 kHz mono WAV\n",
+                argv[0]);
         return 1;
     }
     const std::string backend_name = argv[1];
@@ -2741,7 +2741,9 @@ int main(int argc, char** argv) {
 
         // Compare encoder stages
         static const char* enc_stages[] = {
-            "encoder_wav_out", "encoder_attn_out", "encoder_hidden",
+            "encoder_wav_out",
+            "encoder_attn_out",
+            "encoder_hidden",
         };
         for (const char* stage : enc_stages) {
             if (!ref.has(stage)) {
@@ -2750,13 +2752,13 @@ int main(int argc, char** argv) {
                 continue;
             }
             int n_stage = 0;
-            float* our_data = tada_encoder_extract_stage(
-                ectx, audio_24k.data(), n_24k,
-                token_masks.data(), n_masks, stage, &n_stage);
+            float* our_data =
+                tada_encoder_extract_stage(ectx, audio_24k.data(), n_24k, token_masks.data(), n_masks, stage, &n_stage);
             if (!our_data || n_stage <= 0) {
                 printf("[ERR ] %-22s  extract returned null\n", stage);
                 n_fail++;
-                if (our_data) free(our_data);
+                if (our_data)
+                    free(our_data);
                 continue;
             }
             auto rep = ref.compare(stage, our_data, (size_t)n_stage, crispasr_diff::Ref::COS_LAST_DIM);
@@ -2774,14 +2776,10 @@ int main(int argc, char** argv) {
                 positions[i] = (int32_t)pos_pair.first[i];
 
             tada_encoder_result result;
-            int rc = tada_encoder_encode_with_positions(
-                ectx, audio_24k.data(), n_24k,
-                token_masks.data(), n_masks,
-                positions.data(), n_tokens, result);
+            int rc = tada_encoder_encode_with_positions(ectx, audio_24k.data(), n_24k, token_masks.data(), n_masks,
+                                                        positions.data(), n_tokens, result);
             if (rc == 0 && !result.token_values.empty()) {
-                auto rep = ref.compare("encoder_token_values",
-                                       result.token_values.data(),
-                                       result.token_values.size(),
+                auto rep = ref.compare("encoder_token_values", result.token_values.data(), result.token_values.size(),
                                        crispasr_diff::Ref::COS_LAST_DIM);
                 print_row("encoder_token_values", rep, COS_THRESHOLD);
                 record(rep);

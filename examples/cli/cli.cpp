@@ -1092,9 +1092,10 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.tts_ref_asr.empty() ? "whisper" : params.tts_ref_asr.c_str());
     fprintf(stderr, "             --instruct \"TEXT\"        natural-language voice/style description "
                     "(qwen3-tts: VoiceDesign = voice description; CustomVoice = style control)\n");
-    fprintf(stderr,
-            "             --make-ref                create a TADA voice reference GGUF (with --voice <audio.wav>\n"
-            "                                                 --ref-text \"transcript\" [--make-ref-output path.gguf])\n");
+    fprintf(
+        stderr,
+        "             --make-ref                create a TADA voice reference GGUF (with --voice <audio.wav>\n"
+        "                                                 --ref-text \"transcript\" [--make-ref-output path.gguf])\n");
     fprintf(stderr,
             "             --codec-model FNAME      codec / companion GGUF (defaults to sibling/cache/registry)\n");
     fprintf(stderr, "             --codec-quant Q          [%-7s] preferred quant for registry companion resolution\n",

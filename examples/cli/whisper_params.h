@@ -275,9 +275,9 @@ struct whisper_params {
     // --make-ref: create a TADA voice reference GGUF from --voice <audio.wav>
     // + --ref-text "transcript". Requires tada-encoder.gguf + tada-aligner-*.gguf.
     bool make_ref = false;
-    std::string make_ref_output;    // output path (default: tada-ref-custom.gguf)
-    std::string make_ref_aligner;   // aligner GGUF path (auto-discovered if empty)
-    std::string make_ref_encoder;   // encoder GGUF path (auto-discovered if empty)
+    std::string make_ref_output;  // output path (default: tada-ref-custom.gguf)
+    std::string make_ref_aligner; // aligner GGUF path (auto-discovered if empty)
+    std::string make_ref_encoder; // encoder GGUF path (auto-discovered if empty)
 
     // AudioSeal neural watermark model (optional upgrade from spread-spectrum).
     // When set, loads the GGUF and uses it for watermark embed/detect

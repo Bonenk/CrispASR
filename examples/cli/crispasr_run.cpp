@@ -1487,7 +1487,10 @@ int crispasr_run_backend(const whisper_params& params_in) {
             for (const char* name : {"tada-encoder-f16.gguf", "tada-encoder.gguf"}) {
                 std::string p = dir + "/" + name;
                 struct stat st;
-                if (stat(p.c_str(), &st) == 0) { encoder_path = p; break; }
+                if (stat(p.c_str(), &st) == 0) {
+                    encoder_path = p;
+                    break;
+                }
             }
         }
         if (aligner_path.empty()) {
@@ -1502,7 +1505,10 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 snprintf(name, sizeof(name), fmt, lang_suffix.c_str());
                 std::string p = dir + "/" + name;
                 struct stat st;
-                if (stat(p.c_str(), &st) == 0) { aligner_path = p; break; }
+                if (stat(p.c_str(), &st) == 0) {
+                    aligner_path = p;
+                    break;
+                }
             }
         }
 
@@ -1542,8 +1548,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
             else if (idx < n_16k)
                 audio_24k[i] = ref_audio[idx];
         }
-        fprintf(stderr, "crispasr[make-ref]: audio %.2fs @ 24kHz (%d samples)\n",
-                n_24k / 24000.0f, n_24k);
+        fprintf(stderr, "crispasr[make-ref]: audio %.2fs @ 24kHz (%d samples)\n", n_24k / 24000.0f, n_24k);
 
         // Init encoder
         tada_encoder_params ep = tada_encoder_default_params();
@@ -1558,9 +1563,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
         // Run full pipeline
         tada_encoder_result result;
-        int rc = tada_encoder_encode(ectx, aligner_path.c_str(),
-                                     audio_24k.data(), n_24k,
-                                     params.tts_ref_text.c_str(), result);
+        int rc = tada_encoder_encode(ectx, aligner_path.c_str(), audio_24k.data(), n_24k, params.tts_ref_text.c_str(),
+                                     result);
         tada_encoder_free(ectx);
 
         if (rc != 0) {
@@ -1569,10 +1573,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
         }
 
         // Write GGUF via tada_encoder helper
-        fprintf(stderr, "crispasr[make-ref]: %d tokens × %d-d → %s\n",
-                result.n_tokens, result.embed_dim, out_path.c_str());
-        rc = tada_encoder_write_ref_gguf(out_path.c_str(), result,
-                                         params.tts_ref_text.c_str(),
+        fprintf(stderr, "crispasr[make-ref]: %d tokens × %d-d → %s\n", result.n_tokens, result.embed_dim,
+                out_path.c_str());
+        rc = tada_encoder_write_ref_gguf(out_path.c_str(), result, params.tts_ref_text.c_str(),
                                          params.language.empty() ? nullptr : params.language.c_str());
         if (rc != 0) {
             fprintf(stderr, "crispasr[make-ref]: failed to write GGUF (rc=%d)\n", rc);
