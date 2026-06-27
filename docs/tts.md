@@ -28,32 +28,68 @@ trade-off:
 | **`voxcpm2-tts`** | VoxCPM2: 2B Qwen2 backbone + flow matching + BigVGAN @ 48 kHz (decimated to 24 kHz). Zero-shot voice cloning via `--voice <ref.wav>`. | Yes | ~2.4 GB via `-m auto` |
 | **`pocket-tts`** | Kyutai Pocket TTS 100M: continuous-latent AR @ 12.5 Hz + one-step LSD flow head + Mimi VAE decoder → 24 kHz. MIT / CC-BY-4.0. Voice cloning via `--voice ref.wav`. | Yes (`--voice`) | ~220 MB via `-m auto` (F16 GGUF) |
 | **`kugelaudio`** | KugelAudio-0-Open: 7B Qwen2.5 backbone + 4-layer DiT diffusion head (20-step SDE-DPMSolver++) + acoustic VAE decoder → 24 kHz. 23 languages. MIT. | Pre-encoded voices (`--voice voice.gguf`) | ~5.3 GB Q4_K / ~16 GB F16 via `-m auto` |
-| **`tada` / `tada-1b`** | HumeAI TADA: Llama-3.2 backbone + per-token flow-matching diffusion head + TADA codec → 24 kHz. `tada-1b` is the smaller Q4_K auto-download target; `tada` / `tada-3b-ml` use the larger 3B variant. `-m auto` downloads and uses the default `tada-ref.gguf` prompt; custom voices are prompt GGUFs made with `models/convert-tada-ref-to-gguf.py`. | Yes (`--voice <tada-ref.gguf>`) | ~1.7 GB 1B Q4_K + ~1 GB codec GGUF; 3B also available |
+| **`tada-1b`** | HumeAI TADA 1B: Llama-3.2-1B backbone + per-token flow-matching diffusion head + TADA codec → 24 kHz. **English-only.** `-m auto` downloads model + default `tada-ref.gguf`. | Yes (`--voice <tada-ref.gguf>`, English voice refs only) | ~1.7 GB Q4_K + ~1 GB codec |
+| **`tada` / `tada-3b-ml`** | HumeAI TADA 3B Multilingual: same architecture, 3B params. Supports **ar, ch, de, es, fr, it, ja, pl, pt** in addition to English. `-l <lang>` auto-downloads `tada-ref-<lang>.gguf`. | Yes (`--voice <tada-ref.gguf>`) | ~4 GB Q4_K + ~1 GB codec |
 | **`lfm2-audio`** | LiquidAI LFM2.5-Audio 1.5B: FastConformer encoder + LFM2 hybrid conv+attention backbone + 6L depthformer (8-codebook Mimi) + ISTFT detokenizer → 24 kHz. Interleaved text+audio generation. Also does ASR and speech-to-speech. LFM Open License v1.0 ($10M revenue cap). | No | ~1.5 GB Q4_K (JP) / ~1.6 GB Q5_K (EN) + ~157 MB detokenizer companion |
 | **`mini-omni2`** | gpt-omni/mini-omni2: Whisper-small encoder + Qwen2-0.5B LLM with 8-stream architecture + SNAC 24 kHz decoder → 24 kHz. Also does ASR and speech-to-speech. MIT license. Requires `--codec-model snac-24khz.gguf` companion. | No | ~1.0 GB Q4_K + ~80 MB SNAC companion |
 
 All backends write mono WAV via `--tts-output` (22 kHz for piper/fastpitch, 16 kHz for speecht5, 24 kHz for most others, 44.1 kHz for melotts/dia/parler-tts/zonos-tts, 48 kHz for voxcpm2-tts).
 
-For TADA multilingual prompting, match the Python blueprint by encoding the
-reference audio with the language-specific aligner first:
+## TADA — multilingual and voice cloning
+
+TADA ships as two variants; only the 3B multilingual model can synthesise
+non-English text:
+
+| Backend | Model | Languages |
+|---|---|---|
+| `tada-1b` | HumeAI/tada-1b | English only |
+| `tada` / `tada-3b-ml` | HumeAI/tada-3b-ml | en + ar, ch, de, es, fr, it, ja, pl, pt |
+
+### Use case (a) — built-in default voice for a language
+
+Pass `-l <lang>` with the `tada-3b-ml` backend. CrispASR auto-downloads
+`tada-ref-<lang>.gguf` from `cstr/tada-tts-3b-ml-GGUF` on first use (<200 KB
+per language):
 
 ```bash
-python models/convert-tada-ref-to-gguf.py \
-    --audio french_reference.wav \
-    --transcript "Justice justice." \
-    --language fr \
-    --output tada-ref-fr.gguf
-
-./build/bin/crispasr --backend tada-1b -m auto \
-    --voice tada-ref-fr.gguf \
-    --tts "justice justice" \
+crispasr --backend tada-3b-ml -m auto -l fr \
+    --tts "La justice sans force est impuissante." \
     --tts-output justice.wav
 ```
 
-If `--voice` is omitted, the runtime looks for `tada-ref-<lang>.gguf` next
-to the model when `-l <lang>` is set, then falls back to `tada-ref.gguf`.
-The `-l` flag alone does not run alignment; it only selects a matching
-pre-encoded prompt GGUF when one is available.
+The `tada-ref-fr.gguf` encodes the acoustic fingerprint (speaker identity,
+prosody) extracted offline from a 10 s FLEURS CC-BY-4.0 French clip. Once
+cached it is reused for every subsequent French synthesis call. Available
+language codes: `ar`, `ch`, `de`, `es`, `fr`, `it`, `ja`, `pl`, `pt`.
+
+### Use case (b) — custom voice cloning
+
+To speak in a specific person's voice, bake a ref GGUF from ~10 s of their
+speech. This requires `hume-tada` (Python, offline step only):
+
+```bash
+# Step 1 — bake the ref GGUF (one-time per speaker):
+pip install hume-tada
+python models/convert-tada-ref-to-gguf.py \
+    --audio speaker_10s.wav \
+    --language fr \
+    --output tada-ref-custom.gguf
+
+# Step 2 — synthesise with that voice (C++ only, no Python):
+crispasr --backend tada-3b-ml -m auto \
+    --voice tada-ref-custom.gguf \
+    --tts "Bonjour, comment allez-vous ?" \
+    --tts-output result.wav \
+    --i-have-rights
+```
+
+`--language` selects the language-specific TADA aligner used during encoding;
+it must match the language of the text you will synthesise. A 5–15 s clip of
+clean speech (no music/noise) produces the best fingerprint.
+
+If `--voice` is omitted, the runtime uses `tada-ref-<lang>.gguf` when `-l
+<lang>` is set, then falls back to `tada-ref.gguf` (the built-in English
+voice).
 
 ### Reproducible / diverse generation (`--seed`)
 
