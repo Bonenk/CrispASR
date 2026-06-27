@@ -6,6 +6,7 @@
 
 #include "crispasr_backend.h"
 #include "crispasr_backend_utils.h"
+#include "crispasr_cache.h"
 #include "crispasr_model_mgr_cli.h"
 #include "crispasr_model_registry.h"
 #include "whisper_params.h"
@@ -77,6 +78,13 @@ static std::string discover_prompt(const std::string& model_path, const std::str
             return p;
     }
     return "";
+}
+
+static std::string tada_lang_ref_url(const std::string& backend, const std::string& lang) {
+    const std::string base = (backend == "tada-1b" || backend == "tada-tts-1b")
+                                 ? "https://huggingface.co/cstr/tada-tts-1b-GGUF/resolve/main/"
+                                 : "https://huggingface.co/cstr/tada-tts-3b-ml-GGUF/resolve/main/";
+    return base + "tada-ref-" + lang + ".gguf";
 }
 
 class TadaBackend : public CrispasrBackend {
@@ -160,6 +168,28 @@ public:
             prompt_path = env;
         } else {
             prompt_path = discover_prompt(p.model, p.language);
+            // Language-specific ref: check cache dir, then auto-download.
+            // discover_prompt already prefers tada-ref-<lang>.gguf next to the model
+            // file; this fallback finds refs that landed in the shared cache dir
+            // (e.g. from a previous --auto-download run) and downloads missing ones.
+            if (prompt_path.empty()) {
+                const std::string lang = tada_prompt_lang_suffix(p.language);
+                if (!lang.empty()) {
+                    const std::string ref_name = "tada-ref-" + lang + ".gguf";
+                    const std::string cached = crispasr_cache::dir(p.cache_dir) + "/" + ref_name;
+                    if (crispasr_cache::file_present(cached)) {
+                        prompt_path = cached;
+                    } else if (p.auto_download) {
+                        prompt_path = crispasr_cache::ensure_cached_file(ref_name, tada_lang_ref_url(p.backend, lang),
+                                                                         p.no_prints, "crispasr", p.cache_dir);
+                    } else if (!p.no_prints) {
+                        fprintf(stderr,
+                                "crispasr[tada]: no voice reference for language '%s' found. "
+                                "Add --auto-download to fetch it, or pass --voice tada-ref-%s.gguf.\n",
+                                p.language.c_str(), lang.c_str());
+                    }
+                }
+            }
         }
         if (!prompt_path.empty()) {
             if (tada_load_prompt(ctx_, prompt_path.c_str()) != 0) {
@@ -174,11 +204,6 @@ public:
     std::vector<float> synthesize(const std::string& text, const whisper_params& params) override {
         if (!ctx_)
             return {};
-        if (!params.language.empty() && params.language != "auto" && params.language != "en" && !params.no_prints) {
-            fprintf(stderr, "crispasr[tada]: note: -l / --language has no effect on TADA. "
-                            "To speak a language other than English, pass a reference audio in "
-                            "that language via --voice tada-ref-<lang>.gguf\n");
-        }
         if (params.temperature > 0.0f)
             tada_set_temperature(ctx_, params.temperature);
         if (params.seed > 0)
