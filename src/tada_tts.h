@@ -32,9 +32,10 @@ struct tada_context_params {
     int max_tokens; // max generation tokens (0 = 512 default)
     bool flash_attn;
     // FM solver params
-    int num_fm_steps;   // ODE steps (0 = 10 default)
-    float acoustic_cfg; // CFG scale for acoustic features (1.0 = no CFG)
-    float noise_temp;   // noise temperature (0.0 = deterministic)
+    int num_fm_steps;            // ODE steps (0 = 10 default)
+    float acoustic_cfg;          // CFG scale for acoustic features (1.0 = no CFG)
+    float noise_temp;            // noise temperature (0.0 = deterministic)
+    int num_acoustic_candidates; // FM candidates ranked by reconstruction (0/1 = single)
 };
 
 struct tada_context;

@@ -1423,6 +1423,34 @@ static void fm_euler_solve(tada_context* c, float* speech, const float* cond, in
     }
 }
 
+// Score an FM candidate by reconstruction loss — mirrors Python
+// _score_by_reconstruction (scorer="likelihood", the InferenceOptions default).
+// Evaluates the conditional velocity (CFG=1.0) at 3 timesteps along the
+// straight-line OT path x_t=(1-t)*noise+t*sample and compares it to the target
+// OT velocity (sample-noise) on the acoustic dims only. Returns the negative
+// mean MSE (higher = more on-distribution = better candidate). Eval points are
+// concentrated in [0.3,0.9] where the model is most discriminative.
+static float fm_score_reconstruction(tada_context* c, const float* sample, const float* noise, const float* cond) {
+    const int lat = (int)c->hp.fm_latent;
+    const int ad = (int)c->hp.acoustic_dim;
+    static const float t_pts[3] = {0.3f, 0.6f, 0.9f};
+    std::vector<float> x_t(lat), pred_v(lat);
+    double total_err = 0.0;
+    for (int p = 0; p < 3; p++) {
+        const float t = t_pts[p];
+        for (int j = 0; j < lat; j++)
+            x_t[j] = (1.0f - t) * noise[j] + t * sample[j];
+        run_fm_step(c, x_t.data(), t, cond, pred_v.data());
+        double err = 0.0;
+        for (int j = 0; j < ad; j++) {
+            const float d = pred_v[j] - (sample[j] - noise[j]);
+            err += (double)d * d;
+        }
+        total_err += err / ad;
+    }
+    return (float)(-total_err / 3.0);
+}
+
 // Simple argmax
 static int argmax_logits(const float* logits, int n) {
     int best = 0;
@@ -1455,8 +1483,9 @@ struct tada_context_params tada_context_default_params(void) {
     p.max_tokens = 0;
     p.flash_attn = false;
     p.num_fm_steps = 0;
-    p.acoustic_cfg = 1.6f; // match Python InferenceOptions default
-    p.noise_temp = 0.9f;   // match Python InferenceOptions default
+    p.acoustic_cfg = 1.6f;         // match Python InferenceOptions default
+    p.noise_temp = 0.9f;           // match Python InferenceOptions default
+    p.num_acoustic_candidates = 1; // match Python InferenceOptions default
     return p;
 }
 
@@ -2240,11 +2269,35 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
         }
 
         std::vector<float> speech(lat, 0.0f);
-        if (need_fm) {
+        bool cand_already_solved = false;
+        const int n_cand = ctx->params.num_acoustic_candidates > 1 ? ctx->params.num_acoustic_candidates : 1;
+        if (need_fm && n_cand == 1) {
             // Draw noise using PyTorch-compatible MT19937 + normal_fill algorithm
             // so that noise vectors match torch.randn(lat).to(bfloat16) * temp.
             mt19937_randn(&ctx->mt_rng, speech.data(), lat);
             tada_scale_noise_like_python(speech.data(), lat, noise_temp);
+        } else if (need_fm) {
+            // num_acoustic_candidates>1: draw N noises in one block (matches
+            // torch.randn(N*lat)), solve each FM candidate with CFG, and keep the
+            // one with the best reconstruction score (Python _solve_flow_matching_ranked,
+            // scorer="likelihood"). This makes timing/acoustics robust to the noise
+            // lottery — a single bad noise sample can otherwise collapse durations.
+            std::vector<float> all_noise((size_t)n_cand * lat);
+            mt19937_randn(&ctx->mt_rng, all_noise.data(), n_cand * lat);
+            tada_scale_noise_like_python(all_noise.data(), n_cand * lat, noise_temp);
+            float best_score = -3.4e38f;
+            std::vector<float> cand(lat);
+            for (int ci = 0; ci < n_cand; ci++) {
+                const float* noise_c = all_noise.data() + (size_t)ci * lat;
+                std::copy(noise_c, noise_c + lat, cand.begin());
+                fm_euler_solve(ctx, cand.data(), tr.hidden, num_fm_steps, cfg_scale, neg_hidden, false);
+                const float sc = fm_score_reconstruction(ctx, cand.data(), noise_c, tr.hidden);
+                if (sc > best_score) {
+                    best_score = sc;
+                    speech = cand;
+                }
+            }
+            cand_already_solved = true;
         }
 
         tada_fm_dump_record fm_rec;
@@ -2274,7 +2327,7 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
                     speech[2], speech[3], speech[4]);
         }
 
-        if (need_fm)
+        if (need_fm && !cand_already_solved)
             fm_euler_solve(ctx, speech.data(), tr.hidden, num_fm_steps, cfg_scale, neg_hidden, dump_trajectory);
 
         float speech_rms = 0;

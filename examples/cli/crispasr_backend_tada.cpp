@@ -110,6 +110,19 @@ public:
             cp.temperature = p.temperature;
         cp.seed = p.seed;
 
+        // TADA's per-token flow-matching duration head is noise-sensitive: a
+        // single unlucky noise draw can collapse token durations (rushed,
+        // unintelligible speech). Generate several candidates per step and keep
+        // the best by reconstruction score (Python num_acoustic_candidates).
+        // Default to 4 for robust multilingual output; override with
+        // TADA_NUM_CANDIDATES (1 = fastest, reproduces a single noise draw).
+        cp.num_acoustic_candidates = 4;
+        if (const char* env = std::getenv("TADA_NUM_CANDIDATES"); env && *env) {
+            int n = atoi(env);
+            if (n >= 1)
+                cp.num_acoustic_candidates = n;
+        }
+
         ctx_ = tada_init_from_file(p.model.c_str(), cp);
         if (!ctx_) {
             fprintf(stderr, "crispasr[tada]: failed to load '%s'\n", p.model.c_str());
