@@ -177,6 +177,15 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     if "prompt_token_positions" in stages:
         out["prompt_token_positions"] = prompt.token_positions[0].cpu().float().numpy()
 
+    # Store the (auto-transcribed) reference-audio transcript so the C++ diff
+    # uses the SAME prompt-region tokens Python feeds. Without it, C++ pads the
+    # whole voice-replay region with <pad>, but generate(use_text_in_prompt=False)
+    # only masks the first prompt_acoustic_features.shape[1] positions — the tail
+    # of the transcript stays unmasked and conditions the first AR/FM steps.
+    # Missing those tokens makes fm_cond #0/#1 ≈ 0 and collapses the timing.
+    if prompt.text and prompt.text[0]:
+        out["tada_tts_prompt_text"] = prompt.text[0]
+
     # ── Tokenize synth text ──
     from tada.utils.text import normalize_text
     norm_syn_text = normalize_text(syn_text)
@@ -254,6 +263,17 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         cfg_schedule="cosine",
         time_schedule="logsnr",
     )
+
+    # Reseed RIGHT before generate() so Python's flow-matching noise starts from
+    # a fresh seed-`seed` MT19937 stream. The C++ engine seeds fresh and never
+    # runs the encoder, but Python's encoder (parakeet auto-transcribe + the
+    # codec encoder forward) consumes RNG above, which would otherwise offset
+    # Python's FM noise relative to C++ and make every FM stage (speech_in,
+    # speech_out, time_bits, time_before) look uncorrelated in the diff even
+    # though the math is identical. Reseeding makes the comparison fair.
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
     try:
         with torch.no_grad():
