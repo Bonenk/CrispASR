@@ -133,6 +133,32 @@ If `--voice` is omitted, the runtime uses `tada-ref-<lang>.gguf` when `-l
 <lang>` is set, then falls back to `tada-ref.gguf` (the built-in English
 voice).
 
+### Timing quality (`TADA_NUM_CANDIDATES`)
+
+TADA predicts each token's duration with a per-token flow-matching head that
+is **noise-sensitive**: an unlucky noise draw can collapse durations into a
+rushed, unintelligible utterance (a known property of the model — the PyTorch
+reference behaves identically with the same noise). To make output robust,
+CrispASR generates several flow-matching candidates per token and keeps the
+best one by reconstruction likelihood (the same `num_acoustic_candidates`
+ranking the reference implements).
+
+The CLI defaults to **4 candidates**. Override with `TADA_NUM_CANDIDATES`:
+
+```bash
+# Fastest, single noise draw (may occasionally rush/garble timing):
+TADA_NUM_CANDIDATES=1 crispasr --backend tada-3b-ml -m auto -l fr \
+    --tts "Bonjour, comment allez-vous ?" --tts-output out.wav
+
+# Higher quality / more robust timing (slower):
+TADA_NUM_CANDIDATES=8 crispasr --backend tada-3b-ml -m auto -l de \
+    --tts "Guten Tag, wie geht es Ihnen?" --tts-output out.wav
+```
+
+All candidates for a step are solved in a single batched flow-matching forward,
+so raising the count adds little wall-clock on top of the (model-load-dominated)
+baseline. `1` reproduces a single draw and is the fastest.
+
 ### Reproducible / diverse generation (`--seed`)
 
 Pass `--seed N` (any non-zero integer) for **reproducible** output —

@@ -1134,6 +1134,12 @@ reuse, etc.) see [`tts.md`](tts.md):
   faster while producing identical output on validated CPU and Metal runs.
 - `COSYVOICE3_KV_BUCKET=0` — compatibility fallback that exposes the full KV
   allocation to every AR step instead of the default 256-token active buckets.
+- `TADA_NUM_CANDIDATES=N` — TADA flow-matching duration candidates per token,
+  ranked by reconstruction likelihood (CLI default `4`). The duration head is
+  noise-sensitive, so a single draw (`N=1`, fastest) can occasionally collapse
+  timing into rushed/garbled speech; `4`–`8` make it robust. All candidates
+  for a step solve in one batched forward, so higher `N` adds little wall-clock.
+  See [`tts.md`](tts.md#timing-quality-tada_num_candidates).
 - `VIBEVOICE_VAE_BACKEND={auto,cpu,gpu}` — VAE decoder placement
 - `VIBEVOICE_TTS_FLASH_ATTN={1,0}` — TTS LM attention: `1` (default)
   uses fused `ggml_flash_attn_ext`; `0` uses an explicit
