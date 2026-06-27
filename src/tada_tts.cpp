@@ -718,12 +718,15 @@ static ggml_cgraph* build_graph_fm_step_b2(tada_context* c, ggml_context* arena_
         ggml_tensor* mod = ggml_silu(ctx0, c_emb);
         mod = ggml_mul_mat(ctx0, l.adaln_w, mod); // (3*hid, 2)
 
-        // Chunk into shift/scale/gate — each (hid, 2) via 2D strided views
-        // mod is contiguous (3*hid, 2): nb[0]=4, nb[1]=3*hid*4
+        // Chunk into shift/scale/gate — each (hid, 2) via 2D strided views.
+        // mod is contiguous (3*hid, 2): nb[0]=4, nb[1]=3*hid*4 (non-natural).
+        // Vulkan element-wise kernels require contiguous input; wrap with
+        // ggml_cont() so each view materialises as a (hid, 2) contiguous tensor.
         size_t col_stride = (size_t)3 * hid * sizeof(float);
-        ggml_tensor* shift = ggml_view_2d(ctx0, mod, hid, 2, col_stride, 0);
-        ggml_tensor* scale = ggml_view_2d(ctx0, mod, hid, 2, col_stride, (size_t)hid * sizeof(float));
-        ggml_tensor* gate = ggml_view_2d(ctx0, mod, hid, 2, col_stride, (size_t)2 * hid * sizeof(float));
+        ggml_tensor* shift = ggml_cont(ctx0, ggml_view_2d(ctx0, mod, hid, 2, col_stride, 0));
+        ggml_tensor* scale = ggml_cont(ctx0, ggml_view_2d(ctx0, mod, hid, 2, col_stride, (size_t)hid * sizeof(float)));
+        ggml_tensor* gate =
+            ggml_cont(ctx0, ggml_view_2d(ctx0, mod, hid, 2, col_stride, (size_t)2 * hid * sizeof(float)));
 
         // Modulate + FFN
         ggml_tensor* h = ggml_rms_norm(ctx0, x_b2, eps);
@@ -742,8 +745,8 @@ static ggml_cgraph* build_graph_fm_step_b2(tada_context* c, ggml_context* arena_
         ggml_tensor* mod = ggml_silu(ctx0, c_emb);
         mod = ggml_mul_mat(ctx0, fm.final_adaln_w, mod); // (2*hid, 2)
         size_t col_stride = (size_t)2 * hid * sizeof(float);
-        ggml_tensor* shift = ggml_view_2d(ctx0, mod, hid, 2, col_stride, 0);
-        ggml_tensor* scale = ggml_view_2d(ctx0, mod, hid, 2, col_stride, (size_t)hid * sizeof(float));
+        ggml_tensor* shift = ggml_cont(ctx0, ggml_view_2d(ctx0, mod, hid, 2, col_stride, 0));
+        ggml_tensor* scale = ggml_cont(ctx0, ggml_view_2d(ctx0, mod, hid, 2, col_stride, (size_t)hid * sizeof(float)));
 
         ggml_tensor* h = ggml_rms_norm(ctx0, x_b2, eps);
         if (fm.final_norm_w)
@@ -1933,10 +1936,19 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
         prompt_text_ids = tokenize(ctx, tada_normalize_text(ctx->prompt_text));
     }
 
-    // Full sequence: BOS + prefix + prompt_text + synth_text + EOT*shift
+    // Full sequence: BOS + prefix + [voice_prompt_pads] + prompt_text + synth_text + EOT*shift
+    // Python includes n_prompt PAD slots for the voice replay phase. Without a
+    // voice-prompt transcript (prompt_text_ids), those slots are all PAD tokens.
+    // Omitting them makes num_prompt too small: with 26 voice tokens, the batch
+    // prefill consumes all 19 input tokens and the AR generation loop runs 0
+    // steps, producing nothing beyond the pre-filled voice-replay frames.
+    const int32_t kPadId = 128004; // <|finetune_right_pad_id|>
+    const int n_voice_pad = (ctx->n_prompt > 0 && prompt_text_ids.empty()) ? ctx->n_prompt : 0;
     std::vector<int32_t> full_ids;
     full_ids.push_back(bos);
     full_ids.insert(full_ids.end(), prefix_ids.begin(), prefix_ids.end());
+    for (int i = 0; i < n_voice_pad; i++)
+        full_ids.push_back(kPadId);
     full_ids.insert(full_ids.end(), prompt_text_ids.begin(), prompt_text_ids.end());
     full_ids.insert(full_ids.end(), text_ids.begin(), text_ids.end());
     for (int i = 0; i < shift; i++)
@@ -1972,7 +1984,11 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
     const int transition_steps = shift;
     const int prompt_padded_len = prefix_len + ctx->n_prompt;
     const int prompt_used_len = std::max(0, prompt_padded_len - transition_steps);
-    const int prefill_len = prompt_used_len > 0 ? std::min(num_prompt, transition_steps + prompt_used_len - 1) : 0;
+    // Cap at num_prompt-1 so the main AR loop always runs at least one step with
+    // logits. When prompt_used_len is large (long voice prompt), the uncapped
+    // formula equals num_prompt and the main loop would run 0 iterations —
+    // leaving no room for the generation to continue past the fixed input tokens.
+    const int prefill_len = prompt_used_len > 0 ? std::min(num_prompt - 1, transition_steps + prompt_used_len - 1) : 0;
 
     std::vector<std::vector<float>> acoustic_features;
     std::vector<int> time_before_list;
@@ -2128,12 +2144,20 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
     // Starts at prefill_len when batched prefill ran, otherwise at 0.
     const int loop_start = do_batch_prefill ? prefill_len : 0;
 
-    (void)max_tokens;
-    for (int step = loop_start; step < num_prompt; step++) {
-        if (step >= (int)all_ids.size())
+    // Main AR loop: runs until EOS or max_tokens.
+    // After the batched prefill, the loop starts at prefill_len and continues
+    // until EOS is predicted. The initial all_ids contains the fixed input
+    // tokens; the loop extends it one token at a time as the model generates.
+    bool done = false;
+    for (int step = loop_start; step < (int)all_ids.size() && !done; step++) {
+        if ((int)acoustic_features.size() >= max_tokens)
             break;
 
         int32_t cur_token = all_ids[step];
+        // Compute logits starting at the last fixed-input token (num_prompt-1)
+        // so the first generated token is predicted after all inputs are processed.
+        // For subsequent steps (step >= num_prompt), we are in the generation phase
+        // and logits are always needed (need_logits is always true since step grows).
         bool need_logits = (step >= num_prompt - 1);
 
         // Build step embedding (positive path)
@@ -2285,12 +2309,17 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
             fm_dump_records.push_back(std::move(fm_rec));
         }
 
-        // Next token prediction (greedy for now)
-        if (step >= num_prompt - 1 && tr.logits) {
+        // Next token prediction (greedy). After the last fixed-input token,
+        // push generated tokens to all_ids so the loop extends until EOS.
+        if (need_logits && tr.logits) {
             int next = argmax_logits(tr.logits, (int)hp.vocab_size);
-            if (next == eot && ctx->params.verbosity >= 1)
-                fprintf(stderr, "tada: EOS at step %d\n", step);
-            all_ids.push_back(next);
+            if (next == eot) {
+                if (ctx->params.verbosity >= 1)
+                    fprintf(stderr, "tada: EOS at step %d\n", step);
+                done = true; // stop after this step's acoustic state is updated
+            } else {
+                all_ids.push_back(next);
+            }
         }
         free(tr.logits);
 
