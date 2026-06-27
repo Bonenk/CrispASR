@@ -11,15 +11,18 @@ dynamically and the backend's single-MLP GeGLU path matches E4B's standard MLP.
   (The 12B model is a DIFFERENT architecture, `gemma4_unified`, and is rejected
    by the converter — see #196.)
 
-CPU-only. E4B is ~16 GB BF16; conversion streams tensors one at a time, so RAM
-stays bounded. Large artifacts go to /kaggle/temp (not /kaggle/working, which is
-capped at ~20 GB); GGUFs upload to HF directly.
+Conversion is CPU-bound (streams tensors one at a time, RAM stays bounded), but
+the kernel runs with enable_gpu=true because Kaggle CPU-only workers get NO
+internet — and we must download E4B from HF and upload the GGUFs back. Large
+artifacts go to /kaggle/temp (not /kaggle/working, capped at ~20 GB).
 
 REQUIREMENTS:
   - ${KAGGLE_ACCOUNT}/crispasr-hf-token dataset mounted (HF token); the token's HF
     account must have accepted the google/gemma-4-E4B-it gated license.
 
-Push: python -m kaggle kernels push -p tools/kaggle/gemma4-e4b-convert
+Push (under ${KAGGLE_ACCOUNT}):
+  export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+  python -m kaggle kernels push -p tools/kaggle/gemma4-e4b-convert
 """
 
 import os
@@ -39,22 +42,29 @@ NAME = "gemma4-e4b-it"
 # ── Phase 0: Clone repo (harness + converter live in it) ────────────────────
 print("=== Phase 0: clone repo ===", flush=True)
 if not REPO.exists():
-    subprocess.check_call([
-        "git", "clone", "--depth", "1", "-b", "main",
-        "https://github.com/CrispStrobe/CrispASR", str(REPO),
-    ])
+    try:
+        subprocess.check_call([
+            "git", "clone", "--depth", "1", "-b", "main",
+            "https://github.com/CrispStrobe/CrispASR", str(REPO),
+        ])
+    except Exception as e:
+        print(f"  git clone failed: {e}")
 
-sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
+# Import harness from the clone; fall back to the copy bundled in the push dir.
+if (REPO / "tools" / "kaggle").is_dir():
+    sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaggle_harness as kh  # noqa: E402
 
 kh.init_progress()
 
 # ── Phase 1: Install deps ───────────────────────────────────────────────────
+# torch + transformers are pre-installed and NOT needed by the converter
+# (it reads safetensors directly) — don't reinstall torch (wastes time / OOM).
 kh.step("install deps")
 kh.install_build_toolchain()  # ninja + ccache + mold (for crispasr-quantize)
-kh.sh_with_progress(
-    "pip install -q torch transformers safetensors gguf huggingface_hub hf_transfer"
-)
+kh.sh_with_progress("pip install -q safetensors gguf huggingface_hub hf_transfer")
 
 # ── Phase 2: Resolve HF token ───────────────────────────────────────────────
 kh.step("resolve HF token")
