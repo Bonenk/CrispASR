@@ -4,7 +4,7 @@
 # Generates tada-ref-{ar,ch,de,es,fr,it,ja,pl,pt}.gguf from FLEURS CC-BY-4.0
 # clips using the HumeAI/tada-codec language-specific aligners.
 #
-# NO HF upload from here — use kaggle_harness token path + local upload:
+# NO HF upload from here — fetch locally + upload:
 #
 #   kaggle kernels output ${KAGGLE_ACCOUNT}/tada-language-voice-reference-ggufs \
 #       -p /Volumes/backups/code/tada-lang-refs-stash/kaggle-out/
@@ -12,14 +12,12 @@
 #       --dir /Volumes/backups/code/tada-lang-refs-stash/kaggle-out/lang-refs/
 
 # %% [code]
-import os, sys, subprocess, time, json
-from datetime import datetime, timezone
+import os, sys, subprocess
 from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
-# Prevent transformers from importing tensorflow (protobuf clash on Kaggle)
 os.environ["TRANSFORMERS_NO_TF"] = "1"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 try:
@@ -33,22 +31,29 @@ REPO = WORK / "CrispASR"
 OUT  = WORK / "lang-refs"
 OUT.mkdir(exist_ok=True)
 
-# %% [code]  clone CrispASR + import harness
+# %% [code]  clone CrispASR + import harness (bundled copy as fallback)
 CRISPASR_URL = "https://github.com/CrispStrobe/CrispASR.git"
 if not REPO.exists():
-    subprocess.check_call(["git", "clone", "--depth", "1",
-                           CRISPASR_URL, str(REPO)])
-    sys.path.insert(0, str(REPO / "tools" / "kaggle"))
+    try:
+        subprocess.check_call(["git", "clone", "--depth", "1",
+                               CRISPASR_URL, str(REPO)])
+        sys.path.insert(0, str(REPO / "tools" / "kaggle"))
+    except Exception:
+        pass  # fall through to bundled copy
 else:
     subprocess.check_call(["git", "-C", str(REPO), "pull", "--ff-only"])
     sys.path.insert(0, str(REPO / "tools" / "kaggle"))
 
-# Fall back to bundled copy if clone/import fails
 if str(REPO / "tools" / "kaggle") not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import kaggle_harness as kh
 kh.init_progress()
+
+# ── HF auth — MUST be first after harness init ──────────────────────────
+# Resolves: env HF_TOKEN → Kaggle Secret → mounted dataset file
+# Also sets HF_HUB_ENABLE_HF_TRANSFER=1 and exports to subprocess env.
+token = kh.resolve_hf_token()
 
 # %% [code]  remove tensorflow to prevent protobuf clash
 kh.step("pip-remove-tf")
@@ -63,10 +68,10 @@ kh.step("pip-install")
 subprocess.check_call([
     sys.executable, "-m", "pip", "install", "--quiet",
     "gguf", "datasets", "soundfile", "scipy",
-    "hume-tada",   # PyPI package (not git URL); pulls dac + any torchaudio upgrade
+    "hume-tada",   # PyPI package; not git URL
 ])
 
-# %% [code]  generate
+# %% [code]  generate (subprocess inherits HF_TOKEN env set by resolve_hf_token)
 kh.step("gen.begin")
 result = subprocess.run(
     [sys.executable, str(REPO / "tools" / "gen_tada_lang_refs.py"),
