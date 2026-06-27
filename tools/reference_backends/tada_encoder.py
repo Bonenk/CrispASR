@@ -67,10 +67,6 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     print(f"  transcript: {transcript!r}")
     print(f"  language: {language or 'en'}")
 
-    # ── Load Encoder ──
-    print(f"  loading Encoder from {codec_dir or 'HumeAI/tada-codec'}")
-    from tada.modules.encoder import Encoder
-
     # Patch for transformers >= 5.x: all_tied_weights_keys was renamed/removed
     import transformers
     if not hasattr(transformers.PreTrainedModel, 'all_tied_weights_keys'):
@@ -94,63 +90,70 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
             raise
     AutoTokenizer.from_pretrained = _patched_tok
 
-    encoder = Encoder.from_pretrained(
-        codec_dir or "HumeAI/tada-codec",
-        subfolder="encoder",
-        language=language,
-    ).float().to(device)
-    encoder.eval()
+    import gc
+    from tada.modules.aligner import Aligner
+    from tada.modules.encoder import Encoder
+    from tada.utils.text import normalize_text
 
     # ── Process audio ──
-    # audio is 16 kHz mono float32 from dump_reference.py
     audio_t = torch.from_numpy(audio.astype(np.float32)).unsqueeze(0).to(device)
-    # Resample 16k → 24k for the encoder
     audio_24k = torchaudio.functional.resample(audio_t, 16000, 24000)
     print(f"  audio: {audio_24k.shape[-1]} samples @ 24kHz ({audio_24k.shape[-1]/24000:.2f}s)")
 
-    # ── Step 1: Aligner ──
-    from tada.utils.text import normalize_text
+    # ── Step 1: Aligner (load separately, run, then free to save RAM) ──
+    repo = codec_dir or "HumeAI/tada-codec"
+    aligner_sub = f"aligner-{language}" if language else "aligner"
+    print(f"  loading Aligner from {repo}/{aligner_sub}")
+    aligner = Aligner.from_pretrained(repo, subfolder=aligner_sub).float().to(device)
+    aligner.eval()
+
     norm_text = normalize_text(transcript)
-    text_tokens = encoder.aligner.tokenizer.encode(norm_text, add_special_tokens=False)
+    text_tokens = aligner.tokenizer.encode(norm_text, add_special_tokens=False)
     text_tokens_t = torch.tensor([text_tokens], device=device)
-    text_token_len = torch.tensor([len(text_tokens)], device=device)
-
-    # Resample 24k → 16k for aligner (it resamples internally from sample_rate)
     audio_length = torch.tensor([audio_24k.shape[-1]], device=device)
-    align_output = encoder.aligner(
-        audio_24k,
-        text_tokens=text_tokens_t,
-        audio_length=audio_length,
-        sample_rate=24000,
-    )
 
-    token_positions = align_output.token_positions  # (1, N_tokens)
-    token_masks = align_output.token_masks          # (1, T_50hz)
+    with torch.no_grad():
+        align_output = aligner(
+            audio_24k,
+            text_tokens=text_tokens_t,
+            audio_length=audio_length,
+            sample_rate=24000,
+            return_logits=True,
+        )
+
+    token_positions = align_output.token_positions.cpu()
+    token_masks = align_output.token_masks.cpu()
 
     if "aligner_logits" in stages and align_output.logits is not None:
         logits = align_output.logits[0].cpu().float().numpy()
-        # Truncate to save space — store first 100 frames × first 1000 tokens
         max_frames = min(100, logits.shape[0])
         max_vocab = min(1000, logits.shape[1])
         out["aligner_logits"] = logits[:max_frames, :max_vocab].copy()
 
     if "aligner_positions" in stages:
-        out["aligner_positions"] = token_positions[0].cpu().float().numpy()
+        out["aligner_positions"] = token_positions[0].float().numpy()
 
     if "aligner_token_masks" in stages:
-        out["aligner_token_masks"] = token_masks[0].cpu().float().numpy()
+        out["aligner_token_masks"] = token_masks[0].float().numpy()
 
     print(f"  aligner: {len(text_tokens)} tokens → {int(token_masks[0].sum())} aligned positions")
 
-    # ── Step 2: WavEncoder ──
-    # The encoder.get_encoder_outputs() combines wav_encoder + pos_emb + local_attention
-    # We need to run them separately for stage-by-stage comparison.
+    # Free aligner to reclaim ~1.3 GB before loading encoder
+    del aligner, align_output
+    gc.collect()
+    print(f"  aligner freed")
+
+    # ── Step 2: Load Encoder (WavEncoder + LocalAttention only, no aligner) ──
+    print(f"  loading Encoder from {repo}/encoder")
+    encoder = Encoder.from_pretrained(repo, subfolder="encoder").float().to(device)
+    encoder.eval()
 
     # Run WavEncoder directly
     x = audio_24k
-    wav_out = encoder.wav_encoder(
-        torch.nn.functional.pad(x.unsqueeze(1), (0, 960), value=0)
-    ).transpose(1, 2)  # (1, T, hidden_dim=1024)
+    with torch.no_grad():
+        wav_out = encoder.wav_encoder(
+            torch.nn.functional.pad(x.unsqueeze(1), (0, 960), value=0)
+        ).transpose(1, 2)  # (1, T, hidden_dim=1024)
 
     if "encoder_wav_out" in stages:
         out["encoder_wav_out"] = wav_out[0].cpu().float().numpy()
@@ -158,7 +161,7 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
 
     # ── Step 3: Add pos_emb + LocalAttentionEncoder ──
     seq_len = wav_out.shape[1]
-    padded_masks = torch.nn.functional.pad(token_masks, (0, seq_len - token_masks.shape[1]), value=0)
+    padded_masks = torch.nn.functional.pad(token_masks.to(device), (0, seq_len - token_masks.shape[1]), value=0)
 
     attn_input = wav_out + encoder.pos_emb(padded_masks)
 
@@ -169,7 +172,8 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     from tada.modules.encoder import _create_segment_attention_mask
     attn_mask = _create_segment_attention_mask(padded_masks, version=encoder.config.block_attention)
 
-    attn_out = encoder.local_attention_encoder(attn_input, mask=attn_mask)
+    with torch.no_grad():
+        attn_out = encoder.local_attention_encoder(attn_input, mask=attn_mask)
 
     if "encoder_attn_out" in stages:
         out["encoder_attn_out"] = attn_out[0].cpu().float().numpy()
@@ -198,10 +202,11 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     )
 
     # Gather at token positions
+    token_positions_dev = token_positions.to(device)
     token_values = torch.gather(
         encoded_expanded_sampled,
         1,
-        (token_positions - 1).clamp(min=0).unsqueeze(-1).expand(-1, -1, encoded_expanded_sampled.shape[-1]),
+        (token_positions_dev - 1).clamp(min=0).unsqueeze(-1).expand(-1, -1, encoded_expanded_sampled.shape[-1]),
     )
     # Normalize
     token_values = (token_values - encoder.config.acoustic_mean) / encoder.config.acoustic_std

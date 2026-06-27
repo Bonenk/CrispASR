@@ -306,11 +306,14 @@ static ggml_tensor* snake1d(ggml_context* ctx, ggml_tensor* x, ggml_tensor* alph
 }
 
 // Conv1d with symmetric padding. x: (C_in, T) → (C_out, T_out)
-static ggml_tensor* wn_conv1d(ggml_context* ctx, ggml_tensor* x, const wn_conv& wn, int dilation, int stride = 1) {
+// For dilation>1 convs (ResidualUnits): pad = dilation*(K-1)/2, stride=1
+// For stride convs (EncoderBlocks): pad = ceil(stride/2), dilation=1
+static ggml_tensor* wn_conv1d(ggml_context* ctx, ggml_tensor* x, const wn_conv& wn, int dilation, int stride = 1,
+                              int pad_override = -1) {
     if (!wn.w)
         return x;
     const int K = (int)wn.w->ne[0];
-    const int p = dilation * (K - 1) / 2;
+    const int p = (pad_override >= 0) ? pad_override : dilation * (K - 1) / 2;
 
     ggml_tensor* xt = ggml_cont(ctx, ggml_transpose(ctx, x)); // (T, C_in)
     ggml_tensor* y = ggml_conv_1d(ctx, wn.w, xt, stride, p, dilation);
@@ -335,12 +338,14 @@ static ggml_tensor* res_unit(ggml_context* ctx, ggml_tensor* x, const enc_res_un
 }
 
 // EncoderBlock: 3× ResUnit(d=1,3,9) → Snake → stride Conv
+// Python: WNConv1d(dim//2, dim, kernel_size=2*stride, stride=stride, padding=ceil(stride/2))
 static ggml_tensor* enc_block_forward(ggml_context* ctx, ggml_tensor* x, const enc_block& blk, int stride) {
     static const int dilations[3] = {1, 3, 9};
     for (int r = 0; r < 3; r++)
         x = res_unit(ctx, x, blk.res[r], dilations[r]);
     x = snake1d(ctx, x, blk.snake_alpha, blk.inv_snake_alpha);
-    x = wn_conv1d(ctx, x, blk.stride_conv, 1, stride);
+    int pad = (stride + 1) / 2; // ceil(stride/2)
+    x = wn_conv1d(ctx, x, blk.stride_conv, /*dilation=*/1, stride, pad);
     return x;
 }
 
@@ -417,8 +422,9 @@ static ggml_cgraph* build_encoder_graph(tada_encoder_context* c, int n_audio_sam
     ggml_context* ctx0 = ggml_init(ip);
     ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 65536, false);
 
-    // Input: mono audio (1, n_audio_samples) padded to (1, padded_len)
-    ggml_tensor* audio = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, padded_len, 1);
+    // Input: mono audio — channel-first (C_in=1, T=padded_len)
+    // In ggml ne[0]=C_in=1, ne[1]=T=padded_len
+    ggml_tensor* audio = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, 1, padded_len);
     ggml_set_name(audio, "audio_input");
     ggml_set_input(audio);
 
