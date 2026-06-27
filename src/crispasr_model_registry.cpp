@@ -310,6 +310,11 @@ constexpr Entry k_registry[] = {
     {"gemma4-e2b", "gemma4-e2b-it-q4_k.gguf",
      "https://huggingface.co/cstr/gemma4-e2b-it-GGUF/resolve/main/gemma4-e2b-it-q4_k.gguf",
      "~2.5 GB", nullptr, nullptr},
+    // gemma4-e4b: same `gemma4` architecture as E2B (byte-identical 1024d USM
+    // audio tower) with a larger decoder (42L×2560) — runs on the same backend.
+    {"gemma4-e4b", "gemma4-e4b-it-q4_k.gguf",
+     "https://huggingface.co/cstr/gemma4-e4b-it-GGUF/resolve/main/gemma4-e4b-it-q4_k.gguf",
+     "~4.1 GB", nullptr, nullptr},
     {"titanet", "titanet-large.gguf",
      "https://huggingface.co/cstr/titanet-large-GGUF/resolve/main/titanet-large.gguf",
      "~45 MB", nullptr, nullptr},
