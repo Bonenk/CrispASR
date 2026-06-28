@@ -163,6 +163,21 @@ TEST_CASE("server TTS policy keeps qwen3-tts variants single-shot", "[unit][chun
     }
 }
 
+// GH #197 regression: TADA's AR talker generates multi-sentence utterances in a
+// single pass like HumeAI's reference tada.py. Splitting at punctuation made each
+// isolated sentence's duration head over-predict the trailing pause (e.g. "Hi."
+// alone → ~9 s of silence+hum) and inserted extra inter-chunk silence — both
+// diverge from the reference. The backend registers as bare "tada".
+TEST_CASE("server TTS policy keeps tada single-shot", "[unit][chunking]") {
+    const char* text = "Hi. My name is Bob. It's really nice to meet you!";
+    for (const char* name : {"tada", "tada-1b", "tada-tts-1b", "tada-3b-ml"}) {
+        CAPTURE(name);
+        auto out = crispasr_tts_plan_chunks_for_backend(text, name);
+        REQUIRE(out.size() == 1);
+        REQUIRE(out[0] == text);
+    }
+}
+
 TEST_CASE("server TTS policy chunks sentence-safe backends", "[unit][chunking]") {
     auto out = crispasr_tts_plan_chunks_for_backend("First sentence. Second sentence.", "kokoro");
     REQUIRE(out.size() == 2);
