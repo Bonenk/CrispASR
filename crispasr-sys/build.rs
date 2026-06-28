@@ -188,6 +188,11 @@ fn configure_and_build(src_root: &Path) -> PathBuf {
         .arg(&build_dir)
         .arg("--config")
         .arg("Release")
+        // Build in parallel (matches the README's `-j$(nproc)`); without this the
+        // default Makefiles generator compiles crispasr-lib one TU at a time (#203).
+        // `--parallel` with no number uses the host core count and still honours
+        // CMAKE_BUILD_PARALLEL_LEVEL, so consumers can cap it (CI / low-RAM).
+        .arg("--parallel")
         .arg("--target")
         .arg("crispasr-lib");
     run(&mut build, "cmake build");
