@@ -346,6 +346,8 @@ def main():
     w.add_float32("dots.fm_sigma", config.get("fm_sigma", 0.0))
 
     # ── Tokenizer ──
+    # Store as newline-joined strings (not GGUF string arrays) because the
+    # C GGUF reader can't handle 151K-element string arrays (type 9 error).
     tokenizer_path = model_dir / "tokenizer.json"
     if tokenizer_path.exists():
         with open(tokenizer_path, "r", encoding="utf-8") as tf:
@@ -353,15 +355,17 @@ def main():
         # Extract vocab (token → id mapping)
         vocab = tok_data.get("model", {}).get("vocab", {})
         if vocab:
-            # Sort by id to get token list
             sorted_tokens = sorted(vocab.items(), key=lambda x: x[1])
             token_strings = [t[0] for t in sorted_tokens]
-            w.add_array("dots.tokenizer.tokens", token_strings)
+            # Store as single newline-joined string
+            w.add_string("dots.tokenizer.tokens", "\n".join(token_strings))
+            w.add_int32("dots.tokenizer.n_tokens", len(token_strings))
             print(f"  Tokenizer: {len(token_strings)} tokens")
         # Extract merges
         merges = tok_data.get("model", {}).get("merges", [])
         if merges:
-            w.add_array("dots.tokenizer.merges", merges)
+            w.add_string("dots.tokenizer.merges", "\n".join(merges))
+            w.add_int32("dots.tokenizer.n_merges", len(merges))
             print(f"  Merges: {len(merges)}")
 
     # ── Special tokens ──

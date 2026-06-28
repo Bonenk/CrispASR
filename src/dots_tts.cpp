@@ -159,9 +159,11 @@ struct dots_penc_layer {
     ggml_tensor* o_proj = nullptr;
     ggml_tensor* q_norm = nullptr;
     ggml_tensor* k_norm = nullptr;
-    ggml_tensor* ffn_gate = nullptr;
-    ggml_tensor* ffn_up = nullptr;
-    ggml_tensor* ffn_down = nullptr;
+    // 2-layer MLP (NOT SwiGLU): fc1 (hidden→ffn) + SiLU + fc2 (ffn→hidden)
+    ggml_tensor* ffn_up = nullptr;     // fc1 weight
+    ggml_tensor* ffn_up_b = nullptr;   // fc1 bias
+    ggml_tensor* ffn_down = nullptr;   // fc2 weight
+    ggml_tensor* ffn_down_b = nullptr; // fc2 bias
     ggml_tensor* attn_norm = nullptr;
     ggml_tensor* ffn_norm = nullptr;
 };
@@ -194,9 +196,11 @@ struct dots_dit_block {
     ggml_tensor* o_proj = nullptr;
     ggml_tensor* q_norm = nullptr;
     ggml_tensor* k_norm = nullptr;
-    ggml_tensor* ffn_gate = nullptr;
-    ggml_tensor* ffn_up = nullptr;
-    ggml_tensor* ffn_down = nullptr;
+    // 2-layer MLP (NOT SwiGLU): fc1 → SiLU → fc2
+    ggml_tensor* ffn_up = nullptr; // fc1
+    ggml_tensor* ffn_up_b = nullptr;
+    ggml_tensor* ffn_down = nullptr; // fc2
+    ggml_tensor* ffn_down_b = nullptr;
     ggml_tensor* attn_norm = nullptr;
     ggml_tensor* ffn_norm = nullptr;
 };
@@ -485,30 +489,44 @@ static bool dots_load_core(dots_tts_context* ctx, const char* path, int verbosit
         std::fprintf(stderr, "dots_tts: latent_dim=%d patch_size=%d\n", ctx->latent_dim, ctx->patch_size);
     }
 
-    // Load tokenizer from GGUF arrays
+    // Load tokenizer from GGUF (stored as newline-joined strings, not arrays,
+    // because the C GGUF reader can't handle 151K-element string arrays).
     {
         int tok_idx = gguf_find_key(meta, "dots.tokenizer.tokens");
         int mrg_idx = gguf_find_key(meta, "dots.tokenizer.merges");
         if (tok_idx >= 0 && mrg_idx >= 0) {
-            int n_tokens = (int)gguf_get_arr_n(meta, tok_idx);
-            int n_merges = (int)gguf_get_arr_n(meta, mrg_idx);
-            std::vector<std::string> tokens(n_tokens);
-            std::vector<std::string> merges(n_merges);
-            for (int i = 0; i < n_tokens; i++) {
-                tokens[i] = gguf_get_arr_str(meta, tok_idx, i);
-            }
-            for (int i = 0; i < n_merges; i++) {
-                merges[i] = gguf_get_arr_str(meta, mrg_idx, i);
-            }
+            const char* tok_str = gguf_get_val_str(meta, tok_idx);
+            const char* mrg_str = gguf_get_val_str(meta, mrg_idx);
+            // Split by newlines
+            auto split_nl = [](const char* s) -> std::vector<std::string> {
+                std::vector<std::string> out;
+                if (!s)
+                    return out;
+                std::string cur;
+                for (const char* p = s; *p; p++) {
+                    if (*p == '\n') {
+                        out.push_back(cur);
+                        cur.clear();
+                    } else {
+                        cur.push_back(*p);
+                    }
+                }
+                if (!cur.empty())
+                    out.push_back(cur);
+                return out;
+            };
+            auto tokens = split_nl(tok_str);
+            auto merges = split_nl(mrg_str);
             ctx->id_to_token = tokens;
-            for (int i = 0; i < n_tokens; i++) {
+            for (int i = 0; i < (int)tokens.size(); i++) {
                 ctx->token_to_id[tokens[i]] = i;
             }
-            for (int i = 0; i < n_merges; i++) {
+            for (int i = 0; i < (int)merges.size(); i++) {
                 ctx->merge_rank[merges[i]] = i;
             }
             if (verbosity >= 1)
-                std::fprintf(stderr, "dots_tts: tokenizer %d tokens, %d merges\n", n_tokens, n_merges);
+                std::fprintf(stderr, "dots_tts: tokenizer %d tokens, %d merges\n", (int)tokens.size(),
+                             (int)merges.size());
         } else {
             std::fprintf(stderr, "dots_tts: WARNING: tokenizer not found in GGUF\n");
         }
@@ -576,9 +594,10 @@ static bool dots_load_core(dots_tts_context* ctx, const char* path, int verbosit
         L.o_proj = t("o_proj.weight");
         L.q_norm = t("q_norm.weight");
         L.k_norm = t("k_norm.weight");
-        L.ffn_gate = t("ffn_gate.weight");
-        L.ffn_up = t("ffn_up.weight");
-        L.ffn_down = t("ffn_down.weight");
+        L.ffn_up = t("ffn_up.weight"); // fc1
+        L.ffn_up_b = t("ffn_up.bias");
+        L.ffn_down = t("ffn_down.weight"); // fc2
+        L.ffn_down_b = t("ffn_down.bias");
         L.attn_norm = t("attn_norm.weight");
         L.ffn_norm = t("ffn_norm.weight");
     }
@@ -611,9 +630,10 @@ static bool dots_load_core(dots_tts_context* ctx, const char* path, int verbosit
         B.o_proj = t("o_proj.weight");
         B.q_norm = t("q_norm.weight");
         B.k_norm = t("k_norm.weight");
-        B.ffn_gate = t("ffn_gate.weight");
-        B.ffn_up = t("ffn_up.weight");
-        B.ffn_down = t("ffn_down.weight");
+        B.ffn_up = t("ffn_up.weight"); // fc1
+        B.ffn_up_b = t("ffn_up.bias");
+        B.ffn_down = t("ffn_down.weight"); // fc2
+        B.ffn_down_b = t("ffn_down.bias");
         B.attn_norm = t("attn_norm.weight");
         B.ffn_norm = t("ffn_norm.weight");
     }
@@ -881,8 +901,14 @@ static void dots_dit_forward(dots_tts_context* ctx, const float* fm_seq, int fm_
         // Pre-FFN: LayerNorm + modulation
         cur = core_adaln::apply_norm_modulation(ctx0, cur, mod.scale_mlp, mod.shift_mlp);
 
-        // FFN (SwiGLU)
-        cur = core_ffn::swiglu(ctx0, cur, B.ffn_gate, B.ffn_up, B.ffn_down);
+        // FFN (2-layer MLP: fc1 → SiLU → fc2)
+        cur = ggml_mul_mat(ctx0, B.ffn_up, cur);
+        if (B.ffn_up_b)
+            cur = ggml_add(ctx0, cur, B.ffn_up_b);
+        cur = ggml_silu(ctx0, cur);
+        cur = ggml_mul_mat(ctx0, B.ffn_down, cur);
+        if (B.ffn_down_b)
+            cur = ggml_add(ctx0, cur, B.ffn_down_b);
 
         // Gated residual
         cur = core_adaln::gated_residual(ctx0, residual, cur, mod.gate_mlp);
@@ -988,7 +1014,14 @@ static void dots_penc_forward(dots_tts_context* ctx, const float* latent_patch, 
         residual = cur;
 
         cur = rms_norm(ctx0, cur, L.ffn_norm, 1e-6f);
-        cur = core_ffn::swiglu(ctx0, cur, L.ffn_gate, L.ffn_up, L.ffn_down);
+        // 2-layer MLP: fc1 → SiLU → fc2 (NOT SwiGLU)
+        cur = ggml_mul_mat(ctx0, L.ffn_up, cur);
+        if (L.ffn_up_b)
+            cur = ggml_add(ctx0, cur, L.ffn_up_b);
+        cur = ggml_silu(ctx0, cur);
+        cur = ggml_mul_mat(ctx0, L.ffn_down, cur);
+        if (L.ffn_down_b)
+            cur = ggml_add(ctx0, cur, L.ffn_down_b);
         cur = ggml_add(ctx0, residual, cur);
     }
 
