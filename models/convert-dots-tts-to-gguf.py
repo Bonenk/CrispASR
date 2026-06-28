@@ -180,19 +180,19 @@ def map_core_name(hf_name: str) -> str | None:
     if n.startswith("velocity_field_predictor."):
         n = n.replace("velocity_field_predictor.", "dit.")
         n = n.replace("dit.blocks.", "dit.blk.")
-        # AdaLN modulation: .adaLN_modulation.1. → .adaln.
+        # Output layer replacements BEFORE generic AdaLN (order matters!)
+        n = n.replace("dit.output_layer.adaLN_modulation.1.", "dit.final_adaln.")
+        n = n.replace("dit.output_layer.linear.", "dit.final_proj.")
+        n = n.replace("dit.output_layer.norm.", "dit.final_norm.")
+        # Input layer + timestep
+        n = n.replace("dit.input_layer.", "dit.in_proj.")
+        n = n.replace("dit.time_embedder.", "dit.time_emb.")
+        # Generic block-level AdaLN (after output_layer is handled)
         n = n.replace(".adaLN_modulation.1.", ".adaln.")
         n = n.replace(".attn.", ".")
         # FFN is 2-layer (fc1/fc2)
         n = n.replace(".ffn.fc1.", ".ffn_up.")
         n = n.replace(".ffn.fc2.", ".ffn_down.")
-        # Timestep embedder
-        n = n.replace("dit.time_embedder.", "dit.time_emb.")
-        # Input/output layers
-        n = n.replace("dit.input_layer.", "dit.in_proj.")
-        n = n.replace("dit.output_layer.linear.", "dit.final_proj.")
-        n = n.replace("dit.output_layer.adaLN_modulation.1.", "dit.final_adaln.")
-        n = n.replace("dit.output_layer.norm.", "dit.final_norm.")
         return "dots." + n
 
     # ── Projection layers (no prefix in safetensors) ──

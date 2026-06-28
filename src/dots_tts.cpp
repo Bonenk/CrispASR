@@ -622,8 +622,13 @@ static bool dots_load_core(dots_tts_context* ctx, const char* path, int verbosit
     dit.in_proj_w = T("dots.dit.in_proj.weight");
     dit.in_proj_b = T("dots.dit.in_proj.bias");
     dit.final_norm = T("dots.dit.final_norm.weight");
+    // Try both name variants (conversion script had ordering bug, fixed now)
     dit.final_adaln_w = T("dots.dit.final_adaln.weight");
+    if (!dit.final_adaln_w)
+        dit.final_adaln_w = T("dots.dit.output_layer.adaln.weight");
     dit.final_adaln_b = T("dots.dit.final_adaln.bias");
+    if (!dit.final_adaln_b)
+        dit.final_adaln_b = T("dots.dit.output_layer.adaln.bias");
     dit.final_proj_w = T("dots.dit.final_proj.weight");
     dit.final_proj_b = T("dots.dit.final_proj.bias");
 
@@ -836,6 +841,15 @@ static void dots_dit_forward(dots_tts_context* ctx, const float* fm_seq, int fm_
     auto& dit = ctx->dit;
     const int D = (int)dit.hidden_size;
     const int T = fm_len;
+
+    // Null-check critical tensors
+    if (!dit.time_mlp_0_w || !dit.in_proj_w || !dit.final_proj_w) {
+        std::fprintf(stderr, "dots_tts: DiT has null critical tensors (time_mlp_0=%p in_proj=%p final_proj=%p)\n",
+                     (void*)dit.time_mlp_0_w, (void*)dit.in_proj_w, (void*)dit.final_proj_w);
+        // Zero output and return
+        std::memset(out_velocity, 0, fm_len * (int)dit.hidden_size * sizeof(float));
+        return;
+    }
 
     size_t n_tensors = dit.n_layers * 80 + 256; // AdaLN + attn + FFN needs ~50 nodes/block
     size_t ctx_size = n_tensors * ggml_tensor_overhead() + ggml_graph_overhead();
