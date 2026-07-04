@@ -1,6 +1,6 @@
 {
-  "id": "${KAGGLE_ACCOUNT}/crispasr-irodori-tts-gguf-convert",
-  "title": "CrispASR Irodori-TTS GGUF Conversion",
+  "id": "${KAGGLE_ACCOUNT}/crispasr-irodori-tts-gguf-conversion",
+  "title": "crispasr-irodori-tts-gguf-conversion",
   "code_file": "irodori_tts_convert.py",
   "language": "python",
   "kernel_type": "script",
