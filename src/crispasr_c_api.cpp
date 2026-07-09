@@ -1303,6 +1303,12 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "canary-ctc";
     else if (strcmp(arch, "wav2vec2") == 0)
         backend = "wav2vec2";
+    // Both the Omni ASR CTC and LLM converters write general.architecture="omniasr-ctc"
+    // (see models/convert-omniasr-{ctc,llm}-to-gguf.py); the "omniasr" backend prefix-matches
+    // every omniasr-* variant and reads model_type from the GGUF to route CTC vs LLM.
+    else if (strcmp(arch, "omniasr-ctc") == 0 || strcmp(arch, "omniasr-llm") == 0 ||
+             strcmp(arch, "omniasr") == 0)
+        backend = "omniasr";
     else if (strcmp(arch, "vibevoice-asr") == 0 || strcmp(arch, "vibevoice") == 0 || strcmp(arch, "vibevoice-tts") == 0)
         backend = "vibevoice";
     else if (strcmp(arch, "qwen3-tts") == 0 || strcmp(arch, "qwen3_tts") == 0)
