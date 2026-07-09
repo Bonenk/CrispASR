@@ -1918,6 +1918,29 @@ static std::vector<crispasr_session_seg::word> emit_words_from_tokens(const std:
     return out;
 }
 
+// issue #218 follow-up: fix_loops() cleans a segment's flat `seg.text`, but
+// `seg.words` (built independently, e.g. via emit_words_from_tokens() above)
+// still carries every repeated word from the raw token stream. Filter
+// `words` in place with the same collapse decision fix_loops() made on the
+// corresponding text, so word-level consumers (SRT/VTT, JSON `words`) don't
+// still show duplicates once the flat text looks clean.
+static void filter_words_by_ngram_collapse(std::vector<crispasr_session_seg::word>& words) {
+    if (words.empty())
+        return;
+    std::vector<std::string> word_texts;
+    word_texts.reserve(words.size());
+    for (const auto& w : words)
+        word_texts.push_back(w.text);
+    const std::vector<int> keep = core_ngram::fix_loops_keep_indices(word_texts);
+    if (keep.size() == words.size())
+        return;
+    std::vector<crispasr_session_seg::word> filtered;
+    filtered.reserve(keep.size());
+    for (int idx : keep)
+        filtered.push_back(std::move(words[idx]));
+    words = std::move(filtered);
+}
+
 CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_path, const char* backend_name,
                                                            int n_threads) {
     if (!model_path || !backend_name)
@@ -4440,6 +4463,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             toks.push_back(std::move(tk));
         }
         seg.words = emit_words_from_tokens(toks);
+        filter_words_by_ngram_collapse(seg.words);
         canary_qwen_result_free(cqr);
         r->segments.push_back(std::move(seg));
         return r;
@@ -4713,6 +4737,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         seg.words = emit_words_from_tokens(toks);
+        filter_words_by_ngram_collapse(seg.words);
         r->segments.push_back(std::move(seg));
         return r;
     }
@@ -4746,6 +4771,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             toks.push_back(std::move(tk));
         }
         seg.words = emit_words_from_tokens(toks);
+        filter_words_by_ngram_collapse(seg.words);
         cohere_result_free(cr);
         r->segments.push_back(std::move(seg));
         return r;
@@ -4956,6 +4982,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         seg.words = emit_words_from_tokens(toks);
+        filter_words_by_ngram_collapse(seg.words);
         r->segments.push_back(std::move(seg));
         return r;
     }
@@ -5274,8 +5301,20 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         }
         std::string fixed_text = core_ngram::fix_loops(gr->text);
         glm_asr_result_free(gr);
-        char* text = strdup(fixed_text.c_str());
-        return package_with_tokens(text, std::move(toks));
+
+        // issue #218 follow-up: don't route through package_with_tokens()
+        // here (shared with kyutai-stt/firered-asr, which aren't affected) —
+        // build the segment directly so seg.words can be filtered with the
+        // same collapse decision as seg.text, instead of just cleaning the
+        // flat text and leaving every repeated word in word-level output.
+        crispasr_session_seg seg;
+        seg.text = fixed_text;
+        seg.t0 = 0;
+        seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
+        seg.words = emit_words_from_tokens(toks);
+        filter_words_by_ngram_collapse(seg.words);
+        r->segments.push_back(std::move(seg));
+        return r;
     }
 #endif
 #ifdef CA_HAVE_KYUTAI

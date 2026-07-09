@@ -136,6 +136,26 @@ public:
             }
         }
 
+        // issue #218 follow-up: fix_loops() above cleans seg.text, but
+        // seg.words was built from the raw (un-collapsed) token stream, so
+        // word-level output (SRT/VTT, JSON `words`) still shows every
+        // repeated word even once the flat text looks clean. Filter
+        // seg.words with the SAME collapse decision, in lockstep.
+        {
+            std::vector<std::string> word_texts;
+            word_texts.reserve(seg.words.size());
+            for (const auto& w : seg.words)
+                word_texts.push_back(w.text);
+            const std::vector<int> keep = core_ngram::fix_loops_keep_indices(word_texts);
+            if (keep.size() != seg.words.size()) {
+                std::vector<crispasr_word> filtered;
+                filtered.reserve(keep.size());
+                for (int idx : keep)
+                    filtered.push_back(std::move(seg.words[idx]));
+                seg.words = std::move(filtered);
+            }
+        }
+
         cohere_result_free(r);
         out.push_back(std::move(seg));
         return out;
