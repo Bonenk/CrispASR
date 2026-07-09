@@ -25,10 +25,13 @@ try:
     # ── Clone CrispASR ──────────────────────────────────────────────
     log("Cloning CrispASR...")
     CRISPASR_URL = "https://github.com/CrispStrobe/CrispASR.git"
+    CRISPASR_BRANCH = os.environ.get("CRISPASR_BRANCH", "feat/omnivoice-gen-fix")
     _CRISPASR_DIR = WORK / "CrispASR"
     if not _CRISPASR_DIR.exists():
         subprocess.check_call(["git", "clone", "--depth", "1",
+            "--branch", CRISPASR_BRANCH,
             CRISPASR_URL, str(_CRISPASR_DIR)])
+    log(f"Branch: {CRISPASR_BRANCH}")
     sys.path.insert(0, str(_CRISPASR_DIR / "tools" / "kaggle"))
 
     try:
