@@ -45,6 +45,7 @@
 #include "core/beam_decode.h"        // Shared autoregressive beam-search decode helper
 #include "core/greedy_decode.h"      // Shared autoregressive greedy decode helper
 #include "core/lang_names.h"         // Shared ISO-639-1 → English language-name map
+#include "core/ngram_loop_fix.h"     // core_ngram::fix_loops (issue #218, mirrors CLI adapters)
 #include "grammar-parser.h"          // GBNF parser for grammar-constrained sampling
 // Non-Whisper backend headers. Each of these lives in `src/` and is built as
 // its own shared library — we link them into libwhisper privately so Dart
@@ -4425,7 +4426,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             return nullptr;
         }
         crispasr_session_seg seg;
-        seg.text = cqr->text ? cqr->text : "";
+        seg.text = core_ngram::fix_loops(cqr->text ? cqr->text : "");
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         std::vector<ca_token_record> toks;
@@ -4708,7 +4709,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             transcript.erase(transcript.begin());
 
         crispasr_session_seg seg;
-        seg.text = transcript;
+        seg.text = core_ngram::fix_loops(transcript);
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         seg.words = emit_words_from_tokens(toks);
@@ -4730,7 +4731,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             return nullptr;
         }
         crispasr_session_seg seg;
-        seg.text = cr->text ? cr->text : "";
+        seg.text = core_ngram::fix_loops(cr->text ? cr->text : "");
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
 
@@ -4932,6 +4933,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             std::free(batch_text);
         while (!transcript.empty() && (transcript.front() == ' ' || transcript.front() == '\n'))
             transcript.erase(transcript.begin());
+        transcript = core_ngram::fix_loops(transcript);
 
         std::vector<ca_token_record> toks;
         toks.reserve(dec.tokens.size());
@@ -5270,8 +5272,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             tk.p = gr->token_probs[i];
             toks.push_back(std::move(tk));
         }
-        char* text = strdup(gr->text);
+        std::string fixed_text = core_ngram::fix_loops(gr->text);
         glm_asr_result_free(gr);
+        char* text = strdup(fixed_text.c_str());
         return package_with_tokens(text, std::move(toks));
     }
 #endif
