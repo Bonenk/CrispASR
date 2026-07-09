@@ -116,4 +116,3 @@ SESSION_HANDOVER.md
 /handover-prompts/
 /docs/prompts/
 .ccache/
-tools/kaggle/q8-quantize/kaggle_harness.py
