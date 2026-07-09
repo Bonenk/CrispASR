@@ -271,8 +271,7 @@ struct omnivoice_context {
 // ---------------------------------------------------------------------------
 
 struct omnivoice_context_params omnivoice_context_default_params(void) {
-    struct omnivoice_context_params p;
-    std::memset(&p, 0, sizeof(p));
+    struct omnivoice_context_params p = {};
     p.n_threads = 4;
     p.verbosity = 1;
     p.use_gpu = false;
