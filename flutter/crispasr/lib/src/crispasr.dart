@@ -611,7 +611,7 @@ enum LidMethod {
   whisper,
   /// GGUF-packed Silero 95-language classifier (~16 MB). Fast, no GPU
   /// required. Recommended default when the user has the
-  /// `silero-lid-95-f16.gguf` (or legacy `silero-lang95-v1-f16.gguf`)
+  /// `silero-lid-lang95-f32.gguf` (or legacy `silero-lang95-v1-f16.gguf`)
   /// on disk.
   silero,
   /// FireRed-LID 120-language Transformer (~300 MB). Higher coverage
