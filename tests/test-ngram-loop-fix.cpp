@@ -45,6 +45,18 @@ TEST_CASE("degenerate unigram loop collapses to a bounded run", "[ngram-loop]") 
     REQUIRE(out.size() < loop.size());
 }
 
+TEST_CASE("long single-word chunk loop collapses after larger n-grams", "[ngram-loop]") {
+    std::string loop = "just get him moving";
+    for (int i = 0; i < 80; i++)
+        loop += " back";
+    loop += " It is a joke.";
+    const std::string out = fix_loops(loop);
+    REQUIRE(out.find("just get him moving") == 0);
+    REQUIRE(out.find("It is a joke.") != std::string::npos);
+    REQUIRE(out.find("back back back back") == std::string::npos);
+    REQUIRE(out.size() < loop.size());
+}
+
 TEST_CASE("degenerate multi-word cycle collapses", "[ngram-loop]") {
     // issue #218 slice 5: "run hey hey hey hey hey run" cycles.
     const std::string loop =
@@ -54,6 +66,16 @@ TEST_CASE("degenerate multi-word cycle collapses", "[ngram-loop]") {
     REQUIRE(out.find("Alex you okay?") != std::string::npos);
     // No five-in-a-row "hey" survives the unigram collapse.
     REQUIRE(out.find("hey hey hey hey hey") == std::string::npos);
+}
+
+TEST_CASE("degenerate phrase repetition collapses", "[ngram-loop]") {
+    // issue #218 follow-ups: multiple AR ASR backends can loop on short
+    // phrases such as "come on" after a valid prefix.
+    const std::string loop = "move much of the fence. come on come on come on come on come on come on come on come on";
+    const std::string out = fix_loops(loop);
+    REQUIRE(out.find("move much of the fence.") == 0);
+    REQUIRE(out.find("come on come on come on come on") == std::string::npos);
+    REQUIRE(out.size() < loop.size());
 }
 
 TEST_CASE("edge cases are safe", "[ngram-loop]") {
