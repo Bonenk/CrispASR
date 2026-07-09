@@ -6,6 +6,7 @@
 #include "crispasr_backend.h"
 #include "crispasr_backend_utils.h"
 #include "whisper_params.h"
+#include "core/ngram_loop_fix.h"
 
 #include "canary_qwen.h"
 
@@ -67,7 +68,7 @@ public:
             return out;
 
         crispasr_segment seg;
-        seg.text = r->text ? r->text : "";
+        seg.text = core_ngram::fix_loops(r->text ? r->text : "");
         seg.t0 = t_offset_cs;
         // Estimate duration from audio length
         seg.t1 = t_offset_cs + (int64_t)(100.0 * n_samples / 16000.0);

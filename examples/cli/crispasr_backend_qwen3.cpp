@@ -16,6 +16,7 @@
 #include "core/bpe.h"
 #include "core/greedy_decode.h"
 #include "core/beam_decode.h"
+#include "core/ngram_loop_fix.h"
 
 #include "qwen3_asr.h"
 
@@ -454,7 +455,7 @@ public:
         crispasr_segment seg;
         seg.t0 = t_offset_cs;
         seg.t1 = t_offset_cs + (int64_t)((double)n_samples / 16000.0 * 100.0);
-        seg.text = transcript;
+        seg.text = core_ngram::fix_loops(transcript);
         seg.tokens = std::move(out_tokens);
         out.push_back(std::move(seg));
         return out;

@@ -13,6 +13,7 @@
 #include "crispasr_backend.h"
 #include "crispasr_backend_utils.h"
 #include "whisper_params.h"
+#include "core/ngram_loop_fix.h"
 
 #include "cohere.h"
 
@@ -85,7 +86,7 @@ public:
         crispasr_segment seg;
         seg.t0 = t_offset_cs;
         seg.t1 = t_offset_cs;
-        seg.text = r->text ? r->text : "";
+        seg.text = core_ngram::fix_loops(r->text ? r->text : "");
 
         seg.tokens.reserve(r->n_tokens);
         for (int i = 0; i < r->n_tokens; i++) {

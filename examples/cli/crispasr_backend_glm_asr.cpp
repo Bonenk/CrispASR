@@ -4,6 +4,7 @@
 #include "crispasr_backend_utils.h"
 #include "glm_asr.h"
 #include "whisper_params.h"
+#include "core/ngram_loop_fix.h"
 
 #include <cstdlib>
 #include <cstring>
@@ -121,6 +122,8 @@ public:
             seg.text.erase(seg.text.begin());
         while (!seg.text.empty() && (seg.text.back() == ' ' || seg.text.back() == '\n'))
             seg.text.pop_back();
+
+        seg.text = core_ngram::fix_loops(seg.text);
 
         // GPT-2 byte-level BPE decoder: Ġ (U+0120, UTF-8 0xC4 0xA0) → space,
         // Ċ (U+010A, UTF-8 0xC4 0x8A) → newline. All other bytes pass through.
