@@ -1289,62 +1289,104 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             u_logits = run_llm_forward(u_embeds, T_target, 0);
         }
 
-        // Apply classifier-free guidance
-        std::vector<float>& target_logits = c_logits;
-        if (gen.guidance_scale != 0.0f && !u_logits.empty()) {
-            for (size_t i = 0; i < target_logits.size(); i++) {
-                target_logits[i] = c_logits[i] + gen.guidance_scale * (c_logits[i] - u_logits[i]);
+        // _predict_tokens_with_scoring — mirrors Python exactly:
+        //
+        //   c_log = log_softmax(c_logits)        — mask_id IN denominator
+        //   u_log = log_softmax(u_logits)        — mask_id IN denominator
+        //   guided = c_log + scale*(c_log-u_log)
+        //   log_probs = log_softmax(guided)      — mask_id IN denominator
+        //   log_probs[mask_id] = -inf            — set AFTER all three softmaxes
+        //   filtered = top_k(log_probs, ceil(0.1*V))
+        //   pred_token = argmax(filtered/T + Gumbel)
+        //   confidence = max(log_probs)          — argmax log-prob, NOT sampled token's
+
+        // log_softmax over ALL V tokens (mask_id included in denominator, matching
+        // Python's F.log_softmax before the post-softmax mask zeroing).
+        auto log_softmax_all = [](const float* raw, float* out, int V) {
+            float mx = raw[0];
+            for (int v = 1; v < V; v++)
+                mx = std::max(mx, raw[v]);
+            float se = 0.0f;
+            for (int v = 0; v < V; v++)
+                se += std::exp(raw[v] - mx);
+            float ls = mx + std::log(se);
+            for (int v = 0; v < V; v++)
+                out[v] = raw[v] - ls;
+        };
+
+        int V = (int)hp.audio_vocab_size;
+        int mask_id = (int)hp.audio_mask_id;
+
+        // Pass 1: compute per-codebook log-probs with CFG, store in log_probs.
+        std::vector<float> log_probs(out_dim * T_target);
+        {
+            std::vector<float> c_lp(V), u_lp(V), guided(V), final_lp(V);
+            for (int t = 0; t < T_target; t++) {
+                for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
+                    size_t base = (size_t)t * out_dim + cb * V;
+                    const float* c_raw = c_logits.data() + base;
+
+                    if (gen.guidance_scale != 0.0f && !u_logits.empty()) {
+                        const float* u_raw = u_logits.data() + base;
+                        log_softmax_all(c_raw, c_lp.data(), V);
+                        log_softmax_all(u_raw, u_lp.data(), V);
+                        for (int v = 0; v < V; v++)
+                            guided[v] = c_lp[v] + gen.guidance_scale * (c_lp[v] - u_lp[v]);
+                        log_softmax_all(guided.data(), final_lp.data(), V);
+                    } else {
+                        log_softmax_all(c_raw, final_lp.data(), V);
+                    }
+                    // Set mask_id to -inf AFTER all log_softmax passes
+                    // (Python: log_probs[..., audio_mask_id] = -float("inf"))
+                    final_lp[mask_id] = -1e30f;
+                    std::memcpy(log_probs.data() + base, final_lp.data(), V * sizeof(float));
+                }
             }
         }
 
-        // Reshape logits to (T_target, n_codebooks, audio_vocab_size)
-        // and predict tokens + compute confidence scores
+        // Pass 2: top-k filter → Gumbel sample pred_tokens; compute confidence.
         std::vector<int32_t> pred_tokens(hp.n_codebooks * T_target);
         std::vector<float> confidence(hp.n_codebooks * T_target);
 
         for (int t = 0; t < T_target; t++) {
             for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
-                int offset = (int)(cb * hp.audio_vocab_size);
-                const float* logits = target_logits.data() + (size_t)t * out_dim + offset;
+                float* lp = log_probs.data() + (size_t)t * out_dim + cb * V;
+                // mask_id already -inf in lp
 
-                // Log-softmax
-                float max_val = -1e30f;
-                for (uint32_t v = 0; v < hp.audio_vocab_size; v++) {
-                    if ((int)v != (int)hp.audio_mask_id) {
-                        max_val = std::max(max_val, logits[v]);
-                    }
+                // Top-k filter: keep top ceil(0.1*V) tokens
+                // (Python: _filter_top_k(log_probs, ratio=0.1), k=ceil(0.1*1025)=103)
+                if (gen.class_temperature > 0.0f) {
+                    int top_k = std::max(1, (int)std::ceil(0.1f * V));
+                    std::vector<float> vals(lp, lp + V);
+                    std::nth_element(vals.begin(), vals.begin() + (V - top_k), vals.end());
+                    float threshold = vals[V - top_k];
+                    for (int v = 0; v < V; v++)
+                        if (lp[v] < threshold)
+                            lp[v] = -1e30f;
                 }
-                float sum_exp = 0.0f;
-                for (uint32_t v = 0; v < hp.audio_vocab_size; v++) {
-                    if ((int)v != (int)hp.audio_mask_id) {
-                        sum_exp += std::exp(logits[v] - max_val);
-                    }
-                }
-                float log_sum = max_val + std::log(sum_exp);
 
-                // Find best token (excluding mask)
+                // Confidence = max log-prob after filter (Python: log_probs.max(dim=-1)[0]).
+                // The top-k always preserves the maximum, so max-after-filter = max-before-filter.
+                float max_lp = *std::max_element(lp, lp + V);
+
+                // Sample token: Gumbel or greedy.
                 int best_tok = 0;
                 float best_score = -1e30f;
                 if (gen.class_temperature > 0.0f) {
-                    // Gumbel sampling
-                    for (uint32_t v = 0; v < hp.audio_vocab_size; v++) {
-                        if ((int)v == (int)hp.audio_mask_id)
+                    for (int v = 0; v < V; v++) {
+                        if (lp[v] < -1e20f)
                             continue;
-                        float lp = logits[v] - log_sum;
-                        float g = lp / gen.class_temperature + gumbel_noise();
+                        float g = lp[v] / gen.class_temperature + gumbel_noise();
                         if (g > best_score) {
                             best_score = g;
-                            best_tok = (int)v;
+                            best_tok = v;
                         }
                     }
                 } else {
-                    for (uint32_t v = 0; v < hp.audio_vocab_size; v++) {
-                        if ((int)v == (int)hp.audio_mask_id)
-                            continue;
-                        float lp = logits[v] - log_sum;
-                        if (lp > best_score) {
-                            best_score = lp;
-                            best_tok = (int)v;
+                    for (int v = 0; v < V; v++) {
+                        if (lp[v] > best_score) {
+                            best_score = lp[v];
+                            best_tok = v;
                         }
                     }
                 }
@@ -1353,10 +1395,11 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
                 pred_tokens[idx] = best_tok;
 
                 // Confidence = max log-prob - layer penalty
-                float max_lp = logits[best_tok] - log_sum;
+                // (Python: scores = confidence_scores - layer_ids * layer_penalty_factor)
                 confidence[idx] = max_lp - cb * gen.layer_penalty_factor;
 
-                // Add Gumbel noise for position selection
+                // Position Gumbel noise
+                // (Python: scores = _gumbel_sample(scores, position_temperature))
                 if (gen.position_temperature > 0.0f) {
                     confidence[idx] = confidence[idx] / gen.position_temperature + gumbel_noise();
                 }
