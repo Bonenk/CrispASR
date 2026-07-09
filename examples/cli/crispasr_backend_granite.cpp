@@ -21,6 +21,7 @@
 #include "whisper_params.h"
 #include "core/greedy_decode.h"
 #include "core/beam_decode.h"
+#include "core/ngram_loop_fix.h" // core_ngram::fix_loops (issue #218)
 
 #include "granite_speech.h"
 
@@ -364,7 +365,7 @@ public:
             size_t start = 0;
             while (start < transcript.size() && transcript[start] == ' ')
                 start++;
-            seg.text = transcript.substr(start);
+            seg.text = core_ngram::fix_loops(transcript.substr(start));
             seg.tokens.reserve(gen_ids.size());
             for (size_t i = 0; i < gen_ids.size(); i++) {
                 if (gen_ids[i] == eos_tok)
@@ -565,7 +566,7 @@ public:
                     if (!words.empty()) {
                         s.t0 = words.front().t0;
                         s.t1 = words.back().t1;
-                        s.text = std::move(clean);
+                        s.text = core_ngram::fix_loops(clean);
                         s.words = std::move(words);
                         saa_segs.push_back(std::move(s));
                         return;
@@ -573,7 +574,7 @@ public:
                 }
                 s.t0 = seg.t0;
                 s.t1 = seg.t1;
-                s.text = std::move(chunk);
+                s.text = core_ngram::fix_loops(chunk);
                 saa_segs.push_back(std::move(s));
             };
 
@@ -614,6 +615,7 @@ public:
                     seg.text.clear();
             }
         }
+        seg.text = core_ngram::fix_loops(seg.text);
 
         // Per-token entries with decode-loop confidences. granite uses
         // its own batch detokenizer (granite_speech_decode_tokens) for
