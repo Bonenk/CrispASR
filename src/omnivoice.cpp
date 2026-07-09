@@ -872,7 +872,6 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
 
     const float attn_scale = 1.0f / sqrtf((float)hp.head_dim);
 
-    bool dbg = env_bool("OMNIVOICE_DEBUG");
     for (uint32_t il = 0; il < hp.n_layers; il++) {
         auto& b = m.blocks[il];
 
@@ -881,28 +880,9 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
         attn_in = ggml_mul(ctx0, attn_in, b.attn_norm_w);
 
         // Q, K, V projections
-        if (il == 0 && dbg) {
-            fprintf(stderr,
-                    "  L0 attn_in ne=[%ld,%ld] q_w ne=[%ld,%ld] k_w ne=[%ld,%ld] v_w ne=[%ld,%ld] o_w "
-                    "ne=[%ld,%ld]\n",
-                    attn_in->ne[0], attn_in->ne[1], b.attn_q_w->ne[0], b.attn_q_w->ne[1], b.attn_k_w->ne[0],
-                    b.attn_k_w->ne[1], b.attn_v_w->ne[0], b.attn_v_w->ne[1], b.attn_output_w->ne[0],
-                    b.attn_output_w->ne[1]);
-        }
-        if (dbg && il < 2) {
-            fprintf(stderr, "  L%u attn_in ne=[%ld,%ld,%ld,%ld] q_w ne=[%ld,%ld,%ld,%ld]\n", il, attn_in->ne[0],
-                    attn_in->ne[1], attn_in->ne[2], attn_in->ne[3], b.attn_q_w->ne[0], b.attn_q_w->ne[1],
-                    b.attn_q_w->ne[2], b.attn_q_w->ne[3]);
-        }
         ggml_tensor* Q = ggml_mul_mat(ctx0, b.attn_q_w, attn_in);
-        if (il == 0 && dbg)
-            fprintf(stderr, "  Q ok\n");
         ggml_tensor* K = ggml_mul_mat(ctx0, b.attn_k_w, attn_in);
-        if (il == 0 && dbg)
-            fprintf(stderr, "  K ok\n");
         ggml_tensor* V = ggml_mul_mat(ctx0, b.attn_v_w, attn_in);
-        if (il == 0 && dbg)
-            fprintf(stderr, "  V ok\n");
 
         // Reshape to (head_dim, n_heads, T) / (head_dim, n_kv_heads, T)
         Q = ggml_reshape_3d(ctx0, Q, hp.head_dim, hp.n_heads, T);
@@ -925,26 +905,17 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
         K = ggml_rope_ext(ctx0, K, pos_ids, nullptr, hp.head_dim, GGML_ROPE_TYPE_NEOX, 0, hp.rope_theta, 1.0f, 0.0f,
                           1.0f, 0.0f, 0.0f);
 
-        // GQA: expand KV heads
-        uint32_t kv_repeat = hp.n_heads / hp.n_kv_heads;
-        if (kv_repeat > 1) {
-            K = ggml_reshape_4d(ctx0, K, hp.head_dim, 1, hp.n_kv_heads, T);
-            K = ggml_repeat(ctx0, K, ggml_new_tensor_4d(ctx0, K->type, hp.head_dim, kv_repeat, hp.n_kv_heads, T));
-            K = ggml_reshape_3d(ctx0, K, hp.head_dim, hp.n_heads, T);
+        // ggml_flash_attn_ext requires Q/K/V in (head_dim, T, n_heads) layout.
+        // Permute from (head_dim, n_heads, T) → (head_dim, T, n_heads).
+        // ggml handles GQA natively (Q.ne[2]=n_heads, K.ne[2]=n_kv_heads).
+        Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
+        K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
+        V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
 
-            V = ggml_reshape_4d(ctx0, V, hp.head_dim, 1, hp.n_kv_heads, T);
-            V = ggml_repeat(ctx0, V, ggml_new_tensor_4d(ctx0, V->type, hp.head_dim, kv_repeat, hp.n_kv_heads, T));
-            V = ggml_reshape_3d(ctx0, V, hp.head_dim, hp.n_heads, T);
-        }
-
-        if (il == 0 && dbg) {
-            fprintf(stderr, "  pre-attn Q=[%ld,%ld,%ld] K=[%ld,%ld,%ld] V=[%ld,%ld,%ld]\n", Q->ne[0], Q->ne[1],
-                    Q->ne[2], K->ne[0], K->ne[1], K->ne[2], V->ne[0], V->ne[1], V->ne[2]);
-        }
-        // Attention via ggml_flash_attn_ext — handles Q/K/V layout internally.
-        // Q,K,V are (head_dim, n_heads, T). No mask (full bidirectional).
+        // flash_attn_ext: Q/K/V in (hd, T, n_heads/n_kv) → output (hd, n_heads, T)
+        // Full bidirectional (nullptr mask = no masking).
         ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, attn_scale, 0.0f, 0.0f);
-        // Output: (head_dim, n_heads, T) → reshape to (n_heads*head_dim, T)
+        // Output shape: (head_dim, n_heads, T) → reshape to (n_heads*head_dim, T)
         attn_out = ggml_reshape_2d(ctx0, attn_out, hp.n_heads * hp.head_dim, T);
 
         // Output projection
@@ -962,10 +933,6 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
         gate = ggml_silu(ctx0, gate);
         ggml_tensor* ffn_out = ggml_mul(ctx0, gate, up);
         ffn_out = ggml_mul_mat(ctx0, b.ffn_down_w, ffn_out);
-
-        if (dbg && il < 2) {
-            fprintf(stderr, "  L%u done ffn (ffn_out ne=[%ld,%ld])\n", il, ffn_out->ne[0], ffn_out->ne[1]);
-        }
 
         cur = ggml_add(ctx0, cur, ffn_out);
     }
