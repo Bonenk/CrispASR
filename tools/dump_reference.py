@@ -305,6 +305,10 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # rvq_codes, lm_frame0_logits, generated_text.
     # Requires: safetensors sentencepiece scipy moshi
     "kyutai-stt":  "reference_backends.kyutai_stt",
+    # mistralai/Voxtral-4B-TTS-2603. Three-component TTS:
+    # Ministral-3B AR + 3L FM transformer + codec decoder → 24 kHz PCM.
+    # Text from VOXTRAL_TTS_TEXT env, voice from VOXTRAL_TTS_VOICE env.
+    "voxtral-tts": "reference_backends.voxtral_tts",
 }
 
 DEFAULT_STAGES_BY_BACKEND: Dict[str, List[str]] = {}  # populated at import
