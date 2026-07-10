@@ -209,6 +209,10 @@ struct voxtral_tts_context {
     ggml_backend_buffer_t buf = nullptr;
     ggml_context* ctx_w = nullptr; // weight context
 
+    // Compute scheduler + graph metadata scratch (shared across LLM/FM/codec graphs)
+    ggml_backend_sched_t sched = nullptr;
+    std::vector<uint8_t> compute_meta;
+
     // KV cache for LLM backbone
     ggml_context* kv_ctx = nullptr;
     ggml_backend_buffer_t kv_buf = nullptr;
@@ -497,6 +501,9 @@ extern "C" voxtral_tts_context* voxtral_tts_init_from_file(const char* path_mode
     if (!ctx->backend)
         ctx->backend = be;
 
+    if (ctx->backend_cpu && params.n_threads > 0)
+        ggml_backend_cpu_set_n_threads(ctx->backend_cpu, params.n_threads);
+
     core_gguf::WeightLoad wl;
     if (!core_gguf::load_weights(path_model, ctx->backend, "voxtral_tts", wl)) {
         fprintf(stderr, "voxtral_tts: failed to load weights from '%s'\n", path_model);
@@ -505,6 +512,19 @@ extern "C" voxtral_tts_context* voxtral_tts_init_from_file(const char* path_mode
     }
     ctx->ctx_w = wl.ctx;
     ctx->buf = wl.buf;
+
+    // Compute scheduler (weighted-model inference; sched handles weight + compute
+    // buffers across the GPU/CPU split). 16384-node graph budget covers the 26-layer
+    // LLM prefill plus per-frame FM/codec graphs.
+    {
+        int n_be = 0;
+        ggml_backend_t backends[2];
+        backends[n_be++] = ctx->backend;
+        if (ctx->backend_cpu && ctx->backend_cpu != ctx->backend)
+            backends[n_be++] = ctx->backend_cpu;
+        ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 16384, false, false);
+    }
+    ctx->compute_meta.resize(ggml_tensor_overhead() * 16384 + ggml_graph_overhead_custom(16384, false));
 
     auto get = [&](const std::string& name) -> ggml_tensor* {
         auto it = wl.tensors.find(name);
@@ -663,6 +683,192 @@ static void voxtral_tts_kv_reset(voxtral_tts_context* ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Prompt embedding: [voice frames] ++ [text token embeddings]
+// ---------------------------------------------------------------------------
+// Returns a (dim × T_prompt) column-major F32 buffer (frame-contiguous). Voice
+// frames are the pre-summed conditioning embeddings stored in the GGUF; text
+// tokens are embedded via token_embd. `ggml_get_rows` dequantises any quant
+// type to F32, so this is robust whether the GGUF is F16 or Q4_K.
+static std::vector<float> voxtral_tts_build_prompt_embeds(voxtral_tts_context* ctx, ggml_tensor* voice_t,
+                                                          const std::vector<int32_t>& text_ids, int* out_T_prompt) {
+    const int d = ctx->hp.llm_dim;
+    const int T_voice = (int)voice_t->ne[1];
+    const int n_text = (int)text_ids.size();
+    const int T_prompt = T_voice + n_text;
+    if (out_T_prompt)
+        *out_T_prompt = T_prompt;
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph(ctx0);
+
+    // Voice frames: identity get_rows dequantises (D, T_voice) → F32.
+    ggml_tensor* v_idx = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T_voice);
+    ggml_set_name(v_idx, "v_idx");
+    ggml_set_input(v_idx);
+    ggml_tensor* voice_f32 = ggml_get_rows(ctx0, voice_t, v_idx);
+
+    ggml_tensor* out = voice_f32;
+    if (n_text > 0) {
+        ggml_tensor* t_idx = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_text);
+        ggml_set_name(t_idx, "t_idx");
+        ggml_set_input(t_idx);
+        ggml_tensor* text_emb = ggml_get_rows(ctx0, ctx->model.token_embd, t_idx);
+        out = ggml_concat(ctx0, voice_f32, text_emb, 1); // concat along time (ne[1])
+    }
+    ggml_set_name(out, "prompt_embeds");
+    ggml_set_output(out);
+    ggml_build_forward_expand(gf, out);
+
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        ggml_free(ctx0);
+        return {};
+    }
+
+    std::vector<int32_t> vidx(T_voice);
+    for (int i = 0; i < T_voice; i++)
+        vidx[i] = i;
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "v_idx"), vidx.data(), 0, vidx.size() * sizeof(int32_t));
+    if (n_text > 0)
+        ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "t_idx"), text_ids.data(), 0,
+                                text_ids.size() * sizeof(int32_t));
+
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        ggml_free(ctx0);
+        return {};
+    }
+
+    std::vector<float> buf((size_t)d * T_prompt);
+    ggml_backend_tensor_get(ggml_graph_get_tensor(gf, "prompt_embeds"), buf.data(), 0, buf.size() * sizeof(float));
+    ggml_free(ctx0);
+    return buf;
+}
+
+// ---------------------------------------------------------------------------
+// LLM AR backbone (Ministral-3B) — KV-cached GQA + SwiGLU, NEOX RoPE.
+// ---------------------------------------------------------------------------
+// Architecture is identical to voxtral4b's LLM (mirror of voxtral4b_build_graph_llm_kv)
+// with two differences: (1) no ada_rms_norm time conditioning, and (2) the graph
+// outputs the hidden state after the final RMSNorm+output_norm (the FM head's
+// input), NOT the tied-embedding logits.
+static ggml_cgraph* voxtral_tts_build_graph_llm(voxtral_tts_context* ctx, int n_past, int n_tokens) {
+    const auto& hp = ctx->hp;
+    const auto& m = ctx->model;
+    const int d = hp.llm_dim;
+    const int n_q = hp.llm_n_heads;
+    const int n_kv = hp.llm_n_kv;
+    const int hd = hp.llm_head_dim;
+    const int n_layers = hp.llm_n_layers;
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 16384, false);
+
+    ggml_tensor* embeds = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, d, n_tokens);
+    ggml_set_name(embeds, "inputs_embeds");
+    ggml_set_input(embeds);
+
+    ggml_tensor* positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
+    ggml_set_name(positions, "positions");
+    ggml_set_input(positions);
+
+    ggml_tensor* causal_mask = nullptr;
+    if (n_tokens > 1) {
+        causal_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, n_past + n_tokens, n_tokens);
+        ggml_set_name(causal_mask, "causal_mask");
+        ggml_set_input(causal_mask);
+    }
+
+    ggml_tensor* cur = embeds;
+
+    const core_attn::KvSelfAttnParams kvp = {
+        /*n_heads*/ n_q,
+        /*n_kv_heads*/ n_kv,
+        /*head_dim*/ hd,
+        /*n_kv_grp*/ n_q / n_kv,
+        /*n_ctx_orig*/ 0,
+        /*rope_theta*/ hp.llm_rope_theta,
+        /*rope_beta_fast*/ 0.0f,
+        /*rope_beta_slow*/ 0.0f,
+        /*attn_scale*/ 1.0f / std::sqrt((float)hd),
+        /*qk_norm_eps*/ 0.0f,
+        /*gqa_mode*/ core_attn::GQA_MANUAL_NOCONT,
+    };
+
+    for (int il = 0; il < n_layers; il++) {
+        const auto& b = m.llm_layers[il];
+        ggml_tensor* residual = cur;
+
+        cur = ggml_rms_norm(ctx0, cur, hp.llm_norm_eps);
+        cur = ggml_mul(ctx0, cur, b.attn_norm);
+
+        ggml_tensor* attn = core_attn::kv_self_attn(ctx0, gf, cur, b.attn_q, b.attn_k, b.attn_v, b.attn_o,
+                                                    /*q_norm_w*/ nullptr, /*k_norm_w*/ nullptr, positions, causal_mask,
+                                                    ctx->kv_k, ctx->kv_v, il, n_past, kvp);
+        cur = ggml_add(ctx0, residual, attn);
+
+        residual = cur;
+        cur = ggml_rms_norm(ctx0, cur, hp.llm_norm_eps);
+        cur = ggml_mul(ctx0, cur, b.ffn_norm);
+        ggml_tensor* ffn = core_ffn::swiglu(ctx0, cur, b.ffn_gate, b.ffn_up, b.ffn_down);
+        cur = ggml_add(ctx0, residual, ffn);
+    }
+
+    // Final RMSNorm + output_norm → hidden state (FM head input, not logits).
+    cur = ggml_rms_norm(ctx0, cur, hp.llm_norm_eps);
+    cur = ggml_mul(ctx0, cur, m.output_norm);
+    ggml_set_name(cur, "hidden");
+    ggml_set_output(cur);
+    ggml_build_forward_expand(gf, cur);
+    ggml_free(ctx0);
+    return gf;
+}
+
+// Run the LLM over `n_tokens` prompt embeddings starting at `n_past`, writing K/V
+// into the cache. Returns the LAST position's hidden state (dim floats) — the
+// conditioning `h` for the first FM frame. Empty vector on failure.
+static std::vector<float> voxtral_tts_run_llm(voxtral_tts_context* ctx, const float* embeds, int n_tokens, int n_past) {
+    const int d = ctx->hp.llm_dim;
+
+    std::vector<int32_t> positions(n_tokens);
+    for (int i = 0; i < n_tokens; i++)
+        positions[i] = n_past + i;
+
+    std::vector<ggml_fp16_t> mask;
+    if (n_tokens > 1) {
+        const int Lk = n_past + n_tokens;
+        mask.resize((size_t)n_tokens * Lk, ggml_fp32_to_fp16(0.0f));
+        const ggml_fp16_t ninf = ggml_fp32_to_fp16(-INFINITY);
+        for (int q = 0; q < n_tokens; q++)
+            for (int k = 0; k < Lk; k++)
+                if (k > n_past + q)
+                    mask[(size_t)q * Lk + k] = ninf;
+    }
+
+    ggml_cgraph* gf = voxtral_tts_build_graph_llm(ctx, n_past, n_tokens);
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
+        return {};
+
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "inputs_embeds"), embeds, 0,
+                            (size_t)d * n_tokens * sizeof(float));
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "positions"), positions.data(), 0,
+                            positions.size() * sizeof(int32_t));
+    if (n_tokens > 1)
+        ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "causal_mask"), mask.data(), 0,
+                                mask.size() * sizeof(ggml_fp16_t));
+
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS)
+        return {};
+
+    ggml_tensor* h = ggml_graph_get_tensor(gf, "hidden");
+    std::vector<float> out(d);
+    ggml_backend_tensor_get(h, out.data(), (size_t)(n_tokens - 1) * d * sizeof(float), (size_t)d * sizeof(float));
+    return out;
+}
+
+// ---------------------------------------------------------------------------
 // Synthesize (LLM AR + FM ODE + codec decode)
 // ---------------------------------------------------------------------------
 
@@ -701,14 +907,45 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
         fprintf(stderr, "voxtral_tts: voice '%s' (%d frames)\n", voice_name.c_str(), T_voice);
     }
 
-    // TODO: full pipeline implementation
-    // The pipeline is scaffolded but needs Kaggle testing with the actual
-    // model weights to validate. Key stages:
-    //   1. Embed voice frames + text tokens → prompt embeddings
-    //   2. LLM AR decode with KV cache → hidden states per frame
-    //   3. FM ODE per frame (7 Euler steps, CFG α=1.2) → semantic + acoustic codes
-    //   4. Codec decode → 24 kHz PCM
-    fprintf(stderr, "voxtral_tts: synthesis pipeline in progress — convert model on Kaggle first\n");
+    // Step 3: Prompt embeddings = [voice frames] ++ [text token embeddings]
+    int T_prompt = 0;
+    std::vector<float> prompt = voxtral_tts_build_prompt_embeds(ctx, voice_t, text_ids, &T_prompt);
+    if (prompt.empty()) {
+        fprintf(stderr, "voxtral_tts: failed to build prompt embeddings\n");
+        return nullptr;
+    }
+
+    // Step 4: KV cache + LLM prefill → conditioning hidden state for frame 0.
+    // max_ctx budgets the prompt plus up to 2048 generated audio frames (~164 s
+    // at 12.5 Hz), which the AR decode loop (pending) will consume.
+    if (!voxtral_tts_kv_init(ctx, T_prompt + 2048))
+        return nullptr;
+    voxtral_tts_kv_reset(ctx);
+
+    std::vector<float> h0 = voxtral_tts_run_llm(ctx, prompt.data(), T_prompt, /*n_past*/ 0);
+    if (h0.empty()) {
+        fprintf(stderr, "voxtral_tts: LLM prefill failed\n");
+        return nullptr;
+    }
+    ctx->kv_used = T_prompt;
+
+    if (ctx->verbosity >= 1) {
+        double sq = 0.0, amax = 0.0;
+        for (float x : h0) {
+            sq += (double)x * x;
+            amax = std::max(amax, (double)std::fabs(x));
+        }
+        fprintf(stderr, "voxtral_tts: LLM prefill OK — T_prompt=%d, frame0 hidden |h|=%.4f max=%.4f\n", T_prompt,
+                std::sqrt(sq), amax);
+    }
+
+    // TODO(reference-first): FM ODE (semantic + acoustic codes) + codec decode.
+    // These stages require a Kaggle ground-truth reference dump (semantic_codes /
+    // acoustic_codes / generated_audio) so the flow-matching and codec graph math
+    // can be diff-validated per the project's HARD RULES before shipping. The LLM
+    // backbone above is implemented; its frame-0 hidden state is the diff target
+    // for the `llm_hidden_frame0` reference stage.
+    fprintf(stderr, "voxtral_tts: FM ODE + codec decode pending ground-truth reference dump (see PLAN)\n");
     return nullptr;
 }
 
@@ -734,6 +971,8 @@ extern "C" const char* const* voxtral_tts_list_voices(voxtral_tts_context* ctx, 
 extern "C" void voxtral_tts_free(voxtral_tts_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->sched)
+        ggml_backend_sched_free(ctx->sched);
     if (ctx->kv_buf)
         ggml_backend_buffer_free(ctx->kv_buf);
     if (ctx->kv_ctx)
