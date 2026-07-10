@@ -148,7 +148,21 @@ with safe_open(_ad_path, framework="pt") as _f:
     for _ka in _keys:
         _kb = _ka.replace(".lora_A.", ".lora_B.")
         _mod_path = _ka[len("base_model.model."):-len(".lora_A.weight")]
-        _mod = wrapper.model.get_submodule(_mod_path)
+        # The adapter was trained against a flatter nesting for the LLM
+        # part ('thinker.layers.*'); the qwen_asr modeling nests it under
+        # 'thinker.model.layers.*'. Resolve with candidate rewrites.
+        _mod = None
+        for _cand in (_mod_path,
+                      _mod_path.replace("thinker.layers.", "thinker.model.layers.", 1),
+                      _mod_path.replace("thinker.embed_tokens", "thinker.model.embed_tokens", 1)):
+            try:
+                _mod = wrapper.model.get_submodule(_cand)
+                break
+            except AttributeError:
+                continue
+        if _mod is None:
+            print(f"[lora-merge] UNRESOLVED module path: {_mod_path}", flush=True)
+            continue
         _A = _f.get_tensor(_ka).to(torch.float32)
         _B = _f.get_tensor(_kb).to(torch.float32)
         with torch.no_grad():
