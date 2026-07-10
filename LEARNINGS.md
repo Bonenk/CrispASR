@@ -12030,6 +12030,18 @@ Irodori-TTS voice cloning was a stub. Porting the DAC-VAE **encoder** (reference
 The fix was 3 lines of graph plumbing (`attend_speaker` toggle) on top of the whole encoder port. **Lesson:** when a feature is "stubbed", grep the *consumer* for the zeros / always-masked / `TODO` defaults before declaring the port done — the missing model is usually the visible half; the invisible half is the conditioning path that was wired to ignore it. Diagnostic that pinpointed it fast: A/B the output **with vs without** the reference and measure a speaker-similarity proxy (time-averaged DAC-VAE latent cos) — identical outputs (cos 1.0) said "reference not reaching the model", not "encoder wrong". After the fix: 0.08 → 0.65 (vs 0.70 for the repo's own cloned sample).
 
 
+## Python reference dumpers must apply identical audio conditioning as the C++ runtime (kyutai-stt 2.6B, 2026-07-10)
+
+The kyutai-stt 2.6B reference GGUF had a truncated JFK transcript ("ask not what your country can do for you ask what") because the Python dumper fed raw PCM into Mimi without the silence tail + silence prefix the C++ runtime applies. The 2.6B model has `audio_delay=2.5s` + `audio_silence_prefix=1.0s` = 3.5s total lookahead; without appending 56000 samples of silence at 16 kHz before resampling, and prepending 24000 zeros at 24 kHz before Mimi encode, the causal LM can't flush its final pending tokens and the last ~3 words are dropped.
+
+**Lesson:** when writing a new `tools/reference_backends/<name>.py`, trace the C++ pipeline's audio preprocessing line-by-line (resampling, silence padding, normalization) and replicate it exactly. Both sides must see identical conditioned audio for >99% parity. Read the model's `config.json` (especially `stt_config`) for model-specific conditioning parameters.
+
+
+## Issue triage discipline: check the codebase before leaving issues open (2026-07-10)
+
+28 GitHub issues were open despite having fixes on main — some for months. A single triage pass (grep issue numbers in `git log`, verify the fix exists on main, close with a commit reference) reduced open issues from 28 to 8 in one session. **Lesson:** after merging a fix, close the issue immediately with the commit hash. A stale open-issue list misleads contributors and users about the project's actual state. Periodic triage passes (monthly) catch the ones that slip through.
+
+
 ## Any T-sized `ggml_view` into a fixed-length weight table must be bounded by the tensor's real length — long inputs overflow it and abort (indextts, 2026-07-07)
 
 IndexTTS voice cloning aborted in `ggml_view_2d` for a long reference (a 164 s clip). The Conformer conditioning encoder subsamples mel by ~2 (`T_enc = (T_mel-3)/2 + 1`) then views `T_enc` rows out of the fixed 5000-row relative-position table `pe`; a 164 s ref → ~15.4k mel frames → `T_enc≈7700 > 5000`, so the view ran past the tensor and hit `GGML_ASSERT(data_size + view_offs <= ggml_nbytes)`. It had been *introduced* by deleting an earlier length clamp under a "no truncation needed — full reference is used" comment. Fix: read `pe->ne[1]` at runtime and, only when `T_enc` would exceed it, truncate the conditioning mel to the longest length the table supports (`T2 = 2*(pe_len-1)+3` → `T_enc == pe_len`). **Lesson:** a positional/embedding table is a hard cap on sequence length; any view sized by a runtime `T` must clamp to `ne[1]` (or the model's documented max) rather than trusting the input. Short refs stay under the cap, so this class of bug only surfaces on the largest inputs a user throws at it — and a stale "we removed the limit, it's fine now" comment is a reliable place to find one.
