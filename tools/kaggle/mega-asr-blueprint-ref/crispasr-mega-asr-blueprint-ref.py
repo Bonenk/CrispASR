@@ -56,6 +56,12 @@ kh.step("deps.begin")
 # coherent reinstall of a known-good hub as the LAST dep step.
 kh.sh_with_progress("pip install -q 'transformers==4.57.6' qwen_asr peft librosa soundfile")
 kh.sh_with_progress("pip install -q --force-reinstall 'huggingface_hub==0.36.0'")
+# kaggle_harness's progress pushes already imported the PREINSTALLED hub —
+# its module objects (constants, …) stay cached in sys.modules and mix with
+# the 0.36 files imported later (AttributeError on HF_HUB_ENABLE_HF_TRANSFER,
+# seen twice). Purge so transformers/qwen_asr import a coherent 0.36.
+for _m in [k for k in list(sys.modules) if k.startswith("huggingface_hub")]:
+    del sys.modules[_m]
 kh.step("deps.done")
 
 WAV_ZIP = AUDIO_DIR / "t32-145s.wav.zip"
