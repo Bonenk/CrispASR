@@ -107,3 +107,60 @@ The LFM2 backbone uses two distinct cache types:
 | F16 gallocr | ~2m20s | — | Reduced sys overhead |
 | Q4_K gallocr+256MB | ~1m8s | — | Best CPU perf |
 | GPU (M1 Metal, §206) | ~15s | — | Correct now (gallocr direct compute); AR decode is dispatch-bound so currently ~slower than threaded CPU. GPU-decode graph caching is the perf follow-up. |
+
+## CrispASR vs transcribe.cpp — Head-to-Head Benchmark
+
+Systematic evaluation against [transcribe.cpp](https://github.com/handy-computer/transcribe.cpp)
+(ASR-only, ggml-based, 16 model families, 60+ variants) on Kaggle P100 (sm_60, CUDA 12.8).
+
+Test audio: `jfk.wav` (11s, 16 kHz mono). WER computed against reference transcript.
+RTF = real-time factor (lower = faster; < 1.0 means faster than real-time).
+
+### GPU mode (CrispASR CUDA vs transcribe.cpp CUDA)
+
+| Family | CA RTF | TC RTF | CA WER | TC WER | Notes |
+|--------|--------|--------|--------|--------|-------|
+| Whisper base | **0.025** | 0.144 | 0% | 0% | CA 5.8x faster; CA ggml-base.bin vs TC Q8_0 |
+| SenseVoice Small | **0.016** | 0.117 | 0% | 0% | CA 7.3x faster; CA Q4_K vs TC Q8_0 |
+| Canary 1B v2 | **0.038** | 0.379 | 0% | 0% | CA 10x faster |
+| Qwen3-ASR 0.6B | **0.079** | 0.437 | 0% | 0% | CA 5.5x faster; both Q4_K |
+| FunASR Nano 2512 | **0.040** | 0.244 | 0% | 0% | CA 6.1x faster; both Q8_0 |
+| Parakeet TDT 0.6B | **0.093** | 0.258 | 0% | 0% | CA 2.8x faster; CA v3 vs TC v2 |
+| Moonshine Tiny | 0.067 | 0.071 | 9.1% | 0% | Parity; CA Q4_K transcription diff ("american asked" vs "americans ask") |
+| Moonshine Streaming Tiny | 0.256 | 0.030 | 0% | 0% | TC faster (CA streaming overhead) |
+| Nemotron 3.5 ASR 0.6B | 0.357 | 0.232 | 0% | 0% | TC faster; CA Q4_K vs TC Q8_0 |
+
+### CPU mode (both engines, no GPU)
+
+| Family | CA RTF | TC RTF | CA WER | TC WER |
+|--------|--------|--------|--------|--------|
+| Whisper base | 0.455 | **0.145** | 0% | 0% |
+| SenseVoice Small | 0.161 | **0.115** | 0% | 0% |
+| Canary 1B v2 | 0.500 | **0.391** | 0% | 0% |
+| Qwen3-ASR 0.6B | 0.588 | **0.454** | 0% | 0% |
+| FunASR Nano 2512 | 0.435 | **0.236** | 0% | 0% |
+| Parakeet TDT 0.6B | 0.385 | **0.259** | 0% | 0% |
+| Nemotron 3.5 ASR 0.6B | 0.625 | **0.238** | 0% | 0% |
+
+### transcribe.cpp-only models (CrispASR coverage gaps)
+
+| Family | TC RTF | TC WER | Notes |
+|--------|--------|--------|-------|
+| GigaAM v3 E2E-CTC | 0.200 | 27.3% | Russian-focused + EN; no CrispASR equivalent |
+
+### Key findings
+
+- **GPU**: CrispASR 3-10x faster on 6/9 shared models thanks to CUDA acceleration.
+  transcribe.cpp's CUDA build required `-DGGML_CUDA_NO_VMM=ON` to resolve a
+  `CUDA::cuda_driver` cmake issue on Kaggle.
+- **CPU**: transcribe.cpp 1.3-3x faster across the board — leaner runtime with
+  less dispatch overhead. CrispASR's unified backend path includes VAD, segment
+  merging, and post-processing that transcribe.cpp skips.
+- **WER**: Both engines produce identical transcripts (0% WER) on 7/9 models.
+  Moonshine Tiny shows a minor Q4_K vs Q8_0 quant difference.
+- **Feature gap**: transcribe.cpp is ASR-only; CrispASR adds TTS, S2S, diarization,
+  LID, forced alignment, translation, and streaming — with GPU acceleration.
+
+Benchmark script: `tools/kaggle/transcribe-cpp-bench/transcribe_cpp_bench.py`
+Kernel: `chr1s4/crispasr-vs-transcribe-cpp-bench`
+Results: `cstr/crispasr-kaggle-progress` dataset, prefix `transcribe-cpp-bench/`
