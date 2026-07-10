@@ -1836,7 +1836,8 @@ CA_EXPORT int crispasr_get_streamed_token_count() {
 CA_EXPORT const char* crispasr_drain_streamed_tokens(int* out_count) {
     std::lock_guard<std::mutex> lk(g_tok_mutex);
     if (g_streamed_tokens.empty()) {
-        if (out_count) *out_count = 0;
+        if (out_count)
+            *out_count = 0;
         return nullptr;
     }
     // Concatenate all tokens into a single string, separated by null bytes.
@@ -1847,7 +1848,8 @@ CA_EXPORT const char* crispasr_drain_streamed_tokens(int* out_count) {
         buf += t;
         buf += '\0';
     }
-    if (out_count) *out_count = (int)g_streamed_tokens.size();
+    if (out_count)
+        *out_count = (int)g_streamed_tokens.size();
     g_streamed_tokens.clear();
     g_tok_count.store(0, std::memory_order_relaxed);
     return buf.c_str();
@@ -3994,8 +3996,7 @@ CA_EXPORT void crispasr_session_set_segment_callback(crispasr_session* s, crispa
     s->segment_ud = cb ? user_data : nullptr;
 }
 
-CA_EXPORT void crispasr_session_set_token_callback(crispasr_session* s, crispasr_token_callback cb,
-                                                    void* user_data) {
+CA_EXPORT void crispasr_session_set_token_callback(crispasr_session* s, crispasr_token_callback cb, void* user_data) {
     if (!s)
         return;
     s->token_cb = cb ? cb : _default_token_cb;
@@ -5356,11 +5357,14 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             glm_asr_set_beam_size((glm_asr_context*)s->glmasr_ctx, s->beam_size);
         }
         // ask > language instruction > default (mirrors crispasr_backend_glm_asr.cpp).
+        // "en"/"auto" keep the blueprint default transcription prompt —
+        // English is its default behaviour; only explicit non-English hints
+        // inject an instruction.
         if (!s->ask.empty()) {
             glm_asr_set_ask((glm_asr_context*)s->glmasr_ctx, s->ask.c_str());
         } else {
             const std::string eff_lang = lang_set ? lang : s->source_language;
-            if (!eff_lang.empty() && eff_lang != "auto") {
+            if (!eff_lang.empty() && eff_lang != "auto" && eff_lang != "en") {
                 const std::string instr = "Please transcribe in " + ca_iso_to_english_lang(eff_lang) + ".";
                 glm_asr_set_ask((glm_asr_context*)s->glmasr_ctx, instr.c_str());
             } else {

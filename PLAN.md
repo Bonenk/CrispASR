@@ -569,9 +569,13 @@ shouts, collapsed by fix_loops as before. Session ABI inherits everything via
 `CRISPASR_GLM_ASR_LEGACY_PROMPT=1` (old instruction-less scaffold),
 `CRISPASR_GLM_ASR_DEBUG=1` (raw decode dump).
 
-Follow-ups: (1) bake BPE merges into the GGUF + real text tokenizer so
-`--ask`/`--language` instructions actually encode (they currently warn + fall
-back to the default transcription prompt); (2) CAP_UNBOUNDED_INPUT decision —
+Follow-ups: (1) DONE — `tokenizer.ggml.merges` baked into converter + a
+backfill tool (`tools/gguf-add-merges.py`) patched the published GGUFs;
+`glm_asr_tokenize` is now core_bpe byte-level BPE (verified byte-exact vs
+tokenizers-lib for the default/ask/translate/language instructions), the CLI
+skips the language instruction for en/auto (English IS the blueprint default
+prompt's behaviour), and instruction framing matches the verified scaffold
+("\n" + text, no trailing newline); (2) CAP_UNBOUNDED_INPUT decision —
 same posture as qwen3-asr for now (default 30 s chunks, `--chunk-seconds 0`
 opt-in single-pass ≤655 s); (3) the blueprint itself SKIPS quiet leading
 audio in single-pass mode (starts at ~75 s on t32) — chunked mode covers more
