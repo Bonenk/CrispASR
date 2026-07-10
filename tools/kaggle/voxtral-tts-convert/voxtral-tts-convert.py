@@ -54,7 +54,8 @@ kh.init_progress()
 
 # ── Phase 1: Install deps ────────────────────────────────────────────────────
 kh.step("install deps")
-kh.sh_with_progress("pip install -q safetensors sentencepiece gguf huggingface_hub hf_transfer torch --index-url https://download.pytorch.org/whl/cpu")
+kh.sh_with_progress("pip install -q safetensors sentencepiece gguf huggingface_hub hf_transfer")
+kh.sh_with_progress("pip install -q torch --index-url https://download.pytorch.org/whl/cpu")
 
 # ── Phase 2: Resolve HF token ────────────────────────────────────────────────
 kh.step("resolve HF token")
