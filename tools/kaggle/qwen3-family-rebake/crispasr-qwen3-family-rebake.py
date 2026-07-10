@@ -116,6 +116,12 @@ def loop_metrics(text: str) -> dict:
 
 
 def run_cli(model: Path, backend: str, wav: Path, tag: str, extra=None, env_extra=None) -> dict:
+    # NOTE: tags may contain dots (model filenames) — the CLI writes
+    # "<of>.txt" by string append, so read the SAME name back; Path
+    # .with_suffix() would clobber everything after the first dot (v1 bug:
+    # every phase-B validation read a nonexistent file → chars=0 → uploads
+    # skipped despite good transcripts).
+    tag = tag.replace(".gguf", "")
     out_stem = OUT_DIR / tag
     cmd = [str(CRISPASR), "-m", str(model), "--backend", backend, "-f", str(wav),
            "--no-timestamps", "-np", "-otxt", "-of", str(out_stem)] + (extra or [])
@@ -124,7 +130,7 @@ def run_cli(model: Path, backend: str, wav: Path, tag: str, extra=None, env_extr
     env.update(env_extra or {})
     t0 = time.time()
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env=env)
-    txt = out_stem.with_suffix(".txt")
+    txt = Path(str(out_stem) + ".txt")
     text = txt.read_text(errors="replace") if txt.is_file() else ""
     m = {"rc": r.returncode, "wall_s": round(time.time() - t0, 1), **loop_metrics(text)}
     kh.step(f"run.{tag}", **m)
