@@ -119,6 +119,10 @@
 #include "voxtral4b.h"
 #define CA_HAVE_VOXTRAL4B 1
 #endif
+#if __has_include("voxtral_tts.h")
+#include "voxtral_tts.h"
+#define CA_HAVE_VOXTRAL_TTS 1
+#endif
 #if __has_include("wav2vec2-ggml.h")
 #include "wav2vec2-ggml.h"
 #define CA_HAVE_WAV2VEC2 1
@@ -3329,6 +3333,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_VOXTRAL4B
     list += ",voxtral4b";
+#endif
+#ifdef CA_HAVE_VOXTRAL_TTS
+    list += ",voxtral-tts";
 #endif
 #ifdef CA_HAVE_WAV2VEC2
     list += ",wav2vec2";
