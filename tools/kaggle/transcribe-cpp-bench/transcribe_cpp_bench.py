@@ -338,20 +338,19 @@ def download_gguf(url: str, dest: Path, timeout: int = 600) -> bool:
 
 
 def run_crispasr(binary: Path, model: Path, audio: Path, backend: str | None,
-                 timeout: int = 120) -> dict:
+                 timeout: int = 120, no_gpu: bool = False) -> dict:
     """Run crispasr; return {"transcript": str, "infer_s": float, "rtf": float, "ok": bool}.
 
     CrispASR outputs the transcript to stdout and timing info to stderr:
       stderr: "crispasr: transcribed X.Xs audio in Y.YYs (Z.Zx realtime)"
     """
     b_flag = f"--backend {backend}" if backend else ""
+    ng_flag = "-ng" if no_gpu else ""
     t0 = time.time()
     # Run with stdout and stderr separate
-    # Use -ng (no GPU) to force CPU inference — transcribe.cpp also runs CPU
-    # so this gives a fair comparison, and avoids P100 sm_60 CUDA issues.
     try:
         proc = subprocess.run(
-            f'"{binary}" -m "{model}" {b_flag} -ng --auto-download "{audio}"',
+            f'"{binary}" -m "{model}" {b_flag} {ng_flag} --auto-download "{audio}"',
             shell=True, capture_output=True, text=True, timeout=timeout
         )
         ok = proc.returncode == 0
@@ -615,18 +614,22 @@ step("build_transcribecpp.begin")
 _tc_build_log = (WORK / "build_transcribecpp.log").open("a")
 TC_BUILD = TC_DIR / "build"
 
+# Fix CUDA::cuda_driver target resolution on Kaggle: libcuda.so (the driver
+# library) only lives in /usr/local/cuda/lib64/stubs/ — cmake's FindCUDAToolkit
+# won't find it there. Create a symlink in the standard search path.
+if has_gpu:
+    _stub = Path("/usr/local/cuda/lib64/stubs/libcuda.so")
+    _link = Path("/usr/lib/x86_64-linux-gnu/libcuda.so")
+    if _stub.exists() and not _link.exists():
+        subprocess.run(["ln", "-sf", str(_stub), str(_link)])
+        step("build_transcribecpp.cuda_stub_symlink")
+
 _tc_cuda_flags = ["-DTRANSCRIBE_CUDA=ON"] if has_gpu else []
-# Pin the same arch for transcribe.cpp to avoid fat-binary OOM.
-# Also set CMAKE_CUDA_COMPILER explicitly — without it cmake may not create
-# the CUDA::cuda_driver imported target, causing "target not found" at
-# Generate step.  Point at the driver stub so the linker target resolves.
 if has_gpu and _cuda_arch:
     _tc_cuda_flags += [
         f"-DCMAKE_CUDA_ARCHITECTURES={_cuda_arch}",
         "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
         "-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache",
-        # Kaggle P100: libcuda.so lives only in the stubs dir
-        "-DCUDA_DRIVER_LIBRARY=/usr/local/cuda/lib64/stubs/libcuda.so",
     ]
 
 def _cmake_configure_tc(cuda_flags):
@@ -677,12 +680,56 @@ if not JFK_WAV.exists():
 step("audio.ready", file=str(JFK_WAV))
 
 # ─────────────────────────────────────────────────────────────────────────────
-# STEP 5: Run head-to-head benchmark on shared models
+# STEP 5: Run head-to-head benchmark on shared models (GPU + CPU)
 # ─────────────────────────────────────────────────────────────────────────────
 
 MODELS_DIR = WORK / "models"
 MODELS_DIR.mkdir(exist_ok=True)
 results = []
+
+
+def _bench_crispasr(ca_gguf, backend, timeout, no_gpu, label):
+    """Run CrispASR and return a dict of prefixed result keys."""
+    res = run_crispasr(CRISPASR_BIN, ca_gguf, JFK_WAV,
+                       backend=backend, timeout=timeout, no_gpu=no_gpu)
+    norm = normalise(res["transcript"])
+    wer = wer_simple(JFK_REF, norm)
+    rtf = res.get("rtf") or round(res["infer_s"] / JFK_DURATION_S, 3)
+    step(f"bench.ca_{label}_done", ok=res["ok"], rtf=rtf, wer=round(wer, 4),
+         transcript=norm[:80])
+    return {
+        f"ca_{label}_ok": res["ok"],
+        f"ca_{label}_transcript_norm": norm,
+        f"ca_{label}_jfk_wer": round(wer, 4),
+        f"ca_{label}_infer_s": res["infer_s"],
+        f"ca_{label}_rtf": rtf,
+        f"ca_{label}_stderr_tail": res.get("stderr_tail", ""),
+    }
+
+
+def _bench_transcribe_cpp(tc_gguf, timeout, label):
+    """Run transcribe-cli and return a dict of prefixed result keys."""
+    res = run_transcribe_cpp(TC_BIN, tc_gguf, JFK_WAV, timeout=timeout)
+    norm = normalise(res["transcript"])
+    wer = wer_simple(JFK_REF, norm)
+    tc_infer_ms = res["mel_ms"] + res["encode_ms"] + res["decode_ms"]
+    rtf = (round(tc_infer_ms / (JFK_DURATION_S * 1000), 3)
+           if tc_infer_ms > 0 else round(res["infer_s"] / JFK_DURATION_S, 3))
+    step(f"bench.tc_{label}_done", ok=res["ok"], rtf=rtf, wer=round(wer, 4),
+         transcript=norm[:80])
+    return {
+        f"tc_{label}_ok": res["ok"],
+        f"tc_{label}_transcript_norm": norm,
+        f"tc_{label}_jfk_wer": round(wer, 4),
+        f"tc_{label}_infer_s": res["infer_s"],
+        f"tc_{label}_rtf": rtf,
+        f"tc_{label}_mel_ms": res["mel_ms"],
+        f"tc_{label}_encode_ms": res["encode_ms"],
+        f"tc_{label}_decode_ms": res["decode_ms"],
+        f"tc_{label}_load_ms": res["load_ms"],
+        f"tc_{label}_stderr_tail": res.get("stderr_tail", ""),
+    }
+
 
 for m in SHARED_MODELS:
     fam = m["family"]
@@ -694,7 +741,6 @@ for m in SHARED_MODELS:
     ca_gguf = MODELS_DIR / m["ca_file"]
     tc_gguf = MODELS_DIR / m["tc_file"]
 
-    # Download both GGUFs
     ca_dl = download_gguf(m["ca_url"], ca_gguf, timeout=600)
     tc_dl = download_gguf(m["tc_url"], tc_gguf, timeout=600)
 
@@ -707,78 +753,44 @@ for m in SHARED_MODELS:
         "tc_model": m["tc_file"],
     }
 
-    # ── CrispASR inference ──────────────────────────────────────────────
+    # ── GPU runs ────────────────────────────────────────────────────────
     if ca_dl:
-        ca_res = run_crispasr(
-            CRISPASR_BIN, ca_gguf, JFK_WAV,
-            backend=m["ca_backend"],
-            timeout=m["timeout_s"],
-        )
-        ca_norm = normalise(ca_res["transcript"])
-        ca_wer = wer_simple(JFK_REF, ca_norm)
-        # Prefer RTF from CrispASR stderr (inference-only) over wall-clock
-        ca_rtf = ca_res.get("rtf") or round(ca_res["infer_s"] / JFK_DURATION_S, 3)
-        row.update({
-            "ca_ok": ca_res["ok"],
-            "ca_transcript": ca_res["transcript"],
-            "ca_transcript_norm": ca_norm,
-            "ca_jfk_wer": round(ca_wer, 4),
-            "ca_infer_s": ca_res["infer_s"],
-            "ca_rtf": ca_rtf,
-            "ca_stderr_tail": ca_res.get("stderr_tail", ""),
-        })
-        step(f"bench.ca_done", family=fam, ok=ca_res["ok"],
-             rtf=ca_rtf, wer=row["ca_jfk_wer"],
-             transcript=ca_norm[:80])
-    else:
-        row.update({"ca_ok": False, "ca_transcript": "", "ca_jfk_wer": None,
-                    "ca_infer_s": None, "ca_rtf": None})
-        step(f"bench.ca_download_failed", family=fam)
-
-    # ── transcribe.cpp inference ────────────────────────────────────────
+        row.update(_bench_crispasr(ca_gguf, m["ca_backend"], m["timeout_s"],
+                                   no_gpu=False, label="gpu"))
     if tc_dl:
-        tc_res = run_transcribe_cpp(
-            TC_BIN, tc_gguf, JFK_WAV, timeout=m["timeout_s"]
-        )
-        tc_norm = normalise(tc_res["transcript"])
-        tc_wer = wer_simple(JFK_REF, tc_norm)
-        # RTF from t.cpp detailed timing (mel+encode+decode) is more accurate than wall-clock
-        tc_infer_ms = tc_res["mel_ms"] + tc_res["encode_ms"] + tc_res["decode_ms"]
-        tc_rtf = (round(tc_infer_ms / (JFK_DURATION_S * 1000), 3)
-                  if tc_infer_ms > 0 else round(tc_res["infer_s"] / JFK_DURATION_S, 3))
-        row.update({
-            "tc_ok": tc_res["ok"],
-            "tc_transcript": tc_res["transcript"],
-            "tc_transcript_norm": tc_norm,
-            "tc_jfk_wer": round(tc_wer, 4),
-            "tc_infer_s": tc_res["infer_s"],
-            "tc_rtf": tc_rtf,
-            "tc_mel_ms": tc_res["mel_ms"],
-            "tc_encode_ms": tc_res["encode_ms"],
-            "tc_decode_ms": tc_res["decode_ms"],
-            "tc_load_ms": tc_res["load_ms"],
-            "tc_stderr_tail": tc_res.get("stderr_tail", ""),
-        })
-        step(f"bench.tc_done", family=fam, ok=tc_res["ok"],
-             rtf=tc_rtf, wer=row["tc_jfk_wer"],
-             transcript=tc_norm[:80])
-    else:
-        row.update({"tc_ok": False, "tc_transcript": "", "tc_jfk_wer": None,
-                    "tc_infer_s": None, "tc_rtf": None})
-        step(f"bench.tc_download_failed", family=fam)
+        row.update(_bench_transcribe_cpp(tc_gguf, m["timeout_s"], label="gpu"))
+
+    # ── CPU runs (-ng / no CUDA) ────────────────────────────────────────
+    if ca_dl:
+        row.update(_bench_crispasr(ca_gguf, m["ca_backend"], m["timeout_s"],
+                                   no_gpu=True, label="cpu"))
+    if tc_dl:
+        # transcribe.cpp: set CUDA_VISIBLE_DEVICES="" to force CPU
+        _old_cvd = os.environ.get("CUDA_VISIBLE_DEVICES")
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
+        row.update(_bench_transcribe_cpp(tc_gguf, m["timeout_s"], label="cpu"))
+        if _old_cvd is not None:
+            os.environ["CUDA_VISIBLE_DEVICES"] = _old_cvd
+        else:
+            os.environ.pop("CUDA_VISIBLE_DEVICES", None)
 
     # ── Print side-by-side comparison ──────────────────────────────────
     print(f"\n{'='*72}")
     print(f"  {fam}")
     print(f"  Reference: {JFK_REF}")
-    print(f"  CrispASR : {row.get('ca_transcript_norm', '(failed)')}  [RTF={row.get('ca_rtf')}, WER={row.get('ca_jfk_wer')}]")
-    print(f"  t.cpp    : {row.get('tc_transcript_norm', '(failed)')}  [RTF={row.get('tc_rtf')}, WER={row.get('tc_jfk_wer')}]")
+    for mode in ["gpu", "cpu"]:
+        ca_r = row.get(f"ca_{mode}_rtf")
+        tc_r = row.get(f"tc_{mode}_rtf")
+        ca_w = row.get(f"ca_{mode}_jfk_wer")
+        tc_w = row.get(f"tc_{mode}_jfk_wer")
+        ca_s = f"RTF={ca_r:.3f} WER={ca_w*100:.0f}%" if ca_r is not None else "FAIL"
+        tc_s = f"RTF={tc_r:.3f} WER={tc_w*100:.0f}%" if tc_r is not None else "FAIL"
+        print(f"  [{mode.upper()}] CA: {ca_s}  |  TC: {tc_s}")
     print(f"{'='*72}\n", flush=True)
 
     results.append(row)
     sweep_publish(f"shared__{fam.replace(' ', '_')}", row)
 
-    # Clean up both GGUFs to reclaim disk space
     ca_gguf.unlink(missing_ok=True)
     tc_gguf.unlink(missing_ok=True)
     step(f"bench.cleanup", family=fam)
@@ -828,21 +840,21 @@ for m in TC_ONLY_MODELS:
 # ─────────────────────────────────────────────────────────────────────────────
 # STEP 7: Print final summary
 # ─────────────────────────────────────────────────────────────────────────────
-print("\n" + "=" * 80)
+print("\n" + "=" * 95)
 print("BENCHMARK SUMMARY — CrispASR vs transcribe.cpp")
-print(f"GPU: {_cuda_arch or 'CPU only'}  | Branch: {CRISPASR_BRANCH}")
-print("=" * 80)
-print(f"{'Family':<32} {'CA RTF':>8} {'TC RTF':>8} {'CA WER':>8} {'TC WER':>8}  CA  TC")
-print("-" * 80)
-for row in results:
-    ca_rtf = f"{row.get('ca_rtf', ''):.3f}" if row.get("ca_rtf") is not None else "FAIL"
-    tc_rtf = f"{row.get('tc_rtf', ''):.3f}" if row.get("tc_rtf") is not None else "FAIL"
-    ca_wer = f"{row.get('ca_jfk_wer', 0)*100:.1f}%" if row.get("ca_jfk_wer") is not None else "FAIL"
-    tc_wer = f"{row.get('tc_jfk_wer', 0)*100:.1f}%" if row.get("tc_jfk_wer") is not None else "FAIL"
-    ca_ok = "✓" if row.get("ca_ok") else "✗"
-    tc_ok = "✓" if row.get("tc_ok") else "✗"
-    print(f"{row['family']:<32} {ca_rtf:>8} {tc_rtf:>8} {ca_wer:>8} {tc_wer:>8}  {ca_ok}   {tc_ok}")
-print("=" * 80)
+print(f"CUDA arch: {_cuda_arch or 'N/A'}  | Branch: {CRISPASR_BRANCH}")
+print("=" * 95)
+for mode in ["gpu", "cpu"]:
+    print(f"\n  [{mode.upper()} mode]")
+    print(f"  {'Family':<32} {'CA RTF':>8} {'TC RTF':>8} {'CA WER':>8} {'TC WER':>8}")
+    print(f"  {'-'*72}")
+    for row in results:
+        ca_rtf = f"{row.get(f'ca_{mode}_rtf', ''):.3f}" if row.get(f"ca_{mode}_rtf") is not None else "FAIL"
+        tc_rtf = f"{row.get(f'tc_{mode}_rtf', ''):.3f}" if row.get(f"tc_{mode}_rtf") is not None else "FAIL"
+        ca_wer = f"{row.get(f'ca_{mode}_jfk_wer', 0)*100:.1f}%" if row.get(f"ca_{mode}_jfk_wer") is not None else "FAIL"
+        tc_wer = f"{row.get(f'tc_{mode}_jfk_wer', 0)*100:.1f}%" if row.get(f"tc_{mode}_jfk_wer") is not None else "FAIL"
+        print(f"  {row['family']:<32} {ca_rtf:>8} {tc_rtf:>8} {ca_wer:>8} {tc_wer:>8}")
+print("=" * 95)
 
 if tc_only_results:
     print("\ntranscribe.cpp-only models (CrispASR coverage gaps):")
