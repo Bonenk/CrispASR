@@ -74,6 +74,7 @@
 #include "moss_transcribe.h"
 #include "lfm2_audio.h"
 #include "mini_omni2.h"
+#include "kyutai_stt.h"
 #include "nemotron.h"
 #include "tada_codec.h"
 #include "tada_encoder.h"
@@ -1047,7 +1048,7 @@ int main(int argc, char** argv) {
                 "granite-4.1, "
                 "granite-nle, parakeet, chatterbox, voxcpm2-tts, "
                 "canary, cohere, gemma4, mimo-tokenizer, mimo-asr, orpheus, moonshine, moonshine-streaming, "
-                "parler-tts, moss-audio\n"
+                "kyutai-stt, parler-tts, moss-audio\n"
                 "  model.gguf    crispasr-compatible model weights\n"
                 "  reference.gguf  archive produced by tools/dump_reference.py\n"
                 "  audio.wav     16 kHz mono WAV\n",
@@ -6801,6 +6802,86 @@ int main(int argc, char** argv) {
 
         mini_omni2_free(ctx);
 
+    } else if (backend_name == "kyutai-stt") {
+        // kyutai/stt-1b-en_fr and kyutai/stt-2.6b-en.
+        // Python reference: tools/reference_backends/kyutai_stt.py
+        // Stages: seanet_output, enc_tfm_output, downsampled, rvq_codes,
+        //         lm_frame0_logits, generated_text.
+        // The reference GGUF for 2.6B is hosted on HF:
+        //   cstr/kyutai-stt-2.6b-en-GGUF / kyutai-stt-2.6b-ref.gguf
+        auto cp = kyutai_stt_context_default_params();
+        cp.n_threads = 4;
+        cp.verbosity = 0;
+        kyutai_stt_context* ctx = kyutai_stt_init_from_file(model_path.c_str(), cp);
+        if (!ctx) {
+            fprintf(stderr, "failed to load kyutai-stt model '%s'\n", model_path.c_str());
+            return 4;
+        }
+
+        // Append silence tail so the LM flushes all pending tokens.
+        const float lookahead_s = kyutai_stt_total_lookahead_seconds(ctx);
+        const int tail_n = std::max(8000, (int)(lookahead_s * 16000.0f));
+        std::vector<float> samples_tail(samples);
+        samples_tail.resize(samples_tail.size() + (size_t)tail_n, 0.0f);
+
+        // Full transcription.
+        kyutai_stt_result_ex* r = kyutai_stt_transcribe_ex(ctx, samples_tail.data(), (int)samples_tail.size(), 0);
+
+        if (r && r->text && *r->text) {
+            printf("[INFO] transcript (C++)    : %s\n", r->text);
+        } else {
+            printf("[WARN] kyutai-stt returned empty transcript\n");
+        }
+
+        // Compare transcript against Python reference (stored as GGUF metadata).
+        {
+            std::string ref_text = ref.meta("generated_text");
+            std::string cpp_text = (r && r->text) ? r->text : "";
+            // Trim leading/trailing whitespace for comparison.
+            auto trim = [](std::string s) {
+                while (!s.empty() && (s.front() == ' ' || s.front() == '\n'))
+                    s.erase(s.begin());
+                while (!s.empty() && (s.back() == ' ' || s.back() == '\n'))
+                    s.pop_back();
+                return s;
+            };
+            ref_text = trim(ref_text);
+            cpp_text = trim(cpp_text);
+            if (!ref_text.empty()) {
+                printf("[INFO] transcript (Python) : %s\n", ref_text.c_str());
+                bool match = (cpp_text == ref_text);
+                printf("[%s ] generated_text          (exact-match=%s)\n", match ? "PASS" : "DIFF",
+                       match ? "yes" : "no");
+                if (match)
+                    n_pass++;
+                else
+                    n_fail++;
+            }
+        }
+
+        // Stage: seanet_output — SEANet CNN output (512, T_enc).
+        // TODO: expose kyutai_stt_run_encoder() stage API for element-wise diff.
+        if (ref.has("seanet_output")) {
+            printf("[SKIP] seanet_output           (stage API pending — transcript-only regression)\n");
+            n_skip++;
+        }
+        if (ref.has("enc_tfm_output")) {
+            printf("[SKIP] enc_tfm_output          (stage API pending)\n");
+            n_skip++;
+        }
+        if (ref.has("rvq_codes")) {
+            printf("[SKIP] rvq_codes               (stage API pending)\n");
+            n_skip++;
+        }
+        if (ref.has("lm_frame0_logits")) {
+            printf("[SKIP] lm_frame0_logits        (stage API pending)\n");
+            n_skip++;
+        }
+
+        if (r)
+            kyutai_stt_result_ex_free(r);
+        kyutai_stt_free(ctx);
+
     } else if (backend_name == "nemotron") {
         // Nemotron-3.5-ASR-Streaming: Cache-Aware FastConformer + RNN-T.
         // Compare mel, pre-encode, and encoder output against NeMo reference.
@@ -6911,7 +6992,7 @@ int main(int argc, char** argv) {
                 "granite-4.1, granite-nle, parakeet, canary, canary-qwen, cohere, gemma4, mimo-tokenizer, mimo-asr, "
                 "orpheus, moonshine, moonshine-streaming, lid-cld3, glm-asr, firered-asr, voxcpm2-tts, funasr, "
                 "paraformer, sensevoice, cosyvoice3-tts, melotts, parler-tts, moss-audio, kugelaudio, zonos-tts, "
-                "lfm2-audio, mini-omni2, nemotron.\n",
+                "lfm2-audio, mini-omni2, nemotron, kyutai-stt.\n",
                 backend_name.c_str());
         return 5;
     }

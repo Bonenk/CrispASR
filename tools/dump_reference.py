@@ -300,6 +300,11 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # Text from IRODORI_TEST_TEXT env (default "こんにちは、世界。").
     # Captures text_state, cond_embed, dit_block_0, v_pred_step0.
     "irodori-tts": "reference_backends.irodori_tts",
+    # kyutai/stt-1b-en_fr and kyutai/stt-2.6b-en.
+    # Captures: pcm_24k, seanet_output, enc_tfm_output, downsampled,
+    # rvq_codes, lm_frame0_logits, generated_text.
+    # Requires: safetensors sentencepiece scipy moshi
+    "kyutai-stt":  "reference_backends.kyutai_stt",
 }
 
 DEFAULT_STAGES_BY_BACKEND: Dict[str, List[str]] = {}  # populated at import
