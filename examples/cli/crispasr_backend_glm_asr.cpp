@@ -70,10 +70,16 @@ public:
         if (!ctx_)
             return out;
 
-        // Propagate ask / language instruction to the C library.
+        // Propagate ask / language instruction to the C library. "en" (the
+        // CLI default) and "auto" use the blueprint's default transcription
+        // prompt — a language instruction is only injected for an explicit
+        // non-English hint (English IS the default prompt's behaviour;
+        // silently replacing the blueprint prompt on every run would be
+        // off-distribution).
         if (!params.ask.empty()) {
             glm_asr_set_ask(ctx_, params.ask.c_str());
-        } else if (!params.language.empty() && params.language != "auto" && !params.translate) {
+        } else if (!params.language.empty() && params.language != "auto" && params.language != "en" &&
+                   !params.translate) {
             const std::string instr = "Please transcribe in " + crispasr_iso_to_english_lang(params.language) + ".";
             glm_asr_set_ask(ctx_, instr.c_str());
         } else {
@@ -236,13 +242,13 @@ public:
         {
             std::string instr;
             if (!params.ask.empty()) {
-                instr = "\n" + params.ask + "\n";
+                instr = "\n" + params.ask;
             } else if (!tgt_lang_.empty()) {
                 char buf[256];
-                snprintf(buf, sizeof(buf), "\nPlease translate the speech to %s.\n", tgt_lang_.c_str());
+                snprintf(buf, sizeof(buf), "\nPlease translate the speech to %s.", tgt_lang_.c_str());
                 instr = buf;
-            } else if (!params.language.empty() && params.language != "auto") {
-                instr = "\nPlease transcribe in " + crispasr_iso_to_english_lang(params.language) + ".\n";
+            } else if (!params.language.empty() && params.language != "auto" && params.language != "en") {
+                instr = "\nPlease transcribe in " + crispasr_iso_to_english_lang(params.language) + ".";
             }
             bool emitted = false;
             if (!instr.empty()) {

@@ -35,7 +35,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <unordered_map>
 #include <vector>
+
+#include "core/bpe.h"
 
 // ===========================================================================
 // Bench instrumentation — `GLM_ASR_BENCH=1` for per-stage timings.
@@ -156,8 +159,13 @@ struct glm_asr_model {
         std::vector<glm_llm_block> blocks;
     } llm;
 
-    // Tokenizer
+    // Tokenizer. token_to_id/merge_rank power the byte-level BPE encoder
+    // (core_bpe); merge_rank is populated only when the GGUF carries
+    // `tokenizer.ggml.merges` — older GGUFs fall back to the specials-only
+    // encoder (and the callers' default-instruction fallback).
     std::vector<std::string> vocab;
+    std::unordered_map<std::string, int32_t> token_to_id;
+    std::unordered_map<std::string, int32_t> merge_rank;
 
     // GGUF context (owns the weight memory)
     ggml_context* ctx = nullptr;
@@ -313,9 +321,18 @@ extern "C" struct glm_asr_context* glm_asr_init_from_file(const char* path_model
             const int n = gguf_get_arr_n(gctx, tok_key);
             for (int i = 0; i < n && i < hp.llm_vocab; i++) {
                 const char* s = gguf_get_arr_str(gctx, tok_key, i);
-                if (s)
+                if (s) {
                     m.vocab[i] = s;
+                    m.token_to_id.emplace(m.vocab[i], i);
+                }
             }
+        }
+        // BPE merges (present in GGUFs patched/converted after 2026-07-10;
+        // absent → glm_asr_tokenize stays specials-only).
+        {
+            auto merges = core_gguf::kv_str_array(gctx, "tokenizer.ggml.merges");
+            for (int i = 0; i < (int)merges.size(); i++)
+                m.merge_rank[merges[i]] = i;
         }
 
         gguf_free(gctx);
@@ -502,46 +519,79 @@ extern "C" const char* glm_asr_token_text(struct glm_asr_context* ctx, int id) {
 }
 
 extern "C" int32_t* glm_asr_tokenize(struct glm_asr_context* ctx, const char* text, int* out_n_tokens) {
-    // Simple tokenizer: look up each known special token, then byte-fallback.
-    // For a production implementation, this would use the full tokenizer.
+    // Byte-level BPE (GPT-2 family) + special-token scan, mirroring
+    // qwen3_asr_tokenize. Needs `tokenizer.ggml.merges` in the GGUF; on
+    // older GGUFs without merges only special tokens encode (plain text is
+    // dropped) and callers fall back to the baked default instruction.
     if (!ctx || !text || !out_n_tokens)
         return nullptr;
 
+    const auto& m = ctx->model;
     std::vector<int32_t> ids;
-    std::string s(text);
+    const std::string s(text);
 
-    // Map special tokens
-    struct {
-        const char* text;
-        int id;
-    } specials[] = {
-        {"<|begin_of_audio|>", 59261},
-        {"<|end_of_audio|>", 59262},
-        {"<|pad|>", 59260},
-        {"<|user|>", 59253},
-        {"<|assistant|>", 59254},
-        {"<|system|>", 59252},
-        {"<|endoftext|>", 59246},
-        {"\n", -1}, // handled below
+    // Match a special token at `pos`: "<|...|>" form. Only exact vocab
+    // entries match — a literal '<' in user text is unaffected.
+    auto match_special = [&](size_t pos, int32_t& id) -> size_t {
+        if (s[pos] != '<' || pos + 1 >= s.size() || s[pos + 1] != '|')
+            return 0;
+        const size_t close = s.find("|>", pos + 2);
+        if (close == std::string::npos)
+            return 0;
+        const size_t len = close + 2 - pos;
+        auto it = m.token_to_id.find(s.substr(pos, len));
+        if (it == m.token_to_id.end())
+            return 0;
+        id = it->second;
+        return len;
     };
 
-    size_t pos = 0;
-    while (pos < s.size()) {
-        bool found = false;
-        for (const auto& sp : specials) {
-            size_t len = strlen(sp.text);
-            if (s.compare(pos, len, sp.text) == 0) {
-                if (sp.id >= 0)
-                    ids.push_back(sp.id);
-                pos += len;
-                found = true;
-                break;
+    size_t i = 0;
+    while (i < s.size()) {
+        // 1. Special token
+        {
+            int32_t sp_id = 0;
+            const size_t sp_len = match_special(i, sp_id);
+            if (sp_len > 0) {
+                ids.push_back(sp_id);
+                i += sp_len;
+                continue;
             }
         }
-        if (!found) {
-            // Byte fallback — find the vocab entry for this character/substring
-            // For now, skip unknown bytes
-            pos++;
+
+        // 2. Plain-text segment up to the next recognized special token.
+        size_t j = i;
+        if (s[j] == '<')
+            j++; // always advance past a failed lookalike
+        while (j < s.size()) {
+            if (s[j] == '<') {
+                int32_t sp_id = 0;
+                if (match_special(j, sp_id) > 0)
+                    break;
+            }
+            j++;
+        }
+        std::string chunk = s.substr(i, j - i);
+        i = j;
+        if (chunk.empty())
+            continue;
+        if (m.merge_rank.empty())
+            continue; // no merges in this GGUF — plain text not encodable
+
+        // 3. Whitespace-boundary pre-split (leading space attaches to the
+        //    following word, GPT-2 convention), then byte-encode + BPE.
+        size_t k = 0;
+        while (k < chunk.size()) {
+            const size_t start = k;
+            if (chunk[k] == ' ' || chunk[k] == '\t' || chunk[k] == '\n')
+                k++;
+            while (k < chunk.size() && chunk[k] != ' ' && chunk[k] != '\t' && chunk[k] != '\n')
+                k++;
+            if (k == start)
+                k++;
+            const std::string pre(chunk, start, k - start);
+            const std::string encoded = core_bpe::bytes_to_unicode(pre.data(), pre.size());
+            core_bpe::bpe_one(m.token_to_id, m.merge_rank, encoded, ids);
         }
     }
 
@@ -702,12 +752,15 @@ static char* glm_asr_transcribe_impl(struct glm_asr_context* ctx, const float* s
     // Instruction: custom ask, translate, or the blueprint default.
     {
         std::string instr_str;
+        // Blueprint framing: "\n" + instruction, NO trailing newline (the
+        // verified scaffold puts <|assistant|> directly after the last
+        // instruction token).
         if (!ctx->ask.empty()) {
-            instr_str = "\n" + ctx->ask + "\n";
+            instr_str = "\n" + ctx->ask;
         } else if (ctx->params.translate) {
             const char* tgt = ctx->params.target_lang ? ctx->params.target_lang : "English";
             char buf[256];
-            snprintf(buf, sizeof(buf), "\nPlease translate the speech to %s.\n", tgt);
+            snprintf(buf, sizeof(buf), "\nPlease translate the speech to %s.", tgt);
             instr_str = buf;
         }
         bool instr_emitted = false;
@@ -896,7 +949,10 @@ static char* glm_asr_transcribe_impl(struct glm_asr_context* ctx, const float* s
     // CRISPASR_GLM_ASR_DEBUG=1: dump the raw decode before any framing strip
     // (first/last generated ids + text) — decode-path diagnosis.
     if (const char* dbg = getenv("CRISPASR_GLM_ASR_DEBUG"); dbg && atoi(dbg) != 0) {
-        fprintf(stderr, "glm_asr[debug]: prompt=%d tokens (N_enc=%d), generated=%zu ids:", (int)ids.size(), N_enc,
+        fprintf(stderr, "glm_asr[debug]: prompt tail ids:");
+        for (size_t ti = ids.size() > 20 ? ids.size() - 20 : 0; ti < ids.size(); ti++)
+            fprintf(stderr, " %d", ids[ti]);
+        fprintf(stderr, "\nglm_asr[debug]: prompt=%d tokens (N_enc=%d), generated=%zu ids:", (int)ids.size(), N_enc,
                 gen_ids.size());
         for (size_t i = 0; i < gen_ids.size() && i < 24; i++)
             fprintf(stderr, " %d", gen_ids[i]);
