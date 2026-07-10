@@ -351,7 +351,7 @@ def run_crispasr(binary: Path, model: Path, audio: Path, backend: str | None,
     # so this gives a fair comparison, and avoids P100 sm_60 CUDA issues.
     try:
         proc = subprocess.run(
-            f'"{binary}" -m "{model}" {b_flag} -ng "{audio}"',
+            f'"{binary}" -m "{model}" {b_flag} -ng --auto-download "{audio}"',
             shell=True, capture_output=True, text=True, timeout=timeout
         )
         ok = proc.returncode == 0
