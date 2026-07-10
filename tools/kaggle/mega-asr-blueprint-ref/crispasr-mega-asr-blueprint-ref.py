@@ -132,12 +132,31 @@ results["base_auto"] = run_config("base_auto", wrapper, None)
 results["base_english"] = run_config("base_english", wrapper, "English")
 
 kh.step("lora.merge.begin")
-from peft import PeftModel  # noqa: E402
-wrapper.model = PeftModel.from_pretrained(
-    wrapper.model, "zhifeixie/Mega-ASR", subfolder="mega-asr-merged")
-wrapper.model = wrapper.model.merge_and_unload()
+# The adapter declares target_modules='.*' (peft chokes wrapping container
+# modules) with keys rooted at 'base_model.model.<module path>'. Merge by
+# hand: W += (alpha/r) * B @ A ; r=24, alpha=24 -> scale 1.0.
+from huggingface_hub import hf_hub_download  # noqa: E402
+from safetensors import safe_open  # noqa: E402
+
+_ad_cfg = json.load(open(hf_hub_download(
+    "zhifeixie/Mega-ASR", "mega-asr-merged/adapter_config.json")))
+_scale = _ad_cfg["lora_alpha"] / _ad_cfg["r"]
+_ad_path = hf_hub_download("zhifeixie/Mega-ASR", "mega-asr-merged/adapter_model.safetensors")
+_merged = 0
+with safe_open(_ad_path, framework="pt") as _f:
+    _keys = [k for k in _f.keys() if k.endswith(".lora_A.weight")]
+    for _ka in _keys:
+        _kb = _ka.replace(".lora_A.", ".lora_B.")
+        _mod_path = _ka[len("base_model.model."):-len(".lora_A.weight")]
+        _mod = wrapper.model.get_submodule(_mod_path)
+        _A = _f.get_tensor(_ka).to(torch.float32)
+        _B = _f.get_tensor(_kb).to(torch.float32)
+        with torch.no_grad():
+            _w = _mod.weight
+            _w += (_scale * (_B @ _A)).to(_w.dtype).to(_w.device)
+        _merged += 1
 wrapper.model.eval()
-kh.step("lora.merge.done")
+kh.step("lora.merge.done", merged_pairs=_merged, scale=_scale)
 results["mega_auto"] = run_config("mega_auto", wrapper, None)
 results["mega_english"] = run_config("mega_english", wrapper, "English")
 
