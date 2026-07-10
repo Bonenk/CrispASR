@@ -256,6 +256,41 @@ bool crispasr_words_have_positive_span(const std::vector<crispasr_word>& words) 
     return !words.empty() && words.back().t1 > words.front().t0;
 }
 
+// True if any segment carries a non-whitespace character (i.e. real text).
+// Bytes <= 0x20 are ASCII whitespace/control; UTF-8 continuation/lead bytes
+// are >= 0x80, so this also counts non-Latin scripts as text.
+static bool crispasr_segs_have_text(const std::vector<crispasr_segment>& segs) {
+    for (const auto& s : segs) {
+        for (unsigned char c : s.text) {
+            if (c > 0x20)
+                return true;
+        }
+    }
+    return false;
+}
+
+// Silent-failure guard (issue #240). A degenerate / over-quantized model can
+// emit an empty transcript for clearly non-silent audio while still reporting
+// a successful run; in scripted / embedding contexts (e.g. SubtitleEdit) that
+// is indistinguishable from success. Emit a stderr warning so the empty output
+// is at least visible. Gated by !no_prints (same as the timing line), and by a
+// peak-amplitude silence gate so genuinely silent input never warns.
+static void crispasr_warn_if_empty_transcript(bool have_text, const std::vector<float>& samples, double audio_s,
+                                              const whisper_params& params) {
+    if (params.no_prints || have_text || audio_s < 0.5)
+        return;
+    float peak = 0.0f;
+    for (float v : samples)
+        peak = std::fmax(peak, std::fabs(v));
+    if (peak < 0.01f) // ~ -40 dBFS: treat as silence, no speech expected
+        return;
+    fprintf(stderr,
+            "crispasr: WARNING: no text produced for %.1fs of non-silent audio (peak %.2f). "
+            "Possible causes: the audio has no speech, an unsupported language, or an "
+            "over-quantized model (try a q8_0/f16 build).\n",
+            audio_s, (double)peak);
+}
+
 // Stdout serialization mutex. Used by the parallel-processors path to
 // keep stdout transcript lines from interleaving across worker threads.
 // The single-threaded path acquires it too — no measurable cost since
@@ -653,6 +688,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                 fprintf(stderr, "crispasr: transcribed %.1fs audio in %.2fs (%.1fx realtime)\n", audio_s, t_total,
                         audio_s / std::max(t_total, 0.001));
             }
+            crispasr_warn_if_empty_transcript(crispasr_segs_have_text(all_segs), samples, audio_s, params);
             std::lock_guard<std::mutex> lock(g_stdout_mutex);
             crispasr_print_stdout(disp, show_timestamps);
             if (params.show_alternatives)
@@ -1033,7 +1069,8 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     } else if (params.flush_after > 0 && slices.size() > 1) {
         // Progressive mode: process slices sequentially, flush output after each.
         // This gives media players SRT entries as soon as each VAD segment is done.
-        int srt_index = 1; // running SRT entry counter
+        int srt_index = 1;                 // running SRT entry counter
+        bool progressive_any_text = false; // issue #240 silent-failure guard
         const bool show_ts = !params.no_timestamps && (params.output_srt || params.output_vtt || params.max_len > 0 ||
                                                        params.print_colors || params.diarize);
         for (size_t i = 0; i < slices.size(); i++) {
@@ -1056,6 +1093,12 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
 
             // Print SRT entries progressively to stdout
             for (const auto& d : disp) {
+                for (unsigned char c : d.text) {
+                    if (c > 0x20) {
+                        progressive_any_text = true;
+                        break;
+                    }
+                }
                 if (params.output_srt) {
                     int t0_ms = (int)(d.t0 * 10);
                     int t1_ms = (int)(d.t1 * 10);
@@ -1085,6 +1128,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                 fprintf(stderr, "crispasr: transcribed %.1fs audio in %.2fs (%.1fx realtime)\n", audio_s, t_total,
                         audio_s / t_total);
             }
+            crispasr_warn_if_empty_transcript(progressive_any_text, samples, audio_s, params);
         }
 
         // Write output files (full set, from all slices combined)
@@ -1207,6 +1251,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             fprintf(stderr, "crispasr: transcribed %.1fs audio in %.2fs (%.1fx realtime)\n", audio_s, t_total,
                     audio_s / std::max(t_total, 0.001));
         }
+        crispasr_warn_if_empty_transcript(crispasr_segs_have_text(all_segs), samples, audio_s, params);
 
         // Serialize stdout across parallel workers so multi-file
         // transcripts don't interleave line-by-line.
