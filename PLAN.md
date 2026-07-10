@@ -636,12 +636,21 @@ Everything user-facing from the #218 investigation is fixed and shipped
 (qwen3-asr 0.6b + ja-anime GGUFs rebaked on HF, glm-asr merges + multi-window
 landed, CUDA-validated). Deliberately-open threads, in priority order:
 
-1. **mega-asr long-form vs its Python blueprint.** mega still emits
-   "come on"-cycle loops on the un-chunked 145 s clip even with the Q8_0
-   audio tower (all 4-bit variants; kernel-verified). Unknown whether the
-   bf16 upstream does the same — run the blueprint (glm-blueprint-ref kernel
-   pattern) before touching anything; until then `--chunk-seconds 0` is
-   unsupported for mega at 4-bit (default 30 s chunking unaffected).
+1. **mega-asr long-form vs its Python blueprint — RESOLVED (2026-07-10).**
+   Kaggle kernel `tools/kaggle/mega-asr-blueprint-ref/` (bf16, raw decode,
+   LoRA hand-merged 539 pairs since the adapter declares target_modules='.*'
+   which peft can't wrap): the bf16 BASE Qwen3-ASR-1.7B is CLEAN long-form
+   (max phrase-cycle 3, both auto and forced-English), the bf16 MEGA
+   (LoRA-merged) LOOPS MASSIVELY (unigram run 230, phrase-cycle 115, both
+   modes — the prefill doesn't prevent it). Mega's long-form degeneration is
+   LoRA-INDUCED AND MODEL-INHERENT; our 4-bit port reproduces the blueprint
+   faithfully and the Q8-tower rebakes were behaving correctly. Verdict:
+   nothing to fix in the port — fix_loops + the 30 s chunked default is the
+   correct posture for mega, `--chunk-seconds 0` stays unsupported for it at
+   ANY precision. (Kernel also demonstrates the dep recipe for qwen_asr on
+   Kaggle: transformers==4.57.6 + force-reinstalled huggingface_hub 0.36 +
+   hf_transfer + sys.modules purge, and the LoRA path rewrites
+   thinker.layers → thinker.model.layers.)
 2. **Windowed encoder default flip + CAP_UNBOUNDED_INPUT (qwen3-asr).**
    Mechanism shipped opt-in and parity-verified (cos 0.99953); needs a
    broader eval before flipping: several long clips, windowed-vs-full
