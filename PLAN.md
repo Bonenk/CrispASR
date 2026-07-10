@@ -7697,21 +7697,24 @@ Commits: 42782648, 7cb079a0, 7f60cf72, f508dac1, bba1f0e5, 0595ab6b.
 | #75  | IndexTTS | Full backend + ref cache |
 | #46  | MOSS model | Both MOSS backends |
 
-**Remaining open issues (16):**
+**Further closed in same session (4 more):**
+
+| #234 | OmniVoice TTS | Full pipeline shipped (codes + DAC decode) |
+| #218 | Phrase repeats | fix_loops + word dedup + glm/qwen3 parity |
+| #193 | C# binding | bindings/csharp/ shipped |
+| #89  | Parakeet Japanese | 97% recall via VAD+gap-fill |
+
+**Remaining open issues (12):**
 
 - **#240** qwen3-asr-1.7b Q4_K empty transcripts — **NEW BUG**, needs investigation
-- **#234** OmniVoice TTS — flash_attn + CFG fixed, needs end-to-end validation
-- **#218** Phrase repeats — fix_loops applied to all LLM backends, glm-asr parity fixed; broad issue, mitigations shipped
 - **#227** VAD reuse — feature request, no implementation yet
 - **#204** New models — umbrella request
 - **#198** Higgs-Audio TTS — feature request (porting suggestion)
 - **#196** Gemma4 larger — feature request (12B/26B/31B)
-- **#193** C# binding — feature request
 - **#174** LA Studio — community showcase (not a bug)
 - **#137** Termux build — user-facing workaround documented
 - **#131** Older-glibc Linux build — packaging request
 - **#130** CPU perf docs — documentation request
 - **#125** Long audio broken (v0.6.10) — most fixes shipped, awaiting retest
-- **#93**  Voxtral 4B TTS — feature request
-- **#89**  Parakeet Japanese chunks — hardening shipped in §221
+- **#93**  Voxtral 4B TTS — feature request (no TTS backend for this model yet)
 - **#81**  ONNX-ASR comparison — discussion/tracking
