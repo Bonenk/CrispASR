@@ -7642,3 +7642,76 @@ broader model/format/TTS coverage.
       offline throughput — large, and exactly the cached-graph minefield of
       #171/#184/§227.2; do not start before 0.
 7. [ ] (cleanup) bucket-table quant tensor classifier to replace the per-arch ladder.
+
+## §230 Issue #238 — kyutai/stt-2.6b-en support (DONE)
+
+**Shipped 2026-07-10.** Full support for the 48L / 2.6B English-only Kyutai STT model.
+
+Key changes:
+- Converter reads `audio_silence_prefix_seconds` from `stt_config` → GGUF KV.
+- Runtime prepends silence prefix (1.0 s @ 24 kHz) before Mimi encode.
+- `kyutai_stt_total_lookahead_seconds()` returns `audio_delay + silence_prefix`
+  (3.5 s for 2.6B vs 0.5 s for 1B). CLI adapter sizes silence tail from this.
+- Registry entry `kyutai-stt-2.6b` → `cstr/kyutai-stt-2.6b-en-GGUF` Q4_K.
+- Reference backend `tools/reference_backends/kyutai_stt.py` with full audio
+  conditioning (silence tail + prefix + resample). Frozen ref GGUF on HF.
+- Diff harness dispatch in `crispasr_diff_main.cpp` (transcript-level; stage
+  APIs pending).
+- Kaggle kernel v4 (`chr1s4/crispasr-kyutai-stt-2-6b-convert`): F16/Q8_0/Q4_K
+  + ref GGUF all uploaded.
+
+**Lesson learned:** Python reference dumpers must apply identical audio
+conditioning as the C++ runtime. The initial ref GGUF had a truncated
+transcript because the dumper fed raw PCM without the silence tail/prefix.
+
+Commits: 42782648, 7cb079a0, 7f60cf72, f508dac1, bba1f0e5, 0595ab6b.
+
+## §231 Issue triage 2026-07-10 — bulk close of resolved issues
+
+**Closed 24 issues** that had fixes on main but were never formally closed:
+
+| Issue | Title | Resolution |
+|-------|-------|------------|
+| #238 | kyutai/stt-2.6b-en | Full backend + diff harness (§230) |
+| #239 | Opus popen("rb") on Linux | 276328d0 + fcb91792 |
+| #216 | Kokoro G2P C++ → "k" | be8f7305 |
+| #222 | Silero LID Vulkan segfault | 222b6781 |
+| #182 | Chatterbox segfault long text | 723d5f3c |
+| #231 | Cohere Arabic | 130ca753 + edf31a3e |
+| #221 | Irodori-TTS | Full pipeline + voice cloning |
+| #209 | MOSS-Transcribe | Both MOSS backends working |
+| #220 | Chatterbox CUDA illegal memory | c78b187b |
+| #194 | CosyVoice3 not starting | 589ec2d7 + 97735b78 |
+| #192 | TADA noise | 3b52d268 |
+| #171 | TTS regression (UAF) | c96c4997 |
+| #201 | TADA voice at inference | 3b52d268 |
+| #217 | Alignment mode | e188bcfa |
+| #195 | ReazonSpeech v2 | 308ba15d |
+| #212 | Qwen3-ASR-1.7B-JA-Anime | 612bade0 |
+| #197 | TADA rep penalty | 0f3e6d2c |
+| #169 | espeak-ng lang indicators | 37328f27 |
+| #139 | Windows encoding GGUF | Converters fixed |
+| #135 | FunASR/SenseVoice | Both backends shipped |
+| #128 | --hf-repo flag | b77a74eb |
+| #76  | Chatterbox-turbo distorted | Vocoder parity fixes |
+| #75  | IndexTTS | Full backend + ref cache |
+| #46  | MOSS model | Both MOSS backends |
+
+**Remaining open issues (16):**
+
+- **#240** qwen3-asr-1.7b Q4_K empty transcripts — **NEW BUG**, needs investigation
+- **#234** OmniVoice TTS — flash_attn + CFG fixed, needs end-to-end validation
+- **#218** Phrase repeats — fix_loops applied to all LLM backends, glm-asr parity fixed; broad issue, mitigations shipped
+- **#227** VAD reuse — feature request, no implementation yet
+- **#204** New models — umbrella request
+- **#198** Higgs-Audio TTS — feature request (porting suggestion)
+- **#196** Gemma4 larger — feature request (12B/26B/31B)
+- **#193** C# binding — feature request
+- **#174** LA Studio — community showcase (not a bug)
+- **#137** Termux build — user-facing workaround documented
+- **#131** Older-glibc Linux build — packaging request
+- **#130** CPU perf docs — documentation request
+- **#125** Long audio broken (v0.6.10) — most fixes shipped, awaiting retest
+- **#93**  Voxtral 4B TTS — feature request
+- **#89**  Parakeet Japanese chunks — hardening shipped in §221
+- **#81**  ONNX-ASR comparison — discussion/tracking
