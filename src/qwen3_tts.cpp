@@ -2069,7 +2069,16 @@ float* run_code_pred_kv(qwen3_tts_context* c, const float* embeds, int n_tokens,
     // exactly the two shapes the per-frame loop produces (T=2 prefill at
     // n_past=0 and T=1 steps); anything else — and any backend where an op is
     // unsupported — falls through to the sched paths below.
-    if (env_bool("QWEN3_TTS_CP_DIRECT") && !c->cp_cpu_pinned && (n_tokens == 1 || (n_tokens == 2 && n_past == 0))) {
+    //
+    // Default policy (validated 2026-07-10, md5-identical WAV everywhere):
+    // ON when the code_pred runs on a GPU backend — M1 Metal ~equal on an
+    // idle box but ~3x faster under load (the sched path degrades badly
+    // under contention), CUDA P100 11% faster. OFF on CPU, where there is
+    // no dispatch cost to save and the per-step lm_head slot blit
+    // (~2.2 MB memcpy x14/frame) makes it ~2x SLOWER. Env always wins.
+    const bool cp_direct_default = c->backend && c->backend != c->backend_cpu;
+    if (env_bool_default("QWEN3_TTS_CP_DIRECT", cp_direct_default) && !c->cp_cpu_pinned &&
+        (n_tokens == 1 || (n_tokens == 2 && n_past == 0))) {
         float* r_dir = run_code_pred_direct(c, embeds, n_tokens, n_past, lm_head);
         if (r_dir) {
             return r_dir;
