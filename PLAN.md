@@ -8019,3 +8019,40 @@ in-graph argmax — each step is a single GPU kernel launch, not a CPU→GPU rou
 3. **Moonshine Streaming: accept gap or use non-streaming model** [LOW]
    - 3000ms is architectural (sliding-window attention required by model training)
    - Recommend `--backend moonshine` for offline, `--backend moonshine-streaming` only for live
+
+### §232 Implementation progress (2026-07-10)
+
+**Completed and verified:**
+- [x] GGML_LLAMAFILE ON — neutral on Q4_K/x86, kept as default
+- [x] Moonshine in-graph argmax — GPU-only benefit (4B vs 128KB readback)
+- [x] Moonshine streaming mask bypass — FAILED, model requires masks
+- [x] Parakeet pre-computed encoder projections — cache-friendly, ~0 CPU impact
+- [x] Parakeet batched TDT decode — FAILED correctness (multi-emission/frame)
+- [x] Kaggle v12 kernel — expanded to 11 models, fine-grained timing
+
+**Key diagnostic finding: AR decoder is the universal GPU bottleneck.**
+CrispASR's RNNT/TDT decoders (Parakeet, Nemotron) run on CPU via cblas_sgemv
+while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
+
+| Model | CA decode (GPU run) | TC decode (GPU run) | Root cause |
+|-------|-------------------|-------------------|------------|
+| Parakeet TDT | 955ms (CPU cblas) | 51ms (GPU) | Host-side LSTM+joint |
+| Nemotron RNNT | 2900ms (CPU cblas) | 238ms (GPU) | Host-side LSTM+joint |
+| Moonshine Tiny | 87ms (GPU decode) | 76ms (GPU) | Near parity ✓ |
+
+**Remaining work (needs GPU hardware + careful design):**
+
+1. **Batched TDT decode (correct version)**: The prototype (`parakeet_tdt_decode_batched`,
+   in-tree but unwired) batch-scans frames for blanks but doesn't handle TDT's inner
+   loop (multi-token per frame, dur=0 retries). Correct design:
+   - Process each frame's inner loop sequentially until blank+dur>0
+   - THEN batch-verify remaining frames share the same blank pattern
+   - transcribe.cpp's approach: build the full step as a GPU graph with static
+     structure, avoiding the cblas→GPU migration entirely
+
+2. **Nemotron RNNT batched decode**: Same pattern as Parakeet TDT but simpler
+   (no duration logits). Port once TDT is working.
+
+3. **Moonshine encoder gap (728ms vs 58ms)**: Separate from decoder.
+   Needs GPU profiling — possibly im2col overhead on raw 176K-sample input,
+   or the conv_stem's ggml_im2col creating oversized intermediates.
