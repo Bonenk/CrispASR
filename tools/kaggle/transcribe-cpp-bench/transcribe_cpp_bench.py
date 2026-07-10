@@ -347,9 +347,11 @@ def run_crispasr(binary: Path, model: Path, audio: Path, backend: str | None,
     b_flag = f"-b {backend}" if backend else ""
     t0 = time.time()
     # Run with stdout and stderr separate
+    # Use -ng (no GPU) to force CPU inference — transcribe.cpp also runs CPU
+    # so this gives a fair comparison, and avoids P100 sm_60 CUDA issues.
     try:
         proc = subprocess.run(
-            f'"{binary}" -m "{model}" {b_flag} "{audio}"',
+            f'"{binary}" -m "{model}" {b_flag} -ng "{audio}"',
             shell=True, capture_output=True, text=True, timeout=timeout
         )
         ok = proc.returncode == 0
@@ -379,7 +381,7 @@ def run_crispasr(binary: Path, model: Path, audio: Path, backend: str | None,
         "infer_s": infer_s,
         "rtf": rtf,
         "ok": ok,
-        "stderr_tail": err[-300:] if not ok else "",
+        "stderr_tail": err[-500:],  # always include for diagnostics
     }
 
 
