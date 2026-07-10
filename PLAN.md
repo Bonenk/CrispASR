@@ -7875,10 +7875,17 @@ docs. If comparable, the gap is real and needs profiling.
 | Fix 4: LLAMAFILE ON | **Primary** (CPU A/B) | CPU A/B | Metal A/B | — |
 | Fix 5: Parakeet v2 A/B | **Primary** (quick) | GPU A/B | — | — |
 
-### Priority order
+### Status
 
-1. **Fix 4** (LLAMAFILE ON) — 1 line, 15-29% CPU boost, zero risk, VPS-testable
-2. **Fix 1** (Moonshine decoder) — medium effort, 2-5x decoder speedup, VPS-testable
-3. **Fix 2** (Moonshine Streaming batch) — medium effort, 10-20x encoder speedup
-4. **Fix 3** (Nemotron full-pass) — harder, needs WER verification, risk of regression
-5. **Fix 5** (Parakeet A/B) — just a comparison, no code change
+- [x] **Fix 4** (LLAMAFILE ON) — DONE (`4e9b4087`). No measurable CPU benefit on
+  Intel Xeon Skylake with Q4_K models (A/B: neutral to +11% slower due to variance).
+  tinyBLAS optimises the F32 GEMM but Q4_K dequant dominates. May help on ARM NEON
+  or F16 weights. Kept ON as the upstream-recommended default.
+
+### Priority order (revised)
+
+1. **Fix 1** (Moonshine decoder) — medium effort, 2-5x decoder speedup, VPS-testable.
+   **This is the highest-leverage fix.** The decoder is 83% of Moonshine Tiny time.
+2. **Fix 2** (Moonshine Streaming batch) — medium effort, 10-20x encoder speedup
+3. **Fix 3** (Nemotron full-pass) — harder, needs WER verification, risk of regression
+4. **Fix 5** (Parakeet A/B) — just a comparison, no code change
