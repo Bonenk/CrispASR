@@ -50,7 +50,10 @@ kh.step("script.start")
 
 # qwen_asr pins transformers==4.57.6 (vendors its own modeling code).
 kh.step("deps.begin")
-kh.sh_with_progress("pip install -q 'transformers==4.57.6' qwen_asr peft librosa soundfile")
+# transformers 4.57.6 needs the pre-1.0 huggingface_hub API
+# (constants.HF_HUB_ENABLE_HF_TRANSFER) — pin both or the preinstalled
+# newer hub breaks from_pretrained.
+kh.sh_with_progress("pip install -q 'transformers==4.57.6' 'huggingface_hub<0.40' qwen_asr peft librosa soundfile")
 kh.step("deps.done")
 
 WAV_ZIP = AUDIO_DIR / "t32-145s.wav.zip"
