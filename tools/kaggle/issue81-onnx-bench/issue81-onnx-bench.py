@@ -41,11 +41,22 @@ BUILD.mkdir(parents=True, exist_ok=True)
 has_cuda = Path("/usr/local/cuda/bin/nvcc").exists()
 print(f"  CUDA available: {has_cuda}")
 
-cmake_flags = f"-DCMAKE_BUILD_TYPE=Release -DGGML_CUDA={'ON' if has_cuda else 'OFF'}"
-subprocess.check_call(
+# Kaggle T4 = sm_75, P100 = sm_60. Use native to auto-detect.
+cuda_flags = "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=native" if has_cuda else "-DGGML_CUDA=OFF"
+cmake_flags = f"-DCMAKE_BUILD_TYPE=Release {cuda_flags}"
+ret = subprocess.call(
     f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}",
-    shell=True, stdout=subprocess.DEVNULL,
+    shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
 )
+if ret != 0 and has_cuda:
+    # Fallback: try CPU-only
+    print("  CUDA cmake failed, falling back to CPU-only build")
+    has_cuda = False
+    cmake_flags = "-DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF"
+    subprocess.check_call(
+        f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}",
+        shell=True, stdout=subprocess.DEVNULL,
+    )
 n_jobs = min(os.cpu_count() or 2, 4)
 subprocess.check_call(
     f"cmake --build {BUILD} -j{n_jobs} --target crispasr-cli",
@@ -161,9 +172,13 @@ def run_onnx_asr(audio_path, n_warmup=1, n_runs=5):
 
     # Load model once
     t_load_start = time.perf_counter()
+    providers = None
+    if has_cuda:
+        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
     model = onnx_asr.load_model(
-        "nvidia/parakeet-tdt-0.6b",
-        # Try CUDA EP if available
+        "nemo-parakeet-ctc-0.6b",
+        quantization="int8",
+        providers=providers,
     )
     t_load = time.perf_counter() - t_load_start
     print(f"  onnx-asr load: {t_load:.3f}s")
@@ -176,14 +191,14 @@ def run_onnx_asr(audio_path, n_warmup=1, n_runs=5):
 
     # Warmup
     for _ in range(n_warmup):
-        model.transcribe(pcm)
+        model.recognize(str(audio_path))
 
     # Timed runs
     times = []
     transcript = ""
     for i in range(n_runs):
         t0 = time.perf_counter()
-        result = model.transcribe(pcm)
+        result = model.recognize(str(audio_path))
         t1 = time.perf_counter()
         times.append(t1 - t0)
         if i == 0:
