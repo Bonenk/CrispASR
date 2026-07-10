@@ -80,7 +80,7 @@ if (CRISPASR_COREML)
         )
 
     set_target_properties(${TARGET} PROPERTIES FOLDER "libs")
-    install(TARGETS ${TARGET} LIBRARY)
+    install(TARGETS ${TARGET} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endif()
 
 if (CRISPASR_OPENVINO)
