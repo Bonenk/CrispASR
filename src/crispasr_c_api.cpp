@@ -1874,7 +1874,8 @@ static void _fire_segment_callbacks(crispasr_session* s, crispasr_session_result
 
 // Per-token data fed into emit_words_from_tokens. Backends with their own
 // token-prob APIs project into this shape so the word-grouping logic stays
-// in one place.
+// in one place. Defined before _fire_token_callbacks so that function can
+// dereference its members (MSVC rejects an incomplete type there).
 struct ca_token_record {
     std::string text;
     int64_t t0;
