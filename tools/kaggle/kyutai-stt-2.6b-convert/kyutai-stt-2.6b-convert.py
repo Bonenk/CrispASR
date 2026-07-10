@@ -50,6 +50,13 @@ if not REPO.exists():
     except Exception as e:
         print(f"  git clone failed: {e}")
 
+# Init ggml submodule (needed by crispasr-quantize build)
+if (REPO / "ggml").is_dir() and not (REPO / "ggml" / "CMakeLists.txt").exists():
+    try:
+        subprocess.check_call(["git", "submodule", "update", "--init", "ggml"], cwd=str(REPO))
+    except Exception as e:
+        print(f"  submodule init failed: {e}")
+
 if (REPO / "tools" / "kaggle").is_dir():
     sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
 else:
