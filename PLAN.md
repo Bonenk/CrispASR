@@ -7710,7 +7710,15 @@ Commits: 42782648, 7cb079a0, 7f60cf72, f508dac1, bba1f0e5, 0595ab6b.
 
 **Remaining open issues (12):**
 
-- **#240** qwen3-asr-1.7b Q4_K empty transcripts — **NEW BUG**, needs investigation
+- **#240** qwen3-asr-1.7b Q4_K empty transcripts — **FIXED 2026-07-10.** Same #218
+  cause: the shipped 1.7b q4_k (exported 2026-07-03) predates the Q8_0 audio-tower
+  carve-out (`3c3ba2c7`, `crispasr-quantize/main.cpp:772`, arch-keyed, size-agnostic).
+  Re-baked from f16 → 147 `audio.*` → q8_0, LLM q4_k. Encoder cos vs f16 (jfk, CPU):
+  broken cos_min 0.9632/mean 0.9913 (29/143 rows<0.99) → fixed 0.9989/0.9998 (0/143) —
+  same repair pattern as #218's 0.6b. Ask #2 (warn on empty transcript for non-silent
+  audio) shipped in `crispasr_run.cpp` (`9390dd8c`). Diagnostic harness
+  `qwen3-asr-enc-dump` added (`de260f2a`). Fixed GGUF replaces `qwen3-asr-1.7b-q4_k.gguf`
+  on `cstr/qwen3-asr-1.7b-GGUF`.
 - **#227** VAD reuse — feature request, no implementation yet
 - **#204** New models — umbrella request
 - **#198** Higgs-Audio TTS — feature request (porting suggestion)
