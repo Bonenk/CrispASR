@@ -169,6 +169,11 @@ set(GGML_SANITIZE_UNDEFINED ${CRISPASR_SANITIZE_UNDEFINED})
 set(GGML_ALL_WARNINGS       ${CRISPASR_ALL_WARNINGS})
 set(GGML_FATAL_WARNINGS     ${CRISPASR_FATAL_WARNINGS})
 
+# §232: Enable tinyBLAS/llamafile GEMM by default — ~15-29% faster CPU encoder
+# matmuls across all backends. transcribe.cpp forces this ON; ggml defaults OFF.
+# No risk: tinyBLAS is a drop-in SIMD-optimized GEMM replacement.
+set(GGML_LLAMAFILE_DEFAULT ON)
+
 # transition helpers
 function (crispasr_option_depr TYPE OLD NEW)
     if (${OLD})
