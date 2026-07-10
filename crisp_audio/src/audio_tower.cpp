@@ -387,8 +387,57 @@ bool load_model(crisp_audio_context& ctx, const char* path, const crisp_audio_pa
 //     → (output_dim, N_padded)
 // ---------------------------------------------------------------------------
 
+// Block-diagonal windowed self-attention over the compacted sequence:
+// uniform windows of `W` frames (the reference's cu_seqlens layout,
+// window_aftercnn = T_chunk_out * n_window_infer / (n_window*2)) run as one
+// BATCHED attention (no mask), the ragged tail (< W frames) as a second
+// small unmasked attention, results concatenated. Memory is O(N·W) instead
+// of the full-attention O(N²) — the enabler for unbounded-length input.
+// Matches the FlashAttention-2 varlen semantics of the reference; the
+// eager/SDPA reference path does full attention instead (mode 0 here).
+static ggml_tensor* windowed_self_attn(ggml_context* g, ggml_tensor* Q, ggml_tensor* K, ggml_tensor* V, int d,
+                                       int n_heads, int head_dim, int N_seq, int W, float attn_scale) {
+    const int n_full = N_seq / W;
+    const int rem = N_seq % W;
+
+    auto attn_part = [&](ggml_tensor* q, ggml_tensor* k, ggml_tensor* v, int T, int nb) -> ggml_tensor* {
+        // inputs: (d, T*nb) slices → (hd, heads, T, nb) → (hd, T, heads, nb)
+        q = ggml_reshape_4d(g, q, head_dim, n_heads, T, nb);
+        k = ggml_reshape_4d(g, k, head_dim, n_heads, T, nb);
+        v = ggml_reshape_4d(g, v, head_dim, n_heads, T, nb);
+        q = ggml_cont(g, ggml_permute(g, q, 0, 2, 1, 3));
+        k = ggml_cont(g, ggml_permute(g, k, 0, 2, 1, 3));
+        v = ggml_cont(g, ggml_permute(g, v, 0, 2, 1, 3));
+        ggml_tensor* scores = ggml_mul_mat(g, k, q); // (T, T, heads, nb)
+        scores = ggml_soft_max_ext(g, scores, nullptr, attn_scale, 0.0f);
+        ggml_tensor* v2 = ggml_cont(g, ggml_permute(g, v, 1, 0, 2, 3));
+        ggml_tensor* o = ggml_mul_mat(g, v2, scores);     // (hd, T, heads, nb)
+        o = ggml_cont(g, ggml_permute(g, o, 0, 2, 1, 3)); // (hd, heads, T, nb)
+        return ggml_reshape_2d(g, o, d, T * nb);
+    };
+
+    ggml_tensor* body = nullptr;
+    if (n_full > 0) {
+        ggml_tensor* qb = ggml_view_2d(g, Q, d, n_full * W, Q->nb[1], 0);
+        ggml_tensor* kb = ggml_view_2d(g, K, d, n_full * W, K->nb[1], 0);
+        ggml_tensor* vb = ggml_view_2d(g, V, d, n_full * W, V->nb[1], 0);
+        body = attn_part(ggml_cont(g, qb), ggml_cont(g, kb), ggml_cont(g, vb), W, n_full);
+    }
+    ggml_tensor* tail = nullptr;
+    if (rem > 0) {
+        const size_t off = (size_t)n_full * W;
+        ggml_tensor* qt = ggml_view_2d(g, Q, d, rem, Q->nb[1], off * Q->nb[1]);
+        ggml_tensor* kt = ggml_view_2d(g, K, d, rem, K->nb[1], off * K->nb[1]);
+        ggml_tensor* vt = ggml_view_2d(g, V, d, rem, V->nb[1], off * V->nb[1]);
+        tail = attn_part(ggml_cont(g, qt), ggml_cont(g, kt), ggml_cont(g, vt), rem, 1);
+    }
+    if (body && tail)
+        return ggml_concat(g, body, tail, 1);
+    return body ? body : tail;
+}
+
 ggml_cgraph* build_graph_qwen_omni(crisp_audio_context& ctx, int T_chunk, int num_chunks, int T_chunk_out_expected,
-                                   int N_keep) {
+                                   int N_keep, int window_frames = 0) {
     const auto& hp = ctx.hp;
     const auto& w = ctx.w;
     const int n_mels = (int)hp.n_mels;
@@ -418,9 +467,14 @@ ggml_cgraph* build_graph_qwen_omni(crisp_audio_context& ctx, int T_chunk, int nu
     // REMOVED before the transformer blocks — the encoder attends over the
     // N_keep valid frames only. valid_idx selects them post-conv/PE.
     const int N_seq = (N_keep > 0 && N_keep < N_padded) ? N_keep : N_padded;
-    ggml_tensor* mask_in = ggml_new_tensor_2d(g, GGML_TYPE_F32, N_seq, N_seq);
-    ggml_set_name(mask_in, "attn_mask");
-    ggml_set_input(mask_in);
+    // window_frames > 0 selects the block-diagonal windowed attention path
+    // (no dense mask tensor at all — O(N·W) memory instead of O(N²)).
+    ggml_tensor* mask_in = nullptr;
+    if (window_frames <= 0) {
+        mask_in = ggml_new_tensor_2d(g, GGML_TYPE_F32, N_seq, N_seq);
+        ggml_set_name(mask_in, "attn_mask");
+        ggml_set_input(mask_in);
+    }
 
     auto bias_4d = [&](ggml_tensor* b) {
         return ggml_cast(g, ggml_reshape_4d(g, b, 1, 1, b->ne[0], 1), GGML_TYPE_F32);
@@ -472,21 +526,27 @@ ggml_cgraph* build_graph_qwen_omni(crisp_audio_context& ctx, int T_chunk, int nu
         ggml_tensor* Q = ggml_add(g, ggml_mul_mat(g, b.attn_q_w, x), b.attn_q_b);
         ggml_tensor* K = ggml_add(g, ggml_mul_mat(g, b.attn_k_w, x), b.attn_k_b);
         ggml_tensor* V = ggml_add(g, ggml_mul_mat(g, b.attn_v_w, x), b.attn_v_b);
-        Q = ggml_reshape_3d(g, Q, head_dim, n_heads, N_seq);
-        K = ggml_reshape_3d(g, K, head_dim, n_heads, N_seq);
-        V = ggml_reshape_3d(g, V, head_dim, n_heads, N_seq);
-        Q = ggml_cont(g, ggml_permute(g, Q, 0, 2, 1, 3));
-        K = ggml_cont(g, ggml_permute(g, K, 0, 2, 1, 3));
-        V = ggml_cont(g, ggml_permute(g, V, 0, 2, 1, 3));
 
-        ggml_tensor* scores = ggml_mul_mat(g, K, Q);
-        scores = ggml_add(g, scores, mask_in);
-        scores = ggml_soft_max_ext(g, scores, nullptr, attn_scale, 0.0f);
+        ggml_tensor* attn;
+        if (window_frames > 0) {
+            attn = windowed_self_attn(g, Q, K, V, d, n_heads, head_dim, N_seq, window_frames, attn_scale);
+        } else {
+            Q = ggml_reshape_3d(g, Q, head_dim, n_heads, N_seq);
+            K = ggml_reshape_3d(g, K, head_dim, n_heads, N_seq);
+            V = ggml_reshape_3d(g, V, head_dim, n_heads, N_seq);
+            Q = ggml_cont(g, ggml_permute(g, Q, 0, 2, 1, 3));
+            K = ggml_cont(g, ggml_permute(g, K, 0, 2, 1, 3));
+            V = ggml_cont(g, ggml_permute(g, V, 0, 2, 1, 3));
 
-        ggml_tensor* V2 = ggml_cont(g, ggml_permute(g, V, 1, 0, 2, 3));
-        ggml_tensor* attn = ggml_mul_mat(g, V2, scores);
-        attn = ggml_cont(g, ggml_permute(g, attn, 0, 2, 1, 3));
-        attn = ggml_reshape_2d(g, attn, d, N_seq);
+            ggml_tensor* scores = ggml_mul_mat(g, K, Q);
+            scores = ggml_add(g, scores, mask_in);
+            scores = ggml_soft_max_ext(g, scores, nullptr, attn_scale, 0.0f);
+
+            ggml_tensor* V2 = ggml_cont(g, ggml_permute(g, V, 1, 0, 2, 3));
+            attn = ggml_mul_mat(g, V2, scores);
+            attn = ggml_cont(g, ggml_permute(g, attn, 0, 2, 1, 3));
+            attn = ggml_reshape_2d(g, attn, d, N_seq);
+        }
 
         attn = ggml_add(g, ggml_mul_mat(g, b.attn_out_w, attn), b.attn_out_b);
         cur = ggml_add(g, residual, attn);
@@ -768,7 +828,21 @@ float* crisp_audio_encode(struct crisp_audio_context* ctx, const float* mel_feat
                 valid_idx.push_back(c * T_chunk_out + f);
     }
 
-    std::vector<float> mask((size_t)N_seq * N_seq, 0.0f);
+    // CRISP_AUDIO_WINDOWED_ATTN=1: block-diagonal windowed attention over
+    // n_window_infer windows (the reference's FlashAttention-2 varlen
+    // semantics; O(N·W) memory — the long-audio enabler). Default stays the
+    // dense full-attention graph, which matches the reference's eager/SDPA
+    // CPU path. A/B gate per the perf-change rule.
+    const bool windowed_attn = [&] {
+        const char* e = getenv("CRISP_AUDIO_WINDOWED_ATTN");
+        return e && atoi(e) != 0 && hp.attn_window_mode == 0 && hp.n_window > 0;
+    }();
+    const int window_frames =
+        windowed_attn ? std::max(1, (int)(hp.n_window_infer / (hp.n_window * 2))) * T_chunk_out : 0;
+
+    std::vector<float> mask;
+    if (!windowed_attn)
+        mask.assign((size_t)N_seq * N_seq, 0.0f);
     if (hp.attn_window_mode == 1) {
         // Windowed mask: block-diagonal over inference windows of
         // `chunks_per_window * T_chunk_out` post-cnn frames. Padding frames
@@ -787,7 +861,7 @@ float* crisp_audio_encode(struct crisp_audio_context* ctx, const float* mel_feat
         }
     }
 
-    ggml_cgraph* gf = build_graph_qwen_omni(*ctx, chunk_T, num_chunks, T_chunk_out, N_seq);
+    ggml_cgraph* gf = build_graph_qwen_omni(*ctx, chunk_T, num_chunks, T_chunk_out, N_seq, window_frames);
     ggml_backend_sched_reset(ctx->sched);
     if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
         fprintf(stderr, "crisp_audio: failed to alloc encoder graph\n");
@@ -809,7 +883,8 @@ float* crisp_audio_encode(struct crisp_audio_context* ctx, const float* mel_feat
                                 valid_idx.size() * sizeof(int32_t));
     }
 
-    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "attn_mask"), mask.data(), 0, mask.size() * sizeof(float));
+    if (!windowed_attn)
+        ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "attn_mask"), mask.data(), 0, mask.size() * sizeof(float));
 
     if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "crisp_audio: graph compute failed\n");

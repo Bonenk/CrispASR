@@ -488,12 +488,24 @@ stages; bf16 reference re-dumped via `tools/reference_backends/qwen3.py`):
 - **Note:** the reference wrapper itself ships `detect_and_fix_repetitions()`
   (≥20× char/pattern collapse) in `parse_asr_output` — `core_ngram::fix_loops` is
   blueprint-faithful defense-in-depth; keep it.
-- **NOT done — CAP_UNBOUNDED_INPUT.** Full-attention encoder memory is O(N²)
-  (145 s → 1885² scores/layer); >~10 min un-chunked would OOM, and the blueprint's
-  CPU path has the same property. Default stays 30 s auto-chunk (now clean per
-  slice); `--chunk-seconds 0` is the working long-form escape hatch. To flip the
-  cap honestly, port the FA2 `cu_seqlens` semantics as batched block-diagonal
-  attention (uniform 104-frame windows → linear memory) — future work.
+- **CAP_UNBOUNDED_INPUT — windowed encoder attention SHIPPED opt-in
+  (2026-07-10).** `CRISP_AUDIO_WINDOWED_ATTN=1` runs the encoder with the
+  FA2/cu_seqlens block-diagonal semantics: full 104-frame windows as ONE
+  batched unmasked attention + the ragged tail as a second small attention,
+  concatenated — O(N·W) memory (no dense mask at all), enabling arbitrary
+  audio length. Verified vs a windowed bf16 reference (new
+  `QWEN3_REF_WINDOWED=1` dumper mode monkey-patches the block-diagonal mask
+  from the modeling's own `_prepare_attention_mask` into eager attention):
+  encoder cos_mean **0.99953** on the un-chunked 145 s clip (fixed-tower
+  q4_k). e2e: the windowed path transcribes MORE of the clip (incl. the
+  low-volume leading section full attention skips) with no raw loops; note
+  the windowed *blueprint itself* transcribes noise sections aggressively
+  (its own output shows collapsed "hey" runs there) — that behaviour is
+  inherent to the training-time attention, fix_loops handles it. Encoder is
+  somewhat slower on Metal (many 104² matmuls vs one big one). Default
+  stays full attention (matches the CPU blueprint) + 30 s dispatcher chunks;
+  flipping the default + declaring CAP_UNBOUNDED_INPUT needs a broader eval
+  (more clips, speed profile) — the mechanism is ready.
 - **Follow-ups:** (1) DONE — fixed q4_k / q4_k-imatrix / q3_k-imatrix uploaded to
   `cstr/qwen3-asr-0.6b-GGUF` + README (q8_0/f16 unaffected). A/B during the
   re-bake: quantising the tied LM head (the old imatrix recipe) re-introduces

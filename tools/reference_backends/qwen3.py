@@ -124,6 +124,31 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     # ---- Run the audio encoder ----
     # HF's audio_tower.forward expects a 2D mel (128, T) plus feature_lens
     # because it internally does .T.split(...).
+    #
+    # QWEN3_REF_WINDOWED=1: reference for the WINDOWED encoder-attention
+    # path. The vendored eager/SDPA attention ignores cu_seqlens (full
+    # attention); FlashAttention-2 — and the C++ port's windowed mode —
+    # restrict attention to n_window_infer blocks. Reproduce that on CPU by
+    # monkey-patching each attention layer to receive the block-diagonal
+    # mask the modeling's own _prepare_attention_mask() builds from
+    # cu_seqlens.
+    import os as _os
+    if _os.environ.get("QWEN3_REF_WINDOWED", "") not in ("", "0"):
+        print("  windowed-attention reference (block-diagonal cu_seqlens mask)")
+        _orig_layer_forwards = []
+        for layer in audio_tower.layers:
+            _orig_layer_forwards.append(layer.forward)
+
+        def _windowed_layer_forward(_self_layer, hidden_states, cu_seqlens, attention_mask=None, **kw):
+            if attention_mask is None:
+                attention_mask = audio_tower._prepare_attention_mask(hidden_states, cu_seqlens)
+            return type(_self_layer).forward(
+                _self_layer, hidden_states, cu_seqlens, attention_mask=attention_mask, **kw)
+
+        import functools
+        for layer in audio_tower.layers:
+            layer.forward = functools.partial(_windowed_layer_forward, layer)
+
     mel_2d = mel.squeeze(0).to(model.dtype)  # (128, T), model-native dtype
     feature_lens = torch.tensor([mel_2d.shape[-1]], dtype=torch.long)
     with torch.no_grad():
