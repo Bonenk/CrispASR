@@ -124,6 +124,7 @@ struct kyutai_hparams {
     float hidden_scale = 4.125f;
     int existing_text_padding_id = 3;
     float audio_delay_seconds = 0.5f;
+    float audio_silence_prefix_seconds = 0.0f; // prepended silence before Mimi encode (1.0s for 2.6B)
 
     // Mimi encoder
     int mimi_dim = 512;
@@ -368,6 +369,8 @@ extern "C" struct kyutai_stt_context* kyutai_stt_init_from_file(const char* path
         hp.existing_text_padding_id =
             core_gguf::kv_u32(gctx, "kyutai.existing_text_padding_id", hp.existing_text_padding_id);
         hp.audio_delay_seconds = core_gguf::kv_f32(gctx, "kyutai.stt.audio_delay_seconds", hp.audio_delay_seconds);
+        hp.audio_silence_prefix_seconds =
+            core_gguf::kv_f32(gctx, "kyutai.stt.audio_silence_prefix_seconds", hp.audio_silence_prefix_seconds);
 
         // Mimi hparams
         hp.mimi_dim = core_gguf::kv_u32(gctx, "kyutai.mimi.encoder_dim", hp.mimi_dim);
@@ -1167,6 +1170,12 @@ static char* kyutai_stt_transcribe_impl(struct kyutai_stt_context* ctx, const fl
         fprintf(stderr, "kyutai_stt: resampled %d → %d samples (16k → 24k)\n", n_samples, (int)pcm_24k.size());
     }
 
+    // Step 1b: Prepend silence prefix (required by some models, e.g. stt-2.6b-en uses 1.0s)
+    if (hp.audio_silence_prefix_seconds > 0.0f) {
+        int n_prefix = (int)(hp.audio_silence_prefix_seconds * (float)hp.sample_rate);
+        pcm_24k.insert(pcm_24k.begin(), n_prefix, 0.0f);
+    }
+
     // Step 2: Mimi encode → audio codes
     std::vector<std::vector<int32_t>> codes;
     int T_frames = 0;
@@ -1431,7 +1440,9 @@ extern "C" struct kyutai_stt_result_ex* kyutai_stt_transcribe_ex(struct kyutai_s
         return nullptr;
 
     auto& hp = ctx->model.hp;
-    const int delay_frames = (int)(hp.audio_delay_seconds * hp.frame_rate);
+    // Total frame offset = training-time lookahead + prepended silence prefix.
+    const int delay_frames =
+        (int)(hp.audio_delay_seconds * hp.frame_rate) + (int)(hp.audio_silence_prefix_seconds * hp.frame_rate);
     // Frame duration in centiseconds: 12.5 Hz → 8 cs/frame. Round to
     // nearest cs from the float frame_rate to handle non-12.5 rates.
     const double cs_per_frame = 100.0 / hp.frame_rate;
