@@ -314,6 +314,8 @@ def normalise(text: str) -> str:
     """Lowercase, strip punctuation, normalise whitespace for WER."""
     text = strip_tags(text)
     text = text.lower()
+    # Strip inline language tags emitted by some backends (e.g. nemotron "en-us")
+    text = re.sub(r"\b[a-z]{2}-[a-z]{2}\b", "", text)
     text = re.sub(r"[^a-z0-9 ''-]", " ", text)
     return " ".join(text.split())
 
@@ -616,27 +618,21 @@ step("build_transcribecpp.begin")
 _tc_build_log = (WORK / "build_transcribecpp.log").open("a")
 TC_BUILD = TC_DIR / "build"
 
-# Fix CUDA::cuda_driver target resolution on Kaggle: libcuda.so (the driver
-# library) only lives in /usr/local/cuda/lib64/stubs/ — cmake's FindCUDAToolkit
-# uses find_library(cuda_driver cuda) which doesn't search stubs by default.
-# Two approaches: (1) symlink into standard path, (2) CMAKE_LIBRARY_PATH.
-if has_gpu:
-    _stub = Path("/usr/local/cuda/lib64/stubs/libcuda.so")
-    _link = Path("/usr/lib/x86_64-linux-gnu/libcuda.so")
-    if _stub.exists() and not _link.exists():
-        subprocess.run(["ln", "-sf", str(_stub), str(_link)])
-        step("build_transcribecpp.cuda_stub_symlink",
-             exists_after=_link.exists() or _link.is_symlink())
-
+# Fix CUDA::cuda_driver on Kaggle: the target_link_libraries(ggml-cuda ...
+# CUDA::cuda_driver) in transcribe.cpp's ggml fork fails because libcuda.so
+# only lives in /usr/local/cuda/lib64/stubs/. The real fix is GGML_CUDA_NO_VMM=ON
+# which gates the CUDA::cuda_driver link entirely (same flag CrispASR uses).
+# Also export LIBRARY_PATH so the linker finds the stub at link time.
 _tc_cuda_flags = ["-DTRANSCRIBE_CUDA=ON"] if has_gpu else []
 if has_gpu and _cuda_arch:
     _tc_cuda_flags += [
         f"-DCMAKE_CUDA_ARCHITECTURES={_cuda_arch}",
         "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
         "-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache",
-        # Tell cmake's find_library to also search the CUDA stubs dir
-        "-DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs",
+        "-DGGML_CUDA_NO_VMM=ON",  # skip CUDA::cuda_driver link
     ]
+    # Belt-and-suspenders: linker needs the stub too
+    os.environ["LIBRARY_PATH"] = "/usr/local/cuda/lib64/stubs:" + os.environ.get("LIBRARY_PATH", "")
 
 def _cmake_configure_tc(cuda_flags):
     return subprocess.run(
