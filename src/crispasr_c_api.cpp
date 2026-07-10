@@ -1537,6 +1537,12 @@ struct crispasr_session {
     crispasr_segment_callback segment_cb = nullptr;
     void* segment_ud = nullptr;
 
+    // Per-token streaming callback — fired for every decoded text token
+    // during LLM-based ASR. Defaults to _default_token_cb which feeds
+    // the global polling buffer for Dart FFI.
+    crispasr_token_callback token_cb = nullptr;
+    void* token_ud = nullptr;
+
     // Exactly one of these pointers is non-null based on `backend`.
     whisper_context* whisper_ctx = nullptr;
 #ifdef CA_HAVE_PARAKEET
@@ -1789,6 +1795,19 @@ static void _default_segment_cb(const char* text, int64_t t0, int64_t t1, int /*
     g_seg_count.fetch_add(1, std::memory_order_relaxed);
 }
 
+// ── Streamed-token polling buffer (Dart FFI path) ───────────────────────
+// The default token callback pushes tokens here; Dart polls via
+// crispasr_get_streamed_token_count / crispasr_drain_streamed_tokens.
+static std::mutex g_tok_mutex;
+static std::vector<std::string> g_streamed_tokens;
+static std::atomic<int> g_tok_count{0};
+
+static void _default_token_cb(const char* text, int /*idx*/, void* /*ud*/) {
+    std::lock_guard<std::mutex> lk(g_tok_mutex);
+    g_streamed_tokens.push_back(text);
+    g_tok_count.fetch_add(1, std::memory_order_relaxed);
+}
+
 CA_EXPORT int crispasr_get_streamed_segment_count(void) {
     return g_seg_count.load(std::memory_order_relaxed);
 }
@@ -1810,6 +1829,36 @@ CA_EXPORT void crispasr_reset_streamed_segments(void) {
     g_seg_count.store(0, std::memory_order_relaxed);
 }
 
+CA_EXPORT int crispasr_get_streamed_token_count() {
+    return g_tok_count.load(std::memory_order_relaxed);
+}
+
+CA_EXPORT const char* crispasr_drain_streamed_tokens(int* out_count) {
+    std::lock_guard<std::mutex> lk(g_tok_mutex);
+    if (g_streamed_tokens.empty()) {
+        if (out_count) *out_count = 0;
+        return nullptr;
+    }
+    // Concatenate all tokens into a single string, separated by null bytes.
+    // Caller reads N strings from the returned buffer.
+    static std::string buf;
+    buf.clear();
+    for (const auto& t : g_streamed_tokens) {
+        buf += t;
+        buf += '\0';
+    }
+    if (out_count) *out_count = (int)g_streamed_tokens.size();
+    g_streamed_tokens.clear();
+    g_tok_count.store(0, std::memory_order_relaxed);
+    return buf.c_str();
+}
+
+CA_EXPORT void crispasr_reset_streamed_tokens() {
+    std::lock_guard<std::mutex> lk(g_tok_mutex);
+    g_streamed_tokens.clear();
+    g_tok_count.store(0, std::memory_order_relaxed);
+}
+
 // Fire the session's segment callback for every segment in `r`.
 // Called from the public transcribe entry points after the result is built.
 static void _fire_segment_callbacks(crispasr_session* s, crispasr_session_result* r) {
@@ -1818,6 +1867,17 @@ static void _fire_segment_callbacks(crispasr_session* s, crispasr_session_result
     for (int i = 0; i < (int)r->segments.size(); ++i) {
         const auto& seg = r->segments[i];
         s->segment_cb(seg.text.c_str(), seg.t0, seg.t1, i, s->segment_ud);
+    }
+}
+
+// Fire the session's per-token callback for a vector of ca_token_record
+// entries. Called from the transcribe paths after a segment's tokens have
+// been decoded and detokenised.
+static void _fire_token_callbacks(crispasr_session* s, const std::vector<struct ca_token_record>& toks) {
+    if (!s || !s->token_cb)
+        return;
+    for (int i = 0; i < (int)toks.size(); ++i) {
+        s->token_cb(toks[i].text.c_str(), i, s->token_ud);
     }
 }
 
@@ -1956,6 +2016,11 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
     // crispasr_session_set_segment_callback after open.
     s->segment_cb = _default_segment_cb;
     s->segment_ud = nullptr;
+
+    // Register the default token callback so the Dart polling buffer
+    // is populated out of the box for per-token streaming.
+    s->token_cb = _default_token_cb;
+    s->token_ud = nullptr;
 
     if (s->backend == "whisper") {
         whisper_context_params cparams = whisper_context_default_params();
@@ -3929,6 +3994,14 @@ CA_EXPORT void crispasr_session_set_segment_callback(crispasr_session* s, crispa
     s->segment_ud = cb ? user_data : nullptr;
 }
 
+CA_EXPORT void crispasr_session_set_token_callback(crispasr_session* s, crispasr_token_callback cb,
+                                                    void* user_data) {
+    if (!s)
+        return;
+    s->token_cb = cb ? cb : _default_token_cb;
+    s->token_ud = cb ? user_data : nullptr;
+}
+
 static crispasr_session_result* transcribe_single(crispasr_session* s, const float* pcm, int n_samples,
                                                   const char* language) {
     const std::string lang = (language && *language) ? language : "en";
@@ -4102,6 +4175,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 }
                 toks.push_back(std::move(rec));
             }
+            _fire_token_callbacks(s, toks);
             seg.words = emit_words_from_tokens(toks);
             r->segments.push_back(std::move(seg));
         }
@@ -4434,6 +4508,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             tk.p = cr->tokens[i].p;
             toks.push_back(std::move(tk));
         }
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         canary_result_free(cr);
         r->segments.push_back(std::move(seg));
@@ -4463,6 +4538,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             tk.p = cqr->tokens[i].p;
             toks.push_back(std::move(tk));
         }
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         filter_words_by_ngram_collapse(seg.words);
         canary_qwen_result_free(cqr);
@@ -4751,6 +4827,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.text = core_ngram::fix_loops(transcript);
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         filter_words_by_ngram_collapse(seg.words);
         r->segments.push_back(std::move(seg));
@@ -4785,6 +4862,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             tk.p = cr->tokens[i].p;
             toks.push_back(std::move(tk));
         }
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         filter_words_by_ngram_collapse(seg.words);
         cohere_result_free(cr);
@@ -4996,6 +5074,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.text = transcript;
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         filter_words_by_ngram_collapse(seg.words);
         r->segments.push_back(std::move(seg));
@@ -5016,7 +5095,15 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         ops.token_text = &voxtral_token_text;
         ops.audio_pad_id = 24; // Tekken <audio_pad>
         ops.eos_id = 2;        // Tekken </s>
-        return run_voxtral_family(s->voxtral_ctx, ops, pcm, n_samples, lang, s->ask, s->beam_size);
+        auto* vr = run_voxtral_family(s->voxtral_ctx, ops, pcm, n_samples, lang, s->ask, s->beam_size);
+        // Fire per-token callbacks from the voxtral result words.
+        if (vr && s->token_cb) {
+            int tok_idx = 0;
+            for (const auto& seg : vr->segments)
+                for (const auto& w : seg.words)
+                    s->token_cb(w.text.c_str(), tok_idx++, s->token_ud);
+        }
+        return vr;
     }
 #endif
 #ifdef CA_HAVE_VOXTRAL4B
@@ -5106,6 +5193,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.text = text;
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         r->segments.push_back(std::move(seg));
         return r;
@@ -5170,6 +5258,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.text = vr->text;
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         vibevoice_result_free(vr);
         r->segments.push_back(std::move(seg));
@@ -5218,6 +5307,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             tk.p = dr->token_probs[i];
             toks.push_back(std::move(tk));
         }
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         canary_ctc_decode_result_free(dr);
         r->segments.push_back(std::move(seg));
@@ -5252,6 +5342,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.text = text;
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         r->segments.push_back(std::move(seg));
         return r;
@@ -5326,6 +5417,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.text = fixed_text;
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
+        _fire_token_callbacks(s, toks);
         seg.words = emit_words_from_tokens(toks);
         filter_words_by_ngram_collapse(seg.words);
         r->segments.push_back(std::move(seg));

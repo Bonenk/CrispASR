@@ -4669,6 +4669,58 @@ void resetStreamedSegments({String? libPath}) {
 }
 
 // ---------------------------------------------------------------------------
+// Streamed-token polling (per-token streaming callback, Dart side)
+// ---------------------------------------------------------------------------
+
+/// Number of new tokens available for polling.
+int getStreamedTokenCount({String? libPath}) {
+  final lib = DynamicLibrary.open(libPath ?? CrispASR.defaultLibName());
+  if (!lib.providesSymbol('crispasr_get_streamed_token_count')) return 0;
+  final fn = lib.lookupFunction<Int32 Function(), int Function()>(
+      'crispasr_get_streamed_token_count');
+  return fn();
+}
+
+/// Drain all buffered streamed tokens. Returns a list of token strings.
+List<String> drainStreamedTokens({String? libPath}) {
+  final lib = DynamicLibrary.open(libPath ?? CrispASR.defaultLibName());
+  if (!lib.providesSymbol('crispasr_drain_streamed_tokens')) return const [];
+  final countPtr = calloc<Int32>();
+  try {
+    final fn = lib.lookupFunction<
+        Pointer<Utf8> Function(Pointer<Int32>),
+        Pointer<Utf8> Function(Pointer<Int32>)>(
+        'crispasr_drain_streamed_tokens');
+    final ptr = fn(countPtr);
+    if (ptr == nullptr) return const [];
+    final count = countPtr.value;
+    if (count <= 0) return const [];
+    // Parse null-separated strings
+    final bytes = ptr.cast<Uint8>();
+    final result = <String>[];
+    var start = 0;
+    for (var i = 0; result.length < count; i++) {
+      if (bytes[i] == 0) {
+        result.add(ptr.cast<Utf8>().elementAt(start).toDartString(length: i - start));
+        start = i + 1;
+      }
+    }
+    return result;
+  } finally {
+    calloc.free(countPtr);
+  }
+}
+
+/// Reset the streamed token buffer.
+void resetStreamedTokens({String? libPath}) {
+  final lib = DynamicLibrary.open(libPath ?? CrispASR.defaultLibName());
+  if (!lib.providesSymbol('crispasr_reset_streamed_tokens')) return;
+  final fn = lib.lookupFunction<Void Function(), void Function()>(
+      'crispasr_reset_streamed_tokens');
+  fn();
+}
+
+// ---------------------------------------------------------------------------
 // C2: Stereo audio decode
 // ---------------------------------------------------------------------------
 
