@@ -1335,6 +1335,42 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
     std::vector<float> proj_e(J.joint_hidden);
     std::vector<float> logits(J.vocab_total);
 
+    // §232: Pre-compute ALL encoder projections upfront.
+    // Replaces T_enc individual sgemv calls inside the decode loop with
+    // a single bulk computation. On macOS uses batched sgemm; on Linux
+    // falls back to per-frame sgemv (still benefits from locality).
+    std::vector<float> all_proj_e((size_t)T_enc * J.joint_hidden);
+    {
+        for (int t = 0; t < T_enc; t++) {
+            float* dst = all_proj_e.data() + (size_t)t * J.joint_hidden;
+            std::copy(J.enc_b.begin(), J.enc_b.end(), dst);
+        }
+#if defined(HAVE_ACCELERATE)
+        // Batched sgemm: all_proj_e[T_enc, Jh] += enc[T_enc, d] @ enc_w^T[d, Jh]
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                    T_enc, J.joint_hidden, J.d_model,
+                    1.0f,
+                    enc, J.d_model,
+                    J.enc_w.data(), J.d_model,
+                    1.0f,
+                    all_proj_e.data(), J.joint_hidden);
+#else
+        // Per-frame fallback (still better than computing inside the loop
+        // where cache misses on enc[] are random due to dur_skip advances)
+        for (int t = 0; t < T_enc; t++) {
+            float* dst = all_proj_e.data() + (size_t)t * J.joint_hidden;
+            const float* enc_t = enc + (size_t)t * J.d_model;
+            for (int i = 0; i < J.joint_hidden; i++) {
+                float s = dst[i]; // already has enc_b[i]
+                const float* row = J.enc_w.data() + (size_t)i * J.d_model;
+                for (int k = 0; k < J.d_model; k++)
+                    s += row[k] * enc_t[k];
+                dst[i] = s;
+            }
+        }
+#endif
+    }
+
     // Sampling state — only touched when ctx->decode_temperature > 0.
     // We initialize unconditionally because seeding a mt19937_64 is
     // cheap, and keeping it outside the inner loop preserves the same
@@ -1348,7 +1384,10 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
     int t = 0;
     int total_steps = 0;
     while (t < T_enc) {
-        joint_proj_enc(J, enc + (size_t)t * d_model, proj_e);
+        // §232: use pre-computed projection instead of per-frame sgemv
+        std::copy(all_proj_e.data() + (size_t)t * J.joint_hidden,
+                  all_proj_e.data() + (size_t)(t + 1) * J.joint_hidden,
+                  proj_e.data());
 
         int n_inner = 0;
         while (n_inner < max_per_step) {
