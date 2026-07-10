@@ -7809,14 +7809,36 @@ outputs fixed-Lk=256 attention costs more than the saved rebuilds (dirlk
 slower than dir in 3/3 interleaved reps) → stays opt-in.
 
 **Remaining:**
-- [ ] Flip `QWEN3_TTS_CP_DIRECT` default ON after a clean-box interleaved
-      bench (runs were contended; min-of-N shown above) + 1.7B mtp-fused
-      md5 check + CPU (`--no-gpu`) sanity.
-- [ ] CUDA validation (Kaggle) — direct gallocr should also fix #56's O15
-      story; then revisit O15 default (or retire it in favour of CP_DIRECT).
-- [ ] Talker remains ~77 ms/frame (dynamic sched path, per-step rebuild);
-      candidate: same direct treatment with growing-Lk graph family.
-- [ ] Codec decode is ~half the remaining wall (CPU path) — separate item.
+- [x] CUDA validation (Kaggle P100, kernel `chr1s4/crispasr-qwen3-cp-direct-cuda`,
+      2026-07-11): all four configs rc=0 + **WAV md5-identical** + ASR
+      roundtrip verbatim. base 25.4 → direct 22.5 ms/frame (−11%);
+      direct+LK_BUCKET 21.4 (fastest on CUDA). **O15=1 no longer crashes on
+      P100** (#56 was Jetson sm_87; retire-O15 decision still needs a Jetson
+      or stays cosmetic).
+- [x] Clean-box Metal bench (load-gated, 3 interleaved reps): base ≈ direct
+      within noise (min 110.4 vs 111.3 ms/frame) — the earlier 3x gap was the
+      sched path degrading under load; direct's win on Metal is robustness
+      under contention, not idle speed. dirlk consistently ~10% slower.
+- [x] CPU `--no-gpu` sanity: md5-identical but direct is ~2x SLOWER
+      (87 → 160 ms/frame) — no dispatch cost to save; the per-step lm_head
+      slot blit (~2.2 MB memcpy ×14/frame) dominates.
+- [x] **Default flipped to conditional** (2026-07-11): CP_DIRECT ON when the
+      code_pred runs on a GPU backend, OFF on CPU; env override wins both
+      ways. LK_BUCKET stays opt-in (Metal regression; CUDA users can enable).
+- [x] 1.7B mtp-fused: **WAV md5-identical** on 1.7B-CustomVoice Q8_0 Metal
+      (baked speaker, no ICL; `small_to_mtp fused` + `cp_direct active` in
+      the default run vs CP_DIRECT=0). The 1.7B-Base + ICL route on the
+      16 GB Mac dies in codec decode on BOTH paths (jetsam/timeout,
+      pre-existing, ~1800-frame ICL ref prep + codec at ~5 GB free) —
+      separate issue, not CP_DIRECT.
+- [ ] Talker remains ~77 ms/frame on Metal (dynamic sched path, per-step
+      rebuild); candidate: same direct treatment with growing-Lk graph family.
+- [ ] Codec decode is ~half the remaining wall — and on the 16 GB Mac the
+      1.7B codec decode dies (jetsam at ~5 GB free / 20-min timeout) even on
+      the unmodified path. Separate item.
+- [ ] CPU direct-path rescue (optional): avoid the slot blit with 14 cached
+      per-cb graphs or in-graph lm_head selection via get_rows, then revisit
+      the CPU default.
 
 ## §230 Issue #238 — kyutai/stt-2.6b-en support (DONE)
 
