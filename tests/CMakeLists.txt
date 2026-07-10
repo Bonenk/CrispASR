@@ -1845,6 +1845,24 @@ catch_discover_tests(test-ngram-loop-fix
     PROPERTIES LABELS "unit;ngram-loop"
 )
 
+# ─── test-issue-239-popen-mode — regression guard for issue #239.
+#
+# Verifies that crispasr_popen("cmd", "rb") succeeds on POSIX (it failed
+# before the fix because glibc popen() rejects mode "rb" with EINVAL).
+add_executable(test-issue-239-popen-mode
+    test-issue-239-popen-mode.cpp
+)
+target_include_directories(test-issue-239-popen-mode PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-issue-239-popen-mode PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-issue-239-popen-mode
+    TEST_SPEC "[issue-239]"
+    PROPERTIES LABELS "unit;popen;issue-239"
+)
+
 # ─── test-lcs-c-abi — pin the public C ABI surface for the LCS dedup.
 # Verifies that `crispasr_lcs_dedup_prefix_count` is exported from
 # libcrispasr and agrees with the in-tree algorithm on the same
