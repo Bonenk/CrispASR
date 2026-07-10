@@ -55,7 +55,7 @@ kh.step("deps.begin")
 # _snapshot_download.py + new constants.py → AttributeError) — force a
 # coherent reinstall of a known-good hub as the LAST dep step.
 kh.sh_with_progress("pip install -q 'transformers==4.57.6' qwen_asr peft librosa soundfile")
-kh.sh_with_progress("pip install -q --force-reinstall 'huggingface_hub==0.36.0'")
+kh.sh_with_progress("pip install -q --force-reinstall 'huggingface_hub==0.36.0' hf_transfer")
 # kaggle_harness's progress pushes already imported the PREINSTALLED hub —
 # its module objects (constants, …) stay cached in sys.modules and mix with
 # the 0.36 files imported later (AttributeError on HF_HUB_ENABLE_HF_TRANSFER,
