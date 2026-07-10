@@ -51,6 +51,7 @@ archived at `cstr/chatterbox-GGUF/diff-harness-ref/`.
 | `granite-nle` | `tools/reference_backends/granite_nle.py` | — | — | yes | safetensors, torch, transformers |
 | `indextts` | `tools/reference_backends/indextts.py` | — | — | **no** | torch |
 | `kokoro` | `tools/reference_backends/kokoro.py` | — | — | yes | kokoro, torch |
+| `kyutai-stt` | `tools/reference_backends/kyutai_stt.py` | `cstr/kyutai-stt-2.6b-en-GGUF/kyutai-stt-2.6b-ref.gguf` | 2026-07-10 | yes | moshi, safetensors, scipy, sentencepiece, torch |
 | `kugelaudio` | `tools/reference_backends/kugelaudio.py` | — | — | yes | torch |
 | `lfm2-audio` | `tools/reference_backends/lfm2_audio.py` | — | — | yes | torch |
 | `lid-cld3` | `tools/reference_backends/lid_cld3.py` | — | — | yes | gguf, pycld3 |
