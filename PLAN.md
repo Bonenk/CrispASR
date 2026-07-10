@@ -602,6 +602,34 @@ opt-in single-pass ≤655 s); (3) the blueprint itself SKIPS quiet leading
 audio in single-pass mode (starts at ~75 s on t32) — chunked mode covers more
 content on such clips; document in README.
 
+## #218 qwen3-family rebake + CUDA validation — kernel results (DONE)
+
+Kaggle kernel `tools/kaggle/qwen3-family-rebake/` (T4, HEAD 199609d0):
+
+- **CUDA validation of the week's fixes:** qwen3-asr 0.6b un-chunked 145 s
+  single-pass CLEAN on CUDA (full attention, 686 chars, reaches the final
+  sentence, zero loops raw); glm-asr multi-window single-pass CLEAN on CUDA
+  (reaches final sentence); glm jfk verbatim. The WINDOWED qwen3 path loops
+  in the noisy lead on CUDA (238-run) where Metal recovered — consistent
+  with the windowed blueprint's own noise behaviour + greedy sensitivity to
+  backend numerics; reinforces keeping `CRISP_AUDIO_WINDOWED_ATTN` opt-in.
+- **qwen3-asr-1.7b:** header audit shows its q4_k ALREADY has a Q8_0 audio
+  tower — no rebake needed.
+- **qwen3-asr-1.7b-ja-anime:** q4_k tower was Q4_K → rebaked with the floor
+  (1334→1421 MB), validated (jfk 109 chars; t32 single-pass 1024 chars,
+  max run 1, no loops) and UPLOADED.
+- **mega-asr:** q4_k tower was Q4_K → rebaked all three variants with the
+  floor, but ALL of them still degenerate on the un-chunked 145 s clip —
+  q4_k and q3_k-imatrix produce a "Come on, come on, …" 2-gram cycle (the
+  kernel's unigram-run metric read that as clean; the transcripts don't
+  lie), q4_k-imatrix shows the familiar hey-run (172). Q8 tower alone does
+  not fix mega's long-form drift → uploads correctly skipped, published
+  files unchanged. mega's DEFAULT 30 s-chunked path is unaffected; treat
+  `--chunk-seconds 0` as unsupported for mega at 4-bit until investigated
+  (bf16 blueprint behaviour unknown — candidate follow-up).
+- Metric lesson: loop gates need a PHRASE-cycle check, not just unigram
+  runs (the issue218-quant-audit kernel has one; this kernel didn't).
+
 ## Priority ordering
 
 | Priority | Item | Effort | Status |
