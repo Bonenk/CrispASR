@@ -159,4 +159,34 @@ for quant in ("q8_0", "q4_k"):
     print(f"  uploaded {quant}")
     out.unlink(missing_ok=True)
 
+# ── Phase 8: Generate reference GGUF for crispasr-diff ──────────────────────
+#
+# Dumps Mimi + LM intermediates (seanet_output, enc_tfm_output, rvq_codes,
+# lm_frame0_logits, generated_text) to a GGUF archive so the C++ diff harness
+# can validate element-wise that crispasr's runtime matches PyTorch.
+#
+# The JFK sample is baked into the repo so no extra audio download is needed.
+kh.step("generate reference GGUF")
+kh.sh_with_progress(
+    "pip install -q moshi sentencepiece scipy gguf",
+)
+ref_path = TEMP / f"{NAME}-ref.gguf"
+jfk_wav = REPO / "samples" / "jfk.wav"
+kh.sh_with_progress(
+    f"python tools/dump_reference.py --backend kyutai-stt "
+    f"--model-dir {src} --audio {jfk_wav} --output {ref_path}",
+    cwd=str(REPO),
+)
+print(f"  ref GGUF: {ref_path} ({ref_path.stat().st_size / 1024:.0f} KiB)")
+
+kh.step("upload ref GGUF to HF")
+api.upload_file(
+    path_or_fileobj=str(ref_path),
+    path_in_repo=f"{NAME}-ref.gguf",
+    repo_id=HF_REPO, repo_type="model",
+    commit_message="Add reference activation dump GGUF for crispasr-diff (kyutai-stt 2.6B)",
+)
+print("  uploaded ref GGUF")
+ref_path.unlink(missing_ok=True)
+
 print(f"\n=== Done — GGUFs uploaded to {HF_REPO} ===", flush=True)
