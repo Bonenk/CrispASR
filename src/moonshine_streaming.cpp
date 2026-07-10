@@ -613,7 +613,11 @@ static int run_encoder(moonshine_streaming_context* ctx, const float* frontend_o
     ggml_set_name(cur, "enc_input");
     ggml_set_input(cur);
 
-    // Per-layer masks
+    // Per-layer sliding-window masks. Required for correctness — the model
+    // was trained with specific window sizes and produces garbage without them.
+    // §232 note: removing masks for offline-mode was tested and produces
+    // degenerate output (repeating tokens). The masks ARE the computational
+    // bottleneck (~550² × 6 layers) but cannot be skipped.
     std::vector<ggml_tensor*> masks(hp.enc_n_layers, nullptr);
     for (uint32_t li = 0; li < hp.enc_n_layers; li++) {
         auto [wl, wr] = hp.sliding_windows[li];
