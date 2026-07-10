@@ -1075,6 +1075,26 @@ if(GGML_CUDA)
     target_link_libraries(voxtral4b PUBLIC ggml-cuda)
 endif()
 
+add_library(voxtral_tts STATIC
+            voxtral_tts.h
+            voxtral_tts.cpp
+            )
+target_include_directories(voxtral_tts PUBLIC . ../include)
+target_compile_features   (voxtral_tts PUBLIC cxx_std_17)
+set_target_properties(voxtral_tts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries     (voxtral_tts PUBLIC ggml ggml-base Threads::Threads crispasr-core)
+if(NOT MSVC)
+    target_compile_options(voxtral_tts PRIVATE -O3)
+endif()
+if(GGML_METAL)
+    target_compile_definitions(voxtral_tts PRIVATE GGML_USE_METAL)
+    target_link_libraries(voxtral_tts PUBLIC ggml-metal)
+endif()
+if(GGML_CUDA)
+    target_compile_definitions(voxtral_tts PRIVATE GGML_USE_CUDA)
+    target_link_libraries(voxtral_tts PUBLIC ggml-cuda)
+endif()
+
 add_library(higgs_stt STATIC
             higgs_stt.h
             higgs_stt.cpp
@@ -2176,6 +2196,9 @@ if (TARGET higgs_stt)
 endif()
 if (TARGET voxtral4b)
     target_link_libraries(crispasr-lib PUBLIC voxtral4b)
+endif()
+if (TARGET voxtral_tts)
+    target_link_libraries(crispasr-lib PUBLIC voxtral_tts)
 endif()
 if (TARGET wav2vec2-ggml)
     target_link_libraries(crispasr-lib PUBLIC wav2vec2-ggml)
