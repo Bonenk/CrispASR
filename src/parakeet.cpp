@@ -3176,7 +3176,9 @@ extern "C" struct parakeet_result* parakeet_decode_frames(struct parakeet_contex
                        : (use_maes   ? parakeet_tdt_maes_decode(ctx, enc_frames, T_enc, d_model, ctx->decode_beam_size,
                                                                 ctx->maes_num_steps, ctx->maes_gamma, ctx->maes_beta)
                           : use_beam ? parakeet_tdt_beam_decode(ctx, enc_frames, T_enc, d_model, ctx->decode_beam_size)
-                                     : parakeet_tdt_decode(ctx, enc_frames, T_enc, d_model));
+                                     : (getenv("CRISPASR_TDT_BATCH")
+                                             ? parakeet_tdt_decode_batched(ctx, enc_frames, T_enc, d_model)
+                                             : parakeet_tdt_decode(ctx, enc_frames, T_enc, d_model)));
 
     // Build result (same as the tail of parakeet_transcribe_ex)
     auto* r = (parakeet_result*)calloc(1, sizeof(parakeet_result));
@@ -3555,7 +3557,9 @@ extern "C" struct parakeet_result* parakeet_transcribe_ex(struct parakeet_contex
                        : (use_maes   ? parakeet_tdt_maes_decode(ctx, enc.data(), T_enc, d, ctx->decode_beam_size,
                                                                 ctx->maes_num_steps, ctx->maes_gamma, ctx->maes_beta)
                           : use_beam ? parakeet_tdt_beam_decode(ctx, enc.data(), T_enc, d, ctx->decode_beam_size)
-                                     : parakeet_tdt_decode(ctx, enc.data(), T_enc, d));
+                                     : (getenv("CRISPASR_TDT_BATCH")
+                                             ? parakeet_tdt_decode_batched(ctx, enc.data(), T_enc, d)
+                                             : parakeet_tdt_decode(ctx, enc.data(), T_enc, d)));
     if (getenv("PARAKEET_DEBUG"))
         fprintf(stderr, "parakeet: %s%s decode OK (%d tokens)\n",
                 use_ctc    ? "CTC"
