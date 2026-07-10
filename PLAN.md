@@ -655,12 +655,25 @@ landed, CUDA-validated). Deliberately-open threads, in priority order:
    fix_loops on): jfk verbatim; t32-145s full dialogue start-to-final-
    sentence, genuine shouts bounded — mega's previously-working paths are
    intact and improved by the blueprint prompt.
-2. **Windowed encoder default flip + CAP_UNBOUNDED_INPUT (qwen3-asr).**
-   Mechanism shipped opt-in and parity-verified (cos 0.99953); needs a
-   broader eval before flipping: several long clips, windowed-vs-full
-   completeness + loop metrics WITH a phrase-cycle check (unigram runs miss
-   2-gram cycles), CUDA behaviour (loops in noisy leads where Metal
-   recovers), and an encoder speed profile (many 104² matmuls vs one big).
+2. **Windowed encoder default flip + CAP_UNBOUNDED_INPUT (qwen3-asr) —
+   RESOLVED: FLIP REJECTED (2026-07-10).** Broader eval (M1 Metal, q4_k-v2
+   Q8-tower GGUF, raw decode via CRISPASR_NGRAM_LOOPFIX_OFF=1, single-pass,
+   phrase-cycle metric): on t32-145s the windowed path degenerates in the
+   noisy lead ON METAL TOO (unigram run 238 / cycle 119, never reaches the
+   final sentence; it attends the quiet lead, then greedy collapses on
+   noise) while full attention is clean+complete (run 1 / cycle 0) — the
+   earlier "Metal recovers" observation was not robust; greedy is
+   knife-edge there and CUDA already looped. On clean speech (jfk×12,
+   132 s) both modes are clean; both EOS early on genuinely 12×-repeated
+   audio (model behaviour; full slightly more complete, 198 vs 176 words).
+   Windowed is also ~1.5× slower on Metal at these lengths (jfk×12: 397 s
+   vs 271 s wall; t32: 658 s vs ~400 s) — the many-104²-matmuls cost is
+   real; peak RSS ~2 GB in both modes at 145 s (the O(N·W) advantage only
+   matters beyond full attention's ~10-min OOM point). Verdict: default
+   stays FULL attention + 30 s chunks; CAP_UNBOUNDED_INPUT stays unset;
+   `CRISP_AUDIO_WINDOWED_ATTN=1` remains the documented escape hatch for
+   >10-min single-pass audio (pair with fix_loops ON). Not run: a JA
+   240 s pair (box contention; verdict doesn't hinge on it).
 3. **Loop metric hardening — DONE for new kernels.** The
    mega-asr-blueprint-ref kernel carries the phrase-cycle metric (it is
    what caught the "come on" 2-gram cycle unigram runs missed); any
