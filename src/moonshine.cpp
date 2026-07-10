@@ -79,7 +79,6 @@ struct moonshine_context {
     ggml_cgraph* cached_enc_gf = nullptr;
     ggml_context* cached_enc_ctx = nullptr;
     int cached_enc_n_samples = 0;
-
 };
 
 using TensorMap = std::map<std::string, ggml_tensor*>;
@@ -884,7 +883,8 @@ static int moonshine_decode_step_greedy(struct moonshine_context* ctx, int32_t t
         /*.no_alloc   =*/true,
     };
     struct ggml_context* ctx0 = ggml_init(params);
-    if (!ctx0) return -1;
+    if (!ctx0)
+        return -1;
 
     struct ggml_tensor* inp_token = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, 1);
     ggml_set_name(inp_token, "token_id");
@@ -1173,10 +1173,12 @@ static int moonshine_transcribe_impl(struct moonshine_context* ctx, const float*
         if (greedy_fast) {
             // §232: in-graph argmax — 4 bytes readback instead of 128 KB
             ret = moonshine_decode_step_greedy(ctx, token, picked);
-            if (ret != 0) break;
+            if (ret != 0)
+                break;
         } else {
             ret = moonshine_decode_step(ctx, token, logits);
-            if (ret != 0) break;
+            if (ret != 0)
+                break;
 
             const int V = (int)hp.vocab_size;
 
