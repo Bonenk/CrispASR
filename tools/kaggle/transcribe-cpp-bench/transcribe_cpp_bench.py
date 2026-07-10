@@ -549,24 +549,25 @@ CRISPASR_BUILD = CRISPASR_DIR / "build"
 CRISPASR_BUILD.mkdir(exist_ok=True)
 
 _cuda_arch = kh.detect_cuda_arch() if has_gpu else None
-_cuda_flags = kh.cuda_build_flags(_cuda_arch) if has_gpu else ""
+_cuda_flags = kh.cuda_build_flags(_cuda_arch) if has_gpu else []
 _cache_flags = kh.cache_and_link_flags()
 _jobs = kh.safe_build_jobs(gpu=has_gpu)
-_gen = "-G Ninja" if _tc.get("ninja") else ""
+_gen = ["-G", "Ninja"] if _tc.get("ninja") else []
 
-_cmake_cmd = (
-    f"CCACHE_DIR=/kaggle/working/.ccache cmake {_gen} -B {CRISPASR_BUILD} "
-    f"-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache "
-    f"-DCMAKE_BUILD_TYPE=Release {_cuda_flags} {_cache_flags} {CRISPASR_DIR}"
+subprocess.run(
+    ["cmake"] + _gen + [
+        "-B", str(CRISPASR_BUILD),
+        "-DCMAKE_BUILD_TYPE=Release",
+    ] + _cuda_flags + _cache_flags + [str(CRISPASR_DIR)],
+    check=True, stdout=_build_log, stderr=_build_log,
+    env={**os.environ, "CCACHE_DIR": "/kaggle/working/.ccache"},
 )
-subprocess.run(_cmake_cmd, shell=True, check=True, stdout=_build_log, stderr=_build_log)
 
 _hb = kh.build_heartbeat()
 try:
     subprocess.run(
-        f"cmake --build {CRISPASR_BUILD} -j{_jobs} --target crispasr",
-        shell=True, check=True, stdout=_build_log, stderr=_build_log,
-        timeout=30 * 60,
+        ["cmake", "--build", str(CRISPASR_BUILD), f"-j{_jobs}", "--target", "crispasr"],
+        check=True, stdout=_build_log, stderr=_build_log, timeout=30 * 60,
     )
 finally:
     _hb.cancel() if hasattr(_hb, "cancel") else None
@@ -599,24 +600,25 @@ step("build_transcribecpp.begin")
 _tc_build_log = (WORK / "build_transcribecpp.log").open("a")
 TC_BUILD = TC_DIR / "build"
 
-_tc_cuda_flag = "-DTRANSCRIBE_CUDA=ON" if has_gpu else ""
-_tc_cmake_cmd = (
-    f"CCACHE_DIR=/kaggle/working/.ccache cmake -G Ninja -B {TC_BUILD} "
-    f"-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache "
-    f"-DCMAKE_BUILD_TYPE=Release {_tc_cuda_flag} {TC_DIR}"
-)
+_tc_cuda_flags = ["-DTRANSCRIBE_CUDA=ON"] if has_gpu else []
+# Pin the same arch for transcribe.cpp to avoid fat-binary OOM
+if has_gpu and _cuda_arch:
+    _tc_cuda_flags += [f"-DCMAKE_CUDA_ARCHITECTURES={_cuda_arch}"]
+
 subprocess.run(
-    _tc_cmake_cmd, shell=True, check=True,
-    stdout=_tc_build_log, stderr=_tc_build_log
+    ["cmake"] + _gen + [
+        "-B", str(TC_BUILD),
+        "-DCMAKE_BUILD_TYPE=Release",
+    ] + _tc_cuda_flags + _cache_flags + [str(TC_DIR)],
+    check=True, stdout=_tc_build_log, stderr=_tc_build_log,
+    env={**os.environ, "CCACHE_DIR": "/kaggle/working/.ccache"},
 )
 
 _hb2 = kh.build_heartbeat()
 try:
     subprocess.run(
-        f"cmake --build {TC_BUILD} -j{_jobs} --target transcribe-cli",
-        shell=True, check=True,
-        stdout=_tc_build_log, stderr=_tc_build_log,
-        timeout=30 * 60,
+        ["cmake", "--build", str(TC_BUILD), f"-j{_jobs}", "--target", "transcribe-cli"],
+        check=True, stdout=_tc_build_log, stderr=_tc_build_log, timeout=30 * 60,
     )
 finally:
     _hb2.cancel() if hasattr(_hb2, "cancel") else None
