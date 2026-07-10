@@ -18,7 +18,7 @@ backend doesn't expose that knob, but the call is safe to make.
 | `set_tts_seed(seed)` | `set_tts_seed` / `set_tts_seed` / `SetTTSSeed` / `setTtsSeed` | Chatterbox, vibevoice, qwen3-tts, orpheus; rc=-2 for others |
 | `set_max_new_tokens(n)` | `set_max_new_tokens` / `set_max_new_tokens` / `SetMaxNewTokens` / `setMaxNewTokens` | AR backends; ≤ 0 clears override |
 | `set_frequency_penalty(f)` | `set_frequency_penalty` / `set_frequency_penalty` / `SetFrequencyPenalty` / `setFrequencyPenalty` | AR backends; ≤ 0 disables |
-| `set_tts_steps(n)` | `set_tts_steps` / `set_tts_steps` / `SetTTSSteps` / `setTtsSteps` | Chatterbox S3Gen CFM steps; vibevoice DPM-Solver++ steps |
+| `set_tts_steps(n)` | `set_tts_steps` / `set_tts_steps` / `SetTTSSteps` / `setTtsSteps` | Chatterbox S3Gen CFM steps; vibevoice DPM-Solver++ steps; kugelaudio; tada FM steps; irodori flow-matching ODE steps |
 | `set_tts_num_candidates(n)` | `set_tts_num_candidates` / `set_tts_num_candidates` / `SetTTSNumCandidates` / `setTtsNumCandidates` | TADA flow-matching timing candidates ranked per token (default 4); rc=-2 for others |
 | `set_top_p(p)` | `set_top_p` / `set_top_p` / `SetTopP` / `setTopP` | Chatterbox AR T3 loop |
 | `set_top_k(k)` | `set_top_k` / `set_top_k` / `SetTopK` / `setTopK` | TADA talker sampler (0 = disabled); rc=-2 for others |

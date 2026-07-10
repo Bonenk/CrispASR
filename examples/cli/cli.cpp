@@ -1218,12 +1218,16 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "             --chat-gpu-layers N      [%-7d] server: GPU layers for the chat model "
             "(-1 = all, 0 = CPU only)\n",
             params.chat_n_gpu_layers);
-    fprintf(stderr, "             --tts-steps N            [%-7d] DPM-Solver++ steps (10-20, vibevoice only)\n",
-            params.tts_steps);
     fprintf(stderr,
-            "             --tts-cfg-scale X        [%-7s] TTS CFG guidance scale (vibevoice/chatterbox/f5/tada; "
-            "vibevoice: 0 = model default, try 1.5 or a new --seed to re-roll BGM onsets)\n",
-            "default");
+            "             --tts-steps N            [%-7d] diffusion/ODE steps (vibevoice 10-20; irodori 40; "
+            "chatterbox/f5/tada)\n",
+            params.tts_steps);
+    fprintf(
+        stderr,
+        "             --tts-cfg-scale X        [%-7s] TTS CFG guidance scale (vibevoice/chatterbox/f5/tada/irodori; "
+        "irodori: text CFG (default 3.0); speaker CFG via CRISPASR_IRODORI_CFG_SPEAKER; "
+        "vibevoice: 0 = model default, try 1.5 or a new --seed to re-roll BGM onsets)\n",
+        "default");
     fprintf(stderr, "             --tts-trim-silence       [%-7s] trim leading silence from TTS output\n",
             params.tts_trim_silence ? "true" : "false");
     fprintf(stderr, "             --tts-play               [%-7s] play synthesised audio on the local speaker\n",

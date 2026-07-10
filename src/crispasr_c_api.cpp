@@ -8543,6 +8543,14 @@ CA_EXPORT int crispasr_session_set_tts_steps(crispasr_session* s, int steps) {
         touched++;
     }
 #endif
+#ifdef CA_HAVE_IRODORI_TTS
+    if (s->irodori_ctx) {
+        // Irodori flow-matching Euler ODE step count (default 40). Read live per
+        // synthesize(), so mutation changes the next call's diffusion density (#241).
+        irodori_tts_set_ode_steps(s->irodori_ctx, steps);
+        touched++;
+    }
+#endif
     return touched > 0 ? 0 : -2;
 }
 
@@ -8558,6 +8566,15 @@ CA_EXPORT int crispasr_session_set_tts_cfg_scale(crispasr_session* s, float scal
 #ifdef CA_HAVE_VIBEVOICE
     if (s->vibevoice_ctx) {
         vibevoice_set_cfg_scale((vibevoice_context*)s->vibevoice_ctx, scale);
+        touched++;
+    }
+#endif
+#ifdef CA_HAVE_IRODORI_TTS
+    if (s->irodori_ctx) {
+        // Maps to Irodori's (primary) text CFG scale (default 3.0). The separate
+        // speaker CFG (default 5.0) is reachable only via the CLI env override
+        // CRISPASR_IRODORI_CFG_SPEAKER — the single generic knob can't carry it (#241).
+        irodori_tts_set_cfg_scale_text(s->irodori_ctx, scale);
         touched++;
     }
 #endif

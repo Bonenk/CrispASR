@@ -74,6 +74,24 @@ public:
             return false;
         }
 
+        // ── Diffusion knobs (#241) ──
+        // The generic --tts-steps / --tts-cfg-scale flags map to the flow-matching
+        // ODE step count and the (primary) text CFG scale. Irodori also carries a
+        // separate speaker CFG scale that the single --tts-cfg-scale can't reach, so
+        // expose all three via env overrides too. The setters mutate the context and
+        // synthesize() reads ode_steps/cfg_scale live, so they take effect on the
+        // next call regardless of ordering relative to codec loading below.
+        if (p.tts_num_steps > 0)
+            irodori_tts_set_ode_steps(ctx_, p.tts_num_steps);
+        if (p.tts_cfg_scale >= 0.0f)
+            irodori_tts_set_cfg_scale_text(ctx_, p.tts_cfg_scale);
+        if (const char* e = std::getenv("CRISPASR_IRODORI_ODE_STEPS"))
+            irodori_tts_set_ode_steps(ctx_, std::atoi(e));
+        if (const char* e = std::getenv("CRISPASR_IRODORI_CFG_TEXT"))
+            irodori_tts_set_cfg_scale_text(ctx_, (float)std::atof(e));
+        if (const char* e = std::getenv("CRISPASR_IRODORI_CFG_SPEAKER"))
+            irodori_tts_set_cfg_scale_speaker(ctx_, (float)std::atof(e));
+
         // ── Codec companion loading (3-tier: --codec-model → sibling → registry auto-download) ──
         std::string codec_path = p.tts_codec_model;
         if (!codec_path.empty() && codec_path != "auto" && codec_path != "default") {
