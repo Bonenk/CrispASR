@@ -6,6 +6,34 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-10 — qwen3-asr-1.7b q4_k empty transcripts (#240)
+
+Reporter (macOS/M4/Metal, v0.8.9): `cstr/qwen3-asr-1.7b-GGUF/qwen3-asr-1.7b-q4_k.gguf`
+loads and reports success but emits an empty transcript; the q8_0 and the 0.6b q4_k
+work. Same root cause as #218: the shipped 1.7b q4_k (exported 2026-07-03) predates the
+Q8_0 audio-tower carve-out that landed the same day (`3c3ba2c7`,
+`examples/crispasr-quantize/main.cpp:772` — arch-keyed on `qwen3asr`, size-agnostic).
+The 0.6b was re-baked; the 1.7b was not, so its 24-layer `audio.*` tower stayed q4_k and
+drifted per #218.
+
+- **Re-bake** (worktree `crispasr-quantize` at HEAD): f16 → q4_k with the fix →
+  147 `audio.*` tensors floored to q8_0, LLM at q4_k (1490 MB vs 1334 MB broken).
+- **Validation** — new `examples/qwen3-asr-enc-dump` dumps the encoder output (CPU) per
+  GGUF; per-row cosine vs f16 on jfk (11s, 143 frames): broken cos_min 0.9632 / mean
+  0.9913 (29/143 rows < 0.99) → fixed cos_min 0.9989 / mean 0.9998 (0/143). Same repair
+  pattern as #218's 0.6b (cos_mean 0.9716 → 0.9997); drift compounds with frame count,
+  breaking decode on long / Metal audio (the reporter's case). On CUDA the broken q4_k
+  decode survives at short length (jfk 11s exact), consistent with the platform-amplified
+  Metal manifestation.
+- **Ask #2 (silent-failure guard)**: `crispasr_run.cpp` now warns on stderr when a
+  non-silent clip (peak > ~−40 dBFS, ≥ 0.5 s) produces no non-whitespace text, across all
+  three CLI transcribe paths. Peak-gate so silence never warns; suppressed by `--no-prints`.
+  Validated: tone → warns, silence → no warn, speech → no warn.
+- **Incidental**: fixed a `ca_token_record` definition-ordering bug (from the per-token
+  streaming C-ABI commit) that broke every Windows/MSVC build on main HEAD (C2027).
+
+Fixed GGUF replaces `qwen3-asr-1.7b-q4_k.gguf` on `cstr/qwen3-asr-1.7b-GGUF`.
+
 ## 2026-07-09 — canary-qwen backend (nvidia/canary-qwen-2.5b, #233)
 
 New backend: SALM (Speech-Augmented Language Model) — 32-layer FastConformer
