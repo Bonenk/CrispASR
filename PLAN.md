@@ -7763,6 +7763,48 @@ with 15 sequential AR steps — should be one graph, not 15 dispatches.
 **Effort:** M (the graph fusion is the hard part; the flag defaults are trivial).
 **Priority:** HIGH — TTS perf gap is user-visible and competitively damaging.
 
+### §232 update (2026-07-10, M1 Metal) — CP_DIRECT implemented, LK_BUCKET un-broken
+
+**Why not one fused 15-step graph:** each step samples (top_k=50, temp, seeded
+RNG) on the CPU and the sampled id selects the next `codec_embd` row — bit-
+identical output therefore requires a CPU logits round-trip between steps.
+The right fix is making each dispatch cheap, not fusing.
+
+**What the 15 dispatches actually cost on M1 Metal (0.6B Q8_0, seed 42):**
+build ~2-12 ms + sched alloc ~10-50 ms + compute ~200-600 ms per frame, where
+"compute" is dominated by `ggml_backend_sched` overhead + command-buffer
+round-trips, not kernels (the code_pred is ~64 M MACs/step).
+
+**Fix shipped — `QWEN3_TTS_CP_DIRECT` (opt-in pending clean bench + CUDA):**
+two persistent sched-free graphs (T=2 step-0, T=1 step with O15 topology:
+fixed Lk, runtime positions → RoPE + set_rows KV write, lm_head via the
+writable slot), each gallocr-allocated ONCE on the code_pred backend; a step
+is tensor_set + one `ggml_backend_graph_compute` + logits read. No scheduler
+⇒ the #56-class sched-reuse breakage cannot occur. Ops-supported + placement
+checked once at init; falls back to the sched paths otherwise.
+
+**Measured (M1 Metal, 0.6B Q8_0, seed 42, box otherwise quiet):** ar_loop
+564 → 179 ms/frame; code_pred ~408 → ~125 ms/frame; RTF 10.4 → 3.3.
+**Output md5-identical WAV** across default / O15=1 / CP_DIRECT / CP_DIRECT+
+LK_BUCKET, 9/9 runs.
+
+**LK_BUCKET was SEGFAULTING on main** (nil-buffer inputs on Metal — the same
+ggml sched-plan-reuse tightening; reproduced with LK_BUCKET=1 alone on
+unmodified code). Reworked the bucket path onto per-bucket persistent
+gallocr + sched-free dispatch: no more crash, md5-identical. But at short
+outputs fixed-Lk=256 attention costs more than the saved rebuilds (dirlk
+slower than dir in 3/3 interleaved reps) → stays opt-in.
+
+**Remaining:**
+- [ ] Flip `QWEN3_TTS_CP_DIRECT` default ON after a clean-box interleaved
+      bench (runs were contended; min-of-N shown above) + 1.7B mtp-fused
+      md5 check + CPU (`--no-gpu`) sanity.
+- [ ] CUDA validation (Kaggle) — direct gallocr should also fix #56's O15
+      story; then revisit O15 default (or retire it in favour of CP_DIRECT).
+- [ ] Talker remains ~77 ms/frame (dynamic sched path, per-step rebuild);
+      candidate: same direct treatment with growing-Lk graph family.
+- [ ] Codec decode is ~half the remaining wall (CPU path) — separate item.
+
 ## §230 Issue #238 — kyutai/stt-2.6b-en support (DONE)
 
 **Shipped 2026-07-10.** Full support for the 48L / 2.6B English-only Kyutai STT model.
