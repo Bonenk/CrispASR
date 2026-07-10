@@ -4568,20 +4568,29 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
 
         // ChatML prompt: <|im_start|>system\n{sys}<|im_end|>\n<|im_start|>user\n
         // <|audio_start|><|audio_pad|>×N<|audio_end|>{question}<|im_end|>\n
-        // <|im_start|>assistant\n
+        // <|im_start|>assistant\n[PREFILL]
         //
         // When `s->ask` is set, inject the question between the audio
         // close token and the user-turn end so the LLM answers it
         // instead of producing a verbatim transcript. Otherwise, when a
-        // language is set (per-call or sticky source_language), inject a
-        // "Transcribe the speech in <lang>." system instruction — mirrors
-        // the CLI adapter (crispasr_backend_qwen3.cpp). Empty ask + no
-        // language keeps the historical transcribe-only template.
+        // language is set (per-call or sticky source_language), follow
+        // the blueprint contract (qwen_asr _build_text_prompt): append
+        // an assistant-turn prefill "language <Name><asr_text>" so the
+        // model emits transcript text only and cannot answer "language
+        // none" (issue #218 empty-output escape). Mirrors the CLI
+        // adapter (crispasr_backend_qwen3.cpp); the legacy system-turn
+        // instruction stays behind CRISPASR_QWEN3_SYSPROMPT_LANG=1.
         std::string sys_instruction;
+        std::string assistant_prefill;
         if (s->ask.empty()) {
             const std::string eff_lang = lang_set ? lang : s->source_language;
-            if (!eff_lang.empty() && eff_lang != "auto")
-                sys_instruction = "Transcribe the speech in " + ca_iso_to_english_lang(eff_lang) + ".";
+            if (!eff_lang.empty() && eff_lang != "auto") {
+                const char* legacy_env = getenv("CRISPASR_QWEN3_SYSPROMPT_LANG");
+                if (legacy_env && atoi(legacy_env) != 0)
+                    sys_instruction = "Transcribe the speech in " + ca_iso_to_english_lang(eff_lang) + ".";
+                else
+                    assistant_prefill = "language " + ca_iso_to_english_lang(eff_lang) + "<asr_text>";
+            }
         }
         std::string text = "<|im_start|>system\n" + sys_instruction + "<|im_end|>\n<|im_start|>user\n<|audio_start|>";
         text.reserve(text.size() + (size_t)N_enc * 13 + 64 + s->ask.size());
@@ -4593,6 +4602,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             text += s->ask;
         }
         text += "<|im_end|>\n<|im_start|>assistant\n";
+        text += assistant_prefill;
 
         int n_prompt = 0;
         int32_t* raw_ids = qwen3_asr_tokenize(s->qwen3_ctx, text.c_str(), &n_prompt);
@@ -4629,7 +4639,11 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         }
         std::free(audio_embeds);
 
-        if (!qwen3_asr_kv_init(s->qwen3_ctx, 4096)) {
+        // Blueprint default max_new_tokens=512; KV sized to prompt + decode
+        // budget so unchunked long audio isn't capped at 4096 ctx (mirrors
+        // the CLI adapter's dynamic sizing).
+        const int q3_max_new = s->max_new_tokens > 0 ? s->max_new_tokens : 512;
+        if (!qwen3_asr_kv_init(s->qwen3_ctx, std::max(4096, (int)ids.size() + q3_max_new + 16))) {
             std::free(text_embeds);
             delete r;
             return nullptr;
@@ -4666,7 +4680,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 return lg;
             };
             core_beam_decode::Config bcfg;
-            bcfg.max_new_tokens = s->max_new_tokens > 0 ? s->max_new_tokens : 256;
+            bcfg.max_new_tokens = q3_max_new;
             bcfg.eos_id = eos_id;
             bcfg.vocab_size = vocab;
             bcfg.beam_size = s->beam_size;
@@ -4680,7 +4694,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             const float first_p =
                 core_greedy_decode::softmax_of(logits + last_off, vocab, first_tok, logits[last_off + first_tok]);
             core_greedy_decode::Config dec_cfg;
-            dec_cfg.max_new_tokens = s->max_new_tokens > 0 ? s->max_new_tokens : 256;
+            dec_cfg.max_new_tokens = q3_max_new;
             dec_cfg.eos_id = eos_id;
             dec_cfg.vocab_size = vocab;
             dec_cfg.frequency_penalty = s->frequency_penalty;

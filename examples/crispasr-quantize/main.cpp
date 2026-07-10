@@ -422,8 +422,22 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
     // The encoder is precision-sensitive (conformer drift), keep at source.
     // Only LLM block projections (blk.*.attn_*, blk.*.ffn_*) should be quantized.
     // Keep: encoder.*, preprocessor.*, proj.*, token_embd.*, output_norm.*
-    const bool is_canary_qwen = (arch.find("canary_qwen") != std::string::npos ||
-                                  arch.find("canary-qwen") != std::string::npos);
+    const bool is_canary_qwen =
+        (arch.find("canary_qwen") != std::string::npos || arch.find("canary-qwen") != std::string::npos);
+
+    // Qwen3-ASR: Whisper-style 18-layer full-attention audio tower + Qwen3
+    // LLM. Sub-8-bit audio.* compounds per-block drift (#218 diff harness:
+    // blk00 cos_mean 0.9996 → blk17 0.973 on a 145 s clip) until greedy
+    // decode flips to "language none" / empty output on long audio. Floor
+    // the tower at Q8_0 (~lossless, cos ≥ 0.9999/blk) instead of keeping it
+    // F16 outright — same drift class as the canary/mini-omni2 encoder
+    // carve-outs at ~half their size cost. CRISPASR_QWEN3ASR_QUANT_AUDIO=1
+    // quantizes audio.* at the target type anyway (A/B gate).
+    const bool is_qwen3_asr = (arch == "qwen3asr" || arch == "qwen3-asr");
+    const bool qwen3asr_quant_audio = []() {
+        const char* e = std::getenv("CRISPASR_QWEN3ASR_QUANT_AUDIO");
+        return e && *e && *e != '0';
+    }();
 
     // Bark TTS: 3 GPT-2 sub-models + EnCodec decoder.
     // Embeddings (token_embd, pos_embd), output heads, and the entire
@@ -655,12 +669,11 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                                 sname.find("depth.codebook.") == 0 || sname.find("preprocessor.") == 0)) &&
             !(is_mini_omni2 &&
               (sname.find("audio.") == 0 || sname.find("adapter.") == 0 || sname.find("llm.token_embd") == 0)) &&
-            !(is_omnivoice &&
-              (sname.find("audio_embd") == 0 || sname.find("audio_output") == 0 ||
-               sname.find("llm.token_embd") == 0)) &&
+            !(is_omnivoice && (sname.find("audio_embd") == 0 || sname.find("audio_output") == 0 ||
+                               sname.find("llm.token_embd") == 0)) &&
             !(is_canary_qwen &&
-              (sname.find("encoder.") == 0 || sname.find("preprocessor.") == 0 ||
-               sname.find("proj.") == 0 || sname == "token_embd.weight" || sname == "output.weight")) &&
+              (sname.find("encoder.") == 0 || sname.find("preprocessor.") == 0 || sname.find("proj.") == 0 ||
+               sname == "token_embd.weight" || sname == "output.weight")) &&
             !(is_orpheus && sname.find("talker.token_embd") == 0) &&
             !(is_arkasr && (sname.find("dec.embed.") == 0 || sname.find("enc.") == 0 || sname.find("adapter.") == 0)) &&
             !(is_higgs && (sname == "token_embd.weight" || sname == "output.weight")) &&
@@ -751,6 +764,14 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             target_types[i] = GGML_TYPE_F16;
         } else {
             target_types[i] = t->type;
+        }
+
+        // Qwen3-ASR audio-tower Q8_0 floor (see is_qwen3_asr note above).
+        // Applies only when the chosen type is a sub-8-bit quant; Q8_0 and
+        // unquantized targets pass through. Rows not 32-aligned keep source.
+        if (is_qwen3_asr && !qwen3asr_quant_audio && sname.find("audio.") == 0 && should_quantize &&
+            ggml_is_quantized(target_types[i]) && target_types[i] != GGML_TYPE_Q8_0) {
+            target_types[i] = (ncols % ggml_blck_size(GGML_TYPE_Q8_0) == 0) ? GGML_TYPE_Q8_0 : t->type;
         }
 
         // User per-tensor override (--tensor-type <regex>=<type>). First match
