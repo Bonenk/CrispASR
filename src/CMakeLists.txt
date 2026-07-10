@@ -2446,7 +2446,7 @@ if (TARGET crispasr-llama-core)
     target_link_libraries(crispasr-lib PRIVATE crispasr-llama-core)
 endif()
 
-install(TARGETS crispasr-lib LIBRARY)
+install(TARGETS crispasr-lib LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/../include/crispasr_chat.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
