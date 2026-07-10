@@ -2522,7 +2522,9 @@ static nemotron_result* nemotron_transcribe_impl(nemotron_context* ctx, const fl
         emitted = use_maes        ? nemotron_rnnt_maes_decode(ctx, enc_out.data(), T_enc, d_model, beam_sz,
                                                               ctx->maes_num_steps, ctx->maes_gamma, ctx->maes_beta)
                   : (beam_sz > 1) ? nemotron_rnnt_beam_decode(ctx, enc_out.data(), T_enc, d_model, beam_sz)
-                                  : nemotron_rnnt_decode(ctx, enc_out.data(), T_enc, d_model, on_tok, on_tok_ud);
+                                  : (getenv("CRISPASR_RNNT_BATCH")
+                                     ? nemotron_rnnt_decode_batched(ctx, enc_out.data(), T_enc, d_model, on_tok, on_tok_ud)
+                                     : nemotron_rnnt_decode(ctx, enc_out.data(), T_enc, d_model, on_tok, on_tok_ud));
     }
 
     if (getenv("CRISPASR_NEMOTRON_DEBUG")) {
