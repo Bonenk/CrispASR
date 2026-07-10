@@ -14,6 +14,7 @@
 #include "voxtral_tts.h"
 
 #include "core/attention.h"
+#include "core/conv.h"
 #include "core/ffn.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h"
@@ -228,6 +229,12 @@ struct voxtral_tts_context {
     // Flow-matching noise RNG (xorshift64, matching the reference C port so the
     // acoustic sample is reproducible; the semantic path is deterministic argmax).
     uint64_t rng_state = 0x12345678ABCDEF01ULL;
+
+    // Semantic VQ codebook as host F32 (8192 × 256). The codec's 292-d input is
+    // [semantic_cb[sem] (256) ; FSQ(acoustic) (36)]. Populated from the GGUF
+    // tensor if present, else side-loaded from CRISPASR_VOXTRAL_TTS_SEMANTIC_CB
+    // (a raw float32 blob) since older GGUFs dropped codec.semantic_cb.weight.
+    std::vector<float> semantic_cb_host;
 
     int verbosity = 1;
 };
@@ -639,6 +646,31 @@ extern "C" voxtral_tts_context* voxtral_tts_init_from_file(const char* path_mode
     ctx->model.codec_patch_proj.weight = get("codec.patch_proj.weight");
     ctx->model.codec_patch_proj.bias = get("codec.patch_proj.bias");
     ctx->model.codec_semantic_cb = get("codec.semantic_cb.weight");
+
+    // Load the semantic VQ codebook into host memory (8192 × 256). Prefer the
+    // GGUF tensor; fall back to a side-load file for GGUFs that dropped it.
+    {
+        const int rows = hp.semantic_cb_size, cols = hp.codec_semantic_dim;
+        if (ctx->model.codec_semantic_cb) {
+            ctx->semantic_cb_host.resize((size_t)rows * cols);
+            ggml_backend_tensor_get(ctx->model.codec_semantic_cb, ctx->semantic_cb_host.data(), 0,
+                                    ctx->semantic_cb_host.size() * sizeof(float));
+        } else if (const char* p = std::getenv("CRISPASR_VOXTRAL_TTS_SEMANTIC_CB")) {
+            FILE* fp = fopen(p, "rb");
+            if (fp) {
+                ctx->semantic_cb_host.resize((size_t)rows * cols);
+                size_t n = fread(ctx->semantic_cb_host.data(), sizeof(float), ctx->semantic_cb_host.size(), fp);
+                fclose(fp);
+                if (n != ctx->semantic_cb_host.size()) {
+                    fprintf(stderr, "voxtral_tts: semantic_cb side-load short read (%zu/%zu)\n", n,
+                            ctx->semantic_cb_host.size());
+                    ctx->semantic_cb_host.clear();
+                } else if (ctx->verbosity >= 1) {
+                    fprintf(stderr, "voxtral_tts: semantic_cb side-loaded from %s\n", p);
+                }
+            }
+        }
+    }
 
     // Bind voice embeddings
     for (auto& [name, tensor] : wl.tensors) {
@@ -1222,6 +1254,184 @@ static std::vector<float> vtts_embed_audio_codes(voxtral_tts_context* ctx, const
     return sum;
 }
 
+// ===========================================================================
+// Stage 3 — Voxtral codec decoder
+// ===========================================================================
+// codes[37/frame] → [292,T] (256 semantic VQ + 36 FSQ) → causal conv(292→1024,k3)
+// → 4×[2-layer ALiBi transformer + (first 3) ConvTranspose1d(1024→1024,k4,s2)] →
+// causal conv(1024→240,k7) → 240 PCM/frame @ 24 kHz. ALiBi slopes 2^-(h+1),
+// sliding windows {2,4,8,16}, QK-norm, layer_scale. Blueprint: mudler/voxtral-tts.c.
+
+static constexpr int VTTS_CODEC_WINDOWS[4] = {2, 4, 8, 16};
+
+// 292-d codec input on the host, laid out for a ggml (T, 292) tensor
+// (flat = c*T + t): semantic 256-d VQ lookup + acoustic 36-d FSQ decode.
+static std::vector<float> vtts_codec_embed(voxtral_tts_context* ctx, const std::vector<int>& codes, int n_frames) {
+    const int Ds = ctx->hp.codec_semantic_dim; // 256
+    const int Da = VTTS_ACOUSTIC_DIM;          // 36
+    const int Dc = Ds + Da;                    // 292
+    std::vector<float> emb((size_t)Dc * n_frames, 0.0f);
+    const float* cb = ctx->semantic_cb_host.data();
+    for (int t = 0; t < n_frames; t++) {
+        const int* fc = &codes[(size_t)t * (1 + VTTS_ACOUSTIC_DIM)];
+        int sem = fc[0] - VTTS_SPECIAL_COUNT;
+        sem = std::max(0, std::min(ctx->hp.semantic_cb_size - 1, sem));
+        const float* row = cb + (size_t)sem * Ds;
+        for (int d = 0; d < Ds; d++)
+            emb[(size_t)d * n_frames + t] = row[d];
+        for (int i = 0; i < Da; i++) {
+            int ac = fc[i + 1] - VTTS_SPECIAL_COUNT;
+            ac = std::max(0, std::min(VTTS_FSQ_LEVELS - 1, ac));
+            emb[(size_t)(Ds + i) * n_frames + t] = (float)ac * 2.0f / (float)(VTTS_FSQ_LEVELS - 1) - 1.0f;
+        }
+    }
+    return emb;
+}
+
+// ALiBi + causal + sliding-window bias for one stage, laid out for a ggml scores
+// tensor (n_kv=T, n_q=T, heads): flat = h*T*T + i*T + j (i=query, j=key).
+static std::vector<float> vtts_codec_alibi_bias(int T, int window, int n_heads) {
+    std::vector<float> bias((size_t)n_heads * T * T);
+    for (int h = 0; h < n_heads; h++) {
+        float slope = std::pow(2.0f, -(float)(h + 1)); // 2^-(h+1)
+        for (int i = 0; i < T; i++)
+            for (int j = 0; j < T; j++)
+                bias[(size_t)h * T * T + (size_t)i * T + j] =
+                    (j <= i && j > i - window) ? slope * (float)(j - i) : -INFINITY;
+    }
+    return bias;
+}
+
+// One codec transformer layer (ALiBi attention + QK-norm + layer_scale + SwiGLU).
+// x is (D, T); bias is the precomputed (T, T, heads) ALiBi/window tensor.
+static ggml_tensor* vtts_codec_tfm_layer(ggml_context* ctx0, ggml_tensor* x, const voxtral_tts_codec_tfm_layer& l,
+                                         ggml_tensor* bias, const voxtral_tts_hparams& hp) {
+    const int D = hp.codec_dim, nh = hp.codec_n_heads, hd = hp.codec_head_dim;
+    const int T = (int)x->ne[1];
+    const float scale = 1.0f / std::sqrt((float)hd);
+
+    ggml_tensor* res = x;
+    ggml_tensor* xn = ggml_mul(ctx0, ggml_rms_norm(ctx0, x, hp.codec_norm_eps), l.attn_norm);
+    ggml_tensor* Q = ggml_mul_mat(ctx0, l.attn_q, xn);
+    ggml_tensor* K = ggml_mul_mat(ctx0, l.attn_k, xn);
+    ggml_tensor* V = ggml_mul_mat(ctx0, l.attn_v, xn);
+    if (l.q_norm)
+        Q = ggml_mul(ctx0, ggml_rms_norm(ctx0, Q, hp.codec_qk_norm_eps), l.q_norm);
+    if (l.k_norm)
+        K = ggml_mul(ctx0, ggml_rms_norm(ctx0, K, hp.codec_qk_norm_eps), l.k_norm);
+    Q = ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, Q, hd, nh, T), 0, 2, 1, 3)); // (hd,T,nh)
+    K = ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, K, hd, nh, T), 0, 2, 1, 3));
+    ggml_tensor* V3 = ggml_reshape_3d(ctx0, V, hd, nh, T);
+    ggml_tensor* scores = ggml_mul_mat(ctx0, K, Q); // (T,T,nh)
+    scores = ggml_scale(ctx0, scores, scale);
+    scores = ggml_add(ctx0, scores, bias); // ALiBi + causal + window
+    scores = ggml_soft_max(ctx0, scores);
+    V3 = ggml_cont(ctx0, ggml_permute(ctx0, V3, 0, 2, 1, 3)); // (hd,T,nh)
+    V3 = ggml_cont(ctx0, ggml_permute(ctx0, V3, 1, 0, 2, 3)); // (T,hd,nh)
+    ggml_tensor* attn = ggml_mul_mat(ctx0, V3, scores);       // (hd,T,nh)
+    attn = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3)), D, T);
+    ggml_tensor* proj = ggml_mul_mat(ctx0, l.attn_o, attn); // (D,T)
+    if (l.attn_scale)
+        proj = ggml_mul(ctx0, proj, ggml_reshape_2d(ctx0, l.attn_scale, D, 1));
+    x = ggml_add(ctx0, res, proj);
+
+    res = x;
+    xn = ggml_mul(ctx0, ggml_rms_norm(ctx0, x, hp.codec_norm_eps), l.ffn_norm);
+    ggml_tensor* ffn = core_ffn::swiglu(ctx0, xn, l.ffn_gate, l.ffn_up, l.ffn_down);
+    if (l.ffn_scale)
+        ffn = ggml_mul(ctx0, ffn, ggml_reshape_2d(ctx0, l.ffn_scale, D, 1));
+    return ggml_add(ctx0, res, ffn);
+}
+
+// Causal reflect-padded Conv1d: x=(T,Cin), weight=(K,Cin,Cout) → (T,Cout).
+static ggml_tensor* vtts_codec_causal_conv(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b) {
+    const int K = (int)w->ne[0];
+    ggml_tensor* xp = ggml_pad_reflect_1d(ctx0, x, K - 1, 0); // stride 1 → left_pad = K-1
+    ggml_tensor* y = ggml_conv_1d(ctx0, w, xp, 1, 0, 1);      // (T, Cout)
+    if (b)
+        y = ggml_add(ctx0, y, ggml_reshape_2d(ctx0, b, 1, (int)b->ne[0]));
+    return y;
+}
+
+// Full codec decode → interleaved PCM (T_final × 240 samples). Runs as one graph.
+static std::vector<float> vtts_codec_decode(voxtral_tts_context* ctx, const std::vector<int>& codes, int n_frames) {
+    const auto& hp = ctx->hp;
+    const auto& m = ctx->model;
+    const int D = hp.codec_dim;
+    const int Dc = hp.codec_semantic_dim + VTTS_ACOUSTIC_DIM; // 292
+    const int nh = hp.codec_n_heads;
+
+    if (ctx->semantic_cb_host.empty()) {
+        fprintf(stderr, "voxtral_tts: codec needs semantic_cb (GGUF tensor or CRISPASR_VOXTRAL_TTS_SEMANTIC_CB)\n");
+        return {};
+    }
+
+    std::vector<float> emb = vtts_codec_embed(ctx, codes, n_frames);
+    int Ts[4];
+    Ts[0] = n_frames;
+    for (int s = 1; s < 4; s++)
+        Ts[s] = Ts[s - 1] * hp.codec_conv_strides[s]; // strides {1,2,2,2}
+    std::vector<std::vector<float>> biases(4);
+    for (int s = 0; s < 4; s++)
+        biases[s] = vtts_codec_alibi_bias(Ts[s], VTTS_CODEC_WINDOWS[s], nh);
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 16384, false);
+
+    ggml_tensor* emb_in = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_frames, Dc); // (T,292)
+    ggml_set_name(emb_in, "emb");
+    ggml_set_input(emb_in);
+    ggml_tensor* bias_in[4];
+    for (int s = 0; s < 4; s++) {
+        bias_in[s] = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, Ts[s], Ts[s], nh);
+        ggml_set_name(bias_in[s], ("bias" + std::to_string(s)).c_str());
+        ggml_set_input(bias_in[s]);
+    }
+
+    // Input conv (292→1024, k3) → (1024, T)
+    ggml_tensor* x = vtts_codec_causal_conv(ctx0, emb_in, m.codec_convs[0].weight, m.codec_convs[0].bias); // (T,1024)
+    x = ggml_cont(ctx0, ggml_transpose(ctx0, x));                                                          // (1024,T)
+
+    for (int stage = 0; stage < 4; stage++) {
+        for (int li = 0; li < hp.codec_tfm_lengths[stage]; li++)
+            x = vtts_codec_tfm_layer(ctx0, x, m.codec_tfm_blocks[stage][li], bias_in[stage], hp);
+        if (stage < 3) {
+            // Causal ConvTranspose1d (1024→1024, k4, s2): crop trailing K-stride=2.
+            auto& c = m.codec_convs[stage + 1];
+            x = core_convt::convt1d_crop(ctx0, x, c.weight, c.bias, hp.codec_conv_strides[stage + 1], 0,
+                                         hp.codec_conv_kernels[stage + 1] - hp.codec_conv_strides[stage + 1]);
+        }
+    }
+
+    // Output conv (1024→240, k7) on (T_final,1024) → (240, T_final)
+    ggml_tensor* xt = ggml_cont(ctx0, ggml_transpose(ctx0, x));                                    // (T_final, 1024)
+    ggml_tensor* y = vtts_codec_causal_conv(ctx0, xt, m.codec_output.weight, m.codec_output.bias); // (T_final,240)
+    y = ggml_cont(ctx0, ggml_transpose(ctx0, y)); // (240, T_final) → flat = t*240 + h = interleaved PCM
+    ggml_set_name(y, "pcm");
+    ggml_set_output(y);
+    ggml_build_forward_expand(gf, y);
+
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        ggml_free(ctx0);
+        return {};
+    }
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "emb"), emb.data(), 0, emb.size() * sizeof(float));
+    for (int s = 0; s < 4; s++)
+        ggml_backend_tensor_set(bias_in[s], biases[s].data(), 0, biases[s].size() * sizeof(float));
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        ggml_free(ctx0);
+        return {};
+    }
+    ggml_tensor* pcm_t = ggml_graph_get_tensor(gf, "pcm");
+    const int n_samples = (int)ggml_nelements(pcm_t);
+    std::vector<float> pcm(n_samples);
+    ggml_backend_tensor_get(pcm_t, pcm.data(), 0, (size_t)n_samples * sizeof(float));
+    ggml_free(ctx0);
+    return pcm;
+}
+
 // ---------------------------------------------------------------------------
 // Synthesize (LLM AR + FM ODE + codec decode)
 // ---------------------------------------------------------------------------
@@ -1349,15 +1559,31 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
         fprintf(stderr, "voxtral_tts: generated %d frames (%.2f s)%s\n", n_frames, n_frames / ctx->hp.frame_rate,
                 got_end ? " [END]" : " [max_frames]");
 
-    // Stage 3 (codec decode → PCM) is blocked: the shipped Q4_K GGUF is missing
-    // `codec.semantic_cb.weight` (the 256-d semantic VQ table needed for the
-    // codec's 292-d input) and `fm.semantic_output.bias` — both converter gaps.
-    // The GGUF must be re-converted with those tensors before audio can decode.
-    fprintf(stderr,
-            "voxtral_tts: codec decode blocked — GGUF missing codec.semantic_cb.weight "
-            "(re-convert needed); %d code frames generated\n",
-            n_frames);
-    return nullptr;
+    if (n_frames == 0) {
+        fprintf(stderr, "voxtral_tts: no audio frames produced\n");
+        return nullptr;
+    }
+
+    // Step 6: Codec decode → 24 kHz PCM.
+    std::vector<float> pcm = vtts_codec_decode(ctx, all_codes, n_frames);
+    if (pcm.empty()) {
+        fprintf(stderr, "voxtral_tts: codec decode failed\n");
+        return nullptr;
+    }
+    if (ctx->verbosity >= 1) {
+        float peak = 0.0f;
+        for (float s : pcm)
+            peak = std::max(peak, std::fabs(s));
+        fprintf(stderr, "voxtral_tts: codec decoded %d samples (%.2f s), peak=%.4f\n", (int)pcm.size(),
+                pcm.size() / (float)ctx->hp.sample_rate, peak);
+    }
+
+    float* out = (float*)malloc(pcm.size() * sizeof(float));
+    if (!out)
+        return nullptr;
+    std::copy(pcm.begin(), pcm.end(), out);
+    *out_n_samples = (int)pcm.size();
+    return out;
 }
 
 // ---------------------------------------------------------------------------
