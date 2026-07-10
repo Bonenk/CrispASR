@@ -344,7 +344,7 @@ def run_crispasr(binary: Path, model: Path, audio: Path, backend: str | None,
     CrispASR outputs the transcript to stdout and timing info to stderr:
       stderr: "crispasr: transcribed X.Xs audio in Y.YYs (Z.Zx realtime)"
     """
-    b_flag = f"-b {backend}" if backend else ""
+    b_flag = f"--backend {backend}" if backend else ""
     t0 = time.time()
     # Run with stdout and stderr separate
     # Use -ng (no GPU) to force CPU inference — transcribe.cpp also runs CPU
