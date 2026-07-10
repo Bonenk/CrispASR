@@ -174,7 +174,7 @@ regression test against `samples/jfk.wav`:
 | fc-ctc | FastConformer + CTC | ✔ | ✔ | — | CPU | mel, fastconformer |
 | wav2vec2 | CNN + Transformer + CTC | ✔ | — | — | CUDA / Metal | gguf_loader |
 | glm-asr | Whisper enc + Llama LLM | ✔ | ✔ | ✔ | CPU | mel, kv_self_attn, swiglu, greedy_decode, bpe |
-| kyutai-stt | Mimi codec + causal LM | ✔ | ✔ | ✔ | CPU | gguf_loader |
+| kyutai-stt | Mimi codec + causal LM (1B + 2.6B) | ✔ | ✔ | ✔ | CPU | gguf_loader |
 | firered-asr | Conformer + CTC + beam dec | ✔ | ✔ | ✔ | CPU | mel, gguf_loader |
 | moonshine | Conv + 6L enc-dec | ✔ | ✔ | ✔ | CPU | (vendored) |
 | moonshine-streaming | Sliding-window enc + dec | ✔ | ✔ | ✔ | CPU | (vendored) |
@@ -212,7 +212,11 @@ regression test against `samples/jfk.wav`:
   path; local attention (`att_context_size`) is supported for long-form
   models like ReazonSpeech.
 - **Codec + LM** (kyutai-stt): neural audio codec (RVQ) →
-  token-based LM.
+  token-based LM. Supports stt-1b-en_fr (16L, en+fr) and stt-2.6b-en
+  (48L, en-only). The 2.6B model has a 2.5 s `audio_delay` + 1.0 s
+  `audio_silence_prefix` (3.5 s total lookahead); the runtime prepends
+  the silence prefix before Mimi encode and the CLI appends a silence
+  tail of equal length so the causal LM can flush all pending tokens.
 - **TTS — codec / vocoder pipeline**:
   - **Discrete-token codec + vocoder** (qwen3-tts, orpheus): talker
     LM emits codec tokens; a separate decoder GGUF (12 Hz codec /
