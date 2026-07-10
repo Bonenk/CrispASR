@@ -34,41 +34,37 @@ if not REPO.exists():
 if (REPO / "ggml").is_dir() and not (REPO / "ggml" / "CMakeLists.txt").exists():
     subprocess.check_call(["git", "submodule", "update", "--init", "ggml"], cwd=str(REPO))
 
+if (REPO / "tools" / "kaggle").is_dir():
+    sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaggle_harness as kh  # noqa: E402
+
 BUILD = TEMP / "build"
 BUILD.mkdir(parents=True, exist_ok=True)
 
-# Detect GPU
+# Detect GPU and build with CUDA if available
 has_cuda = Path("/usr/local/cuda/bin/nvcc").exists()
 print(f"  CUDA available: {has_cuda}")
 
-# Kaggle P100 = sm_60, T4 = sm_75. Try native first, then explicit archs, then CPU.
-cuda_attempts = [
-    "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=native",
-    "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES='60;75'",
-    "-DGGML_CUDA=ON",
-]
-cmake_ok = False
 if has_cuda:
-    for attempt in cuda_attempts:
-        cmake_flags = f"-DCMAKE_BUILD_TYPE=Release {attempt}"
-        ret = subprocess.call(
-            f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}",
-            shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-        if ret == 0:
-            cmake_ok = True
-            print(f"  cmake OK with: {attempt}")
-            break
-        # Clean build dir for retry
+    arch = kh.detect_cuda_arch()
+    flags = kh.cuda_build_flags(arch) + kh.cache_and_link_flags()
+    cmake_flags = "-DCMAKE_BUILD_TYPE=Release " + " ".join(flags)
+    print(f"  cmake flags: {cmake_flags[:120]}...")
+    ret = subprocess.call(
+        f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}",
+        shell=True,
+    )
+    if ret != 0:
+        print("  CUDA cmake failed, falling back to CPU-only build")
+        has_cuda = False
         import shutil
         if BUILD.exists():
             shutil.rmtree(BUILD)
             BUILD.mkdir(parents=True, exist_ok=True)
 
-if not cmake_ok:
-    if has_cuda:
-        print("  CUDA cmake failed, falling back to CPU-only build")
-    has_cuda = False
+if not has_cuda:
     cmake_flags = "-DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF"
     subprocess.check_call(
         f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}",
