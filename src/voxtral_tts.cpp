@@ -875,6 +875,12 @@ static ggml_cgraph* voxtral_tts_build_graph_llm(voxtral_tts_context* ctx, int n_
         /*attn_scale*/ 1.0f / std::sqrt((float)hd),
         /*qk_norm_eps*/ 0.0f,
         /*gqa_mode*/ core_attn::GQA_MANUAL_NOCONT,
+        // Raw Mistral `consolidated` weights use adjacent-pair (GPT-J / NORMAL)
+        // RoPE and the converter does NOT permute Q/K for NEOX, so the runtime
+        // must apply NORMAL RoPE (matches the reference tts_apply_rope). Using
+        // NEOX here rotates the wrong dim pairs → semantically wrong hidden state
+        // (right magnitude, wrong direction) → degenerate/non-terminating decode.
+        /*rope_type*/ GGML_ROPE_TYPE_NORMAL,
     };
 
     for (int il = 0; il < n_layers; il++) {
@@ -1110,6 +1116,22 @@ static int vtts_fm_semantic_argmax(voxtral_tts_context* ctx, const float* h) {
     for (int i = 1; i < n_out; i++)
         if (lg[i] > lg[best])
             best = i;
+
+    static bool logged = false;
+    if (!logged && env_bool("CRISPASR_VOXTRAL_TTS_DEBUG")) {
+        logged = true;
+        // rank of [END]=1 and margin of the winner vs runner-up
+        float second = -1e30f;
+        for (int i = 1; i < n_out; i++)
+            if (i != best && lg[i] > second)
+                second = lg[i];
+        int end_rank = 0;
+        for (int i = 1; i < n_out; i++)
+            if (lg[i] > lg[VTTS_AUDIO_END])
+                end_rank++;
+        fprintf(stderr, "voxtral_tts[sem]: best=%d logit=%.3f runnerup=%.3f margin=%.3f | END(1) logit=%.3f rank=%d\n",
+                best, lg[best], second, lg[best] - second, lg[VTTS_AUDIO_END], end_rank);
+    }
     return best;
 }
 
@@ -1216,6 +1238,12 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
     std::vector<int32_t> text_ids = voxtral_tts_tokenize(ctx, text);
     if (ctx->verbosity >= 1) {
         fprintf(stderr, "voxtral_tts: tokenized %d tokens from \"%s\"\n", (int)text_ids.size(), text);
+        if (env_bool("CRISPASR_VOXTRAL_TTS_DEBUG")) {
+            fprintf(stderr, "voxtral_tts: token ids =");
+            for (int32_t id : text_ids)
+                fprintf(stderr, " %d", id);
+            fprintf(stderr, "\n");
+        }
     }
 
     // Step 2: Get voice embedding
@@ -1285,10 +1313,21 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
 
     const bool dbg = env_bool("CRISPASR_VOXTRAL_TTS_DEBUG");
     for (int frame = 0; frame < max_frames; frame++) {
+        if (dbg && frame == 0) {
+            FILE* fp = fopen("/tmp/vtts_h0.f32.bin", "wb");
+            if (fp) {
+                fwrite(h.data(), sizeof(float), h.size(), fp);
+                fclose(fp);
+            }
+        }
         std::vector<int> codes = vtts_acoustic_forward(ctx, h);
-        if (dbg || (ctx->verbosity >= 1 && frame == 0))
-            fprintf(stderr, "voxtral_tts: frame %d sem=%d ac[0..2]=%d,%d,%d\n", frame, codes[0], codes[1], codes[2],
-                    codes[3]);
+        if (dbg || (ctx->verbosity >= 1 && frame < 3)) {
+            double sq = 0.0;
+            for (float x : h)
+                sq += (double)x * x;
+            fprintf(stderr, "voxtral_tts: frame %d |h|=%.3f sem=%d ac[0..2]=%d,%d,%d\n", frame, std::sqrt(sq), codes[0],
+                    codes[1], codes[2], codes[3]);
+        }
         if (codes[0] == VTTS_AUDIO_END) {
             got_end = true;
             break;
