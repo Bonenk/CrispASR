@@ -34,6 +34,54 @@ drifted per #218.
 
 Fixed GGUF replaces `qwen3-asr-1.7b-q4_k.gguf` on `cstr/qwen3-asr-1.7b-GGUF`.
 
+## 2026-07-09/10 — #218 root cause arc: quantized audio tower (qwen3-asr) + instruction-less prompts (glm-asr)
+
+Why did qwen3-asr / glm-asr loop or emit empty output on long audio at all,
+when the bf16 blueprints are clean on the same clip? Full detail in PLAN
+("#218 …" sections) and four LEARNINGS entries; condensed:
+
+- **qwen3-asr**: port math faithful end-to-end (mel 0.999996, prompt ids
+  exact, F16 logits at the F16 floor, F16 e2e verbatim on the un-chunked
+  145 s clip). Root cause = q4_k quantized the 18-layer audio tower →
+  compounding per-block drift (no cliff) → encoder cos_mean 0.9716 →
+  greedy decode flips into loops / "language none". Fixes: **Q8_0 floor
+  for `audio.*` in crispasr-quantize** (3c3ba2c7); **blueprint prompt
+  contract** — forced language as assistant-turn prefill
+  `language <Name><asr_text>` instead of a system instruction; tail-pad
+  frame compaction pre-encoder; KV `max(4096, prompt+max_new+16)` +
+  grow-on-demand; max_new fallback 512. Rebaked GGUFs live on
+  `cstr/qwen3-asr-0.6b-GGUF` (+ ja-anime; 1.7b followed via #240).
+  imatrix A/B: tied-LM-head quantization re-introduces loops; long-form
+  recalibration tested + REJECTED. Windowed (FA2/cu_seqlens) encoder
+  attention shipped opt-in `CRISP_AUDIO_WINDOWED_ATTN=1` (46e08bc4),
+  O(N·W), cos 0.99953 vs a windowed bf16 ref; default flip pending eval.
+- **glm-asr**: NOT quantization. The GGUF had no BPE merges →
+  `glm_asr_tokenize` was specials-only → every plain-text instruction
+  encoded to NOTHING, so the blueprint's mandatory instruction was absent
+  from every prompt ever sent (off-distribution → loops/instant-EOS);
+  plus audio silently truncated to one 30 s window. Fixed: blueprint
+  multi-window prompt (≤21×30 s = 655 s, one decode), baked default
+  instruction, then real byte-level BPE (`tokenizer.ggml.merges` in the
+  converter + `tools/gguf-add-merges.py` backfill of published GGUFs,
+  byte-exact vs tokenizers-lib). q4_k now matches the bf16 blueprint on
+  the 145 s clip (113 vs 115 tokens, near-verbatim). (00d35bee, a4d1eea4,
+  72f7e6d8)
+- **Family sweep + CUDA validation** (Kaggle `qwen3-family-rebake`,
+  `issue218-quant-audit`, `glm-asr-blueprint-ref`, `mega-asr-blueprint-ref`):
+  0.6b + glm single-pass clean on CUDA; ja-anime rebaked + shipped;
+  cohere quant-NEUTRAL (its "loops" are genuine audio shouts, q4==F16);
+  **mega-asr loops long-form even as bf16 LoRA-merged blueprint**
+  (base 1.7B clean, cycle 3; mega cycle 115) → LoRA-induced +
+  model-inherent, port faithful, `--chunk-seconds 0` unsupported for mega
+  at any precision (9acb951b); mega's default 30 s-chunked path verified
+  clean+complete on the 145 s clip (no regression).
+- **Tooling**: crispasr-diff qwen3 stages (conv/per-block/ids/logits,
+  `CRISPASR_DIFF_STAGES`), `CRISP_AUDIO_DUMP_STAGES`, bf16 reference
+  dumper modes (`QWEN3_REF_DTYPE`, `QWEN3_REF_WINDOWED`), real raw-decode
+  gate `CRISPASR_NGRAM_LOOPFIX_OFF=1` (the handoff's
+  `CRISPASR_NO_NGRAM_LOOPFIX` never existed), phrase-cycle loop metric
+  (unigram runs miss 2-gram "come on, come on" cycles).
+
 ## 2026-07-09 — canary-qwen backend (nvidia/canary-qwen-2.5b, #233)
 
 New backend: SALM (Speech-Augmented Language Model) — 32-layer FastConformer

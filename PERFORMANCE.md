@@ -1604,6 +1604,60 @@ gap-heavy clips); `CRISPASR_GAP_FILL=0` restores single-pass-per-slice.
 Reproduce: `tools/asr_coverage_score.py <whisper-ref> <hyp> --strip-latin
 --reading` (scorer) and `tools/nemo_parakeet_blueprint.py` (NeMo modes).
 
+## Long-form single-pass — qwen3-asr / glm-asr (#218, 2026-07-10)
+
+Platforms: Apple M1 16 GB Metal + Kaggle T4 CUDA validation
+(`tools/kaggle/qwen3-family-rebake/`). Canonical clip: the reporter's
+145 s `t32-145s.wav` (noisy dialogue, quiet lead). Full detail in
+PLAN "#218 …" sections; the performance-relevant facts:
+
+### Encoder quantization floor (quality, not speed)
+
+Sub-8-bit `audio.*` towers flip greedy LLM decode into loops/empty output
+on long audio — a behavioral step function, not gradual WER loss.
+`crispasr-quantize` now floors qwen3-asr `audio.*` at Q8_0 (opt-out
+`CRISPASR_QWEN3ASR_QUANT_AUDIO=1`):
+
+| model | q4_k size | encoder cos_mean vs F16 | un-chunked 145 s |
+|---|---|---|---|
+| qwen3-asr-0.6b, old tower Q4 | 540 MB | 0.9716 (cos_min 0.75 @1885 fr) | loops / "language none" |
+| qwen3-asr-0.6b, Q8 tower | 631 MB | 0.9997 (cos_min 0.992) | clean+complete, raw (loop-fix off) |
+| qwen3-asr-1.7b, old tower Q4 (#240) | 1334 MB | 0.9913 (cos_min 0.963 @jfk 143 fr!) | empty on Metal |
+| qwen3-asr-1.7b, Q8 tower (#240) | 1490 MB | 0.9998 (cos_min 0.9989) | fixed |
+| 1.7b-ja-anime, Q8 tower | 1421 MB (was 1334) | — | 1024 chars, max run 1 |
+| mega-asr, Q8 tower | not shipped | — | still loops at bf16 too — LoRA-inherent, chunked-only |
+
+imatrix caveat: quantizing the tied LM head re-introduces long-form loops
+even with a Q8 tower, and a long-form-recalibrated imatrix still drifts
+(tested + rejected) — plain `-q4_k`/`-q8_0` are the long-form
+recommendation; imatrix variants are for short clips.
+
+### Memory: full vs windowed encoder attention (qwen3-asr)
+
+Default full self-attention is O(T²) in the audio tower: 145 s
+(1885 frames) fits easily on 16 GB; beyond ~10 min un-chunked it OOMs.
+KV is sized `max(4096, prompt+max_new+16)` + grow-on-demand (the old
+fixed 4096 capped un-chunked audio at ~5 min regardless of encoder).
+
+`CRISP_AUDIO_WINDOWED_ATTN=1` (opt-in, 46e08bc4) runs the FA2/cu_seqlens
+block-diagonal semantics natively: full 104-frame windows as ONE batched
+unmasked attention + ragged tail, no dense mask → **O(N·W) memory**,
+removing the encoder length cap. Encoder cos_mean 0.99953 vs a windowed
+bf16 reference; on the 145 s clip it transcribes MORE (the quiet lead
+that full attention skips). Costs: somewhat slower on Metal (many 104²
+matmuls vs one big one — not yet profiled), and on CUDA it loops in the
+noisy lead where Metal recovers, so the default stays full attention +
+30 s chunks; flip needs a broader eval (PLAN "#218 arc" thread 2).
+
+### glm-asr multi-window single-pass
+
+Blueprint path: 30 s sample windows, encode-then-trim, concatenated into
+ONE prompt/decode — cap 21 windows = 655 s (processor `max_audio_len`).
+The 145 s clip = 5 windows, 1812 audio tokens, 1827-token prompt,
+q4_k output 113 tokens vs bf16 blueprint's 115 (near-verbatim). Note the
+blueprint (and therefore our single-pass) SKIPS quiet leading audio; the
+default 30 s-chunked path covers more content on such clips.
+
 ## Long-audio coverage benchmark — 2026-05-21 (issue #89, historical)
 
 Platform: x86_64 VPS, 4 threads, CPU-only, no GPU. Commit `5e16414`
