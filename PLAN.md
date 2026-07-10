@@ -7751,3 +7751,134 @@ Commits: 42782648, 7cb079a0, 7f60cf72, f508dac1, bba1f0e5, 0595ab6b.
 - **#125** Long audio broken (v0.6.10) — most fixes shipped, awaiting retest
 - **#93**  Voxtral 4B TTS — feature request (no TTS backend for this model yet)
 - **#81**  ONNX-ASR comparison — discussion/tracking
+
+## §232 transcribe.cpp parity — close the RTF gap (OPEN)
+
+**Context:** Kaggle P100 GPU-vs-GPU benchmark (v11, 2026-07-10) shows CrispASR loses
+on 4/9 shared models by 3-21x. Root causes are identified per-backend below.
+CrispASR wins 3/9 and ties 2/9, so the engine IS competitive — the losses are
+backend-specific, not architectural. Full results in `docs/performance.md`.
+
+### Diagnosis (from VPS CPU profiling + Kaggle GPU timing)
+
+| Model | CA GPU RTF | TC GPU RTF | Gap | Bottleneck (profiled) |
+|-------|-----------|-----------|-----|----------------------|
+| Moonshine Streaming Tiny | 0.278 | 0.013 | 21x | Streaming encoder: 550 frame-by-frame forward passes instead of single batch |
+| Nemotron 3.5 ASR 0.6B | 0.385 | 0.046 | 8.4x | Cache-aware streaming FastConformer encoder (15.6s/20.5s on CPU = 76%) |
+| Moonshine Tiny | 0.080 | 0.013 | 6.3x | AR decoder (8.4s/10.1s on CPU = 83%) — per-token graph rebuild + full-KV snapshot |
+| Parakeet TDT 0.6B | 0.099 | 0.032 | 3.1x | Different model versions (CA=v3 multilingual vs TC=v2 EN-only); need same-version A/B |
+
+Models where CrispASR wins or ties (no action needed):
+- SenseVoice Small: CA 0.018 vs TC 0.020 (CA wins)
+- Qwen3-ASR 0.6B: CA 0.087 vs TC 0.116 (CA 1.3x faster)
+- Canary 1B v2: CA 0.042 vs TC 0.054 (CA 1.3x faster)
+- FunASR Nano 2512: CA 0.043 vs TC 0.142 (CA 3.3x faster; TC has GPU inference bug)
+- Whisper base: CA 0.025 vs TC 0.021 (near parity)
+
+### Fix 1: Moonshine decoder — in-graph argmax + build-once decode graph [HIGH]
+
+**Problem:** Moonshine Tiny decoder takes 8.4s (83% of total) for 26 tokens on CPU.
+That's ~320ms/token. The decode loop (`moonshine.cpp:999-1016`) rebuilds the ggml
+graph every token and reads full-vocab logits to host for `std::max_element`.
+
+**Fix (from §229 analysis):**
+- (a) In-graph `ggml_argmax` — one int32 readback instead of vocab-wide F32 readback
+- (b) Build the decode graph once, reuse it per token (static graph pattern from
+  transcribe.cpp `arch/cohere/model.cpp:1145-1199`)
+- (c) KV snapshot: only copy the used `n_past` prefix, not the full preallocated
+  `dec_max_ctx` K+V (the §229 #161 copy storm)
+
+**Expected impact:** 2-5x decoder speedup → Moonshine Tiny should drop from 0.080
+to ~0.02-0.03 RTF on GPU, matching transcribe.cpp.
+
+**Where to test:** VPS (CPU, 8GB) for correctness + A/B RTF. Kaggle P100 for GPU
+numbers. M1 MacBook for Metal verification.
+
+**Files:** `src/moonshine.cpp` (decoder loop ~999-1100), `src/moonshine.h`
+
+### Fix 2: Moonshine Streaming — offline batch encoder fast-path [HIGH]
+
+**Problem:** The streaming backend processes 550 encoder frames individually when
+given a complete file. transcribe.cpp runs a single batched encoder forward pass.
+
+**Fix:** When `moonshine_streaming_transcribe()` receives the full audio (not
+real-time streaming), batch all frames into one encoder forward pass. The decoder
+can still run token-by-token (it's fast). Gate on a `batch_encode` flag or detect
+non-streaming mode from the caller.
+
+**Expected impact:** 10-20x speedup on encoder → RTF should drop from 0.278 to
+~0.015-0.030, matching or beating transcribe.cpp.
+
+**Where to test:** VPS (CPU) for correctness. Kaggle P100 for GPU RTF.
+
+**Files:** `src/moonshine_streaming.cpp` (encoder loop ~1208+)
+
+### Fix 3: Nemotron encoder — non-streaming full-pass mode [MEDIUM]
+
+**Problem:** The cache-aware streaming FastConformer encoder uses windowed attention
+(L=56, R=3) even for offline files. This requires multiple passes with overlapping
+windows. The encoder alone takes 15.6s on CPU (76% of total).
+
+**Fix:** Add a non-streaming path that uses full bidirectional attention when
+processing a complete file. transcribe.cpp likely uses full attention for offline.
+Gate on `--chunk-seconds 0` (full-audio mode) vs streaming.
+
+**Complication:** The nemotron model was trained with streaming attention. Switching
+to full attention may produce different (possibly worse) results. Need to verify
+WER parity before committing.
+
+**Expected impact:** 3-5x encoder speedup if full attention works → RTF should drop
+from 0.385 to ~0.08-0.12.
+
+**Where to test:** VPS (CPU) for correctness + WER check. Kaggle P100 for GPU RTF.
+May need M1 MacBook or A1000 notebook for Metal/Vulkan testing.
+
+**Files:** `src/nemotron.cpp` (encoder ~1260-1317, streaming attention mask)
+
+### Fix 4: GGML_LLAMAFILE ON by default [HIGH, trivial]
+
+**Problem:** CrispASR ships with `GGML_LLAMAFILE OFF` (the ggml default).
+transcribe.cpp forces it ON: "~29% faster encoder". This affects ALL backends
+on CPU — the encoder matmuls (dominant CPU cost) run on stock ggml kernels
+instead of tinyBLAS/llamafile_sgemm.
+
+**Fix:** One-line CMake change: `set(GGML_LLAMAFILE ON)` or
+`option(GGML_LLAMAFILE "" ON)` in the top-level CMakeLists.txt.
+
+**Expected impact:** ~15-29% CPU encoder speedup across all backends. Zero risk
+(tinyBLAS is a drop-in GEMM replacement). This alone would close the CPU gap
+from 1.3-3x to ~1.0-2.3x.
+
+**Where to test:** VPS (CPU). Build with and without, compare jfk.wav RTF across
+3-4 backends. No GPU needed.
+
+**Files:** `CMakeLists.txt` (one line)
+
+### Fix 5: Parakeet — same-version A/B [LOW]
+
+**Problem:** CrispASR uses parakeet-tdt-0.6b-**v3** (25 EU languages) while
+transcribe.cpp uses **v2** (EN-only). v3 has more parameters in the language
+embedding. The 3.1x gap may be the model, not the engine.
+
+**Fix:** Download the v2 GGUF and benchmark both. If v2 is faster, note it in
+docs. If comparable, the gap is real and needs profiling.
+
+**Where to test:** VPS (CPU), quick test.
+
+### Testing matrix
+
+| Fix | VPS (CPU, 8GB, no GPU) | Kaggle P100 (GPU) | M1 MacBook (Metal) | A1000 Notebook (Vulkan) |
+|-----|------------------------|-------------------|---------------------|------------------------|
+| Fix 1: Moonshine decoder | Correctness + CPU A/B | GPU RTF | Metal verify | Vulkan verify |
+| Fix 2: Moonshine Streaming batch | Correctness + CPU A/B | GPU RTF | Metal verify | — |
+| Fix 3: Nemotron full-pass | Correctness + WER | GPU RTF | — | — |
+| Fix 4: LLAMAFILE ON | **Primary** (CPU A/B) | CPU A/B | Metal A/B | — |
+| Fix 5: Parakeet v2 A/B | **Primary** (quick) | GPU A/B | — | — |
+
+### Priority order
+
+1. **Fix 4** (LLAMAFILE ON) — 1 line, 15-29% CPU boost, zero risk, VPS-testable
+2. **Fix 1** (Moonshine decoder) — medium effort, 2-5x decoder speedup, VPS-testable
+3. **Fix 2** (Moonshine Streaming batch) — medium effort, 10-20x encoder speedup
+4. **Fix 3** (Nemotron full-pass) — harder, needs WER verification, risk of regression
+5. **Fix 5** (Parakeet A/B) — just a comparison, no code change
