@@ -6,6 +6,7 @@
 #include "whisper_params.h"
 #include "core/ngram_loop_fix.h"
 
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -217,9 +218,16 @@ public:
         if (!audio_embeds)
             return;
 
-        // 3. Prompt (mirrors glm_asr_transcribe_impl)
+        // 3. Prompt (mirrors glm_asr_transcribe_impl's blueprint template:
+        //    <|user|>\n<|begin_of_audio|>…<|end_of_audio|><|user|>\n
+        //    Please transcribe this audio into text<|assistant|>\n).
+        //    glm_asr_tokenize is specials-only, so free-text instructions
+        //    fall back to the default transcription prompt like the impl.
+        static const int32_t kNewline = 10;
+        static const int32_t kDefaultInstruction[] = {14215, 1700, 8091, 643, 14812, 1636, 2815};
         std::vector<int32_t> ids;
         ids.push_back(59253); // <|user|>
+        ids.push_back(kNewline);
         ids.push_back(59261); // <|begin_of_audio|>
         for (int i = 0; i < N_enc; i++)
             ids.push_back(59260); // <|pad|>
@@ -236,18 +244,25 @@ public:
             } else if (!params.language.empty() && params.language != "auto") {
                 instr = "\nPlease transcribe in " + crispasr_iso_to_english_lang(params.language) + ".\n";
             }
+            bool emitted = false;
             if (!instr.empty()) {
                 int n_instr = 0;
                 int32_t* itoks = glm_asr_tokenize(ctx_, instr.c_str(), &n_instr);
                 if (itoks && n_instr > 0) {
                     for (int i = 0; i < n_instr; i++)
                         ids.push_back(itoks[i]);
-                    free(itoks);
-                } else if (itoks)
-                    free(itoks);
+                    emitted = true;
+                }
+                free(itoks);
+            }
+            if (!emitted) {
+                ids.push_back(kNewline);
+                for (int32_t id : kDefaultInstruction)
+                    ids.push_back(id);
             }
         }
         ids.push_back(59254); // <|assistant|>
+        ids.push_back(kNewline);
 
         // 4. Embed + splice audio
         float* text_embeds = glm_asr_embed_tokens(ctx_, ids.data(), (int)ids.size());
@@ -265,8 +280,9 @@ public:
         }
         free(audio_embeds);
 
-        // 5. KV init + prefill
-        if (!glm_asr_kv_init(ctx_, 4096)) {
+        // 5. KV init + prefill (sized to prompt + decode budget; kv_init
+        //    grows when a larger request arrives)
+        if (!glm_asr_kv_init(ctx_, std::max(4096, (int)ids.size() + 512 + 16))) {
             free(text_embeds);
             return;
         }
