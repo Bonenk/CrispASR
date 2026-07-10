@@ -801,6 +801,14 @@ extern "C" void canary_ctc_free(struct canary_ctc_context* ctx) {
 extern "C" int canary_ctc_n_vocab(struct canary_ctc_context* ctx) {
     return (int)ctx->model.hparams.vocab_size;
 }
+// SentencePiece piece string for a token id (the id_to_token loaded from the GGUF); "" when the id is
+// out of range or the GGUF carried no token strings. The CTC blank is a separate appended index
+// (blank_id), not a piece, so it is not addressable here — consumers iterate [0, n_vocab).
+extern "C" const char* canary_ctc_token_text(struct canary_ctc_context* ctx, int id) {
+    if (!ctx || id < 0 || id >= (int)ctx->vocab.id_to_token.size())
+        return "";
+    return ctx->vocab.id_to_token[id].c_str();
+}
 extern "C" int canary_ctc_blank_id(struct canary_ctc_context* ctx) {
     return (int)ctx->model.hparams.blank_id;
 }
