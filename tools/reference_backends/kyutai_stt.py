@@ -4,15 +4,26 @@ Runs the full Mimi + LM pipeline in PyTorch and captures intermediate
 activations at every architectural boundary for crispasr-diff.
 
 Architecture:
-  16 kHz PCM → (resample 24 kHz) → SEANet CNN encoder (4 stride convs)
+  16 kHz PCM → append silence tail → resample 24 kHz
+             → prepend silence prefix → SEANet CNN encoder (4 stride convs)
              → 8-layer encoder transformer → stride-2 downsample
              → RVQ (1 semantic + 31 acoustic codebooks)
              → causal LM → SentencePiece decode → text
 
+Audio conditioning (matches the C++ runtime exactly):
+  1. Silence tail: append (audio_delay + silence_prefix) seconds at 16 kHz
+     so the causal LM can flush its final pending tokens.
+  2. Resample 16 → 24 kHz (scipy.signal.resample).
+  3. Silence prefix: prepend silence_prefix seconds at 24 kHz before Mimi
+     encode (stt-2.6b-en uses 1.0 s; stt-1b-en_fr uses 0.0 s).
+
+Without steps 1+3 the 2.6B model truncates the last ~3 words due to its
+2.5 s audio_delay + 1.0 s silence_prefix lookahead.
+
 Stages (all optional, controlled by --stages):
 
   raw_audio          (N,)            F32 input PCM at 16 kHz
-  pcm_24k            (N24,)          F32 resampled to 24 kHz (Mimi input)
+  pcm_24k            (N24,)          F32 resampled+conditioned 24 kHz (Mimi input)
   seanet_output      (512, T_enc)    F32 after SEANet CNN stack
   enc_tfm_output     (T_enc, 512)    F32 after 8L encoder transformer
   downsampled        (512, T_fr)     F32 after stride-2 downsample conv
@@ -143,8 +154,16 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     mimi_name = config.get("mimi_name", "mimi-pytorch-e351c8d8@125.safetensors")
     tok_name = config.get("tokenizer_name", "tokenizer_en_fr_audio_8000.model")
 
+    # Audio conditioning parameters from stt_config.
+    stt_cfg = config.get("stt_config", {})
+    audio_delay_s = float(stt_cfg.get("audio_delay_seconds", 0.5))
+    silence_prefix_s = float(stt_cfg.get("audio_silence_prefix_seconds", 0.0))
+    total_lookahead_s = audio_delay_s + silence_prefix_s
+
     print(f"  config: dim={config['dim']} layers={config['num_layers']} "
           f"heads={config['num_heads']} text_card={config['text_card']}")
+    print(f"  audio_delay={audio_delay_s}s  silence_prefix={silence_prefix_s}s  "
+          f"total_lookahead={total_lookahead_s}s")
 
     from safetensors import safe_open
 
@@ -166,9 +185,34 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
             usage = mimi_sd[prefix + "cluster_usage"].clamp(min=1e-5)
             codebooks[prefix + "embedding"] = mimi_sd[key] / usage.unsqueeze(-1)
 
-    # ── Resample to 24 kHz ───────────────────────────────────────────────────
+    # ── Audio conditioning (must match C++ kyutai_stt_transcribe_impl) ───────
+    #
+    # Step 1: Append silence tail at 16 kHz so the causal LM can flush all
+    # pending tokens. The tail length = total_lookahead = audio_delay +
+    # silence_prefix. Without this, the 2.6B model (3.5 s lookahead) drops
+    # the last ~3 words of the JFK clip.
+    tail_16k = max(8000, int(total_lookahead_s * 16000))
+    audio_with_tail = np.concatenate([
+        audio.astype(np.float32),
+        np.zeros(tail_16k, dtype=np.float32),
+    ])
+    print(f"  appended {tail_16k} silence tail samples at 16 kHz "
+          f"({tail_16k / 16000:.2f} s)")
+
+    # Step 2: Resample 16 → 24 kHz.
     print("  resampling to 24 kHz …")
-    pcm_24k = _resample_24k(audio)
+    pcm_24k = _resample_24k(audio_with_tail)
+
+    # Step 3: Prepend silence prefix at 24 kHz (1.0 s for 2.6B, 0.0 s for 1B).
+    if silence_prefix_s > 0.0:
+        n_prefix_24k = int(silence_prefix_s * 24000)
+        pcm_24k = np.concatenate([
+            np.zeros(n_prefix_24k, dtype=np.float32),
+            pcm_24k,
+        ])
+        print(f"  prepended {n_prefix_24k} silence prefix samples at 24 kHz "
+              f"({silence_prefix_s} s)")
+
     if "pcm_24k" in stages:
         out["pcm_24k"] = pcm_24k
 
