@@ -7977,3 +7977,38 @@ docs. If comparable, the gap is real and needs profiling.
 2. **Fix 2** (Moonshine Streaming batch) — medium effort, 10-20x encoder speedup
 3. **Fix 3** (Nemotron full-pass) — harder, needs WER verification, risk of regression
 4. **Fix 5** (Parakeet A/B) — just a comparison, no code change
+
+### §232 Update — GPU profiling results (v12, 2026-07-10)
+
+**Root causes confirmed from Kaggle P100 fine-grained timing:**
+
+| Model | CA bottleneck | CA time | TC time | Root cause |
+|-------|--------------|---------|---------|------------|
+| Parakeet TDT | decode (CPU cblas) | 955ms | 51ms (GPU) | RNNT/TDT decoder uses host-side cblas_sgemv, NOT ggml graph. TC runs decoder on GPU. |
+| Nemotron | rnnt_decode (CPU cblas) | 2900ms | 238ms (GPU) | Same: host-side LSTM+joint via cblas. TC runs on GPU. |
+| Moonshine Tiny | encoder (GPU) | 728ms | 58ms (GPU) | conv_1d_f32 on raw 176K samples via im2col creates huge intermediate. TC may use optimized audio frontend. |
+| Moonshine Streaming | encoder (GPU) | ~3000ms | 71ms (GPU) | Sliding-window masks (550²×6 F16) + full attention over masked positions. |
+
+**Critical finding: Transducer decoders (Parakeet TDT, Nemotron RNNT) are CPU-only.**
+The `predictor_step()` + `joint_step()` functions use `cblas_sgemv` host-side loops.
+transcribe.cpp builds the entire RNNT/TDT decode loop as a GPU ggml graph with
+in-graph argmax — each step is a single GPU kernel launch, not a CPU→GPU round-trip.
+
+**Revised fix priorities:**
+
+1. **Port RNNT/TDT decoder to ggml graph (GPU)** [HIGH, LARGE]
+   - Parakeet: 955ms→~50ms expected (19x)
+   - Nemotron: 2900ms→~240ms expected (12x)
+   - Build LSTM + joint as ggml ops, run on sched. Use in-graph argmax.
+   - Files: `parakeet.cpp:1034-1139` (LSTM), `parakeet.cpp:1288-1530` (TDT loop)
+   - Risk: moderate — LSTM in ggml is well-supported, joint is just matmul+relu+matmul
+
+2. **Moonshine encoder: replace im2col conv with direct ggml_conv_1d** [MEDIUM]
+   - 728ms→~60ms expected if conv path is optimized
+   - The im2col on 176K raw samples creates massive intermediate tensors
+   - Check if ggml_conv_1d op is GPU-supported as alternative to im2col+mul_mat
+   - Alternative: pre-compute mel on CPU (like TC does) to reduce encoder input size
+
+3. **Moonshine Streaming: accept gap or use non-streaming model** [LOW]
+   - 3000ms is architectural (sliding-window attention required by model training)
+   - Recommend `--backend moonshine` for offline, `--backend moonshine-streaming` only for live
