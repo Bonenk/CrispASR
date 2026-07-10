@@ -1390,6 +1390,13 @@ extern "C" const char* kyutai_stt_token_text(struct kyutai_stt_context* ctx, int
     return ctx->model.vocab[id].c_str();
 }
 
+extern "C" float kyutai_stt_total_lookahead_seconds(struct kyutai_stt_context* ctx) {
+    if (!ctx)
+        return 0.5f;
+    auto& hp = ctx->model.hp;
+    return hp.audio_delay_seconds + hp.audio_silence_prefix_seconds;
+}
+
 // ---------------------------------------------------------------------------
 // PLAN #61c — per-token + word-level timing.
 //
