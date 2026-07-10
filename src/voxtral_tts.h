@@ -36,6 +36,9 @@ struct voxtral_tts_context* voxtral_tts_init_from_file(const char* path_model,
 
 void voxtral_tts_free(struct voxtral_tts_context* ctx);
 
+// Seed the flow-matching noise RNG for reproducible acoustic sampling.
+void voxtral_tts_set_seed(struct voxtral_tts_context* ctx, uint64_t seed);
+
 // Synthesize text to 24 kHz mono PCM. `voice` is a preset name
 // (e.g. "fr_female", "neutral_male") or NULL for the default voice.
 // Returns malloc'd float array; caller frees with voxtral_tts_pcm_free().

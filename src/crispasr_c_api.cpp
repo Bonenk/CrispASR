@@ -1659,6 +1659,10 @@ struct crispasr_session {
 #ifdef CA_HAVE_KOKORO
     kokoro_context* kokoro_ctx = nullptr;
 #endif
+#ifdef CA_HAVE_VOXTRAL_TTS
+    voxtral_tts_context* voxtral_tts_ctx = nullptr;
+    std::string voxtral_tts_voice; // preset voice name (set via set_voice)
+#endif
 #ifdef CA_HAVE_CHATTERBOX
     chatterbox_context* chatterbox_ctx = nullptr;
 #endif
@@ -2525,6 +2529,21 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         kokoro_set_n_threads(s->kokoro_ctx, s->n_threads);
         // Voicepack must be loaded before synthesise. Caller does so via
         // `crispasr_session_set_voice` after open.
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_VOXTRAL_TTS
+    if (s->backend == "voxtral-tts") {
+        voxtral_tts_context_params p = voxtral_tts_context_default_params();
+        p.n_threads = s->n_threads;
+        p.use_gpu = g_open_use_gpu_tls;
+        s->voxtral_tts_ctx = voxtral_tts_init_from_file(model_path, p);
+        if (!s->voxtral_tts_ctx) {
+            delete s;
+            return nullptr;
+        }
+        // Voice is an optional preset name applied via crispasr_session_set_voice;
+        // synthesize() falls back to the default voice when unset.
         return s;
     }
 #endif
@@ -6552,6 +6571,13 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
         return (tail[0] == '.' && (tail[1] == 'w' || tail[1] == 'W') && (tail[2] == 'a' || tail[2] == 'A') &&
                 (tail[3] == 'v' || tail[3] == 'V'));
     };
+#ifdef CA_HAVE_VOXTRAL_TTS
+    if (s->voxtral_tts_ctx) {
+        // `path` is a preset voice name (e.g. "fr_female"); applied at synthesize.
+        s->voxtral_tts_voice = path;
+        return 0;
+    }
+#endif
 #ifdef CA_HAVE_COSYVOICE3
     if (s->cosyvoice3_ctx) {
         // `path` is either a baked-bank voice name (e.g. "fleurs-en") or a
@@ -7078,6 +7104,18 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
             s->last_synth_error = "kokoro synthesis failed — "
                                   "this is usually because the built-in phonemizer could not "
                                   "process the text (check that a voice pack is loaded)";
+        }
+        return pcm;
+    }
+#endif
+#ifdef CA_HAVE_VOXTRAL_TTS
+    if (s->voxtral_tts_ctx) {
+        const char* voice = s->voxtral_tts_voice.empty() ? nullptr : s->voxtral_tts_voice.c_str();
+        float* pcm = voxtral_tts_synthesize(s->voxtral_tts_ctx, text, voice, out_n_samples);
+        if (!pcm && s->last_synth_error.empty()) {
+            s->last_synth_error = "voxtral-tts synthesis failed — the GGUF may be missing "
+                                  "codec.semantic_cb.weight (re-download or set "
+                                  "CRISPASR_VOXTRAL_TTS_SEMANTIC_CB)";
         }
         return pcm;
     }
@@ -7794,6 +7832,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
     if (s->kokoro_ctx)
         kokoro_free(s->kokoro_ctx);
 #endif
+#ifdef CA_HAVE_VOXTRAL_TTS
+    if (s->voxtral_tts_ctx)
+        voxtral_tts_free(s->voxtral_tts_ctx);
+#endif
 #ifdef CA_HAVE_CHATTERBOX
     if (s->chatterbox_ctx)
         chatterbox_free(s->chatterbox_ctx);
@@ -8376,6 +8418,12 @@ CA_EXPORT int crispasr_session_set_tts_seed(crispasr_session* s, uint64_t seed) 
     if (!s)
         return -1;
     int touched = 0;
+#ifdef CA_HAVE_VOXTRAL_TTS
+    if (s->voxtral_tts_ctx) {
+        voxtral_tts_set_seed(s->voxtral_tts_ctx, seed);
+        touched++;
+    }
+#endif
 #ifdef CA_HAVE_CHATTERBOX
     if (s->chatterbox_ctx) {
         chatterbox_set_seed((chatterbox_context*)s->chatterbox_ctx, (uint32_t)seed);

@@ -476,6 +476,8 @@ extern "C" voxtral_tts_context_params voxtral_tts_context_default_params(void) {
 }
 
 extern "C" voxtral_tts_context* voxtral_tts_init_from_file(const char* path_model, voxtral_tts_context_params params) {
+    if (!path_model || !*path_model)
+        return nullptr;
     auto* ctx = new voxtral_tts_context();
     ctx->params = params;
     ctx->verbosity = params.verbosity;
@@ -1636,6 +1638,11 @@ extern "C" void voxtral_tts_pcm_free(float* pcm) {
 
 extern "C" int voxtral_tts_sample_rate(void) {
     return 24000;
+}
+
+extern "C" void voxtral_tts_set_seed(voxtral_tts_context* ctx, uint64_t seed) {
+    if (ctx)
+        ctx->rng_state = seed ? seed : 0x12345678ABCDEF01ULL;
 }
 
 extern "C" const char* const* voxtral_tts_list_voices(voxtral_tts_context* ctx, int* out_n_voices) {

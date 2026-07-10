@@ -1609,6 +1609,23 @@ catch_discover_tests(test-voxtral4b-params
     PROPERTIES LABELS "unit;voxtral4b"
 )
 
+# ─── test-voxtral-tts-params — Catch2 unit tests for voxtral_tts_context_params
+# defaults, sample rate, and null-guard coverage. No GGUF required. ─────────────
+add_executable(test-voxtral-tts-params
+    test-voxtral-tts-params.cpp
+)
+target_include_directories(test-voxtral-tts-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-voxtral-tts-params PRIVATE
+    Catch2::Catch2WithMain
+    voxtral_tts
+)
+catch_discover_tests(test-voxtral-tts-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;voxtral-tts"
+)
+
 # ─── test-qwen3-tts-cv-style — Catch2 unit tests for qwen3_tts_set_cv_style_instruct
 # (issue #91: --instruct silently ignored for CustomVoice models).
 # Exercises null-ctx guards and default-params sanity — no GGUF needed. ─────
