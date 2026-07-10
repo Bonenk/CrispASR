@@ -614,18 +614,41 @@ _tc_build_log = (WORK / "build_transcribecpp.log").open("a")
 TC_BUILD = TC_DIR / "build"
 
 _tc_cuda_flags = ["-DTRANSCRIBE_CUDA=ON"] if has_gpu else []
-# Pin the same arch for transcribe.cpp to avoid fat-binary OOM
+# Pin the same arch for transcribe.cpp to avoid fat-binary OOM.
+# Also set CMAKE_CUDA_COMPILER explicitly — without it cmake may not create
+# the CUDA::cuda_driver imported target, causing "target not found" at
+# Generate step.  Point at the driver stub so the linker target resolves.
 if has_gpu and _cuda_arch:
-    _tc_cuda_flags += [f"-DCMAKE_CUDA_ARCHITECTURES={_cuda_arch}"]
+    _tc_cuda_flags += [
+        f"-DCMAKE_CUDA_ARCHITECTURES={_cuda_arch}",
+        "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
+        "-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache",
+        # Kaggle P100: libcuda.so lives only in the stubs dir
+        "-DCUDA_DRIVER_LIBRARY=/usr/local/cuda/lib64/stubs/libcuda.so",
+    ]
 
-_tc_cmake_ret = subprocess.run(
-    ["cmake"] + _gen + [
-        "-B", str(TC_BUILD),
-        "-DCMAKE_BUILD_TYPE=Release",
-    ] + _tc_cuda_flags + _cache_flags + [str(TC_DIR)],
-    stdout=_tc_build_log, stderr=_tc_build_log,
-    env={**os.environ, "CCACHE_DIR": "/kaggle/working/.ccache"},
-)
+def _cmake_configure_tc(cuda_flags):
+    return subprocess.run(
+        ["cmake"] + _gen + [
+            "-B", str(TC_BUILD),
+            "-DCMAKE_BUILD_TYPE=Release",
+        ] + cuda_flags + _cache_flags + [str(TC_DIR)],
+        stdout=_tc_build_log, stderr=_tc_build_log,
+        env={**os.environ, "CCACHE_DIR": "/kaggle/working/.ccache"},
+    )
+
+_tc_cmake_ret = _cmake_configure_tc(_tc_cuda_flags)
+if _tc_cmake_ret.returncode != 0 and _tc_cuda_flags:
+    # CUDA configure failed — fall back to CPU-only build
+    _tc_build_log.flush()
+    print("=== build_transcribecpp.log (tail, CUDA attempt) ===", flush=True)
+    print(open(str(WORK / "build_transcribecpp.log")).read()[-2000:], flush=True)
+    step("build_transcribecpp.cuda_fallback_cpu")
+    import shutil as _shutil
+    _shutil.rmtree(TC_BUILD, ignore_errors=True)
+    TC_BUILD.mkdir(exist_ok=True)
+    _tc_cmake_ret = _cmake_configure_tc([])  # CPU-only retry
+
 if _tc_cmake_ret.returncode != 0:
     _tc_build_log.flush()
     print("=== build_transcribecpp.log (tail) ===", flush=True)
