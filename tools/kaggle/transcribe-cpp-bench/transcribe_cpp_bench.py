@@ -299,7 +299,7 @@ def wer_simple(ref: str, hyp: str) -> float:
             else:
                 new_dp[j] = 1 + min(dp[j], new_dp[j - 1], dp[j - 1])
         dp = new_dp
-    return dp[m] / m
+    return dp[n] / m
 
 
 def strip_tags(text: str) -> str:
