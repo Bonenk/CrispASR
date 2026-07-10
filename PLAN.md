@@ -502,12 +502,19 @@ stages; bf16 reference re-dumped via `tools/reference_backends/qwen3.py`):
   on the un-chunked 145 s clip where plain q4_k is clean — README carries a
   long-form caveat (prefer `-q4_k`/`-q8_0` for `--chunk-seconds 0`).
   (2) DONE — session-ABI spot-check (python Session → qwen3 forced-language
-  prefill) passes. (3) IN FLIGHT — cohere-transcribe + glm-asr have NO encoder
-  carve-out (granite + canary-qwen do): Kaggle kernel
-  `tools/kaggle/issue218-quant-audit/` A/Bs q4_k vs F16 on the canonical 145 s
-  clip with the loop-fix disabled (new global gate
-  `CRISPASR_NGRAM_LOOPFIX_OFF=1` in `src/core/ngram_loop_fix.h`); verdict
-  QUANT-DRIFT → add carve-out + rebake, MODEL-LIMIT → keep fix_loops only.
+  prefill) passes. (3) DONE — cohere-transcribe + glm-asr audit via Kaggle
+  kernel `tools/kaggle/issue218-quant-audit/` (T4, HEAD c555a40b, raw decode
+  via the new `CRISPASR_NGRAM_LOOPFIX_OFF=1` gate, canonical 145 s clip):
+  **no carve-outs warranted.**
+  - cohere: q4_k and F16 behave IDENTICALLY (max unigram run 7 at both — the
+    clip genuinely contains repeated "hey" shouts; both reach the final
+    sentence, chars within 2 %). Quantisation has no behavioural effect.
+  - glm-asr: raw decode degenerates at BOTH precisions (max unigram run 255
+    at q4_k, 163 at F16) — an inherent model behaviour on this clip, worsened
+    but not caused by quant. The qwen3-asr carve-out criterion (q4 loops, F16
+    clean) is NOT met; `core_ngram::fix_loops` (already applied) is the right
+    mitigation. qwen3-asr remains the only quant-caused #218 case; granite +
+    canary-qwen were already protected.
 
 ---
 
