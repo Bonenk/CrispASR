@@ -202,6 +202,19 @@ def extract_codec_tensors(raw_sd: dict) -> dict[str, np.ndarray]:
     """Extract and fuse all codec decoder tensors."""
     out: dict[str, np.ndarray] = {}
 
+    # Debug: list all codec tensor keys to understand the naming
+    codec_keys = sorted(k for k in raw_sd if k.startswith("audio_tokenizer."))
+    print(f"  {len(codec_keys)} audio_tokenizer tensors")
+    # Print unique prefixes up to 3rd dot
+    prefixes = set()
+    for k in codec_keys:
+        parts = k.split(".")
+        pfx = ".".join(parts[:4]) if len(parts) >= 4 else k
+        prefixes.add(pfx)
+    for p in sorted(prefixes):
+        print(f"    {p}")
+    print()
+
     # Block mapping: even indices are conv layers, odd are transformer layers
     # decoder_blocks.{0,2,4,6} → conv layers (indices 0..3)
     # decoder_blocks.{1,3,5,7} → transformer layers (indices 0..3)
@@ -210,23 +223,54 @@ def extract_codec_tensors(raw_sd: dict) -> dict[str, np.ndarray]:
 
     for hf_blk_idx in [0, 2, 4, 6]:
         conv_idx = conv_block_map[hf_blk_idx]
-        base = f"audio_tokenizer.decoder_blocks.{hf_blk_idx}"
-        w = get_weight(raw_sd, base)
-        out[f"codec.dec.conv.{conv_idx}.weight"] = w
-        b = get_bias(raw_sd, base)
-        if b is not None:
-            out[f"codec.dec.conv.{conv_idx}.bias"] = b
+        # Try multiple naming patterns for the conv weight
+        # Pattern 1: direct (decoder_blocks.N.weight)
+        # Pattern 2: nested conv (decoder_blocks.N.conv.weight)
+        # Pattern 3: weight-normed direct (decoder_blocks.N.parametrizations.weight.original0)
+        # Pattern 4: weight-normed nested (decoder_blocks.N.conv.parametrizations.weight.original0)
+        base_candidates = [
+            f"audio_tokenizer.decoder_blocks.{hf_blk_idx}",
+            f"audio_tokenizer.decoder_blocks.{hf_blk_idx}.conv",
+            f"audio_tokenizer.decoder_blocks.{hf_blk_idx}.conv_block",
+        ]
+        found = False
+        for base in base_candidates:
+            if has_weight_norm(raw_sd, base) or f"{base}.weight" in raw_sd:
+                w = get_weight(raw_sd, base)
+                out[f"codec.dec.conv.{conv_idx}.weight"] = w
+                b = get_bias(raw_sd, base)
+                if b is not None:
+                    out[f"codec.dec.conv.{conv_idx}.bias"] = b
+                print(f"  conv[{conv_idx}] from {base}: {w.shape}")
+                found = True
+                break
+        if not found:
+            print(f"  WARNING: conv block {hf_blk_idx} not found (tried {base_candidates})")
 
     for hf_blk_idx in [1, 3, 5, 7]:
         tfm_idx = tfm_block_map[hf_blk_idx]
-        # Each transformer block has 2 layers
-        for li in range(2):
+        # Each transformer block has N layers (typically 2)
+        # Auto-detect the number of layers from the keys
+        n_layers_detected = 0
+        for k in codec_keys:
+            m = __import__('re').match(
+                rf"audio_tokenizer\.decoder_blocks\.{hf_blk_idx}\.layers\.(\d+)\.", k)
+            if m:
+                n_layers_detected = max(n_layers_detected, int(m.group(1)) + 1)
+        if n_layers_detected == 0:
+            print(f"  WARNING: no transformer layers found in decoder_blocks.{hf_blk_idx}")
+            continue
+        print(f"  tfm[{tfm_idx}] has {n_layers_detected} layers")
+
+        for li in range(n_layers_detected):
             base = f"audio_tokenizer.decoder_blocks.{hf_blk_idx}.layers.{li}"
             pfx = f"codec.dec.tfm.{tfm_idx}.blk.{li}"
 
-            # Attention: q/k/v/o
+            # Attention: q/k/v/o — try wq/wk/wv/wo and q_proj/k_proj/v_proj/o_proj
             for proj in ["q", "k", "v", "o"]:
                 w_key = f"{base}.attention.w{proj}.weight"
+                if w_key not in raw_sd:
+                    w_key = f"{base}.attention.{proj}_proj.weight"
                 if w_key in raw_sd:
                     t = raw_sd[w_key]
                     if "bfloat" in str(t.dtype):
@@ -269,21 +313,27 @@ def extract_codec_tensors(raw_sd: dict) -> dict[str, np.ndarray]:
                         t = t.float()
                     out[f"{pfx}.{scale_suffix}"] = t.numpy().astype(np.float32)
 
-    # Output projection (weight-normed Conv1d k=7)
-    w = get_weight(raw_sd, "audio_tokenizer.output_proj")
-    out["codec.output.weight"] = w
-    b = get_bias(raw_sd, "audio_tokenizer.output_proj")
-    if b is not None:
-        out["codec.output.bias"] = b
+    # Output projection (weight-normed Conv1d k=7) — try direct and nested
+    for out_base in ["audio_tokenizer.output_proj", "audio_tokenizer.output_proj.conv"]:
+        if has_weight_norm(raw_sd, out_base) or f"{out_base}.weight" in raw_sd:
+            w = get_weight(raw_sd, out_base)
+            out["codec.output.weight"] = w
+            b = get_bias(raw_sd, out_base)
+            if b is not None:
+                out["codec.output.bias"] = b
+            print(f"  output_proj from {out_base}: {w.shape}")
+            break
 
-    # Patch projection (input conv, weight-normed)
-    patch_base = "audio_tokenizer.patch_proj"
-    if has_weight_norm(raw_sd, patch_base) or f"{patch_base}.weight" in raw_sd:
-        w = get_weight(raw_sd, patch_base)
-        out["codec.patch_proj.weight"] = w
-        b = get_bias(raw_sd, patch_base)
-        if b is not None:
-            out["codec.patch_proj.bias"] = b
+    # Patch projection (input conv, weight-normed) — try direct and nested
+    for patch_base in ["audio_tokenizer.patch_proj", "audio_tokenizer.patch_proj.conv"]:
+        if has_weight_norm(raw_sd, patch_base) or f"{patch_base}.weight" in raw_sd:
+            w = get_weight(raw_sd, patch_base)
+            out["codec.patch_proj.weight"] = w
+            b = get_bias(raw_sd, patch_base)
+            if b is not None:
+                out["codec.patch_proj.bias"] = b
+            print(f"  patch_proj from {patch_base}: {w.shape}")
+            break
 
     # Semantic codebook: EMA embedding_sum / cluster_usage
     emb_sum_key = "audio_tokenizer.quantizer.semantic_codebook._codebook.embedding_sum"
