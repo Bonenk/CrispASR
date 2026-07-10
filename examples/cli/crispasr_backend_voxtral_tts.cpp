@@ -36,6 +36,10 @@ public:
         if (!ctx_)
             return {};
 
+        // Seed the flow-matching noise for reproducible acoustic sampling (--seed).
+        if (params.seed != 0)
+            voxtral_tts_set_seed(ctx_, (uint64_t)params.seed);
+
         const char* voice = params.tts_voice.empty() ? nullptr : params.tts_voice.c_str();
         int n_samples = 0;
         float* pcm = voxtral_tts_synthesize(ctx_, text.c_str(), voice, &n_samples);
