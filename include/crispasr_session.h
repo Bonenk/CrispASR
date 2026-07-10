@@ -107,6 +107,33 @@ CRISPASR_SESSION_API crispasr_session_result* crispasr_drain_streamed_segments(v
 /// Clear the streamed-segment buffer. Call before starting a new
 /// transcription to discard stale segments from the previous run.
 CRISPASR_SESSION_API void crispasr_reset_streamed_segments(void);
+
+/// Per-token streaming callback. Fired each time the decoder produces a
+/// new text token during LLM-based ASR. The token text may be a partial
+/// word (BPE subword). The callback must be fast and non-blocking.
+typedef void (*crispasr_token_callback)(
+    const char* token_text,     // decoded token text (UTF-8)
+    int token_index,            // 0-based token index within current segment
+    void* user_data
+);
+
+CRISPASR_SESSION_API void crispasr_session_set_token_callback(
+    crispasr_session* s,
+    crispasr_token_callback cb,
+    void* user_data);
+
+/// Number of streamed tokens available for polling (Dart FFI path).
+CRISPASR_SESSION_API int crispasr_get_streamed_token_count(void);
+
+/// Drain all buffered streamed tokens. Returns a buffer of null-separated
+/// UTF-8 strings; *out_count receives the number of tokens. Returns NULL
+/// when the buffer is empty. The returned pointer is valid until the next
+/// drain call.
+CRISPASR_SESSION_API const char* crispasr_drain_streamed_tokens(int* out_count);
+
+/// Clear the streamed-token buffer.
+CRISPASR_SESSION_API void crispasr_reset_streamed_tokens(void);
+
 CRISPASR_SESSION_API void crispasr_params_set_language(whisper_full_params* p, const char* lang);
 CRISPASR_SESSION_API void crispasr_params_set_translate(whisper_full_params* p, int v);
 CRISPASR_SESSION_API void crispasr_params_set_detect_language(whisper_full_params* p, int v);
