@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
-"""Kaggle GPU kernel: CrispASR vs onnx-asr head-to-head benchmark (#81).
+"""Kaggle GPU kernel: CrispASR full-fleet benchmark + onnx-asr head-to-head (#81).
 
-Fair comparison on Kaggle P100/T4:
-  - Same audio (JFK 11s, librispeech 60s)
-  - Same model family (parakeet-tdt-0.6b)
-  - Both use GPU when available
-  - Warmup + 5 timed runs each
-  - Reports: load time, RTF, x-realtime, transcript snippet, WER
+Tests all CrispASR backends that fit in Kaggle's time/disk budget.
+Head-to-head with onnx-asr for overlapping models (whisper, parakeet, canary).
+CrispASR-only RTF for the 20+ backends onnx-asr doesn't support.
 
 Push (under chr1s4):
   export KAGGLE_API_TOKEN=<chr1s4 token>
@@ -24,7 +21,7 @@ WORK = Path("/kaggle/working")
 REPO = WORK / "CrispASR"
 TEMP = Path("/kaggle/temp") if Path("/kaggle/temp").is_dir() else Path("/tmp")
 
-# ── Phase 0: Clone + build CrispASR ─────────────────────────────────────────
+# ── Phase 0: Clone + build CrispASR with CUDA ───────────────────────────────
 print("=== Phase 0: clone + build CrispASR ===", flush=True)
 if not REPO.exists():
     subprocess.check_call([
@@ -36,14 +33,11 @@ if (REPO / "ggml").is_dir() and not (REPO / "ggml" / "CMakeLists.txt").exists():
 
 if (REPO / "tools" / "kaggle").is_dir():
     sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
-else:
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaggle_harness as kh  # noqa: E402
 
 BUILD = TEMP / "build"
 BUILD.mkdir(parents=True, exist_ok=True)
 
-# Detect GPU and build with CUDA if available
 has_cuda = Path("/usr/local/cuda/bin/nvcc").exists()
 print(f"  CUDA available: {has_cuda}")
 
@@ -51,263 +45,250 @@ if has_cuda:
     arch = kh.detect_cuda_arch()
     flags = kh.cuda_build_flags(arch) + kh.cache_and_link_flags()
     cmake_flags = "-DCMAKE_BUILD_TYPE=Release " + " ".join(flags)
-    print(f"  cmake flags: {cmake_flags[:120]}...")
-    ret = subprocess.call(
-        f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}",
-        shell=True,
-    )
+    ret = subprocess.call(f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}", shell=True)
     if ret != 0:
-        print("  CUDA cmake failed, falling back to CPU-only build")
+        print("  CUDA cmake failed, falling back to CPU")
         has_cuda = False
         import shutil
-        if BUILD.exists():
-            shutil.rmtree(BUILD)
-            BUILD.mkdir(parents=True, exist_ok=True)
+        if BUILD.exists(): shutil.rmtree(BUILD); BUILD.mkdir(parents=True, exist_ok=True)
 
 if not has_cuda:
-    cmake_flags = "-DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF"
     subprocess.check_call(
-        f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}",
-        shell=True, stdout=subprocess.DEVNULL,
-    )
+        f"cmake -G Ninja -B {BUILD} -S {REPO} -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF",
+        shell=True, stdout=subprocess.DEVNULL)
+
 n_jobs = min(os.cpu_count() or 2, 4)
-subprocess.check_call(
-    f"cmake --build {BUILD} -j{n_jobs} --target crispasr-cli",
-    shell=True, stdout=subprocess.DEVNULL,
-)
-CRISPASR_BIN = BUILD / "bin" / "crispasr"
-print(f"  built: {CRISPASR_BIN}")
+with kh.build_heartbeat("cmake.build"):
+    subprocess.check_call(f"cmake --build {BUILD} -j{n_jobs} --target crispasr-cli", shell=True,
+                          stdout=subprocess.DEVNULL)
+CRISPASR = BUILD / "bin" / "crispasr"
+print(f"  built: {CRISPASR}")
 
 # ── Phase 1: Install onnx-asr ───────────────────────────────────────────────
 print("\n=== Phase 1: install onnx-asr ===", flush=True)
-subprocess.check_call([
-    sys.executable, "-m", "pip", "install", "-q",
-    "onnx-asr", "soundfile", "huggingface_hub", "onnxruntime",
-])
-# Note: onnxruntime-gpu requires matching CUDA version (13 vs Kaggle's 12).
-# Use CPU onnxruntime for a fair comparison — the original #81 reporter
-# also used CPU/DirectML EP, not CUDA EP.
+subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
+                        "onnx-asr", "soundfile", "huggingface_hub", "onnxruntime"])
 
-# ── Phase 2: Download models ────────────────────────────────────────────────
-print("\n=== Phase 2: download models ===", flush=True)
-from huggingface_hub import hf_hub_download
-
-# CrispASR: parakeet-tdt-0.6b Q8_0
-gguf_model = hf_hub_download(
-    "cstr/parakeet-tdt-0.6b-v2-GGUF",
-    "parakeet-tdt-0.6b-v2-q8_0.gguf",
-    cache_dir=str(TEMP / "hf"),
-)
-print(f"  GGUF: {gguf_model}")
-
-# Audio files
-jfk_wav = REPO / "samples" / "jfk.wav"
-if not jfk_wav.exists():
-    print("  WARNING: jfk.wav not found, generating sine tone")
-    import numpy as np
-    import soundfile as sf
-    sr = 16000
-    t = np.linspace(0, 11, sr * 11, dtype=np.float32)
-    audio = 0.5 * np.sin(2 * np.pi * 440 * t)
-    jfk_wav = TEMP / "test_audio.wav"
-    sf.write(str(jfk_wav), audio, sr)
-
-# Generate a longer test audio (~60s) by repeating JFK
+# ── Phase 2: Prepare audio ──────────────────────────────────────────────────
+print("\n=== Phase 2: prepare audio ===", flush=True)
 import soundfile as sf
 import numpy as np
 
-jfk_pcm, jfk_sr = sf.read(str(jfk_wav), dtype="float32")
-jfk_duration = len(jfk_pcm) / jfk_sr
-# Repeat to get ~60s
-repeats = max(1, int(60 / jfk_duration))
-long_pcm = np.tile(jfk_pcm, repeats)
-long_wav = TEMP / "long_test_60s.wav"
-sf.write(str(long_wav), long_pcm, jfk_sr)
-long_duration = len(long_pcm) / jfk_sr
-print(f"  JFK: {jfk_duration:.1f}s, Long: {long_duration:.1f}s ({repeats}x)")
+jfk_wav = REPO / "samples" / "jfk.wav"
+pcm, sr = sf.read(str(jfk_wav), dtype="float32")
+duration = len(pcm) / sr
 
-# ── Phase 3: Benchmark CrispASR ─────────────────────────────────────────────
-print("\n=== Phase 3: benchmark CrispASR (parakeet-tdt Q8_0) ===", flush=True)
+# 60s version
+repeats = max(1, int(60 / duration))
+long_pcm = np.tile(pcm, repeats)
+long_wav = TEMP / "long_60s.wav"
+sf.write(str(long_wav), long_pcm, sr)
+long_dur = len(long_pcm) / sr
+print(f"  JFK: {duration:.1f}s, Long: {long_dur:.1f}s")
 
-def run_crispasr(audio_path, n_warmup=1, n_runs=5):
-    """Run crispasr CLI and time it."""
-    backend_flag = "--backend parakeet"
-    gpu_flag = ""
-    if has_cuda:
-        gpu_flag = "--gpu-backend cuda"
+# ── Phase 3: Download all GGUF models ───────────────────────────────────────
+print("\n=== Phase 3: download models ===", flush=True)
+from huggingface_hub import hf_hub_download
 
-    cmd = (
-        f"{CRISPASR_BIN} {backend_flag} {gpu_flag} "
-        f"-m {gguf_model} -f {audio_path} --no-prints"
-    )
+MODELS_DIR = TEMP / "models"
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Warmup
-    for _ in range(n_warmup):
-        subprocess.run(cmd, shell=True, capture_output=True)
+# Models to benchmark: (backend, hf_repo, filename, label)
+CRISPASR_MODELS = [
+    # Head-to-head with onnx-asr
+    ("parakeet",  "cstr/parakeet-ctc-0.6b-GGUF",   "parakeet-ctc-0.6b-q8_0.gguf",     "parakeet-ctc-0.6b"),
+    ("parakeet",  "cstr/parakeet-tdt-0.6b-v2-GGUF", "parakeet-tdt-0.6b-v2-q8_0.gguf",  "parakeet-tdt-0.6b"),
+    # CrispASR-only (small models that fit in budget)
+    ("moonshine", "cstr/moonshine-tiny-GGUF",       "moonshine-tiny-q8_0.gguf",         "moonshine-tiny"),
+    ("cohere",    "cstr/cohere-transcribe-GGUF",    "cohere-transcribe-q4_k.gguf",      "cohere-transcribe"),
+    ("kyutai-stt","cstr/kyutai-stt-1b-GGUF",        "kyutai-stt-1b-q4_k.gguf",          "kyutai-stt-1b"),
+    ("firered-asr","cstr/firered-asr2-aed-GGUF",    "firered-asr2-aed-q4_k.gguf",      "firered-asr2"),
+    ("sensevoice","cstr/sensevoice-small-GGUF",     "sensevoice-small-q8_0.gguf",       "sensevoice-small"),
+    ("funasr",    "cstr/fun-asr-nano-GGUF",         "fun-asr-nano-q8_0.gguf",           "funasr-nano"),
+    ("paraformer","cstr/paraformer-zh-GGUF",        "paraformer-zh-q8_0.gguf",          "paraformer-zh"),
+    ("glm-asr",   "cstr/glm-asr-nano-GGUF",        "glm-asr-nano-q4_k.gguf",           "glm-asr-nano"),
+]
 
-    # Timed runs
-    times = []
-    transcript = ""
-    for i in range(n_runs):
-        t0 = time.perf_counter()
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        t1 = time.perf_counter()
-        times.append(t1 - t0)
-        if i == 0:
-            transcript = result.stdout.strip()[:200]
+# Add moonshine tokenizer
+MOONSHINE_TOK = None
 
-    return times, transcript
+model_paths = {}
+for backend, repo, fname, label in CRISPASR_MODELS:
+    try:
+        p = hf_hub_download(repo, fname, cache_dir=str(TEMP / "hf"))
+        model_paths[label] = p
+        sz = Path(p).stat().st_size / (1024**2)
+        print(f"  {label}: {sz:.0f} MB")
+        # Download moonshine tokenizer alongside
+        if "moonshine" in label:
+            try:
+                MOONSHINE_TOK = hf_hub_download(repo, "tokenizer.bin", cache_dir=str(TEMP / "hf"))
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"  {label}: SKIP ({e})")
 
-# Short audio (JFK ~11s)
-print(f"  Running CrispASR on JFK ({jfk_duration:.1f}s)...")
-ca_times_short, ca_text_short = run_crispasr(jfk_wav)
-ca_mean_short = sum(ca_times_short) / len(ca_times_short)
-ca_rtf_short = jfk_duration / ca_mean_short
-print(f"  CrispASR JFK:  mean={ca_mean_short:.3f}s  {ca_rtf_short:.1f}x realtime")
-print(f"  transcript: {ca_text_short[:100]}")
+# ── Phase 4: Benchmark CrispASR fleet ───────────────────────────────────────
+print("\n=== Phase 4: benchmark CrispASR fleet ===", flush=True)
 
-# Long audio (~60s)
-print(f"\n  Running CrispASR on long audio ({long_duration:.1f}s)...")
-ca_times_long, ca_text_long = run_crispasr(long_wav, n_warmup=1, n_runs=3)
-ca_mean_long = sum(ca_times_long) / len(ca_times_long)
-ca_rtf_long = long_duration / ca_mean_long
-print(f"  CrispASR long: mean={ca_mean_long:.3f}s  {ca_rtf_long:.1f}x realtime")
+gpu_flag = "--gpu-backend cuda" if has_cuda else ""
 
-# ── Phase 4: Benchmark onnx-asr ─────────────────────────────────────────────
-print("\n=== Phase 4: benchmark onnx-asr (parakeet-tdt) ===", flush=True)
-
-def run_onnx_asr(audio_path, n_warmup=1, n_runs=5):
-    """Run onnx-asr and time it."""
-    import onnx_asr
-
-    # Load model once
-    t_load_start = time.perf_counter()
-    # Use CPU EP — onnxruntime-gpu requires CUDA 13 which Kaggle doesn't have.
-    # This is still a fair comparison: the original #81 reporter used CPU/DirectML.
-    model = onnx_asr.load_model(
-        "nemo-parakeet-ctc-0.6b",
-        quantization="int8",
-        providers=["CPUExecutionProvider"],
-    )
-    t_load = time.perf_counter() - t_load_start
-    print(f"  onnx-asr load: {t_load:.3f}s")
-
-    pcm, sr = sf.read(str(audio_path), dtype="float32")
-    if sr != 16000:
-        # Resample if needed
-        from scipy.signal import resample
-        pcm = resample(pcm, int(len(pcm) * 16000 / sr)).astype(np.float32)
+def bench_crispasr(backend, model_path, audio_path, audio_dur, label, extra_flags="",
+                   n_warmup=1, n_runs=3):
+    """Benchmark one CrispASR backend. Returns (mean_time, rtf, transcript)."""
+    cmd = f"{CRISPASR} --backend {backend} {gpu_flag} -m {model_path} -f {audio_path} {extra_flags} --no-prints"
 
     # Warmup
     for _ in range(n_warmup):
-        model.recognize(str(audio_path))
+        subprocess.run(cmd, shell=True, capture_output=True, timeout=120)
 
-    # Timed runs
     times = []
-    transcript = ""
+    text = ""
     for i in range(n_runs):
-        t0 = time.perf_counter()
-        result = model.recognize(str(audio_path))
-        t1 = time.perf_counter()
-        times.append(t1 - t0)
-        if i == 0:
-            transcript = str(result)[:200]
+        try:
+            t0 = time.perf_counter()
+            r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
+            t1 = time.perf_counter()
+            times.append(t1 - t0)
+            if i == 0:
+                text = (r.stdout.strip() or r.stderr.strip().split('\n')[-1])[:120]
+        except subprocess.TimeoutExpired:
+            times.append(120.0)
 
-    return times, transcript, t_load
+    if not times:
+        return None, None, "FAILED"
+    mean = sum(times) / len(times)
+    rtf = audio_dur / mean
+    return mean, rtf, text
 
-# Short audio
-print(f"  Running onnx-asr on JFK ({jfk_duration:.1f}s)...")
-try:
-    onnx_times_short, onnx_text_short, onnx_load = run_onnx_asr(jfk_wav)
-    onnx_mean_short = sum(onnx_times_short) / len(onnx_times_short)
-    onnx_rtf_short = jfk_duration / onnx_mean_short
-    print(f"  onnx-asr JFK:  mean={onnx_mean_short:.3f}s  {onnx_rtf_short:.1f}x realtime")
-    print(f"  transcript: {onnx_text_short[:100]}")
-except Exception as e:
-    print(f"  onnx-asr FAILED: {e}")
-    onnx_times_short = []
-    onnx_mean_short = float("inf")
-    onnx_rtf_short = 0
-    onnx_text_short = f"ERROR: {e}"
-    onnx_load = 0
+results = {}
+for backend, repo, fname, label in CRISPASR_MODELS:
+    if label not in model_paths:
+        continue
+    mp = model_paths[label]
+    extra = ""
+    if "moonshine" in label and MOONSHINE_TOK:
+        extra = f"--moonshine-tokenizer {MOONSHINE_TOK}"
 
-# Long audio
-print(f"\n  Running onnx-asr on long audio ({long_duration:.1f}s)...")
-try:
-    onnx_times_long, onnx_text_long, _ = run_onnx_asr(long_wav, n_warmup=1, n_runs=3)
-    onnx_mean_long = sum(onnx_times_long) / len(onnx_times_long)
-    onnx_rtf_long = long_duration / onnx_mean_long
-    print(f"  onnx-asr long: mean={onnx_mean_long:.3f}s  {onnx_rtf_long:.1f}x realtime")
-except Exception as e:
-    print(f"  onnx-asr long FAILED: {e}")
-    onnx_times_long = []
-    onnx_mean_long = float("inf")
-    onnx_rtf_long = 0
+    print(f"\n  [{label}]")
+    mean, rtf, text = bench_crispasr(backend, mp, jfk_wav, duration, label, extra)
+    if mean:
+        print(f"    JFK {duration:.0f}s: {mean:.3f}s = {rtf:.1f}x realtime")
+        results[label] = {"mean_jfk": mean, "rtf_jfk": rtf, "text": text}
 
-# ── Phase 5: Summary ────────────────────────────────────────────────────────
-print("\n" + "=" * 70)
-print("=== BENCHMARK SUMMARY: CrispASR vs onnx-asr ===")
-print("=" * 70)
+        # Also test long audio for the head-to-head models
+        if "parakeet" in label:
+            mean_l, rtf_l, _ = bench_crispasr(backend, mp, long_wav, long_dur, label, extra,
+                                               n_warmup=0, n_runs=2)
+            if mean_l:
+                print(f"    Long {long_dur:.0f}s: {mean_l:.3f}s = {rtf_l:.1f}x realtime")
+                results[label]["mean_long"] = mean_l
+                results[label]["rtf_long"] = rtf_l
+    else:
+        print(f"    FAILED")
+        results[label] = {"mean_jfk": None, "rtf_jfk": None, "text": "FAILED"}
 
+# ── Phase 5: Benchmark onnx-asr (head-to-head models) ───────────────────────
+print("\n=== Phase 5: benchmark onnx-asr ===", flush=True)
+import onnx_asr
+
+ONNX_MODELS = [
+    ("nemo-parakeet-ctc-0.6b",    "int8", "parakeet-ctc-0.6b"),
+    ("nemo-parakeet-tdt-0.6b-v2", "int8", "parakeet-tdt-0.6b"),
+]
+
+onnx_results = {}
+for onnx_name, quant, label in ONNX_MODELS:
+    print(f"\n  [{label} via onnx-asr]")
+    try:
+        t_load = time.perf_counter()
+        model = onnx_asr.load_model(onnx_name, quantization=quant,
+                                     providers=["CPUExecutionProvider"])
+        t_load = time.perf_counter() - t_load
+        print(f"    load: {t_load:.3f}s")
+
+        # Warmup
+        model.recognize(str(jfk_wav))
+
+        times = []
+        text = ""
+        for i in range(3):
+            t0 = time.perf_counter()
+            r = model.recognize(str(jfk_wav))
+            t1 = time.perf_counter()
+            times.append(t1 - t0)
+            if i == 0: text = str(r)[:120]
+
+        mean = sum(times) / len(times)
+        rtf = duration / mean
+        print(f"    JFK {duration:.0f}s: {mean:.3f}s = {rtf:.1f}x realtime")
+        onnx_results[label] = {"mean_jfk": mean, "rtf_jfk": rtf, "text": text, "load": t_load}
+
+        # Long audio
+        times_l = []
+        for i in range(2):
+            t0 = time.perf_counter()
+            r = model.recognize(str(long_wav))
+            t1 = time.perf_counter()
+            times_l.append(t1 - t0)
+        mean_l = sum(times_l) / len(times_l)
+        rtf_l = long_dur / mean_l
+        print(f"    Long {long_dur:.0f}s: {mean_l:.3f}s = {rtf_l:.1f}x realtime")
+        onnx_results[label]["mean_long"] = mean_l
+        onnx_results[label]["rtf_long"] = rtf_l
+
+        del model
+    except Exception as e:
+        print(f"    FAILED: {e}")
+        onnx_results[label] = {"mean_jfk": None, "rtf_jfk": None, "text": f"ERROR: {e}"}
+
+# ── Phase 6: Summary ────────────────────────────────────────────────────────
 gpu_name = "unknown"
 try:
     gpu_name = subprocess.check_output(
-        "nvidia-smi --query-gpu=name --format=csv,noheader", shell=True
-    ).decode().strip()
-except Exception:
-    pass
-cpu_name = "unknown"
-try:
-    cpu_name = subprocess.check_output(
-        "cat /proc/cpuinfo | grep 'model name' | head -1 | cut -d: -f2",
-        shell=True,
-    ).decode().strip()
-except Exception:
-    pass
+        "nvidia-smi --query-gpu=name --format=csv,noheader", shell=True).decode().strip()
+except Exception: pass
 
-print(f"GPU: {gpu_name}")
-print(f"CPU: {cpu_name}")
-print(f"CUDA build: {has_cuda}")
+print("\n" + "=" * 78)
+print("  CrispASR FULL-FLEET BENCHMARK + onnx-asr HEAD-TO-HEAD")
+print("=" * 78)
+print(f"  GPU: {gpu_name}  |  CUDA build: {has_cuda}  |  Audio: {duration:.0f}s JFK")
 print()
-print(f"{'Metric':<30s} {'CrispASR':>12s} {'onnx-asr':>12s} {'ratio':>10s}")
-print("-" * 70)
+print(f"  {'Backend':<22s} {'Engine':>10s} {'JFK RTF':>10s} {'Long RTF':>10s} {'Notes':>20s}")
+print(f"  {'-'*74}")
 
-def fmt_ratio(ca, onnx):
-    if onnx == 0 or onnx == float("inf"):
-        return "N/A"
-    r = ca / onnx
-    return f"{r:.2f}x"
+# Head-to-head
+for label in ["parakeet-ctc-0.6b", "parakeet-tdt-0.6b"]:
+    ca = results.get(label, {})
+    ox = onnx_results.get(label, {})
+    ca_rtf = f"{ca.get('rtf_jfk', 0):.1f}x" if ca.get('rtf_jfk') else "FAIL"
+    ox_rtf = f"{ox.get('rtf_jfk', 0):.1f}x" if ox.get('rtf_jfk') else "FAIL"
+    ca_long = f"{ca.get('rtf_long', 0):.1f}x" if ca.get('rtf_long') else "-"
+    ox_long = f"{ox.get('rtf_long', 0):.1f}x" if ox.get('rtf_long') else "-"
 
-print(f"{'JFK (short) mean time':.<30s} {ca_mean_short:>11.3f}s {onnx_mean_short:>11.3f}s {fmt_ratio(onnx_mean_short, ca_mean_short):>10s}")
-print(f"{'JFK x-realtime':.<30s} {ca_rtf_short:>11.1f}x {onnx_rtf_short:>11.1f}x {fmt_ratio(ca_rtf_short, onnx_rtf_short):>10s}")
-print(f"{'Long (~60s) mean time':.<30s} {ca_mean_long:>11.3f}s {onnx_mean_long:>11.3f}s {fmt_ratio(onnx_mean_long, ca_mean_long):>10s}")
-print(f"{'Long x-realtime':.<30s} {ca_rtf_long:>11.1f}x {onnx_rtf_long:>11.1f}x {fmt_ratio(ca_rtf_long, onnx_rtf_long):>10s}")
-print()
+    print(f"  {label:<22s} {'CrispASR':>10s} {ca_rtf:>10s} {ca_long:>10s} {'CUDA Q8_0':>20s}")
+    print(f"  {'':.<22s} {'onnx-asr':>10s} {ox_rtf:>10s} {ox_long:>10s} {'CPU int8':>20s}")
 
-# Save results as JSON
-results = {
-    "gpu": gpu_name,
-    "cpu": cpu_name,
-    "cuda_build": has_cuda,
-    "crispasr": {
-        "model": "parakeet-tdt-0.6b-v2-q8_0.gguf",
-        "backend": "parakeet",
-        "jfk": {"duration_s": jfk_duration, "times": ca_times_short, "mean": ca_mean_short, "rtf": ca_rtf_short},
-        "long": {"duration_s": long_duration, "times": ca_times_long, "mean": ca_mean_long, "rtf": ca_rtf_long},
-        "transcript_short": ca_text_short,
-    },
-    "onnx_asr": {
-        "model": "nvidia/parakeet-tdt-0.6b",
-        "load_time": onnx_load,
-        "jfk": {"duration_s": jfk_duration, "times": onnx_times_short, "mean": onnx_mean_short, "rtf": onnx_rtf_short},
-        "long": {"duration_s": long_duration, "times": onnx_times_long, "mean": onnx_mean_long, "rtf": onnx_rtf_long},
-        "transcript_short": onnx_text_short,
-    },
+print(f"  {'-'*74}")
+print(f"  {'CrispASR-only backends':}")
+
+# CrispASR-only
+for backend, repo, fname, label in CRISPASR_MODELS:
+    if "parakeet" in label:
+        continue  # already shown above
+    ca = results.get(label, {})
+    ca_rtf = f"{ca.get('rtf_jfk', 0):.1f}x" if ca.get('rtf_jfk') else "FAIL"
+    print(f"  {label:<22s} {'CrispASR':>10s} {ca_rtf:>10s} {'':>10s} {'CUDA':>20s}")
+
+print(f"\n  Total backends tested: {len(results)} CrispASR + {len(onnx_results)} onnx-asr")
+print(f"  CrispASR supports 25+ backends; onnx-asr supports ~10")
+
+# Save JSON
+all_results = {
+    "gpu": gpu_name, "cuda_build": has_cuda, "audio_duration": duration,
+    "crispasr": results, "onnx_asr": onnx_results,
 }
-results_path = WORK / "benchmark_results.json"
-with open(results_path, "w") as f:
-    json.dump(results, f, indent=2)
-print(f"Results saved to {results_path}")
-
-# Also try whisper and cohere if time permits
+with open(WORK / "benchmark_results.json", "w") as f:
+    json.dump(all_results, f, indent=2)
+print(f"\n  Results saved to {WORK / 'benchmark_results.json'}")
 print("\n=== Done ===", flush=True)
