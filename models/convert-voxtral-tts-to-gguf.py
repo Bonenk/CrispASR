@@ -72,8 +72,9 @@ DIRECT_FM = {
     "acoustic_transformer.time_projection.weight": "fm.time_proj.weight",
     "acoustic_transformer.acoustic_codebook_output.weight": "fm.acoustic_output.weight",
     "acoustic_transformer.semantic_codebook_output.weight": "fm.semantic_output.weight",
-    # Bias on the semantic head is REQUIRED: without it the greedy argmax is
-    # degenerate and [END_AUDIO] is never emitted (generation never terminates).
+    # NOTE: the checkpoint has NO semantic_codebook_output.bias (verified from the
+    # safetensors header); the reference runs the greedy argmax without one. Kept as
+    # an optional mapping in case a future checkpoint adds it — harmless if absent.
     "acoustic_transformer.semantic_codebook_output.bias": "fm.semantic_output.bias",
     "acoustic_transformer.norm.weight": "fm.norm.weight",
 }
