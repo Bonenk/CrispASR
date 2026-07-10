@@ -569,56 +569,137 @@ static char* glm_asr_transcribe_impl(struct glm_asr_context* ctx, const float* s
 
     const auto& hp = ctx->model.hp;
 
-    // 1. Compute mel
-    int n_mels = 0, T_mel = 0;
-    float* mel;
-    {
-        glm_asr_bench_stage _b("mel");
-        mel = glm_asr_compute_mel(ctx, samples, n_samples, &n_mels, &T_mel);
-    }
-    if (!mel)
-        return nullptr;
+    // 1+2. Mel + encoder, blueprint window semantics (transformers glmasr
+    // GlmAsrProcessor._process_audio): the raw audio is cut into 30 s SAMPLE
+    // windows, each window is mel'd and encoded independently on a padded
+    // 3000-frame canvas (unmasked attention over the padding — the reference
+    // encodes-then-trims), and only the window's VALID post-conv frames
+    // survive: conv2 (k3 s2 p1) then a 4-frame merge,
+    //   valid = (((L_mel - 1) / 2 + 1) - 4) / 4 + 1.
+    // All windows' valid frames are concatenated into ONE audio-token stream
+    // and decoded in ONE LLM pass (processor max_audio_len = 655 s ≈ the
+    // 8192-token LLM context). The legacy path truncated everything past the
+    // first 30 s window — restore it with CRISPASR_GLM_ASR_SINGLE_WINDOW=1.
+    const bool legacy_single_window = [] {
+        const char* e = getenv("CRISPASR_GLM_ASR_SINGLE_WINDOW");
+        return e && atoi(e) != 0;
+    }();
+    const int kWindowSamples = 30 * 16000; // feature_extractor.chunk_length
+    const int kMaxWindows = 21;            // floor(655 s / 30 s), blueprint truncation
+    const int T_target = 3000;             // mel frames per padded window
 
-    // Normalize mel to 3000 frames (30s) — GLM-ASR expects fixed-length input.
-    // Exact 30 s chunks can land at 3001 frames, so truncate as well as pad.
-    const int T_target = 3000;
-    if (T_mel != T_target) {
-        std::vector<float> padded((size_t)n_mels * T_target, 0.0f);
-        const int T_copy = std::min(T_mel, T_target);
-        // Need to copy each mel band separately because the source and target
-        // strides differ when normalizing to the fixed 3000-frame layout.
-        for (int m = n_mels - 1; m >= 0; m--) {
-            memcpy(padded.data() + (size_t)m * T_target, mel + (size_t)m * T_mel, (size_t)T_copy * sizeof(float));
+    int n_win = (n_samples + kWindowSamples - 1) / kWindowSamples;
+    if (legacy_single_window)
+        n_win = 1;
+    if (n_win > kMaxWindows) {
+        fprintf(stderr,
+                "glm_asr: audio %.1fs exceeds the model's %d s single-pass window — "
+                "truncating (use --chunk-seconds for longer audio)\n",
+                (double)n_samples / 16000.0, kMaxWindows * 30);
+        n_win = kMaxWindows;
+    }
+
+    int n_mels = 0, enc_dim = 0, N_enc = 0;
+    std::vector<float> audio_embeds_v;
+    std::vector<int> win_tokens; // valid audio tokens per window (prompt grouping)
+    for (int w = 0; w < n_win; w++) {
+        const float* win_samples = samples + (size_t)w * kWindowSamples;
+        const int win_n = std::min(kWindowSamples, n_samples - w * kWindowSamples);
+        if (win_n <= 0)
+            break;
+
+        int T_mel = 0;
+        float* mel;
+        {
+            glm_asr_bench_stage _b("mel");
+            mel = glm_asr_compute_mel(ctx, win_samples, win_n, &n_mels, &T_mel);
         }
-        free(mel);
-        mel = (float*)malloc(padded.size() * sizeof(float));
         if (!mel)
             return nullptr;
-        memcpy(mel, padded.data(), padded.size() * sizeof(float));
-        T_mel = T_target;
-    }
 
-    // 2. Run encoder + projector
-    int N_enc = 0, enc_dim = 0;
-    float* audio_embeds;
-    {
-        glm_asr_bench_stage _b("encoder");
-        audio_embeds = glm_asr_run_encoder(ctx, mel, n_mels, T_mel, &N_enc, &enc_dim);
+        // Valid (pre-padding) mel length → post-conv+merge token count.
+        const int T_valid = std::min(T_mel, T_target);
+        const int conv_valid = (T_valid - 1) / 2 + 1;
+        const int tok_valid = (conv_valid - 4) / 4 + 1;
+
+        // Pad/truncate the window to the fixed 3000-frame canvas.
+        if (T_mel != T_target) {
+            std::vector<float> padded((size_t)n_mels * T_target, 0.0f);
+            for (int m = n_mels - 1; m >= 0; m--)
+                memcpy(padded.data() + (size_t)m * T_target, mel + (size_t)m * T_mel, (size_t)T_valid * sizeof(float));
+            free(mel);
+            mel = (float*)malloc(padded.size() * sizeof(float));
+            if (!mel)
+                return nullptr;
+            memcpy(mel, padded.data(), padded.size() * sizeof(float));
+            T_mel = T_target;
+        }
+
+        int N_win = 0;
+        float* win_embeds;
+        {
+            glm_asr_bench_stage _b("encoder");
+            win_embeds = glm_asr_run_encoder(ctx, mel, n_mels, T_mel, &N_win, &enc_dim);
+        }
+        free(mel);
+        if (!win_embeds)
+            return nullptr;
+
+        const int keep = legacy_single_window ? N_win : std::min(std::max(tok_valid, 0), N_win);
+        if (keep > 0) {
+            const size_t old = audio_embeds_v.size();
+            audio_embeds_v.resize(old + (size_t)keep * enc_dim);
+            memcpy(audio_embeds_v.data() + old, win_embeds, (size_t)keep * enc_dim * sizeof(float));
+            N_enc += keep;
+            win_tokens.push_back(keep);
+        }
+        free(win_embeds);
     }
-    free(mel);
-    if (!audio_embeds)
+    if (N_enc <= 0 || audio_embeds_v.empty())
         return nullptr;
+    float* audio_embeds = audio_embeds_v.data();
 
-    // 3. Build prompt: <|user|>\n<|begin_of_audio|><|pad|>×N<|end_of_audio|><|user|>\nPlease transcribe...<|assistant|>\n
+    // 3. Build prompt — blueprint chat template (chat_template.jinja +
+    //    GlmAsrProcessor.apply_transcription_request):
+    //      <|user|>\n<|begin_of_audio|><|pad|>×N<|end_of_audio|><|user|>\n
+    //      Please transcribe this audio into text<|assistant|>\n
+    //    The instruction is ALWAYS present in the blueprint (the processor's
+    //    default_transcription_prompt); the legacy C++ prompt omitted it and
+    //    all newlines (glm_asr_tokenize is specials-only and silently drops
+    //    plain text — see kDefaultInstruction note). Restore the legacy form
+    //    with CRISPASR_GLM_ASR_LEGACY_PROMPT=1.
+    //
+    //    kNewline / kDefaultInstruction are the GLM tokenizer's ids for "\n"
+    //    and "Please transcribe this audio into text", encoded with the HF
+    //    repo's own tokenizer.json (verified against the transformers-5.13
+    //    processor dump, tools/kaggle/glm-asr-blueprint-ref).
+    const bool legacy_prompt = [] {
+        const char* e = getenv("CRISPASR_GLM_ASR_LEGACY_PROMPT");
+        return e && atoi(e) != 0;
+    }();
+    static const int32_t kNewline = 10; // "Ċ"
+    static const int32_t kDefaultInstruction[] = {14215, 1700, 8091, 643, 14812, 1636, 2815};
+    //    Multi-window audio grouping follows the UPSTREAM reference
+    //    (zai-org/GLM-ASR inference.py build_prompt): each 30 s window gets
+    //    its OWN <|begin_of_audio|>…<|end_of_audio|> block — this is the
+    //    layout the model was trained on. (The transformers-5.x processor
+    //    puts one begin/end pair around ALL windows' tokens instead; that
+    //    generalisation is off-distribution for multi-window prompts.)
     std::vector<int32_t> ids;
     ids.push_back(59253); // <|user|>
-    ids.push_back(59261); // <|begin_of_audio|>
-    for (int i = 0; i < N_enc; i++)
-        ids.push_back(59260); // <|pad|> (audio placeholder)
-    ids.push_back(59262);     // <|end_of_audio|>
-    ids.push_back(59253);     // <|user|>
+    if (!legacy_prompt)
+        ids.push_back(kNewline);
+    if (win_tokens.empty())
+        win_tokens.push_back(N_enc); // legacy single-window path
+    for (int wt : win_tokens) {
+        ids.push_back(59261); // <|begin_of_audio|>
+        for (int i = 0; i < wt; i++)
+            ids.push_back(59260); // <|pad|> (audio placeholder)
+        ids.push_back(59262);     // <|end_of_audio|>
+    }
+    ids.push_back(59253); // <|user|>
 
-    // Tokenize instruction: custom ask, translate, or default transcribe
+    // Instruction: custom ask, translate, or the blueprint default.
     {
         std::string instr_str;
         if (!ctx->ask.empty()) {
@@ -629,6 +710,7 @@ static char* glm_asr_transcribe_impl(struct glm_asr_context* ctx, const float* s
             snprintf(buf, sizeof(buf), "\nPlease translate the speech to %s.\n", tgt);
             instr_str = buf;
         }
+        bool instr_emitted = false;
         if (!instr_str.empty()) {
             int n_instr = 0;
             int32_t* instr_ids = glm_asr_tokenize(ctx, instr_str.c_str(), &n_instr);
@@ -636,17 +718,36 @@ static char* glm_asr_transcribe_impl(struct glm_asr_context* ctx, const float* s
                 for (int i = 0; i < n_instr; i++)
                     ids.push_back(instr_ids[i]);
                 free(instr_ids);
+                instr_emitted = true;
+            } else if (instr_ids) {
+                free(instr_ids);
             }
+            if (!instr_emitted && ctx->params.verbosity >= 1) {
+                // glm_asr_tokenize is specials-only (no BPE merges in the
+                // GGUF yet) — plain-text instructions silently vanish. Fall
+                // through to the blueprint default below rather than sending
+                // an instruction-less prompt (the model needs SOME
+                // instruction; without one it hallucinates on noise).
+                fprintf(stderr,
+                        "glm_asr: instruction %.60s… not encodable (specials-only "
+                        "tokenizer) — using the default transcription prompt\n",
+                        instr_str.c_str());
+            }
+        }
+        if (!instr_emitted && !legacy_prompt) {
+            ids.push_back(kNewline);
+            for (int32_t id : kDefaultInstruction)
+                ids.push_back(id);
         }
     }
     ids.push_back(59254); // <|assistant|>
+    if (!legacy_prompt)
+        ids.push_back(kNewline);
 
     // 4. Embed tokens
     float* text_embeds = glm_asr_embed_tokens(ctx, ids.data(), (int)ids.size());
-    if (!text_embeds) {
-        free(audio_embeds);
+    if (!text_embeds)
         return nullptr;
-    }
 
     // 5. Splice audio embeddings into the <|pad|> positions
     const int pdim = enc_dim; // 2048
@@ -657,12 +758,16 @@ static char* glm_asr_transcribe_impl(struct glm_asr_context* ctx, const float* s
             spliced++;
         }
     }
-    free(audio_embeds);
+    audio_embeds_v.clear();
+    audio_embeds_v.shrink_to_fit();
 
-    // 6. KV cache + prefill + greedy decode
+    // 6. KV cache + prefill + greedy decode. Sized to the actual prompt —
+    //    a 655 s single-pass prompt is ~8k tokens, far past the old fixed
+    //    4096 (glm_asr_kv_init grows when a larger request arrives).
     {
         glm_asr_bench_stage _b("kv_init");
-        if (!ctx->kv_ctx && !glm_asr_kv_init(ctx, 4096)) {
+        const int kv_needed = (int)ids.size() + 512 /*max_tokens*/ + 16;
+        if (!glm_asr_kv_init(ctx, std::max(4096, kv_needed))) {
             free(text_embeds);
             return nullptr;
         }
@@ -785,6 +890,53 @@ static char* glm_asr_transcribe_impl(struct glm_asr_context* ctx, const float* s
         if (out_token_ids && out_token_probs) {
             out_token_ids->push_back(id);
             out_token_probs->push_back(gi < gen_probs.size() ? gen_probs[gi] : 0.0f);
+        }
+    }
+
+    // CRISPASR_GLM_ASR_DEBUG=1: dump the raw decode before any framing strip
+    // (first/last generated ids + text) — decode-path diagnosis.
+    if (const char* dbg = getenv("CRISPASR_GLM_ASR_DEBUG"); dbg && atoi(dbg) != 0) {
+        fprintf(stderr, "glm_asr[debug]: prompt=%d tokens (N_enc=%d), generated=%zu ids:", (int)ids.size(), N_enc,
+                gen_ids.size());
+        for (size_t i = 0; i < gen_ids.size() && i < 24; i++)
+            fprintf(stderr, " %d", gen_ids[i]);
+        if (gen_ids.size() > 24)
+            fprintf(stderr, " ...");
+        fprintf(stderr, "\nglm_asr[debug]: raw text (%zu chars): %.400s\n", result.size(), result.c_str());
+    }
+
+    // With the blueprint transcription prompt the model frames its answer
+    // ('The spoken content of the audio is "..."'). Strip the framing like
+    // GlmAsrProcessor._strip_assistant_prefix_and_quotes so callers get the
+    // bare transcript.
+    {
+        auto trim = [](std::string& s) {
+            size_t a = s.find_first_not_of(" \t\n\r");
+            size_t b = s.find_last_not_of(" \t\n\r");
+            s = (a == std::string::npos) ? std::string() : s.substr(a, b - a + 1);
+        };
+        trim(result);
+        static const char* kPrefixes[] = {
+            "The spoken content of the audio is",
+            "The transcription of the audio is",
+            "The content of the input audio is",
+        };
+        for (const char* p : kPrefixes) {
+            const size_t n = strlen(p);
+            if (result.compare(0, n, p) == 0) {
+                result.erase(0, n);
+                trim(result);
+                break;
+            }
+        }
+        if (!result.empty() && result.back() == '.') {
+            result.pop_back();
+            trim(result);
+        }
+        if (result.size() >= 2 && result.front() == result.back() &&
+            (result.front() == '"' || result.front() == '\'')) {
+            result = result.substr(1, result.size() - 2);
+            trim(result);
         }
     }
 
@@ -1026,8 +1178,19 @@ extern "C" float* glm_asr_embed_tokens(struct glm_asr_context* ctx, const int32_
 extern "C" bool glm_asr_kv_init(struct glm_asr_context* ctx, int max_ctx) {
     if (!ctx || max_ctx <= 0)
         return false;
-    if (ctx->kv_k)
-        return true; // already initialized
+    if (ctx->kv_k) {
+        if (ctx->kv_k->ne[1] >= max_ctx)
+            return true; // already initialized and large enough
+        // Grow: a multi-window long-audio prompt (30 s ≈ 375 tokens/window,
+        // up to ~8k for 655 s) can exceed what an earlier shorter call
+        // allocated. Free and reallocate below at the new size.
+        ggml_backend_buffer_free(ctx->kv_buf);
+        ggml_free(ctx->kv_ctx);
+        ctx->kv_buf = nullptr;
+        ctx->kv_ctx = nullptr;
+        ctx->kv_k = nullptr;
+        ctx->kv_v = nullptr;
+    }
     const auto& hp = ctx->model.hp;
     const int hd = hp.llm_head_dim;
     const int n_kv = hp.llm_n_kv_heads;

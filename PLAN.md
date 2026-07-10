@@ -510,13 +510,72 @@ stages; bf16 reference re-dumped via `tools/reference_backends/qwen3.py`):
     clip genuinely contains repeated "hey" shouts; both reach the final
     sentence, chars within 2 %). Quantisation has no behavioural effect.
   - glm-asr: raw decode degenerates at BOTH precisions (max unigram run 255
-    at q4_k, 163 at F16) — an inherent model behaviour on this clip, worsened
-    but not caused by quant. The qwen3-asr carve-out criterion (q4 loops, F16
-    clean) is NOT met; `core_ngram::fix_loops` (already applied) is the right
-    mitigation. qwen3-asr remains the only quant-caused #218 case; granite +
-    canary-qwen were already protected.
+    at q4_k, 163 at F16). ~~An inherent model behaviour~~ — CORRECTED by the
+    follow-up blueprint comparison (see '#218 glm-asr long-form blueprint
+    parity' below): both A/B arms ran INSTRUCTION-LESS prompts (specials-only
+    tokenizer silently dropped every instruction), which is what degenerates.
+    With the blueprint prompt the model matches the bf16 reference at q4_k —
+    no quant carve-out needed. qwen3-asr remains the only quant-caused #218
+    case; granite + canary-qwen were already protected.
 
 ---
+
+## #218 glm-asr long-form blueprint parity — instruction + multi-window (DONE)
+
+User mandate: glm-asr must match the Python blueprint on the reporter's 145 s
+clip. Ground truth from the REAL `GlmAsrForConditionalGeneration`
+(transformers 5.13, bf16, Kaggle kernel `tools/kaggle/glm-asr-blueprint-ref/`,
+results in the run's `results/{jfk,t32}.json`): jfk → 27 greedy tokens; t32 →
+ONE 5-window 1827-token prompt, 115 tokens of clean dialogue starting
+"Alex, you okay?" (the blueprint itself skips the quiet first ~70 s), NO
+loops, NO empty output.
+
+Root causes found (neither was quantization):
+
+1. **No instruction ever reached the model.** `glm_asr_tokenize` is
+   specials-only (the GGUF carries no BPE merges), so every plain-text
+   instruction tokenized to NOTHING — and the CLI adapter always sets one
+   ("Please transcribe in English.", `--language` defaults to en), so the
+   blueprint's mandatory default prompt ("Please transcribe this audio into
+   text") was silently absent from EVERY glm-asr prompt ever sent.
+   Instruction-less prompts are off-distribution: the model hallucinates
+   shout-loops on noise windows and instant-EOSes (`<|user|>`) on
+   multi-window prompts. Fixed: blueprint default-instruction ids baked in
+   (encoded with the repo's own tokenizer.json, verified against the
+   transformers-5.13 processor dump), un-encodable custom instructions fall
+   back to it with a warning. Chat-template newlines were also missing;
+   the answer framing ('The spoken content of the audio is "…"') is now
+   stripped like `GlmAsrProcessor._strip_assistant_prefix_and_quotes`.
+2. **Backend truncated everything past 30 s.** `glm_asr_transcribe_impl`
+   padded/truncated to ONE 3000-frame window. Fixed with the blueprint
+   multi-window path: 30 s sample windows, each encoded on the padded canvas
+   then trimmed to its valid post-conv frames (conv (1,3,1)+(1,3,2), merge 4
+   — N matches `_get_feat_extract_output_lengths` exactly; t32 = 1812),
+   concatenated into ONE prompt, ONE decode. Windows grouped per-window in
+   `<|begin_of_audio|>…<|end_of_audio|>` blocks (the zai-org/GLM-ASR
+   `inference.py` training-time layout; the HF processor's single-group
+   variant behaves identically in ground truth). Cap 21 windows = 655 s
+   (processor `max_audio_len`), warning beyond. KV cache prompt-sized +
+   grow-on-demand (fixed 4096 would cap ~4.5 min).
+
+Verification (q4_k GGUF, Metal): jfk prompt 152 tokens == blueprint, 27
+generated ids == blueprint, text identical. t32 `--chunk-seconds 0`: 113 vs
+blueprint's 115 tokens, near-verbatim ("I'm" vs "I am"-level q4_k variance),
+same scope. Default 30 s-chunked path now recovers the whole dialogue incl.
+slices the old prompt lost; raw noise-window "hey" runs are genuine audio
+shouts, collapsed by fix_loops as before. Session ABI inherits everything via
+`glm_asr_transcribe_impl`; the CLI streaming path mirrors the prompt. Gates:
+`CRISPASR_GLM_ASR_SINGLE_WINDOW=1` (old truncate-to-30 s),
+`CRISPASR_GLM_ASR_LEGACY_PROMPT=1` (old instruction-less scaffold),
+`CRISPASR_GLM_ASR_DEBUG=1` (raw decode dump).
+
+Follow-ups: (1) bake BPE merges into the GGUF + real text tokenizer so
+`--ask`/`--language` instructions actually encode (they currently warn + fall
+back to the default transcription prompt); (2) CAP_UNBOUNDED_INPUT decision —
+same posture as qwen3-asr for now (default 30 s chunks, `--chunk-seconds 0`
+opt-in single-pass ≤655 s); (3) the blueprint itself SKIPS quiet leading
+audio in single-pass mode (starts at ~75 s on t32) — chunked mode covers more
+content on such clips; document in README.
 
 ## Priority ordering
 
