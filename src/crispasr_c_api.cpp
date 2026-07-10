@@ -1870,17 +1870,6 @@ static void _fire_segment_callbacks(crispasr_session* s, crispasr_session_result
     }
 }
 
-// Fire the session's per-token callback for a vector of ca_token_record
-// entries. Called from the transcribe paths after a segment's tokens have
-// been decoded and detokenised.
-static void _fire_token_callbacks(crispasr_session* s, const std::vector<struct ca_token_record>& toks) {
-    if (!s || !s->token_cb)
-        return;
-    for (int i = 0; i < (int)toks.size(); ++i) {
-        s->token_cb(toks[i].text.c_str(), i, s->token_ud);
-    }
-}
-
 // Per-token data fed into emit_words_from_tokens. Backends with their own
 // token-prob APIs project into this shape so the word-grouping logic stays
 // in one place.
@@ -1896,6 +1885,17 @@ struct ca_token_record {
     // word — see the inline note there for why first-token only.
     std::vector<crispasr_session_seg::word_alt> alts;
 };
+
+// Fire the session's per-token callback for a vector of ca_token_record
+// entries. Called from the transcribe paths after a segment's tokens have
+// been decoded and detokenised.
+static void _fire_token_callbacks(crispasr_session* s, const std::vector<ca_token_record>& toks) {
+    if (!s || !s->token_cb)
+        return;
+    for (int i = 0; i < (int)toks.size(); ++i) {
+        s->token_cb(toks[i].text.c_str(), i, s->token_ud);
+    }
+}
 
 // Thin alias — delegates to core_bpe::token_bytes_to_utf8() (§175 DRY).
 static std::string gpt2_byte_decode(const std::string& s) {
