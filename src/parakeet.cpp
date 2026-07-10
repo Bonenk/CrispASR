@@ -1618,8 +1618,11 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode_batched(parakeet_
         }
 #endif
 
-        // Batch: compute mid + logits for all remaining frames at once
-        int batch = T_enc - t;
+        // Batch: compute mid + logits for a window of upcoming frames.
+        // Cap at 32 — between token emissions, blanks advance 1-4 frames
+        // so we rarely need to look further. Avoids the cost of computing
+        // 8198-dim logits for 300+ frames when only ~10 are needed.
+        int batch = std::min(T_enc - t, 32);
         mid_batch.resize((size_t)batch * Jh);
         for (int f = 0; f < batch; f++) {
             const float* pe = all_proj_e.data() + (size_t)(t + f) * Jh;
@@ -1651,9 +1654,17 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode_batched(parakeet_
         }
 #endif
 
-        // Scan batch for first non-blank
-        bool advanced = false;
-        for (int f = 0; f < batch; f++) {
+        // Scan batch: walk through frames using pre-computed logits.
+        // For blank frames, advance by dur_skip (or 1 for dur=0 — deterministic
+        // retries are no-ops for greedy). Stop at first non-blank → emit.
+        // The batch logits are indexed by ABSOLUTE frame position offset from
+        // the start `t` of this batch.
+        bool found_emission = false;
+        int scan_t = t;  // track position as we scan
+        while (scan_t < T_enc) {
+            int f = scan_t - t;  // index into the batch
+            if (f >= batch) break;  // exhausted pre-computed batch
+
             const float* lg = logits_batch.data() + (size_t)f * Vt;
             int tok = 0; float tok_lp = lg[0];
             for (int v = 1; v < n_vocab_blk; v++)
@@ -1665,26 +1676,23 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode_batched(parakeet_
             int dur_skip = (int)hp.tdt_durations[dur_id];
 
             if (tok == blank_id) {
-                t += (t + f) == t ? std::max(dur_skip, 1) : f + std::max(dur_skip, 1);
-                // Actually: we processed frames [t..t+f] and found blank at frame t+f
-                // Advance to t+f + max(dur_skip, 1)
-                t = (t + f) + std::max(dur_skip, 1);
-                advanced = true;
-                break;
+                // Blank: advance. For greedy, dur=0 retries give same result
+                // (same input → same output), so just advance by 1.
+                scan_t += std::max(dur_skip, 1);
             } else {
-                // Emit
-                int frame = t + f;
-                int t_end = std::min(T_enc, frame + std::max(0, dur_skip));
+                // Non-blank: emit token, update predictor, break to re-batch
+                int t_end = std::min(T_enc, scan_t + std::max(0, dur_skip));
                 float tok_p = 1.0f;
                 { double sum = 0.0; for (int v = 0; v < n_vocab_blk; v++) sum += std::exp((double)(lg[v]-tok_lp)); tok_p = sum>0?(float)(1.0/sum):0.0f; }
-                emitted.push_back({tok, frame, t_end, tok_p});
+                emitted.push_back({tok, scan_t, t_end, tok_p});
                 predictor_step(W, tok, state, pred_out);
-                t = frame + std::max(dur_skip, 1);
-                advanced = true;
+                scan_t += std::max(dur_skip, 1);
+                found_emission = true;
                 break;
             }
         }
-        if (!advanced) break; // all frames exhausted
+        t = scan_t;
+        if (!found_emission && t >= T_enc) break;
     }
 
     return emitted;
