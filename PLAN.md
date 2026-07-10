@@ -7729,6 +7729,33 @@ broader model/format/TTS coverage.
       #171/#184/§227.2; do not start before 0.
 7. [ ] (cleanup) bucket-table quant tensor classifier to replace the per-arch ladder.
 
+## §232 qwen3-tts code predictor perf — fuse 15 graph dispatches into 1 (#245, OPEN)
+
+**Problem:** CrispASR's qwen3-tts code predictor runs 15 separate ggml graph
+dispatches per audio frame (one per codebook 1-15). This makes it ~40x slower
+per frame than predict-woo/qwen3-tts.cpp (10s/frame vs 225ms/frame on CPU).
+
+**Competitive benchmarks (CPU, 0.6B Q8_0):**
+
+| Engine | Talker ms/frame | CodePred ms/frame | RTF |
+|--------|----------------|-------------------|-----|
+| CrispASR | ~13,000 | ~10,000 (15×680) | 0.006x |
+| predict-woo | ~84 | ~225 | ~0.5x |
+| qwentts.cpp | no data | no data (claims ~90x with cache) | no data |
+
+**Fix:** Fuse the 15 `run_code_pred_kv()` calls into a single graph with
+sequential KV-cached decode steps. The code predictor is a 5-layer transformer
+with 15 sequential AR steps — should be one graph, not 15 dispatches.
+
+**Also:**
+- [ ] Enable O15 (persistent code_pred graph) by default
+- [ ] Enable LK_BUCKET (bucketed Lk talker) by default
+- [ ] Profile on Metal/CUDA — CPU numbers on the 4-core VPS are misleading
+- [ ] Benchmark CrispASR vs predict-woo vs qwentts.cpp on a Kaggle GPU kernel
+
+**Effort:** M (the graph fusion is the hard part; the flag defaults are trivial).
+**Priority:** HIGH — TTS perf gap is user-visible and competitively damaging.
+
 ## §230 Issue #238 — kyutai/stt-2.6b-en support (DONE)
 
 **Shipped 2026-07-10.** Full support for the 48L / 2.6B English-only Kyutai STT model.
