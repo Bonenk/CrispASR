@@ -2345,7 +2345,8 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
     }
 #endif
 #ifdef CA_HAVE_KYUTAI
-    if (s->backend == "kyutai-stt" || s->backend == "kyutai" || s->backend == "moshi-stt") {
+    if (s->backend == "kyutai-stt" || s->backend == "kyutai" || s->backend == "moshi-stt" ||
+        s->backend == "kyutai-stt-2.6b") {
         kyutai_stt_context_params p = kyutai_stt_context_default_params();
         p.n_threads = s->n_threads;
         s->kyutai_ctx = kyutai_stt_init_from_file(model_path, p);
@@ -5332,7 +5333,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
     }
 #endif
 #ifdef CA_HAVE_KYUTAI
-    if ((s->backend == "kyutai-stt" || s->backend == "kyutai" || s->backend == "moshi-stt") && s->kyutai_ctx) {
+    if ((s->backend == "kyutai-stt" || s->backend == "kyutai" || s->backend == "moshi-stt" ||
+         s->backend == "kyutai-stt-2.6b") &&
+        s->kyutai_ctx) {
         // PLAN §90: forward sticky session beam_size into kyutai-stt's
         // per-context setter so session-API consumers (CrisperWeaver's
         // worker pool, Rust/Node bindings) get the same beam search

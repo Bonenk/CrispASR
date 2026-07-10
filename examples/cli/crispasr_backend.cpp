@@ -182,7 +182,7 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_t5_backend();
     if (name == "glm-asr" || name == "glmasr" || name == "glm" || name == "glm_asr")
         return crispasr_make_glm_asr_backend();
-    if (name == "kyutai-stt" || name == "kyutai" || name == "moshi-stt")
+    if (name == "kyutai-stt" || name == "kyutai" || name == "moshi-stt" || name == "kyutai-stt-2.6b")
         return crispasr_make_kyutai_stt_backend();
     if (name == "firered-asr" || name == "firered")
         return crispasr_make_firered_asr_backend();
