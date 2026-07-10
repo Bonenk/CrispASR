@@ -41,16 +41,33 @@ BUILD.mkdir(parents=True, exist_ok=True)
 has_cuda = Path("/usr/local/cuda/bin/nvcc").exists()
 print(f"  CUDA available: {has_cuda}")
 
-# Kaggle T4 = sm_75, P100 = sm_60. Use native to auto-detect.
-cuda_flags = "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=native" if has_cuda else "-DGGML_CUDA=OFF"
-cmake_flags = f"-DCMAKE_BUILD_TYPE=Release {cuda_flags}"
-ret = subprocess.call(
-    f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}",
-    shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-)
-if ret != 0 and has_cuda:
-    # Fallback: try CPU-only
-    print("  CUDA cmake failed, falling back to CPU-only build")
+# Kaggle P100 = sm_60, T4 = sm_75. Try native first, then explicit archs, then CPU.
+cuda_attempts = [
+    "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=native",
+    "-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES='60;75'",
+    "-DGGML_CUDA=ON",
+]
+cmake_ok = False
+if has_cuda:
+    for attempt in cuda_attempts:
+        cmake_flags = f"-DCMAKE_BUILD_TYPE=Release {attempt}"
+        ret = subprocess.call(
+            f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}",
+            shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        if ret == 0:
+            cmake_ok = True
+            print(f"  cmake OK with: {attempt}")
+            break
+        # Clean build dir for retry
+        import shutil
+        if BUILD.exists():
+            shutil.rmtree(BUILD)
+            BUILD.mkdir(parents=True, exist_ok=True)
+
+if not cmake_ok:
+    if has_cuda:
+        print("  CUDA cmake failed, falling back to CPU-only build")
     has_cuda = False
     cmake_flags = "-DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF"
     subprocess.check_call(
@@ -69,10 +86,10 @@ print(f"  built: {CRISPASR_BIN}")
 print("\n=== Phase 1: install onnx-asr ===", flush=True)
 subprocess.check_call([
     sys.executable, "-m", "pip", "install", "-q",
-    "onnx-asr", "soundfile", "huggingface_hub",
+    "onnx-asr", "soundfile", "huggingface_hub", "onnxruntime",
 ])
 if has_cuda:
-    # Install CUDA EP for onnxruntime
+    # Install CUDA EP for onnxruntime (replaces CPU-only onnxruntime)
     subprocess.call([
         sys.executable, "-m", "pip", "install", "-q",
         "onnxruntime-gpu",
