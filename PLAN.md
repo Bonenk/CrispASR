@@ -501,6 +501,15 @@ stages; bf16 reference re-dumped via `tools/reference_backends/qwen3.py`):
   at F16; and even so the EN+DE short-clip imatrix still drifts into repetition
   on the un-chunked 145 s clip where plain q4_k is clean — README carries a
   long-form caveat (prefer `-q4_k`/`-q8_0` for `--chunk-seconds 0`).
+  RECALIBRATION TESTED AND REJECTED (2026-07-10): an imatrix regenerated with
+  6 long-form concatenated Common Voice clips (49–127 s, run single-pass)
+  among the 48 short ones STILL drifts into the same repetition attractor at
+  the same spot — the activation-weighted redistribution itself harms
+  long-context decode; calibration mix doesn't rescue it. Plain q4_k stays
+  the long-form recommendation; the published v2 imatrix files stay for
+  short-clip use. Long-form producer recipe kept in tools/imatrix-calib/
+  provenance + the generated matrix at
+  /Volumes/backups/ai/crispasr-gguf/qwen3-asr-0.6b-longform.imatrix.gguf.
   (2) DONE — session-ABI spot-check (python Session → qwen3 forced-language
   prefill) passes. (3) DONE — cohere-transcribe + glm-asr audit via Kaggle
   kernel `tools/kaggle/issue218-quant-audit/` (T4, HEAD c555a40b, raw decode
