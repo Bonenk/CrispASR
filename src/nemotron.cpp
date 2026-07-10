@@ -1717,6 +1717,151 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
     return emitted;
 }
 
+// §232: Batched greedy RNNT decode. Same principle as parakeet_tdt_decode_batched:
+// between token emissions the predictor state is constant, so batch-compute
+// joint logits for a window of frames in one sgemm, then scan for first non-blank.
+// GPU-optimised (one kernel vs N kernel launches). On CPU, batch=32 cap avoids
+// computing logits for 300+ unneeded frames.
+static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron_context* ctx, const float* enc,
+                                                                         int T_enc, int d_model,
+                                                                         nemotron_token_cb on_tok = nullptr,
+                                                                         void* on_tok_ud = nullptr) {
+    nemotron_init_pred_weights(ctx);
+    nemotron_init_joint_weights(ctx);
+
+    const auto& W = ctx->pred_w;
+    const auto& J = ctx->joint_w;
+    const int blank_id = (int)ctx->model.hparams.blank_id;
+    const int Jh = J.joint_hidden;
+    const int Vt = J.vocab_total;
+
+    std::vector<nemotron_emitted_token> emitted;
+    nemotron_lstm_state state;
+    state.init(W.H);
+    std::vector<float> pred_out;
+    predictor_step(W, blank_id, state, pred_out);
+
+    // Pre-compute all encoder projections
+    std::vector<float> all_proj_e((size_t)T_enc * Jh);
+    for (int f = 0; f < T_enc; f++)
+        std::copy(J.enc_b.begin(), J.enc_b.end(), all_proj_e.data() + (size_t)f * Jh);
+#if defined(HAVE_ACCELERATE)
+    if (!nemotron_force_scalar()) {
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                    T_enc, Jh, J.d_model, 1.0f, enc, J.d_model, J.enc_w.data(), J.d_model,
+                    1.0f, all_proj_e.data(), Jh);
+    } else
+#endif
+    {
+        for (int f = 0; f < T_enc; f++) {
+            float* dst = all_proj_e.data() + (size_t)f * Jh;
+            const float* enc_f = enc + (size_t)f * d_model;
+            for (int i = 0; i < Jh; i++) {
+                const float* row = J.enc_w.data() + (size_t)i * J.d_model;
+                float s = dst[i];
+                for (int k = 0; k < J.d_model; k++) s += row[k] * enc_f[k];
+                dst[i] = s;
+            }
+        }
+    }
+
+    std::vector<float> pred_proj(Jh);
+    std::vector<float> mid_batch;
+    std::vector<float> logits_batch;
+
+    int t = 0;
+    while (t < T_enc) {
+        // Compute pred_proj (constant until next emission)
+        std::copy(J.pred_b.begin(), J.pred_b.end(), pred_proj.data());
+#if defined(HAVE_ACCELERATE)
+        if (!nemotron_force_scalar()) {
+            cblas_sgemv(CblasRowMajor, CblasNoTrans, Jh, J.pred_hidden, 1.0f,
+                        J.pred_w.data(), J.pred_hidden, pred_out.data(), 1, 1.0f, pred_proj.data(), 1);
+        } else
+#endif
+        {
+            for (int i = 0; i < Jh; i++) {
+                const float* row = J.pred_w.data() + (size_t)i * J.pred_hidden;
+                float s = pred_proj[i];
+                for (int k = 0; k < J.pred_hidden; k++) s += row[k] * pred_out[k];
+                pred_proj[i] = s;
+            }
+        }
+
+        // Batch: compute mid + logits for window of frames
+        int batch = std::min(T_enc - t, 32);
+        mid_batch.resize((size_t)batch * Jh);
+        for (int f = 0; f < batch; f++) {
+            const float* pe = all_proj_e.data() + (size_t)(t + f) * Jh;
+            float* mid = mid_batch.data() + (size_t)f * Jh;
+            for (int i = 0; i < Jh; i++) {
+                float v = pe[i] + pred_proj[i];
+                mid[i] = v > 0.0f ? v : 0.0f;
+            }
+        }
+
+        logits_batch.resize((size_t)batch * Vt);
+        for (int f = 0; f < batch; f++)
+            std::copy(J.out_b.begin(), J.out_b.end(), logits_batch.data() + (size_t)f * Vt);
+#if defined(HAVE_ACCELERATE)
+        if (!nemotron_force_scalar()) {
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                        batch, Vt, Jh, 1.0f, mid_batch.data(), Jh, J.out_w.data(), Jh,
+                        1.0f, logits_batch.data(), Vt);
+        } else
+#endif
+        {
+            for (int f = 0; f < batch; f++) {
+                float* lg = logits_batch.data() + (size_t)f * Vt;
+                const float* m = mid_batch.data() + (size_t)f * Jh;
+                for (int v = 0; v < Vt; v++) {
+                    const float* row = J.out_w.data() + (size_t)v * Jh;
+                    float s = lg[v];
+                    for (int k = 0; k < Jh; k++) s += row[k] * m[k];
+                    lg[v] = s;
+                }
+            }
+        }
+
+        // Scan: advance through blanks, stop at first token
+        int scan_t = t;
+        bool found_emission = false;
+        while (scan_t < T_enc) {
+            int f = scan_t - t;
+            if (f >= batch) break; // exhausted window, re-batch
+
+            const float* lg = logits_batch.data() + (size_t)f * Vt;
+            int tok = 0; float maxl = lg[0];
+            for (int v = 1; v < Vt; v++)
+                if (lg[v] > maxl) { maxl = lg[v]; tok = v; }
+
+            if (tok == blank_id) {
+                scan_t++;
+            } else {
+                // Softmax probability
+                float sum = 0.0f;
+                for (int v = 0; v < Vt; v++) sum += expf(lg[v] - maxl);
+                float prob = sum > 0.0f ? (1.0f / sum) : 0.0f;
+
+                nemotron_emitted_token et;
+                et.id = tok;
+                et.t_start = scan_t;
+                et.t_end = scan_t + 1;
+                et.p = prob;
+                emitted.push_back(et);
+                if (on_tok) on_tok(tok, prob, on_tok_ud);
+                predictor_step(W, tok, state, pred_out);
+                scan_t++;
+                found_emission = true;
+                break;
+            }
+        }
+        t = scan_t;
+        if (!found_emission && t >= T_enc) break;
+    }
+    return emitted;
+}
+
 // ===========================================================================
 // RNN-T beam search decode
 // ===========================================================================
