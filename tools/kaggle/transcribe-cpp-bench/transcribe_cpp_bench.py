@@ -527,6 +527,17 @@ else:
         )
     step("clone_crispasr.done")
 
+# git clone --depth 1 does not pull submodules; ggml is one since 2026-07-07
+# and cmake fails at add_subdirectory(ggml) without it (#238 lesson).
+if not (CRISPASR_DIR / "ggml" / "CMakeLists.txt").exists():
+    step("clone_crispasr.submodule_init.begin")
+    subprocess.run(
+        ["git", "-C", str(CRISPASR_DIR), "submodule", "update",
+         "--init", "--recursive", "--depth", "1"],
+        check=True,
+    )
+    step("clone_crispasr.submodule_init.done")
+
 sys.path.insert(0, str(CRISPASR_DIR / "tools" / "kaggle"))
 # Also accept bundled harness in same dir as this script
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -554,23 +565,25 @@ _cache_flags = kh.cache_and_link_flags()
 _jobs = kh.safe_build_jobs(gpu=has_gpu)
 _gen = ["-G", "Ninja"] if _tc.get("ninja") else []
 
-subprocess.run(
+_cmake_ret = subprocess.run(
     ["cmake"] + _gen + [
         "-B", str(CRISPASR_BUILD),
         "-DCMAKE_BUILD_TYPE=Release",
     ] + _cuda_flags + _cache_flags + [str(CRISPASR_DIR)],
-    check=True, stdout=_build_log, stderr=_build_log,
+    stdout=_build_log, stderr=_build_log,
     env={**os.environ, "CCACHE_DIR": "/kaggle/working/.ccache"},
 )
+if _cmake_ret.returncode != 0:
+    _build_log.flush()
+    print("=== build_crispasr.log (tail) ===", flush=True)
+    print(open(str(WORK / "build_crispasr.log")).read()[-4000:], flush=True)
+    raise subprocess.CalledProcessError(_cmake_ret.returncode, "cmake configure (CrispASR)")
 
-_hb = kh.build_heartbeat()
-try:
+with kh.build_heartbeat("cmake.build.crispasr"):
     subprocess.run(
         ["cmake", "--build", str(CRISPASR_BUILD), f"-j{_jobs}", "--target", "crispasr"],
         check=True, stdout=_build_log, stderr=_build_log, timeout=30 * 60,
     )
-finally:
-    _hb.cancel() if hasattr(_hb, "cancel") else None
 
 CRISPASR_BIN = CRISPASR_BUILD / "bin" / "crispasr"
 assert CRISPASR_BIN.is_file(), f"crispasr binary missing: {CRISPASR_BIN}"
@@ -605,23 +618,25 @@ _tc_cuda_flags = ["-DTRANSCRIBE_CUDA=ON"] if has_gpu else []
 if has_gpu and _cuda_arch:
     _tc_cuda_flags += [f"-DCMAKE_CUDA_ARCHITECTURES={_cuda_arch}"]
 
-subprocess.run(
+_tc_cmake_ret = subprocess.run(
     ["cmake"] + _gen + [
         "-B", str(TC_BUILD),
         "-DCMAKE_BUILD_TYPE=Release",
     ] + _tc_cuda_flags + _cache_flags + [str(TC_DIR)],
-    check=True, stdout=_tc_build_log, stderr=_tc_build_log,
+    stdout=_tc_build_log, stderr=_tc_build_log,
     env={**os.environ, "CCACHE_DIR": "/kaggle/working/.ccache"},
 )
+if _tc_cmake_ret.returncode != 0:
+    _tc_build_log.flush()
+    print("=== build_transcribecpp.log (tail) ===", flush=True)
+    print(open(str(WORK / "build_transcribecpp.log")).read()[-4000:], flush=True)
+    raise subprocess.CalledProcessError(_tc_cmake_ret.returncode, "cmake configure (transcribe.cpp)")
 
-_hb2 = kh.build_heartbeat()
-try:
+with kh.build_heartbeat("cmake.build.transcribecpp"):
     subprocess.run(
         ["cmake", "--build", str(TC_BUILD), f"-j{_jobs}", "--target", "transcribe-cli"],
         check=True, stdout=_tc_build_log, stderr=_tc_build_log, timeout=30 * 60,
     )
-finally:
-    _hb2.cancel() if hasattr(_hb2, "cancel") else None
 
 TC_BIN = TC_BUILD / "bin" / "transcribe-cli"
 assert TC_BIN.is_file(), f"transcribe-cli binary missing: {TC_BIN}"
