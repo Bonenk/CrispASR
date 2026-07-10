@@ -54,6 +54,13 @@ else:
     _clone_cmd = f"git -C {REPO} pull --ff-only"
 if subprocess.run(_clone_cmd, shell=True).returncode != 0:
     raise SystemExit(f"clone failed: {_clone_cmd}")
+# git clone --depth 1 does not pull submodules; ggml is one since 2026-07-07
+# and cmake fails at add_subdirectory(ggml) without it (#238 lesson).
+if not (REPO / "ggml" / "CMakeLists.txt").exists():
+    subprocess.run(
+        f"git -C {REPO} submodule update --init --recursive --depth 1",
+        shell=True, check=True,
+    )
 sha = subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True).strip()
 
 sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
