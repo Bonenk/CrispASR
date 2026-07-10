@@ -576,6 +576,29 @@ curl -L -o parakeet.gguf \
 ./build/bin/crispasr --backend qwen3 -m qwen3-ja-anime --auto-download -f anime.wav
 ```
 
+**Long audio:** the default is safe 30 s chunking. `--chunk-seconds 0` decodes
+the whole file in ONE pass (matches the reference model verbatim on multi-minute
+clips, #218) — but the encoder's full attention is O(N²) in audio length, so
+keep single-pass clips under ~10 minutes on 16 GB machines. For long-form use
+prefer the plain `-q4_k`/`-q8_0` GGUFs over the `-imatrix` variants (see the
+model card).
+
+### GLM-ASR-Nano (Mandarin + dialects + Cantonese + English, 1.5B)
+
+```bash
+./build/bin/crispasr --backend glm-asr -m auto -f audio.wav
+
+# Long audio in one pass (up to 655 s — 30 s encoder windows, one LLM prompt,
+# same layout as the HF/zai reference; matches it verbatim on the #218 clip):
+./build/bin/crispasr --backend glm-asr -m auto --chunk-seconds 0 -f long.wav
+```
+
+Note: in single-pass mode the model (like the reference) skips leading
+non-speech audio; the default 30 s-chunked mode transcribes more of such
+clips. Custom `--ask` / non-English `--language` instructions need a GGUF
+with baked BPE merges (re-published 2026-07; older GGUFs fall back to the
+default transcription prompt with a warning).
+
 ### MiMo-V2.5-ASR (Mandarin + dialects + English, 7.5B Qwen2 LM)
 
 ```bash
