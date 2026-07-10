@@ -1573,7 +1573,15 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
             }
         }
         std::vector<int> codes = vtts_acoustic_forward(ctx, h);
-        if (dbg || (ctx->verbosity >= 1 && frame < 3)) {
+        if (dbg) {
+            double sq = 0.0;
+            for (float x : h)
+                sq += (double)x * x;
+            fprintf(stderr, "MINE frame %d |h|=%.4f codes=", frame, std::sqrt(sq));
+            for (int c : codes)
+                fprintf(stderr, "%d,", c);
+            fprintf(stderr, "\n");
+        } else if (ctx->verbosity >= 1 && frame < 3) {
             double sq = 0.0;
             for (float x : h)
                 sq += (double)x * x;
