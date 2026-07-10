@@ -88,6 +88,7 @@ SHARED_MODELS = [
         "ca_backend":    "moonshine",
         "ca_url":        "https://huggingface.co/cstr/moonshine-tiny-GGUF/resolve/main/moonshine-tiny-q4_k.gguf",
         "ca_file":       "moonshine-tiny-q4_k.gguf",
+        "ca_companion":  "https://huggingface.co/cstr/moonshine-tiny-GGUF/resolve/main/tokenizer.bin",
         "tc_url":        "https://huggingface.co/handy-computer/moonshine-tiny-gguf/resolve/main/moonshine-tiny-Q8_0.gguf",
         "tc_file":       "moonshine-tiny-Q8_0.gguf",
         "ca_wer_libri":  None,
@@ -112,6 +113,7 @@ SHARED_MODELS = [
         "ca_backend":    "moonshine-streaming",
         "ca_url":        "https://huggingface.co/cstr/moonshine-streaming-tiny-GGUF/resolve/main/moonshine-streaming-tiny-q4_k.gguf",
         "ca_file":       "moonshine-streaming-tiny-q4_k.gguf",
+        "ca_companion":  "https://huggingface.co/cstr/moonshine-streaming-tiny-GGUF/resolve/main/tokenizer.bin",
         "tc_url":        "https://huggingface.co/handy-computer/moonshine-streaming-tiny-gguf/resolve/main/moonshine-streaming-tiny-Q8_0.gguf",
         "tc_file":       "moonshine-streaming-tiny-Q8_0.gguf",
         "ca_wer_libri":  None,
@@ -616,13 +618,15 @@ TC_BUILD = TC_DIR / "build"
 
 # Fix CUDA::cuda_driver target resolution on Kaggle: libcuda.so (the driver
 # library) only lives in /usr/local/cuda/lib64/stubs/ — cmake's FindCUDAToolkit
-# won't find it there. Create a symlink in the standard search path.
+# uses find_library(cuda_driver cuda) which doesn't search stubs by default.
+# Two approaches: (1) symlink into standard path, (2) CMAKE_LIBRARY_PATH.
 if has_gpu:
     _stub = Path("/usr/local/cuda/lib64/stubs/libcuda.so")
     _link = Path("/usr/lib/x86_64-linux-gnu/libcuda.so")
     if _stub.exists() and not _link.exists():
         subprocess.run(["ln", "-sf", str(_stub), str(_link)])
-        step("build_transcribecpp.cuda_stub_symlink")
+        step("build_transcribecpp.cuda_stub_symlink",
+             exists_after=_link.exists() or _link.is_symlink())
 
 _tc_cuda_flags = ["-DTRANSCRIBE_CUDA=ON"] if has_gpu else []
 if has_gpu and _cuda_arch:
@@ -630,6 +634,8 @@ if has_gpu and _cuda_arch:
         f"-DCMAKE_CUDA_ARCHITECTURES={_cuda_arch}",
         "-DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc",
         "-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache",
+        # Tell cmake's find_library to also search the CUDA stubs dir
+        "-DCMAKE_LIBRARY_PATH=/usr/local/cuda/lib64/stubs",
     ]
 
 def _cmake_configure_tc(cuda_flags):
@@ -742,6 +748,10 @@ for m in SHARED_MODELS:
     tc_gguf = MODELS_DIR / m["tc_file"]
 
     ca_dl = download_gguf(m["ca_url"], ca_gguf, timeout=600)
+    # Download companion files (e.g. moonshine tokenizer.bin) into the same dir
+    if m.get("ca_companion") and ca_dl:
+        comp_dest = MODELS_DIR / Path(m["ca_companion"]).name
+        download_gguf(m["ca_companion"], comp_dest, timeout=120)
     tc_dl = download_gguf(m["tc_url"], tc_gguf, timeout=600)
 
     row = {
@@ -793,6 +803,8 @@ for m in SHARED_MODELS:
 
     ca_gguf.unlink(missing_ok=True)
     tc_gguf.unlink(missing_ok=True)
+    if m.get("ca_companion"):
+        (MODELS_DIR / Path(m["ca_companion"]).name).unlink(missing_ok=True)
     step(f"bench.cleanup", family=fam)
 
 # ─────────────────────────────────────────────────────────────────────────────
