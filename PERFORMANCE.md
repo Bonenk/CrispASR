@@ -1643,11 +1643,24 @@ fixed 4096 capped un-chunked audio at ~5 min regardless of encoder).
 block-diagonal semantics natively: full 104-frame windows as ONE batched
 unmasked attention + ragged tail, no dense mask → **O(N·W) memory**,
 removing the encoder length cap. Encoder cos_mean 0.99953 vs a windowed
-bf16 reference; on the 145 s clip it transcribes MORE (the quiet lead
-that full attention skips). Costs: somewhat slower on Metal (many 104²
-matmuls vs one big one — not yet profiled), and on CUDA it loops in the
-noisy lead where Metal recovers, so the default stays full attention +
-30 s chunks; flip needs a broader eval (PLAN "#218 arc" thread 2).
+bf16 reference. **Default flip evaluated and REJECTED (2026-07-10)**,
+raw-decode A/B on M1 Metal (phrase-cycle metric, q4_k-v2):
+
+| clip | mode | wall | peak RSS | max uni-run / cycle | complete |
+|---|---|---|---|---|---|
+| t32-145s (noisy) | full | ~400 s | 1.65 GB | 1 / 0 | yes |
+| t32-145s (noisy) | windowed | 658 s | 1.99 GB | **238 / 119** | **no** |
+| jfk×12 132 s (clean) | full | 271 s | 1.99 GB | 1 / 0 | 198 words |
+| jfk×12 132 s (clean) | windowed | 397 s | 1.97 GB | 1 / 0 | 176 words |
+
+The windowed path attends the quiet/noisy lead and greedy decode
+collapses there — on Metal as well as CUDA (the earlier "Metal recovers"
+observation was not robust). It is also ~1.5× slower at these lengths
+(many 104² matmuls vs one big one), and the O(N·W) memory advantage only
+matters past full attention's ~10-min OOM point. Default stays full
+attention + 30 s chunks; windowed remains the escape hatch for >10-min
+single-pass audio, with fix_loops ON. (jfk×12 note: both modes EOS early
+on genuinely 12×-repeated audio — model behaviour, not a loop bug.)
 
 ### glm-asr multi-window single-pass
 
