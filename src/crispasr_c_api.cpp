@@ -3453,6 +3453,15 @@ CA_EXPORT int crispasr_session_n_vocab(crispasr_session* s) {
     if ((s->backend.rfind("omniasr", 0) == 0) && s->omniasr_ctx)
         return omniasr_n_vocab((omniasr_context*)s->omniasr_ctx);
 #endif
+#ifdef CA_HAVE_WAV2VEC2
+    if ((s->backend == "wav2vec2" || s->backend == "hubert" || s->backend == "data2vec") &&
+        s->wav2vec2_ctx)
+        return (int)s->wav2vec2_ctx->vocab.size();
+#endif
+#ifdef CA_HAVE_CTC
+    if ((s->backend == "canary-ctc" || s->backend == "fastconformer-ctc") && s->ctc_ctx)
+        return canary_ctc_n_vocab(s->ctc_ctx);
+#endif
     return 0;
 }
 
@@ -3462,6 +3471,17 @@ CA_EXPORT const char* crispasr_session_token_text(crispasr_session* s, int id) {
 #ifdef CA_HAVE_OMNIASR
     if ((s->backend.rfind("omniasr", 0) == 0) && s->omniasr_ctx)
         return omniasr_token_text((omniasr_context*)s->omniasr_ctx, id);
+#endif
+#ifdef CA_HAVE_WAV2VEC2
+    if ((s->backend == "wav2vec2" || s->backend == "hubert" || s->backend == "data2vec") &&
+        s->wav2vec2_ctx) {
+        const auto& v = s->wav2vec2_ctx->vocab;
+        return (id < (int)v.size()) ? v[id].c_str() : "";
+    }
+#endif
+#ifdef CA_HAVE_CTC
+    if ((s->backend == "canary-ctc" || s->backend == "fastconformer-ctc") && s->ctc_ctx)
+        return canary_ctc_token_text(s->ctc_ctx, id);
 #endif
     return "";
 }
