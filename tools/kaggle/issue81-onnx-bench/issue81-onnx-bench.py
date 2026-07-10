@@ -84,12 +84,9 @@ subprocess.check_call([
     sys.executable, "-m", "pip", "install", "-q",
     "onnx-asr", "soundfile", "huggingface_hub", "onnxruntime",
 ])
-if has_cuda:
-    # Install CUDA EP for onnxruntime (replaces CPU-only onnxruntime)
-    subprocess.call([
-        sys.executable, "-m", "pip", "install", "-q",
-        "onnxruntime-gpu",
-    ])
+# Note: onnxruntime-gpu requires matching CUDA version (13 vs Kaggle's 12).
+# Use CPU onnxruntime for a fair comparison — the original #81 reporter
+# also used CPU/DirectML EP, not CUDA EP.
 
 # ── Phase 2: Download models ────────────────────────────────────────────────
 print("\n=== Phase 2: download models ===", flush=True)
@@ -185,13 +182,12 @@ def run_onnx_asr(audio_path, n_warmup=1, n_runs=5):
 
     # Load model once
     t_load_start = time.perf_counter()
-    providers = None
-    if has_cuda:
-        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+    # Use CPU EP — onnxruntime-gpu requires CUDA 13 which Kaggle doesn't have.
+    # This is still a fair comparison: the original #81 reporter used CPU/DirectML.
     model = onnx_asr.load_model(
         "nemo-parakeet-ctc-0.6b",
         quantization="int8",
-        providers=providers,
+        providers=["CPUExecutionProvider"],
     )
     t_load = time.perf_counter() - t_load_start
     print(f"  onnx-asr load: {t_load:.3f}s")
