@@ -494,12 +494,20 @@ stages; bf16 reference re-dumped via `tools/reference_backends/qwen3.py`):
   slice); `--chunk-seconds 0` is the working long-form escape hatch. To flip the
   cap honestly, port the FA2 `cu_seqlens` semantics as batched block-diagonal
   attention (uniform 104-frame windows → linear memory) — future work.
-- **Follow-ups:** (1) re-bake + upload fixed q4_k / q3_k / imatrix variants to
-  `cstr/qwen3-asr-0.6b-GGUF` (q8_0/f16 unaffected); (2) the OTHER #218 backends —
-  cohere-transcribe and glm-asr have NO encoder quant carve-out either (granite +
-  canary-qwen do) — verify per-backend with the same diff-harness method before
-  assuming transfer; (3) session-ABI streaming + bindings spot-check with the new
-  prompt.
+- **Follow-ups:** (1) DONE — fixed q4_k / q4_k-imatrix / q3_k-imatrix uploaded to
+  `cstr/qwen3-asr-0.6b-GGUF` + README (q8_0/f16 unaffected). A/B during the
+  re-bake: quantising the tied LM head (the old imatrix recipe) re-introduces
+  long-form loops even with the Q8_0 tower → imatrix variants now keep the head
+  at F16; and even so the EN+DE short-clip imatrix still drifts into repetition
+  on the un-chunked 145 s clip where plain q4_k is clean — README carries a
+  long-form caveat (prefer `-q4_k`/`-q8_0` for `--chunk-seconds 0`).
+  (2) DONE — session-ABI spot-check (python Session → qwen3 forced-language
+  prefill) passes. (3) IN FLIGHT — cohere-transcribe + glm-asr have NO encoder
+  carve-out (granite + canary-qwen do): Kaggle kernel
+  `tools/kaggle/issue218-quant-audit/` A/Bs q4_k vs F16 on the canonical 145 s
+  clip with the loop-fix disabled (new global gate
+  `CRISPASR_NGRAM_LOOPFIX_OFF=1` in `src/core/ngram_loop_fix.h`); verdict
+  QUANT-DRIFT → add carve-out + rebake, MODEL-LIMIT → keep fix_loops only.
 
 ---
 

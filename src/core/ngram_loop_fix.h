@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cctype>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -134,10 +135,21 @@ inline std::vector<int> collapse_indices(const std::vector<std::string>& words, 
 // text and leaving duplicates in word-level output (issue #218 follow-up:
 // `fix_loops` alone cleans `seg.text` but not `seg.words`/tokens, which
 // are built independently from the raw token stream).
+// Global diagnostic opt-out: CRISPASR_NGRAM_LOOPFIX_OFF=1 turns every
+// fix_loops/fix_loops_keep_indices call into an identity pass, exposing the
+// RAW decoded text. For A/B-ing whether a loop originates in the decode
+// itself (quant drift, #218) or is merely being masked by the collapse.
+inline bool loopfix_disabled() {
+    const char* e = std::getenv("CRISPASR_NGRAM_LOOPFIX_OFF");
+    return e && std::atoi(e) != 0;
+}
+
 inline std::vector<int> fix_loops_keep_indices(const std::vector<std::string>& words, int max_n = 16) {
     std::vector<int> idx(words.size());
     for (size_t i = 0; i < words.size(); i++)
         idx[i] = (int)i;
+    if (loopfix_disabled())
+        return idx;
     for (int n = max_n; n >= 1; n--)
         idx = collapse_indices(words, idx, n, n == 1 ? 3 : 2);
     return idx;
