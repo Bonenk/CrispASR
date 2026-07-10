@@ -4701,7 +4701,8 @@ List<String> drainStreamedTokens({String? libPath}) {
     var start = 0;
     for (var i = 0; result.length < count; i++) {
       if (bytes[i] == 0) {
-        result.add(ptr.cast<Utf8>().elementAt(start).toDartString(length: i - start));
+        result.add(Pointer<Utf8>.fromAddress(ptr.address + start)
+            .toDartString(length: i - start));
         start = i + 1;
       }
     }
