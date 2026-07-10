@@ -630,6 +630,30 @@ Kaggle kernel `tools/kaggle/qwen3-family-rebake/` (T4, HEAD 199609d0):
 - Metric lesson: loop gates need a PHRASE-cycle check, not just unigram
   runs (the issue218-quant-audit kernel has one; this kernel didn't).
 
+## #218 arc — remaining open threads (OPEN)
+
+Everything user-facing from the #218 investigation is fixed and shipped
+(qwen3-asr 0.6b + ja-anime GGUFs rebaked on HF, glm-asr merges + multi-window
+landed, CUDA-validated). Deliberately-open threads, in priority order:
+
+1. **mega-asr long-form vs its Python blueprint.** mega still emits
+   "come on"-cycle loops on the un-chunked 145 s clip even with the Q8_0
+   audio tower (all 4-bit variants; kernel-verified). Unknown whether the
+   bf16 upstream does the same — run the blueprint (glm-blueprint-ref kernel
+   pattern) before touching anything; until then `--chunk-seconds 0` is
+   unsupported for mega at 4-bit (default 30 s chunking unaffected).
+2. **Windowed encoder default flip + CAP_UNBOUNDED_INPUT (qwen3-asr).**
+   Mechanism shipped opt-in and parity-verified (cos 0.99953); needs a
+   broader eval before flipping: several long clips, windowed-vs-full
+   completeness + loop metrics WITH a phrase-cycle check (unigram runs miss
+   2-gram cycles), CUDA behaviour (loops in noisy leads where Metal
+   recovers), and an encoder speed profile (many 104² matmuls vs one big).
+3. **Loop metric hardening.** Port the issue218-quant-audit kernel's
+   phrase-cycle metric into qwen3-family-rebake (and any future gates) —
+   unigram-only gates pass 2-gram degeneration.
+4. **User-side calls:** reply/close GitHub issue #218 (all reported symptoms
+   fixed on main + HF); tag a release so binary users get the runtime half.
+
 ## Priority ordering
 
 | Priority | Item | Effort | Status |
