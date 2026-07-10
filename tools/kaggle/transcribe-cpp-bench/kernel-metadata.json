@@ -1,6 +1,6 @@
 {
   "id": "chr1s4/crispasr-vs-transcribe-cpp-bench",
-  "title": "CrispASR vs transcribe.cpp — head-to-head GPU benchmark",
+  "title": "CrispASR vs transcribe cpp bench",
   "code_file": "transcribe_cpp_bench.py",
   "language": "python",
   "kernel_type": "script",
