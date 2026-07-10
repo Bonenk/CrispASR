@@ -435,6 +435,7 @@ jobs:
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
+          cp THIRD_PARTY_NOTICES.txt "$OUT/"
           cd release && tar czf libcrispasr-linux-x86_64-hip.tar.gz libcrispasr-linux-x86_64-hip/
           ls -lh libcrispasr-linux-x86_64-hip.tar.gz
 
@@ -789,6 +790,7 @@ jobs:
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
+          cp THIRD_PARTY_NOTICES.txt "$OUT/"
           cd release && tar czf libcrispasr-macos-arm64.tar.gz libcrispasr-macos-arm64/
           ls -lh libcrispasr-macos-arm64.tar.gz
 
@@ -860,6 +862,7 @@ jobs:
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
+          cp THIRD_PARTY_NOTICES.txt "$OUT/"
           cd release && tar czf libcrispasr-linux-x86_64.tar.gz libcrispasr-linux-x86_64/
           ls -lh libcrispasr-linux-x86_64.tar.gz
 
@@ -923,6 +926,7 @@ jobs:
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
+          cp THIRD_PARTY_NOTICES.txt "$OUT/"
           cd release && tar czf libcrispasr-linux-x86_64-avx512.tar.gz \
               libcrispasr-linux-x86_64-avx512/
           ls -lh libcrispasr-linux-x86_64-avx512.tar.gz
@@ -992,6 +996,7 @@ jobs:
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
+          cp THIRD_PARTY_NOTICES.txt "$OUT/"
           cd release && tar czf libcrispasr-linux-arm64.tar.gz libcrispasr-linux-arm64/
           ls -lh libcrispasr-linux-arm64.tar.gz
 
@@ -1055,6 +1060,7 @@ jobs:
           Get-ChildItem ggml\include\*.h -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\include\"
           Copy-Item LICENSE "$OUT\"
+          Copy-Item THIRD_PARTY_NOTICES.txt "$OUT\"
           # Tar.gz (Windows 10+ ships tar; downstream tooling already
           # expects .tar.gz to mirror the macos-arm64 / linux artifacts).
           cd release
@@ -1151,6 +1157,7 @@ jobs:
           Get-ChildItem ggml\include\*.h -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\include\"
           Copy-Item LICENSE "$OUT\"
+          Copy-Item THIRD_PARTY_NOTICES.txt "$OUT\"
           cd release
           tar -czf libcrispasr-windows-x86_64-vulkan.tar.gz libcrispasr-windows-x86_64-vulkan
           Get-Item libcrispasr-windows-x86_64-vulkan.tar.gz | Format-List Name,Length
@@ -1236,6 +1243,7 @@ jobs:
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
+          cp THIRD_PARTY_NOTICES.txt "$OUT/"
           cd release && tar czf libcrispasr-linux-x86_64-cuda.tar.gz libcrispasr-linux-x86_64-cuda/
           ls -lh libcrispasr-linux-x86_64-cuda.tar.gz
 
@@ -1330,6 +1338,7 @@ jobs:
           Get-ChildItem ggml\include\*.h -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\include\"
           Copy-Item LICENSE "$OUT\"
+          Copy-Item THIRD_PARTY_NOTICES.txt "$OUT\"
           cd release
           tar -czf libcrispasr-windows-x86_64-cuda.tar.gz libcrispasr-windows-x86_64-cuda
           Get-Item libcrispasr-windows-x86_64-cuda.tar.gz | Format-List Name,Length
@@ -1391,6 +1400,7 @@ jobs:
           Get-ChildItem ggml\include\*.h -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\include\"
           Copy-Item LICENSE "$OUT\"
+          Copy-Item THIRD_PARTY_NOTICES.txt "$OUT\"
           cd release
           tar -czf libcrispasr-windows-x86_64-cpu-legacy.tar.gz libcrispasr-windows-x86_64-cpu-legacy
           Get-Item libcrispasr-windows-x86_64-cpu-legacy.tar.gz | Format-List Name,Length
@@ -1431,6 +1441,8 @@ jobs:
           New-Item -ItemType Directory -Force release\crispasr-windows-x86_64-cpu
           Copy-Item build\bin\Release\crispasr.exe release\crispasr-windows-x86_64-cpu\
           Copy-Item build\bin\Release\crispasr-quantize.exe release\crispasr-windows-x86_64-cpu\
+          Copy-Item LICENSE release\crispasr-windows-x86_64-cpu\
+          Copy-Item THIRD_PARTY_NOTICES.txt release\crispasr-windows-x86_64-cpu\
           Compress-Archive -Path release\crispasr-windows-x86_64-cpu -DestinationPath release\crispasr-windows-x86_64-cpu.zip -CompressionLevel Optimal
 
       - uses: actions/upload-artifact@v4
@@ -1473,6 +1485,8 @@ jobs:
           New-Item -ItemType Directory -Force release\crispasr-windows-x86_64-cpu-legacy
           Copy-Item build\bin\Release\crispasr.exe release\crispasr-windows-x86_64-cpu-legacy\
           Copy-Item build\bin\Release\crispasr-quantize.exe release\crispasr-windows-x86_64-cpu-legacy\
+          Copy-Item LICENSE release\crispasr-windows-x86_64-cpu-legacy\
+          Copy-Item THIRD_PARTY_NOTICES.txt release\crispasr-windows-x86_64-cpu-legacy\
           Compress-Archive -Path release\crispasr-windows-x86_64-cpu-legacy -DestinationPath release\crispasr-windows-x86_64-cpu-legacy.zip -CompressionLevel Optimal
 
       - uses: actions/upload-artifact@v4
@@ -1537,6 +1551,8 @@ jobs:
           Copy-Item "$env:CUDA_PATH\bin\cudart64_*.dll"   release\crispasr-windows-x86_64-cuda\ -ErrorAction SilentlyContinue
           Copy-Item "$env:CUDA_PATH\bin\cublas64_*.dll"   release\crispasr-windows-x86_64-cuda\ -ErrorAction SilentlyContinue
           Copy-Item "$env:CUDA_PATH\bin\cublasLt64_*.dll" release\crispasr-windows-x86_64-cuda\ -ErrorAction SilentlyContinue
+          Copy-Item LICENSE release\crispasr-windows-x86_64-cuda\
+          Copy-Item THIRD_PARTY_NOTICES.txt release\crispasr-windows-x86_64-cuda\
           Compress-Archive -Path release\crispasr-windows-x86_64-cuda -DestinationPath release\crispasr-windows-x86_64-cuda.zip -CompressionLevel Optimal
 
       - uses: actions/upload-artifact@v4
@@ -1593,6 +1609,8 @@ jobs:
           Copy-Item build\bin\crispasr-quantize.exe release\crispasr-windows-x86_64-vulkan\
           Get-ChildItem build\bin\*.dll | Where-Object { $_.Name -notlike 'Catch2*' } |
             Copy-Item -Destination release\crispasr-windows-x86_64-vulkan\
+          Copy-Item LICENSE release\crispasr-windows-x86_64-vulkan\
+          Copy-Item THIRD_PARTY_NOTICES.txt release\crispasr-windows-x86_64-vulkan\
           Compress-Archive -Path release\crispasr-windows-x86_64-vulkan -DestinationPath release\crispasr-windows-x86_64-vulkan.zip -CompressionLevel Optimal
 
       - uses: actions/upload-artifact@v4
@@ -1676,6 +1694,7 @@ jobs:
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
+          cp THIRD_PARTY_NOTICES.txt "$OUT/"
           cd release && tar czf crispasr-android-arm64-v8a.tar.gz crispasr-android-arm64-v8a/
           ls -lh crispasr-android-arm64-v8a.tar.gz
 
