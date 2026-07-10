@@ -12052,3 +12052,133 @@ IndexTTS voice cloning aborted in `ggml_view_2d` for a long reference (a 164 s c
 Irodori-TTS dropped tail clauses on kanji-heavy text: output length was `latent_steps = T_text * 6.3 frames/token`, but kanji unpack to a variable number of mora, so a 14-token line got 88 frames (3.52 s) when it needed ~196 (7.85 s), and the flow-matching diffusion — which *fills the allocated duration* — simply ran out of room and cut the end. The model ships a **duration predictor** (`token_sum_adarn_zero`: per-token RMSNorm → AdaLN-Zero from `silu(speaker_vec)` → SwiGLU → `tanh(gate)` residual → out_proj → `softplus` per token, **summed**; returns `log1p(total)` so frames = the raw sum) whose weights were loaded and never run. Wiring it (`latent_steps = round(total_frames·scale/speed)`) fixed the truncation; the ASR roundtrip went from cut-off to complete.
 
 Two lessons: (1) **a heuristic in the hot path is a red flag that a real model component is sitting unused** — grep the loader for weights that never appear in a forward. (2) **The duration predictor is sensitive to text-encoder drift**: isolating with the F32 reference gave the exact frame count (196.35) from the reference `text_state`, but the q8 model's `text_state` (cos≈0.9995) gave 163 — the per-token `softplus` sum amplifies small logit errors across tokens. 163 vs 196 didn't truncate (the roundtrip was complete, just ~17 % faster), so it shipped, but it's a reminder that a downstream scalar-regression head is a magnifying glass on upstream cos drift — validate it on the *end metric* (does all the text get spoken?), not just the per-tensor cosine.
+
+
+## Sub-8-bit quantization of an audio tower fails as BEHAVIORAL collapse (loops, empty output) — and there is no per-block cliff to bisect (#218 qwen3-asr, 2026-07-10)
+
+The #218 long-form symptoms (mid-transcript repetition loops, "language
+none" → empty output on a 145 s clip) read like decode or prompt bugs. The
+port was faithful at every stage: mel cos_mean 0.999996, prompt ids exact
+(1900/1900), F16-GGUF first-logits cos 0.9981 vs bf16 (= the F16 floor),
+F16 e2e ≈ verbatim reference. The actual cause was that q4_k quantized the
+18-layer audio tower to Q4_0/Q4_K, and the per-block drift compounds
+*smoothly* — blk00 cos 0.9996 → blk17 0.973, **no cliff, so there is no
+single "broken" layer for a bisect to find** — down to encoder cos_mean
+0.9716 / cos_min 0.75 at 1885 frames, which is enough to flip greedy
+decode into degenerate attractors. Transferable rules:
+
+1. **Diff the encoder OUTPUT, not just per-block cosines.** Drift
+   compounds with depth AND with frame count: jfk (143 frames) survives
+   where 145 s (1885 frames) collapses, and CUDA survives short clips
+   where Metal breaks (#240) — platform numerics amplify, they don't
+   cause. A per-block table that "looks fine everywhere" can still be a
+   broken encoder.
+2. **Encoders feeding an LLM decoder get a Q8_0 floor in the quantizer.**
+   Same carve-out canary/mini-omni2 already had; for qwen3-asr `audio.*`
+   it costs ~17 % size (540→631 MB) and moves encoder cos_mean 0.9716 →
+   0.9997. Greedy LLM decode is a step function on encoder quality; there
+   is no "slightly degraded transcript" regime to trade against.
+3. **Quant A/B verdicts require the loop-fix disabled and the transcripts
+   read** — see the metric entry below.
+4. **imatrix is not a rescue for long-context decode.** Quantizing the
+   tied LM head (the old imatrix recipe) re-introduces loops even with a
+   Q8 tower; and an imatrix recalibrated WITH long-form clips in the
+   corpus still drifts into the same attractor at the same spot — the
+   activation-weighted redistribution itself harms long-context decode.
+   Plain q4_k (F16 head, Q8 tower) is the long-form recommendation.
+
+Related gotcha: the reference's attention semantics depend on which
+codepath it runs — qwen_asr's `cu_seqlens` 104-frame windowing exists
+ONLY on the FlashAttention-2 path; eager/SDPA (any CPU reference dump)
+does FULL attention. Diff against the semantics you actually implement
+(we added `QWEN3_REF_WINDOWED=1` to the dumper to get a windowed ground
+truth for the windowed graph).
+
+
+## The prompt contract is part of the port: a specials-only tokenizer silently sent EVERY glm-asr prompt instruction-less (#218 glm-asr, 2026-07-10)
+
+glm-asr's GGUF carried no BPE merges, so `glm_asr_tokenize` could only
+encode special tokens — **every plain-text instruction tokenized to
+NOTHING**, and the CLI always set one (`--language` defaults to `en` →
+"Please transcribe in English."). Net effect: the blueprint's mandatory
+default instruction ("Please transcribe this audio into text") was absent
+from every glm-asr prompt the runtime ever sent. Instruction-less prompts
+are off-distribution: shout-loops on noise windows, instant `<|user|>`
+EOS on multi-window prompts — the exact #218 symptoms. The second half
+was silent truncation to one 30 s window where the blueprint encodes up
+to 21 windows into one prompt. With both fixed, q4_k matches the bf16
+blueprint on the 145 s clip (113 vs 115 tokens, near-verbatim).
+
+1. **Dump the prompt ids and diff them against the reference processor
+   before ANY quality verdict.** The earlier "degenerates at both
+   precisions ⇒ model-inherent" A/B was invalid — both arms ran the same
+   broken prompt. An A/B across precisions only isolates quantization if
+   the prompt is blueprint-complete.
+2. **A tokenizer that "works" can still be voiding your text.** Specials
+   round-tripped fine for months; only the plain-text spans vanished.
+   The tell: encode a known sentence and assert non-empty + byte-exact
+   vs the HF tokenizer. (Fix: bake `tokenizer.ggml.merges` in the
+   converter, backfill published GGUFs with `tools/gguf-add-merges.py`,
+   run real byte-level BPE via core_bpe.)
+3. **Replicate the blueprint's prompt-building code, don't paraphrase
+   it.** Same class of bug in qwen3-asr: qwen_asr expresses a forced
+   language as an ASSISTANT-TURN PREFILL `language <Name><asr_text>` —
+   the model then structurally cannot answer "language none". Our
+   semantically-equivalent system instruction ("Transcribe the speech in
+   X.") let it. Prompt scaffolds are training-time contracts, not
+   suggestions; chat-template newlines and answer-framing strips
+   (`GlmAsrProcessor._strip_assistant_prefix_and_quotes`) count too.
+
+
+## Unigram run-length loop metrics pass 2-gram cycles — and a "raw" baseline is only raw if the disable gate actually exists (#218, 2026-07-10)
+
+Two measurement traps from the #218 arc, either of which silently turns a
+gate green:
+
+1. **Phrase cycles are invisible to unigram-run metrics.** The
+   qwen3-family rebake kernel's loop gate (max repeated single-token run)
+   read the rebaked mega-asr GGUFs as clean; the transcripts were
+   "Come on, come on, …" ~115× — a 2-gram cycle with no long unigram run.
+   Any loop/degeneration gate needs a phrase-cycle check (max cycle count
+   over n-grams, n=2..8) alongside the unigram run — and the transcripts
+   still need to be READ, because "hey, hey, hey" can also be genuine
+   audio (cohere's q4==F16 "loops" were real shouts in the clip).
+2. **Verify a debug gate exists before trusting measurements taken under
+   it.** The investigation handoff prescribed `CRISPASR_NO_NGRAM_LOOPFIX=1`
+   for raw decode; that env var never existed in the codebase, so every
+   "raw" baseline in the prior audit had `fix_loops` silently active.
+   One `grep -r` would have caught it. (We added a real global gate,
+   `CRISPASR_NGRAM_LOOPFIX_OFF=1` in `core/ngram_loop_fix.h`, so raw
+   decode is now actually reachable.)
+
+
+## A faithful port can still loop: get the bf16 blueprint's behaviour on the SAME audio before hunting a runtime bug (mega-asr, #218, 2026-07-10)
+
+After the Q8-tower rebake fixed qwen3-asr 0.6b and ja-anime, mega-asr
+(a LoRA fine-tune of Qwen3-ASR-1.7B) STILL degenerated on un-chunked
+145 s audio at every quant level. Instead of another runtime hunt, we ran
+the bf16 blueprint on the same clip (Kaggle, raw greedy decode): the bf16
+BASE model is clean (max phrase-cycle 3, auto and forced-English), the
+bf16 LoRA-MERGED mega loops massively (phrase-cycle 115, both modes; the
+assistant prefill doesn't prevent it). Verdict: the degeneration is
+**LoRA-induced and model-inherent** — the port reproduces the blueprint
+faithfully, there is nothing to fix in the runtime, and the correct
+posture is `fix_loops` + the 30 s chunked default, with
+`--chunk-seconds 0` unsupported for mega at ANY precision. Same rule that
+closed the vibevoice BGM case (#171): **run the original pipeline; when
+the blueprint reproduces the symptom, stop debugging the port.**
+
+Blueprint behaviour can itself be the surprise, so establish it before
+judging outputs against intuition: glm-asr's bf16 single-pass SKIPS ~70 s
+of quiet leading audio on this clip (the 30 s-chunked path covers more
+content); the windowed qwen3 blueprint transcribes noise sections
+aggressively with collapsed "hey" runs of its own. Not every repetition
+or omission is a port bug.
+
+Practical notes for LoRA blueprints on Kaggle: an adapter declaring
+`target_modules='.*'` cannot be wrapped by peft — hand-merge
+`W += scale·(B@A)` per `.lora_A/.lora_B` pair, stripping
+`base_model.model.` and rewriting `thinker.layers.` →
+`thinker.model.layers.`; qwen_asr needs `transformers==4.57.6` plus a
+force-reinstalled `huggingface_hub==0.36.0` + `hf_transfer` and a
+`sys.modules` purge of the pre-imported hub.

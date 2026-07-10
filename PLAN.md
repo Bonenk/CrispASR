@@ -650,16 +650,23 @@ landed, CUDA-validated). Deliberately-open threads, in priority order:
    ANY precision. (Kernel also demonstrates the dep recipe for qwen_asr on
    Kaggle: transformers==4.57.6 + force-reinstalled huggingface_hub 0.36 +
    hf_transfer + sys.modules purge, and the LoRA path rewrites
-   thinker.layers → thinker.model.layers.)
+   thinker.layers → thinker.model.layers.) No-regression check on the
+   published mega q8_0 + current main, DEFAULT settings (30 s chunks,
+   fix_loops on): jfk verbatim; t32-145s full dialogue start-to-final-
+   sentence, genuine shouts bounded — mega's previously-working paths are
+   intact and improved by the blueprint prompt.
 2. **Windowed encoder default flip + CAP_UNBOUNDED_INPUT (qwen3-asr).**
    Mechanism shipped opt-in and parity-verified (cos 0.99953); needs a
    broader eval before flipping: several long clips, windowed-vs-full
    completeness + loop metrics WITH a phrase-cycle check (unigram runs miss
    2-gram cycles), CUDA behaviour (loops in noisy leads where Metal
    recovers), and an encoder speed profile (many 104² matmuls vs one big).
-3. **Loop metric hardening.** Port the issue218-quant-audit kernel's
-   phrase-cycle metric into qwen3-family-rebake (and any future gates) —
-   unigram-only gates pass 2-gram degeneration.
+3. **Loop metric hardening — DONE for new kernels.** The
+   mega-asr-blueprint-ref kernel carries the phrase-cycle metric (it is
+   what caught the "come on" 2-gram cycle unigram runs missed); any
+   future loop gate must include it — unigram-only gates pass 2-gram
+   degeneration. qwen3-family-rebake itself was not retrofitted (its
+   remaining use would be a mega re-bake, which is moot per thread 1).
 4. **User-side calls:** reply/close GitHub issue #218 (all reported symptoms
    fixed on main + HF); tag a release so binary users get the runtime half.
 
