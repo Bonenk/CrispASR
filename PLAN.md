@@ -447,6 +447,62 @@ work:
 
 ---
 
+## #218 qwen3-asr long-audio root cause — quantized audio tower + prompt contract (DONE)
+
+Follow-up to the fix_loops mitigation: WHY did qwen3-asr loop / emit empty output on
+the reporter's 145 s clip at all, when the bf16 reference is clean on the same audio?
+Diff-harness verdict (`crispasr-diff qwen3` extended with conv/per-block/ids/logits
+stages; bf16 reference re-dumped via `tools/reference_backends/qwen3.py`):
+
+- **Port math is faithful.** On the full un-chunked 145 s clip: mel cos_mean
+  0.999996, prompt ids EXACT (1900/1900 incl. 1885 audio pads), splice complete,
+  F16-GGUF LLM first-logits cos 0.9981 vs bf16 (= the known F16 floor), F16 e2e
+  transcript ≈ verbatim reference. The reference's eager/SDPA (CPU) encoder does
+  FULL attention — `cu_seqlens` windowing only exists on the FlashAttention-2
+  path — so our mode-0 full-attention graph matches the blueprint's CPU semantics.
+- **Root cause: sub-8-bit `audio.*`.** The old q4_k GGUF quantized the 18-layer
+  tower to Q4_0/Q4_K; per-block drift (blk00 cos 0.9996 → blk17 0.973, no cliff)
+  compounds to encoder cos_mean 0.9716 / cos_min 0.75 at 1885 frames, enough to
+  flip greedy decode into "language none" (empty output) or mid-transcript
+  repeated-phrase attractors ("Hey, hey, …" — the #218 loop). Fixed by a Q8_0
+  floor for `audio.*` in crispasr-quantize (like the canary/mini-omni2 encoder
+  carve-outs, ~half the size cost: q4_k 540→631 MB); opt-out
+  `CRISPASR_QWEN3ASR_QUANT_AUDIO=1`. Re-quantized q4_k: encoder cos_mean 0.9997 /
+  cos_min 0.992, e2e un-chunked 145 s clean + complete with `fix_loops` DISABLED,
+  in both auto and forced-language modes. jfk verbatim.
+- **Prompt contract (blueprint parity).** qwen_asr's `_build_text_prompt` expresses
+  a forced language as an ASSISTANT-TURN PREFILL `language <Name><asr_text>` (the
+  system turn carries only the optional context) — the model then emits transcript
+  text ONLY and structurally cannot answer "language none". Our adapter used a
+  "Transcribe the speech in X." system instruction instead; switched to the
+  blueprint prefill (CLI + streaming + session ABI;
+  `CRISPASR_QWEN3_SYSPROMPT_LANG=1` restores the legacy form). The tokenizer now
+  also recognises bare `<asr_text>`-style added tokens.
+- **More blueprint parity:** tail-chunk padding frames are now removed before the
+  encoder blocks (`padded_embed[padded_mask_after_cnn]` contract; in-graph
+  `get_rows` compaction in crisp_audio, `CRISP_AUDIO_KEEP_PAD_FRAMES=1` opt-out) so
+  N_audio == the processor's `_get_feat_extract_output_lengths` for any T_mel;
+  `max_new_tokens` fallback 256→512 (blueprint default); KV cache sized
+  `max(4096, prompt+max_new+16)` and grow-on-demand (a fixed 4096 capped un-chunked
+  audio at ~5 min).
+- **Note:** the reference wrapper itself ships `detect_and_fix_repetitions()`
+  (≥20× char/pattern collapse) in `parse_asr_output` — `core_ngram::fix_loops` is
+  blueprint-faithful defense-in-depth; keep it.
+- **NOT done — CAP_UNBOUNDED_INPUT.** Full-attention encoder memory is O(N²)
+  (145 s → 1885² scores/layer); >~10 min un-chunked would OOM, and the blueprint's
+  CPU path has the same property. Default stays 30 s auto-chunk (now clean per
+  slice); `--chunk-seconds 0` is the working long-form escape hatch. To flip the
+  cap honestly, port the FA2 `cu_seqlens` semantics as batched block-diagonal
+  attention (uniform 104-frame windows → linear memory) — future work.
+- **Follow-ups:** (1) re-bake + upload fixed q4_k / q3_k / imatrix variants to
+  `cstr/qwen3-asr-0.6b-GGUF` (q8_0/f16 unaffected); (2) the OTHER #218 backends —
+  cohere-transcribe and glm-asr have NO encoder quant carve-out either (granite +
+  canary-qwen do) — verify per-backend with the same diff-harness method before
+  assuming transfer; (3) session-ABI streaming + bindings spot-check with the new
+  prompt.
+
+---
+
 ## Priority ordering
 
 | Priority | Item | Effort | Status |
