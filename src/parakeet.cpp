@@ -1549,6 +1549,147 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
     return emitted;
 }
 
+// §232: Batched greedy TDT decode — processes multiple frames per iteration.
+// Between token emissions, the predictor state (pred_out) doesn't change.
+// We exploit this: compute the full joint+argmax for a BATCH of frames in one
+// pass using sgemm. Reduces ~370 sequential sgemv calls to ~26 batched sgemm
+// calls (one per token emission). Expected 5-15x speedup on CPU, more on GPU.
+static std::vector<parakeet_emitted_token> parakeet_tdt_decode_batched(parakeet_context* ctx, const float* enc,
+                                                                       int T_enc, int d_model) {
+    parakeet_init_pred_weights(ctx);
+    parakeet_init_joint_weights(ctx);
+
+    const auto& hp = ctx->model.hparams;
+    const int blank_id = (int)hp.blank_id;
+    const int n_vocab_blk = blank_id + 1;
+    const int n_dur = (int)hp.n_tdt_durations;
+
+    auto& W = ctx->pred_w;
+    auto& J = ctx->joint_w;
+    const int Jh = J.joint_hidden;
+    const int Vt = J.vocab_total;
+
+    std::vector<parakeet_emitted_token> emitted;
+    emitted.reserve(256);
+
+    parakeet_lstm_state state;
+    lstm_init_state(state, W.H);
+    std::vector<float> pred_out;
+    predictor_step(W, blank_id, state, pred_out);
+
+    // Pre-compute ALL encoder projections
+    std::vector<float> all_proj_e((size_t)T_enc * Jh);
+    for (int f = 0; f < T_enc; f++)
+        std::copy(J.enc_b.begin(), J.enc_b.end(), all_proj_e.data() + (size_t)f * Jh);
+#if defined(HAVE_ACCELERATE)
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                T_enc, Jh, J.d_model, 1.0f, enc, J.d_model, J.enc_w.data(), J.d_model,
+                1.0f, all_proj_e.data(), Jh);
+#else
+    for (int f = 0; f < T_enc; f++) {
+        float* dst = all_proj_e.data() + (size_t)f * Jh;
+        const float* enc_f = enc + (size_t)f * d_model;
+        for (int i = 0; i < Jh; i++) {
+            const float* row = J.enc_w.data() + (size_t)i * J.d_model;
+            float s = dst[i];
+            for (int k = 0; k < J.d_model; k++) s += row[k] * enc_f[k];
+            dst[i] = s;
+        }
+    }
+#endif
+
+    std::vector<float> pred_proj(Jh);
+    std::vector<float> mid_batch;
+    std::vector<float> logits_batch;
+
+    int t = 0;
+    while (t < T_enc) {
+        // Compute pred_proj = pred_w @ pred_out + pred_b (constant until next emission)
+        std::copy(J.pred_b.begin(), J.pred_b.end(), pred_proj.data());
+#if defined(HAVE_ACCELERATE)
+        cblas_sgemv(CblasRowMajor, CblasNoTrans, Jh, J.pred_hidden, 1.0f,
+                    J.pred_w.data(), J.pred_hidden, pred_out.data(), 1, 1.0f, pred_proj.data(), 1);
+#else
+        for (int i = 0; i < Jh; i++) {
+            const float* row = J.pred_w.data() + (size_t)i * J.pred_hidden;
+            float s = pred_proj[i];
+            for (int k = 0; k < J.pred_hidden; k++) s += row[k] * pred_out[k];
+            pred_proj[i] = s;
+        }
+#endif
+
+        // Batch: compute mid + logits for all remaining frames at once
+        int batch = T_enc - t;
+        mid_batch.resize((size_t)batch * Jh);
+        for (int f = 0; f < batch; f++) {
+            const float* pe = all_proj_e.data() + (size_t)(t + f) * Jh;
+            float* mid = mid_batch.data() + (size_t)f * Jh;
+            for (int i = 0; i < Jh; i++) {
+                float v = pe[i] + pred_proj[i];
+                mid[i] = v > 0.0f ? v : 0.0f; // ReLU
+            }
+        }
+
+        // Batched logits: [batch, Vt] = mid_batch[batch, Jh] @ out_w^T[Jh, Vt]
+        logits_batch.resize((size_t)batch * Vt);
+        for (int f = 0; f < batch; f++)
+            std::copy(J.out_b.begin(), J.out_b.end(), logits_batch.data() + (size_t)f * Vt);
+#if defined(HAVE_ACCELERATE)
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+                    batch, Vt, Jh, 1.0f, mid_batch.data(), Jh, J.out_w.data(), Jh,
+                    1.0f, logits_batch.data(), Vt);
+#else
+        for (int f = 0; f < batch; f++) {
+            float* lg = logits_batch.data() + (size_t)f * Vt;
+            const float* m = mid_batch.data() + (size_t)f * Jh;
+            for (int v = 0; v < Vt; v++) {
+                const float* row = J.out_w.data() + (size_t)v * Jh;
+                float s = lg[v];
+                for (int k = 0; k < Jh; k++) s += row[k] * m[k];
+                lg[v] = s;
+            }
+        }
+#endif
+
+        // Scan batch for first non-blank
+        bool advanced = false;
+        for (int f = 0; f < batch; f++) {
+            const float* lg = logits_batch.data() + (size_t)f * Vt;
+            int tok = 0; float tok_lp = lg[0];
+            for (int v = 1; v < n_vocab_blk; v++)
+                if (lg[v] > tok_lp) { tok_lp = lg[v]; tok = v; }
+
+            int dur_id = 0; float dur_lp = lg[n_vocab_blk];
+            for (int d = 1; d < n_dur; d++)
+                if (lg[n_vocab_blk + d] > dur_lp) { dur_lp = lg[n_vocab_blk + d]; dur_id = d; }
+            int dur_skip = (int)hp.tdt_durations[dur_id];
+
+            if (tok == blank_id) {
+                t += (t + f) == t ? std::max(dur_skip, 1) : f + std::max(dur_skip, 1);
+                // Actually: we processed frames [t..t+f] and found blank at frame t+f
+                // Advance to t+f + max(dur_skip, 1)
+                t = (t + f) + std::max(dur_skip, 1);
+                advanced = true;
+                break;
+            } else {
+                // Emit
+                int frame = t + f;
+                int t_end = std::min(T_enc, frame + std::max(0, dur_skip));
+                float tok_p = 1.0f;
+                { double sum = 0.0; for (int v = 0; v < n_vocab_blk; v++) sum += std::exp((double)(lg[v]-tok_lp)); tok_p = sum>0?(float)(1.0/sum):0.0f; }
+                emitted.push_back({tok, frame, t_end, tok_p});
+                predictor_step(W, tok, state, pred_out);
+                t = frame + std::max(dur_skip, 1);
+                advanced = true;
+                break;
+            }
+        }
+        if (!advanced) break; // all frames exhausted
+    }
+
+    return emitted;
+}
+
 // ===========================================================================
 // TDT beam search decode
 // ===========================================================================
@@ -3186,7 +3327,7 @@ extern "C" struct parakeet_result* parakeet_transcribe_chunked(struct parakeet_c
             : (use_maes   ? parakeet_tdt_maes_decode(ctx, enc_all.data(), T_enc_total, d_model, ctx->decode_beam_size,
                                                      ctx->maes_num_steps, ctx->maes_gamma, ctx->maes_beta)
                : use_beam ? parakeet_tdt_beam_decode(ctx, enc_all.data(), T_enc_total, d_model, ctx->decode_beam_size)
-                          : parakeet_tdt_decode(ctx, enc_all.data(), T_enc_total, d_model));
+                          : parakeet_tdt_decode_batched(ctx, enc_all.data(), T_enc_total, d_model));
 
     if (getenv("PARAKEET_DEBUG"))
         fprintf(stderr, "parakeet: %s decode OK (%d tokens from %d enc frames)\n",
