@@ -79,6 +79,7 @@ struct moonshine_context {
     ggml_cgraph* cached_enc_gf = nullptr;
     ggml_context* cached_enc_ctx = nullptr;
     int cached_enc_n_samples = 0;
+
 };
 
 using TensorMap = std::map<std::string, ggml_tensor*>;
@@ -868,6 +869,64 @@ static struct ggml_tensor* moonshine_build_decoder_step(struct ggml_context* ctx
 }
 
 // Build a decoder step graph and compute via scheduler
+// §232: In-graph argmax for greedy decode. The graph is still rebuilt per step
+// (cur_pos is baked into KV cache view offsets), but the argmax runs on-device
+// and we read back 4 bytes instead of 128 KB of logits.
+static int moonshine_decode_step_greedy(struct moonshine_context* ctx, int32_t token_id, int32_t& out_token) {
+    const auto& hp = ctx->model.hparams;
+    const int cur_pos = ctx->kv_self.n;
+
+    const size_t n_tensors = hp.dec_n_layers * 60 + 50;
+    const size_t mem_size = ggml_tensor_overhead() * (n_tensors + 2) + ggml_graph_overhead();
+    struct ggml_init_params params = {
+        /*.mem_size   =*/mem_size,
+        /*.mem_buffer =*/nullptr,
+        /*.no_alloc   =*/true,
+    };
+    struct ggml_context* ctx0 = ggml_init(params);
+    if (!ctx0) return -1;
+
+    struct ggml_tensor* inp_token = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, 1);
+    ggml_set_name(inp_token, "token_id");
+    ggml_set_input(inp_token);
+
+    struct ggml_tensor* inp_pos = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, 1);
+    ggml_set_name(inp_pos, "dec_pos");
+    ggml_set_input(inp_pos);
+
+    struct ggml_cgraph* graph = ggml_new_graph(ctx0);
+
+    struct ggml_tensor* logits = moonshine_build_decoder_step(ctx0, ctx->model, ctx->kv_self, ctx->kv_cross, inp_token,
+                                                              inp_pos, ctx->enc_len, cur_pos, graph);
+
+    // In-graph argmax: runs on-device, returns 1 int32 instead of vocab_size floats
+    struct ggml_tensor* argmax = ggml_argmax(ctx0, logits);
+    ggml_set_name(argmax, "argmax");
+    ggml_set_output(argmax);
+    ggml_build_forward_expand(graph, argmax);
+
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, graph)) {
+        ggml_free(ctx0);
+        return -1;
+    }
+
+    ggml_backend_tensor_set(inp_token, &token_id, 0, sizeof(int32_t));
+    int32_t pos_val = cur_pos;
+    ggml_backend_tensor_set(inp_pos, &pos_val, 0, sizeof(int32_t));
+
+    if (ggml_backend_sched_graph_compute(ctx->sched, graph) != GGML_STATUS_SUCCESS) {
+        ggml_free(ctx0);
+        return -1;
+    }
+
+    ggml_backend_tensor_get(argmax, &out_token, 0, sizeof(int32_t));
+
+    ctx->kv_self.n++;
+    ggml_free(ctx0);
+    return 0;
+}
+
 static int moonshine_decode_step(struct moonshine_context* ctx, int32_t token_id, std::vector<float>& logits_out) {
     const auto& hp = ctx->model.hparams;
     const int cur_pos = ctx->kv_self.n;
@@ -1076,16 +1135,16 @@ static int moonshine_transcribe_impl(struct moonshine_context* ctx, const float*
         ctx->timing.decode_ms = std::chrono::duration<double, std::milli>(t_decode_done - t_encode_done).count();
         ctx->timing.n_tokens = (int)out_tokens.size();
 
-
         ctx->kv_self.reset();
         ctx->kv_cross.reset();
         return 0;
     }
 
     int32_t token = (int32_t)hp.bos_token_id;
-    std::vector<float> logits((size_t)hp.vocab_size);
     const float T = ctx->temperature;
     const bool sample = (T > 0.0f);
+    // §232: use the greedy fast path when no sampling and no probs needed
+    const bool greedy_fast = !sample && !out_token_probs;
 
     // Per-call seed: derive from samples + audio length so repeated runs are
     // deterministic but different from each other. When the caller has
@@ -1103,63 +1162,71 @@ static int moonshine_transcribe_impl(struct moonshine_context* ctx, const float*
         return (float)((rng_state >> 11) & 0x1FFFFF) / (float)(1 << 21);
     };
 
-    for (int step = 0; step < max_len; step++) {
-        ret = moonshine_decode_step(ctx, token, logits);
-        if (ret != 0) {
-            break;
-        }
+    std::vector<float> logits;
+    if (!greedy_fast)
+        logits.resize((size_t)hp.vocab_size);
 
-        const int V = (int)hp.vocab_size;
+    for (int step = 0; step < max_len; step++) {
         int32_t picked = 0;
         float picked_prob = 0.0f;
 
-        if (!sample) {
-            // Greedy argmax
-            int32_t best = 0;
-            float best_val = logits[0];
-            for (int i = 1; i < V; i++) {
-                if (logits[i] > best_val) {
-                    best_val = logits[i];
-                    best = i;
-                }
-            }
-            picked = best;
-            if (out_token_probs) {
-                // Softmax of the picked logit (numerically stable).
-                float mx = best_val;
-                float s = 0.f;
-                for (int i = 0; i < V; i++)
-                    s += expf(logits[i] - mx);
-                picked_prob = 1.0f / s;
-            }
+        if (greedy_fast) {
+            // §232: in-graph argmax — 4 bytes readback instead of 128 KB
+            ret = moonshine_decode_step_greedy(ctx, token, picked);
+            if (ret != 0) break;
         } else {
-            // Multinomial sample from softmax(logits / T).
-            float mx = logits[0];
-            for (int i = 1; i < V; i++)
-                if (logits[i] > mx)
-                    mx = logits[i];
-            std::vector<float> probs((size_t)V);
-            float s = 0.f;
-            const float inv_T = 1.0f / T;
-            for (int i = 0; i < V; i++) {
-                probs[i] = expf((logits[i] - mx) * inv_T);
-                s += probs[i];
-            }
-            const float inv_s = 1.0f / s;
-            for (int i = 0; i < V; i++)
-                probs[i] *= inv_s;
-            float u = rand_uniform();
-            float c = 0.f;
-            picked = V - 1;
-            for (int i = 0; i < V; i++) {
-                c += probs[i];
-                if (u <= c) {
-                    picked = i;
-                    break;
+            ret = moonshine_decode_step(ctx, token, logits);
+            if (ret != 0) break;
+
+            const int V = (int)hp.vocab_size;
+
+            if (!sample) {
+                // Greedy argmax (with probs requested)
+                int32_t best = 0;
+                float best_val = logits[0];
+                for (int i = 1; i < V; i++) {
+                    if (logits[i] > best_val) {
+                        best_val = logits[i];
+                        best = i;
+                    }
                 }
+                picked = best;
+                if (out_token_probs) {
+                    float mx = best_val;
+                    float s = 0.f;
+                    for (int i = 0; i < V; i++)
+                        s += expf(logits[i] - mx);
+                    picked_prob = 1.0f / s;
+                }
+            } else {
+                // Multinomial sample from softmax(logits / T).
+                float mx = logits[0];
+                for (int i = 1; i < V; i++)
+                    if (logits[i] > mx)
+                        mx = logits[i];
+                std::vector<float> probs((size_t)V);
+                float s = 0.f;
+                const float inv_T = 1.0f / T;
+                for (int i = 0; i < V; i++) {
+                    probs[i] = expf((logits[i] - mx) * inv_T);
+                    s += probs[i];
+                }
+                const float inv_s = 1.0f / s;
+                for (int i = 0; i < V; i++)
+                    probs[i] *= inv_s;
+                float u = rand_uniform();
+                float c = 0.f;
+                picked = V - 1;
+                for (int i = 0; i < V; i++) {
+                    c += probs[i];
+                    if (u <= c) {
+                        picked = i;
+                        break;
+                    }
+                }
+                if (out_token_probs)
+                    picked_prob = probs[picked];
             }
-            if (out_token_probs)
-                picked_prob = probs[picked];
         }
 
         if (picked == (int32_t)hp.eos_token_id) {
@@ -1177,7 +1244,6 @@ static int moonshine_transcribe_impl(struct moonshine_context* ctx, const float*
     ctx->timing.n_tokens = (int)out_tokens.size();
 
     // Cleanup
-    // sched is persistent — no per-call free needed
     ctx->kv_self.reset();
     ctx->kv_cross.reset();
 
