@@ -175,11 +175,12 @@ struct voxtral_tts_model {
     std::vector<voxtral_tts_llm_layer> llm_layers;
 
     // FM transformer
-    ggml_tensor* fm_input_proj = nullptr;      // (dim, 36)
-    ggml_tensor* fm_llm_proj = nullptr;        // (dim, dim)
-    ggml_tensor* fm_time_proj = nullptr;       // (dim, dim)
-    ggml_tensor* fm_semantic_output = nullptr; // (8320, dim)
-    ggml_tensor* fm_acoustic_output = nullptr; // (36, dim)
+    ggml_tensor* fm_input_proj = nullptr;           // (dim, 36)
+    ggml_tensor* fm_llm_proj = nullptr;             // (dim, dim)
+    ggml_tensor* fm_time_proj = nullptr;            // (dim, dim)
+    ggml_tensor* fm_semantic_output = nullptr;      // (8320, dim)
+    ggml_tensor* fm_semantic_output_bias = nullptr; // (8320,) — optional
+    ggml_tensor* fm_acoustic_output = nullptr;      // (36, dim)
     ggml_tensor* fm_norm = nullptr;
     std::vector<voxtral_tts_fm_layer> fm_layers;
 
@@ -224,8 +225,34 @@ struct voxtral_tts_context {
     std::vector<std::string> voice_names;
     std::vector<const char*> voice_name_ptrs;
 
+    // Flow-matching noise RNG (xorshift64, matching the reference C port so the
+    // acoustic sample is reproducible; the semantic path is deterministic argmax).
+    uint64_t rng_state = 0x12345678ABCDEF01ULL;
+
     int verbosity = 1;
 };
+
+// xorshift64 + Box-Muller, bit-identical to github.com/mudler/voxtral-tts.c so a
+// fixed seed reproduces the same acoustic sample.
+static inline uint64_t vtts_xorshift64(uint64_t* s) {
+    uint64_t x = *s;
+    x ^= x << 13;
+    x ^= x >> 7;
+    x ^= x << 17;
+    *s = x;
+    return x;
+}
+static inline float vtts_uniform01(uint64_t* s) {
+    return (float)(vtts_xorshift64(s) >> 11) * (1.0f / 9007199254740992.0f);
+}
+static inline float vtts_randn(uint64_t* s) {
+    float u1, u2;
+    do {
+        u1 = vtts_uniform01(s);
+    } while (u1 < 1e-30f);
+    u2 = vtts_uniform01(s);
+    return sqrtf(-2.0f * logf(u1)) * cosf(6.2831853071795864f * u2);
+}
 
 // ---------------------------------------------------------------------------
 // helpers
@@ -557,6 +584,7 @@ extern "C" voxtral_tts_context* voxtral_tts_init_from_file(const char* path_mode
     ctx->model.fm_llm_proj = get("fm.llm_proj.weight");
     ctx->model.fm_time_proj = get("fm.time_proj.weight");
     ctx->model.fm_semantic_output = get("fm.semantic_output.weight");
+    ctx->model.fm_semantic_output_bias = get("fm.semantic_output.bias"); // optional
     ctx->model.fm_acoustic_output = get("fm.acoustic_output.weight");
     ctx->model.fm_norm = get("fm.norm.weight");
     ctx->model.fm_layers.resize(hp.fm_n_layers);
@@ -921,6 +949,257 @@ static std::vector<float> voxtral_tts_run_llm(voxtral_tts_context* ctx, const fl
     return out;
 }
 
+// ===========================================================================
+// Stage 2 — flow-matching acoustic transformer
+// ===========================================================================
+// Blueprint: github.com/mudler/voxtral-tts.c (MIT, validated vs vLLM-Omni). Per
+// frame: a semantic token (greedy argmax of fm.semantic_output @ h) plus 36
+// acoustic FSQ codes from an 8-timestep (7-interval) Euler flow-matching ODE
+// with classifier-free guidance (α=1.2). The FM transformer runs over exactly 3
+// tokens [input_proj(x_t), time_proj(time_emb(t)), llm_proj(h)] and is
+// bidirectional with NO positional encoding.
+
+static constexpr int VTTS_FLOW_STEPS = 8; // timesteps → 7 Euler intervals
+static constexpr float VTTS_CFG_ALPHA = 1.2f;
+static constexpr float VTTS_NOISE_SCALE = 1.0f;
+static constexpr int VTTS_FSQ_LEVELS = 21;
+static constexpr int VTTS_ACOUSTIC_DIM = 36;
+static constexpr int VTTS_SPECIAL_COUNT = 2; // [EMPTY]=0, [END]=1
+static constexpr int VTTS_AUDIO_END = 1;
+static constexpr int VTTS_AUDIO_EMPTY = 0;
+
+// cos-first sinusoidal time embedding: [cos(t·invf) ; sin(t·invf)],
+// invf[i] = exp(-log(1e4)·i/(d/2)).
+static std::vector<float> vtts_fm_time_embed(int dim, float t) {
+    std::vector<float> e(dim);
+    const int half = dim / 2;
+    for (int i = 0; i < half; i++) {
+        float invf = std::exp(-std::log(10000.0f) * (float)i / (float)half);
+        float a = t * invf;
+        e[i] = std::cos(a);
+        e[half + i] = std::sin(a);
+    }
+    return e;
+}
+
+// One FM forward pass → velocity (36 floats) read from token 0. Builds+runs a
+// 3-token bidirectional GQA transformer.
+static std::vector<float> vtts_fm_predict_velocity(voxtral_tts_context* ctx, const float* x_t, const float* h,
+                                                   float t) {
+    const auto& hp = ctx->hp;
+    const auto& m = ctx->model;
+    const int d = hp.fm_dim;
+    const int n_q = hp.fm_n_heads, n_kv = hp.fm_n_kv, hd = hp.fm_head_dim, grp = n_q / n_kv;
+    const int T = 3;
+    const float scale = 1.0f / std::sqrt((float)hd);
+    std::vector<float> time_emb = vtts_fm_time_embed(d, t);
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 2048, false);
+
+    ggml_tensor* xt = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, VTTS_ACOUSTIC_DIM);
+    ggml_set_name(xt, "xt");
+    ggml_set_input(xt);
+    ggml_tensor* hin = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, d);
+    ggml_set_name(hin, "hin");
+    ggml_set_input(hin);
+    ggml_tensor* tin = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, d);
+    ggml_set_name(tin, "tin");
+    ggml_set_input(tin);
+
+    ggml_tensor* tok0 = ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, m.fm_input_proj, xt), d, 1);
+    ggml_tensor* tok1 = ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, m.fm_time_proj, tin), d, 1);
+    ggml_tensor* tok2 = ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, m.fm_llm_proj, hin), d, 1);
+    ggml_tensor* cur = ggml_concat(ctx0, ggml_concat(ctx0, tok0, tok1, 1), tok2, 1); // (d, 3)
+
+    for (int il = 0; il < hp.fm_n_layers; il++) {
+        const auto& l = m.fm_layers[il];
+        ggml_tensor* res = cur;
+        ggml_tensor* x = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, hp.llm_norm_eps), l.attn_norm);
+
+        ggml_tensor* Q = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, l.attn_q, x), hd, n_q, T);
+        ggml_tensor* K = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, l.attn_k, x), hd, n_kv, T);
+        ggml_tensor* V = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, l.attn_v, x), hd, n_kv, T);
+
+        // GQA interleave K,V to n_q heads (each kv head repeated grp times contiguously)
+        K = ggml_reshape_4d(ctx0, K, hd, 1, n_kv, T);
+        K = ggml_repeat(ctx0, K, ggml_new_tensor_4d(ctx0, K->type, hd, grp, n_kv, T));
+        K = ggml_reshape_3d(ctx0, K, hd, n_q, T);
+        V = ggml_reshape_4d(ctx0, V, hd, 1, n_kv, T);
+        V = ggml_repeat(ctx0, V, ggml_new_tensor_4d(ctx0, V->type, hd, grp, n_kv, T));
+        V = ggml_reshape_3d(ctx0, V, hd, n_q, T);
+
+        Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));         // (hd, T, nh)
+        K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));         // (hd, T, nh)
+        ggml_tensor* scores = ggml_mul_mat(ctx0, K, Q);                 // (T, T, nh)
+        scores = ggml_soft_max_ext(ctx0, scores, nullptr, scale, 0.0f); // bidirectional, no mask
+        V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));         // (hd, T, nh)
+        V = ggml_cont(ctx0, ggml_permute(ctx0, V, 1, 0, 2, 3));         // (T, hd, nh)
+        ggml_tensor* attn = ggml_mul_mat(ctx0, V, scores);              // (hd, T, nh)
+        attn = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3)), n_q * hd, T);
+        cur = ggml_add(ctx0, res, ggml_mul_mat(ctx0, l.attn_o, attn));
+
+        res = cur;
+        x = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, hp.llm_norm_eps), l.ffn_norm);
+        cur = ggml_add(ctx0, res, core_ffn::swiglu(ctx0, x, l.ffn_gate, l.ffn_up, l.ffn_down));
+    }
+
+    // Velocity from token 0: final RMSNorm + fm.norm, then acoustic head.
+    ggml_tensor* t0 = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, d, 1, cur->nb[1], 0));
+    t0 = ggml_mul(ctx0, ggml_rms_norm(ctx0, t0, hp.llm_norm_eps), m.fm_norm);
+    ggml_tensor* vel = ggml_mul_mat(ctx0, m.fm_acoustic_output, t0); // (36, 1)
+    ggml_set_name(vel, "vel");
+    ggml_set_output(vel);
+    ggml_build_forward_expand(gf, vel);
+
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        ggml_free(ctx0);
+        return {};
+    }
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "xt"), x_t, 0, VTTS_ACOUSTIC_DIM * sizeof(float));
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "hin"), h, 0, (size_t)d * sizeof(float));
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "tin"), time_emb.data(), 0, (size_t)d * sizeof(float));
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        ggml_free(ctx0);
+        return {};
+    }
+    std::vector<float> v(VTTS_ACOUSTIC_DIM);
+    ggml_backend_tensor_get(ggml_graph_get_tensor(gf, "vel"), v.data(), 0, v.size() * sizeof(float));
+    ggml_free(ctx0);
+    return v;
+}
+
+// Greedy semantic token: argmax of fm.semantic_output @ h (no positional path).
+// [EMPTY]=0 and the padded tail (≥ special+cb) are masked out; [END]=1 is allowed
+// (it stops generation).
+static int vtts_fm_semantic_argmax(voxtral_tts_context* ctx, const float* h) {
+    const int d = ctx->hp.fm_dim;
+    const int n_out = (int)ctx->model.fm_semantic_output->ne[1]; // 8320
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph(ctx0);
+    ggml_tensor* hin = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, d);
+    ggml_set_name(hin, "hin");
+    ggml_set_input(hin);
+    ggml_tensor* logits = ggml_mul_mat(ctx0, ctx->model.fm_semantic_output, hin);
+    if (ctx->model.fm_semantic_output_bias)
+        logits = ggml_add(ctx0, logits, ctx->model.fm_semantic_output_bias);
+    ggml_set_name(logits, "logits");
+    ggml_set_output(logits);
+    ggml_build_forward_expand(gf, logits);
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        ggml_free(ctx0);
+        return VTTS_AUDIO_END;
+    }
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "hin"), h, 0, (size_t)d * sizeof(float));
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        ggml_free(ctx0);
+        return VTTS_AUDIO_END;
+    }
+    std::vector<float> lg(n_out);
+    ggml_backend_tensor_get(ggml_graph_get_tensor(gf, "logits"), lg.data(), 0, lg.size() * sizeof(float));
+    ggml_free(ctx0);
+
+    lg[VTTS_AUDIO_EMPTY] = -1e30f; // [EMPTY] never emitted
+    for (int i = VTTS_SPECIAL_COUNT + ctx->hp.semantic_cb_size; i < n_out; i++)
+        lg[i] = -1e30f; // padded tail
+    int best = 0;
+    for (int i = 1; i < n_out; i++)
+        if (lg[i] > lg[best])
+            best = i;
+    return best;
+}
+
+// One frame → 37 codes (codes[0]=semantic incl. specials; codes[1..36]=acoustic
+// FSQ+special offset). Returns semantic==[END] to signal end of audio.
+static std::vector<int> vtts_acoustic_forward(voxtral_tts_context* ctx, const std::vector<float>& h) {
+    std::vector<int> codes(1 + VTTS_ACOUSTIC_DIM, 0);
+    codes[0] = vtts_fm_semantic_argmax(ctx, h.data());
+    if (codes[0] == VTTS_AUDIO_END) {
+        for (int i = 1; i < (int)codes.size(); i++)
+            codes[i] = VTTS_AUDIO_EMPTY + VTTS_SPECIAL_COUNT;
+        return codes;
+    }
+
+    // Euler flow-matching ODE from Gaussian noise.
+    std::vector<float> x(VTTS_ACOUSTIC_DIM);
+    for (int i = 0; i < VTTS_ACOUSTIC_DIM; i++)
+        x[i] = vtts_randn(&ctx->rng_state) * VTTS_NOISE_SCALE;
+    std::vector<float> zero_h(ctx->hp.fm_dim, 0.0f);
+
+    for (int step = 0; step < VTTS_FLOW_STEPS - 1; step++) {
+        float t = (float)step / (float)(VTTS_FLOW_STEPS - 1);
+        float dt = (float)(step + 1) / (float)(VTTS_FLOW_STEPS - 1) - t;
+        std::vector<float> v_cond = vtts_fm_predict_velocity(ctx, x.data(), h.data(), t);
+        std::vector<float> v_uncond = vtts_fm_predict_velocity(ctx, x.data(), zero_h.data(), t);
+        if (v_cond.empty() || v_uncond.empty())
+            break;
+        for (int i = 0; i < VTTS_ACOUSTIC_DIM; i++) {
+            float v = VTTS_CFG_ALPHA * v_cond[i] + (1.0f - VTTS_CFG_ALPHA) * v_uncond[i];
+            x[i] += v * dt;
+        }
+    }
+
+    // FSQ quantize → [0, levels-1], offset by special count.
+    for (int i = 0; i < VTTS_ACOUSTIC_DIM; i++) {
+        float val = std::max(-1.0f, std::min(1.0f, x[i]));
+        int code = (int)(((val + 1.0f) / 2.0f) * (float)(VTTS_FSQ_LEVELS - 1) + 0.5f);
+        code = std::max(0, std::min(VTTS_FSQ_LEVELS - 1, code));
+        codes[i + 1] = code + VTTS_SPECIAL_COUNT;
+    }
+    return codes;
+}
+
+// Embed the 37 generated codes back into LLM input space: sum of one row per
+// codebook from audio_embd. Offsets follow MultiVocabEmbeddings (pad_to_multiple
+// =None): semantic codebook size 8194 (8192+2), acoustic 23 (21+2) each.
+static std::vector<float> vtts_embed_audio_codes(voxtral_tts_context* ctx, const std::vector<int>& codes) {
+    const int d = ctx->hp.llm_dim;
+    const int sem_size = ctx->hp.semantic_cb_size + VTTS_SPECIAL_COUNT; // 8194
+    const int acou_size = VTTS_FSQ_LEVELS + VTTS_SPECIAL_COUNT;         // 23
+    const int n_cb = (int)codes.size();                                 // 37
+
+    std::vector<int32_t> idx(n_cb);
+    int off = 0;
+    for (int cb = 0; cb < n_cb; cb++) {
+        idx[cb] = off + codes[cb];
+        off += (cb == 0) ? sem_size : acou_size;
+    }
+
+    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph(ctx0);
+    ggml_tensor* ids = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_cb);
+    ggml_set_name(ids, "ids");
+    ggml_set_input(ids);
+    ggml_tensor* rows = ggml_get_rows(ctx0, ctx->model.audio_embd, ids); // (d, n_cb)
+    ggml_set_name(rows, "rows");
+    ggml_set_output(rows);
+    ggml_build_forward_expand(gf, rows);
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        ggml_free(ctx0);
+        return {};
+    }
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "ids"), idx.data(), 0, idx.size() * sizeof(int32_t));
+    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        ggml_free(ctx0);
+        return {};
+    }
+    std::vector<float> rowbuf((size_t)d * n_cb);
+    ggml_backend_tensor_get(ggml_graph_get_tensor(gf, "rows"), rowbuf.data(), 0, rowbuf.size() * sizeof(float));
+    ggml_free(ctx0);
+
+    std::vector<float> sum(d, 0.0f);
+    for (int cb = 0; cb < n_cb; cb++)
+        for (int j = 0; j < d; j++)
+            sum[j] += rowbuf[(size_t)cb * d + j];
+    return sum;
+}
+
 // ---------------------------------------------------------------------------
 // Synthesize (LLM AR + FM ODE + codec decode)
 // ---------------------------------------------------------------------------
@@ -991,24 +1270,54 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
     }
     ctx->kv_used = T_prompt + 1;
 
-    if (ctx->verbosity >= 1) {
-        double sq = 0.0, amax = 0.0;
-        for (float x : h0) {
-            sq += (double)x * x;
-            amax = std::max(amax, (double)std::fabs(x));
+    if (ctx->verbosity >= 1)
+        fprintf(stderr, "voxtral_tts: prefill done (T_prompt=%d), generating audio codes...\n", T_prompt);
+
+    // Step 5: Autoregressive audio-code generation.
+    //   frame: acoustic_forward(h) → 37 codes; stop at [END]; else embed codes
+    //   back (audio_embd sum) → next LLM input → hidden for the next frame.
+    const int max_frames = 2000; // ~160 s at 12.5 Hz
+    std::vector<int> all_codes;
+    std::vector<float> h = h0;
+    int n_past = T_prompt + 1;
+    int n_frames = 0;
+    bool got_end = false;
+
+    const bool dbg = env_bool("CRISPASR_VOXTRAL_TTS_DEBUG");
+    for (int frame = 0; frame < max_frames; frame++) {
+        std::vector<int> codes = vtts_acoustic_forward(ctx, h);
+        if (dbg || (ctx->verbosity >= 1 && frame == 0))
+            fprintf(stderr, "voxtral_tts: frame %d sem=%d ac[0..2]=%d,%d,%d\n", frame, codes[0], codes[1], codes[2],
+                    codes[3]);
+        if (codes[0] == VTTS_AUDIO_END) {
+            got_end = true;
+            break;
         }
-        fprintf(stderr, "voxtral_tts: LLM prefill+frame0 OK — T_prompt=%d, frame0 hidden |h|=%.4f max=%.4f\n", T_prompt,
-                std::sqrt(sq), amax);
+        all_codes.insert(all_codes.end(), codes.begin(), codes.end());
+        n_frames++;
+
+        std::vector<float> next_emb = vtts_embed_audio_codes(ctx, codes);
+        if (next_emb.empty())
+            break;
+        h = voxtral_tts_run_llm(ctx, next_emb.data(), /*n_tokens*/ 1, n_past);
+        if (h.empty())
+            break;
+        n_past++;
+        ctx->kv_used = n_past;
     }
 
-    // TODO: FM ODE (semantic + acoustic codes) + codec decode. Blueprint captured
-    // from the MIT reference C port (github.com/mudler/voxtral-tts.c, validated vs
-    // vLLM-Omni): FM = 3L bidirectional transformer, NO RoPE, cos-first sinusoidal
-    // time embed, 8 Euler steps (7 intervals), CFG α=1.2, greedy-argmax semantic,
-    // FSQ round(((x+1)/2)*20)+2; codec = 292→1024 causal conv, 4×[2L ALiBi
-    // transformer + ConvTranspose1d], output conv k=7 → 240 PCM/frame. To be
-    // ground-truthed against that reference (CPU, runnable locally) before shipping.
-    fprintf(stderr, "voxtral_tts: FM ODE + codec decode pending (blueprint captured; see PLAN)\n");
+    if (ctx->verbosity >= 1)
+        fprintf(stderr, "voxtral_tts: generated %d frames (%.2f s)%s\n", n_frames, n_frames / ctx->hp.frame_rate,
+                got_end ? " [END]" : " [max_frames]");
+
+    // Stage 3 (codec decode → PCM) is blocked: the shipped Q4_K GGUF is missing
+    // `codec.semantic_cb.weight` (the 256-d semantic VQ table needed for the
+    // codec's 292-d input) and `fm.semantic_output.bias` — both converter gaps.
+    // The GGUF must be re-converted with those tensors before audio can decode.
+    fprintf(stderr,
+            "voxtral_tts: codec decode blocked — GGUF missing codec.semantic_cb.weight "
+            "(re-convert needed); %d code frames generated\n",
+            n_frames);
     return nullptr;
 }
 

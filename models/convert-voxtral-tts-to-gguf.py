@@ -72,6 +72,9 @@ DIRECT_FM = {
     "acoustic_transformer.time_projection.weight": "fm.time_proj.weight",
     "acoustic_transformer.acoustic_codebook_output.weight": "fm.acoustic_output.weight",
     "acoustic_transformer.semantic_codebook_output.weight": "fm.semantic_output.weight",
+    # Bias on the semantic head is REQUIRED: without it the greedy argmax is
+    # degenerate and [END_AUDIO] is never emitted (generation never terminates).
+    "acoustic_transformer.semantic_codebook_output.bias": "fm.semantic_output.bias",
     "acoustic_transformer.norm.weight": "fm.norm.weight",
 }
 
@@ -335,16 +338,25 @@ def extract_codec_tensors(raw_sd: dict) -> dict[str, np.ndarray]:
             print(f"  patch_proj from {patch_base}: {w.shape}")
             break
 
-    # Semantic codebook: EMA embedding_sum / cluster_usage
-    emb_sum_key = "audio_tokenizer.quantizer.semantic_codebook._codebook.embedding_sum"
-    usage_key = "audio_tokenizer.quantizer.semantic_codebook._codebook.cluster_usage"
-    if emb_sum_key in raw_sd and usage_key in raw_sd:
-        emb_sum = raw_sd[emb_sum_key].float().numpy()
-        usage = raw_sd[usage_key].float().numpy()
+    # Semantic codebook: EMA embedding_sum / cluster_usage. The checkpoint key
+    # omits the `._codebook.` segment that older converters assumed (the reference
+    # vLLM-Omni/voxtral-tts.c reads `...semantic_codebook.embedding_sum`); try both
+    # so this survives either layout. This tensor is REQUIRED for codec decode.
+    emb_sum = usage = None
+    for base in ("audio_tokenizer.quantizer.semantic_codebook",
+                 "audio_tokenizer.quantizer.semantic_codebook._codebook"):
+        if f"{base}.embedding_sum" in raw_sd and f"{base}.cluster_usage" in raw_sd:
+            emb_sum = raw_sd[f"{base}.embedding_sum"].float().numpy()
+            usage = raw_sd[f"{base}.cluster_usage"].float().numpy()
+            break
+    if emb_sum is not None:
         usage = np.maximum(usage, 1e-5)
         embedding = emb_sum / usage[:, np.newaxis]
         out["codec.semantic_cb.weight"] = embedding.astype(np.float32)
         print(f"  semantic codebook: {embedding.shape}")
+    else:
+        print("  WARNING: semantic codebook (embedding_sum/cluster_usage) NOT FOUND — "
+              "codec decode will be impossible without codec.semantic_cb.weight")
 
     return out
 
