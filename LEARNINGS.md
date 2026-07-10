@@ -12030,6 +12030,20 @@ Irodori-TTS voice cloning was a stub. Porting the DAC-VAE **encoder** (reference
 The fix was 3 lines of graph plumbing (`attend_speaker` toggle) on top of the whole encoder port. **Lesson:** when a feature is "stubbed", grep the *consumer* for the zeros / always-masked / `TODO` defaults before declaring the port done — the missing model is usually the visible half; the invisible half is the conditioning path that was wired to ignore it. Diagnostic that pinpointed it fast: A/B the output **with vs without** the reference and measure a speaker-similarity proxy (time-averaged DAC-VAE latent cos) — identical outputs (cos 1.0) said "reference not reaching the model", not "encoder wrong". After the fix: 0.08 → 0.65 (vs 0.70 for the repo's own cloned sample).
 
 
+## Re-quantized GGUFs on HF must be re-baked when the quantizer adds carve-outs (#240, 2026-07-10)
+
+The qwen3-asr-1.7b Q4_K GGUF on HuggingFace produced empty transcripts because it was quantized before the audio-tower Q8_0 floor landed in `crispasr-quantize` (`3c3ba2c7`). The fix was in the quantizer, not the runtime — old GGUFs need re-quantizing from the F16 source.
+
+**Lesson:** when a `crispasr-quantize` change adds a new tensor carve-out (keeping sensitive weights at higher precision), **every affected GGUF on HF must be re-baked**. The fix isn't deployed until the re-quantized file replaces the old one. Add a re-bake Kaggle kernel to the same PR/commit that adds the carve-out, not as a follow-up.
+
+
+## TTS code predictor: batch sequential AR steps in one graph dispatch, never N separate dispatches (#245, 2026-07-10)
+
+CrispASR's qwen3-tts code predictor runs 15 separate `ggml_backend_sched_graph_compute` calls per audio frame (one per codebook). Each dispatch has scheduler overhead (alloc, reset, compute, read). This makes it ~40x slower per frame than predict-woo/qwen3-tts.cpp (10s vs 225ms on CPU). The graph topology is identical across all 15 steps — only the input data and KV write position change.
+
+**Lesson:** when an AR decode loop has a fixed number of sequential steps with identical graph topology, fuse them into a single graph dispatch (or at minimum skip scheduler reset between steps). The per-dispatch overhead dominates when compute per step is small (5-layer transformer). This applies to any multi-codebook TTS (qwen3-tts, orpheus, bark, csm) where a code predictor fills N codebooks per frame.
+
+
 ## Python reference dumpers must apply identical audio conditioning as the C++ runtime (kyutai-stt 2.6B, 2026-07-10)
 
 The kyutai-stt 2.6B reference GGUF had a truncated JFK transcript ("ask not what your country can do for you ask what") because the Python dumper fed raw PCM into Mimi without the silence tail + silence prefix the C++ runtime applies. The 2.6B model has `audio_delay=2.5s` + `audio_silence_prefix=1.0s` = 3.5s total lookahead; without appending 56000 samples of silence at 16 kHz before resampling, and prepending 24000 zeros at 24 kHz before Mimi encode, the causal LM can't flush its final pending tokens and the last ~3 words are dropped.
