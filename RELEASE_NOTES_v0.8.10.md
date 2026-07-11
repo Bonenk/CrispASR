@@ -94,10 +94,21 @@ OmniVoice's silent-synthesis root cause fixed plus a TTS perf pass
   Scoped to the owning session (and capped so a non-draining consumer can't
   grow them without bound). The persistent CPU threadpool is now released when
   its backend is freed, instead of leaking worker threads per model.
-- **canary-qwen instruction echo (#247)**: the prompt wrapped the audio in
-  `<|audio_start|>`/`<|audio_end|>` framing tokens the SALM model was never
-  trained with, making it echo the instruction ("Transcript:", "PASS") instead
-  of transcribing. Removed to match the NeMo blueprint exactly.
+- **canary-qwen instruction echo (#247)**: on a too-short audio window the SALM
+  decoder echoed its task framing as a meta word ("Transcript", "Transcription",
+  "PASS") instead of transcribing. Root-caused against the NeMo SALM reference:
+  the FastConformer subsamples 8x, so a window with only a few encoder frames
+  (T_enc<=5, ~<=0.4 s) gives the Qwen3 LLM decoder no acoustic content to ground
+  on and it falls back to its language prior — NeMo emits the *identical* tokens
+  ("Okay" on a 0.1 s clip, "Transcript" on a 0.3 s clip), so this is inherent to
+  the model, not a port bug (the prompt is byte-identical to NeMo's, and full-
+  utterance output matches exactly). Earlier theories (framing tokens; string
+  stripping) did not fix it. Fixed in the pipeline: a degenerate-window gate
+  returns empty for sub-gate windows, plus a backend-agnostic safety net that
+  strips any leading instruction-echo token from **both** the text and the
+  tokens array (the old workaround left the tokens array inconsistent — #218).
+  Both paths are env-gated (`CRISPASR_CANARY_QWEN_MIN_ENC_FRAMES`,
+  `CRISPASR_CANARY_QWEN_NO_ECHO_STRIP`) for A/B.
 - **kugelaudio no-voice synthesis (#248)**: no voice packs were ever published
   upstream, so unconditioned synthesis produced noise. Implemented VibeVoice's
   zero-tensor neutral-speaker fallback (1-frame zero VAE latent through the

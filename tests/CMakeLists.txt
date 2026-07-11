@@ -596,6 +596,27 @@ catch_discover_tests(test-ark-asr
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-canary-qwen-live — live integration tests for canary-qwen (#247:
+# short-window instruction-echo regression guard). Needs CRISPASR_MODEL_CANARY_QWEN.
+add_executable(test-canary-qwen-live
+    test_canary_qwen_live.cpp
+)
+target_include_directories(test-canary-qwen-live PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+)
+target_link_libraries(test-canary-qwen-live PRIVATE
+    Catch2::Catch2WithMain
+    canary_qwen
+)
+catch_discover_tests(test-canary-qwen-live
+    TEST_SPEC "[canary-qwen]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test - lfm2-audio — live integration tests for LFM2-Audio ASR + TTS
 add_executable(test-lfm2-audio
     test_lfm2_audio_live.cpp
@@ -955,6 +976,23 @@ target_link_libraries(test-canary-params PRIVATE
 catch_discover_tests(test-canary-params
     TEST_SPEC "[unit]"
     PROPERTIES LABELS "unit;canary"
+)
+
+# ─── test-canary-qwen-params — Catch2 unit tests for canary-qwen params /
+# null-guards and the #247 instruction-echo detection. No GGUF required. ────────
+add_executable(test-canary-qwen-params
+    test-canary-qwen-params.cpp
+)
+target_include_directories(test-canary-qwen-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-canary-qwen-params PRIVATE
+    Catch2::Catch2WithMain
+    canary_qwen
+)
+catch_discover_tests(test-canary-qwen-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;canary-qwen"
 )
 
 # ─── test-orpheus-params — Catch2 unit tests for orpheus_context_params defaults
