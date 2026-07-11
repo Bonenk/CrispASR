@@ -104,6 +104,31 @@ Lessons from the systematic head-to-head benchmark against
     everything — this is what matters for the user experience but not for
     engine-level comparison. Always report both.
 
+20. **Batched blank-scan helps modestly on GPU, hurts on CPU**: The batched
+    TDT/RNNT decode pre-computes joint logits for 32 frames in one sgemm,
+    then scans for the first non-blank. On P100 GPU: Parakeet decode 955ms→828ms
+    (13%), Nemotron 385ms→345ms (10%). On CPU: SLOWER (sgemm overhead for small
+    matrices exceeds N×sgemv). Gate batched path behind GPU detection or env var.
+
+21. **Transducer decoders are fundamentally CPU-bound in CrispASR**: The LSTM
+    predictor + joint network use host-side `cblas_sgemv` with sequential state
+    updates. Even with batched blank-scanning, the LSTM step between token
+    emissions runs on CPU. The path to matching transcribe.cpp's 29ms Parakeet
+    decode is porting LSTM+joint to a ggml graph on GPU. Small matrices (640×640)
+    make this challenging — GPU kernel launch latency may dominate.
+
+22. **Moonshine encoder gap is im2col on raw audio**: CrispASR processes raw
+    176K audio samples through 3 Conv1d layers via `ggml_im2col + ggml_mul_mat`,
+    creating 45.6 MB of F32 intermediates. transcribe.cpp likely uses `ggml_conv_1d`
+    directly or a pre-computed mel spectrogram, avoiding the large intermediate.
+    The encoder produces 2737 frames (not 550 — moonshine-streaming subsamples
+    more aggressively). This accounts for the 5.8x GPU gap.
+
+23. **Cohere works and CrispASR wins**: Fixed URL (repo is `cstr/cohere-transcribe-
+    03-2026-GGUF`, not `cstr/cohere-transcribe-GGUF`). CA 0.046 vs TC 0.070 =
+    CrispASR 1.5x faster on GPU. Cohere's encoder-decoder architecture benefits
+    from CrispASR's GPU-accelerated cross-attention path.
+
 ## Model Coverage
 
 10. **CrispASR coverage gaps**: GigaAM v3 family (Russian+EN ASR, 4 variants) and
