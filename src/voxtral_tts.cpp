@@ -1892,7 +1892,11 @@ extern "C" int voxtral_tts_llm_diff(const char* model_gguf, const char* ref_gguf
         char pth[512];
         snprintf(pth, sizeof(pth), "%s/mine.c1.%s.bin", dir, s.c_str());
         FILE* fp = fopen(pth, "rb");
-        ggml_tensor* rt = ggml_get_tensor(rw.ctx, s.c_str());
+        // Use load_weights' canonical name→tensor map, not ggml_get_tensor(rw.ctx, ...)
+        // which scans the ctx and (observed) could return the wrong tensor's data for
+        // the "embed" stage while the layer stages resolved fine.
+        auto rit = rw.tensors.find(s);
+        ggml_tensor* rt = (rit != rw.tensors.end()) ? rit->second : nullptr;
         bool have_mine = fp && fread(a.data(), sizeof(float), D, fp) == (size_t)D;
         if (fp)
             fclose(fp);
@@ -1919,7 +1923,8 @@ extern "C" int voxtral_tts_llm_diff(const char* model_gguf, const char* ref_gguf
             if (first_bad.empty())
                 first_bad = s;
         }
-        printf("voxtral-tts llm %-8s  cos=%.6f  max_abs=%.5f  %s\n", s.c_str(), cos, maxd, pass ? "PASS" : "FAIL");
+        printf("voxtral-tts llm %-8s  cos=%.6f  max_abs=%.5f  |mine|=%.3f |ref|=%.3f  %s\n", s.c_str(), cos, maxd,
+               std::sqrt(na), std::sqrt(nb), pass ? "PASS" : "FAIL");
     }
     if (!first_bad.empty())
         printf("\nFIRST DIVERGENCE (cos<0.99): %s  → structural bug in that layer.\n", first_bad.c_str());
