@@ -128,9 +128,13 @@ def run_cfg(label: str, env_extra: dict) -> dict:
         "--seed", "42",
         "-np",
     ]
+    # NOTE: NO DIA_GREEDY — dia is a sampled dialogue TTS (temp 1.2); argmax
+    # collapses it to near-silence ([BLANK_AUDIO]), so greedy is useless for the
+    # audio roundtrip. Correctness for a sampled TTS is intelligibility of the
+    # OUTPUT (HARD RULE #3), not token identity (CPU/GPU never match token-for-
+    # token under sampling). seed pins the RNG for reproducibility.
     env = {
         **os.environ,
-        "DIA_GREEDY": "1",
         "DIA_BENCH": "1",
         "DIA_DUMP_TOKENS": "1",
         "DIA_MAX_STEPS": str(STEPS),
@@ -219,20 +223,19 @@ try:
 except Exception as e:  # noqa: BLE001
     audio_verdict = f"ASR roundtrip skipped ({e})"
 
+# Correctness = decoded-audio intelligibility (HARD RULE #3). Token parity is
+# informational only: dia samples, so CPU/GPU never match token-for-token.
 if not gpu["gpu"]:
     verdict = "GPU DID NOT ENGAGE (check CUDA build / DIA_TTS_GPU gate)"
 elif len(gpu["tokens"]) == 0 or gpu["total"] is None:
     verdict = "GPU RUN FAILED (decoder produced no tokens — likely a CUDA op abort)"
-elif parity:
-    verdict = ("GPU WINS ON CUDA — token-identical, confirms default flip"
-               if (speedup and speedup > 1.1) else "GPU CORRECT (token-identical) but NOT faster")
 elif "BOTH INTELLIGIBLE" in audio_verdict:
-    verdict = (f"GPU CORRECT via audio roundtrip (tokens diverge @ {first_div} — benign FP); "
-               f"speedup {speedup}x — WIDEN DEFAULT candidate")
+    verdict = (f"GPU CORRECT — audio roundtrip OK (cpu {n_cpu}/10, gpu {n_gpu}/10 keywords); "
+               f"decode {speedup}x — WIDEN DEFAULT candidate")
 elif "GARBLED" in audio_verdict:
-    verdict = f"CUDA MISCOMPUTE (audio garbled + tokens diverge @ {first_div}) — keep Metal-only"
+    verdict = "CUDA MISCOMPUTE — GPU audio garbled while CPU intelligible; keep Metal-only"
 else:
-    verdict = f"token divergence @ {first_div}; audio roundtrip {audio_verdict}"
+    verdict = f"AUDIO ROUNDTRIP {audio_verdict} — inspect the ASR transcripts below"
 
 per_stage = {}
 for k in sorted(set(list(cpu["stages"]) + list(gpu["stages"]))):
@@ -250,8 +253,8 @@ print("\n" + "=" * 72)
 print(f"SUMMARY — dia TTS CPU vs GPU on CUDA ({sha[:8]}, {model_path.name}, {STEPS} steps)")
 print("=" * 72)
 print(f"  GPU engaged        : {gpu['gpu']}")
-print(f"  token parity       : {'IDENTICAL' if parity else f'DIVERGES @ step {first_div}'}"
-      f"  (cpu={len(cpu['tokens'])} gpu={len(gpu['tokens'])} tok, frames cpu={cpu['frames']} gpu={gpu['frames']})")
+print(f"  token parity (info): {'identical' if parity else f'differ @ {first_div}'} "
+      f"(expected to differ — sampled TTS; cpu={len(cpu['tokens'])} gpu={len(gpu['tokens'])} tok)")
 print(f"  per-stage ms (cpu -> gpu, speedup):")
 for k, v in per_stage.items():
     print(f"    {k:16s}: {v['cpu_ms']} -> {v['gpu_ms']}  ({v['speedup']}x)")
