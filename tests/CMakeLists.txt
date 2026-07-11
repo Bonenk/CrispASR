@@ -1912,6 +1912,23 @@ catch_discover_tests(test-ngram-loop-fix
     PROPERTIES LABELS "unit;ngram-loop"
 )
 
+# ─── test-generation-health — Catch2 unit tests for the generation-health
+# regression gate (core/generation_health.h). Objective quality checks on
+# ASR/TTS output: not-empty, duration plausibility, n-gram loop, truncation.
+add_executable(test-generation-health
+    test-generation-health.cpp
+)
+target_include_directories(test-generation-health PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-generation-health PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-generation-health
+    TEST_SPEC "[gen-health]"
+    PROPERTIES LABELS "unit;gen-health"
+)
+
 # ─── test-issue-239-popen-mode — regression guard for issue #239.
 #
 # Verifies that crispasr_popen("cmd", "rb") succeeds on POSIX (it failed
