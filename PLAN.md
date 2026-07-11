@@ -6746,20 +6746,25 @@ Grounded in the §232 GPU profiling, the qwen3-tts per-op traces, and the
 PERFORMANCE.md gap list. Recalibrated after checking what's already tried
 and what parallel sessions own:
 
-- **DEAD END — do NOT port the Parakeet/Nemotron transducer decoder to GPU.**
-  PLAN §232 lists it as the top win (decode runs on host `cblas_sgemv/sgemm`,
-  paper 12-19×). A parallel session already tried it: batched/GPU decode is
-  **5-9× SLOWER** (`d0bb4601`, `3fcd5ff3`, LEARNINGS item 24). Same class as
-  the qwen3-tts CP_DIRECT CPU result — a decode loop of tiny per-step matmuls
-  + host↔device sync is exactly where CPU cblas wins. The cblas decoder is
-  correct as-is; leave it.
+- **Transducer decoder → GPU: NOT on M1/CPU-batched; a CUDA campaign is being
+    scoped by a parallel session.** PLAN §232 lists it as the top win (decode
+    runs on host `cblas_sgemv/sgemm`, paper 12-19×). The naive attempt —
+    CPU-side batched decode — is **5-9× SLOWER** (`d0bb4601`, `3fcd5ff3`):
+    a decode loop of tiny per-step matmuls + host↔device sync is where CPU
+    cblas wins (same class as qwen3-tts CP_DIRECT-on-CPU). But a parallel
+    session is now scoping a *proper* in-graph GPU decode on datacenter cards
+    (`eb5c5cc5` plan, `a1103c04` learning 29 — gate it on Kaggle/CUDA BEFORE
+    building, since the M1/CPU result doesn't settle a P100/T4 port). So: not
+    a target for THIS session (owned + M1 can't validate it), not a flat dead
+    end — leave the cblas decoder in place pending their CUDA verdict.
 - **OWNED by a parallel session — Moonshine encoder** (im2col of k≈127 conv1
   over ~176K raw samples; 728 ms vs ~58 ms competitor). Worktree
   `moonshine-decode-stash` @ `46127dab` is active on it. Hands off.
 - **qwen3-tts talker** — GPU-execution-bound (§232 profiled: encode 2-3 ms vs
   GPU 38-42 ms). No dispatch trick helps; only `kv_self_attn` node-slimming
   (shared 30-backend helper, high risk). Deprioritized, not a target.
-- [ ] **Pocket-TTS backbone KV cache — IN PROGRESS (this item).** `pocket_tts.
+- [ ] **⏳ ACTIVELY OWNED (session on `feat/232-pocket-kv`, since 2026-07-11 —
+      do not start elsewhere): Pocket-TTS backbone KV cache.** `pocket_tts.
       cpp` host-stores the backbone KV cache and RE-UPLOADS all past positions
       every AR step via a triple-nested host reorder (`backbone_forward_step_
       ggml`, ~L1208-1231): O(pos·NH·HD·NL) host work + full H→D upload per
