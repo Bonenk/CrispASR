@@ -97,6 +97,8 @@ CRISPASR_SESSION_API void crispasr_session_set_segment_callback(crispasr_session
                                                                 void* user_data);
 
 /// Number of streamed segments available for polling (Dart FFI path).
+/// The polling buffers are per-session; this session-less API reads the
+/// session that most recently streamed via the default callbacks.
 CRISPASR_SESSION_API int crispasr_get_streamed_segment_count(void);
 
 /// Drain all buffered streamed segments into a new result. Caller owns the
@@ -111,16 +113,12 @@ CRISPASR_SESSION_API void crispasr_reset_streamed_segments(void);
 /// Per-token streaming callback. Fired each time the decoder produces a
 /// new text token during LLM-based ASR. The token text may be a partial
 /// word (BPE subword). The callback must be fast and non-blocking.
-typedef void (*crispasr_token_callback)(
-    const char* token_text,     // decoded token text (UTF-8)
-    int token_index,            // 0-based token index within current segment
-    void* user_data
-);
+typedef void (*crispasr_token_callback)(const char* token_text, // decoded token text (UTF-8)
+                                        int token_index,        // 0-based token index within current segment
+                                        void* user_data);
 
-CRISPASR_SESSION_API void crispasr_session_set_token_callback(
-    crispasr_session* s,
-    crispasr_token_callback cb,
-    void* user_data);
+CRISPASR_SESSION_API void crispasr_session_set_token_callback(crispasr_session* s, crispasr_token_callback cb,
+                                                              void* user_data);
 
 /// Number of streamed tokens available for polling (Dart FFI path).
 CRISPASR_SESSION_API int crispasr_get_streamed_token_count(void);
@@ -128,7 +126,7 @@ CRISPASR_SESSION_API int crispasr_get_streamed_token_count(void);
 /// Drain all buffered streamed tokens. Returns a buffer of null-separated
 /// UTF-8 strings; *out_count receives the number of tokens. Returns NULL
 /// when the buffer is empty. The returned pointer is valid until the next
-/// drain call.
+/// drain call on the same session, or until the session is closed.
 CRISPASR_SESSION_API const char* crispasr_drain_streamed_tokens(int* out_count);
 
 /// Clear the streamed-token buffer.
