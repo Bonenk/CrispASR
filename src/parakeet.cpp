@@ -22,6 +22,9 @@
 #include "ggml-backend.h"
 #include "crispasr_imatrix.h"
 #include "ggml-cpu.h"
+#if defined(GGML_USE_METAL)
+#include "ggml-metal.h"
+#endif
 #include "gguf.h"
 
 #ifndef M_PI
@@ -1295,6 +1298,13 @@ struct parakeet_emitted_token {
 // Shared by every parakeet decode variant (greedy, beam, maes, rnnt).
 static bool parakeet_init_ggml_decoder(parakeet_context* ctx, core_rnnt_ggml::Decoder& gdec) {
     bool ggml_dec = !ggml_backend_is_cpu(ctx->backend);
+    // ggml decode wins on CUDA/Vulkan (slow CPU BLAS: P100 5-12x) but LOSES on
+    // Metal, where Apple Accelerate cblas beats the small-matmul GPU decode (M1
+    // parakeet total ~16x cblas vs ~11x ggml). Default OFF on Metal (LEARNINGS 34).
+#if defined(GGML_USE_METAL)
+    if (ggml_dec && ggml_backend_is_metal(ctx->backend))
+        ggml_dec = false;
+#endif
     if (const char* e = getenv("PARAKEET_GGML_DECODE"))
         ggml_dec = (e[0] == '1');
     if (ggml_dec && getenv("RNNT_GGML_PERSTEP") == nullptr) {
