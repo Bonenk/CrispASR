@@ -1685,6 +1685,40 @@ superiority claim (onnx here was CPU-only; the reporter's onnx GPU is
 40–45× on parakeet). Net: the honest picture is parity-class on GPU with
 a real CPU/coverage story, not a blowout.
 
+### DEFINITIVE re-run — CrispASR CUDA vs onnx-asr CPU **and** GPU (2026-07-11, P100, warm build)
+
+The kernel (`tools/kaggle/issue81-onnx-bench`, chr1s4) was rebuilt to (a) use the
+correct backends + a FAIL-guard (a crash can no longer mint a fake RTF), (b) run
+onnx on the **CUDA EP** (`onnxruntime-gpu==1.19.2` — the CUDA-12 wheel; the latest
+links libcudart.so.13 and ImportError's on Kaggle's 12.8), with per-shape warmup +
+median, and (c) **prove the work**: log the transcript word count (the 55 s clip
+is jfk×5, so a full transcript must be ~5× the 11 s words).
+
+| model | engine | JFK 11s | Long 55s | long words |
+|---|---|---|---|---|
+| parakeet-ctc-0.6b | CrispASR CUDA Q8_0 | 6.1× | 18–20× | 110 ✓ |
+| parakeet-ctc-0.6b | onnx-asr CPU int8 | 7.4× | 6.5× | 110 ✓ |
+| parakeet-ctc-0.6b | **onnx-asr CUDA fp32** | **174.7×** | **220.5×** | **110 ✓** |
+| parakeet-tdt-0.6b | CrispASR CUDA Q8_0 | 5.7× | 12.9–14× | 110 ✓ |
+| parakeet-tdt-0.6b | onnx-asr CPU int8 | 7.2× | 6.3× | 96–110 |
+| parakeet-tdt-0.6b | **onnx-asr CUDA fp32** | **116.8×** | **147.8×** | **110 ✓** |
+
+**Proof-of-work:** onnx JFK=22 words → 55 s=110 words = exactly 5× (the full JFK×5
+transcript, visible as 5 sentence repetitions). So the 220× is a REAL full
+transcription (0.25 s for 55 s on the P100), not a truncation/no-op — corroborated
+by onnx-CPU-int8 producing the *same* 110-word transcript in 8.47 s (34× slower).
+The earlier v10 "2.3× long collapse" was purely a missing per-shape warmup (cold
+CUDA JIT on the 55 s shape), not an O(T²) blowup.
+
+**Honest conclusion (supersedes the round-3 framing):** onnx-asr on the **GPU**
+decisively beats CrispASR on parakeet (~175–220× ctc / ~117–148× tdt vs CrispASR
+~6× short / ~13–20× long). The prior "CrispASR faster / resolved" only ever held
+against onnx-**CPU**. Caveats kept honest: CrispASR is timed as a fresh CLI
+subprocess **including model load each call** (a persistent/warm harness would
+raise it, but not by ~30×), and onnx-asr doesn't chunk long audio (fine at 55 s
+here). Net: CrispASR's parakeet **GPU decode path is a genuine optimization
+target** — matching the FastConformer perf work now on main (#81).
+
 ---
 
 ## Long-audio coverage — 2026-07-04 final state (issue #89 closed out)
