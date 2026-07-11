@@ -16,7 +16,7 @@
 # Plus a step-count perf sweep (8/7/6/5) on the GPU.
 #
 # Datasets: chr1str/crispasr-hf-token, chr1str/crispasr-ccache,
-#           chr1str/voxtral-tts-ref-src (instrumented reference C source).
+#           (reference C source is vendored in the repo under refsrc/).
 # Needs GPU + Internet + ~30 GB disk (ref model 8 GB + F16 8 GB + Q4_K 2.3 GB).
 # HF token MUST have accepted mistralai/Voxtral-4B-TTS-2603 (gated CC-BY-NC).
 
@@ -35,7 +35,6 @@ from pathlib import Path
 WORK = Path("/kaggle/working")
 REPO = WORK / "CrispASR"
 BUILD = WORK / "build"
-REFSRC = Path("/kaggle/input/voxtral-tts-ref-src")
 REFBUILD = WORK / "ref"
 MODELS = WORK / "models"
 REFMODEL = WORK / "refmodel"
@@ -98,15 +97,11 @@ step("crispasr_built", cli=str(CLI))
 # ─────────────────────────── cell 3 (code) — build reference C (BLAS/CPU) ─
 run(["bash", "-lc", "apt-get install -y -q libopenblas-dev >/dev/null 2>&1 || sudo apt-get install -y -q libopenblas-dev"],
     check=False)
-# Locate the reference source robustly: the dataset mounts under /kaggle/input/<slug>,
-# but a brand-new private dataset can mount under an unexpected slug (or fail to attach).
-# Glob for the dir that actually contains the reference C, and log /kaggle/input either way.
-inputs = sorted(p.name for p in Path("/kaggle/input").glob("*")) if Path("/kaggle/input").exists() else []
-step("kaggle_input", contents=inputs)
-cands = [p for p in Path("/kaggle/input").glob("*") if (p / "Makefile").exists() and (p / "voxtral_tts.c").exists()]
-if not cands:
-    raise SystemExit(f"reference source not mounted; /kaggle/input={inputs}")
-REFSRC = cands[0]
+# Reference source is vendored in the repo (MIT, under the diff-harness tool dir) so it
+# travels with the clone — no flaky external dataset dependency.
+REFSRC = REPO / "tools" / "kaggle" / "voxtral-diff-harness" / "refsrc"
+if not (REFSRC / "voxtral_tts.c").exists():
+    raise SystemExit(f"vendored reference source missing at {REFSRC}")
 step("refsrc", path=str(REFSRC))
 for f in REFSRC.iterdir():
     if f.suffix in (".c", ".h") or f.name == "Makefile":
