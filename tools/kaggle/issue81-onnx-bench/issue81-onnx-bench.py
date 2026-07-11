@@ -212,7 +212,7 @@ def bench_crispasr(backend, model_path, audio_path, audio_dur, label, extra_flag
                     tail = (r.stderr or "").strip().split("\n")[-1] if r.stderr else ""
                     text = f"FAILED (rc={r.returncode}): {tail}"[:120]
             elif i == 0:
-                text = out[:120]
+                text = out  # full transcript (needed to count words for proof-of-work)
         except subprocess.TimeoutExpired:
             times.append(120.0)
             ok = False
@@ -244,12 +244,15 @@ for backend, repo, fname, label in CRISPASR_MODELS:
 
         # Also test long audio for the head-to-head models
         if "parakeet" in label:
-            mean_l, rtf_l, _ = bench_crispasr(backend, mp, long_wav, long_dur, label, extra,
-                                               n_warmup=0, n_runs=2)
+            mean_l, rtf_l, txt_l = bench_crispasr(backend, mp, long_wav, long_dur, label, extra,
+                                                  n_warmup=0, n_runs=2)
             if mean_l:
-                print(f"    Long {long_dur:.0f}s: {mean_l:.3f}s = {rtf_l:.1f}x realtime")
+                nwl = len((txt_l or "").split())
+                print(f"    Long {long_dur:.0f}s: {mean_l:.3f}s = {rtf_l:.1f}x realtime ({nwl}w)")
+                print(f"        long transcript: {(txt_l or '')[:220]!r}")
                 results[label]["mean_long"] = mean_l
                 results[label]["rtf_long"] = rtf_l
+                results[label]["long_words"] = nwl
     else:
         print(f"    FAILED")
         results[label] = {"mean_jfk": None, "rtf_jfk": None, "text": "FAILED"}
@@ -296,15 +299,20 @@ def bench_onnx(onnx_name, quant, providers):
             r = model.recognize(str(wav))
             ts.append(time.perf_counter() - t0)
             if i == 0:
-                txt = str(r)[:80]
+                txt = str(r)
         ts.sort()
         med = ts[len(ts) // 2]
-        return dur / med, med, txt  # RTF, median seconds, transcript
+        # Return FULL transcript + its length/word-count so we can PROVE the run
+        # actually transcribed the whole clip (a 55 s clip = jfk×5 must yield ~5×
+        # the words of the 11 s clip; a truncated/no-op path would be short+fast
+        # -> a fake high RTF, which is what a 222× number would otherwise be).
+        return dur / med, med, txt, len(txt), len(txt.split())
 
-    rj, mj, txt = _timeit(jfk_wav, duration, 2, 5)
-    rl, ml, _ = _timeit(long_wav, long_dur, 1, 3)
+    rj, mj, tj, cj, wj = _timeit(jfk_wav, duration, 2, 5)
+    rl, ml, tl, cl, wl = _timeit(long_wav, long_dur, 1, 3)
     del model
-    return {"rtf_jfk": rj, "s_jfk": mj, "rtf_long": rl, "s_long": ml, "text": txt}
+    return {"rtf_jfk": rj, "s_jfk": mj, "rtf_long": rl, "s_long": ml,
+            "jfk_words": wj, "long_words": wl, "jfk_text": tj[:60], "long_text": tl}
 
 
 onnx_results = {}
@@ -317,8 +325,11 @@ for onnx_name, label in ONNX_MODELS:
     for key, quant, provs in configs:
         try:
             r = bench_onnx(onnx_name, quant, provs)
-            print(f"    {key}: JFK {r['rtf_jfk']:.1f}x ({r['s_jfk'] * 1000:.0f}ms)  "
-                  f"Long {r['rtf_long']:.1f}x ({r['s_long']:.2f}s)  ('{r['text'][:40]}')", flush=True)
+            # PROOF-OF-WORK: JFK vs Long word counts. jfk×5 => long_words should be
+            # ~5× jfk_words if the whole 55 s was really transcribed.
+            print(f"    {key}: JFK {r['rtf_jfk']:.1f}x ({r['s_jfk'] * 1000:.0f}ms, {r['jfk_words']}w)  "
+                  f"Long {r['rtf_long']:.1f}x ({r['s_long']:.2f}s, {r['long_words']}w)", flush=True)
+            print(f"        long transcript: {r['long_text'][:220]!r}", flush=True)
             onnx_results[label][key] = r
         except Exception as e:  # noqa: BLE001
             print(f"    {key}: FAILED: {str(e)[:200]}", flush=True)
