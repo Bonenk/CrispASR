@@ -6710,9 +6710,23 @@ slower than dir in 3/3 interleaved reps) → stays opt-in.
       drop per-layer conts) — shared by 30+ backends, high regression risk
       for a bounded win → DEPRIORITIZED; revisit only with a dedicated
       diff-harness campaign.
-- [ ] Codec decode is ~half the remaining wall — and on the 16 GB Mac the
-      1.7B codec decode dies (jetsam at ~5 GB free / 20-min timeout) even on
-      the unmodified path. Separate item.
+- [x] Codec decode FIXED — FASTCONV (2026-07-11, default ON, opt-out
+      `QWEN3_TTS_CODEC_FASTCONV=0`). `QWEN3_TTS_CODEC_TRACE` per-node profile
+      showed the 3-4 s codec wall was NOT inherent conv compute: (a) K=1
+      convs went through im2col — a pure copy with ~300 MB intermediates at
+      75 ms each, ×12 sites (every res-unit conv2); (b) the causal left-pad
+      `ggml_pad_ext` nodes landed on the CPU backend (Metal rejects
+      asymmetric PAD) forcing sched splits + copies — replaced by
+      pad-inside-im2col + crop-first-T (voxcpm2's causal_conv1d_ggml trick);
+      (c) the fork's ggml_conv_1d casts F16 kernels to F32 inside EVERY
+      graph (in_conv cast alone ~70 ms/decode) — F32 kernels now baked once
+      at load (+~55 MB). Result: codec 3.9 s → 1.3 s on M1 Metal (~3×,
+      md5-identical WAV), 9.1 s → 4.3 s CPU (~2.1×, 1 int16 LSB / PCM cos
+      1.00000000). Total 0.6B pipeline RTF best-case 2.9 → 1.25. Remaining
+      codec cost is the legitimate K=7 SEANet im2cols. The 16 GB-Mac 1.7B
+      codec jetsam should also shrink (peak intermediates ~halved) —
+      re-test when convenient; QWEN3_TTS_CODEC_CHUNK=48 remains the
+      workaround.
 - [ ] CPU direct-path rescue (optional): avoid the slot blit with 14 cached
       per-cb graphs or in-graph lm_head selection via get_rows, then revisit
       the CPU default.
