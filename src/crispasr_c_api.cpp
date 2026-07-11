@@ -5954,11 +5954,8 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             } else {
                 moss_diarize_set_ask(s->moss_diarize_ctx, nullptr);
             }
-            const std::string eff_lang = lang_set ? lang : s->source_language;
-            if (!eff_lang.empty() && eff_lang != "auto")
-                moss_diarize_set_language(s->moss_diarize_ctx, eff_lang.c_str());
-            else
-                moss_diarize_set_language(s->moss_diarize_ctx, nullptr);
+            // Language hint not auto-injected — model auto-detects language.
+            // Only inject when explicitly set by the caller (not LID-resolved).
             text = moss_diarize_transcribe(s->moss_diarize_ctx, pcm, n_samples);
             need_free = true;
         }

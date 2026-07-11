@@ -1391,6 +1391,23 @@ static char* moss_diarize_impl(struct moss_diarize_context* ctx, const float* sa
 
     if (ctx->params.verbosity >= 1)
         fprintf(stderr, "moss_diarize: %d enc, %d merged, %d prompt tokens\n", T_enc, adapt_T, n_prompt);
+    const char* _dbg = std::getenv("CRISPASR_MOSS_DIARIZE_DEBUG");
+    if (ctx->params.verbosity >= 2 || (_dbg && _dbg[0] == '1')) {
+        fprintf(stderr, "moss_diarize: prompt first20:");
+        for (int i = 0; i < std::min(20, n_prompt); i++)
+            fprintf(stderr, " %d", prompt_ids[i]);
+        fprintf(stderr, " ... last10:");
+        for (int i = std::max(0, n_prompt - 10); i < n_prompt; i++)
+            fprintf(stderr, " %d", prompt_ids[i]);
+        fprintf(stderr, "\n");
+        // Count audio_pad tokens
+        int n_pads = 0;
+        for (int i = 0; i < n_prompt; i++)
+            if (prompt_ids[i] == (int32_t)hp.audio_pad_id)
+                n_pads++;
+        fprintf(stderr, "moss_diarize: %d audio_pad tokens (expected %d), audio_pad_id=%d\n", n_pads, adapt_T,
+                (int)hp.audio_pad_id);
+    }
 
     float* text_embeds = moss_diarize_embed_tokens(ctx, prompt_ids.data(), n_prompt);
     if (!text_embeds) {
