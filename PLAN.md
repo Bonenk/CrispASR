@@ -6826,6 +6826,27 @@ and what parallel sessions own:
       (36 %) — both compute-bound transformer work, no cheap+safe conv-style
       win; graph-caching the DiT step is the sched-reuse hazard and won't help
       a compute-bound graph (cf. the talker verdict). Deprioritized.
+- [x] **CosyVoice3 CFM flow-steps — CHARACTERIZED; recommend default 10→6
+      (2026-07-11).** `flow_euler` is the single biggest CV3 cost (48 % of the
+      wall) and `COSYVOICE3_FLOW_STEPS` is already a knob (default 10). Swept
+      10/8/6/4 on M1 Metal (`--seed 42` → identical LM tokens + init noise, so
+      the ONLY variable is CFM step count). **Quality = log-mel-spectrogram
+      corr vs the 10-step output** (the chatterbox §207 metric) — ASR roundtrip
+      is useless here (verbatim at 10/8/6, and even the 4-step "brown→bound"
+      slip is near-threshold). Curve: corr **8→0.9948, 6→0.9925, 4→0.9895**;
+      ASR verbatim at 8/6, a one-word slip at 4. **6 steps is the sweet spot**
+      (corr 0.9925 ≥ 0.98 parity, ASR verbatim, matches chatterbox) — flow work
+      is ~linear in steps so 10→6 ≈ **−40 % flow ≈ −19 % of the CV3 wall**.
+      4 steps is rejected: the ASR word-slip is a localized artifact the
+      whole-utterance corr averages out (the corr band 0.9895–0.9948 is
+      compressed — the ASR slip is the more sensitive signal at 4). **RECOMMEND
+      lowering the default 10→6; NOT flipped here** — a quality-affecting
+      default ships to every user and warrants (a) a human listen and (b) a
+      2–3-sentence confirmation beyond this single utterance (vibevoice onset
+      lesson: corr/ASR don't fully capture artifacts). The knob already lets
+      speed-seekers opt in today. Measured `flow_euler` wall (8133/7481/5758/
+      3962 ms) is contention-noisy (runs at load 5–19) — speedup stated from
+      the linear-in-steps model, not the raw wall-clock.
 
 ## §234 omnivoice — persistent step graphs + silence root cause (DONE)
 

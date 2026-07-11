@@ -1327,8 +1327,14 @@ CosyVoice3 performance notes:
   on CPU; `--gpu-backend metal` selects Metal explicitly on macOS.
 - `-n/--max-new-tokens` is also the AR KV-cache sizing bound. A realistic
   cap reduces per-token work, but a value that is too low truncates speech.
-- `COSYVOICE3_FLOW_STEPS=5` approximately halves flow work. The default `10`
-  preserves upstream quality.
+- `COSYVOICE3_FLOW_STEPS=N` sets the CFM Euler step count (default `10`). Flow
+  work is ~linear in `N` and flow is ~48 % of the wall. M1 sweep (`--seed 42`,
+  log-mel-spectrogram corr vs the 10-step output — ASR roundtrip is verbatim at
+  8/6 and cannot distinguish steps): `8`→0.9948, `6`→0.9925, `4`→0.9895 with a
+  one-word ASR slip. **`6` is the perceptual sweet spot** (~−40 % flow work,
+  ~−19 % of the wall) and matches the chatterbox default; `4` starts to show
+  audible artifacts. `10` is the conservative upstream default; drop to `6` for
+  a large speedup at near-identical quality.
 - An external model directory affects cold startup, not steady-state
   synthesis. For repeated requests, use server mode so the ~1.2 GB model set
   remains resident.
