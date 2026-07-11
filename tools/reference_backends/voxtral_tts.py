@@ -94,10 +94,12 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     def load(name):
         return sf.get_tensor(name).float()
 
-    # Tekken tokenize
-    from mistral_common.tokens.tokenizers.tekken import Tekken
-    tok = Tekken(str(md / "tekken.json"))
-    text_ids = tok.encode(text, bos=False, eos=False)
+    # Tekken tokenize (class name / ctor vary across mistral_common versions)
+    import mistral_common.tokens.tokenizers.tekken as _tk
+    _Tek = getattr(_tk, "Tekkenizer", None) or getattr(_tk, "Tekken")
+    tekp = str(md / "tekken.json")
+    tok = _Tek.from_file(tekp) if hasattr(_Tek, "from_file") else _Tek(tekp)
+    text_ids = tok.encode(text, False, False)  # (s, bos, eos)
     out["text_token_ids"] = np.array(text_ids, dtype=np.float32)
 
     # Preset voice embedding (pre-summed, spliced into the prompt)
