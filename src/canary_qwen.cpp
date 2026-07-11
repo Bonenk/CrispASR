@@ -189,6 +189,12 @@ struct canary_qwen_model {
     ggml_context* ctx = nullptr;
     ggml_backend_buffer_t buf = nullptr;
     ggml_backend_buffer_t buf_cpu = nullptr;
+
+    // Q8_0 repack of the F16 conv pw1/pw2 weights (issue #81, CRISPASR_FC_PW_Q8)
+    core_conformer::PwRepackBuf pw_q8;
+    // Fused Q/K/V weight concat for the encoder blocks (CRISPASR_FC_FUSED_QKV)
+    core_conformer::PwRepackBuf qkv_fused;
+
     std::map<std::string, ggml_tensor*> tensors;
 };
 
@@ -1271,6 +1277,18 @@ extern "C" struct canary_qwen_context* canary_qwen_init_from_file(const char* pa
         return nullptr;
     }
 
+    // Repack F16 conv pw1/pw2 to Q8_0 + fuse encoder Q/K/V (issue #81 — the 3D
+    // conv layout dodges crispasr-quantize; fusion is bit-identical).
+    {
+        auto& m = ctx->model;
+        std::vector<core_conformer::BlockWeights*> layers;
+        for (auto& e : m.enc)
+            layers.push_back(&e);
+        const bool quantized = !m.enc.empty() && m.enc[0].attn_q_w && ggml_is_quantized(m.enc[0].attn_q_w->type);
+        core_conformer::repack_conv_pw_q8(layers, ctx->backend, quantized, m.pw_q8, "canary_qwen");
+        core_conformer::fuse_qkv(layers, ctx->backend, m.qkv_fused, "canary_qwen");
+    }
+
     return ctx;
 }
 
@@ -1285,6 +1303,8 @@ extern "C" void canary_qwen_free(struct canary_qwen_context* ctx) {
         ggml_free(ctx->cached_enc_ctx);
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
+    ctx->model.pw_q8.free();
+    ctx->model.qkv_fused.free();
     if (ctx->model.buf)
         ggml_backend_buffer_free(ctx->model.buf);
     if (ctx->model.buf_cpu)
