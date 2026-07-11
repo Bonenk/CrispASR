@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -33,7 +34,8 @@ static std::string sample(const char* name) {
 }
 
 // Normalised cross-correlation between two float signals (peak over ±lag window).
-static double cross_correlation(const float* a, int na, const float* b, int nb, int max_lag = 480 /* 30 ms at 16 kHz */) {
+static double cross_correlation(const float* a, int na, const float* b, int nb,
+                                int max_lag = 480 /* 30 ms at 16 kHz */) {
     int n = std::min(na, nb);
     if (n == 0)
         return 0.0;
@@ -126,6 +128,70 @@ TEST_CASE("crispasr_audio_load decodes AU (µ-law)", "[audio][unit][au]") {
     REQUIRE(cc > 0.70);
 
     crispasr_audio_free(pcm);
+}
+
+// Regression: a crafted Sun-AU header must not drive an unbounded allocation
+// or an out-of-bounds read. crispasr_au_decode now clamps data_size to the
+// real file size and rejects a data_offset past EOF. Pre-fix, section 1
+// allocated ~4 GB from the untrusted data_size (DoS / unhandled bad_alloc)
+// and section 2 underflowed end-cur into a huge size_t. We only require the
+// process to survive and behave sanely — under ASan this also proves no OOB.
+TEST_CASE("crispasr_audio_load rejects malicious AU sizes without over-allocating", "[audio][unit][au]") {
+    auto put_be32 = [](std::vector<uint8_t>& b, uint32_t v) {
+        b.push_back((uint8_t)(v >> 24));
+        b.push_back((uint8_t)(v >> 16));
+        b.push_back((uint8_t)(v >> 8));
+        b.push_back((uint8_t)v);
+    };
+    auto write_file = [](const char* p, const std::vector<uint8_t>& bytes) {
+        FILE* f = std::fopen(p, "wb");
+        REQUIRE(f != nullptr);
+        std::fwrite(bytes.data(), 1, bytes.size(), f);
+        std::fclose(f);
+    };
+    const char* path = "crispasr_au_regression_tmp.au";
+
+    SECTION("data_size claims ~4 GB in a tiny file") {
+        std::vector<uint8_t> b;
+        put_be32(b, 0x2e736e64u); // ".snd"
+        put_be32(b, 24);          // data_offset
+        put_be32(b, 0xFFFFFFFEu); // data_size ~4 GB (not the 0xFFFFFFFF sentinel)
+        put_be32(b, 1);           // encoding = µ-law
+        put_be32(b, 8000);        // sample_rate
+        put_be32(b, 1);           // channels
+        for (int i = 0; i < 8; i++)
+            b.push_back(0x7F); // 8 bytes of audio
+        write_file(path, b);
+
+        float* pcm = nullptr;
+        int samples = 0, rate = 0;
+        // Must return without a 4 GB allocation; result is a tiny clip or an error.
+        int rc = crispasr_audio_load(path, &pcm, &samples, &rate);
+        if (rc == 0) {
+            CHECK(samples < 1000);
+            crispasr_audio_free(pcm);
+        }
+    }
+
+    SECTION("data_offset past EOF (size_t underflow path)") {
+        std::vector<uint8_t> b;
+        put_be32(b, 0x2e736e64u);
+        put_be32(b, 0xFFFFFF00u); // data_offset far past EOF
+        put_be32(b, 0);           // data_size = 0 → "compute from file" branch
+        put_be32(b, 1);
+        put_be32(b, 8000);
+        put_be32(b, 1);
+        for (int i = 0; i < 8; i++)
+            b.push_back(0x7F);
+        write_file(path, b);
+
+        float* pcm = nullptr;
+        int samples = 0, rate = 0;
+        int rc = crispasr_audio_load(path, &pcm, &samples, &rate);
+        CHECK(rc != 0); // offset past EOF → clean rejection, no underflow
+    }
+
+    std::remove(path);
 }
 
 TEST_CASE("crispasr_audio_load decodes AMR-NB", "[audio][unit][amr]") {
