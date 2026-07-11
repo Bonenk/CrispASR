@@ -7313,3 +7313,51 @@ only), so the port must be built + A/B'd on Kaggle:
 Model local: `parakeet-tdt-0.6b-v3-q4_k.gguf` (467 MB). Baseline M1: Metal
 6.1× RT, CPU 1.1× RT — parakeet is already encoder-bound and fast on Metal;
 the decode gap is a CUDA-vs-CUDA competitiveness issue, not an M1 UX issue.
+
+### §232 v15 Final Benchmark (2026-07-11) + GPU-forwarding audit
+
+**v15 results (batched decode DISABLED — v14 proved 5-9x worse on GPU):**
+
+| Model | CA GPU | TC GPU | Result |
+|-------|--------|--------|--------|
+| SenseVoice Small | **0.018** | 0.022 | CA wins |
+| Canary 1B v2 | **0.044** | 0.048 | CA wins |
+| FunASR Nano 2512 | **0.045** | 0.139 | CA wins 3x |
+| Cohere Transcribe | **0.046** | FAIL | CA (TC crashed) |
+| Qwen3-ASR 0.6B | **0.085** | 0.114 | CA wins |
+| Whisper base | 0.026 | **0.021** | TC 1.2x |
+| Whisper Large v3 Turbo | 0.060 | **0.050** | TC 1.2x |
+| Moonshine Tiny | 0.059 | **0.012** | TC 4.9x (WAS CPU — see below) |
+| Parakeet TDT 0.6B | 0.100 | **0.037** | TC 2.7x (CPU cblas decode) |
+| Moonshine Streaming | 0.244 | **0.014** | TC 17x (architectural) |
+| Nemotron 3.5 ASR 0.6B | 0.345 | **0.042** | TC 8.2x (CPU cblas decode) |
+
+Score: CA 5 — TC 6.
+
+**v16 (running):** moonshine GPU-forwarding fix (`d46839ca`). The moonshine CLI
+adapter never set `use_gpu` — it ran CPU on every platform including the Kaggle
+"GPU" benchmarks. On M1 Metal: encoder 1300ms→200-300ms (4-6x). Expected P100:
+CA ~0.012-0.015, matching TC. If confirmed: **CA 6 — TC 5** (CrispASR leads).
+
+**GPU-forwarding audit (all CLI adapters):**
+
+| Backend | use_gpu? | Impact |
+|---------|----------|--------|
+| moonshine | FIXED (`d46839ca`) | Was the "encoder gap" |
+| moonshine-streaming | Intentionally CPU | GPU is 3.2x SLOWER (launch-bound) |
+| fastconformer_ctc | Auto-GPU (`crispasr_init_gpu_backend`) | No fix needed |
+| paraformer | No GPU in params | CPU-only by design (NAR, fast) |
+| bananamind_tts | Missing | TTS, low priority |
+| f5_tts | FIXED (`da082f2e`) | Was CPU-only, now GPU |
+| fastpitch | Missing | TTS, tiny model |
+| m2m100 | Missing | Translation, low priority |
+
+**Remaining optimisations (all need Kaggle P100 validation):**
+1. RNNT/TDT ggml-graph decode (§232 scoped above) — CUDA-graph capture likely
+   required; per-step dispatch is launch-bound
+2. PR #246 (wav2vec2 group-norm) — merged, enables wav2vec2-base-960h
+
+**Decision: no more optimisations on VPS.** All remaining wins require GPU
+hardware (Kaggle) for both validation and measurement. Run v16 kernel, confirm
+moonshine GPU fix, then the §232 transcribe.cpp eval is DONE pending the
+RNNT ggml-decode campaign (separate issue, not blocking).
