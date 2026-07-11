@@ -1130,6 +1130,29 @@ static canary_qwen_result* canary_qwen_transcribe_impl(canary_qwen_context* ctx,
     if (start > 0)
         text = text.substr(start);
 
+    // Strip instruction-echo prefixes that the model sometimes generates
+    // when the prompt says "Transcribe the following:" — the model may
+    // echo "Transcript:" / "Transcription:" / "PASS" before the actual
+    // text (#247). Case-insensitive prefix match + strip.
+    static const char* echo_prefixes[] = {
+        "Transcript:", "Transcript :", "Transcription:", "Transcription :",
+        "transcript:", "transcript :", "transcription:", "transcription :",
+        "PASS",        "Pass",         "pass",           nullptr,
+    };
+    for (const char** pp = echo_prefixes; *pp; pp++) {
+        size_t plen = strlen(*pp);
+        if (text.size() >= plen && text.compare(0, plen, *pp) == 0) {
+            text = text.substr(plen);
+            // Strip whitespace after the prefix
+            size_t ws = 0;
+            while (ws < text.size() && (text[ws] == ' ' || text[ws] == '\n'))
+                ws++;
+            if (ws > 0)
+                text = text.substr(ws);
+            break;
+        }
+    }
+
     // Build result
     auto* r = (canary_qwen_result*)calloc(1, sizeof(canary_qwen_result));
     r->text = strdup(text.c_str());
