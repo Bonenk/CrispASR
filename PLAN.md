@@ -7415,6 +7415,27 @@ margin); a Kaggle CUDA A/B is running to confirm the CUDA arm; `load_weights_
 split` (encoder+DAC→GPU, decoder→CPU) is the fallback if any platform shows the
 decoder losing on GPU.
 
+### §232 paraformer GPU path — implemented, OPT-IN (kept CPU default, 2026-07-11)
+
+Audit follow-up to dia: paraformer was also CPU-pinned (`ctx->backend =
+ggml_backend_cpu_init()` hardcoded, 1-backend sched, no `use_gpu` param) despite
+already loading weights via `core_gguf::load_weights`. Added a `use_gpu` param +
+`backend_cpu` member, init-before-load GPU selection (`crispasr_init_gpu_backend`),
+a 2-backend sched, and CLI/c_api wiring — same shape as dia. Gated
+`CRISPASR_PARAFORMER_GPU=1`.
+
+**Validated (M1, paraformer-zh-q4_k, paraformer_zh.wav 13 s):** transcript
+**identical** CPU vs Metal (correctness PASS). Timing inconclusive: CPU median
+~0.85 s (15–17× RT) vs GPU median ~0.77 s (17–18×) with a 1.32 s GPU outlier —
+roughly neutral. Expected: it's a small model (~123 MB) on short audio, so it
+sits in LEARNING 34's launch-bound / overhead-dominated regime (unlike dia's
+1.6B decoder). **Kept CPU default** (A/B rule #3: correct but not a clear speed
+win → stays opt-in). The win is more likely on a slow-CPU-BLAS box (Kaggle
+OpenBLAS, cf. LEARNING 30 parakeet) or long audio (encoder cost scales with T);
+a CUDA A/B would settle whether to flip. m2m100 / t5_translate share the same
+CPU pin and could be enabled identically, with the same "validate before flip"
+caveat.
+
 ### §232 Moonshine decode — hybrid weight placement (DONE, 2026-07-11, M1 Metal)
 
 **Superseded Fix 1's premise.** Profiled moonshine-tiny on a *quiet* M1 (the
