@@ -1,11 +1,12 @@
 """Irodori-TTS reference dump backend for crispasr-diff.
 
-Loads Aratako/Irodori-TTS-500M-v3 and captures intermediate activations
-at each architectural boundary for comparison against the C++ runtime.
+Loads Aratako/Irodori-TTS (base or VoiceDesign) and captures intermediate
+activations at each architectural boundary for comparison against C++.
 
 Stages:
   text_embedding     (T, text_dim)    raw embedding lookup (before encoder blocks)
   text_state         (T, text_dim)    text encoder output (after all blocks + norm)
+  cap_state          (T_cap, cap_dim) caption encoder output (VoiceDesign only)
   spk_state_zeros    (T_ref, spk_dim) speaker encoder output with zero reference
   timestep_embed     (timestep_embed_dim,) sinusoidal timestep embedding at t=0.999
   cond_embed         (model_dim*3,)   timestep conditioning MLP output
@@ -16,14 +17,15 @@ Stages:
 
 Usage:
   python tools/dump_reference.py --backend irodori-tts \\
-      --model-dir Aratako/Irodori-TTS-500M-v3 \\
+      --model-dir Aratako/Irodori-TTS-600M-v3-VoiceDesign \\
       --audio samples/jfk.wav \\
-      --output /tmp/irodori-ref.gguf
+      --output /mnt/volume1/tmp-overflow/irodori-ref.gguf
 
 Environment variables:
-  IRODORI_TEST_TEXT   text to synthesize (default: "こんにちは、世界。")
-  IRODORI_SEED       random seed for noise (default: 42)
-  IRODORI_ODE_STEPS  number of ODE steps to run (default: 2, for speed)
+  IRODORI_TEST_TEXT      text to synthesize (default: "こんにちは、世界。")
+  IRODORI_CAPTION_TEXT   caption for VoiceDesign (default: none)
+  IRODORI_SEED           random seed for noise (default: 42)
+  IRODORI_ODE_STEPS      number of ODE steps to run (default: 2, for speed)
 """
 
 from __future__ import annotations
@@ -37,6 +39,7 @@ import numpy as np
 DEFAULT_STAGES = [
     "text_embedding",
     "text_state",
+    "cap_state",
     "spk_state_zeros",
     "timestep_embed",
     "cond_embed",
@@ -93,7 +96,8 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         sys.path.insert(0, irodori_src)
     else:
         # Try common locations
-        for candidate in ["/kaggle/temp/irodori-tts-src", "/tmp/irodori-tts-src",
+        for candidate in ["/kaggle/temp/irodori-tts-src",
+                          "/mnt/volume1/tmp-overflow/irodori-tts-src",
                           str(Path(__file__).parent.parent.parent / "irodori-tts-src")]:
             if Path(candidate).exists():
                 sys.path.insert(0, candidate)
@@ -149,6 +153,27 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         if "text_state" in stages:
             results["text_state"] = text_state[0].float().numpy()
             print(f"  text_state: {text_state.shape}, first 4: {text_state[0, 0, :4].tolist()}")
+
+        # ── Caption encoder (VoiceDesign) ──
+        cap_state_for_dit = None
+        cap_mask_for_dit = None
+        if model_cfg.use_caption_condition and model.caption_encoder is not None:
+            caption_text = os.environ.get("IRODORI_CAPTION_TEXT",
+                                          "落ち着いた大人の男性。")
+            cap_tok_repo = model_cfg.caption_tokenizer_repo_resolved
+            cap_tok = AutoTokenizer.from_pretrained(cap_tok_repo, use_fast=True)
+            cap_ids_raw = cap_tok.encode(caption_text, add_special_tokens=False)
+            if model_cfg.caption_add_bos_resolved and cap_tok.bos_token_id is not None:
+                cap_ids_raw = [cap_tok.bos_token_id] + cap_ids_raw
+            cap_ids = torch.tensor([cap_ids_raw], dtype=torch.long)
+            cap_mask = torch.ones_like(cap_ids, dtype=torch.bool)
+            cap_state = model.caption_encoder(cap_ids, cap_mask)
+            cap_state = model.caption_norm(cap_state)
+            if "cap_state" in stages:
+                results["cap_state"] = cap_state[0].float().numpy()
+                print(f"  cap_state: {cap_state.shape} (caption: '{caption_text}')")
+            cap_state_for_dit = cap_state
+            cap_mask_for_dit = cap_mask
 
         # ── Speaker encoder (zeros = unconditional) ──
         if "spk_state_zeros" in stages and model_cfg.use_speaker_condition_resolved:
@@ -210,7 +235,7 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
                 x=x, cond_embed=cond_1d,
                 text_state=text_state, text_mask=text_mask,
                 speaker_state=spk_state_for_dit, speaker_mask=spk_mask_for_dit,
-                caption_state=None, caption_mask=None,
+                caption_state=cap_state_for_dit, caption_mask=cap_mask_for_dit,
                 freqs_cis=freqs,
             )
             if "dit_block_0" in stages:
@@ -222,6 +247,7 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
             x_t=x_t, t=t_tensor.to(dtype=model.dtype),
             text_state=text_state, text_mask=text_mask,
             speaker_state=spk_state_for_dit, speaker_mask=spk_mask_for_dit,
+            caption_state=cap_state_for_dit, caption_mask=cap_mask_for_dit,
         )
         if "v_pred_step0" in stages:
             results["v_pred_step0"] = v_pred[0].float().numpy()
