@@ -1098,7 +1098,17 @@ static std::vector<float> voxtral_tts_run_llm(voxtral_tts_context* ctx, const fl
                 fclose(fp);
             }
         };
-        dump("embed", ggml_graph_get_tensor(gf, "inputs_embeds"));
+        // "embed": write the RAW input, not the post-compute inputs_embeds tensor —
+        // its buffer is reused as scratch after layer 0 (gallocr/sched), so reading it
+        // back here yields llm_L0's value. `embeds` is the caller's untouched input.
+        {
+            char p[512];
+            snprintf(p, sizeof(p), "%s/mine.c%d.embed.bin", dd, call);
+            if (FILE* fp = fopen(p, "wb")) {
+                fwrite(embeds + (size_t)(n_tokens - 1) * d, sizeof(float), d, fp);
+                fclose(fp);
+            }
+        }
         for (int il = 0; il < ctx->hp.llm_n_layers; il++) {
             char nm[24];
             snprintf(nm, sizeof(nm), "llm_L%d", il);
