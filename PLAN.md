@@ -7527,3 +7527,50 @@ CA ~0.012-0.015, matching TC. If confirmed: **CA 6 — TC 5** (CrispASR leads).
 hardware (Kaggle) for both validation and measurement. Run v16 kernel, confirm
 moonshine GPU fix, then the §232 transcribe.cpp eval is DONE pending the
 RNNT ggml-decode campaign (separate issue, not blocking).
+
+## Runtime speedup roadmap (2026-07-11 cross-repo sweep)
+
+Source: full ASR + TTS + codec + pipeline re-verification, 2026-07-11 — see
+`PERFORMANCE.md → "Runtime Optimization Audit — Re-verification (2026-07-11)"`
+for verified state + corrected stale claims. **Every item needs a target GGUF
+model (q8_0 preferred, to isolate from q4_k quant noise) + before/after parity +
+latency; do NOT land a perf change on a compile-only check.** Key correction:
+the per-model TTS "flash not wired" claims are mostly false — flash reaches
+Orpheus/OuteTTS/Zonos/TADA/Chatterbox/CSM via the shared
+`core_attn::kv_self_attn` (`src/core/attention.h:665,903`, unconditional
+`ggml_flash_attn_ext`). Real flash gaps are only the manual-`soft_max` backends
+(dia, speecht5, parler) and the structurally-can't-flash relpos models (melotts,
+piper).
+
+### Maps onto existing tracked items (don't duplicate)
+- **Decode-step graph cache for remaining LLM/AR backends** → this IS §210
+  follow-up (shape-stable bucketed decode / CUDA-graph capture). Templates:
+  qwen3-tts Lk-bucket, granite §210 gallocr, mimo `step_t1_gf`.
+- **Batched-CFG (B=2) for remaining TTS** → §215. Un-migrated diffusion/DiT
+  targets: f5, dots, kugelaudio, pocket (+ dia/speecht5/parler once they get
+  device KV). Respect the Metal quant-B=2 gotcha (dequant batched-against
+  weights q*→F16 once) and item-24 (don't CPU-batch a GPU pipeline).
+- **gallocr cross-call UAF audit** → #215e / the encoder-graph-cache removal
+  (#235). Encoder-graph caching stays OFF (measured dud + GPU UAF).
+
+### Shared cross-repo Tier-1 levers (coordinate with CrispEmbed PLAN.md)
+- **Decode-step graph cache** — same design as CrispEmbed Tier-1 #1; CrispASR is
+  further along (§210 has the CUDA-graph-capture template).
+- **ggml-metal ICB replay** — the Apple-side equivalent of §210's CUDA-graph
+  capture; ggml-metal has no ICB path. Depends on a stable per-step graph.
+  Shared ggml submodule — do it once, both repos benefit.
+
+### Genuinely-new gaps (not yet tracked)
+| P | Area | Gap | File |
+|---|---|---|---|
+| P0 | firered_asr | Decoder self-attn has **no KV cache** — growing vector, O(T²) recompute | `firered_asr.cpp:2697` |
+| P0 | melotts / piper | Scalar O(H·T²·D) relpos attention (can't flash — additive bias); HiFi-GAN 17.9s of 26.3s VPS total. Needs manual-attn ggml graph or BLAS | melotts.cpp, piper_tts.cpp |
+| P0 | voxcpm2_tts | CPU-only (Metal SIGSEGV); manual per-step host KV re-upload | `voxcpm2_tts.cpp:106-111` |
+| P0 | openvoice2 | 16-layer WaveNet + ref-encoder Conv2d/GRU scalar CPU | openvoice2.cpp |
+| P1 | voxtral/voxtral4b enc, mimo LLM dec | Attention not on flash_attn_ext (manual soft_max) | voxtral4b.cpp, mimo_asr.cpp |
+| P1 | firered/glm/funasr/qwen3/omniasr/mimo | Beam = replay; add KV snapshot pool (canary/moonshine/kyutai template) | — |
+| P2 | align_wav2vec2_ctc | **Reloads 300MB–1GB model every call** — add §176e-style ctx-cache | `crispasr_aligner.cpp:315` |
+| P2 | scalar CPU hotpaths | RNN-T LSTM pred+joint; granite cpu_linear+depthwise; rvq encode; istft IRFFT; titanet mel; diarize `apply_xcorr` | core/rvq.cpp, core/istft.h, titanet.cpp:740 |
+| P2 | parakeet/nemotron | Batched sgemm decode opt-in default-OFF — validate + flip on | `CRISPASR_TDT_BATCH` |
+| P3 | threading | Hardcoded default-4 threads in ~90 sites; adopt whisper-core's `min(4, hw)` | crispasr_c_api.cpp |
+| P3 | pyannote | Runs per-slice not once-over-audio (#107); RNNoise recreates state+resamplers/call | crispasr_diarize.cpp |
