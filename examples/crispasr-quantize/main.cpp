@@ -799,6 +799,15 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             target_types[i] = (ncols % ggml_blck_size(GGML_TYPE_Q8_0) == 0) ? GGML_TYPE_Q8_0 : t->type;
         }
 
+        // FastConformer conv pointwise Q8_0 floor: sub-8-bit quants are both
+        // lossier and slower than Q8_0 on CPU for these matmul shapes, and
+        // Q8_0 here makes newly-quantized GGUFs byte-match what
+        // core_conformer::repack_conv_pw_q8 produces at load from old files.
+        if (pw_conv3d && should_quantize && ggml_is_quantized(target_types[i]) && target_types[i] != GGML_TYPE_Q8_0 &&
+            ncols % ggml_blck_size(GGML_TYPE_Q8_0) == 0) {
+            target_types[i] = GGML_TYPE_Q8_0;
+        }
+
         // User per-tensor override (--tensor-type <regex>=<type>). First match
         // wins; overrides the arch guards above. A quant override on a <2-D or
         // ill-tiled row is skipped (with a note) rather than corrupting output.

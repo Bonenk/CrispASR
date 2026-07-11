@@ -191,6 +191,11 @@ struct lfm2_audio_model {
     ggml_backend_buffer_t buf = nullptr;
     std::map<std::string, ggml_tensor*> tensors;
 
+    // Q8_0 repack of the F16 conv pw1/pw2 weights (issue #81, CRISPASR_FC_PW_Q8)
+    core_conformer::PwRepackBuf pw_q8;
+    // Fused Q/K/V weight concat for the encoder blocks (CRISPASR_FC_FUSED_QKV)
+    core_conformer::PwRepackBuf qkv_fused;
+
     // Vocabulary
     std::vector<std::string> vocab;
     std::unordered_map<std::string, int32_t> token_to_id;
@@ -605,6 +610,19 @@ lfm2_audio_context* lfm2_audio_init_from_file(const char* path_model, lfm2_audio
         return nullptr;
     }
 
+    // Repack F16 conv pw1/pw2 to Q8_0 + fuse encoder Q/K/V (issue #81 — the 3D
+    // conv layout dodges crispasr-quantize; fusion is bit-identical).
+    {
+        auto& m = ctx->model;
+        std::vector<core_conformer::BlockWeights*> layers;
+        for (auto& e : m.enc_blocks)
+            layers.push_back(&e);
+        const bool quantized =
+            !m.enc_blocks.empty() && m.enc_blocks[0].attn_q_w && ggml_is_quantized(m.enc_blocks[0].attn_q_w->type);
+        core_conformer::repack_conv_pw_q8(layers, ctx->backend, quantized, m.pw_q8, "lfm2_audio");
+        core_conformer::fuse_qkv(layers, ctx->backend, m.qkv_fused, "lfm2_audio");
+    }
+
     // Initialize KV cache for attention layers
     {
         auto& hp = ctx->model.hparams;
@@ -653,6 +671,8 @@ void lfm2_audio_free(lfm2_audio_context* ctx) {
         ggml_backend_buffer_free(ctx->kv_buf);
     if (ctx->kv_ctx)
         ggml_free(ctx->kv_ctx);
+    ctx->model.pw_q8.free();
+    ctx->model.qkv_fused.free();
     if (ctx->model.buf)
         ggml_backend_buffer_free(ctx->model.buf);
     if (ctx->model.ctx)
