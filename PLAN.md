@@ -6727,6 +6727,11 @@ slower than dir in 3/3 interleaved reps) → stays opt-in.
       codec jetsam should also shrink (peak intermediates ~halved) —
       re-test when convenient; QWEN3_TTS_CODEC_CHUNK=48 remains the
       workaround.
+      **CUDA validated (kernel v2, P100, 2026-07-11):** shipped defaults
+      (CP_DIRECT + FASTCONV) vs full-legacy — rc=0, PCM cos 0.9999999997
+      (md5 drift, same K=1-matmul realization class as CPU), ASR roundtrip
+      verbatim; AR 24.7 → 22.3 ms/frame, wall 6.9 → 5.6 s. direct and
+      direct+LK_BUCKET WAVs byte-identical (FASTCONV deterministic on CUDA).
 - [ ] CPU direct-path rescue (optional): avoid the slot blit with 14 cached
       per-cb graphs or in-graph lm_head selection via get_rows, then revisit
       the CPU default.
