@@ -7227,21 +7227,30 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
      relative bottleneck (~4.7 s / DiT forward); batched CFG and moving the
      input embedding into the GPU graph are the next levers.
 
-   **>>> IN PROGRESS (this session, 2026-07-11) — f5/diarize GPU perf campaign.**
-   Actively editing `src/f5_tts.cpp` and (next) `src/titanet.cpp` — parallel
-   sessions please avoid these two files. Ordered plan:
-   1. f5 batched CFG — the DiT runs twice per ODE step (cond+uncond); batch the
-      two into one graph (B=2 `hidden_in`, t_emb/pos broadcast; 4D RoPE +
-      batched flash-attn). MEASURING per-forward breakdown first (`F5_BENCH=1`)
-      to confirm the DiT dispatch — not the host input-embed — is the cost;
-      won't invest in the graph refactor if it's host-embed-bound.
-   2. f5 host input-proj + conv_pos → GPU graph (kill the last CPU island in
-      the per-forward hot loop).
-   3. titanet/diarization GPU port — titanet loads weights to a GPU backend but
-      re-folds BN into a CPU-only cache and computes the whole speaker-embedding
-      conformer on CPU by design; this is the substance of the §224 open
-      "diarize CPU perf" item. Bigger refactor (undo the CPU fold).
-   Each step validated by ASR-roundtrip (and diff-harness for the graph math).
+   **f5 perf follow-up — MEASURED (this session, 2026-07-11, M1 Metal). The
+   low-risk levers are exhausted; the base fix (7.8×) is the win.**
+   Per-forward split (`F5_BENCH=1`, 8 steps): host_embed ~0.7 s/fwd,
+   dit_graph ~1 s/fwd. Metal profile of the DiT: 979 nodes, host-encode
+   ~1.5 ms vs GPU-execute ~1–2 s → **compute/bandwidth-bound, not
+   dispatch-bound**, and ~12–15× off the F32-matmul ideal (F32 activations).
+   1. **Batched CFG — DONE, MEASURED DUD** (f77b5351, opt-in `F5_BATCH_CFG`,
+      OFF by default). B=2 cond+uncond in one graph; output corr 1.00000 vs
+      sequential, roundtrip identical — so the 4D-RoPE + batched-flash-attn
+      graph is correct — but NO speedup (slightly slower), because the DiT is
+      compute-bound so B=2 just doubles per-dispatch work. Kept gated for
+      reference / a future F16 DiT (where it could become dispatch-bound).
+   2. **Host input-embed → GPU — NOT worth it as-is.** host_embed is already
+      Accelerate-BLAS (`f5_linear` + grouped-conv `cblas_sgemm`); it's ~42% of
+      time but real compute (grouped convs), and moving it to the GPU adds
+      small-op nodes to an already compute-bound graph. Uncertain/negative.
+   3. **The real remaining f5 lever: DiT compute efficiency** — F32→F16
+      activations (halve matmul bandwidth, hit F16 throughput) and/or op
+      fusion to cut the 979-node count. Precision-sensitive (flow-matching);
+      needs a dedicated diff-harness session. Deferred, not attempted.
+   **titanet/diarization GPU port** (was step 3) stands as separate open work:
+   titanet loads weights to a GPU backend but re-folds BN into a CPU-only
+   cache and computes the whole speaker-embedding conformer on CPU by design
+   — the substance of the §224 "diarize CPU perf" item. Bigger refactor.
 
 ### §232 v13 Results (2026-07-11)
 
