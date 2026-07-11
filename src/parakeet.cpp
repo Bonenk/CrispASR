@@ -209,6 +209,10 @@ struct parakeet_model {
     ggml_context* ctx = nullptr;
     ggml_backend_buffer_t buf = nullptr;
 
+    // F32 conv_dw_w copies (created during BN fold, avoids per-forward F16→F32 cast)
+    ggml_context* ctx_f32 = nullptr;
+    ggml_backend_buffer_t buf_f32 = nullptr;
+
     std::map<std::string, ggml_tensor*> tensors;
 };
 
@@ -696,12 +700,17 @@ static void parakeet_apply_znorm(float* mel, int T, int n_mels, const double* ba
 // the BN block entirely.
 // ===========================================================================
 
-static void parakeet_fold_batchnorm(parakeet_model& model) {
+static void parakeet_fold_batchnorm(parakeet_model& model, ggml_backend_t backend) {
     const int d = (int)model.hparams.d_model;
     const int K = (int)model.hparams.conv_kernel;
     const float eps = 1e-5f;
+    const uint32_t n_layers = model.hparams.n_layers;
 
-    for (uint32_t il = 0; il < model.hparams.n_layers; il++) {
+    // Collect folded F32 weights for F32 pre-cast allocation.
+    std::vector<std::vector<float>> all_w_f32(n_layers);
+    int n_f16_layers = 0;
+
+    for (uint32_t il = 0; il < n_layers; il++) {
         auto& e = model.enc[il];
         if (!e.conv_dw_w || !e.conv_dw_b || !e.conv_bn_w || !e.conv_bn_b || !e.conv_bn_rm || !e.conv_bn_rv) {
             fprintf(stderr, "parakeet: BN fold: missing tensor on layer %u\n", il);
@@ -739,11 +748,13 @@ static void parakeet_fold_batchnorm(parakeet_model& model) {
                 std::vector<ggml_fp16_t> tmp(n);
                 ggml_fp32_to_fp16_row(w_f32.data(), tmp.data(), (int)n);
                 ggml_backend_tensor_set(e.conv_dw_w, tmp.data(), 0, n * sizeof(ggml_fp16_t));
+                // Save F32 for pre-cast
+                all_w_f32[il] = std::move(w_f32);
+                n_f16_layers++;
             }
         }
 
         // Fold into conv_dw_b: b[c] = (existing_b[c] - mean[c]) * s[c] + bn_b[c]
-        // Read existing bias (may be non-zero for models with explicit dw bias)
         std::vector<float> dw_b(d, 0.0f);
         ggml_backend_tensor_get(e.conv_dw_b, dw_b.data(), 0, d * sizeof(float));
         for (int c = 0; c < d; c++)
@@ -751,7 +762,26 @@ static void parakeet_fold_batchnorm(parakeet_model& model) {
         ggml_backend_tensor_set(e.conv_dw_b, dw_b.data(), 0, d * sizeof(float));
     }
 
-    fprintf(stderr, "parakeet: BN folded into conv_dw weights for %u layers\n", model.hparams.n_layers);
+    // Allocate F32 copies of F16 conv_dw_w so build_block skips the per-forward cast.
+    if (n_f16_layers > 0) {
+        ggml_init_params ip = {(size_t)n_f16_layers * ggml_tensor_overhead(), nullptr, true};
+        model.ctx_f32 = ggml_init(ip);
+        for (uint32_t il = 0; il < n_layers; il++) {
+            if (all_w_f32[il].empty())
+                continue;
+            auto& e = model.enc[il];
+            e.conv_dw_w_f32 = ggml_new_tensor_1d(model.ctx_f32, GGML_TYPE_F32, (int64_t)K * d);
+        }
+        model.buf_f32 = ggml_backend_alloc_ctx_tensors(model.ctx_f32, backend);
+        for (uint32_t il = 0; il < n_layers; il++) {
+            if (all_w_f32[il].empty())
+                continue;
+            auto& e = model.enc[il];
+            ggml_backend_tensor_set(e.conv_dw_w_f32, all_w_f32[il].data(), 0, all_w_f32[il].size() * sizeof(float));
+        }
+    }
+
+    fprintf(stderr, "parakeet: BN folded into conv_dw weights for %u layers\n", n_layers);
 }
 
 // ===========================================================================
@@ -2817,7 +2847,7 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
         return nullptr;
     }
 
-    parakeet_fold_batchnorm(ctx->model);
+    parakeet_fold_batchnorm(ctx->model, ctx->backend);
 
     // Hybrid TDT+CTC models with a single-LSTM predictor (parakeet-tdt_ctc-110m
     // has pred_layers=1) can only decode via the CTC head — TDT decode requires
@@ -2834,6 +2864,10 @@ extern "C" void parakeet_free(struct parakeet_context* ctx) {
         return;
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
+    if (ctx->model.buf_f32)
+        ggml_backend_buffer_free(ctx->model.buf_f32);
+    if (ctx->model.ctx_f32)
+        ggml_free(ctx->model.ctx_f32);
     if (ctx->model.buf)
         ggml_backend_buffer_free(ctx->model.buf);
     if (ctx->model.ctx)

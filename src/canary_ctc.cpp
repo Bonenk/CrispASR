@@ -137,6 +137,10 @@ struct cc_model {
     ggml_context* ctx = nullptr;
     ggml_backend_buffer_t buf = nullptr;
 
+    // F32 conv_dw_w copies (created during BN fold, avoids per-forward F16→F32 cast)
+    ggml_context* ctx_f32 = nullptr;
+    ggml_backend_buffer_t buf_f32 = nullptr;
+
     std::map<std::string, ggml_tensor*> tensors;
 };
 
@@ -328,7 +332,7 @@ static ggml_cgraph* cc_build_graph(canary_ctc_context* ctx, int T_mel) {
 // BatchNorm folding (load-time, once)
 // ===========================================================================
 
-static void cc_fold_batchnorm(cc_model& model) {
+static void cc_fold_batchnorm(cc_model& model, ggml_backend_t backend) {
     if (model.hparams.conv_norm_layer) {
         fprintf(stderr, "canary_ctc: conv norm is layer_norm — applied in-graph, no BN folding\n");
         return;
@@ -336,8 +340,12 @@ static void cc_fold_batchnorm(cc_model& model) {
     const int d = (int)model.hparams.d_model;
     const int K = (int)model.hparams.conv_kernel;
     const float eps = 1e-5f;
+    const uint32_t n_layers = model.hparams.n_layers;
 
-    for (uint32_t il = 0; il < model.hparams.n_layers; il++) {
+    // Collect folded F32 weights for all layers, then batch-allocate.
+    std::vector<std::vector<float>> all_w_f32(n_layers);
+
+    for (uint32_t il = 0; il < n_layers; il++) {
         auto& e = model.enc[il];
         if (!e.conv_dw_w || !e.conv_dw_b || !e.conv_bn_w || !e.conv_bn_b || !e.conv_bn_rm || !e.conv_bn_rv)
             continue;
@@ -364,19 +372,8 @@ static void cc_fold_batchnorm(cc_model& model) {
             w_f16[i] = ggml_fp32_to_fp16(w_f32[i]);
         ggml_backend_tensor_set(e.conv_dw_w, w_f16.data(), 0, w_f16.size() * sizeof(ggml_fp16_t));
 
-        // Read the original depthwise-conv bias (the pretrained value)
-        // BEFORE overwriting it — NeMo's FastConformer Conformer conv
-        // module learns a bias on the depthwise conv, so the pre-BN
-        // output is `conv(x) + orig_dw_b`. Folding BN into the conv
-        // gives:
-        //   y = scale * (conv(x) + orig_dw_b) + shift
-        //     = scale * conv(x) + (scale * orig_dw_b + shift)
-        //
-        // canary_ctc aligner has synthetic zero orig_dw_b so the term
-        // vanishes, but for stt_en_fastconformer_ctc_large (and any
-        // other NeMo FC-CTC release with biased conv.depthwise_conv)
-        // dropping the orig_dw_b contribution silently zeros a learned
-        // offset and collapses the encoder output across time.
+        all_w_f32[il] = std::move(w_f32);
+
         std::vector<float> orig_dw_b(d);
         ggml_backend_tensor_get(e.conv_dw_b, orig_dw_b.data(), 0, d * sizeof(float));
 
@@ -387,7 +384,34 @@ static void cc_fold_batchnorm(cc_model& model) {
         }
         ggml_backend_tensor_set(e.conv_dw_b, dw_b.data(), 0, d * sizeof(float));
     }
-    fprintf(stderr, "canary_ctc: BN folded into conv_dw weights for %u layers\n", model.hparams.n_layers);
+
+    // Allocate F32 copies of conv_dw_w so build_block skips the per-forward cast.
+    {
+        size_t n_tensors = 0;
+        for (uint32_t il = 0; il < n_layers; il++)
+            if (!all_w_f32[il].empty())
+                n_tensors++;
+
+        if (n_tensors > 0) {
+            ggml_init_params ip = {n_tensors * ggml_tensor_overhead(), nullptr, true};
+            model.ctx_f32 = ggml_init(ip);
+            for (uint32_t il = 0; il < n_layers; il++) {
+                if (all_w_f32[il].empty())
+                    continue;
+                auto& e = model.enc[il];
+                e.conv_dw_w_f32 = ggml_new_tensor_1d(model.ctx_f32, GGML_TYPE_F32, (int64_t)K * d);
+            }
+            model.buf_f32 = ggml_backend_alloc_ctx_tensors(model.ctx_f32, backend);
+            for (uint32_t il = 0; il < n_layers; il++) {
+                if (all_w_f32[il].empty())
+                    continue;
+                auto& e = model.enc[il];
+                ggml_backend_tensor_set(e.conv_dw_w_f32, all_w_f32[il].data(), 0, all_w_f32[il].size() * sizeof(float));
+            }
+        }
+    }
+
+    fprintf(stderr, "canary_ctc: BN folded into conv_dw weights for %u layers\n", n_layers);
 }
 
 // ===========================================================================
@@ -565,7 +589,7 @@ extern "C" struct canary_ctc_context* canary_ctc_init_from_file(const char* path
         canary_ctc_free(ctx);
         return nullptr;
     }
-    cc_fold_batchnorm(ctx->model);
+    cc_fold_batchnorm(ctx->model, ctx->backend);
     return ctx;
 }
 
@@ -574,6 +598,10 @@ extern "C" void canary_ctc_free(struct canary_ctc_context* ctx) {
         return;
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
+    if (ctx->model.buf_f32)
+        ggml_backend_buffer_free(ctx->model.buf_f32);
+    if (ctx->model.ctx_f32)
+        ggml_free(ctx->model.ctx_f32);
     if (ctx->model.buf)
         ggml_backend_buffer_free(ctx->model.buf);
     if (ctx->model.ctx)

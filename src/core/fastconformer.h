@@ -28,9 +28,22 @@
 
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
 #include <vector>
 
 namespace core_conformer {
+
+// Env-var gate: CRISPASR_FC_NO_FLASH=1 disables flash_attn_ext in the
+// FastConformer encoder and uses manual QK^T + softmax + V instead.
+// Useful for A/B-ing the flash path on CPU for short sequences.
+static inline bool fc_no_flash() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = std::getenv("CRISPASR_FC_NO_FLASH");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v != 0;
+}
 
 // ---------------------------------------------------------------------------
 // Rel-pos "shift" trick from Transformer-XL / Conformer: rewrites the raw
@@ -223,6 +236,7 @@ struct BlockWeights {
     ggml_tensor *norm_conv_w = nullptr, *norm_conv_b = nullptr;
     ggml_tensor *conv_pw1_w = nullptr, *conv_pw1_b = nullptr; // (2d, d)
     ggml_tensor *conv_dw_w = nullptr, *conv_dw_b = nullptr;   // (d, 1, K)
+    ggml_tensor* conv_dw_w_f32 = nullptr;                     // pre-cast F32 copy (set by BN fold)
     ggml_tensor *conv_pw2_w = nullptr, *conv_pw2_b = nullptr; // (d, d)
     // Post-dw-conv LayerNorm affine (NeMo conv_norm_type=layer_norm, e.g.
     // stt_kk_ru hybrid). nullptr for the common batch_norm models, whose
@@ -320,15 +334,38 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
         BD_scaled = ggml_add(ctx0, BD_scaled, local_attn_mask);
     }
 
-    // flash_attn_ext mask must be F16
-    ggml_tensor* BD_mask = ggml_cast(ctx0, BD_scaled, GGML_TYPE_F16);
+    ggml_tensor* attn_out;
+    if (fc_no_flash()) {
+        // Manual attention: QK^T + BD, softmax, ×V — no flash_attn_ext.
+        // Q_u, K_ are (head_dim, T, n_heads) after permute.
+        // mul_mat(K, Q) computes Q^T × K^T^T = Q^T × K → (T, T, n_heads).
+        ggml_tensor* Q_u_c = ggml_cont(ctx0, Q_u);            // (head_dim, T, n_heads)
+        ggml_tensor* K_c = ggml_cont(ctx0, K_);               // (head_dim, T, n_heads)
+        ggml_tensor* scores = ggml_mul_mat(ctx0, K_c, Q_u_c); // (T, T, n_heads)
+        ggml_tensor* BD_c2 = ggml_cont(ctx0, BD);             // (T, T, n_heads)
+        scores = ggml_add(ctx0, scores, BD_c2);
+        if (local_attn_mask)
+            scores = ggml_add(ctx0, scores, local_attn_mask);
+        scores = ggml_soft_max_ext(ctx0, scores, nullptr, scale, 0.0f);
+        // V: (head_dim, n_heads, T) → permute(0,2,1,3) → (head_dim, T, n_heads)
+        // Then transpose via permute(1,0,2,3) → (T, head_dim, n_heads) for mul_mat
+        ggml_tensor* V_3d =
+            ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, V, head_dim, n_heads, T), 0, 2, 1, 3));
+        // V_3d: (head_dim, T, n_heads) — need (T, head_dim, n_heads) for mul_mat
+        ggml_tensor* V_t = ggml_cont(ctx0, ggml_permute(ctx0, V_3d, 1, 0, 2, 3)); // (T, head_dim, n_heads)
+        attn_out = ggml_mul_mat(ctx0, V_t, scores);                               // (head_dim, T, n_heads)
+        attn_out = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn_out, 0, 2, 1, 3)), d, T);
+    } else {
+        // flash_attn_ext mask must be F16
+        ggml_tensor* BD_mask = ggml_cast(ctx0, BD_scaled, GGML_TYPE_F16);
 
-    // V needs [head_dim, T, n_heads] layout for flash_attn_ext (same as K)
-    ggml_tensor* V_ = ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, V, head_dim, n_heads, T), 0, 2, 1, 3));
+        // V needs [head_dim, T, n_heads] layout for flash_attn_ext (same as K)
+        ggml_tensor* V_ =
+            ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, V, head_dim, n_heads, T), 0, 2, 1, 3));
 
-    ggml_tensor* attn_out =
-        ggml_flash_attn_ext(ctx0, ggml_cont(ctx0, Q_u), ggml_cont(ctx0, K_), V_, BD_mask, scale, 0.0f, 0.0f);
-    attn_out = ggml_reshape_2d(ctx0, attn_out, d, T);
+        attn_out = ggml_flash_attn_ext(ctx0, ggml_cont(ctx0, Q_u), ggml_cont(ctx0, K_), V_, BD_mask, scale, 0.0f, 0.0f);
+        attn_out = ggml_reshape_2d(ctx0, attn_out, d, T);
+    }
 
     attn_out = mm_bias(e.attn_out_w, attn_out, e.attn_out_b);
     cur = ggml_add(ctx0, inpAttn, attn_out);
@@ -344,7 +381,8 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
     cnv = ggml_siglu_swapped(ctx0, cnv);
 
     // dw conv (kernel K, padding K/2). BN was folded into conv_dw_w/b at load.
-    ggml_tensor* dw_w_f32 = ggml_cast(ctx0, e.conv_dw_w, GGML_TYPE_F32);
+    // Use pre-cast F32 weights if available (avoids F16→F32 cast per forward).
+    ggml_tensor* dw_w_f32 = e.conv_dw_w_f32 ? e.conv_dw_w_f32 : ggml_cast(ctx0, e.conv_dw_w, GGML_TYPE_F32);
     ggml_tensor* dw_w_4d = ggml_reshape_4d(ctx0, dw_w_f32, K, 1, 1, d);
     cnv = ggml_cont(ctx0, ggml_transpose(ctx0, cnv)); // (d, T) → (T, d)
     cnv = ggml_reshape_4d(ctx0, cnv, T, 1, d, 1);
