@@ -6,6 +6,33 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-11 — pocket-tts voice-clone onset "gong": encoder frame off-by-one (fixed); per-conv framing tried + rejected
+
+Voice-cloned pocket-tts syntheses opened with a loud onset transient; no-voice output
+was clean. **Fixed on `main`; root-caused by reference diff, not patched over.**
+
+- **Root cause** (`src/pocket_tts.cpp` `mimi_encode`, `eac86f1b`): the reference PCM was
+  padded to a **hop-length (120)** multiple, but the Mimi VAE encoder does a further
+  `/downsample_stride` (16) conv to the 12.5 Hz latent rate. Padding to a hop floored the
+  downsample one short — **137 voice frames vs the reference's 138** (jfk ≈137.5, reference
+  ceils). The missing frame shifted every downstream RoPE position by one → the first
+  generated latent was mis-conditioned → the decoder rendered the onset "gong". Fix: pad to
+  a whole latent frame (`hop * downsample_stride` = 1920 samples). Onset RMS **0.0621 →
+  0.0045**, byte-matching the reference profile.
+- **Codec exonerated first:** force-decoding the reference's exact latents through OUR
+  decoder was already clean (0.0045); force-decoding OUR latents gonged — same decoder, so
+  the bug was upstream in the encoder frame count.
+- **Per-conv framing tried + REJECTED** (`dcb80789`, no code change): hypothesised the
+  encoder should use moshi `MimiConv1d._get_extra_padding_for_conv1d` per strided conv (the
+  scheme `qwen3_tts`'s SEANet+RVQ codec uses). Diff killed it: onset 0.0579 and
+  `backbone_out0` corr vs reference **0.18** — the pre-pad already value-matches the
+  reference; pocket-tts's Mimi VAE encoder pads to a whole latent frame and does NOT use
+  independent per-conv extra padding. Reverted, kept the pre-pad fix. Grade conditioning
+  with the deterministic pre-sampling `backbone_out0` corr, not the RNG-confounded onset RMS.
+- **Ops:** the §224 voice-latent disk cache keys on the PCM hash, not the algorithm — clear
+  `pocket-voice-*.latents` (or `CRISPASR_POCKET_VOICE_CACHE=0`) after any encoder change.
+  See `LEARNINGS.md` + memory `project_pocket_tts_gong_encoder_frame`.
+
 ## 2026-07-11 — §93 voxtral-tts synthesis: shipped + correctness proven
 
 Voxtral-4B-TTS text-to-speech backend (Ministral-3B AR LLM → 3-layer flow-matching
