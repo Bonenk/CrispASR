@@ -59,8 +59,15 @@ if not has_cuda:
 
 n_jobs = min(os.cpu_count() or 2, 4)
 with kh.build_heartbeat("cmake.build"):
-    subprocess.check_call(f"cmake --build {BUILD} -j{n_jobs} --target crispasr-cli", shell=True,
-                          stdout=subprocess.DEVNULL)
+    # Capture build output and surface the tail on failure. v7 errored here with
+    # stdout=DEVNULL, hiding the cause (a transient glint size_t GCC break on main,
+    # since fixed) — a silent build failure is undebuggable from the kernel log.
+    _b = subprocess.run(f"cmake --build {BUILD} -j{n_jobs} --target crispasr-cli 2>&1",
+                        shell=True, capture_output=True, text=True)
+    if _b.returncode != 0:
+        print("=== crispasr-cli BUILD FAILED — last 40 lines ===", flush=True)
+        print("\n".join((_b.stdout or "").splitlines()[-40:]), flush=True)
+        raise SystemExit("crispasr-cli build failed")
 CRISPASR = BUILD / "bin" / "crispasr"
 print(f"  built: {CRISPASR}")
 
