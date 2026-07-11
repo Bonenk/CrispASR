@@ -12,6 +12,7 @@
 #include "m2m100.h"
 #include "core/beam_decode.h"
 #include "core/gguf_loader.h"
+#include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 m2m100 GPU path)
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -956,9 +957,24 @@ extern "C" struct m2m100_context* m2m100_init_from_file(const char* path_model, 
                 hp.dec_n_layers, hp.enc_n_heads, hp.enc_ffn_dim, hp.vocab_size, (int)c->tokenizer.lang_codes.size());
     }
 
-    // Backend
+    // Backend. GPU is OPT-IN behind CRISPASR_M2M100_GPU=1 (§232 audit): m2m100
+    // was CPU-pinned though it already loads weights + KV onto c->backend, so
+    // pointing that at a GPU backend is the whole change. Kept an explicit env
+    // gate (default CPU) — an encoder-decoder MT model of this size is not an
+    // obvious GPU win on Metal (small AR decode steps are launch-bound; the
+    // encoder helps most on long inputs / a slow-CPU-BLAS box). Validate a CUDA
+    // A/B before flipping the default.
     c->backend_cpu = ggml_backend_cpu_init();
-    c->backend = c->backend_cpu;
+    if (std::getenv("CRISPASR_M2M100_GPU")) {
+        c->backend = crispasr_init_gpu_backend();
+        if (!c->backend) {
+            c->backend = c->backend_cpu;
+        } else if (params.verbosity >= 1) {
+            fprintf(stderr, "m2m100: GPU backend enabled (%s)\n", ggml_backend_name(c->backend));
+        }
+    } else {
+        c->backend = c->backend_cpu;
+    }
 
     // Pass 2: weights
     {
@@ -980,8 +996,9 @@ extern "C" struct m2m100_context* m2m100_init_from_file(const char* path_model, 
 
     // Compute scheduler
     {
-        ggml_backend_t backends[] = {c->backend};
-        c->sched = ggml_backend_sched_new(backends, nullptr, 1, 8192, false, false);
+        ggml_backend_t backends[] = {c->backend, c->backend_cpu};
+        int n_be = (c->backend != c->backend_cpu) ? 2 : 1;
+        c->sched = ggml_backend_sched_new(backends, nullptr, n_be, 8192, false, false);
         c->compute_meta.resize(ggml_tensor_overhead() * 8192 + ggml_graph_overhead_custom(8192, false));
     }
 
@@ -1005,8 +1022,10 @@ extern "C" void m2m100_free(struct m2m100_context* ctx) {
         ggml_backend_buffer_free(ctx->buf_w);
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
-    if (ctx->backend)
+    if (ctx->backend && ctx->backend != ctx->backend_cpu)
         ggml_backend_free(ctx->backend);
+    if (ctx->backend_cpu)
+        ggml_backend_free(ctx->backend_cpu);
     delete ctx;
 }
 
