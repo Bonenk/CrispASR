@@ -41,6 +41,9 @@
 #include "core/dac_decoder.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 dia GPU path)
+#if defined(GGML_USE_METAL)
+#include "ggml-metal.h" // ggml_backend_is_metal (§232 Metal-only GPU default)
+#endif
 
 #include <algorithm>
 #include <cassert>
@@ -683,7 +686,13 @@ static ggml_tensor* build_dia_decoder_embedding(ggml_context* ctx, dia_model& m,
         ggml_tensor* view = ggml_view_1d(ctx, audio_tokens, B, i * ggml_element_size(audio_tokens));
         view->nb[0] = m.n_output_heads * ggml_element_size(audio_tokens);
 
-        ggml_tensor* e = ggml_get_rows(ctx, m.decoder.embeddings[i], view);
+        // §232 GPU: ggml_get_rows requires a CONTIGUOUS index tensor on CUDA
+        // (GGML_ASSERT(src1->nb[0] == ggml_type_size) — the strided view above
+        // aborts the CUDA decode; CPU/Metal tolerate the stride). ggml_cont
+        // materialises the 2 indices contiguously — negligible cost, correct on
+        // every backend.
+        ggml_tensor* idx = ggml_cont(ctx, view);
+        ggml_tensor* e = ggml_get_rows(ctx, m.decoder.embeddings[i], idx);
         emb = (i == 0) ? e : ggml_add(ctx, emb, e);
     }
     return emb;
@@ -818,33 +827,42 @@ struct dia_tts_context* dia_tts_init_from_file(const char* path_model, struct di
     m.decoder.embeddings.resize(m.n_output_heads, nullptr);
     m.decoder.heads.resize(m.n_output_heads, nullptr);
 
-    // Initialize backends BEFORE loading weights so the main model can be placed
-    // on a GPU backend BUFFER — a GPU sched can't use weights in a plain CPU
-    // malloc ctx ("sched no longer auto-copies CPU-buffer tensors"; see the
-    // dev-guide GPU-portability notes), which is why dia historically pinned CPU
-    // here. GPU is now the DEFAULT when use_gpu is set (not --no-gpu).
-    // DIA_TTS_GPU is the A/B override, kept as the regression-bisection gate:
-    // "0" forces the old CPU path, "1" forces GPU even under --no-gpu. Validated
-    // M1 Metal (§232): GPU wins every stage on dia's 1.6B model (encoder ~94x,
-    // decode ~1.5x, DAC ~4.9x) with an identical generate->ASR roundtrip — so
-    // unlike LEARNING 34's tiny transducer, Metal is NOT excluded here (the
-    // large decoder matmuls escape the launch-bound regime). A Kaggle CUDA A/B
-    // confirms the CUDA arm.
+    // Initialize backends BEFORE loading weights so the main model lands on a GPU
+    // backend BUFFER (a GPU sched can't use weights in a plain CPU malloc ctx —
+    // "sched no longer auto-copies CPU-buffer tensors"; dev-guide GPU notes),
+    // which is why dia historically pinned CPU here. Backend selection (§232):
+    //   * DIA_TTS_GPU=1 forces GPU on ANY backend (opt-in for the CUDA/Vulkan A/B).
+    //   * DIA_TTS_GPU=0 forces CPU (regression-bisection gate; never removed).
+    //   * default: GPU on Metal ONLY — the Metal path is generate->ASR-roundtrip
+    //     validated and wins every stage (encoder ~94x, decode ~1.5x, DAC ~4.9x).
+    //     CUDA/Vulkan decode is NOT yet validated: a P100 A/B aborted in the
+    //     decoder on a strided get_rows index (GGML_ASSERT src1->nb[0]; fixed in
+    //     build_dia_decoder_embedding), so those backends fall back to CPU until a
+    //     Kaggle CUDA re-run confirms the fix. Mirrors LEARNING 34's
+    //     ggml_backend_is_metal gate (here Metal is the *validated* one).
     ctx->backend_cpu = ggml_backend_cpu_init();
-    bool want_gpu = params.use_gpu;
-    if (const char* e = std::getenv("DIA_TTS_GPU")) {
-        want_gpu = std::atoi(e) != 0;
-    }
-    if (want_gpu) {
-        ctx->backend = crispasr_init_gpu_backend();
-        if (!ctx->backend) {
-            fprintf(stderr, "dia_tts: DIA_TTS_GPU set but no GPU backend available; using CPU\n");
-            ctx->backend = ctx->backend_cpu;
-        } else if (params.verbosity >= 1) {
-            fprintf(stderr, "dia_tts: GPU backend enabled (%s)\n", ggml_backend_name(ctx->backend));
+    const char* gpu_env = std::getenv("DIA_TTS_GPU");
+    const bool force_gpu = gpu_env && std::atoi(gpu_env) != 0;
+    const bool force_cpu = gpu_env && std::atoi(gpu_env) == 0;
+    ctx->backend = ctx->backend_cpu;
+    if (!force_cpu && (force_gpu || params.use_gpu)) {
+        ggml_backend_t gpu = crispasr_init_gpu_backend();
+        if (gpu) {
+            bool is_metal = false;
+#if defined(GGML_USE_METAL)
+            is_metal = ggml_backend_is_metal(gpu);
+#endif
+            if (is_metal || force_gpu) {
+                ctx->backend = gpu;
+                if (params.verbosity >= 1)
+                    fprintf(stderr, "dia_tts: GPU backend enabled (%s)\n", ggml_backend_name(ctx->backend));
+            } else {
+                ggml_backend_free(gpu);
+                if (params.verbosity >= 1)
+                    fprintf(stderr, "dia_tts: GPU default limited to Metal pending CUDA/Vulkan decode "
+                                    "validation (§232); set DIA_TTS_GPU=1 to force\n");
+            }
         }
-    } else {
-        ctx->backend = ctx->backend_cpu;
     }
 
     // Load main-model weights onto the selected backend's buffer, mirroring the
