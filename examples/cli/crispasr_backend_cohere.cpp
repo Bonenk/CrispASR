@@ -156,6 +156,22 @@ public:
             }
         }
 
+        // Apply the exact same logic to seg.tokens for full JSON output parity.
+        {
+            std::vector<std::string> token_texts;
+            token_texts.reserve(seg.tokens.size());
+            for (const auto& t : seg.tokens)
+                token_texts.push_back(t.text);
+            const std::vector<int> keep = core_ngram::fix_loops_keep_indices(token_texts);
+            if (keep.size() != seg.tokens.size()) {
+                std::vector<crispasr_token> filtered;
+                filtered.reserve(keep.size());
+                for (int idx : keep)
+                    filtered.push_back(std::move(seg.tokens[idx]));
+                seg.tokens = std::move(filtered);
+            }
+        }
+
         cohere_result_free(r);
         out.push_back(std::move(seg));
         return out;

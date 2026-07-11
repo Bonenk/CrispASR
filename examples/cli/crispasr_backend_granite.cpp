@@ -375,6 +375,23 @@ public:
                 ct.confidence = (i < probs.size()) ? probs[i] : -1.0f;
                 seg.tokens.push_back(std::move(ct));
             }
+
+            // issue #218 follow-up: filter seg.tokens in lockstep with the
+            // collapse decision made on seg.text above.
+            {
+                std::vector<std::string> token_ids_str;
+                token_ids_str.reserve(seg.tokens.size());
+                for (const auto& t : seg.tokens)
+                    token_ids_str.push_back(std::to_string(t.id));
+                const std::vector<int> keep = core_ngram::fix_loops_keep_indices(token_ids_str);
+                if (keep.size() != seg.tokens.size()) {
+                    std::vector<crispasr_token> filtered;
+                    filtered.reserve(keep.size());
+                    for (int idx : keep)
+                        filtered.push_back(std::move(seg.tokens[idx]));
+                    seg.tokens = std::move(filtered);
+                }
+            }
             if (!params.punctuation) {
                 crispasr_strip_ascii_punctuation(seg.text);
                 crispasr_lowercase_ascii(seg.text);
@@ -665,6 +682,23 @@ public:
             ct.id = gen_ids[i];
             ct.confidence = (i < probs.size()) ? probs[i] : -1.0f;
             seg.tokens.push_back(std::move(ct));
+        }
+
+        // issue #218 follow-up: filter seg.tokens in lockstep with the
+        // collapse decision made on seg.text above.
+        {
+            std::vector<std::string> token_ids_str;
+            token_ids_str.reserve(seg.tokens.size());
+            for (const auto& t : seg.tokens)
+                token_ids_str.push_back(std::to_string(t.id));
+            const std::vector<int> keep = core_ngram::fix_loops_keep_indices(token_ids_str);
+            if (keep.size() != seg.tokens.size()) {
+                std::vector<crispasr_token> filtered;
+                filtered.reserve(keep.size());
+                for (int idx : keep)
+                    filtered.push_back(std::move(seg.tokens[idx]));
+                seg.tokens = std::move(filtered);
+            }
         }
 
         out.push_back(std::move(seg));
