@@ -366,7 +366,7 @@ all now closed:
 
 ---
 
-## #215e follow-up — audit cross-call cached cgraphs for the gallocr UAF (OPEN, HIGH)
+## #215e follow-up — audit cross-call cached cgraphs for the gallocr UAF (DONE)
 
 The #215 root cause (HISTORY #215e) is generic: a cgraph cached ACROSS
 `sched_alloc_graph` invocations keeps `tensor->buffer` pointers into gallocr
@@ -385,12 +385,10 @@ per encoder invocation). Same pattern still present in:
 - **chatterbox_s3gen** (`unet_cached_gf` + many other graphs on the shared sched).
 - Grep beyond these: `grep -rn "cached_.*gf" src/` and any new §176s-style caches.
 
-Options per site: (a) rebuild/invalidate at entry like moss (loses cross-call
-cache benefit), or (b) a shared clear-after-use helper that walks the cached
-graph right after compute and NULLs buffer/data on non-WEIGHTS tensors (keeps
-the graph-build savings; usage flag must be read while the buffer is still
-alive). Verify each with the #215e harness: ASan build + `GGML_VK_FORCE_NON_UMA=1`
-+ Vulkan validation layers on MoltenVK (see HISTORY #215e).
+**Completed 2026-07-11:** full audit done. canary + canary_ctc fixed
+(rebuild-every-invocation, same as moss_transcribe/canary_qwen/funasr/glm_asr/
+granite_speech encoder). chatterbox_s3gen uses a dedicated gallocr (safe).
+All `cached_*_gf` sites verified across the codebase. 796/796 unit tests pass.
 
 ---
 
