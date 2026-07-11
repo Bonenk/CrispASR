@@ -53,6 +53,11 @@ int voxtral_tts_sample_rate(void);
 // The returned pointer is owned by the context and must not be freed.
 const char* const* voxtral_tts_list_voices(struct voxtral_tts_context* ctx, int* out_n_voices);
 
+// crispasr-diff: per-layer frame-0 LLM cos vs a reference GGUF (from
+// tools/reference_backends/voxtral_tts.py). Returns 0 if all stages pass (cos>=0.99),
+// 1 on divergence, 2 on load error. Text/voice from VOXTRAL_TTS_TEXT/VOICE env.
+int voxtral_tts_llm_diff(const char* model_gguf, const char* ref_gguf, int verbosity);
+
 #ifdef __cplusplus
 }
 #endif

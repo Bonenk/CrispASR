@@ -37,78 +37,112 @@ from typing import Dict, Set
 
 import numpy as np
 
-DEFAULT_STAGES = [
-    "text_token_ids",
-    "voice_embedding",
-    "semantic_codes",
-    "acoustic_codes",
-    "generated_audio",
-    "generated_text",
-]
+# LLM backbone params (Ministral-3B; from voxtral_tts hparams). vllm-omni is NOT
+# required — the LLM is a standard Mistral stack loadable straight from the native
+# consolidated.safetensors and run with a manual forward (this is what the mudler C
+# reference does). The FM + codec are TTS-custom; the codec is already validated
+# (cos 0.9999), so this dumper covers the per-layer LLM path where a structural bug
+# would live. Frame-0 stage names match the runtime's CRISPASR_VOXTRAL_TTS_DIFF_DUMP.
+_D, _NL, _NH, _NKV, _HD = 3072, 26, 32, 8, 128
+_THETA, _EPS = 1_000_000.0, 1e-5
+
+DEFAULT_STAGES = ["text_token_ids", "voice_embedding", "embed"] \
+    + [f"llm_L{i}" for i in range(_NL)] + ["hidden", "generated_text"]
+
+
+def _rms_norm(x, w, eps):
+    import torch
+    return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + eps) * w
+
+
+def _rope_normal(x, pos, head_dim, theta):
+    """GGML_ROPE_TYPE_NORMAL: rotate ADJACENT pairs (2i, 2i+1). x: (T, H, head_dim)."""
+    import torch
+    half = head_dim // 2
+    inv = theta ** (-torch.arange(0, half, dtype=torch.float32) * 2.0 / head_dim)
+    ang = pos[:, None].float() * inv[None, :]           # (T, half)
+    cos, sin = torch.cos(ang)[:, None, :], torch.sin(ang)[:, None, :]
+    x0, x1 = x[..., 0::2], x[..., 1::2]
+    out = torch.empty_like(x)
+    out[..., 0::2] = x0 * cos - x1 * sin
+    out[..., 1::2] = x0 * sin + x1 * cos
+    return out
 
 
 def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
          max_new_tokens: int) -> Dict[str, np.ndarray]:
-    """Run Voxtral TTS reference forward and return stage captures.
+    """Manual PyTorch forward of the LLM backbone → per-layer frame-0 hidden.
 
-    This is a stub that will be populated once the model inference
-    flow is validated on Kaggle. For now, it captures the text tokens
-    and voice embedding from the model's tokenizer and preset voices.
+    Runs WITHOUT vllm/transformers: loads the native consolidated.safetensors keys
+    lazily (one layer at a time, ~sub-2 GB peak) and runs a single causal forward over
+    [BOS][BEGIN_AUDIO][voice][/INST=36]text[INST=35][BEGIN_AUDIO][AUDIO=24]; the last
+    position (the AUDIO token) is the frame-0 h0 decode. Dumps per-layer residual +
+    final hidden for a per-layer cos diff vs the runtime.
     """
-    import json
     import torch
+    from safetensors import safe_open
 
     out: Dict[str, np.ndarray] = {}
-    model_dir = Path(model_dir)
+    md = Path(model_dir)
+    text = os.environ.get("VOXTRAL_TTS_TEXT", "Hello world.")
+    voice = os.environ.get("VOXTRAL_TTS_VOICE", "neutral_female")
+    out["generated_text"] = text
+    print(f"  text={text!r} voice={voice}  (manual PyTorch LLM forward, no vllm)")
 
-    syn_text = os.environ.get("VOXTRAL_TTS_TEXT", "Hello world.")
-    voice_name = os.environ.get("VOXTRAL_TTS_VOICE", "fr_female")
+    sf = safe_open(str(md / "consolidated.safetensors"), framework="pt")
 
-    out["generated_text"] = syn_text
+    def load(name):
+        return sf.get_tensor(name).float()
 
-    # Load params
-    params_path = model_dir / "params.json"
-    if not params_path.exists():
-        from huggingface_hub import hf_hub_download
-        cache = os.environ.get("HF_HOME", "/tmp") + "/hub"
-        params_path = Path(hf_hub_download(str(model_dir), "params.json",
-                                            cache_dir=cache))
-        model_dir = params_path.parent
+    # Tekken tokenize
+    from mistral_common.tokens.tokenizers.tekken import Tekken
+    tok = Tekken(str(md / "tekken.json"))
+    text_ids = tok.encode(text, bos=False, eos=False)
+    out["text_token_ids"] = np.array(text_ids, dtype=np.float32)
 
-    with open(params_path) as f:
-        params = json.load(f)
+    # Preset voice embedding (pre-summed, spliced into the prompt)
+    ve = torch.load(str(md / "voice_embedding" / f"{voice}.pt"),
+                    map_location="cpu", weights_only=True).float()
+    if ve.dim() == 1:
+        ve = ve.view(-1, _D)
+    out["voice_embedding"] = ve.numpy()
 
-    print(f"  model_type: {params.get('model_type')}")
-    print(f"  text: {syn_text!r}")
-    print(f"  voice: {voice_name}")
+    emb_w = load("mm_audio_embeddings.tok_embeddings.weight")  # (V, D)
 
-    # Load voice embedding
-    if "voice_embedding" in stages:
-        voice_path = model_dir / "voice_embedding" / f"{voice_name}.pt"
-        if voice_path.exists():
-            data = torch.load(str(voice_path), map_location="cpu", weights_only=True)
-            if isinstance(data, torch.Tensor):
-                out["voice_embedding"] = data.float().numpy()
-                print(f"  voice embedding: {out['voice_embedding'].shape}")
+    def e(tid):
+        return emb_w[tid]
 
-    # Tokenize text (Tekken BPE — load and encode)
-    if "text_token_ids" in stages:
-        try:
-            # Try using mistral_common if available
-            from mistral_common.tokens.tokenizers.tekken import SpecialTokenPolicy, Tekken
-            tekken_path = model_dir / "tekken.json"
-            if tekken_path.exists():
-                tok = Tekken(str(tekken_path))
-                ids = tok.encode(syn_text, bos=False, eos=False)
-                out["text_token_ids"] = np.array(ids, dtype=np.float32)
-                print(f"  text tokens: {len(ids)}")
-        except ImportError:
-            print("  mistral_common not available — text_token_ids skipped")
+    # [BOS=1][BEGIN_AUDIO=25][voice…][/INST=36]text[INST=35][BEGIN_AUDIO=25][AUDIO=24]
+    seq = [e(1), e(25)] + [ve[i] for i in range(ve.shape[0])] + [e(36)] \
+        + [e(t) for t in text_ids] + [e(35), e(25), e(24)]
+    x = torch.stack(seq, 0).float()  # (T, D); last row = AUDIO token = frame-0 position
+    T = x.shape[0]
+    pos = torch.arange(T)
+    out["embed"] = x[-1].numpy()
+    print(f"  seq len={T} (frame-0 decode at last position, pos={T - 1})")
 
-    # Full pipeline stages require vllm-omni or manual inference
-    # (too large for a simple reference dumper — stub for now)
-    if {"semantic_codes", "acoustic_codes", "generated_audio"} & stages:
-        print("  NOTE: full pipeline stages require vllm-omni inference")
-        print("  These will be captured on the Kaggle GPU kernel")
+    scale = 1.0 / (_HD ** 0.5)
+    grp = _NH // _NKV
+    cmask = torch.triu(torch.full((T, T), float("-inf")), diagonal=1)
+    for il in range(_NL):
+        xn = _rms_norm(x, load(f"layers.{il}.attention_norm.weight"), _EPS)
+        q = (xn @ load(f"layers.{il}.attention.wq.weight").T).view(T, _NH, _HD)
+        k = (xn @ load(f"layers.{il}.attention.wk.weight").T).view(T, _NKV, _HD)
+        v = (xn @ load(f"layers.{il}.attention.wv.weight").T).view(T, _NKV, _HD)
+        q = _rope_normal(q, pos, _HD, _THETA)
+        k = _rope_normal(k, pos, _HD, _THETA)
+        k = k.repeat_interleave(grp, dim=1)  # GQA → (T, NH, HD)
+        v = v.repeat_interleave(grp, dim=1)
+        qh, kh, vh = q.permute(1, 0, 2), k.permute(1, 0, 2), v.permute(1, 0, 2)
+        att = torch.softmax((qh @ kh.transpose(1, 2)) * scale + cmask, dim=-1)
+        o = (att @ vh).permute(1, 0, 2).reshape(T, _NH * _HD)
+        x = x + (o @ load(f"layers.{il}.attention.wo.weight").T)
+        xn = _rms_norm(x, load(f"layers.{il}.ffn_norm.weight"), _EPS)
+        gate = torch.nn.functional.silu(xn @ load(f"layers.{il}.feed_forward.w1.weight").T) \
+            * (xn @ load(f"layers.{il}.feed_forward.w3.weight").T)
+        x = x + (gate @ load(f"layers.{il}.feed_forward.w2.weight").T)
+        out[f"llm_L{il}"] = x[-1].numpy()
 
+    out["hidden"] = _rms_norm(x, load("norm.weight"), _EPS)[-1].numpy()
+    print(f"  dumped {_NL} layers + embed + hidden  |h0|={float(np.linalg.norm(out['hidden'])):.3f}")
     return out
