@@ -2513,6 +2513,96 @@ int crispasr_adts_decode_glint(const char* path, int want_channels, float** out_
     return 0;
 }
 
+// ── glint Ogg Opus (.opus) decoder (RFC-conformant, no libopus) ──────────────
+// Decodes Ogg Opus (.opus, and Ogg-Opus-in-.ogg) via the in-tree glint decoder
+// (glint_ogg_opus_decode; SILK/CELT/hybrid, all 12 RFC 6716/8251 vectors pass,
+// SILK byte-identical to libopus). PRIMARY for Ogg Opus unless
+// CRISPASR_OPUS_DECODER pins libopus — so .opus reads even in builds without
+// libopus (CRISPASR_OPUS=OFF). Returns -2 for non-Opus Ogg (e.g. Vorbis) so
+// those fall through to stb_vorbis, and for non-Ogg input so WAV/etc. take the
+// ma_decoder path. On glint failure the caller still reaches the libopus path.
+// NOTE: only the Ogg container — WebM/Matroska Opus stays on libopus.
+// Signature matches the loader fallbacks: 0 + malloc-owned 16 kHz mono f32.
+int crispasr_ogg_opus_decode_glint(const char* path, int want_channels, float** out_buf, int* out_frames,
+                                   int* out_channels) {
+    (void)want_channels; // 16 kHz ASR path is mono; downmix here
+
+    if (const char* pref = std::getenv("CRISPASR_OPUS_DECODER")) {
+        if (pref[0] && std::strcmp(pref, "glint") != 0 && std::strcmp(pref, "auto") != 0)
+            return -2; // user pinned libopus
+    }
+    const bool dbg = [] {
+        const char* e = std::getenv("CRISPASR_OPUS_DEBUG");
+        return e && e[0] && e[0] != '0';
+    }();
+
+    FILE* f = std::fopen(path, "rb");
+    if (!f)
+        return -2;
+    std::fseek(f, 0, SEEK_END);
+    long fsize = std::ftell(f);
+    std::fseek(f, 0, SEEK_SET);
+    if (fsize <= 4 || fsize > 500 * 1024 * 1024) {
+        std::fclose(f);
+        return -2;
+    }
+    std::vector<uint8_t> buf((size_t)fsize);
+    if (std::fread(buf.data(), 1, (size_t)fsize, f) != (size_t)fsize) {
+        std::fclose(f);
+        return -2;
+    }
+    std::fclose(f);
+
+    // Must be an Ogg stream ("OggS"); glint's reader further checks for Opus.
+    if (buf[0] != 'O' || buf[1] != 'g' || buf[2] != 'g' || buf[3] != 'S')
+        return -2;
+
+    float* pcm48 = nullptr;
+    int frames = 0, ch = 0;
+    if (glint_ogg_opus_decode(buf.data(), (int)buf.size(), &pcm48, &frames, &ch) != 0 || !pcm48)
+        return -2; // not Ogg Opus (e.g. Vorbis) or a decode error → fall through
+    if (frames <= 0 || ch < 1) {
+        glint_opus_free(pcm48);
+        return -2;
+    }
+
+    // Downmix to mono at the native 48 kHz.
+    std::vector<float> mono((size_t)frames);
+    for (int i = 0; i < frames; i++) {
+        float s = 0.0f;
+        for (int c = 0; c < ch; c++)
+            s += pcm48[(size_t)i * ch + c];
+        mono[(size_t)i] = s / (float)ch;
+    }
+    glint_opus_free(pcm48);
+    if (dbg)
+        std::fprintf(stderr, "[glint-opus] decoded %d frames, %d ch @ 48000 -> 16 kHz mono\n", frames, ch);
+
+    // Resample 48 kHz -> 16 kHz mono (linear; matches the other decode paths).
+    ma_resampler_config rcfg =
+        ma_resampler_config_init(ma_format_f32, 1, 48000, kTargetSampleRate, ma_resample_algorithm_linear);
+    ma_resampler rs;
+    if (ma_resampler_init(&rcfg, nullptr, &rs) != MA_SUCCESS)
+        return -2;
+    ma_uint64 in_len = mono.size();
+    ma_uint64 out_len = 0;
+    ma_resampler_get_expected_output_frame_count(&rs, in_len, &out_len);
+    out_len += 256;
+    float* result = (float*)std::malloc((size_t)out_len * sizeof(float));
+    if (!result) {
+        ma_resampler_uninit(&rs, nullptr);
+        return -3;
+    }
+    ma_uint64 in_consumed = in_len;
+    ma_uint64 out_produced = out_len;
+    ma_resampler_process_pcm_frames(&rs, mono.data(), &in_consumed, result, &out_produced);
+    ma_resampler_uninit(&rs, nullptr);
+    *out_buf = result;
+    *out_frames = (int)out_produced;
+    *out_channels = 1;
+    return 0;
+}
+
 } // namespace
 
 CA_EXPORT int crispasr_audio_load(const char* path, float** out_pcm, int* out_samples, int* out_sample_rate) {
@@ -2522,6 +2612,22 @@ CA_EXPORT int crispasr_audio_load(const char* path, float** out_pcm, int* out_sa
     *out_samples = 0;
     if (out_sample_rate)
         *out_sample_rate = 0;
+
+    // Ogg Opus (.opus) via the in-tree glint decoder — RFC-conformant, no
+    // libopus required, so .opus reads even in builds without CRISPASR_OPUS.
+    // Runs BEFORE ma_decoder (which would otherwise take it via libopus).
+    // Non-Opus Ogg (Vorbis) and non-Ogg inputs return -2 → normal path below.
+    {
+        float* g_buf = nullptr;
+        int g_fr = 0, g_ch = 0;
+        if (crispasr_ogg_opus_decode_glint(path, 1, &g_buf, &g_fr, &g_ch) == 0) {
+            *out_pcm = g_buf;
+            *out_samples = g_fr;
+            if (out_sample_rate)
+                *out_sample_rate = kTargetSampleRate;
+            return 0;
+        }
+    }
 
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, kTargetChannels, kTargetSampleRate);
     CRISPASR_OPUS_DECODER_CONFIG(cfg);

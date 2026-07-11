@@ -348,6 +348,35 @@ TEST_CASE("crispasr_audio_load decodes ADTS AAC (glint)", "[audio][unit][aac]") 
     crispasr_audio_free(pcm);
 }
 
+TEST_CASE("crispasr_audio_load decodes Ogg Opus (glint)", "[audio][unit][opus]") {
+    // Real libopus-encoded .opus decoded by the in-tree glint decoder (default
+    // for Ogg Opus; RFC-conformant). libopus-encode -> glint-decode is the
+    // cross-encoder validation (HARD RULE #3); glint is always available, so
+    // unlike WebM this must succeed everywhere.
+    float* pcm = nullptr;
+    int samples = 0, rate = 0;
+    int rc = crispasr_audio_load(sample("jfk.opus").c_str(), &pcm, &samples, &rate);
+    REQUIRE(rc == 0);
+    REQUIRE(pcm != nullptr);
+    REQUIRE(rate == 16000);
+    REQUIRE(has_energy(pcm, samples));
+
+    auto ref = load_ref();
+
+    double ratio = (double)samples / ref.samples;
+    INFO("Ogg Opus length ratio: " << ratio);
+    REQUIRE(ratio > 0.90);
+    REQUIRE(ratio < 1.10);
+
+    // Opus is high quality and the decoder applies the pre-skip edit list, so
+    // alignment is tight; a moderate lag window suffices.
+    double cc = cross_correlation(ref.pcm, ref.samples, pcm, samples, 500);
+    INFO("Ogg Opus cross-correlation: " << cc);
+    REQUIRE(cc > 0.80);
+
+    crispasr_audio_free(pcm);
+}
+
 TEST_CASE("crispasr_audio_load rejects missing file", "[audio][unit]") {
     float* pcm = nullptr;
     int samples = 0, rate = 0;
