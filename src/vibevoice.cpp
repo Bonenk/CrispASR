@@ -101,6 +101,14 @@ struct vibevoice_model {
     std::vector<std::string> vocab;
     std::unordered_map<std::string, int32_t> token_to_id;
     std::unordered_map<std::string, int32_t> merge_rank;
+
+    // Lazily built greedy-tokenizer lookup over `vocab` (see
+    // tokenize_text_greedy). Scoped to the model so a second model with a
+    // different vocab is not tokenized with the first's (same single-model
+    // assumption as the dequant caches fixed in PR #244).
+    // mutable: tokenize_text_greedy takes `const vibevoice_model&`.
+    mutable std::map<std::string, int> greedy_vocab_map;
+    mutable int greedy_max_token_len = 0;
 };
 
 struct vibevoice_context {
@@ -1732,18 +1740,16 @@ static const std::vector<int>& qwen_byte_encoder() {
 // This approximates BPE well for common words (exact match) and falls
 // back to single-byte tokens for unknown substrings.
 static std::vector<int32_t> tokenize_text_greedy(const vibevoice_model& m, const char* text) {
-    // Build vocab lookup (once)
-    static std::map<std::string, int> vocab_map;
-    static int max_token_len = 0;
-    static bool built = false;
-    if (!built && !m.vocab.empty()) {
+    // Build vocab lookup (once per model)
+    auto& vocab_map = m.greedy_vocab_map;
+    auto& max_token_len = m.greedy_max_token_len;
+    if (vocab_map.empty() && !m.vocab.empty()) {
         for (int i = 0; i < (int)m.vocab.size(); i++) {
             if (!m.vocab[i].empty())
                 vocab_map[m.vocab[i]] = i;
             if ((int)m.vocab[i].size() > max_token_len)
                 max_token_len = (int)m.vocab[i].size();
         }
-        built = true;
     }
 
     // Convert text bytes to GPT-2 byte-encoded string
