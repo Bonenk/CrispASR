@@ -2841,3 +2841,15 @@ add_test(NAME test-granite-maxlen
 set_tests_properties(test-granite-maxlen PROPERTIES
     LABELS "live;granite;max-len"
     TIMEOUT 300)
+
+# ─── libFuzzer harness over crispasr_audio_load (opt-in, clang only) ─────────
+# Build: cmake -B build-fuzz -DCRISPASR_FUZZ=ON -DCRISPASR_SANITIZE_ADDRESS=ON \
+#          -DCRISPASR_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+#        cmake --build build-fuzz --target crispasr-fuzz-audio
+# Run:   ./build-fuzz/bin/crispasr-fuzz-audio -max_len=65536 tests/fuzz/corpus
+if (CRISPASR_FUZZ)
+    add_executable(crispasr-fuzz-audio fuzz/fuzz_audio_load.cpp)
+    target_link_libraries(crispasr-fuzz-audio PRIVATE crispasr-lib)
+    target_compile_options(crispasr-fuzz-audio PRIVATE -fsanitize=fuzzer)
+    target_link_options(crispasr-fuzz-audio PRIVATE -fsanitize=fuzzer)
+endif()

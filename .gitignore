@@ -116,3 +116,11 @@ SESSION_HANDOVER.md
 /handover-prompts/
 /docs/prompts/
 .ccache/
+
+# Fuzzer / parser-test runtime artifacts (tests/fuzz + the crafted-input tests)
+crispasr_fuzz_input.bin
+crispasr_*_regression_tmp.*
+crash-*
+leak-*
+timeout-*
+/tests/fuzz/corpus/
