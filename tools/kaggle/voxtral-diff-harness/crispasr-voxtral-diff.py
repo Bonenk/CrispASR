@@ -36,9 +36,12 @@ WORK = Path("/kaggle/working")
 REPO = WORK / "CrispASR"
 BUILD = WORK / "build"
 REFBUILD = WORK / "ref"
-MODELS = WORK / "models"
-REFMODEL = WORK / "refmodel"
-RESULTS = WORK / "results"
+# ~18 GB of model downloads (BF16 ref 8 GB + F16 GGUF 8 GB + Q4_K 2.3 GB) must go on
+# the ~70 GB ephemeral /tmp layer, NOT the ~20 GB /kaggle/working mount (would ENOSPC).
+TMP = Path("/tmp/vtts-diff")
+MODELS = TMP / "models"
+REFMODEL = TMP / "refmodel"
+RESULTS = WORK / "results"  # small (dumps, wavs, summary.json) — keep as downloadable output
 for d in (REFBUILD, MODELS, REFMODEL, RESULTS):
     d.mkdir(parents=True, exist_ok=True)
 
