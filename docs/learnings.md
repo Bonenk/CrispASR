@@ -320,3 +320,25 @@ Lessons from the systematic head-to-head benchmark against
     `strstr(name, "Metal")` check silently never matches; use
     `ggml_backend_is_metal()` (guarded by `GGML_USE_METAL` so CUDA builds compile
     it out). Caught only because I measured TOTAL RTF, not just the decode A/B.
+
+35. **A strided `ggml_get_rows` index tensor aborts on CUDA but silently works on
+    CPU/Metal.** Enabling the dia TTS GPU path, the encoder + cross-attn ran fine
+    on a P100 but the AR decoder produced **0 tokens** and aborted with
+    `GGML_ASSERT(src1->nb[0] == ggml_type_size(src1->type)) failed`.
+    `build_dia_decoder_embedding` built a per-codebook index by hand-striding a
+    view (`view->nb[0] = n_output_heads * elsize`) and passing it straight to
+    `ggml_get_rows`. CUDA's `get_rows` kernel requires the **index tensor
+    (`src1`) to be contiguous in dim 0** (`nb[0] == type_size`); the CPU and Metal
+    kernels tolerate an arbitrary stride, so it worked on both dev boxes and the
+    bug only surfaced on the Kaggle CUDA A/B. Fix: `ggml_cont` the index before
+    `get_rows` — output-neutral, negligible cost, correct on every backend (also
+    covers Vulkan, same requirement). **Two lessons:** (a) any `ggml_get_rows`
+    whose index comes from a `view`/`permute`/hand-set `nb[]` must be `ggml_cont`'d
+    before it touches a GPU — audit for `nb[0] =` assignments feeding `get_rows`
+    (dia was the ONLY offender across src/; the other ~126 call sites pass
+    contiguous I32 or offset-only `view_1d` slices, which are fine). (b) "correct
+    on CPU AND Metal" is NOT sufficient GPU validation — CUDA has stricter
+    contiguity asserts on several ops; the decoded-output roundtrip must run on a
+    real CUDA box (Kaggle) before a GPU default flips there. This is the mandated
+    CUDA A/B (rule #4/#5) earning its keep: it stopped dia shipping empty audio on
+    CUDA. Ties back to the GPU-portability gotchas in the dev guide.
