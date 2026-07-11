@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `5e9d674ff81d49ffa6cd762075d58108c1a17e9e` (fix(build): define _USE_MATH_DEFINES for MSVC (M_PI in Opus/decoder/resample)).
+Synced at upstream commit: `2ba09678649cdd0f528bc7e6a718c2145ff3efe5` (fix(build): portable case-insensitive ends_with (MSVC has no strcasecmp)).
