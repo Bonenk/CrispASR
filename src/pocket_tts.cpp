@@ -2699,9 +2699,17 @@ static void mimi_encode(pocket_tts_context* pctx, const float* pcm, int n_sample
         return;
     }
 
-    // 1. Pad PCM to hop_length multiple
-    int hop = (int)mi.hop_length(); // 120
-    int n_padded = ((n_samples + hop - 1) / hop) * hop;
+    // 1. Pad PCM up to a whole LATENT frame, not just a hop.
+    // The encoder maps samples -> hop-length STFT frames -> a further /downsample_stride
+    // conv to reach the 12.5 Hz latent rate. Padding only to a hop multiple can leave the
+    // downsample one short (floor), giving one fewer latent frame than the reference model,
+    // which ceils. A missing voice frame shifts every downstream RoPE position by one and
+    // corrupts the very first generated latent, which the Mimi decoder renders as an onset
+    // "gong". Pad to a full latent frame (hop * downsample_stride samples) so the encoded
+    // frame count matches the reference.
+    int hop = (int)mi.hop_length();                     // 120
+    int latent_hop = hop * (int)mi.downsample_stride(); // 120 * 16 = 1920
+    int n_padded = ((n_samples + latent_hop - 1) / latent_hop) * latent_hop;
     std::vector<float> pcm_padded(n_padded, 0.0f);
     memcpy(pcm_padded.data(), pcm, n_samples * sizeof(float));
 
