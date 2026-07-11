@@ -388,6 +388,14 @@ if (CRISPASR_AMR)
         # wrappers (pvgsm*.cpp, decoder_gsm_amr.cpp) which depend on
         # case-insensitive includes and OSCL C++ framework classes we
         # don't need — the amrnb/wrapper.cpp already wraps the codec API.
+        # ALSO exclude the seven common/src files that upstream's authoritative
+        # amrnb/Makefile.am deliberately drops (see its "sources we exclude"
+        # comment): bits2prm, copy, div_32, l_abs, r_fft, vad1, vad2. They are
+        # encoder-only / unused by the decoder, and bits2prm.cpp in particular
+        # #includes a bits2prm.h that the fork does not ship — a blanket
+        # common/src/*.cpp glob picks it up and the static build fails with
+        # "bits2prm.h file not found". Matching upstream's set = upstream's
+        # working decoder.
         file(GLOB _amrnb_srcs
             "${_amr_src}/opencore/codecs_v2/audio/gsm_amr/amr_nb/dec/src/*.cpp"
             "${_amr_src}/opencore/codecs_v2/audio/gsm_amr/amr_nb/dec/src/*.c"
@@ -395,11 +403,19 @@ if (CRISPASR_AMR)
             "${_amr_src}/opencore/codecs_v2/audio/gsm_amr/amr_nb/common/src/*.c"
             "${_amr_src}/opencore/codecs_v2/audio/gsm_amr/common/dec/src/*.cpp"
             "${_amr_src}/opencore/codecs_v2/audio/gsm_amr/common/dec/src/*.c")
-        list(FILTER _amrnb_srcs EXCLUDE REGEX "pvgsm[^/]*\\.cpp$|decoder_gsm_amr\\.cpp$")
+        # Anchor each basename with a leading "/" so an exclusion can't match as
+        # a suffix of a longer filename (cf. the amr-wb dtx_decoder_amr_wb.cpp
+        # over-match fixed below).
+        list(FILTER _amrnb_srcs EXCLUDE REGEX
+            "pvgsm[^/]*\\.cpp$|/decoder_gsm_amr\\.cpp$|/(bits2prm|copy|div_32|l_abs|r_fft|vad1|vad2)\\.cpp$")
         file(GLOB _amrwb_srcs
             "${_amr_src}/opencore/codecs_v2/audio/gsm_amr/amr_wb/dec/src/*.cpp"
             "${_amr_src}/opencore/codecs_v2/audio/gsm_amr/amr_wb/dec/src/*.c")
-        list(FILTER _amrwb_srcs EXCLUDE REGEX "pvgsm[^/]*\\.cpp$|decoder_amr_wb\\.cpp$")
+        # "/decoder_amr_wb.cpp$" is anchored on "/" so it excludes ONLY the PV
+        # framework wrapper decoder_amr_wb.cpp — an unanchored "decoder_amr_wb"
+        # also matched dtx_decoder_amr_wb.cpp (suffix), dropping the DTX/comfort-
+        # noise decoder and breaking the link with undefined _dtx_dec_amr_wb.
+        list(FILTER _amrwb_srcs EXCLUDE REGEX "pvgsm[^/]*\\.cpp$|/decoder_amr_wb\\.cpp$")
         if (_amrnb_srcs AND _amrwb_srcs AND EXISTS "${_amr_src}/amrnb/wrapper.cpp")
             add_library(crispasr_amrnb STATIC
                 "${_amr_src}/amrnb/wrapper.cpp" ${_amrnb_srcs})
