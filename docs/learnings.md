@@ -251,3 +251,20 @@ Lessons from the systematic head-to-head benchmark against
     it, let Kaggle judge perf" was tractable after all; the reservation in
     LEARNINGS 29 was about not FLIPPING THE DEFAULT unvalidated, which still holds.
     Kaggle P100 A/B: `tools/kaggle/parakeet-ggml-decode-ab/`.
+
+31. **Per-step ggml decode overhead scales with STEP COUNT — same code, opposite
+    M1 verdict on parakeet vs nemotron.** The identical `core_rnnt_ggml` decode
+    (predictor LSTM + joint as per-step ggml graphs, shared by both after the DRY
+    extract) is M1-neutral on parakeet (cblas ~60 ms vs ggml ~57 ms) but a **2×
+    REGRESSION on nemotron** (cblas ~755 ms vs ggml ~1613 ms) — both
+    transcript-identical. The difference is decode length: nemotron runs far more
+    per-step dispatches, so the per-step `ggml_init`/build/`sched_reset`/alloc/free
+    overhead (fixed per step) dominates when there are many steps. **Lessons:** (a)
+    a per-step ggml dispatch pattern's cost is `n_steps × per-step-overhead` — it
+    can be neutral on a short decode and a big regression on a long one; measure on
+    the backend with the MOST steps, not the fewest. (b) This is exactly why the
+    real fix is a **persistent graph** (build once, reuse — amortises the per-step
+    build/alloc) and/or in-graph argmax; the naive per-step version is a
+    correctness-validated stepping stone, not the shippable-default perf win.
+    Both backends stay gated (`PARAKEET_GGML_DECODE` / `NEMOTRON_GGML_DECODE`),
+    default cblas; the Kaggle P100 A/B covers both.
