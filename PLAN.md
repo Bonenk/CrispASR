@@ -785,6 +785,21 @@ PERFORMANCE §214.
 
 ## §215 — batched-CFG (B=2) for the remaining TTS backends (OPEN)
 
+**⚠ STATE AUDIT 2026-07-11 (code-verified — the list below predates several commits):**
+- **§215a dia — DONE.** `src/dia_tts.cpp` decoder already runs B=2 (output batch dim 2,
+  index 0=cond/1=uncond; single KV cache sized `*2`, line ~563) since `d63b0774`. Not 2-pass.
+- **§215b tada — FM done, TALKER remains.** The FM velocity is already B=2 (gated
+  `CRISPASR_TADA_FM_B2`); the genuine remaining work is the **talker AR loop**
+  (`run_talker_kv` + separate `kv_neg` cache, lines ~199/407). That is the real §215b.
+- **§215c zonos / §215d voxcpm2 — confirmed still 2-pass** (candidates).
+- **§215e f5 — SKIP.** DiT runs on `backend_cpu` (no per-dispatch-latency win — voxtral §93
+  measured batched-CFG as a Metal/CUDA-*dispatch*-bound win, ~1.2×, worthless on CPU), plus the
+  §176h B=2 corruption. Non-goal unless f5 moves to GPU.
+- **General caveat (voxtral §93 lesson):** batched-CFG is a MODEST (~1.2–1.3×), GPU-dispatch-
+  bound win. Before each port confirm the stage is GPU-run AND dispatch-bound AND the dominant
+  cost — measure, don't assume the T3 −42% transfers. seq-concat + block-diagonal-mask (voxtral
+  FM) is for fixed-seq no-KV DiTs; AR-with-KV backends use the chatterbox-T3 B=2 pattern.
+
 Full-tree audit (§214, see PERFORMANCE.md): only **s3gen CFM** and **chatterbox
 T3** batch cond+uncond into one B=2 forward; every other CFG backend runs **two
 sequential B=1 passes** and blends post-hoc — correct, but it reads the full
