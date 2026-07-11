@@ -12450,3 +12450,63 @@ Two transferable methodology points, both learned the hard way this session:
   token-level signal disagree near the boundary, trust the more sensitive one
   and stop there. Final arbiter for any quality-affecting DEFAULT remains a
   human listen on 2–3 diverse sentences — recommend, don't unilaterally flip.
+
+## A "GPU" model can be silently running on CPU — audit for hot graphs pinned to backend_cpu and CLI adapters that never forward use_gpu (f5-tts / moonshine, 2026-07-11)
+
+Two backends looked like they "supported GPU" but never used it, and both cost
+real time before anyone noticed:
+
+- **moonshine**: the CLI adapter zero-initialized `moonshine_init_params` and
+  never set `use_gpu`, so every run — *including the §232 Kaggle "GPU"
+  benchmarks* — used the CPU backend. The whole "moonshine encoder is 6-21×
+  slower than transcribe.cpp" investigation was chasing a CPU-vs-GPU comparison
+  mislabeled as GPU-vs-GPU. One line (`mp.use_gpu = params.use_gpu`) → encoder
+  4-6× faster on Metal. The tell: the model-load banner lacked its `(GPU)`
+  suffix and `CRISPASR_METAL_PROFILE=1` printed zero `[metal-prof]` lines.
+- **f5-tts**: the DiT graph (the dominant compute) was hardcoded
+  `ggml_backend_graph_compute(ctx->backend_cpu, gf)` with the gallocr bound to
+  backend_cpu's buffer type, regardless of `use_gpu`. Weights loaded on
+  `ctx->backend` (GPU), so on Metal it *worked* — unified memory let the CPU
+  backend read the GPU-resident weights — and just ran every forward on the CPU
+  (sampling showed `ggml_vec_dot_f16_f32` / flash-attn in libggml-cpu). Compute
+  on `ctx->backend` instead (== backend_cpu when use_gpu is off) → 7.8×/step.
+
+**Audit recipe when a backend feels slow on GPU:** grep for
+`ggml_backend_graph_compute(.*_cpu` and `gallocr_new(...buffer_type(.*_cpu` in
+the hot path; check the CLI adapter actually forwards `params.use_gpu`; confirm
+the load banner says `(GPU)` and `CRISPASR_METAL_PROFILE` emits per-graph lines.
+On unified-memory Metal a CPU-pinned graph never errors — it silently computes
+on the CPU while claiming the GPU backend.
+
+Corollary — **low-step "degenerate on both CPU and GPU" is not automatically a
+quality floor.** f5 produced garbage at 4 steps on *both* backends; the first
+read was "4 steps is below the model's floor." It was actually a shared bug:
+`pos_in` set once but the gallocr re-aliased its slot every step, corrupting
+RoPE positions from step 1 (the omnivoice §245 input-aliasing class). Fixing it
+made 16-step output roundtrip verbatim. When both backends agree on garbage,
+suspect a shared bug before blaming the step count.
+
+## Micro-optimizing an already-BLAS'd path with a GPU-ggml port is usually a dud — check for existing Accelerate/cblas and measure encode-vs-execute BEFORE porting (f5 / titanet perf sweep, 2026-07-11)
+
+After the f5 base fix (7.8×, a real *bug*), the "obvious" follow-on GPU
+optimizations were all measured duds, and the pattern is worth internalizing:
+
+- **f5 batched CFG** (run the 2 CFG DiT passes as one B=2 graph): implemented,
+  correct (corr 1.00000 vs sequential, 4D-RoPE + batched flash-attn work on
+  Metal) — but NO speedup. The Metal profile (979-node DiT, ~1.5 ms host-encode
+  vs ~1-2 s GPU-execute/forward) proved it's compute-bound, so B=2 just doubles
+  per-dispatch work. Batching only helps *dispatch*-bound graphs.
+- **f5 F16 activations** (cast QKV/FFN matmul inputs to F16): correct, but
+  slightly *slower* (added cast nodes) → the DiT isn't matmul-bound either. The
+  ~0.8-1 s/forward is the ~800 small ops + flash-attn, which neither lever hits.
+- **f5 host input-embed → GPU** and **titanet GPU port**: both already run on
+  **Accelerate BLAS** (`cblas_sgemm`) on CPU. titanet's *default* path is legacy
+  Accelerate (~1 s/forward); its ggml-CPU path is 1.7× *slower*, so a GPU-ggml
+  port would have to beat Accelerate with a graph that already loses to it.
+
+The durable rule: **the big wins are bugs, not micro-opts.** Before porting a
+hot path to the GPU, (1) check whether it's already `cblas`/Accelerate-optimized
+— if so a naive ggml graph often loses; (2) split host-encode vs GPU-execute to
+know if you're dispatch- or compute-bound — batching and precision changes only
+help the former. Guess-and-check across an already-optimized seam burns hours
+for nothing; a per-op Metal capture is the only honest next step there.
