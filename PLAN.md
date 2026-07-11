@@ -6781,6 +6781,26 @@ and what parallel sessions own:
       per frame — biggest AR cost) and mimi decode; the voice encode is the
       largest single cost but is already cacheable. None has an obvious
       cheap+safe win — deprioritized.
+- [x] **Pocket-TTS voice-clone onset "gong" — ROOT-CAUSED + FIXED (2026-07-11).**
+      Voice-cloned syntheses (e.g. jfk.wav prompt) opened with a loud onset
+      transient ("gong"); no-voice output was clean. Root cause via reference
+      diff against kyutai's `pocket_tts` (moshi) at F16: our `mimi_encode`
+      padded PCM to a **hop-length (120)** multiple, but the encoder does a
+      further `/downsample_stride` (16) conv to reach the 12.5 Hz latent rate.
+      Padding only to a hop could leave the downsample one **short (floor)**,
+      yielding one fewer latent voice frame than the reference (which ceils).
+      For jfk.wav (~137.5 latent frames) we produced 137 vs the reference's
+      138. The missing voice frame shifted every downstream RoPE position by
+      one, corrupting the very first generated latent → the Mimi decoder
+      rendered it as the onset gong. Fix (`src/pocket_tts.cpp` ~L2703): pad to
+      a full **latent** frame (`hop * downsample_stride` = 1920 samples). After:
+      138 latent frames, voice conditioning 139 (=138+bos) matching reference;
+      onset RMS t0 **0.0621 → 0.0045** (reference is 0.0045). Confirmed the
+      codec itself was correct (force-decoding the reference's exact latents
+      through OUR codec was already clean); the bug was purely the encoder
+      frame count. **Must clear the §224 voice-latent disk cache
+      (`pocket-voice-*.latents`, or `CRISPASR_POCKET_VOICE_CACHE=0`) after this
+      fix** — stale 137-frame latents would otherwise mask it.
 - [x] **CosyVoice3 HiFT / FASTCONV — MEASURED, NOT WORTH IT (2026-07-11).**
       Downloaded the full CV3 GGUF set to `/Volumes/backups/ai/crispasr-gguf`,
       `COSYVOICE3_BENCH=1` on a 174-mel synthesis (M1 Metal, quiet box). Wall
