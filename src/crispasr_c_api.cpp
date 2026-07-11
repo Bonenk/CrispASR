@@ -1394,6 +1394,30 @@ static thread_local int g_open_n_gpu_layers_tls = -1;
 static thread_local float g_open_temperature_tls = 0.0f;
 static thread_local uint64_t g_open_seed_tls = 0;
 
+// Defined ahead of crispasr_session so the session can hold its own
+// streamed-segment polling buffer (see the Dart FFI polling API below).
+struct crispasr_session_seg {
+    std::string text;
+    int64_t t0 = 0; // centiseconds absolute
+    int64_t t1 = 0;
+    struct word_alt {
+        std::string text;
+        float p = 0.0f;
+    };
+    struct word {
+        std::string text;
+        int64_t t0 = 0; // centiseconds absolute
+        int64_t t1 = 0;
+        float p = 1.0f;
+        // Top-N alternative candidates for the first content token of
+        // this word (whisper greedy decode only, when alt_n > 0).
+        // Empty when alts weren't captured or the backend doesn't
+        // produce them. Ordered descending by p.
+        std::vector<word_alt> alts;
+    };
+    std::vector<word> words;
+};
+
 struct crispasr_session {
     std::string backend; // "whisper", "parakeet", ...
     std::string model_path;
@@ -1546,6 +1570,18 @@ struct crispasr_session {
     // the global polling buffer for Dart FFI.
     crispasr_token_callback token_cb = nullptr;
     void* token_ud = nullptr;
+
+    // Per-session polling buffers fed by the default segment/token callbacks
+    // (Dart FFI path; ud = the owning session). Scoped to the session so two
+    // sessions can't interleave or drain each other's output. The session-less
+    // polling API (crispasr_drain_streamed_segments etc.) delegates to the
+    // session that most recently streamed via the default callbacks.
+    std::mutex stream_mutex;
+    std::vector<crispasr_session_seg> streamed_segments;
+    std::vector<std::string> streamed_tokens;
+    std::atomic<int> streamed_seg_count{0};
+    std::atomic<int> streamed_tok_count{0};
+    std::string token_drain_buf; // backing store for crispasr_drain_streamed_tokens
 
     // Exactly one of these pointers is non-null based on `backend`.
     whisper_context* whisper_ctx = nullptr;
@@ -1750,28 +1786,6 @@ struct crispasr_session {
 #endif
 };
 
-struct crispasr_session_seg {
-    std::string text;
-    int64_t t0 = 0; // centiseconds absolute
-    int64_t t1 = 0;
-    struct word_alt {
-        std::string text;
-        float p = 0.0f;
-    };
-    struct word {
-        std::string text;
-        int64_t t0 = 0; // centiseconds absolute
-        int64_t t1 = 0;
-        float p = 1.0f;
-        // Top-N alternative candidates for the first content token of
-        // this word (whisper greedy decode only, when alt_n > 0).
-        // Empty when alts weren't captured or the backend doesn't
-        // produce them. Ordered descending by p.
-        std::vector<word_alt> alts;
-    };
-    std::vector<word> words;
-};
-
 struct crispasr_session_result {
     std::vector<crispasr_session_seg> segments;
     std::string backend;
@@ -1786,87 +1800,121 @@ struct crispasr_session_result {
     int n_logit_frames = 0;
 };
 
-// ── Streamed-segment polling buffer (Dart FFI path) ─────────────────────
-// The default segment callback pushes segments here; Dart polls via
-// crispasr_get_streamed_segment_count / crispasr_drain_streamed_segments.
-static std::mutex g_seg_mutex;
-static std::vector<crispasr_session_seg> g_streamed_segments;
-static std::atomic<int> g_seg_count{0};
+// ── Streamed-segment/token polling (Dart FFI path) ──────────────────────
+// The default callbacks push into the OWNING SESSION's buffers (ud = the
+// session), so two sessions — concurrent or sequential — can't interleave
+// or drain each other's output. The session-less polling API below keeps
+// its historical signatures by delegating to the session that most
+// recently streamed via the default callbacks.
+//
+// Lock order: g_stream_session_mtx before s->stream_mutex. session_close
+// unregisters under g_stream_session_mtx before tearing down, so a drain
+// holding that mutex can never race a concurrent free.
+static std::mutex g_stream_session_mtx;
+static crispasr_session* g_stream_session = nullptr;
 
-static void _default_segment_cb(const char* text, int64_t t0, int64_t t1, int /*idx*/, void* /*ud*/) {
-    std::lock_guard<std::mutex> lk(g_seg_mutex);
+static void _register_stream_session(crispasr_session* s) {
+    std::lock_guard<std::mutex> reg(g_stream_session_mtx);
+    g_stream_session = s;
+}
+
+static void _default_segment_cb(const char* text, int64_t t0, int64_t t1, int /*idx*/, void* ud) {
+    auto* s = (crispasr_session*)ud;
+    if (!s)
+        return;
+    _register_stream_session(s);
+    std::lock_guard<std::mutex> lk(s->stream_mutex);
     crispasr_session_seg seg;
     seg.text = text;
     seg.t0 = t0;
     seg.t1 = t1;
-    g_streamed_segments.push_back(std::move(seg));
-    g_seg_count.fetch_add(1, std::memory_order_relaxed);
+    s->streamed_segments.push_back(std::move(seg));
+    s->streamed_seg_count.fetch_add(1, std::memory_order_relaxed);
 }
 
-// ── Streamed-token polling buffer (Dart FFI path) ───────────────────────
-// The default token callback pushes tokens here; Dart polls via
-// crispasr_get_streamed_token_count / crispasr_drain_streamed_tokens.
-static std::mutex g_tok_mutex;
-static std::vector<std::string> g_streamed_tokens;
-static std::atomic<int> g_tok_count{0};
-
-static void _default_token_cb(const char* text, int /*idx*/, void* /*ud*/) {
-    std::lock_guard<std::mutex> lk(g_tok_mutex);
-    g_streamed_tokens.push_back(text);
-    g_tok_count.fetch_add(1, std::memory_order_relaxed);
+static void _default_token_cb(const char* text, int /*idx*/, void* ud) {
+    auto* s = (crispasr_session*)ud;
+    if (!s)
+        return;
+    _register_stream_session(s);
+    std::lock_guard<std::mutex> lk(s->stream_mutex);
+    s->streamed_tokens.push_back(text);
+    s->streamed_tok_count.fetch_add(1, std::memory_order_relaxed);
 }
 
 CA_EXPORT int crispasr_get_streamed_segment_count(void) {
-    return g_seg_count.load(std::memory_order_relaxed);
+    std::lock_guard<std::mutex> reg(g_stream_session_mtx);
+    return g_stream_session ? g_stream_session->streamed_seg_count.load(std::memory_order_relaxed) : 0;
 }
 
 CA_EXPORT crispasr_session_result* crispasr_drain_streamed_segments(void) {
-    std::lock_guard<std::mutex> lk(g_seg_mutex);
-    if (g_streamed_segments.empty())
+    std::lock_guard<std::mutex> reg(g_stream_session_mtx);
+    crispasr_session* s = g_stream_session;
+    if (!s)
+        return nullptr;
+    std::lock_guard<std::mutex> lk(s->stream_mutex);
+    if (s->streamed_segments.empty())
         return nullptr;
     auto* r = new crispasr_session_result;
-    r->segments = std::move(g_streamed_segments);
-    g_streamed_segments.clear();
-    g_seg_count.store(0, std::memory_order_relaxed);
+    r->segments = std::move(s->streamed_segments);
+    s->streamed_segments.clear();
+    s->streamed_seg_count.store(0, std::memory_order_relaxed);
     return r;
 }
 
 CA_EXPORT void crispasr_reset_streamed_segments(void) {
-    std::lock_guard<std::mutex> lk(g_seg_mutex);
-    g_streamed_segments.clear();
-    g_seg_count.store(0, std::memory_order_relaxed);
+    std::lock_guard<std::mutex> reg(g_stream_session_mtx);
+    crispasr_session* s = g_stream_session;
+    if (!s)
+        return;
+    std::lock_guard<std::mutex> lk(s->stream_mutex);
+    s->streamed_segments.clear();
+    s->streamed_seg_count.store(0, std::memory_order_relaxed);
 }
 
 CA_EXPORT int crispasr_get_streamed_token_count() {
-    return g_tok_count.load(std::memory_order_relaxed);
+    std::lock_guard<std::mutex> reg(g_stream_session_mtx);
+    return g_stream_session ? g_stream_session->streamed_tok_count.load(std::memory_order_relaxed) : 0;
 }
 
 CA_EXPORT const char* crispasr_drain_streamed_tokens(int* out_count) {
-    std::lock_guard<std::mutex> lk(g_tok_mutex);
-    if (g_streamed_tokens.empty()) {
+    std::lock_guard<std::mutex> reg(g_stream_session_mtx);
+    crispasr_session* s = g_stream_session;
+    if (!s) {
+        if (out_count)
+            *out_count = 0;
+        return nullptr;
+    }
+    std::lock_guard<std::mutex> lk(s->stream_mutex);
+    if (s->streamed_tokens.empty()) {
         if (out_count)
             *out_count = 0;
         return nullptr;
     }
     // Concatenate all tokens into a single string, separated by null bytes.
-    // Caller reads N strings from the returned buffer.
-    static std::string buf;
+    // Caller reads N strings from the returned buffer, which stays valid
+    // until the next drain on this session or the session is closed.
+    std::string& buf = s->token_drain_buf;
     buf.clear();
-    for (const auto& t : g_streamed_tokens) {
+    for (const auto& t : s->streamed_tokens) {
         buf += t;
         buf += '\0';
     }
     if (out_count)
-        *out_count = (int)g_streamed_tokens.size();
-    g_streamed_tokens.clear();
-    g_tok_count.store(0, std::memory_order_relaxed);
+        *out_count = (int)s->streamed_tokens.size();
+    s->streamed_tokens.clear();
+    s->streamed_tok_count.store(0, std::memory_order_relaxed);
     return buf.c_str();
 }
 
 CA_EXPORT void crispasr_reset_streamed_tokens() {
-    std::lock_guard<std::mutex> lk(g_tok_mutex);
-    g_streamed_tokens.clear();
-    g_tok_count.store(0, std::memory_order_relaxed);
+    std::lock_guard<std::mutex> reg(g_stream_session_mtx);
+    crispasr_session* s = g_stream_session;
+    if (!s)
+        return;
+    std::lock_guard<std::mutex> lk(s->stream_mutex);
+    s->streamed_tokens.clear();
+    s->streamed_tok_count.store(0, std::memory_order_relaxed);
 }
 
 // Fire the session's segment callback for every segment in `r`.
@@ -2024,14 +2072,15 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
 
     // Register the default segment callback so the Dart polling buffer
     // is populated out of the box. Users can override via
-    // crispasr_session_set_segment_callback after open.
+    // crispasr_session_set_segment_callback after open. ud is the session
+    // itself: the default callbacks push into its per-session buffers.
     s->segment_cb = _default_segment_cb;
-    s->segment_ud = nullptr;
+    s->segment_ud = s;
 
     // Register the default token callback so the Dart polling buffer
     // is populated out of the box for per-token streaming.
     s->token_cb = _default_token_cb;
-    s->token_ud = nullptr;
+    s->token_ud = s;
 
     if (s->backend == "whisper") {
         whisper_context_params cparams = whisper_context_default_params();
@@ -4020,14 +4069,14 @@ CA_EXPORT void crispasr_session_set_segment_callback(crispasr_session* s, crispa
     if (!s)
         return;
     s->segment_cb = cb ? cb : _default_segment_cb;
-    s->segment_ud = cb ? user_data : nullptr;
+    s->segment_ud = cb ? user_data : s;
 }
 
 CA_EXPORT void crispasr_session_set_token_callback(crispasr_session* s, crispasr_token_callback cb, void* user_data) {
     if (!s)
         return;
     s->token_cb = cb ? cb : _default_token_cb;
-    s->token_ud = cb ? user_data : nullptr;
+    s->token_ud = cb ? user_data : s;
 }
 
 static crispasr_session_result* transcribe_single(crispasr_session* s, const float* pcm, int n_samples,
@@ -7693,6 +7742,13 @@ CA_EXPORT crispasr_stream* crispasr_session_stream_open(crispasr_session* s, int
 CA_EXPORT void crispasr_session_close(crispasr_session* s) {
     if (!s)
         return;
+    {
+        // Unregister from the session-less polling API before teardown so a
+        // concurrent drain can't touch a dying session (see g_stream_session).
+        std::lock_guard<std::mutex> reg(g_stream_session_mtx);
+        if (g_stream_session == s)
+            g_stream_session = nullptr;
+    }
 #ifdef CA_HAVE_FIREREDPUNC
     if (s->punc_ctx)
         fireredpunc_free((fireredpunc_context*)s->punc_ctx);
