@@ -7703,3 +7703,18 @@ piper).
 | P2 | parakeet/nemotron | Batched sgemm decode opt-in default-OFF — validate + flip on | `CRISPASR_TDT_BATCH` |
 | P3 | threading | Hardcoded default-4 threads in ~90 sites; adopt whisper-core's `min(4, hw)` | crispasr_c_api.cpp |
 | P3 | pyannote | Runs per-slice not once-over-audio (#107); RNNoise recreates state+resamplers/call | crispasr_diarize.cpp |
+
+## §244 — Irodori-TTS VoiceDesign (caption conditioning)
+
+**Status: DONE** (2026-07-11)
+
+Ported Aratako/Irodori-TTS-600M-v3-VoiceDesign to the irodori-tts backend.
+Adds a caption encoder (TextEncoder, 10L/512d) for style/emotion text
+conditioning via `--instruct`. Three-way independent CFG (text/speaker/caption).
+
+- Converter: caption encoder + DiT caption KV + dual-adarn-zero duration
+- Runtime: caption encoder graph, JointAttention caption KV, DurationPredictor
+  caption modulation, Euler ODE caption CFG
+- Diff harness: F16 cos=1.000000; Q4_K cos=0.996491 (526 MB)
+- Registry entry added; docs/tts.md updated
+- GGUF artifacts: irodori-tts-600m-v3-voicedesign-{f16,q4_k}.gguf
