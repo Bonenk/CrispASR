@@ -44,6 +44,22 @@ parsers have their own 500 MB caps; the cap just keeps the fuzzer itself fast).
 
 Every format-detection + fallback path in `crispasr_audio_load`, i.e. the
 `crispasr_au_decode` / `crispasr_amr_decode` / `crispasr_webm_decode` /
-`crispasr_m4a_decode` parsers plus miniaudio's WAV/MP3/FLAC/OGG handling. The
-`core/wav_reader.h` and GGUF loaders are reached by *other* entry points and
-would need their own harnesses (a follow-up).
+`crispasr_m4a_decode` parsers plus miniaudio's WAV/MP3/FLAC/OGG handling.
+
+## GGUF metadata harness (`crispasr-fuzz-gguf`)
+
+`fuzz_gguf_meta.cpp` fuzzes GGUF **model-file** parsing — a model is untrusted
+input too. It drives `core_gguf::open_metadata()` plus the KV/array accessors
+(`kv_str_array` is the vocab path: count + per-string lengths straight from the
+file). GGUF has a magic + structured header, so **seed from a real small
+`.gguf`** or the fuzzer never gets past the magic:
+
+```bash
+cmake --build build-fuzz --target crispasr-fuzz-gguf
+mkdir -p gguf-corpus && cp /path/to/small-model.gguf gguf-corpus/
+./build-fuzz/bin/crispasr-fuzz-gguf -max_len=2097152 gguf-corpus
+```
+
+The audio harness is the one wired into CI (`linux-fuzz-smoke`) because it has
+committed seeds (`samples/`); the GGUF harness needs a model seed, so run it out
+of band.

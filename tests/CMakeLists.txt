@@ -2852,4 +2852,11 @@ if (CRISPASR_FUZZ)
     target_link_libraries(crispasr-fuzz-audio PRIVATE crispasr-lib)
     target_compile_options(crispasr-fuzz-audio PRIVATE -fsanitize=fuzzer)
     target_link_options(crispasr-fuzz-audio PRIVATE -fsanitize=fuzzer)
+
+    # GGUF metadata parser harness (seed from a real .gguf — see tests/fuzz/README).
+    add_executable(crispasr-fuzz-gguf fuzz/fuzz_gguf_meta.cpp)
+    target_include_directories(crispasr-fuzz-gguf PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_link_libraries(crispasr-fuzz-gguf PRIVATE crispasr-lib)
+    target_compile_options(crispasr-fuzz-gguf PRIVATE -fsanitize=fuzzer)
+    target_link_options(crispasr-fuzz-gguf PRIVATE -fsanitize=fuzzer)
 endif()

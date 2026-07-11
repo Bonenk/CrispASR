@@ -117,6 +117,11 @@ static inline std::vector<int32_t> tokenize(const std::string& text,
         }
     }
 
+    // A >2 GiB input would overflow the int32 length below (negative n → OOB
+    // reads in the DP tables / piece_at). No real ASR/TTS text approaches this.
+    if (s.size() > 0x7fffffffu) {
+        return {};
+    }
     const int n = (int)s.size();
     if (n == 0) {
         return {};
@@ -291,6 +296,11 @@ static inline std::vector<int32_t> tokenize_bpe(const std::string& text,
                                                 const std::unordered_map<std::string, int32_t>& token_to_id,
                                                 const std::vector<float>& scores, const Config& cfg = {},
                                                 bool prepend_space = true) {
+    // A >2 GiB input would overflow the int32 arithmetic below (max_iter =
+    // (int)symbols.size() * 2). No real ASR/TTS text approaches this.
+    if (text.size() > 0x7fffffffu) {
+        return {};
+    }
     std::string s;
     s.reserve(text.size() + 4);
     if (prepend_space) {
