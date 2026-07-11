@@ -7646,13 +7646,13 @@ piper).
 ### Genuinely-new gaps (not yet tracked)
 | P | Area | Gap | File |
 |---|---|---|---|
-| P0 | firered_asr | Decoder self-attn has **no KV cache** — growing vector, O(T²) recompute | `firered_asr.cpp:2697` |
+| ~~P0~~ **STALE** | firered_asr | ~~Decoder self-attn has no KV cache~~ — **incorrect**: the greedy decode already caches self-attn K/V (`beam_hyp::sa_k/sa_v`, appended per step at `firered_asr.cpp` ~L2205-2208; past tokens are never re-projected). The O(T²) that remains is the inherent attention *scoring* over history, run as scalar-CPU triple-loops + one-at-a-time `ggml_vecmat` — a scalar→ggml-graph decoder rewrite, not a missing cache, and the §235 AR-decoder verdicts show those often lose on M1/CPU (launch-bound). Not the cheap win the row implied. | `firered_asr.cpp` |
 | P0 | melotts / piper | Scalar O(H·T²·D) relpos attention (can't flash — additive bias); HiFi-GAN 17.9s of 26.3s VPS total. Needs manual-attn ggml graph or BLAS | melotts.cpp, piper_tts.cpp |
 | P0 | voxcpm2_tts | CPU-only (Metal SIGSEGV); manual per-step host KV re-upload | `voxcpm2_tts.cpp:106-111` |
 | P0 | openvoice2 | 16-layer WaveNet + ref-encoder Conv2d/GRU scalar CPU | openvoice2.cpp |
 | P1 | voxtral/voxtral4b enc, mimo LLM dec | Attention not on flash_attn_ext (manual soft_max) | voxtral4b.cpp, mimo_asr.cpp |
 | P1 | firered/glm/funasr/qwen3/omniasr/mimo | Beam = replay; add KV snapshot pool (canary/moonshine/kyutai template) | — |
-| P2 | align_wav2vec2_ctc | **Reloads 300MB–1GB model every call** — add §176e-style ctx-cache | `crispasr_aligner.cpp:315` |
+| ~~P2~~ **DONE** | align_wav2vec2_ctc | ~~Reloads 300MB–1GB model every call~~ — **wav2vec2 now joins the §176e resident cache** (qwen3-FA / canary-ctc were already cached; wav2vec2 was the lone gap, stubbed `AlignerType::Wav2Vec2` no-op). Heap `wav2vec2_model*` keyed by path, freed via `delete` in `crispasr_aligner_free_cache()` (Metal-safe order). M1 A/B (`wav2vec2-xlsr-en-q4_k`, jfk, `test-align-only`): call1 load+align **13.8 s → call2 cached 0.92 s (~15×)**, word timings byte-identical. | `crispasr_aligner.cpp` |
 | P2 | scalar CPU hotpaths | RNN-T LSTM pred+joint; granite cpu_linear+depthwise; rvq encode; istft IRFFT; titanet mel; diarize `apply_xcorr` | core/rvq.cpp, core/istft.h, titanet.cpp:740 |
 | P2 | parakeet/nemotron | Batched sgemm decode opt-in default-OFF — validate + flip on | `CRISPASR_TDT_BATCH` |
 | P3 | threading | Hardcoded default-4 threads in ~90 sites; adopt whisper-core's `min(4, hw)` | crispasr_c_api.cpp |
