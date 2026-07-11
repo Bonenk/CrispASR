@@ -14,8 +14,13 @@
 //   Vocab:         151936 (Qwen3 BPE, tied embed/lm_head)
 //
 // Prompt format:
-//   <|im_start|>user\nTranscribe the following: <|AUDIO|><|im_end|>\n
+//   <|im_start|>user\nTranscribe the following: <|audio_pad|>×N<|im_end|>\n
 //   <|im_start|>assistant\n
+//
+// NeMo blueprint: QwenPromptFormatter (NOT Qwen3). No system role.
+// No <|audio_start|>/<|audio_end|> framing — the model was never
+// trained with those tokens; including them causes instruction-echo
+// artifacts ("Transcript:", "PASS") per issue #247.
 
 #include "canary_qwen.h"
 
@@ -957,8 +962,7 @@ static std::string canary_qwen_decode_tokens(canary_qwen_context* ctx, const int
 // ===========================================================================
 
 // Build the Qwen-style prompt with audio_start/pad/end framing:
-//   <|im_start|>user\nTranscribe the following:
-//   <|audio_start|><|audio_pad|>×N<|audio_end|><|im_end|>\n
+//   <|im_start|>user\nTranscribe the following: <|audio_pad|>×N<|im_end|>\n
 //   <|im_start|>assistant\n
 //
 // The <|audio_pad|> tokens (id 151676) are placeholders — their text
@@ -969,11 +973,16 @@ static std::vector<float> canary_qwen_build_prompt_embeds(canary_qwen_context* c
     const int d = (int)ctx->model.hparams.llm_d_model;
     const int32_t audio_pad_id = 151676; // <|audio_pad|>
 
-    // Build the prompt with N audio_pad tokens that we'll replace
-    std::string prompt_text = "<|im_start|>user\nTranscribe the following: <|audio_start|>";
+    // Build the prompt with N audio_pad tokens that we'll replace.
+    // NeMo blueprint (QwenPromptFormatter + SALM) uses a single
+    // <|audioplaceholder|> whose embedding is replaced with the projected
+    // encoder frames. NO <|audio_start|> / <|audio_end|> framing tokens —
+    // the model was never trained with them, and including them causes
+    // instruction-echo artifacts ("Transcript:", "PASS") (#247).
+    std::string prompt_text = "<|im_start|>user\nTranscribe the following: ";
     for (int i = 0; i < T_enc; i++)
         prompt_text += "<|audio_pad|>";
-    prompt_text += "<|audio_end|><|im_end|>\n<|im_start|>assistant\n";
+    prompt_text += "<|im_end|>\n<|im_start|>assistant\n";
 
     // Tokenize
     auto prompt_ids = canary_qwen_tokenize(ctx, prompt_text.c_str());
@@ -1129,29 +1138,6 @@ static canary_qwen_result* canary_qwen_transcribe_impl(canary_qwen_context* ctx,
         start++;
     if (start > 0)
         text = text.substr(start);
-
-    // Strip instruction-echo prefixes that the model sometimes generates
-    // when the prompt says "Transcribe the following:" — the model may
-    // echo "Transcript:" / "Transcription:" / "PASS" before the actual
-    // text (#247). Case-insensitive prefix match + strip.
-    static const char* echo_prefixes[] = {
-        "Transcript:", "Transcript :", "Transcription:", "Transcription :",
-        "transcript:", "transcript :", "transcription:", "transcription :",
-        "PASS",        "Pass",         "pass",           nullptr,
-    };
-    for (const char** pp = echo_prefixes; *pp; pp++) {
-        size_t plen = strlen(*pp);
-        if (text.size() >= plen && text.compare(0, plen, *pp) == 0) {
-            text = text.substr(plen);
-            // Strip whitespace after the prefix
-            size_t ws = 0;
-            while (ws < text.size() && (text[ws] == ' ' || text[ws] == '\n'))
-                ws++;
-            if (ws > 0)
-                text = text.substr(ws);
-            break;
-        }
-    }
 
     // Build result
     auto* r = (canary_qwen_result*)calloc(1, sizeof(canary_qwen_result));
