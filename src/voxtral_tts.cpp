@@ -1016,6 +1016,16 @@ static ggml_cgraph* voxtral_tts_build_graph_llm(voxtral_tts_context* ctx, int n_
         cur = ggml_mul(ctx0, cur, b.ffn_norm);
         ggml_tensor* ffn = core_ffn::swiglu(ctx0, cur, b.ffn_gate, b.ffn_up, b.ffn_down);
         cur = ggml_add(ctx0, residual, ffn);
+
+        // Per-stage diff harness: expose every LLM layer output for a per-layer cos
+        // comparison vs the reference (CRISPASR_VOXTRAL_TTS_DIFF_DUMP). set_output is
+        // required or ggml reuses the buffer and later layers overwrite it.
+        if (std::getenv("CRISPASR_VOXTRAL_TTS_DIFF_DUMP")) {
+            char nm[24];
+            snprintf(nm, sizeof(nm), "llm_L%d", il);
+            ggml_set_name(cur, nm);
+            ggml_set_output(cur);
+        }
     }
 
     // Final RMSNorm + output_norm → hidden state (FM head input, not logits).
@@ -1068,6 +1078,34 @@ static std::vector<float> voxtral_tts_run_llm(voxtral_tts_context* ctx, const fl
     ggml_tensor* h = ggml_graph_get_tensor(gf, "hidden");
     std::vector<float> out(d);
     ggml_backend_tensor_get(h, out.data(), (size_t)(n_tokens - 1) * d * sizeof(float), (size_t)d * sizeof(float));
+
+    // Per-stage diff harness: dump the LAST-position d-vector of the input embed +
+    // every LLM layer + the final hidden, per run_llm call, as raw f32. call 0 =
+    // prompt prefill, call 1 = frame-0 (h0) decode, etc. Compared per stage vs the
+    // reference dumps (same layout) to find the first divergent layer.
+    if (const char* dd = std::getenv("CRISPASR_VOXTRAL_TTS_DIFF_DUMP")) {
+        static int call = 0;
+        auto dump = [&](const char* stage, ggml_tensor* t) {
+            if (!t)
+                return;
+            std::vector<float> v(d);
+            ggml_backend_tensor_get(t, v.data(), (size_t)(n_tokens - 1) * d * sizeof(float), (size_t)d * sizeof(float));
+            char p[512];
+            snprintf(p, sizeof(p), "%s/mine.c%d.%s.bin", dd, call, stage);
+            if (FILE* fp = fopen(p, "wb")) {
+                fwrite(v.data(), sizeof(float), d, fp);
+                fclose(fp);
+            }
+        };
+        dump("embed", ggml_graph_get_tensor(gf, "inputs_embeds"));
+        for (int il = 0; il < ctx->hp.llm_n_layers; il++) {
+            char nm[24];
+            snprintf(nm, sizeof(nm), "llm_L%d", il);
+            dump(nm, ggml_graph_get_tensor(gf, nm));
+        }
+        dump("hidden", h);
+        call++;
+    }
     return out;
 }
 
