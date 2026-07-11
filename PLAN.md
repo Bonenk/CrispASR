@@ -7014,6 +7014,18 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
    Needs GPU profiling — possibly im2col overhead on raw 176K-sample input,
    or the conv_stem's ggml_im2col creating oversized intermediates.
 
+   **Update (2026-07-11): the im2col-size hypothesis doesn't hold for tiny.**
+   Shape math for the 11 s clip (176 400 samples, hidden=288): conv1 K=127
+   S=64 IC=1 → im2col [127, 2755] ≈ 1.4 MB; conv2 K=7 S=3 IC=288 →
+   [2016, 917] ≈ 7.4 MB; conv3 K=3 S=2 IC=576 → [1728, 458] ≈ 3.2 MB.
+   Whole stem ≈ 1.4 GMACs — ~1 ms of P100 F32 compute, nowhere near 670 ms.
+   Look instead for: sched graph splits bouncing ops to CPU (group_norm /
+   gelu_erf / cont-transpose support on the GPU backend), per-op sync from
+   host readbacks, or the encoder graph being rebuilt/recomputed per call.
+   `MOONSHINE_BENCH=1` gives per-stage ms; `CRISPASR_METAL_PROFILE` gives
+   per-op on Metal (M1 profiling pending — box was saturated by the
+   omnivoice bench campaign when this was written).
+
 ### §232 v13 Results (2026-07-11)
 
 **All models improved 8-14% vs v12** from LID skip (-l en) + in-graph argmax:
