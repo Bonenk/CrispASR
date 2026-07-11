@@ -12224,3 +12224,36 @@ graph-construction differences from cross-compute state carryover in one
 experiment. Related: the sched-level graph-cache entries above (#171, #220,
 #235) — this is the gallocr-level sibling of the same class. Payoff here:
 CPU 1.64× / Metal ~2× per synthesis, WAV byte-identical.
+
+
+## Generation-config defaults are part of the blueprint contract — a masked-iterative TTS with the wrong sampler knobs degenerates to SILENCE, not to bad audio (omnivoice §234, 2026-07-11)
+
+omnivoice synthesized near-silence (peak ≤0.009, whisper "[ Silence ]") on
+every platform, precision, and prompt variant, deterministically. The port's
+tensors were fine: text ids byte-exact vs tokenizers-lib, embedding
+offsets/mixing identical to `_prepare_embed_inputs`, codec innocent. The bug
+was five **generation-config fallbacks** that didn't match the blueprint's
+`OmniVoiceGenerationConfig` dataclass: guidance 1.0 (ref 2.0), class_temp
+0.7 (ref 0.0 = argmax), position_temp 4.5 (ref 5.0), layer_penalty 0.5 (ref
+5.0 — the coarse-to-fine codebook unmask ordering), t_shift 1.0 (ref 0.1 — a
+different unmask-schedule *shape*). Under the wrong decode policy the
+model's highest-confidence predictions are silence codes, and the
+confidence-ranked unmasker locks them in: 59 unique tokens across 1344
+positions. With blueprint defaults: 278 unique codes, roundtrip VERBATIM.
+
+1. **Diff the sampler/scheduler defaults against the blueprint's config
+   dataclass line-by-line** — same discipline as prompt scaffolds (glm #218)
+   and for the same reason: they're training-time contracts. A `>0 ?
+   param : fallback` pattern makes the fallback THE user-visible default;
+   plausible-looking placeholder values shipped as if tuned.
+2. **Degenerate-output triage order that worked (one run each):** (a) codes
+   histogram (`OMNIVOICE_DEBUG_CODES=1`) — degenerate codes ⇒ codec
+   innocent, LLM/sampling side guilty; (b) token ids vs HF tokenizer;
+   (c) embedding table offsets/mixing vs the reference module; (d) the
+   generation-config diff. Silence ≠ "encoder broken": a healthy codec
+   rendering silence codes IS silence.
+3. A MaskGIT-style sampler has more load-bearing knobs than an AR sampler —
+   schedule shape (t_shift), unmask ordering (layer penalty, position
+   temperature), and CFG scale all change WHAT gets committed WHEN;
+   "conservative" values don't fail loud, they converge to the model's
+   safe token, which for audio is silence.
