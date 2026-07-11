@@ -1,5 +1,5 @@
 // crispasr_opus_writer.h — Ogg Opus serializer for TTS float32 PCM, built on
-// the in-tree glint Opus encoder (glint_ogg_opus_encode). Header-only like
+// the in-tree glint Opus encoder (glint_opus_encode_file). Header-only like
 // crispasr_mp3_writer.h / crispasr_aac_writer.h; consumers link the `glint`
 // static library.
 //
@@ -55,12 +55,15 @@ inline std::string crispasr_make_opus_glint(const float* pcm, int n_samples, int
             s = -1.0f;
     }
 
-    uint8_t* data = nullptr;
     int size = 0;
-    if (glint_ogg_opus_encode(clamped.data(), n_samples, 1, bitrate_bps, /*vbr=*/0, &data, &size) != 0 || !data)
+    uint8_t* data = glint_opus_encode_file(clamped.data(), n_samples, 1, bitrate_bps, /*vbr=*/0, &size);
+    if (!data || size <= 0) {
+        if (data)
+            glint_free(data);
         return {};
+    }
     std::string out((const char*)data, (size_t)size);
-    glint_opus_free(data);
+    glint_free(data);
     return out;
 }
 

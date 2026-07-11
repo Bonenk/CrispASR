@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `8dee4e36d1e91dcbe4b420f2d796551d07160cc1` (feat(opus): public Ogg Opus file C ABI (one-call encode/decode)).
+Synced at upstream commit: `fd6598881fc1bdf733833c68858906aabd05b0da` (feat(wrappers): Opus encode from Python/Rust/Dart + C ABI).

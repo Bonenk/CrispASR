@@ -2515,7 +2515,7 @@ int crispasr_adts_decode_glint(const char* path, int want_channels, float** out_
 
 // ── glint Ogg Opus (.opus) decoder (RFC-conformant, no libopus) ──────────────
 // Decodes Ogg Opus (.opus, and Ogg-Opus-in-.ogg) via the in-tree glint decoder
-// (glint_ogg_opus_decode; SILK/CELT/hybrid, all 12 RFC 6716/8251 vectors pass,
+// (glint_decode_audio; SILK/CELT/hybrid, all 12 RFC 6716/8251 vectors pass,
 // SILK byte-identical to libopus). PRIMARY for Ogg Opus unless
 // CRISPASR_OPUS_DECODER pins libopus — so .opus reads even in builds without
 // libopus (CRISPASR_OPUS=OFF). Returns -2 for non-Opus Ogg (e.g. Vorbis) so
@@ -2553,52 +2553,64 @@ int crispasr_ogg_opus_decode_glint(const char* path, int want_channels, float** 
     }
     std::fclose(f);
 
-    // Must be an Ogg stream ("OggS"); glint's reader further checks for Opus.
+    // Must be an Ogg stream ("OggS"); glint_decode_audio further checks it is
+    // Opus (returns NULL for Ogg Vorbis, which then falls through to stb_vorbis).
     if (buf[0] != 'O' || buf[1] != 'g' || buf[2] != 'g' || buf[3] != 'S')
         return -2;
 
-    float* pcm48 = nullptr;
-    int frames = 0, ch = 0;
-    if (glint_ogg_opus_decode(buf.data(), (int)buf.size(), &pcm48, &frames, &ch) != 0 || !pcm48)
+    int sr = 0, ch = 0, frames = 0;
+    float* pcm = glint_decode_audio(buf.data(), (int)buf.size(), &sr, &ch, &frames);
+    if (!pcm)
         return -2; // not Ogg Opus (e.g. Vorbis) or a decode error → fall through
-    if (frames <= 0 || ch < 1) {
-        glint_opus_free(pcm48);
+    if (frames <= 0 || ch < 1 || sr <= 0) {
+        glint_free(pcm);
         return -2;
     }
 
-    // Downmix to mono at the native 48 kHz.
+    // Downmix to mono at the native rate (Opus decodes at 48 kHz).
     std::vector<float> mono((size_t)frames);
     for (int i = 0; i < frames; i++) {
         float s = 0.0f;
         for (int c = 0; c < ch; c++)
-            s += pcm48[(size_t)i * ch + c];
+            s += pcm[(size_t)i * ch + c];
         mono[(size_t)i] = s / (float)ch;
     }
-    glint_opus_free(pcm48);
+    glint_free(pcm);
     if (dbg)
-        std::fprintf(stderr, "[glint-opus] decoded %d frames, %d ch @ 48000 -> 16 kHz mono\n", frames, ch);
+        std::fprintf(stderr, "[glint-opus] decoded %d frames, %d ch @ %d -> 16 kHz mono\n", frames, ch, sr);
 
-    // Resample 48 kHz -> 16 kHz mono (linear; matches the other decode paths).
-    ma_resampler_config rcfg =
-        ma_resampler_config_init(ma_format_f32, 1, 48000, kTargetSampleRate, ma_resample_algorithm_linear);
-    ma_resampler rs;
-    if (ma_resampler_init(&rcfg, nullptr, &rs) != MA_SUCCESS)
-        return -2;
-    ma_uint64 in_len = mono.size();
-    ma_uint64 out_len = 0;
-    ma_resampler_get_expected_output_frame_count(&rs, in_len, &out_len);
-    out_len += 256;
-    float* result = (float*)std::malloc((size_t)out_len * sizeof(float));
-    if (!result) {
+    // Resample native -> 16 kHz mono (linear; matches the other decode paths).
+    if (sr != kTargetSampleRate) {
+        ma_resampler_config rcfg =
+            ma_resampler_config_init(ma_format_f32, 1, (ma_uint32)sr, kTargetSampleRate, ma_resample_algorithm_linear);
+        ma_resampler rs;
+        if (ma_resampler_init(&rcfg, nullptr, &rs) != MA_SUCCESS)
+            return -2;
+        ma_uint64 in_len = mono.size();
+        ma_uint64 out_len = 0;
+        ma_resampler_get_expected_output_frame_count(&rs, in_len, &out_len);
+        out_len += 256;
+        float* result = (float*)std::malloc((size_t)out_len * sizeof(float));
+        if (!result) {
+            ma_resampler_uninit(&rs, nullptr);
+            return -3;
+        }
+        ma_uint64 in_consumed = in_len;
+        ma_uint64 out_produced = out_len;
+        ma_resampler_process_pcm_frames(&rs, mono.data(), &in_consumed, result, &out_produced);
         ma_resampler_uninit(&rs, nullptr);
-        return -3;
+        *out_buf = result;
+        *out_frames = (int)out_produced;
+        *out_channels = 1;
+        return 0;
     }
-    ma_uint64 in_consumed = in_len;
-    ma_uint64 out_produced = out_len;
-    ma_resampler_process_pcm_frames(&rs, mono.data(), &in_consumed, result, &out_produced);
-    ma_resampler_uninit(&rs, nullptr);
+
+    float* result = (float*)std::malloc(mono.size() * sizeof(float));
+    if (!result)
+        return -3;
+    std::memcpy(result, mono.data(), mono.size() * sizeof(float));
     *out_buf = result;
-    *out_frames = (int)out_produced;
+    *out_frames = (int)mono.size();
     *out_channels = 1;
     return 0;
 }
