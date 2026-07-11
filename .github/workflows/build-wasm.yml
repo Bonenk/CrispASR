@@ -58,6 +58,13 @@ jobs:
             grep -q "ttsSynthesizeAsync" build-wasm/bin/libwhisper.wasm || \
               (echo "proxy build missing ttsSynthesizeAsync export" && exit 1)
           fi
+          # §166 build-verify: the backend-agnostic ASR session surface
+          # (asrOpen/asrClose/asrSet*) must actually compile + export in the
+          # WASM binding — it was added by inspection only (emsdk was broken on
+          # the dev box) and never had a build gate. asrOpen is the entry point;
+          # its presence proves the whole asr* Embind surface built.
+          grep -q "asrOpen" build-wasm/bin/libwhisper.wasm || \
+            (echo "WASM build missing asrOpen export (§166 asr* session surface)" && exit 1)
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

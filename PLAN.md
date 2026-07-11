@@ -990,7 +990,7 @@ WMA, AC-3/DTS, .ape). Remaining open: only item 4 (LOW).
 
 ---
 
-## §166 follow-up — WASM `asr*` session surface needs a build-verify (OPEN)
+## §166 follow-up — WASM `asr*` session surface needs a build-verify (MOSTLY DONE — build-verified in CI)
 
 Round 4 (2026-06-13, see HISTORY) added a backend-agnostic ASR session surface to
 the WASM/JS binding (`bindings/javascript/emscripten.cpp`:
@@ -1002,6 +1002,15 @@ manifest resolution; no Homebrew emscripten either). **Open:** build via
 `build-wasm.sh` / the WASM CI and smoke-test `asrTranscribe` in node/browser once
 an emcc toolchain is available. The §166 native-wrapper + server + Node-addon
 parity is DONE (HISTORY).
+
+**Update (build-verify DONE):** `build-wasm.yml` now builds the binding in CI
+(`build-wasm.sh --clean` across single-thread / proxy-to-pthread / webgpu), so
+the asr* surface is compiled on every relevant change — a compile break in
+`emscripten.cpp` fails CI. Added an explicit `grep -q "asrOpen" …libwhisper.wasm`
+guard to the Verify step (mirroring the existing `ttsSynthesizeAsync` check) so
+the asr* Embind exports can't silently drop out. Remaining (LOW): a runtime
+`asrTranscribe`-equivalent smoke test in node/browser — a nicety, not a
+build-verify; the compile+export gate is the part that was actually missing.
 
 ---
 
