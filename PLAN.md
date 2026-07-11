@@ -7369,16 +7369,58 @@ is now AUDITED ACROSS THE TREE and the clean fix is EXHAUSTED.
      docs/performance.md. Measurement, not a code change.
   4. **In-graph argmax** for the transducer greedy path (2 int32 vs 8198-logit
      readback) — minor now that persistent won; only the greedy no-hotword path.
-  5. **A real dia GPU path** — dia is CPU-only (`dia_tts.cpp:861`). Blocker: the
-     main model loads into a plain CPU ggml context (`:820-857`,
-     `gguf_init_from_file` w/ data), not a backend buffer — must rework onto a
-     GPU backend buffer (mirror the DAC's `core_gguf::load_weights` at `:989`).
-     Then debug GPU portability (DAC `conv_1d`/`cast`, sched splits, §234 gallocr,
-     Metal conv per §232 qwen3 FASTCONV) + TTS-roundtrip validation. 1.6B/3GB is
-     near the M1 4 GB budget → iterate carefully / use Kaggle for a clean CUDA
-     A/B. Its own session — full scoping + plan in `HANDOVER_dia_gpu.md` (a fresh
-     agent picks it up). Per LEARNING 34, gate any GPU default to CUDA/Vulkan
-     (Accelerate likely wins the decoder on Metal; measure DAC/encoder separately).
+  5. **A real dia GPU path** — **DONE 2026-07-11 (M1 Metal), default flipped to
+     GPU.** The blocker (main model in a plain CPU malloc ctx, not a backend
+     buffer) was reworked onto `core_gguf::load_weights(ctx->backend)`; DAC
+     already loaded on `ctx->backend` so it followed. Roundtrip-validated,
+     default GPU on all backends incl. Metal (dia's 1.6B decoder wins on Metal
+     too — LEARNING 34's Metal exclusion is for tiny transducers). `DIA_TTS_GPU`
+     kept as the A/B gate (`=0` CPU, `=1` force GPU). See the dedicated subsection
+     below. Kaggle CUDA A/B confirms the CUDA arm.
+
+### §232 dia TTS GPU path (DONE, 2026-07-11, M1 Metal — default GPU)
+
+dia was hard-pinned to CPU because the main model (encoder + 18L decoder + heads)
+loaded into a **plain CPU malloc ggml context** via `gguf_init_from_file(...,
+no_alloc=false)`. A GPU sched can't use those weights (not in a backend buffer —
+"sched no longer auto-copies CPU-buffer tensors"). Everything else was already
+backend-agnostic: all three graphs (encoder / cross-KV / per-step decode) run
+through `ggml_backend_sched`, and self-attn KV flows through host vectors +
+`ggml_backend_tensor_set/get` on sched-allocated graph inputs (`ctx->kv` is
+inert in the hot path). So the only blocker was weight residency + the CPU pin.
+
+**Change (`src/dia_tts.cpp`):** init the backend *before* loading and load the
+main model via `core_gguf::load_weights(path, ctx->backend, "dia", wl)` (mirrors
+the DAC path), binding the returned name→tensor map through the existing
+`dia_assign_weight`. DAC already loaded onto `ctx->backend`, so it follows to
+GPU. Free path now releases `buf_w` + the GPU backend.
+
+**Default:** GPU when `use_gpu` (not `--no-gpu`), on ALL GPU backends incl.
+Metal. `DIA_TTS_GPU` is the A/B / regression-bisection gate: `=0` forces the old
+CPU path, `=1` forces GPU even under `--no-gpu`.
+
+**A/B (M1, dia-1.6b-q4_k, 384 steps, seed 42, single run — indicative):**
+
+| stage | CPU | Metal GPU | speedup |
+|-------|-----|-----------|---------|
+| encoder | 13 655 ms | 145 ms | ~94× |
+| cross_attn_kv | 4 330 ms | 43 ms | ~101× |
+| decoder_ar | 116 311 ms | 77 334 ms | ~1.5× |
+| dac_decode | 20 474 ms | 4 221 ms | ~4.9× |
+
+Correctness: step-0 logits match to ~4 decimals (argmax=568 both, == Python
+ref); generate→ASR roundtrip (whisper-tiny) is **identical** on both arms ("The
+quick brown fox jumps over the lazy dog while the sun sets slowly behind..").
+Metal decode is *faster* here, not slower — dia's 1.6B decoder does large
+matmuls (unlike LEARNING 34's tiny parakeet transducer), so the launch-bound
+regime doesn't apply and Metal is NOT excluded. Both speed and quality win →
+default flipped (A/B rule #3), old path kept behind `DIA_TTS_GPU=0`. No k-quant
+CAST / left-pad PAD issues on this DAC (F16/F32 codec weights). Caveats: M1
+numbers are single-run on a loaded box (rule #5 wants median-of-3 — deltas are
+large enough that noise can't flip the verdict, decode's 1.5× the thinnest
+margin); a Kaggle CUDA A/B is running to confirm the CUDA arm; `load_weights_
+split` (encoder+DAC→GPU, decoder→CPU) is the fallback if any platform shows the
+decoder losing on GPU.
 
 ### §232 Moonshine decode — hybrid weight placement (DONE, 2026-07-11, M1 Metal)
 
