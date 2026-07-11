@@ -125,7 +125,11 @@ snapshot_download(ORIG_REPO, local_dir=str(REFMODEL), token=TOKEN or None,
 step("dl_refmodel_done", files=sorted(os.listdir(REFMODEL)))
 
 GGUF = {}
-for tag, fn in [("f16", "voxtral-4b-tts-f16.gguf"), ("q4_k", "voxtral-4b-tts-q4_k.gguf")]:
+# VTTS_DIFF_FULL=1 also compares Q4_K + runs the perf sweep; default (unset) is the fast
+# F16-vs-reference structural diagnosis only (Q4_K + perf already captured in a prior run).
+_FULL = os.environ.get("VTTS_DIFF_FULL") == "1"
+_gguf_list = [("f16", "voxtral-4b-tts-f16.gguf")] + ([("q4_k", "voxtral-4b-tts-q4_k.gguf")] if _FULL else [])
+for tag, fn in _gguf_list:
     try:
         GGUF[tag] = hf_hub_download(GGUF_REPO, fn, local_dir=str(MODELS), token=TOKEN or None)
         step("dl_gguf", tag=tag, size_gb=round(os.path.getsize(GGUF[tag]) / 1e9, 2))
@@ -196,6 +200,20 @@ def diff_codes(a, b):
             if abs(ca[i] - cb[i]) <= 1:
                 ac_pm1 += 1
     h_rel.sort()
+    # Per-frame trail (printed to stdout so it lands in the always-downloadable kernel log)
+    # + first-divergence localization: is frame 0 (prefill-only, no feedback) already off,
+    # or does divergence start later (acoustic-feedback cascade)?
+    per_frame, first_sem_div, first_ac_div = [], None, None
+    for f in common:
+        ha, ca = a[f]
+        hb, cb = b[f]
+        ac_ex = sum(1 for i in range(1, min(len(ca), len(cb))) if ca[i] == cb[i])
+        per_frame.append({"f": f, "hrel": round(abs(hb - ha) / ha, 4) if ha else None,
+                          "ref_sem": ca[0], "mine_sem": cb[0], "ac_exact": f"{ac_ex}/36"})
+        if first_sem_div is None and ca[0] != cb[0]:
+            first_sem_div = f
+        if first_ac_div is None and any(ca[i] != cb[i] for i in range(1, min(len(ca), len(cb)))):
+            first_ac_div = f
     return {
         "common_frames": len(common),
         "ref_frames": len(a), "mine_frames": len(b),
@@ -204,6 +222,9 @@ def diff_codes(a, b):
         "semantic_exact_pct": round(100 * sem_hit / len(common), 2),
         "acoustic_exact_pct": round(100 * ac_exact / ac_total, 2) if ac_total else None,
         "acoustic_pm1_pct": round(100 * ac_pm1 / ac_total, 2) if ac_total else None,
+        "first_semantic_divergence_frame": first_sem_div,
+        "first_acoustic_divergence_frame": first_ac_div,
+        "per_frame_first12": per_frame[:12],
     }
 
 
@@ -251,11 +272,11 @@ if ref:
     step("stage3", **summary["stage3_codec"])
 
 
-# ─────────────────────────── cell 8 (code) — perf step sweep ──────────────
+# ─────────────────────────── cell 8 (code) — perf step sweep (VTTS_DIFF_FULL only) ─
 _TIM = re.compile(r"LLM-decode\s+([\d.]+)\s+ms/frame,\s+FM\s+([\d.]+)\s+ms/frame")
 _FR = re.compile(r"generated\s+(\d+)\s+frames")
 g = GGUF.get("q4_k") or GGUF.get("f16")
-if g:
+if g and _FULL:
     for steps in (8, 7, 6, 5):
         env = {"CRISPASR_VOXTRAL_TTS_TIMING": "1"}
         if steps != 8:
@@ -289,6 +310,13 @@ for tag, d in summary["stage2_codes"].items():
           f"|h| relerr med={d.get('h_rel_median')} max={d.get('h_rel_max')} | "
           f"semantic {d.get('semantic_exact_pct')}% exact | "
           f"acoustic {d.get('acoustic_exact_pct')}% exact, {d.get('acoustic_pm1_pct')}% ±1", flush=True)
+print("STAGE 2 — first-divergence localization (is frame 0 already off, or a feedback cascade?):", flush=True)
+for tag, d in summary["stage2_codes"].items():
+    print(f"  {tag}: first semantic divergence @ frame {d.get('first_semantic_divergence_frame')}, "
+          f"first acoustic divergence @ frame {d.get('first_acoustic_divergence_frame')}", flush=True)
+    print(f"    {'frame':>5} {'|h|rel':>7} {'ref_sem':>8} {'mine_sem':>9} {'ac_exact':>9}", flush=True)
+    for pf in d.get("per_frame_first12", []):
+        print(f"    {pf['f']:>5} {str(pf['hrel']):>7} {pf['ref_sem']:>8} {pf['mine_sem']:>9} {pf['ac_exact']:>9}", flush=True)
 print("STAGE 3 (codec on identical ref codes):", flush=True)
 print(f"  {summary['stage3_codec']}", flush=True)
 print("PERF (FM ms/frame by ODE steps):", flush=True)
