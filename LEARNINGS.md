@@ -12037,11 +12037,61 @@ The qwen3-asr-1.7b Q4_K GGUF on HuggingFace produced empty transcripts because i
 **Lesson:** when a `crispasr-quantize` change adds a new tensor carve-out (keeping sensitive weights at higher precision), **every affected GGUF on HF must be re-baked**. The fix isn't deployed until the re-quantized file replaces the old one. Add a re-bake Kaggle kernel to the same PR/commit that adds the carve-out, not as a follow-up.
 
 
-## TTS code predictor: batch sequential AR steps in one graph dispatch, never N separate dispatches (#245, 2026-07-10)
+## TTS code predictor: the dispatch overhead is real, but "fuse into one graph" and "skip the reset" are BOTH wrong — the fix is a sched-free persistent graph (#245/§232, corrected 2026-07-11)
 
-CrispASR's qwen3-tts code predictor runs 15 separate `ggml_backend_sched_graph_compute` calls per audio frame (one per codebook). Each dispatch has scheduler overhead (alloc, reset, compute, read). This makes it ~40x slower per frame than predict-woo/qwen3-tts.cpp (10s vs 225ms on CPU). The graph topology is identical across all 15 steps — only the input data and KV write position change.
+CrispASR's qwen3-tts code predictor runs 15 `ggml_backend_sched_graph_compute`
+calls per audio frame (one per codebook 1-15), each paying scheduler
+reset+alloc+split. On M1 Metal that was ~25 ms/dispatch against sub-ms kernel
+time (~400 ms/frame). The original write-up of this entry proposed "fuse the
+15 into one graph, or at minimum skip the scheduler reset between steps."
+**Both halves of that advice are wrong** — recording the correction because
+each half detonates a known trap:
 
-**Lesson:** when an AR decode loop has a fixed number of sequential steps with identical graph topology, fuse them into a single graph dispatch (or at minimum skip scheduler reset between steps). The per-dispatch overhead dominates when compute per step is small (5-layer transformer). This applies to any multi-codebook TTS (qwen3-tts, orpheus, bark, csm) where a code predictor fills N codebooks per frame.
+- **You cannot fuse the 15 steps into one graph.** Between steps the logits go
+  to the CPU for `top_k`/seeded-RNG sampling, and the sampled id selects the
+  next `codec_embd` row — a genuine CPU round-trip data dependency. Bit-
+  identical output *requires* 15 dispatches with host sampling in between; a
+  single unrolled graph would have to bake the sampler into ggml (it can't, and
+  even a greedy argmax variant would change the output). This is the same
+  "sampling lives on the host between steps" property that stops you fusing any
+  real AR decode loop.
+- **"Skip the scheduler reset between steps" is exactly the #220/#171 hazard.**
+  Reusing an allocated sched across steps (the O15_SKIP_REALLOC path) crashes on
+  CUDA (stale captured-executable / UAF) and returns nil-buffer inputs → no
+  audio on current Metal. See the two entries above; do not reintroduce it.
+
+**The correct resolution — a third option between "reuse the sched plan"
+(unsafe) and "reset+alloc every step" (still pays the dispatch cost): drop the
+scheduler entirely for the hot step.** Build the T=1 step graph (and the T=2
+step-0 graph) ONCE into a private `ggml_context` arena with a fixed topology
+(pinned `Lk`, runtime `positions` feeding both RoPE and the `ggml_set_rows` KV
+write, `lm_head` routed through a writable slot tensor so all 14 skip-steps
+share one graph), `ggml_gallocr_new(default_buft(ctx->backend))` +
+`ggml_gallocr_alloc_graph` it ONCE on the single code-pred backend, then each
+step is just `ggml_backend_tensor_set` on the inputs + `ggml_backend_graph_
+compute(ctx->backend, gf)` + read. No `ggml_backend_sched` is involved, so the
+sched-plan-reuse breakage cannot occur by construction. Guard init with a
+per-node `ggml_backend_supports_op` scan and a KV-buffer-placement check; fall
+back to the sched path (and when the code-pred is CPU-pinned). Gated
+`QWEN3_TTS_CP_DIRECT`, **default ON for GPU backends** (`bf74d22b`).
+
+**Backend-dependent verdict — the same "fast path" flips sign across
+backends, so the default must be conditional:**
+- **CUDA P100:** −11 % (25.4 → 22.3 ms/frame), output-equivalent (PCM cos
+  0.9999999997) — a clean win, and it also sidesteps the #56 O15 CUDA crash.
+- **M1 Metal:** ~equal on an *idle* box (110 vs 111 ms/frame) but ~3× faster
+  *under load* — the sched path degrades badly under GPU contention, so the
+  real Metal win is robustness, not idle speed.
+- **CPU:** ~2× **slower** (87 → 160 ms/frame). There is no dispatch cost to
+  save on CPU, and the per-step `lm_head` slot blit (~2.2 MB `ggml_backend_
+  tensor_copy` ×14/frame) becomes pure overhead. → default OFF on CPU
+  (`c->backend == c->backend_cpu`); env overrides both ways.
+
+**Transferable lesson:** for any small fixed-topology hot graph (multi-codebook
+TTS code predictors, per-step decoders), the win is not fusion and not sched-
+reuse — it's a single-backend `gallocr` graph you allocate once and re-dispatch
+sched-free. And always A/B the "fast path" on CPU too: a per-step blit that is
+free on unified-memory GPU can dominate on CPU and invert the default.
 
 
 ## Python reference dumpers must apply identical audio conditioning as the C++ runtime (kyutai-stt 2.6B, 2026-07-10)
@@ -12257,3 +12307,82 @@ positions. With blueprint defaults: 278 unique codes, roundtrip VERBATIM.
    temperature), and CFG scale all change WHAT gets committed WHEN;
    "conservative" values don't fail loud, they converge to the model's
    safe token, which for audio is silence.
+
+
+## Vocoder/codec conv graphs hide three graph-construction wastes that dwarf the actual conv FLOPs — profile per-node before assuming it's inherent (#245/§232 qwen3-tts codec, 2026-07-11)
+
+The qwen3-tts codec decode read as ~3-4 s (RTF ~1.0 by itself, half the whole
+pipeline wall) and looked like honest vocoder compute. A per-node trace
+(`QWEN3_TTS_CODEC_TRACE`, an eval-callback that times + names + shows the
+backend of every node) proved otherwise: the wall was three kinds of
+graph-construction waste, none of them the K=7 SEANet convs that are the only
+legitimately expensive part. All three recur in any im2col-based conv1d stack
+(SEANet/HiFi-GAN/DAC/EnCodec/ConvNeXt decoders), so they're worth a checklist:
+
+1. **K=1 convs routed through `ggml_conv_1d`/im2col.** A 1×1 conv is a channel
+   matmul, but the generic helper still does transpose → im2col → matmul →
+   transpose. The im2col of a K=1 conv is a *pure copy* of the input, and at
+   24 kHz T it materializes ~300 MB F32 intermediates at ~75 ms each — ×12
+   sites here (every residual unit's `conv2`). Fix: detect `K==1 && stride==1`
+   and emit `ggml_mul_mat(reshape_2d(w), x)` directly on the `[C_in,T]` layout,
+   no transposes, no pad, no im2col.
+2. **Causal left-pad `ggml_pad_ext` nodes silently placed on the CPU backend.**
+   Metal rejects left/asymmetric PAD (`GGML_OP_PAD` needs left-pad==0), so the
+   scheduler routes every causal conv's explicit pad node to `backend_cpu`,
+   forcing a graph split + a cross-backend copy of the (padded) activation both
+   ways — per conv, per decode. Fix: don't emit a pad node at all — pad *inside*
+   im2col (`ggml_conv_1d(w, x, s, /*p=*/K-1, d)`) and crop to the first `T_out`
+   columns (`ggml_view_2d`). Bit-identical, and the whole CPU-placed subgraph
+   disappears. (Same trick as `voxcpm2_tts.cpp` `causal_conv1d_ggml`; also the
+   Metal-asymmetric-PAD note in `docs/contributing.md`.)
+3. **Per-graph F16→F32 kernel casts.** Our ggml fork's `ggml_conv_1d`/`_dw`
+   cast the conv *kernel* to F32 inside every graph when the activations are
+   F32 (so `mul_mat` gets an F32 src1). For multi-MB kernels that `ggml_cast`
+   runs every decode — the `in_conv` cast alone was ~70 ms/frame. Fix: bake
+   F32 copies of the K>1 conv kernels ONCE at load into a dedicated context/
+   buffer and repoint the tensor pointers; the in-graph cast becomes a no-op.
+   (~+55 MB resident; K==1 kernels excluded because the matmul path from #1
+   consumes F16 directly.)
+
+Result on M1 Metal (0.6B Q8_0): codec 3.9 → 1.3 s (~3×), WAV **md5-identical**;
+on CPU 9.1 → 4.3 s (~2.1×), within 1 int16 LSB / PCM cos 1.00000000 (the K=1
+matmul realizes slightly differently than im2col+matmul — an expected float-
+order difference, not a bug; acceptance falls to decoded-output equivalence per
+the house rule). Total 0.6B pipeline RTF 2.9 → 1.25. Peak intermediates roughly
+halved as a side effect, which also cured a 16 GB-Mac 1.7B jetsam/OOM on long
+outputs. Gated `QWEN3_TTS_CODEC_FASTCONV`, default ON. **Lesson:** before
+accepting a conv/vocoder graph's cost as inherent, per-node-trace it — the
+usual suspects are 1×1-through-im2col, asymmetric-PAD-shunted-to-CPU, and
+per-graph weight casts, all of which are graph-shape bugs, not compute.
+
+
+## Before optimizing a graph's *dispatch*, split host-encode vs GPU-execute — and never trust a GPU benchmark taken under load (talker §232, 2026-07-11)
+
+Having won on the qwen3-tts code predictor by going sched-free, the obvious next
+move was the same treatment for the talker AR step (~50 ms/frame on a quiet M1).
+It would have been wasted work. `CRISPASR_METAL_PROFILE` (which splits each
+`ggml_metal_graph_compute` into host encode+commit time vs GPU execute+sync
+time) showed the 1068-node talker step is **encode 2-3 ms, GPU-execute
+38-42 ms** — GPU-execution-bound. Sched-free dispatch or an MTLIndirectCommand
+Buffer replay can only remove *host* encode time, so they can't help here (same
+verdict as the §210 granite ICB probe). Confirmed empirically: the sched-free
+bucket path computes in ~56 ms/step vs ~54 ms dynamic. The op profile explains
+the floor — ~460 real ops/step, `mul_mat` only ~24 %, ~85 `cont` copies plus
+hundreds of tiny norm/add/rope kernels; it's death by kernel *count*, and the
+only lever left is node-count slimming inside the shared `core_attn::kv_self_
+attn` (30+ backends, high regression risk) → deprioritized with data instead of
+attempted.
+
+Two reusable rules:
+- **Attribute host vs device before choosing a dispatch optimization.** "It's
+  slow and it's a small model" does NOT mean it's dispatch-bound. If GPU-execute
+  dominates, no amount of gallocr/ICB/graph-reuse cleverness moves it; you need
+  fewer/bigger kernels, not fewer dispatches.
+- **A GPU benchmark taken under contention is noise.** On this 16 GB M1 with
+  other sessions running, `CRISPASR_METAL_PROFILE` `gpu_us` for *identical*
+  193-node code-pred graphs swung 4-17 ms purely from WindowServer/browser GPU
+  time-slicing, and whole-pipeline ms/frame swung 2-3× run to run. Every number
+  above was taken load-gated (1-min loadavg < 6, sustained across two checks) or
+  as min-of-N interleaved reps. A "3× speedup" measured against a contended
+  baseline can be entirely the baseline degrading — interleave old/new in the
+  same quiet window before believing a ratio.

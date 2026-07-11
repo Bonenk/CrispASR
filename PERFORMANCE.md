@@ -2949,12 +2949,20 @@ core infrastructure.
   coefficients recomputed per call
 
 **Qwen3 TTS** (`qwen3_tts.cpp`):
-- Has: **Lk-bucketing** (5 pre-built graphs), **O15 code-predictor
-  reuse** (14-19 ms/frame saving), **CPU embedding cache**, per-op
-  profiler, fused QKV, codec CPU pinning workaround, dedicated talker
-  scheduler, flash attn throughout
-- Gap: O15 default OFF (CUDA sm_87 crash), Lk bucket boundaries
-  hardcoded, no speculative decoding
+- Has: **CP_DIRECT sched-free code predictor** (§232, default ON GPU /
+  OFF CPU — two persistent gallocr graphs, no scheduler; −11 % CUDA,
+  ~3× under Metal load, md5-identical; supersedes O15 and fixes its #56
+  CUDA crash), **codec FASTCONV** (§232, default ON — K=1-conv→matmul +
+  pad-in-im2col + load-time F32 kernel bake; codec 3× Metal / 2.1× CPU,
+  0.6B pipeline RTF 2.9→1.25), **CPU embedding cache**, per-op profiler
+  + per-node codec trace, fused QKV, dedicated talker scheduler, flash
+  attn throughout. Lk-bucketing (opt-in, sched-free since §232 — Metal
+  loses ~10 % at short outputs, fastest config on CUDA P100).
+- Gap: talker AR step is **GPU-execution-bound** (§232 profiled: encode
+  2-3 ms vs GPU 38-42 ms — dispatch tricks can't help; needs kv_self_attn
+  node-count slimming, shared 30-backend helper, deprioritized); codec
+  residual cost is the legitimate K=7 SEANet im2cols; no speculative
+  decoding.
 
 **CosyVoice3** (`cosyvoice3_tts.cpp`):
 - Has: RAS sampler, multi-GGUF pipeline, voice packs with precomputed
