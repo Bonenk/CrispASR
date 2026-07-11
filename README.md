@@ -24,6 +24,7 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 ### What's new (v0.8.3)
 
 - **Audio format expansion (v0.8.3):** `.opus`, `.webm`, `.au`, `.amr`, `.m4a`/`.aac` decode — no ffmpeg. Apple platforms use AudioToolbox natively for AAC/M4A/ALAC/CAF/AIFF.
+- **Native cross-platform AAC input:** raw ADTS `.aac` is decoded by the in-tree clean-room [glint](https://github.com/CrispStrobe/glint) AAC-LC decoder — always available on every platform, no runtime library. Set `CRISPASR_AAC_DECODER=fdk`/`coreaudio` to pin the previous platform decoder.
 - **qwen3-tts: GQA_NATIVE + chunked codec (v0.8.3, #183):** O(N²)→O(N) scaling on Vulkan; RTF stays ~0.5 at any text length. Chunked codec decode caps VRAM peak. Scratch scheduler reset prevents cross-request memory bloat.
 - **vibevoice TTS on Vulkan/CUDA (v0.8.3, #184):** fixed segfault on AMD RDNA4 (strided view fix) and illegal memory access on CUDA (stale gallocr state in bucket cache).
 - **chatterbox: long-text + turbo emotion tags (v0.8.2, #182):** sentence-chunked synthesis for arbitrarily long input; `[laugh]`, `[whispering]`, `[angry]` etc. drive turbo prosody.
@@ -915,6 +916,7 @@ downloads (in that order).
 - **[Silero](https://github.com/snakers4/silero-vad)** — VAD (native GGUF) and language identification (native GGUF, 95 languages)
 - **[pyannote](https://github.com/pyannote/pyannote-audio)** — speaker diarization segmentation (native GGUF port)
 - **[miniaudio](https://miniaud.io/)** + **[stb_vorbis](https://github.com/nothings/stb)** + **[libopus/opusfile](https://opus-codec.org/)** — embedded/linked audio decoders (WAV/MP3/FLAC/AIFF/OGG/Opus, no ffmpeg; AAC/M4A/ALAC via Apple AudioToolbox)
+- **[glint](https://github.com/CrispStrobe/glint)** (MIT) — in-tree clean-room codec suite: MP3/AAC-LC output encoders (TTS `.mp3`/`.aac`) and the cross-platform ADTS AAC-LC input decoder
 - **[Claude Code](https://claude.ai/claude-code)** (Anthropic) — significant portions of the crispasr integration layer, all model converters, and the FastConformer/attention/mel/FFN/BPE core helpers were co-authored with Claude
 
 ---

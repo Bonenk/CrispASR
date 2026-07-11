@@ -10,7 +10,10 @@
 // `ma_decoder` stream. Ogg Vorbis is handled by stb_vorbis (include it
 // header-only before miniaudio so MA_HAS_VORBIS is auto-defined). Opus is added
 // as a miniaudio custom backend (libopus/opusfile, CRISPASR_HAVE_OPUS; see
-// below), and AAC/M4A/ALAC/CAF fall back to AudioToolbox on Apple. All
+// below). Raw ADTS AAC-LC (.aac) is decoded by the in-tree glint clean-room
+// decoder — cross-platform and always available, no runtime library (gated by
+// CRISPASR_AAC_DECODER, glint primary); container AAC (M4A/ALAC/CAF) still
+// falls back to fdk-aac (dlopen) or AudioToolbox on Apple. All
 // permissive-licensed; ffmpeg stays an optional dynamic fallback only.
 
 // On Windows, include Media Foundation headers BEFORE miniaudio /
@@ -71,6 +74,10 @@
 #include <cstring>
 #include <string>
 #include <vector>
+
+// In-tree glint clean-room codec suite — used here for always-available,
+// cross-platform AAC-LC (ADTS) decode of raw .aac input (public C ABI only).
+#include <glint/glint.h>
 
 // Optional .opus (Ogg/Opus) support via libopus + opusfile (BSD-3-Clause),
 // wired in as a miniaudio custom decoding backend so .opus flows through the
@@ -2368,6 +2375,146 @@ int crispasr_ndk_decode(const char* path, int want_channels, float** out_buf, in
 ///   -2 decoder init failed (unsupported format or read error)
 ///   -3 allocation failed
 ///   -4 decode of a chunk failed mid-stream
+namespace {
+
+// ── glint ADTS AAC-LC decoder (cross-platform, no runtime dependency) ────────
+// Always-available AAC-LC decode for raw ADTS (.aac) via the in-tree glint
+// clean-room decoder (public C ABI). This is the PRIMARY path for raw AAC on
+// every platform, replacing the previously platform-specific chain
+// (fdk-aac dlopen on Linux/Windows, AudioToolbox on Apple) which required an
+// optional runtime library. glint's AAC-LC decoder matches ffmpeg and Apple
+// CoreAudio at 86–135 dB.
+//
+// Gated per the A/B convention: set CRISPASR_AAC_DECODER=fdk|coreaudio|os to
+// pin the old platform decoder (glint returns -2, caller falls through);
+// =glint|auto|unset keeps glint primary. On any glint failure we also return
+// -2 so the existing fallback chain still runs — the working path is never
+// removed. CRISPASR_AAC_DEBUG=1 prints a one-line decode summary.
+//
+// Signature matches the loader's other fallbacks (and the stereo
+// split_fallback lambda): returns 0 with a malloc-owned 16 kHz mono f32 buffer,
+// or a negative error. MP4/M4A/ALAC/CAF are NOT ADTS and are left to the
+// container-aware decoders.
+int crispasr_adts_decode_glint(const char* path, int want_channels, float** out_buf, int* out_frames,
+                               int* out_channels) {
+    (void)want_channels; // 16 kHz ASR path is mono; downmix here
+
+    if (const char* pref = std::getenv("CRISPASR_AAC_DECODER")) {
+        if (pref[0] && std::strcmp(pref, "glint") != 0 && std::strcmp(pref, "auto") != 0)
+            return -2; // user pinned a non-glint decoder
+    }
+    const bool dbg = [] {
+        const char* e = std::getenv("CRISPASR_AAC_DEBUG");
+        return e && e[0] && e[0] != '0';
+    }();
+
+    FILE* f = std::fopen(path, "rb");
+    if (!f)
+        return -2;
+    std::fseek(f, 0, SEEK_END);
+    long fsize = std::ftell(f);
+    std::fseek(f, 0, SEEK_SET);
+    if (fsize <= 2 || fsize > 500 * 1024 * 1024) {
+        std::fclose(f);
+        return -2;
+    }
+    std::vector<uint8_t> buf((size_t)fsize);
+    if (std::fread(buf.data(), 1, (size_t)fsize, f) != (size_t)fsize) {
+        std::fclose(f);
+        return -2;
+    }
+    std::fclose(f);
+
+    // Skip a leading ID3v2 tag if present (our own AAC writer prepends one).
+    size_t pos = 0;
+    if (buf.size() > 10 && buf[0] == 'I' && buf[1] == 'D' && buf[2] == '3') {
+        size_t tag = ((size_t)(buf[6] & 0x7f) << 21) | ((size_t)(buf[7] & 0x7f) << 14) |
+                     ((size_t)(buf[8] & 0x7f) << 7) | (size_t)(buf[9] & 0x7f);
+        pos = 10 + tag;
+    }
+    // ADTS syncword is 0xFFF (12 bits): byte0 == 0xFF, byte1 high nibble == 0xF.
+    if (pos + 2 > buf.size() || buf[pos] != 0xFF || (buf[pos + 1] & 0xF0) != 0xF0)
+        return -2; // not ADTS — let the container decoders handle it
+
+    glint_aac_dec_t dec = glint_aac_dec_create();
+    if (!dec)
+        return -2;
+
+    std::vector<float> mono; // native-rate mono
+    std::vector<float> frame_pcm(1024 * 8);
+    int sr = 0, decoded_frames = 0;
+    while (pos + 2 <= buf.size()) {
+        if (buf[pos] != 0xFF || (buf[pos + 1] & 0xF0) != 0xF0) {
+            // Resync to the next ADTS syncword (tolerate stray bytes).
+            size_t scan = pos + 1;
+            while (scan + 1 < buf.size() && !(buf[scan] == 0xFF && (buf[scan + 1] & 0xF0) == 0xF0))
+                ++scan;
+            if (scan + 1 >= buf.size())
+                break;
+            pos = scan;
+        }
+        glint_dec_frame_info fi;
+        int n = glint_aac_decode(dec, buf.data() + pos, (int)(buf.size() - pos), frame_pcm.data(), &fi);
+        if (n <= 0 || fi.frame_bytes <= 0)
+            break;
+        sr = fi.sample_rate;
+        const int ch = fi.channels > 0 ? fi.channels : 1;
+        mono.reserve(mono.size() + (size_t)n);
+        for (int i = 0; i < n; ++i) {
+            float s = 0.0f;
+            for (int c = 0; c < ch; ++c)
+                s += frame_pcm[(size_t)i * ch + c];
+            mono.push_back(s / (float)ch);
+        }
+        pos += (size_t)fi.frame_bytes;
+        ++decoded_frames;
+    }
+    glint_aac_dec_destroy(dec);
+
+    if (mono.empty() || sr <= 0)
+        return -2;
+    if (dbg)
+        std::fprintf(stderr, "[glint-aac] decoded %d frames, %zu samples @ %d Hz -> 16 kHz mono\n", decoded_frames,
+                     mono.size(), sr);
+
+    // Resample native → 16 kHz mono (linear; matches the fdk/M4A path).
+    if (sr != kTargetSampleRate) {
+        ma_resampler_config rcfg =
+            ma_resampler_config_init(ma_format_f32, 1, (ma_uint32)sr, kTargetSampleRate, ma_resample_algorithm_linear);
+        ma_resampler rs;
+        if (ma_resampler_init(&rcfg, nullptr, &rs) != MA_SUCCESS)
+            return -2;
+        ma_uint64 in_len = mono.size();
+        ma_uint64 out_len = 0;
+        ma_resampler_get_expected_output_frame_count(&rs, in_len, &out_len);
+        out_len += 256;
+        float* result = (float*)std::malloc((size_t)out_len * sizeof(float));
+        if (!result) {
+            ma_resampler_uninit(&rs, nullptr);
+            return -3;
+        }
+        ma_uint64 in_consumed = in_len;
+        ma_uint64 out_produced = out_len;
+        ma_resampler_process_pcm_frames(&rs, mono.data(), &in_consumed, result, &out_produced);
+        ma_resampler_uninit(&rs, nullptr);
+        *out_buf = result;
+        *out_frames = (int)out_produced;
+        *out_channels = 1;
+        return 0;
+    }
+
+    float* result = (float*)std::malloc(mono.size() * sizeof(float));
+    if (!result)
+        return -3;
+    std::memcpy(result, mono.data(), mono.size() * sizeof(float));
+    *out_buf = result;
+    *out_frames = (int)mono.size();
+    *out_channels = 1;
+    return 0;
+}
+
+} // namespace
+
 CA_EXPORT int crispasr_audio_load(const char* path, float** out_pcm, int* out_samples, int* out_sample_rate) {
     if (!path || !out_pcm || !out_samples)
         return -1;
@@ -2380,6 +2527,21 @@ CA_EXPORT int crispasr_audio_load(const char* path, float** out_pcm, int* out_sa
     CRISPASR_OPUS_DECODER_CONFIG(cfg);
     ma_decoder decoder;
     if (ma_decoder_init_file(path, &cfg, &decoder) != MA_SUCCESS) {
+        // Raw ADTS AAC-LC (.aac) via the in-tree glint decoder — cross-platform,
+        // no runtime dependency, PRIMARY unless CRISPASR_AAC_DECODER pins the
+        // platform decoder. Returns -2 for non-ADTS (MP4/M4A) so the
+        // container-aware fallbacks below still run.
+        {
+            float* g_buf = nullptr;
+            int g_fr = 0, g_ch = 0;
+            if (crispasr_adts_decode_glint(path, 1, &g_buf, &g_fr, &g_ch) == 0) {
+                *out_pcm = g_buf;
+                *out_samples = g_fr;
+                if (out_sample_rate)
+                    *out_sample_rate = kTargetSampleRate;
+                return 0;
+            }
+        }
 #if defined(__APPLE__)
         // Format miniaudio can't decode (AAC / M4A / ALAC / CAF …) — try the
         // OS-native AudioToolbox decoder. Requesting 1 channel gives mono
@@ -2622,6 +2784,10 @@ CA_EXPORT int crispasr_audio_load_stereo(const char* path, float** out_left, flo
                 *out_sample_rate = kTargetSampleRate;
             return 0;
         };
+        // Raw ADTS AAC-LC (.aac) via glint — cross-platform primary (see the
+        // mono loader). Non-ADTS returns -2 and falls through.
+        if (split_fallback(crispasr_adts_decode_glint) == 0)
+            return 0;
         // AU / .snd fallback
         if (split_fallback(crispasr_au_decode) == 0)
             return 0;

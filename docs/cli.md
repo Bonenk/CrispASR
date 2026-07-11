@@ -1036,19 +1036,28 @@ embedded or linked:
 - **libopus + opusfile** (BSD-3) — **`.opus`** (Ogg/Opus). Built by default
   (`CRISPASR_OPUS`, on when system `opusfile` is found; `CRISPASR_OPUS_FETCH=ON`
   builds it statically for platforms without system libs)
-- **AudioToolbox** (Apple system framework) — **`.aac` / `.m4a` / `.alac` /
-  `.caf`** on macOS/iOS, no extra dependency
+- **[glint](https://github.com/CrispStrobe/glint)** (MIT) — in-tree clean-room
+  decoder for **raw ADTS `.aac`** (AAC-LC), cross-platform and always available
+  with no runtime library. This is the primary `.aac` path on every platform;
+  set `CRISPASR_AAC_DECODER=fdk`/`coreaudio` to pin the previous platform
+  decoder, or `=glint` to force glint (default). `CRISPASR_AAC_DEBUG=1` prints a
+  one-line decode summary.
+- **AudioToolbox** (Apple system framework) — container **`.m4a` / `.alac` /
+  `.caf`** (and `.aac`) on macOS/iOS, no extra dependency; **fdk-aac** via
+  `dlopen` provides the same container support on Linux/Windows when installed.
 
 | Format | Linux/other | Apple (macOS/iOS) | `CRISPASR_FFMPEG=ON` |
 |---|:---:|:---:|:---:|
 | WAV / FLAC / MP3 / OGG Vorbis / AIFF / W64 / RF64 | ✔ | ✔ | ✔ |
 | `.opus` | ✔ | ✔ | ✔ |
-| `.aac` / `.m4a` / `.alac` / `.caf` | ✗¹ | ✔ (AudioToolbox) | ✔ |
+| `.aac` (raw ADTS, AAC-LC) | ✔ (glint) | ✔ (glint) | ✔ |
+| `.m4a` / `.alac` / `.caf` (container) | ✔¹ | ✔ (AudioToolbox) | ✔ |
 | `.webm` / `.wma` / `.amr` / raw PCM | ✗ | ✗ | ✔ / pre-convert |
 
-¹ No permissive cross-platform AAC decoder exists. On Apple it's handled natively
-(AudioToolbox); on Windows/Android the OS decoders (Media Foundation /
-MediaCodec) are planned; on Linux use `CRISPASR_FFMPEG=ON` or pre-convert.
+¹ Container AAC (`.m4a`) needs libfdk-aac installed (loaded via `dlopen`) or
+`CRISPASR_FFMPEG=ON`; only **raw ADTS `.aac`** is covered dependency-free by the
+in-tree glint decoder. On Apple all AAC/ALAC/CAF is handled natively
+(AudioToolbox).
 
 For anything not covered natively, build with `CRISPASR_FFMPEG=ON` (an optional,
 dynamically-linked fallback — see [install.md](install.md)) or pre-convert:
