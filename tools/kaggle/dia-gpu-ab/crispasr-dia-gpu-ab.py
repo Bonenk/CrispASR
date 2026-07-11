@@ -151,7 +151,10 @@ def run_cfg(label: str, env_extra: dict) -> dict:
             stages.setdefault(m.group(1), []).append(float(m.group(2)))
         if rep == 0:
             tokens = [ln.split(":", 1)[1].strip() for ln in log.splitlines() if ln.startswith("DIA_TOK step")]
-            gpu_line = "GPU backend enabled" in log
+            # Detect GPU engagement from ggml's UNCONDITIONAL backend-init banner
+            # (the "dia_tts: GPU backend enabled" line is verbosity-gated and -np
+            # suppresses it — that produced a false "did not engage" last run).
+            gpu_line = bool(re.search(r"ggml_cuda|CUDA\d|found \d+ CUDA|ggml_metal|GPU backend enabled", log))
             fm = re.search(r"(\d+) valid code frames", log)
             frames = int(fm.group(1)) if fm else None
             if not stages or not tokens:
@@ -182,6 +185,8 @@ if cpu["total"] and gpu["total"] and gpu["total"] > 0:
 
 if not gpu["gpu"]:
     verdict = "GPU DID NOT ENGAGE (check CUDA build / DIA_TTS_GPU gate)"
+elif len(gpu["tokens"]) == 0 or gpu["total"] is None:
+    verdict = "GPU RUN FAILED (decoder produced no tokens — likely a CUDA op abort)"
 elif not parity:
     verdict = f"CORRECTNESS FAIL (first token divergence @ step {first_div})"
 elif speedup and speedup > 1.1:
