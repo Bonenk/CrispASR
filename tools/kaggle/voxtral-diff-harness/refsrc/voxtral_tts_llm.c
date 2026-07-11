@@ -168,6 +168,19 @@ static int alloc_decoder_buffers(tts_ctx_t *ctx) {
  * Single-Token Forward Pass (autoregressive generation)
  * ======================================================================== */
 
+/* Per-stage diff harness: dump per-layer hidden for frame 0 only (set by the frame
+ * loop in voxtral_tts.c). Matches the CrispASR runtime's CRISPASR_VOXTRAL_TTS_DIFF_DUMP
+ * layout so a per-layer cos comparison localizes the first divergence. */
+int g_tts_diff_frame = -1; /* frame loop sets this; -1 during prefill = no dump */
+static void tts_diff_dump(const char *stage, const float *v, int n) {
+    const char *dd = getenv("VTTS_DIFF_DUMP");
+    if (!dd || g_tts_diff_frame != 0) return;
+    char p[512];
+    snprintf(p, sizeof(p), "%s/ref.%s.bin", dd, stage);
+    FILE *fp = fopen(p, "wb");
+    if (fp) { fwrite(v, sizeof(float), (size_t)n, fp); fclose(fp); }
+}
+
 void tts_llm_forward(tts_ctx_t *ctx, const float *input_embed, float *out_hidden) {
     /*
      * Process a single token through all 26 layers.
@@ -200,6 +213,7 @@ void tts_llm_forward(tts_ctx_t *ctx, const float *input_embed, float *out_hidden
 
     /* Start with input embedding */
     tts_copy(ctx->dec_x, input_embed, dim);
+    tts_diff_dump("embed", ctx->dec_x, dim);
 
     /* Process each layer */
     for (int layer = 0; layer < TTS_DEC_LAYERS; layer++) {
@@ -261,10 +275,17 @@ void tts_llm_forward(tts_ctx_t *ctx, const float *input_embed, float *out_hidden
 
         /* Residual */
         tts_add_inplace(ctx->dec_x, ctx->dec_ffn_out, dim);
+
+        {
+            char nm[24];
+            snprintf(nm, sizeof(nm), "llm_L%d", layer);
+            tts_diff_dump(nm, ctx->dec_x, dim);
+        }
     }
 
     /* Final norm */
     tts_rms_norm(out_hidden, ctx->dec_x, dec->norm, 1, dim, TTS_DEC_NORM_EPS);
+    tts_diff_dump("hidden", out_hidden, dim);
 
     /* Advance cache position */
     ctx->kv_cache_len++;

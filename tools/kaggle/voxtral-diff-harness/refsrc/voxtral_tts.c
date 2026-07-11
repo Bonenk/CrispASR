@@ -299,7 +299,9 @@ int tts_generate(tts_ctx_t *ctx, const char *text, const char *voice_name,
     int n_frames = 0;
     fprintf(stderr, "Generating audio");
 
+    extern int g_tts_diff_frame; /* per-stage diff harness: dump per-layer only at frame 0 */
     for (int frame = 0; frame < max_frames; frame++) {
+        g_tts_diff_frame = frame;
         tts_llm_forward(ctx, next_embed, hidden);
 
         int codes[TTS_CODES_PER_FRAME];
