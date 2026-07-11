@@ -3,6 +3,8 @@
 
 #include "resample.hpp"
 
+#include <cstddef>
+
 #include <cmath>
 
 namespace glint {
