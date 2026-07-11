@@ -23,6 +23,11 @@
 extern "C" int crispasr_audio_load(const char* path, float** out_pcm, int* out_samples, int* out_sample_rate);
 extern "C" void crispasr_audio_free(float* pcm);
 
+// Header-only WAV reader used directly by the indextts/voxcpm2 --voice paths
+// (crispasr_audio_load routes WAV through miniaudio, not this), so its own
+// malicious-size clamp needs a direct test.
+#include "core/wav_reader.h"
+
 // ── helpers ──────────────────────────────────────────────────────────
 
 #ifndef SAMPLES_DIR
@@ -191,6 +196,54 @@ TEST_CASE("crispasr_audio_load rejects malicious AU sizes without over-allocatin
         CHECK(rc != 0); // offset past EOF → clean rejection, no underflow
     }
 
+    std::remove(path);
+}
+
+// Regression: read_wav_mono_pcm16 sized its int16 buffer from the untrusted
+// `data` chunk_size — a tiny WAV claiming data_size ~2 GB forced a ~2 GB alloc.
+// Now clamped to the real file size. Require survival + a tiny result.
+TEST_CASE("read_wav_mono_pcm16 clamps malicious data_size without over-allocating", "[audio][unit]") {
+    std::vector<uint8_t> w;
+    auto le32 = [&](uint32_t v) {
+        for (int i = 0; i < 4; i++)
+            w.push_back((uint8_t)(v >> (8 * i)));
+    };
+    auto le16 = [&](uint16_t v) {
+        w.push_back((uint8_t)v);
+        w.push_back((uint8_t)(v >> 8));
+    };
+    auto tag = [&](const char* s) {
+        for (int i = 0; i < 4; i++)
+            w.push_back((uint8_t)s[i]);
+    };
+    tag("RIFF");
+    le32(0x7FFFFFFFu);
+    tag("WAVE");
+    tag("fmt ");
+    le32(16);
+    le16(1);
+    le16(1);
+    le32(16000);
+    le32(32000);
+    le16(2);
+    le16(16);
+    tag("data");
+    le32(0x7FFFFFFEu); // claims ~2 GB
+    for (int i = 0; i < 8; i++)
+        w.push_back(0x11); // but only 8 real bytes
+    const char* path = "crispasr_wav_regression_tmp.wav";
+    {
+        FILE* f = std::fopen(path, "wb");
+        REQUIRE(f != nullptr);
+        std::fwrite(w.data(), 1, w.size(), f);
+        std::fclose(f);
+    }
+
+    std::vector<float> pcm;
+    int rate = 0;
+    bool ok = crispasr::core::read_wav_mono_pcm16(path, pcm, rate);
+    if (ok)
+        CHECK(pcm.size() < 1000);
     std::remove(path);
 }
 

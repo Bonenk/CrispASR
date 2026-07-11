@@ -867,6 +867,12 @@ static std::vector<OpusPacket> parse_block_packets(const uint8_t* block_data, si
         if (n_frames <= 0 || br.remaining() == 0)
             return packets;
         size_t frame_size = br.remaining() / (size_t)n_frames;
+        // A zero-size fixed frame is meaningless and makes the loop below emit
+        // n_frames (up to 256) empty packets while br.skip(0) never advances —
+        // a crafted cluster of tiny blocks amplifies that into billions of
+        // empty vectors (OOM DoS). Reject it.
+        if (frame_size == 0)
+            return packets;
         for (int i = 0; i < n_frames && br.remaining() >= frame_size; ++i) {
             packets.push_back({br.ptr(), frame_size});
             br.skip(frame_size);
@@ -1055,6 +1061,11 @@ int crispasr_webm_decode(const char* path, int want_channels, float** out_buf, i
                     for (auto& p : pkts) {
                         opus_packets.emplace_back(p.data, p.data + p.size);
                     }
+                    // Defense-in-depth cap: a valid Opus packet occupies >=1 byte
+                    // of the file, so the packet count can never legitimately
+                    // exceed the file size — bail rather than accumulate forever.
+                    if (opus_packets.size() > file_data.size())
+                        return -2;
                 } else if (bid == EBML_BLOCK_GROUP) {
                     // Find Block element inside BlockGroup
                     EBMLReader bg(r.data, block_end);
@@ -1072,6 +1083,8 @@ int crispasr_webm_decode(const char* path, int want_channels, float** out_buf, i
                             for (auto& p : pkts) {
                                 opus_packets.emplace_back(p.data, p.data + p.size);
                             }
+                            if (opus_packets.size() > file_data.size())
+                                return -2;
                         }
                         bg.pos = bg_elem_end;
                     }
@@ -1827,6 +1840,13 @@ static bool mp4_parse_audio(const uint8_t* data, size_t data_size, MP4AudioInfo&
                     if (bstart + 12 <= bend) {
                         uint32_t uniform_size = mp4_be32(data + bstart + 4);
                         uint32_t count = mp4_be32(data + bstart + 8);
+                        // Clamp the untrusted count so a crafted box can't drive a
+                        // multi-GB resize(): the non-uniform table needs 4 bytes per
+                        // entry (bounded by the box), and even a uniform table can't
+                        // describe more samples than the file has bytes.
+                        size_t max_count = (uniform_size != 0) ? data_size : (bend - (bstart + 12)) / 4;
+                        if (count > max_count)
+                            count = (uint32_t)max_count;
                         info.sample_sizes.resize(count);
                         if (uniform_size != 0) {
                             for (uint32_t i = 0; i < count; ++i)
@@ -1840,6 +1860,10 @@ static bool mp4_parse_audio(const uint8_t* data, size_t data_size, MP4AudioInfo&
                     // Chunk offset box (32-bit): version(4) + count(4) + [offsets]
                     if (bstart + 8 <= bend) {
                         uint32_t count = mp4_be32(data + bstart + 4);
+                        // Clamp: 4 bytes per offset, bounded by the box's remaining bytes.
+                        size_t max_count = (bend - (bstart + 8)) / 4;
+                        if (count > max_count)
+                            count = (uint32_t)max_count;
                         info.chunk_offsets.resize(count);
                         for (uint32_t i = 0; i < count && bstart + 8 + (i + 1) * 4 <= bend; ++i)
                             info.chunk_offsets[i] = mp4_be32(data + bstart + 8 + i * 4);
@@ -1848,6 +1872,10 @@ static bool mp4_parse_audio(const uint8_t* data, size_t data_size, MP4AudioInfo&
                     // Chunk offset box (64-bit): version(4) + count(4) + [offsets]
                     if (bstart + 8 <= bend) {
                         uint32_t count = mp4_be32(data + bstart + 4);
+                        // Clamp: 8 bytes per offset, bounded by the box's remaining bytes.
+                        size_t max_count = (bend - (bstart + 8)) / 8;
+                        if (count > max_count)
+                            count = (uint32_t)max_count;
                         info.chunk_offsets.resize(count);
                         for (uint32_t i = 0; i < count && bstart + 8 + (i + 1) * 8 <= bend; ++i)
                             info.chunk_offsets[i] = mp4_be64(data + bstart + 8 + i * 8);
@@ -2004,7 +2032,10 @@ int crispasr_m4a_decode(const char* path, int want_channels, float** out_buf, in
         for (size_t i = 0; i < mp4info.sample_sizes.size(); ++i) {
             uint64_t off = (i < sample_offsets.size()) ? sample_offsets[i] : 0;
             uint32_t sz = mp4info.sample_sizes[i];
-            if (off + sz > file_data.size())
+            // Overflow-safe bounds check: `off + sz` can wrap in uint64 for a
+            // co64 offset near UINT64_MAX, defeating the guard and yielding a
+            // wild `file_data.data() + off` pointer. Compare subtractively.
+            if (off > file_data.size() || sz > file_data.size() - off)
                 continue;
 
             FDK_UCHAR* in_ptr = file_data.data() + off;
