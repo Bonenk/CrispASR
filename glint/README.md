@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `80e20399a12bfa30c8a98df17a19820efecb418c` (fix(opus): include <cstddef> for size_t in opus_ogg.hpp).
+Synced at upstream commit: `5e9d674ff81d49ffa6cd762075d58108c1a17e9e` (fix(build): define _USE_MATH_DEFINES for MSVC (M_PI in Opus/decoder/resample)).
