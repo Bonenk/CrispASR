@@ -6736,7 +6736,7 @@ slower than dir in 3/3 interleaved reps) → stays opt-in.
       per-cb graphs or in-graph lm_head selection via get_rows, then revisit
       the CPU default.
 
-## §234 omnivoice — persistent step graphs DONE; SILENT OUTPUT on M1 (OPEN)
+## §234 omnivoice — persistent step graphs + silence root cause (DONE)
 
 Spun out of the reporter's #245 question ("does this affect omnivoice?").
 
@@ -6749,17 +6749,26 @@ Spun out of the reporter's #245 question ("does this affect omnivoice?").
   a bisect: gallocr aliases input-flagged tensor slots with intermediates —
   ALL inputs must be re-set before every compute of a persistent graph
   (→ LEARNINGS).
-- **OPEN — omnivoice synthesizes near-SILENCE on M1** (q8_0, unpatched main,
-  CPU and Metal, with and without `--voice` ref + `--i-have-rights`):
-  peak ≤ 0.009, RMS ≈ 0.0001, whisper roundtrip "[ Silence ]", for both
-  short and long texts, seed 42. Deterministic on CPU, so it's structural,
-  not sampling luck. Unknown whether CUDA behaves the same (the parity
-  Kaggle campaign should cover it — check its transcripts, not just RTF).
-  Next probes: HF-blueprint A/B on the same text (does upstream produce
-  audio unconditionally?), dump `audio_logits` distribution (is mask_id
-  winning every position?), verify RVQ decode + HiggsAudioV2 codec on a
-  known-good code sequence. Perf A/B above is unaffected (byte-identical
-  transform), but the backend needs this resolved to be usable on macOS.
+- **SILENCE ROOT-CAUSED AND FIXED (2026-07-11, 9fde8411).** Was never
+  M1-specific: the C++ gen-config fallbacks didn't match the blueprint's
+  `OmniVoiceGenerationConfig` — guidance 1.0 (ref 2.0), class_temp 0.7
+  (ref 0.0 = argmax), position_temp 4.5 (ref 5.0), layer_penalty 0.5 (ref
+  5.0, the coarse-to-fine unmask ordering), t_shift 1.0 (ref 0.1, a
+  different unmask-schedule shape). The wrong decode policy degenerated
+  into near-constant silence codes (59 unique tokens / 1344 positions,
+  top token ×159) which the codec faithfully rendered as silence. With
+  blueprint defaults: 278 unique codes, real audio, whisper roundtrip
+  VERBATIM on CPU, near-verbatim on Metal. Diagnosis chain that worked:
+  `OMNIVOICE_DEBUG_CODES=1` histogram split codec-vs-LLM in one run
+  (codes degenerate ⇒ codec innocent); text ids verified byte-exact vs
+  tokenizers-lib (glm lesson — not the bug this time); embedding
+  offsets/mixing verified == `_prepare_embed_inputs`; then a
+  side-by-side of `OmniVoiceGenerationConfig` vs `ov_gen_config` found
+  the five wrong defaults. Remaining nice-to-haves: peak hits 1.0
+  (clipping — check the blueprint's postprocess/fade for an output gain
+  we skip); `<|denoise|>` token for the ref-audio path (blueprint adds
+  it when denoise=True + ref present); voice-cloning path not yet
+  roundtrip-validated; parity kernel should go green now — rerun it.
 
 ## §230 Issue #238 — kyutai/stt-2.6b-en support (DONE)
 
