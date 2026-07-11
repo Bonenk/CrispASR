@@ -97,13 +97,24 @@ struct irodori_hparams {
     int sample_rate = 48000;
     int codec_hop_length = 1920; // Semantic-DACVAE-Japanese-32dim: strides [12,10,8,2] = 1920
 
+    // Caption encoder (VoiceDesign)
+    int use_caption_condition = 0;
+    int caption_dim = 512;
+    int caption_layers = 10;
+    int caption_heads = 8;
+    float caption_mlp_ratio = 2.6f;
+    int caption_vocab_size = 99574;
+    float cfg_scale_caption = 3.0f;
+
     int patched_latent_dim() const { return latent_dim * latent_patch_size; }
     int head_dim() const { return model_dim / num_heads; }
     int text_head_dim() const { return text_dim / text_heads; }
     int speaker_head_dim() const { return speaker_dim / speaker_heads; }
+    int caption_head_dim() const { return caption_dim / caption_heads; }
     int ff_dim() const { return (int)(model_dim * mlp_ratio); }
     int text_ff_dim() const { return (int)(text_dim * text_mlp_ratio); }
     int speaker_ff_dim() const { return (int)(speaker_dim * speaker_mlp_ratio); }
+    int caption_ff_dim() const { return (int)(caption_dim * caption_mlp_ratio); }
 };
 
 // ── Weight structures ───────────────────────────────────────────────
@@ -149,6 +160,8 @@ struct irodori_dit_block_weights {
     ggml_tensor* wv_text = nullptr;
     ggml_tensor* wk_spk = nullptr; // (speaker_dim, model_dim)
     ggml_tensor* wv_spk = nullptr;
+    ggml_tensor* wk_cap = nullptr; // (caption_dim, model_dim) — VoiceDesign
+    ggml_tensor* wv_cap = nullptr;
 
     // LowRankAdaLN for attention and MLP
     irodori_low_rank_adaln_weights adaln_attn;
@@ -165,8 +178,10 @@ struct irodori_dur_block_weights {
     ggml_tensor* mlp_w1 = nullptr;
     ggml_tensor* mlp_w2 = nullptr;
     ggml_tensor* mlp_w3 = nullptr;
-    ggml_tensor* mod_w = nullptr; // (speaker_dim, hidden_dim*3)
-    ggml_tensor* mod_b = nullptr; // (hidden_dim*3,)
+    ggml_tensor* mod_w = nullptr;     // (speaker_dim, hidden_dim*3)
+    ggml_tensor* mod_b = nullptr;     // (hidden_dim*3,)
+    ggml_tensor* cap_mod_w = nullptr; // (caption_dim, hidden_dim*3) — VoiceDesign
+    ggml_tensor* cap_mod_b = nullptr; // (hidden_dim*3,)
 };
 
 struct irodori_weights {
@@ -174,6 +189,11 @@ struct irodori_weights {
     ggml_tensor* text_emb = nullptr; // (vocab_size, text_dim)
     std::vector<irodori_text_block_weights> text_blocks;
     ggml_tensor* text_norm = nullptr; // (text_dim,)
+
+    // Caption encoder (VoiceDesign — same TextEncoder structure)
+    ggml_tensor* cap_emb = nullptr; // (caption_vocab_size, caption_dim)
+    std::vector<irodori_text_block_weights> cap_blocks;
+    ggml_tensor* cap_norm = nullptr; // (caption_dim,)
 
     // Speaker encoder
     ggml_tensor* spk_in_proj_w = nullptr; // (patched_latent_dim, speaker_dim)
@@ -200,6 +220,7 @@ struct irodori_weights {
     ggml_tensor* dur_input_proj_w = nullptr;
     ggml_tensor* dur_input_proj_b = nullptr;
     ggml_tensor* dur_null_speaker = nullptr;
+    ggml_tensor* dur_null_caption = nullptr; // VoiceDesign
     std::vector<irodori_dur_block_weights> dur_blocks;
     ggml_tensor* dur_out_norm = nullptr;
     ggml_tensor* dur_out_proj_w = nullptr;
@@ -289,11 +310,15 @@ struct irodori_tts_context {
     // DAC-VAE encoder weights (voice cloning: reference audio → latent)
     irodori_dacvae_encoder enc;
 
+    // Caption (VoiceDesign) — set via irodori_tts_set_caption()
+    std::string caption_text;
+
     // Runtime params
     int seed = 0;
     int ode_steps = 40;
     float cfg_scale_text = 3.0f;
     float cfg_scale_speaker = 5.0f;
+    float cfg_scale_caption = 3.0f;
     float speed = 1.0f;
     float duration_scale = 1.0f;
     float max_seconds = 30.0f;
@@ -369,7 +394,7 @@ static bool eval_graph(ggml_backend_t backend, ggml_cgraph* gf) {
 
 // Load weights using the core_gguf map-based getter pattern.
 template <typename GetFn, typename TryGetFn>
-static bool load_weights_from_map(irodori_tts_context* ctx, GetFn get, TryGetFn /*try_get*/) {
+static bool load_weights_from_map(irodori_tts_context* ctx, GetFn get, TryGetFn try_get) {
     auto& w = ctx->weights;
     const auto& hp = ctx->hparams;
 
@@ -416,6 +441,29 @@ static bool load_weights_from_map(irodori_tts_context* ctx, GetFn get, TryGetFn 
         blk.mlp_w3 = get(p + "mlp.w3");
     }
 
+    // Caption encoder (VoiceDesign)
+    if (hp.use_caption_condition) {
+        w.cap_emb = get("irodori.cap_enc.emb");
+        w.cap_norm = get("irodori.cap_norm");
+        w.cap_blocks.resize(hp.caption_layers);
+        for (int i = 0; i < hp.caption_layers; i++) {
+            auto& blk = w.cap_blocks[i];
+            std::string p = "irodori.cap_enc.blk." + std::to_string(i) + ".";
+            blk.attn_norm = get(p + "attn_norm");
+            blk.wq = get(p + "attn.wq");
+            blk.wk = get(p + "attn.wk");
+            blk.wv = get(p + "attn.wv");
+            blk.wo = get(p + "attn.wo");
+            blk.gate = get(p + "attn.gate");
+            blk.q_norm = get(p + "attn.q_norm");
+            blk.k_norm = get(p + "attn.k_norm");
+            blk.mlp_norm = get(p + "mlp_norm");
+            blk.mlp_w1 = get(p + "mlp.w1");
+            blk.mlp_w2 = get(p + "mlp.w2");
+            blk.mlp_w3 = get(p + "mlp.w3");
+        }
+    }
+
     // Top-level
     w.cond_0_w = get("irodori.cond.0.w");
     w.cond_2_w = get("irodori.cond.2.w");
@@ -442,6 +490,10 @@ static bool load_weights_from_map(irodori_tts_context* ctx, GetFn get, TryGetFn 
         blk.wv_text = get(p + "attn.wv_text");
         blk.wk_spk = get(p + "attn.wk_spk");
         blk.wv_spk = get(p + "attn.wv_spk");
+        if (hp.use_caption_condition) {
+            blk.wk_cap = get(p + "attn.wk_cap");
+            blk.wv_cap = get(p + "attn.wv_cap");
+        }
 
         // AdaLN attention
         auto load_adaln = [&](irodori_low_rank_adaln_weights& adaln, const std::string& ap) {
@@ -468,6 +520,7 @@ static bool load_weights_from_map(irodori_tts_context* ctx, GetFn get, TryGetFn 
         w.dur_input_proj_w = get("irodori.dur.input_proj.w");
         w.dur_input_proj_b = get("irodori.dur.input_proj.b");
         w.dur_null_speaker = get("irodori.dur.null_speaker");
+        w.dur_null_caption = try_get("irodori.dur.null_caption");
         w.dur_blocks.resize(hp.duration_layers);
         for (int i = 0; i < hp.duration_layers; i++) {
             auto& blk = w.dur_blocks[i];
@@ -478,6 +531,8 @@ static bool load_weights_from_map(irodori_tts_context* ctx, GetFn get, TryGetFn 
             blk.mlp_w3 = get(p + "mlp.w3");
             blk.mod_w = get(p + "mod.w");
             blk.mod_b = get(p + "mod.b");
+            blk.cap_mod_w = try_get((p + "cap_mod.w").c_str());
+            blk.cap_mod_b = try_get((p + "cap_mod.b").c_str());
         }
         w.dur_out_norm = get("irodori.dur.out_norm");
         w.dur_out_proj_w = get("irodori.dur.out_proj.w");
@@ -572,6 +627,70 @@ static ggml_tensor* build_text_encoder_graph(ggml_context* ctx, const irodori_tt
 
     // Final text norm
     x = rms_norm(ctx, x, w.text_norm, hp.norm_eps);
+    return x;
+}
+
+// ── Graph: Caption encoder forward (VoiceDesign) ────────────────────
+// Same structure as text encoder but uses caption weights/dims.
+
+static ggml_tensor* build_caption_encoder_graph(ggml_context* ctx, const irodori_tts_context* model,
+                                                ggml_tensor* token_ids, ggml_tensor* mask_f, ggml_tensor* pos_ids,
+                                                int T_cap) {
+    const auto& w = model->weights;
+    const auto& hp = model->hparams;
+
+    ggml_tensor* x = ggml_get_rows(ctx, w.cap_emb, token_ids);
+    x = ggml_cast(ctx, x, GGML_TYPE_F32);
+    x = ggml_mul(ctx, x, mask_f);
+
+    for (int i = 0; i < hp.caption_layers; i++) {
+        const auto& blk = w.cap_blocks[i];
+
+        ggml_tensor* residual = x;
+        ggml_tensor* h = rms_norm(ctx, x, blk.attn_norm, hp.norm_eps);
+
+        ggml_tensor* q = mul_mat_f32(ctx, blk.wq, h);
+        ggml_tensor* k = mul_mat_f32(ctx, blk.wk, h);
+        ggml_tensor* v = mul_mat_f32(ctx, blk.wv, h);
+
+        int hd = hp.caption_head_dim();
+        int nh = hp.caption_heads;
+        q = ggml_reshape_3d(ctx, q, hd, nh, T_cap);
+        k = ggml_reshape_3d(ctx, k, hd, nh, T_cap);
+        v = ggml_reshape_3d(ctx, v, hd, nh, T_cap);
+
+        q = ggml_rms_norm(ctx, q, hp.norm_eps);
+        q = ggml_mul(ctx, q, ggml_cast(ctx, blk.q_norm, GGML_TYPE_F32));
+        k = ggml_rms_norm(ctx, k, hp.norm_eps);
+        k = ggml_mul(ctx, k, ggml_cast(ctx, blk.k_norm, GGML_TYPE_F32));
+
+        q = ggml_rope_ext(ctx, q, pos_ids, nullptr, hd, 0, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+        k = ggml_rope_ext(ctx, k, pos_ids, nullptr, hd, 0, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+        q = ggml_cont(ctx, ggml_permute(ctx, q, 0, 2, 1, 3));
+        k = ggml_cont(ctx, ggml_permute(ctx, k, 0, 2, 1, 3));
+        v = ggml_cont(ctx, ggml_permute(ctx, v, 0, 2, 1, 3));
+
+        ggml_tensor* attn_out = ggml_flash_attn_ext(ctx, q, k, v, nullptr, 1.0f / std::sqrt((float)hd), 0.0f, 0.0f);
+        attn_out = ggml_cast(ctx, attn_out, GGML_TYPE_F32);
+        attn_out = ggml_reshape_2d(ctx, attn_out, hp.caption_dim, T_cap);
+
+        ggml_tensor* g = mul_mat_f32(ctx, blk.gate, h);
+        g = ggml_sigmoid(ctx, g);
+        attn_out = ggml_mul(ctx, attn_out, g);
+        attn_out = mul_mat_f32(ctx, blk.wo, attn_out);
+        x = ggml_add(ctx, residual, attn_out);
+
+        residual = x;
+        h = rms_norm(ctx, x, blk.mlp_norm, hp.norm_eps);
+        ggml_tensor* gate_proj = mul_mat_f32(ctx, blk.mlp_w1, h);
+        ggml_tensor* up_proj = mul_mat_f32(ctx, blk.mlp_w3, h);
+        ggml_tensor* mlp_out = ggml_mul(ctx, ggml_silu(ctx, gate_proj), up_proj);
+        mlp_out = mul_mat_f32(ctx, blk.mlp_w2, mlp_out);
+        x = ggml_add(ctx, residual, mlp_out);
+        x = ggml_mul(ctx, x, mask_f);
+    }
+
+    x = rms_norm(ctx, x, w.cap_norm, hp.norm_eps);
     return x;
 }
 
@@ -692,7 +811,8 @@ static void apply_low_rank_adaln(ggml_context* ctx, const irodori_low_rank_adaln
 static ggml_tensor* build_dit_block_graph(ggml_context* ctx, const irodori_tts_context* model,
                                           const irodori_dit_block_weights& blk, ggml_tensor* x, ggml_tensor* cond_embed,
                                           ggml_tensor* text_state, int T_text, ggml_tensor* spk_state, int T_ref,
-                                          int T_latent, ggml_tensor* pos_ids, ggml_tensor* attn_mask) {
+                                          ggml_tensor* cap_state, int T_cap, int T_latent, ggml_tensor* pos_ids,
+                                          ggml_tensor* attn_mask) {
     const auto& hp = model->hparams;
     int hd = hp.head_dim();
     int nh = hp.num_heads;
@@ -750,6 +870,16 @@ static ggml_tensor* build_dit_block_graph(ggml_context* ctx, const irodori_tts_c
         k_spk = mul_mat_f32(ctx, blk.wk_spk, spk_state);
         v_spk = mul_mat_f32(ctx, blk.wv_spk, spk_state);
         T_kv_total += T_ref;
+    }
+
+    // Caption context K/V (VoiceDesign)
+    ggml_tensor* k_cap = nullptr;
+    ggml_tensor* v_cap = nullptr;
+    if (cap_state && T_cap > 0 && blk.wk_cap && blk.wv_cap) {
+        cap_state = ggml_cast(ctx, cap_state, GGML_TYPE_F32);
+        k_cap = mul_mat_f32(ctx, blk.wk_cap, cap_state);
+        v_cap = mul_mat_f32(ctx, blk.wv_cap, cap_state);
+        T_kv_total += T_cap;
     }
 
     // All tensors start as (hd*nh, T) from mul_mat → reshape to (hd, nh, T)
@@ -815,6 +945,18 @@ static ggml_tensor* build_dit_block_graph(ggml_context* ctx, const irodori_tts_c
         v_spk = ggml_cont(ctx, ggml_permute(ctx, v_spk, 0, 2, 1, 3));
         k_cat = ggml_concat(ctx, k_cat, k_spk, 1);
         v_cat = ggml_concat(ctx, v_cat, v_spk, 1);
+    }
+
+    // Concat caption KV (VoiceDesign) — after speaker, matching Python order
+    if (k_cap && v_cap && T_cap > 0) {
+        k_cap = ggml_reshape_3d(ctx, k_cap, hd, nh, T_cap);
+        k_cap = ggml_rms_norm(ctx, k_cap, hp.norm_eps);
+        k_cap = ggml_mul(ctx, k_cap, ggml_cast(ctx, blk.k_norm, GGML_TYPE_F32));
+        k_cap = ggml_cont(ctx, ggml_permute(ctx, k_cap, 0, 2, 1, 3));
+        v_cap = ggml_reshape_3d(ctx, v_cap, hd, nh, T_cap);
+        v_cap = ggml_cont(ctx, ggml_permute(ctx, v_cap, 0, 2, 1, 3));
+        k_cat = ggml_concat(ctx, k_cat, k_cap, 1);
+        v_cat = ggml_concat(ctx, v_cat, v_cap, 1);
     }
 
     // Flash attention with mask (mask passed from run_dit_forward)
@@ -963,6 +1105,7 @@ static std::vector<int32_t> bpe_merge(const std::string& text,
 static std::vector<int32_t> tokenize_text(const irodori_tts_context* ctx, const char* text) {
     // Override token IDs from env var for parity testing:
     //   CRISPASR_IRODORI_TOKEN_IDS="1,19144,52839,302,275"
+    //   CRISPASR_IRODORI_CAPTION_TOKEN_IDS="1,..." (VoiceDesign caption)
     const char* override_ids = std::getenv("CRISPASR_IRODORI_TOKEN_IDS");
     if (override_ids && *override_ids) {
         std::vector<int32_t> tokens;
@@ -1056,6 +1199,7 @@ struct irodori_tts_params irodori_tts_default_params(void) {
     p.ode_steps = 40;
     p.cfg_scale_text = 3.0f;
     p.cfg_scale_speaker = 5.0f;
+    p.cfg_scale_caption = 3.0f;
     p.speed = 1.0f;
     p.duration_scale = 1.0f;
     p.max_seconds = 30.0f;
@@ -1073,6 +1217,7 @@ struct irodori_tts_context* irodori_tts_init_from_file(const char* path_model, s
     ctx->ode_steps = params.ode_steps > 0 ? params.ode_steps : 40;
     ctx->cfg_scale_text = params.cfg_scale_text;
     ctx->cfg_scale_speaker = params.cfg_scale_speaker;
+    ctx->cfg_scale_caption = params.cfg_scale_caption;
     ctx->speed = params.speed > 0 ? params.speed : 1.0f;
     ctx->duration_scale = params.duration_scale > 0 ? params.duration_scale : 1.0f;
     ctx->max_seconds = params.max_seconds > 0 ? params.max_seconds : 30.0f;
@@ -1167,6 +1312,17 @@ struct irodori_tts_context* irodori_tts_init_from_file(const char* path_model, s
     hp.cfg_scale_speaker = core_gguf::kv_f32(meta, "irodori.cfg_scale_speaker", hp.cfg_scale_speaker);
     hp.sample_rate = core_gguf::kv_i32(meta, "irodori.sample_rate", hp.sample_rate);
     hp.codec_hop_length = core_gguf::kv_i32(meta, "irodori.codec_hop_length", hp.codec_hop_length);
+
+    // Caption (VoiceDesign)
+    hp.use_caption_condition = core_gguf::kv_i32(meta, "irodori.use_caption_condition", hp.use_caption_condition);
+    if (hp.use_caption_condition) {
+        hp.caption_dim = core_gguf::kv_i32(meta, "irodori.caption_dim", hp.caption_dim);
+        hp.caption_layers = core_gguf::kv_i32(meta, "irodori.caption_layers", hp.caption_layers);
+        hp.caption_heads = core_gguf::kv_i32(meta, "irodori.caption_heads", hp.caption_heads);
+        hp.caption_mlp_ratio = core_gguf::kv_f32(meta, "irodori.caption_mlp_ratio", hp.caption_mlp_ratio);
+        hp.caption_vocab_size = core_gguf::kv_i32(meta, "irodori.caption_vocab_size", hp.caption_vocab_size);
+        hp.cfg_scale_caption = core_gguf::kv_f32(meta, "irodori.cfg_scale_caption", hp.cfg_scale_caption);
+    }
 
     // Load tokenizer from GGUF metadata
     {
@@ -1874,6 +2030,61 @@ static std::vector<float> run_text_encoder(irodori_tts_context* ctx, const int32
     return result;
 }
 
+// Run caption encoder: token_ids → caption_state (T_cap × caption_dim).
+// VoiceDesign only.
+static std::vector<float> run_caption_encoder(irodori_tts_context* ctx, const int32_t* token_ids, int T_cap) {
+    const auto& hp = ctx->hparams;
+    const int D = hp.caption_dim;
+
+    const int n_tensors = 512 + hp.caption_layers * 80;
+    size_t ctx_size = n_tensors * ggml_tensor_overhead() + ggml_graph_overhead_custom(n_tensors, false);
+    ggml_init_params ip = {ctx_size, nullptr, true};
+    ggml_context* g = ggml_init(ip);
+
+    ggml_tensor* ids = ggml_new_tensor_1d(g, GGML_TYPE_I32, T_cap);
+    ggml_set_name(ids, "cap_token_ids");
+    ggml_set_input(ids);
+
+    ggml_tensor* mask_f = ggml_new_tensor_2d(g, GGML_TYPE_F32, 1, T_cap);
+    ggml_set_name(mask_f, "cap_mask_f");
+    ggml_set_input(mask_f);
+
+    ggml_tensor* pos = ggml_new_tensor_1d(g, GGML_TYPE_I32, T_cap);
+    ggml_set_name(pos, "cap_pos_ids");
+    ggml_set_input(pos);
+
+    ggml_tensor* out = build_caption_encoder_graph(g, ctx, ids, mask_f, pos, T_cap);
+    ggml_set_name(out, "cap_state");
+    ggml_set_output(out);
+
+    ggml_cgraph* gf = ggml_new_graph_custom(g, n_tensors, false);
+    ggml_build_forward_expand(gf, out);
+
+    ggml_gallocr_t galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+    if (!ggml_gallocr_alloc_graph(galloc, gf)) {
+        ggml_gallocr_free(galloc);
+        ggml_free(g);
+        return {};
+    }
+
+    ggml_backend_tensor_set(ids, token_ids, 0, T_cap * sizeof(int32_t));
+    std::vector<float> mask_data(T_cap, 1.0f);
+    ggml_backend_tensor_set(mask_f, mask_data.data(), 0, T_cap * sizeof(float));
+    std::vector<int32_t> pos_data(T_cap);
+    for (int i = 0; i < T_cap; i++)
+        pos_data[i] = i;
+    ggml_backend_tensor_set(pos, pos_data.data(), 0, T_cap * sizeof(int32_t));
+
+    ggml_backend_graph_compute(ctx->backend, gf);
+
+    std::vector<float> result(T_cap * D);
+    ggml_backend_tensor_get(out, result.data(), 0, result.size() * sizeof(float));
+
+    ggml_gallocr_free(galloc);
+    ggml_free(g);
+    return result;
+}
+
 // Run the speaker (reference-latent) encoder on ctx->ref_latent → speaker
 // state (speaker_dim, T_ref) as a CPU-side array. Empty on failure.
 static std::vector<float> run_speaker_encoder(irodori_tts_context* ctx) {
@@ -1940,7 +2151,7 @@ static std::vector<float> run_speaker_encoder(irodori_tts_context* ctx) {
 // spk_vec: speaker_state[:,0] (768) when cloning, else the learned null_speaker.
 // Returns total_frames (>0), or -1 on failure / no predictor.
 static float run_duration_predictor(irodori_tts_context* ctx, const float* text_state_data, int T_text,
-                                    const float* spk_vec_data) {
+                                    const float* spk_vec_data, const float* cap_vec_data = nullptr) {
     const auto& hp = ctx->hparams;
     const auto& w = ctx->weights;
     if (!hp.use_duration_predictor || !w.dur_input_proj_w || !w.dur_out_proj_w)
@@ -1961,20 +2172,45 @@ static float run_duration_predictor(irodori_tts_context* ctx, const float* text_
     ggml_set_name(spk_in, "dur_spk_vec");
     ggml_set_input(spk_in);
 
+    // Caption vec input (VoiceDesign dual_adarn_zero)
+    const int Dcap = hp.caption_dim;
+    const bool has_cap_dur = hp.use_caption_condition && w.dur_null_caption;
+    ggml_tensor* cap_dur_in = nullptr;
+    if (has_cap_dur) {
+        cap_dur_in = ggml_new_tensor_1d(g, GGML_TYPE_F32, Dcap);
+        ggml_set_name(cap_dur_in, "dur_cap_vec");
+        ggml_set_input(cap_dur_in);
+    }
+
     // h = input_proj(text_state) → (Dh, T)
     ggml_tensor* h = mul_mat_f32(g, w.dur_input_proj_w, ts_in);
     h = ggml_add(g, h, w.dur_input_proj_b);
     ggml_tensor* sm = ggml_silu(g, spk_in); // silu(cond) once; reused per block
+    ggml_tensor* cm = has_cap_dur ? ggml_silu(g, cap_dur_in) : nullptr;
 
     for (int i = 0; i < hp.duration_layers; i++) {
         const auto& blk = w.dur_blocks[i];
         ggml_tensor* hn = rms_norm(g, h, blk.norm, hp.norm_eps); // (Dh, T)
-        // modulation: (shift, scale, gate) = mod(silu(spk)) chunked
+        // Speaker modulation: (shift, scale, gate) = mod(silu(spk)) chunked
         ggml_tensor* mod = mul_mat_f32(g, blk.mod_w, sm); // (3*Dh, 1)
         mod = ggml_add(g, mod, blk.mod_b);
         ggml_tensor* shift = ggml_view_1d(g, mod, Dh, 0);
         ggml_tensor* scale = ggml_view_1d(g, mod, Dh, (size_t)Dh * sizeof(float));
         ggml_tensor* gate = ggml_view_1d(g, mod, Dh, (size_t)2 * Dh * sizeof(float));
+
+        // Caption modulation additive (VoiceDesign dual_adarn_zero):
+        //   shift += cap_shift; scale += cap_scale; gate += cap_gate
+        if (cm && blk.cap_mod_w) {
+            ggml_tensor* cmod = mul_mat_f32(g, blk.cap_mod_w, cm);
+            cmod = ggml_add(g, cmod, blk.cap_mod_b);
+            ggml_tensor* cap_shift = ggml_view_1d(g, cmod, Dh, 0);
+            ggml_tensor* cap_scale = ggml_view_1d(g, cmod, Dh, (size_t)Dh * sizeof(float));
+            ggml_tensor* cap_gate = ggml_view_1d(g, cmod, Dh, (size_t)2 * Dh * sizeof(float));
+            shift = ggml_add(g, shift, cap_shift);
+            scale = ggml_add(g, scale, cap_scale);
+            gate = ggml_add(g, gate, cap_gate);
+        }
+
         // hm = hn*(1+scale)+shift  (broadcast (Dh) over (Dh,T))
         ggml_tensor* hm = ggml_add(g, hn, ggml_mul(g, hn, scale));
         hm = ggml_add(g, hm, shift);
@@ -2011,6 +2247,18 @@ static float run_duration_predictor(irodori_tts_context* ctx, const float* text_
         spk_src = spk_tmp.data();
     }
     ggml_backend_tensor_set(spk_in, spk_src, 0, (size_t)Dsp * sizeof(float));
+    // Caption vec: use provided or null_caption fallback
+    if (has_cap_dur && cap_dur_in) {
+        std::vector<float> cap_tmp;
+        const float* cap_src = cap_vec_data;
+        if (!cap_src) {
+            cap_tmp.resize(Dcap, 0.0f);
+            if (w.dur_null_caption)
+                ggml_backend_tensor_get(w.dur_null_caption, cap_tmp.data(), 0, (size_t)Dcap * sizeof(float));
+            cap_src = cap_tmp.data();
+        }
+        ggml_backend_tensor_set(cap_dur_in, cap_src, 0, (size_t)Dcap * sizeof(float));
+    }
     ggml_backend_graph_compute(ctx->backend, gf);
 
     std::vector<float> lg(T_text);
@@ -2032,7 +2280,8 @@ static float run_duration_predictor(irodori_tts_context* ctx, const float* text_
 static std::vector<float> run_dit_forward(irodori_tts_context* ctx, const float* x_t_data, int T_latent,
                                           const float* cond_embed_data, // (model_dim*3,)
                                           const float* text_state_data, int T_text, const float* spk_state_data,
-                                          int T_ref, bool attend_speaker = false) {
+                                          int T_ref, bool attend_speaker = false, const float* cap_state_data = nullptr,
+                                          int T_cap = 0, bool attend_caption = false) {
     const auto& hp = ctx->hparams;
     const auto& w = ctx->weights;
     const int D = hp.model_dim;
@@ -2061,15 +2310,27 @@ static std::vector<float> run_dit_forward(irodori_tts_context* ctx, const float*
     ggml_set_input(pos_latent);
 
     ggml_tensor* spk_in = nullptr;
+    ggml_tensor* cap_in = nullptr;
     ggml_tensor* attn_mask_in = nullptr;
+
     if (spk_state_data && T_ref > 0) {
         spk_in = ggml_new_tensor_2d(g, GGML_TYPE_F32, hp.speaker_dim, T_ref);
         ggml_set_name(spk_in, "spk_state");
         ggml_set_input(spk_in);
+    }
+    if (cap_state_data && T_cap > 0) {
+        cap_in = ggml_new_tensor_2d(g, GGML_TYPE_F32, hp.caption_dim, T_cap);
+        ggml_set_name(cap_in, "cap_state");
+        ggml_set_input(cap_in);
+    }
 
-        // Attention mask: (T_kv, T_latent) where T_kv = T_latent + T_text + T_ref
-        // Values: 0.0 for attend, -inf for masked positions. Must be F16!
-        int T_kv = T_latent + T_text + T_ref;
+    // Attention mask when speaker or caption needs masking
+    int T_kv = T_latent + T_text;
+    if (spk_in)
+        T_kv += T_ref;
+    if (cap_in)
+        T_kv += T_cap;
+    if (spk_in || cap_in) {
         attn_mask_in = ggml_new_tensor_2d(g, GGML_TYPE_F16, T_kv, T_latent);
         ggml_set_name(attn_mask_in, "attn_mask");
         ggml_set_input(attn_mask_in);
@@ -2089,8 +2350,8 @@ static std::vector<float> run_dit_forward(irodori_tts_context* ctx, const float*
         n_build_layers = std::min(std::atoi(env_layers), hp.num_layers);
     for (int i = 0; i < n_build_layers; i++) {
         IRODORI_DBG("[irodori]     building DiT block %d...\n", i);
-        x = build_dit_block_graph(g, ctx, w.dit_blocks[i], x, cond_in, text_in, T_text, spk_in, T_ref, T_latent,
-                                  pos_latent, attn_mask_in);
+        x = build_dit_block_graph(g, ctx, w.dit_blocks[i], x, cond_in, text_in, T_text, spk_in, T_ref, cap_in, T_cap,
+                                  T_latent, pos_latent, attn_mask_in);
         IRODORI_DBG("[irodori]     DiT block %d built OK\n", i);
     }
 
@@ -2128,6 +2389,9 @@ static std::vector<float> run_dit_forward(irodori_tts_context* ctx, const float*
     if (spk_in && spk_in->buffer) {
         ggml_backend_tensor_set(spk_in, spk_state_data, 0, T_ref * hp.speaker_dim * sizeof(float));
     }
+    if (cap_in && cap_in->buffer) {
+        ggml_backend_tensor_set(cap_in, cap_state_data, 0, (size_t)T_cap * hp.caption_dim * sizeof(float));
+    }
     if (pos_latent->buffer) {
         std::vector<int32_t> pos_data(T_latent);
         for (int i = 0; i < T_latent; i++)
@@ -2135,17 +2399,18 @@ static std::vector<float> run_dit_forward(irodori_tts_context* ctx, const float*
         ggml_backend_tensor_set(pos_latent, pos_data.data(), 0, T_latent * sizeof(int32_t));
     }
     if (attn_mask_in && attn_mask_in->buffer) {
-        // Build mask (F16): 0.0 for self+text (attend), -inf for speaker (mask out)
-        int T_kv = T_latent + T_text + T_ref;
-        std::vector<ggml_fp16_t> mask_data(T_kv * T_latent);
+        // Build mask (F16): 0.0 for attend, -inf for masked positions.
+        // KV order: self | text | speaker | caption (matching Python concat order).
+        std::vector<ggml_fp16_t> mask_data((size_t)T_kv * T_latent);
         ggml_fp16_t zero_f16 = ggml_fp32_to_fp16(0.0f);
         ggml_fp16_t neginf_f16 = ggml_fp32_to_fp16(-INFINITY);
+        int spk_start = T_latent + T_text;
+        int cap_start = spk_start + (spk_in ? T_ref : 0);
         for (int q = 0; q < T_latent; q++) {
             for (int k = 0; k < T_kv; k++) {
-                bool is_speaker = (k >= T_latent + T_text);
-                // Mask speaker positions only for unconditional generation;
-                // with a real reference (attend_speaker) they carry the voice.
-                bool masked = is_speaker && !attend_speaker;
+                bool is_speaker = spk_in && k >= spk_start && k < cap_start;
+                bool is_caption = cap_in && k >= cap_start;
+                bool masked = (is_speaker && !attend_speaker) || (is_caption && !attend_caption);
                 mask_data[q * T_kv + k] = masked ? neginf_f16 : zero_f16;
             }
         }
@@ -2348,10 +2613,44 @@ int irodori_tts_synthesize(struct irodori_tts_context* ctx, const char* text, fl
         }
     }
 
+    // ── Step 2b: Encode caption (VoiceDesign) ──
+    std::vector<float> cap_state;
+    int T_cap = 0;
+    bool attend_caption = false;
+    if (hp.use_caption_condition && !ctx->caption_text.empty()) {
+        IRODORI_DBG("[irodori] encoding caption: \"%s\"\n", ctx->caption_text.c_str());
+        // Caption uses the same tokenizer as text (same vocab in VoiceDesign).
+        // Use a separate token override env var so diff harness can control both.
+        std::vector<int32_t> cap_ids;
+        const char* cap_override = std::getenv("CRISPASR_IRODORI_CAPTION_TOKEN_IDS");
+        if (cap_override && *cap_override) {
+            std::string s(cap_override);
+            size_t pos = 0;
+            while (pos < s.size()) {
+                size_t end = s.find(',', pos);
+                if (end == std::string::npos)
+                    end = s.size();
+                cap_ids.push_back(std::atoi(s.substr(pos, end - pos).c_str()));
+                pos = end + 1;
+            }
+        } else {
+            cap_ids = tokenize_text(ctx, ctx->caption_text.c_str());
+        }
+        T_cap = (int)cap_ids.size();
+        if (T_cap > 0) {
+            cap_state = run_caption_encoder(ctx, cap_ids.data(), T_cap);
+            if (!cap_state.empty()) {
+                attend_caption = true;
+                IRODORI_DBG("[irodori] caption conditioning active (%d tokens)\n", T_cap);
+            }
+        }
+    }
+
     // ── Determine output length ──
     // Priority: explicit override → duration predictor → frames/token fallback.
     // The predictor conditions on the same speaker vector (first speaker-encoder
     // frame when cloning, else null_speaker) as the reference pipeline.
+    // For VoiceDesign, caption conditioning uses masked_mean of caption_state.
     int latent_steps = 0;
     const char* dur_src = "duration-predictor";
     if (t_lat_override && std::atoi(t_lat_override) > 0) {
@@ -2359,7 +2658,20 @@ int irodori_tts_synthesize(struct irodori_tts_context* ctx, const char* text, fl
         dur_src = "override";
     } else {
         const float* spk_vec = attend_speaker ? spk_state.data() : nullptr; // spk_state[:,0]
-        float frames = run_duration_predictor(ctx, text_state.data(), T_text, spk_vec);
+        // Caption vec for duration: masked_mean of caption_state (mean over all T_cap frames)
+        std::vector<float> cap_vec_dur;
+        const float* cap_vec_ptr = nullptr;
+        if (attend_caption && !cap_state.empty()) {
+            cap_vec_dur.resize(hp.caption_dim, 0.0f);
+            for (int t = 0; t < T_cap; t++)
+                for (int d = 0; d < hp.caption_dim; d++)
+                    cap_vec_dur[d] += cap_state[t * hp.caption_dim + d];
+            float inv_T = 1.0f / (float)T_cap;
+            for (int d = 0; d < hp.caption_dim; d++)
+                cap_vec_dur[d] *= inv_T;
+            cap_vec_ptr = cap_vec_dur.data();
+        }
+        float frames = run_duration_predictor(ctx, text_state.data(), T_text, spk_vec, cap_vec_ptr);
         if (frames > 0.0f) {
             latent_steps = (int)std::lround(frames * ctx->duration_scale / ctx->speed);
         } else {
@@ -2424,8 +2736,10 @@ int irodori_tts_synthesize(struct irodori_tts_context* ctx, const char* text, fl
 
         IRODORI_DBG("[irodori]   step %d: running DiT forward...\n", step);
         // DiT forward: conditioned pass
+        const float* cap_ptr = cap_state.empty() ? nullptr : cap_state.data();
         auto v_cond = run_dit_forward(ctx, x_t.data(), patched_steps, cond_embed.data(), text_state.data(), T_text,
-                                      spk_state.empty() ? nullptr : spk_state.data(), T_ref, attend_speaker);
+                                      spk_state.empty() ? nullptr : spk_state.data(), T_ref, attend_speaker, cap_ptr,
+                                      T_cap, attend_caption);
         if (v_cond.empty()) {
             std::fprintf(stderr, "[irodori] DiT forward failed at step %d\n", step);
             return 0;
@@ -2448,6 +2762,7 @@ int irodori_tts_synthesize(struct irodori_tts_context* ctx, const char* text, fl
         // "independent"):  v = v_cond
         //                    + cfg_text    * (v_cond - v_text_uncond)      [text zeroed]
         //                    + cfg_speaker * (v_cond - v_speaker_uncond)   [speaker masked]
+        //                    + cfg_caption * (v_cond - v_caption_uncond)   [caption masked]
         float cfg_text = ctx->cfg_scale_text;
         const char* cfg_env = std::getenv("CRISPASR_IRODORI_CFG_TEXT");
         if (cfg_env)
@@ -2456,28 +2771,38 @@ int irodori_tts_synthesize(struct irodori_tts_context* ctx, const char* text, fl
         const char* cfgsp_env = std::getenv("CRISPASR_IRODORI_CFG_SPEAKER");
         if (cfgsp_env)
             cfg_speaker = (float)std::atof(cfgsp_env);
+        float cfg_caption = ctx->cfg_scale_caption;
+        const char* cfgcap_env = std::getenv("CRISPASR_IRODORI_CFG_CAPTION");
+        if (cfgcap_env)
+            cfg_caption = (float)std::atof(cfgcap_env);
         const float cfg_min_t = 0.5f, cfg_max_t = 1.0f;
         bool in_window = (t_val >= cfg_min_t) && (t_val <= cfg_max_t);
         bool do_text_cfg = (cfg_text > 0.0f) && in_window;
-        // Speaker CFG only when a reference is actually attended. Gated to the
-        // same early-t window as text CFG: measured marginally better speaker
-        // fidelity than all-step guidance (0.649 vs 0.636 cos) at half the cost.
         bool do_spk_cfg = attend_speaker && (cfg_speaker > 0.0f) && in_window;
+        bool do_cap_cfg = attend_caption && (cfg_caption > 0.0f) && in_window;
 
-        if (do_text_cfg || do_spk_cfg) {
+        if (do_text_cfg || do_spk_cfg || do_cap_cfg) {
             const float* spk_ptr = spk_state.empty() ? nullptr : spk_state.data();
-            // Text-unconditional pass: zero text state, keep speaker attended.
+            // Text-unconditional pass: zero text state, keep speaker+caption attended.
             std::vector<float> v_text_uncond;
             if (do_text_cfg) {
                 std::vector<float> text_uncond(T_text * hp.text_dim, 0.0f);
                 v_text_uncond = run_dit_forward(ctx, x_t.data(), patched_steps, cond_embed.data(), text_uncond.data(),
-                                                T_text, spk_ptr, T_ref, attend_speaker);
+                                                T_text, spk_ptr, T_ref, attend_speaker, cap_ptr, T_cap, attend_caption);
             }
-            // Speaker-unconditional pass: conditioned text, speaker masked out.
+            // Speaker-unconditional pass: conditioned text+caption, speaker masked out.
             std::vector<float> v_spk_uncond;
             if (do_spk_cfg) {
-                v_spk_uncond = run_dit_forward(ctx, x_t.data(), patched_steps, cond_embed.data(), text_state.data(),
-                                               T_text, spk_ptr, T_ref, /*attend_speaker=*/false);
+                v_spk_uncond =
+                    run_dit_forward(ctx, x_t.data(), patched_steps, cond_embed.data(), text_state.data(), T_text,
+                                    spk_ptr, T_ref, /*attend_speaker=*/false, cap_ptr, T_cap, attend_caption);
+            }
+            // Caption-unconditional pass: conditioned text+speaker, caption masked out.
+            std::vector<float> v_cap_uncond;
+            if (do_cap_cfg) {
+                v_cap_uncond =
+                    run_dit_forward(ctx, x_t.data(), patched_steps, cond_embed.data(), text_state.data(), T_text,
+                                    spk_ptr, T_ref, attend_speaker, cap_ptr, T_cap, /*attend_caption=*/false);
             }
             for (size_t i = 0; i < x_t.size(); i++) {
                 float v = v_cond[i];
@@ -2485,6 +2810,8 @@ int irodori_tts_synthesize(struct irodori_tts_context* ctx, const char* text, fl
                     v += cfg_text * (v_cond[i] - v_text_uncond[i]);
                 if (!v_spk_uncond.empty())
                     v += cfg_speaker * (v_cond[i] - v_spk_uncond[i]);
+                if (!v_cap_uncond.empty())
+                    v += cfg_caption * (v_cond[i] - v_cap_uncond[i]);
                 x_t[i] += v * dt;
             }
         } else {
@@ -2601,6 +2928,17 @@ void irodori_tts_set_cfg_scale_text(struct irodori_tts_context* ctx, float scale
 void irodori_tts_set_cfg_scale_speaker(struct irodori_tts_context* ctx, float scale) {
     if (ctx)
         ctx->cfg_scale_speaker = scale;
+}
+
+void irodori_tts_set_cfg_scale_caption(struct irodori_tts_context* ctx, float scale) {
+    if (ctx)
+        ctx->cfg_scale_caption = scale;
+}
+
+void irodori_tts_set_caption(struct irodori_tts_context* ctx, const char* caption) {
+    if (!ctx)
+        return;
+    ctx->caption_text = (caption && *caption) ? caption : "";
 }
 
 void irodori_tts_set_speed(struct irodori_tts_context* ctx, float speed) {

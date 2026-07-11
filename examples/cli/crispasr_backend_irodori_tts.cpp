@@ -91,6 +91,8 @@ public:
             irodori_tts_set_cfg_scale_text(ctx_, (float)std::atof(e));
         if (const char* e = std::getenv("CRISPASR_IRODORI_CFG_SPEAKER"))
             irodori_tts_set_cfg_scale_speaker(ctx_, (float)std::atof(e));
+        if (const char* e = std::getenv("CRISPASR_IRODORI_CFG_CAPTION"))
+            irodori_tts_set_cfg_scale_caption(ctx_, (float)std::atof(e));
 
         // ── Codec companion loading (3-tier: --codec-model → sibling → registry auto-download) ──
         std::string codec_path = p.tts_codec_model;
@@ -127,6 +129,12 @@ public:
     std::vector<float> synthesize(const std::string& text, const whisper_params& p) override {
         if (!ctx_ || text.empty())
             return {};
+
+        // Caption text (VoiceDesign): --instruct flag or env-gated.
+        if (!p.tts_instruct.empty())
+            irodori_tts_set_caption(ctx_, p.tts_instruct.c_str());
+        else if (const char* cap = std::getenv("CRISPASR_IRODORI_CAPTION"))
+            irodori_tts_set_caption(ctx_, cap);
 
         // Per-call voice gating. The reference lives on the context (stateful
         // set_reference), so we sync it to params.tts_voice on every call:

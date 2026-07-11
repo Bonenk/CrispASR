@@ -28,6 +28,7 @@ struct irodori_tts_params {
     int ode_steps;           // number of Euler ODE steps (default 40)
     float cfg_scale_text;    // text CFG guidance scale (default 3.0)
     float cfg_scale_speaker; // speaker CFG guidance scale (default 5.0)
+    float cfg_scale_caption; // caption CFG guidance scale (default 3.0, VoiceDesign)
     float speed;             // speech speed factor (>1 = faster, <1 = slower)
     float duration_scale;    // duration multiplier (>1 = longer, <1 = shorter)
     float max_seconds;       // maximum output duration in seconds (default 30)
@@ -69,6 +70,10 @@ int irodori_tts_reference_latent_dim(const struct irodori_tts_context* ctx);
 // Clear reference (unconditional generation).
 void irodori_tts_clear_reference(struct irodori_tts_context* ctx);
 
+// Set caption text for VoiceDesign style conditioning.
+// Pass NULL or "" to clear (unconditional caption).
+void irodori_tts_set_caption(struct irodori_tts_context* ctx, const char* caption);
+
 // Synthesize text to mono 48 kHz PCM.
 // Returns number of samples written, 0 on failure.
 // Caller owns the returned buffer (malloc'd; free with free()).
@@ -84,6 +89,7 @@ void irodori_tts_set_seed(struct irodori_tts_context* ctx, int seed);
 void irodori_tts_set_ode_steps(struct irodori_tts_context* ctx, int steps);
 void irodori_tts_set_cfg_scale_text(struct irodori_tts_context* ctx, float scale);
 void irodori_tts_set_cfg_scale_speaker(struct irodori_tts_context* ctx, float scale);
+void irodori_tts_set_cfg_scale_caption(struct irodori_tts_context* ctx, float scale);
 void irodori_tts_set_speed(struct irodori_tts_context* ctx, float speed);
 
 // Query model info.
