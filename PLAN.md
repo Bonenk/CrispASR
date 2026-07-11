@@ -7398,7 +7398,16 @@ Vulkan/base re-test where the tradeoff may differ. `src/moonshine.cpp`
 encoder GPU>CPU gap for tiny is inherent Metal launch overhead, not a
 fixable bounce — for moonshine-tiny, `--no-gpu` remains fastest at idle.
 
-### §232 RNNT/TDT GPU decode — IMPLEMENTED + M1-validated; Kaggle A/B ready (2026-07-11)
+### §232 RNNT/TDT GPU decode — DONE, DEFAULT FLIPPED (P100 5-12× faster, 2026-07-11)
+
+**GAP CLOSED.** Kaggle P100 (sm_60) A/B, both transcript-IDENTICAL: parakeet
+decode **763.5 → 145.2 ms (5.26×)**, nemotron **2589.3 → 209.1 ms (12.38×)** —
+the persistent-graph ggml decode replaces the host cblas that left the GPU idle.
+Default flipped: ggml decode when the decode backend is a GPU
+(`!ggml_backend_is_cpu(ctx->backend)`), cblas on CPU. Override
+`PARAKEET/NEMOTRON_GGML_DECODE=1/0`; `RNNT_GGML_PERSTEP` = per-step path.
+See LEARNINGS 33. Original notes below.
+
 
 **Shipped (opt-in, `PARAKEET_GGML_DECODE=1`, commit on main):** the Parakeet TDT
 predictor LSTM + joint head now run as ggml graphs on `ctx->backend`
