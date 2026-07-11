@@ -7219,6 +7219,22 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
      relative bottleneck (~4.7 s / DiT forward); batched CFG and moving the
      input embedding into the GPU graph are the next levers.
 
+   **>>> IN PROGRESS (this session, 2026-07-11) — f5/diarize GPU perf campaign.**
+   Actively editing `src/f5_tts.cpp` and (next) `src/titanet.cpp` — parallel
+   sessions please avoid these two files. Ordered plan:
+   1. f5 batched CFG — the DiT runs twice per ODE step (cond+uncond); batch the
+      two into one graph (B=2 `hidden_in`, t_emb/pos broadcast; 4D RoPE +
+      batched flash-attn). MEASURING per-forward breakdown first (`F5_BENCH=1`)
+      to confirm the DiT dispatch — not the host input-embed — is the cost;
+      won't invest in the graph refactor if it's host-embed-bound.
+   2. f5 host input-proj + conv_pos → GPU graph (kill the last CPU island in
+      the per-forward hot loop).
+   3. titanet/diarization GPU port — titanet loads weights to a GPU backend but
+      re-folds BN into a CPU-only cache and computes the whole speaker-embedding
+      conformer on CPU by design; this is the substance of the §224 open
+      "diarize CPU perf" item. Bigger refactor (undo the CPU fold).
+   Each step validated by ASR-roundtrip (and diff-harness for the graph math).
+
 ### §232 v13 Results (2026-07-11)
 
 **All models improved 8-14% vs v12** from LID skip (-l en) + in-graph argmax:
