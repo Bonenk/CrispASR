@@ -256,9 +256,15 @@ except Exception as e:  # noqa: BLE001
 
 def bench_onnx(onnx_name, quant, providers):
     model = onnx_asr.load_model(onnx_name, quantization=quant, providers=providers)
-    model.recognize(str(jfk_wav))  # warmup (cold CUDA JIT)
 
-    def _rtf(wav, dur, n):
+    # PER-SHAPE warmup (a 55 s clip specialises different kernels than 11 s, and
+    # the first call pays cold CUDA JIT) + MEDIAN of N + absolute time. The v10
+    # "174.9×" was a tiny-denominator artifact (0.063 s warmed on the same file);
+    # reporting absolute ms alongside RTF makes that visible, and per-shape
+    # warmup + median stop one cold call from dominating.
+    def _timeit(wav, dur, warmups, n):
+        for _ in range(warmups):
+            model.recognize(str(wav))
         ts, txt = [], ""
         for i in range(n):
             t0 = time.perf_counter()
@@ -266,12 +272,14 @@ def bench_onnx(onnx_name, quant, providers):
             ts.append(time.perf_counter() - t0)
             if i == 0:
                 txt = str(r)[:80]
-        return dur / (sum(ts) / len(ts)), txt
+        ts.sort()
+        med = ts[len(ts) // 2]
+        return dur / med, med, txt  # RTF, median seconds, transcript
 
-    rj, txt = _rtf(jfk_wav, duration, 3)
-    rl, _ = _rtf(long_wav, long_dur, 2)
+    rj, mj, txt = _timeit(jfk_wav, duration, 2, 5)
+    rl, ml, _ = _timeit(long_wav, long_dur, 1, 3)
     del model
-    return rj, rl, txt
+    return {"rtf_jfk": rj, "s_jfk": mj, "rtf_long": rl, "s_long": ml, "text": txt}
 
 
 onnx_results = {}
@@ -283,9 +291,10 @@ for onnx_name, label in ONNX_MODELS:
         configs.append(("cuda_fp32", None, ["CUDAExecutionProvider", "CPUExecutionProvider"]))
     for key, quant, provs in configs:
         try:
-            rj, rl, txt = bench_onnx(onnx_name, quant, provs)
-            print(f"    {key}: JFK {rj:.1f}x  Long {rl:.1f}x  ('{txt[:40]}')", flush=True)
-            onnx_results[label][key] = {"rtf_jfk": rj, "rtf_long": rl, "text": txt}
+            r = bench_onnx(onnx_name, quant, provs)
+            print(f"    {key}: JFK {r['rtf_jfk']:.1f}x ({r['s_jfk'] * 1000:.0f}ms)  "
+                  f"Long {r['rtf_long']:.1f}x ({r['s_long']:.2f}s)  ('{r['text'][:40]}')", flush=True)
+            onnx_results[label][key] = r
         except Exception as e:  # noqa: BLE001
             print(f"    {key}: FAILED: {str(e)[:200]}", flush=True)
             onnx_results[label][key] = {"error": str(e)[:200]}
@@ -301,6 +310,10 @@ print("\n" + "=" * 78)
 print("  CrispASR FULL-FLEET BENCHMARK + onnx-asr HEAD-TO-HEAD")
 print("=" * 78)
 print(f"  GPU: {gpu_name}  |  CUDA build: {has_cuda}  |  Audio: {duration:.0f}s JFK")
+print("  METHOD NOTE: CrispASR is timed as a fresh CLI subprocess INCLUDING model")
+print("  load each call; onnx-asr loads once then times inference-only. So short-")
+print("  clip RTF favours onnx; the LONG-audio column (load amortised) is the fair")
+print("  one. onnx-asr does not chunk long audio -> O(T^2) attention blowup there.")
 print()
 print(f"  {'Backend':<22s} {'Engine':>10s} {'JFK RTF':>10s} {'Long RTF':>10s} {'Notes':>20s}")
 print(f"  {'-'*74}")
