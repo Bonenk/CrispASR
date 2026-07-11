@@ -204,3 +204,14 @@ Lessons from the systematic head-to-head benchmark against
     hundred KB is often cheaper than materialising T² attention on the GPU for
     a small model; don't assume "keep it all on one backend" wins — measure.**
     Kept opt-in (`MOONSHINE_ENC_ATTN=manual`) for CUDA/Vulkan/base re-test.
+
+28. **The GPU→CPU decoder-weight copy isn't just slow — it drifts the output**:
+    applying the learning-25 hybrid split to `moonshine_streaming` (same
+    CPU-KV-pinned decode) in forced-GPU mode (`MOONSHINE_STREAMING_GPU=1`), the
+    hybrid path reproduces the pure-CPU transcript **exactly**, while the legacy
+    all-GPU path stably drops a comma ("so my" vs "so, my", deterministic across
+    reps). The per-token GPU→CPU weight copy perturbs a borderline decode logit
+    enough to shift a token boundary → different punctuation. So co-locating a
+    CPU-pinned graph's weights on CPU is a *correctness* win too, not only perf.
+    (moonshine_streaming stays CPU-by-default — the encoder is launch-bound on
+    GPU; the fix is latent until the §232 Fix-2 batch encoder lands.)
