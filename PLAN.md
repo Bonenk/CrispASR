@@ -7350,10 +7350,20 @@ is now AUDITED ACROSS THE TREE and the clean fix is EXHAUSTED.
      they're even more CPU-bound than greedy. Reuse `core_rnnt_ggml::Decoder`
      (one Decoder serves all hypotheses; state is passed per call). Proven
      pattern, low risk. Needs a parakeet-rnnt model to validate the RNNT path.
-  2. **Moonshine-streaming Fix-2 (batch encoder)** — the last §232 architectural
-     loss (18×): batch the 550 frame-by-frame encoder passes into one when
-     given a complete file; also activates the latent streaming hybrid-weight
-     fix. Medium, M1-validatable.
+  2. **Moonshine-streaming (18× loss) — Fix-2 premise was WRONG, re-scoped
+     2026-07-11.** The encoder is NOT 550 frame-by-frame passes: `run_encoder`
+     is called ONCE (`moonshine_streaming.cpp:808`) and builds a single batched
+     graph over all T_enc frames. The real bottleneck (per the in-code note,
+     `:641`) is the **O(T²) sliding-window masked attention** —
+     `ggml_flash_attn_ext(Q,K,V, mask_li, …)` with a dense T_enc×T_enc F16 mask
+     per layer × 6 layers (~550²×6), computing full attention then masking to a
+     ~20-wide window (wl=16/wr=4). The masks can't be dropped (LEARNING 17:
+     degenerate output). So the fix is **banded/blocked windowed attention**
+     (compute only the window, not full T²) — a hard, correctness-sensitive
+     ggml/kernel change (no native banded flash in ggml), NOT a batch-encoder
+     tweak. Larger than a quick win; own campaign. (The streaming hybrid-weight
+     fix is already shipped, latent — it activates whenever streaming runs on
+     GPU, independent of this.)
   3. **Re-run the P100 competitive scoreboard** — parakeet/nemotron TOTAL RTF vs
      transcribe.cpp should now be near-parity after the decode flip; update
      docs/performance.md. Measurement, not a code change.
