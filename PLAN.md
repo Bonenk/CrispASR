@@ -6695,8 +6695,21 @@ slower than dir in 3/3 interleaved reps) → stays opt-in.
       16 GB Mac dies in codec decode on BOTH paths (jetsam/timeout,
       pre-existing, ~1800-frame ICL ref prep + codec at ~5 GB free) —
       separate issue, not CP_DIRECT.
-- [ ] Talker remains ~77 ms/frame on Metal (dynamic sched path, per-step
-      rebuild); candidate: same direct treatment with growing-Lk graph family.
+- [x] Talker step PROFILED (2026-07-11, M1 Metal, 0.6B Q8_0) — direct
+      treatment is NOT the fix. `CRISPASR_METAL_PROFILE` on the 1068-node
+      talker step graph: **encode 2-3 ms, GPU-execute 38-42 ms** — the step
+      is GPU-execution-bound, so sched-free dispatch / ICB replay can't
+      help (same conclusion as §210 granite). Confirmed empirically: the
+      sched-free bucket path computes in ~56 ms/step vs ~54 ms dynamic.
+      The eval-callback op profile shows why: ~460 real ops/step, mul_mat
+      only ~24%; ~85 `cont` copies + hundreds of tiny norm/add/rope
+      kernels/step — death by kernel count, amplified by desktop-GPU
+      time-slicing (probe gpu_us on identical 193-node code_pred graphs
+      swings 4-17 ms under WindowServer/browser GPU load). Remaining lever
+      is node-count slimming in `core_attn::kv_self_attn` (fuse qk-norm,
+      drop per-layer conts) — shared by 30+ backends, high regression risk
+      for a bounded win → DEPRIORITIZED; revisit only with a dedicated
+      diff-harness campaign.
 - [ ] Codec decode is ~half the remaining wall — and on the 16 GB Mac the
       1.7B codec decode dies (jetsam at ~5 GB free / 20-min timeout) even on
       the unmodified path. Separate item.
