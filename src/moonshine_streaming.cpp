@@ -601,21 +601,7 @@ static int run_encoder(moonshine_streaming_context* ctx, const float* frontend_o
     float ln_eps = 1e-5f;
     bool verbose = ctx->verbosity >= 2 || getenv("MOONSHINE_STREAMING_BENCH");
 
-    // §176s: reuse cached encoder graph when T_enc matches.
-    if (ctx->cached_enc_gf && ctx->cached_enc_T == T_enc) {
-        ggml_cgraph* gf = ctx->cached_enc_gf;
-        ggml_backend_sched_reset(ctx->sched);
-        if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
-            return -2;
-        ggml_tensor* inp = ggml_graph_get_tensor(gf, "enc_input");
-        ggml_backend_tensor_set(inp, frontend_out, 0, (size_t)d * T_enc * sizeof(float));
-        if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS)
-            return -3;
-        ggml_tensor* out = ggml_graph_get_tensor(gf, "encoder_output");
-        enc_output.resize((size_t)d * T_enc);
-        ggml_backend_tensor_get(out, enc_output.data(), 0, enc_output.size() * sizeof(float));
-        return 0;
-    }
+    // #215e UAF fix: always rebuild (sched gallocr regrow frees cached buffers).
     if (ctx->cached_enc_ctx) {
         ggml_free(ctx->cached_enc_ctx);
         ctx->cached_enc_ctx = nullptr;
