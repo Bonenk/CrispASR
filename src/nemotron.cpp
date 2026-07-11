@@ -1680,6 +1680,8 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
     // §232: opt-in GPU decode (LSTM predictor + joint as ggml graphs). Default
     // off (cblas). Runs on ctx->backend; perf verdict is P100-only.
     const bool ggml_dec = getenv("NEMOTRON_GGML_DECODE") != nullptr;
+    const bool time_dec = getenv("NEMOTRON_DECODE_TIMING") != nullptr;
+    auto _dt0 = std::chrono::steady_clock::now();
 
     const auto& W = ctx->pred_w;
     const auto& J = ctx->joint_w;
@@ -1746,6 +1748,12 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
                 predictor_step(W, tok, state, pred_out);
             sym_count++;
         }
+    }
+    if (time_dec) {
+        auto _dt1 = std::chrono::steady_clock::now();
+        fprintf(stderr, "nemotron: rnnt_decode %.1f ms (%s, T_enc=%d, %zu tokens)\n",
+                std::chrono::duration<double, std::milli>(_dt1 - _dt0).count(), ggml_dec ? "ggml" : "cblas", T_enc,
+                emitted.size());
     }
     return emitted;
 }

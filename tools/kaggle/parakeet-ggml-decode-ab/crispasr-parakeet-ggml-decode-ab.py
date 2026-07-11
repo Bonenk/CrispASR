@@ -1,25 +1,24 @@
 """
-CrispASR — Parakeet TDT decode: cblas vs ggml-graph GPU decode A/B (§232)
+CrispASR — Transducer GPU decode: cblas vs ggml-graph A/B on P100 (§232)
 
 Question this kernel answers (P100, the ONLY hardware where the win is
-measurable — see LEARNINGS 29): does running the TDT decode's LSTM predictor
-+ joint head as ggml graphs on the GPU (PARAKEET_GGML_DECODE=1) beat the
-default CPU cblas_sgemv path on a real CUDA box?
+measurable — see LEARNINGS 29-30): does running the transducer decode's LSTM
+predictor + joint head as ggml graphs on the GPU (shared core_rnnt_ggml, gated
+per backend) beat the default CPU cblas_sgemv path on a real CUDA box?
 
-Context: §232 measured CA parakeet decode at ~828-955 ms on P100 (host-side
-cblas, GPU idle) vs transcribe.cpp's ~51 ms (GPU). On M1 the gap is invisible
-because Apple Accelerate's cblas is fast (decode ~60 ms) — so the A/B must run
-where the CPU BLAS is slow relative to the GPU. This kernel builds the CUDA
-runtime from the feat branch, downloads parakeet-tdt-0.6b-v3 Q4_K, and runs
-JFK three ways × N reps with PARAKEET_DECODE_TIMING=1:
-  - cblas  (default)
-  - ggml   (PARAKEET_GGML_DECODE=1)
-and reports per-config decode ms + transcript parity + speedup.
+Context: §232 measured CA decode at ~955 ms (parakeet) / ~2900 ms (nemotron) on
+P100 (host-side cblas, GPU idle) vs transcribe.cpp's GPU decode. On M1 the gap
+is invisible because Apple Accelerate's cblas is fast (decode ~60 ms) — the A/B
+must run where the CPU BLAS is slow relative to the GPU. This kernel builds the
+CUDA runtime from the feat branch and, for BOTH transducers, runs JFK N reps ×
+{cblas default, ggml (<BACKEND>_GGML_DECODE=1)} with <BACKEND>_DECODE_TIMING=1,
+reporting per-config decode ms + transcript parity + wall RTF + a verdict.
 
-Acceptance: transcripts MUST be identical (correctness), and ggml decode ms
-should be < cblas decode ms for the port to be worth flipping. If ggml is
-launch-bound (not faster), the follow-up is a persistent-graph / CUDA-graph
-variant — do NOT flip the default from this result alone.
+Acceptance: transcripts MUST be identical (correctness); ggml decode ms should be
+< cblas decode ms to be worth flipping. If ggml is launch-bound (not faster) the
+follow-up is a persistent-graph / in-graph-argmax variant — do NOT flip from
+this result alone. parakeet + nemotron share core_rnnt_ggml, so the verdict
+transfers between them.
 """
 
 import os
@@ -84,31 +83,34 @@ with kh.build_heartbeat("cmake-build"):
 assert CRISPASR.is_file(), "crispasr binary missing after build"
 kh.step("build.done", binary=str(CRISPASR))
 
-# ── Download parakeet model + JFK ─────────────────────────────────────────
+# ── Download models + JFK ─────────────────────────────────────────────────
 kh.step("download.begin")
 MODELS.mkdir(exist_ok=True)
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 kh.sh_with_progress("pip install -q huggingface_hub hf_transfer")
 from huggingface_hub import hf_hub_download  # noqa: E402
 
-MODEL_FILE = "parakeet-tdt-0.6b-v3-q4_k.gguf"
-p = hf_hub_download(
-    repo_id="cstr/parakeet-tdt-0.6b-v3-GGUF",
-    filename=MODEL_FILE,
-    local_dir=str(MODELS),
-    local_dir_use_symlinks=False,
-)
-kh.step("download.model.done", path=p, size_mib=Path(p).stat().st_size // (1 << 20))
-model_path = MODELS / MODEL_FILE
+# (backend, HF repo, filename, GGML gate env, DECODE_TIMING env, decode-log regex)
+BACKENDS = [
+    ("parakeet", "cstr/parakeet-tdt-0.6b-v3-GGUF", "parakeet-tdt-0.6b-v3-q4_k.gguf",
+     "PARAKEET_GGML_DECODE", "PARAKEET_DECODE_TIMING", r"parakeet: tdt_decode ([\d.]+) ms"),
+    ("nemotron", "cstr/nemotron-3.5-asr-streaming-0.6b-GGUF", "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
+     "NEMOTRON_GGML_DECODE", "NEMOTRON_DECODE_TIMING", r"nemotron: rnnt_decode ([\d.]+) ms"),
+]
+model_paths = {}
+for backend, repo, fname, _gate, _timing, _rx in BACKENDS:
+    p = hf_hub_download(repo_id=repo, filename=fname, local_dir=str(MODELS), local_dir_use_symlinks=False)
+    model_paths[backend] = Path(p)
+    kh.step(f"download.{backend}.done", path=p, size_mib=Path(p).stat().st_size // (1 << 20))
 
 subprocess.run(["cp", f"{REPO}/samples/jfk.wav", str(SAMPLE)], check=False)
 assert SAMPLE.is_file(), "jfk.wav missing"
 kh.step("download.done")
 
 
-# ── Run one config ────────────────────────────────────────────────────────
-def run_cfg(label: str, env_extra: dict) -> dict:
-    out_stem = WORK / f"pk-jfk-{label}"
+# ── Run one (backend, config) ─────────────────────────────────────────────
+def run_cfg(backend: str, model_path: Path, timing_env: str, rx: str, label: str, env_extra: dict) -> dict:
+    out_stem = WORK / f"{backend}-jfk-{label}"
     for ext in [".txt", ".srt"]:
         f = out_stem.with_suffix(ext)
         if f.exists():
@@ -116,21 +118,19 @@ def run_cfg(label: str, env_extra: dict) -> dict:
     cmd = [
         str(CRISPASR),
         "-m", str(model_path),
-        "--backend", "parakeet",
+        "--backend", backend,
         "-l", "en",
         "-f", str(SAMPLE),
         "-of", str(out_stem),
         "-otxt",
         "-np",
     ]
-    env = {**os.environ, "PARAKEET_DECODE_TIMING": "1", **env_extra}
+    env = {**os.environ, timing_env: "1", **env_extra}
     decs, wall_rtfs, text = [], [], ""
     for rep in range(REPS):
-        t0 = time.time()
         r = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=900)
-        dt = time.time() - t0
         log = (r.stdout or "") + (r.stderr or "")
-        m = re.search(r"parakeet: tdt_decode ([\d.]+) ms", log)
+        m = re.search(rx, log)
         if m:
             decs.append(float(m.group(1)))
         rtf = re.search(r"\(([\d.]+)x realtime\)", log)
@@ -140,58 +140,47 @@ def run_cfg(label: str, env_extra: dict) -> dict:
         if txt_path.exists() and txt_path.stat().st_size > 0:
             text = txt_path.read_text().strip()
         if rep == 0 and (not decs or not text):
-            print(f"--- {label} rep0 stderr tail ---", flush=True)
+            print(f"--- {backend}/{label} rep0 stderr tail ---", flush=True)
             for line in log.splitlines()[-25:]:
                 print(line, flush=True)
     best_dec = min(decs) if decs else None
     med_dec = sorted(decs)[len(decs) // 2] if decs else None
     best_rtf = max(wall_rtfs) if wall_rtfs else None
     ok = EXPECTED in text.lower()
-    kh.step(
-        f"run.{label}.done",
-        best_decode_ms=best_dec,
-        median_decode_ms=med_dec,
-        best_wall_rtf=best_rtf,
-        text_ok=ok,
-        n_reps=len(decs),
-    )
-    return {"label": label, "best_dec": best_dec, "med_dec": med_dec, "best_rtf": best_rtf, "text": text, "ok": ok}
+    kh.step(f"run.{backend}.{label}.done", best_decode_ms=best_dec, median_decode_ms=med_dec,
+            best_wall_rtf=best_rtf, text_ok=ok, n_reps=len(decs))
+    return {"best_dec": best_dec, "med_dec": med_dec, "best_rtf": best_rtf, "text": text, "ok": ok}
 
 
 kh.step("run.section.begin", reps=REPS)
-cblas = run_cfg("cblas", {})
-ggml = run_cfg("ggml", {"PARAKEET_GGML_DECODE": "1"})
+results = {}
+for backend, _repo, _fname, gate, timing_env, rx in BACKENDS:
+    mp = model_paths[backend]
+    cblas = run_cfg(backend, mp, timing_env, rx, "cblas", {})
+    ggml = run_cfg(backend, mp, timing_env, rx, "ggml", {gate: "1"})
+    parity = cblas["text"] == ggml["text"]
+    speedup = None
+    if cblas["best_dec"] and ggml["best_dec"] and ggml["best_dec"] > 0:
+        speedup = round(cblas["best_dec"] / ggml["best_dec"], 2)
+    verdict = "FLIP CANDIDATE" if (parity and speedup and speedup > 1.2) else (
+        "NO WIN (keep cblas; try persistent/CUDA-graph)" if parity else "CORRECTNESS FAIL")
+    results[backend] = dict(parity=parity, speedup=speedup, cblas=cblas, ggml=ggml, verdict=verdict)
+    kh.step(f"summary.{backend}", parity=parity, cblas_decode_ms=cblas["best_dec"],
+            ggml_decode_ms=ggml["best_dec"], decode_speedup=speedup,
+            cblas_rtf=cblas["best_rtf"], ggml_rtf=ggml["best_rtf"], verdict=verdict)
 
 # ── Summary ───────────────────────────────────────────────────────────────
-parity = cblas["text"] == ggml["text"]
-speedup = None
-if cblas["best_dec"] and ggml["best_dec"] and ggml["best_dec"] > 0:
-    speedup = round(cblas["best_dec"] / ggml["best_dec"], 2)
-
-kh.step(
-    "summary",
-    sha=sha[:8],
-    parity=parity,
-    cblas_decode_ms=cblas["best_dec"],
-    ggml_decode_ms=ggml["best_dec"],
-    decode_speedup=speedup,
-    cblas_rtf=cblas["best_rtf"],
-    ggml_rtf=ggml["best_rtf"],
-)
 print("\n" + "=" * 72)
-print(f"SUMMARY — parakeet TDT decode cblas vs ggml GPU decode ({sha[:8]})")
+print(f"SUMMARY — transducer decode cblas vs ggml GPU decode ({sha[:8]})")
 print("=" * 72)
-print(f"  transcript parity : {'IDENTICAL' if parity else 'DIFFERENT (BUG!)'}")
-print(f"  cblas decode  (ms): best={cblas['best_dec']}  median={cblas['med_dec']}")
-print(f"  ggml  decode  (ms): best={ggml['best_dec']}  median={ggml['med_dec']}")
-print(f"  decode speedup    : {speedup}x  (>1 = ggml faster)")
-print(f"  wall RTF          : cblas={cblas['best_rtf']}x  ggml={ggml['best_rtf']}x")
-print(f"  cblas text        : {cblas['text'][:160]}")
-print(f"  ggml  text        : {ggml['text'][:160]}")
-print()
-verdict = "FLIP CANDIDATE" if (parity and speedup and speedup > 1.2) else (
-    "NO WIN (keep cblas; try persistent/CUDA-graph)" if parity else "CORRECTNESS FAIL")
-print(f"  VERDICT: {verdict}")
+for backend, r in results.items():
+    print(f"\n[{backend}]")
+    print(f"  transcript parity : {'IDENTICAL' if r['parity'] else 'DIFFERENT (BUG!)'}")
+    print(f"  cblas decode  (ms): best={r['cblas']['best_dec']}  median={r['cblas']['med_dec']}")
+    print(f"  ggml  decode  (ms): best={r['ggml']['best_dec']}  median={r['ggml']['med_dec']}")
+    print(f"  decode speedup    : {r['speedup']}x  (>1 = ggml faster)")
+    print(f"  wall RTF          : cblas={r['cblas']['best_rtf']}x  ggml={r['ggml']['best_rtf']}x")
+    print(f"  VERDICT           : {r['verdict']}")
 
 kh._push_progress_to_hf(force=True)
-kh.step("script.end", verdict=verdict)
+kh.step("script.end", verdicts={b: r["verdict"] for b, r in results.items()})
