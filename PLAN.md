@@ -33,8 +33,9 @@ roundtrips EN+FR). Active threads:
 - **License compliance (DONE):** base model `mistralai/Voxtral-4B-TTS-2603` is CC-BY-NC-4.0
   (non-gated). Fixed two gaps: the public `cstr/voxtral-4b-tts-GGUF` had no README (→ no
   attribution, violating CC-BY-NC's BY) — uploaded the card; and the registry auto-downloaded
-  the NC model with no warning — populated the `license` field (`eb07a653`). **Follow-up:** audit
-  the sibling `cstr/voxtral-mini-*` / `voxtral-realtime` cards (those ASR models are Apache-2.0).
+  the NC model with no warning — populated the `license` field (`eb07a653`). Sibling
+  `cstr/voxtral-mini-3b` / `voxtral-mini-4b-realtime` GGUF repos audited clean: both
+  Apache-2.0 with proper cards (permissive, no NC concern) — only the TTS repo had the gap.
 
 ## Gemma-4 12B (gemma4_unified) ASR support (OPEN)
 
