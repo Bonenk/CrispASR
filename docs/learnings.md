@@ -286,3 +286,21 @@ Lessons from the systematic head-to-head benchmark against
     default only after the clean P100 bench (the noisy M1 load here inflates the
     absolutes; the ordering is stable). (c) Watch the §234 gallocr aliasing gotcha
     — re-set ALL inputs before every compute (state + token/proj each step do).
+
+33. **P100 A/B CLOSES the §232 transducer decode gap — persistent ggml decode is
+    5-12× faster than cblas, DEFAULT FLIPPED.** The Kaggle P100 (sm_60) run
+    (`tools/kaggle/parakeet-ggml-decode-ab`, both transcript-IDENTICAL): parakeet
+    decode **763.5 → 145.2 ms (5.26×)**, nemotron decode **2589.3 → 209.1 ms
+    (12.38×)**. This is the win LEARNING 30 predicted (Kaggle's slow OpenBLAS cblas
+    vs the GPU) and 32 set up (persistent graph). Default flipped to persistent
+    ggml decode **when the decode backend is a GPU** (`!ggml_backend_is_cpu(
+    ctx->backend)`), cblas on CPU. **Two gotchas that mattered for the flip:**
+    (a) detect GPU with `ggml_backend_is_cpu(backend)`, NOT `backend !=
+    backend_cpu` — parakeet's `pick_backend(false)` returns a *distinct* CPU
+    backend instance, so the `!=` test mis-enabled ggml on `--no-gpu` (caught by
+    the decode-timer printing "(ggml)" under `--no-gpu`). (b) The whole arc
+    validates the "build it, gate it, let the TARGET hardware judge, then flip"
+    discipline (29→33): per-step was a stepping stone; persistent won; P100
+    confirmed; only then flip. nemotron's 12× shows the payoff scales with decode
+    length (LEARNING 31's step-count point, inverted once the per-step overhead is
+    gone).
