@@ -7276,8 +7276,9 @@ is now AUDITED ACROSS THE TREE and the clean fix is EXHAUSTED.
 
 - **DONE + on main:** moonshine (offline) decode hybrid placement (q8 −40%,
   f16 −58%); moonshine encoder manual-attn (negative result, opt-in);
-  moonshine_streaming hybrid placement (latent, correctness bonus). RNNT/TDT
-  GPU decode SCOPED for a Kaggle campaign (see below).
+  moonshine_streaming hybrid placement (latent, correctness bonus). Parakeet
+  TDT GPU decode IMPLEMENTED (opt-in PARAKEET_GGML_DECODE=1) + M1-validated
+  (identical transcript); Kaggle P100 A/B kernel ready (see below).
 - **Audited, does NOT apply (no more clean targets):**
   - `crispasr.cpp` (whisper): `cpu_buffer_type` sites are device enumeration /
     op-support, not a CPU KV cache; KV lives on the compute backend. No copy.
@@ -7344,7 +7345,33 @@ Vulkan/base re-test where the tradeoff may differ. `src/moonshine.cpp`
 encoder GPU>CPU gap for tiny is inherent Metal launch overhead, not a
 fixable bounce — for moonshine-tiny, `--no-gpu` remains fastest at idle.
 
-### §232 RNNT/TDT GPU decode — scoped, needs a Kaggle/CUDA session (2026-07-11)
+### §232 RNNT/TDT GPU decode — IMPLEMENTED + M1-validated; Kaggle A/B ready (2026-07-11)
+
+**Shipped (opt-in, `PARAKEET_GGML_DECODE=1`, commit on main):** the Parakeet TDT
+predictor LSTM + joint head now run as ggml graphs on `ctx->backend`
+(`parakeet_predictor_step_ggml` / `parakeet_joint_step_ggml` /
+`parakeet_lstm_layer_ggml` in `parakeet.cpp`), so the whole per-step decode
+executes on the GPU instead of host cblas_sgemv. Default stays cblas.
+
+- **CORRECTNESS (M1, done):** transcript IDENTICAL to cblas on jfk +
+  multispeaker, CPU & Metal. Hand-written LSTM (gate order i,f,g,o) + ReLU joint
+  match the cblas math exactly.
+- **M1 perf (done):** decode 55-59 ms (ggml) vs 60-61 ms (cblas) on Metal —
+  neutral/slightly faster. No local win because Apple Accelerate cblas is
+  already fast (~60 ms); the P100 gap (955 ms cblas) is a slow-CPU-BLAS effect,
+  so the win is expected on P100, not M1. `PARAKEET_DECODE_TIMING=1` prints
+  decode ms.
+- **PERF VERDICT — run this Kaggle kernel next:**
+  `tools/kaggle/parakeet-ggml-decode-ab/` (P100, GPU-enabled, clones the feat
+  branch, builds CUDA, A/Bs cblas vs ggml decode ms + transcript parity + RTF,
+  N reps). `bash tools/kaggle/parakeet-ggml-decode-ab/push.sh`. Flip the default
+  only if parity holds AND ggml decode < cblas decode there.
+- **Follow-ups if per-step is launch-bound on P100:** persistent gallocr graphs
+  + in-graph argmax (2 int32 readback vs 8198-logit) instead of per-step sched
+  rebuild; then port the identical treatment to nemotron RNNT
+  (`parakeet_rnnt_decode` shares the LSTM+joint shape).
+
+--- original scoping notes (kept for reference) ---
 
 Scoped the Parakeet TDT decode port (target: TC's 29 ms P100 decode vs CA's
 ~828-955 ms cblas). Findings that must guide the implementation:
