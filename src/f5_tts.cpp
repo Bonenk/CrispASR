@@ -1094,8 +1094,12 @@ static bool f5_dit_cache_build(f5_tts_context* ctx, int T) {
     cache.gf = ggml_new_graph_custom(cache.gctx, 8192, false);
     ggml_build_forward_expand(cache.gf, cache.output);
 
-    // Reserve then allocate memory layout
-    cache.galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend_cpu));
+    // Reserve then allocate memory layout on the compute backend (GPU when
+    // use_gpu; falls back to backend_cpu otherwise). The DiT weights already
+    // live on ctx->backend, so keeping the graph on the same backend keeps the
+    // 64×-per-synthesis forward off the CPU — a single-backend gallocr compute
+    // (no sched), matching the §206/§232 direct-gallocr pattern.
+    cache.galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
     if (!ggml_gallocr_reserve(cache.galloc, cache.gf) || !ggml_gallocr_alloc_graph(cache.galloc, cache.gf)) {
         cache.reset();
         return false;
@@ -1125,8 +1129,18 @@ static std::vector<float> f5_dit_run(f5_tts_context* ctx, const float* hidden, i
     const int dim = ctx->hp.dim;
     ggml_backend_tensor_set(cache.hidden_in, hidden, 0, (size_t)T * dim * sizeof(float));
     ggml_backend_tensor_set(cache.t_emb_in, t_emb_data, 0, (size_t)dim * sizeof(float));
+    // pos_in must be re-set every step: gallocr re-allocs the graph each call
+    // and may alias this input's slot with a prior step's compute intermediate,
+    // so a set-once value read back corrupt RoPE positions from step 1 on (the
+    // same gallocr input-aliasing bug fixed in omnivoice §245 / voxtral #93).
+    {
+        std::vector<int32_t> pos_data(T);
+        for (int i = 0; i < T; i++)
+            pos_data[i] = i;
+        ggml_backend_tensor_set(cache.pos_in, pos_data.data(), 0, (size_t)T * sizeof(int32_t));
+    }
 
-    if (ggml_backend_graph_compute(ctx->backend_cpu, cache.gf) != GGML_STATUS_SUCCESS)
+    if (ggml_backend_graph_compute(ctx->backend, cache.gf) != GGML_STATUS_SUCCESS)
         return {};
 
     const int mel_dim = ctx->hp.mel_dim;
