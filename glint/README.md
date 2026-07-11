@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `b1f831d6ccd3bcc4aa7f63c1068ba97ae30746b4` (docs: v0.9.0 release notes — the three-codec release).
+Synced at upstream commit: `80e20399a12bfa30c8a98df17a19820efecb418c` (fix(opus): include <cstddef> for size_t in opus_ogg.hpp).
