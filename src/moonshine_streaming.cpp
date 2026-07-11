@@ -123,10 +123,20 @@ struct ms_dec_layer {
     ggml_tensor* ffn_fc2_b = nullptr;
 };
 
+// §232 hybrid placement: encoder weights on GPU, decoder weights on CPU. The
+// per-token decode graph is CPU-pinned (KV cache is a CPU buffer), so keeping
+// the decoder weights CPU-resident avoids a per-token GPU->CPU weight re-copy.
+// Mirrors the moonshine (offline) fix. See PLAN §232 / LEARNINGS 25.
+static bool ms_is_gpu_tensor(const char* tensor_name, void* /*user*/) {
+    return tensor_name && std::strncmp(tensor_name, "encoder.", 8) == 0;
+}
+
 struct ms_model {
     ms_hparams hp;
     ggml_context* ctx_w = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
+    // §232: CPU partition for decoder weights under the hybrid (split) load.
+    ggml_backend_buffer_t buf_w_cpu = nullptr;
 
     // Audio frontend
     ggml_tensor* embedder_log_k = nullptr;
@@ -294,13 +304,24 @@ extern "C" struct moonshine_streaming_context* moonshine_streaming_init_from_fil
         ctx->backend = ctx->backend_cpu;
     ctx->use_gpu = (ctx->backend != ctx->backend_cpu);
 
-    // Load weights via core_gguf (mmap, backend buffer)
+    // Load weights via core_gguf (mmap, backend buffer). §232: on GPU, split
+    // encoder->GPU / decoder->CPU (opt out with MOONSHINE_ALL_GPU=1).
     core_gguf::WeightLoad wl;
-    if (!core_gguf::load_weights(path_model, ctx->backend, "moonshine_streaming", wl)) {
+    const char* all_gpu_env = std::getenv("MOONSHINE_ALL_GPU");
+    const bool all_gpu = all_gpu_env && all_gpu_env[0] == '1';
+    bool loaded;
+    if (ctx->use_gpu && !all_gpu) {
+        loaded = core_gguf::load_weights_split(path_model, ctx->backend, ctx->backend_cpu, ms_is_gpu_tensor, nullptr,
+                                               "moonshine_streaming", wl);
+    } else {
+        loaded = core_gguf::load_weights(path_model, ctx->backend, "moonshine_streaming", wl);
+    }
+    if (!loaded) {
         fprintf(stderr, "moonshine_streaming: failed to load weights from '%s'\n", path_model);
         delete ctx;
         return nullptr;
     }
+    m.buf_w_cpu = wl.buf_cpu; // non-null only for the split (hybrid) load
     m.ctx_w = wl.ctx;
     m.buf_w = wl.buf;
 
@@ -1162,6 +1183,8 @@ extern "C" void moonshine_streaming_free(struct moonshine_streaming_context* ctx
         ggml_backend_sched_free(ctx->sched);
     if (ctx->model.buf_w)
         ggml_backend_buffer_free(ctx->model.buf_w);
+    if (ctx->model.buf_w_cpu)
+        ggml_backend_buffer_free(ctx->model.buf_w_cpu);
     if (ctx->model.ctx_w)
         ggml_free(ctx->model.ctx_w);
     if (ctx->backend && ctx->backend != ctx->backend_cpu)
