@@ -7396,7 +7396,7 @@ is now AUDITED ACROSS THE TREE and the clean fix is EXHAUSTED.
      kept as the A/B gate (`=0` CPU, `=1` force GPU). See the dedicated subsection
      below. Kaggle CUDA A/B confirms the CUDA arm.
 
-### §232 dia TTS GPU path (DONE, 2026-07-11, M1 Metal — default GPU)
+### §232 dia TTS GPU path (2026-07-11 — default GPU on Metal; CUDA opt-in pending re-validation)
 
 dia was hard-pinned to CPU because the main model (encoder + 18L decoder + heads)
 loaded into a **plain CPU malloc ggml context** via `gguf_init_from_file(...,
@@ -7413,9 +7413,10 @@ the DAC path), binding the returned name→tensor map through the existing
 `dia_assign_weight`. DAC already loaded onto `ctx->backend`, so it follows to
 GPU. Free path now releases `buf_w` + the GPU backend.
 
-**Default:** GPU when `use_gpu` (not `--no-gpu`), on ALL GPU backends incl.
-Metal. `DIA_TTS_GPU` is the A/B / regression-bisection gate: `=0` forces the old
-CPU path, `=1` forces GPU even under `--no-gpu`.
+**Default: GPU on Metal ONLY** (not `--no-gpu`); CUDA/Vulkan fall back to CPU
+unless forced. `DIA_TTS_GPU` gate: `=1` forces GPU on any backend (the CUDA/Vulkan
+opt-in), `=0` forces CPU (regression bisection). Why Metal-only: the Kaggle P100
+A/B (below) caught the CUDA decoder aborting; Metal is roundtrip-validated.
 
 **A/B (M1, dia-1.6b-q4_k, 384 steps, seed 42, single run — indicative):**
 
@@ -7431,14 +7432,24 @@ ref); generate→ASR roundtrip (whisper-tiny) is **identical** on both arms ("Th
 quick brown fox jumps over the lazy dog while the sun sets slowly behind..").
 Metal decode is *faster* here, not slower — dia's 1.6B decoder does large
 matmuls (unlike LEARNING 34's tiny parakeet transducer), so the launch-bound
-regime doesn't apply and Metal is NOT excluded. Both speed and quality win →
-default flipped (A/B rule #3), old path kept behind `DIA_TTS_GPU=0`. No k-quant
-CAST / left-pad PAD issues on this DAC (F16/F32 codec weights). Caveats: M1
-numbers are single-run on a loaded box (rule #5 wants median-of-3 — deltas are
-large enough that noise can't flip the verdict, decode's 1.5× the thinnest
-margin); a Kaggle CUDA A/B is running to confirm the CUDA arm; `load_weights_
-split` (encoder+DAC→GPU, decoder→CPU) is the fallback if any platform shows the
-decoder losing on GPU.
+regime doesn't apply and Metal is NOT excluded.
+
+**Kaggle P100 CUDA A/B (`f0872174`) — caught a CUDA-only decoder abort.** Encoder
+(1629→79 ms, 20.7×) and cross-KV (561→102 ms) ran fine on CUDA, but the AR
+decoder produced **0 tokens** and aborted:
+`GGML_ASSERT(src1->nb[0] == ggml_type_size(src1->type)) failed`. Root cause:
+`build_dia_decoder_embedding` fed `ggml_get_rows` a **strided index view**
+(`view->nb[0] = n_output_heads*elsize`); CPU/Metal tolerate the stride but CUDA's
+`get_rows` kernel requires a contiguous index tensor. **Fixed** by materialising
+the 2 indices with `ggml_cont` before `get_rows` (negligible cost, correct on
+every backend). Because that fix is untestable from an M1, the **default was
+narrowed to Metal-only** and CUDA/Vulkan kept opt-in (`DIA_TTS_GPU=1`) until a
+Kaggle re-run confirms the fix. This is the A/B process (rule #4/#5) doing its job
+— the mandated CUDA A/B caught a flip that would have shipped empty audio on CUDA.
+No k-quant CAST / left-pad PAD issues on the DAC (F16/F32 codec weights).
+`load_weights_split` (encoder+DAC→GPU, decoder→CPU) remains the fallback if a
+platform shows the decoder losing on GPU. Follow-up: re-run
+`tools/kaggle/dia-gpu-ab` on the fix; if green, widen the default to CUDA/Vulkan.
 
 ### §232 paraformer GPU path — implemented, OPT-IN (kept CPU default, 2026-07-11)
 
@@ -7457,9 +7468,22 @@ sits in LEARNING 34's launch-bound / overhead-dominated regime (unlike dia's
 1.6B decoder). **Kept CPU default** (A/B rule #3: correct but not a clear speed
 win → stays opt-in). The win is more likely on a slow-CPU-BLAS box (Kaggle
 OpenBLAS, cf. LEARNING 30 parakeet) or long audio (encoder cost scales with T);
-a CUDA A/B would settle whether to flip. m2m100 / t5_translate share the same
-CPU pin and could be enabled identically, with the same "validate before flip"
-caveat.
+a CUDA A/B would settle whether to flip.
+
+### §232 m2m100 + t5/madlad GPU paths — implemented, OPT-IN (2026-07-11)
+
+Same audit follow-up: both MT backends were CPU-pinned (`c->backend =
+c->backend_cpu`) but already loaded weights AND KV onto `c->backend` via
+`core_gguf::load_weights` + `ggml_backend_alloc_ctx_tensors`, so pointing that at
+a GPU backend + a 2-backend sched is the whole change. Gated `CRISPASR_M2M100_GPU`
+/ `CRISPASR_T5_GPU` (pure env opt-in; default CPU). Validated on M1 Metal:
+en→de translation **identical** CPU vs GPU (m2m100-418m-q4_k: "Der schnelle braune
+Fuchs…"; madlad-3b-q4_k: "Der schnelle Braunfuchs…"), GPU engaged on both.
+Timing not chased (encoder-decoder AR, small/short — same launch-bound regime as
+paraformer; the CUDA A/B in `tools/kaggle/gpu-pin-ab` measures paraformer +
+m2m100 + madlad together). Kept opt-in pending that verdict. NOTE: watch for the
+same strided-`get_rows` CUDA abort dia hit — MT embeddings look contiguous, but
+the Kaggle run is the check.
 
 ### §232 Moonshine decode — hybrid weight placement (DONE, 2026-07-11, M1 Metal)
 

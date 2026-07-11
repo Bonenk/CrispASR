@@ -14,6 +14,7 @@
 #include "t5_translate.h"
 #include "core/beam_decode.h"
 #include "core/gguf_loader.h"
+#include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 t5 GPU path)
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -992,8 +993,23 @@ extern "C" struct t5_translate_context* t5_translate_init_from_file(const char* 
                 hp.enc_n_layers, hp.dec_n_layers, hp.n_heads, hp.d_ff, hp.vocab_size, hp.ff_proj.c_str());
     }
 
+    // Backend. GPU is OPT-IN behind CRISPASR_T5_GPU=1 (§232 audit): t5 was
+    // CPU-pinned though it already loads weights + KV onto c->backend, so
+    // pointing that at a GPU backend is the whole change. Kept an explicit env
+    // gate (default CPU) — same "validate a CUDA A/B before flipping" caveat as
+    // m2m100 (small AR decode is launch-bound on Metal; encoder helps most on
+    // long inputs / a slow-CPU-BLAS box).
     c->backend_cpu = ggml_backend_cpu_init();
-    c->backend = c->backend_cpu;
+    if (std::getenv("CRISPASR_T5_GPU")) {
+        c->backend = crispasr_init_gpu_backend();
+        if (!c->backend) {
+            c->backend = c->backend_cpu;
+        } else if (params.verbosity >= 1) {
+            fprintf(stderr, "t5: GPU backend enabled (%s)\n", ggml_backend_name(c->backend));
+        }
+    } else {
+        c->backend = c->backend_cpu;
+    }
 
     {
         core_gguf::WeightLoad wl;
@@ -1012,8 +1028,9 @@ extern "C" struct t5_translate_context* t5_translate_init_from_file(const char* 
     }
 
     {
-        ggml_backend_t backends[] = {c->backend};
-        c->sched = ggml_backend_sched_new(backends, nullptr, 1, 16384, false, false);
+        ggml_backend_t backends[] = {c->backend, c->backend_cpu};
+        int n_be = (c->backend != c->backend_cpu) ? 2 : 1;
+        c->sched = ggml_backend_sched_new(backends, nullptr, n_be, 16384, false, false);
         c->compute_meta.resize(ggml_tensor_overhead() * 16384 + ggml_graph_overhead_custom(16384, false));
     }
 
@@ -1037,8 +1054,10 @@ extern "C" void t5_translate_free(struct t5_translate_context* ctx) {
         ggml_backend_buffer_free(ctx->buf_w);
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
-    if (ctx->backend)
+    if (ctx->backend && ctx->backend != ctx->backend_cpu)
         ggml_backend_free(ctx->backend);
+    if (ctx->backend_cpu)
+        ggml_backend_free(ctx->backend_cpu);
     delete ctx;
 }
 
