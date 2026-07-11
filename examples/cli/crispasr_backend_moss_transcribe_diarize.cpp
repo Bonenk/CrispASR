@@ -69,7 +69,7 @@ public:
             seg.text = raw_segs[i].text;
             if (raw_segs[i].speaker_id > 0) {
                 char spk[32];
-                snprintf(spk, sizeof(spk), "Speaker %d", raw_segs[i].speaker_id);
+                snprintf(spk, sizeof(spk), "(Speaker %d) ", raw_segs[i].speaker_id);
                 seg.speaker = spk;
             }
             result.push_back(std::move(seg));

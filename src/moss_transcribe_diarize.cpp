@@ -533,29 +533,38 @@ static ggml_cgraph* moss_diarize_build_encoder_graph(moss_diarize_context* ctx, 
     // Conv1d bias broadcast helper: reshape (OC,) → (1, OC, 1) for 3D conv output
     auto bias_1d = [&](ggml_tensor* b) { return ggml_reshape_3d(ctx0, b, 1, b->ne[0], 1); };
 
-    // Mark mel input for extraction (verify it reaches the graph correctly)
-    ggml_tensor* mel_snap = ggml_cont(ctx0, mel_in);
-    ggml_set_name(mel_snap, "mel_in_graph");
-    ggml_set_output(mel_snap);
-    ggml_build_forward_expand(gf, mel_snap);
+    // CRISPASR_MOSS_DIARIZE_DUMP_CONV=1 enables per-stage conv snapshots
+    const bool dump_conv = [] {
+        const char* e = std::getenv("CRISPASR_MOSS_DIARIZE_DUMP_CONV");
+        return e && e[0] == '1';
+    }();
+
+    if (dump_conv) {
+        ggml_tensor* mel_snap = ggml_cont(ctx0, mel_in);
+        ggml_set_name(mel_snap, "mel_in_graph");
+        ggml_set_output(mel_snap);
+        ggml_build_forward_expand(gf, mel_snap);
+    }
 
     // conv1: k=3, s=1, p=1 → same length
     ggml_tensor* x = ggml_conv_1d(ctx0, enc.conv1_w, mel_in, 1, 1, 1);
 
-    // Debug: mark raw conv1 output (BEFORE bias, BEFORE gelu) for extraction
-    ggml_tensor* conv1_raw = ggml_cont(ctx0, x);
-    ggml_set_name(conv1_raw, "conv1_raw");
-    ggml_set_output(conv1_raw);
-    ggml_build_forward_expand(gf, conv1_raw);
+    if (dump_conv) {
+        ggml_tensor* snap = ggml_cont(ctx0, x);
+        ggml_set_name(snap, "conv1_raw");
+        ggml_set_output(snap);
+        ggml_build_forward_expand(gf, snap);
+    }
 
     x = ggml_add(ctx0, x, bias_1d(enc.conv1_b));
     x = ggml_gelu_erf(ctx0, x);
 
-    // Debug: mark conv1 output (after bias+gelu) for extraction
-    ggml_tensor* conv1_out = ggml_cont(ctx0, x);
-    ggml_set_name(conv1_out, "conv1_out");
-    ggml_set_output(conv1_out);
-    ggml_build_forward_expand(gf, conv1_out);
+    if (dump_conv) {
+        ggml_tensor* snap = ggml_cont(ctx0, x);
+        ggml_set_name(snap, "conv1_out");
+        ggml_set_output(snap);
+        ggml_build_forward_expand(gf, snap);
+    }
 
     // conv2: k=3, s=2, p=1 → T_enc = T_mel/2
     x = ggml_conv_1d(ctx0, enc.conv2_w, x, 2, 1, 1);
@@ -664,73 +673,25 @@ static float* moss_diarize_run_encoder_chunk(moss_diarize_context* ctx, const fl
     float* result = (float*)malloc((size_t)d * T_enc * sizeof(float));
     ggml_backend_tensor_get(eo, result, 0, (size_t)d * T_enc * sizeof(float));
 
-    // Optionally dump mel as it enters the graph
-    ggml_tensor* mg = ggml_graph_get_tensor(gf, "mel_in_graph");
-    if (mg) {
-        const char* dump = std::getenv("CRISPASR_MOSS_DIARIZE_MELINGRAPH_DUMP");
-        if (dump && dump[0]) {
-            size_t sz = ggml_nelements(mg);
-            std::vector<float> data(sz);
-            ggml_backend_tensor_get(mg, data.data(), 0, sz * sizeof(float));
-            FILE* f = fopen(dump, "wb");
-            if (f) {
-                fwrite(data.data(), sizeof(float), sz, f);
-                fclose(f);
-                fprintf(stderr, "moss_diarize: dumped mel_in_graph (%lld elems, ne=[%lld,%lld]) to %s\n", (long long)sz,
-                        (long long)mg->ne[0], (long long)mg->ne[1], dump);
-            }
-        }
-    }
-
-    // Optionally extract conv1_raw (before bias/gelu) for debugging
-    ggml_tensor* c1r = ggml_graph_get_tensor(gf, "conv1_raw");
-    if (c1r) {
-        const char* dump = std::getenv("CRISPASR_MOSS_DIARIZE_CONV1RAW_DUMP");
-        if (dump && dump[0]) {
-            size_t sz = ggml_nelements(c1r);
-            std::vector<float> data(sz);
-            ggml_backend_tensor_get(c1r, data.data(), 0, sz * sizeof(float));
-            FILE* f = fopen(dump, "wb");
-            if (f) {
-                fwrite(data.data(), sizeof(float), sz, f);
-                fclose(f);
-                fprintf(stderr, "moss_diarize: dumped conv1_raw (%lld elems, ne=[%lld,%lld,%lld]) to %s\n",
-                        (long long)sz, (long long)c1r->ne[0], (long long)c1r->ne[1], (long long)c1r->ne[2], dump);
-            }
-        }
-    }
-
-    // Optionally extract conv1_out for debugging
-    ggml_tensor* c1 = ggml_graph_get_tensor(gf, "conv1_out");
-    if (c1) {
-        const char* dump = std::getenv("CRISPASR_MOSS_DIARIZE_CONV1_DUMP");
-        if (dump && dump[0]) {
-            size_t c1_size = ggml_nelements(c1);
-            std::vector<float> c1_data(c1_size);
-            ggml_backend_tensor_get(c1, c1_data.data(), 0, c1_size * sizeof(float));
-            FILE* f = fopen(dump, "wb");
-            if (f) {
-                fwrite(c1_data.data(), sizeof(float), c1_size, f);
-                fclose(f);
-                fprintf(stderr, "moss_diarize: dumped conv1_out (%lld elements, ne=[%lld,%lld,%lld]) to %s\n",
-                        (long long)c1_size, (long long)c1->ne[0], (long long)c1->ne[1], (long long)c1->ne[2], dump);
-            }
-        }
-    }
-
-    // Optionally extract conv_stem_out for diff harness
-    ggml_tensor* cs = ggml_graph_get_tensor(gf, "conv_stem_out");
-    if (cs) {
-        const char* dump = std::getenv("CRISPASR_MOSS_DIARIZE_CONV_DUMP");
-        if (dump && dump[0]) {
-            std::vector<float> cs_data((size_t)d * T_enc);
-            ggml_backend_tensor_get(cs, cs_data.data(), 0, cs_data.size() * sizeof(float));
-            FILE* f = fopen(dump, "wb");
-            if (f) {
-                fwrite(cs_data.data(), sizeof(float), cs_data.size(), f);
-                fclose(f);
-                fprintf(stderr, "moss_diarize: dumped conv_stem_out (%d,%d) to %s\n", d, T_enc, dump);
-            }
+    // CRISPASR_MOSS_DIARIZE_DUMP_CONV=1: dump per-stage conv intermediates to stderr
+    {
+        static const char* _dc = std::getenv("CRISPASR_MOSS_DIARIZE_DUMP_CONV");
+        if (_dc && _dc[0] == '1') {
+            auto dump_tensor = [](const char* name, ggml_cgraph* g) {
+                ggml_tensor* t = ggml_graph_get_tensor(g, name);
+                if (!t)
+                    return;
+                size_t n = ggml_nelements(t);
+                std::vector<float> buf(n);
+                ggml_backend_tensor_get(t, buf.data(), 0, n * sizeof(float));
+                fprintf(stderr, "moss_diarize: %s ne=[%lld,%lld,%lld] first5=[%.4f,%.4f,%.4f,%.4f,%.4f]\n", name,
+                        (long long)t->ne[0], (long long)t->ne[1], (long long)t->ne[2], buf[0], n > 1 ? buf[1] : 0.f,
+                        n > 2 ? buf[2] : 0.f, n > 3 ? buf[3] : 0.f, n > 4 ? buf[4] : 0.f);
+            };
+            dump_tensor("mel_in_graph", gf);
+            dump_tensor("conv1_raw", gf);
+            dump_tensor("conv1_out", gf);
+            dump_tensor("conv_stem_out", gf);
         }
     }
 
