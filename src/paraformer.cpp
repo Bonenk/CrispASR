@@ -12,6 +12,7 @@
 #include "core/lfr.h"
 #include "core/sanm.h"
 #include "core/gguf_loader.h"
+#include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 paraformer GPU path)
 
 #include "ggml.h"
 #include "ggml-backend.h"
@@ -123,6 +124,7 @@ struct paraformer_context {
     core_gguf::WeightLoad wl;
     std::string model_path;
     ggml_backend_t backend = nullptr;
+    ggml_backend_t backend_cpu = nullptr;
     ggml_backend_sched_t sched = nullptr;
     int n_threads = 4;
     bool flash_attn = true;
@@ -560,8 +562,9 @@ static ggml_tensor* build_decoder_post(ggml_context* ctx0, ggml_tensor* cur, con
 static bool paraformer_ensure_sched(paraformer_context* ctx) {
     if (ctx->sched)
         return true;
-    ggml_backend_t backends[1] = {ctx->backend};
-    ctx->sched = ggml_backend_sched_new(backends, nullptr, 1, 8192, false, false);
+    ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
+    int n_be = (ctx->backend != ctx->backend_cpu) ? 2 : 1;
+    ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 8192, false, false);
     return ctx->sched != nullptr;
 }
 
@@ -929,7 +932,7 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
 // ===========================================================================
 
 paraformer_context_params paraformer_context_default_params() {
-    return {4, 0, true};
+    return {4, 0, true, true};
 }
 
 paraformer_context* paraformer_init_from_file(const char* path, paraformer_context_params params) {
@@ -938,11 +941,28 @@ paraformer_context* paraformer_init_from_file(const char* path, paraformer_conte
     ctx->flash_attn = params.flash_attn;
     ctx->verbosity = params.verbosity;
 
-    ctx->backend = ggml_backend_cpu_init();
-    if (!ctx->backend) {
+    ctx->backend_cpu = ggml_backend_cpu_init();
+    if (!ctx->backend_cpu) {
         fprintf(stderr, "paraformer: failed to init CPU backend\n");
         delete ctx;
         return nullptr;
+    }
+    // GPU is OPT-IN behind CRISPASR_PARAFORMER_GPU=1 (§232, mirrors dia): default
+    // CPU until the ASR roundtrip validates. paraformer is non-AR (encoder + CIF
+    // predictor + decoder — no per-token loop), so the encoder should win on GPU
+    // like dia's did. Weights already load onto ctx->backend via
+    // core_gguf::load_weights, so pointing that at a GPU backend is the whole fix.
+    bool want_gpu = params.use_gpu && (std::getenv("CRISPASR_PARAFORMER_GPU") != nullptr);
+    if (want_gpu) {
+        ctx->backend = crispasr_init_gpu_backend();
+        if (!ctx->backend) {
+            fprintf(stderr, "paraformer: CRISPASR_PARAFORMER_GPU set but no GPU backend; using CPU\n");
+            ctx->backend = ctx->backend_cpu;
+        } else if (ctx->verbosity >= 1) {
+            fprintf(stderr, "paraformer: GPU backend enabled (%s)\n", ggml_backend_name(ctx->backend));
+        }
+    } else {
+        ctx->backend = ctx->backend_cpu;
     }
 
     ctx->model_path = path;
@@ -987,8 +1007,10 @@ void paraformer_free(paraformer_context* ctx) {
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
     core_gguf::free_weights(ctx->wl);
-    if (ctx->backend)
+    if (ctx->backend && ctx->backend != ctx->backend_cpu)
         ggml_backend_free(ctx->backend);
+    if (ctx->backend_cpu)
+        ggml_backend_free(ctx->backend_cpu);
     delete ctx;
 }
 

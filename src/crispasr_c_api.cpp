@@ -2309,6 +2309,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.n_threads = s->n_threads;
         p.verbosity = g_open_verbosity_tls;
         p.flash_attn = g_open_flash_attn_tls;
+        p.use_gpu = g_open_use_gpu_tls;
         s->paraformer_ctx = paraformer_init_from_file(model_path, p);
         if (!s->paraformer_ctx) {
             delete s;
