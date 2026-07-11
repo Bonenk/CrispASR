@@ -7111,16 +7111,22 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
      but 5x SLOWER (13.5s vs 2.7s) — tiny VITS graph is launch-bound,
      same class as moonshine-streaming. Deliberate-CPU comment added to
      the adapter.
-   - **f5_tts**: GPU path is BROKEN-slow: with use_gpu forwarded, an
-     8-step short-text synthesis ran >10 min; sampling the process shows
-     `ggml_compute_forward_flash_attn_ext` + `ggml_vec_dot_f16_f32`
-     executing in libggml-cpu — the DiT runs on CPU sched threads
-     despite "using GPU backend: Metal". Metal's supports_op accepts the
-     op (head_dim 64, F32 K/V), so this is sched PLACEMENT, most likely
-     the CPU-resident-leaf/weights class from the ggml sched
-     cross-backend tightening (see §206 lfm2-audio and the
-     set_tensor_backend requirement). Needs a dedicated diff-harness
-     session; adapter left unforwarded.
+   - **f5_tts**: GPU path is CORRECT but SLOWER — controlled A/B at 4 ODE
+     steps, seed 42, 10 s FLEURS ref (T=1238 mel): CPU 294 s vs GPU
+     ~415 s compute (+35 s Metal library init). Both produce the same
+     output character (matching RMS/peak; at 4 steps that's degenerate
+     audio — below F5's quality floor — so the earlier "GPU produces
+     garbage" read was the step count, not the backend). Process
+     sampling during the GPU run shows `ggml_vec_dot_f16_f32` and
+     flash-attn executing in libggml-cpu — partial CPU fallback, plus
+     per-run Metal pipeline compiles. Adapter left unforwarded (GPU is
+     a regression as-is).
+     **The real story: F5 is ~unusable on M1 either way** — 294 s CPU
+     for a 4-step synthesis extrapolates to ~40 min at the default
+     ode=32. Est. ~3 TFLOP of DiT work should be ~2 s on M1 GPU if
+     fully resident: finding and fixing the CPU-fallback ops (which,
+     what placement rule) is a genuine 100x-class opportunity, but a
+     dedicated diff-harness session (§206 pattern).
 
 ### §232 v13 Results (2026-07-11)
 
