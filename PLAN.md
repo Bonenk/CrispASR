@@ -793,9 +793,14 @@ PERFORMANCE §214.
 **⚠ STATE AUDIT 2026-07-11 (code-verified — the list below predates several commits):**
 - **§215a dia — DONE.** `src/dia_tts.cpp` decoder already runs B=2 (output batch dim 2,
   index 0=cond/1=uncond; single KV cache sized `*2`, line ~563) since `d63b0774`. Not 2-pass.
-- **§215b tada — FM done, TALKER remains.** The FM velocity is already B=2 (gated
-  `CRISPASR_TADA_FM_B2`); the genuine remaining work is the **talker AR loop**
-  (`run_talker_kv` + separate `kv_neg` cache, lines ~199/407). That is the real §215b.
+- **§215b tada — FM done; TALKER B=2 is a MEASURED NON-GOAL (2026-07-11).** The FM
+  velocity is already B=2 (gated `CRISPASR_TADA_FM_B2`). The talker AR loop was the
+  candidate remaining work, but STEP-0 measurement (see the §215b note below) shows
+  batched-CFG does **not** apply cleanly: the two CFG passes take **different graph
+  paths** (pos through the §176b bucket, attention padded to Lk≥512; neg exact-Lk),
+  so they are 3.3× asymmetric and the "fuse two equal passes" premise fails. Talker
+  is only ~40% of per-step wall time; FM+codec dominate ~60%. The real talker lever
+  is orthogonal & simpler (bucket-floor tuning, not B=2). Do not port.
 - **§215c zonos / §215d voxcpm2 — confirmed still 2-pass** (candidates).
 - **§215e f5 — SKIP.** DiT runs on `backend_cpu` (no per-dispatch-latency win — voxtral §93
   measured batched-CFG as a Metal/CUDA-*dispatch*-bound win, ~1.2×, worthless on CPU), plus the
@@ -825,10 +830,33 @@ Prioritized by expected payoff (high step count × dispatch-bound first):
    two KV caches (`run_dia_decode_step`). Mirror chatterbox T3: B=2 decode-step
    graph, split per-batch KV write/read, F16-dequant on GPU+quant. Largest payoff
    — long AR token loop with CFG every step.
-2. **§215b tada (HIGH).** `src/tada_tts.cpp` runs the talker twice per step
-   (`run_talker_kv` for pos + `kv_neg_*` for neg, ~lines 1286–1313). Lockstep
-   `n_past` like T3 → reuse both caches, batch the GEMMs, split attention. Same
-   shape as chatterbox; should port almost directly.
+2. **§215b tada — MEASURED NON-GOAL (2026-07-11, do NOT port).** `src/tada_tts.cpp`
+   runs the talker twice per step (`run_talker_kv` for pos + `kv_neg_*` for neg).
+   STEP-0 instrumented both passes (env `CRISPASR_TADA_TALKER_TIMING=1`; timing code
+   is env-gated, default off, kept for re-measure) on Metal / tada-1b q4_k. **Numbers
+   are load-contaminated (session box ran loadavg 31→137); the DECISION rests on the
+   load-robust per-pass RATIO + the exact-Lk A/B, not absolute ms.** Findings:
+   - The two CFG passes take **different graph paths**: pos hits the §176b **bucket**
+     (attention padded to Lk≥512 via `kBucketLks={512,1024,2048,4096}`); neg passes
+     `kv_neg_*` → falls to the **exact-Lk** graph (`build_graph_talker_kv`). At a
+     short utterance (n_past 6–59, all ≪512) pos ran **266 ms/call** vs neg **81 ms**
+     — 3.3× asymmetric, `first≈steady-state` so not a warmup artifact.
+   - **Mechanism confirmed by A/B** (`CRISPASR_TADA_NO_BUCKET=1`, forces pos onto the
+     exact-Lk path): pos dropped **266→49 ms/call (5.4×)** and pos≈neg (49 vs 61) —
+     symmetric, as expected when both use the same graph. Talker share fell 40%→24%
+     of the per-step loop; whole-loop per-step also roughly halved in that run.
+   - **Why batched-CFG (B=2) does not pay here:** its premise is fusing two ~equal
+     dispatch-bound passes so weights read once (voxtral §93: modest ~1.2–1.3×). With
+     both on exact-Lk the talker is only ~24% of the loop and the passes are ~55 ms
+     symmetric bodies → B=2 saves ≤~5% of loop for the cost of F16-dequant + a
+     dual-KV-split B=2 graph. FM+codec dominate (~60–76%). Not worth it.
+   - **Real lever is orthogonal & simpler (candidate §215-tada-followup):** the §176b
+     bucket Lk=512 floor is a net loss for SHORT generations (padded attention >
+     the per-step graph-rebuild it saves). A tighter floor (add a 64/128 bucket) or
+     exact-Lk for small n_past recovers ~5.4× on the pos pass — a bigger win than B=2,
+     no dual-KV machinery. **Needs its own clean-box / Kaggle A/B** (guard against a
+     long-utterance regression where n_past approaches the bucket size and the
+     rebuild-avoidance the bucket was built for actually wins).
 3. **§215c zonos (MED).** `src/zonos_tts.cpp` keeps two separate KV caches
    (`kv_k`/`kv_k_uncond`) and decodes sequentially (~lines 1740–1842). Batch the
    AR backbone B=2, split the dual-KV attention. Dual-KV CFG + (optional) random
