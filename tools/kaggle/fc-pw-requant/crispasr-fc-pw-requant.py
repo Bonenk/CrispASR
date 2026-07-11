@@ -175,9 +175,12 @@ print("TRANSCRIPT::" + " | ".join(seg.text for seg in segs))
 
 def transcribe(path, backend, lang, env_extra=None):
     env = dict(os.environ, **(env_extra or {}))
-    r = subprocess.run(
-        [sys.executable, "-c", CHILD, str(path), backend or "", str(WAV), str(REPO), str(LIB), lang],
-        capture_output=True, text=True, timeout=2400, env=env)
+    try:
+        r = subprocess.run(
+            [sys.executable, "-c", CHILD, str(path), backend or "", str(WAV), str(REPO), str(LIB), lang],
+            capture_output=True, text=True, timeout=600, env=env)
+    except subprocess.TimeoutExpired:
+        return None, None, "transcribe timeout (600s)"
     txt, dt = None, None
     for ln in r.stdout.splitlines():
         if ln.startswith("TRANSCRIPT::"):
@@ -185,6 +188,73 @@ def transcribe(path, backend, lang, env_extra=None):
         elif ln.startswith("DT::"):
             dt = float(ln[4:])
     return txt, dt, r.stderr[-400:]
+
+
+# ── hang-proof network ops ────────────────────────────────────────────────────
+# HfApi.upload_file can strand in CLOSE_WAIT after the commit lands (observed:
+# commit visible on HF, client never returns). Run uploads/downloads on daemon
+# threads with a join timeout, then verify server/file state to decide success.
+import threading  # noqa: E402
+
+
+def _run_daemon(fn, timeout_s):
+    box = {}
+
+    def _t():
+        try:
+            box["ret"] = fn()
+        except Exception as exc:
+            box["exc"] = exc
+
+    th = threading.Thread(target=_t, daemon=True)
+    th.start()
+    th.join(timeout_s)
+    return (not th.is_alive()), box.get("ret"), box.get("exc")
+
+
+def download_with_timeout(repo, path, timeout_s=1800):
+    done, ret, exc = _run_daemon(
+        lambda: hf_hub_download(repo, path, local_dir=str(MODELS), token=TOKEN), timeout_s)
+    if done and exc is None:
+        return Path(ret)
+    local = MODELS / path
+    if local.is_file():  # thread hung after the file fully landed
+        return local
+    raise RuntimeError(f"download {'hung' if not done else 'failed'}: {exc}")
+
+
+def upload_with_timeout(local, repo, path, msg, timeout_s=1800):
+    size = Path(local).stat().st_size
+
+    def _up():
+        API.upload_file(path_or_fileobj=str(local), path_in_repo=path, repo_id=repo,
+                        repo_type="model", commit_message=msg)
+
+    done, _, exc = _run_daemon(_up, timeout_s)
+    if done and exc is None:
+        return True
+    # Client hung or errored — trust the server: did the new blob land?
+    try:
+        for f in HfApi(token=TOKEN).list_repo_tree(repo):
+            if f.path == path and getattr(f, "size", None) == size:
+                step("upload.recovered", repo=repo, file=path,
+                     note="client hung/errored but commit landed")
+                return True
+    except Exception:
+        pass
+    raise RuntimeError(f"upload {'hung' if not done else 'failed'}: {exc}")
+
+
+def push_progress(results):
+    """Best-effort per-file progress mirror (own API object, daemon timeout)."""
+    def _up():
+        blob = json.dumps(results, indent=1).encode()
+        HfApi(token=TOKEN).upload_file(
+            path_or_fileobj=blob, path_in_repo="fc-pw-requant/results.json",
+            repo_id="cstr/crispasr-kaggle-progress", repo_type="dataset",
+            commit_message="fc-pw-requant progress")
+
+    _run_daemon(_up, 120)
 
 
 def words(s):
@@ -237,7 +307,7 @@ def process_file(repo, path, backend, lang):
     if qtype is None:
         return "skip-unquantized"
 
-    old = Path(hf_hub_download(repo, path, local_dir=str(MODELS), token=TOKEN))
+    old = download_with_timeout(repo, path)
     new = MODELS / "new" / path
     new.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -279,10 +349,9 @@ def process_file(repo, path, backend, lang):
                  legacy=(t_leg or "")[:150], new=t_new[:150])
             return "soft-fail"
 
-        API.upload_file(path_or_fileobj=str(new), path_in_repo=path, repo_id=repo,
-                        repo_type="model",
-                        commit_message=f"Requantize {path}: conv pw1/pw2 F16→Q8_0 "
-                                       f"(#81 CPU perf fix; all other tensors byte-identical)")
+        upload_with_timeout(new, repo, path,
+                            f"Requantize {path}: conv pw1/pw2 F16→Q8_0 "
+                            f"(#81 CPU perf fix; all other tensors byte-identical)")
         step("file.UPLOADED", repo=repo, file=path)
         return "uploaded"
     finally:
@@ -301,15 +370,16 @@ for short, backend, lang in FLEET:
         results[repo] = {"error": str(exc)}
         continue
     r = {}
+    results[repo] = r
     for path in sorted(files):
         try:
             r[path] = process_file(repo, path, backend, lang)
         except Exception as exc:
             step("file.EXCEPTION", repo=repo, file=path, error=f"{type(exc).__name__}: {exc}")
             r[path] = f"exception: {exc}"
-    results[repo] = r
+        (WORK / "results.json").write_text(json.dumps(results, indent=1))
+        push_progress(results)
     step("repo.done", repo=repo, results=r)
-    (WORK / "results.json").write_text(json.dumps(results, indent=1))
 
 n_up = sum(1 for r in results.values() if isinstance(r, dict)
            for v in r.values() if v == "uploaded")
