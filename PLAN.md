@@ -6731,6 +6731,31 @@ slower than dir in 3/3 interleaved reps) → stays opt-in.
       per-cb graphs or in-graph lm_head selection via get_rows, then revisit
       the CPU default.
 
+## §234 omnivoice — persistent step graphs DONE; SILENT OUTPUT on M1 (OPEN)
+
+Spun out of the reporter's #245 question ("does this affect omnivoice?").
+
+- **Perf DONE (2026-07-11, 4ad5f2ad):** the masked-iteration loop rebuilt +
+  gallocr-allocated the 28-layer forward graph 2×/step (cond + CFG uncond),
+  64×/synthesis, despite fixed T and no KV state. Persistent per-arm graphs:
+  CPU 135.5 → 82.8 s (WAV **byte-identical**), Metal 509.9 → 245.4 s
+  (~1.6–2×, single-rep). Gates: `OMNIVOICE_PERSISTENT_GRAPH=0` (per-call
+  path), `OMNIVOICE_DEBUG_SUM=1` (per-forward logit sums). Gotcha that cost
+  a bisect: gallocr aliases input-flagged tensor slots with intermediates —
+  ALL inputs must be re-set before every compute of a persistent graph
+  (→ LEARNINGS).
+- **OPEN — omnivoice synthesizes near-SILENCE on M1** (q8_0, unpatched main,
+  CPU and Metal, with and without `--voice` ref + `--i-have-rights`):
+  peak ≤ 0.009, RMS ≈ 0.0001, whisper roundtrip "[ Silence ]", for both
+  short and long texts, seed 42. Deterministic on CPU, so it's structural,
+  not sampling luck. Unknown whether CUDA behaves the same (the parity
+  Kaggle campaign should cover it — check its transcripts, not just RTF).
+  Next probes: HF-blueprint A/B on the same text (does upstream produce
+  audio unconditionally?), dump `audio_logits` distribution (is mask_id
+  winning every position?), verify RVQ decode + HiggsAudioV2 codec on a
+  known-good code sequence. Perf A/B above is unaffected (byte-identical
+  transform), but the backend needs this resolved to be usable on macOS.
+
 ## §230 Issue #238 — kyutai/stt-2.6b-en support (DONE)
 
 **Shipped 2026-07-10.** Full support for the 48L / 2.6B English-only Kyutai STT model.

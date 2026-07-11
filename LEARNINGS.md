@@ -12196,3 +12196,31 @@ Practical notes for LoRA blueprints on Kaggle: an adapter declaring
 `thinker.model.layers.`; qwen_asr needs `transformers==4.57.6` plus a
 force-reinstalled `huggingface_hub==0.36.0` + `hf_transfer` and a
 `sys.modules` purge of the pre-imported hub.
+
+
+## gallocr does NOT protect input-flagged tensors across computes — re-set EVERY input before EVERY compute of a persistent graph (omnivoice #245 follow-up, 2026-07-11)
+
+Converting omnivoice's per-step graph rebuild into a persistent
+build-once/compute-many graph (fixed T, no KV — the textbook case) changed
+the output *deterministically* on CPU. The graph audit showed nothing: every
+input (`input_embeds`, `pos_ids`) was written, no read-before-write tensor
+existed. The bisect that found it: dump a per-forward logit checksum under
+both modes (`OMNIVOICE_DEBUG_SUM`) — **step 0 was bitwise-equal, step 1+
+diverged**. That signature means the first compute *clobbers* something the
+second compute reads: `ggml_gallocr` may alias an input-flagged tensor's
+slot with intermediates of the graph, so `pos_ids`, set once at init, read
+back garbage from the second compute on. The old per-call path was correct
+only by accident — it re-set the positions before every (first-and-only)
+compute.
+
+Rules: (1) when converting per-call graph builds to a persistent graph,
+treat **all** `ggml_set_input` tensors as volatile — re-set each one before
+every compute, even "constant" ones like positions (the cost is trivial);
+(2) validate the conversion where the backend is deterministic (CPU) with a
+byte-compare — Metal is nondeterministic run-to-run at fixed seed (three
+different WAV md5s from identical binaries), so md5 there proves nothing;
+(3) the step-0-equal/step-1-diverged bisect discriminates static
+graph-construction differences from cross-compute state carryover in one
+experiment. Related: the sched-level graph-cache entries above (#171, #220,
+#235) — this is the gallocr-level sibling of the same class. Payoff here:
+CPU 1.64× / Metal ~2× per synthesis, WAV byte-identical.
