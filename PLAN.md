@@ -7087,6 +7087,27 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
    need per-backend validation (ASR-roundtrip) before that. paraformer /
    fastconformer_ctc / fastpitch have no use_gpu knob (not affected).
 
+   **Validation results (2026-07-11, M1 Metal) — none should forward:**
+   - **m2m100 / bananamind_tts**: their `use_gpu` param is DEAD — the
+     backend sets `c->backend = c->backend_cpu` unconditionally
+     (m2m100.cpp:961, bananamind has no consumer at all). Forwarding is
+     a no-op (verified: identical 0.27s CPU vs 0.29s "GPU" translation).
+     A real GPU port is separate backend work; the CLI adapter is fine.
+   - **piper_tts**: GPU path is CORRECT (roundtrip-verified waveform)
+     but 5x SLOWER (13.5s vs 2.7s) — tiny VITS graph is launch-bound,
+     same class as moonshine-streaming. Deliberate-CPU comment added to
+     the adapter.
+   - **f5_tts**: GPU path is BROKEN-slow: with use_gpu forwarded, an
+     8-step short-text synthesis ran >10 min; sampling the process shows
+     `ggml_compute_forward_flash_attn_ext` + `ggml_vec_dot_f16_f32`
+     executing in libggml-cpu — the DiT runs on CPU sched threads
+     despite "using GPU backend: Metal". Metal's supports_op accepts the
+     op (head_dim 64, F32 K/V), so this is sched PLACEMENT, most likely
+     the CPU-resident-leaf/weights class from the ggml sched
+     cross-backend tightening (see §206 lfm2-audio and the
+     set_tensor_backend requirement). Needs a dedicated diff-harness
+     session; adapter left unforwarded.
+
 ### §232 v13 Results (2026-07-11)
 
 **All models improved 8-14% vs v12** from LID skip (-l en) + in-graph argmax:
