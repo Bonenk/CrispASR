@@ -226,6 +226,46 @@ TEST_CASE("AAC encode: invalid input returns empty", "[unit][provenance][aac]") 
 }
 
 // ──────────────────────────────────────────────────────────────────────────
+// Ogg Opus encoding + OpusTags AI-provenance (crispasr_opus_writer.h)
+// ──────────────────────────────────────────────────────────────────────────
+
+#include "crispasr_opus_writer.h"
+
+TEST_CASE("Opus encode: valid Ogg with AI-provenance in OpusTags", "[unit][provenance][opus]") {
+    const int sr = 48000;
+    const int n = sr / 2; // 0.5 s
+    std::vector<float> pcm(n);
+    for (int i = 0; i < n; i++)
+        pcm[i] = 0.3f * std::sin(2.0f * 3.14159265f * 300.0f * (float)i / (float)sr);
+
+    std::string opus = crispasr_make_opus(pcm.data(), n, sr);
+    REQUIRE(opus.size() > 100);
+    REQUIRE(opus.compare(0, 4, "OggS") == 0); // Ogg capture pattern
+
+    // The rewritten OpusTags packet carries the AI-provenance comments verbatim.
+    REQUIRE(opus.find("OpusTags") != std::string::npos);
+    REQUIRE(opus.find("AI_GENERATED=true") != std::string::npos);
+    REQUIRE(opus.find("GENERATOR=CrispASR") != std::string::npos);
+    REQUIRE(opus.find("AI_CONTENT_NOTICE=This audio was synthesized") != std::string::npos);
+
+    // The rewritten page must remain a valid Ogg Opus (CRC + lacing correct):
+    // glint's decoder round-trips it.
+    int dsr = 0, dch = 0, dfr = 0;
+    float* dec = glint_decode_audio(reinterpret_cast<const uint8_t*>(opus.data()), (int)opus.size(), &dsr, &dch, &dfr);
+    REQUIRE(dec != nullptr);
+    REQUIRE(dfr > 0);
+    REQUIRE(dsr == 48000);
+    glint_free(dec);
+}
+
+TEST_CASE("Opus encode: invalid input returns empty", "[unit][provenance][opus]") {
+    std::vector<float> pcm(100, 0.0f);
+    REQUIRE(crispasr_make_opus(nullptr, 100, 48000).empty());
+    REQUIRE(crispasr_make_opus(pcm.data(), 0, 48000).empty());
+    REQUIRE(crispasr_make_opus(pcm.data(), 100, 0).empty());
+}
+
+// ──────────────────────────────────────────────────────────────────────────
 // C2PA (compile-time gated)
 // ──────────────────────────────────────────────────────────────────────────
 
