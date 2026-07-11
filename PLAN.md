@@ -948,32 +948,45 @@ A/B on Ampere+ doesn't justify the next.
 
 ---
 
-## §219 — more permissive audio input formats for crispasr_audio_load (OPEN)
+## §219 — more permissive audio input formats for crispasr_audio_load (MOSTLY DONE)
 
-Done so far (ffmpeg-free): WAV/MP3/FLAC (miniaudio), Ogg Vorbis (stb_vorbis),
+Done (ffmpeg-free): WAV/MP3/FLAC (miniaudio), Ogg Vorbis (stb_vorbis),
 Opus (libopus/opusfile), AIFF/W64/RF64 (miniaudio dr_wav, free), and AAC/M4A/
-ALAC/CAF on **Apple** via AudioToolbox `ExtAudioFile`. Remaining, by value:
+ALAC/CAF on **Apple** via AudioToolbox `ExtAudioFile`.
 
-1. **AAC/M4A on Windows + Android (native, HIGH).** Mirror the Apple AudioToolbox
-   fallback with Media Foundation (`IMFSourceReader`, Windows) and NDK
-   `MediaExtractor`+`MediaCodec` (Android) — free OS decoders, no ffmpeg/GPL.
-   Same `crispasr_audio.cpp` fallback hook, platform-`#if`'d. Linux still has no
-   permissive AAC decoder (fdk-aac is non-OSI/patent-disclaimed) → optional
-   ffmpeg dynamic fallback only.
-2. **AMR-NB/WB (MED).** opencore-amr (Apache-2.0) — telephony/voicemail speech.
-   Direct decode (simple `#!AMR` framing) → ma_resampler to 16 k. pkg-config +
-   FetchContent-static (autotools upstream → compile the amrnb/amrwb sources).
-3. **WebM/Matroska Opus|Vorbis (MED).** libwebm (BSD-3) demux → feed the already-
-   linked libopus / stb_vorbis. Web/browser audio.
-4. **Speex / WavPack (LOW).** BSD libs; Speex is obsolete (Opus superseded it),
-   WavPack niche. Only if a corpus needs them.
-5. **AU / Sun .snd (LOW).** Tiny PCM/µ-law parser; cheap if requested.
+Items 1–3 and 5 below all **shipped** (a parallel session implemented them in
+`crispasr_audio.cpp`; this PLAN entry was stale). Coverage now, all wired into
+`crispasr_audio_load` + covered by `tests/test-audio-formats.cpp`:
 
-Pattern is fixed: permissive decoder (or OS-native) behind the miniaudio custom
+1. **AAC/M4A on Windows + Android (DONE).** Media Foundation `IMFSourceReader`
+   (`crispasr_mf_decode`) + NDK `MediaExtractor`/`MediaCodec` (`crispasr_ndk_decode`),
+   plus a portable MP4 box parser (`crispasr_m4a_decode`). Linux still relies on
+   the optional ffmpeg/fdk-aac dynamic fallback only.
+2. **AMR-NB/WB (DONE + fetch-path fixed here).** `crispasr_amr_decode` via
+   opencore-amr (Apache-2.0), CMake-gated `CRISPASR_AMR` (system pkg-config) /
+   `CRISPASR_AMR_FETCH` (static FetchContent of CrispStrobe/opencore-amr v0.1.7).
+   ⚠ **The `-DCRISPASR_AMR_FETCH=ON` static build was broken and untested** (the
+   parallel session only had the system pkg-config path). Two `src/CMakeLists.txt`
+   glob/regex bugs, both fixed + M1-validated (`jfk.amr` decodes, ratio + xcorr
+   pass): (a) the `common/src/*.cpp` glob pulled in the 7 files upstream's
+   `amrnb/Makefile.am` deliberately excludes (`bits2prm`/`copy`/`div_32`/`l_abs`/
+   `r_fft`/`vad1`/`vad2`) — `bits2prm.cpp` #includes a header the fork doesn't
+   ship → "bits2prm.h file not found"; (b) the amr-**wb** exclusion regex
+   `decoder_amr_wb\.cpp$` was unanchored and also matched `dtx_decoder_amr_wb.cpp`
+   (suffix), dropping the DTX decoder → undefined `_dtx_dec_amr_wb` at link.
+   Both `list(FILTER)` patterns are now `/`-anchored to basenames.
+3. **WebM/Matroska Opus|Vorbis (DONE).** `crispasr_webm_decode` — inline EBML
+   demux → the already-linked libopus / stb_vorbis. Web/browser audio.
+4. **Speex / WavPack (LOW, still open).** BSD libs; Speex is obsolete (Opus
+   superseded it), WavPack niche. Only if a corpus needs them.
+5. **AU / Sun .snd (DONE).** `crispasr_au_decode` — inline PCM/µ-law/A-law parser,
+   zero deps.
+
+Pattern (unchanged): permissive decoder (or OS-native) behind the miniaudio custom
 backend / fallback hook, CMake-gated (pkg-config primary + FetchContent static
 fallback for no-system-lib platforms), greedy decode → 16 k. ffmpeg stays an
 optional dynamic fallback only for what none of the above covers (AAC-on-Linux,
-WMA, AC-3/DTS, .ape).
+WMA, AC-3/DTS, .ape). Remaining open: only item 4 (LOW).
 
 ---
 
