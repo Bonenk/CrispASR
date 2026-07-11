@@ -15,10 +15,13 @@ misses. Pure additive, non-breaking.
 
 ## 2026-07-11 — #215e gallocr UAF audit: canary + canary_ctc fixed
 
-Full codebase audit of `cached_*_gf` for the sched-regrow UAF. canary and
-canary_ctc were the last two vulnerable sites — fixed with rebuild-every-invocation.
-All other sites (canary_qwen, funasr, glm_asr, granite_speech) already patched;
-chatterbox_s3gen safe (dedicated gallocr).
+Full codebase audit of `cached_*_gf` for the sched-regrow UAF. Two rounds:
+(1) canary + canary_ctc; (2) kyutai_stt, moonshine_streaming, nemotron,
+paraformer, sensevoice — all fixed with rebuild-every-invocation. Previously
+patched: canary_qwen, funasr, glm_asr, granite_speech, moss_transcribe,
+moss_audio, qwen3_asr, voxtral, voxtral4b. parakeet already opt-in.
+chatterbox_s3gen + granite_speech decoder safe (dedicated gallocr). 19 sites
+audited, 0 remaining.
 
 ## 2026-07-11 — dots-tts: PatchEncoder RoPE + QK-norm fix, CLI steps wiring (#200)
 
