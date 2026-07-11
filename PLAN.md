@@ -8136,3 +8136,30 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
 3. **Moonshine encoder gap (728ms vs 58ms)**: Separate from decoder.
    Needs GPU profiling — possibly im2col overhead on raw 176K-sample input,
    or the conv_stem's ggml_im2col creating oversized intermediates.
+
+### §232 v13 Results (2026-07-11)
+
+**All models improved 8-14% vs v12** from LID skip (-l en) + in-graph argmax:
+
+| Model | v12→v13 CA GPU | TC GPU | Status |
+|-------|---------------|--------|--------|
+| Whisper base | 0.025→**0.022** | 0.021 | **Parity** ✓ |
+| SenseVoice | 0.018→**0.016** | 0.019 | **CA wins** ✓ |
+| Canary 1B v2 | 0.048→**0.043** | 0.048 | **CA wins** ✓ |
+| Qwen3-ASR | 0.094→**0.086** | 0.112 | **CA wins** ✓ |
+| Parakeet TDT | 0.109→**0.095** | 0.029 | TC 3.3x (decode=828ms, was 955ms) |
+| Moonshine Tiny | 0.080→**0.069** | 0.012 | TC 5.8x (encoder gap) |
+| Moonshine Streaming | 0.278→**0.250** | 0.014 | TC 18x (architectural) |
+
+**CrispASR wins or ties 5/7 tested models.** Kernel errored after 7 (Nemotron/Cohere/
+FunASR/Whisper Large untested — likely OOM or download timeout from large merge).
+
+Batched TDT decode (CRISPASR_TDT_BATCH=1): 828ms vs 955ms = 13% improvement.
+Helps but doesn't close the 28x gap. The LSTM predictor step between emissions
+remains sequential on CPU (cblas) while the GPU sits idle.
+
+**Next steps to close remaining gaps:**
+1. Full ggml-graph RNNT decoder (LSTM+joint+argmax as GPU ops) — the only
+   path to matching TC's 29ms decode on Parakeet
+2. Moonshine encoder: investigate ggml_conv_1d vs im2col+mul_mat on GPU
+3. Fix v14 kernel stability (Nemotron/Cohere/FunASR need to complete)
