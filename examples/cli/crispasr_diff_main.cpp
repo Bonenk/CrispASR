@@ -37,6 +37,7 @@
 
 #include "voxtral.h"
 #include "voxtral4b.h"
+#include "voxtral_tts.h"
 #include "higgs_stt.h"
 #include "moss_transcribe_diarize.h"
 #include "qwen3_asr.h"
@@ -1085,6 +1086,11 @@ int main(int argc, char** argv) {
     if (backend_name == "dots-tts-spk") {
         // model_path = speaker encoder GGUF, ref_path = spk-ref GGUF.
         return dots_tts_spk_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
+    }
+    if (backend_name == "voxtral-tts") {
+        // model_path = voxtral-tts GGUF (F16 for a clean structural diff), ref_path =
+        // ref GGUF from tools/reference_backends/voxtral_tts.py. Per-layer frame-0 LLM cos.
+        return voxtral_tts_llm_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
     }
 
     // Load the reference archive.

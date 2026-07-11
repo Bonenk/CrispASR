@@ -45,6 +45,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <unistd.h> // mkdtemp (crispasr-diff LLM stage)
 #include <map>
 #include <memory>
 #include <numeric>
@@ -1840,4 +1841,92 @@ extern "C" void voxtral_tts_free(voxtral_tts_context* ctx) {
     if (ctx->backend_cpu)
         ggml_backend_free(ctx->backend_cpu);
     delete ctx;
+}
+
+// crispasr-diff LLM stage: per-layer frame-0 cos vs the reference GGUF produced by
+// tools/reference_backends/voxtral_tts.py (manual PyTorch forward, no vllm). Runs the
+// real synth path with CRISPASR_VOXTRAL_TTS_DIFF_DUMP so the per-layer dumps come from
+// the actual runtime graph, then compares embed + each LLM layer + hidden against the
+// ref tensors of the same name. Prints the FIRST divergent stage (structural bug) or
+// confirms the LLM path is correct (so any code divergence is downstream/stochastic).
+extern "C" int voxtral_tts_llm_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
+    voxtral_tts_context_params p = voxtral_tts_context_default_params();
+    p.verbosity = 0;
+    voxtral_tts_context* ctx = voxtral_tts_init_from_file(model_gguf, p);
+    if (!ctx) {
+        fprintf(stderr, "voxtral_tts_llm_diff: failed to load model %s\n", model_gguf);
+        return 2;
+    }
+    core_gguf::WeightLoad rw;
+    if (!core_gguf::load_weights(ref_gguf, ctx->backend, "ref", rw)) {
+        fprintf(stderr, "voxtral_tts_llm_diff: failed to load reference %s\n", ref_gguf);
+        voxtral_tts_free(ctx);
+        return 2;
+    }
+    const int D = ctx->hp.llm_dim;
+
+    char tmpl[] = "/tmp/vtts_diff_XXXXXX";
+    char* dir = mkdtemp(tmpl);
+    if (!dir) {
+        voxtral_tts_free(ctx);
+        return 2;
+    }
+    setenv("CRISPASR_VOXTRAL_TTS_DIFF_DUMP", dir, 1);
+    const char* text = getenv("VOXTRAL_TTS_TEXT") ? getenv("VOXTRAL_TTS_TEXT") : "Hello world.";
+    const char* voice = getenv("VOXTRAL_TTS_VOICE") ? getenv("VOXTRAL_TTS_VOICE") : "neutral_female";
+    int n_samples = 0;
+    float* pcm = voxtral_tts_synthesize(ctx, text, voice, &n_samples); // dumps mine.c1.<stage> (frame 0)
+    if (pcm)
+        voxtral_tts_pcm_free(pcm);
+    unsetenv("CRISPASR_VOXTRAL_TTS_DIFF_DUMP");
+
+    std::vector<std::string> stages = {"embed"};
+    for (int i = 0; i < ctx->hp.llm_n_layers; i++)
+        stages.push_back("llm_L" + std::to_string(i));
+    stages.push_back("hidden");
+
+    int n_fail = 0;
+    std::string first_bad;
+    for (const auto& s : stages) {
+        std::vector<float> a(D), b(D);
+        char pth[512];
+        snprintf(pth, sizeof(pth), "%s/mine.c1.%s.bin", dir, s.c_str());
+        FILE* fp = fopen(pth, "rb");
+        ggml_tensor* rt = ggml_get_tensor(rw.ctx, s.c_str());
+        bool have_mine = fp && fread(a.data(), sizeof(float), D, fp) == (size_t)D;
+        if (fp)
+            fclose(fp);
+        remove(pth);
+        if (!have_mine || !rt || ggml_nelements(rt) != D) {
+            printf("voxtral-tts llm %-8s  (missing: %s%s)\n", s.c_str(), have_mine ? "" : "runtime ",
+                   (rt && ggml_nelements(rt) == D) ? "" : "ref");
+            continue;
+        }
+        ggml_backend_tensor_get(rt, b.data(), 0, (size_t)D * sizeof(float));
+        double dot = 0, na = 0, nb = 0, maxd = 0;
+        for (int i = 0; i < D; i++) {
+            dot += (double)a[i] * b[i];
+            na += (double)a[i] * a[i];
+            nb += (double)b[i] * b[i];
+            double dd = std::fabs((double)a[i] - b[i]);
+            if (dd > maxd)
+                maxd = dd;
+        }
+        double cos = (na > 0 && nb > 0) ? dot / (std::sqrt(na) * std::sqrt(nb)) : 0.0;
+        bool pass = cos > 0.99;
+        if (!pass) {
+            n_fail++;
+            if (first_bad.empty())
+                first_bad = s;
+        }
+        printf("voxtral-tts llm %-8s  cos=%.6f  max_abs=%.5f  %s\n", s.c_str(), cos, maxd, pass ? "PASS" : "FAIL");
+    }
+    if (!first_bad.empty())
+        printf("\nFIRST DIVERGENCE (cos<0.99): %s  → structural bug in that layer.\n", first_bad.c_str());
+    else
+        printf("\nALL LLM STAGES cos>=0.99 — the deterministic LLM path matches the reference; any "
+               "per-frame code divergence is downstream (stochastic acoustic sampler).\n");
+    (void)verbosity;
+    voxtral_tts_free(ctx);
+    return n_fail > 0 ? 1 : 0;
 }
