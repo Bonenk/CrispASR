@@ -7369,8 +7369,16 @@ is now AUDITED ACROSS THE TREE and the clean fix is EXHAUSTED.
      docs/performance.md. Measurement, not a code change.
   4. **In-graph argmax** for the transducer greedy path (2 int32 vs 8198-logit
      readback) — minor now that persistent won; only the greedy no-hotword path.
-  5. **A real dia GPU path** — dia is CPU-only (`// CPU-only for now`); a full
-     GPU port is a feature, not a decode tweak. Larger.
+  5. **A real dia GPU path** — dia is CPU-only (`dia_tts.cpp:861`). Blocker: the
+     main model loads into a plain CPU ggml context (`:820-857`,
+     `gguf_init_from_file` w/ data), not a backend buffer — must rework onto a
+     GPU backend buffer (mirror the DAC's `core_gguf::load_weights` at `:989`).
+     Then debug GPU portability (DAC `conv_1d`/`cast`, sched splits, §234 gallocr,
+     Metal conv per §232 qwen3 FASTCONV) + TTS-roundtrip validation. 1.6B/3GB is
+     near the M1 4 GB budget → iterate carefully / use Kaggle for a clean CUDA
+     A/B. Its own session — full scoping + plan in `HANDOVER_dia_gpu.md` (a fresh
+     agent picks it up). Per LEARNING 34, gate any GPU default to CUDA/Vulkan
+     (Accelerate likely wins the decoder on Metal; measure DAC/encoder separately).
 
 ### §232 Moonshine decode — hybrid weight placement (DONE, 2026-07-11, M1 Metal)
 
