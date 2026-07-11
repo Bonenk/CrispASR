@@ -342,3 +342,43 @@ Lessons from the systematic head-to-head benchmark against
     real CUDA box (Kaggle) before a GPU default flips there. This is the mandated
     CUDA A/B (rule #4/#5) earning its keep: it stopped dia shipping empty audio on
     CUDA. Ties back to the GPU-portability gotchas in the dev guide.
+
+36. **A benchmark RTF is meaningless until you prove it did the work — a
+    crash/no-op mints a fake "win."** The issue-#81 fleet bench reported CrispASR
+    parakeet-ctc at "102.4× / 127.7× RT" and moonshine at "103×" — all bogus. Root
+    cause: the harness timed a CLI subprocess and computed `rtf = audio_dur /
+    walltime` with **no return-code or transcript check**, and the parakeet-CTC
+    model was pointed at the *transducer* backend, which rejects it and exits in
+    ~0.5 s. `audio_dur / 0.5 s` = a spectacular fake RTF. The tell was in the log:
+    the "55 s" run took the SAME ~0.5 s as the "11 s" run (fixed time ⇒ not
+    processing the audio; real inference scales with duration). Three defenses,
+    now standard in the kernel: (a) **FAIL-guard** — a non-zero exit or empty
+    transcript is recorded as FAIL, never timed; (b) **proof-of-work word count** —
+    the 55 s clip is the 11 s clip ×5, so a real transcript must have ~5× the words
+    (this is how the onnx-CUDA **220×** was confirmed REAL — 22 words → 110 words —
+    vs the failed-load fakes); (c) **per-shape warmup + median + absolute ms** —
+    the same onnx run first showed "174× / 2.3×" (short fast, long "collapsed"),
+    which was a cold-CUDA-JIT artifact on the un-warmed 55 s shape, not an O(T²)
+    blowup. Also: quote absolute time next to RTF — a 0.06 s denominator magnifies
+    noise. And keep the comparison honest about asymmetry: CrispASR was timed as a
+    fresh subprocess **including model load per call** while onnx loaded once, so
+    short-clip RTF favours onnx; the load-amortised long column is the fair one.
+    Net #81 truth: onnx-asr on the **GPU** genuinely beats CrispASR on parakeet
+    (~175-220× vs ~6-20×) — the earlier "CrispASR faster" only held vs onnx-CPU.
+
+37. **`kaggle kernels output` is page-capped at 500 files and does NOT
+    auto-continue — anything that sorts late is unreachable.** Refreshing the
+    `crispasr-ccache` dataset requires pulling the kernel's `ccache.tar` back out,
+    but the kernel `git clone`s the whole repo into `/kaggle/working` AND ccache
+    wrote a loose `.ccache/` tree there — thousands of files that sort before
+    `ccache.tar`, filling page 1 forever, so `ccache.tar` never downloaded and
+    every build stayed cold (0 % hits). Two fixes: put the git clone under
+    **`/kaggle/temp`** (not `/kaggle/working`) and relocate **`CCACHE_DIR`** out of
+    `/kaggle/working` too, so the only ccache artifact left in the output is the
+    single `ccache.tar` (reachable in page 1). After that the documented `kaggle
+    datasets version` refresh works and the next build warmed to **92.9 % hits**
+    (~3 min vs ~21 min cold). Lesson: keep `/kaggle/working` down to just the
+    artifacts you need to retrieve; stage the repo, models, and build dirs in
+    `/kaggle/temp`. (And `onnxruntime-gpu`: pin the **CUDA-12** wheel `==1.19.2` on
+    Kaggle P100 — the default now links libcudart.so.13 and ImportErrors on 12.8;
+    import-guard the onnx phase so it can't crash the whole run.)
