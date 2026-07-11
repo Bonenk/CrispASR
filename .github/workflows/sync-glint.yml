@@ -71,6 +71,9 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add glint/
           git commit -m "chore(glint): sync to upstream ${sha:0:12} — ${subject}"
-          # another push may have landed while tests ran
-          git pull --rebase origin main
+          # another push may have landed while tests ran. --autostash: the
+          # provenance build above dirties tracked files outside glint/ (not
+          # staged, so never pushed); without it the rebase aborts with
+          # "cannot pull with rebase: You have unstaged changes".
+          git pull --rebase --autostash origin main
           git push origin main
