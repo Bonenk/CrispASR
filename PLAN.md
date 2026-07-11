@@ -62,7 +62,10 @@ The memory-safety fixes shipped (see HISTORY 2026-07-11). Test/tooling state:
   key (log + `ok=false` → returns nullptr) the same way a duplicate key is
   rejected. Validated on the saved reproducer (`gguf-empty-key-abort.crash`):
   now returns nullptr, valid models still load. Submodule pointer bumped here.
-  Consider upstreaming to ggml-org.
+  Then re-fuzzed `gguf_init_from_file` against the fixed ggml — **384K runs,
+  cov 3912→7548, zero crashes**, so the metadata parser is now robust under
+  fuzzing (no further asserts reachable from a malformed file). Consider
+  upstreaming to ggml-org.
 - **Open (LOW)**: a deterministic GGUF `load_weights` bounds regression test
   (needs a crafted GGUF + backend), and a `bpe.h`/`wordpiece.h` fuzz harness
   (both came back clean in the audit).
