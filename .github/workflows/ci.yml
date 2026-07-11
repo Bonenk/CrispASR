@@ -37,6 +37,47 @@ jobs:
         run: ./build/bin/crispasr --list-backends
 
   # ===========================================================================
+  # Linux x86_64 — AMR opencore FetchContent static build (opt-in gate guard)
+  # ===========================================================================
+  # The -DCRISPASR_AMR_FETCH=ON path compiles opencore-amr from source (for
+  # platforms without a system libopencore-amr). It is OFF by default, so the
+  # rest of the matrix never exercises it — and it silently broke once (§219):
+  # an over-inclusive common/src glob pulled in files upstream excludes
+  # (bits2prm.cpp → missing header), and an unanchored exclusion regex also
+  # matched dtx_decoder_amr_wb.cpp (link error). Neither surfaced until the
+  # static sources were actually compiled + linked + run. This job builds that
+  # path and decodes samples/jfk.amr end-to-end so a regression fails CI at
+  # authoring time. NOTE: the configure step asserts the gate genuinely turned
+  # ON — otherwise the [amr] test WARN-skips and hides the regression (a false
+  # green), which is precisely how the original break went unnoticed.
+  linux-amr-fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libopenblas-dev
+
+      - name: Configure (AMR FetchContent static) + assert gate enabled
+        run: |
+          cmake -S . -B build-amr \
+            -DCMAKE_BUILD_TYPE=Release -DGGML_OPENBLAS=ON -DGGML_NATIVE=OFF \
+            -DCRISPASR_BUILD_TESTS=ON -DCRISPASR_AMR=ON -DCRISPASR_AMR_FETCH=ON \
+            2>&1 | tee cfg.log
+          grep -q "AMR via FetchContent" cfg.log || {
+            echo "::error::CRISPASR_AMR_FETCH did not enable — the AMR static gate is not actually being tested (would give a false green)";
+            exit 1;
+          }
+
+      - name: Build audio-format tests (compiles + links opencore-amr static)
+        run: cmake --build build-amr --target test-audio-formats -j $(nproc)
+
+      - name: Decode AMR end-to-end (samples/jfk.amr)
+        run: ./build-amr/bin/test-audio-formats "[amr]"
+
+  # ===========================================================================
   # Linux x86_64 + Vulkan
   # ===========================================================================
   linux-vulkan:
