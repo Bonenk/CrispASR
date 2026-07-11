@@ -217,6 +217,30 @@ int      glint_opus_encode(glint_opus_enc_t enc, const float* pcm,
 uint32_t glint_opus_enc_final_range(glint_opus_enc_t enc);
 void     glint_opus_enc_destroy(glint_opus_enc_t enc);
 
+// ── Ogg Opus file (container) — one-call encode / decode ─────────────────────
+// Convenience wrappers that mux/demux a complete in-memory Ogg Opus stream
+// (RFC 7845), so callers get a playable .opus file (or read one) without
+// touching the packet-level API or the Ogg layer. CELT-only, fullband, 20 ms
+// frames; channels 1 or 2.
+
+// Encode interleaved float PCM (±1.0) to a complete Ogg Opus stream. Input MUST
+// be 48 kHz (resample first). vbr = 0 CBR / 1 VBR at bitrate_bps. On success
+// returns 0 and sets *out_data (allocated — free with glint_opus_free) and
+// *out_size; negative on error (-1 bad args, -2 alloc).
+int      glint_ogg_opus_encode(const float* pcm, int frames, int channels,
+                               int bitrate_bps, int vbr, uint8_t** out_data,
+                               int* out_size);
+
+// Decode a complete Ogg Opus stream to interleaved float PCM at 48 kHz, with
+// the OpusHead edit list (pre-skip, end trim, output gain) applied. On success
+// returns 0 and sets *out_pcm (allocated — free with glint_opus_free),
+// *out_frames (per channel) and *out_channels; negative on error.
+int      glint_ogg_opus_decode(const uint8_t* data, int size, float** out_pcm,
+                               int* out_frames, int* out_channels);
+
+// Free a buffer returned by glint_ogg_opus_encode / glint_ogg_opus_decode.
+void     glint_opus_free(void* p);
+
 #ifdef __cplusplus
 }
 #endif

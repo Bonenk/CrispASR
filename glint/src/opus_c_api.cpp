@@ -1,14 +1,18 @@
 // glint - Opus C ABI (decoder, multistream decoder, CELT encoder)
 // MIT License - Clean-room implementation
 
+#include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <new>
+#include <vector>
 
 #include "glint/glint.h"
 #include "opus_celt_encoder.hpp"
 #include "opus_decoder.hpp"
 #include "opus_ms_decoder.hpp"
+#include "opus_ogg.hpp"
 
 using glint::opus::CeltEncoder;
 using glint::opus::OpusDecoder;
@@ -132,5 +136,94 @@ uint32_t glint_opus_enc_final_range(glint_opus_enc_t enc) {
 }
 
 void glint_opus_enc_destroy(glint_opus_enc_t enc) { delete enc; }
+
+// ── Ogg Opus file (container) encode / decode ────────────────────────────────
+
+int glint_ogg_opus_encode(const float* pcm, int frames, int channels,
+                          int bitrate_bps, int vbr, uint8_t** out_data,
+                          int* out_size) {
+    if (!pcm || frames <= 0 || channels < 1 || channels > 2 || !out_data ||
+        !out_size)
+        return -1;
+    if (bitrate_bps < 6000) bitrate_bps = 6000;
+    if (bitrate_bps > 510000) bitrate_bps = 510000;
+
+    CeltEncoder enc;
+    enc.init(channels);
+    if (vbr) enc.set_vbr(bitrate_bps);
+
+    glint::opus::OggOpusWriter w;
+    w.begin(channels, 120, 48000);  // pre-skip 120 = one CELT overlap
+
+    const int frame = 960;  // 20 ms at 48 kHz
+    uint8_t pkt[1500];
+    std::vector<float> buf((size_t)frame * channels);
+    for (long p = 0; p < frames; p += frame) {
+        int got = (int)std::min<long>(frame, (long)frames - p);
+        std::fill(buf.begin(), buf.end(), 0.0f);
+        std::memcpy(buf.data(), pcm + (size_t)p * channels,
+                    (size_t)got * channels * sizeof(float));
+        int nb = vbr ? 1275 : bitrate_bps * frame / 48000 / 8 - 1;
+        if (nb < 2) nb = 2;
+        if (nb > 1275) nb = 1275;
+        // CELT-only fullband TOC (config 31 = 20 ms), stereo bit from channels.
+        pkt[0] = static_cast<uint8_t>((31 << 3) | ((channels == 2) << 2));
+        int r = enc.encode_frame(buf.data(), frame, pkt + 1, nb);
+        if (r < 0) continue;
+        w.add_packet(pkt, 1 + r, frame);
+    }
+    const std::vector<uint8_t>& bytes = w.finish();
+
+    uint8_t* out = static_cast<uint8_t*>(std::malloc(bytes.size()));
+    if (!out) return -2;
+    std::memcpy(out, bytes.data(), bytes.size());
+    *out_data = out;
+    *out_size = static_cast<int>(bytes.size());
+    return 0;
+}
+
+int glint_ogg_opus_decode(const uint8_t* data, int size, float** out_pcm,
+                          int* out_frames, int* out_channels) {
+    if (!data || size <= 0 || !out_pcm || !out_frames || !out_channels)
+        return -1;
+
+    glint::opus::OggOpusReader r;
+    if (r.parse(data, (size_t)size) != 0) return -1;
+    int ch = r.head().channels;
+    if (ch < 1 || ch > 2) return -3;
+
+    OpusDecoder dec;
+    dec.init(ch);
+    std::vector<float> pcm;
+    std::vector<float> frame_buf((size_t)2 * 5760);
+    for (int i = 0; i < r.packet_count(); i++) {
+        const std::vector<uint8_t>& p = r.packet(i);
+        int s = dec.decode(p.data(), (int)p.size(), frame_buf.data(), 5760);
+        if (s > 0)
+            pcm.insert(pcm.end(), frame_buf.data(),
+                       frame_buf.data() + (size_t)s * ch);
+    }
+
+    // Apply the OpusHead edit list: output gain, drop pre-skip, trim to granule.
+    double gain = r.output_gain();
+    if (gain != 1.0)
+        for (float& x : pcm) x = static_cast<float>(x * gain);
+    int pre = r.head().pre_skip;
+    if (pre > 0 && (long)pcm.size() >= (long)pre * ch)
+        pcm.erase(pcm.begin(), pcm.begin() + (size_t)pre * ch);
+    int64_t total = r.total_samples();
+    if (total >= 0 && (long)pcm.size() > total * ch)
+        pcm.resize((size_t)total * ch);
+
+    float* out = static_cast<float*>(std::malloc(pcm.size() * sizeof(float)));
+    if (!out) return -2;
+    if (!pcm.empty()) std::memcpy(out, pcm.data(), pcm.size() * sizeof(float));
+    *out_pcm = out;
+    *out_frames = ch > 0 ? (int)(pcm.size() / ch) : 0;
+    *out_channels = ch;
+    return 0;
+}
+
+void glint_opus_free(void* p) { std::free(p); }
 
 }  // extern "C"
