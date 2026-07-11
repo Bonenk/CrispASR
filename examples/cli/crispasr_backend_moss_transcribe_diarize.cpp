@@ -52,10 +52,10 @@ public:
         moss_diarize_set_beam_size(ctx_, params.beam_size > 0 ? params.beam_size : 1);
         if (!params.hotwords.empty())
             moss_diarize_set_hotwords(ctx_, params.hotwords.c_str());
-        if (!params.language.empty() && params.language != "auto")
-            moss_diarize_set_language(ctx_, params.language.c_str());
-        else
-            moss_diarize_set_language(ctx_, nullptr);
+        // Language hint not injected by default — the model auto-detects language.
+        // Injecting the LID-resolved language disrupts the model's timestamp generation
+        // (the model wasn't trained with language hints). Users who need it can pass
+        // an explicit --language via the C API set_language() instead.
 
         // Use the segment-based API for native timestamps + diarization
         std::vector<moss_diarize_segment> raw_segs(256);
