@@ -177,3 +177,24 @@ cmake --build build -j$(sysctl -n hw.ncpu)
 - Hotwords are prompt-injected, not architecturally special
 - Time markers in the audio pad sequence are the clever trick for timestamps
 - `crisp_audio` should handle the Whisper encoder if configured for 80 mel bins
+
+## Implementation Status (2026-07-11)
+
+**DONE** — backend merged to main, all features working:
+
+- Diff harness: 4/4 stages PASS (mel, conv_stem, encoder, audio_embeds: cos=1.000)
+- ASR: correct JFK transcript
+- Diarization: [S01]/[S02] speaker labels working
+- Timestamps: [start][end] timestamps working on multi-speaker audio
+- 30s audio chunking: correctly handles audio > 30s
+- Time markers: every 5s, bare digit tokens (from processor_config.json)
+- Prompt format: single user turn (no system turn) — audio first, instruction after
+- Hotwords, set_ask, language hint: all wired through C API + CLI
+
+**Key learnings for future ports:**
+1. ggml Conv1d input layout: MelsTime `mel[f*T+t]` IS the correct ggml ne=(T, IC) layout — do NOT transpose
+2. HF model repo: `OpenMOSS-Team/MOSS-Transcribe-Diarize` (not `-0.9B`)
+3. Prompt: NO system turn — instruction in user turn after `<|audio_end|>`
+4. Time markers: `processor_config.json` overrides class default (5s not 2s)
+5. Converter: watch for `.replace()` chain clobbering (e.g. `norm.` inside `layernorm.`)
+6. The `torch_compilable_check` import needs stubbing for older transformers
