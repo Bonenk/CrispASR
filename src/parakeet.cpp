@@ -2057,6 +2057,8 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_beam_decode(parakeet_co
         lstm_init_state(h.lstm, W.H);
         if (ggml_dec)
             parakeet_predictor_step_ggml(ctx, gdec, blank_id, h.lstm, h.pred_out);
+        else if (ggml_dec)
+            parakeet_predictor_step_ggml(ctx, gdec, blank_id, h.lstm, h.pred_out);
         else
             predictor_step(W, blank_id, h.lstm, h.pred_out);
         h.emitted.reserve(256);
@@ -2094,9 +2096,10 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_beam_decode(parakeet_co
             joint_proj_enc(J, enc + (size_t)h.t * d_model, proj_e);
             if (ggml_dec)
                 parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), h.pred_out.data(), logits);
+            else if (ggml_dec)
+                parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), h.pred_out.data(), logits);
             else
                 joint_step(J, proj_e.data(), h.pred_out.data(), logits);
-
             if (has_hotwords)
                 core_context_bias::apply_bias(ctx->hotword_trie, h.hw_state, logits.data(), n_vocab_blk,
                                               ctx->hotword_boost);
@@ -2170,6 +2173,8 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_beam_decode(parakeet_co
                 if (has_hotwords)
                     core_context_bias::advance(ctx->hotword_trie, nh.hw_state, c.token);
                 if (ggml_dec)
+                    parakeet_predictor_step_ggml(ctx, gdec, c.token, nh.lstm, nh.pred_out);
+                else if (ggml_dec)
                     parakeet_predictor_step_ggml(ctx, gdec, c.token, nh.lstm, nh.pred_out);
                 else
                     predictor_step(W, c.token, nh.lstm, nh.pred_out);
@@ -2246,6 +2251,8 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_maes_decode(parakeet_con
         lstm_init_state(h.lstm, W.H);
         if (ggml_dec)
             parakeet_predictor_step_ggml(ctx, gdec, blank_id, h.lstm, h.pred_out);
+        else if (ggml_dec)
+            parakeet_predictor_step_ggml(ctx, gdec, blank_id, h.lstm, h.pred_out);
         else
             predictor_step(W, blank_id, h.lstm, h.pred_out);
         h.emitted.reserve(256);
@@ -2269,9 +2276,10 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_maes_decode(parakeet_con
                 // Joint step
                 if (ggml_dec)
                     parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), h.pred_out.data(), logits);
+                else if (ggml_dec)
+                    parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), h.pred_out.data(), logits);
                 else
                     joint_step(J, proj_e.data(), h.pred_out.data(), logits);
-
                 // Duration: always argmax over duration head
                 int dur_id = 0;
                 float dur_lp = logits[n_vocab_blk];
@@ -2339,6 +2347,8 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_maes_decode(parakeet_con
                         // Advance predictor for non-blank
                         if (ggml_dec)
                             parakeet_predictor_step_ggml(ctx, gdec, ex.token, nh.lstm, nh.pred_out);
+                        else if (ggml_dec)
+                            parakeet_predictor_step_ggml(ctx, gdec, ex.token, nh.lstm, nh.pred_out);
                         else
                             predictor_step(W, ex.token, nh.lstm, nh.pred_out);
                         list_exp.push_back(std::move(nh));
@@ -2359,6 +2369,8 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_maes_decode(parakeet_con
                 // non-blank hyps so they can compete with blank hyps.
                 for (auto& nh : list_exp) {
                     if (ggml_dec)
+                        parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), nh.pred_out.data(), logits);
+                    else if (ggml_dec)
                         parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), nh.pred_out.data(), logits);
                     else
                         joint_step(J, proj_e.data(), nh.pred_out.data(), logits);
@@ -2437,6 +2449,8 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_maes_decode(parakeet_co
         lstm_init_state(h.lstm, W.H);
         if (ggml_dec)
             parakeet_predictor_step_ggml(ctx, gdec, blank_id, h.lstm, h.pred_out);
+        else if (ggml_dec)
+            parakeet_predictor_step_ggml(ctx, gdec, blank_id, h.lstm, h.pred_out);
         else
             predictor_step(W, blank_id, h.lstm, h.pred_out);
         h.emitted.reserve(256);
@@ -2457,9 +2471,10 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_maes_decode(parakeet_co
             for (auto& h : hyps) {
                 if (ggml_dec)
                     parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), h.pred_out.data(), logits);
+                else if (ggml_dec)
+                    parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), h.pred_out.data(), logits);
                 else
                     joint_step(J, proj_e.data(), h.pred_out.data(), logits);
-
                 // Log-softmax over vocab+blank
                 float max_l = logits[0];
                 for (int v = 1; v < n_vocab_blk; v++)
@@ -2497,7 +2512,10 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_maes_decode(parakeet_co
                         nh.score = new_score;
                         nh.emitted = h.emitted;
                         nh.emitted.push_back({tok, t, t, (float)std::exp(new_score - h.score)});
-                        predictor_step(W, tok, nh.lstm, nh.pred_out);
+                        if (ggml_dec)
+                            parakeet_predictor_step_ggml(ctx, gdec, tok, nh.lstm, nh.pred_out);
+                        else
+                            predictor_step(W, tok, nh.lstm, nh.pred_out);
                         list_exp.push_back(std::move(nh));
                     }
                 }
@@ -2511,6 +2529,8 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_maes_decode(parakeet_co
             } else {
                 for (auto& nh : list_exp) {
                     if (ggml_dec)
+                        parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), nh.pred_out.data(), logits);
+                    else if (ggml_dec)
                         parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), nh.pred_out.data(), logits);
                     else
                         joint_step(J, proj_e.data(), nh.pred_out.data(), logits);
@@ -2563,6 +2583,8 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_decode(parakeet_context
     const int blank_id = (int)hp.blank_id; // vocab_size
     const int n_vocab_blk = blank_id + 1;  // vocab + blank
     const int max_per_step = 10;
+    core_rnnt_ggml::Decoder gdec;
+    const bool ggml_dec = parakeet_init_ggml_decoder(ctx, gdec);
 
     auto& W = ctx->pred_w;
     auto& J = ctx->joint_w;
@@ -2577,8 +2599,10 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_decode(parakeet_context
     lstm_init_state(state, W.H);
 
     std::vector<float> pred_out;
-    predictor_step(W, blank_id, state, pred_out);
-
+    if (ggml_dec)
+        parakeet_predictor_step_ggml(ctx, gdec, blank_id, state, pred_out);
+    else
+        predictor_step(W, blank_id, state, pred_out);
     std::vector<float> proj_e(J.joint_hidden);
     std::vector<float> logits(J.vocab_total);
 
@@ -2591,8 +2615,10 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_decode(parakeet_context
 
         int n_inner = 0;
         while (n_inner < max_per_step) {
-            joint_step(J, proj_e.data(), pred_out.data(), logits);
-
+            if (ggml_dec)
+                parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), pred_out.data(), logits);
+            else
+                joint_step(J, proj_e.data(), pred_out.data(), logits);
             if (has_hotwords)
                 core_context_bias::apply_bias(ctx->hotword_trie, hw_state, logits.data(), n_vocab_blk,
                                               ctx->hotword_boost);
@@ -2622,7 +2648,10 @@ static std::vector<parakeet_emitted_token> parakeet_rnnt_decode(parakeet_context
             emitted.push_back({tok, t, t, tok_p});
             if (has_hotwords)
                 core_context_bias::advance(ctx->hotword_trie, hw_state, tok);
-            predictor_step(W, tok, state, pred_out);
+            if (ggml_dec)
+                parakeet_predictor_step_ggml(ctx, gdec, tok, state, pred_out);
+            else
+                predictor_step(W, tok, state, pred_out);
             n_inner++;
         }
 
