@@ -10,6 +10,23 @@
 //   - core_attn::llama_self_attn_kv() for the LLM backbone (GQA + RoPE + KV cache)
 //   - core_ffn::swiglu() for SwiGLU FFN in both LLM and FM
 //   - Tekken BPE tokenizer pattern from voxtral4b.cpp
+//
+// Env knobs:
+//   CRISPASR_VOXTRAL_TTS_TIMING=1    print per-stage LLM/FM ms/frame
+//   CRISPASR_VOXTRAL_TTS_FM_CPU=1    run the FM velocity graph on CPU instead of
+//                                    the main backend (EXPERIMENTAL, default off).
+//                                    Measured SLOWER than Metal on a quiet box
+//                                    (161 vs 127 ms/frame) — the FM has enough
+//                                    compute that GPU parallelism wins — but it can
+//                                    help when Metal is contended by other GPU work.
+//   CRISPASR_VOXTRAL_TTS_FM_STEPS=N  Euler ODE step count (default 8 → 7 intervals).
+//                                    EXPERIMENTAL quality/speed lever: the model is
+//                                    calibrated for 8; fewer steps perturb the
+//                                    acoustic feedback loop (5 → ~2x more frames,
+//                                    net slower + degraded). Not a free win.
+//   CRISPASR_VOXTRAL_TTS_DEBUG=1     per-frame code dump + semantic-argmax diag
+//   CRISPASR_VOXTRAL_TTS_SEMANTIC_CB=<f32 blob>  side-load codec.semantic_cb
+//   CRISPASR_VOXTRAL_TTS_CODEC_FROM_FILE=<codes> codec-only diff-harness mode
 
 #include "voxtral_tts.h"
 
@@ -209,7 +226,9 @@ struct voxtral_tts_context {
     ggml_backend_t backend = nullptr;
     ggml_backend_t backend_cpu = nullptr;
     ggml_backend_buffer_t buf = nullptr;
-    ggml_context* ctx_w = nullptr; // weight context
+    ggml_backend_buffer_t buf_cpu = nullptr; // CPU copies of fm.* weights (FM_CPU gate only)
+    ggml_context* fm_ctx_w = nullptr;        // metadata ctx for the fm.* CPU copies
+    ggml_context* ctx_w = nullptr;           // weight context
 
     // Compute scheduler + graph metadata scratch (shared across LLM/FM/codec graphs)
     ggml_backend_sched_t sched = nullptr;
@@ -221,6 +240,16 @@ struct voxtral_tts_context {
     ggml_cgraph* fm_gf = nullptr;
     ggml_gallocr_t fm_alloc = nullptr;
     std::vector<uint8_t> fm_meta;
+
+    // Perf gates (env-tunable, all default = current shipped behaviour):
+    //  - fm_backend: which backend runs the tiny FM velocity graph. Default = main
+    //    backend; CRISPASR_VOXTRAL_TTS_FM_CPU=1 routes fm.* weights to CPU and runs
+    //    the FM on CPU (the FM is dispatch-latency-bound on Metal at ~1% GPU util,
+    //    so CPU may be faster with identical math). Set in init.
+    //  - fm_flow_steps: Euler ODE step count (default 8 → 7 intervals).
+    //    CRISPASR_VOXTRAL_TTS_FM_STEPS=N overrides (quality/speed tradeoff).
+    ggml_backend_t fm_backend = nullptr;
+    int fm_flow_steps = 8; // = VTTS_FLOW_STEPS
 
     // KV cache for LLM backbone
     ggml_context* kv_ctx = nullptr;
@@ -276,6 +305,17 @@ static bool env_bool(const char* name) {
     const char* v = std::getenv(name);
     return v && (*v == '1' || *v == 'y' || *v == 'Y');
 }
+
+// Env int with fallback (returns def if unset/unparseable/<=0).
+static int env_int(const char* name, int def) {
+    const char* v = std::getenv(name);
+    if (!v || !*v)
+        return def;
+    int n = atoi(v);
+    return n > 0 ? n : def;
+}
+
+static constexpr int VTTS_FLOW_STEPS = 8; // FM timesteps → 7 Euler intervals (default)
 
 static std::vector<int> parse_int_list(const std::string& s) {
     std::vector<int> out;
@@ -587,7 +627,17 @@ extern "C" voxtral_tts_context* voxtral_tts_init_from_file(const char* path_mode
     if (ctx->backend_cpu && params.n_threads > 0)
         ggml_backend_cpu_set_n_threads(ctx->backend_cpu, params.n_threads);
 
+    // Perf gates. FM_CPU routes fm.* weights to CPU so the dispatch-latency-bound
+    // FM velocity graph runs on CPU (identical math). FM_STEPS overrides the Euler
+    // ODE step count. Both default to shipped behaviour.
+    const bool fm_cpu = env_bool("CRISPASR_VOXTRAL_TTS_FM_CPU") && ctx->backend != ctx->backend_cpu;
+    ctx->fm_flow_steps = env_int("CRISPASR_VOXTRAL_TTS_FM_STEPS", VTTS_FLOW_STEPS);
+
     core_gguf::WeightLoad wl;
+    // Always the fast contiguous load. FM_CPU does NOT use a split load (routing the
+    // scattered fm.* tensors off-GPU makes the read non-contiguous → ~6x slower on the
+    // SSD); instead it duplicates just the small fm.* subset (~200 MB) to CPU post-load
+    // (below, after the FM weights are bound).
     if (!core_gguf::load_weights(path_model, ctx->backend, "voxtral_tts", wl)) {
         fprintf(stderr, "voxtral_tts: failed to load weights from '%s'\n", path_model);
         delete ctx;
@@ -595,6 +645,10 @@ extern "C" voxtral_tts_context* voxtral_tts_init_from_file(const char* path_mode
     }
     ctx->ctx_w = wl.ctx;
     ctx->buf = wl.buf;
+    ctx->fm_backend = fm_cpu ? ctx->backend_cpu : ctx->backend;
+    if (ctx->verbosity >= 1 && (fm_cpu || ctx->fm_flow_steps != VTTS_FLOW_STEPS))
+        fprintf(stderr, "voxtral_tts: FM gates — backend=%s, ode_steps=%d\n", fm_cpu ? "CPU" : "GPU",
+                ctx->fm_flow_steps);
 
     // Compute scheduler (weighted-model inference; sched handles weight + compute
     // buffers across the GPU/CPU split). 16384-node graph budget covers the 26-layer
@@ -656,6 +710,42 @@ extern "C" voxtral_tts_context* voxtral_tts_init_from_file(const char* path_mode
         l.ffn_gate = b("ffn_gate.weight");
         l.ffn_up = b("ffn_up.weight");
         l.ffn_down = b("ffn_down.weight");
+    }
+
+    // CRISPASR_VOXTRAL_TTS_FM_CPU: the tiny FM velocity graph is Metal-dispatch-latency
+    // bound (~1% GPU util → ~2x faster on CPU with identical math). Duplicate just the
+    // fm.* weights (~200 MB Q4_K) onto CPU and repoint the model at the copies. Keeps
+    // the fast contiguous GPU load; the copy is a one-time byte-copy per tensor.
+    if (fm_cpu) {
+        std::vector<ggml_tensor**> fmw = {&ctx->model.fm_input_proj,
+                                          &ctx->model.fm_llm_proj,
+                                          &ctx->model.fm_time_proj,
+                                          &ctx->model.fm_semantic_output,
+                                          &ctx->model.fm_semantic_output_bias,
+                                          &ctx->model.fm_acoustic_output,
+                                          &ctx->model.fm_norm};
+        for (auto& l : ctx->model.fm_layers)
+            for (ggml_tensor** t : {&l.attn_norm, &l.attn_q, &l.attn_k, &l.attn_v, &l.attn_o, &l.ffn_norm, &l.ffn_gate,
+                                    &l.ffn_up, &l.ffn_down})
+                fmw.push_back(t);
+
+        ggml_init_params ip = {ggml_tensor_overhead() * (fmw.size() + 8), nullptr, /*no_alloc*/ true};
+        ctx->fm_ctx_w = ggml_init(ip);
+        std::vector<ggml_tensor*> dups(fmw.size(), nullptr);
+        for (size_t i = 0; i < fmw.size(); i++)
+            if (*fmw[i])
+                dups[i] = ggml_dup_tensor(ctx->fm_ctx_w, *fmw[i]);
+        ctx->buf_cpu = ggml_backend_alloc_ctx_tensors(ctx->fm_ctx_w, ctx->backend_cpu);
+        if (!ctx->buf_cpu) {
+            fprintf(stderr, "voxtral_tts: FM CPU weight alloc failed\n");
+            delete ctx;
+            return nullptr;
+        }
+        for (size_t i = 0; i < fmw.size(); i++)
+            if (dups[i]) {
+                ggml_backend_tensor_copy(*fmw[i], dups[i]);
+                *fmw[i] = dups[i];
+            }
     }
 
     // Bind codec weights
@@ -1046,7 +1136,6 @@ static std::vector<float> voxtral_tts_run_llm(voxtral_tts_context* ctx, const fl
 // tokens [input_proj(x_t), time_proj(time_emb(t)), llm_proj(h)] and is
 // bidirectional with NO positional encoding.
 
-static constexpr int VTTS_FLOW_STEPS = 8; // timesteps → 7 Euler intervals
 static constexpr float VTTS_CFG_ALPHA = 1.2f;
 static constexpr float VTTS_NOISE_SCALE = 1.0f;
 static constexpr int VTTS_FSQ_LEVELS = 21;
@@ -1163,7 +1252,7 @@ static bool vtts_fm_predict_velocity_cfg(voxtral_tts_context* ctx, const float* 
         ggml_set_output(vel);
         ggml_build_forward_expand(gf, vel);
 
-        ctx->fm_alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+        ctx->fm_alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->fm_backend));
         if (!ctx->fm_alloc || !ggml_gallocr_alloc_graph(ctx->fm_alloc, gf)) {
             fprintf(stderr, "voxtral_tts: FM graph alloc failed\n");
             return false;
@@ -1187,7 +1276,7 @@ static bool vtts_fm_predict_velocity_cfg(voxtral_tts_context* ctx, const float* 
         const int32_t vi[2] = {0, 3};
         ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "velidx"), vi, 0, sizeof(vi));
     }
-    if (ggml_backend_graph_compute(ctx->backend, gf) != GGML_STATUS_SUCCESS)
+    if (ggml_backend_graph_compute(ctx->fm_backend, gf) != GGML_STATUS_SUCCESS)
         return false;
     v_cond.resize(VTTS_ACOUSTIC_DIM);
     v_uncond.resize(VTTS_ACOUSTIC_DIM);
@@ -1271,9 +1360,10 @@ static std::vector<int> vtts_acoustic_forward(voxtral_tts_context* ctx, const st
     std::vector<float> x(VTTS_ACOUSTIC_DIM);
     for (int i = 0; i < VTTS_ACOUSTIC_DIM; i++)
         x[i] = vtts_randn(&ctx->rng_state) * VTTS_NOISE_SCALE;
-    for (int step = 0; step < VTTS_FLOW_STEPS - 1; step++) {
-        float t = (float)step / (float)(VTTS_FLOW_STEPS - 1);
-        float dt = (float)(step + 1) / (float)(VTTS_FLOW_STEPS - 1) - t;
+    const int n_steps = ctx->fm_flow_steps; // = VTTS_FLOW_STEPS unless CRISPASR_VOXTRAL_TTS_FM_STEPS
+    for (int step = 0; step < n_steps - 1; step++) {
+        float t = (float)step / (float)(n_steps - 1);
+        float dt = (float)(step + 1) / (float)(n_steps - 1) - t;
         std::vector<float> v_cond, v_uncond;
         if (!vtts_fm_predict_velocity_cfg(ctx, x.data(), h.data(), t, v_cond, v_uncond))
             break;
@@ -1760,6 +1850,10 @@ extern "C" void voxtral_tts_free(voxtral_tts_context* ctx) {
         ggml_free(ctx->kv_ctx);
     if (ctx->buf)
         ggml_backend_buffer_free(ctx->buf);
+    if (ctx->buf_cpu)
+        ggml_backend_buffer_free(ctx->buf_cpu);
+    if (ctx->fm_ctx_w)
+        ggml_free(ctx->fm_ctx_w);
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
     if (ctx->backend && ctx->backend != ctx->backend_cpu)
