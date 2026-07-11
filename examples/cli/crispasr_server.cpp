@@ -129,6 +129,22 @@ static std::string scratch_dir() {
 // The caller is responsible for calling std::remove() on the returned path.
 // Preserve the original file extension so ffmpeg and miniaudio can detect
 // the container format (critical for m4a/aac/opus/webm uploads).
+// Sanitise an untrusted, request-supplied string before it goes into a stderr
+// log line: cap the length and replace control bytes (incl. CR/LF and terminal
+// escape sequences) so a crafted filename / voice / attestation can't forge log
+// lines or inject escapes into an operator's terminal.
+static std::string log_sanitize(const std::string& s, size_t cap = 256) {
+    std::string o;
+    o.reserve(s.size() < cap ? s.size() : cap);
+    for (size_t i = 0; i < s.size() && i < cap; i++) {
+        unsigned char c = (unsigned char)s[i];
+        o += (c < 0x20 || c == 0x7f) ? '?' : (char)c;
+    }
+    if (s.size() > cap)
+        o += "...";
+    return o;
+}
+
 static std::string write_temp_audio(const char* data, size_t size, const std::string& original_filename = "") {
     // Extract extension from original filename
     std::string ext;
@@ -391,7 +407,7 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
     result.language = rp.language;
 
     if (rp.verbose)
-        fprintf(stderr, "crispasr-server: processing '%s' (%zu bytes)\n", audio_file.filename.c_str(),
+        fprintf(stderr, "crispasr-server: processing '%s' (%zu bytes)\n", log_sanitize(audio_file.filename).c_str(),
                 audio_file.content.size());
 
     // Write to a secure temporary file for audio decoding.
@@ -884,28 +900,42 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
 
     Server svr;
 
-    // CORS support — opt-in via --cors-origin. Browser clients calling our
-    // /v1/* endpoints from a different origin need:
-    //   1. Access-Control-Allow-Origin on every response (set on each route)
-    //   2. A 204 reply to OPTIONS preflights with Allow-{Methods,Headers}
-    // The pre-routing handler runs on every request before route dispatch;
-    // we use it to attach the response headers and short-circuit the
-    // OPTIONS preflight without touching individual routes.
-    if (!params.server_cors_origin.empty()) {
-        const std::string cors_origin = params.server_cors_origin;
-        svr.set_pre_routing_handler([cors_origin](const Request& req, Response& res) {
+    // Security: bound the request body so an unbounded multipart upload cannot
+    // buffer gigabytes into RAM (OOM DoS) before auth/routing even run — the
+    // body is read (and, for multipart, fully accumulated) BEFORE the route
+    // handler + require_auth. set_payload_max_length makes httplib's read_content
+    // reject an over-cap Content-Length with 413 and skip the body WITHOUT
+    // buffering it — the clean fix for the normal (Content-Length) upload path.
+    const size_t max_upload_bytes = 512ull * 1024 * 1024; // 512 MB — far above any real audio upload
+    svr.set_payload_max_length(max_upload_bytes);
+
+    // A pre-routing handler runs before body read + route dispatch (httplib
+    // routing() calls it before read_content). httplib's CHUNKED reader does
+    // NOT honour payload_max_length (only the Content-Length path does), so a
+    // Transfer-Encoding: chunked upload would bypass the cap and buffer
+    // unbounded — reject chunked bodies on mutating requests here. When
+    // --cors-origin is set this handler also attaches CORS + answers OPTIONS.
+    const std::string cors_origin = params.server_cors_origin;
+    svr.set_pre_routing_handler([cors_origin](const Request& req, Response& res) {
+        if ((req.method == "POST" || req.method == "PUT") && req.has_header("Transfer-Encoding")) {
+            // Chunked/streamed upload — not bounded by set_payload_max_length.
+            res.status = 411; // Length Required — resend with a Content-Length.
+            return Server::HandlerResponse::Handled;
+        }
+        if (!cors_origin.empty()) {
             res.set_header("Access-Control-Allow-Origin", cors_origin);
-            res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            res.set_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS, DELETE");
             res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
             res.set_header("Access-Control-Max-Age", "86400");
             if (req.method == "OPTIONS") {
                 res.status = 204;
                 return Server::HandlerResponse::Handled;
             }
-            return Server::HandlerResponse::Unhandled;
-        });
+        }
+        return Server::HandlerResponse::Unhandled;
+    });
+    if (!cors_origin.empty())
         fprintf(stderr, "crispasr-server: CORS enabled (Allow-Origin: %s)\n", cors_origin.c_str());
-    }
 
     auto require_auth = [&](const Request& req, Response& res) -> bool {
         if (is_authorized(req, api_keys))
@@ -930,8 +960,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         }
 
         auto audio_file = req.get_file_value("file");
-        fprintf(stderr, "crispasr-server: /inference received '%s' (%zu bytes)\n", audio_file.filename.c_str(),
-                audio_file.content.size());
+        fprintf(stderr, "crispasr-server: /inference received '%s' (%zu bytes)\n",
+                log_sanitize(audio_file.filename).c_str(), audio_file.content.size());
 
         // Per-request parameter overrides.
         whisper_params rp = params;
@@ -1544,7 +1574,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             char ts[64];
             std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
             fprintf(stderr, "[CONSENT] ts=%s voice=%s attestation=\"%s\" spoken_disclaimer=%s\n", ts,
-                    voice_name.c_str(), consent_attestation.c_str(), spoken_disclaimer ? "yes" : "no");
+                    log_sanitize(voice_name).c_str(), log_sanitize(consent_attestation).c_str(),
+                    spoken_disclaimer ? "yes" : "no");
         }
         std::string response_format = body.value("response_format", std::string("wav"));
         if (response_format != "wav" && response_format != "pcm" && response_format != "f32" &&
@@ -1576,8 +1607,20 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // when they're using gpt-4o-mini-tts and shouldn't see errors
         // when pointed at a base TTS server.
         whisper_params rp = params;
-        if (!voice_name.empty())
+        if (!voice_name.empty()) {
+            // Path-traversal guard: `voice` is resolved by the backend as a
+            // filesystem path (bare name relative to --voice-dir, or a path).
+            // Over the network that must not escape the voice dir or read an
+            // absolute path — reject `..`, absolute/home paths, NUL and
+            // backslashes (a legitimate bare name / speaker / preset has none).
+            if (voice_name.find("..") != std::string::npos || voice_name.front() == '/' || voice_name.front() == '~' ||
+                voice_name.find('\\') != std::string::npos || voice_name.find('\0') != std::string::npos) {
+                json_error(res, 400, "'voice' must not contain '..', a leading '/' or '~', or path separators",
+                           "invalid_voice", "voice");
+                return;
+            }
             rp.tts_voice = voice_name;
+        }
         if (!instructions.empty())
             rp.tts_instruct = instructions;
         if (body.contains("seed") && body["seed"].is_number_integer())
@@ -2118,6 +2161,13 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     svr.Post("/v1/voices", [&](const Request& req, Response& res) {
         if (!require_auth(req, res))
             return;
+        // CAP_TTS gate (documented CAP_TTS-only; matches the GET /v1/voices guard).
+        if (!(backend->capabilities() & CAP_TTS)) {
+            json_error(res, 400,
+                       "loaded backend '" + backend_name +
+                           "' does not support TTS (no CAP_TTS); load a TTS backend via POST /load");
+            return;
+        }
         if (params.tts_voice_dir.empty()) {
             json_error(res, 400, "server has no --voice-dir configured; cannot store voice files");
             return;
@@ -2194,6 +2244,13 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     svr.Delete(R"(/v1/voices/([a-zA-Z0-9_-]+))", [&](const Request& req, Response& res) {
         if (!require_auth(req, res))
             return;
+        // CAP_TTS gate (documented CAP_TTS-only; matches the GET /v1/voices guard).
+        if (!(backend->capabilities() & CAP_TTS)) {
+            json_error(res, 400,
+                       "loaded backend '" + backend_name +
+                           "' does not support TTS (no CAP_TTS); load a TTS backend via POST /load");
+            return;
+        }
         if (params.tts_voice_dir.empty()) {
             json_error(res, 400, "server has no --voice-dir configured");
             return;
