@@ -159,3 +159,33 @@ Lessons from the systematic head-to-head benchmark against
     GPU (i.e., the LSTM+joint is a ggml graph), not when it's a CPU-side
     cblas call between GPU encoder passes. **Lesson: don't batch CPU work
     that feeds a GPU pipeline — batch the GPU work itself.**
+
+25. **A CPU-pinned decode graph must keep its weights on CPU too (moonshine,
+    M1 Metal)**: moonshine's self-attn KV cache lives on a CPU buffer, so
+    `ggml_backend_sched` runs the whole decode step on the CPU even in GPU
+    mode. With the decoder weights loaded onto the GPU (the naive all-GPU
+    load), the sched then re-copies every GPU-resident decoder weight
+    (incl. the 18-36 MB embed/lm_head) GPU→CPU on *each* per-token graph
+    rebuild — the copy can't be cached because each step builds a fresh
+    graph. Measured on a *quiet* M1 (jfk, 26 tok): Metal decode q8 39→23 ms
+    (−40%), f16 119→50 ms (−58%), bit-identical transcript; f16 hurts most
+    because its weights are 2× q8. Fix: `load_weights_split` routing
+    `encoder.*`→GPU, `decoder.*`→CPU (moonshine default; `MOONSHINE_ALL_GPU=1`
+    restores the old load). The per-token copy also explains the plan's
+    440-660 ms/decode-*under-load* figures — the copy balloons under GPU
+    contention. **Lesson: when the KV cache pins a decode graph to CPU,
+    co-locate that graph's weights on CPU; a GPU weight buffer feeding a
+    CPU split is a per-step cross-backend copy, not free residency.**
+    (Corollary to the §232 CP_DIRECT finding: for these tiny models the win
+    is avoiding cross-backend traffic, not sched-free dispatch.)
+
+26. **For moonshine *tiny* on Apple Silicon at idle, pure CPU beats GPU
+    outright**: measured totals (jfk, q8) — CPU 79 ms (enc 47 + dec 30) vs
+    all-GPU 110 ms (enc 67 + dec 39). The model is small enough that Metal
+    launch + the per-layer encoder attention Metal↔CPU permute bounces cost
+    more than they save. The hybrid load (learning 25) recovers the decode
+    half; the encoder half (GPU 67 vs CPU 47) remains a launch/bounce tax,
+    left as-is (fixing the flash-attn layout bounce is a shared-code, higher-
+    risk change). Net: GPU-mode moonshine-tiny is now enc-bound, not the
+    earlier "GPU decode is 440 ms" story (that was the CPU-run-mislabeled-as-
+    GPU bug × the weight-copy tax, both now addressed).

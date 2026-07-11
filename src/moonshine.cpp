@@ -94,6 +94,15 @@ static struct ggml_tensor* checked_get_tensor(const TensorMap& tensors, const ch
     return it->second;
 }
 
+// §232 hybrid placement predicate for load_weights_split: encoder weights on
+// the GPU, decoder weights on the CPU. The moonshine decode graph is CPU-pinned
+// (self-attn KV cache is a CPU buffer), so co-locating the decoder weights on
+// the CPU avoids a per-token GPU→CPU weight re-copy. Any non-"encoder." tensor
+// (decoder.*, output, tied embeddings) stays off-GPU.
+static bool moonshine_is_gpu_tensor(const char* tensor_name, void* /*user*/) {
+    return tensor_name && std::strncmp(tensor_name, "encoder.", 8) == 0;
+}
+
 // helper: read uint32 from GGUF KV
 static uint32_t gguf_get_u32(struct gguf_context* ctx, const char* key) {
     int64_t id = gguf_find_key(ctx, key);
@@ -198,14 +207,35 @@ struct moonshine_context* moonshine_init_with_params(struct moonshine_init_param
     ctx->use_gpu = (ctx->backend != ctx->backend_cpu);
 
     // ── Pass 2: load weights via core_gguf (mmap, backend buffer) ──
+    //
+    // §232 hybrid placement: on GPU, keep only the *encoder* weights on the GPU
+    // and route the *decoder* weights to the CPU backend. The decode graph is
+    // already CPU-pinned (the self-attn KV cache lives on a CPU buffer), so in
+    // the all-GPU layout the sched re-copies every GPU-resident decoder weight
+    // (incl. the 18-36 MB embed/lm_head) from GPU→CPU on *each* of the ~26
+    // per-token graph rebuilds — pure waste that balloons under GPU contention
+    // (the source of the plan's 440-660 ms/decode-under-load figures). With the
+    // decoder weights already CPU-resident there is nothing to copy: decode runs
+    // CPU-local, bit-identical output, and the encoder still runs on GPU.
+    // Opt out with MOONSHINE_ALL_GPU=1 (restores the legacy all-GPU load for A/B).
     core_gguf::WeightLoad wl;
-    if (!core_gguf::load_weights(model_path, ctx->backend, "moonshine", wl)) {
+    const char* all_gpu_env = std::getenv("MOONSHINE_ALL_GPU");
+    const bool all_gpu = all_gpu_env && all_gpu_env[0] == '1';
+    bool loaded;
+    if (ctx->use_gpu && !all_gpu) {
+        loaded = core_gguf::load_weights_split(model_path, ctx->backend, ctx->backend_cpu, moonshine_is_gpu_tensor,
+                                               nullptr, "moonshine", wl);
+    } else {
+        loaded = core_gguf::load_weights(model_path, ctx->backend, "moonshine", wl);
+    }
+    if (!loaded) {
         fprintf(stderr, "%s: failed to load weights from '%s'\n", __func__, model_path);
         delete ctx;
         return nullptr;
     }
     model.ctx_w = wl.ctx;
     model.buf_w = wl.buf;
+    model.buf_w_cpu = wl.buf_cpu; // non-null only for the split (hybrid) load
 
     // Bind tensors into model struct fields
     bool ok = true;
