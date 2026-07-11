@@ -631,11 +631,14 @@ int crispasr_amr_decode(const char* path, int want_channels, float** out_buf, in
 // ── WebM/Matroska Opus|Vorbis demux (inline EBML parser, no deps) ───────────
 // Minimal EBML parser extracts Opus or Vorbis codec data from WebM/Matroska
 // containers, then feeds the extracted Ogg stream to the existing
-// libopus (via opusfile) or stb_vorbis decoders. This covers browser-recorded
-// audio (MediaRecorder → WebM/Opus) and Matroska files with Opus/Vorbis tracks.
-// No external dependencies beyond what we already link (libopus, stb_vorbis).
+// in-tree glint Opus decoder (or libopus when pinned) and stb_vorbis. This
+// covers browser-recorded audio (MediaRecorder → WebM/Opus) and Matroska files
+// with Opus/Vorbis tracks. No external dependency — glint + stb_vorbis are
+// in-tree; libopus is an optional fallback (built with CRISPASR_OPUS, selected
+// via CRISPASR_OPUS_DECODER=libopus).
 #if defined(CRISPASR_HAVE_OPUS)
-#include <opusfile.h>
+#include <opusfile.h> // only for the optional libopus fallback path
+#endif
 
 namespace {
 
@@ -1100,8 +1103,6 @@ int crispasr_webm_decode(const char* path, int want_channels, float** out_buf, i
 
     // Decode the extracted packets
     if (is_opus) {
-        // Use libopus directly to decode packets
-        int opus_err = 0;
         int ch = audio_track.channels > 0 ? audio_track.channels : 2;
         if (ch > 2)
             ch = 2;
@@ -1118,22 +1119,45 @@ int crispasr_webm_decode(const char* path, int want_channels, float** out_buf, i
                 ch = 2;
         }
 
-        OpusDecoder* opus_dec = opus_decoder_create(48000, ch, &opus_err);
-        if (!opus_dec || opus_err != OPUS_OK)
-            return -2;
-
         std::vector<float> pcm_all;
         // Opus decodes at 48 kHz natively
         const int max_frame = 5760 * ch; // max 120ms at 48kHz
         std::vector<float> frame_buf((size_t)max_frame);
 
-        for (auto& pkt : opus_packets) {
-            int n = opus_decode_float(opus_dec, pkt.data(), (opus_int32)pkt.size(), frame_buf.data(), 5760, 0);
-            if (n > 0) {
-                pcm_all.insert(pcm_all.end(), frame_buf.data(), frame_buf.data() + n * ch);
+        // Decode the packets. Default: the in-tree glint packet decoder
+        // (RFC-conformant, no libopus). CRISPASR_OPUS_DECODER=libopus selects
+        // libopus (only when built with CRISPASR_OPUS).
+        bool use_libopus = false;
+#if defined(CRISPASR_HAVE_OPUS)
+        if (const char* pref = std::getenv("CRISPASR_OPUS_DECODER"))
+            use_libopus = pref[0] && std::strcmp(pref, "glint") != 0 && std::strcmp(pref, "auto") != 0;
+#endif
+        if (use_libopus) {
+#if defined(CRISPASR_HAVE_OPUS)
+            int opus_err = 0;
+            OpusDecoder* opus_dec = opus_decoder_create(48000, ch, &opus_err);
+            if (!opus_dec || opus_err != OPUS_OK)
+                return -2;
+            for (auto& pkt : opus_packets) {
+                int n = opus_decode_float(opus_dec, pkt.data(), (opus_int32)pkt.size(), frame_buf.data(), 5760, 0);
+                if (n > 0)
+                    pcm_all.insert(pcm_all.end(), frame_buf.data(), frame_buf.data() + n * ch);
             }
+            opus_decoder_destroy(opus_dec);
+#endif
+        } else {
+            if (const char* e = std::getenv("CRISPASR_OPUS_DEBUG"); e && e[0] && e[0] != '0')
+                std::fprintf(stderr, "[glint-webm-opus] %zu packets, %d ch @ 48000\n", opus_packets.size(), ch);
+            glint_opus_dec_t gdec = glint_opus_dec_create(ch, 48000);
+            if (!gdec)
+                return -2;
+            for (auto& pkt : opus_packets) {
+                int n = glint_opus_decode(gdec, pkt.data(), (int)pkt.size(), frame_buf.data(), 5760);
+                if (n > 0)
+                    pcm_all.insert(pcm_all.end(), frame_buf.data(), frame_buf.data() + n * ch);
+            }
+            glint_opus_dec_destroy(gdec);
         }
-        opus_decoder_destroy(opus_dec);
 
         if (pcm_all.empty())
             return -2;
@@ -1433,7 +1457,6 @@ int crispasr_webm_decode(const char* path, int want_channels, float** out_buf, i
     }
 }
 } // namespace
-#endif // CRISPASR_HAVE_OPUS
 
 // ── M4A/AAC decode via fdk-aac (runtime dlopen, MIT-clean) ──────────────────
 // Minimal ISOBMFF (MP4/M4A) parser extracts AudioSpecificConfig + raw AAC
@@ -2763,8 +2786,9 @@ CA_EXPORT int crispasr_audio_load(const char* path, float** out_pcm, int* out_sa
             }
         }
 #endif
-#if defined(CRISPASR_HAVE_OPUS)
-        // WebM/Matroska Opus fallback (EBML demux → libopus)
+        // WebM/Matroska fallback (EBML demux → glint Opus, or libopus when
+        // CRISPASR_OPUS_DECODER=libopus; Vorbis via stb_vorbis). Now always
+        // available — no libopus required.
         {
             float* webm_buf = nullptr;
             int webm_fr = 0, webm_ch = 0;
@@ -2776,7 +2800,6 @@ CA_EXPORT int crispasr_audio_load(const char* path, float** out_pcm, int* out_sa
                 return 0;
             }
         }
-#endif
 #if !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
         // M4A / AAC / ADTS fallback (fdk-aac via dlopen, if installed)
         {
@@ -3006,10 +3029,9 @@ CA_EXPORT int crispasr_audio_load_stereo(const char* path, float** out_left, flo
         if (split_fallback(crispasr_amr_decode) == 0)
             return 0;
 #endif
-#if defined(CRISPASR_HAVE_OPUS)
+        // WebM/Matroska (glint Opus / stb_vorbis) — always available, no libopus.
         if (split_fallback(crispasr_webm_decode) == 0)
             return 0;
-#endif
 #if !defined(__APPLE__) && !defined(__EMSCRIPTEN__)
         if (split_fallback(crispasr_m4a_decode) == 0)
             return 0;

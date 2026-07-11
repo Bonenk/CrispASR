@@ -1041,10 +1041,13 @@ embedded or linked:
   even in builds without libopus. Pin the previous decoder with
   `CRISPASR_AAC_DECODER=fdk`/`coreaudio` or `CRISPASR_OPUS_DECODER=libopus`
   (`=glint`/`auto` = default); `CRISPASR_{AAC,OPUS}_DEBUG=1` prints a one-line
-  decode summary. (WebM/Matroska Opus and the stereo loader still use libopus.)
-- **libopus + opusfile** (BSD-3) — fallback for `.opus` (and WebM/Opus). Built by
-  default (`CRISPASR_OPUS`, on when system `opusfile` is found;
-  `CRISPASR_OPUS_FETCH=ON` builds it statically for platforms without system libs)
+  decode summary. Opus is glint by default **everywhere it appears** — bare
+  `.opus`, the stereo loader, and **WebM/Matroska Opus** — so a build with
+  `CRISPASR_OPUS=OFF` (no libopus at all) still decodes them.
+- **libopus + opusfile** (BSD-3) — optional fallback for Opus (`.opus` + WebM),
+  selected via `CRISPASR_OPUS_DECODER=libopus`. Built by default (`CRISPASR_OPUS`,
+  on when system `opusfile` is found; `CRISPASR_OPUS_FETCH=ON` builds it statically
+  for platforms without system libs). No longer required for any input format.
 - **AudioToolbox** (Apple system framework) — container **`.m4a` / `.alac` /
   `.caf`** (and `.aac`) on macOS/iOS, no extra dependency; **fdk-aac** via
   `dlopen` provides the same container support on Linux/Windows when installed.
@@ -1055,7 +1058,8 @@ embedded or linked:
 | `.opus` | ✔ | ✔ | ✔ |
 | `.aac` (raw ADTS, AAC-LC) | ✔ (glint) | ✔ (glint) | ✔ |
 | `.m4a` / `.alac` / `.caf` (container) | ✔¹ | ✔ (AudioToolbox) | ✔ |
-| `.webm` / `.wma` / `.amr` / raw PCM | ✗ | ✗ | ✔ / pre-convert |
+| `.webm` (Opus/Vorbis, Matroska) | ✔ (glint/stb_vorbis) | ✔ | ✔ |
+| `.wma` / `.amr` / raw PCM | ✗ | ✗ | ✔ / pre-convert |
 
 ¹ Container AAC (`.m4a`) needs libfdk-aac installed (loaded via `dlopen`) or
 `CRISPASR_FFMPEG=ON`; only **raw ADTS `.aac`** is covered dependency-free by the
