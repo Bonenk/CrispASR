@@ -12604,3 +12604,37 @@ DiT layers, llm-jp-3-150m tokenizer vs sarashina2.2). The converter/runtime
 already read hparams from config/GGUF dynamically, so the dimension changes were
 handled — but the assumption that "VoiceDesign = base + caption" would have led
 to hardcoded wrong dimensions. Always check the actual checkpoint config.
+
+### #81: profile per-node before trusting a handover's bottleneck theory — the "memory traffic" was two F16 matmuls the quantizer silently skipped
+
+The FastConformer CPU-perf handover attributed the 1.5× gap vs onnx-asr to
+ggml's per-op intermediate materialization and proposed cont-reduction /
+gallocr / fusion work. A 30-line sched-eval-callback profiler
+(`CRISPASR_FC_PROFILE=1`, aggregate by op+shape) showed conts+casts ≈ 3%,
+sched ≈ 1% — and **35% of encoder time in `conv.pw1/pw2` F16 matmuls**.
+The converter writes those as 3D conv tensors `(1, d, N)`; the quantizer's
+`ggml_n_dims(t) == 2` rule skips them; so every quantized FastConformer
+GGUF shipped with F16 pointwise-conv weights running on ggml's slow
+(~6× vs Q8_0) CPU F16 mul_mat path. Three durable lessons:
+
+1. **Grep quantized GGUFs for leftover F16 2D-consumed weights** — a
+   tensor stored 3D but consumed as `reshape_2d + mul_mat` is invisible
+   to dimension-based quantize rules. Check with
+   `GGUFReader` per-tensor types on layer 0, not by assuming "q8_0 model".
+   Fixed at both ends: `crispasr-quantize` now quantizes
+   `*.conv.pw[12].weight` as its 2D view; runtimes repack old GGUFs at
+   load (`core_conformer::repack_conv_pw_q8`, `CRISPASR_FC_PW_Q8`).
+2. **ggml CPU F16 mul_mat is a perf trap** (~30 GFLOP/s vs ~176 for q8_0
+   on M1) — same class as the F16-cast-per-graph conv trap (§conv1d
+   hygiene), but for matmul weights.
+3. **`GGML_BLAS=ON` does nothing for a backend whose sched only registers
+   {gpu, cpu}** — the blas backend must be in the sched's backend list to
+   ever be scheduled. The VPS "OpenBLAS build" benchmarks never used it
+   in the FastConformer path.
+
+Bonus (bit-identical, gated): fused QKV (`CRISPASR_FC_FUSED_QKV`, one
+matmul + view-split; concat weights at load) and strided
+`flash_attn_ext` inputs (drop Q/K/V `ggml_cont`s; `CRISPASR_FC_ATTN_CONT=1`
+restores). Verified bit-identical on the full CTC logit grid — view-split
+matmul and strided flash reads change nothing numerically. Combined:
+parakeet-ctc q8_0 M1 CPU 1.13→0.73 s (re-quantized GGUF: 0.60 s, 18.4× RT).

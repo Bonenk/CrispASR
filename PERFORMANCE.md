@@ -3410,3 +3410,59 @@ Ordered by estimated breadth × depth of impact across the project:
 | | hifigan_decode | 17947 |
 | | **total** | **26272** |
 
+
+### FastConformer CPU: F16 conv-pw repack + fused QKV + strided flash-attn — issue #81 (2026-07-11)
+
+Per-node profiling (new `CRISPASR_FC_PROFILE=1` in canary_ctc, sched
+eval-callback, aggregated by op+shape) overturned the standing theory for
+the CPU gap vs onnx-asr. It was NOT per-op intermediate materialization:
+all `ggml_cont`/`CPY` traffic together was ~3% and `ggml_backend_sched`
+build+alloc ~1%. The profile (M1, 4 threads, parakeet-ctc-0.6b q8_0,
+JFK 11 s, T=138) showed **35% of encoder time in two F16 matmuls per
+block**: `conv.pw1.weight (1024→2048)` and `conv.pw2.weight (1024→1024)`.
+
+Root cause: the converter stores the conv pointwise weights as 3D conv
+tensors `(1, d, N)`, so `crispasr-quantize`'s 2D-only rule skips them —
+every "Q8_0"/"Q4_K" FastConformer GGUF ever shipped carries F16 pw1/pw2.
+The ggml CPU F16 mul_mat path has no optimized fast path and measured
+~6× slower per FLOP than Q8_0 (≈30 vs ≈176 GFLOP/s effective).
+
+Fixes (all in `core_conformer`, shared by parakeet / canary / canary_ctc):
+
+1. **`repack_conv_pw_q8`** — load-time F16→Q8_0 repack of pw1/pw2 into 2D
+   tensors. Gate `CRISPASR_FC_PW_Q8` (0/1); default: on iff the model is
+   already quantized (pure-F16 models keep exact weights). Logit shift on
+   the CTC grid: max 0.56, mean 0.12 log-prob — in-family with the model's
+   own q8 noise; transcripts identical on every model tested.
+2. **`fuse_qkv`** — load-time concat of Wq/Wk/Wv (+biases) into one
+   `(d, 3d)` tensor; one matmul + view-split per block instead of three.
+   Gate `CRISPASR_FC_FUSED_QKV` (default on). **Bit-identical** logits.
+3. **Strided flash-attn views** — dropped the `ggml_cont` copies of
+   Q/K/V before `ggml_flash_attn_ext` (the kernel reads strided views,
+   same as llama.cpp). `CRISPASR_FC_ATTN_CONT=1` restores the copies for
+   bisection. **Bit-identical** logits.
+4. **`crispasr-quantize` carve-out** — quantizes `*.conv.pw[12].weight`
+   3D tensors as their 2D matmul view, so newly-quantized GGUFs need no
+   runtime repack (and are ~5% smaller + a bit faster than repack-at-load).
+   Backward-compatible: old binaries `reshape_2d` the 2D tensor fine.
+
+M1 CPU-only build (`GGML_METAL=OFF`), 4 threads, JFK 11 s, median of 5-7
+back-to-back on a quiet box, identical transcripts everywhere:
+
+| Config | parakeet-ctc q8_0 | parakeet-ctc q4_k | parakeet-tdt-v3 q4_k |
+|---|---|---|---|
+| old paths (gates off) | 1.13 s (9.7×) | 1.33 s (8.3×) | 1.89 s (5.8×) |
+| new defaults (runtime repack) | **0.73 s (15.0×)** | 1.07 s (10.3×) | **1.03 s (10.7×)** |
+| re-quantized GGUF (pw native q8) | **0.60 s (18.4×)** | — | — |
+
+Speedups: **1.54×** (ctc q8 runtime), **1.89×** (ctc q8 re-quantized),
+1.24× (ctc q4_k), **1.83×** (tdt q4_k). Thread sweep on M1: 4 threads
+optimal (1t 2.73 s / 2t 1.44 s / 4t 0.95 s / 8t 2.07 s — E-cores hurt);
+the handover's "2 threads best" was VPS-specific.
+
+Ruled out (measured, not assumed): sched→gallocr (~1%), conv-module
+transpose conts (~1.2%), flash-vs-manual attn (parity on CPU at this T).
+VPS/OpenBLAS note: the ggml-blas backend was never in these backends'
+sched — `GGML_BLAS=ON` has no effect on the FastConformer path; the same
+F16-pw pathology is expected to dominate the VPS numbers too (re-bench
+there before closing #81).
