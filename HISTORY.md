@@ -6,6 +6,32 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-11 — §93 voxtral-tts synthesis: shipped + correctness proven
+
+Voxtral-4B-TTS text-to-speech backend (Ministral-3B AR LLM → 3-layer flow-matching
+acoustic transformer → Voxtral codec, 24 kHz, 9 languages / 20 voices). **Shipped to
+`main` + HF; correctness settled via the proper per-stage diff harness.**
+
+- **Runtime** `src/voxtral_tts.cpp`: e2e text→LLM→FM→codec→WAV; roundtrips EN+FR
+  multi-voice. Core bug during the port was RoPE variant (NORMAL/adjacent-pair, not
+  NEOX — raw Mistral consolidated weights, converter doesn't permute Q/K).
+- **HF**: `cstr/voxtral-4b-tts-GGUF` Q4_K + Q8_0 + F16, all with baked
+  `codec.semantic_cb`; model card `cc-by-nc-4.0` + attribution. Registry entry prints
+  the NC restriction on auto-download.
+- **FM perf**: batched CFG cond+uncond in one cached graph via **seq-concat +
+  block-diagonal mask** (not a 4D batch dim — sidesteps the batched-fused-graph-alloc
+  bug), `55e54775` (M1 566→430, P100 26 ms/frame). `FM_CPU` gate measured a DUD on
+  clean CUDA (18× slower) and DROPPED; `FM_STEPS` kept experimental default-off (7-step
+  ~11% faster but changes prosody — user confirmed "a bit slow", 8-step stays default).
+- **All 12 contributing.md points wired**, incl. the per-stage diff harness:
+  `tools/reference_backends/voxtral_tts.py` is a manual PyTorch LLM forward (NO vllm —
+  lazy safetensors), `src/voxtral_tts.cpp::voxtral_tts_llm_diff()` +
+  `crispasr-diff voxtral-tts`, ref dump on `cstr/crispasr-regression-fixtures`.
+- **Correctness verdict** (F16 vs BF16 reference): frame 0 `|h|rel=0.0`, all 37 codes
+  EXACT; divergence begins ~frame 7 as F16-vs-BF16 rounding amplifies through the
+  acoustic feedback loop — NOT a bug (HARD RULE #2), codec cos 0.9999, audio
+  word-perfect. See `LEARNINGS.md` / memory `project_93_voxtral_tts_backbone`.
+
 ## 2026-07-10 — qwen3-asr-1.7b q4_k empty transcripts (#240)
 
 Reporter (macOS/M4/Metal, v0.8.9): `cstr/qwen3-asr-1.7b-GGUF/qwen3-asr-1.7b-q4_k.gguf`

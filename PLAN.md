@@ -10,33 +10,6 @@ effort estimate. Completed items have been moved to `HISTORY.md`.
 
 **Latest release: v0.6.12** (commit `345ecfdc`). Full notes in [`RELEASE_NOTES_v0.6.12.md`](RELEASE_NOTES_v0.6.12.md).
 
-## §93 voxtral-tts — perf gates + diff-harness validation + license (IN PROGRESS)
-
-Currently working on the `voxtral-tts` backend (`src/voxtral_tts.cpp`, worktree
-`.claude/worktrees/voxtral-tts`). The e2e pipeline shipped earlier (text→LLM→FM→codec→WAV,
-roundtrips EN+FR). Active threads:
-
-- **FM perf (DONE):** batched CFG cond+uncond in one cached graph — `55e54775`
-  (FM 566→430 ms/frame on M1; 26 ms/frame on CUDA P100). This is the only real FM win.
-- **FM perf gates (measured, disposed):** `CRISPASR_VOXTRAL_TTS_FM_CPU` (run FM on CPU) —
-  measured a **DUD** on a clean CUDA P100 (485 vs 26 ms/frame = 18× slower; the earlier M1
-  "2×" was a load artifact, quiet-CPU vs loaded-GPU), **DROPPED** in `319f6d4d`.
-  `CRISPASR_VOXTRAL_TTS_FM_STEPS` (Euler ODE step override) — KEPT as an experimental
-  default-off lever: ~11% end-to-end on CUDA at 7 steps but a **quality tradeoff** (changes
-  prosody via the acoustic feedback loop), needs a listening check before promotion.
-- **Diff-harness validation (IN PROGRESS):** Kaggle kernel
-  `chr1str/crispasr-voxtral-tts-diff-harness` (`tools/kaggle/voxtral-diff-harness/`) diffs the
-  runtime against the MIT mudler reference C (BF16 ground truth, validated vs vLLM-Omni)
-  stage-by-stage — per-frame `|h|` rel-err, semantic exact-match%, acoustic exact/±1%, codec
-  PCM correlation — at F16 (isolates structural correctness from quant) and Q4_K. Goal: confirm
-  the default 8-step runtime is >99% correct or find the gap. Perf step-sweep bundled in.
-- **License compliance (DONE):** base model `mistralai/Voxtral-4B-TTS-2603` is CC-BY-NC-4.0
-  (non-gated). Fixed two gaps: the public `cstr/voxtral-4b-tts-GGUF` had no README (→ no
-  attribution, violating CC-BY-NC's BY) — uploaded the card; and the registry auto-downloaded
-  the NC model with no warning — populated the `license` field (`eb07a653`). Sibling
-  `cstr/voxtral-mini-3b` / `voxtral-mini-4b-realtime` GGUF repos audited clean: both
-  Apache-2.0 with proper cards (permissive, no NC concern) — only the TTS repo had the gap.
-
 ## Gemma-4 12B (gemma4_unified) ASR support (OPEN)
 
 The remaining open item for full 12B support (a new converter map + backend audio path for the 640-dim unified
