@@ -1268,13 +1268,23 @@ extern "C" float* kugelaudio_synthesize(struct kugelaudio_context* ctx, const ch
 
     bool has_voice = (ctx->n_voice_frames > 0 && !ctx->voice_acoustic_mean.empty());
 
+    // VibeVoice zero-tensor fallback (#248): when no voice GGUF is loaded,
+    // synthesize a 1-frame neutral embedding from an all-zeros VAE latent
+    // run through the acoustic_connector. The connector's bias terms +
+    // RMSNorm produce a non-trivial "default speaker" that the LM can
+    // condition on. Upstream VibeVoice does the same
+    // (modeling_vibevoice.py:~281, forward_speech_features zero-tensor path).
+    // Quality is lower than a real voice reference but produces intelligible
+    // speech instead of noise.
     if (!has_voice) {
-        fprintf(stderr, "kugelaudio: ERROR — no voice loaded. KugelAudio requires a voice GGUF for\n"
-                        "  speaker conditioning; without it the output is noise.\n"
-                        "  Pass --voice <voice.gguf> with a pre-encoded voice pack.\n"
-                        "  To create one, re-convert the model with encoders (without --no-encoders)\n"
-                        "  and use kugelaudio_encode_voice() on a reference WAV.\n");
-        return nullptr;
+        if (ctx->params.verbosity >= 1) {
+            fprintf(stderr, "kugelaudio: no voice loaded — using zero-tensor neutral fallback.\n"
+                            "  For better quality, pass --voice <voice.gguf>.\n");
+        }
+        int vae_dim = hp.vae_dim_acoustic;
+        ctx->voice_acoustic_mean.assign((size_t)vae_dim, 0.0f);
+        ctx->n_voice_frames = 1;
+        has_voice = true;
     }
 
     // Voice input section: " Voice input:\n Speaker 0:" + [VAE placeholders] + "\n"
