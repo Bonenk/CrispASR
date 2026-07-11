@@ -1685,9 +1685,13 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
     nemotron_init_pred_weights(ctx);
     nemotron_init_joint_weights(ctx);
 
-    // §232: opt-in GPU decode (LSTM predictor + joint as ggml graphs). Default
-    // off (cblas). Runs on ctx->backend; perf verdict is P100-only.
-    const bool ggml_dec = getenv("NEMOTRON_GGML_DECODE") != nullptr;
+    // §232: ggml GPU decode is DEFAULT ON when the decode backend is a GPU —
+    // P100 A/B measured 12.38x faster decode (2589→209 ms) with an IDENTICAL
+    // transcript (Kaggle crispasr-parakeet-ggml-decode-ab). CPU stays cblas.
+    // Override both ways: NEMOTRON_GGML_DECODE=1/0.
+    bool ggml_dec = !ggml_backend_is_cpu(ctx->backend);
+    if (const char* e = getenv("NEMOTRON_GGML_DECODE"))
+        ggml_dec = (e[0] == '1');
     const bool time_dec = getenv("NEMOTRON_DECODE_TIMING") != nullptr;
     auto _dt0 = std::chrono::steady_clock::now();
 
