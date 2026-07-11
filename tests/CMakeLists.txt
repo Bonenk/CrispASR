@@ -2367,6 +2367,7 @@ catch_discover_tests(test-core-seanet
 add_executable(test-audio-formats test-audio-formats.cpp)
 target_include_directories(test-audio-formats PRIVATE
     ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/ggml/include
 )
 target_link_libraries(test-audio-formats PRIVATE
