@@ -1033,15 +1033,18 @@ embedded or linked:
   PCM, IEEE float, A-law, μ-law, ADPCM), FLAC, MP3, and the WAV family **AIFF /
   W64 / RF64** (via its bundled `dr_wav`)
 - **[stb_vorbis](https://github.com/nothings/stb)** (public domain) — OGG Vorbis
-- **libopus + opusfile** (BSD-3) — **`.opus`** (Ogg/Opus). Built by default
-  (`CRISPASR_OPUS`, on when system `opusfile` is found; `CRISPASR_OPUS_FETCH=ON`
-  builds it statically for platforms without system libs)
 - **[glint](https://github.com/CrispStrobe/glint)** (MIT) — in-tree clean-room
-  decoder for **raw ADTS `.aac`** (AAC-LC), cross-platform and always available
-  with no runtime library. This is the primary `.aac` path on every platform;
-  set `CRISPASR_AAC_DECODER=fdk`/`coreaudio` to pin the previous platform
-  decoder, or `=glint` to force glint (default). `CRISPASR_AAC_DEBUG=1` prints a
-  one-line decode summary.
+  decoder for **raw ADTS `.aac`** (AAC-LC) and **Ogg `.opus`** (RFC-conformant:
+  all 12 RFC 6716/8251 vectors, SILK byte-identical to libopus). Cross-platform,
+  always available with no runtime library, so it is the **default** for both
+  `.aac` and `.opus` via the library `crispasr_audio_load` API — `.opus` decodes
+  even in builds without libopus. Pin the previous decoder with
+  `CRISPASR_AAC_DECODER=fdk`/`coreaudio` or `CRISPASR_OPUS_DECODER=libopus`
+  (`=glint`/`auto` = default); `CRISPASR_{AAC,OPUS}_DEBUG=1` prints a one-line
+  decode summary. (WebM/Matroska Opus and the stereo loader still use libopus.)
+- **libopus + opusfile** (BSD-3) — fallback for `.opus` (and WebM/Opus). Built by
+  default (`CRISPASR_OPUS`, on when system `opusfile` is found;
+  `CRISPASR_OPUS_FETCH=ON` builds it statically for platforms without system libs)
 - **AudioToolbox** (Apple system framework) — container **`.m4a` / `.alac` /
   `.caf`** (and `.aac`) on macOS/iOS, no extra dependency; **fdk-aac** via
   `dlopen` provides the same container support on Linux/Windows when installed.

@@ -916,7 +916,7 @@ downloads (in that order).
 - **[Silero](https://github.com/snakers4/silero-vad)** — VAD (native GGUF) and language identification (native GGUF, 95 languages)
 - **[pyannote](https://github.com/pyannote/pyannote-audio)** — speaker diarization segmentation (native GGUF port)
 - **[miniaudio](https://miniaud.io/)** + **[stb_vorbis](https://github.com/nothings/stb)** + **[libopus/opusfile](https://opus-codec.org/)** — embedded/linked audio decoders (WAV/MP3/FLAC/AIFF/OGG/Opus, no ffmpeg; AAC/M4A/ALAC via Apple AudioToolbox)
-- **[glint](https://github.com/CrispStrobe/glint)** (MIT) — in-tree clean-room codec suite: MP3/AAC-LC output encoders (TTS `.mp3`/`.aac`) and the cross-platform ADTS AAC-LC input decoder
+- **[glint](https://github.com/CrispStrobe/glint)** (MIT) — in-tree clean-room codec suite: MP3/AAC-LC/Ogg-Opus output encoders (TTS `.mp3`/`.aac`/`.opus`) and cross-platform ADTS AAC-LC + Ogg Opus input decoders (no libopus needed)
 - **[Claude Code](https://claude.ai/claude-code)** (Anthropic) — significant portions of the crispasr integration layer, all model converters, and the FastConformer/attention/mel/FFN/BPE core helpers were co-authored with Claude
 
 ---
