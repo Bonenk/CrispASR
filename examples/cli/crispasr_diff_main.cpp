@@ -38,6 +38,7 @@
 #include "voxtral.h"
 #include "voxtral4b.h"
 #include "higgs_stt.h"
+#include "moss_transcribe_diarize.h"
 #include "qwen3_asr.h"
 #include "qwen3_tts.h"
 #include "omnivoice.h"
@@ -6985,6 +6986,87 @@ int main(int argc, char** argv) {
         free(text);
         canary_qwen_free(ctx);
 
+    } else if (backend_name == "moss-diarize") {
+        auto cp = moss_diarize_default_params();
+        cp.n_threads = 4;
+        cp.verbosity = 0;
+        moss_diarize_context* ctx = moss_diarize_init_from_file(model_path.c_str(), cp);
+        if (!ctx) {
+            fprintf(stderr, "failed to load moss-diarize model\n");
+            return 4;
+        }
+
+        // mel_spectrogram + conv_stem_out: single 30s chunk
+        float* mel_for_enc = nullptr;
+        int mel_n = 0, mel_T = 0;
+        {
+            int chunk_samples = std::min((int)samples.size(), 480000);
+            std::vector<float> chunk(480000, 0.0f);
+            std::memcpy(chunk.data(), samples.data(), (size_t)chunk_samples * sizeof(float));
+            mel_for_enc = moss_diarize_compute_mel(ctx, chunk.data(), 480000, &mel_n, &mel_T);
+            if (mel_for_enc) {
+                auto rep = ref.compare("mel_spectrogram", mel_for_enc, (size_t)mel_n * mel_T);
+                print_row("mel_spectrogram", rep, COS_THRESHOLD);
+                record(rep);
+            } else {
+                printf("[ERR ] mel_spectrogram         compute_mel returned null\n");
+                n_fail++;
+            }
+        }
+
+        // conv_stem_out: dump via env, compare against ref
+        {
+            std::string conv_dump = "/mnt/volume1/tmp-overflow/moss_diarize_conv_stem.bin";
+            setenv("CRISPASR_MOSS_DIARIZE_CONV_DUMP", conv_dump.c_str(), 1);
+        }
+
+        // encoder_output + audio_embeds: full chunked pipeline
+        {
+            int T_enc = 0, enc_d = 0;
+            float* enc = moss_diarize_run_encoder(ctx, samples.data(), (int)samples.size(), &T_enc, &enc_d);
+            if (enc) {
+                auto rep = ref.compare("encoder_output", enc, (size_t)T_enc * enc_d);
+                print_row("encoder_output", rep, COS_THRESHOLD);
+                record(rep);
+
+                int adapt_T = 0, adapt_d = 0;
+                float* adapted = moss_diarize_run_adaptor(ctx, enc, T_enc, enc_d, &adapt_T, &adapt_d);
+                if (adapted) {
+                    auto rep2 = ref.compare("audio_embeds", adapted, (size_t)adapt_T * adapt_d);
+                    print_row("audio_embeds", rep2, COS_THRESHOLD);
+                    record(rep2);
+                    free(adapted);
+                } else {
+                    printf("[ERR ] audio_embeds            run_adaptor returned null\n");
+                    n_fail++;
+                }
+                free(enc);
+            } else {
+                printf("[ERR ] encoder_output          run_encoder returned null\n");
+                n_fail++;
+            }
+        }
+        if (mel_for_enc)
+            free(mel_for_enc);
+
+        // conv_stem_out: read dumped file and compare
+        {
+            std::string conv_dump = "/mnt/volume1/tmp-overflow/moss_diarize_conv_stem.bin";
+            FILE* f = fopen(conv_dump.c_str(), "rb");
+            if (f) {
+                fseek(f, 0, SEEK_END);
+                size_t sz = ftell(f);
+                fseek(f, 0, SEEK_SET);
+                std::vector<float> cs(sz / sizeof(float));
+                fread(cs.data(), sizeof(float), cs.size(), f);
+                fclose(f);
+                auto rep = ref.compare("conv_stem_out", cs.data(), cs.size());
+                print_row("conv_stem_out", rep, COS_THRESHOLD);
+                record(rep);
+            }
+        }
+
+        moss_diarize_free(ctx);
     } else {
         fprintf(stderr,
                 "crispasr-diff: backend '%s' is not recognised. "
@@ -6992,7 +7074,7 @@ int main(int argc, char** argv) {
                 "granite-4.1, granite-nle, parakeet, canary, canary-qwen, cohere, gemma4, mimo-tokenizer, mimo-asr, "
                 "orpheus, moonshine, moonshine-streaming, lid-cld3, glm-asr, firered-asr, voxcpm2-tts, funasr, "
                 "paraformer, sensevoice, cosyvoice3-tts, melotts, parler-tts, moss-audio, kugelaudio, zonos-tts, "
-                "lfm2-audio, mini-omni2, nemotron, kyutai-stt.\n",
+                "lfm2-audio, mini-omni2, nemotron, kyutai-stt, moss-diarize.\n",
                 backend_name.c_str());
         return 5;
     }

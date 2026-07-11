@@ -599,6 +599,30 @@ Encoder output padded to 3000 frames (Whisper 30s convention).
 at fixed intervals between audio frame embeddings. Supports custom prompts
 via `--prompt` / `set_ask()` for audio understanding tasks beyond ASR.
 
+### moss-diarize
+
+Joint ASR + speaker diarization + timestamps in a single 0.9B model
+(OpenMOSS-Team/MOSS-Transcribe-Diarize-0.9B, Apache-2.0). A **stock
+Whisper encoder** (80-mel → Conv1d stem → 24L pre-LN transformer, 1024d,
+16 heads, global attention → `ln_post`) feeds into a **4× temporal merge**
+(reshape T/4 × 4096) followed by a **VQAdaptor** (Linear(4096→1024) + SiLU
++ Linear(1024→1024) + LayerNorm) that projects merged audio frames into the
+LM embedding space. Time markers (digit tokens encoding the current
+timestamp) are injected every 5 seconds into the `<|audio_pad|>` token
+sequence. The decoder is a **Qwen3-0.6B** LM (28L, 1024d, 16Q/8KV,
+head_dim 128, SwiGLU 3072, RoPE θ=1M, tied embeddings). ~0.9B params,
+~500 MB at Q4_K.
+
+**Output format:** `[start_time][Sxx]text[end_time]` — each segment has
+a start/end timestamp in seconds and a speaker label (`[S01]`, `[S02]`,
+etc.). The CLI adapter parses these into `crispasr_segment` entries with
+native timestamps and speaker IDs.
+
+**Prompt format:** ChatML with a system instruction requesting timestamped,
+speaker-labelled transcription. Hotwords are injected into the system prompt
+via `热词提示：word1, word2`. The user turn wraps the audio pad sequence
+between `<|audio_start|>` and `<|audio_end|>`.
+
 ### qwen3-tts
 
 Qwen3 talker LM + 12 Hz RVQ speech tokenizer. Three variants:

@@ -1326,6 +1326,18 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# moss_transcribe_diarize — OpenMOSS-Team/MOSS-Transcribe-Diarize-0.9B (Whisper encoder + Qwen3-0.6B LLM)
+# ---------------------------------------------------------------------------
+add_library(moss_transcribe_diarize STATIC moss_transcribe_diarize.h moss_transcribe_diarize.cpp)
+set_target_properties(moss_transcribe_diarize PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(moss_transcribe_diarize PUBLIC .)
+target_compile_features   (moss_transcribe_diarize PUBLIC cxx_std_17)
+target_link_libraries     (moss_transcribe_diarize PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(moss_transcribe_diarize PRIVATE -O3)
+endif()
+
+# ---------------------------------------------------------------------------
 # qwen3_tts — Qwen/Qwen3-TTS (Qwen3 talker + 16-codebook RVQ output)
 # ---------------------------------------------------------------------------
 add_library(qwen3_tts STATIC qwen3_tts.h qwen3_tts.cpp)
@@ -2273,6 +2285,9 @@ if (TARGET moss_audio)
 endif()
 if (TARGET moss_transcribe)
     target_link_libraries(crispasr-lib PUBLIC moss_transcribe)
+endif()
+if (TARGET moss_transcribe_diarize)
+    target_link_libraries(crispasr-lib PUBLIC moss_transcribe_diarize)
 endif()
 if (TARGET qwen3_tts)
     target_link_libraries(crispasr-lib PUBLIC qwen3_tts)

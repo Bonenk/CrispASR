@@ -67,6 +67,7 @@ add_executable(${TARGET}
     crispasr_backend_ark_asr.cpp
     crispasr_backend_moss_audio.cpp
     crispasr_backend_moss_transcribe.cpp
+    crispasr_backend_moss_transcribe_diarize.cpp
     crispasr_backend_funasr.cpp
     crispasr_backend_paraformer.cpp
     crispasr_backend_sensevoice.cpp
@@ -209,6 +210,7 @@ target_link_libraries(crispasr-diff PRIVATE
     ark_asr
     moss_audio
     moss_transcribe
+    moss_transcribe_diarize
     voxcpm2_tts
     funasr
     paraformer
@@ -326,6 +328,7 @@ target_link_libraries(${TARGET} PRIVATE
     sensevoice
     moss_audio
     moss_transcribe
+    moss_transcribe_diarize
     ${FFMPEG_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     $<$<BOOL:${WIN32}>:winhttp>
