@@ -98,6 +98,16 @@ step("crispasr_built", cli=str(CLI))
 # ─────────────────────────── cell 3 (code) — build reference C (BLAS/CPU) ─
 run(["bash", "-lc", "apt-get install -y -q libopenblas-dev >/dev/null 2>&1 || sudo apt-get install -y -q libopenblas-dev"],
     check=False)
+# Locate the reference source robustly: the dataset mounts under /kaggle/input/<slug>,
+# but a brand-new private dataset can mount under an unexpected slug (or fail to attach).
+# Glob for the dir that actually contains the reference C, and log /kaggle/input either way.
+inputs = sorted(p.name for p in Path("/kaggle/input").glob("*")) if Path("/kaggle/input").exists() else []
+step("kaggle_input", contents=inputs)
+cands = [p for p in Path("/kaggle/input").glob("*") if (p / "Makefile").exists() and (p / "voxtral_tts.c").exists()]
+if not cands:
+    raise SystemExit(f"reference source not mounted; /kaggle/input={inputs}")
+REFSRC = cands[0]
+step("refsrc", path=str(REFSRC))
 for f in REFSRC.iterdir():
     if f.suffix in (".c", ".h") or f.name == "Makefile":
         shutil.copy(f, REFBUILD / f.name)
