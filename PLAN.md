@@ -50,12 +50,12 @@ Three larger extensions remain:
    generation step in both the Python reference and the C++ runtime and compare
    them. Validates the text-decoder *input* so the sampler is a faithful port
    over verified logits — today only the FM/codec stages are diffed.
-2. **Generation-health regression gate (non-diff).** A small en/fr/de suite
-   asserting objective signals on the raw output: EOS reached within a bound, no
-   token-loop (n-gram repeat rate under threshold), no excessive trailing
-   low-energy frames (the #192 "trailing background noise" symptom), audio
-   duration within a sane band of the text length. Catches perceptual
-   pathologies cosine can't, without trusting noisy ASR roundtrips.
+2. **Generation-health regression gate (non-diff). DONE (2026-07-11).**
+   `src/core/generation_health.h` — shared header with check_not_empty,
+   check_duration_plausibility, check_no_ngram_loop, check_not_truncated,
+   check_tts_duration. 16 Catch2 unit tests in `tests/test-generation-health.cpp`.
+   Backends can integrate these into live tests. The en/fr/de suite and
+   trailing-silence check remain as future per-backend instantiation work.
 3. **Replay-token dual-mode reference.** Dump the Python *sampled* token ids and
    replay them in C++ (instead of re-sampling) so the sampling-enabled
    downstream stages can be diffed deterministically despite torch-vs-`mt19937`
