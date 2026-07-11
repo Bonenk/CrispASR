@@ -47,6 +47,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_mimo_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_ark_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_audio_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_transcribe_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_moss_transcribe_diarize_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_funasr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_paraformer_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_sensevoice_backend();
@@ -205,6 +206,9 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_moss_audio_backend();
     if (name == "moss-transcribe" || name == "moss_transcribe" || name == "mosstranscribe")
         return crispasr_make_moss_transcribe_backend();
+    if (name == "moss-diarize" || name == "moss_diarize" || name == "moss-transcribe-diarize" ||
+        name == "moss_transcribe_diarize")
+        return crispasr_make_moss_transcribe_diarize_backend();
     if (name == "funasr" || name == "fun-asr" || name == "fun-asr-nano" || name == "fun-asr-mlt-nano")
         return crispasr_make_funasr_backend();
     if (name == "paraformer" || name == "paraformer-zh" || name == "paraformer-en")
@@ -307,6 +311,7 @@ std::vector<std::string> crispasr_list_backends() {
         "ark-asr",
         "moss-audio",
         "moss-transcribe",
+        "moss-diarize",
         "funasr",
         "fun-asr-mlt-nano",
         "paraformer",
@@ -641,6 +646,12 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "parler-tts";
     if (contains_ci("zonos"))
         return "zonos";
+    if (contains_ci("moss") && contains_ci("diarize"))
+        return "moss-diarize";
+    if (contains_ci("moss") && contains_ci("transcribe"))
+        return "moss-transcribe";
+    if (contains_ci("moss") && contains_ci("audio"))
+        return "moss-audio";
     if (contains_ci("ggml-") && contains_ci(".bin"))
         return "whisper";
 
@@ -770,6 +781,9 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "moss-audio";
             else if (a == "moss_transcribe" || a == "moss-transcribe")
                 result = "moss-transcribe";
+            else if (a == "moss_transcribe_diarize" || a == "moss-transcribe-diarize" || a == "moss_diarize" ||
+                     a == "moss-diarize")
+                result = "moss-diarize";
             else if (a == "funasr" || a == "fun_asr" || a == "fun-asr")
                 result = "funasr";
             else if (a == "paraformer")

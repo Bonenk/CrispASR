@@ -75,6 +75,9 @@ export CRISPASR_MODEL_MOSS_AUDIO="${CRISPASR_MODEL_MOSS_AUDIO:-$CRISPASR_MODELS_
 # MOSS-Transcribe (OpenMOSS-Team/MOSS-Transcribe-preview-2B): ASR
 export CRISPASR_MODEL_MOSS_TRANSCRIBE="${CRISPASR_MODEL_MOSS_TRANSCRIBE:-$CRISPASR_MODELS_DIR/moss-transcribe-preview-2b-q4_k.gguf}"
 
+# MOSS-Transcribe-Diarize (OpenMOSS-Team/MOSS-Transcribe-Diarize-0.9B): ASR + diarization + timestamps
+export CRISPASR_MODEL_MOSS_DIARIZE="${CRISPASR_MODEL_MOSS_DIARIZE:-$CRISPASR_MODELS_DIR/moss-transcribe-diarize-0.9b-q4_k.gguf}"
+
 # ARK-ASR-3B (AutoArk-AI/ARK-ASR-3B): Whisper-large-v3 enc (partial RoPE) + Qwen2.5-3B LM.
 # ⚠️ experimental/WIP — CPU only. See PLAN.md §ARK.
 export CRISPASR_MODEL_ARK_ASR="${CRISPASR_MODEL_ARK_ASR:-$CRISPASR_MODELS_DIR/ark-asr-3b-q8_0.gguf}"

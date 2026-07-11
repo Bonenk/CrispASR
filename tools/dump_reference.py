@@ -309,6 +309,9 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # Ministral-3B AR + 3L FM transformer + codec decoder → 24 kHz PCM.
     # Text from VOXTRAL_TTS_TEXT env, voice from VOXTRAL_TTS_VOICE env.
     "voxtral-tts": "reference_backends.voxtral_tts",
+    # MOSS-Transcribe-Diarize: Whisper-Medium encoder + VQAdaptor + Qwen3-0.6B.
+    # Joint ASR + diarization + timestamps. model_dir = OpenMOSS-Team/MOSS-Transcribe-Diarize.
+    "moss-diarize": "reference_backends.moss_diarize",
 }
 
 DEFAULT_STAGES_BY_BACKEND: Dict[str, List[str]] = {}  # populated at import

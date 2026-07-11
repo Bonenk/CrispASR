@@ -625,6 +625,10 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             // both the input embeddings and every output logit.
             !(arch == "moss_transcribe" &&
               (sname.find("enc.") == 0 || sname.find("adapter.") == 0 || sname == "llm.embed.weight")) &&
+            // MOSS-Transcribe-Diarize: keep encoder + adaptor at F16, and the
+            // tied token embedding (token_embd.weight = lm_head).
+            !(arch == "moss_transcribe_diarize" &&
+              (sname.find("enc.") == 0 || sname.find("adaptor.") == 0 || sname == "token_embd.weight")) &&
             // Voxtral-TTS: keep the semantic VQ codebook (256-d rows — quantizing
             // corrupts the codec's per-frame lookup), the preset voice conditioning
             // embeddings, and the tiny FM input projection at F16/F32.
