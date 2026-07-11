@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `2576102767ab1fd871a3642cb670df7f24ed3b67` (docs: rewrite README — current, ordered, stale history removed).
+Synced at upstream commit: `59fc13200eeafcfb12069046bbe673dabba68c06` (docs: plan CLI+wrapper feature expansion (buckets A/B, SoX-informed)).
