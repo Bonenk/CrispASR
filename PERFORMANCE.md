@@ -232,7 +232,7 @@ the §232 campaign. Verified against current code, not carried from this doc.
 | **P0** | firered_asr | Decoder self-attention has **no KV cache** — growing vector, O(T²) recompute (`firered_asr.cpp:2697`) | Highest-impact ASR gap |
 | **P0** | melotts / piper | Scalar O(H·T²·D) relpos attention; HiFi-GAN 17.9s of 26.3s VPS total. Needs manual-attn ggml graph or BLAS (can't flash) | Dominant TTS cost |
 | **P0** | voxcpm2_tts | CPU-only (Metal SIGSEGV), manual per-step host KV re-upload (`voxcpm2_tts.cpp:106-111`) | GPU-locked-out |
-| **P0** | openvoice2 | 16-layer WaveNet + ref-encoder Conv2d/GRU scalar CPU | Dominant, unthreaded |
+| ~~P0~~ | openvoice2 | STFT scalar O(bins·win) DFT → shared radix-2 FFT: **1182 ms → 10.7 ms** (110×, ~26% of convert) `2026-07-11`. WaveNet already GEMM'd (§176d); ref-enc is 4% one-time. **Remaining: hifigan_decode is 67% of convert** — next target | STFT fixed; vocoder dominant |
 | **P1** | voxtral/voxtral4b enc, mimo LLM decoder | Attention not on flash_attn_ext (O(T²) manual softmax) | Enc mem+dispatch; mimo dispatch-bound |
 | **P1** | dia / speecht5 / parler | Manual soft_max + host KV re-uploaded per step | Long outputs |
 | **P1** | firered/glm/funasr/qwen3/omniasr/mimo | Beam search is replay (no KV snapshot pool; canary/moonshine/kyutai have one) | beam≥2 quadratic |
@@ -3011,10 +3011,13 @@ core infrastructure.
 
 **OpenVoice2** (`openvoice2.cpp`):
 - Has: pre-permuted HiFi-GAN ConvT weights, ref encoder embedding
-  reusable, WaveNet speaker cond precomputed, GPU backend for HiFi-GAN
-- Gap: **WaveNet entirely scalar CPU** (16 layers × T × K=5 × C=192 —
-  highest-impact gap), **ref encoder Conv2d + GRU scalar CPU**, STFT
-  recomputed fresh per call, no threading in WaveNet
+  reusable, WaveNet speaker cond precomputed, GPU backend for HiFi-GAN,
+  WaveNet GEMM'd via Accelerate (§176d), **STFT now radix-2 FFT** (2026-07-11:
+  1182→10.7 ms, 110×; was O(bins·win) scalar DFT)
+- Measured breakdown (3 s convert, quiet M1): **hifigan_decode 67 %**,
+  ~~stft 27 %~~ (fixed), ref_enc 4 % (one-time, not worth caching),
+  enc_q+flow×2 3 %. **Real remaining gap: HiFi-GAN decode** — the WaveNet/
+  ConvT vocoder dominates; ref-enc Conv2d+GRU scalar is a rounding error.
 
 **Zonos** (`zonos_tts.cpp`):
 - Has: dual KV caches (quant), fused gate+up, DAC lazy-loaded,
