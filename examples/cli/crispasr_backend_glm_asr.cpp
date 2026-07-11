@@ -130,7 +130,7 @@ public:
         while (!seg.text.empty() && (seg.text.back() == ' ' || seg.text.back() == '\n'))
             seg.text.pop_back();
 
-        seg.text = core_ngram::fix_loops(seg.text);
+        // Apply fix_loops to text; token dedup done after token construction below (#218)
 
         // GPT-2 byte-level BPE decoder: Ġ (U+0120, UTF-8 0xC4 0xA0) → space,
         // Ċ (U+010A, UTF-8 0xC4 0x8A) → newline. All other bytes pass through.
@@ -161,15 +161,27 @@ public:
 
         // Per-token confidence; no per-token timestamps (GLM-ASR's LLM
         // decoder isn't time-aligned).
-        seg.tokens.reserve((size_t)r->n_tokens);
+        std::vector<crispasr_token> all_tokens;
+        all_tokens.reserve((size_t)r->n_tokens);
         for (int i = 0; i < r->n_tokens; i++) {
             crispasr_token tok;
             tok.id = r->token_ids[i];
             tok.confidence = r->token_probs[i];
             tok.text = decode_bpe_piece(glm_asr_token_text(ctx_, r->token_ids[i]));
-            seg.tokens.push_back(std::move(tok));
+            all_tokens.push_back(std::move(tok));
         }
         glm_asr_result_free(r);
+
+        // Apply fix_loops to both text and tokens (#218)
+        std::vector<std::string> tok_texts;
+        for (auto& tk : all_tokens)
+            tok_texts.push_back(tk.text);
+        const std::vector<int> keep = core_ngram::fix_loops_keep_indices(tok_texts);
+        seg.text = core_ngram::fix_loops(seg.text);
+        for (int ki : keep) {
+            if (ki >= 0 && ki < (int)all_tokens.size())
+                seg.tokens.push_back(std::move(all_tokens[ki]));
+        }
 
         // --no-punctuation: strip ASCII punctuation from segment text and per-token
         // pieces. GLM-ASR's LLM produces punctuated, capitalised English by

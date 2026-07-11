@@ -68,17 +68,22 @@ public:
             return out;
 
         crispasr_segment seg;
-        seg.text = core_ngram::fix_loops(r->text ? r->text : "");
         seg.t0 = t_offset_cs;
-        // Estimate duration from audio length
         seg.t1 = t_offset_cs + (int64_t)(100.0 * n_samples / 16000.0);
 
-        // Per-token data
-        for (int i = 0; i < r->n_tokens; i++) {
+        // Build token texts for dedup, then apply fix_loops to both text and tokens (#218)
+        std::vector<std::string> tok_texts;
+        for (int i = 0; i < r->n_tokens; i++)
+            tok_texts.push_back(r->tokens[i].text ? r->tokens[i].text : "");
+        const std::vector<int> keep = core_ngram::fix_loops_keep_indices(tok_texts);
+        seg.text = core_ngram::fix_loops(r->text ? r->text : "");
+        for (int ki : keep) {
+            if (ki < 0 || ki >= r->n_tokens)
+                continue;
             crispasr_token tok;
-            tok.id = r->tokens[i].id;
-            tok.text = r->tokens[i].text;
-            tok.confidence = r->tokens[i].p;
+            tok.id = r->tokens[ki].id;
+            tok.text = r->tokens[ki].text;
+            tok.confidence = r->tokens[ki].p;
             tok.t0 = seg.t0;
             tok.t1 = seg.t1;
             seg.tokens.push_back(tok);
