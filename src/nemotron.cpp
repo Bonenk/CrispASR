@@ -1836,7 +1836,7 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
                 if (lg[v] > maxl) { maxl = lg[v]; tok = v; }
 
             if (tok == blank_id) {
-                scan_t++;
+                scan_t++;  // advance past blank frame
             } else {
                 // Softmax probability
                 float sum = 0.0f;
@@ -1851,7 +1851,8 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
                 emitted.push_back(et);
                 if (on_tok) on_tok(tok, prob, on_tok_ud);
                 predictor_step(W, tok, state, pred_out);
-                scan_t++;
+                // DON'T advance scan_t — RNNT can emit multiple tokens per frame.
+                // The outer loop will re-batch from this frame with updated pred_out.
                 found_emission = true;
                 break;
             }
