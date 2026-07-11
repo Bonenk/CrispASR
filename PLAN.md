@@ -7411,11 +7411,18 @@ executes on the GPU instead of host cblas_sgemv. Default stays cblas.
   **nemotron ggml ~1613 ms vs cblas ~755 ms — 2× SLOWER** (LEARNINGS 31: per-step
   overhead × many steps). Both gated, default cblas. The Kaggle kernel now A/Bs
   BOTH backends in one P100 run.
-- **Follow-ups (the M1 nemotron regression makes these the likely real fix):**
-  persistent gallocr graphs (build once, amortise the per-step build/alloc that
-  dominates long decodes) + in-graph argmax (2 int32 readback vs 8198-logit)
-  instead of per-step sched rebuild. Do this in `core/rnnt_ggml.h` → both
-  backends benefit at once.
+- **Persistent-graph decoder DONE — fixes the regression + WINS on M1
+  (LEARNINGS 32).** `core_rnnt_ggml::Decoder` builds the predictor + joint graphs
+  once, gallocr-allocates once, dispatches sched-free per step. M1 Metal (jfk,
+  transcript-identical, `RNNT_GGML_PERSTEP` to A/B): nemotron decode cblas
+  ~510-806 ms | **persistent ~261-307 ms** | per-step ~318-421 ms → persistent
+  ~2× faster than cblas. parakeet within noise (short decode). Now the default
+  ggml path for both backends (per-step is the RNNT_GGML_PERSTEP fallback).
+- **Remaining follow-ups:** (1) clean P100 bench (`tools/kaggle/
+  parakeet-ggml-decode-ab/`, now exercises the persistent path) → if it wins,
+  FLIP the default to persistent-ggml-when-GPU (cblas stays on CPU, where
+  Accelerate beats ggml). (2) optional in-graph argmax (2 int32 readback vs
+  8198-logit) for the greedy no-hotword path — minor vs the persistent win.
 
 --- original scoping notes (kept for reference) ---
 

@@ -268,3 +268,21 @@ Lessons from the systematic head-to-head benchmark against
     correctness-validated stepping stone, not the shippable-default perf win.
     Both backends stay gated (`PARAKEET_GGML_DECODE` / `NEMOTRON_GGML_DECODE`),
     default cblas; the Kaggle P100 A/B covers both.
+
+32. **The persistent-graph decoder confirms LEARNING 31 and WINS on M1 — build the
+    step graph once, reuse it.** `core_rnnt_ggml::Decoder` builds the predictor +
+    joint graphs once, gallocr-allocates each once on the backend, and dispatches
+    sched-free per step (tensor_set → `ggml_backend_graph_compute` → read),
+    amortising the per-step `ggml_init`/build/`sched_alloc` that killed the naive
+    version. Measured on M1 Metal (jfk, transcript-identical, RNNT_GGML_PERSTEP to
+    A/B): **nemotron decode cblas ~510-806 ms | persistent ~261-307 ms | per-step
+    ~318-421 ms** — persistent is ~2× faster than cblas AND beats per-step,
+    fixing the LEARNING-31 regression. Parakeet (short decode) is within noise for
+    all three (per-step overhead is small when there are few steps — consistent
+    with 31). **Lessons:** (a) for a reused per-token/-frame GPU graph, persistent
+    gallocr + sched-free `ggml_backend_graph_compute` is the pattern; per-step
+    rebuild is only a correctness scaffold. (b) It beats M1's *fast* Accelerate
+    cblas, so on P100 (slow OpenBLAS) the win should be much larger — but flip the
+    default only after the clean P100 bench (the noisy M1 load here inflates the
+    absolutes; the ordering is stable). (c) Watch the §234 gallocr aliasing gotcha
+    — re-set ALL inputs before every compute (state + token/proj each step do).
