@@ -705,8 +705,11 @@ static ggml_cgraph* wav2vec2_build_transformer_graph(const wav2vec2_model& m,
 
     const bool pre_norm = (hp.do_stable_layer_norm != 0);
 
-    // Data2Vec: applies global encoder LN BEFORE transformer layers.
-    // wav2vec2/HuBERT: global LN is applied AFTER all layers instead.
+    // Global encoder LayerNorm placement (converter-set per the HF encoder
+    // variant): non-stable encoders (Wav2Vec2Encoder: wav2vec2-base, data2vec)
+    // apply it BEFORE the transformer layers; stable encoders
+    // (Wav2Vec2EncoderStableLayerNorm: large / MMS / XLS-R / HuBERT) apply it
+    // AFTER (below).
     if (hp.global_ln_before_encoder) {
         cur = ggml_norm(ctx0, cur, ln_eps);
         cur = ggml_mul(ctx0, cur, m.enc_ln_w);
@@ -790,7 +793,7 @@ static ggml_cgraph* wav2vec2_build_transformer_graph(const wav2vec2_model& m,
         }
     }
 
-    // ---- Global LayerNorm (skip if already applied before the loop for data2vec) ----
+    // ---- Global LayerNorm (skip if already applied before the loop) ----
     if (!hp.global_ln_before_encoder) {
         cur = ggml_norm(ctx0, cur, ln_eps);
         cur = ggml_mul(ctx0, cur, m.enc_ln_w);
@@ -1201,13 +1204,29 @@ static std::vector<float> wav2vec2_compute_logits_graph(const wav2vec2_model& m,
         if (m.cnn[li].conv_b)
             cur = ggml_add(cctx, cur, m.cnn[li].conv_b);
 
-        // Norm: ggml_norm over ne[0]=OC
+        // Norm. feat_extract_norm="layer" (type 1): LayerNorm over channels
+        // (ne[0]=OC). feat_extract_norm="group" (type 0): GroupNorm(C, C) ==
+        // InstanceNorm, i.e. per-channel normalization over time; only CNN
+        // layer 0 carries a norm in group mode.
         if (m.cnn[li].has_norm) {
-            cur = ggml_norm(cctx, cur, hp.layer_norm_eps);
-            if (m.cnn[li].norm_w)
-                cur = ggml_mul(cctx, cur, m.cnn[li].norm_w);
-            if (m.cnn[li].norm_b)
-                cur = ggml_add(cctx, cur, m.cnn[li].norm_b);
+            if (hp.feat_extract_norm_type == 1) {
+                cur = ggml_norm(cctx, cur, hp.layer_norm_eps);
+                if (m.cnn[li].norm_w)
+                    cur = ggml_mul(cctx, cur, m.cnn[li].norm_w);
+                if (m.cnn[li].norm_b)
+                    cur = ggml_add(cctx, cur, m.cnn[li].norm_b);
+            } else {
+                // Transpose [OC, L] -> [L, OC] so ggml_norm reduces over time
+                // (ne[0]=L) per channel; per-channel affine broadcasts through
+                // a [1, OC] view; transpose back to [OC, L].
+                cur = ggml_cont(cctx, ggml_transpose(cctx, cur));
+                cur = ggml_norm(cctx, cur, hp.layer_norm_eps);
+                if (m.cnn[li].norm_w)
+                    cur = ggml_mul(cctx, cur, ggml_reshape_2d(cctx, m.cnn[li].norm_w, 1, OC));
+                if (m.cnn[li].norm_b)
+                    cur = ggml_add(cctx, cur, ggml_reshape_2d(cctx, m.cnn[li].norm_b, 1, OC));
+                cur = ggml_cont(cctx, ggml_transpose(cctx, cur));
+            }
         }
 
         cur = ggml_gelu(cctx, cur);
@@ -1840,12 +1859,21 @@ std::vector<float> wav2vec2_compute_logits(const wav2vec2_model& m, const float*
 
 
     // ------------------------------------------------------------------
-    // 4. Transformer encoder layers (pre-norm / stable layer norm)
+    // 4. Transformer encoder layers.
+    // Stable (do_stable_layer_norm) is pre-norm: LN -> sublayer -> residual,
+    // with the global encoder LN applied AFTER the layers. Non-stable is
+    // post-norm: sublayer -> residual -> LN, with the global encoder LN applied
+    // BEFORE the layers (global_ln_before_encoder) instead.
     // ------------------------------------------------------------------
+    const bool pre_norm = (hp.do_stable_layer_norm != 0);
     int n_heads = (int)hp.num_attention_heads;
     int head_dim = H / n_heads;
     float scale = 1.f / sqrtf((float)head_dim);
     int I = (int)hp.intermediate_size;
+
+    if (hp.global_ln_before_encoder)
+        layer_norm(hidden.data(), hidden.data(), tensor_data_f32(m, m.enc_ln_w), tensor_data_f32(m, m.enc_ln_b), T, H,
+                   hp.layer_norm_eps);
 
     std::vector<float> normed(T * H);
     std::vector<float> Q_buf(T * H), K_buf(T * H), V_buf(T * H);
@@ -1856,14 +1884,19 @@ std::vector<float> wav2vec2_compute_logits(const wav2vec2_model& m, const float*
     for (uint32_t li = 0; li < hp.num_hidden_layers; li++) {
         const auto& e = m.enc[li];
 
-        layer_norm(hidden.data(), normed.data(), tensor_data_f32(m, e.ln1_w), tensor_data_f32(m, e.ln1_b), T, H,
-                   hp.layer_norm_eps);
+        // Attention input: pre-norm normalizes first; post-norm feeds hidden.
+        const float* attn_src = hidden.data();
+        if (pre_norm) {
+            layer_norm(hidden.data(), normed.data(), tensor_data_f32(m, e.ln1_w), tensor_data_f32(m, e.ln1_b), T, H,
+                       hp.layer_norm_eps);
+            attn_src = normed.data();
+        }
 
-        ggml_linear_f32(scratch, e.q_w, tensor_data_f32(m, e.q_b), normed.data(), Q_buf.data(), H, H, T, n_threads,
+        ggml_linear_f32(scratch, e.q_w, tensor_data_f32(m, e.q_b), attn_src, Q_buf.data(), H, H, T, n_threads,
                         m.backend);
-        ggml_linear_f32(scratch, e.k_w, tensor_data_f32(m, e.k_b), normed.data(), K_buf.data(), H, H, T, n_threads,
+        ggml_linear_f32(scratch, e.k_w, tensor_data_f32(m, e.k_b), attn_src, K_buf.data(), H, H, T, n_threads,
                         m.backend);
-        ggml_linear_f32(scratch, e.v_w, tensor_data_f32(m, e.v_b), normed.data(), V_buf.data(), H, H, T, n_threads,
+        ggml_linear_f32(scratch, e.v_w, tensor_data_f32(m, e.v_b), attn_src, V_buf.data(), H, H, T, n_threads,
                         m.backend);
 
         // Encoder self-attention, hand-rolled CPU path (O(T²) — the alignment
@@ -1888,12 +1921,20 @@ std::vector<float> wav2vec2_compute_logits(const wav2vec2_model& m, const float*
                         m.backend);
         for (int i = 0; i < T * H; i++)
             hidden[i] += normed[i];
+        // Post-norm applies the attention LN after the residual add.
+        if (!pre_norm)
+            layer_norm(hidden.data(), hidden.data(), tensor_data_f32(m, e.ln1_w), tensor_data_f32(m, e.ln1_b), T, H,
+                       hp.layer_norm_eps);
 
-        layer_norm(hidden.data(), normed.data(), tensor_data_f32(m, e.ln2_w), tensor_data_f32(m, e.ln2_b), T, H,
-                   hp.layer_norm_eps);
+        // FFN input: pre-norm normalizes first; post-norm feeds hidden.
+        const float* ffn_src = hidden.data();
+        if (pre_norm) {
+            layer_norm(hidden.data(), normed.data(), tensor_data_f32(m, e.ln2_w), tensor_data_f32(m, e.ln2_b), T, H,
+                       hp.layer_norm_eps);
+            ffn_src = normed.data();
+        }
 
-        ggml_linear_f32(scratch, e.fc1_w, tensor_data_f32(m, e.fc1_b), normed.data(), ffn_mid.data(), H, I, T,
-                        n_threads);
+        ggml_linear_f32(scratch, e.fc1_w, tensor_data_f32(m, e.fc1_b), ffn_src, ffn_mid.data(), H, I, T, n_threads);
         for (int i = 0; i < T * I; i++)
             ffn_mid[i] = gelu(ffn_mid[i]);
 
@@ -1901,13 +1942,18 @@ std::vector<float> wav2vec2_compute_logits(const wav2vec2_model& m, const float*
                         n_threads);
         for (int i = 0; i < T * H; i++)
             hidden[i] += ffn_out[i];
+        // Post-norm applies the FFN LN after the residual add.
+        if (!pre_norm)
+            layer_norm(hidden.data(), hidden.data(), tensor_data_f32(m, e.ln2_w), tensor_data_f32(m, e.ln2_b), T, H,
+                       hp.layer_norm_eps);
     }
 
     // ------------------------------------------------------------------
-    // 5. Encoder global LayerNorm
+    // 5. Global encoder LayerNorm (skip if already applied before the layers).
     // ------------------------------------------------------------------
-    layer_norm(hidden.data(), hidden.data(), tensor_data_f32(m, m.enc_ln_w), tensor_data_f32(m, m.enc_ln_b), T, H,
-               hp.layer_norm_eps);
+    if (!hp.global_ln_before_encoder)
+        layer_norm(hidden.data(), hidden.data(), tensor_data_f32(m, m.enc_ln_w), tensor_data_f32(m, m.enc_ln_b), T, H,
+                   hp.layer_norm_eps);
 
     // ------------------------------------------------------------------
     // 6. LM head: Linear(H → V) — raw logits (no softmax)
