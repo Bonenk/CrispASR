@@ -34,7 +34,7 @@ MODELS = WORK / "models"
 SAMPLE = WORK / "jfk.wav"
 CRISPASR = BUILD / "bin" / "crispasr"
 
-CRISPASR_REF = os.environ.get("CRISPASR_REF", "feat/232-moonshine-decode")
+CRISPASR_REF = os.environ.get("CRISPASR_REF", "main")
 REPS = int(os.environ.get("REPS", "5"))
 EXPECTED = "ask not what your country can do for you"
 
