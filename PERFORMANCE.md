@@ -1616,17 +1616,37 @@ bandwidth, is what limits them.
 
 ## issue #81 round 3 — Kaggle P100 CUDA fleet benchmark (2026-07-10)
 
+> **⚠ CORRECTION (2026-07-11) — the parakeet-ctc-0.6b rows below were WRONG
+> (a benchmark-harness bug), now retracted.** The kernel
+> (`tools/kaggle/issue81-onnx-bench`) ran parakeet-**ctc** models through the
+> `--backend parakeet` *transducer* runtime, which **rejects CTC models and
+> exits in ~0.5 s** ("this GGUF has no RNN-T decoder/joint tensors — failed to
+> load"). `bench_crispasr` had no return-code / transcript check, so it timed the
+> crash and computed `rtf = audio_dur / (crash time)` → bogus 19.9× / 102.4× /
+> 127.7×. The tell is in the raw log: parakeet-ctc "took" **0.552 s for 11 s and
+> 0.537 s for 55 s** — i.e. a *fixed* sub-second runtime independent of audio
+> length (real inference scales with duration, as parakeet-**tdt** does right
+> below). Fixed 2026-07-11: the kernel now auto-detects the CTC backend and
+> `bench_crispasr` marks a failed/empty run as FAIL. **Real** parakeet-ctc-0.6b
+> measured on M1 CPU (auto-detected `fastconformer-ctc`, verified transcript):
+> **3.2× (Q4_K) / 3.5× (Q8_0)** — note Q8_0 is *not* slower, so the "Q4_K
+> memory-bandwidth advantage" story was also false. A valid CUDA figure is
+> pending a kernel re-run. The parakeet-**tdt** and CrispASR-only / onnx-asr rows
+> below ran correctly and stand.
+
 Full-fleet benchmark on Kaggle P100 (sm_60, CUDA 12.8). CrispASR built
 with GGML_CUDA=ON. onnx-asr uses CPU EP (onnxruntime-gpu requires
-CUDA 13 which Kaggle doesn't provide — matches original #81 reporter's
-CPU/DirectML EP setup). Kernel: `chr1s4/crispasr-issue81-onnx-bench` v6.
+CUDA 13 which Kaggle doesn't provide) — so this is CrispASR-CUDA vs
+onnx-**CPU**, NOT a GPU-vs-GPU comparison (the #81 reporter later measured
+onnx GPU/CoreML at 40–45× on parakeet, which this kernel never ran).
+Kernel: `chr1s4/crispasr-issue81-onnx-bench` v6.
 
 ### Head-to-head (CrispASR CUDA Q8_0 vs onnx-asr CPU int8)
 
 | model | engine | JFK 11s | Long 55s | ratio (long) |
 |---|---|---|---|---|
-| parakeet-ctc-0.6b | **CrispASR** | **19.9× RT** | **102.4× RT** | **15.5× faster** |
-| parakeet-ctc-0.6b | onnx-asr | 7.3× RT | 6.6× RT | |
+| ~~parakeet-ctc-0.6b~~ | ~~CrispASR~~ | ~~19.9×~~ | ~~102.4×~~ | **RETRACTED — failed-load artifact (see above); real M1 CPU 3.2–3.5×** |
+| parakeet-ctc-0.6b | onnx-asr | 7.3× RT | 6.6× RT | (valid) |
 | parakeet-tdt-0.6b | **CrispASR** | 7.5× RT | **11.8× RT** | **1.8× faster** |
 | parakeet-tdt-0.6b | onnx-asr | 7.5× RT | 6.7× RT | |
 
@@ -1645,20 +1665,25 @@ CPU/DirectML EP setup). Kernel: `chr1s4/crispasr-issue81-onnx-bench` v6.
 
 | engine | quant | mean time | x-realtime |
 |---|---|---|---|
-| **CrispASR** | **Q4_K** | **0.086s** | **127.7×** |
-| onnx-asr | int8 | 4.312s | 2.6× |
+| ~~CrispASR~~ | ~~Q4_K~~ | ~~0.086s~~ | ~~127.7×~~ **RETRACTED — same failed-load bug (0.086 s can't even load a 687 MB model)** |
+| onnx-asr | int8 | 4.312s | 2.6× (valid) |
 
-CrispASR **50× faster on CPU** — Q4_K quantization gives a massive
-memory-bandwidth advantage over int8 ONNX on low-core CPUs.
+The "50× faster on CPU / Q4_K memory-bandwidth advantage" claim is
+**withdrawn.** Real CrispASR parakeet-ctc-0.6b on CPU is single-digit
+realtime (M1: 3.2× Q4_K, 3.5× Q8_0 — Q4_K is *not* meaningfully faster),
+consistent with the ~5× a #81 reporter measured; onnx-asr int8 is faster
+than CrispASR on that x86 CPU.
 
-### Summary
+### Summary (revised 2026-07-11)
 
-The original #81 complaint ("5× slower than ONNX on GPU") is
-**definitively resolved.** CrispASR is now faster or equal on every
-overlapping model (parakeet CTC/TDT), and offers 25+ backends that
-onnx-asr (~10 models) doesn't support at all. The gap was never
-architectural — it was a missing CUDA build + missing flash-attn
-fusion, both now shipped.
+What actually holds: with the CUDA build + flash-attn fusion shipped,
+CrispASR is competitive-to-faster vs onnx-asr **CPU EP** on the models
+that ran correctly (parakeet-**tdt** 1.8× on long audio), and offers 25+
+backends onnx-asr doesn't. What does **not** hold: the parakeet-**ctc**
+"15.5×/50× faster" headline (a failed-load artifact) and any GPU-vs-GPU
+superiority claim (onnx here was CPU-only; the reporter's onnx GPU is
+40–45× on parakeet). Net: the honest picture is parity-class on GPU with
+a real CPU/coverage story, not a blowout.
 
 ---
 

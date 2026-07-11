@@ -95,8 +95,14 @@ MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Models to benchmark: (backend, hf_repo, filename, label)
 CRISPASR_MODELS = [
-    # Head-to-head with onnx-asr
-    ("parakeet",  "cstr/parakeet-ctc-0.6b-GGUF",   "parakeet-ctc-0.6b-q8_0.gguf",     "parakeet-ctc-0.6b"),
+    # Head-to-head with onnx-asr.
+    # NOTE: parakeet-ctc is a pure CTC (EncDecCTCModelBPE) — it must run on the
+    # fastconformer-ctc backend, NOT the `parakeet` transducer backend (which
+    # rejects it: "no RNN-T decoder/joint tensors — failed to load"). Using the
+    # wrong backend here is exactly the #81 bug that produced the bogus 102.4×/
+    # 127.7× (a ~0.5 s failed load timed as if it were inference). See the guard
+    # in bench_crispasr() below.
+    ("fastconformer-ctc", "cstr/parakeet-ctc-0.6b-GGUF",   "parakeet-ctc-0.6b-q8_0.gguf",     "parakeet-ctc-0.6b"),
     ("parakeet",  "cstr/parakeet-tdt-0.6b-v2-GGUF", "parakeet-tdt-0.6b-v2-q8_0.gguf",  "parakeet-tdt-0.6b"),
     # CrispASR-only (small models that fit in budget)
     ("moonshine", "cstr/moonshine-tiny-GGUF",       "moonshine-tiny-q8_0.gguf",         "moonshine-tiny"),
@@ -144,19 +150,31 @@ def bench_crispasr(backend, model_path, audio_path, audio_dur, label, extra_flag
 
     times = []
     text = ""
+    ok = True
     for i in range(n_runs):
         try:
             t0 = time.perf_counter()
             r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
             t1 = time.perf_counter()
             times.append(t1 - t0)
-            if i == 0:
-                text = (r.stdout.strip() or r.stderr.strip().split('\n')[-1])[:120]
+            out = (r.stdout or "").strip()
+            if r.returncode != 0 or not out:
+                ok = False
+                if i == 0:
+                    tail = (r.stderr or "").strip().split("\n")[-1] if r.stderr else ""
+                    text = f"FAILED (rc={r.returncode}): {tail}"[:120]
+            elif i == 0:
+                text = out[:120]
         except subprocess.TimeoutExpired:
             times.append(120.0)
+            ok = False
 
-    if not times:
-        return None, None, "FAILED"
+    # A crash / empty transcript must NOT be reported as a fast run — that was
+    # the #81 bug: `--backend parakeet` on a CTC model exits in ~0.5 s, which the
+    # old code timed and turned into `audio_dur / 0.5` = 102.4× / 127.7×. Only a
+    # run that exited 0 with a non-empty transcript counts as a real measurement.
+    if not times or not ok:
+        return None, None, (text or "FAILED")
     mean = sum(times) / len(times)
     rtf = audio_dur / mean
     return mean, rtf, text
