@@ -10,6 +10,13 @@ effort estimate. Completed items have been moved to `HISTORY.md`.
 
 **Latest release: v0.6.12** (commit `345ecfdc`). Full notes in [`RELEASE_NOTES_v0.6.12.md`](RELEASE_NOTES_v0.6.12.md).
 
+**Recent completions (2026-07-11):**
+- **#242 moss-diarize**: SHIPPED — joint ASR + diarization + timestamps, 0.9B model,
+  diff harness 4/4 cos=1.0, GGUFs on HF, full 12-point checklist. See `HISTORY.md`.
+- **#200 dots-tts PatchEncoder**: FIXED — added missing RoPE (theta=10K) + QK-norm;
+  full pipeline now runs e2e (LLM → DiT → PEnc → vocoder → WAV), ASR roundtrip passes.
+  Wired `--tts-steps` / `--tts-cfg-scale`. GPU already supported. See `HISTORY.md`.
+
 ## Gemma-4 12B (gemma4_unified) ASR support (OPEN)
 
 The remaining open item for full 12B support (a new converter map + backend audio path for the 640-dim unified
