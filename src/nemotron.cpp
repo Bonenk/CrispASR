@@ -37,6 +37,7 @@
 #include "core/gguf_loader.h"
 #include "core/mel.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/rnnt_ggml.h"        // §232 GPU transducer decode (shared)
 
 #if defined(HAVE_ACCELERATE)
 #include <Accelerate/Accelerate.h>
@@ -1651,11 +1652,34 @@ struct nemotron_emitted_token {
     float p;
 };
 
+// §232 — GPU decode (opt-in NEMOTRON_GGML_DECODE=1). Thin wrappers over the
+// shared core_rnnt_ggml helpers (same as parakeet). Default stays cblas; perf
+// verdict is P100-only. See core/rnnt_ggml.h + LEARNINGS 29-30.
+static void nemotron_predictor_step_ggml(nemotron_context* ctx, int token_id, nemotron_lstm_state& state,
+                                         std::vector<float>& pred_out) {
+    const auto& p = ctx->model.predictor;
+    core_rnnt_ggml::predictor_step(ctx->sched, p.embed_w, p.lstm0_w_ih, p.lstm0_b_ih, p.lstm0_w_hh, p.lstm0_b_hh,
+                                   p.lstm1_w_ih, p.lstm1_b_ih, p.lstm1_w_hh, p.lstm1_b_hh, token_id,
+                                   (int)ctx->model.hparams.pred_hidden, state.h0, state.c0, state.h1, state.c1,
+                                   pred_out);
+}
+
+static void nemotron_joint_step_ggml(nemotron_context* ctx, const float* proj_e, const float* pred_u,
+                                     std::vector<float>& logits) {
+    const auto& j = ctx->model.joint;
+    core_rnnt_ggml::joint_step(ctx->sched, j.pred_w, j.pred_b, j.out_w, j.out_b, proj_e, pred_u,
+                               (int)ctx->model.hparams.joint_hidden, (int)ctx->model.hparams.pred_hidden, logits);
+}
+
 static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context* ctx, const float* enc, int T_enc,
                                                                 int d_model, nemotron_token_cb on_tok = nullptr,
                                                                 void* on_tok_ud = nullptr) {
     nemotron_init_pred_weights(ctx);
     nemotron_init_joint_weights(ctx);
+
+    // §232: opt-in GPU decode (LSTM predictor + joint as ggml graphs). Default
+    // off (cblas). Runs on ctx->backend; perf verdict is P100-only.
+    const bool ggml_dec = getenv("NEMOTRON_GGML_DECODE") != nullptr;
 
     const auto& W = ctx->pred_w;
     const auto& J = ctx->joint_w;
@@ -1667,7 +1691,10 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
     state.init(W.H);
 
     std::vector<float> pred_out;
-    predictor_step(W, blank_id, state, pred_out);
+    if (ggml_dec)
+        nemotron_predictor_step_ggml(ctx, blank_id, state, pred_out);
+    else
+        predictor_step(W, blank_id, state, pred_out);
 
     for (int t = 0; t < T_enc; t++) {
         const float* enc_t = enc + (size_t)t * d_model;
@@ -1677,7 +1704,10 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
         int sym_count = 0;
         while (sym_count < max_symbols_per_frame) {
             std::vector<float> logits;
-            joint_step(J, proj_e.data(), pred_out.data(), logits);
+            if (ggml_dec)
+                nemotron_joint_step_ggml(ctx, proj_e.data(), pred_out.data(), logits);
+            else
+                joint_step(J, proj_e.data(), pred_out.data(), logits);
 
             // Softmax for probability
             float maxl = *std::max_element(logits.begin(), logits.end());
@@ -1710,7 +1740,10 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
             if (on_tok)
                 on_tok(tok, logits[tok], on_tok_ud);
 
-            predictor_step(W, tok, state, pred_out);
+            if (ggml_dec)
+                nemotron_predictor_step_ggml(ctx, tok, state, pred_out);
+            else
+                predictor_step(W, tok, state, pred_out);
             sym_count++;
         }
     }
@@ -1723,9 +1756,9 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
 // GPU-optimised (one kernel vs N kernel launches). On CPU, batch=32 cap avoids
 // computing logits for 300+ unneeded frames.
 static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron_context* ctx, const float* enc,
-                                                                         int T_enc, int d_model,
-                                                                         nemotron_token_cb on_tok = nullptr,
-                                                                         void* on_tok_ud = nullptr) {
+                                                                        int T_enc, int d_model,
+                                                                        nemotron_token_cb on_tok = nullptr,
+                                                                        void* on_tok_ud = nullptr) {
     nemotron_init_pred_weights(ctx);
     nemotron_init_joint_weights(ctx);
 
@@ -1747,9 +1780,8 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
         std::copy(J.enc_b.begin(), J.enc_b.end(), all_proj_e.data() + (size_t)f * Jh);
 #if defined(HAVE_ACCELERATE)
     if (!nemotron_force_scalar()) {
-        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
-                    T_enc, Jh, J.d_model, 1.0f, enc, J.d_model, J.enc_w.data(), J.d_model,
-                    1.0f, all_proj_e.data(), Jh);
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, T_enc, Jh, J.d_model, 1.0f, enc, J.d_model, J.enc_w.data(),
+                    J.d_model, 1.0f, all_proj_e.data(), Jh);
     } else
 #endif
     {
@@ -1759,7 +1791,8 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
             for (int i = 0; i < Jh; i++) {
                 const float* row = J.enc_w.data() + (size_t)i * J.d_model;
                 float s = dst[i];
-                for (int k = 0; k < J.d_model; k++) s += row[k] * enc_f[k];
+                for (int k = 0; k < J.d_model; k++)
+                    s += row[k] * enc_f[k];
                 dst[i] = s;
             }
         }
@@ -1775,15 +1808,16 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
         std::copy(J.pred_b.begin(), J.pred_b.end(), pred_proj.data());
 #if defined(HAVE_ACCELERATE)
         if (!nemotron_force_scalar()) {
-            cblas_sgemv(CblasRowMajor, CblasNoTrans, Jh, J.pred_hidden, 1.0f,
-                        J.pred_w.data(), J.pred_hidden, pred_out.data(), 1, 1.0f, pred_proj.data(), 1);
+            cblas_sgemv(CblasRowMajor, CblasNoTrans, Jh, J.pred_hidden, 1.0f, J.pred_w.data(), J.pred_hidden,
+                        pred_out.data(), 1, 1.0f, pred_proj.data(), 1);
         } else
 #endif
         {
             for (int i = 0; i < Jh; i++) {
                 const float* row = J.pred_w.data() + (size_t)i * J.pred_hidden;
                 float s = pred_proj[i];
-                for (int k = 0; k < J.pred_hidden; k++) s += row[k] * pred_out[k];
+                for (int k = 0; k < J.pred_hidden; k++)
+                    s += row[k] * pred_out[k];
                 pred_proj[i] = s;
             }
         }
@@ -1805,9 +1839,8 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
             std::copy(J.out_b.begin(), J.out_b.end(), logits_batch.data() + (size_t)f * Vt);
 #if defined(HAVE_ACCELERATE)
         if (!nemotron_force_scalar()) {
-            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
-                        batch, Vt, Jh, 1.0f, mid_batch.data(), Jh, J.out_w.data(), Jh,
-                        1.0f, logits_batch.data(), Vt);
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, batch, Vt, Jh, 1.0f, mid_batch.data(), Jh,
+                        J.out_w.data(), Jh, 1.0f, logits_batch.data(), Vt);
         } else
 #endif
         {
@@ -1817,7 +1850,8 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
                 for (int v = 0; v < Vt; v++) {
                     const float* row = J.out_w.data() + (size_t)v * Jh;
                     float s = lg[v];
-                    for (int k = 0; k < Jh; k++) s += row[k] * m[k];
+                    for (int k = 0; k < Jh; k++)
+                        s += row[k] * m[k];
                     lg[v] = s;
                 }
             }
@@ -1828,19 +1862,25 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
         bool found_emission = false;
         while (scan_t < T_enc) {
             int f = scan_t - t;
-            if (f >= batch) break; // exhausted window, re-batch
+            if (f >= batch)
+                break; // exhausted window, re-batch
 
             const float* lg = logits_batch.data() + (size_t)f * Vt;
-            int tok = 0; float maxl = lg[0];
+            int tok = 0;
+            float maxl = lg[0];
             for (int v = 1; v < Vt; v++)
-                if (lg[v] > maxl) { maxl = lg[v]; tok = v; }
+                if (lg[v] > maxl) {
+                    maxl = lg[v];
+                    tok = v;
+                }
 
             if (tok == blank_id) {
-                scan_t++;  // advance past blank frame
+                scan_t++; // advance past blank frame
             } else {
                 // Softmax probability
                 float sum = 0.0f;
-                for (int v = 0; v < Vt; v++) sum += expf(lg[v] - maxl);
+                for (int v = 0; v < Vt; v++)
+                    sum += expf(lg[v] - maxl);
                 float prob = sum > 0.0f ? (1.0f / sum) : 0.0f;
 
                 nemotron_emitted_token et;
@@ -1849,7 +1889,8 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
                 et.t_end = scan_t + 1;
                 et.p = prob;
                 emitted.push_back(et);
-                if (on_tok) on_tok(tok, prob, on_tok_ud);
+                if (on_tok)
+                    on_tok(tok, prob, on_tok_ud);
                 predictor_step(W, tok, state, pred_out);
                 // DON'T advance scan_t — RNNT can emit multiple tokens per frame.
                 // The outer loop will re-batch from this frame with updated pred_out.
@@ -1858,7 +1899,8 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode_batched(nemotron
             }
         }
         t = scan_t;
-        if (!found_emission && t >= T_enc) break;
+        if (!found_emission && t >= T_enc)
+            break;
     }
     return emitted;
 }
@@ -2520,12 +2562,13 @@ static nemotron_result* nemotron_transcribe_impl(nemotron_context* ctx, const fl
     decltype(nemotron_rnnt_decode(ctx, enc_out.data(), T_enc, d_model, on_tok, on_tok_ud)) emitted;
     {
         nemotron_bench_stage _b("rnnt_decode");
-        emitted = use_maes        ? nemotron_rnnt_maes_decode(ctx, enc_out.data(), T_enc, d_model, beam_sz,
-                                                              ctx->maes_num_steps, ctx->maes_gamma, ctx->maes_beta)
-                  : (beam_sz > 1) ? nemotron_rnnt_beam_decode(ctx, enc_out.data(), T_enc, d_model, beam_sz)
-                                  : (getenv("CRISPASR_RNNT_BATCH")
-                                     ? nemotron_rnnt_decode_batched(ctx, enc_out.data(), T_enc, d_model, on_tok, on_tok_ud)
-                                     : nemotron_rnnt_decode(ctx, enc_out.data(), T_enc, d_model, on_tok, on_tok_ud));
+        emitted = use_maes ? nemotron_rnnt_maes_decode(ctx, enc_out.data(), T_enc, d_model, beam_sz,
+                                                       ctx->maes_num_steps, ctx->maes_gamma, ctx->maes_beta)
+                  : (beam_sz > 1)
+                      ? nemotron_rnnt_beam_decode(ctx, enc_out.data(), T_enc, d_model, beam_sz)
+                      : (getenv("CRISPASR_RNNT_BATCH")
+                             ? nemotron_rnnt_decode_batched(ctx, enc_out.data(), T_enc, d_model, on_tok, on_tok_ud)
+                             : nemotron_rnnt_decode(ctx, enc_out.data(), T_enc, d_model, on_tok, on_tok_ud));
     }
 
     if (getenv("CRISPASR_NEMOTRON_DEBUG")) {
