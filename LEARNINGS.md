@@ -12386,3 +12386,35 @@ Two reusable rules:
   as min-of-N interleaved reps. A "3× speedup" measured against a contended
   baseline can be entirely the baseline degrading — interleave old/new in the
   same quiet window before believing a ratio.
+
+
+## Before starting a "top-priority, profiled" perf target: check whether it's already been tried-and-rejected, and whether a parallel session owns it (§235 triage, 2026-07-11)
+
+Picking the next optimization after the §232 qwen3-tts sweep, the obvious #1 was
+PLAN §232's own top item: "port the Parakeet/Nemotron transducer decoder to GPU"
+— the decode loop demonstrably runs on host `cblas_sgemv/sgemm`, and the profile
+gap vs a competitor was 12-19×. It is a **trap**, and two cheap checks caught it
+before any code:
+
+1. **`git log --grep` for prior attempts.** A parallel session had already tried
+   it and recorded the result: batched/GPU transducer decode is **5-9× SLOWER**
+   (`d0bb4601`, `3fcd5ff3`). A transducer decode step is a handful of tiny
+   matmuls (LSTM predictor + joint) with a host↔device sync every step; that is
+   precisely the regime where CPU `cblas` beats the GPU (the same lesson as
+   qwen3-tts CP_DIRECT being 2× *slower* on CPU, and f5/native-on-GPU losing to
+   custom-op-on-CPU). A big *paper* FLOP win on a fine-grained decode loop
+   routinely goes **negative** once per-step launch + sync dominate. So: a
+   PLAN item marked "[HIGH] 12-19×" is a hypothesis, not a fact — grep for
+   whether someone already measured it.
+2. **`git worktree list` + recent `git log` for ownership.** The next candidate
+   (Moonshine encoder im2col) was being actively worked in another session's
+   worktree (`moonshine-decode-stash`); starting it would have collided. On a
+   box with many concurrent Claude sessions all pushing to `main`, check who's
+   on a target before opening a worktree for it.
+
+The general rule: treat a profiled "top priority" as a lead to *verify*, not a
+task to start. `git log --grep`/`--oneline` and `git worktree list` are 10-second
+checks that turn "I nearly reimplemented a measured-negative optimization" into
+"crossed off with evidence." Record the dead end in PLAN so the next person
+doesn't re-derive it (the transducer GPU port is now explicitly marked DEAD in
+§235, not silently left as a tempting [HIGH] in §232).
