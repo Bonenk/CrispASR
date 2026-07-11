@@ -213,6 +213,11 @@ struct parakeet_model {
     ggml_context* ctx_f32 = nullptr;
     ggml_backend_buffer_t buf_f32 = nullptr;
 
+    // Q8_0 repack of the F16 conv pw1/pw2 weights (issue #81, CRISPASR_FC_PW_Q8)
+    core_conformer::PwRepackBuf pw_q8;
+    // Fused Q/K/V weight concat (issue #81, CRISPASR_FC_FUSED_QKV)
+    core_conformer::PwRepackBuf qkv_fused;
+
     std::map<std::string, ggml_tensor*> tensors;
 };
 
@@ -2849,6 +2854,18 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
 
     parakeet_fold_batchnorm(ctx->model, ctx->backend);
 
+    // Repack F16 conv pw1/pw2 to Q8_0 (issue #81 — the 3D conv layout dodges
+    // crispasr-quantize, and the CPU F16 mul_mat path is ~6x slower than Q8_0).
+    {
+        auto& m = ctx->model;
+        std::vector<core_conformer::BlockWeights*> layers;
+        for (auto& e : m.enc)
+            layers.push_back(&e);
+        const bool quantized = !m.enc.empty() && m.enc[0].attn_q_w && ggml_is_quantized(m.enc[0].attn_q_w->type);
+        core_conformer::repack_conv_pw_q8(layers, ctx->backend, quantized, m.pw_q8, "parakeet");
+        core_conformer::fuse_qkv(layers, ctx->backend, m.qkv_fused, "parakeet");
+    }
+
     // Hybrid TDT+CTC models with a single-LSTM predictor (parakeet-tdt_ctc-110m
     // has pred_layers=1) can only decode via the CTC head — TDT decode requires
     // a 2-layer LSTM. Default to CTC so the model just works out of the box.
@@ -2864,6 +2881,8 @@ extern "C" void parakeet_free(struct parakeet_context* ctx) {
         return;
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
+    ctx->model.pw_q8.free();
+    ctx->model.qkv_fused.free();
     if (ctx->model.buf_f32)
         ggml_backend_buffer_free(ctx->model.buf_f32);
     if (ctx->model.ctx_f32)

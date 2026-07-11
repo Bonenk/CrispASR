@@ -71,6 +71,64 @@ struct canary_ctc_bench_stage {
 };
 
 // ===========================================================================
+// Per-node profiler — `CRISPASR_FC_PROFILE=1` aggregates graph-compute time
+// by op (mul_mat keyed by src0 type+shape). Forces per-node sched splits, so
+// absolute times carry dispatch overhead; use the relative shares.
+// ===========================================================================
+
+static bool canary_ctc_profile_enabled() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = std::getenv("CRISPASR_FC_PROFILE");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v != 0;
+}
+
+struct cc_prof_state {
+    std::map<std::string, std::pair<double, int64_t>> agg; // key → (ms, count)
+    std::chrono::steady_clock::time_point last;
+
+    void dump() const {
+        std::vector<std::pair<std::string, std::pair<double, int64_t>>> rows(agg.begin(), agg.end());
+        std::sort(rows.begin(), rows.end(),
+                  [](const auto& a, const auto& b) { return a.second.first > b.second.first; });
+        double total = 0;
+        for (const auto& r : rows)
+            total += r.second.first;
+        std::fprintf(stderr, "  cc_profile: %-52s %9s %6s %6s\n", "op", "ms", "%", "n");
+        for (const auto& r : rows)
+            std::fprintf(stderr, "  cc_profile: %-52s %9.2f %5.1f%% %6lld\n", r.first.c_str(), r.second.first,
+                         100.0 * r.second.first / total, (long long)r.second.second);
+        std::fprintf(stderr, "  cc_profile: total %.2f ms\n", total);
+    }
+};
+
+static bool cc_prof_cb(ggml_tensor* t, bool ask, void* ud) {
+    auto* st = (cc_prof_state*)ud;
+    if (ask)
+        return true; // observe every node → per-node splits
+    auto now = std::chrono::steady_clock::now();
+    double ms = std::chrono::duration<double, std::milli>(now - st->last).count();
+    st->last = now;
+    char key[192];
+    if (t->op == GGML_OP_MUL_MAT) {
+        snprintf(key, sizeof(key), "MUL_MAT %s [%lldx%lld]@[%lldx%lld]", ggml_type_name(t->src[0]->type),
+                 (long long)t->src[0]->ne[0], (long long)t->src[0]->ne[1], (long long)t->src[1]->ne[0],
+                 (long long)t->src[1]->ne[1]);
+    } else if (t->op == GGML_OP_CPY || t->op == GGML_OP_CONT || t->op == GGML_OP_DUP) {
+        snprintf(key, sizeof(key), "%s %s→%s [%lldx%lldx%lld]", ggml_op_name(t->op), ggml_type_name(t->src[0]->type),
+                 ggml_type_name(t->type), (long long)t->ne[0], (long long)t->ne[1], (long long)t->ne[2]);
+    } else {
+        snprintf(key, sizeof(key), "%s", ggml_op_name(t->op));
+    }
+    auto& e = st->agg[key];
+    e.first += ms;
+    e.second += 1;
+    return true;
+}
+
+// ===========================================================================
 // Hyperparameters (mirror canary_ctc.* keys in the GGUF)
 // ===========================================================================
 
@@ -140,6 +198,11 @@ struct cc_model {
     // F32 conv_dw_w copies (created during BN fold, avoids per-forward F16→F32 cast)
     ggml_context* ctx_f32 = nullptr;
     ggml_backend_buffer_t buf_f32 = nullptr;
+
+    // Q8_0 repack of the F16 conv pw1/pw2 weights (issue #81, CRISPASR_FC_PW_Q8)
+    core_conformer::PwRepackBuf pw_q8;
+    // Fused Q/K/V weight concat (issue #81, CRISPASR_FC_FUSED_QKV)
+    core_conformer::PwRepackBuf qkv_fused;
 
     std::map<std::string, ggml_tensor*> tensors;
 };
@@ -590,6 +653,18 @@ extern "C" struct canary_ctc_context* canary_ctc_init_from_file(const char* path
         return nullptr;
     }
     cc_fold_batchnorm(ctx->model, ctx->backend);
+
+    // Repack F16 conv pw1/pw2 to Q8_0 (issue #81 — the 3D conv layout dodges
+    // crispasr-quantize, and the CPU F16 mul_mat path is ~6x slower than Q8_0).
+    {
+        auto& m = ctx->model;
+        std::vector<core_conformer::BlockWeights*> layers;
+        for (auto& e : m.enc)
+            layers.push_back(&e);
+        const bool quantized = !m.enc.empty() && m.enc[0].attn_q_w && ggml_is_quantized(m.enc[0].attn_q_w->type);
+        core_conformer::repack_conv_pw_q8(layers, ctx->backend, quantized, m.pw_q8, "canary_ctc");
+        core_conformer::fuse_qkv(layers, ctx->backend, m.qkv_fused, "canary_ctc");
+    }
     return ctx;
 }
 
@@ -598,6 +673,8 @@ extern "C" void canary_ctc_free(struct canary_ctc_context* ctx) {
         return;
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
+    ctx->model.pw_q8.free();
+    ctx->model.qkv_fused.free();
     if (ctx->model.buf_f32)
         ggml_backend_buffer_free(ctx->model.buf_f32);
     if (ctx->model.ctx_f32)
@@ -735,6 +812,10 @@ extern "C" int canary_ctc_compute_logits(struct canary_ctc_context* ctx, const f
     ctx->cached_gf = gf;
     ctx->cached_T_mel = T_mel;
 
+    cc_prof_state prof;
+    if (canary_ctc_profile_enabled())
+        ggml_backend_sched_set_eval_callback(ctx->sched, cc_prof_cb, &prof);
+
     ggml_backend_sched_reset(ctx->sched);
     if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
         return -2;
@@ -748,8 +829,16 @@ extern "C" int canary_ctc_compute_logits(struct canary_ctc_context* ctx, const f
     auto pe = core_conformer::make_pos_enc((int)ctx->model.hparams.d_model, T_enc);
     ggml_backend_tensor_set(pos_in, pe.data(), 0, pe.size() * sizeof(float));
 
+    if (canary_ctc_profile_enabled())
+        prof.last = std::chrono::steady_clock::now();
+
     if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS)
         return -3;
+
+    if (canary_ctc_profile_enabled()) {
+        ggml_backend_sched_set_eval_callback(ctx->sched, nullptr, nullptr);
+        prof.dump();
+    }
 
     ggml_tensor* out = ggml_graph_get_tensor(gf, "ctc_logits");
     if (!out)

@@ -567,6 +567,9 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
     // sizes.
     const int n_tensors = gguf_get_n_tensors(ctx_in);
     std::vector<ggml_type> target_types(n_tensors);
+    // Effective quantization row length per tensor — t->ne[0] except for the
+    // FastConformer 3D conv pointwise carve-out below, which quantizes as 2D.
+    std::vector<int64_t> row_lens(n_tensors, 0);
     // Per-rule --tensor-type match counters (summarised after the first pass).
     std::vector<int> override_hits(g_type_overrides.size(), 0);
     std::vector<int> override_skips(g_type_overrides.size(), 0);
@@ -600,8 +603,21 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                           sname[sname.size() - 1] >= '1' && sname[sname.size() - 1] <= '9') ||
                          (sname.find(".wq") != std::string::npos) || (sname.find(".wk") != std::string::npos) ||
                          (sname.find(".wv") != std::string::npos);
-        const bool ok_dims = (ggml_n_dims(t) == 2) || ((is_firered || is_ecapa) && ggml_n_dims(t) >= 2);
-        const int64_t ncols = t->ne[0];
+        // FastConformer conv pointwise weights ship as 3D conv tensors
+        // (1, d, N), which the 2D-only rule skips — so they stayed F16 even
+        // in Q8_0/Q4_K models and ran on the slow CPU F16 mul_mat path
+        // (issue #81). Every consumer does reshape_2d + mul_mat, so quantize
+        // them as their 2D (d, N) equivalent. Runtimes repack pre-existing
+        // GGUFs at load (core_conformer::repack_conv_pw_q8).
+        auto ends_with = [&sname](const char* suf) {
+            const size_t n = strlen(suf);
+            return sname.size() >= n && sname.compare(sname.size() - n, n, suf) == 0;
+        };
+        const bool pw_conv3d =
+            ggml_n_dims(t) == 3 && t->ne[0] == 1 && (ends_with("conv.pw1.weight") || ends_with("conv.pw2.weight"));
+        const bool ok_dims = (ggml_n_dims(t) == 2) || pw_conv3d || ((is_firered || is_ecapa) && ggml_n_dims(t) >= 2);
+        const int64_t ncols = pw_conv3d ? t->ne[1] : t->ne[0];
+        row_lens[i] = ncols;
 
         // Source may be F32/F16 OR already quantized. Accepting a quantized
         // source lets us re-quantize a big model straight from its q8_0 GGUF
@@ -809,7 +825,13 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
 
         // Create a tensor descriptor with the target type for ctx_out
         if (target_types[i] != t->type) {
-            struct ggml_tensor* t_out = ggml_new_tensor(ctx_scratch, target_types[i], ggml_n_dims(t), t->ne);
+            struct ggml_tensor* t_out;
+            if (pw_conv3d && ggml_is_quantized(target_types[i])) {
+                // Quantized as the 2D (d, N) matmul view (see carve-out above).
+                t_out = ggml_new_tensor_2d(ctx_scratch, target_types[i], t->ne[1], t->ne[2]);
+            } else {
+                t_out = ggml_new_tensor(ctx_scratch, target_types[i], ggml_n_dims(t), t->ne);
+            }
             ggml_set_name(t_out, name);
             gguf_add_tensor(ctx_out, t_out);
         } else {
@@ -909,7 +931,8 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                 tr->to_float(qbuf.data(), f32_data.data(), nelements);
             }
 
-            const size_t max_q_size = ggml_row_size(qtype_used, t->ne[0]) * (nelements / t->ne[0]);
+            const int64_t n_per_row = row_lens[i] > 0 ? row_lens[i] : t->ne[0];
+            const size_t max_q_size = ggml_row_size(qtype_used, n_per_row) * (nelements / n_per_row);
             q_data.resize(max_q_size);
 
             // Importance matrix (if loaded and shape-matched): steers k-quant/IQ
@@ -918,17 +941,17 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             if (!g_imatrix.empty()) {
                 auto it = g_imatrix.find(name);
                 if (it != g_imatrix.end()) {
-                    if ((int64_t)it->second.size() == t->ne[0]) {
+                    if ((int64_t)it->second.size() == n_per_row) {
                         imatrix = it->second.data();
                         printf("(imatrix) ");
                     } else {
-                        printf("(imatrix shape %zu!=%lld, skipped) ", it->second.size(), (long long)t->ne[0]);
+                        printf("(imatrix shape %zu!=%lld, skipped) ", it->second.size(), (long long)n_per_row);
                     }
                 }
             }
 
-            size_t q_size = ggml_quantize_chunk(qtype_used, f32_data.data(), q_data.data(), 0, nelements / t->ne[0],
-                                                t->ne[0], imatrix);
+            size_t q_size = ggml_quantize_chunk(qtype_used, f32_data.data(), q_data.data(), 0, nelements / n_per_row,
+                                                n_per_row, imatrix);
 
             fwrite(q_data.data(), 1, q_size, fout);
 

@@ -24,10 +24,13 @@
 
 #pragma once
 
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
 #include "ggml.h"
 
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <cstdlib>
 #include <vector>
 
@@ -40,6 +43,19 @@ static inline bool fc_no_flash() {
     static int v = -1;
     if (v < 0) {
         const char* e = std::getenv("CRISPASR_FC_NO_FLASH");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v != 0;
+}
+
+// Env-var gate: CRISPASR_FC_ATTN_CONT=1 restores the legacy ggml_cont copies
+// of Q/K/V before flash_attn_ext. The kernel reads strided views directly
+// (same as llama.cpp's permuted Q), so the copies are pure overhead — this
+// gate exists only for regression bisection (issue #81).
+static inline bool fc_attn_cont() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = std::getenv("CRISPASR_FC_ATTN_CONT");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -227,6 +243,9 @@ struct BlockWeights {
     ggml_tensor *attn_q_w = nullptr, *attn_q_b = nullptr;
     ggml_tensor *attn_k_w = nullptr, *attn_k_b = nullptr;
     ggml_tensor *attn_v_w = nullptr, *attn_v_b = nullptr;
+    // Fused [Wq;Wk;Wv] concat (set by fuse_qkv at load, CRISPASR_FC_FUSED_QKV).
+    // When attn_qkv_w is non-null, build_block does one matmul + view-split.
+    ggml_tensor *attn_qkv_w = nullptr, *attn_qkv_b = nullptr;
     ggml_tensor *attn_out_w = nullptr, *attn_out_b = nullptr;
     ggml_tensor* attn_pos_w = nullptr; // no bias on rel-pos projection
     ggml_tensor* pos_bias_u = nullptr;
@@ -251,6 +270,221 @@ struct BlockWeights {
     // ---- Block final LN ----
     ggml_tensor *norm_out_w = nullptr, *norm_out_b = nullptr;
 };
+
+// ---------------------------------------------------------------------------
+// Load-time Q8_0 repack of the conv pointwise weights (issue #81).
+//
+// The GGUF stores conv.pw1/pw2 as 3D conv tensors (1, d, 2d)/(1, d, d), so
+// crispasr-quantize's 2D-only rule skips them and they ship as F16 even in
+// Q8_0/Q4_K models. The ggml CPU F16 mul_mat has no repack fast path and
+// measures ~6x slower per FLOP than Q8_0 (M1 per-node profile: the two pw
+// matmuls were 35% of encoder time in a q8_0 parakeet-ctc). Repacking them
+// to 2D Q8_0 at load moves them onto the optimized int8 kernels.
+//
+// Gate: CRISPASR_FC_PW_Q8 — "0" forces off, "1" forces on. Unset: enabled
+// only when the model is already quantized (pw quantization noise is then
+// in-family); pure F16/F32 models keep their exact weights.
+// ---------------------------------------------------------------------------
+static inline int fc_pw_q8_mode() { // -1 = auto, 0 = off, 1 = on
+    static int v = -2;
+    if (v == -2) {
+        const char* e = std::getenv("CRISPASR_FC_PW_Q8");
+        v = (!e || !*e) ? -1 : (*e != '0' ? 1 : 0);
+    }
+    return v;
+}
+
+struct PwRepackBuf {
+    ggml_context* ctx = nullptr;
+    ggml_backend_buffer_t buf = nullptr;
+
+    void free() {
+        if (buf)
+            ggml_backend_buffer_free(buf);
+        if (ctx)
+            ggml_free(ctx);
+        buf = nullptr;
+        ctx = nullptr;
+    }
+};
+
+// Repack each layer's F16 conv_pw1_w / conv_pw2_w into fresh 2D Q8_0 tensors
+// (allocated in `out`) and repoint the BlockWeights fields. `model_quantized`
+// should be true when the surrounding model weights are quantized (used by
+// the auto gate). Returns the number of tensors repacked.
+static inline int repack_conv_pw_q8(std::vector<BlockWeights*>& layers, ggml_backend_t backend, bool model_quantized,
+                                    PwRepackBuf& out, const char* tag) {
+    const int mode = fc_pw_q8_mode();
+    if (mode == 0 || (mode == -1 && !model_quantized))
+        return 0;
+
+    auto eligible = [](ggml_tensor* t) {
+        if (!t || t->type != GGML_TYPE_F16 || !ggml_is_contiguous(t))
+            return false;
+        const int64_t n_per_row = t->ne[0] > 1 ? t->ne[0] : t->ne[1]; // (d,2d) or 3D (1,d,2d)
+        return n_per_row % ggml_blck_size(GGML_TYPE_Q8_0) == 0;
+    };
+
+    size_t n_tensors = 0;
+    for (auto* e : layers)
+        n_tensors += (eligible(e->conv_pw1_w) ? 1 : 0) + (eligible(e->conv_pw2_w) ? 1 : 0);
+    if (n_tensors == 0)
+        return 0;
+
+    ggml_init_params ip = {n_tensors * ggml_tensor_overhead(), nullptr, true};
+    out.ctx = ggml_init(ip);
+    if (!out.ctx)
+        return 0;
+
+    // Pass 1: create the Q8_0 tensors (2D — collapse the leading unit dim).
+    std::vector<std::pair<ggml_tensor**, ggml_tensor*>> jobs; // (slot, q8 tensor)
+    for (auto* e : layers) {
+        for (ggml_tensor** slot : {&e->conv_pw1_w, &e->conv_pw2_w}) {
+            ggml_tensor* src = *slot;
+            if (!eligible(src))
+                continue;
+            const int64_t n_per_row = src->ne[0] > 1 ? src->ne[0] : src->ne[1];
+            const int64_t n_rows = ggml_nelements(src) / n_per_row;
+            ggml_tensor* q8 = ggml_new_tensor_2d(out.ctx, GGML_TYPE_Q8_0, n_per_row, n_rows);
+            jobs.push_back({slot, q8});
+        }
+    }
+    out.buf = ggml_backend_alloc_ctx_tensors(out.ctx, backend);
+    if (!out.buf) {
+        out.free();
+        return 0;
+    }
+
+    // Pass 2: F16 → F32 → Q8_0, upload, repoint.
+    std::vector<ggml_fp16_t> h16;
+    std::vector<float> h32;
+    std::vector<uint8_t> hq;
+    for (auto& j : jobs) {
+        ggml_tensor* src = *j.first;
+        const int64_t n = ggml_nelements(src);
+        const int64_t n_per_row = j.second->ne[0];
+        const int64_t n_rows = j.second->ne[1];
+        h16.resize(n);
+        h32.resize(n);
+        ggml_backend_tensor_get(src, h16.data(), 0, n * sizeof(ggml_fp16_t));
+        ggml_fp16_to_fp32_row(h16.data(), h32.data(), n);
+        hq.resize(ggml_row_size(GGML_TYPE_Q8_0, n_per_row) * n_rows);
+        ggml_quantize_chunk(GGML_TYPE_Q8_0, h32.data(), hq.data(), 0, n_rows, n_per_row, nullptr);
+        ggml_backend_tensor_set(j.second, hq.data(), 0, hq.size());
+        *j.first = j.second;
+    }
+
+    fprintf(stderr, "%s: repacked %zu F16 conv pw tensors to Q8_0 (CRISPASR_FC_PW_Q8)\n", tag, jobs.size());
+    return (int)jobs.size();
+}
+
+// ---------------------------------------------------------------------------
+// Load-time Q/K/V weight fusion (issue #81). Concatenates each layer's
+// attn_q_w / attn_k_w / attn_v_w (same shape, same type) into one
+// (d_in, 3*d_out) tensor so build_block issues a single matmul + view-split
+// instead of three matmuls over the same input. Output rows are the same
+// independent dot products, so the result is bit-identical to the split path.
+//
+// Gate: CRISPASR_FC_FUSED_QKV — "0" off, unset/other = on.
+// ---------------------------------------------------------------------------
+static inline bool fc_fused_qkv_enabled() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = std::getenv("CRISPASR_FC_FUSED_QKV");
+        v = (e && *e == '0') ? 0 : 1;
+    }
+    return v != 0;
+}
+
+static inline int fuse_qkv(std::vector<BlockWeights*>& layers, ggml_backend_t backend, PwRepackBuf& out,
+                           const char* tag) {
+    if (!fc_fused_qkv_enabled())
+        return 0;
+
+    auto eligible = [](const BlockWeights* e) {
+        ggml_tensor *q = e->attn_q_w, *k = e->attn_k_w, *v = e->attn_v_w;
+        if (!q || !k || !v)
+            return false;
+        if (q->type != k->type || q->type != v->type)
+            return false;
+        if (!ggml_is_contiguous(q) || !ggml_is_contiguous(k) || !ggml_is_contiguous(v))
+            return false;
+        if (q->ne[0] != k->ne[0] || q->ne[0] != v->ne[0] || q->ne[1] != k->ne[1] || q->ne[1] != v->ne[1] ||
+            ggml_n_dims(q) != 2 || ggml_n_dims(k) != 2 || ggml_n_dims(v) != 2)
+            return false;
+        // Biases: all absent or all present (F32 1-D).
+        const int nb = (e->attn_q_b != nullptr) + (e->attn_k_b != nullptr) + (e->attn_v_b != nullptr);
+        if (nb != 0 && nb != 3)
+            return false;
+        if (nb == 3 && (e->attn_q_b->type != GGML_TYPE_F32 || e->attn_k_b->type != GGML_TYPE_F32 ||
+                        e->attn_v_b->type != GGML_TYPE_F32))
+            return false;
+        return true;
+    };
+
+    size_t n_tensors = 0;
+    for (auto* e : layers)
+        if (eligible(e))
+            n_tensors += e->attn_q_b ? 2 : 1;
+    if (n_tensors == 0)
+        return 0;
+
+    ggml_init_params ip = {n_tensors * ggml_tensor_overhead(), nullptr, true};
+    out.ctx = ggml_init(ip);
+    if (!out.ctx)
+        return 0;
+
+    struct Job {
+        BlockWeights* e;
+        ggml_tensor *w = nullptr, *b = nullptr;
+    };
+    std::vector<Job> jobs;
+    for (auto* e : layers) {
+        if (!eligible(e))
+            continue;
+        Job j;
+        j.e = e;
+        j.w = ggml_new_tensor_2d(out.ctx, e->attn_q_w->type, e->attn_q_w->ne[0], 3 * e->attn_q_w->ne[1]);
+        if (e->attn_q_b)
+            j.b = ggml_new_tensor_1d(out.ctx, GGML_TYPE_F32, 3 * e->attn_q_b->ne[0]);
+        jobs.push_back(j);
+    }
+    ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors(out.ctx, backend);
+    if (!buf) {
+        out.free();
+        return 0;
+    }
+    out.buf = buf;
+
+    std::vector<uint8_t> h;
+    int n_fused = 0;
+    for (auto& j : jobs) {
+        size_t off = 0;
+        for (ggml_tensor* src : {j.e->attn_q_w, j.e->attn_k_w, j.e->attn_v_w}) {
+            const size_t nb = ggml_nbytes(src);
+            h.resize(nb);
+            ggml_backend_tensor_get(src, h.data(), 0, nb);
+            ggml_backend_tensor_set(j.w, h.data(), off, nb);
+            off += nb;
+        }
+        j.e->attn_qkv_w = j.w;
+        if (j.b) {
+            off = 0;
+            for (ggml_tensor* src : {j.e->attn_q_b, j.e->attn_k_b, j.e->attn_v_b}) {
+                const size_t nb = ggml_nbytes(src);
+                h.resize(nb);
+                ggml_backend_tensor_get(src, h.data(), 0, nb);
+                ggml_backend_tensor_set(j.b, h.data(), off, nb);
+                off += nb;
+            }
+            j.e->attn_qkv_b = j.b;
+        }
+        n_fused++;
+    }
+
+    fprintf(stderr, "%s: fused Q/K/V projections for %d layers (CRISPASR_FC_FUSED_QKV)\n", tag, n_fused);
+    return n_fused;
+}
 
 struct BlockParams {
     int d; // d_model
@@ -299,9 +533,26 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
     // ---- Self-Attention (rel_pos with untied biases) ----
     x = ggml_norm_affine(ctx0, cur, e.norm_attn_w, e.norm_attn_b, eps);
 
-    ggml_tensor* Q = mm_bias(e.attn_q_w, x, e.attn_q_b);
-    ggml_tensor* K_ = mm_bias(e.attn_k_w, x, e.attn_k_b);
-    ggml_tensor* V = mm_bias(e.attn_v_w, x, e.attn_v_b);
+    // Q/K/V projections — fused single matmul + view-split when the load-time
+    // concat is available (bit-identical: each output row is the same dot
+    // product either way), else three separate matmuls.
+    ggml_tensor* Q;  // (d, T)
+    ggml_tensor* K3; // (head_dim, n_heads, T)
+    ggml_tensor* V3; // (head_dim, n_heads, T)
+    if (e.attn_qkv_w) {
+        ggml_tensor* qkv = ggml_mul_mat(ctx0, e.attn_qkv_w, x); // (3d, T)
+        if (e.attn_qkv_b)
+            qkv = ggml_add(ctx0, qkv, e.attn_qkv_b);
+        Q = ggml_view_2d(ctx0, qkv, d, T, qkv->nb[1], 0);
+        K3 = ggml_view_3d(ctx0, qkv, head_dim, n_heads, T, (size_t)head_dim * sizeof(float), qkv->nb[1],
+                          (size_t)d * sizeof(float));
+        V3 = ggml_view_3d(ctx0, qkv, head_dim, n_heads, T, (size_t)head_dim * sizeof(float), qkv->nb[1],
+                          (size_t)2 * d * sizeof(float));
+    } else {
+        Q = mm_bias(e.attn_q_w, x, e.attn_q_b);
+        K3 = ggml_reshape_3d(ctx0, mm_bias(e.attn_k_w, x, e.attn_k_b), head_dim, n_heads, T);
+        V3 = ggml_reshape_3d(ctx0, mm_bias(e.attn_v_w, x, e.attn_v_b), head_dim, n_heads, T);
+    }
     ggml_tensor* R = ggml_mul_mat(ctx0, e.attn_pos_w, pos_enc); // no bias
 
     ggml_tensor* Q_u = ggml_add(ctx0, Q, ggml_reshape_1d(ctx0, e.pos_bias_u, d));
@@ -309,7 +560,7 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
 
     Q_u = ggml_permute(ctx0, ggml_reshape_3d(ctx0, Q_u, head_dim, n_heads, T), 0, 2, 1, 3);
     Q_v = ggml_permute(ctx0, ggml_reshape_3d(ctx0, Q_v, head_dim, n_heads, T), 0, 2, 1, 3);
-    K_ = ggml_permute(ctx0, ggml_reshape_3d(ctx0, K_, head_dim, n_heads, T), 0, 2, 1, 3);
+    ggml_tensor* K_ = ggml_permute(ctx0, K3, 0, 2, 1, 3);
     R = ggml_permute(ctx0, ggml_reshape_3d(ctx0, R, head_dim, n_heads, 2 * T - 1), 0, 2, 1, 3);
 
     // Compute the relative position bias BD = rel_shift(Q_v × R^T).
@@ -349,8 +600,7 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
         scores = ggml_soft_max_ext(ctx0, scores, nullptr, scale, 0.0f);
         // V: (head_dim, n_heads, T) → permute(0,2,1,3) → (head_dim, T, n_heads)
         // Then transpose via permute(1,0,2,3) → (T, head_dim, n_heads) for mul_mat
-        ggml_tensor* V_3d =
-            ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, V, head_dim, n_heads, T), 0, 2, 1, 3));
+        ggml_tensor* V_3d = ggml_cont(ctx0, ggml_permute(ctx0, V3, 0, 2, 1, 3));
         // V_3d: (head_dim, T, n_heads) — need (T, head_dim, n_heads) for mul_mat
         ggml_tensor* V_t = ggml_cont(ctx0, ggml_permute(ctx0, V_3d, 1, 0, 2, 3)); // (T, head_dim, n_heads)
         attn_out = ggml_mul_mat(ctx0, V_t, scores);                               // (head_dim, T, n_heads)
@@ -359,11 +609,20 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
         // flash_attn_ext mask must be F16
         ggml_tensor* BD_mask = ggml_cast(ctx0, BD_scaled, GGML_TYPE_F16);
 
-        // V needs [head_dim, T, n_heads] layout for flash_attn_ext (same as K)
-        ggml_tensor* V_ =
-            ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, V, head_dim, n_heads, T), 0, 2, 1, 3));
+        // V needs [head_dim, T, n_heads] layout for flash_attn_ext (same as K).
+        // The kernel reads strided views (nb0 == type size) directly — the
+        // legacy ggml_cont copies of Q/K/V are restorable via
+        // CRISPASR_FC_ATTN_CONT=1 for regression bisection.
+        ggml_tensor* Q_f = Q_u;
+        ggml_tensor* K_f = K_;
+        ggml_tensor* V_f = ggml_permute(ctx0, V3, 0, 2, 1, 3);
+        if (fc_attn_cont()) {
+            Q_f = ggml_cont(ctx0, Q_f);
+            K_f = ggml_cont(ctx0, K_f);
+            V_f = ggml_cont(ctx0, V_f);
+        }
 
-        attn_out = ggml_flash_attn_ext(ctx0, ggml_cont(ctx0, Q_u), ggml_cont(ctx0, K_), V_, BD_mask, scale, 0.0f, 0.0f);
+        attn_out = ggml_flash_attn_ext(ctx0, Q_f, K_f, V_f, BD_mask, scale, 0.0f, 0.0f);
         attn_out = ggml_reshape_2d(ctx0, attn_out, d, T);
     }
 
