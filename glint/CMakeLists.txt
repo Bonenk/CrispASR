@@ -39,6 +39,7 @@ add_library(glint STATIC
     src/mp3_decoder.cpp
     src/aac_decoder.cpp
     src/decoder_c_api.cpp
+    src/decode_audio_c_api.cpp
     src/opus_mdct.cpp
     src/opus_ogg.cpp
     src/opus_celt_enc_energy.cpp
