@@ -38,6 +38,12 @@ import kaggle_harness as kh  # noqa: E402
 BUILD = TEMP / "build"
 BUILD.mkdir(parents=True, exist_ok=True)
 
+# Install ninja/ccache/mold AND warm ccache from the attached chr1s4/crispasr-ccache
+# dataset (kaggle_usage.md #13/#17). Without this the build runs cold (~21 min);
+# warm it's ~3 min. cache_and_link_flags() below only sets the compiler-launcher
+# flags — it does NOT install or warm ccache, which is what this call does.
+kh.install_build_toolchain()
+
 has_cuda = Path("/usr/local/cuda/bin/nvcc").exists()
 print(f"  CUDA available: {has_cuda}")
 
@@ -325,4 +331,20 @@ all_results = {
 with open(WORK / "benchmark_results.json", "w") as f:
     json.dump(all_results, f, indent=2)
 print(f"\n  Results saved to {WORK / 'benchmark_results.json'}")
+
+# Refresh the ccache snapshot so the chr1s4/crispasr-ccache dataset can be
+# updated from this run's output (kaggle_usage.md #17 — keep it current or warm
+# builds go stale). ccache lives at /kaggle/working/.ccache (set by
+# install_build_toolchain); tar it into /kaggle/working so it downloads as a
+# kernel output, then `kaggle datasets version` from it.
+try:
+    ccache_dir = Path("/kaggle/working/.ccache")
+    if ccache_dir.is_dir():
+        subprocess.run("cd /kaggle/working && tar cf ccache.tar .ccache/", shell=True, check=True)
+        sz = (WORK / "ccache.tar").stat().st_size / (1024**2)
+        print(f"  ccache.tar written ({sz:.0f} MB) — update chr1s4/crispasr-ccache from it", flush=True)
+        subprocess.run("ccache -s 2>/dev/null | tail -5 || true", shell=True)
+except Exception as e:  # noqa: BLE001
+    print(f"  ccache tar skipped: {e}", flush=True)
+
 print("\n=== Done ===", flush=True)
