@@ -50,8 +50,9 @@
 #include "crispasr_watermark.h"
 #include "crispasr_watermark_dispatch.h"
 #include "crispasr_wav_writer.h"
-#include "crispasr_mp3_writer.h" // MP3 output via in-tree glint encoder
-#include "crispasr_aac_writer.h" // AAC-LC (ADTS) output via in-tree glint encoder
+#include "crispasr_mp3_writer.h"  // MP3 output via in-tree glint encoder
+#include "crispasr_aac_writer.h"  // AAC-LC (ADTS) output via in-tree glint encoder
+#include "crispasr_opus_writer.h" // Ogg Opus output via in-tree glint encoder
 #include "../server/httplib.h"
 #include "../json.hpp"
 
@@ -715,6 +716,24 @@ static std::string crispasr_encode_opus(const float* pcm, int n_samples, int sam
     return result;
 }
 #endif // CRISPASR_HAVE_OPUS
+
+// Encode TTS PCM for response_format=opus. Default: a real, playable Ogg Opus
+// file via the in-tree glint encoder (RFC 7845; no libopus needed, so opus
+// output is now always available). CRISPASR_OPUS_ENCODER=libopus selects the
+// legacy raw-packet libopus path (kept for A/B; it is NOT a standard container
+// — length-prefixed frames — so only reachable when built with libopus).
+// Sets content_type and returns the encoded bytes (empty on failure).
+static std::string crispasr_opus_response(const float* pcm, int n_samples, int sample_rate, const char** content_type) {
+#ifdef CRISPASR_HAVE_OPUS
+    const char* pref = std::getenv("CRISPASR_OPUS_ENCODER");
+    if (pref && std::strcmp(pref, "libopus") == 0) {
+        *content_type = "audio/opus";
+        return crispasr_encode_opus(pcm, n_samples, sample_rate);
+    }
+#endif
+    *content_type = "audio/ogg";
+    return crispasr_make_opus(pcm, n_samples, sample_rate);
+}
 
 // ---------------------------------------------------------------------------
 // Server entry point
@@ -1534,15 +1553,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                        "unsupported_response_format", "response_format");
             return;
         }
-#ifndef CRISPASR_HAVE_OPUS
-        if (response_format == "opus") {
-            json_error(res, 400,
-                       "opus output requires libopus; rebuild with -DCMAKE_PREFIX_PATH pointing at opus, "
-                       "or install libopus-dev",
-                       "codec_not_available", "response_format");
-            return;
-        }
-#endif
+        // opus output is always available via the in-tree glint encoder
+        // (a real Ogg Opus file); no libopus required.
 
         float speed = body.value("speed", 1.0f);
         if (!(speed >= 0.25f && speed <= 4.0f)) {
@@ -1898,15 +1910,14 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                 return;
             }
             res.set_content(std::move(aac), "audio/aac");
-#ifdef CRISPASR_HAVE_OPUS
         } else if (response_format == "opus") {
-            std::string opus = crispasr_encode_opus(pcm.data(), (int)pcm.size(), sr_out);
+            const char* ct = "audio/ogg";
+            std::string opus = crispasr_opus_response(pcm.data(), (int)pcm.size(), sr_out, &ct);
             if (opus.empty()) {
                 json_error(res, 500, "Opus encoding failed", "encoding_failed");
                 return;
             }
-            res.set_content(std::move(opus), "audio/opus");
-#endif
+            res.set_content(std::move(opus), ct);
         } else {
             std::string wav = crispasr_make_wav_int16(pcm.data(), (int)pcm.size(), sr_out);
             // C2PA Content Credentials signing (when c2pa-c is available
@@ -2044,15 +2055,14 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                 return;
             }
             res.set_content(std::move(aac), "audio/aac");
-#ifdef CRISPASR_HAVE_OPUS
         } else if (response_format == "opus") {
-            std::string opus = crispasr_encode_opus(pcm.data(), (int)pcm.size(), sr_out);
+            const char* ct = "audio/ogg";
+            std::string opus = crispasr_opus_response(pcm.data(), (int)pcm.size(), sr_out, &ct);
             if (opus.empty()) {
                 json_error(res, 500, "Opus encoding failed", "encoding_failed");
                 return;
             }
-            res.set_content(std::move(opus), "audio/opus");
-#endif
+            res.set_content(std::move(opus), ct);
         } else {
             std::string wav = crispasr_make_wav_int16(pcm.data(), (int)pcm.size(), sr_out);
             crispasr_c2pa_sign_wav(wav, params.c2pa_cert, params.c2pa_key);
