@@ -116,31 +116,37 @@ Systematic evaluation against [transcribe.cpp](https://github.com/handy-computer
 Test audio: `jfk.wav` (11s, 16 kHz mono). WER computed against reference transcript.
 RTF = real-time factor (lower = faster; < 1.0 means faster than real-time).
 
-### GPU mode (both engines on CUDA, P100 sm_60)
+### GPU mode (both engines on CUDA, P100 sm_60) — v13, 2026-07-11
 
 | Family | CA RTF | TC RTF | CA WER | TC WER | Notes |
 |--------|--------|--------|--------|--------|-------|
-| Whisper base | 0.025 | **0.021** | 0% | 0% | Near parity; CA ggml-base.bin vs TC Q8_0 |
-| SenseVoice Small | **0.018** | 0.020 | 0% | 0% | Near parity; CA Q4_K vs TC Q8_0 |
-| Parakeet TDT 0.6B | 0.099 | **0.032** | 0% | 0% | TC 3.1x faster; CA v3 vs TC v2 |
-| Qwen3-ASR 0.6B | **0.087** | 0.116 | 0% | 0% | CA 1.3x faster; both Q4_K |
-| Canary 1B v2 | **0.042** | 0.054 | 0% | 0% | CA 1.3x faster |
-| FunASR Nano 2512 | **0.043** | 0.142 | 0% | 100% | CA 3.3x faster; TC GPU inference bug (100% WER) |
-| Moonshine Tiny | 0.080 | **0.013** | 9.1% | 0% | TC 6x faster; CA Q4_K quant diff |
-| Moonshine Streaming Tiny | 0.278 | **0.013** | 0% | 0% | TC 21x faster (CA streaming overhead) |
-| Nemotron 3.5 ASR 0.6B | 0.385 | **0.046** | 0% | 0% | TC 8.4x faster |
+| SenseVoice Small | **0.016** | 0.019 | 0% | 0% | CA 1.2x faster |
+| Whisper base | **0.022** | 0.021 | 0% | 0% | Parity |
+| Canary 1B v2 | **0.043** | 0.048 | 0% | 0% | CA 1.1x faster |
+| FunASR Nano 2512 | **0.046** | 0.140 | 0% | 100% | CA 3x faster; TC GPU bug |
+| Cohere Transcribe | **0.046** | 0.070 | 0% | 0% | CA 1.5x faster |
+| Whisper Large v3 Turbo | 0.060 | **0.049** | 0% | 0% | TC 1.2x faster |
+| Moonshine Tiny | 0.069 | **0.012** | 9.1% | 0% | TC 5.8x; encoder im2col overhead |
+| Qwen3-ASR 0.6B | **0.086** | 0.112 | 0% | 0% | CA 1.3x faster |
+| Parakeet TDT 0.6B | 0.095 | **0.029** | 0% | 0% | TC 3.3x; CPU cblas decoder |
+| Moonshine Streaming Tiny | 0.250 | **0.014** | 0% | 0% | TC 18x; sliding-window masks |
+| Nemotron 3.5 ASR 0.6B | 0.345 | **0.049** | 0% | 0% | TC 7x; CPU cblas RNNT decoder |
 
-### CPU mode (both engines, no GPU)
+### CPU mode (both engines, no GPU) — v13
 
 | Family | CA RTF | TC RTF | CA WER | TC WER |
 |--------|--------|--------|--------|--------|
-| Whisper base | 0.500 | **0.170** | 0% | 0% |
-| SenseVoice Small | 0.179 | **0.135** | 0% | 0% |
-| Parakeet TDT 0.6B | 0.476 | **0.313** | 0% | 0% |
-| Qwen3-ASR 0.6B | 0.667 | **0.518** | 0% | 0% |
-| Canary 1B v2 | 0.588 | **0.445** | 0% | 0% |
-| FunASR Nano 2512 | 0.476 | **0.290** | 0% | 0% |
-| Nemotron 3.5 ASR 0.6B | 0.714 | **0.266** | 0% | 0% |
+| Moonshine Tiny | 0.069 | **0.068** | 9.1% | 0% |
+| SenseVoice Small | 0.156 | **0.118** | 0% | 0% |
+| Whisper base | 0.233 | **0.135** | 0% | 0% |
+| Moonshine Streaming Tiny | 0.244 | **0.032** | 0% | 0% |
+| Parakeet TDT 0.6B | 0.385 | **0.266** | 0% | 0% |
+| FunASR Nano 2512 | 0.417 | **0.232** | 0% | 0% |
+| Canary 1B v2 | 0.526 | **0.384** | 0% | 0% |
+| Qwen3-ASR 0.6B | 0.625 | **0.459** | 0% | 0% |
+| Nemotron 3.5 ASR 0.6B | 0.625 | **0.232** | 0% | 0% |
+| Cohere Transcribe | 0.909 | **0.803** | 0% | 0% |
+| Whisper Large v3 Turbo | 5.000 | **2.294** | 0% | 0% |
 
 ### transcribe.cpp-only models (CrispASR coverage gaps)
 
@@ -150,8 +156,9 @@ RTF = real-time factor (lower = faster; < 1.0 means faster than real-time).
 
 ### Key findings
 
-- **GPU**: Competitive — CrispASR wins 3/9 (SenseVoice, Qwen3, Canary, FunASR),
-  transcribe.cpp wins 4/9 (Parakeet, Moonshine, Nemotron), near-parity on Whisper.
+- **GPU**: CrispASR wins 6/11, ties 1, loses 4. Wins on SenseVoice, Whisper,
+  Canary, FunASR, Cohere, Qwen3. Loses on Parakeet (CPU cblas decoder), Nemotron
+  (CPU cblas RNNT), Moonshine (encoder im2col), Moonshine Streaming (architectural).
   Both require `-DGGML_CUDA_NO_VMM=ON` on Kaggle for `CUDA::cuda_driver` resolution.
 - **CPU**: transcribe.cpp 1.3-3x faster across the board — leaner runtime with
   less dispatch overhead. CrispASR's unified backend path includes VAD, segment
