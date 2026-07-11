@@ -829,6 +829,14 @@ constexpr Entry k_registry[] = {
      "dacvae-ja-32dim-f16.gguf",
      "https://huggingface.co/cstr/irodori-tts-voicedesign-GGUF/resolve/main/dacvae-ja-32dim-f16.gguf",
      "~135 MB"},
+    // BananaMind-TTS: Tacotron-lite + HiFi-GAN vocoder. Lightweight
+    // (~50 MB) single-speaker TTS, EN and DE variants.
+    {"bananamind-tts", "bananamind-tts-en-q8_0.gguf",
+     "https://huggingface.co/cstr/bananamind-tts-GGUF/resolve/main/bananamind-tts-en-q8_0.gguf",
+     "~38 MB", nullptr, nullptr},
+    {"bananamind-tts-de", "bananamind-tts-de-q8_0.gguf",
+     "https://huggingface.co/cstr/bananamind-tts-GGUF/resolve/main/bananamind-tts-de-q8_0.gguf",
+     "~38 MB", nullptr, nullptr},
     // CTC forced aligner — used by `-am auto` to attach word-level
     // timestamps (LLM-decode backends, or any backend when paired
     // with `--force-aligner` / `-fa`). Q4_K is the recommended quant
