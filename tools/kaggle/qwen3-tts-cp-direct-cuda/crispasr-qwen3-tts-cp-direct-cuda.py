@@ -279,11 +279,16 @@ def run_tts(label, env_overrides, timeout=600):
     }
 
 
+# v2 (post-3584fac0): CP_DIRECT and codec FASTCONV are now DEFAULT-ON for
+# GPU backends — this run validates the shipped defaults against the full
+# legacy path on CUDA. "base" pins both gates OFF; "direct" is the shipped
+# default; "direct_lk" adds the opt-in talker bucketing (fastest on P100
+# in v1). Output equivalence: md5, else PCM cosine (CPU showed a 1-LSB
+# realization drift on the FASTCONV K=1 matmul; cos 1.00000000).
 MATRIX = [
-    ("base", {}),
-    ("o15", {"QWEN3_TTS_O15": "1"}),
-    ("direct", {"QWEN3_TTS_CP_DIRECT": "1"}),
-    ("direct_lk", {"QWEN3_TTS_CP_DIRECT": "1", "QWEN3_TTS_LK_BUCKET": "1"}),
+    ("base", {"QWEN3_TTS_CODEC_FASTCONV": "0", "QWEN3_TTS_CP_DIRECT": "0"}),
+    ("direct", {}),
+    ("direct_lk", {"QWEN3_TTS_LK_BUCKET": "1"}),
 ]
 results = {}
 for label, env_overrides in MATRIX:
@@ -344,9 +349,36 @@ for label, _ in MATRIX:
 print(f"  ASR roundtrip base:   {asr_base[:100]!r}", flush=True)
 print(f"  ASR roundtrip direct: {asr_direct[:100]!r}", flush=True)
 
+def pcm_cos(p1, p2):
+    """Sample-wise cosine of two 16-bit WAVs (None on any failure)."""
+    try:
+        import wave
+        import numpy as np
+        def rd(p):
+            w = wave.open(p)
+            x = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+            w.close()
+            return x.astype(np.float64)
+        a, b = rd(p1), rd(p2)
+        n = min(len(a), len(b))
+        if n == 0 or len(a) != len(b):
+            return 0.0
+        a, b = a[:n], b[:n]
+        return float(a @ b / ((a @ a) ** 0.5 * (b @ b) ** 0.5 + 1e-12))
+    except Exception:
+        return None
+
+
 d = results["direct"]
+same_md5 = bool(d["md5"]) and d["md5"] == base_md5
+cos = None
+if not same_md5 and d["wav_ok"] and results["base"]["wav_ok"]:
+    cos = pcm_cos(results["base"]["wav_path"], d["wav_path"])
+out_equiv = same_md5 or (cos is not None and cos > 0.99999)
+if cos is not None:
+    print(f"  PCM cos(base, direct) = {cos:.8f}", flush=True)
 direct_ok = (
-    d["rc"] == 0 and d["wav_ok"] and d["md5"] == base_md5
+    d["rc"] == 0 and d["wav_ok"] and out_equiv
     and d["direct_active"] and not d["fell_back"]
 )
 direct_faster = (
@@ -357,26 +389,28 @@ direct_faster = (
 
 if direct_ok and direct_faster:
     b = results["base"]
-    print(f"\n  VERDICT: CP_DIRECT WORKS on CUDA ({gpu_name}), md5-identical. "
+    eq = "md5-identical" if same_md5 else f"PCM cos {cos:.8f}"
+    print(f"\n  VERDICT: shipped defaults (CP_DIRECT + FASTCONV) WORK on CUDA "
+          f"({gpu_name}), {eq}. "
           f"{b['ms_per_frame']:.1f} -> {d['ms_per_frame']:.1f} ms/frame "
           f"({(1 - d['ms_per_frame']/b['ms_per_frame'])*100:.0f}% faster).", flush=True)
-    print("  ACTION: safe to flip QWEN3_TTS_CP_DIRECT default ON.", flush=True)
 elif direct_ok:
-    print("\n  VERDICT: CP_DIRECT correct on CUDA (md5-identical) but no "
-          "speedup here — check bench lines before flipping the default.", flush=True)
+    print("\n  VERDICT: shipped defaults correct on CUDA (output equivalent) "
+          "but no speedup here — check bench lines.", flush=True)
 elif d["rc"] != 0:
-    print(f"\n  VERDICT: CP_DIRECT CRASHES on CUDA (rc={d['rc']}). "
-          "Keep opt-in, investigate.", flush=True)
+    print(f"\n  VERDICT: shipped defaults CRASH on CUDA (rc={d['rc']}). "
+          "REGRESSION — investigate before release.", flush=True)
 elif d["fell_back"]:
     print("\n  VERDICT: CP_DIRECT fell back to the sched path on CUDA "
           "(unsupported op / placement). Output still valid; no CUDA win.", flush=True)
 else:
-    print("\n  VERDICT: CP_DIRECT output mismatch on CUDA. Investigate "
-          "before any default flip.", flush=True)
+    print("\n  VERDICT: shipped-defaults output mismatch on CUDA "
+          f"(md5 differs, cos={cos}). REGRESSION — investigate.", flush=True)
 
 kh.step(
     "summary",
-    direct_ok=direct_ok, direct_faster=direct_faster,
+    direct_ok=direct_ok, direct_faster=direct_faster, same_md5=same_md5,
+    pcm_cos=cos,
     base_ms=results["base"]["ms_per_frame"], direct_ms=d["ms_per_frame"],
     base_md5=base_md5, direct_md5=d["md5"], sha=sha,
 )
