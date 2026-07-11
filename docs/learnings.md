@@ -215,3 +215,20 @@ Lessons from the systematic head-to-head benchmark against
     CPU-pinned graph's weights on CPU is a *correctness* win too, not only perf.
     (moonshine_streaming stays CPU-by-default — the encoder is launch-bound on
     GPU; the fix is latent until the §232 Fix-2 batch encoder lands.)
+
+29. **Gate a GPU transducer-decode port on Kaggle BEFORE building it — the naive
+    per-step version loses.** Scoped the Parakeet TDT decode port (target: TC's
+    29 ms P100 decode). Three pieces of evidence all point the same way: (a)
+    LEARNINGS 24 — batched GPU joint measured 8.8× WORSE (CPU sgemm, idle GPU);
+    (b) LEARNINGS 25-27 — per-step GPU dispatch of ≤8198×640 matmuls is
+    launch-bound on Metal and loses to CPU cblas; (c) M1 CANNOT measure the win
+    (parakeet is already encoder-bound + 6× RT on Metal; the decode gap is a
+    CUDA-vs-CUDA competitiveness issue). TC's 29 ms almost certainly comes from
+    **CUDA-graph capture** (whole step loop as one replayable graph), not per-step
+    ggml dispatch. **Lesson: for a transducer/AR GPU-decode port whose only
+    payoff is on CUDA, don't hand-write a large speculative ggml decode from an
+    M1 session — scope the exact math (mind stale comments: the parakeet joint is
+    ReLU, not the tanh the header claims), record the design, and build+A/B it on
+    Kaggle where it can actually be measured. Correctness (transcript/WER parity)
+    is HW-independent and can be pre-validated on M1; perf cannot.** Design in
+    PLAN §232 "RNNT/TDT GPU decode".
