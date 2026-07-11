@@ -1177,6 +1177,82 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         return -std::log(-std::log(u));
     };
 
+    // 8. Persistent forward graphs (#245 follow-up). The graph topology and
+    // every tensor shape are identical across all masked-iteration steps —
+    // T_total / T_target are fixed for the whole synthesis and there is no
+    // KV cache (bidirectional attention, full recompute per step). Build and
+    // gallocr-allocate each arm once, refresh only the input embeddings per
+    // step; positions never change so they are set once at init.
+    int out_dim = (int)(hp.n_codebooks * hp.audio_vocab_size);
+    struct ov_step_graph {
+        std::vector<uint8_t> mem_buf;
+        ggml_context* ctx0 = nullptr;
+        ggml_cgraph* gf = nullptr;
+        ggml_tensor* inp = nullptr;
+        ggml_tensor* logits = nullptr;
+        ggml_gallocr_t ga = nullptr;
+    };
+    ov_step_graph fwd_c, fwd_u;
+    auto fwd_free = [](ov_step_graph& g) {
+        if (g.ga)
+            ggml_gallocr_free(g.ga);
+        if (g.ctx0)
+            ggml_free(g.ctx0);
+        g.ga = nullptr;
+        g.ctx0 = nullptr;
+    };
+    auto run_llm_forward = [&](ov_step_graph& g, const std::vector<float>& emb, int T_in,
+                               int target_offset) -> std::vector<float> {
+        if (!g.ctx0) {
+            size_t n_tensors = hp.n_layers * 40 + 100;
+            size_t mem_size = n_tensors * ggml_tensor_overhead() + ggml_graph_overhead_custom(8192, false);
+            g.mem_buf.resize(mem_size);
+            ggml_init_params ip2 = {mem_size, g.mem_buf.data(), true};
+            g.ctx0 = ggml_init(ip2);
+            g.inp = ggml_new_tensor_2d(g.ctx0, GGML_TYPE_F32, hp.d_model, T_in);
+            ggml_set_name(g.inp, "input_embeds");
+            ggml_set_input(g.inp);
+            g.gf = build_llm_graph(ctx, g.ctx0, g.inp, T_in);
+            g.ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+            ggml_gallocr_alloc_graph(g.ga, g.gf);
+            g.logits = ggml_graph_get_tensor(g.gf, "audio_logits");
+        }
+        // Refresh BOTH inputs every compute: gallocr may alias an
+        // input-flagged tensor's slot with intermediates of the previous
+        // compute, so a set-once position tensor reads back clobbered data
+        // from the second compute on (bisected: step 0 bitwise-equal to the
+        // per-call path, step 1+ diverged until pos_ids was re-set).
+        std::vector<int32_t> pos_data(T_in);
+        for (int i = 0; i < T_in; i++)
+            pos_data[i] = i;
+        ggml_tensor* pos_t = ggml_graph_get_tensor(g.gf, "pos_ids");
+        if (pos_t)
+            ggml_backend_tensor_set(pos_t, pos_data.data(), 0, pos_data.size() * sizeof(int32_t));
+        ggml_backend_tensor_set(g.inp, emb.data(), 0, emb.size() * sizeof(float));
+        ggml_backend_graph_compute(ctx->backend, g.gf);
+        std::vector<float> all_logits(out_dim * T_in);
+        ggml_backend_tensor_get(g.logits, all_logits.data(), 0, all_logits.size() * sizeof(float));
+        // Extract target portion
+        std::vector<float> tgt(out_dim * T_target);
+        for (int t = 0; t < T_target; t++) {
+            std::memcpy(tgt.data() + (size_t)t * out_dim, all_logits.data() + (size_t)(target_offset + t) * out_dim,
+                        out_dim * sizeof(float));
+        }
+        static const bool persistent = [] {
+            const char* e = getenv("OMNIVOICE_PERSISTENT_GRAPH");
+            return !(e && e[0] == '0');
+        }();
+        if (!persistent)
+            fwd_free(g);
+        if (getenv("OMNIVOICE_DEBUG_SUM")) {
+            double s = 0;
+            for (float v : tgt)
+                s += v;
+            fprintf(stderr, "omnivoice-dbg: T_in=%d off=%d sum=%.9e\n", T_in, target_offset, s);
+        }
+        return tgt;
+    };
+
     // 8. Iterative generation loop
     for (int step = 0; step < gen.num_steps; step++) {
         int k = schedule[step];
@@ -1199,45 +1275,9 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         // Prepare conditional embeddings (full context: style + text + ref + target)
         auto embeds = prepare_embeddings(ctx, full_text_ids, audio_tokens, audio_mask, T_total);
 
-        // Helper: run LLM forward and extract target logits
-        int out_dim = (int)(hp.n_codebooks * hp.audio_vocab_size);
-        auto run_llm_forward = [&](const std::vector<float>& emb, int T_in, int target_offset) -> std::vector<float> {
-            size_t n_tensors = hp.n_layers * 40 + 100;
-            size_t mem_size = n_tensors * ggml_tensor_overhead() + ggml_graph_overhead_custom(8192, false);
-            std::vector<uint8_t> mem_buf(mem_size);
-            ggml_init_params ip2 = {mem_size, mem_buf.data(), true};
-            ggml_context* ctx0 = ggml_init(ip2);
-            ggml_tensor* inp = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, hp.d_model, T_in);
-            ggml_set_name(inp, "input_embeds");
-            ggml_set_input(inp);
-            ggml_cgraph* gf2 = build_llm_graph(ctx, ctx0, inp, T_in);
-            ggml_gallocr_t ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
-            ggml_gallocr_alloc_graph(ga, gf2);
-            ggml_backend_tensor_set(inp, emb.data(), 0, emb.size() * sizeof(float));
-            std::vector<int32_t> pos_data(T_in);
-            for (int i = 0; i < T_in; i++)
-                pos_data[i] = i;
-            ggml_tensor* pos_t = ggml_graph_get_tensor(gf2, "pos_ids");
-            if (pos_t)
-                ggml_backend_tensor_set(pos_t, pos_data.data(), 0, pos_data.size() * sizeof(int32_t));
-            ggml_backend_graph_compute(ctx->backend, gf2);
-            ggml_tensor* logits_out = ggml_graph_get_tensor(gf2, "audio_logits");
-            std::vector<float> all_logits(out_dim * T_in);
-            ggml_backend_tensor_get(logits_out, all_logits.data(), 0, all_logits.size() * sizeof(float));
-            // Extract target portion
-            std::vector<float> tgt(out_dim * T_target);
-            for (int t = 0; t < T_target; t++) {
-                std::memcpy(tgt.data() + (size_t)t * out_dim, all_logits.data() + (size_t)(target_offset + t) * out_dim,
-                            out_dim * sizeof(float));
-            }
-            ggml_gallocr_free(ga);
-            ggml_free(ctx0);
-            return tgt;
-        };
-
         // Conditional forward (full context)
         int target_start = T_total - T_target;
-        auto c_logits = run_llm_forward(embeds, T_total, target_start);
+        auto c_logits = run_llm_forward(fwd_c, embeds, T_total, target_start);
 
         // Unconditional forward (target tokens only) for classifier-free guidance
         std::vector<float> u_logits;
@@ -1253,7 +1293,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
                 }
             }
             auto u_embeds = prepare_embeddings(ctx, u_text_ids, u_audio, u_mask, T_target);
-            u_logits = run_llm_forward(u_embeds, T_target, 0);
+            u_logits = run_llm_forward(fwd_u, u_embeds, T_target, 0);
         }
 
         // _predict_tokens_with_scoring — mirrors Python exactly:
@@ -1390,6 +1430,9 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             tokens[indices[i]] = pred_tokens[indices[i]];
         }
     }
+
+    fwd_free(fwd_c);
+    fwd_free(fwd_u);
 
     result.codes = std::move(tokens);
     return result;
