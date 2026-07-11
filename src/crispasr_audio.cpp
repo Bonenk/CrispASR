@@ -282,22 +282,36 @@ int crispasr_au_decode(const char* path, int want_channels, float** out_buf, int
         return -2; // unsupported encoding
     }
 
+    // Determine the real file size up front so an untrusted data_offset /
+    // data_size can never drive an out-of-bounds seek or an unbounded
+    // allocation. Without this, a crafted .snd with data_size ≈ 4 GB in a
+    // tiny file forces a ~4 GB `raw` allocation (memory-exhaustion DoS /
+    // unhandled bad_alloc), and a data_offset past EOF makes the old
+    // `end - cur` underflow into a huge size_t.
+    if (std::fseek(f, 0, SEEK_END) != 0) {
+        std::fclose(f);
+        return -2;
+    }
+    long file_end = std::ftell(f);
+    if (file_end < 0 || (uint64_t)data_offset > (uint64_t)file_end) {
+        std::fclose(f);
+        return -2;
+    }
+
     // Seek to data
     if (std::fseek(f, (long)data_offset, SEEK_SET) != 0) {
         std::fclose(f);
         return -2;
     }
 
-    // Determine actual data size
+    // Determine actual data size — always clamped to the bytes the file
+    // really holds past data_offset, whatever the header claims.
+    size_t avail = (size_t)(file_end - (long)data_offset);
     size_t actual_size;
     if (data_size != 0xFFFFFFFFu && data_size != 0) {
-        actual_size = data_size;
+        actual_size = ((size_t)data_size < avail) ? (size_t)data_size : avail;
     } else {
-        long cur = std::ftell(f);
-        std::fseek(f, 0, SEEK_END);
-        long end = std::ftell(f);
-        std::fseek(f, cur, SEEK_SET);
-        actual_size = (size_t)(end - cur);
+        actual_size = avail;
     }
 
     size_t frame_size = (size_t)bytes_per_sample * file_ch;
