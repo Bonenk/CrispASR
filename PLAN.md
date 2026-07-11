@@ -6766,9 +6766,17 @@ and what parallel sessions own:
       step → the decode is O(T²). Fix: resident device-side KV cache written
       one position/step in-graph (the standard `core_attn::kv_self_attn`
       pattern). Gate + validate by TTS→ASR roundtrip. Model is local
-      (`pocket-tts-english-f16.gguf` + voice latents); measure the backbone
-      fraction of the wall FIRST (the mimi encoder was the old bottleneck,
-      already fixed `63ae5a43` 43 s→5.6 s).
+      (`pocket-tts-english-f16.gguf` + voice latents).
+      Established so far (branch `feat/232-pocket-kv`, WIP): the GGML backbone
+      path IS the default on GPU (`backbone_step` L1371 → `_ggml` unless
+      `--no-gpu`/`POCKET_MANUAL_BACKBONE`), so the O(T²) re-upload is on the
+      hot path. Per-frame ALSO runs `flow_net_forward` (diffusion, `lsd_steps`
+      per frame), which may dominate — added backbone-vs-flow accumulator
+      timers (`POCKET_TTS_BENCH=1`, `ar_loop backbone=… flow=…`, WIP
+      uncommitted). **GATE: measure the split on a quiet box before the graph
+      rewrite** — if flow dominates, the KV fix is not worth it (cf. vibevoice
+      graph-cache 0%-win). mimi encoder was the old bottleneck, already fixed
+      `63ae5a43` (43 s→5.6 s), so it's backbone-or-flow now.
 - [ ] **CosyVoice3 HiFT istft — DEFERRED, needs measurement + reframe.**
       PERFORMANCE.md calls it "O(n²) DFT, should be FFT", but `n_fft=16` — an
       FFT barely helps at that size. The real cost is `std::cos`/`std::sin`
