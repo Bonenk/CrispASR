@@ -5,7 +5,7 @@ codebase. Nothing here is breaking news; everything here is something
 we'd have saved days if we'd known up front.
 
 If a lesson is still "live" (affects current work), it's linked from
-`TODO.md`. If it's historical (a bug we already fixed), it's linked from
+`PLAN.md`. If it's historical (a bug we already fixed), it's linked from
 `HISTORY.md`.
 
 ---
