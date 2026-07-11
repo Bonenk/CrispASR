@@ -1073,18 +1073,25 @@ inflated; here are the trustworthy ones.** floor64 vs default:
   AND graph caching. Exactly the regression the §176b bucket was built to avoid,
   and the tight-floor bucket sidesteps it where raw NO_BUCKET does not.
 
-**Decision — keep opt-in, default 512; a Metal-only default flip is a viable
-future option (owner's call).** The platform split is real: on **Metal** floor64 is
-byte-identical AND a genuine 1.07–1.21× win (bigger on short utterances) → flipping
-the default there is pure upside; on **CUDA** it is marginal (1.02–1.06×) AND
-changes output bytes (benign FP) → flipping there is not warranted. A global flip is
-therefore wrong; a backend-conditional default (Metal/CPU→64, CUDA→512) is the
-disciplined form but adds conditional complexity for a modest win, so it is deferred
-as a judgment call. Until then `CRISPASR_TADA_BUCKET_MIN=64` is a recommended opt-in
-for latency-sensitive Metal/CPU TTS. No HISTORY perf entry (no default shipped).
-Kernel caveat for reuse: md5 is stricter than needed on a GPU (sampled/AR TTS is not
-bit-identical across a bucket-width change) — the kernel now gates on ASR
-keyword-recall of ALL arms, md5 informational only.
+**Decision — SHIPPED a backend-conditional default (2026-07-11).**
+`tada_default_bucket_min()` sets the floor by backend: **Metal + CPU → 64**
+(byte-identical win), **CUDA/ROCm/Vulkan/WebGPU → 512** (output left bit-for-bit
+unchanged — reduction order makes a bucket-width change non-bit-identical there,
+and the win is marginal). `CRISPASR_TADA_BUCKET_MIN` still overrides. The platform
+split drove it: Metal floor64 is byte-identical AND 1.07–1.21× (bigger on short
+utterances); CUDA is marginal (1.02–1.06×) AND changes output bytes → a global flip
+would be wrong, so the default is conditional. Discrete-GPU backends other than the
+measured CUDA (Vulkan/WebGPU) stay on 512 conservatively (unmeasured → keep original).
+
+Validation (all gates passed): **Metal** default(64) == `BUCKET_MIN=512` == golden
+`a5ce6e08` (3/3 consistent — the flip does NOT change existing Metal output, just
+speeds it up); **CPU** default(64) == 512 == `68ad4ce4` byte-identical AND **1.53×
+faster** (1203 vs 1843 ms/step — CPU was unmeasured before, now confirmed); **CUDA**
+unchanged by construction (512 preserved, no re-run needed); roundtrip clean ("the
+quick brown fox…"). NOTE: Metal runs are flaky under GPU contention (transient
+no-output/`MISSING` at rc=0) — a correctness signal only when the box is quiet; the
+3/3 golden match was taken at loadavg ~2–5. Kernel md5 caveat (fixed): the Kaggle
+kernel now gates on ASR keyword-recall of ALL arms, md5 informational only.
 
 ---
 
