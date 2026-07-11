@@ -54,10 +54,18 @@ acoustic transformer → Voxtral codec, 24 kHz, 9 languages / 20 voices). **Ship
   `tools/reference_backends/voxtral_tts.py` is a manual PyTorch LLM forward (NO vllm —
   lazy safetensors), `src/voxtral_tts.cpp::voxtral_tts_llm_diff()` +
   `crispasr-diff voxtral-tts`, ref dump on `cstr/crispasr-regression-fixtures`.
-- **Correctness verdict** (F16 vs BF16 reference): frame 0 `|h|rel=0.0`, all 37 codes
-  EXACT; divergence begins ~frame 7 as F16-vs-BF16 rounding amplifies through the
-  acoustic feedback loop — NOT a bug (HARD RULE #2), codec cos 0.9999, audio
-  word-perfect. See `LEARNINGS.md` / memory `project_93_voxtral_tts_backbone`.
+- **Correctness verdict** (codes-level, F16 vs BF16 reference): frame 0 `|h|rel=0.0`, all
+  37 codes EXACT; divergence begins ~frame 7 as F16-vs-BF16 rounding amplifies through the
+  acoustic feedback loop — NOT a bug (HARD RULE #2), codec cos 0.9999, audio word-perfect.
+- **Per-LAYER crispasr-diff (F16, Kaggle P100)**: all 26 LLM layers + hidden cos
+  `0.999996–1.0` — the LLM is bit-exact. The tool flagged `embed` cos=0.44 as "first
+  divergence", but that was a **false positive from a bug in the harness itself**, not the
+  runtime: verified the runtime's fed AUDIO embed (`|v|0.974 max0.054`) matches the ref row
+  24 (`0.975/0.054`), and `voxtral_tts_llm_diff` was reading the wrong ref tensor for that
+  one stage (`ggml_get_tensor(rw.ctx,…)` returned llm_L0-magnitude data). Fix `1498534d`
+  switches to `load_weights`' canonical `rw.tensors` map + prints `|mine|`/`|ref|`;
+  ⚠ verification pending on a quiet box. Lesson: a self-diff can lie via its OWN read bug —
+  check both magnitudes before blaming the runtime. See memory `project_93_voxtral_tts_backbone`.
 
 ## 2026-07-10 — qwen3-asr-1.7b q4_k empty transcripts (#240)
 
