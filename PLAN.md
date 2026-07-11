@@ -7163,22 +7163,30 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
      but 5x SLOWER (13.5s vs 2.7s) — tiny VITS graph is launch-bound,
      same class as moonshine-streaming. Deliberate-CPU comment added to
      the adapter.
-   - **f5_tts**: GPU path is CORRECT but SLOWER — controlled A/B at 4 ODE
-     steps, seed 42, 10 s FLEURS ref (T=1238 mel): CPU 294 s vs GPU
-     ~415 s compute (+35 s Metal library init). Both produce the same
-     output character (matching RMS/peak; at 4 steps that's degenerate
-     audio — below F5's quality floor — so the earlier "GPU produces
-     garbage" read was the step count, not the backend). Process
-     sampling during the GPU run shows `ggml_vec_dot_f16_f32` and
-     flash-attn executing in libggml-cpu — partial CPU fallback, plus
-     per-run Metal pipeline compiles. Adapter left unforwarded (GPU is
-     a regression as-is).
-     **The real story: F5 is ~unusable on M1 either way** — 294 s CPU
-     for a 4-step synthesis extrapolates to ~40 min at the default
-     ode=32. Est. ~3 TFLOP of DiT work should be ~2 s on M1 GPU if
-     fully resident: finding and fixing the CPU-fallback ops (which,
-     what placement rule) is a genuine 100x-class opportunity, but a
-     dedicated diff-harness session (§206 pattern).
+   - **f5_tts: FIXED** (was two bugs, not "correct-but-slower"; the earlier
+     verdict here was wrong). Root cause 1: the 22-layer DiT graph (the
+     dominant compute, run 2× per ODE step for CFG) was hardcoded to
+     `ggml_backend_graph_compute(ctx->backend_cpu, ...)` with the gallocr
+     bound to backend_cpu's buffer type — so it ran on CPU regardless of
+     use_gpu (on Metal it "worked" via unified-memory reads of the GPU
+     weights, which is why sampling showed vec_dot_f16_f32 / flash-attn in
+     libggml-cpu). Root cause 2: `pos_in` was set once in
+     f5_dit_cache_build, but f5_dit_run re-allocs the gallocr every step and
+     only re-set hidden_in/t_emb_in — gallocr aliased pos_in's slot with a
+     prior step's intermediate, corrupting RoPE positions from step 1 on.
+     This broke BOTH backends (the "f5 CPU=DUD" state); the earlier "same
+     output character on CPU and GPU at 4 steps" was this shared corruption,
+     not a step-count floor.
+     Fix: compute the DiT on `ctx->backend` (single-backend gallocr, no
+     sched; == backend_cpu when use_gpu off, so CPU compute is unchanged) and
+     re-set pos_in every step. M1 Metal, 16 ODE steps, seed 42: GPU now
+     roundtrips VERBATIM ("The quick brown fox jumps over the lazy dog"),
+     RMS 1795→4178; ~7.8× faster per step than CPU (151 s GPU-16 vs ~1176 s
+     CPU-16 extrapolated). Adapter now forwards use_gpu.
+     Remaining headroom (follow-up, not blocking): the per-forward host-side
+     input projection + conv_pos (`f5_linear`, 32× per synthesis) is now the
+     relative bottleneck (~4.7 s / DiT forward); batched CFG and moving the
+     input embedding into the GPU graph are the next levers.
 
 ### §232 v13 Results (2026-07-11)
 

@@ -108,6 +108,13 @@ OmniVoice's silent-synthesis root cause fixed plus a TTS perf pass
   Metal, transcript identical, `--no-gpu` still opts out. (moonshine-streaming
   and piper stay on CPU deliberately: their tiny per-frame graphs are
   launch-bound and measurably slower on GPU.)
+- **f5-tts was broken and CPU-only**: the DiT transformer (the model's dominant
+  compute) was hardcoded to run on the CPU backend regardless of `--gpu`, and a
+  gallocr input-aliasing bug corrupted the RoPE positions from the first ODE
+  step on — so synthesis produced degenerate audio on both backends (the prior
+  "f5 CPU is a dud" state). Both fixed: the DiT now runs on the selected backend
+  and positions are re-set each step. On M1 Metal, synthesis roundtrips verbatim
+  and is ~7.8× faster per step on GPU.
 - **GPU graph-cache use-after-free (#235)**: glm-asr crashed when the encoder
   graph was cached across slices on GPU; the same stale encoder-graph cache
   was removed from 7 backends.
