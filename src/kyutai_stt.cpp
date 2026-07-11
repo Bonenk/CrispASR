@@ -842,11 +842,9 @@ static bool mimi_encode(kyutai_stt_context* sctx, const float* pcm_24k, int n_sa
     auto& m = sctx->model;
     auto& hp = m.hp;
 
-    // §176s: reuse cached Mimi encoder graph when n_samples matches.
+    // #215e UAF fix: always rebuild (sched gallocr regrow frees cached buffers).
     ggml_cgraph* gf;
-    if (sctx->cached_enc_gf && sctx->cached_enc_n_samples == n_samples) {
-        gf = sctx->cached_enc_gf;
-    } else {
+    {
         if (sctx->cached_enc_ctx) {
             ggml_free(sctx->cached_enc_ctx);
             sctx->cached_enc_ctx = nullptr;

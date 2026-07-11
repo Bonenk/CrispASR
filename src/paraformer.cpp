@@ -599,12 +599,9 @@ static std::string paraformer_transcribe_impl(paraformer_context* ctx, const flo
 
     ggml_init_params ip = {meta_sz, ctx->compute_meta.data(), true};
 
+    // #215e UAF fix: always rebuild (sched gallocr regrow frees cached buffers).
     const bool can_cache = (stage == nullptr);
-    if (can_cache && ctx->cached_enc_gf && ctx->cached_enc_T_lfr == T_lfr) {
-        // Reuse cached graph — same topology, just new input data.
-        gf = ctx->cached_enc_gf;
-    } else {
-        // Free previous cache if any.
+    {
         if (ctx->cached_enc_ctx) {
             ggml_free(ctx->cached_enc_ctx);
             ctx->cached_enc_ctx = nullptr;

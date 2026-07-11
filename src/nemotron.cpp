@@ -1130,14 +1130,13 @@ static bool nemotron_ensure_sched(nemotron_context* ctx) {
 
 static bool nemotron_run_encoder(nemotron_context* ctx, const float* mel, int n_mels, int T_mel,
                                  std::vector<float>& enc_out, int& T_enc, int& d_model_out) {
-    // §176s: reuse cached encoder graph when T_mel matches.
-    ggml_cgraph* gf;
-    if (ctx->cached_enc_gf && ctx->cached_enc_T_mel == T_mel) {
-        gf = ctx->cached_enc_gf;
-    } else {
+    // #215e UAF fix: always rebuild (sched gallocr regrow frees cached buffers).
+    {
         ctx->cached_enc_meta.assign(ctx->compute_meta.size(), 0);
         std::swap(ctx->compute_meta, ctx->cached_enc_meta);
-        gf = nemotron_build_graph_encoder(ctx, T_mel);
+    }
+    ggml_cgraph* gf = nemotron_build_graph_encoder(ctx, T_mel);
+    {
         std::swap(ctx->compute_meta, ctx->cached_enc_meta);
         ctx->cached_enc_gf = gf;
         ctx->cached_enc_T_mel = T_mel;
