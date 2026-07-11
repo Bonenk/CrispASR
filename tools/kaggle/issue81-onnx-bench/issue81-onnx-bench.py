@@ -71,10 +71,18 @@ with kh.build_heartbeat("cmake.build"):
 CRISPASR = BUILD / "bin" / "crispasr"
 print(f"  built: {CRISPASR}")
 
-# ── Phase 1: Install onnx-asr ───────────────────────────────────────────────
+# ── Phase 1: Install onnx-asr (+ onnxruntime-gpu for the CUDA EP) ────────────
 print("\n=== Phase 1: install onnx-asr ===", flush=True)
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
-                        "onnx-asr", "soundfile", "huggingface_hub", "onnxruntime"])
+                        "onnx-asr", "soundfile", "huggingface_hub"])
+# Force the GPU build: onnx-asr pulls in CPU `onnxruntime`; both ship the same
+# `onnxruntime` module, so uninstall then install -gpu. CUDA 12.x on Kaggle P100
+# IS supported by onnxruntime-gpu (the old "needs CUDA 13" note was wrong). If
+# the CUDA EP still won't load (cuDNN mismatch), Phase 5 reports it and the CPU
+# int8 arm still runs.
+subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "onnxruntime", "onnxruntime-gpu"],
+               capture_output=True)
+subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "onnxruntime-gpu"])
 
 # ── Phase 2: Prepare audio ──────────────────────────────────────────────────
 print("\n=== Phase 2: prepare audio ===", flush=True)
@@ -214,58 +222,58 @@ for backend, repo, fname, label in CRISPASR_MODELS:
         results[label] = {"mean_jfk": None, "rtf_jfk": None, "text": "FAILED"}
 
 # ── Phase 5: Benchmark onnx-asr (head-to-head models) ───────────────────────
+# CPU int8 (the original #81 baseline) AND, when the CUDA EP is available, GPU
+# fp32 — the true GPU-vs-GPU comparison the issue is really about. onnx's CUDA
+# EP has thin int8 coverage, so the GPU arm uses fp32 (quantization=None).
 print("\n=== Phase 5: benchmark onnx-asr ===", flush=True)
 import onnx_asr
+import onnxruntime as ort
+
+_avail = ort.get_available_providers()
+cuda_ok = "CUDAExecutionProvider" in _avail
+print(f"  onnxruntime providers: {_avail}  (CUDA EP available: {cuda_ok})", flush=True)
 
 ONNX_MODELS = [
-    ("nemo-parakeet-ctc-0.6b",    "int8", "parakeet-ctc-0.6b"),
-    ("nemo-parakeet-tdt-0.6b-v2", "int8", "parakeet-tdt-0.6b"),
+    ("nemo-parakeet-ctc-0.6b", "parakeet-ctc-0.6b"),
+    ("nemo-parakeet-tdt-0.6b-v2", "parakeet-tdt-0.6b"),
 ]
 
+
+def bench_onnx(onnx_name, quant, providers):
+    model = onnx_asr.load_model(onnx_name, quantization=quant, providers=providers)
+    model.recognize(str(jfk_wav))  # warmup (cold CUDA JIT)
+
+    def _rtf(wav, dur, n):
+        ts, txt = [], ""
+        for i in range(n):
+            t0 = time.perf_counter()
+            r = model.recognize(str(wav))
+            ts.append(time.perf_counter() - t0)
+            if i == 0:
+                txt = str(r)[:80]
+        return dur / (sum(ts) / len(ts)), txt
+
+    rj, txt = _rtf(jfk_wav, duration, 3)
+    rl, _ = _rtf(long_wav, long_dur, 2)
+    del model
+    return rj, rl, txt
+
+
 onnx_results = {}
-for onnx_name, quant, label in ONNX_MODELS:
+for onnx_name, label in ONNX_MODELS:
     print(f"\n  [{label} via onnx-asr]")
-    try:
-        t_load = time.perf_counter()
-        model = onnx_asr.load_model(onnx_name, quantization=quant,
-                                     providers=["CPUExecutionProvider"])
-        t_load = time.perf_counter() - t_load
-        print(f"    load: {t_load:.3f}s")
-
-        # Warmup
-        model.recognize(str(jfk_wav))
-
-        times = []
-        text = ""
-        for i in range(3):
-            t0 = time.perf_counter()
-            r = model.recognize(str(jfk_wav))
-            t1 = time.perf_counter()
-            times.append(t1 - t0)
-            if i == 0: text = str(r)[:120]
-
-        mean = sum(times) / len(times)
-        rtf = duration / mean
-        print(f"    JFK {duration:.0f}s: {mean:.3f}s = {rtf:.1f}x realtime")
-        onnx_results[label] = {"mean_jfk": mean, "rtf_jfk": rtf, "text": text, "load": t_load}
-
-        # Long audio
-        times_l = []
-        for i in range(2):
-            t0 = time.perf_counter()
-            r = model.recognize(str(long_wav))
-            t1 = time.perf_counter()
-            times_l.append(t1 - t0)
-        mean_l = sum(times_l) / len(times_l)
-        rtf_l = long_dur / mean_l
-        print(f"    Long {long_dur:.0f}s: {mean_l:.3f}s = {rtf_l:.1f}x realtime")
-        onnx_results[label]["mean_long"] = mean_l
-        onnx_results[label]["rtf_long"] = rtf_l
-
-        del model
-    except Exception as e:
-        print(f"    FAILED: {e}")
-        onnx_results[label] = {"mean_jfk": None, "rtf_jfk": None, "text": f"ERROR: {e}"}
+    onnx_results[label] = {}
+    configs = [("cpu_int8", "int8", ["CPUExecutionProvider"])]
+    if cuda_ok:
+        configs.append(("cuda_fp32", None, ["CUDAExecutionProvider", "CPUExecutionProvider"]))
+    for key, quant, provs in configs:
+        try:
+            rj, rl, txt = bench_onnx(onnx_name, quant, provs)
+            print(f"    {key}: JFK {rj:.1f}x  Long {rl:.1f}x  ('{txt[:40]}')", flush=True)
+            onnx_results[label][key] = {"rtf_jfk": rj, "rtf_long": rl, "text": txt}
+        except Exception as e:  # noqa: BLE001
+            print(f"    {key}: FAILED: {str(e)[:200]}", flush=True)
+            onnx_results[label][key] = {"error": str(e)[:200]}
 
 # ── Phase 6: Summary ────────────────────────────────────────────────────────
 gpu_name = "unknown"
@@ -287,12 +295,13 @@ for label in ["parakeet-ctc-0.6b", "parakeet-tdt-0.6b"]:
     ca = results.get(label, {})
     ox = onnx_results.get(label, {})
     ca_rtf = f"{ca.get('rtf_jfk', 0):.1f}x" if ca.get('rtf_jfk') else "FAIL"
-    ox_rtf = f"{ox.get('rtf_jfk', 0):.1f}x" if ox.get('rtf_jfk') else "FAIL"
     ca_long = f"{ca.get('rtf_long', 0):.1f}x" if ca.get('rtf_long') else "-"
-    ox_long = f"{ox.get('rtf_long', 0):.1f}x" if ox.get('rtf_long') else "-"
-
     print(f"  {label:<22s} {'CrispASR':>10s} {ca_rtf:>10s} {ca_long:>10s} {'CUDA Q8_0':>20s}")
-    print(f"  {'':.<22s} {'onnx-asr':>10s} {ox_rtf:>10s} {ox_long:>10s} {'CPU int8':>20s}")
+    for key, note in [("cpu_int8", "onnx CPU int8"), ("cuda_fp32", "onnx CUDA fp32")]:
+        o = ox.get(key, {})
+        oj = f"{o.get('rtf_jfk', 0):.1f}x" if o.get("rtf_jfk") else "FAIL"
+        ol = f"{o.get('rtf_long', 0):.1f}x" if o.get("rtf_long") else "-"
+        print(f"  {'':.<22s} {'onnx-asr':>10s} {oj:>10s} {ol:>10s} {note:>20s}")
 
 print(f"  {'-'*74}")
 print(f"  {'CrispASR-only backends':}")
