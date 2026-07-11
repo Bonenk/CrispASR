@@ -42,7 +42,26 @@ BUILD.mkdir(parents=True, exist_ok=True)
 # dataset (kaggle_usage.md #13/#17). Without this the build runs cold (~21 min);
 # warm it's ~3 min. cache_and_link_flags() below only sets the compiler-launcher
 # flags — it does NOT install or warm ccache, which is what this call does.
-kh.install_build_toolchain()
+kh.install_build_toolchain()  # sets CCACHE_DIR=/kaggle/working/.ccache + warms it
+
+# Relocate the ccache OUT of /kaggle/working. `kaggle kernels output` is page-
+# capped at 500 files and `.ccache/` (thousands of tiny files, sorts before
+# ccache.tar) fills page 1 — so the ccache.tar we write can never be downloaded.
+# Move the warmed cache to /kaggle/temp so the only ccache artifact left in the
+# output is the single ccache.tar (retrievable in page 1). We warm from the
+# dataset, not from Kaggle's /kaggle/working persistence, so this is safe.
+import shutil  # noqa: E402
+
+_ccache_run = (Path("/kaggle/temp") if Path("/kaggle/temp").is_dir() else Path("/tmp")) / ".ccache"
+_warmed = Path("/kaggle/working/.ccache")
+if _warmed.exists():
+    if _ccache_run.exists():
+        shutil.rmtree(_ccache_run, ignore_errors=True)
+    shutil.move(str(_warmed), str(_ccache_run))
+else:
+    _ccache_run.mkdir(parents=True, exist_ok=True)
+os.environ["CCACHE_DIR"] = str(_ccache_run)
+print(f"  CCACHE_DIR relocated to {_ccache_run}", flush=True)
 
 has_cuda = Path("/usr/local/cuda/bin/nvcc").exists()
 print(f"  CUDA available: {has_cuda}")
@@ -354,18 +373,21 @@ with open(WORK / "benchmark_results.json", "w") as f:
     json.dump(all_results, f, indent=2)
 print(f"\n  Results saved to {WORK / 'benchmark_results.json'}")
 
-# Refresh the ccache snapshot so the chr1s4/crispasr-ccache dataset can be
-# updated from this run's output (kaggle_usage.md #17 — keep it current or warm
-# builds go stale). ccache lives at /kaggle/working/.ccache (set by
-# install_build_toolchain); tar it into /kaggle/working so it downloads as a
-# kernel output, then `kaggle datasets version` from it.
+# Refresh the ccache snapshot so the chr1s4/crispasr-ccache dataset can be updated
+# from this run (kaggle_usage.md #17 — keep it current or warm builds go stale).
+# ccache lives at the RELOCATED CCACHE_DIR (/kaggle/temp/.ccache, out of the
+# output). Tar it into /kaggle/working/ccache.tar as the ONLY ccache artifact in
+# the output so it's retrievable in page 1 (not buried behind 500 loose files),
+# then `kaggle datasets version` from it locally.
 try:
-    ccache_dir = Path("/kaggle/working/.ccache")
+    ccache_dir = Path(os.environ.get("CCACHE_DIR", "/kaggle/temp/.ccache"))
     if ccache_dir.is_dir():
-        subprocess.run("cd /kaggle/working && tar cf ccache.tar .ccache/", shell=True, check=True)
+        parent = ccache_dir.parent
+        subprocess.run(f"tar cf {WORK}/ccache.tar -C {parent} {ccache_dir.name}", shell=True, check=True)
         sz = (WORK / "ccache.tar").stat().st_size / (1024**2)
-        print(f"  ccache.tar written ({sz:.0f} MB) — update chr1s4/crispasr-ccache from it", flush=True)
-        subprocess.run("ccache -s 2>/dev/null | tail -5 || true", shell=True)
+        print(f"  ccache.tar written to /kaggle/working ({sz:.0f} MB) — the only ccache artifact in "
+              f"the output; update chr1s4/crispasr-ccache from it", flush=True)
+        subprocess.run("ccache -s 2>/dev/null | tail -6 || true", shell=True)
 except Exception as e:  # noqa: BLE001
     print(f"  ccache tar skipped: {e}", flush=True)
 
