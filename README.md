@@ -1,6 +1,6 @@
 # CrispASR
 
-**One C++ binary, 36 ASR backends + 23 TTS engines + multilingual text translation, zero Python dependencies.**
+**One C++ binary, 43 ASR backends + 48 TTS engines + multilingual text translation, zero Python dependencies.**
 
 CrispASR started as a fork of [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and extends that base into a **unified speech engine** called `crispasr`, backed by full ggml C++ runtimes for major open-weights ASR *and* TTS architectures. One build, one binary, one consistent CLI — pick the backend at the command line or let CrispASR auto-detect it from your GGUF file. See [Text-to-Speech](#text-to-speech-tts) for the TTS side.
 
@@ -21,23 +21,23 @@ Multithreaded, runs entirely client-side with COOP/COEP headers.
 **Demo**: [HuggingFace Space](https://huggingface.co/spaces/cstr/CrispASR) —
 live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 
-### What's new (v0.8.3)
+### What's new (v0.8.9)
 
-- **Audio format expansion (v0.8.3):** `.opus`, `.webm`, `.au`, `.amr`, `.m4a`/`.aac` decode — no ffmpeg. Apple platforms use AudioToolbox natively for AAC/M4A/ALAC/CAF/AIFF.
-- **Native cross-platform AAC input:** raw ADTS `.aac` is decoded by the in-tree clean-room [glint](https://github.com/CrispStrobe/glint) AAC-LC decoder — always available on every platform, no runtime library. Set `CRISPASR_AAC_DECODER=fdk`/`coreaudio` to pin the previous platform decoder.
-- **qwen3-tts: GQA_NATIVE + chunked codec (v0.8.3, #183):** O(N²)→O(N) scaling on Vulkan; RTF stays ~0.5 at any text length. Chunked codec decode caps VRAM peak. Scratch scheduler reset prevents cross-request memory bloat.
-- **vibevoice TTS on Vulkan/CUDA (v0.8.3, #184):** fixed segfault on AMD RDNA4 (strided view fix) and illegal memory access on CUDA (stale gallocr state in bucket cache).
-- **chatterbox: long-text + turbo emotion tags (v0.8.2, #182):** sentence-chunked synthesis for arbitrarily long input; `[laugh]`, `[whispering]`, `[angry]` etc. drive turbo prosody.
-- **Parakeet long-audio = NeMo-exact (#89):** non-JA models default to single full-attention pass, byte-for-byte identical to upstream NeMo; clips past 300 s are silence-split with no boundary duplicates.
+- **MOSS-Transcribe-Diarize (#242, v0.8.9):** joint ASR + speaker diarization + timestamps in a single 0.9B model. Stock Whisper encoder + VQAdaptor + Qwen3-0.6B. Diff harness 4/4 cos=1.0. `--backend moss-diarize -m auto`.
+- **dots.tts full pipeline (#200, v0.8.9):** PatchEncoder RoPE + QK-norm fix, BigVGAN vocoder working e2e, voice cloning via CAM++ speaker encoder. `--tts-steps` / `--tts-cfg-scale` wired.
+- **Irodori-TTS VoiceDesign (v0.8.9):** caption-conditioned voice design for Irodori TTS.
+- **gallocr UAF audit (#215e, v0.8.9):** fixed stale-buffer use-after-free in 7 backends (canary, canary_ctc, kyutai_stt, moonshine_streaming, nemotron, paraformer, sensevoice). All 19 cached-graph sites audited.
+- **Generation-health gate (v0.8.9):** `core/generation_health.h` — 5 objective quality checks (empty, duration, n-gram loop, truncation, TTS duration) with 16 unit tests.
+- **Audio format expansion (v0.8.3):** `.opus`, `.webm`, `.au`, `.amr`, `.m4a`/`.aac` decode — no ffmpeg.
 - **Hotwords (#98):** `--hotwords "Tokyo,CrispASR"` for CTC/TDT contextual biasing + LLM prompt injection.
-- **Global diarization (#110):** `--diarize-method sherpa` / `pyannote` runs once on full audio for consistent speaker IDs.
+- **Global diarization (#110):** `--diarize-method sherpa` / `pyannote` / `moss-diarize` (native) for consistent speaker IDs.
 - **Generation controls:** `--seed`, `--beam-size`, `--frequency-penalty`, `--max-new-tokens` wired through all backends.
 
 ### Ecosystem
 
 | Project | What it does |
 |---|---|
-| **[CrispASR](https://github.com/CrispStrobe/CrispASR)** | This repo — C++ speech engine. 36 ASR backends + 23 TTS engines, CLI + HTTP server + C-ABI + Python/Rust/Dart/Go/Ruby bindings. |
+| **[CrispASR](https://github.com/CrispStrobe/CrispASR)** | This repo — C++ speech engine. 43 ASR + 48 TTS backends, CLI + HTTP server + C-ABI + Python/Rust/Dart/Go/Ruby/Java bindings. |
 | **[CrisperWeaver](https://github.com/CrispStrobe/CrisperWeaver)** | Cross-platform Flutter transcription app built on CrispASR. Desktop + mobile, all 10 backends, model browser with download queue, mic capture, SRT/VTT/JSON export, diarization, batch processing. Fully offline. |
 | **[CrispEmbed](https://github.com/CrispStrobe/CrispEmbed)** | Text embedding engine via ggml — same philosophy as CrispASR but for retrieval. 10 architectures (XLM-R, Qwen3-Embed, Gemma3, ModernBERT, ...), dense + sparse + ColBERT + reranking. 9.5x faster than ONNX on CPU, GPU via CUDA/Metal/Vulkan. Python/Rust/Dart bindings. |
 | **[Susurrus](https://github.com/CrispStrobe/Susurrus)** | Python ASR GUI with 9 backends (faster-whisper, mlx-whisper, voxtral, insanely-fast-whisper, ...). The Python counterpart to CrispASR's C++ approach. |
@@ -50,7 +50,7 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 - [Feature matrix](#feature-matrix)
 - [Install & build](#install--build) — quick install (full guide in [docs/install.md](docs/install.md))
 - [Quick start — ASR](#quick-start)
-- [**Text-to-Speech (TTS)**](docs/tts.md) — Kokoro, Qwen3-TTS, VibeVoice, Orpheus, Chatterbox, IndexTTS, VoxCPM2, CosyVoice3, CSM, Dia, Zonos, Bark, Piper, MeloTTS, and more
+- [**Text-to-Speech (TTS)**](docs/tts.md) — 48 engines: Kokoro, Qwen3-TTS, VibeVoice, dots.tts, Orpheus, Chatterbox, IndexTTS, Irodori, VoxCPM2, CosyVoice3, CSM, Dia, Zonos, Bark, Piper, MeloTTS, and more
 - [Streaming & live transcription](docs/streaming.md)
 - [Server mode (HTTP API)](docs/server.md)
 - [CLI reference](docs/cli.md) — flags, VAD, CTC alignment, output formats, auto-download, audio formats
@@ -67,10 +67,10 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 
 ## Supported backends
 
-CrispASR ships **36 ASR backends** for transcription/translation and
-**23 TTS engines** for synthesis. Pick at the CLI with `--backend NAME`,
-or omit it to let the binary auto-detect from the GGUF metadata. Jump
-to the [TTS table](#text-to-speech-models) for the synthesis side.
+CrispASR ships **43 ASR backends** for transcription/translation and
+**48 TTS engines** for synthesis (91 total in the [feature matrix](docs/feature-matrix.md)).
+Pick at the CLI with `--backend NAME`, or omit it to let the binary auto-detect
+from the GGUF metadata. Jump to the [TTS table](#text-to-speech-models) for the synthesis side.
 
 ### ASR backends
 
@@ -269,7 +269,7 @@ Run `crispasr --list-backends` to see it live. Each backend declares capabilitie
 
 **Sortable / filterable view:** [`docs/feature-matrix.html`](docs/feature-matrix.html) — click any column header to sort, type to filter rows, click cap pills to require a capability. Generated from `crispasr --list-backends-json` (single source of truth — drift impossible). Regenerate via `python tools/gen-feature-matrix.py`. A Markdown twin lives at [`docs/feature-matrix.md`](docs/feature-matrix.md).
 
-The static table below is a curated subset focusing on the ASR backends and the cross-cutting features that matter for ASR pipelines. The full 39-backend × 18-cap surface is in the generated views.
+The static table below is a curated subset focusing on the ASR backends and the cross-cutting features that matter for ASR pipelines. The full 91-backend × 21-cap surface is in the generated views.
 
 <!-- Generated from `crispasr --list-backends` + cross-cutting features. -->
 
