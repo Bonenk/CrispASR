@@ -7264,11 +7264,18 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
       Accelerate-BLAS (`f5_linear` + grouped-conv `cblas_sgemm`); it's ~42% of
       time but real compute (grouped convs), and moving it to the GPU adds
       small-op nodes to an already compute-bound graph. Uncertain/negative.
-   3. **The real remaining f5 lever: DiT compute efficiency** — F32→F16
-      activations (halve matmul bandwidth, hit F16 throughput) and/or op
-      fusion to cut the 979-node count. Precision-sensitive (flow-matching);
-      needs a dedicated diff-harness session. Deferred, not attempted.
-   **titanet/diarization GPU port** (was step 3) stands as separate open work:
+   3. **DiT F16 activations — TRIED, MEASURED DUD.** Cast the QKV+FFN matmul
+      inputs to F16 (weights already F16). Correct (corr 1.00000, verbatim
+      roundtrip) but NO speedup — DiT graph slightly slower (added cast nodes).
+      So the DiT is NOT matmul-bound. Reverted (no reuse value). Combined with
+      the batched-CFG dud, the ~0.8-1 s/forward is dominated by the ~800 small
+      ops + flash-attention over T=1238, NOT matmuls or dispatch overhead.
+      **f5 GPU perf is now tapped out for cheap wins** — the base fix (7.8×) is
+      the win. Any further gain needs true per-op GPU profiling (Metal capture /
+      Instruments) to localize the flash-attn/small-op cost — not more
+      guess-and-check. NOTE: the huge host_embed variance in F5_BENCH
+      (8-58 s across runs) is CPU contention on the shared box, not inherent.
+   **titanet/diarization GPU port** stands as separate open work:
    titanet loads weights to a GPU backend but re-folds BN into a CPU-only
    cache and computes the whole speaker-embedding conformer on CPU by design
    — the substance of the §224 "diarize CPU perf" item. Bigger refactor.
