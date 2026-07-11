@@ -21,6 +21,8 @@
 // The C ABI under test — declared in crispasr.h, but we forward-declare to
 // avoid pulling the full header into a test TU that doesn't need it.
 extern "C" int crispasr_audio_load(const char* path, float** out_pcm, int* out_samples, int* out_sample_rate);
+extern "C" int crispasr_audio_load_stereo(const char* path, float** out_left, float** out_right, int* out_samples,
+                                          int* out_sample_rate, int* out_channels);
 extern "C" void crispasr_audio_free(float* pcm);
 
 // Header-only WAV reader used directly by the indextts/voxcpm2 --voice paths
@@ -428,6 +430,30 @@ TEST_CASE("crispasr_audio_load decodes Ogg Opus (glint)", "[audio][unit][opus]")
     REQUIRE(cc > 0.80);
 
     crispasr_audio_free(pcm);
+}
+
+TEST_CASE("crispasr_audio_load_stereo decodes Ogg Opus (glint, stereo path)", "[audio][unit][opus]") {
+    // The stereo loader routes Ogg Opus through glint too (stereo-preserving).
+    // jfk.opus is mono, so we expect 1 channel with L == R; the point is to
+    // exercise the stereo loader's glint interception and its resample path.
+    float* left = nullptr;
+    float* right = nullptr;
+    int samples = 0, rate = 0, channels = 0;
+    int rc = crispasr_audio_load_stereo(sample("jfk.opus").c_str(), &left, &right, &samples, &rate, &channels);
+    REQUIRE(rc == 0);
+    REQUIRE(left != nullptr);
+    REQUIRE(right != nullptr);
+    REQUIRE(rate == 16000);
+    REQUIRE(samples > 100000);
+    REQUIRE(has_energy(left, samples));
+
+    auto ref = load_ref();
+    double cc = cross_correlation(ref.pcm, ref.samples, left, samples, 500);
+    INFO("stereo Ogg Opus (L) cross-correlation: " << cc);
+    REQUIRE(cc > 0.80);
+
+    crispasr_audio_free(left);
+    crispasr_audio_free(right);
 }
 
 TEST_CASE("crispasr_audio_load rejects missing file", "[audio][unit]") {

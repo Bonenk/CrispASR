@@ -114,6 +114,38 @@ bool read_audio_data(const std::string& fname, std::vector<float>& pcmf32, std::
 
         fprintf(stderr, "%s: read %zu bytes from stdin\n", __func__, audio_data.size());
     } else if (((result = ma_decoder_init_file(fname.c_str(), &decoder_config, &decoder)) != MA_SUCCESS)) {
+        // Container miniaudio can't open (.opus / .aac / .m4a / .webm / .amr / …):
+        // decode via the crispasr_audio_load C ABI first — it covers these
+        // natively (glint AAC/Opus, AudioToolbox/fdk-aac, libopus WebM, opencore
+        // AMR, …) at 16 kHz mono, no ffmpeg. Falls through to ffmpeg only if it
+        // can't handle the format either.
+        if (stereo) {
+            float* L = nullptr;
+            float* R = nullptr;
+            int fr = 0, sr = 0, ch = 0;
+            if (crispasr_audio_load_stereo(fname.c_str(), &L, &R, &fr, &sr, &ch) == 0) {
+                pcmf32.resize((size_t)fr);
+                pcmf32s.assign(2, std::vector<float>((size_t)fr));
+                for (int i = 0; i < fr; i++) {
+                    const float l = L[i];
+                    const float rr = (ch >= 2 && R) ? R[i] : l;
+                    pcmf32s[0][(size_t)i] = l;
+                    pcmf32s[1][(size_t)i] = rr;
+                    pcmf32[(size_t)i] = 0.5f * (l + rr);
+                }
+                crispasr_audio_free(L);
+                crispasr_audio_free(R);
+                return true;
+            }
+        } else {
+            float* buf = nullptr;
+            int fr = 0, sr = 0;
+            if (crispasr_audio_load(fname.c_str(), &buf, &fr, &sr) == 0) {
+                pcmf32.assign(buf, buf + fr);
+                crispasr_audio_free(buf);
+                return true;
+            }
+        }
 #if defined(CRISPASR_FFMPEG)
         if (ffmpeg_decode_audio(fname, audio_data) != 0) {
             fprintf(stderr, "error: failed to ffmpeg decode '%s'\n", fname.c_str());

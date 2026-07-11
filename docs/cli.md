@@ -1062,9 +1062,12 @@ embedded or linked:
 in-tree glint decoder. On Apple all AAC/ALAC/CAF is handled natively
 (AudioToolbox).
 
-For anything not covered natively, build with `CRISPASR_FFMPEG=ON` (an optional,
-dynamically-linked fallback — see [install.md](install.md)) or pre-convert:
-`ffmpeg -i in.X -ar 16000 -ac 1 -c:a pcm_s16le out.wav`.
+The `crispasr` CLI decodes all of the above through the same library loader
+(`crispasr_audio_load`), so `-f in.opus` / `in.aac` / `in.m4a` / `in.webm` work
+with **no ffmpeg subprocess** — the ffmpeg fallback is only reached for formats
+the native decoders can't handle. For those, build with `CRISPASR_FFMPEG=ON` (an
+optional, dynamically-linked fallback — see [install.md](install.md)) or
+pre-convert: `ffmpeg -i in.X -ar 16000 -ac 1 -c:a pcm_s16le out.wav`.
 
 ## Memory footprint
 

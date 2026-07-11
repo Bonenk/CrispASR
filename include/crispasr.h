@@ -867,6 +867,16 @@ CRISPASR_API int crispasr_watermark_load_model(const char* gguf_path);
 CRISPASR_API int crispasr_get_progress(void);
 CRISPASR_API void crispasr_reset_progress(void);
 
+// ─── Audio decode ────────────────────────────────────────────────────
+//
+// Decode any supported audio file (WAV/MP3/FLAC/OGG/Opus/AAC/M4A/WebM/AMR/…)
+// to 16 kHz mono float PCM. Returns 0 with a malloc-owned buffer in *out_pcm
+// (free with crispasr_audio_free), *out_samples element count and
+// *out_sample_rate (always 16000), or a negative error. No ffmpeg needed for
+// the common formats (glint AAC/Opus, miniaudio, AudioToolbox/fdk, libopus, …).
+CRISPASR_API int crispasr_audio_load(const char* path, float** out_pcm, int* out_samples, int* out_sample_rate);
+CRISPASR_API void crispasr_audio_free(float* pcm);
+
 // ─── Stereo audio decode ─────────────────────────────────────────────
 //
 // Like crispasr_audio_load but returns stereo (2-channel) PCM.

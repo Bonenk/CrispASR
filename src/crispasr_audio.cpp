@@ -2553,11 +2553,10 @@ int crispasr_adts_decode_glint(const char* path, int want_channels, float** out_
 // those fall through to stb_vorbis, and for non-Ogg input so WAV/etc. take the
 // ma_decoder path. On glint failure the caller still reaches the libopus path.
 // NOTE: only the Ogg container — WebM/Matroska Opus stays on libopus.
-// Signature matches the loader fallbacks: 0 + malloc-owned 16 kHz mono f32.
-int crispasr_ogg_opus_decode_glint(const char* path, int want_channels, float** out_buf, int* out_frames,
-                                   int* out_channels) {
-    (void)want_channels; // 16 kHz ASR path is mono; downmix here
-
+//
+// Core: decode to INTERLEAVED 16 kHz f32 with the native channel count
+// preserved (malloc-owned, capped at 2 ch). The mono + stereo loaders wrap it.
+int crispasr_ogg_opus_decode_glint_16k(const char* path, float** out_itl, int* out_frames, int* out_channels) {
     if (const char* pref = std::getenv("CRISPASR_OPUS_DECODER")) {
         if (pref[0] && std::strcmp(pref, "glint") != 0 && std::strcmp(pref, "auto") != 0)
             return -2; // user pinned libopus
@@ -2597,51 +2596,84 @@ int crispasr_ogg_opus_decode_glint(const char* path, int want_channels, float** 
         glint_free(pcm);
         return -2;
     }
-
-    // Downmix to mono at the native rate (Opus decodes at 48 kHz).
-    std::vector<float> mono((size_t)frames);
-    for (int i = 0; i < frames; i++) {
-        float s = 0.0f;
-        for (int c = 0; c < ch; c++)
-            s += pcm[(size_t)i * ch + c];
-        mono[(size_t)i] = s / (float)ch;
+    if (ch > 2) {
+        // Downmix >2 ch to stereo up front (rare; the loaders cap at 2).
+        for (int i = 0; i < frames; i++) {
+            pcm[(size_t)i * 2] = pcm[(size_t)i * ch];
+            pcm[(size_t)i * 2 + 1] = pcm[(size_t)i * ch + 1];
+        }
+        ch = 2;
     }
-    glint_free(pcm);
     if (dbg)
-        std::fprintf(stderr, "[glint-opus] decoded %d frames, %d ch @ %d -> 16 kHz mono\n", frames, ch, sr);
+        std::fprintf(stderr, "[glint-opus] decoded %d frames, %d ch @ %d -> 16 kHz\n", frames, ch, sr);
 
-    // Resample native -> 16 kHz mono (linear; matches the other decode paths).
+    // Resample native -> 16 kHz, preserving channels (interleaved, linear).
     if (sr != kTargetSampleRate) {
-        ma_resampler_config rcfg =
-            ma_resampler_config_init(ma_format_f32, 1, (ma_uint32)sr, kTargetSampleRate, ma_resample_algorithm_linear);
+        ma_resampler_config rcfg = ma_resampler_config_init(ma_format_f32, (ma_uint32)ch, (ma_uint32)sr,
+                                                            kTargetSampleRate, ma_resample_algorithm_linear);
         ma_resampler rs;
-        if (ma_resampler_init(&rcfg, nullptr, &rs) != MA_SUCCESS)
+        if (ma_resampler_init(&rcfg, nullptr, &rs) != MA_SUCCESS) {
+            glint_free(pcm);
             return -2;
-        ma_uint64 in_len = mono.size();
+        }
+        ma_uint64 in_len = (ma_uint64)frames;
         ma_uint64 out_len = 0;
         ma_resampler_get_expected_output_frame_count(&rs, in_len, &out_len);
         out_len += 256;
-        float* result = (float*)std::malloc((size_t)out_len * sizeof(float));
+        float* result = (float*)std::malloc((size_t)out_len * (size_t)ch * sizeof(float));
         if (!result) {
             ma_resampler_uninit(&rs, nullptr);
+            glint_free(pcm);
             return -3;
         }
         ma_uint64 in_consumed = in_len;
         ma_uint64 out_produced = out_len;
-        ma_resampler_process_pcm_frames(&rs, mono.data(), &in_consumed, result, &out_produced);
+        ma_resampler_process_pcm_frames(&rs, pcm, &in_consumed, result, &out_produced);
         ma_resampler_uninit(&rs, nullptr);
-        *out_buf = result;
+        glint_free(pcm);
+        *out_itl = result;
         *out_frames = (int)out_produced;
-        *out_channels = 1;
+        *out_channels = ch;
         return 0;
     }
 
-    float* result = (float*)std::malloc(mono.size() * sizeof(float));
-    if (!result)
+    float* result = (float*)std::malloc((size_t)frames * (size_t)ch * sizeof(float));
+    if (!result) {
+        glint_free(pcm);
         return -3;
-    std::memcpy(result, mono.data(), mono.size() * sizeof(float));
-    *out_buf = result;
-    *out_frames = (int)mono.size();
+    }
+    std::memcpy(result, pcm, (size_t)frames * (size_t)ch * sizeof(float));
+    glint_free(pcm);
+    *out_itl = result;
+    *out_frames = frames;
+    *out_channels = ch;
+    return 0;
+}
+
+// Mono wrapper — signature matches the loader fallbacks: 0 + malloc-owned
+// 16 kHz mono f32. Downmixes the core's interleaved output.
+int crispasr_ogg_opus_decode_glint(const char* path, int want_channels, float** out_buf, int* out_frames,
+                                   int* out_channels) {
+    (void)want_channels; // 16 kHz ASR path is mono; downmix here
+    float* itl = nullptr;
+    int frames = 0, ch = 0;
+    int rc = crispasr_ogg_opus_decode_glint_16k(path, &itl, &frames, &ch);
+    if (rc != 0)
+        return rc;
+    float* mono = (float*)std::malloc((size_t)frames * sizeof(float));
+    if (!mono) {
+        std::free(itl);
+        return -3;
+    }
+    for (int i = 0; i < frames; i++) {
+        float s = 0.0f;
+        for (int c = 0; c < ch; c++)
+            s += itl[(size_t)i * ch + c];
+        mono[(size_t)i] = s / (float)ch;
+    }
+    std::free(itl);
+    *out_buf = mono;
+    *out_frames = frames;
     *out_channels = 1;
     return 0;
 }
@@ -2860,6 +2892,36 @@ CA_EXPORT int crispasr_audio_load_stereo(const char* path, float** out_left, flo
     *out_channels = 0;
     if (out_sample_rate)
         *out_sample_rate = 0;
+
+    // Ogg Opus (.opus) via glint — RFC-conformant, no libopus; stereo-preserving.
+    // Runs BEFORE ma_decoder (which would otherwise take it via libopus). Gated
+    // CRISPASR_OPUS_DECODER=libopus; non-Opus Ogg / non-Ogg fall through.
+    {
+        float* itl = nullptr;
+        int fr = 0, ch = 0;
+        if (crispasr_ogg_opus_decode_glint_16k(path, &itl, &fr, &ch) == 0) {
+            float* left = (float*)std::malloc((size_t)fr * sizeof(float));
+            float* right = (float*)std::malloc((size_t)fr * sizeof(float));
+            if (!left || !right) {
+                std::free(itl);
+                std::free(left);
+                std::free(right);
+                return -3;
+            }
+            for (int i = 0; i < fr; i++) {
+                left[i] = itl[(size_t)i * ch];
+                right[i] = (ch >= 2) ? itl[(size_t)i * ch + 1] : itl[(size_t)i * ch];
+            }
+            std::free(itl);
+            *out_left = left;
+            *out_right = right;
+            *out_samples = fr;
+            *out_channels = (ch >= 2) ? 2 : 1;
+            if (out_sample_rate)
+                *out_sample_rate = kTargetSampleRate;
+            return 0;
+        }
+    }
 
     // Detect native channel count (channels = 0 → native).
     ma_decoder_config probe_cfg = ma_decoder_config_init(ma_format_f32, 0, kTargetSampleRate);
