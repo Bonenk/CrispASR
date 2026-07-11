@@ -30,3 +30,20 @@ tdt-v3 q4_k 1.89→1.03 s. Full data in PERFORMANCE.md + LEARNINGS.md.
    BlockWeights/naming, calls are two lines per runtime (see canary_ctc).
 4. Directions 2/4/5/6 above are RULED OUT by measurement (see PERFORMANCE.md
    entry); don't re-attempt without new profile data.
+
+## STATUS UPDATE 2026-07-11 (later, same session)
+
+- Extension shipped (cdc6dbc4): conv-pw Q8_0 repack wired into nemotron
+  (repack only — its streaming builder bypasses build_block), canary_qwen +
+  lfm2_audio (repack + fuse_qkv). nemotron transcript-verified identical
+  locally; box too loaded for local timing (another session's builds).
+- crispasr-quantize now pins conv pw to a Q8_0 floor for sub-8-bit targets,
+  so re-quantized GGUFs byte-match the runtime repack output.
+- HF fleet re-quantization runs on Kaggle:
+  `tools/kaggle/fc-pw-requant/` → kernel chr1str/crispasr-fc-pw-requant
+  (c8930529). 42 repos, per-file strict transcript-equality validation +
+  per-backend legacy-vs-new timing on the Kaggle box. Progress lands in
+  cstr/crispasr-kaggle-progress; results.json in the kernel output.
+  Re-push to resume (already-fixed files no-op).
+- Still open: VPS re-bench (item 1 above) — the parallel session's
+  issue81-onnx-bench kernel may already cover the GPU side.
