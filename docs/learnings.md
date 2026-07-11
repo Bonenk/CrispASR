@@ -304,3 +304,19 @@ Lessons from the systematic head-to-head benchmark against
     confirmed; only then flip. nemotron's 12× shows the payoff scales with decode
     length (LEARNING 31's step-count point, inverted once the per-step overhead is
     gone).
+
+34. **The P100 decode win is a slow-OpenBLAS effect — flipping "ggml when GPU"
+    REGRESSED Metal.** After flipping (LEARNING 33), a total-RTF check on M1
+    caught it: parakeet total ~16× cblas vs ~11× ggml — cblas FASTER on Metal.
+    Apple Accelerate cblas does the small transducer matmuls faster than the
+    per-step GPU decode dispatch, so the P100 5-12× (vs slow OpenBLAS) does NOT
+    generalise to Metal. Fix: gate the default to CUDA/Vulkan, keep cblas on
+    Metal + CPU — `#if defined(GGML_USE_METAL): if
+    (ggml_backend_is_metal(backend)) ggml_dec = false;` (env override still forces
+    either way). **Two lessons:** (a) a GPU-vs-CPU "win" measured on one platform's
+    BLAS must be re-checked on the others before a blanket flip — the CPU baseline
+    quality (Accelerate vs OpenBLAS) flips the verdict (ties back to LEARNING 30).
+    (b) `ggml_backend_name()` for Metal returns **"MTL0"**, not "Metal" — a
+    `strstr(name, "Metal")` check silently never matches; use
+    `ggml_backend_is_metal()` (guarded by `GGML_USE_METAL` so CUDA builds compile
+    it out). Caught only because I measured TOTAL RTF, not just the decode A/B.

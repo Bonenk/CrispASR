@@ -7430,10 +7430,14 @@ fixable bounce — for moonshine-tiny, `--no-gpu` remains fastest at idle.
 **GAP CLOSED.** Kaggle P100 (sm_60) A/B, both transcript-IDENTICAL: parakeet
 decode **763.5 → 145.2 ms (5.26×)**, nemotron **2589.3 → 209.1 ms (12.38×)** —
 the persistent-graph ggml decode replaces the host cblas that left the GPU idle.
-Default flipped: ggml decode when the decode backend is a GPU
-(`!ggml_backend_is_cpu(ctx->backend)`), cblas on CPU. Override
+Default flipped: ggml decode when the decode backend is a **CUDA/Vulkan** GPU,
+cblas on **Metal + CPU** (`!ggml_backend_is_cpu` AND not
+`ggml_backend_is_metal`). Metal is excluded because Apple Accelerate cblas beats
+the GPU decode there — the P100 win is a slow-OpenBLAS effect, NOT universal (M1
+parakeet total ~16× cblas vs ~11× ggml; LEARNING 34). Override
 `PARAKEET/NEMOTRON_GGML_DECODE=1/0`; `RNNT_GGML_PERSTEP` = per-step path.
-See LEARNINGS 33. Original notes below.
+Applies to all parakeet + nemotron decode paths (greedy/beam/maes/rnnt).
+See LEARNINGS 33-34. Original notes below.
 
 
 **Shipped (opt-in, `PARAKEET_GGML_DECODE=1`, commit on main):** the Parakeet TDT
