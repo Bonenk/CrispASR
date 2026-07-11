@@ -1486,6 +1486,38 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
 
     const auto& m = ctx->model;
 
+    // Diff-harness codec isolation: decode a codes file (37 ints/line) directly,
+    // bypassing the LLM+FM, so my codec can be compared to the reference codec on
+    // IDENTICAL codes. Gated by CRISPASR_VOXTRAL_TTS_CODEC_FROM_FILE.
+    if (const char* cf = std::getenv("CRISPASR_VOXTRAL_TTS_CODEC_FROM_FILE")) {
+        FILE* fp = fopen(cf, "r");
+        if (!fp)
+            return nullptr;
+        std::vector<int> codes;
+        int n_frames = 0;
+        char line[8192];
+        while (fgets(line, sizeof(line), fp)) {
+            int k = 0;
+            for (char* p = strtok(line, ",\n"); p && k < 1 + VTTS_ACOUSTIC_DIM; p = strtok(nullptr, ",\n")) {
+                codes.push_back(atoi(p));
+                k++;
+            }
+            if (k == 1 + VTTS_ACOUSTIC_DIM)
+                n_frames++;
+            else
+                codes.resize((size_t)n_frames * (1 + VTTS_ACOUSTIC_DIM));
+        }
+        fclose(fp);
+        fprintf(stderr, "voxtral_tts: codec-only decode of %d frames from %s\n", n_frames, cf);
+        std::vector<float> pcm = vtts_codec_decode(ctx, codes, n_frames);
+        if (pcm.empty())
+            return nullptr;
+        float* out = (float*)malloc(pcm.size() * sizeof(float));
+        std::copy(pcm.begin(), pcm.end(), out);
+        *out_n_samples = (int)pcm.size();
+        return out;
+    }
+
     // Step 1: Tokenize text
     std::vector<int32_t> text_ids = voxtral_tts_tokenize(ctx, text);
     if (ctx->verbosity >= 1) {
