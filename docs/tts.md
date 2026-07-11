@@ -17,7 +17,7 @@ trade-off:
 | **`chatterbox`** | T3 AR + S3Gen flow-matching + HiFTGenerator. Built-in voice baked into the T3 GGUF; clones via a baked voice GGUF (see workflow below). EN/AR/DE variants share runtime. | Yes (`--voice <voice.gguf>`, baked from a WAV with `models/bake-chatterbox-voice-from-wav.py`) | ~880 MB via `-m auto` (T3 Q8 + S3Gen Q8) |
 | **`outetts`** | OuteTTS-0.3-1B: OLMo-1B LLM + WavTokenizer single-codebook VQ-GAN. Lightweight (1B params), CC BY 4.0 license. 24 kHz output. | Yes (`--voice <speaker.json>`, created with `tools/reference_backends/outetts_create_speaker.py`) | ~2.5 GB via `-m auto` (talker F16 + WavTokenizer decoder) |
 | **`f5-tts`** | F5-TTS v1 Base: 22-layer DiT flow-matching TTS + Vocos iSTFT vocoder. MIT license. High-quality zero-shot voice cloning from 3-15s reference audio. 24 kHz output, character-level tokenization. | Yes (`--voice <ref.wav> --ref-text "transcript"`) | ~953 MB via `-m auto` (single F16 GGUF, DiT + Vocos) |
-| **`irodori-tts`** | Irodori-TTS v3 500M: RF-DiT flow-matching TTS with LowRankAdaLN + JointAttention + half-RoPE + SwiGLU. 48 kHz via Semantic-DACVAE-Japanese-32dim codec. MIT license. Japanese-focused (llm-jp-3 tokenizer). Zero-shot voice cloning from any reference WAV (DAC-VAE encoder + speaker CFG); emoji emotion control (whisper 👂, breath 😮‍💨, …); the duration predictor sets output length; encoded references are cached to `<voice>.iro32latent`. | Yes (`--voice <ref.wav> --i-have-rights`) | ~852 MB Q4_K via `-m auto` + DAC-VAE codec |
+| **`irodori-tts`** | Irodori-TTS: RF-DiT flow-matching TTS with LowRankAdaLN + JointAttention + half-RoPE + SwiGLU. 48 kHz via Semantic-DACVAE-Japanese-32dim codec. MIT license. Japanese-focused (llm-jp-3 tokenizer). Zero-shot voice cloning from any reference WAV (DAC-VAE encoder + speaker CFG); emoji emotion control; duration predictor for output length. **VoiceDesign** (600M-v3): adds caption encoder for style/emotion control via text descriptions (`--instruct "calm adult male, deep voice"`); independent text/speaker/caption CFG. | Yes (`--voice <ref.wav> --i-have-rights`) | ~526 MB Q4_K (VoiceDesign) / ~852 MB Q4_K (base) + DAC-VAE codec |
 | **`indextts`** | IndexTTS-1.5: GPT-2 AR (24L/1280d) mel-code generator + BigVGAN vocoder. Designed for Chinese+English. Zero-shot voice cloning from any reference WAV. | Yes (`--voice <ref.wav>`) | ~2.4 GB via `-m auto` (GPT F16 + BigVGAN F16) |
 | **`cosyvoice3-tts`** | Fun-CosyVoice3-0.5B-2512: Qwen2-0.5B AR speech-token LM + DiT-CFM (10-step Euler) + HiFT (NSF + iSTFT) @ 24 kHz. 9 languages + 18 Chinese dialects. Ships an 8-voice baked bank (`zero_shot` + `fleurs-{en,de,zh,ja,fr,es,ko}`). | Yes — baked-bank name via `--voice <name>`, **or** native arbitrary-WAV cloning via `--voice <ref.wav> --ref-text "..."` (ports speech_tokenizer_v3 + CAMPPlus + matcha mel to ggml; speech tokens byte-exact vs ONNX). | ~1.2 GB via `-m auto` (Q4_K LLM + Q8_0 flow + HiFT + s3tok + campplus + voices) |
 | **`csm`** | Sesame CSM-1B: Llama-3.2 1B backbone (first-codebook AR) + 100M depth decoder (codebooks 1–31) + Kyutai Mimi codec (32-codebook RVQ → SEANet) @ 24 kHz. Single GGUF. Apache-2.0. | No (single built-in voice) | ~1.4 GB via `-m auto` (single Q4_K GGUF) |
@@ -1082,6 +1082,12 @@ crispasr --backend irodori-tts -m irodori-tts-500m-v3-q8_0.gguf \
 crispasr --backend irodori-tts -m irodori-tts-500m-v3-q8_0.gguf \
     --codec-model dacvae-ja-32dim-f16.gguf \
     --voice reference.wav --i-have-rights --tts "テスト。" -o cloned.wav
+
+# VoiceDesign (600M-v3): style/emotion control via --instruct:
+crispasr --backend irodori-tts -m irodori-tts-600m-v3-voicedesign-q4_k.gguf \
+    --codec-model dacvae-ja-32dim-f16.gguf \
+    --instruct "落ち着いた大人の男性。深く響く声で丁寧に話している。" \
+    --tts "こんにちは、世界。" -o voicedesign.wav
 ```
 
 **Voice cloning** encodes the reference through the DAC-VAE encoder (resample →

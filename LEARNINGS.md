@@ -12541,3 +12541,11 @@ hot path to the GPU, (1) check whether it's already `cblas`/Accelerate-optimized
 know if you're dispatch- or compute-bound — batching and precision changes only
 help the former. Guess-and-check across an already-optimized seam burns hours
 for nothing; a per-op Metal capture is the only honest next step there.
+
+27. **VoiceDesign == different model, not just + caption encoder.** Irodori-TTS
+600M-v3-VoiceDesign has completely different dimensions from the base v3 500M
+(model_dim 1280 vs 2048, latent_dim 32 vs 128, text_dim 512 vs 1280, 12 vs 24
+DiT layers, llm-jp-3-150m tokenizer vs sarashina2.2). The converter/runtime
+already read hparams from config/GGUF dynamically, so the dimension changes were
+handled — but the assumption that "VoiceDesign = base + caption" would have led
+to hardcoded wrong dimensions. Always check the actual checkpoint config.

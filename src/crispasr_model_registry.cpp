@@ -821,6 +821,14 @@ constexpr Entry k_registry[] = {
      "dacvae-ja-32dim-f16.gguf",
      "https://huggingface.co/cstr/irodori-tts-GGUF/resolve/main/dacvae-ja-32dim-f16.gguf",
      "~135 MB"},
+    // Irodori-TTS v3 600M VoiceDesign: caption encoder for style/emotion
+    // conditioning via text descriptions. Same codec companion.
+    {"irodori-tts-voicedesign", "irodori-tts-600m-v3-voicedesign-q4_k.gguf",
+     "https://huggingface.co/cstr/irodori-tts-GGUF/resolve/main/irodori-tts-600m-v3-voicedesign-q4_k.gguf",
+     "~526 MB",
+     "dacvae-ja-32dim-f16.gguf",
+     "https://huggingface.co/cstr/irodori-tts-GGUF/resolve/main/dacvae-ja-32dim-f16.gguf",
+     "~135 MB"},
     // CTC forced aligner — used by `-am auto` to attach word-level
     // timestamps (LLM-decode backends, or any backend when paired
     // with `--force-aligner` / `-fa`). Q4_K is the recommended quant

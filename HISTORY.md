@@ -11372,3 +11372,15 @@ filters devices by name prefix. Replaced all call sites. Also exposed as
 Kaggle P100 validation: 7/7 ASR backends pass (moonshine, firered-asr,
 parakeet, sensevoice, qwen3, glm-asr, fastconformer-ctc). `--gpu-backend cpu`
 runs 3.6× slower than CUDA with zero CUDA library references.
+
+## Irodori-TTS VoiceDesign caption conditioning
+
+Ported Aratako/Irodori-TTS-600M-v3-VoiceDesign — adds a caption encoder for
+style/emotion conditioning. VoiceDesign is a different architecture variant
+(model_dim=1280, latent_dim=32, 12 DiT layers, llm-jp-3-150m tokenizer vs the
+base v3's model_dim=2048, latent_dim=128, 24 layers, sarashina2.2). The caption
+encoder is a TextEncoder (10 layers, 512-dim) whose output is cross-attended in
+every DiT block and modulates the duration predictor via dual AdaRN-Zero.
+Independent text/speaker/caption CFG in the Euler ODE sampler. Diff harness:
+F16 cos=1.000000 (text_state + v_pred_step0); Q4_K cos=0.996491 (526 MB from
+1.2 GB F16). Wired via `--instruct` flag and `CRISPASR_IRODORI_CAPTION` env var.
