@@ -1333,8 +1333,9 @@ CosyVoice3 performance notes:
   8/6 and cannot distinguish steps): `8`→0.9948, `6`→0.9925, `4`→0.9895 with a
   one-word ASR slip. **`6` is the perceptual sweet spot** (~−40 % flow work,
   ~−19 % of the wall) and matches the chatterbox default; `4` starts to show
-  audible artifacts. `10` is the conservative upstream default; drop to `6` for
-  a large speedup at near-identical quality.
+  audible artifacts. `6` was confirmed across short / numbers / long sentences
+  (6-vs-10 mel-corr 0.9953 / 0.9930 / 0.9938). `10` is the conservative
+  upstream default; drop to `6` for a large speedup at near-identical quality.
 - An external model directory affects cold startup, not steady-state
   synthesis. For repeated requests, use server mode so the ~1.2 GB model set
   remains resident.
