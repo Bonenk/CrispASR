@@ -232,3 +232,22 @@ Lessons from the systematic head-to-head benchmark against
     Kaggle where it can actually be measured. Correctness (transcript/WER parity)
     is HW-independent and can be pre-validated on M1; perf cannot.** Design in
     PLAN §232 "RNNT/TDT GPU decode".
+
+30. **The Parakeet "955 ms P100 decode gap" is substantially a slow-CPU-BLAS
+    artifact, not pure GPU-idle.** After actually implementing the ggml-graph
+    TDT decode (LSTM predictor + joint on `ctx->backend`, opt-in
+    `PARAKEET_GGML_DECODE=1`), the M1 numbers reframe the whole gap: cblas decode
+    is only **~60 ms on M1** (Apple Accelerate) vs the **955 ms** the §232 Kaggle
+    kernel reported (OpenBLAS on the Kaggle CPU) — same code, same audio, ~16×
+    difference purely from CPU BLAS quality. The ggml GPU decode is **55-59 ms on
+    M1 Metal** — neutral/slightly faster, and **transcript-identical** to cblas
+    (jfk + multispeaker, CPU & Metal), so the port is correct and safe to ship
+    gated. **Lessons:** (a) before attributing a CPU-path "gap" to GPU-idle /
+    architecture and building a GPU port, measure the baseline on the SAME BLAS
+    the comparison used — a large chunk of the parakeet gap may close by linking a
+    faster CPU BLAS, not by a GPU decode. (b) A correct hand-written ggml
+    transducer decode is a modest, contained amount of code (one LSTM-layer helper
+    + two step builders) and validates on M1 for correctness — so "build it, gate
+    it, let Kaggle judge perf" was tractable after all; the reservation in
+    LEARNINGS 29 was about not FLIPPING THE DEFAULT unvalidated, which still holds.
+    Kaggle P100 A/B: `tools/kaggle/parakeet-ggml-decode-ab/`.
