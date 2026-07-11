@@ -477,8 +477,16 @@ public:
         crispasr_segment seg;
         seg.t0 = t_offset_cs;
         seg.t1 = t_offset_cs + (int64_t)((double)n_samples / 16000.0 * 100.0);
+        // Apply fix_loops to both text and tokens (#218)
+        std::vector<std::string> tok_texts;
+        for (auto& tk : out_tokens)
+            tok_texts.push_back(tk.text);
+        const std::vector<int> keep = core_ngram::fix_loops_keep_indices(tok_texts);
         seg.text = core_ngram::fix_loops(transcript);
-        seg.tokens = std::move(out_tokens);
+        for (int ki : keep) {
+            if (ki >= 0 && ki < (int)out_tokens.size())
+                seg.tokens.push_back(std::move(out_tokens[ki]));
+        }
         out.push_back(std::move(seg));
         return out;
     }
