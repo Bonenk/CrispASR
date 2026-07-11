@@ -1818,18 +1818,32 @@ static void _register_stream_session(crispasr_session* s) {
     g_stream_session = s;
 }
 
+// Cap on each per-session polling buffer. Non-polling consumers (Go/Java/C#
+// bindings call session_transcribe with the default callbacks but never
+// drain) would otherwise grow a long-lived session's buffer without bound.
+// On overflow the OLDEST half is dropped — a polling consumer that lags this
+// far behind loses history, not recent segments. 4096 segments/tokens is far
+// beyond any real polling lag (Dart drains every few hundred ms).
+static constexpr size_t CA_STREAM_BUF_CAP = 4096;
+
+template <typename T> static void _trim_stream_buffer(std::vector<T>& buf) {
+    if (buf.size() >= CA_STREAM_BUF_CAP)
+        buf.erase(buf.begin(), buf.begin() + (long)(buf.size() / 2));
+}
+
 static void _default_segment_cb(const char* text, int64_t t0, int64_t t1, int /*idx*/, void* ud) {
     auto* s = (crispasr_session*)ud;
     if (!s)
         return;
     _register_stream_session(s);
     std::lock_guard<std::mutex> lk(s->stream_mutex);
+    _trim_stream_buffer(s->streamed_segments);
     crispasr_session_seg seg;
     seg.text = text;
     seg.t0 = t0;
     seg.t1 = t1;
     s->streamed_segments.push_back(std::move(seg));
-    s->streamed_seg_count.fetch_add(1, std::memory_order_relaxed);
+    s->streamed_seg_count.store((int)s->streamed_segments.size(), std::memory_order_relaxed);
 }
 
 static void _default_token_cb(const char* text, int /*idx*/, void* ud) {
@@ -1838,8 +1852,9 @@ static void _default_token_cb(const char* text, int /*idx*/, void* ud) {
         return;
     _register_stream_session(s);
     std::lock_guard<std::mutex> lk(s->stream_mutex);
+    _trim_stream_buffer(s->streamed_tokens);
     s->streamed_tokens.push_back(text);
-    s->streamed_tok_count.fetch_add(1, std::memory_order_relaxed);
+    s->streamed_tok_count.store((int)s->streamed_tokens.size(), std::memory_order_relaxed);
 }
 
 CA_EXPORT int crispasr_get_streamed_segment_count(void) {
