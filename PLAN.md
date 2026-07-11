@@ -7259,3 +7259,44 @@ Vulkan/base re-test where the tradeoff may differ. `src/moonshine.cpp`
 (`moonshine_build_encoder` `manual_attn` param). See LEARNINGS 27. Net: the
 encoder GPU>CPU gap for tiny is inherent Metal launch overhead, not a
 fixable bounce — for moonshine-tiny, `--no-gpu` remains fastest at idle.
+
+### §232 RNNT/TDT GPU decode — scoped, needs a Kaggle/CUDA session (2026-07-11)
+
+Scoped the Parakeet TDT decode port (target: TC's 29 ms P100 decode vs CA's
+~828-955 ms cblas). Findings that must guide the implementation:
+
+**Where/what.** Single hot function `parakeet_tdt_decode` (`parakeet.cpp:1288`;
+the same gate must be mirrored into `_rnnt_decode`, and the four transcribe
+entry points already funnel through these). Exact per-step math to replicate
+(read line-by-line — the header comment is STALE):
+- predictor: `embed[tok]` → 2× PyTorch-LSTM (gate order i,f,g,o; `c=σ(f)·c +
+  σ(i)·tanh(g)`, `h=σ(o)·tanh(c)`) → `pred_out=h1`. Weights `lstm{0,1}.w_ih
+  [4H,H] w_hh[4H,H] b_ih/b_hh[4H]`, H=640. Reuse `core_lstm::lstm_unidir`
+  (already ggml, matching gate math) adapted to a single carried-state step.
+- joint: `mid = pred_w[640,640]@pred_u + pred_b`; **`relu`**(proj_e + mid)
+  (NOT tanh — code at 1135 is relu); `logits = out_w[8198,640]@mid + out_b`.
+  proj_e is precomputed per frame (batched sgemm, §232). Token argmax over
+  `[0,n_vocab_blk)`, duration argmax over the last `n_dur=5` — do BOTH
+  in-graph (2 int32 readbacks) ONLY on the greedy no-hotword no-sampling path;
+  hotword-bias / temperature need the full 8198-logit readback.
+
+**Go/no-go — do NOT ship a per-step ggml dispatch without P100 proof.**
+Strong evidence it is launch-bound and LOSES: LEARNINGS 20/24 (batched GPU
+joint measured **8.8× WORSE** — CPU sgemm while GPU idle) and 25-26 + the
+qwen3 talker (§232): per-step GPU dispatch of small (≤8198×640) matmuls is
+launch-bound on Metal and often slower than CPU cblas. TC's 29 ms almost
+certainly comes from **CUDA-graph capture** (whole decode as one replayable
+graph), not per-step ggml dispatch. M1 CANNOT measure the win (it is P100-
+only), so the port must be built + A/B'd on Kaggle:
+1. Implement gated (`PARAKEET_GGML_DECODE=1`) LSTM+joint+in-graph-argmax as a
+   persistent gallocr graph on `ctx->backend` (CP_DIRECT pattern), state
+   carried via tensor_set/get of h0/c0/h1/c1 (640 f32 each).
+2. Validate transcript/WER parity on M1 (CPU + Metal) vs the cblas path first
+   (correctness is HW-independent) — this half IS doable off-Kaggle.
+3. Measure RTF on Kaggle P100 (kaggle_harness). Flip default only if it beats
+   cblas there. If launch-bound (likely), the real fix is CUDA-graph capture
+   of the whole step loop — a larger ggml-cuda effort, own campaign.
+
+Model local: `parakeet-tdt-0.6b-v3-q4_k.gguf` (467 MB). Baseline M1: Metal
+6.1× RT, CPU 1.1× RT — parakeet is already encoder-bound and fast on Metal;
+the decode gap is a CUDA-vs-CUDA competitiveness issue, not an M1 UX issue.
