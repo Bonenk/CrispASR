@@ -1,0 +1,49 @@
+# Fuzzing `crispasr_audio_load`
+
+`crispasr_audio_load()` runs an attacker-controllable file through the whole
+decoder dispatch — miniaudio (WAV/MP3/FLAC/OGG) plus the hand-rolled Sun-AU,
+AMR, WebM/EBML and MP4 fallbacks. Those hand-rolled parsers are the audio
+attack surface; the harness (`fuzz_audio_load.cpp`) fuzzes the one entry point
+that reaches all of them.
+
+## Build (clang required)
+
+```bash
+cmake -B build-fuzz \
+  -DCRISPASR_FUZZ=ON \
+  -DCRISPASR_SANITIZE_ADDRESS=ON \
+  -DCRISPASR_SANITIZE_UNDEFINED=ON \
+  -DCRISPASR_BUILD_TESTS=ON \
+  -DCMAKE_BUILD_TYPE=Debug
+cmake --build build-fuzz --target crispasr-fuzz-audio
+```
+
+`-DCRISPASR_FUZZ=ON` adds `-fsanitize=fuzzer-no-link` (coverage) to every TU;
+the harness target adds `-fsanitize=fuzzer` (the libFuzzer driver). Combine
+with the sanitizers so out-of-bounds accesses abort instead of reading garbage.
+
+## Run
+
+Seed from the committed samples (valid inputs for every format the loader
+handles), so the mutator starts from real container structure:
+
+```bash
+mkdir -p /tmp-nonsmall/crispasr-fuzz-corpus   # any writable dir off a real fs
+cp samples/jfk.wav samples/jfk.au samples/jfk.amr samples/jfk.webm \
+   samples/jfk-vorbis.webm samples/jfk.m4a /tmp-nonsmall/crispasr-fuzz-corpus/
+
+./build-fuzz/bin/crispasr-fuzz-audio -max_len=1048576 /tmp-nonsmall/crispasr-fuzz-corpus
+```
+
+A crash writes `crash-<hash>`; reproduce with
+`./build-fuzz/bin/crispasr-fuzz-audio crash-<hash>`. The harness writes each
+input to `crispasr_fuzz_input.bin` in the cwd and caps size at 8 MB (the
+parsers have their own 500 MB caps; the cap just keeps the fuzzer itself fast).
+
+## What it exercises
+
+Every format-detection + fallback path in `crispasr_audio_load`, i.e. the
+`crispasr_au_decode` / `crispasr_amr_decode` / `crispasr_webm_decode` /
+`crispasr_m4a_decode` parsers plus miniaudio's WAV/MP3/FLAC/OGG handling. The
+`core/wav_reader.h` and GGUF loaders are reached by *other* entry points and
+would need their own harnesses (a follow-up).

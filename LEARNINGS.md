@@ -10,6 +10,47 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Every hand-rolled file parser sizes a buffer from an untrusted length field — that is the #1 memory-safety bug class, and a multi-agent audit finds them fast (parser hardening, 2026-07-11)
+
+CrispASR parses attacker-controllable bytes in several places: the audio
+demuxers (`crispasr_audio.cpp`: Sun-AU, WAV, MP4/box, WebM/EBML, Ogg/Opus,
+AMR), `core/wav_reader.h`, and the GGUF loader (a model file is untrusted too).
+A structured audit turned up the **same defect class in five independent
+parsers**:
+
+1. **Alloc sized from an untrusted length/count with no clamp to the real
+   file/buffer size.** `vector.resize(count)` / `vector(n)` / `malloc(n)` where
+   `n` is a header field. A tiny file claiming a 4 GB `data_size` or a
+   `0xFFFFFFFF` sample count forces a multi-GB allocation → OOM / `bad_alloc`
+   thrown across a C ABI (DoS). Seen in AU (`data_size`), WAV (`chunk_size`),
+   MP4 (`stsz`/`stco`/`co64` count). **Fix: always clamp the field to the bytes
+   the file actually holds** (`min(field, file_end - pos)`, or box-entry bytes).
+   The bounded read *loop* after the alloc does NOT save you — the alloc fires
+   first.
+2. **Additive bounds checks overflow.** `off + sz > size` wraps when `off` is a
+   64-bit attacker value near UINT64_MAX, so the guard passes and a wild pointer
+   is dereferenced (OOB read). **Fix: subtractive form** — `off > size || sz > size - off`.
+3. **A degenerate size makes a loop emit N items with no forward progress.**
+   WebM fixed-size lacing with `frame_size == 0` pushed 256 empty packets per
+   block while the cursor never advanced; a cluster of tiny blocks amplified it
+   ~768× into hundreds of GB of empty vectors. **Fix: reject the zero case +
+   cap the accumulator by file size** (a valid item occupies ≥1 byte).
+4. **One path in a family missing the guard its siblings have.** Three GGUF mmap
+   paths bounds-checked `data_off + off + nbytes > mf.size`; `load_weights_split`
+   didn't → SIGBUS / info-leak. **Fix: grep the sibling guards and mirror.**
+
+**Methodology that worked.** A multi-agent workflow — parallel auditors, one per
+parser region, each handed the bug taxonomy + a *confirmed exemplar* (the AU
+`raw(data_size)` bug), then an **adversarial verifier per finding** whose default
+is "refuted" and who re-reads the code to check for an existing guard. 10
+findings, all 10 survived verification, 6 unique real bugs across 5 subsystems in
+one pass — the diversity is the point (one reviewer fixates on one parser). The
+verify step matters: "the alloc is bounded because the later loop is bounded" is
+the tempting-but-wrong refutation to reject. Judge by the alloc, not the read.
+Regression-test the *reachable* path (the internal demuxers are `static`, so
+drive them through `crispasr_audio_load` with a crafted file; a libFuzzer harness
+over that entry point exercises all formats at once).
+
 ## MelsTime mel layout IS ggml Conv1d input layout — transposing corrupts with cos ~0.3, not a gradual drift (moss-diarize #242, 2026-07-11)
 
 ggml `Conv1d` with kernel ne=(K, IC, OC) expects input ne=(T, IC): T is the fast (contiguous) axis, IC groups sit at stride T. The `core_mel::compute` MelsTime layout `mel[f*T+t]` has T contiguous per mel bin — **this IS the correct ggml layout**. Transposing to `mel[t*IC+f]` (IC contiguous per timestep) produces cos ~0.3 from the conv stem — total garbage, not a small drift. The diff harness mel stage passes (cos=1.0) because it compares the raw mel before feeding to the encoder, so it doesn't catch a transposition applied between mel and conv1d.

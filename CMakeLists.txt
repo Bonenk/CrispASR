@@ -103,6 +103,15 @@ option(CRISPASR_SANITIZE_THREAD    "crispasr: enable thread sanitizer"    OFF)
 option(CRISPASR_SANITIZE_ADDRESS   "crispasr: enable address sanitizer"   OFF)
 option(CRISPASR_SANITIZE_UNDEFINED "crispasr: enable undefined sanitizer" OFF)
 
+# libFuzzer harnesses (clang only). Combine with -DCRISPASR_SANITIZE_ADDRESS=ON
+# for OOB detection. `-fsanitize=fuzzer-no-link` instruments every TU compiled
+# after this for coverage; each harness target adds `-fsanitize=fuzzer` for the
+# libFuzzer driver. See tests/fuzz/.
+option(CRISPASR_FUZZ "crispasr: build libFuzzer harnesses (clang only)" OFF)
+if (CRISPASR_FUZZ)
+    add_compile_options(-fsanitize=fuzzer-no-link)
+endif()
+
 # extra artifacts
 option(CRISPASR_BUILD_TESTS    "crispasr: build tests"          ${CRISPASR_STANDALONE})
 option(CRISPASR_BUILD_EXAMPLES "crispasr: build examples"       ${CRISPASR_STANDALONE})

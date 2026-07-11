@@ -26,6 +26,27 @@ effort estimate. Completed items have been moved to `HISTORY.md`.
   already caches the graph and uses a dedicated sched. Skip-realloc is broken on
   CUDA+Metal. The bottleneck is pure matmul compute; perf wins require GPU where
   the ~5ms overhead becomes significant. Handover removed.
+- **Untrusted-input parser hardening**: SHIPPED — multi-agent security audit of the
+  audio demuxers + GGUF loader found 6 DoS/OOB defects (MP4 stsz/stco/co64 count +
+  co64 offset overflow, WebM lacing, WAV + AU size clamps, GGUF split mmap bounds),
+  all fixed + ASan-validated. See `HISTORY.md` + `LEARNINGS.md`.
+
+## Untrusted-input parser hardening — follow-ups (MOSTLY DONE)
+
+The memory-safety fixes shipped (see HISTORY 2026-07-11). Test/tooling state:
+- **DONE**: AU + WAV crafted-input regression tests (ASan/UBSan-clean); the
+  `linux-asan-audio` CI job builds the decoders under ASan and decodes the
+  samples on every change.
+- **DONE**: MP4 crafted-input *reachability* test (malicious `stsz` count)
+  through the full `crispasr_audio_load` dispatch → `crispasr_m4a_decode`.
+- **DONE**: libFuzzer harness over `crispasr_audio_load` (`tests/fuzz/`, gated
+  `-DCRISPASR_FUZZ=ON`, clang) — seed from `samples/`; mutation covers the
+  AU/AMR/WebM/MP4/WAV dispatch under ASan, so WebM/AU/AMR get reachability
+  coverage there rather than as separate hand-crafted tests.
+- **Open (LOW)**: a GGUF `load_weights_split` bounds regression test (needs a
+  crafted GGUF + dual-backend setup) + harnesses for the model-load and
+  tokenizer file readers (`bpe.h`/`sentencepiece.h`) — same untrusted-input
+  class, not yet covered.
 
 ## Scoped next items (for a new agent picking up)
 

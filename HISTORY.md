@@ -22,6 +22,37 @@ patched: canary_qwen, funasr, glm_asr, granite_speech, moss_transcribe,
 moss_audio, qwen3_asr, voxtral, voxtral4b. parakeet already opt-in.
 chatterbox_s3gen + granite_speech decoder safe (dedicated gallocr). 19 sites
 audited, 0 remaining.
+## 2026-07-11 — untrusted-input parser hardening (multi-agent security audit)
+
+Audited the whole untrusted-input file-parsing surface (audio demuxers + GGUF
+loader) for memory-safety defects via a multi-agent workflow: parallel auditors
+per parser region → adversarial refutation of every finding. 10 findings, all
+verified, **6 unique real defects fixed** (`db8903d4`/`3739e70d`, plus the AU
+reader in `9871e1ac`):
+
+- **MP4 box parser** (`crispasr_audio.cpp`): `stsz`/`stco`/`co64` did
+  `resize(count)` from an untrusted 32-bit box field → 16–32 GB alloc DoS
+  (clamp to box/file bytes); the `co64` chunk offset flowed into
+  `off + sz > file_data.size()` which wraps in uint64 → wild OOB read
+  (overflow-safe subtractive check). `stsc` was already bounded (push_back).
+- **WebM demux**: fixed-size lacing with `frame_size==0` emitted up to 256
+  empty packets/block with no forward progress → a tiny cluster amplified into
+  billions of empty vectors (OOM). Reject + file-size packet cap.
+- **WAV** (`core/wav_reader.h`): `read_wav_mono_pcm16` sized its buffer from the
+  untrusted `data` chunk_size → ~2 GB alloc from a tiny file (clamp to file
+  size; reached via indextts/voxcpm2 `--voice`).
+- **GGUF** (`core/gguf_loader.cpp`): `load_weights_split`'s mmap branch copied
+  each tensor with no bounds check vs the mapping → SIGBUS / info-leak on a
+  truncated/crafted GGUF; added the guard its three sibling paths already have.
+- **AU** (`crispasr_au_decode`, earlier): `data_size`/`data_offset` clamp.
+
+Regression tests (AU + WAV crafted-input) pass under ASan/UBSan + Release; an
+MP4 crafted-input reachability test (through the full `crispasr_audio_load`
+dispatch → `crispasr_m4a_decode`) and a libFuzzer harness over
+`crispasr_audio_load` (`tests/fuzz/`, gated `-DCRISPASR_FUZZ=ON`; mutation covers
+the AU/AMR/WebM/MP4/WAV parsers under ASan) added alongside. CI guards via the
+`linux-asan-audio` job. See LEARNINGS (parser hardening) for the bug taxonomy +
+audit methodology.
 
 ## 2026-07-11 — dots-tts: PatchEncoder RoPE + QK-norm fix, CLI steps wiring (#200)
 
