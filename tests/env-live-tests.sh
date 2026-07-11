@@ -32,6 +32,8 @@ export CRISPASR_MODEL_QWEN3_ASR="${CRISPASR_MODEL_QWEN3_ASR:-$CRISPASR_MODELS_DI
 export CRISPASR_MODEL_HIGGS_STT="${CRISPASR_MODEL_HIGGS_STT:-$CRISPASR_MODELS_DIR/higgs-stt-q8_0.gguf}"
 export CRISPASR_MODEL_VOXTRAL_TTS="${CRISPASR_MODEL_VOXTRAL_TTS:-$CRISPASR_MODELS_DIR/voxtral-4b-tts-q4_k.gguf}"
 export CRISPASR_MODEL_CANARY="${CRISPASR_MODEL_CANARY:-$CRISPASR_MODELS_DIR/canary-1b-v2.gguf}"
+# canary-qwen SALM (nvidia/canary-qwen-2.5b). #247 short-window echo regression.
+export CRISPASR_MODEL_CANARY_QWEN="${CRISPASR_MODEL_CANARY_QWEN:-$CRISPASR_MODELS_DIR/canary-qwen-2.5b-q8_0.gguf}"
 export CRISPASR_MODEL_LFM2_EN="${CRISPASR_MODEL_LFM2_EN:-$CRISPASR_MODELS_DIR/lfm2-audio-1.5b-q5_k.gguf}"
 export CRISPASR_MODEL_LFM2_JP="${CRISPASR_MODEL_LFM2_JP:-$CRISPASR_MODELS_DIR/lfm2-audio-1.5b-jp-q5_k.gguf}"
 # dots.tts: F16 core (the CFG flow-match derails on full-q8) + vocoder companion.

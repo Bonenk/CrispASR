@@ -4649,14 +4649,25 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         seg.text = core_ngram::fix_loops(cqr->text ? cqr->text : "");
         seg.t0 = 0;
         seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
+        // #218: keep the tokens array consistent with the loop-fixed text —
+        // drop the same duplicate tokens fix_loops removes (mirrors the CLI
+        // adapter's fix_loops_keep_indices path; the inline session ABI
+        // previously emitted the un-deduplicated tokens).
+        std::vector<std::string> tok_texts;
+        tok_texts.reserve((size_t)cqr->n_tokens);
+        for (int i = 0; i < cqr->n_tokens; i++)
+            tok_texts.push_back(cqr->tokens[i].text ? cqr->tokens[i].text : "");
+        const std::vector<int> keep = core_ngram::fix_loops_keep_indices(tok_texts);
         std::vector<ca_token_record> toks;
-        toks.reserve((size_t)cqr->n_tokens);
-        for (int i = 0; i < cqr->n_tokens; i++) {
+        toks.reserve(keep.size());
+        for (int ki : keep) {
+            if (ki < 0 || ki >= cqr->n_tokens)
+                continue;
             ca_token_record tk;
-            tk.text = cqr->tokens[i].text;
+            tk.text = cqr->tokens[ki].text;
             tk.t0 = 0;
             tk.t1 = seg.t1;
-            tk.p = cqr->tokens[i].p;
+            tk.p = cqr->tokens[ki].p;
             toks.push_back(std::move(tk));
         }
         _fire_token_callbacks(s, toks);

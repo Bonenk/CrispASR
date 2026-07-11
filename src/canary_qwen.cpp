@@ -13,16 +13,28 @@
 //                  ff=6144 (SwiGLU), RoPE θ=1e6, RMSNorm ε=1e-6
 //   Vocab:         151936 (Qwen3 BPE, tied embed/lm_head)
 //
-// Prompt format:
+// Prompt format (verified byte-identical to NeMo's QwenPromptFormatter.
+// encode_dialog: ids [151644,872,198,3167,3114,279,2701,25,220,<audio>,
+// 151645,198,151644,77091,198]):
 //   <|im_start|>user\nTranscribe the following: <|audio_pad|>×N<|im_end|>\n
 //   <|im_start|>assistant\n
 //
-// NeMo blueprint: QwenPromptFormatter (NOT Qwen3). No system role.
-// No <|audio_start|>/<|audio_end|> framing — the model was never
-// trained with those tokens; including them causes instruction-echo
-// artifacts ("Transcript:", "PASS") per issue #247.
+// NeMo blueprint: QwenPromptFormatter (NOT Qwen3). No system role, no BOS.
+// No <|audio_start|>/<|audio_end|> framing — the model was never trained with
+// those tokens.
+//
+// #247 ("Transcript"/"PASS" leak): NOT the framing tokens (removing them did
+// not fix it) and NOT the prompt (it matches NeMo exactly). Root cause is a
+// too-short audio window: the FastConformer subsamples 8x, so a window with
+// only a few encoder frames (T_enc<=5, ~<=0.4 s) gives the Qwen3 LLM decoder
+// no acoustic content to ground on, and it falls back to its language prior,
+// echoing the task framing as meta words. NeMo's SALM.generate() is plain
+// greedy with no suppress/min-length, so it echoes too — this is inherent to
+// the model on degenerate input, and must be handled in the pipeline. See the
+// degenerate-window gate + instruction-echo safety net in the transcribe path.
 
 #include "canary_qwen.h"
+#include "canary_qwen_echo.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -43,6 +55,7 @@
 #include "core/mel.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -957,6 +970,27 @@ static std::string canary_qwen_decode_tokens(canary_qwen_context* ctx, const int
     return core_bpe::detokenize(ctx->vocab.id_to_token, ids, (size_t)n_ids);
 }
 
+// #247: Count how many leading generated tokens form an instruction-echo
+// artifact. When the audio window is too short/low-content to ground a
+// transcription, the Qwen3 LLM decoder falls back to its language prior and
+// echoes the task framing — emitting meta words like "Transcript",
+// "Transcription" or "PASS" instead of a transcript (NeMo's SALM.generate()
+// runs plain greedy with no suppress/min-length guard, so this is inherent to
+// the model on degenerate input). Those exact leading words are never a real
+// ASR transcript under the "Transcribe the following:" prompt, so we strip them
+// from BOTH the token array and the text. A multi-token word ("Trans"+"cript")
+// is handled by accumulating up to `max_probe` leading tokens and matching the
+// decoded, normalised string. Returns the number of leading tokens to drop.
+static int canary_qwen_echo_prefix_tokens(canary_qwen_context* ctx, const std::vector<int32_t>& ids) {
+    const int max_probe = std::min((int)ids.size(), 4);
+    for (int k = max_probe; k >= 1; --k) {
+        std::string s = canary_qwen_decode_tokens(ctx, ids.data(), k);
+        if (canary_qwen_echo::is_meta_echo(s))
+            return k;
+    }
+    return 0;
+}
+
 // ===========================================================================
 // Full transcription pipeline
 // ===========================================================================
@@ -1045,6 +1079,31 @@ static canary_qwen_result* canary_qwen_transcribe_impl(canary_qwen_context* ctx,
     if (cq_debug_enabled())
         fprintf(stderr, "canary_qwen: T_mel=%d T_enc=%d\n", T_mel, T_enc);
 
+    // #247: Degenerate-window guard (root cause of the "Transcript"/"PASS"
+    // leak). The FastConformer applies 8x subsampling, so T_enc encoder frames
+    // correspond to ~T_enc*80 ms of audio. With only a handful of frames there
+    // is not enough acoustic content to ground a transcription, and the Qwen3
+    // LLM decoder falls back to its language prior — emitting instruction-echo
+    // meta tokens ("Transcript", "Transcription", "PASS", "Okay") instead of
+    // words. Measured on canary-qwen-2.5b-q8_0: T_enc<=5 (~<=0.4 s) reliably
+    // echoes; T_enc>=6 transcribes. NeMo's SALM.generate() has no guard against
+    // this (plain greedy, no suppress/min-length), so the pipeline must not
+    // feed the model such windows. Return an empty transcript; in a chunking
+    // pipeline the overlapping neighbour already covers any real fragment.
+    // Tunable/disable via env (0 disables the gate → pre-fix behaviour).
+    int min_enc_frames = 6;
+    if (const char* e = std::getenv("CRISPASR_CANARY_QWEN_MIN_ENC_FRAMES"))
+        min_enc_frames = std::atoi(e);
+    if (min_enc_frames > 0 && T_enc < min_enc_frames) {
+        if (cq_debug_enabled())
+            fprintf(stderr, "canary_qwen: window too short (T_enc=%d < %d) — empty result to avoid instruction echo\n",
+                    T_enc, min_enc_frames);
+        auto* r = (canary_qwen_result*)calloc(1, sizeof(canary_qwen_result));
+        r->text = strdup("");
+        r->n_tokens = 0;
+        return r;
+    }
+
     // 3. Build prompt embeddings (text + audio splice)
     int total_prompt = 0;
     std::vector<float> prompt_embeds;
@@ -1126,6 +1185,24 @@ static canary_qwen_result* canary_qwen_transcribe_impl(canary_qwen_context* ctx,
             ctx->kv_n_used++;
             if (logits.empty())
                 break;
+        }
+    }
+
+    // #247: Instruction-echo safety net. The degenerate-window gate above stops
+    // the common case (too-short audio), but a borderline window — or a GPU
+    // miscompute on another backend — can still start the output with an
+    // instruction-echo meta word ("Transcript"/"Transcription"/"PASS"). Those
+    // are never a real transcript here, so drop the leading echo tokens from
+    // BOTH the token array and the text (the previous #247 workaround stripped
+    // text only, leaving the tokens array inconsistent — see #218). Disable via
+    // env for A/B.
+    if (!generated_ids.empty() && !std::getenv("CRISPASR_CANARY_QWEN_NO_ECHO_STRIP")) {
+        int drop = canary_qwen_echo_prefix_tokens(ctx, generated_ids);
+        if (drop > 0) {
+            if (cq_debug_enabled())
+                fprintf(stderr, "canary_qwen: stripped %d leading instruction-echo token(s)\n", drop);
+            generated_ids.erase(generated_ids.begin(), generated_ids.begin() + drop);
+            generated_probs.erase(generated_probs.begin(), generated_probs.begin() + drop);
         }
     }
 

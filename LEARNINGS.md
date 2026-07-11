@@ -10,6 +10,26 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## LLM-ASR (SALM) instruction-echo on short windows is genuine model behaviour, not a port bug — gate the input, don't chase the prompt (canary-qwen #247, 2026-07-11)
+
+canary-qwen leaked "Transcript"/"PASS"/"Okay" into transcripts. Two prior "fixes" failed: string-stripping the echo (masks symptom, and only touched text not the tokens array), then removing `<|audio_start|>`/`<|audio_end|>` framing tokens ("root cause") — the reporter confirmed the leak survived both. It survived because neither was the cause.
+
+**Actual root cause, proven against the NeMo SALM reference (`nvidia/canary-qwen-2.5b`):** the leak is the Qwen3-1.7B decoder falling back to its language prior when the audio window is too short to ground a transcription. The FastConformer subsamples 8×, so a window with only a few encoder frames (`T_enc<=5`, ~≤0.4 s) carries no transcribable content, and the LLM echoes the task framing ("Transcribe the following:" → "Transcript") or emits a filler ("Okay"). Measured, C++ q8 vs NeMo bf16 on the SAME clips:
+
+| clip | CrispASR C++ | NeMo SALM reference |
+|------|--------------|---------------------|
+| jfk 11 s (full) | "And so my fellow Americans ask not what your country can do for you ask what you can do for your country" | **identical** (byte-for-byte, same token ids) |
+| 0.10 s | "Okay" | "Okay" |
+| 0.30 s | "Transcript" | "Transcript" (ids [3167,1228]) |
+| 0.45 s | "And" | "And" |
+
+The port is faithful — the prompt is byte-identical to NeMo's `QwenPromptFormatter.encode_dialog` (`[151644,872,198,3167,3114,279,2701,25,220,<audio>,151645,198,151644,77091,198]`, no system role, no BOS), and full-utterance output matches exactly. NeMo's `SALM.generate()` runs plain greedy with **no** `suppress_tokens`/`begin_suppress_tokens`/`min_new_tokens`, so it has zero protection and echoes too. There is nothing to "match" in the blueprint — the fix belongs in the pipeline.
+
+**Fix (two env-gated layers in the shared `canary_qwen_transcribe_impl`, so CLI + session ABI + diff all inherit it — avoids the HARD-RULE-#6 mirror trap):** (1) a degenerate-window gate returns empty when `T_enc < 6`; (2) a backend-agnostic safety net strips a leading `Transcript`/`Transcription`/`PASS` from **both** the text and the tokens array (also closes the #218 "tokens array not deduped" note; the same `fix_loops_keep_indices` dedup was additionally mirrored into the inline session path in `crispasr_c_api.cpp`, which previously emitted un-deduped tokens).
+
+**Lessons:** (a) for LLM-based ASR, "hallucinates meta-text on empty/tiny input" is expected — the acceptance test is a reference comparison on the SAME degenerate clips, not a prompt audit; (b) when a "root cause" fix is contradicted by the reporter, reproduce before theorising again — a length sweep (`s_100..s_600`) localised it in minutes; (c) `q8` vs `bf16` diverge on the knife-edge degenerate input (0.15 s: C++ "Transcript" vs NeMo "Okay") but agree exactly on real speech — judge parity on the decoded output of a *real* utterance, not a 2-frame window.
+
+
 ## Baked mel filterbank layout MUST match core_mel's `fb_layout` — a transpose produces cos_min ≈ −0.15, not a gradual drift (canary-qwen #233, 2026-07-09)
 
 The canary-qwen converter's `compute_mel_filters()` returned `(n_freqs, n_mels)` (FreqsMels layout), but `core_mel::Params` defaults to `FbLayout::MelsFreqs` = `(n_mels, n_freqs)`. A transposed filterbank doesn't produce a "slightly wrong" mel — it produces an **anti-correlated** one: `cos_min = −0.15`, `cos_mean = 0.43` against the Python reference. The LLM hallucinated coherent English ("Yes sir, sir, sir") because it saw noise-like features, not silence.
