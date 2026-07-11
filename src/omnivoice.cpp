@@ -40,6 +40,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <numeric>
 #include <random>
@@ -220,13 +221,18 @@ struct ov_higgs_tokenizer {
 // Generation config
 // ---------------------------------------------------------------------------
 
+// Defaults MUST match the blueprint's OmniVoiceGenerationConfig
+// (k2-fsa/OmniVoice omnivoice/models/omnivoice.py). The previous values
+// (guidance 1.0, class_temp 0.7, layer_penalty 0.5, t_shift 1.0) ran a
+// completely different decode policy and degenerated into near-constant
+// "silence" codes on every platform.
 struct ov_gen_config {
     int num_steps = 32;
-    float guidance_scale = 1.0f;
-    float class_temperature = 0.7f;
-    float position_temperature = 4.5f;
-    float layer_penalty_factor = 0.5f;
-    float t_shift = 1.0f;
+    float guidance_scale = 2.0f;
+    float class_temperature = 0.0f;
+    float position_temperature = 5.0f;
+    float layer_penalty_factor = 5.0f;
+    float t_shift = 0.1f;
     uint64_t seed = 42;
 };
 
@@ -1434,6 +1440,28 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     fwd_free(fwd_c);
     fwd_free(fwd_u);
 
+    if (getenv("OMNIVOICE_DEBUG_CODES")) {
+        int n_mask = 0;
+        std::map<int32_t, int> hist;
+        for (int32_t t : tokens) {
+            if (t == (int32_t)hp.audio_mask_id)
+                n_mask++;
+            hist[t]++;
+        }
+        int top = 0;
+        int32_t top_tok = -1;
+        for (auto& kv : hist)
+            if (kv.second > top) {
+                top = kv.second;
+                top_tok = kv.first;
+            }
+        fprintf(stderr, "omnivoice-codes: total=%zu mask=%d uniq=%zu top_tok=%d(x%d) cb0[0:24]=", tokens.size(), n_mask,
+                hist.size(), top_tok, top);
+        for (int t = 0; t < std::min(24, T_target); t++)
+            fprintf(stderr, "%d ", tokens[t]);
+        fprintf(stderr, "\n");
+    }
+
     result.codes = std::move(tokens);
     return result;
 }
@@ -1453,11 +1481,11 @@ struct omnivoice_context* omnivoice_init_from_file(const char* path_model, struc
 
     // Generation config
     ctx->gen.num_steps = params.num_steps > 0 ? params.num_steps : 32;
-    ctx->gen.guidance_scale = params.guidance_scale > 0.0f ? params.guidance_scale : 1.0f;
-    ctx->gen.class_temperature = params.class_temperature > 0.0f ? params.class_temperature : 0.7f;
-    ctx->gen.position_temperature = params.position_temperature > 0.0f ? params.position_temperature : 4.5f;
-    ctx->gen.layer_penalty_factor = params.layer_penalty_factor > 0.0f ? params.layer_penalty_factor : 0.5f;
-    ctx->gen.t_shift = params.t_shift > 0.0f ? params.t_shift : 1.0f;
+    ctx->gen.guidance_scale = params.guidance_scale > 0.0f ? params.guidance_scale : 2.0f;
+    ctx->gen.class_temperature = params.class_temperature > 0.0f ? params.class_temperature : 0.0f;
+    ctx->gen.position_temperature = params.position_temperature > 0.0f ? params.position_temperature : 5.0f;
+    ctx->gen.layer_penalty_factor = params.layer_penalty_factor > 0.0f ? params.layer_penalty_factor : 5.0f;
+    ctx->gen.t_shift = params.t_shift > 0.0f ? params.t_shift : 0.1f;
     ctx->gen.seed = params.seed > 0 ? params.seed : 42;
 
     if (!load_model(ctx, path_model)) {
