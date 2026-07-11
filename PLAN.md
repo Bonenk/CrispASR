@@ -7158,3 +7158,40 @@ remains sequential on CPU (cblas) while the GPU sits idle.
    path to matching TC's 29ms decode on Parakeet
 2. Moonshine encoder: investigate ggml_conv_1d vs im2col+mul_mat on GPU
 3. Fix v14 kernel stability (Nemotron/Cohere/FunASR need to complete)
+
+### §232 Moonshine decode — hybrid weight placement (DONE, 2026-07-11, M1 Metal)
+
+**Superseded Fix 1's premise.** Profiled moonshine-tiny on a *quiet* M1 (the
+plan's 440-660 ms/decode numbers were a contended box × the copy tax below).
+At idle the decode is only ~1 ms/token, so the CP_DIRECT-style static-graph
+rewrite (Fix 1) would save almost nothing — same conclusion as the qwen3
+talker (§232): sched-free dispatch doesn't help when you're not launch-bound.
+The real waste was elsewhere.
+
+**Root cause (`GGML_SCHED_DEBUG=2`):** moonshine's self-attn KV cache is a CPU
+buffer, so the sched runs the *entire* decode step on CPU even in GPU mode
+(encoder + cross-KV stay on Metal). With the all-GPU weight load the decoder
+weights sit in the Metal buffer, so the sched re-copies them GPU→CPU on *every*
+per-token graph rebuild (the copy can't cache — fresh graph each step). The
+overhead scales with weight size, which is why f16 (2× q8) hurt most.
+
+**Fix (default ON):** `load_weights_split` routes `encoder.*`→GPU,
+`decoder.*`→CPU, so the CPU-pinned decode is weight-local (no copy). Encoder
+unchanged on GPU. `MOONSHINE_ALL_GPU=1` restores the legacy load for A/B.
+`src/moonshine.cpp` (`moonshine_is_gpu_tensor` + split load in
+`moonshine_init_with_params`), `src/moonshine-impl.h` (`buf_w_cpu`).
+
+**Measured (quiet M1, jfk, 26 tok, 3 reps, bit-identical transcript on
+greedy + beam-4 + multispeaker, q8 & f16):**
+
+| quant | decode all-GPU | decode hybrid | Δ |
+|-------|---------------|--------------|---|
+| q8_0  | 39-48 ms      | 21-25 ms     | **−40%** |
+| f16   | 112-119 ms    | 45-55 ms     | **−55%** |
+
+Encoder unchanged (~65 ms). `--no-gpu` path untouched. This is the same
+CPU-resident-leaf/weights sched class flagged for f5_tts above (§232 GPU-
+forwarding validation) — the general remedy is to co-locate a CPU-pinned
+graph's weights on CPU. Remaining moonshine-tiny cost is now the encoder
+(GPU 67 vs CPU 47 ms — per-layer flash-attn Metal↔CPU permute bounce; left
+opt-in-free, a shared-code higher-risk fix). See LEARNINGS 25-26.
