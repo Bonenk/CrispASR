@@ -223,8 +223,12 @@ struct tada_context {
         std::vector<uint8_t> meta;
         ggml_cgraph* gf = nullptr;
     };
-    static constexpr int kBucketN = 4;
-    static constexpr int kBucketLks[kBucketN] = {512, 1024, 2048, 4096};
+    // §215b follow-up: smaller buckets prepended for short generations. The
+    // eligible floor is gated at runtime (tada_pick_bucket); the default floor
+    // (512) makes {64,128,256} inert — never picked, never built — so default
+    // behaviour is byte- AND perf-identical to the original §176b set.
+    static constexpr int kBucketN = 7;
+    static constexpr int kBucketLks[kBucketN] = {64, 128, 256, 512, 1024, 2048, 4096};
     std::array<TadaBucket, kBucketN> ar_buckets{};
     ggml_backend_sched_t ar_step_sched = nullptr;
 
@@ -1157,9 +1161,22 @@ static float* build_step_embedding(tada_context* c, int32_t token_id, const floa
 
 // §176b: Lk-bucketed single-step AR decode helpers.
 static int tada_pick_bucket(tada_context* c, int needed_lk) {
-    for (int i = 0; i < tada_context::kBucketN; i++)
-        if (tada_context::kBucketLks[i] >= needed_lk && tada_context::kBucketLks[i] <= c->kv_max_ctx)
+    // §215b follow-up: smallest ELIGIBLE bucket. The floor gates out buckets below
+    // CRISPASR_TADA_BUCKET_MIN (default 512 = original §176b behaviour). Lowering it
+    // (e.g. =64) lets a short generation (n_past << 512) use a tighter Lk and waste
+    // far less padded attention. Output-identical — padding positions are masked
+    // to -inf in run_talker_kv_bucket — so this is a pure speed A/B, default OFF.
+    static const int s_bucket_min = []() {
+        const char* e = std::getenv("CRISPASR_TADA_BUCKET_MIN");
+        return (e && e[0]) ? atoi(e) : 512;
+    }();
+    for (int i = 0; i < tada_context::kBucketN; i++) {
+        const int lk = tada_context::kBucketLks[i];
+        if (lk < s_bucket_min)
+            continue;
+        if (lk >= needed_lk && lk <= c->kv_max_ctx)
             return i;
+    }
     return -1;
 }
 
