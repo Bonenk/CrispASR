@@ -973,6 +973,42 @@ duplicated in `ensure_t3_b2_f16_weights` + s3gen `dequant_cfm_f16`) into a
 `core_*` helper if a third backend needs it — but only on the third consumer, per
 the "don't extract single-consumer helpers" rule.
 
+### §215b follow-up — tada talker §176b bucket floor (PARITY DONE, timing PENDING)
+
+The §215b measurement above found the real tada talker lever: the §176b decode
+bucket floors Lk at **512**, so a short generation (n_past ≪ 512) wastes ~500
+padded/masked attention columns per step. Bypassing the bucket (exact-Lk)
+dropped the positive pass **266→49 ms/call** on Metal/tada-1b q4_k.
+
+**Implemented (opt-in, default OFF):** `kBucketLks` now
+`{64,128,256,512,1024,2048,4096}`; `tada_pick_bucket` gates the eligible floor by
+**`CRISPASR_TADA_BUCKET_MIN`** (default **512** = original behaviour exactly — the
+small buckets are inert, never picked, never built). Set e.g. `=64` to let short
+generations use a tighter Lk. Output-neutral by construction (padding masked to
+`-inf`), and **PARITY PROVEN byte-identical**: default-512 vs NO_BUCKET vs
+floor=64 all md5 `265b9798…` on the 5-pangram fixture. Zero regression risk.
+
+**Why a bucket (not just NO_BUCKET):** the exact-Lk path rebuilds the graph every
+step; the bucket caches + reuses it. A tight-floor bucket should be the best of
+both — tight padding AND no per-step rebuild — so it should beat both the
+512-floor bucket and NO_BUCKET. That is the hypothesis to confirm.
+
+**PENDING — timing A/B on a QUIET box (loadavg < ~6) or Kaggle CUDA.** This
+session's box ran loadavg 31→137 the whole time; no trustworthy timing was
+possible, so the default is NOT flipped. Recipe (each config a SEPARATE process,
+discard cold run, median of ≥3, `CRISPASR_TADA_TALKER_TIMING=1` for ms/step):
+```
+# A: default floor      (baseline)
+# B: CRISPASR_TADA_BUCKET_MIN=64   (tight bucket)
+# C: CRISPASR_TADA_NO_BUCKET=1     (exact-Lk, no cache — the ceiling on padding win)
+```
+**Guard the regression the bucket was built for:** also measure a LONG utterance
+(n_past approaching/ crossing 512+ so multiple buckets build) — if crossing more
+bucket boundaries (more one-time graph builds) costs more than the padding it
+saves there, the tight floor must stay opt-in / short-utterance-only. Flip the
+default to a tighter floor only if it wins on BOTH short and long inputs (or gate
+the floor by expected length). Then update this note + HISTORY.
+
 ---
 
 ## §210 follow-up — shape-stable bucketed decode for the remaining LLM/AR backends (CUDA-graph capture) (OPEN, CONDITIONAL)
