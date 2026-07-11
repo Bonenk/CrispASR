@@ -6839,14 +6839,20 @@ and what parallel sessions own:
       is ~linear in steps so 10→6 ≈ **−40 % flow ≈ −19 % of the CV3 wall**.
       4 steps is rejected: the ASR word-slip is a localized artifact the
       whole-utterance corr averages out (the corr band 0.9895–0.9948 is
-      compressed — the ASR slip is the more sensitive signal at 4). **RECOMMEND
-      lowering the default 10→6; NOT flipped here** — a quality-affecting
-      default ships to every user and warrants (a) a human listen and (b) a
-      2–3-sentence confirmation beyond this single utterance (vibevoice onset
-      lesson: corr/ASR don't fully capture artifacts). The knob already lets
-      speed-seekers opt in today. Measured `flow_euler` wall (8133/7481/5758/
-      3962 ms) is contention-noisy (runs at load 5–19) — speedup stated from
-      the linear-in-steps model, not the raw wall-clock.
+      compressed — the ASR slip is the more sensitive signal at 4).
+      **Multi-sentence confirmation (2026-07-11): 6 steps holds across diverse
+      text.** 6-vs-10 mel-corr on short / numbers / long = 0.9953 / 0.9930 /
+      0.9938 (all ≥ 0.99), and ASR@6 is verbatim-identical to ASR@10 on short
+      and long. (The numbers sentence is inconclusive on the ASR axis only —
+      moonshine-tiny garbles spoken-out digits at BOTH 10 and 6 steps, an ASR
+      failure, not 6-step degradation; the 0.9930 corr confirms 6≈10
+      acoustically.) So the recommendation is now robust, not single-utterance.
+      **RECOMMEND lowering the default 10→6; NOT flipped here** — a
+      quality-affecting default ships to every user; the remaining gate is a
+      human listen (corr/ASR are proxies; vibevoice onset lesson). The knob
+      already lets speed-seekers opt in today. Measured `flow_euler` wall
+      (8133/7481/5758/3962 ms) is contention-noisy (runs at load 5–19) —
+      speedup stated from the linear-in-steps model, not the raw wall-clock.
 
 ## §234 omnivoice — persistent step graphs + silence root cause (DONE)
 
