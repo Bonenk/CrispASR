@@ -13,6 +13,9 @@
 class OmniasrBackend : public CrispasrBackend {
 public:
     OmniasrBackend() = default;
+    // RAII cleanup so resources are freed on destruction even when a return path
+    // skips the explicit backend->shutdown() (matches PocketTTSBackend).
+    ~OmniasrBackend() override { OmniasrBackend::shutdown(); }
 
     const char* name() const override { return "omniasr"; }
     uint32_t capabilities() const override {
