@@ -7026,6 +7026,28 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
    per-op on Metal (M1 profiling pending — box was saturated by the
    omnivoice bench campaign when this was written).
 
+   **ROOT CAUSE FOUND (2026-07-11, M1): moonshine never ran on GPU from
+   the CLI.** The adapter zero-initialized `moonshine_init_params` and
+   never forwarded `params.use_gpu` (backend default: false). Every
+   Kaggle "GPU" run of Moonshine Tiny AND Moonshine Streaming (v11-v13)
+   was actually a CPU run — the 728 ms "GPU encoder" was the CPU
+   encoder. Fixed for moonshine (adapter now forwards use_gpu): on M1
+   Metal the encoder drops 1300 ms → 200-300 ms (4-6x), identical
+   transcript. The tiny AR decoder is SLOWER on GPU (launch-bound;
+   ~440-660 ms vs 66 ms CPU under load) — a hybrid GPU-encoder/CPU-
+   decoder split may be the real winner for tiny; measure on a quiet
+   box and re-run the P100 kernel (v14) for the moonshine row.
+   moonshine-streaming deliberately stays CPU (550 launch-bound
+   frame passes = 3.2x slower on GPU, measured) until Fix 2's batch
+   encoder lands.
+
+   **Same missing use_gpu forwarding in 4 more CLI adapters** (backends
+   default false, so they are CPU-only from the CLI): bananamind_tts,
+   f5_tts, m2m100, piper_tts. NOT flipped yet — CLI default use_gpu is
+   true, so forwarding flips them GPU-by-default, and TTS GPU paths
+   need per-backend validation (ASR-roundtrip) before that. paraformer /
+   fastconformer_ctc / fastpitch have no use_gpu knob (not affected).
+
 ### §232 v13 Results (2026-07-11)
 
 **All models improved 8-14% vs v12** from LID skip (-l en) + in-graph argmax:
