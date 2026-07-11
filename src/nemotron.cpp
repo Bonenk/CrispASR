@@ -1655,8 +1655,12 @@ struct nemotron_emitted_token {
 // §232 — GPU decode (opt-in NEMOTRON_GGML_DECODE=1). Thin wrappers over the
 // shared core_rnnt_ggml helpers (same as parakeet). Default stays cblas; perf
 // verdict is P100-only. See core/rnnt_ggml.h + LEARNINGS 29-30.
-static void nemotron_predictor_step_ggml(nemotron_context* ctx, int token_id, nemotron_lstm_state& state,
-                                         std::vector<float>& pred_out) {
+static void nemotron_predictor_step_ggml(nemotron_context* ctx, core_rnnt_ggml::Decoder& dec, int token_id,
+                                         nemotron_lstm_state& state, std::vector<float>& pred_out) {
+    if (dec.active()) {
+        core_rnnt_ggml::decoder_predictor(dec, token_id, state.h0, state.c0, state.h1, state.c1, pred_out);
+        return;
+    }
     const auto& p = ctx->model.predictor;
     core_rnnt_ggml::predictor_step(ctx->sched, p.embed_w, p.lstm0_w_ih, p.lstm0_b_ih, p.lstm0_w_hh, p.lstm0_b_hh,
                                    p.lstm1_w_ih, p.lstm1_b_ih, p.lstm1_w_hh, p.lstm1_b_hh, token_id,
@@ -1664,8 +1668,12 @@ static void nemotron_predictor_step_ggml(nemotron_context* ctx, int token_id, ne
                                    pred_out);
 }
 
-static void nemotron_joint_step_ggml(nemotron_context* ctx, const float* proj_e, const float* pred_u,
-                                     std::vector<float>& logits) {
+static void nemotron_joint_step_ggml(nemotron_context* ctx, core_rnnt_ggml::Decoder& dec, const float* proj_e,
+                                     const float* pred_u, std::vector<float>& logits) {
+    if (dec.active()) {
+        core_rnnt_ggml::decoder_joint(dec, proj_e, pred_u, logits);
+        return;
+    }
     const auto& j = ctx->model.joint;
     core_rnnt_ggml::joint_step(ctx->sched, j.pred_w, j.pred_b, j.out_w, j.out_b, proj_e, pred_u,
                                (int)ctx->model.hparams.joint_hidden, (int)ctx->model.hparams.pred_hidden, logits);
@@ -1683,6 +1691,18 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
     const bool time_dec = getenv("NEMOTRON_DECODE_TIMING") != nullptr;
     auto _dt0 = std::chrono::steady_clock::now();
 
+    // §232: persistent-graph GPU decoder (built once, reused per step); per-step
+    // fallback via RNNT_GGML_PERSTEP. See core/rnnt_ggml.h + LEARNINGS 31.
+    core_rnnt_ggml::Decoder gdec;
+    if (ggml_dec && getenv("RNNT_GGML_PERSTEP") == nullptr) {
+        const auto& p = ctx->model.predictor;
+        const auto& jj = ctx->model.joint;
+        core_rnnt_ggml::decoder_init(gdec, ctx->backend, p.embed_w, p.lstm0_w_ih, p.lstm0_b_ih, p.lstm0_w_hh,
+                                     p.lstm0_b_hh, p.lstm1_w_ih, p.lstm1_b_ih, p.lstm1_w_hh, p.lstm1_b_hh, jj.pred_w,
+                                     jj.pred_b, jj.out_w, jj.out_b, (int)ctx->model.hparams.pred_hidden,
+                                     (int)ctx->model.hparams.joint_hidden);
+    }
+
     const auto& W = ctx->pred_w;
     const auto& J = ctx->joint_w;
     const int blank_id = (int)ctx->model.hparams.blank_id;
@@ -1694,7 +1714,7 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
 
     std::vector<float> pred_out;
     if (ggml_dec)
-        nemotron_predictor_step_ggml(ctx, blank_id, state, pred_out);
+        nemotron_predictor_step_ggml(ctx, gdec, blank_id, state, pred_out);
     else
         predictor_step(W, blank_id, state, pred_out);
 
@@ -1707,7 +1727,7 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
         while (sym_count < max_symbols_per_frame) {
             std::vector<float> logits;
             if (ggml_dec)
-                nemotron_joint_step_ggml(ctx, proj_e.data(), pred_out.data(), logits);
+                nemotron_joint_step_ggml(ctx, gdec, proj_e.data(), pred_out.data(), logits);
             else
                 joint_step(J, proj_e.data(), pred_out.data(), logits);
 
@@ -1743,7 +1763,7 @@ static std::vector<nemotron_emitted_token> nemotron_rnnt_decode(nemotron_context
                 on_tok(tok, logits[tok], on_tok_ud);
 
             if (ggml_dec)
-                nemotron_predictor_step_ggml(ctx, tok, state, pred_out);
+                nemotron_predictor_step_ggml(ctx, gdec, tok, state, pred_out);
             else
                 predictor_step(W, tok, state, pred_out);
             sym_count++;

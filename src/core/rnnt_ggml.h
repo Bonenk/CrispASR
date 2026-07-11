@@ -135,4 +135,127 @@ static inline void joint_step(ggml_backend_sched_t sched, ggml_tensor* pred_w, g
     ggml_free(cx);
 }
 
+// ── Persistent-graph decoder ───────────────────────────────────────────────
+// The step_ functions above rebuild the graph + realloc every step; that fixed
+// per-step cost dominates long decodes (nemotron: ggml 2x SLOWER than cblas on
+// M1 — LEARNINGS 31). Decoder builds the predictor + joint graphs ONCE, gallocr-
+// allocates each ONCE on `backend`, and dispatches sched-free per step
+// (tensor_set inputs → ggml_backend_graph_compute → read). RAII; non-copyable.
+//
+// §234 gotcha: gallocr may alias input slots with intermediates, so ALL inputs
+// are re-set before every compute (they are — state + token/proj each step).
+struct Decoder {
+    ggml_backend_t backend = nullptr;
+    int H = 0, Jh = 0, Vt = 0;
+    // predictor persistent graph
+    ggml_context* pctx = nullptr;
+    ggml_cgraph* pgf = nullptr;
+    ggml_gallocr_t palloc = nullptr;
+    ggml_tensor *p_tok = nullptr, *p_h0i = nullptr, *p_c0i = nullptr, *p_h1i = nullptr, *p_c1i = nullptr;
+    ggml_tensor *p_h0o = nullptr, *p_c0o = nullptr, *p_h1o = nullptr, *p_c1o = nullptr;
+    // joint persistent graph
+    ggml_context* jctx = nullptr;
+    ggml_cgraph* jgf = nullptr;
+    ggml_gallocr_t jalloc = nullptr;
+    ggml_tensor *j_pe = nullptr, *j_pu = nullptr, *j_lg = nullptr;
+
+    Decoder() = default;
+    Decoder(const Decoder&) = delete;
+    Decoder& operator=(const Decoder&) = delete;
+    ~Decoder() {
+        if (palloc)
+            ggml_gallocr_free(palloc);
+        if (pctx)
+            ggml_free(pctx);
+        if (jalloc)
+            ggml_gallocr_free(jalloc);
+        if (jctx)
+            ggml_free(jctx);
+    }
+    bool active() const { return pgf != nullptr; }
+};
+
+// Build both persistent graphs. Returns true on success (Decoder::active()).
+static inline bool decoder_init(Decoder& d, ggml_backend_t backend, ggml_tensor* embed_w, ggml_tensor* l0_wih,
+                                ggml_tensor* l0_bih, ggml_tensor* l0_whh, ggml_tensor* l0_bhh, ggml_tensor* l1_wih,
+                                ggml_tensor* l1_bih, ggml_tensor* l1_whh, ggml_tensor* l1_bhh, ggml_tensor* pred_w,
+                                ggml_tensor* pred_b, ggml_tensor* out_w, ggml_tensor* out_b, int H, int Jh) {
+    d.backend = backend;
+    d.H = H;
+    d.Jh = Jh;
+    d.Vt = (int)out_w->ne[1];
+    ggml_backend_buffer_type_t buft = ggml_backend_get_default_buffer_type(backend);
+
+    // predictor graph
+    d.pctx = ggml_init({ggml_tensor_overhead() * 64 + ggml_graph_overhead(), nullptr, true});
+    d.p_tok = ggml_new_tensor_1d(d.pctx, GGML_TYPE_I32, 1);
+    d.p_h0i = ggml_new_tensor_1d(d.pctx, GGML_TYPE_F32, H);
+    d.p_c0i = ggml_new_tensor_1d(d.pctx, GGML_TYPE_F32, H);
+    d.p_h1i = ggml_new_tensor_1d(d.pctx, GGML_TYPE_F32, H);
+    d.p_c1i = ggml_new_tensor_1d(d.pctx, GGML_TYPE_F32, H);
+    for (ggml_tensor* t : {d.p_tok, d.p_h0i, d.p_c0i, d.p_h1i, d.p_c1i})
+        ggml_set_input(t);
+    ggml_tensor* emb = ggml_reshape_1d(d.pctx, ggml_get_rows(d.pctx, embed_w, d.p_tok), H);
+    if (emb->type != GGML_TYPE_F32)
+        emb = ggml_cast(d.pctx, emb, GGML_TYPE_F32);
+    d.p_h0o = lstm_layer(d.pctx, emb, l0_wih, l0_bih, l0_whh, l0_bhh, d.p_h0i, d.p_c0i, H, &d.p_c0o);
+    d.p_h1o = lstm_layer(d.pctx, d.p_h0o, l1_wih, l1_bih, l1_whh, l1_bhh, d.p_h1i, d.p_c1i, H, &d.p_c1o);
+    for (ggml_tensor* t : {d.p_h0o, d.p_c0o, d.p_h1o, d.p_c1o})
+        ggml_set_output(t);
+    d.pgf = ggml_new_graph(d.pctx);
+    for (ggml_tensor* t : {d.p_h0o, d.p_c0o, d.p_h1o, d.p_c1o})
+        ggml_build_forward_expand(d.pgf, t);
+    d.palloc = ggml_gallocr_new(buft);
+    if (!ggml_gallocr_alloc_graph(d.palloc, d.pgf))
+        return false;
+
+    // joint graph
+    d.jctx = ggml_init({ggml_tensor_overhead() * 32 + ggml_graph_overhead(), nullptr, true});
+    d.j_pe = ggml_new_tensor_1d(d.jctx, GGML_TYPE_F32, Jh);
+    d.j_pu = ggml_new_tensor_1d(d.jctx, GGML_TYPE_F32, H);
+    ggml_set_input(d.j_pe);
+    ggml_set_input(d.j_pu);
+    ggml_tensor* mid = ggml_add(d.jctx, ggml_mul_mat(d.jctx, pred_w, d.j_pu), pred_b);
+    mid = ggml_relu(d.jctx, ggml_add(d.jctx, mid, d.j_pe));
+    d.j_lg = ggml_add(d.jctx, ggml_mul_mat(d.jctx, out_w, mid), out_b);
+    ggml_set_output(d.j_lg);
+    d.jgf = ggml_new_graph(d.jctx);
+    ggml_build_forward_expand(d.jgf, d.j_lg);
+    d.jalloc = ggml_gallocr_new(buft);
+    if (!ggml_gallocr_alloc_graph(d.jalloc, d.jgf))
+        return false;
+    return true;
+}
+
+// One predictor step on the persistent graph. Reads/writes CPU state; fills pred_out.
+static inline void decoder_predictor(Decoder& d, int token_id, std::vector<float>& h0, std::vector<float>& c0,
+                                     std::vector<float>& h1, std::vector<float>& c1, std::vector<float>& pred_out) {
+    const size_t nb = (size_t)d.H * sizeof(float);
+    int32_t tid = token_id;
+    ggml_backend_tensor_set(d.p_tok, &tid, 0, sizeof(int32_t));
+    ggml_backend_tensor_set(d.p_h0i, h0.data(), 0, nb);
+    ggml_backend_tensor_set(d.p_c0i, c0.data(), 0, nb);
+    ggml_backend_tensor_set(d.p_h1i, h1.data(), 0, nb);
+    ggml_backend_tensor_set(d.p_c1i, c1.data(), 0, nb);
+    ggml_backend_graph_compute(d.backend, d.pgf);
+    h0.resize(d.H);
+    c0.resize(d.H);
+    h1.resize(d.H);
+    c1.resize(d.H);
+    ggml_backend_tensor_get(d.p_h0o, h0.data(), 0, nb);
+    ggml_backend_tensor_get(d.p_c0o, c0.data(), 0, nb);
+    ggml_backend_tensor_get(d.p_h1o, h1.data(), 0, nb);
+    ggml_backend_tensor_get(d.p_c1o, c1.data(), 0, nb);
+    pred_out = h1;
+}
+
+// One joint step on the persistent graph.
+static inline void decoder_joint(Decoder& d, const float* proj_e, const float* pred_u, std::vector<float>& logits) {
+    ggml_backend_tensor_set(d.j_pe, proj_e, 0, (size_t)d.Jh * sizeof(float));
+    ggml_backend_tensor_set(d.j_pu, pred_u, 0, (size_t)d.H * sizeof(float));
+    ggml_backend_graph_compute(d.backend, d.jgf);
+    logits.resize(d.Vt);
+    ggml_backend_tensor_get(d.j_lg, logits.data(), 0, (size_t)d.Vt * sizeof(float));
+}
+
 } // namespace core_rnnt_ggml
