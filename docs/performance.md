@@ -116,21 +116,21 @@ Systematic evaluation against [transcribe.cpp](https://github.com/handy-computer
 Test audio: `jfk.wav` (11s, 16 kHz mono). WER computed against reference transcript.
 RTF = real-time factor (lower = faster; < 1.0 means faster than real-time).
 
-### GPU mode (both engines on CUDA, P100 sm_60) — v13, 2026-07-11
+### GPU mode (both engines on CUDA, P100 sm_60) — v16, 2026-07-11
 
 | Family | CA RTF | TC RTF | CA WER | TC WER | Notes |
 |--------|--------|--------|--------|--------|-------|
 | SenseVoice Small | **0.016** | 0.019 | 0% | 0% | CA 1.2x faster |
-| Whisper base | **0.022** | 0.021 | 0% | 0% | Parity |
-| Canary 1B v2 | **0.043** | 0.048 | 0% | 0% | CA 1.1x faster |
-| FunASR Nano 2512 | **0.046** | 0.140 | 0% | 100% | CA 3x faster; TC GPU bug |
-| Cohere Transcribe | **0.046** | 0.070 | 0% | 0% | CA 1.5x faster |
-| Whisper Large v3 Turbo | 0.060 | **0.049** | 0% | 0% | TC 1.2x faster |
-| Moonshine Tiny | 0.069 | **0.012** | 9.1% | 0% | TC 5.8x; encoder im2col overhead |
-| Qwen3-ASR 0.6B | **0.086** | 0.112 | 0% | 0% | CA 1.3x faster |
-| Parakeet TDT 0.6B | 0.095 | **0.029** | 0% | 0% | TC 3.3x; CPU cblas decoder |
-| Moonshine Streaming Tiny | 0.250 | **0.014** | 0% | 0% | TC 18x; sliding-window masks |
-| Nemotron 3.5 ASR 0.6B | 0.345 | **0.049** | 0% | 0% | TC 7x; CPU cblas RNNT decoder |
+| Whisper base | **0.022** | 0.020 | 0% | 0% | Parity |
+| Canary 1B v2 | **0.045** | 0.049 | 0% | 0% | CA 1.1x faster |
+| FunASR Nano 2512 | **0.045** | 0.140 | 0% | 100% | CA 3x faster; TC GPU bug |
+| Cohere Transcribe | **0.045** | FAIL | 0% | — | CA wins; TC crashes on GPU |
+| Moonshine Tiny | 0.051 | **0.012** | 9.1% | 0% | TC 4.3x; head_dim=36 no fast flash kernel |
+| Whisper Large v3 Turbo | 0.061 | **0.050** | 0% | 0% | TC 1.2x faster |
+| Qwen3-ASR 0.6B | **0.086** | 0.115 | 0% | 0% | CA 1.3x faster |
+| Parakeet TDT 0.6B | 0.100 | **0.030** | 0% | 0% | TC 3.3x; CPU cblas TDT decoder |
+| Moonshine Streaming Tiny | 0.238 | **0.012** | 0% | 0% | TC 20x; sliding-window masks |
+| Nemotron 3.5 ASR 0.6B | 0.345 | **0.053** | 0% | 0% | TC 6.5x; CPU cblas RNNT decoder |
 
 ### CPU mode (both engines, no GPU) — v13
 
