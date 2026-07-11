@@ -215,6 +215,13 @@ struct voxtral_tts_context {
     ggml_backend_sched_t sched = nullptr;
     std::vector<uint8_t> compute_meta;
 
+    // Cached FM velocity graph (fixed shape → built + allocated once via a dedicated
+    // gallocr, single backend, reused every eval). Computes cond+uncond in one pass.
+    ggml_context* fm_ctx = nullptr;
+    ggml_cgraph* fm_gf = nullptr;
+    ggml_gallocr_t fm_alloc = nullptr;
+    std::vector<uint8_t> fm_meta;
+
     // KV cache for LLM backbone
     ggml_context* kv_ctx = nullptr;
     ggml_backend_buffer_t kv_buf = nullptr;
@@ -1062,93 +1069,133 @@ static std::vector<float> vtts_fm_time_embed(int dim, float t) {
     return e;
 }
 
-// One FM forward pass → velocity (36 floats) read from token 0. Builds+runs a
-// 3-token bidirectional GQA transformer.
-static std::vector<float> vtts_fm_predict_velocity(voxtral_tts_context* ctx, const float* x_t, const float* h,
-                                                   float t) {
+// Computes BOTH the conditional (h) and unconditional (h=0) FM velocities in ONE
+// graph: a 6-token sequence [cond: input_proj(x), time_proj(t), llm_proj(h);
+// uncond: input_proj(x), time_proj(t), 0] with a block-diagonal mask so the two
+// 3-token CFG groups don't attend to each other — mathematically identical to
+// running them separately. This halves the per-frame graph dispatch count (the
+// FM is 14 tiny dispatches/frame and dominates generation time). The fixed-shape
+// graph is built + allocated once (dedicated gallocr, single backend) and reused
+// every eval. llm_proj(0)==0, so the uncond third token is the cond one scaled by
+// 0. Velocities come from token 0 (cond) and token 3 (uncond).
+static bool vtts_fm_predict_velocity_cfg(voxtral_tts_context* ctx, const float* x_t, const float* h, float t,
+                                         std::vector<float>& v_cond, std::vector<float>& v_uncond) {
     const auto& hp = ctx->hp;
     const auto& m = ctx->model;
     const int d = hp.fm_dim;
     const int n_q = hp.fm_n_heads, n_kv = hp.fm_n_kv, hd = hp.fm_head_dim, grp = n_q / n_kv;
-    const int T = 3;
+    const int T = 6; // 2 CFG groups × 3 tokens
     const float scale = 1.0f / std::sqrt((float)hd);
     std::vector<float> time_emb = vtts_fm_time_embed(d, t);
 
-    ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
-    ggml_context* ctx0 = ggml_init(ip);
-    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 2048, false);
+    if (!ctx->fm_gf) {
+        if (ctx->fm_meta.empty())
+            ctx->fm_meta.resize(ggml_tensor_overhead() * 4096 + ggml_graph_overhead_custom(4096, false));
+        ggml_init_params ip = {ctx->fm_meta.size(), ctx->fm_meta.data(), true};
+        ctx->fm_ctx = ggml_init(ip);
+        ggml_context* ctx0 = ctx->fm_ctx;
+        ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 4096, false);
 
-    ggml_tensor* xt = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, VTTS_ACOUSTIC_DIM);
-    ggml_set_name(xt, "xt");
-    ggml_set_input(xt);
-    ggml_tensor* hin = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, d);
-    ggml_set_name(hin, "hin");
-    ggml_set_input(hin);
-    ggml_tensor* tin = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, d);
-    ggml_set_name(tin, "tin");
-    ggml_set_input(tin);
+        ggml_tensor* xt = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, VTTS_ACOUSTIC_DIM);
+        ggml_set_name(xt, "xt");
+        ggml_set_input(xt);
+        ggml_tensor* hin = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, d);
+        ggml_set_name(hin, "hin");
+        ggml_set_input(hin);
+        ggml_tensor* tin = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, d);
+        ggml_set_name(tin, "tin");
+        ggml_set_input(tin);
+        ggml_tensor* mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T); // (kv, q) block-diagonal
+        ggml_set_name(mask, "mask");
+        ggml_set_input(mask);
+        ggml_tensor* velidx = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, 2); // tokens {0, 3}
+        ggml_set_name(velidx, "velidx");
+        ggml_set_input(velidx);
 
-    ggml_tensor* tok0 = ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, m.fm_input_proj, xt), d, 1);
-    ggml_tensor* tok1 = ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, m.fm_time_proj, tin), d, 1);
-    ggml_tensor* tok2 = ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, m.fm_llm_proj, hin), d, 1);
-    ggml_tensor* cur = ggml_concat(ctx0, ggml_concat(ctx0, tok0, tok1, 1), tok2, 1); // (d, 3)
+        ggml_tensor* tok0 = ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, m.fm_input_proj, xt), d, 1);
+        ggml_tensor* tok1 = ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, m.fm_time_proj, tin), d, 1);
+        ggml_tensor* tok2c = ggml_reshape_2d(ctx0, ggml_mul_mat(ctx0, m.fm_llm_proj, hin), d, 1);
+        ggml_tensor* tok2u = ggml_scale(ctx0, tok2c, 0.0f); // llm_proj(0) == 0
+        // [c0, c1, c2, u0, u1, u2]  (u0==c0, u1==c1)
+        ggml_tensor* cur = ggml_concat(ctx0, tok0, tok1, 1);
+        cur = ggml_concat(ctx0, cur, tok2c, 1);
+        cur = ggml_concat(ctx0, cur, tok0, 1);
+        cur = ggml_concat(ctx0, cur, tok1, 1);
+        cur = ggml_concat(ctx0, cur, tok2u, 1); // (d, 6)
 
-    for (int il = 0; il < hp.fm_n_layers; il++) {
-        const auto& l = m.fm_layers[il];
-        ggml_tensor* res = cur;
-        ggml_tensor* x = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, hp.llm_norm_eps), l.attn_norm);
+        for (int il = 0; il < hp.fm_n_layers; il++) {
+            const auto& l = m.fm_layers[il];
+            ggml_tensor* res = cur;
+            ggml_tensor* x = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, hp.llm_norm_eps), l.attn_norm);
 
-        ggml_tensor* Q = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, l.attn_q, x), hd, n_q, T);
-        ggml_tensor* K = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, l.attn_k, x), hd, n_kv, T);
-        ggml_tensor* V = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, l.attn_v, x), hd, n_kv, T);
+            ggml_tensor* Q = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, l.attn_q, x), hd, n_q, T);
+            ggml_tensor* K = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, l.attn_k, x), hd, n_kv, T);
+            ggml_tensor* V = ggml_reshape_3d(ctx0, ggml_mul_mat(ctx0, l.attn_v, x), hd, n_kv, T);
 
-        // GQA interleave K,V to n_q heads (each kv head repeated grp times contiguously)
-        K = ggml_reshape_4d(ctx0, K, hd, 1, n_kv, T);
-        K = ggml_repeat(ctx0, K, ggml_new_tensor_4d(ctx0, K->type, hd, grp, n_kv, T));
-        K = ggml_reshape_3d(ctx0, K, hd, n_q, T);
-        V = ggml_reshape_4d(ctx0, V, hd, 1, n_kv, T);
-        V = ggml_repeat(ctx0, V, ggml_new_tensor_4d(ctx0, V->type, hd, grp, n_kv, T));
-        V = ggml_reshape_3d(ctx0, V, hd, n_q, T);
+            // GQA interleave K,V to n_q heads (each kv head repeated grp times contiguously)
+            K = ggml_reshape_4d(ctx0, K, hd, 1, n_kv, T);
+            K = ggml_repeat(ctx0, K, ggml_new_tensor_4d(ctx0, K->type, hd, grp, n_kv, T));
+            K = ggml_reshape_3d(ctx0, K, hd, n_q, T);
+            V = ggml_reshape_4d(ctx0, V, hd, 1, n_kv, T);
+            V = ggml_repeat(ctx0, V, ggml_new_tensor_4d(ctx0, V->type, hd, grp, n_kv, T));
+            V = ggml_reshape_3d(ctx0, V, hd, n_q, T);
 
-        Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));         // (hd, T, nh)
-        K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));         // (hd, T, nh)
-        ggml_tensor* scores = ggml_mul_mat(ctx0, K, Q);                 // (T, T, nh)
-        scores = ggml_soft_max_ext(ctx0, scores, nullptr, scale, 0.0f); // bidirectional, no mask
-        V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));         // (hd, T, nh)
-        V = ggml_cont(ctx0, ggml_permute(ctx0, V, 1, 0, 2, 3));         // (T, hd, nh)
-        ggml_tensor* attn = ggml_mul_mat(ctx0, V, scores);              // (hd, T, nh)
-        attn = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3)), n_q * hd, T);
-        cur = ggml_add(ctx0, res, ggml_mul_mat(ctx0, l.attn_o, attn));
+            Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));      // (hd, T, nh)
+            K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));      // (hd, T, nh)
+            ggml_tensor* scores = ggml_mul_mat(ctx0, K, Q);              // (T, T, nh)
+            scores = ggml_soft_max_ext(ctx0, scores, mask, scale, 0.0f); // block-diagonal (per CFG group)
+            V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));      // (hd, T, nh)
+            V = ggml_cont(ctx0, ggml_permute(ctx0, V, 1, 0, 2, 3));      // (T, hd, nh)
+            ggml_tensor* attn = ggml_mul_mat(ctx0, V, scores);           // (hd, T, nh)
+            attn = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3)), n_q * hd, T);
+            cur = ggml_add(ctx0, res, ggml_mul_mat(ctx0, l.attn_o, attn));
 
-        res = cur;
-        x = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, hp.llm_norm_eps), l.ffn_norm);
-        cur = ggml_add(ctx0, res, core_ffn::swiglu(ctx0, x, l.ffn_gate, l.ffn_up, l.ffn_down));
+            res = cur;
+            x = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, hp.llm_norm_eps), l.ffn_norm);
+            cur = ggml_add(ctx0, res, core_ffn::swiglu(ctx0, x, l.ffn_gate, l.ffn_up, l.ffn_down));
+        }
+
+        // Velocities from token 0 (cond) and token 3 (uncond): final RMSNorm + fm.norm + acoustic head.
+        ggml_tensor* t03 = ggml_get_rows(ctx0, cur, velidx); // (d, 2)
+        t03 = ggml_mul(ctx0, ggml_rms_norm(ctx0, t03, hp.llm_norm_eps), m.fm_norm);
+        ggml_tensor* vel = ggml_mul_mat(ctx0, m.fm_acoustic_output, t03); // (36, 2)
+        ggml_set_name(vel, "vel");
+        ggml_set_output(vel);
+        ggml_build_forward_expand(gf, vel);
+
+        ctx->fm_alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+        if (!ctx->fm_alloc || !ggml_gallocr_alloc_graph(ctx->fm_alloc, gf)) {
+            fprintf(stderr, "voxtral_tts: FM graph alloc failed\n");
+            return false;
+        }
+        ctx->fm_gf = gf;
     }
 
-    // Velocity from token 0: final RMSNorm + fm.norm, then acoustic head.
-    ggml_tensor* t0 = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, d, 1, cur->nb[1], 0));
-    t0 = ggml_mul(ctx0, ggml_rms_norm(ctx0, t0, hp.llm_norm_eps), m.fm_norm);
-    ggml_tensor* vel = ggml_mul_mat(ctx0, m.fm_acoustic_output, t0); // (36, 1)
-    ggml_set_name(vel, "vel");
-    ggml_set_output(vel);
-    ggml_build_forward_expand(gf, vel);
-
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
-        ggml_free(ctx0);
-        return {};
-    }
+    ggml_cgraph* gf = ctx->fm_gf;
+    // ALL inputs must be re-set every call: gallocr reuses input buffers as scratch
+    // after their last use, so the (constant) mask + velidx are re-written too.
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "xt"), x_t, 0, VTTS_ACOUSTIC_DIM * sizeof(float));
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "hin"), h, 0, (size_t)d * sizeof(float));
     ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "tin"), time_emb.data(), 0, (size_t)d * sizeof(float));
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
-        ggml_free(ctx0);
-        return {};
+    {
+        std::vector<ggml_fp16_t> mbuf((size_t)T * T);
+        const ggml_fp16_t z = ggml_fp32_to_fp16(0.0f), ninf = ggml_fp32_to_fp16(-INFINITY);
+        for (int q = 0; q < T; q++)
+            for (int k = 0; k < T; k++)
+                mbuf[(size_t)q * T + k] = ((q < 3) == (k < 3)) ? z : ninf; // same CFG group → attend
+        ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "mask"), mbuf.data(), 0, mbuf.size() * sizeof(ggml_fp16_t));
+        const int32_t vi[2] = {0, 3};
+        ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "velidx"), vi, 0, sizeof(vi));
     }
-    std::vector<float> v(VTTS_ACOUSTIC_DIM);
-    ggml_backend_tensor_get(ggml_graph_get_tensor(gf, "vel"), v.data(), 0, v.size() * sizeof(float));
-    ggml_free(ctx0);
-    return v;
+    if (ggml_backend_graph_compute(ctx->backend, gf) != GGML_STATUS_SUCCESS)
+        return false;
+    v_cond.resize(VTTS_ACOUSTIC_DIM);
+    v_uncond.resize(VTTS_ACOUSTIC_DIM);
+    ggml_tensor* velt = ggml_graph_get_tensor(gf, "vel");
+    ggml_backend_tensor_get(velt, v_cond.data(), 0, VTTS_ACOUSTIC_DIM * sizeof(float)); // col 0
+    ggml_backend_tensor_get(velt, v_uncond.data(), VTTS_ACOUSTIC_DIM * sizeof(float),
+                            VTTS_ACOUSTIC_DIM * sizeof(float)); // col 1
+    return true;
 }
 
 // Greedy semantic token: argmax of fm.semantic_output @ h (no positional path).
@@ -1224,14 +1271,11 @@ static std::vector<int> vtts_acoustic_forward(voxtral_tts_context* ctx, const st
     std::vector<float> x(VTTS_ACOUSTIC_DIM);
     for (int i = 0; i < VTTS_ACOUSTIC_DIM; i++)
         x[i] = vtts_randn(&ctx->rng_state) * VTTS_NOISE_SCALE;
-    std::vector<float> zero_h(ctx->hp.fm_dim, 0.0f);
-
     for (int step = 0; step < VTTS_FLOW_STEPS - 1; step++) {
         float t = (float)step / (float)(VTTS_FLOW_STEPS - 1);
         float dt = (float)(step + 1) / (float)(VTTS_FLOW_STEPS - 1) - t;
-        std::vector<float> v_cond = vtts_fm_predict_velocity(ctx, x.data(), h.data(), t);
-        std::vector<float> v_uncond = vtts_fm_predict_velocity(ctx, x.data(), zero_h.data(), t);
-        if (v_cond.empty() || v_uncond.empty())
+        std::vector<float> v_cond, v_uncond;
+        if (!vtts_fm_predict_velocity_cfg(ctx, x.data(), h.data(), t, v_cond, v_uncond))
             break;
         for (int i = 0; i < VTTS_ACOUSTIC_DIM; i++) {
             float v = VTTS_CFG_ALPHA * v_cond[i] + (1.0f - VTTS_CFG_ALPHA) * v_uncond[i];
@@ -1596,6 +1640,8 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
     bool got_end = false;
 
     const bool dbg = env_bool("CRISPASR_VOXTRAL_TTS_DEBUG");
+    const bool timing = dbg || env_bool("CRISPASR_VOXTRAL_TTS_TIMING");
+    int64_t t_fm_us = 0, t_llm_us = 0;
     for (int frame = 0; frame < max_frames; frame++) {
         if (dbg && frame == 0) {
             FILE* fp = fopen("/tmp/vtts_h0.f32.bin", "wb");
@@ -1604,7 +1650,9 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
                 fclose(fp);
             }
         }
+        int64_t _t0 = ggml_time_us();
         std::vector<int> codes = vtts_acoustic_forward(ctx, h);
+        t_fm_us += ggml_time_us() - _t0;
         if (dbg) {
             double sq = 0.0;
             for (float x : h)
@@ -1630,7 +1678,9 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
         std::vector<float> next_emb = vtts_embed_audio_codes(ctx, codes);
         if (next_emb.empty())
             break;
+        int64_t _t1 = ggml_time_us();
         h = voxtral_tts_run_llm(ctx, next_emb.data(), /*n_tokens*/ 1, n_past);
+        t_llm_us += ggml_time_us() - _t1;
         if (h.empty())
             break;
         n_past++;
@@ -1640,6 +1690,9 @@ extern "C" float* voxtral_tts_synthesize(voxtral_tts_context* ctx, const char* t
     if (ctx->verbosity >= 1)
         fprintf(stderr, "voxtral_tts: generated %d frames (%.2f s)%s\n", n_frames, n_frames / ctx->hp.frame_rate,
                 got_end ? " [END]" : " [max_frames]");
+    if (timing && n_frames > 0)
+        fprintf(stderr, "voxtral_tts[timing]: LLM-decode %.1f ms/frame, FM %.1f ms/frame (%.1f s tot)\n",
+                t_llm_us / 1000.0 / n_frames, t_fm_us / 1000.0 / n_frames, t_fm_us / 1e6);
 
     if (n_frames == 0) {
         fprintf(stderr, "voxtral_tts: no audio frames produced\n");
@@ -1695,6 +1748,10 @@ extern "C" const char* const* voxtral_tts_list_voices(voxtral_tts_context* ctx, 
 extern "C" void voxtral_tts_free(voxtral_tts_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->fm_alloc)
+        ggml_gallocr_free(ctx->fm_alloc);
+    if (ctx->fm_ctx)
+        ggml_free(ctx->fm_ctx);
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
     if (ctx->kv_buf)
