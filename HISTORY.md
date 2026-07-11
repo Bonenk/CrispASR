@@ -6,6 +6,34 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-11 — dots-tts: PatchEncoder RoPE + QK-norm fix, CLI steps wiring (#200)
+
+The PatchEncoder (24L VAESemanticEncoder) was running attention with no RoPE and
+no QK-norm — the config has `rotary_bias=true` (theta=10K, NEOX) and `qk_norm=true`
+(unweighted RMSNorm, weights not in safetensors). Fixed both the full-recompute path
+(manual attention + `ggml_rope_ext` + `ggml_rms_norm`) and the incremental KV-cached
+path (`core_attn::kv_self_attn` with all-ones QK-norm weight + actual positions).
+Wired `--tts-steps` → `ode_steps` and `--tts-cfg-scale` → `cfg_scale` in the CLI
+adapter. ASR roundtrip verified: "Hello world." → "Hello, world." (8 steps).
+The stale handover listing 8 open issues was removed — all were already resolved.
+
+## 2026-07-11 — MOSS-Transcribe-Diarize 0.9B backend shipped (#242)
+
+New backend `moss-diarize` for OpenMOSS-Team/MOSS-Transcribe-Diarize. Joint ASR +
+speaker diarization + timestamps in a single 0.9B model. Stock Whisper encoder (24L,
+80 mel, Conv1d) → 4x temporal merge → VQAdaptor (Linear+SiLU+Linear+LayerNorm) →
+time markers every 5s (bare digit tokens) → Qwen3-0.6B LM. Diff harness 4/4 stages
+cos=1.000 (mel, conv_stem, encoder, audio_embeds) on both F32 and Q4_K. Full 12-point
+checklist wired per docs/contributing.md. GGUFs (F16/Q4_K/Q8_0 + ref) uploaded to
+cstr/MOSS-Transcribe-Diarize-GGUF with README. Registry entry enables `-m auto`.
+
+Key bugs found during bring-up: (1) spurious mel transpose — MelsTime layout
+`mel[f*T+t]` IS ggml Conv1d input layout, no transposition needed; (2) wrong prompt
+structure — model uses single user turn (audio first, instruction after `<|audio_end|>`),
+NOT system+user turns; (3) LID language injection broke timestamp generation — model
+wasn't trained with language hints. All three would have been caught by reading the
+Python source first (HARD RULE #1).
+
 ## 2026-07-11 — openvoice2 STFT: scalar DFT → shared radix-2 FFT (110× on the stage, ~26% of convert)
 
 Perf pass on `openvoice2` voice conversion. **Measure-before-optimize redirected the
