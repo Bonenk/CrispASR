@@ -51,9 +51,10 @@
 #include "crispasr_watermark.h"
 #include "crispasr_watermark_dispatch.h"
 #include "crispasr_wav_writer.h"
-#include "crispasr_mp3_writer.h" // MP3 output via in-tree glint encoder
-#include "crispasr_aac_writer.h" // AAC-LC (ADTS) output via in-tree glint encoder
-#include "common-crispasr.h"     // read_audio_data
+#include "crispasr_mp3_writer.h"  // MP3 output via in-tree glint encoder
+#include "crispasr_aac_writer.h"  // AAC-LC (ADTS) output via in-tree glint encoder
+#include "crispasr_opus_writer.h" // Ogg Opus output via in-tree glint encoder
+#include "common-crispasr.h"      // read_audio_data
 
 #include <algorithm>
 #include <atomic>
@@ -88,13 +89,28 @@ static int crispasr_write_synth_audio(const std::string& out_path, const float* 
         return out_path.size() >= 4 &&
                (out_path.compare(out_path.size() - 4, 4, lo) == 0 || out_path.compare(out_path.size() - 4, 4, up) == 0);
     };
+    // Case-insensitive suffix test (handles extensions of any length, e.g. the
+    // 5-char ".opus" that has_ext's fixed 4-char compare can't).
+    auto ends_with_ci = [&](const char* suf) {
+        const size_t n = std::strlen(suf);
+        if (out_path.size() < n)
+            return false;
+        for (size_t i = 0; i < n; ++i)
+            if (std::tolower((unsigned char)out_path[out_path.size() - n + i]) != std::tolower((unsigned char)suf[i]))
+                return false;
+        return true;
+    };
     const bool is_mp3 = has_ext(".mp3", ".MP3");
     const bool is_aac = has_ext(".aac", ".AAC");
+    const bool is_opus = ends_with_ci(".opus") || ends_with_ci(".ogg");
     std::string blob;
-    if (is_mp3 || is_aac) {
-        blob = is_mp3 ? crispasr_make_mp3(pcm, n_samples, sample_rate) : crispasr_make_aac(pcm, n_samples, sample_rate);
+    if (is_mp3 || is_aac || is_opus) {
+        const char* codec = is_mp3 ? "MP3" : (is_aac ? "AAC" : "Opus");
+        blob = is_mp3   ? crispasr_make_mp3(pcm, n_samples, sample_rate)
+               : is_aac ? crispasr_make_aac(pcm, n_samples, sample_rate)
+                        : crispasr_make_opus(pcm, n_samples, sample_rate);
         if (blob.empty()) {
-            fprintf(stderr, "crispasr: error: %s encoding failed for '%s'\n", is_mp3 ? "MP3" : "AAC", out_path.c_str());
+            fprintf(stderr, "crispasr: error: %s encoding failed for '%s'\n", codec, out_path.c_str());
             return 16;
         }
         if (!c2pa_cert.empty() || !c2pa_key.empty())
