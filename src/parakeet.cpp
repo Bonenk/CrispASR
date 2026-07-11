@@ -1290,8 +1290,12 @@ struct parakeet_emitted_token {
 // shared core_rnnt_ggml helpers (predictor LSTM + joint as ggml graphs on
 // ctx->backend). Default stays cblas; perf verdict is P100-only. See
 // core/rnnt_ggml.h + LEARNINGS 29-30.
-static void parakeet_predictor_step_ggml(parakeet_context* ctx, int token_id, parakeet_lstm_state& state,
-                                         std::vector<float>& pred_out) {
+static void parakeet_predictor_step_ggml(parakeet_context* ctx, core_rnnt_ggml::Decoder& dec, int token_id,
+                                         parakeet_lstm_state& state, std::vector<float>& pred_out) {
+    if (dec.active()) {
+        core_rnnt_ggml::decoder_predictor(dec, token_id, state.h0, state.c0, state.h1, state.c1, pred_out);
+        return;
+    }
     const auto& p = ctx->model.predictor;
     core_rnnt_ggml::predictor_step(ctx->sched, p.embed_w, p.lstm0_w_ih, p.lstm0_b_ih, p.lstm0_w_hh, p.lstm0_b_hh,
                                    p.lstm1_w_ih, p.lstm1_b_ih, p.lstm1_w_hh, p.lstm1_b_hh, token_id,
@@ -1299,8 +1303,12 @@ static void parakeet_predictor_step_ggml(parakeet_context* ctx, int token_id, pa
                                    pred_out);
 }
 
-static void parakeet_joint_step_ggml(parakeet_context* ctx, const float* proj_e, const float* pred_u,
-                                     std::vector<float>& logits) {
+static void parakeet_joint_step_ggml(parakeet_context* ctx, core_rnnt_ggml::Decoder& dec, const float* proj_e,
+                                     const float* pred_u, std::vector<float>& logits) {
+    if (dec.active()) {
+        core_rnnt_ggml::decoder_joint(dec, proj_e, pred_u, logits);
+        return;
+    }
     const auto& j = ctx->model.joint;
     core_rnnt_ggml::joint_step(ctx->sched, j.pred_w, j.pred_b, j.out_w, j.out_b, proj_e, pred_u,
                                (int)ctx->model.hparams.joint_hidden, (int)ctx->model.hparams.pred_hidden, logits);
@@ -1317,6 +1325,19 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
     const bool ggml_dec = getenv("PARAKEET_GGML_DECODE") != nullptr;
     const bool time_dec = getenv("PARAKEET_DECODE_TIMING") != nullptr;
     auto _dt0 = std::chrono::steady_clock::now();
+
+    // §232: persistent-graph GPU decoder (built once, reused per step). Falls
+    // back to the per-step path when RNNT_GGML_PERSTEP is set (for A/B). See
+    // core/rnnt_ggml.h + LEARNINGS 31.
+    core_rnnt_ggml::Decoder gdec;
+    if (ggml_dec && getenv("RNNT_GGML_PERSTEP") == nullptr) {
+        const auto& p = ctx->model.predictor;
+        const auto& j = ctx->model.joint;
+        core_rnnt_ggml::decoder_init(gdec, ctx->backend, p.embed_w, p.lstm0_w_ih, p.lstm0_b_ih, p.lstm0_w_hh,
+                                     p.lstm0_b_hh, p.lstm1_w_ih, p.lstm1_b_ih, p.lstm1_w_hh, p.lstm1_b_hh, j.pred_w,
+                                     j.pred_b, j.out_w, j.out_b, (int)ctx->model.hparams.pred_hidden,
+                                     (int)ctx->model.hparams.joint_hidden);
+    }
 
     const auto& hp = ctx->model.hparams;
     const int blank_id = (int)hp.blank_id;     // 8192
@@ -1340,7 +1361,7 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
     // SOS / first input is the blank token (NeMo convention)
     std::vector<float> pred_out;
     if (ggml_dec)
-        parakeet_predictor_step_ggml(ctx, blank_id, state, pred_out);
+        parakeet_predictor_step_ggml(ctx, gdec, blank_id, state, pred_out);
     else
         predictor_step(W, blank_id, state, pred_out);
     if (getenv("PARAKEET_DEBUG"))
@@ -1417,7 +1438,7 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
         int n_inner = 0;
         while (n_inner < max_per_step) {
             if (ggml_dec)
-                parakeet_joint_step_ggml(ctx, proj_e.data(), pred_out.data(), logits);
+                parakeet_joint_step_ggml(ctx, gdec, proj_e.data(), pred_out.data(), logits);
             else
                 joint_step(J, proj_e.data(), pred_out.data(), logits);
 
@@ -1536,7 +1557,7 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
             if (has_hotwords)
                 core_context_bias::advance(ctx->hotword_trie, hw_state, tok);
             if (ggml_dec)
-                parakeet_predictor_step_ggml(ctx, tok, state, pred_out);
+                parakeet_predictor_step_ggml(ctx, gdec, tok, state, pred_out);
             else
                 predictor_step(W, tok, state, pred_out);
 
