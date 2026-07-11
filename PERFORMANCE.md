@@ -179,6 +179,88 @@ for the implementation write-up.
 
 ---
 
+## Runtime Optimization Audit — Re-verification (2026-07-11)
+
+Full re-sweep of the ASR + TTS + codec + pipeline paths against the matrix and
+the §232 campaign. Verified against current code, not carried from this doc.
+**The matrix and per-model TTS section are stale on several flash/CFG claims**
+— corrections below.
+
+### Stale claims corrected
+
+- **Flash attention is NOT missing across AR decoders.** The per-model TTS
+  section lists Orpheus/OuteTTS/Zonos/TADA/Chatterbox/CSM as flash-"stub" or
+  "not wired". In fact they route through `core_attn::kv_self_attn`
+  (`src/core/attention.h:665,903`), whose body **unconditionally** calls
+  `ggml_flash_attn_ext` (no soft_max fallback). The per-file grep-count of 0 is
+  because the call lives in the shared helper. The Tier-1 "wire flash in all AR
+  decoders" backlog item is largely obsolete.
+- **The real remaining flash gaps** are only the manual-`ggml_soft_max`
+  backends — **dia, speecht5, parler** — and the **structurally-can't-flash**
+  additive-relpos models **melotts, piper** (same constraint as T5).
+- **chatterbox flash "stub"** — false: `chatterbox.cpp:1806,2662`, default ON.
+- **tada "two sequential B=1 FM passes"** — false: opt-in B=2 graph exists
+  (`tada_tts.cpp:238`).
+- **Batched TDT/RNNT decode is env-gated, not GPU-gated** — it is a CPU
+  sgemm-batching win (370 sgemv → 26 sgemm), `CRISPASR_TDT_BATCH` /
+  `CRISPASR_RNNT_BATCH`, default OFF (parakeet.cpp:3179; nemotron.cpp:2526).
+
+### Verified state
+
+- **§232 TTS campaign** (persistent sched-free graph + batched CFG cond+uncond +
+  device KV + FASTCONV codec) has landed for qwen3-tts, voxtral-tts, omnivoice,
+  tada, chatterbox. Un-migrated: f5, dots, kugelaudio, pocket (natural next
+  targets — same levers).
+- **Codec decoders are already ggml-graph** (snac/dac/seanet/hifigan/adaln/
+  qformer). Scalar survivors: `core/rvq.cpp` encode-search and `core/istft.h`
+  O(N²) IRFFT (both run once/synthesis).
+- **Encoder-graph caching is a closed chapter** — disabled in 8 backends for a
+  GPU heap-use-after-free (#235) *and* independently a measured dud on
+  compute-bound encoders. The one working cache is nemotron's dimension-keyed
+  streaming cache.
+- **#218 quant floor**: audio towers floored to Q8_0 (cos 0.97→0.9998 fixes
+  long-form loops/empty output); quantizing the **tied LM head** re-introduces
+  loops even with a Q8 tower — plain `-q4_k`/`-q8_0` are the long-form
+  recommendation, imatrix variants for short clips only. No inference-time cost.
+- **CUDA-graph capture (§210)** gives ~9–13× on RTX decode; Metal lacks the
+  equivalent (no ICB in ggml-metal).
+
+### True remaining gaps (2026-07-11)
+
+| P | Area | Gap | Impact |
+|---|---|---|---|
+| **P0** | firered_asr | Decoder self-attention has **no KV cache** — growing vector, O(T²) recompute (`firered_asr.cpp:2697`) | Highest-impact ASR gap |
+| **P0** | melotts / piper | Scalar O(H·T²·D) relpos attention; HiFi-GAN 17.9s of 26.3s VPS total. Needs manual-attn ggml graph or BLAS (can't flash) | Dominant TTS cost |
+| **P0** | voxcpm2_tts | CPU-only (Metal SIGSEGV), manual per-step host KV re-upload (`voxcpm2_tts.cpp:106-111`) | GPU-locked-out |
+| **P0** | openvoice2 | 16-layer WaveNet + ref-encoder Conv2d/GRU scalar CPU | Dominant, unthreaded |
+| **P1** | voxtral/voxtral4b enc, mimo LLM decoder | Attention not on flash_attn_ext (O(T²) manual softmax) | Enc mem+dispatch; mimo dispatch-bound |
+| **P1** | dia / speecht5 / parler | Manual soft_max + host KV re-uploaded per step | Long outputs |
+| **P1** | firered/glm/funasr/qwen3/omniasr/mimo | Beam search is replay (no KV snapshot pool; canary/moonshine/kyutai have one) | beam≥2 quadratic |
+| **P1** | f5/dots/kugelaudio/pocket | CFG serial / no persistent graph — un-migrated §232 targets | ~halves DiT time |
+| **P1** | granite/moss Metal decode | Per-op dispatch ~100ms/step; ggml-metal has no ICB replay | Dominant Metal decode cost |
+| **P2** | Scalar CPU hotpaths | RNN-T LSTM pred+joint; granite cpu_linear+depthwise; paraformer CIF; rvq encode; istft IRFFT; titanet mel front-end; diarize `apply_xcorr` | Per-token/frame scalar loops |
+| **P2** | parakeet/nemotron | Batched sgemm decode opt-in default-OFF — validate + flip on | Unshipped CPU win |
+| **P2** | align_wav2vec2_ctc | **Reloads the 300MB–1GB model every call** (`crispasr_aligner.cpp:315`) — missing the §176e ctx-cache | Concrete single-file win |
+| **P2** | paraformer / voxcpm2 | CPU-only, no GPU backend (paraformer leaks 256MB buffer) | GPU offload available |
+| **P3** | Threading | Hardcoded default 4 threads in ~90 sites; only whisper-core caps to `min(4, hw)` | Idle cores on big hosts |
+| **P3** | Misc | pyannote per-slice not once-over-audio (#107); RNNoise recreates state+resamplers/call; glm mel padded to 3000 always | Localized |
+
+### Highest-ceiling paths forward
+
+1. **Lk-bucketed decode-step graph caching** generalized to the 30+ decoders
+   that rebuild per step — templates: qwen3-tts (5 buckets), granite §210
+   gallocr, mimo `step_t1_gf`. Cache the *decode-step* graph, not the encoder.
+2. **ggml-metal ICB replay** — the Apple-side equivalent of CUDA-graph capture;
+   decode is per-op-dispatch bound.
+3. **BLAS/ggml the scalar hotpaths** (melotts/piper relpos, openvoice2 WaveNet,
+   rvq, istft, titanet mel, RNN-T LSTM/joint) and extend §232's CFG-batch +
+   device-KV playbook to f5/dots/kugelaudio/pocket/dia/speecht5/parler.
+
+Do **not** re-enable encoder-graph caching (#235 UAF + measured dud), and do
+**not** CPU-batch decode that feeds a GPU pipeline (item 24).
+
+---
+
 ## Kaggle GPU — full backend sweep — 2026-06-20
 
 Platform: Kaggle GPU worker (CUDA), `tools/kaggle-benchmark-all-backends.py`
