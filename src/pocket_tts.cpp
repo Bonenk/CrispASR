@@ -3253,10 +3253,18 @@ float* pocket_tts_synthesize(struct pocket_tts_context* ctx, const char* text, i
 
     std::normal_distribution<float> noise_dist(0.0f, 1.0f);
 
+    // §235 measurement: split the AR-loop wall between the backbone step and
+    // the flow net so we know which to optimize (POCKET_TTS_BENCH=1).
+    double t_backbone_ms = 0.0, t_flow_ms = 0.0;
+    const bool _pt_bench = pocket_tts_bench_enabled();
+
     for (int frame = 0; frame < max_frames; frame++) {
         // Run backbone on current input
         std::vector<float> backbone_out(D);
+        auto _t_bb0 = std::chrono::steady_clock::now();
         backbone_step(ctx, prev_input.data(), backbone_out.data());
+        if (_pt_bench)
+            t_backbone_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _t_bb0).count();
         ctx->backbone_kv.offset++;
 
         // Dump step-0 backbone output for diff testing
@@ -3322,7 +3330,10 @@ float* pocket_tts_synthesize(struct pocket_tts_context* ctx, const char* text, i
             }
 
             // Flow net: predict latent from backbone output + noise
+            auto _t_fl0 = std::chrono::steady_clock::now();
             flow_net_forward(ctx, backbone_out.data(), noise.data(), lsd_steps, latent.data());
+            if (_pt_bench)
+                t_flow_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - _t_fl0).count();
         }
 
         // Append to sequence
@@ -3339,6 +3350,10 @@ float* pocket_tts_synthesize(struct pocket_tts_context* ctx, const char* text, i
     if (ctx->verbosity >= 1)
         fprintf(stderr, "pocket_tts: generated %d audio frames (%.1f s at 12.5 Hz)\n", n_gen_frames,
                 n_gen_frames / 12.5f);
+    if (_pt_bench && n_gen_frames > 0)
+        fprintf(stderr,
+                "  pocket_tts_bench: ar_loop backbone=%.1f ms (%.2f/frame)  flow=%.1f ms (%.2f/frame)  frames=%d\n",
+                t_backbone_ms, t_backbone_ms / n_gen_frames, t_flow_ms, t_flow_ms / n_gen_frames, n_gen_frames);
 
     // Dump latent sequence
     if (pocket_dump_dir && n_gen_frames > 0) {
