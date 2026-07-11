@@ -2388,7 +2388,7 @@ class Session:
         ``csm``, ``dia``, ``fastpitch``, ``bananamind-tts``, ``speecht5``,
         ``melotts``, ``piper``, ``parler-tts``, ``outetts``, ``cosyvoice3-tts``,
         ``pocket-tts``, ``f5-tts``, ``irodori-tts``, ``bark``, ``kugelaudio``, ``tada``,
-        ``lfm2-audio``.
+        ``lfm2-audio``, ``voxtral-tts``, ``dots-tts``, ``omnivoice``.
         For qwen3-tts call :meth:`set_codec_path` and one of:
 
         * :meth:`set_voice` — Base variants (WAV + ref_text, or voice-pack GGUF)
