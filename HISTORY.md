@@ -60,12 +60,15 @@ acoustic transformer → Voxtral codec, 24 kHz, 9 languages / 20 voices). **Ship
 - **Per-LAYER crispasr-diff (F16, Kaggle P100)**: all 26 LLM layers + hidden cos
   `0.999996–1.0` — the LLM is bit-exact. The tool flagged `embed` cos=0.44 as "first
   divergence", but that was a **false positive from a bug in the harness itself**, not the
-  runtime: verified the runtime's fed AUDIO embed (`|v|0.974 max0.054`) matches the ref row
-  24 (`0.975/0.054`), and `voxtral_tts_llm_diff` was reading the wrong ref tensor for that
-  one stage (`ggml_get_tensor(rw.ctx,…)` returned llm_L0-magnitude data). Fix `1498534d`
-  switches to `load_weights`' canonical `rw.tensors` map + prints `|mine|`/`|ref|`;
-  ⚠ verification pending on a quiet box. Lesson: a self-diff can lie via its OWN read bug —
-  check both magnitudes before blaming the runtime. See memory `project_93_voxtral_tts_backbone`.
+  runtime. Root cause (found via a `|mine|`/`|ref|` magnitude print, `1498534d`): the runtime
+  DUMP read `ggml_graph_get_tensor(gf,"inputs_embeds")` *after* compute, but that buffer is
+  reused as scratch for `llm_L0`'s output (the gallocr input-buffer-reuse gotcha) → the dumped
+  `embed` held `llm_L0`'s value (`|mine|=2.158=|llm_L0|` vs correct `|ref|=0.975`). (My first
+  guess — a ref-lookup bug — was wrong; the ref read was fine.) Fix `9537fc95`: dump the embed
+  from the caller's untouched `embeds` argument. **VERIFIED** (Q4_K, quiet box): embed cos
+  0.44→0.9976, `|mine|` 2.158→0.974 PASS. Lesson: print BOTH magnitudes — a self-diff can lie
+  via its own read, and `set_output`-less inputs get clobbered post-compute. See memory
+  `project_93_voxtral_tts_backbone`.
 
 ## 2026-07-10 — qwen3-asr-1.7b q4_k empty transcripts (#240)
 
