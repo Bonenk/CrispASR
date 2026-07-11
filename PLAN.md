@@ -6814,6 +6814,18 @@ and what parallel sessions own:
       frame count. **Must clear the §224 voice-latent disk cache
       (`pocket-voice-*.latents`, or `CRISPASR_POCKET_VOICE_CACHE=0`) after this
       fix** — stale 137-frame latents would otherwise mask it.
+      **Per-conv ceil-framing refinement — TRIED, REJECTED by the measurement
+      gate (2026-07-11).** Hypothesis: replace the raw-PCM pre-pad with moshi's
+      `MimiConv1d._get_extra_padding_for_conv1d` applied at each strided conv (the
+      scheme `qwen3_tts`'s codec uses), for byte-exact tail values. Built + diffed
+      vs the reference: the pre-pad already **value-matches** the reference (gen
+      onset t0 **0.0045**, profile `[0.0045 0.0034 0.0034 0.0047 …]` identical),
+      whereas per-conv gave onset **0.0579** and **backbone_out0 corr vs reference
+      = 0.18** (catastrophic). Conclusion: pocket-tts's Mimi VAE encoder does NOT
+      use independent per-conv extra padding — it effectively pads the input to a
+      whole latent frame, which is exactly the pre-pad fix. Do not retry per-conv
+      here (it's correct for qwen3's codec, wrong for this one). Reverted; kept the
+      pre-pad fix.
 - [x] **CosyVoice3 HiFT / FASTCONV — MEASURED, NOT WORTH IT (2026-07-11).**
       Downloaded the full CV3 GGUF set to `/Volumes/backups/ai/crispasr-gguf`,
       `COSYVOICE3_BENCH=1` on a 174-mel synthesis (M1 Metal, quiet box). Wall
