@@ -6,6 +6,26 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-11 — HiFi-GAN ~2× via ggml-metal im2col batch-1 occupancy fix
+
+Reversed the prior "hifigan is at the compute floor, not worth it" verdict with a
+new per-node profiler. Added `CRISPASR_METAL_PROFILE=2` (per-op GPU profiler:
+one node per command buffer, GPUEnd−GPUStart per GGML_OP, no-op nodes skipped,
+empty-buffer floor subtracted). On a **quiet** M1 it showed the melotts HiFi-GAN
+decode is **im2col 58% / cont 22% / mul_mat 12%** — not the ~1% the ideal roofline
+implied (the old 4.02e6 gpu_us was ~2× load-inflated; true quiet ≈ 1.75e6, 13× off
+roofline). Root cause: `ggml-metal` sized im2col thread-dim0 from batch N, so at
+inference N=1 threadgroups ran only KH·KW (3–11) threads → ~10–34% of one simdgroup
+→ im2col ~40× below bandwidth. Fix (fork, `CRISPASR_METAL_IM2COL_OCC`, auto-on for
+N==1): block OW across thread-dim0 so threadgroups fill — a bit-exact copy reorg.
+Validated bit-exact (moonshine ASR occ-on==occ-off byte-identical; melotts ASR
+round-trip valid) and ~2–3× on hifigan (gpu 1.88→0.83 s), 1.65× on moonshine, no
+regression on paraformer/melotts. General batch-1 Metal conv win; CUDA unaffected
+(parallelizes threads over IC·KH·KW). The existing `ggml_conv_2d_direct` was tried
+and is a dud (2.25× slower, naive scalar). **Methodology bite:** melotts `--seed`
+is NOT deterministic, so audio-corr parity is invalid — validate TTS kernel changes
+by ASR round-trip / a deterministic-ASR bit-check, not WAV correlation.
+
 ## 2026-07-11 — security hardening continued: HTTP server, model loader, ggml fuzz
 
 Follow-on to the audio-parser hardening, extending the multi-agent audit

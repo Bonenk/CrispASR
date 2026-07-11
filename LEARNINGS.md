@@ -10,6 +10,37 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## ggml-metal im2col starves batch-1 convs — 3–11 threads/threadgroup at N=1, ~40× below bandwidth (HiFi-GAN perf, 2026-07-11)
+
+ggml-metal's `kernel_im2col` sized thread-dim0 from batch N (`ntptg0 =
+min(max/(KH·KW), N)`). At inference **N=1** that's 1 → each threadgroup runs only
+`KH·KW` (3–11) threads = ~10–34% of ONE 32-wide simdgroup, across millions of tiny
+threadgroups → im2col ran ~40× below bandwidth. On the melotts HiFi-GAN decode that
+was **58% of GPU time** (per-node profile), with cont-transpose another 22% and the
+actual matmul only 12%. Fix: block a range of OW across thread-dim0 so threadgroups
+fill (`CRISPASR_METAL_IM2COL_OCC`, auto-on N==1) — a **bit-exact copy reorg**, ~2–3×
+on hifigan, 1.65× on moonshine, no regression. General batch-1 Metal conv win.
+**CUDA does NOT have this** — its im2col parallelizes threads over IC·KH·KW (hundreds),
+not N. Two meta-lessons: (1) the **ideal roofline lied** — it put im2col at ~1%; only
+a per-op MEASUREMENT (added `CRISPASR_METAL_PROFILE=2`) on a **quiet** box found the
+real 58% (a loaded box also inflated the whole-graph number 2×, 4.02e6 vs true
+1.75e6). (2) the existing `ggml_conv_2d_direct` is NOT a free fused-conv win — it's a
+naive scalar kernel, 2.25× SLOWER than im2col+mul_mm.
+
+## Validating a TTS perf change by WAV correlation is invalid — melotts `--seed` isn't deterministic; use ASR round-trip or a deterministic-ASR bit-check (HiFi-GAN perf, 2026-07-11)
+
+melotts (VITS) is not fully deterministic even with `--seed` — the same seed gave
+115712 / 95232 / 115712 samples across three runs (unseeded component in the
+stochastic duration predictor / flow noise). A bit-exact kernel change therefore
+shows corr≈0 and different durations, which looks EXACTLY like a correctness bug —
+this cost a long false-alarm cycle where a valid ~2× im2col fix was wrongly gated as
+"broken." Validate TTS kernel changes RNG-immune instead: (a) **ASR round-trip**
+(synth → transcribe → text recognizable, both arms); (b) for bit-parity, run a
+**deterministic ASR** (no RNG) with the change on vs off — identical transcripts prove
+bit-parity on that model's conv shapes (moonshine occ-on == occ-off byte-for-byte
+settled it); (c) best, an im2col/stage-level diff on a fixed input tensor. Reserve
+audio-corr for a pipeline you've VERIFIED deterministic at a pinned seed.
+
 ## Two more untrusted-input lessons: an HTTP server reads the body before your auth check, and a parser that abort()s on malformed input is a DoS a fuzzer finds in seconds (server + ggml hardening, 2026-07-11)
 
 Extending the audit to `crispasr-server` (cpp-httplib) and the model loader
