@@ -6740,6 +6740,46 @@ slower than dir in 3/3 interleaved reps) → stays opt-in.
       per-cb graphs or in-graph lm_head selection via get_rows, then revisit
       the CPU default.
 
+## §235 next perf targets — triage after the §232 qwen3-tts sweep (2026-07-11)
+
+Grounded in the §232 GPU profiling, the qwen3-tts per-op traces, and the
+PERFORMANCE.md gap list. Recalibrated after checking what's already tried
+and what parallel sessions own:
+
+- **DEAD END — do NOT port the Parakeet/Nemotron transducer decoder to GPU.**
+  PLAN §232 lists it as the top win (decode runs on host `cblas_sgemv/sgemm`,
+  paper 12-19×). A parallel session already tried it: batched/GPU decode is
+  **5-9× SLOWER** (`d0bb4601`, `3fcd5ff3`, LEARNINGS item 24). Same class as
+  the qwen3-tts CP_DIRECT CPU result — a decode loop of tiny per-step matmuls
+  + host↔device sync is exactly where CPU cblas wins. The cblas decoder is
+  correct as-is; leave it.
+- **OWNED by a parallel session — Moonshine encoder** (im2col of k≈127 conv1
+  over ~176K raw samples; 728 ms vs ~58 ms competitor). Worktree
+  `moonshine-decode-stash` @ `46127dab` is active on it. Hands off.
+- **qwen3-tts talker** — GPU-execution-bound (§232 profiled: encode 2-3 ms vs
+  GPU 38-42 ms). No dispatch trick helps; only `kv_self_attn` node-slimming
+  (shared 30-backend helper, high risk). Deprioritized, not a target.
+- [ ] **Pocket-TTS backbone KV cache — IN PROGRESS (this item).** `pocket_tts.
+      cpp` host-stores the backbone KV cache and RE-UPLOADS all past positions
+      every AR step via a triple-nested host reorder (`backbone_forward_step_
+      ggml`, ~L1208-1231): O(pos·NH·HD·NL) host work + full H→D upload per
+      step → the decode is O(T²). Fix: resident device-side KV cache written
+      one position/step in-graph (the standard `core_attn::kv_self_attn`
+      pattern). Gate + validate by TTS→ASR roundtrip. Model is local
+      (`pocket-tts-english-f16.gguf` + voice latents); measure the backbone
+      fraction of the wall FIRST (the mimi encoder was the old bottleneck,
+      already fixed `63ae5a43` 43 s→5.6 s).
+- [ ] **CosyVoice3 HiFT istft — DEFERRED, needs measurement + reframe.**
+      PERFORMANCE.md calls it "O(n²) DFT, should be FFT", but `n_fft=16` — an
+      FFT barely helps at that size. The real cost is `std::cos`/`std::sin`
+      recomputed in the innermost istft loop for the same 16×9 angles every
+      frame (`cv3_hift_istft`, ~L3812); the win is a precomputed twiddle
+      table, not an FFT. Vocoder fraction of the CV3 wall is UNVERIFIED (the
+      LLM + 2×22 flow blocks likely dominate) and the full CV3 GGUF set isn't
+      local. Measure the fraction before spending effort — a 3× vocoder win is
+      worthless if the vocoder is 2% of the wall (cf. the vibevoice graph-cache
+      0%-win lesson).
+
 ## §234 omnivoice — persistent step graphs + silence root cause (DONE)
 
 Spun out of the reporter's #245 question ("does this affect omnivoice?").
