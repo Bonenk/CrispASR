@@ -177,9 +177,33 @@ SHARED_MODELS = [
         "tc_url":        "https://huggingface.co/handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf/resolve/main/nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
         "tc_file":       "nemotron-3.5-asr-streaming-0.6b-Q8_0.gguf",
         "ca_wer_libri":  None,
-        "tc_wer_libri":  None,  # check docs
+        "tc_wer_libri":  None,
         "timeout_s":     120,
         "notes":         "CrispASR Q4_K vs t.cpp Q8_0",
+    },
+    {
+        "family":        "Cohere Transcribe",
+        "ca_backend":    "cohere",
+        "ca_url":        "https://huggingface.co/cstr/cohere-transcribe-03-2026-GGUF/resolve/main/cohere-transcribe-q4_k.gguf",
+        "ca_file":       "cohere-transcribe-q4_k.gguf",
+        "tc_url":        "https://huggingface.co/handy-computer/cohere-transcribe-03-2026-gguf/resolve/main/cohere-transcribe-03-2026-Q4_K_M.gguf",
+        "tc_file":       "cohere-transcribe-03-2026-Q4_K_M.gguf",
+        "ca_wer_libri":  None,
+        "tc_wer_libri":  "1.25%",
+        "timeout_s":     180,
+        "notes":         "Both Q4_K; ~1.5 GB each; encoder-decoder with cross-attention",
+    },
+    {
+        "family":        "Whisper Large v3 Turbo",
+        "ca_backend":    "whisper",
+        "ca_url":        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
+        "ca_file":       "ggml-large-v3-turbo.bin",
+        "tc_url":        "https://huggingface.co/handy-computer/whisper-large-v3-turbo-gguf/resolve/main/whisper-large-v3-turbo-Q8_0.gguf",
+        "tc_file":       "whisper-large-v3-turbo-Q8_0.gguf",
+        "ca_wer_libri":  None,
+        "tc_wer_libri":  "2.01%",
+        "timeout_s":     180,
+        "notes":         "CrispASR ggml .bin vs t.cpp Q8_0; larger model tests GPU scaling",
     },
 ]
 
@@ -343,26 +367,44 @@ def download_gguf(url: str, dest: Path, timeout: int = 600) -> bool:
 
 def run_crispasr(binary: Path, model: Path, audio: Path, backend: str | None,
                  timeout: int = 120, no_gpu: bool = False) -> dict:
-    """Run crispasr; return {"transcript": str, "infer_s": float, "rtf": float, "ok": bool}.
+    """Run crispasr; return structured result with per-stage timing breakdown.
 
-    CrispASR outputs the transcript to stdout and timing info to stderr:
+    CrispASR outputs transcript to stdout, timing to stderr:
       stderr: "crispasr: transcribed X.Xs audio in Y.YYs (Z.Zx realtime)"
+    Per-stage bench lines (when *_BENCH=1):
+      stderr: "  <backend>_bench: <stage>  <ms> ms"
     """
     b_flag = f"--backend {backend}" if backend else ""
     ng_flag = "-ng" if no_gpu else ""
+    # Enable per-stage bench output for the backend + common subsystems
+    bench_env = {**os.environ}
+    if backend:
+        # Map backend name to bench env var prefix
+        bench_name = backend.upper().replace("-", "_")
+        bench_env[f"{bench_name}_BENCH"] = "1"
+    # Also enable common subsystems + batched decode for GPU runs
+    for k in ["MOONSHINE_BENCH", "MOONSHINE_STREAMING_BENCH", "NEMOTRON_BENCH",
+              "COHERE_BENCH", "PARAKEET_BENCH", "SENSEVOICE_BENCH", "FUNASR_BENCH",
+              "QWEN3_ASR_BENCH", "VOXTRAL_BENCH", "WHISPER_BENCH"]:
+        bench_env[k] = "1"
+    # §232: batched TDT/RNNT decode DISABLED — v14 showed 5-9x SLOWER on GPU.
+    # The CPU sgemm for 32 frames computes unused logits; sequential sgemv is
+    # faster because each call is tiny and terminates at first blank.
+    # The real fix is porting LSTM+joint to a ggml graph (GPU-native decode).
     t0 = time.time()
-    # Run with stdout and stderr separate
+    # -l en: skip LID probe (saves ~1-2s); --auto-download for companion files
     try:
         proc = subprocess.run(
-            f'"{binary}" -m "{model}" {b_flag} {ng_flag} --auto-download "{audio}"',
-            shell=True, capture_output=True, text=True, timeout=timeout
+            f'"{binary}" -m "{model}" {b_flag} {ng_flag} -l en --auto-download "{audio}"',
+            shell=True, capture_output=True, text=True, timeout=timeout,
+            env=bench_env,
         )
         ok = proc.returncode == 0
         out = proc.stdout
         err = proc.stderr
     except subprocess.TimeoutExpired:
         return {"transcript": "", "infer_s": timeout, "rtf": None, "ok": False,
-                "stderr_tail": "TIMEOUT"}
+                "stderr_tail": "TIMEOUT", "bench": {}}
     infer_s = round(time.time() - t0, 3)
 
     # Extract transcript from stdout — CrispASR outputs plain text, one segment per line
@@ -379,12 +421,22 @@ def run_crispasr(binary: Path, model: Path, audio: Path, backend: str | None,
             except Exception:
                 pass
 
+    # Parse per-stage bench timing from stderr lines like:
+    #   "  moonshine_bench: encoder                1623.89 ms"
+    #   "  nemotron_bench: mel                      366.78 ms"
+    bench = {}
+    for line in err.splitlines():
+        m2 = re.search(r"_bench:\s+(\S+)\s+([\d.]+)\s*ms", line)
+        if m2:
+            bench[m2.group(1)] = round(float(m2.group(2)), 1)
+
     return {
         "transcript": transcript,
         "infer_s": infer_s,
         "rtf": rtf,
         "ok": ok,
         "stderr_tail": err[-500:],  # always include for diagnostics
+        "bench": bench,  # per-stage timing in ms
     }
 
 
@@ -697,9 +749,10 @@ def _bench_crispasr(ca_gguf, backend, timeout, no_gpu, label):
     norm = normalise(res["transcript"])
     wer = wer_simple(JFK_REF, norm)
     rtf = res.get("rtf") or round(res["infer_s"] / JFK_DURATION_S, 3)
+    bench = res.get("bench", {})
     step(f"bench.ca_{label}_done", ok=res["ok"], rtf=rtf, wer=round(wer, 4),
-         transcript=norm[:80])
-    return {
+         transcript=norm[:80], bench=bench)
+    d = {
         f"ca_{label}_ok": res["ok"],
         f"ca_{label}_transcript_norm": norm,
         f"ca_{label}_jfk_wer": round(wer, 4),
@@ -707,6 +760,10 @@ def _bench_crispasr(ca_gguf, backend, timeout, no_gpu, label):
         f"ca_{label}_rtf": rtf,
         f"ca_{label}_stderr_tail": res.get("stderr_tail", ""),
     }
+    # Include per-stage bench breakdown (e.g. ca_gpu_bench_encoder_ms)
+    for stage, ms in bench.items():
+        d[f"ca_{label}_bench_{stage}_ms"] = ms
+    return d
 
 
 def _bench_transcribe_cpp(tc_gguf, timeout, label):
