@@ -13,6 +13,7 @@
 
 add_library(glint STATIC
     src/subband.cpp
+    src/resample.cpp
     src/mdct.cpp
     src/quantize.cpp
     src/huffman.cpp
