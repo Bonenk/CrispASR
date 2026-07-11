@@ -3135,6 +3135,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         m2m100_context_params p = m2m100_context_default_params();
         p.n_threads = s->n_threads;
         p.verbosity = 1;
+        p.use_gpu = g_open_use_gpu_tls;
         s->m2m100_ctx = m2m100_init_from_file(model_path, p);
         if (!s->m2m100_ctx) {
             delete s;

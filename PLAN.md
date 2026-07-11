@@ -7468,8 +7468,21 @@ Kaggle re-run confirms the fix. This is the A/B process (rule #4/#5) doing its j
 — the mandated CUDA A/B caught a flip that would have shipped empty audio on CUDA.
 No k-quant CAST / left-pad PAD issues on the DAC (F16/F32 codec weights).
 `load_weights_split` (encoder+DAC→GPU, decoder→CPU) remains the fallback if a
-platform shows the decoder losing on GPU. Follow-up: re-run
-`tools/kaggle/dia-gpu-ab` on the fix; if green, widen the default to CUDA/Vulkan.
+platform shows the decoder losing on GPU.
+
+**Kaggle P100 v2 re-run (`65a5d30c`, get_rows fix): crash GONE — decoder runs on
+CUDA (256 tokens, total 2.33×, encoder 23×, DAC 49×, decode 1.9×). BUT under
+greedy the CUDA tokens DIVERGE from CPU at step 0** ("CORRECTNESS FAIL" by
+token-parity), whereas M1 Metal step-0 matched CPU exactly (argmax 568). The dia
+kernel only checks token identity, not decoded audio — a step-0 greedy divergence
+on CUDA is either benign FP (CUDA matmul reduction order flipping a close argmax;
+dia's step-0 logits are tightly spaced) or a second CUDA miscompute. **Unresolved
+→ dia default stays Metal-only; CUDA/Vulkan opt-in (`DIA_TTS_GPU=1`).** Next: ASR-
+roundtrip the CUDA-generated audio (the real HARD-RULE-#3 test) — if intelligible,
+it's benign FP and the default can widen; if garbled, bisect the decode graph for
+another non-contiguous/precision-sensitive op. Contrast: the 3 MT/ASR backends
+compared *decoded output* on CUDA and were identical, so they flipped cleanly;
+dia's token-level check is stricter and flagged this.
 
 ### §232 paraformer GPU path — implemented, OPT-IN (kept CPU default, 2026-07-11)
 
@@ -7485,10 +7498,10 @@ a 2-backend sched, and CLI/c_api wiring — same shape as dia. Gated
 ~0.85 s (15–17× RT) vs GPU median ~0.77 s (17–18×) with a 1.32 s GPU outlier —
 roughly neutral. Expected: it's a small model (~123 MB) on short audio, so it
 sits in LEARNING 34's launch-bound / overhead-dominated regime (unlike dia's
-1.6B decoder). **Kept CPU default** (A/B rule #3: correct but not a clear speed
-win → stays opt-in). The win is more likely on a slow-CPU-BLAS box (Kaggle
-OpenBLAS, cf. LEARNING 30 parakeet) or long audio (encoder cost scales with T);
-a CUDA A/B would settle whether to flip.
+1.6B decoder). M1 kept opt-in; the **Kaggle P100 A/B then confirmed the win
+(identical transcript, 2.15× — LEARNING 30's slow-OpenBLAS regime), so the
+default flipped to GPU on CUDA/Vulkan, CPU on Metal** (see the m2m100/t5 section
+below for the shared flip + gate).
 
 ### §232 m2m100 + t5/madlad GPU paths — implemented, OPT-IN (2026-07-11)
 
@@ -7499,11 +7512,17 @@ a GPU backend + a 2-backend sched is the whole change. Gated `CRISPASR_M2M100_GP
 / `CRISPASR_T5_GPU` (pure env opt-in; default CPU). Validated on M1 Metal:
 en→de translation **identical** CPU vs GPU (m2m100-418m-q4_k: "Der schnelle braune
 Fuchs…"; madlad-3b-q4_k: "Der schnelle Braunfuchs…"), GPU engaged on both.
-Timing not chased (encoder-decoder AR, small/short — same launch-bound regime as
-paraformer; the CUDA A/B in `tools/kaggle/gpu-pin-ab` measures paraformer +
-m2m100 + madlad together). Kept opt-in pending that verdict. NOTE: watch for the
-same strided-`get_rows` CUDA abort dia hit — MT embeddings look contiguous, but
-the Kaggle run is the check.
+Timing not chased on M1 (encoder-decoder AR, small/short — launch-bound like
+paraformer). **Kaggle P100 A/B (`tools/kaggle/gpu-pin-ab`, `65a5d30c`) settled it:
+output IDENTICAL cpu vs gpu on CUDA for all three; wall speedups paraformer 2.15×,
+m2m100 1.24×, madlad 2.13×** (slow OpenBLAS baseline reveals the encoder win M1's
+Accelerate hides — LEARNING 30). No strided-get_rows abort (MT embeddings are
+contiguous). So the **default flipped to GPU on CUDA/Vulkan** for all three
+(rule #3: correct + faster on the measured platform), CPU on Metal (neutral;
+`ggml_backend_is_metal` gate). Env still forces:
+`CRISPASR_{PARAFORMER,M2M100,T5}_GPU=1` → GPU any backend, `=0` → CPU. m2m100/t5
+`use_gpu` default now `true` (gate decides actual use); m2m100 c_api wired to
+`g_open_use_gpu_tls`.
 
 ### §232 Moonshine decode — hybrid weight placement (DONE, 2026-07-11, M1 Metal)
 

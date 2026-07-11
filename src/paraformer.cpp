@@ -13,6 +13,9 @@
 #include "core/sanm.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 paraformer GPU path)
+#if defined(GGML_USE_METAL)
+#include "ggml-metal.h" // ggml_backend_is_metal (§232 CUDA/Vulkan-default gate)
+#endif
 
 #include "ggml.h"
 #include "ggml-backend.h"
@@ -947,22 +950,35 @@ paraformer_context* paraformer_init_from_file(const char* path, paraformer_conte
         delete ctx;
         return nullptr;
     }
-    // GPU is OPT-IN behind CRISPASR_PARAFORMER_GPU=1 (§232, mirrors dia): default
-    // CPU until the ASR roundtrip validates. paraformer is non-AR (encoder + CIF
-    // predictor + decoder — no per-token loop), so the encoder should win on GPU
-    // like dia's did. Weights already load onto ctx->backend via
+    // Backend selection (§232). Weights already load onto ctx->backend via
     // core_gguf::load_weights, so pointing that at a GPU backend is the whole fix.
-    bool want_gpu = params.use_gpu && (std::getenv("CRISPASR_PARAFORMER_GPU") != nullptr);
-    if (want_gpu) {
-        ctx->backend = crispasr_init_gpu_backend();
-        if (!ctx->backend) {
-            fprintf(stderr, "paraformer: CRISPASR_PARAFORMER_GPU set but no GPU backend; using CPU\n");
-            ctx->backend = ctx->backend_cpu;
-        } else if (ctx->verbosity >= 1) {
-            fprintf(stderr, "paraformer: GPU backend enabled (%s)\n", ggml_backend_name(ctx->backend));
+    //   * CRISPASR_PARAFORMER_GPU=1 forces GPU on ANY backend; =0 forces CPU.
+    //   * default: GPU on CUDA/Vulkan, CPU on Metal. Kaggle P100 A/B: identical
+    //     transcript, 2.15x wall (slow OpenBLAS baseline). On M1 (Accelerate) it
+    //     is neutral — small model / short audio, launch-bound (LEARNING 34) — so
+    //     Metal stays CPU unless forced. Mirrors LEARNING 34's is_metal gate.
+    const char* gpu_env = std::getenv("CRISPASR_PARAFORMER_GPU");
+    const bool force_gpu = gpu_env && std::atoi(gpu_env) != 0;
+    const bool force_cpu = gpu_env && std::atoi(gpu_env) == 0;
+    ctx->backend = ctx->backend_cpu;
+    if (!force_cpu && (force_gpu || params.use_gpu)) {
+        ggml_backend_t gpu = crispasr_init_gpu_backend();
+        if (gpu) {
+            bool is_metal = false;
+#if defined(GGML_USE_METAL)
+            is_metal = ggml_backend_is_metal(gpu);
+#endif
+            if (!is_metal || force_gpu) {
+                ctx->backend = gpu;
+                if (ctx->verbosity >= 1)
+                    fprintf(stderr, "paraformer: GPU backend enabled (%s)\n", ggml_backend_name(ctx->backend));
+            } else {
+                ggml_backend_free(gpu);
+                if (ctx->verbosity >= 1)
+                    fprintf(stderr, "paraformer: GPU default limited to CUDA/Vulkan (Metal neutral); set "
+                                    "CRISPASR_PARAFORMER_GPU=1 to force\n");
+            }
         }
-    } else {
-        ctx->backend = ctx->backend_cpu;
     }
 
     ctx->model_path = path;
