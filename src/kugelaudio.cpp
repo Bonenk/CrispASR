@@ -1268,6 +1268,15 @@ extern "C" float* kugelaudio_synthesize(struct kugelaudio_context* ctx, const ch
 
     bool has_voice = (ctx->n_voice_frames > 0 && !ctx->voice_acoustic_mean.empty());
 
+    if (!has_voice) {
+        fprintf(stderr, "kugelaudio: ERROR — no voice loaded. KugelAudio requires a voice GGUF for\n"
+                        "  speaker conditioning; without it the output is noise.\n"
+                        "  Pass --voice <voice.gguf> with a pre-encoded voice pack.\n"
+                        "  To create one, re-convert the model with encoders (without --no-encoders)\n"
+                        "  and use kugelaudio_encode_voice() on a reference WAV.\n");
+        return nullptr;
+    }
+
     // Voice input section: " Voice input:\n Speaker 0:" + [VAE placeholders] + "\n"
     std::string voice_section;
     if (has_voice) {
