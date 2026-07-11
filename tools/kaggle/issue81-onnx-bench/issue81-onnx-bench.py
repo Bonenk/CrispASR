@@ -82,13 +82,15 @@ print("\n=== Phase 1: install onnx-asr ===", flush=True)
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
                         "onnx-asr", "soundfile", "huggingface_hub"])
 # Force the GPU build: onnx-asr pulls in CPU `onnxruntime`; both ship the same
-# `onnxruntime` module, so uninstall then install -gpu. CUDA 12.x on Kaggle P100
-# IS supported by onnxruntime-gpu (the old "needs CUDA 13" note was wrong). If
-# the CUDA EP still won't load (cuDNN mismatch), Phase 5 reports it and the CPU
-# int8 arm still runs.
+# `onnxruntime` module, so uninstall then install -gpu. PIN the CUDA-12 wheel:
+# Kaggle's P100 worker has CUDA 12.8, but the LATEST onnxruntime-gpu links
+# libcudart.so.13 -> ImportError on 12.8 (this crashed v9). onnxruntime-gpu
+# 1.19.2 = CUDA 12 + cuDNN 9. Phase 5 is import-guarded, so if this still can't
+# load (e.g. cuDNN mismatch) the kernel skips onnx cleanly and keeps the CrispASR
+# numbers rather than crashing.
 subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "onnxruntime", "onnxruntime-gpu"],
                capture_output=True)
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "onnxruntime-gpu"])
+subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "onnxruntime-gpu==1.19.2"])
 
 # ── Phase 2: Prepare audio ──────────────────────────────────────────────────
 print("\n=== Phase 2: prepare audio ===", flush=True)
@@ -232,17 +234,24 @@ for backend, repo, fname, label in CRISPASR_MODELS:
 # fp32 — the true GPU-vs-GPU comparison the issue is really about. onnx's CUDA
 # EP has thin int8 coverage, so the GPU arm uses fp32 (quantization=None).
 print("\n=== Phase 5: benchmark onnx-asr ===", flush=True)
-import onnx_asr
-import onnxruntime as ort
-
-_avail = ort.get_available_providers()
-cuda_ok = "CUDAExecutionProvider" in _avail
-print(f"  onnxruntime providers: {_avail}  (CUDA EP available: {cuda_ok})", flush=True)
-
-ONNX_MODELS = [
-    ("nemo-parakeet-ctc-0.6b", "parakeet-ctc-0.6b"),
-    ("nemo-parakeet-tdt-0.6b-v2", "parakeet-tdt-0.6b"),
-]
+# Import-guarded: a broken onnxruntime (e.g. CUDA-13 wheel on a CUDA-12 box, or a
+# cuDNN mismatch) must NOT crash the kernel — v9 died here on
+# `ImportError: libcudart.so.13`. On failure we skip onnx and keep the CrispASR
+# fleet numbers + saved results.
+try:
+    import onnx_asr
+    import onnxruntime as ort
+    _avail = ort.get_available_providers()
+    cuda_ok = "CUDAExecutionProvider" in _avail
+    print(f"  onnxruntime {ort.__version__} providers: {_avail}  (CUDA EP: {cuda_ok})", flush=True)
+    ONNX_MODELS = [
+        ("nemo-parakeet-ctc-0.6b", "parakeet-ctc-0.6b"),
+        ("nemo-parakeet-tdt-0.6b-v2", "parakeet-tdt-0.6b"),
+    ]
+except Exception as e:  # noqa: BLE001
+    print(f"  onnx-asr/onnxruntime unavailable ({str(e)[:160]}) — skipping onnx phase", flush=True)
+    cuda_ok = False
+    ONNX_MODELS = []
 
 
 def bench_onnx(onnx_name, quant, providers):
