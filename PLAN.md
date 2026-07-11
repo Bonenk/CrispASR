@@ -1039,11 +1039,30 @@ default-flip:
    "byte-identical AND faster", the bar to flip a GPU default, is **not met on
    CUDA**.
 
-Net: platform-dependent, marginal-on-CUDA, byte-identical-only-on-Metal → the
-`CRISPASR_TADA_BUCKET_MIN` knob stays **opt-in, default 512**. No HISTORY perf
-entry (nothing shipped as a default). Kernel caveat for reuse: its md5 gate is
-stricter than needed on CUDA — like the dia kernel, an ASR-recall compare of ALL
-arms (not md5) is the right correctness gate for a sampled/AR TTS on GPU.
+**Clean M1/Metal A/B (loadavg ~5, 2026-07-11) — the load-137 numbers were ~3.7×
+inflated; here are the trustworthy ones.** floor64 vs default:
+- short (17 steps): loop 249.3→**206.2 ms/step (1.21×)**, pos_ss 70.8→28.7 (2.46×)
+- long  (114 steps): loop 249.1→**233.2 ms/step (1.07×)**, pos_ss 69.2→33.1 (2.09×)
+- **byte-identical on Metal** (all arms md5-equal per input: short `a5ce6e08…`,
+  long `d396e8bf…`) — re-confirmed clean.
+- **"best of both" hypothesis CONFIRMED:** on long, **nobucket is SLOWER than
+  default (255.7 > 249.1 ms/step)** — its per-step graph rebuild finally costs more
+  than the padding it saves — while **floor64 (233.2) beats BOTH**: tight padding
+  AND graph caching. Exactly the regression the §176b bucket was built to avoid,
+  and the tight-floor bucket sidesteps it where raw NO_BUCKET does not.
+
+**Decision — keep opt-in, default 512; a Metal-only default flip is a viable
+future option (owner's call).** The platform split is real: on **Metal** floor64 is
+byte-identical AND a genuine 1.07–1.21× win (bigger on short utterances) → flipping
+the default there is pure upside; on **CUDA** it is marginal (1.02–1.06×) AND
+changes output bytes (benign FP) → flipping there is not warranted. A global flip is
+therefore wrong; a backend-conditional default (Metal/CPU→64, CUDA→512) is the
+disciplined form but adds conditional complexity for a modest win, so it is deferred
+as a judgment call. Until then `CRISPASR_TADA_BUCKET_MIN=64` is a recommended opt-in
+for latency-sensitive Metal/CPU TTS. No HISTORY perf entry (no default shipped).
+Kernel caveat for reuse: md5 is stricter than needed on a GPU (sampled/AR TTS is not
+bit-identical across a bucket-width change) — the kernel now gates on ASR
+keyword-recall of ALL arms, md5 informational only.
 
 ---
 
