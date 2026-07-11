@@ -1,7 +1,7 @@
 # CrispASR — Port history
 
 Condensed chronology of the ports that built this repo. Kept for
-context, not for day-to-day reference. Live work is in `TODO.md`;
+context, not for day-to-day reference. Live work is in `PLAN.md`;
 technical deep-dives are in `LEARNINGS.md`.
 
 ---
