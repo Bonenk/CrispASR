@@ -28,6 +28,11 @@ public:
         cp.n_threads = params.n_threads;
         cp.verbosity = params.no_prints ? 0 : 1;
         cp.temperature = params.temperature;
+        // use_gpu deliberately NOT forwarded: the streaming encoder runs ~550
+        // frame-by-frame forward passes, which are launch-bound on GPU —
+        // measured 3.2x SLOWER on M1 Metal (27.4s vs 8.5s CPU, identical
+        // text). Revisit once the offline batch-encoder fast-path lands
+        // (PLAN §232 Fix 2).
         if (getenv("CRISPASR_VERBOSE") || getenv("MOONSHINE_STREAMING_BENCH"))
             cp.verbosity = 2;
         ctx_ = moonshine_streaming_init_from_file(params.model.c_str(), cp);
