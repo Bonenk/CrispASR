@@ -6,6 +6,20 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-11 — generation-health regression gate (core/generation_health.h)
+
+New shared header with objective quality checks for ASR/TTS output: not-empty,
+duration plausibility, n-gram loop detection, truncation detection, TTS duration
+plausibility. 16 Catch2 unit tests. Catches perceptual pathologies cosine-diff
+misses. Pure additive, non-breaking.
+
+## 2026-07-11 — #215e gallocr UAF audit: canary + canary_ctc fixed
+
+Full codebase audit of `cached_*_gf` for the sched-regrow UAF. canary and
+canary_ctc were the last two vulnerable sites — fixed with rebuild-every-invocation.
+All other sites (canary_qwen, funasr, glm_asr, granite_speech) already patched;
+chatterbox_s3gen safe (dedicated gallocr).
+
 ## 2026-07-11 — dots-tts: PatchEncoder RoPE + QK-norm fix, CLI steps wiring (#200)
 
 The PatchEncoder (24L VAESemanticEncoder) was running attention with no RoPE and
