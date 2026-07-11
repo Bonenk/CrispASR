@@ -7193,5 +7193,21 @@ Encoder unchanged (~65 ms). `--no-gpu` path untouched. This is the same
 CPU-resident-leaf/weights sched class flagged for f5_tts above (§232 GPU-
 forwarding validation) — the general remedy is to co-locate a CPU-pinned
 graph's weights on CPU. Remaining moonshine-tiny cost is now the encoder
-(GPU 67 vs CPU 47 ms — per-layer flash-attn Metal↔CPU permute bounce; left
-opt-in-free, a shared-code higher-risk fix). See LEARNINGS 25-26.
+(GPU 67 vs CPU 47 ms — per-layer flash-attn Metal↔CPU permute bounce).
+See LEARNINGS 25-26.
+
+### §232 Moonshine encoder bounce — manual attention is SLOWER (opt-in, 2026-07-11)
+
+Investigated the encoder Metal↔CPU bounce: `GGML_SCHED_DEBUG=2` confirms
+`FLASH_ATTN` is the *only* encoder op on CPU (head_dim=36 has no Metal flash
+kernel) — every other op is on Metal, so each of the 6 layers bounces
+MTL→CPU→MTL. Replaced flash with manual `mul_mat + soft_max_ext + mul_mat`
+(Metal-supported at any head_dim, MHA so no GQA) to keep the encoder fully
+on-backend. **Measured ~40% SLOWER on M1** (enc 162 vs 114 ms, 3 reps,
+transcript identical) — the T² scores + 3 conts spawn more small Metal
+kernels than the cheap 514 KB bounce copies cost. Flash stays default on
+both backends; manual is opt-in (`MOONSHINE_ENC_ATTN=manual`) for CUDA/
+Vulkan/base re-test where the tradeoff may differ. `src/moonshine.cpp`
+(`moonshine_build_encoder` `manual_attn` param). See LEARNINGS 27. Net: the
+encoder GPU>CPU gap for tiny is inherent Metal launch overhead, not a
+fixable bounce — for moonshine-tiny, `--no-gpu` remains fastest at idle.

@@ -189,3 +189,18 @@ Lessons from the systematic head-to-head benchmark against
     risk change). Net: GPU-mode moonshine-tiny is now enc-bound, not the
     earlier "GPU decode is 440 ms" story (that was the CPU-run-mislabeled-as-
     GPU bug × the weight-copy tax, both now addressed).
+
+27. **Keeping a small-model encoder fully on Metal (manual attn) is SLOWER
+    than the flash_attn CPU-bounce**: moonshine's encoder head_dim=36 has no
+    Metal flash_attn kernel, so `ggml_flash_attn_ext` runs on CPU and the
+    sched bounces each layer MTL→CPU→MTL (Q/K/V copies ≈514 KB each). Replacing
+    it with manual `mul_mat + soft_max_ext + mul_mat` (Metal-supported at any
+    head_dim) keeps the whole encoder on-backend — but measured ~40% SLOWER on
+    M1 (enc 162 vs 114 ms, even with the flash path's CPU work under load).
+    The T² scores tensor ([T,T,nh] ≈ 6.8 MB/layer) + 3 `cont`s spawn many small
+    Metal kernels whose launch cost exceeds the cheap bounce copies — the same
+    "death by kernel count" that sinks sched-free dispatch for these tiny
+    graphs. Transcript identical. **Lesson: a cross-backend bounce of a few
+    hundred KB is often cheaper than materialising T² attention on the GPU for
+    a small model; don't assume "keep it all on one backend" wins — measure.**
+    Kept opt-in (`MOONSHINE_ENC_ATTN=manual`) for CUDA/Vulkan/base re-test.

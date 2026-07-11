@@ -451,7 +451,7 @@ static struct ggml_tensor* build_conv_stem(struct ggml_context* ctx0, const moon
 static struct ggml_tensor* moonshine_build_encoder(struct ggml_context* ctx0, const moonshine_model& model,
                                                    struct ggml_tensor* conv_output, // [hidden, seq_len]
                                                    struct ggml_tensor* pos,         // [seq_len] I32 position IDs
-                                                   int seq_len) {
+                                                   int seq_len, bool manual_attn) {
     const auto& hp = model.hparams;
     const int n_heads = hp.n_heads;
     const int n_kv_heads = hp.n_kv_heads;
@@ -485,15 +485,29 @@ static struct ggml_tensor* moonshine_build_encoder(struct ggml_context* ctx0, co
         Q = ggml_rope_ext(ctx0, Q, pos, nullptr, rotary_dim, 0, 0, rope_theta, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
         K = ggml_rope_ext(ctx0, K, pos, nullptr, rotary_dim, 0, 0, rope_theta, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
 
-        // Permute for flash attention:
-        //   [head_dim, n_heads, seq_len] -> [head_dim, seq_len, n_heads]
-        Q = ggml_permute(ctx0, Q, 0, 2, 1, 3);
-        K = ggml_permute(ctx0, K, 0, 2, 1, 3);
-        V = ggml_permute(ctx0, V, 0, 2, 1, 3);
-
-        // Flash attention (bidirectional — no causal mask)
-        float scale = 1.0f / sqrtf((float)head_dim);
-        struct ggml_tensor* attn = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, scale, 0.0f, 0.0f);
+        // Bidirectional attention (no causal mask). Q/K/V: [head_dim, n_heads, seq_len].
+        const float scale = 1.0f / sqrtf((float)head_dim);
+        struct ggml_tensor* attn;
+        if (manual_attn) {
+            // §232: Metal has no flash_attn kernel for head_dim=36, so
+            // ggml_flash_attn_ext falls back to CPU — bouncing every encoder
+            // layer MTL->CPU->MTL. Manual mul_mat + soft_max keeps the whole
+            // encoder on-backend (used on GPU; CPU keeps flash, which is faster
+            // there). MHA (n_kv_heads == n_heads), so no GQA repeat.
+            struct ggml_tensor* Qp = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3)); // [hd, T, nh]
+            struct ggml_tensor* Kp = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3)); // [hd, T, nh]
+            struct ggml_tensor* scores = ggml_mul_mat(ctx0, Kp, Qp);                     // [T_k, T_q, nh]
+            scores = ggml_soft_max_ext(ctx0, scores, nullptr, scale, 0.0f);
+            struct ggml_tensor* Vp = ggml_cont(ctx0, ggml_permute(ctx0, V, 1, 2, 0, 3)); // [T_k, hd, nh]
+            attn = ggml_mul_mat(ctx0, Vp, scores);                                       // [hd, T_q, nh]
+            attn = ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3));                // [hd, nh, T]
+        } else {
+            // Flash attention: [head_dim, n_heads, seq_len] -> [head_dim, seq_len, n_heads]
+            Q = ggml_permute(ctx0, Q, 0, 2, 1, 3);
+            K = ggml_permute(ctx0, K, 0, 2, 1, 3);
+            V = ggml_permute(ctx0, V, 0, 2, 1, 3);
+            attn = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, scale, 0.0f, 0.0f);
+        }
 
         // Result is [head_dim, n_heads, seq_len] — reshape to [hidden, seq_len]
         attn = ggml_reshape_2d(ctx0, attn, (int64_t)head_dim * n_heads, seq_len);
@@ -600,7 +614,22 @@ static int moonshine_run_encoder(struct moonshine_context* ctx, const float* aud
         struct ggml_tensor* pos = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, seq_len);
         ggml_set_name(pos, "enc_pos");
         ggml_set_input(pos);
-        struct ggml_tensor* output = moonshine_build_encoder(ctx0, ctx->model, conv_out, pos, seq_len);
+        // §232: flash_attn_ext falls back to CPU for head_dim=36 (Metal has no
+        // kernel), bouncing every encoder layer MTL->CPU->MTL. Keeping the
+        // whole encoder on Metal via manual mul_mat+soft_max was MEASURED SLOWER
+        // (~40%: the T² scores + conts spawn more small Metal kernels than the
+        // cheap 514K bounce copies cost — "death by kernel count" for this tiny
+        // model). So flash stays the default on both backends; the manual path
+        // is opt-in (MOONSHINE_ENC_ATTN=manual) for A/B on other GPUs / larger
+        // moonshine variants where the tradeoff may differ. See PLAN §232.
+        bool manual_attn = false;
+        if (const char* e = std::getenv("MOONSHINE_ENC_ATTN")) {
+            if (std::strcmp(e, "manual") == 0)
+                manual_attn = true;
+            else if (std::strcmp(e, "flash") == 0)
+                manual_attn = false;
+        }
+        struct ggml_tensor* output = moonshine_build_encoder(ctx0, ctx->model, conv_out, pos, seq_len, manual_attn);
         ggml_set_name(output, "encoder_output");
         ggml_set_output(output);
         graph = ggml_new_graph(ctx0);
