@@ -13,6 +13,9 @@
 #include "core/beam_decode.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 m2m100 GPU path)
+#if defined(GGML_USE_METAL)
+#include "ggml-metal.h" // ggml_backend_is_metal (§232 CUDA/Vulkan-default gate)
+#endif
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -932,7 +935,7 @@ extern "C" struct m2m100_context_params m2m100_context_default_params(void) {
     m2m100_context_params p{};
     p.n_threads = 4;
     p.verbosity = 1;
-    p.use_gpu = false;
+    p.use_gpu = true; // §232: GPU allowed by default; the is_metal gate + env decide actual use
     return p;
 }
 
@@ -957,23 +960,37 @@ extern "C" struct m2m100_context* m2m100_init_from_file(const char* path_model, 
                 hp.dec_n_layers, hp.enc_n_heads, hp.enc_ffn_dim, hp.vocab_size, (int)c->tokenizer.lang_codes.size());
     }
 
-    // Backend. GPU is OPT-IN behind CRISPASR_M2M100_GPU=1 (§232 audit): m2m100
-    // was CPU-pinned though it already loads weights + KV onto c->backend, so
-    // pointing that at a GPU backend is the whole change. Kept an explicit env
-    // gate (default CPU) — an encoder-decoder MT model of this size is not an
-    // obvious GPU win on Metal (small AR decode steps are launch-bound; the
-    // encoder helps most on long inputs / a slow-CPU-BLAS box). Validate a CUDA
-    // A/B before flipping the default.
+    // Backend selection (§232). m2m100 loads weights + KV onto c->backend via
+    // core_gguf::load_weights + ggml_backend_alloc_ctx_tensors, so picking a GPU
+    // backend is the whole change.
+    //   * CRISPASR_M2M100_GPU=1 forces GPU on ANY backend; =0 forces CPU.
+    //   * default: GPU on CUDA/Vulkan, CPU on Metal. Kaggle P100 A/B: identical
+    //     en->de output, 1.24x wall (slow OpenBLAS baseline). On M1 (Accelerate)
+    //     neutral — small encoder-decoder AR, launch-bound (LEARNING 34) — so
+    //     Metal stays CPU unless forced. Mirrors LEARNING 34's is_metal gate.
     c->backend_cpu = ggml_backend_cpu_init();
-    if (std::getenv("CRISPASR_M2M100_GPU")) {
-        c->backend = crispasr_init_gpu_backend();
-        if (!c->backend) {
-            c->backend = c->backend_cpu;
-        } else if (params.verbosity >= 1) {
-            fprintf(stderr, "m2m100: GPU backend enabled (%s)\n", ggml_backend_name(c->backend));
+    const char* gpu_env = std::getenv("CRISPASR_M2M100_GPU");
+    const bool force_gpu = gpu_env && std::atoi(gpu_env) != 0;
+    const bool force_cpu = gpu_env && std::atoi(gpu_env) == 0;
+    c->backend = c->backend_cpu;
+    if (!force_cpu && (force_gpu || params.use_gpu)) {
+        ggml_backend_t gpu = crispasr_init_gpu_backend();
+        if (gpu) {
+            bool is_metal = false;
+#if defined(GGML_USE_METAL)
+            is_metal = ggml_backend_is_metal(gpu);
+#endif
+            if (!is_metal || force_gpu) {
+                c->backend = gpu;
+                if (params.verbosity >= 1)
+                    fprintf(stderr, "m2m100: GPU backend enabled (%s)\n", ggml_backend_name(c->backend));
+            } else {
+                ggml_backend_free(gpu);
+                if (params.verbosity >= 1)
+                    fprintf(stderr, "m2m100: GPU default limited to CUDA/Vulkan (Metal neutral); set "
+                                    "CRISPASR_M2M100_GPU=1 to force\n");
+            }
         }
-    } else {
-        c->backend = c->backend_cpu;
     }
 
     // Pass 2: weights
