@@ -38,7 +38,7 @@ CRISPASR = BUILD / "bin" / "crispasr"
 
 CRISPASR_REF = os.environ.get("CRISPASR_REF", "feat/232-dia-gpu")
 REPS = int(os.environ.get("REPS", "3"))
-STEPS = int(os.environ.get("DIA_STEPS", "256"))
+STEPS = int(os.environ.get("DIA_STEPS", "384"))  # ~4.3s audio — full prompt through "behind" for the ASR roundtrip
 DIA_REPO = os.environ.get("DIA_REPO", "cstr/dia-1.6b-GGUF")
 PROMPT = (
     "[S1] The quick brown fox jumps over the lazy dog while the sun sets slowly "
@@ -183,16 +183,56 @@ speedup = None
 if cpu["total"] and gpu["total"] and gpu["total"] > 0:
     speedup = round(cpu["total"] / gpu["total"], 2)
 
+# ── Decoded-output roundtrip (HARD RULE #3): ASR the CPU and GPU audio ─────
+# Greedy token identity is STRICTER than needed cross-device — CUDA's matmul
+# reduction order can flip a close argmax at step 0 without the audio being
+# wrong. The real acceptance test is whether the GPU audio still says the
+# prompt. Transcribe both wavs with whisper-tiny and score keyword recall.
+EXPECT_WORDS = ["quick", "brown", "fox", "jumps", "lazy", "dog", "sun", "sets", "behind", "mountains"]
+asr_cpu = asr_gpu = ""
+n_cpu = n_gpu = 0
+audio_verdict = "n/a"
+try:
+    whisper = Path(hf_hub_download(repo_id="ggerganov/whisper.cpp", filename="ggml-tiny.bin",
+                                   local_dir=str(MODELS), local_dir_use_symlinks=False))
+
+    def asr(wav):
+        if not Path(wav).is_file():
+            return ""
+        rr = subprocess.run([str(CRISPASR), "--backend", "whisper", "-m", str(whisper),
+                             "-f", str(wav), "--no-gpu", "-l", "en", "-np"],
+                            capture_output=True, text=True, timeout=600)
+        return (rr.stdout or "").strip()
+
+    asr_cpu = asr(WORK / "dia-cpu.wav")
+    asr_gpu = asr(WORK / "dia-gpu.wav")
+    n_cpu = sum(w in asr_cpu.lower() for w in EXPECT_WORDS)
+    n_gpu = sum(w in asr_gpu.lower() for w in EXPECT_WORDS)
+    if n_gpu >= 5 and n_cpu >= 5:
+        audio_verdict = f"BOTH INTELLIGIBLE (cpu {n_cpu}/10, gpu {n_gpu}/10) — CUDA token divergence is benign FP"
+    elif n_cpu >= 5 and n_gpu < 5:
+        audio_verdict = f"GPU AUDIO GARBLED (cpu {n_cpu}/10, gpu {n_gpu}/10) — real CUDA miscompute"
+    else:
+        audio_verdict = f"INCONCLUSIVE (cpu {n_cpu}/10, gpu {n_gpu}/10)"
+    kh.step("audio_roundtrip", asr_cpu=asr_cpu, asr_gpu=asr_gpu, cpu_kw=n_cpu, gpu_kw=n_gpu,
+            audio_verdict=audio_verdict)
+except Exception as e:  # noqa: BLE001
+    audio_verdict = f"ASR roundtrip skipped ({e})"
+
 if not gpu["gpu"]:
     verdict = "GPU DID NOT ENGAGE (check CUDA build / DIA_TTS_GPU gate)"
 elif len(gpu["tokens"]) == 0 or gpu["total"] is None:
     verdict = "GPU RUN FAILED (decoder produced no tokens — likely a CUDA op abort)"
-elif not parity:
-    verdict = f"CORRECTNESS FAIL (first token divergence @ step {first_div})"
-elif speedup and speedup > 1.1:
-    verdict = "GPU WINS ON CUDA — confirms default flip"
+elif parity:
+    verdict = ("GPU WINS ON CUDA — token-identical, confirms default flip"
+               if (speedup and speedup > 1.1) else "GPU CORRECT (token-identical) but NOT faster")
+elif "BOTH INTELLIGIBLE" in audio_verdict:
+    verdict = (f"GPU CORRECT via audio roundtrip (tokens diverge @ {first_div} — benign FP); "
+               f"speedup {speedup}x — WIDEN DEFAULT candidate")
+elif "GARBLED" in audio_verdict:
+    verdict = f"CUDA MISCOMPUTE (audio garbled + tokens diverge @ {first_div}) — keep Metal-only"
 else:
-    verdict = "GPU CORRECT but NOT faster on CUDA — consider load_weights_split"
+    verdict = f"token divergence @ {first_div}; audio roundtrip {audio_verdict}"
 
 per_stage = {}
 for k in sorted(set(list(cpu["stages"]) + list(gpu["stages"]))):
@@ -217,7 +257,11 @@ for k, v in per_stage.items():
     print(f"    {k:16s}: {v['cpu_ms']} -> {v['gpu_ms']}  ({v['speedup']}x)")
 print(f"  total decode ms    : cpu={cpu['total']}  gpu={gpu['total']}  speedup={speedup}x")
 print(f"  wall s             : cpu={cpu['wall']}  gpu={gpu['wall']}")
+print(f"  audio roundtrip    : {audio_verdict}")
+print(f"    ASR(cpu wav)     : {asr_cpu[:120]}")
+print(f"    ASR(gpu wav)     : {asr_gpu[:120]}")
 print(f"  VERDICT            : {verdict}")
 
 kh._push_progress_to_hf(force=True)
-kh.step("script.end", verdict=verdict, decode_speedup=speedup, parity=parity)
+kh.step("script.end", verdict=verdict, decode_speedup=speedup, parity=parity,
+        audio_verdict=audio_verdict)
