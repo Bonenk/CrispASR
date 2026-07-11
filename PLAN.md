@@ -7341,9 +7341,26 @@ is now AUDITED ACROSS THE TREE and the clean fix is EXHAUSTED.
   - `f5_tts.cpp`: a *different, harder* class — the flow-matching DiT runs on
     CPU sched threads despite the Metal backend (needs a diff-harness session,
     not the weight split). Worktree `f5-gpu-stash` is another session's.
-- **Remaining §232 perf work is now larger, focused efforts** (own sessions):
-  the RNNT/TDT Kaggle campaign (below); a real dia GPU path; the
-  moonshine-streaming Fix-2 batch encoder. No quick weight-split wins remain.
+- **RNNT/TDT GPU decode: DONE + FLIPPED** (P100 5-12× — see below). §232's
+  parakeet + nemotron decode losses are closed.
+- **NEXT optimization targets (ranked), post-decode-flip:**
+  1. **Extend the persistent decode to the beam/RNNT paths** (`parakeet_rnnt_
+     decode`, `parakeet_tdt_beam_decode`, `*_maes_decode`, nemotron beam) — they
+     still call the cblas `predictor_step`/`joint_step` beam_size× per step, so
+     they're even more CPU-bound than greedy. Reuse `core_rnnt_ggml::Decoder`
+     (one Decoder serves all hypotheses; state is passed per call). Proven
+     pattern, low risk. Needs a parakeet-rnnt model to validate the RNNT path.
+  2. **Moonshine-streaming Fix-2 (batch encoder)** — the last §232 architectural
+     loss (18×): batch the 550 frame-by-frame encoder passes into one when
+     given a complete file; also activates the latent streaming hybrid-weight
+     fix. Medium, M1-validatable.
+  3. **Re-run the P100 competitive scoreboard** — parakeet/nemotron TOTAL RTF vs
+     transcribe.cpp should now be near-parity after the decode flip; update
+     docs/performance.md. Measurement, not a code change.
+  4. **In-graph argmax** for the transducer greedy path (2 int32 vs 8198-logit
+     readback) — minor now that persistent won; only the greedy no-hotword path.
+  5. **A real dia GPU path** — dia is CPU-only (`// CPU-only for now`); a full
+     GPU port is a feature, not a decode tweak. Larger.
 
 ### §232 Moonshine decode — hybrid weight placement (DONE, 2026-07-11, M1 Metal)
 
