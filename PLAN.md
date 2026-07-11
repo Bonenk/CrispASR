@@ -6789,25 +6789,24 @@ and what parallel sessions own:
 - **qwen3-tts talker** — GPU-execution-bound (§232 profiled: encode 2-3 ms vs
   GPU 38-42 ms). No dispatch trick helps; only `kv_self_attn` node-slimming
   (shared 30-backend helper, high risk). Deprioritized, not a target.
-- [ ] **⏳ ACTIVELY OWNED (session on `feat/232-pocket-kv`, since 2026-07-11 —
-      do not start elsewhere): Pocket-TTS backbone KV cache.** `pocket_tts.
-      cpp` host-stores the backbone KV cache and RE-UPLOADS all past positions
-      every AR step via a triple-nested host reorder (`backbone_forward_step_
-      ggml`, ~L1208-1231): O(pos·NH·HD·NL) host work + full H→D upload per
-      step → the decode is O(T²). Fix: resident device-side KV cache written
-      one position/step in-graph (the standard `core_attn::kv_self_attn`
-      pattern). Gate + validate by TTS→ASR roundtrip. Model is local
-      (`pocket-tts-english-f16.gguf` + voice latents).
-      Established so far (branch `feat/232-pocket-kv`, WIP): the GGML backbone
-      path IS the default on GPU (`backbone_step` L1371 → `_ggml` unless
-      `--no-gpu`/`POCKET_MANUAL_BACKBONE`), so the O(T²) re-upload is on the
-      hot path. Per-frame ALSO runs `flow_net_forward` (diffusion, `lsd_steps`
-      per frame), which may dominate — added backbone-vs-flow accumulator
-      timers (`POCKET_TTS_BENCH=1`, `ar_loop backbone=… flow=…`, WIP
-      uncommitted). **GATE: measure the split on a quiet box before the graph
-      rewrite** — if flow dominates, the KV fix is not worth it (cf. vibevoice
-      graph-cache 0%-win). mimi encoder was the old bottleneck, already fixed
-      `63ae5a43` (43 s→5.6 s), so it's backbone-or-flow now.
+- [x] **Pocket-TTS backbone KV cache — MEASURED, NOT WORTH IT (2026-07-11).**
+      The plan was a resident device KV cache to kill the O(T²) host re-upload
+      in `backbone_forward_step_ggml` (~L1208-1231). The measurement gate
+      killed it, exactly as intended (cf. vibevoice graph-cache 0%-win). M1
+      Metal, `pocket-tts-english-f16.gguf`, 71-frame synthesis
+      (`POCKET_TTS_BENCH=1`, timers landed `d895e581`):
+      - synthesize **4780 ms**; voice mimi-encode seanet 1046 + xfmr 1676 =
+        **2721 ms (57 %)** — one-time / disk-cacheable (§224 `e5f75436`);
+      - AR loop: **backbone 587 ms (8.27/frame, 12 %)** vs **flow 1228 ms
+        (17.29/frame, 26 %)**; mimi_decode **1003 ms (21 %)**.
+      The backbone is only ~8 ms/frame — a risky attention-graph rewrite that
+      saves ≤12 % (backbone→0 ceiling), realistically ~7 %. Not worth it;
+      the O(T²) re-upload is real but the constant is tiny (6-layer D=1024).
+      **Ownership released.** Bigger repeatable levers if pocket-tts is ever
+      revisited: the flow-net diffusion head (`flow_net_forward`, `lsd_steps`
+      per frame — biggest AR cost) and mimi decode; the voice encode is the
+      largest single cost but is already cacheable. None has an obvious
+      cheap+safe win — deprioritized.
 - [ ] **CosyVoice3 HiFT istft — DEFERRED, needs measurement + reframe.**
       PERFORMANCE.md calls it "O(n²) DFT, should be FFT", but `n_fft=16` — an
       FFT barely helps at that size. The real cost is `std::cos`/`std::sin`
