@@ -994,7 +994,7 @@ duplicated in `ensure_t3_b2_f16_weights` + s3gen `dequant_cfm_f16`) into a
 `core_*` helper if a third backend needs it — but only on the third consumer, per
 the "don't extract single-consumer helpers" rule.
 
-### §215b follow-up — tada talker §176b bucket floor (PARITY DONE, timing PENDING)
+### §215b follow-up — tada talker §176b bucket floor (RESOLVED: keep opt-in, do NOT flip)
 
 The §215b measurement above found the real tada talker lever: the §176b decode
 bucket floors Lk at **512**, so a short generation (n_past ≪ 512) wastes ~500
@@ -1014,21 +1014,36 @@ step; the bucket caches + reuses it. A tight-floor bucket should be the best of
 both — tight padding AND no per-step rebuild — so it should beat both the
 512-floor bucket and NO_BUCKET. That is the hypothesis to confirm.
 
-**PENDING — timing A/B on a QUIET box (loadavg < ~6) or Kaggle CUDA.** This
-session's box ran loadavg 31→137 the whole time; no trustworthy timing was
-possible, so the default is NOT flipped. Recipe (each config a SEPARATE process,
-discard cold run, median of ≥3, `CRISPASR_TADA_TALKER_TIMING=1` for ms/step):
-```
-# A: default floor      (baseline)
-# B: CRISPASR_TADA_BUCKET_MIN=64   (tight bucket)
-# C: CRISPASR_TADA_NO_BUCKET=1     (exact-Lk, no cache — the ceiling on padding win)
-```
-**Guard the regression the bucket was built for:** also measure a LONG utterance
-(n_past approaching/ crossing 512+ so multiple buckets build) — if crossing more
-bucket boundaries (more one-time graph builds) costs more than the padding it
-saves there, the tight floor must stay opt-in / short-utterance-only. Flip the
-default to a tighter floor only if it wins on BOTH short and long inputs (or gate
-the floor by expected length). Then update this note + HISTORY.
+**RESOLVED on clean CUDA (P100), 2026-07-11 — DECISION: keep opt-in, do NOT flip
+the default.** Kaggle kernel `chr1str/crispasr-tada-bucket-ab`
+(`tools/kaggle/tada-bucket-ab/`) ran the 3-way A/B (default / floor64 / nobucket)
+× short(17 steps)/long(174 steps), REPS=3, on tada-1b q4_k. Two findings kill the
+default-flip:
+
+1. **The big Metal win does NOT transfer to CUDA.** The 266→49 ms/call (5.4×) pos
+   penalty above is **Metal-specific** — masked attention over Lk=512 padding is
+   expensive on M1 but cheap on a GPU. On P100 pos_ss is only 9.37 (default) vs
+   6.56 (nobucket) = 1.43×, and at LOOP level floor64 is just **1.058× (short),
+   1.016× (long)** vs default — marginal (LEARNING 34/35: a Metal win doesn't
+   generalise; measure the other platform before flipping).
+2. **The tighter bucket is NOT byte-identical on CUDA** (it IS on Metal — md5
+   `265b9798…`). On P100 the md5s diverge with a *coherent, deterministic*
+   signature: short `floor64 == nobucket ≠ default` (both tight/exact reductions
+   agree, differ from the 512-padded one); long all-three-differ (default=512,
+   floor64 crosses into the 256 bucket, nobucket exact). Cause: `soft_max_ext`
+   sums the −inf-masked padding as exp→0 terms, and the GPU reduction *order* over
+   Lk=512 vs a tight Lk flips a borderline FP bit → a different acoustic frame,
+   AR-amplified. It's a **benign FP-reduction difference** (roundtrip ASR of the
+   default output was 6/6 intelligible; the divergent output was not re-ASR'd but
+   the ~2–6 % win doesn't justify it either way), NOT a logic bug — but it means
+   "byte-identical AND faster", the bar to flip a GPU default, is **not met on
+   CUDA**.
+
+Net: platform-dependent, marginal-on-CUDA, byte-identical-only-on-Metal → the
+`CRISPASR_TADA_BUCKET_MIN` knob stays **opt-in, default 512**. No HISTORY perf
+entry (nothing shipped as a default). Kernel caveat for reuse: its md5 gate is
+stricter than needed on CUDA — like the dia kernel, an ASR-recall compare of ALL
+arms (not md5) is the right correctness gate for a sampled/AR TTS on GPU.
 
 ---
 
