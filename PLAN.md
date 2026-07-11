@@ -16,6 +16,95 @@ effort estimate. Completed items have been moved to `HISTORY.md`.
 - **#200 dots-tts PatchEncoder**: FIXED — added missing RoPE (theta=10K) + QK-norm;
   full pipeline now runs e2e (LLM → DiT → PEnc → vocoder → WAV), ASR roundtrip passes.
   Wired `--tts-steps` / `--tts-cfg-scale`. GPU already supported. See `HISTORY.md`.
+- **#215e gallocr UAF audit**: DONE — all 19 `cached_*_gf` sites audited across
+  the codebase. 7 backends fixed (canary, canary_ctc, kyutai_stt, moonshine_streaming,
+  nemotron, paraformer, sensevoice). See `HISTORY.md`.
+- **Generation-health gate**: DONE — `src/core/generation_health.h` with 5 checks
+  + 16 unit tests. Non-breaking additive.
+- **qwen3-tts-perf (#245)**: ANALYZED — profiled on CPU: dispatch overhead (build+
+  reset+alloc = ~5ms) is <0.1% of per-frame cost (5000ms compute). The O15 path
+  already caches the graph and uses a dedicated sched. Skip-realloc is broken on
+  CUDA+Metal. The bottleneck is pure matmul compute; perf wins require GPU where
+  the ~5ms overhead becomes significant. Handover removed.
+
+## Scoped next items (for a new agent picking up)
+
+### qwen3-tts code predictor fused graph (#245, GPU-ONLY)
+
+**What:** The 15-codebook AR loop in `code_pred_generate_15()` (`src/qwen3_tts.cpp:2352`)
+dispatches 15 separate ggml graphs per frame. On GPU the dispatch overhead (sched
+reset+alloc) becomes significant (~5ms × 15 = 75ms vs ~100ms compute). On CPU the
+overhead is negligible (<5ms vs 5000ms compute).
+
+**Option A (unrolled graph):** Build one graph with 15 × 5 = 75 transformer blocks,
+KV cache growing from pos 0→14. Fixed topology since n_steps=15. Large but bounded.
+Eliminates all inter-step dispatch. Needs GPU to measure impact.
+
+**Option C (skip sched reset):** The `O15_SKIP_REALLOC` path (`src/qwen3_tts.cpp:2270`)
+already attempts this but is broken on CUDA (#56 illegal memory access) and Metal
+(nil-buffer inputs). Root cause is ggml sched not supporting graph reuse across
+`sched_reset` boundaries. Would need an ggml-level fix or a dedicated gallocr
+(the chatterbox_s3gen pattern).
+
+**Test:** needs a GPU machine (Kaggle P100 or Metal Mac). CPU benchmarking shows
+the fix would save <1% on CPU. Model files: `qwen3-tts-12hz-0.6b-base-q8_0.gguf`
+(941 MB) + `qwen3-tts-tokenizer-12hz.gguf` (342 MB).
+
+### Defaults-audit generalisation (VPS-doable)
+
+**What:** Extend the tada-params defaults-audit pattern (`tests/test-tada-params.cpp`)
+across backends that have params structs with documented upstream defaults.
+
+**How:** For each backend with a `*_context_default_params()` function, write a Catch2
+test asserting key defaults match the upstream Python reference. Priority backends:
+chatterbox (cfg_weight, ve_steps), vibevoice (tts_steps, cfg_scale), dots-tts
+(ode_steps, cfg_scale, eos_threshold), f5-tts (n_steps), kokoro (speed).
+
+**Files:** One test file per backend in `tests/test-<backend>-params.cpp`, registered
+in `tests/CMakeLists.txt` with label `[unit]`. Read upstream defaults from the
+Python source or model card.
+
+### Diff-harness extension: per-step talker logits (#1, GPU-preferred)
+
+**What:** Dump the talker LLM logits at each generation step in both the Python
+reference and C++ runtime, compare them. Validates the text-decoder input so the
+sampler is a faithful port over verified logits.
+
+**How:** (a) Add a `talker_logits_step_N` capture to the Python reference dumper
+(e.g. `tools/reference_backends/qwen3_tts.py`) using a `generate`-time hook.
+(b) Add the matching C++ stage to `crispasr_diff_main.cpp`. (c) Run on the TTS
+diff harness.
+
+**Test:** needs a TTS model (qwen3-tts or tada). The 0.6B Q8_0 (941 MB) fits on VPS
+but TTS generation is slow on CPU (~105x RTF). A short "Hi." input with 2-3 frames
+is feasible.
+
+### Diff-harness extension: replay-token dual-mode (#3, VPS-doable)
+
+**What:** Dump the Python's *sampled* token IDs and replay them in C++ (instead of
+re-sampling) so sampling-enabled downstream stages can be diffed deterministically
+despite torch-vs-mt19937 RNG mismatch.
+
+**How:** (a) Python dumper captures `sampled_token_ids` as a 1D int32 tensor in the
+reference GGUF. (b) C++ diff harness reads them and feeds them to the backend's
+step function instead of sampling. (c) Compare downstream stages (codec, vocoder)
+against the Python reference that used those same tokens.
+
+**Files:** Extend `tools/reference_backends/<tts_backend>.py` + `crispasr_diff_main.cpp`.
+
+### #227 — VAD info reuse (VPS-doable, feature request)
+
+**What:** User wants to run ASR multiple times on the same audio with different
+backends without re-computing VAD. Expose the VAD segment boundaries so they can
+be reused.
+
+**How:** The VAD already produces segment boundaries internally. Add a
+`--vad-export FILE` flag that writes the boundaries as JSON, and a
+`--vad-import FILE` flag that reads them back instead of running VAD. Pure CLI
+feature, no model changes.
+
+**Files:** `examples/cli/crispasr_run.cpp` (VAD integration), add export/import
+around the `vad_segments` vector.
 
 ## Gemma-4 12B (gemma4_unified) ASR support (OPEN)
 
