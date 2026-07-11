@@ -7064,7 +7064,7 @@ int main(int argc, char** argv) {
                 size_t sz = ftell(f);
                 fseek(f, 0, SEEK_SET);
                 std::vector<float> cs(sz / sizeof(float));
-                fread(cs.data(), sizeof(float), cs.size(), f);
+                (void)!fread(cs.data(), sizeof(float), cs.size(), f);
                 fclose(f);
                 auto rep = ref.compare("conv_stem_out", cs.data(), cs.size());
                 print_row("conv_stem_out", rep, COS_THRESHOLD);
