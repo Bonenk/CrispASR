@@ -6826,6 +6826,17 @@ and what parallel sessions own:
       whole latent frame, which is exactly the pre-pad fix. Do not retry per-conv
       here (it's correct for qwen3's codec, wrong for this one). Reverted; kept the
       pre-pad fix.
+      **Boundary hardening — PASSED (2026-07-11).** Ran the fix across trimmed
+      refs straddling 1920-sample latent-frame boundaries + real clips (5-15 s).
+      Frame count = moshi's `ceil(N/1920)` at every length incl. exact multiples
+      (verified against moshi's KV `offset`: N=261120→136, 263040→137, 263041→138,
+      264000→138 — all match). Onset clean for all real/non-exact refs. The one
+      exact-multiple clip (263040 = 137×1920, zero trailing pad) shows a loud
+      onset — but **moshi generates the same loud onset for it** (t0 0.066 vs
+      0.063), so it's faithful truncation-content behavior, not a bug; real refs
+      never land on an exact multiple. No further code change. NB: explicit
+      `--voice` cloning needs `--i-have-rights` (consent gate); the auto-default
+      voice path does not.
 - [x] **CosyVoice3 HiFT / FASTCONV — MEASURED, NOT WORTH IT (2026-07-11).**
       Downloaded the full CV3 GGUF set to `/Volumes/backups/ai/crispasr-gguf`,
       `COSYVOICE3_BENCH=1` on a 174-mel synthesis (M1 Metal, quiet box). Wall
