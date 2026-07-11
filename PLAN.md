@@ -7275,10 +7275,19 @@ while the GPU sits idle. transcribe.cpp runs its decoders on GPU.
       Instruments) to localize the flash-attn/small-op cost — not more
       guess-and-check. NOTE: the huge host_embed variance in F5_BENCH
       (8-58 s across runs) is CPU contention on the shared box, not inherent.
-   **titanet/diarization GPU port** stands as separate open work:
-   titanet loads weights to a GPU backend but re-folds BN into a CPU-only
-   cache and computes the whole speaker-embedding conformer on CPU by design
-   — the substance of the §224 "diarize CPU perf" item. Bigger refactor.
+   **titanet/diarization GPU port — INVESTIGATED, NOT worth it.** The port IS
+   tractable (the ggml graph computes on backend_cpu with weights uploaded
+   there; all ops — conv_1d, conv_1d_dw, mul_mat, SE-block mean/sigmoid —
+   decompose to Metal-supported im2col+matmul, same shape as the f5 base fix).
+   BUT measured on M1: the DEFAULT path is legacy Accelerate-BLAS (macOS
+   default `titanet_use_legacy()==true`), ~1 s/forward for 10 s audio — already
+   optimized. The ggml-CPU path (`CRISPASR_TITANET_GGML=1`) is 1.7× SLOWER
+   (14.96 s vs 8.65 s wall, 6 forwards). So a GPU-ggml port would have to beat
+   Accelerate using a graph that's already slower on CPU, and per the f5
+   findings GPU-ggml for conv/small-op graphs isn't dramatically faster. Poor
+   expected value; not pursued. The real diarization lever, if needed, is
+   FEWER forwards (batch/enlarge segments) or the clustering — not per-forward
+   speed. Closes the §224 "diarize CPU perf" concern: it's Accelerate-BLAS'd.
 
 ### §232 v13 Results (2026-07-11)
 
