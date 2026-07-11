@@ -6724,9 +6724,13 @@ slower than dir in 3/3 interleaved reps) → stays opt-in.
       md5-identical WAV), 9.1 s → 4.3 s CPU (~2.1×, 1 int16 LSB / PCM cos
       1.00000000). Total 0.6B pipeline RTF best-case 2.9 → 1.25. Remaining
       codec cost is the legitimate K=7 SEANet im2cols. The 16 GB-Mac 1.7B
-      codec jetsam should also shrink (peak intermediates ~halved) —
-      re-test when convenient; QWEN3_TTS_CODEC_CHUNK=48 remains the
-      workaround.
+      codec jetsam is FIXED in practice: post-FASTCONV, 1.7B-CustomVoice
+      Q8_0 with a 156-frame (~12.5 s) output decodes rc=0 with DEFAULT
+      chunking at ~6 GB free (this exact profile died pre-FASTCONV);
+      QWEN3_TTS_CODEC_CHUNK=48 stays available for tighter boxes (note:
+      non-default ctx changes conv warm-up at chunk boundaries → WAV not
+      byte-equal to the default config; pre-existing chunked-decode
+      property, not FASTCONV).
       **CUDA validated (kernel v2, P100, 2026-07-11):** shipped defaults
       (CP_DIRECT + FASTCONV) vs full-legacy — rc=0, PCM cos 0.9999999997
       (md5 drift, same K=1-matmul realization class as CPU), ASR roundtrip
