@@ -18,8 +18,14 @@ import time
 from pathlib import Path
 
 WORK = Path("/kaggle/working")
-REPO = WORK / "CrispASR"
 TEMP = Path("/kaggle/temp") if Path("/kaggle/temp").is_dir() else Path("/tmp")
+# Clone the repo into TEMP, NOT /kaggle/working. The git-cloned CrispASR/ tree
+# (thousands of files, sorts before ccache.tar) was filling `kaggle kernels
+# output`'s 500-file page 1 and burying ccache.tar — so it could never be
+# retrieved to refresh the dataset. With the repo in TEMP, /kaggle/working holds
+# only ccache.tar + benchmark_results.json (+ the always-fetched log), so
+# ccache.tar is reachable in page 1.
+REPO = TEMP / "CrispASR"
 
 # ── Phase 0: Clone + build CrispASR with CUDA ───────────────────────────────
 print("=== Phase 0: clone + build CrispASR ===", flush=True)
