@@ -230,7 +230,7 @@ the §232 campaign. Verified against current code, not carried from this doc.
 | P | Area | Gap | Impact |
 |---|---|---|---|
 | **P0** | firered_asr | Decoder self-attention has **no KV cache** — growing vector, O(T²) recompute (`firered_asr.cpp:2697`) | Highest-impact ASR gap |
-| **P0** | melotts / piper | Scalar O(H·T²·D) relpos attention; HiFi-GAN 17.9s of 26.3s VPS total. Needs manual-attn ggml graph or BLAS (can't flash) | Dominant TTS cost |
+| ~~P0 relpos~~ → **P0 hifigan** | melotts / piper | relpos is a MEASURED DUD (`2026-07-11`): already GEMM'd (`melotts_use_scalar()` gate) and only **~1.5% of synthesis** (text_encoder 190 ms of 12.3 s). **hifigan_decode is 73–92%** — the real cost. It's already on Metal; measured time is inflated by cold Metal-pipeline JIT (dozens of `compile_pipeline` during first decode; `Apple_M1.archive` warms it). Untangle cold-JIT vs steady-state before optimizing. NB `ggml_metal_device_free` hits `GGML_ASSERT([rsets data count]==0)` at process exit (after WAV write) — separate teardown bug. | HiFi-GAN dominant |
 | **P0** | voxcpm2_tts | CPU-only (Metal SIGSEGV), manual per-step host KV re-upload (`voxcpm2_tts.cpp:106-111`) | GPU-locked-out |
 | ~~P0~~ | openvoice2 | STFT scalar O(bins·win) DFT → shared radix-2 FFT: **1182 ms → 10.7 ms** (110×, ~26% of convert) `2026-07-11`. WaveNet already GEMM'd (§176d); ref-enc is 4% one-time. **Remaining: hifigan_decode is 67% of convert** — next target | STFT fixed; vocoder dominant |
 | **P1** | voxtral/voxtral4b enc, mimo LLM decoder | Attention not on flash_attn_ext (O(T²) manual softmax) | Enc mem+dispatch; mimo dispatch-bound |
@@ -252,9 +252,12 @@ the §232 campaign. Verified against current code, not carried from this doc.
    gallocr, mimo `step_t1_gf`. Cache the *decode-step* graph, not the encoder.
 2. **ggml-metal ICB replay** — the Apple-side equivalent of CUDA-graph capture;
    decode is per-op-dispatch bound.
-3. **BLAS/ggml the scalar hotpaths** (melotts/piper relpos, openvoice2 WaveNet,
-   rvq, istft, titanet mel, RNN-T LSTM/joint) and extend §232's CFG-batch +
-   device-KV playbook to f5/dots/kugelaudio/pocket/dia/speecht5/parler.
+3. **BLAS/ggml the scalar hotpaths** (~~melotts/piper relpos~~ — measured DUD,
+   already GEMM'd + ~1.5%; ~~openvoice2 WaveNet~~ — GEMM'd §176d; openvoice2 STFT
+   DFT→FFT DONE `2026-07-11`; rvq, titanet mel, RNN-T LSTM/joint still open) and
+   extend §232's CFG-batch + device-KV playbook to f5/dots/kugelaudio/pocket/dia/
+   speecht5/parler. **The real cross-cutting TTS cost is HiFi-GAN decode**
+   (openvoice2 67%, melotts 73–92%) — GPU-resident but cold-JIT-confounded on Metal.
 
 Do **not** re-enable encoder-graph caching (#235 UAF + measured dud), and do
 **not** CPU-batch decode that feeds a GPU pipeline (item 24).
