@@ -6,6 +6,26 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-11 — openvoice2 STFT: scalar DFT → shared radix-2 FFT (110× on the stage, ~26% of convert)
+
+Perf pass on `openvoice2` voice conversion. **Measure-before-optimize redirected the
+work:** the flagged target (P0 "WaveNet + ref-encoder scalar CPU") was already
+addressed — the WaveNet is GEMM'd via Accelerate (§176d) — and per-stage bench of a
+3 s convert showed the ref-encoder is only **4%** (one-time; a cache would've been
+near-worthless). The real costs were **hifigan_decode 67%** and **stft 27%**.
+
+- **Fix** (`src/openvoice2.cpp` `stft_magnitude`): the STFT was a naive
+  O(bins·win) scalar DFT with `cosf/sinf` in the inner loop (~270 M transcendentals
+  for a 3 s convert). Replaced with the shared `core_fft::fft_radix2_wrapper`
+  (already used by chatterbox/cosyvoice3) — window into an `fft_size` frame, one
+  FFT, take magnitudes. Same window / reflect-pad / bin count / magnitude formula.
+  **1182 ms → 10.7 ms (110×)**; output audio corr **0.999993** vs the DFT baseline
+  (target_se/enc_q_z/HiFi-GAN stats match to ~1e-4). ~26% off the convert wall.
+- Also registered the `test-openvoice2-hifi` standalone convert harness as a build
+  target (it existed but wasn't wired into CMake) — needed for the bench/validation.
+- **Remaining:** hifigan_decode (67%) is now the dominant cost — the ConvT/WaveNet
+  vocoder. Bigger, separate effort. See PERFORMANCE.md.
+
 ## 2026-07-11 — pocket-tts voice-clone onset "gong": encoder frame off-by-one (fixed); per-conv framing tried + rejected
 
 Voice-cloned pocket-tts syntheses opened with a loud onset transient; no-voice output
