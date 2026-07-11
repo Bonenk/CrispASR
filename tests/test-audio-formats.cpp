@@ -318,6 +318,36 @@ TEST_CASE("crispasr_audio_load decodes M4A (AAC)", "[audio][unit][m4a]") {
     crispasr_audio_free(pcm);
 }
 
+TEST_CASE("crispasr_audio_load decodes ADTS AAC (glint)", "[audio][unit][aac]") {
+    // Raw ADTS .aac (ffmpeg-encoded AAC-LC) decoded by the in-tree glint
+    // decoder — cross-platform and always available (no runtime lib), so unlike
+    // M4A this must succeed everywhere. ffmpeg-encoded -> glint-decoded is the
+    // cross-reference roundtrip (HARD RULE #3).
+    float* pcm = nullptr;
+    int samples = 0, rate = 0;
+    int rc = crispasr_audio_load(sample("jfk.aac").c_str(), &pcm, &samples, &rate);
+    REQUIRE(rc == 0);
+    REQUIRE(pcm != nullptr);
+    REQUIRE(rate == 16000);
+    REQUIRE(has_energy(pcm, samples));
+
+    auto ref = load_ref();
+
+    double ratio = (double)samples / ref.samples;
+    INFO("ADTS AAC length ratio: " << ratio);
+    REQUIRE(ratio > 0.90);
+    REQUIRE(ratio < 1.10);
+
+    // AAC-LC encoder priming (~1024-2112 samples) shifts the stream; raw ADTS
+    // carries no edit list to strip it (unlike M4A's elst), so use a wide lag
+    // window (3000 samples = 188 ms) to locate the true correlation peak.
+    double cc = cross_correlation(ref.pcm, ref.samples, pcm, samples, 3000);
+    INFO("ADTS AAC cross-correlation: " << cc);
+    REQUIRE(cc > 0.85);
+
+    crispasr_audio_free(pcm);
+}
+
 TEST_CASE("crispasr_audio_load rejects missing file", "[audio][unit]") {
     float* pcm = nullptr;
     int samples = 0, rate = 0;

@@ -493,6 +493,12 @@ endif()
 find_package(Threads REQUIRED)
 target_link_libraries(crispasr-lib PUBLIC ggml Threads::Threads audioseal crispasr-core snac ${CMAKE_DL_LIBS})
 
+# glint — in-tree clean-room codec suite. crispasr_audio.cpp uses its AAC-LC
+# decoder for cross-platform raw-ADTS (.aac) input (glint target is defined
+# later via add_subdirectory(glint); CMake resolves the link at generate time).
+# PUBLIC so every consumer (CLI, server, bindings) inherits the static link.
+target_link_libraries(crispasr-lib PUBLIC glint)
+
 # `crispasr_cache.cpp` calls WinHTTP for HF auto-download on Windows. MSVC
 # auto-links winhttp.lib via `#pragma comment(lib, "winhttp.lib")` inside
 # the .cpp, but MinGW / GCC ignore that pragma — so any downstream test or
