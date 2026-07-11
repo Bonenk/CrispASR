@@ -116,6 +116,7 @@ SESSION_HANDOVER.md
 /handover-prompts/
 /docs/prompts/
 .ccache/
+tools/kaggle/q8-quantize/kaggle_harness.py
 
 # Fuzzer / parser-test runtime artifacts (tests/fuzz + the crafted-input tests)
 crispasr_fuzz_input.bin
@@ -124,3 +125,4 @@ crash-*
 leak-*
 timeout-*
 /tests/fuzz/corpus/
+tools/kaggle/fc-pw-requant/kaggle_harness.py
