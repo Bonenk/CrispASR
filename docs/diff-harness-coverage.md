@@ -37,6 +37,7 @@ archived at `cstr/chatterbox-GGUF/diff-harness-ref/`.
 | backend | ref module | archive | mtime | harness | deps |
 |---|---|---|---|---|---|
 | `canary` | `tools/reference_backends/canary.py` | — | — | yes | nemo, torch |
+| `canary-qwen` | `tools/reference_backends/canary_qwen.py` | `cstr/canary-qwen-2.5b-GGUF/diff-harness-ref/canary-qwen-2.5b-ref.gguf` | 2026-07-11 | yes | nemo, torch |
 | `chatterbox` | `tools/reference_backends/chatterbox.py` | — | — | yes | chatterbox, librosa, torch, torchaudio |
 | `chatterbox_turbo` | `tools/reference_backends/chatterbox_turbo.py` | — | — | **no** | chatterbox, torch |
 | `cohere` | `tools/reference_backends/cohere.py` | — | — | yes | safetensors, torch, transformers |
