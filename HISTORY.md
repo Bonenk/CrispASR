@@ -80,6 +80,29 @@ was clean. **Fixed on `main`; root-caused by reference diff, not patched over.**
 - **Ops:** the §224 voice-latent disk cache keys on the PCM hash, not the algorithm — clear
   `pocket-voice-*.latents` (or `CRISPASR_POCKET_VOICE_CACHE=0`) after any encoder change.
   See `LEARNINGS.md` + memory `project_pocket_tts_gong_encoder_frame`.
+## 2026-07-11 — glint codec integration: AAC + Opus in both directions
+
+Wired the sibling **glint** codec suite (refreshed from encoder-only to the full
+MP3/AAC/Opus decoder + encoder set) into CrispASR so AAC and Opus work in both
+directions with no libopus/fdk/ffmpeg hard dependency by default.
+
+- **Input decode (C ABI `crispasr_audio_load`)**: raw ADTS `.aac` (AAC-LC) and
+  Ogg `.opus` now decode via glint (`glint_aac_decode`, `glint_decode_audio`),
+  cross-platform and always available — so the bindings read `.aac`/`.opus`
+  without libopus/fdk. Default, gated `CRISPASR_AAC_DECODER` /
+  `CRISPASR_OPUS_DECODER=libopus`, with the old decoder as automatic fallback.
+  Still libopus: WebM/Matroska Opus + the stereo loader.
+- **Output encode**: CLI `--tts-output out.opus` + server `response_format=opus`
+  emit a real Ogg Opus file (`audio/ogg`) via `glint_opus_encode_file`
+  (`crispasr_opus_writer.h`), fixing the server's old non-conformant framing.
+  libopus reachable via `CRISPASR_OPUS_ENCODER=libopus`.
+- **glint C ABI**: the one-call Ogg-Opus file + unified `glint_decode_audio`
+  API landed on glint main (a concurrent effort); adopted it rather than the
+  parallel API this branch first drafted.
+- `crispasr-lib` links glint PUBLIC (→ `bindings/go/whisper.go` `-lglint`
+  regen). Verified: `[audio]` unit suite 87/10 + provenance 48/13; kokoro TTS →
+  {mp3,aac,opus} → moonshine ASR round-trips; ffmpeg/libopus decode glint's
+  `.opus`; glint's decoder sources compile clean under emscripten (WASM).
 
 ## 2026-07-11 — §93 voxtral-tts synthesis: shipped + correctness proven
 
