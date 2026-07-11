@@ -6807,16 +6807,24 @@ and what parallel sessions own:
       per frame — biggest AR cost) and mimi decode; the voice encode is the
       largest single cost but is already cacheable. None has an obvious
       cheap+safe win — deprioritized.
-- [ ] **CosyVoice3 HiFT istft — DEFERRED, needs measurement + reframe.**
-      PERFORMANCE.md calls it "O(n²) DFT, should be FFT", but `n_fft=16` — an
-      FFT barely helps at that size. The real cost is `std::cos`/`std::sin`
-      recomputed in the innermost istft loop for the same 16×9 angles every
-      frame (`cv3_hift_istft`, ~L3812); the win is a precomputed twiddle
-      table, not an FFT. Vocoder fraction of the CV3 wall is UNVERIFIED (the
-      LLM + 2×22 flow blocks likely dominate) and the full CV3 GGUF set isn't
-      local. Measure the fraction before spending effort — a 3× vocoder win is
-      worthless if the vocoder is 2% of the wall (cf. the vibevoice graph-cache
-      0%-win lesson).
+- [x] **CosyVoice3 HiFT / FASTCONV — MEASURED, NOT WORTH IT (2026-07-11).**
+      Downloaded the full CV3 GGUF set to `/Volumes/backups/ai/crispasr-gguf`,
+      `COSYVOICE3_BENCH=1` on a 174-mel synthesis (M1 Metal, quiet box). Wall
+      split (~7.4 s total): **flow_euler 3526 ms (48 %)**, **lm_ar_decode
+      2681 ms (36 %)**, **hift_vocoder 1152 ms (16 %)**, tokenize+pre_la
+      ~156 ms. HiFT is 16 %, but the FASTCONV levers barely touch it: (a) HiFT
+      **already uses pad-in-im2col** (`cv3_causal_conv1d`), so trick #2 is done;
+      (b) HiFT decode is a SINGLE sched graph (`cv3_extract_hift_inference`
+      L1628/1643), so an F32-kernel-bake casts once/synthesis ≈ 15-20 ms, not
+      per-frame; (c) the istft twiddle-table saves ~20-30 ms (`std::cos/sin` in
+      the inner loop, but T_stft×16×9 is only ~3 M calls); (d) no meaningful
+      K=1 convs (kernels 16/11/7). Addressable ≈ 40-50 ms of a 7.4 s wall =
+      **~0.6 %** — a regression-risky conv sweep for <1 % fails the A/B bar
+      (vibevoice 0%-win). The real CV3 costs are the flow-matching CFM
+      (48 %, `cfm_steps=10`×CFG×22 DiT blocks) and the Qwen2-0.5B AR decode
+      (36 %) — both compute-bound transformer work, no cheap+safe conv-style
+      win; graph-caching the DiT step is the sched-reuse hazard and won't help
+      a compute-bound graph (cf. the talker verdict). Deprioritized.
 
 ## §234 omnivoice — persistent step graphs + silence root cause (DONE)
 
