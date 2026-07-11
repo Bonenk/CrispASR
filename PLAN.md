@@ -7397,10 +7397,18 @@ executes on the GPU instead of host cblas_sgemv. Default stays cblas.
   branch, builds CUDA, A/Bs cblas vs ggml decode ms + transcript parity + RTF,
   N reps). `bash tools/kaggle/parakeet-ggml-decode-ab/push.sh`. Flip the default
   only if parity holds AND ggml decode < cblas decode there.
-- **Follow-ups if per-step is launch-bound on P100:** persistent gallocr graphs
-  + in-graph argmax (2 int32 readback vs 8198-logit) instead of per-step sched
-  rebuild; then port the identical treatment to nemotron RNNT
-  (`parakeet_rnnt_decode` shares the LSTM+joint shape).
+- **Nemotron wired too (shared module).** The parakeet helpers were extracted to
+  `core/rnnt_ggml.h` (DRY) and nemotron_rnnt_decode now uses the same code behind
+  `NEMOTRON_GGML_DECODE=1` — nemotron had the larger gap (2900 ms P100). M1 A/B
+  (both transcript-identical): parakeet ggml ~57 ms vs cblas ~60 ms (neutral);
+  **nemotron ggml ~1613 ms vs cblas ~755 ms — 2× SLOWER** (LEARNINGS 31: per-step
+  overhead × many steps). Both gated, default cblas. The Kaggle kernel now A/Bs
+  BOTH backends in one P100 run.
+- **Follow-ups (the M1 nemotron regression makes these the likely real fix):**
+  persistent gallocr graphs (build once, amortise the per-step build/alloc that
+  dominates long decodes) + in-graph argmax (2 int32 readback vs 8198-logit)
+  instead of per-step sched rebuild. Do this in `core/rnnt_ggml.h` → both
+  backends benefit at once.
 
 --- original scoping notes (kept for reference) ---
 
