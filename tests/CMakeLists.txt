@@ -1543,6 +1543,18 @@ catch_discover_tests(test-openvoice2-params
     PROPERTIES LABELS "unit;openvoice2"
 )
 
+# ─── test-openvoice2-hifi — standalone convert harness (needs a GGUF + src/ref wav).
+# Not a ctest; used for manual bench/validation of openvoice2_convert. ───────────
+add_executable(test-openvoice2-hifi
+    test-openvoice2-hifi.cpp
+)
+target_include_directories(test-openvoice2-hifi PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-openvoice2-hifi PRIVATE
+    openvoice2
+)
+
 # ─── test-t5translate-params — Catch2 unit tests for t5_translate_context_params defaults
 # and null-guard coverage. No GGUF required. ───────────────────────────────────
 add_executable(test-t5translate-params
