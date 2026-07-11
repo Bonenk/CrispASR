@@ -12418,3 +12418,35 @@ checks that turn "I nearly reimplemented a measured-negative optimization" into
 "crossed off with evidence." Record the dead end in PLAN so the next person
 doesn't re-derive it (the transducer GPU port is now explicitly marked DEAD in
 §235, not silently left as a tempting [HIGH] in §232).
+
+
+## CosyVoice3 CFM Euler steps: 6 is the sweet spot, and validate it with log-mel corr vs full-steps — NOT ASR roundtrip (§235, 2026-07-11)
+
+Flow-matching CFM trajectories are nearly straight, so an N-step Euler solve
+barely differs from a 10-step one down to surprisingly small N — the same
+property that let chatterbox drop its S3Gen CFM default 10→6 (§207). Confirmed
+for CosyVoice3's DiT-CFM (the single biggest CV3 cost, ~48 % of the wall):
+`COSYVOICE3_FLOW_STEPS` swept 10/8/6/4 with a **fixed seed** (identical LM
+speech tokens + init noise, so step count is the ONLY variable), quality read
+as **log-mel-spectrogram correlation vs the 10-step output** — corr
+8→0.9948, 6→0.9925, 4→0.9895. 6 steps is the sweet spot (≥0.98 parity, ASR
+verbatim), ~−40 % flow work ≈ −19 % of the wall.
+
+Two transferable methodology points, both learned the hard way this session:
+- **ASR roundtrip cannot grade CFM step count.** It was verbatim at 10/8/6 and
+  only slipped one word ("brown"→"bound") at 4 — long after the mel-corr starts
+  drifting. ASR proves intelligibility, not fidelity; use log-mel corr vs the
+  full-step render as the quality axis (chatterbox §207 established this; I
+  re-derived it after an ASR-only sweep would have called 4 steps "fine").
+- **Calibrate the spectral metric to the accepted threshold.** A raw
+  linear-frequency **log-STFT** corr over-weights high-frequency detail (where
+  under-stepping shows up) and read 0.958 at 8 steps — falsely alarming;
+  the **log-mel** version (n_mels=80) read 0.9948 for the same audio, matching
+  chatterbox's 0.98 parity threshold. Match the reference metric before
+  applying its threshold, or the numbers don't transfer.
+- **The whole-utterance corr under-weights localized artifacts.** At 4 steps
+  corr was still 0.9895 (above 0.98) yet ASR misheard a word — the artifact was
+  local and the utterance-averaged corr washed it out. When corr and a
+  token-level signal disagree near the boundary, trust the more sensitive one
+  and stop there. Final arbiter for any quality-affecting DEFAULT remains a
+  human listen on 2–3 diverse sentences — recommend, don't unilaterally flip.
