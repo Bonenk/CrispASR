@@ -40,6 +40,7 @@
 #include "core/conv.h"
 #include "core/dac_decoder.h"
 #include "core/gguf_loader.h"
+#include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 dia GPU path)
 
 #include <algorithm>
 #include <cassert>
@@ -817,53 +818,59 @@ struct dia_tts_context* dia_tts_init_from_file(const char* path_model, struct di
     m.decoder.embeddings.resize(m.n_output_heads, nullptr);
     m.decoder.heads.resize(m.n_output_heads, nullptr);
 
-    // Count tensors and create ggml context for weights
-    int n_tensors = gguf_get_n_tensors(meta);
-    ggml_init_params weight_params = {
-        (size_t)(n_tensors + 1) * ggml_tensor_overhead(),
-        nullptr,
-        true,
-    };
-    ggml_context* ctx_data = ggml_init(weight_params);
-    if (!ctx_data) {
-        fprintf(stderr, "dia_tts: failed to create weight context\n");
-        gguf_free(meta);
-        delete ctx;
-        return nullptr;
-    }
-
-    // Load weights from GGUF with data
-    gguf_init_params gguf_data_params = {false, &ctx_data};
-    gguf_context* meta_data = gguf_init_from_file(path_model, gguf_data_params);
-    if (!meta_data) {
-        fprintf(stderr, "dia_tts: failed to load GGUF data\n");
-        ggml_free(ctx_data);
-        gguf_free(meta);
-        delete ctx;
-        return nullptr;
-    }
-
-    // Assign weights
-    for (int i = 0; i < n_tensors; i++) {
-        const char* name = gguf_get_tensor_name(meta_data, i);
-        ggml_tensor* tensor = ggml_get_tensor(ctx_data, name);
-        if (tensor) {
-            dia_assign_weight(m, name, tensor);
-        } else if (params.verbosity >= 2) {
-            fprintf(stderr, "dia_tts: tensor '%s' not found in context\n", name);
-        }
-    }
-
-    m.ctx_w = ctx_data;
-
-    // Initialize backend
+    // Initialize backends BEFORE loading weights so the main model can be placed
+    // on a GPU backend BUFFER — a GPU sched can't use weights in a plain CPU
+    // malloc ctx ("sched no longer auto-copies CPU-buffer tensors"; see the
+    // dev-guide GPU-portability notes), which is why dia historically pinned CPU
+    // here. GPU is now the DEFAULT when use_gpu is set (not --no-gpu).
+    // DIA_TTS_GPU is the A/B override, kept as the regression-bisection gate:
+    // "0" forces the old CPU path, "1" forces GPU even under --no-gpu. Validated
+    // M1 Metal (§232): GPU wins every stage on dia's 1.6B model (encoder ~94x,
+    // decode ~1.5x, DAC ~4.9x) with an identical generate->ASR roundtrip — so
+    // unlike LEARNING 34's tiny transducer, Metal is NOT excluded here (the
+    // large decoder matmuls escape the launch-bound regime). A Kaggle CUDA A/B
+    // confirms the CUDA arm.
     ctx->backend_cpu = ggml_backend_cpu_init();
-    ctx->backend = ctx->backend_cpu; // CPU-only for now
+    bool want_gpu = params.use_gpu;
+    if (const char* e = std::getenv("DIA_TTS_GPU")) {
+        want_gpu = std::atoi(e) != 0;
+    }
+    if (want_gpu) {
+        ctx->backend = crispasr_init_gpu_backend();
+        if (!ctx->backend) {
+            fprintf(stderr, "dia_tts: DIA_TTS_GPU set but no GPU backend available; using CPU\n");
+            ctx->backend = ctx->backend_cpu;
+        } else if (params.verbosity >= 1) {
+            fprintf(stderr, "dia_tts: GPU backend enabled (%s)\n", ggml_backend_name(ctx->backend));
+        }
+    } else {
+        ctx->backend = ctx->backend_cpu;
+    }
+
+    // Load main-model weights onto the selected backend's buffer, mirroring the
+    // DAC's core_gguf::load_weights path (replaces the old plain-CPU
+    // gguf_init_from_file data load). core_gguf allocates the backend buffer,
+    // mmaps/copies the data, and returns a name->tensor map we bind via
+    // dia_assign_weight exactly as before.
+    core_gguf::WeightLoad wl;
+    if (!core_gguf::load_weights(path_model, ctx->backend, "dia", wl)) {
+        fprintf(stderr, "dia_tts: failed to load weights from '%s'\n", path_model);
+        if (ctx->backend != ctx->backend_cpu)
+            ggml_backend_free(ctx->backend);
+        ggml_backend_free(ctx->backend_cpu);
+        gguf_free(meta);
+        delete ctx;
+        return nullptr;
+    }
+    for (const auto& named : wl.tensors) {
+        dia_assign_weight(m, named.first, named.second);
+    }
+    m.ctx_w = wl.ctx;
+    m.buf_w = wl.buf;
 
     // Initialize KV cache
     if (!dia_kv_cache_init(ctx->kv, m)) {
         fprintf(stderr, "dia_tts: failed to init KV cache\n");
-        gguf_free(meta_data);
         gguf_free(meta);
         delete ctx;
         return nullptr;
@@ -873,7 +880,6 @@ struct dia_tts_context* dia_tts_init_from_file(const char* path_model, struct di
         fprintf(stderr, "dia_tts: model loaded from '%s'\n", path_model);
     }
 
-    gguf_free(meta_data);
     gguf_free(meta);
     return ctx;
 }
@@ -2124,6 +2130,9 @@ void dia_tts_free(struct dia_tts_context* ctx) {
     if (ctx->buf_output) {
         ggml_backend_buffer_free(ctx->buf_output);
     }
+    if (ctx->model.buf_w) {
+        ggml_backend_buffer_free(ctx->model.buf_w);
+    }
     if (ctx->model.ctx_w) {
         ggml_free(ctx->model.ctx_w);
     }
@@ -2141,6 +2150,9 @@ void dia_tts_free(struct dia_tts_context* ctx) {
     }
     if (ctx->sched) {
         ggml_backend_sched_free(ctx->sched);
+    }
+    if (ctx->backend && ctx->backend != ctx->backend_cpu) {
+        ggml_backend_free(ctx->backend);
     }
     if (ctx->backend_cpu) {
         ggml_backend_free(ctx->backend_cpu);
