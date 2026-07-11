@@ -149,3 +149,13 @@ Lessons from the systematic head-to-head benchmark against
 13. **Normalisation matters for WER**: SenseVoice emits `<|TAG|>` tokens, Nemotron
     emits inline `en-us` language codes. Strip both before WER computation.
     Use lowercase + strip punctuation + normalise whitespace as the baseline.
+
+24. **Batched blank-scan makes GPU WORSE, not better**: v14 showed Parakeet
+    decode 0.095→0.833 (8.8x slower) and Nemotron 0.345→1.667 (4.8x slower)
+    with CRISPASR_TDT_BATCH=1. Root cause: the "batch" runs a CPU sgemm
+    (32×8198 logits) while the GPU sits idle. The sequential path runs 1×8198
+    sgemv per step and terminates at the first blank — much cheaper because
+    most frames ARE blank. Batching only helps when the sgemm itself runs on
+    GPU (i.e., the LSTM+joint is a ggml graph), not when it's a CPU-side
+    cblas call between GPU encoder passes. **Lesson: don't batch CPU work
+    that feeds a GPU pipeline — batch the GPU work itself.**
