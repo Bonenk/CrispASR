@@ -1322,7 +1322,13 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
     // §232: opt-in GPU decode (LSTM predictor + joint as ggml graphs). Default
     // off (cblas). Runs on ctx->backend — enable on CPU too for pure-math parity
     // checks; the intended win is GPU (perf verdict P100-only, see helper header).
-    const bool ggml_dec = getenv("PARAKEET_GGML_DECODE") != nullptr;
+    // §232: ggml GPU decode is DEFAULT ON when the decode backend is a GPU —
+    // P100 A/B measured 5.26x faster decode (763→145 ms) with an IDENTICAL
+    // transcript (Kaggle crispasr-parakeet-ggml-decode-ab). CPU stays cblas
+    // (Apple Accelerate beats ggml-CPU). Override both ways: PARAKEET_GGML_DECODE=1/0.
+    bool ggml_dec = !ggml_backend_is_cpu(ctx->backend);
+    if (const char* e = getenv("PARAKEET_GGML_DECODE"))
+        ggml_dec = (e[0] == '1');
     const bool time_dec = getenv("PARAKEET_DECODE_TIMING") != nullptr;
     auto _dt0 = std::chrono::steady_clock::now();
 
