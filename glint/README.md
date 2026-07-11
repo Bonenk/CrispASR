@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `b448c749f7d40ea0a6c149c845b107979f4208ea` (fix(ci): relax glint-noise AAC decoder floor 55->50 (fixed-path variance)).
+Synced at upstream commit: `b1f831d6ccd3bcc4aa7f63c1068ba97ae30746b4` (docs: v0.9.0 release notes — the three-codec release).
