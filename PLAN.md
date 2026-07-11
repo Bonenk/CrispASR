@@ -43,10 +43,28 @@ The memory-safety fixes shipped (see HISTORY 2026-07-11). Test/tooling state:
   `-DCRISPASR_FUZZ=ON`, clang) — seed from `samples/`; mutation covers the
   AU/AMR/WebM/MP4/WAV dispatch under ASan, so WebM/AU/AMR get reachability
   coverage there rather than as separate hand-crafted tests.
-- **Open (LOW)**: a GGUF `load_weights_split` bounds regression test (needs a
-  crafted GGUF + dual-backend setup) + harnesses for the model-load and
-  tokenizer file readers (`bpe.h`/`sentencepiece.h`) — same untrusted-input
-  class, not yet covered.
+- **DONE**: `crispasr_server` security audit (multi-agent) — 7 fixes: unbounded
+  upload DoS (`set_payload_max_length` + chunked reject), `/v1/audio/speech`
+  voice path-traversal, CAP_TTS gates on POST/DELETE `/v1/voices`, log-injection
+  sanitisation. See HISTORY.
+- **DONE**: GGUF loader + tokenizer audit (multi-agent) — GGUF mmap bounds
+  checks made overflow-safe (subtractive, 3 sites in `gguf_loader.cpp`; a crafted
+  GGUF declaring a `SIZE_MAX` tensor wrapped `data_off+off+nbytes` → SIGBUS on
+  Metal), and sentencepiece input-length clamp (`tokenize`/`tokenize_bpe`).
+- **DONE**: `linux-fuzz-smoke` CI job (audio fuzzer, seeded, ASan) + a second
+  harness `tests/fuzz/fuzz_gguf_meta.cpp` (`crispasr-fuzz-gguf`) over the GGUF
+  metadata path.
+- **Open (upstream ggml, MED)**: the GGUF fuzzer found a real DoS — a malformed
+  GGUF with an **empty KV key** hits `GGML_ASSERT(!key.empty())` in
+  `ggml/src/gguf.cpp:143` → `ggml_abort` → `abort()`. `gguf_init_from_file`
+  aborts instead of returning nullptr on malformed input, so ANY untrusted model
+  load (incl. server `POST /load`) can crash the process. Fix belongs in the
+  `CrispStrobe/ggml` fork (return an error on empty/duplicate keys instead of
+  asserting). Reproducer saved off-tree (`gguf-empty-key-abort.crash`, 1735 B);
+  replay with `crispasr-fuzz-gguf <file>`. Not fixed here (submodule scope).
+- **Open (LOW)**: a deterministic GGUF `load_weights` bounds regression test
+  (needs a crafted GGUF + backend), and a `bpe.h`/`wordpiece.h` fuzz harness
+  (both came back clean in the audit).
 
 ## Scoped next items (for a new agent picking up)
 
