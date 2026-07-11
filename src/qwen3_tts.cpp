@@ -642,6 +642,12 @@ struct g3t_codec {
     ggml_backend_buffer_t buf_w = nullptr;
     ggml_context* ctx_perm = nullptr;
     ggml_backend_buffer_t buf_perm = nullptr;
+    // §232 FASTCONV: F32 copies of the K>1 conv kernels, baked at load so
+    // ggml_conv_1d/_dw don't insert a per-graph F16→F32 CAST of multi-MB
+    // weights (the fork casts the kernel when activations are F32; the
+    // in_conv cast alone was ~70 ms per decode on M1 Metal).
+    ggml_context* ctx_conv32 = nullptr;
+    ggml_backend_buffer_t buf_conv32 = nullptr;
     std::map<std::string, ggml_tensor*> tensors;
 
     bool loaded = false;
@@ -3749,9 +3755,56 @@ bool build_voicedesign_prefill_embeds(qwen3_tts_context* c, const std::string& i
 // where dilations cycle through 1, 3, 9.
 // Input/output: [C, T] channels-first.
 // ---------------------------------------------------------------------------
+// §232 FASTCONV gate (default ON; opt out with QWEN3_TTS_CODEC_FASTCONV=0
+// — validated 2026-07-11: WAV md5-identical to the legacy path on M1 Metal,
+// and within 1 int16 LSB / PCM cos 1.00000000 on CPU; codec wall ~3x faster
+// on Metal, ~2.1x on CPU): three codec conv rewrites that remove the decode
+// hot spots found by QWEN3_TTS_CODEC_TRACE on M1 Metal (im2col of K=1
+// convs, CPU-placed asymmetric PAD nodes, and per-graph F16→F32 kernel
+// casts):
+//   1. K==1 stride-1 conv == channel matmul — no transposes, no im2col
+//      (the im2col of a 1×1 conv is a pure copy of the input; ~75 ms and a
+//      ~300 MB intermediate per instance at 24 kHz T).
+//   2. K>1 causal conv: symmetric pad INSIDE im2col + keep the first T_out
+//      columns. Metal rejects left/asymmetric PAD so the explicit pad node
+//      lands on the CPU backend and forces sched splits + copies; the
+//      im2col-internal pad has no such node. Same trick as voxcpm2's
+//      causal_conv1d_ggml.
+//   3. F32 conv kernels baked at load (see load_codec) so ggml_conv_1d
+//      doesn't cast multi-MB F16 kernels inside every graph.
+static bool codec_fastconv_enabled() {
+    return env_bool_default("QWEN3_TTS_CODEC_FASTCONV", true);
+}
+
 static ggml_tensor* codec_causal_conv1d(ggml_context* ctx, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b, int stride,
                                         int dilation) {
     const int K = (int)w->ne[0];
+    const bool fastconv = codec_fastconv_enabled() && stride == 1;
+    if (fastconv && K == 1) {
+        // 1×1 conv: y = Wᵀx over channels, directly on the [C_in, T] layout.
+        ggml_tensor* w2d = ggml_reshape_2d(ctx, w, w->ne[1], w->ne[2]); // [C_in, C_out]
+        ggml_tensor* y = ggml_mul_mat(ctx, w2d, x);                     // [C_out, T]
+        if (b) {
+            y = ggml_add(ctx, y, b);
+        }
+        return y;
+    }
+    if (fastconv) {
+        const int pad = (K - 1) * dilation;
+        const int64_t T_in = x->ne[1];
+        x = ggml_cont(ctx, ggml_transpose(ctx, x));                 // [T, C_in]
+        ggml_tensor* y = ggml_conv_1d(ctx, w, x, 1, pad, dilation); // [T + pad, C_out]
+        if (y->ne[0] > T_in) {
+            // Causal = the first T_in output columns; the trailing `pad`
+            // columns read right-padding and are dropped.
+            y = ggml_view_2d(ctx, y, T_in, y->ne[1], y->nb[1], 0);
+        }
+        y = ggml_cont(ctx, ggml_transpose(ctx, y)); // [C_out, T]
+        if (b) {
+            y = ggml_add(ctx, y, b);
+        }
+        return y;
+    }
     int pad_left = (K - 1) * dilation;
     if (stride > 1) {
         pad_left -= (stride - 1);
@@ -3781,6 +3834,24 @@ static ggml_tensor* codec_causal_conv1d(ggml_context* ctx, ggml_tensor* x, ggml_
 static ggml_tensor* codec_dw_causal_conv1d(ggml_context* ctx, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b) {
     const int K = (int)w->ne[0];
     const int pad_left = K - 1;
+    if (codec_fastconv_enabled()) {
+        // Same causal trick as codec_causal_conv1d: pad inside im2col (no
+        // CPU-placed PAD node), keep the first T_in output columns.
+        const int64_t T_in = x->ne[1];
+        x = ggml_cont(ctx, ggml_transpose(ctx, x)); // [T, C]
+        ggml_tensor* y = ggml_conv_1d_dw(ctx, w, x, 1, pad_left, 1);
+        if (ggml_n_dims(y) > 2) {
+            y = ggml_reshape_2d(ctx, y, y->ne[0], y->ne[1] * y->ne[2]);
+        }
+        if (y->ne[0] > T_in) {
+            y = ggml_view_2d(ctx, y, T_in, y->ne[1], y->nb[1], 0);
+        }
+        y = ggml_cont(ctx, ggml_transpose(ctx, y)); // [C, T]
+        if (b) {
+            y = ggml_add(ctx, y, b);
+        }
+        return y;
+    }
     x = ggml_cont(ctx, ggml_transpose(ctx, x)); // [T, C]
     if (pad_left > 0) {
         x = ggml_pad_ext(ctx, x, pad_left, 0, 0, 0, 0, 0, 0, 0);
@@ -4217,6 +4288,63 @@ static bool load_codec(qwen3_tts_context* c, const char* path) {
         for (int b = 0; b < 4; b++)
             ggml_backend_tensor_set(codec.blocks[b].tconv_w_perm, blk_wp_buf[b].get(), 0,
                                     ggml_nbytes(codec.blocks[b].tconv_w_perm));
+    }
+
+    // ---------- §232 FASTCONV: bake F32 copies of the K>1 conv kernels ----------
+    // ggml_conv_1d/_dw (fork) cast an F16 kernel to F32 inside EVERY graph
+    // when the activations are F32 — the in_conv cast alone was ~70 ms per
+    // decode on M1 Metal. Baking F32 copies once at load makes that cast a
+    // no-op. K==1 kernels are excluded: the fastconv matmul path consumes
+    // F16 directly (and better). ~+55 MB resident for the F16→F32 copies.
+    if (codec_fastconv_enabled()) {
+        std::vector<ggml_tensor**> conv_ws = {&codec.pre_conv_w, &codec.in_conv_w, &codec.out_conv_w,
+                                              &codec.rvq_first_out_w, &codec.rvq_rest_out_w};
+        for (int s = 0; s < 2; s++) {
+            conv_ws.push_back(&codec.up[s].dw_w);
+        }
+        for (int b = 0; b < 4; b++) {
+            for (int u = 0; u < 3; u++) {
+                conv_ws.push_back(&codec.blocks[b].res[u].conv1_w);
+                conv_ws.push_back(&codec.blocks[b].res[u].conv2_w);
+            }
+        }
+        std::vector<ggml_tensor**> to_cast;
+        for (auto** pw : conv_ws) {
+            if (*pw && (*pw)->type == GGML_TYPE_F16 && (*pw)->ne[0] > 1) {
+                to_cast.push_back(pw);
+            }
+        }
+        if (!to_cast.empty()) {
+            ggml_init_params cp = {ggml_tensor_overhead() * (to_cast.size() + 1) + 4096, nullptr, true};
+            codec.ctx_conv32 = ggml_init(cp);
+            if (codec.ctx_conv32) {
+                std::vector<ggml_tensor*> dsts(to_cast.size());
+                for (size_t i = 0; i < to_cast.size(); i++) {
+                    ggml_tensor* src = *to_cast[i];
+                    dsts[i] = ggml_new_tensor(codec.ctx_conv32, GGML_TYPE_F32, GGML_MAX_DIMS, src->ne);
+                    ggml_format_name(dsts[i], "%s.f32", src->name);
+                }
+                codec.buf_conv32 = ggml_backend_alloc_ctx_tensors(codec.ctx_conv32, weight_backend);
+                if (codec.buf_conv32) {
+                    std::vector<ggml_fp16_t> h16;
+                    std::vector<float> h32;
+                    for (size_t i = 0; i < to_cast.size(); i++) {
+                        ggml_tensor* src = *to_cast[i];
+                        const int64_t n = ggml_nelements(src);
+                        h16.resize((size_t)n);
+                        h32.resize((size_t)n);
+                        ggml_backend_tensor_get(src, h16.data(), 0, (size_t)n * sizeof(ggml_fp16_t));
+                        ggml_fp16_to_fp32_row(h16.data(), h32.data(), n);
+                        ggml_backend_tensor_set(dsts[i], h32.data(), 0, (size_t)n * sizeof(float));
+                        *to_cast[i] = dsts[i]; // graph builder now sees the F32 kernel
+                    }
+                } else {
+                    fprintf(stderr, "qwen3_tts: codec: fastconv F32 kernel bake alloc failed (non-fatal)\n");
+                    ggml_free(codec.ctx_conv32);
+                    codec.ctx_conv32 = nullptr;
+                }
+            }
+        }
     }
 
     // Codec compute metadata
@@ -7491,6 +7619,12 @@ extern "C" void qwen3_tts_free(struct qwen3_tts_context* ctx) {
     }
     if (ctx->codec.ctx_perm) {
         ggml_free(ctx->codec.ctx_perm);
+    }
+    if (ctx->codec.buf_conv32) {
+        ggml_backend_buffer_free(ctx->codec.buf_conv32);
+    }
+    if (ctx->codec.ctx_conv32) {
+        ggml_free(ctx->codec.ctx_conv32);
     }
     if (ctx->vp_buf_w) {
         ggml_backend_buffer_free(ctx->vp_buf_w);
