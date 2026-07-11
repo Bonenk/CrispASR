@@ -7262,6 +7262,25 @@ remains sequential on CPU (cblas) while the GPU sits idle.
 2. Moonshine encoder: investigate ggml_conv_1d vs im2col+mul_mat on GPU
 3. Fix v14 kernel stability (Nemotron/Cohere/FunASR need to complete)
 
+### §232 ACTIVE SESSION (2026-07-11, worktree `moonshine-decode-stash`, M1)
+
+**Now working on:** auditing the remaining backends for the CPU-pinned-decode /
+GPU-weight-copy sched class (LEARNINGS 25) and applying the `load_weights_split`
+hybrid fix where it applies + is GPU-used.
+
+- **DONE + on main:** moonshine (offline) decode hybrid placement (q8 −40%,
+  f16 −58%); moonshine encoder manual-attn (negative result, opt-in);
+  moonshine_streaming hybrid placement (latent, correctness bonus). RNNT/TDT
+  GPU decode SCOPED for a Kaggle campaign (see below).
+- **Audited, does NOT apply:** `crispasr.cpp` (whisper) — its `cpu_buffer_type`
+  sites are device enumeration / op-support, not a CPU-resident KV cache; KV
+  lives on the compute backend, so no per-token weight copy. Skip.
+- **Candidates left (TTS — need ASR-roundtrip validation, not owned by me
+  right now):** `dia_tts.cpp` (all-GPU load + per-step alloc + CPU buffer);
+  `f5_tts.cpp` (plan already flags its DiT running on CPU sched threads — a
+  *different, harder* sched-placement class, not the simple weight split;
+  worktree `f5-gpu-stash` is another session's). Coordinate before touching.
+
 ### §232 Moonshine decode — hybrid weight placement (DONE, 2026-07-11, M1 Metal)
 
 **Superseded Fix 1's premise.** Profiled moonshine-tiny on a *quiet* M1 (the
