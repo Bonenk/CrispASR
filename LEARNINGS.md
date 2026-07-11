@@ -10,6 +10,33 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Two more untrusted-input lessons: an HTTP server reads the body before your auth check, and a parser that abort()s on malformed input is a DoS a fuzzer finds in seconds (server + ggml hardening, 2026-07-11)
+
+Extending the audit to `crispasr-server` (cpp-httplib) and the model loader
+surfaced classes the file-parser sweep didn't:
+
+- **The framework reads the request body BEFORE your handler runs.** cpp-httplib
+  accumulates the whole multipart body into `req.files[...].content` in
+  `read_content()` — which `routing()` calls *before* `dispatch_request()`, so
+  your `require_auth()` inside the handler is too late. Without
+  `set_payload_max_length()` (default `SIZE_MAX`) a large upload OOM-kills the
+  process **pre-auth**. Set the cap (it makes `read_content` return 413 + skip
+  without buffering — verified in the httplib source), and note its *chunked*
+  reader ignores the cap, so reject `Transfer-Encoding` on uploads in a
+  pre-routing handler (which does run before the body read).
+- **Any request field that becomes a filesystem path needs `..`/absolute/NUL
+  rejection at the choke point** — even when a *sibling* route already validates
+  it (the `/v1/voices` handlers validated the name; `/v1/audio/speech` passed
+  `voice` straight through to a path). Audit by data-flow, not by endpoint.
+- **A parser that `GGML_ASSERT`/`abort()`s on malformed input is a DoS**, not a
+  safe failure — you cannot catch `abort()`. ggml's `gguf_init_from_file`
+  aborted on an empty KV key; any untrusted model load could crash the process.
+  The fix is to make the parser *return an error* on malformed input, not
+  assert. A libFuzzer harness over the load entry point found this in seconds —
+  and after fixing it, ~880K runs across both parse paths found nothing more.
+  The lesson: fuzz the file-load entry points; asserts-as-validation are the
+  first thing it trips.
+
 ## Every hand-rolled file parser sizes a buffer from an untrusted length field — that is the #1 memory-safety bug class, and a multi-agent audit finds them fast (parser hardening, 2026-07-11)
 
 CrispASR parses attacker-controllable bytes in several places: the audio

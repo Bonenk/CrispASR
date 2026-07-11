@@ -6,6 +6,35 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-11 — security hardening continued: HTTP server, model loader, ggml fuzz
+
+Follow-on to the audio-parser hardening, extending the multi-agent audit
+(find → adversarial-verify → fix-by-hand) to the rest of the untrusted-input
+surface.
+
+- **crispasr-server (network-facing, 7 fixes):** no `set_payload_max_length`
+  meant every multipart upload buffered into RAM *before* auth → a large (even
+  unauthenticated) body OOM-killed the process — capped at 512 MB + reject
+  chunked uploads. Plus a `/v1/audio/speech` `voice` path-traversal (arbitrary-
+  file-open), missing CAP_TTS gates on POST/DELETE `/v1/voices`, and raw
+  request fields logged via `fprintf %s` (log/terminal-escape injection →
+  `log_sanitize`). Validated: server builds + serves; legit uploads pass, huge/
+  chunked ones rejected without buffering.
+- **GGUF loader + tokenizers (2 fixes):** the tensor-bounds checks
+  `data_off + off + nbytes > size` add attacker-controlled sizes near SIZE_MAX
+  → wrap and pass → SIGBUS on Metal; rewritten subtractive at all 3 sites.
+  SentencePiece truncated a >2 GiB input to a negative int → clamp. (bpe /
+  wordpiece / SRT audited clean.)
+- **libFuzzer harnesses + CI:** `crispasr-fuzz-audio` (wired into a
+  `linux-fuzz-smoke` CI job, seeded from `samples/`) and `crispasr-fuzz-gguf`.
+  The GGUF harness immediately found a real crash — a malformed model with an
+  empty KV key aborted via `GGML_ASSERT` in ggml's parser (a DoS on any
+  untrusted model load). Fixed in the `CrispStrobe/ggml` fork (`1dc4cb93`,
+  reject empty keys → return nullptr); submodule bumped. Re-fuzzed both parser
+  paths against the fix — ~880K runs, 0 findings.
+
+See LEARNINGS (parser hardening; network-server security) for the taxonomy.
+
 ## 2026-07-11 — generation-health regression gate (core/generation_health.h)
 
 New shared header with objective quality checks for ASR/TTS output: not-empty,
