@@ -585,6 +585,7 @@ static void parakeet_fft_r2c(const float* in, int N, float* out) {
 
 #include "core/mel.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/rnnt_ggml.h"        // §232 GPU transducer decode (shared)
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -1285,141 +1286,24 @@ struct parakeet_emitted_token {
     float p;     // softmax probability of the emitted token [0, 1]
 };
 
-// ===========================================================================
-// §232 — RNNT/TDT decode as ggml graphs (opt-in PARAKEET_GGML_DECODE=1)
-//
-// The default decode (predictor_step / joint_step) runs the LSTM predictor and
-// the joint head on the CPU via cblas_sgemv. That leaves the GPU idle and is the
-// P100 decode bottleneck vs transcribe.cpp (§232). These helpers run the exact
-// same math as ggml graphs on ctx->backend so the whole per-step decode executes
-// on the GPU (in-graph, one dispatch per step).
-//
-// SCOPE: correctness-first, per-step sched dispatch (state carried via CPU
-// readback). This is validatable on M1 for transcript parity; the PERF verdict
-// is P100-only (M1 per-step GPU dispatch is launch-bound — see LEARNINGS 25-29).
-// Default stays cblas; flip only after a Kaggle P100 A/B. A persistent-graph /
-// CUDA-graph-capture variant is the follow-up if the per-step version is
-// launch-bound on P100.
-//
-// LSTM recurrence (PyTorch convention, gate order [i,f,g,o]):
-//   gates = w_ih·x + b_ih + w_hh·h + b_hh
-//   c' = sigmoid(f)·c + sigmoid(i)·tanh(g);  h' = sigmoid(o)·tanh(c')
-// Joint (ReLU, NOT tanh — matches the CPU code):
-//   mid = pred_w·pred_u + pred_b;  logits = out_w·relu(proj_e + mid) + out_b
-// ===========================================================================
-
-// One LSTM layer as ggml ops. x/h_in/c_in are [H]; returns h' ([H]) and writes c'.
-static ggml_tensor* parakeet_lstm_layer_ggml(ggml_context* c0, ggml_tensor* x, ggml_tensor* w_ih, ggml_tensor* b_ih,
-                                             ggml_tensor* w_hh, ggml_tensor* b_hh, ggml_tensor* h_in, ggml_tensor* c_in,
-                                             int H, ggml_tensor** c_out) {
-    // gates [4H] = w_ih·x + b_ih + w_hh·h_in + b_hh
-    ggml_tensor* g = ggml_add(c0, ggml_mul_mat(c0, w_ih, x), b_ih);
-    g = ggml_add(c0, g, ggml_add(c0, ggml_mul_mat(c0, w_hh, h_in), b_hh));
-    const size_t fs = sizeof(float);
-    ggml_tensor* i_ = ggml_sigmoid(c0, ggml_view_1d(c0, g, H, 0 * (size_t)H * fs));
-    ggml_tensor* f_ = ggml_sigmoid(c0, ggml_view_1d(c0, g, H, 1 * (size_t)H * fs));
-    ggml_tensor* g_ = ggml_tanh(c0, ggml_view_1d(c0, g, H, 2 * (size_t)H * fs));
-    ggml_tensor* o_ = ggml_sigmoid(c0, ggml_view_1d(c0, g, H, 3 * (size_t)H * fs));
-    ggml_tensor* c_new = ggml_add(c0, ggml_mul(c0, f_, c_in), ggml_mul(c0, i_, g_)); // f·c + i·g
-    ggml_tensor* h_new = ggml_mul(c0, o_, ggml_tanh(c0, c_new));                     // o·tanh(c')
-    *c_out = c_new;
-    return h_new;
-}
-
-// One predictor step on the GPU. Reads/writes the CPU-side LSTM state.
+// §232 — GPU decode (opt-in PARAKEET_GGML_DECODE=1). Thin wrappers over the
+// shared core_rnnt_ggml helpers (predictor LSTM + joint as ggml graphs on
+// ctx->backend). Default stays cblas; perf verdict is P100-only. See
+// core/rnnt_ggml.h + LEARNINGS 29-30.
 static void parakeet_predictor_step_ggml(parakeet_context* ctx, int token_id, parakeet_lstm_state& state,
                                          std::vector<float>& pred_out) {
     const auto& p = ctx->model.predictor;
-    const int H = (int)ctx->model.hparams.pred_hidden;
-
-    const size_t mem = ggml_tensor_overhead() * 64 + ggml_graph_overhead();
-    ggml_init_params ip = {mem, nullptr, true};
-    ggml_context* c0 = ggml_init(ip);
-
-    ggml_tensor* tok = ggml_new_tensor_1d(c0, GGML_TYPE_I32, 1);
-    ggml_set_name(tok, "tok");
-    ggml_set_input(tok);
-    ggml_tensor* h0i = ggml_new_tensor_1d(c0, GGML_TYPE_F32, H);
-    ggml_tensor* c0i = ggml_new_tensor_1d(c0, GGML_TYPE_F32, H);
-    ggml_tensor* h1i = ggml_new_tensor_1d(c0, GGML_TYPE_F32, H);
-    ggml_tensor* c1i = ggml_new_tensor_1d(c0, GGML_TYPE_F32, H);
-    for (ggml_tensor* t : {h0i, c0i, h1i, c1i})
-        ggml_set_input(t);
-
-    ggml_tensor* emb = ggml_get_rows(c0, p.embed_w, tok); // [H,1]
-    emb = ggml_reshape_1d(c0, emb, H);
-    if (emb->type != GGML_TYPE_F32)
-        emb = ggml_cast(c0, emb, GGML_TYPE_F32);
-
-    ggml_tensor *c0o, *c1o;
-    ggml_tensor* h0o =
-        parakeet_lstm_layer_ggml(c0, emb, p.lstm0_w_ih, p.lstm0_b_ih, p.lstm0_w_hh, p.lstm0_b_hh, h0i, c0i, H, &c0o);
-    ggml_tensor* h1o =
-        parakeet_lstm_layer_ggml(c0, h0o, p.lstm1_w_ih, p.lstm1_b_ih, p.lstm1_w_hh, p.lstm1_b_hh, h1i, c1i, H, &c1o);
-
-    for (ggml_tensor* t : {h0o, c0o, h1o, c1o})
-        ggml_set_output(t);
-    ggml_cgraph* gf = ggml_new_graph(c0);
-    for (ggml_tensor* t : {h0o, c0o, h1o, c1o})
-        ggml_build_forward_expand(gf, t);
-
-    ggml_backend_sched_reset(ctx->sched);
-    ggml_backend_sched_alloc_graph(ctx->sched, gf);
-    int32_t tid = token_id;
-    ggml_backend_tensor_set(tok, &tid, 0, sizeof(int32_t));
-    ggml_backend_tensor_set(h0i, state.h0.data(), 0, H * sizeof(float));
-    ggml_backend_tensor_set(c0i, state.c0.data(), 0, H * sizeof(float));
-    ggml_backend_tensor_set(h1i, state.h1.data(), 0, H * sizeof(float));
-    ggml_backend_tensor_set(c1i, state.c1.data(), 0, H * sizeof(float));
-    ggml_backend_sched_graph_compute(ctx->sched, gf);
-
-    state.h0.resize(H);
-    state.c0.resize(H);
-    state.h1.resize(H);
-    state.c1.resize(H);
-    ggml_backend_tensor_get(h0o, state.h0.data(), 0, H * sizeof(float));
-    ggml_backend_tensor_get(c0o, state.c0.data(), 0, H * sizeof(float));
-    ggml_backend_tensor_get(h1o, state.h1.data(), 0, H * sizeof(float));
-    ggml_backend_tensor_get(c1o, state.c1.data(), 0, H * sizeof(float));
-    pred_out = state.h1; // predictor output = top-layer hidden
-    ggml_free(c0);
+    core_rnnt_ggml::predictor_step(ctx->sched, p.embed_w, p.lstm0_w_ih, p.lstm0_b_ih, p.lstm0_w_hh, p.lstm0_b_hh,
+                                   p.lstm1_w_ih, p.lstm1_b_ih, p.lstm1_w_hh, p.lstm1_b_hh, token_id,
+                                   (int)ctx->model.hparams.pred_hidden, state.h0, state.c0, state.h1, state.c1,
+                                   pred_out);
 }
 
-// One joint step on the GPU: logits = out_w·relu(proj_e + pred_w·pred_u + pred_b) + out_b.
 static void parakeet_joint_step_ggml(parakeet_context* ctx, const float* proj_e, const float* pred_u,
                                      std::vector<float>& logits) {
     const auto& j = ctx->model.joint;
-    const int Jh = (int)ctx->model.hparams.joint_hidden;
-    const int H = (int)ctx->model.hparams.pred_hidden;
-    const int Vt = (int)j.out_w->ne[1];
-
-    const size_t mem = ggml_tensor_overhead() * 32 + ggml_graph_overhead();
-    ggml_init_params ip = {mem, nullptr, true};
-    ggml_context* c0 = ggml_init(ip);
-
-    ggml_tensor* pe = ggml_new_tensor_1d(c0, GGML_TYPE_F32, Jh);
-    ggml_set_name(pe, "proj_e");
-    ggml_set_input(pe);
-    ggml_tensor* pu = ggml_new_tensor_1d(c0, GGML_TYPE_F32, H);
-    ggml_set_name(pu, "pred_u");
-    ggml_set_input(pu);
-
-    ggml_tensor* mid = ggml_add(c0, ggml_mul_mat(c0, j.pred_w, pu), j.pred_b); // pred_w·pred_u + pred_b
-    mid = ggml_relu(c0, ggml_add(c0, mid, pe));                                // relu(proj_e + mid)
-    ggml_tensor* lg = ggml_add(c0, ggml_mul_mat(c0, j.out_w, mid), j.out_b);   // out_w·mid + out_b
-    ggml_set_name(lg, "logits");
-    ggml_set_output(lg);
-    ggml_cgraph* gf = ggml_new_graph(c0);
-    ggml_build_forward_expand(gf, lg);
-
-    ggml_backend_sched_reset(ctx->sched);
-    ggml_backend_sched_alloc_graph(ctx->sched, gf);
-    ggml_backend_tensor_set(pe, proj_e, 0, Jh * sizeof(float));
-    ggml_backend_tensor_set(pu, pred_u, 0, H * sizeof(float));
-    ggml_backend_sched_graph_compute(ctx->sched, gf);
-    logits.resize(Vt);
-    ggml_backend_tensor_get(lg, logits.data(), 0, Vt * sizeof(float));
-    ggml_free(c0);
+    core_rnnt_ggml::joint_step(ctx->sched, j.pred_w, j.pred_b, j.out_w, j.out_b, proj_e, pred_u,
+                               (int)ctx->model.hparams.joint_hidden, (int)ctx->model.hparams.pred_hidden, logits);
 }
 
 static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context* ctx, const float* enc, int T_enc,
