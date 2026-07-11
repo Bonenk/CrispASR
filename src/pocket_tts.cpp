@@ -3409,36 +3409,6 @@ float* pocket_tts_synthesize(struct pocket_tts_context* ctx, const char* text, i
         fprintf(stderr, "pocket_tts: decoded %d PCM samples (%.2f s at %u Hz)\n", pcm_samples,
                 (float)pcm_samples / m.mimi_hp.sample_rate, m.mimi_hp.sample_rate);
 
-    // Onset fade-in: the Mimi decoder cold-starts its causal convs from an empty
-    // receptive field, so the first generated frame (also ~1.2× hot vs steady
-    // state) renders as a decaying resonant transient — an audible "gong" ahead
-    // of the speech. ASR roundtrip and peak/RMS gates all miss it (it sits in
-    // the low-energy pre-speech region); only a human listen catches it. A short
-    // raised-cosine fade-in zeroes the transient's loud attack and ramps to unity
-    // well under a syllable, so it is inaudible on the speech onset. Default on;
-    // POCKET_TTS_ONSET_FADE=0 disables (or POCKET_TTS_ONSET_FADE=<ms> to tune).
-    {
-        const char* fenv = getenv("POCKET_TTS_ONSET_FADE");
-        const bool fade_off = fenv && fenv[0] == '0' && fenv[1] == '\0';
-        if (!fade_off && pcm_samples > 0) {
-            const int sr = (int)m.mimi_hp.sample_rate;
-            float fade_ms = 100.0f; // default ~0.1 s
-            if (fenv && !fade_off) {
-                float v = std::atof(fenv);
-                if (v > 0.0f && v <= 1000.0f)
-                    fade_ms = v;
-            }
-            int fade = (int)(fade_ms * 0.001f * sr);
-            fade = std::min(fade, pcm_samples / 4); // never fade more than 1/4 of the clip
-            for (int i = 0; i < fade; i++) {
-                const float g = 0.5f * (1.0f - std::cos((float)M_PI * (float)i / (float)fade));
-                pcm[i] *= g;
-            }
-            if (ctx->verbosity >= 2 && fade > 0)
-                fprintf(stderr, "pocket_tts: onset fade-in %d samples (%.0f ms)\n", fade, 1000.0f * fade / sr);
-        }
-    }
-
     // Dump PCM
     if (pocket_dump_dir && pcm_samples > 0) {
         FILE* f = fopen(dump_path("cpp_pcm.f32").c_str(), "wb");
