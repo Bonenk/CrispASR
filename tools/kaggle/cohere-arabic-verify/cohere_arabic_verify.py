@@ -89,9 +89,12 @@ CLIPS = {"short_4s": CLIPS_DIR / "ar_clean_4s.wav",
 def norm(s): return re.sub(r"\s+", " ", (s or "").strip())
 
 # ───────────────────────── C++ transcription ──────────────────────────────
-def cpp_transcribe(gguf, wav, timeout=1800):
+def cpp_transcribe(gguf, wav, timeout=1800, extra_env=None):
+    env = dict(os.environ)
+    if extra_env:
+        env.update(extra_env)
     r = subprocess.run([str(CLI), "-m", str(gguf), "-f", str(wav), "-l", "ar"],
-                       capture_output=True, text=True, timeout=timeout)
+                       capture_output=True, text=True, timeout=timeout, env=env)
     lines = [l for l in r.stdout.splitlines()
              if l.strip() and not l.lstrip().startswith(("[", "whisper_", "crispasr_", "load", "main:"))]
     return norm(" ".join(lines)), r.returncode
@@ -217,6 +220,28 @@ if PY_OK:
         import traceback; traceback.print_exc()
         results["python_error"] = str(e)[:300]
         jstep("python_fail", err=str(e)[:150])
+
+# ───────────────────────── overhang-masking A/B ───────────────────────────
+# Does CRISPASR_COHERE_MASK_OVERHANG=1 change/improve the transcript? Test on
+# 8s, a boundary-length ~11s single-pass clip (where overhang lands on a
+# subsampling boundary), and 40s (chunked). Keep the feature only if it helps.
+try:
+    import soundfile as sf
+    a40, sr = sf.read(str(CLIPS["long_40s"]))
+    clip11 = TMP / "ar_11s.wav"
+    sf.write(str(clip11), a40[5 * sr:16 * sr], sr)
+    g = GGUF.get("q4_k") or next(iter(GGUF.values()))
+    mask_ab = {}
+    for nm, wav in [("8s", CLIPS["med_8s"]), ("11s", clip11), ("40s", CLIPS["long_40s"])]:
+        off, _ = cpp_transcribe(g, wav)
+        on, _ = cpp_transcribe(g, wav, extra_env={"CRISPASR_COHERE_MASK_OVERHANG": "1"})
+        mask_ab[nm] = {"off": off, "on": on, "identical": norm(off) == norm(on)}
+        jstep(f"mask_ab_{nm}", identical=mask_ab[nm]["identical"])
+    results["mask_ab"] = mask_ab
+    results["mask_changes_anything"] = any(not v["identical"] for v in mask_ab.values())
+except Exception as e:
+    results["mask_ab_error"] = str(e)[:200]
+    jstep("mask_ab_fail", err=str(e)[:120])
 
 # ───────────────────────── verdict ────────────────────────────────────────
 verdict = {}
