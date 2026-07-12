@@ -108,8 +108,11 @@ def dump(
 
     from transformers import AutoModel, AutoProcessor
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.bfloat16 if device == "cuda" else torch.float32
+    # The 8B bf16 (~16 GB) doesn't fit a 16 GB GPU (Kaggle P100/T4) — force CPU
+    # there via MOSS_TTS_REF_DEVICE=cpu (fits ~29 GB host RAM in bf16).
+    dev_env = os.environ.get("MOSS_TTS_REF_DEVICE", "auto")
+    device = ("cuda" if torch.cuda.is_available() else "cpu") if dev_env == "auto" else dev_env
+    dtype = torch.bfloat16  # keep both greedy sides comparable; bf16 fits CPU RAM
     print(f"[moss_tts_ref] loading {model_id} on {device} ({dtype})", flush=True)
     model = AutoModel.from_pretrained(model_id, trust_remote_code=True, torch_dtype=dtype).to(device).eval()
     processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
