@@ -67,17 +67,23 @@ static inline bool fc_attn_cont() {
 // mask->ne[2] != 1), so every flash node falls back to CPU — 24 GPU↔CPU
 // bounces per encoder pass. The manual QK^T + soft_max_ext + V path runs
 // fully on-device there. Metal handles the per-head mask and measured
-// FASTER with flash (PERFORMANCE.md 2026-05-09), so this only ever applies
-// to non-CPU backends. CRISPASR_FC_GPU_MANUAL_ATTN: "1" = manual attention
-// on the GPU backend; unset/"0" = flash (current default until the Kaggle
-// CUDA A/B lands — flip to CUDA-auto once verified, per the A/B rule).
+// FASTER with flash (PERFORMANCE.md 2026-05-09), so auto never fires there.
+// Kaggle P100 A/B (2026-07-12, parakeet-ctc q8_0, transcripts identical):
+// jfk 11 s 0.180→0.095 s, jfk 55 s 1.140→0.360 s (3.2x) → default ON for
+// CUDA. CRISPASR_FC_GPU_MANUAL_ATTN: "0" never, "1" any non-CPU backend,
+// unset = auto (CUDA only).
 static inline bool fc_gpu_manual_attn(ggml_backend_t backend) {
     static int v = -2;
     if (v == -2) {
         const char* e = std::getenv("CRISPASR_FC_GPU_MANUAL_ATTN");
-        v = (e && *e && *e != '0') ? 1 : 0;
+        v = (!e || !*e) ? -1 : (*e != '0' ? 1 : 0);
     }
-    return v == 1 && backend && !ggml_backend_is_cpu(backend);
+    if (v == 0 || !backend || ggml_backend_is_cpu(backend))
+        return false;
+    if (v == 1)
+        return true;
+    const char* name = ggml_backend_name(backend);
+    return name && (name[0] == 'C' || name[0] == 'c') && (name[1] == 'U' || name[1] == 'u');
 }
 
 // ---------------------------------------------------------------------------

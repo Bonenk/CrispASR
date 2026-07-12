@@ -3506,3 +3506,35 @@ VPS/OpenBLAS note: the ggml-blas backend was never in these backends'
 sched — `GGML_BLAS=ON` has no effect on the FastConformer path; the same
 F16-pw pathology is expected to dominate the VPS numbers too (re-bench
 there before closing #81).
+
+### FastConformer CUDA: manual attention beats the flash CPU-fallback 3.2× — issue #81 (2026-07-12)
+
+CUDA's `flash_attn_ext` rejects the FastConformer per-head rel-pos mask
+(`fattn.cu` guard on `mask->ne[2] != 1`), so all 24 attention nodes fell
+back to CPU with GPU↔CPU bounces every layer. `CRISPASR_FC_GPU_MANUAL_ATTN`
+switches those backends to the manual QK^T + `soft_max_ext` + V path
+(all-GPU). Kaggle P100 A/B (`tools/kaggle/fc-unified-graph-ab`, branch
+build, parakeet-ctc-0.6b q8_0 requantized, in-process warm medians,
+transcripts identical everywhere):
+
+| config | JFK 11 s | JFK×5 55 s |
+|---|---|---|
+| flash (CPU-fallback) | 0.180 s (61×) | 1.140 s (48×) |
+| **manual attention** | **0.095 s (116×)** | **0.360 s (153×)** |
+| manual + bucket 500 | 0.110 s | 0.389 s |
+| bucket 500 alone | 0.209 s | 1.144 s |
+
+**Defaults**: manual-attn auto-ON for CUDA (env "0" restores flash);
+Metal keeps flash (per-head mask supported there and measured faster).
+**`CRISPASR_FC_BUCKET` stays opt-in (inverse-default)**: the starling-style
+bucketed persistent graph is output-equivalent (transcripts identical;
+valid columns equal the unpadded graph up to GEMM micro-kernel ULP
+reassociation) but the pad compute overhead ≈ its graph-reuse savings on
+P100 at these sizes. The masking machinery (attention -inf pad keys +
+dw-conv/pre-encode stage zeroing) is the reusable piece for future
+CUDA-graph capture / batching work.
+
+Warm-vs-warm on the 55 s clip this puts CrispASR parakeet-ctc CUDA at
+~153× RT vs onnx-asr CUDA fp32 ~220× — the remaining gap is ~1.4×
+(was ~11× against the CLI-measured numbers; those included per-call
+model load).
