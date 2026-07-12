@@ -6045,6 +6045,9 @@ items, kept verbatim:
 #### §176c Migrate host-side KV to device-resident 4D tensors
 
 **Status:** OPEN — 3 backends (re-verified 2026-07-12; VoxCPM2 dropped, now done).
+**⏳ IN PROGRESS 2026-07-12:** taking on **Dia** first (model `dia-1.6b-q4_k.gguf`
+is local, so TTS→ASR roundtrip validation is possible here) — branch
+`feat/dia-device-kv-176c`. SpeechT5 + Pocket-TTS remain queued.
 **Effort:** Medium per backend
 **Backends (verified 2026-07-12 by code read — genuinely still host-side):**
 - **SpeechT5** self-attn KV: OPEN. `decoder_kv_cache` is host `std::vector<float>`
