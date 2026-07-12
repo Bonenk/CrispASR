@@ -653,7 +653,11 @@ decoded by a **1.6B pure-transformer codec** to 24 kHz mono.
 - Two GGUFs: quantizable backbone (`moss-tts`) + F16 codec (`moss-tts-codec`).
   `--backend moss-tts -m <backbone> --codec-model <codec> --tts "..."`.
 - Runtime clones CrispASR's in-house Qwen3 (`moss_audio.cpp`) — no libllama.
-  Voice cloning (codec encoder) and the 4B `MossTTSLocal` variant are follow-ups.
+  Voice cloning is supported via `--voice ref.wav` — the codec **encoder** (mirror
+  of the decoder: patch_downsample → 4 enc stages → quantizer iproj → 32-step
+  residual LFQ with cosine-sim argmax) encodes the reference to codes, which are
+  delay-pattern-spliced into the prompt's reference block. The 4B `MossTTSLocal`
+  variant (48 kHz stereo, depth-transformer) is a follow-up.
 
 ### omnivoice
 
