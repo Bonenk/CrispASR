@@ -61,6 +61,34 @@ bottleneck; profiling showed the KV was already cached and the decode was
 dispatch-bound. **Re-profile per-node before trusting a handover's bottleneck
 theory** — cf. the #81 case. The fix that shipped was the opposite of the one the
 plan named.
+## Porting a libllama-hosted reference onto our in-house Qwen3 was clean on first contact; and Kaggle `kernels_logs()` is the escape hatch when the output is page-capped (MOSS-TTS #249, 2026-07-12)
+
+Three things from the MOSS-TTS-v1.5 port (`OpenMOSS-Team/MOSS-TTS-v1.5`, an 8B
+Qwen3 + 32-codebook delay + 1.6B transformer codec):
+
+- **The seam to graft a libllama-hosted reference onto CrispASR is `inputs_embeds`
+  + a `hidden_last` output.** `pwilkin/openmoss` hosts the Qwen3 backbone with
+  libllama and reads back per-token hidden states; we forbid libllama. The in-house
+  Qwen3 (`moss_audio.cpp`/`qwen3_asr.cpp`) already takes `inputs_embeds` first-class,
+  and `qwen3_tts.cpp` already marks the pre-lm-head hidden as an output — so the port
+  is: clone the KV graph, add `ggml_set_output` on the post-final-norm `cur` named
+  `hidden_last`, and run the aux graphs (summed embed, 32 heads) + codec + delay
+  verbatim from the reference. **The ~2,500 lines of hand-ported codec/delay graph
+  math were CORRECT on first contact with the real 8B weights** (Q4_K decoded
+  round-trip intelligible). Cloning a *validated* reference verbatim beats building
+  from the paper — the earlier a port's graph matches a known-good one, the fewer the
+  first-contact bugs.
+
+- **An F16 8B backbone (~17 GB) does not fit a 16 GB Kaggle P100/T4** — `cudaMalloc
+  out of memory` at load. Validate the HARD-RULE-#3 acceptance test on **Q4_K** on
+  Kaggle (fits in ~7 GB), not F16; F16 needs a >20 GB GPU (L4/A100) or CPU. Don't
+  read an F16 load-OOM as a port failure.
+
+- **`KaggleApi().kernels_logs(slug)` returns the full stdout log as a string** — the
+  reliable way to read a kernel's traceback/results when `kernels_output` is blocked
+  by the 500-file page cap (kaggle_usage #22; e.g. `CCACHE_DIR` under
+  `/kaggle/working` buries `progress.txt` behind thousands of ccache files). Keep
+  `/kaggle/working` tiny AND remember the logs API bypasses the file cap entirely.
 
 ## A Metal masked-attention-padding penalty does NOT transfer to CUDA, and a bucket-width change is byte-identical on Metal/CPU but not on CUDA (tada §215b bucket floor, 2026-07-12)
 
