@@ -2992,8 +2992,11 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.flash_attn = g_open_flash_attn_tls;
         // CV3 greedy decode (temperature 0) falls into a documented
         // silent_tokens loop within ~5 AR steps and emits silence; the RAS
-        // sampler needs temperature > 0. Mirror the CLI's 0->0.8 default.
-        p.temperature = 0.8f;
+        // sampler needs temperature > 0. Honour the session temperature when
+        // set, else fall back to 0.8 (mirrors the CLI's 0->0.8 default). The
+        // library default stays 0.0 (greedy) for diff-harness byte-parity;
+        // hardcoding 0.8 here silently ignored crispasr_session_set_temperature.
+        p.temperature = (g_open_temperature_tls > 0.0f) ? g_open_temperature_tls : 0.8f;
         s->cosyvoice3_ctx = cosyvoice3_tts_init_from_file(model_path, p);
         if (!s->cosyvoice3_ctx) {
             delete s;
@@ -3074,7 +3077,10 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.n_threads = s->n_threads;
         p.verbosity = g_open_verbosity_tls;
         p.use_gpu = g_open_use_gpu_tls;
-        p.seed = 42;
+        // Honour the session seed when set; else keep f5's deterministic
+        // default of 42 (0 = non-deterministic in f5_tts). Hardcoding 42
+        // silently ignored crispasr_session's seed for f5-tts only.
+        p.seed = (g_open_seed_tls != 0) ? (int)g_open_seed_tls : 42;
         s->f5tts_ctx = f5_tts_init_from_file(model_path, p);
         if (!s->f5tts_ctx) {
             delete s;
