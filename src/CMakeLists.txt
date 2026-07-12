@@ -1336,6 +1336,27 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# moss_tts — OpenMOSS-Team/MOSS-TTS-v1.5 (MossTTSDelay: Qwen3-8B backbone + 32
+#            RVQ audio codebooks under a delay pattern + transformer codec)
+# ---------------------------------------------------------------------------
+add_library(moss_tts STATIC moss_tts.h moss_tts.cpp)
+set_target_properties(moss_tts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(moss_tts PUBLIC .)
+target_compile_features   (moss_tts PUBLIC cxx_std_17)
+target_link_libraries     (moss_tts PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(moss_tts PRIVATE -O3)
+endif()
+if(GGML_METAL)
+    target_compile_definitions(moss_tts PRIVATE GGML_USE_METAL)
+    target_link_libraries(moss_tts PUBLIC ggml-metal)
+endif()
+if(GGML_CUDA)
+    target_compile_definitions(moss_tts PRIVATE GGML_USE_CUDA)
+    target_link_libraries(moss_tts PUBLIC ggml-cuda)
+endif()
+
+# ---------------------------------------------------------------------------
 # moss_transcribe — OpenMOSS-Team/MOSS-Transcribe-preview-2B (Qwen3-Omni audio encoder + Qwen3-1.7B LLM)
 # ---------------------------------------------------------------------------
 add_library(moss_transcribe STATIC moss_transcribe.h moss_transcribe.cpp)
