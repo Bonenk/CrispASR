@@ -10,6 +10,22 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Metal-validated GPU TTS graph paths DID transfer cleanly to CUDA — the stricter-CUDA risk is real but not universal (§176n/§245, 2026-07-12)
+
+LEARNING 35 warns that CUDA has stricter per-op contiguity asserts than Metal, so
+a Metal-clean GPU default can still crash/mis-decode on CUDA (the dia `get_rows`
+non-contig case). Counterweight datum: both GPU TTS paths validated on M1 Metal
+this session — VoxCPM2's `VOXCPM2_USE_GRAPH` (discrete-GPU *mirror* path, device-
+local VRAM) and qwen3-tts CP_DIRECT (sched-free persistent gallocr graphs) —
+**passed the Kaggle P100/T4 TTS→ASR round-trip on the first run**, no contiguity
+abort. So the rule is not "Metal→CUDA always diverges" but "Metal→CUDA is not a
+proof": paths built on the disciplined ggml patterns (contig before `get_rows`,
+gallocr not sched-reuse, explicit mirror weights) tend to transfer, while the
+failure mode is specific ops with hand-strided views. Still run the CUDA
+round-trip before flipping a GPU default there — but budget it as a confirmation,
+not an expected-crash hunt. The confirmation is cheap: a `SystemExit`-on-fail
+Kaggle kernel makes `COMPLETE` == PASS, so the run status alone is the verdict.
+
 ## Audit a whole roadmap CLUSTER in one measure-first pass before implementing any of it (§176/§245, 2026-07-12)
 
 When several sibling PLAN items share a theme ("runtime optimization pass",
