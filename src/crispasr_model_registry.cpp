@@ -556,6 +556,17 @@ constexpr Entry k_registry[] = {
      "qwen3-tts-tokenizer-12hz.gguf",
      "https://huggingface.co/cstr/qwen3-tts-tokenizer-12hz-GGUF/resolve/main/qwen3-tts-tokenizer-12hz.gguf",
      "~60 MB"},
+    // MOSS-TTS-v1.5 (MossTTSDelay): Qwen3-8B backbone + 32 RVQ audio codebooks
+    // + a 1.6B transformer codec companion (kept F16 — quantising the codec
+    // degrades audio earlier than the backbone). Default download is the Q4_K
+    // backbone (~5 GB) paired with the F16 codec. (URLs populated at ship after
+    // the GGUF upload — see Phase 6.)
+    {"moss-tts", "moss-tts-v1.5-q4_k.gguf",
+     "https://huggingface.co/cstr/moss-tts-v1.5-GGUF/resolve/main/moss-tts-v1.5-q4_k.gguf",
+     "~5 GB",
+     "moss-tts-v1.5-codec.gguf",
+     "https://huggingface.co/cstr/moss-tts-v1.5-GGUF/resolve/main/moss-tts-v1.5-codec.gguf",
+     "~3.4 GB"},
     // gwen-tts-0.6B: Vietnamese-optimized Qwen3-TTS-0.6B-Base finetune
     // (MIT, g-group-ai-lab). Same architecture as qwen3-tts-0.6B-Base,
     // trained on ~1000h Vietnamese TikTok audio. Supports all 10 Qwen3-TTS

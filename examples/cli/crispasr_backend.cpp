@@ -46,6 +46,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_omniasr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_mimo_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_ark_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_audio_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_moss_tts_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_transcribe_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_transcribe_diarize_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_funasr_backend();
@@ -141,6 +142,9 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         name == "qwen3-tts-1.7b-customvoice" || name == "qwen3-tts-1.7b-cv" || name == "qwen3-tts-1.7b-voicedesign" ||
         name == "qwen3-tts-voicedesign" || name == "qwen3-tts-vd")
         return crispasr_make_qwen3_tts_backend();
+    if (name == "moss-tts" || name == "moss_tts" || name == "mosstts" || name == "moss-tts-v1.5" ||
+        name == "moss-tts-delay")
+        return crispasr_make_moss_tts_backend();
     if (name == "orpheus" || name == "orpheus-tts" || name == "orpheus3b" || name == "kartoffel-orpheus" ||
         name == "kartoffel_orpheus" || name == "kartoffel-orpheus-de-natural" ||
         name == "kartoffel-orpheus-de-synthetic" || name == "kartoffel-orpheus-natural" ||
@@ -650,6 +654,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "moss-diarize";
     if (contains_ci("moss") && contains_ci("transcribe"))
         return "moss-transcribe";
+    if (contains_ci("moss") && contains_ci("tts"))
+        return "moss-tts";
     if (contains_ci("moss") && contains_ci("audio"))
         return "moss-audio";
     if (contains_ci("ggml-") && contains_ci(".bin"))
@@ -703,6 +709,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "qwen3";
             else if (a == "qwen3-tts" || a == "qwen3_tts" || a == "qwen3tts")
                 result = "qwen3-tts";
+            else if (a == "moss-tts" || a == "moss_tts" || a == "moss-tts-delay")
+                result = "moss-tts";
             else if (a == "orpheus")
                 result = "orpheus";
             else if (a == "kokoro" || a == "styletts2" || a == "styletts2-ljspeech")
