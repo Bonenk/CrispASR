@@ -336,6 +336,15 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
     // code_pred.blk.*) are safe to quantize.
     const bool is_qwen3_tts = (arch.find("qwen3tts") != std::string::npos);
 
+    // MOSS-TTS-v1.5 (arch "moss-tts"): quantize the Qwen3-8B backbone bulk
+    // (llm.blk.*.attn_*, llm.blk.*.ffn_*) but keep the precision-sensitive
+    // lookups/heads at F16 — the token embedding (llm.embed), the text lm_head
+    // (llm.lm_head), and the 32 audio embedding tables + 32 audio LM heads
+    // (moss.audio_embed.*, moss.audio_head.*) that map codebook indices to/from
+    // hidden space and drive per-codebook sampling. (The transformer codec ships
+    // as a separate F16 GGUF and is never quantized here.)
+    const bool is_moss_tts = (arch.find("moss-tts") != std::string::npos || arch.find("moss_tts") != std::string::npos);
+
     // OmniVoice: Qwen3 backbone + audio_embeddings + audio_heads.
     // Keep audio_embd (8200×1024) and audio_output (8200×1024) at original
     // precision — they map codebook indices to/from hidden space, and
@@ -672,6 +681,8 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                                sname.find("code_pred.output") == 0 || sname.find("code_pred.small_to_mtp") == 0 ||
                                sname.find("talker.token_embd") == 0 || sname.find("talker.text_proj") == 0 ||
                                sname.find("talker.codec_bridge") == 0)) &&
+            !(is_moss_tts && (sname.find("llm.embed") == 0 || sname.find("llm.lm_head") == 0 ||
+                              sname.find("moss.audio_embed") == 0 || sname.find("moss.audio_head") == 0)) &&
             !(is_parler && sname.find("dac.") == 0) &&
             !(is_dia && (sname.find("embedding") != std::string::npos || sname.find("audio_encoder") == 0)) &&
             // VibeVoice: keep the trajectory/control stack — diffusion head
