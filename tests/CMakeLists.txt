@@ -1912,6 +1912,22 @@ catch_discover_tests(test-ngram-loop-fix
     PROPERTIES LABELS "unit;ngram-loop"
 )
 
+# ─── test-uroman — Catch2 unit tests for core/uroman.h romanization.
+# Validates Arabic + Cyrillic romanization for CTC forced alignment (#252).
+add_executable(test-uroman
+    test-uroman.cpp
+)
+target_include_directories(test-uroman PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-uroman PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-uroman
+    TEST_SPEC "[uroman]"
+    PROPERTIES LABELS "unit;uroman"
+)
+
 # ─── test-generation-health — Catch2 unit tests for the generation-health
 # regression gate (core/generation_health.h). Objective quality checks on
 # ASR/TTS output: not-empty, duration plausibility, n-gram loop, truncation.
