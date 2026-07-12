@@ -15,6 +15,37 @@ integration in `crispasr_aligner.cpp`. 8 unit tests. Env gate:
 `CRISPASR_ALIGN_NO_ROMANIZE=1` disables. Reporter verified the romanized path
 lands within ~138 ms median on Arabic word onsets.
 
+## 2026-07-12 — §176k FireRed decoder: profiling debunked the handover, shipped a matvec graph cache
+
+**The handover was wrong.** PLAN §176k claimed the FireRed decoder "grows
+`std::vector<float>` per beam per layer and does O(T²) scalar attention — add a 4D
+KV cache + flash_attn, highest-impact optimization remaining." Per-node profiling
+(`FIRERED_BENCH`, jfk on the firered-asr2-aed Q4_K) showed otherwise: (1) the
+self-attn KV is **already cached** (`beam.sa_k/sa_v` append only the current
+token's K/V); (2) per-step time is **flat vs history length** → the decode is
+**dispatch-bound**, not attention-bound. The real cost is ~90+ tiny matvecs/step
+(8 projections × 16 layers), each doing a full `ggml_init` + graph build +
+`sched_reset` + `sched_alloc_graph` + `ggml_free` (~45 ms/step baseline).
+
+**Fix (shipped, env-gated `CRISPASR_FIRERED_MATVEC_CACHE`, default ON):** a
+persistent per-`(weight, M)` matvec graph cache (`ggml_matmat_cached`) — the
+no_alloc graph is built once and gallocr-allocated once, then each call is just
+`tensor_set → ggml_backend_graph_compute` (sched-free on `backend_cpu`, native
+Q4_K SIMD) `→ tensor_get`. The gallocr aliasing gotcha is handled (the single
+input is re-set every call). Covers greedy (M=1) and beam (M=n_active∈{1..3}).
+
+**Verification.** Bit-identical: jfk + multispeaker transcripts byte-for-byte
+match across default / `=1` / `=0` (md5 equal). Pure Pareto — the cached path is a
+strict subset of the per-call path's work, so it is never slower. A/B on the
+dispatch-only timer (min-of-N, contention-robust): quiet box (load ~3.7) OFF
+~0.188 vs ON ~0.178 ms/call (~5%); loaded box (load 20–50) min OFF 1.15 vs min ON
+0.71 ms/call (~1.6×). The win **grows with load** because the removed ops
+(malloc/sched) are exactly what contention penalizes — the clean-box ~5% is the
+trustworthy headline; the 1.6× is a load artifact. Old sched path kept behind
+`=0` for A/B + bisection. Residual OPEN (LOW): the growing-`std::vector` self-attn
+KV + scalar scoring could matter on very long single-pass decodes — measure first.
+See LEARNINGS + PLAN §176k.
+
 ## 2026-07-12 — tada bucket floor (backend-conditional), irodori persistent DiT graph, parakeet-CTC reroute
 
 **§215b tada talker — batched-CFG (B=2) is a MEASURED NON-GOAL.** Instrumented the
