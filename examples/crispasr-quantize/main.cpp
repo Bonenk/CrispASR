@@ -807,6 +807,14 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             ncols % ggml_blck_size(GGML_TYPE_Q8_0) == 0) {
             target_types[i] = GGML_TYPE_Q8_0;
         }
+        // Idempotency for already-fixed GGUFs: their conv pw is 2D Q8_0, so
+        // pw_conv3d no longer matches and a sub-8-bit re-run would silently
+        // down-quantize the floor above to a k-quant. Keep Q8_0.
+        if (!pw_conv3d && ggml_n_dims(t) == 2 && t->type == GGML_TYPE_Q8_0 && should_quantize &&
+            ggml_is_quantized(target_types[i]) && target_types[i] != GGML_TYPE_Q8_0 &&
+            (ends_with("conv.pw1.weight") || ends_with("conv.pw2.weight"))) {
+            target_types[i] = GGML_TYPE_Q8_0;
+        }
 
         // User per-tensor override (--tensor-type <regex>=<type>). First match
         // wins; overrides the arch guards above. A quant override on a <2-D or
