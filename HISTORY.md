@@ -11603,3 +11603,46 @@ every DiT block and modulates the duration predictor via dual AdaRN-Zero.
 Independent text/speaker/caption CFG in the Euler ODE sampler. Diff harness:
 F16 cos=1.000000 (text_state + v_pred_step0); Q4_K cos=0.996491 (526 MB from
 1.2 GB F16). Wired via `--instruct` flag and `CRISPASR_IRODORI_CAPTION` env var.
+
+## 2026-07-11/12 — issue #81 FastConformer perf: CPU root cause, HF fleet requant, CUDA manual-attn (M1 session)
+
+Per-node profiling (new `CRISPASR_FC_PROFILE=1`, sched eval callback)
+overturned the handover's "intermediate materialization" theory: **35% of
+CPU encoder time was two F16 matmuls per block** — conv.pw1/pw2 are stored
+as 3D conv tensors, so crispasr-quantize's 2D-only rule skipped them in
+every quantized FastConformer GGUF ever shipped, landing them on ggml's
+~6×-slower CPU F16 mul_mat path.
+
+Shipped (env-gated per convention, `core_conformer` shared):
+- `repack_conv_pw_q8` load-time F16→Q8_0 repack (`CRISPASR_FC_PW_Q8`,
+  auto-on for quantized models) — wired into parakeet, canary, canary_ctc,
+  canary_qwen, lfm2_audio, nemotron.
+- `fuse_qkv` load-time Wq/Wk/Wv concat → one matmul + view-split
+  (`CRISPASR_FC_FUSED_QKV`, bit-identical, default on).
+- Strided flash-attn inputs (dropped 3 conts/block; `CRISPASR_FC_ATTN_CONT=1`
+  restores). Bit-identical on the full CTC logit grid.
+- Quantizer: 3D conv-pw carve-out (quantized as 2D view), Q8_0 floor for
+  sub-8-bit targets, idempotency rule for already-fixed files.
+- **HF fleet requant** via Kaggle kernel `tools/kaggle/fc-pw-requant`
+  (5 iterations): all 42 FastConformer-family repos — **80 quantized GGUFs
+  re-uploaded** (non-pw tensors byte-identical; transcripts exactly equal
+  to old-file+runtime-repack), 6 never affected, 0 missing. Two old TDT
+  q4_k files needed `--tensor-type` pins (old rules kept the transducer
+  head at F16). Kernel hardening: daemon-thread timeouts around HF I/O
+  after `upload_file` stranded post-commit (CLOSE_WAIT) on Kaggle too.
+- **CUDA**: flash_attn_ext's per-head-mask guard silently bounced all 24
+  attention layers to CPU. Manual QK^T+soft_max attention (all-GPU) now
+  default on CUDA (`CRISPASR_FC_GPU_MANUAL_ATTN`) after P100 A/B.
+- `CRISPASR_FC_BUCKET` bucketed persistent encoder graph (starling-style,
+  -inf pad masks, output-equivalent) — opt-in, inverse-default on P100.
+
+Numbers (details in PERFORMANCE.md §"issue #81 CURRENT metrics"): M1 CPU
+parakeet-ctc q8 9.7×→**18.4×** RT (re-quantized GGUF), tdt q4_k 5.8×→10.7×;
+M1 Metal ctc 9.9×→16.2×; P100 CUDA ctc 48×→**153×** warm (gap to onnx-CUDA
+now ~1.4×). Unit tests 819→824 green throughout. Follow-ups: PLAN §246
+(close the CUDA gap) + §247 (roll techniques to other runtimes); VPS
+re-bench pending (handover synced to VPS handover-prompts/).
+
+Process notes: all handover docs untracked from git (they live in
+gitignored handover-prompts/, rsync'd Mac↔VPS); PERFORMANCE.md
+consolidated to current-metrics-only (-1117 lines).
