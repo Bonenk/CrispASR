@@ -650,40 +650,6 @@ static struct ggml_cgraph* cohere_build_graph_encoder(struct cohere_context* ctx
 
     const int T = H3;
 
-    // ── NeMo masked subsampling ────────────────────────────────────────────
-    // The conv frontend emits T frames from the center-padded mel, but only
-    // valid_enc = calc_length(valid_mel) are real; the trailing frame(s) are
-    // conv-padding overhang. Left unmasked, the invalid frame(s) pollute every
-    // frame through self-attention and the depthwise conv, and the decoder's
-    // cross-attention, producing an EOS-less repetition loop on long audio
-    // (short clips tolerate it, which is why they transcribe). valid_mel =
-    // T_mel-1 because center_pad appends exactly one padding mel frame. Matches
-    // transcribe.cpp's apply_valid_mask / attn_pad_mask. Masks are filled by the
-    // host (enc_frame_mask: 1 valid / 0 padded; enc_attn_mask: 0 valid / -inf padded).
-    auto nemo_calc_len = [](int L) {
-        for (int i = 0; i < 3; i++)
-            L = (L - 1) / 2 + 1; // add_pad = 2*pad-kernel = -1 → floor((L-1)/2)+1
-        return L;
-    };
-    const int valid_enc = std::min(T, std::max(1, nemo_calc_len(std::max(0, T_mel))));
-    // Overhang masking is OFF by default (env-gated). Its original rationale
-    // (long-audio 🎵/repetition loops) turned out to be a corrupt-weights
-    // artifact, not conv-padding overhang — correct weights transcribe long
-    // audio cleanly with no masking. Enable with CRISPASR_COHERE_MASK_OVERHANG=1
-    // to A/B whether trimming the trailing overhang frame(s) improves anything.
-    static const bool mask_overhang_enabled = (std::getenv("CRISPASR_COHERE_MASK_OVERHANG") != nullptr);
-    const bool need_mask = (valid_enc < T) && mask_overhang_enabled;
-    struct ggml_tensor* enc_attn_mask = nullptr;  // [T,1]  added to attention scores
-    struct ggml_tensor* enc_frame_mask = nullptr; // [1,T]  multiplied into features
-    if (need_mask) {
-        enc_attn_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, T, 1);
-        ggml_set_name(enc_attn_mask, "enc_attn_mask");
-        ggml_set_input(enc_attn_mask);
-        enc_frame_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, 1, T);
-        ggml_set_name(enc_frame_mask, "enc_frame_mask");
-        ggml_set_input(enc_frame_mask);
-    }
-
     // Positional encodings sinusoidal: [d, 2*T-1]
     struct ggml_tensor* pos_enc = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, d, 2 * T - 1);
     ggml_set_name(pos_enc, "pos_enc");
@@ -691,13 +657,6 @@ static struct ggml_cgraph* cohere_build_graph_encoder(struct cohere_context* ctx
 
     for (int il = 0; il < hp.enc_n_layers; il++) {
         const auto& layer = model.enc_layers[il];
-        // Re-zero the padded (overhang) frames at every layer. Masking them only
-        // as attention KEYS (weight→0 via -inf) is NOT enough: their VALUE can
-        // overflow to NaN in F16 (observed on Metal), and 0*NaN = NaN then
-        // contaminates every valid query. Keeping the frame zeroed bounds its V
-        // (LayerNorm(0) = bias, finite).
-        if (enc_frame_mask)
-            cur = ggml_mul(ctx0, cur, enc_frame_mask);
         struct ggml_tensor* inpL = cur;
 
         // FF1
@@ -739,8 +698,6 @@ static struct ggml_cgraph* cohere_build_graph_encoder(struct cohere_context* ctx
 
         struct ggml_tensor* scores = ggml_add_inplace(ctx0, AC, BD);
         scores = ggml_scale_inplace(ctx0, scores, 1.0f / sqrtf((float)head_dim));
-        if (enc_attn_mask) // exclude padded (overhang) keys from every query's softmax
-            scores = ggml_add(ctx0, scores, enc_attn_mask);
         scores = ggml_soft_max_inplace(ctx0, scores);
 
         struct ggml_tensor* V_reshaped = ggml_reshape_3d(ctx0, V, head_dim, n_heads, T);
@@ -766,11 +723,6 @@ static struct ggml_cgraph* cohere_build_graph_encoder(struct cohere_context* ctx
 
         struct ggml_tensor* cnv_gate = ggml_view_2d(ctx0, cnv, d, T, cnv->nb[1], d * sizeof(float));
         cnv = ggml_mul(ctx0, ggml_view_2d(ctx0, cnv, d, T, cnv->nb[1], 0), ggml_sigmoid(ctx0, cnv_gate));
-
-        // Zero padded (overhang) frames before the depthwise conv so their junk
-        // can't spread into valid frames through the kernel-9 time mixing.
-        if (enc_frame_mask)
-            cnv = ggml_mul(ctx0, cnv, enc_frame_mask);
 
         // Depthwise conv via ggml_conv_2d_dw_direct (no im2col intermediate buffer).
         // Kernel needs F32 [k, 1, 1, d] layout; input needs contiguous [T, 1, d, 1] (WHCN).
@@ -839,12 +791,6 @@ static struct ggml_cgraph* cohere_build_graph_encoder(struct cohere_context* ctx
     ggml_set_output(enc_final_dbg);
     ggml_build_forward_expand(gf, enc_final_dbg);
 
-    // Drop the padded (overhang) frames so enc_out + cross-KV — and therefore
-    // the decoder's cross-attention — only ever see valid encoder positions.
-    if (need_mask)
-        cur = ggml_cont(ctx0, ggml_view_2d(ctx0, cur, d, valid_enc, cur->nb[1], 0));
-    const int T_out = need_mask ? valid_enc : T; // encoder length after overhang removal
-
     // Encoder-decoder projection
     cur = ggml_add(ctx0, ggml_mul_mat(ctx0, model.enc_proj_w, cur), model.enc_proj_b);
     ggml_set_name(cur, "enc_out");
@@ -856,13 +802,13 @@ static struct ggml_cgraph* cohere_build_graph_encoder(struct cohere_context* ctx
         struct ggml_tensor* ck = ggml_add(ctx0, ggml_mul_mat(ctx0, layer.cross_k_w, cur), layer.cross_k_b);
         struct ggml_tensor* cv = ggml_add(ctx0, ggml_mul_mat(ctx0, layer.cross_v_w, cur), layer.cross_v_b);
 
-        // CK: [d, T_out] -> [hd, H, T_out] -> [hd, T_out, H]
+        // CK: [d, T] -> [hd, H, T] -> [hd, T, H]
         struct ggml_tensor* ck_ready = ggml_cont(
-            ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, ck, hp.dec_head_dim, hp.dec_n_heads, T_out), 0, 2, 1, 3));
+            ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, ck, hp.dec_head_dim, hp.dec_n_heads, T), 0, 2, 1, 3));
 
-        // CV: [d, T_out] -> [hd, H, T_out] -> [hd, T_out, H] (matches CK layout for ggml_flash_attn_ext)
+        // CV: [d, T] -> [hd, H, T] -> [hd, T, H] (matches CK layout for ggml_flash_attn_ext)
         struct ggml_tensor* cv_ready = ggml_cont(
-            ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, cv, hp.dec_head_dim, hp.dec_n_heads, T_out), 0, 2, 1, 3));
+            ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, cv, hp.dec_head_dim, hp.dec_n_heads, T), 0, 2, 1, 3));
 
         char ck_name[32], cv_name[32];
         snprintf(ck_name, sizeof(ck_name), "ck_%d", il);
@@ -2413,31 +2359,6 @@ struct cohere_result* cohere_transcribe_ex(struct cohere_context* ctx, const flo
                 return nullptr;
             }
             ggml_backend_tensor_set(pos_enc_t, pos_enc_c.data(), 0, pos_enc_c.size() * sizeof(float));
-
-            // NeMo masked subsampling: valid_enc = calc_length(valid_mel), where
-            // valid_mel = T_mel_c-1 (center_pad appends one padding mel frame).
-            // Mask the trailing overhang frames out of attention + the conv.
-            {
-                auto calc = [](int L) {
-                    for (int i = 0; i < 3; i++)
-                        L = (L - 1) / 2 + 1;
-                    return L;
-                };
-                const int valid_enc_c = std::min(H3c, std::max(1, calc(std::max(0, T_mel_c))));
-                struct ggml_tensor* eam = ggml_graph_get_tensor(gf_enc, "enc_attn_mask");
-                struct ggml_tensor* efm = ggml_graph_get_tensor(gf_enc, "enc_frame_mask");
-                if (eam && efm) {
-                    std::vector<float> am((size_t)H3c), fm((size_t)H3c);
-                    for (int t = 0; t < H3c; t++) {
-                        am[t] = (t < valid_enc_c) ? 0.0f : -INFINITY;
-                        fm[t] = (t < valid_enc_c) ? 1.0f : 0.0f;
-                    }
-                    ggml_backend_tensor_set(eam, am.data(), 0, am.size() * sizeof(float));
-                    ggml_backend_tensor_set(efm, fm.data(), 0, fm.size() * sizeof(float));
-                    COHERE_VLOG2(vb, "cohere: masked subsampling     T_enc=%d valid=%d (%d overhang)\n", H3c,
-                                 valid_enc_c, H3c - valid_enc_c);
-                }
-            }
 
             if (do_prof) {
                 ggml_backend_sched_set_eval_callback(ctx->ggml_alloc, cohere_prof_eval_cb, &prof_state);
