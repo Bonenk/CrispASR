@@ -6,6 +6,20 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — §245 qwen3-tts code-predictor: DONE via CP_DIRECT (stale entry), verified on Metal
+
+Third stale perf entry this session (after §176k framing + §176n). PLAN §245
+("15 code_pred graphs/frame → dispatch overhead; Option A unrolled graph /
+Option C skip-sched-reset, both broken") was superseded by **CP_DIRECT**
+(§232/#245) — sched-free persistent code_pred graphs, default ON for GPU,
+md5-identical WAV validated 2026-07-10. Empirically confirmed on M1
+(`qwen3-tts-12hz-0.6b-base-q8_0.gguf`, quiet, `QWEN3_TTS_BENCH=1`): `cp_direct
+active`; per-frame code_pred set≈2-4 ms / compute≈45-60 ms / read≈0.1 ms →
+dispatch ~5% (was ~375 ms/frame under sched), RTF 1.2×, ASR round-trip correct.
+code_pred is now compute-bound (15 sequential steps) so Option A would buy
+nothing. Docs only (PLAN §245 → DONE). See LEARNINGS ("verify a roadmap
+'broken/OPEN' claim empirically").
+
 ## 2026-07-12 — §176n VoxCPM2 Metal: the roadmap entry was stale — GPU already works (3.75×), verified
 
 PLAN §176n was marked OPEN ("CPU-only due to SIGSEGV from `matmul_mv_ggml`"). That
