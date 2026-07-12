@@ -6103,13 +6103,40 @@ quantization / FAISS-style IVF for approximate nearest-neighbor.
 
 #### §176n VoxCPM2: fix Metal buffer type mismatch
 
-**Status:** OPEN
-**Effort:** Medium (investigation)
+**Status:** OPEN — root-caused + scope de-risked 2026-07-12 (needs a quiet box to
+build/run the TTS→ASR roundtrip; not started under load).
+**Effort:** Medium
 **File:** `src/voxcpm2_tts.cpp`
-**Approach:** Currently CPU-only due to SIGSEGV from `matmul_mv_ggml`
-allocating input tensors in CPU-side mem buffer. Root cause is likely a
-buffer type mismatch in `ggml_backend_sched` allocation strategy. Fixing
-unlocks GPU for the entire pipeline + flash attn.
+
+**Root cause (confirmed by reading, not guessed):** the SIGSEGV is NOT a
+`ggml_backend_sched` buffer-type bug — it's `matmul_mv_ggml` (`src/voxcpm2_tts.cpp`
+~L543) using `ggml_init(no_alloc=false)` and `memcpy`-ing straight into
+`v_t->data` / reading `result->data` — **raw CPU malloc pointers**. A Metal
+backend can't dereference those, so `ggml_backend_graph_compute` on Metal
+segfaults on first dispatch. It is fundamentally a CPU-only pattern.
+
+**Why "just make matmul_mv_ggml Metal-safe" is the wrong fix:** the pipeline
+issues ~30 of these tiny matvecs per step. Routing each individually through
+Metal is launch-bound and would *lose* to CPU (the per-step-dispatch lesson —
+cf. §176k FireRed, moonshine). The win requires ONE fused step graph per Metal
+dispatch, not 30.
+
+**Good news — the fused-graph infra already exists** (gated `VOXCPM2_USE_GRAPH=1`):
+`build_tslm_step_graph` (~L1222) + bucketed `get_or_build_tslm_step_graph`
+(~L1405), `build_ralm_step_graph` (~L1076), plus LocDiT/LocEnc/VAE gallocr pools
+(~L389–480). They use `ggml_gallocr` on `ctx->backend` + backend-resident KV +
+`ggml_backend_tensor_set/get` — i.e. exactly the Metal-safe pattern. So §176n is
+**not** a from-scratch rewrite.
+
+**Remaining work:** (1) make `ctx->backend` actually Metal (it's CPU-pinned today);
+(2) audit every per-step path (TSLM, RALM, LocDiT, VAE decode/encode) to confirm
+each routes through the `USE_GRAPH` graph and NOT the CPU `matmul_mv_ggml`
+fallback under Metal — any straggler resurrects the segfault; (3) handle the
+Metal op-support gotchas (k-quant CPY/CAST, left-pad conv — see the GPU
+portability notes) if they surface; (4) validate by TTS→ASR roundtrip + per-stage
+diff on **both** F16 and Q4_K, then A/B GPU-vs-CPU on a **quiet** box (Metal
+timing swings ±20% under load — the box was at load 33–46 when this was scoped).
+Model available locally: `.../voxcpm2/voxcpm2-q4_k.gguf` (1.6 GB) + `voxcpm2-ref*.gguf`.
 
 ## §ARK — ARK-ASR-3B support (⚠️ EXPERIMENTAL / WIP; branch feat/arkasr-3b)
 
