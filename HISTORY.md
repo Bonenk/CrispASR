@@ -6,6 +6,28 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — §176/§245 perf-cluster audit (roll-up)
+
+One session-long audit of the whole runtime-optimization cluster, measure-first
+throughout. Net: **1 real fix shipped, 3 stale-but-done items reclassified, 2
+low-value items deferred with data.** Detail entries below; summary:
+- **§176k FireRed** — profiling debunked the "add KV cache + flash_attn" framing
+  (decode is dispatch-bound, KV already cached). Shipped a persistent per-`(weight,M)`
+  matvec graph cache (`CRISPASR_FIRERED_MATVEC_CACHE`, default ON) — bit-identical,
+  pure Pareto; ~5% at idle, up to ~1.6× under load (load-dependent).
+- **§176n VoxCPM2 Metal** — stale "CPU-only SIGSEGV"; already runs on Metal via
+  `VOXCPM2_USE_GRAPH`, verified **3.75×**, correct roundtrip. Reclassified DONE.
+- **§245 qwen3-tts code_pred** — done via **CP_DIRECT**, verified on Metal (RTF
+  1.2×, dispatch ~5% of code_pred). Reclassified DONE.
+- **§176c** — VoxCPM2 already device-resident (dropped); Dia **measured ~1.2%** of
+  decode → deferred (not worth a non-bit-identical rewrite); SpeechT5/Pocket-TTS
+  to be measured before any work.
+- **§176l Kyutai RVQ** — genuinely still scalar brute-force, but no local model to
+  validate a change; documented the `ggml_mul_mat` recipe.
+Priority-table row downgraded from HIGH → DONE/LOW. The cluster is now accurately
+tracked; future sessions should not re-chase it. See LEARNINGS (three measure-first
+entries) + the per-item entries below.
+
 ## 2026-07-12 — §176c Dia device-resident KV: MEASURED at ~1.2%, DEFERRED (not implemented)
 
 Took §176c (host→device-resident self-attn KV) on for Dia (local model). Before
