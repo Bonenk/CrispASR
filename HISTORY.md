@@ -6,6 +6,15 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — #252: auto-romanize non-Latin text for CTC forced alignment
+
+Arabic/Cyrillic/Greek/Hebrew/Devanagari reference text now auto-romanizes before
+CTC alignment. Fixes all-zero timestamps when the aligner vocabulary is Latin-only
+(wav2vec2-based). New `src/core/uroman.h` (lightweight Unicode→Latin mapping) +
+integration in `crispasr_aligner.cpp`. 8 unit tests. Env gate:
+`CRISPASR_ALIGN_NO_ROMANIZE=1` disables. Reporter verified the romanized path
+lands within ~138 ms median on Arabic word onsets.
+
 ## 2026-07-12 — tada bucket floor (backend-conditional), irodori persistent DiT graph, parakeet-CTC reroute
 
 **§215b tada talker — batched-CFG (B=2) is a MEASURED NON-GOAL.** Instrumented the
