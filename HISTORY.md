@@ -112,6 +112,20 @@ See LEARNINGS + PLAN §176k.
 
 ## 2026-07-12 — tada bucket floor (backend-conditional), irodori persistent DiT graph, parakeet-CTC reroute
 
+**MOSS-TTS-v1.5 (#249) — new `moss-tts` backend: Qwen3-8B + 32-codebook delay +
+transformer codec.** Ported `OpenMOSS-Team/MOSS-TTS-v1.5` (MossTTSDelay) by grafting
+`pwilkin/openmoss`'s validated codec + delay logic onto CrispASR's in-house Qwen3
+runtime (cloned `moss_audio.cpp`'s KV path + added a `hidden_last` output for the 32
+audio heads — no libllama). New `src/moss_tts.{h,cpp}` (backbone + 32 embed/head aux
+graphs + delay state machine + AR code-gen) and `src/moss_tts_codec.{h,cpp}` (RVQ →
+weight-norm-reconstructed 1×1 projections → 4 ProjectedTransformer stages with a
+sliding-window causal mask → patch upsamples → 24 kHz). Two GGUFs (quantizable
+backbone `moss-tts` + F16 codec `moss-tts-codec`) from `convert-moss-tts-to-gguf.py`;
+full 12-point integration incl. the session-ABI inline synthesize. **Validated on
+Kaggle P100: the Q4_K decoded round-trip is intelligible + correct on first contact
+with the real 8B weights** (F16 backbone is 17 GB — skipped on the 16 GB P100, a VRAM
+limit not a bug). Voice-cloning encoder and the 4B `MossTTSLocal` are follow-ups.
+
 **§215b tada talker — batched-CFG (B=2) is a MEASURED NON-GOAL.** Instrumented the
 talker's two per-step CFG passes (`CRISPASR_TADA_TALKER_TIMING`). They take
 *different* graph paths — the positive pass through the §176b decode bucket (padded
