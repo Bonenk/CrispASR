@@ -120,13 +120,29 @@ def load_python():
     except Exception: pass
     cfg = CohereAsrConfig.from_pretrained(str(REFMODEL))
     model = M.from_pretrained(str(REFMODEL), config=cfg, torch_dtype=torch.float32).eval()
+    # CohereAsrPreTrainedModel._init_weights re-initializes all Linear/Conv
+    # weights to normal(0, 0.02) on some transformers versions, overwriting the
+    # pretrained values -> garbage output. Reload ALL params from safetensors
+    # (the fix the real reference backend applies).
+    import glob
+    from safetensors import safe_open
+    msd = dict(model.named_parameters()); nrel = 0
+    for sfp in glob.glob(str(Path(REFMODEL) / "*.safetensors")):
+        with safe_open(sfp, framework="pt") as sf:
+            for k in sf.keys():
+                if k in msd:
+                    try: msd[k].data.copy_(sf.get_tensor(k).float()); nrel += 1
+                    except Exception: pass
     fe = CohereAsrFeatureExtractor.from_pretrained(str(REFMODEL))
     tok = AutoTokenizer.from_pretrained(str(REFMODEL))
     proc = CohereAsrProcessor(feature_extractor=fe, tokenizer=tok)
-    # sanity: no zeroed encoder norms (would mean a corrupt download)
+    # sanity: conv0 weight rms (real weights ~0.1+, random-init ~0.02) + zeroed norms
     import torch.nn as nn
+    conv0 = next((m.weight for m in model.encoder.modules()
+                  if getattr(getattr(m, "weight", None), "dim", lambda: 0)() >= 3), None)
+    rms = float(conv0.norm() / conv0.numel() ** 0.5) if conv0 is not None else None
     z = [n for n, m in model.named_modules() if isinstance(m, nn.LayerNorm) and float(m.weight.abs().max()) < 1e-6]
-    jstep("py_loaded", zeroed_norms=len(z))
+    jstep("py_loaded", reloaded=nrel, conv0_rms=round(rms, 4) if rms else None, zeroed_norms=len(z))
     return model, proc
 
 def py_transcribe(model, proc, wav):
@@ -135,21 +151,28 @@ def py_transcribe(model, proc, wav):
 # ───────────────────────── numerical parity (hooks + crispasr-diff) ────────
 def dump_reference(model, proc, wav, out_gguf):
     import torch, numpy as np, soundfile as sf, importlib.util
+    a, _ = sf.read(str(wav))
+    # mel_spectrogram exactly as the reference backend stores it ([T, n_mels])
+    inputs = proc(np.asarray(a, dtype=np.float32), sampling_rate=16000,
+                  return_tensors="pt", language="ar")
+    mel = inputs["input_features"][0].transpose(0, 1).contiguous().float().numpy()  # [T, n_mels]
     enc = model.encoder; caps = {}
     def cap(nm):
         def h(_m, _i, o):
-            t = o[0] if isinstance(o, tuple) else o
+            t = (o.last_hidden_state if hasattr(o, "last_hidden_state")
+                 else (o[0] if isinstance(o, tuple) else o))
             caps[nm] = t.detach().clone()
         return h
     H = [enc.layers[i].register_forward_hook(cap(f"encoder_layer_{i}")) for i in range(len(enc.layers))]
-    for a in ("pre_encode", "subsampling", "subsample"):
-        if hasattr(enc, a): H.append(getattr(enc, a).register_forward_hook(cap("enc_pre_subsample_out"))); break
+    for at in ("pre_encode", "subsampling", "subsample"):
+        if hasattr(enc, at): H.append(getattr(enc, at).register_forward_hook(cap("pre_encode_output"))); break
+    H.append(enc.register_forward_hook(cap("encoder_output")))  # final encoder hidden
     text = model.transcribe(proc, language="ar", audio_files=[str(wav)])[0]
     for h in H: h.remove()
     spec = importlib.util.spec_from_file_location("dr", str(REPO / "tools" / "dump_reference.py"))
     dr = importlib.util.module_from_spec(spec); spec.loader.exec_module(dr)
-    a, _ = sf.read(str(wav))
     tens = {k: v[0].detach().cpu().float().numpy() for k, v in caps.items()}
+    tens["mel_spectrogram"] = mel
     meta = {"audio": Path(wav).name, "n_samples": int(len(a)), "sample_rate": 16000, "generated_text": str(text)}
     dr.write_gguf_archive(tens, meta, Path(out_gguf))
     return text
