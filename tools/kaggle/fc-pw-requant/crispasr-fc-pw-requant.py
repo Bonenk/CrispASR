@@ -155,13 +155,14 @@ FLEET = [
 ]
 QUANT_SUFFIXES = ["q8_0", "q6_k", "q5_k", "q5_0", "q4_k", "q4_0", "q3_k", "q2_k"]
 
-# Per-file quantizer overrides: these published q4_k files keep
-# decoder.embed.weight at F16 (old rule), which current rules would
-# quantize — pin it so ONLY the conv pw tensors change (minimal diff,
-# passes the structural gate).
+# Per-file quantizer overrides: these published q4_k files keep the whole
+# transducer decode head (decoder.embed + joint.out + joint.pred) at F16
+# (old rule), which current rules would quantize — pin them so ONLY the
+# conv pw tensors change (minimal diff, passes the structural gate).
+_TDT_HEAD_PIN = ["--tensor-type", r"(decoder\.embed|joint\.out|joint\.pred)\.weight=f16"]
 EXTRA_ARGS = {
-    "parakeet-tdt-0.6b-v3-q4_k.gguf": ["--tensor-type", r"decoder\.embed\.weight=f16"],
-    "parakeet_de_med-q4_k.gguf": ["--tensor-type", r"decoder\.embed\.weight=f16"],
+    "parakeet-tdt-0.6b-v3-q4_k.gguf": _TDT_HEAD_PIN,
+    "parakeet_de_med-q4_k.gguf": _TDT_HEAD_PIN,
 }
 LEGACY_ENV = {"CRISPASR_FC_PW_Q8": "0", "CRISPASR_FC_FUSED_QKV": "0",
               "CRISPASR_FC_ATTN_CONT": "1"}
@@ -381,8 +382,16 @@ def process_file(repo, path, backend, lang):
         new.unlink(missing_ok=True)
 
 
+# Optional scope file: an `only.txt` pushed next to the script restricts the
+# run to the listed repo shortnames (for targeted re-runs without touring
+# the whole fleet).
+_only_f = Path(__file__).resolve().parent / "only.txt"
+ONLY = set(_only_f.read_text().split()) if _only_f.exists() else set()
+
 results = {}
 for short, backend, lang in FLEET:
+    if ONLY and short not in ONLY:
+        continue
     repo = f"cstr/{short}"
     step("repo.begin", repo=repo, free_gb=free_gb())
     try:
