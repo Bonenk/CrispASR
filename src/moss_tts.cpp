@@ -30,6 +30,7 @@
 #include "ggml-cpu.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -1117,8 +1118,114 @@ extern "C" float* moss_tts_synthesize(moss_tts_context* ctx, const char* text, c
 }
 
 // ===========================================================================
-// Tokenizer (Qwen3 gpt2-style BPE, special-token aware) — clone of qwen3_asr.
+// Tokenizer (Qwen3 gpt2-style BPE, special-token aware).
 // ===========================================================================
+
+// Qwen2/3 pre-tokenizer regex, ASCII/byte approximation (bytes >=0x80 count as
+// letters so UTF-8 stays grouped):
+//   (?i:'s|'t|'re|'ve|'m|'ll|'d) | [^\r\n L N]? L+ | N | ?[^\s L N]+[\r\n]* |
+//   \s*[\r\n]+ | \s+(?!\S) | \s+
+// The crude whitespace splitter this replaces split "\>" from a trailing "\n";
+// Qwen's `[^\s L N]+[\r\n]*` groups punctuation WITH the following newline
+// ("\>\n", "):\n"), which is why the greedy code-parity diverged at frame 0 (#249).
+static std::vector<std::string> mt_qwen_pretokenize(const std::string& s) {
+    std::vector<std::string> out;
+    const size_t n = s.size();
+    auto is_letter = [](unsigned char c) { return std::isalpha(c) != 0 || c >= 0x80; };
+    auto is_digit = [](unsigned char c) { return std::isdigit(c) != 0; };
+    auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
+    auto is_nl = [](unsigned char c) { return c == '\r' || c == '\n'; };
+    size_t i = 0;
+    while (i < n) {
+        const unsigned char c = (unsigned char)s[i];
+        // 1. contractions
+        if (c == '\'' && i + 1 < n) {
+            static const char* cons[] = {"'s", "'t", "'re", "'ve", "'m", "'ll", "'d"};
+            bool matched = false;
+            for (const char* cc : cons) {
+                const size_t len = std::strlen(cc);
+                if (i + len > n)
+                    continue;
+                bool eq = true;
+                for (size_t k = 0; k < len; k++)
+                    if (std::tolower((unsigned char)s[i + k]) != std::tolower((unsigned char)cc[k])) {
+                        eq = false;
+                        break;
+                    }
+                if (eq) {
+                    out.push_back(s.substr(i, len));
+                    i += len;
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched)
+                continue;
+        }
+        // 2. [^\r\n L N]? L+
+        {
+            size_t j = i;
+            if (j < n && !is_nl((unsigned char)s[j]) && !is_letter((unsigned char)s[j]) &&
+                !is_digit((unsigned char)s[j]))
+                j++;
+            if (j < n && is_letter((unsigned char)s[j])) {
+                while (j < n && is_letter((unsigned char)s[j]))
+                    j++;
+                out.push_back(s.substr(i, j - i));
+                i = j;
+                continue;
+            }
+        }
+        // 3. N (one digit)
+        if (is_digit(c)) {
+            out.push_back(s.substr(i, 1));
+            i++;
+            continue;
+        }
+        // 4.  ?[^\s L N]+[\r\n]*
+        {
+            size_t j = i;
+            if (s[j] == ' ')
+                j++;
+            const size_t p0 = j;
+            while (j < n && !is_space((unsigned char)s[j]) && !is_letter((unsigned char)s[j]) &&
+                   !is_digit((unsigned char)s[j]))
+                j++;
+            if (j > p0) {
+                while (j < n && is_nl((unsigned char)s[j]))
+                    j++;
+                out.push_back(s.substr(i, j - i));
+                i = j;
+                continue;
+            }
+        }
+        // 5. \s*[\r\n]+
+        {
+            size_t j = i;
+            while (j < n && is_space((unsigned char)s[j]) && !is_nl((unsigned char)s[j]))
+                j++;
+            if (j < n && is_nl((unsigned char)s[j])) {
+                while (j < n && is_nl((unsigned char)s[j]))
+                    j++;
+                out.push_back(s.substr(i, j - i));
+                i = j;
+                continue;
+            }
+        }
+        // 6/7. \s+
+        if (is_space(c)) {
+            size_t j = i;
+            while (j < n && is_space((unsigned char)s[j]))
+                j++;
+            out.push_back(s.substr(i, j - i));
+            i = j;
+            continue;
+        }
+        out.push_back(s.substr(i, 1)); // fallback
+        i++;
+    }
+    return out;
+}
 
 extern "C" int32_t* moss_tts_tokenize(moss_tts_context* ctx, const char* text, int* out_n_tokens) {
     if (!ctx || !text) {
@@ -1173,16 +1280,7 @@ extern "C" int32_t* moss_tts_tokenize(moss_tts_context* ctx, const char* text, i
         i = j;
         if (chunk.empty())
             continue;
-        size_t k = 0;
-        while (k < chunk.size()) {
-            size_t start = k;
-            if (chunk[k] == ' ' || chunk[k] == '\t' || chunk[k] == '\n')
-                k++;
-            while (k < chunk.size() && chunk[k] != ' ' && chunk[k] != '\t' && chunk[k] != '\n')
-                k++;
-            if (k == start)
-                k++;
-            std::string pre(chunk, start, k - start);
+        for (const std::string& pre : mt_qwen_pretokenize(chunk)) {
             std::string encoded = core_bpe::bytes_to_unicode(pre.data(), pre.size());
             core_bpe::bpe_one(v.token_to_id, v.merge_rank, encoded, result);
         }
