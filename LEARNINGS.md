@@ -10,6 +10,53 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## A Metal masked-attention-padding penalty does NOT transfer to CUDA, and a bucket-width change is byte-identical on Metal/CPU but not on CUDA (tada §215b bucket floor, 2026-07-12)
+
+The tada talker's positive CFG pass runs through the §176b decode bucket, which
+floors attention width at Lk=512; for a short generation (n_past ≪ 512) that pads
+~500 masked columns per step. On M1 Metal the penalty is huge — the positive pass
+drops **266→49 ms/call (5.4×)** when forced onto the exact-Lk path. On a clean CUDA
+P100 the *same* change is only **1.43×** at the pass level and **1.02–1.06×** at the
+loop level: 512-wide masked attention is cheap on a GPU built for it. This is the
+LEARNING-34/35 "a Metal win doesn't generalise" rule, quantified — always measure
+the *target* platform before flipping a GPU default; a Metal profile can be an order
+of magnitude off for CUDA.
+
+Worse, the bucket width is **not output-neutral on CUDA even though it is on
+Metal/CPU**. `soft_max_ext` sums the −inf-masked padding as `exp→0` terms; on a
+deterministic backend (CPU, Metal) adding exact zeros doesn't change the reduction,
+so the output is byte-identical regardless of Lk (proven md5-equal). On CUDA the
+*parallel reduction order* over Lk=512 vs a tight Lk flips a borderline FP bit → a
+different acoustic frame, AR-amplified — benign (still intelligible) but observably
+different bytes, with a coherent signature (`floor64 == nobucket ≠ default` on
+short). Consequence: "byte-identical AND faster", the bar to flip a GPU default, is
+met on Metal/CPU but not CUDA → ship a **backend-conditional** default
+(`tada_default_bucket_min`: Metal/CPU→64, discrete-GPU→512), not a global one.
+Corollary for A/B harnesses: on a GPU, gate a sampled/AR TTS on **ASR keyword-recall
+of every arm**, not md5 — md5 is a bit-determinism signal, not a correctness gate
+(same lesson the dia CUDA A/B taught). Also: the tight-floor *bucket* beats both the
+512-floor bucket AND raw NO_BUCKET on long inputs — NO_BUCKET rebuilds the graph
+every step and that eventually costs more than the padding it saves, while the
+cached tight bucket has neither cost.
+
+## ggml disables CUDA graphs below Ampere (cc < 800) — an Ampere-only re-warm bug can't be reproduced on Kaggle's P100/T4 (irodori #243, 2026-07-12)
+
+irodori's RF-DiT rebuilds its graph + a fresh `gallocr` every ODE/CFG call
+(~100/generation), so the tensor addresses change each step and ggml's CUDA-graph
+machinery sees "properties changed" → warmup resets and re-completes every step
+(`ggml-cuda.cu:4361`), paying the capture/update cost instead of the capture-once-
+replay benefit (the reporter's "CUDA graph warmup complete" spam). A persistent
+cached graph is the textbook fix. But the *time cost* is unmeasurable on any hardware
+we have: ggml gates CUDA graphs on `cc ≥ GGML_CUDA_CC_AMPERE` (800,
+`ggml-cuda.cu:4329`), and Kaggle offers only **P100 (cc 600)** and **T4 (cc 750)** —
+both pre-Ampere, so CUDA graphs are off there and the re-warm never happens; Metal
+has no CUDA graphs at all (and measured the DiT **98% compute-bound** → the graph
+construct+alloc a persistent graph removes is only 1.7%, so no Metal/CPU win either).
+So the disciplined move: implement the sound fix, prove it **byte-identical** on the
+hardware you *do* have, ship it **opt-in**, and delegate the Ampere-only speedup
+confirmation to whoever has the GPU — do not fabricate a number you cannot measure.
+**Kaggle is not a substitute for an Ampere box** for CUDA-graph work.
+
 ## ggml-metal im2col starves batch-1 convs — 3–11 threads/threadgroup at N=1, ~40× below bandwidth (HiFi-GAN perf, 2026-07-11)
 
 ggml-metal's `kernel_im2col` sized thread-dim0 from batch N (`ntptg0 =
