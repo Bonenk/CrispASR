@@ -26,6 +26,7 @@
 
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
+#include "ggml-cpu.h"
 #include "ggml.h"
 
 #include <cmath>
@@ -59,6 +60,24 @@ static inline bool fc_attn_cont() {
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
+}
+
+// GPU manual-attention gate (issue #81 GPU phase). CUDA's flash_attn_ext
+// rejects the FastConformer per-head rel-pos mask (fattn.cu guard on
+// mask->ne[2] != 1), so every flash node falls back to CPU — 24 GPU↔CPU
+// bounces per encoder pass. The manual QK^T + soft_max_ext + V path runs
+// fully on-device there. Metal handles the per-head mask and measured
+// FASTER with flash (PERFORMANCE.md 2026-05-09), so this only ever applies
+// to non-CPU backends. CRISPASR_FC_GPU_MANUAL_ATTN: "1" = manual attention
+// on the GPU backend; unset/"0" = flash (current default until the Kaggle
+// CUDA A/B lands — flip to CUDA-auto once verified, per the A/B rule).
+static inline bool fc_gpu_manual_attn(ggml_backend_t backend) {
+    static int v = -2;
+    if (v == -2) {
+        const char* e = std::getenv("CRISPASR_FC_GPU_MANUAL_ATTN");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v == 1 && backend && !ggml_backend_is_cpu(backend);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,8 +194,14 @@ static inline void snap_conv4d(ggml_context* ctx0, ggml_cgraph* gf, ggml_tensor*
 // conv output via the caller (write it back through `out_T_enc`).
 // When `gf` is non-null, named dup snaps are added after each conv step for
 // staged comparison via the diff harness.
+// `stage_mask_t0` / `stage_mask_t1` are optional (1, T, 1, 1) multiplicative
+// time masks for the bucketed-padding path: zeroing pad frames after the
+// stage feeding each k=3 conv makes the padded graph's valid outputs
+// bit-identical to the unpadded graph (whose convs zero-pad those reads).
 static inline ggml_tensor* build_pre_encode(ggml_context* ctx0, ggml_tensor* mel, const PreEncodeWeights& w,
-                                            int subsampling_channels, int* out_T_enc, ggml_cgraph* gf = nullptr) {
+                                            int subsampling_channels, int* out_T_enc, ggml_cgraph* gf = nullptr,
+                                            ggml_tensor* stage_mask_t0 = nullptr,
+                                            ggml_tensor* stage_mask_t1 = nullptr) {
     auto bias_4d = [&](ggml_tensor* b) {
         return ggml_cast(ctx0, ggml_reshape_4d(ctx0, b, 1, 1, b->ne[0], 1), GGML_TYPE_F32);
     };
@@ -186,6 +211,8 @@ static inline ggml_tensor* build_pre_encode(ggml_context* ctx0, ggml_tensor* mel
     if (gf)
         snap_conv4d(ctx0, gf, cur, "pre_enc_c0");
     cur = ggml_relu(ctx0, cur);
+    if (stage_mask_t0) // zero pad frames before the next k=3 conv (see header note)
+        cur = ggml_mul(ctx0, cur, stage_mask_t0);
 
     cur = ggml_conv_2d_dw(ctx0, w.conv2_w, cur, 2, 2, 1, 1, 1, 1);
     cur = ggml_add(ctx0, cur, bias_4d(w.conv2_b));
@@ -196,6 +223,8 @@ static inline ggml_tensor* build_pre_encode(ggml_context* ctx0, ggml_tensor* mel
     if (gf)
         snap_conv4d(ctx0, gf, cur, "pre_enc_c3");
     cur = ggml_relu(ctx0, cur);
+    if (stage_mask_t1) // zero pad frames before the next k=3 conv
+        cur = ggml_mul(ctx0, cur, stage_mask_t1);
 
     cur = ggml_conv_2d_dw(ctx0, w.conv5_w, cur, 2, 2, 1, 1, 1, 1);
     cur = ggml_add(ctx0, cur, bias_4d(w.conv5_b));
@@ -497,16 +526,28 @@ struct BlockParams {
     int att_context_left = -1;  // max positions to the left each query sees
     int att_context_right = -1; // max positions to the right
     int global_tokens = 0;      // first N positions are global (visible to all)
+
+    // Use the manual QK^T + soft_max_ext + V attention instead of
+    // flash_attn_ext (set from fc_gpu_manual_attn — CUDA rejects the
+    // per-head rel-pos mask and would bounce every flash node to CPU).
+    bool manual_attn = false;
 };
 
 // Build one Conformer block. `cur` must be (d, T). `pos_enc` is the shared
 // sinusoidal rel-pos table (d, 2T-1). `local_attn_mask` is an optional (T, T)
 // F32 tensor with 0.0 for visible positions and -inf for masked positions
-// (used by rel_pos_local_attn models). Pass nullptr for full attention.
+// (used by rel_pos_local_attn models, and by the bucketed-padding path to
+// mask pad keys). Pass nullptr for full attention.
+// `time_mask` is an optional (1, T) F32 multiplicative mask (1.0 valid /
+// 0.0 pad) applied before the depthwise conv and at the block output —
+// with pad keys masked in attention (-inf; a finite constant gets overrun
+// once pad garbage grows), these cover every inter-column path, so valid
+// columns match an unpadded graph exactly up to GEMM micro-kernel ULP
+// reassociation (see the CRISPASR_FC_BUCKET note in canary_ctc.cpp).
 // Returns the post-block (d, T) output.
 static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggml_tensor* pos_enc, int T,
                                        const BlockWeights& e, const BlockParams& p,
-                                       ggml_tensor* local_attn_mask = nullptr) {
+                                       ggml_tensor* local_attn_mask = nullptr, ggml_tensor* time_mask = nullptr) {
     const int d = p.d;
     const int n_heads = p.n_heads;
     const int head_dim = p.head_dim;
@@ -586,7 +627,7 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
     }
 
     ggml_tensor* attn_out;
-    if (fc_no_flash()) {
+    if (fc_no_flash() || p.manual_attn) {
         // Manual attention: QK^T + BD, softmax, ×V — no flash_attn_ext.
         // Q_u, K_ are (head_dim, T, n_heads) after permute.
         // mul_mat(K, Q) computes Q^T × K^T^T = Q^T × K → (T, T, n_heads).
@@ -638,6 +679,8 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
     ggml_tensor* pw1_w = ggml_reshape_2d(ctx0, e.conv_pw1_w, d, 2 * d);
     ggml_tensor* cnv = mm_bias(pw1_w, x, e.conv_pw1_b);
     cnv = ggml_siglu_swapped(ctx0, cnv);
+    if (time_mask) // zero pad columns so the dw conv sees them as its own zero border
+        cnv = ggml_mul(ctx0, cnv, time_mask);
 
     // dw conv (kernel K, padding K/2). BN was folded into conv_dw_w/b at load.
     // Use pre-cast F32 weights if available (avoids F16→F32 cast per forward).
@@ -669,6 +712,12 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
 
     // ---- Block final LN ----
     cur = ggml_norm_affine(ctx0, cur, e.norm_out_w, e.norm_out_b, eps);
+
+    // Re-zero pad columns at the block boundary (bucketed path): pad garbage
+    // otherwise grows across blocks until 0-weight × huge-value artifacts
+    // (or a mask-magnitude overrun) leak into valid columns.
+    if (time_mask)
+        cur = ggml_mul(ctx0, cur, time_mask);
 
     return cur;
 }
