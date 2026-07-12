@@ -363,8 +363,15 @@ Lessons from the systematic head-to-head benchmark against
     noise. And keep the comparison honest about asymmetry: CrispASR was timed as a
     fresh subprocess **including model load per call** while onnx loaded once, so
     short-clip RTF favours onnx; the load-amortised long column is the fair one.
-    Net #81 truth: onnx-asr on the **GPU** genuinely beats CrispASR on parakeet
-    (~175-220× vs ~6-20×) — the earlier "CrispASR faster" only held vs onnx-CPU.
+    Net #81 truth (real varied audio, load-excluded): onnx-asr on the **GPU** beats
+    CrispASR on parakeet (ctc 207× / tdt 112× vs CrispASR 25× / 35×), while CrispASR
+    beats onnx on **CPU** (25-35× vs 4.6-4.8×). (d) **Never loop one short clip to
+    fake "long" audio** — a 55 s clip made of jfk×5 lets the model/CUDA caches reuse
+    work across the identical repeats and inflates the RTF (onnx-CUDA 220×→**207×**
+    on real varied 134 s LibriSpeech). Use genuinely varied speech (concatenate
+    DISTINCT utterances). (e) Report the engine's **load-excluded** RTF when
+    comparing a subprocess-per-call engine against an in-process one — CrispASR's
+    own CLI RTF (excludes load, #19) was 25× vs 18-20× from subprocess wall.
 
 37. **`kaggle kernels output` is page-capped at 500 files and does NOT
     auto-continue — anything that sorts late is unreachable.** Refreshing the
