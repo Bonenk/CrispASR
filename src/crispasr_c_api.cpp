@@ -1929,6 +1929,11 @@ CA_EXPORT const char* crispasr_drain_streamed_tokens(int* out_count) {
         *out_count = (int)s->streamed_tokens.size();
     s->streamed_tokens.clear();
     s->streamed_tok_count.store(0, std::memory_order_relaxed);
+    // `buf` is a reference to the persistent session member `s->token_drain_buf`
+    // (not a local), so the returned pointer stays valid until the next drain or
+    // session close, as documented above. cppcheck's stlcstr heuristic can't see
+    // the alias — this is a false positive, not a dangling pointer.
+    // cppcheck-suppress stlcstr
     return buf.c_str();
 }
 
