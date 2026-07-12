@@ -17,10 +17,12 @@
 #include "moss_tts_codec.h"
 
 #include "core/attention.h"
+#include "core/audio_resample.h"
 #include "core/bpe.h"
 #include "core/ffn.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h"
+#include "core/wav_reader.h"
 
 #include "ggml.h"
 #include "ggml-alloc.h"
@@ -1309,6 +1311,23 @@ extern "C" bool moss_tts_set_reference_wav(moss_tts_context* ctx, const float* s
 
 extern "C" bool moss_tts_has_reference(const moss_tts_context* ctx) {
     return ctx && ctx->ref_t_audio > 0;
+}
+
+extern "C" bool moss_tts_set_reference_wav_file(moss_tts_context* ctx, const char* path) {
+    if (!ctx)
+        return false;
+    if (!path || !*path)
+        return moss_tts_set_reference_wav(ctx, nullptr, 0); // clear
+    std::vector<float> ref;
+    int sr = 0;
+    if (!crispasr::core::read_wav_mono_pcm16(path, ref, sr) || ref.empty()) {
+        fprintf(stderr, "moss_tts: failed to read reference WAV '%s'\n", path);
+        return false;
+    }
+    const int target = (int)ctx->model.hparams.sampling_rate;
+    if (sr != target && sr > 0)
+        ref = core_audio::resample_polyphase(ref.data(), (int)ref.size(), sr, target);
+    return moss_tts_set_reference_wav(ctx, ref.data(), (int)ref.size());
 }
 
 extern "C" void moss_tts_free(moss_tts_context* ctx) {
