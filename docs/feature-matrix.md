@@ -34,6 +34,7 @@ All 91 backends compiled into the `crispasr` binary, with their declared capabil
 | `vibevoice` | ✓ |  |  |  |  | ✓ |  | ✓ |  |  | ✓ |  |  | ✓ | ✓ |  |  |  |  |  |  |
 | `kugelaudio` | ✓ |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 | `qwen3-tts` | ✓ | ✓ |  |  |  | ✓ |  |  |  |  | ✓ |  |  | ✓ |  |  |  |  |  |  | ✓ |
+| `moss-tts` | ✓ |  |  |  |  | ✓ |  |  |  |  | ✓ |  |  | ✓ |  |  |  |  |  |  |  |
 | `vibevoice-1.5b` | ✓ | ✓ |  |  |  | ✓ |  | ✓ |  |  | ✓ |  |  | ✓ | ✓ |  |  |  |  |  |  |
 | `qwen3-tts-customvoice` | ✓ |  |  |  |  | ✓ |  |  |  |  | ✓ |  |  | ✓ |  |  |  |  |  |  | ✓ |
 | `qwen3-tts-1.7b-base` | ✓ | ✓ |  |  |  | ✓ |  |  |  |  | ✓ |  |  | ✓ |  |  |  |  |  |  | ✓ |

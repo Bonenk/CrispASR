@@ -3493,6 +3493,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #ifdef CA_HAVE_QWEN3_TTS
     list += ",qwen3-tts";
 #endif
+#ifdef CA_HAVE_MOSS_TTS
+    list += ",moss-tts";
+#endif
 #ifdef CA_HAVE_OMNIVOICE
     list += ",omnivoice";
 #endif
@@ -8672,6 +8675,12 @@ CA_EXPORT int crispasr_session_set_tts_seed(crispasr_session* s, uint64_t seed) 
 #ifdef CA_HAVE_QWEN3_TTS
     if (s->qwen3_tts_ctx) {
         qwen3_tts_set_seed((qwen3_tts_context*)s->qwen3_tts_ctx, seed);
+        touched++;
+    }
+#endif
+#ifdef CA_HAVE_MOSS_TTS
+    if (s->moss_tts_ctx) {
+        moss_tts_set_seed(s->moss_tts_ctx, (uint32_t)seed);
         touched++;
     }
 #endif
