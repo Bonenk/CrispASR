@@ -189,23 +189,29 @@ gpu_flag = "--gpu-backend cuda" if has_cuda else ""
 
 def bench_crispasr(backend, model_path, audio_path, audio_dur, label, extra_flags="",
                    n_warmup=1, n_runs=3):
-    """Benchmark one CrispASR backend. Returns (mean_time, rtf, transcript)."""
-    cmd = f"{CRISPASR} --backend {backend} {gpu_flag} -m {model_path} -f {audio_path} {extra_flags} --no-prints"
+    """Benchmark one CrispASR backend. Returns a dict with BOTH:
+      wall_rtf  = audio_dur / subprocess walltime (INCLUDES model load each call)
+      cli_rtf   = the CLI's own '(Nx realtime)' (load-EXCLUDED, per LEARNINGS #19)
+    onnx-asr is timed in-process (load once), so cli_rtf is the fair apples-to-
+    apples number; wall_rtf shows the per-call load tax. NOTE: dropped --no-prints
+    so the 'transcribed .. in X.Xs (Y.Yx realtime)' line reaches stderr; the
+    transcript still comes on stdout."""
+    cmd = f"{CRISPASR} --backend {backend} {gpu_flag} -m {model_path} -f {audio_path} {extra_flags}"
 
-    # Warmup
     for _ in range(n_warmup):
         subprocess.run(cmd, shell=True, capture_output=True, timeout=120)
 
-    times = []
-    text = ""
-    ok = True
+    times, cli_rtfs, text, ok = [], [], "", True
+    rtf_re = re.compile(r"in ([\d.]+)s \(([\d.]+)x realtime\)")
     for i in range(n_runs):
         try:
             t0 = time.perf_counter()
             r = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
-            t1 = time.perf_counter()
-            times.append(t1 - t0)
+            times.append(time.perf_counter() - t0)
             out = (r.stdout or "").strip()
+            m = rtf_re.search((r.stderr or "") + (r.stdout or ""))
+            if m:
+                cli_rtfs.append(float(m.group(2)))
             if r.returncode != 0 or not out:
                 ok = False
                 if i == 0:
@@ -217,15 +223,13 @@ def bench_crispasr(backend, model_path, audio_path, audio_dur, label, extra_flag
             times.append(120.0)
             ok = False
 
-    # A crash / empty transcript must NOT be reported as a fast run — that was
-    # the #81 bug: `--backend parakeet` on a CTC model exits in ~0.5 s, which the
-    # old code timed and turned into `audio_dur / 0.5` = 102.4× / 127.7×. Only a
-    # run that exited 0 with a non-empty transcript counts as a real measurement.
+    # A crash / empty transcript must NOT be reported as a fast run (the #81
+    # `--backend parakeet` on a CTC model bug: exited ~0.5 s -> fake 102/127×).
     if not times or not ok:
-        return None, None, (text or "FAILED")
+        return None
     mean = sum(times) / len(times)
-    rtf = audio_dur / mean
-    return mean, rtf, text
+    cli_rtf = max(cli_rtfs) if cli_rtfs else None  # best (least noisy) load-excluded RTF
+    return {"wall_s": mean, "wall_rtf": audio_dur / mean, "cli_rtf": cli_rtf, "text": text}
 
 results = {}
 for backend, repo, fname, label in CRISPASR_MODELS:
@@ -237,25 +241,27 @@ for backend, repo, fname, label in CRISPASR_MODELS:
         extra = f"--moonshine-tokenizer {MOONSHINE_TOK}"
 
     print(f"\n  [{label}]")
-    mean, rtf, text = bench_crispasr(backend, mp, jfk_wav, duration, label, extra)
-    if mean:
-        print(f"    JFK {duration:.0f}s: {mean:.3f}s = {rtf:.1f}x realtime")
-        results[label] = {"mean_jfk": mean, "rtf_jfk": rtf, "text": text}
+    rj = bench_crispasr(backend, mp, jfk_wav, duration, label, extra)
+    if rj:
+        # rtf_jfk = load-EXCLUDED CLI RTF (fair vs onnx); wall shows the load tax.
+        print(f"    JFK {duration:.0f}s: cli {rj['cli_rtf']}x (load-excl) | wall "
+              f"{rj['wall_rtf']:.1f}x (incl {rj['wall_s']:.2f}s load+infer)")
+        results[label] = {"rtf_jfk": rj["cli_rtf"], "wall_rtf_jfk": rj["wall_rtf"], "text": rj["text"]}
 
         # Also test long audio for the head-to-head models
         if "parakeet" in label:
-            mean_l, rtf_l, txt_l = bench_crispasr(backend, mp, long_wav, long_dur, label, extra,
-                                                  n_warmup=0, n_runs=2)
-            if mean_l:
-                nwl = len((txt_l or "").split())
-                print(f"    Long {long_dur:.0f}s: {mean_l:.3f}s = {rtf_l:.1f}x realtime ({nwl}w)")
-                print(f"        long transcript: {(txt_l or '')[:220]!r}")
-                results[label]["mean_long"] = mean_l
-                results[label]["rtf_long"] = rtf_l
+            rl = bench_crispasr(backend, mp, long_wav, long_dur, label, extra, n_warmup=0, n_runs=2)
+            if rl:
+                nwl = len((rl["text"] or "").split())
+                print(f"    Long {long_dur:.0f}s: cli {rl['cli_rtf']}x (load-excl) | wall "
+                      f"{rl['wall_rtf']:.1f}x  ({nwl}w)")
+                print(f"        long transcript: {(rl['text'] or '')[:220]!r}")
+                results[label]["rtf_long"] = rl["cli_rtf"]
+                results[label]["wall_rtf_long"] = rl["wall_rtf"]
                 results[label]["long_words"] = nwl
     else:
         print(f"    FAILED")
-        results[label] = {"mean_jfk": None, "rtf_jfk": None, "text": "FAILED"}
+        results[label] = {"rtf_jfk": None, "text": "FAILED"}
 
 # ── Phase 5: Benchmark onnx-asr (head-to-head models) ───────────────────────
 # CPU int8 (the original #81 baseline) AND, when the CUDA EP is available, GPU
