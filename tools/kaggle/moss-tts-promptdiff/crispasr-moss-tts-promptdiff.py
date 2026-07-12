@@ -127,7 +127,10 @@ def main():
     ref_ids, ref_toks = [], []
     try:
         from transformers import AutoProcessor
-        proc = AutoProcessor.from_pretrained(HF_MODEL, trust_remote_code=True, token=tok_hf)
+        if tok_hf:  # the custom processor's from_pretrained rejects token= — use env
+            os.environ.setdefault("HF_TOKEN", tok_hf)
+            os.environ.setdefault("HUGGING_FACE_HUB_TOKEN", tok_hf)
+        proc = AutoProcessor.from_pretrained(HF_MODEL, trust_remote_code=True)
         msg = proc.build_user_message(text=TEXT, reference=None, instruction=None, tokens=None,
                                       quality=None, sound_event=None, ambient_sound=None, language=None)
         batch = proc(conversations=[msg], mode="generation", apply_chat_template=True)
