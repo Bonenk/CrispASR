@@ -65,3 +65,18 @@ tdt-v3 q4_k 1.89→1.03 s. Full data in PERFORMANCE.md + LEARNINGS.md.
 - Remaining ideas for the last ~1.4× CUDA gap: per-op dispatch → real
   CUDA-graph capture (needs stable topology = the bucket path), fused
   QKV+BD batching, and the CLI's per-call model load for one-shot use.
+
+## FINAL 2026-07-12: HF fleet requant COMPLETE
+
+All 42 FastConformer-family repos: **80 quantized GGUFs re-uploaded**
+(verified: non-pw tensors byte-identical, transcripts exactly equal to
+old-file + runtime repack), **6 never affected** (canary-qwen, lfm2-audio
+— their converters stored pw as 2D). Zero missing. The two stubborn q4_k
+files (tdt-v3, de_med) needed a `--tensor-type
+'(decoder\.embed|joint\.out|joint\.pred)\.weight=f16'` pin — old rules
+kept the whole transducer head at F16. Kernel supports an `only.txt`
+scope file for targeted re-runs.
+
+Issue #81 state: CPU fixed (M1 beats onnx-CPU; VPS re-bench still open),
+Metal CTC 1.64×, CUDA manual-attn default (warm gap to onnx-CUDA ~1.4×;
+next lever = real CUDA-graph capture on the CRISPASR_FC_BUCKET topology).
