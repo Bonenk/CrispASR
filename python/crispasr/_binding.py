@@ -1612,14 +1612,14 @@ class Session:
         return vocab
 
     # ---------------------------------------------------------------------
-    # TTS synthesis (vibevoice, qwen3-tts, omnivoice, kokoro, orpheus, chatterbox, outetts, indextts, voxcpm2, csm, dia, zonos-tts, bark, speecht5, parler-tts, pocket-tts, kugelaudio, tada, lfm2-audio, dots-tts)
+    # TTS synthesis (vibevoice, qwen3-tts, moss-tts, omnivoice, kokoro, orpheus, chatterbox, outetts, indextts, voxcpm2, csm, dia, zonos-tts, bark, speecht5, parler-tts, pocket-tts, kugelaudio, tada, lfm2-audio, dots-tts)
     # ---------------------------------------------------------------------
 
     def set_codec_path(self, path: str) -> None:
         """Load a separate codec GGUF.
 
-        Required for qwen3-tts (12 Hz tokenizer) and orpheus (SNAC
-        codec); no-op for other backends.
+        Required for qwen3-tts (12 Hz tokenizer), moss-tts (1.6B transformer
+        RVQ codec) and orpheus (SNAC codec); no-op for other backends.
         """
         if not hasattr(self._lib, "crispasr_session_set_codec_path"):
             raise RuntimeError("TTS API not present in this libcrispasr build")
