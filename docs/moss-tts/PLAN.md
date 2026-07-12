@@ -35,7 +35,35 @@ resolves (backbone + codec companion). All builds 0 errors.
 - [ ] Live test `tests/test_moss_tts_live.cpp` + `tests/env-live-tests.sh` entry.
 - [ ] README.md + `docs/{tts,architecture}.md`.
 
-## Phase 6 — validation (the ONLY acceptance test; HARD RULE #3)
+## Phase 6 — VALIDATED (2026-07-12, Kaggle P100, kernel run 1)
+
+**The port works.** Decoded round-trip (HARD RULE #3) **PASSES on Q4_K, CUDA**:
+- convert OK (F16 backbone 16.99 GB + codec 3.55 GB), quantize OK (→ Q4_K 7.0 GB,
+  252/463 tensors quantized; audio embeds/heads + norms kept F16).
+- Q4_K short "Hello world." → ASR "HEllo world!."; Q4_K long → ASR reproduces the
+  whole passage ("the quick round fox jumps over the lazy dog. speech synthesis
+  should stay intelligible over a longer passage. …"; brown→round, codec→Codex are
+  ASR mishears). rms 0.10–0.16, 1.68 s / 22.04 s, proof-of-work TRUE (21→55 words).
+- **F16 FAIL = P100 VRAM only, NOT a bug**: the 16.99 GB F16 backbone doesn't fit a
+  16.27 GB P100 (`cudaMalloc out of memory` at load). Needs a >24 GB GPU (L4/A100)
+  or CPU; Q4_K is the practical target and is proven.
+- code-parity ref dump: torch OOM loading the 8B alongside the crispasr process on
+  the same 16 GB P100 (non-gating; expected).
+
+**Kernel refinements for a cleaner re-run** (both known bugs, not port issues):
+1. `CCACHE_DIR=/kaggle/working/.ccache` bloats the output with the ccache tree →
+   `progress.txt` sorts past the 500-file `kernels_output` page cap (usage #22).
+   Move ccache to `/kaggle/temp/.ccache` after `install_build_toolchain`; keep
+   `/kaggle/working` to just `progress.txt`+`results/`. (Log is still reachable via
+   `KaggleApi().kernels_logs(slug)` — used to diagnose this run.)
+2. Treat an F16-backbone load-OOM as **SKIP** on ≤16 GB GPUs, not FAIL — gate only
+   on Q4_K there; run F16 only when VRAM ≥ ~20 GB.
+
+Ship next: upload GGUFs to `cstr/moss-tts-v1.5-GGUF` (backbone Q4_K + F16 codec;
+daemon-thread + timeout + server-side verify per the HF-upload note), populate the
+registry `license` (Apache-2.0), version bump, HISTORY + LEARNINGS.
+
+## Phase 6 — original validation plan (the ONLY acceptance test; HARD RULE #3)
 
 8B backbone won't fit the 8 GB VPS and is tight on the 16 GB Mac with the 1.6 B
 codec → run on **Kaggle** (P100/T4). Reference kernels:
