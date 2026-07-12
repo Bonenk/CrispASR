@@ -44,6 +44,26 @@ pure noise. The reference backend needs a guard: detect it (a conv weight's RMS 
 below any trained value, ~<0.1) and reload every param from the safetensors shard(s).
 See `tools/reference_backends/_reload_guard.py`.
 
+## "Migrate host KV to device-resident" is a ~1% win on a compute-bound transformer decoder — measure the fraction before the rewrite (Dia §176c, 2026-07-12)
+
+PLAN §176c claimed host↔device KV round-trips were "the dominant data-movement
+bottleneck" for several TTS decoders and wanted them migrated to device-resident
+4D tensors. A `DIA_BENCH`-gated timer around Dia's per-step KV upload+readback
+measured **201.6 ms of 17435 ms decode = ~1.2%** (M1, `dia-1.6b-q4_k`, 120 steps).
+For a 1.6B decoder the transformer forward (×2 for CFG) is ~99% of the step; the
+KV bandwidth is noise. So the "dominant" framing was wrong, and a device-resident-
+KV rewrite — which is NOT bit-identical (it changes the compute graph: in-graph
+`ggml_cpy`/`set_rows` writes + strided views vs a host round-trip) and lands in
+ggml's most bug-prone area (KV write/read ordering on Metal/CUDA) — buys ≤1.2%.
+Not worth the risk; deferred with data.
+
+Rule: before any "reduce data movement / device-resident KV / fewer host
+round-trips" change, add a one-off timer around EXACTLY the bytes you'd remove and
+divide by total. A single-digit-% ceiling on a non-bit-identical graph change is a
+decline, not a task. (This is the KV-cache-flavoured sibling of the §176k
+dispatch lesson and the §208/§214 "measured DUD" pattern — the win must be proven
+before the graph is touched, not after.)
+
 ## Verify a roadmap "broken/OPEN" claim empirically before implementing it — the codebase may have outgrown the note (VoxCPM2 §176n Metal, 2026-07-12)
 
 PLAN §176n said VoxCPM2 was "CPU-only due to a Metal SIGSEGV" and scoped a fused-

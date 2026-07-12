@@ -6,6 +6,22 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — §176c Dia device-resident KV: MEASURED at ~1.2%, DEFERRED (not implemented)
+
+Took §176c (host→device-resident self-attn KV) on for Dia (local model). Before
+the rewrite, added a `DIA_BENCH`-gated instrument timing the host↔device self-attn
+KV round-trip (upload of reordered past KV + readback/append of new K/V) vs total
+decode. M1 Metal, `dia-1.6b-q4_k`, 120 steps: **upload 166 ms + readback 35 ms =
+201.6 ms / 17435 ms decode = ~1.2%.** The 1.6B transformer forward (×B=2 CFG)
+dominates; the KV round-trip is negligible. A device-resident-KV rewrite is
+non-bit-identical and high-risk (ggml KV write/read ordering on Metal — the
+codebase's most bug-prone pattern) for a ≤1.2% ceiling → **not worth it, not
+implemented.** The §176c "eliminates the *dominant* data-movement bottleneck"
+premise is false for compute-bound transformer decoders; PLAN §176c revised to
+"measure-first, low-value" and SpeechT5/Pocket-TTS flagged to be measured before
+any rewrite. Kept the instrument (permanent gated bench) as the evidence. Same
+lesson as §176k/§208/§214: profile before optimizing. See LEARNINGS.
+
 ## 2026-07-12 — §245 qwen3-tts code-predictor: DONE via CP_DIRECT (stale entry), verified on Metal
 
 Third stale perf entry this session (after §176k framing + §176n). PLAN §245
