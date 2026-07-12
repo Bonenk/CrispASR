@@ -1339,7 +1339,7 @@ endif()
 # moss_tts — OpenMOSS-Team/MOSS-TTS-v1.5 (MossTTSDelay: Qwen3-8B backbone + 32
 #            RVQ audio codebooks under a delay pattern + transformer codec)
 # ---------------------------------------------------------------------------
-add_library(moss_tts STATIC moss_tts.h moss_tts.cpp)
+add_library(moss_tts STATIC moss_tts.h moss_tts.cpp moss_tts_codec.h moss_tts_codec.cpp)
 set_target_properties(moss_tts PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(moss_tts PUBLIC .)
 target_compile_features   (moss_tts PUBLIC cxx_std_17)

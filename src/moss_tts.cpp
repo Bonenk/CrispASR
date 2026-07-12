@@ -14,6 +14,8 @@
 
 #include "moss_tts.h"
 
+#include "moss_tts_codec.h"
+
 #include "core/attention.h"
 #include "core/bpe.h"
 #include "core/ffn.h"
@@ -138,9 +140,10 @@ struct moss_tts_context {
     int n_threads = 4;
     uint32_t seed = 0;
 
-    // Codec (Phase 4) — loaded lazily from the companion GGUF.
+    // Codec — loaded from the companion GGUF via moss_tts_set_codec_path().
     std::string codec_path;
     bool codec_loaded = false;
+    moss_tts_codec::Codec* codec = nullptr;
 };
 
 // ===========================================================================
@@ -1016,14 +1019,26 @@ extern "C" float* moss_tts_synthesize(moss_tts_context* ctx, const char* text, c
         *out_n_samples = 0;
     if (!ctx || !text)
         return nullptr;
-    if (!ctx->codec_loaded) {
-        fprintf(stderr, "moss_tts: codec not loaded — call moss_tts_set_codec_path() with the companion "
-                        "GGUF (codec decode lands in Phase 4)\n");
+    if (!ctx->codec_loaded || !ctx->codec) {
+        fprintf(stderr, "moss_tts: codec not loaded — call moss_tts_set_codec_path() with the companion GGUF\n");
         return nullptr;
     }
-    // Phase 4: generate codes, then codec_decode -> waveform.
-    (void)sp;
-    return nullptr;
+    moss_tts_synth_params p = sp ? *sp : moss_tts_synth_default_params();
+    std::unique_ptr<DelayState> state;
+    if (!mt_generate(ctx, text, p, state) || !state)
+        return nullptr;
+    int nvq = 0, t_audio = 0;
+    std::vector<int32_t> codes = state->extract_audio_codes(nvq, t_audio);
+    if (t_audio <= 0 || codes.empty())
+        return nullptr;
+    std::vector<float> wav = moss_tts_codec::decode(ctx->codec, codes.data(), nvq, t_audio);
+    if (wav.empty())
+        return nullptr;
+    float* out = (float*)malloc(wav.size() * sizeof(float));
+    std::memcpy(out, wav.data(), wav.size() * sizeof(float));
+    if (out_n_samples)
+        *out_n_samples = (int)wav.size();
+    return out;
 }
 
 // ===========================================================================
@@ -1184,14 +1199,20 @@ extern "C" bool moss_tts_set_codec_path(moss_tts_context* ctx, const char* path_
     if (!ctx || !path_codec)
         return false;
     ctx->codec_path = path_codec;
-    // Phase 4: open the codec GGUF, bind moss.codec.* tensors, set codec_loaded.
-    ctx->codec_loaded = false;
-    return false;
+    if (ctx->codec) {
+        moss_tts_codec::free(ctx->codec);
+        ctx->codec = nullptr;
+    }
+    ctx->codec = moss_tts_codec::load(path_codec, ctx->backend, ctx->sched, ctx->params.verbosity);
+    ctx->codec_loaded = (ctx->codec != nullptr);
+    return ctx->codec_loaded;
 }
 
 extern "C" void moss_tts_free(moss_tts_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->codec)
+        moss_tts_codec::free(ctx->codec);
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
     if (ctx->kv_buf)
