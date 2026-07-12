@@ -815,3 +815,28 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
     gguf_free(gctx);
     return result;
 }
+
+bool crispasr_gguf_is_pure_ctc(const std::string& model_path) {
+    // Mirror the parakeet backend's pure-CTC guard (src/parakeet.cpp): a NeMo
+    // EncDecCTCModelBPE (parakeet-ctc-*, stt_*_fastconformer_ctc) has an encoder +
+    // CTC head but NO RNN-T prediction network / joint — so it lacks both the
+    // single-embedding predictor (decoder.embed.weight) and the LSTM predictor
+    // (decoder.lstm.0.w_ih). Reads tensor infos only; no weights loaded.
+    struct gguf_init_params gip = {/*.no_alloc=*/true, /*.ctx=*/nullptr};
+    gguf_context* gctx = gguf_init_from_file(model_path.c_str(), gip);
+    if (!gctx)
+        return false;
+    bool has_embed = false, has_lstm = false;
+    const int64_t n_tensors = gguf_get_n_tensors(gctx);
+    for (int64_t i = 0; i < n_tensors; i++) {
+        const char* name = gguf_get_tensor_name(gctx, i);
+        if (!name)
+            continue;
+        if (std::strcmp(name, "decoder.embed.weight") == 0)
+            has_embed = true;
+        else if (std::strcmp(name, "decoder.lstm.0.w_ih") == 0)
+            has_lstm = true;
+    }
+    gguf_free(gctx);
+    return !has_embed && !has_lstm;
+}
