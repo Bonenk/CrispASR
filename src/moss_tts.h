@@ -70,6 +70,11 @@ bool moss_tts_codec_loaded(const struct moss_tts_context* ctx);
 int32_t* moss_tts_tokenize(struct moss_tts_context* ctx, const char* text, int* out_n_tokens);
 const char* moss_tts_token_text(struct moss_tts_context* ctx, int token_id);
 
+// Diagnostic (parity): the col-0 prompt token ids the AR loop builds for `text`.
+// Caller frees; sets *out_n.
+int32_t* moss_tts_debug_prompt_ids(struct moss_tts_context* ctx, const char* text,
+                                   const struct moss_tts_synth_params* sp, int* out_n);
+
 // ---- Backbone (KV-cached) ----
 bool moss_tts_kv_init(struct moss_tts_context* ctx, int max_ctx);
 void moss_tts_kv_reset(struct moss_tts_context* ctx);
