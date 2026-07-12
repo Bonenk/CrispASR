@@ -6,6 +6,23 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — security tokenizer fuzz harness + core_rvq proof test
+
+Two test-only deliverables from the same session:
+- **`tests/fuzz/fuzz_tokenizer.cpp`** (`crispasr-fuzz-tokenizer`, `-DCRISPASR_FUZZ=ON`)
+  — libFuzzer over `core_bpe::tokenize_simple` + `core_wordpiece::Tokenizer::tokenize`
+  on arbitrary text (the untrusted prompt/`--ref-text`/caption surface; vocab pinned
+  benign, GGUF vocab covered by `fuzz_gguf_meta`). **138,705 runs / 16 s clean** under
+  `-fsanitize=fuzzer,address,undefined` locally — closes the open bpe/wordpiece fuzz
+  item from the untrusted-input hardening. (Deterministic GGUF `load_weights` bounds
+  test still scoped — see PLAN.)
+- **`tests/test-core-rvq.cpp`** (`test-core-rvq`, `[unit]`) — proves
+  `core_rvq::encode_euclidean`'s `2·x·E−‖E‖²` shootout selects codes IDENTICAL to a
+  double-precision full-distance reference (5 shapes, K≤512, 8 stages; any
+  disagreement a certified <1e-4 near-tie) + malformed-input rejection. Retires the
+  algorithmic risk of §176l with no model; kyutai still needs to route through the
+  (now-proven) helper.
+
 ## 2026-07-12 — §176n / §245 CUDA validation PASS (Kaggle P100/T4)
 
 Ran the two CUDA validation kernels on Kaggle (chr1s4). Both reached `COMPLETE`
