@@ -10,6 +10,31 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## When the full system needs an unavailable resource (model / GPU), factor the risky logic into a pure helper and prove IT on synthetic data (§176l + GGUF-bounds, 2026-07-12)
+
+Two follow-ups had no local model / were untrusted-input paths, yet both shipped
+*validated* by construction — no "gated but never run" code:
+- **§176l kyutai RVQ routing.** Can't run kyutai (no Kyutai GGUF). But the risky
+  part is a pure transform: extract codebooks → `‖E[k]‖²` → argmin → transpose to
+  `out_codes[q][t]`. Factored it into `core_rvq::encode_euclidean_per_stage` and
+  unit-tested THAT against a double-precision scalar reference on random data
+  (identical codes, near-ties certified). kyutai then just calls the proven helper
+  behind `CRISPASR_KYUTAI_RVQ_FAST` (default OFF) — so the integration is correct
+  *by construction*, and only the end-to-end default-flip waits on a model. The
+  shared helper is the seam that lets you validate without the system.
+- **GGUF `load_weights` bounds test.** No crafted-corpus needed: write a valid GGUF
+  with the ggml writer, then truncate it **8 bytes short of the tensor data** — so
+  metadata still parses and control reaches the *specific* hardened check, not an
+  earlier magic/metadata bail-out. (Truncating to zero passes the test but only
+  exercises "failed to read magic" — a weaker guard. To guard a specific line,
+  craft the input to reach exactly that line; confirm via the log it emits.)
+
+General rule: "needs a model / a GPU / a crafted file" is rarely a hard blocker —
+find the pure sub-transform that carries the risk, give it a testable signature,
+and prove it deterministically. A gated path built on a proven helper is shippable;
+a gated path you've never executed is not. Cf. the §176c-Dia measure-first and the
+§176n empirical-repro lessons — same family: extract the checkable core.
+
 ## Metal-validated GPU TTS graph paths DID transfer cleanly to CUDA — the stricter-CUDA risk is real but not universal (§176n/§245, 2026-07-12)
 
 LEARNING 35 warns that CUDA has stricter per-op contiguity asserts than Metal, so
