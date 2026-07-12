@@ -161,8 +161,11 @@ def main():
     try:
         log("HF reference greedy generate")
         renv = os.environ.copy()
+        # 8B bf16 (~16 GB) won't fit the 16 GB P100 — run the reference on CPU
+        # (fits ~29 GB host RAM); the C++ side runs Q4_K on the GPU.
         renv.update(MOSS_TTS_MODEL=HF_MODEL, MOSS_TTS_TEXT=TEXT, MOSS_TTS_SEED="0",
-                    MOSS_TTS_MAXNEW=str(MAXNEW))
+                    MOSS_TTS_MAXNEW=str(MAXNEW), MOSS_TTS_REF_DEVICE="cpu",
+                    CUDA_VISIBLE_DEVICES="")
         r = subprocess.run(
             [sys.executable, "-c",
              f"import sys; sys.path.insert(0, r'{REPO/'tools'/'reference_backends'}');"
