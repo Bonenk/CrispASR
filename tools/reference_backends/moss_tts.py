@@ -117,18 +117,12 @@ def dump(
     model = AutoModel.from_pretrained(model_id, trust_remote_code=True, torch_dtype=dtype).to(device).eval()
     processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
 
-    # Build the user turn via the processor (mirrors build_user_message /
-    # the C++ prompt template). Fall back to a plain text prompt if the
-    # processor doesn't expose the helper under the expected name.
-    build = getattr(processor, "build_user_message", None) or getattr(processor, "apply_chat_template", None)
-    if build is not None:
-        try:
-            inputs = build(text=text, return_tensors="pt")
-        except TypeError:
-            inputs = processor(text=text, return_tensors="pt")
-    else:
-        inputs = processor(text=text, return_tensors="pt")
-    inputs = {k: (v.to(device) if hasattr(v, "to") else v) for k, v in dict(inputs).items()}
+    # MossTTSProcessor is a chat processor: build a user message, then call it
+    # with conversations=[...] (NOT text=...). See processing_moss_tts.py.
+    user_msg = processor.build_user_message(text=text, reference=None, instruction=None, tokens=None,
+                                            quality=None, sound_event=None, ambient_sound=None, language=None)
+    batch = processor(conversations=[user_msg], mode="generation", apply_chat_template=True)
+    inputs = {k: (v.to(device) if hasattr(v, "to") else v) for k, v in dict(batch).items()}
 
     print(f"[moss_tts_ref] greedy generate (max_new_tokens={max_new_tokens})", flush=True)
     with torch.no_grad():
