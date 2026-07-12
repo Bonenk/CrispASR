@@ -299,6 +299,25 @@ catch_discover_tests(test-core-rvq
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-gguf-bounds — regression guard for the GGUF load_weights OOB fix ─────
+# Untrusted-input hardening: a truncated/crafted GGUF must be rejected by
+# core_gguf::load_weights, not SIGBUS the mmap loader. Needs crispasr-lib (the
+# loader) + ggml (gguf writer).
+add_executable(test-gguf-bounds test-gguf-bounds.cpp)
+target_include_directories(test-gguf-bounds PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+)
+target_link_libraries(test-gguf-bounds PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+    ggml
+)
+catch_discover_tests(test-gguf-bounds
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-vibevoice-quant-carveout — regression guard for issue #171 ──────────
 # Asserts crispasr-quantize keeps the VibeVoice diffusion prediction head and
 # connectors/EOS (pred.*, at_conn.*, se_conn.*, tts_eos.*, tts_types.*) at source

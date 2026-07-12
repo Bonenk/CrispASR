@@ -144,6 +144,84 @@ TEST_CASE("core_rvq::encode_euclidean matches full-distance reference", "[unit][
     REQUIRE(mismatches == tie_mismatches);
 }
 
+TEST_CASE("core_rvq::encode_euclidean_per_stage matches the scalar reference (kyutai §176l layout)", "[unit][rvq]") {
+    // Validates the convenience wrapper kyutai_stt routes through: internal
+    // ||E[k]||^2 precompute + transpose of encode_euclidean's (T,n_stages) output
+    // into per-stage out_codes[s][t]. Compared against the full-distance
+    // reference (transposed), with the same near-tie certification.
+    std::mt19937 rng(0xBADC0DE);
+    std::normal_distribution<float> gauss(0.0f, 1.0f);
+
+    struct Shape {
+        int T, dim, K, n_stages;
+    };
+    const Shape shapes[] = {{1, 4, 4, 1}, {12, 16, 64, 4}, {20, 24, 128, 6}};
+
+    for (const auto& sh : shapes) {
+        std::vector<float> features((size_t)sh.T * sh.dim);
+        for (auto& f : features)
+            f = gauss(rng);
+
+        std::vector<std::vector<float>> embeds(sh.n_stages);
+        std::vector<std::vector<float>> norms(sh.n_stages);
+        std::vector<const float*> embed_ptrs(sh.n_stages);
+        std::vector<int> sizes(sh.n_stages);
+        std::vector<core_rvq::Codebook> stages(sh.n_stages);
+        for (int s = 0; s < sh.n_stages; s++) {
+            embeds[s].resize((size_t)sh.K * sh.dim);
+            norms[s].resize(sh.K);
+            for (auto& e : embeds[s])
+                e = gauss(rng);
+            for (int k = 0; k < sh.K; k++) {
+                float nn = 0.0f;
+                for (int j = 0; j < sh.dim; j++) {
+                    float v = embeds[s][(size_t)k * sh.dim + j];
+                    nn += v * v;
+                }
+                norms[s][k] = nn;
+            }
+            embed_ptrs[s] = embeds[s].data();
+            sizes[s] = sh.K;
+            stages[s] = {embeds[s].data(), norms[s].data(), sh.K, sh.dim};
+        }
+
+        std::vector<std::vector<int32_t>> got;
+        REQUIRE(core_rvq::encode_euclidean_per_stage(features.data(), sh.T, sh.dim, embed_ptrs.data(), sizes.data(),
+                                                     sh.n_stages, got));
+        REQUIRE((int)got.size() == sh.n_stages);
+
+        std::vector<int32_t> want = reference_encode(features, sh.T, sh.dim, stages);
+
+        // Certify any disagreement as a genuine near-tie (walk with a double
+        // residual along the codes the wrapper chose).
+        std::vector<double> residual(features.begin(), features.end());
+        for (int s = 0; s < sh.n_stages; s++) {
+            REQUIRE((int)got[s].size() == sh.T);
+            const auto& cb = stages[s];
+            for (int t = 0; t < sh.T; t++) {
+                double* x = residual.data() + (size_t)t * sh.dim;
+                int g = got[s][t];
+                int w = want[(size_t)t * sh.n_stages + s];
+                if (g != w) {
+                    double dg = true_dist(x, cb.embed + (size_t)g * sh.dim, sh.dim);
+                    double dw = true_dist(x, cb.embed + (size_t)w * sh.dim, sh.dim);
+                    REQUIRE(std::abs(dg - dw) / std::max(1.0, std::abs(dw)) < 1e-4);
+                }
+                const float* e = cb.embed + (size_t)g * sh.dim;
+                for (int j = 0; j < sh.dim; j++)
+                    x[j] -= (double)e[j];
+            }
+        }
+    }
+
+    // Malformed: null embed pointer array entry.
+    std::vector<float> feat(4, 0.0f);
+    const float* nullembed[1] = {nullptr};
+    int sz[1] = {2};
+    std::vector<std::vector<int32_t>> oc;
+    REQUIRE_FALSE(core_rvq::encode_euclidean_per_stage(feat.data(), 1, 4, nullembed, sz, 1, oc));
+}
+
 TEST_CASE("core_rvq::encode_euclidean rejects malformed input", "[unit][rvq]") {
     std::vector<float> feat(4, 0.0f);
     std::vector<float> emb(8, 0.0f), norm(2, 0.0f);
