@@ -271,6 +271,7 @@ std::vector<std::string> crispasr_list_backends() {
         "vibevoice",
         "kugelaudio",
         "qwen3-tts",
+        "moss-tts",
         "vibevoice-1.5b",
         "qwen3-tts-customvoice",
         "qwen3-tts-1.7b-base",

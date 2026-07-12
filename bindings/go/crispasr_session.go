@@ -2,7 +2,7 @@ package whisper
 
 // Minimal TTS + S2S surface for the Go binding. Exposes the unified
 // CrispASR Session API for TTS-capable backends (kokoro, vibevoice,
-// qwen3-tts, orpheus, chatterbox, csm, dia, zonos-tts, speecht5, fastpitch,
+// qwen3-tts, moss-tts, orpheus, chatterbox, csm, dia, zonos-tts, speecht5, fastpitch,
 // bananamind-tts, melotts, piper, parler-tts, outetts, indextts, voxcpm2-tts,
 // cosyvoice3-tts, pocket-tts, f5-tts, bark, kugelaudio, tada, lfm2-audio,
 // dots-tts, ...)
@@ -331,7 +331,7 @@ import (
 	"unsafe"
 )
 
-// CrispasrSession is a TTS/S2S-capable session (kokoro, vibevoice, qwen3-tts, orpheus, parler-tts, pocket-tts, tada, lfm2-audio, mini-omni2).
+// CrispasrSession is a TTS/S2S-capable session (kokoro, vibevoice, qwen3-tts, moss-tts, orpheus, parler-tts, pocket-tts, tada, lfm2-audio, mini-omni2).
 type CrispasrSession struct {
 	handle *C.CrispasrSession
 }

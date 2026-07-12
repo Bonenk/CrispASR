@@ -36,6 +36,7 @@
 #include <limits>
 #include <memory>
 #include <random>
+#include <chrono>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -43,6 +44,27 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+// Per-stage RAII timing, gated by MOSS_TTS_BENCH=1 (zero overhead when unset).
+static bool moss_tts_bench_enabled() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = std::getenv("MOSS_TTS_BENCH");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v != 0;
+}
+struct moss_tts_bench_stage {
+    const char* name;
+    std::chrono::steady_clock::time_point t0;
+    explicit moss_tts_bench_stage(const char* n) : name(n), t0(std::chrono::steady_clock::now()) {}
+    ~moss_tts_bench_stage() {
+        if (!moss_tts_bench_enabled())
+            return;
+        double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        std::fprintf(stderr, "  moss_tts_bench: %-22s %.2f ms\n", name, ms);
+    }
+};
 
 // ===========================================================================
 // Hyper-parameters
@@ -905,6 +927,7 @@ static std::string mt_build_prompt_text(const moss_tts_context* ctx, const char*
 // Shared AR loop → DelayState with the generated history. Returns false on error.
 static bool mt_generate(moss_tts_context* ctx, const char* text, const moss_tts_synth_params& sp,
                         std::unique_ptr<DelayState>& state_out) {
+    moss_tts_bench_stage _b("generate_codes");
     const auto& hp = ctx->model.hparams;
     const int n_vq = (int)hp.n_vq;
     const int max_new = sp.max_new_tokens > 0 ? sp.max_new_tokens : 4096;
@@ -1031,6 +1054,7 @@ extern "C" float* moss_tts_synthesize(moss_tts_context* ctx, const char* text, c
     std::vector<int32_t> codes = state->extract_audio_codes(nvq, t_audio);
     if (t_audio <= 0 || codes.empty())
         return nullptr;
+    moss_tts_bench_stage _bd("codec_decode");
     std::vector<float> wav = moss_tts_codec::decode(ctx->codec, codes.data(), nvq, t_audio);
     if (wav.empty())
         return nullptr;
