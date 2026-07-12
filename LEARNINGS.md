@@ -12773,3 +12773,32 @@ logits that drifted ~0.7 — and the drift ENTERED at block 3, not block 0
    build dir; the stale worktree dylib then "disproved" a correct fix
    (same max_abs before/after). `strings <dylib> | grep <new-env-var>`
    is the 5-second staleness check.
+
+### #81 endgame: three more durable lessons from the fleet requant + CUDA phase
+
+1. **A documented op-fallback note is an unexploited perf bug.** The
+   `fattn.cu` per-head-mask guard (`mask->ne[2] != 1` → flash rejected on
+   CUDA) had been sitting in PERFORMANCE.md's CUDA op-support table since
+   May as "the dominant CPU-fallback" — acting on it (manual QK^T +
+   soft_max_ext attention, all-GPU) was a **3.2×** on long audio. When a
+   support-table entry says "falls back to CPU on <backend>", treat it as
+   an open perf ticket: either restructure the graph around the guard or
+   fix the kernel upstream. `GGML_SCHED_DEBUG=2` per backend per GPU is
+   the audit tool.
+2. **Requantizing an old GGUF with today's quantizer is NOT identity —
+   rules drift.** Old parakeet q4_k files kept the whole transducer head
+   (decoder.embed, joint.out, joint.pred) at F16 under rules that no
+   longer exist; a naive re-quant silently changes those tensors too. The
+   safe fleet-fix pattern: same-type tensors byte-copy (so requant = the
+   minimal intended diff), a structural gate that refuses ANY unexpected
+   type/data change, per-file `--tensor-type` pins to reproduce retired
+   rules, and strict transcript equality (old + runtime repack vs new)
+   as acceptance. The gate caught both the rules drift AND a
+   down-quantization bug (q8 pw → q4 on re-runs) before anything shipped.
+3. **`HfApi.upload_file` can strand after its commit lands (CLOSE_WAIT)
+   on Kaggle too** — not just on the Mac (memory said laptop-specific;
+   wrong). A single-threaded pipeline wedges forever on one call. Pattern:
+   run HF network ops on daemon threads with a join timeout, then verify
+   server-side (list_repo_tree size match) and treat a hung-but-landed
+   upload as success. Progress mirroring to a side repo (small JSON per
+   file) is what makes a wedged cloud kernel diagnosable at all.
