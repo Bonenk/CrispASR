@@ -31,7 +31,7 @@ MODELS = TMP / "moss-models"
 WORK = Path("/kaggle/working")
 MODELS.mkdir(parents=True, exist_ok=True)
 
-REF = os.environ.get("CRISPASR_REF", "feat/moss-tts-followups")
+REF = os.environ.get("CRISPASR_REF", "feat/moss-tts-parity-diff")
 HF_MODEL = os.environ.get("MOSS_TTS_MODEL", "OpenMOSS-Team/MOSS-TTS-v1.5")
 HF_GGUF = os.environ.get("MOSS_TTS_GGUF_REPO", "cstr/moss-tts-v1.5-GGUF")
 TEXT = os.environ.get("MOSS_TTS_TEXT", "The quick brown fox jumps over the lazy dog.")
