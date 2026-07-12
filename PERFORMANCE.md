@@ -3538,3 +3538,20 @@ Warm-vs-warm on the 55 s clip this puts CrispASR parakeet-ctc CUDA at
 ~153× RT vs onnx-asr CUDA fp32 ~220× — the remaining gap is ~1.4×
 (was ~11× against the CLI-measured numbers; those included per-call
 model load).
+
+### M1 Metal re-measure with the #81 defaults (2026-07-12)
+
+Back-to-back legacy-gates vs defaults on the merged main (a7f04050),
+Metal build, JFK 11 s, medians of 5, load ~4-8 (shared box — treat ±10%):
+
+| model | legacy | defaults | Δ |
+|---|---|---|---|
+| parakeet-ctc-0.6b q8_0 (fastconformer-ctc, Metal) | 1.116 s (9.9×) | **0.681 s (16.2×)** | **1.64×** |
+| parakeet-ctc-0.6b requantized GGUF | — | 0.754 s (14.6×, noisy) | ≈defaults |
+| parakeet-tdt-0.6b-v3 q4_k (parakeet) | 0.759 s (14.5×) | 0.797 s (13.8×) | neutral (noise) |
+
+The conv-pw Q8_0 repack + fused QKV pay on Metal too for the CTC path
+(Metal's q8_0 matmul beats its F16 matmul at these shapes). The TDT
+session path shows no encoder-dominated gain — its wallclock is decode/
+session-bound on Metal; worth a per-stage look before drawing conclusions.
+Flash attention remains the Metal default (manual-attn auto is CUDA-only).
