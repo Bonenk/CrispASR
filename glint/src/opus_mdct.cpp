@@ -21,7 +21,6 @@
 #include "opus_mdct.hpp"
 
 #include <cassert>
-#include <cstddef>
 #include <cmath>
 
 namespace glint {
