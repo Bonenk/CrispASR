@@ -6,6 +6,28 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — §176n VoxCPM2 Metal: the roadmap entry was stale — GPU already works (3.75×), verified
+
+PLAN §176n was marked OPEN ("CPU-only due to SIGSEGV from `matmul_mv_ggml`"). That
+note predates the `VOXCPM2_USE_GRAPH` fused-graph infra that has since shipped.
+Empirical check on M1 (`voxcpm2-q4_k.gguf`): `crispasr --backend voxcpm2-tts`
+already runs on **Metal** by default (CLI `should_use_gpu`; session ABI
+`g_open_use_gpu_tls`), and the heavy pipeline — per-step TSLM/RALM/LocDiT fused
+graphs + VAE encode/decode graphs, all gated `VOXCPM2_USE_GRAPH=1` (default ON) on
+`ctx->backend` via `ggml_gallocr` + `ggml_backend_tensor_set` — executes on the
+GPU with no SIGSEGV.
+
+**Verified (load ~2.7, quiet):** basic synth GPU **5772 ms** vs CPU **21647 ms** =
+**3.75×** (AR loop 2.05×, VAE decode 3.5×); both ASR-roundtrip to the exact input
+text. Voice-clone (`--voice jfk.wav`) also runs fully on Metal incl. the VAE-
+*encode* graph — no crash/NaN/unsupported-op. The old SIGSEGV was only ever about
+routing the tiny CPU helper matmuls (`matmul_mv_ggml`, raw host pointers) through
+Metal, which is neither done nor wanted (30 tiny matvecs/step would be launch-
+bound). Only change: corrected the misleading in-code comment + reclassified the
+PLAN entry. CUDA/discrete-GPU mirror path still unvalidated (Metal unified-memory
+only). Lib `default_params use_gpu=false` left as-is — the conventional
+conservative default, overridden by CLI + session. See LEARNINGS + PLAN §176n.
+
 ## 2026-07-12 — Cohere Arabic "🎵 loop" was a corrupt safetensors download, not a bug
 
 A reported `🎵بحبح…` repetition loop on clean Arabic speech (cohere-transcribe-arabic-07-2026)

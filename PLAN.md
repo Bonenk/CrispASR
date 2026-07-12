@@ -829,7 +829,7 @@ landed, CUDA-validated). Deliberately-open threads, in priority order:
 |---|---|---|---|
 | **HIGH** | [#221 Issue #89 hardening + v0.8.8](#221-issue-89-hardening--v088-release) | Medium | 5 steps: CI regression guard (a), server-path mirror (b), Vulkan sanity (c), q4_k registry/UX (d), release (e). |
 | **DONE** | CPU weight-read hardening + Mimi codec causal default | Medium | **DONE 2026-07.** Routed ~14 CPU-side weight readers through the quantized-safe `core_cpu::to_f32` (`src/core/cpu_ops.h`); unit (`test-cpu-ops-to-f32`) + live tested on Metal + CUDA. wav2vec2 conv_w left as-is (zero-copy hot path, never quantized). **Mimi codec:** `kyutai_stt` now **defaults to causal+sliding-window** — a >250-frame WER A/B (3× jfk ≈412 frames) showed the old full non-causal attention truncates long audio ~25%; opt out with **`CRISPASR_MIMI_NONCAUSAL=1`**. `csm_tts` **also defaults to causal** (opt out `CRISPASR_MIMI_NONCAUSAL=1`) after a TTS→ASR A/B (~256 dec frames) gave causal 9.3% vs non-causal 12.0% WER (a modest single-sample win — non-causal TTS stayed intelligible rather than truncating like STT). → HISTORY, LEARNINGS. |
-| **HIGH** | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | 20 sub-items (§176a–§176t). **16 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176i (cross-KV F16, 5 backends), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **3 OPEN**: §176c (device-resident KV), §176l (Kyutai RVQ), §176n (VoxCPM2 Metal). **§176k (FireRed) MOSTLY DONE 2026-07-12** — profiling debunked the "KV/flash" framing (decode is dispatch-bound, not attention-bound); shipped an env-gated persistent matvec graph cache (`CRISPASR_FIRERED_MATVEC_CACHE`, default ON, bit-identical, pure Pareto). |
+| **HIGH** | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | 20 sub-items (§176a–§176t). **16 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176i (cross-KV F16, 5 backends), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **2 OPEN**: §176c (device-resident KV), §176l (Kyutai RVQ). **§176k (FireRed) MOSTLY DONE 2026-07-12** — profiling debunked the "KV/flash" framing (decode is dispatch-bound, not attention-bound); shipped an env-gated persistent matvec graph cache (`CRISPASR_FIRERED_MATVEC_CACHE`, default ON, bit-identical, pure Pareto). **§176n (VoxCPM2 Metal) DONE 2026-07-12** — stale entry: Metal already works via `VOXCPM2_USE_GRAPH` fused graphs, verified 3.75× on M1 with correct ASR roundtrip (CUDA still unvalidated). |
 | **MEDIUM** | [#52 Qwen3-TTS](#52-qwen3-tts) — perf pass | Medium | talker + code_predictor + codec + ECAPA + codec_encoder all done; step-4 perf pass open (~137 ms/frame → real-time). **O15 broken on CUDA and default-OFF** (`61c42bfb`) — main perf lever disabled. **2026-06-13 Kaggle P100:** dedicated-sched fix (`baef21aa`) didn't help — O15=ON still rc=-6 SIGABRT at 6.0s. Crash is on the *first* code_pred call (not cached reuse), so root cause is `ggml_set_rows`-based KV scatter or the fixed-Lk causal mask on CUDA, not sched sharing. Baseline O15=OFF: 27.4 ms/frame, WAV OK. |
 | **HIGH** | [#57 Commercial-friendly TTS expansion](#57-commercial-friendly-tts-backend-expansion) | Phased | Phases 1–3 + Turbo + native voice cloning shipped (→ HISTORY §82). **#83 S3Gen production fix LANDED** — UNet weight-residency split + `parallel=true` sched cache-coherency fix; M1 Metal diff cos_min 0.940→0.999976, intelligible at all T. **Remaining:** Kartoffelbox_Turbo DE. → see HISTORY + upstream-prs/09–11. |
 | **MEDIUM** | [#51c MiMo-V2.5-ASR F16 step decode](#51c-f16-step-decode) | Small | F16 step-decode validation blocked behind ≥32 GB box (see PLAN #51c); base runtime + Q4_K shipped → HISTORY §56 |
@@ -6101,42 +6101,39 @@ lever for typical clips. Measure on a long clip before investing.
 dominant cost. Options: SIMD-vectorized exhaustive search, or product
 quantization / FAISS-style IVF for approximate nearest-neighbor.
 
-#### §176n VoxCPM2: fix Metal buffer type mismatch
+#### §176n VoxCPM2: Metal — ALREADY WORKS, VERIFIED (was a stale entry)
 
-**Status:** OPEN — root-caused + scope de-risked 2026-07-12 (needs a quiet box to
-build/run the TTS→ASR roundtrip; not started under load).
-**Effort:** Medium
-**File:** `src/voxcpm2_tts.cpp`
+**Status:** DONE 2026-07-12 — the premise was stale. VoxCPM2 already runs on Metal
+GPU correctly and is a **3.75× win**; the SIGSEGV described here predates the
+`VOXCPM2_USE_GRAPH` fused-graph infra that has since shipped. No code fix needed
+(only a misleading comment corrected). **CUDA still unvalidated** (Metal-only).
 
-**Root cause (confirmed by reading, not guessed):** the SIGSEGV is NOT a
-`ggml_backend_sched` buffer-type bug — it's `matmul_mv_ggml` (`src/voxcpm2_tts.cpp`
-~L543) using `ggml_init(no_alloc=false)` and `memcpy`-ing straight into
-`v_t->data` / reading `result->data` — **raw CPU malloc pointers**. A Metal
-backend can't dereference those, so `ggml_backend_graph_compute` on Metal
-segfaults on first dispatch. It is fundamentally a CPU-only pattern.
+**What was actually true (empirically, on M1):** `crispasr --backend voxcpm2-tts`
+already sets `use_gpu` via `should_use_gpu` (as does the session ABI via
+`g_open_use_gpu_tls`), so `ctx->backend` IS Metal by default. The heavy pipeline
+runs on it: the per-step fused graphs (`build_tslm_step_graph` / `_ralm_` /
+`build_locdit_graph`) + VAE encode/decode graphs are gated `VOXCPM2_USE_GRAPH=1`
+(default ON) on `ctx->backend` via `ggml_gallocr` + `ggml_backend_tensor_set`. The
+old SIGSEGV was about routing the *tiny CPU helper* matmuls (`matmul_mv_ggml`,
+raw host pointers) through Metal — which is neither done nor wanted (30 tiny
+matvecs/step = launch-bound; the graph path is the win).
 
-**Why "just make matmul_mv_ggml Metal-safe" is the wrong fix:** the pipeline
-issues ~30 of these tiny matvecs per step. Routing each individually through
-Metal is launch-bound and would *lose* to CPU (the per-step-dispatch lesson —
-cf. §176k FireRed, moonshine). The win requires ONE fused step graph per Metal
-dispatch, not 30.
+**Verification (M1, `voxcpm2-q4_k.gguf`, load ~2.7 — quiet):**
+- Basic synth "and so my fellow americans": GPU total **5772 ms** (AR 4392 + VAE
+  1005) vs CPU **21647 ms** (AR 8987 + VAE 3537) → **3.75×**. Both round-trip via
+  firered-asr to the exact input text (correct, not garbage).
+- Voice-clone (`--voice jfk.wav`): runs fully on Metal — VAE-**encode** graph
+  (2166 ms) + AR (13069 ms) + VAE-decode (4174 ms), no SIGSEGV / NaN / unsupported
+  op. So even the VAE-encode path is Metal-clean.
 
-**Good news — the fused-graph infra already exists** (gated `VOXCPM2_USE_GRAPH=1`):
-`build_tslm_step_graph` (~L1222) + bucketed `get_or_build_tslm_step_graph`
-(~L1405), `build_ralm_step_graph` (~L1076), plus LocDiT/LocEnc/VAE gallocr pools
-(~L389–480). They use `ggml_gallocr` on `ctx->backend` + backend-resident KV +
-`ggml_backend_tensor_set/get` — i.e. exactly the Metal-safe pattern. So §176n is
-**not** a from-scratch rewrite.
-
-**Remaining work:** (1) make `ctx->backend` actually Metal (it's CPU-pinned today);
-(2) audit every per-step path (TSLM, RALM, LocDiT, VAE decode/encode) to confirm
-each routes through the `USE_GRAPH` graph and NOT the CPU `matmul_mv_ggml`
-fallback under Metal — any straggler resurrects the segfault; (3) handle the
-Metal op-support gotchas (k-quant CPY/CAST, left-pad conv — see the GPU
-portability notes) if they surface; (4) validate by TTS→ASR roundtrip + per-stage
-diff on **both** F16 and Q4_K, then A/B GPU-vs-CPU on a **quiet** box (Metal
-timing swings ±20% under load — the box was at load 33–46 when this was scoped).
-Model available locally: `.../voxcpm2/voxcpm2-q4_k.gguf` (1.6 GB) + `voxcpm2-ref*.gguf`.
+**Left open (LOW):** CUDA/discrete-GPU is unvalidated here — the mirror path
+(`needs_gpu_mirror`, device-local VRAM) only exercised on Metal (unified memory).
+A Kaggle P100 TTS→ASR roundtrip would confirm before relying on GPU-default there
+([[gpu-default-needs-cuda-roundtrip]] / LEARNING 35). The lib `default_params`
+keeps `use_gpu=false` — that is the **conventional** conservative default (dia,
+bark, csm, piper, irodori, tada, chatterbox all do the same); it's overridden by
+CLI + session, so all real consumers already get the Metal win. Don't flip it
+without the CUDA roundtrip.
 
 ## §ARK — ARK-ASR-3B support (⚠️ EXPERIMENTAL / WIP; branch feat/arkasr-3b)
 
