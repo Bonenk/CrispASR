@@ -38,4 +38,12 @@ void free(Codec* c);
 // (length t_audio * 1920). Returns empty on error / t_audio <= 0.
 std::vector<float> decode(Codec* c, const int32_t* codes, int n_vq, int t_audio);
 
+// True iff the codec GGUF carried the encoder tensors (voice cloning available).
+bool encoder_ready(const Codec* c);
+
+// Encode a 24 kHz mono waveform (length n_samples, padded to a multiple of 1920)
+// -> (n_vq, t_audio) row-major int32 RVQ codes; sets *n_vq_out, *t_audio_out.
+// Returns empty if the encoder isn't available. (Voice cloning.)
+std::vector<int32_t> encode(Codec* c, const float* waveform, int64_t n_samples, int& n_vq_out, int& t_audio_out);
+
 } // namespace moss_tts_codec

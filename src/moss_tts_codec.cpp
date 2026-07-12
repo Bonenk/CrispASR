@@ -57,6 +57,17 @@ constexpr std::array<StageSpec, 4> DECODER_STAGES = {{
     {384, 768, 12, 3072, 12, 240, 240, 6, 1000},
 }};
 
+// Encoder (voice cloning: waveform -> codes). Mirror of the decoder; the initial
+// patch=240 downsample happens BEFORE enc.1 (CODEC_PRE_PATCH); patch_after here
+// is the downsample that FOLLOWS the stage. RVQ dims: cb_dim 8, rvq 512, out 768.
+constexpr int CODEC_PRE_PATCH = 240;
+constexpr std::array<StageSpec, 4> ENCODER_STAGES = {{
+    {240, 768, 12, 3072, 12, 384, 2, 1, 1000},  // enc.1 @100Hz + enc.2 patch
+    {768, 768, 12, 3072, 12, 384, 2, 3, 500},   // enc.3 @50Hz  + enc.4 patch
+    {768, 768, 12, 3072, 12, 640, 2, 5, 250},   // enc.5 @25Hz  + enc.6 patch
+    {1280, 1280, 20, 5120, 32, 768, 0, 7, 125}, // enc.7 @12.5Hz (no patch after)
+}};
+
 } // namespace
 
 // ===========================================================================
@@ -80,6 +91,14 @@ struct Codec {
     ggml_tensor* quant_oproj_w = nullptr;
     ggml_tensor* quant_oproj_b = nullptr;
 
+    // Encoder-only reconstructed weights + L2-normalized codebooks (voice cloning).
+    std::array<ggml_tensor*, NUM_VQ> q_iproj_w{};
+    std::array<ggml_tensor*, NUM_VQ> q_iproj_b{};
+    ggml_tensor* quant_iproj_w = nullptr;
+    ggml_tensor* quant_iproj_b = nullptr;
+    std::array<ggml_tensor*, NUM_VQ> codebook_normed{};
+    bool encoder_ready = false;
+
     std::array<ggml_tensor*, NUM_VQ> codebook{};
 
     struct Layer {
@@ -94,6 +113,7 @@ struct Codec {
         std::vector<Layer> layers;
     };
     std::array<Stage, 4> stages;
+    std::array<Stage, 4> enc_stages; // encoder transformer stages (voice cloning)
 
     std::vector<uint8_t> compute_meta;
 
@@ -251,6 +271,18 @@ ggml_tensor* patch_upsample(ggml_context* g, ggml_tensor* x, int patch) {
     return y;
 }
 
+// Inverse of patch_upsample (encoder downsample): (D, T_in) -> (D*patch, T_in/patch).
+// out[d*patch + h, t] = in[d, t*patch + h].
+ggml_tensor* patch_downsample(ggml_context* g, ggml_tensor* x, int patch) {
+    const int64_t D = x->ne[0];
+    const int64_t T_out = x->ne[1] / patch;
+    ggml_tensor* y = ggml_reshape_3d(g, x, D, patch, T_out);
+    y = ggml_permute(g, y, 1, 0, 2, 3); // (patch, D, T_out)
+    y = ggml_cont(g, y);
+    y = ggml_reshape_2d(g, y, D * patch, T_out);
+    return y;
+}
+
 // (T, T) F32 additive sliding-window causal mask: 0 if kv<=q && q-kv<ctx else -inf.
 void fill_mask(std::vector<float>& buf, int T, int context) {
     buf.assign((size_t)T * T, 0.f);
@@ -319,7 +351,7 @@ Codec* load(const char* path, ggml_backend_t backend, ggml_backend_sched_t sched
 
     // Reconstruct weight-normed projections into a dedicated buffer.
     {
-        ggml_init_params ip = {ggml_tensor_overhead() * (2 * NUM_VQ + 8), nullptr, true};
+        ggml_init_params ip = {ggml_tensor_overhead() * (5 * NUM_VQ + 16), nullptr, true};
         c->w_ctx = ggml_init(ip);
         auto mk_w = [&](int in, int out) { return ggml_new_tensor_2d(c->w_ctx, GGML_TYPE_F16, in, out); };
         auto mk_b = [&](int out) { return ggml_new_tensor_1d(c->w_ctx, GGML_TYPE_F16, out); };
@@ -329,6 +361,15 @@ Codec* load(const char* path, ggml_backend_t backend, ggml_backend_sched_t sched
         }
         c->quant_oproj_w = mk_w(RVQ_DIM, OUT_DIM);
         c->quant_oproj_b = mk_b(OUT_DIM);
+        // Encoder-only (voice cloning): q.iproj (512->8), quantizer.iproj (768->512),
+        // and per-row-L2-normalized codebooks (8, 1024) for cosine-similarity argmax.
+        for (int i = 0; i < NUM_VQ; i++) {
+            c->q_iproj_w[i] = mk_w(RVQ_DIM, CB_DIM);
+            c->q_iproj_b[i] = mk_b(CB_DIM);
+            c->codebook_normed[i] = ggml_new_tensor_2d(c->w_ctx, GGML_TYPE_F16, CB_DIM, CB_SIZE);
+        }
+        c->quant_iproj_w = mk_w(OUT_DIM, RVQ_DIM);
+        c->quant_iproj_b = mk_b(RVQ_DIM);
         c->w_buf = ggml_backend_alloc_ctx_tensors(c->w_ctx, backend);
         if (!c->w_buf) {
             fprintf(stderr, "moss_tts_codec: alloc weight buffer failed\n");
@@ -347,6 +388,63 @@ Codec* load(const char* path, ggml_backend_t backend, ggml_backend_sched_t sched
             free(c);
             return nullptr;
         }
+
+        // Encoder is best-effort: if the codec GGUF lacks enc/iproj tensors, decode
+        // still works; only voice cloning (encode) is unavailable.
+        bool eok = c->get("moss.codec.quantizer.iproj.wp0") != nullptr;
+        for (int i = 0; eok && i < NUM_VQ; i++) {
+            const std::string b = "moss.codec.quantizer.q." + std::to_string(i) + ".iproj.";
+            eok = reconstruct(*c, b, c->q_iproj_w[i], c->q_iproj_b[i], RVQ_DIM, CB_DIM);
+        }
+        eok =
+            eok && reconstruct(*c, "moss.codec.quantizer.iproj.", c->quant_iproj_w, c->quant_iproj_b, OUT_DIM, RVQ_DIM);
+        // L2-normalize each codebook row (8-dim) -> codebook_normed (for cosine sim).
+        for (int i = 0; eok && i < NUM_VQ; i++) {
+            std::vector<float> cb = read_f32(c->codebook[i]); // (CB_SIZE, CB_DIM) row-major
+            if ((int)cb.size() != CB_SIZE * CB_DIM) {
+                eok = false;
+                break;
+            }
+            std::vector<ggml_fp16_t> nrm((size_t)CB_SIZE * CB_DIM);
+            for (int r = 0; r < CB_SIZE; r++) {
+                float ss = 0.f;
+                for (int d = 0; d < CB_DIM; d++)
+                    ss += cb[(size_t)r * CB_DIM + d] * cb[(size_t)r * CB_DIM + d];
+                float inv = ss > 0.f ? 1.0f / std::sqrt(ss) : 0.f;
+                for (int d = 0; d < CB_DIM; d++)
+                    nrm[(size_t)r * CB_DIM + d] = ggml_fp32_to_fp16(cb[(size_t)r * CB_DIM + d] * inv);
+            }
+            ggml_backend_tensor_set(c->codebook_normed[i], nrm.data(), 0, nrm.size() * sizeof(ggml_fp16_t));
+        }
+        // Resolve encoder transformer stages (enc.1/3/5/7), same layout as decoder.
+        for (size_t s = 0; eok && s < c->enc_stages.size(); s++) {
+            auto& S = c->enc_stages[s];
+            S.spec = ENCODER_STAGES[s];
+            const std::string base = "moss.codec.enc." + std::to_string(S.spec.gguf_idx) + ".";
+            S.iproj = (S.spec.d_model != S.spec.input_dim) ? c->get(base + "iproj.weight") : nullptr;
+            S.oproj = (S.spec.d_model != S.spec.output_dim) ? c->get(base + "oproj.weight") : nullptr;
+            S.layers.resize((size_t)S.spec.n_layers);
+            for (int li = 0; li < S.spec.n_layers; li++) {
+                const std::string lb = base + "tr.l." + std::to_string(li) + ".";
+                auto& L = S.layers[(size_t)li];
+                L.norm1_w = c->get(lb + "norm1.weight");
+                L.norm1_b = c->get(lb + "norm1.bias");
+                L.norm2_w = c->get(lb + "norm2.weight");
+                L.norm2_b = c->get(lb + "norm2.bias");
+                L.attn_in = c->get(lb + "attn.inp.0.weight");
+                L.attn_out = c->get(lb + "attn.outp.0.weight");
+                L.linear1 = c->get(lb + "linear1.weight");
+                L.linear2 = c->get(lb + "linear2.weight");
+                L.layer_scale_1 = c->get(lb + "layer_scale_1.scale");
+                L.layer_scale_2 = c->get(lb + "layer_scale_2.scale");
+                eok = eok && L.norm1_w && L.attn_in && L.linear1 && L.layer_scale_1;
+            }
+            if ((S.iproj == nullptr) != (S.spec.d_model == S.spec.input_dim))
+                eok = false;
+        }
+        c->encoder_ready = eok;
+        if (!eok && verbosity >= 1)
+            fprintf(stderr, "moss_tts_codec: encoder tensors absent/incomplete — voice cloning disabled\n");
     }
 
     c->compute_meta.resize(ggml_tensor_overhead() * 65536 + ggml_graph_overhead_custom(65536, false));
@@ -465,6 +563,123 @@ std::vector<float> decode(Codec* c, const int32_t* codes, int n_vq, int t_audio)
     ggml_backend_tensor_get(out, wav.data(), 0, wav.size() * sizeof(float));
     ggml_free(g);
     return wav;
+}
+
+bool encoder_ready(const Codec* c) {
+    return c && c->encoder_ready;
+}
+
+// Encode a 24 kHz mono waveform -> (n_vq, T_audio) RVQ codes (voice cloning).
+// Ported from openmoss codec.cpp encode(): pad -> patch_downsample(240) -> 4 enc
+// stages (each + patch_downsample) -> quantizer iproj -> 32-step residual LFQ
+// (L2-normalize z, cosine-sim argmax vs the normalized codebook, subtract
+// oproj(codebook[idx])).
+std::vector<int32_t> encode(Codec* c, const float* waveform, int64_t n_samples, int& n_vq_out, int& t_audio_out) {
+    n_vq_out = 0;
+    t_audio_out = 0;
+    if (!c || !c->encoder_ready || !waveform || n_samples <= 0)
+        return {};
+    const int64_t hop = 1920;
+    const int64_t T_padded = n_samples + ((hop - (n_samples % hop)) % hop);
+    const int t_audio = (int)(T_padded / hop);
+    if (t_audio <= 0)
+        return {};
+
+    ggml_init_params ip = {c->compute_meta.size(), c->compute_meta.data(), true};
+    ggml_context* g = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(g, 65536, false);
+
+    ggml_tensor* wav = ggml_new_tensor_2d(g, GGML_TYPE_F32, 1, T_padded);
+    ggml_set_name(wav, "waveform");
+    ggml_set_input(wav);
+
+    int T_at[4];
+    T_at[0] = (int)(T_padded / CODEC_PRE_PATCH);
+    T_at[1] = T_at[0] / ENCODER_STAGES[0].patch_after;
+    T_at[2] = T_at[1] / ENCODER_STAGES[1].patch_after;
+    T_at[3] = T_at[2] / ENCODER_STAGES[2].patch_after;
+    std::array<ggml_tensor*, 4> pos_T{}, mask_T{};
+    for (int s = 0; s < 4; s++) {
+        pos_T[s] = ggml_new_tensor_1d(g, GGML_TYPE_I32, T_at[s]);
+        char nm[16];
+        snprintf(nm, sizeof(nm), "enc_pos_%d", s);
+        ggml_set_name(pos_T[s], nm);
+        ggml_set_input(pos_T[s]);
+        mask_T[s] = ggml_new_tensor_2d(g, GGML_TYPE_F32, T_at[s], T_at[s]);
+        snprintf(nm, sizeof(nm), "enc_mask_%d", s);
+        ggml_set_name(mask_T[s], nm);
+        ggml_set_input(mask_T[s]);
+    }
+
+    ggml_tensor* x = patch_downsample(g, wav, CODEC_PRE_PATCH); // (240, T0)
+    for (int s = 0; s < 4; s++) {
+        x = build_stage(g, x, c->enc_stages[s], pos_T[s], mask_T[s]);
+        if (ENCODER_STAGES[s].patch_after > 0)
+            x = patch_downsample(g, x, ENCODER_STAGES[s].patch_after);
+    }
+
+    ggml_tensor* residual = ggml_mul_mat(g, c->quant_iproj_w, x); // (512, T)
+    residual = ggml_add(g, residual, to_f32(g, c->quant_iproj_b));
+
+    std::array<ggml_tensor*, NUM_VQ> idx_t{};
+    for (int i = 0; i < NUM_VQ; i++) {
+        ggml_tensor* z_e = ggml_mul_mat(g, c->q_iproj_w[i], residual); // (8, T)
+        z_e = ggml_add(g, z_e, to_f32(g, c->q_iproj_b[i]));
+        ggml_tensor* z_n = ggml_l2_norm(g, z_e, 1e-12f);
+        ggml_tensor* sim = ggml_mul_mat(g, c->codebook_normed[i], z_n); // (1024, T)
+        ggml_mul_mat_set_prec(sim, GGML_PREC_F32);
+        ggml_tensor* idx = ggml_argmax(g, sim); // (T,) i32
+        char nm[16];
+        snprintf(nm, sizeof(nm), "idx_%d", i);
+        ggml_set_name(idx, nm);
+        ggml_set_output(idx);
+        idx_t[i] = idx;
+        ggml_tensor* z_q = ggml_get_rows(g, c->codebook[i], idx); // (8, T)
+        z_q = ggml_mul_mat(g, c->q_oproj_w[i], z_q);
+        z_q = ggml_add(g, z_q, to_f32(g, c->q_oproj_b[i]));
+        residual = ggml_sub(g, residual, z_q);
+    }
+
+    for (int i = 0; i < NUM_VQ; i++)
+        ggml_build_forward_expand(gf, idx_t[i]);
+
+    ggml_backend_sched_reset(c->sched);
+    if (!ggml_backend_sched_alloc_graph(c->sched, gf)) {
+        fprintf(stderr, "moss_tts_codec: alloc encode graph failed\n");
+        ggml_free(g);
+        return {};
+    }
+
+    {
+        std::vector<float> wpad((size_t)T_padded, 0.0f);
+        std::memcpy(wpad.data(), waveform, (size_t)n_samples * sizeof(float));
+        ggml_backend_tensor_set(wav, wpad.data(), 0, wpad.size() * sizeof(float));
+    }
+    for (int s = 0; s < 4; s++) {
+        std::vector<int32_t> p((size_t)T_at[s]);
+        for (int t = 0; t < T_at[s]; t++)
+            p[(size_t)t] = t;
+        ggml_backend_tensor_set(pos_T[s], p.data(), 0, p.size() * sizeof(int32_t));
+        std::vector<float> mbuf;
+        fill_mask(mbuf, T_at[s], ENCODER_STAGES[s].context);
+        ggml_backend_tensor_set(mask_T[s], mbuf.data(), 0, mbuf.size() * sizeof(float));
+    }
+
+    if (ggml_backend_sched_graph_compute(c->sched, gf) != GGML_STATUS_SUCCESS) {
+        fprintf(stderr, "moss_tts_codec: encode compute failed\n");
+        ggml_free(g);
+        return {};
+    }
+
+    std::vector<int32_t> out((size_t)NUM_VQ * (size_t)t_audio, 0);
+    for (int i = 0; i < NUM_VQ; i++) {
+        ggml_tensor* it = ggml_graph_get_tensor(gf, ("idx_" + std::to_string(i)).c_str());
+        ggml_backend_tensor_get(it, out.data() + (size_t)i * t_audio, 0, (size_t)t_audio * sizeof(int32_t));
+    }
+    ggml_free(g);
+    n_vq_out = NUM_VQ;
+    t_audio_out = t_audio;
+    return out;
 }
 
 } // namespace moss_tts_codec
