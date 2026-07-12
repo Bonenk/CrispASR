@@ -6,6 +6,34 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — Cohere Arabic "🎵 loop" was a corrupt safetensors download, not a bug
+
+A reported `🎵بحبح…` repetition loop on clean Arabic speech (cohere-transcribe-arabic-07-2026)
+turned out **not** to be a model, HF, quant, or C++ port bug — it was a **corrupt local
+`model.safetensors` download**: ~10 encoder LayerNorm weights (blocks 20/21/24…,
+`norm_self_att` / `norm_conv` / `norm_feed_forward1`) were **zeroed**, nulling those
+Conformer sub-layers → the decoder hallucinates the music/repetition token (same class as
+the transposed-filterbank "noise-like features → coherent garbage" failure).
+
+Diagnosis chain: dequantized `enc.blk.20.conv.norm.weight` (mean≈0 = broken, ≈0.9 = OK);
+SHA-compared local vs upstream (`local 264b549c… ≠ upstream`, same byte count → specific
+tensors zeroed); authenticated HTTP range-read of the **gated** upstream
+`CohereLabs/cohere-transcribe-arabic-07-2026` confirmed its norms are correct
+(0.4682 / 0.9318 / 1.1523). **Upstream, the published `cstr/…-GGUF` files (q4_k, imatrix,
+f16), and the reference gguf are all clean** — only the one local download was corrupt.
+The converter already repairs this class of defect (`c9a4de65`, BN-fold + ref weight patch).
+Re-downloading `cohere-hf/` restored correct weights (all 314 norm tensors non-zero).
+
+Also fixed the Python reference path (`fix(cohere-ref)`): patch zeroed norms from a
+known-good GGUF (`CRISPASR_COHERE_NORM_PATCH_GGUF`) + Arabic language override
+(`CRISPASR_COHERE_REF_LANG`); on newer transformers, reload all params from safetensors
+after `from_pretrained` (its `_init_weights` randomizes Linear/Conv → garbage).
+
+**Verified end-to-end on Kaggle GPU** (`tools/kaggle/cohere-arabic-verify/`): shipped C++
+(`crispasr` from main) vs Python HF reference on 4s / 8s / 40s Arabic — both transcribe
+correct Arabic (no 🎵), content-identical transcripts (word overlap ≤0.95, diffs are
+punctuation only), 40s exercises the chunking path, **mel numerical parity cos_min=0.999981**.
+
 ## 2026-07-12 — #252: auto-romanize non-Latin text for CTC forced alignment
 
 Arabic/Cyrillic/Greek/Hebrew/Devanagari reference text now auto-romanizes before
