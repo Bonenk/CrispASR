@@ -6044,18 +6044,39 @@ items, kept verbatim:
 
 #### §176c Migrate host-side KV to device-resident 4D tensors
 
-**Status:** OPEN
+**Status:** OPEN — 3 backends (re-verified 2026-07-12; VoxCPM2 dropped, now done).
 **Effort:** Medium per backend
-**Backends:** SpeechT5 (cross-attn KV DONE §202; self-attn KV still host-side), Dia,
-Pocket-TTS, VoxCPM2 (all use `std::vector<float>` KV that grows and re-uploads every step).
-Parler DONE (§176b+c 2026-06-21, opt-in — see §176b note).
-LFM2 and KugelAudio already have device-resident KV (no §176c work needed there).
+**Backends (verified 2026-07-12 by code read — genuinely still host-side):**
+- **SpeechT5** self-attn KV: OPEN. `decoder_kv_cache` is host `std::vector<float>`
+  that GROWS per step (`insert`, `speecht5_tts.cpp:246-265`), re-uploaded whole
+  every step via `ggml_backend_tensor_set` (`:1035-1041,1084`). Cross-attn KV
+  already device-resident/precomputed (§202, `precompute_cross_kv` :568-644). No
+  env-gated device path.
+- **Dia** self-attn KV: OPEN. Host `std::vector<std::vector<float>>` grows via
+  `insert` (`dia_tts.cpp:1594-1595,1955-1956`); whole past window reordered into
+  fresh host buffers + `ggml_backend_tensor_set` per step (`:1891-1902`). No
+  device path.
+- **Pocket-TTS** self-attn KV: OPEN (nuance: does NOT grow — pre-sized to
+  `max_seq` on the HOST, `pocket_tts.cpp:311-319,1000-1001`, advanced by
+  `offset`) but still host-resident and the reordered past window is re-uploaded
+  to per-step graph inputs every step (`:1207-1228`). `POCKET_MANUAL_BACKBONE`
+  gates CPU-vs-graph but both use the same host KV.
+
+**Already DONE (do NOT re-chase):** VoxCPM2 — the default `VOXCPM2_USE_GRAPH` GPU
+path uses device-resident backend tensors `tslm_kv_k/v` + `ralm_kv_k/v`
+(`voxcpm2_tts.cpp:488-505`), seeded once from the legacy vector then written
+in-graph (no per-step full re-upload); the `std::vector` KV survives only as the
+CPU-path/seed. Parler DONE (§176b+c 2026-06-21, opt-in). LFM2 + KugelAudio already
+device-resident.
+
 **Approach:** Follow IndexTTS/CSM pattern: 4D on-device tensor
 `[head_dim, max_ctx, n_heads, n_layers]` with `ggml_view_4d` +
 `ggml_cpy` writes. Eliminates O(step × layers × hidden) host↔device
 bandwidth per step.
 **Impact:** Eliminates the dominant data-movement bottleneck for these
-backends at long output sequences.
+backends at long output sequences. NOTE (per §176k/§245 findings): dispatch/
+data-movement wins are load-dependent — measure on a quiet box AND under load,
+judge by the decoded round-trip, keep both paths gated.
 
 #### §176k FireRed ASR: decoder self-attention — PROFILED + partial fix (2026-07-12)
 
@@ -6100,12 +6121,22 @@ lever for typical clips. Measure on a long clip before investing.
 
 #### §176l Kyutai STT: vectorized RVQ encode
 
-**Status:** OPEN
+**Status:** OPEN — re-verified genuinely open 2026-07-12.
 **Effort:** Medium
 **File:** `src/kyutai_stt.cpp`
+**Verified 2026-07-12 (code read):** `rvq_encode_group()` (`:768`) nearest-neighbor
+search is still a plain scalar triple-nested loop — codebooks × 2048 entries ×
+dims computing `diff*diff` L2 with a scalar argmin (`:809-822`). No SIMD/NEON, no
+BLAS/`ggml_mul_mat` distance, no PQ; only `KYUTAI_STT_BENCH`/`CRISPASR_MIMI_NONCAUSAL`
+env gates (neither touches RVQ). Unchanged from the original framing.
 **Approach:** Brute-force O(T×32×2048×256) codebook search is the
 dominant cost. Options: SIMD-vectorized exhaustive search, or product
 quantization / FAISS-style IVF for approximate nearest-neighbor.
+Fastest correct win is `‖r-c‖² = ‖r‖² + ‖c‖² − 2·r·c` → the `−2·r·c` term is one
+`ggml_mul_mat(codebook[2048×d], residual[d×T])` per codebook (BLAS/Metal), plus a
+precomputed `‖c‖²` per entry; argmin over the 2048 result rows. Bit-exact vs the
+scalar loop (same distances). Model not local — validate on a box with a Kyutai
+STT GGUF (TTS→ASR not applicable; check RVQ codes are byte-identical + speedup).
 
 #### §176n VoxCPM2: Metal — ALREADY WORKS, VERIFIED (was a stale entry)
 
