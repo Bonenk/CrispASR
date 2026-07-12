@@ -113,11 +113,12 @@ the sequential steps and dispatch is already ~zero. The O15_SKIP_REALLOC path
 
 **Load-dependence (same as §176k):** the CP_DIRECT comment records "M1 Metal
 ~equal on an idle box, ~3× under load" — confirmed compute-bound at idle here.
-Nothing further to do on Metal. **CUDA:** validated as 11% faster on P100 per the
-CP_DIRECT note. A ready re-validation kernel lives at
-`tools/kaggle/qwen3-tts-cp-direct-cuda/` (base/o15/direct/direct_lk matrix,
-md5-identical + ASR-roundtrip acceptance, `CRISPASR_REF=main`) — run it after any
-code_pred change: `cd tools/kaggle/qwen3-tts-cp-direct-cuda && kaggle kernels push`.
+Nothing further to do on Metal. **CUDA: RE-VALIDATED PASS 2026-07-12** (Kaggle
+P100/T4, `chr1s4/crispasr-qwen3-cp-direct-cuda` reached `COMPLETE` = base/o15/
+direct/direct_lk all rc=0, md5/PCM-equivalent, ASR round-trip intact) — on top of
+the prior "11% faster on P100" datum. Re-run after any code_pred change:
+`kaggle kernels push -p tools/kaggle/qwen3-tts-cp-direct-cuda` (chr1s4;
+base/o15/direct/direct_lk matrix, md5 + ASR-roundtrip acceptance, `CRISPASR_REF=main`).
 
 ### Defaults-audit generalisation (VPS-doable) — LARGELY DONE (2026-07-12)
 
@@ -885,7 +886,7 @@ landed, CUDA-validated). Deliberately-open threads, in priority order:
 |---|---|---|---|
 | **HIGH** | [#221 Issue #89 hardening + v0.8.8](#221-issue-89-hardening--v088-release) | Medium | 5 steps: CI regression guard (a), server-path mirror (b), Vulkan sanity (c), q4_k registry/UX (d), release (e). |
 | **DONE** | CPU weight-read hardening + Mimi codec causal default | Medium | **DONE 2026-07.** Routed ~14 CPU-side weight readers through the quantized-safe `core_cpu::to_f32` (`src/core/cpu_ops.h`); unit (`test-cpu-ops-to-f32`) + live tested on Metal + CUDA. wav2vec2 conv_w left as-is (zero-copy hot path, never quantized). **Mimi codec:** `kyutai_stt` now **defaults to causal+sliding-window** — a >250-frame WER A/B (3× jfk ≈412 frames) showed the old full non-causal attention truncates long audio ~25%; opt out with **`CRISPASR_MIMI_NONCAUSAL=1`**. `csm_tts` **also defaults to causal** (opt out `CRISPASR_MIMI_NONCAUSAL=1`) after a TTS→ASR A/B (~256 dec frames) gave causal 9.3% vs non-causal 12.0% WER (a modest single-sample win — non-causal TTS stayed intelligible rather than truncating like STT). → HISTORY, LEARNINGS. |
-| **DONE / LOW** (audited 2026-07-12) | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | **Cluster audit 2026-07-12: 18/20 done; the 2 remaining are low-value (measure-first).** §176k shipped (matvec cache), §176n/§245 were stale-but-already-done (reclassified), §176c Dia measured ~1.2% → deferred, §176l needs a model to validate. Do not treat §176 as HIGH anymore. 20 sub-items (§176a–§176t). **16 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176i (cross-KV F16, 5 backends), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **2 OPEN (both low-value/measure-first)**: §176c (device-resident KV — **Dia measured ~1.2% of decode, DEFERRED**; compute-bound decoders make this a <2% win, not the "dominant bottleneck" originally claimed), §176l (Kyutai RVQ — genuinely scalar, but no local model to validate). **§176k (FireRed) MOSTLY DONE 2026-07-12** — profiling debunked the "KV/flash" framing (decode is dispatch-bound, not attention-bound); shipped an env-gated persistent matvec graph cache (`CRISPASR_FIRERED_MATVEC_CACHE`, default ON, bit-identical, pure Pareto). **§176n (VoxCPM2 Metal) DONE 2026-07-12** — stale entry: Metal already works via `VOXCPM2_USE_GRAPH` fused graphs, verified 3.75× on M1 with correct ASR roundtrip (CUDA still unvalidated). |
+| **DONE / LOW** (audited 2026-07-12) | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | **Cluster audit 2026-07-12: 18/20 done; the 2 remaining are low-value (measure-first).** §176k shipped (matvec cache), §176n/§245 were stale-but-already-done (reclassified), §176c Dia measured ~1.2% → deferred, §176l needs a model to validate. Do not treat §176 as HIGH anymore. 20 sub-items (§176a–§176t). **16 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176i (cross-KV F16, 5 backends), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **2 OPEN (both low-value/measure-first)**: §176c (device-resident KV — **Dia measured ~1.2% of decode, DEFERRED**; compute-bound decoders make this a <2% win, not the "dominant bottleneck" originally claimed), §176l (Kyutai RVQ — genuinely scalar, but no local model to validate). **§176k (FireRed) MOSTLY DONE 2026-07-12** — profiling debunked the "KV/flash" framing (decode is dispatch-bound, not attention-bound); shipped an env-gated persistent matvec graph cache (`CRISPASR_FIRERED_MATVEC_CACHE`, default ON, bit-identical, pure Pareto). **§176n (VoxCPM2 Metal) DONE 2026-07-12** — stale entry: Metal already works via `VOXCPM2_USE_GRAPH` fused graphs, verified 3.75× on M1 with correct ASR roundtrip; **CUDA validated PASS 2026-07-12** (Kaggle P100/T4 mirror-path roundtrip). |
 | **MEDIUM** | [#52 Qwen3-TTS](#52-qwen3-tts) — perf pass | Medium | talker + code_predictor + codec + ECAPA + codec_encoder all done; step-4 perf pass open (~137 ms/frame → real-time). **O15 broken on CUDA and default-OFF** (`61c42bfb`) — main perf lever disabled. **2026-06-13 Kaggle P100:** dedicated-sched fix (`baef21aa`) didn't help — O15=ON still rc=-6 SIGABRT at 6.0s. Crash is on the *first* code_pred call (not cached reuse), so root cause is `ggml_set_rows`-based KV scatter or the fixed-Lk causal mask on CUDA, not sched sharing. Baseline O15=OFF: 27.4 ms/frame, WAV OK. |
 | **HIGH** | [#57 Commercial-friendly TTS expansion](#57-commercial-friendly-tts-backend-expansion) | Phased | Phases 1–3 + Turbo + native voice cloning shipped (→ HISTORY §82). **#83 S3Gen production fix LANDED** — UNet weight-residency split + `parallel=true` sched cache-coherency fix; M1 Metal diff cos_min 0.940→0.999976, intelligible at all T. **Remaining:** Kartoffelbox_Turbo DE. → see HISTORY + upstream-prs/09–11. |
 | **MEDIUM** | [#51c MiMo-V2.5-ASR F16 step decode](#51c-f16-step-decode) | Small | F16 step-decode validation blocked behind ≥32 GB box (see PLAN #51c); base runtime + Q4_K shipped → HISTORY §56 |
@@ -6246,19 +6247,17 @@ matvecs/step = launch-bound; the graph path is the win).
   (2166 ms) + AR (13069 ms) + VAE-decode (4174 ms), no SIGSEGV / NaN / unsupported
   op. So even the VAE-encode path is Metal-clean.
 
-**CUDA validation — kernel READY, needs a run (2026-07-12):**
-`tools/kaggle/voxcpm2-176n-cuda/` — builds on CUDA, downloads `cstr/voxcpm2-GGUF`
-+ parakeet, runs CPU vs GPU(default `USE_GRAPH`), asserts both round-trip through
-parakeet ASR (word-recall ≥0.6), the GPU actually ran (weight mirror, not a silent
-CPU fallback), and no crash/NaN/unsupported-op; reports GPU speedup. Run:
-`cd tools/kaggle/voxcpm2-176n-cuda && kaggle kernels push` (branch must be pushed
-first; kernel clones `CRISPASR_REF`, default `main`). This closes the mirror-path
-+ CUDA-contiguity risk (LEARNING 35). Until it's run + green, keep the note below.
+**CUDA validation — DONE + PASS (2026-07-12, Kaggle P100/T4).** Kernel
+`tools/kaggle/voxcpm2-176n-cuda/` (`chr1s4/crispasr-voxcpm2-176n-cuda`) builds on
+CUDA, runs CPU vs GPU(default `USE_GRAPH`), and asserts both round-trip through
+parakeet ASR (recall ≥0.6), the GPU actually ran (weight mirror, not a silent CPU
+fallback), and no crash/NaN/unsupported-op — else it `SystemExit`s. It reached
+`COMPLETE` (= verdict PASS), so the **discrete-GPU mirror path is correct on CUDA**;
+the LEARNING-35 contiguity risk did NOT materialize. §176n CUDA gap CLOSED. Re-run
+after any voxcpm2 change: `kaggle kernels push -p tools/kaggle/voxcpm2-176n-cuda`
+(chr1s4; clones `CRISPASR_REF=main`).
 
-**Left open (LOW):** CUDA/discrete-GPU is unvalidated here — the mirror path
-(`needs_gpu_mirror`, device-local VRAM) only exercised on Metal (unified memory).
-A Kaggle P100 TTS→ASR roundtrip would confirm before relying on GPU-default there
-([[gpu-default-needs-cuda-roundtrip]] / LEARNING 35). The lib `default_params`
+**Note:** the lib `default_params`
 keeps `use_gpu=false` — that is the **conventional** conservative default (dia,
 bark, csm, piper, irodori, tada, chatterbox all do the same); it's overridden by
 CLI + session, so all real consumers already get the Metal win. Don't flip it

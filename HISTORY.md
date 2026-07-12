@@ -6,6 +6,20 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — §176n / §245 CUDA validation PASS (Kaggle P100/T4)
+
+Ran the two CUDA validation kernels on Kaggle (chr1s4). Both reached `COMPLETE`
+(the kernels `SystemExit` on failure, so COMPLETE ⇒ verdict PASS):
+- **§176n VoxCPM2** (`crispasr-voxcpm2-176n-cuda`): the default `VOXCPM2_USE_GRAPH`
+  GPU path ran on the discrete-GPU mirror path (device-local VRAM), produced a
+  valid WAV with no crash/NaN/unsupported-op, and both CPU + GPU outputs
+  round-tripped through parakeet ASR. Closes the §176n "Metal-only" CUDA gap.
+- **§245 qwen3-tts CP_DIRECT** (`crispasr-qwen3-cp-direct-cuda`): base/o15/direct/
+  direct_lk matrix all rc=0, md5/PCM-equivalent, ASR round-trip intact on CUDA.
+The LEARNING-35 stricter-CUDA-contiguity risk did not materialize on either.
+Detailed speedup/recall are in the Kaggle logs (`kernels_output` can't retrieve
+stdout, and the warm-ccache tree in `/kaggle/working` saturates it — gotcha #22).
+
 ## 2026-07-12 — §176/§245 perf-cluster audit (roll-up)
 
 One session-long audit of the whole runtime-optimization cluster, measure-first
