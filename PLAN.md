@@ -6269,6 +6269,30 @@ without the CUDA roundtrip.
 
 ## §ARK — ARK-ASR-3B support (⚠️ EXPERIMENTAL / WIP; branch feat/arkasr-3b)
 
+**#253 FIXED 2026-07-12 (drops transcriptions on long audio).** Reporter: a 118 s
+LibriSpeech clip produced NO transcription; `--chunk-seconds 10` dropped scattered
+windows incl. a stray "p". Two root causes, both reproduced + fixed in
+`src/ark_asr.cpp`:
+1. **Long single pass degenerates.** The whole-audio pass extrapolates the
+   Whisper encoder's RoPE far past its 1500-frame / 30 s training window; the
+   decoder then emits `<im_end>` as the FIRST token → empty. Repro: 118 s → empty;
+   same clip in 30 s windows → full transcript. **Fix:** cap single-pass at 30 s
+   (was 300) and decode longer audio in 30 s windows with the existing cross-chunk
+   language conditioning. `CRISPASR_ARKASR_MAX_SINGLE_PASS_S` still overrides.
+2. **Windows degenerate to an immediate `<im_end>` (empty/"p").** Some windows
+   (esp. short) emit `<im_end>` first → empty for clearly-audible speech; the
+   leading-"." cleanup turned a stray `. p` into "p". **Fix:** suppress `<im_end>`
+   on the FIRST decode step (Whisper's suppress-EOT-at-start); later steps allow
+   it, and a truly-silent window's forced first token is the model's "." which
+   cleanup strips back to empty (opt out `CRISPASR_ARKASR_NO_EOS_SUPPRESS=1`).
+**Verified on M1 (q8_0):** reporter's exact default command on the 118 s clip now
+yields the full correct transcript ("mr quilter is the apostle of the middle
+classes…"), 1.7× RT; jfk 11 s unchanged (no spurious words from suppression).
+Residual: explicit `--chunk-seconds 10` still isn't ideal (10 s ≪ the 30 s
+training window — one slice recovered only "paragraph"), but the default no longer
+needs it. `CRISPASR_ARKASR_DEBUG_GEN=1` prints per-window raw gen for future
+triage.
+
 **STATUS 2026-06-29**: ⚠️ **experimental / WIP** — wired through CLI, session C
 ABI, model registry, and docs; shipped to main + GGUF published
 (cstr/ark-asr-3b-GGUF). Core ASR VALIDATED on **both GPU and CPU**: jfk.wav →

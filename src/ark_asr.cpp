@@ -914,6 +914,18 @@ static std::string ark_transcribe_window(ark_asr_context* ctx, const float* pcm,
     if (!logits)
         return std::string();
 
+    // #253: some windows (esp. short ones) degenerate — the model emits <im_end>
+    // as the very FIRST token, yielding an empty transcript for clearly-audible
+    // speech. Suppress <im_end> on the first step so the decoder must emit real
+    // content (Whisper's "suppress-EOT-at-start"); later steps allow <im_end>
+    // normally, so genuine endings are unaffected. On a truly empty/silent window
+    // the forced first token is the model's opening "." which the output cleanup
+    // strips back to empty, so this doesn't invent words out of silence. Opt out
+    // with CRISPASR_ARKASR_NO_EOS_SUPPRESS=1.
+    if (ctx->id_im_end >= 0 && ctx->id_im_end < (int)ctx->hp.llm_vocab &&
+        std::getenv("CRISPASR_ARKASR_NO_EOS_SUPPRESS") == nullptr)
+        logits[ctx->id_im_end] = -INFINITY;
+
     std::vector<int32_t> gen;
     gen.reserve((size_t)max_new);
     const int beam = ctx->params.beam_size > 0 ? ctx->params.beam_size : 1;
@@ -959,6 +971,11 @@ static std::string ark_transcribe_window(ark_asr_context* ctx, const float* pcm,
     }
 
     std::string txt = core_bpe::detokenize(ctx->vocab, gen.data(), gen.size());
+    if (std::getenv("CRISPASR_ARKASR_DEBUG_GEN")) {
+        fprintf(stderr, "[ark-gen] window %.1fs: %zu tokens, first_tok=%d (im_end=%d) raw='%.90s'\n",
+                (double)n_samples / (double)ctx->hp.sample_rate, gen.size(), gen.empty() ? -1 : gen[0], ctx->id_im_end,
+                txt.c_str());
+    }
     // Output cleanup. ARK opens every transcript with a bare "." token (the
     // reference .generate() output shows the same leading ". " — it's the model's
     // trained format, not a bug here), which is noise in an ASR transcript. Trim
@@ -992,20 +1009,52 @@ static int ark_max_new_for(int n_samples) {
     return est;
 }
 
+// Internal 30 s windowed decode. The Whisper encoder was trained on 30 s
+// (max_source_positions=1500); a single pass over much longer audio extrapolates
+// its RoPE far past that window and the decoder degenerates (issue #253 — often
+// to empty). 30 s windows keep the encoder in-distribution. Cross-chunk language
+// conditioning carries the previous window's transcript tail forward so the model
+// keeps the same language instead of re-detecting per window (disable with
+// CRISPASR_ARKASR_NO_CHUNK_CONTEXT=1).
+static std::string ark_transcribe_chunked(ark_asr_context* ctx, const float* pcm, int n_samples, int sr) {
+    const bool ctx_carry = std::getenv("CRISPASR_ARKASR_NO_CHUNK_CONTEXT") == nullptr;
+    const int kPrefixTokens = 32; // tail length to seed (enough to fix language)
+    const int win = 30 * sr;
+    std::vector<int32_t> prefix;
+    std::string full;
+    for (int off = 0; off < n_samples; off += win) {
+        const int len = std::min(win, n_samples - off);
+        std::string seg = ark_transcribe_window(ctx, pcm + off, len, ark_max_new_for(len), prefix);
+        if (!seg.empty()) {
+            if (!full.empty())
+                full += " ";
+            full += seg;
+            if (ctx_carry) {
+                // Seed the next window with the tail of this chunk's transcript.
+                std::vector<int32_t> toks = core_bpe::tokenize_simple(ctx->token_to_id, ctx->merge_rank, seg);
+                const int keep = std::min((int)toks.size(), kPrefixTokens);
+                prefix.assign(toks.end() - keep, toks.end());
+            }
+        }
+    }
+    return full;
+}
+
 extern "C" char* ark_asr_transcribe(struct ark_asr_context* ctx, const float* pcm, int n_samples) {
     if (!ctx || !pcm || n_samples <= 0)
         return nullptr;
     const int sr = (int)ctx->hp.sample_rate;
 
-    // Single-pass whole-audio, matching the reference (modeling_arkasr.py): the
-    // RoPE encoder has no positional cap, so the whole clip is one encoder pass +
-    // one decode. This avoids the per-window language drift that independent
-    // chunks cause. The encoder uses flash-attn (bounded memory), but attention
-    // is O(T^2) compute and decode is O(transcript) — so cap single-pass length
-    // and fall back to internal chunking for very long audio to stay off the
-    // 16 GB M1's OOM/slowdown cliff. Override the cap (seconds) with
-    // CRISPASR_ARKASR_MAX_SINGLE_PASS_S (0 = never chunk).
-    int cap_s = 300;
+    // #253: cap single-pass at the Whisper encoder's TRAINING window (30 s /
+    // max_source_positions=1500). Feeding a longer clip in one pass extrapolates
+    // the encoder's RoPE far past 1500 frames and the decoder degenerates — often
+    // to an empty transcript (reproduced: a 118 s clip → no text; the same clip in
+    // 30 s windows → full transcript). So decode audio > 30 s in 30 s windows,
+    // with cross-chunk language conditioning (below) carrying the language forward
+    // to avoid the per-window drift that motivated the old whole-audio pass.
+    // Raise CRISPASR_ARKASR_MAX_SINGLE_PASS_S to force a longer single pass
+    // (0 = never chunk); it will degrade past ~30 s.
+    int cap_s = 30;
     if (const char* e = std::getenv("CRISPASR_ARKASR_MAX_SINGLE_PASS_S"))
         cap_s = std::atoi(e);
     const long cap_samples = (long)cap_s * sr;
@@ -1014,32 +1063,21 @@ extern "C" char* ark_asr_transcribe(struct ark_asr_context* ctx, const float* pc
     std::string full;
     if (cap_s <= 0 || (long)n_samples <= cap_samples) {
         full = ark_transcribe_window(ctx, pcm, n_samples, ark_max_new_for(n_samples), no_prefix);
-    } else {
-        // Fallback for very long audio: internal 30 s windows, bounding memory/time.
-        // Cross-chunk language conditioning carries the previous chunk's transcript
-        // tail into the next window so the model keeps the same language instead of
-        // re-detecting (and translating) per window. Disable with
-        // CRISPASR_ARKASR_NO_CHUNK_CONTEXT=1. Pass --vad for cleaner segments, or
-        // raise CRISPASR_ARKASR_MAX_SINGLE_PASS_S to extend the single-pass window.
-        const bool ctx_carry = std::getenv("CRISPASR_ARKASR_NO_CHUNK_CONTEXT") == nullptr;
-        const int kPrefixTokens = 32; // tail length to seed (enough to fix language)
-        const int win = 30 * sr;
-        std::vector<int32_t> prefix;
-        for (int off = 0; off < n_samples; off += win) {
-            const int len = std::min(win, n_samples - off);
-            std::string seg = ark_transcribe_window(ctx, pcm + off, len, ark_max_new_for(len), prefix);
-            if (!seg.empty()) {
-                if (!full.empty())
-                    full += " ";
-                full += seg;
-                if (ctx_carry) {
-                    // Seed the next window with the tail of this chunk's transcript.
-                    std::vector<int32_t> toks = core_bpe::tokenize_simple(ctx->token_to_id, ctx->merge_rank, seg);
-                    const int keep = std::min((int)toks.size(), kPrefixTokens);
-                    prefix.assign(toks.end() - keep, toks.end());
-                }
-            }
+        // #253: a single pass over audio well past the encoder's 30 s / 1500-frame
+        // training window can degenerate to EMPTY (RoPE extrapolation → the decoder
+        // emits nothing). Rather than returning no transcript at all, retry with
+        // 30 s windowed decode, which keeps the encoder in-distribution.
+        if (full.empty() && (long)n_samples > (long)30 * sr) {
+            if (ctx->params.verbosity >= 1)
+                fprintf(stderr,
+                        "ark_asr: single pass produced no text for %.1f s of audio; "
+                        "retrying with 30 s windows (issue #253)\n",
+                        (double)n_samples / sr);
+            full = ark_transcribe_chunked(ctx, pcm, n_samples, sr);
         }
+    } else {
+        // Very long audio: skip the doomed single pass, decode in 30 s windows.
+        full = ark_transcribe_chunked(ctx, pcm, n_samples, sr);
     }
     char* out = (char*)malloc(full.size() + 1);
     if (out)
