@@ -10,6 +10,26 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Audit a whole roadmap CLUSTER in one measure-first pass before implementing any of it (§176/§245, 2026-07-12)
+
+When several sibling PLAN items share a theme ("runtime optimization pass",
+§176a–t + §245), don't pick one and implement — audit the cluster first, because a
+roadmap ages unevenly and in predictable ways:
+1. **Some are already done** — later cross-cutting work (fused graphs: CP_DIRECT,
+   VOXCPM2_USE_GRAPH) silently closed them; the entry was never updated. A ~2-min
+   reproduction reclassifies them (§176n VoxCPM2 "SIGSEGV" already ran on Metal at
+   3.75×; §245 already done via CP_DIRECT).
+2. **Some are mis-framed** — the named bottleneck is wrong; profiling redirects the
+   fix (§176k "add KV+flash" → actually dispatch-bound → matvec cache).
+3. **Some are real but low-value** — a per-fraction measurement caps the payoff below
+   the risk (§176c Dia KV round-trip = 1.2% of a compute-bound decode → deferred).
+This session: 5 items → 3 stale-done, 1 mis-framed (1 real fix), 1 low-value. Only
+**one** warranted code. Auditing the cluster (verify-done, then measure-value)
+before touching any item turned a "HIGH, implement several" row into "DONE/LOW,
+stop chasing" — and every conclusion is backed by a run, not a reading. Cheap
+instruments (per-op profiler, per-fraction timer, `*_BENCH` gates) are the whole
+game; keep them in-tree as the evidence. Cf. [[verify-handovers-with-profiling]].
+
 ## BatchNorm-fold must respect the conv tensor's dtype — and a per-backend fix usually has siblings (canary family, 2026-07-12)
 
 Folding a Conformer conv-module BatchNorm into the depthwise-conv weight
