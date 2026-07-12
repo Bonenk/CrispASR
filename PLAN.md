@@ -102,15 +102,33 @@ the sequential steps and dispatch is already ~zero. The O15_SKIP_REALLOC path
 Nothing further to do on Metal. **CUDA:** validated as 11% faster on P100 per the
 CP_DIRECT note; no further action.
 
-### Defaults-audit generalisation (VPS-doable)
+### Defaults-audit generalisation (VPS-doable) — LARGELY DONE (2026-07-12)
 
 **What:** Extend the tada-params defaults-audit pattern (`tests/test-tada-params.cpp`)
 across backends that have params structs with documented upstream defaults.
 
 **How:** For each backend with a `*_context_default_params()` function, write a Catch2
-test asserting key defaults match the upstream Python reference. Priority backends:
-chatterbox (cfg_weight, ve_steps), vibevoice (tts_steps, cfg_scale), dots-tts
-(ode_steps, cfg_scale, eos_threshold), f5-tts (n_steps), kokoro (speed).
+test asserting key defaults match the upstream Python reference.
+
+**Status (2026-07-12):** The `test-<backend>-params.cpp` files were already
+*registered* for ~52 backends but were **hollow** — only 5 (tada, chatterbox,
+orpheus, voxtral-tts, dots-tts) asserted actual value knobs; the other ~47 only
+smoke-checked `n_threads>=1` / `verbosity>=0`, which structurally cannot catch a
+#192-class silent default drift. Swept the meaningful backends and added
+grounded value-knob assertions (now **37/52** assert value knobs), in three
+commits:
+- TTS priority set: vibevoice, kokoro, f5-tts, dots-tts (exact upstream).
+- TTS/audio-gen: bark, cosyvoice3 (RAS), csm, dia, indextts, outetts, zonos,
+  fastpitch, melotts, piper, speecht5, qwen3-tts, parler, pocket-tts.
+- ASR: firered-asr (beam), glm-asr, kyutai-stt, funasr, gemma4-e2b, mimo-asr
+  (greedy temp 0); flash/gpu guards (PLAN #89 class) for qwen3-asr, voxtral,
+  voxtral4b, granite-speech, canary-qwen, nemotron, parakeet, canary.
+
+**Deliberately left smoke-only:** granitenle, m2m100, sensevoice, t5translate,
+canaryctc (pure infra — no perceptual/decode knob to pin); firered + the two
+moonshine-stream tests (duplicate the firered-asr / moonshine_streaming structs
+already covered); openvoice2 (single `tau` knob). Skipped as owned/blocked:
+cohere, voxcpm2, voxcpm2-tts (concurrent work), kugelaudio (CFG is a TODO).
 
 **Files:** One test file per backend in `tests/test-<backend>-params.cpp`, registered
 in `tests/CMakeLists.txt` with label `[unit]`. Read upstream defaults from the
