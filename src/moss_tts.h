@@ -47,6 +47,13 @@ void moss_tts_free(struct moss_tts_context* ctx);
 // Returns false if the file can't be opened / parsed.
 bool moss_tts_set_codec_path(struct moss_tts_context* ctx, const char* path_codec);
 
+// Voice cloning: encode a reference WAV (mono f32 @ sampling_rate) so subsequent
+// synthesize()/generate_codes() clone that voice. Pass samples=NULL or
+// n_samples<=0 to clear. Requires the codec (with encoder) loaded. Returns false
+// on error (no codec/encoder, or encode failure).
+bool moss_tts_set_reference_wav(struct moss_tts_context* ctx, const float* samples, int n_samples);
+bool moss_tts_has_reference(const struct moss_tts_context* ctx);
+
 // ---- Model dims (read from GGUF metadata) ----
 int moss_tts_n_vq(const struct moss_tts_context* ctx);
 int moss_tts_hidden_size(const struct moss_tts_context* ctx);

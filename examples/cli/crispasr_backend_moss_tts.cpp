@@ -2,8 +2,8 @@
 //
 // Two-GGUF runtime: the Qwen3-8B backbone (from --model) plus a companion
 // transformer RVQ codec (from --codec-model, or a sibling "<stem>-codec.gguf",
-// or the registry companion). Text-to-speech only (voice cloning is a
-// documented follow-up).
+// or the registry companion). Voice cloning: `--voice ref.wav` encodes the
+// reference through the codec encoder and clones that speaker.
 
 #include "crispasr_backend.h"
 #include "crispasr_backend_utils.h"
@@ -11,6 +11,8 @@
 #include "crispasr_model_registry.h"
 #include "whisper_params.h"
 
+#include "core/audio_resample.h"
+#include "core/wav_reader.h"
 #include "moss_tts.h"
 
 #include <cstdio>
@@ -62,7 +64,9 @@ public:
 
     const char* name() const override { return "moss-tts"; }
 
-    uint32_t capabilities() const override { return CAP_TTS | CAP_AUTO_DOWNLOAD | CAP_TEMPERATURE | CAP_FLASH_ATTN; }
+    uint32_t capabilities() const override {
+        return CAP_TTS | CAP_AUTO_DOWNLOAD | CAP_TEMPERATURE | CAP_FLASH_ATTN | CAP_VOICE_CLONING;
+    }
 
     std::vector<crispasr_segment> transcribe(const float* /*samples*/, int /*n_samples*/, int64_t /*t_offset_cs*/,
                                              const whisper_params& /*params*/) override {
@@ -113,9 +117,41 @@ public:
         return true;
     }
 
+    // Load + encode the reference WAV (voice cloning), re-loading only when the
+    // path changes so single-shot and server callers pay the encode once.
+    void prepare_voice(const whisper_params& params) {
+        if (params.tts_voice == last_voice_)
+            return;
+        last_voice_ = params.tts_voice;
+        if (params.tts_voice.empty()) {
+            moss_tts_set_reference_wav(ctx_, nullptr, 0); // plain TTS
+            return;
+        }
+        std::vector<float> ref;
+        int sr = 0;
+        if (!crispasr::core::read_wav_mono_pcm16(params.tts_voice, ref, sr) || ref.empty()) {
+            fprintf(stderr, "crispasr[moss-tts]: failed to load reference audio '%s'\n", params.tts_voice.c_str());
+            last_voice_.clear();
+            return;
+        }
+        const int target = moss_tts_sampling_rate(ctx_);
+        if (sr != target && sr > 0) {
+            ref = core_audio::resample_polyphase(ref.data(), (int)ref.size(), sr, target);
+            if (!params.no_prints)
+                fprintf(stderr, "crispasr[moss-tts]: resampled reference %d->%d Hz\n", sr, target);
+        }
+        if (!moss_tts_set_reference_wav(ctx_, ref.data(), (int)ref.size())) {
+            fprintf(stderr, "crispasr[moss-tts]: reference encode failed for '%s'\n", params.tts_voice.c_str());
+            last_voice_.clear();
+        } else if (!params.no_prints) {
+            fprintf(stderr, "crispasr[moss-tts]: cloning voice from '%s'\n", params.tts_voice.c_str());
+        }
+    }
+
     std::vector<float> synthesize(const std::string& text, const whisper_params& params) override {
         if (!ctx_ || text.empty())
             return {};
+        prepare_voice(params);
         moss_tts_synth_params sp = moss_tts_synth_default_params();
         sp.seed = params.seed;
         // A single --temperature knob scales both text and audio sampling when set.
@@ -153,6 +189,7 @@ public:
 
 private:
     moss_tts_context* ctx_ = nullptr;
+    std::string last_voice_; // cache key for the loaded reference voice
 };
 
 } // namespace
