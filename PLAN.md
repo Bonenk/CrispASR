@@ -1150,6 +1150,31 @@ than granite's 1.8 %, which would change the calculus — so don't assume, measu
 
 ### Already done (no work): `granite_speech`, `mimo_asr`, `dots_tts` (Metal gallocr, `ec74c5a0`).
 
+### irodori-tts DiT — persistent fixed-shape graph (issue #243, 2026-07-12)
+
+Simpler than the growing-KV ASR case: the RF-DiT is a **fixed-shape diffusion** — one
+generation runs `run_dit_forward` ~100× (40 ODE steps × up to 4 independent-CFG
+passes) and the graph shape is **constant** across all of them (T_latent/T_text/
+T_ref/T_cap fixed; only input data + the attn-mask values change). The old code
+rebuilt the whole graph **and a fresh `gallocr` every call**, so on Ampere+ the CUDA
+graph's tensor addresses changed each step → "properties changed" → warmup
+resets/re-completes **every step** (ggml-cuda.cu:4361; the reporter's "CUDA graph
+warmup complete" spam). A persistent cached graph (build once, reuse, re-set ALL
+inputs each call for the §234 gotcha) makes warmup complete **once** and replay.
+
+- **Implemented**, gated `CRISPASR_IRODORI_PERSIST_GRAPH` (default OFF), + a
+  `CRISPASR_IRODORI_DIT_TIMING` construct/setinput/compute split.
+- **Parity PROVEN byte-identical** persist vs rebuild: CPU `6c3e16d0`, Metal
+  `1c7f9f27` (default==persist on each). No hang.
+- **Metal/CPU: no throughput win** — STEP-0 shows the DiT is **98.2% compute-bound**
+  (graph construct+alloc only 1.7%), matching the §210 "no Metal win" rule. So the
+  default stays OFF there.
+- **CUDA (Ampere+) win is UNMEASURABLE on available hardware** — ggml disables CUDA
+  graphs below Ampere (cc<800, ggml-cuda.cu:4329) and Kaggle only has P100 (600) /
+  T4 (750), so the re-warm can't be reproduced. The reporter (Ampere+) can confirm
+  warmup-once + any speedup via `CRISPASR_IRODORI_PERSIST_GRAPH=1`. Flip the default
+  (or gate it to `cc>=800`) only once a real Ampere A/B shows a win.
+
 ### Candidates — growing-shape (`Lk = n_past + T`) + naive per-step rebuild + `sched_reset`/`alloc`
 
 ASR-LLM (prioritized by likely server deployment):
