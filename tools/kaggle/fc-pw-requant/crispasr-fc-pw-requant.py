@@ -154,6 +154,15 @@ FLEET = [
     ("stt-kk-ru-fastconformer-hybrid-ctc-large-GGUF", None, "kk"),
 ]
 QUANT_SUFFIXES = ["q8_0", "q6_k", "q5_k", "q5_0", "q4_k", "q4_0", "q3_k", "q2_k"]
+
+# Per-file quantizer overrides: these published q4_k files keep
+# decoder.embed.weight at F16 (old rule), which current rules would
+# quantize — pin it so ONLY the conv pw tensors change (minimal diff,
+# passes the structural gate).
+EXTRA_ARGS = {
+    "parakeet-tdt-0.6b-v3-q4_k.gguf": ["--tensor-type", r"decoder\.embed\.weight=f16"],
+    "parakeet_de_med-q4_k.gguf": ["--tensor-type", r"decoder\.embed\.weight=f16"],
+}
 LEGACY_ENV = {"CRISPASR_FC_PW_Q8": "0", "CRISPASR_FC_FUSED_QKV": "0",
               "CRISPASR_FC_ATTN_CONT": "1"}
 
@@ -311,7 +320,7 @@ def process_file(repo, path, backend, lang):
     new = MODELS / "new" / path
     new.parent.mkdir(parents=True, exist_ok=True)
     try:
-        p = subprocess.run([str(QUANT), str(old), str(new), qtype],
+        p = subprocess.run([str(QUANT), str(old), str(new), qtype] + EXTRA_ARGS.get(path, []),
                            capture_output=True, text=True, timeout=3600)
         if p.returncode != 0:
             step("file.QUANTIZE-FAIL", repo=repo, file=path, tail=p.stdout[-200:] + p.stderr[-200:])

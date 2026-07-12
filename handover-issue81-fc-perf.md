@@ -47,3 +47,21 @@ tdt-v3 q4_k 1.89→1.03 s. Full data in PERFORMANCE.md + LEARNINGS.md.
   Re-push to resume (already-fixed files no-op).
 - Still open: VPS re-bench (item 1 above) — the parallel session's
   issue81-onnx-bench kernel may already cover the GPU side.
+
+## STATUS UPDATE 2026-07-12 (GPU phase)
+
+- **CUDA manual-attention default ON** (a7f04050): the flash_attn_ext
+  per-head-mask CPU fallback was the dominant CUDA encoder cost. P100 A/B:
+  parakeet-ctc q8_0 jfk55 1.140→0.360 s (3.2×, 153× RT warm) — the warm
+  gap to onnx-asr CUDA (220×) is now ~1.4×. Gate:
+  CRISPASR_FC_GPU_MANUAL_ATTN (auto=CUDA only; Metal keeps flash).
+- **CRISPASR_FC_BUCKET** (starling-style bucketed persistent graph,
+  canary_ctc): output-equivalent, opt-in (inverse-default — pad overhead ≈
+  reuse savings on P100). The pad-masking machinery is the reusable piece
+  for future CUDA-graph capture / batching.
+- **HF fleet requant**: complete except lfm2-audio-1.5b q8_0 (flaky
+  download, retried) and 2 rules-drift q4_k files (tdt-v3, de_med) —
+  kernel v4 pins decoder.embed=f16 via --tensor-type for those.
+- Remaining ideas for the last ~1.4× CUDA gap: per-op dispatch → real
+  CUDA-graph capture (needs stable topology = the bucket path), fused
+  QKV+BD batching, and the CLI's per-call model load for one-shot use.
