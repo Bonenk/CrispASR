@@ -54,6 +54,10 @@ bool moss_tts_set_codec_path(struct moss_tts_context* ctx, const char* path_code
 bool moss_tts_set_reference_wav(struct moss_tts_context* ctx, const float* samples, int n_samples);
 bool moss_tts_has_reference(const struct moss_tts_context* ctx);
 
+// Convenience: load a reference WAV from `path` (any sample rate; resampled to
+// the model rate), encode it, and set it as the voice prompt. path=NULL clears.
+bool moss_tts_set_reference_wav_file(struct moss_tts_context* ctx, const char* path);
+
 // ---- Model dims (read from GGUF metadata) ----
 int moss_tts_n_vq(const struct moss_tts_context* ctx);
 int moss_tts_hidden_size(const struct moss_tts_context* ctx);

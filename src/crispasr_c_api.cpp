@@ -6802,6 +6802,12 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
         return rc;
     }
 #endif
+#ifdef CA_HAVE_MOSS_TTS
+    if (s->moss_tts_ctx) {
+        // moss-tts clones from a reference WAV (no ref-text needed).
+        return moss_tts_set_reference_wav_file(s->moss_tts_ctx, path) ? 0 : -1;
+    }
+#endif
 #ifdef CA_HAVE_TADA
     if (s->tada_ctx) {
         if (ends_with_wav(path))
