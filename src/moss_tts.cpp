@@ -1206,6 +1206,19 @@ extern "C" const char* moss_tts_token_text(moss_tts_context* ctx, int id) {
     return ctx->vocab.id_to_token[id].c_str();
 }
 
+// Diagnostic: the exact prompt (col-0 text) token ids the AR loop builds for
+// `text` — for diffing against the HF reference's input_ids[:,:,0]. Caller frees.
+extern "C" int32_t* moss_tts_debug_prompt_ids(moss_tts_context* ctx, const char* text,
+                                              const struct moss_tts_synth_params* sp_in, int* out_n) {
+    if (out_n)
+        *out_n = 0;
+    if (!ctx || !text)
+        return nullptr;
+    moss_tts_synth_params sp = sp_in ? *sp_in : moss_tts_synth_default_params();
+    std::string prompt = mt_build_prompt_text(ctx, text, sp);
+    return moss_tts_tokenize(ctx, prompt.c_str(), out_n);
+}
+
 // ===========================================================================
 // Init / free / params / accessors
 // ===========================================================================
