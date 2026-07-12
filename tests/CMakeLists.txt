@@ -2892,4 +2892,13 @@ if (CRISPASR_FUZZ)
     target_link_libraries(crispasr-fuzz-gguf PRIVATE crispasr-lib)
     target_compile_options(crispasr-fuzz-gguf PRIVATE -fsanitize=fuzzer)
     target_link_options(crispasr-fuzz-gguf PRIVATE -fsanitize=fuzzer)
+
+    # Text tokenizer harness — core_bpe + core_wordpiece over untrusted
+    # prompt / reference-text strings (header-only; needs the ggml headers
+    # transitively via src include path).
+    add_executable(crispasr-fuzz-tokenizer fuzz/fuzz_tokenizer.cpp)
+    target_include_directories(crispasr-fuzz-tokenizer PRIVATE ${PROJECT_SOURCE_DIR}/src)
+    target_link_libraries(crispasr-fuzz-tokenizer PRIVATE crispasr-lib)
+    target_compile_options(crispasr-fuzz-tokenizer PRIVATE -fsanitize=fuzzer)
+    target_link_options(crispasr-fuzz-tokenizer PRIVATE -fsanitize=fuzzer)
 endif()

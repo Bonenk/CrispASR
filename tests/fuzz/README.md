@@ -63,3 +63,21 @@ mkdir -p gguf-corpus && cp /path/to/small-model.gguf gguf-corpus/
 The audio harness is the one wired into CI (`linux-fuzz-smoke`) because it has
 committed seeds (`samples/`); the GGUF harness needs a model seed, so run it out
 of band.
+
+## Text tokenizer harness (`crispasr-fuzz-tokenizer`)
+
+`fuzz_tokenizer.cpp` fuzzes the shared text tokenizers `core_bpe::tokenize_simple`
+(GPT-2 byte-level BPE) and `core_wordpiece::Tokenizer::tokenize` (BERT WordPiece)
+over arbitrary **text** — the untrusted prompt / `--ref-text` / caption surface.
+Vocab/merges are pinned benign (the model-supplied vocab is covered by the GGUF
+harness); the fuzzed bytes drive the byte→unicode map, the whitespace/punctuation
+pre-tokenizer, the BPE merge loop, and the WordPiece greedy match on invalid
+UTF-8 / lone continuation bytes / embedded NULs. No seed needed (any bytes are
+valid text):
+
+```bash
+cmake --build build-fuzz --target crispasr-fuzz-tokenizer
+./build-fuzz/bin/crispasr-fuzz-tokenizer -max_len=65536 tok-corpus
+```
+
+Clean at ~139K runs/16 s under `-fsanitize=fuzzer,address,undefined` (2026-07-12).

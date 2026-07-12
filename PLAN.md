@@ -69,9 +69,23 @@ The memory-safety fixes shipped (see HISTORY 2026-07-11). Test/tooling state:
   further asserts, no unbounded alloc from declared tensor sizes). **Open (your
   call):** upstream the empty-key fix to ggml-org — it's a general robustness
   bug worth contributing back (an outbound public PR, so left for a human).
-- **Open (LOW)**: a deterministic GGUF `load_weights` bounds regression test
-  (needs a crafted GGUF + backend), and a `bpe.h`/`wordpiece.h` fuzz harness
-  (both came back clean in the audit).
+- **DONE 2026-07-12**: the `bpe.h`/`wordpiece.h` fuzz harness —
+  `tests/fuzz/fuzz_tokenizer.cpp` (`crispasr-fuzz-tokenizer`, gated
+  `-DCRISPASR_FUZZ=ON`). Fuzzes `core_bpe::tokenize_simple` +
+  `core_wordpiece::Tokenizer::tokenize` over arbitrary text (the untrusted
+  prompt/`--ref-text`/caption surface; vocab pinned benign since GGUF vocab is
+  covered by `fuzz_gguf_meta`). Validated locally: **138,705 runs / 16 s clean**
+  under `-fsanitize=fuzzer,address,undefined` (adversarial UTF-8, lone 0xFF/
+  continuation bytes, embedded NULs) — confirms the audit's "clean" verdict with
+  a runnable harness.
+- **Open (LOW)**: a deterministic GGUF `load_weights` bounds regression test.
+  The overflow-safe checks are inline in `gguf_loader.cpp` (not a helper), so a
+  deterministic test must craft a minimal valid-enough GGUF (magic + version + 0
+  KV + 1 tensor whose `offset`/`nbytes` makes `data_off+off+nbytes` overflow or
+  exceed the file) and assert `load_weights(..., backend_cpu)` returns
+  nullptr/error rather than SIGBUS. `fuzz_gguf_meta` already covers the metadata
+  parse (~880K runs clean); this is a fast always-on CI guard for the specific
+  `SIZE_MAX`-tensor regression, complementary to fuzzing. Scoped, not yet done.
 
 ## Scoped next items (for a new agent picking up)
 
