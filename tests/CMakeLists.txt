@@ -1338,6 +1338,23 @@ catch_discover_tests(test-qwen3tts-params
     PROPERTIES LABELS "unit;qwen3_tts"
 )
 
+# ─── test-moss-tts-params — Catch2 unit tests for moss_tts_context_params /
+# moss_tts_synth_params defaults + null-guards. No GGUF required. ───────────────
+add_executable(test-moss-tts-params
+    test-moss-tts-params.cpp
+)
+target_include_directories(test-moss-tts-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-moss-tts-params PRIVATE
+    Catch2::Catch2WithMain
+    moss_tts
+)
+catch_discover_tests(test-moss-tts-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;moss_tts"
+)
+
 # ─── test-tada-params — Catch2 unit tests for tada_context_params defaults
 # and null-guard coverage. No GGUF required. ───────────────────────────────────
 add_executable(test-tada-params
