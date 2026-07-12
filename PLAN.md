@@ -203,6 +203,16 @@ the library default (`tada_context_default_params` → 1), so the existing
 defaults-audit test now guards all three paths. The only deliberate adapter
 override left is `text_do_sample=true`.
 
+**Full adapter-parity audit DONE (2026-07-12).** Swept all ~40 c_api adapter
+blocks + the CLI adapters for hardcoded perceptual/decode-knob overrides that
+diverge from — or wrongly ignore session config vs — the library default. CLI
+adapters were clean; two real c_api bugs found + fixed: cosyvoice3 hardcoded
+`temperature=0.8` (ignoring `crispasr_session_set_temperature`; the CLI + siblings
+gate on the session temp) and f5-tts hardcoded `seed=42` (ignoring the session
+seed). Both now honour session config, falling back to the working default.
+outetts/dots/parler re-state their library temp default as the fallback literal —
+redundant but correct + session-gated, left as-is.
+
 Three larger extensions remain:
 
 1. **Per-step talker logits in the diff.** Dump the talker logits at each
@@ -212,9 +222,14 @@ Three larger extensions remain:
 2. **Generation-health regression gate (non-diff). DONE (2026-07-11).**
    `src/core/generation_health.h` — shared header with check_not_empty,
    check_duration_plausibility, check_no_ngram_loop, check_not_truncated,
-   check_tts_duration. 16 Catch2 unit tests in `tests/test-generation-health.cpp`.
-   Backends can integrate these into live tests. The en/fr/de suite and
-   trailing-silence check remain as future per-backend instantiation work.
+   check_tts_duration. Catch2 unit tests in `tests/test-generation-health.cpp`.
+   Backends can integrate these into live tests. **en/fr/de suite +
+   trailing-silence check DONE (2026-07-12):** added `check_trailing_silence`
+   (windowed-RMS backward scan — flags TTS dead-air / EOS-overrun / untrimmed
+   padding) plus French/German plausible-duration, UTF-8 accented + German
+   word-loop, and mixed-language no-false-positive cases (25 unit cases total).
+   Remaining: wiring the checks into individual backends' *live* tests (needs
+   models).
 3. **Replay-token dual-mode reference.** Dump the Python *sampled* token ids and
    replay them in C++ (instead of re-sampling) so the sampling-enabled
    downstream stages can be diffed deterministically despite torch-vs-`mt19937`
