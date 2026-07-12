@@ -6,6 +6,46 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — tada bucket floor (backend-conditional), irodori persistent DiT graph, parakeet-CTC reroute
+
+**§215b tada talker — batched-CFG (B=2) is a MEASURED NON-GOAL.** Instrumented the
+talker's two per-step CFG passes (`CRISPASR_TADA_TALKER_TIMING`). They take
+*different* graph paths — the positive pass through the §176b decode bucket (padded
+to Lk≥512), the negative on the exact-Lk graph — so they're 3.3× asymmetric and the
+"fuse two equal passes" premise fails; the talker is only ~40% of per-step wall time
+(FM+codec dominate). Did NOT port. The real lever is orthogonal: the bucket's Lk=512
+floor wastes ~500 masked attention columns/step for short generations. Shipped a
+**backend-conditional default** (`tada_default_bucket_min`): Metal/CPU→64 (a
+byte-identical *measured* win — Metal loop 1.07–1.21×, CPU 1.53×), CUDA/ROCm/Vulkan/
+WebGPU→512 (there a bucket-width change is NOT bit-identical — GPU reduction order
+over the −inf-masked padding differs — and only ~1.02–1.06×). `CRISPASR_TADA_BUCKET_MIN`
+overrides. Also added a Kaggle CUDA A/B kernel (`tools/kaggle/tada-bucket-ab`).
+
+**irodori-tts #243 — persistent cached DiT graph (opt-in).** The RF-DiT is
+fixed-shape, but `run_dit_forward` rebuilt the whole graph + a fresh `gallocr` every
+call (~100/generation: 40 ODE steps × up to 4 independent-CFG passes), so on Ampere+
+the CUDA graph re-warmed every step (the reporter's "CUDA graph warmup complete"
+spam) instead of capture-once-replay. Cache ctx+graph+gallocr keyed on the shape
+signature, reuse across calls, re-set all inputs each call. Gated
+`CRISPASR_IRODORI_PERSIST_GRAPH`, byte-identical (CPU `6c3e16d0`, Metal `1c7f9f27`).
+STEP-0 showed the DiT is 98% compute-bound → no Metal/CPU win; the CUDA (Ampere+)
+warmup-once win is unmeasurable locally (ggml disables CUDA graphs below Ampere;
+Kaggle has only P100/T4) → delegated to the reporter.
+
+**parakeet-CTC auto-reroute.** `--backend parakeet` on a pure-CTC model
+(parakeet-ctc-*, encoder + CTC head, no RNN-T decoder) previously dead-ended at the
+transducer-only guard. Added `crispasr_gguf_is_pure_ctc()` (cheap tensor-info peek)
+and a run-flow reroute → `fastconformer-ctc` with a note; the guard stays as a
+backstop, and no-`--backend` autodetection already handled it. Tested: parakeet-ctc-
+0.6b reroutes + transcribes, parakeet-tdt-0.6b-v3 is untouched.
+
+**Infra fixes.** glint's clean-room codec failed the Kaggle CUDA (GCC) build with
+`'size_t' has not been declared` — added `<cstddef>` to opus_ogg.hpp / resample.cpp /
+opus_mdct.cpp (macOS clang/libc++ pulls it in transitively; libstdc++ doesn't).
+Suppressed a cppcheck `stlcstr` false-positive in `crispasr_drain_streamed_tokens`
+(returns `buf.c_str()` where `buf` aliases the persistent session member, not a
+local) that had been failing main's Lint across several commits.
+
 ## 2026-07-11 — HiFi-GAN ~2× via ggml-metal im2col batch-1 occupancy fix
 
 Reversed the prior "hifigan is at the compute floor, not worth it" verdict with a
