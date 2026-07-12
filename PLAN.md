@@ -8066,3 +8066,91 @@ conditioning via `--instruct`. Three-way independent CFG (text/speaker/caption).
 - Diff harness: F16 cos=1.000000; Q4_K cos=0.996491 (526 MB)
 - Registry entry added; docs/tts.md updated
 - GGUF artifacts: irodori-tts-600m-v3-voicedesign-{f16,q4_k}.gguf
+
+## §246 issue #81 endgame — close the remaining ~1.4× CUDA gap to onnx-asr (OPEN)
+
+Current: CrispASR parakeet-ctc q8_0 CUDA manual-attn = 153× RT warm
+(jfk×5 55 s, in-process) vs onnx-asr CUDA fp32 = 207× (134 s varied).
+Where the remaining ~0.36 s/55 s plausibly goes, ranked by expected value —
+**measure before building (LEARNING: the handover's bottleneck theory was
+wrong; the profiler wasn't):**
+
+1. **Per-stage split on CUDA first** (cheap, decides everything below):
+   extend `tools/kaggle/fc-unified-graph-ab` to run with
+   `CANARY_CTC_BENCH=1` + `CRISPASR_FC_PROFILE=1` on the P100 — mel vs
+   encoder+ctc vs readout. The mel is host-side single-threaded FFT
+   (`cc_fft_r2c`); at 55-134 s it may be a triple-digit-ms constant that
+   onnx doesn't pay. If so: parallelize `core_mel` (an unused
+   `mel_parallel` flag already sits in mel.cpp) or overlap mel with the
+   previous graph's compute.
+2. **F16 vs Q8_0 on GPU**: P100 has 2:1 fp16 rate and no tensor cores;
+   onnx runs fp32 cuBLAS. Our q8_0 mmq may be losing to plain f16/f32
+   GEMM at these shapes — one kernel arm with the F16 GGUF answers it.
+3. **CUDA-graph replay**: verify whether ggml-cuda's graph capture
+   actually engages across our rebuild-per-call graphs (same topology →
+   it should). If not, the `CRISPASR_FC_BUCKET` path provides the stable
+   topology; retry with small buckets (100 mel frames ≈ 1 s — the 500
+   bucket's pad overhead ≈ savings, smaller pads waste less).
+4. **Upstream flash fix (structural)**: teach `fattn.cu` to accept
+   per-head masks (`mask->ne[2] != 1` guard) so flash works for Shaw
+   rel-pos models on CUDA — reclaims fused-attention memory traffic that
+   manual attention re-materializes ((T,T,H) scores ×24). Upstream PR to
+   ggml-org/llama.cpp per repo convention (mechanical-AI disclosure only).
+5. **Honest re-run**: after any of the above, the canonical number is the
+   134 s-varied load-excluded methodology (issue81-onnx-bench), not jfk×5.
+
+Also OPEN: VPS 4-core x86 re-bench with the shipped defaults (pre-fix
+2.1× vs onnx-CPU 3.1×; handover synced to the VPS at
+handover-prompts/issue81-fc-perf.md).
+
+## §247 roll #81 techniques out to the other runtimes (OPEN)
+
+What shipped for the FastConformer family (fastconformer.h consumers:
+parakeet, canary, canary_ctc, canary_qwen, lfm2_audio, nemotron) and
+where else each technique applies:
+
+1. **F16-weights-in-quantized-GGUF audit** (the 35%-of-encoder trap):
+   any backend whose converter stores matmul-consumed weights 3D/1D gets
+   them silently skipped by the quantizer's 2D rule and runs them on the
+   ~6×-slower CPU F16 mul_mat path. Method: for each backend's shipped
+   q8_0/q4_k GGUF, list tensors with `GGUFReader` and flag F16 tensors
+   that feed `mul_mat` (reshape-consumed); or just run the per-node
+   profiler and look for `MUL_MAT f16` rows at high %. Prime suspects:
+   cohere-transcribe (Conformer convs), firered-asr (Conformer),
+   granite/conformer_ibm, sanm/paraformer conv layers, moonshine,
+   TTS vocoders (hifigan/seanet/dac k=1 convs — qwen3-tts FASTCONV
+   already fixed the cast side, not the storage side). Fix pattern:
+   quantizer carve-out (+ Q8_0 floor + idempotency rule) + load-time
+   repack via `core_conformer::repack_conv_pw_q8`-style helper +
+   fleet requant kernel (`tools/kaggle/fc-pw-requant` — FLEET list +
+   structural check + strict transcript equality are generic).
+2. **Generalize the per-node profiler**: `cc_prof_cb` (sched eval
+   callback, aggregates by op+src-type+shape, CRISPASR_FC_PROFILE=1)
+   should move to `src/core/sched_prof.h` so every sched-based runtime
+   gets it — it found in one run what three A/B rounds missed.
+3. **Fused QKV** (`core_conformer::fuse_qkv` is tensor-generic):
+   bit-identical, ~free win wherever Q/K/V matmuls share an input —
+   whisper-family encoders, cohere, firered, granite, sanm, decoder
+   self-attention in AED backends. Wire-up is load-time concat +
+   view-split at the build site.
+4. **Strided flash inputs**: grep `ggml_cont` feeding `flash_attn_ext`
+   across src/ — the kernel reads strided views (llama.cpp does this);
+   each cont is a full tensor copy per layer per pass.
+5. **Manual-attn-on-CUDA gate**: any backend whose flash mask has
+   ne[2] > 1 (per-head bias) silently falls back to CPU on CUDA —
+   `GGML_SCHED_DEBUG=2` on a CUDA box shows flash nodes on CPU splits.
+   Check cohere-transcribe (Shaw rel-pos) first. Reuse
+   `fc_gpu_manual_attn` + BlockParams.manual_attn pattern.
+6. **-inf pad masking + bucketed persistent graphs**
+   (CRISPASR_FC_BUCKET machinery): the reusable base for batched
+   inference and CUDA-graph capture; also the correct padding semantics
+   for any future streaming/batching work (finite mask constants get
+   overrun by pad garbage — LEARNINGS 2026-07-12).
+7. **Q8_0 floor for decode-critical tensors in sub-8-bit quants**
+   (quantizer): conv pw done; consider the same floor for other
+   high-sensitivity small tensors flagged by future A/Bs.
+
+Suggested order: (2) profiler generalization → (1) audit sweep with it
+(one Kaggle CPU kernel over the registry models, collect `MUL_MAT f16` %
+per backend) → fix the top offenders with the proven pattern → (4)/(3)
+mechanical wins alongside → (5) after the §246 CUDA per-stage data.
