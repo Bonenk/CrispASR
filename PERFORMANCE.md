@@ -739,15 +739,30 @@ needs a per-stage look).
 |---|---|
 | CrispASR parakeet-ctc Q8_0, manual attn, warm in-process, jfk×5 55 s | **153×** (11 s: 116×) |
 | same, flash-with-CPU-fallback (old default) | 48× (11 s: 61×) |
-| onnx-asr parakeet-ctc CUDA fp32, 134 s varied speech, in-process | **207×** (tdt 112×) |
-| onnx-asr parakeet-ctc CPU int8, 134 s varied | 4.8× (tdt 4.6×) |
+| CrispASR parakeet-ctc Q8_0, manual attn, **134 s varied, load-excl (honest)** | **137×** (tdt 49.5×) |
+| onnx-asr parakeet-ctc CUDA fp32, 134 s varied speech, in-process | **214×** (tdt 121×) |
+| onnx-asr parakeet-ctc CPU int8, 134 s varied | 5.8× (tdt 5.7×) |
 
-Caveats on the CUDA rows: the CrispASR 153× is repeat-audio (jfk×5, ~6%
-cache-friendly) and in-process warm; the honest-methodology re-run
-(134 s varied, load-excluded) with the manual-attn default is **PENDING**
-— the last such run predates manual-attn (25.3× ctc / 34.7× tdt,
-superseded). **VPS 4-core x86 re-bench also PENDING** (pre-fix: 2.1× vs
-onnx-CPU 3.1×).
+CUDA rows resolved (2026-07-12, kernel `issue81-onnx-bench` v16, real
+134 s varied LibriSpeech, load-excluded, 301-word proof-of-work,
+same-run onnx head-to-head): the honest-methodology re-run with the
+manual-attn default lands **137× ctc / 49.5× tdt** — a 5.4× jump from the
+pre-manual-attn 25.3× ctc / 34.7× tdt (superseded). That cuts the warm
+gap to onnx-asr CUDA to **~1.56× (ctc) / ~2.4× (tdt)**, confirming the
+handover's "~1.4×" claim on independent honest methodology. (The 153×
+in-process row is repeat-audio jfk×5, ~6% cache-friendly and warm —
+kept as the best-case in-process figure; the 137× row is the fair
+varied-audio comparison against onnx.)
+
+**VPS 4-core x86 re-bench (2026-07-12, DONE)**: parakeet-ctc-0.6b q8_0,
+jfk 11 s, same-box A/B (load ~2.5) — new defaults **5.43 s (2.0× RT)**
+vs legacy (`CRISPASR_FC_PW_Q8=0 CRISPASR_FC_FUSED_QKV=0
+CRISPASR_FC_ATTN_CONT=1`) 6.30 s (1.7×); q4_k new 6.24 s. FC-perf gain
+on x86 is **~14%** (vs M1's 35%) — OpenBLAS already handles the F16
+conv-pw GEMM well, so the Q8 repack recovers less than on ggml's ARM
+CPU F16 path. Still beats onnx-CPU int8 (5.8× above). The re-quantized
+GGUF would not change this load-excluded inference RTF — it only saves
+one-time load (skips the runtime repack).
 
 Gates: `CRISPASR_FC_PW_Q8` (auto-on for quantized models) ·
 `CRISPASR_FC_FUSED_QKV` (on) · `CRISPASR_FC_ATTN_CONT=1` legacy conts ·
