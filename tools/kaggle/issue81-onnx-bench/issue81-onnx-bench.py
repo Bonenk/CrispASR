@@ -12,6 +12,7 @@ Push (under chr1s4):
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -105,7 +106,7 @@ print(f"  built: {CRISPASR}")
 # ── Phase 1: Install onnx-asr (+ onnxruntime-gpu for the CUDA EP) ────────────
 print("\n=== Phase 1: install onnx-asr ===", flush=True)
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
-                        "onnx-asr", "soundfile", "huggingface_hub"])
+                        "onnx-asr", "soundfile", "huggingface_hub", "datasets"])
 # Force the GPU build: onnx-asr pulls in CPU `onnxruntime`; both ship the same
 # `onnxruntime` module, so uninstall then install -gpu. PIN the CUDA-12 wheel:
 # Kaggle's P100 worker has CUDA 12.8, but the LATEST onnxruntime-gpu links
@@ -126,13 +127,35 @@ jfk_wav = REPO / "samples" / "jfk.wav"
 pcm, sr = sf.read(str(jfk_wav), dtype="float32")
 duration = len(pcm) / sr
 
-# 60s version
-repeats = max(1, int(60 / duration))
-long_pcm = np.tile(pcm, repeats)
-long_wav = TEMP / "long_60s.wav"
-sf.write(str(long_wav), long_pcm, sr)
-long_dur = len(long_pcm) / sr
-print(f"  JFK: {duration:.1f}s, Long: {long_dur:.1f}s")
+# LONG clip = REAL VARIED speech, NOT jfk×5. Repeating one 11 s clip lets the
+# model/CUDA caches reuse work across identical repeats, inflating the RTF
+# (especially on GPU) — a fake "long-audio" number. Concatenate DIFFERENT
+# LibriSpeech utterances (16 kHz) up to ~120 s with 0.3 s silences between, so
+# every frame is novel content. Falls back to jfk×5 only if the dataset can't load.
+long_wav = TEMP / "long_real.wav"
+try:
+    from datasets import load_dataset
+    ds = load_dataset("hf-internal-testing/librispeech_asr_dummy", "clean", split="validation")
+    gap = np.zeros(int(0.3 * 16000), dtype="float32")
+    chunks, tot = [], 0.0
+    for row in ds:
+        a = np.asarray(row["audio"]["array"], dtype="float32")
+        chunks.append(a)
+        chunks.append(gap)
+        tot += (len(a) + len(gap)) / 16000
+        if tot >= 120:
+            break
+    long_pcm = np.concatenate(chunks)
+    sf.write(str(long_wav), long_pcm, 16000)
+    long_dur = len(long_pcm) / 16000
+    print(f"  JFK: {duration:.1f}s (real), Long: {long_dur:.1f}s (real, {len(chunks)//2} distinct LibriSpeech utterances)")
+except Exception as e:  # noqa: BLE001
+    print(f"  LibriSpeech load failed ({str(e)[:120]}); falling back to jfk×5", flush=True)
+    repeats = max(1, int(60 / duration))
+    long_pcm = np.tile(pcm, repeats)
+    sf.write(str(long_wav), long_pcm, sr)
+    long_dur = len(long_pcm) / sr
+    print(f"  JFK: {duration:.1f}s, Long: {long_dur:.1f}s (FALLBACK jfk×{repeats})")
 
 # ── Phase 3: Download all GGUF models ───────────────────────────────────────
 print("\n=== Phase 3: download models ===", flush=True)
@@ -308,10 +331,12 @@ def bench_onnx(onnx_name, quant, providers):
                 txt = str(r)
         ts.sort()
         med = ts[len(ts) // 2]
-        # Return FULL transcript + its length/word-count so we can PROVE the run
-        # actually transcribed the whole clip (a 55 s clip = jfk×5 must yield ~5×
-        # the words of the 11 s clip; a truncated/no-op path would be short+fast
-        # -> a fake high RTF, which is what a 222× number would otherwise be).
+        # Return FULL transcript + word count so we can PROVE the run transcribed
+        # the WHOLE clip: the ~120 s real clip must yield a large word count that
+        # ~matches across engines/EPs (onnx-CUDA long_words ≈ onnx-CPU long_words ≈
+        # CrispASR long_words). A truncated/no-op fast path would be short+fast =
+        # a fake high RTF. (Real varied speech, not jfk×5 — so caches can't reuse
+        # work across identical repeats and inflate the GPU number.)
         return dur / med, med, txt, len(txt), len(txt.split())
 
     rj, mj, tj, cj, wj = _timeit(jfk_wav, duration, 2, 5)
@@ -331,8 +356,9 @@ for onnx_name, label in ONNX_MODELS:
     for key, quant, provs in configs:
         try:
             r = bench_onnx(onnx_name, quant, provs)
-            # PROOF-OF-WORK: JFK vs Long word counts. jfk×5 => long_words should be
-            # ~5× jfk_words if the whole 55 s was really transcribed.
+            # PROOF-OF-WORK: long_words must be large (proportional to ~120 s of
+            # real speech) and ~match across CPU/GPU EPs; a fast run with few
+            # words = truncation/no-op = fake RTF.
             print(f"    {key}: JFK {r['rtf_jfk']:.1f}x ({r['s_jfk'] * 1000:.0f}ms, {r['jfk_words']}w)  "
                   f"Long {r['rtf_long']:.1f}x ({r['s_long']:.2f}s, {r['long_words']}w)", flush=True)
             print(f"        long transcript: {r['long_text'][:220]!r}", flush=True)
