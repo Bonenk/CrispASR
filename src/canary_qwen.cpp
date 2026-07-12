@@ -606,6 +606,7 @@ static ggml_cgraph* canary_qwen_build_graph_encoder(canary_qwen_context* ctx, in
     core_conformer::BlockParams bp = {
         (int)hp.enc_d_model, (int)hp.enc_n_heads, (int)hp.enc_head_dim, (int)hp.conv_kernel, kLayerNormEps,
     };
+    bp.manual_attn = core_conformer::fc_gpu_manual_attn(ctx->backend);
     for (uint32_t il = 0; il < hp.enc_n_layers; il++) {
         cur = core_conformer::build_block(ctx0, cur, pos_enc, T, m.enc[il], bp);
     }

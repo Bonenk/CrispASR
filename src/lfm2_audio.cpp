@@ -769,6 +769,7 @@ float* lfm2_audio_run_encoder(lfm2_audio_context* ctx, const float* mel, int T_m
 
     // Encoder blocks
     core_conformer::BlockParams bp = {d, (int)hp.enc_n_heads, d / (int)hp.enc_n_heads, (int)hp.enc_conv_kernel, 1e-5f};
+    bp.manual_attn = core_conformer::fc_gpu_manual_attn(ctx->backend);
     for (uint32_t i = 0; i < hp.enc_n_layers; i++)
         enc = core_conformer::build_block(ctx0, enc, pos_t, T_enc, model.enc_blocks[i], bp);
 
