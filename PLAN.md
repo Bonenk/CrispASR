@@ -100,7 +100,10 @@ the sequential steps and dispatch is already ~zero. The O15_SKIP_REALLOC path
 **Load-dependence (same as §176k):** the CP_DIRECT comment records "M1 Metal
 ~equal on an idle box, ~3× under load" — confirmed compute-bound at idle here.
 Nothing further to do on Metal. **CUDA:** validated as 11% faster on P100 per the
-CP_DIRECT note; no further action.
+CP_DIRECT note. A ready re-validation kernel lives at
+`tools/kaggle/qwen3-tts-cp-direct-cuda/` (base/o15/direct/direct_lk matrix,
+md5-identical + ASR-roundtrip acceptance, `CRISPASR_REF=main`) — run it after any
+code_pred change: `cd tools/kaggle/qwen3-tts-cp-direct-cuda && kaggle kernels push`.
 
 ### Defaults-audit generalisation (VPS-doable) — LARGELY DONE (2026-07-12)
 
@@ -6212,6 +6215,15 @@ matvecs/step = launch-bound; the graph path is the win).
 - Voice-clone (`--voice jfk.wav`): runs fully on Metal — VAE-**encode** graph
   (2166 ms) + AR (13069 ms) + VAE-decode (4174 ms), no SIGSEGV / NaN / unsupported
   op. So even the VAE-encode path is Metal-clean.
+
+**CUDA validation — kernel READY, needs a run (2026-07-12):**
+`tools/kaggle/voxcpm2-176n-cuda/` — builds on CUDA, downloads `cstr/voxcpm2-GGUF`
++ parakeet, runs CPU vs GPU(default `USE_GRAPH`), asserts both round-trip through
+parakeet ASR (word-recall ≥0.6), the GPU actually ran (weight mirror, not a silent
+CPU fallback), and no crash/NaN/unsupported-op; reports GPU speedup. Run:
+`cd tools/kaggle/voxcpm2-176n-cuda && kaggle kernels push` (branch must be pushed
+first; kernel clones `CRISPASR_REF`, default `main`). This closes the mirror-path
++ CUDA-contiguity risk (LEARNING 35). Until it's run + green, keep the note below.
 
 **Left open (LOW):** CUDA/discrete-GPU is unvalidated here — the mirror path
 (`needs_gpu_mirror`, device-local VRAM) only exercised on Metal (unified memory).
