@@ -143,6 +143,10 @@
 #include "qwen3_tts.h"
 #define CA_HAVE_QWEN3_TTS 1
 #endif
+#if __has_include("moss_tts.h")
+#include "moss_tts.h"
+#define CA_HAVE_MOSS_TTS 1
+#endif
 #if __has_include("omnivoice.h")
 #include "omnivoice.h"
 #define CA_HAVE_OMNIVOICE 1
@@ -1299,6 +1303,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "vibevoice";
     else if (strcmp(arch, "qwen3-tts") == 0 || strcmp(arch, "qwen3_tts") == 0)
         backend = "qwen3-tts";
+    else if (strcmp(arch, "moss-tts") == 0 || strcmp(arch, "moss_tts") == 0 || strcmp(arch, "moss-tts-delay") == 0)
+        backend = "moss-tts";
     else if (strcmp(arch, "omnivoice") == 0 || strcmp(arch, "omnivoice-tts") == 0)
         backend = "omnivoice";
     else if (strcmp(arch, "orpheus") == 0)
@@ -1667,6 +1673,9 @@ struct crispasr_session {
 #ifdef CA_HAVE_QWEN3_TTS
     qwen3_tts_context* qwen3_tts_ctx = nullptr;
     bool qwen3_tts_voice_loaded = false;
+#endif
+#ifdef CA_HAVE_MOSS_TTS
+    moss_tts_context* moss_tts_ctx = nullptr;
 #endif
 #ifdef CA_HAVE_OMNIVOICE
     omnivoice_context* omnivoice_ctx = nullptr;
@@ -2470,6 +2479,22 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         }
         // Codec must be loaded before synthesise. Caller does so via
         // `crispasr_session_set_codec_path` after open.
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_MOSS_TTS
+    if (s->backend == "moss-tts" || s->backend == "moss_tts" || s->backend == "mosstts") {
+        moss_tts_context_params p = moss_tts_context_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
+        p.flash_attn = g_open_flash_attn_tls;
+        s->moss_tts_ctx = moss_tts_init_from_file(model_path, p);
+        if (!s->moss_tts_ctx) {
+            delete s;
+            return nullptr;
+        }
+        // Codec loaded via `crispasr_session_set_codec_path` after open.
         return s;
     }
 #endif
@@ -6600,6 +6625,10 @@ CA_EXPORT int crispasr_session_set_codec_path(crispasr_session* s, const char* p
     if (s->qwen3_tts_ctx)
         return qwen3_tts_set_codec_path(s->qwen3_tts_ctx, path);
 #endif
+#ifdef CA_HAVE_MOSS_TTS
+    if (s->moss_tts_ctx)
+        return moss_tts_set_codec_path(s->moss_tts_ctx, path) ? 0 : -1;
+#endif
 #ifdef CA_HAVE_ORPHEUS
     if (s->orpheus_ctx) {
         int rc = orpheus_set_codec_path(s->orpheus_ctx, path);
@@ -7192,6 +7221,23 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
         if (!pcm && s->last_synth_error.empty()) {
             s->last_synth_error = "qwen3-tts synthesis failed — "
                                   "try q8_0 quantisation or a different model variant";
+        }
+        return pcm;
+    }
+#endif
+#ifdef CA_HAVE_MOSS_TTS
+    if (s->moss_tts_ctx) {
+        moss_tts_synth_params p = moss_tts_synth_default_params();
+        const std::string tts_lang = !s->target_language.empty() ? s->target_language : s->source_language;
+        std::string lang_en;
+        if (!tts_lang.empty() && tts_lang != "auto") {
+            lang_en = ca_iso_to_english_lang(tts_lang);
+            p.language = lang_en.c_str();
+        }
+        float* pcm = moss_tts_synthesize(s->moss_tts_ctx, text, &p, out_n_samples);
+        if (!pcm && s->last_synth_error.empty()) {
+            s->last_synth_error = "moss-tts synthesis failed — ensure the companion codec GGUF is loaded "
+                                  "(crispasr_session_set_codec_path)";
         }
         return pcm;
     }
@@ -7922,6 +7968,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_QWEN3_TTS
     if (s->qwen3_tts_ctx)
         qwen3_tts_free(s->qwen3_tts_ctx);
+#endif
+#ifdef CA_HAVE_MOSS_TTS
+    if (s->moss_tts_ctx)
+        moss_tts_free(s->moss_tts_ctx);
 #endif
 #ifdef CA_HAVE_OMNIVOICE
     if (s->omnivoice_ctx)
