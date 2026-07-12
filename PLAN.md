@@ -75,26 +75,32 @@ The memory-safety fixes shipped (see HISTORY 2026-07-11). Test/tooling state:
 
 ## Scoped next items (for a new agent picking up)
 
-### qwen3-tts code predictor fused graph (#245, GPU-ONLY)
+### qwen3-tts code predictor fused graph (#245, GPU-ONLY) — DONE (CP_DIRECT), verified 2026-07-12
 
-**What:** The 15-codebook AR loop in `code_pred_generate_15()` (`src/qwen3_tts.cpp:2352`)
-dispatches 15 separate ggml graphs per frame. On GPU the dispatch overhead (sched
-reset+alloc) becomes significant (~5ms × 15 = 75ms vs ~100ms compute). On CPU the
-overhead is negligible (<5ms vs 5000ms compute).
+**Status:** DONE. This was superseded by **CP_DIRECT** (§232/#245,
+`src/qwen3_tts.cpp` ~L1912) — the sched-free persistent code_pred dispatch that
+Option C wanted but without the O15_SKIP_REALLOC breakage. It builds the two
+per-frame code_pred graph shapes (T=2 prefill + T=1 step) once, gallocr-allocates
+on the dedicated code_pred backend, and each of the 15 dispatches is just
+blit-lm_head-slot + tensor_set + one `ggml_backend_graph_compute` (no
+`sched_reset`/`alloc`). **Default ON when code_pred runs on a GPU backend**
+(`QWEN3_TTS_CP_DIRECT`, else per-backend default); md5-identical WAV validated
+2026-07-10.
 
-**Option A (unrolled graph):** Build one graph with 15 × 5 = 75 transformer blocks,
-KV cache growing from pos 0→14. Fixed topology since n_steps=15. Large but bounded.
-Eliminates all inter-step dispatch. Needs GPU to measure impact.
+**Verified on M1 Metal 2026-07-12** (`qwen3-tts-12hz-0.6b-base-q8_0.gguf`, quiet
+box, `QWEN3_TTS_BENCH=1`): `cp_direct active`; per-frame code_pred bench
+**set≈2-4 ms, compute≈45-60 ms, read≈0.1 ms** — dispatch is now ~5% (the pre-CP_DIRECT
+sched path was ~25 ms × 15 ≈ 375 ms/frame of pure dispatch). ar_loop 76 ms/frame,
+**RTF 1.2×**, ASR round-trip correct ("and so my fellow americans"). code_pred is now
+**compute-bound** (15 sequential T=1 steps of a 5L/d=1024 transformer), so
+**Option A (unrolled 75-block graph) would buy ~nothing** — it can't parallelize
+the sequential steps and dispatch is already ~zero. The O15_SKIP_REALLOC path
+(Option C) remains the broken predecessor; CP_DIRECT is the shipped replacement.
 
-**Option C (skip sched reset):** The `O15_SKIP_REALLOC` path (`src/qwen3_tts.cpp:2270`)
-already attempts this but is broken on CUDA (#56 illegal memory access) and Metal
-(nil-buffer inputs). Root cause is ggml sched not supporting graph reuse across
-`sched_reset` boundaries. Would need an ggml-level fix or a dedicated gallocr
-(the chatterbox_s3gen pattern).
-
-**Test:** needs a GPU machine (Kaggle P100 or Metal Mac). CPU benchmarking shows
-the fix would save <1% on CPU. Model files: `qwen3-tts-12hz-0.6b-base-q8_0.gguf`
-(941 MB) + `qwen3-tts-tokenizer-12hz.gguf` (342 MB).
+**Load-dependence (same as §176k):** the CP_DIRECT comment records "M1 Metal
+~equal on an idle box, ~3× under load" — confirmed compute-bound at idle here.
+Nothing further to do on Metal. **CUDA:** validated as 11% faster on P100 per the
+CP_DIRECT note; no further action.
 
 ### Defaults-audit generalisation (VPS-doable)
 
