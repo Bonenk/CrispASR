@@ -1824,6 +1824,23 @@ int crispasr_run_backend(const whisper_params& params_in) {
     }
     params.model = resolved;
 
+    // A pure-CTC FastConformer model (parakeet-ctc-*, stt_*_fastconformer_ctc:
+    // encoder + CTC head, no RNN-T decoder/joint) cannot run on the parakeet
+    // (transducer) backend. Autodetection already routes such GGUFs to
+    // fastconformer-ctc by arch ("canary-ctc") and filename, but an explicit
+    // `--backend parakeet` bypasses that and dead-ends at the parakeet guard.
+    // Reroute here so the transducer-only backend never gets a CTC model.
+    if (backend_name == "parakeet" && crispasr_gguf_is_pure_ctc(params.model)) {
+        if (!params.no_prints) {
+            fprintf(stderr,
+                    "crispasr: '%s' is a pure-CTC model (no RNN-T decoder) — the parakeet\n"
+                    "crispasr: backend is transducer-only; auto-routing to --backend fastconformer-ctc\n",
+                    params.model.c_str());
+        }
+        backend_name = "fastconformer-ctc";
+        params.backend = "fastconformer-ctc";
+    }
+
     // Issue #125 follow-up: when the LM has a companion file in the
     // registry (e.g. mimo-tokenizer-q4_k.gguf for mimo-asr), fetch it now
     // so `--auto-download` produces a fully-functional setup. Previously
