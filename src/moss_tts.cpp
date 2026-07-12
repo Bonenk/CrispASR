@@ -166,6 +166,11 @@ struct moss_tts_context {
     std::string codec_path;
     bool codec_loaded = false;
     moss_tts_codec::Codec* codec = nullptr;
+
+    // Voice cloning: encoded reference-audio codes (n_vq, ref_t_audio) row-major,
+    // set via moss_tts_set_reference_wav(). Empty = plain TTS.
+    std::vector<int32_t> ref_codes;
+    int ref_t_audio = 0;
 };
 
 // ===========================================================================
@@ -907,9 +912,22 @@ static std::string mt_build_prompt_text(const moss_tts_context* ctx, const char*
     const std::string instruction = sp.instruction ? std::string(sp.instruction) : "None";
     const std::string language = sp.language ? std::string(sp.language) : "None";
 
+    // Reference-audio block (voice cloning): <audio_start> + user_slot ×
+    // (T_ref + n_vq - 1) + <audio_end>, mirroring openmoss _replace_audio_placeholders.
+    std::string ref = "None\n";
+    if (ctx->ref_t_audio > 0) {
+        const std::string audio_end = mt_tok_str(ctx, hp.tok_audio_end);
+        const std::string user_slot = mt_tok_str(ctx, hp.tok_audio_user_slot);
+        std::string block = audio_start;
+        for (int t = 0; t < ctx->ref_t_audio + (int)hp.n_vq - 1; t++)
+            block += user_slot;
+        block += audio_end;
+        ref = "[S1]:\n" + block + "\n";
+    }
+
     std::string body;
     body += "<user_inst>\n";
-    body += "- Reference(s):\nNone\n";
+    body += "- Reference(s):\n" + ref;
     body += "- Instruction:\n" + instruction + "\n";
     body += "- Tokens:\nNone\n";
     body += "- Quality:\nNone\n";
@@ -943,10 +961,41 @@ static bool mt_generate(moss_tts_context* ctx, const char* text, const moss_tts_
     const int prompt_len = n_ids;
     const int stride = 1 + n_vq;
 
-    // Prompt grid: col 0 = text ids, audio cols = pad. (No reference audio.)
+    // Prompt grid: col 0 = text ids, audio cols = pad.
     std::vector<int32_t> grid((size_t)prompt_len * stride, (int32_t)hp.audio_pad_code);
     for (int r = 0; r < prompt_len; r++)
         grid[(size_t)r * stride + 0] = ids[r];
+
+    // Voice cloning: splice the delay-shifted reference codes into the rows between
+    // the first <audio_start>/<audio_end> pair (openmoss build_prompt_grid ref path).
+    if (ctx->ref_t_audio > 0 && !ctx->ref_codes.empty()) {
+        const int T_ref = ctx->ref_t_audio;
+        int a_start = -1, a_end = -1;
+        for (int r = 0; r < prompt_len; r++) {
+            if (a_start < 0 && ids[r] == (int32_t)hp.tok_audio_start)
+                a_start = r;
+            else if (a_start >= 0 && ids[r] == (int32_t)hp.tok_audio_end) {
+                a_end = r;
+                break;
+            }
+        }
+        const int span = (a_start >= 0 && a_end >= 0) ? a_end - a_start - 1 : -1;
+        const int expected = T_ref + n_vq - 1;
+        if (span == expected) {
+            // apply_delay_pattern: row (i+t) col i = codes[i, t], else pad.
+            std::vector<int32_t> delayed((size_t)expected * n_vq, (int32_t)hp.audio_pad_code);
+            for (int i = 0; i < n_vq; i++)
+                for (int t = 0; t < T_ref; t++)
+                    delayed[(size_t)(i + t) * n_vq + i] = ctx->ref_codes[(size_t)i * T_ref + t];
+            for (int k = 0; k < span; k++) {
+                const int r = a_start + 1 + k;
+                for (int i = 0; i < n_vq; i++)
+                    grid[(size_t)r * stride + 1 + i] = delayed[(size_t)k * n_vq + i];
+            }
+        } else if (ctx->params.verbosity >= 1) {
+            fprintf(stderr, "moss_tts: reference span %d != expected %d — ignoring voice prompt\n", span, expected);
+        }
+    }
     free(ids);
 
     if (!moss_tts_kv_init(ctx, prompt_len + max_new + 8))
@@ -1230,6 +1279,36 @@ extern "C" bool moss_tts_set_codec_path(moss_tts_context* ctx, const char* path_
     ctx->codec = moss_tts_codec::load(path_codec, ctx->backend, ctx->sched, ctx->params.verbosity);
     ctx->codec_loaded = (ctx->codec != nullptr);
     return ctx->codec_loaded;
+}
+
+extern "C" bool moss_tts_set_reference_wav(moss_tts_context* ctx, const float* samples, int n_samples) {
+    if (!ctx)
+        return false;
+    ctx->ref_codes.clear();
+    ctx->ref_t_audio = 0;
+    if (!samples || n_samples <= 0)
+        return true; // clear the reference (plain TTS)
+    if (!ctx->codec || !moss_tts_codec::encoder_ready(ctx->codec)) {
+        fprintf(stderr, "moss_tts: voice cloning needs a codec with the encoder loaded "
+                        "(set the companion codec GGUF first)\n");
+        return false;
+    }
+    int nvq = 0, t_audio = 0;
+    std::vector<int32_t> codes = moss_tts_codec::encode(ctx->codec, samples, (int64_t)n_samples, nvq, t_audio);
+    if (codes.empty() || t_audio <= 0 || nvq != (int)ctx->model.hparams.n_vq) {
+        fprintf(stderr, "moss_tts: reference-audio encode failed\n");
+        return false;
+    }
+    ctx->ref_codes = std::move(codes);
+    ctx->ref_t_audio = t_audio;
+    if (ctx->params.verbosity >= 1)
+        fprintf(stderr, "moss_tts: reference encoded — %d frames (%.2fs)\n", t_audio,
+                t_audio * 1920.0 / (double)ctx->model.hparams.sampling_rate);
+    return true;
+}
+
+extern "C" bool moss_tts_has_reference(const moss_tts_context* ctx) {
+    return ctx && ctx->ref_t_audio > 0;
 }
 
 extern "C" void moss_tts_free(moss_tts_context* ctx) {
