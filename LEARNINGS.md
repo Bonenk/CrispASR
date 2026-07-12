@@ -10,6 +10,24 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Verify a roadmap "broken/OPEN" claim empirically before implementing it — the codebase may have outgrown the note (VoxCPM2 §176n Metal, 2026-07-12)
+
+PLAN §176n said VoxCPM2 was "CPU-only due to a Metal SIGSEGV" and scoped a fused-
+graph rewrite to "unlock GPU." Before writing any code, one empirical run
+(`crispasr --backend voxcpm2-tts`, default = GPU) showed it **already runs on
+Metal**, correct (ASR round-trip) and **3.75× faster than CPU** — because the
+`VOXCPM2_USE_GRAPH` fused graphs (built for a *different* PLAN item) had since made
+the whole hot path Metal-safe. The SIGSEGV note was true only for the tiny CPU
+helper matmuls, which nobody needs on GPU. The "medium rewrite" was zero code.
+
+Durable habit: a stale OPEN item can cost a whole session of unnecessary graph
+surgery. For any "X is broken on backend Y" claim, the FIRST step is the ~2-minute
+reproduction (run it, read the actual failure mode), not a code plan. Related to
+the §176k lesson (re-profile before trusting a handover's bottleneck) — same root:
+**the map is not the territory; check the territory first.** Corollary carried
+here: GPU-default was confirmed only on Metal (unified memory); the discrete-GPU
+mirror path needs a Kaggle CUDA round-trip before trusting it there (LEARNING 35).
+
 ## Per-step matvec dispatch overhead is LOAD-DEPENDENT — a "win" measured on a busy box is mostly a contention artifact (FireRed §176k, 2026-07-12)
 
 Replacing the FireRed decoder's per-call matvec graphs (each a fresh `ggml_init`
