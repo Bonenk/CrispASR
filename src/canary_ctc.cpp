@@ -513,17 +513,31 @@ static void cc_fold_batchnorm(cc_model& model, ggml_backend_t backend) {
         for (int c = 0; c < d; c++)
             s[c] = bn_w[c] / sqrtf(bn_var[c] + eps);
 
-        std::vector<ggml_fp16_t> w_f16((size_t)K * d);
-        ggml_backend_tensor_get(e.conv_dw_w, w_f16.data(), 0, w_f16.size() * sizeof(ggml_fp16_t));
-        std::vector<float> w_f32((size_t)K * d);
-        for (size_t i = 0; i < w_f16.size(); i++)
-            w_f32[i] = ggml_fp16_to_fp32(w_f16[i]);
+        // Read in the tensor's native dtype — an F32 conv_dw_w (--f32-encoder /
+        // diff-harness) read as F16 would misinterpret the bytes and corrupt the
+        // folded F32 copy fed to the graph below (c9a4de65).
+        const size_t n_dw = (size_t)K * d;
+        std::vector<float> w_f32(n_dw);
+        if (e.conv_dw_w->type == GGML_TYPE_F32) {
+            ggml_backend_tensor_get(e.conv_dw_w, w_f32.data(), 0, n_dw * sizeof(float));
+        } else {
+            std::vector<ggml_fp16_t> w_f16(n_dw);
+            ggml_backend_tensor_get(e.conv_dw_w, w_f16.data(), 0, n_dw * sizeof(ggml_fp16_t));
+            for (size_t i = 0; i < n_dw; i++)
+                w_f32[i] = ggml_fp16_to_fp32(w_f16[i]);
+        }
         for (int c = 0; c < d; c++)
             for (int ki = 0; ki < K; ki++)
                 w_f32[ki + c * K] *= s[c];
-        for (size_t i = 0; i < w_f16.size(); i++)
-            w_f16[i] = ggml_fp32_to_fp16(w_f32[i]);
-        ggml_backend_tensor_set(e.conv_dw_w, w_f16.data(), 0, w_f16.size() * sizeof(ggml_fp16_t));
+        // Write back in native dtype (superseded by conv_dw_w_f32 below, but kept correct).
+        if (e.conv_dw_w->type == GGML_TYPE_F32) {
+            ggml_backend_tensor_set(e.conv_dw_w, w_f32.data(), 0, n_dw * sizeof(float));
+        } else {
+            std::vector<ggml_fp16_t> w_f16(n_dw);
+            for (size_t i = 0; i < n_dw; i++)
+                w_f16[i] = ggml_fp32_to_fp16(w_f32[i]);
+            ggml_backend_tensor_set(e.conv_dw_w, w_f16.data(), 0, n_dw * sizeof(ggml_fp16_t));
+        }
 
         all_w_f32[il] = std::move(w_f32);
 

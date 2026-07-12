@@ -1176,13 +1176,19 @@ static void canary_fold_batchnorm(canary_model& model) {
             s[c] = bn_w[c] / sqrtf(bn_var[c] + eps);
 
         std::vector<float> w_f32 = core_cpu::to_f32(e.conv_dw_w); // F32/F16/quantized-safe read
-        std::vector<ggml_fp16_t> w_f16(w_f32.size());             // reused for the F16 write-back below
         for (int c = 0; c < d; c++)
             for (int ki = 0; ki < K; ki++)
                 w_f32[ki + c * K] *= s[c];
-        for (size_t i = 0; i < w_f16.size(); i++)
-            w_f16[i] = ggml_fp32_to_fp16(w_f32[i]);
-        ggml_backend_tensor_set(e.conv_dw_w, w_f16.data(), 0, w_f16.size() * sizeof(ggml_fp16_t));
+        // Write back in the tensor's native dtype — an F32 conv_dw_w (--f32-encoder
+        // GGUFs / diff-harness validation) must NOT be clobbered with F16 (c9a4de65).
+        if (e.conv_dw_w->type == GGML_TYPE_F32) {
+            ggml_backend_tensor_set(e.conv_dw_w, w_f32.data(), 0, w_f32.size() * sizeof(float));
+        } else {
+            std::vector<ggml_fp16_t> w_f16(w_f32.size());
+            for (size_t i = 0; i < w_f16.size(); i++)
+                w_f16[i] = ggml_fp32_to_fp16(w_f32[i]);
+            ggml_backend_tensor_set(e.conv_dw_w, w_f16.data(), 0, w_f16.size() * sizeof(ggml_fp16_t));
+        }
 
         // Fold into existing dw_b: b'[c] = (dw_b[c] - mean[c]) * s[c] + bn_b[c]
         for (int c = 0; c < d; c++)

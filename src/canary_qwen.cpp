@@ -477,13 +477,18 @@ static bool canary_qwen_load_model(canary_qwen_model& model, canary_qwen_vocab& 
             for (int c = 0; c < d; c++)
                 s[c] = bn_w[c] / sqrtf(bn_var[c] + eps);
             std::vector<float> w_f32 = core_cpu::to_f32(e.conv_dw_w);
-            std::vector<ggml_fp16_t> w_f16(w_f32.size());
             for (int c = 0; c < d; c++)
                 for (int ki = 0; ki < K; ki++)
                     w_f32[ki + c * K] *= s[c];
-            for (size_t j = 0; j < w_f16.size(); j++)
-                w_f16[j] = ggml_fp32_to_fp16(w_f32[j]);
-            ggml_backend_tensor_set(e.conv_dw_w, w_f16.data(), 0, w_f16.size() * sizeof(ggml_fp16_t));
+            // Write back in native dtype — don't clobber an F32 conv_dw_w with F16 (c9a4de65).
+            if (e.conv_dw_w->type == GGML_TYPE_F32) {
+                ggml_backend_tensor_set(e.conv_dw_w, w_f32.data(), 0, w_f32.size() * sizeof(float));
+            } else {
+                std::vector<ggml_fp16_t> w_f16(w_f32.size());
+                for (size_t j = 0; j < w_f16.size(); j++)
+                    w_f16[j] = ggml_fp32_to_fp16(w_f32[j]);
+                ggml_backend_tensor_set(e.conv_dw_w, w_f16.data(), 0, w_f16.size() * sizeof(ggml_fp16_t));
+            }
             for (int c = 0; c < d; c++)
                 dw_b[c] = (dw_b[c] - bn_mean[c]) * s[c] + bn_b[c];
             ggml_backend_tensor_set(e.conv_dw_b, dw_b.data(), 0, d * sizeof(float));
