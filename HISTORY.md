@@ -42,6 +42,37 @@ PLAN entry. CUDA/discrete-GPU mirror path still unvalidated (Metal unified-memor
 only). Lib `default_params use_gpu=false` left as-is — the conventional
 conservative default, overridden by CLI + session. See LEARNINGS + PLAN §176n.
 
+## 2026-07-12 — BN-fold dtype audit: canary family had the same bug as cohere/parakeet
+
+After the cohere corrupt-download fix, audited whether other runtimes share the two
+bug classes from `c9a4de65`. They do.
+
+**BN-fold dtype write-back (RUNTIME, fixed `702db9af`).** `c9a4de65` fixed only
+cohere + parakeet, but 8 more backends fold BatchNorm. The **canary family** had the
+identical defect: `canary.cpp` / `canary_qwen.cpp` read `conv_dw_w` dtype-safely
+(`core_cpu::to_f32`) but wrote the folded weight back as **unconditional F16**;
+`canary_ctc.cpp` **read** `conv_dw_w` as unconditional F16 (so an F32 tensor is
+misread and the corruption propagates into the F32 copy fed to the graph). All three
+now branch on `conv_dw_w->type` for read and write. The F16 path is **bit-identical**
+to before, so shipped F16 GGUFs are unaffected — this only corrects the `--f32-encoder`
+/ diff-harness path. Audited **clean** (no fix): granite_speech, titanet,
+chatterbox_campplus (host-side F32 fold into fresh F32 tensors), and nemotron,
+lfm2_audio (LayerNorm conv, no BatchNorm at all).
+
+**Follow-ups (`1360a6bc`).** (1) Added `--f32-encoder` to all three canary converters
+(`convert-canary{,-ctc,-qwen}-to-gguf.py`) — they previously had no way to emit an F32
+`conv_dw_w`, so the fixed F32 path wasn't even producible. (2) Added a shared
+`tools/reference_backends/_reload_guard.py::reload_if_random_init()` (the second
+`c9a4de65` bug class — HF `_init_weights` on a custom remote model randomizes
+Linear/Conv weights on `from_pretrained` → noise reference) and wired it into the three
+unguarded reference backends that load custom remote classes: moss_diarize, mimo_asr,
+gemma4. No-op when weights are already pretrained.
+
+Verified: canary C++ passes `-fsyntax-only` (via compile_commands.json); all Python
+`py_compile`s. Full NeMo F32 diff-harness deferred as validation-by-equivalence — the
+canary F32 branch is the same code as parakeet's, F32-validated at cos≥0.999983 in the
+same core_conformer framework.
+
 ## 2026-07-12 — Cohere Arabic "🎵 loop" was a corrupt safetensors download, not a bug
 
 A reported `🎵بحبح…` repetition loop on clean Arabic speech (cohere-transcribe-arabic-07-2026)

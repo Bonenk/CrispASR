@@ -10,6 +10,40 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## BatchNorm-fold must respect the conv tensor's dtype — and a per-backend fix usually has siblings (canary family, 2026-07-12)
+
+Folding a Conformer conv-module BatchNorm into the depthwise-conv weight
+(`conv_dw_w`) at load time means read → multiply by the BN scale → write back.
+Both the read and the write **must branch on `conv_dw_w->type`**. The trap:
+`ggml_backend_tensor_get/set` with an F16-sized buffer against an **F32** tensor
+reads/writes only half the bytes and reinterprets F32 bit patterns as F16 —
+silent, total corruption of that layer's conv weights (the decoder then
+hallucinates coherent-but-wrong output, same signature as a transposed mel).
+
+Crucially this is **latent for shipped GGUFs**: converters emit `conv.dw.weight`
+as F16 by default (`is_f32_tensor()` returns False for a 3-D non-norm/bias
+tensor), so the F16→F16 path is bit-identical whether or not the code branches on
+dtype. It only bites the **`--f32-encoder` / diff-harness path**, which is exactly
+the workflow used to *validate* the port — so the bug hides until someone runs the
+validation that would catch every other bug. `c9a4de65` fixed it for cohere +
+parakeet; the identical defect sat unfixed in `canary.cpp` / `canary_qwen.cpp`
+(F16 write-back) and `canary_ctc.cpp` (F16 read) until a follow-up audit (fixed
+`702db9af`).
+
+Two durable habits: (1) when a fix lands for one backend, `grep -rn fold_batchnorm
+src/` and check the **whole family** — a per-backend defect almost always has
+siblings sharing the copied code (canary_qwen's comment literally said "same as
+canary.cpp"). (2) A dtype-safe read helper (`core_cpu::to_f32`) fixes the read side
+for free; the write side still needs an explicit `type == GGML_TYPE_F32` branch —
+don't assume "reads safely" means "round-trips safely."
+
+Related, same commit family: HF `from_pretrained(..., trust_remote_code=True)` on a
+**custom remote model** can run a `_init_weights` that re-inits all Linear/Conv to
+`normal(0, 0.02)`, silently overwriting the pretrained weights → a reference dump of
+pure noise. The reference backend needs a guard: detect it (a conv weight's RMS far
+below any trained value, ~<0.1) and reload every param from the safetensors shard(s).
+See `tools/reference_backends/_reload_guard.py`.
+
 ## Verify a roadmap "broken/OPEN" claim empirically before implementing it — the codebase may have outgrown the note (VoxCPM2 §176n Metal, 2026-07-12)
 
 PLAN §176n said VoxCPM2 was "CPU-only due to a Metal SIGSEGV" and scoped a fused-
