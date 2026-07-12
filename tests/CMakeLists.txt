@@ -279,6 +279,26 @@ catch_discover_tests(test-cpu-ops-to-f32
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-core-rvq — core_rvq::encode_euclidean vs full-distance reference ─────
+# Proves the 2·x·E−‖E‖² shootout selects the same codes as a direct argmin
+# (the correctness property behind §176l routing kyutai through core_rvq).
+# rvq.cpp is dep-free (rvq.h + cstdio) so compile it straight into the test.
+add_executable(test-core-rvq
+    test-core-rvq.cpp
+    ${PROJECT_SOURCE_DIR}/src/core/rvq.cpp
+)
+target_include_directories(test-core-rvq PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core
+)
+target_link_libraries(test-core-rvq PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-core-rvq
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-vibevoice-quant-carveout — regression guard for issue #171 ──────────
 # Asserts crispasr-quantize keeps the VibeVoice diffusion prediction head and
 # connectors/EOS (pred.*, at_conn.*, se_conn.*, tts_eos.*, tts_types.*) at source

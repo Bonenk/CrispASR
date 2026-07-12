@@ -6188,22 +6188,38 @@ lever for typical clips. Measure on a long clip before investing.
 
 #### §176l Kyutai STT: vectorized RVQ encode
 
-**Status:** OPEN — re-verified genuinely open 2026-07-12.
-**Effort:** Medium
-**File:** `src/kyutai_stt.cpp`
-**Verified 2026-07-12 (code read):** `rvq_encode_group()` (`:768`) nearest-neighbor
-search is still a plain scalar triple-nested loop — codebooks × 2048 entries ×
-dims computing `diff*diff` L2 with a scalar argmin (`:809-822`). No SIMD/NEON, no
-BLAS/`ggml_mul_mat` distance, no PQ; only `KYUTAI_STT_BENCH`/`CRISPASR_MIMI_NONCAUSAL`
-env gates (neither touches RVQ). Unchanged from the original framing.
-**Approach:** Brute-force O(T×32×2048×256) codebook search is the
-dominant cost. Options: SIMD-vectorized exhaustive search, or product
-quantization / FAISS-style IVF for approximate nearest-neighbor.
-Fastest correct win is `‖r-c‖² = ‖r‖² + ‖c‖² − 2·r·c` → the `−2·r·c` term is one
-`ggml_mul_mat(codebook[2048×d], residual[d×T])` per codebook (BLAS/Metal), plus a
-precomputed `‖c‖²` per entry; argmin over the 2048 result rows. Bit-exact vs the
-scalar loop (same distances). Model not local — validate on a box with a Kyutai
-STT GGUF (TTS→ASR not applicable; check RVQ codes are byte-identical + speedup).
+**Status:** OPEN — but the optimized encoder ALREADY EXISTS and is now PROVEN
+CORRECT; only the kyutai *routing* remains (needs a model to validate the
+mechanical integration). Re-scoped 2026-07-12.
+**Effort:** Small (DRY refactor, not new algorithm).
+**Files:** `src/kyutai_stt.cpp` (still scalar), `src/core/rvq.h` + `rvq.cpp` (the
+fast helper), `tests/test-core-rvq.cpp` (new proof).
+
+**The fast search is already written.** `core_rvq::encode_euclidean` (used by
+`mimo_tokenizer`) implements exactly the recipe below — the `2·x·E[k] − ‖E[k]‖²`
+shootout (argmin over `‖x−E[k]‖²` dropping the per-frame-constant `‖x‖²`), with
+pre-computed `‖E[k]‖²`. **Kyutai just doesn't call it** — `rvq_encode_group()`
+(`kyutai_stt.cpp:768`, scalar triple loop `:809-828`) still does the naive
+`Σ(x−e)²` argmin per (frame × 2048 entries × dim). Same stale-infra pattern as the
+rest of the 2026-07-12 audit.
+
+**Proven correct with no model (2026-07-12):** `tests/test-core-rvq.cpp`
+(`test-core-rvq`, LABELS unit) compares `encode_euclidean` to a double-precision
+full-distance reference across 5 shapes (K up to 512, dim 32, 8 stages) —
+**codes identical** (every disagreement certified a genuine <1e-4 near-tie), plus
+malformed-input rejection. So the shootout is a correct drop-in for the scalar
+argmin; the algorithmic risk is retired.
+
+**Remaining (needs a Kyutai model):** route `rvq_encode_group` through
+`core_rvq::encode_euclidean` — extract each codebook to F32 row-major + precompute
+`‖E[k]‖²` (the scalar path already extracts the codebook via
+`ggml_backend_tensor_get`), build `Codebook[]`, call the helper, and repack its
+`(T, n_stages)` output into kyutai's `out_codes[q][t]`. The ONLY unverified part
+is that mechanical extraction/layout/transpose (and `cdim` vs per-codebook
+`cb_dim`); validate by asserting the emitted RVQ codes are byte-identical to the
+scalar path on a real clip (a Kyutai STT GGUF, e.g. via
+`tools/kaggle/kyutai-stt-2.6b-convert`), then measure the speedup. Kept scalar as
+the reference; gate the routed path until that check is green.
 
 #### §176n VoxCPM2: Metal — ALREADY WORKS, VERIFIED (was a stale entry)
 
