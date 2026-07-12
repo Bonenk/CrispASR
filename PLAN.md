@@ -853,7 +853,7 @@ landed, CUDA-validated). Deliberately-open threads, in priority order:
 |---|---|---|---|
 | **HIGH** | [#221 Issue #89 hardening + v0.8.8](#221-issue-89-hardening--v088-release) | Medium | 5 steps: CI regression guard (a), server-path mirror (b), Vulkan sanity (c), q4_k registry/UX (d), release (e). |
 | **DONE** | CPU weight-read hardening + Mimi codec causal default | Medium | **DONE 2026-07.** Routed ~14 CPU-side weight readers through the quantized-safe `core_cpu::to_f32` (`src/core/cpu_ops.h`); unit (`test-cpu-ops-to-f32`) + live tested on Metal + CUDA. wav2vec2 conv_w left as-is (zero-copy hot path, never quantized). **Mimi codec:** `kyutai_stt` now **defaults to causal+sliding-window** — a >250-frame WER A/B (3× jfk ≈412 frames) showed the old full non-causal attention truncates long audio ~25%; opt out with **`CRISPASR_MIMI_NONCAUSAL=1`**. `csm_tts` **also defaults to causal** (opt out `CRISPASR_MIMI_NONCAUSAL=1`) after a TTS→ASR A/B (~256 dec frames) gave causal 9.3% vs non-causal 12.0% WER (a modest single-sample win — non-causal TTS stayed intelligible rather than truncating like STT). → HISTORY, LEARNINGS. |
-| **HIGH** | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | 20 sub-items (§176a–§176t). **16 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176i (cross-KV F16, 5 backends), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **2 OPEN**: §176c (device-resident KV), §176l (Kyutai RVQ). **§176k (FireRed) MOSTLY DONE 2026-07-12** — profiling debunked the "KV/flash" framing (decode is dispatch-bound, not attention-bound); shipped an env-gated persistent matvec graph cache (`CRISPASR_FIRERED_MATVEC_CACHE`, default ON, bit-identical, pure Pareto). **§176n (VoxCPM2 Metal) DONE 2026-07-12** — stale entry: Metal already works via `VOXCPM2_USE_GRAPH` fused graphs, verified 3.75× on M1 with correct ASR roundtrip (CUDA still unvalidated). |
+| **HIGH** | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | 20 sub-items (§176a–§176t). **16 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176i (cross-KV F16, 5 backends), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **2 OPEN (both low-value/measure-first)**: §176c (device-resident KV — **Dia measured ~1.2% of decode, DEFERRED**; compute-bound decoders make this a <2% win, not the "dominant bottleneck" originally claimed), §176l (Kyutai RVQ — genuinely scalar, but no local model to validate). **§176k (FireRed) MOSTLY DONE 2026-07-12** — profiling debunked the "KV/flash" framing (decode is dispatch-bound, not attention-bound); shipped an env-gated persistent matvec graph cache (`CRISPASR_FIRERED_MATVEC_CACHE`, default ON, bit-identical, pure Pareto). **§176n (VoxCPM2 Metal) DONE 2026-07-12** — stale entry: Metal already works via `VOXCPM2_USE_GRAPH` fused graphs, verified 3.75× on M1 with correct ASR roundtrip (CUDA still unvalidated). |
 | **MEDIUM** | [#52 Qwen3-TTS](#52-qwen3-tts) — perf pass | Medium | talker + code_predictor + codec + ECAPA + codec_encoder all done; step-4 perf pass open (~137 ms/frame → real-time). **O15 broken on CUDA and default-OFF** (`61c42bfb`) — main perf lever disabled. **2026-06-13 Kaggle P100:** dedicated-sched fix (`baef21aa`) didn't help — O15=ON still rc=-6 SIGABRT at 6.0s. Crash is on the *first* code_pred call (not cached reuse), so root cause is `ggml_set_rows`-based KV scatter or the fixed-Lk causal mask on CUDA, not sched sharing. Baseline O15=OFF: 27.4 ms/frame, WAV OK. |
 | **HIGH** | [#57 Commercial-friendly TTS expansion](#57-commercial-friendly-tts-backend-expansion) | Phased | Phases 1–3 + Turbo + native voice cloning shipped (→ HISTORY §82). **#83 S3Gen production fix LANDED** — UNet weight-residency split + `parallel=true` sched cache-coherency fix; M1 Metal diff cos_min 0.940→0.999976, intelligible at all T. **Remaining:** Kartoffelbox_Turbo DE. → see HISTORY + upstream-prs/09–11. |
 | **MEDIUM** | [#51c MiMo-V2.5-ASR F16 step decode](#51c-f16-step-decode) | Small | F16 step-decode validation blocked behind ≥32 GB box (see PLAN #51c); base runtime + Q4_K shipped → HISTORY §56 |
@@ -6062,21 +6062,32 @@ items, kept verbatim:
 
 #### §176c Migrate host-side KV to device-resident 4D tensors
 
-**Status:** OPEN — 3 backends (re-verified 2026-07-12; VoxCPM2 dropped, now done).
-**⏳ IN PROGRESS 2026-07-12:** taking on **Dia** first (model `dia-1.6b-q4_k.gguf`
-is local, so TTS→ASR roundtrip validation is possible here) — branch
-`feat/dia-device-kv-176c`. SpeechT5 + Pocket-TTS remain queued.
-**Effort:** Medium per backend
+**Status:** OPEN but LOW-VALUE — **the "dominant bottleneck" premise is WRONG for
+compute-bound transformer decoders** (measured on Dia 2026-07-12). Do NOT
+implement without measuring the KV round-trip fraction on the specific backend
+first (`DIA_BENCH`-style instrument).
+**Dia — MEASURED, then DEFERRED (2026-07-12):** instrumented the host↔device
+self-attn KV round-trip (`DIA_BENCH: self_kv_roundtrip`, kept in `dia_tts.cpp`).
+On M1 Metal, `dia-1.6b-q4_k`, 120 steps: **upload 166 ms + readback 35 ms =
+201.6 ms out of 17435 ms decode = ~1.2%**. The 1.6B transformer forward (×B=2 CFG)
+dominates; the KV round-trip is negligible. A device-resident-KV rewrite is
+non-bit-identical + high-risk (ggml KV write/read ordering on Metal — the
+codebase's most bug-prone pattern) for a ≤1.2% ceiling → **not worth it; not
+implemented.** Same lesson as §176k/§208/§214: profile before optimizing.
+**SpeechT5 + Pocket-TTS:** almost certainly the same story (compute-bound
+decoders) — **measure the fraction first** before any rewrite; likely also <5%.
+**Effort:** Medium per backend (but expected <2% payoff — deprioritize).
 **Backends (verified 2026-07-12 by code read — genuinely still host-side):**
 - **SpeechT5** self-attn KV: OPEN. `decoder_kv_cache` is host `std::vector<float>`
   that GROWS per step (`insert`, `speecht5_tts.cpp:246-265`), re-uploaded whole
   every step via `ggml_backend_tensor_set` (`:1035-1041,1084`). Cross-attn KV
   already device-resident/precomputed (§202, `precompute_cross_kv` :568-644). No
   env-gated device path.
-- **Dia** self-attn KV: OPEN. Host `std::vector<std::vector<float>>` grows via
-  `insert` (`dia_tts.cpp:1594-1595,1955-1956`); whole past window reordered into
-  fresh host buffers + `ggml_backend_tensor_set` per step (`:1891-1902`). No
-  device path.
+- **Dia** self-attn KV: host-side (confirmed), but **MEASURED at ~1.2% of decode →
+  DEFERRED, not worth a device-KV rewrite** (see status block above). Host
+  `std::vector<std::vector<float>>` grows via `insert`
+  (`dia_tts.cpp:1594-1595,1955-1956`); whole past window reordered + re-uploaded
+  per step (`:1891-1902`).
 - **Pocket-TTS** self-attn KV: OPEN (nuance: does NOT grow — pre-sized to
   `max_seq` on the HOST, `pocket_tts.cpp:311-319,1000-1001`, advanced by
   `offset`) but still host-resident and the reordered past window is re-uploaded
@@ -6094,10 +6105,13 @@ device-resident.
 `[head_dim, max_ctx, n_heads, n_layers]` with `ggml_view_4d` +
 `ggml_cpy` writes. Eliminates O(step × layers × hidden) host↔device
 bandwidth per step.
-**Impact:** Eliminates the dominant data-movement bottleneck for these
-backends at long output sequences. NOTE (per §176k/§245 findings): dispatch/
-data-movement wins are load-dependent — measure on a quiet box AND under load,
-judge by the decoded round-trip, keep both paths gated.
+**Impact (REVISED by Dia measurement):** the original "eliminates the *dominant*
+data-movement bottleneck" claim is FALSE for compute-bound transformer decoders —
+Dia's KV round-trip is ~1.2%, not dominant. It could matter only for a small/fast
+decoder with very long outputs where the transformer forward is cheap relative to
+KV bandwidth; verify with a per-fraction measurement before investing. Judge by
+the decoded round-trip, keep both paths gated, and expect a low-single-digit-%
+ceiling on typical transformer TTS.
 
 #### §176k FireRed ASR: decoder self-attention — PROFILED + partial fix (2026-07-12)
 
