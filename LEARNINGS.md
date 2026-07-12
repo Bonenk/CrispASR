@@ -10,6 +10,40 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Per-step matvec dispatch overhead is LOAD-DEPENDENT — a "win" measured on a busy box is mostly a contention artifact (FireRed §176k, 2026-07-12)
+
+Replacing the FireRed decoder's per-call matvec graphs (each a fresh `ggml_init`
++ build + `sched_reset` + `sched_alloc_graph` + `ggml_free`) with a persistent
+per-`(weight, M)` gallocr graph reused across steps is a **pure Pareto** change
+(bit-identical output; strictly less work per call). But the *magnitude* of the
+speedup depends entirely on machine load, and measuring it wrong nearly shipped a
+6× overstatement:
+
+- **Quiet box (load ~3.7):** OFF ~0.188 vs ON ~0.178 ms/call → **~5%**. The removed
+  ops (malloc, sched reset/alloc) are cheap when the allocator/scheduler aren't
+  contended, so the cache saves little.
+- **Loaded box (load 20–50):** OFF up to 22 vs ON up to 20 ms/call; min-of-N OFF
+  1.15 vs ON 0.71 → **~1.6×**. Under contention, malloc + scheduler ops get
+  disproportionately penalized (lock contention, TLB/cache pressure, deschedule),
+  so removing them helps far more.
+
+Takeaways: (1) the **clean-box number is the honest headline** — a big speedup
+that only appears under load is telling you the *baseline* is contention-fragile,
+not that your change is a 1.6× win (reinforces the "noisy box fabricates wins"
+A/B rule); (2) for the dispatch-only comparison, **isolate the metric you changed**
+(a `FIRERED_BENCH` timer summing time in the dispatch function) and use
+**min-of-N** — the minimum is the least-descheduled sample, so its ratio survives
+load that makes wall-clock useless; (3) a per-call graph rebuild is
+contention-fragile even when it looks cheap at idle — persistent graphs also buy
+**robustness under load**, which is a real (if unglamorous) production benefit on
+a shared box. See [[firered-matvec-cache-load-dependent]].
+
+**Meta-lesson (same session):** the §176k handover asserted a KV-cache/flash-attn
+bottleneck; profiling showed the KV was already cached and the decode was
+dispatch-bound. **Re-profile per-node before trusting a handover's bottleneck
+theory** — cf. the #81 case. The fix that shipped was the opposite of the one the
+plan named.
+
 ## A Metal masked-attention-padding penalty does NOT transfer to CUDA, and a bucket-width change is byte-identical on Metal/CPU but not on CUDA (tada §215b bucket floor, 2026-07-12)
 
 The tada talker's positive CFG pass runs through the §176b decode bucket, which

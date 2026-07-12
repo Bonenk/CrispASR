@@ -829,7 +829,7 @@ landed, CUDA-validated). Deliberately-open threads, in priority order:
 |---|---|---|---|
 | **HIGH** | [#221 Issue #89 hardening + v0.8.8](#221-issue-89-hardening--v088-release) | Medium | 5 steps: CI regression guard (a), server-path mirror (b), Vulkan sanity (c), q4_k registry/UX (d), release (e). |
 | **DONE** | CPU weight-read hardening + Mimi codec causal default | Medium | **DONE 2026-07.** Routed ~14 CPU-side weight readers through the quantized-safe `core_cpu::to_f32` (`src/core/cpu_ops.h`); unit (`test-cpu-ops-to-f32`) + live tested on Metal + CUDA. wav2vec2 conv_w left as-is (zero-copy hot path, never quantized). **Mimi codec:** `kyutai_stt` now **defaults to causal+sliding-window** — a >250-frame WER A/B (3× jfk ≈412 frames) showed the old full non-causal attention truncates long audio ~25%; opt out with **`CRISPASR_MIMI_NONCAUSAL=1`**. `csm_tts` **also defaults to causal** (opt out `CRISPASR_MIMI_NONCAUSAL=1`) after a TTS→ASR A/B (~256 dec frames) gave causal 9.3% vs non-causal 12.0% WER (a modest single-sample win — non-causal TTS stayed intelligible rather than truncating like STT). → HISTORY, LEARNINGS. |
-| **HIGH** | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | 20 sub-items (§176a–§176t). **16 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176i (cross-KV F16, 5 backends), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **4 OPEN**: §176c (device-resident KV), §176k (FireRed KV), §176l (Kyutai RVQ), §176n (VoxCPM2 Metal). |
+| **HIGH** | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | 20 sub-items (§176a–§176t). **16 DONE or MOSTLY DONE**: §176a (flash-attn via core_attn), §176b (bucket cache 8 backends), §176d (BLAS 9 backends), §176e (context cache all support runtimes), §176f (mel BLAS+OMP), §176g (embd cache 3 backends), §176h (F5-TTS fused graph), §176i (cross-KV F16, 5 backends), §176j (iterative FFT), §176m (nemotron memmove), §176o (embed fast path), §176p (MOSS flash), §176q (greedy alloc), §176r (beam top-K), §176s (encoder cache 16/17), §176t (weight pre-cache). **3 OPEN**: §176c (device-resident KV), §176l (Kyutai RVQ), §176n (VoxCPM2 Metal). **§176k (FireRed) MOSTLY DONE 2026-07-12** — profiling debunked the "KV/flash" framing (decode is dispatch-bound, not attention-bound); shipped an env-gated persistent matvec graph cache (`CRISPASR_FIRERED_MATVEC_CACHE`, default ON, bit-identical, pure Pareto). |
 | **MEDIUM** | [#52 Qwen3-TTS](#52-qwen3-tts) — perf pass | Medium | talker + code_predictor + codec + ECAPA + codec_encoder all done; step-4 perf pass open (~137 ms/frame → real-time). **O15 broken on CUDA and default-OFF** (`61c42bfb`) — main perf lever disabled. **2026-06-13 Kaggle P100:** dedicated-sched fix (`baef21aa`) didn't help — O15=ON still rc=-6 SIGABRT at 6.0s. Crash is on the *first* code_pred call (not cached reuse), so root cause is `ggml_set_rows`-based KV scatter or the fixed-Lk causal mask on CUDA, not sched sharing. Baseline O15=OFF: 27.4 ms/frame, WAV OK. |
 | **HIGH** | [#57 Commercial-friendly TTS expansion](#57-commercial-friendly-tts-backend-expansion) | Phased | Phases 1–3 + Turbo + native voice cloning shipped (→ HISTORY §82). **#83 S3Gen production fix LANDED** — UNet weight-residency split + `parallel=true` sched cache-coherency fix; M1 Metal diff cos_min 0.940→0.999976, intelligible at all T. **Remaining:** Kartoffelbox_Turbo DE. → see HISTORY + upstream-prs/09–11. |
 | **MEDIUM** | [#51c MiMo-V2.5-ASR F16 step decode](#51c-f16-step-decode) | Small | F16 step-decode validation blocked behind ≥32 GB box (see PLAN #51c); base runtime + Q4_K shipped → HISTORY §56 |
@@ -6051,15 +6051,46 @@ bandwidth per step.
 **Impact:** Eliminates the dominant data-movement bottleneck for these
 backends at long output sequences.
 
-#### §176k FireRed ASR: add KV cache for decoder self-attention
+#### §176k FireRed ASR: decoder self-attention — PROFILED + partial fix (2026-07-12)
 
-**Status:** OPEN
-**Effort:** Medium
+**Status:** MOSTLY DONE — the handover framing was WRONG; profiled + shipped the
+real lever (env-gated matvec graph cache, default ON). A residual algorithmic
+item stays open.
 **File:** `src/firered_asr.cpp`
-**Approach:** Currently grows `std::vector<float>` per beam per layer
-and does O(T²) scalar attention. Add pre-allocated 4D KV cache
-(`core_attn` pattern) with flash_attn_ext. Highest-impact single-backend
-optimization remaining.
+
+**Handover framing (debunked by profiling):** "grows `std::vector<float>` per
+beam per layer and does O(T²) scalar attention; add a 4D KV cache + flash_attn —
+highest-impact optimization." Per-node profiling (`FIRERED_BENCH` per-step +
+per-dispatch timers) shows:
+- The self-attention KV is **already cached** (`beam.sa_k/sa_v` grow by appending
+  only the *current* token's K/V — no history recompute). The scalar scoring loop
+  is genuinely O(T²) *cumulative* but negligible for real transcripts (n_hist is
+  small; per-step time is **flat vs history length** → NOT attention-bound).
+- The decode step is **dispatch-bound**: each step issues ~3741/dec ≈ 90+ tiny
+  matvecs (8 projections × 16 layers, greedy M=1 / beam M=n_active), and each
+  `ggml_matmat` did a full `ggml_init` + graph build + `sched_reset` +
+  `sched_alloc_graph` + `ggml_free`. That per-call overhead — not attention —
+  dominates (~45 ms/step baseline on jfk).
+
+**Shipped:** a persistent per-`(weight, M)` matvec graph cache
+(`ggml_matmat_cached`) — builds the no_alloc graph once, gallocr-allocates once,
+then each call is just `tensor_set → ggml_backend_graph_compute (sched-free on
+backend_cpu, native Q4_K SIMD) → tensor_get`. Bit-identical (same op/backend/
+weights; jfk + multispeaker byte-identical transcript, all 3 gate states, md5
+match). Gated `CRISPASR_FIRERED_MATVEC_CACHE` (default ON; `=0` = old sched path,
+kept for A/B + bisection). **Pure Pareto: never slower (strict work-subset).**
+A/B (per-call dispatch, `FIRERED_BENCH` timer, min-of-N — contention-robust):
+- **quiet box (load ~3.7):** OFF ~0.188 vs ON ~0.178 ms/call → marginal ~5%.
+- **loaded box (load 20–50):** OFF up to 22 vs ON up to 20 ms/call; min OFF 1.15
+  vs min ON 0.71 → up to ~1.6×. The gap **grows with load** because the removed
+  ops (malloc / sched_reset / sched_alloc) are the ones contention penalizes.
+  → [[firered-matvec-cache-load-dependent]], the "noisy box fabricates wins" rule.
+
+**Still OPEN (LOW):** the self-attn KV is a growing `std::vector<float>` with a
+scalar scoring loop. For very long single-pass decodes (hundreds of tokens) the
+O(T²) scoring + realloc churn could start to matter — a pre-allocated 4D device
+KV + BLAS/ggml scoring would help *there*, but it is NOT the "highest-impact"
+lever for typical clips. Measure on a long clip before investing.
 
 #### §176l Kyutai STT: vectorized RVQ encode
 
