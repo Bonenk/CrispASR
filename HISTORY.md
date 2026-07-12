@@ -6,6 +6,23 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-12 — follow-ups: GGUF bounds regression test + kyutai RVQ routing (gated)
+
+Closed the two scoped follow-ups:
+- **`tests/test-gguf-bounds.cpp`** (`test-gguf-bounds`, `[unit]`) — deterministic
+  guard for the GGUF `load_weights` OOB hardening. Writes a valid 1-tensor GGUF,
+  truncates it 8 bytes short of the tensor data (metadata parses; the declared
+  256-byte tensor overruns), and asserts `load_weights` returns `false` — no
+  SIGBUS. Confirmed it reaches the exact subtractive bounds check (`mmap legacy
+  path: tensor exceeds file bounds`), plus a positive control.
+- **§176l kyutai routing** — added `core_rvq::encode_euclidean_per_stage`
+  (‖E[k]‖² precompute + `encode_euclidean` + transpose to `out_codes[q][t]`),
+  routed `kyutai_stt.cpp::rvq_encode_group` through it behind
+  `CRISPASR_KYUTAI_RVQ_FAST` (**default OFF**, scalar remains default + fallback on
+  non-uniform dims). Unit-tested: `test-core-rvq` now covers the wrapper vs the
+  scalar reference (identical codes). End-to-end model code-identity check +
+  default-flip remain (no local Kyutai model).
+
 ## 2026-07-12 — security tokenizer fuzz harness + core_rvq proof test
 
 Two test-only deliverables from the same session:

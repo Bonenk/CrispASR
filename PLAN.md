@@ -78,14 +78,15 @@ The memory-safety fixes shipped (see HISTORY 2026-07-11). Test/tooling state:
   under `-fsanitize=fuzzer,address,undefined` (adversarial UTF-8, lone 0xFF/
   continuation bytes, embedded NULs) — confirms the audit's "clean" verdict with
   a runnable harness.
-- **Open (LOW)**: a deterministic GGUF `load_weights` bounds regression test.
-  The overflow-safe checks are inline in `gguf_loader.cpp` (not a helper), so a
-  deterministic test must craft a minimal valid-enough GGUF (magic + version + 0
-  KV + 1 tensor whose `offset`/`nbytes` makes `data_off+off+nbytes` overflow or
-  exceed the file) and assert `load_weights(..., backend_cpu)` returns
-  nullptr/error rather than SIGBUS. `fuzz_gguf_meta` already covers the metadata
-  parse (~880K runs clean); this is a fast always-on CI guard for the specific
-  `SIZE_MAX`-tensor regression, complementary to fuzzing. Scoped, not yet done.
+- **DONE 2026-07-12**: the deterministic GGUF `load_weights` bounds regression
+  test — `tests/test-gguf-bounds.cpp` (`test-gguf-bounds`, `[unit]`). Writes a
+  valid 1-tensor GGUF, truncates it to 8 bytes short of the tensor data (metadata
+  fully parses; the declared 256-byte tensor overruns the file), and asserts
+  `load_weights(..., backend_cpu)` returns `false` — no SIGBUS. Verified it hits
+  the exact hardened path (the run logs the subtractive `mmap legacy path: tensor
+  exceeds file bounds` check), plus a positive control (intact file loads). A fast
+  always-on CI guard for the `SIZE_MAX`/truncated-tensor regression, complementary
+  to `fuzz_gguf_meta` (~880K runs clean).
 
 ## Scoped next items (for a new agent picking up)
 
@@ -6189,10 +6190,11 @@ lever for typical clips. Measure on a long clip before investing.
 
 #### §176l Kyutai STT: vectorized RVQ encode
 
-**Status:** OPEN — but the optimized encoder ALREADY EXISTS and is now PROVEN
-CORRECT; only the kyutai *routing* remains (needs a model to validate the
-mechanical integration). Re-scoped 2026-07-12.
-**Effort:** Small (DRY refactor, not new algorithm).
+**Status:** MOSTLY DONE 2026-07-12 — optimized encoder proven correct AND kyutai
+routing SHIPPED behind `CRISPASR_KYUTAI_RVQ_FAST` (default OFF); only the
+end-to-end model code-identity check + default-flip remain (see "Routing SHIPPED"
+below).
+**Effort:** Small (DRY refactor, done); remaining is a one-clip validation on a model.
 **Files:** `src/kyutai_stt.cpp` (still scalar), `src/core/rvq.h` + `rvq.cpp` (the
 fast helper), `tests/test-core-rvq.cpp` (new proof).
 
@@ -6211,16 +6213,18 @@ full-distance reference across 5 shapes (K up to 512, dim 32, 8 stages) —
 malformed-input rejection. So the shootout is a correct drop-in for the scalar
 argmin; the algorithmic risk is retired.
 
-**Remaining (needs a Kyutai model):** route `rvq_encode_group` through
-`core_rvq::encode_euclidean` — extract each codebook to F32 row-major + precompute
-`‖E[k]‖²` (the scalar path already extracts the codebook via
-`ggml_backend_tensor_get`), build `Codebook[]`, call the helper, and repack its
-`(T, n_stages)` output into kyutai's `out_codes[q][t]`. The ONLY unverified part
-is that mechanical extraction/layout/transpose (and `cdim` vs per-codebook
-`cb_dim`); validate by asserting the emitted RVQ codes are byte-identical to the
-scalar path on a real clip (a Kyutai STT GGUF, e.g. via
-`tools/kaggle/kyutai-stt-2.6b-convert`), then measure the speedup. Kept scalar as
-the reference; gate the routed path until that check is green.
+**Routing SHIPPED (gated, 2026-07-12):** `rvq_encode_group` now has a fast path
+(env `CRISPASR_KYUTAI_RVQ_FAST=1`, **default OFF**) that extracts all codebooks to
+F32, checks they share `cdim`, and calls the new `core_rvq::encode_euclidean_per_stage`
+(‖E[k]‖² precompute + `encode_euclidean` + transpose into `out_codes[q][t]`); any
+non-uniform dim or failure falls back to the scalar path. The mechanical
+extraction+transpose is unit-tested — `test-core-rvq` now covers
+`encode_euclidean_per_stage` vs the scalar reference (identical codes, near-ties
+certified), so the only thing NOT verified is end-to-end behaviour on a real
+model. **To flip the default:** run kyutai on a Kyutai STT GGUF with the flag on vs
+off and assert the emitted RVQ codes are byte-identical (a clip through
+`tools/kaggle/kyutai-stt-2.6b-convert`), then measure the speedup. Until then the
+scalar path stays default + reference.
 
 #### §176n VoxCPM2: Metal — ALREADY WORKS, VERIFIED (was a stale entry)
 

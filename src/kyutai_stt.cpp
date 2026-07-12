@@ -19,6 +19,7 @@
 #include "core/beam_decode.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/rvq.h"              // §176l: shared Euclidean RVQ encode
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -790,6 +791,40 @@ static void rvq_encode_group(kyutai_stt_context* sctx, ggml_tensor* x_projected,
         for (int d = 0; d < cdim; d++) {
             residual[t * cdim + d] = raw[d * T + t];
         }
+    }
+
+    // §176l: route the RVQ argmin through the shared core_rvq helper (the
+    // 2·x·E−‖E‖² shootout, proven code-identical to the scalar loop below in
+    // test-core-rvq). Gated CRISPASR_KYUTAI_RVQ_FAST (default OFF until the
+    // emitted codes are confirmed byte-identical on a real Kyutai model). Needs
+    // all codebooks to share cdim; any mismatch falls through to the scalar path.
+    static const bool kyutai_rvq_fast = [] {
+        const char* e = std::getenv("CRISPASR_KYUTAI_RVQ_FAST");
+        return e && e[0] == '1';
+    }();
+    if (kyutai_rvq_fast) {
+        std::vector<std::vector<float>> cbdata((size_t)n_codebooks);
+        std::vector<const float*> embeds((size_t)n_codebooks);
+        std::vector<int> sizes((size_t)n_codebooks);
+        bool uniform = true;
+        for (int q = 0; q < n_codebooks && uniform; q++) {
+            const int cb_dim = (int)rvq.codebooks[q].embedding->ne[0];
+            const int num_codes = (int)rvq.codebooks[q].embedding->ne[1];
+            if (cb_dim != cdim) {
+                uniform = false;
+                break;
+            }
+            cbdata[q].resize((size_t)num_codes * cb_dim);
+            ggml_backend_tensor_get(rvq.codebooks[q].embedding, cbdata[q].data(), 0,
+                                    (size_t)num_codes * cb_dim * sizeof(float));
+            embeds[q] = cbdata[q].data();
+            sizes[q] = num_codes;
+        }
+        if (uniform && core_rvq::encode_euclidean_per_stage(residual.data(), T, cdim, embeds.data(), sizes.data(),
+                                                            n_codebooks, out_codes)) {
+            return;
+        }
+        out_codes.clear(); // partial fill on fallthrough — scalar path repopulates
     }
 
     for (int q = 0; q < n_codebooks; q++) {
