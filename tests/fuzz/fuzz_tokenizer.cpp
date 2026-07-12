@@ -29,8 +29,8 @@
 // safety property — arbitrary text still drives every code path.
 static const std::unordered_map<std::string, int32_t>& bpe_vocab() {
     static const std::unordered_map<std::string, int32_t> v = {
-        {"h", 0},  {"e", 1},   {"l", 2},   {"o", 3},   {"\xC4\xA0", 4}, // 'Ġ' (byte-encoded space)
-        {"he", 5}, {"ll", 6},  {"hell", 7}, {"hello", 8}, {"\xC4\xA0h", 9},
+        {"h", 0},  {"e", 1},  {"l", 2},    {"o", 3},     {"\xC4\xA0", 4}, // 'Ġ' (byte-encoded space)
+        {"he", 5}, {"ll", 6}, {"hell", 7}, {"hello", 8}, {"\xC4\xA0h", 9},
     };
     return v;
 }
@@ -44,8 +44,8 @@ static const std::unordered_map<std::string, int32_t>& bpe_merges() {
 static const core_wordpiece::Tokenizer& wp_tokenizer() {
     static const core_wordpiece::Tokenizer t = [] {
         core_wordpiece::Tokenizer w;
-        w.id_to_token = {"[PAD]", "[UNK]", "[CLS]", "[SEP]", "hello", "world",
-                         "the", "##ing", "##s", "a", "!", "?", ",", "."};
+        w.id_to_token = {"[PAD]", "[UNK]", "[CLS]", "[SEP]", "hello", "world", "the",
+                         "##ing", "##s",   "a",     "!",     "?",     ",",     "."};
         w.unk_id = 1;
         w.build_map();
         return w;
