@@ -12743,3 +12743,33 @@ matmul + view-split; concat weights at load) and strided
 restores). Verified bit-identical on the full CTC logit grid — view-split
 matmul and strided flash reads change nothing numerically. Combined:
 parakeet-ctc q8_0 M1 CPU 1.13→0.73 s (re-quantized GGUF: 0.60 s, 18.4× RT).
+
+### #81 GPU phase: a finite attention mask constant is not a mask — pad garbage overruns it a few blocks deep
+
+Building the bucketed-padding path (pad T to a bucket, mask pad frames)
+for the FastConformer encoder produced transcripts that matched but
+logits that drifted ~0.7 — and the drift ENTERED at block 3, not block 0
+(bisected with `CRISPASR_FC_MAX_LAYERS=N` truncation). Three lessons:
+
+1. **Mask pad KEYS with `-INFINITY`, never `-1e9`.** Pad columns carry
+   untrained garbage that grows across blocks; by block ~3 their QK
+   scores reach 1e8+ and a finite mask constant no longer dominates —
+   pad keys get real softmax weight. `-inf + finite = -inf` always.
+   (`make_local_attn_mask`'s -1e9 is fine for its use — masked positions
+   there hold trained-scale values.) Also re-zero pad columns at every
+   block boundary so 0-weight × huge-value artifacts can't arise.
+2. **Bitwise equality across different tensor shapes is bounded by
+   size-adaptive GEMM kernel selection.** After fixing every structural
+   leak (attention keys, dw-conv inputs, pre-encode stage boundaries),
+   a rel≈3e-9 seed remained at the pre-encode matmuls: im2col GEMMs pick
+   different micro-kernels for different widths, regrouping the same dot
+   products (ULP reassociation), and 24 LayerNorms amplify it to ~0.7 in
+   logits. Same accepted class as BLAS-variant drift — acceptance is
+   identical decoded output, and bit-equality only when shapes coincide.
+   Corollary: when a "leak" survives every masking fix, check whether
+   the first divergence is ULP-sized before hunting more structure.
+3. **Build worktrees with ABSOLUTE paths** (`cmake --build $W/build`).
+   A shell cwd reset mid-session sent two rebuilds into the main tree's
+   build dir; the stale worktree dylib then "disproved" a correct fix
+   (same max_abs before/after). `strings <dylib> | grep <new-env-var>`
+   is the 5-second staleness check.
