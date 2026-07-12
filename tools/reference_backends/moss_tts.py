@@ -44,46 +44,39 @@ def _extract_codes(model, out: Any) -> np.ndarray:
     structure if nothing matches (so the Kaggle run tells us the real shape)."""
     import torch
 
-    n_vq = int(getattr(model.config, "n_vq", 32))
+    cfg = model.config
+    n_vq = int(getattr(cfg, "n_vq", 32))
+    audio_start = int(getattr(cfg, "audio_start_token_id", 151652))
+    audio_end = int(getattr(cfg, "audio_end_token_id", 151653))
 
-    def as_np(x):
-        return x.detach().to(torch.int32).cpu().numpy() if hasattr(x, "detach") else np.asarray(x)
+    # generate() returns a list of (start_len, tokens) tuples; tokens is the raw
+    # DELAYED (seq_len, 1+n_vq) grid [text, audio_0..audio_{n_vq-1}].
+    tokens = out[0][1] if (isinstance(out, (list, tuple)) and out and isinstance(out[0], (list, tuple))) else out
+    tok = tokens.detach().to(torch.int64).cpu().numpy() if hasattr(tokens, "detach") else np.asarray(tokens)
+    tok = np.squeeze(tok)
+    if tok.ndim != 2:
+        raise RuntimeError(f"moss_tts_ref: unexpected tokens shape {tok.shape}")
+    if tok.shape[1] != 1 + n_vq and tok.shape[0] == 1 + n_vq:
+        tok = tok.T  # orient to (seq_len, 1+n_vq)
 
-    # 1. Common attribute names on the custom output object / dict.
-    for attr in ("audio_codes", "codes", "audio_tokens", "sequences_audio"):
-        v = getattr(out, attr, None) if not isinstance(out, dict) else out.get(attr)
-        if v is not None:
-            arr = as_np(v)
-            arr = np.squeeze(arr)
-            if arr.ndim == 2:
-                # Orient to (n_vq, T): put the n_vq axis first.
-                if arr.shape[0] != n_vq and arr.shape[1] == n_vq:
-                    arr = arr.T
-                return arr.astype(np.int32)
-
-    # 2. Fallback: scan every tensor-like member for a 2D int grid with an
-    #    axis == n_vq.
-    candidates = []
-    members = out.items() if isinstance(out, dict) else vars(out).items() if hasattr(out, "__dict__") else []
-    for name, v in members:
-        try:
-            arr = np.squeeze(as_np(v))
-        except Exception:  # noqa: BLE001
-            continue
-        if arr.ndim == 2 and n_vq in arr.shape and np.issubdtype(arr.dtype, np.integer):
-            candidates.append((name, arr))
-    if candidates:
-        name, arr = candidates[0]
-        print(f"[moss_tts_ref] using generate output member '{name}' shape={arr.shape}", flush=True)
-        if arr.shape[0] != n_vq and arr.shape[1] == n_vq:
-            arr = arr.T
-        return arr.astype(np.int32)
-
-    raise RuntimeError(
-        "moss_tts_ref: could not locate the audio code grid in the generate output. "
-        f"n_vq={n_vq}. Output type={type(out)}; "
-        f"members={[k for k, _ in members]}. "
-        "Inspect on Kaggle and point _extract_codes at the right field.")
+    # Un-delay exactly like the C++ extract_audio_codes: last <audio_start> bounds
+    # the segment, un-shift codebook cb by cb steps, T_audio = T - n_vq.
+    col0 = tok[:, 0]
+    starts = np.where(col0 == audio_start)[0]
+    if len(starts) == 0:
+        raise RuntimeError("moss_tts_ref: no <audio_start> in generated tokens")
+    start = int(starts[-1]) + 1
+    ends = np.where(col0[start:] == audio_end)[0]
+    end = start + int(ends[0]) if len(ends) else tok.shape[0]
+    T = end - start
+    if T <= n_vq:
+        raise RuntimeError(f"moss_tts_ref: audio segment too short (T={T} <= n_vq={n_vq})")
+    T_audio = T - n_vq
+    codes = np.zeros((n_vq, T_audio), dtype=np.int32)
+    for cb in range(n_vq):
+        for t in range(T_audio):
+            codes[cb, t] = tok[start + t + cb, 1 + cb]
+    return codes
 
 
 def dump(
@@ -125,9 +118,10 @@ def dump(
     inputs = {k: (v.to(device) if hasattr(v, "to") else v) for k, v in dict(batch).items()}
 
     print(f"[moss_tts_ref] greedy generate (max_new_tokens={max_new_tokens})", flush=True)
+    # Custom MossTTSDelay.generate: greedy = both temperatures 0 (no do_sample kwarg).
     with torch.no_grad():
-        out = model.generate(**inputs, do_sample=False, max_new_tokens=max_new_tokens,
-                             return_dict_in_generate=True)
+        out = model.generate(inputs["input_ids"], attention_mask=inputs.get("attention_mask"),
+                             max_new_tokens=max_new_tokens, text_temperature=0.0, audio_temperature=0.0)
 
     codes = _extract_codes(model, out)
     print(f"[moss_tts_ref] codes shape={codes.shape} dtype={codes.dtype} "
