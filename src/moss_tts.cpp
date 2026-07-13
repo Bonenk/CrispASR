@@ -1317,6 +1317,68 @@ extern "C" int32_t* moss_tts_debug_prompt_ids(moss_tts_context* ctx, const char*
     return moss_tts_tokenize(ctx, prompt.c_str(), out_n);
 }
 
+// Diagnostic (parity): the step-0 audio-head logits for one codebook. Prefills
+// the prompt (col-0 ids + audio-pad cols) exactly like the AR loop's first step,
+// then returns the (audio_vocab_size+1,) F32 logits of head `codebook`. Lets a
+// harness check where the reference's greedy pick ranks (near-tie => quantization
+// argmax flip; far down => a real numerics/head divergence). Caller frees.
+extern "C" float* moss_tts_debug_first_audio_logits(moss_tts_context* ctx, const char* text,
+                                                    const struct moss_tts_synth_params* sp_in, int codebook,
+                                                    int* out_len) {
+    if (out_len)
+        *out_len = 0;
+    if (!ctx || !text)
+        return nullptr;
+    moss_tts_synth_params sp = sp_in ? *sp_in : moss_tts_synth_default_params();
+    const auto& hp = ctx->model.hparams;
+    const int n_vq = (int)hp.n_vq;
+    const int aud_v_full = (int)hp.audio_vocab_size + 1;
+    if (codebook < 0 || codebook >= n_vq)
+        return nullptr;
+
+    std::string prompt = mt_build_prompt_text(ctx, text, sp);
+    int n_ids = 0;
+    int32_t* ids = moss_tts_tokenize(ctx, prompt.c_str(), &n_ids);
+    if (!ids || n_ids <= 0) {
+        free(ids);
+        return nullptr;
+    }
+    const int prompt_len = n_ids;
+    const int stride = 1 + n_vq;
+    std::vector<int32_t> grid((size_t)prompt_len * stride, (int32_t)hp.audio_pad_code);
+    for (int r = 0; r < prompt_len; r++)
+        grid[(size_t)r * stride + 0] = ids[r];
+    free(ids);
+
+    if (!moss_tts_kv_init(ctx, prompt_len + 8))
+        return nullptr;
+    moss_tts_kv_reset(ctx);
+    float* prefill_emb = moss_tts_compute_input_embeddings(ctx, grid.data(), prompt_len);
+    if (!prefill_emb)
+        return nullptr;
+    int vocab = 0;
+    float* hidden_vec = nullptr;
+    float* text_logits = moss_tts_run_llm_kv(ctx, prefill_emb, prompt_len, 0, &vocab, &hidden_vec);
+    free(prefill_emb);
+    if (!text_logits || !hidden_vec) {
+        free(text_logits);
+        free(hidden_vec);
+        return nullptr;
+    }
+    float* audio_logits = moss_tts_compute_audio_logits(ctx, hidden_vec); // (n_vq, aud_v_full)
+    free(text_logits);
+    free(hidden_vec);
+    if (!audio_logits)
+        return nullptr;
+    float* out = (float*)malloc((size_t)aud_v_full * sizeof(float));
+    if (out)
+        std::memcpy(out, audio_logits + (size_t)codebook * aud_v_full, (size_t)aud_v_full * sizeof(float));
+    free(audio_logits);
+    if (out_len)
+        *out_len = aud_v_full;
+    return out;
+}
+
 // ===========================================================================
 // Init / free / params / accessors
 // ===========================================================================
