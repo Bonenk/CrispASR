@@ -886,7 +886,10 @@ static std::string ark_deloop(const std::string& s) {
                 reps++;
                 j += (size_t)k;
             }
-            if (reps >= 3 && reps * (size_t)k > bestreps * (size_t)bestk) {
+            // >=3 reps of any phrase, OR >=2 reps of a >=4-word phrase (a long
+            // verbatim repeat is a loop, not natural speech — a cross-window seed
+            // echo shows up as the phrase appearing exactly twice back-to-back).
+            if ((reps >= 3 || (reps >= 2 && k >= 4)) && reps * (size_t)k > bestreps * (size_t)bestk) {
                 bestk = k;
                 bestreps = reps;
             }
@@ -1113,7 +1116,10 @@ static std::string ark_transcribe_chunked(ark_asr_context* ctx, const float* pcm
             }
         }
     }
-    return full;
+    // #253: final pass to collapse a seed echo that spans window boundaries (the
+    // same phrase emitted once per window shows up as a back-to-back repeat only
+    // in the concatenated transcript, so the per-window de-loop can't see it).
+    return ark_deloop(full);
 }
 
 extern "C" char* ark_asr_transcribe(struct ark_asr_context* ctx, const float* pcm, int n_samples) {
