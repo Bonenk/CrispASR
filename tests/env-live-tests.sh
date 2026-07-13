@@ -84,6 +84,8 @@ export CRISPASR_MODEL_MOSS_DIARIZE="${CRISPASR_MODEL_MOSS_DIARIZE:-$CRISPASR_MOD
 # codebooks + transformer codec companion (validated by ASR round-trip, #249).
 export CRISPASR_MODEL_MOSS_TTS="${CRISPASR_MODEL_MOSS_TTS:-$CRISPASR_MODELS_DIR/moss-tts-v1.5-q4_k.gguf}"
 export CRISPASR_MODEL_MOSS_TTS_CODEC="${CRISPASR_MODEL_MOSS_TTS_CODEC:-$CRISPASR_MODELS_DIR/moss-tts-v1.5-codec.gguf}"
+export CRISPASR_MODEL_MOSS_TTS_LOCAL="${CRISPASR_MODEL_MOSS_TTS_LOCAL:-$CRISPASR_MODELS_DIR/moss-tts-local-v1.5-q4_k.gguf}"
+export CRISPASR_MODEL_MOSS_TTS_LOCAL_CODEC="${CRISPASR_MODEL_MOSS_TTS_LOCAL_CODEC:-$CRISPASR_MODELS_DIR/moss-tts-local-v1.5-codec.gguf}"
 
 # ARK-ASR-3B (AutoArk-AI/ARK-ASR-3B): Whisper-large-v3 enc (partial RoPE) + Qwen2.5-3B LM.
 # ⚠️ experimental/WIP — CPU only. See PLAN.md §ARK.
