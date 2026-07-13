@@ -241,7 +241,22 @@ backbone `moss-tts` + F16 codec `moss-tts-codec`) from `convert-moss-tts-to-gguf
 full 12-point integration incl. the session-ABI inline synthesize. **Validated on
 Kaggle P100: the Q4_K decoded round-trip is intelligible + correct on first contact
 with the real 8B weights** (F16 backbone is 17 GB — skipped on the 16 GB P100, a VRAM
-limit not a bug). Voice-cloning encoder and the 4B `MossTTSLocal` are follow-ups.
+limit not a bug).
+
+**(2026-07-13) Code-parity resolved + voice cloning validated.** Greedy code-parity
+vs the HF BF16 reference exposed a real tokenizer bug — the prompt tokenizer (cloned
+from `qwen3_asr`) split `>` from a trailing `\n` where Qwen groups punctuation with
+trailing newlines (`[^\s\p{L}\p{N}]+[\r\n]*`); fixed with a proper `mt_qwen_pretokenize`
+→ the 67-token prompt is now byte-identical to the HF processor. The residual frame-0
+divergence is NOT a bug: the `logit0` probe shows the reference's greedy pick is the
+C++ Q4_K rank-1 runner-up (0.135-logit near-tie) — Q4_K rounding flips the onset
+argmax and the delay-pattern AR loop cascades it (exact greedy parity is unachievable
+for a quantized AR audio LM; the ASR round-trip is the gate). **Voice cloning
+validated** on Kaggle (Q4_K): `--voice ref.wav` runs clean, the clone's speaker
+embedding is much closer to the reference than the no-voice baseline (cosine 0.845 vs
+0.585, Δ+0.26), and the words are preserved (cloned clip ASR == the text). The 4B
+`MossTTSLocal` variant remains a follow-up. Diagnostic kernels:
+`tools/kaggle/moss-tts-{promptdiff,parity,logit0,voiceclone}/`.
 
 **§215b tada talker — batched-CFG (B=2) is a MEASURED NON-GOAL.** Instrumented the
 talker's two per-step CFG passes (`CRISPASR_TADA_TALKER_TIMING`). They take
