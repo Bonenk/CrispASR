@@ -75,6 +75,12 @@ const char* moss_tts_token_text(struct moss_tts_context* ctx, int token_id);
 int32_t* moss_tts_debug_prompt_ids(struct moss_tts_context* ctx, const char* text,
                                    const struct moss_tts_synth_params* sp, int* out_n);
 
+// Diagnostic (parity): the step-0 audio-head logits for one `codebook`
+// (audio_vocab_size+1 floats). Prefills the prompt like the AR loop's first
+// step. Caller frees; sets *out_len.
+float* moss_tts_debug_first_audio_logits(struct moss_tts_context* ctx, const char* text,
+                                         const struct moss_tts_synth_params* sp, int codebook, int* out_len);
+
 // ---- Backbone (KV-cached) ----
 bool moss_tts_kv_init(struct moss_tts_context* ctx, int max_ctx);
 void moss_tts_kv_reset(struct moss_tts_context* ctx);
