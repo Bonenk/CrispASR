@@ -278,6 +278,15 @@ target_link_libraries(mimo-tokenizer-smoke PRIVATE
     ${CMAKE_THREAD_LIBS_INIT}
 )
 
+# 4B MossTTSLocal (#249) — P5-lite runtime smoke test (generate_codes end-to-end).
+if (TARGET moss_tts_local)
+    add_executable(moss-tts-local-smoke moss_tts_local_smoke.cpp)
+    target_link_libraries(moss-tts-local-smoke PRIVATE
+        moss_tts_local
+        ${CMAKE_THREAD_LIBS_INIT}
+    )
+endif()
+
 set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME crispasr)
 
 # httplib.h is in the server example directory
