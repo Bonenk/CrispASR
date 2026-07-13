@@ -50,10 +50,10 @@ void moss_tts_local_free(struct moss_tts_local_context* ctx);
 bool moss_tts_local_set_codec_path(struct moss_tts_local_context* ctx, const char* path_codec);
 
 // ---- Model dims (read from GGUF metadata) ----
-int moss_tts_local_n_vq(const struct moss_tts_local_context* ctx);           // 12
-int moss_tts_local_hidden_size(const struct moss_tts_local_context* ctx);    // 2560
+int moss_tts_local_n_vq(const struct moss_tts_local_context* ctx);             // 12
+int moss_tts_local_hidden_size(const struct moss_tts_local_context* ctx);      // 2560
 int moss_tts_local_audio_vocab_size(const struct moss_tts_local_context* ctx); // 1024 (no +1)
-int moss_tts_local_sampling_rate(const struct moss_tts_local_context* ctx);  // 48000
+int moss_tts_local_sampling_rate(const struct moss_tts_local_context* ctx);    // 48000
 bool moss_tts_local_codec_loaded(const struct moss_tts_local_context* ctx);
 
 // ---- Tokenizer (Qwen3 gpt2-style BPE, special-token aware) ----
@@ -62,8 +62,8 @@ const char* moss_tts_local_token_text(struct moss_tts_local_context* ctx, int to
 
 // ---- End-to-end synthesis ----
 struct moss_tts_local_synth_params {
-    int max_new_frames;      // 0 -> default 4096
-    float text_temperature;  // binary continue/stop head; <=0 -> greedy
+    int max_new_frames;     // 0 -> default 4096
+    float text_temperature; // binary continue/stop head; <=0 -> greedy
     float text_top_p;
     int text_top_k;
     float audio_temperature; // codebook heads; <=0 -> greedy
@@ -88,8 +88,7 @@ float* moss_tts_local_synthesize(struct moss_tts_local_context* ctx, const char*
 // int32 row-major; sets *out_n_vq, *out_t_audio. For code-parity + driving the
 // codec separately. Caller frees.
 int32_t* moss_tts_local_generate_codes(struct moss_tts_local_context* ctx, const char* text,
-                                       const struct moss_tts_local_synth_params* sp,
-                                       int* out_n_vq, int* out_t_audio);
+                                       const struct moss_tts_local_synth_params* sp, int* out_n_vq, int* out_t_audio);
 
 void moss_tts_local_set_seed(struct moss_tts_local_context* ctx, uint32_t seed);
 
