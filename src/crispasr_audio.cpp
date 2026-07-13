@@ -1348,8 +1348,10 @@ int crispasr_webm_decode(const char* path, int want_channels, float** out_buf, i
                         remaining = 0;
                     }
                 }
-                // Packet data
-                std::memcpy(data.data() + page_start + hdr_size, pkt_data, pkt_size);
+                // Packet data (the EOS page is empty: pkt_data=nullptr, pkt_size=0
+                // — memcpy(dst, nullptr, 0) is UB, so guard it).
+                if (pkt_data && pkt_size > 0)
+                    std::memcpy(data.data() + page_start + hdr_size, pkt_data, pkt_size);
 
                 // Compute and fill CRC
                 uint32_t crc = ogg_crc(data.data() + page_start, hdr_size + pkt_size);
