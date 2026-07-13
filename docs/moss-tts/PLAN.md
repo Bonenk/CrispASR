@@ -21,11 +21,39 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
   `--list-backends`; `check-backend-wiring.py` RESULT PASS (required tier). NOT yet
   merged to `main` — awaits P5 Kaggle round-trip (do not ship an unvalidated codec
   as done). Advisory gaps left: live test + reference dumper.
-- **IN FLIGHT — P5 Kaggle ASR round-trip (the ONLY acceptance gate, HARD RULE #3):**
-  kernel `chr1str/crispasr-moss-tts-local-validate` LAUNCHED
-  (`tools/kaggle/moss-tts-local-validate/`, off `feat/moss-tts-local-4b`).
-  Converts the codec, quantizes Q4_K, synthesizes short+long → whisper ASR →
-  word-overlap + proof-of-work. Uploads GGUFs on pass. Monitoring.
+- **P5 Kaggle run 1 (P100, sha 2be38c9f) — PORT VALIDATED; gate FAILED on 2
+  non-port bugs.** kernel `chr1str/crispasr-moss-tts-local-validate`.
+  - ✅ **The codec port is CORRECT.** The one synth that generated a sane length
+    (F16 long, 219 frames = 17.56 s @ 48 kHz, rms 0.097, ch=1) **round-tripped with
+    ASR word-overlap 1.00** — *"the quick brown fox jumps over the lazy dog. speech
+    synthesis should stay intelligible over a longer passage, so this sentence
+    exercises many autoregressive steps and the codec sliding window..."*. Convert
+    (codec `dec.0: 32 layers`) + quantize Q4_K both OK. HARD RULE #3 satisfied for
+    the port itself.
+  - ❌ **Gate FAILED (roundtrip_q4_k FAIL) on two DISTINCT non-port issues:**
+    1. **Generation runaway.** Short "Hello world." and q4_k-long never fired the
+       binary stop head → ran to the `max_new_frames=4096` cap instead of ~15/~219
+       frames. F16-long DID stop at 219 ⇒ the stop head *works* but is unreliable
+       under short + sampled (audio_temperature 1.0) + Q4_K generation. (8B moss-tts
+       handled the same "Hello world." fine — likely a 4B-specific robustness gap.)
+    2. **Codec dense O(T²) attention.** At 4096 frames the final decoder stage runs
+       at T=t_audio·32=131072; the K×Q scores (T×T×heads) needs ~916 GB →
+       `cudaMalloc failed` abort (rc=-6) in `moss_tts_local_codec::decode`. Even a
+       legit ~30 s clip (~375 frames) strains a 16 GB GPU. The HF reference chunks
+       queries (`query_chunk_size=1500`) + streams (RingKVCache); my port builds a
+       dense mask/scores. **This caps decodable audio at ~250 frames (~20 s) today.**
+  - **FIX PLAN (remaining #249 work):** (a) codec: time-chunked / streaming decode
+    (the reference's own approach — bounds BOTH memory and graph-node count; the
+    right fix for O(T²)); alternatively a lower hard cap + graceful error, but that
+    truncates. (b) generation: stop-head robustness for short/quantized text (lower
+    default cap as a stopgap; investigate greedy-audio + stop bias; a step-0
+    logit-rank-style probe on the stop head). Both need a fresh Kaggle A/B.
+  - **Kernel/harness note:** F16-short's 916 GB abort has "out of memory" in stderr,
+    so my `oom=SKIP` classifier mislabeled roundtrip_f16 as SKIP(oom) — it's a
+    graph-size bug, not a load OOM. Tighten the classifier (match `cudaMalloc failed:
+    out of memory` on a load-phase line only, or check the alloc size).
+  - **NOT merged to `main`** — correct call; the codec can't yet decode arbitrary
+    length. Merge after the chunked-decode fix re-validates.
 - **P5 plan (the ONLY acceptance gate, HARD RULE #3):**
   convert codec on Kaggle (`--codec OpenMOSS-Team/MOSS-Audio-Tokenizer-v2`),
   quantize backbone Q4_K, `crispasr --backend moss-tts-local -m <bb> --codec-model
