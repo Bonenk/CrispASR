@@ -26,14 +26,17 @@ onto CrispASR's in-house Qwen3 runtime — no libllama).
   ran on the real 4B weights on Kaggle (`tools/kaggle/moss-tts-local-convert`):
   **9.11 GB F16 GGUF, 438 tensors, arch moss-tts-local, all 6 structural checks
   PASS**, shapes confirmed. See STUDY-4B.md.
-- **P2 header DONE** — `src/moss_tts_local.h`. **P2 .cpp fully specified** in
-  STUDY-4B.md "Runtime implementation notes" (prompt = reuse 8B `mt_build_prompt_text`;
-  ⚠ audio_embed size 1024 → pad-masked; local transformer graph rebuilt per
-  codebook step; depth-first generate + binary stop). **Next: write the .cpp**
-  (backbone reuse via `core_attn::kv_self_attn`/`core_ffn::swiglu` + the novel
-  local transformer + generate loop, by hand).
-- Then **P3** codec-v2 study (48 kHz, confirm hop), **P4** 12-point integration,
-  **P5** Kaggle round-trip validate. Heavy steps on Kaggle.
+- **P2 runtime DONE + COMPILES** — `src/moss_tts_local.{h,cpp}` (+ CMake
+  `moss_tts_local` lib, builds clean → `libmoss_tts_local.a`). Backbone reused via
+  `core_attn::kv_self_attn`/`core_ffn::swiglu` (2560d, tied lm_head); NEW: pad-masked
+  input embeddings (audio_embed size 1024), the 1-layer local/depth transformer
+  forward (LayerNorm+bias, fused-QKV, RoPE NEOX 1e6, SiLU), and the depth-first
+  generate loop (backbone→local→binary stop→12 codebooks AR). `generate_codes`
+  emits the (12, T) grid.
+- Next: **P3** codec-v2 (48 kHz decode — `synthesize` needs it), **P4** 12-point
+  integration (CLI/factory/registry/c_api/bindings/docs), **P5** Kaggle round-trip
+  validate (the runtime runs the real 4B GGUF there — won't fit locally). The
+  generate loop is untested until P5 (Kaggle); it compiles but hasn't run.
 - Issue #249 stays **OPEN** until the 4B ships (only the 8B half is done).
 
 ## Done (compiles clean; NOT yet parity-validated)
