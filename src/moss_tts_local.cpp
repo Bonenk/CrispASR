@@ -1116,13 +1116,19 @@ extern "C" moss_tts_local_context_params moss_tts_local_context_default_params(v
 
 extern "C" moss_tts_local_synth_params moss_tts_local_synth_default_params(void) {
     moss_tts_local_synth_params p = {};
+    // Defaults per the model card (OpenMOSS MOSS-TTS-Local-Transformer-v1.5
+    // "Generation Parameters"): audio 1.7 / 0.8 / 25, do_sample=True with the
+    // binary stop head SAMPLED at text_temperature 1.0. Using a too-low audio
+    // temperature (the old generic 1.0/0.95/50) produces a degenerate acoustic
+    // trajectory that never reaches a natural end, so the stop head never fires
+    // and generation runs away (P5 run1/run2).
     p.max_new_frames = 4096;
-    p.text_temperature = 0.0f; // greedy binary continue/stop by default
+    p.text_temperature = 1.0f; // SAMPLED continue/stop (reference default)
     p.text_top_p = 1.0f;
-    p.text_top_k = 0;
-    p.audio_temperature = 1.0f;
-    p.audio_top_p = 0.95f;
-    p.audio_top_k = 50;
+    p.text_top_k = 50;
+    p.audio_temperature = 1.7f;
+    p.audio_top_p = 0.8f;
+    p.audio_top_k = 25;
     p.audio_repetition_penalty = 1.0f;
     p.min_audio_frames = 0;
     p.max_audio_frames = 0;
