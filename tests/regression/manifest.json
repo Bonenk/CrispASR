@@ -30,8 +30,9 @@
       },
       "diff_thresholds_note": "mel_spectrogram tightened from 0.95 to 0.999 after drop_last_frame fix (commit 07cfcff). NeMo ref needs rebake to clip mel to feat_len; current ref has one extra frame that the comparison truncates.",
       "transcript_tolerance": {
-        "cer_max": 0.3,
-        "wer_max": 1.0
+        "cer_max": 0.1,
+        "wer_max": 1.0,
+        "transcript_tolerance_note": "CJK: WER is degenerate (no whitespace) so the gate is CER. cer_max=0.10 tolerates minor kanji/punct decode variance but FAILS the current real problem (cer≈0.30: wrong numbers '6対3'→'0失点' + a hallucinated trailing sentence 'はきょう先発の石川。'). Was 0.30 — a prior band-aid that masked the hallucination."
       },
       "transcript_tolerance_note": "Wide tolerance — GH runner decode diverges significantly from Kaggle T4"
     },
