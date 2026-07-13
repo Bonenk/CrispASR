@@ -1394,6 +1394,23 @@ catch_discover_tests(test-moss-tts-params
     PROPERTIES LABELS "unit;moss_tts"
 )
 
+# ─── test-moss-tts-local-params — Catch2 unit tests for the 4B MossTTSLocal
+# context/synth param defaults + null-guards. No GGUF required. ─────────────────
+add_executable(test-moss-tts-local-params
+    test-moss-tts-local-params.cpp
+)
+target_include_directories(test-moss-tts-local-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-moss-tts-local-params PRIVATE
+    Catch2::Catch2WithMain
+    moss_tts_local
+)
+catch_discover_tests(test-moss-tts-local-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;moss_tts_local"
+)
+
 # ─── test-tada-params — Catch2 unit tests for tada_context_params defaults
 # and null-guard coverage. No GGUF required. ───────────────────────────────────
 add_executable(test-tada-params
