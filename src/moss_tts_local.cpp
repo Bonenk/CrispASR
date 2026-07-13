@@ -13,6 +13,8 @@
 
 #include "moss_tts_local.h"
 
+#include "moss_tts_local_codec.h"
+
 #include "core/attention.h"
 #include "core/bpe.h"
 #include "core/ffn.h"
@@ -153,6 +155,7 @@ struct moss_tts_local_context {
 
     std::string codec_path;
     bool codec_loaded = false;
+    moss_tts_local_codec::Codec* codec = nullptr;
 };
 
 static ggml_tensor* mtl_req(mtl_model& m, const char* name) {
@@ -1150,6 +1153,8 @@ extern "C" moss_tts_local_context* moss_tts_local_init_from_file(const char* pat
 extern "C" void moss_tts_local_free(moss_tts_local_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->codec)
+        moss_tts_local_codec::free(ctx->codec);
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
     if (ctx->kv_buf)
@@ -1171,9 +1176,13 @@ extern "C" bool moss_tts_local_set_codec_path(moss_tts_local_context* ctx, const
     if (!ctx || !path_codec)
         return false;
     ctx->codec_path = path_codec;
-    // Codec-v2 (48 kHz) runtime is Phase 3 — not yet wired.
-    ctx->codec_loaded = false;
-    return false;
+    if (ctx->codec) {
+        moss_tts_local_codec::free(ctx->codec);
+        ctx->codec = nullptr;
+    }
+    ctx->codec = moss_tts_local_codec::load(path_codec, ctx->backend, ctx->sched, ctx->params.verbosity);
+    ctx->codec_loaded = (ctx->codec != nullptr);
+    return ctx->codec_loaded;
 }
 
 extern "C" int moss_tts_local_n_vq(const moss_tts_local_context* ctx) {
@@ -1223,16 +1232,43 @@ extern "C" int32_t* moss_tts_local_generate_codes(moss_tts_local_context* ctx, c
 }
 
 extern "C" float* moss_tts_local_synthesize(moss_tts_local_context* ctx, const char* text,
-                                            const moss_tts_local_synth_params* sp, int* out_n_samples) {
-    (void)sp; // synth knobs used once codec decode is wired (Phase 3)
+                                            const moss_tts_local_synth_params* sp_in, int* out_n_samples) {
     if (out_n_samples)
         *out_n_samples = 0;
     if (!ctx || !text)
         return nullptr;
-    if (!ctx->codec_loaded) {
-        fprintf(stderr, "moss_tts_local: codec not loaded (MOSS-Audio-Tokenizer-v2 decode is Phase 3); "
-                        "use moss_tts_local_generate_codes for the code grid\n");
+    if (!ctx->codec_loaded || !ctx->codec) {
+        fprintf(stderr, "moss_tts_local: codec not loaded — call moss_tts_local_set_codec_path() with the "
+                        "companion MOSS-Audio-Tokenizer-v2 GGUF\n");
         return nullptr;
     }
-    return nullptr; // codec decode wired in Phase 3
+    moss_tts_local_synth_params sp = sp_in ? *sp_in : moss_tts_local_synth_default_params();
+
+    // 1) Backbone + local transformer -> (n_vq, t_audio) RVQ code grid.
+    std::vector<int32_t> codes;
+    int t_audio = 0;
+    if (!mtl_generate_grid(ctx, text, sp, codes, t_audio) || t_audio <= 0 || codes.empty())
+        return nullptr;
+    const int n_vq = (int)ctx->model.hparams.n_vq;
+
+    // 2) Codec decode -> channel-interleaved [L0,R0,L1,R1,...] @ 48 kHz.
+    std::vector<float> inter = moss_tts_local_codec::decode(ctx->codec, codes.data(), n_vq, t_audio);
+    if (inter.empty())
+        return nullptr;
+
+    // 3) De-interleave stereo -> mono downmix (the public API is mono).
+    const int nch = moss_tts_local_codec::num_channels(ctx->codec);
+    const size_t n_mono = (nch > 0) ? inter.size() / (size_t)nch : inter.size();
+    float* out = (float*)malloc(n_mono * sizeof(float));
+    if (!out)
+        return nullptr;
+    if (nch == 2) {
+        for (size_t k = 0; k < n_mono; k++)
+            out[k] = 0.5f * (inter[2 * k] + inter[2 * k + 1]);
+    } else {
+        std::memcpy(out, inter.data(), n_mono * sizeof(float));
+    }
+    if (out_n_samples)
+        *out_n_samples = (int)n_mono;
+    return out;
 }
