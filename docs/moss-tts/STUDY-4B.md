@@ -116,6 +116,41 @@ to `temperature/top_p/top_k/repetition_penalty`). Greedy = `do_sample=False` →
   greedy code-parity is diagnostic only (quantized AR — see the 8B's logit-rank note in
   [[tts-port-parity-via-logit-rank]] / PLAN.md).
 
+## P1 converter — EMPIRICALLY VALIDATED (2026-07-13, Kaggle `moss-tts-local-convert`)
+
+Ran `convert-moss-tts-local-to-gguf.py` on the real 4B weights → **9.11 GB F16
+GGUF, 438 tensors**, arch `moss-tts-local`, all 6 structural checks PASS. Confirmed
+shapes: backbone q 4096 / k,v 1024 / o→2560, ffn 9728, QK-norm 128, embed &
+re-emitted `llm.lm_head` 2560×151936; local `attn.qkv` 7680 (=3×2560 → head_dim
+80) + biases, `attn.o` 2560 + bias, `ffn.in/out` + biases; 12 `audio_embed` +
+12 tied `audio_head`; `local_text_head` 2560×2. Metadata `frame_rate=25` (from the
+placeholder `downsample_rate=1920` — real v2 hop TBD in P3).
+
+## Runtime (P2) implementation notes — confirmed details
+
+- **Prompt template is IDENTICAL to the 8B** (`<|im_start|>user\n<user_inst>\n-
+  Reference(s):\n...\n- Text:\n{text}\n</user_inst><|im_end|>\n<|im_start|>assistant
+  \n<|audio_start|>`) → reuse `mt_build_prompt_text` + the Qwen pre-tokenizer; only
+  the token ids differ (from hparams: audio_start 151669, audio_end 151670, …).
+- **⚠ audio_embed is size `audio_vocab_size` (1024), NOT +1.** The pad code (1024)
+  is OUT of range and handled by MASKING to zero (HF: `safe_ids =
+  masked_fill(~valid, 0)`, `emb * valid_mask`). So `compute_input_embeddings` must
+  replace pad ids with 0 on the host AND multiply that channel's contribution by a
+  per-position 0/1 mask — differs from the 8B (which had a real 1025th pad row).
+  Audio heads output **1024** codes (no +1 pad slot).
+- **Local transformer**: run on ≤13 tokens × 1 layer, so REBUILD its small graph
+  each codebook step (feed positions 0..k, take last hidden) instead of a ggml
+  static KV — correct + only ~n_vq²≈144 tiny 1-layer forwards/frame. Block:
+  `ln_1`(LayerNorm+bias) → fused-QKV(+bias) MHA (32h×80, RoPE NEOX 1e6, causal,
+  scale 1/√80) → `attn.o`(+bias) → +res → `ln_2` → MLP(`fc_in`+bias → SiLU →
+  `fc_out`+bias) → +res, then `ln_f`. Position-0 input = the backbone hidden;
+  positions 1..k = `audio_embed[k-1](code_{k-1})`.
+- **Generate loop**: per frame — backbone(row)[last] → local(seq)[last] → binary
+  head (continue=assistant_slot / stop=audio_end); if continue, depth-first
+  code_k = argmax/sample(audio_head[k](local_hidden)), embed → extend local seq →
+  re-run local. Append `[assistant_slot, code_0..11]` to the backbone; KV grows 1.
+  Extraction: no un-delay — the stacked frames ARE the (n_vq, T) grid.
+
 ## Open questions to resolve during implementation
 - Codec-v2 exact architecture + whether output is **stereo** (config `sampling_rate`
   48000; `MOSS-Audio-Tokenizer-v2` internals not yet read).

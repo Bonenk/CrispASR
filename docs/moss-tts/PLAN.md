@@ -22,16 +22,18 @@ onto CrispASR's in-house Qwen3 runtime — no libllama).
   decoded line-by-line: Qwen3-4B backbone [2560d, tied] + a 1-layer local/depth
   transformer that AR-generates 12 codebooks per frame — the delay pattern is
   replaced; codec = MOSS-Audio-Tokenizer-v2 @ 48 kHz).
-- **P1 converter DONE** — `models/convert-moss-tts-local-to-gguf.py` (arch
-  `moss-tts-local`): backbone `transformer.*`→`llm.*` (QK-norm, tied→re-emit
-  `llm.lm_head`), local `local_transformer.*`→`local.*` (fused QKV, biases),
-  12 `moss.audio_embed.k` (+ tied `moss.audio_head.k`), `moss.local_text_head`,
-  full KV metadata + gpt2 tokenizer. Validated against all 438 real tensor names
-  (0 unmapped, none >64 chars) — correct-by-construction.
-- Next: **P2 runtime** `src/moss_tts_local.{h,cpp}` (reuse backbone KV path; NEW
-  1-layer local transformer + depth-first generate + binary stop head), **P3**
-  codec-v2 study, **P4** 12-point integration, **P5** Kaggle round-trip validate.
-  Heavy steps on Kaggle (Mac loadavg high; 4B+codec won't fit locally).
+- **P1 converter DONE + EMPIRICALLY VALIDATED** — `convert-moss-tts-local-to-gguf.py`
+  ran on the real 4B weights on Kaggle (`tools/kaggle/moss-tts-local-convert`):
+  **9.11 GB F16 GGUF, 438 tensors, arch moss-tts-local, all 6 structural checks
+  PASS**, shapes confirmed. See STUDY-4B.md.
+- **P2 header DONE** — `src/moss_tts_local.h`. **P2 .cpp fully specified** in
+  STUDY-4B.md "Runtime implementation notes" (prompt = reuse 8B `mt_build_prompt_text`;
+  ⚠ audio_embed size 1024 → pad-masked; local transformer graph rebuilt per
+  codebook step; depth-first generate + binary stop). **Next: write the .cpp**
+  (backbone reuse via `core_attn::kv_self_attn`/`core_ffn::swiglu` + the novel
+  local transformer + generate loop, by hand).
+- Then **P3** codec-v2 study (48 kHz, confirm hop), **P4** 12-point integration,
+  **P5** Kaggle round-trip validate. Heavy steps on Kaggle.
 - Issue #249 stays **OPEN** until the 4B ships (only the 8B half is done).
 
 ## Done (compiles clean; NOT yet parity-validated)
