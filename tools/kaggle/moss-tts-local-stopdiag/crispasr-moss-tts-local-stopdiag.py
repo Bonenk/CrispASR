@@ -71,7 +71,7 @@ def run_reference(hf_token):
     log("load reference model (float32, cpu)")
     model = AutoModel.from_pretrained(HF_MODEL, trust_remote_code=True, torch_dtype=torch.float32,
                                       token=hf_token).eval()
-    proc = AutoProcessor.from_pretrained(HF_MODEL, trust_remote_code=True, token=hf_token)
+    proc = AutoProcessor.from_pretrained(HF_MODEL, trust_remote_code=True)  # public; token kwarg rejected by custom proc
     log("model + processor loaded")
 
     out = {}
