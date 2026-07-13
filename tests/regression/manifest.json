@@ -430,7 +430,12 @@
       },
       "sample": "samples/jfk.wav",
       "expected_transcript": "And so my fellow americans ask not what your country can do for you, ask what you can do for your country.",
-      "expected_transcript_source": "captured 2026-06-15 with wav2vec2-xlsr-en-q4_k on samples/jfk.wav"
+      "expected_transcript_source": "captured 2026-06-15 with wav2vec2-xlsr-en-q4_k on samples/jfk.wav",
+      "transcript_tolerance": {
+        "cer_max": 0.05,
+        "wer_max": 0.0
+      },
+      "transcript_tolerance_note": "CTC decoder is byte-equal-fragile to the punctuation decode tie (the comma after 'americans' flips run-to-run on CI at WER=0). Route through the WER gate (space-delimited → WER is the gate, CER advisory): wer_max=0.0 keeps words exact while absorbing the punctuation flip. Added 2026-07-13 after runs 29238328963 / 29242753343 flipped this model pass/fail on the comma alone."
     },
     {
       "name": "hubert-large",
@@ -475,7 +480,12 @@
       },
       "sample": "samples/jfk.wav",
       "expected_transcript": "And so my fellow americans, ask not what your country can do for you, ask what you can do for your country.",
-      "expected_transcript_source": "re-baked 2026-07-13 from nightly run 29232149677 (ubuntu-x86 OpenBLAS CI); word-identical to the prior CPU capture (WER=0), differs only in decode-tie punctuation/case"
+      "expected_transcript_source": "re-baked 2026-07-13 from nightly run 29232149677 (ubuntu-x86 OpenBLAS CI); word-identical to the prior CPU capture (WER=0), differs only in decode-tie punctuation/case",
+      "transcript_tolerance": {
+        "cer_max": 0.05,
+        "wer_max": 0.0
+      },
+      "transcript_tolerance_note": "CTC decoder is byte-equal-fragile to the punctuation decode tie (the comma after 'americans' flips run-to-run on CI at WER=0). Route through the WER gate (space-delimited → WER is the gate, CER advisory): wer_max=0.0 keeps words exact while absorbing the punctuation flip. Added 2026-07-13 after runs 29238328963 / 29242753343 flipped this model pass/fail on the comma alone."
     },
     {
       "name": "sensevoice-small",
