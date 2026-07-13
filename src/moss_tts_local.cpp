@@ -1154,7 +1154,11 @@ extern "C" moss_tts_local_context* moss_tts_local_init_from_file(const char* pat
     backends[n_be++] = ctx->backend;
     if (ctx->backend_cpu && ctx->backend_cpu != ctx->backend)
         backends[n_be++] = ctx->backend_cpu;
-    ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 16384, false, false);
+    // The codec (query-chunked attention) reuses this sched and can emit tens of
+    // thousands of nodes for long/runaway audio, so its hash-set must be sized for
+    // the codec, not just the small per-frame backbone graph (else the codec decode
+    // aborts on GGML_ASSERT(hash_set.size >= n_nodes + n_leafs)).
+    ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 262144, false, false);
     ctx->compute_meta.resize(ggml_tensor_overhead() * 16384 + ggml_graph_overhead_custom(16384, false));
     if (params.verbosity >= 1)
         fprintf(stderr, "moss_tts_local: loaded %s (llm %u layers d=%u, local %u layer, n_vq=%u)\n",
