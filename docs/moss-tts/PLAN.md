@@ -87,6 +87,23 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
      does the reference stop for "Hello world", and where? That decides my-bug vs
      model-fragility, and whether the acceptance gate should be F16 (Q4_K may be
      intrinsically runaway-prone per [[tts-port-parity-via-logit-rank]]).
+- **P5 RUNAWAY ROOT CAUSE FOUND — wrong sampling defaults (model card).** GPU
+  quota exhausted → static inspection confirmed the port matches the reference on
+  every structural point, then the **model card "Generation Parameters"** settled
+  it: MOSS-TTS-Local wants **`audio_temperature=1.7, audio_top_p=0.8,
+  audio_top_k=25`** with the binary stop head **SAMPLED** (`do_sample=True`,
+  `text_temperature=1.0`). My generic defaults (audio 1.0/0.95/50, GREEDY stop)
+  yield a too-conservative/degenerate acoustic trajectory that never reaches a
+  natural end → the stop head never fires → runaway. Explains everything: correct
+  audio content (Text field present) + broken stop timing (wrong sampling).
+  **FIX committed** (`moss_tts_local_synth_default_params` → card values).
+  **Validating on CPU** (no GPU needed): `crispasr-mtl-fixcheck` builds the smoke
+  and runs `generate_codes` with the fixed defaults — does "Hello world." now stop
+  at a sane frame count? (`crispasr-mtl-stopcpu` v4 corroborates the reference also
+  runs away at the WRONG temp 1.0.)
+- **Remaining once fix validated:** re-run the full codec round-trip on GPU (when
+  the weekly quota resets) to confirm end-to-end with the chunked codec + sched fix
+  + correct params; then upload GGUFs, ff `main`, release, close #249.
 - **P5 plan (the ONLY acceptance gate, HARD RULE #3):**
   convert codec on Kaggle (`--codec OpenMOSS-Team/MOSS-Audio-Tokenizer-v2`),
   quantize backbone Q4_K, `crispasr --backend moss-tts-local -m <bb> --codec-model
