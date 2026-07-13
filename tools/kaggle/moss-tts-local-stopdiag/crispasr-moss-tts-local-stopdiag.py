@@ -56,6 +56,15 @@ def log(m):
 
 
 def run_reference(hf_token):
+    # huggingface_hub freezes HF_HUB_ENABLE_HF_TRANSFER at import (Kaggle sets =1 but
+    # the pkg is absent) -> force it off on the already-imported module.
+    import huggingface_hub.constants as _hfc
+    _hfc.HF_HUB_ENABLE_HF_TRANSFER = False
+    try:
+        import huggingface_hub.file_download as _fd
+        _fd.HF_HUB_ENABLE_HF_TRANSFER = False
+    except Exception:  # noqa: BLE001
+        pass
     import torch
     from transformers import AutoModel, AutoProcessor
     torch.set_num_threads(os.cpu_count() or 4)
@@ -119,7 +128,7 @@ def main():
 
     import subprocess
     subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
-                           "transformers==4.57.6", "accelerate", "huggingface_hub"])
+                           "transformers==4.57.6", "accelerate", "huggingface_hub", "hf_transfer"])
     try:
         summary["reference"] = run_reference(hf_token)
     except Exception as e:  # noqa: BLE001
