@@ -65,6 +65,28 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
   Kernel run 2 A/Bs q4_k sampled vs **q4_k greedy-audio (the gate candidate)** vs
   f16 greedy (oracle) — testing whether sampled-audio feedback is what stops the
   stop head from firing. If greedy-audio stops cleanly, that becomes the default.
+- **P5 run 2 RESULT — gate FAIL, but two big findings + a red herring ruled out:**
+  1. ✅ **O(T²) codec OOM is GONE** (0 × 916 GB; the query-chunking works).
+  2. ❌ **New crash: sched hash-set too small.** All 6 synths aborted on
+     `GGML_ASSERT(sched->hash_set.size >= n_nodes+n_leafs)` in the codec decode —
+     the codec reuses the runtime sched (created at graph_size **16384**), but the
+     chunked codec graph is far larger. **FIXED:** runtime sched → 262144 (codec's
+     own compute_meta already 262144). Must re-validate the codec decode.
+  3. ❌ **The stop head is the core blocker — and it's structural, not quant/tie.**
+     DEBUG trace shows the stop logit *pinned* deeply negative every frame:
+     `continue≈7–9, stop≈−2…−5` (a ~10-logit gap) across all 4096 frames. Greedy
+     vs sampled didn't change the runaway.
+  4. **Greedy audio is DEGENERATE — discard that lever.** `f16_greedy` long
+     "stopped" at 35 frames (2.8 s for a 30-word passage = wrong), while run 1's
+     *sampled* f16 long stopped correctly at 219 (17.5 s, overlap 1.0). So SAMPLED
+     audio is correct; the runaway is **short-text + Q4_K under sampled audio**.
+  - **ROOT-CAUSE PLAN (next):** the audio is provably correct, so the stop
+     mechanism is the isolated problem. Need a FAST diagnostic (no codec/ASR):
+     `generate_codes` (C++) for short+long × f16+q4_k SAMPLED with the stop-logit
+     trace, **vs the HF reference `MossTTSLocal.generate`** on the same prompt —
+     does the reference stop for "Hello world", and where? That decides my-bug vs
+     model-fragility, and whether the acceptance gate should be F16 (Q4_K may be
+     intrinsically runaway-prone per [[tts-port-parity-via-logit-rank]]).
 - **P5 plan (the ONLY acceptance gate, HARD RULE #3):**
   convert codec on Kaggle (`--codec OpenMOSS-Team/MOSS-Audio-Tokenizer-v2`),
   quantize backbone Q4_K, `crispasr --backend moss-tts-local -m <bb> --codec-model
