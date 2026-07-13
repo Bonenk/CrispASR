@@ -846,6 +846,72 @@ extern "C" float* ark_asr_prefill_logits(struct ark_asr_context* ctx, const floa
     return logits;
 }
 
+// #253: Qwen2.5's added/special tokens start here (<|endoftext|>=151643); the
+// base BPE text vocab is below. The model can emit these on out-of-distribution
+// chunks and core_bpe::detokenize would render them as literal text ("endoftext",
+// "im_start", ...) — the reference decodes with skip_special_tokens=True.
+static constexpr int32_t ARK_FIRST_SPECIAL_TOKEN = 151643;
+
+// #253: collapse a phrase repeated >=3x consecutively down to a single copy.
+// The cross-chunk language seed (ark_transcribe_chunked) can make an
+// uninformative window (silence/music/OOD) echo the seeded phrase, which greedy
+// decode then loops. Real speech never repeats a multi-word phrase verbatim 3+
+// times, so this is safe; applied per window so the seed carried to the next
+// window stays clean and the loop can't grow across windows. Returns the input
+// unchanged when no loop is present (preserves original spacing).
+static std::string ark_deloop(const std::string& s) {
+    std::vector<std::string> w;
+    for (size_t i = 0; i < s.size();) {
+        while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n'))
+            i++;
+        size_t j = i;
+        while (j < s.size() && s[j] != ' ' && s[j] != '\t' && s[j] != '\n')
+            j++;
+        if (j > i)
+            w.emplace_back(s.substr(i, j - i));
+        i = j;
+    }
+    if (w.size() < 4)
+        return s;
+    std::vector<std::string> out;
+    out.reserve(w.size());
+    bool changed = false;
+    size_t i = 0;
+    while (i < w.size()) {
+        int bestk = 0;
+        size_t bestreps = 0;
+        for (int k = 1; k <= 10 && i + (size_t)2 * k <= w.size(); k++) {
+            size_t reps = 1, j = i + (size_t)k;
+            while (j + (size_t)k <= w.size() && std::equal(w.begin() + i, w.begin() + i + k, w.begin() + j)) {
+                reps++;
+                j += (size_t)k;
+            }
+            if (reps >= 3 && reps * (size_t)k > bestreps * (size_t)bestk) {
+                bestk = k;
+                bestreps = reps;
+            }
+        }
+        if (bestk) {
+            for (int m = 0; m < bestk; m++)
+                out.push_back(w[i + (size_t)m]); // keep one copy of the looped phrase
+            i += bestreps * (size_t)bestk;
+            changed = true;
+        } else {
+            out.push_back(w[i]);
+            i++;
+        }
+    }
+    if (!changed)
+        return s;
+    std::string res;
+    for (size_t k = 0; k < out.size(); k++) {
+        if (k)
+            res += ' ';
+        res += out[k];
+    }
+    return res;
+}
+
 // ===========================================================================
 // Transcribe (one <=30s window)
 // ===========================================================================
@@ -970,7 +1036,16 @@ static std::string ark_transcribe_window(ark_asr_context* ctx, const float* pcm,
             gen.pop_back();
     }
 
-    std::string txt = core_bpe::detokenize(ctx->vocab, gen.data(), gen.size());
+    // #253: strip special/added tokens (>= ARK_FIRST_SPECIAL_TOKEN) the model can
+    // emit on OOD chunks (<|endoftext|>, <|im_start|>, ...) before detokenising —
+    // core_bpe::detokenize renders them as literal text, unlike the reference's
+    // tokenizer.decode(skip_special_tokens=True).
+    std::vector<int32_t> vis;
+    vis.reserve(gen.size());
+    for (int32_t t : gen)
+        if (t < ARK_FIRST_SPECIAL_TOKEN)
+            vis.push_back(t);
+    std::string txt = core_bpe::detokenize(ctx->vocab, vis.data(), vis.size());
     if (std::getenv("CRISPASR_ARKASR_DEBUG_GEN")) {
         fprintf(stderr, "[ark-gen] window %.1fs: %zu tokens, first_tok=%d (im_end=%d) raw='%.90s'\n",
                 (double)n_samples / (double)ctx->hp.sample_rate, gen.size(), gen.empty() ? -1 : gen[0], ctx->id_im_end,
@@ -993,6 +1068,7 @@ static std::string ark_transcribe_window(ark_asr_context* ctx, const float* pcm,
         txt.erase(0, 1);
         ltrim(txt);
     }
+    txt = ark_deloop(txt); // #253: collapse seed-echo repetition loops
     return txt;
 }
 
