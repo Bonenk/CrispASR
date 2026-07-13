@@ -4,6 +4,18 @@ Branch `feat/moss-tts-249`. Spec: `docs/moss-tts/STUDY.md`. Reference:
 `github.com/pwilkin/openmoss` (validated C++ port; we graft its codec + delay
 onto CrispASR's in-house Qwen3 runtime — no libllama).
 
+## NOW — active work (update at every checkpoint; push to main)
+
+- **2026-07-13:** Phase 3 code-parity RESOLVED (tokenizer bug fixed; frame-0
+  divergence proven = Q4_K near-tie argmax flip, not a bug — see the resolution
+  section below). Merged to `main` @ `dd5a21a4`.
+- **In flight:** voice-cloning round-trip validation on Kaggle
+  (`tools/kaggle/moss-tts-voiceclone/`, kernel `chr1str/crispasr-moss-tts-voiceclone`)
+  — closed-loop R/B/C clips, gating on no-crash + ASR-intelligible + speaker
+  cosine(clone,ref) > cosine(baseline,ref). Awaiting terminal result.
+- **Next:** on PASS, mark voice cloning validated here + HISTORY/LEARNINGS; on
+  FAIL, diagnose the encoder/reference-splice path.
+
 ## Done (compiles clean; NOT yet parity-validated)
 
 | Phase | What | Files |
