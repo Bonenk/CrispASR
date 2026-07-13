@@ -880,7 +880,9 @@ static std::string ark_deloop(const std::string& s) {
     while (i < w.size()) {
         int bestk = 0;
         size_t bestreps = 0;
-        for (int k = 1; k <= 10 && i + (size_t)2 * k <= w.size(); k++) {
+        // Scan phrase lengths up to a full sentence — seed-echo loops repeat an
+        // entire clause (observed ~16 words), which a short k window can't see.
+        for (int k = 1; k <= 40 && i + (size_t)2 * k <= w.size(); k++) {
             size_t reps = 1, j = i + (size_t)k;
             while (j + (size_t)k <= w.size() && std::equal(w.begin() + i, w.begin() + i + k, w.begin() + j)) {
                 reps++;
