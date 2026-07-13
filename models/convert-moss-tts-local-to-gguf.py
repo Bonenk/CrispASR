@@ -181,7 +181,9 @@ def write_backbone_gguf(model_dir: Path, config: dict, out_path: Path, out_dtype
     audio_vocab_size = int(config.get("audio_vocab_size", 1024))
     audio_pad_code = int(config.get("audio_pad_code", audio_vocab_size))
     sampling_rate = int(config.get("sampling_rate", 48000))
-    downsample_rate = int(config.get("downsample_rate", 1920))  # TODO confirm for v2 codec
+    # MOSS-Audio-Tokenizer-v2 hop = 3840 (48000/3840 = 12.5 Hz frame rate); STEREO.
+    downsample_rate = int(config.get("downsample_rate", 3840))
+    audio_channels = int(config.get("number_channels", 2))
     vocab_size = int(qc.get("vocab_size", 151936))
 
     print("\nMOSS-TTS-Local-Transformer-v1.5 (MossTTSLocal, 4B)")
@@ -225,6 +227,7 @@ def write_backbone_gguf(model_dir: Path, config: dict, out_path: Path, out_dtype
     writer.add_uint32("moss.audio_pad_code", audio_pad_code)
     writer.add_uint32("moss.sampling_rate", sampling_rate)
     writer.add_uint32("moss.downsample_rate", downsample_rate)
+    writer.add_uint32("moss.audio_channels", audio_channels)
     writer.add_float32("moss.frame_rate", float(sampling_rate) / float(downsample_rate))
     writer.add_string("moss.local_text_head_mode", str(config.get("local_text_head_mode", "binary")))
 
