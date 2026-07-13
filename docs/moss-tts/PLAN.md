@@ -21,10 +21,17 @@ onto CrispASR's in-house Qwen3 runtime — no libllama).
   deliverable.** Phase 0 STUDY **done** → `docs/moss-tts/STUDY-4B.md` (architecture
   decoded line-by-line: Qwen3-4B backbone [2560d, tied] + a 1-layer local/depth
   transformer that AR-generates 12 codebooks per frame — the delay pattern is
-  replaced; codec = MOSS-Audio-Tokenizer-v2 @ 48 kHz). Next: P1 converter
-  `convert-moss-tts-local-to-gguf.py`, P2 runtime `src/moss_tts_local.{h,cpp}`,
-  P3 codec-v2 study, P4 12-point integration, P5 Kaggle round-trip validate. Heavy
-  steps on Kaggle (Mac loadavg high; 4B+codec won't fit locally).
+  replaced; codec = MOSS-Audio-Tokenizer-v2 @ 48 kHz).
+- **P1 converter DONE** — `models/convert-moss-tts-local-to-gguf.py` (arch
+  `moss-tts-local`): backbone `transformer.*`→`llm.*` (QK-norm, tied→re-emit
+  `llm.lm_head`), local `local_transformer.*`→`local.*` (fused QKV, biases),
+  12 `moss.audio_embed.k` (+ tied `moss.audio_head.k`), `moss.local_text_head`,
+  full KV metadata + gpt2 tokenizer. Validated against all 438 real tensor names
+  (0 unmapped, none >64 chars) — correct-by-construction.
+- Next: **P2 runtime** `src/moss_tts_local.{h,cpp}` (reuse backbone KV path; NEW
+  1-layer local transformer + depth-first generate + binary stop head), **P3**
+  codec-v2 study, **P4** 12-point integration, **P5** Kaggle round-trip validate.
+  Heavy steps on Kaggle (Mac loadavg high; 4B+codec won't fit locally).
 - Issue #249 stays **OPEN** until the 4B ships (only the 8B half is done).
 
 ## Done (compiles clean; NOT yet parity-validated)
