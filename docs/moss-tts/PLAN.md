@@ -63,6 +63,44 @@ Ship next: upload GGUFs to `cstr/moss-tts-v1.5-GGUF` (backbone Q4_K + F16 codec;
 daemon-thread + timeout + server-side verify per the HF-upload note), populate the
 registry `license` (Apache-2.0), version bump, HISTORY + LEARNINGS.
 
+## Phase 3 code-parity — RESOLVED (2026-07-13, Kaggle P100)
+
+Ran the greedy code-parity (C++ Q4_K vs HF BF16 reference on CPU, temps=0) and
+methodically diffed the divergence. Two of the PLAN's "known-suspect" areas were
+both confirmed — one a real bug, one an intrinsic limit:
+
+1. **Tokenizer (real bug, FIXED — `41c08e8f`).** The moss-tts prompt tokenizer
+   (cloned from `qwen3_asr`) used a crude whitespace pre-splitter that split `>`
+   from a trailing `\n`. Qwen's pre-tokenizer regex `[^\s\p{L}\p{N}]+[\r\n]*`
+   groups punctuation with trailing newlines (`>\n`=397, `):\n`=982). The
+   `moss-tts-promptdiff` kernel isolated it: prompt TEXT identical, tokenization
+   differed at the first newline. Fix: a proper Qwen2/3 pre-tokenizer
+   (`mt_qwen_pretokenize`). After the fix the 67-token conditioning prompt is
+   **byte-identical** to the HF processor (`first_mismatch=null`, `prefix=67`).
+
+2. **F16-vs-BF16 rounding through the AR loop (intrinsic — NOT a bug).** Even with
+   byte-identical prompts, greedy codes diverge from **frame 0** (~0.5% exact
+   match). The `moss-tts-logit0` probe settles it: at step-0 head-0, the C++ Q4_K
+   logits are essentially the reference's distribution — the reference's greedy
+   pick (143) is the C++'s **rank-1 runner-up**, only **0.135 logits** below the
+   C++ argmax (1021). Q4_K rounding (O(0.1–0.5) on logits) flips this near-tie
+   onset token; the MOSS delay makes every un-delayed frame span many raw AR
+   steps, so one flip cascades (~n_vq·T decisions → ~0.1% survival = the 0.5%
+   observed). Codebook-0 (coarse RVQ) still re-syncs to exact reference values at
+   scattered frames (807, 578, 756; 2-frame-shifted runs 400/575/254) — the
+   models produce the same coarse audio, differing only on quant-sensitive fine
+   residuals.
+
+**Conclusion:** exact greedy code-parity between ggml-Q4_K and torch-BF16 is
+*unachievable* for this AR audio LM (near-tie onset flips + AR chaos + dtype
+mismatch), exactly as the last PLAN bullet predicted ("judge by the deterministic
+prefix + round-trip, not aggregate cos"). The port is **structurally confirmed**:
+byte-identical prompt + near-identical step-0 logit distribution + coarse-codebook
+re-sync + the passing ASR round-trip (HARD RULE #3). The correct acceptance gate
+is the round-trip (passes) and the step-0 logit-rank probe (ref pick = C++ rank-1),
+NOT byte-exact greedy codes. Kernels: `tools/kaggle/moss-tts-{promptdiff,parity,
+logit0}/`.
+
 ## Phase 6 — original validation plan (the ONLY acceptance test; HARD RULE #3)
 
 8B backbone won't fit the 8 GB VPS and is tight on the 16 GB Mac with the 1.6 B
