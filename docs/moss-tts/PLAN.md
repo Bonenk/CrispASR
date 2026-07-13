@@ -15,9 +15,17 @@ onto CrispASR's in-house Qwen3 runtime — no libllama).
   1.00 — cloned clip ASR == clone text), GATE3 voice_moved PASS (speaker cosine
   clone↔ref **0.853** vs baseline↔ref **0.471**, Δ **+0.382**). `--voice ref.wav`
   transfers the timbre AND preserves the words.
-- **Nothing in flight.** Phase 6 (validate + ship), code-parity, and voice cloning
-  all complete and on `main`. Optional follow-ups: 4B `MossTTSLocal` variant;
-  tagged release via `scripts/bump-version.sh`.
+- **8B (MOSS-TTS-v1.5 / MossTTSDelay) COMPLETE** — Phase 6, code-parity, voice
+  cloning all on `main`; shipped in **v0.8.10** (released 2026-07-13).
+- **NOW: 4B port (MOSS-TTS-Local-Transformer-v1.5 / MossTTSLocal), #249 second
+  deliverable.** Phase 0 STUDY **done** → `docs/moss-tts/STUDY-4B.md` (architecture
+  decoded line-by-line: Qwen3-4B backbone [2560d, tied] + a 1-layer local/depth
+  transformer that AR-generates 12 codebooks per frame — the delay pattern is
+  replaced; codec = MOSS-Audio-Tokenizer-v2 @ 48 kHz). Next: P1 converter
+  `convert-moss-tts-local-to-gguf.py`, P2 runtime `src/moss_tts_local.{h,cpp}`,
+  P3 codec-v2 study, P4 12-point integration, P5 Kaggle round-trip validate. Heavy
+  steps on Kaggle (Mac loadavg high; 4B+codec won't fit locally).
+- Issue #249 stays **OPEN** until the 4B ships (only the 8B half is done).
 
 ## Done (compiles clean; NOT yet parity-validated)
 
