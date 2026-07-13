@@ -176,6 +176,12 @@ def main():
         if rp.exists():
             ref_codes = np.load(rp)
             log(f"ref codes {ref_codes.shape}")
+            rawp = MODELS / "ref" / "raw.npy"
+            if rawp.exists():
+                ref_raw = np.load(rawp)  # (T_raw, 1+n_vq) delayed grid from <audio_start>
+                print(f"\n== reference RAW delayed grid (warm-up), first 36 rows, cols 0..8 ==")
+                for r in range(min(36, ref_raw.shape[0])):
+                    print(f"  raw[{r:2d}] col0={int(ref_raw[r,0])} audio1..8={ref_raw[r,1:9].tolist()}")
         else:
             log("ref codes NOT produced — see ref.log (HF API extraction may need a fix)")
             summary["ref_error"] = r.stderr[-800:]
@@ -261,6 +267,23 @@ def main():
             print(f"  [f{t}] ref={a[:, t].tolist()}")
             print(f"  [f{t}] cpp={b[:, t].tolist()}")
             print(f"  [f{t}] match={int(eq[:, t].sum())}/{nvq}")
+
+        # Full codebook-0 (coarse/semantic RVQ level) sequences — the robust one.
+        print("\n== codebook-0 (coarse) full sequence ==")
+        print(f"  ref cb0 = {a[0, :].tolist()}")
+        print(f"  cpp cb0 = {b[0, :].tolist()}")
+        # Per-codebook agreement across ALL frames: RVQ coarse (cb0) should agree
+        # far more than fine residuals (cb1..) if the port is structurally correct
+        # and the divergence is quantization of the fine levels.
+        per_cb = [int(eq[cb, :].sum()) for cb in range(nvq)]
+        print(f"\n== per-codebook match count (/{T} frames) ==")
+        print(f"  {per_cb}")
+        summary["per_codebook_match"] = per_cb
+        summary["cb0_match"] = per_cb[0]
+        summary["cb0_match_frac"] = per_cb[0] / T if T else 0.0
+        summary["fine_mean_match_frac"] = (sum(per_cb[1:]) / (nvq - 1) / T) if (nvq > 1 and T) else 0.0
+        log(f"CODEBOOK PROFILE: cb0={per_cb[0]}/{T} ({per_cb[0]/T:.2f}); "
+            f"fine cb1..{nvq-1} mean={summary['fine_mean_match_frac']:.3f}")
         log(f"PARITY: first_token_match={tok0_match} frame0={f0_match}/{nvq} "
             f"(leading run {lead}); exact_prefix={exact_prefix}/{T}; "
             f"overall={eq.mean():.3f}; best_offset={best['offset']}@{best['frac']:.3f}")
