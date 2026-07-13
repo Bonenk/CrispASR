@@ -33,10 +33,14 @@ onto CrispASR's in-house Qwen3 runtime — no libllama).
   forward (LayerNorm+bias, fused-QKV, RoPE NEOX 1e6, SiLU), and the depth-first
   generate loop (backbone→local→binary stop→12 codebooks AR). `generate_codes`
   emits the (12, T) grid.
+- **In flight: runtime SMOKE test** (`tools/kaggle/moss-tts-local-smoke`,
+  `moss-tts-local-smoke` exe) — first run of the hand-written runtime on real
+  weights: convert 4B → GGUF (uploads to `cstr/moss-tts-local-v1.5-GGUF`), then
+  `generate_codes` end-to-end on a P100, asserting a valid (12,T) grid with
+  in-range codes. De-risks the generate loop before the codec.
 - Next: **P3** codec-v2 (48 kHz decode — `synthesize` needs it), **P4** 12-point
   integration (CLI/factory/registry/c_api/bindings/docs), **P5** Kaggle round-trip
-  validate (the runtime runs the real 4B GGUF there — won't fit locally). The
-  generate loop is untested until P5 (Kaggle); it compiles but hasn't run.
+  validate (ASR = acceptance gate).
 - Issue #249 stays **OPEN** until the 4B ships (only the 8B half is done).
 
 ## Done (compiles clean; NOT yet parity-validated)
