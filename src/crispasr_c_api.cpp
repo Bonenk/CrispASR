@@ -147,6 +147,10 @@
 #include "moss_tts.h"
 #define CA_HAVE_MOSS_TTS 1
 #endif
+#if __has_include("moss_tts_local.h")
+#include "moss_tts_local.h"
+#define CA_HAVE_MOSS_TTS_LOCAL 1
+#endif
 #if __has_include("omnivoice.h")
 #include "omnivoice.h"
 #define CA_HAVE_OMNIVOICE 1
@@ -1303,6 +1307,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "vibevoice";
     else if (strcmp(arch, "qwen3-tts") == 0 || strcmp(arch, "qwen3_tts") == 0)
         backend = "qwen3-tts";
+    else if (strcmp(arch, "moss-tts-local") == 0 || strcmp(arch, "moss_tts_local") == 0)
+        backend = "moss-tts-local";
     else if (strcmp(arch, "moss-tts") == 0 || strcmp(arch, "moss_tts") == 0 || strcmp(arch, "moss-tts-delay") == 0)
         backend = "moss-tts";
     else if (strcmp(arch, "omnivoice") == 0 || strcmp(arch, "omnivoice-tts") == 0)
@@ -1676,6 +1682,9 @@ struct crispasr_session {
 #endif
 #ifdef CA_HAVE_MOSS_TTS
     moss_tts_context* moss_tts_ctx = nullptr;
+#endif
+#ifdef CA_HAVE_MOSS_TTS_LOCAL
+    moss_tts_local_context* moss_tts_local_ctx = nullptr;
 #endif
 #ifdef CA_HAVE_OMNIVOICE
     omnivoice_context* omnivoice_ctx = nullptr;
@@ -2491,6 +2500,22 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.flash_attn = g_open_flash_attn_tls;
         s->moss_tts_ctx = moss_tts_init_from_file(model_path, p);
         if (!s->moss_tts_ctx) {
+            delete s;
+            return nullptr;
+        }
+        // Codec loaded via `crispasr_session_set_codec_path` after open.
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_MOSS_TTS_LOCAL
+    if (s->backend == "moss-tts-local" || s->backend == "moss_tts_local") {
+        moss_tts_local_context_params p = moss_tts_local_context_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
+        p.flash_attn = g_open_flash_attn_tls;
+        s->moss_tts_local_ctx = moss_tts_local_init_from_file(model_path, p);
+        if (!s->moss_tts_local_ctx) {
             delete s;
             return nullptr;
         }
@@ -3501,6 +3526,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_MOSS_TTS
     list += ",moss-tts";
+#endif
+#ifdef CA_HAVE_MOSS_TTS_LOCAL
+    list += ",moss-tts-local";
 #endif
 #ifdef CA_HAVE_OMNIVOICE
     list += ",omnivoice";
@@ -6638,6 +6666,10 @@ CA_EXPORT int crispasr_session_set_codec_path(crispasr_session* s, const char* p
     if (s->moss_tts_ctx)
         return moss_tts_set_codec_path(s->moss_tts_ctx, path) ? 0 : -1;
 #endif
+#ifdef CA_HAVE_MOSS_TTS_LOCAL
+    if (s->moss_tts_local_ctx)
+        return moss_tts_local_set_codec_path(s->moss_tts_local_ctx, path) ? 0 : -1;
+#endif
 #ifdef CA_HAVE_ORPHEUS
     if (s->orpheus_ctx) {
         int rc = orpheus_set_codec_path(s->orpheus_ctx, path);
@@ -7252,6 +7284,23 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
         float* pcm = moss_tts_synthesize(s->moss_tts_ctx, text, &p, out_n_samples);
         if (!pcm && s->last_synth_error.empty()) {
             s->last_synth_error = "moss-tts synthesis failed — ensure the companion codec GGUF is loaded "
+                                  "(crispasr_session_set_codec_path)";
+        }
+        return pcm;
+    }
+#endif
+#ifdef CA_HAVE_MOSS_TTS_LOCAL
+    if (s->moss_tts_local_ctx) {
+        moss_tts_local_synth_params p = moss_tts_local_synth_default_params();
+        const std::string tts_lang = !s->target_language.empty() ? s->target_language : s->source_language;
+        std::string lang_en;
+        if (!tts_lang.empty() && tts_lang != "auto") {
+            lang_en = ca_iso_to_english_lang(tts_lang);
+            p.language = lang_en.c_str();
+        }
+        float* pcm = moss_tts_local_synthesize(s->moss_tts_local_ctx, text, &p, out_n_samples);
+        if (!pcm && s->last_synth_error.empty()) {
+            s->last_synth_error = "moss-tts-local synthesis failed — ensure the companion codec GGUF is loaded "
                                   "(crispasr_session_set_codec_path)";
         }
         return pcm;
@@ -7988,6 +8037,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
     if (s->moss_tts_ctx)
         moss_tts_free(s->moss_tts_ctx);
 #endif
+#ifdef CA_HAVE_MOSS_TTS_LOCAL
+    if (s->moss_tts_local_ctx)
+        moss_tts_local_free(s->moss_tts_local_ctx);
+#endif
 #ifdef CA_HAVE_OMNIVOICE
     if (s->omnivoice_ctx)
         omnivoice_free(s->omnivoice_ctx);
@@ -8693,6 +8746,12 @@ CA_EXPORT int crispasr_session_set_tts_seed(crispasr_session* s, uint64_t seed) 
 #ifdef CA_HAVE_MOSS_TTS
     if (s->moss_tts_ctx) {
         moss_tts_set_seed(s->moss_tts_ctx, (uint32_t)seed);
+        touched++;
+    }
+#endif
+#ifdef CA_HAVE_MOSS_TTS_LOCAL
+    if (s->moss_tts_local_ctx) {
+        moss_tts_local_set_seed(s->moss_tts_local_ctx, (uint32_t)seed);
         touched++;
     }
 #endif

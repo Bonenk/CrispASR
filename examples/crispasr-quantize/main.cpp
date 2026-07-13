@@ -681,8 +681,13 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                                sname.find("code_pred.output") == 0 || sname.find("code_pred.small_to_mtp") == 0 ||
                                sname.find("talker.token_embd") == 0 || sname.find("talker.text_proj") == 0 ||
                                sname.find("talker.codec_bridge") == 0)) &&
+            // moss-tts-local (4B) additionally keeps the 1-layer local/depth
+            // transformer (local.*) and its binary stop head (moss.local_text_head)
+            // at F16 — precision-sensitive, run n_vq times per frame. (8B has no
+            // such tensors, so these terms are inert there.)
             !(is_moss_tts && (sname.find("llm.embed") == 0 || sname.find("llm.lm_head") == 0 ||
-                              sname.find("moss.audio_embed") == 0 || sname.find("moss.audio_head") == 0)) &&
+                              sname.find("moss.audio_embed") == 0 || sname.find("moss.audio_head") == 0 ||
+                              sname.find("local.") == 0 || sname.find("moss.local_text_head") == 0)) &&
             !(is_parler && sname.find("dac.") == 0) &&
             !(is_dia && (sname.find("embedding") != std::string::npos || sname.find("audio_encoder") == 0)) &&
             // VibeVoice: keep the trajectory/control stack — diffusion head

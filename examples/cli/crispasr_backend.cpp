@@ -47,6 +47,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_mimo_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_ark_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_audio_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_tts_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_moss_tts_local_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_transcribe_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_transcribe_diarize_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_funasr_backend();
@@ -142,6 +143,9 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         name == "qwen3-tts-1.7b-customvoice" || name == "qwen3-tts-1.7b-cv" || name == "qwen3-tts-1.7b-voicedesign" ||
         name == "qwen3-tts-voicedesign" || name == "qwen3-tts-vd")
         return crispasr_make_qwen3_tts_backend();
+    if (name == "moss-tts-local" || name == "moss_tts_local" || name == "moss-tts-local-v1.5" ||
+        name == "mosstts-local" || name == "moss-tts-local-transformer")
+        return crispasr_make_moss_tts_local_backend();
     if (name == "moss-tts" || name == "moss_tts" || name == "mosstts" || name == "moss-tts-v1.5" ||
         name == "moss-tts-delay")
         return crispasr_make_moss_tts_backend();
@@ -272,6 +276,7 @@ std::vector<std::string> crispasr_list_backends() {
         "kugelaudio",
         "qwen3-tts",
         "moss-tts",
+        "moss-tts-local",
         "vibevoice-1.5b",
         "qwen3-tts-customvoice",
         "qwen3-tts-1.7b-base",
@@ -655,6 +660,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "moss-diarize";
     if (contains_ci("moss") && contains_ci("transcribe"))
         return "moss-transcribe";
+    if (contains_ci("moss") && contains_ci("tts") && contains_ci("local"))
+        return "moss-tts-local";
     if (contains_ci("moss") && contains_ci("tts"))
         return "moss-tts";
     if (contains_ci("moss") && contains_ci("audio"))
@@ -710,6 +717,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "qwen3";
             else if (a == "qwen3-tts" || a == "qwen3_tts" || a == "qwen3tts")
                 result = "qwen3-tts";
+            else if (a == "moss-tts-local" || a == "moss_tts_local")
+                result = "moss-tts-local";
             else if (a == "moss-tts" || a == "moss_tts" || a == "moss-tts-delay")
                 result = "moss-tts";
             else if (a == "orpheus")
