@@ -76,7 +76,9 @@ def _extract_codes(model, out: Any) -> np.ndarray:
     for cb in range(n_vq):
         for t in range(T_audio):
             codes[cb, t] = tok[start + t + cb, 1 + cb]
-    return codes
+    # also expose the RAW delayed grid (from `start`) for warm-up/onset diffing
+    raw = tok[start:end].astype(np.int32)
+    return codes, raw
 
 
 def dump(
@@ -123,10 +125,11 @@ def dump(
         out = model.generate(inputs["input_ids"], attention_mask=inputs.get("attention_mask"),
                              max_new_tokens=max_new_tokens, text_temperature=0.0, audio_temperature=0.0)
 
-    codes = _extract_codes(model, out)
+    codes, raw = _extract_codes(model, out)
     print(f"[moss_tts_ref] codes shape={codes.shape} dtype={codes.dtype} "
           f"range=[{codes.min()},{codes.max()}]", flush=True)
-    results: Dict[str, np.ndarray] = {"codes": codes.astype(np.int32)}
+    results: Dict[str, np.ndarray] = {"codes": codes.astype(np.int32),
+                                      "raw": raw.astype(np.int32)}
 
     # Optional: decode the reference waveform via the codec.
     if "waveform" in stages:
