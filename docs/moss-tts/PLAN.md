@@ -16,9 +16,18 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
 - **DONE (inherited, validated on Kaggle):** P0 STUDY, P1 converter (9.11 GB F16,
   438 tensors, hosted `cstr/moss-tts-local-v1.5-GGUF`), P2 runtime (smoke PASS on
   P100 — valid (12,T) grid, natural stop).
-- **IN FLIGHT — P3 codec (MOSS-Audio-Tokenizer-v2) decode.** Read
-  `modeling_moss_audio_tokenizer.py` line-by-line (HARD RULE #1). **Decode path
-  locked:**
+- **DONE — P3 codec (compiles) + P4 integration (wiring PASS).** Committed on
+  `feat/moss-tts-local-4b`; builds `crispasr` + links; `moss-tts-local` appears in
+  `--list-backends`; `check-backend-wiring.py` RESULT PASS (required tier). NOT yet
+  merged to `main` — awaits P5 Kaggle round-trip (do not ship an unvalidated codec
+  as done). Advisory gaps left: live test + reference dumper.
+- **NEXT — P5 Kaggle ASR round-trip (the ONLY acceptance gate, HARD RULE #3):**
+  convert codec on Kaggle (`--codec OpenMOSS-Team/MOSS-Audio-Tokenizer-v2`),
+  quantize backbone Q4_K, `crispasr --backend moss-tts-local -m <bb> --codec-model
+  <codec> --tts "..." --tts-output out.wav` → whisper ASR → recognizable text.
+  Model on `tools/kaggle/moss-tts-local-smoke/`. Then upload GGUFs, ff `main`,
+  release, close #249.
+- **P3 decode path (locked, read line-by-line, HARD RULE #1):**
   - Quantizer (ResidualLFQ.decode_codes): per cb `codebook[1024,8][code] →
     WNConv1d 8→512 (+bias)`, sum over the 12 used cbs, then `output_proj WNConv1d
     512→768 (+bias)`. Weight-norm reconstruct `w=g·v/‖v‖` (v1 pattern transfers).
