@@ -1,17 +1,37 @@
 # CrispASR v0.8.10
 
-205 commits since v0.8.9. Headline: the #218 long-audio arc root-caused and
-fixed (qwen3-asr / glm-asr now match their Python blueprints; loop mitigation
-across all LLM backends), four new backends/models (canary-qwen, OmniVoice,
-Voxtral-TTS, kyutai-stt-2.6b), raw CTC logits access across every language
+Headline: the #218 long-audio arc root-caused and fixed (qwen3-asr / glm-asr now
+match their Python blueprints; loop mitigation across all LLM backends), new
+backends/models (MOSS-TTS-v1.5, canary-qwen, OmniVoice, Voxtral-TTS,
+kyutai-stt-2.6b, bananamind-tts), raw CTC logits access across every language
 binding, per-token streaming in the C ABI, a GPU graph-cache use-after-free
 fix across 7 backends, a class of multi-model-in-one-process correctness bugs
-fixed (a second model no longer reads the first's cached weights/vocab), and
+fixed (a second model no longer reads the first's cached weights/vocab),
 OmniVoice's silent-synthesis root cause fixed plus a TTS perf pass
-(OmniVoice ~1.6-2×, qwen3-tts codec 3× on Metal).
+(OmniVoice ~1.6-2×, qwen3-tts codec 3× on Metal), a generation-health regression
+gate (empty/looping/trailing-silence output caught in CI), and a CUDA long-audio
+speedup (qwen3-asr manual-attn default-on, 3.2×).
 
 ## New backends / models
 
+- **MOSS-TTS-v1.5** (#249) — `OpenMOSS-Team/MOSS-TTS-v1.5` (MossTTSDelay): a
+  Qwen3-8B backbone autoregressively emits 32 RVQ audio codebooks under a
+  staggered delay pattern, decoded to 24 kHz by a 1.6B pure-transformer codec.
+  Ported onto CrispASR's in-house Qwen3 runtime (no libllama) by grafting
+  `pwilkin/openmoss`'s codec + delay logic. New `src/moss_tts.{h,cpp}` (backbone
+  + 32 embed/head aux graphs + delay state machine) and `src/moss_tts_codec.{h,cpp}`
+  (weight-norm-reconstructed projections → 4 sliding-window ProjectedTransformer
+  stages → 24 kHz). **Voice cloning** via `--voice ref.wav` (codec encoder +
+  reference splice; validated by ASR + speaker-cosine roundtrip). GGUFs at
+  `cstr/moss-tts-v1.5-GGUF` (Q4_K backbone + F16 codec). Validated on Kaggle
+  P100: Q4_K decoded round-trip is intelligible + correct on the real 8B weights.
+  Code-parity note: the greedy code stream is *not* byte-identical to the HF
+  BF16 reference and is not expected to be — a fixed tokenizer bug made the prompt
+  byte-identical, but the residual frame-0 divergence is a Q4_K near-tie argmax
+  flip cascading through the AR loop (the reference's greedy pick is the runtime's
+  rank-1 runner-up at a 0.135-logit gap), so the ASR round-trip is the acceptance
+  gate, not exact codes.
+- **bananamind-tts** — added to the model registry (EN + DE auto-download).
 - **canary-qwen** (#233) — `nvidia/canary-qwen-2.5b` SALM: FastConformer
   encoder → Qwen3-1.7B decoder with merged LoRA. English ASR. GGUFs at
   `cstr/canary-qwen-2.5b-GGUF` (F16/Q8_0/Q4_K; Q8_0 registry default).
@@ -139,6 +159,26 @@ OmniVoice's silent-synthesis root cause fixed plus a TTS perf pass
 - MSVC build break (`ca_token_record` definition order); missing
   `install(TARGETS)` DESTINATIONs; dead lid-silero registry entry removed
   (community PR #237).
+- **ark-asr long-audio drop (#253)**: ark-asr silently dropped transcriptions on
+  long audio — cap the single pass at 30 s and suppress an EOS-at-start so
+  multi-window decoding produces the full transcript.
+- **Session adapter-parity (#192)**: the session C-ABI didn't honour per-session
+  `temperature` (cosyvoice3) or `seed` (f5-tts) — the CLI reimplements each
+  backend inline, so knobs set only on the CLI path never reached bindings/server.
+  Mirrored at the inline dispatch sites (audited across the adapter set).
+- **canary BN-fold dtype (#702db9af)**: BatchNorm folding assumed F32 and
+  corrupted a non-F32 conv in the canary / canary-qwen / canary-ctc FastConformer;
+  now respects the tensor dtype.
+- **Model-cache cross-repo collision (#250)**: the auto-download cache keyed on
+  bare filename, so two repos sharing a basename could serve the wrong file.
+  Validate the cache entry's source identity before reuse.
+- **CTC forced alignment on non-Latin text (#252)**: auto-romanize non-Latin
+  reference text so the CTC aligner (wav2vec2 / canary-ctc) can map graphemes.
+- **parakeet pure-CTC models mis-routed**: a pure-CTC checkpoint loaded on the
+  transducer backend now auto-reroutes to the CTC path.
+- **cohere-transcribe-arabic reference**: patch the 10 zeroed encoder norms (a
+  corrupt safetensors download artifact, not a port bug) + Arabic language
+  override in the diff-harness reference backend.
 
 ## Performance
 
@@ -158,6 +198,15 @@ OmniVoice's silent-synthesis root cause fixed plus a TTS perf pass
 - **moonshine**: in-graph argmax for greedy decode.
 - **tinyBLAS** (`GGML_LLAMAFILE`) enabled by default for CPU GEMM.
 - **irodori-tts** (#241): diffusion knobs exposed (ODE steps + CFG scale).
+- **qwen3-asr CUDA long audio** (#81): the manual-attention + bucketed persistent
+  encoder graph is now the default on CUDA after a P100 A/B — 3.2× on long audio.
+  FastConformer got Q8_0 conv-pw repack + fused QKV + strided flash-attn; the
+  conv-pw Q8_0 repack extended to nemotron / canary-qwen / lfm2-audio.
+- **melotts** HiFi-GAN ~2-3× via a ggml-metal im2col batch-1 occupancy fix.
+- **FireRed** decoder (#176k): persistent matvec graph cache (the decode was
+  dispatch-bound, not attention-bound).
+- **irodori-tts** (#243) + **Dia** (#176c): persistent cached DiT graph (opt-in);
+  Dia device-resident KV measured at ~1.2% and deferred (measure-first).
 
 ## Packaging / project
 
@@ -165,3 +214,15 @@ OmniVoice's silent-synthesis root cause fixed plus a TTS perf pass
 - Kaggle GPU benchmarks: 10-backend CrispASR vs onnx-asr fleet run (#81) and a
   CrispASR vs transcribe.cpp harness — results in `PERFORMANCE.md`.
 - Issue triage: 28 stale-open issues closed against their landed fixes.
+- **Generation-health regression gate** (`core/generation_health.h`): a CI gate
+  that catches empty / looping / trailing-silence output, with an en/fr/de
+  multilingual test suite — so a degenerate-output regression fails CI instead of
+  shipping.
+- **Security hardening**: clamp/bounds-check untrusted file parsers (GGUF mmap
+  overflow + tokenizer clamp; DoS/OOB parsers), a CI fuzz gate + GGUF harness
+  (`crispasr-fuzz-tokenizer`, bpe.h/wordpiece.h), server payload cap +
+  path-traversal + CAP_TTS gating + log sanitization, and a GGUF-bounds
+  regression test.
+- **Audio I/O via glint**: compressed input (WebM/Matroska + Ogg Opus `.opus`)
+  now decodes through glint so libopus is fully optional; `response_format=opus`
+  emits real Ogg Opus with AI-provenance OpusTags.
