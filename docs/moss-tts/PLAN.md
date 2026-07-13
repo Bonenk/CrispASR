@@ -33,14 +33,16 @@ onto CrispASR's in-house Qwen3 runtime — no libllama).
   forward (LayerNorm+bias, fused-QKV, RoPE NEOX 1e6, SiLU), and the depth-first
   generate loop (backbone→local→binary stop→12 codebooks AR). `generate_codes`
   emits the (12, T) grid.
-- **In flight: runtime SMOKE test** (`tools/kaggle/moss-tts-local-smoke`,
-  `moss-tts-local-smoke` exe) — first run of the hand-written runtime on real
-  weights: convert 4B → GGUF (uploads to `cstr/moss-tts-local-v1.5-GGUF`), then
-  `generate_codes` end-to-end on a P100, asserting a valid (12,T) grid with
-  in-range codes. De-risks the generate loop before the codec.
-- Next: **P3** codec-v2 (48 kHz decode — `synthesize` needs it), **P4** 12-point
-  integration (CLI/factory/registry/c_api/bindings/docs), **P5** Kaggle round-trip
-  validate (ASR = acceptance gate).
+- **Runtime SMOKE test PASSED** (2026-07-13, Kaggle P100,
+  `tools/kaggle/moss-tts-local-smoke`) — the hand-written runtime RUNS on real
+  weights: loaded n_vq=12/hidden=2560/48kHz, `generate_codes` produced a valid
+  (12, T=35) grid, all codes in [1,1022] (0 out-of-range), natural termination
+  (binary stop head fired), no crash. Backbone + local/depth transformer +
+  depth-first generate loop + stop head all structurally correct. GGUF uploaded to
+  `cstr/moss-tts-local-v1.5-GGUF` (9.11 GB, reusable).
+- Next: **P3** codec-v2 (48 kHz decode of the codes → audio — the acceptance test
+  needs it), **P4** 12-point integration, **P5** ASR round-trip validate. Code
+  parity is diagnostic only (quantized AR — see the 8B logit-rank note).
 - Issue #249 stays **OPEN** until the 4B ships (only the 8B half is done).
 
 ## Done (compiles clean; NOT yet parity-validated)
