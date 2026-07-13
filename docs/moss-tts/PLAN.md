@@ -6,6 +6,44 @@ onto CrispASR's in-house Qwen3 runtime — no libllama).
 
 ## NOW — active work (update at every checkpoint; push to main)
 
+### 4B `moss-tts-local` (#249 second deliverable) — codec-v2 IN FLIGHT (2026-07-13)
+
+Branch `feat/moss-tts-local-4b` (off `feat/moss-tts-parity-diff`, which carries
+the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet on
+`main`). Spec: `docs/moss-tts/STUDY-4B.md`. Worktree
+`.claude/worktrees/moss-tts-local-4b`.
+
+- **DONE (inherited, validated on Kaggle):** P0 STUDY, P1 converter (9.11 GB F16,
+  438 tensors, hosted `cstr/moss-tts-local-v1.5-GGUF`), P2 runtime (smoke PASS on
+  P100 — valid (12,T) grid, natural stop).
+- **IN FLIGHT — P3 codec (MOSS-Audio-Tokenizer-v2) decode.** Read
+  `modeling_moss_audio_tokenizer.py` line-by-line (HARD RULE #1). **Decode path
+  locked:**
+  - Quantizer (ResidualLFQ.decode_codes): per cb `codebook[1024,8][code] →
+    WNConv1d 8→512 (+bias)`, sum over the 12 used cbs, then `output_proj WNConv1d
+    512→768 (+bias)`. Weight-norm reconstruct `w=g·v/‖v‖` (v1 pattern transfers).
+    Codebooks are LEARNED nn.Embedding; decode is a plain lookup (no L2-norm — that
+    is encode-only).
+  - Decoder = 6 ProjectedTransformer + 6 PatchedPretransform (pure reshape
+    upsamplers, NO weights). Dims/ctx (12.5Hz→96kHz interleaved): dec.0 768→1280
+    d1280/20h/32L ctx125 · p2 · dec.2 640→768 d768/12h/12L ctx250 · p2 · dec.4
+    384→768 ctx400 · p2 · dec.6 384→768 ctx400 · p2 · dec.8 384→768 ctx400 · p2 ·
+    dec.10 384→240 ctx400 · p240 → (1, 7680·T) mono-interleaved → de-interleave to
+    STEREO (2, 3840·T) @48kHz. Synthesize downmixes (L+R)/2 to the mono API.
+  - ⚠ vs v1: **12** cbs (not 32); hop **3840**; **6** stages; **input_proj AND
+    output_proj exist on EVERY stage** (e.g. dec.0 output_proj is a real 1280→1280
+    matrix — v1's dim-conditional skip would be WRONG); stereo out.
+  - Transformer block: pre-norm LayerNorm(w+b, eps 1e-5), fused-QKV NO bias, RoPE
+    **NORMAL** (adjacent-pair, base 1e4, head_dim 64), sliding-window causal (ctx),
+    scale 1/√64, FFN Linear→**GELU-erf**→Linear (no bias), LayerScale 0.01
+    per-channel. No final norm. (Reuses `moss_tts_codec.cpp` block math.)
+  - Converter: emit a focused DECODE-only codec GGUF (arch `moss-tts-local-codec`)
+    — skip encoder + quantizers 12..31 (~halves size). Runtime:
+    `src/moss_tts_local_codec.{h,cpp}`; wire `set_codec_path` + `synthesize`.
+- **NEXT:** P4 12-point integration, P5 Kaggle ASR round-trip (the only gate).
+
+---
+
 - **2026-07-13:** Phase 3 code-parity RESOLVED (tokenizer bug fixed; frame-0
   divergence proven = Q4_K near-tie argmax flip, not a bug — see the resolution
   section below). Merged to `main` @ `dd5a21a4`.
