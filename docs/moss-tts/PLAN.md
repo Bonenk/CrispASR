@@ -9,12 +9,18 @@ onto CrispASR's in-house Qwen3 runtime — no libllama).
 - **2026-07-13:** Phase 3 code-parity RESOLVED (tokenizer bug fixed; frame-0
   divergence proven = Q4_K near-tie argmax flip, not a bug — see the resolution
   section below). Merged to `main` @ `dd5a21a4`.
-- **In flight:** voice-cloning round-trip validation on Kaggle
-  (`tools/kaggle/moss-tts-voiceclone/`, kernel `chr1str/crispasr-moss-tts-voiceclone`)
-  — closed-loop R/B/C clips, gating on no-crash + ASR-intelligible + speaker
-  cosine(clone,ref) > cosine(baseline,ref). Awaiting terminal result.
-- **Next:** on PASS, mark voice cloning validated here + HISTORY/LEARNINGS; on
-  FAIL, diagnose the encoder/reference-splice path.
+- **2026-07-13:** Voice-cloning round-trip **VALIDATED** on Kaggle P100
+  (`tools/kaggle/moss-tts-voiceclone/`). Closed-loop R/B/C clips, Q4_K:
+  GATE1 no_crash PASS (rc=0, non-silent), GATE3 voice_moved PASS strongly
+  (speaker cosine clone↔ref **0.845** vs baseline↔ref **0.585**, Δ **+0.26**),
+  GATE2 intelligible = real transcript "Cloning should keep my voice while
+  changing the words entirely." (== clone text, 100% word overlap; the reported
+  FAIL was an ASR-stdout truncation artifact in the harness, now fixed). Net:
+  `--voice ref.wav` transfers the timbre AND preserves the words.
+- **In flight:** clean re-run of the voiceclone kernel with the fixed ASR parser
+  to record a green `all_pass=True` artifact.
+- **Next:** on clean green, mark voice cloning validated in HISTORY/LEARNINGS +
+  docs and close task #8.
 
 ## Done (compiles clean; NOT yet parity-validated)
 

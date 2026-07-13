@@ -95,6 +95,11 @@ def synth(cli, backbone, codec, text, out_wav, voice=None, timeout=2400) -> dict
 
 
 def asr(cli, wav, timeout=900) -> str:
+    """Return the whisper stdout, ANSI/progress-bar stripped. Do NOT truncate or
+    over-filter — word_overlap only needs the transcript words to be PRESENT, and
+    the crispasr whisper CLI interleaves device/model-load noise on the same lines
+    as the transcript (fireredpunc punctuation model). Keep it all."""
+    import re
     if not wav.exists():
         return ""
     cmd = [str(cli), "--backend", "whisper", "-m", "auto", "--auto-download",
@@ -102,10 +107,12 @@ def asr(cli, wav, timeout=900) -> str:
     try:
         r = subprocess.run(cmd, timeout=timeout, stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT, text=True)
-        (RESULTS / f"{wav.stem}.asr.log").write_text(r.stdout)
-        lines = [ln.strip() for ln in r.stdout.splitlines() if ln.strip()]
-        return " ".join(ln for ln in lines
-                        if not ln.startswith(("[", "whisper", "ggml", "load", "crispasr")))[-400:]
+        raw = r.stdout
+        (RESULTS / f"{wav.stem}.asr.log").write_text(raw)
+        raw = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", raw)          # strip ANSI
+        lines = [ln.strip() for ln in raw.splitlines() if ln.strip()
+                 and "━" not in ln and "eta " not in ln and "MB/s" not in ln]
+        return " ".join(lines)
     except Exception as ex:  # noqa: BLE001
         return f"<asr-error: {type(ex).__name__}>"
 
