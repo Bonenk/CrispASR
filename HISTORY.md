@@ -6,6 +6,34 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-13 — #253 follow-up: ARK-ASR loops/leaks on messy audio — root cause, not band-aid
+
+Reporter's second clip (`t501-3.75m.wav`, a soap-opera scene: dialogue + a
+background song) showed a repetition loop and `endoftext`/`Human` leaking with
+`--chunk-seconds 7`. Diagnosed head-to-head against the original Python model
+(`AutoArk-AI/ARK-ASR-3B`) on Kaggle:
+
+- **`endoftext` leak = real port bug.** The C++ `detokenize` rendered special
+  tokens as literal text; the reference decodes with `skip_special_tokens=True`.
+  Fixed by dropping tokens ≥151643 (Qwen2.5 added-token start) before detokenising.
+- **The loop = the cross-chunk seed echoing.** ARK is tuned for clean read speech
+  and **spuriously declines messy audio** — it emits `<|im_end|>` first → empty
+  (confirmed: BOTH the Python blueprint AND C++ F16 with `NO_EOS_SUPPRESS` are
+  empty on t501, which Parakeet-TDT transcribes cleanly end-to-end — so it's a
+  MODEL limitation, not the port and not bf16). The C++ EOS-suppression forces the
+  model past that stop and it transcribes REAL content (Parakeet-verified: the
+  song + "bath gel…Tess these are lovely" dialogue are genuinely in the audio —
+  NOT hallucination). The 32-token seed recovers content the blueprint drops; its
+  failure mode is a repeat loop on uninformative windows. Fixed with `ark_deloop`
+  (collapse a phrase repeated ≥3x, or a ≥4-word phrase ≥2x, consecutively; per
+  window + on the concatenated transcript, k≤40). "Faithful to Python" is worse
+  here — it returns empty and loses the real speech.
+
+Commits `7439f4d1` / `2d4922ab8` / `d76cce027`. Recommend Parakeet/FastConformer
+over ARK for music-mixed / multi-speaker audio. (Process note: two interim
+conclusions were wrong — a rationalized "model behavior", then a broken whisper
+oracle read as "ground truth". A local Parakeet run on the real clip settled it.)
+
 ## 2026-07-12 — follow-ups: GGUF bounds regression test + kyutai RVQ routing (gated)
 
 Closed the two scoped follow-ups:
