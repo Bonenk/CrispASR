@@ -1357,6 +1357,28 @@ if(GGML_CUDA)
 endif()
 
 # ---------------------------------------------------------------------------
+# moss_tts_local — OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5 (MossTTSLocal:
+#            Qwen3-4B backbone + 1-layer local/depth transformer that AR-generates
+#            12 RVQ codebooks per frame + 48 kHz codec-v2) — #249 second deliverable
+# ---------------------------------------------------------------------------
+add_library(moss_tts_local STATIC moss_tts_local.h moss_tts_local.cpp)
+set_target_properties(moss_tts_local PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(moss_tts_local PUBLIC .)
+target_compile_features   (moss_tts_local PUBLIC cxx_std_17)
+target_link_libraries     (moss_tts_local PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(moss_tts_local PRIVATE -O3)
+endif()
+if(GGML_METAL)
+    target_compile_definitions(moss_tts_local PRIVATE GGML_USE_METAL)
+    target_link_libraries(moss_tts_local PUBLIC ggml-metal)
+endif()
+if(GGML_CUDA)
+    target_compile_definitions(moss_tts_local PRIVATE GGML_USE_CUDA)
+    target_link_libraries(moss_tts_local PUBLIC ggml-cuda)
+endif()
+
+# ---------------------------------------------------------------------------
 # moss_transcribe — OpenMOSS-Team/MOSS-Transcribe-preview-2B (Qwen3-Omni audio encoder + Qwen3-1.7B LLM)
 # ---------------------------------------------------------------------------
 add_library(moss_transcribe STATIC moss_transcribe.h moss_transcribe.cpp)
