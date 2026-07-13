@@ -26,6 +26,7 @@ import traceback
 from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"  # Kaggle sets =1 but the pkg isn't installed
 try:
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)
