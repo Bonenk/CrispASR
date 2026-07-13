@@ -1361,7 +1361,8 @@ endif()
 #            Qwen3-4B backbone + 1-layer local/depth transformer that AR-generates
 #            12 RVQ codebooks per frame + 48 kHz codec-v2) — #249 second deliverable
 # ---------------------------------------------------------------------------
-add_library(moss_tts_local STATIC moss_tts_local.h moss_tts_local.cpp)
+add_library(moss_tts_local STATIC moss_tts_local.h moss_tts_local.cpp
+            moss_tts_local_codec.h moss_tts_local_codec.cpp)
 set_target_properties(moss_tts_local PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(moss_tts_local PUBLIC .)
 target_compile_features   (moss_tts_local PUBLIC cxx_std_17)

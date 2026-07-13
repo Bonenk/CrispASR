@@ -291,6 +291,139 @@ def write_backbone_gguf(model_dir: Path, config: dict, out_path: Path, out_dtype
     print(f"  -> {out_path} ({out_path.stat().st_size / 1e9:.2f} GB)")
 
 
+# ===========================================================================
+# Codec (MOSS-Audio-Tokenizer-v2) — DECODE-only companion GGUF
+# ===========================================================================
+#
+# We emit ONLY the tensors the decode path needs (see docs/moss-tts/STUDY-4B.md
+# "P3 codec" + PLAN NOW):
+#   - quantizer: output_proj (512->768) + the FIRST 12 LFQ quantizers
+#     (codebook[1024,8] + out_proj 8->512). Encoder + quantizers 12..31 skipped.
+#   - decoder: the 6 ProjectedTransformer stages (gguf idx 0,2,4,6,8,10). The 6
+#     PatchedPretransform upsamplers (odd idx) are weightless pure reshapes.
+# WNConv1d weight-norm params are stored raw (wp0=original0, wp1=original1) and
+# reconstructed at load (w = wp0 * wp1 / ||wp1||) — mirrors the v1 codec runtime.
+#
+# ⚠ v2 has input_proj AND output_proj on EVERY stage (even when d_model==out_dim,
+# e.g. dec.0 output_proj is a real 1280->1280 matrix) — both are always emitted.
+
+CODEC_N_VQ_USED = 12          # the LM predicts the top 12 of 32 quantizers
+CODEC_DECODER_STAGES = [0, 2, 4, 6, 8, 10]  # ProjectedTransformer gguf indices
+
+
+def _codec_add(writer, name, tensor, force_f32):
+    """Add a codec tensor. 2D matmul weights -> F16 unless force_f32; 1D -> F32."""
+    if tensor.dtype == torch.bfloat16:
+        arr = tensor.to(torch.float32).numpy()
+    else:
+        arr = tensor.numpy()
+    arr = np.ascontiguousarray(arr)
+    if force_f32 or arr.ndim < 2:
+        writer.add_tensor(name, arr.astype(np.float32), raw_dtype=GGMLQuantizationType.F32)
+    else:
+        writer.add_tensor(name, arr.astype(np.float16), raw_dtype=GGMLQuantizationType.F16)
+
+
+def _wn_prefix(handles, name_to_handle, hf_prefix, gguf_prefix, writer):
+    """Emit a WNConv1d (k=1) as wp0/wp1/bias. hf_prefix e.g.
+    'quantizer.output_proj'; gguf_prefix e.g. 'codec.quant.oproj'."""
+    g0 = handles[name_to_handle[hf_prefix + ".parametrizations.weight.original0"]].get_tensor(
+        hf_prefix + ".parametrizations.weight.original0")
+    g1 = handles[name_to_handle[hf_prefix + ".parametrizations.weight.original1"]].get_tensor(
+        hf_prefix + ".parametrizations.weight.original1")
+    # original0: (out,1,1) -> (out,);  original1: (out,in,1) -> (out,in)
+    _codec_add(writer, gguf_prefix + ".wp0", g0.reshape(g0.shape[0]), force_f32=True)
+    _codec_add(writer, gguf_prefix + ".wp1", g1.reshape(g1.shape[0], g1.shape[1]), force_f32=True)
+    bkey = hf_prefix + ".bias"
+    if bkey in name_to_handle:
+        b = handles[name_to_handle[bkey]].get_tensor(bkey)
+        _codec_add(writer, gguf_prefix + ".bias", b, force_f32=True)
+
+
+def write_codec_gguf(codec_dir: Path, out_path: Path):
+    with open(codec_dir / "config.json", encoding="utf-8") as f:
+        ccfg = json.load(f)
+    qk = ccfg.get("quantizer_kwargs", {})
+
+    print("\nMOSS-Audio-Tokenizer-v2 codec (decode-only)")
+    print(f"  {ccfg.get('sample_rate', 48000)} Hz, {ccfg.get('number_channels', 2)}ch, "
+          f"hop {ccfg.get('downsample_rate', 3840)}, n_vq_used {CODEC_N_VQ_USED}")
+
+    writer = GGUFWriter(str(out_path), "moss-tts-local-codec", use_temp_file=True)
+    writer.add_name("MOSS-Audio-Tokenizer-v2")
+    writer.add_uint32("moss-tts-local-codec.num_quantizers", CODEC_N_VQ_USED)
+    writer.add_uint32("moss-tts-local-codec.codebook_size", int(qk.get("codebook_size", 1024)))
+    writer.add_uint32("moss-tts-local-codec.codebook_dim", int(qk.get("codebook_dim", 8)))
+    writer.add_uint32("moss-tts-local-codec.rvq_dim", int(qk.get("rvq_dim", 512)))
+    writer.add_uint32("moss-tts-local-codec.output_dim", int(qk.get("output_dim", 768)))
+    writer.add_uint32("moss-tts-local-codec.sampling_rate", int(ccfg.get("sample_rate", 48000)))
+    writer.add_uint32("moss-tts-local-codec.downsample_rate", int(ccfg.get("downsample_rate", 3840)))
+    writer.add_uint32("moss-tts-local-codec.num_channels", int(ccfg.get("number_channels", 2)))
+    writer.add_bool("moss-tts-local-codec.enable_channel_interleave",
+                    bool(ccfg.get("enable_channel_interleave", True)))
+    writer.add_float32("moss-tts-local-codec.rope_max_period", 10000.0)
+    writer.add_bool("moss-tts-local-codec.present", True)
+
+    st_files = sorted(codec_dir.glob("*.safetensors"))
+    handles = [safe_open(str(f), framework="pt") for f in st_files]
+    name_to_handle = {}
+    for idx, h in enumerate(handles):
+        for name in h.keys():
+            name_to_handle[name] = idx
+    print(f"  Safetensors: {len(name_to_handle)} tensors in {len(st_files)} file(s)")
+
+    n_emit = 0
+
+    # --- Quantizer: global output_proj (512->768) + 12 LFQ quantizers ---
+    _wn_prefix(handles, name_to_handle, "quantizer.output_proj", "codec.quant.oproj", writer)
+    n_emit += 1
+    for i in range(CODEC_N_VQ_USED):
+        cb = handles[name_to_handle[f"quantizer.quantizers.{i}.codebook.weight"]].get_tensor(
+            f"quantizer.quantizers.{i}.codebook.weight")  # (1024, 8)
+        _codec_add(writer, f"codec.quant.q.{i}.codebook", cb, force_f32=False)
+        _wn_prefix(handles, name_to_handle, f"quantizer.quantizers.{i}.out_proj",
+                   f"codec.quant.q.{i}.oproj", writer)
+        n_emit += 1
+
+    # --- Decoder: 6 ProjectedTransformer stages ---
+    for S in CODEC_DECODER_STAGES:
+        base = f"decoder.{S}."
+        gb = f"codec.dec.{S}."
+        # input_proj / output_proj ALWAYS present (bias=False linears).
+        _codec_add(writer, gb + "iproj.weight",
+                   handles[name_to_handle[base + "input_proj.weight"]].get_tensor(base + "input_proj.weight"),
+                   force_f32=False)
+        _codec_add(writer, gb + "oproj.weight",
+                   handles[name_to_handle[base + "output_proj.weight"]].get_tensor(base + "output_proj.weight"),
+                   force_f32=False)
+        # count layers present for this stage
+        li = 0
+        while (base + f"transformer.layers.{li}.norm1.weight") in name_to_handle:
+            lb = base + f"transformer.layers.{li}."
+            glb = gb + f"l.{li}."
+            for src, dst, f32 in [
+                ("norm1.weight", "norm1.weight", True), ("norm1.bias", "norm1.bias", True),
+                ("norm2.weight", "norm2.weight", True), ("norm2.bias", "norm2.bias", True),
+                ("self_attn.in_proj.weight", "attn_in.weight", False),
+                ("self_attn.out_proj.weight", "attn_out.weight", False),
+                ("ffn.0.weight", "ffn1.weight", False), ("ffn.2.weight", "ffn2.weight", False),
+                ("layer_scale_1.scale", "ls1.scale", True), ("layer_scale_2.scale", "ls2.scale", True),
+            ]:
+                key = lb + src
+                if key not in name_to_handle:
+                    raise RuntimeError(f"codec: missing {key}")
+                _codec_add(writer, glb + dst, handles[name_to_handle[key]].get_tensor(key), force_f32=f32)
+            li += 1
+        print(f"  dec.{S}: {li} layers")
+        n_emit += 1
+
+    writer.write_header_to_file()
+    writer.write_kv_data_to_file()
+    writer.write_tensors_to_file()
+    writer.close()
+    print(f"  -> {out_path} ({out_path.stat().st_size / 1e9:.2f} GB), {n_emit} modules")
+
+
 def main():
     ap = argparse.ArgumentParser(description="Convert MOSS-TTS-Local-Transformer-v1.5 (4B) to GGUF")
     ap.add_argument("--input", required=True, help="HF id or local dir of MOSS-TTS-Local-Transformer-v1.5")
@@ -312,8 +445,10 @@ def main():
     write_backbone_gguf(model_dir, config, Path(args.output), out_dtype, ggml_type)
 
     if args.codec:
-        print("\nNOTE: MOSS-Audio-Tokenizer-v2 codec conversion is Phase 3 (48 kHz, 12 cb) — "
-              "the v2 tensor map still needs confirmation vs the v1 codec. Skipping for now.")
+        codec_dir = load_model_dir(args.codec)
+        codec_out = (Path(args.codec_output) if args.codec_output
+                     else Path(args.output).with_name(Path(args.output).stem + "-codec.gguf"))
+        write_codec_gguf(codec_dir, codec_out)
 
 
 if __name__ == "__main__":
