@@ -973,7 +973,12 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
     const int stride = 1 + n_vq;
     Rng rng(sp.seed ? sp.seed : ctx->seed);
     const bool text_greedy = sp.text_temperature <= 0.f;
-    const bool audio_greedy = sp.audio_temperature <= 0.f;
+    // CRISPASR_MOSS_TTS_LOCAL_GREEDY_AUDIO=1 forces greedy audio codebooks (A/B the
+    // stop-runaway hypothesis: sampled audio feeds back and may prevent the binary
+    // stop head from firing). CRISPASR_MOSS_TTS_LOCAL_DEBUG=1 traces stop logits.
+    const bool audio_greedy =
+        (sp.audio_temperature <= 0.f) || (getenv("CRISPASR_MOSS_TTS_LOCAL_GREEDY_AUDIO") != nullptr);
+    const bool dbg = getenv("CRISPASR_MOSS_TTS_LOCAL_DEBUG") != nullptr;
 
     std::string prompt = mtl_build_prompt(ctx, text, sp);
     int n_ids = 0;
@@ -1016,9 +1021,14 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
         float* tl = mtl_apply_head(ctx, ctx->model.local_text_head_w, lh, d, 2);
         const int stop_idx =
             tl ? sample_one(tl, 2, sp.text_temperature, sp.text_top_p, sp.text_top_k, !text_greedy, rng) : 1;
+        if (dbg && tl && (f < 8 || f % 64 == 0))
+            fprintf(stderr, "moss_tts_local[dbg] frame %d: stop_head continue=%.4f stop=%.4f -> %s\n", f, tl[0], tl[1],
+                    stop_idx == 1 ? "STOP" : "cont");
         free(tl);
         if (stop_idx == 1) { // audio_end -> stop
             free(lh);
+            if (dbg)
+                fprintf(stderr, "moss_tts_local[dbg] stop head fired at frame %d\n", f);
             break;
         }
 
@@ -1079,6 +1089,9 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
     free(global_hidden);
 
     out_t_audio = (int)frames.size();
+    if (dbg)
+        fprintf(stderr, "moss_tts_local[dbg] generated %d frames (max_frames=%d, %s)\n", out_t_audio, max_frames,
+                out_t_audio >= max_frames ? "HIT CAP — stop head never fired (runaway)" : "stopped naturally");
     if (out_t_audio <= 0)
         return false;
     out_codes.assign((size_t)n_vq * out_t_audio, 0);

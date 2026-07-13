@@ -54,6 +54,17 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
     out of memory` on a load-phase line only, or check the alloc size).
   - **NOT merged to `main`** — correct call; the codec can't yet decode arbitrary
     length. Merge after the chunked-decode fix re-validates.
+- **P5 run 2 — FIX IN, re-launched.** (a) **Codec: query-chunked attention**
+  (`QCHUNK=2048`) — each query block attends only its windowed keys, so peak
+  memory is O(QCHUNK·(QCHUNK+ctx)) not O(T²); byte-identical to the dense pass
+  (the reference's `query_chunk_size` approach). Block-0 + shared interior-band
+  masks; graph node cap 262144. The old 916 GB abort is gone; f16-long (T=7008 >
+  QCHUNK) is the built-in correctness oracle — overlap must stay ~1.0. (b) **Stop
+  diagnosis:** `CRISPASR_MOSS_TTS_LOCAL_DEBUG=1` traces per-frame stop logits +
+  final frame count; `CRISPASR_MOSS_TTS_LOCAL_GREEDY_AUDIO=1` forces greedy audio.
+  Kernel run 2 A/Bs q4_k sampled vs **q4_k greedy-audio (the gate candidate)** vs
+  f16 greedy (oracle) — testing whether sampled-audio feedback is what stops the
+  stop head from firing. If greedy-audio stops cleanly, that becomes the default.
 - **P5 plan (the ONLY acceptance gate, HARD RULE #3):**
   convert codec on Kaggle (`--codec OpenMOSS-Team/MOSS-Audio-Tokenizer-v2`),
   quantize backbone Q4_K, `crispasr --backend moss-tts-local -m <bb> --codec-model

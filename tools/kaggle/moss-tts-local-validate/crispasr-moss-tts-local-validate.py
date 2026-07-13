@@ -120,20 +120,29 @@ def asr_roundtrip(cli: Path, wav: Path, timeout=900) -> str:
         return f"<asr-error: {type(ex).__name__}>"
 
 
-def synth(cli: Path, backbone: str, codec: str, text: str, out_wav: Path, timeout=2400) -> dict:
+def synth(cli: Path, backbone: str, codec: str, text: str, out_wav: Path, extra_env=None, timeout=2400) -> dict:
     cmd = [str(cli), "--backend", "moss-tts-local", "-m", backbone, "--codec-model", codec,
            "--tts", text, "--tts-output", str(out_wav), "--no-prints"]
+    env = os.environ.copy()
+    env["CRISPASR_MOSS_TTS_LOCAL_DEBUG"] = "1"  # trace stop logits + frame count
+    if extra_env:
+        env.update(extra_env)
     t0 = time.time()
     try:
         r = subprocess.run(cmd, timeout=timeout, stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, text=True)
+                           stderr=subprocess.STDOUT, text=True, env=env)
         rc, out = r.returncode, r.stdout
     except subprocess.TimeoutExpired as ex:
         rc, out = -1, f"TIMEOUT {timeout}s\n{ex.stdout or ''}"
     (RESULTS / f"{out_wav.stem}.log").write_text(out)
+    frames, stopped = None, None
+    m = re.search(r"generated (\d+) frames .*?(runaway|stopped naturally)", out)
+    if m:
+        frames, stopped = int(m.group(1)), (m.group(2) == "stopped naturally")
     return {"rc": rc, "elapsed_s": round(time.time() - t0, 1),
             "wav": wav_summary(out_wav) if out_wav.exists() else {"error": "no-wav"},
-            "err_excerpt": out[-1500:]}
+            "frames": frames, "stopped": stopped,
+            "err_excerpt": out[-1800:]}
 
 
 def verdict(res: dict, min_dur: float) -> str:
@@ -191,8 +200,11 @@ def main():
     kh.install_build_toolchain()
     arch = kh.detect_cuda_arch()
     log(f"cuda_arch {arch}")
+    # Keep ccache OFF /kaggle/working (else it bloats the kernel output and the
+    # download page-caps past progress.txt/results — kaggle_usage #22). Export it
+    # globally so both cmake and the sh_with_progress build inherit it.
+    os.environ["CCACHE_DIR"] = "/kaggle/temp/.ccache"
     env = os.environ.copy()
-    env["CCACHE_DIR"] = "/kaggle/temp/.ccache"
     cmake_args = (["cmake", "-G", "Ninja", "-B", str(BUILD), "-S", str(REPO),
                    "-DCMAKE_BUILD_TYPE=Release"]
                   + list(kh.cache_and_link_flags()) + list(kh.cuda_build_flags(arch)))
@@ -273,53 +285,53 @@ def main():
     summary["phases"]["quantize"] = {"q4k_gb": round(q4k.stat().st_size / 1e9, 2)}
     log(f"quantized: {summary['phases']['quantize']}")
 
-    # ── 4. GATING round-trip: Q4_K (primary), F16 (best-effort) ────────────
-    arms = [("q4_k", str(q4k), True)]
-    # F16 backbone ~9 GB + codec ~4 GB may OOM a 16 GB GPU alongside whisper; try
-    # it best-effort and mark OOM as SKIP, gate only on Q4_K (matches the 8B P6).
-    arms.append(("f16", str(f16), False))
-    for tag, backbone, gating in arms:
-        rs = synth(cli, backbone, str(codec_gguf), SHORT_TEXT, RESULTS / f"{tag}_short.wav")
+    # ── 4. Round-trip arms (chunked codec + stop-runaway A/B) ──────────────
+    # run1 showed the codec decode is CORRECT (f16-long overlap 1.0) but short/
+    # quantized synths RAN AWAY (stop head never fired) -> 916GB codec OOM. This
+    # run: (a) the codec now query-chunks (bounded memory — f16-long is the
+    # correctness oracle: overlap must stay ~1.0); (b) A/B sampled vs greedy audio
+    # to test whether sampled-audio feedback is what prevents the stop head firing.
+    GREEDY = {"CRISPASR_MOSS_TTS_LOCAL_GREEDY_AUDIO": "1"}
+    arms = [
+        ("q4k_samp", str(q4k), None, False),    # q4_k, sampled audio (run1 default)
+        ("q4k_greedy", str(q4k), GREEDY, True), # q4_k, greedy audio — the GATE candidate
+        ("f16_greedy", str(f16), GREEDY, False),# f16, greedy — codec correctness oracle
+    ]
+    for tag, backbone, extra_env, gating in arms:
+        rs = synth(cli, backbone, str(codec_gguf), SHORT_TEXT, RESULTS / f"{tag}_short.wav", extra_env=extra_env)
         rs["verdict"] = verdict(rs, min_dur=0.2)
         rs["asr"] = asr_roundtrip(cli, RESULTS / f"{tag}_short.wav")
         rs["overlap"] = word_overlap(rs["asr"], SHORT_TEXT)
-        log(f"{tag} short: {rs['verdict']} rc={rs['rc']} wav={rs['wav']} "
+        log(f"{tag} short: {rs['verdict']} rc={rs['rc']} frames={rs['frames']} stopped={rs['stopped']} "
             f"overlap={rs['overlap']} asr={rs['asr'][:120]!r}")
 
-        rl = synth(cli, backbone, str(codec_gguf), LONG_TEXT, RESULTS / f"{tag}_long.wav")
+        rl = synth(cli, backbone, str(codec_gguf), LONG_TEXT, RESULTS / f"{tag}_long.wav", extra_env=extra_env)
         rl["verdict"] = verdict(rl, min_dur=2.0)
         rl["asr"] = asr_roundtrip(cli, RESULTS / f"{tag}_long.wav")
         rl["overlap"] = word_overlap(rl["asr"], LONG_TEXT)
-        log(f"{tag} long: {rl['verdict']} rc={rl['rc']} wav={rl['wav']} "
+        log(f"{tag} long: {rl['verdict']} rc={rl['rc']} frames={rl['frames']} stopped={rl['stopped']} "
             f"overlap={rl['overlap']} asr={rl['asr'][:200]!r}")
 
         short_words = len((rs["asr"] or "").split())
         long_words = len((rl["asr"] or "").split())
-        # Acceptance: both non-silent, proof-of-work (long > short), and the ASR
-        # actually recognizes the words (overlap thresholds).
         pow_ok = (rl["verdict"] == "PASS" and rs["verdict"] == "PASS"
                   and long_words > short_words
                   and rl["wav"].get("duration_s", 0) > rs["wav"].get("duration_s", 0))
-        recognizable = (rs["overlap"] >= 0.5 and rl["overlap"] >= 0.4)
+        # Recognizable = the synth stopped at a sane length AND ASR matches the text.
+        recognizable = (rs["overlap"] >= 0.5 and rl["overlap"] >= 0.4
+                        and (rs["stopped"] is not False) and (rl["stopped"] is not False))
         rt = {"short": rs, "long": rl, "short_words": short_words,
-              "long_words": long_words, "proof_of_work": pow_ok,
-              "recognizable": recognizable}
+              "long_words": long_words, "proof_of_work": pow_ok, "recognizable": recognizable}
         summary["roundtrip"][tag] = rt
         arm_pass = pow_ok and recognizable
-        # F16 arm: a load OOM (rc!=0 + "out of memory") is a SKIP, not a fail.
         oom = (not gating) and (rs["rc"] != 0) and ("out of memory" in (rs["err_excerpt"] or "").lower())
-        if oom:
-            summary["gates"][f"roundtrip_{tag}"] = "SKIP(oom)"
-        elif gating:
-            summary["gates"][f"roundtrip_{tag}"] = "PASS" if arm_pass else "FAIL"
-        else:
-            summary["gates"][f"roundtrip_{tag}"] = "PASS" if arm_pass else "WARN"
+        summary["gates"][f"roundtrip_{tag}"] = ("SKIP(oom)" if oom else
+                                                ("PASS" if arm_pass else ("FAIL" if gating else "WARN")))
         log(f"{tag} gate: {summary['gates'][f'roundtrip_{tag}']} "
-            f"(pow={pow_ok} recognizable={recognizable} "
-            f"overlap short={rs['overlap']} long={rl['overlap']})")
+            f"(pow={pow_ok} recognizable={recognizable} overlap short={rs['overlap']} long={rl['overlap']})")
 
-    # Acceptance = the gating (Q4_K) arm passes.
-    summary["all_gates_pass"] = summary["gates"].get("roundtrip_q4_k") == "PASS"
+    # Acceptance = the q4_k greedy-audio arm passes (that becomes the default if so).
+    summary["all_gates_pass"] = summary["gates"].get("roundtrip_q4k_greedy") == "PASS"
 
     # ── 5. upload GGUFs on success ─────────────────────────────────────────
     if summary["all_gates_pass"] and DO_UPLOAD:
