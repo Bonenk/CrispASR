@@ -151,6 +151,36 @@ placeholder `downsample_rate=1920` — real v2 hop TBD in P3).
   re-run local. Append `[assistant_slot, code_0..11]` to the backbone; KV grows 1.
   Extraction: no un-delay — the stacked frames ARE the (n_vq, T) grid.
 
+## P3 codec — MOSS-Audio-Tokenizer-v2 STUDY (2026-07-13)
+
+`OpenMOSS-Team/MOSS-Audio-Tokenizer-v2` (`model_type: moss-audio-tokenizer`). A
+MATERIALLY bigger/different codec than the 8B's v1 — this is a substantial port on
+its own.
+
+- **48 kHz STEREO** — `number_channels: 2`, `enable_channel_interleave: true`.
+  `sample_rate 48000`, **`downsample_rate 3840`** → frame rate **12.5 Hz** (the
+  backbone converter's `downsample_rate=1920` placeholder was WRONG; fix to 3840).
+- **Quantizer = ResidualLFQ** (`quantizer_type: rlfq`): input 768 / rvq_dim 512 /
+  output 768, `num_quantizers: 32`, codebook_size 1024, codebook_dim 8. The LM
+  predicts only the **top 12** of the 32 quantizers (n_vq=12). **Decode is close to
+  v1's RVQ**: per quantizer `code → Embedding(1024,8) → out_proj (WNConv1d 8→512,
+  k=1)`, summed over the 12 used quantizers, then `output_proj (WNConv1d 512→768)`.
+  (LFQ only differs in code ASSIGNMENT — L2-normalize + argmin; decode is a plain
+  embedding lookup + weight-normed 1×1 proj, so the 8B `moss_tts_codec.cpp` RVQ
+  pattern + weight-norm reconstruction `w=wp0*wp1/‖wp1‖` transfers.)
+- **Decoder = 12 stages** (`decoder_kwargs`), the heavy part: stage 0 is a
+  ProjectedTransformer **768→1280, d_model 1280, 20 heads, 32 LAYERS, ffn 5120,
+  causal, LayerNorm, RoPE (base 1e4), LayerScale 0.01, 10 s context** — much bigger
+  than v1's decoder. Then `PatchedPretransform (patch_size 2)` upsamplers + more
+  stages to 48 kHz stereo. Classes in `modeling_moss_audio_tokenizer.py`:
+  `MossAudioTokenizerResidualLFQ`, `...ProjectedTransformer`, `...Transformer`
+  (RingKVCache sliding window), `...PatchedPretransform`, `...Model._decode_frame`.
+- **Scope:** the P3 codec is comparable to (or bigger than) the whole 8B codec port
+  — a 32-layer decoder transformer + patch upsamplers + stereo interleave + the
+  ResidualLFQ dequant. Reuse: v1's RVQ-decode + weight-norm-reconstruction + the
+  sliding-window causal transformer machinery from `moss_tts_codec.cpp`; NEW: the
+  bigger decoder config, patch-transform upsampling, and stereo output.
+
 ## Open questions to resolve during implementation
 - Codec-v2 exact architecture + whether output is **stereo** (config `sampling_rate`
   48000; `MOSS-Audio-Tokenizer-v2` internals not yet read).

@@ -67,7 +67,7 @@ struct mtl_hparams {
     uint32_t audio_vocab_size = 1024; // codes 0..1023; pad (1024) is masked, NOT a row
     uint32_t audio_pad_code = 1024;
     uint32_t sampling_rate = 48000;
-    uint32_t downsample_rate = 1920;
+    uint32_t downsample_rate = 3840; // MOSS-Audio-Tokenizer-v2 hop (48000/3840 = 12.5 Hz); stereo
 
     // Special token ids
     uint32_t tok_audio_start = 151669;
