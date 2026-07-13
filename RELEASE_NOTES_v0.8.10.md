@@ -31,6 +31,9 @@ speedup (qwen3-asr manual-attn default-on, 3.2×).
   flip cascading through the AR loop (the reference's greedy pick is the runtime's
   rank-1 runner-up at a 0.135-logit gap), so the ASR round-trip is the acceptance
   gate, not exact codes.
+- **moss-diarize** (#242) — `MOSS-Transcribe-Diarize-0.9B`: transcription with
+  speaker diarization (SRT with speaker labels). Registry auto-download,
+  diff-harness reference backend, quantization rules.
 - **bananamind-tts** — added to the model registry (EN + DE auto-download).
 - **canary-qwen** (#233) — `nvidia/canary-qwen-2.5b` SALM: FastConformer
   encoder → Qwen3-1.7B decoder with merged LoRA. English ASR. GGUFs at
@@ -179,6 +182,14 @@ speedup (qwen3-asr manual-attn default-on, 3.2×).
 - **cohere-transcribe-arabic reference**: patch the 10 zeroed encoder norms (a
   corrupt safetensors download artifact, not a port bug) + Arabic language
   override in the diff-harness reference backend.
+- **dots-tts (#200)**: RoPE + QK-norm added to the PatchEncoder attention (were
+  missing vs the blueprint), plus `--tts-steps` / `--tts-cfg-scale` wired through
+  to the backend.
+- **wav2vec2 (#246)**: corrected the group-norm CNN feature extractor + the
+  non-stable-layer-norm encoder forward path.
+- **Cached encoder-graph invalidation (#215e)**: extends the #235 fix — the stale
+  encoder-graph cache is now also invalidated in canary / canary-ctc and 5 more
+  backends, so a re-run with a different input length can't reuse a wrong graph.
 
 ## Performance
 
@@ -207,6 +218,12 @@ speedup (qwen3-asr manual-attn default-on, 3.2×).
   dispatch-bound, not attention-bound).
 - **irodori-tts** (#243) + **Dia** (#176c): persistent cached DiT graph (opt-in);
   Dia device-resident KV measured at ~1.2% and deferred (measure-first).
+- **dia TTS GPU path** (#5, §232): the DiT now runs on the selected backend
+  (default GPU, `DIA_TTS_GPU` A/B gate) instead of CPU-only.
+- **paraformer / m2m100 / t5-madlad GPU defaults** (§232): flipped to GPU on
+  CUDA/Vulkan after a P100 A/B (paraformer stays CPU-default with an opt-in
+  `CRISPASR_PARAFORMER_GPU`); CUDA A/B kernel added for the CPU-pinned backends.
+- **Irodori-TTS**: VoiceDesign caption conditioning (text prompt → voice style).
 
 ## Packaging / project
 
