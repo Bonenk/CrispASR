@@ -21,7 +21,12 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
   `--list-backends`; `check-backend-wiring.py` RESULT PASS (required tier). NOT yet
   merged to `main` — awaits P5 Kaggle round-trip (do not ship an unvalidated codec
   as done). Advisory gaps left: live test + reference dumper.
-- **NEXT — P5 Kaggle ASR round-trip (the ONLY acceptance gate, HARD RULE #3):**
+- **IN FLIGHT — P5 Kaggle ASR round-trip (the ONLY acceptance gate, HARD RULE #3):**
+  kernel `chr1str/crispasr-moss-tts-local-validate` LAUNCHED
+  (`tools/kaggle/moss-tts-local-validate/`, off `feat/moss-tts-local-4b`).
+  Converts the codec, quantizes Q4_K, synthesizes short+long → whisper ASR →
+  word-overlap + proof-of-work. Uploads GGUFs on pass. Monitoring.
+- **P5 plan (the ONLY acceptance gate, HARD RULE #3):**
   convert codec on Kaggle (`--codec OpenMOSS-Team/MOSS-Audio-Tokenizer-v2`),
   quantize backbone Q4_K, `crispasr --backend moss-tts-local -m <bb> --codec-model
   <codec> --tts "..." --tts-output out.wav` → whisper ASR → recognizable text.
