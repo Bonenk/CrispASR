@@ -119,11 +119,19 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
     (real range-resume, ratchets through). Progress MUST use `kh.step()` +
     `os.environ['HF_TOKEN']` (mirrors to `cstr/crispasr-kaggle-progress`) — else
     zero live visibility. ccache seed stale → cold ~23min builds (stash+refresh).
-- **NEXT:** flip the validate gate to F16 (q4k best-effort); trigger the GGUF
-  upload (F16 + codec + q4k) to `cstr/moss-tts-local-v1.5-GGUF`; refresh the ccache
-  seed; then ff `main`, docs/HISTORY/LEARNINGS, release, close #249. (Optional:
-  probe whether a higher-precision quant Q5_K/Q6_K keeps the long trajectory stable
-  for a smaller-than-F16 shippable target.)
+- **✅ SHIPPED artifacts (2026-07-14): both hosted + verified on
+  `cstr/moss-tts-local-v1.5-GGUF`** — `moss-tts-local-v1.5-f16.gguf` (9.107 GB, the
+  validated backbone) + `moss-tts-local-v1.5-codec.gguf` (2.125 GB, decode-only).
+  Codec uploaded via the CPU `moss-tts-local-codec-upload` kernel (curl-download +
+  write_codec_gguf + server-verified upload). Registry defaults `-m auto` to F16 +
+  codec. Gate flipped to F16 in the validate kernel.
+- **NEXT (finish #249):** ff `feat/moss-tts-local-4b` → `main`; **regen Go cgo
+  LDFLAGS on Linux** (`tools/sync_go_cgo_ldflags.py` — the one CI-red item, can't
+  run on macOS); HISTORY/LEARNINGS; release via `scripts/bump-version.sh`; close
+  #249. Follow-ups: short-clip ASR 0.0 (likely whisper-on-~1s artifact — long clip
+  proved audio correct); refresh chr1s4/crispasr-ccache seed (warm builds); optional
+  Q5_K/Q6_K probe for a smaller-than-F16 stable target; v2 codec ENCODER for voice
+  cloning.
 - **P5 GPU validate LAUNCHED on chr1s4** (2026-07-14). `chr1str` GPU quota was
   exhausted → the CPU fallback runs were ~3 h each (a 4B fwd/frame). `kaggle_usage.md`
   has the **secondary account `chr1s4`** (token `KGAT_95d684…`, separate 30 h GPU
