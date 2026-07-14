@@ -93,8 +93,27 @@ Per-phase `gen_step` (M1 Metal, `OMNIVOICE_BENCH`, steady state): embeds ~2 ms e
   overhead (~12.5k dispatches/synth) — investigate CP_DIRECT / fewer ops per layer.
   **Deferred as a focused follow-on** — not landed unverified.
 
+### RTF benchmark vs ServeurpersoCom/omnivoice.cpp (M1 Metal, per-step, instrumented)
+Built their repo + timed their batched forward directly (`OVCPP_BENCH`, added to
+`pipeline-tts.cpp:638`). Clean per-step forward (S≈128):
+| impl | per-step fwd | how |
+|------|------|-----|
+| omnivoice.cpp | **~165 ms** | **B'=2 4D-batch** cond+uncond, persistent graph |
+| ours 2-forward | ~198 ms (99+99) | two separate forwards |
+| ours unified seq-concat | ~212 ms | one seq (T_tot+T_tgt) + block-diag mask |
+
+**Findings:**
+1. **The reporter's "3–4× RTF" was mostly the over-length bug** (3× frames at wrong
+   75 Hz) — now fixed. Per-step we're within **~1.2×** of omnivoice.cpp, not 3–4×.
+2. **Seq-concat is the WRONG fusion** — block-diag mask still makes flash-attn compute
+   the full (T_tot+T_tgt)² then masks half away (that's why ours is 212 > 198). Their
+   **4D batch dim (B'=2)** computes only within-batch attention (2×128²) → the win.
+   So the real RTF fix is a **B'=2 4D-batched forward**, NOT seq-concat. (Dev-guide's
+   "seq-concat beats 4D batch" was a different model's alloc-bug case; here 4D wins.)
+
 ### Remaining
-1. Unified CFG graph (above) — the RTF fix.
+1. **RTF: implement B'=2 4D-batched cond+uncond forward** (~1.2× on the forward) —
+   watch the batched-fused-graph batch-1 alloc gotcha; gate + A/B + Kaggle CUDA.
 2. Optional: match torchaudio resample (Hann sinc) to push encode codes >99%.
 3. **Ship the GGUF fix**: `omnivoice-tokenizer-f16-fixed.gguf` (0 zeroed channels)
    → replace corrupt HF `cstr/omnivoice-GGUF` + registry SHA bump.
