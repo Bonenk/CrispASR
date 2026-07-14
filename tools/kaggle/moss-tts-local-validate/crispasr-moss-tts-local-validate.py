@@ -129,6 +129,10 @@ def main():
         sys.path.insert(0, str(Path(__file__).resolve().parent))  # bundled fallback
     import kaggle_harness as kh
     kh.init_progress()  # mirrors to HF cstr/crispasr-kaggle-progress once HF_TOKEN is set
+    # Fixed, identifiable HF progress path (the default is <ts>-batch-unknown.jsonl,
+    # indistinguishable from every other CrispASR kernel on the shared mirror).
+    kh._HF_PROGRESS_PATH = "runs/moss-tts-local-validate-live.jsonl"
+    kh._HF_PUSH_INTERVAL_S = 15.0
     summary = {"ref": CRISPASR_REF, "gates": {}, "roundtrip": {}, "phases": {}}
     summary["sha"] = subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True).strip()
     kh.step("cloned", sha=summary["sha"][:10])
@@ -173,21 +177,65 @@ def main():
     kh.step("build ok")
 
     # ── backbone F16 (download) + codec (download safetensors + convert) ───
+    import threading
     from huggingface_hub import snapshot_download, hf_hub_download, HfApi  # noqa: E402
     conv = REPO / "models" / "convert-moss-tts-local-to-gguf.py"
-    kh.step("download backbone F16")
+
+    def dir_bytes(d):
+        try:
+            return sum(f.stat().st_size for f in Path(d).rglob("*") if f.is_file())
+        except Exception:  # noqa: BLE001
+            return 0
+
+    def watched_dl(what, fn, watch_dir, total_timeout=1800, attempts=4, **kw):
+        """Run an HF download in a daemon thread; every 15s emit a step with the
+        MB-on-disk so a HANG (bytes frozen) is visible + a timeout bounds it.
+        hf_transfer + local cache mean a retry resumes from partial bytes."""
+        for i in range(attempts):
+            box = {}
+
+            def _w():
+                try:
+                    box["v"] = fn(token=hf_token, **kw)
+                except Exception as e:  # noqa: BLE001
+                    box["e"] = e
+
+            t = threading.Thread(target=_w, daemon=True)
+            t.start()
+            t0 = time.time()
+            last_mb, stall = -1, 0
+            while t.is_alive():
+                t.join(15)
+                mb = round(dir_bytes(watch_dir) / 1e6, 1)
+                el = round(time.time() - t0, 0)
+                kh.step(f"{what} (dl)", mb=mb, s=el, attempt=i + 1)
+                kh._push_progress_to_hf(force=True)
+                stall = stall + 1 if mb == last_mb else 0
+                last_mb = mb
+                if el > total_timeout or stall >= 8:  # 8*15s = 2min no bytes = hung
+                    kh.step(f"{what}: {'timeout' if el > total_timeout else 'STALLED'} — retry", mb=mb)
+                    break
+            if "v" in box:
+                kh.step(f"{what}: ok", mb=round(dir_bytes(watch_dir) / 1e6, 1))
+                return box["v"]
+            if "e" in box:
+                kh.step(f"{what}: error {type(box['e']).__name__} — retry", err=str(box["e"])[:120])
+            time.sleep(5)
+        raise SystemExit(f"{what}: failed/hung after {attempts} attempts")
+
     f16 = MODELS / "moss-tts-local-v1.5-f16.gguf"
     need_src = False
     try:
-        f16 = Path(hf_hub_download(GGUF_REPO, f16.name, local_dir=str(MODELS), token=hf_token))
-        kh.step("backbone F16 ready", gb=round(f16.stat().st_size / 1e9, 2))
-    except Exception as e:  # noqa: BLE001
+        got = watched_dl("backbone F16", hf_hub_download, MODELS,
+                         repo_id=GGUF_REPO, filename=f16.name, local_dir=str(MODELS))
+        f16 = Path(got)
+    except SystemExit as e:
         need_src = True
         kh.step("backbone F16 not hosted — converting", err=str(e)[:120])
 
-    kh.step("download codec safetensors")
-    codec_src = snapshot_download(HF_CODEC, cache_dir=str(MODELS / "hf"), token=hf_token,
-                                  allow_patterns=["*.safetensors", "*.json"])
+    codec_src = watched_dl("codec safetensors", snapshot_download, MODELS / "hf", total_timeout=2400,
+                           repo_id=HF_CODEC, cache_dir=str(MODELS / "hf"),
+                           allow_patterns=["*.safetensors", "*.json"])
     codec_gguf = MODELS / "moss-tts-local-v1.5-codec.gguf"
     kh.step("convert codec")
     if need_src:
