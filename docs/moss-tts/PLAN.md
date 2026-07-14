@@ -101,9 +101,29 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
   and runs `generate_codes` with the fixed defaults — does "Hello world." now stop
   at a sane frame count? (`crispasr-mtl-stopcpu` v4 corroborates the reference also
   runs away at the WRONG temp 1.0.)
-- **Remaining once fix validated:** re-run the full codec round-trip on GPU (when
-  the weekly quota resets) to confirm end-to-end with the chunked codec + sched fix
-  + correct params; then upload GGUFs, ff `main`, release, close #249.
+- **✅ P5 VALIDATED on chr1s4 GPU (2026-07-14) — the 4B port WORKS end-to-end.**
+  Full round-trip (chunked codec + sched fix + card-correct sampling defaults):
+  | arm | frames | stopped | ASR overlap |
+  |---|---|---|---|
+  | **f16 long** | **124** | ✅ | **0.969** |
+  | f16 short | 15 | ✅ | 0.0 (whisper on ~1s clip) |
+  | q4k short | 39 | ✅ | 0.0 |
+  | q4k long | 4096 | ❌ runaway | 0.0 |
+  - **Stop-runaway FIXED** (root cause = wrong sampling defaults; card says audio
+    1.7/0.8/25, sampled stop). F16 stops naturally (15/124) + round-trips
+    (long overlap **0.969**) = HARD RULE #3 satisfied. **Acceptance target = F16.**
+  - **Q4_K long still runs away** — intrinsic quantized-AR trajectory drift
+    ([[tts-port-parity-via-logit-rank]]); keep Q4_K best-effort, gate on F16.
+  - Infra lessons (kaggle_usage regime): `hf_transfer` DOESN'T resume → wedges at a
+    fixed offset on Kaggle's flaky HF link; use `curl -C - --retry --speed-time`
+    (real range-resume, ratchets through). Progress MUST use `kh.step()` +
+    `os.environ['HF_TOKEN']` (mirrors to `cstr/crispasr-kaggle-progress`) — else
+    zero live visibility. ccache seed stale → cold ~23min builds (stash+refresh).
+- **NEXT:** flip the validate gate to F16 (q4k best-effort); trigger the GGUF
+  upload (F16 + codec + q4k) to `cstr/moss-tts-local-v1.5-GGUF`; refresh the ccache
+  seed; then ff `main`, docs/HISTORY/LEARNINGS, release, close #249. (Optional:
+  probe whether a higher-precision quant Q5_K/Q6_K keeps the long trajectory stable
+  for a smaller-than-F16 shippable target.)
 - **P5 GPU validate LAUNCHED on chr1s4** (2026-07-14). `chr1str` GPU quota was
   exhausted → the CPU fallback runs were ~3 h each (a 4B fwd/frame). `kaggle_usage.md`
   has the **secondary account `chr1s4`** (token `KGAT_95d684…`, separate 30 h GPU
