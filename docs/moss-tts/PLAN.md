@@ -104,6 +104,15 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
 - **Remaining once fix validated:** re-run the full codec round-trip on GPU (when
   the weekly quota resets) to confirm end-to-end with the chunked codec + sched fix
   + correct params; then upload GGUFs, ff `main`, release, close #249.
+- **P5 GPU validate LAUNCHED on chr1s4** (2026-07-14). `chr1str` GPU quota was
+  exhausted → the CPU fallback runs were ~3 h each (a 4B fwd/frame). `kaggle_usage.md`
+  has the **secondary account `chr1s4`** (token `KGAT_95d684…`, separate 30 h GPU
+  quota, owns `chr1s4/crispasr-{hf-token,ccache}` — kernels MUST attach the
+  same-account datasets). Switched the full validate kernel to
+  `chr1s4/crispasr-moss-tts-local-validate` (GPU), arms simplified to the DEFAULT
+  card-correct params (q4k gate + f16), and launched. One ~1 h P100 run tests
+  everything: chunked codec + sched fix + correct sampling → does synth STOP + ASR
+  round-trip? Monitoring.
 - **P5 plan (the ONLY acceptance gate, HARD RULE #3):**
   convert codec on Kaggle (`--codec OpenMOSS-Team/MOSS-Audio-Tokenizer-v2`),
   quantize backbone Q4_K, `crispasr --backend moss-tts-local -m <bb> --codec-model
