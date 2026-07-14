@@ -5,7 +5,34 @@ stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
 ## NOW — active work
 
-**Status: investigation + blueprint complete; building isolated reference-dump env.**
+**Status (2026-07-14): duration estimator adopted from OmniVoice reference —
+DONE, committed `f17f47c49`, merging to main.**
+
+- ✅ **Reference-relative duration estimator** (`estimate_target_tokens`,
+  `src/omnivoice.cpp`). Faithful port of OmniVoice's `RuleDurationEstimator`
+  (`omnivoice/utils/duration.py`, Apache-2.0 © Xiaomi/k2-fsa; MIT C++ mirror
+  in ServeurpersoCom/omnivoice.cpp). Both licenses MIT-compatible ⇒ direct
+  adoption + attribution, no clean-room. Three pieces, all byte-matching the
+  reference: (1) per-Unicode-script phonetic weights; (2) reference-RELATIVE
+  formula `target = ref_T·w(target)/w(ref_text)` — with a voice prompt the
+  anchor IS the reference, so **length now tracks the reference speaker's rate**
+  (fixes reporter's "duration doesn't change with ref voice"); no-ref falls back
+  to "Nice to meet you." ≈ 25 frames; (3) low-length **power-curve boost**
+  (`<50 → 50·(est/50)^(1/3)`) so short clips don't render too fast / skip
+  characters (reporter's Japanese complaint); digit weight 3.5 lengthens
+  number-heavy text. Validated end-to-end: fox → 65 frames / 2.60 s (exact
+  prediction), short clips boosted, JP/numbers longer, duration scales with ref_T.
+- 🔎 **Orthogonal follow-up (NOT this change):** whisper-base ASR-roundtrip of
+  the fox drops "quick" — reproduces at **f16@65 AND q4_k@92 frames**, so it's
+  neither length nor quant, and not a regression (prior estimator gave ~67
+  frames too). Likely model under-articulation of a short word, or base-ASR
+  mishearing. Track separately if it recurs on cleaner ASR.
+- ⏭ **Next:** post #254 update asking reporter to re-verify JP length + ref-voice
+  scaling on current main; optional `--verbose` per-stage timings + RTF flag.
+
+---
+
+**Prior status: investigation + blueprint complete; building isolated reference-dump env.**
 
 - ✅ **Encode blueprint pinned** (cross-validated: HF transformers source +
   OmniVoice inference + omnivoice.cpp as spec-oracle). See "Encode blueprint" below.
