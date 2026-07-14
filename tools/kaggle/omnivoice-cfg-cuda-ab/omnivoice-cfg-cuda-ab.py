@@ -76,34 +76,44 @@ step("script.start", branch=BRANCH)
 TOKEN = kh.resolve_hf_token("HF_TOKEN")
 prog(f"token resolved: {bool(TOKEN)}")
 
-subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "huggingface_hub", "soundfile"])
-from huggingface_hub import hf_hub_download  # noqa: E402
+# Disable HF's Xet client for good measure; we don't use hf_hub_download.
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+os.environ["HF_HUB_DISABLE_XET"] = "1"
+subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "soundfile"])
 prog("pip deps installed")
 
 
-def hf_get(repo, fname, dest, timeout=300):
-    """Download in a daemon thread with a join timeout (Kaggle HF ops strand)."""
+def hf_get(repo, fname, dest, timeout=900, tries=6):
+    """Download a HF LFS/Xet file via curl -L (follows the 302 to the Xet CAS
+    bridge and streams plain HTTP) — the HF client's hf_xet path STRANDS on Kaggle
+    (CLAUDE.md CLOSE_WAIT). Resume (-C -) + retry loop + expected-size verify."""
     prog(f"dl.begin {fname}")
     step("dl.begin", file=fname)
-    holder = {}
-
-    def _work():
-        try:
-            holder["path"] = hf_hub_download(repo, fname, local_dir=str(dest), token=TOKEN)
-        except Exception as e:  # noqa: BLE001
-            holder["err"] = str(e)[:300]
-
-    th = threading.Thread(target=_work, daemon=True)
-    th.start()
-    th.join(timeout)
-    if th.is_alive():
-        raise TimeoutError(f"hf_hub_download({fname}) hung > {timeout}s")
-    if "err" in holder:
-        raise RuntimeError(f"hf_hub_download({fname}) failed: {holder['err']}")
-    p = holder["path"]
-    sz = os.path.getsize(p)
-    prog(f"dl.done {fname} {round(sz / 1e6, 1)}MB")
-    step("dl.done", file=fname, mb=round(sz / 1e6, 1))
+    dest = Path(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+    out = dest / fname
+    url = f"https://huggingface.co/{repo}/resolve/main/{fname}"
+    hdr = ["-H", f"Authorization: Bearer {TOKEN}"] if TOKEN else []
+    # Expected size from the redirect target (HEAD), for a completeness check.
+    exp = None
+    try:
+        h = subprocess.run(["curl", "-sIL", *hdr, url], capture_output=True, text=True, timeout=60).stdout
+        for ln in h.splitlines():
+            if ln.lower().startswith("content-length:"):
+                exp = int(ln.split(":", 1)[1].strip())  # last one = redirect target
+    except Exception:
+        pass
+    for attempt in range(1, tries + 1):
+        rc = subprocess.call(["curl", "-L", "--fail", "-C", "-", "--connect-timeout", "30",
+                              "--max-time", str(timeout), *hdr, "-o", str(out), url])
+        sz = out.stat().st_size if out.is_file() else 0
+        if rc == 0 and (exp is None or sz >= exp):
+            prog(f"dl.done {fname} {round(sz / 1e6, 1)}MB (exp={exp})")
+            step("dl.done", file=fname, mb=round(sz / 1e6, 1))
+            return str(out)
+        prog(f"dl.retry {fname} attempt={attempt} rc={rc} sz={sz} exp={exp}")
+        time.sleep(5)
+    raise RuntimeError(f"curl download failed for {fname} after {tries} tries (sz={sz} exp={exp})")
     return p
 
 
