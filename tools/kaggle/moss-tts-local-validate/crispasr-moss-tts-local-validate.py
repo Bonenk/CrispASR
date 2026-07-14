@@ -197,13 +197,17 @@ def main():
     summary["gpu"] = gpu
     log(f"gpu {gpu}")
 
-    kh.install_build_toolchain()
+    kh.install_build_toolchain()  # warms /kaggle/working/.ccache from chr1s4/crispasr-ccache
     arch = kh.detect_cuda_arch()
     log(f"cuda_arch {arch}")
-    # Keep ccache OFF /kaggle/working (else it bloats the kernel output and the
-    # download page-caps past progress.txt/results — kaggle_usage #22). Export it
-    # globally so both cmake and the sh_with_progress build inherit it.
+    # kaggle_usage #22: MOVE the harness-warmed cache OFF /kaggle/working (else the
+    # loose .ccache tree page-caps `kaggle kernels output` at 500 files AND the
+    # build runs cold if CCACHE_DIR points elsewhere). Move it, then point there.
+    subprocess.run("rm -rf /kaggle/temp/.ccache && "
+                   "if [ -d /kaggle/working/.ccache ]; then mv /kaggle/working/.ccache /kaggle/temp/.ccache; "
+                   "else mkdir -p /kaggle/temp/.ccache; fi", shell=True, check=False)
     os.environ["CCACHE_DIR"] = "/kaggle/temp/.ccache"
+    subprocess.run(["ccache", "-s"], check=False)  # confirm warm (cache hit stats)
     env = os.environ.copy()
     cmake_args = (["cmake", "-G", "Ninja", "-B", str(BUILD), "-S", str(REPO),
                    "-DCMAKE_BUILD_TYPE=Release"]
