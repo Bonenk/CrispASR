@@ -62,3 +62,22 @@ mid-sentence split segments. Not seen with cohere/granite.
 2. (B) find why the chunk-merge drops parakeet tails; fix; verify jfk chunked == baseline.
 3. Unit test(s) for the word-grouping helper + a chunk-merge regression.
 4. Build, run unit tests, merge to main, comment #257.
+
+## REOPENED (2026-07-14) — reporter feedback: partial fix
+
+Reporter (AppleSheeple) on parakeet-tdt-1.1b: (A) words now present ✓ but weird
+single-word split-outs appear; (B) chunked still cuts tails + splits. Key detail:
+tokens array is FULL, but the SEGMENT offsets.to is cut and text/words are filtered
+to end before it.
+
+ROOT CAUSE: `is_ja_model_ = (parakeet_n_vocab <= 4096)` (adapter:75) MISDETECTS
+parakeet-tdt-1.1b (English, vocab ~1024) as Japanese. JA-ness is vocab CONTENT not
+size: 0.6b-ja vocab_size=3073 is ~97% CJK/kana; v3 vocab_size=8192 is 0% CJK; 1.1b
+English small vocab is ~0% CJK. Misdetected-JA → CAP_INTERNAL_CHUNKING off, (B) fix
+gated off (!is_ja), JA 8-12s small-chunk path used on an English full-attention
+model → split-outs (default) + dispatcher-slice corruption (chunked). Same bug in
+the lib's `vocab_size < 4000` heuristics (parakeet.cpp:3654,3774).
+
+FIX: detect JA by scanning the vocab for Japanese script (kana/kanji fraction),
+not vocab size. Verify: 0.6b-ja stays JA, 0.6b-v3 non-JA, 1.1b-EN non-JA. Download
+cstr/parakeet-tdt-1.1b-GGUF to reproduce the reporter's exact case.
