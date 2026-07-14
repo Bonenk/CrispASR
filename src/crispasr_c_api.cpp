@@ -1306,8 +1306,7 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
     // Both the Omni ASR CTC and LLM converters write general.architecture="omniasr-ctc"
     // (see models/convert-omniasr-{ctc,llm}-to-gguf.py); the "omniasr" backend prefix-matches
     // every omniasr-* variant and reads model_type from the GGUF to route CTC vs LLM.
-    else if (strcmp(arch, "omniasr-ctc") == 0 || strcmp(arch, "omniasr-llm") == 0 ||
-             strcmp(arch, "omniasr") == 0)
+    else if (strcmp(arch, "omniasr-ctc") == 0 || strcmp(arch, "omniasr-llm") == 0 || strcmp(arch, "omniasr") == 0)
         backend = "omniasr";
     else if (strcmp(arch, "vibevoice-asr") == 0 || strcmp(arch, "vibevoice") == 0 || strcmp(arch, "vibevoice-tts") == 0)
         backend = "vibevoice";
@@ -3454,8 +3453,7 @@ CA_EXPORT int crispasr_session_n_vocab(crispasr_session* s) {
         return omniasr_n_vocab((omniasr_context*)s->omniasr_ctx);
 #endif
 #ifdef CA_HAVE_WAV2VEC2
-    if ((s->backend == "wav2vec2" || s->backend == "hubert" || s->backend == "data2vec") &&
-        s->wav2vec2_ctx)
+    if ((s->backend == "wav2vec2" || s->backend == "hubert" || s->backend == "data2vec") && s->wav2vec2_ctx)
         return (int)s->wav2vec2_ctx->vocab.size();
 #endif
 #ifdef CA_HAVE_CTC
@@ -3473,8 +3471,7 @@ CA_EXPORT const char* crispasr_session_token_text(crispasr_session* s, int id) {
         return omniasr_token_text((omniasr_context*)s->omniasr_ctx, id);
 #endif
 #ifdef CA_HAVE_WAV2VEC2
-    if ((s->backend == "wav2vec2" || s->backend == "hubert" || s->backend == "data2vec") &&
-        s->wav2vec2_ctx) {
+    if ((s->backend == "wav2vec2" || s->backend == "hubert" || s->backend == "data2vec") && s->wav2vec2_ctx) {
         const auto& v = s->wav2vec2_ctx->vocab;
         return (id < (int)v.size()) ? v[id].c_str() : "";
     }
