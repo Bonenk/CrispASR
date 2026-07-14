@@ -1,26 +1,15 @@
 # CrispASR — MOSS-TTS-Local-Transformer-v1.5 (4B) Kaggle validation (#249, P5)
 #
-# The ONLY acceptance gate for the 4B port (HARD RULE #3): the decoded ASR
-# round-trip. Runs on a CUDA box (P100/T4); the 4B F16 backbone (~9 GB) fits a
-# P100 16 GB GPU, Q4_K (~2.7 GB) is the practical target.
+# Rebuilt on the proven harness regime (kaggle_usage.md + gemma4-e4b-convert):
+#   - kh.init_progress() mirrors progress.jsonl to HF cstr/crispasr-kaggle-progress
+#     (requires os.environ["HF_TOKEN"] so the push fires) -> externally watchable.
+#   - kh.step() at EVERY phase; kh.build_heartbeat() around the build.
+#   - hf_transfer for downloads (no http_get CLOSE_WAIT hang).
+#   - ccache warmed from chr1s4/crispasr-ccache, MOVED off /kaggle/working (§22).
+#   - everything large under /kaggle/temp (or /tmp), /kaggle/working stays small.
 #
-# Flow:
-#   1. Clone CrispASR @ CRISPASR_REF (default feat/moss-tts-local-4b), build CUDA
-#      (crispasr-cli + crispasr-quantize).
-#   2. Backbone F16 GGUF: download from cstr/moss-tts-local-v1.5-GGUF if present,
-#      else convert from the HF weights. Codec: convert MOSS-Audio-Tokenizer-v2
-#      -> decode-only companion GGUF (arch moss-tts-local-codec).
-#   3. Quantize backbone -> Q4_K.
-#   4. GATING round-trip on Q4_K (and F16 best-effort; F16 OOM on <=16 GB = SKIP):
-#      synthesize a short + a long text, verify non-silent + plausible length,
-#      ASR each with whisper, proof-of-work that the long clip yields more words
-#      than the short (kaggle_usage #24: a round-trip is a lie until you prove
-#      the work). Acceptance = the ASR text is recognizable (word overlap with the
-#      input) — greedy code-parity is NOT the gate (quantized AR near-tie flips,
-#      see the tts-port-parity-via-logit-rank memory).
-#   5. On success, upload the codec GGUF + Q4_K backbone to the GGUF repo.
-#
-# Keep /kaggle/working minimal; stage everything large under /tmp.
+# Acceptance (HARD RULE #3): the decoded ASR round-trip. All fixes in place:
+# chunked codec + sched-size fix + card-correct sampling defaults. Gate = q4_k.
 
 import json
 import os
@@ -31,21 +20,16 @@ import sys
 import time
 import traceback
 import wave
-from datetime import datetime, timezone
 from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
-try:
-    sys.stdout.reconfigure(line_buffering=True)
-    sys.stderr.reconfigure(line_buffering=True)
-except (AttributeError, ValueError):
-    pass
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"  # rust downloader — avoids CLOSE_WAIT hangs
 
+TEMP = Path("/kaggle/temp") if Path("/kaggle/temp").is_dir() else Path("/tmp")
 WORK = Path("/kaggle/working")
-TMP = Path("/tmp")
-REPO = TMP / "CrispASR"
+REPO = TEMP / "CrispASR"
 BUILD = REPO / "build"
-MODELS = TMP / "moss-local-models"
+MODELS = TEMP / "moss-local-models"
 RESULTS = WORK / "results"
 RESULTS.mkdir(parents=True, exist_ok=True)
 MODELS.mkdir(parents=True, exist_ok=True)
@@ -57,35 +41,15 @@ HF_CODEC = os.environ.get("MOSS_CODEC", "OpenMOSS-Team/MOSS-Audio-Tokenizer-v2")
 GGUF_REPO = os.environ.get("MOSS_GGUF_REPO", "cstr/moss-tts-local-v1.5-GGUF")
 DO_UPLOAD = os.environ.get("MOSS_UPLOAD", "1") == "1"
 
-PROGRESS = WORK / "progress.txt"
-_T0 = time.time()
+SHORT_TEXT = "Hello world."
+LONG_TEXT = ("The quick brown fox jumps over the lazy dog. "
+             "Speech synthesis should stay intelligible over a longer passage, "
+             "so this sentence exercises many autoregressive steps and the codec "
+             "sliding window well past the first few frames.")
 
 
-def log(msg):
-    line = f"[{round(time.time() - _T0, 1)}s] {msg}"
-    print(line, flush=True)
-    with open(PROGRESS, "a") as f:
-        f.write(line + "\n")
-
-
-def run(cmd, check=True, timeout=None, env=None, cwd=None, capture=True):
-    print(f"\n$ {' '.join(str(c) for c in cmd)}", flush=True)
-    e = os.environ.copy()
-    if env:
-        e.update(env)
-    kw = dict(env=e, cwd=cwd, timeout=timeout, text=True)
-    if capture:
-        kw.update(stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    r = subprocess.run(cmd, **kw)
-    if capture and r.stdout:
-        print(r.stdout[-4000:], flush=True)
-    if check and r.returncode != 0:
-        raise SystemExit(f"command failed (rc={r.returncode}): {cmd}")
-    return r
-
-
-# ── WAV / ASR helpers ──────────────────────────────────────────────────────
-def wav_summary(path: Path) -> dict:
+# ── WAV / ASR / synth helpers ───────────────────────────────────────────────
+def wav_summary(path):
     if not path.exists():
         return {"error": "missing"}
     with wave.open(str(path), "rb") as w:
@@ -99,53 +63,44 @@ def wav_summary(path: Path) -> dict:
     if not pcm:
         return {"duration_s": 0.0, "rms": 0.0, "n_samples": 0, "sr": sr}
     rms = ((sum(int(x) * int(x) for x in pcm) / max(1, len(pcm))) ** 0.5) / 32768.0
-    return {"duration_s": round(len(pcm) / sr, 3), "rms": round(rms, 6),
-            "n_samples": len(pcm), "sr": sr, "ch": ch}
+    return {"duration_s": round(len(pcm) / sr, 3), "rms": round(rms, 6), "n_samples": len(pcm), "sr": sr, "ch": ch}
 
 
-def asr_roundtrip(cli: Path, wav: Path, timeout=900) -> str:
+def asr_roundtrip(cli, wav, timeout=900):
     if not wav.exists():
         return ""
-    cmd = [str(cli), "--backend", "whisper", "-m", "auto", "--auto-download",
-           "-f", str(wav), "--no-prints"]
     try:
-        r = subprocess.run(cmd, timeout=timeout, stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, text=True)
+        r = subprocess.run([str(cli), "--backend", "whisper", "-m", "auto", "--auto-download",
+                            "-f", str(wav), "--no-prints"],
+                           timeout=timeout, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         (RESULTS / f"{wav.stem}.asr.log").write_text(r.stdout)
         lines = [ln.strip() for ln in r.stdout.splitlines() if ln.strip()]
-        text = " ".join(ln for ln in lines
-                        if not ln.startswith(("[", "whisper", "ggml", "load", "crispasr")))
-        return text
+        return " ".join(ln for ln in lines if not ln.startswith(("[", "whisper", "ggml", "load", "crispasr")))
     except Exception as ex:  # noqa: BLE001
         return f"<asr-error: {type(ex).__name__}>"
 
 
-def synth(cli: Path, backbone: str, codec: str, text: str, out_wav: Path, extra_env=None, timeout=2400) -> dict:
-    cmd = [str(cli), "--backend", "moss-tts-local", "-m", backbone, "--codec-model", codec,
-           "--tts", text, "--tts-output", str(out_wav), "--no-prints"]
+def synth(cli, backbone, codec, text, out_wav, timeout=2400):
     env = os.environ.copy()
-    env["CRISPASR_MOSS_TTS_LOCAL_DEBUG"] = "1"  # trace stop logits + frame count
-    if extra_env:
-        env.update(extra_env)
+    env["CRISPASR_MOSS_TTS_LOCAL_DEBUG"] = "1"
     t0 = time.time()
     try:
-        r = subprocess.run(cmd, timeout=timeout, stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, text=True, env=env)
+        r = subprocess.run([str(cli), "--backend", "moss-tts-local", "-m", backbone, "--codec-model", codec,
+                            "--tts", text, "--tts-output", str(out_wav), "--no-prints"],
+                           timeout=timeout, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=env)
         rc, out = r.returncode, r.stdout
     except subprocess.TimeoutExpired as ex:
         rc, out = -1, f"TIMEOUT {timeout}s\n{ex.stdout or ''}"
     (RESULTS / f"{out_wav.stem}.log").write_text(out)
-    frames, stopped = None, None
     m = re.search(r"generated (\d+) frames .*?(runaway|stopped naturally)", out)
-    if m:
-        frames, stopped = int(m.group(1)), (m.group(2) == "stopped naturally")
     return {"rc": rc, "elapsed_s": round(time.time() - t0, 1),
+            "frames": int(m.group(1)) if m else None,
+            "stopped": (m.group(2) == "stopped naturally") if m else None,
             "wav": wav_summary(out_wav) if out_wav.exists() else {"error": "no-wav"},
-            "frames": frames, "stopped": stopped,
-            "err_excerpt": out[-1800:]}
+            "err_excerpt": out[-1500:]}
 
 
-def verdict(res: dict, min_dur: float) -> str:
+def verdict(res, min_dur):
     if res["rc"] != 0:
         return f"FAIL: rc={res['rc']}"
     w = res["wav"]
@@ -158,208 +113,160 @@ def verdict(res: dict, min_dur: float) -> str:
     return "PASS"
 
 
-def word_overlap(asr_text: str, ref_text: str) -> float:
-    def norm(s):
-        return set(re.findall(r"[a-z]+", s.lower()))
-    ref = norm(ref_text)
-    got = norm(asr_text)
-    if not ref:
-        return 0.0
-    return round(len(ref & got) / len(ref), 3)
-
-
-SHORT_TEXT = "Hello world."
-LONG_TEXT = ("The quick brown fox jumps over the lazy dog. "
-             "Speech synthesis should stay intelligible over a longer passage, "
-             "so this sentence exercises many autoregressive steps and the codec "
-             "sliding window well past the first few frames.")
+def word_overlap(asr_text, ref_text):
+    ref = set(re.findall(r"[a-z]+", ref_text.lower()))
+    got = set(re.findall(r"[a-z]+", (asr_text or "").lower()))
+    return round(len(ref & got) / len(ref), 3) if ref else 0.0
 
 
 def main():
-    summary = {"ts": datetime.now(timezone.utc).isoformat(), "ref": CRISPASR_REF,
-               "phases": {}, "roundtrip": {}, "gates": {}}
-
-    # ── 1. clone + build ───────────────────────────────────────────────────
-    log(f"clone {CRISPASR_REF}")
+    # ── harness + progress mirror ──────────────────────────────────────────
     if not REPO.exists():
-        run(["git", "clone", "--depth", "1", "--branch", CRISPASR_REF, "--recursive",
-             CRISPASR_REPO, str(REPO)])
+        subprocess.check_call(["git", "clone", "--depth", "1", "--branch", CRISPASR_REF, "--recursive",
+                               CRISPASR_REPO, str(REPO)])
     sys.path.insert(0, str(REPO / "tools" / "kaggle"))
+    if str(REPO / "tools" / "kaggle") not in sys.path:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))  # bundled fallback
     import kaggle_harness as kh
-    kh.init_progress()
-    sha = subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True).strip()
-    summary["sha"] = sha
-    log(f"cloned {sha}")
+    kh.init_progress()  # mirrors to HF cstr/crispasr-kaggle-progress once HF_TOKEN is set
+    summary = {"ref": CRISPASR_REF, "gates": {}, "roundtrip": {}, "phases": {}}
+    summary["sha"] = subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True).strip()
+    kh.step("cloned", sha=summary["sha"][:10])
 
-    run(["nvidia-smi", "-L"], check=False)
-    gpu = subprocess.check_output(
+    subprocess.run(["nvidia-smi", "-L"], check=False)
+    summary["gpu"] = subprocess.check_output(
         ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"], text=True).strip()
-    summary["gpu"] = gpu
-    log(f"gpu {gpu}")
+    kh.step("gpu", gpu=summary["gpu"])
 
-    kh.install_build_toolchain()  # warms /kaggle/working/.ccache from chr1s4/crispasr-ccache
-    arch = kh.detect_cuda_arch()
-    log(f"cuda_arch {arch}")
-    # kaggle_usage #22: MOVE the harness-warmed cache OFF /kaggle/working (else the
-    # loose .ccache tree page-caps `kaggle kernels output` at 500 files AND the
-    # build runs cold if CCACHE_DIR points elsewhere). Move it, then point there.
-    subprocess.run("rm -rf /kaggle/temp/.ccache && "
-                   "if [ -d /kaggle/working/.ccache ]; then mv /kaggle/working/.ccache /kaggle/temp/.ccache; "
-                   "else mkdir -p /kaggle/temp/.ccache; fi", shell=True, check=False)
-    os.environ["CCACHE_DIR"] = "/kaggle/temp/.ccache"
-    subprocess.run(["ccache", "-s"], check=False)  # confirm warm (cache hit stats)
-    env = os.environ.copy()
-    cmake_args = (["cmake", "-G", "Ninja", "-B", str(BUILD), "-S", str(REPO),
-                   "-DCMAKE_BUILD_TYPE=Release"]
-                  + list(kh.cache_and_link_flags()) + list(kh.cuda_build_flags(arch)))
-    run(cmake_args, env=env, timeout=300)
-    jobs = kh.safe_build_jobs(gpu=True)
-    with kh.build_heartbeat("moss-tts-local CUDA build"):
-        kh.sh_with_progress(
-            f"stdbuf -oL -eL cmake --build {BUILD} "
-            f"--target crispasr-cli crispasr-quantize -j{jobs}")
-    cli = BUILD / "bin" / "crispasr"
-    if not cli.exists():
-        cands = [c for c in BUILD.rglob("crispasr") if c.is_file() and os.access(c, os.X_OK)]
-        cli = cands[0] if cands else cli
-    quant = BUILD / "bin" / "crispasr-quantize"
-    if not cli.exists() or not quant.exists():
-        raise SystemExit(f"binaries missing: cli={cli.exists()} quant={quant.exists()}")
-    os.environ["LD_LIBRARY_PATH"] = f"{BUILD / 'src'}:{os.environ.get('LD_LIBRARY_PATH', '')}"
-    summary["phases"]["build"] = "ok"
-    log("build ok")
-
-    # ── 2. backbone F16 (download-or-convert) + codec (convert) ────────────
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "-q",
-                           "huggingface_hub", "safetensors", "gguf"])
+    # ── deps + HF token (HF_TOKEN enables the progress push) ───────────────
+    kh.step("install deps")
+    kh.install_build_toolchain()  # ninja + ccache + mold; warms /kaggle/working/.ccache
+    kh.sh_with_progress("pip install -q huggingface_hub hf_transfer safetensors gguf")
     hf_token = kh.resolve_hf_token()
-    from huggingface_hub import snapshot_download, hf_hub_download, HfApi
-    f16 = MODELS / "moss-tts-local-v1.5-f16.gguf"
-    try:
-        got = hf_hub_download(GGUF_REPO, f16.name, local_dir=str(MODELS), token=hf_token)
-        f16 = Path(got)
-        log(f"downloaded existing backbone F16 {f16} ({f16.stat().st_size/1e9:.2f} GB)")
-        need_backbone_src = False
-    except Exception:  # noqa: BLE001
-        need_backbone_src = True
-        log("backbone F16 not hosted — will convert from HF weights")
+    if hf_token:
+        os.environ["HF_TOKEN"] = hf_token
+        os.environ["HUGGING_FACE_HUB_TOKEN"] = hf_token
+    kh.step("hf token", ok=bool(hf_token))
 
-    log("download codec (MOSS-Audio-Tokenizer-v2) -> /tmp")
+    # ccache §22: move warmed cache OFF /kaggle/working so output stays page-1 small.
+    subprocess.run("if [ -d /kaggle/working/.ccache ]; then rm -rf /kaggle/temp/.ccache; "
+                   "mv /kaggle/working/.ccache /kaggle/temp/.ccache; fi", shell=True, check=False)
+    os.environ["CCACHE_DIR"] = "/kaggle/temp/.ccache"
+    subprocess.run("ccache -s | head -5", shell=True, check=False)
+
+    # ── build cli + quantize ───────────────────────────────────────────────
+    kh.step("cmake configure")
+    arch = kh.detect_cuda_arch()
+    subprocess.run(["cmake", "-G", "Ninja", "-B", str(BUILD), "-S", str(REPO), "-DCMAKE_BUILD_TYPE=Release"]
+                   + list(kh.cache_and_link_flags()) + list(kh.cuda_build_flags(arch)),
+                   check=True, timeout=300)
+    with kh.build_heartbeat("cmake.build"):
+        kh.sh_with_progress(f"cmake --build {BUILD} --target crispasr-cli crispasr-quantize "
+                            f"-j{kh.safe_build_jobs(gpu=True)}")
+    cli = next((c for c in [BUILD / "bin" / "crispasr"] + list(BUILD.rglob("crispasr"))
+                if c.is_file() and os.access(c, os.X_OK)), None)
+    quant = next((c for c in [BUILD / "bin" / "crispasr-quantize"] + list(BUILD.rglob("crispasr-quantize"))
+                  if c.is_file() and os.access(c, os.X_OK)), None)
+    if not cli or not quant:
+        raise SystemExit(f"binaries missing cli={cli} quant={quant}")
+    os.environ["LD_LIBRARY_PATH"] = f"{BUILD / 'src'}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+    kh.step("build ok")
+
+    # ── backbone F16 (download) + codec (download safetensors + convert) ───
+    from huggingface_hub import snapshot_download, hf_hub_download, HfApi  # noqa: E402
+    conv = REPO / "models" / "convert-moss-tts-local-to-gguf.py"
+    kh.step("download backbone F16")
+    f16 = MODELS / "moss-tts-local-v1.5-f16.gguf"
+    need_src = False
+    try:
+        f16 = Path(hf_hub_download(GGUF_REPO, f16.name, local_dir=str(MODELS), token=hf_token))
+        kh.step("backbone F16 ready", gb=round(f16.stat().st_size / 1e9, 2))
+    except Exception as e:  # noqa: BLE001
+        need_src = True
+        kh.step("backbone F16 not hosted — converting", err=str(e)[:120])
+
+    kh.step("download codec safetensors")
     codec_src = snapshot_download(HF_CODEC, cache_dir=str(MODELS / "hf"), token=hf_token,
                                   allow_patterns=["*.safetensors", "*.json"])
     codec_gguf = MODELS / "moss-tts-local-v1.5-codec.gguf"
-
-    conv = REPO / "models" / "convert-moss-tts-local-to-gguf.py"
-    if need_backbone_src:
+    kh.step("convert codec")
+    if need_src:
         src = snapshot_download(HF_MODEL, cache_dir=str(MODELS / "hf"), token=hf_token,
-                                allow_patterns=["*.safetensors", "*.json", "merges.txt",
-                                                "vocab.json", "tokenizer.json", "added_tokens.json"])
-        log("convert -> f16 backbone + codec")
-        run([sys.executable, str(conv), "--input", src, "--codec", codec_src,
-             "--output", str(f16), "--codec-output", str(codec_gguf)], timeout=3600)
+                                allow_patterns=["*.safetensors", "*.json", "merges.txt", "vocab.json",
+                                                "tokenizer.json", "added_tokens.json"])
+        subprocess.run([sys.executable, str(conv), "--input", src, "--codec", codec_src,
+                        "--output", str(f16), "--codec-output", str(codec_gguf)], check=True, timeout=3600)
     else:
-        # Backbone already hosted — convert the codec only. The converter's main()
-        # requires --input (backbone dir) even for codec, so pull the (small) config
-        # + tokenizer of the backbone and let it re-emit the backbone too, or call
-        # write_codec_gguf directly. We call write_codec_gguf directly (cheaper).
-        log("convert codec only (backbone F16 reused)")
-        codegen = (
-            "import sys; sys.path.insert(0, r'%s');"
-            "import importlib.util as u;"
-            "spec=u.spec_from_file_location('conv', r'%s');"
-            "m=u.module_from_spec(spec); spec.loader.exec_module(m);"
-            "from pathlib import Path;"
-            "m.write_codec_gguf(Path(r'%s'), Path(r'%s'))"
-        ) % (str(REPO / "models"), str(conv), codec_src, str(codec_gguf))
-        run([sys.executable, "-c", codegen], timeout=3600)
-
+        codegen = ("import importlib.util as u; from pathlib import Path;"
+                   "s=u.spec_from_file_location('c', r'%s'); m=u.module_from_spec(s); s.loader.exec_module(m);"
+                   "m.write_codec_gguf(Path(r'%s'), Path(r'%s'))") % (str(conv), codec_src, str(codec_gguf))
+        subprocess.run([sys.executable, "-c", codegen], check=True, timeout=3600)
     if not codec_gguf.exists():
         raise SystemExit("codec GGUF not produced")
     summary["phases"]["convert"] = {"f16_gb": round(f16.stat().st_size / 1e9, 2),
                                     "codec_gb": round(codec_gguf.stat().st_size / 1e9, 2)}
-    log(f"converted: {summary['phases']['convert']}")
-
     import shutil
     shutil.rmtree(MODELS / "hf", ignore_errors=True)
+    kh.step("converted", **summary["phases"]["convert"])
 
-    # ── 3. quantize backbone -> Q4_K ───────────────────────────────────────
+    # ── quantize -> Q4_K ───────────────────────────────────────────────────
+    kh.step("quantize q4_k")
     q4k = MODELS / "moss-tts-local-v1.5-q4_k.gguf"
-    log("quantize -> q4_k")
-    run([str(quant), str(f16), str(q4k), "q4_k"], timeout=1800)
+    subprocess.run([str(quant), str(f16), str(q4k), "q4_k"], check=True, timeout=1800)
     summary["phases"]["quantize"] = {"q4k_gb": round(q4k.stat().st_size / 1e9, 2)}
-    log(f"quantized: {summary['phases']['quantize']}")
+    kh.step("quantized", **summary["phases"]["quantize"])
 
-    # ── 4. Round-trip arms (chunked codec + stop-runaway A/B) ──────────────
-    # run1 showed the codec decode is CORRECT (f16-long overlap 1.0) but short/
-    # quantized synths RAN AWAY (stop head never fired) -> 916GB codec OOM. This
-    # run: (a) the codec now query-chunks (bounded memory — f16-long is the
-    # correctness oracle: overlap must stay ~1.0); (b) A/B sampled vs greedy audio
-    # to test whether sampled-audio feedback is what prevents the stop head firing.
-    # Default synth params now come from the model card (audio 1.7/0.8/25, sampled
-    # stop) — the fix for the stop-runaway. Greedy audio is degenerate (P5 run2), so
-    # we test the DEFAULT (correct) config only.
-    arms = [
-        ("q4k", str(q4k), None, True),   # q4_k default params — the GATE
-        ("f16", str(f16), None, False),  # f16 default params (best-effort; may OOM on load)
-    ]
-    for tag, backbone, extra_env, gating in arms:
-        rs = synth(cli, backbone, str(codec_gguf), SHORT_TEXT, RESULTS / f"{tag}_short.wav", extra_env=extra_env)
-        rs["verdict"] = verdict(rs, min_dur=0.2)
+    # ── round-trip: q4_k (gate) + f16 (best-effort) with card-default params ─
+    for tag, backbone, gating in (("q4k", str(q4k), True), ("f16", str(f16), False)):
+        kh.step(f"synth {tag} short")
+        rs = synth(cli, backbone, str(codec_gguf), SHORT_TEXT, RESULTS / f"{tag}_short.wav")
+        rs["verdict"] = verdict(rs, 0.2)
         rs["asr"] = asr_roundtrip(cli, RESULTS / f"{tag}_short.wav")
         rs["overlap"] = word_overlap(rs["asr"], SHORT_TEXT)
-        log(f"{tag} short: {rs['verdict']} rc={rs['rc']} frames={rs['frames']} stopped={rs['stopped']} "
-            f"overlap={rs['overlap']} asr={rs['asr'][:120]!r}")
+        kh.step(f"{tag} short done", frames=rs["frames"], stopped=rs["stopped"],
+                verdict=rs["verdict"], overlap=rs["overlap"])
 
-        rl = synth(cli, backbone, str(codec_gguf), LONG_TEXT, RESULTS / f"{tag}_long.wav", extra_env=extra_env)
-        rl["verdict"] = verdict(rl, min_dur=2.0)
+        kh.step(f"synth {tag} long")
+        rl = synth(cli, backbone, str(codec_gguf), LONG_TEXT, RESULTS / f"{tag}_long.wav")
+        rl["verdict"] = verdict(rl, 2.0)
         rl["asr"] = asr_roundtrip(cli, RESULTS / f"{tag}_long.wav")
         rl["overlap"] = word_overlap(rl["asr"], LONG_TEXT)
-        log(f"{tag} long: {rl['verdict']} rc={rl['rc']} frames={rl['frames']} stopped={rl['stopped']} "
-            f"overlap={rl['overlap']} asr={rl['asr'][:200]!r}")
+        kh.step(f"{tag} long done", frames=rl["frames"], stopped=rl["stopped"],
+                verdict=rl["verdict"], overlap=rl["overlap"])
 
-        short_words = len((rs["asr"] or "").split())
-        long_words = len((rl["asr"] or "").split())
-        pow_ok = (rl["verdict"] == "PASS" and rs["verdict"] == "PASS"
-                  and long_words > short_words
+        sw, lw = len((rs["asr"] or "").split()), len((rl["asr"] or "").split())
+        pow_ok = (rl["verdict"] == "PASS" and rs["verdict"] == "PASS" and lw > sw
                   and rl["wav"].get("duration_s", 0) > rs["wav"].get("duration_s", 0))
-        # Recognizable = the synth stopped at a sane length AND ASR matches the text.
         recognizable = (rs["overlap"] >= 0.5 and rl["overlap"] >= 0.4
-                        and (rs["stopped"] is not False) and (rl["stopped"] is not False))
-        rt = {"short": rs, "long": rl, "short_words": short_words,
-              "long_words": long_words, "proof_of_work": pow_ok, "recognizable": recognizable}
-        summary["roundtrip"][tag] = rt
-        arm_pass = pow_ok and recognizable
-        oom = (not gating) and (rs["rc"] != 0) and ("out of memory" in (rs["err_excerpt"] or "").lower())
+                        and rs["stopped"] is not False and rl["stopped"] is not False)
+        summary["roundtrip"][tag] = {"short": rs, "long": rl, "proof_of_work": pow_ok,
+                                     "recognizable": recognizable}
+        oom = (not gating) and rs["rc"] != 0 and "out of memory" in (rs["err_excerpt"] or "").lower()
         summary["gates"][f"roundtrip_{tag}"] = ("SKIP(oom)" if oom else
-                                                ("PASS" if arm_pass else ("FAIL" if gating else "WARN")))
-        log(f"{tag} gate: {summary['gates'][f'roundtrip_{tag}']} "
-            f"(pow={pow_ok} recognizable={recognizable} overlap short={rs['overlap']} long={rl['overlap']})")
+                                                ("PASS" if (pow_ok and recognizable) else
+                                                 ("FAIL" if gating else "WARN")))
+        kh.step(f"gate {tag}", result=summary["gates"][f"roundtrip_{tag}"])
 
-    # Acceptance = the q4_k (default-params) arm passes.
     summary["all_gates_pass"] = summary["gates"].get("roundtrip_q4k") == "PASS"
 
-    # ── 5. upload GGUFs on success ─────────────────────────────────────────
+    # ── upload GGUFs on pass ───────────────────────────────────────────────
     if summary["all_gates_pass"] and DO_UPLOAD:
+        kh.step("upload GGUFs")
         try:
             api = HfApi()
             api.create_repo(GGUF_REPO, repo_type="model", exist_ok=True, token=hf_token)
             for p in (codec_gguf, q4k):
                 api.upload_file(path_or_fileobj=str(p), path_in_repo=p.name, repo_id=GGUF_REPO,
                                 repo_type="model", token=hf_token)
-                log(f"uploaded {p.name}")
             summary["uploaded"] = [codec_gguf.name, q4k.name]
         except Exception as e:  # noqa: BLE001
             summary["uploaded"] = f"upload error: {e}"
-            log(f"upload skipped: {e}")
 
     (RESULTS / "summary.json").write_text(json.dumps(summary, indent=2))
-    print("\n" + "=" * 60)
-    print(json.dumps(summary, indent=2))
-    print("=" * 60)
+    print("\n" + "=" * 60 + "\n" + json.dumps(summary, indent=2) + "\n" + "=" * 60)
+    kh.step("done", all_gates_pass=summary["all_gates_pass"], gates=summary["gates"])
     if not summary["all_gates_pass"]:
-        log("ROUND-TRIP GATE FAILED — see results/ logs")
         sys.exit(1)
-    log(f"MOSS-TTS-Local-v1.5 (4B) PASSES the ASR round-trip on {gpu} (Q4_K)")
 
 
 if __name__ == "__main__":
@@ -368,6 +275,10 @@ if __name__ == "__main__":
     except SystemExit:
         raise
     except Exception as e:  # noqa: BLE001
-        log(f"FATAL: {e}")
-        log(traceback.format_exc())
+        print(f"FATAL: {e}\n{traceback.format_exc()}", flush=True)
+        try:
+            import kaggle_harness as kh
+            kh.step("FATAL", err=str(e)[:200])
+        except Exception:
+            pass
         sys.exit(1)
