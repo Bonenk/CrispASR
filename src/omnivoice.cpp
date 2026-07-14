@@ -1070,7 +1070,7 @@ static std::vector<float> get_time_steps(float t_start, float t_end, int num_ste
 // ---------------------------------------------------------------------------
 
 static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, ggml_tensor* input_embeds, int T,
-                                    bool use_block_mask = false) {
+                                    int block_split = 0) {
     auto& hp = ctx->hp;
     auto& m = ctx->model;
 
@@ -1083,14 +1083,12 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
     ggml_set_name(pos_ids, "pos_ids");
     ggml_set_input(pos_ids);
 
-    // Optional block-diagonal attention mask (unified cond+uncond fusion): F16
-    // [T_kv, T_q], 0 within a block, -inf across blocks. nullptr = full attention.
-    ggml_tensor* block_mask = nullptr;
-    if (use_block_mask) {
-        block_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T);
-        ggml_set_name(block_mask, "block_mask");
-        ggml_set_input(block_mask);
-    }
+    // Unified CFG (block_split>0): the sequence is [cond(0:split) | uncond(split:T)].
+    // All matmuls/FFN/norms run over the full T (one dispatch), but ATTENTION is
+    // split per block (independent flash-attns) — no wasted cross-block compute,
+    // no padding. Beats both the 2-forward path (2× dispatch) and a block-diagonal
+    // mask (which still computes T² attention).
+    const bool split_attn = block_split > 0 && block_split < T;
 
     const float attn_scale = 1.0f / sqrtf((float)hp.head_dim);
 
@@ -1134,9 +1132,23 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
         K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
         V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
 
-        // flash_attn_ext: Q/K/V in (hd, T, n_heads/n_kv) → output (hd, n_heads, T)
-        // Full bidirectional (nullptr) or block-diagonal (unified CFG) masking.
-        ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, block_mask, attn_scale, 0.0f, 0.0f);
+        // flash_attn_ext: Q/K/V in (hd, T, n_heads/n_kv) → output (hd, n_heads, T).
+        ggml_tensor* attn_out;
+        if (split_attn) {
+            // Independent flash-attn per block (cond [0:split], uncond [split:T]).
+            const int Ta = block_split, Tb = T - block_split;
+            auto blk = [&](ggml_tensor* X, int nh, int t0, int tn) {
+                return ggml_cont(ctx0,
+                                 ggml_view_3d(ctx0, X, hp.head_dim, tn, nh, X->nb[1], X->nb[2], (size_t)t0 * X->nb[1]));
+            };
+            ggml_tensor* Ac = ggml_flash_attn_ext(ctx0, blk(Q, hp.n_heads, 0, Ta), blk(K, hp.n_kv_heads, 0, Ta),
+                                                  blk(V, hp.n_kv_heads, 0, Ta), nullptr, attn_scale, 0.0f, 0.0f);
+            ggml_tensor* Au = ggml_flash_attn_ext(ctx0, blk(Q, hp.n_heads, Ta, Tb), blk(K, hp.n_kv_heads, Ta, Tb),
+                                                  blk(V, hp.n_kv_heads, Ta, Tb), nullptr, attn_scale, 0.0f, 0.0f);
+            attn_out = ggml_concat(ctx0, Ac, Au, 2); // concat along T (ne[2])
+        } else {
+            attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, attn_scale, 0.0f, 0.0f);
+        }
         // Output shape: (head_dim, n_heads, T) → reshape to (n_heads*head_dim, T)
         attn_out = ggml_reshape_2d(ctx0, attn_out, hp.n_heads * hp.head_dim, T);
 
@@ -1505,7 +1517,9 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         int T_c = T_tot + T_tgt;
         ov_step_graph& g = fwd_uni;
         if (!g.ctx0) {
-            size_t n_tensors = hp.n_layers * 40 + 100;
+            // Attention-split adds ~15 tensors/layer (per-block views/conts/2 flash-
+            // attns/concat), so budget more than the plain forward's 40/layer.
+            size_t n_tensors = hp.n_layers * 64 + 100;
             size_t mem_size = n_tensors * ggml_tensor_overhead() + ggml_graph_overhead_custom(8192, false);
             g.mem_buf.resize(mem_size);
             ggml_init_params ip2 = {mem_size, g.mem_buf.data(), true};
@@ -1513,7 +1527,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             g.inp = ggml_new_tensor_2d(g.ctx0, GGML_TYPE_F32, hp.d_model, T_c);
             ggml_set_name(g.inp, "input_embeds");
             ggml_set_input(g.inp);
-            g.gf = build_llm_graph(ctx, g.ctx0, g.inp, T_c, /*use_block_mask=*/true);
+            g.gf = build_llm_graph(ctx, g.ctx0, g.inp, T_c, /*block_split=*/T_tot);
             g.ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
             ggml_gallocr_alloc_graph(g.ga, g.gf);
             g.logits = ggml_graph_get_tensor(g.gf, "audio_logits");
@@ -1531,16 +1545,8 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             pos[T_tot + i] = i;
         if (ggml_tensor* pt = ggml_graph_get_tensor(g.gf, "pos_ids"))
             ggml_backend_tensor_set(pt, pos.data(), 0, pos.size() * sizeof(int32_t));
-        // Block-diagonal F16 mask: 0 within a block, -inf across (symmetric).
-        std::vector<ggml_fp16_t> mask((size_t)T_c * T_c);
-        const ggml_fp16_t z = ggml_fp32_to_fp16(0.0f), ninf = ggml_fp32_to_fp16(-INFINITY);
-        for (int q = 0; q < T_c; q++) {
-            bool qc = q < T_tot;
-            for (int kk = 0; kk < T_c; kk++)
-                mask[(size_t)q * T_c + kk] = (qc == (kk < T_tot)) ? z : ninf;
-        }
-        if (ggml_tensor* mt = ggml_graph_get_tensor(g.gf, "block_mask"))
-            ggml_backend_tensor_set(mt, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
+        // Attention is split per block inside the graph (block_split=T_tot) — no
+        // mask tensor needed.
         ggml_backend_tensor_set(g.inp, cat.data(), 0, cat.size() * sizeof(float));
         ggml_backend_graph_compute(ctx->backend, g.gf);
         std::vector<float> all_logits((size_t)out_dim * T_c);
