@@ -568,15 +568,16 @@ constexpr Entry k_registry[] = {
      "https://huggingface.co/cstr/moss-tts-v1.5-GGUF/resolve/main/moss-tts-v1.5-codec.gguf",
      "~3.4 GB"},
     // MOSS-TTS-Local-Transformer-v1.5 (4B, arch "moss-tts-local"): Qwen3-4B
-    // backbone (Q4_K ~2.7 GB) + MOSS-Audio-Tokenizer-v2 codec (48 kHz stereo,
-    // decode-only F16 companion). Apache-2.0. (URLs populated at ship after the
-    // GGUF upload to cstr/moss-tts-local-v1.5-GGUF — see PLAN P5.)
-    {"moss-tts-local", "moss-tts-local-v1.5-q4_k.gguf",
-     "https://huggingface.co/cstr/moss-tts-local-v1.5-GGUF/resolve/main/moss-tts-local-v1.5-q4_k.gguf",
-     "~2.7 GB",
+    // backbone + MOSS-Audio-Tokenizer-v2 codec (48 kHz stereo, decode-only
+    // companion). Apache-2.0. Default = F16 backbone: the acceptance target
+    // (P5 round-trip overlap 0.969). Q4_K exists but its long trajectory runs away
+    // (intrinsic quantized-AR drift) — F16 is the reliable config, fits a 16 GB GPU.
+    {"moss-tts-local", "moss-tts-local-v1.5-f16.gguf",
+     "https://huggingface.co/cstr/moss-tts-local-v1.5-GGUF/resolve/main/moss-tts-local-v1.5-f16.gguf",
+     "~9.1 GB",
      "moss-tts-local-v1.5-codec.gguf",
      "https://huggingface.co/cstr/moss-tts-local-v1.5-GGUF/resolve/main/moss-tts-local-v1.5-codec.gguf",
-     "~4.3 GB"},
+     "~2.1 GB"},
     // gwen-tts-0.6B: Vietnamese-optimized Qwen3-TTS-0.6B-Base finetune
     // (MIT, g-group-ai-lab). Same architecture as qwen3-tts-0.6B-Base,
     // trained on ~1000h Vietnamese TikTok audio. Supports all 10 Qwen3-TTS
