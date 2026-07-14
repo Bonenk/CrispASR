@@ -111,10 +111,28 @@ Built their repo + timed their batched forward directly (`OVCPP_BENCH`, added to
    So the real RTF fix is a **B'=2 4D-batched forward**, NOT seq-concat. (Dev-guide's
    "seq-concat beats 4D batch" was a different model's alloc-bug case; here 4D wins.)
 
-### Remaining
-1. **RTF: implement B'=2 4D-batched cond+uncond forward** (~1.2× on the forward) —
-   watch the batched-fused-graph batch-1 alloc gotcha; gate + A/B + Kaggle CUDA.
-2. Optional: match torchaudio resample (Hann sinc) to push encode codes >99%.
+### RTF verdict: PARITY reached (load-matched, back-to-back ×3)
+Per-step FORWARD (both cond+uncond), M1 Metal, clean:
+| impl | per-step fwd |
+|------|------|
+| ours q8 2-forward (default) | **~170 ms** |
+| omnivoice.cpp B'=2 batched | ~167 ms |
+| ours unified attention-split (gated) | ~200 ms (WORSE — extra views/conts/concat) |
+
+- **We're at ~2% = PARITY.** The reporter's "3–4×" was 100% the over-length bug (now
+  fixed). Not 3–4× behind — neck-and-neck.
+- **Fusion is a dead end on M1**: the forward is COMPUTE-bound (238 tokens ≈ 200 ms in
+  1 or 2 dispatches), so fusing 2 forwards saves nothing; the attention-split even adds
+  overhead. `OMNIVOICE_UNIFIED_CFG` kept gated OFF (may still help CUDA — Kaggle A/B).
+- **q4_k is SLOWER than q8** (~97 vs ~86 ms/fwd) — our Metal q4_k dequant path; so a
+  smaller model isn't the lever either.
+- Remaining edge to omnivoice.cpp = ~9% per-token kernel efficiency (their ggml fork),
+  since we already process fewer tokens (238 vs their padded 256). Beating them further
+  is kernel-level (port their Metal kernels) — a separate deep effort, uncertain payoff.
+
+### Remaining (optional)
+1. Kernel-level: profile per-op vs their ggml fork if sub-parity RTF is wanted.
+2. Match torchaudio resample (Hann sinc) to push encode codes >99%.
 3. **Ship the GGUF fix**: `omnivoice-tokenizer-f16-fixed.gguf` (0 zeroed channels)
    → replace corrupt HF `cstr/omnivoice-GGUF` + registry SHA bump.
 4. RTF wins (issue #2), gated + A/B'd.
