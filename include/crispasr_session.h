@@ -220,6 +220,12 @@ CRISPASR_SESSION_API crispasr_session* crispasr_session_open_with_params(const c
                                                                          const crispasr_open_params_v1* params);
 CRISPASR_SESSION_API const char* crispasr_session_backend(crispasr_session* s);
 CRISPASR_SESSION_API int crispasr_session_available_backends(char* out_csv, int out_cap);
+// Acoustic language detected by the last transcribe, as an ISO-639-1 code
+// (whisper only; other backends fall back to the source-language hint, then
+// "unknown"). Writes into out_buf (NUL-terminated, truncated to out_cap) and
+// returns the code length in bytes, or -1 on bad args. Distinct from the
+// text-LID pass crispasr_text_detect_language.
+CRISPASR_SESSION_API int crispasr_session_detected_language(crispasr_session* s, char* out_buf, int out_cap);
 // CTC vocabulary access (Omni CTC backend). crispasr_session_n_vocab returns
 // the number of SentencePiece pieces in the loaded model (0 for backends that
 // don't expose a CTC vocab); crispasr_session_token_text maps a token id in

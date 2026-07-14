@@ -224,6 +224,20 @@ fn session_whisper_no_speech_prob() {
 }
 
 #[test]
+fn session_whisper_detected_language() {
+    let model_path = whisper_model();
+    if !Path::new(&model_path).exists() {
+        eprintln!("SKIP: whisper model not found at {model_path}");
+        return;
+    }
+    let sess = crispasr::Session::open(&model_path).expect("session open whisper");
+    // Whisper's in-decode acoustic language detection surfaces on the
+    // exception-safe session (JFK is English).
+    sess.transcribe(&jfk_pcm()).expect("transcribe");
+    assert_eq!(sess.detected_language(), "en");
+}
+
+#[test]
 fn session_available_backends() {
     let backends = crispasr::Session::available_backends();
     assert!(backends.contains(&"whisper".to_string()));
