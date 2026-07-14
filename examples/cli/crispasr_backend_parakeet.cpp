@@ -207,6 +207,24 @@ public:
         // past that the encoder collapses on real speech); with the VAD
         // slice cap at 12 s every slice decodes single-pass. Longer inputs
         // (explicit --chunk-seconds 0) still stream.
+        // Issue #257: honor CLI --chunk-seconds / --chunk-overlap by driving the
+        // library's internal encoder-frame chunking (one coherent decode over the
+        // concatenated encoder output) instead of the dispatcher's per-slice
+        // transcribe+merge, which corrupts this full-attention encoder. The
+        // dispatcher stops slicing us when --chunk-seconds is explicit
+        // (CAP_INTERNAL_CHUNKING, non-JA), so we receive the whole audio here.
+        // JA keeps the dispatcher's VAD/12 s slicing (no CAP_INTERNAL_CHUNKING).
+        if (!is_ja_model_ && params.chunk_seconds_explicit && params.chunk_seconds > 0) {
+            const int cs = std::max(2, params.chunk_seconds);
+            const int ov = std::max(0, (int)(params.chunk_overlap_seconds + 0.5f));
+            parakeet_result* rc = parakeet_transcribe_streamed(ctx_, samples, n_samples, t_offset_cs, cs, ov);
+            if (!rc)
+                return out;
+            out.push_back(result_to_segment(rc, t_offset_cs));
+            parakeet_result_free(rc);
+            return out;
+        }
+
         int stream_threshold_s = is_ja_model_ ? 12 : 300;
         bool longform_enabled = !is_ja_model_;
         int stream_chunk_s = 0; // 0 = let the C library pick per-model

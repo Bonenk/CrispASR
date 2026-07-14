@@ -1,6 +1,6 @@
 # parakeet-tdt: word list + chunking fixes (issue #257)
 
-## NOW — active work (2026-07-14)
+## DONE (2026-07-14) — both fixes on main; issue closeable
 
 Branch `fix/parakeet-257`. Reporter (AppleSheeple) on parakeet-tdt-1.1b:
 (A) `-ojf` JSON has text + tokens but **no words list**; (B) `--chunk-seconds 7
@@ -50,10 +50,15 @@ mid-sentence split segments. Not seen with cohere/granite.
   the backend chunk internally. parakeet adapter honors params.chunk_seconds/overlap
   by routing to parakeet_transcribe_streamed.
 
-### Next
-1. (A) done. 2. Implement (B): crispasr_run.cpp (skip dispatcher slice for
-   CAP_INTERNAL_CHUNKING + explicit chunk_seconds) + parakeet adapter (honor
-   params.chunk_seconds → streamed). 3. Verify jfk chunked == baseline. 4. Tests, merge.
+### DONE
+- (A) parakeet_group_words() shared helper → words on streamed/chunked paths.
+- (B) backend_self_chunks_on_explicit() gate: CAP_INTERNAL_CHUNKING + explicit
+  --chunk-seconds bypasses dispatcher slicing (crispasr_run.cpp); parakeet adapter
+  routes to parakeet_transcribe_streamed(chunk,overlap). jfk --chunk-seconds 7
+  --chunk-overlap 2 now == baseline ("...ask not what your country can do for you.
+  Ask what you can do for your country.", 22 words). 4 new unit tests in
+  test-issue-114-chunk-context-gate. Full unit suite green (12 'failures' = unbuilt
+  metal/vad binaries in the targeted build, not regressions).
 2. (B) find why the chunk-merge drops parakeet tails; fix; verify jfk chunked == baseline.
 3. Unit test(s) for the word-grouping helper + a chunk-merge regression.
 4. Build, run unit tests, merge to main, comment #257.
