@@ -81,3 +81,12 @@ the lib's `vocab_size < 4000` heuristics (parakeet.cpp:3654,3774).
 FIX: detect JA by scanning the vocab for Japanese script (kana/kanji fraction),
 not vocab size. Verify: 0.6b-ja stays JA, 0.6b-v3 non-JA, 1.1b-EN non-JA. Download
 cstr/parakeet-tdt-1.1b-GGUF to reproduce the reporter's exact case.
+
+
+## FIXED v2 (2026-07-14) — JA misdetection resolved, verified on real 1.1b
+- parakeet_vocab_is_japanese() (vocab content scan) replaces vocab<=4096. Downloaded
+  cstr/parakeet-tdt-1.1b-GGUF (vocab_size=1024, confirms misdetection).
+- 1.1b DEFAULT: 1 clean complete segment, 21 words (was split-outs + truncation).
+- 1.1b --chunk-seconds 7 --chunk-overlap 2: full correct transcript (was corrupted).
+- 0.6b-ja still JA (97% CJK vocab); 0.6b-v3 still non-JA. No regressions.
+- TODO: extract testable vocab_looks_japanese() helper + unit test.
