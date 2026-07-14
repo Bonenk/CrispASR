@@ -232,6 +232,12 @@ pub struct SessionSegment {
     pub start: f64,
     pub end: f64,
     pub words: Vec<SessionWord>,
+    /// Whisper's per-segment probability that the segment is non-speech (the
+    /// `<|nospeech|>` token posterior), in `[0, 1]`. Only the whisper backend
+    /// produces it; every other backend leaves the `-1.0` sentinel ("no
+    /// data"), so a consumer can tell "unavailable" apart from a genuine low
+    /// no-speech probability.
+    pub no_speech_prob: f32,
 }
 
 /// Per-frame CTC logits captured from a CTC backend.
@@ -635,11 +641,13 @@ impl Session {
                         confidence: if raw_p < 0.0 { 1.0 } else { raw_p },
                     });
                 }
+                let nsp = crispasr_sys::crispasr_session_result_segment_no_speech_prob(res, i);
                 out.push(SessionSegment {
                     text: text.trim().to_string(),
                     start: t0,
                     end: t1,
                     words,
+                    no_speech_prob: nsp,
                 });
             }
             // Lift out the raw CTC logits (if any) before the handle is freed.
@@ -769,11 +777,13 @@ impl Session {
                         confidence: if raw_p < 0.0 { 1.0 } else { raw_p },
                     });
                 }
+                let nsp = crispasr_sys::crispasr_session_result_segment_no_speech_prob(res, i);
                 out.push(SessionSegment {
                     text: text.trim().to_string(),
                     start: t0,
                     end: t1,
                     words,
+                    no_speech_prob: nsp,
                 });
             }
             crispasr_sys::crispasr_session_result_free(res);

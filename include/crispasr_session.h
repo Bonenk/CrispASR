@@ -290,6 +290,10 @@ CRISPASR_SESSION_API const char* crispasr_session_result_word_text(crispasr_sess
 CRISPASR_SESSION_API int64_t crispasr_session_result_word_t0(crispasr_session_result* r, int i_seg, int i_word);
 CRISPASR_SESSION_API int64_t crispasr_session_result_word_t1(crispasr_session_result* r, int i_seg, int i_word);
 CRISPASR_SESSION_API float crispasr_session_result_word_p(crispasr_session_result* r, int i_seg, int i_word);
+// Whisper's per-segment no-speech probability (the <|nospeech|> token
+// posterior) in [0, 1]. Only the whisper backend populates it; other backends
+// and out-of-range indices return the -1.0 sentinel ("no data").
+CRISPASR_SESSION_API float crispasr_session_result_segment_no_speech_prob(crispasr_session_result* r, int i_seg);
 // Per-frame CTC logits (opted in via crispasr_session_set_return_logits) for
 // backends that produce a dense CTC grid (Omni CTC, wav2vec2/hubert/data2vec,
 // canary-ctc). Frame-major: logits[t * n_logit_vocab + v]. Raw pre-softmax for
