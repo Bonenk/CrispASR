@@ -125,13 +125,19 @@ the validated P0/P1/P2 — STUDY-4B, converter, backbone+local runtime; NOT yet 
   Codec uploaded via the CPU `moss-tts-local-codec-upload` kernel (curl-download +
   write_codec_gguf + server-verified upload). Registry defaults `-m auto` to F16 +
   codec. Gate flipped to F16 in the validate kernel.
-- **NEXT (finish #249):** ff `feat/moss-tts-local-4b` → `main`; **regen Go cgo
-  LDFLAGS on Linux** (`tools/sync_go_cgo_ldflags.py` — the one CI-red item, can't
-  run on macOS); HISTORY/LEARNINGS; release via `scripts/bump-version.sh`; close
-  #249. Follow-ups: short-clip ASR 0.0 (likely whisper-on-~1s artifact — long clip
-  proved audio correct); refresh chr1s4/crispasr-ccache seed (warm builds); optional
-  Q5_K/Q6_K probe for a smaller-than-F16 stable target; v2 codec ENCODER for voice
-  cloning.
+- **✅ MERGED TO `main`** (2026-07-14, rebased 29 commits cleanly onto the advanced
+  main; rebuilt + wiring PASS + unit test 30/30 + feature-matrix current). The 4B
+  `moss-tts-local` backend is live on `main` with the F16+codec GGUFs hosted.
+- **REMAINING (VPS/follow-up):**
+  1. **Regen Go cgo LDFLAGS on Linux** (`python tools/sync_go_cgo_ldflags.py`) —
+     the ONE item that reds CI on the merge commit (I hand-added `-lmoss_tts_local`;
+     can't regen on macOS — Metal/BLAS pollution). Do this first to green CI.
+  2. HISTORY/LEARNINGS entries; release via `scripts/bump-version.sh` once CI green.
+  3. Close #249 (shipped end-to-end).
+  - Non-blocking follow-ups: short-clip ASR 0.0 (likely whisper-on-~1s artifact —
+    the long clip proved the audio correct); refresh `chr1s4/crispasr-ccache` seed
+    (warm builds); optional Q5_K/Q6_K probe for a smaller stable target; v2 codec
+    ENCODER for voice cloning.
 - **P5 GPU validate LAUNCHED on chr1s4** (2026-07-14). `chr1str` GPU quota was
   exhausted → the CPU fallback runs were ~3 h each (a 4B fwd/frame). `kaggle_usage.md`
   has the **secondary account `chr1s4`** (token `KGAT_95d684…`, separate 30 h GPU
