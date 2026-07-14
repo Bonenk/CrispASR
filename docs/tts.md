@@ -522,6 +522,23 @@ defaults reproduce the validated, end-to-end-tested code path.
 | `QWEN3_TTS_CODEC_CTX` | `128` (`96` on CUDA) | Left-context codec frames prepended to each chunk. Values below the codec sliding window are raised; CUDA clamps larger values unless `QWEN3_TTS_CODEC_ALLOW_FULL=1` is set. |
 | `QWEN3_TTS_SKIP_REF_DECODE` | **on** (set `=0` to opt out) | Skip the codec decode of the reference audio in `qwen3_tts_synthesize`. The default-on path emits `codec_decode_codes(gen)` directly; the opt-out path concatenates `ref_codes + gen_codes`, decodes both, then trims the ref portion. With a 26 s reference (~334 codec frames at 12 Hz), the ref half adds ~16 s of constant codec compute regardless of how much new audio is generated (Jetson Orin AGX, issue #64). End-to-end RTF on Orin drops from ~7-9 → ~1.5; the win compounds N× under `/v1/audio/speech` long-form chunking. Bit-identity verified 2026-05-05 on Apple Silicon Metal, qwen3-tts-customvoice 0.6B Q8_0: max\|diff\| = 0, cosine similarity = 1.0 — equivalence holds because the codec is a straight-line forward pass with no rolling state. Set `QWEN3_TTS_SKIP_REF_DECODE=0` only for A/B verification or if a future codec graph variant grows rolling state. |
 
+### pocket-tts voices and environment switches
+
+Voice cloning takes a reference WAV via `--voice`. Three forms are accepted:
+
+- **Absolute/relative path** — `--voice /path/to/ref.wav` (requires `--i-have-rights`).
+- **Bare name + `--voice-dir`** — `--voice alice --voice-dir voices/` resolves to
+  `voices/alice.wav`. This is what `--server` / `{"voice": "<name>"}` requests use,
+  so a single server can serve multiple voices from one directory (issue #255).
+- **Unset** — auto-loads `samples/jfk.wav` as a default; without any voice the
+  output is near-silent.
+
+| Variable | Default | Effect when set |
+|---|---|---|
+| `POCKET_MANUAL_MIMI` | unset | Force the CPU Mimi decoder path (bypass the ggml/GPU decode). |
+| `POCKET_MANUAL_BACKBONE` | unset | Force the CPU FlowLM backbone path. |
+| `POCKET_VULKAN_MIMI_MAX_FRAMES` | `120` | Vulkan-only guard (issue #256): fall back to the CPU Mimi decoder when a generation exceeds this many frames, avoiding the `maxComputeWorkGroupCount` abort on constrained iGPUs (e.g. AMD 780M / gfx1103). Set `<=0` to disable the guard and always attempt the GPU decode. No effect on non-Vulkan backends. |
+
 ## VibeVoice — realtime streaming TTS
 
 Lowest-latency TTS engine. Uses `--voice` for its voice prompt or
