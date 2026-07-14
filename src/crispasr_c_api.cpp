@@ -1424,6 +1424,12 @@ struct crispasr_session_seg {
     std::string text;
     int64_t t0 = 0; // centiseconds absolute
     int64_t t1 = 0;
+    // Whisper's per-segment probability that the segment is non-speech (the
+    // <|nospeech|> token posterior). Only the whisper branch populates it;
+    // every other backend leaves the -1.0 sentinel ("no signal", never a
+    // real [0,1] probability) so a consumer can tell "unavailable" apart
+    // from a genuine low no-speech probability.
+    float no_speech_prob = -1.0f;
     struct word_alt {
         std::string text;
         float p = 0.0f;
@@ -4347,6 +4353,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 seg.text = t;
             seg.t0 = whisper_full_get_segment_t0(s->whisper_ctx, i);
             seg.t1 = whisper_full_get_segment_t1(s->whisper_ctx, i);
+            seg.no_speech_prob = whisper_full_get_segment_no_speech_prob(s->whisper_ctx, i);
 
             // Convert whisper's per-token output into the unified
             // ca_token_record shape and run it through
@@ -6597,6 +6604,16 @@ CA_EXPORT float crispasr_session_result_word_p(crispasr_session_result* r, int i
         return -1.0f;
     auto& ws = r->segments[i_seg].words;
     return (i_word >= 0 && i_word < (int)ws.size()) ? ws[i_word].p : -1.0f;
+}
+
+// Whisper's per-segment no-speech probability (the <|nospeech|> token
+// posterior), in [0, 1]. Only the whisper backend populates it; other
+// backends and out-of-range indices return the -1.0 sentinel so callers can
+// tell "unavailable" apart from a genuine low probability.
+CA_EXPORT float crispasr_session_result_segment_no_speech_prob(crispasr_session_result* r, int i_seg) {
+    if (!r || i_seg < 0 || i_seg >= (int)r->segments.size())
+        return -1.0f;
+    return r->segments[i_seg].no_speech_prob;
 }
 
 // Per-frame CTC logits (opted in via crispasr_session_set_return_logits) for

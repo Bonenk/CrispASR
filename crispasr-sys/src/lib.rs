@@ -445,6 +445,13 @@ extern "C" {
         i_seg: c_int,
         i_word: c_int,
     ) -> f32;
+    // Whisper's per-segment no-speech probability (the <|nospeech|> token
+    // posterior) in [0, 1]. Only the whisper backend populates it; other
+    // backends and out-of-range indices return the -1.0 sentinel ("no data").
+    pub fn crispasr_session_result_segment_no_speech_prob(
+        r: *mut CrispasrSessionResult,
+        i_seg: c_int,
+    ) -> f32;
 
     // Raw per-frame CTC logits (Omni CTC backend, opted in via
     // `crispasr_session_set_return_logits`). Frame-major, pre-softmax:
