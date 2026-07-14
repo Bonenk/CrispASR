@@ -118,6 +118,13 @@ public:
             omnivoice_set_instruct(ctx_, p.tts_instruct.c_str());
         }
 
+        // Speaking-rate multiplier (--tts-speed): scales the estimated target
+        // length. >1 = faster/shorter, <1 = slower/longer. Handy to trim an
+        // over-long estimate from a slow reference voice (#254).
+        if (p.tts_speed > 0.0f && p.tts_speed != 1.0f) {
+            omnivoice_set_speed(ctx_, p.tts_speed);
+        }
+
         return true;
     }
 

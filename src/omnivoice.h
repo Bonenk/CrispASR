@@ -63,6 +63,11 @@ int omnivoice_set_language(struct omnivoice_context* ctx, const char* lang);
 // Set a style instruction (for instruct-capable variants).
 int omnivoice_set_instruct(struct omnivoice_context* ctx, const char* instruct);
 
+// Set the speaking-rate multiplier used to scale the estimated target length:
+// >1 = faster / shorter audio, <1 = slower / longer, 1.0 = model estimate.
+// Useful when a reference voice yields an over- or under-long estimate.
+int omnivoice_set_speed(struct omnivoice_context* ctx, float speed);
+
 // Run the masked iterative generation: text → 8-codebook audio codes.
 // Returns malloc'd int32_t array of shape (n_codebooks * T) row-major
 // [cb0_t0, cb1_t0, ..., cb7_t0, cb0_t1, ...].
