@@ -1069,7 +1069,8 @@ static std::vector<float> get_time_steps(float t_start, float t_end, int num_ste
 // Build the Qwen3 LLM graph for a forward pass
 // ---------------------------------------------------------------------------
 
-static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, ggml_tensor* input_embeds, int T) {
+static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, ggml_tensor* input_embeds, int T,
+                                    bool use_block_mask = false) {
     auto& hp = ctx->hp;
     auto& m = ctx->model;
 
@@ -1077,10 +1078,19 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
 
     ggml_tensor* cur = input_embeds; // (d_model, T)
 
-    // Position IDs: [0, 1, 2, ..., T-1]
+    // Position IDs: [0, 1, 2, ..., T-1] (per-block for the unified CFG graph).
     ggml_tensor* pos_ids = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
     ggml_set_name(pos_ids, "pos_ids");
     ggml_set_input(pos_ids);
+
+    // Optional block-diagonal attention mask (unified cond+uncond fusion): F16
+    // [T_kv, T_q], 0 within a block, -inf across blocks. nullptr = full attention.
+    ggml_tensor* block_mask = nullptr;
+    if (use_block_mask) {
+        block_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T);
+        ggml_set_name(block_mask, "block_mask");
+        ggml_set_input(block_mask);
+    }
 
     const float attn_scale = 1.0f / sqrtf((float)hp.head_dim);
 
@@ -1125,8 +1135,8 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
         V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
 
         // flash_attn_ext: Q/K/V in (hd, T, n_heads/n_kv) → output (hd, n_heads, T)
-        // Full bidirectional (nullptr mask = no masking).
-        ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, attn_scale, 0.0f, 0.0f);
+        // Full bidirectional (nullptr) or block-diagonal (unified CFG) masking.
+        ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, block_mask, attn_scale, 0.0f, 0.0f);
         // Output shape: (head_dim, n_heads, T) → reshape to (n_heads*head_dim, T)
         attn_out = ggml_reshape_2d(ctx0, attn_out, hp.n_heads * hp.head_dim, T);
 
@@ -1418,7 +1428,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         ggml_tensor* logits = nullptr;
         ggml_gallocr_t ga = nullptr;
     };
-    ov_step_graph fwd_c, fwd_u;
+    ov_step_graph fwd_c, fwd_u, fwd_uni;
     auto fwd_free = [](ov_step_graph& g) {
         if (g.ga)
             ggml_gallocr_free(g.ga);
@@ -1427,6 +1437,17 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         g.ga = nullptr;
         g.ctx0 = nullptr;
     };
+    const bool persistent = [] {
+        const char* e = getenv("OMNIVOICE_PERSISTENT_GRAPH");
+        return !(e && e[0] == '0');
+    }();
+    // Unified CFG: fuse the cond + uncond forwards into ONE graph via seq-concat
+    // + a block-diagonal attention mask (per-block RoPE positions). Compute-neutral
+    // but halves per-step dispatch. Opt-in pending a Kaggle CUDA A/B verdict.
+    const bool unified_cfg = [] {
+        const char* e = getenv("OMNIVOICE_UNIFIED_CFG");
+        return e && e[0] && e[0] != '0';
+    }();
     auto run_llm_forward = [&](ov_step_graph& g, const std::vector<float>& emb, int T_in,
                                int target_offset) -> std::vector<float> {
         if (!g.ctx0) {
@@ -1464,10 +1485,6 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             std::memcpy(tgt.data() + (size_t)t * out_dim, all_logits.data() + (size_t)(target_offset + t) * out_dim,
                         out_dim * sizeof(float));
         }
-        static const bool persistent = [] {
-            const char* e = getenv("OMNIVOICE_PERSISTENT_GRAPH");
-            return !(e && e[0] == '0');
-        }();
         if (!persistent)
             fwd_free(g);
         if (getenv("OMNIVOICE_DEBUG_SUM")) {
@@ -1477,6 +1494,67 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             fprintf(stderr, "omnivoice-dbg: T_in=%d off=%d sum=%.9e\n", T_in, target_offset, s);
         }
         return tgt;
+    };
+
+    // Unified cond+uncond forward: concat [cond(T_total) | uncond(T_target)] into
+    // one sequence, per-block RoPE positions, block-diagonal mask, single forward;
+    // splits out cond-target + uncond-target logits. Output-equivalent to two
+    // separate full-attention forwards.
+    auto run_unified = [&](const std::vector<float>& cond_emb, int T_tot, const std::vector<float>& uncond_emb,
+                           int T_tgt, int cond_target_off, std::vector<float>& c_out, std::vector<float>& u_out) {
+        int T_c = T_tot + T_tgt;
+        ov_step_graph& g = fwd_uni;
+        if (!g.ctx0) {
+            size_t n_tensors = hp.n_layers * 40 + 100;
+            size_t mem_size = n_tensors * ggml_tensor_overhead() + ggml_graph_overhead_custom(8192, false);
+            g.mem_buf.resize(mem_size);
+            ggml_init_params ip2 = {mem_size, g.mem_buf.data(), true};
+            g.ctx0 = ggml_init(ip2);
+            g.inp = ggml_new_tensor_2d(g.ctx0, GGML_TYPE_F32, hp.d_model, T_c);
+            ggml_set_name(g.inp, "input_embeds");
+            ggml_set_input(g.inp);
+            g.gf = build_llm_graph(ctx, g.ctx0, g.inp, T_c, /*use_block_mask=*/true);
+            g.ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+            ggml_gallocr_alloc_graph(g.ga, g.gf);
+            g.logits = ggml_graph_get_tensor(g.gf, "audio_logits");
+        }
+        // Concat embeds (d_model, T_c).
+        std::vector<float> cat((size_t)hp.d_model * T_c);
+        std::memcpy(cat.data(), cond_emb.data(), (size_t)hp.d_model * T_tot * sizeof(float));
+        std::memcpy(cat.data() + (size_t)hp.d_model * T_tot, uncond_emb.data(),
+                    (size_t)hp.d_model * T_tgt * sizeof(float));
+        // Per-block positions.
+        std::vector<int32_t> pos(T_c);
+        for (int i = 0; i < T_tot; i++)
+            pos[i] = i;
+        for (int i = 0; i < T_tgt; i++)
+            pos[T_tot + i] = i;
+        if (ggml_tensor* pt = ggml_graph_get_tensor(g.gf, "pos_ids"))
+            ggml_backend_tensor_set(pt, pos.data(), 0, pos.size() * sizeof(int32_t));
+        // Block-diagonal F16 mask: 0 within a block, -inf across (symmetric).
+        std::vector<ggml_fp16_t> mask((size_t)T_c * T_c);
+        const ggml_fp16_t z = ggml_fp32_to_fp16(0.0f), ninf = ggml_fp32_to_fp16(-INFINITY);
+        for (int q = 0; q < T_c; q++) {
+            bool qc = q < T_tot;
+            for (int kk = 0; kk < T_c; kk++)
+                mask[(size_t)q * T_c + kk] = (qc == (kk < T_tot)) ? z : ninf;
+        }
+        if (ggml_tensor* mt = ggml_graph_get_tensor(g.gf, "block_mask"))
+            ggml_backend_tensor_set(mt, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
+        ggml_backend_tensor_set(g.inp, cat.data(), 0, cat.size() * sizeof(float));
+        ggml_backend_graph_compute(ctx->backend, g.gf);
+        std::vector<float> all_logits((size_t)out_dim * T_c);
+        ggml_backend_tensor_get(g.logits, all_logits.data(), 0, all_logits.size() * sizeof(float));
+        c_out.resize((size_t)out_dim * T_tgt);
+        u_out.resize((size_t)out_dim * T_tgt);
+        for (int t = 0; t < T_tgt; t++) {
+            std::memcpy(c_out.data() + (size_t)t * out_dim, all_logits.data() + (size_t)(cond_target_off + t) * out_dim,
+                        out_dim * sizeof(float));
+            std::memcpy(u_out.data() + (size_t)t * out_dim, all_logits.data() + (size_t)(T_tot + t) * out_dim,
+                        out_dim * sizeof(float));
+        }
+        if (!persistent)
+            fwd_free(g);
     };
 
     // 8. Iterative generation loop
@@ -1498,41 +1576,50 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             }
         }
 
-        // Prepare conditional embeddings (full context: style + text + ref + target)
-        std::vector<float> embeds;
-        {
-            ov_bench_stage b("  embeds_cond");
-            embeds = prepare_embeddings(ctx, full_text_ids, audio_tokens, audio_mask, T_total);
-        }
-
-        // Conditional forward (full context)
         int target_start = T_total - T_target;
-        std::vector<float> c_logits;
-        {
-            ov_bench_stage b("  fwd_cond");
-            c_logits = run_llm_forward(fwd_c, embeds, T_total, target_start);
-        }
-
-        // Unconditional forward (target tokens only) for classifier-free guidance
-        std::vector<float> u_logits;
-        if (gen.guidance_scale != 0.0f) {
-            // Build unconditional input: just the target audio tokens
+        std::vector<float> c_logits, u_logits;
+        // Build the uncond (target-only) inputs once when guidance is on.
+        auto build_uncond_embeds = [&]() {
             std::vector<int32_t> u_text_ids(T_target, 0);
             std::vector<bool> u_mask(T_target, true);
-            // Extract just target audio tokens
             std::vector<int32_t> u_audio(hp.n_codebooks * T_target);
-            for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
-                for (int t = 0; t < T_target; t++) {
+            for (uint32_t cb = 0; cb < hp.n_codebooks; cb++)
+                for (int t = 0; t < T_target; t++)
                     u_audio[cb * T_target + t] = audio_tokens[cb * T_audio + T_ref + t];
-                }
-            }
-            std::vector<float> u_embeds;
+            return prepare_embeddings(ctx, u_text_ids, u_audio, u_mask, T_target);
+        };
+
+        if (unified_cfg && gen.guidance_scale != 0.0f) {
+            // Fused single-graph CFG.
+            std::vector<float> embeds, u_embeds;
             {
-                ov_bench_stage b("  embeds_uncond");
-                u_embeds = prepare_embeddings(ctx, u_text_ids, u_audio, u_mask, T_target);
+                ov_bench_stage b("  embeds");
+                embeds = prepare_embeddings(ctx, full_text_ids, audio_tokens, audio_mask, T_total);
+                u_embeds = build_uncond_embeds();
             }
-            ov_bench_stage b("  fwd_uncond");
-            u_logits = run_llm_forward(fwd_u, u_embeds, T_target, 0);
+            ov_bench_stage b("  fwd_unified");
+            run_unified(embeds, T_total, u_embeds, T_target, target_start, c_logits, u_logits);
+        } else {
+            // Prepare conditional embeddings (full context: style + text + ref + target)
+            std::vector<float> embeds;
+            {
+                ov_bench_stage b("  embeds_cond");
+                embeds = prepare_embeddings(ctx, full_text_ids, audio_tokens, audio_mask, T_total);
+            }
+            {
+                ov_bench_stage b("  fwd_cond");
+                c_logits = run_llm_forward(fwd_c, embeds, T_total, target_start);
+            }
+            // Unconditional forward (target tokens only) for classifier-free guidance
+            if (gen.guidance_scale != 0.0f) {
+                std::vector<float> u_embeds;
+                {
+                    ov_bench_stage b("  embeds_uncond");
+                    u_embeds = build_uncond_embeds();
+                }
+                ov_bench_stage b("  fwd_uncond");
+                u_logits = run_llm_forward(fwd_u, u_embeds, T_target, 0);
+            }
         }
 
         // _predict_tokens_with_scoring — mirrors Python exactly:
@@ -1672,6 +1759,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
 
     fwd_free(fwd_c);
     fwd_free(fwd_u);
+    fwd_free(fwd_uni);
 
     if (getenv("OMNIVOICE_DEBUG_CODES")) {
         int n_mask = 0;
