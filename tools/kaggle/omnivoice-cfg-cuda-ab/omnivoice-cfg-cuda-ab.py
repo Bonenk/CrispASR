@@ -83,10 +83,12 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "sound
 prog("pip deps installed")
 
 
-def hf_get(repo, fname, dest, timeout=900, tries=6):
+def hf_get(repo, fname, dest, timeout=600, tries=5):
     """Download a HF LFS/Xet file via curl -L (follows the 302 to the Xet CAS
     bridge and streams plain HTTP) — the HF client's hf_xet path STRANDS on Kaggle
-    (CLAUDE.md CLOSE_WAIT). Resume (-C -) + retry loop + expected-size verify."""
+    (CLAUDE.md CLOSE_WAIT). NO -C - resume: it sends a Range header the signed CAS
+    URL rejects (Kaggle rc=22). Fresh GET each retry + exact-size verify + backoff.
+    Validated locally (403 MB in 70 s, exact size)."""
     prog(f"dl.begin {fname}")
     step("dl.begin", file=fname)
     dest = Path(dest)
@@ -94,17 +96,19 @@ def hf_get(repo, fname, dest, timeout=900, tries=6):
     out = dest / fname
     url = f"https://huggingface.co/{repo}/resolve/main/{fname}"
     hdr = ["-H", f"Authorization: Bearer {TOKEN}"] if TOKEN else []
-    # Expected size from the redirect target (HEAD), for a completeness check.
     exp = None
-    try:
+    try:  # expected size = MAX content-length across the redirect chain (the file)
         h = subprocess.run(["curl", "-sIL", *hdr, url], capture_output=True, text=True, timeout=60).stdout
-        for ln in h.splitlines():
-            if ln.lower().startswith("content-length:"):
-                exp = int(ln.split(":", 1)[1].strip())  # last one = redirect target
+        cls = [int(l.split(":", 1)[1].strip()) for l in h.splitlines()
+               if l.lower().startswith("content-length:") and l.split(":", 1)[1].strip().isdigit()]
+        exp = max(cls) if cls else None
     except Exception:
         pass
+    sz = 0
     for attempt in range(1, tries + 1):
-        rc = subprocess.call(["curl", "-L", "--fail", "-C", "-", "--connect-timeout", "30",
+        if out.exists():
+            out.unlink()  # fresh download — no Range/resume on the signed URL
+        rc = subprocess.call(["curl", "-sL", "--fail", "--connect-timeout", "30",
                               "--max-time", str(timeout), *hdr, "-o", str(out), url])
         sz = out.stat().st_size if out.is_file() else 0
         if rc == 0 and (exp is None or sz >= exp):
@@ -112,7 +116,7 @@ def hf_get(repo, fname, dest, timeout=900, tries=6):
             step("dl.done", file=fname, mb=round(sz / 1e6, 1))
             return str(out)
         prog(f"dl.retry {fname} attempt={attempt} rc={rc} sz={sz} exp={exp}")
-        time.sleep(5)
+        time.sleep(10 * attempt)  # backoff (rate-limit safe)
     raise RuntimeError(f"curl download failed for {fname} after {tries} tries (sz={sz} exp={exp})")
     return p
 
