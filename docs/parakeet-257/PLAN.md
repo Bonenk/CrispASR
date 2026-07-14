@@ -33,8 +33,12 @@ mid-sentence split segments. Not seen with cohere/granite.
   → INVESTIGATING the dispatcher chunk+merge + LCS dedup (crispasr_c_api
   session_transcribe_chunked path).
 
+### Progress
+- (A) DONE: extracted `parakeet_group_words()` helper, called from decode_frames +
+  transcribe_ex. Streamed path (STREAM_THRESHOLD=0) now emits 22 words on jfk (was 0).
+
 ### Next
-1. (A) shared word-grouping helper → decode_frames; verify streamed path emits words.
+1. (A) done.
 2. (B) find why the chunk-merge drops parakeet tails; fix; verify jfk chunked == baseline.
 3. Unit test(s) for the word-grouping helper + a chunk-merge regression.
 4. Build, run unit tests, merge to main, comment #257.

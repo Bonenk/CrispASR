@@ -3376,6 +3376,142 @@ extern "C" float* parakeet_encode(struct parakeet_context* ctx, const float* sam
     return out;
 }
 
+// Group r->tokens into r->words (issue #257). Shared by parakeet_transcribe_ex
+// (single-pass) and parakeet_decode_frames (streamed / chunked) so every path
+// emits a word list — previously decode_frames left r->words null and the CLI
+// adapter only *copies* r->words, so streamed/chunked output had no words.
+static void parakeet_group_words(parakeet_result* r, int frame_dur_cs) {
+    // ----- Group sub-word tokens into words -----
+    //
+    // Latin SentencePiece convention: a token starting with U+2581 (▁ → ' ')
+    // begins a new word. Punctuation tokens attach to the previous word.
+    //
+    // Japanese parakeet (and other no-space tokenizers) emit no leading-space
+    // markers because written Japanese has no inter-word spaces. In that
+    // mode every non-punctuation token is its own "word" — sufficient
+    // granularity for word-level SRT (issue #37).
+    std::vector<parakeet_word_data> words;
+    words.reserve(r->n_tokens);
+
+    // Detect tokenizer style: count tokens that look like real
+    // word-starts (leading space + at least one more char). A
+    // standalone " " token (BOS-ish) doesn't count.
+    int n_space_word_starts = 0;
+    for (int i = 0; i < r->n_tokens; i++) {
+        const char* t = r->tokens[i].text;
+        if (t[0] == ' ' && t[1] != '\0')
+            n_space_word_starts++;
+    }
+    const bool space_prefix_style = (n_space_word_starts >= 2);
+
+    auto is_punct_only = [](const char* s) {
+        if (!s || !*s)
+            return false;
+        const unsigned char* p = (const unsigned char*)s;
+        while (*p) {
+            unsigned char c = *p;
+            if (c < 0x80) {
+                if (!(c == '.' || c == ',' || c == '?' || c == '!' || c == ';' || c == ':' || c == '\'' || c == '"' ||
+                      c == '(' || c == ')' || c == '-'))
+                    return false;
+                p++;
+            } else if (c == 0xE3 && p[1] == 0x80 && p[2] >= 0x80 && p[2] <= 0xBF) {
+                p += 3; // U+3000–U+303F CJK Symbols and Punctuation
+            } else if (c == 0xE3 && p[1] == 0x83 && p[2] == 0xBB) {
+                p += 3; // U+30FB ・
+            } else if (c == 0xEF && p[1] == 0xBC && ((p[2] >= 0x81 && p[2] <= 0x8F) || p[2] == 0x9F)) {
+                p += 3; // U+FF01–U+FF0F, U+FF1F
+            } else {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    auto ends_with_sentence_punct = [](const char* s) {
+        size_t len = s ? strlen(s) : 0;
+        if (len == 0)
+            return false;
+        unsigned char last = (unsigned char)s[len - 1];
+        if (last == '.' || last == '!' || last == '?')
+            return true;
+        if (len >= 3) {
+            const unsigned char* tail = (const unsigned char*)(s + len - 3);
+            if (tail[0] == 0xE3 && tail[1] == 0x80 && tail[2] == 0x82)
+                return true;
+            if (tail[0] == 0xEF && tail[1] == 0xBC && (tail[2] == 0x81 || tail[2] == 0x9F))
+                return true;
+        }
+        return false;
+    };
+
+    parakeet_word_data cur = {};
+    bool have_cur = false;
+    float cur_p_sum = 0.0f;
+    int cur_p_cnt = 0;
+
+    auto flush_cur = [&]() {
+        if (cur_p_cnt > 0)
+            cur.p = cur_p_sum / (float)cur_p_cnt;
+        words.push_back(cur);
+    };
+
+    for (int i = 0; i < r->n_tokens; i++) {
+        const auto& td = r->tokens[i];
+        if (!td.text[0])
+            continue;
+        if (td.text[0] == ' ' && td.text[1] == '\0')
+            continue; // standalone space / BOS marker
+
+        const bool has_leading_space = (td.text[0] == ' ');
+        const bool is_punct = is_punct_only(td.text);
+        const bool is_new_word = !is_punct && (has_leading_space || !space_prefix_style);
+
+        if (is_new_word && have_cur) {
+            flush_cur();
+            cur = {};
+            cur_p_sum = 0.0f;
+            cur_p_cnt = 0;
+            have_cur = false;
+        }
+
+        if (!have_cur) {
+            cur.t0 = td.t0;
+            have_cur = true;
+        }
+        cur.t1 = td.t1;
+        cur_p_sum += td.p;
+        cur_p_cnt += 1;
+
+        const char* src = td.text + (has_leading_space ? 1 : 0);
+        size_t cur_len = strlen(cur.text);
+        size_t cap = sizeof(cur.text) - cur_len - 1;
+        size_t add = strlen(src);
+        if (add > cap)
+            add = cap;
+        memcpy(cur.text + cur_len, src, add);
+        cur.text[cur_len + add] = '\0';
+    }
+    if (have_cur)
+        flush_cur();
+
+    // Insert minimum gaps after sentence-ending punctuation (subtitle spacing).
+    for (size_t wi = 0; wi + 1 < words.size(); wi++) {
+        if (!ends_with_sentence_punct(words[wi].text))
+            continue;
+        if (words[wi].t1 >= words[wi + 1].t0 && words[wi].t1 > words[wi].t0) {
+            int64_t shrunk = words[wi].t1 - frame_dur_cs;
+            if (shrunk > words[wi].t0)
+                words[wi].t1 = shrunk;
+        }
+    }
+
+    r->n_words = (int)words.size();
+    r->words = (parakeet_word_data*)calloc(r->n_words > 0 ? r->n_words : 1, sizeof(parakeet_word_data));
+    for (int i = 0; i < r->n_words; i++)
+        r->words[i] = words[i];
+}
+
 extern "C" struct parakeet_result* parakeet_decode_frames(struct parakeet_context* ctx, const float* enc_frames,
                                                           int T_enc, int d_model, int64_t t_offset_cs) {
     if (!ctx || !enc_frames || T_enc <= 0)
@@ -3423,13 +3559,9 @@ extern "C" struct parakeet_result* parakeet_decode_frames(struct parakeet_contex
         text = text.substr(1);
     r->text = strdup(text.c_str());
 
-    // Word grouping — reuse the logic from parakeet_transcribe_ex.
-    // (Simplified: delegate to the existing result builder by calling
-    // parakeet_transcribe_ex's word-grouping code. For now, skip word
-    // grouping in the split path — the backend adapter builds words
-    // from tokens anyway.)
-    r->words = nullptr;
-    r->n_words = 0;
+    // Word grouping (issue #257): the streamed / chunked paths funnel through
+    // here, so build words too — otherwise those paths emit none.
+    parakeet_group_words(r, frame_dur_cs);
 
     return r;
 }
@@ -3812,162 +3944,7 @@ extern "C" struct parakeet_result* parakeet_transcribe_ex(struct parakeet_contex
         text = text.substr(1);
     r->text = strdup(text.c_str());
 
-    // ----- Group sub-word tokens into words -----
-    //
-    // Latin SentencePiece convention: a token starting with U+2581 (▁ → ' ')
-    // begins a new word. Punctuation tokens attach to the previous word.
-    //
-    // Japanese parakeet (and other no-space tokenizers) emit no leading-space
-    // markers because written Japanese has no inter-word spaces. In that
-    // mode every non-punctuation token is its own "word" — sufficient
-    // granularity for word-level SRT (issue #37).
-    {
-        std::vector<parakeet_word_data> words;
-        words.reserve(r->n_tokens);
-
-        // Detect tokenizer style: count tokens that look like real
-        // word-starts (leading space + at least one more char). A
-        // standalone " " token (BOS-ish) doesn't count.
-        int n_space_word_starts = 0;
-        for (int i = 0; i < r->n_tokens; i++) {
-            const char* t = r->tokens[i].text;
-            if (t[0] == ' ' && t[1] != '\0')
-                n_space_word_starts++;
-        }
-        const bool space_prefix_style = (n_space_word_starts >= 2);
-
-        // Pure-punctuation detector. Recognises ASCII punct plus the
-        // common CJK punctuation (。、？！「」『』・,) so JA tokens
-        // like "、" attach to the previous word instead of forming their
-        // own subtitle entry.
-        auto is_punct_only = [](const char* s) {
-            if (!s || !*s)
-                return false;
-            const unsigned char* p = (const unsigned char*)s;
-            while (*p) {
-                unsigned char c = *p;
-                if (c < 0x80) {
-                    if (!(c == '.' || c == ',' || c == '?' || c == '!' || c == ';' || c == ':' || c == '\'' ||
-                          c == '"' || c == '(' || c == ')' || c == '-'))
-                        return false;
-                    p++;
-                } else if (c == 0xE3 && p[1] == 0x80 && p[2] >= 0x80 && p[2] <= 0xBF) {
-                    // U+3000–U+303F: CJK Symbols and Punctuation (。、「」『』 etc.)
-                    p += 3;
-                } else if (c == 0xE3 && p[1] == 0x83 && p[2] == 0xBB) {
-                    // U+30FB ・ (katakana middle dot)
-                    p += 3;
-                } else if (c == 0xEF && p[1] == 0xBC && ((p[2] >= 0x81 && p[2] <= 0x8F) || p[2] == 0x9F)) {
-                    // U+FF01–U+FF0F (full-width !"#$%&'()*+,-./) and U+FF1F (？)
-                    p += 3;
-                } else {
-                    return false;
-                }
-            }
-            return true;
-        };
-
-        // True end-of-sentence punct (for the gap-insertion pass below).
-        auto ends_with_sentence_punct = [](const char* s) {
-            size_t len = s ? strlen(s) : 0;
-            if (len == 0)
-                return false;
-            unsigned char last = (unsigned char)s[len - 1];
-            if (last == '.' || last == '!' || last == '?')
-                return true;
-            if (len >= 3) {
-                const unsigned char* tail = (const unsigned char*)(s + len - 3);
-                // U+3002 。 = E3 80 82, U+FF01 ！ = EF BC 81, U+FF1F ？ = EF BC 9F
-                if (tail[0] == 0xE3 && tail[1] == 0x80 && tail[2] == 0x82)
-                    return true;
-                if (tail[0] == 0xEF && tail[1] == 0xBC && (tail[2] == 0x81 || tail[2] == 0x9F))
-                    return true;
-            }
-            return false;
-        };
-
-        parakeet_word_data cur = {};
-        bool have_cur = false;
-        // Per-word probability: arithmetic mean of contributing tokens'
-        // softmax probabilities. Tracked alongside `cur`.
-        float cur_p_sum = 0.0f;
-        int cur_p_cnt = 0;
-
-        auto flush_cur = [&]() {
-            if (cur_p_cnt > 0)
-                cur.p = cur_p_sum / (float)cur_p_cnt;
-            words.push_back(cur);
-        };
-
-        for (int i = 0; i < r->n_tokens; i++) {
-            const auto& td = r->tokens[i];
-            if (!td.text[0])
-                continue;
-            // Skip standalone space tokens (e.g. an initial " " BOS marker).
-            // Without this they leak through as empty word entries in
-            // no-space mode.
-            if (td.text[0] == ' ' && td.text[1] == '\0')
-                continue;
-
-            const bool has_leading_space = (td.text[0] == ' ');
-            const bool is_punct = is_punct_only(td.text);
-
-            // A token starts a new word if either:
-            //   - it has a Latin-style leading-space marker, or
-            //   - the segment is no-space style (e.g. JA) and the token
-            //     is not pure punctuation (so 、 attaches to prev word).
-            const bool is_new_word = !is_punct && (has_leading_space || !space_prefix_style);
-
-            if (is_new_word && have_cur) {
-                flush_cur();
-                cur = {};
-                cur_p_sum = 0.0f;
-                cur_p_cnt = 0;
-                have_cur = false;
-            }
-
-            if (!have_cur) {
-                cur.t0 = td.t0;
-                have_cur = true;
-            }
-            cur.t1 = td.t1;
-            cur_p_sum += td.p;
-            cur_p_cnt += 1;
-
-            // Append, dropping the leading space.
-            const char* src = td.text + (has_leading_space ? 1 : 0);
-            size_t cur_len = strlen(cur.text);
-            size_t cap = sizeof(cur.text) - cur_len - 1;
-            size_t add = strlen(src);
-            if (add > cap)
-                add = cap;
-            memcpy(cur.text + cur_len, src, add);
-            cur.text[cur_len + add] = '\0';
-        }
-        if (have_cur)
-            flush_cur();
-
-        // Post-process: insert minimum gaps after sentence-ending punctuation.
-        // The TDT decoder often produces contiguous timestamps even across
-        // sentence boundaries (e.g. "code." t1==6.400, "In" t0==6.400).
-        // When a word ends with .!?。！？ and the next word starts at the
-        // exact same frame, shrink the punctuated word's t1 by one frame
-        // duration to create a visible gap in subtitles.
-        for (size_t wi = 0; wi + 1 < words.size(); wi++) {
-            if (!ends_with_sentence_punct(words[wi].text))
-                continue;
-            if (words[wi].t1 >= words[wi + 1].t0 && words[wi].t1 > words[wi].t0) {
-                int64_t shrunk = words[wi].t1 - frame_dur_cs;
-                if (shrunk > words[wi].t0)
-                    words[wi].t1 = shrunk;
-            }
-        }
-
-        r->n_words = (int)words.size();
-        r->words = (parakeet_word_data*)calloc(r->n_words > 0 ? r->n_words : 1, sizeof(parakeet_word_data));
-        for (int i = 0; i < r->n_words; i++)
-            r->words[i] = words[i];
-    }
+    parakeet_group_words(r, frame_dur_cs);
 
     return r;
 }
