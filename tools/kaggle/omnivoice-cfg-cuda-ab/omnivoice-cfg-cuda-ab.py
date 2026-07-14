@@ -28,12 +28,26 @@ import time
 from pathlib import Path
 
 WORK = Path("/kaggle/working")
-REPO = WORK / "CrispASR"
 TEMP = Path("/kaggle/temp") if Path("/kaggle/temp").is_dir() else Path("/tmp")
+REPO = TEMP / "CrispASR"  # clone OUT of /kaggle/working (#22: keeps output page-1 retrievable)
 BRANCH = "main"
 TXT = "The quick brown fox jumps over the lazy dog."
 STEPS = 24
 RESULTS = {"stage": "start", "ours": {}, "theirs": {}, "verdict": {}}
+_PROG = WORK / "progress.txt"
+
+
+def prog(msg):
+    """Flushed append to /kaggle/working/progress.txt — survives a hard-kill/OOM
+    (gotcha #15: kernels_output can't fetch logs; write progress to the working dir)."""
+    try:
+        with open(_PROG, "a") as f:
+            f.write(msg + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+    except Exception:
+        pass
+    print(msg, flush=True)
 
 
 def dump_results():
@@ -43,10 +57,11 @@ def dump_results():
         pass
 
 
-print("=== Phase 0: clone + build ours ===", flush=True)
+prog("Phase 0: clone (to /kaggle/temp) + build ours")
 if not REPO.exists():
     subprocess.check_call(["git", "clone", "--depth", "1", "-b", BRANCH,
                            "https://github.com/CrispStrobe/CrispASR", str(REPO)])
+prog("clone done")
 if (REPO / "ggml").is_dir() and not (REPO / "ggml" / "CMakeLists.txt").exists():
     subprocess.check_call(["git", "submodule", "update", "--init", "ggml"], cwd=str(REPO))
 sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
@@ -54,17 +69,21 @@ if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaggle_harness as kh  # noqa: E402
 
+prog("harness imported")
 kh.init_progress(hf_progress_repo="cstr/crispasr-kaggle-progress")
 step = kh.step
 step("script.start", branch=BRANCH)
 TOKEN = kh.resolve_hf_token("HF_TOKEN")
+prog(f"token resolved: {bool(TOKEN)}")
 
 subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", "huggingface_hub", "soundfile"])
 from huggingface_hub import hf_hub_download  # noqa: E402
+prog("pip deps installed")
 
 
 def hf_get(repo, fname, dest, timeout=300):
     """Download in a daemon thread with a join timeout (Kaggle HF ops strand)."""
+    prog(f"dl.begin {fname}")
     step("dl.begin", file=fname)
     holder = {}
 
@@ -83,6 +102,7 @@ def hf_get(repo, fname, dest, timeout=300):
         raise RuntimeError(f"hf_hub_download({fname}) failed: {holder['err']}")
     p = holder["path"]
     sz = os.path.getsize(p)
+    prog(f"dl.done {fname} {round(sz / 1e6, 1)}MB")
     step("dl.done", file=fname, mb=round(sz / 1e6, 1))
     return p
 
@@ -105,21 +125,33 @@ try:
 
     has_cuda = Path("/usr/local/cuda/bin/nvcc").exists()
     RESULTS["stage"] = "build"
+    dump_results()
+    prog(f"build.begin cuda={has_cuda}")
     step("build.begin", cuda=has_cuda)
     flags = (kh.cuda_build_flags(kh.detect_cuda_arch()) if has_cuda else []) + kh.cache_and_link_flags()
     subprocess.check_call(f"cmake -G Ninja -B {BUILD} -S {REPO} -DCMAKE_BUILD_TYPE=Release " + " ".join(flags),
                           shell=True)
+    # Conservative -j: the full CLI+CUDA compile is memory-heavy on a 13 GB P100
+    # (gotcha #5); cap at 2 to avoid an OOM hard-kill.
+    jobs = min(2, int(kh.safe_build_jobs(has_cuda)) if str(kh.safe_build_jobs(has_cuda)).isdigit() else 2)
     with kh.build_heartbeat("cmake.build"):
-        kh.sh_with_progress(f"stdbuf -oL -eL cmake --build {BUILD} -j {kh.safe_build_jobs(has_cuda)} --target crispasr")
+        kh.sh_with_progress(f"stdbuf -oL -eL cmake --build {BUILD} -j {jobs} --target crispasr")
     CLI = BUILD / "bin" / "crispasr"
     assert CLI.is_file(), f"CLI not built at {CLI}"
+    prog("build.done")
+    RESULTS["stage"] = "build_done"
+    dump_results()
     step("build.done")
 
     RESULTS["stage"] = "download"
+    dump_results()
     MODELS = TEMP / "models"
     MODELS.mkdir(parents=True, exist_ok=True)
     MODEL = hf_get("cstr/omnivoice-GGUF", "omnivoice-q8_0.gguf", MODELS)
     TOK = hf_get("cstr/omnivoice-GGUF", "omnivoice-tokenizer-f16.gguf", MODELS)
+    prog("models downloaded")
+    RESULTS["stage"] = "models_done"
+    dump_results()
     step("model.downloaded")
 
     _FWD = re.compile(r"omnivoice_bench:\s+(fwd_cond|fwd_uncond|fwd_unified)\s+([0-9.]+)\s+ms")
@@ -127,6 +159,7 @@ try:
     _BACKEND = re.compile(r"compute backend = (\S+)")
 
     def run_cfg(name, env_extra, timeout=420):
+        prog(f"cfg.begin {name}")
         step("cfg.begin", cfg=name)
         env = dict(os.environ, OMNIVOICE_BENCH="1", OMNIVOICE_DEBUG_CODES="1", **env_extra)
         out = MODELS / f"{name}.wav"
@@ -163,13 +196,16 @@ try:
                "warm_median": (statistics.median(per_step[3:]) if len(per_step) > 4 else None),
                "codes": (cm.group(1).strip() if cm else None), "backend": (bm.group(1) if bm else "?"),
                "dur": round(dur, 2), "ok": ok, "err_tail": ("" if ok else err[-600:])}
+        prog(f"cfg.done {name} ok={ok} median={res['warm_median']} backend={res['backend']} rc={rc} dur={res['dur']}")
         step("cfg.done", cfg=name, ok=ok, warm_median_ms=res["warm_median"], backend=res["backend"],
              dur=res["dur"], rc=rc, timed_out=timed_out)
         return res
 
     RESULTS["stage"] = "bench_ours"
+    dump_results()
     for nm, ev in [("2forward", {}), ("unified", {"OMNIVOICE_UNIFIED_CFG": "1"})]:
         RESULTS["ours"][nm] = run_cfg(nm, ev)
+        RESULTS["stage"] = f"bench_ours_{nm}_done"
         dump_results()
 
     two, uni = RESULTS["ours"]["2forward"], RESULTS["ours"]["unified"]
@@ -202,12 +238,12 @@ try:
             pt.write_text(txt.replace(needle, inj, 1))
         obuild = OVCPP / "build"
         cuda_flag = "-DGGML_CUDA=ON" if has_cuda else ""
+        prog("ovcpp.build.begin")
         step("ovcpp.build.begin")
         subprocess.check_call(f"cmake -B {obuild} -S {OVCPP} -DCMAKE_BUILD_TYPE=Release {cuda_flag} -DGGML_NATIVE=OFF",
                               shell=True)
         with kh.build_heartbeat("ovcpp.build"):
-            kh.sh_with_progress(f"stdbuf -oL -eL cmake --build {obuild} -j {kh.safe_build_jobs(has_cuda)} "
-                                f"--target omnivoice-tts")
+            kh.sh_with_progress(f"stdbuf -oL -eL cmake --build {obuild} -j {jobs} --target omnivoice-tts")
         otts = obuild / "omnivoice-tts"
         if not otts.is_file():
             otts = obuild / "bin" / "omnivoice-tts"
@@ -228,21 +264,25 @@ try:
         theirs.update({"rc": rc, "n_steps": len(steps),
                        "warm_median": (statistics.median(steps[3:]) if len(steps) > 4 else None),
                        "err_tail": ("" if rc == 0 and steps else err[-600:])})
+        prog(f"ovcpp.bench rc={rc} median={theirs['warm_median']} n={len(steps)}")
         step("ovcpp.bench", rc=rc, warm_median_ms=theirs["warm_median"], n=len(steps))
     except Exception as e:  # noqa: BLE001
         theirs["error"] = str(e)[:300]
+        prog(f"ovcpp.error {str(e)[:150]}")
         step("ovcpp.error", err=str(e)[:200])
 
     RESULTS["verdict"]["theirs_ovcpp_ms"] = theirs.get("warm_median")
     RESULTS["stage"] = "done"
-    step("script.done", **RESULTS["verdict"])
     dump_results()
+    prog("script.done " + json.dumps(RESULTS["verdict"]))
+    step("script.done", **RESULTS["verdict"])
     print("DONE", json.dumps(RESULTS["verdict"]), flush=True)
 
 except Exception as e:  # noqa: BLE001
     import traceback
     RESULTS["fatal"] = {"stage": RESULTS["stage"], "error": str(e), "tb": traceback.format_exc()[-1500:]}
     dump_results()
+    prog(f"FATAL at {RESULTS['stage']}: {str(e)[:200]}")
     try:
         step("script.FATAL", stage=RESULTS["stage"], err=str(e)[:200])
     except Exception:
