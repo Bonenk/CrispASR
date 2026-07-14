@@ -1453,12 +1453,16 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         const char* e = getenv("OMNIVOICE_PERSISTENT_GRAPH");
         return !(e && e[0] == '0');
     }();
-    // Unified CFG: fuse the cond + uncond forwards into ONE graph via seq-concat
-    // + a block-diagonal attention mask (per-block RoPE positions). Compute-neutral
-    // but halves per-step dispatch. Opt-in pending a Kaggle CUDA A/B verdict.
-    const bool unified_cfg = [] {
+    // Unified CFG: fuse cond + uncond into ONE graph (seq-concat + per-block
+    // attention split, per-block RoPE positions). Kaggle CUDA A/B verdict: on CUDA
+    // it's ~13% faster (67 vs 77 ms/step, codes byte-identical) so it's the default
+    // there; on Metal/CPU the forward is compute-bound and fusion is ~3% slower, so
+    // 2-forward stays the default. Override with OMNIVOICE_UNIFIED_CFG=0/1.
+    const bool unified_cfg = [&] {
         const char* e = getenv("OMNIVOICE_UNIFIED_CFG");
-        return e && e[0] && e[0] != '0';
+        if (e && e[0])
+            return e[0] != '0'; // explicit override
+        return ctx->backend && std::strstr(ggml_backend_name(ctx->backend), "CUDA") != nullptr;
     }();
     auto run_llm_forward = [&](ov_step_graph& g, const std::vector<float>& emb, int T_in,
                                int target_offset) -> std::vector<float> {

@@ -130,17 +130,29 @@ Per-step FORWARD (both cond+uncond), M1 Metal, clean:
   since we already process fewer tokens (238 vs their padded 256). Beating them further
   is kernel-level (port their Metal kernels) — a separate deep effort, uncertain payoff.
 
-### CUDA A/B (Kaggle) — the one place a "beat" is still plausible
-`tools/kaggle/omnivoice-cfg-cuda-ab/` (chr1s4): builds crispasr CLI CUDA, benches
-per-step fwd 2-forward vs `OMNIVOICE_UNIFIED_CFG` with code-match proof-of-work, +
-best-effort omnivoice.cpp B'=2 head-to-head. Answers: does the fusion that LOST on
-M1 (compute-bound) win on CUDA (where batching/dispatch differ)? Pushed + running
-2026-07-14; results → `results.json` + step() to cstr/crispasr-kaggle-progress.
+### ✅ CUDA A/B verdict (Kaggle chr1s4, P100/T4) — the fusion WINS on CUDA
+`tools/kaggle/omnivoice-cfg-cuda-ab/`. Per-step forward, on_cuda=true (CUDA0),
+codes byte-identical (proof-of-work ✓):
+| config | CUDA ms/step | M1 Metal ms/step |
+|--------|------|------|
+| 2-forward | 77.2 | ~170 |
+| **unified CFG** | **67.1 (−13%)** | ~200 (+3%, worse) |
+
+**So the fusion that LOSES on M1 (compute-bound) WINS ~13% on CUDA** (batching/dispatch
+differ — exactly the dev-guide prediction). Codes byte-identical ⇒ pure speed win.
+**Landed: `OMNIVOICE_UNIFIED_CFG` now auto-defaults ON for CUDA, OFF for Metal/CPU**
+(env override kept). omnivoice.cpp's CUDA build errored on Kaggle → no head-to-head
+vs theirs on CUDA (M1 was parity: 170 vs 167).
+
+Kaggle regime lessons burned in (kernel is now the reference impl for HF-on-Kaggle):
+downloads via `curl -L` (HF client Xet path strands, CLAUDE.md gotcha #1; NO `-C -` —
+signed CAS URL rejects Range → rc=22); clone to `/kaggle/temp` (#22); flushed
+`progress.txt` after every phase (#15 — survives hard-kill); `-j2` (OOM #5).
 
 ### Remaining (optional)
-1. Await CUDA A/B verdict; flip `OMNIVOICE_UNIFIED_CFG` default only if it wins there.
-2. Kernel-level: profile per-op vs their ggml fork if sub-parity RTF is wanted.
-3. Match torchaudio resample (Hann sinc) to push encode codes >99%.
+1. Kernel-level: profile per-op vs their ggml fork for sub-parity RTF on M1.
+2. Match torchaudio resample (Hann sinc) to push encode codes >99%.
+3. Re-confirm CUDA win with a 2nd run + T4-vs-P100 before over-trusting one box.
 3. **Ship the GGUF fix**: `omnivoice-tokenizer-f16-fixed.gguf` (0 zeroed channels)
    → replace corrupt HF `cstr/omnivoice-GGUF` + registry SHA bump.
 4. RTF wins (issue #2), gated + A/B'd.
