@@ -515,6 +515,16 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     if (!params.chunk_seconds_explicit && (backend.capabilities() & CAP_UNBOUNDED_INPUT)) {
         effective_chunk_seconds = 0;
     }
+    // Issue #257: a backend that chunks internally (parakeet / canary — full-
+    // attention FastConformer) is corrupted by the dispatcher's per-slice
+    // transcribe + overlap-save trim + LCS merge. When the user forces
+    // --chunk-seconds on such a backend, hand it the whole clip and let its
+    // internal chunker honour the requested size (see the header for the gate).
+    if (crispasr_chunk_context::backend_self_chunks_on_explicit(
+            (backend.capabilities() & CAP_INTERNAL_CHUNKING) != 0, params.chunk_seconds_explicit,
+            params.chunk_seconds)) {
+        effective_chunk_seconds = 0;
+    }
 
     // Issue #89: CAP_UNBOUNDED_INPUT backends are mathematically able to take
     // arbitrarily long audio, but in practice the FastConformer encoder + TDT
