@@ -641,6 +641,10 @@ constexpr Entry k_registry[] = {
     // OmniVoice: k2-fsa/OmniVoice — Qwen3-0.6B backbone with masked
     // iterative multi-codebook TTS (8 codebooks × 1025 vocab, 600+
     // languages). Uses HiggsAudioV2 audio tokenizer for encode/decode.
+    // cstr/omnivoice-GGUF also hosts base quants omnivoice-{q8_0,q4_k}.gguf and a
+    // smaller TTS-ONLY omnivoice-tokenizer-q8_0.gguf (320 MB) — the Q8 tokenizer
+    // decodes fine but voice-clone ENCODE needs F16 (RVQ nearest-neighbor is
+    // quant-sensitive), so the default tokenizer stays f16.
     {"omnivoice", "omnivoice-f16.gguf",
      "https://huggingface.co/cstr/omnivoice-GGUF/resolve/main/omnivoice-f16.gguf",
      "~1.2 GB",
