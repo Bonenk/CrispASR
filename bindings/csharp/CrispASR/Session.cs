@@ -547,8 +547,12 @@ namespace CrispASR
         {
             var buf = new byte[128];
             int rc = NativeMethods.crispasr_detect_backend_from_gguf(path, buf, buf.Length);
-            if (rc != 0) return null;
-            return NativeMethods.NullTerminated(buf);
+            // rc > 0 = detected (strlen of name); rc == 0 = valid GGUF but no backend
+            // mapping; rc < 0 = error. The prior `rc != 0` returned null on every
+            // successful detection.
+            if (rc <= 0) return null;
+            var name = NativeMethods.NullTerminated(buf);
+            return string.IsNullOrEmpty(name) ? null : name;
         }
 
         // ----------------------------------------------------------------

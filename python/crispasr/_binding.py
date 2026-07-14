@@ -3015,7 +3015,10 @@ def detect_backend_from_gguf(
 
     out = ctypes.create_string_buffer(64)
     rc = fn(gguf_path.encode("utf-8"), out, 64)
-    if rc != 0:
+    # ABI contract: rc > 0 = detected (strlen of the name), rc == 0 = valid
+    # GGUF but its architecture maps to no backend (name is ""), rc < 0 = error.
+    # A prior `rc != 0` check treated every successful detection as a failure.
+    if rc < 0:
         raise RuntimeError(f"detect_backend_from_gguf failed (rc={rc})")
     return out.value.decode("utf-8")
 
