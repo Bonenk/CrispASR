@@ -23,7 +23,7 @@ import wave
 from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"  # rust downloader — avoids CLOSE_WAIT hangs
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"  # hf_transfer re-fetches from 0 (no resume) -> wedges; use curl -C -
 
 TEMP = Path("/kaggle/temp") if Path("/kaggle/temp").is_dir() else Path("/tmp")
 WORK = Path("/kaggle/working")
@@ -175,86 +175,65 @@ def main():
         raise SystemExit(f"binaries missing cli={cli} quant={quant}")
     os.environ["LD_LIBRARY_PATH"] = f"{BUILD / 'src'}:{os.environ.get('LD_LIBRARY_PATH', '')}"
     kh.step("build ok")
+    # Stash the (now-populated) ccache as a single output tar so the seed dataset
+    # can be refreshed externally -> future builds warm (~3 min instead of ~23).
+    subprocess.run("cd /kaggle/temp && tar cf /kaggle/working/ccache.tar .ccache 2>/dev/null || true", shell=True)
+    kh.step("ccache stashed")
 
     # ── backbone F16 (download) + codec (download safetensors + convert) ───
     import threading
-    from huggingface_hub import snapshot_download, hf_hub_download, HfApi  # noqa: E402
     conv = REPO / "models" / "convert-moss-tts-local-to-gguf.py"
+    HFBASE = "https://huggingface.co"
 
-    def dir_bytes(d):
-        try:
-            return sum(f.stat().st_size for f in Path(d).rglob("*") if f.is_file())
-        except Exception:  # noqa: BLE001
-            return 0
+    def curl_get(what, url, out, total_timeout=3000):
+        # Resumable download. curl -C - continues the partial file; --speed-time
+        # aborts a stalled connection (<30KB/s for 20s) and --retry resumes from the
+        # partial byte -> ratchets THROUGH the wedge that kills hf_transfer (which
+        # re-fetches from 0 each attempt and never resumes). Watched via file size.
+        out = Path(out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        cmd = ("curl -sSL -C - --retry 50 --retry-delay 3 --retry-all-errors "
+               "--speed-limit 30000 --speed-time 20 --fail-with-body "
+               f'-H "Authorization: Bearer {hf_token}" -o "{out}" "{url}"')
+        box = {}
 
-    def watched_dl(what, fn, watch_dir, total_timeout=1800, attempts=4, **kw):
-        """Run an HF download in a daemon thread; every 15s emit a step with the
-        MB-on-disk so a HANG (bytes frozen) is visible + a timeout bounds it.
-        hf_transfer + local cache mean a retry resumes from partial bytes."""
-        for i in range(attempts):
-            box = {}
+        def _w():
+            box["rc"] = subprocess.run(cmd, shell=True).returncode
 
-            def _w():
-                try:
-                    box["v"] = fn(token=hf_token, **kw)
-                except Exception as e:  # noqa: BLE001
-                    box["e"] = e
+        t = threading.Thread(target=_w, daemon=True)
+        t.start()
+        t0 = time.time()
+        while t.is_alive():
+            t.join(15)
+            mb = round(out.stat().st_size / 1e6, 1) if out.exists() else 0.0
+            kh.step(f"{what} (dl)", mb=mb, s=round(time.time() - t0))
+            kh._push_progress_to_hf(force=True)
+            if time.time() - t0 > total_timeout:
+                raise SystemExit(f"{what}: timeout {total_timeout}s at {mb}MB")
+        if box.get("rc") != 0:
+            raise SystemExit(f"{what}: curl rc={box.get('rc')}")
+        kh.step(f"{what}: ok", mb=round(out.stat().st_size / 1e6, 1))
+        return out
 
-            t = threading.Thread(target=_w, daemon=True)
-            t.start()
-            t0 = time.time()
-            last_mb, stall = -1, 0
-            while t.is_alive():
-                t.join(15)
-                mb = round(dir_bytes(watch_dir) / 1e6, 1)
-                el = round(time.time() - t0, 0)
-                kh.step(f"{what} (dl)", mb=mb, s=el, attempt=i + 1)
-                kh._push_progress_to_hf(force=True)
-                stall = stall + 1 if mb == last_mb else 0
-                last_mb = mb
-                if el > total_timeout or stall >= 8:  # 8*15s = 2min no bytes = hung
-                    kh.step(f"{what}: {'timeout' if el > total_timeout else 'STALLED'} — retry", mb=mb)
-                    break
-            if "v" in box:
-                kh.step(f"{what}: ok", mb=round(dir_bytes(watch_dir) / 1e6, 1))
-                return box["v"]
-            if "e" in box:
-                kh.step(f"{what}: error {type(box['e']).__name__} — retry", err=str(box["e"])[:120])
-            time.sleep(5)
-        raise SystemExit(f"{what}: failed/hung after {attempts} attempts")
-
+    # backbone F16 (single hosted file) + codec safetensors (3 shards) + config
     f16 = MODELS / "moss-tts-local-v1.5-f16.gguf"
-    need_src = False
-    try:
-        got = watched_dl("backbone F16", hf_hub_download, MODELS,
-                         repo_id=GGUF_REPO, filename=f16.name, local_dir=str(MODELS))
-        f16 = Path(got)
-    except SystemExit as e:
-        need_src = True
-        kh.step("backbone F16 not hosted — converting", err=str(e)[:120])
+    curl_get("backbone F16", f"{HFBASE}/{GGUF_REPO}/resolve/main/{f16.name}", f16)
+    codec_dir = MODELS / "codec-src"
+    for fn in ("config.json", "model.safetensors.index.json",
+               "model-00001-of-00003.safetensors", "model-00002-of-00003.safetensors",
+               "model-00003-of-00003.safetensors"):
+        curl_get(f"codec {fn}", f"{HFBASE}/{HF_CODEC}/resolve/main/{fn}", codec_dir / fn, total_timeout=2400)
 
-    codec_src = watched_dl("codec safetensors", snapshot_download, MODELS / "hf", total_timeout=2400,
-                           repo_id=HF_CODEC, cache_dir=str(MODELS / "hf"),
-                           allow_patterns=["*.safetensors", "*.json"])
     codec_gguf = MODELS / "moss-tts-local-v1.5-codec.gguf"
     kh.step("convert codec")
-    if need_src:
-        src = snapshot_download(HF_MODEL, cache_dir=str(MODELS / "hf"), token=hf_token,
-                                allow_patterns=["*.safetensors", "*.json", "merges.txt", "vocab.json",
-                                                "tokenizer.json", "added_tokens.json"])
-        subprocess.run([sys.executable, str(conv), "--input", src, "--codec", codec_src,
-                        "--output", str(f16), "--codec-output", str(codec_gguf)], check=True, timeout=3600)
-    else:
-        codegen = ("import importlib.util as u; from pathlib import Path;"
-                   "s=u.spec_from_file_location('c', r'%s'); m=u.module_from_spec(s); s.loader.exec_module(m);"
-                   "m.write_codec_gguf(Path(r'%s'), Path(r'%s'))") % (str(conv), codec_src, str(codec_gguf))
-        subprocess.run([sys.executable, "-c", codegen], check=True, timeout=3600)
+    codegen = ("import importlib.util as u; from pathlib import Path;"
+               "s=u.spec_from_file_location('c', r'%s'); m=u.module_from_spec(s); s.loader.exec_module(m);"
+               "m.write_codec_gguf(Path(r'%s'), Path(r'%s'))") % (str(conv), str(codec_dir), str(codec_gguf))
+    subprocess.run([sys.executable, "-c", codegen], check=True, timeout=3600)
     if not codec_gguf.exists():
         raise SystemExit("codec GGUF not produced")
     summary["phases"]["convert"] = {"f16_gb": round(f16.stat().st_size / 1e9, 2),
                                     "codec_gb": round(codec_gguf.stat().st_size / 1e9, 2)}
-    import shutil
-    shutil.rmtree(MODELS / "hf", ignore_errors=True)
     kh.step("converted", **summary["phases"]["convert"])
 
     # ── quantize -> Q4_K ───────────────────────────────────────────────────
