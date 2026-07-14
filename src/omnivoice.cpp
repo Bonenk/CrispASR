@@ -1030,8 +1030,11 @@ static int estimate_target_tokens(const std::string& text, float speed = 1.0f) {
     // frames/char on English) with a small safety margin — over-estimating trails
     // silence, under-estimating truncates the tail. Override K via
     // OMNIVOICE_FRAMES_PER_CHAR. (A flat 2.5/char was ~1.7× too long: a 362-char
-    // prompt gave 905 frames / 36 s vs omnivoice.cpp's 540 / 22 s, and the extra
-    // T_total made every O(T²)-attention MaskGIT step needlessly expensive.)
+    // prompt gave 905 frames / 36 s vs omnivoice.cpp's 540 / 22 s. Measured: per-step
+    // cost is ~LINEAR in T_total here (matmul-dominated: gen_step 314 vs 435 ms for
+    // 180 vs 295 target frames), so this cuts WALL TIME ~1.4× and fixes the trailing
+    // silence, but RTF/unit-audio is ~unchanged — the RTF gap vs omnivoice.cpp is
+    // per-frame kernel/model efficiency, not over-generation.)
     float K = 1.8f;
     if (const char* e = std::getenv("OMNIVOICE_FRAMES_PER_CHAR")) {
         float v = (float)atof(e);
