@@ -291,11 +291,12 @@ def main():
     # run: (a) the codec now query-chunks (bounded memory — f16-long is the
     # correctness oracle: overlap must stay ~1.0); (b) A/B sampled vs greedy audio
     # to test whether sampled-audio feedback is what prevents the stop head firing.
-    GREEDY = {"CRISPASR_MOSS_TTS_LOCAL_GREEDY_AUDIO": "1"}
+    # Default synth params now come from the model card (audio 1.7/0.8/25, sampled
+    # stop) — the fix for the stop-runaway. Greedy audio is degenerate (P5 run2), so
+    # we test the DEFAULT (correct) config only.
     arms = [
-        ("q4k_samp", str(q4k), None, False),    # q4_k, sampled audio (run1 default)
-        ("q4k_greedy", str(q4k), GREEDY, True), # q4_k, greedy audio — the GATE candidate
-        ("f16_greedy", str(f16), GREEDY, False),# f16, greedy — codec correctness oracle
+        ("q4k", str(q4k), None, True),   # q4_k default params — the GATE
+        ("f16", str(f16), None, False),  # f16 default params (best-effort; may OOM on load)
     ]
     for tag, backbone, extra_env, gating in arms:
         rs = synth(cli, backbone, str(codec_gguf), SHORT_TEXT, RESULTS / f"{tag}_short.wav", extra_env=extra_env)
@@ -330,8 +331,8 @@ def main():
         log(f"{tag} gate: {summary['gates'][f'roundtrip_{tag}']} "
             f"(pow={pow_ok} recognizable={recognizable} overlap short={rs['overlap']} long={rl['overlap']})")
 
-    # Acceptance = the q4_k greedy-audio arm passes (that becomes the default if so).
-    summary["all_gates_pass"] = summary["gates"].get("roundtrip_q4k_greedy") == "PASS"
+    # Acceptance = the q4_k (default-params) arm passes.
+    summary["all_gates_pass"] = summary["gates"].get("roundtrip_q4k") == "PASS"
 
     # ── 5. upload GGUFs on success ─────────────────────────────────────────
     if summary["all_gates_pass"] and DO_UPLOAD:
