@@ -1466,6 +1466,14 @@ struct crispasr_session {
     bool punctuation = true;     // canary/cohere per-call arg + post-process gate
     bool translate = false;      // whisper sticky --translate (others: use src/tgt mismatch)
 
+    // Acoustic language detected by the last transcribe (whisper only —
+    // whisper_full_lang_id → whisper_lang_str, an ISO-639-1 code). Set on
+    // every whisper dispatch; empty for other backends, where
+    // crispasr_session_detected_language falls back to the source-language
+    // hint or "unknown". This is the in-decode acoustic signal, distinct
+    // from the backend-agnostic text-LID pass (crispasr_text_detect_language).
+    std::string detected_lang;
+
     // --punc-model post-processor (set via crispasr_session_set_punc_model).
     // Held as void* so the struct doesn't depend on the optionally-compiled
     // fireredpunc/pcs headers; at most one is non-null. Applied per segment
@@ -3448,6 +3456,28 @@ CA_EXPORT const char* crispasr_session_backend(crispasr_session* s) {
     return s ? s->backend.c_str() : "";
 }
 
+// Acoustic language detected by the last transcribe, written into `out_buf` as
+// an ISO-639-1 code (e.g. "en"). Only whisper decodes an in-session acoustic
+// language; other backends (and whisper before its first pass) fall back to
+// the session's source-language hint, then "unknown". Returns the code length
+// (bytes, not counting NUL) or -1 on bad args. This is distinct from the
+// backend-agnostic text-LID pass (crispasr_text_detect_language), which runs
+// CLD3 + fastText over the transcript.
+CA_EXPORT int crispasr_session_detected_language(crispasr_session* s, char* out_buf, int out_cap) {
+    if (!s || !out_buf || out_cap <= 0)
+        return -1;
+    std::string lang;
+    if (!s->detected_lang.empty())
+        lang = s->detected_lang;
+    else if (!s->source_language.empty())
+        lang = s->source_language;
+    else
+        lang = "unknown";
+    std::strncpy(out_buf, lang.c_str(), out_cap - 1);
+    out_buf[out_cap - 1] = '\0';
+    return (int)lang.size();
+}
+
 // CTC vocabulary access (Omni CTC backend). Surfaces the SentencePiece pieces
 // already loaded from the GGUF so callers can detokenize a greedy CTC decode
 // over crispasr_session_result_logits. Returns 0 / "" for other backends.
@@ -4398,6 +4428,15 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             _fire_token_callbacks(s, toks);
             seg.words = emit_words_from_tokens(toks);
             r->segments.push_back(std::move(seg));
+        }
+        // Record the acoustic language whisper auto-detected on this pass so
+        // crispasr_session_detected_language can surface it (ISO-639-1). The
+        // id indexes whisper's static language table; whisper_lang_str returns
+        // a pointer into that table (nothing to free).
+        {
+            const int lang_id = whisper_full_lang_id(s->whisper_ctx);
+            const char* code = lang_id >= 0 ? whisper_lang_str(lang_id) : nullptr;
+            s->detected_lang = code ? code : "";
         }
         return r;
     }

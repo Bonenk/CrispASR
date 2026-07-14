@@ -384,6 +384,28 @@ impl Session {
         Some(out)
     }
 
+    /// The acoustic language whisper detected on the last transcribe, as an
+    /// ISO-639-1 code (e.g. `"en"`). Whisper-only: other backends return the
+    /// session's source-language hint, or `"unknown"` when none was set — as
+    /// does whisper before its first transcribe. This is the in-decode
+    /// acoustic signal, distinct from a text-LID pass over the transcript.
+    pub fn detected_language(&self) -> String {
+        let mut buf = [0 as c_char; 32];
+        let n = unsafe {
+            crispasr_sys::crispasr_session_detected_language(
+                self.handle,
+                buf.as_mut_ptr(),
+                buf.len() as c_int,
+            )
+        };
+        if n <= 0 {
+            return "unknown".to_string();
+        }
+        unsafe { CStr::from_ptr(buf.as_ptr()) }
+            .to_string_lossy()
+            .into_owned()
+    }
+
     /// Transcribe 16 kHz mono `f32` PCM. The internal dispatcher routes
     /// to whichever backend this session was opened with.
     pub fn transcribe(&self, pcm: &[f32]) -> Result<Vec<SessionSegment>, String> {
