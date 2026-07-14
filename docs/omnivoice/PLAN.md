@@ -130,9 +130,17 @@ Per-step FORWARD (both cond+uncond), M1 Metal, clean:
   since we already process fewer tokens (238 vs their padded 256). Beating them further
   is kernel-level (port their Metal kernels) — a separate deep effort, uncertain payoff.
 
+### CUDA A/B (Kaggle) — the one place a "beat" is still plausible
+`tools/kaggle/omnivoice-cfg-cuda-ab/` (chr1s4): builds crispasr CLI CUDA, benches
+per-step fwd 2-forward vs `OMNIVOICE_UNIFIED_CFG` with code-match proof-of-work, +
+best-effort omnivoice.cpp B'=2 head-to-head. Answers: does the fusion that LOST on
+M1 (compute-bound) win on CUDA (where batching/dispatch differ)? Pushed + running
+2026-07-14; results → `results.json` + step() to cstr/crispasr-kaggle-progress.
+
 ### Remaining (optional)
-1. Kernel-level: profile per-op vs their ggml fork if sub-parity RTF is wanted.
-2. Match torchaudio resample (Hann sinc) to push encode codes >99%.
+1. Await CUDA A/B verdict; flip `OMNIVOICE_UNIFIED_CFG` default only if it wins there.
+2. Kernel-level: profile per-op vs their ggml fork if sub-parity RTF is wanted.
+3. Match torchaudio resample (Hann sinc) to push encode codes >99%.
 3. **Ship the GGUF fix**: `omnivoice-tokenizer-f16-fixed.gguf` (0 zeroed channels)
    → replace corrupt HF `cstr/omnivoice-GGUF` + registry SHA bump.
 4. RTF wins (issue #2), gated + A/B'd.
