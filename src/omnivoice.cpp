@@ -1045,14 +1045,23 @@ static int estimate_target_tokens(const std::string& text, float speed = 1.0f) {
     for (size_t i = 0; i < text.size();) {
         unsigned char c = text[i];
         int adv = (c < 0x80) ? 1 : (c < 0xE0) ? 2 : (c < 0xF0) ? 3 : 4;
-        if (c >= 0x80)
-            weighted += 1.3; // multibyte glyph — denser (≈1 syllable)
-        else if (std::isalnum(c))
-            weighted += 1.0; // spoken character
-        else if (std::isspace(c))
-            weighted += 0.25; // inter-word gap
-        else
-            weighted += 0.4; // punctuation
+        if (c < 0x80) {
+            if (std::isalnum(c))
+                weighted += 1.0; // spoken ASCII character
+            else if (std::isspace(c))
+                weighted += 0.25; // inter-word gap
+            else
+                weighted += 0.4; // punctuation
+        } else if (adv == 2) {
+            weighted += 1.0; // 2-byte: Latin-ext / Cyrillic / Greek etc. — alphabetic
+        } else {
+            // 3–4-byte: CJK / kana / Hangul / Thai / Devanagari — each glyph is a
+            // full syllable/mora, so ~2× denser in duration than an ASCII letter.
+            // Calibrated to omnivoice.cpp: JP ~3.5 frames/char (weight 1.95 × K 1.8),
+            // vs the old flat 1.3 that made non-English audio too short (skipped
+            // characters, issue #254).
+            weighted += 1.95;
+        }
         i += adv;
     }
     int est = (int)(weighted * K / speed);
