@@ -350,6 +350,9 @@ struct omnivoice_context {
     std::string language;
     std::string instruct;
 
+    // Speaking-rate multiplier for the target-length estimate (>1 faster/shorter).
+    float speed = 1.0f;
+
     // Audio tokenizer path (separate GGUF)
     std::string tokenizer_path;
 };
@@ -1428,7 +1431,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     // 2. Estimate target audio length. When cloning, anchor the length to the
     //    reference (ref_text → ref_T frames) so it tracks the reference speaker's
     //    actual rate; otherwise use the built-in speaking-rate anchor.
-    int T_target = estimate_target_tokens(text, ctx->ref_text, ctx->ref_T);
+    int T_target = estimate_target_tokens(text, ctx->ref_text, ctx->ref_T, ctx->speed);
     result.T = T_target;
 
     if (debug) {
@@ -2887,6 +2890,13 @@ int omnivoice_set_instruct(struct omnivoice_context* ctx, const char* instruct) 
     if (!ctx)
         return -1;
     ctx->instruct = instruct ? instruct : "";
+    return 0;
+}
+
+int omnivoice_set_speed(struct omnivoice_context* ctx, float speed) {
+    if (!ctx)
+        return -1;
+    ctx->speed = (speed > 0.0f) ? speed : 1.0f;
     return 0;
 }
 

@@ -564,6 +564,12 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
             params.tts_cfg_scale = 0.0f;
         if (params.tts_cfg_scale > 10.0f)
             params.tts_cfg_scale = 10.0f;
+    } else if (arg == "--tts-speed") {
+        params.tts_speed = std::stof(ARGV_NEXT);
+        if (params.tts_speed <= 0.0f)
+            params.tts_speed = 1.0f;
+        if (params.tts_speed > 4.0f)
+            params.tts_speed = 4.0f;
     } else if (arg == "--codec-model") {
         params.tts_codec_model = ARGV_NEXT;
         std::string auto_base;
@@ -1228,6 +1234,10 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
         "irodori: text CFG (default 3.0); speaker CFG via CRISPASR_IRODORI_CFG_SPEAKER; "
         "vibevoice: 0 = model default, try 1.5 or a new --seed to re-roll BGM onsets)\n",
         "default");
+    fprintf(stderr,
+            "             --tts-speed X            [%-7.2f] speaking-rate multiplier (omnivoice/f5/piper/melotts/"
+            "fastpitch): >1 faster/shorter, <1 slower/longer\n",
+            params.tts_speed);
     fprintf(stderr, "             --tts-trim-silence       [%-7s] trim leading silence from TTS output\n",
             params.tts_trim_silence ? "true" : "false");
     fprintf(stderr, "             --tts-play               [%-7s] play synthesised audio on the local speaker\n",
