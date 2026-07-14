@@ -5,8 +5,19 @@ stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
 ## NOW — active work
 
-**Status (2026-07-14): duration estimator adopted from OmniVoice reference —
-DONE, committed `f17f47c49`, merging to main.**
+**Status (2026-07-14): duration estimator adopted + `--tts-speed` knob —
+DONE, on `main` (`224420b8e`, `19151d124`). Reporter confirmed ref-voice
+scaling works.**
+
+- ✅ **Reporter re-verified** ([#254 comment](https://github.com/CrispStrobe/CrispASR/issues/254#issuecomment-4973702610)):
+  no-ref JP line = 6.72 s (good); WITH a (slow) ref voice it grew to 11.60 s —
+  too slow, unnatural inter-letter pauses. Asked for a duration-multiplier knob.
+- ✅ **`--tts-speed X` knob** (`19151d124`): speaking-rate multiplier scaling the
+  target-length estimate (>1 faster/shorter, <1 slower/longer). Reuses the
+  codebase-standard flag (f5/piper/melotts/fastpitch); new `omnivoice_set_speed`
+  + `ctx->speed` → `estimate_target_tokens(...,speed)`. Verified exact 1/speed
+  scaling (fox: 1.0→65f, 1.7→38f, 0.7→93f). Told reporter `--tts-speed 1.7`
+  brings their 11.6 s → ~6.8 s. Possible next: check if ref_T is measured long.
 
 - ✅ **Reference-relative duration estimator** (`estimate_target_tokens`,
   `src/omnivoice.cpp`). Faithful port of OmniVoice's `RuleDurationEstimator`
