@@ -72,7 +72,10 @@ public:
         }
         // Issue #89: JA-only models (vocab=3072) collapse past ~12 s on
         // real audio. Auto-chunk at 10 s instead of the global 30 s default.
-        is_ja_model_ = (parakeet_n_vocab(ctx_) <= 4096);
+        // Issue #257: detect JA by vocab content, not size — small-vocab ENGLISH
+        // models (parakeet-tdt-1.1b, vocab ~1024) were misclassified as Japanese
+        // and forced onto the JA short-chunk path, corrupting long/chunked output.
+        is_ja_model_ = parakeet_vocab_is_japanese(ctx_) != 0;
         // CTC decode mode (hybrid TDT+CTC models).
         if (p.parakeet_decoder == "ctc") {
             if (parakeet_has_ctc(ctx_)) {

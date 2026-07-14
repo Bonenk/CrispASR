@@ -96,6 +96,10 @@ struct parakeet_result* parakeet_transcribe_streamed(struct parakeet_context* ct
 
 // Vocabulary helpers
 int parakeet_n_vocab(struct parakeet_context* ctx);
+// Issue #257: 1 iff the model's vocab is predominantly Japanese script (JA-only
+// model). Detects JA by content, not vocab size (small English vocabs were
+// misclassified). Drives the JA-specific short-chunk decode path.
+int parakeet_vocab_is_japanese(struct parakeet_context* ctx);
 int parakeet_blank_id(struct parakeet_context* ctx);
 const char* parakeet_token_to_str(struct parakeet_context* ctx, int token_id);
 

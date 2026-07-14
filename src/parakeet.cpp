@@ -3310,6 +3310,44 @@ extern "C" void parakeet_result_free(struct parakeet_result* r) {
 extern "C" int parakeet_n_vocab(struct parakeet_context* ctx) {
     return (int)ctx->model.hparams.vocab_size;
 }
+
+// Issue #257: is this a Japanese-only model? Detect by vocab CONTENT, not size.
+// The old `vocab_size <= 4096` heuristic misclassified small-vocab ENGLISH models
+// (e.g. parakeet-tdt-1.1b, vocab ~1024) as Japanese, forcing them onto the JA
+// small-chunk path. JA-only parakeet vocabs are ~97% kana/kanji; multilingual v3
+// (vocab 8192) and English models are ~0%. Returns 1 iff >50% of non-empty tokens
+// contain a Japanese script character (hiragana/katakana U+3040–30FF, CJK
+// ideographs U+4E00–9FFF / ext-A U+3400–4DBF).
+extern "C" int parakeet_vocab_is_japanese(struct parakeet_context* ctx) {
+    if (!ctx)
+        return 0;
+    const auto& toks = ctx->vocab.id_to_token;
+    size_t ja = 0, total = 0;
+    for (const auto& t : toks) {
+        if (t.empty() || (t[0] == '<' && t.back() == '>')) // skip specials like <blank>, <|ja|>
+            continue;
+        total++;
+        bool has_ja = false;
+        const unsigned char* p = (const unsigned char*)t.c_str();
+        for (size_t i = 0; p[i]; i++) {
+            const unsigned char c = p[i];
+            // Hiragana/Katakana: E3 [81..83] xx  (U+3040..U+30FF)
+            if (c == 0xE3 && p[i + 1] >= 0x81 && p[i + 1] <= 0x83) {
+                has_ja = true;
+                break;
+            }
+            // CJK ideographs (U+3400..U+4DBF ext-A = E3 90.. / E4 8x, U+4E00..U+9FFF
+            // = E4 B8..E9 BF): any 3-byte lead in [E4..E9], plus ext-A tail of E3.
+            if (c >= 0xE4 && c <= 0xE9) {
+                has_ja = true;
+                break;
+            }
+        }
+        if (has_ja)
+            ja++;
+    }
+    return (total > 0 && ja * 2 > total) ? 1 : 0;
+}
 extern "C" int parakeet_blank_id(struct parakeet_context* ctx) {
     return (int)ctx->model.hparams.blank_id;
 }
@@ -3654,7 +3692,7 @@ extern "C" struct parakeet_result* parakeet_transcribe_chunked(struct parakeet_c
         // vocab < 4000 ⇒ JA-only model (small chunks work best), else
         // multilingual / v3 (needs ~30 s of context for the Conformer
         // encoder to produce in-distribution features).
-        chunk_seconds = (ctx->model.hparams.vocab_size < 4000) ? 8 : 30;
+        chunk_seconds = parakeet_vocab_is_japanese(ctx) ? 8 : 30; // #257: content, not vocab size
     }
     if (overlap_seconds < 0)
         overlap_seconds = 2;
@@ -3774,7 +3812,7 @@ extern "C" struct parakeet_result* parakeet_transcribe_streamed(struct parakeet_
         // multilingual / v3 / etc. variants (vocab >= 4096) via vocab_size.
         // The override env var CRISPASR_PARAKEET_STREAM_CHUNK is honoured
         // upstream of this default.
-        chunk_seconds = (ctx->model.hparams.vocab_size < 4000) ? 8 : 30;
+        chunk_seconds = parakeet_vocab_is_japanese(ctx) ? 8 : 30; // #257: content, not vocab size
     }
     if (overlap_seconds < 0)
         overlap_seconds = 2;
