@@ -1818,7 +1818,10 @@ func DetectBackendFromGGUF(path string) (string, error) {
 	defer C.free(unsafe.Pointer(cpath))
 	var out [128]C.char
 	rc := C.crispasr_detect_backend_from_gguf(cpath, &out[0], 128)
-	if rc != 0 {
+	// rc > 0 = detected (strlen of name); rc == 0 = valid GGUF but no backend
+	// mapping (empty name); rc < 0 = error. The prior `rc != 0` reported every
+	// successful detection as a failure.
+	if rc < 0 {
 		return "", fmt.Errorf("detect_backend_from_gguf failed for %s", path)
 	}
 	return C.GoString(&out[0]), nil

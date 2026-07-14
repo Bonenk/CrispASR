@@ -965,7 +965,10 @@ EMSCRIPTEN_BINDINGS(whisper) {
         [](const std::string& path) -> std::string {
             char out[128] = {0};
             int rc = crispasr_detect_backend_from_gguf(path.c_str(), out, sizeof(out));
-            return rc == 0 ? std::string(out) : "";
+            // rc > 0 = detected (strlen of name); rc == 0 = valid GGUF, no backend
+            // mapping (name ""); rc < 0 = error. The prior `rc == 0` check returned
+            // the empty name on success and "" on unknown-arch — i.e. always "".
+            return rc > 0 ? std::string(out) : std::string();
         }));
 
     // --- LCS dedup ---

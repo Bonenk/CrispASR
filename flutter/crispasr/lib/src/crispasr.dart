@@ -4370,8 +4370,12 @@ String? detectBackendFromGguf(String path, {String? libPath}) {
   final outBuf = calloc<Uint8>(cap);
   try {
     final rc = fn(pathPtr, outBuf.cast<Utf8>(), cap);
-    if (rc != 0) return null;
-    return outBuf.cast<Utf8>().toDartString();
+    // rc > 0 = detected (strlen of name); rc == 0 = valid GGUF but no backend
+    // mapping; rc < 0 = error. The prior `rc != 0` returned null on every
+    // successful detection. Treat both error and unmapped-arch as "no backend".
+    if (rc <= 0) return null;
+    final name = outBuf.cast<Utf8>().toDartString();
+    return name.isEmpty ? null : name;
   } finally {
     calloc.free(pathPtr);
     calloc.free(outBuf);
