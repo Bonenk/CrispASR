@@ -1864,6 +1864,26 @@ catch_discover_tests(test-issue-114-chunk-context-gate
     PROPERTIES LABELS "unit;chunk-context;issue-114"
 )
 
+# ─── test-parakeet-ja-detect — issue #257 regression guard
+#
+# Pins crispasr_parakeet::vocab_looks_japanese so the JA-model detection keys on
+# vocab content (kana/kanji), not vocab size — a small-vocab English model
+# (parakeet-tdt-1.1b, vocab 1024) must not be misclassified as Japanese. Pure
+# CPU, no model load.
+add_executable(test-parakeet-ja-detect
+    test-parakeet-ja-detect.cpp
+)
+target_include_directories(test-parakeet-ja-detect PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-parakeet-ja-detect PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-parakeet-ja-detect
+    TEST_SPEC "[issue-257]"
+    PROPERTIES LABELS "unit;parakeet;issue-257"
+)
+
 # ─── test-issue-89-long-audio-fallback — issue #89 regression guard
 #
 # Pins crispasr_long_audio::should_auto_chunk_long so a future refactor

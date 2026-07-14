@@ -13,6 +13,7 @@
 //              8198 = 8192 vocab + 1 blank + 5 TDT durations {0,1,2,3,4}
 
 #include "parakeet.h"
+#include "parakeet_ja_detect.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -3321,32 +3322,7 @@ extern "C" int parakeet_n_vocab(struct parakeet_context* ctx) {
 extern "C" int parakeet_vocab_is_japanese(struct parakeet_context* ctx) {
     if (!ctx)
         return 0;
-    const auto& toks = ctx->vocab.id_to_token;
-    size_t ja = 0, total = 0;
-    for (const auto& t : toks) {
-        if (t.empty() || (t[0] == '<' && t.back() == '>')) // skip specials like <blank>, <|ja|>
-            continue;
-        total++;
-        bool has_ja = false;
-        const unsigned char* p = (const unsigned char*)t.c_str();
-        for (size_t i = 0; p[i]; i++) {
-            const unsigned char c = p[i];
-            // Hiragana/Katakana: E3 [81..83] xx  (U+3040..U+30FF)
-            if (c == 0xE3 && p[i + 1] >= 0x81 && p[i + 1] <= 0x83) {
-                has_ja = true;
-                break;
-            }
-            // CJK ideographs (U+3400..U+4DBF ext-A = E3 90.. / E4 8x, U+4E00..U+9FFF
-            // = E4 B8..E9 BF): any 3-byte lead in [E4..E9], plus ext-A tail of E3.
-            if (c >= 0xE4 && c <= 0xE9) {
-                has_ja = true;
-                break;
-            }
-        }
-        if (has_ja)
-            ja++;
-    }
-    return (total > 0 && ja * 2 > total) ? 1 : 0;
+    return crispasr_parakeet::vocab_looks_japanese(ctx->vocab.id_to_token) ? 1 : 0;
 }
 extern "C" int parakeet_blank_id(struct parakeet_context* ctx) {
     return (int)ctx->model.hparams.blank_id;
