@@ -37,8 +37,23 @@ mid-sentence split segments. Not seen with cohere/granite.
 - (A) DONE: extracted `parakeet_group_words()` helper, called from decode_frames +
   transcribe_ex. Streamed path (STREAM_THRESHOLD=0) now emits 22 words on jfk (was 0).
 
+### (B) root cause + fix
+- `--chunk-seconds` forces the DISPATCHER per-slice transcribe + overlap-save
+  trim + LCS merge. parakeet is a full-attention FastConformer (`CAP_UNBOUNDED_INPUT
+  + CAP_INTERNAL_CHUNKING`): short context-extended slices decode DEGRADED
+  ("your country"→"yourself") and the trim drops boundary words ("ask not" lost).
+- cohere/granite lack `CAP_INTERNAL_CHUNKING` → dispatcher chunking is correct for
+  them (matches user: "not seen with cohere/granite").
+- parakeet's INTERNAL streaming at 7s/2s (STREAM_THRESHOLD=0 STREAM_CHUNK=7) gives
+  the CORRECT full transcript. → FIX: for CAP_INTERNAL_CHUNKING backends, when
+  --chunk-seconds is explicit, DON'T dispatcher-slice; pass the whole audio and let
+  the backend chunk internally. parakeet adapter honors params.chunk_seconds/overlap
+  by routing to parakeet_transcribe_streamed.
+
 ### Next
-1. (A) done.
+1. (A) done. 2. Implement (B): crispasr_run.cpp (skip dispatcher slice for
+   CAP_INTERNAL_CHUNKING + explicit chunk_seconds) + parakeet adapter (honor
+   params.chunk_seconds → streamed). 3. Verify jfk chunked == baseline. 4. Tests, merge.
 2. (B) find why the chunk-merge drops parakeet tails; fix; verify jfk chunked == baseline.
 3. Unit test(s) for the word-grouping helper + a chunk-merge regression.
 4. Build, run unit tests, merge to main, comment #257.
