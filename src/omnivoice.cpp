@@ -20,6 +20,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+#include <cctype>
 #include "core/activation.h"
 #include "core/attention.h"
 #include "core/bpe.h"
@@ -1021,30 +1022,37 @@ static std::vector<int32_t> tokenize(const ov_vocab& vocab, const std::string& t
 // ---------------------------------------------------------------------------
 
 static int estimate_target_tokens(const std::string& text, float speed = 1.0f) {
-    // OmniVoice's codec frame rate is 24000/960 = 25 Hz (hop_length=960), NOT 75 Hz
-    // — downsample_factor=320 is a red herring. English speech ~11 chars/s ⇒ ~2.3
-    // frames/char at 25 Hz; use 2.5 (slightly generous — over-estimating trails
-    // silence, under-estimating truncates). Override via OMNIVOICE_FRAMES_PER_CHAR.
-    float fpc = 2.5f;
+    // 25 Hz codec (hop 960). Estimate speech duration from a WEIGHTED char-rate
+    // model rather than a flat frames/char: letters/digits count full, whitespace
+    // and punctuation contribute little (they add scant duration), non-ASCII
+    // glyphs (CJK etc.) are slightly denser (~one syllable each). K≈1.8 frames per
+    // weighted char matches omnivoice.cpp's calibrated Unicode estimator (~1.5 raw
+    // frames/char on English) with a small safety margin — over-estimating trails
+    // silence, under-estimating truncates the tail. Override K via
+    // OMNIVOICE_FRAMES_PER_CHAR. (A flat 2.5/char was ~1.7× too long: a 362-char
+    // prompt gave 905 frames / 36 s vs omnivoice.cpp's 540 / 22 s, and the extra
+    // T_total made every O(T²)-attention MaskGIT step needlessly expensive.)
+    float K = 1.8f;
     if (const char* e = std::getenv("OMNIVOICE_FRAMES_PER_CHAR")) {
         float v = (float)atof(e);
         if (v > 0.0f)
-            fpc = v;
+            K = v;
     }
-    int n_chars = 0;
+    double weighted = 0.0;
     for (size_t i = 0; i < text.size();) {
         unsigned char c = text[i];
-        if (c < 0x80)
-            i += 1;
-        else if (c < 0xE0)
-            i += 2;
-        else if (c < 0xF0)
-            i += 3;
+        int adv = (c < 0x80) ? 1 : (c < 0xE0) ? 2 : (c < 0xF0) ? 3 : 4;
+        if (c >= 0x80)
+            weighted += 1.3; // multibyte glyph — denser (≈1 syllable)
+        else if (std::isalnum(c))
+            weighted += 1.0; // spoken character
+        else if (std::isspace(c))
+            weighted += 0.25; // inter-word gap
         else
-            i += 4;
-        n_chars++;
+            weighted += 0.4; // punctuation
+        i += adv;
     }
-    int est = (int)(n_chars * fpc / speed);
+    int est = (int)(weighted * K / speed);
     return std::max(est, 10);
 }
 
