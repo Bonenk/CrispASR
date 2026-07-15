@@ -2941,6 +2941,20 @@ extern "C" bool parakeet_has_ctc(struct parakeet_context* ctx) {
     return ctx && ctx->model.has_ctc;
 }
 
+// Issue #257: switch the FastConformer encoder to local (windowed) attention at
+// inference time — the equivalent of NeMo's
+// `model.change_attention_model("rel_pos_local_attn", [left, right])`. Bounds
+// encoder self-attention memory to O(T·window) instead of O(T²), for long audio
+// on limited VRAM. Units are encoder frames (1 frame = frame_dur_cs, ~80 ms).
+// left/right < 0 restores full (global) attention. Takes effect on the next
+// transcribe (the mask is rebuilt per encode).
+extern "C" void parakeet_set_att_context(struct parakeet_context* ctx, int left, int right) {
+    if (!ctx)
+        return;
+    ctx->model.hparams.att_context_left = left;
+    ctx->model.hparams.att_context_right = right;
+}
+
 extern "C" void parakeet_set_hotwords(struct parakeet_context* ctx, const char** hotwords, int n_hotwords,
                                       float boost) {
     if (!ctx || !hotwords || n_hotwords <= 0)

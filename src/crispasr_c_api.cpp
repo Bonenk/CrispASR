@@ -1571,6 +1571,11 @@ struct crispasr_session {
     // forced) means "keep the per-model defaults".
     int parakeet_force_chunk_seconds = -1;
     int parakeet_force_overlap_seconds = -1;
+    // Issue #257: parakeet/canary local-attention window (encoder frames) —
+    // NeMo rel_pos_local_attn, bounds long-audio encoder VRAM. INT_MIN = unset
+    // (keep the model default). Applied to parakeet_ctx before each transcribe.
+    int parakeet_att_context_left = INT_MIN;
+    int parakeet_att_context_right = INT_MIN;
 
     // Issue #208: per-session progress callback for long-form (chunked)
     // transcription. Fired once per finished window from the chunked merge
@@ -4373,6 +4378,11 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
     }
 #ifdef CA_HAVE_PARAKEET
     if (s->backend == "parakeet" && s->parakeet_ctx) {
+        // Issue #257: apply the caller-chosen local-attention window (NeMo
+        // rel_pos_local_attn) before decoding. INT_MIN = unset (model default).
+        if (s->parakeet_att_context_left != INT_MIN && s->parakeet_att_context_right != INT_MIN) {
+            parakeet_set_att_context(s->parakeet_ctx, s->parakeet_att_context_left, s->parakeet_att_context_right);
+        }
         // Issue #89 (JA long audio): mirror of the CLI default — energy-minima
         // slices at most `cap_s` long (the JA encoder collapses past ~12 s of
         // context on real speech), one exact single pass per slice, then a
@@ -6656,6 +6666,22 @@ CA_EXPORT void crispasr_session_result_free(crispasr_session_result* r) {
 // active backend (qwen3-tts, orpheus, zonos, dia, tada, outetts, indextts).
 // For Zonos and Dia the codec is auto-discovered as a sibling on open;
 // call this only to override the discovered path.
+
+CA_EXPORT int crispasr_session_set_parakeet_att_context(crispasr_session* s, int left, int right) {
+    // Issue #257: parakeet/canary local-attention window (encoder frames) — NeMo
+    // change_attention_model("rel_pos_local_attn", [L,R]); bounds long-audio
+    // encoder VRAM. Pass INT_MIN,INT_MIN to clear (use the model default);
+    // negative values = full attention. Applied before each transcribe.
+    if (!s)
+        return -1;
+    s->parakeet_att_context_left = left;
+    s->parakeet_att_context_right = right;
+#ifdef CA_HAVE_PARAKEET
+    if (s->parakeet_ctx && left != INT_MIN && right != INT_MIN)
+        parakeet_set_att_context(s->parakeet_ctx, left, right);
+#endif
+    return 0;
+}
 
 CA_EXPORT int crispasr_session_set_codec_path(crispasr_session* s, const char* path) {
     if (!s || !path)

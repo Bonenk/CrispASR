@@ -304,6 +304,12 @@ CRISPASR_SESSION_API const char* crispasr_session_result_word_alt_text(crispasr_
 CRISPASR_SESSION_API float crispasr_session_result_word_alt_p(crispasr_session_result* r, int i_seg, int i_word,
                                                               int i_alt);
 CRISPASR_SESSION_API void crispasr_session_result_free(crispasr_session_result* r);
+// Issue #257: parakeet/canary local-attention window in encoder frames (~80 ms
+// each) — NeMo change_attention_model("rel_pos_local_attn", [left, right]).
+// Bounds long-audio encoder memory to O(T·window) instead of O(T²). Negative
+// values = full attention; INT_MIN,INT_MIN = clear (use the model default).
+// No-op for non-parakeet backends. Returns 0 on success.
+CRISPASR_SESSION_API int crispasr_session_set_parakeet_att_context(crispasr_session* s, int left, int right);
 CRISPASR_SESSION_API int crispasr_session_set_codec_path(crispasr_session* s, const char* path);
 CRISPASR_SESSION_API int crispasr_session_set_voice(crispasr_session* s, const char* path,
                                                     const char* ref_text_or_null);

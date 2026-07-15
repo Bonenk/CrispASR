@@ -448,6 +448,18 @@ static bool whisper_params_parse_arg_backend_vad(int argc, char** argv, int& i, 
         params.no_warmup = true;
     } else if (arg == "--parakeet-decoder") {
         params.parakeet_decoder = ARGV_NEXT;
+    } else if (arg == "--att-context") {
+        // Issue #257: parakeet/canary local-attention window "L,R" (encoder
+        // frames, 1 ≈ 80 ms) — NeMo change_attention_model. Bounds long-audio
+        // encoder memory to O(T·window). "-1,-1" = full attention.
+        const std::string v = ARGV_NEXT;
+        int l = INT_MIN, r = INT_MIN;
+        if (std::sscanf(v.c_str(), "%d,%d", &l, &r) == 2) {
+            params.att_context_left = l;
+            params.att_context_right = r;
+        } else {
+            fprintf(stderr, "crispasr: --att-context expects \"L,R\" (e.g. 128,128 or -1,-1), got '%s'\n", v.c_str());
+        }
     } else if (arg == "--lid-backend") {
         params.lid_backend = ARGV_NEXT;
     } else if (arg == "--lid-model") {
@@ -1137,6 +1149,9 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.chunk_seconds);
     fprintf(stderr, "             --chunk-overlap F      [%-7.1f] overlap context (sec) at chunk boundaries\n",
             params.chunk_overlap_seconds);
+    fprintf(stderr, "             --att-context L,R      [%-7s] parakeet/canary local-attention window in encoder "
+                    "frames (~80ms ea) — bounds long-audio VRAM, NeMo rel_pos_local_attn; -1,-1 = full\n",
+            "model");
     fprintf(stderr,
             "             --lcs-dedup VAL        [%-7s] sub-word LCS dedup across chunk boundaries: auto|on|off\n",
             params.lcs_dedup.c_str());

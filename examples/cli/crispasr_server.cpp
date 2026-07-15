@@ -1021,6 +1021,16 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         rp.lcs_dedup = form_string(req, "lcs_dedup", rp.lcs_dedup);
         rp.lcs_min_length = form_int(req, "lcs_min_length", rp.lcs_min_length);
         rp.parakeet_decoder = form_string(req, "parakeet_decoder", rp.parakeet_decoder);
+        {
+            // Issue #257: parakeet/canary local-attention window "L,R" (encoder
+            // frames) — NeMo rel_pos_local_attn, bounds long-audio VRAM.
+            const std::string ac = form_string(req, "att_context", "");
+            int l = INT_MIN, r = INT_MIN;
+            if (!ac.empty() && std::sscanf(ac.c_str(), "%d,%d", &l, &r) == 2) {
+                rp.att_context_left = l;
+                rp.att_context_right = r;
+            }
+        }
         rp.no_auto_aligner = form_bool(req, "no_auto_aligner", rp.no_auto_aligner);
         rp.show_alternatives = form_bool(req, "show_alternatives", rp.show_alternatives);
         rp.n_alternatives = form_int(req, "alt_n", rp.n_alternatives);
@@ -1179,6 +1189,16 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         rp.lcs_dedup = form_string(req, "lcs_dedup", rp.lcs_dedup);
         rp.lcs_min_length = form_int(req, "lcs_min_length", rp.lcs_min_length);
         rp.parakeet_decoder = form_string(req, "parakeet_decoder", rp.parakeet_decoder);
+        {
+            // Issue #257: parakeet/canary local-attention window "L,R" (encoder
+            // frames) — NeMo rel_pos_local_attn, bounds long-audio VRAM.
+            const std::string ac = form_string(req, "att_context", "");
+            int l = INT_MIN, r = INT_MIN;
+            if (!ac.empty() && std::sscanf(ac.c_str(), "%d,%d", &l, &r) == 2) {
+                rp.att_context_left = l;
+                rp.att_context_right = r;
+            }
+        }
         rp.no_auto_aligner = form_bool(req, "no_auto_aligner", rp.no_auto_aligner);
         rp.show_alternatives = form_bool(req, "show_alternatives", rp.show_alternatives);
         rp.n_alternatives = form_int(req, "alt_n", rp.n_alternatives);
