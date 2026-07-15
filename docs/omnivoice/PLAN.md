@@ -30,11 +30,22 @@ copies amortized over few frames).
 - ✅ **Reporter ask:** `omnivoice_synthesize` now prints a per-stage timing + RTF
   summary at normal verbosity (`gen Xs + decode Ys = Zs for Ws audio (RTF …)`) —
   no more wrapping in `time`.
-- ⏭ **Follow-ups (not done):** move decode to GPU/Metal (needs a Metal-op audit of
-  conv_transpose + Kaggle CUDA verify per perf-discipline); the LLM forward (`gen`)
-  is already at per-step parity with omnivoice.cpp so headroom there is kernel-level.
-- ⏭ **Merge:** commit on the feature branch; ff into `main` after user confirms the
-  win reproduces on the reporter's box (or on green CI).
+- ✅ **Landed on `main`** (`6a1b1903b`, rebased past the 0.8.11 release bump).
+- 🧪 **GPU/Metal codec decode (`OMNIVOICE_CODEC_GPU`, default OFF, shipped as scaffold):**
+  every decode op is Metal-supported (CONV_TRANSPOSE_1D/IM2COL/MUL_MAT/SIN/CAST/
+  GET_ROWS), output equivalent (max |Δ| ≈ 54/32768, inaudible). **But on M1 Metal it
+  LOSES to CPU-FASTCONV:** decode 1.15→1.73 s (short) and 11.2→19.6 s (437-frame) —
+  ~40 modest-channel convs are dispatch-bound on Metal and contend with the
+  concurrently-Metal LLM (the dev-guide "small-op GPU dispatch is launch-bound"
+  case). Kept OFF (verified-but-slower → opt-in). **May still win on CUDA** (the
+  unified-CFG precedent in this same PLAN flipped a Metal-loser into a +13% CUDA
+  win) → needs a Kaggle CUDA A/B before any default flip. Box was loaded (gen
+  37→58 s between runs) so numbers are directional, not clean — but the conservative
+  default (OFF) is unaffected.
+- ⏭ **Remaining lever:** the LLM `gen` phase is already at per-step parity with
+  omnivoice.cpp, so headroom there is kernel-level (their ggml fork). A persistent
+  decode graph (build/alloc once, reuse across chunks) could cut the GPU dispatch
+  overhead enough to make GPU decode competitive — untested.
 
 ---
 
