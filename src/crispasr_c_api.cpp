@@ -4521,8 +4521,10 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         // on long audio, #89) use the overlapping streamed encoder instead.
         // Audio up to one window is a single exact pass (unchanged).
         const int SR = 16000;
-        // JA-model detection matches the CLI adapter (is_ja_model_).
-        const bool is_ja = parakeet_n_vocab(s->parakeet_ctx) <= 4096;
+        // JA-model detection matches the CLI adapter (is_ja_model_). Issue #257:
+        // detect by vocab CONTENT, not size — small-vocab English models
+        // (parakeet-tdt-1.1b, vocab 1024) were misclassified as Japanese.
+        const bool is_ja = parakeet_vocab_is_japanese(s->parakeet_ctx) != 0;
         int chunk_s = 20;       // non-JA overlapping-window length (s)
         int overlap_s = 8;      // window overlap (s)
         int stream_chunk_s = 0; // JA streamed window (s); 0 = library per-model default
