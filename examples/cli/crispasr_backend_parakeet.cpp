@@ -114,6 +114,13 @@ public:
         parakeet_set_temperature(ctx_, params.temperature, params.seed);
         parakeet_set_beam_size(ctx_, params.beam_size > 0 ? params.beam_size : 1);
 
+        // Issue #257: local-attention window (--att-context "L,R") — NeMo
+        // rel_pos_local_attn, bounds long-audio encoder VRAM. INT_MIN = unset
+        // (keep the model default loaded from the GGUF / env).
+        if (params.att_context_left != INT_MIN && params.att_context_right != INT_MIN) {
+            parakeet_set_att_context(ctx_, params.att_context_left, params.att_context_right);
+        }
+
         // MAES beam search (env: CRISPASR_PARAKEET_MAES=1, or --decode maes).
         // Requires beam_size > 1. Configurable via env vars.
         {

@@ -149,6 +149,12 @@ struct whisper_params {
     bool warmup = false;    // run a short dummy transcribe after init to amortize first-call overhead (PLAN #80e)
     bool no_warmup = false; // --no-warmup: skip the always-on server warmup (e.g. crashes on some Vulkan drivers, #165)
     std::string parakeet_decoder; // "tdt" (default), "ctc" — selects parakeet decode head
+    // Issue #257: parakeet/canary local-attention window (encoder frames, 1 = ~80 ms)
+    // — NeMo change_attention_model("rel_pos_local_attn", [L,R]); bounds long-audio
+    // encoder memory to O(T·window). INT_MIN = unset (use the model default);
+    // negative = full attention. Set via --att-context "L,R".
+    int att_context_left = INT_MIN;
+    int att_context_right = INT_MIN;
     std::string hotwords;         // comma-separated hotword list (PLAN #98)
     float hotwords_boost = 2.0f;  // per-token log-prob boost for hotword prefix matches
     // Free-form hotword/context text injected into the vibevoice-asr prompt
