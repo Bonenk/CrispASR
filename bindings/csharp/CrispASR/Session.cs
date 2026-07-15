@@ -69,6 +69,18 @@ namespace CrispASR
             return csv.Split(',', StringSplitOptions.RemoveEmptyEntries);
         }
 
+        /// <summary>
+        /// The acoustic language Whisper detected on the last transcribe, as an
+        /// ISO-639-1 code ("en"). Whisper-only; other backends return the
+        /// session's source-language hint, or "unknown".
+        /// </summary>
+        public string DetectedLanguage()
+        {
+            var buf = new byte[32];
+            NativeMethods.crispasr_session_detected_language(Handle, buf, buf.Length);
+            return NativeMethods.NullTerminated(buf);
+        }
+
         public void Dispose()
         {
             if (_handle != IntPtr.Zero)
@@ -403,7 +415,8 @@ namespace CrispASR
                         NativeMethods.crispasr_session_result_word_p(r, i, j),
                         alts);
                 }
-                segs[i] = new Segment(text, t0, t1, words);
+                float noSpeechProb = NativeMethods.crispasr_session_result_segment_no_speech_prob(r, i);
+                segs[i] = new Segment(text, t0, t1, words, noSpeechProb);
             }
             return segs;
         }
@@ -643,10 +656,13 @@ namespace CrispASR
         public long T0 { get; }
         public long T1 { get; }
         public Word[] Words { get; }
+        /// <summary>Whisper's per-segment no-speech probability (the &lt;|nospeech|&gt;
+        /// posterior) in [0, 1]. Whisper-only; other backends leave -1.0 ("no data").</summary>
+        public float NoSpeechProb { get; }
 
-        public Segment(string text, long t0, long t1, Word[] words)
+        public Segment(string text, long t0, long t1, Word[] words, float noSpeechProb = -1.0f)
         {
-            Text = text; T0 = t0; T1 = t1; Words = words;
+            Text = text; T0 = t0; T1 = t1; Words = words; NoSpeechProb = noSpeechProb;
         }
 
         public override string ToString() => $"[{T0}-{T1}] {Text}";
