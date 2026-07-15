@@ -2805,6 +2805,15 @@ struct omnivoice_context* omnivoice_init_from_file(const char* path_model, struc
     ctx->gen.t_shift = params.t_shift > 0.0f ? params.t_shift : 0.1f;
     ctx->gen.seed = params.seed > 0 ? params.seed : 42;
 
+    // Diagnostic env overrides (can set exact 0, unlike the CLI which treats 0 as
+    // "use default"). Used to bisect the #254 word-dropping (CFG vs forward).
+    if (const char* e = getenv("OMNIVOICE_GUIDANCE"))
+        ctx->gen.guidance_scale = (float)atof(e);
+    if (const char* e = getenv("OMNIVOICE_POS_TEMP"))
+        ctx->gen.position_temperature = (float)atof(e);
+    if (const char* e = getenv("OMNIVOICE_CLASS_TEMP"))
+        ctx->gen.class_temperature = (float)atof(e);
+
     if (!load_model(ctx, path_model)) {
         delete ctx;
         return nullptr;
