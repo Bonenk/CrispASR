@@ -5,9 +5,31 @@ stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
 ## NOW — active work
 
-**Status (2026-07-15): investigating OmniVoice WORD-DROPPING (#254 new report).
-Root-caused to our LM FORWARD producing wrong audio_logits — NOT estimator/
-chunking/decode. Bisecting the exact mis-converted weight next.**
+**Status (2026-07-15): OmniVoice WORD-DROPPING (#254) — ROOT CAUSE FOUND.
+`llm.token_embd.weight` in our shipped `omnivoice-f16.gguf` has 4094 ZEROED
+rows (token ids ~3380–12594). "quick"=3974 and "None"=4064 are among them, so
+any word whose BPE token lands in that block renders SILENT → dropped. FIX =
+reconvert token_embd from clean source + re-upload + update SHA (same class as
+the tokenizer block.4 corruption). NEXT: get clean k2-fsa/OmniVoice LM source.**
+
+- 🎯 **ROOT CAUSE (bisected via step-0 dumps):** input-embedding compare vs
+  omnivoice.cpp `--dump` (`lm-hidden-step0-cond-embed` [83,1024]) — global
+  cos 0.995, but positions 1/4/8 cos=**0.0** (our vectors literally 0). Oracle
+  `prompt-cond-ids`: pos1/4=4064 "None", pos8=**3974 "quick"**. Scanned our
+  `llm.token_embd.weight`: **4094 zeroed rows in [3380,12594]** (first ~1023
+  contiguous, then blocky). ALL other tensors clean (audio_embd/output/layers
+  ~0% zeros). Deterministic + word-specific + quant-independent (f16 AND q4_k
+  share it) — matches every symptom. Same class as [[cohere-arabic-gguf-zeroed-norms]]
+  / the tokenizer block.4 zeroing.
+- 🔧 **FIX PLAN:** (1) obtain clean `k2-fsa/OmniVoice` LM safetensors (not in
+  local HF cache — only config/tokenizer; original convert ran on VPS);
+  (2) reconvert f16, verify `token_embd` has 0 zeroed rows + re-run fox ASR
+  (must say "quick"); (3) re-derive q4_k/q8_0; (4) re-upload to
+  `cstr/omnivoice-GGUF` (SHA-verified) + bump registry SHAs; (5) tell reporter.
+- 🧰 Tooling landed: `OMNIVOICE_DUMP_DIR` step-0 embed/logits dump; diagnostic
+  temp/guidance env knobs.
+- ⚠ The shipped HF `omnivoice-f16.gguf` is almost certainly the corrupt file the
+  reporter used (their dropped words match our local file exactly).
 
 - 🐞 **Reporter** ([comment](https://github.com/CrispStrobe/CrispASR/issues/254#issuecomment-4973702610)):
   long English paragraph drops words ("started", "One", "See", "pick" missing;
