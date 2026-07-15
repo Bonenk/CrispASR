@@ -261,6 +261,15 @@ inline bool crispasr_c2pa_sign_auto(std::string& data, const char* format, const
 // (EU AI Act Art. 50); verifiers show "unverified signer". For a trusted signer
 // identity, pass a CA-issued cert via --c2pa-cert / --c2pa-key instead.
 inline bool crispasr_c2pa_autocert(const std::string& cache_dir, std::string& out_cert, std::string& out_key) {
+#if defined(__EMSCRIPTEN__)
+    // No usable process/openssl in the browser sandbox — on-by-default self-sign
+    // isn't possible here. The host must pass a cert/key (or a build-time bundled
+    // cert) to sign in WASM; otherwise C2PA is skipped (watermark still applies).
+    (void)cache_dir;
+    (void)out_cert;
+    (void)out_key;
+    return false;
+#else
     namespace fs = std::filesystem;
     std::string base = cache_dir;
     if (base.empty()) {
@@ -313,6 +322,7 @@ inline bool crispasr_c2pa_autocert(const std::string& cache_dir, std::string& ou
     out_cert = cert;
     out_key = key;
     return true;
+#endif // __EMSCRIPTEN__
 }
 
 // Print a one-time startup warning if C2PA is not compiled in.
