@@ -106,6 +106,7 @@ const char*  crispasr_session_result_word_text(crispasr_session_result* r, int i
 long long    crispasr_session_result_word_t0(crispasr_session_result* r, int i_seg, int i_word);
 long long    crispasr_session_result_word_t1(crispasr_session_result* r, int i_seg, int i_word);
 float        crispasr_session_result_word_p(crispasr_session_result* r, int i_seg, int i_word);
+float        crispasr_session_result_segment_no_speech_prob(crispasr_session_result* r, int i_seg);
 // Per-frame CTC logits (opted in via crispasr_session_set_return_logits) for
 // backends that produce a dense CTC grid (Omni CTC, wav2vec2/hubert/data2vec,
 // canary-ctc). Frame-major: logits[t * n_logit_vocab + v]. Raw pre-softmax for
@@ -306,6 +307,7 @@ int crispasr_registry_list_backends_abi(char* out_csv, int out_cap);
 
 // --- Session extras ---
 int crispasr_session_available_backends(char* out_csv, int out_cap);
+int crispasr_session_detected_language(crispasr_session* s, char* out_buf, int out_cap);
 // CTC vocabulary access (Omni CTC backend): n_vocab piece count, token_text
 // maps an id to its raw piece (word-boundary marker intact) or "" when out of
 // range / unsupported. Pairs with the result logits accessor for detokenization.
@@ -1054,6 +1056,10 @@ type TranscribeSegment struct {
 	T0    int64 // centiseconds
 	T1    int64
 	Words []TranscribeWord
+	// NoSpeechProb is Whisper's per-segment no-speech probability (the
+	// <|nospeech|> posterior) in [0, 1]. Whisper-only; other backends leave
+	// the -1.0 "no data" sentinel.
+	NoSpeechProb float32
 }
 
 // TranscribeWord is one word with timing and confidence.
@@ -1192,6 +1198,7 @@ func extractResult(r *C.crispasr_session_result) *TranscribeResult {
 		seg.Text = C.GoString(C.crispasr_session_result_segment_text(r, C.int(i)))
 		seg.T0 = int64(C.crispasr_session_result_segment_t0(r, C.int(i)))
 		seg.T1 = int64(C.crispasr_session_result_segment_t1(r, C.int(i)))
+		seg.NoSpeechProb = float32(C.crispasr_session_result_segment_no_speech_prob(r, C.int(i)))
 		nWords := int(C.crispasr_session_result_n_words(r, C.int(i)))
 		seg.Words = make([]TranscribeWord, nWords)
 		for j := 0; j < nWords; j++ {
@@ -1757,6 +1764,15 @@ func AvailableBackends() []string {
 		}
 	}
 	return out
+}
+
+// DetectedLanguage returns the acoustic language Whisper detected on the last
+// transcribe as an ISO-639-1 code (e.g. "en"). Whisper-only; other backends
+// return the session's source-language hint, or "unknown".
+func (s *Session) DetectedLanguage() string {
+	var buf [32]C.char
+	C.crispasr_session_detected_language(s.handle, &buf[0], 32)
+	return C.GoString(&buf[0])
 }
 
 func splitCSV(s string) []string {
