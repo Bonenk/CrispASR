@@ -1705,6 +1705,21 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             return e[0] != '0'; // explicit override
         return ctx->backend && std::strstr(ggml_backend_name(ctx->backend), "CUDA") != nullptr;
     }();
+    // Interval-CFG (#254, opt-in, APPROXIMATE): the uncond forward is ~44% of
+    // stage0 but its output is smooth across masked-iterative steps. Recompute it
+    // only every K steps and reuse the cached u_logits in between; the cond
+    // forward stays fresh every step. K=1 = exact (default). K=2 ≈ −22% stage0.
+    // This CHANGES output (guided uses a slightly stale uncond), so it's gated OFF
+    // and validated by ASR + listening, never a silent default. Only applies to
+    // the 2-forward path (unified fuses cond+uncond, so K>1 forces 2-forward).
+    const int cfg_interval = [&] {
+        const char* e = getenv("OMNIVOICE_CFG_INTERVAL");
+        int k = e ? atoi(e) : 1;
+        return k >= 1 ? k : 1;
+    }();
+    if (cfg_interval > 1 && debug)
+        fprintf(stderr, "omnivoice: interval-CFG K=%d (uncond recomputed every %d steps)\n", cfg_interval,
+                cfg_interval);
     auto run_llm_forward = [&](ov_step_graph& g, const std::vector<float>& emb, int T_in,
                                int target_offset) -> std::vector<float> {
         if (!g.ctx0) {
@@ -1809,6 +1824,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     };
 
     // 8. Iterative generation loop
+    std::vector<float> u_logits_cache; // interval-CFG: last computed uncond logits
     for (int step = 0; step < gen.num_steps; step++) {
         int k = schedule[step];
         if (k <= 0)
@@ -1840,8 +1856,8 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             return prepare_embeddings(ctx, u_text_ids, u_audio, u_mask, T_target);
         };
 
-        if (unified_cfg && gen.guidance_scale != 0.0f) {
-            // Fused single-graph CFG.
+        if (unified_cfg && cfg_interval <= 1 && gen.guidance_scale != 0.0f) {
+            // Fused single-graph CFG (exact only; interval-CFG needs the 2-forward path).
             std::vector<float> embeds, u_embeds;
             {
                 ov_bench_stage b("  embeds");
@@ -1861,15 +1877,23 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
                 ov_bench_stage b("  fwd_cond");
                 c_logits = run_llm_forward(fwd_c, embeds, T_total, target_start);
             }
-            // Unconditional forward (target tokens only) for classifier-free guidance
+            // Unconditional forward (target tokens only) for classifier-free guidance.
+            // Interval-CFG: recompute only every cfg_interval steps (plus the first
+            // and last for accuracy); reuse the cached u_logits otherwise. K=1 =
+            // every step = exact.
             if (gen.guidance_scale != 0.0f) {
-                std::vector<float> u_embeds;
-                {
-                    ov_bench_stage b("  embeds_uncond");
-                    u_embeds = build_uncond_embeds();
+                const bool recompute =
+                    (step % cfg_interval == 0) || u_logits_cache.empty() || (step == gen.num_steps - 1);
+                if (recompute) {
+                    std::vector<float> u_embeds;
+                    {
+                        ov_bench_stage b("  embeds_uncond");
+                        u_embeds = build_uncond_embeds();
+                    }
+                    ov_bench_stage b("  fwd_uncond");
+                    u_logits_cache = run_llm_forward(fwd_u, u_embeds, T_target, 0);
                 }
-                ov_bench_stage b("  fwd_uncond");
-                u_logits = run_llm_forward(fwd_u, u_embeds, T_target, 0);
+                u_logits = u_logits_cache;
             }
         }
 
