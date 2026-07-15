@@ -35,16 +35,33 @@
 - Real-model A/B (in progress): qwen3-tts-1.7b-customvoice-q8_0, `--seed 42`,
   `CRISPASR_NO_WATERMARK=1` vs default → diff = watermark only.
 
-## Fix options (product decision — watermark/provenance policy)
-1. **Perceptual masking**: only nudge bins already carrying energy; never inject
-   into empty bins; cap per-bin boost to a fraction of the local masking
-   threshold. Keeps provenance, kills the audible comb.
-2. **Restrict comb to the speech band** (e.g. lo..~hi where energy exists) and
-   lower alpha; trade some detection robustness for inaudibility.
-3. **Add a proper `--no-watermark` CLI flag** (today only the env var exists).
-4. **Make watermark opt-in** for TTS (default off), keep AudioSeal/C2PA path.
+## Fix — chosen direction: "2 then 1" + evaluate a permissive SOTA tool
 
-Likely: (1)+(3) — inaudible-but-detectable watermark + a first-class opt-out.
+### DONE — approach 2 (band-limit + lower alpha)  [commit on this branch]
+- `wm_params()` in `crispasr_watermark.h`: comb `hi_bin` `n_fft/2-1` → `n_fft/5`
+  (~4.8 kHz), default `alpha` `0.08` → `0.05`. Both embed + detect read
+  `wm_params()` so they agree. `CRISPASR_WATERMARK_LEGACY=1` restores the old
+  wideband/loud path (A/B + re-detect old marks). `embed_impl` alpha default
+  `-1`=auto; `alpha==0` stays a true no-op.
+- Real qwen3 clip: **above-5 kHz SNR 17.7 → 51.7 dB** (tinny region gone),
+  detection 0.94 → 0.81 (>0.65 threshold), clean 0.44. All watermark unit
+  tests pass (+ new speech-like #260 guard).
+
+### NEXT — approach 1 (psychoacoustic masking), then neural upgrade
+- Shape the nudge under a masking threshold; only modulate bins with a local
+  masker; skip empty bins (needs the unit-test signal to be broadband, not a
+  pure tone — sine watermarking relies on empty-bin injection today).
+- **Permissive SOTA survey (agent):** **AudioSeal (Meta) is the answer** — MIT
+  *code AND weights* since v0.1.2 (relicensed from CC-BY-NC), SOTA robustness,
+  small SEANet convnet that ports to ggml; we already have `src/audioseal.cpp`
+  partially wired → finish it as the optional `--watermark-model` default.
+  Reject **audiowmark** + **Timbre WM** (GPLv3, copyleft — clean-room the DSP
+  ideas only). WavMark/SilentCipher/Perth: code MIT but weights license
+  unclear — verify before shipping. Full survey in agent output.
+
+### Not done (optional, low-risk)
+- `--no-watermark` CLI flag (today only `CRISPASR_NO_WATERMARK=1` env). Trivial
+  additive; hold pending maintainer nod.
 
 ## Measured (both confirm the comb)
 - Synthetic clean speech-like signal: broadband 41 dB, in-band(<4k) 47.5 dB,
