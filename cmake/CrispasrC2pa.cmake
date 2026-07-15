@@ -63,8 +63,8 @@ if (CRISPASR_C2PA_FETCH AND NOT EXISTS "${_c2pa_hint}/include/c2pa.h")
     endif()
 endif()
 
-find_library(C2PA_LIBRARY NAMES c2pa_c c2pa HINTS "${_c2pa_hint}/lib")
-find_path(C2PA_INCLUDE_DIR NAMES c2pa.h c2pa/c2pa.h HINTS "${_c2pa_hint}/include")
+find_library(C2PA_LIBRARY NAMES c2pa_c c2pa HINTS "${_c2pa_hint}/lib" NO_CMAKE_FIND_ROOT_PATH)
+find_path(C2PA_INCLUDE_DIR NAMES c2pa.h c2pa/c2pa.h HINTS "${_c2pa_hint}/include" NO_CMAKE_FIND_ROOT_PATH)
 
 set(CRISPASR_C2PA_STATIC OFF)
 if (C2PA_LIBRARY)
