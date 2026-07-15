@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.10
+
+- Initial pub.dev release for the current CrispASR 0.8 line.
+- Exposes Dart FFI bindings for the unified CrispASR session API, Whisper-shaped legacy API, audio decode helpers, language detection, diarization, chat/text helpers, grammar support and alt-token capture.
+- Keeps the package pure Dart FFI: native `libcrispasr` must be installed or bundled separately.
+
 ## 0.5.13
 
 - **Whisper alt-token capture (`--alt N` parity)** — per-token
