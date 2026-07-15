@@ -161,6 +161,30 @@ static inline std::vector<float> make_local_attn_mask(int T, int left, int right
     return mask;
 }
 
+// Band mask for the TRUE windowed (block sliding-chunks) attention path.
+// Layout matches build_windowed_attn: a flat (3*BS, BS, NB) F32 array indexed
+// [b*BS+i][3*BS] + j, natural key order — global query q=b*BS+i, global key
+// k=(b-1)*BS+j. 0.0 where k is in [0,T) and within [q-left, q+right] (or a
+// global token), -inf otherwise. NB = ceil(T/BS). Must use the same BS as
+// fc_window_block_size(left, right).
+static inline std::vector<float> make_window_band_mask(int T, int left, int right, int global_tokens, int BS) {
+    const float NEG_INF = -1e9f;
+    const int NB = (T + BS - 1) / BS;
+    std::vector<float> mask((size_t)3 * BS * BS * NB, NEG_INF);
+    for (int b = 0; b < NB; b++) {
+        for (int i = 0; i < BS; i++) {
+            const int q = b * BS + i;
+            for (int j = 0; j < 3 * BS; j++) {
+                const int k = (b - 1) * BS + j;
+                bool vis =
+                    k >= 0 && k < T && ((k >= q - left && k <= q + right) || k < global_tokens || q < global_tokens);
+                mask[((size_t)b * BS + i) * (3 * BS) + j] = vis ? 0.0f : NEG_INF;
+            }
+        }
+    }
+    return mask;
+}
+
 // ---------------------------------------------------------------------------
 // Pre-encode (dw_striding 8× subsampling) weights.
 //
@@ -539,6 +563,130 @@ struct BlockParams {
     bool manual_attn = false;
 };
 
+// Env gate: CRISPASR_FC_WINDOWED_ATTN=1 enables the TRUE windowed (block
+// sliding-chunks) attention path for rel_pos_local_attn models — scores and
+// rel-pos bias are computed only within a local band, giving O(T·window)
+// memory instead of the O(T²) masked-full attention. Default OFF: the existing
+// masked-full path (a T×T mask over full attention) stays intact for A/B.
+static inline bool fc_windowed_attn() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = std::getenv("CRISPASR_FC_WINDOWED_ATTN");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v != 0;
+}
+
+// Block size for windowed attention. Must be >= max(att_left, att_right) so the
+// 3-block band [b-1, b, b+1] covers every query's window. Shared between the
+// encoder (mask builder) and build_block so the band mask dims agree. An env
+// override (CRISPASR_FC_WINDOW_BLOCK) can trade graph size vs. band width.
+static inline int fc_window_block_size(int att_left, int att_right) {
+    int bs = att_left > att_right ? att_left : att_right;
+    if (bs < 1)
+        bs = 1;
+    const char* e = std::getenv("CRISPASR_FC_WINDOW_BLOCK");
+    if (e && *e) {
+        int ov = std::atoi(e);
+        if (ov >= bs)
+            bs = ov; // only allow >= the minimum that still covers the window
+    }
+    return bs;
+}
+
+// Whether the windowed path can run for this (T, window). Needs T >= 2*BS so the
+// rel-pos R slice [T-2BS .. T+2BS-2] stays in range; short clips fall back to
+// masked-full (cheap anyway).
+static inline bool fc_window_attn_applicable(int T, int att_left, int att_right) {
+    if (att_left < 0 || att_right < 0)
+        return false;
+    const int bs = fc_window_block_size(att_left, att_right);
+    return T >= 2 * bs && T > att_left + att_right + 1;
+}
+
+// True windowed (block sliding-chunks) rel-pos attention. Inputs are the
+// post-projection tensors as they exist in build_block right after the
+// permutes: Q_u, Q_v, K_ are (head_dim, T, n_heads); V3 is (head_dim, n_heads,
+// T); R is (head_dim, 2T-1, n_heads). `band_mask` is a host-filled (3*BS, BS,
+// NB) F32 additive mask (0 visible / -inf masked, natural key order). Returns
+// attn_out (d, T). Validated bit-exact vs masked-full in tools/dev/winattn_parity.cpp.
+static inline ggml_tensor* build_windowed_attn(ggml_context* ctx0, ggml_tensor* Q_u, ggml_tensor* Q_v, ggml_tensor* K_,
+                                               ggml_tensor* V3, ggml_tensor* R, int T, const BlockParams& p,
+                                               ggml_tensor* band_mask) {
+    const int HD = p.head_dim;
+    const int NH = p.n_heads;
+    const int d = p.d;
+    const int BS = fc_window_block_size(p.att_context_left, p.att_context_right);
+    const int NB = (T + BS - 1) / BS;
+    const int Tp = NB * BS;
+    const int RB = 4 * BS - 1;
+    const float scale = 1.0f / sqrtf((float)HD);
+
+    // Head-shaped, contiguous. V3 (HD,NH,T) -> (HD,T,NH).
+    ggml_tensor* Qu = ggml_cont(ctx0, Q_u);                                // (HD,T,NH)
+    ggml_tensor* Qv = ggml_cont(ctx0, Q_v);                                // (HD,T,NH)
+    ggml_tensor* Kc = ggml_cont(ctx0, K_);                                 // (HD,T,NH)
+    ggml_tensor* Vc = ggml_cont(ctx0, ggml_permute(ctx0, V3, 0, 2, 1, 3)); // (HD,T,NH)
+
+    // Zero-pad queries to Tp (tail) and keys/values to Tp+2*BS (band halo + tail).
+    auto pad_q = [&](ggml_tensor* xin) {
+        return (Tp == T) ? xin : ggml_pad_ext(ctx0, xin, 0, 0, 0, Tp - T, 0, 0, 0, 0);
+    };
+    ggml_tensor* Qu_p = ggml_cont(ctx0, pad_q(Qu)); // (HD,Tp,NH)
+    ggml_tensor* Qv_p = ggml_cont(ctx0, pad_q(Qv));
+    // left BS, right BS + (Tp - T)  -> length T + 2*BS + (Tp-T) = Tp + 2*BS
+    auto pad_kv = [&](ggml_tensor* xin) { return ggml_pad_ext(ctx0, xin, 0, 0, BS, BS + (Tp - T), 0, 0, 0, 0); };
+    ggml_tensor* Kp = ggml_cont(ctx0, pad_kv(Kc)); // (HD,Tp+2*BS,NH)
+    ggml_tensor* Vp = ggml_cont(ctx0, pad_kv(Vc));
+
+    // 3-block band via non-overlapping block reshape + 3 stride-1 slices + concat
+    // (ggml forbids overlapping views). block bo keys = [orig bo-1, bo, bo+1].
+    auto band3 = [&](ggml_tensor* Xp) {
+        ggml_tensor* Xb = ggml_reshape_4d(ctx0, Xp, HD, BS, NB + 2, NH);
+        auto slc = [&](int i) {
+            return ggml_cont(
+                ctx0, ggml_view_4d(ctx0, Xb, HD, BS, NB, NH, Xb->nb[1], Xb->nb[2], Xb->nb[3], (size_t)i * Xb->nb[2]));
+        };
+        return ggml_concat(ctx0, ggml_concat(ctx0, slc(0), slc(1), 1), slc(2), 1); // (HD,3BS,NB,NH)
+    };
+    ggml_tensor* K_band = band3(Kp);
+    ggml_tensor* V_band = band3(Vp);
+
+    // Query blocks (HD,BS,NB,NH).
+    ggml_tensor* Qu_blk = ggml_cont(
+        ctx0, ggml_view_4d(ctx0, Qu_p, HD, BS, NB, NH, Qu_p->nb[1], (size_t)BS * Qu_p->nb[1], Qu_p->nb[2], 0));
+    ggml_tensor* Qv_blk = ggml_cont(
+        ctx0, ggml_view_4d(ctx0, Qv_p, HD, BS, NB, NH, Qv_p->nb[1], (size_t)BS * Qv_p->nb[1], Qv_p->nb[2], 0));
+
+    // Banded AC term: scores[j,i,b,h] = <K_band key j, Q_u query i>.
+    ggml_tensor* sc = ggml_mul_mat(ctx0, K_band, Qu_blk); // (3BS,BS,NB,NH)
+
+    // Banded rel-pos bias BD. R_sl = R rows [T-2BS .. T-2BS+RB-1] reshaped to
+    // (HD,RB,1,NH) so mul_mat broadcasts R over blocks and aligns heads in ne3.
+    ggml_tensor* R_sl =
+        ggml_cont(ctx0, ggml_view_3d(ctx0, R, HD, RB, NH, R->nb[1], R->nb[2], (size_t)(T - 2 * BS) * R->nb[1]));
+    R_sl = ggml_reshape_4d(ctx0, R_sl, HD, RB, 1, NH);
+    ggml_tensor* BDraw_blk = ggml_mul_mat(ctx0, R_sl, Qv_blk); // (RB,BS,NB,NH)
+    // In-block rel-shift: BD_blk[j,i] = BDraw_blk[(BS-1)+j-i, i] (natural key order).
+    ggml_tensor* BD_blk =
+        ggml_cont(ctx0, ggml_view_4d(ctx0, BDraw_blk, 3 * BS, BS, NB, NH, BDraw_blk->nb[1] - BDraw_blk->nb[0],
+                                     BDraw_blk->nb[2], BDraw_blk->nb[3], (size_t)(BS - 1) * BDraw_blk->nb[0]));
+    sc = ggml_add(ctx0, sc, BD_blk);
+
+    // Band mask (3BS,BS,NB) broadcast over heads.
+    sc = ggml_add(ctx0, sc, ggml_reshape_4d(ctx0, band_mask, 3 * BS, BS, NB, 1));
+    sc = ggml_soft_max_ext(ctx0, sc, nullptr, scale, 0.0f);
+
+    // Weighted sum over the band: attn[:,i,b] = sum_j sc[j,i,b] * V_band[:,j,b].
+    ggml_tensor* V_band_t = ggml_cont(ctx0, ggml_permute(ctx0, V_band, 1, 0, 2, 3)); // (3BS,HD,NB,NH)
+    ggml_tensor* a_blk = ggml_mul_mat(ctx0, V_band_t, sc);                           // (HD,BS,NB,NH)
+    ggml_tensor* a_full = ggml_cont(ctx0, ggml_reshape_3d(ctx0, ggml_cont(ctx0, a_blk), HD, Tp, NH));
+    if (Tp != T)
+        a_full = ggml_cont(ctx0, ggml_view_3d(ctx0, a_full, HD, T, NH, a_full->nb[1], a_full->nb[2], 0));
+    // (HD,T,NH) -> (d,T)
+    return ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, a_full, 0, 2, 1, 3)), d, T);
+}
+
 // Build one Conformer block. `cur` must be (d, T). `pos_enc` is the shared
 // sinusoidal rel-pos table (d, 2T-1). `local_attn_mask` is an optional (T, T)
 // F32 tensor with 0.0 for visible positions and -inf for masked positions
@@ -553,7 +701,8 @@ struct BlockParams {
 // Returns the post-block (d, T) output.
 static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggml_tensor* pos_enc, int T,
                                        const BlockWeights& e, const BlockParams& p,
-                                       ggml_tensor* local_attn_mask = nullptr, ggml_tensor* time_mask = nullptr) {
+                                       ggml_tensor* local_attn_mask = nullptr, ggml_tensor* time_mask = nullptr,
+                                       ggml_tensor* window_band_mask = nullptr) {
     const int d = p.d;
     const int n_heads = p.n_heads;
     const int head_dim = p.head_dim;
@@ -610,67 +759,81 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
     ggml_tensor* K_ = ggml_permute(ctx0, K3, 0, 2, 1, 3);
     R = ggml_permute(ctx0, ggml_reshape_3d(ctx0, R, head_dim, n_heads, 2 * T - 1), 0, 2, 1, 3);
 
-    // Compute the relative position bias BD = rel_shift(Q_v × R^T).
-    // This is query-dependent so it can't be precomputed, but it CAN
-    // be passed as the additive mask to ggml_flash_attn_ext, which
-    // fuses AC (= Q_u × K^T) + BD + softmax + ×V into one kernel.
-    ggml_tensor* BD_raw = ggml_mul_mat(ctx0, ggml_cont(ctx0, R), Q_v);
-    ggml_tensor* BD = rel_shift(ctx0, BD_raw);
-
-    // flash_attn_ext computes: softmax(Q_u × K^T * scale + mask) × V
-    // We need:                 softmax((Q_u × K^T + BD) * scale)  × V
-    // So pass mask = BD * scale to get equivalent semantics.
     const float scale = 1.0f / sqrtf((float)head_dim);
-    // BD is a strided view from rel_shift — make contiguous before scale/cast.
-    ggml_tensor* BD_c = ggml_cont(ctx0, BD);
-    ggml_tensor* BD_scaled = ggml_scale(ctx0, BD_c, scale);
-
-    // Local attention window mask: add -inf for positions outside the window.
-    // The mask tensor is created externally and passed via `local_attn_mask`.
-    if (local_attn_mask) {
-        // Broadcast (T, T) mask across all heads in BD_scaled (T, T, n_heads).
-        BD_scaled = ggml_add(ctx0, BD_scaled, local_attn_mask);
-    }
 
     ggml_tensor* attn_out;
-    if (fc_no_flash() || p.manual_attn) {
-        // Manual attention: QK^T + BD, softmax, ×V — no flash_attn_ext.
-        // Q_u, K_ are (head_dim, T, n_heads) after permute.
-        // mul_mat(K, Q) computes Q^T × K^T^T = Q^T × K → (T, T, n_heads).
-        ggml_tensor* Q_u_c = ggml_cont(ctx0, Q_u);            // (head_dim, T, n_heads)
-        ggml_tensor* K_c = ggml_cont(ctx0, K_);               // (head_dim, T, n_heads)
-        ggml_tensor* scores = ggml_mul_mat(ctx0, K_c, Q_u_c); // (T, T, n_heads)
-        ggml_tensor* BD_c2 = ggml_cont(ctx0, BD);             // (T, T, n_heads)
-        scores = ggml_add(ctx0, scores, BD_c2);
-        if (local_attn_mask)
-            scores = ggml_add(ctx0, scores, local_attn_mask);
-        scores = ggml_soft_max_ext(ctx0, scores, nullptr, scale, 0.0f);
-        // V: (head_dim, n_heads, T) → permute(0,2,1,3) → (head_dim, T, n_heads)
-        // Then transpose via permute(1,0,2,3) → (T, head_dim, n_heads) for mul_mat
-        ggml_tensor* V_3d = ggml_cont(ctx0, ggml_permute(ctx0, V3, 0, 2, 1, 3));
-        // V_3d: (head_dim, T, n_heads) — need (T, head_dim, n_heads) for mul_mat
-        ggml_tensor* V_t = ggml_cont(ctx0, ggml_permute(ctx0, V_3d, 1, 0, 2, 3)); // (T, head_dim, n_heads)
-        attn_out = ggml_mul_mat(ctx0, V_t, scores);                               // (head_dim, T, n_heads)
-        attn_out = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn_out, 0, 2, 1, 3)), d, T);
+    // ---- TRUE windowed attention (block sliding-chunks, O(T·window) memory) ----
+    if (fc_windowed_attn() && window_band_mask &&
+        fc_window_attn_applicable(T, p.att_context_left, p.att_context_right)) {
+        static bool logged = false;
+        if (!logged) {
+            logged = true;
+            fprintf(stderr, "[fc] windowed attn ENGAGED: T=%d BS=%d left=%d right=%d\n", T,
+                    fc_window_block_size(p.att_context_left, p.att_context_right), p.att_context_left,
+                    p.att_context_right);
+        }
+        attn_out = build_windowed_attn(ctx0, Q_u, Q_v, K_, V3, R, T, p, window_band_mask);
     } else {
-        // flash_attn_ext mask must be F16
-        ggml_tensor* BD_mask = ggml_cast(ctx0, BD_scaled, GGML_TYPE_F16);
+        // Compute the relative position bias BD = rel_shift(Q_v × R^T).
+        // This is query-dependent so it can't be precomputed, but it CAN
+        // be passed as the additive mask to ggml_flash_attn_ext, which
+        // fuses AC (= Q_u × K^T) + BD + softmax + ×V into one kernel.
+        ggml_tensor* BD_raw = ggml_mul_mat(ctx0, ggml_cont(ctx0, R), Q_v);
+        ggml_tensor* BD = rel_shift(ctx0, BD_raw);
 
-        // V needs [head_dim, T, n_heads] layout for flash_attn_ext (same as K).
-        // The kernel reads strided views (nb0 == type size) directly — the
-        // legacy ggml_cont copies of Q/K/V are restorable via
-        // CRISPASR_FC_ATTN_CONT=1 for regression bisection.
-        ggml_tensor* Q_f = Q_u;
-        ggml_tensor* K_f = K_;
-        ggml_tensor* V_f = ggml_permute(ctx0, V3, 0, 2, 1, 3);
-        if (fc_attn_cont()) {
-            Q_f = ggml_cont(ctx0, Q_f);
-            K_f = ggml_cont(ctx0, K_f);
-            V_f = ggml_cont(ctx0, V_f);
+        // flash_attn_ext computes: softmax(Q_u × K^T * scale + mask) × V
+        // We need:                 softmax((Q_u × K^T + BD) * scale)  × V
+        // So pass mask = BD * scale to get equivalent semantics.
+        // BD is a strided view from rel_shift — make contiguous before scale/cast.
+        ggml_tensor* BD_c = ggml_cont(ctx0, BD);
+        ggml_tensor* BD_scaled = ggml_scale(ctx0, BD_c, scale);
+
+        // Local attention window mask: add -inf for positions outside the window.
+        // The mask tensor is created externally and passed via `local_attn_mask`.
+        if (local_attn_mask) {
+            // Broadcast (T, T) mask across all heads in BD_scaled (T, T, n_heads).
+            BD_scaled = ggml_add(ctx0, BD_scaled, local_attn_mask);
         }
 
-        attn_out = ggml_flash_attn_ext(ctx0, Q_f, K_f, V_f, BD_mask, scale, 0.0f, 0.0f);
-        attn_out = ggml_reshape_2d(ctx0, attn_out, d, T);
+        if (fc_no_flash() || p.manual_attn) {
+            // Manual attention: QK^T + BD, softmax, ×V — no flash_attn_ext.
+            // Q_u, K_ are (head_dim, T, n_heads) after permute.
+            // mul_mat(K, Q) computes Q^T × K^T^T = Q^T × K → (T, T, n_heads).
+            ggml_tensor* Q_u_c = ggml_cont(ctx0, Q_u);            // (head_dim, T, n_heads)
+            ggml_tensor* K_c = ggml_cont(ctx0, K_);               // (head_dim, T, n_heads)
+            ggml_tensor* scores = ggml_mul_mat(ctx0, K_c, Q_u_c); // (T, T, n_heads)
+            ggml_tensor* BD_c2 = ggml_cont(ctx0, BD);             // (T, T, n_heads)
+            scores = ggml_add(ctx0, scores, BD_c2);
+            if (local_attn_mask)
+                scores = ggml_add(ctx0, scores, local_attn_mask);
+            scores = ggml_soft_max_ext(ctx0, scores, nullptr, scale, 0.0f);
+            // V: (head_dim, n_heads, T) → permute(0,2,1,3) → (head_dim, T, n_heads)
+            // Then transpose via permute(1,0,2,3) → (T, head_dim, n_heads) for mul_mat
+            ggml_tensor* V_3d = ggml_cont(ctx0, ggml_permute(ctx0, V3, 0, 2, 1, 3));
+            // V_3d: (head_dim, T, n_heads) — need (T, head_dim, n_heads) for mul_mat
+            ggml_tensor* V_t = ggml_cont(ctx0, ggml_permute(ctx0, V_3d, 1, 0, 2, 3)); // (T, head_dim, n_heads)
+            attn_out = ggml_mul_mat(ctx0, V_t, scores);                               // (head_dim, T, n_heads)
+            attn_out = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn_out, 0, 2, 1, 3)), d, T);
+        } else {
+            // flash_attn_ext mask must be F16
+            ggml_tensor* BD_mask = ggml_cast(ctx0, BD_scaled, GGML_TYPE_F16);
+
+            // V needs [head_dim, T, n_heads] layout for flash_attn_ext (same as K).
+            // The kernel reads strided views (nb0 == type size) directly — the
+            // legacy ggml_cont copies of Q/K/V are restorable via
+            // CRISPASR_FC_ATTN_CONT=1 for regression bisection.
+            ggml_tensor* Q_f = Q_u;
+            ggml_tensor* K_f = K_;
+            ggml_tensor* V_f = ggml_permute(ctx0, V3, 0, 2, 1, 3);
+            if (fc_attn_cont()) {
+                Q_f = ggml_cont(ctx0, Q_f);
+                K_f = ggml_cont(ctx0, K_f);
+                V_f = ggml_cont(ctx0, V_f);
+            }
+
+            attn_out = ggml_flash_attn_ext(ctx0, Q_f, K_f, V_f, BD_mask, scale, 0.0f, 0.0f);
+            attn_out = ggml_reshape_2d(ctx0, attn_out, d, T);
+        }
     }
 
     attn_out = mm_bias(e.attn_out_w, attn_out, e.attn_out_b);

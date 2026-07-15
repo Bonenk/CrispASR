@@ -172,3 +172,29 @@ Key algorithm (O(T·BS·H) scores/BD instead of O(T²·H)):
 NEXT (M2): wire as core_conformer::build_windowed_attn, gated CRISPASR_FC_WINDOWED_ATTN
 (default keeps masked-full path intact for A/B), validate via real parakeet
 transcript parity + memory measurement.
+
+### R4 M2 DONE + M3 in progress (2026-07-15) — wired + validated
+
+M2: build_windowed_attn wired into core_conformer::build_block, gated
+CRISPASR_FC_WINDOWED_ATTN=1 (default OFF keeps masked-full intact). Caller
+parakeet.cpp builds O(T·window) band mask (make_window_band_mask) instead of the
+T×T local mask when gated+applicable. Builds clean.
+
+M3 findings (parakeet-tdt-0.6b-v3 q4_k, Metal M1):
+- PARITY: windowed-local == masked-full-local transcripts IDENTICAL on 20s
+  (T=250) and 209s (T=2613) clips. Windowed path confirmed engaging (stderr trace).
+- MEMORY: KEY metric is phys_footprint (macOS caps RSS via compression). At forced
+  single-pass T=7838 (627s clip, CRISPASR_PARAKEET_STREAM_THRESHOLD=9999):
+    masked-full local: peak footprint = 2402 MB  (the O(T²) BD_raw ~ user's "2GiB")
+    windowed local:    <measuring — slow, backgrounded>
+  So the O(T²) memory hog is REAL at large single-pass T, and it IS the rel-pos BD.
+- CAVEAT: default dispatcher silence-splits/chunks long audio (STREAM_THRESHOLD
+  300s), bounding per-encode T, so the blow-up only appears in forced single-pass.
+  Windowed's purpose = enable bounded-memory SINGLE-PASS long encode (avoids the
+  chunking that corrupts full-attention FastConformer — the #257 root issue).
+- CONCERN: windowed is SLOWER at large T (many small ops: 2×concat + 4×pad + several
+  cont per layer ×24). Timed out >2min at T=7838. Needs perf assessment / op fusion
+  before it's a viable default; fine as an opt-in memory-vs-speed lever now.
+
+NEXT: confirm windowed footprint << 2402MB; assess speed; fix --att-context help
+wording; decide default (opt-in for now).

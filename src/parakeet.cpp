@@ -840,9 +840,23 @@ static ggml_cgraph* parakeet_build_graph_encoder(parakeet_context* ctx, int T_me
 
     // ----- Local attention mask (rel_pos_local_attn models) -----
     ggml_tensor* local_mask = nullptr;
+    ggml_tensor* window_band_mask = nullptr;
     const bool use_local_attn =
         hp.att_context_left >= 0 && hp.att_context_right >= 0 && T > hp.att_context_left + hp.att_context_right + 1;
-    if (use_local_attn) {
+    // TRUE windowed attention: build the O(T·window) band mask instead of the T×T
+    // full mask when the gate is on and the clip is long enough to benefit.
+    const bool use_windowed_attn =
+        core_conformer::fc_windowed_attn() &&
+        core_conformer::fc_window_attn_applicable(T, hp.att_context_left, hp.att_context_right);
+    if (getenv("CRISPASR_FC_MEM_DEBUG"))
+        fprintf(stderr, "[fc-encode] T=%d windowed=%d local=%d\n", T, (int)use_windowed_attn, (int)use_local_attn);
+    if (use_windowed_attn) {
+        const int BS = core_conformer::fc_window_block_size(hp.att_context_left, hp.att_context_right);
+        const int NB = (T + BS - 1) / BS;
+        window_band_mask = ggml_new_tensor_3d(ctx0, GGML_TYPE_F32, 3 * BS, BS, NB);
+        ggml_set_name(window_band_mask, "window_band_mask");
+        ggml_set_input(window_band_mask);
+    } else if (use_local_attn) {
         local_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, T, T);
         ggml_set_name(local_mask, "local_attn_mask");
         ggml_set_input(local_mask);
@@ -855,7 +869,7 @@ static ggml_cgraph* parakeet_build_graph_encoder(parakeet_context* ctx, int T_me
     };
     bp.manual_attn = core_conformer::fc_gpu_manual_attn(ctx->backend);
     for (uint32_t il = 0; il < hp.n_layers; il++) {
-        cur = core_conformer::build_block(ctx0, cur, pos_enc, T, m.enc[il], bp, local_mask);
+        cur = core_conformer::build_block(ctx0, cur, pos_enc, T, m.enc[il], bp, local_mask, nullptr, window_band_mask);
     }
 
     ggml_set_name(cur, "enc_out");
@@ -959,6 +973,16 @@ static std::vector<float> parakeet_encode_mel(parakeet_context* ctx, const float
         auto lm = core_conformer::make_local_attn_mask(T_enc, hp.att_context_left, hp.att_context_right,
                                                        (int)hp.global_tokens);
         ggml_backend_tensor_set(local_mask_in, lm.data(), 0, lm.size() * sizeof(float));
+    }
+
+    // Windowed-attention band mask (when present in the graph).
+    ggml_tensor* band_mask_in = ggml_graph_get_tensor(gf, "window_band_mask");
+    if (band_mask_in) {
+        const auto& hp = ctx->model.hparams;
+        const int BS = core_conformer::fc_window_block_size(hp.att_context_left, hp.att_context_right);
+        auto bm = core_conformer::make_window_band_mask(T_enc, hp.att_context_left, hp.att_context_right,
+                                                        (int)hp.global_tokens, BS);
+        ggml_backend_tensor_set(band_mask_in, bm.data(), 0, bm.size() * sizeof(float));
     }
 
     // Compute
