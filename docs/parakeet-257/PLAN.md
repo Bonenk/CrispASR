@@ -127,3 +127,23 @@ PLAN:
    active; symbol exported; python syntax OK.
 Matches NeMo: full attention default; opt-in local attention (rel_pos_local_attn)
 for long-audio VRAM. --chunk-seconds remains the other reference control.
+
+## ROUND 4 (2026-07-15) — true windowed attention (maintainer-directed)
+
+FINDING: --att-context (as shipped R3) does NOT reduce memory — CrispASR builds a
+T×T mask over FULL attention (fastconformer build_block: scores are (T,T,n_heads)),
+matching NeMo's OUTPUT but not its O(T·window) memory. Measured peak RSS: full ==
+att-context (1.41GB); --chunk-seconds ~same/slightly higher. The real single-alloc
+memory lever today is --chunk-seconds (per-chunk encode graphs).
+
+DIRECTIVE: implement TRUE windowed attention (compute only the local band →
+O(T·window)) so --att-context delivers NeMo rel_pos_local_attn's memory benefit.
+
+REFERENCE: NeMo RelPositionMultiHeadAttentionLongformer — "sliding chunks":
+pad+reshape Q/K/V into overlapping windows of size w; each query chunk attends to a
+2w+1 key band; rel-pos bias (BD) windowed too. O(T·w) scores.
+
+PLAN: core_conformer::build_block windowed-attention path (gated), validated vs the
+masked-full output (parity ≥0.999 on the encoder / transcript-identical) + measured
+memory reduction, before flipping --att-context to use it. HARD: ggml banded matmul
+(overlapping key-window gather) + windowed rel-pos. Incremental, diff-harness-checked.
