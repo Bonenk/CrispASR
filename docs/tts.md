@@ -1273,11 +1273,15 @@ is present):
 # then cmake reconfigure; look for "C2PA signing enabled" at configure time
 ```
 
-**On by default (self-signed).** When built with C2PA, output is signed
-automatically — no flags needed. On first use CrispASR auto-provisions a
-per-install self-signed certificate (10-year P-256 / ES256) under the cache dir
-and reuses it. Self-signed manifests are valid and machine-readable (EU AI Act
-Art. 50); C2PA verifiers show "unverified signer".
+**On by default (self-signed), on every platform.** When built with C2PA, output
+is signed automatically — no flags needed. Signing uses a fixed self-signed
+certificate **baked into the binary** (`crispasr_c2pa_default_cert.h`), so it
+works identically on desktop, mobile, and in the **WASM browser sandbox** (no
+filesystem or openssl needed at runtime). Self-signed manifests are valid and
+machine-readable (EU AI Act Art. 50); C2PA verifiers show "unverified signer".
+The bundled private key is intentionally public — it only marks content as
+AI-generated, it is not a trust anchor. (Regenerate with
+`scripts/gen-default-cert-header.sh`.)
 
 ```bash
 crispasr --tts "hello" -m kokoro.gguf --tts-output out.wav   # signed automatically

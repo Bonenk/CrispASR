@@ -32,6 +32,8 @@
 #include <string>
 #include <system_error>
 
+#include "crispasr_c2pa_default_cert.h" // bundled self-signed default cert (baked in)
+
 #ifdef CRISPASR_HAVE_C2PA
 #include <c2pa.h>
 #endif
@@ -140,13 +142,14 @@ inline std::string read_file(const std::string& path) {
 
 #endif // CRISPASR_HAVE_C2PA
 
-// Sign an in-memory audio buffer with a C2PA manifest. `format` is a C2PA
-// MIME/format string (see crispasr_c2pa_format_for_ext). `cert_pem`/`key_pem`
-// are PATHS to PEM files. On success, `data` is replaced with the signed asset
-// and true is returned. Returns false (leaving `data` unchanged) when C2PA is
-// unavailable, inputs are missing, the format is unsupported, or signing fails.
-inline bool crispasr_c2pa_sign_buffer(std::string& data, const char* format, const std::string& cert_pem,
-                                      const std::string& key_pem) {
+// Sign an in-memory audio buffer with a C2PA manifest from in-memory PEM
+// content (no filesystem — works in the browser/mobile sandbox). `format` is a
+// C2PA MIME string (see crispasr_c2pa_format_for_ext). On success `data` is
+// replaced with the signed asset and true is returned; false (data unchanged)
+// when C2PA is unavailable, inputs are empty, the format is unsupported, or
+// signing fails.
+inline bool crispasr_c2pa_sign_pem(std::string& data, const char* format, const std::string& cert_pem,
+                                   const std::string& key_pem) {
     if (!format || !*format || cert_pem.empty() || key_pem.empty())
         return false;
 
@@ -161,14 +164,10 @@ inline bool crispasr_c2pa_sign_buffer(std::string& data, const char* format, con
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #endif
-    std::string cert = read_file(cert_pem);
-    std::string key = read_file(key_pem);
-    if (cert.empty() || key.empty()) {
-        fprintf(stderr, "crispasr: C2PA cert/key unreadable ('%s' / '%s')\n", cert_pem.c_str(), key_pem.c_str());
-        return false;
-    }
+    const std::string& cert = cert_pem;
+    const std::string& key = key_pem;
 
-    // Self-signed P-256 EC cert from generate-c2pa-cert.sh → ES256.
+    // Self-signed P-256 EC cert (ES256).
     C2paSignerInfo info;
     info.alg = "es256";
     info.sign_cert = cert.c_str();
@@ -221,108 +220,44 @@ inline bool crispasr_c2pa_sign_buffer(std::string& data, const char* format, con
 #endif
 }
 
-// Back-compat WAV wrapper (existing call sites). Prefer crispasr_c2pa_sign_buffer.
-inline bool crispasr_c2pa_sign_wav(std::string& wav, const std::string& cert_pem, const std::string& key_pem) {
-    return crispasr_c2pa_sign_buffer(wav, "audio/wav", cert_pem, key_pem);
+// Sign from PEM FILE PATHS (reads the files, then delegates to sign_pem).
+inline bool crispasr_c2pa_sign_buffer(std::string& data, const char* format, const std::string& cert_path,
+                                      const std::string& key_path) {
+    if (!format || !*format || cert_path.empty() || key_path.empty())
+        return false;
+#ifdef CRISPASR_HAVE_C2PA
+    std::string cert = crispasr_c2pa_detail::read_file(cert_path);
+    std::string key = crispasr_c2pa_detail::read_file(key_path);
+    if (cert.empty() || key.empty()) {
+        fprintf(stderr, "crispasr: C2PA cert/key unreadable ('%s' / '%s')\n", cert_path.c_str(), key_path.c_str());
+        return false;
+    }
+    return crispasr_c2pa_sign_pem(data, format, cert, key);
+#else
+    (void)data;
+    return false;
+#endif
 }
 
-inline bool crispasr_c2pa_autocert(const std::string& cache_dir, std::string& out_cert, std::string& out_key);
+// Back-compat WAV wrapper (existing call sites).
+inline bool crispasr_c2pa_sign_wav(std::string& wav, const std::string& cert_path, const std::string& key_path) {
+    return crispasr_c2pa_sign_buffer(wav, "audio/wav", cert_path, key_path);
+}
 
-// Sign `data` (format = C2PA MIME, e.g. "audio/wav" / "audio/mpeg") with the
-// EFFECTIVE credentials: the user's --c2pa-cert/--c2pa-key if given, otherwise an
-// auto-provisioned per-install self-signed cert (on-by-default provenance).
-// Best-effort — returns false (leaving `data` unchanged) if C2PA is unavailable,
-// the format is empty/unsupported, cert provisioning fails, or signing fails.
+// Sign `data` (format = C2PA MIME) with the EFFECTIVE credentials: the user's
+// --c2pa-cert/--c2pa-key (file paths) if given, otherwise the built-in bundled
+// self-signed default cert (on-by-default provenance on EVERY platform — the
+// bundled cert is baked in, so this works in the browser/mobile sandbox with no
+// filesystem or openssl). Best-effort — returns false (data unchanged) if C2PA
+// is unavailable, the format is unsupported, or signing fails.
 inline bool crispasr_c2pa_sign_auto(std::string& data, const char* format, const std::string& user_cert,
                                     const std::string& user_key, const std::string& cache_dir) {
+    (void)cache_dir; // reserved (unused since the default cert is bundled, not cached)
     if (!format || !*format)
         return false;
-    std::string cert = user_cert, key = user_key;
-    if (cert.empty() || key.empty()) {
-#ifdef CRISPASR_HAVE_C2PA
-        if (!crispasr_c2pa_autocert(cache_dir, cert, key))
-            return false;
-#else
-        (void)cache_dir;
-        return false;
-#endif
-    }
-    return crispasr_c2pa_sign_buffer(data, format, cert, key);
-}
-
-// Ensure a per-install self-signed C2PA certificate exists, for on-by-default
-// signing when the user didn't pass --c2pa-cert. Generates one with `openssl`
-// into <cache_dir>/c2pa/ on first use and caches it (10-year P-256 / ES256, with
-// the C2PA-required extensions). Returns true and fills cert/key paths on
-// success; false if openssl is unavailable or generation fails (the caller then
-// falls back to watermark-only — C2PA is a best-effort upgrade, never fatal).
-//
-// A self-signed cert marks content as AI-generated in a machine-readable way
-// (EU AI Act Art. 50); verifiers show "unverified signer". For a trusted signer
-// identity, pass a CA-issued cert via --c2pa-cert / --c2pa-key instead.
-inline bool crispasr_c2pa_autocert(const std::string& cache_dir, std::string& out_cert, std::string& out_key) {
-#if defined(__EMSCRIPTEN__)
-    // No usable process/openssl in the browser sandbox — on-by-default self-sign
-    // isn't possible here. The host must pass a cert/key (or a build-time bundled
-    // cert) to sign in WASM; otherwise C2PA is skipped (watermark still applies).
-    (void)cache_dir;
-    (void)out_cert;
-    (void)out_key;
-    return false;
-#else
-    namespace fs = std::filesystem;
-    std::string base = cache_dir;
-    if (base.empty()) {
-        const char* home = std::getenv("HOME");
-#ifdef _WIN32
-        if (!home)
-            home = std::getenv("USERPROFILE");
-#endif
-        if (!home)
-            return false;
-        base = std::string(home) + "/.cache/crispasr";
-    }
-    const std::string dir = base + "/c2pa";
-    const std::string cert = dir + "/crispasr-c2pa.crt";
-    const std::string key = dir + "/crispasr-c2pa.key";
-
-    std::error_code ec;
-    if (fs::exists(cert, ec) && fs::exists(key, ec)) {
-        out_cert = cert;
-        out_key = key;
-        return true;
-    }
-    fs::create_directories(dir, ec);
-    if (ec)
-        return false;
-
-    const std::string cnf = dir + "/c2pa-ext.cnf";
-    {
-        std::ofstream f(cnf);
-        if (!f)
-            return false;
-        f << "[req]\ndistinguished_name = dn\nx509_extensions = v3\nprompt = no\n"
-             "[dn]\nCN = CrispASR TTS\nO = Self-Signed C2PA\n"
-             "[v3]\nbasicConstraints = critical, CA:FALSE\n"
-             "keyUsage = critical, digitalSignature\n"
-             "extendedKeyUsage = critical, emailProtection\n"
-             "subjectKeyIdentifier = hash\nauthorityKeyIdentifier = keyid:always\n";
-    }
-    // Quote paths to tolerate spaces; silence openssl's stderr chatter.
-    std::string cmd = "openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 3650"
-                      " -keyout \"" +
-                      key + "\" -out \"" + cert + "\" -config \"" + cnf + "\" >/dev/null 2>&1";
-    int rc = std::system(cmd.c_str());
-    fs::remove(cnf, ec);
-    if (rc != 0 || !fs::exists(cert, ec) || !fs::exists(key, ec)) {
-        fprintf(stderr, "crispasr: C2PA auto-cert generation failed (openssl missing?); "
-                        "signing skipped (watermark still applied)\n");
-        return false;
-    }
-    out_cert = cert;
-    out_key = key;
-    return true;
-#endif // __EMSCRIPTEN__
+    if (!user_cert.empty() && !user_key.empty())
+        return crispasr_c2pa_sign_buffer(data, format, user_cert, user_key);
+    return crispasr_c2pa_sign_pem(data, format, crispasr_c2pa_default_cert_pem(), crispasr_c2pa_default_key_pem());
 }
 
 // Print a one-time startup warning if C2PA is not compiled in.
