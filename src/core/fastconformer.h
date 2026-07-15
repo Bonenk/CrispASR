@@ -563,16 +563,18 @@ struct BlockParams {
     bool manual_attn = false;
 };
 
-// Env gate: CRISPASR_FC_WINDOWED_ATTN=1 enables the TRUE windowed (block
-// sliding-chunks) attention path for rel_pos_local_attn models — scores and
-// rel-pos bias are computed only within a local band, giving O(T·window)
-// memory instead of the O(T²) masked-full attention. Default OFF: the existing
-// masked-full path (a T×T mask over full attention) stays intact for A/B.
+// TRUE windowed (block sliding-chunks) attention for rel_pos_local_attn models:
+// scores and rel-pos bias are computed only within a local band, giving
+// O(T·window) memory instead of the O(T²) masked-full attention. Bit-exact vs
+// masked-full (tools/dev/winattn_parity.cpp) and ~3× faster on Metal.
+// DEFAULT ON when --att-context is set (only engages via build_block when a band
+// mask is supplied and T >= 2*BS). Set CRISPASR_FC_WINDOWED_ATTN=0 to force the
+// legacy masked-full local path (T×T mask over full attention) for A/B.
 static inline bool fc_windowed_attn() {
     static int v = -1;
     if (v < 0) {
         const char* e = std::getenv("CRISPASR_FC_WINDOWED_ATTN");
-        v = (e && *e && *e != '0') ? 1 : 0;
+        v = (e && *e == '0') ? 0 : 1; // default ON; only an explicit "0" disables
     }
     return v != 0;
 }

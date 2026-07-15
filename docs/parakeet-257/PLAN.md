@@ -217,3 +217,15 @@ VERDICT: windowed local attention is strictly better than the shipped masked-ful
 local path — same output, ~3x faster, less memory (growing with length). Still
 gated CRISPASR_FC_WINDOWED_ATTN=1 for A/B per maintainer. Candidate to become the
 DEFAULT when --att-context is set, pending CUDA cross-check.
+
+### R4 DONE (2026-07-15) — windowed attn is now DEFAULT for --att-context
+
+fc_windowed_attn() flipped to default-ON (CRISPASR_FC_WINDOWED_ATTN=0 forces legacy
+masked-full). Only engages when --att-context is set + T>=2*BS + band mask supplied;
+full-attention (no --att-context) is unaffected. --att-context help updated.
+Verified: default engages windowed, gate=0 uses masked-full, output IDENTICAL.
+Unit suite green (911 unit + 11 metal). parakeet.cpp is wired; canary/canary_ctc
+share core_conformer::build_block and would benefit from the same ~10-line caller
+plumbing (band mask + pass window_band_mask) — NOT yet wired.
+
+OPEN: CUDA (Kaggle P100) cross-check not yet run (can't validate CUDA on M1).

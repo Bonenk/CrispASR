@@ -1149,8 +1149,10 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.chunk_seconds);
     fprintf(stderr, "             --chunk-overlap F      [%-7.1f] overlap context (sec) at chunk boundaries\n",
             params.chunk_overlap_seconds);
-    fprintf(stderr, "             --att-context L,R      [%-7s] parakeet/canary local-attention window in encoder "
-                    "frames (~80ms ea) — bounds long-audio VRAM, NeMo rel_pos_local_attn; -1,-1 = full\n",
+    fprintf(stderr,
+            "             --att-context L,R      [%-7s] parakeet/canary local-attention window in encoder "
+            "frames (~80ms ea) — true windowed attn (O(T*window) mem, NeMo rel_pos_local_attn); "
+            "-1,-1 = full. CRISPASR_FC_WINDOWED_ATTN=0 forces legacy masked-full\n",
             "model");
     fprintf(stderr,
             "             --lcs-dedup VAL        [%-7s] sub-word LCS dedup across chunk boundaries: auto|on|off\n",
