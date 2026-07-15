@@ -796,11 +796,17 @@ class SessionSegment {
   final double start; // seconds (centiseconds / 100 on the C side)
   final double end;
   final List<Word> words;
+
+  /// Whisper's per-segment no-speech probability (the `<|nospeech|>` posterior)
+  /// in [0, 1]. Whisper-only; other backends (and older dylibs without the
+  /// accessor) leave the -1.0 "no data" sentinel.
+  final double noSpeechProb;
   const SessionSegment({
     required this.text,
     required this.start,
     required this.end,
     this.words = const [],
+    this.noSpeechProb = -1.0,
   });
   @override
   String toString() =>
@@ -2256,6 +2262,26 @@ class CrispasrSession {
   String get backend => _backend;
   bool get isClosed => _closed;
 
+  /// The acoustic language Whisper detected on the last transcribe, as an
+  /// ISO-639-1 code ("en"). Whisper-only; other backends return the session's
+  /// source-language hint, or "unknown" (also on dylibs predating the accessor).
+  String detectedLanguage() {
+    if (!_lib.providesSymbol('crispasr_session_detected_language'))
+      return 'unknown';
+    final fn = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Pointer<Utf8>, Int32),
+        int Function(Pointer<Void>, Pointer<Utf8>,
+            int)>('crispasr_session_detected_language');
+    final buf = calloc<Uint8>(32);
+    try {
+      fn(_handle, buf.cast<Utf8>(), 32);
+      final s = buf.cast<Utf8>().toDartString();
+      return s.isEmpty ? 'unknown' : s;
+    } finally {
+      calloc.free(buf);
+    }
+  }
+
   /// Transcribe 16 kHz mono float32 PCM. Returns a list of segments
   /// with word-level timings when the backend supports them.
   ///
@@ -2534,6 +2560,15 @@ class CrispasrSession {
         int Function(Pointer<Void>, int)>('crispasr_session_result_segment_t0');
     final segT1 = _lib.lookupFunction<Int64 Function(Pointer<Void>, Int32),
         int Function(Pointer<Void>, int)>('crispasr_session_result_segment_t1');
+    // Per-segment no_speech_prob (Whisper). Probe like word_p — older dylibs
+    // lack the symbol; fall back to the -1.0 "no data" sentinel.
+    final segNSPFn =
+        _lib.providesSymbol('crispasr_session_result_segment_no_speech_prob')
+            ? _lib.lookupFunction<
+                Float Function(Pointer<Void>, Int32),
+                double Function(Pointer<Void>,
+                    int)>('crispasr_session_result_segment_no_speech_prob')
+            : null;
     final nWords = _lib.lookupFunction<Int32 Function(Pointer<Void>, Int32),
         int Function(Pointer<Void>, int)>('crispasr_session_result_n_words');
     final wordText = _lib.lookupFunction<
@@ -2590,6 +2625,7 @@ class CrispasrSession {
       final text = tp == nullptr ? '' : tp.toDartString();
       final t0 = segT0(res, i) / 100.0;
       final t1 = segT1(res, i) / 100.0;
+      final nsp = segNSPFn == null ? -1.0 : segNSPFn(res, i);
       final wc = nWords(res, i);
       final words = <Word>[];
       for (var k = 0; k < wc; k++) {
@@ -2624,8 +2660,12 @@ class CrispasrSession {
           alts: alts,
         ));
       }
-      out.add(
-          SessionSegment(text: text.trim(), start: t0, end: t1, words: words));
+      out.add(SessionSegment(
+          text: text.trim(),
+          start: t0,
+          end: t1,
+          words: words,
+          noSpeechProb: nsp));
     }
     return out;
   }
@@ -4835,6 +4875,14 @@ List<SessionSegment> drainStreamedSegments({String? libPath}) {
       int Function(Pointer<Void>, int)>('crispasr_session_result_segment_t0');
   final segT1 = lib.lookupFunction<Int64 Function(Pointer<Void>, Int32),
       int Function(Pointer<Void>, int)>('crispasr_session_result_segment_t1');
+  // Per-segment no_speech_prob (Whisper); probe like elsewhere, -1.0 fallback.
+  final segNSPFn =
+      lib.providesSymbol('crispasr_session_result_segment_no_speech_prob')
+          ? lib.lookupFunction<
+              Float Function(Pointer<Void>, Int32),
+              double Function(Pointer<Void>,
+                  int)>('crispasr_session_result_segment_no_speech_prob')
+          : null;
 
   final out = <SessionSegment>[];
   for (var i = 0; i < nSegs; i++) {
@@ -4842,7 +4890,9 @@ List<SessionSegment> drainStreamedSegments({String? libPath}) {
     final text = tp == nullptr ? '' : tp.toDartString();
     final t0 = segT0(res, i) / 100.0;
     final t1 = segT1(res, i) / 100.0;
-    out.add(SessionSegment(text: text.trim(), start: t0, end: t1));
+    final nsp = segNSPFn == null ? -1.0 : segNSPFn(res, i);
+    out.add(SessionSegment(
+        text: text.trim(), start: t0, end: t1, noSpeechProb: nsp));
   }
 
   // Free the result.

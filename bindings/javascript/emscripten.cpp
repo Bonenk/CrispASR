@@ -59,6 +59,7 @@ int                     crispasr_kokoro_resolve_fallback_voice_abi(const char* m
 // --- Full C-ABI parity declarations ---
 // Session extras
 int          crispasr_session_available_backends(char* out_csv, int out_cap);
+int          crispasr_session_detected_language(CrispasrSession* s, char* out_buf, int out_cap);
 // CTC vocabulary access (Omni CTC backend): n_vocab piece count, token_text
 // maps an id to its model-owned raw piece (do not free) or "" when out of
 // range / unsupported.
@@ -128,6 +129,7 @@ const char*  crispasr_session_result_word_text(struct crispasr_session_result* r
 long long    crispasr_session_result_word_t0(struct crispasr_session_result* r, int i_seg, int i_word);
 long long    crispasr_session_result_word_t1(struct crispasr_session_result* r, int i_seg, int i_word);
 float        crispasr_session_result_word_p(struct crispasr_session_result* r, int i_seg, int i_word);
+float        crispasr_session_result_segment_no_speech_prob(struct crispasr_session_result* r, int i_seg);
 int          crispasr_session_result_word_n_alts(struct crispasr_session_result* r, int i_seg, int i_word);
 const char*  crispasr_session_result_word_alt_text(struct crispasr_session_result* r, int i_seg, int i_word, int i_alt);
 float        crispasr_session_result_word_alt_p(struct crispasr_session_result* r, int i_seg, int i_word, int i_alt);
@@ -826,6 +828,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
                 seg.set("text", std::string(t ? t : ""));
                 seg.set("t0", crispasr_session_result_segment_t0(res, i) / 100.0);
                 seg.set("t1", crispasr_session_result_segment_t1(res, i) / 100.0);
+                seg.set("noSpeechProb", (double)crispasr_session_result_segment_no_speech_prob(res, i));
                 int nw = crispasr_session_result_n_words(res, i);
                 emscripten::val words = emscripten::val::array();
                 for (int j = 0; j < nw; j++) {
@@ -882,6 +885,7 @@ EMSCRIPTEN_BINDINGS(whisper) {
                 seg.set("text", std::string(t ? t : ""));
                 seg.set("t0", crispasr_session_result_segment_t0(res, i) / 100.0);
                 seg.set("t1", crispasr_session_result_segment_t1(res, i) / 100.0);
+                seg.set("noSpeechProb", (double)crispasr_session_result_segment_no_speech_prob(res, i));
                 int nw = crispasr_session_result_n_words(res, i);
                 emscripten::val words = emscripten::val::array();
                 for (int j = 0; j < nw; j++) {
@@ -957,6 +961,14 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function("availableBackends", emscripten::optional_override([]() -> std::string {
         char buf[1024] = {0};
         crispasr_session_available_backends(buf, sizeof(buf));
+        return std::string(buf);
+    }));
+
+    // --- Detected language (Whisper acoustic; "unknown" for other backends) ---
+    emscripten::function("detectedLanguage", emscripten::optional_override([]() -> std::string {
+        if (!g_tts_session) return std::string("unknown");
+        char buf[32] = {0};
+        crispasr_session_detected_language(g_tts_session, buf, sizeof(buf));
         return std::string(buf);
     }));
 
