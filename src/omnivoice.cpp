@@ -633,6 +633,7 @@ static bool load_model(omnivoice_context* ctx, const char* path) {
 // ---------------------------------------------------------------------------
 
 static bool codec_fastconv_enabled();
+static bool codec_gpu_enabled();
 static void bake_decode_f32_kernels(ov_higgs_tokenizer& tok);
 
 static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
@@ -827,9 +828,18 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
         return false;
     }
 
-    // Create backend + buffer
-    tok.backend = ggml_backend_cpu_init();
-    ggml_backend_cpu_set_n_threads(tok.backend, ctx->n_threads);
+    // Create backend + buffer. Codec decode is normally CPU; OMNIVOICE_CODEC_GPU=1
+    // (with a GPU main backend) puts the conv-heavy decode/encode graphs on the GPU
+    // — experimental, default OFF (see codec_gpu_enabled). A fresh GPU backend keeps
+    // the tokenizer independent of ctx->backend for clean teardown.
+    const bool codec_gpu = ctx->use_gpu && codec_gpu_enabled();
+    tok.backend = codec_gpu ? crispasr_init_gpu_backend() : nullptr;
+    if (!tok.backend)
+        tok.backend = ggml_backend_cpu_init();
+    if (ggml_backend_is_cpu(tok.backend))
+        ggml_backend_cpu_set_n_threads(tok.backend, ctx->n_threads);
+    if (ctx->verbosity >= 1)
+        fprintf(stderr, "omnivoice: codec backend = %s\n", ggml_backend_name(tok.backend));
     tok.buf_w = ggml_backend_alloc_ctx_tensors(tok.ctx_w, tok.backend);
 
     // Load tensor data
@@ -899,6 +909,18 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
 static bool codec_fastconv_enabled() {
     const char* e = std::getenv("OMNIVOICE_CODEC_FASTCONV");
     return !(e && e[0] == '0');
+}
+
+// GPU codec decode (#254, experimental). The DAC decode is one big conv-heavy
+// graph (not a per-step small-matmul loop), so unlike an AR decode it is a good
+// GPU candidate — the dev-guide "codec 3× Metal" case. Every op in the decode
+// graph is Metal-supported (CONV_TRANSPOSE_1D, IM2COL, MUL_MAT, SIN/SQR/DIV,
+// CAST, GET_ROWS). Default OFF: a GPU default must be Kaggle-CUDA-verified per
+// perf-discipline before flipping. Enable with OMNIVOICE_CODEC_GPU=1 (requires
+// --use-gpu / GPU main backend). Pairs with FASTCONV (baked F32 kernels).
+static bool codec_gpu_enabled() {
+    const char* e = std::getenv("OMNIVOICE_CODEC_GPU");
+    return e && e[0] && e[0] != '0';
 }
 
 // Bake F32 copies of every decode-path conv kernel into a dedicated buffer on
