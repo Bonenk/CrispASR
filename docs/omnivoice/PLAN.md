@@ -5,6 +5,39 @@ stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
 ## NOW — active work
 
+**Status (2026-07-15): OmniVoice RTF #2 — codec-decode FASTCONV landed on branch
+`perf/omnivoice-254-decode-rtf` (worktree `.claude/worktrees/omnivoice-rtf-decode`).**
+
+Reporter's residual complaint after the over-length + word-drop fixes: "CrispASR
+is still slower than alternative implementations" and "decoding is on cpu, which
+is now taking longer." **Profiled → confirmed:** the DAC decode runs 100% on CPU
+(`tok.backend = ggml_backend_cpu_init()`, hardcoded) and was the wall — on M1 the
+reporter's paragraph decoded in **11.4 s (11.7 s audio) + 6.8 s (2.5 s tail) = 18.2 s**;
+the short tail chunk was decode-RTF **2.7** (per-call F16→F32 kernel casts + im2col
+copies amortized over few frames).
+
+- ✅ **FASTCONV (`OMNIVOICE_CODEC_FASTCONV`, default ON)** — the dev-guide
+  `QWEN3_TTS_CODEC_FASTCONV` pattern applied to `higgs_decode`: (1) **bake F32
+  decode conv kernels once at load** (`bake_decode_f32_kernels`) so the fork's
+  per-graph `ggml_cast(F16→F32)` inside every `ggml_conv_1d`/`conv_transpose_1d`
+  becomes a no-op; (2) **k=1 conv → `ggml_mul_mat`** (skip the pure-copy im2col);
+  (3) baked F32 conv_t1 selects the direct `_f32` conv-transpose CPU path.
+- ✅ **A/B (M1, q4_k + tokenizer-f16, back-to-back):** decode **10.6 s → 3.6 s ≈ 2.9×**
+  (matches the guide's 2.1× CPU / 3× Metal). Short-sentence decode RTF **2.7 → 0.41**.
+- ✅ **Equivalence:** output numerically equivalent (max |Δ| ≈ 20/32768, rmse ≈ 1.75
+  int16 ≈ −85 dB, inaudible reduction-order drift from the k=1 matmul + `_f32`
+  conv-transpose). **ASR roundtrip identical** (both → "The quick brown fox…").
+- ✅ **Reporter ask:** `omnivoice_synthesize` now prints a per-stage timing + RTF
+  summary at normal verbosity (`gen Xs + decode Ys = Zs for Ws audio (RTF …)`) —
+  no more wrapping in `time`.
+- ⏭ **Follow-ups (not done):** move decode to GPU/Metal (needs a Metal-op audit of
+  conv_transpose + Kaggle CUDA verify per perf-discipline); the LLM forward (`gen`)
+  is already at per-step parity with omnivoice.cpp so headroom there is kernel-level.
+- ⏭ **Merge:** commit on the feature branch; ff into `main` after user confirms the
+  win reproduces on the reporter's box (or on green CI).
+
+---
+
 **Status (2026-07-15): OmniVoice WORD-DROPPING (#254) — ✅ FIXED + SHIPPED.
 Root cause: `llm.token_embd.weight` in shipped `omnivoice-f16.gguf` had 4094
 ZEROED rows (ids ~3380–12594; "quick"=3974) from a post-conversion WRITE
