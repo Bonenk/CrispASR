@@ -526,7 +526,12 @@ static bool parakeet_load_model(parakeet_model& model, parakeet_vocab& vocab, co
     // a fixed-point repetition loop) — while CTC decode over the same
     // quantised encoder is clean, and q8_0 TDT is byte-identical to F16.
     // Warn so q4_k users don't ship garbage silently.
-    if (model.hparams.vocab_size <= 4096 && j.out_w && ggml_is_quantized(j.out_w->type) &&
+    //
+    // Issue #257: gate on vocab CONTENT (kana/kanji fraction), not vocab_size
+    // <= 4096 — small-vocab ENGLISH models (parakeet-tdt-1.1b, vocab 1024) are
+    // NOT JA and decode cleanly at q4_k, so the size heuristic mis-warned them
+    // that their (correct) output was garbage.
+    if (crispasr_parakeet::vocab_looks_japanese(vocab.id_to_token) && j.out_w && ggml_is_quantized(j.out_w->type) &&
         j.out_w->type != GGML_TYPE_Q8_0) {
         fprintf(stderr,
                 "parakeet: WARNING: JA model with %s weights — TDT decode degrades to repetition "
