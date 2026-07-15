@@ -15,8 +15,9 @@ import 'package:test/test.dart';
 DynamicLibrary _openLib() {
   final path = Platform.environment['CRISPASR_LIB'];
   if (path != null && path.isNotEmpty) return DynamicLibrary.open(path);
-  if (Platform.isMacOS)
+  if (Platform.isMacOS) {
     return DynamicLibrary.open('../../build/src/libwhisper.dylib');
+  }
   return DynamicLibrary.open('../../build/src/libwhisper.so');
 }
 

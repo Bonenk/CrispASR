@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.11
+
+- Session introspection accessors: CTC vocab, Whisper `no_speech_prob`, and
+  `detected_language`, mirrored across the language bindings.
+- Docs/quality: add an example, enable `lints/core`, and apply the resulting
+  fixes (flow-control braces + FFI typedef casing).
+
 ## 0.8.10
 
 - Initial pub.dev release for the current CrispASR 0.8 line.
