@@ -2139,6 +2139,28 @@ catch_discover_tests(test-session-setters
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-session-introspection — Catch2 unit tests for the exception-safe
+# session introspection accessors added in PR #259 (CTC vocab + whisper
+# no_speech_prob + detected_language).
+#
+# Verifies the null-handle / bad-arg / OOB sentinel contract (return
+# -1 / -1.0 / 0 / ""). No model loaded — pure guard path, sub-millisecond.
+add_executable(test-session-introspection
+    test-session-introspection.cpp
+)
+target_include_directories(test-session-introspection PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
+)
+target_link_libraries(test-session-introspection PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-session-introspection
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-session-beam — functional beam-search regression test (§90).
 #
 # [unit][beam]  — setter API (null guard, width clamping). No model.
