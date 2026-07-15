@@ -4,7 +4,7 @@
 // WAV LIST/INFO metadata, disclaimer helpers.
 
 #include "crispasr_wav_writer.h"
-#include "crispasr_c2pa.h"
+#include "core/crispasr_c2pa.h"
 
 #include <catch2/catch_test_macros.hpp>
 

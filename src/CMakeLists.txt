@@ -226,6 +226,10 @@ set_target_properties(crispasr-lib PROPERTIES
 
 target_include_directories(crispasr-lib PUBLIC . ../include)
 
+# C2PA (Content Credentials) signing in the core C API — so wasm / bindings /
+# server get provenance too, not just the CLI. No-op when C2PA isn't available.
+crispasr_enable_c2pa(crispasr-lib)
+
 set(CRISPASR_LIB_CXX_STANDARD cxx_std_11)
 if (GGML_CUDA AND CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
     set(CRISPASR_LIB_CXX_STANDARD cxx_std_17)

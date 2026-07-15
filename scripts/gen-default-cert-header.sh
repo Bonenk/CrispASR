@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # gen-default-cert-header.sh — (re)generate the bundled default C2PA cert and the
-# embedded header examples/cli/crispasr_c2pa_default_cert.h.
+# embedded header src/core/crispasr_c2pa_default_cert.h.
 #
 # The bundled cert is a fixed, self-signed P-256/ES256 certificate baked into the
 # binary so C2PA signing is on by default on EVERY platform (incl. the WASM
@@ -14,7 +14,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CRT="$ROOT/assets/c2pa/crispasr-default-c2pa.crt"
 KEY="$ROOT/assets/c2pa/crispasr-default-c2pa.key"
-HDR="$ROOT/examples/cli/crispasr_c2pa_default_cert.h"
+HDR="$ROOT/src/core/crispasr_c2pa_default_cert.h"
 mkdir -p "$ROOT/assets/c2pa"
 
 CNF="$(mktemp)"; trap 'rm -f "$CNF"' EXIT

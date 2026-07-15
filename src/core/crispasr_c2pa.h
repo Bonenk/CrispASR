@@ -24,13 +24,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
-#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
-#include <system_error>
 
 #include "crispasr_c2pa_default_cert.h" // bundled self-signed default cert (baked in)
 

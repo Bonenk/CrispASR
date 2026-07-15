@@ -853,6 +853,18 @@ CRISPASR_API float crispasr_watermark_detect(const float* pcm, int n_samples);
 // when AudioSeal is loaded.
 CRISPASR_API void crispasr_watermark_embed(float* pcm, int n_samples, float alpha);
 
+// C2PA (Content Credentials) signing of an in-memory audio CONTAINER (WAV/MP3
+// bytes, not raw PCM). Signs with the user cert/key (PEM file paths) when both
+// are non-NULL, else a bundled self-signed default cert (works with no
+// filesystem, including the browser). `format` is a C2PA MIME string, e.g.
+// "audio/wav" or "audio/mpeg". Returns malloc'd signed bytes (free with
+// crispasr_c2pa_free) and sets *out_len, or NULL when C2PA is unavailable, the
+// container can't embed a manifest (AAC/Opus), or signing fails. Available to
+// wasm / bindings / server, not just the CLI.
+CRISPASR_API unsigned char* crispasr_c2pa_sign(const unsigned char* data, size_t len, const char* format,
+                                               const char* cert_path, const char* key_path, size_t* out_len);
+CRISPASR_API void crispasr_c2pa_free(unsigned char* p);
+
 // Load an AudioSeal GGUF model for neural watermarking. Call once at
 // startup. Returns 0 on success, -1 on failure (falls back to
 // spread-spectrum). The model is shared across all subsequent

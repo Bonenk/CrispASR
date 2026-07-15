@@ -2273,6 +2273,7 @@ catch_discover_tests(test_watermark
 add_executable(test_tts_provenance test_tts_provenance.cpp)
 target_include_directories(test_tts_provenance PRIVATE
     ${PROJECT_SOURCE_DIR}/examples/cli
+    ${PROJECT_SOURCE_DIR}/src
 )
 target_link_libraries(test_tts_provenance PRIVATE
     Catch2::Catch2WithMain

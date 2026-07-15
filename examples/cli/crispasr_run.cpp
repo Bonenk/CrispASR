@@ -45,7 +45,7 @@
 #include "titanet.h"
 #include "speaker_db.h"
 
-#include "crispasr_c2pa.h"
+#include "core/crispasr_c2pa.h"
 #include "crispasr_tts_chunking.h"
 #include "crispasr_tts_disclaimer.h"
 #include "crispasr_watermark.h"

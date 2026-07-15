@@ -45,7 +45,7 @@
 #include "../server/ws_stream.h"       // real-time WebSocket ASR streaming (--ws-port)
 #include "../server/realtime_server.h" // vLLM Realtime API
 #include "wyoming.h"                   // Wyoming protocol for Home Assistant Assist (--wyoming-port)
-#include "crispasr_c2pa.h"
+#include "core/crispasr_c2pa.h"
 #include "crispasr_tts_chunking.h"
 #include "crispasr_tts_disclaimer.h"
 #include "crispasr_watermark.h"
