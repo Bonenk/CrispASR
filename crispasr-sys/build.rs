@@ -225,6 +225,14 @@ fn configure_and_build(src_root: &Path) -> PathBuf {
     // launcher above is unaffected, so just disable ggml's auto-detection.
     configure.arg("-DGGML_CCACHE=OFF");
 
+    // The session/back-end library is consumed with raw PCM input; the
+    // optional .opus/.amr file-decode extras would link Homebrew/system
+    // dylibs by absolute path (libopusfile, libopencore-amr, ...) and break
+    // the library on machines without them. Keep the build self-contained.
+    configure
+        .arg("-DCRISPASR_OPUS=OFF")
+        .arg("-DCRISPASR_AMR=OFF");
+
     if cfg!(feature = "cuda") {
         configure.arg("-DGGML_CUDA=ON");
     }
