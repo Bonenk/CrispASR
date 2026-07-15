@@ -114,3 +114,16 @@ PLAN:
    (parakeet_set_att_context) → C-ABI (session field + inline dispatch) → server
    (form) → python/go wrapper docs. Default full attention (matches NeMo default).
    --chunk-seconds stays the other reference control (chunked inference).
+
+
+## ROUND 3 DONE (2026-07-15)
+1. C-ABI JA fix (crispasr_c_api.cpp:4525) — bindings/server now match CLI. ✓
+2. --att-context "L,R" wired: lib parakeet_set_att_context → whisper_params → CLI
+   (+help) → parakeet adapter → C-ABI (session field + inline dispatch +
+   crispasr_session_set_parakeet_att_context + header) → server (att_context form,
+   both handlers) → python Session.set_parakeet_att_context(). Go binding has no
+   session-API surface (0 crispasr_session refs), nothing to wire there.
+   Verified: --att-context 64,64 on 88s clip == full-attention output, local attn
+   active; symbol exported; python syntax OK.
+Matches NeMo: full attention default; opt-in local attention (rel_pos_local_attn)
+for long-audio VRAM. --chunk-seconds remains the other reference control.
