@@ -1223,8 +1223,8 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "             --g2p-dict SOURCE        [%-7s] G2P dict: 'olaph' (MIT), 'open-dict' (CC-BY-SA), or path to "
             "file\n",
             params.g2p_dict.empty() ? "olaph" : params.g2p_dict.c_str());
-    fprintf(stderr, "             --watermark-model PATH           AudioSeal GGUF for neural watermarking "
-                    "(upgrades built-in spread-spectrum)\n");
+    fprintf(stderr, "             --watermark-model PATH|auto      AudioSeal GGUF for neural watermarking "
+                    "('auto' downloads it; upgrades built-in spread-spectrum)\n");
     fprintf(stderr, "             --detect-watermark PATH          read WAV file and detect AI watermark "
                     "(prints confidence + exits)\n");
     fprintf(stderr, "             --c2pa-cert PATH                 X.509 cert for C2PA Content Credentials signing\n"

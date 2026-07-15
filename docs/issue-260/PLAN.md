@@ -69,20 +69,27 @@ band-limit for this spread-spectrum scheme.**
   tensors) and ran the harness:
   - **Generator: PERFECT** — `test_audioseal_cosine` full-output cos **1.000000**,
     watermark-only cos **1.000000**, RMS ratio 1.000 vs the PyTorch reference.
-  - **Detector: BROKEN** — embed→detect round-trip returns **0.4988 (chance)**;
-    the Python reference detector returns 1.0 (watermarked) / 0.0 (clean). So the
-    model + our converter + our generator are correct; the bug is isolated to the
-    C++ **detector** path (`audioseal.det.enc/reverse/head` in `src/audioseal.cpp`).
+  - **Detector: WAS BROKEN, NOW FIXED.** Round-trip returned 0.4988 (chance) over
+    "18 frames". Root cause: the detector head output is (T, C=18) but the
+    post-processing assumed (C, T) — it sliced 2 elements along ne[0] (2 time
+    samples, not the 2 detection classes), softmaxed the wrong axis, and read
+    ne[1]=18 (the channel count) as the frame count. The Python detector shape
+    (1,18,16000) gave the layout. Fixed the axis handling (detection = channels
+    0,1 transposed to (2,T), softmax over classes, class 1; message = channels
+    2-17 time-averaged). Now: round-trip **1.0000** over 16000 frames, clean
+    **0.0024**, generator cos still 1.0.
   - The old round-trip test never caught this (it computed the detection prob but
-    never asserted it — line 143 was a comment). Test now strengthened to
-    `REQUIRE(avg_prob > 0.9)` + FAIL on null probs → a real regression guard.
-- **NEXT (scoped follow-up):** dump the Python detector's per-stage intermediates
-  (det encoder → reverse transposed-conv → 2-class head → per-sample prob) and
-  diff vs the C++ det path to find the first divergence. Likely suspects: head
-  channel/softmax indexing, the "reverse" transposed conv, or LSTM state in the
-  det encoder. Once detection >0.9: add registry entry (`cstr/audioseal-GGUF`,
-  MIT) + `--watermark-model auto` resolve + RTF A/B, then it's the optional SOTA
-  upgrade (classical v2 stays the default fallback).
+    never asserted it — line 143 was a comment). Test now asserts >0.9 watermarked
+    AND <0.5 clean → a real regression guard.
+- **Productionized (opt-in SOTA upgrade):** GGUF hosted at `cstr/audioseal-GGUF`
+  (MIT, ungated, README + Meta attribution); registry entry added; CLI resolver
+  wired so `--watermark-model auto` downloads + loads it. End-to-end CLI verified:
+  detect on an AudioSeal-watermarked clip → **0.9999**, clean → **0.0518**.
+- **Perf:** AudioSeal embed ~72 ms/s of audio (+ 24k<->16k resample); the built-in
+  spread-spectrum default is ~1.8 ms/s (~40x cheaper). Both negligible vs synthesis,
+  but this is why classical stays the always-on default and AudioSeal is opt-in.
+- Remaining (optional): 16-bit message-payload round-trip parity; a CUDA RTF A/B
+  only if AudioSeal is ever considered for default-on (it is not — opt-in).
 
 ### Not done, deliberately
 - `--no-watermark` CLI flag — **declined (EU AI Act Art. 50)**: an easy opt-out

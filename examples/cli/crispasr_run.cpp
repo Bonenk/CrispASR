@@ -76,6 +76,21 @@
 
 namespace {
 
+// Resolve the --watermark-model argument to a GGUF path (#260). "auto"/"default"
+// pulls the AudioSeal neural watermark (MIT, opt-in SOTA) from the registry,
+// auto-downloading when enabled; any other value is passed through as a literal
+// path/name; empty stays empty (→ the always-on built-in spread-spectrum
+// watermark). A failed AudioSeal resolve falls back to spread-spectrum via the
+// dispatcher, which treats an unloadable model as "no neural watermark".
+static std::string crispasr_resolve_watermark_model(const whisper_params& params) {
+    if (params.watermark_model.empty())
+        return "";
+    if (params.watermark_model == "auto" || params.watermark_model == "default")
+        return crispasr_resolve_model_cli("auto", "audioseal", params.no_prints, params.cache_dir, params.auto_download,
+                                          "");
+    return params.watermark_model;
+}
+
 // Serialize synthesized (TTS/S2S) float32 PCM to `out_path` — WAV by
 // default, MP3 or AAC-LC/ADTS (in-tree glint encoder) when the path
 // ends in .mp3 / .aac. All carry AI-provenance metadata (WAV LIST/INFO
@@ -1459,8 +1474,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
             pcm[i] = (float)pcm_i16[i] / 32768.0f;
         }
 
-        // Initialize watermark dispatcher (AudioSeal if --watermark-model given)
-        crispasr_wm_dispatch::init(params.watermark_model);
+        // Initialize watermark dispatcher (AudioSeal if --watermark-model given;
+        // "auto" pulls the AudioSeal GGUF from the registry — #260)
+        crispasr_wm_dispatch::init(crispasr_resolve_watermark_model(params));
 
         float confidence = crispasr_wm_dispatch::detect(pcm.data(), n_samples, (int)wav_sr);
 
@@ -2219,7 +2235,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
         // Initialize AudioSeal neural watermark if --watermark-model is set
         if (!params.watermark_model.empty()) {
-            crispasr_wm_dispatch::init(params.watermark_model);
+            crispasr_wm_dispatch::init(crispasr_resolve_watermark_model(params));
         }
 
         // Voice-cloning consent gate: if the voice is a .wav reference
@@ -2436,7 +2452,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
         }
 
         if (!params.watermark_model.empty()) {
-            crispasr_wm_dispatch::init(params.watermark_model);
+            crispasr_wm_dispatch::init(crispasr_resolve_watermark_model(params));
         }
 
         std::string transcript;

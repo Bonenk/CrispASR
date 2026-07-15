@@ -42,6 +42,13 @@ struct ExtraList {
 constexpr Entry k_registry[] = {
     {"whisper", "ggml-base.bin",
      "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin", "~147 MB", nullptr, nullptr},
+    // AudioSeal (Meta FAIR) — optional NEURAL watermark model (MIT code + weights).
+    // Not a transcription/TTS backend: resolved by the name "audioseal" when the
+    // user passes `--watermark-model auto`. CrispASR's built-in zero-dependency
+    // spread-spectrum watermark stays the always-on default; this is the opt-in
+    // SOTA upgrade (imperceptible + robust neural watermark). #260.
+    {"audioseal", "audioseal.gguf",
+     "https://huggingface.co/cstr/audioseal-GGUF/resolve/main/audioseal.gguf", "~89 MB", nullptr, nullptr},
     {"nemotron", "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
      "https://huggingface.co/cstr/nemotron-3.5-asr-streaming-0.6b-GGUF/resolve/main/nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
      "~458 MB", nullptr, nullptr},
