@@ -229,3 +229,27 @@ share core_conformer::build_block and would benefit from the same ~10-line calle
 plumbing (band mask + pass window_band_mask) — NOT yet wired.
 
 OPEN: CUDA (Kaggle P100) cross-check not yet run (can't validate CUDA on M1).
+
+### R4 — canary wiring: NOT done (blueprint says full-attention)
+
+Checked the Python blueprints per maintainer request ("compare what the python
+blueprints do"):
+- models/convert-parakeet-to-gguf.py reads self_attention_model; emits
+  att_context_left/right ONLY for "rel_pos_local_attn" (else full "rel_pos").
+- models/convert-canary-to-gguf.py + convert-canary-ctc-to-gguf.py NEVER read
+  self_attention_model / att_context_size. tools/reference_backends/canary.py has
+  no local-attn path. => NeMo canary/canary_ctc are FULL-attention by design.
+- parakeet-tdt-0.6b-v3 GGUF has NO att_context baked in (full-attention); windowed
+  engages only via user --att-context. True rel_pos_local_attn models (reazonspeech)
+  bake att_context and auto-engage (matches their NeMo training exactly).
+
+DECISION: do NOT wire canary/canary_ctc for local attention — it would diverge from
+the reference and degrade quality (global-context-trained). The shared
+core_conformer::build_windowed_attn is available if a future canary variant ships
+rel_pos_local_attn; converter would emit att_context and the parakeet-style caller
+plumbing would light it up. canary_ctc additionally uses the mask slot for pad
+masking, so any future adoption must merge pad-validity into the band mask.
+
+CAVEAT to document: --att-context on a full-attention model (e.g. v3) yields LOCAL
+attention output (differs from full) — a quality/memory tradeoff the user opts into;
+on a rel_pos_local_attn model it is exact to training.
