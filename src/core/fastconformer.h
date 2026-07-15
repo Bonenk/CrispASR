@@ -766,7 +766,7 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
     if (fc_windowed_attn() && window_band_mask &&
         fc_window_attn_applicable(T, p.att_context_left, p.att_context_right)) {
         static bool logged = false;
-        if (!logged) {
+        if (!logged && std::getenv("CRISPASR_FC_MEM_DEBUG")) {
             logged = true;
             fprintf(stderr, "[fc] windowed attn ENGAGED: T=%d BS=%d left=%d right=%d\n", T,
                     fc_window_block_size(p.att_context_left, p.att_context_right), p.att_context_left,

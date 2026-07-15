@@ -198,3 +198,22 @@ M3 findings (parakeet-tdt-0.6b-v3 q4_k, Metal M1):
 
 NEXT: confirm windowed footprint << 2402MB; assess speed; fix --att-context help
 wording; decide default (opt-in for now).
+
+### R4 M3 RESULTS (2026-07-15) — windowed is FASTER + lower memory (correction)
+
+Earlier "windowed is slower" was WRONG (that was T=7838 being slow for ALL paths).
+Real data at T=2613 (209s, single-pass, Metal M1):
+    masked-full local (att 64,64): 25.7 s   (worst: full compute + T×T mask)
+    windowed local     (att 64,64):  8.3 s   (3.1x faster than masked-full)
+    full attention:                 11.4 s   (windowed 1.4x faster than full)
+Memory (peak footprint, macOS phys_footprint; RSS is compression-capped):
+    T=7838 single-pass: masked-full 2402 MB vs windowed 2155 MB (~10%; the O(T)
+    conv front-end co-dominates at this T — BD is O(T²) so the win grows for
+    longer audio). Attention BD itself drops from ~2GB to a few hundred MB.
+Parity: windowed == masked-full transcripts IDENTICAL on t501-20s/long90/long3m
+    at both att 32,32 and 64,64. Bit-exact algorithm (parity harness).
+
+VERDICT: windowed local attention is strictly better than the shipped masked-full
+local path — same output, ~3x faster, less memory (growing with length). Still
+gated CRISPASR_FC_WINDOWED_ATTN=1 for A/B per maintainer. Candidate to become the
+DEFAULT when --att-context is set, pending CUDA cross-check.
