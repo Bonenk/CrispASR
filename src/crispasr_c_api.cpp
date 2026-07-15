@@ -1303,6 +1303,11 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "canary-ctc";
     else if (strcmp(arch, "wav2vec2") == 0)
         backend = "wav2vec2";
+    // Both the Omni ASR CTC and LLM converters write general.architecture="omniasr-ctc"
+    // (see models/convert-omniasr-{ctc,llm}-to-gguf.py); the "omniasr" backend prefix-matches
+    // every omniasr-* variant and reads model_type from the GGUF to route CTC vs LLM.
+    else if (strcmp(arch, "omniasr-ctc") == 0 || strcmp(arch, "omniasr-llm") == 0 || strcmp(arch, "omniasr") == 0)
+        backend = "omniasr";
     else if (strcmp(arch, "vibevoice-asr") == 0 || strcmp(arch, "vibevoice") == 0 || strcmp(arch, "vibevoice-tts") == 0)
         backend = "vibevoice";
     else if (strcmp(arch, "qwen3-tts") == 0 || strcmp(arch, "qwen3_tts") == 0)
@@ -1419,6 +1424,12 @@ struct crispasr_session_seg {
     std::string text;
     int64_t t0 = 0; // centiseconds absolute
     int64_t t1 = 0;
+    // Whisper's per-segment probability that the segment is non-speech (the
+    // <|nospeech|> token posterior). Only the whisper branch populates it;
+    // every other backend leaves the -1.0 sentinel ("no signal", never a
+    // real [0,1] probability) so a consumer can tell "unavailable" apart
+    // from a genuine low no-speech probability.
+    float no_speech_prob = -1.0f;
     struct word_alt {
         std::string text;
         float p = 0.0f;
@@ -1454,6 +1465,14 @@ struct crispasr_session {
     std::string target_language; // canary/cohere/voxtral target-lang (≠ source ⇒ translate)
     bool punctuation = true;     // canary/cohere per-call arg + post-process gate
     bool translate = false;      // whisper sticky --translate (others: use src/tgt mismatch)
+
+    // Acoustic language detected by the last transcribe (whisper only —
+    // whisper_full_lang_id → whisper_lang_str, an ISO-639-1 code). Set on
+    // every whisper dispatch; empty for other backends, where
+    // crispasr_session_detected_language falls back to the source-language
+    // hint or "unknown". This is the in-decode acoustic signal, distinct
+    // from the backend-agnostic text-LID pass (crispasr_text_detect_language).
+    std::string detected_lang;
 
     // --punc-model post-processor (set via crispasr_session_set_punc_model).
     // Held as void* so the struct doesn't depend on the optionally-compiled
@@ -3442,6 +3461,28 @@ CA_EXPORT const char* crispasr_session_backend(crispasr_session* s) {
     return s ? s->backend.c_str() : "";
 }
 
+// Acoustic language detected by the last transcribe, written into `out_buf` as
+// an ISO-639-1 code (e.g. "en"). Only whisper decodes an in-session acoustic
+// language; other backends (and whisper before its first pass) fall back to
+// the session's source-language hint, then "unknown". Returns the code length
+// (bytes, not counting NUL) or -1 on bad args. This is distinct from the
+// backend-agnostic text-LID pass (crispasr_text_detect_language), which runs
+// CLD3 + fastText over the transcript.
+CA_EXPORT int crispasr_session_detected_language(crispasr_session* s, char* out_buf, int out_cap) {
+    if (!s || !out_buf || out_cap <= 0)
+        return -1;
+    std::string lang;
+    if (!s->detected_lang.empty())
+        lang = s->detected_lang;
+    else if (!s->source_language.empty())
+        lang = s->source_language;
+    else
+        lang = "unknown";
+    std::strncpy(out_buf, lang.c_str(), out_cap - 1);
+    out_buf[out_cap - 1] = '\0';
+    return (int)lang.size();
+}
+
 // CTC vocabulary access (Omni CTC backend). Surfaces the SentencePiece pieces
 // already loaded from the GGUF so callers can detokenize a greedy CTC decode
 // over crispasr_session_result_logits. Returns 0 / "" for other backends.
@@ -3452,6 +3493,14 @@ CA_EXPORT int crispasr_session_n_vocab(crispasr_session* s) {
     if ((s->backend.rfind("omniasr", 0) == 0) && s->omniasr_ctx)
         return omniasr_n_vocab((omniasr_context*)s->omniasr_ctx);
 #endif
+#ifdef CA_HAVE_WAV2VEC2
+    if ((s->backend == "wav2vec2" || s->backend == "hubert" || s->backend == "data2vec") && s->wav2vec2_ctx)
+        return (int)s->wav2vec2_ctx->vocab.size();
+#endif
+#ifdef CA_HAVE_CTC
+    if ((s->backend == "canary-ctc" || s->backend == "fastconformer-ctc") && s->ctc_ctx)
+        return canary_ctc_n_vocab(s->ctc_ctx);
+#endif
     return 0;
 }
 
@@ -3461,6 +3510,16 @@ CA_EXPORT const char* crispasr_session_token_text(crispasr_session* s, int id) {
 #ifdef CA_HAVE_OMNIASR
     if ((s->backend.rfind("omniasr", 0) == 0) && s->omniasr_ctx)
         return omniasr_token_text((omniasr_context*)s->omniasr_ctx, id);
+#endif
+#ifdef CA_HAVE_WAV2VEC2
+    if ((s->backend == "wav2vec2" || s->backend == "hubert" || s->backend == "data2vec") && s->wav2vec2_ctx) {
+        const auto& v = s->wav2vec2_ctx->vocab;
+        return (id < (int)v.size()) ? v[id].c_str() : "";
+    }
+#endif
+#ifdef CA_HAVE_CTC
+    if ((s->backend == "canary-ctc" || s->backend == "fastconformer-ctc") && s->ctc_ctx)
+        return canary_ctc_token_text(s->ctc_ctx, id);
 #endif
     return "";
 }
@@ -4329,6 +4388,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 seg.text = t;
             seg.t0 = whisper_full_get_segment_t0(s->whisper_ctx, i);
             seg.t1 = whisper_full_get_segment_t1(s->whisper_ctx, i);
+            seg.no_speech_prob = whisper_full_get_segment_no_speech_prob(s->whisper_ctx, i);
 
             // Convert whisper's per-token output into the unified
             // ca_token_record shape and run it through
@@ -4373,6 +4433,15 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             _fire_token_callbacks(s, toks);
             seg.words = emit_words_from_tokens(toks);
             r->segments.push_back(std::move(seg));
+        }
+        // Record the acoustic language whisper auto-detected on this pass so
+        // crispasr_session_detected_language can surface it (ISO-639-1). The
+        // id indexes whisper's static language table; whisper_lang_str returns
+        // a pointer into that table (nothing to free).
+        {
+            const int lang_id = whisper_full_lang_id(s->whisper_ctx);
+            const char* code = lang_id >= 0 ? whisper_lang_str(lang_id) : nullptr;
+            s->detected_lang = code ? code : "";
         }
         return r;
     }
@@ -6586,6 +6655,16 @@ CA_EXPORT float crispasr_session_result_word_p(crispasr_session_result* r, int i
         return -1.0f;
     auto& ws = r->segments[i_seg].words;
     return (i_word >= 0 && i_word < (int)ws.size()) ? ws[i_word].p : -1.0f;
+}
+
+// Whisper's per-segment no-speech probability (the <|nospeech|> token
+// posterior), in [0, 1]. Only the whisper backend populates it; other
+// backends and out-of-range indices return the -1.0 sentinel so callers can
+// tell "unavailable" apart from a genuine low probability.
+CA_EXPORT float crispasr_session_result_segment_no_speech_prob(crispasr_session_result* r, int i_seg) {
+    if (!r || i_seg < 0 || i_seg >= (int)r->segments.size())
+        return -1.0f;
+    return r->segments[i_seg].no_speech_prob;
 }
 
 // Per-frame CTC logits (opted in via crispasr_session_set_return_logits) for
