@@ -30,6 +30,7 @@
 #include "crispasr_output.h"
 #include "crispasr_model_mgr_cli.h"
 #include "crispasr_vad_cli.h"
+#include "crispasr_cpu_isa.h" // #261: CPU instruction-set self-check (soft-degrade VAD/diarize)
 #include "crispasr_aligner_cli.h"
 #include "whisper_params.h"
 #include "fireredpunc.h"                 // server-mode punctuation restoration (--punc-model)
@@ -895,6 +896,13 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
 
     crispasr_install_fatal_signal_handlers();
 
+    // #261: compare the build's CPU instruction-set baseline against this host.
+    // If they mismatch, the CPU-only paths (VAD / diarization) would raise
+    // SIGILL — log a loud banner now and refuse those requests below (soft
+    // degrade) instead of crashing mid-request. Computed once; read by handlers.
+    const crispasr_cpu_isa::IsaCheck cpu_isa = crispasr_cpu_isa::check();
+    fprintf(stderr, "%s\n", crispasr_cpu_isa::banner(cpu_isa).c_str());
+
     crispasr_c2pa_startup_check();
     if (!params.watermark_model.empty()) {
         crispasr_wm_dispatch::init(params.watermark_model);
@@ -1176,6 +1184,16 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         rp.show_alternatives = form_bool(req, "show_alternatives", rp.show_alternatives);
         rp.n_alternatives = form_int(req, "alt_n", rp.n_alternatives);
 
+        // #261: soft-degrade — refuse CPU-only VAD/diarize on an ISA-mismatched
+        // host rather than SIGILL-crashing the server (see /v1/audio/transcriptions).
+        if (!cpu_isa.ok && (rp.vad || rp.diarize)) {
+            json_error(res, 400,
+                       "this server build requires CPU instructions this host lacks (" + cpu_isa.missing +
+                           "), so VAD/diarization cannot run without crashing. Retry without "
+                           "vad/diarize, or deploy a portable image built with -DGGML_NATIVE=OFF (issue #261).");
+            return;
+        }
+
         auto result = do_transcribe(audio_file, backend.get(), model_mutex, rp, /*need_timestamps=*/true,
                                     punc_ctx.get(), pcs_ctx.get(), tc_ctx.get(), tc_crf_ctx.get(), tc_lstm_ctx.get());
         if (!result.ok) {
@@ -1345,6 +1363,18 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         rp.n_alternatives = form_int(req, "alt_n", rp.n_alternatives);
         if (!prompt.empty())
             rp.prompt = prompt;
+
+        // #261: soft-degrade. When the build's CPU ISA baseline exceeds this
+        // host, the CPU-only VAD / diarization kernels would SIGILL and kill
+        // the server. Refuse those requests with a clear 400 instead; plain
+        // ASR (GPU) still works, so a client can retry with vad=false&diarize=false.
+        if (!cpu_isa.ok && (rp.vad || rp.diarize)) {
+            json_error(res, 400,
+                       "this server build requires CPU instructions this host lacks (" + cpu_isa.missing +
+                           "), so VAD/diarization cannot run without crashing. Retry without "
+                           "vad/diarize, or deploy a portable image built with -DGGML_NATIVE=OFF (issue #261).");
+            return;
+        }
 
         bool stream = form_bool(req, "stream", false);
 

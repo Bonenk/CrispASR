@@ -124,6 +124,11 @@ add_library(crispasr-lib
             # playback mode, mirrors crispasr_mic.cpp. Used by the CLI's
             # --tts-play flag; server mode routes audio via HTTP.
             crispasr_speaker.cpp
+            # CPU instruction-set self-check (#261). Compares the compile-time
+            # ISA baseline (AVX2/FMA/F16C ...) against runtime cpuid so callers
+            # can fail fast / soft-degrade instead of SIGILL-crashing on a CPU
+            # that lacks an instruction the ggml kernels emit.
+            crispasr_cpu_isa.cpp
             # Silero-VAD-driven segmentation + crispasr.cpp-style stitching.
             # Consumed by the CLI and by the C-ABI `crispasr_session_transcribe_vad`
             # wrapper so every language binding benefits without re-implementing.
