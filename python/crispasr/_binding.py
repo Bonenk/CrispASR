@@ -1947,9 +1947,11 @@ class Session:
             raise RuntimeError(f"set_frequency_penalty failed (rc={rc})")
 
     def set_tts_steps(self, steps: int) -> None:
-        """Set the diffusion / CFM step count for diffusion-based TTS backends.
+        """Set the diffusion / CFM / masked-iterative step count for step-based
+        TTS backends (chatterbox, vibevoice, kugelaudio, tada, irodori, omnivoice).
 
-        Soft no-op (rc=-2) when the active backend has no diffusion stage.
+        Higher = better fidelity, slower. Soft no-op (rc=-2) when the active
+        backend has no step-based stage.
         """
         if not hasattr(self._lib, "crispasr_session_set_tts_steps"):
             return
