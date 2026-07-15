@@ -154,6 +154,20 @@ TEST_CASE("audioseal embed+detect round-trip", "[audioseal][live]") {
         FAIL("audioseal_detect returned null — detector did not run");
     }
 
+    // The detector must DISCRIMINATE: the un-watermarked input must score low.
+    // (Guards against a degenerate "always ~1" or "always ~0.5" detector.)
+    int n_clean = 0;
+    float* clean_probs = audioseal_detect(ctx, pcm.data(), (int)pcm.size(), &n_clean, nullptr);
+    if (clean_probs) {
+        double avg_clean = 0.0;
+        for (int i = 0; i < n_clean; i++)
+            avg_clean += clean_probs[i];
+        avg_clean /= (double)n_clean;
+        printf("audioseal clean (unwatermarked): avg detection probability = %.4f\n", avg_clean);
+        REQUIRE(avg_clean < 0.5);
+        std::free(clean_probs);
+    }
+
     std::free(watermarked);
     audioseal_free(ctx);
 }
