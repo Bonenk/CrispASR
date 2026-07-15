@@ -1629,6 +1629,24 @@ class Session:
         if rc != 0:
             raise RuntimeError(f"set_codec_path failed (rc={rc}) for backend {self.backend!r}")
 
+    def set_parakeet_att_context(self, left: int, right: int) -> None:
+        """Set parakeet/canary local-attention window (issue #257).
+
+        Encoder frames (~80 ms each) — the equivalent of NeMo's
+        ``model.change_attention_model("rel_pos_local_attn", [left, right])``.
+        Bounds long-audio encoder memory to ``O(T * window)`` instead of
+        ``O(T^2)``, so long clips fit in limited VRAM. Negative values select
+        full (global) attention; the default (unset) keeps the model's own
+        window. No-op for non-parakeet backends.
+        """
+        if not hasattr(self._lib, "crispasr_session_set_parakeet_att_context"):
+            raise RuntimeError("crispasr_session_set_parakeet_att_context not present in this libcrispasr build")
+        self._lib.crispasr_session_set_parakeet_att_context.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
+        self._lib.crispasr_session_set_parakeet_att_context.restype = ctypes.c_int
+        rc = self._lib.crispasr_session_set_parakeet_att_context(self._handle, int(left), int(right))
+        if rc != 0:
+            raise RuntimeError(f"set_parakeet_att_context failed (rc={rc}) for backend {self.backend!r}")
+
     def set_voice(self, path: str, ref_text: Optional[str] = None) -> None:
         """Load a voice prompt: a baked GGUF voice pack OR a *.wav reference.
 
