@@ -52,6 +52,33 @@ copies amortized over few frames).
   OmniVoice (`omnivoice_set_num_steps` + `crispasr_session_set_tts_steps` dispatch),
   default 32 (quality). Env `OMNIVOICE_NUM_STEPS=N` for quick A/B. Validated ASR
   roundtrip stays clean down to N≈16 (2× fewer forwards); see sweep in this doc.
+  Tunable from EVERY consumer (CLI/server-per-request/C-ABI/Python/Go/Dart).
+
+### stage0 breakdown (M1, clean full-synth log) — what's worth optimizing
+`fwd_cond 49.9% + fwd_uncond 44.3% + sampling 4.6% + embeds 1.1%`. So the embed
+path is NOT worth folding (1.1%); the only big lever left is the **uncond forward
+(44%)**, which interval-CFG attacks. The forwards themselves are compute-bound at
+parity with the reference — no free graph-fusion win on Metal (unified CFG is
+CUDA-only for that reason).
+
+- ✅ **Interval-CFG (`OMNIVOICE_CFG_INTERVAL=K`, default 1=exact, opt-in APPROX):**
+  recompute the uncond forward only every K steps, reuse cached `u_logits` between
+  (cond stays fresh every step; first + last steps always recompute). Gated OFF
+  (changes output slightly); forces the 2-forward path (unified fuses cond+uncond).
+  Env-only like `OMNIVOICE_UNIFIED_CFG` (experimental perf path). **Sweep (M1 q8_0,
+  2-sentence, ASR roundtrip):**
+
+  | K | gen | uncond fwds | ASR |
+  |---|-----|-------------|-----|
+  | 1 (exact) | 9.01 s | 64 | clean |
+  | 2 | 6.35 s (−30%) | 34 | clean |
+  | 3 | 5.88 s (−35%) | 24 | clean |
+  | 4 | 5.50 s (−39%) | 18 | clean |
+
+  K=1 is exact by construction (`step % 1 == 0` ⇒ recompute every step). Content
+  preserved at all K; naturalness of the stale-uncond approximation still wants a
+  listen, so it stays opt-in. This is the one lever that pushes stage0 *below*
+  reference cost (the cpp/torch ports all do full CFG every step).
 
 ### Competitive comparison — vs `rockerritesh/omnivoice-tts.cpp` (read their code post-solution)
 Their README is candid and **corroborates our design decisions**:
