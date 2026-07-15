@@ -266,3 +266,22 @@ Only for pure full attention (no local/pad mask); no caller change (BD from R).
 Verified real-transcript IDENTICAL vs monolithic on 209s (T=2613, NB=6).
 Measuring memory + speed at forced single-pass T=7838 (NB=16) — tiled is manual
 per-block (Metal monolithic uses flash), so speed is the open question.
+
+### R5 RESULTS (2026-07-15) — tiled BD is a CUDA-only memory lever; Metal already fine
+
+Measured tiled vs monolithic full attention on Metal M1 (parity IDENTICAL throughout):
+- T=2613: mono-flash 1301 MB, mono-manual 1271 MB, tiled 1273 MB — NO win.
+- T=7838 single-pass: mono-flash 1603 MB vs tiled 1608 MB — NO win.
+- Footprint is ~FLAT with length on Metal (20s→209s: 1226→1301 MB): model + fixed
+  buffers dominate; flash_attn_ext never materializes the O(T²) scores, so full
+  attention memory barely grows. The conv pre-encoder is the other O(T) consumer.
+
+=> On METAL/flash the O(T²) bias is already invisible; tiling can't help and is
+slower (manual per-block). The reporter's ~2 GiB is on CUDA, where
+fc_gpu_manual_attn MATERIALIZES O(T²) scores+BD — that IS what tiling reduces
+(→ O(T·block)). Can't measure on M1. Added tiled_full config to the CUDA kernel
+(tools/kaggle/windowed-attn-cuda) to validate the GPU payoff.
+
+STATUS: build_tiled_attn kept, gated OFF (CRISPASR_FC_TILED_ATTN=1), documented as a
+CUDA-side memory lever. Speed on Metal is worse (manual) so not for Metal use.
+OPEN: run the CUDA kernel to confirm tiled_full GPU peak << full_attention.

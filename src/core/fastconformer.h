@@ -690,11 +690,18 @@ static inline ggml_tensor* build_windowed_attn(ggml_context* ctx0, ggml_tensor* 
 }
 
 // Env gate: CRISPASR_FC_TILED_ATTN=1 enables query-TILED full attention for
-// rel_pos (full-attention) models — EXACT (bit-identical) output, but the O(T²)
-// rel-pos bias BD is computed one query-block at a time so peak memory is
-// O(T·block) instead of O(T²). Trades one big attention for NB smaller ones
-// (more kernel launches) → measure speed. Default OFF. Only for pure full
-// attention (no local/pad mask). Bit-exact vs monolithic (tools/dev/tiledbd_parity.cpp).
+// rel_pos (full-attention) models — EXACT (bit-identical) output, but the rel-pos
+// bias BD (and, on the manual path, the QK^T scores) is computed one query-block
+// at a time so peak memory is O(T·block) instead of O(T²). Default OFF; only for
+// pure full attention (no local/pad mask). Bit-exact vs monolithic
+// (tools/dev/tiledbd_parity.cpp).
+//
+// WHERE IT HELPS: the MANUAL attention path (CUDA, fc_gpu_manual_attn default-on),
+// which materializes O(T²) scores+BD at large single-pass T — the ~2 GiB VRAM in
+// issue #257. It does NOT help Metal/flash (flash_attn_ext never materializes the
+// scores, so full-attention memory is already ~flat with length there) and is
+// slower than flash — so it is a CUDA-side memory lever, gated off by default.
+// Validate on CUDA (tools/kaggle/windowed-attn-cuda).
 static inline bool fc_tiled_attn() {
     static int v = -1;
     if (v < 0) {
