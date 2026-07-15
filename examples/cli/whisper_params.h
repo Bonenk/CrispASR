@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <climits> // INT_MIN (att_context_* sentinels) — issue #257
 #include <string>
 #include <thread>
 #include <vector>
@@ -155,8 +156,8 @@ struct whisper_params {
     // negative = full attention. Set via --att-context "L,R".
     int att_context_left = INT_MIN;
     int att_context_right = INT_MIN;
-    std::string hotwords;         // comma-separated hotword list (PLAN #98)
-    float hotwords_boost = 2.0f;  // per-token log-prob boost for hotword prefix matches
+    std::string hotwords;        // comma-separated hotword list (PLAN #98)
+    float hotwords_boost = 2.0f; // per-token log-prob boost for hotword prefix matches
     // Free-form hotword/context text injected into the vibevoice-asr prompt
     // (only backend that reads this so far). Matches the `context_info` param
     // in microsoft/VibeVoice's vibevoice_asr_processor.py.

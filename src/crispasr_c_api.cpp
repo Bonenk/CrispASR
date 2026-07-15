@@ -18,6 +18,7 @@
 #include "core/gpu_backend_pref.h" // crispasr_set_gpu_backend_pref (#214)
 
 #include <atomic>
+#include <climits> // INT_MIN (parakeet att_context_* sentinels) — issue #257
 #include <cstdint>
 #include <cstdio>
 #include <cstring>

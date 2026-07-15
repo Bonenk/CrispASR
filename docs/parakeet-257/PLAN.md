@@ -1,5 +1,52 @@
 # parakeet-tdt: word list + chunking fixes (issue #257)
 
+## NOW — active work (2026-07-15, branch `fix/issue-257-segmentation`)
+
+Reporter comment #4983428974 (build @ 345e80d3): (a) build FAILS without
+`<climits>` (INT_MIN from the att-context commit c08898ea); (b) "the last issues
+mentioned are not fixed by --att-context" — i.e. R3's remaining ask: `--chunk-seconds`
+still emits ONE giant transcription, not segments.
+
+**DONE on this branch (verified on parakeet-tdt-0.6b-v3-q4_k, Metal M1, reporter's
+t501-20s.wav):**
+
+1. **Build fix.** `#include <climits>` added to `whisper_params.h` (the reported
+   TU; also covers cli.cpp/server.cpp/backend_parakeet.cpp which include it) and to
+   `crispasr_c_api.cpp` (separate src TU with its own INT_MIN use). `sentencepiece.h`
+   mentions INT_MIN only in comments — no fix needed. Full build green.
+
+2. **Segmentation + truncation fix (the real bug).** Reproduced that
+   `--chunk-seconds 7 --chunk-overlap 2` on 0.6b-v3 both (i) emitted 1 segment AND
+   (ii) TRUNCATED the tail (15 words / ends 10.7 s of a 20 s clip) — because the
+   `--chunk-seconds` path drove `parakeet_transcribe_streamed` with a 7 s ENCODER
+   window, and small windows shift this full-attention FastConformer's per-feature
+   stats → sparse/truncated TDT decode (already documented at parakeet.cpp:3818).
+   Fix (crispasr_backend_parakeet.cpp): **decouple the encoder window from output
+   segmentation.** Keep the encoder at the model's quality default (30 s, bounded
+   VRAM, `CRISPASR_PARAKEET_STREAM_CHUNK`-overridable), decode once coherently, then
+   split the words/tokens into ~N-second OUTPUT segments via new pure helper
+   `core_segment::group_by_window` (`src/core/asr_segment_group.h`, snapped to word
+   boundaries, contiguous, every seg ≥1 word). New unit test `test-segment-group`
+   (6 cases, `[unit]`).
+
+   Verified vs single-pass reference (identical text = no corruption/truncation):
+   - `--chunk-seconds 7`  → 2 segments, 20 words, text == single-pass. (was 1 seg/15 w)
+   - `--chunk-seconds 5`  → 3 segments, 20 words, contiguous offsets.
+   - `--chunk-seconds 30` → 1 segment (whole clip fits).
+   - default (no chunk)   → 1 segment, 20 words (NO regression).
+   - JA model             → dispatcher VAD path unchanged (my branch only touches
+                            the non-JA explicit-chunk branch).
+
+   Net for the reporter: `--chunk-seconds N` now = bounded VRAM + complete transcript
+   + N-second segments, all at once — no need for --att-context on the chunked path.
+
+**NEXT:** await maintainer decision to ff-merge to `main`; post reply on #257
+(include the `<climits>` patch acknowledgement + the new `--chunk-seconds`
+segmentation semantics). CUDA cross-check of att-context memory (R4/R5 open) is
+unrelated to this branch.
+
+---
+
 ## DONE (2026-07-14) — both fixes on main; issue closeable
 
 Branch `fix/parakeet-257`. Reporter (AppleSheeple) on parakeet-tdt-1.1b:

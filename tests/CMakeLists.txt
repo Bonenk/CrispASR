@@ -1949,6 +1949,25 @@ catch_discover_tests(test-internal-chunking-gate
     PROPERTIES LABELS "unit;internal-chunking;issue-89"
 )
 
+# ─── test-segment-group — output-segment grouping (issue #257)
+#
+# Pins core_segment::group_by_window, which splits parakeet's single coherent
+# decode into ~N-second output segments for `--chunk-seconds N` without
+# re-running the encoder on quality-degrading small windows.
+add_executable(test-segment-group
+    test-segment-group.cpp
+)
+target_include_directories(test-segment-group PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-segment-group PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-segment-group
+    TEST_SPEC "[segment-group]"
+    PROPERTIES LABELS "unit;segment-group;issue-257"
+)
+
 # ─── test-lcs-chunk-merge — Catch2 unit tests for LCS chunk-merge dedup
 #
 # Ports of NeMo's `longest_common_subsequence_merge` test cases
