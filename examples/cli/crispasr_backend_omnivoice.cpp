@@ -139,6 +139,14 @@ public:
         if (!ctx_ || text.empty())
             return {};
 
+        // Apply the diffusion step count PER CALL, not just at init: the server
+        // reuses one backend instance and passes tts_num_steps per request, so a
+        // per-request "num_steps" only takes effect if set here. Read live by the
+        // runtime (no reload). tts_num_steps is -1 unless the caller set it. (#254)
+        if (params.tts_num_steps >= 1) {
+            omnivoice_set_num_steps(ctx_, params.tts_num_steps);
+        }
+
         int n_samples = 0;
         float* pcm = omnivoice_synthesize(ctx_, text.c_str(), &n_samples);
         if (pcm && n_samples > 0) {

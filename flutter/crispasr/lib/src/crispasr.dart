@@ -3221,10 +3221,10 @@ class CrispasrSession {
     }
   }
 
-  /// Set the diffusion / CFM step count for diffusion-based TTS
-  /// backends (chatterbox today). Higher = better fidelity, slower.
-  /// Returns silently when the active backend has no diffusion stage
-  /// (rc=-2 from the C side maps to a soft no-op here).
+  /// Set the diffusion / CFM / masked-iterative step count for step-based TTS
+  /// backends (chatterbox, vibevoice, kugelaudio, tada, irodori, omnivoice).
+  /// Higher = better fidelity, slower. Returns silently when the active backend
+  /// has no step-based stage (rc=-2 from the C side maps to a soft no-op here).
   void setTtsSteps(int steps) {
     if (_closed) throw StateError('CrispasrSession is closed');
     if (!_lib.providesSymbol('crispasr_session_set_tts_steps')) {
