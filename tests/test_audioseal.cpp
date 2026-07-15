@@ -145,10 +145,13 @@ TEST_CASE("audioseal embed+detect round-trip", "[audioseal][live]") {
         for (int i = 0; i < n_det; i++)
             avg_prob += probs[i];
         avg_prob /= (double)n_det;
-        // With correct LSTM, this should be >> 0.5
-        // With approximation, we at least check it doesn't crash
-        INFO("average detection probability: " << avg_prob);
+        // A correctly-ported generator+detector recovers its own watermark with
+        // high confidence — well above chance. (Not merely "doesn't crash".)
+        printf("audioseal round-trip: avg detection probability = %.4f over %d frames\n", avg_prob, n_det);
+        REQUIRE(avg_prob > 0.9);
         std::free(probs);
+    } else {
+        FAIL("audioseal_detect returned null — detector did not run");
     }
 
     std::free(watermarked);
