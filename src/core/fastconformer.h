@@ -689,6 +689,86 @@ static inline ggml_tensor* build_windowed_attn(ggml_context* ctx0, ggml_tensor* 
     return ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, a_full, 0, 2, 1, 3)), d, T);
 }
 
+// Env gate: CRISPASR_FC_TILED_ATTN=1 enables query-TILED full attention for
+// rel_pos (full-attention) models — EXACT (bit-identical) output, but the O(T²)
+// rel-pos bias BD is computed one query-block at a time so peak memory is
+// O(T·block) instead of O(T²). Trades one big attention for NB smaller ones
+// (more kernel launches) → measure speed. Default OFF. Only for pure full
+// attention (no local/pad mask). Bit-exact vs monolithic (tools/dev/tiledbd_parity.cpp).
+static inline bool fc_tiled_attn() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = std::getenv("CRISPASR_FC_TILED_ATTN");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v != 0;
+}
+
+// Query-block size for tiled attention. Bigger = fewer blocks / graph nodes but
+// larger O(T·block) slab; smaller = less memory but more launches. Env override
+// CRISPASR_FC_TILED_BLOCK.
+static inline int fc_tiled_block_size() {
+    int bs = 512;
+    if (const char* e = std::getenv("CRISPASR_FC_TILED_BLOCK")) {
+        int o = std::atoi(e);
+        if (o >= 1)
+            bs = o;
+    }
+    return bs;
+}
+
+// Tiled only helps when there is more than one block; short clips run the cheap
+// monolithic path.
+static inline bool fc_tiled_attn_applicable(int T) {
+    return T > fc_tiled_block_size();
+}
+
+// Query-TILED full rel-pos attention. Same inputs/shapes as build_windowed_attn.
+// Processes queries in blocks of BS against ALL keys, computing only a (T×BS)
+// rel-pos bias slab per block (the O(T²) hog becomes O(T·BS) peak). Bit-exact to
+// monolithic full attention. Manual QK^T path (works on every backend).
+static inline ggml_tensor* build_tiled_attn(ggml_context* ctx0, ggml_tensor* Q_u, ggml_tensor* Q_v, ggml_tensor* K_,
+                                            ggml_tensor* V3, ggml_tensor* R, int T, const BlockParams& p) {
+    const int HD = p.head_dim;
+    const int NH = p.n_heads;
+    const int d = p.d;
+    const int BS = fc_tiled_block_size();
+    const int NB = (T + BS - 1) / BS;
+    const int Tp = NB * BS;
+    const float scale = 1.0f / sqrtf((float)HD);
+
+    ggml_tensor* Qu = ggml_cont(ctx0, Q_u);                                // (HD,T,NH)
+    ggml_tensor* Qv = ggml_cont(ctx0, Q_v);                                // (HD,T,NH)
+    ggml_tensor* Kh = ggml_cont(ctx0, K_);                                 // (HD,T,NH)
+    ggml_tensor* Vh = ggml_cont(ctx0, ggml_permute(ctx0, V3, 0, 2, 1, 3)); // (HD,T,NH)
+    ggml_tensor* Vt = ggml_cont(ctx0, ggml_permute(ctx0, Vh, 1, 0, 2, 3)); // (T,HD,NH) shared across blocks
+    // Pad queries to Tp (padded queries are sliced off at the end).
+    ggml_tensor* Qup = (Tp == T) ? Qu : ggml_cont(ctx0, ggml_pad_ext(ctx0, Qu, 0, 0, 0, Tp - T, 0, 0, 0, 0));
+    ggml_tensor* Qvp = (Tp == T) ? Qv : ggml_cont(ctx0, ggml_pad_ext(ctx0, Qv, 0, 0, 0, Tp - T, 0, 0, 0, 0));
+
+    ggml_tensor* out = nullptr; // (HD, *, NH), concatenated per block
+    for (int b = 0; b < NB; b++) {
+        ggml_tensor* Qu_b =
+            ggml_cont(ctx0, ggml_view_3d(ctx0, Qup, HD, BS, NH, Qup->nb[1], Qup->nb[2], (size_t)b * BS * Qup->nb[1]));
+        ggml_tensor* Qv_b =
+            ggml_cont(ctx0, ggml_view_3d(ctx0, Qvp, HD, BS, NH, Qvp->nb[1], Qvp->nb[2], (size_t)b * BS * Qvp->nb[1]));
+        ggml_tensor* BDraw_b = ggml_mul_mat(ctx0, R, Qv_b); // (2T-1,BS,NH)
+        // BD_b[k,i] = BDraw_b[k - i + (T-1) - b*BS, i]: rel_shift with offset (T-1-b*BS).
+        // Offset >= 0 for BS>=2 (b*BS <= Tp-BS <= T-1); rows stay within [0,2T-2].
+        const int off = (T - 1) - b * BS;
+        ggml_tensor* BD_b = ggml_view_3d(ctx0, BDraw_b, T, BS, NH, BDraw_b->nb[1] - BDraw_b->nb[0], BDraw_b->nb[2],
+                                         (size_t)off * BDraw_b->nb[0]);
+        ggml_tensor* sc = ggml_mul_mat(ctx0, Kh, Qu_b); // (T,BS,NH)
+        sc = ggml_add(ctx0, sc, ggml_cont(ctx0, BD_b));
+        sc = ggml_soft_max_ext(ctx0, sc, nullptr, scale, 0.0f);
+        ggml_tensor* ob = ggml_mul_mat(ctx0, Vt, sc); // (HD,BS,NH)
+        out = out ? ggml_concat(ctx0, out, ob, 1) : ob;
+    }
+    if (Tp != T)
+        out = ggml_view_3d(ctx0, out, HD, T, NH, out->nb[1], out->nb[2], 0);
+    return ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, ggml_cont(ctx0, out), 0, 2, 1, 3)), d, T);
+}
+
 // Build one Conformer block. `cur` must be (d, T). `pos_enc` is the shared
 // sinusoidal rel-pos table (d, 2T-1). `local_attn_mask` is an optional (T, T)
 // F32 tensor with 0.0 for visible positions and -inf for masked positions
@@ -775,6 +855,14 @@ static inline ggml_tensor* build_block(ggml_context* ctx0, ggml_tensor* cur, ggm
                     p.att_context_right);
         }
         attn_out = build_windowed_attn(ctx0, Q_u, Q_v, K_, V3, R, T, p, window_band_mask);
+    } else if (fc_tiled_attn() && !local_attn_mask && fc_tiled_attn_applicable(T)) {
+        // ---- Query-TILED full attention (exact, O(T·block) peak memory) ----
+        static bool logged = false;
+        if (!logged && std::getenv("CRISPASR_FC_MEM_DEBUG")) {
+            logged = true;
+            fprintf(stderr, "[fc] tiled attn ENGAGED: T=%d BS=%d\n", T, fc_tiled_block_size());
+        }
+        attn_out = build_tiled_attn(ctx0, Q_u, Q_v, K_, V3, R, T, p);
     } else {
         // Compute the relative position bias BD = rel_shift(Q_v × R^T).
         // This is query-dependent so it can't be precomputed, but it CAN
