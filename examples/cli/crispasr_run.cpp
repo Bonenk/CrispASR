@@ -2250,6 +2250,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
         if (!params.watermark_model.empty()) {
             crispasr_wm_dispatch::init(crispasr_resolve_watermark_model(params));
         }
+        // Honor the --no-watermark opt-out (equivalent to CRISPASR_NO_WATERMARK).
+        crispasr_wm_dispatch::set_disabled(params.tts_no_watermark);
 
         // Voice-cloning consent gate: if the voice is a .wav reference
         // (i.e. voice cloning), require --i-have-rights attestation.
@@ -2467,6 +2469,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
         if (!params.watermark_model.empty()) {
             crispasr_wm_dispatch::init(crispasr_resolve_watermark_model(params));
         }
+        // Honor the --no-watermark opt-out (equivalent to CRISPASR_NO_WATERMARK).
+        crispasr_wm_dispatch::set_disabled(params.tts_no_watermark);
 
         std::string transcript;
         auto audio = backend->speech_to_speech(s2s_samples.data(), (int)s2s_samples.size(), &transcript, params);
