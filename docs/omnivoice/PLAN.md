@@ -5,14 +5,15 @@ stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
 ## NOW — active work
 
-**Status (2026-07-15): OmniVoice WORD-DROPPING (#254) — FIXED, re-uploading.
+**Status (2026-07-15): OmniVoice WORD-DROPPING (#254) — ✅ FIXED + SHIPPED.
 Root cause: `llm.token_embd.weight` in shipped `omnivoice-f16.gguf` had 4094
-ZEROED rows (ids ~3380–12594; "quick"=3974, "None"=4064) from a post-conversion
-WRITE corruption (source safetensors clean, SHA-verified; reconvert clean).
-Reconverted f16/q4_k/q8_0 → 0 zeroed rows → fox + reporter paragraph render
-EVERY word. Re-uploading the 3 fixed files to `cstr/omnivoice-GGUF` (SHA-
-verified, same names/sizes; registry stores no SHA so no code change). NEXT:
-confirm HF SHA match, swap local canonical files, update issue #254.**
+ZEROED rows (ids ~3380–12594; "quick"=3974) from a post-conversion WRITE
+corruption (source clean SHA-verified; reconvert clean → converter is fine).
+Reconverted f16/q4_k/q8_0 (0 zeroed rows) → fox + reporter paragraph render
+EVERY word. Re-uploaded all 3 to `cstr/omnivoice-GGUF`, **SHA-verified server-
+side** (f16 670592a5, q8_0 9d8835c8, q4_k a1a9c6fc). Local canonical files
+swapped. Issue #254 updated (comment 4977208265). Registry needs no change
+(stores URL+size, not SHA; sizes unchanged). DONE.**
 
 - ✅ **FIXED + validated:** reconverted from clean `k2-fsa/OmniVoice/model.safetensors`
   (2.45 GB, sha `730839316de5…` == HF; source token_embd 0 zeroed rows, "quick"
