@@ -10,6 +10,52 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Deterministic DROPOUT of whole words/tokens (not garble) = a zeroed weight BLOCK in the shipped GGUF — scan converted tensors for zero-norm rows BEFORE debugging the port (OmniVoice #254 `token_embd`, 2026-07-15)
+
+OmniVoice TTS silently dropped specific words ("quick", "started", "One", "See";
+"TTS"→"T"). It *looked* like a subtle forward/alignment bug, and I spent real
+effort ruling out the estimator, chunking, CFG, sampling, seed, and quant, and
+line-by-line verifying the decode against the omnivoice.cpp oracle — all faithful.
+The actual cause: **`llm.token_embd.weight` in the shipped GGUF had 4094 ZEROED
+rows** (a post-conversion write/upload corruption). Any word whose BPE token landed
+in that id block embedded to a zero vector, so the model literally could not voice
+it. This is now the **third** corruption of this exact class (Cohere Arabic zeroed
+encoder norms; the OmniVoice tokenizer `block.4` zeroing; now the LM embedding) —
+it is a recurring failure mode of our convert→upload→download pipeline, not a
+freak event.
+
+The signature that should have pointed here immediately:
+- **Dropout, not distortion.** Whole tokens *vanish* rather than degrade. A numeric
+  forward bug (bad RoPE/scale/norm) smears everything; a zeroed weight ROW removes
+  exactly the content that indexes it. If some words are perfect and others are
+  simply *absent*, suspect a data hole, not math.
+- **Deterministic AND quant-independent.** Same words drop across f16 and q4_k and
+  every seed/temperature/CFG. Quant noise flips near-ties; it does not delete words.
+  When f16 (higher precision than a *clean* Q8_0 reference) is the one that fails,
+  the weights themselves are wrong, not the precision.
+
+Two cheap tools settle it fast:
+1. **Step-0 input-embedding diff vs a reference `--dump`.** Input embeddings depend
+   only on the embedding tables (tokenization + lookup), *before* any transformer
+   weight, so they're comparable across quant/impl. Global cos was 0.995 but three
+   positions were exactly **cos 0.0** — and the oracle's dumped `prompt-cond-ids`
+   named those tokens ("None", "quick"). Dumping our step-0 embeds in the oracle's
+   `[ndims][shape][data]` format (`OMNIVOICE_DUMP_DIR`) made this a 5-minute check.
+   Generalize: to split "embedding bug vs forward bug", diff the input embeddings
+   first — it's the one tensor that's quant-robust.
+2. **Zero-norm row scan** of the suspect table (`gguf.GGUFReader` → per-row L2 →
+   `where(norm==0)`). Instantly gives count + id range; compare against the source
+   safetensors (SHA-verified) to prove source-clean ⇒ pipeline corruption ⇒ a
+   reconvert fixes it (no code change).
+
+Also two process notes from this hunt: (a) use the black-box oracle in **both**
+greedy and stochastic decode to prove "our bug, not the model" — greedy alone can
+mislead; (b) I floated a plausible "sentence-splitting degrades the bidirectional
+aligner" hypothesis and had to **revert** it when single-shot dropped words too —
+a reminder to disprove the mechanism (single-shot still failed) before shipping the
+"fix". Cf. the Cohere Arabic zeroed-norms entry in `HISTORY.md` (same class,
+same "it's a corrupt download, not a bug" resolution).
+
 ## When the full system needs an unavailable resource (model / GPU), factor the risky logic into a pure helper and prove IT on synthetic data (§176l + GGUF-bounds, 2026-07-12)
 
 Two follow-ups had no local model / were untrusted-input paths, yet both shipped

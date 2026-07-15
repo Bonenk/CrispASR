@@ -6,6 +6,38 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-15 — #254: OmniVoice dropped whole words = 4094 zeroed rows in the shipped `token_embd`
+
+Reporter: long English prompts dropped words ("started", "One", "See", "pick";
+"TTS"→"T"). Reproduced (minimal repro: the pangram drops "quick"). Ruled out the
+duration estimator, sentence-chunking, CFG guidance, sampling temperature, seed,
+and quantization (f16 — *higher* precision than the oracle's Q8_0 — also dropped),
+and confirmed the MaskGIT decode loop is byte-faithful to omnivoice.cpp. Bisected
+with a **step-0 INPUT-EMBEDDING diff** against omnivoice.cpp's `--dump`
+(`lm-hidden-step0-cond-embed` [S,H]): global cos 0.995 but three positions at
+exactly cos **0.0** — our vectors were literally zero, and the oracle's
+`prompt-cond-ids` showed those were the "None"/"None"/**"quick"** tokens. A
+zero-norm scan of `llm.token_embd.weight` found **4094 ZEROED rows** (token ids
+~3380–12594); every other tensor was clean. A post-conversion write/upload
+corruption — the source `k2-fsa/OmniVoice/model.safetensors` is clean
+(SHA `730839316de5…` == HF, 0 zeroed rows) and a fresh reconvert is clean, so the
+converter is fine.
+
+Fix: reconverted f16 (0 zeroed rows) + re-derived q4_k/q8_0 → the pangram *and*
+the reporter's full paragraph render every word → re-uploaded all three to
+`cstr/omnivoice-GGUF`, SHA-verified server-side (f16 `670592a5`, q8_0 `9d8835c8`,
+q4_k `a1a9c6fc`); registry needs no change (stores URL+size, not SHA; sizes
+unchanged). **Third corruption of this class** (cf. Cohere Arabic zeroed encoder
+norms, 2026-07-12; the OmniVoice tokenizer `block.4` zeroing earlier this
+project). Diagnostic tooling landed: `OMNIVOICE_DUMP_DIR` (step-0 embed/logits
+dump in omnivoice.cpp's `[ndims][shape][data]` format) and
+`OMNIVOICE_GUIDANCE/POS_TEMP/CLASS_TEMP` knobs. Also this session: adopted
+OmniVoice's reference-relative duration estimator (Apache-2.0 `RuleDurationEstimator`
+/ MIT mirror) and a `--tts-speed` knob. A "sentence-splitting" hypothesis for the
+dropout was tried and **reverted** — single-shot dropped words too — before the
+zeroed-embedding root cause was found. See `LEARNINGS.md` for the generalizable
+lesson.
+
 ## 2026-07-13 — #253 follow-up: ARK-ASR loops/leaks on messy audio — root cause, not band-aid
 
 Reporter's second clip (`t501-3.75m.wav`, a soap-opera scene: dialogue + a
