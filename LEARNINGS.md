@@ -55,6 +55,41 @@ aligner" hypothesis and had to **revert** it when single-shot dropped words too 
 a reminder to disprove the mechanism (single-shot still failed) before shipping the
 "fix". Cf. the Cohere Arabic zeroed-norms entry in `HISTORY.md` (same class,
 same "it's a corrupt download, not a bug" resolution).
+## A TTS AR model that "never stops" is often a WRONG-SAMPLING-PARAMS bug, not a stop-head/port bug — read the model card's generation params (MOSS-TTS-Local 4B #249, 2026-07-14)
+
+The 4B `moss-tts-local` port synthesized **correct, intelligible audio** but
+generation **ran away** — the binary stop head never fired, hitting the
+4096-frame cap. Chasing it as a stop-head/port bug was wrong. Static inspection
+proved the port matched the HF reference on every structural point
+(`_global_hidden_to_local` = identity, local-transformer path/positions/`ln_f`,
+the stop head = the checkpoint's `local_text_lm_head`, row feedback, KV cache);
+crucially, **codebook-0 reads the same `local_hidden[0]` as the stop head and
+produced correct audio**, so `local_hidden` was correct and the ~10-logit
+continue-vs-stop gap was real (the reference produces it too). The bug was the
+**generation config**: the model card's "Generation Parameters" specify
+`audio_temperature=1.7, top_p=0.8, top_k=25`, `do_sample`, stop head SAMPLED
+(`text_temperature=1.0`). My generic defaults (`1.0/0.95/50` + GREEDY stop) gave a
+too-conservative/degenerate acoustic trajectory that **never reached the natural
+end state**, so the stop logit never rose. Fixing the defaults to the card values
+→ F16 stops naturally (15/124 frames) and the long clip round-trips at ASR
+word-overlap **0.969**. Lessons: (a) the tell is "audio content correct + STOP
+timing broken" — suspect sampling before the stop head; (b) **read the card's
+recommended generation params** before porting defaults from another backend;
+(c) **greedy audio is degenerate** for these RVQ AR LMs (it "stopped" at 35 frames
+= 2.8 s for a 30-word passage) — sampled audio at the card temperature is required;
+(d) confirm the stop head input by checking that codebook-0 (same hidden) decodes
+correct audio.
+
+Two more from the same port: **Q4_K's LONG trajectory runs away while short + F16
+stop** — intrinsic quantized-AR drift accumulates over the trajectory (reinforces
+[[tts-port-parity-via-logit-rank]]); ship/validate **F16**, keep quant
+best-effort. And the **decode-side codec attention must be query-chunked, not
+dense**: a sliding-window causal transformer whose T reaches `t_audio·32` (~131k at
+the final 48 kHz stage) OOMs a dense `T×T` scores tensor (~916 GB); chunk queries
+against their windowed keys (the reference's `query_chunk_size` path) — bounded
+memory, byte-identical output. See also [[kaggle-hf-download-curl-not-hftransfer]]
+for the Kaggle infra lessons this port cost (hf_transfer no-resume → `curl -C -`;
+progress via `kh.step()`+`HF_TOKEN` mirror, never narrate from status).
 
 ## When the full system needs an unavailable resource (model / GPU), factor the risky logic into a pure helper and prove IT on synthetic data (§176l + GGUF-bounds, 2026-07-12)
 

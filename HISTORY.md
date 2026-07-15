@@ -37,6 +37,33 @@ OmniVoice's reference-relative duration estimator (Apache-2.0 `RuleDurationEstim
 dropout was tried and **reverted** — single-shot dropped words too — before the
 zeroed-embedding root cause was found. See `LEARNINGS.md` for the generalizable
 lesson.
+## 2026-07-14 — #249 second deliverable: `moss-tts-local` (4B MossTTSLocal) shipped end-to-end
+
+Ported `OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5` (4B) as the second half of
+#249 (the 8B `moss-tts` shipped in v0.8.10). Architecture differs from the 8B: a
+Qwen3-4B backbone emits one hidden per frame, then a 1-layer GPT2-style local/depth
+transformer AR-generates 12 RVQ codebooks *within* the frame (RQ-Transformer, no
+delay pattern), with a binary continue/stop head. Decoded to 48 kHz by
+MOSS-Audio-Tokenizer-v2 — a materially bigger codec (ResidualLFQ dequant + 6
+ProjectedTransformer stages + patch upsamplers + stereo), ported from scratch in
+`src/moss_tts_local_codec.{h,cpp}` (no C++ reference existed). Full 12-point
+integration; F16-default registry.
+
+**Validated on Kaggle P100 (HARD RULE #3):** F16 synth stops naturally (15/124
+frames) and the long clip round-trips through whisper at word-overlap **0.969**.
+GGUFs hosted on `cstr/moss-tts-local-v1.5-GGUF` (F16 9.107 GB + codec 2.125 GB).
+Merged to `main` (rebased 29 commits clean; wiring PASS + unit test 30/30).
+
+Three things this cost that are now written down (`LEARNINGS.md`): the
+"generation runaway" was a **wrong-sampling-defaults** bug (card wants audio
+1.7/0.8/25 sampled, not the generic 1.0/0.95/50 greedy) — the audio was correct
+throughout, only the stop timing broke; the codec's dense `T×T` attention OOMs at
+the upsampled 48 kHz stage and must be **query-chunked**; and Kaggle's `hf_transfer`
+silently doesn't resume (wedges multi-GB downloads) so use `curl -C -`, and monitor
+via the harness `kh.step()`+`HF_TOKEN` HF-mirror rather than narrating from kernel
+status (see [[kaggle-hf-download-curl-not-hftransfer]]). Q4_K's long trajectory runs
+away (intrinsic quantized-AR drift) → F16 is the ship target, Q4_K best-effort.
+Remaining before release: regen Go cgo LDFLAGS on Linux (the one CI-red item).
 
 ## 2026-07-13 — #253 follow-up: ARK-ASR loops/leaks on messy audio — root cause, not band-aid
 
