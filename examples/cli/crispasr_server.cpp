@@ -1985,7 +1985,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             std::string wav = crispasr_make_wav_int16(pcm.data(), (int)pcm.size(), sr_out);
             // C2PA Content Credentials signing (when c2pa-c is available
             // and --c2pa-cert / --c2pa-key are configured)
-            crispasr_c2pa_sign_wav(wav, params.c2pa_cert, params.c2pa_key);
+            crispasr_c2pa_sign_auto(wav, "audio/wav", params.c2pa_cert, params.c2pa_key, params.cache_dir);
             res.set_content(std::move(wav), "audio/wav");
         }
     });
@@ -2128,7 +2128,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             res.set_content(std::move(opus), ct);
         } else {
             std::string wav = crispasr_make_wav_int16(pcm.data(), (int)pcm.size(), sr_out);
-            crispasr_c2pa_sign_wav(wav, params.c2pa_cert, params.c2pa_key);
+            crispasr_c2pa_sign_auto(wav, "audio/wav", params.c2pa_cert, params.c2pa_key, params.cache_dir);
             res.set_content(std::move(wav), "audio/wav");
         }
     });

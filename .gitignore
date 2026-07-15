@@ -133,3 +133,4 @@ tools/kaggle/fc-pw-requant/only.txt
 # #254 omnivoice reference artifacts (belong on HF fixtures, not git)
 *.encode-ref.gguf
 omnivoice-encode-ref.gguf
+/third_party/c2pa/

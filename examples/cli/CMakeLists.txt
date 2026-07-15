@@ -404,16 +404,20 @@ else()
     message(STATUS "Opus output disabled (libopus-dev not found)")
 endif()
 
-# Optional C2PA Content Credentials signing (c2pa-c library)
-find_library(C2PA_LIBRARY NAMES c2pa)
-find_path(C2PA_INCLUDE_DIR NAMES c2pa.h c2pa/c2pa.h)
+# Optional C2PA Content Credentials signing (c2pa-rs native lib).
+# The prebuilt library is `libc2pa_c`; `scripts/fetch-c2pa.sh` drops it under
+# third_party/c2pa. Probe that path first, then any system/CMAKE_PREFIX_PATH.
+set(_c2pa_hint "${CMAKE_SOURCE_DIR}/third_party/c2pa")
+find_library(C2PA_LIBRARY NAMES c2pa_c c2pa HINTS "${_c2pa_hint}/lib")
+find_path(C2PA_INCLUDE_DIR NAMES c2pa.h c2pa/c2pa.h HINTS "${_c2pa_hint}/include")
 if (C2PA_LIBRARY AND C2PA_INCLUDE_DIR)
     target_link_libraries(${TARGET} PRIVATE ${C2PA_LIBRARY})
     target_include_directories(${TARGET} PRIVATE ${C2PA_INCLUDE_DIR})
     target_compile_definitions(${TARGET} PRIVATE CRISPASR_HAVE_C2PA=1)
-    message(STATUS "C2PA signing enabled (c2pa-c)")
+    message(STATUS "C2PA signing enabled (${C2PA_LIBRARY})")
 else()
-    message(STATUS "C2PA signing disabled (c2pa-c not found; install from github.com/contentauth/c2pa-c)")
+    message(STATUS "C2PA signing disabled (run scripts/fetch-c2pa.sh, or pass "
+                   "-DCMAKE_PREFIX_PATH=<c2pa-prefix>)")
 endif()
 
 install(TARGETS ${TARGET} RUNTIME BUNDLE DESTINATION bin)
