@@ -253,3 +253,16 @@ masking, so any future adoption must merge pad-validity into the band mask.
 CAVEAT to document: --att-context on a full-attention model (e.g. v3) yields LOCAL
 attention output (differs from full) — a quality/memory tradeoff the user opts into;
 on a rel_pos_local_attn model it is exact to training.
+
+### R5 (2026-07-15) — reduce the FULL-attention O(T²) rel-pos bias (query-tiled BD)
+
+Q: "can we reduce the O(T²) rel-pos bias?" A: yes, for EXACT full attention too.
+build_tiled_attn (gated CRISPASR_FC_TILED_ATTN=1): process queries in blocks of
+BS (default 512, CRISPASR_FC_TILED_BLOCK) against ALL keys, computing only a
+(T×BS) rel-pos bias slab per block via a per-block rel_shift (offset (T-1)-b*BS).
+Peak O(T·BS) instead of O(T²). Bit-exact vs monolithic full attention
+(tools/dev/tiledbd_parity.cpp: 0..1e-8 across T/BS/head sweeps incl. non-div T).
+Only for pure full attention (no local/pad mask); no caller change (BD from R).
+Verified real-transcript IDENTICAL vs monolithic on 209s (T=2613, NB=6).
+Measuring memory + speed at forced single-pass T=7838 (NB=16) — tiled is manual
+per-block (Metal monolithic uses flash), so speed is the open question.
