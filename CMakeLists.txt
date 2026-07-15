@@ -31,6 +31,10 @@ endif()
 # Add path to modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 
+# C2PA (Content Credentials) enablement — defines crispasr_enable_c2pa(<target>),
+# called for both the core lib (src/) and the CLI (examples/cli/).
+include(CrispasrC2pa)
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)

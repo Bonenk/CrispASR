@@ -46,6 +46,7 @@
 #include "core/greedy_decode.h"      // Shared autoregressive greedy decode helper
 #include "core/lang_names.h"         // Shared ISO-639-1 → English language-name map
 #include "core/ngram_loop_fix.h"     // core_ngram::fix_loops (issue #218, mirrors CLI adapters)
+#include "core/crispasr_c2pa.h"      // C2PA Content Credentials signing (shared with CLI; #260)
 #include "grammar-parser.h"          // GBNF parser for grammar-constrained sampling
 // Non-Whisper backend headers. Each of these lives in `src/` and is built as
 // its own shared library — we link them into libwhisper privately so Dart
@@ -826,6 +827,39 @@ CA_EXPORT void crispasr_watermark_embed(float* pcm, int n_samples, float alpha) 
         }
     }
     ::crispasr_watermark_embed_impl(pcm, n_samples, alpha > 0.0f ? alpha : 0.005f);
+}
+
+// C2PA (Content Credentials) signing of an in-memory audio CONTAINER (WAV/MP3
+// bytes — not raw PCM). Exposes the CLI's provenance signing through the C ABI so
+// wasm / bindings / server can sign too. Signs with the user cert/key (PEM file
+// paths) when both are given, else the bundled self-signed default cert (baked
+// in — works with no filesystem, incl. the browser). Returns malloc'd signed
+// bytes (free with crispasr_c2pa_free) and sets *out_len, or NULL when C2PA is
+// unavailable, the format can't embed a manifest (e.g. AAC/Opus), or signing
+// fails. `format` is a C2PA MIME string, e.g. "audio/wav" or "audio/mpeg".
+CA_EXPORT unsigned char* crispasr_c2pa_sign(const unsigned char* data, size_t len, const char* format,
+                                            const char* cert_path, const char* key_path, size_t* out_len) {
+    if (out_len)
+        *out_len = 0;
+    if (!data || len == 0 || !format || !*format)
+        return nullptr;
+    std::string buf(reinterpret_cast<const char*>(data), len);
+    std::string cert = cert_path ? cert_path : "";
+    std::string key = key_path ? key_path : "";
+    if (!::crispasr_c2pa_sign_auto(buf, format, cert, key, std::string()))
+        return nullptr;
+    unsigned char* out = static_cast<unsigned char*>(malloc(buf.size()));
+    if (!out)
+        return nullptr;
+    memcpy(out, buf.data(), buf.size());
+    if (out_len)
+        *out_len = buf.size();
+    return out;
+}
+
+// Free a buffer returned by crispasr_c2pa_sign.
+CA_EXPORT void crispasr_c2pa_free(unsigned char* p) {
+    free(p);
 }
 
 #include "core/crispasr_lcs.h"
