@@ -40,10 +40,42 @@ t501-20s.wav):**
    Net for the reporter: `--chunk-seconds N` now = bounded VRAM + complete transcript
    + N-second segments, all at once — no need for --att-context on the chunked path.
 
-**NEXT:** await maintainer decision to ff-merge to `main`; post reply on #257
-(include the `<climits>` patch acknowledgement + the new `--chunk-seconds`
-segmentation semantics). CUDA cross-check of att-context memory (R4/R5 open) is
-unrelated to this branch.
+**Merged to `main` `7c1bbbbc0`** (CLI + `<climits>`). Then extended for full
+consumer wiring — see next section.
+
+## WIRING — all consumers (2026-07-15, branch `fix/issue-257-wiring`)
+
+The first fix landed in the CLI backend ADAPTER only. Per the dev-guide HARD
+RULE #6, the session C-ABI reimplements each backend inline (bindings/wrappers
+don't call the adapter), and the server had its own slicing that ignored
+CAP_INTERNAL_CHUNKING. Audited + wired every consumer:
+
+- **CLI** — adapter fix (already on main). ✓
+- **Server** (`crispasr_server.cpp`) — added the CLI's CAP_INTERNAL_CHUNKING
+  gate: a self-chunking backend (parakeet/canary) with no VAD now gets the WHOLE
+  clip (`effective_chunk_seconds = 0`) → its coherent decode + adapter
+  segmentation runs, instead of per-slice transcribe that corrupts the
+  full-attention encoder. ✓
+- **C-ABI session** (`crispasr_c_api.cpp`, used by python/go/java/dart/ruby/rust/
+  wasm/node wrappers) — mirrored the adapter: explicit `chunk_seconds>0` (non-JA)
+  → `parakeet_transcribe_streamed` at the quality window + new
+  `parakeet_result_to_session_segs` (reuses `core_segment::group_by_window`) →
+  ~N-second segments. `chunk_seconds<=0` keeps the one-merged-segment #208
+  contract. ✓
+- **Wrappers** — no code change needed: they marshal `crispasr_session_seg[]`
+  generically, so they get the segments once the C-ABI emits them.
+
+Verified on the reporter's ACTUAL model (`cstr/parakeet-tdt-1.1b-GGUF` q4_k) +
+`t501-20s.wav`, `--chunk-seconds 7 --chunk-overlap 2`:
+- CLI: 2 segments, 21 words, text == single-pass (== maintainer's #257 baseline).
+- Server (`/v1/audio/transcriptions`, `chunk_seconds=7`): 2 segments, complete.
+- Python `Session.transcribe_chunked(7)`: 2 segments, `chunked text == plain`.
+All three agree. `docs/{cli,server,bindings}.md` updated.
+
+**NEXT:** run the unit suite, format, merge to `main`, update #257 reply to
+mention server + bindings parity. (Note: a cosmetic "JA model with q4_0" load
+warning misfires on the 1.1b — pre-existing print heuristic, decode is correct;
+out of #257 scope.)
 
 ---
 

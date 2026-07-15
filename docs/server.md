@@ -130,8 +130,18 @@ curl http://localhost:8080/v1/audio/transcriptions \
 | `split_on_word` | `true`/`false` — split segments on word boundaries |
 | `max_len` | Maximum segment length in characters |
 | `chunk_seconds` | Maximum chunk duration for long audio (default: 30) |
+| `chunk_overlap` | Overlap context (seconds) around chunk boundaries |
 
 The `/inference` endpoint accepts the same CrispASR extension fields.
+
+> **Parakeet segmentation (issue #257).** Backends that chunk internally
+> (parakeet/canary — full-attention FastConformer) now receive the whole clip
+> instead of dispatcher-pre-sliced pieces (per-slice transcribe corrupts this
+> encoder). With an explicit `chunk_seconds=N`, the non-JA Parakeet response is
+> split into **~N-second segments** of the complete transcript (each with
+> `start`/`end`/`words`); without it, one coherent segment (or the silence-split
+> longform above the memory cap). VAD, when requested, still provides
+> silence-bounded slices. Matches the CLI's `--chunk-seconds` behaviour.
 
 ### Server startup flags (resident post-processors)
 
