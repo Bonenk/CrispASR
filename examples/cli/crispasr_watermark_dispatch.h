@@ -35,10 +35,14 @@ inline bool& disabled_flag() {
 }
 
 // Set from the --no-watermark CLI flag at startup.
-inline void set_disabled(bool value) { disabled_flag() = value; }
+inline void set_disabled(bool value) {
+    disabled_flag() = value;
+}
 
 // True if watermarking has been turned off via the CLI flag or the env var.
-inline bool is_disabled() { return disabled_flag() || std::getenv("CRISPASR_NO_WATERMARK") != nullptr; }
+inline bool is_disabled() {
+    return disabled_flag() || std::getenv("CRISPASR_NO_WATERMARK") != nullptr;
+}
 
 // Initialize AudioSeal from GGUF path. Call once at startup.
 // Returns true if loaded, false if not (falls back to spread-spectrum).
@@ -82,9 +86,8 @@ inline void embed(float* pcm, int n_samples, int sample_rate = 24000) {
         static bool warned = false;
         if (!warned) {
             warned = true;
-            fprintf(stderr,
-                    "crispasr: warning: watermarking disabled. "
-                    "AI usage marking responsibility rests with the operator.\n");
+            fprintf(stderr, "crispasr: warning: watermarking disabled. "
+                            "AI usage marking responsibility rests with the operator.\n");
         }
         return; // opt-out honored; warning emitted once per process
     }
