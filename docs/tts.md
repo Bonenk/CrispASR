@@ -1220,18 +1220,43 @@ crispasr --tts "hello" -m kokoro.gguf --watermark-model audioseal.gguf
 - **WAV**: `LIST`/`INFO` chunk with `ISFT="CrispASR (AI-generated audio)"` and `ICMT` notice
 - **MP3**: ID3v2 `TXXX` frames: `AI_GENERATED=true`, `GENERATOR=CrispASR`
 
-### C2PA Content Credentials (optional, compile-time)
+### C2PA Content Credentials
 
-Signed provenance manifests with `digitalSourceType=trainedAlgorithmicMedia`.
-Requires `c2pa-c` library and a self-signed certificate:
+Cryptographically-signed provenance manifests with
+`digitalSourceType=trainedAlgorithmicMedia` (a C2PA `c2pa.created` action),
+embedded directly in the output file. This is the "signed metadata" layer that
+complements the waveform watermark.
+
+**Build** (compile-time — signing is enabled only when the c2pa native library
+is present):
 
 ```bash
-# Generate certificate
-./scripts/generate-c2pa-cert.sh
+./scripts/fetch-c2pa.sh          # downloads the prebuilt c2pa-rs lib → third_party/c2pa
+# then cmake reconfigure; look for "C2PA signing enabled" at configure time
+```
 
-# Use with TTS
+**On by default (self-signed).** When built with C2PA, output is signed
+automatically — no flags needed. On first use CrispASR auto-provisions a
+per-install self-signed certificate (10-year P-256 / ES256) under the cache dir
+and reuses it. Self-signed manifests are valid and machine-readable (EU AI Act
+Art. 50); C2PA verifiers show "unverified signer".
+
+```bash
+crispasr --tts "hello" -m kokoro.gguf --tts-output out.wav   # signed automatically
+crispasr --detect-watermark out.wav                          # (or verify at contentcredentials.org)
+```
+
+**Bring your own cert** for a *trusted* signer identity (a CA-issued
+code-signing cert; verifiers then show the named issuer):
+
+```bash
+./scripts/generate-c2pa-cert.sh   # or use your CA-issued cert + key
 crispasr --tts "hello" --c2pa-cert crispasr-c2pa.crt --c2pa-key crispasr-c2pa.key
 ```
+
+**Format support.** c2pa can embed a manifest in **WAV** and **MP3** (also
+M4A/MP4/FLAC). It cannot embed in **AAC (ADTS)** or **Opus (Ogg)** — those
+outputs are written unsigned but still carry the watermark + file-metadata tag.
 
 ### Voice cloning consent gate
 

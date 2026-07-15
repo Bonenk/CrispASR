@@ -1228,8 +1228,10 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(stderr, "             --detect-watermark PATH          read WAV file and detect AI watermark "
                     "(prints confidence + exits)\n");
     fprintf(stderr, "             --c2pa-cert PATH                 X.509 cert for C2PA Content Credentials signing\n"
-                    "             --c2pa-key PATH                  private key for C2PA signing "
-                    "(generate both with scripts/generate-c2pa-cert.sh)\n");
+                    "             --c2pa-key PATH                  private key for C2PA signing. When built with "
+                    "C2PA and no cert is given, a per-install self-signed cert is auto-provisioned and WAV/MP3 "
+                    "output is signed by default (AAC/Opus can't embed C2PA). Provide your own CA-issued cert for "
+                    "a trusted signer identity; generate a self-signed one with scripts/generate-c2pa-cert.sh\n");
     fprintf(stderr, "             --cors-origin ORIGIN     server: opt-in CORS for browser clients "
                     "('*' for any, or scheme://host[:port])\n");
     fprintf(stderr, "             --chat-model PATH        server: enable POST /v1/chat/completions backed by "

@@ -99,7 +99,8 @@ static std::string crispasr_resolve_watermark_model(const whisper_params& params
 // silently dropping the manifest. Returns 0 on success, 16 on failure
 // (caller's exit code).
 static int crispasr_write_synth_audio(const std::string& out_path, const float* pcm, int n_samples, int sample_rate,
-                                      const std::string& c2pa_cert, const std::string& c2pa_key) {
+                                      const std::string& c2pa_cert, const std::string& c2pa_key,
+                                      const std::string& cache_dir = "") {
     auto has_ext = [&](const char* lo, const char* up) {
         return out_path.size() >= 4 &&
                (out_path.compare(out_path.size() - 4, 4, lo) == 0 || out_path.compare(out_path.size() - 4, 4, up) == 0);
@@ -119,6 +120,9 @@ static int crispasr_write_synth_audio(const std::string& out_path, const float* 
     const bool is_aac = has_ext(".aac", ".AAC");
     const bool is_opus = ends_with_ci(".opus") || ends_with_ci(".ogg");
     std::string blob;
+    // C2PA MIME/format for this container ("" = c2pa can't embed here, e.g. AAC
+    // (ADTS) / Opus (Ogg) — those get watermark + tag provenance only).
+    const char* c2pa_fmt = is_mp3 ? "audio/mpeg" : (is_aac || is_opus) ? "" : "audio/wav";
     if (is_mp3 || is_aac || is_opus) {
         const char* codec = is_mp3 ? "MP3" : (is_aac ? "AAC" : "Opus");
         blob = is_mp3   ? crispasr_make_mp3(pcm, n_samples, sample_rate)
@@ -128,13 +132,22 @@ static int crispasr_write_synth_audio(const std::string& out_path, const float* 
             fprintf(stderr, "crispasr: error: %s encoding failed for '%s'\n", codec, out_path.c_str());
             return 16;
         }
-        if (!c2pa_cert.empty() || !c2pa_key.empty())
-            fprintf(stderr, "crispasr: warning: C2PA signing is WAV-only; '%s' is written unsigned\n",
-                    out_path.c_str());
     } else {
         blob = crispasr_make_wav_int16(pcm, n_samples, sample_rate);
-        // C2PA Content Credentials signing (when available + configured)
-        crispasr_c2pa_sign_wav(blob, c2pa_cert, c2pa_key);
+    }
+
+    // C2PA Content Credentials signing. Effective signer creds are the
+    // user-provided --c2pa-cert/--c2pa-key, or (on by default when C2PA is
+    // compiled in) an auto-provisioned per-install self-signed cert. Signing is
+    // best-effort provenance: any failure or an unembeddable container leaves
+    // the watermark + metadata tag as the provenance signal.
+    if (c2pa_fmt && *c2pa_fmt) {
+        crispasr_c2pa_sign_auto(blob, c2pa_fmt, c2pa_cert, c2pa_key, cache_dir);
+    } else if (!c2pa_cert.empty() || !c2pa_key.empty()) {
+        fprintf(stderr,
+                "crispasr: note: C2PA cannot embed a manifest in this container; "
+                "'%s' written unsigned (watermark + metadata provenance still applied)\n",
+                out_path.c_str());
     }
     FILE* fout = fopen(out_path.c_str(), "wb");
     if (!fout) {
@@ -2393,7 +2406,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // default, MP3/AAC when --tts-output ends in .mp3/.aac.
         std::string out_path = params.tts_output.empty() ? "tts_output.wav" : params.tts_output;
         if (int rc = crispasr_write_synth_audio(out_path, audio.data(), (int)audio.size(), sr_in, params.c2pa_cert,
-                                                params.c2pa_key))
+                                                params.c2pa_key, params.cache_dir))
             return rc;
 
         // Post-embed watermark verification: re-detect on the in-memory
@@ -2478,7 +2491,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // ends in .mp3/.aac.
         std::string out_path = params.s2s_output.empty() ? "s2s_output.wav" : params.s2s_output;
         if (int rc = crispasr_write_synth_audio(out_path, audio.data(), (int)audio.size(), sr_out, params.c2pa_cert,
-                                                params.c2pa_key))
+                                                params.c2pa_key, params.cache_dir))
             return rc;
 
         if (!params.no_prints)
