@@ -134,15 +134,24 @@ cfgs = [
     ("masked_full_local", {"CRISPASR_FC_WINDOWED_ATTN": "0"}, ["--att-context", ATT]),
     ("windowed_local",     {"CRISPASR_FC_WINDOWED_ATTN": "1"}, ["--att-context", ATT]),
     ("full_attention",     {}, []),
+    # CUDA uses the MANUAL attention path (fc_gpu_manual_attn default-on), which
+    # materializes O(T²) scores+BD — the reporter's ~2 GiB. tiled_full computes the
+    # bias one query-block at a time (O(T·block)); this is the config where the win
+    # should appear on CUDA (it does NOT on Metal, where flash already avoids scores).
+    ("tiled_full",         {"CRISPASR_FC_TILED_ATTN": "1"}, []),
 ]
 results = [run_cfg(*c) for c in cfgs]
 
 # ── verdict ────────────────────────────────────────────────────────────────
 by = {r["label"]: r for r in results}
 mf, win = by["masked_full_local"], by["windowed_local"]
+full, tiled = by["full_attention"], by["tiled_full"]
 parity = (mf["text"] == win["text"]) and mf["rc"] == 0 and win["rc"] == 0
 mem_win = mf["peak"] - win["peak"]
 speedup = (mf["wall"] / win["wall"]) if win["wall"] else 0
+# tiled must be bit-exact to full attention; the memory win is the CUDA payoff.
+tiled_parity = (full["text"] == tiled["text"]) and full["rc"] == 0 and tiled["rc"] == 0
+tiled_mem_win = full["peak"] - tiled["peak"]
 
 print("\n" + "=" * 72)
 print(f"CUDA windowed-attn A/B  (arch={arch}, clip={dur:.0f}s, att={ATT})")
@@ -156,14 +165,21 @@ print(f"  GPU peak masked_full - windowed : {mem_win:+d} MiB "
       f"({mf['peak']} -> {win['peak']})")
 print(f"  speedup windowed vs masked_full : {speedup:.2f}x "
       f"({mf['wall']:.1f}s -> {win['wall']:.1f}s)")
-if not parity:
-    print("\n  [!] transcripts differ — first 300 chars each:")
-    print("   masked_full:", mf["text"][:300])
-    print("   windowed   :", win["text"][:300])
-    print("   windowed stderr tail:\n", win["stderr"])
+print(f"  PARITY tiled==full_attention : {'IDENTICAL' if tiled_parity else 'DIFFER'}")
+print(f"  GPU peak full - tiled (CUDA payoff) : {tiled_mem_win:+d} MiB "
+      f"({full['peak']} -> {tiled['peak']})")
+if not parity or not tiled_parity:
+    print("\n  [!] a transcript pair differs — first 300 chars:")
+    if not parity:
+        print("   masked_full:", mf["text"][:300])
+        print("   windowed   :", win["text"][:300])
+    if not tiled_parity:
+        print("   full       :", full["text"][:300])
+        print("   tiled      :", tiled["text"][:300])
 print("=" * 72)
 
-kh.step("verdict", parity=parity, gpu_mem_win_mib=mem_win, speedup=round(speedup, 2))
+kh.step("verdict", parity=parity, gpu_mem_win_mib=mem_win, speedup=round(speedup, 2),
+        tiled_parity=tiled_parity, tiled_gpu_mem_win_mib=tiled_mem_win)
 kh.step("script.done")
 # non-zero exit on parity failure so the kernel status flags it
-sys.exit(0 if parity else 1)
+sys.exit(0 if (parity and tiled_parity) else 1)
