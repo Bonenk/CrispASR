@@ -9005,6 +9005,15 @@ CA_EXPORT int crispasr_session_set_tts_steps(crispasr_session* s, int steps) {
         touched++;
     }
 #endif
+#ifdef CA_HAVE_OMNIVOICE
+    if (s->omnivoice_ctx) {
+        // OmniVoice masked-iterative (diffusion) step count (default 32). stage0
+        // cost = steps × 2 backbone forwards, so this is its dominant speed lever
+        // — ASR-clean down to ~16. Read live per synthesize() (#254).
+        omnivoice_set_num_steps(s->omnivoice_ctx, steps);
+        touched++;
+    }
+#endif
     return touched > 0 ? 0 : -2;
 }
 

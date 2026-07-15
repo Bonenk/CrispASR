@@ -2961,6 +2961,13 @@ struct omnivoice_context* omnivoice_init_from_file(const char* path_model, struc
         ctx->gen.position_temperature = (float)atof(e);
     if (const char* e = getenv("OMNIVOICE_CLASS_TEMP"))
         ctx->gen.class_temperature = (float)atof(e);
+    // num_steps is the dominant speed lever (stage0 = num_steps × 2 forwards).
+    // Env override for quick A/B; the CLI --tts-steps / session setter also drive it.
+    if (const char* e = getenv("OMNIVOICE_NUM_STEPS")) {
+        int n = atoi(e);
+        if (n > 0)
+            ctx->gen.num_steps = n;
+    }
 
     if (!load_model(ctx, path_model)) {
         delete ctx;
@@ -3054,6 +3061,14 @@ int omnivoice_set_speed(struct omnivoice_context* ctx, float speed) {
     if (!ctx)
         return -1;
     ctx->speed = (speed > 0.0f) ? speed : 1.0f;
+    return 0;
+}
+
+int omnivoice_set_num_steps(struct omnivoice_context* ctx, int num_steps) {
+    if (!ctx)
+        return -1;
+    if (num_steps >= 1)
+        ctx->gen.num_steps = num_steps; // read live by generate_iterative
     return 0;
 }
 

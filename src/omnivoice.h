@@ -68,6 +68,12 @@ int omnivoice_set_instruct(struct omnivoice_context* ctx, const char* instruct);
 // Useful when a reference voice yields an over- or under-long estimate.
 int omnivoice_set_speed(struct omnivoice_context* ctx, float speed);
 
+// Set the number of masked-iterative (diffusion) steps. Stage0 cost is
+// num_steps × 2 backbone forwards, so this is the dominant speed/quality lever:
+// lower = faster, fewer refinement passes. Default 32; ASR-clean down to ~16.
+// Read live per synthesize (no reload). Values <1 are ignored. (#254)
+int omnivoice_set_num_steps(struct omnivoice_context* ctx, int num_steps);
+
 // Run the masked iterative generation: text → 8-codebook audio codes.
 // Returns malloc'd int32_t array of shape (n_codebooks * T) row-major
 // [cb0_t0, cb1_t0, ..., cb7_t0, cb0_t1, ...].

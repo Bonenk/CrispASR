@@ -125,6 +125,13 @@ public:
             omnivoice_set_speed(ctx_, p.tts_speed);
         }
 
+        // Diffusion step count (--tts-steps): stage0 = num_steps × 2 backbone
+        // forwards — the dominant cost. Default 32; lower trades refinement for
+        // speed (ASR-clean to ~16). tts_num_steps is -1 unless the user set it.
+        if (p.tts_num_steps >= 1) {
+            omnivoice_set_num_steps(ctx_, p.tts_num_steps);
+        }
+
         return true;
     }
 
