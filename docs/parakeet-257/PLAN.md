@@ -90,3 +90,27 @@ cstr/parakeet-tdt-1.1b-GGUF to reproduce the reporter's exact case.
 - 1.1b --chunk-seconds 7 --chunk-overlap 2: full correct transcript (was corrupted).
 - 0.6b-ja still JA (97% CJK vocab); 0.6b-v3 still non-JA. No regressions.
 - TODO: extract testable vocab_looks_japanese() helper + unit test.
+
+## ROUND 3 (2026-07-15) — reporter: split-outs fixed; default VRAM heavy
+
+Reporter: split-outs gone ✓. Remaining: (i) --chunk-seconds gives one coherent
+transcription (INTENDED — chunked encode, decode once, word timestamps); (ii)
+default (no chunk) ~2GiB VRAM for <4min (single-pass full O(T²) attention).
+
+USER DIRECTION: option 2 (memory-bounded, CLI-steered) wired through C-ABI/server/
+wrappers, MATCHING the Python reference.
+
+REFERENCE (NeMo): long-audio memory is bounded via `change_attention_model(
+"rel_pos_local_attn", [L,R])` (local/windowed attention → O(T·window)); default is
+full attention. CrispASR already implements this (att_context_left/right) but only
+via env CRISPASR_PARAKEET_ATT_CONTEXT.
+
+PLAN:
+1. BUG (critical): C-ABI inline parakeet dispatch (crispasr_c_api.cpp:4525) still
+   uses the OLD `parakeet_n_vocab<=4096` JA heuristic → bindings/server STILL
+   misdetect 1.1b. Mirror parakeet_vocab_is_japanese() there (contributing pt6).
+2. FEATURE: expose local-attention window as CLI `--att-context L,R` (matches NeMo
+   change_attention_model), wired: whisper_params → CLI → parakeet adapter
+   (parakeet_set_att_context) → C-ABI (session field + inline dispatch) → server
+   (form) → python/go wrapper docs. Default full attention (matches NeMo default).
+   --chunk-seconds stays the other reference control (chunked inference).
