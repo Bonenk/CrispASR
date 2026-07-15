@@ -147,3 +147,28 @@ PLAN: core_conformer::build_block windowed-attention path (gated), validated vs 
 masked-full output (parity ≥0.999 on the encoder / transcript-identical) + measured
 memory reduction, before flipping --att-context to use it. HARD: ggml banded matmul
 (overlapping key-window gather) + windowed rel-pos. Incremental, diff-harness-checked.
+
+### R4 Milestone 1 DONE (2026-07-15) — windowed-attn algorithm validated
+
+Standalone ggml parity harness (tools/dev/winattn_parity.cpp) proves the block
+sliding-chunks windowed attention is BIT-EXACT vs full masked rel-pos attention
+(max abs diff ~1e-7) across: baseline, asymmetric windows (WL!=WR), BS/HD/NH
+sweeps, and non-divisible T with query-axis zero-padding (T=13,17,100,209).
+
+Key algorithm (O(T·BS·H) scores/BD instead of O(T²·H)):
+- Block size BS >= max(att_left, att_right). NB=ceil(T/BS), Tp=NB*BS (pad Q/K/V).
+- 3-block band per query block via reshape->3 stride-1 block slices->concat
+  (ggml forbids overlapping views: view_4d checks contiguous product<=src bytes).
+- K/V zero-padded BS each side so band [b-1,b,b+1] = keys k=(bo-1)BS+j, j∈[0,3BS).
+- scores_blk = mul_mat(K_band(HD,3BS,NB,NH), Qu_blk(HD,BS,NB,NH)) -> (3BS,BS,NB,NH).
+- BD (rel-pos bias) windowed: R_sl = R rows [T-2BS .. T+2BS-2] (RB=4BS-1),
+  RESHAPED (HD,RB,1,NH) so mul_mat broadcasts R over blocks & aligns heads in ne3
+  (critical bug found: without the size-1 block axis, ggml mixes head/block batch
+  dims and blocks b>=2 diverge). BDraw_blk=mul_mat(R_sl,Qv_blk)->(RB,BS,NB,NH),
+  then in-block rel_shift view: BD_blk[j,i]=BDraw_blk[(BS-1)+j-i,i], nb1'=nb1-nb0,
+  offset (BS-1)*nb0 — natural key order, all strides>=0.
+- Host band mask (3BS,BS,NB): -inf where k out of [0,T) or out of [q-WL,q+WR].
+
+NEXT (M2): wire as core_conformer::build_windowed_attn, gated CRISPASR_FC_WINDOWED_ATTN
+(default keeps masked-full path intact for A/B), validate via real parakeet
+transcript parity + memory measurement.
