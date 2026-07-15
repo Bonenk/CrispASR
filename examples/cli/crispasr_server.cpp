@@ -60,6 +60,7 @@
 #include <cerrno>
 #include <chrono>
 #include <cmath>
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -395,6 +396,21 @@ static std::string add_ctc_logits_to_json(const std::string& base, const crispas
     }
 }
 
+// Per-thread breadcrumb of the current processing stage (#261). Synchronous
+// fault signals (SIGILL/SIGSEGV/…) are delivered to the faulting thread, so the
+// fatal-signal handler runs on that thread and reads its own TLS — the crashing
+// stage. Reading a const char* is async-signal-safe. See the fatal-signal
+// handler further down for how this is used.
+static thread_local const char* g_current_stage = nullptr;
+
+struct stage_scope {
+    const char* prev;
+    explicit stage_scope(const char* s) : prev(g_current_stage) { g_current_stage = s; }
+    ~stage_scope() { g_current_stage = prev; }
+    stage_scope(const stage_scope&) = delete;
+    stage_scope& operator=(const stage_scope&) = delete;
+};
+
 // Load audio from a multipart file upload, transcribe it, return result.
 // Acquires model_mutex internally.
 static transcription_result do_transcribe(const httplib::MultipartFormData& audio_file, CrispasrBackend* backend,
@@ -462,7 +478,14 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         (effective_chunk_seconds == 0 || effective_chunk_seconds > vad_cap)) {
         effective_chunk_seconds = vad_cap;
     }
-    const auto slices = crispasr_compute_audio_slices(pcmf32.data(), n_samples, SR, effective_chunk_seconds, rp);
+    // #261: Silero/MarbleNet VAD runs on the CPU ggml backend inside slicing —
+    // breadcrumb it so a native-instruction fault (SIGILL) is attributed
+    // correctly by the fatal-signal handler.
+    std::vector<crispasr_audio_slice> slices;
+    {
+        stage_scope _stg(rp.vad ? "vad (silero/marblenet CPU inference)" : "audio slicing");
+        slices = crispasr_compute_audio_slices(pcmf32.data(), n_samples, SR, effective_chunk_seconds, rp);
+    }
     if (slices.empty()) {
         result.ok = true;
         return result;
@@ -563,61 +586,81 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         // Diarization post-step (#143): assign speaker labels to segments.
         // Mirrors the CLI path in crispasr_run.cpp:732-743.
         if (rp.diarize && !result.segs.empty()) {
-            const bool have_stereo = pcmf32s.size() == 2 && !pcmf32s[0].empty() && !pcmf32s[1].empty();
+            // #261: diarization (pyannote-seg / sherpa / embedding) runs on the
+            // CPU ggml backend. Breadcrumb the stage for the fatal-signal
+            // handler, and wrap the whole step so a throwing failure (e.g.
+            // std::bad_alloc on a very long clip) degrades to "transcription
+            // without speaker labels" instead of failing the request — the
+            // server must not lose a good ASR result over an optional post-step.
+            stage_scope _stg("diarization (cpu inference)");
+            try {
+                const bool have_stereo = pcmf32s.size() == 2 && !pcmf32s[0].empty() && !pcmf32s[1].empty();
 
-            // Pre-compute global caches for cross-slice consistency.
-            CrispasrPyannoteCache pyannote_cache;
-            if (rp.diarize_method == "pyannote" && !pcmf32.empty()) {
-                crispasr_compute_pyannote_cache(pcmf32.data(), n_samples, rp, pyannote_cache);
-            }
-            CrispasrSherpaCache sherpa_cache;
-            if ((rp.diarize_method == "sherpa" || rp.diarize_method == "sherpa-onnx" || rp.diarize_method == "ecapa") &&
-                !pcmf32.empty()) {
-                crispasr_compute_sherpa_cache(pcmf32.data(), n_samples, rp, sherpa_cache);
-            }
-            const CrispasrPyannoteCache* pya_ptr = pyannote_cache.valid() ? &pyannote_cache : nullptr;
-            const CrispasrSherpaCache* shp_ptr = sherpa_cache.valid() ? &sherpa_cache : nullptr;
-
-            // Apply diarize per-slice. We re-walk the slices and apply
-            // diarize to the corresponding range of result.segs.
-            size_t seg_offset = 0;
-            for (size_t i = 0; i < slices.size(); ++i) {
-                const auto& sl = slices[i];
-                // Count how many segments belong to this slice (by timestamp range).
-                size_t seg_count = 0;
-                for (size_t j = seg_offset; j < result.segs.size(); ++j) {
-                    // Segments from the next slice will have t0 >= next slice's t0_cs.
-                    if (i + 1 < slices.size() && result.segs[j].t0 >= slices[i + 1].t0_cs)
-                        break;
-                    seg_count++;
+                // Pre-compute global caches for cross-slice consistency.
+                CrispasrPyannoteCache pyannote_cache;
+                if (rp.diarize_method == "pyannote" && !pcmf32.empty()) {
+                    crispasr_compute_pyannote_cache(pcmf32.data(), n_samples, rp, pyannote_cache);
                 }
+                CrispasrSherpaCache sherpa_cache;
+                if ((rp.diarize_method == "sherpa" || rp.diarize_method == "sherpa-onnx" ||
+                     rp.diarize_method == "ecapa") &&
+                    !pcmf32.empty()) {
+                    crispasr_compute_sherpa_cache(pcmf32.data(), n_samples, rp, sherpa_cache);
+                }
+                const CrispasrPyannoteCache* pya_ptr = pyannote_cache.valid() ? &pyannote_cache : nullptr;
+                const CrispasrSherpaCache* shp_ptr = sherpa_cache.valid() ? &sherpa_cache : nullptr;
 
-                if (seg_count > 0) {
-                    std::vector<crispasr_segment> slice_segs(result.segs.begin() + (ptrdiff_t)seg_offset,
-                                                             result.segs.begin() + (ptrdiff_t)(seg_offset + seg_count));
-                    if (have_stereo) {
-                        std::vector<float> sl_l(pcmf32s[0].begin() + sl.start, pcmf32s[0].begin() + sl.end);
-                        std::vector<float> sl_r(pcmf32s[1].begin() + sl.start, pcmf32s[1].begin() + sl.end);
-                        crispasr_apply_diarize(sl_l, sl_r, /*is_stereo=*/true, sl.t0_cs, slice_segs, rp, pya_ptr,
-                                               shp_ptr);
-                    } else {
-                        std::vector<float> mono_slice(pcmf32.begin() + sl.start, pcmf32.begin() + sl.end);
-                        crispasr_apply_diarize(mono_slice, mono_slice,
-                                               /*is_stereo=*/false, sl.t0_cs, slice_segs, rp, pya_ptr, shp_ptr);
+                // Apply diarize per-slice. We re-walk the slices and apply
+                // diarize to the corresponding range of result.segs.
+                size_t seg_offset = 0;
+                for (size_t i = 0; i < slices.size(); ++i) {
+                    const auto& sl = slices[i];
+                    // Count how many segments belong to this slice (by timestamp range).
+                    size_t seg_count = 0;
+                    for (size_t j = seg_offset; j < result.segs.size(); ++j) {
+                        // Segments from the next slice will have t0 >= next slice's t0_cs.
+                        if (i + 1 < slices.size() && result.segs[j].t0 >= slices[i + 1].t0_cs)
+                            break;
+                        seg_count++;
                     }
-                    // Copy back the diarized segments.
-                    for (size_t j = 0; j < seg_count; ++j)
-                        result.segs[seg_offset + j] = std::move(slice_segs[j]);
-                }
-                seg_offset += seg_count;
-            }
 
-            // Global embedding-based re-clustering (issue #107 P3).
-            if (!rp.diarize_embedder.empty() && !pcmf32.empty()) {
-                auto embedder = crispasr_make_speaker_embedder(rp.diarize_embedder, rp.n_threads, rp.cache_dir);
-                if (embedder) {
-                    crispasr_remap_speakers_via_embeddings(result.segs, pcmf32.data(), n_samples, embedder.get(), rp);
+                    if (seg_count > 0) {
+                        std::vector<crispasr_segment> slice_segs(result.segs.begin() + (ptrdiff_t)seg_offset,
+                                                                 result.segs.begin() +
+                                                                     (ptrdiff_t)(seg_offset + seg_count));
+                        if (have_stereo) {
+                            std::vector<float> sl_l(pcmf32s[0].begin() + sl.start, pcmf32s[0].begin() + sl.end);
+                            std::vector<float> sl_r(pcmf32s[1].begin() + sl.start, pcmf32s[1].begin() + sl.end);
+                            crispasr_apply_diarize(sl_l, sl_r, /*is_stereo=*/true, sl.t0_cs, slice_segs, rp, pya_ptr,
+                                                   shp_ptr);
+                        } else {
+                            std::vector<float> mono_slice(pcmf32.begin() + sl.start, pcmf32.begin() + sl.end);
+                            crispasr_apply_diarize(mono_slice, mono_slice,
+                                                   /*is_stereo=*/false, sl.t0_cs, slice_segs, rp, pya_ptr, shp_ptr);
+                        }
+                        // Copy back the diarized segments.
+                        for (size_t j = 0; j < seg_count; ++j)
+                            result.segs[seg_offset + j] = std::move(slice_segs[j]);
+                    }
+                    seg_offset += seg_count;
                 }
+
+                // Global embedding-based re-clustering (issue #107 P3).
+                if (!rp.diarize_embedder.empty() && !pcmf32.empty()) {
+                    auto embedder = crispasr_make_speaker_embedder(rp.diarize_embedder, rp.n_threads, rp.cache_dir);
+                    if (embedder) {
+                        crispasr_remap_speakers_via_embeddings(result.segs, pcmf32.data(), n_samples, embedder.get(),
+                                                               rp);
+                    }
+                }
+            } catch (const std::exception& e) {
+                fprintf(stderr,
+                        "crispasr-server: warning: diarization failed (%s) — returning transcription "
+                        "without speaker labels\n",
+                        e.what());
+            } catch (...) {
+                fprintf(stderr, "crispasr-server: warning: diarization failed (unknown error) — returning "
+                                "transcription without speaker labels\n");
             }
         }
 
@@ -752,11 +795,105 @@ static std::string crispasr_opus_response(const float* pcm, int n_samples, int s
 }
 
 // ---------------------------------------------------------------------------
+// Fatal-signal diagnostics (#261)
+//
+// The CPU ggml backend runs Silero VAD and pyannote diarization (GPU ASR does
+// not touch it). If an image is mistakenly built with `-march=native`
+// (GGML_NATIVE=ON) on a host with wider CPU extensions than the deployment
+// host, those CPU kernels raise SIGILL and the process dies with NO message —
+// httplib's exception handler only catches C++ exceptions, not signals, so the
+// container just restarts silently (the exact report in #261).
+//
+// The real fix is building with -DGGML_NATIVE=OFF (see .devops/*.Dockerfile).
+// This handler is the safety net: it turns the silent death into an
+// actionable, async-signal-safe diagnostic that names the stage that was
+// running, then re-raises so the process still terminates with the correct
+// signal (core-dump / restart semantics preserved). It uses only
+// async-signal-safe calls (write(2); no printf/malloc). The g_current_stage
+// breadcrumb and stage_scope RAII helper are defined earlier (before
+// do_transcribe, which sets them).
+// ---------------------------------------------------------------------------
+
+static void crispasr_sig_write(const char* s) {
+    if (!s)
+        return;
+    size_t n = 0;
+    while (s[n])
+        ++n;
+#ifdef _WIN32
+    (void)fwrite(s, 1, n, stderr);
+#else
+    ssize_t rc = write(STDERR_FILENO, s, n);
+    (void)rc;
+#endif
+}
+
+static void crispasr_fatal_signal_handler(int sig) {
+    const char* name = "fatal signal";
+    switch (sig) {
+    case SIGILL:
+        name = "SIGILL (illegal instruction)";
+        break;
+    case SIGSEGV:
+        name = "SIGSEGV (segmentation fault)";
+        break;
+    case SIGFPE:
+        name = "SIGFPE (floating-point exception)";
+        break;
+#ifdef SIGBUS
+    case SIGBUS:
+        name = "SIGBUS (bus error)";
+        break;
+#endif
+    default:
+        break;
+    }
+    crispasr_sig_write("\n*** crispasr-server: FATAL ");
+    crispasr_sig_write(name);
+    crispasr_sig_write(" during stage: ");
+    crispasr_sig_write(g_current_stage ? g_current_stage : "unknown");
+    crispasr_sig_write(" ***\n");
+    if (sig == SIGILL) {
+        crispasr_sig_write("This almost always means the binary uses CPU instructions this host does\n"
+                           "not support (e.g. AVX-512 baked in by -march=native). The CPU ggml backend\n"
+                           "used by VAD / diarization hit an unsupported instruction. Use an image built\n"
+                           "with -DGGML_NATIVE=OFF (portable AVX2), or run plain ASR without vad/diarize\n"
+                           "(that path executes on the GPU). See issue #261.\n");
+    }
+    // Restore the default disposition and re-raise so the process terminates
+    // with the original signal (SA_NODEFER lets the re-raise re-enter).
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+static void crispasr_install_fatal_signal_handlers() {
+#ifndef _WIN32
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = crispasr_fatal_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_NODEFER;
+    sigaction(SIGILL, &sa, nullptr);
+    sigaction(SIGSEGV, &sa, nullptr);
+    sigaction(SIGFPE, &sa, nullptr);
+#ifdef SIGBUS
+    sigaction(SIGBUS, &sa, nullptr);
+#endif
+#else
+    signal(SIGILL, crispasr_fatal_signal_handler);
+    signal(SIGSEGV, crispasr_fatal_signal_handler);
+    signal(SIGFPE, crispasr_fatal_signal_handler);
+#endif
+}
+
+// ---------------------------------------------------------------------------
 // Server entry point
 // ---------------------------------------------------------------------------
 
 int crispasr_run_server(whisper_params& params, const std::string& host, int port) {
     using namespace httplib;
+
+    crispasr_install_fatal_signal_handlers();
 
     crispasr_c2pa_startup_check();
     if (!params.watermark_model.empty()) {
