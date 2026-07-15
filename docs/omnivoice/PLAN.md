@@ -46,6 +46,30 @@ copies amortized over few frames).
   omnivoice.cpp, so headroom there is kernel-level (their ggml fork). A persistent
   decode graph (build/alloc once, reuse across chunks) could cut the GPU dispatch
   overhead enough to make GPU decode competitive — untested.
+- ✅ **`--tts-steps` / `OMNIVOICE_NUM_STEPS` knob** — stage0 (now the dominant cost
+  post-FASTCONV) is exactly `num_steps × 2` backbone forwards, so it's the biggest
+  remaining speed lever. Wired the codebase-standard `--tts-steps` flag into
+  OmniVoice (`omnivoice_set_num_steps` + `crispasr_session_set_tts_steps` dispatch),
+  default 32 (quality). Env `OMNIVOICE_NUM_STEPS=N` for quick A/B. Validated ASR
+  roundtrip stays clean down to N≈16 (2× fewer forwards); see sweep in this doc.
+
+### Competitive comparison — vs `rockerritesh/omnivoice-tts.cpp` (read their code post-solution)
+Their README is candid and **corroborates our design decisions**:
+- **Codec stays on CPU in both ports.** They tried codec-on-GPU and measured it
+  **~40× slower** (ggml CUDA `conv_transpose_1d` unoptimized: 14 s vs 0.4 s), and
+  abandoned it — the exact conclusion behind our `OMNIVOICE_CODEC_GPU` default-OFF.
+- **Their fast decode == our FASTCONV.** Their converter: *"CPU ggml_conv_1d/im2col
+  REQUIRES f16 conv kernels; CUDA/Metal accept f32."* Their Metal RTF 0.89 comes from
+  **f32 codec convs (no cast)**; they expose `--codec-conv-f32` as an opt-in. FASTCONV
+  gets the same cast-free decode **automatically from the f16 model** (baked F32
+  kernels) — no 2.7 GB f32 GGUF, no ~24 GB CPU RAM — and adds **k=1→matmul** (they
+  im2col k=1). CrispASR weights: q4_k 597 MB / q8_0 818 MB vs their f32 2.7 GB.
+- **stage0 is the same shape:** 2 separate cond/uncond forwards, 32 steps, persistent
+  graph — matched on both. The one stage0 lever they flag as *not done* ("unbatched
+  CFG, ~2×") is one **we already have** (`OMNIVOICE_UNIFIED_CFG`, +13% CUDA).
+- Their published wins are **M4 Pro / T4** (different silicon than our M1) at f32 —
+  not a same-box comparison. A fair head-to-head belongs on **Kaggle CUDA** (guide's
+  <1 %-variance box), at matched dtype, where the kernel-quality gap actually lives.
 
 ---
 

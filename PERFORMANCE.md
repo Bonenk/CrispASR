@@ -211,6 +211,15 @@ the §232 campaign. Verified against current code, not carried from this doc.
   device KV + FASTCONV codec) has landed for qwen3-tts, voxtral-tts, omnivoice,
   tada, chatterbox. Un-migrated: f5, dots, kugelaudio, pocket (natural next
   targets — same levers).
+- **omnivoice codec FASTCONV actually landed 2026-07-15** (`6a1b1903b`) — its DAC
+  decode had NOT been migrated (it ran `core_dac::conv1d` with F16 kernels, paying
+  the per-graph F16→F32 cast + im2col-for-k=1). Profiling caught it: decode was the
+  RTF wall (18.2 s for the reporter's paragraph on M1). Baking F32 decode kernels at
+  load + k=1→matmul (`OMNIVOICE_CODEC_FASTCONV`, default ON) → **decode 10.6 s → 3.6 s
+  ≈ 2.9×**, ASR-identical. Corroborated by `rockerritesh/omnivoice-tts.cpp` (their fast
+  Metal decode is the same f32-no-cast path). GPU codec decode measured slower on M1
+  Metal (dispatch-bound) → gated `OMNIVOICE_CODEC_GPU`, default OFF, pending Kaggle CUDA.
+  `--tts-steps` now drives omnivoice's stage0 step count (default 32).
 - **Codec decoders are already ggml-graph** (snac/dac/seanet/hifigan/adaln/
   qformer). Scalar survivors: `core/rvq.cpp` encode-search and `core/istft.h`
   O(N²) IRFFT (both run once/synthesis).
