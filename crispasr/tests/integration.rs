@@ -193,6 +193,51 @@ fn session_whisper_auto_detect() {
 }
 
 #[test]
+fn session_whisper_no_speech_prob() {
+    let model_path = whisper_model();
+    if !Path::new(&model_path).exists() {
+        eprintln!("SKIP: whisper model not found at {model_path}");
+        return;
+    }
+    let sess = crispasr::Session::open(&model_path).expect("session open whisper");
+    let segs = sess.transcribe(&jfk_pcm()).expect("transcribe");
+    assert!(!segs.is_empty());
+
+    // Every whisper segment carries a real no-speech probability in [0, 1] —
+    // not the -1.0 "no data" sentinel other backends leave. JFK is clean
+    // speech, so the values should also sit well below the 0.6 suspect
+    // threshold, confirming it is the true posterior and not a placeholder.
+    for s in &segs {
+        assert!(
+            (0.0..=1.0).contains(&s.no_speech_prob),
+            "no_speech_prob {} out of [0,1] for segment {:?}",
+            s.no_speech_prob,
+            s.text
+        );
+        assert!(
+            s.no_speech_prob < 0.6,
+            "unexpected high no_speech_prob {} on clean speech {:?}",
+            s.no_speech_prob,
+            s.text
+        );
+    }
+}
+
+#[test]
+fn session_whisper_detected_language() {
+    let model_path = whisper_model();
+    if !Path::new(&model_path).exists() {
+        eprintln!("SKIP: whisper model not found at {model_path}");
+        return;
+    }
+    let sess = crispasr::Session::open(&model_path).expect("session open whisper");
+    // Whisper's in-decode acoustic language detection surfaces on the
+    // exception-safe session (JFK is English).
+    sess.transcribe(&jfk_pcm()).expect("transcribe");
+    assert_eq!(sess.detected_language(), "en");
+}
+
+#[test]
 fn session_available_backends() {
     let backends = crispasr::Session::available_backends();
     assert!(backends.contains(&"whisper".to_string()));
