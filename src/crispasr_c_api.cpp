@@ -15,7 +15,8 @@
 #include "crispasr_session.h"
 #include "core/win_compat.h"
 #include "core/bpe.h"
-#include "core/gpu_backend_pref.h" // crispasr_set_gpu_backend_pref (#214)
+#include "core/asr_segment_group.h" // issue #257: output-segment grouping (parakeet --chunk-seconds)
+#include "core/gpu_backend_pref.h"  // crispasr_set_gpu_backend_pref (#214)
 
 #include <atomic>
 #include <climits> // INT_MIN (parakeet att_context_* sentinels) — issue #257
@@ -4222,6 +4223,53 @@ static void parakeet_session_chunked_merge(parakeet_context* ctx, const float* s
     seg.t1 = dedup.back().t1;
     out.push_back(std::move(seg));
 }
+
+// Issue #257: split ONE coherent parakeet decode into ~seg_seconds session
+// segments, snapped to word boundaries. Mirrors the CLI adapter's
+// split_result_into_segments so the session API (server / language bindings)
+// emits per-segment offsets for an explicit `--chunk-seconds`, instead of one
+// giant segment. session_seg carries words only (no per-token array), so we
+// group words; text is re-joined with single spaces (non-JA path).
+static void parakeet_result_to_session_segs(const parakeet_result* pr, int seg_seconds,
+                                            std::vector<crispasr_session_seg>& out) {
+    if (!pr)
+        return;
+    if (pr->n_words <= 0) {
+        // No word timings → one segment with whatever text we have.
+        crispasr_session_seg seg;
+        seg.text = pr->text ? pr->text : "";
+        if (!seg.text.empty())
+            out.push_back(std::move(seg));
+        return;
+    }
+    std::vector<int64_t> word_t0;
+    word_t0.reserve(pr->n_words);
+    for (int i = 0; i < pr->n_words; ++i)
+        word_t0.push_back(pr->words[i].t0);
+    const std::vector<int> starts = core_segment::group_by_window(word_t0, (int64_t)seg_seconds * 100);
+    for (size_t si = 0; si < starts.size(); ++si) {
+        const int w_begin = starts[si];
+        const int w_end = (si + 1 < starts.size()) ? starts[si + 1] : pr->n_words;
+        crispasr_session_seg seg;
+        std::string text;
+        seg.words.reserve(w_end - w_begin);
+        for (int wi = w_begin; wi < w_end; ++wi) {
+            if (!text.empty())
+                text += ' ';
+            text += pr->words[wi].text;
+            crispasr_session_seg::word sw;
+            sw.text = pr->words[wi].text;
+            sw.t0 = pr->words[wi].t0;
+            sw.t1 = pr->words[wi].t1;
+            sw.p = pr->words[wi].p > 0.0f ? pr->words[wi].p : 1.0f;
+            seg.words.push_back(std::move(sw));
+        }
+        seg.text = std::move(text);
+        seg.t0 = seg.words.front().t0;
+        seg.t1 = seg.words.back().t1;
+        out.push_back(std::move(seg));
+    }
+}
 #endif
 
 // Issue #208: explicit chunked-encode transcribe for batch callers.
@@ -4683,8 +4731,35 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         else
             use_single_pass = (int64_t)n_samples <= chunk_samp;
 
-        // non-JA long audio → overlapping-window merge (no dropped sections,
-        // no boundary duplicates). Emits one merged segment.
+        // Issue #257: an EXPLICIT --chunk-seconds request via the session API
+        // (crispasr_session_transcribe_chunked → server / language bindings)
+        // mirrors the CLI adapter: one coherent internal-streamed decode at the
+        // model's quality window (complete text, bounded VRAM — small encoder
+        // windows degrade this full-attention FastConformer), then group the
+        // words into ~N-second OUTPUT segments. This replaces the one-merged-
+        // segment overlapping-window path for the explicit non-JA case, so the
+        // wrappers get per-segment offsets like the CLI. STREAM_CHUNK still
+        // overrides the encoder window for power users.
+        if (force_chunked && !is_ja && s->parakeet_force_chunk_seconds > 0) {
+            int enc_window = 0; // 0 → library quality default (30 s non-JA)
+            if (const char* e = getenv("CRISPASR_PARAKEET_STREAM_CHUNK"))
+                enc_window = std::max(2, atoi(e));
+            const int ov = s->parakeet_force_overlap_seconds >= 0 ? s->parakeet_force_overlap_seconds : 2;
+            g_progress.store(0, std::memory_order_relaxed);
+            parakeet_result* pr = parakeet_transcribe_streamed(s->parakeet_ctx, pcm, n_samples, 0, enc_window, ov);
+            g_progress.store(-1, std::memory_order_relaxed);
+            if (!pr) {
+                delete r;
+                return nullptr;
+            }
+            parakeet_result_to_session_segs(pr, s->parakeet_force_chunk_seconds, r->segments);
+            parakeet_result_free(pr);
+            return r;
+        }
+
+        // non-JA long audio (no explicit --chunk-seconds) → overlapping-window
+        // merge (no dropped sections, no boundary duplicates). Emits one merged
+        // segment (the #208 batch-caller contract).
         if (!use_single_pass && !is_ja) {
             g_progress.store(0, std::memory_order_relaxed); // issue #208: pollers see "started"
             parakeet_session_chunked_merge(s->parakeet_ctx, pcm, n_samples, chunk_s * SR, overlap_s * SR, r->segments,

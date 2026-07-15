@@ -479,6 +479,17 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         (effective_chunk_seconds == 0 || effective_chunk_seconds > vad_cap)) {
         effective_chunk_seconds = vad_cap;
     }
+    // Issue #257: backends that chunk internally (parakeet/canary — full-
+    // attention FastConformer) are corrupted by the dispatcher's per-slice
+    // transcribe + merge. Hand them the whole clip so their coherent internal
+    // decode runs — and, for an explicit --chunk-seconds request, emits
+    // ~N-second segments (the CLI adapter's issue #257 path) instead of one
+    // blob. Mirrors the CLI dispatcher (crispasr_run.cpp
+    // backend_self_chunks_on_explicit + CAP_INTERNAL_CHUNKING gate). VAD still
+    // provides silence-bounded slices when the caller requested it.
+    if ((backend->capabilities() & CAP_INTERNAL_CHUNKING) && !rp.vad) {
+        effective_chunk_seconds = 0;
+    }
     // #261: Silero/MarbleNet VAD runs on the CPU ggml backend inside slicing —
     // breadcrumb it so a native-instruction fault (SIGILL) is attributed
     // correctly by the fatal-signal handler.
