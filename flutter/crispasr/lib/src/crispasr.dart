@@ -264,12 +264,16 @@ bool diarizeSegments({
 
   final n = left.length;
   final leftPtr = calloc<Float>(n);
-  for (var i = 0; i < n; i++) leftPtr[i] = left[i];
+  for (var i = 0; i < n; i++) {
+    leftPtr[i] = left[i];
+  }
 
   Pointer<Float> rightPtr = leftPtr;
   if (isStereo && right != null) {
     rightPtr = calloc<Float>(right.length);
-    for (var i = 0; i < right.length; i++) rightPtr[i] = right[i];
+    for (var i = 0; i < right.length; i++) {
+      rightPtr[i] = right[i];
+    }
   }
 
   // ABI struct layout must match `crispasr_diarize_seg_abi`:
@@ -348,8 +352,9 @@ RegistryEntry? registryLookupByFilename(String filename,
 /// can be passed back to [registryLookup] for full details.
 List<String> listKnownModels({DynamicLibrary? lib}) {
   lib ??= DynamicLibrary.open(CrispASR.defaultLibName());
-  if (!lib.providesSymbol('crispasr_registry_list_backends_abi'))
+  if (!lib.providesSymbol('crispasr_registry_list_backends_abi')) {
     return const [];
+  }
   final fn = lib.lookupFunction<Int32 Function(Pointer<Uint8>, Int32),
       int Function(Pointer<Uint8>, int)>('crispasr_registry_list_backends_abi');
   final buf = calloc<Uint8>(8192);
@@ -576,7 +581,9 @@ List<AlignedWord> alignWords({
   lib ??= DynamicLibrary.open(CrispASR.defaultLibName());
 
   final samples = calloc<Float>(pcm.length);
-  for (var i = 0; i < pcm.length; i++) samples[i] = pcm[i];
+  for (var i = 0; i < pcm.length; i++) {
+    samples[i] = pcm[i];
+  }
   final modelPtr = alignerModel.toNativeUtf8();
   final txtPtr = transcript.toNativeUtf8();
 
@@ -677,7 +684,9 @@ LidResult detectLanguagePcm({
   lib ??= DynamicLibrary.open(CrispASR.defaultLibName());
 
   final samples = calloc<Float>(pcm.length);
-  for (var i = 0; i < pcm.length; i++) samples[i] = pcm[i];
+  for (var i = 0; i < pcm.length; i++) {
+    samples[i] = pcm[i];
+  }
   final pathPtr = modelPath.toNativeUtf8();
   final outBuf = calloc<Uint8>(16);
   final outConf = calloc<Float>();
@@ -738,13 +747,17 @@ Float32List enhanceAudioRnnoise(
   final inBuf = calloc<Float>(pcm.length);
   final outBuf = calloc<Float>(pcm.length);
   try {
-    for (var i = 0; i < pcm.length; i++) inBuf[i] = pcm[i];
+    for (var i = 0; i < pcm.length; i++) {
+      inBuf[i] = pcm[i];
+    }
     final rc = fn(inBuf, pcm.length, outBuf, pcm.length);
     if (rc != 0) {
       throw StateError('crispasr_enhance_audio_rnnoise failed (rc=$rc)');
     }
     final out = Float32List(pcm.length);
-    for (var i = 0; i < pcm.length; i++) out[i] = outBuf[i];
+    for (var i = 0; i < pcm.length; i++) {
+      out[i] = outBuf[i];
+    }
     return out;
   } finally {
     calloc.free(inBuf);
@@ -1000,7 +1013,7 @@ typedef _WhisperInitNative = Pointer<Void> Function(
     Pointer<Utf8>, Pointer<Void>);
 typedef _WhisperInit = Pointer<Void> Function(Pointer<Utf8>, Pointer<Void>);
 
-typedef _VoidPtr_C = Void Function(Pointer<Void>);
+typedef _VoidPtrC = Void Function(Pointer<Void>);
 typedef _VoidPtr = void Function(Pointer<Void>);
 
 typedef _WhisperFullNative = Int32 Function(
@@ -1014,7 +1027,7 @@ typedef _DefaultParams = Pointer<Void> Function(int);
 typedef _DefaultCtxParamsNative = Pointer<Void> Function();
 typedef _DefaultCtxParams = Pointer<Void> Function();
 
-typedef _IntPtr_C = Int32 Function(Pointer<Void>);
+typedef _IntPtrC = Int32 Function(Pointer<Void>);
 typedef _IntPtr = int Function(Pointer<Void>);
 
 typedef _GetTextNative = Pointer<Utf8> Function(Pointer<Void>, Int32);
@@ -1215,11 +1228,11 @@ class CrispASR {
   CrispASR(String modelPath, {String? libPath}) {
     _lib = DynamicLibrary.open(libPath ?? _findLib());
 
-    _free = _lib.lookupFunction<_VoidPtr_C, _VoidPtr>('whisper_free');
+    _free = _lib.lookupFunction<_VoidPtrC, _VoidPtr>('whisper_free');
     _defaultParams = _lib.lookupFunction<_DefaultParamsNative, _DefaultParams>(
         'whisper_full_default_params_by_ref');
     _nSegments =
-        _lib.lookupFunction<_IntPtr_C, _IntPtr>('whisper_full_n_segments');
+        _lib.lookupFunction<_IntPtrC, _IntPtr>('whisper_full_n_segments');
     _getText = _lib.lookupFunction<_GetTextNative, _GetText>(
         'whisper_full_get_segment_text');
     _getT0 = _lib
@@ -1229,7 +1242,7 @@ class CrispASR {
     _getNSP = _lib.lookupFunction<_GetNSPNative, _GetNSP>(
         'whisper_full_get_segment_no_speech_prob');
     _freeParams =
-        _lib.lookupFunction<_VoidPtr_C, _VoidPtr>('whisper_free_params');
+        _lib.lookupFunction<_VoidPtrC, _VoidPtr>('whisper_free_params');
 
     // Prefer the *_by_ref wrappers (CrispASR ≥0.6.11) that take struct
     // pointers — calling the canonical `whisper_init_from_file_with_params` /
@@ -1566,8 +1579,9 @@ class CrispASR {
       if (opts.noContext) _paramsSetNoContext?.call(params, 1);
       if (opts.singleSegment) _paramsSetSingleSegment?.call(params, 1);
       if (!opts.suppressBlank) _paramsSetSuppressBlank?.call(params, 0);
-      if (opts.temperature > 0.0)
+      if (opts.temperature > 0.0) {
         _paramsSetTemperature?.call(params, opts.temperature);
+      }
       // Alt-token capture (0 = off, default). Pre-0.5.13 dylibs lack
       // the setter — silently skip so callers stay forward-compatible.
       if (opts.altN > 0) _paramsSetAltN?.call(params, opts.altN);
@@ -2266,8 +2280,9 @@ class CrispasrSession {
   /// ISO-639-1 code ("en"). Whisper-only; other backends return the session's
   /// source-language hint, or "unknown" (also on dylibs predating the accessor).
   String detectedLanguage() {
-    if (!_lib.providesSymbol('crispasr_session_detected_language'))
+    if (!_lib.providesSymbol('crispasr_session_detected_language')) {
       return 'unknown';
+    }
     final fn = _lib.lookupFunction<
         Int32 Function(Pointer<Void>, Pointer<Utf8>, Int32),
         int Function(Pointer<Void>, Pointer<Utf8>,
@@ -2742,8 +2757,9 @@ class CrispasrSession {
     final p = path.toNativeUtf8();
     try {
       final rc = fn(_handle, p);
-      if (rc != 0)
+      if (rc != 0) {
         throw Exception('setCodecPath failed (rc=$rc) for backend $_backend');
+      }
     } finally {
       calloc.free(p);
     }
@@ -3531,8 +3547,9 @@ class CrispasrSession {
     final refPtr = refText != null ? refText.toNativeUtf8() : nullptr;
     try {
       final rc = fn(_handle, pathPtr, refPtr.cast());
-      if (rc != 0)
+      if (rc != 0) {
         throw Exception('setVoice failed (rc=$rc) for backend $_backend');
+      }
     } finally {
       calloc.free(pathPtr);
       if (refPtr != nullptr) calloc.free(refPtr);
@@ -3565,8 +3582,9 @@ class CrispasrSession {
         throw StateError(
             'backend $_backend has no preset speakers; use setVoice() instead');
       }
-      if (rc != 0)
+      if (rc != 0) {
         throw Exception('setSpeakerName failed (rc=$rc) for backend $_backend');
+      }
     } finally {
       calloc.free(namePtr);
     }
@@ -3614,8 +3632,9 @@ class CrispasrSession {
       throw StateError(
           'backend $_backend has no integer-speaker contract; use setSpeakerName() instead');
     }
-    if (rc != 0)
+    if (rc != 0) {
       throw Exception('setSpeakerID failed (rc=$rc) for backend $_backend');
+    }
   }
 
   /// Number of preset speakers for the active backend.
@@ -3657,8 +3676,9 @@ class CrispasrSession {
         throw StateError(
             'backend $_backend is not a VoiceDesign variant; setInstruct only applies to qwen3-tts VoiceDesign');
       }
-      if (rc != 0)
+      if (rc != 0) {
         throw Exception('setInstruct failed (rc=$rc) for backend $_backend');
+      }
     } finally {
       calloc.free(p);
     }
@@ -4656,8 +4676,9 @@ bool kokoroLangIsGerman(String lang, {String? libPath}) {
 /// Whether [lang] has a native Kokoro voice (vs. cross-lingual fallback).
 bool kokoroLangHasNativeVoice(String lang, {String? libPath}) {
   final lib = DynamicLibrary.open(libPath ?? CrispASR.defaultLibName());
-  if (!lib.providesSymbol('crispasr_kokoro_lang_has_native_voice_abi'))
+  if (!lib.providesSymbol('crispasr_kokoro_lang_has_native_voice_abi')) {
     return false;
+  }
   final fn = lib.lookupFunction<
       Bool Function(Pointer<Utf8>),
       bool Function(

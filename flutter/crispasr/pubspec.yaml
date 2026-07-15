@@ -23,5 +23,6 @@ dependencies:
 
 dev_dependencies:
   test: ^1.24.0
+  lints: ^5.0.0
   # `Pointer<Utf8>` and `toDartString` come from `package:ffi`, which is a
   # runtime dep — nothing else needed for the smoke tests.
