@@ -5,9 +5,41 @@ stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
 ## NOW — active work
 
-**Status (2026-07-14): duration estimator adopted + `--tts-speed` knob —
-DONE, on `main` (`224420b8e`, `19151d124`). Reporter confirmed ref-voice
-scaling works.**
+**Status (2026-07-15): investigating OmniVoice WORD-DROPPING (#254 new report).
+Root-caused to our LM FORWARD producing wrong audio_logits — NOT estimator/
+chunking/decode. Bisecting the exact mis-converted weight next.**
+
+- 🐞 **Reporter** ([comment](https://github.com/CrispStrobe/CrispASR/issues/254#issuecomment-4973702610)):
+  long English paragraph drops words ("started", "One", "See", "pick" missing;
+  "TTS"→"T"). JP length now fine.
+- ✅ **Reproduced** on our build. Minimal repro: `--tts "The quick brown fox
+  jumps over the lazy dog."` drops **"quick"** (65 frames).
+- ✅ **omnivoice.cpp oracle CLEAN** on the SAME text — both default (pos_temp=5)
+  AND greedy (repacked its `--maskgit-test` i32 dump → `.rvq` → codec-decode →
+  ASR = full "quick"). So it's OUR bug, not the model.
+- ✅ **Ruled OUT**: estimator (21.8 s / 16.6 cps normal); sentence-splitting
+  (single-shot also drops — my first hypothesis, WRONG, reverted); CFG
+  (guidance 0/1/2/3 all drop); sampling (greedy pos_temp=0/class_temp=0 drops);
+  seed (1/42/123/999 all drop); quant (f16 — higher precision than oracle's
+  Q8_0 — also drops). ⇒ **deterministic forward divergence.**
+- ✅ **Decode logic byte-faithful** to omnivoice.cpp `maskgit-tts.h`
+  (schedule, log_softmax, CFG, confidence `(max_lp−k·pen)/pos_temp+gumbel`,
+  layer-penalty, top-k selection — all identical, verified line-by-line).
+  Hparams match (28L, d=1024, 16/8 heads, hd=128, ff=3072, **rope θ=1e6**,
+  eps=1e-6, NEOX). Structure matches (full-bidir attn, Qwen3 Q/K-norm,
+  scale 1/√128, SwiGLU, separate/untied `audio_output` head, k·1025 codebook
+  offsets, `where(audio_mask,...)` merge).
+- 🔎 **Prime suspect**: a mis-converted LM weight (our LM forward was only ever
+  A/B'd internally, never diffed vs Python/omnivoice.cpp; we already found one
+  corrupt converted tensor — the tokenizer block.4 — earlier this project).
+- ⏭ **NEXT**: dump omnivoice.cpp step-0 `lm-logits-step0-cond` [K,T,V] (`--dump`)
+  + add matching step-0 dump to ours, compare argmax per (k,t) → localize to a
+  layer/weight. Diagnostic knobs landed: `OMNIVOICE_GUIDANCE/POS_TEMP/CLASS_TEMP`.
+
+---
+
+**Prior (DONE): duration estimator adopted + `--tts-speed` knob**
+on `main` (`224420b8e`, `19151d124`). Reporter confirmed ref-voice scaling works.
 
 - ✅ **Reporter re-verified** ([#254 comment](https://github.com/CrispStrobe/CrispASR/issues/254#issuecomment-4973702610)):
   no-ref JP line = 6.72 s (good); WITH a (slow) ref voice it grew to 11.60 s —
