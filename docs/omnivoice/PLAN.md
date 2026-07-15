@@ -5,12 +5,23 @@ stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
 ## NOW — active work
 
-**Status (2026-07-15): OmniVoice WORD-DROPPING (#254) — ROOT CAUSE FOUND.
-`llm.token_embd.weight` in our shipped `omnivoice-f16.gguf` has 4094 ZEROED
-rows (token ids ~3380–12594). "quick"=3974 and "None"=4064 are among them, so
-any word whose BPE token lands in that block renders SILENT → dropped. FIX =
-reconvert token_embd from clean source + re-upload + update SHA (same class as
-the tokenizer block.4 corruption). NEXT: get clean k2-fsa/OmniVoice LM source.**
+**Status (2026-07-15): OmniVoice WORD-DROPPING (#254) — FIXED, re-uploading.
+Root cause: `llm.token_embd.weight` in shipped `omnivoice-f16.gguf` had 4094
+ZEROED rows (ids ~3380–12594; "quick"=3974, "None"=4064) from a post-conversion
+WRITE corruption (source safetensors clean, SHA-verified; reconvert clean).
+Reconverted f16/q4_k/q8_0 → 0 zeroed rows → fox + reporter paragraph render
+EVERY word. Re-uploading the 3 fixed files to `cstr/omnivoice-GGUF` (SHA-
+verified, same names/sizes; registry stores no SHA so no code change). NEXT:
+confirm HF SHA match, swap local canonical files, update issue #254.**
+
+- ✅ **FIXED + validated:** reconverted from clean `k2-fsa/OmniVoice/model.safetensors`
+  (2.45 GB, sha `730839316de5…` == HF; source token_embd 0 zeroed rows, "quick"
+  row norm 1.53). Reconverted f16 = 0 zeroed rows (was 4094). Acceptance:
+  fox → "The quick brown fox…" (full); reporter's paragraph → all of "started",
+  "major open weights", "TTS architectures", "One build", "pick", "See…TTS side"
+  restored. q4_k + q8_0 re-derived (same sizes) also say "quick".
+  Fixed-file SHAs: f16 `670592a5…`, q8_0 `9d8835c8…`, q4_k `a1a9c6fc…`.
+  The CONVERTER is fine (reconvert clean) — corruption was a file write/upload.
 
 - 🎯 **ROOT CAUSE (bisected via step-0 dumps):** input-embedding compare vs
   omnivoice.cpp `--dump` (`lm-hidden-step0-cond-embed` [83,1024]) — global
