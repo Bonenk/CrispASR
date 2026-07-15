@@ -762,6 +762,10 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     if (!params.watermark_model.empty()) {
         crispasr_wm_dispatch::init(params.watermark_model);
     }
+    // Honor the --no-watermark opt-out (equivalent to CRISPASR_NO_WATERMARK).
+    // A server operator that disables it takes on the AI-content marking duty
+    // for every response the process serves.
+    crispasr_wm_dispatch::set_disabled(params.tts_no_watermark);
 
     std::vector<std::string> api_keys = split_api_keys(params.server_api_keys);
     if (const char* env_keys = getenv("CRISPASR_API_KEYS")) {

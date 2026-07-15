@@ -346,6 +346,13 @@ struct whisper_params {
     // CLI: --no-spoken-disclaimer   Server: "spoken_disclaimer": false
     bool tts_no_spoken_disclaimer = false;
 
+    // Turn off the imperceptible AI-content watermark on TTS output.
+    // Equivalent to the CRISPASR_NO_WATERMARK env var; both emit a one-time
+    // warning that AI-usage marking responsibility then rests with the operator.
+    // On by default — see docs/issue-260/PLAN.md for the regulatory background.
+    // CLI: --no-watermark
+    bool tts_no_watermark = false;
+
     // Server mode: directory containing voice profiles for /v1/audio/speech.
     // Each profile is a sibling pair: <name>.wav + <name>.txt (the WAV is
     // the reference audio, the TXT is its transcription used by Qwen3-TTS

@@ -639,6 +639,8 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.tts_consent_attestation = "CLI --i-have-rights flag";
     } else if (arg == "--no-spoken-disclaimer") {
         params.tts_no_spoken_disclaimer = true;
+    } else if (arg == "--no-watermark") {
+        params.tts_no_watermark = true;
     } else if (arg == "--cors-origin") {
         params.server_cors_origin = ARGV_NEXT;
     } else if (arg == "--chat-model") {
@@ -1185,7 +1187,9 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "             --i-have-rights                    required for voice cloning (.wav); attests consent\n"
             "                                                 of the cloned speaker or that it is your own voice\n"
             "             --no-spoken-disclaimer              skip audible AI-disclosure prefix on voice-cloned\n"
-            "                                                 output (watermark + C2PA provenance still applied)\n");
+            "                                                 output (watermark + C2PA provenance still applied)\n"
+            "             --no-watermark                     disable AI-content watermark on TTS output; marking\n"
+            "                                                 responsibility then rests with the operator\n");
     fprintf(stderr,
             "             --ref-text \"TEXT\"        reference transcription (qwen3-tts/f5-tts; auto-transcribed "
             "if omitted)\n");
