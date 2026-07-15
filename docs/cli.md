@@ -293,6 +293,17 @@ multilingual / v3 / EN models behave very differently:
 CLI escape hatches (no env needed): `--chunk-seconds N` forces the dispatcher's
 N-second chunk + merge; `--vad` forces the VAD path.
 
+For **parakeet** (non-JA, `CAP_INTERNAL_CHUNKING`), `--chunk-seconds N` does *not*
+go through the dispatcher's per-slice merge (which corrupts this full-attention
+FastConformer). Instead it runs one coherent internal-streamed decode — encoded
+at the model's quality window (30 s, bounded VRAM), so the full transcript is
+preserved — and then groups the resulting words into **~N-second output
+segments** with per-segment `offsets`/`words`/`tokens` (issue #257). So
+`--chunk-seconds 7` yields ~7-second segments of the *complete* transcript, not a
+truncated single blob. The encoder window can be overridden independently with
+`CRISPASR_PARAKEET_STREAM_CHUNK`. (For bounded-VRAM *single-pass* long audio with
+no segmentation, use `--att-context L,R` instead.)
+
 **Examples:**
 
 ```bash
