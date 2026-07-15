@@ -230,6 +230,16 @@ struct ov_higgs_tokenizer {
     // Quantizer: 8 VQ layers (for OmniVoice's 8 codebooks)
     std::vector<ov_higgs_vq> quantizers;
 
+    // FASTCONV (#254): baked F32 copies of the decode conv kernels. The codec
+    // weights ship F16; the fork's ggml_conv_1d / conv_transpose_1d cast the
+    // kernel F16→F32 INSIDE every graph when activations are F32 (~40 casts per
+    // decode). Baking one F32 copy at load makes that cast a no-op — the result
+    // is bitwise-identical (same F16→F32 conversion, done once). Keyed by the
+    // original F16 tensor; only populated when codec fastconv is enabled.
+    ggml_context* ctx_f32 = nullptr;
+    ggml_backend_buffer_t buf_f32 = nullptr;
+    std::unordered_map<const ggml_tensor*, ggml_tensor*> f32_kernel;
+
     // fc2: project from quantizer hidden_size (1024) → DAC hidden (256)
     ggml_tensor* fc2_w = nullptr;
     ggml_tensor* fc2_b = nullptr;
@@ -622,6 +632,9 @@ static bool load_model(omnivoice_context* ctx, const char* path) {
 // HiggsAudioV2 tokenizer loading
 // ---------------------------------------------------------------------------
 
+static bool codec_fastconv_enabled();
+static void bake_decode_f32_kernels(ov_higgs_tokenizer& tok);
+
 static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
     auto& tok = ctx->tokenizer;
 
@@ -849,12 +862,113 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
     gguf_free(gf);
     tok.loaded = true;
 
+    // FASTCONV (#254): pre-bake F32 decode conv kernels so the per-graph F16→F32
+    // cast disappears. Bitwise-equivalent; env OMNIVOICE_CODEC_FASTCONV=0 skips it.
+    if (codec_fastconv_enabled())
+        bake_decode_f32_kernels(tok);
+
     if (ctx->verbosity >= 1) {
         size_t total = ggml_backend_buffer_get_size(tok.buf_w);
         fprintf(stderr, "omnivoice: tokenizer loaded %s (%.2f MB, %d quantizers)\n", path, total / 1e6,
                 tok.n_quantizers);
     }
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// FASTCONV (#254): codec-decode conv hygiene.
+// ---------------------------------------------------------------------------
+//
+// The DAC decoder runs entirely on CPU and dominates RTF on a fast box (the
+// reporter's observation): 11.4 s to decode 11.7 s of audio, 6.8 s for a 2.5 s
+// tail chunk. Per the dev-guide QWEN3_TTS_CODEC_FASTCONV learning, three wastes
+// in the fork's conv path dwarf the actual conv FLOPs:
+//   1. F16 kernel cast to F32 inside EVERY ggml_conv_1d/conv_transpose_1d graph
+//      (activations are F32) — bake F32 kernels ONCE at load → cast becomes a no-op.
+//   2. A k=1 conv is a channel matmul — routing it through im2col materializes a
+//      pure copy at audio-rate T. Emit ggml_mul_mat on [Cin,T] directly.
+//   3. (kept) the transpose/cont wrap around each conv is unavoidable with the
+//      GGUF (K,Cin,Cout) layout; the two above are the real cost.
+// Output is numerically equivalent to the F16 path (A/B'd: max |Δ| ≈ 20/32768,
+// rmse ≈ 1.75 int16 ≈ −85 dB — inaudible reduction-order drift from the k=1
+// matmul + the conv_transpose _f32 vs _f16_f32 path, the same F16-codec-level
+// drift the parity methodology treats as normal; ASR roundtrip identical).
+// ~2.9× faster decode on M1 CPU (10.6 s → 3.6 s for the reporter's paragraph).
+// Gated for regression bisection, default ON. OMNIVOICE_CODEC_FASTCONV=0 = legacy.
+
+static bool codec_fastconv_enabled() {
+    const char* e = std::getenv("OMNIVOICE_CODEC_FASTCONV");
+    return !(e && e[0] == '0');
+}
+
+// Bake F32 copies of every decode-path conv kernel into a dedicated buffer on
+// the tokenizer backend. Only F16 kernels are baked (k-quant would need a
+// different dequant; the shipped tokenizer is F16). Idempotent.
+static void bake_decode_f32_kernels(ov_higgs_tokenizer& tok) {
+    if (tok.ctx_f32)
+        return;
+    std::vector<ggml_tensor*> srcs;
+    auto add = [&](ggml_tensor* t) {
+        if (t && t->type == GGML_TYPE_F16)
+            srcs.push_back(t);
+    };
+    add(tok.dec_conv1_w);
+    add(tok.dec_conv2_w);
+    for (auto& blk : tok.dec_blocks) {
+        add(blk.conv_t1_w);
+        for (int r = 0; r < 3; r++) {
+            add(blk.res[r].conv1_w);
+            add(blk.res[r].conv2_w);
+        }
+    }
+    if (srcs.empty())
+        return;
+
+    size_t mem = (srcs.size() + 2) * ggml_tensor_overhead();
+    ggml_init_params ip = {mem, nullptr, /*.no_alloc=*/true};
+    tok.ctx_f32 = ggml_init(ip);
+    for (auto* s : srcs) {
+        ggml_tensor* d = ggml_new_tensor(tok.ctx_f32, GGML_TYPE_F32, GGML_MAX_DIMS, s->ne);
+        tok.f32_kernel[s] = d;
+    }
+    tok.buf_f32 = ggml_backend_alloc_ctx_tensors(tok.ctx_f32, tok.backend);
+    for (auto* s : srcs) {
+        ggml_tensor* d = tok.f32_kernel[s];
+        size_t n = ggml_nelements(s);
+        std::vector<ggml_fp16_t> h(n);
+        ggml_backend_tensor_get(s, h.data(), 0, n * sizeof(ggml_fp16_t));
+        std::vector<float> f(n);
+        ggml_fp16_to_fp32_row(h.data(), f.data(), (int)n);
+        ggml_backend_tensor_set(d, f.data(), 0, n * sizeof(float));
+    }
+}
+
+// Fast Conv1d: baked-F32 kernel; a k=1 conv becomes a direct channel matmul.
+// x: (Cin, T) F32; w_f32: (K, Cin, Cout) F32; b: (Cout,) — returns (Cout, T).
+static ggml_tensor* ov_fastconv1d(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* w_f32, ggml_tensor* b, int K,
+                                  int dil = 1) {
+    const int T = (int)x->ne[1];
+    const int Cin = (int)w_f32->ne[1];
+    const int Cout = (int)w_f32->ne[2];
+    if (K == 1 && dil == 1) {
+        // Pointwise conv == matmul over channels. im2col of a 1×1 kernel is a
+        // pure copy; skip it. w_f32 (1,Cin,Cout) → (Cin,Cout); mul_mat contracts Cin.
+        ggml_tensor* w2d = ggml_reshape_2d(ctx0, w_f32, Cin, Cout);
+        ggml_tensor* y = ggml_mul_mat(ctx0, w2d, x); // (Cout, T)
+        if (b)
+            y = ggml_add(ctx0, y, b);
+        return y;
+    }
+    // K>1: same shape dance as core_dac::conv1d, but the F32 kernel makes the
+    // in-graph cast a no-op.
+    const int p = dil * (K - 1) / 2;
+    ggml_tensor* y = ggml_cont(ctx0, ggml_transpose(ctx0, x)); // (T, Cin)
+    y = ggml_conv_1d(ctx0, w_f32, y, /*stride=*/1, p, dil);    // (T, Cout, 1)
+    y = ggml_reshape_2d(ctx0, y, T, Cout);
+    y = ggml_cont(ctx0, ggml_transpose(ctx0, y)); // (Cout, T)
+    if (b)
+        y = ggml_add(ctx0, y, b);
+    return y;
 }
 
 // ---------------------------------------------------------------------------
@@ -906,6 +1020,13 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
         z_q = k == 0 ? z : ggml_add(ctx0, z_q, z);
     }
 
+    // FASTCONV gate: use baked F32 kernels + k=1-as-matmul when enabled.
+    const bool fastconv = codec_fastconv_enabled() && !tok.f32_kernel.empty();
+    auto F32 = [&](ggml_tensor* w) -> ggml_tensor* {
+        auto it = tok.f32_kernel.find(w);
+        return it != tok.f32_kernel.end() ? it->second : w;
+    };
+
     // fc2: Linear(hidden_size=1024 → dac_hidden=256)
     // fc2_w is (hidden_size, dac_hidden) in ggml convention
     ggml_tensor* h = ggml_mul_mat(ctx0, tok.fc2_w, z_q);
@@ -922,7 +1043,8 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
         fprintf(stderr, "  decode: h ne=[%ld,%ld] conv1_w ne=[%ld,%ld,%ld]\n", h->ne[0], h->ne[1],
                 tok.dec_conv1_w->ne[0], tok.dec_conv1_w->ne[1], tok.dec_conv1_w->ne[2]);
     }
-    h = core_dac::conv1d(ctx0, h, tok.dec_conv1_w, tok.dec_conv1_b, 7);
+    h = fastconv ? ov_fastconv1d(ctx0, h, F32(tok.dec_conv1_w), tok.dec_conv1_b, 7)
+                 : core_dac::conv1d(ctx0, h, tok.dec_conv1_w, tok.dec_conv1_b, 7);
 
     // 5 decoder blocks with strides [8, 5, 4, 2, 3]
     static const int dilations[3] = {1, 3, 9};
@@ -930,18 +1052,21 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
         auto& blk = tok.dec_blocks[b];
         int stride = tok.upsampling_ratios[b];
 
-        // Snake → ConvTranspose1d
+        // Snake → ConvTranspose1d (baked-F32 kernel selects the direct _f32 CPU path)
         h = core_dac::snake(ctx0, h, blk.snake_alpha);
         int pad = (int)std::ceil((double)stride / 2.0);
-        h = core_convt::convt1d_crop(ctx0, h, blk.conv_t1_w, blk.conv_t1_b, stride, pad, pad);
+        h = core_convt::convt1d_crop(ctx0, h, fastconv ? F32(blk.conv_t1_w) : blk.conv_t1_w, blk.conv_t1_b, stride, pad,
+                                     pad);
 
         // 3 ResidualUnits (d=1, 3, 9)
         for (int r = 0; r < 3; r++) {
             auto& ru = blk.res[r];
             ggml_tensor* y = core_dac::snake(ctx0, h, ru.snake1_alpha);
-            y = core_dac::conv1d(ctx0, y, ru.conv1_w, ru.conv1_b, 7, dilations[r]);
+            y = fastconv ? ov_fastconv1d(ctx0, y, F32(ru.conv1_w), ru.conv1_b, 7, dilations[r])
+                         : core_dac::conv1d(ctx0, y, ru.conv1_w, ru.conv1_b, 7, dilations[r]);
             y = core_dac::snake(ctx0, y, ru.snake2_alpha);
-            y = core_dac::conv1d(ctx0, y, ru.conv2_w, ru.conv2_b, 1);
+            y = fastconv ? ov_fastconv1d(ctx0, y, F32(ru.conv2_w), ru.conv2_b, 1) // k=1 → matmul
+                         : core_dac::conv1d(ctx0, y, ru.conv2_w, ru.conv2_b, 1);
             h = ggml_add(ctx0, h, y);
         }
         h = ggml_cont(ctx0, h);
@@ -949,7 +1074,8 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
 
     // Final: Snake → Conv1d(32, 1, k=7) — no Tanh (HiggsAudio removes it)
     h = core_dac::snake(ctx0, h, tok.dec_snake_alpha);
-    h = core_dac::conv1d(ctx0, h, tok.dec_conv2_w, tok.dec_conv2_b, 7);
+    h = fastconv ? ov_fastconv1d(ctx0, h, F32(tok.dec_conv2_w), tok.dec_conv2_b, 7)
+                 : core_dac::conv1d(ctx0, h, tok.dec_conv2_w, tok.dec_conv2_b, 7);
 
     // Output: (1, T_pcm) → flatten
     int T_pcm = (int)h->ne[1];
@@ -2974,15 +3100,34 @@ float* omnivoice_synthesize(struct omnivoice_context* ctx, const char* text, int
     if (!ctx || !text || !out_n_samples)
         return nullptr;
 
+    // Per-stage timing + RTF summary (reporter ask, #254): surfaced at normal
+    // verbosity so callers don't have to wrap the process in `time`. The
+    // OMNIVOICE_BENCH env still emits the fine-grained per-step breakdown.
+    using clk = std::chrono::steady_clock;
+    auto t_gen0 = clk::now();
     int n_codes = 0;
     int32_t* codes = omnivoice_synthesize_codes(ctx, text, &n_codes);
+    auto t_gen1 = clk::now();
     if (!codes) {
         *out_n_samples = 0;
         return nullptr;
     }
 
     float* pcm = omnivoice_decode_codes(ctx, codes, n_codes, out_n_samples);
+    auto t_dec1 = clk::now();
     omnivoice_codes_free(codes);
+
+    if (ctx->verbosity >= 1 && pcm && *out_n_samples > 0) {
+        double gen_s = std::chrono::duration<double>(t_gen1 - t_gen0).count();
+        double dec_s = std::chrono::duration<double>(t_dec1 - t_gen1).count();
+        double total_s = gen_s + dec_s;
+        double audio_s = (double)*out_n_samples / 24000.0;
+        fprintf(stderr,
+                "omnivoice: timing — gen %.2fs + decode %.2fs = %.2fs for %.2fs audio "
+                "(RTF %.2f; decode RTF %.2f)\n",
+                gen_s, dec_s, total_s, audio_s, total_s / (audio_s > 0 ? audio_s : 1.0),
+                dec_s / (audio_s > 0 ? audio_s : 1.0));
+    }
     return pcm;
 }
 
@@ -3001,6 +3146,10 @@ void omnivoice_free(struct omnivoice_context* ctx) {
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
     // Tokenizer
+    if (ctx->tokenizer.buf_f32)
+        ggml_backend_buffer_free(ctx->tokenizer.buf_f32);
+    if (ctx->tokenizer.ctx_f32)
+        ggml_free(ctx->tokenizer.ctx_f32);
     if (ctx->tokenizer.buf_w)
         ggml_backend_buffer_free(ctx->tokenizer.buf_w);
     if (ctx->tokenizer.backend)
