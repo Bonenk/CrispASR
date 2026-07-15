@@ -276,6 +276,13 @@ curl http://localhost:8080/v1/audio/speech \
 | `consent_attestation` | empty | Required when `voice` ends in `.wav` (voice cloning). A free-text statement attesting speaker consent, e.g. `"I have the speaker's consent"`. Logged for audit. |
 | `spoken_disclaimer` | `true` | Set to `false` to skip the audible AI-disclosure prefix on voice-cloned output. Machine-readable provenance (watermark + C2PA) is always applied. When `false`, the caller assumes responsibility for providing appropriate AI-disclosure to end users. |
 
+> **Watermarking.** Every response is watermarked by default. There is **no
+> per-request watermark toggle** — the mark is disabled only at the process
+> level by starting the server with `--no-watermark` (or `CRISPASR_NO_WATERMARK=1`),
+> which turns it off for **all** responses and logs a one-time warning that the
+> AI-content marking responsibility then rests with the operator. See
+> [`tts.md`](tts.md#disabling-the-watermark-operator-opt-out).
+
 **Returns:**
 
 | Status | Content-Type | Body |
@@ -410,7 +417,8 @@ curl http://localhost:8080/v1/audio/speech-to-speech \
 
 The intermediate ASR transcript (if the backend produces one) is
 returned in the `X-Transcript` response header (URL-encoded). Output
-audio is watermarked automatically, same as TTS.
+audio is watermarked by default, same as TTS (process-level opt-out via
+`--no-watermark` / `CRISPASR_NO_WATERMARK`).
 
 ### Deferred
 

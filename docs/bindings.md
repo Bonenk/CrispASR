@@ -304,6 +304,15 @@ concatenation) before watermarking, use `synthesize_raw()` +
 the C API level (see
 [`tts.md`](tts.md#spoken-disclaimer-voice-clones-only)).
 
+> **The CLI `--no-watermark` flag and the `CRISPASR_NO_WATERMARK` env var do
+> NOT affect the bindings.** They are wired into the `crispasr` CLI and server
+> only; `synthesize()` and `crispasr_watermark_embed()` watermark
+> unconditionally. A binding consumer that legitimately needs unwatermarked
+> output uses `synthesize_raw()` and simply does not call `watermark_embed()` —
+> and thereby assumes the AI-content marking responsibility itself (see
+> [`tts.md`](tts.md#disabling-the-watermark-operator-opt-out) for what that
+> means).
+
 ```python
 # Python (identical shape in every binding)
 s = crispasr.Session("cosyvoice3-llm-f16.gguf")   # backend auto-detected

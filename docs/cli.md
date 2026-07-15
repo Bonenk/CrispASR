@@ -1278,18 +1278,32 @@ for the full layer-offload and KV-spill knobs — both are supported.
 
 ### TTS provenance & watermarking flags
 
-All TTS output is automatically watermarked. Additional flags control
-the neural watermark, C2PA signing, and voice-cloning consent:
+All TTS output is watermarked by default. Additional flags control
+the neural watermark, C2PA signing, voice-cloning consent, and the opt-out:
 
 | Flag | Description |
 |------|-------------|
 | `--watermark-model PATH` | Load AudioSeal GGUF for neural watermarking (upgrades built-in spread-spectrum) |
+| `--no-watermark` | Disable the AI-content watermark on TTS output. Equivalent to the `CRISPASR_NO_WATERMARK` env var; both emit a one-time stderr warning and shift the AI-content marking responsibility onto the operator (see below) |
 | `--detect-watermark PATH` | Read a WAV file, run watermark detection, print confidence + verdict (`>0.65` = AI-GENERATED, `0.4–0.65` = UNCERTAIN, `<0.4` = none), then exit |
 | `--i-have-rights` | Required for voice cloning (`--voice <file.wav>`); attests speaker consent |
 | `--no-spoken-disclaimer` | Skip the audible AI-disclosure prefix on voice-cloned output (watermark + C2PA still applied; caller assumes disclosure responsibility) |
 | `--g2p-dict SOURCE` | G2P pronunciation dictionary: `olaph` (MIT, default), `open-dict` (CC-BY-SA), or path to a custom dict file. Auto-downloads on first use. See [`tts.md`](tts.md) for details. |
 | `--c2pa-cert PATH` | X.509 certificate for C2PA Content Credentials signing |
 | `--c2pa-key PATH` | Private key for C2PA signing (generate both with `scripts/generate-c2pa-cert.sh`) |
+
+**Disabling the watermark.** `--no-watermark` and `CRISPASR_NO_WATERMARK=1` are
+equal-status opt-outs (neither is more "official"). Either one turns the mark
+off for the whole process and logs, once:
+
+```
+crispasr: warning: watermarking disabled. AI usage marking responsibility rests with the operator.
+```
+
+The message is deliberately jurisdiction-neutral — no statute is named at
+runtime. Turning the mark off does not remove any legal AI-disclosure obligation
+that may apply to the output; it transfers responsibility for meeting it to
+whoever runs the binary. See [`tts.md`](tts.md) for the full rationale.
 
 Debug env vars:
 - `AUDIOSEAL_DEBUG=1` — print AudioSeal tensor shapes during graph build
