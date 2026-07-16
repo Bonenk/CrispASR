@@ -2528,6 +2528,24 @@ catch_discover_tests(test-core-seanet
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-fastconv — core_dac::fastconv_cache + conv1d fast path (ggml graph) ──
+# Shared FASTCONV (docs/perf-sweep/PLAN.md item 1): baked-F32 kernel + k=1→matmul
+# must equal the legacy conv1d, and a disabled cache must be byte-identical.
+add_executable(test-fastconv test-fastconv.cpp)
+target_include_directories(test-fastconv PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(test-fastconv PRIVATE
+    Catch2::Catch2WithMain
+    ggml ggml-base ggml-cpu
+)
+catch_discover_tests(test-fastconv
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-audio-formats — Catch2 unit tests for crispasr_audio_load format coverage
 #
 # Validates AU (µ-law), AMR-NB, and WebM (Opus) decode against the WAV
