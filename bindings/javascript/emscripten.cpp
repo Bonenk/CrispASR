@@ -1055,23 +1055,21 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // "audio/mpeg"). Signs with the bundled self-signed default cert (baked in —
     // no filesystem/openssl needed). Returns a signed Uint8Array, or an empty one
     // on failure / unsupported container (AAC/Opus). #260.
-    emscripten::function(
-        "c2paSign",
-        emscripten::optional_override([](const emscripten::val& data, const std::string& format) -> emscripten::val {
-            const size_t len = data["length"].as<size_t>();
-            std::vector<unsigned char> in(len ? len : 1);
-            emscripten::val heapu8 = emscripten::val::module_property("HEAPU8");
-            emscripten::val inView =
-                heapu8["constructor"].new_(heapu8["buffer"], reinterpret_cast<uintptr_t>(in.data()), len);
-            inView.call<void>("set", data);
-            size_t out_len = 0;
-            unsigned char* out_ptr = crispasr_c2pa_sign(in.data(), len, format.c_str(), nullptr, nullptr, &out_len);
-            if (!out_ptr || out_len == 0)
-                return emscripten::val::global("Uint8Array").new_(0);
-            emscripten::val outView =
-                heapu8["constructor"].new_(heapu8["buffer"], reinterpret_cast<uintptr_t>(out_ptr), out_len);
-            emscripten::val result = emscripten::val::global("Uint8Array").new_(outView); // copies out of wasm heap
-            crispasr_c2pa_free(out_ptr);
-            return result;
-        }));
+    emscripten::function("c2paSign", emscripten::optional_override([](const emscripten::val& data,
+                                                                      const std::string& format) -> emscripten::val {
+                             // Copy the JS Uint8Array into wasm memory (no reliance on HEAPU8 being
+                             // exposed as a Module property, which varies by build config).
+                             std::vector<unsigned char> in = emscripten::vecFromJSArray<unsigned char>(data);
+                             size_t out_len = 0;
+                             unsigned char* out_ptr =
+                                 crispasr_c2pa_sign(in.data(), in.size(), format.c_str(), nullptr, nullptr, &out_len);
+                             if (!out_ptr || out_len == 0)
+                                 return emscripten::val::global("Uint8Array").new_(0);
+                             // View over the signed bytes in the wasm heap, then copy into a fresh
+                             // JS Uint8Array so we can free the wasm buffer.
+                             emscripten::val view(emscripten::typed_memory_view(out_len, out_ptr));
+                             emscripten::val result = emscripten::val::global("Uint8Array").new_(view);
+                             crispasr_c2pa_free(out_ptr);
+                             return result;
+                         }));
 }
