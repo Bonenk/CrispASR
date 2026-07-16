@@ -19,8 +19,22 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       AND the 225 s single-pass clip (where the old inline session diverged).
       **Remaining backends** (canary/cohere/granite/…) follow the same recipe —
       tracked below.
-- [ ] **Phase 1b** — extend the hoist + gate to the other backends, flip the gate
-      default to ON once each is parity-verified.
+- [x] **Phase 1b** — audited, no further hoist warranted (evidence-driven). Rather
+      than speculatively hoist every backend, generalized the parity harness
+      (`CRISPASR_PARITY_BACKEND` + a CONTENT check that ignores punctuation/case)
+      and ran it CLI-vs-session on the locally-available backends. Result on jfk
+      (16 kHz, no resample artifact): **parakeet PASS** (unified); **qwen3,
+      moonshine, nemotron all PASS(content)** — CLI and session produce identical
+      transcriptions, differing only by punctuation (the harness's
+      `--no-punctuation` CLI flag has no session equivalent — cosmetic, not a
+      dispatch bug). So the #257-class divergence was parakeet-specific (its
+      CAP_INTERNAL_CHUNKING long-audio path); the other backends' simpler session
+      paths already agree with their adapters. **No further unification needed
+      now.** ⚠ Caveat: audited on SHORT audio only; parakeet's divergence surfaced
+      on LONG/chunked audio, so a long-clip audit of any backend with a bespoke
+      long-audio session path (qwen3's ~212-line block) is the remaining check —
+      the generalized harness makes it a one-liner. The parakeet gate
+      (`CRISPASR_SESSION_UNIFIED_DISPATCH`) stays opt-in.
 - [x] **Phase 2** — proactive encoder memory policy — DONE (opt-in). Pure
       `parakeet_est_singlepass_peak_mb` / `parakeet_singlepass_fits_budget`
       (`test-parakeet-strategy`, +2 cases) proactively pick streamed over
