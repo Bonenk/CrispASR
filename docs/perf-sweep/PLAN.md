@@ -99,11 +99,20 @@ shipped dtypes (voc conv1d-routed kernels, ups.* excluded):
   no RNG): ON-vs-ON 0/32768, ON-vs-OFF 0/32768 (byte-identical).** Engagement proven
   via `CRISPASR_SPEECHT5_FASTCONV_DEBUG`: ON bakes 74/74, OFF bakes 0. ASR roundtrip
   intact.
-- ⏭ **Next:** fastpitch (blocked on f16 loader, see above) / bananamind (no f16, skip);
-  backends with bespoke conv lambdas (chatterbox_s3gen 12 convs, cosyvoice3,
-  indextts_voc, kokoro) one at a time — first GGUF-parse each to confirm F16 kernels
-  before wiring (the dtype check above is now mandatory triage). Then items 2
-  (interval-CFG), 3/4 (Metal q4_k, CI perf gate).
+### Bespoke-lambda triage (GGUF-parsed 2026-07-16 — F16 conv kernels required)
+Parse conv kernels by dtype (⚠ name suffix varies: HiFi-GAN uses `.weight`,
+cosyvoice3 uses `.w`) before wiring — only F16 benefits:
+- **cosyvoice3-hift-f16** → **85 F16 conv kernels (conv_pre/conv_post/resblocks) →
+  TARGET.** Local model present. Bespoke `cv3_hift` struct with named tensor
+  fields (not a c->tensors map), so wire by threading a cache into the hift decode
+  graph (fc.get(w) at the ~10 conv sites), not pointer-swap. Also flow-matching
+  (CFM) → seed-aware A/B; the hift vocoder itself is deterministic given mel.
+- **chatterbox_s3gen** — ✅ DONE (q8_0 default, 275 F16). Note its `-mtl` variant is
+  all-F32 (no-op) — the q8_0 is the one that benefits.
+- **indextts_voc (9 convs), kokoro (9)** — no local main model on this box; parse +
+  wire on a box that has them.
+- ⏭ **Next:** cosyvoice3_tts FASTCONV (the one remaining local F16 target), then
+  items 2 (interval-CFG), 3 (Metal q4_k), 4 (CI perf gate).
 
 ---
 
