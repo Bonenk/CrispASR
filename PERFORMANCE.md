@@ -250,6 +250,16 @@ the §232 campaign. Verified against current code, not carried from this doc.
   Escape hatch `CRISPASR_OMNIVOICE_CHUNK=1` restores chunking. Interval-CFG
   (`OMNIVOICE_CFG_INTERVAL=K`) recomputes uncond every K steps — K=2 ≈ −30% stage0,
   opt-in/approximate.
+- **omnivoice fused stage0 step graph (2026-07-16, default ON):** the residual #254
+  gap vs omnivoice.cpp was per-step HOST overhead (≈18 MB embed readback + CPU
+  codebook sum + 5 MB re-upload, full-seq 39 MB logits readback, single-threaded
+  ~13M-exp CFG scoring). Fused graph: ids-only upload (~140 KB), in-graph embeds
+  (get_rows + cb-order adds, bitwise == host), target-slice-only logits, threaded
+  scoring (rng-order preserved). Codes byte-identical to legacy on M1 Metal (5 config
+  classes) and CUDA (reporter cmp). **Reporter's RTX 5070 Ti: gen 3.55 s → 1.53 s
+  (2.3×), RTF 0.17 → 0.07 for the 21.8 s paragraph — ~2× faster than omnivoice.cpp
+  (0.144), single CUDA-graph warmup.** Per-step: fwd 27.4 ms + score 11.6 + read 5.2
+  + sample 1.5 = 45.9 ms. `OMNIVOICE_FUSED_STEP=0` restores the legacy path.
 - **Codec decoders are already ggml-graph** (snac/dac/seanet/hifigan/adaln/
   qformer). Scalar survivors: `core/rvq.cpp` encode-search and `core/istft.h`
   O(N²) IRFFT (both run once/synthesis).
