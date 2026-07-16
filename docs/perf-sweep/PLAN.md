@@ -9,11 +9,29 @@ possible. Default flips only on a proven speed AND quality win.
 ## NOW — active work
 
 **Status (2026-07-16): 2 shared FASTCONV helpers landed; 3 DAC-family backends
-wired+verified; HiFi-GAN family overload ready. All on `main`, all green.**
+wired+verified; HiFi-GAN family now wired for speecht5 (verified). All on `main`,
+all green.**
 
-Commits (branch `perf/omnivoice-254-decode-rtf`, pushed to `main`):
+Commits (pushed to `main`):
 `203f28f01` shared core_dac cache+conv1d · `191a7ebe4` omnivoice migrate ·
-`8f2b17e4a` irodori · `8d8e6d9c8` zonos · `8231e8144` core_hifigan overload.
+`8f2b17e4a` irodori · `8d8e6d9c8` zonos · `8231e8144` core_hifigan overload ·
+`1c558b4f0` speecht5 FASTCONV (branch `perf/fastconv-hifigan-fleet`).
+
+### ⚠ HiFi-GAN family — coverage reality (measured 2026-07-16, GGUF-parsed)
+The handover's "one overload sets up 3 backends" is over-optimistic. FASTCONV
+only engages when the vocoder conv kernels are **F16** (the cast it kills). Actual
+shipped dtypes (voc conv1d-routed kernels, ups.* excluded):
+- **speecht5** — registry default `-f16` → **F16 ×74 → ENGAGES.** ✅ wired+verified.
+- **fastpitch** — default `-q8_0` → F32 ×74 → **no-op**; only the non-default
+  `-f16` variant has F16 ×74. Wired locally but NOT committed: its `-f16` GGUF hits
+  a *pre-existing* loader bug (`gguf_init_from_file_ptr: failed to read tensor data`,
+  in the GGUF reader before any graph code — file is byte-valid, md5-stable across
+  two downloads) so it can't be run end-to-end here; and the q8_0 default is a no-op
+  anyway. Low value until the f16 loader is fixed. **Discipline: don't ship what you
+  can't run.**
+- **bananamind** — ships only `-q8_0` and `-f32` (NO f16 variant in either
+  en/de repo) → F32 ×74 → FASTCONV can **never** engage. Do NOT wire (dead code)
+  unless an F16 build is published.
 
 ### Recipe — wire FASTCONV into one backend (proven 3×)
 1. Add `core_dac::fastconv_cache <name>_fc;` to the backend's context struct.
@@ -59,9 +77,17 @@ Commits (branch `perf/omnivoice-254-decode-rtf`, pushed to `main`):
   k=1→matmul, but the F16-cast kill (the main win) applies. Unit test extended
   (`core_hifigan` case, cos>0.99999); 210 assertions total. `nullptr`-default so
   nothing changes until a backend bakes + passes `&fc`.
-- ⏭ **Next:** wire fastpitch/speecht5/bananamind (bake vocoder convs + pass &fc,
-  seed-aware A/B each); other backends with bespoke conv lambdas (chatterbox_s3gen
-  12 convs, cosyvoice3, indextts_voc, kokoro) one at a time. Then items 2
+- ✅ **speecht5_tts** (`CRISPASR_SPEECHT5_FASTCONV`, default on) — `1c558b4f0`.
+  Threaded the fastconv cache through `core_hifigan::forward()`/`resblock_forward()`
+  (one change wires the whole family) + `collect_fastconv_kernels()` helper (excludes
+  ups.*). Bakes 74 F16 vocoder convs → F32. **A/B on `speecht5-tts-f16` (deterministic,
+  no RNG): ON-vs-ON 0/32768, ON-vs-OFF 0/32768 (byte-identical).** Engagement proven
+  via `CRISPASR_SPEECHT5_FASTCONV_DEBUG`: ON bakes 74/74, OFF bakes 0. ASR roundtrip
+  intact.
+- ⏭ **Next:** fastpitch (blocked on f16 loader, see above) / bananamind (no f16, skip);
+  backends with bespoke conv lambdas (chatterbox_s3gen 12 convs, cosyvoice3,
+  indextts_voc, kokoro) one at a time — first GGUF-parse each to confirm F16 kernels
+  before wiring (the dtype check above is now mandatory triage). Then items 2
   (interval-CFG), 3/4 (Metal q4_k, CI perf gate).
 
 ---
