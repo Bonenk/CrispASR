@@ -18,9 +18,14 @@ diverged with unrelated FASTCONV/parity work → **rebase needed before merge**)
   `c2pa_native_parity.sh` live parity. ✅
 - **WASM win**: native C++ signer compiles under emscripten (verified), so
   `c2paSign("audio/wav")` now works WITHOUT `--c2pa` / the ~10 MB c2pa-rs stack.
-- **PENDING**: full end-to-end wasm module run of `c2paSign` (deferred — machine
-  at load 136; emscripten compile-check passed, leave the module build to CI).
-  Then rebase onto origin/main + merge.
+- **WASM end-to-end VERIFIED (2026-07-16)**: built libwhisper with `third_party/c2pa`
+  hidden (configure: "C2PA signing disabled" → native-only). `Module.c2paSign(wav,
+  "audio/wav")` in Node signed 9644→11324 bytes; c2pa-python reader validated it
+  (only `signingCredential.untrusted`, gen CrispASR / c2pa.created /
+  trainedAlgorithmicMedia / Es256). Proves WAV Content Credentials in wasm with
+  ZERO c2pa-rs. (Local emscripten 6.0.2 needs `-DCMAKE_CXX_SCAN_FOR_MODULES=OFF` to
+  get past cohere.cpp's C++20 module scan — unrelated toolchain quirk.)
+- **Merged to origin/main** (rebased clean). All three signers (JS, C++, wasm) done.
 
 - **Root cause FOUND & reproduced (model-free): the built-in spread-spectrum
   watermark, not the qwen3-tts port.** Every TTS output from the CLI is
