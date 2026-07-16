@@ -8,13 +8,17 @@ possible. Default flips only on a proven speed AND quality win.
 
 ## NOW — active work
 
-**🔨 [OPUS-1M-c2pa] CLAIMED 2026-07-16 — f5_tts reference-voice disk cache (TODO-6).**
-f5 re-encodes the ref mel (`preprocess_ref` → mel spectrogram) on EVERY CLI call;
-mirroring the omnivoice OVC1 / pocket PVL1 content-addressed cache (FNV-1a64 over the
-PREPROCESSED ref pcm + an encoder-weight fingerprint, atomic tmp+rename, CRISPASR_CACHE_DIR
-→ CRISPASR_MODELS_DIR → ~/.cache/crispasr, `CRISPASR_F5_VOICE_CACHE=0` disables). Branch
-`perf/f5-refvoice-cache`. Live-test = 2 synths, cache-hit line + identical WAV `data` chunk.
-Do NOT double-work f5 TODO-6.
+**🔨 [OPUS-1M-c2pa] CLAIMED 2026-07-16 — openvoice2 reference-SE disk cache (TODO-6).**
+⚠ **Re-targeted from f5_tts** — f5's `set_reference` is only `compute_mel_spectrogram`
+(pure DSP, sub-ms), NOT a neural encode, so caching it yields no measurable win (fails
+the "proven speed win" bar). Switched to **openvoice2**, whose `ref_enc_forward` (STFT +
+6-conv reference encoder → 256-d `target_se`) is a real neural encode re-run on every
+`openvoice2_convert` / `openvoice2_extract_speaker_embedding`. Wired into the SHARED
+`crispasr_ref_cache` content-addressed helper (tag `openvoice2-se`, key = fnv1a(ref_pcm)^
+fnv1a(ref_sr)), same as irodori-latent / indextts-cond; global `CRISPASR_TTS_REF_CACHE=0`
+disables. Code DONE on branch `perf/f5-refvoice-cache`; **build + 2-run live-test (cache-hit
+line + byte-identical WAV `data`) DEFERRED until box load drops** (load 120+ right now).
+Do NOT double-work openvoice2 TODO-6. (dots_tts NOT viable here — speaker CAM++ GGUF not local.)
 
 **🔨 [OPUS-1M] CLAIMED 2026-07-16 — chatterbox interval-CFG (TODO-2, the last clean
 flow candidate).** Implementing `CRISPASR_S3GEN_CFG_INTERVAL` in s3gen's 10-step CFM
