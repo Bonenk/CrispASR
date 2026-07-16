@@ -75,6 +75,13 @@ if [ "$SIMD" = "ON" ]; then
 fi
 
 # Configure
+# NOTE: C2PA in wasm is NOT enabled here (no -DCRISPASR_C2PA_FETCH=ON). The
+# prebuilt c2pa-rs wasm32-emscripten lib is built WITH C++ exceptions, but this
+# wasm build links the no-exceptions C++ runtime (-lc++-mt-noexcept), so linking
+# c2pa fails with `undefined symbol: __cpp_exception` (from c2pa's lopdf/rayon
+# deps). The C API `crispasr_c2pa_sign` / JS `c2paSign` are still present but
+# return empty in wasm until the ABI is reconciled — either build this wasm target
+# with exceptions, or rebuild c2pa-rs from source for wasm with -fno-exceptions.
 echo "[INFO] Configuring with emcmake..."
 cd "$SCRIPT_DIR"
 # Use ninja if available (faster parallel builds) + ccache
@@ -100,7 +107,6 @@ emcmake cmake -S . -B "$BUILD_DIR" $GENERATOR \
     -DCRISPASR_CURL=OFF \
     -DCRISPASR_OPUS_FETCH=ON \
     -DOPUS_DISABLE_INTRINSICS=ON \
-    -DCRISPASR_C2PA_FETCH=ON \
     -DCRISPASR_WASM_SINGLE_FILE="$SINGLE_FILE" \
     -DCRISPASR_WASM=ON \
     -DCMAKE_C_FLAGS="$SIMD_FLAGS" \
