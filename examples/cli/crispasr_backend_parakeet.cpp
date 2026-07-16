@@ -275,7 +275,29 @@ public:
         parakeet_result* r;
         const bool use_single_pass = stream_threshold_s > 0 && n_samples <= stream_threshold_s * SR;
         if (use_single_pass) {
-            r = parakeet_transcribe_ex(ctx_, samples, n_samples, t_offset_cs);
+            // Issue #257: single-pass full attention is O(T^2) in the rel-pos
+            // bias, so a multi-minute clip under the single-pass cap can fail
+            // the encoder allocation on a VRAM-limited GPU (reporter: a 3.75 min
+            // clip tried to alloc ~1.9 GiB and hit `cudaMalloc … out of memory`
+            // on a 3.7 GiB card). The encode then returns null → an empty
+            // transcript (silent failure). Fall back to the streamed
+            // (bounded-window) encoder so the DEFAULT still produces a full
+            // transcript without the user needing --chunk-seconds / --att-context.
+            // The streamed path encodes in ~30 s windows (the reporter confirmed
+            // --chunk-seconds doesn't OOM on the same card). Simulate the failure
+            // for testing with CRISPASR_PARAKEET_SIMULATE_ENCODE_OOM=1.
+            const bool simulate_oom = getenv("CRISPASR_PARAKEET_SIMULATE_ENCODE_OOM") != nullptr;
+            r = simulate_oom ? nullptr : parakeet_transcribe_ex(ctx_, samples, n_samples, t_offset_cs);
+            if (!r) {
+                if (!params.no_prints)
+                    fprintf(stderr,
+                            "crispasr[parakeet]: single-pass encode failed (likely VRAM OOM at %.0fs); "
+                            "falling back to streamed encoding — pass --chunk-seconds N for segmented "
+                            "output or --att-context L,R for bounded-memory single-pass\n",
+                            (double)n_samples / SR);
+                r = parakeet_transcribe_streamed(ctx_, samples, n_samples, t_offset_cs, stream_chunk_s,
+                                                 stream_overlap_s);
+            }
         } else {
             r = parakeet_transcribe_streamed(ctx_, samples, n_samples, t_offset_cs, stream_chunk_s, stream_overlap_s);
         }
