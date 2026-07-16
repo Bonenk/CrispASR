@@ -1056,6 +1056,12 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // "audio/mpeg"). Signs with the bundled self-signed default cert (baked in —
     // no filesystem/openssl needed). Returns a signed Uint8Array, or an empty one
     // on failure / unsupported container (AAC/Opus). #260.
+    //
+    // WAV is signed by the built-in native C++ signer (crispasr_c2pa_native) —
+    // it compiles into every wasm build, so c2paSign("audio/wav") works WITHOUT
+    // ./build-wasm.sh --c2pa and adds no ~10 MB c2pa-rs weight. (The pure-JS
+    // signer in bindings/javascript/c2pa.mjs is an equivalent module-free option.)
+    // MP3/M4A still require --c2pa (the c2pa-rs stack).
     // Wrap a Float32Array of mono PCM into a WAV Uint8Array carrying the
     // interoperable AI-provenance metadata tag (standard WAV LIST/INFO chunk) —
     // the zero-cost provenance floor for the browser (ttsSynthesize returns raw

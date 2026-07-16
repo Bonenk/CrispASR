@@ -1319,33 +1319,34 @@ Build the library for the target with `-DCRISPASR_C2PA_FETCH=ON`:
 - **iOS**: links `libc2pa_c.a` statically; `crispasr_enable_c2pa` auto-links the
   required Apple frameworks (Security / CoreFoundation / SystemConfiguration)
   (verified: the arm64 prebuilt links cleanly with the iOS SDK).
-- **WASM** — two ways to sign, the first recommended:
-  1. **Native-JS signer (default, zero-dependency).** `bindings/javascript/c2pa.mjs`
+- **WASM** — WAV signing works out of the box (no `--c2pa`, no ~10 MB c2pa-rs).
+  Three ways, in order of preference:
+  1. **Native-JS signer (module-free).** `bindings/javascript/c2pa.mjs`
      re-implements C2PA signing in **pure WebCrypto** (ECDSA P-256/ES256 + SHA-256,
      hand-built canonical CBOR / JUMBF / COSE_Sign1 / RIFF embedding) — **no
-     c2pa-rs, no ~10 MB wasm, no special exception flags**. It runs in any browser,
-     Node ≥16, Deno, or a Worker. Usage:
+     c2pa-rs, no wasm module at all**. Runs in any browser, Node ≥16, Deno, or a
+     Worker. Usage:
      ```js
      import { c2paSignWav } from 'crispasr/c2pa';
      const wav    = Module.pcmToWav(float32Pcm, 24000);          // interop WAV + AI tag
      const signed = await c2paSignWav(wav, certPem, keyPem);      // full C2PA manifest
      ```
-     Output validates in the c2pa-rs reference reader (only status:
-     `signingCredential.untrusted`, expected for the self-signed bundled cert).
      Covered by `npm test` in `bindings/javascript/` — 12 hermetic unit tests
-     (CBOR RFC-8949 vectors, JUMBF layout, tamper detection) plus a live parity
-     test that round-trips through the c2pa-python reference reader. WAV only for
-     now (matches the TTS output path); MP3/M4A embedding stays on the native lib.
-  2. **c2pa-rs in wasm (opt-in)** via `./build-wasm.sh --c2pa` — adds ~10 MB (the
-     full Rust stack) so it is off by default. When enabled, the module is built
-     with **`-fwasm-exceptions`** + **`-sSUPPORT_LONGJMP=wasm`** because the prebuilt
-     c2pa-rs emscripten lib uses **native wasm exceptions** (it imports the
+     plus a live parity test through the c2pa-python reference reader.
+  2. **Built-in native C++ signer via `c2paSign()`.** The native signer
+     (`crispasr_c2pa_native`) compiles into every wasm build, so
+     `Module.c2paSign(wavBytes, "audio/wav")` works **without `--c2pa`** and adds
+     no c2pa-rs weight — use this if you already hold a wasm `Module`. Both 1 and
+     2 emit the same manifest and validate in the c2pa-rs reference reader (only
+     status `signingCredential.untrusted`, expected for the self-signed cert).
+  3. **c2pa-rs in wasm (opt-in, MP3/M4A only)** via `./build-wasm.sh --c2pa` —
+     adds ~10 MB (the full Rust stack), off by default. When enabled, the module
+     is built with **`-fwasm-exceptions`** + **`-sSUPPORT_LONGJMP=wasm`** because the
+     prebuilt c2pa-rs emscripten lib uses **native wasm exceptions** (it imports the
      `__cpp_exception` tag — provided only by native wasm EH, not the default
      no-exceptions runtime nor JS-based `-fexceptions`); needs a wasm-EH browser
-     (all modern browsers, 2023+). JS usage:
-     `const signed = Module.c2paSign(wavBytes, "audio/wav")`. Without `--c2pa`,
-     `c2paSign()` returns an empty array. Use this only if you need MP3/M4A in the
-     browser; for WAV the native-JS signer above is smaller and dependency-free.
+     (all modern browsers, 2023+). Only needed for `c2paSign(bytes, "audio/mpeg")`
+     and other non-WAV containers in the browser.
 
 ### Voice cloning consent gate
 
