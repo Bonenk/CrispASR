@@ -2005,6 +2005,24 @@ catch_discover_tests(test-parakeet-strategy
     PROPERTIES LABELS "unit;parakeet-strategy;improvements"
 )
 
+# ─── test-worker-pool — bounded blocking resource pool (improvements Phase 4).
+# Pins core_pool::WorkerPool behind the server worker-pool.
+find_package(Threads REQUIRED)
+add_executable(test-worker-pool
+    test-worker-pool.cpp
+)
+target_include_directories(test-worker-pool PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-worker-pool PRIVATE
+    Catch2::Catch2WithMain
+    Threads::Threads
+)
+catch_discover_tests(test-worker-pool
+    TEST_SPEC "[worker-pool]"
+    PROPERTIES LABELS "unit;worker-pool;improvements"
+)
+
 # ─── test-lcs-chunk-merge — Catch2 unit tests for LCS chunk-merge dedup
 #
 # Ports of NeMo's `longest_common_subsequence_merge` test cases
