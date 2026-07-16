@@ -35,6 +35,23 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       long-audio session path (qwen3's ~212-line block) is the remaining check —
       the generalized harness makes it a one-liner. The parakeet gate
       (`CRISPASR_SESSION_UNIFIED_DISPATCH`) stays opt-in.
+
+      **Long-audio audit run (2026-07-16).** Ran the harness on a 225 s / 60 s
+      clip. Finding: on long audio CLI and session DO diverge — e.g. moonshine
+      CLI = 8 segments (dispatcher chunks at 30 s) vs session = 1 segment. Root
+      cause (verified in `crispasr_c_api.cpp`): the raw `crispasr_session_transcribe`
+      is a LOW-LEVEL "transcribe this buffer" primitive that does NOT auto-chunk —
+      `moonshine_transcribe_with_probs(ctx, pcm, n_samples)` runs one pass over
+      the whole buffer (degraded + very slow on a short-segment model like
+      moonshine), while the CLI/server dispatcher adds chunking on top. **Parakeet
+      is the exception** — its session branch has bespoke inline long-audio
+      handling (chunked_merge), which is exactly what let #257's divergence exist.
+      So this is an ARCHITECTURAL layering fact, not a per-backend bug: session
+      callers must chunk long audio themselves or use `transcribe_chunked`.
+      A uniform fix (auto-chunk in the session for every backend, or push chunking
+      below the session) is a real design decision for the maintainer, not a
+      drive-by — deferred, documented here + in bindings docs. Short-audio parity
+      (the common session use) is clean (Phase 1b audit above).
 - [x] **Phase 2** — proactive encoder memory policy — DONE (opt-in). Pure
       `parakeet_est_singlepass_peak_mb` / `parakeet_singlepass_fits_budget`
       (`test-parakeet-strategy`, +2 cases) proactively pick streamed over
