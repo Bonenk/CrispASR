@@ -54,3 +54,29 @@ TEST_CASE("JA never takes the CHUNK_SEGMENTED branch", "[unit][parakeet-strategy
     REQUIRE(parakeet_pick_strategy(mk(8, true, true, 7, 12, false)) == parakeet_strategy::SINGLE_PASS);
     REQUIRE(parakeet_pick_strategy(mk(30, true, true, 7, 12, false)) == parakeet_strategy::STREAMED);
 }
+
+// ---- Phase 2: memory policy ----
+
+TEST_CASE("est_singlepass_peak_mb matches the reporter's ~1.9 GiB data point",
+          "[unit][parakeet-strategy][improvements]") {
+    // ~4 min clip → T_enc≈2800, 8 heads, default coeff 8.0 → ~1914 MiB.
+    const double est = parakeet_est_singlepass_peak_mb(2800, 8, 8.0);
+    REQUIRE(est > 1800.0);
+    REQUIRE(est < 2100.0);
+    // O(T^2): doubling T ~quadruples the estimate.
+    REQUIRE(parakeet_est_singlepass_peak_mb(5600, 8, 8.0) > 3.9 * est);
+    // degenerate inputs → 0
+    REQUIRE(parakeet_est_singlepass_peak_mb(0, 8, 8.0) == 0.0);
+    REQUIRE(parakeet_est_singlepass_peak_mb(2800, 0, 8.0) == 0.0);
+}
+
+TEST_CASE("singlepass_fits_budget gating", "[unit][parakeet-strategy][improvements]") {
+    // Disabled: budget 0 or coeff 0 → always fits (historical behaviour).
+    REQUIRE(parakeet_singlepass_fits_budget(9999, 8, 0.0, 8.0));
+    REQUIRE(parakeet_singlepass_fits_budget(9999, 8, 100.0, 0.0));
+    // ~4 min clip fits a 3.7 GiB card but not a 1.5 GiB budget.
+    REQUIRE(parakeet_singlepass_fits_budget(2800, 8, 3700.0, 8.0));
+    REQUIRE_FALSE(parakeet_singlepass_fits_budget(2800, 8, 1500.0, 8.0));
+    // A short clip (T≈250, 20 s) fits even a tiny budget.
+    REQUIRE(parakeet_singlepass_fits_budget(250, 8, 256.0, 8.0));
+}

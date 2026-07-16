@@ -289,6 +289,10 @@ multilingual / v3 / EN models behave very differently:
 | `CRISPASR_PARAKEET_INTERNAL_CHUNKING` | non-JA on, JA off | `0` = revert to the dispatcher's chunk-30 + overlap-save + LCS-merge path (A/B). |
 | `CRISPASR_PARAKEET_STREAM_CHUNK` | 0 (auto: 8 JA / 30 non-JA) | Streamed-path encoder chunk size (seconds). |
 | `CRISPASR_PARAKEET_STREAM_OVERLAP` | 2 | Streamed-path encoder overlap (seconds). |
+| `CRISPASR_PARAKEET_VRAM_BUDGET_MB` | 0 (off) | Proactive memory policy: if single-pass full attention's estimated O(T²) rel-pos bias exceeds this, use the streamed (bounded-window) encoder *before* allocating — avoids the OOM spike on small GPUs. 0 = disabled (single-pass as before; the reactive OOM fallback still backstops). |
+| `CRISPASR_PARAKEET_MEM_POLICY` | `auto` | `auto` honours the VRAM budget; `single`/`streamed` force that path; `off` disables the proactive check (reactive-only). |
+| `CRISPASR_PARAKEET_MEM_COEFF` | 8.0 | O(T²) estimate coefficient. Default calibrated so a ~4 min clip (T≈2800, 8 heads) estimates ~1.9 GiB, matching a measured CUDA allocation. |
+| `CRISPASR_SESSION_UNIFIED_DISPATCH` | 0 | `1` routes the session/bindings parakeet path through the shared CLI orchestration (improvements Phase 1) instead of the legacy inline copy. Default off until parity-flipped. |
 
 CLI escape hatches (no env needed): `--chunk-seconds N` forces the dispatcher's
 N-second chunk + merge; `--vad` forces the VAD path.
