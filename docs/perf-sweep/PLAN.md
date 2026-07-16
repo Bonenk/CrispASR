@@ -416,6 +416,21 @@ arm so CUDA-graph capture engages. Survey of the fleet for the same shape
 5. **NOT amenable:** pure-AR KV-cache decoders (dia/zonos/voxtral/moss) — a
    1-token step has no bulk embed prep or full-seq logits to fuse; their
    pattern is the persistent AR step graph (already the dev-guide default).
+   Threaded scoring is likewise omnivoice-specific: MaskGIT scores all
+   n_cb×T positions per step; AR backends score ONE position per step.
+6. **Platform caveat (from the #254 M1 A/B):** these host-detour wins are
+   CUDA-shaped. On unified-memory Metal the identical change measured NEUTRAL
+   (embeds cost 0.9 s of ~94 s legacy gen) — the M1 cannot SHOW the win, so
+   candidates must be judged on a discrete-GPU box (Kaggle / reporter-class).
+
+**Model-tier triage (who does what):** the step-graph rework itself — block-
+split attention fusion, gallocr aliasing discipline, bitwise-identity design
+(order-matched adds, rng-stream-preserving threading), CUDA-graph capture
+semantics — is runtime compute-graph work: **top-tier model, by hand, against
+the diff harness** (dev-guide rule: never delegate graph math to agents).
+Delegable to a smaller model (Sonnet-class): the surrounding scaffolding —
+env-gate boilerplate, OMNIVOICE_BENCH-style stage timers, A/B runner scripts,
+codes-dump/cmp verification runs, ASR roundtrips, README/env-var doc sync.
 
 ## TODO-6 — Reference-voice disk cache rollout (omnivoice OVC1 / pocket PVL1 pattern)
 
@@ -431,6 +446,26 @@ to disk), f5_tts (re-encodes the ref mel every call), voxcpm2, dots_tts,
 vibevoice, tada_tts, openvoice2, moss/dia (codec ref codes, same shape as
 omnivoice). Verify per backend: run 2 logs a cache-hit line + decoded output
 identical (compare WAV `data` chunks — the C2PA chunk is timestamped).
+
+**Model-tier triage: Sonnet-friendly.** No graph math — an ~80-line mirror of
+a twice-proven pattern (pocket_tts PVL1 `src/pocket_tts.cpp:3481`, omnivoice
+OVC1 `omnivoice_set_voice_prompt`) with a mechanical verification recipe. The
+two things a smaller model must get right (spell them out in the task prompt):
+(a) hash the PREPROCESSED audio (post resample/RMS/trim), never the raw file
+bytes; (b) fingerprint an encoder weight tensor so a re-converted model
+re-encodes. One backend per worktree/commit; live-test each before the next.
+
+## TODO-7 — CUDA-graph capture audit, fleet-wide (data collection → verdicts)
+
+Two-phase. **Phase 1 (Sonnet-friendly, mechanical):** on a CUDA box run one
+synthesis per iterative backend (dots, tada, kugelaudio, vibevoice, cosyvoice3,
+f5, voxcpm2, irodori, chatterbox) with GGML_LOG_DEBUG visible; tabulate per
+backend: #`CUDA graph warmup complete`, #`warmup reset`, and #distinct graphs
+expected. Also record each shipped quant's embd-table dtype (gguf-dump) — a
+quantized embd table + in-graph GET_ROWS disables capture entirely
+(TAG_GET_ROWS_CUDA_GRAPHS). **Phase 2 (top-tier):** interpret thrash patterns
+(reset mid-loop = unstable graph; warmups >> graphs = per-step rebuild) and fix
+— that is step-graph restructuring per TODO-5.
 
 ## TODO-3 — Metal q4_k → prefer q8 on Apple Silicon
 Measured earlier this campaign: q4_k is BOTH slower AND lower-quality than q8 on
