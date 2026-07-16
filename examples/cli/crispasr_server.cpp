@@ -51,6 +51,7 @@
 #include "crispasr_watermark.h"
 #include "crispasr_watermark_dispatch.h"
 #include "core/crispasr_wav_writer.h"
+#include "core/worker_pool.h"     // improvements Phase 4b: concurrent ASR worker pool
 #include "crispasr_mp3_writer.h"  // MP3 output via in-tree glint encoder
 #include "crispasr_aac_writer.h"  // AAC-LC (ADTS) output via in-tree glint encoder
 #include "crispasr_opus_writer.h" // Ogg Opus output via in-tree glint encoder
@@ -934,6 +935,20 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     std::atomic<bool> ready{false};
     std::string backend_name = params.backend;
 
+    // Improvements Phase 4b: concurrent ASR worker pool. The primary `backend`
+    // above (+ model_mutex) still handles streaming/TTS/load and any request
+    // that touches SHARED state (auto-LID model, aligner, punctuation/truecaser
+    // contexts) — those must stay serialized. A "pure ASR" request (explicit
+    // language, no aligner, no post-processing) touches only its backend, so it
+    // can run on a pooled worker concurrently. Each worker owns its backend and
+    // a private mutex; different workers never contend. Built only when
+    // CRISPASR_SERVER_WORKERS>1 (default 1 = single instance, unchanged).
+    struct AsrWorker {
+        std::unique_ptr<CrispasrBackend> backend;
+        std::mutex mtx;
+    };
+    std::unique_ptr<core_pool::WorkerPool<AsrWorker>> asr_pool;
+
     // Initial model load
     {
         const bool model_is_auto = params.model == "auto" || params.model == "default";
@@ -1003,6 +1018,38 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                 fprintf(stderr, "crispasr-server: warning: warmup failed (%s) — continuing without warmup\n", e.what());
             } catch (...) {
                 fprintf(stderr, "crispasr-server: warning: warmup failed — continuing without warmup\n");
+            }
+        }
+        // Phase 4b: build the concurrent ASR worker pool. Each worker is an
+        // independent backend used ONLY for pure-ASR requests (explicit
+        // language, no aligner, no post-processing) so it shares no mutable
+        // state with other workers. N=1 (default) leaves `asr_pool` null →
+        // every request uses the primary backend + model_mutex (unchanged).
+        int n_workers = 1;
+        if (const char* e = std::getenv("CRISPASR_SERVER_WORKERS"))
+            n_workers = std::max(1, atoi(e));
+        if (n_workers > 1) {
+            std::vector<std::unique_ptr<AsrWorker>> workers;
+            for (int i = 0; i < n_workers; ++i) {
+                auto w = std::make_unique<AsrWorker>();
+                w->backend = crispasr_create_backend(backend_name);
+                if (!w->backend || !w->backend->init(params)) {
+                    fprintf(stderr, "crispasr-server: worker %d init failed — running single-instance\n", i);
+                    workers.clear();
+                    break;
+                }
+                if (!skip_warmup) {
+                    try {
+                        w->backend->warmup();
+                    } catch (...) {
+                    }
+                }
+                workers.push_back(std::move(w));
+            }
+            if (!workers.empty()) {
+                asr_pool = std::make_unique<core_pool::WorkerPool<AsrWorker>>(std::move(workers));
+                fprintf(stderr, "crispasr-server: ASR worker pool = %zu workers (pure-ASR requests run concurrently)\n",
+                        asr_pool->size());
             }
         }
         ready.store(true);
@@ -1102,6 +1149,27 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             return true;
         auth_error(res);
         return false;
+    };
+
+    // Phase 4b: route a transcription to a concurrent pooled worker when it is
+    // "pure ASR" — explicit language (no shared LID model), no aligner, and no
+    // punctuation/truecaser post-processing (those contexts are shared and
+    // non-re-entrant). Such a request touches only its own backend, so pooled
+    // workers run without contending. Everything else stays on the primary
+    // backend + model_mutex (serialized, unchanged). asr_pool is null unless
+    // CRISPASR_SERVER_WORKERS>1.
+    auto dispatch_transcribe = [&](const httplib::MultipartFormData& audio_file, whisper_params rp,
+                                   bool need_ts) -> transcription_result {
+        const bool lang_explicit = !rp.language.empty() && rp.language != "auto";
+        const bool no_post = !punc_ctx && !pcs_ctx && !tc_ctx && !tc_crf_ctx && !tc_lstm_ctx;
+        const bool pure_asr = lang_explicit && rp.aligner_model.empty() && no_post;
+        if (asr_pool && pure_asr) {
+            auto lease = asr_pool->acquire();
+            return do_transcribe(audio_file, lease->backend.get(), lease->mtx, rp, need_ts, nullptr, nullptr, nullptr,
+                                 nullptr, nullptr);
+        }
+        return do_transcribe(audio_file, backend.get(), model_mutex, rp, need_ts, punc_ctx.get(), pcs_ctx.get(),
+                             tc_ctx.get(), tc_crf_ctx.get(), tc_lstm_ctx.get());
     };
 
     // -----------------------------------------------------------------------
@@ -1205,8 +1273,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             return;
         }
 
-        auto result = do_transcribe(audio_file, backend.get(), model_mutex, rp, /*need_timestamps=*/true,
-                                    punc_ctx.get(), pcs_ctx.get(), tc_ctx.get(), tc_crf_ctx.get(), tc_lstm_ctx.get());
+        auto result = dispatch_transcribe(audio_file, rp, /*need_timestamps=*/true);
         if (!result.ok) {
             json_error(res, 400, result.error);
             return;
@@ -1449,8 +1516,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
 
         const bool need_timestamps = response_format == "verbose_json" || response_format == "srt" ||
                                      response_format == "vtt" || response_format == "diarized_json";
-        auto result = do_transcribe(audio_file, backend.get(), model_mutex, rp, need_timestamps, punc_ctx.get(),
-                                    pcs_ctx.get(), tc_ctx.get(), tc_crf_ctx.get(), tc_lstm_ctx.get());
+        auto result = dispatch_transcribe(audio_file, rp, need_timestamps);
         if (!result.ok) {
             json_error(res, 400, result.error);
             return;
@@ -1496,6 +1562,14 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     svr.Post("/load", [&](const Request& req, Response& res) {
         if (!require_auth(req, res))
             return;
+        // Phase 4b: the worker pool is built once at startup; a runtime model
+        // swap would leave pooled workers serving the old model. Reject the swap
+        // rather than silently serve a stale model (restart to change models
+        // when running with CRISPASR_SERVER_WORKERS>1).
+        if (asr_pool) {
+            json_error(res, 409, "/load is not supported with CRISPASR_SERVER_WORKERS>1 — restart to change models");
+            return;
+        }
         std::lock_guard<std::mutex> lock(model_mutex);
         ready.store(false);
 

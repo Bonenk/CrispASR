@@ -61,7 +61,27 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       per-worker ctx); (b) build the pool of N workers at startup; (c) A/B N=1 vs
       N=2 throughput with identical transcripts; GPU-worker concurrency
       (per-context Metal queues) validated per-platform.
-- [ ] **Phase 4b** — wire WorkerPool into the server per the constraint above.
+- [x] **Phase 4b** — WorkerPool wired into the server — DONE (gated, correctness-
+      verified; throughput is workload-dependent). `CRISPASR_SERVER_WORKERS=N`
+      builds N independent backends; a "pure ASR" request (explicit language, no
+      aligner, no punctuation/truecaser) routes to a pooled worker and runs
+      concurrently, while anything touching the shared LID/aligner/post-processing
+      stays on the primary backend + `model_mutex` (serialized, unchanged). `/load`
+      returns 409 when the pool is active (pooled workers hold the startup model).
+      Default N=1 → `asr_pool` null → zero behaviour change.
+
+      **A/B (honest):** correctness holds — 2 concurrent requests returned
+      identical, correct transcripts, and they demonstrably ran in parallel. But
+      **throughput is workload-bound**: on this CPU (M1) with the memory-bandwidth-
+      bound parakeet-tdt-1.1b-q4_k, 2 concurrent requests took **62 s vs 16 s
+      single** — *worse* than the ~32 s a serial pair would take, i.e. the two
+      instances contend for memory bandwidth. So the pool is a **latency/
+      throughput win only where a single request under-utilises the box** (spare
+      cores, a GPU not saturated by one stream, smaller models, or I/O-bound
+      mixes), and a net loss on a saturated memory-bound CPU. Kept **default-off**
+      per the "flip only when it wins on speed AND quality" rule; documented as an
+      opt-in for deployments with headroom. (GPU-worker concurrency —
+      per-context Metal/CUDA queues — still wants a per-platform check.)
 
 Execution order is deliberately **0 before 1**: the parity test is the guard that
 proves the dispatch unification changes nothing observable. Each phase merges to

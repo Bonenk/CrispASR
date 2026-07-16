@@ -646,6 +646,7 @@ You can override the loaded model and startup flags through `.env`:
 | `CRISPASR_CACHE_DIR` | Where auto-downloaded models live (defaults to `/cache`) |
 | `CRISPASR_API_KEYS` | Comma-separated API keys (see [API keys](#api-keys)) |
 | `CRISPASR_EXTRA_ARGS` | Forwarded verbatim to the server CLI (e.g. `--no-punctuation`) |
+| `CRISPASR_SERVER_WORKERS` | `N>1` loads N independent ASR backend instances so **pure-ASR** requests (explicit `language`, no aligner, no punctuation/truecaser) run concurrently instead of serializing on the single model. Costs N× model memory. Only a throughput win where a single request under-utilises the box (spare cores, a GPU not saturated by one stream, smaller models); a *net loss* on a saturated memory-bandwidth-bound CPU model, where the instances contend. Requests using shared LID/aligner/post-processing stay serialized. `/load` is disabled while a pool is active (restart to change models). Default `1` = single instance. |
 
 The service is configured to avoid serving as root by default:
 - `user: "${CRISPASR_UID:-1000}:${CRISPASR_GID:-1000}"`
