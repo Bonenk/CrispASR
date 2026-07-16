@@ -33,8 +33,35 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       (can't OOM on M1); the estimate matching the reporter's number is the
       evidence so far.
 - [ ] **Phase 2** — unified encoder memory policy (proactive, replaces ad-hoc gates)
-- [ ] **Phase 3** — diff-harness parity in CI (per-stage cos + decoded roundtrip)
-- [ ] **Phase 4** — server throughput (batching / worker pool)
+- [x] **Phase 3** — diff-harness parity in CI — **ALREADY IMPLEMENTED** (verified,
+      no new code). The initial PLAN under-counted the existing harness. On audit,
+      `.github/workflows/regression.yml` already runs: the dry-run pin gate on PR,
+      a nightly per-backend matrix via `tests/regression/run_one.py`, per-stage
+      `cos_min` thresholds, exact-transcript + CER/WER tolerance, AND a full
+      TTS→ASR roundtrip gate (21 `tts_backends`, WER≤max) — the exact "cos 0.99 →
+      hallucination" / "component cos but audio garbage" coverage this phase
+      wanted. The pure functions (`_levenshtein`, `compute_transcript_metrics`,
+      `parse_diff_stdout`, `evaluate_stage_thresholds`) are unit-tested in
+      `tests/regression/test_driver_smoke.py` (model-free, runs in CI). Nothing to
+      add without redundancy. Future extension if desired: a distinct word-OVERLAP
+      (present-in) verdict alongside WER for very-noisy roundtrips.
+- [~] **Phase 4** — server throughput — primitive DONE, integration scoped.
+      Landed the reusable, thread-safe `core_pool::WorkerPool<T>` (RAII lease,
+      blocking acquire, `test-worker-pool` 17 assertions incl. a blocking-until-
+      release concurrency case) + the `CRISPASR_SERVER_WORKERS` gate design.
+      **Full server integration deferred to 4b with a hard constraint I verified
+      by reading the code:** `do_transcribe`'s single `model_mutex` guards not
+      just the backend but the SHARED, explicitly non-re-entrant post-processing
+      contexts (punctuation `fireredpunc`/`pcs`, truecaser — comment at
+      server L708). So a correct pool must ALSO pool (or fine-grain-lock) those,
+      not just the backend — otherwise concurrent workers race the truecaser.
+      That's a real `do_transcribe` locking refactor + a concurrent load test,
+      not a drop-in; not shipping it half-verified. 4b plan: (a) split
+      `do_transcribe` into ASR (pooled, lock-free) + post-process (own mutex or
+      per-worker ctx); (b) build the pool of N workers at startup; (c) A/B N=1 vs
+      N=2 throughput with identical transcripts; GPU-worker concurrency
+      (per-context Metal queues) validated per-platform.
+- [ ] **Phase 4b** — wire WorkerPool into the server per the constraint above.
 
 Execution order is deliberately **0 before 1**: the parity test is the guard that
 proves the dispatch unification changes nothing observable. Each phase merges to
