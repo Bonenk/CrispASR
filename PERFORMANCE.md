@@ -220,6 +220,15 @@ the §232 campaign. Verified against current code, not carried from this doc.
   Metal decode is the same f32-no-cast path). GPU codec decode measured slower on M1
   Metal (dispatch-bound) → gated `OMNIVOICE_CODEC_GPU`, default OFF, pending Kaggle CUDA.
   `--tts-steps` now drives omnivoice's stage0 step count (default 32).
+- **omnivoice single-shot synthesis (2026-07-16):** omnivoice was sentence-chunked by
+  the generic TTS path; a reporter (#254, CUDA) showed that cost 15–20% vs omnivoice.cpp
+  (3 chunks → 3 graph builds + 3 CUDA-graph warmups + 3×num_steps). Added omnivoice to
+  the single-shot whitelist (masked-iterative → whole span in one pass, like the
+  reference). M1 A/B: net faster even here (decode 9.1 s vs 23.7 s from 1 vs 3 decode
+  graph builds outweighs +6% gen O(T²)); on CUDA the gen graph-reuse is a bigger win.
+  Escape hatch `CRISPASR_OMNIVOICE_CHUNK=1` restores chunking. Interval-CFG
+  (`OMNIVOICE_CFG_INTERVAL=K`) recomputes uncond every K steps — K=2 ≈ −30% stage0,
+  opt-in/approximate.
 - **Codec decoders are already ggml-graph** (snac/dac/seanet/hifigan/adaln/
   qformer). Scalar survivors: `core/rvq.cpp` encode-search and `core/istft.h`
   O(N²) IRFFT (both run once/synthesis).
