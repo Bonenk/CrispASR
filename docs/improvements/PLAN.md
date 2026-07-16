@@ -21,11 +21,32 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
 - [x] **F3 — flip `CRISPASR_SESSION_UNIFIED_DISPATCH` default ON** for parakeet
       (verified byte-identical to the inline path, Phase 1). `=0` still selects
       the legacy inline path for A/B.
-- [ ] **F4 — per-backend session auto-chunk window.** `transcribe_autochunk` uses
-      a fixed 30 s window; short-segment models (moonshine) want smaller, mirroring
-      the adapter's `vad_slice_cap_seconds()`. Small refinement, needs a per-backend
-      window map + verification; scoped, not yet done (`CRISPASR_SESSION_CHUNK_SECONDS`
-      is the manual override meanwhile).
+- [x] **F4 — per-backend session auto-chunk window.** INVESTIGATED, **not shipped —
+      measured no benefit** (in fact a regression), so per HARD RULE #4 the window
+      stays a flat 30 s for every backend. The hypothesis was that short-segment
+      models (moonshine) want a sub-30 s window, mirroring the adapter's
+      `vad_slice_cap_seconds()`. Prototyped a pure `session_default_chunk_seconds()`
+      (moonshine 20 s, else 30 s) + wiring + unit test, then A/B'd the window on the
+      moonshine / 60 s tiled-song clip via `test-surface-parity.sh` (CLI-vs-session
+      total-content word-overlap, greedy ⇒ deterministic, reproduced):
+
+      | window | session segs | overlap vs CLI |
+      |--------|--------------|----------------|
+      | 15 s   | 5            | 0.58           |
+      | 20 s   | 4            | 0.56           |
+      | **30 s** (current) | 3 | **0.75**      |
+      | 40 s   | 2            | 0.75           |
+
+      A smaller window strictly *lowers* the overlap (more slices → more
+      chunk-boundary artifacts on this hard song audio); 30 s is the plateau/optimum
+      and 40 s ties it. The premise ("a 30 s chunk still loops") was already resolved
+      by the moonshine decode-time repeat-break follow-up that shipped on `main`
+      (below) — the residual 0.75 is genuine song-transcription divergence + boundary
+      effects, not a loop the window size can fix. And `CRISPASR_SESSION_CHUNK_SECONDS`
+      already gives any user a per-call override, so a per-backend default equal to
+      30 s would be redundant dead code. Prototype reverted; only this finding is
+      recorded. No-regression confirmed: parakeet + qwen3 parity PASS 1.00 on jfk;
+      `test-session-autochunk` 13 assertions green. Backends touched: none.
 - [ ] **F5 — run the two CUDA kernels** (`tools/kaggle/{parakeet-mem-policy-cuda,
       server-workers-cuda}/`) — prepared; user-gated on Kaggle quota.
 
