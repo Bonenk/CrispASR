@@ -1304,11 +1304,18 @@ code-signing cert; verifiers then show the named issuer):
 crispasr --tts "hello" --c2pa-cert crispasr-c2pa.crt --c2pa-key crispasr-c2pa.key
 ```
 
-**Format support.** **WAV** is signed by the built-in native signer (always
-available). **MP3** and **M4A/MP4/FLAC** are signed via the optional c2pa-rs lib
-(`fetch-c2pa.sh`). **AAC (ADTS)** and **Opus (Ogg)** cannot carry a C2PA manifest
-— those outputs are written unsigned but still carry the watermark +
-file-metadata tag.
+**Format support.** **WAV** (RIFF), **MP3** (ID3v2 GEOB), and **M4A/MP4** (ISO
+BMFF, `c2pa.hash.bmff.v3`) are all signed by the built-in native signer — no
+c2pa-rs needed. FLAC signing needs the optional c2pa-rs lib (`fetch-c2pa.sh`).
+
+**AAC and Opus** have no C2PA embedding path in their raw streaming containers
+(ADTS / Ogg) — and neither does c2pa-rs. So when C2PA is active, CrispASR
+**muxes AAC/Opus into an MP4 container** (`.aac` → `.m4a`, `.opus` → `.mp4`, via
+the in-tree glint encoder + `crispasr_mp4_writer.h`) and signs that natively.
+Explicit `.m4a`/`.mp4` output is always AAC-in-MP4. Set
+`CRISPASR_NO_C2PA_REMUX=1` to keep the raw `.aac`/`.opus` container (watermark +
+file-metadata tag only). The muxed MP4 output validates in the c2pa-rs reference
+reader and plays in standard players.
 
 **Bindings / mobile.** C2PA lives in the core C API (`crispasr_c2pa_sign` /
 `crispasr_c2pa_free`, and `c2paSign()` in the wasm/JS binding), so any consumer

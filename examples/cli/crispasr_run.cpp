@@ -53,6 +53,7 @@
 #include "core/crispasr_wav_writer.h"
 #include "crispasr_mp3_writer.h"  // MP3 output via in-tree glint encoder
 #include "crispasr_aac_writer.h"  // AAC-LC (ADTS) output via in-tree glint encoder
+#include "crispasr_mp4_writer.h"  // AAC/Opus-in-MP4 muxer (C2PA-capable container)
 #include "crispasr_opus_writer.h" // Ogg Opus output via in-tree glint encoder
 #include "common-crispasr.h"      // read_audio_data
 
@@ -118,18 +119,61 @@ static int crispasr_write_synth_audio(const std::string& out_path, const float* 
     };
     const bool is_mp3 = has_ext(".mp3", ".MP3");
     const bool is_aac = has_ext(".aac", ".AAC");
+    const bool is_m4a = has_ext(".m4a", ".M4A");
+    const bool is_mp4 = has_ext(".mp4", ".MP4");
     const bool is_opus = ends_with_ci(".opus") || ends_with_ci(".ogg");
+
+    // Native C2PA embeds in ISO-BMFF (MP4) but NOT raw ADTS AAC / Ogg Opus. So
+    // when C2PA is active we mux AAC/Opus into an MP4 container (.m4a / .mp4) so
+    // the output carries a real manifest, not just the watermark. Explicit
+    // .m4a/.mp4 output is always AAC-in-MP4. Set CRISPASR_NO_C2PA_REMUX=1 to keep
+    // the raw .aac/.opus container (watermark + metadata provenance only).
+#if defined(CRISPASR_HAVE_C2PA) || !defined(CRISPASR_NO_C2PA_NATIVE)
+    const bool c2pa_active = std::getenv("CRISPASR_NO_C2PA_REMUX") == nullptr;
+#else
+    const bool c2pa_active = false;
+#endif
+    const bool opus_mp4 = is_opus && c2pa_active;
+    const bool aac_mp4 = is_m4a || is_mp4 || (is_aac && c2pa_active);
+
+    std::string path = out_path; // may change extension when upgrading a raw container
     std::string blob;
-    // C2PA MIME/format for this container ("" = c2pa can't embed here, e.g. AAC
-    // (ADTS) / Opus (Ogg) — those get watermark + tag provenance only).
-    const char* c2pa_fmt = is_mp3 ? "audio/mpeg" : (is_aac || is_opus) ? "" : "audio/wav";
-    if (is_mp3 || is_aac || is_opus) {
-        const char* codec = is_mp3 ? "MP3" : (is_aac ? "AAC" : "Opus");
-        blob = is_mp3   ? crispasr_make_mp3(pcm, n_samples, sample_rate)
-               : is_aac ? crispasr_make_aac(pcm, n_samples, sample_rate)
-                        : crispasr_make_opus(pcm, n_samples, sample_rate);
+    const char* c2pa_fmt = "audio/wav";
+    if (aac_mp4 || opus_mp4) {
+        blob = opus_mp4 ? crispasr_mp4::make_opus_mp4(pcm, n_samples, sample_rate)
+                        : crispasr_mp4::make_aac_mp4(pcm, n_samples, sample_rate);
         if (blob.empty()) {
-            fprintf(stderr, "crispasr: error: %s encoding failed for '%s'\n", codec, out_path.c_str());
+            fprintf(stderr, "crispasr: error: MP4 encoding failed for '%s'\n", path.c_str());
+            return 16;
+        }
+        c2pa_fmt = "audio/mp4";
+        if (is_aac) {
+            path = path.substr(0, path.size() - 4) + ".m4a";
+            fprintf(stderr,
+                    "crispasr: note: emitting '%s' (AAC-in-MP4) so C2PA can embed a manifest; "
+                    "set CRISPASR_NO_C2PA_REMUX=1 for raw .aac\n",
+                    path.c_str());
+        } else if (is_opus) {
+            path = path.substr(0, path.find_last_of('.')) + ".mp4";
+            fprintf(stderr,
+                    "crispasr: note: emitting '%s' (Opus-in-MP4) so C2PA can embed a manifest; "
+                    "set CRISPASR_NO_C2PA_REMUX=1 for raw .opus\n",
+                    path.c_str());
+        }
+    } else if (is_mp3) {
+        blob = crispasr_make_mp3(pcm, n_samples, sample_rate);
+        c2pa_fmt = "audio/mpeg";
+        if (blob.empty()) {
+            fprintf(stderr, "crispasr: error: MP3 encoding failed for '%s'\n", path.c_str());
+            return 16;
+        }
+    } else if (is_aac || is_opus) {
+        // C2PA remux opted out — raw ADTS/Ogg, watermark + tag only.
+        blob =
+            is_aac ? crispasr_make_aac(pcm, n_samples, sample_rate) : crispasr_make_opus(pcm, n_samples, sample_rate);
+        c2pa_fmt = "";
+        if (blob.empty()) {
+            fprintf(stderr, "crispasr: error: %s encoding failed for '%s'\n", is_aac ? "AAC" : "Opus", path.c_str());
             return 16;
         }
     } else {
@@ -147,11 +191,11 @@ static int crispasr_write_synth_audio(const std::string& out_path, const float* 
         fprintf(stderr,
                 "crispasr: note: C2PA cannot embed a manifest in this container; "
                 "'%s' written unsigned (watermark + metadata provenance still applied)\n",
-                out_path.c_str());
+                path.c_str());
     }
-    FILE* fout = fopen(out_path.c_str(), "wb");
+    FILE* fout = fopen(path.c_str(), "wb");
     if (!fout) {
-        fprintf(stderr, "crispasr: error: cannot write '%s'\n", out_path.c_str());
+        fprintf(stderr, "crispasr: error: cannot write '%s'\n", path.c_str());
         return 16;
     }
     fwrite(blob.data(), 1, blob.size(), fout);
