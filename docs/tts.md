@@ -1304,9 +1304,10 @@ code-signing cert; verifiers then show the named issuer):
 crispasr --tts "hello" --c2pa-cert crispasr-c2pa.crt --c2pa-key crispasr-c2pa.key
 ```
 
-**Format support.** **WAV** (RIFF), **MP3** (ID3v2 GEOB), and **M4A/MP4** (ISO
-BMFF, `c2pa.hash.bmff.v3`) are all signed by the built-in native signer — no
-c2pa-rs needed. FLAC signing needs the optional c2pa-rs lib (`fetch-c2pa.sh`).
+**Format support.** **WAV** (RIFF), **MP3** (ID3v2 GEOB), **M4A/MP4** (ISO BMFF,
+`c2pa.hash.bmff.v3`), and **FLAC** (ID3v2 GEOB prepend) are **all** signed by the
+built-in native signer (the `c2pa-audio` submodule) — **c2pa-rs is no longer
+needed for any audio container**; `fetch-c2pa.sh` is optional/legacy.
 
 **AAC and Opus** have no C2PA embedding path in their raw streaming containers
 (ADTS / Ogg) — and neither does c2pa-rs. So when C2PA is active, CrispASR
