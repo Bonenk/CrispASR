@@ -102,11 +102,22 @@ shipped dtypes (voc conv1d-routed kernels, ups.* excluded):
 ### Bespoke-lambda triage (GGUF-parsed 2026-07-16 — F16 conv kernels required)
 Parse conv kernels by dtype (⚠ name suffix varies: HiFi-GAN uses `.weight`,
 cosyvoice3 uses `.w`) before wiring — only F16 benefits:
-- **cosyvoice3-hift-f16** → **85 F16 conv kernels (conv_pre/conv_post/resblocks) →
-  TARGET.** Local model present. Bespoke `cv3_hift` struct with named tensor
-  fields (not a c->tensors map), so wire by threading a cache into the hift decode
-  graph (fc.get(w) at the ~10 conv sites), not pointer-swap. Also flow-matching
-  (CFM) → seed-aware A/B; the hift vocoder itself is deterministic given mel.
+- **cosyvoice3-hift-f16** → **85 F16 conv kernels → TARGET** (local model). Exact
+  wiring (turnkey): `cv3_hift` (src/cosyvoice3_tts.cpp:339) holds the kernels in
+  named fields — `conv_pre_w`, `conv_post_w`, `ups_w[3]`, `resblocks[9].{c1_w,c2_w}[3]`,
+  `src_down_w[3]`, `src_resblocks[3].{c1_w,c2_w}[3]`, `f0_condnet_w[5]` — AND a
+  `cv3_hift::tensors` map. ⚠ **cosyvoice3 ups are regular conv1d (via
+  `cv3_causal_conv1d`), NOT conv_transpose** — so unlike HiFi-GAN/chatterbox, INCLUDE
+  `ups_w` (do NOT exclude `.ups.`). Two viable idioms: (a) re-point every named
+  conv-kernel field to a baked F32 copy at hift load (zero graph change, but must
+  enumerate all ~85 fields); (b) thread `fc.get(w)` through the 3 helpers
+  (`cv3_lookahead_conv1d`, `cv3_causal_conv1d`, `cv3_causal_grouped_conv1d`) + the
+  raw resblock `ggml_conv_1d` sites. Gate `CRISPASR_COSYVOICE3_FASTCONV`.
+  ⚠ Flow-matching (CFM) → seed-aware A/B, and each synth is slow like chatterbox;
+  the hift vocoder is deterministic given mel, so the FAST verify path is the
+  existing `cv3_extract_hift_decode_stage` harness driven with a fixed mel — A/B
+  just the hift decode, no slow flow stage. **Left for a next cycle** (large edit +
+  slow full-pipeline verify; not startable half-verified at session tail).
 - **chatterbox_s3gen** — ✅ DONE (q8_0 default, 275 F16). Note its `-mtl` variant is
   all-F32 (no-op) — the q8_0 is the one that benefits.
 - **indextts_voc (9 convs), kokoro (9)** — no local main model on this box; parse +
