@@ -129,7 +129,13 @@ public:
     // they care about.
     virtual bool init(const whisper_params& params) = 0;
 
-    // Transcribe a single audio slice of 16 kHz mono PCM samples.
+    // Sample rate the backend expects for input PCM (default 16000).
+    // The CLI loads audio at this rate via crispasr_audio_load_at_rate,
+    // avoiding the lossy down-then-up resample for non-16 kHz backends.
+    virtual int input_sample_rate() const { return 16000; }
+
+    // Transcribe a single audio slice of mono PCM samples at the rate
+    // returned by input_sample_rate() (16 kHz unless overridden).
     // t_offset_cs is the absolute start of this slice in centiseconds; all
     // returned segment/word/token timestamps must be absolute (include the
     // offset).

@@ -27,6 +27,9 @@ public:
                CAP_WORD_TIMESTAMPS | CAP_PUNCTUATION_TOGGLE | CAP_FLASH_ATTN | CAP_DIARIZE;
     }
 
+    // Kyutai's Mimi codec operates at 24 kHz.
+    int input_sample_rate() const override { return 24000; }
+
     bool init(const whisper_params& params) override {
         kyutai_stt_context_params cp = kyutai_stt_context_default_params();
         cp.n_threads = params.n_threads;
@@ -34,6 +37,7 @@ public:
         cp.use_gpu = crispasr_backend_should_use_gpu(params);
         cp.temperature = params.temperature;
         cp.beam_size = params.beam_size > 0 ? params.beam_size : 1;
+        cp.input_sample_rate = 24000;
         ctx_ = kyutai_stt_init_from_file(params.model.c_str(), cp);
         return ctx_ != nullptr;
     }
@@ -56,11 +60,12 @@ public:
         // produces its own segment and the silence-tail flush from P6a
         // applies per-chunk so chunk boundaries close cleanly. Linear
         // wallclock + a predictable progress for callers.
-        constexpr int kChunkSamples = 30 * 16000;
+        const int sr = input_sample_rate();
+        const int kChunkSamples = 30 * sr;
         if (n_samples > kChunkSamples) {
             for (int start = 0; start < n_samples; start += kChunkSamples) {
                 const int this_n = std::min(kChunkSamples, n_samples - start);
-                const int64_t chunk_offset_cs = t_offset_cs + (int64_t)((double)start / 16000.0 * 100.0);
+                const int64_t chunk_offset_cs = t_offset_cs + (int64_t)((double)start / (double)sr * 100.0);
                 auto chunk_segs = transcribe_one(samples + start, this_n, chunk_offset_cs, params);
                 for (auto& s : chunk_segs)
                     out.push_back(std::move(s));
