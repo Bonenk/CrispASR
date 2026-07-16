@@ -2,6 +2,26 @@
 
 ## NOW — active work
 
+### LATEST (2026-07-16): native C2PA signers — DONE, replacing c2pa-rs for WAV
+Branch `feat/c2pa-native-js` (3 commits ahead of the base; origin/main has since
+diverged with unrelated FASTCONV/parity work → **rebase needed before merge**).
+
+- **JS/WebCrypto signer** `bindings/javascript/c2pa.mjs` — pure WebCrypto ES256 +
+  hand-built CBOR/JUMBF/COSE/RIFF. Validates in the c2pa-rs reference reader
+  (only `signingCredential.untrusted`). Tests: 12 hermetic unit + 2 live parity
+  (`npm test`; ctests `test-c2pa-js-unit/-parity`). ✅
+- **C++ signer** `src/core/crispasr_c2pa_native.{h,cpp}` — same manifest, ES256 via
+  vendored BSD-2 micro-ecc (`third_party/uecc/`, RFC-6979 deterministic) + header
+  `crispasr_sha256.h`. Wired as the primary WAV path in `crispasr_c2pa_sign_pem`
+  (c2pa-rs now optional, MP3/M4A only). Built as its own C++17 static lib
+  `crispasr_c2pa_native` linked into crispasr-lib. Tests: 6 Catch2 unit +
+  `c2pa_native_parity.sh` live parity. ✅
+- **WASM win**: native C++ signer compiles under emscripten (verified), so
+  `c2paSign("audio/wav")` now works WITHOUT `--c2pa` / the ~10 MB c2pa-rs stack.
+- **PENDING**: full end-to-end wasm module run of `c2paSign` (deferred — machine
+  at load 136; emscripten compile-check passed, leave the module build to CI).
+  Then rebase onto origin/main + merge.
+
 - **Root cause FOUND & reproduced (model-free): the built-in spread-spectrum
   watermark, not the qwen3-tts port.** Every TTS output from the CLI is
   unconditionally watermarked (`crispasr_run.cpp:2374`,
