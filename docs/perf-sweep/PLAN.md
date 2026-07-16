@@ -11,8 +11,11 @@ possible. Default flips only on a proven speed AND quality win.
 **In flight (2026-07-16, this session): remaining locally-doable items.** ✅ TODO-C
 resolved — **kokoro FASTCONV landed** (`323e96f23`, 89 F16 kernels, byte-identical);
 **indextts_voc not applicable** (F16 tensors are custom-CPU-op AA filters, not
-ggml_conv_1d). Next: TODO-D (fastpitch `-f16` GGUF loader bug: `gguf_init_from_file_ptr:
-failed to read tensor data`, a pre-existing reader bug — file byte-valid).
+ggml_conv_1d). ✅ TODO-D **diagnosed** — fastpitch f16 is a MULTI-bug dead-end (loader
+= converter offset gaps, fixable by re-pack; but then Metal + CPU f16-path runtime
+asserts) — not worth pursuing (q8_0 default is a FASTCONV no-op anyway). Full
+diagnosis in the TODO-D section. **All locally-doable items in this batch are now
+resolved.**
 
 
 **Status (2026-07-16): FASTCONV landed + A/B-verified (byte-identical, default ON)
@@ -325,13 +328,26 @@ Same for TODO-A's cosyvoice3 K=1 kernels once cast-kill lands.
   (conv_pre/post/resblocks, 218 tensors) are already F32 → no-op. ⚠ Refined gate:
   "F16 kernels ROUTED THROUGH ggml_conv_1d", not just "F16 present". Do NOT wire.
 
-## TODO-D [SONNET] — unblock fastpitch f16 (currently a dead end)
-fastpitch's `-f16` GGUF (the only variant with F16 conv kernels) fails to LOAD:
-`gguf_init_from_file_ptr: failed to read tensor data` — a pre-existing GGUF-reader
-bug, not FASTCONV. File is byte-valid (md5-stable across 2 downloads). Fix the reader
-(or re-convert the model), THEN the HiFi-GAN wiring is trivial (identical to
-speecht5: bake, pass `&fc` to `core_hifigan::forward(...)`, free). Low priority —
-fastpitch's DEFAULT is q8_0 (F32 kernels, no-op) so only the f16 variant benefits.
+## TODO-D — fastpitch f16 ✅ DIAGNOSED — a MULTI-bug dead-end (not a single loader fix)
+Investigated end-to-end (2026-07-16). The loader error was mis-scoped as a reader bug;
+it is actually **THREE separate bugs**, and fastpitch's `-f16` variant was clearly
+never run (the q8_0 default masks them):
+1. **Loader = CONVERTER offset bug, not a reader bug.** `gguf_init_from_file_ptr:
+   tensor 'dec.layer.0.attn.qkv.bias' has offset 98304, expected 49152` — the f16
+   GGUF has **non-sequential tensor-data offsets** (~49 KB gaps; 98304 = expected +
+   one `attn.out.weight` = 49152×2). The ggml reader correctly rejects the gaps; the
+   lenient Python `gguf` lib reads it fine via per-tensor `data_offset`. **A re-pack**
+   (GGUFReader → GGUFWriter, preserving exact KV `field.types` + `raw_dtype=tensor_type`)
+   rewrites sequential offsets and **LOADS**. So the file data is intact; only its
+   layout is malformed → the real fix is re-CONVERTING from source with a correct
+   writer (the uploaded `cstr/fastpitch-en-GGUF` f16 is malformed).
+2. **Then Metal aborts:** `ggml-metal-ops.cpp:3355 GGML_ASSERT(op->src[1]->type ==
+   F32)` — an F16 activation feeds a Metal op that requires F32.
+3. **And CPU aborts:** `ggml_compute_forward_sub` — an F16/shape mismatch in a `sub`.
+So the f16 code path has latent type bugs beyond the loader. **Verdict: not worth it**
+— fastpitch's default is q8_0 (F32 kernels → FASTCONV no-op anyway), and unblocking
+f16 needs (a) a re-converted GGUF AND (b) fixing 2 f16-path runtime type bugs. Left as
+a documented dead-end; re-pack recipe above is the starting point if ever pursued.
 
 ## TODO-2 [FABLE — only chatterbox left, CFM + off-box verify] — Interval-CFG for guidance backends (~20–40%, biggest raw win, APPROXIMATE)
 ✅ **cosyvoice3 landed opt-in** (`63a91a6a5`, `CRISPASR_COSYVOICE3_CFG_INTERVAL`,
