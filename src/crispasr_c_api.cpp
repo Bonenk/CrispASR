@@ -4704,9 +4704,14 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         // Improvements Phase 1: unified dispatch — run the SAME orchestration as
         // the CLI backend adapter (parakeet_transcribe_segments) rather than the
         // divergent inline path below, so a fix/feature lands on every surface at
-        // once. Gated CRISPASR_SESSION_UNIFIED_DISPATCH=1 for A/B; default off
-        // keeps the historical inline path until parity is proven per backend.
-        if (getenv("CRISPASR_SESSION_UNIFIED_DISPATCH")) {
+        // once. Default ON (F3) — verified byte-identical to the inline path on
+        // parakeet (short + 225 s). CRISPASR_SESSION_UNIFIED_DISPATCH=0 selects the
+        // legacy inline path for A/B.
+        const bool _unified = [] {
+            const char* e = getenv("CRISPASR_SESSION_UNIFIED_DISPATCH");
+            return !(e && e[0] == '0'); // default on; only an explicit "0" disables
+        }();
+        if (_unified) {
             const bool is_ja = parakeet_vocab_is_japanese(s->parakeet_ctx) != 0;
             parakeet_orchestrate_opts oo;
             oo.chunk_seconds_explicit = s->parakeet_force_chunk_seconds > 0;
