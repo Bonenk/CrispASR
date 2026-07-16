@@ -26,7 +26,7 @@ kernels is k=1, measured) · TODO-C indextts/kokoro · TODO-D fastpitch loader �
 TODO-2 interval-CFG (✅ cosyvoice3 `63a91a6a5` + f5-tts `678ee5ce1` + voxcpm2
 `2c7cc5df4` + dots `675498cb3` + irodori `d04620cba` + tada `3c8180cdc` landed opt-in;
 only chatterbox left, off-box) · TODO-3
-Metal q4_k (needs registry alt-quant schema — not a quick win) · TODO-4 CI perf gate.
+Metal q4_k (needs registry alt-quant schema — not a quick win) · TODO-4 CI perf gate (🟡 compare logic+test landed; nightly benchmark-emit + committed baseline pending).
 Coverage triage below (only F16-kernel models benefit). ⚠ There is no
 `handover-prompts/fastconv-fleet-sweep-round2.md` on disk — this NOW section + the
 TODO QUEUE below ARE the round-2 handover.
@@ -394,6 +394,20 @@ Metal (Apple's q4_k dequant path). Two tiers:
   able to ggml-org/llama.cpp (disclose only mechanical AI use, per the dev guide).
 
 ## TODO-4 — Perf-regression CI gate (highest leverage, but CI-only-verifiable)
+🟡 **Compare logic + test LANDED** (`tools/perf_baseline_compare.py` +
+`tests/test_perf_baseline_compare.py`, wired into the nightly `unit-tests` job).
+`compare(baseline, current, factor=2.0)` is a pure function → HARD issues (a
+baseline (engine,quant,mode,audio) MISSING / realtime_factor<=0 / empty transcript in
+current — the LEARNINGS-4a crash-mints-a-fake-win case) + SOFT warnings (RTF below
+baseline/2× — coarse, runner-noise-tolerant). CLI: `--strict` exits 1 only on a HARD
+issue; default always exits 0 (informational). 9 unit tests green locally (pytest +
+unittest); `--selftest` for a dependency-free smoke check. **Remaining (needs a
+GPU-in-CI nightly run + a committed baseline JSON, calibrated over a few nights):**
+add a nightly step that runs `benchmark_asr_engines.py --json`, commits the first run
+as `tests/regression/perf_baseline.json`, and runs the compare informationally; also
+add TTS backends via a TTS→ASR word-overlap gate (the manifest is ASR-only today).
+This slice ships the verifiable core; the nightly wiring proves out only on the cron.
+
 PERFORMANCE.md demonstrably drifts (this campaign corrected its FASTCONV overclaims
 twice). Wire a real gate. **⚠ Design pitfall:** tight RTF gating on shared GitHub
 runners is a FALSE-ALARM generator — the regression manifest itself notes "GH runner
