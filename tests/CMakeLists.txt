@@ -3087,3 +3087,24 @@ if (CRISPASR_FUZZ)
     target_compile_options(crispasr-fuzz-tokenizer PRIVATE -fsanitize=fuzzer)
     target_link_options(crispasr-fuzz-tokenizer PRIVATE -fsanitize=fuzzer)
 endif()
+
+# ─── C2PA native-JS signer — unit + live parity tests (node --test) ──────────
+# The signer (bindings/javascript/c2pa.mjs) re-implements C2PA signing in pure
+# WebCrypto so the wasm build needs no c2pa-rs. Unit tests are hermetic (CBOR
+# vectors, JUMBF layout, tamper); the parity test validates a JS-signed WAV in
+# the c2pa-rs reference reader and is skipped (still exit 0) when node or the
+# c2pa python package is unavailable.
+find_program(NODE_EXECUTABLE NAMES node nodejs)
+if (NODE_EXECUTABLE)
+    set(_c2pa_js_dir ${PROJECT_SOURCE_DIR}/bindings/javascript)
+
+    add_test(NAME test-c2pa-js-unit
+        COMMAND ${NODE_EXECUTABLE} --test test/c2pa.unit.test.mjs
+        WORKING_DIRECTORY ${_c2pa_js_dir})
+    set_tests_properties(test-c2pa-js-unit PROPERTIES LABELS "unit;c2pa;js" TIMEOUT 60)
+
+    add_test(NAME test-c2pa-js-parity
+        COMMAND ${NODE_EXECUTABLE} --test test/c2pa.parity.test.mjs
+        WORKING_DIRECTORY ${_c2pa_js_dir})
+    set_tests_properties(test-c2pa-js-parity PROPERTIES LABELS "live;c2pa;js;parity" TIMEOUT 120)
+endif()
