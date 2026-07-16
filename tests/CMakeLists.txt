@@ -2632,6 +2632,20 @@ catch_discover_tests(test-fastconv
     PROPERTIES LABELS "unit"
 )
 
+# ─── cosyvoice3-hift-fastconv-ab — manual A/B harness (needs local GGUF models) ─
+# Drives the deterministic HiFT vocoder with fixed mel+noise so the
+# CRISPASR_COSYVOICE3_FASTCONV cast-kill can be byte-diffed ON vs OFF. Not a
+# ctest (requires cosyvoice3-{llm,hift} GGUFs); run manually. See
+# docs/perf-sweep/PLAN.md TODO-A.
+add_executable(cosyvoice3-hift-fastconv-ab cosyvoice3-hift-fastconv-ab.cpp)
+target_include_directories(cosyvoice3-hift-fastconv-ab PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(cosyvoice3-hift-fastconv-ab PRIVATE
+    cosyvoice3_tts
+    chatterbox
+)
+
 # ─── test-audio-formats — Catch2 unit tests for crispasr_audio_load format coverage
 #
 # Validates AU (µ-law), AMR-NB, and WebM (Opus) decode against the WAV
