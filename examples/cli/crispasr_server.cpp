@@ -16,6 +16,7 @@
 //   GET  /backends                    — list available backends
 //   GET  /v1/models                   — OpenAI-compatible model list
 //   GET  /v1/voices                   — list voices in --voice-dir (CAP_TTS only)
+//        /voices, /v1/audio/voices    — aliases for llama-swap compatibility (#264)
 //   POST /v1/voices                   — upload voice file (multipart, CAP_TTS only)
 //   DELETE /v1/voices/:name           — delete voice file (CAP_TTS only)
 //
@@ -2391,9 +2392,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
 
     // -----------------------------------------------------------------------
     // GET /v1/voices — list voices in --voice-dir (CAP_TTS only)
+    // Also aliased on /voices and /v1/audio/voices for llama-swap and
+    // OpenAI-client compatibility (#264).
     // Returns: {"voices": [{"name": "<stem>", "format": "wav"|"gguf"}, ...]}
     // -----------------------------------------------------------------------
-    svr.Get("/v1/voices", [&](const Request& req, Response& res) {
+    auto handle_list_voices = [&](const Request& req, Response& res) {
         if (!require_auth(req, res))
             return;
         if (!(backend->capabilities() & CAP_TTS)) {
@@ -2428,7 +2431,10 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         }
         js << "]}";
         res.set_content(js.str(), "application/json");
-    });
+    };
+    svr.Get("/v1/voices", handle_list_voices);
+    svr.Get("/voices", handle_list_voices);
+    svr.Get("/v1/audio/voices", handle_list_voices);
 
     // -----------------------------------------------------------------------
     // POST /v1/voices — upload a voice file (multipart: "voice" file + optional "name" field)
@@ -2855,6 +2861,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     fprintf(stderr, "  GET  /v1/models                  — model info\n");
     if (tts) {
         fprintf(stderr, "  GET  /v1/voices                  — list voices in --voice-dir\n");
+        fprintf(stderr, "       /voices, /v1/audio/voices   — aliases (llama-swap compat)\n");
         fprintf(stderr, "  POST /v1/voices                  — upload voice file (multipart)\n");
         fprintf(stderr, "  DELETE /v1/voices/:name          — delete voice file\n");
         if (params.tts_voice_dir.empty()) {
