@@ -1576,6 +1576,26 @@ static std::vector<float> euler_solve(f5_tts_context* ctx,
 
     int n_steps = (int)t_schedule.size() - 1;
 
+    // Interval-CFG (opt-in, APPROXIMATE — mirrors OMNIVOICE_CFG_INTERVAL): recompute
+    // the uncond DiT forward only every K ODE steps and reuse the cached uncond
+    // velocity in between; the cond forward stays fresh every step; the FIRST and
+    // LAST step always recompute. This uses a slightly stale uncond, so it CHANGES
+    // the output and stays gated OFF by default (K=1 = exact). It uses the separate
+    // 2-forward path (which is already the default; the batched F5_BATCH_CFG path
+    // fuses cond+uncond in one B=2 graph, nothing to skip — so interval overrides it).
+    // Only active when K>1 && CFG is on, so at the default the legacy paths below are
+    // byte-for-byte unchanged. Gated CRISPASR_F5_CFG_INTERVAL.
+    const int cfg_interval = [] {
+        const char* e = std::getenv("CRISPASR_F5_CFG_INTERVAL");
+        const int k = e ? atoi(e) : 1;
+        return k < 1 ? 1 : k;
+    }();
+    const bool interval_on = cfg_interval > 1 && ctx->cfg_strength >= 1e-5f;
+    std::vector<float> v_uncond_cache; // last computed uncond velocity [T*mel_dim]; reused between recomputes
+    if (interval_on && ctx->verbosity >= 1)
+        fprintf(stderr, "f5_tts: interval-CFG K=%d (uncond recomputed every %d ODE steps; first+last always)\n",
+                cfg_interval, cfg_interval);
+
     // Initial noise y0 ~ N(0, 1)
     std::vector<float> x(T * mel_dim);
     if (!ctx->ref_init_noise.empty() && (int)ctx->ref_init_noise.size() == T * mel_dim) {
@@ -1624,7 +1644,25 @@ static std::vector<float> euler_solve(f5_tts_context* ctx,
             // work per dispatch. Kept opt-in + off by default; the real lever
             // is DiT compute efficiency (F32→F16 activations). See PLAN §232.
             std::vector<float> v_cond, v_uncond;
-            if (f5_batch_cfg_enabled()) {
+            const float* v_unc_ptr = nullptr;
+            if (interval_on) {
+                // Cond fresh every step; uncond recomputed on the first + last step
+                // and every K-th step, otherwise reused from the cache (the approximation).
+                v_cond = dit_forward(ctx, x.data(), T, mel_dim, cond.data(), text_emb.data(), text_dim, time_emb.data(),
+                                     false, false, step);
+                if (v_cond.empty())
+                    return {};
+                const bool recompute_unc =
+                    (step == 0) || (step == n_steps - 1) || ((step % cfg_interval) == 0) || v_uncond_cache.empty();
+                if (recompute_unc) {
+                    v_uncond = dit_forward(ctx, x.data(), T, mel_dim, cond.data(), text_emb_uncond.data(), text_dim,
+                                           time_emb.data(), true, true, step);
+                    if (v_uncond.empty())
+                        return {};
+                    v_uncond_cache = v_uncond;
+                }
+                v_unc_ptr = v_uncond_cache.data();
+            } else if (f5_batch_cfg_enabled()) {
                 auto h_cond = f5_compute_hidden(ctx, x.data(), T, mel_dim, cond.data(), text_emb.data(), text_dim,
                                                 false, false, step);
                 auto h_uncond = f5_compute_hidden(ctx, x.data(), T, mel_dim, cond.data(), text_emb_uncond.data(),
@@ -1641,6 +1679,7 @@ static std::vector<float> euler_solve(f5_tts_context* ctx,
                 const size_t arm = (size_t)T * mel_dim;
                 v_cond.assign(v.begin(), v.begin() + arm);
                 v_uncond.assign(v.begin() + arm, v.begin() + 2 * arm);
+                v_unc_ptr = v_uncond.data();
             } else {
                 v_cond = dit_forward(ctx, x.data(), T, mel_dim, cond.data(), text_emb.data(), text_dim, time_emb.data(),
                                      false, false, step);
@@ -1648,12 +1687,13 @@ static std::vector<float> euler_solve(f5_tts_context* ctx,
                                        time_emb.data(), true, true, step);
                 if (v_cond.empty() || v_uncond.empty())
                     return {};
+                v_unc_ptr = v_uncond.data();
             }
 
             // CFG: v = v_cond + cfg * (v_cond - v_uncond)
             float cfg = ctx->cfg_strength;
             for (size_t i = 0; i < x.size(); i++) {
-                float v = v_cond[i] + cfg * (v_cond[i] - v_uncond[i]);
+                float v = v_cond[i] + cfg * (v_cond[i] - v_unc_ptr[i]);
                 x[i] += v * dt;
             }
         }
