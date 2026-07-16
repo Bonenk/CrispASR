@@ -2021,6 +2021,21 @@ catch_discover_tests(test-session-autochunk
     PROPERTIES LABELS "unit;session-autochunk;session-long-audio"
 )
 
+# ─── test-repeat-break — decode-time repetition-loop detector (fix/moonshine-repeat-break)
+add_executable(test-repeat-break
+    test-repeat-break.cpp
+)
+target_include_directories(test-repeat-break PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-repeat-break PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-repeat-break
+    TEST_SPEC "[repeat-break]"
+    PROPERTIES LABELS "unit;repeat-break;moonshine"
+)
+
 # ─── test-worker-pool — bounded blocking resource pool (improvements Phase 4).
 # Pins core_pool::WorkerPool behind the server worker-pool.
 find_package(Threads REQUIRED)

@@ -24,6 +24,12 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       backends inherit the same safe CLI-style chunking (verified on moonshine;
       chunking-at-silence mirrors the dispatcher). Default-on because the prior
       behaviour was a hang.
+      _Follow-up (same day):_ closed the decode-time-waste caveat — added a
+      decode-time repetition break to moonshine's greedy loop
+      (`core_repeat::tail_is_repetition`: a period-≤8 block repeated ≥4× stops
+      generation early). moonshine/60 s went **57.2 s → 11.3 s (5×), identical
+      output**. Gate `CRISPASR_MOONSHINE_NO_REPEAT_BREAK=1`; pure detector
+      unit-tested (`test-repeat-break`, 13 assertions).
 - [x] **Phase 0** — cross-surface parity harness + test (safety net) — DONE
       (`src/core/asr_parity.h` + `test-asr-parity` 13 assertions; live
       `test-surface-parity.sh` PASS: CLI==session on parakeet-tdt-1.1b/jfk)
