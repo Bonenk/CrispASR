@@ -1168,14 +1168,14 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(stderr, "             --s2s                   [%-7s] speech-to-speech mode: audio input → audio output\n",
             params.s2s ? "true" : "false");
     fprintf(stderr,
-            "             --s2s-output FNAME      [%-7s] output path: .wav, .mp3, .aac (default: s2s_output.wav)\n",
+            "             --s2s-output FNAME      [%-7s] output path: .wav, .mp3, .m4a, .mp4, .aac, .opus (default: s2s_output.wav)\n",
             params.s2s_output.c_str());
 
     fprintf(stderr, "\nText-to-speech (TTS) options:\n");
     fprintf(stderr,
             "             --tts \"TEXT\"            synthesise TEXT and write audio to --tts-output (24 kHz mono)\n");
     fprintf(stderr,
-            "             --tts-output FNAME      [%-7s] output path: .wav, .mp3, .aac (default: tts_output.wav)\n",
+            "             --tts-output FNAME      [%-7s] output path: .wav, .mp3, .m4a, .mp4, .aac, .opus (default: tts_output.wav)\n",
             params.tts_output.c_str());
     fprintf(stderr, "             --tts-stream            stream s16le mono PCM to stdout per sentence (pipe to a "
                     "player); logs stay on stderr\n");
