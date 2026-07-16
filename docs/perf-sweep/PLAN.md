@@ -9,12 +9,15 @@ possible. Default flips only on a proven speed AND quality win.
 ## NOW — active work
 
 **Status (2026-07-16): FASTCONV landed + A/B-verified (byte-identical, default ON)
-for 6 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen,
-cosyvoice3. All on `main`, all green.**
+for 6 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen, cosyvoice3.
+Interval-CFG (opt-in, default OFF) landed + verified for 4 — cosyvoice3, f5-tts,
+voxcpm2, dots-tts. All on `main`, all green.**
 
 **➡ FRESH AGENT: go to the "TODO QUEUE FOR A FRESH AGENT" section near the bottom
-of this file — every remaining task is scoped there in order (TODO-B is next now
-that TODO-A cosyvoice3 has landed).**
+of this file. FASTCONV is done for every local F16 target; the active thread is
+TODO-2 interval-CFG (4 landed, ~7 CFG backends left — the flow/diffusion ones are
+easiest, AR ones need stale-uncond-with-advancing-KV care). TODO-B/C/D/3/4 remain
+as scoped below.**
 Remaining: TODO-B chatterbox k=1→matmul (⚠ NOT cosyvoice3 — only 1 of its 85 hift
 kernels is k=1, measured) · TODO-C indextts/kokoro · TODO-D fastpitch loader ·
 TODO-2 interval-CFG (✅ cosyvoice3 `63a91a6a5` + f5-tts `678ee5ce1` + voxcpm2
