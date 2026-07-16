@@ -10,8 +10,14 @@ possible. Default flips only on a proven speed AND quality win.
 
 **Status (2026-07-16): FASTCONV landed + A/B-verified (byte-identical, default ON)
 for 5 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen. All on
-`main`, all green.** Remaining campaign items: 2 (interval-CFG), 3 (Metal q4_k),
-4 (CI perf gate). Coverage triage below (only F16-kernel models benefit).
+`main`, all green.**
+
+**➡ FRESH AGENT: go to the "TODO QUEUE FOR A FRESH AGENT" section near the bottom
+of this file — every remaining task is scoped there in order (TODO-A cosyvoice3 is
+next). Read the handover `handover-prompts/fastconv-fleet-sweep-round2.md` first.**
+Remaining: TODO-A cosyvoice3 FASTCONV · TODO-B chatterbox k=1→matmul · TODO-C
+indextts/kokoro · TODO-D fastpitch loader · TODO-2 interval-CFG · TODO-3 Metal q4_k
+· TODO-4 CI perf gate. Coverage triage below (only F16-kernel models benefit).
 
 Commits (pushed to `main`):
 `203f28f01` shared core_dac cache+conv1d · `191a7ebe4` omnivoice migrate ·
@@ -164,28 +170,133 @@ decode, output-equivalent**.
 **Rollout:** shared helper → migrate omnivoice (dogfood/de-dup) → pilot kokoro/piper/
 melotts → remaining ~21, each byte+ASR A/B'd.
 
-## Item 2 — Interval-CFG for guidance backends (~11)
-Port the OmniVoice uncond-skip-every-K trick (recompute uncond only every K steps,
-reuse cached logits; cond fresh every step; first+last always recompute). Gated
-`<BACKEND>_CFG_INTERVAL`, default 1 (exact). ~20–40% on flow/diffusion stages.
-Per-backend ASR-validated (approximate → opt-in). Candidates: f5 (ODE), chatterbox
-(CFM), vibevoice (DPM), voxcpm2, cosyvoice3, dia, zonos.
+# ============================================================================
+# TODO QUEUE FOR A FRESH AGENT — fully scoped, do in this order
+# ============================================================================
+# Every item below: work in a git worktree off origin/main, gate behind an env
+# var, keep BOTH paths, A/B before flipping any default, format with
+# tools/format.sh --fix (clang-format 18), rebase onto origin/main before every
+# push (main moves constantly). See "Discipline" at the very bottom + the
+# handover in handover-prompts/fastconv-fleet-sweep-round2.md.
 
-## Item 3 — Metal q4_k
-Measured: q4_k is slower AND lower-quality than q8 on Metal (Apple q4_k dequant path).
-- **Quick:** registry/auto-select prefers q8 on Apple Silicon (config-level).
-- **Deep:** ggml-fork Metal q4_k dequant kernel — helps every quantized backend on M-series.
+## TODO-A — cosyvoice3_tts FASTCONV  ★ next, highest-confidence win
+**Goal:** cast-kill the 85 F16 hift-vocoder conv kernels (same idea as speecht5/
+chatterbox). GGUF-confirmed: `cosyvoice3-hift-f16.gguf` has 85 F16 3D conv kernels.
+**Files:** `src/cosyvoice3_tts.cpp` only. Struct `cv3_hift` at :339 (fields listed
+in the Bespoke-lambda triage above); conv helpers `cv3_lookahead_conv1d` (:2559),
+`cv3_causal_conv1d` (:2577), `cv3_causal_grouped_conv1d` (:2515); main graph
+`cv3_build_hift_decode_graph` (:4079); f0 graph `cv3_build_hift_f0_graph` (:3599).
+**Steps:**
+  1. Add `core_dac::fastconv_cache hift_fc;` to `cosyvoice3_tts_context` (or to
+     `cv3_hift`). `#include "core/dac_decoder.h"`.
+  2. At hift load (where `cv3_hift` named fields are assigned from `cv3_hift::tensors`):
+     collect every F16 3D conv kernel (`conv_pre_w`, `conv_post_w`, `ups_w[3]`,
+     `resblocks[9].{c1_w,c2_w}[3]`, `src_down_w[3]`, `src_resblocks[3].{c1_w,c2_w}[3]`,
+     `f0_condnet_w[5]` — NOT the 2D `f0_classifier_w`/`m_source_l_linear_w`), then
+     `hift_fc.bake(hift_backend, kernels, on)` gated `CRISPASR_COSYVOICE3_FASTCONV`.
+  3. Re-point each named field to its baked copy: `f = hift_fc.get(f)`. ⚠ INCLUDE
+     `ups_w` — cosyvoice3 upsamples with REGULAR conv1d (`cv3_causal_conv1d`), not
+     conv_transpose, so it benefits (do NOT copy the chatterbox/HiFi-GAN `.ups`
+     exclusion). Re-point is cleaner than threading `fc` through every helper.
+  4. `hift_fc.free();` in the context free, BEFORE the hift backend is freed.
+  5. Add a `CRISPASR_COSYVOICE3_FASTCONV_DEBUG` one-liner printing baked/swapped counts.
+**Verify (FAST path — avoids the slow flow stage):** the hift vocoder is
+deterministic given the mel. Drive `cv3_extract_hift_decode_stage(ctx, mel, T_mel,
+s_stft, "hift_decode", &n)` with a FIXED mel (dump one from a short synth, or a
+constant ramp) ON vs OFF → must be byte-identical (cast-kill). Full-pipeline synth
+A/B (seed-aware, flow-matching) is the belt-and-braces but is slow (~min–h on M1).
+Local models: `cosyvoice3-{llm-q4_k,flow-q8_0,campplus-f16,hift-f16,s3tok-f16,
+voices}.gguf` all in `/Volumes/backups/ai/crispasr-gguf/`. **⚠ Stage models to the
+internal disk first** — the external SSD reads at ~13 MB/s (near-full). Default ON
+once byte-identical.
 
-## Item 4 — Perf-regression CI gate
-Wire the existing benchmark harness into CI: per-backend RTF + decoded-output snapshot,
-fail on regression. Keeps PERFORMANCE.md honest (it demonstrably drifts) and guides
-optimization with real numbers.
+## TODO-B — chatterbox_s3gen k=1→matmul (further win, on top of the landed cast-kill)
+The landed `CRISPASR_S3GEN_FASTCONV` does cast-kill only. 175 of its 275 F16 conv
+kernels are K=1 — a K=1 conv is a channel matmul, so routing them through
+`ggml_mul_mat` instead of `ggml_conv_1d`/im2col skips a pure-copy im2col
+(materialises hundreds of MB at audio-rate T). BUT this changes reduction order, so
+it is NOT bitwise-identical and needs its OWN seed-aware A/B on the drift-prone GPU
+path (chatterbox has a documented GPU mul_mat drift history — see
+handover-prompts/chatterbox-gpu-mul-mat-drift.md). Gate separately
+(`CRISPASR_S3GEN_FASTCONV_MATMUL`), default OFF until A/B'd on Metal AND CUDA.
+Same for TODO-A's cosyvoice3 K=1 kernels once cast-kill lands.
+
+## TODO-C — indextts_voc (9 convs) + kokoro (9 convs) FASTCONV
+No local main model on this box — GGUF-parse each on a box that has them (or download
+to the internal disk). Only wire if the shipped default quant has F16 conv kernels
+(the recurring gate — see memory [[fastconv-needs-f16-kernels]]). Same recipe.
+
+## TODO-D — unblock fastpitch f16 (currently a dead end)
+fastpitch's `-f16` GGUF (the only variant with F16 conv kernels) fails to LOAD:
+`gguf_init_from_file_ptr: failed to read tensor data` — a pre-existing GGUF-reader
+bug, not FASTCONV. File is byte-valid (md5-stable across 2 downloads). Fix the reader
+(or re-convert the model), THEN the HiFi-GAN wiring is trivial (identical to
+speecht5: bake, pass `&fc` to `core_hifigan::forward(...)`, free). Low priority —
+fastpitch's DEFAULT is q8_0 (F32 kernels, no-op) so only the f16 variant benefits.
+
+## TODO-2 — Interval-CFG for guidance backends (~20–40%, biggest raw win, APPROXIMATE)
+Port OmniVoice's `OMNIVOICE_CFG_INTERVAL=K`: recompute the UNCOND classifier-free-
+guidance forward only every K steps and reuse its cached logits; the COND forward
+stays fresh every step; ALWAYS recompute the first + last step. Reference impl: grep
+`OMNIVOICE_CFG_INTERVAL` in `src/omnivoice.cpp` for the caching pattern to copy.
+**Candidates (11, all CFG):** f5 (ODE), chatterbox (CFM), vibevoice (DPM), voxcpm2,
+cosyvoice3, dia, zonos, tada, dots, voxtral, irodori — do one at a time.
+**Per backend:** gate `CRISPASR_<BACKEND>_CFG_INTERVAL` (or `<BACKEND>_CFG_INTERVAL`
+to match omnivoice), default **1 (exact)** — this path is APPROXIMATE so it stays
+OPT-IN forever, never a default flip. **Validation:** ASR-roundtrip the decoded
+audio at K=1 vs K=2/3 — content must stay intact (word overlap ~1.0). ⚠ NATURALNESS
+at aggressive K needs a HUMAN EAR (an agent can't listen) — so ship it enabled-but-
+default-off with a doc note, do NOT claim a naturalness verdict. Document each env
+var in this PLAN.
+
+## TODO-3 — Metal q4_k → prefer q8 on Apple Silicon
+Measured earlier this campaign: q4_k is BOTH slower AND lower-quality than q8 on
+Metal (Apple's q4_k dequant path). Two tiers:
+- **Quick (config):** `src/crispasr_model_registry.cpp` is currently a STATIC table
+  with ONE hardcoded quant per entry (no platform hook). Add a platform-aware
+  preference: on Apple Silicon (`#ifdef __APPLE__` / runtime `ggml_backend_metal`),
+  when both a q8 and q4_k variant exist for a model, PREFER q8 — but as a
+  preference + stderr WARNING, NOT a forced flip (q8 is ~2× the download/RAM, a real
+  tradeoff). `--model-quant` already exists as a manual override; respect it. Verify
+  by checking the resolved filename on an Apple run vs a `--model-quant q4_k` override.
+- **Deep (kernel, upstream ggml):** write a faster Metal q4_k dequant kernel in the
+  ggml fork (`ggml/` submodule, branch `crispstrobe-ops`) — helps EVERY quantized
+  backend on M-series. Bench with `tools/benchmark_asr_engines.py --json`. Upstream-
+  able to ggml-org/llama.cpp (disclose only mechanical AI use, per the dev guide).
+
+## TODO-4 — Perf-regression CI gate (highest leverage, but CI-only-verifiable)
+PERFORMANCE.md demonstrably drifts (this campaign corrected its FASTCONV overclaims
+twice). Wire a real gate. **⚠ Design pitfall:** tight RTF gating on shared GitHub
+runners is a FALSE-ALARM generator — the regression manifest itself notes "GH runner
+decode diverges significantly." So gate the DETERMINISTIC signal hard and the noisy
+one loose:
+- **Building blocks that already exist:** `tools/benchmark_asr_engines.py` emits a
+  rich JSON snapshot via `--json` (RunResult: engine, quant, `realtime_factor`,
+  `transcript_sample`, wer, load_s). `.github/workflows/regression.yml` +
+  `tests/regression/manifest.json` already do per-backend decoded-output goldens
+  (transcript + CER/WER tolerances) for ASR, nightly. TTS backends are NOT in the
+  manifest (it's ASR-only).
+- **Robust design:** extend the nightly regression job (do NOT add a PR-blocking
+  perf job) to also (a) HARD-gate the decoded output (exact / CER as today — this is
+  the high-signal deterministic check), and (b) capture RTF into a committed
+  baseline JSON and SOFT-warn (log, don't fail) only on a coarse ≥2× regression
+  (catches algorithmic blowups, ignores runner noise). For TTS backends, the "decoded
+  output" gate = TTS→ASR roundtrip word-overlap.
+- **Verify:** the compare-script logic is locally unit-testable; the CI wiring itself
+  only proves out on push (watch the Actions run). Land it as informational first,
+  tighten thresholds after a few nightly runs establish the noise floor.
 
 ---
 
-## Discipline (every item)
+## Discipline (every item — NON-NEGOTIABLE)
 1. Env-gated (`CRISPASR_<BACKEND>_<FEATURE>`), both paths kept, never remove gates.
 2. A/B vs ground truth: byte/near-equivalence + ASR/decoded roundtrip, F16 AND quant.
-3. Unit test where model-free (the shared conv helper especially).
-4. Flip default only on speed AND quality win; approximate paths stay opt-in.
-5. Checkpoint: update this PLAN + push to main at each landed backend.
+   For stochastic (flow-matching/AR) backends: PASS A SEED; prove ON-vs-ON=0 (or that
+   ON-vs-OFF=0 across all samples, which subsumes it) before trusting ON-vs-OFF.
+3. Unit test where model-free (the shared conv helper especially — `test-fastconv`).
+4. Flip default only on speed AND quality win; approximate paths (interval-CFG,
+   k=1→matmul on GPU) stay opt-in until A/B'd.
+5. Prove FASTCONV ENGAGED, not a silent no-op: a `*_FASTCONV_DEBUG` bake-count print
+   (ON bakes N/N, OFF bakes 0). Byte-identity ALONE can't tell "equivalent" from
+   "no-op" — GGUF-parse the shipped quant to confirm F16 conv kernels first.
+6. Checkpoint: update this PLAN + push to main at each landed backend.
