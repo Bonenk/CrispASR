@@ -1329,11 +1329,14 @@ Build the library for the target with `-DCRISPASR_C2PA_FETCH=ON`:
   (verified: the arm64 prebuilt links cleanly with the iOS SDK).
 - **WASM** — WAV signing works out of the box (no `--c2pa`, no ~10 MB c2pa-rs).
   Three ways, in order of preference:
-  1. **Native-JS signer (module-free).** `bindings/javascript/c2pa.mjs`
-     re-implements C2PA signing in **pure WebCrypto** (ECDSA P-256/ES256 + SHA-256,
-     hand-built canonical CBOR / JUMBF / COSE_Sign1 / RIFF embedding) — **no
-     c2pa-rs, no wasm module at all**. Runs in any browser, Node ≥16, Deno, or a
-     Worker. Usage:
+  1. **Native-JS signer (module-free).** `bindings/javascript/c2pa.mjs` +
+     `c2pa-verify.mjs` — **pure WebCrypto** C2PA sign + verify (ECDSA P-256/ES256
+     + SHA-256, hand-built canonical CBOR / JUMBF / COSE_Sign1) for WAV/MP3/M4A/
+     FLAC — **no c2pa-rs, no wasm module at all**. These are **vendored from the
+     `c2pa-audio` submodule** (`third_party/c2pa-audio/js/`, the single source of
+     truth) — CMake copies them in at configure time; don't edit the copies. Runs
+     in any browser, Node ≥16, Deno, or a Worker. Also on npm/pub.dev as
+     `c2pa-audio` / `c2pa_audio`. Usage:
      ```js
      import { c2paSignWav } from 'crispasr/c2pa';
      const wav    = Module.pcmToWav(float32Pcm, 24000);          // interop WAV + AI tag
