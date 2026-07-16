@@ -6,6 +6,13 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
 
 ## NOW — active work
 
+- [ ] **CUDA proofs — kernels prepared, awaiting a run** (2026-07-16). The two
+      hardware-gated open items can't run on M1; ready-to-push Kaggle kernels:
+      `tools/kaggle/parakeet-mem-policy-cuda/` (Phase 2: estimate-vs-real VRAM +
+      budget-policy OOM avoidance, incl. a torch VRAM-hog to simulate the
+      reporter's small card) and `tools/kaggle/server-workers-cuda/` (Phase 4b:
+      `CRISPASR_SERVER_WORKERS=2` concurrency + transcript parity). Merge to main,
+      then `bash <dir>/push.sh` when Kaggle quota is available.
 - [x] **Session long-audio fix** (2026-07-16) — DONE. The long-audio audit found
       `crispasr_session_transcribe` did one degraded/hanging pass on long audio
       (the CLI/server chunk it). Fixed: `transcribe_autochunk` now slices long
