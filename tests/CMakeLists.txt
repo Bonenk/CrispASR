@@ -2262,6 +2262,7 @@ catch_discover_tests(test-companion-resolve
 add_executable(test_server_wav_writer test_server_wav_writer.cpp)
 target_include_directories(test_server_wav_writer PRIVATE
     ${PROJECT_SOURCE_DIR}/examples/cli
+    ${PROJECT_SOURCE_DIR}/src
 )
 target_link_libraries(test_server_wav_writer PRIVATE
     Catch2::Catch2WithMain

@@ -39,17 +39,18 @@
 #if defined(CRISPASR_RNNOISE)
 #include "crispasr_enhance.h" // RNNoise audio enhancement (shared with CLI)
 #endif
-#include "text_lid_dispatch.h"       // Text-LID backend-agnostic façade (CLD3 + fastText)
-#include "crispasr_aligner.h"        // CTC / forced-aligner word timings (shared with CLI)
-#include "crispasr_cache.h"          // HF download + filesystem cache (shared with CLI)
-#include "crispasr_model_registry.h" // Known-model lookup (shared with CLI)
-#include "crispasr_punc_model.h"     // shared --punc-model alias resolution (CLI/server/C-ABI parity)
-#include "core/beam_decode.h"        // Shared autoregressive beam-search decode helper
-#include "core/greedy_decode.h"      // Shared autoregressive greedy decode helper
-#include "core/lang_names.h"         // Shared ISO-639-1 → English language-name map
-#include "core/ngram_loop_fix.h"     // core_ngram::fix_loops (issue #218, mirrors CLI adapters)
-#include "core/crispasr_c2pa.h"      // C2PA Content Credentials signing (shared with CLI; #260)
-#include "grammar-parser.h"          // GBNF parser for grammar-constrained sampling
+#include "text_lid_dispatch.h"        // Text-LID backend-agnostic façade (CLD3 + fastText)
+#include "crispasr_aligner.h"         // CTC / forced-aligner word timings (shared with CLI)
+#include "crispasr_cache.h"           // HF download + filesystem cache (shared with CLI)
+#include "crispasr_model_registry.h"  // Known-model lookup (shared with CLI)
+#include "crispasr_punc_model.h"      // shared --punc-model alias resolution (CLI/server/C-ABI parity)
+#include "core/beam_decode.h"         // Shared autoregressive beam-search decode helper
+#include "core/greedy_decode.h"       // Shared autoregressive greedy decode helper
+#include "core/lang_names.h"          // Shared ISO-639-1 → English language-name map
+#include "core/ngram_loop_fix.h"      // core_ngram::fix_loops (issue #218, mirrors CLI adapters)
+#include "core/crispasr_c2pa.h"       // C2PA Content Credentials signing (shared with CLI; #260)
+#include "core/crispasr_wav_writer.h" // WAV container + AI-provenance INFO tag (interop floor)
+#include "grammar-parser.h"           // GBNF parser for grammar-constrained sampling
 // Non-Whisper backend headers. Each of these lives in `src/` and is built as
 // its own shared library — we link them into libwhisper privately so Dart
 // only has to open one library to reach every backend. Any missing header
@@ -865,6 +866,29 @@ CA_EXPORT unsigned char* crispasr_c2pa_sign(const unsigned char* data, size_t le
 // Free a buffer returned by crispasr_c2pa_sign.
 CA_EXPORT void crispasr_c2pa_free(unsigned char* p) {
     free(p);
+}
+
+// Wrap float32 mono PCM into a 16-bit WAV container that carries the AI-generated
+// provenance metadata tag (a standard WAV LIST/INFO chunk: ISFT="CrispASR
+// (AI-generated audio)" + ICMT notice). This is the interoperable, zero-cost
+// provenance floor for consumers that only get raw PCM from synthesis (wasm /
+// bindings): the INFO tag is a standard container field any tool can read,
+// complementing the (always-on) inaudible watermark. Returns malloc'd WAV bytes
+// (free with crispasr_c2pa_free) and sets *out_len, or NULL on bad input.
+// Feed the result to crispasr_c2pa_sign() to additionally embed a C2PA manifest.
+CA_EXPORT unsigned char* crispasr_pcm_to_wav(const float* pcm, int n_samples, int sample_rate, size_t* out_len) {
+    if (out_len)
+        *out_len = 0;
+    if (!pcm || n_samples <= 0 || sample_rate <= 0)
+        return nullptr;
+    std::string wav = ::crispasr_make_wav_int16(pcm, n_samples, sample_rate);
+    unsigned char* out = static_cast<unsigned char*>(malloc(wav.size()));
+    if (!out)
+        return nullptr;
+    memcpy(out, wav.data(), wav.size());
+    if (out_len)
+        *out_len = wav.size();
+    return out;
 }
 
 #include "core/crispasr_lcs.h"
