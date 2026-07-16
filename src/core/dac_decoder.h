@@ -322,7 +322,7 @@ static inline ggml_tensor* dec_block(ggml_context* ctx, ggml_tensor* x, const Da
 // `codes_in` is an array of n_codebooks I32 tensors, each of length T.
 // These must already be created (ggml_new_tensor_1d) and set as inputs.
 static inline ggml_tensor* build_decode_graph(ggml_context* ctx, const DacWeights& w, ggml_tensor** codes_in, int /*T*/,
-                                              ggml_cgraph* gf) {
+                                              ggml_cgraph* gf, const fastconv_cache* fc = nullptr) {
     const auto& cfg = w.config;
     const int n_cb = cfg.n_codebooks;
 
@@ -345,17 +345,17 @@ static inline ggml_tensor* build_decode_graph(ggml_context* ctx, const DacWeight
     z_q = ggml_cont(ctx, z_q);
 
     // Input conv: Conv1d(hidden, 1536, k=7, p=3)
-    ggml_tensor* h = conv1d(ctx, z_q, w.in_conv_w, w.in_conv_b, 7);
+    ggml_tensor* h = conv1d(ctx, z_q, w.in_conv_w, w.in_conv_b, 7, 1, fc);
 
     // 4 decoder blocks: strides [8, 8, 4, 2]
     for (int b = 0; b < cfg.n_decoder_blocks; b++) {
-        h = dec_block(ctx, h, w.blocks[b], cfg.upsampling_ratios[b]);
+        h = dec_block(ctx, h, w.blocks[b], cfg.upsampling_ratios[b], fc);
         h = ggml_cont(ctx, h);
     }
 
     // Final: Snake -> Conv1d(96, 1, k=7, p=3) -> Tanh
     h = snake(ctx, h, w.out_snake_alpha);
-    h = conv1d(ctx, h, w.out_conv_w, w.out_conv_b, 7);
+    h = conv1d(ctx, h, w.out_conv_w, w.out_conv_b, 7, 1, fc);
     h = ggml_tanh(ctx, h);
 
     // Output: (1, T_pcm) -> flatten to (T_pcm,)

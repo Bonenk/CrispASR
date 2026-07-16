@@ -24,9 +24,14 @@ possible. Default flips only on a proven speed AND quality win.
     `random_device`, flow-matching noise). A naive on/off byte-diff showed
     max|d|=45607 (RNG, NOT fastconv). ON-vs-ON @seed42 = 0 confirmed determinism;
     the seeded on/off = 0 confirmed the codec change. [[tts-parity-not-by-audio-corr]].
+- ✅ **zonos_tts** (`CRISPASR_ZONOS_FASTCONV`, default on): threaded the cache
+  through `core_dac::build_decode_graph(...,&fc)` (extended with an optional fc
+  param; nullptr = legacy). Bakes the dac-44khz F16 decode kernels. **Codec A/B
+  (seed 42): BYTE-IDENTICAL (0/32768), non-silent.** So all three core_dac-family
+  backends (omnivoice/irodori/zonos) now share one FASTCONV impl.
 - ⏭ **Next:** the remaining backends have their OWN local conv lambdas (not
-  `core_dac::conv1d`). Wire the reusable `fastconv_cache` into each: add a cache
-  member, bake its convs at load, call `fc->get(w)` in its lambda (or route to
+  `core_dac`). Wire the reusable `fastconv_cache` into each: add a cache member,
+  bake its convs at load, call `fc->get(w)` in its lambda (or route to
   `core_dac::conv1d`). Then items 2 (interval-CFG), 3/4 (Metal q4_k, CI perf gate).
 
 ---
