@@ -5,8 +5,39 @@ stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
 ## NOW — active work
 
-**Status (2026-07-15): OmniVoice RTF #2 — codec-decode FASTCONV landed on branch
-`perf/omnivoice-254-decode-rtf` (worktree `.claude/worktrees/omnivoice-rtf-decode`).**
+**Status (2026-07-16): OmniVoice RTF #4 — fused stage0 step graph, branch
+`feat/omnivoice-rtf-stage0` (worktree `.claude/worktrees/omnivoice-rtf-stage0`).**
+
+Reporter re-benched after single-shot (#254 last comment): CUDA RTF still 0.17
+vs omnivoice.cpp 0.144 — gen 3.55 s vs their 3.02 s for ~22 s audio (decode now
+free). Structural read of the step loop found the residual ~44 ms/step of host
+overhead: per-step ~18 MB audio-embedding readback + single-threaded codebook
+sum + ~5 MB embed re-upload, a full-sequence ~39 MB logits readback (only the
+target slice is used), single-threaded triple-log-softmax CFG scoring (~13M
+`exp`/step), and multi-MB per-step vector allocs (+ a full `u_logits` copy).
+
+- ✅ **Fused per-step graph (`OMNIVOICE_FUSED_STEP`, default ON when persistent):**
+  token ids in (→ ~140 KB int32 upload), in-graph `get_rows` + cb-ascending
+  chained adds (bitwise == host sum) + concat with a device-resident text-embed
+  tensor (own buffer, gallocr-alias-proof), transformer unchanged, `ggml_cont`
+  view of ONLY the target logit slices out. Modes: cond-only / uncond-only /
+  unified. Embed tables are F16 even in quant GGUFs (quantize rule), so the
+  in-graph `get_rows` stays CUDA-graph-capture-safe (fork's
+  TAG_GET_ROWS_CUDA_GRAPHS disables capture only for quantized `get_rows`).
+- ✅ **Threaded CFG scoring** (`ov_parallel_for` over target positions; the
+  position-Gumbel draws are precomputed serially so the rng stream is
+  bit-identical; sampled path `class_temp>0` stays serial). Scoring buffers
+  hoisted; interval-CFG uses the persistent `u_buf` — no more 18 MB/step copy.
+- ✅ **Byte-identity (M1 Metal, q8_0, `OMNIVOICE_DUMP_CODES` + cmp):** legacy vs
+  fused BYTE-IDENTICAL on (a) reporter's paragraph, 2-forward path (modes 0+1,
+  4360 codes), (b) fox + `OMNIVOICE_UNIFIED_CFG=1` (mode 2, 520 codes).
+- 🔄 **In flight:** interval-CFG K=2 + guidance=0 edge A/Bs (fox, byte-identity);
+  local timings are UNUSABLE (box loadavg 100–290, decode-stage noise 3.8×) —
+  perf verdict comes from Kaggle CUDA kernel
+  `tools/kaggle/omnivoice-fused-step-ab/` (legacy vs fused vs fused+2-forward,
+  reporter's paragraph, byte-identity gate + median gen s + per-stage bench).
+- **Next:** push branch → run Kaggle A/B → if identical + faster, flip default,
+  merge to main, ask reporter to re-bench.
 
 Reporter's residual complaint after the over-length + word-drop fixes: "CrispASR
 is still slower than alternative implementations" and "decoding is on cpu, which
