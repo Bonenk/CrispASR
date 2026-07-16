@@ -1987,6 +1987,24 @@ catch_discover_tests(test-asr-parity
     PROPERTIES LABELS "unit;parity;improvements"
 )
 
+# ─── test-parakeet-strategy — pure long-audio routing decision (improvements
+# Phase 1). Header-only: pins parakeet_pick_strategy so the CLI adapter and the
+# session C-ABI can't diverge on which path to take.
+add_executable(test-parakeet-strategy
+    test-parakeet-strategy.cpp
+)
+target_include_directories(test-parakeet-strategy PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(test-parakeet-strategy PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-parakeet-strategy
+    TEST_SPEC "[parakeet-strategy]"
+    PROPERTIES LABELS "unit;parakeet-strategy;improvements"
+)
+
 # ─── test-lcs-chunk-merge — Catch2 unit tests for LCS chunk-merge dedup
 #
 # Ports of NeMo's `longest_common_subsequence_merge` test cases

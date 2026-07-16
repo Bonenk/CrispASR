@@ -16,6 +16,7 @@
 #include "core/win_compat.h"
 #include "core/bpe.h"
 #include "core/asr_segment_group.h" // issue #257: output-segment grouping (parakeet --chunk-seconds)
+#include "parakeet_orchestrate.h"   // improvements Phase 1: shared parakeet transcribe orchestration
 #include "core/gpu_backend_pref.h"  // crispasr_set_gpu_backend_pref (#214)
 
 #include <atomic>
@@ -4561,6 +4562,37 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         // rel_pos_local_attn) before decoding. INT_MIN = unset (model default).
         if (s->parakeet_att_context_left != INT_MIN && s->parakeet_att_context_right != INT_MIN) {
             parakeet_set_att_context(s->parakeet_ctx, s->parakeet_att_context_left, s->parakeet_att_context_right);
+        }
+        // Improvements Phase 1: unified dispatch — run the SAME orchestration as
+        // the CLI backend adapter (parakeet_transcribe_segments) rather than the
+        // divergent inline path below, so a fix/feature lands on every surface at
+        // once. Gated CRISPASR_SESSION_UNIFIED_DISPATCH=1 for A/B; default off
+        // keeps the historical inline path until parity is proven per backend.
+        if (getenv("CRISPASR_SESSION_UNIFIED_DISPATCH")) {
+            const bool is_ja = parakeet_vocab_is_japanese(s->parakeet_ctx) != 0;
+            parakeet_orchestrate_opts oo;
+            oo.chunk_seconds_explicit = s->parakeet_force_chunk_seconds > 0;
+            oo.chunk_seconds = s->parakeet_force_chunk_seconds > 0 ? s->parakeet_force_chunk_seconds : 0;
+            oo.chunk_overlap_seconds =
+                s->parakeet_force_overlap_seconds >= 0 ? (float)s->parakeet_force_overlap_seconds : 2.0f;
+            oo.no_prints = false;
+            for (auto& ps : parakeet_transcribe_segments(s->parakeet_ctx, pcm, n_samples, 0, is_ja, oo)) {
+                crispasr_session_seg seg;
+                seg.text = std::move(ps.text);
+                seg.t0 = ps.t0;
+                seg.t1 = ps.t1;
+                seg.words.reserve(ps.words.size());
+                for (auto& w : ps.words) {
+                    crispasr_session_seg::word sw;
+                    sw.text = std::move(w.text);
+                    sw.t0 = w.t0;
+                    sw.t1 = w.t1;
+                    sw.p = w.p > 0.0f ? w.p : 1.0f;
+                    seg.words.push_back(std::move(sw));
+                }
+                r->segments.push_back(std::move(seg));
+            }
+            return r;
         }
         // Issue #89 (JA long audio): mirror of the CLI default — energy-minima
         // slices at most `cap_s` long (the JA encoder collapses past ~12 s of

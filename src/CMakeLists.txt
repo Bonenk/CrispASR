@@ -946,6 +946,8 @@ endif()
 add_library(parakeet STATIC
             parakeet.h
             parakeet.cpp
+            parakeet_orchestrate.h
+            parakeet_orchestrate.cpp
             )
 target_include_directories(parakeet PUBLIC . ../include)
 target_compile_features   (parakeet PUBLIC cxx_std_17)

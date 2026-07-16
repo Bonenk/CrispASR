@@ -54,6 +54,27 @@ CLIP="${CRISPASR_PARITY_CLIP:-samples/jfk.wav}"   # ~11 s → single-pass on bot
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
+# Feed BOTH surfaces identical samples: if the clip isn't 16 kHz mono, resample
+# it ONCE to a shared 16 kHz WAV (both the CLI and the python session then read
+# the same samples — otherwise their different resamplers produce different mel
+# and the comparison is meaningless).
+SRATE=$($PY -c "import wave,sys; w=wave.open(sys.argv[1]); print(w.getframerate(),w.getnchannels())" "$CLIP" 2>/dev/null)
+if [ "$SRATE" != "16000 1" ]; then
+    $PY - "$CLIP" "$TMP/clip16k.wav" <<'PY' || { echo "SKIP: could not resample clip to 16k"; exit 2; }
+import sys, wave, numpy as np
+w = wave.open(sys.argv[1]); sr = w.getframerate(); n = w.getnframes()
+pcm = np.frombuffer(w.readframes(n), dtype=np.int16).astype(np.float32)
+if w.getnchannels() == 2:
+    pcm = pcm.reshape(-1, 2).mean(axis=1)
+if sr != 16000:
+    tgt = int(round(len(pcm) / sr * 16000))
+    pcm = np.interp(np.linspace(0, len(pcm) - 1, tgt), np.arange(len(pcm)), pcm)
+o = wave.open(sys.argv[2], "w"); o.setnchannels(1); o.setsampwidth(2); o.setframerate(16000)
+o.writeframes(pcm.astype(np.int16).tobytes()); o.close()
+PY
+    CLIP="$TMP/clip16k.wav"
+fi
+
 echo "parity: model=$(basename "$MODEL") clip=$(basename "$CLIP")"
 
 # --- Surface A: CLI adapter ---
