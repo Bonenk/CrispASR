@@ -15,11 +15,21 @@ cosyvoice3. All on `main`, all green.**
 **➡ FRESH AGENT: go to the "TODO QUEUE FOR A FRESH AGENT" section near the bottom
 of this file — every remaining task is scoped there in order (TODO-B is next now
 that TODO-A cosyvoice3 has landed).**
-Remaining: TODO-B chatterbox k=1→matmul · TODO-C indextts/kokoro · TODO-D fastpitch
-loader · TODO-2 interval-CFG · TODO-3 Metal q4_k · TODO-4 CI perf gate. Coverage
-triage below (only F16-kernel models benefit). ⚠ There is no
-`handover-prompts/fastconv-fleet-sweep-round2.md` on disk — this NOW section + the
-TODO QUEUE below ARE the round-2 handover.
+Remaining: TODO-B chatterbox k=1→matmul (⚠ NOT cosyvoice3 — only 1 of its 85 hift
+kernels is k=1, measured) · TODO-C indextts/kokoro · TODO-D fastpitch loader ·
+TODO-2 interval-CFG (✅ cosyvoice3 landed opt-in `63a91a6a5`; ~10 other CFG backends
+remain) · TODO-3 Metal q4_k (needs registry alt-quant schema — not a quick win) ·
+TODO-4 CI perf gate. Coverage triage below (only F16-kernel models benefit). ⚠ There
+is no `handover-prompts/fastconv-fleet-sweep-round2.md` on disk — this NOW section +
+the TODO QUEUE below ARE the round-2 handover.
+
+**Interval-CFG (TODO-2) — cosyvoice3 landed opt-in (`63a91a6a5`, default OFF).**
+`CRISPASR_COSYVOICE3_CFG_INTERVAL` (default 1 = exact) recomputes the uncond CFM
+forward only every K steps in `cv3_run_solve_euler`. K=1 is byte-identical to
+legacy (verified cos=1.0 twice via the new `cosyvoice3-flow-cfg-interval-ab`
+harness); K=2 mel cos 0.9994, K=3 cos 0.9915 vs exact. Approximate → stays opt-in;
+full-text ASR round-trip + naturalness ear PENDING (needs the slow CLI synth + a
+human listener — NO naturalness verdict claimed).
 
 Commits (pushed to `main`):
 `203f28f01` shared core_dac cache+conv1d · `191a7ebe4` omnivoice migrate ·
@@ -260,6 +270,15 @@ speecht5: bake, pass `&fc` to `core_hifigan::forward(...)`, free). Low priority 
 fastpitch's DEFAULT is q8_0 (F32 kernels, no-op) so only the f16 variant benefits.
 
 ## TODO-2 — Interval-CFG for guidance backends (~20–40%, biggest raw win, APPROXIMATE)
+✅ **cosyvoice3 landed opt-in** (`63a91a6a5`, `CRISPASR_COSYVOICE3_CFG_INTERVAL`,
+default 1). `cv3_run_solve_euler` gains the uncond-skip-every-K path; K>1 forces the
+separate 2-forward path (the batched `COSYVOICE3_CFG_BATCH` fuses cond+uncond, nothing
+to skip). Verified via `tests/cosyvoice3-flow-cfg-interval-ab` (fixed-input flow
+solver): K=1 byte-identical to legacy (cos=1.0 twice); K=2 mel cos 0.9994, K=3 0.9915
+vs exact; non-silent, no NaN. ⚠ mel-cosine (synthetic inputs) is a content PROXY —
+full real-text ASR round-trip + naturalness ear PENDING (slow CLI synth + human
+listener); no naturalness verdict claimed. ~10 CFG backends still to do (below).
+
 Port OmniVoice's `OMNIVOICE_CFG_INTERVAL=K`: recompute the UNCOND classifier-free-
 guidance forward only every K steps and reuse its cached logits; the COND forward
 stays fresh every step; ALWAYS recompute the first + last step. Reference impl: grep
