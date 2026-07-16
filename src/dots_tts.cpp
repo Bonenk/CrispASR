@@ -1509,6 +1509,29 @@ static void dots_flow_match_core(dots_tts_context* ctx, const float* input_seq, 
     std::vector<float> vel_c((size_t)fm_total_len * latent_dim);
     std::vector<float> vel_u((size_t)fm_total_len * latent_dim);
 
+    // Interval-CFG (opt-in, APPROXIMATE — mirrors OMNIVOICE_CFG_INTERVAL): recompute
+    // the uncond DiT forward only every K ODE steps and reuse the cached uncond
+    // velocity in between; the cond forward stays fresh every step; the FIRST and
+    // LAST step always recompute. This uses a slightly stale uncond, so it CHANGES
+    // the output and stays gated OFF by default (K=1 = exact). The cond/uncond
+    // forwards are already two separate B=1 dots_dit_forward()s, so K>1 simply skips
+    // the uncond forward. Only active when K>1, so at the default both forwards run
+    // every step and the result is byte-for-byte the legacy path. Gated
+    // CRISPASR_DOTS_CFG_INTERVAL.
+    const int cfg_interval = [] {
+        const char* e = std::getenv("CRISPASR_DOTS_CFG_INTERVAL");
+        const int k = e ? atoi(e) : 1;
+        return k < 1 ? 1 : k;
+    }();
+    const bool interval_on = cfg_interval > 1;
+    std::vector<float> vel_u_cache; // last computed uncond velocity; reused between recomputes
+    static bool dbg_printed = false;
+    if (interval_on && !dbg_printed && std::getenv("CRISPASR_DOTS_CFG_INTERVAL_DEBUG")) {
+        fprintf(stderr, "dots_tts: interval-CFG K=%d (uncond recomputed every %d ODE steps; first+last always)\n",
+                cfg_interval, cfg_interval);
+        dbg_printed = true;
+    }
+
     for (int step = 0; step < num_steps; step++) {
         float t = (float)step * dt;
 
@@ -1524,7 +1547,18 @@ static void dots_flow_match_core(dots_tts_context* ctx, const float* input_seq, 
         // branch carries the speaker g_cond and the UNCOND branch carries zero
         // (reference fm_solver_step: DiT g_cond=[g, 0]). Text-only → both null.
         dots_dit_forward(ctx, seq_c.data(), fm_total_len, t, g_cond, attn_mask_add, pos_ids, vel_c.data());
-        dots_dit_forward(ctx, seq_u.data(), fm_total_len, t, /*g_cond=*/nullptr, attn_mask_add, pos_ids, vel_u.data());
+        // Interval-CFG: recompute uncond on the first + last step and every K-th step;
+        // otherwise reuse the cached uncond velocity (the approximation).
+        const bool recompute_unc = !interval_on || vel_u_cache.empty() || (step == 0) || (step == num_steps - 1) ||
+                                   ((step % cfg_interval) == 0);
+        if (recompute_unc) {
+            dots_dit_forward(ctx, seq_u.data(), fm_total_len, t, /*g_cond=*/nullptr, attn_mask_add, pos_ids,
+                             vel_u.data());
+            if (interval_on)
+                vel_u_cache = vel_u;
+        } else {
+            vel_u = vel_u_cache; // reuse stale uncond velocity
+        }
 
         // Euler step on the noise-slot velocities with classifier-free guidance.
         for (int i = 0; i < patch_size; i++) {
