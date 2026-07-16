@@ -79,14 +79,22 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       re-run `bash <dir>/push.sh` once the weekly window resets._
 
 ### Further follow-ups (2026-07-16, session 2)
-- [ ] **F6 — extend the F1 runaway audit to the other greedy decoders.** firered
-      was the first probe and had a real 354 s greedy runaway (F1). `glm-asr` and
-      `cohere-transcribe` are also greedy AR decoders (EOS + token cap) that have
-      adapter-level `core_ngram::fix_loops` (output cleaned) but NO decode-time
-      break — so a runaway still BURNS decode compute even though the transcript
-      looks clean. Probe each on the loop-prone 60 s song; wire
-      `core_repeat::tail_is_repetition` (gated, default on) ONLY where a `max_len`
-      saturation is DEMONSTRATED (evidence-gated, per Phase 1b). _IN PROGRESS._
+- [x] **F6 — extend the F1 runaway audit to the other greedy decoders.** AUDITED,
+      **nothing more to wire** — only firered looped (done in F1). `glm-asr` and
+      `cohere-transcribe` are also greedy AR decoders (EOS + token cap) with
+      adapter-level `core_ngram::fix_loops` (output cleaned) but no decode-time
+      break, so a runaway would still BURN decode compute even with a clean
+      transcript. Probed both on the same loop-prone 60 s song that caught
+      moonshine + firered:
+      - **glm-asr** (`glm-asr-nano-q4_k`): clean, EOS-terminated, no repetition —
+        "It'll take some time to find your heart… Cause I'll be there". No runaway.
+      - **cohere-transcribe** (`cohere-transcribe-q4_k`): clean, EOS-terminated, no
+        loop (one mild trailing single-phrase hallucination, which `fix_loops`
+        covers regardless). No `max_len` saturation.
+      Neither shows the runaway symptom, so per the evidence gate (Phase 1b) NOT
+      wired. ⚠ Scope: one clip (the established worst-case); a broader clip corpus
+      could still surface a runaway, at which point `core_repeat::tail_is_repetition`
+      drops in exactly as for firered. Backends touched: none.
 - [ ] **F7 — repo hygiene.** ~25 untracked entries in the tree (stray `bark_*.log`,
       `failed_logs.txt`, loose `*.gguf`/`ggml-*.bin`, `.codex-scratch/`). Triage into
       gitignore vs safe-delete; present the list before touching anything.
