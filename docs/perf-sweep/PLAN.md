@@ -251,6 +251,12 @@ melotts → remaining ~21, each byte+ASR A/B'd.
 
 # ============================================================================
 # TODO QUEUE FOR A FRESH AGENT — fully scoped, do in this order
+
+**Owner tags:** `[FABLE]` = top-tier model, graph/runtime math written by hand
+against the diff harness (dev-guide rule: never delegate compute-graph code).
+`[SONNET]` = delegable to a smaller model — pattern-proven, no graph math, has
+a mechanical pass/fail recipe; verification (byte-A/B + roundtrip) is still
+NON-NEGOTIABLE. Mixed tags split design/graph work from scaffolding.
 # ============================================================================
 # Every item below: work in a git worktree off origin/main, gate behind an env
 # var, keep BOTH paths, A/B before flipping any default, format with
@@ -293,7 +299,7 @@ voices}.gguf` all in `/Volumes/backups/ai/crispasr-gguf/`. **⚠ Stage models to
 internal disk first** — the external SSD reads at ~13 MB/s (near-full). Default ON
 once byte-identical.
 
-## TODO-B — chatterbox_s3gen k=1→matmul (further win, on top of the landed cast-kill)
+## TODO-B [SONNET] — chatterbox_s3gen k=1→matmul (further win, on top of the landed cast-kill)
 The landed `CRISPASR_S3GEN_FASTCONV` does cast-kill only. 175 of its 275 F16 conv
 kernels are K=1 — a K=1 conv is a channel matmul, so routing them through
 `ggml_mul_mat` instead of `ggml_conv_1d`/im2col skips a pure-copy im2col
@@ -319,7 +325,7 @@ Same for TODO-A's cosyvoice3 K=1 kernels once cast-kill lands.
   (conv_pre/post/resblocks, 218 tensors) are already F32 → no-op. ⚠ Refined gate:
   "F16 kernels ROUTED THROUGH ggml_conv_1d", not just "F16 present". Do NOT wire.
 
-## TODO-D — unblock fastpitch f16 (currently a dead end)
+## TODO-D [SONNET] — unblock fastpitch f16 (currently a dead end)
 fastpitch's `-f16` GGUF (the only variant with F16 conv kernels) fails to LOAD:
 `gguf_init_from_file_ptr: failed to read tensor data` — a pre-existing GGUF-reader
 bug, not FASTCONV. File is byte-valid (md5-stable across 2 downloads). Fix the reader
@@ -327,7 +333,7 @@ bug, not FASTCONV. File is byte-valid (md5-stable across 2 downloads). Fix the r
 speecht5: bake, pass `&fc` to `core_hifigan::forward(...)`, free). Low priority —
 fastpitch's DEFAULT is q8_0 (F32 kernels, no-op) so only the f16 variant benefits.
 
-## TODO-2 — Interval-CFG for guidance backends (~20–40%, biggest raw win, APPROXIMATE)
+## TODO-2 [FABLE — only chatterbox left, CFM + off-box verify] — Interval-CFG for guidance backends (~20–40%, biggest raw win, APPROXIMATE)
 ✅ **cosyvoice3 landed opt-in** (`63a91a6a5`, `CRISPASR_COSYVOICE3_CFG_INTERVAL`,
 default 1). `cv3_run_solve_euler` gains the uncond-skip-every-K path; K>1 forces the
 separate 2-forward path (the batched `COSYVOICE3_CFG_BATCH` fuses cond+uncond, nothing
@@ -395,7 +401,7 @@ at aggressive K needs a HUMAN EAR (an agent can't listen) — so ship it enabled
 default-off with a doc note, do NOT claim a naturalness verdict. Document each env
 var in this PLAN.
 
-## TODO-5 — Fused step graph rollout (the omnivoice #254 2.3× CUDA pattern)
+## TODO-5 [FABLE — graph math by hand; SONNET for scaffolding/bench] — Fused step graph rollout (the omnivoice #254 2.3× CUDA pattern)
 
 Omnivoice's stage0 win (LEARNINGS 2026-07-16 entry; reporter-verified 2.3× /
 RTF 0.07 on CUDA, byte-identical) came from killing per-step HOST detours in a
@@ -449,7 +455,7 @@ Delegable to a smaller model (Sonnet-class): the surrounding scaffolding —
 env-gate boilerplate, OMNIVOICE_BENCH-style stage timers, A/B runner scripts,
 codes-dump/cmp verification runs, ASR roundtrips, README/env-var doc sync.
 
-## TODO-6 — Reference-voice disk cache rollout (omnivoice OVC1 / pocket PVL1 pattern)
+## TODO-6 [SONNET] — Reference-voice disk cache rollout (omnivoice OVC1 / pocket PVL1 pattern)
 
 Deterministic, expensive reference encodes re-run on EVERY CLI invocation for
 voice-cloning backends. pocket_tts (PVL1 latents) and omnivoice (OVC1 codes,
@@ -472,7 +478,7 @@ two things a smaller model must get right (spell them out in the task prompt):
 bytes; (b) fingerprint an encoder weight tensor so a re-converted model
 re-encodes. One backend per worktree/commit; live-test each before the next.
 
-## TODO-7 — CUDA-graph capture audit, fleet-wide (data collection → verdicts)
+## TODO-7 [SONNET phase 1 → FABLE phase 2] — CUDA-graph capture audit, fleet-wide (data collection → verdicts)
 
 Two-phase. **Phase 1 (Sonnet-friendly, mechanical):** on a CUDA box run one
 synthesis per iterative backend (dots, tada, kugelaudio, vibevoice, cosyvoice3,
@@ -484,7 +490,7 @@ quantized embd table + in-graph GET_ROWS disables capture entirely
 (reset mid-loop = unstable graph; warmups >> graphs = per-step rebuild) and fix
 — that is step-graph restructuring per TODO-5.
 
-## TODO-3 — Metal q4_k → prefer q8 on Apple Silicon
+## TODO-3 [FABLE design → SONNET impl] — Metal q4_k → prefer q8 on Apple Silicon
 Measured earlier this campaign: q4_k is BOTH slower AND lower-quality than q8 on
 Metal (Apple's q4_k dequant path). Two tiers:
 - **Quick (config):** `src/crispasr_model_registry.cpp` is currently a STATIC table
@@ -499,7 +505,7 @@ Metal (Apple's q4_k dequant path). Two tiers:
   backend on M-series. Bench with `tools/benchmark_asr_engines.py --json`. Upstream-
   able to ggml-org/llama.cpp (disclose only mechanical AI use, per the dev guide).
 
-## TODO-4 — Perf-regression CI gate (highest leverage, but CI-only-verifiable)
+## TODO-4 [SONNET] — Perf-regression CI gate (highest leverage, but CI-only-verifiable)
 🟡 **Compare logic + test LANDED** (`tools/perf_baseline_compare.py` +
 `tests/test_perf_baseline_compare.py`, wired into the nightly `unit-tests` job).
 `compare(baseline, current, factor=2.0)` is a pure function → HARD issues (a
