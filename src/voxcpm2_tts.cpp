@@ -2744,6 +2744,26 @@ static std::vector<float> cfm_euler_solve(voxcpm2_context* ctx, const float* mu,
     // CFG zero-star: first N steps skip computation (use zero velocity)
     int zero_init_steps = std::max(1, (int)(steps * 0.04f)); // = 1 for steps<=25
 
+    // Interval-CFG (opt-in, APPROXIMATE — mirrors OMNIVOICE_CFG_INTERVAL): recompute
+    // the uncond LocDiT forward only every K denoise steps and reuse the cached
+    // uncond velocity in between; the cond forward stays fresh every step; the FIRST
+    // CFG-active step and the LAST step always recompute. This uses a slightly stale
+    // uncond, so it CHANGES the output and stays gated OFF by default (K=1 = exact).
+    // The cond/uncond forwards here are already two separate locdit_call()s, so K>1
+    // simply skips the uncond call. Only active when K>1 && cfg>1, so at the default
+    // the legacy branch below is byte-for-byte unchanged. Gated
+    // CRISPASR_VOXCPM2_CFG_INTERVAL.
+    const int cfg_interval = [] {
+        const char* e = std::getenv("CRISPASR_VOXCPM2_CFG_INTERVAL");
+        const int k = e ? atoi(e) : 1;
+        return k < 1 ? 1 : k;
+    }();
+    const bool interval_on = cfg_interval > 1 && cfg > 1.0f;
+    std::vector<float> v_uncond_cache_tc; // last computed uncond velocity [T,C]; reused between recomputes
+    if (interval_on && std::getenv("CRISPASR_VOXCPM2_CFG_INTERVAL_DEBUG"))
+        fprintf(stderr, "voxcpm2_tts: interval-CFG K=%d (uncond recomputed every %d steps; first+last always)\n",
+                cfg_interval, cfg_interval);
+
     float dt_scalar = 0.0f; // non-mean-mode
 
     for (int step = 1; step <= steps; step++) {
@@ -2765,8 +2785,19 @@ static std::vector<float> cfm_euler_solve(voxcpm2_context* ctx, const float* mu,
 
             double tl = bench ? vox_now_ms() : 0;
             std::vector<float> v_cond_tc = locdit_call(x_tc.data(), mu, t_cur, cond_raw, dt_scalar);
-            std::vector<float> zero_mu(ctx->hp.tslm_d_model, 0.0f);
-            std::vector<float> v_uncond_tc = locdit_call(x_tc.data(), zero_mu.data(), t_cur, cond_raw, dt_scalar);
+            // Interval-CFG: recompute uncond on the first CFG-active step, the last
+            // step, and every K-th step; otherwise reuse the cached uncond velocity.
+            std::vector<float> v_uncond_tc;
+            const bool recompute_unc = !interval_on || v_uncond_cache_tc.empty() || (step == zero_init_steps + 1) ||
+                                       (step == steps) || (((step - zero_init_steps - 1) % cfg_interval) == 0);
+            if (recompute_unc) {
+                std::vector<float> zero_mu(ctx->hp.tslm_d_model, 0.0f);
+                v_uncond_tc = locdit_call(x_tc.data(), zero_mu.data(), t_cur, cond_raw, dt_scalar);
+                if (interval_on)
+                    v_uncond_cache_tc = v_uncond_tc;
+            } else {
+                v_uncond_tc = v_uncond_cache_tc; // reuse stale uncond (the approximation)
+            }
             if (bench)
                 sum_locdit += vox_now_ms() - tl;
 
