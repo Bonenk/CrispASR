@@ -18,16 +18,16 @@ that TODO-A cosyvoice3 has landed).**
 Remaining: TODO-B chatterbox k=1→matmul (⚠ NOT cosyvoice3 — only 1 of its 85 hift
 kernels is k=1, measured) · TODO-C indextts/kokoro · TODO-D fastpitch loader ·
 TODO-2 interval-CFG (✅ cosyvoice3 `63a91a6a5` + f5-tts `678ee5ce1` + voxcpm2
-`2c7cc5df4` landed opt-in; ~8 other CFG backends remain) · TODO-3 Metal q4_k (needs
-registry alt-quant schema — not a quick win) · TODO-4 CI perf gate. Coverage triage
-below (only F16-kernel models benefit). ⚠ There is no
+`2c7cc5df4` + dots `675498cb3` landed opt-in; ~7 other CFG backends remain) · TODO-3
+Metal q4_k (needs registry alt-quant schema — not a quick win) · TODO-4 CI perf gate.
+Coverage triage below (only F16-kernel models benefit). ⚠ There is no
 `handover-prompts/fastconv-fleet-sweep-round2.md` on disk — this NOW section + the
 TODO QUEUE below ARE the round-2 handover.
 
 **Interval-CFG (TODO-2) — cosyvoice3 (`63a91a6a5`) + f5-tts (`678ee5ce1`) + voxcpm2
-(`2c7cc5df4`) landed opt-in, default OFF.** Recompute the uncond CFG forward only
-every K steps, reuse the cache in between; cond fresh; first+last always recompute.
-Default K=1 is byte-identical to legacy.
+(`2c7cc5df4`) + dots (`675498cb3`) landed opt-in, default OFF.** Recompute the uncond
+CFG forward only every K steps, reuse the cache in between; cond fresh; first+last
+always recompute. Default K=1 is byte-identical to legacy.
 - **cosyvoice3** `CRISPASR_COSYVOICE3_CFG_INTERVAL` (`cv3_run_solve_euler`): K=1
   byte-exact (cos=1.0 twice via `cosyvoice3-flow-cfg-interval-ab`); K=2 mel cos
   0.9994, K=3 0.9915. Full ASR round-trip PENDING (synthetic-input harness).
@@ -39,6 +39,11 @@ Default K=1 is byte-identical to legacy.
   verified via CLI — K=1 twice PCM byte-IDENTICAL; content preserved (ASR(K1)==ASR(K2)).
   ⚠ voxcpm2 is AR at the patch level, so K=2 shifts the stop predictor by a patch
   (3.36 s → 3.52 s) — same words, slightly different duration.
+- **dots-tts** `CRISPASR_DOTS_CFG_INTERVAL` (per-patch flow-matching `dots_flow_match_core`):
+  verified via CLI (dots-tts-soar-f16 + BigVGAN vocoder, 4.4 GB) — K=1 twice PCM
+  byte-IDENTICAL; content preserved — ASR(K1)==ASR(K2) word-for-word on an unambiguous
+  sentence (an earlier fox/box diff was a whisper mishearing of the K=1 baseline, not
+  interval); K=2 log-STFT cos 0.940.
 All approximate → stay opt-in. NATURALNESS at aggressive K needs a HUMAN EAR — NOT
 claimed for any.
 
@@ -308,7 +313,7 @@ content preserved — ASR(K1)==ASR(K2). ⚠ voxcpm2 is AR at the patch level, so
 shifts the stop predictor one patch (3.36 s → 3.52 s output) — same words. ~8 CFG
 backends still to do (below).
 
-**Remaining TODO-2 candidates (~8):** chatterbox (CFM), vibevoice (DPM), dia, zonos, tada, dots, voxtral, irodori. Pattern proven twice; each needs its own
+**Remaining TODO-2 candidates (~7):** chatterbox (CFM), vibevoice (DPM), dia, zonos, tada, voxtral, irodori. Pattern proven twice; each needs its own
 seed-aware A/B (ASR round-trip where a real synth is affordable; else a fixed-input
 solver harness like cosyvoice3's). irodori output is Japanese (base.en ASR won't
 work — use a JA ASR or the solver-harness route).
