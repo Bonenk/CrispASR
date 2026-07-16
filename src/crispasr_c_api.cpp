@@ -4135,14 +4135,20 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
 // (parakeet_force_chunk_seconds >= 0); return_logits sessions (per-slice CTC
 // grids can't be merged meaningfully); and audio at/under the window. Gate:
 // CRISPASR_SESSION_AUTOCHUNK=0 disables (default on — it fixes a degradation and
-// matches the CLI); CRISPASR_SESSION_CHUNK_SECONDS overrides the 30 s window.
+// matches the CLI); CRISPASR_SESSION_CHUNK_SECONDS overrides the window. The
+// default window is a flat 30 s for every backend; CRISPASR_SESSION_PERBACKEND_CHUNK=1
+// opts into per-backend windows (F4: moonshine 20 s) — kept gated because it needs
+// more A/B (regressed the one long clip measured; see session_default_chunk_seconds).
 static crispasr_session_result* transcribe_autochunk(crispasr_session* s, const float* pcm, int n_samples,
                                                      const char* language) {
     const int SR = 16000;
     bool enabled = true;
     if (const char* e = getenv("CRISPASR_SESSION_AUTOCHUNK"))
         enabled = atoi(e) != 0;
-    int chunk_s = 30;
+    bool perbackend = false;
+    if (const char* e = getenv("CRISPASR_SESSION_PERBACKEND_CHUNK"))
+        perbackend = atoi(e) != 0;
+    int chunk_s = core_session::session_default_chunk_seconds(s->backend, perbackend);
     if (const char* e = getenv("CRISPASR_SESSION_CHUNK_SECONDS"))
         chunk_s = std::max(5, atoi(e));
 

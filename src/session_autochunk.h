@@ -34,4 +34,25 @@ inline bool session_autochunk_applicable(bool enabled, const std::string& backen
     return (long long)n_samples > (long long)chunk_seconds * sr;
 }
 
+// Per-backend default auto-chunk window in seconds, used when the caller did not
+// pin one via CRISPASR_SESSION_CHUNK_SECONDS. The shipped default is a flat 30 s
+// for every backend (perbackend_enabled=false) — that is the verified-best window
+// for moonshine on the long-song A/B (see below), and the safe single-pass window
+// for whisper/qwen3/nemotron.
+//
+// F4 (opt-in via CRISPASR_SESSION_PERBACKEND_CHUNK=1): short-segment models whose
+// encoder is trained on short utterances (moonshine) get a smaller window, the
+// session mirror of the CLI's vad_slice_cap_seconds(). This path is kept behind a
+// gate — NOT deleted — because it MIGHT help on other clips/models and just needs
+// more A/B. On the one long clip measured so far (moonshine / 60 s tiled song) it
+// REGRESSED CLI-vs-session content overlap (30 s → 0.75, 20 s → 0.56) because more
+// slices add chunk-boundary artifacts on that hard audio, so it stays opt-in until
+// a clip is found where it wins; then flipping the default here is a one-liner.
+// CRISPASR_SESSION_CHUNK_SECONDS remains the direct per-call override for any run.
+inline int session_default_chunk_seconds(const std::string& backend, bool perbackend_enabled) {
+    if (perbackend_enabled && (backend == "moonshine" || backend == "moonshine-streaming"))
+        return 20;
+    return 30;
+}
+
 } // namespace core_session

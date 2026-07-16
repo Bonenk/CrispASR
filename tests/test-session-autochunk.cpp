@@ -45,3 +45,25 @@ TEST_CASE("degenerate inputs are safe", "[unit][session-autochunk]") {
     REQUIRE_FALSE(session_autochunk_applicable(true, "moonshine", 999 * SR, 0, 30, false, false)); // sr=0
     REQUIRE_FALSE(session_autochunk_applicable(true, "moonshine", 999 * SR, SR, 0, false, false)); // chunk=0
 }
+
+// F4: per-backend default auto-chunk window (opt-in via CRISPASR_SESSION_PERBACKEND_CHUNK).
+TEST_CASE("per-backend window off (default): flat 30 s for every backend", "[unit][session-autochunk]") {
+    using core_session::session_default_chunk_seconds;
+    REQUIRE(session_default_chunk_seconds("moonshine", false) == 30);
+    REQUIRE(session_default_chunk_seconds("moonshine-streaming", false) == 30);
+    REQUIRE(session_default_chunk_seconds("whisper", false) == 30);
+    REQUIRE(session_default_chunk_seconds("qwen3", false) == 30);
+    REQUIRE(session_default_chunk_seconds("", false) == 30);
+}
+
+TEST_CASE("per-backend window on: short-segment models chunk smaller", "[unit][session-autochunk]") {
+    using core_session::session_default_chunk_seconds;
+    // Only the short-segment models change; everything else keeps 30 s.
+    REQUIRE(session_default_chunk_seconds("moonshine", true) == 20);
+    REQUIRE(session_default_chunk_seconds("moonshine-streaming", true) == 20);
+    REQUIRE(session_default_chunk_seconds("moonshine", true) < 30);
+    REQUIRE(session_default_chunk_seconds("whisper", true) == 30);
+    REQUIRE(session_default_chunk_seconds("qwen3", true) == 30);
+    REQUIRE(session_default_chunk_seconds("nemotron", true) == 30);
+    REQUIRE(session_default_chunk_seconds("", true) == 30);
+}

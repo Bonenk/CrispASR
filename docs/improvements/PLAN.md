@@ -21,32 +21,38 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
 - [x] **F3 — flip `CRISPASR_SESSION_UNIFIED_DISPATCH` default ON** for parakeet
       (verified byte-identical to the inline path, Phase 1). `=0` still selects
       the legacy inline path for A/B.
-- [x] **F4 — per-backend session auto-chunk window.** INVESTIGATED, **not shipped —
-      measured no benefit** (in fact a regression), so per HARD RULE #4 the window
-      stays a flat 30 s for every backend. The hypothesis was that short-segment
-      models (moonshine) want a sub-30 s window, mirroring the adapter's
-      `vad_slice_cap_seconds()`. Prototyped a pure `session_default_chunk_seconds()`
-      (moonshine 20 s, else 30 s) + wiring + unit test, then A/B'd the window on the
-      moonshine / 60 s tiled-song clip via `test-surface-parity.sh` (CLI-vs-session
-      total-content word-overlap, greedy ⇒ deterministic, reproduced):
+- [x] **F4 — per-backend session auto-chunk window.** SHIPPED **opt-in, gated off**
+      (default behavior unchanged: flat 30 s for every backend). `transcribe_autochunk`
+      now sources its default window from the pure
+      `session_default_chunk_seconds(backend, perbackend_enabled)`; with
+      `CRISPASR_SESSION_PERBACKEND_CHUNK=1` short-segment models (moonshine /
+      moonshine-streaming) chunk at 20 s — the session mirror of the CLI's
+      `vad_slice_cap_seconds()`. `CRISPASR_SESSION_CHUNK_SECONDS` stays the direct
+      per-call override.
+
+      **Why opt-in, not default:** the hypothesis (short-segment models want a
+      sub-30 s window) REGRESSED the one long clip measured — moonshine / 60 s
+      tiled-song via `test-surface-parity.sh` (CLI-vs-session total-content
+      word-overlap, greedy ⇒ deterministic, reproduced):
 
       | window | session segs | overlap vs CLI |
       |--------|--------------|----------------|
       | 15 s   | 5            | 0.58           |
       | 20 s   | 4            | 0.56           |
-      | **30 s** (current) | 3 | **0.75**      |
+      | **30 s** (shipped default) | 3 | **0.75** |
       | 40 s   | 2            | 0.75           |
 
-      A smaller window strictly *lowers* the overlap (more slices → more
-      chunk-boundary artifacts on this hard song audio); 30 s is the plateau/optimum
-      and 40 s ties it. The premise ("a 30 s chunk still loops") was already resolved
-      by the moonshine decode-time repeat-break follow-up that shipped on `main`
-      (below) — the residual 0.75 is genuine song-transcription divergence + boundary
-      effects, not a loop the window size can fix. And `CRISPASR_SESSION_CHUNK_SECONDS`
-      already gives any user a per-call override, so a per-backend default equal to
-      30 s would be redundant dead code. Prototype reverted; only this finding is
-      recorded. No-regression confirmed: parakeet + qwen3 parity PASS 1.00 on jfk;
-      `test-session-autochunk` 13 assertions green. Backends touched: none.
+      A smaller window strictly *lowers* the overlap here (more slices → more
+      chunk-boundary artifacts on hard song audio); 30 s is the plateau and 40 s
+      ties it. The "30 s still loops" premise was already resolved by the moonshine
+      decode-time repeat-break that shipped on `main` (below). But per the A/B rule
+      3a (dev-guide): a plausible path whose first A/B regressed on ONE clip is kept
+      **gated off**, not deleted — it may win on other clips/models and flipping the
+      default is then a one-liner. No-regression confirmed: gate off ⇒ moonshine
+      30 s = 0.75, identical to pre-change; parakeet + qwen3 parity PASS 1.00 on jfk;
+      `test-session-autochunk` green (both gate modes covered). Backends touched:
+      none (session-only). Gates: `CRISPASR_SESSION_PERBACKEND_CHUNK`,
+      `CRISPASR_SESSION_CHUNK_SECONDS`.
 - [ ] **F5 — run the two CUDA kernels** (`tools/kaggle/{parakeet-mem-policy-cuda,
       server-workers-cuda}/`) — prepared; user-gated on Kaggle quota.
 
