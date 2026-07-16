@@ -16,6 +16,9 @@
 #include "core/win_compat.h"
 #include "core/bpe.h"
 #include "core/asr_segment_group.h" // issue #257: output-segment grouping (parakeet --chunk-seconds)
+#include "core/audio_chunking.h"    // fix/session-long-audio: energy-minima slicing for session auto-chunk
+#include "session_autochunk.h"      // fix/session-long-audio: pure auto-chunk applicability decision
+#include "core/ngram_loop_fix.h"    // fix/session-long-audio: collapse decode loops in merged chunks (issue #218)
 #include "parakeet_orchestrate.h"   // improvements Phase 1: shared parakeet transcribe orchestration
 #include "core/gpu_backend_pref.h"  // crispasr_set_gpu_backend_pref (#214)
 
@@ -4118,6 +4121,84 @@ static std::string ca_iso_to_english_lang(const std::string& code) {
 static crispasr_session_result* transcribe_single(crispasr_session* s, const float* pcm, int n_samples,
                                                   const char* language);
 
+// Long-audio auto-chunking for the session API (fix/session-long-audio).
+//
+// The raw session transcribe is otherwise a single pass over the whole buffer;
+// for short-segment models (moonshine, whisper, …) that degrades and slows
+// badly past ~30 s, while the CLI/server dispatcher chunks long audio. This
+// wraps transcribe_single so the session behaves like the CLI: slice long audio
+// at energy minima (quiet cuts → no boundary dedup needed, PLAN #80b) and
+// transcribe each piece, shifting timestamps back to the absolute timeline.
+//
+// Skipped for: backends that already chunk internally (parakeet/reazonspeech
+// self-chunk in transcribe_single); an explicit chunked request
+// (parakeet_force_chunk_seconds >= 0); return_logits sessions (per-slice CTC
+// grids can't be merged meaningfully); and audio at/under the window. Gate:
+// CRISPASR_SESSION_AUTOCHUNK=0 disables (default on — it fixes a degradation and
+// matches the CLI); CRISPASR_SESSION_CHUNK_SECONDS overrides the 30 s window.
+static crispasr_session_result* transcribe_autochunk(crispasr_session* s, const float* pcm, int n_samples,
+                                                     const char* language) {
+    const int SR = 16000;
+    bool enabled = true;
+    if (const char* e = getenv("CRISPASR_SESSION_AUTOCHUNK"))
+        enabled = atoi(e) != 0;
+    int chunk_s = 30;
+    if (const char* e = getenv("CRISPASR_SESSION_CHUNK_SECONDS"))
+        chunk_s = std::max(5, atoi(e));
+
+    const bool already_chunking = (s->parakeet_force_chunk_seconds >= 0);
+    if (!core_session::session_autochunk_applicable(enabled, s->backend, n_samples, SR, chunk_s, s->return_logits,
+                                                    already_chunking))
+        return transcribe_single(s, pcm, n_samples, language);
+
+    const auto ranges =
+        audio_chunking::split_at_energy_minima(pcm, (size_t)n_samples, (size_t)chunk_s * SR, (size_t)(5 * SR));
+    if (ranges.size() <= 1)
+        return transcribe_single(s, pcm, n_samples, language);
+
+    auto* merged = new crispasr_session_result();
+    for (const auto& range : ranges) {
+        const size_t b = range.first, e = range.second;
+        crispasr_session_result* part = transcribe_single(s, pcm + b, (int)(e - b), language);
+        if (!part)
+            continue;
+        if (merged->backend.empty())
+            merged->backend = part->backend;
+        const int64_t off_cs = (int64_t)((double)b / SR * 100.0);
+        for (auto& seg : part->segments) {
+            seg.t0 += off_cs;
+            seg.t1 += off_cs;
+            for (auto& w : seg.words) {
+                w.t0 += off_cs;
+                w.t1 += off_cs;
+            }
+            // Chunked long audio can send a short-segment model (moonshine) into
+            // an n-gram repetition loop on a hard slice ("I'm sorry, I'm sorry,
+            // …"). Collapse it like the cohere/granite adapters do (issue #218);
+            // fix_loops is identity on clean text, so this is safe for every
+            // backend. Prune the looped words too so text and words stay aligned.
+            if (!seg.words.empty()) {
+                std::vector<std::string> wtexts;
+                wtexts.reserve(seg.words.size());
+                for (const auto& w : seg.words)
+                    wtexts.push_back(w.text);
+                const std::vector<int> keep = core_ngram::fix_loops_keep_indices(wtexts);
+                if (keep.size() < seg.words.size()) {
+                    std::vector<crispasr_session_seg::word> kept;
+                    kept.reserve(keep.size());
+                    for (int i : keep)
+                        kept.push_back(std::move(seg.words[i]));
+                    seg.words = std::move(kept);
+                }
+            }
+            seg.text = core_ngram::fix_loops(seg.text);
+            merged->segments.push_back(std::move(seg));
+        }
+        delete part;
+    }
+    return merged;
+}
+
 // Applies the session's resident --punc-model (if any) to a result in place.
 // Defined further down next to crispasr_session_set_punc_model.
 static void apply_session_punc_model(crispasr_session* s, crispasr_session_result* r);
@@ -4132,7 +4213,7 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_lang(crispasr_ses
     // via greedy.best_of, so we only loop externally for non-whisper backends.
     const int n_runs = (s->best_of > 1 && s->backend != "whisper") ? s->best_of : 1;
     if (n_runs <= 1) {
-        crispasr_session_result* r = transcribe_single(s, pcm, n_samples, language);
+        crispasr_session_result* r = transcribe_autochunk(s, pcm, n_samples, language);
         apply_session_punc_model(s, r);
         _fire_segment_callbacks(s, r);
         return r;
@@ -4141,7 +4222,7 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_lang(crispasr_ses
     crispasr_session_result* best = nullptr;
     double best_avg_p = -1.0;
     for (int run = 0; run < n_runs; run++) {
-        crispasr_session_result* candidate = transcribe_single(s, pcm, n_samples, language);
+        crispasr_session_result* candidate = transcribe_autochunk(s, pcm, n_samples, language);
         if (!candidate)
             continue;
         // Compute average per-word confidence

@@ -6,6 +6,24 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
 
 ## NOW — active work
 
+- [x] **Session long-audio fix** (2026-07-16) — DONE. The long-audio audit found
+      `crispasr_session_transcribe` did one degraded/hanging pass on long audio
+      (the CLI/server chunk it). Fixed: `transcribe_autochunk` now slices long
+      audio at energy minima and transcribes each piece, shifting timestamps to
+      the absolute timeline — like the CLI. Merged chunks are run through
+      `core_ngram::fix_loops` (identity on clean text) since a short-segment
+      model (moonshine) can loop on a hard slice. Pure applicability decision in
+      `src/session_autochunk.h` (`test-session-autochunk`, 13 assertions). Gate:
+      `CRISPASR_SESSION_AUTOCHUNK` (default ON — it fixes a hang; `=0` disables),
+      `CRISPASR_SESSION_CHUNK_SECONDS` (window, default 30). Skips self-chunkers
+      (parakeet/reazonspeech), the return_logits path, and explicit chunk
+      requests. Verified on moonshine/60 s: 1 seg (hung, 104-word ×15 loop) →
+      3 segs, 43 words, loop collapsed, completes, timestamps monotonic. Caveat:
+      moonshine still spends decode time generating the loop before fix_loops
+      cleans it (57 s on this song-worst-case); normal speech doesn't loop. Other
+      backends inherit the same safe CLI-style chunking (verified on moonshine;
+      chunking-at-silence mirrors the dispatcher). Default-on because the prior
+      behaviour was a hang.
 - [x] **Phase 0** — cross-surface parity harness + test (safety net) — DONE
       (`src/core/asr_parity.h` + `test-asr-parity` 13 assertions; live
       `test-surface-parity.sh` PASS: CLI==session on parakeet-tdt-1.1b/jfk)
