@@ -6,6 +6,29 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
 
 ## NOW — active work
 
+### Follow-ups (2026-07-16) — from the session-long-audio arc
+- [ ] **F1 — reuse `core_repeat` beyond moonshine.** Audit result: most ASR
+      backends already have adapter-level `core_ngram::fix_loops` output cleanup
+      (cohere/granite/glm/qwen3/canary-qwen/higgs/moss); only `firered_asr`/
+      `kyutai_stt` libs have NO guard, but there's no evidence they loop (unlike
+      moonshine, which we caught). Per the Phase 1b lesson, NOT wiring
+      speculatively — `core_repeat::tail_is_repetition` is ready to drop into any
+      backend that shows the runaway-greedy-loop symptom (decode-time break =
+      speed, on top of fix_loops = output cleanup). Left as ready, evidence-gated.
+- [x] **F2 — surface-parity in nightly CI.** Added `test-surface-parity.sh` to the
+      regression workflow so cross-surface (CLI vs session) parity is a permanent
+      guard against the #257 class, not a manual audit.
+- [x] **F3 — flip `CRISPASR_SESSION_UNIFIED_DISPATCH` default ON** for parakeet
+      (verified byte-identical to the inline path, Phase 1). `=0` still selects
+      the legacy inline path for A/B.
+- [ ] **F4 — per-backend session auto-chunk window.** `transcribe_autochunk` uses
+      a fixed 30 s window; short-segment models (moonshine) want smaller, mirroring
+      the adapter's `vad_slice_cap_seconds()`. Small refinement, needs a per-backend
+      window map + verification; scoped, not yet done (`CRISPASR_SESSION_CHUNK_SECONDS`
+      is the manual override meanwhile).
+- [ ] **F5 — run the two CUDA kernels** (`tools/kaggle/{parakeet-mem-policy-cuda,
+      server-workers-cuda}/`) — prepared; user-gated on Kaggle quota.
+
 - [ ] **CUDA proofs — kernels prepared, awaiting a run** (2026-07-16). The two
       hardware-gated open items can't run on M1; ready-to-push Kaggle kernels:
       `tools/kaggle/parakeet-mem-policy-cuda/` (Phase 2: estimate-vs-real VRAM +
