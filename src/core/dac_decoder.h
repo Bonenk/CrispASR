@@ -291,22 +291,28 @@ static inline ggml_tensor* convt1d(ggml_context* ctx, ggml_tensor* x, ggml_tenso
     return core_convt::convt1d_crop(ctx, x, w, b, stride, /*crop_left=*/pad, /*crop_right=*/pad);
 }
 
-// ResidualUnit: Snake -> Conv1d(k=7,dil=d) -> Snake -> Conv1d(k=1) -> add
-static inline ggml_tensor* res_unit(ggml_context* ctx, ggml_tensor* x, const DacResUnit& u, int dil) {
+// ResidualUnit: Snake -> Conv1d(k=7,dil=d) -> Snake -> Conv1d(k=1) -> add.
+// Optional FASTCONV cache (nullptr = legacy path, unchanged for existing callers).
+static inline ggml_tensor* res_unit(ggml_context* ctx, ggml_tensor* x, const DacResUnit& u, int dil,
+                                    const fastconv_cache* fc = nullptr) {
     ggml_tensor* y = snake(ctx, x, u.alpha0);
-    y = conv1d(ctx, y, u.conv0_w, u.conv0_b, 7, dil);
+    y = conv1d(ctx, y, u.conv0_w, u.conv0_b, 7, dil, fc);
     y = snake(ctx, y, u.alpha1);
-    y = conv1d(ctx, y, u.conv1_w, u.conv1_b, 1); // k=1 pointwise
+    y = conv1d(ctx, y, u.conv1_w, u.conv1_b, 1, 1, fc); // k=1 pointwise
     return ggml_add(ctx, x, y);
 }
 
-// DecoderBlock: Snake -> ConvTranspose1d(stride=s) -> 3 x ResidualUnit(d=1,3,9)
-static inline ggml_tensor* dec_block(ggml_context* ctx, ggml_tensor* x, const DacDecoderBlock& blk, int stride) {
+// DecoderBlock: Snake -> ConvTranspose1d(stride=s) -> 3 x ResidualUnit(d=1,3,9).
+// Optional FASTCONV cache (nullptr = legacy). The baked-F32 up kernel is a no-op
+// for the decomp path (w_perm already F32) and removes the cast for the crop path.
+static inline ggml_tensor* dec_block(ggml_context* ctx, ggml_tensor* x, const DacDecoderBlock& blk, int stride,
+                                     const fastconv_cache* fc = nullptr) {
     x = snake(ctx, x, blk.snake_alpha);
-    x = convt1d(ctx, x, blk.up_w, blk.up_w_perm, blk.up_b, stride);
-    x = res_unit(ctx, x, blk.res[0], 1);
-    x = res_unit(ctx, x, blk.res[1], 3);
-    x = res_unit(ctx, x, blk.res[2], 9);
+    ggml_tensor* up_w = (fc && fc->enabled) ? fc->get(blk.up_w) : blk.up_w;
+    x = convt1d(ctx, x, up_w, blk.up_w_perm, blk.up_b, stride);
+    x = res_unit(ctx, x, blk.res[0], 1, fc);
+    x = res_unit(ctx, x, blk.res[1], 3, fc);
+    x = res_unit(ctx, x, blk.res[2], 9, fc);
     return x;
 }
 

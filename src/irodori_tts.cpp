@@ -318,6 +318,9 @@ struct irodori_tts_context {
     ggml_tensor* codec_out_proj_b = nullptr;
     // DAC decoder weights (reusing core_dac structure with DACVAE config)
     core_dac::DacWeights dac;
+    // FASTCONV (docs/perf-sweep/PLAN.md): baked-F32 decode conv kernels so the
+    // per-graph F16→F32 cast becomes a no-op. Gated CRISPASR_IRODORI_FASTCONV.
+    core_dac::fastconv_cache dac_fc;
     // DAC-VAE encoder weights (voice cloning: reference audio → latent)
     irodori_dacvae_encoder enc;
 
@@ -1474,6 +1477,7 @@ struct irodori_tts_context* irodori_tts_init_from_file(const char* path_model, s
 void irodori_tts_free(struct irodori_tts_context* ctx) {
     if (!ctx)
         return;
+    ctx->dac_fc.free(); // FASTCONV baked-kernel buffer (on codec_backend)
     if (ctx->codec_buf)
         ggml_backend_buffer_free(ctx->codec_buf);
     if (ctx->codec_ctx)
@@ -1661,6 +1665,25 @@ int irodori_tts_set_codec_path(struct irodori_tts_context* ctx, const char* code
     ctx->codec_ctx = wl.ctx;
     ctx->codec_buf = wl.buf;
     ctx->has_codec = true;
+
+    // FASTCONV (docs/perf-sweep/PLAN.md): bake F32 copies of the DECODE conv
+    // kernels via the shared core_dac cache so the per-graph F16→F32 cast becomes
+    // a no-op + k=1 convs become matmuls. Gated CRISPASR_IRODORI_FASTCONV (default
+    // on); =0 restores the legacy cast path (clean A/B). Encode/voice-clone convs
+    // stay legacy (rare path).
+    {
+        const char* e = std::getenv("CRISPASR_IRODORI_FASTCONV");
+        const bool on = !(e && e[0] == '0');
+        std::vector<ggml_tensor*> convs = {dac.in_conv_w, dac.out_conv_w, ctx->codec_out_proj_w};
+        for (auto& blk : dac.blocks) {
+            convs.push_back(blk.up_w);
+            for (int r = 0; r < 3; r++) {
+                convs.push_back(blk.res[r].conv0_w);
+                convs.push_back(blk.res[r].conv1_w);
+            }
+        }
+        ctx->dac_fc.bake(ctx->codec_backend, convs, on);
+    }
 
     if (ctx->verbosity >= 1) {
         std::fprintf(stderr, "[irodori] DAC-VAE codec loaded (%d decoder blocks)\n", dac.config.n_decoder_blocks);
@@ -2596,24 +2619,25 @@ static std::vector<float> decode_dac_window(irodori_tts_context* ctx, const floa
     ggml_set_name(lat_in, "latent_in");
     ggml_set_input(lat_in);
 
+    const core_dac::fastconv_cache* fc = &ctx->dac_fc;
     ggml_tensor* h = lat_in;
     if (ctx->codec_out_proj_w) {
-        h = core_dac::conv1d(g, h, ctx->codec_out_proj_w, ctx->codec_out_proj_b, 1);
+        h = core_dac::conv1d(g, h, ctx->codec_out_proj_w, ctx->codec_out_proj_b, 1, 1, fc);
         h = ggml_cast(g, h, GGML_TYPE_F32);
     }
     if (dac.in_conv_w) {
-        h = core_dac::conv1d(g, h, dac.in_conv_w, dac.in_conv_b, 7);
+        h = core_dac::conv1d(g, h, dac.in_conv_w, dac.in_conv_b, 7, 1, fc);
         h = ggml_cast(g, h, GGML_TYPE_F32);
     }
     for (int b = 0; b < cfg.n_decoder_blocks; b++) {
-        h = core_dac::dec_block(g, h, dac.blocks[b], cfg.upsampling_ratios[b]);
+        h = core_dac::dec_block(g, h, dac.blocks[b], cfg.upsampling_ratios[b], fc);
         h = ggml_cont(g, h);
         h = ggml_cast(g, h, GGML_TYPE_F32);
     }
     if (dac.out_snake_alpha)
         h = core_dac::snake(g, h, dac.out_snake_alpha);
     if (dac.out_conv_w) {
-        h = core_dac::conv1d(g, h, dac.out_conv_w, dac.out_conv_b, 7);
+        h = core_dac::conv1d(g, h, dac.out_conv_w, dac.out_conv_b, 7, 1, fc);
         h = ggml_cast(g, h, GGML_TYPE_F32);
     }
     h = ggml_tanh(g, h);

@@ -8,8 +8,30 @@ possible. Default flips only on a proven speed AND quality win.
 
 ## NOW — active work
 
-**Status (2026-07-16): campaign kickoff. Building the shared FASTCONV helper first
-so 24 backends benefit from one implementation.**
+**Status (2026-07-16): shared FASTCONV helper landed + 2 backends migrated/piloted.**
+
+- ✅ **Item 1 — shared `core_dac::fastconv_cache` + `conv1d`/`res_unit`/`dec_block`
+  fast path** (`203f28f01`). Unit test `test-fastconv` (206 assertions): fast ≈
+  legacy (K=7 + k=1), byte-identical when disabled. `res_unit`/`dec_block` take an
+  optional `fc` (default nullptr = legacy, so all existing callers untouched).
+- ✅ **Item 6 — OmniVoice migrated to the shared helper** (`191a7ebe4`) — deleted
+  its ~90-line local copy; verified equivalent (max|d| 23/32768, ASR exact).
+- ✅ **Item 7 pilot — irodori_tts** (`CRISPASR_IRODORI_FASTCONV`, default on):
+  bakes 92 F16 decode conv kernels → F32; wired `decode_dac_window` through
+  `core_dac::conv1d(...,&fc)` + `dec_block(...,&fc)`. **Codec-only A/B (seed 42,
+  isolating the flow-matching RNG): BYTE-IDENTICAL (0/32768).**
+  - ⚠ **Lesson:** irodori is non-deterministic without a seed (`std::mt19937` from
+    `random_device`, flow-matching noise). A naive on/off byte-diff showed
+    max|d|=45607 (RNG, NOT fastconv). ON-vs-ON @seed42 = 0 confirmed determinism;
+    the seeded on/off = 0 confirmed the codec change. [[tts-parity-not-by-audio-corr]].
+- ⏭ **Next:** the remaining backends have their OWN local conv lambdas (not
+  `core_dac::conv1d`). Wire the reusable `fastconv_cache` into each: add a cache
+  member, bake its convs at load, call `fc->get(w)` in its lambda (or route to
+  `core_dac::conv1d`). Then items 2 (interval-CFG), 3/4 (Metal q4_k, CI perf gate).
+
+---
+
+**Kickoff notes (superseded above): 26 backends, only 2 had FASTCONV.**
 
 ### Evidence (grep of `src/*.cpp`, 2026-07-16)
 - **26 TTS backends** route their vocoder/codec through `core_dac::conv1d` /
