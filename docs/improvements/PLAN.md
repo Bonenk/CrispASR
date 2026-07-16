@@ -9,7 +9,18 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
 - [x] **Phase 0** — cross-surface parity harness + test (safety net) — DONE
       (`src/core/asr_parity.h` + `test-asr-parity` 13 assertions; live
       `test-surface-parity.sh` PASS: CLI==session on parakeet-tdt-1.1b/jfk)
-- [ ] **Phase 1** — collapse the dual dispatch (session C-ABI → shared adapter) — IN PROGRESS
+- [x] **Phase 1** — collapse the dual dispatch — DONE for **parakeet** (pilot).
+      Orchestration hoisted to `src/parakeet_orchestrate.{h,cpp}`
+      (`parakeet_transcribe_segments`); the CLI adapter is now a thin wrapper
+      (**−310 LOC**, 544→234) and the session C-ABI calls the same code under
+      `CRISPASR_SESSION_UNIFIED_DISPATCH=1`. Pure `parakeet_pick_strategy`
+      unit-tested (`test-parakeet-strategy`, 11 assertions). A/B: CLI
+      byte-identical pre/post refactor; parity harness PASS gate-ON on jfk (short)
+      AND the 225 s single-pass clip (where the old inline session diverged).
+      **Remaining backends** (canary/cohere/granite/…) follow the same recipe —
+      tracked below.
+- [ ] **Phase 1b** — extend the hoist + gate to the other backends, flip the gate
+      default to ON once each is parity-verified.
 - [ ] **Phase 2** — unified encoder memory policy (proactive, replaces ad-hoc gates)
 - [ ] **Phase 3** — diff-harness parity in CI (per-stage cos + decoded roundtrip)
 - [ ] **Phase 4** — server throughput (batching / worker pool)
