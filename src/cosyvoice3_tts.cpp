@@ -3477,6 +3477,28 @@ float* cv3_run_solve_euler(cosyvoice3_tts_context* ctx, const float* mu, int T_m
     const char* cfg_batch_env = std::getenv("COSYVOICE3_CFG_BATCH");
     bool use_cfg_batch = !cfg_batch_env || strcmp(cfg_batch_env, "0") != 0;
 
+    // Interval-CFG (opt-in, APPROXIMATE — mirrors OMNIVOICE_CFG_INTERVAL): recompute
+    // the uncond CFG forward only every K steps and reuse the cached uncond dphi in
+    // between; the cond forward stays fresh every step; the first AND last step
+    // always recompute uncond. This uses a slightly stale uncond, so it CHANGES the
+    // output and stays gated OFF by default (K=1 = exact). It requires the SEPARATE
+    // 2-forward path — the batched path (COSYVOICE3_CFG_BATCH) fuses cond+uncond into
+    // one graph, so there is no uncond forward to skip; K>1 therefore forces separate
+    // forwards. Only active when K>1 && cfg_rate!=0, so at the default the legacy path
+    // below is byte-for-byte unchanged. Gated CRISPASR_COSYVOICE3_CFG_INTERVAL.
+    const int cfg_interval = [] {
+        const char* e = std::getenv("CRISPASR_COSYVOICE3_CFG_INTERVAL");
+        const int k = e ? atoi(e) : 1;
+        return k < 1 ? 1 : k;
+    }();
+    const bool interval_on = cfg_interval > 1 && cfg_rate != 0.0f;
+    if (interval_on)
+        use_cfg_batch = false;       // interval needs the standalone uncond forward to skip
+    std::vector<float> uncond_cache; // last computed uncond dphi [mel_n]; reused between recomputes
+    if (interval_on && std::getenv("CRISPASR_COSYVOICE3_CFG_INTERVAL_DEBUG"))
+        fprintf(stderr, "cosyvoice3_tts: interval-CFG K=%d (uncond recomputed every %d steps; first+last always)\n",
+                cfg_interval, cfg_interval);
+
     double t = t_span[0];
     double dt = t_span[1] - t_span[0];
     for (int step = 1; step <= n_steps; step++) {
@@ -3485,7 +3507,26 @@ float* cv3_run_solve_euler(cosyvoice3_tts_context* ctx, const float* mu, int T_m
         const float w_cond = 1.0f + cfg_rate;
         const float w_unc = cfg_rate;
         float* dphi_cond = nullptr;
-        if (cfg_rate == 0.0f) {
+        if (interval_on) {
+            // Cond fresh every step; uncond recomputed on the first + last step and
+            // every K-th step, otherwise reused from uncond_cache (the approximation).
+            dphi_cond = cv3_run_estimator_full(ctx, x.data(), T_mel, mu, spks_proj, cond, sin_emb.data());
+            if (!dphi_cond)
+                return nullptr;
+            const bool recompute_unc = (step == 1) || (step == n_steps) || (((step - 1) % cfg_interval) == 0);
+            if (recompute_unc || uncond_cache.empty()) {
+                float* dphi_unc = cv3_run_estimator_full(ctx, x.data(), T_mel, mu_zero.data(), spks_zero.data(),
+                                                         cond_zero.data(), sin_emb.data());
+                if (!dphi_unc) {
+                    free(dphi_cond);
+                    return nullptr;
+                }
+                uncond_cache.assign(dphi_unc, dphi_unc + mel_n);
+                free(dphi_unc);
+            }
+            for (size_t i = 0; i < mel_n; i++)
+                dphi_cond[i] = w_cond * dphi_cond[i] - w_unc * uncond_cache[i];
+        } else if (cfg_rate == 0.0f) {
             dphi_cond = cv3_run_estimator_full(ctx, x.data(), T_mel, mu, spks_proj, cond, sin_emb.data());
             if (!dphi_cond)
                 return nullptr;
