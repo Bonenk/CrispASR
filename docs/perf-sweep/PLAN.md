@@ -29,10 +29,16 @@ possible. Default flips only on a proven speed AND quality win.
   param; nullptr = legacy). Bakes the dac-44khz F16 decode kernels. **Codec A/B
   (seed 42): BYTE-IDENTICAL (0/32768), non-silent.** So all three core_dac-family
   backends (omnivoice/irodori/zonos) now share one FASTCONV impl.
-- ⏭ **Next:** the remaining backends have their OWN local conv lambdas (not
-  `core_dac`). Wire the reusable `fastconv_cache` into each: add a cache member,
-  bake its convs at load, call `fc->get(w)` in its lambda (or route to
-  `core_dac::conv1d`). Then items 2 (interval-CFG), 3/4 (Metal q4_k, CI perf gate).
+- ✅ **Shared `core_hifigan::conv1d` FASTCONV overload** — the HiFi-GAN vocoder is
+  shared by fastpitch/speecht5/bananamind, so one overload (reusing
+  `core_dac::fastconv_cache`) sets up 3 backends. Time-major layout so no
+  k=1→matmul, but the F16-cast kill (the main win) applies. Unit test extended
+  (`core_hifigan` case, cos>0.99999); 210 assertions total. `nullptr`-default so
+  nothing changes until a backend bakes + passes `&fc`.
+- ⏭ **Next:** wire fastpitch/speecht5/bananamind (bake vocoder convs + pass &fc,
+  seed-aware A/B each); other backends with bespoke conv lambdas (chatterbox_s3gen
+  12 convs, cosyvoice3, indextts_voc, kokoro) one at a time. Then items 2
+  (interval-CFG), 3/4 (Metal q4_k, CI perf gate).
 
 ---
 

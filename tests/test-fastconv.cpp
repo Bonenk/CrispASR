@@ -12,6 +12,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "core/dac_decoder.h"
+#include "core/hifigan.h"
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -153,4 +154,66 @@ TEST_CASE("core_dac::fastconv — disabled cache is byte-identical to legacy", "
     REQUIRE(legacy.size() == gated.size());
     for (size_t i = 0; i < legacy.size(); i++)
         REQUIRE(legacy[i] == gated[i]); // exact
+}
+
+TEST_CASE("core_hifigan::conv1d — FASTCONV overload equivalent to legacy", "[unit][fastconv]") {
+    // HiFi-GAN conv is time-major (x is (T, C_in)); reuse the shared cache to bake
+    // the F16 kernel and confirm the baked-F32 path matches the legacy F16-cast path.
+    Rng rng(0x41F1ull);
+    const int Cin = 5, Cout = 9, T = 32, K = 7;
+    ggml_backend_t backend = ggml_backend_cpu_init();
+    ggml_init_params ip{4 * ggml_tensor_overhead(), nullptr, true};
+    ggml_context* wctx = ggml_init(ip);
+    ggml_tensor* w = ggml_new_tensor_3d(wctx, GGML_TYPE_F16, K, Cin, Cout);
+    ggml_tensor* b = ggml_new_tensor_1d(wctx, GGML_TYPE_F32, Cout);
+    ggml_tensor* x = ggml_new_tensor_2d(wctx, GGML_TYPE_F32, T, Cin); // time-major (T, Cin)
+    ggml_backend_buffer_t wbuf = ggml_backend_alloc_ctx_tensors(wctx, backend);
+    {
+        size_t n = ggml_nelements(w);
+        std::vector<ggml_fp16_t> h(n);
+        for (size_t i = 0; i < n; i++)
+            h[i] = ggml_fp32_to_fp16(rng.sym());
+        ggml_backend_tensor_set(w, h.data(), 0, n * sizeof(ggml_fp16_t));
+        std::vector<float> bb(Cout), xx((size_t)T * Cin);
+        for (auto& v : bb)
+            v = rng.sym();
+        for (auto& v : xx)
+            v = rng.sym();
+        ggml_backend_tensor_set(b, bb.data(), 0, bb.size() * sizeof(float));
+        ggml_backend_tensor_set(x, xx.data(), 0, xx.size() * sizeof(float));
+    }
+    core_dac::fastconv_cache fc;
+    fc.bake(backend, {w}, true);
+    REQUIRE(fc.get(w)->type == GGML_TYPE_F32);
+
+    auto run_hg = [&](const core_dac::fastconv_cache* c) {
+        std::vector<uint8_t> meta(1 << 20);
+        ggml_init_params gip{meta.size(), meta.data(), true};
+        ggml_context* g = ggml_init(gip);
+        ggml_tensor* y =
+            c ? core_hifigan::conv1d(g, x, w, b, 1, K / 2, 1, c) : core_hifigan::conv1d(g, x, w, b, 1, K / 2, 1);
+        ggml_set_output(y);
+        ggml_set_name(y, "y");
+        ggml_cgraph* gf = ggml_new_graph(g);
+        ggml_build_forward_expand(gf, y);
+        ggml_gallocr_t ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(backend));
+        ggml_gallocr_alloc_graph(ga, gf);
+        ggml_backend_graph_compute(backend, gf);
+        std::vector<float> out(ggml_nelements(ggml_graph_get_tensor(gf, "y")));
+        ggml_backend_tensor_get(ggml_graph_get_tensor(gf, "y"), out.data(), 0, out.size() * sizeof(float));
+        ggml_gallocr_free(ga);
+        ggml_free(g);
+        return out;
+    };
+    auto legacy = run_hg(nullptr);
+    auto fast = run_hg(&fc);
+    double cos, mx;
+    cos_and_max(legacy, fast, cos, mx);
+    REQUIRE(cos > 0.99999);
+    REQUIRE(mx < 1e-2);
+
+    fc.free();
+    ggml_backend_buffer_free(wbuf);
+    ggml_backend_free(backend);
+    ggml_free(wctx);
 }
