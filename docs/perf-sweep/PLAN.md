@@ -8,6 +8,13 @@ possible. Default flips only on a proven speed AND quality win.
 
 ## NOW — active work
 
+**🔨 [OPUS-1M] CLAIMED 2026-07-16 — chatterbox interval-CFG (TODO-2, the last clean
+flow candidate).** Implementing `CRISPASR_S3GEN_CFG_INTERVAL` in s3gen's 10-step CFM
+Euler solver (`cfm_euler_solve`): K>1 forces the sequential single UNet path
+(`CRISPASR_S3GEN_UNET_CFG_SINGLE`) and skips the uncond UNet pass every K steps; the
+batched-B2 default (K=1) stays byte-identical. Verifying via CLI synth at low load.
+Do NOT double-work this. (Sonnet owns TODO-B chatterbox k=1→matmul — different item.)
+
 **In flight (2026-07-16, this session): remaining locally-doable items.** ✅ TODO-C
 resolved — **kokoro FASTCONV landed** (`323e96f23`, 89 F16 kernels, byte-identical);
 **indextts_voc not applicable** (F16 tensors are custom-CPU-op AA filters, not
