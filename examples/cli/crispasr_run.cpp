@@ -407,7 +407,10 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     std::vector<float> samples;
     std::vector<std::vector<float>> stereo;
     const bool want_stereo = params.diarize;
-    if (!read_audio_data(fname_inp, samples, stereo, want_stereo)) {
+    // Load audio at the backend's native rate (e.g. 24 kHz for kyutai/vibevoice)
+    // to avoid the lossy 16k→Nk double-resample path (issue #263).
+    const int native_rate = backend.input_sample_rate();
+    if (!read_audio_data(fname_inp, samples, stereo, want_stereo, native_rate)) {
         fprintf(stderr, "crispasr: error: failed to read audio '%s'\n", fname_inp.c_str());
         return 20;
     }
