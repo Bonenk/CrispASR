@@ -72,7 +72,31 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       none (session-only). Gates: `CRISPASR_SESSION_PERBACKEND_CHUNK`,
       `CRISPASR_SESSION_CHUNK_SECONDS`.
 - [ ] **F5 — run the two CUDA kernels** (`tools/kaggle/{parakeet-mem-policy-cuda,
-      server-workers-cuda}/`) — prepared; user-gated on Kaggle quota.
+      server-workers-cuda}/`) — prepared; user-gated on Kaggle quota. _2026-07-16:
+      push attempted, REJECTED pre-flight — `chr1str` account at its 30 h/week GPU
+      quota (0 quota consumed; kernels never created, `status` → 404). Scripts
+      verified launch-ready (py_compile OK, GPU+internet on, proof-of-work guards);
+      re-run `bash <dir>/push.sh` once the weekly window resets._
+
+### Further follow-ups (2026-07-16, session 2)
+- [ ] **F6 — extend the F1 runaway audit to the other greedy decoders.** firered
+      was the first probe and had a real 354 s greedy runaway (F1). `glm-asr` and
+      `cohere-transcribe` are also greedy AR decoders (EOS + token cap) that have
+      adapter-level `core_ngram::fix_loops` (output cleaned) but NO decode-time
+      break — so a runaway still BURNS decode compute even though the transcript
+      looks clean. Probe each on the loop-prone 60 s song; wire
+      `core_repeat::tail_is_repetition` (gated, default on) ONLY where a `max_len`
+      saturation is DEMONSTRATED (evidence-gated, per Phase 1b). _IN PROGRESS._
+- [ ] **F7 — repo hygiene.** ~25 untracked entries in the tree (stray `bark_*.log`,
+      `failed_logs.txt`, loose `*.gguf`/`ggml-*.bin`, `.codex-scratch/`). Triage into
+      gitignore vs safe-delete; present the list before touching anything.
+- [ ] **F8 — F5 auto-retry.** A `/loop` or scheduled agent that re-runs the two
+      `push.sh` scripts and fires them the moment the Kaggle 30 h GPU quota resets.
+- [ ] **F9 — test-suite health snapshot.** Run unit + live integration tests against
+      current `main` for a clean baseline (nothing verified end-to-end since F1
+      beyond the manual firered A/B).
+- [ ] **F10 — propagate the dev-guide A/B rule 3a** (keep-gated-not-revert) to the
+      `~/code/vps-mds/` copies so it isn't Mac-only.
 
 - [ ] **CUDA proofs — kernels prepared, awaiting a run** (2026-07-16). The two
       hardware-gated open items can't run on M1; ready-to-push Kaggle kernels:
