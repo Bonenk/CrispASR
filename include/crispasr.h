@@ -641,6 +641,17 @@ CRISPASR_API int crispasr_session_set_hotwords(struct crispasr_session* s, const
 // when the last call succeeded. Pointer owned by the session.
 CRISPASR_API const char* crispasr_session_last_synth_error(struct crispasr_session* s);
 
+// Sample rate the backend expects for input PCM. Use with
+// crispasr_audio_load_at_rate to load audio at the model's native rate,
+// avoiding a lossy down-then-up resample. Returns 16000 for Whisper-family
+// backends and 0 on error.
+CRISPASR_API int crispasr_session_input_sample_rate(struct crispasr_session* s);
+
+// Tell the session what sample rate the next transcribe call's PCM is at.
+// Backends that normally resample (e.g. 16 kHz → 24 kHz) will skip the
+// step when the rate already matches. Defaults to 16000 for back-compat.
+CRISPASR_API int crispasr_session_set_pcm_sample_rate(struct crispasr_session* s, int rate);
+
 // CTC vocabulary access. Returns 0 / "" for backends without an exposed CTC
 // vocabulary. The token text pointer is model-owned and must not be freed.
 CRISPASR_API int crispasr_session_n_vocab(struct crispasr_session* s);
@@ -895,6 +906,13 @@ CRISPASR_API void crispasr_reset_progress(void);
 // *out_sample_rate (always 16000), or a negative error. No ffmpeg needed for
 // the common formats (glint AAC/Opus, miniaudio, AudioToolbox/fdk, libopus, …).
 CRISPASR_API int crispasr_audio_load(const char* path, float** out_pcm, int* out_samples, int* out_sample_rate);
+
+// Like crispasr_audio_load but resamples to `target_rate` instead of 16 kHz.
+// When the source audio already matches `target_rate`, no resampling occurs —
+// avoids the quality-degrading down-then-up path for non-16 kHz backends.
+CRISPASR_API int crispasr_audio_load_at_rate(const char* path, int target_rate, float** out_pcm, int* out_samples,
+                                             int* out_sample_rate);
+
 CRISPASR_API void crispasr_audio_free(float* pcm);
 
 // ─── Stereo audio decode ─────────────────────────────────────────────

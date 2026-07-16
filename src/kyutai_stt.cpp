@@ -266,7 +266,9 @@ struct kyutai_stt_context {
 // ===========================================================================
 
 extern "C" struct kyutai_stt_context_params kyutai_stt_context_default_params(void) {
-    return {/*n_threads=*/4, /*verbosity=*/1, /*use_gpu=*/true, /*temperature=*/0.0f, /*beam_size=*/1};
+    return {/*n_threads=*/4,        /*verbosity=*/1, /*use_gpu=*/true,
+            /*temperature=*/0.0f,   /*beam_size=*/1,
+            /*input_sample_rate=*/0};
 }
 
 // --- Helpers ---
@@ -1192,15 +1194,23 @@ static char* kyutai_stt_transcribe_impl(struct kyutai_stt_context* ctx, const fl
     auto& hp = ctx->model.hp;
     auto& m = ctx->model;
 
-    // Step 1: Resample 16 kHz → 24 kHz
+    // Step 1: Resample to 24 kHz if the input is not already at that rate.
+    // When the caller loads audio via crispasr_audio_load_at_rate(path, 24000, …)
+    // the PCM is already at 24 kHz and the resample is a no-op, avoiding the
+    // quality-degrading 16k→24k round-trip (issue #263).
+    const int input_rate = ctx->params.input_sample_rate > 0 ? ctx->params.input_sample_rate : 16000;
     std::vector<float> pcm_24k;
-    {
+    if (input_rate == (int)ctx->model.hp.sample_rate) {
+        // Already at model rate — just copy.
+        pcm_24k.assign(samples, samples + n_samples);
+        if (ctx->params.verbosity >= 1)
+            fprintf(stderr, "kyutai_stt: input already at %d Hz, no resample\n", input_rate);
+    } else {
         kyutai_stt_bench_stage _b("resample");
         resample_16k_to_24k(samples, n_samples, pcm_24k);
-    }
-
-    if (ctx->params.verbosity >= 1) {
-        fprintf(stderr, "kyutai_stt: resampled %d → %d samples (16k → 24k)\n", n_samples, (int)pcm_24k.size());
+        if (ctx->params.verbosity >= 1)
+            fprintf(stderr, "kyutai_stt: resampled %d → %d samples (%dk → 24k)\n", n_samples, (int)pcm_24k.size(),
+                    input_rate / 1000);
     }
 
     // Step 1b: Prepend silence prefix (required by some models, e.g. stt-2.6b-en uses 1.0s)
@@ -1406,6 +1416,11 @@ extern "C" void kyutai_stt_set_seed(struct kyutai_stt_context* ctx, unsigned int
 extern "C" void kyutai_stt_set_beam_size(struct kyutai_stt_context* ctx, int beam_size) {
     if (ctx)
         ctx->params.beam_size = (beam_size > 0) ? beam_size : 1;
+}
+
+extern "C" void kyutai_stt_set_input_sample_rate(struct kyutai_stt_context* ctx, int rate) {
+    if (ctx)
+        ctx->params.input_sample_rate = (rate > 0) ? rate : 0;
 }
 
 extern "C" void kyutai_stt_result_free(struct kyutai_stt_result* r) {

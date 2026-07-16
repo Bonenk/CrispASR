@@ -1517,6 +1517,12 @@ struct crispasr_session {
     std::string model_path;
     int n_threads = 4;
 
+    // Sample rate of the PCM the caller is about to pass to transcribe.
+    // Set via crispasr_session_set_pcm_sample_rate() so backends that
+    // normally resample from 16 kHz can skip the step when the audio is
+    // already at their native rate.  Defaults to 16000 for back-compat.
+    int pcm_sample_rate = 16000;
+
     // Last synthesize error — populated by synthesize_raw_impl when it
     // returns nullptr so callers can surface a meaningful reason instead
     // of the generic "no audio produced". Cleared on every synthesize call.
@@ -3545,6 +3551,57 @@ CA_EXPORT int crispasr_session_detected_language(crispasr_session* s, char* out_
     std::strncpy(out_buf, lang.c_str(), out_cap - 1);
     out_buf[out_cap - 1] = '\0';
     return (int)lang.size();
+}
+
+// Return the sample rate the backend expects for input PCM. Callers should
+// use this with crispasr_audio_load_at_rate() to decode audio directly at
+// the model's native rate, avoiding a lossy down-then-up resample.
+CA_EXPORT int crispasr_session_input_sample_rate(crispasr_session* s) {
+    if (!s)
+        return 0;
+        // Backends that operate at 24 kHz internally.
+#ifdef CA_HAVE_VIBEVOICE
+    if (s->backend.find("vibevoice") == 0 && s->vibevoice_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_KYUTAI_STT
+    if (s->kyutai_ctx)
+        return 24000;
+#endif
+        // Backends with model-level sample_rate hparams.
+#ifdef CA_HAVE_PARAKEET
+    if (s->parakeet_ctx)
+        return parakeet_sample_rate(s->parakeet_ctx);
+#endif
+#ifdef CA_HAVE_CANARY
+    if (s->canary_ctx)
+        return canary_sample_rate(s->canary_ctx);
+#endif
+#ifdef CA_HAVE_CANARY_QWEN
+    if (s->canary_qwen_ctx)
+        return canary_qwen_sample_rate(s->canary_qwen_ctx);
+#endif
+#ifdef CA_HAVE_LFM2_AUDIO
+    if (s->lfm2_audio_ctx)
+        return lfm2_audio_sample_rate(s->lfm2_audio_ctx);
+#endif
+#ifdef CA_HAVE_NEMOTRON
+    if (s->nemotron_ctx)
+        return nemotron_sample_rate(s->nemotron_ctx);
+#endif
+#ifdef CA_HAVE_CTC
+    if (s->ctc_ctx)
+        return canary_ctc_sample_rate(s->ctc_ctx);
+#endif
+    // Default: Whisper-family and all other backends expect 16 kHz.
+    return CRISPASR_SAMPLE_RATE;
+}
+
+CA_EXPORT int crispasr_session_set_pcm_sample_rate(crispasr_session* s, int rate) {
+    if (!s || rate <= 0)
+        return -1;
+    s->pcm_sample_rate = rate;
+    return 0;
 }
 
 // CTC vocabulary access (Omni CTC backend). Surfaces the SentencePiece pieces
@@ -5652,34 +5709,34 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
 #endif
 #ifdef CA_HAVE_VIBEVOICE
     if (s->backend == "vibevoice" && s->vibevoice_ctx) {
-        auto resample_16k_to_24k = [](const float* in, int n_in) {
-            std::vector<float> out;
-            if (!in || n_in <= 0)
-                return out;
-
-            const int n_out = (int)((double)n_in * 24000.0 / 16000.0);
-            out.resize((size_t)n_out);
+        // vibevoice expects 24 kHz. Resample only if the caller supplied
+        // 16 kHz (legacy default); skip if already at 24 kHz via
+        // crispasr_session_set_pcm_sample_rate + crispasr_audio_load_at_rate.
+        const float* vv_pcm = pcm;
+        int vv_n = n_samples;
+        std::vector<float> pcm24_buf;
+        if (s->pcm_sample_rate != 24000) {
+            const int n_out = (int)((double)n_samples * 24000.0 / (double)s->pcm_sample_rate);
+            pcm24_buf.resize((size_t)n_out);
             for (int i = 0; i < n_out; ++i) {
-                const double pos = (double)i * 16000.0 / 24000.0;
+                const double pos = (double)i * (double)s->pcm_sample_rate / 24000.0;
                 int i0 = (int)pos;
                 int i1 = i0 + 1;
                 if (i0 < 0)
                     i0 = 0;
-                if (i1 >= n_in)
-                    i1 = n_in - 1;
+                if (i1 >= n_samples)
+                    i1 = n_samples - 1;
                 const float frac = (float)(pos - (double)i0);
-                out[(size_t)i] = in[i0] * (1.0f - frac) + in[i1] * frac;
+                pcm24_buf[(size_t)i] = pcm[i0] * (1.0f - frac) + pcm[i1] * frac;
             }
-            return out;
-        };
-
-        const std::vector<float> pcm24 = resample_16k_to_24k(pcm, n_samples);
+            vv_pcm = pcm24_buf.data();
+            vv_n = n_out;
+        }
         // Session hotwords double as vibevoice's free-form context injection
         // (CLI: --context; here the comma-separated hotword list is spliced
         // into the prompt's "with extra info:" slot, PR #223 / issue #224).
         const char* vv_context = s->hotwords.empty() ? nullptr : s->hotwords.c_str();
-        vibevoice_result* vr =
-            vibevoice_transcribe_with_probs_and_context(s->vibevoice_ctx, pcm24.data(), (int)pcm24.size(), vv_context);
+        vibevoice_result* vr = vibevoice_transcribe_with_probs_and_context(s->vibevoice_ctx, vv_pcm, vv_n, vv_context);
         if (!vr || !vr->text) {
             if (vr)
                 vibevoice_result_free(vr);
@@ -5889,6 +5946,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         if (s->beam_size > 1) {
             kyutai_stt_set_beam_size((kyutai_stt_context*)s->kyutai_ctx, s->beam_size);
         }
+        // Forward the caller's PCM rate so kyutai skips 16k→24k resample
+        // when the audio was already loaded at 24 kHz (issue #263).
+        kyutai_stt_set_input_sample_rate((kyutai_stt_context*)s->kyutai_ctx, s->pcm_sample_rate);
         kyutai_stt_result* kr = kyutai_stt_transcribe_with_probs((kyutai_stt_context*)s->kyutai_ctx, pcm, n_samples);
         if (!kr || !kr->text) {
             if (kr)
@@ -7001,11 +7061,12 @@ CA_EXPORT int crispasr_session_set_codec_path(crispasr_session* s, const char* p
 #if defined(CA_HAVE_INDEXTTS) || defined(CA_HAVE_VOXCPM2) || defined(CA_HAVE_POCKET)
 // crispasr_audio_load lives in crispasr_audio.cpp (same shared lib);
 // forward-declare it so set_voice can decode a reference WAV without
-// pulling in the audio header. Returns 16 kHz mono f32 — voxcpm2 uses it
-// directly; indextts upsamples to 24 kHz below; pocket-tts needs 24 kHz
-// (the Mimi encoder expects 24 kHz, but crispasr_audio_load returns 16 kHz
-// — pocket_tts_set_voice handles the resample internally if needed).
+// pulling in the audio header.
+// crispasr_audio_load_at_rate resamples directly to the requested rate,
+// avoiding the quality-degrading 16k→Nk double-resample path.
 extern "C" int crispasr_audio_load(const char* path, float** out_pcm, int* out_samples, int* out_sample_rate);
+extern "C" int crispasr_audio_load_at_rate(const char* path, int target_rate, float** out_pcm, int* out_samples,
+                                           int* out_sample_rate);
 #endif
 
 #ifdef CA_HAVE_INDEXTTS
@@ -7152,60 +7213,49 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
 #endif
 #ifdef CA_HAVE_INDEXTTS
     if (s->indextts_ctx) {
-        // indextts clones from a reference clip. Decode the WAV (16 kHz
-        // mono via the shared loader), upsample to the 24 kHz the encoder
-        // expects, and stash it for the next synthesize. ref_text is
-        // unused — indextts conditions on audio, not a transcript.
+        // indextts clones from a reference clip. Decode directly to 24 kHz
+        // (the encoder's native rate) — avoids the lossy 16k→24k resample.
+        // ref_text is unused — indextts conditions on audio, not a transcript.
         if (!ends_with_wav(path))
             return -2;
         float* pcm = nullptr;
         int n = 0, sr = 0;
-        if (crispasr_audio_load(path, &pcm, &n, &sr) != 0 || !pcm || n <= 0) {
+        if (crispasr_audio_load_at_rate(path, 24000, &pcm, &n, &sr) != 0 || !pcm || n <= 0) {
             if (pcm)
                 free(pcm);
             return -1;
         }
-        s->indextts_ref_pcm = indextts_resample_16k_to_24k(pcm, n);
+        s->indextts_ref_pcm.assign(pcm, pcm + n);
         free(pcm);
         return s->indextts_ref_pcm.empty() ? -1 : 0;
     }
 #endif
 #ifdef CA_HAVE_F5TTS
     if (s->f5tts_ctx) {
-        // F5-TTS clones from a reference WAV + its transcript. Load the
-        // audio (16 kHz from shared loader), resample to 24 kHz, and pass
-        // to the library which computes the mel spectrogram internally.
+        // F5-TTS clones from a reference WAV + its transcript. Load
+        // directly at 24 kHz — avoids the lossy 16k→24k resample path.
         if (!ends_with_wav(path))
             return -2;
         float* pcm = nullptr;
         int n = 0, sr = 0;
-        if (crispasr_audio_load(path, &pcm, &n, &sr) != 0 || !pcm || n <= 0) {
+        if (crispasr_audio_load_at_rate(path, 24000, &pcm, &n, &sr) != 0 || !pcm || n <= 0) {
             if (pcm)
                 free(pcm);
             return -1;
         }
-        // Resample 16 kHz → 24 kHz (linear interp)
-        int n24 = (int)((float)n * 24000.0f / 16000.0f);
-        std::vector<float> pcm24(n24);
-        for (int i = 0; i < n24; i++) {
-            float pos = (float)i * 16000.0f / 24000.0f;
-            int idx = (int)pos;
-            float frac = pos - (float)idx;
-            pcm24[i] = (idx + 1 < n) ? pcm[idx] * (1 - frac) + pcm[idx + 1] * frac : pcm[std::min(idx, n - 1)];
-        }
-        free(pcm);
         // RMS normalize to 0.1
         float rms = 0;
-        for (float v : pcm24)
-            rms += v * v;
-        rms = sqrtf(rms / (float)pcm24.size());
+        for (int i = 0; i < n; i++)
+            rms += pcm[i] * pcm[i];
+        rms = sqrtf(rms / (float)n);
         if (rms < 0.1f && rms > 1e-10f) {
             float s2 = 0.1f / rms;
-            for (float& v : pcm24)
-                v *= s2;
+            for (int i = 0; i < n; i++)
+                pcm[i] *= s2;
         }
         const char* rt = ref_text_or_null ? ref_text_or_null : "";
-        int rc = f5_tts_set_reference(s->f5tts_ctx, pcm24.data(), n24, rt);
+        int rc = f5_tts_set_reference(s->f5tts_ctx, pcm, n, rt);
+        free(pcm);
         return (rc == 0) ? 0 : -1;
     }
 #endif
@@ -7230,43 +7280,19 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
 #endif
 #ifdef CA_HAVE_POCKET
     if (s->pocket_tts_ctx) {
+        // Pocket TTS (Mimi encoder) expects 24 kHz. Load directly at that
+        // rate — avoids the lossy 16k→24k double-resample.
         if (!ends_with_wav(path))
             return -2;
         float* pcm = nullptr;
         int n = 0, sr = 0;
-        if (crispasr_audio_load(path, &pcm, &n, &sr) != 0 || !pcm || n <= 0) {
+        if (crispasr_audio_load_at_rate(path, 24000, &pcm, &n, &sr) != 0 || !pcm || n <= 0) {
             if (pcm)
                 free(pcm);
             return -1;
         }
-        // crispasr_audio_load returns 16 kHz mono; pocket_tts_set_voice
-        // expects 24 kHz (Mimi encoder native rate). Resample 16→24 kHz
-        // with linear interpolation.
-        if (sr <= 0)
-            sr = 16000;
-        int rc;
-        if (sr != 24000) {
-            const int n24 = (int)((int64_t)n * 24000 / sr);
-            float* pcm24 = (float*)malloc((size_t)(n24 > 0 ? n24 : 1) * sizeof(float));
-            if (!pcm24) {
-                free(pcm);
-                return -1;
-            }
-            const double ratio = (double)sr / 24000.0;
-            for (int j = 0; j < n24; ++j) {
-                const double pos = (double)j * ratio;
-                const int i0 = (int)pos;
-                const int i1 = (i0 + 1 < n) ? i0 + 1 : n - 1;
-                const double frac = pos - (double)i0;
-                pcm24[j] = (float)((double)pcm[i0] * (1.0 - frac) + (double)pcm[i1] * frac);
-            }
-            free(pcm);
-            rc = pocket_tts_set_voice(s->pocket_tts_ctx, pcm24, n24);
-            free(pcm24);
-        } else {
-            rc = pocket_tts_set_voice(s->pocket_tts_ctx, pcm, n);
-            free(pcm);
-        }
+        int rc = pocket_tts_set_voice(s->pocket_tts_ctx, pcm, n);
+        free(pcm);
         return rc;
     }
 #endif
