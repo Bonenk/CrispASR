@@ -8,14 +8,16 @@ possible. Default flips only on a proven speed AND quality win.
 
 ## NOW — active work
 
-**Status (2026-07-16): 2 shared FASTCONV helpers landed; 3 DAC-family backends
-wired+verified; HiFi-GAN family now wired for speecht5 (verified). All on `main`,
-all green.**
+**Status (2026-07-16): FASTCONV landed + A/B-verified (byte-identical, default ON)
+for 5 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen. All on
+`main`, all green.** Remaining campaign items: 2 (interval-CFG), 3 (Metal q4_k),
+4 (CI perf gate). Coverage triage below (only F16-kernel models benefit).
 
 Commits (pushed to `main`):
 `203f28f01` shared core_dac cache+conv1d · `191a7ebe4` omnivoice migrate ·
 `8f2b17e4a` irodori · `8d8e6d9c8` zonos · `8231e8144` core_hifigan overload ·
-`1c558b4f0` speecht5 FASTCONV (branch `perf/fastconv-hifigan-fleet`).
+`1c558b4f0` speecht5 · `41dbc88cc` chatterbox_s3gen wire + default flip (branch
+`perf/fastconv-hifigan-fleet`).
 
 ### ⚠ HiFi-GAN family — coverage reality (measured 2026-07-16, GGUF-parsed)
 The handover's "one overload sets up 3 backends" is over-optimistic. FASTCONV
