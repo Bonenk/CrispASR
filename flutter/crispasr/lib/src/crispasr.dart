@@ -4832,6 +4832,129 @@ class CrispasrWatermark {
 }
 
 // ---------------------------------------------------------------------------
+// C2PA (Content Credentials) signing — EU AI Act Art. 50
+// ---------------------------------------------------------------------------
+
+/// Cryptographic C2PA signing for AI-generated audio.
+///
+/// Wraps the native `crispasr_c2pa_sign()` / `crispasr_pcm_to_wav()` C-ABI.
+/// The native layer uses ES256 (P-256 ECDSA) via the vendored c2pa-audio
+/// submodule — no external dependencies. When [certPath] and [keyPath] are
+/// omitted, a bundled self-signed certificate is used (CN = "CrispASR
+/// (AI-generated, self-signed)"). The self-signed cert is sufficient for
+/// machine-readable AI marking per EU AI Act Art. 50.
+class CrispasrC2pa {
+  CrispasrC2pa._();
+
+  /// Check whether the loaded dylib exports the C2PA signing symbols.
+  static bool isAvailable({DynamicLibrary? lib}) {
+    lib ??= DynamicLibrary.open(CrispASR.defaultLibName());
+    return lib.providesSymbol('crispasr_c2pa_sign') &&
+        lib.providesSymbol('crispasr_c2pa_free');
+  }
+
+  /// Sign an in-memory audio container (WAV, MP3, or M4A bytes) with a
+  /// C2PA manifest. Returns signed bytes, or `null` if signing fails or
+  /// the format is unsupported.
+  ///
+  /// [format] is a MIME type: `"audio/wav"`, `"audio/mpeg"`, `"audio/mp4"`.
+  /// [certPath] / [keyPath] are optional PEM file paths; when null the
+  /// bundled self-signed default cert is used.
+  static Uint8List? sign(
+    Uint8List data, {
+    required String format,
+    String? certPath,
+    String? keyPath,
+    DynamicLibrary? lib,
+  }) {
+    lib ??= DynamicLibrary.open(CrispASR.defaultLibName());
+    if (!lib.providesSymbol('crispasr_c2pa_sign')) return null;
+
+    final signFn = lib.lookupFunction<
+        Pointer<Uint8> Function(Pointer<Uint8>, IntPtr, Pointer<Utf8>,
+            Pointer<Utf8>, Pointer<Utf8>, Pointer<IntPtr>),
+        Pointer<Uint8> Function(Pointer<Uint8>, int, Pointer<Utf8>,
+            Pointer<Utf8>, Pointer<Utf8>, Pointer<IntPtr>)>('crispasr_c2pa_sign');
+
+    final freeFn = lib.lookupFunction<Void Function(Pointer<Uint8>),
+        void Function(Pointer<Uint8>)>('crispasr_c2pa_free');
+
+    final dataPtr = malloc<Uint8>(data.length);
+    dataPtr.asTypedList(data.length).setAll(0, data);
+
+    final fmtPtr = format.toNativeUtf8();
+    final certPtr = certPath != null ? certPath.toNativeUtf8() : nullptr;
+    final keyPtr = keyPath != null ? keyPath.toNativeUtf8() : nullptr;
+    final outLenPtr = malloc<IntPtr>();
+
+    final result = signFn(
+      dataPtr,
+      data.length,
+      fmtPtr.cast(),
+      certPtr.cast(),
+      keyPtr.cast(),
+      outLenPtr,
+    );
+
+    malloc.free(dataPtr);
+    malloc.free(fmtPtr);
+    if (certPtr != nullptr) malloc.free(certPtr);
+    if (keyPtr != nullptr) malloc.free(keyPtr);
+
+    if (result == nullptr) {
+      malloc.free(outLenPtr);
+      return null;
+    }
+
+    final outLen = outLenPtr.value;
+    malloc.free(outLenPtr);
+
+    final signed = Uint8List.fromList(result.asTypedList(outLen));
+    freeFn(result);
+    return signed;
+  }
+
+  /// Convert float32 mono PCM to a WAV file with AI-provenance LIST/INFO
+  /// metadata. The returned WAV can be fed to [sign] for full C2PA signing.
+  static Uint8List? pcmToWav(
+    Float32List pcm, {
+    int sampleRate = 24000,
+    DynamicLibrary? lib,
+  }) {
+    lib ??= DynamicLibrary.open(CrispASR.defaultLibName());
+    if (!lib.providesSymbol('crispasr_pcm_to_wav')) return null;
+
+    final fn = lib.lookupFunction<
+        Pointer<Uint8> Function(Pointer<Float>, Int32, Int32, Pointer<IntPtr>),
+        Pointer<Uint8> Function(
+            Pointer<Float>, int, int, Pointer<IntPtr>)>('crispasr_pcm_to_wav');
+
+    final freeFn = lib.lookupFunction<Void Function(Pointer<Uint8>),
+        void Function(Pointer<Uint8>)>('crispasr_c2pa_free');
+
+    final pcmPtr = malloc<Float>(pcm.length);
+    pcmPtr.asTypedList(pcm.length).setAll(0, pcm);
+    final outLenPtr = malloc<IntPtr>();
+
+    final result = fn(pcmPtr, pcm.length, sampleRate, outLenPtr);
+
+    malloc.free(pcmPtr);
+
+    if (result == nullptr) {
+      malloc.free(outLenPtr);
+      return null;
+    }
+
+    final outLen = outLenPtr.value;
+    malloc.free(outLenPtr);
+
+    final wav = Uint8List.fromList(result.asTypedList(outLen));
+    freeFn(result);
+    return wav;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // C1: Transcription progress polling
 // ---------------------------------------------------------------------------
 
