@@ -32,6 +32,7 @@
 #pragma once
 
 #include "conv.h"
+#include "core/dac_decoder.h" // core_dac::fastconv_cache (shared FASTCONV)
 #include "ggml.h"
 
 #include <cassert>
@@ -91,6 +92,23 @@ static inline ggml_tensor* conv1d(ggml_context* ctx, ggml_tensor* x, ggml_tensor
     ggml_tensor* y = ggml_conv_1d(ctx, weight, x, stride, padding, dilation);
     if (bias) {
         // bias is (C_out,). Reshape to (1, C_out) for broadcast over T (ne[0]).
+        ggml_tensor* b = ggml_reshape_2d(ctx, bias, 1, (int)bias->ne[0]);
+        y = ggml_add(ctx, y, b);
+    }
+    return y;
+}
+
+// FASTCONV overload (docs/perf-sweep/PLAN.md): use the baked-F32 kernel from the
+// shared cache so the fork's per-graph F16→F32 cast becomes a no-op. Time-major
+// layout here (x is (T,C_in)) so the k=1→matmul trick doesn't apply, but killing
+// the cast is the main win. `fc == nullptr`/disabled → identical to the legacy
+// path above (clean A/B gate). Used by the HiFi-GAN family (fastpitch, speecht5,
+// bananamind); each bakes its vocoder conv kernels and passes &fc.
+static inline ggml_tensor* conv1d(ggml_context* ctx, ggml_tensor* x, ggml_tensor* weight, ggml_tensor* bias, int stride,
+                                  int padding, int dilation, const core_dac::fastconv_cache* fc) {
+    ggml_tensor* w = (fc && fc->enabled) ? fc->get(weight) : weight;
+    ggml_tensor* y = ggml_conv_1d(ctx, w, x, stride, padding, dilation);
+    if (bias) {
         ggml_tensor* b = ggml_reshape_2d(ctx, bias, 1, (int)bias->ne[0]);
         y = ggml_add(ctx, y, b);
     }
