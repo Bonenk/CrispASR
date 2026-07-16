@@ -470,3 +470,34 @@ Lessons from the systematic head-to-head benchmark against
     on the missing `third_party/c2pa-audio/src/*.cpp`. Also: heavy concurrent I/O
     on the external SSD wedges *git itself* (2-min timeouts on `git status`), not
     just model access — the tell it's the disk, not a hang.
+
+45. **A new path whose FIRST A/B regressed on one clip → keep it GATED (off), not
+    revert (F4).** Per-backend session chunk window: the hypothesis (short-segment
+    models want a sub-30 s slice, mirroring the CLI's `vad_slice_cap_seconds()`)
+    REGRESSED the one long clip measured — moonshine/60 s song CLI-vs-session
+    content overlap `15 s→0.58 | 20 s→0.56 | 30 s→0.75 | 40 s→0.75` (more slices =
+    more chunk-boundary artifacts on hard audio; 30 s is the plateau). The reflex
+    was to revert as "no measured benefit" (HARD RULE #4). Corrected: #4 forbids
+    shipping an unverified path AS DEFAULT — it does not mean delete it. A one-clip
+    regression is evidence to gate-OFF, not to erase; the path may win on other
+    clips/models and flipping the default is then a one-liner. Shipped opt-in
+    (`CRISPASR_SESSION_PERBACKEND_CHUNK=1`, default flat 30 s). Codified as
+    dev-guide A/B rule 3a. Implement the decision pure with the gate as a PARAMETER
+    (`session_default_chunk_seconds(backend, perbackend_enabled)`) so both modes
+    unit-test without env.
+
+46. **firered's greedy decoder runs away exactly like moonshine — but only greedy,
+    and the audit stops there (F1/F6).** Extended the `core_repeat` decode-time
+    break beyond moonshine, evidence-gated. On the loop-prone 60 s song, firered at
+    `--beam-size 1` SATURATES `max_len=150` with a period-1 cycle (`OOH ×35`),
+    burning ~350 s, and firered's CLI adapter has no `core_ngram::fix_loops` so the
+    garbage tail reaches the output — a speed AND quality bug. Wired
+    `core_repeat::tail_is_repetition` into the `beam_size==1` branch ONLY (beam=3,
+    the default, self-terminated at 59 tokens → not wired, Phase 1b), gated
+    `CRISPASR_FIRERED_NO_REPEAT_BREAK` default on. A/B on the SAME binary (token
+    count is the load-invariant proof, not wall-clock on a contended box): break
+    OFF → 150 tokens/`OOH ×35`, break ON → 59 tokens/`OOH ×4`, coherent content
+    byte-identical. Audit discipline held: the OTHER guard-less greedy backends
+    (glm-asr, cohere-transcribe) transcribed the same song CLEANLY (EOS-terminated,
+    no saturation) → NOT wired; kyutai_stt has no local model + a different
+    streaming-decoder shape → NOT wired. Only wire where the runaway is DEMONSTRATED.
