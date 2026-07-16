@@ -8,7 +8,31 @@ possible. Default flips only on a proven speed AND quality win.
 
 ## NOW — active work
 
-**Status (2026-07-16): shared FASTCONV helper landed + 2 backends migrated/piloted.**
+**Status (2026-07-16): 2 shared FASTCONV helpers landed; 3 DAC-family backends
+wired+verified; HiFi-GAN family overload ready. All on `main`, all green.**
+
+Commits (branch `perf/omnivoice-254-decode-rtf`, pushed to `main`):
+`203f28f01` shared core_dac cache+conv1d · `191a7ebe4` omnivoice migrate ·
+`8f2b17e4a` irodori · `8d8e6d9c8` zonos · `8231e8144` core_hifigan overload.
+
+### Recipe — wire FASTCONV into one backend (proven 3×)
+1. Add `core_dac::fastconv_cache <name>_fc;` to the backend's context struct.
+2. At codec/vocoder load (after weights resolved, on the codec compute backend):
+   collect all decode conv-kernel `ggml_tensor*` into a vector and
+   `ctx-><name>_fc.bake(codec_backend, convs, env_on);` gated
+   `CRISPASR_<BACKEND>_FASTCONV` (default on — the change is numerically equivalent).
+3. In the decode graph, route each conv through the fc-aware overload:
+   `core_dac::conv1d(g,x,w,b,K,dil,&fc)` / `dec_block(...,&fc)` /
+   `build_decode_graph(...,&fc)` (DAC family) or `core_hifigan::conv1d(...,&fc)`
+   (HiFi-GAN family). For a bespoke local lambda, replace `w` with `fc.get(w)`.
+4. `<name>_fc.free();` in the backend's free().
+5. **A/B (MANDATORY, seed-aware):** build, then synth fastconv ON vs OFF. If the
+   model is stochastic (flow-matching / AR sampling), PASS `--seed N` — else the
+   RNG dominates and a huge diff is FALSE (the irodori trap below). Gate:
+   ON-vs-ON @same seed must be 0 (deterministic) BEFORE trusting ON-vs-OFF.
+   Expect ON-vs-OFF ≈ 0 (byte-identical) or ≤~F16-codec drift; ASR/decoded output
+   must be intact. Confirm fastconv ENGAGED (kernels are F16, not a no-op).
+
 
 - ✅ **Item 1 — shared `core_dac::fastconv_cache` + `conv1d`/`res_unit`/`dec_block`
   fast path** (`203f28f01`). Unit test `test-fastconv` (206 assertions): fast ≈
