@@ -10,29 +10,32 @@ possible. Default flips only on a proven speed AND quality win.
 
 **Status (2026-07-16): FASTCONV landed + A/B-verified (byte-identical, default ON)
 for 6 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen, cosyvoice3.
-Interval-CFG (opt-in, default OFF) landed + verified for 5 — cosyvoice3, f5-tts,
-voxcpm2, dots-tts, irodori. All on `main`, all green.**
+Interval-CFG (opt-in, default OFF) landed + verified for 6 — cosyvoice3, f5-tts,
+voxcpm2, dots-tts, irodori, tada. All on `main`, all green.**
 
 **➡ FRESH AGENT: go to the "TODO QUEUE FOR A FRESH AGENT" section near the bottom
 of this file. FASTCONV is done for every local F16 target; the active thread is
-TODO-2 interval-CFG (5 landed, ~6 CFG backends left — flow/diffusion ones (chatterbox
-CFM, tada) are the clean copies; ⚠ AR ones (dia, zonos, voxtral) are NOT amenable —
-their uncond shares a batched KV cache, so skipping its forward corrupts the KV;
-measured dia to confirm). TODO-B/C/D/3/4 remain as scoped below.**
+TODO-2 interval-CFG (6 landed). Only chatterbox (CFM — clean pattern but ~1–3 h synth
+on this M1, so verify on a quieter box / CUDA) remains as a clean flow candidate. ⚠
+NOT amenable: dia/zonos/voxtral (AR — uncond shares a batched B=2 KV cache, skipping
+its forward corrupts the KV; measured dia); vibevoice (dominant CFG is that same
+AR-neg-LM path — its cheap diffusion pred-head CFG is intervallable but low-value,
+~20 DPM steps, coarse). TODO-B/C/D/3/4 remain as scoped below.**
 Remaining: TODO-B chatterbox k=1→matmul (⚠ NOT cosyvoice3 — only 1 of its 85 hift
 kernels is k=1, measured) · TODO-C indextts/kokoro · TODO-D fastpitch loader ·
 TODO-2 interval-CFG (✅ cosyvoice3 `63a91a6a5` + f5-tts `678ee5ce1` + voxcpm2
-`2c7cc5df4` + dots `675498cb3` + irodori `d04620cba` landed opt-in; ~6 remain) · TODO-3
+`2c7cc5df4` + dots `675498cb3` + irodori `d04620cba` + tada `3c8180cdc` landed opt-in;
+only chatterbox left, off-box) · TODO-3
 Metal q4_k (needs registry alt-quant schema — not a quick win) · TODO-4 CI perf gate.
 Coverage triage below (only F16-kernel models benefit). ⚠ There is no
 `handover-prompts/fastconv-fleet-sweep-round2.md` on disk — this NOW section + the
 TODO QUEUE below ARE the round-2 handover.
 
 **Interval-CFG (TODO-2) — cosyvoice3 (`63a91a6a5`) + f5-tts (`678ee5ce1`) + voxcpm2
-(`2c7cc5df4`) + dots (`675498cb3`) + irodori (`d04620cba`) landed opt-in, default
-OFF.** Recompute the uncond CFG forward only every K steps, reuse the cache in
-between; cond fresh; first+last always recompute. Default K=1 is byte-identical to
-legacy.
+(`2c7cc5df4`) + dots (`675498cb3`) + irodori (`d04620cba`) + tada (`3c8180cdc`) landed
+opt-in, default OFF.** Recompute the uncond CFG forward only every K steps, reuse the
+cache in between; cond fresh; first+last always recompute. Default K=1 is
+byte-identical to legacy.
 - **cosyvoice3** `CRISPASR_COSYVOICE3_CFG_INTERVAL` (`cv3_run_solve_euler`): K=1
   byte-exact (cos=1.0 twice via `cosyvoice3-flow-cfg-interval-ab`); K=2 mel cos
   0.9994, K=3 0.9915. Full ASR round-trip PENDING (synthetic-input harness).
@@ -54,8 +57,20 @@ legacy.
   + dacvae-ja, JA text, seed 42) — K=1 twice PCM byte-IDENTICAL; K=2 log-STFT cos 0.971.
   ⚠ ASR round-trip INCONCLUSIVE (multilingual ggml-base garbles both the exact K=1 and
   K=2 — weak JA ASR, not interval); rests on byte-exact K=1 + high STFT cosine.
+- **tada** `CRISPASR_TADA_CFG_INTERVAL` (FM Euler `fm_euler_solve`; neg is a fixed
+  per-solve uncond, so cleanly skippable — the neg-KV is the separate AR LLM):
+  verified via CLI (tada-tts-1b-q4_k + tada-codec, text-only, seed 42) — K=1 twice PCM
+  byte-IDENTICAL; content preserved ASR(K1)==ASR(K2); K=2 log-STFT cos 0.978. Covers
+  the default single-candidate AND ranked paths.
 All approximate → stay opt-in. NATURALNESS at aggressive K needs a HUMAN EAR — NOT
 claimed for any.
+
+**⚠ vibevoice — investigated, NOT worth interval-CFG.** Its dominant CFG is an AR
+negative-LM path (`run_lm_step kv_sel=1`, per-frame KV-cached — same non-amenable
+class as dia). It also has a batched cond+uncond CFG in the DPM-Solver++ pred-head
+(`get_pred_head_graph(ctx,2)`, ~20 steps) which IS intervallable, but that head is
+cheap and its neg_condition is fixed per frame (uncond varies only via z/t), so the
+win is negligible while the expensive neg-LM CFG can't be intervalled. Skipped.
 
 Commits (pushed to `main`):
 `203f28f01` shared core_dac cache+conv1d · `191a7ebe4` omnivoice migrate ·
@@ -331,14 +346,23 @@ steps. **Verified via CLI (irodori-500m-v3 + dacvae-ja, JA text, seed 42):** K=1
 PCM byte-IDENTICAL; K=2 log-STFT cos 0.971. ⚠ JA ASR round-trip inconclusive (base
 multilingual whisper garbles both K=1 and K=2 — weak JA ASR, not interval).
 
-**Remaining TODO-2 candidates (~6):** chatterbox (CFM), vibevoice (DPM), tada
-(batched CFG + neg-KV), dia, zonos, voxtral. ⚠ **dia/zonos/voxtral are AR with a
-BATCHED B=2 KV cache (cond+uncond in one cache)** — skipping the uncond forward
-corrupts its KV, so the simple interval skip does NOT apply (confirmed by reading
-dia). Only the flow/diffusion ones (chatterbox CFM, tada, vibevoice if it has CFG)
-are clean copies of the proven pattern; each needs its own seed-aware A/B (real ASR
-round-trip where affordable, else STFT-cosine + byte-exact K=1). chatterbox synth is
-~1–3 h on this M1 (verify on a quieter box / CUDA).
+✅ **tada landed opt-in** (`3c8180cdc`, `CRISPASR_TADA_CFG_INTERVAL`, default 1).
+FM Euler `fm_euler_solve`: the neg is a fixed per-solve uncond (the neg-KV cache is
+the separate AR LLM, not the FM head), and `vel_neg` persists across iterations, so a
+skip step just leaves its stale value — no cache buffer. Covers the default
+single-candidate AND ranked paths; only the a_cfg!=1 (cosine-decayed prefix) steps
+count. **Verified via CLI (tada-tts-1b-q4_k, text-only, seed 42):** K=1 twice PCM
+byte-IDENTICAL; content preserved ASR(K1)==ASR(K2); K=2 log-STFT cos 0.978.
+
+**Remaining TODO-2 candidates — only 1 clean (chatterbox), 4 non-amenable:**
+- **chatterbox** (CFM s3gen) — clean flow pattern, but a full synth is ~1–3 h on this
+  contended M1, so verify on a quieter box / CUDA. The one remaining clean copy.
+- ⚠ **dia / zonos / voxtral** — AR with a BATCHED B=2 KV cache (cond+uncond share one
+  cache); skipping the uncond forward corrupts its KV, so the simple interval skip
+  does NOT apply (confirmed by reading dia's decoder). NOT amenable.
+- ⚠ **vibevoice** — dominant CFG is the same AR neg-LM path (`run_lm_step kv_sel=1`);
+  its DPM pred-head CFG is intervallable but cheap + coarse (fixed per-frame
+  neg_condition, ~20 steps) → negligible ROI. Skipped (investigated).
 
 Port OmniVoice's `OMNIVOICE_CFG_INTERVAL=K`: recompute the UNCOND classifier-free-
 guidance forward only every K steps and reuse its cached logits; the COND forward
