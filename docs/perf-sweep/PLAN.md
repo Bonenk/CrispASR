@@ -17,16 +17,17 @@ of this file — every remaining task is scoped there in order (TODO-B is next n
 that TODO-A cosyvoice3 has landed).**
 Remaining: TODO-B chatterbox k=1→matmul (⚠ NOT cosyvoice3 — only 1 of its 85 hift
 kernels is k=1, measured) · TODO-C indextts/kokoro · TODO-D fastpitch loader ·
-TODO-2 interval-CFG (✅ cosyvoice3 `63a91a6a5` + f5-tts `678ee5ce1` landed opt-in;
-~9 other CFG backends remain) · TODO-3 Metal q4_k (needs registry alt-quant schema —
-not a quick win) · TODO-4 CI perf gate. Coverage triage below (only F16-kernel models
-benefit). ⚠ There is no `handover-prompts/fastconv-fleet-sweep-round2.md` on disk —
-this NOW section + the TODO QUEUE below ARE the round-2 handover.
+TODO-2 interval-CFG (✅ cosyvoice3 `63a91a6a5` + f5-tts `678ee5ce1` + voxcpm2
+`2c7cc5df4` landed opt-in; ~8 other CFG backends remain) · TODO-3 Metal q4_k (needs
+registry alt-quant schema — not a quick win) · TODO-4 CI perf gate. Coverage triage
+below (only F16-kernel models benefit). ⚠ There is no
+`handover-prompts/fastconv-fleet-sweep-round2.md` on disk — this NOW section + the
+TODO QUEUE below ARE the round-2 handover.
 
-**Interval-CFG (TODO-2) — cosyvoice3 (`63a91a6a5`) + f5-tts (`678ee5ce1`) landed
-opt-in, default OFF.** Recompute the uncond CFG forward only every K steps, reuse the
-cache in between; cond fresh; first+last always recompute; K>1 forces the separate
-2-forward path. Default K=1 is byte-identical to legacy.
+**Interval-CFG (TODO-2) — cosyvoice3 (`63a91a6a5`) + f5-tts (`678ee5ce1`) + voxcpm2
+(`2c7cc5df4`) landed opt-in, default OFF.** Recompute the uncond CFG forward only
+every K steps, reuse the cache in between; cond fresh; first+last always recompute.
+Default K=1 is byte-identical to legacy.
 - **cosyvoice3** `CRISPASR_COSYVOICE3_CFG_INTERVAL` (`cv3_run_solve_euler`): K=1
   byte-exact (cos=1.0 twice via `cosyvoice3-flow-cfg-interval-ab`); K=2 mel cos
   0.9994, K=3 0.9915. Full ASR round-trip PENDING (synthetic-input harness).
@@ -34,8 +35,12 @@ cache in between; cond fresh; first+last always recompute; K>1 forces the separa
   via the CLI — K=1 twice PCM byte-IDENTICAL; **content preserved (ASR(K1)==ASR(K2),
   whisper base.en, word-overlap 1.0)**; K=2 acoustic divergence log-STFT cos 0.945 /
   envelope corr 0.78 (PCM corr is phase-noise per [[tts-parity-not-by-audio-corr]]).
-Both approximate → stay opt-in. NATURALNESS at aggressive K needs a HUMAN EAR — NOT
-claimed for either.
+- **voxcpm2** `CRISPASR_VOXCPM2_CFG_INTERVAL` (per-patch CFM `cfm_euler_solve`):
+  verified via CLI — K=1 twice PCM byte-IDENTICAL; content preserved (ASR(K1)==ASR(K2)).
+  ⚠ voxcpm2 is AR at the patch level, so K=2 shifts the stop predictor by a patch
+  (3.36 s → 3.52 s) — same words, slightly different duration.
+All approximate → stay opt-in. NATURALNESS at aggressive K needs a HUMAN EAR — NOT
+claimed for any.
 
 Commits (pushed to `main`):
 `203f28f01` shared core_dac cache+conv1d · `191a7ebe4` omnivoice migrate ·
@@ -293,10 +298,17 @@ end-to-end via the CLI (f5-tts-v1-base-f16, jfk voice, seed 42):** K=1 twice →
 byte-identical; content preserved — ASR(K1)==ASR(K2) exact (whisper base.en);
 K=2 acoustic divergence log-STFT cos 0.945 / envelope corr 0.78 (⚠ PCM corr 0.089 is
 phase-noise, NOT content — [[tts-parity-not-by-audio-corr]]). No new harness — used
-`crispasr --tts … --voice … --seed`. ~9 CFG backends still to do (below).
+`crispasr --tts … --voice … --seed`.
 
-**Remaining TODO-2 candidates (~9):** chatterbox (CFM), vibevoice (DPM), voxcpm2,
-dia, zonos, tada, dots, voxtral, irodori. Pattern proven twice; each needs its own
+✅ **voxcpm2 landed opt-in** (`2c7cc5df4`, `CRISPASR_VOXCPM2_CFG_INTERVAL`, default 1).
+Per-patch CFM denoiser `cfm_euler_solve` — the cond/uncond forwards are already two
+separate `locdit_call()`s, so interval simply skips the uncond call every K steps.
+**Verified via CLI (voxcpm2-q4_k, jfk voice, seed 42):** K=1 twice PCM byte-identical;
+content preserved — ASR(K1)==ASR(K2). ⚠ voxcpm2 is AR at the patch level, so K=2
+shifts the stop predictor one patch (3.36 s → 3.52 s output) — same words. ~8 CFG
+backends still to do (below).
+
+**Remaining TODO-2 candidates (~8):** chatterbox (CFM), vibevoice (DPM), dia, zonos, tada, dots, voxtral, irodori. Pattern proven twice; each needs its own
 seed-aware A/B (ASR round-trip where a real synth is affordable; else a fixed-input
 solver harness like cosyvoice3's). irodori output is Japanese (base.en ASR won't
 work — use a JA ASR or the solver-harness route).
