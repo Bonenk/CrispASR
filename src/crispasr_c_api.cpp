@@ -828,7 +828,10 @@ CA_EXPORT void crispasr_watermark_embed(float* pcm, int n_samples, float alpha) 
             return;
         }
     }
-    ::crispasr_watermark_embed_impl(pcm, n_samples, alpha > 0.0f ? alpha : 0.005f);
+    // alpha <= 0 → the robust, band-limited default (see wm_params / #260). The
+    // old 0.005 fallback was too faint to reliably detect on real speech, so it
+    // did not robustly satisfy EU AI Act Art. 50 "detectable" marking.
+    ::crispasr_watermark_embed_impl(pcm, n_samples, alpha > 0.0f ? alpha : -1.0f);
 }
 
 // C2PA (Content Credentials) signing of an in-memory audio CONTAINER (WAV/MP3
@@ -7847,13 +7850,16 @@ CA_EXPORT float* crispasr_session_synthesize_raw(crispasr_session* s, const char
     return crispasr_session_synthesize_raw_impl(s, text, out_n_samples);
 }
 
-// Synthesize + auto-watermark. The default API — all TTS output is
-// watermarked for EU AI Act provenance compliance. Use synthesize_raw()
-// only when you need to post-process PCM before watermarking.
+// Synthesize + auto-watermark. The default API — all TTS output is watermarked
+// for EU AI Act Art. 50 provenance compliance, on EVERY C-ABI consumer (wasm /
+// Python / Dart / Go / server), not just the CLI. Uses the robust, band-limited
+// watermark (alpha<=0 → the #260 default, ~0.05) so the mark is reliably
+// DETECTABLE yet inaudible — the faint 0.005 it used before was too weak to
+// detect on real speech. Use synthesize_raw() to post-process PCM before marking.
 CA_EXPORT float* crispasr_session_synthesize(crispasr_session* s, const char* text, int* out_n_samples) {
     float* pcm = crispasr_session_synthesize_raw_impl(s, text, out_n_samples);
     if (pcm && out_n_samples && *out_n_samples > 0) {
-        crispasr_watermark_embed(pcm, *out_n_samples, 0.005f);
+        crispasr_watermark_embed(pcm, *out_n_samples, -1.0f);
     }
     return pcm;
 }
