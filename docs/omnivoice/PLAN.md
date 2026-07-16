@@ -45,6 +45,13 @@ target slice is used), single-threaded triple-log-softmax CFG scoring (~13M
   `CRISPASR_REF=main`). Local M1 timing is load-noise (loadavg 100–290 all
   day; legacy vs fused gen 370→234 s directional only, decode-stage noise
   3.8× between arms of identical code).
+- ✅ **CUDA A/B verdict IN (2026-07-16, reporter, RTX 5070 Ti):** `cmp`
+  byte-identical on CUDA; gen 3.55 s → **1.53 s (2.3×)**, RTF 0.17 → **0.07**
+  (vs omnivoice.cpp 0.144 — CrispASR is now ~2× FASTER than the reference
+  implementation); single CUDA-graph warmup. Per-step 45.9 ms = fwd 27.4 +
+  score_cfg 11.6 + read_logits 5.2 + sample 1.5. → **CUDA default flipped to
+  fused** (this commit). Reporter's remaining ask: reference-voice caching to
+  disk (omnivoice.cpp feature parity) — next work item.
 - 📣 **Reporter A/B requested (2026-07-16):** asked the #254 reporter (RTX
   5070 Ti — the exact platform) to run `OMNIVOICE_FUSED_STEP=0` vs `=1` with
   `OMNIVOICE_DUMP_CODES` + `cmp` on current main
