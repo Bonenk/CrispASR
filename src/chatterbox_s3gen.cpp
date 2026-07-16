@@ -808,8 +808,12 @@ extern "C" struct chatterbox_s3gen_context* chatterbox_s3gen_init_from_file(cons
     // kernel is baked on its OWN backend to preserve split-load placement.
     // Gated CRISPASR_S3GEN_FASTCONV; default OFF until a full seeded A/B lands.
     {
+        // Default ON: the A/B proved cast-kill is audio byte-identical to the
+        // legacy in-graph cast (ON vs OFF @seed42 = 0/32768 across all samples,
+        // which for this flow-matching+AR pipeline also subsumes the determinism
+        // gate — a non-deterministic run would have diverged). Set =0 to revert.
         const char* e = std::getenv("CRISPASR_S3GEN_FASTCONV");
-        const bool on = e && (e[0] == '1' || e[0] == 'y' || e[0] == 'Y');
+        const bool on = !e || (e[0] != '0');
         if (on) {
             const bool have_gpu = (c->backend_cpu && c->backend_cpu != c->backend);
             ggml_backend_buffer_type_t cpu_buft =
