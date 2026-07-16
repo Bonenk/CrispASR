@@ -1348,8 +1348,6 @@ static ggml_cgraph* build_llm_graph(omnivoice_context* ctx, ggml_context* ctx0, 
     ggml_set_name(logits, "audio_logits");
     ggml_set_output(logits);
 
-    ggml_set_name(cur, "llm_out");
-    ggml_set_output(cur);
     ggml_build_forward_expand(gf, logits);
 
     return gf;
@@ -1399,6 +1397,57 @@ static std::vector<float> read_embedding_rows(ggml_backend_t backend, ggml_tenso
     ggml_free(ctx0);
     return result;
 }
+
+// Persistent embedding-lookup graph: avoids per-call ggml_context + gallocr
+// creation in the hot MaskGIT loop. Shape is fixed (n_rows constant across
+// steps), so the graph and buffer allocation are reused — only the row-ID
+// input data changes per step.
+struct ov_persist_embed {
+    std::vector<uint8_t> mem_buf;
+    ggml_context* ctx0 = nullptr;
+    ggml_cgraph* gf = nullptr;
+    ggml_tensor* ids = nullptr;
+    ggml_tensor* out = nullptr;
+    ggml_gallocr_t ga = nullptr;
+    int n_rows = 0;
+    int dim = 0;
+
+    void init(ggml_backend_t backend, ggml_tensor* embd_w, int nr, int d) {
+        n_rows = nr;
+        dim = d;
+        size_t mem = (size_t)(n_rows + 6) * ggml_tensor_overhead() + ggml_graph_overhead();
+        mem_buf.resize(mem);
+        ggml_init_params ip = {mem, mem_buf.data(), true};
+        ctx0 = ggml_init(ip);
+        ids = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_rows);
+        ggml_set_name(ids, "pe_row_ids");
+        ggml_set_input(ids);
+        out = ggml_get_rows(ctx0, embd_w, ids);
+        ggml_set_name(out, "pe_embd_out");
+        ggml_set_output(out);
+        gf = ggml_new_graph(ctx0);
+        ggml_build_forward_expand(gf, out);
+        ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(backend));
+        ggml_gallocr_alloc_graph(ga, gf);
+    }
+
+    void compute(ggml_backend_t backend, const int32_t* row_data, float* result) {
+        ggml_backend_tensor_set(ids, row_data, 0, (size_t)n_rows * sizeof(int32_t));
+        ggml_backend_graph_compute(backend, gf);
+        ggml_backend_tensor_get(out, result, 0, (size_t)n_rows * dim * sizeof(float));
+    }
+
+    void release() {
+        if (ga) {
+            ggml_gallocr_free(ga);
+            ga = nullptr;
+        }
+        if (ctx0) {
+            ggml_free(ctx0);
+            ctx0 = nullptr;
+        }
+    }
+};
 
 static std::vector<float> prepare_embeddings(
     omnivoice_context* ctx, const std::vector<int32_t>& text_ids,
@@ -1752,7 +1801,84 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             fwd_free(g);
     };
 
-    // 8. Iterative generation loop
+    // 8. Pre-computed/persistent embeddings for the hot loop.
+    //
+    // Text embeddings are constant across MaskGIT steps (only audio tokens
+    // change as masks lift). Compute once and reuse. Audio embedding graphs
+    // are shape-constant (n_codebooks × T_audio / T_target rows), so we
+    // build one persistent gallocr per arm and reuse the buffer across steps
+    // — eliminating the per-step ggml_context + gallocr alloc/free overhead
+    // and the repeated text-embedding GPU→CPU round-trip. (#254)
+    const int d = (int)hp.d_model;
+    const int target_start = T_total - T_target;
+
+    // 8a. Text embedding cache (positions 0..audio_start-1) — computed once.
+    std::vector<float> text_emb_cache;
+    if (audio_start > 0) {
+        std::vector<int32_t> text_only_ids(full_text_ids.begin(), full_text_ids.begin() + audio_start);
+        text_emb_cache =
+            read_embedding_rows(ctx->backend, ctx->model.token_embd_w, text_only_ids.data(), audio_start, d);
+    }
+
+    // 8b. Persistent audio embedding graphs (reused across all 32 steps).
+    const int n_cond_audio_rows = (int)hp.n_codebooks * T_audio;
+    const int n_uncond_audio_rows = (int)hp.n_codebooks * T_target;
+    ov_persist_embed audio_cond_pe, audio_uncond_pe;
+    audio_cond_pe.init(ctx->backend, ctx->model.audio_embd_w, n_cond_audio_rows, d);
+    if (gen.guidance_scale != 0.0f)
+        audio_uncond_pe.init(ctx->backend, ctx->model.audio_embd_w, n_uncond_audio_rows, d);
+
+    // 8c. Pre-allocated per-step buffers (avoid heap churn in the hot loop).
+    std::vector<int32_t> cond_audio_ids(n_cond_audio_rows);
+    std::vector<int32_t> uncond_audio_ids(n_uncond_audio_rows);
+    std::vector<float> cond_audio_emb((size_t)n_cond_audio_rows * d);
+    std::vector<float> uncond_audio_emb((size_t)n_uncond_audio_rows * d);
+    std::vector<float> cond_embeds_buf((size_t)T_total * d);
+    std::vector<float> uncond_embeds_buf((size_t)T_target * d);
+
+    // 8d. Fast embedding helpers: text from cache, audio via persistent graph.
+    auto prepare_cond_fast = [&]() {
+        // Text portion: copy from cache (constant across steps)
+        if (audio_start > 0)
+            std::memcpy(cond_embeds_buf.data(), text_emb_cache.data(), (size_t)audio_start * d * sizeof(float));
+        // Audio portion: zero then accumulate codebook embeddings
+        std::memset(cond_embeds_buf.data() + (size_t)audio_start * d, 0, (size_t)T_audio * d * sizeof(float));
+        // Build shifted row IDs for all codebooks × all audio positions
+        for (int t = 0; t < T_audio; t++)
+            for (uint32_t cb = 0; cb < hp.n_codebooks; cb++)
+                cond_audio_ids[(size_t)t * hp.n_codebooks + cb] =
+                    audio_tokens[cb * T_audio + t] + (int)(cb * hp.audio_vocab_size);
+        // Single persistent GPU compute (no alloc/free)
+        audio_cond_pe.compute(ctx->backend, cond_audio_ids.data(), cond_audio_emb.data());
+        // Sum across codebooks per position
+        for (int t = 0; t < T_audio; t++) {
+            float* dst = cond_embeds_buf.data() + (size_t)(audio_start + t) * d;
+            for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
+                const float* src = cond_audio_emb.data() + (size_t)((size_t)t * hp.n_codebooks + cb) * d;
+                for (int j = 0; j < d; j++)
+                    dst[j] += src[j];
+            }
+        }
+    };
+
+    auto prepare_uncond_fast = [&]() {
+        std::memset(uncond_embeds_buf.data(), 0, (size_t)T_target * d * sizeof(float));
+        for (int t = 0; t < T_target; t++)
+            for (uint32_t cb = 0; cb < hp.n_codebooks; cb++)
+                uncond_audio_ids[(size_t)t * hp.n_codebooks + cb] =
+                    audio_tokens[cb * T_audio + T_ref + t] + (int)(cb * hp.audio_vocab_size);
+        audio_uncond_pe.compute(ctx->backend, uncond_audio_ids.data(), uncond_audio_emb.data());
+        for (int t = 0; t < T_target; t++) {
+            float* dst = uncond_embeds_buf.data() + (size_t)t * d;
+            for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
+                const float* src = uncond_audio_emb.data() + (size_t)((size_t)t * hp.n_codebooks + cb) * d;
+                for (int j = 0; j < d; j++)
+                    dst[j] += src[j];
+            }
+        }
+    };
+
+    // 9. Iterative generation loop
     std::vector<float> u_logits_cache; // interval-CFG: last computed uncond logits
     for (int step = 0; step < gen.num_steps; step++) {
         int k = schedule[step];
@@ -1772,39 +1898,26 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             }
         }
 
-        int target_start = T_total - T_target;
         std::vector<float> c_logits, u_logits;
-        // Build the uncond (target-only) inputs once when guidance is on.
-        auto build_uncond_embeds = [&]() {
-            std::vector<int32_t> u_text_ids(T_target, 0);
-            std::vector<bool> u_mask(T_target, true);
-            std::vector<int32_t> u_audio(hp.n_codebooks * T_target);
-            for (uint32_t cb = 0; cb < hp.n_codebooks; cb++)
-                for (int t = 0; t < T_target; t++)
-                    u_audio[cb * T_target + t] = audio_tokens[cb * T_audio + T_ref + t];
-            return prepare_embeddings(ctx, u_text_ids, u_audio, u_mask, T_target);
-        };
 
         if (unified_cfg && cfg_interval <= 1 && gen.guidance_scale != 0.0f) {
             // Fused single-graph CFG (exact only; interval-CFG needs the 2-forward path).
-            std::vector<float> embeds, u_embeds;
             {
                 ov_bench_stage b("  embeds");
-                embeds = prepare_embeddings(ctx, full_text_ids, audio_tokens, audio_mask, T_total);
-                u_embeds = build_uncond_embeds();
+                prepare_cond_fast();
+                prepare_uncond_fast();
             }
             ov_bench_stage b("  fwd_unified");
-            run_unified(embeds, T_total, u_embeds, T_target, target_start, c_logits, u_logits);
+            run_unified(cond_embeds_buf, T_total, uncond_embeds_buf, T_target, target_start, c_logits, u_logits);
         } else {
             // Prepare conditional embeddings (full context: style + text + ref + target)
-            std::vector<float> embeds;
             {
                 ov_bench_stage b("  embeds_cond");
-                embeds = prepare_embeddings(ctx, full_text_ids, audio_tokens, audio_mask, T_total);
+                prepare_cond_fast();
             }
             {
                 ov_bench_stage b("  fwd_cond");
-                c_logits = run_llm_forward(fwd_c, embeds, T_total, target_start);
+                c_logits = run_llm_forward(fwd_c, cond_embeds_buf, T_total, target_start);
             }
             // Unconditional forward (target tokens only) for classifier-free guidance.
             // Interval-CFG: recompute only every cfg_interval steps (plus the first
@@ -1814,13 +1927,12 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
                 const bool recompute =
                     (step % cfg_interval == 0) || u_logits_cache.empty() || (step == gen.num_steps - 1);
                 if (recompute) {
-                    std::vector<float> u_embeds;
                     {
                         ov_bench_stage b("  embeds_uncond");
-                        u_embeds = build_uncond_embeds();
+                        prepare_uncond_fast();
                     }
                     ov_bench_stage b("  fwd_uncond");
-                    u_logits_cache = run_llm_forward(fwd_u, u_embeds, T_target, 0);
+                    u_logits_cache = run_llm_forward(fwd_u, uncond_embeds_buf, T_target, 0);
                 }
                 u_logits = u_logits_cache;
             }
@@ -1964,6 +2076,8 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     fwd_free(fwd_c);
     fwd_free(fwd_u);
     fwd_free(fwd_uni);
+    audio_cond_pe.release();
+    audio_uncond_pe.release();
 
     if (getenv("OMNIVOICE_DEBUG_CODES")) {
         int n_mask = 0;
