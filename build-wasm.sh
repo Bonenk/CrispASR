@@ -29,6 +29,7 @@ BUILD_DIR="build-wasm"
 CLEAN=false
 SIMD=ON
 SINGLE_FILE=OFF
+C2PA=OFF
 CMAKE_EXTRA=()
 
 while [[ $# -gt 0 ]]; do
@@ -39,6 +40,7 @@ while [[ $# -gt 0 ]]; do
         --single-file) SINGLE_FILE=ON; shift ;;
         --single-thread) CMAKE_EXTRA+=("-DCRISPASR_WASM_SINGLE_THREAD=ON"); shift ;;
         --proxy-to-pthread) CMAKE_EXTRA+=("-DCRISPASR_WASM_PROXY_TO_PTHREAD=ON"); shift ;;
+        --c2pa)        C2PA=ON; shift ;;   # opt-in: bundle C2PA signing (+~10 MB, needs wasm-EH)
         --)            shift; CMAKE_EXTRA+=("$@"); break ;;
         *)             CMAKE_EXTRA+=("$1"); shift ;;
     esac
@@ -75,18 +77,25 @@ if [ "$SIMD" = "ON" ]; then
 fi
 
 # Configure
-# C2PA in wasm: the prebuilt c2pa-rs wasm32-emscripten lib is compiled with
-# NATIVE wasm exceptions (its Rust deps lopdf/rayon emit unwinding that imports
-# the `__cpp_exception` tag). That tag is provided only by `-fwasm-exceptions`
-# (native wasm EH) — NOT `-fexceptions` (JS-based EH) — so the whole module must
-# use -fwasm-exceptions or the link fails `undefined symbol: __cpp_exception`.
-# We also switch longjmp to the wasm-EH-compatible implementation
-# (-sSUPPORT_LONGJMP=wasm) since CrispASR uses setjmp/longjmp too. This is the
-# trade for on-by-default C2PA in the browser (needs a browser with the wasm EH
-# proposal — all modern browsers, 2023+). To opt out, drop -DCRISPASR_C2PA_FETCH
-# and the flags below (c2paSign then returns empty in wasm).
-C2PA_WASM_FLAGS="-fwasm-exceptions"
-C2PA_WASM_LINK_FLAGS="-fwasm-exceptions -sSUPPORT_LONGJMP=wasm"
+# C2PA in wasm is OPT-IN (--c2pa) because it adds ~10 MB (the full c2pa-rs stack)
+# to the module — enough to trip the web build's size budget by default. When
+# enabled: the prebuilt c2pa-rs wasm32-emscripten lib is compiled with NATIVE
+# wasm exceptions (its Rust deps lopdf/rayon import the `__cpp_exception` tag),
+# which is provided ONLY by `-fwasm-exceptions` (native wasm EH) — NOT
+# `-fexceptions` (JS-based EH) — so the whole module must use -fwasm-exceptions
+# or the link fails `undefined symbol: __cpp_exception`. We also switch longjmp
+# to the wasm-EH-compatible impl (-sSUPPORT_LONGJMP=wasm) since CrispASR uses
+# setjmp/longjmp. Needs a browser with the wasm-EH proposal (all modern, 2023+).
+# Without --c2pa the module is unchanged and Module.c2paSign() returns empty.
+C2PA_FETCH_FLAG=""
+C2PA_WASM_FLAGS=""
+C2PA_WASM_LINK_FLAGS=""
+if [ "$C2PA" = "ON" ]; then
+    C2PA_FETCH_FLAG="-DCRISPASR_C2PA_FETCH=ON"
+    C2PA_WASM_FLAGS="-fwasm-exceptions"
+    C2PA_WASM_LINK_FLAGS="-fwasm-exceptions -sSUPPORT_LONGJMP=wasm"
+    echo "[INFO] C2PA signing enabled in wasm (+~10 MB, needs wasm-EH browser)"
+fi
 echo "[INFO] Configuring with emcmake..."
 cd "$SCRIPT_DIR"
 # Use ninja if available (faster parallel builds) + ccache
@@ -112,7 +121,7 @@ emcmake cmake -S . -B "$BUILD_DIR" $GENERATOR \
     -DCRISPASR_CURL=OFF \
     -DCRISPASR_OPUS_FETCH=ON \
     -DOPUS_DISABLE_INTRINSICS=ON \
-    -DCRISPASR_C2PA_FETCH=ON \
+    $C2PA_FETCH_FLAG \
     -DCRISPASR_WASM_SINGLE_FILE="$SINGLE_FILE" \
     -DCRISPASR_WASM=ON \
     -DCMAKE_C_FLAGS="$SIMD_FLAGS $C2PA_WASM_FLAGS" \
