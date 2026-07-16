@@ -2005,6 +2005,22 @@ catch_discover_tests(test-parakeet-strategy
     PROPERTIES LABELS "unit;parakeet-strategy;improvements"
 )
 
+# ─── test-session-autochunk — pure applicability decision for session long-audio
+# auto-chunking (fix/session-long-audio). Header-only.
+add_executable(test-session-autochunk
+    test-session-autochunk.cpp
+)
+target_include_directories(test-session-autochunk PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-session-autochunk PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-session-autochunk
+    TEST_SPEC "[session-autochunk]"
+    PROPERTIES LABELS "unit;session-autochunk;session-long-audio"
+)
+
 # ─── test-worker-pool — bounded blocking resource pool (improvements Phase 4).
 # Pins core_pool::WorkerPool behind the server worker-pool.
 find_package(Threads REQUIRED)

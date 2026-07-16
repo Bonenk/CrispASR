@@ -78,12 +78,13 @@ backend doesn't expose that knob, but the call is safe to make.
 > (`bindings/javascript/emscripten.cpp`) via the `asr*` functions
 > (`asrOpen`/`asrTranscribe`/`asrSet…`).
 >
-> **⚠ `transcribe` does not auto-chunk long audio.** The session `transcribe`
-> is a low-level "transcribe this buffer" primitive: it runs one pass over the
-> whole PCM. For short-segment models (e.g. moonshine) that degrades and slows
-> badly past ~30 s. The CLI/server add dispatcher chunking on top; session
-> callers must chunk long audio themselves or use `transcribe_chunked`
-> (parakeet has bespoke internal long-audio handling, so it is the exception).
+> **Long audio auto-chunks.** `transcribe` slices audio longer than
+> ~30 s at energy minima and transcribes each piece (like the CLI/server),
+> collapsing any decode-loop repetition — so short-segment models (e.g.
+> moonshine) don't degrade or hang on a single long pass. Disable with
+> `CRISPASR_SESSION_AUTOCHUNK=0`; window via `CRISPASR_SESSION_CHUNK_SECONDS`.
+> `transcribe_chunked` remains the explicit, tunable long-form control (and
+> parakeet has its own internal long-audio handling either way).
 >
 > **Chunked long-form + progress (issue #208).** `transcribe_chunked` forces
 > the Parakeet backend through its bounded long-form path (inert on other
