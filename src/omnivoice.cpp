@@ -45,6 +45,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <functional>
 #include <map>
 #include <memory>
@@ -3395,17 +3396,100 @@ int omnivoice_set_voice_prompt(struct omnivoice_context* ctx, const char* wav_pa
         fprintf(stderr, "omnivoice: voice WAV too short after clipping\n");
         return -1;
     }
+
+    // Reference-voice disk cache (#254 reporter request; omnivoice.cpp
+    // --ref-rvq parity, but automatic). The RVQ encode (HuBERT + DAC + 8-stage
+    // RVQ over the whole reference) is the expensive part of voice cloning and
+    // its result is deterministic, so cache the codes content-addressed:
+    // FNV-1a over the PREPROCESSED pcm (post resample/RMS/clip — robust to
+    // container differences) + an encoder-weight fingerprint (re-encode after
+    // a tokenizer re-conversion). Same pattern & cache-dir resolution as
+    // pocket_tts voice latents. CRISPASR_OMNIVOICE_VOICE_CACHE=0 disables.
+    std::string codes_cache_path;
+    {
+        const char* e = std::getenv("CRISPASR_OMNIVOICE_VOICE_CACHE");
+        const bool cache_on = !(e && *e && *e == '0');
+        if (cache_on && ctx->tokenizer.enc_conv1_w) {
+            uint64_t h = 1469598103934665603ull; // FNV-1a 64
+            auto mix = [&h](const void* p, size_t n) {
+                const uint8_t* b = (const uint8_t*)p;
+                for (size_t i = 0; i < n; i++) {
+                    h ^= b[i];
+                    h *= 1099511628211ull;
+                }
+            };
+            mix(pcm.data(), pcm.size() * sizeof(float));
+            uint64_t n_samp = (uint64_t)pcm.size();
+            mix(&n_samp, sizeof(n_samp));
+            ggml_tensor* fp = ctx->tokenizer.enc_conv1_w;
+            size_t fp_n = std::min<size_t>(4096, ggml_nbytes(fp));
+            std::vector<uint8_t> fp_buf(fp_n);
+            ggml_backend_tensor_get(fp, fp_buf.data(), 0, fp_n);
+            mix(fp_buf.data(), fp_n);
+            uint64_t total = (uint64_t)ggml_nbytes(fp);
+            mix(&total, sizeof(total));
+
+            char name[64];
+            snprintf(name, sizeof(name), "omnivoice-voice-%016llx.codes", (unsigned long long)h);
+            std::string cdir;
+            if (const char* d = std::getenv("CRISPASR_CACHE_DIR"); d && *d)
+                cdir = d;
+            else if (const char* d2 = std::getenv("CRISPASR_MODELS_DIR"); d2 && *d2)
+                cdir = d2;
+            else if (const char* home = std::getenv("HOME"); home && *home)
+                cdir = std::string(home) + "/.cache/crispasr";
+            std::error_code ec;
+            if (!cdir.empty() &&
+                (std::filesystem::is_directory(cdir, ec) || std::filesystem::create_directories(cdir, ec)))
+                codes_cache_path = cdir + "/" + name;
+        }
+    }
+
     int T_ref = 0;
-    auto codes = higgs_encode(ctx, pcm.data(), (int)pcm.size(), &T_ref);
-    if (codes.empty() || T_ref <= 0) {
-        fprintf(stderr, "omnivoice: voice-prompt encode failed\n");
-        return -1;
+    std::vector<int32_t> codes;
+    if (!codes_cache_path.empty()) {
+        if (FILE* f = fopen(codes_cache_path.c_str(), "rb")) {
+            uint32_t magic = 0, ncb = 0, nT = 0;
+            if (fread(&magic, 4, 1, f) == 1 && magic == 0x3143564fu /* 'OVC1' */ && fread(&ncb, 4, 1, f) == 1 &&
+                fread(&nT, 4, 1, f) == 1 && ncb == ctx->hp.n_codebooks && nT > 0 && nT < 1000000) {
+                codes.resize((size_t)ncb * nT);
+                if (fread(codes.data(), sizeof(int32_t), codes.size(), f) == codes.size()) {
+                    T_ref = (int)nT;
+                    if (ctx->verbosity >= 1)
+                        fprintf(stderr, "omnivoice: voice codes loaded from cache (%d ref frames)\n", T_ref);
+                } else {
+                    codes.clear();
+                    T_ref = 0;
+                }
+            }
+            fclose(f);
+        }
+    }
+    if (codes.empty()) {
+        codes = higgs_encode(ctx, pcm.data(), (int)pcm.size(), &T_ref);
+        if (codes.empty() || T_ref <= 0) {
+            fprintf(stderr, "omnivoice: voice-prompt encode failed\n");
+            return -1;
+        }
+        if (ctx->verbosity >= 1)
+            fprintf(stderr, "omnivoice: voice prompt encoded — %d ref frames (%d codebooks)\n", T_ref,
+                    (int)ctx->hp.n_codebooks);
+        if (!codes_cache_path.empty()) {
+            std::string tmp = codes_cache_path + ".tmp";
+            if (FILE* f = fopen(tmp.c_str(), "wb")) {
+                uint32_t magic = 0x3143564fu, ncb = (uint32_t)ctx->hp.n_codebooks, nT = (uint32_t)T_ref;
+                bool ok = fwrite(&magic, 4, 1, f) == 1 && fwrite(&ncb, 4, 1, f) == 1 && fwrite(&nT, 4, 1, f) == 1 &&
+                          fwrite(codes.data(), sizeof(int32_t), codes.size(), f) == codes.size();
+                fclose(f);
+                if (ok)
+                    rename(tmp.c_str(), codes_cache_path.c_str());
+                else
+                    remove(tmp.c_str());
+            }
+        }
     }
     ctx->ref_audio_codes = std::move(codes);
     ctx->ref_T = T_ref;
-    if (ctx->verbosity >= 1)
-        fprintf(stderr, "omnivoice: voice prompt encoded — %d ref frames (%d codebooks)\n", T_ref,
-                (int)ctx->hp.n_codebooks);
     return 0;
 }
 
