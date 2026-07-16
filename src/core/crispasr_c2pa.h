@@ -164,8 +164,8 @@ inline bool crispasr_c2pa_sign_pem(std::string& data, const char* format, const 
 #ifndef CRISPASR_NO_C2PA_NATIVE
     // Native path — pure C++ (uECC ES256 + hand-built CBOR/JUMBF/COSE) from the
     // vendored c2pa-audio lib, no c2pa-rs; works on every platform including the
-    // wasm/mobile sandbox. WAV (RIFF chunk) and MP3 (ID3v2 GEOB) are supported;
-    // MP4/M4A still needs c2pa-rs (BmffHash), handled below.
+    // wasm/mobile sandbox. WAV (RIFF chunk), MP3 (ID3v2 GEOB), and M4A/MP4 (ISO
+    // BMFF, c2pa.hash.bmff.v3) are all supported natively.
     {
         crispasr::c2pa_native::Bytes in(data.begin(), data.end());
         crispasr::c2pa_native::Bytes out;
@@ -173,6 +173,8 @@ inline bool crispasr_c2pa_sign_pem(std::string& data, const char* format, const 
             out = crispasr::c2pa_native::sign_wav(in, cert_pem, key_pem);
         else if (std::strcmp(format, "audio/mpeg") == 0)
             out = crispasr::c2pa_native::sign_mp3(in, cert_pem, key_pem);
+        else if (std::strcmp(format, "audio/mp4") == 0)
+            out = crispasr::c2pa_native::sign_m4a(in, cert_pem, key_pem);
         if (!out.empty()) {
             data.assign(reinterpret_cast<const char*>(out.data()), out.size());
             return true;
