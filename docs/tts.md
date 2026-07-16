@@ -1300,6 +1300,20 @@ crispasr --tts "hello" --c2pa-cert crispasr-c2pa.crt --c2pa-key crispasr-c2pa.ke
 M4A/MP4/FLAC). It cannot embed in **AAC (ADTS)** or **Opus (Ogg)** — those
 outputs are written unsigned but still carry the watermark + file-metadata tag.
 
+**Bindings / mobile.** C2PA lives in the core C API (`crispasr_c2pa_sign` /
+`crispasr_c2pa_free`, and `c2paSign()` in the wasm/JS binding), so any consumer
+of `crispasr-lib` can sign — pass a WAV/MP3 container and get signed bytes back.
+Build the library for the target with `-DCRISPASR_C2PA_FETCH=ON`:
+- **Android**: links `libc2pa_c.so`; bundle it in the APK `jniLibs/<abi>/` next to
+  `libwhisper.so` (verified: the arm64 prebuilt links cleanly with the NDK).
+- **iOS**: links `libc2pa_c.a` statically; `crispasr_enable_c2pa` auto-links the
+  required Apple frameworks (Security / CoreFoundation / SystemConfiguration)
+  (verified: the arm64 prebuilt links cleanly with the iOS SDK).
+- **WASM**: not yet enabled — the prebuilt c2pa-rs emscripten lib is built with
+  C++ exceptions while the wasm target links the no-exceptions runtime, so the
+  link fails (`undefined symbol: __cpp_exception`). `c2paSign()` returns empty in
+  wasm until that ABI is reconciled (see build-wasm.sh).
+
 ### Voice cloning consent gate
 
 Voice cloning (`.wav` reference files) requires explicit consent:
