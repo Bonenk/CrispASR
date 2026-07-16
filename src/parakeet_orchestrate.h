@@ -87,6 +87,36 @@ inline parakeet_strategy parakeet_pick_strategy(const parakeet_strategy_in& in) 
     return parakeet_strategy::STREAMED;
 }
 
+// ---- Phase 2: proactive encoder memory policy ----
+//
+// Single-pass full attention materializes an O(T^2) relative-position bias
+// (several T×(2T) tensors live at once), which is what OOM'd the reporter's
+// 3.7 GiB card at ~4 min (issue #257). Rather than allocate-and-fail-and-retry
+// (the reactive fallback), estimate the peak up front and proactively pick the
+// streamed (bounded-window) encoder when it would exceed a user-set budget.
+//
+// `coeff` folds the "how many T×2T F32 tensors coexist" constant; the default
+// (8.0) is calibrated so a ~4 min clip (T≈2800, 8 heads) estimates ~2 GiB,
+// matching the reporter's 1911 MiB, and is deliberately a slight OVER-estimate
+// so the gate errs toward the safe streamed path. Env-tunable via
+// CRISPASR_PARAKEET_MEM_COEFF. This is a heuristic gate, NOT an exact allocator
+// model — the reactive OOM fallback still backstops a wrong estimate.
+inline double parakeet_est_singlepass_peak_mb(int T_enc, int n_heads, double coeff) {
+    if (T_enc <= 0 || n_heads <= 0)
+        return 0.0;
+    const double T = (double)T_enc;
+    return coeff * T * T * (double)n_heads * 4.0 / (1024.0 * 1024.0);
+}
+
+// Does single-pass fit `budget_mb`? A non-positive budget means "no budget set"
+// → always fits (policy disabled, historical behaviour). A non-positive coeff
+// disables the estimate → always fits.
+inline bool parakeet_singlepass_fits_budget(int T_enc, int n_heads, double budget_mb, double coeff) {
+    if (budget_mb <= 0.0 || coeff <= 0.0)
+        return true;
+    return parakeet_est_singlepass_peak_mb(T_enc, n_heads, coeff) <= budget_mb;
+}
+
 // Full orchestration: mel → path selection → decode → segmentation, returning
 // the neutral segment list. `is_ja` is passed in (callers already detect it, or
 // pass parakeet_vocab_is_japanese(ctx)). Reads the same CRISPASR_PARAKEET_*

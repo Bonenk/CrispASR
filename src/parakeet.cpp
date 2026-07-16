@@ -3379,6 +3379,21 @@ extern "C" int parakeet_n_mels(struct parakeet_context* ctx) {
 extern "C" int parakeet_sample_rate(struct parakeet_context* ctx) {
     return (int)ctx->model.hparams.sample_rate;
 }
+extern "C" int parakeet_n_heads(struct parakeet_context* ctx) {
+    return ctx ? (int)ctx->model.hparams.n_heads : 0;
+}
+// Approximate encoder-frame count for `n_samples` (mel frames / subsampling).
+// Used by the Phase 2 memory policy to estimate the single-pass O(T^2) rel-pos
+// bias before allocating it — not exact (ignores conv edge arithmetic), which
+// is fine for a conservative memory gate.
+extern "C" int parakeet_est_enc_frames(struct parakeet_context* ctx, int n_samples) {
+    if (!ctx || n_samples <= 0)
+        return 0;
+    const auto& hp = ctx->model.hparams;
+    const int hop = (int)hp.hop_length > 0 ? (int)hp.hop_length : 160;
+    const int sub = (int)hp.subsampling_factor > 0 ? (int)hp.subsampling_factor : 8;
+    return (n_samples / hop) / sub;
+}
 
 extern "C" const char* parakeet_token_to_str(struct parakeet_context* ctx, int id) {
     if (id < 0 || id >= (int)ctx->vocab.id_to_token.size())

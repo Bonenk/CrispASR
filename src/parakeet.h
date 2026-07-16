@@ -149,6 +149,8 @@ struct parakeet_result* parakeet_decode_frames(struct parakeet_context* ctx, con
 int parakeet_frame_dur_cs(struct parakeet_context* ctx); // centiseconds per encoder frame
 int parakeet_n_mels(struct parakeet_context* ctx);
 int parakeet_sample_rate(struct parakeet_context* ctx);
+int parakeet_n_heads(struct parakeet_context* ctx); // encoder attention heads (Phase 2 mem policy)
+int parakeet_est_enc_frames(struct parakeet_context* ctx, int n_samples); // approx T_enc for n_samples
 
 // ---- Stage-level entry points (for crispasr-diff testing) ----
 // These let the diff harness compare intermediate activations against

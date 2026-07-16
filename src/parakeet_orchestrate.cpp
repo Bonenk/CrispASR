@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -251,7 +252,41 @@ std::vector<parakeet_seg> parakeet_transcribe_segments(parakeet_context* ctx, co
     sin.chunk_seconds = opts.chunk_seconds;
     sin.stream_threshold_s = stream_threshold_s;
     sin.longform_enabled = longform_enabled;
-    const parakeet_strategy strat = parakeet_pick_strategy(sin);
+    parakeet_strategy strat = parakeet_pick_strategy(sin);
+
+    // Phase 2: proactive encoder memory policy. When single-pass is chosen but
+    // its estimated O(T^2) rel-pos bias would exceed a user-set VRAM budget,
+    // switch to the streamed (bounded-window) encoder BEFORE allocating —
+    // instead of allocate → OOM → reactive fallback. Opt-in: default budget 0
+    // = disabled → single-pass as before (the reactive fallback still backstops).
+    //   CRISPASR_PARAKEET_MEM_POLICY = auto (default) | off | single | streamed
+    //   CRISPASR_PARAKEET_VRAM_BUDGET_MB : budget (MiB); 0/unset = disabled
+    //   CRISPASR_PARAKEET_MEM_COEFF : O(T^2) estimate coefficient (default 8.0)
+    if (strat == parakeet_strategy::SINGLE_PASS) {
+        const char* pol = getenv("CRISPASR_PARAKEET_MEM_POLICY");
+        const bool mode_off = pol && strcmp(pol, "off") == 0;
+        const bool mode_force_single = pol && strcmp(pol, "single") == 0;
+        const bool mode_force_streamed = pol && strcmp(pol, "streamed") == 0;
+        if (mode_force_streamed) {
+            strat = parakeet_strategy::STREAMED;
+        } else if (!mode_off && !mode_force_single) {
+            double budget = 0.0, coeff = 8.0;
+            if (const char* e = getenv("CRISPASR_PARAKEET_VRAM_BUDGET_MB"))
+                budget = atof(e);
+            if (const char* e = getenv("CRISPASR_PARAKEET_MEM_COEFF"))
+                coeff = atof(e);
+            const int T_enc = parakeet_est_enc_frames(ctx, n_samples);
+            const int H = parakeet_n_heads(ctx);
+            if (!parakeet_singlepass_fits_budget(T_enc, H, budget, coeff)) {
+                if (!opts.no_prints)
+                    fprintf(stderr,
+                            "crispasr[parakeet]: single-pass est %.0f MiB > budget %.0f MiB (T=%d, H=%d); "
+                            "using streamed encoding (set CRISPASR_PARAKEET_MEM_POLICY=single to force)\n",
+                            parakeet_est_singlepass_peak_mb(T_enc, H, coeff), budget, T_enc, H);
+                strat = parakeet_strategy::STREAMED;
+            }
+        }
+    }
 
     if (strat == parakeet_strategy::LONGFORM)
         return transcribe_longform(ctx, samples, n_samples, t_offset_cs, stream_threshold_s * SR);

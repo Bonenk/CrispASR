@@ -21,6 +21,17 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       tracked below.
 - [ ] **Phase 1b** — extend the hoist + gate to the other backends, flip the gate
       default to ON once each is parity-verified.
+- [x] **Phase 2** — proactive encoder memory policy — DONE (opt-in). Pure
+      `parakeet_est_singlepass_peak_mb` / `parakeet_singlepass_fits_budget`
+      (`test-parakeet-strategy`, +2 cases) proactively pick streamed over
+      single-pass when the O(T²) bias would exceed
+      `CRISPASR_PARAKEET_VRAM_BUDGET_MB` — before allocating, layered over the
+      reactive OOM fallback. A/B: on the reporter's 225 s clip the estimate came
+      out **1931 MiB (T=2812, H=8)** — matching the reporter's actual **1911.98
+      MiB** — and `budget=1500` correctly switched to streamed (full 267-word
+      transcript). Default (no budget) unchanged. **CUDA memory proof pending**
+      (can't OOM on M1); the estimate matching the reporter's number is the
+      evidence so far.
 - [ ] **Phase 2** — unified encoder memory policy (proactive, replaces ad-hoc gates)
 - [ ] **Phase 3** — diff-harness parity in CI (per-stage cos + decoded roundtrip)
 - [ ] **Phase 4** — server throughput (batching / worker pool)
