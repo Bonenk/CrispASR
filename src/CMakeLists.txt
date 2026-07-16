@@ -239,15 +239,21 @@ option(CRISPASR_NO_C2PA_NATIVE "Disable the built-in pure-C++ C2PA WAV signer" O
 if (CRISPASR_NO_C2PA_NATIVE)
     target_compile_definitions(crispasr-lib PUBLIC CRISPASR_NO_C2PA_NATIVE)
 else()
+    # Sources vendored from the standalone c2pa-audio repo (git submodule).
+    set(_c2pa_audio_dir ${CMAKE_SOURCE_DIR}/third_party/c2pa-audio)
     add_library(crispasr_c2pa_native STATIC
-        core/crispasr_c2pa_native.cpp
-        ${CMAKE_SOURCE_DIR}/third_party/uecc/uECC.c)
-    target_include_directories(crispasr_c2pa_native PRIVATE
-        core ${CMAKE_SOURCE_DIR}/third_party/uecc)
+        ${_c2pa_audio_dir}/src/c2pa_native.cpp
+        ${_c2pa_audio_dir}/third_party/uecc/uECC.c)
+    # src/ is PUBLIC — the shim headers (src/core/crispasr_c2pa_native.h etc.)
+    # and crispasr_c2pa.h include the submodule's c2pa_native.h / sha256.h, so
+    # every consumer that links crispasr_c2pa_native needs it on the path. uecc
+    # is PRIVATE (only the .cpp needs it).
+    target_include_directories(crispasr_c2pa_native PUBLIC ${_c2pa_audio_dir}/src)
+    target_include_directories(crispasr_c2pa_native PRIVATE ${_c2pa_audio_dir}/third_party/uecc)
     # Vendored micro-ecc — silence its warnings so CRISPASR_FATAL_WARNINGS builds
     # don't trip on third-party code we don't modify.
     if (NOT MSVC)
-        set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/uecc/uECC.c
+        set_source_files_properties(${_c2pa_audio_dir}/third_party/uecc/uECC.c
             PROPERTIES COMPILE_OPTIONS "-w")
     endif()
     target_compile_features(crispasr_c2pa_native PRIVATE cxx_std_17)
