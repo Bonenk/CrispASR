@@ -50,6 +50,7 @@ void crispasr_pcm_free(float* pcm);
 unsigned char* crispasr_c2pa_sign(const unsigned char* data, size_t len, const char* format, const char* cert_path,
                                   const char* key_path, size_t* out_len);
 void crispasr_c2pa_free(unsigned char* p);
+unsigned char* crispasr_pcm_to_wav(const float* pcm, int n_samples, int sample_rate, size_t* out_len);
 int crispasr_session_kokoro_clear_phoneme_cache(CrispasrSession* s);
 int crispasr_kokoro_resolve_model_for_lang_abi(const char* model_path, const char* lang, char* out_path,
                                                int out_path_len);
@@ -1055,6 +1056,24 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // "audio/mpeg"). Signs with the bundled self-signed default cert (baked in —
     // no filesystem/openssl needed). Returns a signed Uint8Array, or an empty one
     // on failure / unsupported container (AAC/Opus). #260.
+    // Wrap a Float32Array of mono PCM into a WAV Uint8Array carrying the
+    // interoperable AI-provenance metadata tag (standard WAV LIST/INFO chunk) —
+    // the zero-cost provenance floor for the browser (ttsSynthesize returns raw
+    // watermarked PCM; wrap it to also get a machine-readable, any-tool-readable
+    // AI marker). Optionally feed the result to c2paSign() for a full manifest.
+    emscripten::function(
+        "pcmToWav", emscripten::optional_override([](const emscripten::val& pcm, int sampleRate) -> emscripten::val {
+            std::vector<float> in = emscripten::vecFromJSArray<float>(pcm);
+            size_t out_len = 0;
+            unsigned char* out = crispasr_pcm_to_wav(in.data(), (int)in.size(), sampleRate, &out_len);
+            if (!out || out_len == 0)
+                return emscripten::val::global("Uint8Array").new_(0);
+            emscripten::val view(emscripten::typed_memory_view(out_len, out));
+            emscripten::val result = emscripten::val::global("Uint8Array").new_(view);
+            crispasr_c2pa_free(out);
+            return result;
+        }));
+
     emscripten::function("c2paSign", emscripten::optional_override([](const emscripten::val& data,
                                                                       const std::string& format) -> emscripten::val {
                              // Copy the JS Uint8Array into wasm memory (no reliance on HEAPU8 being

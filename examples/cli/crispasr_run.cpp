@@ -50,7 +50,7 @@
 #include "crispasr_tts_disclaimer.h"
 #include "crispasr_watermark.h"
 #include "crispasr_watermark_dispatch.h"
-#include "crispasr_wav_writer.h"
+#include "core/crispasr_wav_writer.h"
 #include "crispasr_mp3_writer.h"  // MP3 output via in-tree glint encoder
 #include "crispasr_aac_writer.h"  // AAC-LC (ADTS) output via in-tree glint encoder
 #include "crispasr_opus_writer.h" // Ogg Opus output via in-tree glint encoder

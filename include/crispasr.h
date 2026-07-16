@@ -865,6 +865,14 @@ CRISPASR_API unsigned char* crispasr_c2pa_sign(const unsigned char* data, size_t
                                                const char* cert_path, const char* key_path, size_t* out_len);
 CRISPASR_API void crispasr_c2pa_free(unsigned char* p);
 
+// Wrap float32 mono PCM into a 16-bit WAV carrying the AI-generated provenance
+// metadata tag (standard WAV LIST/INFO chunk — interoperable, any tool reads it).
+// The zero-cost provenance floor for wasm/bindings that only get raw PCM from
+// synthesis. Returns malloc'd WAV bytes (free with crispasr_c2pa_free), *out_len
+// set, or NULL on bad input. Feed to crispasr_c2pa_sign() to also embed a C2PA
+// manifest.
+CRISPASR_API unsigned char* crispasr_pcm_to_wav(const float* pcm, int n_samples, int sample_rate, size_t* out_len);
+
 // Load an AudioSeal GGUF model for neural watermarking. Call once at
 // startup. Returns 0 on success, -1 on failure (falls back to
 // spread-spectrum). The model is shared across all subsequent
