@@ -45,6 +45,11 @@ target slice is used), single-threaded triple-log-softmax CFG scoring (~13M
   `CRISPASR_REF=main`). Local M1 timing is load-noise (loadavg 100–290 all
   day; legacy vs fused gen 370→234 s directional only, decode-stage noise
   3.8× between arms of identical code).
+- 📣 **Reporter A/B requested (2026-07-16):** asked the #254 reporter (RTX
+  5070 Ti — the exact platform) to run `OMNIVOICE_FUSED_STEP=0` vs `=1` with
+  `OMNIVOICE_DUMP_CODES` + `cmp` on current main
+  (issue comment 4995155233). Whichever lands first — reporter, Kaggle
+  quota (~07-18), or the A1000 — gates the CUDA default flip.
 - **Next (when GPU access returns):** run the Kaggle/A1000 A/B → if
   byte-identical + faster on CUDA, flip the CUDA default to fused and ask the
   reporter to re-bench. Expected: kills the ~44 ms/step host overhead that is
