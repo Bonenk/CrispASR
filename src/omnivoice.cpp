@@ -45,11 +45,13 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <memory>
 #include <numeric>
 #include <random>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -93,6 +95,30 @@ struct ov_bench_stage {
         std::fprintf(stderr, "  omnivoice_bench: %-22s %.2f ms\n", name, ms);
     }
 };
+
+// ---------------------------------------------------------------------------
+// Parallel-for over [0, n) in contiguous chunks (scoring hot loop)
+// ---------------------------------------------------------------------------
+
+static void ov_parallel_for(int n_threads, int n, const std::function<void(int, int)>& fn) {
+    n_threads = std::max(1, std::min(n_threads, n));
+    if (n_threads == 1) {
+        fn(0, n);
+        return;
+    }
+    const int chunk = (n + n_threads - 1) / n_threads;
+    std::vector<std::thread> workers;
+    workers.reserve(n_threads);
+    for (int i = 0; i < n_threads; i++) {
+        const int a = i * chunk;
+        const int b = std::min(n, a + chunk);
+        if (a >= b)
+            break;
+        workers.emplace_back(fn, a, b);
+    }
+    for (auto& w : workers)
+        w.join();
+}
 
 // ---------------------------------------------------------------------------
 // Hyperparameters
@@ -1698,6 +1724,19 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     if (cfg_interval > 1 && debug)
         fprintf(stderr, "omnivoice: interval-CFG K=%d (uncond recomputed every %d steps)\n", cfg_interval,
                 cfg_interval);
+    // Fused step graph (#254): move the audio-embedding lookup + codebook sum +
+    // text-embed concat INTO the forward graph (token ids in, target-slice
+    // logits out). Kills the per-step ~18 MB embed readback, the CPU codebook
+    // sum, the ~5 MB embed re-upload, and two extra graph dispatches. The
+    // embedding math is the same get_rows + same-order F32 adds the legacy
+    // path does on the host, so codes are byte-identical (A/B-gated).
+    // OMNIVOICE_FUSED_STEP=0 restores the legacy split path.
+    const bool fused_step = [&] {
+        const char* e = getenv("OMNIVOICE_FUSED_STEP");
+        if (e && e[0])
+            return e[0] != '0';
+        return persistent; // fused graphs are persistent-only
+    }();
     auto run_llm_forward = [&](ov_step_graph& g, const std::vector<float>& emb, int T_in,
                                int target_offset) -> std::vector<float> {
         if (!g.ctx0) {
@@ -1824,9 +1863,182 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     const int n_cond_audio_rows = (int)hp.n_codebooks * T_audio;
     const int n_uncond_audio_rows = (int)hp.n_codebooks * T_target;
     ov_persist_embed audio_cond_pe, audio_uncond_pe;
-    audio_cond_pe.init(ctx->backend, ctx->model.audio_embd_w, n_cond_audio_rows, d);
-    if (gen.guidance_scale != 0.0f)
-        audio_uncond_pe.init(ctx->backend, ctx->model.audio_embd_w, n_uncond_audio_rows, d);
+    if (!fused_step) {
+        audio_cond_pe.init(ctx->backend, ctx->model.audio_embd_w, n_cond_audio_rows, d);
+        if (gen.guidance_scale != 0.0f)
+            audio_uncond_pe.init(ctx->backend, ctx->model.audio_embd_w, n_uncond_audio_rows, d);
+    }
+
+    // 8b'. Fused step graphs (#254). One persistent graph per arm that takes
+    // shifted audio-token IDs as its only per-step input and emits ONLY the
+    // target-slice logits. The text embeddings live in a dedicated backend
+    // buffer (outside any gallocr, so they can't be aliased) and are uploaded
+    // once; the audio embedding lookup + per-position codebook sum run
+    // in-graph (get_rows + chained adds in the same cb-ascending order as the
+    // host sum — bitwise-identical F32).
+    struct ov_fused_graph {
+        std::vector<uint8_t> mem_buf;
+        ggml_context* ctx0 = nullptr;
+        ggml_cgraph* gf = nullptr;
+        ggml_tensor* ids_c = nullptr; // cond audio ids (n_cb * T_audio) or null
+        ggml_tensor* ids_u = nullptr; // uncond audio ids (n_cb * T_target) or null
+        ggml_tensor* pos = nullptr;
+        ggml_tensor* c_out = nullptr; // (out_dim, T_target) cond-target logits
+        ggml_tensor* u_out = nullptr; // (out_dim, T_target) uncond logits
+        void release() {
+            if (ga)
+                ggml_gallocr_free(ga);
+            if (ctx0)
+                ggml_free(ctx0);
+            ga = nullptr;
+            ctx0 = nullptr;
+        }
+        ggml_gallocr_t ga = nullptr;
+    };
+    ov_fused_graph fu_c, fu_u, fu_uni;
+    ggml_context* ctx_ext = nullptr;
+    ggml_backend_buffer_t buf_ext = nullptr;
+    ggml_tensor* text_ext = nullptr;
+    if (fused_step && audio_start > 0) {
+        ggml_init_params ipe = {2 * ggml_tensor_overhead(), nullptr, true};
+        ctx_ext = ggml_init(ipe);
+        text_ext = ggml_new_tensor_2d(ctx_ext, GGML_TYPE_F32, d, audio_start);
+        ggml_set_name(text_ext, "text_emb_ext");
+        buf_ext = ggml_backend_alloc_ctx_tensors(ctx_ext, ctx->backend);
+        ggml_backend_tensor_set(text_ext, text_emb_cache.data(), 0, (size_t)audio_start * d * sizeof(float));
+    }
+
+    // In-graph audio embedding: ids ordered [cb * T_a + t] (the audio_tokens
+    // layout) → get_rows (d, n_cb*T_a) → reshape (d, T_a, n_cb) → sum the
+    // n_cb slices with chained adds (cb ascending, matching the host loop).
+    auto build_audio_sum = [&](ggml_context* c, ggml_tensor* ids, int T_a) -> ggml_tensor* {
+        ggml_tensor* rows = ggml_get_rows(c, ctx->model.audio_embd_w, ids);
+        ggml_tensor* r3 = ggml_reshape_3d(c, rows, d, T_a, hp.n_codebooks);
+        ggml_tensor* acc = ggml_view_2d(c, r3, d, T_a, r3->nb[1], 0);
+        for (uint32_t cb = 1; cb < hp.n_codebooks; cb++)
+            acc = ggml_add(c, acc, ggml_view_2d(c, r3, d, T_a, r3->nb[1], (size_t)cb * r3->nb[2]));
+        return acc;
+    };
+
+    // mode: 0 = cond-only (T_total), 1 = uncond-only (T_target),
+    //       2 = unified cond+uncond (T_total + T_target, split attention)
+    auto build_fused = [&](ov_fused_graph& g, int mode) {
+        const size_t n_tensors = (size_t)hp.n_layers * 64 + 256;
+        const size_t mem_size = n_tensors * ggml_tensor_overhead() + ggml_graph_overhead_custom(8192, false);
+        g.mem_buf.resize(mem_size);
+        ggml_init_params ip2 = {mem_size, g.mem_buf.data(), true};
+        g.ctx0 = ggml_init(ip2);
+
+        ggml_tensor* emb_in = nullptr;
+        int T_in = 0;
+        int split = 0;
+        if (mode == 0 || mode == 2) {
+            g.ids_c = ggml_new_tensor_1d(g.ctx0, GGML_TYPE_I32, n_cond_audio_rows);
+            ggml_set_name(g.ids_c, "fused_ids_c");
+            ggml_set_input(g.ids_c);
+            ggml_tensor* audio_c = build_audio_sum(g.ctx0, g.ids_c, T_audio);
+            emb_in = (audio_start > 0) ? ggml_concat(g.ctx0, text_ext, audio_c, 1) : audio_c;
+            T_in = T_total;
+        }
+        if (mode == 1 || mode == 2) {
+            g.ids_u = ggml_new_tensor_1d(g.ctx0, GGML_TYPE_I32, n_uncond_audio_rows);
+            ggml_set_name(g.ids_u, "fused_ids_u");
+            ggml_set_input(g.ids_u);
+            ggml_tensor* audio_u = build_audio_sum(g.ctx0, g.ids_u, T_target);
+            if (mode == 2) {
+                emb_in = ggml_concat(g.ctx0, emb_in, audio_u, 1);
+                T_in = T_total + T_target;
+                split = T_total;
+            } else {
+                emb_in = audio_u;
+                T_in = T_target;
+            }
+        }
+
+        g.gf = build_llm_graph(ctx, g.ctx0, emb_in, T_in, split);
+        g.pos = ggml_graph_get_tensor(g.gf, "pos_ids");
+        ggml_tensor* logits = ggml_graph_get_tensor(g.gf, "audio_logits");
+
+        if (mode == 0 || mode == 2) {
+            g.c_out = ggml_cont(g.ctx0, ggml_view_2d(g.ctx0, logits, out_dim, T_target, logits->nb[1],
+                                                     (size_t)target_start * logits->nb[1]));
+            ggml_set_name(g.c_out, "fused_c_tgt");
+            ggml_set_output(g.c_out);
+            ggml_build_forward_expand(g.gf, g.c_out);
+        }
+        if (mode == 1) {
+            g.u_out = logits; // uncond-only graph IS the target slice already
+        } else if (mode == 2) {
+            g.u_out = ggml_cont(g.ctx0, ggml_view_2d(g.ctx0, logits, out_dim, T_target, logits->nb[1],
+                                                     (size_t)T_total * logits->nb[1]));
+            ggml_set_name(g.u_out, "fused_u_tgt");
+            ggml_set_output(g.u_out);
+            ggml_build_forward_expand(g.gf, g.u_out);
+        }
+
+        g.ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+        ggml_gallocr_alloc_graph(g.ga, g.gf);
+    };
+
+    // Per-step fused inputs (rebuilt on the host each step — a few hundred KB
+    // of int32, trivially cheap) and persistent logit read-back buffers.
+    std::vector<int32_t> fused_cond_ids(n_cond_audio_rows);
+    std::vector<int32_t> fused_uncond_ids(n_uncond_audio_rows);
+    std::vector<int32_t> fused_pos_buf;
+    std::vector<float> c_buf, u_buf;
+    if (fused_step) {
+        c_buf.resize((size_t)out_dim * T_target);
+        if (gen.guidance_scale != 0.0f)
+            u_buf.resize((size_t)out_dim * T_target);
+    }
+
+    // Refresh EVERY gallocr-managed input each compute (aliasing gotcha —
+    // see run_llm_forward). text_ext lives in its own buffer and is exempt.
+    auto run_fused = [&](ov_fused_graph& g, int mode) {
+        {
+            ov_bench_stage b("  ids_upload");
+            if (g.ids_c) {
+                for (int t = 0; t < T_audio; t++)
+                    for (uint32_t cb = 0; cb < hp.n_codebooks; cb++)
+                        fused_cond_ids[(size_t)cb * T_audio + t] =
+                            audio_tokens[cb * T_audio + t] + (int)(cb * hp.audio_vocab_size);
+                ggml_backend_tensor_set(g.ids_c, fused_cond_ids.data(), 0, (size_t)n_cond_audio_rows * sizeof(int32_t));
+            }
+            if (g.ids_u) {
+                for (int t = 0; t < T_target; t++)
+                    for (uint32_t cb = 0; cb < hp.n_codebooks; cb++)
+                        fused_uncond_ids[(size_t)cb * T_target + t] =
+                            audio_tokens[cb * T_audio + T_ref + t] + (int)(cb * hp.audio_vocab_size);
+                ggml_backend_tensor_set(g.ids_u, fused_uncond_ids.data(), 0,
+                                        (size_t)n_uncond_audio_rows * sizeof(int32_t));
+            }
+            if (g.pos) {
+                const int T_in = (mode == 2) ? T_total + T_target : (mode == 0 ? T_total : T_target);
+                fused_pos_buf.resize(T_in);
+                if (mode == 2) {
+                    for (int i = 0; i < T_total; i++)
+                        fused_pos_buf[i] = i;
+                    for (int i = 0; i < T_target; i++)
+                        fused_pos_buf[T_total + i] = i;
+                } else {
+                    for (int i = 0; i < T_in; i++)
+                        fused_pos_buf[i] = i;
+                }
+                ggml_backend_tensor_set(g.pos, fused_pos_buf.data(), 0, (size_t)T_in * sizeof(int32_t));
+            }
+        }
+        {
+            ov_bench_stage b("  fwd_fused");
+            ggml_backend_graph_compute(ctx->backend, g.gf);
+        }
+        {
+            ov_bench_stage b("  read_logits");
+            if (g.c_out)
+                ggml_backend_tensor_get(g.c_out, c_buf.data(), 0, c_buf.size() * sizeof(float));
+            if (g.u_out)
+                ggml_backend_tensor_get(g.u_out, u_buf.data(), 0, u_buf.size() * sizeof(float));
+        }
+    };
 
     // 8c. Pre-allocated per-step buffers (avoid heap churn in the hot loop).
     std::vector<int32_t> cond_audio_ids(n_cond_audio_rows);
@@ -1879,7 +2091,14 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     };
 
     // 9. Iterative generation loop
-    std::vector<float> u_logits_cache; // interval-CFG: last computed uncond logits
+    std::vector<float> u_logits_cache; // interval-CFG (legacy path): last computed uncond logits
+    bool fused_u_valid = false;        // interval-CFG (fused path): u_buf holds a computed uncond
+    // Scoring buffers hoisted out of the hot loop (multi-MB, reused each step).
+    std::vector<float> log_probs((size_t)out_dim * T_target);
+    std::vector<int32_t> pred_tokens(hp.n_codebooks * T_target);
+    std::vector<float> confidence(hp.n_codebooks * T_target);
+    std::vector<int> indices(hp.n_codebooks * T_target);
+    std::vector<float> pos_noise; // precomputed Gumbel noise (rng-order preserving)
     for (int step = 0; step < gen.num_steps; step++) {
         int k = schedule[step];
         if (k <= 0)
@@ -1898,9 +2117,34 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             }
         }
 
-        std::vector<float> c_logits, u_logits;
+        std::vector<float> c_logits, u_logits; // legacy-path storage
+        const float* c_lg = nullptr;
+        const float* u_lg = nullptr;
 
-        if (unified_cfg && cfg_interval <= 1 && gen.guidance_scale != 0.0f) {
+        if (fused_step) {
+            if (unified_cfg && cfg_interval <= 1 && gen.guidance_scale != 0.0f) {
+                if (!fu_uni.ctx0)
+                    build_fused(fu_uni, 2);
+                run_fused(fu_uni, 2);
+                c_lg = c_buf.data();
+                u_lg = u_buf.data();
+            } else {
+                if (!fu_c.ctx0)
+                    build_fused(fu_c, 0);
+                run_fused(fu_c, 0);
+                c_lg = c_buf.data();
+                if (gen.guidance_scale != 0.0f) {
+                    const bool recompute = (step % cfg_interval == 0) || !fused_u_valid || (step == gen.num_steps - 1);
+                    if (recompute) {
+                        if (!fu_u.ctx0)
+                            build_fused(fu_u, 1);
+                        run_fused(fu_u, 1);
+                        fused_u_valid = true;
+                    }
+                    u_lg = u_buf.data();
+                }
+            }
+        } else if (unified_cfg && cfg_interval <= 1 && gen.guidance_scale != 0.0f) {
             // Fused single-graph CFG (exact only; interval-CFG needs the 2-forward path).
             {
                 ov_bench_stage b("  embeds");
@@ -1909,6 +2153,8 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             }
             ov_bench_stage b("  fwd_unified");
             run_unified(cond_embeds_buf, T_total, uncond_embeds_buf, T_target, target_start, c_logits, u_logits);
+            c_lg = c_logits.data();
+            u_lg = u_logits.data();
         } else {
             // Prepare conditional embeddings (full context: style + text + ref + target)
             {
@@ -1936,6 +2182,8 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
                 }
                 u_logits = u_logits_cache;
             }
+            c_lg = c_logits.data();
+            u_lg = u_logits.empty() ? nullptr : u_logits.data();
         }
 
         // _predict_tokens_with_scoring — mirrors Python exactly:
@@ -1967,44 +2215,85 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         int mask_id = (int)hp.audio_mask_id;
 
         // Pass 1: compute per-codebook log-probs with CFG, store in log_probs.
-        std::vector<float> log_probs(out_dim * T_target);
+        // Parallel over target positions — each (t, cb) cell is independent and
+        // rng-free, so the arithmetic (and output) is identical to the serial
+        // loop. This pass is ~13M exp() calls per step at T_target≈545.
         {
-            std::vector<float> c_lp(V), u_lp(V), guided(V), final_lp(V);
-            for (int t = 0; t < T_target; t++) {
-                for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
-                    size_t base = (size_t)t * out_dim + cb * V;
-                    const float* c_raw = c_logits.data() + base;
+            ov_bench_stage b("  score_cfg");
+            ov_parallel_for(ctx->n_threads, T_target, [&](int t0, int t1) {
+                std::vector<float> c_lp(V), u_lp(V), guided(V), final_lp(V);
+                for (int t = t0; t < t1; t++) {
+                    for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
+                        size_t base = (size_t)t * out_dim + cb * V;
+                        const float* c_raw = c_lg + base;
 
-                    if (gen.guidance_scale != 0.0f && !u_logits.empty()) {
-                        const float* u_raw = u_logits.data() + base;
-                        log_softmax_all(c_raw, c_lp.data(), V);
-                        log_softmax_all(u_raw, u_lp.data(), V);
-                        for (int v = 0; v < V; v++)
-                            guided[v] = c_lp[v] + gen.guidance_scale * (c_lp[v] - u_lp[v]);
-                        log_softmax_all(guided.data(), final_lp.data(), V);
-                    } else {
-                        log_softmax_all(c_raw, final_lp.data(), V);
+                        if (gen.guidance_scale != 0.0f && u_lg) {
+                            const float* u_raw = u_lg + base;
+                            log_softmax_all(c_raw, c_lp.data(), V);
+                            log_softmax_all(u_raw, u_lp.data(), V);
+                            for (int v = 0; v < V; v++)
+                                guided[v] = c_lp[v] + gen.guidance_scale * (c_lp[v] - u_lp[v]);
+                            log_softmax_all(guided.data(), final_lp.data(), V);
+                        } else {
+                            log_softmax_all(c_raw, final_lp.data(), V);
+                        }
+                        // Set mask_id to -inf AFTER all log_softmax passes
+                        // (Python: log_probs[..., audio_mask_id] = -float("inf"))
+                        final_lp[mask_id] = -1e30f;
+                        std::memcpy(log_probs.data() + base, final_lp.data(), V * sizeof(float));
                     }
-                    // Set mask_id to -inf AFTER all log_softmax passes
-                    // (Python: log_probs[..., audio_mask_id] = -float("inf"))
-                    final_lp[mask_id] = -1e30f;
-                    std::memcpy(log_probs.data() + base, final_lp.data(), V * sizeof(float));
                 }
-            }
+            });
         }
 
         // Pass 2: top-k filter → Gumbel sample pred_tokens; compute confidence.
-        std::vector<int32_t> pred_tokens(hp.n_codebooks * T_target);
-        std::vector<float> confidence(hp.n_codebooks * T_target);
+        ov_bench_stage bench_sample("  sample_select");
+        if (gen.class_temperature <= 0.0f) {
+            // Greedy path (default). Draw the position-Gumbel noise serially
+            // FIRST — same rng stream, same (t-outer, cb-inner) order as the
+            // serial loop — then consume it from the threaded loop, so the
+            // output is bitwise-identical to the single-threaded original.
+            if (gen.position_temperature > 0.0f) {
+                pos_noise.resize((size_t)T_target * hp.n_codebooks);
+                for (size_t i = 0; i < pos_noise.size(); i++)
+                    pos_noise[i] = gumbel_noise();
+            }
+            ov_parallel_for(ctx->n_threads, T_target, [&](int t0, int t1) {
+                for (int t = t0; t < t1; t++) {
+                    for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
+                        const float* lp = log_probs.data() + (size_t)t * out_dim + cb * V;
+                        // Confidence = max log-prob; greedy pick = argmax (first
+                        // maximum, matching std::max_element tie-breaking).
+                        int best_tok = 0;
+                        float max_lp = -1e30f;
+                        for (int v = 0; v < V; v++) {
+                            if (lp[v] > max_lp) {
+                                max_lp = lp[v];
+                                best_tok = v;
+                            }
+                        }
+                        int idx = (int)cb * T_target + t;
+                        pred_tokens[idx] = best_tok;
+                        // Confidence = max log-prob - layer penalty
+                        confidence[idx] = max_lp - cb * gen.layer_penalty_factor;
+                        // Position Gumbel noise
+                        if (gen.position_temperature > 0.0f)
+                            confidence[idx] =
+                                confidence[idx] / gen.position_temperature + pos_noise[(size_t)t * hp.n_codebooks + cb];
+                    }
+                }
+            });
+        } else {
+            // Sampled path (class_temperature > 0): draws a data-dependent
+            // number of gumbels per cell, so the rng stream can't be
+            // precomputed — stays serial.
+            for (int t = 0; t < T_target; t++) {
+                for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
+                    float* lp = log_probs.data() + (size_t)t * out_dim + cb * V;
+                    // mask_id already -inf in lp
 
-        for (int t = 0; t < T_target; t++) {
-            for (uint32_t cb = 0; cb < hp.n_codebooks; cb++) {
-                float* lp = log_probs.data() + (size_t)t * out_dim + cb * V;
-                // mask_id already -inf in lp
-
-                // Top-k filter: keep top ceil(0.1*V) tokens
-                // (Python: _filter_top_k(log_probs, ratio=0.1), k=ceil(0.1*1025)=103)
-                if (gen.class_temperature > 0.0f) {
+                    // Top-k filter: keep top ceil(0.1*V) tokens
+                    // (Python: _filter_top_k(log_probs, ratio=0.1), k=ceil(0.1*1025)=103)
                     int top_k = std::max(1, (int)std::ceil(0.1f * V));
                     std::vector<float> vals(lp, lp + V);
                     std::nth_element(vals.begin(), vals.begin() + (V - top_k), vals.end());
@@ -2012,16 +2301,14 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
                     for (int v = 0; v < V; v++)
                         if (lp[v] < threshold)
                             lp[v] = -1e30f;
-                }
 
-                // Confidence = max log-prob after filter (Python: log_probs.max(dim=-1)[0]).
-                // The top-k always preserves the maximum, so max-after-filter = max-before-filter.
-                float max_lp = *std::max_element(lp, lp + V);
+                    // Confidence = max log-prob after filter (Python: log_probs.max(dim=-1)[0]).
+                    // The top-k always preserves the maximum, so max-after-filter = max-before-filter.
+                    float max_lp = *std::max_element(lp, lp + V);
 
-                // Sample token: Gumbel or greedy.
-                int best_tok = 0;
-                float best_score = -1e30f;
-                if (gen.class_temperature > 0.0f) {
+                    // Sample token: Gumbel.
+                    int best_tok = 0;
+                    float best_score = -1e30f;
                     for (int v = 0; v < V; v++) {
                         if (lp[v] < -1e20f)
                             continue;
@@ -2031,26 +2318,19 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
                             best_tok = v;
                         }
                     }
-                } else {
-                    for (int v = 0; v < V; v++) {
-                        if (lp[v] > best_score) {
-                            best_score = lp[v];
-                            best_tok = v;
-                        }
+
+                    int idx = (int)cb * T_target + t;
+                    pred_tokens[idx] = best_tok;
+
+                    // Confidence = max log-prob - layer penalty
+                    // (Python: scores = confidence_scores - layer_ids * layer_penalty_factor)
+                    confidence[idx] = max_lp - cb * gen.layer_penalty_factor;
+
+                    // Position Gumbel noise
+                    // (Python: scores = _gumbel_sample(scores, position_temperature))
+                    if (gen.position_temperature > 0.0f) {
+                        confidence[idx] = confidence[idx] / gen.position_temperature + gumbel_noise();
                     }
-                }
-
-                int idx = (int)cb * T_target + t;
-                pred_tokens[idx] = best_tok;
-
-                // Confidence = max log-prob - layer penalty
-                // (Python: scores = confidence_scores - layer_ids * layer_penalty_factor)
-                confidence[idx] = max_lp - cb * gen.layer_penalty_factor;
-
-                // Position Gumbel noise
-                // (Python: scores = _gumbel_sample(scores, position_temperature))
-                if (gen.position_temperature > 0.0f) {
-                    confidence[idx] = confidence[idx] / gen.position_temperature + gumbel_noise();
                 }
             }
         }
@@ -2063,7 +2343,6 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         }
 
         // Select top-k positions to unmask
-        std::vector<int> indices(hp.n_codebooks * T_target);
         std::iota(indices.begin(), indices.end(), 0);
         std::partial_sort(indices.begin(), indices.begin() + k, indices.end(),
                           [&](int a, int b) { return confidence[a] > confidence[b]; });
@@ -2076,8 +2355,25 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     fwd_free(fwd_c);
     fwd_free(fwd_u);
     fwd_free(fwd_uni);
+    fu_c.release();
+    fu_u.release();
+    fu_uni.release();
+    if (buf_ext)
+        ggml_backend_buffer_free(buf_ext);
+    if (ctx_ext)
+        ggml_free(ctx_ext);
     audio_cond_pe.release();
     audio_uncond_pe.release();
+
+    // Byte-exact A/B hook: dump the raw generated codes to a file so two runs
+    // (e.g. OMNIVOICE_FUSED_STEP=0 vs 1) can be diffed with cmp.
+    if (const char* dump_path = env_str("OMNIVOICE_DUMP_CODES")) {
+        if (FILE* f = fopen(dump_path, "wb")) {
+            fwrite(tokens.data(), sizeof(int32_t), tokens.size(), f);
+            fclose(f);
+            fprintf(stderr, "omnivoice: dumped %zu codes to %s\n", tokens.size(), dump_path);
+        }
+    }
 
     if (getenv("OMNIVOICE_DEBUG_CODES")) {
         int n_mask = 0;
