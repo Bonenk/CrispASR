@@ -2662,6 +2662,19 @@ target_link_libraries(cosyvoice3-hift-fastconv-ab PRIVATE
     chatterbox
 )
 
+# ─── cosyvoice3-flow-cfg-interval-ab — manual A/B harness (needs local GGUFs) ──
+# Drives the CFM Euler flow solver with fixed inputs so interval-CFG
+# (CRISPASR_COSYVOICE3_CFG_INTERVAL) can be A/B'd: K=1 byte-exact, K>1 vs K=1
+# cosine. Not a ctest (requires cosyvoice3-{llm,flow} GGUFs). See PLAN.md TODO-2.
+add_executable(cosyvoice3-flow-cfg-interval-ab cosyvoice3-flow-cfg-interval-ab.cpp)
+target_include_directories(cosyvoice3-flow-cfg-interval-ab PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(cosyvoice3-flow-cfg-interval-ab PRIVATE
+    cosyvoice3_tts
+    chatterbox
+)
+
 # ─── test-audio-formats — Catch2 unit tests for crispasr_audio_load format coverage
 #
 # Validates AU (µ-law), AMR-NB, and WebM (Opus) decode against the WAV
