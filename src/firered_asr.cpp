@@ -20,6 +20,7 @@
 #include "core/fastconformer.h" // core_conformer::rel_shift (ggml rel-pos attention)
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/repeat_break.h"     // F1: decode-time repetition-loop break (greedy runaway)
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -2259,6 +2260,19 @@ static char* firered_asr_transcribe_impl(struct firered_asr_context* ctx, const 
                     beam_size_effective, hp.n_layers_dec);
         int64_t t_dec0 = ggml_time_us();
 
+        // F1 decode-time repetition break (greedy path only; on by default).
+        // Greedy firered runs away on hard audio (a song's backing vocals →
+        // "OOH" ×35, saturating max_len=150 and burning ~350 s of decode) — the
+        // same runaway moonshine had. Beam search self-terminates, so the break
+        // is wired ONLY into the beam_size==1 branch below. Disable with
+        // CRISPASR_FIRERED_NO_REPEAT_BREAK=1. (firered's CLI adapter has no
+        // core_ngram::fix_loops, so this also cleans the garbage tail from the
+        // decoded output, not just compute.)
+        const bool repeat_break = [] {
+            const char* e = std::getenv("CRISPASR_FIRERED_NO_REPEAT_BREAK");
+            return !(e && e[0] && e[0] != '0');
+        }();
+
         for (int step = 0; step < max_len; step++) {
             // Check if all beams finished
             bool all_done = true;
@@ -2408,10 +2422,16 @@ static char* firered_asr_transcribe_impl(struct firered_asr_context* ctx, const 
                         best_token = i;
                     }
 
-                if (best_token == hp.eos_id)
+                if (best_token == hp.eos_id) {
                     beam.finished = true;
-                else
+                } else {
                     beam.tokens.push_back(best_token);
+                    // Stop a runaway greedy loop as soon as a short token cycle
+                    // repeats (period <=8, >=4x) at the tail — saves the wasted
+                    // decode steps and trims the looped tail from the output.
+                    if (repeat_break && core_repeat::tail_is_repetition(beam.tokens))
+                        beam.finished = true;
+                }
 
                 continue;
             }
