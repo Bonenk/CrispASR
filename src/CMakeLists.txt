@@ -230,6 +230,31 @@ target_include_directories(crispasr-lib PUBLIC . ../include)
 # server get provenance too, not just the CLI. No-op when C2PA isn't available.
 crispasr_enable_c2pa(crispasr-lib)
 
+# Native pure-C++ C2PA signer (uECC ES256 + hand-built CBOR/JUMBF/COSE). Small,
+# permissively licensed (BSD-2 micro-ecc), zero external deps — always compiled
+# in so WAV provenance works on EVERY platform (desktop/mobile/wasm) without the
+# c2pa-rs Rust lib. Built as its own C++17 static lib so the C++11 crispasr-lib
+# language contract is untouched. Set CRISPASR_NO_C2PA_NATIVE=ON to opt out.
+option(CRISPASR_NO_C2PA_NATIVE "Disable the built-in pure-C++ C2PA WAV signer" OFF)
+if (CRISPASR_NO_C2PA_NATIVE)
+    target_compile_definitions(crispasr-lib PUBLIC CRISPASR_NO_C2PA_NATIVE)
+else()
+    add_library(crispasr_c2pa_native STATIC
+        core/crispasr_c2pa_native.cpp
+        ${CMAKE_SOURCE_DIR}/third_party/uecc/uECC.c)
+    target_include_directories(crispasr_c2pa_native PRIVATE
+        core ${CMAKE_SOURCE_DIR}/third_party/uecc)
+    # Vendored micro-ecc — silence its warnings so CRISPASR_FATAL_WARNINGS builds
+    # don't trip on third-party code we don't modify.
+    if (NOT MSVC)
+        set_source_files_properties(${CMAKE_SOURCE_DIR}/third_party/uecc/uECC.c
+            PROPERTIES COMPILE_OPTIONS "-w")
+    endif()
+    target_compile_features(crispasr_c2pa_native PRIVATE cxx_std_17)
+    set_target_properties(crispasr_c2pa_native PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_link_libraries(crispasr-lib PUBLIC crispasr_c2pa_native)
+endif()
+
 set(CRISPASR_LIB_CXX_STANDARD cxx_std_11)
 if (GGML_CUDA AND CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
     set(CRISPASR_LIB_CXX_STANDARD cxx_std_17)

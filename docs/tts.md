@@ -1265,18 +1265,26 @@ Cryptographically-signed provenance manifests with
 embedded directly in the output file. This is the "signed metadata" layer that
 complements the waveform watermark.
 
-**Build** (compile-time — signing is enabled only when the c2pa native library
-is present):
+**Build.** WAV signing needs **no build flags and no external library** — it is
+handled by the built-in native signer (`src/core/crispasr_c2pa_native.{h,cpp}`),
+a pure-C++ implementation of C2PA (hand-built CBOR / JUMBF / COSE_Sign1, ES256
+via the vendored BSD-2 micro-ecc + a header-only SHA-256). It compiles into
+`crispasr-lib` on every platform with zero dependencies. Its output validates
+in the c2pa-rs reference reader. To additionally sign **MP3/M4A/FLAC**, fetch the
+optional c2pa-rs library:
 
 ```bash
 ./scripts/fetch-c2pa.sh          # downloads the prebuilt c2pa-rs lib → third_party/c2pa
 # then cmake reconfigure; look for "C2PA signing enabled" at configure time
 ```
 
-**On by default (self-signed), on every platform.** When built with C2PA, output
-is signed automatically — no flags needed. Signing uses a fixed self-signed
-certificate **baked into the binary** (`crispasr_c2pa_default_cert.h`), so it
-works identically on desktop, mobile, and in the **WASM browser sandbox** (no
+(Set `-DCRISPASR_NO_C2PA_NATIVE=ON` to drop the built-in signer, e.g. a build
+that wants only the c2pa-rs path.)
+
+**On by default (self-signed), on every platform.** Output is signed
+automatically — no flags needed. Signing uses a fixed self-signed certificate
+**baked into the binary** (`crispasr_c2pa_default_cert.h`), so it works
+identically on desktop, mobile, and in the **WASM browser sandbox** (no
 filesystem or openssl needed at runtime). Self-signed manifests are valid and
 machine-readable (EU AI Act Art. 50); C2PA verifiers show "unverified signer".
 The bundled private key is intentionally public — it only marks content as
@@ -1296,9 +1304,11 @@ code-signing cert; verifiers then show the named issuer):
 crispasr --tts "hello" --c2pa-cert crispasr-c2pa.crt --c2pa-key crispasr-c2pa.key
 ```
 
-**Format support.** c2pa can embed a manifest in **WAV** and **MP3** (also
-M4A/MP4/FLAC). It cannot embed in **AAC (ADTS)** or **Opus (Ogg)** — those
-outputs are written unsigned but still carry the watermark + file-metadata tag.
+**Format support.** **WAV** is signed by the built-in native signer (always
+available). **MP3** and **M4A/MP4/FLAC** are signed via the optional c2pa-rs lib
+(`fetch-c2pa.sh`). **AAC (ADTS)** and **Opus (Ogg)** cannot carry a C2PA manifest
+— those outputs are written unsigned but still carry the watermark +
+file-metadata tag.
 
 **Bindings / mobile.** C2PA lives in the core C API (`crispasr_c2pa_sign` /
 `crispasr_c2pa_free`, and `c2paSign()` in the wasm/JS binding), so any consumer

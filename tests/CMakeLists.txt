@@ -2324,6 +2324,30 @@ catch_discover_tests(test_watermark
     PROPERTIES LABELS "unit"
 )
 
+# ─── test_c2pa_native — Catch2 unit tests for the native C++ C2PA signer
+#(CBOR/JUMBF/COSE/ES256 via uECC). Hermetic — no c2pa-rs, no network, no model.
+#The [emit] case writes a signed WAV for the live parity ctest below.
+if (NOT CRISPASR_NO_C2PA_NATIVE)
+    add_executable(test_c2pa_native test_c2pa_native.cpp)
+    target_include_directories(test_c2pa_native PRIVATE
+        ${PROJECT_SOURCE_DIR}/src/core
+    )
+    target_link_libraries(test_c2pa_native PRIVATE
+        Catch2::Catch2WithMain
+        crispasr_c2pa_native
+    )
+    catch_discover_tests(test_c2pa_native
+        TEST_SPEC "[unit]"
+        PROPERTIES LABELS "unit;c2pa"
+    )
+
+    # Live parity: emit a signed WAV and validate it in the c2pa-rs reference
+    # reader (via c2pa-python). Skips cleanly when python/c2pa is unavailable.
+    add_test(NAME test-c2pa-native-parity
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/c2pa_native_parity.sh $<TARGET_FILE:test_c2pa_native>)
+    set_tests_properties(test-c2pa-native-parity PROPERTIES LABELS "live;c2pa;parity" TIMEOUT 120)
+endif()
+
 # ─── test_tts_provenance — Catch2 unit tests for TTS AI-provenance
 #compliance (WAV LIST/INFO, ID3v2, MP3/glint encode, C2PA, consent gate,
 #watermark edge cases). Pure CPU, no model dependencies.
@@ -2336,6 +2360,11 @@ target_link_libraries(test_tts_provenance PRIVATE
     Catch2::Catch2WithMain
     glint
 )
+# crispasr_c2pa.h routes WAV signing through the native signer; link it so this
+# test (which includes the header directly, not via crispasr-lib) resolves.
+if (NOT CRISPASR_NO_C2PA_NATIVE)
+    target_link_libraries(test_tts_provenance PRIVATE crispasr_c2pa_native)
+endif()
 catch_discover_tests(test_tts_provenance
     TEST_SPEC "[unit]"
     PROPERTIES LABELS "unit"
