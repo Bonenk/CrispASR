@@ -61,6 +61,8 @@ endif()
 
 set_target_properties(${TARGET} PROPERTIES LINK_FLAGS " \
     --bind \
+    -fwasm-exceptions \
+    -s SUPPORT_LONGJMP=wasm \
     -s MODULARIZE=1 \
     -s EXPORT_NAME=\"'whisper_factory'\" \
     -s FORCE_FILESYSTEM=1 \

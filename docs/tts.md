@@ -1309,10 +1309,14 @@ Build the library for the target with `-DCRISPASR_C2PA_FETCH=ON`:
 - **iOS**: links `libc2pa_c.a` statically; `crispasr_enable_c2pa` auto-links the
   required Apple frameworks (Security / CoreFoundation / SystemConfiguration)
   (verified: the arm64 prebuilt links cleanly with the iOS SDK).
-- **WASM**: not yet enabled — the prebuilt c2pa-rs emscripten lib is built with
-  C++ exceptions while the wasm target links the no-exceptions runtime, so the
-  link fails (`undefined symbol: __cpp_exception`). `c2paSign()` returns empty in
-  wasm until that ABI is reconciled (see build-wasm.sh).
+- **WASM**: enabled in `build-wasm.sh`. The prebuilt c2pa-rs emscripten lib uses
+  **native wasm exceptions** (its unwinding imports the `__cpp_exception` tag), so
+  the wasm target is built with **`-fwasm-exceptions`** + **`-sSUPPORT_LONGJMP=wasm`**
+  (not the default no-exceptions runtime, and not JS-based `-fexceptions` — the
+  tag is only provided by native wasm EH). Trade-off: needs a browser with the
+  wasm-EH proposal (all modern browsers, 2023+) and adds ~10 MB (c2pa-rs) to the
+  module. JS usage: build a WAV from the `ttsSynthesize()` Float32Array, then
+  `const signed = Module.c2paSign(wavBytes, "audio/wav")`.
 
 ### Voice cloning consent gate
 
