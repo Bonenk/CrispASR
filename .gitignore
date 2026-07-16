@@ -134,3 +134,6 @@ tools/kaggle/fc-pw-requant/only.txt
 *.encode-ref.gguf
 omnivoice-encode-ref.gguf
 /third_party/c2pa/
+a.out
+a.out.js
+a.out.wasm
