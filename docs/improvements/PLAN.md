@@ -7,14 +7,32 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
 ## NOW — active work
 
 ### Follow-ups (2026-07-16) — from the session-long-audio arc
-- [ ] **F1 — reuse `core_repeat` beyond moonshine.** Audit result: most ASR
+- [x] **F1 — reuse `core_repeat` beyond moonshine.** DONE for **firered_asr**
+      (evidence-gated — a runaway was DEMONSTRATED, not assumed). Audit: most ASR
       backends already have adapter-level `core_ngram::fix_loops` output cleanup
       (cohere/granite/glm/qwen3/canary-qwen/higgs/moss); only `firered_asr`/
-      `kyutai_stt` libs have NO guard, but there's no evidence they loop (unlike
-      moonshine, which we caught). Per the Phase 1b lesson, NOT wiring
-      speculatively — `core_repeat::tail_is_repetition` is ready to drop into any
-      backend that shows the runaway-greedy-loop symptom (decode-time break =
-      speed, on top of fix_loops = output cleanup). Left as ready, evidence-gated.
+      `kyutai_stt` libs had NO guard. Probed both on the loop-prone 60 s song:
+      **firered greedy (`--beam-size 1`) runs away** — segment 1 saturates
+      `max_len=150` with a period-1 cycle (`OOH ×35`), the same class of loop
+      moonshine had, and firered's CLI adapter has no `fix_loops` so that garbage
+      tail reaches the decoded output. Wired `core_repeat::tail_is_repetition` into
+      firered's **greedy branch only** (`beam_size==1`), gate
+      `CRISPASR_FIRERED_NO_REPEAT_BREAK` (default on, mirrors moonshine). A/B on the
+      SAME binary (token count is the load-invariant proof):
+
+      | firered greedy / 60 s song | seg-1 tokens | tail | decode |
+      |----------------------------|--------------|------|--------|
+      | break OFF (old)            | 150 (saturated) | `OOH ×35` | 58–354 s |
+      | **break ON (default)**     | **59** (EOS via break) | `OOH ×4` | 15–17 s |
+
+      Coherent content byte-identical between the two — only the runaway tail is
+      trimmed. No-regression: jfk greedy unchanged (28 tokens, clean); **beam=3
+      (firered's default) untouched by construction** (break is inside the
+      `beam_size==1` branch; beam self-terminated at 59 tokens in the probe, so no
+      speculative wiring — Phase 1b lesson); `test-repeat-break` green (13
+      assertions). **kyutai_stt NOT wired** — no model available locally to probe,
+      and its streaming decoder (`eos_id=-1`, runs to `T_frames`) is a different
+      shape; left evidence-gated. Backends touched: firered_asr (lib, all surfaces).
 - [x] **F2 — surface-parity in nightly CI.** Added `test-surface-parity.sh` to the
       regression workflow so cross-surface (CLI vs session) parity is a permanent
       guard against the #257 class, not a manual audit.
