@@ -1968,6 +1968,25 @@ catch_discover_tests(test-segment-group
     PROPERTIES LABELS "unit;segment-group;issue-257"
 )
 
+# ─── test-asr-parity — canonical cross-surface parity predicate (improvements Phase 0)
+#
+# Pins core_parity::segments_equal, the rule the surface-parity harness uses to
+# assert CLI / server / session produce the same transcription, and the
+# acceptance gate for the Phase 1 dispatch unification.
+add_executable(test-asr-parity
+    test-asr-parity.cpp
+)
+target_include_directories(test-asr-parity PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-asr-parity PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-asr-parity
+    TEST_SPEC "[parity]"
+    PROPERTIES LABELS "unit;parity;improvements"
+)
+
 # ─── test-lcs-chunk-merge — Catch2 unit tests for LCS chunk-merge dedup
 #
 # Ports of NeMo's `longest_common_subsequence_merge` test cases
@@ -2861,6 +2880,17 @@ set_tests_properties(test-speaker-id-live PROPERTIES
     LABELS "live;diarize;speaker"
     TIMEOUT 600)
 endif()
+
+# ─── test-surface-parity — cross-surface parity harness (improvements Phase 0):
+# CLI adapter vs session C-ABI produce the same transcription. Skips unless a
+# parakeet model + libcrispasr shared lib + python are present.
+add_test(NAME test-surface-parity
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-surface-parity.sh
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-surface-parity PROPERTIES
+    LABELS "live;parity;improvements"
+    SKIP_RETURN_CODE 2
+    TIMEOUT 300)
 
 # ─── test-progress-output — live test: -pp/--print-progress emits per-slice
 # progress on stderr for unified backends (issue #130).
