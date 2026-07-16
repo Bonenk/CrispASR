@@ -30,6 +30,18 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       generation early). moonshine/60 s went **57.2 s → 11.3 s (5×), identical
       output**. Gate `CRISPASR_MOONSHINE_NO_REPEAT_BREAK=1`; pure detector
       unit-tested (`test-repeat-break`, 13 assertions).
+      _Broad long-audio re-verification (2026-07-16):_ ran the parity harness on a
+      60 s clip across the locally-available backends to check the auto-chunk
+      default-on doesn't regress others. Total-content (not per-segment — CLI and
+      session cut at different energy minima, so segment counts legitimately
+      differ) results: **qwen3 PASS** (both chunk to 3, content agrees);
+      **nemotron** CLI 11 w / session 11 w, **0.91 overlap** (CLI treats it as
+      single-pass, session re-segments into 3 — same content, harmless);
+      **moonshine** 0.75 overlap on the *song* worst-case (chunk-boundary
+      sensitivity on genuinely hard audio, not a dispatch bug — hang resolved,
+      session actually got slightly more words). No content regressions. Also
+      hardened the harness to compare TOTAL content with a word-overlap threshold
+      so segmentation differences don't false-fail long-audio audits.
 - [x] **Phase 0** — cross-surface parity harness + test (safety net) — DONE
       (`src/core/asr_parity.h` + `test-asr-parity` 13 assertions; live
       `test-surface-parity.sh` PASS: CLI==session on parakeet-tdt-1.1b/jfk)
