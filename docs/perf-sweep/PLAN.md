@@ -378,6 +378,60 @@ at aggressive K needs a HUMAN EAR (an agent can't listen) — so ship it enabled
 default-off with a doc note, do NOT claim a naturalness verdict. Document each env
 var in this PLAN.
 
+## TODO-5 — Fused step graph rollout (the omnivoice #254 2.3× CUDA pattern)
+
+Omnivoice's stage0 win (LEARNINGS 2026-07-16 entry; reporter-verified 2.3× /
+RTF 0.07 on CUDA, byte-identical) came from killing per-step HOST detours in a
+fixed-shape iterative loop: embeds computed in-graph from an ids-only upload,
+target-slice-only logits readback, threaded scoring, ONE persistent graph per
+arm so CUDA-graph capture engages. Survey of the fleet for the same shape
+(fixed-T multi-step loop with per-step host work between forwards):
+
+1. **dots_tts DiT/FM solver — STRONGEST candidate.** `dots_dit_forward`
+   (src/dots_tts.cpp:903) builds a fresh ggml_context + graph + gallocr and
+   frees them EVERY ODE step, for BOTH CFG arms (2 × num_steps rebuild+alloc
+   per synthesis); `dots_linear` (:1461) additionally spins a one-shot graph
+   per step for coordinate_proj on the host, and the full seq_c/seq_u embeds
+   re-upload every step when only the noise-slot patch changes. Fixed shapes
+   across steps → persistent per-arm graphs + in-graph coord_proj + noise-slot-
+   only upload; optionally fuse cond+uncond via seq-concat + block-split attn
+   (the omnivoice unified mode — dots already carries an additive attn mask, so
+   the masking fits). Expect the omnivoice-class CUDA win; Metal likely neutral.
+2. **vibevoice token-embed round-trip.** src/vibevoice.cpp:936 reads the
+   tok_emb lookup back to host and re-feeds it (the exact legacy-omnivoice
+   embed pattern). Keep it device-resident. Also audit its ~20-step DPM
+   pred-head loop for per-step rebuild.
+3. **kugelaudio DPM-SDE + tada FM.** Both already cache gallocrs
+   (kugelaudio:473, tada:919/1108) — audit instead for per-step graph REBUILD
+   (a cached gallocr under a rebuilt graph still re-captures on CUDA), host
+   detours between steps, and full-logits readbacks.
+4. **CUDA-graph capture audit (cheap, fleet-wide):** on a CUDA box, count
+   `CUDA graph warmup` prints per synthesis for every iterative backend — more
+   than one per distinct graph, or any `warmup reset` mid-loop, means capture
+   is thrashing (omnivoice showed 4+reset pre-fix, 1 post-fix). ⚠ Before fusing
+   any embedding lookup in-graph, check the embd table dtype in the SHIPPED
+   quants: the fork disables CUDA-graph capture for GET_ROWS on a quantized
+   table (TAG_GET_ROWS_CUDA_GRAPHS); omnivoice survives only because the
+   quantizer keeps its embd tables F16 — zonos/parler/moss may not.
+5. **NOT amenable:** pure-AR KV-cache decoders (dia/zonos/voxtral/moss) — a
+   1-token step has no bulk embed prep or full-seq logits to fuse; their
+   pattern is the persistent AR step graph (already the dev-guide default).
+
+## TODO-6 — Reference-voice disk cache rollout (omnivoice OVC1 / pocket PVL1 pattern)
+
+Deterministic, expensive reference encodes re-run on EVERY CLI invocation for
+voice-cloning backends. pocket_tts (PVL1 latents) and omnivoice (OVC1 codes,
+`007f82357`) now cache content-addressed (FNV-1a over PREPROCESSED audio +
+encoder-weight fingerprint, atomic tmp+rename, CRISPASR_CACHE_DIR →
+CRISPASR_MODELS_DIR → ~/.cache/crispasr, env-gated OFF switch). ~80-line
+mirror per backend. Candidates (each has a ref-audio encode in
+set-voice/prompt paths): qwen3_tts, chatterbox (campplus speaker emb + s3gen
+prompt tokens), indextts (persist its in-memory `cond_latents`/`ref_cached`
+to disk), f5_tts (re-encodes the ref mel every call), voxcpm2, dots_tts,
+vibevoice, tada_tts, openvoice2, moss/dia (codec ref codes, same shape as
+omnivoice). Verify per backend: run 2 logs a cache-hit line + decoded output
+identical (compare WAV `data` chunks — the C2PA chunk is timestamped).
+
 ## TODO-3 — Metal q4_k → prefer q8 on Apple Silicon
 Measured earlier this campaign: q4_k is BOTH slower AND lower-quality than q8 on
 Metal (Apple's q4_k dequant path). Two tiers:
