@@ -29,15 +29,26 @@ target slice is used), single-threaded triple-log-softmax CFG scoring (~13M
   bit-identical; sampled path `class_temp>0` stays serial). Scoring buffers
   hoisted; interval-CFG uses the persistent `u_buf` — no more 18 MB/step copy.
 - ✅ **Byte-identity (M1 Metal, q8_0, `OMNIVOICE_DUMP_CODES` + cmp):** legacy vs
-  fused BYTE-IDENTICAL on (a) reporter's paragraph, 2-forward path (modes 0+1,
-  4360 codes), (b) fox + `OMNIVOICE_UNIFIED_CFG=1` (mode 2, 520 codes).
-- 🔄 **In flight:** interval-CFG K=2 + guidance=0 edge A/Bs (fox, byte-identity);
-  local timings are UNUSABLE (box loadavg 100–290, decode-stage noise 3.8×) —
-  perf verdict comes from Kaggle CUDA kernel
+  fused BYTE-IDENTICAL on ALL five config classes — (a) reporter's paragraph,
+  2-forward path (modes 0+1, 4360 codes); (b) fox + `OMNIVOICE_UNIFIED_CFG=1`
+  (mode 2, 520 codes); (c) fox + `OMNIVOICE_CFG_INTERVAL=2` (interval-CFG
+  u_buf caching); (d) fox + `OMNIVOICE_GUIDANCE=0` (cond-only, no uncond arm).
+  ASR roundtrip on the fused paragraph clean (all #254 words present). 907/907
+  unit tests pass.
+- ✅ **Default policy:** fused ON for CPU/Metal (proven above); **legacy stays
+  the default on CUDA** until the roundtrip runs there (LEARNING 35 — never
+  flip a GPU default blind). `OMNIVOICE_FUSED_STEP=1` opts in on CUDA.
+- ⏳ **CUDA A/B blocked on quota:** both Kaggle accounts exhausted (30 h/wk,
+  ~2 days to reset); alternative: the A1000 box. Kernel is ready:
   `tools/kaggle/omnivoice-fused-step-ab/` (legacy vs fused vs fused+2-forward,
-  reporter's paragraph, byte-identity gate + median gen s + per-stage bench).
-- **Next:** push branch → run Kaggle A/B → if identical + faster, flip default,
-  merge to main, ask reporter to re-bench.
+  reporter's paragraph, byte-identity gate + median gen s + per-stage bench;
+  `CRISPASR_REF=main`). Local M1 timing is load-noise (loadavg 100–290 all
+  day; legacy vs fused gen 370→234 s directional only, decode-stage noise
+  3.8× between arms of identical code).
+- **Next (when GPU access returns):** run the Kaggle/A1000 A/B → if
+  byte-identical + faster on CUDA, flip the CUDA default to fused and ask the
+  reporter to re-bench. Expected: kills the ~44 ms/step host overhead that is
+  the residual RTF 0.17-vs-0.144 gap.
 
 Reporter's residual complaint after the over-length + word-drop fixes: "CrispASR
 is still slower than alternative implementations" and "decoding is on cpu, which
