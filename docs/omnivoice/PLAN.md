@@ -45,6 +45,21 @@ target slice is used), single-threaded triple-log-softmax CFG scoring (~13M
   `CRISPASR_REF=main`). Local M1 timing is load-noise (loadavg 100–290 all
   day; legacy vs fused gen 370→234 s directional only, decode-stage noise
   3.8× between arms of identical code).
+- ✅ **Reference-voice disk cache shipped (2026-07-16):** the reporter's last
+  ask (omnivoice.cpp `--ref-rvq` parity). Automatic content-addressed cache of
+  the RVQ ref codes (FNV-1a over preprocessed pcm + encoder fingerprint, OVC1
+  file, same dir resolution as the pocket_tts latents cache);
+  `CRISPASR_OMNIVOICE_VOICE_CACHE=0` disables. Verified: run 2 logs "voice
+  codes loaded from cache", codes byte-identical, WAV audio data bit-identical.
+- ✅ **M1 matched-load per-stage A/B (load≈29 both arms):** fused vs legacy gen
+  is NEUTRAL on Metal (96.3 s vs 93.7 s totals, per-forward medians within
+  noise) — unified memory made the legacy host overhead nearly free (embeds
+  0.9 s of ~94 s), so the fused win is CUDA-specific (2.3×). Default fused
+  everywhere stands (identical output, neutral Metal, big CUDA).
+  Same-box omnivoice.cpp: its Metal backend fails to init on macOS 26 (bf16
+  Metal-shader compile error in their ggml), CPU-only path is gen 728 s
+  (RTF 34) vs our Metal ~90-116 s — CrispASR is the only implementation with
+  a working GPU path on this Mac.
 - ✅ **CUDA A/B verdict IN (2026-07-16, reporter, RTX 5070 Ti):** `cmp`
   byte-identical on CUDA; gen 3.55 s → **1.53 s (2.3×)**, RTF 0.17 → **0.07**
   (vs omnivoice.cpp 0.144 — CrispASR is now ~2× FASTER than the reference
