@@ -8,8 +8,15 @@ possible. Default flips only on a proven speed AND quality win.
 
 ## NOW — active work
 
+**In flight (2026-07-16, this session): remaining locally-doable items.** ✅ TODO-C
+resolved — **kokoro FASTCONV landed** (`323e96f23`, 89 F16 kernels, byte-identical);
+**indextts_voc not applicable** (F16 tensors are custom-CPU-op AA filters, not
+ggml_conv_1d). Next: TODO-D (fastpitch `-f16` GGUF loader bug: `gguf_init_from_file_ptr:
+failed to read tensor data`, a pre-existing reader bug — file byte-valid).
+
+
 **Status (2026-07-16): FASTCONV landed + A/B-verified (byte-identical, default ON)
-for 6 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen, cosyvoice3.
+for 7 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen, cosyvoice3, kokoro.
 Interval-CFG (opt-in, default OFF) landed + verified for 6 — cosyvoice3, f5-tts,
 voxcpm2, dots-tts, irodori, tada. All on `main`, all green.**
 
@@ -297,10 +304,20 @@ handover-prompts/chatterbox-gpu-mul-mat-drift.md). Gate separately
 (`CRISPASR_S3GEN_FASTCONV_MATMUL`), default OFF until A/B'd on Metal AND CUDA.
 Same for TODO-A's cosyvoice3 K=1 kernels once cast-kill lands.
 
-## TODO-C — indextts_voc (9 convs) + kokoro (9 convs) FASTCONV
-No local main model on this box — GGUF-parse each on a box that has them (or download
-to the internal disk). Only wire if the shipped default quant has F16 conv kernels
-(the recurring gate — see memory [[fastconv-needs-f16-kernels]]). Same recipe.
+## TODO-C — kokoro ✅ DONE · indextts_voc ✅ investigated (not applicable)
+- **kokoro** ✅ **DONE** (`323e96f23`, `CRISPASR_KOKORO_FASTCONV`, default on). GGUF
+  finding: despite the `-q8_0` default, **all 89 3D conv kernels are F16** (q8_0 hits
+  matmul/linear weights only) — FASTCONV engages. Re-point idiom (bake F32 + swap
+  c->tensors); ConvTranspose ups use a separate F32 `ups_w_perm` (swap harmless);
+  only 3D F16 baked (1D/2D linears read raw on CPU untouched). **A/B: ON vs OFF PCM
+  BYTE-IDENTICAL, 89/89 baked, ASR intact.** ⚠ Lesson: the F16-kernel gate is
+  PER-TENSOR — a q8_0 model can still keep conv kernels F16.
+- **indextts_voc** ✅ **investigated — NOT a FASTCONV target.** `indextts-bigvgan` has
+  161 F16 3D tensors, but they are BigVGAN anti-aliasing `us`/`ds` filters consumed by
+  a **custom CPU op** (`aa_snake_beta_op`, read into `std::vector<float>` at load) —
+  NOT through `ggml_conv_1d`, so there is no F16→F32 cast to kill. The learned convs
+  (conv_pre/post/resblocks, 218 tensors) are already F32 → no-op. ⚠ Refined gate:
+  "F16 kernels ROUTED THROUGH ggml_conv_1d", not just "F16 present". Do NOT wire.
 
 ## TODO-D — unblock fastpitch f16 (currently a dead end)
 fastpitch's `-f16` GGUF (the only variant with F16 conv kernels) fails to LOAD:
