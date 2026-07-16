@@ -230,15 +230,10 @@ struct ov_higgs_tokenizer {
     // Quantizer: 8 VQ layers (for OmniVoice's 8 codebooks)
     std::vector<ov_higgs_vq> quantizers;
 
-    // FASTCONV (#254): baked F32 copies of the decode conv kernels. The codec
-    // weights ship F16; the fork's ggml_conv_1d / conv_transpose_1d cast the
-    // kernel F16→F32 INSIDE every graph when activations are F32 (~40 casts per
-    // decode). Baking one F32 copy at load makes that cast a no-op — the result
-    // is bitwise-identical (same F16→F32 conversion, done once). Keyed by the
-    // original F16 tensor; only populated when codec fastconv is enabled.
-    ggml_context* ctx_f32 = nullptr;
-    ggml_backend_buffer_t buf_f32 = nullptr;
-    std::unordered_map<const ggml_tensor*, ggml_tensor*> f32_kernel;
+    // FASTCONV (#254): shared codec-conv fast path (baked F32 kernels + k=1→matmul),
+    // so the fork's per-graph F16→F32 conv-kernel cast becomes a no-op. See
+    // core_dac::fastconv_cache / docs/perf-sweep/PLAN.md item 1.
+    core_dac::fastconv_cache fc;
 
     // fc2: project from quantizer hidden_size (1024) → DAC hidden (256)
     ggml_tensor* fc2_w = nullptr;
@@ -634,7 +629,6 @@ static bool load_model(omnivoice_context* ctx, const char* path) {
 
 static bool codec_fastconv_enabled();
 static bool codec_gpu_enabled();
-static void bake_decode_f32_kernels(ov_higgs_tokenizer& tok);
 
 static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
     auto& tok = ctx->tokenizer;
@@ -872,10 +866,19 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
     gguf_free(gf);
     tok.loaded = true;
 
-    // FASTCONV (#254): pre-bake F32 decode conv kernels so the per-graph F16→F32
-    // cast disappears. Bitwise-equivalent; env OMNIVOICE_CODEC_FASTCONV=0 skips it.
-    if (codec_fastconv_enabled())
-        bake_decode_f32_kernels(tok);
+    // FASTCONV (#254): pre-bake F32 decode conv kernels (shared core_dac helper) so
+    // the per-graph F16→F32 cast disappears. env OMNIVOICE_CODEC_FASTCONV=0 skips it.
+    {
+        std::vector<ggml_tensor*> convs = {tok.dec_conv1_w, tok.dec_conv2_w};
+        for (auto& blk : tok.dec_blocks) {
+            convs.push_back(blk.conv_t1_w);
+            for (int r = 0; r < 3; r++) {
+                convs.push_back(blk.res[r].conv1_w);
+                convs.push_back(blk.res[r].conv2_w);
+            }
+        }
+        tok.fc.bake(tok.backend, convs, codec_fastconv_enabled());
+    }
 
     if (ctx->verbosity >= 1) {
         size_t total = ggml_backend_buffer_get_size(tok.buf_w);
@@ -926,73 +929,6 @@ static bool codec_gpu_enabled() {
 // Bake F32 copies of every decode-path conv kernel into a dedicated buffer on
 // the tokenizer backend. Only F16 kernels are baked (k-quant would need a
 // different dequant; the shipped tokenizer is F16). Idempotent.
-static void bake_decode_f32_kernels(ov_higgs_tokenizer& tok) {
-    if (tok.ctx_f32)
-        return;
-    std::vector<ggml_tensor*> srcs;
-    auto add = [&](ggml_tensor* t) {
-        if (t && t->type == GGML_TYPE_F16)
-            srcs.push_back(t);
-    };
-    add(tok.dec_conv1_w);
-    add(tok.dec_conv2_w);
-    for (auto& blk : tok.dec_blocks) {
-        add(blk.conv_t1_w);
-        for (int r = 0; r < 3; r++) {
-            add(blk.res[r].conv1_w);
-            add(blk.res[r].conv2_w);
-        }
-    }
-    if (srcs.empty())
-        return;
-
-    size_t mem = (srcs.size() + 2) * ggml_tensor_overhead();
-    ggml_init_params ip = {mem, nullptr, /*.no_alloc=*/true};
-    tok.ctx_f32 = ggml_init(ip);
-    for (auto* s : srcs) {
-        ggml_tensor* d = ggml_new_tensor(tok.ctx_f32, GGML_TYPE_F32, GGML_MAX_DIMS, s->ne);
-        tok.f32_kernel[s] = d;
-    }
-    tok.buf_f32 = ggml_backend_alloc_ctx_tensors(tok.ctx_f32, tok.backend);
-    for (auto* s : srcs) {
-        ggml_tensor* d = tok.f32_kernel[s];
-        size_t n = ggml_nelements(s);
-        std::vector<ggml_fp16_t> h(n);
-        ggml_backend_tensor_get(s, h.data(), 0, n * sizeof(ggml_fp16_t));
-        std::vector<float> f(n);
-        ggml_fp16_to_fp32_row(h.data(), f.data(), (int)n);
-        ggml_backend_tensor_set(d, f.data(), 0, n * sizeof(float));
-    }
-}
-
-// Fast Conv1d: baked-F32 kernel; a k=1 conv becomes a direct channel matmul.
-// x: (Cin, T) F32; w_f32: (K, Cin, Cout) F32; b: (Cout,) — returns (Cout, T).
-static ggml_tensor* ov_fastconv1d(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* w_f32, ggml_tensor* b, int K,
-                                  int dil = 1) {
-    const int T = (int)x->ne[1];
-    const int Cin = (int)w_f32->ne[1];
-    const int Cout = (int)w_f32->ne[2];
-    if (K == 1 && dil == 1) {
-        // Pointwise conv == matmul over channels. im2col of a 1×1 kernel is a
-        // pure copy; skip it. w_f32 (1,Cin,Cout) → (Cin,Cout); mul_mat contracts Cin.
-        ggml_tensor* w2d = ggml_reshape_2d(ctx0, w_f32, Cin, Cout);
-        ggml_tensor* y = ggml_mul_mat(ctx0, w2d, x); // (Cout, T)
-        if (b)
-            y = ggml_add(ctx0, y, b);
-        return y;
-    }
-    // K>1: same shape dance as core_dac::conv1d, but the F32 kernel makes the
-    // in-graph cast a no-op.
-    const int p = dil * (K - 1) / 2;
-    ggml_tensor* y = ggml_cont(ctx0, ggml_transpose(ctx0, x)); // (T, Cin)
-    y = ggml_conv_1d(ctx0, w_f32, y, /*stride=*/1, p, dil);    // (T, Cout, 1)
-    y = ggml_reshape_2d(ctx0, y, T, Cout);
-    y = ggml_cont(ctx0, ggml_transpose(ctx0, y)); // (Cout, T)
-    if (b)
-        y = ggml_add(ctx0, y, b);
-    return y;
-}
-
 // ---------------------------------------------------------------------------
 // HiggsAudioV2 decode: codes → PCM
 // ---------------------------------------------------------------------------
@@ -1042,12 +978,10 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
         z_q = k == 0 ? z : ggml_add(ctx0, z_q, z);
     }
 
-    // FASTCONV gate: use baked F32 kernels + k=1-as-matmul when enabled.
-    const bool fastconv = codec_fastconv_enabled() && !tok.f32_kernel.empty();
-    auto F32 = [&](ggml_tensor* w) -> ggml_tensor* {
-        auto it = tok.f32_kernel.find(w);
-        return it != tok.f32_kernel.end() ? it->second : w;
-    };
+    // FASTCONV: route decode convs through the shared core_dac fast path. The
+    // cache (&tok.fc) selects baked-F32 kernels + k=1→matmul when enabled, and is
+    // a no-op (identical to legacy conv1d) when OMNIVOICE_CODEC_FASTCONV=0.
+    const core_dac::fastconv_cache* fc = &tok.fc;
 
     // fc2: Linear(hidden_size=1024 → dac_hidden=256)
     // fc2_w is (hidden_size, dac_hidden) in ggml convention
@@ -1065,8 +999,7 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
         fprintf(stderr, "  decode: h ne=[%ld,%ld] conv1_w ne=[%ld,%ld,%ld]\n", h->ne[0], h->ne[1],
                 tok.dec_conv1_w->ne[0], tok.dec_conv1_w->ne[1], tok.dec_conv1_w->ne[2]);
     }
-    h = fastconv ? ov_fastconv1d(ctx0, h, F32(tok.dec_conv1_w), tok.dec_conv1_b, 7)
-                 : core_dac::conv1d(ctx0, h, tok.dec_conv1_w, tok.dec_conv1_b, 7);
+    h = core_dac::conv1d(ctx0, h, tok.dec_conv1_w, tok.dec_conv1_b, 7, 1, fc);
 
     // 5 decoder blocks with strides [8, 5, 4, 2, 3]
     static const int dilations[3] = {1, 3, 9};
@@ -1077,18 +1010,15 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
         // Snake → ConvTranspose1d (baked-F32 kernel selects the direct _f32 CPU path)
         h = core_dac::snake(ctx0, h, blk.snake_alpha);
         int pad = (int)std::ceil((double)stride / 2.0);
-        h = core_convt::convt1d_crop(ctx0, h, fastconv ? F32(blk.conv_t1_w) : blk.conv_t1_w, blk.conv_t1_b, stride, pad,
-                                     pad);
+        h = core_convt::convt1d_crop(ctx0, h, fc->get(blk.conv_t1_w), blk.conv_t1_b, stride, pad, pad);
 
         // 3 ResidualUnits (d=1, 3, 9)
         for (int r = 0; r < 3; r++) {
             auto& ru = blk.res[r];
             ggml_tensor* y = core_dac::snake(ctx0, h, ru.snake1_alpha);
-            y = fastconv ? ov_fastconv1d(ctx0, y, F32(ru.conv1_w), ru.conv1_b, 7, dilations[r])
-                         : core_dac::conv1d(ctx0, y, ru.conv1_w, ru.conv1_b, 7, dilations[r]);
+            y = core_dac::conv1d(ctx0, y, ru.conv1_w, ru.conv1_b, 7, dilations[r], fc);
             y = core_dac::snake(ctx0, y, ru.snake2_alpha);
-            y = fastconv ? ov_fastconv1d(ctx0, y, F32(ru.conv2_w), ru.conv2_b, 1) // k=1 → matmul
-                         : core_dac::conv1d(ctx0, y, ru.conv2_w, ru.conv2_b, 1);
+            y = core_dac::conv1d(ctx0, y, ru.conv2_w, ru.conv2_b, 1, 1, fc); // k=1 → matmul
             h = ggml_add(ctx0, h, y);
         }
         h = ggml_cont(ctx0, h);
@@ -1096,8 +1026,7 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
 
     // Final: Snake → Conv1d(32, 1, k=7) — no Tanh (HiggsAudio removes it)
     h = core_dac::snake(ctx0, h, tok.dec_snake_alpha);
-    h = fastconv ? ov_fastconv1d(ctx0, h, F32(tok.dec_conv2_w), tok.dec_conv2_b, 7)
-                 : core_dac::conv1d(ctx0, h, tok.dec_conv2_w, tok.dec_conv2_b, 7);
+    h = core_dac::conv1d(ctx0, h, tok.dec_conv2_w, tok.dec_conv2_b, 7, 1, fc);
 
     // Output: (1, T_pcm) → flatten
     int T_pcm = (int)h->ne[1];
@@ -3207,10 +3136,7 @@ void omnivoice_free(struct omnivoice_context* ctx) {
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
     // Tokenizer
-    if (ctx->tokenizer.buf_f32)
-        ggml_backend_buffer_free(ctx->tokenizer.buf_f32);
-    if (ctx->tokenizer.ctx_f32)
-        ggml_free(ctx->tokenizer.ctx_f32);
+    ctx->tokenizer.fc.free();
     if (ctx->tokenizer.buf_w)
         ggml_backend_buffer_free(ctx->tokenizer.buf_w);
     if (ctx->tokenizer.backend)
