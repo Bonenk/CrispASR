@@ -54,6 +54,29 @@ copies amortized over few frames).
   roundtrip stays clean down to N≈16 (2× fewer forwards); see sweep in this doc.
   Tunable from EVERY consumer (CLI/server-per-request/C-ABI/Python/Go/Dart).
 
+### Single-shot synthesis (#254 reporter: "reduce chunking")
+Reporter (CUDA, q8_0, `OMNIVOICE_CODEC_GPU=1`) benched CrispASR at RTF 0.17–0.21 vs
+omnivoice.cpp 0.144 on the SAME text/params — a 15–20% gap traced entirely to
+**chunking**: CrispASR sentence-split the paragraph into 3 chunks (292+197+54
+frames), each a different T, so the CUDA graph re-warmed per chunk (visible
+`warmup complete`/`reset` spam) and stage0 ran 3×32 iterations. omnivoice.cpp does
+the whole paragraph as one T=544 MaskGIT pass (one warmup, 32 steps). Their decode
+was already free on CUDA (0.05 s via `OMNIVOICE_CODEC_GPU=1` — the gate wins on CUDA,
+as predicted).
+
+- ✅ **Fix:** added `omnivoice` to the single-shot whitelist in
+  `crispasr_tts_plan_chunks_for_backend` (alongside vibevoice/qwen3-tts/tada/dots-tts).
+  OmniVoice is masked-iterative — it synthesizes the whole target span in one
+  fixed-`num_steps` pass with a single length estimate (no per-token duration head,
+  no `MAX_FRAMES` truncation), exactly like omnivoice.cpp. Verified: the reporter's
+  paragraph now renders as ONE 410-frame generation (one decode), ASR-complete.
+- ⚖️ **Tradeoff:** single-shot has the SAME linear compute but ~2.7× the attention
+  (O(T²)) vs 3 chunks. On CUDA the graph-reuse win dominates (matches the reference).
+  On Metal/CPU there's no CUDA-graph benefit, so multi-sentence text costs ~10–15%
+  more attention — but this is the SAME tradeoff the 4 existing single-shot backends
+  already ship on Metal, and it matches the reference. Not cleanly A/B'd on Metal
+  (box load-contended); CUDA win is the reporter's measured data.
+
 ### stage0 breakdown (M1, clean full-synth log) — what's worth optimizing
 `fwd_cond 49.9% + fwd_uncond 44.3% + sampling 4.6% + embeds 1.1%`. So the embed
 path is NOT worth folding (1.1%); the only big lever left is the **uncond forward
