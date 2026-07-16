@@ -1677,6 +1677,24 @@ static void fm_euler_solve(tada_context* c, float* speech, const float* cond, in
     std::vector<float> zero_cond(c->hp.fm_hidden, 0.0f);
     const float* neg = neg_cond ? neg_cond : zero_cond.data();
 
+    // Interval-CFG (opt-in, APPROXIMATE — mirrors OMNIVOICE_CFG_INTERVAL): recompute
+    // the uncond (neg) FM velocity only every K CFG-active steps and reuse the stale
+    // value in between; the cond (pos) velocity stays fresh every step; the first
+    // CFG-active step always recomputes. vel_neg persists across iterations, so a skip
+    // step simply leaves its last-recomputed value in place — no separate cache. Only
+    // active when K>1, so at the default both velocities are recomputed every step and
+    // the result is byte-for-byte the legacy path. Gated CRISPASR_TADA_CFG_INTERVAL.
+    const int cfg_interval = [] {
+        const char* e = std::getenv("CRISPASR_TADA_CFG_INTERVAL");
+        const int k = e ? std::atoi(e) : 1;
+        return k < 1 ? 1 : k;
+    }();
+    const bool interval_on = cfg_interval > 1;
+    int cfg_active_idx = 0; // counts CFG-active (a_cfg != 1) steps for the every-K test
+    if (interval_on && std::getenv("CRISPASR_TADA_CFG_INTERVAL_DEBUG"))
+        fprintf(stderr, "[tada] interval-CFG K=%d (neg velocity recomputed every %d CFG-active steps; first always)\n",
+                cfg_interval, cfg_interval);
+
     for (int i = 0; i < num_steps; i++) {
         float dt = t_span[i + 1] - t_span[i];
         float t_val = t_span[i];
@@ -1687,13 +1705,22 @@ static void fm_euler_solve(tada_context* c, float* speech, const float* cond, in
         if (a_cfg != 1.0f) {
             // CFG: velocity = v_neg + cfg * (v_pos - v_neg)
             // Separate acoustic and duration CFG (duration_cfg = 1.0)
-            // B=2 path: run pos+neg in one batched forward when available.
-            bool used_b2 =
-                c->fm_b2_active && run_fm_step_b2(c, speech, t_val, cond, neg, vel_pos.data(), vel_neg.data());
-            if (!used_b2) {
+            // Interval-CFG: recompute neg only on the first + every K-th CFG-active
+            // step; otherwise keep vel_neg's stale value and refresh only vel_pos.
+            const bool recompute_neg = !interval_on || (cfg_active_idx % cfg_interval == 0);
+            if (recompute_neg) {
+                // B=2 path: run pos+neg in one batched forward when available.
+                bool used_b2 =
+                    c->fm_b2_active && run_fm_step_b2(c, speech, t_val, cond, neg, vel_pos.data(), vel_neg.data());
+                if (!used_b2) {
+                    run_fm_step(c, speech, t_val, cond, vel_pos.data());
+                    run_fm_step(c, speech, t_val, neg, vel_neg.data());
+                }
+            } else {
+                // pos fresh only; vel_neg retains its last-recomputed (stale) value
                 run_fm_step(c, speech, t_val, cond, vel_pos.data());
-                run_fm_step(c, speech, t_val, neg, vel_neg.data());
             }
+            cfg_active_idx++;
 
             for (int j = 0; j < ad; j++) {
                 // Acoustic dims: apply acoustic CFG
