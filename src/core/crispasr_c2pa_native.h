@@ -34,5 +34,21 @@ struct SignOptions {
 Bytes sign_wav(const Bytes& wav, const std::string& cert_pem, const std::string& key_pem,
                const SignOptions& opts = SignOptions());
 
+// Result of verifying a signed WAV's C2PA manifest.
+struct VerifyResult {
+    bool valid = false;            // signature + data hash + assertions all OK
+    bool signature_valid = false;  // COSE ES256 verified vs the embedded cert
+    bool data_hash_valid = false;  // hard binding matches the audio
+    bool assertions_valid = false; // every claimed assertion hash matches
+    bool trusted = false;          // always false here (no trust-anchor check)
+    std::string generator_name;    // claim_generator_info.name (if present)
+    std::vector<std::string> errors;
+};
+
+// Verify a C2PA-signed WAV natively (no c2pa-rs): parse the JUMBF tree, verify
+// the COSE_Sign1 ES256 signature against the embedded certificate's public key
+// (uECC), and recompute the hard-binding data hash + assertion hashedURIs.
+VerifyResult verify_wav(const Bytes& wav);
+
 } // namespace c2pa_native
 } // namespace crispasr

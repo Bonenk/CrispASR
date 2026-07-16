@@ -413,5 +413,347 @@ Bytes sign_wav(const Bytes& wav, const std::string& cert_pem, const std::string&
     return with_chunk(a4.store);
 }
 
+// ============================================================================
+// Verifier — the native twin of bindings/javascript/c2pa-verify.mjs.
+// ============================================================================
+namespace {
+
+// ---- minimal CBOR decoder -> generic Value ----
+struct Value {
+    enum Type { UINT, NINT, BSTR, TSTR, ARRAY, MAP, TAG, BOOL, NUL } type = NUL;
+    int64_t i = 0;                            // UINT / NINT / BOOL
+    Bytes bytes;                              // BSTR
+    std::string str;                          // TSTR
+    std::vector<Value> arr;                   // ARRAY, or TAG(1 elem)
+    std::vector<std::pair<Value, Value>> map; // MAP
+    uint64_t tag = 0;                         // TAG
+
+    const Value* get(const std::string& key) const { // map lookup by tstr key
+        for (auto& kv : map)
+            if (kv.first.type == TSTR && kv.first.str == key)
+                return &kv.second;
+        return nullptr;
+    }
+    const Value* get(int64_t key) const { // map lookup by integer key
+        for (auto& kv : map)
+            if ((kv.first.type == UINT || kv.first.type == NINT) && kv.first.i == key)
+                return &kv.second;
+        return nullptr;
+    }
+};
+
+struct CborReader {
+    const uint8_t* p;
+    size_t n, pos = 0;
+    bool ok = true;
+    uint64_t readLen(uint8_t ai) {
+        if (ai < 24)
+            return ai;
+        int nb = ai == 24 ? 1 : ai == 25 ? 2 : ai == 26 ? 4 : ai == 27 ? 8 : 0;
+        if (!nb || pos + nb > n) {
+            ok = false;
+            return 0;
+        }
+        uint64_t v = 0;
+        for (int k = 0; k < nb; k++)
+            v = (v << 8) | p[pos++];
+        return v;
+    }
+    Value value() {
+        Value out;
+        if (pos >= n) {
+            ok = false;
+            return out;
+        }
+        uint8_t ib = p[pos++];
+        uint8_t major = ib >> 5, ai = ib & 0x1f;
+        uint64_t len = readLen(ai);
+        if (!ok)
+            return out;
+        switch (major) {
+        case 0:
+            out.type = Value::UINT;
+            out.i = int64_t(len);
+            break;
+        case 1:
+            out.type = Value::NINT;
+            out.i = -1 - int64_t(len);
+            break;
+        case 2:
+            if (pos + len > n) {
+                ok = false;
+                break;
+            }
+            out.type = Value::BSTR;
+            out.bytes.assign(p + pos, p + pos + len);
+            pos += len;
+            break;
+        case 3:
+            if (pos + len > n) {
+                ok = false;
+                break;
+            }
+            out.type = Value::TSTR;
+            out.str.assign(reinterpret_cast<const char*>(p + pos), len);
+            pos += len;
+            break;
+        case 4:
+            out.type = Value::ARRAY;
+            for (uint64_t k = 0; k < len && ok; k++)
+                out.arr.push_back(value());
+            break;
+        case 5:
+            out.type = Value::MAP;
+            for (uint64_t k = 0; k < len && ok; k++) {
+                Value key = value();
+                Value val = value();
+                out.map.emplace_back(std::move(key), std::move(val));
+            }
+            break;
+        case 6:
+            out.type = Value::TAG;
+            out.tag = len;
+            out.arr.push_back(value());
+            break;
+        case 7:
+            if (ai == 20) {
+                out.type = Value::BOOL;
+                out.i = 0;
+            } else if (ai == 21) {
+                out.type = Value::BOOL;
+                out.i = 1;
+            } else
+                out.type = Value::NUL;
+            break;
+        default:
+            ok = false;
+        }
+        return out;
+    }
+};
+Value cbor_decode(const Bytes& b, bool& ok) {
+    CborReader r{b.data(), b.size()};
+    Value v = r.value();
+    ok = r.ok;
+    return v;
+}
+
+// ---- JUMBF walk: label -> {full box, cbor content} ----
+struct JumbfBox {
+    Bytes box;
+    Bytes content;
+    bool has_content = false;
+};
+uint32_t rd32be(const uint8_t* b) {
+    return (uint32_t(b[0]) << 24) | (uint32_t(b[1]) << 16) | (uint32_t(b[2]) << 8) | b[3];
+}
+void jumbf_walk(const uint8_t* b, size_t len, std::vector<std::pair<std::string, JumbfBox>>& out) {
+    size_t o = 0;
+    while (o + 8 <= len) {
+        uint32_t sz = rd32be(b + o);
+        if (sz < 8 || o + sz > len)
+            break;
+        if (std::memcmp(b + o + 4, "jumb", 4) == 0) {
+            const uint8_t* payload = b + o + 8;
+            size_t plen = sz - 8;
+            uint32_t jsz = rd32be(payload);
+            size_t lblStart = 8 + 16 + 1;
+            size_t e = lblStart;
+            while (e < jsz && payload[e] != 0)
+                e++;
+            std::string label(reinterpret_cast<const char*>(payload + lblStart), e - lblStart);
+            JumbfBox jb;
+            jb.box.assign(b + o, b + o + sz);
+            size_t po = jsz;
+            while (po + 8 <= plen) {
+                uint32_t psz = rd32be(payload + po);
+                if (psz < 8 || po + psz > plen)
+                    break;
+                if (std::memcmp(payload + po + 4, "cbor", 4) == 0) {
+                    jb.content.assign(payload + po + 8, payload + po + psz);
+                    jb.has_content = true;
+                }
+                po += psz;
+            }
+            out.emplace_back(label, std::move(jb));
+            jumbf_walk(payload, plen, out);
+        }
+        o += sz;
+    }
+}
+const JumbfBox* find_box(const std::vector<std::pair<std::string, JumbfBox>>& boxes, const std::string& label) {
+    for (auto& p : boxes)
+        if (p.first == label)
+            return &p.second;
+    return nullptr;
+}
+
+// Extract the 64-byte EC public point (x||y, NO 0x04 prefix — uECC form) from an
+// X.509 P-256 cert DER: locate the SPKI BIT STRING `03 42 00 04 <64>`.
+bool extract_ec_point(const Bytes& der, uint8_t out[64]) {
+    for (size_t i = 0; i + 4 + 65 <= der.size(); i++) {
+        if (der[i] == 0x03 && der[i + 1] == 0x42 && der[i + 2] == 0x00 && der[i + 3] == 0x04) {
+            std::memcpy(out, &der[i + 4], 64); // skip the 0x04 marker
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace
+
+VerifyResult verify_wav(const Bytes& wav) {
+    VerifyResult res;
+    auto& err = res.errors;
+
+    // locate C2PA RIFF chunk
+    if (wav.size() < 12) {
+        err.push_back("input too small");
+        return res;
+    }
+    size_t cstart = 0, csize = 0;
+    bool found = false;
+    for (size_t off = 12; off + 8 <= wav.size();) {
+        uint32_t sz = uint32_t(wav[off + 4]) | (uint32_t(wav[off + 5]) << 8) | (uint32_t(wav[off + 6]) << 16) |
+                      (uint32_t(wav[off + 7]) << 24);
+        if (std::memcmp(&wav[off], "C2PA", 4) == 0) {
+            cstart = off;
+            csize = sz;
+            found = true;
+            break;
+        }
+        off += 8 + sz + (sz & 1);
+    }
+    if (!found) {
+        err.push_back("no C2PA chunk in RIFF");
+        return res;
+    }
+
+    std::vector<std::pair<std::string, JumbfBox>> boxes;
+    jumbf_walk(&wav[cstart + 8], csize, boxes);
+    const JumbfBox *claimBox = find_box(boxes, "c2pa.claim.v2"), *sigBox = find_box(boxes, "c2pa.signature"),
+                   *hashBox = find_box(boxes, "c2pa.hash.data"), *actBox = find_box(boxes, "c2pa.actions.v2");
+    if (!claimBox || !sigBox || !hashBox || !actBox) {
+        err.push_back("missing required JUMBF box");
+        return res;
+    }
+
+    bool ok = true;
+    Value claim = cbor_decode(claimBox->content, ok);
+    if (!ok) {
+        err.push_back("claim CBOR decode failed");
+        return res;
+    }
+    Value cose = cbor_decode(sigBox->content, ok);
+    if (!ok) {
+        err.push_back("signature CBOR decode failed");
+        return res;
+    }
+    const Value& coseArr = (cose.type == Value::TAG && !cose.arr.empty()) ? cose.arr[0] : cose;
+    if (coseArr.type != Value::ARRAY || coseArr.arr.size() < 4) {
+        err.push_back("malformed COSE_Sign1");
+        return res;
+    }
+    const Bytes& protectedBstr = coseArr.arr[0].bytes;
+    const Bytes& signature = coseArr.arr[3].bytes;
+
+    // cert from protected header {1:-7, 33:[cert]}
+    Value prot = cbor_decode(protectedBstr, ok);
+    const Value* chain = ok ? prot.get(int64_t(33)) : nullptr;
+    const Bytes* certDer = nullptr;
+    if (chain) {
+        if (chain->type == Value::ARRAY && !chain->arr.empty())
+            certDer = &chain->arr[0].bytes;
+        else if (chain->type == Value::BSTR)
+            certDer = &chain->bytes;
+    }
+    if (!certDer) {
+        err.push_back("no certificate in COSE protected header");
+        return res;
+    }
+
+    // verify COSE ES256 (uECC): message = Sig_structure, hash = sha256(message)
+    uint8_t pub[64];
+    if (!extract_ec_point(*certDer, pub)) {
+        err.push_back("cannot extract EC public key from cert");
+        return res;
+    }
+    // Sig_structure = ["Signature1", protected(bstr), external_aad(empty bstr), payload(claim bstr)]
+    Bytes sigStruct;
+    {
+        put(sigStruct, cbor::head(4, 4));
+        put(sigStruct, cbor::tstr("Signature1"));
+        put(sigStruct, cbor::bstr(protectedBstr));
+        put(sigStruct, cbor::bstr(Bytes{}));
+        put(sigStruct, cbor::bstr(claimBox->content));
+    }
+    auto digest = sha::sha256(sigStruct);
+    if (signature.size() == 64)
+        res.signature_valid = uECC_verify(pub, digest.data(), 32, signature.data(), uECC_secp256r1()) == 1;
+    if (!res.signature_valid)
+        err.push_back("COSE ES256 signature does not verify");
+
+    // assertion hashedURIs: hash = sha256(box without 8-byte header)
+    res.assertions_valid = true;
+    for (const char* grp : {"created_assertions", "gathered_assertions"}) {
+        const Value* list = claim.get(std::string(grp));
+        if (!list || list->type != Value::ARRAY)
+            continue;
+        for (const Value& a : list->arr) {
+            const Value* url = a.get("url");
+            const Value* h = a.get("hash");
+            if (!url || !h)
+                continue;
+            std::string label = url->str.substr(url->str.find_last_of('/') + 1);
+            const JumbfBox* bx = find_box(boxes, label);
+            if (!bx) {
+                err.push_back("assertion box not found: " + label);
+                res.assertions_valid = false;
+                continue;
+            }
+            auto actual = sha::sha256(bx->box.data() + 8, bx->box.size() - 8);
+            if (h->bytes.size() != 32 || std::memcmp(actual.data(), h->bytes.data(), 32) != 0) {
+                err.push_back("assertion hash mismatch: " + label);
+                res.assertions_valid = false;
+            }
+        }
+    }
+
+    // hard binding: data hash over file minus the C2PA chunk exclusion
+    Value hd = cbor_decode(hashBox->content, ok);
+    const Value* excls = ok ? hd.get("exclusions") : nullptr;
+    uint64_t exStart = cstart, exLen = 8 + csize + (csize & 1);
+    if (excls && excls->type == Value::ARRAY && !excls->arr.empty()) {
+        const Value* s = excls->arr[0].get("start");
+        const Value* l = excls->arr[0].get("length");
+        if (s)
+            exStart = uint64_t(s->i);
+        if (l)
+            exLen = uint64_t(l->i);
+    }
+    const Value* storedHash = ok ? hd.get("hash") : nullptr;
+    if (storedHash && exStart + exLen <= wav.size()) {
+        Bytes concat(wav.begin(), wav.begin() + exStart);
+        concat.insert(concat.end(), wav.begin() + exStart + exLen, wav.end());
+        auto fh = sha::sha256(concat);
+        res.data_hash_valid =
+            storedHash->bytes.size() == 32 && std::memcmp(fh.data(), storedHash->bytes.data(), 32) == 0;
+    }
+    if (!res.data_hash_valid)
+        err.push_back("data hash (hard binding) mismatch");
+
+    // surface generator name
+    const Value* gen = claim.get("claim_generator_info");
+    if (gen) {
+        const Value* name = gen->get("name");
+        if (name)
+            res.generator_name = name->str;
+    }
+
+    res.valid = res.signature_valid && res.data_hash_valid && res.assertions_valid;
+    res.trusted = false;
+    return res;
+}
+
 } // namespace c2pa_native
 } // namespace crispasr
