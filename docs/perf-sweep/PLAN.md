@@ -77,19 +77,19 @@ shipped dtypes (voc conv1d-routed kernels, ups.* excluded):
   k=1→matmul, but the F16-cast kill (the main win) applies. Unit test extended
   (`core_hifigan` case, cos>0.99999); 210 assertions total. `nullptr`-default so
   nothing changes until a backend bakes + passes `&fc`.
-- 🟡 **chatterbox_s3gen** (`CRISPASR_S3GEN_FASTCONV`, **default OFF / opt-in**) — `41dbc88cc`.
-  Cast-kill only (bitwise-identical): bakes F32 copies of the 275 F16 conv kernels
-  (100 K>1 + 175 K=1) and pointer-swaps `c->tensors` (same idiom as the ctx_f16 Metal
-  fix), so `ggml_conv_1d` skips its F16→F32 cast. Split-load aware (two
+- ✅ **chatterbox_s3gen** (`CRISPASR_S3GEN_FASTCONV`, **default ON**) — `41dbc88cc` (wire,
+  opt-in) + default flip. Cast-kill only (bitwise-identical): bakes F32 copies of the
+  275 F16 conv kernels (100 K>1 + 175 K=1) and pointer-swaps `c->tensors` (same idiom as
+  the ctx_f16 Metal fix), so `ggml_conv_1d` skips its F16→F32 cast. Split-load aware (two
   `fastconv_cache`, one per backend); `.ups.` conv_transpose excluded (permute path).
-  **Verified:** builds clean; load-time bake+swap+permute runs, engages exactly
-  (275 baked/swapped, all GPU on this box, via `CRISPASR_S3GEN_FASTCONV_DEBUG`).
-  **NOT yet:** full seeded decoded-output A/B — chatterbox is flow-matching + AR, each
-  synth is ~30 min on the current contended M1 (load 300+), too slow for a 3-run
-  byte-diff. Default-flip pending that A/B on a quiet box / CUDA. ⚠ GGUF-parse note: only
-  the F16 conv kernels benefit; the 79 F32 + 3 ups kernels are untouched (correct).
-  **k=1→matmul NOT done** (175 K=1 kernels) — a further win, but changes reduction order
-  so it needs its own A/B on the drift-prone GPU path; left for later.
+  **A/B (seed 42, Metal, `chatterbox-s3gen-q8_0`): ON vs OFF = 0/32768 across all 17280
+  samples — audio BYTE-IDENTICAL** (only the trailing AI-provenance metadata chunk differs
+  per-run, unrelated). For a flow-matching+AR pipeline that byte-identity also subsumes the
+  determinism gate. Engagement proven (ON 275 baked/swapped, OFF 0; `CRISPASR_S3GEN_FASTCONV_DEBUG`).
+  ⚠ Each synth is ~1–3 h on the contended M1 (load 300+), so this was one full ON+OFF pair,
+  not 3 arms. ⚠ Only F16 conv kernels benefit; the 79 F32 + 3 ups kernels are untouched (correct).
+  **k=1→matmul NOT done** (175 K=1 kernels) — a further win, but changes reduction order so it
+  needs its own A/B on the drift-prone GPU path; left for later.
 - ✅ **speecht5_tts** (`CRISPASR_SPEECHT5_FASTCONV`, default on) — `1c558b4f0`.
   Threaded the fastconv cache through `core_hifigan::forward()`/`resblock_forward()`
   (one change wires the whole family) + `collect_fastconv_kernels()` helper (excludes
