@@ -1730,11 +1730,16 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     // sum, the ~5 MB embed re-upload, and two extra graph dispatches. The
     // embedding math is the same get_rows + same-order F32 adds the legacy
     // path does on the host, so codes are byte-identical (A/B-gated).
-    // OMNIVOICE_FUSED_STEP=0 restores the legacy split path.
+    // OMNIVOICE_FUSED_STEP=0 restores the legacy split path. Default ON for
+    // CPU/Metal (byte-identical codes proven on M1); default OFF on CUDA until
+    // the Kaggle A/B (tools/kaggle/omnivoice-fused-step-ab/) verifies the
+    // roundtrip there — never flip a GPU default blind (dev-guide LEARNING 35).
     const bool fused_step = [&] {
         const char* e = getenv("OMNIVOICE_FUSED_STEP");
         if (e && e[0])
             return e[0] != '0';
+        if (ctx->backend && std::strstr(ggml_backend_name(ctx->backend), "CUDA") != nullptr)
+            return false;  // pending CUDA A/B
         return persistent; // fused graphs are persistent-only
     }();
     auto run_llm_forward = [&](ov_step_graph& g, const std::vector<float>& emb, int T_in,

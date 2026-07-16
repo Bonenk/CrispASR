@@ -36,7 +36,7 @@ BUILD = WORK / "build"
 MODELS = WORK / "models"
 CRISPASR = BUILD / "bin" / "crispasr"
 
-CRISPASR_REF = os.environ.get("CRISPASR_REF", "feat/omnivoice-rtf-stage0")
+CRISPASR_REF = os.environ.get("CRISPASR_REF", "main")
 REPS = int(os.environ.get("REPS", "3"))
 
 TEXT = (
