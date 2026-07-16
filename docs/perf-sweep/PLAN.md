@@ -9,15 +9,17 @@ possible. Default flips only on a proven speed AND quality win.
 ## NOW — active work
 
 **Status (2026-07-16): FASTCONV landed + A/B-verified (byte-identical, default ON)
-for 5 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen. All on
-`main`, all green.**
+for 6 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen,
+cosyvoice3. All on `main`, all green.**
 
 **➡ FRESH AGENT: go to the "TODO QUEUE FOR A FRESH AGENT" section near the bottom
-of this file — every remaining task is scoped there in order (TODO-A cosyvoice3 is
-next). Read the handover `handover-prompts/fastconv-fleet-sweep-round2.md` first.**
-Remaining: TODO-A cosyvoice3 FASTCONV · TODO-B chatterbox k=1→matmul · TODO-C
-indextts/kokoro · TODO-D fastpitch loader · TODO-2 interval-CFG · TODO-3 Metal q4_k
-· TODO-4 CI perf gate. Coverage triage below (only F16-kernel models benefit).
+of this file — every remaining task is scoped there in order (TODO-B is next now
+that TODO-A cosyvoice3 has landed).**
+Remaining: TODO-B chatterbox k=1→matmul · TODO-C indextts/kokoro · TODO-D fastpitch
+loader · TODO-2 interval-CFG · TODO-3 Metal q4_k · TODO-4 CI perf gate. Coverage
+triage below (only F16-kernel models benefit). ⚠ There is no
+`handover-prompts/fastconv-fleet-sweep-round2.md` on disk — this NOW section + the
+TODO QUEUE below ARE the round-2 handover.
 
 Commits (pushed to `main`):
 `203f28f01` shared core_dac cache+conv1d · `191a7ebe4` omnivoice migrate ·
@@ -105,10 +107,27 @@ shipped dtypes (voc conv1d-routed kernels, ups.* excluded):
   no RNG): ON-vs-ON 0/32768, ON-vs-OFF 0/32768 (byte-identical).** Engagement proven
   via `CRISPASR_SPEECHT5_FASTCONV_DEBUG`: ON bakes 74/74, OFF bakes 0. ASR roundtrip
   intact.
+- ✅ **cosyvoice3_tts** (`CRISPASR_COSYVOICE3_FASTCONV`, default on) — `edbe64d28`.
+  Cast-kill for the 85 F16 hift-vocoder conv kernels via the re-point idiom (idiom
+  (a)): bake one F32 copy of each F16 kernel at hift load, re-point the named
+  `cv3_hift` fields (`conv_pre_w`, `conv_post_w`, `ups_w[3]`, `resblocks[9].{c1,c2}_w[3]`,
+  `src_down_w[3]`, `src_resblocks[3].{c1,c2}_w[3]`, `f0_condnet_w[5]` = 85) to the
+  baked copies — zero graph change (every hift graph reads via `const auto& h =
+  ctx->hift`). ⚠ **ups_w[] ARE baked** (cosyvoice3 upsamples with a regular
+  `cv3_causal_conv1d`, not conv_transpose). 2D linears (m_source.l_linear,
+  f0.classifier) left untouched (the CPU source path reads l_linear as raw F32).
+  GGUF-verified 85 F16 conv kernels, 0 F16 non-conv. **A/B (new deterministic
+  harness `tests/cosyvoice3-hift-fastconv-ab.cpp`: fixed mel+noise →
+  `run_hift_inference`, no seed needed): ON vs OFF vs ON-rerun all hash
+  `127fb40eeec32d8f` — BYTE-IDENTICAL, non-silent (max|a|=0.99, no NaN).**
+  Engagement proven via `CRISPASR_COSYVOICE3_FASTCONV_DEBUG`: ON bakes 85/85, OFF 0.
+  test-fastconv still green (210 assertions; core_dac untouched). ⚠ k=1→matmul NOT
+  done (reduction-order change, its own A/B) — same as chatterbox, left for later.
 ### Bespoke-lambda triage (GGUF-parsed 2026-07-16 — F16 conv kernels required)
 Parse conv kernels by dtype (⚠ name suffix varies: HiFi-GAN uses `.weight`,
 cosyvoice3 uses `.w`) before wiring — only F16 benefits:
-- **cosyvoice3-hift-f16** → **85 F16 conv kernels → TARGET** (local model). Exact
+- **cosyvoice3-hift-f16** → ✅ **DONE** (`edbe64d28`, re-point idiom (a), 85/85 baked,
+  byte-identical A/B). Original scope kept below for reference. Exact
   wiring (turnkey): `cv3_hift` (src/cosyvoice3_tts.cpp:339) holds the kernels in
   named fields — `conv_pre_w`, `conv_post_w`, `ups_w[3]`, `resblocks[9].{c1_w,c2_w}[3]`,
   `src_down_w[3]`, `src_resblocks[3].{c1_w,c2_w}[3]`, `f0_condnet_w[5]` — AND a
@@ -128,8 +147,10 @@ cosyvoice3 uses `.w`) before wiring — only F16 benefits:
   all-F32 (no-op) — the q8_0 is the one that benefits.
 - **indextts_voc (9 convs), kokoro (9)** — no local main model on this box; parse +
   wire on a box that has them.
-- ⏭ **Next:** cosyvoice3_tts FASTCONV (the one remaining local F16 target), then
-  items 2 (interval-CFG), 3 (Metal q4_k), 4 (CI perf gate).
+- ⏭ **Next:** all local F16 FASTCONV targets are now landed (cosyvoice3 was the last).
+  Remaining FASTCONV work needs a different box (TODO-C indextts/kokoro — no local
+  model here) or is a separate GPU-A/B item (TODO-B chatterbox/cosyvoice3
+  k=1→matmul). Then items 2 (interval-CFG), 3 (Metal q4_k), 4 (CI perf gate).
 
 ---
 
@@ -179,7 +200,11 @@ melotts → remaining ~21, each byte+ASR A/B'd.
 # push (main moves constantly). See "Discipline" at the very bottom + the
 # handover in handover-prompts/fastconv-fleet-sweep-round2.md.
 
-## TODO-A — cosyvoice3_tts FASTCONV  ★ next, highest-confidence win
+## TODO-A — cosyvoice3_tts FASTCONV  ✅ DONE (`edbe64d28`, 2026-07-16)
+Landed via re-point idiom (a): 85/85 F16 hift conv kernels baked+swapped,
+byte-identical A/B (hash `127fb40eeec32d8f` ON==OFF==ON-rerun) with the new
+deterministic `tests/cosyvoice3-hift-fastconv-ab.cpp` harness. Original plan below.
+
 **Goal:** cast-kill the 85 F16 hift-vocoder conv kernels (same idea as speecht5/
 chatterbox). GGUF-confirmed: `cosyvoice3-hift-f16.gguf` has 85 F16 3D conv kernels.
 **Files:** `src/cosyvoice3_tts.cpp` only. Struct `cv3_hift` at :339 (fields listed
