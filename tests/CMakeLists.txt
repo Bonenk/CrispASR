@@ -2350,6 +2350,8 @@ if (NOT CRISPASR_NO_C2PA_NATIVE)
     target_include_directories(test_c2pa_native PRIVATE
         ${PROJECT_SOURCE_DIR}/src/core
     )
+    target_compile_definitions(test_c2pa_native PRIVATE
+        CRISPASR_TEST_ASSETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
     target_link_libraries(test_c2pa_native PRIVATE
         Catch2::Catch2WithMain
         crispasr_c2pa_native

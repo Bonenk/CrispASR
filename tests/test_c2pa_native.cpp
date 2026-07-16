@@ -206,6 +206,59 @@ TEST_CASE("C2PA native: bad PEM input yields empty (no crash)", "[unit][c2pa]") 
     REQUIRE(crispasr::c2pa_native::sign_wav(Bytes{}, bundled_cert(), bundled_key()).empty());
 }
 
+// ---------------------------------------------------------------- verifier
+TEST_CASE("C2PA native verify: round-trip (sign then verify) is valid", "[unit][c2pa]") {
+    Bytes signed_ = crispasr::c2pa_native::sign_wav(make_wav(), bundled_cert(), bundled_key());
+    auto r = crispasr::c2pa_native::verify_wav(signed_);
+    INFO(std::string("err: ") + (r.errors.empty() ? std::string("ok") : r.errors[0]));
+    REQUIRE(r.signature_valid);
+    REQUIRE(r.data_hash_valid);
+    REQUIRE(r.assertions_valid);
+    REQUIRE(r.valid);
+    REQUIRE(r.generator_name == "CrispASR");
+}
+
+TEST_CASE("C2PA native verify: audio tamper fails the hard binding", "[unit][c2pa]") {
+    Bytes signed_ = crispasr::c2pa_native::sign_wav(make_wav(), bundled_cert(), bundled_key());
+    signed_[46] ^= 0xff; // flip a byte in the audio payload
+    auto r = crispasr::c2pa_native::verify_wav(signed_);
+    REQUIRE_FALSE(r.data_hash_valid);
+    REQUIRE_FALSE(r.valid);
+}
+
+TEST_CASE("C2PA native verify: signature tamper fails", "[unit][c2pa]") {
+    Bytes signed_ = crispasr::c2pa_native::sign_wav(make_wav(), bundled_cert(), bundled_key());
+    signed_[signed_.size() - 20] ^= 0xff; // flip a byte in the trailing signature region
+    auto r = crispasr::c2pa_native::verify_wav(signed_);
+    REQUIRE_FALSE(r.valid);
+}
+
+TEST_CASE("C2PA native verify: non-C2PA WAV reports no manifest", "[unit][c2pa]") {
+    auto r = crispasr::c2pa_native::verify_wav(make_wav());
+    REQUIRE_FALSE(r.valid);
+    REQUIRE_FALSE(r.errors.empty());
+}
+
+// their signer -> our verifier: validate a committed c2pa-rs reference vector.
+TEST_CASE("C2PA native verify: c2pa-rs reference vector validates", "[unit][c2pa]") {
+#ifdef CRISPASR_TEST_ASSETS_DIR
+    std::string p = std::string(CRISPASR_TEST_ASSETS_DIR) + "/c2pa/reference-c2pa-rs.wav";
+    std::ifstream f(p, std::ios::binary);
+    if (!f) {
+        WARN("reference fixture missing: " + p);
+        return;
+    }
+    Bytes wav((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    auto r = crispasr::c2pa_native::verify_wav(wav);
+    INFO(std::string("err: ") + (r.errors.empty() ? std::string("ok") : r.errors[0]));
+    REQUIRE(r.signature_valid);
+    REQUIRE(r.data_hash_valid);
+    REQUIRE(r.valid);
+#else
+    WARN("CRISPASR_TEST_ASSETS_DIR not defined; skipping reference-vector check");
+#endif
+}
+
 // Emit a signed WAV for the live parity ctest (validates in c2pa-rs reader).
 TEST_CASE("C2PA native: emit signed WAV for parity", "[emit][c2pa]") {
     Bytes signed_ = crispasr::c2pa_native::sign_wav(make_wav(), bundled_cert(), bundled_key());
