@@ -6,8 +6,10 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
 
 ## NOW — active work
 
-- [ ] **Phase 0** — cross-surface parity harness + test (safety net; must land first)
-- [ ] **Phase 1** — collapse the dual dispatch (session C-ABI → shared adapter)
+- [x] **Phase 0** — cross-surface parity harness + test (safety net) — DONE
+      (`src/core/asr_parity.h` + `test-asr-parity` 13 assertions; live
+      `test-surface-parity.sh` PASS: CLI==session on parakeet-tdt-1.1b/jfk)
+- [ ] **Phase 1** — collapse the dual dispatch (session C-ABI → shared adapter) — IN PROGRESS
 - [ ] **Phase 2** — unified encoder memory policy (proactive, replaces ad-hoc gates)
 - [ ] **Phase 3** — diff-harness parity in CI (per-stage cos + decoded roundtrip)
 - [ ] **Phase 4** — server throughput (batching / worker pool)
