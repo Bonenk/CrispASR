@@ -1,4 +1,5 @@
 // crispasr_tts_chunking.cpp — sentence splitter + silence-padded concat.
+#include <cstdlib>
 //
 // See crispasr_tts_chunking.h for the design rationale (issue #66).
 
@@ -153,9 +154,17 @@ std::vector<std::string> crispasr_tts_plan_chunks_for_backend(const std::string&
     // instead of one, which is exactly the reporter's 15–20% gap vs omnivoice.cpp
     // (each chunk reshapes T so the CUDA graph can't be reused across chunks).
     if (backend_name.rfind("vibevoice", 0) == 0 || backend_name.rfind("qwen3-tts", 0) == 0 ||
-        backend_name.rfind("tada", 0) == 0 || backend_name.rfind("dots-tts", 0) == 0 ||
-        backend_name.rfind("omnivoice", 0) == 0)
+        backend_name.rfind("tada", 0) == 0 || backend_name.rfind("dots-tts", 0) == 0)
         return {text};
+    // omnivoice defaults to single-shot too, but keep an escape hatch: on a
+    // GPU without CUDA-graph reuse (Metal/CPU) single-shot's ~2.7× attention
+    // (O(T²)) can cost more than the per-chunk warmup it saves. CRISPASR_OMNIVOICE_CHUNK=1
+    // forces the legacy sentence-split path (also the A/B toggle for that tradeoff).
+    if (backend_name.rfind("omnivoice", 0) == 0) {
+        const char* e = std::getenv("CRISPASR_OMNIVOICE_CHUNK");
+        if (!(e && e[0] && e[0] != '0'))
+            return {text};
+    }
 
     std::vector<std::string> result = crispasr_tts_split_sentences(text, max_chars);
     if (result.empty())

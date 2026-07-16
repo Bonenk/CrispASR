@@ -70,12 +70,24 @@ as predicted).
   fixed-`num_steps` pass with a single length estimate (no per-token duration head,
   no `MAX_FRAMES` truncation), exactly like omnivoice.cpp. Verified: the reporter's
   paragraph now renders as ONE 410-frame generation (one decode), ASR-complete.
-- ⚖️ **Tradeoff:** single-shot has the SAME linear compute but ~2.7× the attention
-  (O(T²)) vs 3 chunks. On CUDA the graph-reuse win dominates (matches the reference).
-  On Metal/CPU there's no CUDA-graph benefit, so multi-sentence text costs ~10–15%
-  more attention — but this is the SAME tradeoff the 4 existing single-shot backends
-  already ship on Metal, and it matches the reference. Not cleanly A/B'd on Metal
-  (box load-contended); CUDA win is the reporter's measured data.
+- ⚖️ **Tradeoff + M1 A/B:** single-shot has the SAME linear compute but ~2.7× the
+  attention (O(T²)) vs 3 chunks. BUT it also does 1 decode + 1 forward-graph build
+  instead of 3 — and that consolidation more than pays for the attention. M1 A/B
+  (q8_0, reporter paragraph, interleaved; abs numbers load-garbage — load hit 79 —
+  so read the RELATIVE pair only):
+
+  | path | gen | decode | total |
+  |------|-----|--------|-------|
+  | single-shot | 103.96 s (+6%, O(T²)) | **9.09 s** | **113.0 s** |
+  | chunked (×3) | 98.11 s | 23.65 s (3 graph builds) | 121.8 s |
+
+  So single-shot is **net faster even on M1** — the decode consolidation (2.6×
+  fewer graph builds, load-independent structural win) outweighs the ~6% gen
+  penalty. This flips the earlier worry that it would regress Metal. On CUDA the
+  gen graph-reuse is an additional, larger win (the reporter's case).
+- 🔌 **Escape hatch:** `CRISPASR_OMNIVOICE_CHUNK=1` forces the legacy sentence-split
+  path (also the A/B toggle) — for a Metal user feeding pathologically long text
+  where O(T²) attention could dominate.
 
 ### stage0 breakdown (M1, clean full-synth log) — what's worth optimizing
 `fwd_cond 49.9% + fwd_uncond 44.3% + sampling 4.6% + embeds 1.1%`. So the embed
