@@ -207,6 +207,16 @@ the §232 campaign. Verified against current code, not carried from this doc.
 
 ### Verified state
 
+- **Fleet FASTCONV campaign (2026-07-16, `docs/perf-sweep/PLAN.md`)** — shared
+  `core_dac::fastconv_cache` + fc-aware `conv1d`/`res_unit`/`dec_block`/
+  `build_decode_graph`, and a `core_hifigan::conv1d` overload, so codec/vocoder
+  backends kill the per-graph F16→F32 conv cast from ONE implementation. Wired +
+  A/B-verified (byte-identical, seed-isolated): omnivoice, irodori
+  (`CRISPASR_IRODORI_FASTCONV`), zonos (`CRISPASR_ZONOS_FASTCONV`). HiFi-GAN
+  overload ready for fastpitch/speecht5/bananamind. Model-free unit test
+  `test-fastconv` (210 assertions). Grep audit found only 2/26 codec backends had
+  FASTCONV before this — PERFORMANCE.md's earlier "landed for 5 backends" was an
+  overclaim (verify coverage, don't trust the doc).
 - **§232 TTS campaign** (persistent sched-free graph + batched CFG cond+uncond +
   device KV + FASTCONV codec) has landed for qwen3-tts, voxtral-tts, omnivoice,
   tada, chatterbox. Un-migrated: f5, dots, kugelaudio, pocket (natural next
