@@ -5,6 +5,7 @@
 #include "core/attention.h"
 #include "core/beam_decode.h"
 #include "core/gguf_loader.h"
+#include "core/repeat_break.h"     // fix/moonshine-repeat-break: decode-time loop break
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
 
 #include "ggml.h"
@@ -1225,6 +1226,12 @@ static int moonshine_transcribe_impl(struct moonshine_context* ctx, const float*
     if (!greedy_fast)
         logits.resize((size_t)hp.vocab_size);
 
+    // Decode-time repetition-loop break (on by default; see the loop body).
+    const bool repeat_break = [] {
+        const char* e = std::getenv("CRISPASR_MOONSHINE_NO_REPEAT_BREAK");
+        return !(e && e[0] && e[0] != '0');
+    }();
+
     for (int step = 0; step < max_len; step++) {
         int32_t picked = 0;
         float picked_prob = 0.0f;
@@ -1298,6 +1305,14 @@ static int moonshine_transcribe_impl(struct moonshine_context* ctx, const float*
         if (out_token_probs)
             out_token_probs->push_back(picked_prob);
         token = picked;
+
+        // Decode-time repetition break: on hard audio (e.g. a chunked long-audio
+        // slice) greedy decode can get stuck in a short token cycle and burn
+        // every remaining step. Stop as soon as a period-<=8 block repeats 4x —
+        // saves the wasted compute; core_ngram::fix_loops still cleans residue.
+        // Disable with CRISPASR_MOONSHINE_NO_REPEAT_BREAK=1.
+        if (repeat_break && core_repeat::tail_is_repetition(out_tokens))
+            break;
     }
 
     auto t_decode_done = std::chrono::high_resolution_clock::now();
