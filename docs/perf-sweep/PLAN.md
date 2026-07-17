@@ -272,6 +272,32 @@ decode, output-equivalent**.
 melotts → remaining ~21, each byte+ASR A/B'd.
 
 # ============================================================================
+# PENDING — consolidated status board (OPUS-1M, 2026-07-16→17)
+# ============================================================================
+# Single place to see EVERY remaining task + its blocker. Detail in the TODO
+# sections below. ✅ = landed this session · 🔨 = in progress · ⛔ = blocked.
+#
+# FASTCONV (default-on, byte-identical): ✅ 7 landed (omnivoice, irodori, zonos,
+#   speecht5, chatterbox_s3gen, cosyvoice3, kokoro). No local F16-through-conv1d
+#   targets remain (indextts F16 = custom-CPU-op filters; fastpitch f16 = dead-end).
+# Interval-CFG (opt-in): ✅ 6 landed (cosyvoice3, f5, voxcpm2, dots, irodori, tada);
+#   🔨 chatterbox impl'd + M1-verifying [OPUS-1M]. ⛔ dia/zonos/voxtral (AR batched-KV,
+#   not amenable); vibevoice (low-value). NATURALNESS ear for ALL 7 = ⛔ human-only.
+#
+# STILL OPEN (by blocker):
+#   • TODO-3 Metal q4_k→prefer-q8 on Apple — VERIFIABLE HERE (registry schema + test-
+#     registry). Quick tier needs per-entry alt-quant metadata + HF q8-URL check. OPEN.
+#   • TODO-B chatterbox k=1→matmul [SONNET] — needs CUDA A/B (drift-prone GPU). OPEN.
+#   • TODO-2 chatterbox interval-CFG K>1 CONTENT verify — needs CUDA / quiet-box +
+#     proper voice (M1 no-voice audio garbles ASR). Impl done; verify OPEN off-box.
+#   • TODO-4 nightly perf-emit + committed baseline [SONNET] — needs GPU-in-CI +
+#     noise-floor calibration; compare-logic+test already landed (unit-tested here).
+#   • TODO-5 fused-step-graph rollout [FABLE] · TODO-6 voice-cache rollout [claimed] ·
+#     TODO-7 CUDA-graph audit [SONNET→FABLE] — graph/CUDA work, off-box or FABLE-tier.
+#   • TODO-3 deep (ggml Metal q4_k dequant kernel) + TODO-D fastpitch f16 re-convert
+#     — larger, low-priority; documented dead-ends/kernels.
+#   • NATURALNESS ears for the 6–7 interval-CFG backends at aggressive K = human-only.
+# ============================================================================
 # TODO QUEUE FOR A FRESH AGENT — fully scoped, do in this order
 
 **Owner tags:** `[FABLE]` = top-tier model, graph/runtime math written by hand
@@ -368,7 +394,11 @@ So the f16 code path has latent type bugs beyond the loader. **Verdict: not wort
 f16 needs (a) a re-converted GGUF AND (b) fixing 2 f16-path runtime type bugs. Left as
 a documented dead-end; re-pack recipe above is the starting point if ever pursued.
 
-## TODO-2 [FABLE — only chatterbox left, CFM + off-box verify] — Interval-CFG for guidance backends (~20–40%, biggest raw win, APPROXIMATE)
+## TODO-2 [OPUS-1M ACTIVE — chatterbox impl'd + M1-verifying; off-box CUDA verify OPEN] — Interval-CFG for guidance backends (~20–40%, biggest raw win, APPROXIMATE)
+⚠ **Coordination:** OPUS-1M has already IMPLEMENTED chatterbox interval-CFG
+(`CRISPASR_S3GEN_CFG_INTERVAL`, s3gen `cfm_euler_solve`) and is verifying on M1 (see
+NOW claim). Fable/others: the only OPEN part is the **off-box CUDA verify** of the
+chatterbox K>1 approximation (drift-prone GPU path). Do NOT re-implement.
 ✅ **cosyvoice3 landed opt-in** (`63a91a6a5`, `CRISPASR_COSYVOICE3_CFG_INTERVAL`,
 default 1). `cv3_run_solve_euler` gains the uncond-skip-every-K path; K>1 forces the
 separate 2-forward path (the batched `COSYVOICE3_CFG_BATCH` fuses cond+uncond, nothing
