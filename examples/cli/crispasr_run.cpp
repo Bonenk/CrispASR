@@ -443,7 +443,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
 
     crispasr_log_mem(params.verbose, "after audio decode");
     if (params.verbose) {
-        double dur = (double)samples.size() / 16000.0;
+        double dur = (double)samples.size() / (double)native_rate;
         double est = crispasr_estimate_mem_mb(dur, backend.name());
         fprintf(stderr, "crispasr[verbose]: audio %.1fs (%zu samples, %.1f MB PCM), est encoder mem ~%.0f MB\n", dur,
                 samples.size(), samples.size() * 4.0 / 1e6, est);
@@ -463,7 +463,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             have_stereo = false;
     }
 
-    constexpr int SR = 16000;
+    const int SR = native_rate;
     if (!params.no_prints) {
         fprintf(stderr, "crispasr: audio: %d samples (%.1f s) @ %d Hz, %d threads\n", (int)samples.size(),
                 (double)samples.size() / SR, SR, params.n_threads);

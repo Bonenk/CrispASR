@@ -78,6 +78,7 @@ public:
     std::vector<crispasr_segment> transcribe_one(const float* samples, int n_samples, int64_t t_offset_cs,
                                                  const whisper_params& params) {
         std::vector<crispasr_segment> out;
+        const int sr = input_sample_rate();
 
         // PLAN #61c: use the _ex API to get per-token + word-level
         // timestamps. The kyutai LM emits one text token per Mimi frame
@@ -99,7 +100,7 @@ public:
         // Default 500 ms for models where the accessor isn't available yet;
         // stt-2.6b-en uses 2.5+1.0 = 3.5s → 56000 samples.
         const float lookahead_s = kyutai_stt_total_lookahead_seconds(ctx_);
-        const int kTailSilenceSamples = std::max(8000, (int)(lookahead_s * 16000.0f));
+        const int kTailSilenceSamples = std::max(sr / 2, (int)(lookahead_s * (float)sr));
         std::vector<float> padded;
         padded.reserve((size_t)n_samples + kTailSilenceSamples);
         padded.assign(samples, samples + n_samples);
@@ -151,7 +152,7 @@ public:
             seg.t1 = r->words[r->n_words - 1].t1;
         } else {
             seg.t0 = t_offset_cs;
-            seg.t1 = t_offset_cs + (int64_t)((double)n_samples / 16000.0 * 100.0);
+            seg.t1 = t_offset_cs + (int64_t)((double)n_samples / (double)sr * 100.0);
         }
 
         seg.tokens.reserve((size_t)r->n_tokens);
