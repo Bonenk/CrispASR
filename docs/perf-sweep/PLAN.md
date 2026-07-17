@@ -8,17 +8,21 @@ possible. Default flips only on a proven speed AND quality win.
 
 ## NOW — active work
 
-**🔨 [OPUS-1M-c2pa] CLAIMED 2026-07-16 — openvoice2 reference-SE disk cache (TODO-6).**
-⚠ **Re-targeted from f5_tts** — f5's `set_reference` is only `compute_mel_spectrogram`
-(pure DSP, sub-ms), NOT a neural encode, so caching it yields no measurable win (fails
-the "proven speed win" bar). Switched to **openvoice2**, whose `ref_enc_forward` (STFT +
-6-conv reference encoder → 256-d `target_se`) is a real neural encode re-run on every
-`openvoice2_convert` / `openvoice2_extract_speaker_embedding`. Wired into the SHARED
-`crispasr_ref_cache` content-addressed helper (tag `openvoice2-se`, key = fnv1a(ref_pcm)^
-fnv1a(ref_sr)), same as irodori-latent / indextts-cond; global `CRISPASR_TTS_REF_CACHE=0`
-disables. Code DONE on branch `perf/f5-refvoice-cache`; **build + 2-run live-test (cache-hit
-line + byte-identical WAV `data`) DEFERRED until box load drops** (load 120+ right now).
-Do NOT double-work openvoice2 TODO-6. (dots_tts NOT viable here — speaker CAM++ GGUF not local.)
+**✅ [OPUS-1M-c2pa] DONE 2026-07-17 — openvoice2 reference-SE disk cache (TODO-6).**
+⚠ Re-targeted from f5_tts (f5's `set_reference` is only `compute_mel_spectrogram` — pure
+DSP, sub-ms, no win). openvoice2's `ref_enc_forward` (STFT + 6-conv reference encoder →
+256-d `target_se`) IS a neural encode, re-run on every `openvoice2_convert` /
+`openvoice2_extract_speaker_embedding`. Both routed through a new `openvoice2_target_se()`
+that wraps the SHARED `crispasr_ref_cache` content-addressed helper (tag `openvoice2-se`,
+key = fnv1a(ref_pcm) ^ fnv1a(ref_sr)) — same helper as irodori-latent / indextts-cond;
+resample+STFT+ref_enc are skipped entirely on a hit. Cache dir = `CRISPASR_TTS_REF_CACHE_DIR`
+→ `$TMPDIR/crispasr-tts-refcache/`; global `CRISPASR_TTS_REF_CACHE=0` disables (helper-owned
+env, NOT the OVC1 `CRISPASR_*_VOICE_CACHE`). **A/B VERIFIED** via `test-openvoice2-hifi`
+(clean-WAV harness, jfk src=ref, `openvoice2-tcc-f16`): run1 miss → run2 HIT (log-confirmed)
+→ run3 `CRISPASR_TTS_REF_CACHE=0` no-hit; **output byte-IDENTICAL across all 3 runs**
+(cache returns bit-exact SE; the disabled fresh-encode matches too). Cache blob 1061 B
+(256×f32 + header); `CRISPASR_TTS_REF_CACHE_DIR` honored. Landed on branch
+`perf/f5-refvoice-cache`. (dots_tts NOT viable here — speaker CAM++ GGUF not local.)
 
 **✅ [OPUS-1M] DONE (impl) 2026-07-16 — chatterbox interval-CFG (`a4a8f64de`, opt-in).**
 `CRISPASR_S3GEN_CFG_INTERVAL` in s3gen's 10-step CFM Euler solver: K>1 forces the
