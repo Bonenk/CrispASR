@@ -56,6 +56,7 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 - [CLI reference](docs/cli.md) — flags, VAD, CTC alignment, output formats, auto-download, audio formats
 - [Environment variables](docs/environment-variables.md) — the `CRISPASR_<BACKEND>_<FEATURE>` convention, global knobs, and every per-backend variable
 - [Language bindings](docs/bindings.md) — Python / Rust / Dart / Go / Java / JavaScript / Ruby / mobile
+- [Benchmarking CrispASR](docs/benchmarking.md) — how to measure transcribe time (not cold start): server/in-process reps, proof-of-work rules, phase-timing env vars
 - [Architecture](docs/architecture.md) — layered layout, `src/core/` primitives, regression discipline
 - [Contributing — adding a new backend](docs/contributing.md) — 5-file recipe, ground-truth diff workflow
 - [Regression matrix](docs/regression-matrix.md) — `tools/test-all-backends.py` capability tiers
