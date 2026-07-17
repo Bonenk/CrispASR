@@ -481,7 +481,15 @@ target-slice-only logits readback, threaded scoring, ONE persistent graph per
 arm so CUDA-graph capture engages. Survey of the fleet for the same shape
 (fixed-T multi-step loop with per-step host work between forwards):
 
-1. **dots_tts DiT/FM solver — STRONGEST candidate.** `dots_dit_forward`
+1. ✅ **dots_tts DiT/FM solver — LANDED (`53941ccc8`, 2026-07-17).** Persistent
+   per-arm per-patch graphs, in-graph coordinate_proj, constants (prefix/mask/
+   pos/g_cond) in a dedicated buffer, noise-slot-only velocity readback; shared
+   dots_build_dit_body so legacy/fused cannot drift. Flow-match latents
+   BYTE-IDENTICAL on CPU and Metal (CRISPASR_DOTS_FM_AB in-process A/B).
+   Gate CRISPASR_DOTS_FUSED_STEP: default ON CPU/Metal (strict subset of legacy
+   host work + identical output), OFF on CUDA pending TODO-7. Quiet-box timing
+   + the voice-clone (g_cond) arm exercise ride with the TODO-7 audit.
+   Original scoping (kept for reference): **dots_tts DiT/FM solver.** `dots_dit_forward`
    (src/dots_tts.cpp:903) builds a fresh ggml_context + graph + gallocr and
    frees them EVERY ODE step, for BOTH CFG arms (2 × num_steps rebuild+alloc
    per synthesis); `dots_linear` (:1461) additionally spins a one-shot graph
