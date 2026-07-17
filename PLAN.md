@@ -1242,7 +1242,25 @@ Issue #123 added the JA variant to the registry + README, but no row in any of `
 
 ---
 
-## 128. Piper TTS — lightweight VITS runtime (MIT) (OPEN — trigger immediate)
+## 128. Piper TTS — lightweight VITS runtime (MIT) — DONE
+
+**Status:** SHIPPED — the full backend exists and works; PLAN entry was stale.
+Present: `src/piper_tts.{cpp,h}` (VITS text-encoder + duration predictor + flow
+coupling + HiFi-GAN), converter `models/convert-piper-to-gguf.py`, CLI adapter
+`examples/cli/crispasr_backend_piper.cpp`, factory/detect
+(`crispasr_backend.cpp`, aliases `piper`/`piper-tts`/`piper-vits`/`vits`),
+registry entries (`piper-en_US-lessac-medium` + German thorsten/kerstin voices on
+`cstr/piper-voices-GGUF`), and tests (`test-piper-params.cpp`,
+`test-piper-tts.cpp`, `test-piper-roundtrip.sh`). Phonemization goes through the
+#156 permissive G2P cascade (not GPL espeak static-link). **Verified**: `--backend
+piper -m auto --auto-download --tts "The quick brown fox…"` synthesized 2.59 s
+@ 22050 Hz and the moonshine ASR roundtrip returned the exact sentence.
+
+Remaining (tracked elsewhere, not blocking): the P0 relpos-attention / HiFi-GAN
+perf item (Runtime-speedup table, `piper_tts.cpp`); more language voices as
+demand appears.
+
+<details><summary>original port plan (for reference — the affine-coupling/reuse map that guided the build)</summary>
 
 Native C++ runtime for [rhasspy/piper](https://github.com/rhasspy/piper) VITS models, MIT.
 Fills the tiny-model gap: ~15 MB Q4_K/language (vs Kokoro ~75 MB), single-digit ms/sentence
@@ -1286,6 +1304,8 @@ Steps:
    `tools/test-all-backends.py`.
 
 Effort: Small-Medium. ~1–2 days for an EN/DE prototype, +1 day per additional language voice.
+
+</details>
 
 ---
 
