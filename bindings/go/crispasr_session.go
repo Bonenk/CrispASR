@@ -308,7 +308,7 @@ int crispasr_registry_list_backends_abi(char* out_csv, int out_cap);
 
 // --- Session extras ---
 int crispasr_session_available_backends(char* out_csv, int out_cap);
-int crispasr_session_detected_language(crispasr_session* s, char* out_buf, int out_cap);
+int crispasr_session_detected_language(CrispasrSession* s, char* out_buf, int out_cap);
 // CTC vocabulary access (Omni CTC backend): n_vocab piece count, token_text
 // maps an id to its raw piece (word-boundary marker intact) or "" when out of
 // range / unsupported. Pairs with the result logits accessor for detokenization.
