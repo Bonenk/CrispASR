@@ -719,7 +719,16 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     // (e.g. parakeet-ja) auto-enable VAD for long audio so the model
     // gets silence-bounded segments matching its training distribution.
     const bool is_long_audio = (int)samples.size() > kLongAudioFallbackChunkSeconds * SR;
-    if (backend.prefers_vad() && is_long_audio && !params.vad && params.vad_model.empty() &&
+    // A backend that declares its OWN safe single-pass window (vad_slice_cap_seconds
+    // — 12 s for parakeet-ja, #89) has to be protected at that window, not at the
+    // unrelated 30 s global long-audio constant. Otherwise every JA clip in the
+    // 12–30 s gap is "not long audio", skips the auto-VAD safeguard, and runs one
+    // full pass past the encoder's trained range: the 14 s JA regression fixture
+    // degraded to a hallucinated leading + trailing sentence and misread digits
+    // (`6対3` → `0失点`). With VAD it reproduces the pinned reference core exactly.
+    const int backend_window_s = backend.vad_slice_cap_seconds();
+    const bool exceeds_backend_window = backend_window_s > 0 && (int)samples.size() > backend_window_s * SR;
+    if (backend.prefers_vad() && (is_long_audio || exceeds_backend_window) && !params.vad && params.vad_model.empty() &&
         !params.chunk_seconds_explicit) {
         params.vad = true;
         if (!params.no_prints) {
