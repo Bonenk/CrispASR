@@ -127,7 +127,7 @@ TODO (partial — status verified 2026-07-17):
 
 ---
 
-## #201 follow-up — generate a TADA voice ref from audio+transcript at query time (C-ABI DONE gated; server half OPEN)
+## #201 follow-up — generate a TADA voice ref from audio+transcript at query time (C-ABI + server DONE gated; roundtrip pending)
 
 Switch-voice, offline `--make-ref`, `--align`, and CLI query-time inline cloning
 (`--tts "…" --voice sample.wav --ref-text "…"`) all shipped.
@@ -152,13 +152,22 @@ make-ref, no temp GGUF:
   via the Python `Session` API on `tada-1b` (+ `tada-encoder-f16.gguf` +
   `tada-aligner-en.gguf`). Not run on the dev box (memory-pressured).
 
-**TO DO (server half, still OPEN):**
-- The HTTP server uses the backend *adapter* (`crispasr_backend_tada.cpp`), a
-  distinct surface from the session C-ABI. Wire its `.wav` synth case through
-  `tada_make_ref_from_pcm` (same gate), add a `ref_text` field to
-  `/v1/audio/speech` (consent gate + `consent_attestation` already exist).
-- Optionally cache baked ref keyed by (audio hash, transcript) to skip
-  re-running the aligner.
+**Server / adapter half — DONE (opt-in, same gate).** The HTTP server uses the
+backend *adapter* (`crispasr_backend_tada.cpp`), a distinct surface from the
+session C-ABI:
+- `TadaBackend::clone_from_wav()` — gated (`CRISPASR_TADA_WAV_CLONE=1`) helper
+  called from both `init()` (first voice) and `apply_request_voice()` (the
+  server's per-request switch). Resolves the WAV against `--voice-dir` (bare
+  name → `<dir>/<name>.wav` + companion `<dir>/<name>.txt` for ref-text, the
+  qwen3-tts convention), resolves encoder + aligner (explicit → next-to-model →
+  cache → auto-download), decodes to 24 kHz, and applies via
+  `tada_make_ref_from_pcm` — no temp GGUF. Off/failed → the historical reject.
+- `/v1/audio/speech` gained a `ref_text` body field (→ `tts_ref_text`). The
+  existing `consent_attestation` gate already fires for a `.wav` voice.
+- Docs: `docs/server.md` (ref_text field + updated tada voice note).
+
+**Still OPEN (optional):** cache baked ref keyed by (audio hash, transcript) to
+skip re-running the aligner on repeat requests.
 
 **Files:** `examples/cli/crispasr_backend_tada.cpp`, `examples/cli/crispasr_server.cpp`,
 `src/tada_tts.{h,cpp}`, `src/tada_encoder.*`. Aligner is language-specific
