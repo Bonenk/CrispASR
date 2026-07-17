@@ -151,13 +151,16 @@ static int crispasr_write_synth_audio(const std::string& out_path, const float* 
         }
         c2pa_fmt = "audio/mp4";
         if (is_aac) {
-            path = path.substr(0, path.size() - 4) + ".m4a";
+            path.erase(path.size() - 4); // drop ".aac"
+            path += ".m4a";
             fprintf(stderr,
                     "crispasr: note: emitting '%s' (AAC-in-MP4) so C2PA can embed a manifest; "
                     "set CRISPASR_NO_C2PA_REMUX=1 for raw .aac\n",
                     path.c_str());
         } else if (is_opus) {
-            path = path.substr(0, path.find_last_of('.')) + ".mp4";
+            if (const size_t dot = path.find_last_of('.'); dot != std::string::npos)
+                path.erase(dot); // drop the extension
+            path += ".mp4";
             fprintf(stderr,
                     "crispasr: note: emitting '%s' (Opus-in-MP4) so C2PA can embed a manifest; "
                     "set CRISPASR_NO_C2PA_REMUX=1 for raw .opus\n",
