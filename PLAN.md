@@ -109,17 +109,18 @@ Status: config/adapter-parity guards DONE (`tests/test-tada-params.cpp` defaults
 now covers library + CLI + c_api; full ~40-adapter sweep clean, cosyvoice3/f5-tts session-config
 bugs fixed). Generation-health header + unit tests DONE. Three extensions + one generalisation remain.
 
-TODO (open):
-1. **Per-step talker logits in the diff.** Dump talker logits at each generation step in
-   both the Python reference and C++ runtime and compare — validates the text-decoder input
-   so the sampler is a faithful port over verified logits (today only FM/codec stages diffed).
-2. **Wire generation-health checks into backends' live tests.** Shared header
+TODO (partial — status verified 2026-07-17):
+1. **Per-step talker logits in the diff — DONE for the qwen3_tts exemplar.**
+   `tools/reference_backends/qwen3_tts.py` captures `talker_logits` + `cp_step{0..14}_logits`;
+   `_iter_capture.py` documents per-step talker_logits. Generalise to other TTS backends if/when
+   a second consumer needs it.
+2. **Wire generation-health checks into backends' live tests — still OPEN.** Shared header
    `src/core/generation_health.h` (check_not_empty / duration_plausibility / no_ngram_loop /
    not_truncated / tts_duration / trailing_silence) + `tests/test-generation-health.cpp` are
    done; still need per-backend live-test integration (needs models).
-3. **Replay-token dual-mode reference.** Dump the Python *sampled* token ids and replay them
-   in C++ (instead of re-sampling) so sampling-enabled downstream stages diff deterministically
-   despite torch-vs-`mt19937` RNG mismatch — gives the sampling path a ground-truth diff.
+3. **Replay-token dual-mode reference — PARTIAL.** Noise-replay infra exists
+   (`_iter_capture.py` writes `noise.bin` for C++ to replay); the *sampled-token* dual-mode
+   (replay Python's argmax picks instead of re-sampling) is the remaining piece.
 4. **Generalise the defaults-audit pattern across backends.** Per-backend table of
    (param → upstream default) checked against the params struct, so "knob declared but dead /
    default diverges from upstream" fails CI everywhere.
@@ -250,7 +251,7 @@ degeneration.
 | **HIGH** | [#221 Issue #89 hardening + v0.8.8](#221-issue-89-hardening--v088-release) | Medium | 5 steps: CI regression guard (a), server-path mirror (b), Vulkan sanity (c), q4_k registry/UX (d), release (e). |
 | **DONE / LOW** | [§176 Runtime optimization pass](#176-runtime-optimization-pass--2026-06-20-audit) | Phased | 18/20 done. **2 OPEN (low-value, measure-first):** §176c device-resident KV (Dia measured ~1.2% of decode → DEFERRED; compute-bound decoders make this <2%), §176l Kyutai RVQ (genuinely scalar, but no local model to validate). Do not treat as HIGH. |
 | **MEDIUM** | [#52 Qwen3-TTS](#52-qwen3-tts) — perf pass | Medium | talker + code_predictor + codec + ECAPA + codec_encoder done; step-4 perf pass open (~137 ms/frame → real-time). **O15 broken on CUDA and default-OFF** (`61c42bfb`) — main perf lever disabled; root cause is `ggml_set_rows` KV scatter or fixed-Lk causal mask on CUDA (crash on first code_pred call). Baseline O15=OFF: 27.4 ms/frame, WAV OK. |
-| **HIGH** | [#57 Commercial-friendly TTS expansion](#57-commercial-friendly-tts-backend-expansion) | Phased | Phases 1–3 + Turbo + native voice cloning shipped; #83 S3Gen production fix landed. **Remaining:** Kartoffelbox_Turbo DE. → see HISTORY §82, upstream-prs/09–11. |
+| **MOSTLY DONE** | [#57 Commercial-friendly TTS expansion](#57-commercial-friendly-tts-backend-expansion) | Phased | Phases 1–3 + Turbo + native voice cloning shipped; #83 S3Gen fix landed. VoxCPM2, kugelaudio, gwen-tts, kartoffelbox-turbo, CosyVoice3 all shipped + registry-wired (verified 2026-07-17). **Remaining:** only the Darwin-TTS-1.7B-Cross / AMAImedia Qwen3-Darwin family unported. → HISTORY §82, upstream-prs/09–11. |
 | **MEDIUM** | [#51c MiMo-V2.5-ASR F16 step decode](#51c-f16-step-decode) | Small | F16 step-decode validation blocked behind ≥32 GB box. Base runtime + Q4_K shipped → HISTORY §56. |
 | **MOSTLY DONE** | [#58 MOSS-Audio-4B-Instruct](#58-moss-audio-4b-instruct) | Large | Runtime + GGUFs shipped, diff cos≥0.999, Kaggle P100 CUDA PASS. **Remaining:** flash-attn encoder, sweep transcript-extraction fix. → see HISTORY. |
 | **MOSTLY DONE** | [§221 TADA encoder `--make-ref`](#221-tada-encoder---make-ref) | Medium | C++ encoder runtime + GGUF converters + diff harness shipped; GGUFs at `cstr/tada-encoder-GGUF`. **WIP:** cos_mean=0.94 parity (F16 precision), C++ BPE tokenizer for end-to-end `--make-ref`. → HISTORY §221. |
@@ -655,10 +656,12 @@ License triage that drives ordering (candidates for later phases):
 | kugelaudio/kugelaudio-0-open (MIT) | | |
 
 TO DO:
-- Resolve license gap before depending on **CosyVoice 3**
-  (`FunAudioLLM/Fun-CosyVoice3-0.5B-2512`) — model card silent; v1/v2 were Apache 2.0, v3
-  not yet confirmed.
-- Phase 2+ ports not yet detailed here — scope from the permissive column above when picking
+- ~~Resolve license gap before depending on CosyVoice 3~~ — MOOT: `src/cosyvoice3_tts.cpp`
+  + registry entry already shipped. Likewise VoxCPM2, kugelaudio, gwen-tts, and
+  kartoffelbox-turbo (German) are all ported + registry-wired (verified 2026-07-17).
+- Remaining unported from the permissive column: **Darwin-TTS-1.7B-Cross** and the
+  **AMAImedia Qwen3-1.7B-TTS-Cross-Darwin** family (no `src/*darwin*`, no registry entry).
+- Phase 2+ ports otherwise not detailed here — scope from the permissive column when picking
   the next family.
 
 Phase 1 — DONE (see HISTORY.md + git log).
@@ -805,11 +808,22 @@ Each = ~3-12 exports + an idiomatic result type per binding:
 ### Follow-up — Rust binding directory location (low priority)
 Optionally relocate `crispasr/` + `crispasr-sys/` (repo root) under `bindings/rust/` to match C-family bindings. **Do NOT rename the crates** (names are correct/idiomatic). Move both dirs together (relative `path = "../crispasr-sys"` dep, no workspace). Consumer-safe (crates.io resolves by name+version). Before moving, audit: (a) downstream repos using `git`+`path` dep on the subdir (CrispEmbed/CrisperWeaver), (b) internal CI/`scripts/`/`build_go` refs, (c) docs path refs. One deliberate commit. Not worth churn unless the root-dir ambiguity bothers.
 
-## 60o. MTLBinaryArchive Metal pipeline cache — OPEN
+## 60o. MTLBinaryArchive Metal pipeline cache — DONE
 
-Parent #60 shipped 60a–g (→ HISTORY §63/§64/§71/§75); 60h–n parked. 60o is the only open item.
+Parent #60 shipped 60a–g (→ HISTORY §63/§64/§71/§75); 60h–n parked.
 
-**Status:** OPEN. **Tier 1.** **Effort:** M (~half-day source patch in upstream `ggml/src/ggml-metal/`). Source: CrisperWeaver PLAN §5.18 — highest-leverage perf item the Flutter app CI sweep is waiting on.
+**Status:** DONE (verified in code 2026-07-17 — PLAN entry was stale). Implemented
+in `ggml/src/ggml-metal/ggml-metal-device.m`, tagged `// CrispASR patch (PLAN #88 /
+CrisperWeaver §5.18)`: `crispasr_metal_pipeline_cache_url()` (honours
+`GGML_METAL_PIPELINE_CACHE`, default cache dir; `GGML_METAL_PIPELINE_CACHE_DISABLE`
+opt-out) → `crispasr_metal_pipeline_cache_open()` calls
+`[device newBinaryArchiveWithDescriptor:]` with corrupt-archive fallback; new PSOs
+added via `[archive addComputePipelineFunctionsWithDescriptor:]`;
+`crispasr_metal_pipeline_cache_flush()` serialises to disk at device free. This is
+the source of the `crispasr_metal_pipeline_cache_open/_flush` log lines seen on every
+CLI/server run. The whole "TO DO" below matches what shipped.
+
+<details><summary>original TODO (all satisfied — kept for reference)</summary>
 
 **Problem:** ggml-metal JIT-compiles MSL pipelines lazily per unique tensor shape on first use, cached in-memory only. Every fresh process pays 30–60 s of MTLLibrary + MTLComputePipelineState compile before the first `ggml_metal_encode`. Hits every `flutter test`/CLI run (~30–60 s startup tax), every CI sweep (~25 min single-process multi-backend; projected ~5 min warm), and every end-user macOS/iOS app launch.
 
@@ -821,6 +835,8 @@ Parent #60 shipped 60a–g (→ HISTORY §63/§64/§71/§75); 60h–n parked. 60
 - Join the existing `// CrispASR patch` set in ggml-metal (same rebase discipline as the conv_transpose_1d perf patch).
 
 **Risk:** Low — API stable since iOS 14 / macOS 11; worst case archive fails to load and falls back to today's JIT path.
+
+</details>
 
 ## 65-residual. JS / emscripten word-accessor surface — open
 
@@ -1015,9 +1031,10 @@ HISTORY.)
   `--logprob-thold`, `--no-speech-thold`, `--no-fallback`, `--temperature-inc`)
   — already in Dart binding's TranscribeOptions; just add UI rows + l10n in
   CrisperWeaver Advanced Options. ~half a day.
-- Subtitle line formatting (`--max-len`, `--split-on-word`, `--split-on-punct`)
-  — whisper context-params fields; CrisperWeaver formats post-hoc. QoL win for
-  SRT export. ~1 day.
+- Subtitle line formatting: **`--max-len` + `--split-on-punct` already work for all
+  backends** (applied post-hoc via `crispasr_make_disp_segments(all_segs, max_len,
+  split_on_punct)` in `crispasr_run.cpp`, verified 2026-07-17). Still whisper-only:
+  **`--split-on-word`** (referenced only in `cli.cpp`, no `crispasr_run.cpp` hookup).
 - `--carry-initial-prompt` — sticky vs reset initial prompt across segments.
   Edge case, ~1 hour.
 - ~~`--print-confidence`~~ — DONE (feat/print-confidence-nonwhisper). The flag
@@ -1397,12 +1414,22 @@ _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
 **Still open:** mimo-asr beam (blocked on PLAN #115) and lfm2-audio beam (needs KV+conv save/restore) still API stubs
 
-## 155. CONV_TRANSPOSE_1D GPU optimization (issue #155) — IN PROGRESS
+## 155. CONV_TRANSPOSE_1D GPU optimization (issue #155) — DONE (Phase 5 cleanup optional)
 
-**Status:** Core decomposition landed (`5f600f25`, PR #160): new `GGML_OP_COL2IM_1D`
-op with CPU (F32) + CUDA (F32/F16/BF16) kernels; Qwen3-TTS codec 1200 ms → 130 ms.
-Old `ggml_conv_transpose_1d` stays as fallback when `w_perm == NULL`. Phases 1
-(remaining) → 5 open.
+**Status:** DONE (verified in code 2026-07-17 — header was stale at "IN PROGRESS").
+All phases landed:
+- **P1** `convt1d_decomp`/`convt1d_decomp_tf`/`permute_convt1d_weight(_batch)` — `src/core/conv.h:156-278`.
+- **P2a/b/c** `up_w_perm` wired in `core/hifigan.h`, `core/seanet_decoder.h`, `core/dac_decoder.h`.
+- **P3a-e** every standalone runtime uses the decomposed path (kokoro, indextts_voc,
+  chatterbox_s3gen, audioseal, csm_tts, vibevoice, voxcpm2_tts, tada_codec, pocket_tts,
+  kugelaudio) — `a862f2de2`.
+- **P4** Metal kernel present (`ggml-metal.metal kernel_col2im_1d` + f32/f16 instantiations,
+  `ggml-metal-ops.cpp` dispatch, `ggml-metal-device.m` supports_op) — plus Vulkan
+  (`col2im_1d.comp`) and CUDA (`col2im-1d.cu`). Codec GPU default flipped on Metal (`1d00e20f6`).
+- **P5** (remove the Kokoro Metal CPU-pin at `kokoro.cpp:~2380`) — the ONLY residual, and it's a
+  deliberate cleanup kept gated behind `gen_force_metal`, not part of the feature.
+
+Original core decomposition landed `5f600f25` / PR #160 (Qwen3-TTS codec 1200 ms → 130 ms).
 
 **Decomposition:** pre-permute `w[K,OC,IC]→w_perm[IC,K*OC]` at load; `col =
 mul_mat(w_perm,x)`; `y = col2im_1d(col, stride, OC, p0)`; crop + transpose.
