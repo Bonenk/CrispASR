@@ -388,10 +388,12 @@ namespace CrispASR
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern float crispasr_titanet_cosine_sim(float[] a, float[] b, int dim);
 
-        // ---- Speaker database ----
+        // ---- Speaker database (closed-roster, consent-gated — issue #266) ----
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern IntPtr crispasr_speaker_db_load(
-            [MarshalAs(UnmanagedType.LPUTF8Str)] string dirPath);
+        internal static extern IntPtr crispasr_speaker_db_open(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string dirPath,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string expectedNamesCsv,
+            int consentAttested);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void crispasr_speaker_db_free(IntPtr db);
@@ -405,10 +407,10 @@ namespace CrispASR
             byte[] outName, int outCap);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
-        internal static extern int crispasr_speaker_db_enroll(
+        internal static extern int crispasr_speaker_db_enroll2(
             [MarshalAs(UnmanagedType.LPUTF8Str)] string dirPath,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
-            float[] embedding, int dim);
+            float[] embedding, int dim, int consentAttested);
 
         // ---- Text translation ----
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

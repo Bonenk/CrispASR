@@ -243,13 +243,17 @@ public final class CrispasrSession implements AutoCloseable {
         int     crispasr_titanet_embed(Pointer ctx, float[] pcm16k, int nSamples, float[] out);
         float   crispasr_titanet_cosine_sim(float[] a, float[] b, int dim);
 
-        // Speaker database
-        Pointer crispasr_speaker_db_load(String dirPath);
+        // Speaker database (closed-roster, consent-gated — issue #266).
+        // expectedNamesCsv names the enrolled participants asserted present
+        // (e.g. "Alice,Bob"); consentAttested affirms GDPR Art. 9 consent.
+        // Open 1:N identification is unsupported.
+        Pointer crispasr_speaker_db_open(String dirPath, String expectedNamesCsv, int consentAttested);
         void    crispasr_speaker_db_free(Pointer db);
         int     crispasr_speaker_db_count(Pointer db);
         float   crispasr_speaker_db_match(Pointer db, float[] embedding, int dim,
                                           float threshold, byte[] outName, int outCap);
-        int     crispasr_speaker_db_enroll(String dirPath, String name, float[] embedding, int dim);
+        int     crispasr_speaker_db_enroll2(String dirPath, String name, float[] embedding, int dim,
+                                            int consentAttested);
 
         // Pluggable speaker embedder + clustering + pyannote cache
         Pointer crispasr_speaker_embedder_make_abi(String modelSpec, int nThreads, String cacheDir);

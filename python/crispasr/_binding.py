@@ -2669,12 +2669,21 @@ class TitaNet:
 
 
 class SpeakerDB:
-    """File-based speaker profile database for speaker identification."""
+    """Closed-roster speaker profile database (issue #266).
 
-    def __init__(self, dir_path: str, lib_path: str = None):
+    Named identification is a claimed-participant confirmation, never an
+    open 1:N search: ``expected_names`` (comma-separated, e.g.
+    ``"Alice,Bob"``) is the roster of enrolled participants you assert are
+    present in the audio, and the db is narrowed to exactly those
+    profiles. ``consent`` affirms a lawful basis + explicit consent from
+    every enrolled person (GDPR Art. 9); opening and enrolling refuse
+    without it.
+    """
+
+    def __init__(self, dir_path: str, expected_names: str = "", consent: bool = False, lib_path: str = None):
         self._lib = ctypes.CDLL(lib_path or _find_lib())
-        self._lib.crispasr_speaker_db_load.argtypes = [ctypes.c_char_p]
-        self._lib.crispasr_speaker_db_load.restype = ctypes.c_void_p
+        self._lib.crispasr_speaker_db_open.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int32]
+        self._lib.crispasr_speaker_db_open.restype = ctypes.c_void_p
         self._lib.crispasr_speaker_db_free.argtypes = [ctypes.c_void_p]
         self._lib.crispasr_speaker_db_free.restype = None
         self._lib.crispasr_speaker_db_count.argtypes = [ctypes.c_void_p]
@@ -2684,11 +2693,20 @@ class SpeakerDB:
             ctypes.c_float, ctypes.c_char_p, ctypes.c_int32,
         ]
         self._lib.crispasr_speaker_db_match.restype = ctypes.c_float
-        self._lib.crispasr_speaker_db_enroll.argtypes = [
-            ctypes.c_char_p, ctypes.c_char_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int32,
+        self._lib.crispasr_speaker_db_enroll2.argtypes = [
+            ctypes.c_char_p, ctypes.c_char_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int32, ctypes.c_int32,
         ]
-        self._lib.crispasr_speaker_db_enroll.restype = ctypes.c_int32
-        self._db = self._lib.crispasr_speaker_db_load(dir_path.encode())
+        self._lib.crispasr_speaker_db_enroll2.restype = ctypes.c_int32
+        self._consent = bool(consent)
+        if not self._consent:
+            raise ValueError(
+                "SpeakerDB requires consent=True: matching named voiceprints is biometric "
+                "identification (GDPR Art. 9); affirm a lawful basis + explicit consent "
+                "from every enrolled person"
+            )
+        self._db = None
+        if expected_names:
+            self._db = self._lib.crispasr_speaker_db_open(dir_path.encode(), expected_names.encode(), 1)
         self._dir = dir_path
 
     @property
@@ -2708,12 +2726,16 @@ class SpeakerDB:
         return name, float(score)
 
     def enroll(self, name, embedding):
-        """Enroll a speaker with the given name and embedding."""
+        """Enroll a speaker with the given name and embedding.
+
+        The consent attestation given at construction is recorded in the
+        v2 .spkr profile (audit trail).
+        """
         import numpy as np
         emb = np.ascontiguousarray(embedding, dtype=np.float32)
-        rc = self._lib.crispasr_speaker_db_enroll(
+        rc = self._lib.crispasr_speaker_db_enroll2(
             self._dir.encode(), name.encode(),
-            emb.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), len(emb),
+            emb.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), len(emb), 1,
         )
         return rc == 0
 

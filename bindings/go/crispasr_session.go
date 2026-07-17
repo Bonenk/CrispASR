@@ -287,14 +287,15 @@ void  crispasr_titanet_free(void* ctx);
 int   crispasr_titanet_embed(void* ctx, const float* pcm_16k, int n_samples, float* out);
 float crispasr_titanet_cosine_sim(const float* a, const float* b, int dim);
 
-// --- Speaker database ---
-void* crispasr_speaker_db_load(const char* dir_path);
+// --- Speaker database (closed-roster, consent-gated — issue #266) ---
+void* crispasr_speaker_db_open(const char* dir_path, const char* expected_names_csv,
+                               int consent_attested);
 void  crispasr_speaker_db_free(void* db);
 int   crispasr_speaker_db_count(const void* db);
 float crispasr_speaker_db_match(const void* db, const float* embedding, int dim,
                                 float threshold, char* out_name, int out_cap);
-int   crispasr_speaker_db_enroll(const char* dir_path, const char* name,
-                                 const float* embedding, int dim);
+int   crispasr_speaker_db_enroll2(const char* dir_path, const char* name,
+                                  const float* embedding, int dim, int consent_attested);
 
 // --- Kokoro lang helpers ---
 int  crispasr_kokoro_lang_is_german_abi(const char* lang);
@@ -2120,13 +2121,24 @@ type SpeakerDB struct {
 	dirPath string
 }
 
-// SpeakerDBLoad opens a speaker database directory.
-func SpeakerDBLoad(dirPath string) (*SpeakerDB, error) {
+// SpeakerDBOpen opens a speaker database directory for closed-roster
+// matching (issue #266). expectedNames is the comma-separated list of
+// enrolled participants you assert are present in the audio (e.g.
+// "Alice,Bob") — the db is narrowed to exactly those profiles; open 1:N
+// identification is deliberately unsupported. consentAttested affirms a
+// lawful basis + explicit consent from every enrolled person (GDPR
+// Art. 9); the call fails without it.
+func SpeakerDBOpen(dirPath, expectedNames string, consentAttested bool) (*SpeakerDB, error) {
+	if !consentAttested {
+		return nil, fmt.Errorf("speaker db requires an explicit consent attestation (GDPR Art. 9)")
+	}
 	cd := C.CString(dirPath)
 	defer C.free(unsafe.Pointer(cd))
-	h := C.crispasr_speaker_db_load(cd)
+	cn := C.CString(expectedNames)
+	defer C.free(unsafe.Pointer(cn))
+	h := C.crispasr_speaker_db_open(cd, cn, 1)
 	if h == nil {
-		return nil, fmt.Errorf("crispasr_speaker_db_load failed for %s", dirPath)
+		return nil, fmt.Errorf("crispasr_speaker_db_open failed for %s", dirPath)
 	}
 	return &SpeakerDB{handle: h, dirPath: dirPath}, nil
 }
@@ -2149,14 +2161,19 @@ func (db *SpeakerDB) Match(embedding []float32, threshold float32) (string, floa
 	return n, float32(score)
 }
 
-// Enroll adds a speaker to the database.
-func (db *SpeakerDB) Enroll(name string, embedding []float32) error {
+// Enroll adds a speaker to the database. consentAttested affirms the
+// enrolled person's explicit consent (GDPR Art. 9); it is recorded in
+// the profile and enrollment refuses without it.
+func (db *SpeakerDB) Enroll(name string, embedding []float32, consentAttested bool) error {
+	if !consentAttested {
+		return fmt.Errorf("enrollment requires an explicit consent attestation (GDPR Art. 9)")
+	}
 	cd := C.CString(db.dirPath)
 	defer C.free(unsafe.Pointer(cd))
 	cn := C.CString(name)
 	defer C.free(unsafe.Pointer(cn))
-	rc := C.crispasr_speaker_db_enroll(cd, cn,
-		(*C.float)(unsafe.Pointer(&embedding[0])), C.int(len(embedding)))
+	rc := C.crispasr_speaker_db_enroll2(cd, cn,
+		(*C.float)(unsafe.Pointer(&embedding[0])), C.int(len(embedding)), 1)
 	if rc != 0 {
 		return fmt.Errorf("speaker_db_enroll failed (rc=%d)", int(rc))
 	}

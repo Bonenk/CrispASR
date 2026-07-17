@@ -2,14 +2,28 @@
 
 ## NOW — active work
 
-- **Done**: worktree + branch `fix/266-speaker-db-cluster-id`; full code trace of
-  the diarization / clustering / speaker-db interaction; EU AI Act compliance
-  analysis (below). Issue #266's report is **confirmed accurate** on both claims.
-- **In flight**: design sign-off — the compliance stance (claimed-participant
-  verification only, no open 1:N DB scan) is recommended but awaits maintainer
-  confirmation before implementation starts.
-- **Next**: implement the shared pipeline (structured speaker labels + cluster-level
-  identification stage), consent gate at the C-ABI, tests, docs.
+- **DECIDED (maintainer, 2026-07-17): no open 1:N escape hatch survives** —
+  identification is closed-roster (`--expect-speakers`) only, at every surface.
+- **Done**: full implementation on `fix/266-speaker-db-cluster-id` —
+  - shared pipeline: slice-level match deleted; identification runs post-merge
+    per global cluster via `crispasr_apply_global_speaker_stages()`
+    (sequential + parallel output paths); centroid matching reuses the
+    clustering embeddings; unmatched clusters stay `(speaker N)`; matched
+    names can no longer be overwritten (ordering fix — no structured-label
+    refactor needed, the two writers became one sequential stage);
+  - gates: `--expect-speakers` mandatory (exit 27 without), consent
+    warn-and-ignore preserved, streaming refusal (exit 26), `--speaker-db`
+    with `--diarize` implies `--diarize-embedder auto`;
+  - `.spkr` v2 (consent attestation + timestamp; v1 loads with notice);
+    `speaker_db_retain()` roster narrowing; enroll requires consent param;
+  - C-ABI: `crispasr_speaker_db_open(dir, roster_csv, consent)` +
+    `enroll2(..., consent)`; legacy `_load`/`_enroll` refuse at runtime;
+    all 7 binding wrappers + parity list updated;
+  - tests: 981/981 unit green (new: consent refusal, retain, v1 legacy,
+    centroids, params default); CLI gates smoke-tested (exit 26/27, warn path);
+  - docs: diarization-speakers.md §2 rewritten, cli.md blockquote updated.
+- **Next**: live E2E validation on a real 2-speaker fixture with models
+  (named + unmatched cluster in one transcript), then merge to main.
 
 ## Confirmed findings (trace, 2026-07-17)
 
@@ -112,13 +126,16 @@ Concrete changes:
 7. **Precedence rule**: db-named > anonymous cluster > slice-local diarize
    label; deterministic cluster numbering for unmatched clusters.
 
-## Open decisions (maintainer)
+## Decisions (resolved 2026-07-17)
 
-- Flag name/UX for the claimed list; whether an escape hatch for full-DB scan
-  should exist at all (recommendation: **no**).
-- Whether `.spkr` v1 files (no consent record) keep working (recommendation:
-  load with a warning, refuse enrollment in v1 format going forward).
-- C-ABI shape: consent param vs session-level option.
+- Claimed-list flag: `--expect-speakers "NameA,NameB"`. **No full-DB-scan
+  escape hatch exists** (maintainer decision — none survives, at any surface).
+- `.spkr` v1 files load with a stderr notice; all new enrollment writes v2
+  (consent attestation + timestamp).
+- C-ABI shape: gate at handle acquisition — `crispasr_speaker_db_open(dir,
+  expected_names_csv, consent_attested)` + `crispasr_speaker_db_enroll2(...,
+  consent_attested)`; the pre-#266 ungated symbols remain linkable but refuse
+  at runtime with a pointer to the new entry points.
 
 ## Test plan (sketch)
 

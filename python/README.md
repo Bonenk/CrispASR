@@ -61,7 +61,7 @@ for seg in s.transcribe_pcm(pcm_f32, sample_rate=16000):
 - `SpeakerEmbedder(spec)` — pluggable embedder ("auto"/"titanet", "indextts"/"ecapa", or a `.gguf` path)
 - `PyannoteCache(pcm, model)` — pre-computed pyannote-seg posteriors for cross-slice consistency
 - `agglomerative_cluster(embeddings, ...)` — single-linkage cosine clustering for globally stable speaker IDs
-- `TitaNet` / `SpeakerDB` — standalone speaker verification + profile matching
+- `TitaNet` / `SpeakerDB` — standalone speaker verification + closed-roster profile matching (consent-gated; requires `expected_names` + `consent=True`, see docs/diarization-speakers.md)
 - `detect_language_pcm(...)` — language ID
 - `registry_lookup(...)` — auto-download known models from the model hub
 

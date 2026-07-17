@@ -9754,8 +9754,40 @@ CA_EXPORT float crispasr_titanet_cosine_sim(const float* a, const float* b, int3
     return titanet_cosine_sim(a, b, dim);
 }
 
+// Open a speaker profile db for CLOSED-ROSTER matching (issue #266).
+// `expected_names_csv` is the comma-separated list of enrolled participants
+// the caller asserts are present in the audio being processed — the loaded
+// db is narrowed to exactly those profiles. `consent_attested` affirms a
+// lawful basis + explicit consent from every enrolled person (GDPR Art. 9).
+// Returns NULL unless both are provided: there is deliberately no
+// open-ended "identify anyone in the db" mode (EU AI Act, Annex III 1(a)).
+CA_EXPORT void* crispasr_speaker_db_open(const char* dir_path, const char* expected_names_csv,
+                                         int32_t consent_attested) {
+    if (!consent_attested) {
+        fprintf(stderr, "crispasr: speaker_db_open refused: matching named voiceprints is biometric\n"
+                        "  identification (GDPR Art. 9); pass consent_attested=1 only with a lawful basis\n"
+                        "  and explicit consent from every enrolled person\n");
+        return nullptr;
+    }
+    if (!expected_names_csv || !*expected_names_csv) {
+        fprintf(stderr, "crispasr: speaker_db_open refused: a closed roster of claimed participants is\n"
+                        "  required (expected_names_csv, e.g. \"Alice,Bob\"); open 1:N identification is\n"
+                        "  deliberately unsupported\n");
+        return nullptr;
+    }
+    speaker_db* db = speaker_db_load(dir_path);
+    if (db)
+        speaker_db_retain(db, expected_names_csv);
+    return (void*)db;
+}
+
+// Legacy open-1:N entry point — removed (issue #266). Kept as a symbol so
+// old callers fail loudly at runtime instead of at link time.
 CA_EXPORT void* crispasr_speaker_db_load(const char* dir_path) {
-    return (void*)speaker_db_load(dir_path);
+    (void)dir_path;
+    fprintf(stderr, "crispasr: crispasr_speaker_db_load was removed (#266): open 1:N identification is\n"
+                    "  unsupported. Use crispasr_speaker_db_open(dir, expected_names_csv, consent_attested)\n");
+    return nullptr;
 }
 
 CA_EXPORT void crispasr_speaker_db_free(void* db) {
@@ -9783,9 +9815,26 @@ CA_EXPORT float crispasr_speaker_db_match(const void* db, const float* embedding
     return name ? score : -1.0f;
 }
 
+// Enroll with an explicit consent attestation (issue #266). Refuses (rc=2)
+// unless `consent_attested` is non-zero; the attestation + timestamp are
+// recorded in the v2 .spkr profile as an audit trail.
+CA_EXPORT int32_t crispasr_speaker_db_enroll2(const char* dir_path, const char* name, const float* embedding,
+                                              int32_t dim, int32_t consent_attested) {
+    if (!consent_attested)
+        return 2;
+    return speaker_db_enroll(dir_path, name, embedding, dim, /*consent_attested=*/true) ? 0 : 1;
+}
+
+// Legacy ungated enrollment — removed (issue #266); fails loudly at runtime.
 CA_EXPORT int32_t crispasr_speaker_db_enroll(const char* dir_path, const char* name, const float* embedding,
                                              int32_t dim) {
-    return speaker_db_enroll(dir_path, name, embedding, dim) ? 0 : 1;
+    (void)dir_path;
+    (void)name;
+    (void)embedding;
+    (void)dim;
+    fprintf(stderr, "crispasr: crispasr_speaker_db_enroll was removed (#266): enrollment requires a consent\n"
+                    "  attestation. Use crispasr_speaker_db_enroll2(dir, name, emb, dim, consent_attested)\n");
+    return 2;
 }
 
 #endif // CA_HAVE_TITANET

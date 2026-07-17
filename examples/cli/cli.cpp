@@ -484,6 +484,12 @@ static bool whisper_params_parse_arg_backend_vad(int argc, char** argv, int& i, 
         params.titanet_model = ARGV_NEXT;
     } else if (arg == "--speaker-threshold" || arg == "-st") {
         params.speaker_threshold = std::stof(ARGV_NEXT);
+    } else if (arg == "--expect-speakers") {
+        // Closed roster (issue #266): the deployer asserts these enrolled,
+        // consenting participants are present in the recording; matching
+        // runs per global speaker cluster and ONLY against these names.
+        // Required for --speaker-db matching — there is no open 1:N mode.
+        params.expect_speakers = ARGV_NEXT;
     } else if (arg == "--diarize-embedder") {
         params.diarize_embedder = ARGV_NEXT;
     } else if (arg == "--diarize-speakers") {
@@ -1044,6 +1050,29 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
                     "Transient only: identifies no one, no voiceprint database, no names stored. See "
                     "docs/diarization-speakers.md\n");
     fprintf(stderr,
+            "  --speaker-db DIR                  [%-7s] directory of enrolled voiceprint profiles (<name>.spkr). "
+            "Identification runs per global speaker cluster and ONLY against the closed roster named via "
+            "--expect-speakers; requires --speaker-db-consent. See docs/diarization-speakers.md\n",
+            params.speaker_db.c_str());
+    fprintf(stderr,
+            "  --expect-speakers NAMES           [%-7s] comma-separated enrolled participants you assert are "
+            "present in this recording (e.g. \"Alice,Bob\"). REQUIRED with --speaker-db: matching is a "
+            "claimed-participant confirmation, never an open who-is-this search. Unmatched clusters keep "
+            "anonymous (speaker N) labels\n",
+            params.expect_speakers.c_str());
+    fprintf(stderr,
+            "  --enroll-speaker NAME             [%-7s] enroll the input audio as NAME into --speaker-db "
+            "and exit. Requires --speaker-db-consent (records the consent attestation in the profile)\n",
+            params.enroll_speaker.c_str());
+    fprintf(stderr,
+            "  --speaker-threshold X, -st X      [%-7.2f] cosine threshold for cluster-to-profile matching "
+            "(below it a cluster stays anonymous)\n",
+            params.speaker_threshold);
+    fprintf(stderr,
+            "  --titanet-model PATH              [%-7s] TitaNet GGUF for enrollment/identification "
+            "embeddings (default: auto-download)\n",
+            params.titanet_model.c_str());
+    fprintf(stderr,
             "  --speaker-db-consent              [%-7s] REQUIRED to use the biometric named-profile path "
             "(--enroll-speaker / --speaker-db). Affirms you have a lawful basis (GDPR Art. 9) and explicit "
             "consent from every enrolled person. Not needed for --diarize-speakers / --diarize-embedder.\n",
@@ -1168,14 +1197,16 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(stderr, "             --s2s                   [%-7s] speech-to-speech mode: audio input → audio output\n",
             params.s2s ? "true" : "false");
     fprintf(stderr,
-            "             --s2s-output FNAME      [%-7s] output path: .wav, .mp3, .m4a, .mp4, .aac, .opus (default: s2s_output.wav)\n",
+            "             --s2s-output FNAME      [%-7s] output path: .wav, .mp3, .m4a, .mp4, .aac, .opus (default: "
+            "s2s_output.wav)\n",
             params.s2s_output.c_str());
 
     fprintf(stderr, "\nText-to-speech (TTS) options:\n");
     fprintf(stderr,
             "             --tts \"TEXT\"            synthesise TEXT and write audio to --tts-output (24 kHz mono)\n");
     fprintf(stderr,
-            "             --tts-output FNAME      [%-7s] output path: .wav, .mp3, .m4a, .mp4, .aac, .opus (default: tts_output.wav)\n",
+            "             --tts-output FNAME      [%-7s] output path: .wav, .mp3, .m4a, .mp4, .aac, .opus (default: "
+            "tts_output.wav)\n",
             params.tts_output.c_str());
     fprintf(stderr, "             --tts-stream            stream s16le mono PCM to stdout per sentence (pipe to a "
                     "player); logs stay on stderr\n");

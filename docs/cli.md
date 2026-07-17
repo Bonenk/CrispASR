@@ -852,12 +852,16 @@ crispasr -m auto --backend cohere -f meeting.wav --diarize-speakers -ojf
 
 > **Named profiles are a separate, deliberately opt-in feature.** The
 > `--enroll-speaker` / `--speaker-db` flags build a *persistent* database
-> of voiceprints linked to real names and perform one-to-many
-> identification — that is biometric special-category data under GDPR
-> Art. 9 and carries consent/transparency obligations. They are
-> off-by-default and refuse to run without `--speaker-db-consent`. The
-> session-scoped clustering above does **not** persist anything and needs
-> no consent flag. See
+> of voiceprints linked to real names — biometric special-category data
+> under GDPR Art. 9, with consent/transparency obligations. Matching is a
+> **closed-roster confirmation** applied per global speaker cluster: it
+> requires `--speaker-db-consent` AND `--expect-speakers "NameA,NameB"`
+> (the enrolled participants you assert are present), only runs on
+> recorded files (never streaming), and unmatched clusters keep their
+> anonymous `(speaker N)` labels. An open "identify anyone in the
+> database" 1:N scan is deliberately unsupported (EU AI Act, Annex III
+> 1(a)). The session-scoped clustering above does **not** persist
+> anything and needs no consent flag. See
 > [diarization-speakers.md](diarization-speakers.md) for the full
 > comparison and the legal/privacy posture.
 
