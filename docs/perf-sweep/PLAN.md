@@ -508,8 +508,17 @@ arm so CUDA-graph capture engages. Survey of the fleet for the same shape
    the right design is a persistent embed MICRO-graph (built once, dedicated
    gallocr) whose output tensor is device-resident and referenced by the step
    graph, no host round-trip. Models are local (0.5b f16/q8, 7b q4_k) so the
-   byte-A/B is runnable on this box. [FABLE — step-graph rewiring in a
-   backend with AR + diffusion + negative-KV interplay.]
+   byte-A/B is runnable on this box. ✅ **LANDED (`736b70762`, 2026-07-17)**
+   as a persistent 1-token embed micro-graph (own gallocr pinned to the
+   weight's backend, sched-independent — pred_sched isolation rationale;
+   quantized-GET_ROWS capture rule respected by NOT fusing into the step
+   graph). A/B: ASR 7b decode transcripts identical across ~200+ per-token
+   lookups (engagement print verified); realtime-TTS wav data byte-identical.
+   Gate VIBEVOICE_PERSIST_EMBED (default ON). ⚠ Side-finding: the LOCAL
+   vibevoice-7b-q4_k.gguf transcribes jfk.wav as garbage on BOTH arms
+   (pre-existing) and vibevoice-realtime-0.5b-tts-f16.gguf is TRUNCATED
+   (mmap bounds check fails) — likely one bad download batch; re-download
+   and re-verify both [SONNET].
 3. ✅ **tada FM — AUDITED 2026-07-17, already persistent, no action.**
    `fm_batch_gf` is built once in a dedicated meta arena (`fm_batch_meta`,
    rebuilt only when B changes); per step is alloc+set+compute. Remaining
