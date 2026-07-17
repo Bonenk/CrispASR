@@ -23,6 +23,8 @@
 #endif
 
 #include <algorithm>
+#include <cctype>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -471,4 +473,117 @@ int64_t crispasr_vad_remap_timestamp(const std::vector<crispasr_vad_mapping>& ma
         return a.original_cs;
     const double frac = (double)(stitched_cs - a.stitched_cs) / (double)(b.stitched_cs - a.stitched_cs);
     return a.original_cs + (int64_t)(frac * (double)(b.original_cs - a.original_cs));
+}
+
+// ---- VAD segment boundary export / import (issue #227) ----
+
+std::string crispasr_serialize_vad_slices(const std::vector<crispasr_audio_slice>& slices, int sample_rate) {
+    std::string out;
+    out.reserve(64 + slices.size() * 96);
+    out += "{\n  \"crispasr_vad\": {\n";
+    out += "    \"version\": 1,\n";
+    out += "    \"sample_rate\": " + std::to_string(sample_rate) + ",\n";
+    out += "    \"num_slices\": " + std::to_string(slices.size()) + ",\n";
+    out += "    \"slices\": [";
+    for (size_t i = 0; i < slices.size(); ++i) {
+        const auto& s = slices[i];
+        out += (i == 0) ? "\n" : ",\n";
+        out += "      { \"start\": " + std::to_string(s.start) + ", \"end\": " + std::to_string(s.end) +
+               ", \"t0_cs\": " + std::to_string((long long)s.t0_cs) +
+               ", \"t1_cs\": " + std::to_string((long long)s.t1_cs) + " }";
+    }
+    out += slices.empty() ? "]\n" : "\n    ]\n";
+    out += "  }\n}\n";
+    return out;
+}
+
+namespace {
+
+// Find the value of an integer field `"<key>"` starting at or after `from`
+// within [begin, end) of `text`. Returns true and sets `value` + `next`
+// (index just past the parsed number) on success. Tolerant of whitespace
+// between the key, the colon, and the number.
+bool ca_vad_find_int(const std::string& text, size_t from, size_t end, const char* key, int64_t& value, size_t& next) {
+    const std::string needle = std::string("\"") + key + "\"";
+    size_t k = text.find(needle, from);
+    if (k == std::string::npos || k >= end)
+        return false;
+    size_t p = k + needle.size();
+    while (p < end && (text[p] == ' ' || text[p] == '\t' || text[p] == '\n' || text[p] == '\r'))
+        p++;
+    if (p >= end || text[p] != ':')
+        return false;
+    p++;
+    while (p < end && (text[p] == ' ' || text[p] == '\t' || text[p] == '\n' || text[p] == '\r'))
+        p++;
+    if (p >= end)
+        return false;
+    size_t num_start = p;
+    if (text[p] == '+' || text[p] == '-')
+        p++;
+    size_t digits = 0;
+    while (p < end && text[p] >= '0' && text[p] <= '9') {
+        p++;
+        digits++;
+    }
+    if (digits == 0)
+        return false;
+    value = (int64_t)std::strtoll(text.c_str() + num_start, nullptr, 10);
+    next = p;
+    return true;
+}
+
+} // namespace
+
+bool crispasr_parse_vad_slices(const std::string& text, std::vector<crispasr_audio_slice>& out, int* sample_rate_out) {
+    out.clear();
+    if (sample_rate_out)
+        *sample_rate_out = 0;
+
+    // Optional top-level sample_rate (before the slices array).
+    size_t arr = text.find("\"slices\"");
+    if (arr == std::string::npos)
+        return false;
+    if (sample_rate_out) {
+        int64_t sr = 0;
+        size_t tmp = 0;
+        if (ca_vad_find_int(text, 0, arr, "sample_rate", sr, tmp))
+            *sample_rate_out = (int)sr;
+    }
+
+    size_t lb = text.find('[', arr);
+    if (lb == std::string::npos)
+        return false;
+    size_t rb = text.find(']', lb);
+    if (rb == std::string::npos)
+        return false;
+
+    // Walk each { ... } object inside the array.
+    size_t p = lb + 1;
+    while (p < rb) {
+        size_t obj_lb = text.find('{', p);
+        if (obj_lb == std::string::npos || obj_lb >= rb)
+            break;
+        size_t obj_rb = text.find('}', obj_lb);
+        if (obj_rb == std::string::npos || obj_rb > rb)
+            return false;
+
+        int64_t start = 0, endv = 0, t0 = 0, t1 = 0;
+        size_t nx = 0;
+        if (!ca_vad_find_int(text, obj_lb, obj_rb, "start", start, nx) ||
+            !ca_vad_find_int(text, obj_lb, obj_rb, "end", endv, nx) ||
+            !ca_vad_find_int(text, obj_lb, obj_rb, "t0_cs", t0, nx) ||
+            !ca_vad_find_int(text, obj_lb, obj_rb, "t1_cs", t1, nx)) {
+            out.clear();
+            return false;
+        }
+        crispasr_audio_slice s;
+        s.start = (int)start;
+        s.end = (int)endv;
+        s.t0_cs = t0;
+        s.t1_cs = t1;
+        out.push_back(s);
+        p = obj_rb + 1;
+    }
+    return true;
 }

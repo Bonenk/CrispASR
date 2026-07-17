@@ -103,6 +103,11 @@ struct whisper_params {
     int vad_speech_pad_ms = 30;
     float vad_samples_overlap = 0.1f;
     bool vad_stitch = false;
+    // Issue #227: reuse VAD segment boundaries across ASR runs. --vad-export
+    // writes the computed slices to a JSON file; --vad-import reads slices from
+    // one instead of running VAD (skips the VAD model entirely).
+    std::string vad_export_file = "";
+    std::string vad_import_file = "";
 
     std::string backend;
     std::string source_lang;
