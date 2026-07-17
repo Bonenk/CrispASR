@@ -877,6 +877,18 @@ catch_discover_tests(test-chatterbox-params
     PROPERTIES LABELS "unit;chatterbox"
 )
 
+# ─── chatterbox-s3gen-cfg-interval-ab — manual A/B harness (needs local GGUFs) ──
+# Drives the s3gen CFM decoder from fixed synthetic tokens (skips slow T3 AR) so
+# CRISPASR_S3GEN_CFG_INTERVAL can be A/B'd fast + deterministically on M1. Not a
+# ctest (requires chatterbox-t3 + chatterbox-s3gen GGUFs). See PLAN.md TODO-2.
+add_executable(chatterbox-s3gen-cfg-interval-ab chatterbox-s3gen-cfg-interval-ab.cpp)
+target_include_directories(chatterbox-s3gen-cfg-interval-ab PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(chatterbox-s3gen-cfg-interval-ab PRIVATE
+    chatterbox
+)
+
 # ─── test-firered-params — Catch2 unit tests for firered_asr_context_params defaults
 # and null-guard coverage. No GGUF required. ───────────────────────────────────
 add_executable(test-firered-params
