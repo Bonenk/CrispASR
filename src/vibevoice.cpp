@@ -164,6 +164,23 @@ struct vibevoice_context {
     // ASan heap-use-after-free). A private sched only ever sees this one
     // fixed-topology graph, so its gallocr never reallocates under it.
     ggml_backend_sched_t pred_sched = nullptr;
+
+    // Persistent 1-token embedding micro-graph (perf-sweep TODO-5): the AR
+    // loops call run_token_embedding_lookup once PER TOKEN; a fresh graph +
+    // sched_reset + sched_alloc per call is pure lifecycle overhead for a
+    // single get_rows. Own gallocr pinned to the backend where tok_emb
+    // actually lives (same placement the sched would pick), fully independent
+    // of the shared sched — same isolation rationale as pred_sched above.
+    struct {
+        std::vector<uint8_t> meta;
+        ggml_context* ctx0 = nullptr;
+        ggml_cgraph* gf = nullptr;
+        ggml_tensor* ids = nullptr;
+        ggml_tensor* out = nullptr;
+        ggml_gallocr_t ga = nullptr;
+        ggml_backend_t be = nullptr;
+        bool disabled = false; // init failed once — stay on the legacy path
+    } embed1;
     // §201 Lk-bucketed TTS LM step graphs (positive + negative KV paths)
     struct LmBucket {
         int lk = 0;
@@ -412,6 +429,10 @@ extern "C" void vibevoice_set_cfg_scale(struct vibevoice_context* ctx, float sca
 extern "C" void vibevoice_free(struct vibevoice_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->embed1.ga)
+        ggml_gallocr_free(ctx->embed1.ga);
+    if (ctx->embed1.ctx0)
+        ggml_free(ctx->embed1.ctx0);
     if (ctx->pred_graph_ctx)
         ggml_free(ctx->pred_graph_ctx);
     for (auto& bk : ctx->lm_buckets_pos)
@@ -906,6 +927,59 @@ static std::vector<float> run_token_embedding_lookup(vibevoice_context* ctx, con
     auto it = m.tensors.find("lm.tok_emb.weight");
     if (it == m.tensors.end() || !it->second)
         return {};
+
+    // Persistent 1-token fast path (perf-sweep TODO-5). Byte-identical: the
+    // same ggml_get_rows on the same weight, computed on the backend the
+    // weight lives on (which is where the sched placed it in the legacy
+    // path). VIBEVOICE_PERSIST_EMBED=0 restores the per-call graph.
+    const bool persist_gate = [] {
+        const char* e = std::getenv("VIBEVOICE_PERSIST_EMBED");
+        return !(e && *e && *e == '0');
+    }();
+    if (n_ids == 1 && persist_gate && !ctx->embed1.disabled) {
+        auto& e1 = ctx->embed1;
+        if (!e1.ctx0) {
+            // Pin to the weight's backend: host-resident weight + GPU main
+            // backend would otherwise hit the no-auto-copy sched rule.
+            e1.be = (it->second->buffer && ggml_backend_buffer_is_host(it->second->buffer) &&
+                     !ggml_backend_is_cpu(ctx->backend))
+                        ? ctx->backend_cpu
+                        : ctx->backend;
+            size_t mem1 = 16 * ggml_tensor_overhead() + ggml_graph_overhead();
+            e1.meta.resize(mem1);
+            ggml_init_params ip1 = {mem1, e1.meta.data(), true};
+            e1.ctx0 = ggml_init(ip1);
+            e1.ids = ggml_new_tensor_1d(e1.ctx0, GGML_TYPE_I32, 1);
+            ggml_set_name(e1.ids, "tok_ids1");
+            ggml_set_input(e1.ids);
+            e1.out = ggml_get_rows(e1.ctx0, it->second, e1.ids);
+            ggml_set_name(e1.out, "tok_emb1_out");
+            ggml_set_output(e1.out);
+            e1.gf = ggml_new_graph(e1.ctx0);
+            ggml_build_forward_expand(e1.gf, e1.out);
+            e1.ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(e1.be));
+            if (!e1.ga || !ggml_gallocr_alloc_graph(e1.ga, e1.gf)) {
+                if (e1.ga)
+                    ggml_gallocr_free(e1.ga);
+                ggml_free(e1.ctx0);
+                e1.ctx0 = nullptr;
+                e1.ga = nullptr;
+                e1.disabled = true;
+            } else if (ctx->params.verbosity >= 1) {
+                fprintf(stderr, "vibevoice: persistent embed micro-graph active (%s)\n", ggml_backend_name(e1.be));
+            }
+        }
+        if (e1.ctx0) {
+            // Re-set the input EVERY compute (gallocr aliasing gotcha).
+            ggml_backend_tensor_set(e1.ids, ids, 0, sizeof(int32_t));
+            if (ggml_backend_graph_compute(e1.be, e1.gf) == GGML_STATUS_SUCCESS) {
+                std::vector<float> embeds((size_t)ctx->model.hp.d_lm);
+                ggml_backend_tensor_get(e1.out, embeds.data(), 0, embeds.size() * sizeof(float));
+                return embeds;
+            }
+            e1.disabled = true; // compute failed — legacy path from here on
+        }
+    }
 
     size_t mem = ctx->compute_meta.size();
     ggml_init_params ip = {mem, ctx->compute_meta.data(), true};
