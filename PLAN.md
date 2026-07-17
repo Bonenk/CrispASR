@@ -757,7 +757,7 @@ OpenMP). Candidate from CrispEmbed: SentencePiece Viterbi DP optimal tokenizer.
 
 ## Publish language wrappers to package registries
 
-**Status:** All three wrappers (Rust, Dart, Python) have publishable metadata + passing dry-runs; CI workflow `release-wrappers.yml` is wired but blocked on one-time registry setup below. All are thin FFI/ctypes shims over the C ABI in `src/crispasr_c_api.cpp` — they do NOT bundle the native lib (user must have `libcrispasr.{so,dylib,dll}` installed).
+**Status:** Dart wrapper is **published** on pub.dev (`crispasr 0.8.11`, manual publish — see §66). Rust + Python wrappers have publishable metadata + passing dry-runs but are **not yet on crates.io / PyPI** (both 404, verified 2026-07-17) — blocked on the one-time registry creds bootstrap in §66. All are thin FFI/ctypes shims over the C ABI in `src/crispasr_c_api.cpp` — they do NOT bundle the native lib (user must have `libcrispasr.{so,dylib,dll}` installed).
 
 ### TO DO — one-time registry setup (must happen before first `v*` tag)
 
@@ -834,12 +834,21 @@ current JS binding is TTS-focused).
 
 ## 66. Wrapper publishing bootstrap — required before language registries can ship
 
-**Status:** OPEN. Auto-trigger silenced — `tags: ['v*']` push trigger on
-`release-wrappers.yml` is COMMENTED OUT (failed on every release since v0.5.0,
-confirmed v0.5.4 `gh run view 25248028443`). Workflow stays on `workflow_dispatch`
-only. None of the packages exist yet (crates.io `crispasr-sys`/`crispasr` 404,
-PyPI `crispasr` 404, pub.dev `crispasr` absent). All three registries need a
-one-time manual bootstrap before CI/OIDC can take over.
+**Status:** PARTIAL (verified live 2026-07-17). Auto-trigger silenced —
+`tags: ['v*']` push trigger on `release-wrappers.yml` is COMMENTED OUT (failed on
+every release since v0.5.0, confirmed v0.5.4 `gh run view 25248028443`). Workflow
+stays on `workflow_dispatch` only.
+
+Live registry state:
+- **pub.dev `crispasr` — DONE**, latest **0.8.11** (manually published
+  `dart pub publish --force`, see `~/code/pupdev.md` handover 2026-07-15). No
+  bootstrap needed for the package to exist; only the pub.dev-admin "automated
+  publishing" toggle remains if tag-triggered republish is wanted.
+- **crates.io `crispasr` + `crispasr-sys` — NOT published** (both 404).
+- **PyPI `crispasr` — NOT published** (404).
+
+So only crates.io + PyPI still need the one-time creds bootstrap below before
+CI/OIDC can take over; the pub.dev bootstrap step (3) is already satisfied.
 
 ### TO DO — bootstrap (one-time, needs repo admin creds)
 
@@ -858,12 +867,12 @@ one-time manual bootstrap before CI/OIDC can take over.
    Environment `pypi`. Push a `v*` tag; the OIDC handshake creates the package
    (no manual twine upload).
 
-3. **pub.dev (Dart, hardest — needs interactive shell for first version):**
-   ```bash
-   cd flutter/crispasr && dart pub get && dart pub publish   # interactive login
-   ```
-   Then https://pub.dev/packages/crispasr/admin → enable Automated publishing,
-   Repository `CrispStrobe/CrispASR`, Tag pattern `v{{version}}`.
+3. **pub.dev (Dart) — ALREADY DONE** (first-published manually to `crispasr 0.8.11`).
+   ~~`cd flutter/crispasr && dart pub get && dart pub publish`~~. Only remaining
+   optional step: https://pub.dev/packages/crispasr/admin → enable Automated
+   publishing, Repository `CrispStrobe/CrispASR`, Tag pattern `v{{version}}` — do
+   this only if you want tag-triggered republish (manual `dart pub publish` works
+   without it).
 
 4. **After bootstrap:** re-enable the auto-trigger by un-commenting the `push:` /
    `tags: ['v*']` lines in `release-wrappers.yml`. Next tag push should publish all
