@@ -1096,16 +1096,20 @@ static std::vector<int32_t> tokenize_text(bark_context* ctx, const char* text, i
     std::vector<int32_t> tokens;
 
     if (ctx->tokenizer.loaded) {
-        // BERT WordPiece: [CLS] tokens... [SEP], then offset by TEXT_ENCODING_OFFSET
+        // BERT WordPiece, then offset by TEXT_ENCODING_OFFSET. Bark tokenizes with
+        // add_special_tokens=False — NO [CLS]/[SEP]. The reference
+        // (suno/bark `_tokenize` and transformers BarkProcessor both use
+        // add_special_tokens=False): e.g. "The quick brown fox …" →
+        // [10117,69609,31299,174,…] ('The','quick','brown','f','##ox',…) with no
+        // 101/102. Prepending [CLS] shifted the whole prompt right by one token,
+        // which made the semantic model hallucinate a spurious leading word and
+        // truncate early (WER 0.78 vs the reference's 0.00).
         std::vector<int32_t> wp_ids = ctx->tokenizer.tokenize(text);
-        // Bark prepends [CLS]=101 and appends [SEP]=102
-        tokens.push_back((int32_t)(101 + pp.text_encoding_offset));
         for (int32_t id : wp_ids) {
-            if ((int)tokens.size() >= max_len - 1)
+            if ((int)tokens.size() >= max_len)
                 break;
             tokens.push_back(id + (int32_t)pp.text_encoding_offset);
         }
-        tokens.push_back((int32_t)(102 + pp.text_encoding_offset));
 
         if (ctx->params.verbosity >= 2) {
             fprintf(stderr, "bark: BERT tokenized %d tokens (max=%d)\n", (int)tokens.size(), max_len);
