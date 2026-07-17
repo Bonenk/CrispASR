@@ -959,6 +959,8 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             crispasr_print_stdout(disp, show_timestamps);
             if (params.show_alternatives)
                 crispasr_print_alternatives(all_segs, params.n_alternatives);
+            else if (params.print_confidence)
+                crispasr_print_confidence(all_segs);
         }
         if (params.output_txt)
             crispasr_write_txt(out_path(".txt"), disp);
@@ -1499,6 +1501,8 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         crispasr_print_stdout(disp, show_timestamps);
         if (params.show_alternatives) {
             crispasr_print_alternatives(all_segs, params.n_alternatives);
+        } else if (params.print_confidence) {
+            crispasr_print_confidence(all_segs);
         }
     }
 
@@ -3839,6 +3843,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
              params.max_len > 0  || params.print_colors ||
              params.diarize);
         crispasr_print_stdout(disp, show_timestamps);
+        if (params.print_confidence)
+            crispasr_print_confidence(all_segs);
 
         // Write output files.
         if (params.output_txt)

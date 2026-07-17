@@ -1008,8 +1008,17 @@ HISTORY.)
   SRT export. ~1 day.
 - `--carry-initial-prompt` — sticky vs reset initial prompt across segments.
   Edge case, ~1 hour.
-- `--print-confidence` — per-token confidence in JSON/WTS exports. Segments
-  already carry `confidence`; exporters could surface per-token.
+- ~~`--print-confidence`~~ — DONE (feat/print-confidence-nonwhisper). The flag
+  was advertised in `--help` and parsed but did **nothing** for non-whisper
+  backends (only the whisper path in `cli.cpp` honoured it) — a silently-broken
+  flag, not a missing feature. `crispasr_run.cpp` now prints each segment's
+  tokens with an inline `word[NN%]` annotation after the transcript, via a new
+  `crispasr_print_confidence` in `crispasr_output.cpp` (gated `else if` after
+  the `--alt` printer so the two don't double up). Verified on parakeet-ctc
+  (`ans[85%]`) and moonshine (`my[67%] ask[61%] ,[42%]` — low-confidence tokens
+  now visible); no flag → single transcript line unchanged. Docs in `docs/cli.md`.
+  (JSON/WTS exports already surfaced per-token `confidence`; this closes the
+  stdout half.)
 - Token suppression (`--suppress-nst`, `--suppress-regex`) — niche,
   whisper-specific; lowest priority.
 
