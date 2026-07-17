@@ -1222,7 +1222,9 @@ LSTM state threading is the work).** Split API already exists (`parakeet.h`:
 
 _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
-**Still open:** Benchmark new aligners vs canary-ctc; document -am aliases in docs/cli.md
+**Still open:** Benchmark new aligners vs canary-ctc. (`-am` aliases now documented
+in `docs/cli.md` — canary-ctc, wav2vec2 [12 langs], fastconformer [18 langs],
+qwen3-forced.)
 
 ## 106. TEN-VAD — low-latency cross-platform VAD
 
