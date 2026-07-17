@@ -1261,7 +1261,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     // workers run without contending. Everything else stays on the primary
     // backend + model_mutex (serialized, unchanged). asr_pool is null unless
     // CRISPASR_SERVER_WORKERS>1.
-    auto dispatch_transcribe = [&](const httplib::MultipartFormData& audio_file, whisper_params rp,
+    auto dispatch_transcribe = [&](const httplib::MultipartFormData& audio_file, const whisper_params& rp,
                                    bool need_ts) -> transcription_result {
         const bool lang_explicit = !rp.language.empty() && rp.language != "auto";
         const bool no_post = !punc_ctx && !pcs_ctx && !tc_ctx && !tc_crf_ctx && !tc_lstm_ctx;
