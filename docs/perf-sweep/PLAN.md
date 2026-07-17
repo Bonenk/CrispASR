@@ -20,7 +20,7 @@ disables. Code DONE on branch `perf/f5-refvoice-cache`; **build + 2-run live-tes
 line + byte-identical WAV `data`) DEFERRED until box load drops** (load 120+ right now).
 Do NOT double-work openvoice2 TODO-6. (dots_tts NOT viable here — speaker CAM++ GGUF not local.)
 
-**✅ [OPUS-1M] DONE (impl) 2026-07-16 — chatterbox interval-CFG (`adbf27ff1`, opt-in).**
+**✅ [OPUS-1M] DONE (impl) 2026-07-16 — chatterbox interval-CFG (`a4a8f64de`, opt-in).**
 `CRISPASR_S3GEN_CFG_INTERVAL` in s3gen's 10-step CFM Euler solver: K>1 forces the
 sequential single-UNet path and skips the uncond pass every K steps; batched-B2 default
 (K=1) byte-unchanged by construction. **Verification (honest):** default byte-safe;
@@ -283,7 +283,7 @@ melotts → remaining ~21, each byte+ASR A/B'd.
 #   speecht5, chatterbox_s3gen, cosyvoice3, kokoro). No local F16-through-conv1d
 #   targets remain (indextts F16 = custom-CPU-op filters; fastpitch f16 = dead-end).
 # Interval-CFG (opt-in): ✅ 6 landed (cosyvoice3, f5, voxcpm2, dots, irodori, tada);
-#   ✅ chatterbox impl (`adbf27ff1`) opt-in, off-box content verify OPEN. ⛔ dia/zonos/voxtral (AR batched-KV,
+#   ✅ chatterbox impl (`a4a8f64de`) opt-in, off-box content verify OPEN. ⛔ dia/zonos/voxtral (AR batched-KV,
 #   not amenable); vibevoice (low-value). NATURALNESS ear for ALL 7 = ⛔ human-only.
 #
 # STILL OPEN (by blocker):
