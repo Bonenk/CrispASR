@@ -484,9 +484,14 @@ def tts_roundtrip_for(name: str, manifest: dict, work_dir: Path,
         if not dest.exists():
             shutil.copy2(c_local, dest)
 
-    if voice_local is None and not voice_preset:
-        die(f"{name}: no voice resolved (entry needs either a `voice` block "
-            f"or a `voice_preset` name)")
+    # `no_voice: true` — the TTS model has no voice-cloning / speaker input
+    # (e.g. pocket-tts-english-NOVC). Synthesize with its baked default speaker
+    # and pass NO --voice. Forcing a `--voice <name>` on such a model resolves to
+    # a nonexistent WAV and yields silence (empty ASR → WER 1.0).
+    no_voice = bool(entry.get("no_voice", False))
+    if voice_local is None and not voice_preset and not no_voice:
+        die(f"{name}: no voice resolved (entry needs a `voice` block, a "
+            f"`voice_preset` name, or `no_voice: true`)")
 
     # ---- 2. Download ASR ground-truth model ----
     asr_name = entry["roundtrip_asr_backend"]
@@ -708,15 +713,17 @@ def dry_run(manifest: dict, backend_filter: str | None = None) -> int:
         all_ok &= _check_pinned_file(
             "tts gguf", name, entry["gguf"]["repo"],
             entry["gguf"]["revision"], entry["gguf"]["file"])
-        # Voice can be either a `voice` block (separate GGUF) or a
-        # `voice_preset` name (baked into the TTS model). Exactly one
-        # must be set.
+        # Voice is either a `voice` block (separate GGUF), a `voice_preset`
+        # name (baked into the model), or `no_voice: true` (no-voice-clone
+        # model, synth with its default speaker). Exactly one must be set.
         has_voice_block = "voice" in entry
         has_voice_preset = "voice_preset" in entry
-        if has_voice_block == has_voice_preset:
+        has_no_voice = bool(entry.get("no_voice", False))
+        if (int(has_voice_block) + int(has_voice_preset) + int(has_no_voice)) != 1:
             print(f"  \033[31mFAIL\033[0m {name}: must set exactly one of "
-                  f"`voice` (block) or `voice_preset` (name); got "
-                  f"voice={has_voice_block} voice_preset={has_voice_preset}")
+                  f"`voice` (block), `voice_preset` (name), or `no_voice: true`; "
+                  f"got voice={has_voice_block} voice_preset={has_voice_preset} "
+                  f"no_voice={has_no_voice}")
             failures += 1
             continue
         if has_voice_block and all_ok:
