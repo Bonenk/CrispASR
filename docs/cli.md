@@ -220,6 +220,26 @@ timestamps; boundaries are clamped to the imported audio and rescaled if
 the sample rate differs. `--vad-export` also works without `--vad` (it
 then captures the fixed-chunk boundaries).
 
+#### Transcribing a time window (`--offset-t` / `--duration`, #91)
+
+Restrict processing to a slice of the input instead of the whole file:
+
+```bash
+crispasr -m parakeet.gguf -f talk.wav --offset-t 60000              # skip the first 60 s
+crispasr -m parakeet.gguf -f talk.wav --offset-t 60000 --duration 30000   # only 60 s → 90 s
+```
+
+| Flag | Meaning |
+|---|---|
+| `-ot MS`, `--offset-t MS` | Start transcription `MS` milliseconds into the audio |
+| `-d MS`, `--duration MS` | Process only `MS` milliseconds from the offset (0 = to end) |
+
+The window is applied to the decoded audio before VAD/chunking, and reported
+timestamps (segment, word, token) are shifted back so they stay in
+original-audio time. These flags previously affected only the `whisper`
+backend's internal seek; they now work for every backend. An offset past the
+end of the file is reported and exits cleanly.
+
 ### MAES beam search (§134)
 
 MAES (Modified Adaptive Expansion Search) is a transducer-specific beam
