@@ -1943,6 +1943,10 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         std::string voice_name = body.value("voice", "");
         std::string consent_attestation = body.value("consent_attestation", "");
         std::string instructions = body.value("instructions", "");
+        // #201: transcript of a .wav clone reference (TADA on-the-fly cloning,
+        // gated by CRISPASR_TADA_WAV_CLONE). Passed through to the backend as
+        // tts_ref_text; a companion <name>.txt in --voice-dir is the fallback.
+        std::string ref_text = body.value("ref_text", "");
         // spoken_disclaimer defaults to true; set to false to skip the
         // audible AI-disclosure prefix (watermark + C2PA remain).
         const bool spoken_disclaimer = body.value("spoken_disclaimer", true);
@@ -2014,6 +2018,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             }
             rp.tts_voice = voice_name;
         }
+        if (!ref_text.empty())
+            rp.tts_ref_text = ref_text;
         if (!instructions.empty())
             rp.tts_instruct = instructions;
         if (body.contains("seed") && body["seed"].is_number_integer())
