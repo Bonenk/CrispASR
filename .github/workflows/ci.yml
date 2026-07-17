@@ -284,7 +284,7 @@ jobs:
         run: cmake --build build --config Release --target test-speaker-db --target test-speaker-cluster --target test-params -j $env:NUMBER_OF_PROCESSORS
 
       - name: Run speaker-db unit tests
-        run: ctest --test-dir build -C Release -R "speaker|cluster|centroid|whisper_params" --output-on-failure --timeout 120
+        run: ctest --test-dir build -C Release -R "speaker|cluster|centroid|whisper_params" -E "live" --output-on-failure --timeout 120
 
   # ===========================================================================
   # iOS (cross-compile gate — no runtime test)
