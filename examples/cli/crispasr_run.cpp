@@ -45,6 +45,7 @@
 #include "titanet.h"
 #include "speaker_db.h"
 
+#include "core/audio_window.h"
 #include "core/crispasr_c2pa.h"
 #include "crispasr_tts_chunking.h"
 #include "crispasr_tts_disclaimer.h"
@@ -476,33 +477,23 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     // transcription then all operate on the window, and reported timestamps
     // are shifted back by the offset at emit time (process_slice below) so
     // they stay in original-audio time.
-    if (params.offset_t_ms > 0 || params.duration_ms > 0) {
-        const int64_t total = (int64_t)samples.size();
-        int64_t off = (int64_t)params.offset_t_ms * native_rate / 1000;
-        if (off < 0)
-            off = 0;
-        if (off >= total) {
+    {
+        const auto win =
+            core_audio_window::compute((int64_t)samples.size(), params.offset_t_ms, params.duration_ms, native_rate);
+        if (win.active && win.past_end) {
             fprintf(stderr, "crispasr: error: --offset-t %d ms is past the end of '%s' (%.1f s)\n", params.offset_t_ms,
-                    fname_inp.c_str(), (double)total / native_rate);
+                    fname_inp.c_str(), (double)samples.size() / native_rate);
             return 0;
         }
-        int64_t len = (params.duration_ms > 0) ? (int64_t)params.duration_ms * native_rate / 1000 : (total - off);
-        if (len > total - off)
-            len = total - off;
-        auto window = [off, len](std::vector<float>& v) {
-            if (v.empty())
-                return;
-            const int64_t o = std::min<int64_t>(off, (int64_t)v.size());
-            const int64_t e = std::min<int64_t>(o + len, (int64_t)v.size());
-            std::vector<float> w(v.begin() + o, v.begin() + e);
-            v.swap(w);
-        };
-        window(samples);
-        for (auto& ch : stereo)
-            window(ch);
-        if (!params.no_prints) {
-            fprintf(stderr, "crispasr: processing window [%.2f s, %.2f s) of '%s'\n", (double)off / native_rate,
-                    (double)(off + len) / native_rate, fname_inp.c_str());
+        if (win.active) {
+            core_audio_window::trim(samples, win);
+            for (auto& ch : stereo)
+                core_audio_window::trim(ch, win);
+            if (!params.no_prints) {
+                fprintf(stderr, "crispasr: processing window [%.2f s, %.2f s) of '%s'\n",
+                        (double)win.start / native_rate, (double)(win.start + win.len) / native_rate,
+                        fname_inp.c_str());
+            }
         }
     }
 

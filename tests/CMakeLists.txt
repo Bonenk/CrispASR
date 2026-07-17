@@ -493,6 +493,22 @@ catch_discover_tests(test-vad-boundaries
     PROPERTIES LABELS "unit;vad"
 )
 
+# --offset-t / --duration time-window math (core/audio_window.h, #91). Pure
+# arithmetic, header-only — no model, no audio, no lib link needed.
+add_executable(test-audio-window
+    test-audio-window.cpp
+)
+target_include_directories(test-audio-window PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-audio-window PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-audio-window
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;audio-window"
+)
+
 # Named-voiceprint profile DB used by the opt-in --speaker-db path. Drives
 # enroll/load/match on synthetic embeddings; no model, no audio, no network.
 add_executable(test-speaker-db

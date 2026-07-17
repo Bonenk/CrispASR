@@ -46,6 +46,7 @@
 #include "../server/ws_stream.h"       // real-time WebSocket ASR streaming (--ws-port)
 #include "../server/realtime_server.h" // vLLM Realtime API
 #include "wyoming.h"                   // Wyoming protocol for Home Assistant Assist (--wyoming-port)
+#include "core/audio_window.h"
 #include "core/crispasr_c2pa.h"
 #include "crispasr_tts_chunking.h"
 #include "crispasr_tts_disclaimer.h"
@@ -477,30 +478,18 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
     // they stay in original-audio time. No backend adapter applies the offset
     // itself (only the legacy whisper CLI path did), so this is the sole
     // application — no double-shift.
-    if (rp.offset_t_ms > 0 || rp.duration_ms > 0) {
-        const int64_t total = (int64_t)pcmf32.size();
-        int64_t off = (int64_t)rp.offset_t_ms * 16000 / 1000;
-        if (off < 0)
-            off = 0;
-        if (off >= total) {
+    {
+        const auto win = core_audio_window::compute((int64_t)pcmf32.size(), rp.offset_t_ms, rp.duration_ms, 16000);
+        if (win.active && win.past_end) {
             // Window starts past end-of-audio: nothing to transcribe.
             result.ok = true;
             return result;
         }
-        int64_t len = (rp.duration_ms > 0) ? (int64_t)rp.duration_ms * 16000 / 1000 : (total - off);
-        if (len > total - off)
-            len = total - off;
-        auto window = [off, len](std::vector<float>& v) {
-            if (v.empty())
-                return;
-            const int64_t o = std::min<int64_t>(off, (int64_t)v.size());
-            const int64_t e = std::min<int64_t>(o + len, (int64_t)v.size());
-            std::vector<float> w(v.begin() + o, v.begin() + e);
-            v.swap(w);
-        };
-        window(pcmf32);
-        for (auto& ch : pcmf32s)
-            window(ch);
+        if (win.active) {
+            core_audio_window::trim(pcmf32, win);
+            for (auto& ch : pcmf32s)
+                core_audio_window::trim(ch, win);
+        }
     }
 
     result.duration_s = (double)pcmf32.size() / 16000.0;
