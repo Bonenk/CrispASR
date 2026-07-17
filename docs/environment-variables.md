@@ -203,6 +203,20 @@ scheme:
 - **`glint/`** — clean-room MP3/AAC codec: `GLINT_*`, `AACDBG`.
 - **`crisp_lid/` · `crisp_punc/` · `crisp_truecase/`** — standalone LID / punctuation / truecasing libraries (mirrored, not built by the main target); their runtime copies in `src/` follow each library's own naming (`LID_*`, `FIREREDPUNC_*`, `PCS_*`, `TRUECASER_*`).
 
+## Test fixtures
+
+The live/integration test suite reads a few `CRISPASR_`-prefixed fixture
+variables (model/audio paths); `tests/env-live-tests.sh` sets sensible defaults.
+Like every other variable here, the pre-standardization bare names are still
+honored as deprecated aliases:
+
+| Variable | Purpose |
+|----------|---------|
+| `CRISPASR_PARAFORMER_MODEL` / `_PARAFORMER_MODEL_Q4K` / `_PARAFORMER_AUDIO_ZH` / `_PARAFORMER_AUDIO_EN` | Paraformer test model / audio paths. |
+| `CRISPASR_AUDIOSEAL_GGUF` | AudioSeal test model path. |
+| `CRISPASR_PIPER_TEST_MODEL` | Piper phonemize test model path. |
+| `CRISPASR_OV2_DUMP_DIR` | OpenVoice2 HiFi test dump directory. |
+
 ---
 
 # Per-backend variables

@@ -255,7 +255,7 @@ regression test against `samples/jfk.wav`:
 - **Fused QKV** (single matmul for Q / K / V projections) — used in
   CrispEmbed, applicable to all attention layers; landed for
   qwen3-tts talker (Q8_0/Q4_K-skipped) under env flag
-  `QWEN3_TTS_FUSED_QKV`.
+  `CRISPASR_QWEN3_TTS_FUSED_QKV`.
 - **Temperature sampling** for the few backends that don't have it
   (glm-asr, kyutai-stt, firered-asr, moonshine, omniasr-LLM) via
   `core_greedy_decode`.
@@ -279,7 +279,7 @@ Conformer encoder + BLIP-2 Q-Former + Granite LLM (μP scaling).
 (16-layer Conformer + Q-Former + Granite LLM); "2B" = full system.
 Encoder runs as a single ggml graph by default with per-layer Shaw RPE
 in attention (PLAN #16) — bit-near-identical to the per-op CPU loop,
-~2.1× faster end-to-end on M1+Q4_K. `GRANITE_DISABLE_ENCODER_GRAPH=1`
+~2.1× faster end-to-end on M1+Q4_K. `CRISPASR_GRANITE_DISABLE_ENCODER_GRAPH=1`
 falls back to the CPU loop.
 
 **granite-4.1-plus** (`granite-speech-4.1-2b-plus`): 4.1 + 2-layer
@@ -425,7 +425,7 @@ convolutional architecture — all weight tensors have kernel-size ≤ 16 as
 ne[0], making block quantization impossible. F16 is the only usable quant.
 
 **Voice cloning**: pass `--voice <ref.wav>` at the CLI or set
-`ZONOS_SPEAKER_EMB_PATH=/path/to/jfk_speaker_emb.bin` (raw float32,
+`CRISPASR_ZONOS_SPEAKER_EMB_PATH=/path/to/jfk_speaker_emb.bin` (raw float32,
 512 floats). The runtime calls `zonos_tts_set_voice(ctx, path)` which
 decodes the WAV via `src/core/audio_resample` and runs the VoiceEncoder
 MLP to produce the speaker embedding.
@@ -801,7 +801,7 @@ Character-based tokenizer (39 symbols en-us, 43 de-de with umlauts).
   [3,7,11], dilations [[1,3,5]×3]) + conv_post → 22 kHz PCM.
 
 Env vars: `CRISPASR_BANANAMIND_DEBUG=1` (per-step decoder diagnostics),
-`BANANAMIND_TTS_BENCH=1` (per-stage timing).
+`CRISPASR_BANANAMIND_TTS_BENCH=1` (per-stage timing).
 
 **Tacotron2 generalization note.** BananaMind is a "Tacotron-lite" variant
 of the standard Tacotron2 architecture (NVIDIA, 1712.05884). The main

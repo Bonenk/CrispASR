@@ -1111,7 +1111,7 @@ CRISPASR_KV_QUANT=q8_0 ./build/bin/crispasr --backend voxtral4b -m auto -f audio
 
 Per-backend coverage:
 
-| Backend | Honors `KV_QUANT`? |
+| Backend | Honors `CRISPASR_KV_QUANT`? |
 |---|:-:|
 | voxtral / voxtral4b | ✔ |
 | qwen3-asr | ✔ |
@@ -1164,7 +1164,7 @@ glm_asr, gemma4_e2b, mimo_asr, qwen3_tts).
 
 ### `CRISPASR_KV_ON_CPU=1` — spill KV cache to system RAM
 
-For users with very long context where even `KV_QUANT=q4_0` won't
+For users with very long context where even `CRISPASR_KV_QUANT=q4_0` won't
 fit in VRAM. Allocates the KV cache on the CPU backend instead of
 the GPU backend, even when model weights are active on GPU.
 
@@ -1172,15 +1172,15 @@ the GPU backend, even when model weights are active on GPU.
 # Long-context fallback when VRAM is exhausted
 CRISPASR_KV_ON_CPU=1 ./build/bin/crispasr --backend voxtral4b -m auto -f long-audio.wav
 
-# Stacks with KV_QUANT_K/_V — minimum-memory KV path
+# Stacks with CRISPASR_KV_QUANT_K/_V — minimum-memory KV path
 CRISPASR_KV_ON_CPU=1 CRISPASR_KV_QUANT_K=q8_0 CRISPASR_KV_QUANT_V=q4_0 \
   ./build/bin/crispasr --backend voxtral4b -m auto -f long-audio.wav
 ```
 
-**Try `KV_QUANT` first.** The expensive part isn't the alloc —
+**Try `CRISPASR_KV_QUANT` first.** The expensive part isn't the alloc —
 every attention step copies the KV slice GPU↔CPU↔GPU. The
 PCIe / unified-memory traffic is typically slower than just running
-with quantised KV in VRAM. Reach for `KV_ON_CPU` only when
+with quantised KV in VRAM. Reach for `CRISPASR_KV_ON_CPU` only when
 quantisation alone can't fit the context.
 
 The verbose log line shows `(on cpu)` vs `(on gpu)` so you can
@@ -1190,7 +1190,7 @@ confirm where the cache landed:
 voxtral4b: kv cache 169 MiB k=q8_0 v=q4_0 (on cpu, ...)
 ```
 
-Same per-backend coverage as `KV_QUANT` (voxtral, voxtral4b,
+Same per-backend coverage as `CRISPASR_KV_QUANT` (voxtral, voxtral4b,
 omniasr, qwen3_asr, granite_speech, orpheus, glm_asr, gemma4_e2b,
 mimo_asr, qwen3_tts).
 
@@ -1229,9 +1229,9 @@ split the dominant 20-layer `tts_lm.layers.<N>.*` path while the
 kyutai-stt) is not yet covered — cross-attention layout has no
 `<prefix><N>.*` block-tagged tensors and needs a bespoke predicate.
 
-**Stacks with `KV_ON_CPU` and `KV_QUANT_K/_V`** — set all three for
-the most aggressive memory footprint reduction. `KV_QUANT` is
-cheaper than layer offload; reach for `N_GPU_LAYERS` only when the
+**Stacks with `CRISPASR_KV_ON_CPU` and `CRISPASR_KV_QUANT_K/_V`** — set all three for
+the most aggressive memory footprint reduction. `CRISPASR_KV_QUANT` is
+cheaper than layer offload; reach for `CRISPASR_N_GPU_LAYERS` only when the
 *model* doesn't fit, not the cache.
 
 ### `CRISPASR_GGUF_MMAP` — zero-copy weight load (default **on**)
@@ -1325,8 +1325,8 @@ that may apply to the output; it transfers responsibility for meeting it to
 whoever runs the binary. See [`tts.md`](tts.md) for the full rationale.
 
 Debug env vars:
-- `AUDIOSEAL_DEBUG=1` — print AudioSeal tensor shapes during graph build
-- `AUDIOSEAL_DUMP_STAGES=1` — dump per-stage binary tensors to `/tmp/`
+- `CRISPASR_AUDIOSEAL_DEBUG=1` — print AudioSeal tensor shapes during graph build
+- `CRISPASR_AUDIOSEAL_DUMP_STAGES=1` — dump per-stage binary tensors to `/tmp/`
 
 See [`tts.md`](tts.md) for full watermarking documentation.
 
@@ -1334,19 +1334,19 @@ See [`tts.md`](tts.md) for full watermarking documentation.
 
 For TTS-specific deployment knobs (codec backend selection, graph
 reuse, etc.) see [`tts.md`](tts.md):
-- `QWEN3_TTS_CODEC_GPU` — clean codec-on-GPU path (CUDA / Vulkan)
-- `QWEN3_TTS_O15` — code-predictor graph reuse (CPU/Metal opt-in)
-- `KOKORO_GEN_GPU` — generator on GPU (CUDA / Vulkan)
-- `COSYVOICE3_FLOW_STEPS=N` — CosyVoice3 flow Euler steps (`1..100`;
+- `CRISPASR_QWEN3_TTS_CODEC_GPU` — clean codec-on-GPU path (CUDA / Vulkan)
+- `CRISPASR_QWEN3_TTS_O15` — code-predictor graph reuse (CPU/Metal opt-in)
+- `CRISPASR_KOKORO_GEN_GPU` — generator on GPU (CUDA / Vulkan)
+- `CRISPASR_COSYVOICE3_FLOW_STEPS=N` — CosyVoice3 flow Euler steps (`1..100`;
   model default `10`). Lower values reduce flow latency approximately
   linearly at a possible quality cost; `5` is a practical fast mode.
-- `COSYVOICE3_BENCH=1` — print CosyVoice3 per-stage timings.
-- `COSYVOICE3_CFG_BATCH=0` — compatibility fallback to two separate flow
+- `CRISPASR_COSYVOICE3_BENCH=1` — print CosyVoice3 per-stage timings.
+- `CRISPASR_COSYVOICE3_CFG_BATCH=0` — compatibility fallback to two separate flow
   forwards per Euler step. The default batch-2 path matches upstream and is
   faster while producing identical output on validated CPU and Metal runs.
-- `COSYVOICE3_KV_BUCKET=0` — compatibility fallback that exposes the full KV
+- `CRISPASR_COSYVOICE3_KV_BUCKET=0` — compatibility fallback that exposes the full KV
   allocation to every AR step instead of the default 256-token active buckets.
-- `TADA_NUM_CANDIDATES=N` — TADA flow-matching duration candidates per token,
+- `CRISPASR_TADA_NUM_CANDIDATES=N` — TADA flow-matching duration candidates per token,
   ranked by reconstruction likelihood (CLI default `4`). The duration head is
   noise-sensitive, so a single draw (`N=1`, fastest) can occasionally collapse
   timing into rushed/garbled speech; `4`–`8` make it robust. All candidates
@@ -1354,23 +1354,23 @@ reuse, etc.) see [`tts.md`](tts.md):
   Default `4` also applies through the C ABI / bindings / server; override there
   at runtime with `set_tts_num_candidates(n)`.
   See [`tts.md`](tts.md#timing-quality-tada_num_candidates).
-- `TADA_DO_SAMPLE`, `TADA_TEMPERATURE`, `TADA_TOP_P`, `TADA_TOP_K`,
-  `TADA_REPETITION_PENALTY` — TADA **talker** text-decoder sampling, matching
+- `CRISPASR_TADA_DO_SAMPLE`, `CRISPASR_TADA_TEMPERATURE`, `CRISPASR_TADA_TOP_P`, `CRISPASR_TADA_TOP_K`,
+  `CRISPASR_TADA_REPETITION_PENALTY` — TADA **talker** text-decoder sampling, matching
   upstream `InferenceOptions` defaults (do_sample=1, temp=0.6, top_p=0.9,
   top_k=0, rep_penalty=1.1). The talker samples by default; greedy decoding
-  (`TADA_DO_SAMPLE=0`) has no repetition control and loops/cuts off words on
+  (`CRISPASR_TADA_DO_SAMPLE=0`) has no repetition control and loops/cuts off words on
   harder or non-English text. Honoured by the CLI, C ABI, bindings and server;
   `set_temperature` / `set_top_p` / `set_repetition_penalty` also reach TADA at
   runtime.
-- `VIBEVOICE_VAE_BACKEND={auto,cpu,gpu}` — VAE decoder placement
-- `VIBEVOICE_TTS_FLASH_ATTN={1,0}` — TTS LM attention: `1` (default)
+- `CRISPASR_VIBEVOICE_VAE_BACKEND={auto,cpu,gpu}` — VAE decoder placement
+- `CRISPASR_VIBEVOICE_TTS_FLASH_ATTN={1,0}` — TTS LM attention: `1` (default)
   uses fused `ggml_flash_attn_ext`; `0` uses an explicit
   `softmax(QKᵀ)·V` path. Set `0` if VibeVoice TTS garbles, mixes
   voices, or repeats on a GPU whose fused flash-attention shader is
   buggy — notably **AMD RDNA4 (RX 9700 XT) on Vulkan**, whose coopmat2
   FA shader produces wrong hidden states (issue #171). The
   no-rebuild equivalent is `GGML_VK_DISABLE_COOPMAT2=1`. This knob and
-  `VIBEVOICE_VAE_BACKEND` bisect the TTS GPU graph (LM attention vs.
+  `CRISPASR_VIBEVOICE_VAE_BACKEND` bisect the TTS GPU graph (LM attention vs.
   the conv/col2im VAE) to localise a bad kernel.
 
 CosyVoice3 performance notes:
@@ -1379,7 +1379,7 @@ CosyVoice3 performance notes:
   on CPU; `--gpu-backend metal` selects Metal explicitly on macOS.
 - `-n/--max-new-tokens` is also the AR KV-cache sizing bound. A realistic
   cap reduces per-token work, but a value that is too low truncates speech.
-- `COSYVOICE3_FLOW_STEPS=N` sets the CFM Euler step count (default `10`). Flow
+- `CRISPASR_COSYVOICE3_FLOW_STEPS=N` sets the CFM Euler step count (default `10`). Flow
   work is ~linear in `N` and flow is ~48 % of the wall. M1 sweep (`--seed 42`,
   log-mel-spectrogram corr vs the 10-step output — ASR roundtrip is verbatim at
   8/6 and cannot distinguish steps): `8`→0.9948, `6`→0.9925, `4`→0.9895 with a
@@ -1447,9 +1447,9 @@ Differences worth flagging:
 - [`docs/streaming.md`](streaming.md) — `--stream`, `--mic`, `--live`,
   sliding-window flags, per-token confidence
 - [`docs/tts.md`](tts.md) — Kokoro / Qwen3-TTS / VibeVoice / Orpheus / Chatterbox
-  + every TTS-side env var (`QWEN3_TTS_CODEC_GPU`,
-  `QWEN3_TTS_SKIP_REF_DECODE`, `QWEN3_TTS_O15`, `KOKORO_GEN_GPU`,
-  `VIBEVOICE_VAE_BACKEND`, …)
+  + every TTS-side env var (`CRISPASR_QWEN3_TTS_CODEC_GPU`,
+  `CRISPASR_QWEN3_TTS_SKIP_REF_DECODE`, `CRISPASR_QWEN3_TTS_O15`, `CRISPASR_KOKORO_GEN_GPU`,
+  `CRISPASR_VIBEVOICE_VAE_BACKEND`, …)
 - [`docs/server.md`](server.md) — HTTP `/inference`, OpenAI-compat
   `/v1/audio/transcriptions`, `/v1/audio/speech` (TTS),
   `/v1/audio/speech-to-speech` (S2S)
