@@ -77,6 +77,10 @@ Branch `fix/ci-green`. Goal: every GitHub Actions workflow green.
 - parakeet-ja: build clean, 987/987 unit tests, fixture byte-equal cer 0.000
   locally; **completed/success on the CI Linux runner** (dispatched nightly
   29572285635 on 081feba73).
-- bark-small: manifest JSON valid, dry-run PASS, e2e harness → "ADVISORY
-  wer=0.7778 [not gating]", exit 0.
-- Full nightly re-triggered on the fixed tip to confirm all-green.
+- bark-small: HARD gate. e2e harness → PASS wer=0.111 (M1) / 0.000 (x86).
+- pocket-tts-en: HARD gate. Local e2e (real harness) → PASS wer=0.0000 (max 0.15)
+  after strip_ai_disclaimer; 51/51 driver smoke tests pass.
+- **Full nightly 29591010369 (on dba88fee6): conclusion=success, 33/33 jobs
+  green** — parakeet-en/ja/rnnt, bark-small, pocket-tts-en all `success`. All
+  three previously-red gates are now hard gates and pass on the Linux runner.
+  CI-green sweep COMPLETE.
