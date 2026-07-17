@@ -468,6 +468,44 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         fprintf(stderr, "crispasr: error: failed to read audio '%s'\n", fname_inp.c_str());
         return 20;
     }
+
+    // #91: --offset-t MS / --duration MS — restrict processing to a time
+    // window of the input. The whisper backend honours these via its own
+    // seek (cli.cpp); this dispatcher (all other backends) had no window
+    // support, so apply it to the raw decoded PCM here — VAD, chunking and
+    // transcription then all operate on the window, and reported timestamps
+    // are shifted back by the offset at emit time (process_slice below) so
+    // they stay in original-audio time.
+    if (params.offset_t_ms > 0 || params.duration_ms > 0) {
+        const int64_t total = (int64_t)samples.size();
+        int64_t off = (int64_t)params.offset_t_ms * native_rate / 1000;
+        if (off < 0)
+            off = 0;
+        if (off >= total) {
+            fprintf(stderr, "crispasr: error: --offset-t %d ms is past the end of '%s' (%.1f s)\n", params.offset_t_ms,
+                    fname_inp.c_str(), (double)total / native_rate);
+            return 0;
+        }
+        int64_t len = (params.duration_ms > 0) ? (int64_t)params.duration_ms * native_rate / 1000 : (total - off);
+        if (len > total - off)
+            len = total - off;
+        auto window = [off, len](std::vector<float>& v) {
+            if (v.empty())
+                return;
+            const int64_t o = std::min<int64_t>(off, (int64_t)v.size());
+            const int64_t e = std::min<int64_t>(o + len, (int64_t)v.size());
+            std::vector<float> w(v.begin() + o, v.begin() + e);
+            v.swap(w);
+        };
+        window(samples);
+        for (auto& ch : stereo)
+            window(ch);
+        if (!params.no_prints) {
+            fprintf(stderr, "crispasr: processing window [%.2f s, %.2f s) of '%s'\n", (double)off / native_rate,
+                    (double)(off + len) / native_rate, fname_inp.c_str());
+        }
+    }
+
     // When --verbose (-v) or CRISPASR_VERBOSE=1 is set, activate ALL
     // backend-specific debug/bench/verbose env vars. Only sets if not
     // already set, so explicit per-backend vars still take precedence.
@@ -1163,6 +1201,29 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                     seg.t0 = words.front().t0;
                     seg.t1 = words.back().t1;
                     seg.words = std::move(words);
+                }
+            }
+        }
+
+        // #91: shift reported timestamps back into original-audio time when
+        // a --offset-t window trimmed the buffer (segs are in window-relative
+        // centiseconds at this point). This is the single choke point every
+        // output surface reads, and it re-runs cleanly on the file-output
+        // redo pass since each process_slice call rebuilds segs from scratch.
+        if (params.offset_t_ms > 0) {
+            const int64_t off_cs = (int64_t)params.offset_t_ms / 10;
+            for (auto& seg : segs) {
+                seg.t0 += off_cs;
+                seg.t1 += off_cs;
+                for (auto& w : seg.words) {
+                    w.t0 += off_cs;
+                    w.t1 += off_cs;
+                }
+                for (auto& tok : seg.tokens) {
+                    if (tok.t0 >= 0)
+                        tok.t0 += off_cs;
+                    if (tok.t1 >= 0)
+                        tok.t1 += off_cs;
                 }
             }
         }

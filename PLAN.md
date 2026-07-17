@@ -953,9 +953,14 @@ the next parity-pass audit doesn't re-discover them. (`--alt N` shipped — see
 HISTORY.)
 
 **TO DO (open parity gaps):**
-- `--offset-t MS` / `--duration MS` — process only a time window. Needs
-  engine-side `audio[t0:t0+d]` slice + timestamp shift (like existing
-  resume-offset routing). ~1 day end-to-end (CrispASR Dart binding + UI).
+- ~~`--offset-t MS` / `--duration MS`~~ — DONE (feat/offset-duration). The CLI
+  general path (`crispasr_run.cpp process_one_input`) now windows the decoded
+  PCM to `[offset, offset+duration)` before VAD/chunking and shifts reported
+  segment/word/token timestamps back into original-audio time. Was
+  whisper-internal only. Offset-past-end exits cleanly. Verified on parakeet-ctc
+  + jfk (offset skips leading audio, timestamps land at 5.0–11.0 s; word-level
+  JSON offsets shifted too). Docs in `docs/cli.md`. **Still open:** the Dart
+  binding + CrisperWeaver UI rows (out of this repo's scope).
 - Whisper decoder fallback knobs (`--word-thold`, `--entropy-thold`,
   `--logprob-thold`, `--no-speech-thold`, `--no-fallback`, `--temperature-inc`)
   — already in Dart binding's TranscribeOptions; just add UI rows + l10n in
