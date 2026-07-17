@@ -1,6 +1,67 @@
 # Speaker DB × diarization clusters (issue #266) — PLAN
 
-## NOW — active work
+## NOW — follow-ups (post-merge hardening, 2026-07-17)
+
+Core change merged (148e5a51e) and CI green (main CI + Go + Ruby). Remaining
+gaps, delegated to agents with verification by the main session:
+
+**Untested gaps**
+- [ ] **F1** Automated CLI gate tests — exit 26 (streaming refusal), exit 27
+  (missing `--expect-speakers`), no-consent warn-and-ignore. Smoke-tested
+  manually only; no CI guard. Needs a CLI-invocation test following existing
+  tests/ conventions (no models required — gates fire before model load).
+- [ ] **F2** Parallel/output-redo path (`-p N` + file outputs) with
+  `--speaker-db`: shares `crispasr_apply_global_speaker_stages()` with the
+  sequential path but never run live. Verify parity on the two-voice fixture.
+- [ ] **F3** Real multi-speaker validation: run identification over
+  `samples/multispeaker.wav` (in-repo fixture, used by the pyannote live
+  test) through `--diarize-speakers`; add an env-gated live test
+  (tests/env-live-tests.sh vars: `CRISPASR_TEST_DIARIZE_WAV`,
+  `CRISPASR_TEST_DIARIZE_MODEL`) asserting named + anonymous clusters
+  coexist, so live runs guard the flow. Prior E2E used a pitch-shifted
+  jfk proxy + vad-turns only.
+- [ ] **F4** Binding wrappers never compiled/executed beyond Go + Ruby CI:
+  - Python `SpeakerDB` (consent-raise ctor, open/enroll2 wiring) — needs a
+    runtime run against a freshly built shared lib;
+  - Flutter/Dart `CrispasrSpeakerDB` — `dart analyze`;
+  - Java JNA interface decls — compile check;
+  - C# `SpeakerDb.Open/Enroll` — **no dotnet on this box and no C# CI
+    workflow exists (pre-existing)** — signature cross-check vs the C-ABI
+    only;
+  - JS emscripten decls — rode through the green WASM build; confirm.
+- [ ] **F5** Windows: ci.yml windows job builds with
+  `-DCRISPASR_BUILD_TESTS=OFF` and only smokes `--list-backends` — the
+  `.spkr` v2 write path (CreateDirectoryA branch) and speaker-db unit tests
+  never run on Windows (pre-existing matrix gap; v2 code is compile-covered
+  via crispasr-cli). Either enable unit tests on the windows job or record
+  as accepted gap.
+
+**Known scope / deliberate**
+- [ ] **F6** Legacy whisper-native path (cli.cpp) silently ignores
+  `--speaker-db` (pre-existing — it never matched there). Add a stderr
+  warning pointing at the unified path.
+- [ ] **F7** Document in docs/diarization-speakers.md: (a) two over-split
+  clusters may both match the same enrolled name (intentional); (b)
+  segments <0.25 s keep their local diarize label, so a transcript can mix
+  `(Alice)` with a stale local `(speaker N)` for the same person.
+- [ ] **F8** Breaking-change entry for the next release notes — draft:
+  > **Breaking (speaker identification, #266):** `--speaker-db` now
+  > requires `--expect-speakers "NameA,NameB"` (closed claimed roster);
+  > the open 1:N database scan was removed. Matching is applied per global
+  > diarization cluster instead of per audio slice; unmatched clusters keep
+  > anonymous `(speaker N)` labels. C API: `crispasr_speaker_db_load`/
+  > `_enroll` were replaced by `crispasr_speaker_db_open(dir,
+  > expected_names_csv, consent_attested)` / `_enroll2(..., consent_attested)`
+  > — the old symbols remain linkable but refuse at runtime. Binding
+  > wrapper signatures changed accordingly (consent + roster parameters).
+  > `.spkr` v2 records the consent attestation; v1 profiles still load.
+- [ ] **F9 (parked)** Hoist the diarize → cluster → identify orchestration
+  from the CLI into the library so session-ABI/bindings/server share one
+  implementation (the multi-surface lesson). Design-heavy; separate change —
+  today bindings compose the primitives themselves and the server
+  deliberately exposes no speaker-db.
+
+## Done — core change
 
 - **DECIDED (maintainer, 2026-07-17): no open 1:N escape hatch survives** —
   identification is closed-roster (`--expect-speakers`) only, at every surface.
