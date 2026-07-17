@@ -22,8 +22,17 @@
   - tests: 981/981 unit green (new: consent refusal, retain, v1 legacy,
     centroids, params default); CLI gates smoke-tested (exit 26/27, warn path);
   - docs: diarization-speakers.md §2 rewritten, cli.md blockquote updated.
-- **Next**: live E2E validation on a real 2-speaker fixture with models
-  (named + unmatched cluster in one transcript), then merge to main.
+- **E2E validated live** (M1, whisper-tiny + cached titanet-large):
+  - enroll jfk.wav as `JFK` → v2 `.spkr` (magic/version/dim/consent trailer
+    verified byte-level);
+  - standalone (no diarize): transcript labeled `(JFK)`, `recording -> 'JFK'
+    (cos 1.00)`; claimed-but-unenrolled name (`Alice`) → warn + anonymous;
+  - two-voice fixture (jfk + 0.72x-slowed jfk, `--diarize --diarize-method
+    vad-turns`, embedder implied): `cluster 0 -> 'JFK' (cos 1.00)`,
+    `cluster 1 -> unmatched, keeps (speaker 1) (best cos 0.19)` — transcript
+    shows `(JFK)` + `(speaker 1)`, exactly the issue's target behavior;
+  - gates: streaming exit 26, missing roster exit 27, no-consent warn+ignore.
+- **Next**: merge to main + push; close #266 with a summary comment.
 
 ## Confirmed findings (trace, 2026-07-17)
 

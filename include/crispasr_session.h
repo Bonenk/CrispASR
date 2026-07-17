@@ -446,11 +446,25 @@ CRISPASR_SESSION_API void* crispasr_titanet_init(const char* model_path, int32_t
 CRISPASR_SESSION_API void crispasr_titanet_free(void* ctx);
 CRISPASR_SESSION_API int32_t crispasr_titanet_embed(void* ctx, const float* pcm_16k, int32_t n_samples, float* out);
 CRISPASR_SESSION_API float crispasr_titanet_cosine_sim(const float* a, const float* b, int32_t dim);
-CRISPASR_SESSION_API void* crispasr_speaker_db_load(const char* dir_path);
+// Speaker database — closed-roster, consent-gated (issue #266).
+// `expected_names_csv` is the comma-separated roster of enrolled
+// participants the caller asserts are present in the audio (e.g.
+// "Alice,Bob"); the db is narrowed to exactly those profiles.
+// `consent_attested` affirms a lawful basis + explicit consent from
+// every enrolled person (GDPR Art. 9). Open 1:N identification is
+// deliberately unsupported: crispasr_speaker_db_open refuses without
+// both, and the legacy ungated _load/_enroll symbols below refuse at
+// runtime (kept so old callers fail loudly, not at link time).
+CRISPASR_SESSION_API void* crispasr_speaker_db_open(const char* dir_path, const char* expected_names_csv,
+                                                    int32_t consent_attested);
 CRISPASR_SESSION_API void crispasr_speaker_db_free(void* db);
 CRISPASR_SESSION_API int32_t crispasr_speaker_db_count(const void* db);
 CRISPASR_SESSION_API float crispasr_speaker_db_match(const void* db, const float* embedding, int32_t dim,
                                                      float threshold, char* out_name, int32_t out_cap);
+CRISPASR_SESSION_API int32_t crispasr_speaker_db_enroll2(const char* dir_path, const char* name, const float* embedding,
+                                                         int32_t dim, int32_t consent_attested);
+// Legacy (pre-#266) entry points — always refuse at runtime.
+CRISPASR_SESSION_API void* crispasr_speaker_db_load(const char* dir_path);
 CRISPASR_SESSION_API int32_t crispasr_speaker_db_enroll(const char* dir_path, const char* name, const float* embedding,
                                                         int32_t dim);
 CRISPASR_SESSION_API void* crispasr_speaker_embedder_make_abi(const char* model_spec, int32_t n_threads,
