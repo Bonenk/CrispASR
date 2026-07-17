@@ -17,20 +17,25 @@ Branch `fix/ci-green`. Goal: every GitHub Actions workflow green.
   `vad_slice_cap_seconds()`. CER 0.680 → 0.000 (byte-equal to the re-baked
   reference; deterministic ×4). Reference re-baked because the old one was itself
   captured on the degraded no-VAD path.
-- **Nightly regression / bark-small** — IN FLIGHT. Root cause: the manifest's
-  `voice_preset: v2/en_speaker_3` is unsupported by the bark backend (needs a
-  `.npz`), so bark ran unconditioned → near-silence → WER 1.0. Fixes:
-  1. Pinned the real suno `en_speaker_3.npz` (uploaded to fixtures repo
-     @736366c8) as a `voice` block.
-  2. `tts_extra_args: --temperature 0.3 --seed 1234` for determinism (bark
-     default is temp 0.7 + seed 0 = non-deterministic).
-  3. Marked the entry `advisory: true` (harness reports WER, returns 0): even
-     conditioned+seeded, bark-small is a genuinely weak stochastic model
-     (measured WER 0.78–1.11 across seeds on M1) and AR float divergence means an
-     M1-tuned seed won't reproduce on the GH runner. NOT masking a bug — the real
-     bug (voice_preset→silence) is fixed; this is honest handling of a weak model.
-     Distinct from parakeet, whose gate stays hard.
-  Verifying end-to-end (harness returns 0 via the advisory path) before commit.
+- **Nightly regression / bark-small** — FIXED, HARD GATE (two real bugs).
+  1. Config bug: `voice_preset: v2/en_speaker_3` is unsupported by the bark
+     backend (needs a `.npz`) → bark ran unconditioned → near-silence → WER 1.0.
+     Pinned the real suno `en_speaker_3.npz` (fixtures repo @736366c8) as a
+     `voice` block + `--temperature 0.3 --seed 1234` for determinism.
+  2. **PORT bug** (found by running the Python blueprint per HARD RULE #3, after
+     the reviewer asked "what do the original blueprints produce?"):
+     transformers `suno/bark-small` round-trips at WER 0.00 while our backend gave
+     0.78 — *identically at F16 and q8_0*, ruling out quantization AND "weak
+     model". Root cause: `tokenize_text()` prepended [CLS]/appended [SEP], but
+     bark tokenizes with `add_special_tokens=False`; the extra leading [CLS]
+     shifted the 256-token prompt right by one → semantic stage emitted a spurious
+     leading word then truncated after ~3 words. Fixed in src/bark_tts.cpp →
+     WER 0.78 → 0.222 (full sentence, deterministic). Advisory REMOVED; harness
+     reports PASS wer=0.2222 (max 0.4).
+  NOTE: an earlier revision of this doc called bark "a genuinely weak stochastic
+  model" and marked it advisory — that was a MISDIAGNOSIS; advisory was masking a
+  one-line tokenizer bug. Always check the blueprint before calling a TTS backend
+  weak.
 
 - **Nightly mass-failure (07-17) was a build break, not model regressions.**
   Every one of the ~30 jobs failed because they all build crispasr first, and
