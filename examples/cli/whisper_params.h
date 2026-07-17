@@ -108,6 +108,13 @@ struct whisper_params {
     // one instead of running VAD (skips the VAD model entirely).
     std::string vad_export_file = "";
     std::string vad_import_file = "";
+    // Server-side (#227) equivalents. The HTTP API can't take file paths — that
+    // would be an arbitrary read/write on the server host — so boundaries are
+    // returned inline in the response (`vad_export=true`) and supplied inline as
+    // the serialized JSON (`vad_import=<json>`). Same wire format as the CLI's
+    // files; both use crispasr_{serialize,parse}_vad_slices.
+    bool vad_export_inline = false;
+    std::string vad_import_json = "";
 
     std::string backend;
     std::string source_lang;

@@ -371,6 +371,9 @@ struct transcription_result {
     std::string language;
     double duration_s = 0.0;
     double elapsed_s = 0.0;
+    // #227: serialized VAD/chunk boundaries, when the request asked for them
+    // via `vad_export=true`. Empty otherwise.
+    std::string vad_segments_json;
 };
 
 static void append_ctc_logits(crispasr_ctc_logits& dst, const crispasr_ctc_logits* src) {
@@ -393,6 +396,21 @@ static std::string add_ctc_logits_to_json(const std::string& base, const crispas
     try {
         auto obj = nlohmann::json::parse(base);
         obj["ctc_logits"] = nlohmann::json::parse(crispasr_ctc_logits_to_json(logits));
+        return obj.dump();
+    } catch (...) {
+        return base;
+    }
+}
+
+// #227: splice the serialized VAD/chunk boundaries into a JSON response under
+// `vad_segments`, so a client can feed them back via `vad_import` on a later
+// request (e.g. same audio, different backend) and skip re-running VAD.
+static std::string add_vad_segments_to_json(const std::string& base, const std::string& vad_segments_json) {
+    if (vad_segments_json.empty())
+        return base;
+    try {
+        auto obj = nlohmann::json::parse(base);
+        obj["vad_segments"] = nlohmann::json::parse(vad_segments_json);
         return obj.dump();
     } catch (...) {
         return base;
@@ -530,10 +548,49 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
     // breadcrumb it so a native-instruction fault (SIGILL) is attributed
     // correctly by the fatal-signal handler.
     std::vector<crispasr_audio_slice> slices;
-    {
+    if (!rp.vad_import_json.empty()) {
+        // #227: caller supplied boundaries from an earlier response's
+        // `vad_segments` — reuse them instead of running VAD again. Mirrors the
+        // CLI's --vad-import (crispasr_run.cpp); same wire format.
+        int imported_sr = 0;
+        if (!crispasr_parse_vad_slices(rp.vad_import_json, slices, &imported_sr)) {
+            result.error = "malformed vad_import (expected the vad_segments object from a vad_export response)";
+            return result;
+        }
+        if (imported_sr > 0 && imported_sr != SR) {
+            for (auto& s : slices) {
+                s.start = (int)((int64_t)s.start * SR / imported_sr);
+                s.end = (int)((int64_t)s.end * SR / imported_sr);
+            }
+        }
+        // Clamp to this request's buffer and drop out-of-range slices, so a
+        // stale or hand-edited boundary set can't index out of bounds. Note the
+        // boundaries are interpreted in the buffer actually being processed —
+        // i.e. after any offset_t_ms/duration_ms window was applied above.
+        std::vector<crispasr_audio_slice> clean;
+        clean.reserve(slices.size());
+        for (auto& s : slices) {
+            if (s.start < 0)
+                s.start = 0;
+            if (s.end > n_samples)
+                s.end = n_samples;
+            if (s.end > s.start)
+                clean.push_back(s);
+        }
+        slices = std::move(clean);
+    } else {
+        // #261: Silero/MarbleNet VAD runs on the CPU ggml backend inside slicing —
+        // breadcrumb it so a native-instruction fault (SIGILL) is attributed
+        // correctly by the fatal-signal handler.
         stage_scope _stg(rp.vad ? "vad (silero/marblenet CPU inference)" : "audio slicing");
         slices = crispasr_compute_audio_slices(pcmf32.data(), n_samples, SR, effective_chunk_seconds, rp);
     }
+
+    // #227: hand the boundaries back when asked, so the next request (same
+    // audio, different backend) can skip VAD via `vad_import`.
+    if (rp.vad_export_inline)
+        result.vad_segments_json = crispasr_serialize_vad_slices(slices, SR);
+
     if (slices.empty()) {
         result.ok = true;
         return result;
@@ -1298,6 +1355,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         rp.split_on_punct = form_bool(req, "split_on_punct", rp.split_on_punct);
         rp.offset_t_ms = form_int(req, "offset_t_ms", rp.offset_t_ms);
         rp.duration_ms = form_int(req, "duration_ms", rp.duration_ms);
+        // #227: VAD boundary reuse. `vad_export=true` returns the computed
+        // boundaries under `vad_segments`; `vad_import=<that object>` reuses
+        // them and skips VAD entirely.
+        rp.vad_export_inline = form_bool(req, "vad_export", rp.vad_export_inline);
+        rp.vad_import_json = form_string(req, "vad_import", rp.vad_import_json);
         rp.max_context = form_int(req, "max_context", rp.max_context);
         rp.audio_ctx = form_int(req, "audio_ctx", rp.audio_ctx);
         rp.word_thold = form_float(req, "word_thold", rp.word_thold);
@@ -1342,6 +1404,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         std::string json = crispasr_segments_to_native_json(result.segs, backend_name, result.duration_s);
         if (rp.return_logits)
             json = add_ctc_logits_to_json(json, result.logits);
+        json = add_vad_segments_to_json(json, result.vad_segments_json);
         res.set_content(json, "application/json");
     });
 
@@ -1475,6 +1538,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         rp.split_on_punct = form_bool(req, "split_on_punct", rp.split_on_punct);
         rp.offset_t_ms = form_int(req, "offset_t_ms", rp.offset_t_ms);
         rp.duration_ms = form_int(req, "duration_ms", rp.duration_ms);
+        // #227: VAD boundary reuse. `vad_export=true` returns the computed
+        // boundaries under `vad_segments`; `vad_import=<that object>` reuses
+        // them and skips VAD entirely.
+        rp.vad_export_inline = form_bool(req, "vad_export", rp.vad_export_inline);
+        rp.vad_import_json = form_string(req, "vad_import", rp.vad_import_json);
         rp.max_context = form_int(req, "max_context", rp.max_context);
         rp.audio_ctx = form_int(req, "audio_ctx", rp.audio_ctx);
         rp.word_thold = form_float(req, "word_thold", rp.word_thold);
@@ -1596,6 +1664,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                                                                         task, temperature);
             if (rp.return_logits)
                 json = add_ctc_logits_to_json(json, result.logits);
+            json = add_vad_segments_to_json(json, result.vad_segments_json);
             res.set_content(json, "application/json");
         } else if (response_format == "diarized_json") {
             std::string task = rp.translate ? "translate" : "transcribe";
@@ -1603,12 +1672,14 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                 crispasr_segments_to_diarized_json(result.segs, result.duration_s, result.language, task, temperature);
             if (rp.return_logits)
                 json = add_ctc_logits_to_json(json, result.logits);
+            json = add_vad_segments_to_json(json, result.vad_segments_json);
             res.set_content(json, "application/json");
         } else {
             // Default: json — {"text": "..."}
             std::string json = crispasr_segments_to_openai_json(result.segs);
             if (rp.return_logits)
                 json = add_ctc_logits_to_json(json, result.logits);
+            json = add_vad_segments_to_json(json, result.vad_segments_json);
             res.set_content(json, "application/json");
         }
     });

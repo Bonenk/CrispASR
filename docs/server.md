@@ -105,6 +105,8 @@ curl http://localhost:8080/v1/audio/transcriptions \
 | `diarize_embedder` | Speaker-embedding model for cross-slice clustering (path or `auto`) |
 | `diarize_cluster_threshold` | Cosine merge threshold for embedding clustering (default: 0.5) |
 | `diarize_max_speakers` | Upper bound on speaker cluster count (default: 8) |
+| `vad_export` | `true`/`false` — include the computed VAD/chunk boundaries in the JSON response under `vad_segments` (default: `false`) |
+| `vad_import` | The `vad_segments` object from an earlier `vad_export` response. Reuses those boundaries and skips VAD entirely |
 | `vad` | `true`/`false` — enable VAD pre-processing |
 | `vad_threshold` | VAD speech probability threshold (default: 0.5) |
 | `vad_min_speech_duration_ms` | Minimum speech segment duration in ms (default: 250) |
@@ -135,6 +137,34 @@ curl http://localhost:8080/v1/audio/transcriptions \
 | `chunk_overlap` | Overlap context (seconds) around chunk boundaries |
 
 The `/inference` endpoint accepts the same CrispASR extension fields.
+
+### Reusing VAD boundaries across backends (#227)
+
+VAD (or the fixed-chunk fallback) runs on every request. To transcribe the same
+audio with several backends without paying it each time, ask for the boundaries
+once and hand them back afterwards:
+
+```bash
+# 1. Transcribe + get the boundaries back.
+curl -s -F file=@talk.wav -F vad=true -F vad_export=true \
+     -F response_format=verbose_json \
+     http://127.0.0.1:8080/v1/audio/transcriptions > first.json
+
+# 2. Extract the vad_segments object.
+jq '.vad_segments' first.json > vad.json
+
+# 3. Reuse it on later requests — no VAD model is run.
+curl -s -F file=@talk.wav -F "vad_import=<vad.json" \
+     -F response_format=verbose_json \
+     http://127.0.0.1:8080/v1/audio/transcriptions
+```
+
+`vad_segments` is the same wire format the CLI's `--vad-export` writes, so
+boundaries are interchangeable between the two. Boundaries are clamped to the
+audio of the request they're used on and out-of-range slices are dropped, so a
+stale set can't read out of bounds; a malformed one returns
+`invalid_request_error`. They are interpreted against the audio actually being
+processed — i.e. after any `offset_t_ms`/`duration_ms` window is applied.
 
 > **Parakeet segmentation (issue #257).** Backends that chunk internally
 > (parakeet/canary — full-attention FastConformer) now receive the whole clip
