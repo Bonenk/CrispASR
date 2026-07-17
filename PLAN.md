@@ -668,7 +668,16 @@ Phase 1 — DONE (see HISTORY.md + git log).
 
 ---
 
-## 58. MOSS-Audio-4B-Instruct (NOT STARTED — queued port)
+## 58. MOSS-Audio-4B-Instruct — DONE (was mislabelled "NOT STARTED")
+
+**Status:** SHIPPED (verified in code 2026-07-17). `src/moss_audio.{h,cpp}` ("public
+C API for MOSS-Audio-4B-Instruct" — 32L Whisper encoder + DeepStack + 36L Qwen3 LM),
+converter `models/convert-moss-audio-to-gguf.py`, registry entry `moss-audio`
+(`crispasr_model_registry.cpp:276`, GGUFs on `cstr/MOSS-Audio-4B-Instruct-GGUF`),
+arch-detect + dispatch in `crispasr_c_api.cpp`. NOTE: the shipped DeepStack is
+**3-tap** (L8/L16/L24), not the "4-tap" the original scoping below guessed.
+
+<details><summary>original port scoping (superseded — kept for reference)</summary>
 
 Port [`OpenMOSS-Team/MOSS-Audio-4B-Instruct`](https://huggingface.co/OpenMOSS-Team/MOSS-Audio-4B-Instruct)
 — Apache-2.0, ~4 B (~2.5 GB Q4_K), Mandarin+English. First **audio-understanding**
@@ -702,6 +711,8 @@ multi-tap bug shows), `lm_last_hidden`, `lm_logits_step0`. ~6–8 stages.
 **Sequencing gate — don't start until:** mimo-asr perf follow-ups (51a/b/c)
 scoped (inform DeepStack KV-reuse) AND Orpheus / Qwen3-TTS-1.7B (PLAN #57
 phases 1–2) finish (active sessions, high I/O contention).
+
+</details>
 
 ## Ecosystem expansion (lower priority)
 
@@ -1122,7 +1133,18 @@ Not alternatives (already surveyed as insufficient): ICU `Transliterator`, `cn2a
 
 ---
 
-## 101. OmniVoice — single-stage NAR diffusion TTS with voice cloning (SURVEY-ONLY)
+## 101. OmniVoice — single-stage NAR diffusion TTS with voice cloning — DONE (was SURVEY-ONLY)
+
+**Status:** SHIPPED (verified in code 2026-07-17 — the "survey-only" label was stale).
+`src/omnivoice.{h,cpp}` implements k2-fsa/OmniVoice (Qwen3-0.6B backbone + masked
+iterative / NAR-diffusion decode over 8 codebooks, SoundStorm-style), converters
+`models/convert-omnivoice{,-tokenizer}-to-gguf.py`, registry `omnivoice`
+(`crispasr_model_registry.cpp:648`, GGUFs on `cstr/omnivoice-GGUF`), arch-detect +
+dispatch in `crispasr_c_api.cpp`. This is the backend the #254 session hardened
+(voice-clone / RTF / token_embd fixes). Ongoing #254 follow-ups (voice-clone
+roundtrip validation etc.) are tracked under §234, not here.
+
+<details><summary>original survey notes (superseded)</summary>
 
 Surveyed via RapidAI/RapidSpeech.cpp ("single-stage NAR diffusion TTS, multilingual + voice
 cloning"); ships `convert_omnivoice_to_gguf.py` merging an LLM component + audio tokenizer
@@ -1149,6 +1171,8 @@ LLM (~0.5–1B, qwen3-tts-talker-like) + NAR diffusion head over a discrete code
 **DECISION-GATE / triggers:** proceed only if survey clears with a permissive license AND a
 measurable advantage over voxcpm2 on one of {CJK quality, model size, latency}. Otherwise
 stays survey-only — voxcpm2 + qwen3-tts + planned melotts/openvoice2 already cover the space.
+
+</details>
 
 ---
 
@@ -1728,7 +1752,9 @@ _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
 _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
-**Still open:** Vulkan RADV verify, TitaNet batch/F16, openvoice2/firered_vad/chatterbox_campplus scalar cures
+**Still open:** Vulkan RADV verify, TitaNet batch/F16, chatterbox_campplus scalar cure.
+(openvoice2 + firered_vad scalar cures already DONE — both use Accelerate `cblas_sgemm`
+gated by `CRISPASR_OV2_FORCE_SCALAR` / `CRISPASR_FIRERED_VAD_FORCE_SCALAR`, verified 2026-07-17.)
 
 ## §226 irodori-tts GPU + codec GGUF fix
 
@@ -1806,11 +1832,10 @@ findings in HISTORY. Every port gated on decoded-output A/B (§176/§210/§227 r
 ### Actions (ranked)
 0. **GATE on measurement (do first).** One M1 + one T4/CPU encoder-RTF A/B for
    wins 1-2. Port each only if it moves the encoder ≥5%.
-1. [ ] **Force `GGML_LLAMAFILE ON`** (tinyBLAS/llamafile_sgemm) — cheapest, biggest
-   CPU lever. We ship it OFF (never set except `-DGGML_LLAMAFILE=OFF` for WASM;
-   ggml default OFF `ggml/CMakeLists.txt:113`; `COHERE_MKL` default OFF
-   `CMakeLists.txt:137`). They force ON (`CMakeLists.txt:283`, "~29% faster
-   encoder"). One-line CMake change; A/B encoder RTF.
+1. [x] **Force `GGML_LLAMAFILE ON`** — DONE (verified 2026-07-17). `CMakeLists.txt:199`
+   `set(GGML_LLAMAFILE_DEFAULT ON)` overrides ggml's default-OFF (`ggml/CMakeLists.txt:113`),
+   landed with the §232 work. Note §232's closed-notes call the net effect "neutral on
+   Q4_K/x86" but it stays ON as a low-risk default.
 2. [ ] **Metal (+Vulkan) `GGML_OP_NORM_AFFINE` kernel** — our fused norm op
    (`ggml.h:500`, `ggml.c:3162`, used 7×/block in `core/fastconformer.h` + `core/sanm.h`)
    has ZERO Metal/Vulkan impl → falls to CPU with GPU↔CPU copies in the hot loop
@@ -2012,8 +2037,12 @@ canary, canary_ctc, canary_qwen, lfm2_audio, nemotron); roll each out where it a
   aggregates by op+src-type+shape, `CRISPASR_FC_PROFILE=1`) to `src/core/sched_prof.h` so
   every sched-based runtime gets it.
 - [ ] **(3) Fused QKV** (`core_conformer::fuse_qkv` is tensor-generic): bit-identical ~free
-  win wherever Q/K/V share an input — whisper encoders, cohere, firered, granite, sanm,
-  AED decoder self-attn. Load-time concat + view-split at build site.
+  win wherever Q/K/V share an input. Already deployed on ~10 backends
+  (parakeet/canary/canary_qwen/canary_ctc/lfm2_audio via `core_conformer::fuse_qkv`
+  under `CRISPASR_FC_FUSED_QKV`; voxtral/voxtral4b/qwen3_asr/higgs_stt/qwen3_tts have
+  their own env-gated fused impls; nemotron deliberately opts out). **Still open** for
+  the remaining named targets: whisper encoders, cohere, firered_asr, granite_speech,
+  sanm/paraformer, AED decoder self-attn.
 - [ ] **(4) Strided flash inputs**: grep `ggml_cont` feeding `flash_attn_ext` across src/ —
   the kernel reads strided views (llama.cpp does); each cont is a full tensor copy/layer/pass.
 - [ ] **(5) Manual-attn-on-CUDA gate**: any backend whose flash mask has ne[2]>1 (per-head
