@@ -20,12 +20,14 @@ disables. Code DONE on branch `perf/f5-refvoice-cache`; **build + 2-run live-tes
 line + byte-identical WAV `data`) DEFERRED until box load drops** (load 120+ right now).
 Do NOT double-work openvoice2 TODO-6. (dots_tts NOT viable here — speaker CAM++ GGUF not local.)
 
-**🔨 [OPUS-1M] CLAIMED 2026-07-16 — chatterbox interval-CFG (TODO-2, the last clean
-flow candidate).** Implementing `CRISPASR_S3GEN_CFG_INTERVAL` in s3gen's 10-step CFM
-Euler solver (`cfm_euler_solve`): K>1 forces the sequential single UNet path
-(`CRISPASR_S3GEN_UNET_CFG_SINGLE`) and skips the uncond UNet pass every K steps; the
-batched-B2 default (K=1) stays byte-identical. Verifying via CLI synth at low load.
-Do NOT double-work this. (Sonnet owns TODO-B chatterbox k=1→matmul — different item.)
+**✅ [OPUS-1M] DONE (impl) 2026-07-16 — chatterbox interval-CFG (`adbf27ff1`, opt-in).**
+`CRISPASR_S3GEN_CFG_INTERVAL` in s3gen's 10-step CFM Euler solver: K>1 forces the
+sequential single-UNet path and skips the uncond pass every K steps; batched-B2 default
+(K=1) byte-unchanged by construction. **Verification (honest):** default byte-safe;
+K>1 ENGAGES + valid non-crash output; but K>1 CONTENT A/B did NOT complete on M1 (synth
+6+ min t3-AR-bound; no-voice audio garbles ASR; proper-voice single-path A/B too slow)
+→ **content verify DEFERRED OFF-BOX (CUDA / quiet box + voice)**. Do NOT re-implement;
+the OPEN part is that off-box content verify. (Sonnet owns TODO-B k=1→matmul.)
 
 **In flight (2026-07-16, this session): remaining locally-doable items.** ✅ TODO-C
 resolved — **kokoro FASTCONV landed** (`323e96f23`, 89 F16 kernels, byte-identical);
@@ -39,8 +41,8 @@ resolved.**
 
 **Status (2026-07-16): FASTCONV landed + A/B-verified (byte-identical, default ON)
 for 7 backends — omnivoice, irodori, zonos, speecht5, chatterbox_s3gen, cosyvoice3, kokoro.
-Interval-CFG (opt-in, default OFF) landed + verified for 6 — cosyvoice3, f5-tts,
-voxcpm2, dots-tts, irodori, tada. All on `main`, all green.**
+Interval-CFG (opt-in, default OFF): 6 landed+verified (cosyvoice3, f5-tts,
+voxcpm2, dots-tts, irodori, tada) + chatterbox impl (off-box content verify open). All on `main`, all green.**
 
 **➡ FRESH AGENT: go to the "TODO QUEUE FOR A FRESH AGENT" section near the bottom
 of this file. FASTCONV is done for every local F16 target; the active thread is
@@ -281,7 +283,7 @@ melotts → remaining ~21, each byte+ASR A/B'd.
 #   speecht5, chatterbox_s3gen, cosyvoice3, kokoro). No local F16-through-conv1d
 #   targets remain (indextts F16 = custom-CPU-op filters; fastpitch f16 = dead-end).
 # Interval-CFG (opt-in): ✅ 6 landed (cosyvoice3, f5, voxcpm2, dots, irodori, tada);
-#   🔨 chatterbox impl'd + M1-verifying [OPUS-1M]. ⛔ dia/zonos/voxtral (AR batched-KV,
+#   ✅ chatterbox impl (`adbf27ff1`) opt-in, off-box content verify OPEN. ⛔ dia/zonos/voxtral (AR batched-KV,
 #   not amenable); vibevoice (low-value). NATURALNESS ear for ALL 7 = ⛔ human-only.
 #
 # STILL OPEN (by blocker):
