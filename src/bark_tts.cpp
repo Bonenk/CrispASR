@@ -1150,12 +1150,25 @@ static std::vector<int32_t> generate_text_semantic(bark_context* ctx, const char
     // 1. Tokenize text -> padded to 256
     std::vector<int32_t> text_tokens = tokenize_text(ctx, text, ctx_len);
 
-    // 2. Semantic history (from speaker or all-PAD)
+    // 2. Semantic history (from speaker or all-PAD). Must match the reference
+    // exactly (transformers modeling_bark.py / suno bark generate_text_semantic):
+    //
+    //     semantic_history = history_prompt["semantic_prompt"][-256:]      # LAST 256
+    //     semantic_history = pad(semantic_history, (0, 256 - len), SEMANTIC_PAD)
+    //
+    // i.e. take the LAST ctx_len tokens and LEFT-align them, padding on the
+    // RIGHT. We previously took the FIRST ctx_len and right-aligned them — both
+    // wrong. It matters: v2/en_speaker_3's semantic_prompt is 427 tokens, so we
+    // conditioned on tokens [0,256) instead of the reference's [171,427),
+    // i.e. an entirely different slice of the speaker prompt. That mis-primed
+    // the semantic stage (spurious leading word, dropped tail).
     std::vector<int32_t> sem_hist(ctx_len, (int32_t)pp.semantic_pad_token);
     if (ctx->speaker.loaded && !ctx->speaker.semantic_prompt.empty()) {
-        int copy_len = std::min((int)ctx->speaker.semantic_prompt.size(), ctx_len);
+        const int n_prompt = (int)ctx->speaker.semantic_prompt.size();
+        const int copy_len = std::min(n_prompt, ctx_len);
+        const int src_off = n_prompt - copy_len; // tail slice: [n_prompt-copy_len, n_prompt)
         for (int i = 0; i < copy_len; i++) {
-            sem_hist[(size_t)(ctx_len - copy_len + i)] = ctx->speaker.semantic_prompt[(size_t)i];
+            sem_hist[(size_t)i] = ctx->speaker.semantic_prompt[(size_t)(src_off + i)];
         }
     }
 
