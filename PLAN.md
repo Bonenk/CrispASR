@@ -997,8 +997,11 @@ HISTORY.)
 
   No session-C-ABI change needed: `crispasr_session_transcribe` is a low-level
   PCM-buffer primitive — windowing is the caller's concern there. Docs in
-  `docs/cli.md` + `docs/server.md`. **Still open:** the Dart binding +
-  CrisperWeaver UI rows (out of this repo's scope).
+  `docs/cli.md` + `docs/server.md`. The window arithmetic (initially copy-pasted
+  into both surfaces) was factored into `src/core/audio_window.h`
+  (`core_audio_window::compute` + `trim`) and unit-tested (`tests/test-audio-window.cpp`,
+  9 cases, model-free) so the CLI/server can't drift and the logic is CI-guarded.
+  **Still open:** the Dart binding + CrisperWeaver UI rows (out of this repo's scope).
 - Whisper decoder fallback knobs (`--word-thold`, `--entropy-thold`,
   `--logprob-thold`, `--no-speech-thold`, `--no-fallback`, `--temperature-inc`)
   — already in Dart binding's TranscribeOptions; just add UI rows + l10n in
