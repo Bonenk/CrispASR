@@ -5,6 +5,7 @@
 // See moss_audio.h for the full architecture description.
 
 #include "moss_audio.h"
+#include "core/crispasr_env.h"
 #include "core/win_compat.h"
 
 #include "core/beam_decode.h"
@@ -47,7 +48,7 @@
 static bool moss_audio_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("MOSS_AUDIO_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_MOSS_AUDIO_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -1757,7 +1758,7 @@ static char* moss_audio_process_impl(struct moss_audio_context* ctx, const float
     // 1. Mel spectrogram (or load from file for debugging)
     int n_mels = 0, T_mel = 0;
     float* mel = nullptr;
-    const char* mel_override = std::getenv("MOSS_AUDIO_MEL_FILE");
+    const char* mel_override = crispasr_env::get("CRISPASR_MOSS_AUDIO_MEL_FILE");
     if (mel_override) {
         // Load pre-computed mel from raw F32 file (n_mels × T row-major)
         FILE* mf = fopen(mel_override, "rb");

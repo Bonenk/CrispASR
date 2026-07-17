@@ -21,6 +21,7 @@
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
 #include "core/repeat_break.h"     // F1: decode-time repetition-loop break (greedy runaway)
+#include "core/crispasr_env.h"
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -46,7 +47,7 @@
 static bool firered_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("FIRERED_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_FIRERED_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -378,7 +379,7 @@ extern "C" struct firered_asr_context* firered_asr_init_from_file(const char* pa
     {
         const char* e = getenv("CRISPASR_FIRERED_MATVEC_CACHE");
         ctx->dec_matvec_cache_on = !(e && e[0] == '0');
-        ctx->dec_bench = getenv("FIRERED_BENCH") != nullptr;
+        ctx->dec_bench = crispasr_env::get("CRISPASR_FIRERED_BENCH") != nullptr;
         if (params.verbosity >= 1)
             fprintf(stderr, "firered_asr: decoder matvec cache %s\n", ctx->dec_matvec_cache_on ? "ON" : "OFF");
     }
@@ -2188,7 +2189,7 @@ static char* firered_asr_transcribe_impl(struct firered_asr_context* ctx, const 
         }
 
         int64_t t_weight_cache = ggml_time_us() - t_weight_cache0;
-        if (ctx->params.verbosity >= 1 || getenv("FIRERED_BENCH"))
+        if (ctx->params.verbosity >= 1 || crispasr_env::get("CRISPASR_FIRERED_BENCH"))
             fprintf(stderr, "firered_asr: decoder weights cached + K/V pre-computed in %.1fms\n", t_weight_cache / 1e3);
 
         ggml_context* dec_proj_ctx = nullptr;
@@ -2284,7 +2285,8 @@ static char* firered_asr_transcribe_impl(struct firered_asr_context* ctx, const 
             if (all_done)
                 break;
 
-            if (ctx->params.verbosity >= 2 || (getenv("FIRERED_BENCH") && (step % 20 == 0 || step < 3))) {
+            if (ctx->params.verbosity >= 2 ||
+                (crispasr_env::get("CRISPASR_FIRERED_BENCH") && (step % 20 == 0 || step < 3))) {
                 int64_t t_now = ggml_time_us();
                 fprintf(stderr, "firered_asr: decode step %d/%d (%.1fms elapsed)\n", step, max_len,
                         (t_now - t_dec0) / 1e3);
@@ -2409,7 +2411,7 @@ static char* firered_asr_transcribe_impl(struct firered_asr_context* ctx, const 
                 fr_vecmat(ctx, m.dec.prj_w, nullptr, xn.data(), logits.data(), d, odim);
                 t_logit += ggml_time_us() - tl0;
 
-                if (getenv("FIRERED_BENCH") && (step < 3 || step == max_len - 1)) {
+                if (crispasr_env::get("CRISPASR_FIRERED_BENCH") && (step < 3 || step == max_len - 1)) {
                     int64_t t_step = ggml_time_us() - t_step0;
                     fprintf(stderr, "firered: step %d: %.1fms (logit=%.1fms)\n", step, t_step / 1e3, t_logit / 1e3);
                 }

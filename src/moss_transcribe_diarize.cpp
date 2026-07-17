@@ -41,6 +41,7 @@
 #include "core/bpe.h"
 #include "core/gpu_backend_pref.h"
 #include "core/ngram_loop_fix.h"
+#include "core/crispasr_env.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -53,7 +54,7 @@
 static bool moss_diarize_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("MOSS_DIARIZE_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_MOSS_DIARIZE_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;

@@ -45,6 +45,7 @@
 #include "core/bpe.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
 #include "core/ngram_loop_fix.h"   // core_ngram::fix_loops (issue #218)
+#include "core/crispasr_env.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -57,7 +58,7 @@
 static bool moss_transcribe_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("MOSS_TRANSCRIBE_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_MOSS_TRANSCRIBE_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -573,7 +574,7 @@ extern "C" float* moss_transcribe_compute_mel(struct moss_transcribe_context* ct
 
     float* result = (float*)malloc(mel_out.size() * sizeof(float));
     memcpy(result, mel_out.data(), mel_out.size() * sizeof(float));
-    if (const char* dp = std::getenv("MOSS_TRANSCRIBE_MEL_DUMP")) {
+    if (const char* dp = crispasr_env::get("CRISPASR_MOSS_TRANSCRIBE_MEL_DUMP")) {
         FILE* f = fopen(dp, "wb");
         if (f) {
             fwrite(result, sizeof(float), mel_out.size(), f);
@@ -869,7 +870,7 @@ extern "C" float* moss_transcribe_run_encoder(struct moss_transcribe_context* ct
     ggml_tensor* eo = ggml_graph_get_tensor(gf, "encoder_output"); // (out_dim, T_enc)
     float* result = (float*)malloc((size_t)out_dim * T_enc * sizeof(float));
     ggml_backend_tensor_get(eo, result, 0, (size_t)out_dim * T_enc * sizeof(float));
-    if (const char* dp = std::getenv("MOSS_TRANSCRIBE_L0_DUMP")) {
+    if (const char* dp = crispasr_env::get("CRISPASR_MOSS_TRANSCRIBE_L0_DUMP")) {
         ggml_tensor* l0 = ggml_graph_get_tensor(gf, "enc_layer_0");
         if (l0) {
             std::vector<float> b((size_t)d * T_enc);
@@ -882,7 +883,7 @@ extern "C" float* moss_transcribe_run_encoder(struct moss_transcribe_context* ct
             }
         }
     }
-    if (const char* dp = std::getenv("MOSS_TRANSCRIBE_ENC_DUMP")) {
+    if (const char* dp = crispasr_env::get("CRISPASR_MOSS_TRANSCRIBE_ENC_DUMP")) {
         FILE* f = fopen(dp, "wb");
         if (f) {
             fwrite(result, sizeof(float), (size_t)out_dim * T_enc, f);

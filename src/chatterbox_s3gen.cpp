@@ -23,6 +23,7 @@
 #include "core/dac_decoder.h" // core_dac::fastconv_cache (shared FASTCONV)
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
@@ -49,7 +50,7 @@
 static bool cb_s3gen_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("CB_S3GEN_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_CB_S3GEN_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -2793,7 +2794,7 @@ static std::vector<float> cfm_euler_solve(chatterbox_s3gen_context* c,
             } else {
                 // ── Legacy ggml_backend_sched path (default) ──────────────────
                 // Rebuild graph each step (sched mutates it on alloc; not reusable).
-                const bool bench_alloc = std::getenv("CHATTERBOX_BENCH") != nullptr;
+                const bool bench_alloc = crispasr_env::get("CRISPASR_CHATTERBOX_BENCH") != nullptr;
                 int64_t t_alloc0 = bench_alloc ? ggml_time_us() : 0;
                 gf_b2 = build_graph_unet1d_b2(c, T_mel);
                 ggml_backend_sched_reset(c->sched);

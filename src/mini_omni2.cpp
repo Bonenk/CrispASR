@@ -22,6 +22,7 @@
 #include "core/mel.h"
 #include "core/snac.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -45,7 +46,7 @@
 static bool mini_omni2_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("MINI_OMNI2_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_MINI_OMNI2_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;

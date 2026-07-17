@@ -17,6 +17,7 @@
 #include <utility>
 #include <sys/stat.h>
 #include <vector>
+#include "core/crispasr_env.h"
 
 namespace {
 
@@ -237,7 +238,7 @@ public:
         // Gate: the realtime model requires a prompt voice. The 1.5B base
         // model can run without one and generate its generic prior voice.
         if (!allow_generic_no_voice_ && last_voice_key_.empty() && wav_ref_path_.empty()) {
-            const char* voice_wav_env = getenv("VIBEVOICE_VOICE_AUDIO");
+            const char* voice_wav_env = crispasr_env::get("CRISPASR_VIBEVOICE_VOICE_AUDIO");
             if (!voice_wav_env || !voice_wav_env[0]) {
                 fprintf(stderr,
                         "crispasr[%s]: no voice prompt resolved (pass --voice <path.gguf>, --voice <path.wav>, "

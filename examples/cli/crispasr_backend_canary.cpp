@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include "core/crispasr_env.h"
 
 namespace {
 
@@ -143,7 +144,7 @@ public:
         // splice). Set CANARY_STREAM_THRESHOLD_S=N to force single-pass
         // for inputs ≤ N seconds.
         int stream_threshold_s = 0;
-        if (const char* e = std::getenv("CANARY_STREAM_THRESHOLD_S")) {
+        if (const char* e = crispasr_env::get("CRISPASR_CANARY_STREAM_THRESHOLD_S")) {
             stream_threshold_s = std::max(0, atoi(e));
         }
         const int stream_chunk_s = 8;

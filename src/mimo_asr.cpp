@@ -43,6 +43,7 @@
 #include "core/ffn.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "crispasr_imatrix.h"
@@ -71,7 +72,7 @@ namespace {
 static bool mimo_asr_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("MIMO_ASR_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_MIMO_ASR_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -1578,7 +1579,8 @@ static float* mimo_asr_run_lm(mimo_asr_context* ctx, const int32_t* input_ids_9x
     // Production path: skip diag captures (~5% win + cleaner allocator,
     // PLAN #51 perf wave). Honour MIMO_ASR_DIAG=1 to keep the diag tensors
     // resident when debugging a transcribe-time regression directly.
-    const bool diag_env = std::getenv("MIMO_ASR_DIAG") != nullptr || std::getenv("MIMO_ASR_DUMP_STAGES") != nullptr;
+    const bool diag_env = crispasr_env::get("CRISPASR_MIMO_ASR_DIAG") != nullptr ||
+                          crispasr_env::get("CRISPASR_MIMO_ASR_DUMP_STAGES") != nullptr;
     ggml_cgraph* gf = mimo_asr_build_prefill_graph(ctx, Tg, n_past, /*diag_captures*/ diag_env);
     ggml_backend_sched_reset(ctx->sched);
     if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
@@ -1639,7 +1641,7 @@ static float* mimo_asr_run_lm(mimo_asr_context* ctx, const int32_t* input_ids_9x
     // FUNASR_DUMP_STAGES so a CPU run and a GPU run (CRISPASR_MIMO_FORCE_GPU=1)
     // can be compared stage-by-stage to localise where the PLAN #115 GPU
     // prefill diverges (NaN / wrong / zero).
-    if (std::getenv("MIMO_ASR_DUMP_STAGES")) {
+    if (crispasr_env::get("CRISPASR_MIMO_ASR_DUMP_STAGES")) {
         static const char* dump_stages[] = {
             "prefill_audio_features", "prefill_text_embeds",       "prefill_inputs_embeds",
             "prefill_last_hidden",    "prefill_text_logits_step0",
@@ -1777,7 +1779,7 @@ static char* mimo_asr_transcribe_impl(struct mimo_asr_context* ctx, const float*
     ctx->step_t1_fixed_kv_len = 0;
 
     // 5. Prefill.
-    const bool bench = std::getenv("MIMO_ASR_BENCH") != nullptr;
+    const bool bench = crispasr_env::get("CRISPASR_MIMO_ASR_BENCH") != nullptr;
     auto now_ms = []() {
         using namespace std::chrono;
         return duration_cast<duration<double, std::milli>>(steady_clock::now().time_since_epoch()).count();

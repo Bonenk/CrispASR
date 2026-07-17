@@ -34,6 +34,7 @@
 // degenerate-window gate + instruction-echo safety net in the transcribe path.
 
 #include "canary_qwen.h"
+#include "core/crispasr_env.h"
 #include "canary_qwen_echo.h"
 
 #ifndef M_PI
@@ -74,7 +75,7 @@
 static bool cq_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("CANARY_QWEN_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_CANARY_QWEN_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;

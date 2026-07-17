@@ -20,6 +20,7 @@
 #include <string>
 #include <sys/stat.h>
 #include <vector>
+#include "core/crispasr_env.h"
 
 namespace {
 
@@ -118,7 +119,7 @@ public:
         // (#192, N=4). A redundant override here is exactly how that 4 (and a
         // parallel session's 8) shipped; inheriting the tested library default
         // keeps one source of truth. Opt in to >1 with TADA_NUM_CANDIDATES.
-        if (const char* env = std::getenv("TADA_NUM_CANDIDATES"); env && *env) {
+        if (const char* env = crispasr_env::get("CRISPASR_TADA_NUM_CANDIDATES"); env && *env) {
             int n = atoi(env);
             if (n >= 1)
                 cp.num_acoustic_candidates = n;
@@ -129,29 +130,29 @@ public:
         // values (do_sample=True, temp=0.6, top_k=0, top_p=0.9, rep_penalty=1.1).
         // Override via env vars. --temperature (above) still sets cp.temperature.
         cp.text_do_sample = true;
-        if (const char* e = std::getenv("TADA_DO_SAMPLE"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_DO_SAMPLE"); e && *e)
             cp.text_do_sample = !(e[0] == '0' || e[0] == 'f' || e[0] == 'F' || e[0] == 'n' || e[0] == 'N');
-        if (const char* e = std::getenv("TADA_TEMPERATURE"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_TEMPERATURE"); e && *e)
             cp.temperature = (float)atof(e);
-        if (const char* e = std::getenv("TADA_TOP_P"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_TOP_P"); e && *e)
             cp.text_top_p = (float)atof(e);
-        if (const char* e = std::getenv("TADA_TOP_K"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_TOP_K"); e && *e)
             cp.text_top_k = atoi(e);
-        if (const char* e = std::getenv("TADA_REPETITION_PENALTY"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_REPETITION_PENALTY"); e && *e)
             cp.text_repetition_penalty = (float)atof(e);
 
         // Acoustic flow-matching knobs (#197): the "quick and dirty" vs "slow and
         // accurate" axis. num_fm_steps is the primary quality lever (more ODE
         // steps = slower, higher fidelity). Defaults match upstream
         // InferenceOptions (10 / 1.6 / 0.9); override via env or per request.
-        if (const char* e = std::getenv("TADA_NUM_FM_STEPS"); e && *e) {
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_NUM_FM_STEPS"); e && *e) {
             int n = atoi(e);
             if (n > 0)
                 cp.num_fm_steps = n;
         }
-        if (const char* e = std::getenv("TADA_ACOUSTIC_CFG"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_ACOUSTIC_CFG"); e && *e)
             cp.acoustic_cfg = (float)atof(e);
-        if (const char* e = std::getenv("TADA_NOISE_TEMP"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_NOISE_TEMP"); e && *e)
             cp.noise_temp = (float)atof(e);
 
         // Remember the resolved sampler defaults so a server can override them
@@ -232,7 +233,7 @@ public:
                     return false; // explicit voice couldn't be honored — fail loudly, don't use default
                 }
             }
-        } else if (const char* env = getenv("TADA_PROMPT_CACHE"); env && *env) {
+        } else if (const char* env = crispasr_env::get("CRISPASR_TADA_PROMPT_CACHE"); env && *env) {
             prompt_path = env;
         } else {
             prompt_path = discover_prompt(p.model, p.language);

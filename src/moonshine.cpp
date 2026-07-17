@@ -7,6 +7,7 @@
 #include "core/gguf_loader.h"
 #include "core/repeat_break.h"     // fix/moonshine-repeat-break: decode-time loop break
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 
 #include "ggml.h"
 #include "gguf.h"
@@ -30,7 +31,7 @@
 static bool moonshine_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("MOONSHINE_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_MOONSHINE_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -220,7 +221,7 @@ struct moonshine_context* moonshine_init_with_params(struct moonshine_init_param
     // CPU-local, bit-identical output, and the encoder still runs on GPU.
     // Opt out with MOONSHINE_ALL_GPU=1 (restores the legacy all-GPU load for A/B).
     core_gguf::WeightLoad wl;
-    const char* all_gpu_env = std::getenv("MOONSHINE_ALL_GPU");
+    const char* all_gpu_env = crispasr_env::get("CRISPASR_MOONSHINE_ALL_GPU");
     const bool all_gpu = all_gpu_env && all_gpu_env[0] == '1';
     bool loaded;
     if (ctx->use_gpu && !all_gpu) {
@@ -624,7 +625,7 @@ static int moonshine_run_encoder(struct moonshine_context* ctx, const float* aud
         // is opt-in (MOONSHINE_ENC_ATTN=manual) for A/B on other GPUs / larger
         // moonshine variants where the tradeoff may differ. See PLAN §232.
         bool manual_attn = false;
-        if (const char* e = std::getenv("MOONSHINE_ENC_ATTN")) {
+        if (const char* e = crispasr_env::get("CRISPASR_MOONSHINE_ENC_ATTN")) {
             if (std::strcmp(e, "manual") == 0)
                 manual_attn = true;
             else if (std::strcmp(e, "flash") == 0)

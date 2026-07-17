@@ -37,6 +37,7 @@
 #include "core/gguf_loader.h"
 #include "core/wordpiece.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -68,7 +69,7 @@ namespace {
 static bool bark_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("BARK_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_BARK_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -258,7 +259,7 @@ struct bark_context {
 namespace {
 
 static const char* bark_dump_dir() {
-    static const char* d = std::getenv("BARK_DUMP_DIR");
+    static const char* d = crispasr_env::get("CRISPASR_BARK_DUMP_DIR");
     return d;
 }
 
@@ -2274,7 +2275,7 @@ float* bark_synthesize(struct bark_context* ctx, const char* text, int* out_n_sa
     // Usage: BARK_DECODE_CODES=/path/to/fine_codes.bin:8:148
     //        (path:n_codebooks:n_timesteps)
     {
-        const char* dc = std::getenv("BARK_DECODE_CODES");
+        const char* dc = crispasr_env::get("CRISPASR_BARK_DECODE_CODES");
         if (dc) {
             std::string spec(dc);
             // Parse path:n_cb:n_t
