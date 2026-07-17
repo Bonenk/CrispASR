@@ -1,11 +1,31 @@
 # Speaker DB × diarization clusters (issue #266) — PLAN
 
-## NOW — DONE (worktree agent-acaa79335b603a236, 2026-07-17)
+## NOW — hardening follow-ups DONE (merged to main, 2026-07-17)
 
-F1, F3, F6, F7, F2, and the Python half of F4 are DONE in this worktree
-(branch `worktree-agent-acaa79335b603a236`), committed (6 commits), unit
-suite green (988/988), not yet merged to main — the parent session
-verifies and merges. Summary:
+All follow-ups except the parked F9 are resolved. Work was delegated to two
+agents and independently verified by the main session (diff review; own
+re-runs of the 988/988 unit suite, the F1 gate test, the F3 live test, and
+the 5/5 Python tests).
+
+- **F1/F2/F3/F6/F7 + F4-Python**: agent A (details below).
+- **F4 Dart/Java/C#/JS**: agent B — `dart analyze` clean (re-run by main
+  session); Java compiles under javac + JNA 5.14 (gradle 8.1 can't parse
+  under the box's JDK 23 — pre-existing toolchain gap); C# P/Invoke +
+  Session + tests cross-checked textually against the C-ABI (no dotnet on
+  this box, and NO C# CI workflow exists — pre-existing); JS decls are
+  parity-only (never embind-exposed, unchanged posture) and rode through
+  the green WASM build. No wrapper bugs found in these four.
+- **F5**: ci.yml windows job now builds + runs the three speaker-db Catch2
+  targets (`ctest -R "speaker|cluster|centroid|whisper_params" -E "live"`);
+  main session added the `-E live` exclusion (configure-time-registered
+  `test-speaker-id-live` would otherwise match) and gated the new F1 gate
+  script `NOT WIN32` (POSIX shell). PENDING: first green windows CI run
+  confirms empirically.
+- **F8**: release-notes draft ready below (Earlier section) — pick it up at
+  the next `scripts/bump-version.sh` release.
+- **F9**: parked (library-level orchestration hoist; separate change).
+
+Agent A summary (F1/F2/F3/F6/F7/F4-py):
 
 - **F1**: `tests/test-speaker-db-gates.sh` + CMake registration
   (`tests/CMakeLists.txt`, LABELS `unit;diarize;regression-266`) — asserts
