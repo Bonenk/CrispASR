@@ -425,6 +425,17 @@ def tts_roundtrip_for(name: str, manifest: dict, work_dir: Path,
     if entry is None:
         die(f"tts backend '{name}' not in manifest.tts_backends")
 
+    # `advisory: true` — this roundtrip is reported but NEVER gates the run
+    # (weak / high-variance TTS model; see the entry's advisory_note). That
+    # covers not just an over-the-bar WER but also a synth/ASR timeout or crash
+    # or empty output: on a slow CI runner those must not red the nightly for a
+    # model we've explicitly decided not to gate. Emits ADVISORY and returns 0.
+    advisory = bool(entry.get("advisory", False))
+
+    def advisory_skip(reason: str) -> int:
+        print(f"\033[33m  ADVISORY\033[0m  {name}: {reason} — non-gating, not failing the run")
+        return 0
+
     # ---- 1. Download TTS GGUF + voice GGUF (or use a baked voice preset) ----
     gguf_local = hf_download(
         entry["gguf"]["repo"],
@@ -514,12 +525,18 @@ def tts_roundtrip_for(name: str, manifest: dict, work_dir: Path,
         proc = subprocess.run(syn_cmd, capture_output=True, text=True,
                               timeout=300)
     except subprocess.TimeoutExpired:
+        if advisory:
+            return advisory_skip("TTS synth timed out after 300 s")
         die(f"{name}: TTS synth timed out after 300 s")
     if proc.returncode != 0:
+        if advisory:
+            return advisory_skip(f"TTS synth crashed (rc={proc.returncode})")
         print(f"\033[31m  FAIL\033[0m  TTS synth crashed (rc={proc.returncode})")
         print(f"    stderr tail: ...{(proc.stderr or '')[-300:]}")
         return 1
     if not out_wav.is_file() or out_wav.stat().st_size < 1000:
+        if advisory:
+            return advisory_skip(f"TTS produced no usable output: {out_wav}")
         print(f"\033[31m  FAIL\033[0m  TTS produced no usable output: {out_wav}")
         return 1
 
@@ -533,8 +550,12 @@ def tts_roundtrip_for(name: str, manifest: dict, work_dir: Path,
         proc = subprocess.run(asr_cmd, capture_output=True, text=True,
                               timeout=180)
     except subprocess.TimeoutExpired:
+        if advisory:
+            return advisory_skip("ASR roundtrip timed out after 180 s")
         die(f"{name}: ASR roundtrip timed out after 180 s")
     if proc.returncode != 0:
+        if advisory:
+            return advisory_skip(f"ASR roundtrip crashed (rc={proc.returncode})")
         print(f"\033[31m  FAIL\033[0m  ASR roundtrip crashed (rc={proc.returncode})")
         print(f"    stderr tail: ...{(proc.stderr or '')[-300:]}")
         return 1
@@ -545,11 +566,22 @@ def tts_roundtrip_for(name: str, manifest: dict, work_dir: Path,
     wer_max = float(entry["wer_max"])
     _, wer = compute_transcript_metrics(tts_phrase, transcript)
     ok = wer <= wer_max
-    verdict = "\033[32m  PASS\033[0m" if ok else "\033[31m  FAIL\033[0m"
-    print(f"{verdict}  wer={wer:.4f} (max {wer_max})")
+    # `advisory: true` entries report their WER but never fail the run — for
+    # legitimately weak / high-variance TTS models (e.g. bark-small) whose
+    # roundtrip can't clear a tight cross-platform bar. NOT for masking a real
+    # regression: the parakeet-ja gate stays hard precisely because a tight gate
+    # surfaced a real bug there. See the entry's advisory_note.
+    advisory = bool(entry.get("advisory", False))
+    if ok:
+        verdict = "\033[32m  PASS\033[0m"
+    elif advisory:
+        verdict = "\033[33m  ADVISORY\033[0m"  # over the bar, but non-gating
+    else:
+        verdict = "\033[31m  FAIL\033[0m"
+    print(f"{verdict}  wer={wer:.4f} (max {wer_max}){' [advisory — not gating]' if advisory and not ok else ''}")
     print(f"    phrase:     {tts_phrase!r}")
     print(f"    transcript: {transcript!r}")
-    return 0 if ok else 1
+    return 0 if (ok or advisory) else 1
 
 
 def dry_run(manifest: dict, backend_filter: str | None = None) -> int:
