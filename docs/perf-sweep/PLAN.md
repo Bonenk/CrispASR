@@ -499,14 +499,30 @@ arm so CUDA-graph capture engages. Survey of the fleet for the same shape
    only upload; optionally fuse cond+uncond via seq-concat + block-split attn
    (the omnivoice unified mode — dots already carries an additive attn mask, so
    the masking fits). Expect the omnivoice-class CUDA win; Metal likely neutral.
-2. **vibevoice token-embed round-trip.** src/vibevoice.cpp:936 reads the
-   tok_emb lookup back to host and re-feeds it (the exact legacy-omnivoice
-   embed pattern). Keep it device-resident. Also audit its ~20-step DPM
-   pred-head loop for per-step rebuild.
-3. **kugelaudio DPM-SDE + tada FM.** Both already cache gallocrs
-   (kugelaudio:473, tada:919/1108) — audit instead for per-step graph REBUILD
-   (a cached gallocr under a rebuilt graph still re-captures on CUDA), host
-   detours between steps, and full-logits readbacks.
+2. **vibevoice token-embed round-trip — AUDITED 2026-07-17, scoped.**
+   `run_token_embedding_lookup` builds a fresh graph + sched_reset +
+   sched_alloc + host round-trip PER AR TOKEN (call sites :1617 and :3535,
+   n_ids=1) for a single get_rows. ⚠ tok_emb is QUANTIZED in shipped ggufs
+   (the function exists for exactly that), so folding the lookup into the LM
+   step graph would disable CUDA-graph capture (TAG_GET_ROWS_CUDA_GRAPHS) —
+   the right design is a persistent embed MICRO-graph (built once, dedicated
+   gallocr) whose output tensor is device-resident and referenced by the step
+   graph, no host round-trip. Models are local (0.5b f16/q8, 7b q4_k) so the
+   byte-A/B is runnable on this box. [FABLE — step-graph rewiring in a
+   backend with AR + diffusion + negative-KV interplay.]
+3. ✅ **tada FM — AUDITED 2026-07-17, already persistent, no action.**
+   `fm_batch_gf` is built once in a dedicated meta arena (`fm_batch_meta`,
+   rebuilt only when B changes); per step is alloc+set+compute. Remaining
+   per-step gallocr/sched alloc is the standard idiom, low value.
+4. **kugelaudio DPM pred head — AUDITED 2026-07-17, scoped, PARKED (no local
+   model).** `build_pred_head_graph(ctx, 1)` is rebuilt INSIDE the 20-step
+   DPM-SDE loop (× every generated frame; shared compute_meta arena, shared
+   galloc). Fix: hoist build+alloc above the step loop (per frame — the
+   shared meta arena is clobbered by the LM step graph between frames, so
+   per-synthesis persistence needs its own arena like tada's fm_batch_meta);
+   the 3 inputs are already re-set every step. [SONNET-capable once a
+   kugelaudio gguf is present — lifecycle hoist + byte-cmp recipe; design
+   decided here.]
 4. **CUDA-graph capture audit (cheap, fleet-wide):** on a CUDA box, count
    `CUDA graph warmup` prints per synthesis for every iterative backend — more
    than one per distinct graph, or any `warmup reset` mid-loop, means capture
