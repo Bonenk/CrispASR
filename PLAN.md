@@ -1677,8 +1677,19 @@ while starling/stock numbers exclude model load and use warm reps. Cold-start se
 labeled engine speed. No crispasr numbers published yet, but the columns could appear anytime.
 - [ ] Contact author: benchmark `crispasr-server` (resident model, matches their server mode)
       or parse our stderr phase timings; offer setup help / a resident-mode adapter PR.
-- [ ] Add a documented "benchmarking CrispASR" recipe in `docs/` (server mode, warm reps,
-      phase-timing flags) so third-party benchers measure transcribe time, not cold start.
+      (**The doc to point them at now exists — see below.**)
+- [x] **DONE** — `docs/benchmarking.md`: the fair-measurement contract (measure transcribe
+      time, not cold start), three methods (server resident-model, in-process
+      Session/ctypes = the apples-to-apples path, CLI-with-parsed-stderr-line),
+      proof-of-work rules (non-zero exit/empty = FAIL; scale check; warmup + median +
+      absolute ms), identical-load discipline, required reporting fields, and the
+      phase-timing env vars (`CRISPASR_VERBOSE`, `CRISPASR_<BACKEND>_BENCH`,
+      `CRISPASR_METAL_PROFILE`, `CRISPASR_FC_PROFILE`). Links the existing
+      `tools/benchmark_asr_engines.README.md` rather than duplicating it, and is linked
+      from README's doc index so third-party benchers actually find it. Key fact it
+      documents: the CLI/server stderr line `transcribed Xs audio in Ys (Zx realtime)`
+      already excludes model load (timer starts after init/decode/VAD) — so benchers
+      should parse it instead of wrapping the process in `time`.
 
 **DECISION-GATE — option 0 first, gate options 1–4 on it:** one Kaggle T4/P100 run measuring
 GPU-busy% during granite/qwen3-asr AR decode (`nvidia-smi dmon` or nsys). If ggml decode is
