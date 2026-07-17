@@ -1,6 +1,51 @@
 # Speaker DB × diarization clusters (issue #266) — PLAN
 
-## NOW — follow-ups (post-merge hardening, 2026-07-17)
+## NOW — DONE (worktree agent-acaa79335b603a236, 2026-07-17)
+
+F1, F3, F6, F7, F2, and the Python half of F4 are DONE in this worktree
+(branch `worktree-agent-acaa79335b603a236`), committed (6 commits), unit
+suite green (988/988), not yet merged to main — the parent session
+verifies and merges. Summary:
+
+- **F1**: `tests/test-speaker-db-gates.sh` + CMake registration
+  (`tests/CMakeLists.txt`, LABELS `unit;diarize;regression-266`) — asserts
+  exit 26 / exit 27 / no-consent warn, all model-free and network-free.
+- **F3**: live-validated on `samples/multispeaker.wav` (whisper-tiny +
+  cached titanet-large): `cluster 0 -> 'SpeakerA' (cos 0.97)`, `cluster 1 ->
+  unmatched (best cos 0.05)`; transcript mixes `(SpeakerA)` / `(speaker 1)`.
+  Env-gated live Catch2 test added to `tests/test-diarize-pyannote-live.cpp`
+  (reuses `CRISPASR_TEST_DIARIZE_WAV` / `CRISPASR_TEST_DIARIZE_MODEL` +
+  `CRISPASR_TEST_TITANET_MODEL`, enrolls into a temp dir at test time).
+- **F2**: parallel (`-p 2`) vs sequential output parity checked on the same
+  fixture — both contain `(SpeakerA)` + an anonymous cluster. FINDING (not a
+  #266 bug, no code changed): `-p N` with the whisper backend nests
+  `whisper_full_parallel` inside each already-parallel slice
+  (`crispasr_backend_crispasr.cpp:159-167`), fragmenting segments near
+  internal split boundaries and occasionally over-splitting one speaker into
+  an extra anonymous cluster. Reproduces identically with plain
+  `--diarize-speakers` (no `--speaker-db` at all) — pre-existing, unrelated
+  to the #266 rework.
+- **F6**: one-time stderr warning added in `examples/cli/cli.cpp` where the
+  legacy whisper-native path is entered, when `--speaker-db` is set.
+- **F7**: `docs/diarization-speakers.md` §2 — new "Caveats" subsection
+  (over-split clusters both matching the same name; sub-0.25s segments
+  keeping a local `(speaker N)` label).
+- **F4 (Python half)**: `tests/test_python_speaker_db.py` — runtime-tests
+  `crispasr.SpeakerDB` against a freshly built `build-shared` lib (consent
+  ValueError, enroll write-through, roster-narrowed reopen + match/no-match,
+  legacy `crispasr_speaker_db_load` refusal). Run with the miniconda
+  interpreter (`/Users/christianstrobele/miniconda3/bin/python`) — the
+  default Homebrew python3 on this box lacks numpy. Two real bugs found +
+  fixed while writing this (the wrapper had never been executed before):
+  `SpeakerDB` was never re-exported from `crispasr/__init__.py` (ImportError
+  on the documented usage), and `__init__` set `self._db = None` AFTER the
+  no-consent `raise ValueError`, so every refused instance crashed `__del__`
+  with a swallowed `AttributeError` at GC time.
+
+Not touched by this worktree: F4 (Dart/Java/C#/JS parts), F5, F8, F9 — still
+open, see below.
+
+## Earlier — follow-ups (post-merge hardening, 2026-07-17)
 
 Core change merged (148e5a51e) and CI green (main CI + Go + Ruby). Remaining
 gaps, delegated to agents with verification by the main session:
