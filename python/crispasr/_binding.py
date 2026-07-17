@@ -2681,6 +2681,12 @@ class SpeakerDB:
     """
 
     def __init__(self, dir_path: str, expected_names: str = "", consent: bool = False, lib_path: str = None):
+        # Set _db before any check that can raise, so __del__ -> close()
+        # (which reads self._db) never sees a half-constructed instance —
+        # otherwise a no-consent ValueError during __init__ leaves _db
+        # unset and garbage collection prints a spurious "Exception
+        # ignored in __del__: AttributeError" for every refused instance.
+        self._db = None
         self._lib = ctypes.CDLL(lib_path or _find_lib())
         self._lib.crispasr_speaker_db_open.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int32]
         self._lib.crispasr_speaker_db_open.restype = ctypes.c_void_p
@@ -2704,7 +2710,6 @@ class SpeakerDB:
                 "identification (GDPR Art. 9); affirm a lawful basis + explicit consent "
                 "from every enrolled person"
             )
-        self._db = None
         if expected_names:
             self._db = self._lib.crispasr_speaker_db_open(dir_path.encode(), expected_names.encode(), 1)
         self._dir = dir_path
