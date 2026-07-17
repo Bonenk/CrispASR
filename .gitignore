@@ -152,3 +152,7 @@ a.out.wasm
 /issue*-sample/
 # Kaggle bundled-fallback harnesses — regenerated per push (already ignored one-by-one)
 tools/kaggle/*/kaggle_harness.py
+
+# Agent/worktree scratch dir convention (see .claude/CLAUDE.md) — temp
+# clips, enrollment DBs, and log captures from live validation runs.
+/scratch/
