@@ -918,6 +918,43 @@ void crispasr_print_alternatives(const std::vector<crispasr_segment>& segs, int 
     fflush(stdout);
 }
 
+void crispasr_print_confidence(const std::vector<crispasr_segment>& segs) {
+    for (const auto& seg : segs) {
+        // No token-level confidence (backend didn't emit tokens) — fall back to
+        // the plain segment text so the flag still yields readable output.
+        bool any_tok = false;
+        for (const auto& tok : seg.tokens) {
+            if (!tok.is_special) {
+                any_tok = true;
+                break;
+            }
+        }
+        if (!any_tok) {
+            if (!seg.text.empty())
+                printf("%s\n", seg.text.c_str());
+            continue;
+        }
+        bool first = true;
+        for (const auto& tok : seg.tokens) {
+            if (tok.is_special)
+                continue;
+            // Tokens carry the leading-space word-boundary convention; strip it
+            // so the annotation attaches to the word, not a stray gap.
+            const char* t = tok.text.c_str();
+            while (*t == ' ')
+                ++t;
+            if (!*t)
+                continue;
+            printf("%s%s", first ? "" : " ", t);
+            first = false;
+            if (tok.confidence >= 0.0f)
+                printf("[%.0f%%]", tok.confidence * 100.0f);
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+}
+
 void crispasr_print_stdout(const std::vector<crispasr_disp_segment>& segs, bool show_timestamps) {
     if (show_timestamps) {
         for (const auto& s : segs) {

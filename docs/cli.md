@@ -667,8 +667,9 @@ causing `--max-len` to silently have no effect.
 | `--grammar FNAME` | GBNF grammar file for constrained whisper decoding |
 | `--grammar-rule NAME` | Top-level rule name in the grammar (default: `root`) |
 | `--grammar-penalty F` | Scales down logits of tokens that violate the grammar (default: `100.0`) |
-| `--alt` | Show alternative token candidates with per-token probabilities (whisper) |
-| `--alt-n N` | Number of alternative token candidates per step (whisper, default: `1`) |
+| `--alt` | Show alternative token candidates with per-token probabilities (whisper + any backend that emits token alternatives) |
+| `--alt-n N` | Number of alternative token candidates per step (default: `1`) |
+| `--print-confidence` | After the transcript, print each segment's tokens with an inline confidence annotation (`word[NN%]`). Works for any backend that emits per-token confidence (whisper, parakeet, moonshine, …); backends without token info print plain text |
 | `--prompt STR` | Initial prompt for whisper |
 
 ## Hotwords / contextual biasing

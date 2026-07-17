@@ -941,7 +941,8 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.print_special ? "true" : "false");
     fprintf(stderr, "  -pc,       --print-colors         [%-7s] print colors\n",
             params.print_colors ? "true" : "false");
-    fprintf(stderr, "             --print-confidence     [%-7s] print confidence\n",
+    fprintf(stderr,
+            "             --print-confidence     [%-7s] print per-token confidence (word[NN%%]) after the transcript\n",
             params.print_confidence ? "true" : "false");
     fprintf(stderr, "  -pp,       --print-progress       [%-7s] print progress\n",
             params.print_progress ? "true" : "false");
