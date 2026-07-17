@@ -57,7 +57,7 @@ The qwen3-tts CP_DIRECT fused graph (#245) and the defaults-audit generalisation
 
 **Files:** `tools/reference_backends/<tts_backend>.py` + `crispasr_diff_main.cpp`.
 
-### #227 — VAD info reuse — DONE (feat/vad-export-import)
+### #227 — VAD info reuse — DONE (CLI: feat/vad-export-import; server: feat/server-vad-reuse)
 
 **What:** Run ASR multiple times on the same audio with different backends without re-computing VAD — expose VAD segment boundaries for reuse.
 
@@ -72,6 +72,18 @@ out-of-range slices, and rescales when the sample rate differs. Unit test
 malformed-reject). Verified e2e: `--vad-export` then `--vad-import` on jfk.wav
 (moonshine-tiny) → byte-identical transcript, VAD skipped. Documented in
 `docs/cli.md`.
+
+**Server surface also DONE** (multi-surface trap — `do_transcribe` has its own
+slice loop). File paths would be an arbitrary read/write on the server host, so
+the HTTP mapping is inline: `vad_export=true` returns the boundaries in the
+response under `vad_segments`; `vad_import=<that object>` reuses them and skips
+VAD. Same wire format as the CLI's files (both go through the shared
+`crispasr_{serialize,parse}_vad_slices`), so boundaries are interchangeable
+between CLI and server. Opt-in — no `vad_segments` field unless requested.
+Verified live (`crispasr --server --backend moonshine` + curl): `vad_export=true
+chunk_seconds=4` → 4 slices returned; feeding them back via `vad_import` →
+identical transcript + same 4 segments; malformed → `invalid_request_error`; no
+flag → no field. Documented in `docs/server.md`.
 
 ## Gemma-4 12B (gemma4_unified) ASR support (OPEN)
 
