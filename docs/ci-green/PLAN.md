@@ -32,7 +32,18 @@ Branch `fix/ci-green`. Goal: every GitHub Actions workflow green.
      Distinct from parakeet, whose gate stays hard.
   Verifying end-to-end (harness returns 0 via the advisory path) before commit.
 
+- **Nightly mass-failure (07-17) was a build break, not model regressions.**
+  Every one of the ~30 jobs failed because they all build crispasr first, and
+  `crispasr_vad.h` was missing `#include <string>` (compiles on macOS/clang,
+  breaks Linux/gcc). Introduced by dddc8f478 (#227). ALREADY FIXED on main by a
+  parallel session (6c8d857); CI green on the current tip. The weeks-long reds
+  (07-10→07-16) were purely parakeet-ja + bark-small — confirmed via the 07-16
+  run's failed-job list (only those two).
+
 ## Verification
-- parakeet-ja: build clean, 987/987 unit tests, fixture byte-equal cer 0.000.
-- bark-small: manifest JSON valid, dry-run PASS (pinned npz resolves), e2e in
-  progress.
+- parakeet-ja: build clean, 987/987 unit tests, fixture byte-equal cer 0.000
+  locally; **completed/success on the CI Linux runner** (dispatched nightly
+  29572285635 on 081feba73).
+- bark-small: manifest JSON valid, dry-run PASS, e2e harness → "ADVISORY
+  wer=0.7778 [not gating]", exit 0.
+- Full nightly re-triggered on the fixed tip to confirm all-green.
