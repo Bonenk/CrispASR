@@ -1417,7 +1417,29 @@ _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
 ## §169 — Qwen3-ASR ChatML language prompt (non-English script output)
 
-**Status:** OPEN
+**Status:** DONE — landed with the #218 blueprint-prompt-contract work
+(`3c3ba2c74`), not as a standalone §169 change; PLAN entry was stale. Both
+required surfaces build the full ChatML prompt and honour `-l LANG`:
+- **CLI adapter** `examples/cli/crispasr_backend_qwen3.cpp` (~L94-152): ChatML
+  system/user/assistant turns; when a language is set, an assistant-turn prefill
+  `language <Name><asr_text>` (or, behind `CRISPASR_QWEN3_SYSPROMPT_LANG=1`, the
+  legacy system-turn `Transcribe the speech in <Name>.`), via
+  `crispasr_iso_to_english_lang`.
+- **Session C-ABI** `src/crispasr_c_api.cpp` (~L5247-5283): same construction
+  mirrored inline (per HARD RULE #6), using per-call `lang` or sticky
+  `source_language` + `ca_iso_to_english_lang`. The HTTP server inherits it via
+  the session ABI (no separate qwen3 prompt build) — all three surfaces covered.
+
+The real transcribe path is the adapter/session inline decode, NOT the
+`qwen3_asr_transcribe` stub the old TODO named. `-l` is wired end-to-end; ChatML
+special-token ids resolve through `qwen3_asr_tokenize` (vocab map handles
+`<|im_start|>` etc.). No-language falls through to ChatML with an empty system
+turn (auto-detect preserved). **Verified** on `samples/paraformer_zh.wav`
+(qwen3-asr-0.6b-q4_k): correct Chinese script with `-l zh`, `-l en`, and auto.
+Arabic romanization (the original report) uses the exact mechanism prescribed
+here but wasn't re-verified locally (no Arabic fixture on the dev box).
+
+<details><summary>original (stale) problem statement</summary>
 
 **Problem:** Qwen3-ASR supports 30 languages but our `src/qwen3_asr.cpp` skips the ChatML prompt and builds bare `<|audio_start|>...<|audio_end|>` with no system/user message. Without the ChatML wrapper the model auto-detects language but may romanize non-Latin scripts (Arabic AA0010.wav → `istagel` instead of `استغل`). Explicit language selection (`-l ar`) currently has no effect. HF model uses:
 ```
@@ -1439,6 +1461,8 @@ Transcribe the following audio in Arabic.
 **Effort:** MEDIUM — ChatML token IDs (`<|im_start|>` etc.) must be resolved from the GGUF vocab; the word-level timestamp alignment loop (`src/qwen3_asr.cpp` L2074-2091) needs adjustment since the prompt prefix shifts positions.
 
 **Test:** Arabic audio from `atishay23/Arabic_Audio` (AA001.wav → should output `مرحبًا` in native script with `-l ar`).
+
+</details>
 
 ## §176 Runtime optimization pass — 18/20 DONE, 2 open
 
