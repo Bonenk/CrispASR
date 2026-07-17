@@ -510,6 +510,25 @@ catch_discover_tests(test-speaker-db
     PROPERTIES LABELS "unit;diarize"
 )
 
+# ─── test-speaker-db-gates — CLI policy-gate regression guard (issue #266) ─────
+# Invokes the built crispasr binary and asserts the three hard gates in
+# crispasr_run_backend() fire before any model resolution: streaming refusal
+# (exit 26), missing --expect-speakers with consent given (exit 27), and the
+# no-consent warn-and-ignore path (stderr "speaker-db ignored"). All three
+# fire before model/network access, so this needs no models and no network.
+# crispasr lives in examples/, added AFTER tests/ — same forward-reference
+# pattern as test-vibevoice-quant-carveout above ($<TARGET_FILE:> resolves
+# after all subdirectories are processed).
+if(CRISPASR_BUILD_EXAMPLES)
+    add_test(NAME test-speaker-db-gates
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test-speaker-db-gates.sh
+            $<TARGET_FILE:crispasr-cli>
+            ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-speaker-db-gates PROPERTIES
+        LABELS "unit;diarize;regression-266"
+        TIMEOUT 60)
+endif()
+
 # test-titanet — TitaNet speaker-embedding smoke/live tool. Plain main(); takes
 # <model.gguf> <audio...> and prints embeddings + a cosine-sim matrix. Builds
 # the orphaned smoke test so it can serve as a live check (same-speaker high /
