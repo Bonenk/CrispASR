@@ -519,7 +519,10 @@ catch_discover_tests(test-speaker-db
 # crispasr lives in examples/, added AFTER tests/ — same forward-reference
 # pattern as test-vibevoice-quant-carveout above ($<TARGET_FILE:> resolves
 # after all subdirectories are processed).
-if(CRISPASR_BUILD_EXAMPLES)
+# POSIX shell script — not registered on Windows, where the CI windows job's
+# scoped `ctest -R "speaker|..."` leg would otherwise match it by name and
+# fail trying to exec a shebang script.
+if(CRISPASR_BUILD_EXAMPLES AND NOT WIN32)
     add_test(NAME test-speaker-db-gates
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test-speaker-db-gates.sh
             $<TARGET_FILE:crispasr-cli>
