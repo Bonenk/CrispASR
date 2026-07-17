@@ -10,6 +10,46 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## PLAN "OPEN" items are frequently already shipped — audit against the CODE, never the prose (2026-07-17)
+
+A single session found **~11 PLAN items marked OPEN / NOT STARTED / SURVEY-ONLY
+that were fully implemented in the tree**: §169 (qwen3-asr ChatML prompt, landed
+under the #218 work), #128 (Piper TTS — whole backend + converter + registry +
+tests present), #60o (MTLBinaryArchive pipeline cache — the
+`crispasr_metal_pipeline_cache_open/_flush` lines print on every run), §155
+(CONV_TRANSPOSE_1D — all phases + Metal/Vulkan/CUDA `col2im_1d` kernels), #58
+(MOSS-Audio-4B), #101 (OmniVoice), §229 (`GGML_LLAMAFILE ON`), python `_find_lib`,
+§66 (pub.dev `crispasr` published), plus §57/§106/§224/§247 sub-items. The PLAN is
+compacted periodically but individual stale entries survive, so trusting one
+wastes hours re-deriving shipped code. **Before implementing any roadmap item,
+`grep`/read the code it names and check `git log -- <file>`; if it exists, verify
+empirically and just correct the PLAN.** Corollary for *external*-state claims
+(registry presence, HF uploads): a one-line API `curl` settles them — the PLAN
+said pub.dev was "absent" when the package was live (crates.io 404-checks need a
+`User-Agent` header or they 403 and masquerade as a real 404). A subagent is an
+efficient way to run this audit across many headers at once.
+
+## When you can't run the acceptance roundtrip, ship the path gated default-OFF + a provable-equivalence argument — don't block on the model (#201 TADA cloning, 2026-07-17)
+
+HARD RULE #3 says the decoded-output roundtrip is the only acceptance test, but a
+memory-pressured box couldn't load tada-1b + the 1.3 GB aligner to run it. Rather
+than block, the mergeable move was: (1) build the new path so its numerics are
+**equivalent by construction** to a shipped, already-validated path — here
+`tada_make_ref_from_pcm` = the validated `tada_encoder_encode` + a `load_prompt`
+body extracted into `tada_set_prompt_values`, and `write_ref_gguf` demonstrably
+writes the exact tensors `load_prompt` reads, so the in-memory path is the
+file path minus the I/O (no new graph math); and (2) gate the new behaviour behind
+`CRISPASR_TADA_WAV_CLONE=1`, default OFF, so the default path is byte-identical and
+no regression is possible. That combination is safe to merge to `main` *before*
+the roundtrip — the roundtrip then only gates flipping the default ON, not the
+merge. Matches the `keep-gated-not-revert` discipline: a plausible,
+review-verified path ships opt-in with the acceptance gate documented, not
+withheld. (Also: the feature needed the SAME logic in TWO surfaces — session
+C-ABI and server *adapter* — the recurring multi-surface trap; a shared
+`clone_from_wav`/`tada_make_ref_from_pcm` keeps them from drifting.)
+
+---
+
 ## Two writers on one output field at different pipeline stages = an ordering bug — fix the ORDER, don't bolt on provenance (#266 speaker labels, 2026-07-17)
 
 `--speaker-db` wrote matched names into `seg.speaker` per slice (pre-merge);

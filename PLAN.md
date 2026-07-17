@@ -21,7 +21,26 @@ effort estimate. Completed items have been moved to `HISTORY.md`.
 > independent sequences and numbers may collide. When in doubt, PLAN
 > items are always written as `§N` and GitHub issues as `#N`.
 
-**Latest release: v0.6.12** (commit `345ecfdc`). Full notes in [`RELEASE_NOTES_v0.6.12.md`](RELEASE_NOTES_v0.6.12.md).
+**Latest release: v0.8.12** (tag `v0.8.12`). Release notes live on the tag.
+
+**Recent completions (2026-07-17):**
+- **Roadmap accuracy sweep** — audited the PLAN's OPEN/NOT-STARTED headers against
+  the code; **~11 items were already shipped** but still marked open and are now
+  corrected: §169 (qwen3-asr ChatML prompt), #128 (Piper TTS), §66 (pub.dev
+  `crispasr 0.8.11`), python `_find_lib`, #60o (MTLBinaryArchive pipeline cache),
+  §155 (CONV_TRANSPOSE_1D — all phases + Metal/Vulkan/CUDA col2im kernels), #58
+  (MOSS-Audio-4B), #101 (OmniVoice), §229 (GGML_LLAMAFILE ON), plus §57/§106/§224/§247
+  sub-items. See `LEARNINGS.md` "verify PLAN OPEN items against code".
+- **#227 VAD boundary reuse** — SHIPPED (CLI `--vad-export`/`--vad-import` +
+  server `vad_export`/`vad_import`); shared serializer, unit-tested.
+- **#91 CLI parity** — `--offset-t`/`--duration` now honoured by every backend on
+  both CLI + server (shared `core/audio_window.h`, unit-tested); `--print-confidence`
+  fixed for non-whisper backends (was a parsed-but-dead flag).
+- **#201 TADA on-the-fly voice cloning** — in-memory make-ref (no temp GGUF) on
+  both the C-ABI/session and server/adapter surfaces, opt-in
+  (`CRISPASR_TADA_WAV_CLONE=1`). Roundtrip gate pending (see below).
+- **Docs** — new `docs/benchmarking.md` (§227 fair-measurement recipe); `-am`
+  aligner aliases enumerated in `docs/cli.md` (§105).
 
 **Recent completions (2026-07-11):**
 - **#242 moss-diarize**: SHIPPED — joint ASR + diarization + timestamps, 0.9B model,
