@@ -1771,7 +1771,7 @@ func AvailableBackends() []string {
 // DetectedLanguage returns the acoustic language Whisper detected on the last
 // transcribe as an ISO-639-1 code (e.g. "en"). Whisper-only; other backends
 // return the session's source-language hint, or "unknown".
-func (s *Session) DetectedLanguage() string {
+func (s *CrispasrSession) DetectedLanguage() string {
 	var buf [32]C.char
 	C.crispasr_session_detected_language(s.handle, &buf[0], 32)
 	return C.GoString(&buf[0])
