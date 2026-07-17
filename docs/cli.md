@@ -494,6 +494,29 @@ All models are Q4_K-quantized (~200 MB each) and auto-download on first
 use. The canary-ctc aligner remains the default (`-am auto`) because
 it covers 25+ languages in one model.
 
+### Language-specific FastConformer-CTC aligners
+
+A second aligner family (NVIDIA FastConformer-Hybrid-CTC, CC-BY-4.0) covers
+languages the wav2vec2 set doesn't — Slavic, Caucasian, Central-Asian. Same
+usage, all auto-download:
+
+`-am fastconformer-aligner-<code>` where `<code>` is one of: `en` /
+`en-pc` (English, +punctuation/caps) · `de` · `es` · `fr` · `it` · `nl` ·
+`pl` (Polish) · `ru` (Russian) · `ua` (Ukrainian) · `hr` (Croatian) ·
+`be` (Belarusian) · `ar` (Arabic) · `fa` (Persian) · `ka` (Georgian) ·
+`hy` (Armenian) · `uz` (Uzbek) · `kk-ru` (Kazakh+Russian). Bare
+`-am fastconformer-aligner` = English.
+
+```bash
+# Polish word timestamps (no wav2vec2 PL aligner exists):
+crispasr --backend voxtral -m auto -f polish.wav \
+    -am fastconformer-aligner-pl --auto-download -osrt -ml 1
+```
+
+For LLM backends with a native timestamp head there is also
+`-am qwen3-forced-aligner` (multilingual, ~500 MB) — note it is more
+sensitive to leading silence than the CTC aligners.
+
 For subtitle output, prefer adding `--vad --split-on-punct`:
 
 ```bash
