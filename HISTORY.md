@@ -6,6 +6,26 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-17 — #266: speaker-db moved to cluster-level, closed-roster identification
+
+Reporter (confirmed by trace): `--speaker-db` embedded each dispatcher slice
+ONCE and stamped the single matched name on every segment in the slice (wrong
+for mixed-speaker slices), and global embedding clustering — which runs
+post-merge — then overwrote those names with `(speaker N)` anyway. Fix:
+identification is now a post-merge stage per GLOBAL speaker cluster
+(`crispasr_apply_global_speaker_stages`), matching each cluster's centroid
+(reusing the clustering embeddings) so anonymous and named labeling share one
+pipeline and matched names can't be overwritten. Compliance redesign in the
+same change (EU AI Act, Annex III 1(a) remote-biometric-identification
+avoidance): matching requires a **closed claimed roster**
+(`--expect-speakers`, hard error without), stays consent-gated, refuses in
+streaming mode, and the open "identify anyone in the db" 1:N scan was removed
+at every surface — CLI and C-ABI (`speaker_db_open(dir, roster, consent)` /
+`enroll2(..., consent)`; legacy ungated symbols refuse at runtime; all 7
+binding wrappers updated). `.spkr` v2 records the consent attestation +
+enrollment timestamp. Details: `docs/speaker-db-clusters/PLAN.md`,
+`docs/diarization-speakers.md`.
+
 ## 2026-07-15 — #254: OmniVoice dropped whole words = 4094 zeroed rows in the shipped `token_embd`
 
 Reporter: long English prompts dropped words ("started", "One", "See", "pick";

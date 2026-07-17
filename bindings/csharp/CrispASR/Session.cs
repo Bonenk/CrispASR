@@ -866,17 +866,30 @@ namespace CrispASR
     // Speaker database
     // ====================================================================
 
-    /// <summary>On-disk speaker embedding database.</summary>
+    /// <summary>
+    /// On-disk speaker embedding database (closed-roster, consent-gated —
+    /// issue #266). Matching is a claimed-participant confirmation, never
+    /// an open 1:N search.
+    /// </summary>
     public sealed class SpeakerDb : IDisposable
     {
         private IntPtr _handle;
 
         private SpeakerDb(IntPtr handle) => _handle = handle;
 
-        public static SpeakerDb Load(string dirPath)
+        /// <summary>
+        /// Open a db narrowed to the claimed roster. <paramref name="expectedNames"/>
+        /// is the comma-separated list of enrolled participants asserted present
+        /// (e.g. "Alice,Bob"). <paramref name="consentAttested"/> affirms a lawful
+        /// basis + explicit consent from every enrolled person (GDPR Art. 9);
+        /// the call refuses without both.
+        /// </summary>
+        public static SpeakerDb Open(string dirPath, string expectedNames, bool consentAttested)
         {
-            var p = NativeMethods.crispasr_speaker_db_load(dirPath);
-            if (p == IntPtr.Zero) throw new InvalidOperationException($"Failed to load speaker db from {dirPath}");
+            if (!consentAttested)
+                throw new InvalidOperationException("SpeakerDb requires an explicit consent attestation (GDPR Art. 9)");
+            var p = NativeMethods.crispasr_speaker_db_open(dirPath, expectedNames, 1);
+            if (p == IntPtr.Zero) throw new InvalidOperationException($"Failed to open speaker db from {dirPath}");
             return new SpeakerDb(p);
         }
 
@@ -892,10 +905,16 @@ namespace CrispASR
             return (NativeMethods.NullTerminated(outName), score);
         }
 
-        /// <summary>Enroll a new speaker embedding.</summary>
-        public static void Enroll(string dirPath, string name, float[] embedding)
+        /// <summary>
+        /// Enroll a new speaker embedding. <paramref name="consentAttested"/> records
+        /// the enrolled person's explicit consent (GDPR Art. 9) in the profile;
+        /// enrollment refuses without it.
+        /// </summary>
+        public static void Enroll(string dirPath, string name, float[] embedding, bool consentAttested)
         {
-            int rc = NativeMethods.crispasr_speaker_db_enroll(dirPath, name, embedding, embedding.Length);
+            if (!consentAttested)
+                throw new InvalidOperationException("Enrollment requires an explicit consent attestation (GDPR Art. 9)");
+            int rc = NativeMethods.crispasr_speaker_db_enroll2(dirPath, name, embedding, embedding.Length, 1);
             if (rc != 0) throw new InvalidOperationException($"speaker_db_enroll failed (rc={rc})");
         }
 

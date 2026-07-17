@@ -4217,18 +4217,33 @@ class CrispasrTitaNet {
   }
 }
 
-/// File-based speaker profile database.
+/// File-based speaker profile database (closed-roster, consent-gated —
+/// issue #266). Matching is a claimed-participant confirmation, never an
+/// open 1:N search: [expectedNames] is the comma-separated list of
+/// enrolled participants you assert are present (e.g. "Alice,Bob"), and
+/// [consentAttested] affirms a lawful basis + explicit consent from every
+/// enrolled person (GDPR Art. 9). Construction throws without consent.
 class CrispasrSpeakerDB {
   late final DynamicLibrary _lib;
   Pointer<Void> _handle = nullptr;
   final String dirPath;
 
-  CrispasrSpeakerDB(DynamicLibrary lib, this.dirPath) : _lib = lib {
-    final loadFn = lib.lookupFunction<Pointer<Void> Function(Pointer<Utf8>),
-        Pointer<Void> Function(Pointer<Utf8>)>('crispasr_speaker_db_load');
+  CrispasrSpeakerDB(DynamicLibrary lib, this.dirPath,
+      {required String expectedNames, required bool consentAttested})
+      : _lib = lib {
+    if (!consentAttested) {
+      throw StateError(
+          'CrispasrSpeakerDB requires an explicit consent attestation (GDPR Art. 9)');
+    }
+    final openFn = lib.lookupFunction<
+        Pointer<Void> Function(Pointer<Utf8>, Pointer<Utf8>, Int32),
+        Pointer<Void> Function(
+            Pointer<Utf8>, Pointer<Utf8>, int)>('crispasr_speaker_db_open');
     final dp = dirPath.toNativeUtf8();
-    _handle = loadFn(dp);
+    final en = expectedNames.toNativeUtf8();
+    _handle = openFn(dp, en, 1);
     malloc.free(dp);
+    malloc.free(en);
   }
 
   int get count {
@@ -4258,17 +4273,19 @@ class CrispasrSpeakerDB {
     return (name, score);
   }
 
-  /// Enroll a speaker with the given name and embedding.
+  /// Enroll a speaker with the given name and embedding. The consent
+  /// attestation given at construction is recorded in the profile.
   bool enroll(String name, Float32List embedding) {
     final enrollFn = _lib.lookupFunction<
-        Int32 Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Float>, Int32),
-        int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Float>,
-            int)>('crispasr_speaker_db_enroll');
+        Int32 Function(
+            Pointer<Utf8>, Pointer<Utf8>, Pointer<Float>, Int32, Int32),
+        int Function(Pointer<Utf8>, Pointer<Utf8>, Pointer<Float>, int,
+            int)>('crispasr_speaker_db_enroll2');
     final dp = dirPath.toNativeUtf8();
     final np = name.toNativeUtf8();
     final embPtr = malloc<Float>(embedding.length);
     embPtr.asTypedList(embedding.length).setAll(0, embedding);
-    final rc = enrollFn(dp, np, embPtr, embedding.length);
+    final rc = enrollFn(dp, np, embPtr, embedding.length, 1);
     malloc.free(dp);
     malloc.free(np);
     malloc.free(embPtr);

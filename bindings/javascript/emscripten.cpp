@@ -227,13 +227,14 @@ void crispasr_titanet_free(void* ctx);
 int crispasr_titanet_embed(void* ctx, const float* pcm_16k, int n_samples, float* out);
 float crispasr_titanet_cosine_sim(const float* a, const float* b, int dim);
 
-// Speaker database
-void* crispasr_speaker_db_load(const char* dir_path);
+// Speaker database (closed-roster, consent-gated — issue #266)
+void* crispasr_speaker_db_open(const char* dir_path, const char* expected_names_csv, int consent_attested);
 void crispasr_speaker_db_free(void* db);
 int crispasr_speaker_db_count(const void* db);
 float crispasr_speaker_db_match(const void* db, const float* embedding, int dim, float threshold, char* out_name,
                                 int out_cap);
-int crispasr_speaker_db_enroll(const char* dir_path, const char* name, const float* embedding, int dim);
+int crispasr_speaker_db_enroll2(const char* dir_path, const char* name, const float* embedding, int dim,
+                                int consent_attested);
 
 // Pluggable speaker embedder + clustering + pyannote cache
 void* crispasr_speaker_embedder_make_abi(const char* model_spec, int n_threads, const char* cache_dir);

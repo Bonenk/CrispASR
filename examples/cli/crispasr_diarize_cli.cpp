@@ -12,6 +12,7 @@
 #include "crispasr_speaker_cluster.h"
 #include "crispasr_speaker_embedder.h"
 #include "pyannote_seg.h"
+#include "speaker_db.h"
 #include "whisper_params.h"
 
 #include <algorithm>
@@ -783,23 +784,15 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
     return false;
 }
 
-void crispasr_remap_speakers_via_embeddings(std::vector<crispasr_segment>& segs, const float* full_audio, int n_samples,
-                                            CrispasrSpeakerEmbedder* embedder, const whisper_params& params) {
-    if (!embedder || segs.empty() || !full_audio || n_samples <= 0)
-        return;
-
-    // Skip very short segments — TitaNet (and similar) need ~250 ms+
-    // of speech to produce a reliable embedding. Shorter segments
-    // keep their existing pyannote-local label; clustering then
-    // ignores them.
+// Embed every segment long enough for a reliable speaker embedding
+// (~250 ms+; shorter clips give noisy vectors on TitaNet and similar).
+// Fills `embed_idx` with the segs indices that produced an embedding
+// and `embeddings` with embed_idx.size()*dim floats, row-major.
+static void crispasr_embed_segments(const std::vector<crispasr_segment>& segs, const float* full_audio, int n_samples,
+                                    CrispasrSpeakerEmbedder* embedder, int d, std::vector<size_t>& embed_idx,
+                                    std::vector<float>& embeddings) {
     constexpr int64_t MIN_EMBED_CS = 25; // 0.25 s
 
-    const int d = embedder->dim();
-    if (d <= 0)
-        return;
-
-    std::vector<size_t> embed_idx;
-    std::vector<float> embeddings;
     embed_idx.reserve(segs.size());
     embeddings.reserve((size_t)segs.size() * (size_t)d);
 
@@ -818,12 +811,35 @@ void crispasr_remap_speakers_via_embeddings(std::vector<crispasr_segment>& segs,
         embed_idx.push_back(i);
         embeddings.insert(embeddings.end(), tmp.begin(), tmp.end());
     }
+}
+
+void crispasr_remap_speakers_via_embeddings(std::vector<crispasr_segment>& segs, const float* full_audio, int n_samples,
+                                            CrispasrSpeakerEmbedder* embedder, const whisper_params& params,
+                                            CrispasrClusterEmbeddings* out_clusters) {
+    if (!embedder || segs.empty() || !full_audio || n_samples <= 0)
+        return;
+
+    const int d = embedder->dim();
+    if (d <= 0)
+        return;
+
+    std::vector<size_t> embed_idx;
+    std::vector<float> embeddings;
+    crispasr_embed_segments(segs, full_audio, n_samples, embedder, d, embed_idx, embeddings);
+
     if (embed_idx.size() < 2) {
         // Nothing to cluster — either zero or one usable segment.
         if (embed_idx.size() == 1) {
             // Force the one embeddable segment to (speaker 0) so the
             // global label exists even on single-speaker inputs.
             segs[embed_idx[0]].speaker = "(speaker 0) ";
+            if (out_clusters) {
+                out_clusters->seg_idx = std::move(embed_idx);
+                out_clusters->embeddings = std::move(embeddings);
+                out_clusters->labels = {0};
+                out_clusters->dim = d;
+                out_clusters->n_clusters = 1;
+            }
         }
         return;
     }
@@ -835,10 +851,91 @@ void crispasr_remap_speakers_via_embeddings(std::vector<crispasr_segment>& segs,
     // Rewrite segment speakers from clustering output. Segments that
     // couldn't be embedded (too short) keep their existing pyannote-
     // local label as a best-effort fallback.
+    int n_clusters = 0;
     for (size_t k = 0; k < embed_idx.size(); k++) {
         const int spk = labels[k];
         if (spk < 0)
             continue;
+        n_clusters = std::max(n_clusters, spk + 1);
         segs[embed_idx[k]].speaker = "(speaker " + std::to_string(spk) + ") ";
     }
+
+    if (out_clusters) {
+        out_clusters->seg_idx = std::move(embed_idx);
+        out_clusters->embeddings = std::move(embeddings);
+        out_clusters->labels = std::move(labels);
+        out_clusters->dim = d;
+        out_clusters->n_clusters = n_clusters;
+    }
+}
+
+int crispasr_identify_speaker_clusters(std::vector<crispasr_segment>& segs, const CrispasrClusterEmbeddings& ce,
+                                       const struct speaker_db* db, float threshold, bool no_prints) {
+    if (!ce.valid() || !db || speaker_db_count(db) <= 0)
+        return 0;
+
+    const auto centroids = crispasr_cluster_centroids(ce.embeddings, ce.labels, (int)ce.seg_idx.size(), ce.dim);
+    if ((int)centroids.size() < ce.n_clusters * ce.dim)
+        return 0;
+
+    int n_named = 0;
+    for (int c = 0; c < ce.n_clusters; c++) {
+        float score = 0.0f;
+        const char* name = speaker_db_match(db, centroids.data() + (size_t)c * ce.dim, ce.dim, threshold, &score);
+        if (!name) {
+            if (!no_prints)
+                fprintf(stderr, "crispasr: speaker-db: cluster %d -> unmatched, keeps (speaker %d) (best cos %.2f)\n",
+                        c, c, score);
+            continue;
+        }
+        const std::string label = std::string("(") + name + ") ";
+        for (size_t k = 0; k < ce.seg_idx.size(); k++) {
+            if (ce.labels[k] == c)
+                segs[ce.seg_idx[k]].speaker = label;
+        }
+        if (!no_prints)
+            fprintf(stderr, "crispasr: speaker-db: cluster %d -> '%s' (cos %.2f)\n", c, name, score);
+        n_named++;
+    }
+    return n_named;
+}
+
+bool crispasr_identify_single_speaker(std::vector<crispasr_segment>& segs, const float* full_audio, int n_samples,
+                                      CrispasrSpeakerEmbedder* embedder, const struct speaker_db* db, float threshold,
+                                      bool no_prints) {
+    if (!embedder || segs.empty() || !full_audio || n_samples <= 0 || !db || speaker_db_count(db) <= 0)
+        return false;
+
+    const int d = embedder->dim();
+    if (d <= 0)
+        return false;
+
+    std::vector<size_t> embed_idx;
+    std::vector<float> embeddings;
+    crispasr_embed_segments(segs, full_audio, n_samples, embedder, d, embed_idx, embeddings);
+    if (embed_idx.empty())
+        return false;
+
+    const std::vector<int> labels(embed_idx.size(), 0);
+    const auto centroid = crispasr_cluster_centroids(embeddings, labels, (int)embed_idx.size(), d);
+    if ((int)centroid.size() < d)
+        return false;
+
+    float score = 0.0f;
+    const char* name = speaker_db_match(db, centroid.data(), d, threshold, &score);
+    if (!name) {
+        if (!no_prints)
+            fprintf(stderr, "crispasr: speaker-db: recording unmatched, labels stay anonymous (best cos %.2f)\n",
+                    score);
+        return false;
+    }
+
+    // No diarization ran, so the recording is asserted single-speaker:
+    // the one matched identity labels every segment, short ones included.
+    const std::string label = std::string("(") + name + ") ";
+    for (auto& seg : segs)
+        seg.speaker = label;
+    if (!no_prints)
+        fprintf(stderr, "crispasr: speaker-db: recording -> '%s' (cos %.2f)\n", name, score);
+    return true;
 }

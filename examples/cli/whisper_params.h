@@ -184,11 +184,18 @@ struct whisper_params {
     std::string enroll_speaker;     // enrollment mode: save embedding as this name
     std::string titanet_model;      // TitaNet GGUF path or "auto"
     float speaker_threshold = 0.7f; // cosine similarity threshold for matching
+    // Closed roster for identification (issue #266): comma-separated names
+    // of enrolled participants the deployer asserts are present in THIS
+    // recording. Matching runs per global speaker cluster and only against
+    // these profiles; there is no open "identify anyone in the db" mode
+    // (that would be remote biometric identification under the EU AI Act,
+    // Annex III 1(a)). REQUIRED for --speaker-db matching.
+    std::string expect_speakers;
     // The named-profile DB (--enroll-speaker / --speaker-db) persists
-    // voiceprints linked to real names and performs 1:N identification —
-    // biometric special-category data under GDPR Art. 9. It is OFF by
-    // default: the deployer must affirm a lawful basis + explicit consent
-    // via --speaker-db-consent before enrollment or matching will run.
+    // voiceprints linked to real names — biometric special-category data
+    // under GDPR Art. 9. It is OFF by default: the deployer must affirm a
+    // lawful basis + explicit consent via --speaker-db-consent before
+    // enrollment or matching will run.
     bool speaker_db_consent = false;
 
     // Embedding-based diarization clustering (issue #107 P3). When set,

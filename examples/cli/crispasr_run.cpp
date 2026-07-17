@@ -385,6 +385,58 @@ static void crispasr_warn_if_empty_transcript(bool have_text, const std::vector<
 // it's an uncontended lock when n_processors == 1.
 std::mutex g_stdout_mutex;
 
+// Global post-merge speaker stages (issue #266). Runs on the FULL merged
+// segment list so anonymous clustering and named identification share one
+// foundation and one execution order:
+//   global embedding clustering  ->  per-cluster speaker-db matching
+// Identification is a closed-roster confirmation: the db is narrowed to
+// params.expect_speakers before any match, each cluster is matched
+// independently against the claimed profiles, unmatched clusters keep
+// their anonymous "(speaker N) " labels, and nothing runs after this
+// stage that could overwrite a matched name.
+static void crispasr_apply_global_speaker_stages(std::vector<crispasr_segment>& all_segs,
+                                                 const std::vector<float>& samples, const whisper_params& params) {
+    const bool want_cluster = params.diarize && !params.diarize_embedder.empty();
+    const bool want_ident = !params.speaker_db.empty() && params.speaker_db_consent && !params.expect_speakers.empty();
+    if ((!want_cluster && !want_ident) || all_segs.empty() || samples.empty())
+        return;
+
+    // One embedder for both stages. Identification without --diarize uses
+    // the enrollment-side model (--titanet-model / auto) so dimensions
+    // match the enrolled profiles.
+    const std::string spec = !params.diarize_embedder.empty()
+                                 ? params.diarize_embedder
+                                 : (!params.titanet_model.empty() ? params.titanet_model : std::string("auto"));
+    auto embedder = crispasr_make_speaker_embedder(spec, params.n_threads, params.cache_dir);
+    if (!embedder)
+        return;
+
+    CrispasrClusterEmbeddings clusters;
+    if (want_cluster)
+        crispasr_remap_speakers_via_embeddings(all_segs, samples.data(), (int)samples.size(), embedder.get(), params,
+                                               want_ident ? &clusters : nullptr);
+
+    if (!want_ident)
+        return;
+
+    speaker_db* db = speaker_db_load(params.speaker_db.c_str());
+    if (!db)
+        return;
+    const int claimed = speaker_db_retain(db, params.expect_speakers.c_str());
+    if (claimed <= 0) {
+        fprintf(stderr,
+                "crispasr: speaker-db: none of the claimed speakers (--expect-speakers '%s') are\n"
+                "  enrolled in '%s' — all labels stay anonymous\n",
+                params.expect_speakers.c_str(), params.speaker_db.c_str());
+    } else if (want_cluster) {
+        crispasr_identify_speaker_clusters(all_segs, clusters, db, params.speaker_threshold, params.no_prints);
+    } else {
+        crispasr_identify_single_speaker(all_segs, samples.data(), (int)samples.size(), embedder.get(), db,
+                                         params.speaker_threshold, params.no_prints);
+    }
+    speaker_db_free(db);
+}
+
 // Process a single input file end-to-end with the given backend instance.
 // Pulled out of the main loop so the parallel-processors path can call
 // it from worker threads. Each call holds its own audio buffers + segment
@@ -509,7 +561,8 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             db_dir = params.cache_dir.empty()
                          ? std::string(getenv("HOME") ? getenv("HOME") : ".") + "/.cache/crispasr/speakers"
                          : params.cache_dir + "/speakers";
-        if (!speaker_db_enroll(db_dir.c_str(), params.enroll_speaker.c_str(), emb, dim)) {
+        if (!speaker_db_enroll(db_dir.c_str(), params.enroll_speaker.c_str(), emb, dim,
+                               /*consent_attested=*/params.speaker_db_consent)) {
             fprintf(stderr, "crispasr: error: failed to enroll speaker '%s'\n", params.enroll_speaker.c_str());
             return 24;
         }
@@ -1019,49 +1072,12 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             }
         }
 
-        // Speaker identification: match diarized speakers against profile DB.
-        // Also supports standalone speaker ID (without diarize) when --speaker-db is set.
-        //
-        // Biometric consent gate (1:N named identification, GDPR Art. 9):
-        // skip entirely unless the deployer affirmed --speaker-db-consent.
-        // Warn once (the slice loop may run on multiple workers).
-        if (!params.speaker_db.empty() && !params.speaker_db_consent) {
-            static std::once_flag spk_consent_warn;
-            std::call_once(spk_consent_warn, [] {
-                fprintf(stderr, "crispasr: --speaker-db ignored: 1:N matching against named voiceprints is\n"
-                                "  biometric identification (GDPR Art. 9). Re-run with --speaker-db-consent to\n"
-                                "  affirm consent + a lawful basis. For privacy-clean stable speaker labels\n"
-                                "  that identify no one, use --diarize-speakers instead.\n");
-            });
-        }
-        if (!params.speaker_db.empty() && params.speaker_db_consent && !segs.empty()) {
-            static titanet_context* spk_ctx = nullptr;
-            static speaker_db* spk_db = nullptr;
-            if (!spk_ctx) {
-                std::string tm = params.titanet_model;
-                if (tm.empty() || tm == "auto")
-                    tm = crispasr_resolve_model("auto", "titanet", params.no_prints, params.cache_dir,
-                                                params.auto_download, "");
-                if (!tm.empty())
-                    spk_ctx = titanet_init(tm.c_str(), params.n_threads);
-            }
-            if (!spk_db)
-                spk_db = speaker_db_load(params.speaker_db.c_str());
-            if (spk_ctx && spk_db && speaker_db_count(spk_db) > 0) {
-                // Extract embedding for the whole slice and match
-                float emb[192];
-                int dim = titanet_embed(spk_ctx, samples.data() + sl.start, sl.end - sl.start, emb);
-                if (dim > 0) {
-                    float score = 0;
-                    const char* name = speaker_db_match(spk_db, emb, dim, params.speaker_threshold, &score);
-                    if (name) {
-                        std::string label = std::string("(") + name + ") ";
-                        for (auto& seg : segs)
-                            seg.speaker = label;
-                    }
-                }
-            }
-        }
+        // NOTE (issue #266): speaker-db identification no longer runs here.
+        // One embedding per dispatcher slice assigned a single identity to
+        // every segment in the slice — wrong for mixed-speaker slices — and
+        // global clustering later overwrote the names anyway. Identification
+        // now runs once, post-merge, per global speaker cluster: see
+        // crispasr_apply_global_speaker_stages().
 
         // Issue #62: --force-aligner bypasses CAP gate + already-aligned skip.
         const bool want_align =
@@ -1242,17 +1258,11 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                 per_slice_redo[i] = std::move(per_slice[i]);
             }
             auto all_segs = merge_segments(std::move(per_slice_redo), slices);
-            // Mirror the embedding-based remap from the sequential
-            // path above so file outputs in the parallel/output-redo
-            // path get globally stable speaker IDs too (#107 P3).
-            if (params.diarize && !params.diarize_embedder.empty() && !all_segs.empty() && !samples.empty()) {
-                auto embedder =
-                    crispasr_make_speaker_embedder(params.diarize_embedder, params.n_threads, params.cache_dir);
-                if (embedder) {
-                    crispasr_remap_speakers_via_embeddings(all_segs, samples.data(), (int)samples.size(),
-                                                           embedder.get(), params);
-                }
-            }
+            // Mirror the global speaker stages from the sequential path
+            // below so file outputs in the parallel/output-redo path get
+            // globally stable speaker IDs (#107 P3) and cluster-level
+            // named identification (#266) too.
+            crispasr_apply_global_speaker_stages(all_segs, samples, params);
             apply_punc_model(punc_ctx, all_segs);
             apply_truecase_model(tc_ctx, all_segs);
             apply_truecase_crf_model(tc_crf_ctx, all_segs);
@@ -1314,18 +1324,12 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
 
     auto all_segs = merge_segments(std::move(per_slice), slices);
 
-    // Optional embedding-based clustering (#107 P3). When the user
-    // supplied --diarize-embedder, anchor speaker IDs globally across
-    // all slices by embedding each finalized segment and clustering
-    // on cosine similarity. The pluggable embedder dispatches to
-    // TitaNet today; future adapters drop in via the same factory.
-    if (params.diarize && !params.diarize_embedder.empty() && !all_segs.empty() && !samples.empty()) {
-        auto embedder = crispasr_make_speaker_embedder(params.diarize_embedder, params.n_threads, params.cache_dir);
-        if (embedder) {
-            crispasr_remap_speakers_via_embeddings(all_segs, samples.data(), (int)samples.size(), embedder.get(),
-                                                   params);
-        }
-    }
+    // Global speaker stages (#107 P3 clustering + #266 identification):
+    // embedding-based clustering anchors speaker IDs globally across all
+    // slices, then the optional speaker-db stage matches each CLUSTER
+    // against the claimed roster. Runs after merge so both label writers
+    // share one foundation and matched names can't be overwritten.
+    crispasr_apply_global_speaker_stages(all_segs, samples, params);
 
     apply_punc_model(punc_ctx, all_segs);
     apply_truecase_model(tc_ctx, all_segs);
@@ -1486,6 +1490,46 @@ static int tada_run_aligner_pipeline(const whisper_params& params, const std::st
 
 int crispasr_run_backend(const whisper_params& params_in) {
     whisper_params params = params_in;
+
+    // ── Speaker-db policy gates (issue #266) ──────────────────────────────
+    // Named identification is recorded-file only, consent-gated, and a
+    // closed-roster confirmation. All three are hard invariants:
+    //  * never in streaming/live mode (a real-time identification path is
+    //    exactly what the EU AI Act's RBI regime restricts — Art. 5(1)(h));
+    //  * no consent affirmation, no biometric processing (GDPR Art. 9);
+    //  * no open 1:N scan — the deployer must claim WHO is present via
+    //    --expect-speakers; clusters match only against those profiles.
+    if (params.stream && (!params.speaker_db.empty() || !params.enroll_speaker.empty())) {
+        fprintf(stderr, "crispasr: error: --speaker-db/--enroll-speaker are not available in streaming mode.\n"
+                        "  Named speaker identification is restricted to recorded files (post-processing);\n"
+                        "  real-time identification is deliberately unsupported.\n");
+        return 26;
+    }
+    if (!params.speaker_db.empty() && params.enroll_speaker.empty()) {
+        if (!params.speaker_db_consent) {
+            fprintf(stderr, "crispasr: --speaker-db ignored: matching named voiceprints is biometric\n"
+                            "  identification (GDPR Art. 9). Re-run with --speaker-db-consent to affirm\n"
+                            "  consent + a lawful basis. For privacy-clean stable speaker labels that\n"
+                            "  identify no one, use --diarize-speakers instead.\n");
+            params.speaker_db.clear();
+        } else if (params.expect_speakers.empty()) {
+            fprintf(stderr, "crispasr: error: --speaker-db requires --expect-speakers \"NameA,NameB\".\n"
+                            "  Identification is a closed-roster confirmation of participants you assert are\n"
+                            "  present (and who consented at enrollment). An open \"who is this voice\" scan of\n"
+                            "  the whole database is deliberately unsupported: that would be 1:N remote\n"
+                            "  biometric identification (EU AI Act, Annex III 1(a)). Unmatched clusters keep\n"
+                            "  anonymous (speaker N) labels.\n");
+            return 27;
+        } else if (params.diarize && params.diarize_embedder.empty()) {
+            // Identification is defined per global speaker cluster, so
+            // --speaker-db with diarization implies the clustering
+            // embedder (same default as --diarize-speakers).
+            params.diarize_embedder = "auto";
+            if (!params.no_prints)
+                fprintf(stderr, "crispasr: --speaker-db with --diarize enables global speaker clustering "
+                                "(--diarize-embedder auto)\n");
+        }
+    }
 
     // ── --detect-watermark: standalone watermark detection verb ───────────
     // Reads a WAV file, runs watermark detection, prints the result, exits.
