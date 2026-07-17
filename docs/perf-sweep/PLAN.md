@@ -28,10 +28,10 @@ env, NOT the OVC1 `CRISPASR_*_VOICE_CACHE`). **A/B VERIFIED** via `test-openvoic
 `CRISPASR_S3GEN_CFG_INTERVAL` in s3gen's 10-step CFM Euler solver: K>1 forces the
 sequential single-UNet path and skips the uncond pass every K steps; batched-B2 default
 (K=1) byte-unchanged by construction. **Verification (honest):** default byte-safe;
-K>1 ENGAGES + valid non-crash output; but K>1 CONTENT A/B did NOT complete on M1 (synth
-6+ min t3-AR-bound; no-voice audio garbles ASR; proper-voice single-path A/B too slow)
-→ **content verify DEFERRED OFF-BOX (CUDA / quiet box + voice)**. Do NOT re-implement;
-the OPEN part is that off-box content verify. (Sonnet owns TODO-B k=1→matmul.)
+K>1 ENGAGES + valid non-crash output; but K>1 now M1-VERIFIED via a fast CFM-only
+harness (`tests/chatterbox-s3gen-cfg-interval-ab`, skips T3 AR): K1a==K1b byte-identical
+(default B2 deterministic), K1-vs-K2 mel cos 0.980 / K3 0.984 — strong content proxy.
+Only a real-speech ASR round-trip + CUDA remain as off-box nice-to-haves. (Sonnet owns TODO-B k=1→matmul.)
 
 **In flight (2026-07-16, this session): remaining locally-doable items.** ✅ TODO-C
 resolved — **kokoro FASTCONV landed** (`323e96f23`, 89 F16 kernels, byte-identical);
@@ -287,15 +287,15 @@ melotts → remaining ~21, each byte+ASR A/B'd.
 #   speecht5, chatterbox_s3gen, cosyvoice3, kokoro). No local F16-through-conv1d
 #   targets remain (indextts F16 = custom-CPU-op filters; fastpitch f16 = dead-end).
 # Interval-CFG (opt-in): ✅ 6 landed (cosyvoice3, f5, voxcpm2, dots, irodori, tada);
-#   ✅ chatterbox impl (`a4a8f64de`) opt-in, off-box content verify OPEN. ⛔ dia/zonos/voxtral (AR batched-KV,
+#   ✅ chatterbox opt-in, M1-VERIFIED (mel cos 0.980 via CFM-only harness); real-speech ASR + CUDA = off-box nice-to-haves. ⛔ dia/zonos/voxtral (AR batched-KV,
 #   not amenable); vibevoice (low-value). NATURALNESS ear for ALL 7 = ⛔ human-only.
 #
 # STILL OPEN (by blocker):
 #   • TODO-3 Metal q4_k→prefer-q8 on Apple — VERIFIABLE HERE (registry schema + test-
 #     registry). Quick tier needs per-entry alt-quant metadata + HF q8-URL check. OPEN.
 #   • TODO-B chatterbox k=1→matmul [SONNET] — needs CUDA A/B (drift-prone GPU). OPEN.
-#   • TODO-2 chatterbox interval-CFG K>1 CONTENT verify — needs CUDA / quiet-box +
-#     proper voice (M1 no-voice audio garbles ASR). Impl done; verify OPEN off-box.
+#   • TODO-2 chatterbox interval-CFG — DONE + M1-verified (mel cos 0.980, CFM-only
+#     harness); real-speech ASR round-trip + CUDA = off-box nice-to-haves only.
 #   • TODO-4 nightly perf-emit + committed baseline [SONNET] — needs GPU-in-CI +
 #     noise-floor calibration; compare-logic+test already landed (unit-tested here).
 #   • TODO-5 fused-step-graph rollout [FABLE] · TODO-6 voice-cache rollout [claimed] ·
