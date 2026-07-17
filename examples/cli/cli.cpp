@@ -783,6 +783,10 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.vad_samples_overlap = std::stof(ARGV_NEXT);
     } else if (arg == "--vad-stitch") {
         params.vad_stitch = true;
+    } else if (arg == "--vad-export") {
+        params.vad_export_file = ARGV_NEXT;
+    } else if (arg == "--vad-import") {
+        params.vad_import_file = ARGV_NEXT;
     } else {
         return false;
     }
@@ -1328,6 +1332,13 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(stderr,
             "  -vo N,     --vad-samples-overlap         N [%-7.2f] VAD samples overlap (seconds between segments)\n",
             params.vad_samples_overlap);
+    fprintf(stderr,
+            "             --vad-export FILE            [%-7s] write computed VAD/chunk boundaries to FILE (JSON)\n",
+            params.vad_export_file.empty() ? "none" : params.vad_export_file.c_str());
+    fprintf(
+        stderr,
+        "             --vad-import FILE            [%-7s] read segment boundaries from FILE instead of running VAD\n",
+        params.vad_import_file.empty() ? "none" : params.vad_import_file.c_str());
     fprintf(stderr, "\n");
 }
 

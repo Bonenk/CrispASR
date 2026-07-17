@@ -168,3 +168,24 @@ int64_t crispasr_vad_remap_timestamp(const std::vector<crispasr_vad_mapping>& ma
 // shutdown or when the VAD model is no longer needed. The cache is
 // automatically invalidated when the model path changes.
 void crispasr_vad_free_cache();
+
+// ---- VAD segment boundary export / import (issue #227) ----
+//
+// Serialize a slice list to a small JSON document so it can be persisted
+// and reused across ASR runs (e.g. transcribe the same audio with several
+// backends without re-running VAD each time). The format is:
+//
+//   { "crispasr_vad": { "version": 1, "sample_rate": 16000,
+//       "num_slices": N,
+//       "slices": [ { "start": <sample>, "end": <sample>,
+//                     "t0_cs": <centisec>, "t1_cs": <centisec> }, ... ] } }
+//
+// `start`/`end` are sample indices into the full PCM buffer at
+// `sample_rate`; `t0_cs`/`t1_cs` are absolute centisecond timestamps.
+std::string crispasr_serialize_vad_slices(const std::vector<crispasr_audio_slice>& slices, int sample_rate);
+
+// Parse a document produced by crispasr_serialize_vad_slices back into a
+// slice list. Tolerant of whitespace and field ordering. Returns false on
+// malformed input (in which case `out` is left empty). When `sample_rate_out`
+// is non-null it receives the serialized sample rate (0 if absent).
+bool crispasr_parse_vad_slices(const std::string& text, std::vector<crispasr_audio_slice>& out, int* sample_rate_out);

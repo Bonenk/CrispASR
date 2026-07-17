@@ -57,13 +57,21 @@ The qwen3-tts CP_DIRECT fused graph (#245) and the defaults-audit generalisation
 
 **Files:** `tools/reference_backends/<tts_backend>.py` + `crispasr_diff_main.cpp`.
 
-### #227 — VAD info reuse (VPS-doable, feature request)
+### #227 — VAD info reuse — DONE (feat/vad-export-import)
 
 **What:** Run ASR multiple times on the same audio with different backends without re-computing VAD — expose VAD segment boundaries for reuse.
 
-**How:** Add `--vad-export FILE` (writes boundaries as JSON) and `--vad-import FILE` (reads them instead of running VAD). Pure CLI, no model changes.
-
-**Files:** `examples/cli/crispasr_run.cpp` — export/import around the `vad_segments` vector.
+**Shipped:** `--vad-export FILE` writes the computed slice boundaries as JSON;
+`--vad-import FILE` reads them instead of running VAD (skips the VAD model
+entirely). Serializer/parser live in the library (`crispasr_serialize_vad_slices`
+/ `crispasr_parse_vad_slices` in `src/crispasr_vad.{h,cpp}`) so they're
+unit-tested and reusable; CLI wiring in `examples/cli/crispasr_run.cpp` +
+`cli.cpp` + `whisper_params.h`. Import clamps to the current buffer, drops
+out-of-range slices, and rescales when the sample rate differs. Unit test
+`tests/test-vad-boundaries.cpp` (6 cases, round-trip + tolerant-parse +
+malformed-reject). Verified e2e: `--vad-export` then `--vad-import` on jfk.wav
+(moonshine-tiny) → byte-identical transcript, VAD skipped. Documented in
+`docs/cli.md`.
 
 ## Gemma-4 12B (gemma4_unified) ASR support (OPEN)
 

@@ -69,8 +69,10 @@
 #include <fcntl.h>
 #include <io.h>
 #endif
+#include <fstream>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -729,8 +731,72 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         (slice_chunk_seconds == 0 || slice_chunk_seconds > vad_cap)) {
         slice_chunk_seconds = vad_cap;
     }
-    const auto slices =
-        crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, slice_chunk_seconds, params);
+    // Issue #227: when --vad-import is given, read the segment boundaries from
+    // the JSON file instead of running VAD (skips the VAD model entirely). This
+    // lets the same audio be transcribed by several backends while paying the
+    // VAD cost only once (--vad-export writes the boundaries on the first run).
+    std::vector<crispasr_audio_slice> slices;
+    if (!params.vad_import_file.empty()) {
+        std::ifstream in(params.vad_import_file, std::ios::binary);
+        if (!in) {
+            fprintf(stderr, "crispasr: error: cannot open --vad-import file '%s'\n", params.vad_import_file.c_str());
+            return 1;
+        }
+        std::ostringstream ss;
+        ss << in.rdbuf();
+        int imported_sr = 0;
+        if (!crispasr_parse_vad_slices(ss.str(), slices, &imported_sr)) {
+            fprintf(stderr, "crispasr: error: malformed --vad-import file '%s'\n", params.vad_import_file.c_str());
+            return 1;
+        }
+        // Boundaries are sample indices at the rate they were computed. If that
+        // differs from this run's rate, rescale to keep them aligned in time
+        // (t0_cs/t1_cs are rate-independent centiseconds — left as-is).
+        if (imported_sr > 0 && imported_sr != SR) {
+            fprintf(stderr, "crispasr: --vad-import boundaries were computed at %d Hz, this run is %d Hz — rescaling\n",
+                    imported_sr, SR);
+            for (auto& s : slices) {
+                s.start = (int)((int64_t)s.start * SR / imported_sr);
+                s.end = (int)((int64_t)s.end * SR / imported_sr);
+            }
+        }
+        // Clamp to the current buffer and drop empty/invalid slices so a stale
+        // or hand-edited file can't index out of bounds.
+        const int n_samp = (int)samples.size();
+        std::vector<crispasr_audio_slice> clean;
+        clean.reserve(slices.size());
+        for (auto& s : slices) {
+            if (s.start < 0)
+                s.start = 0;
+            if (s.end > n_samp)
+                s.end = n_samp;
+            if (s.end > s.start)
+                clean.push_back(s);
+        }
+        const size_t dropped = slices.size() - clean.size();
+        slices = std::move(clean);
+        if (!params.no_prints) {
+            fprintf(stderr, "crispasr: imported %zu VAD segment(s) from '%s'%s\n", slices.size(),
+                    params.vad_import_file.c_str(),
+                    dropped ? (" (" + std::to_string(dropped) + " out-of-range dropped)").c_str() : "");
+        }
+    } else {
+        slices = crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, slice_chunk_seconds, params);
+    }
+
+    // Issue #227: persist the computed boundaries for reuse on a later run.
+    if (!params.vad_export_file.empty()) {
+        std::ofstream out(params.vad_export_file, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            fprintf(stderr, "crispasr: warning: cannot write --vad-export file '%s'\n", params.vad_export_file.c_str());
+        } else {
+            out << crispasr_serialize_vad_slices(slices, SR);
+            if (!params.no_prints) {
+                fprintf(stderr, "crispasr: exported %zu VAD segment(s) to '%s'\n", slices.size(),
+                        params.vad_export_file.c_str());
+            }
+        }
+    }
 
     if (slices.empty()) {
         fprintf(stderr, "crispasr: warning: no speech detected in '%s'\n", fname_inp.c_str());

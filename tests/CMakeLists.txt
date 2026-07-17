@@ -475,6 +475,24 @@ catch_discover_tests(test-speaker-cluster
     PROPERTIES LABELS "unit;diarize"
 )
 
+# VAD segment boundary export/import serialization (issue #227). Pure
+# string <-> struct round-trip; no model, no audio. Links crispasr-lib so
+# it tests the shipped serializer/parser rather than a fork.
+add_executable(test-vad-boundaries
+    test-vad-boundaries.cpp
+)
+target_include_directories(test-vad-boundaries PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-vad-boundaries PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-vad-boundaries
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;vad"
+)
+
 # Named-voiceprint profile DB used by the opt-in --speaker-db path. Drives
 # enroll/load/match on synthetic embeddings; no model, no audio, no network.
 add_executable(test-speaker-db

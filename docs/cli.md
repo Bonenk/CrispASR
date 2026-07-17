@@ -191,12 +191,34 @@ document (issue #228).
 | `-vt F` | VAD threshold (default 0.5) |
 | `-vspd N` | VAD min speech duration (ms, default 250) |
 | `-vsd N` | VAD min silence duration (ms, default 100) |
+| `--vad-export FILE` | Write the computed VAD/chunk segment boundaries to `FILE` as JSON |
+| `--vad-import FILE` | Read segment boundaries from `FILE` instead of running VAD — reuse boundaries across backends without recomputing VAD (issue #227) |
 | `-ck N`, `--chunk-seconds N` | Fallback chunk size when VAD is off (default: 30 s for whisper, disabled for other backends) |
 | `--chunk-overlap F` | Overlap context (seconds) at chunk boundaries (default 3.0) |
 | `--lcs-dedup auto\|on\|off` | NeMo-style sub-word LCS dedup across chunk boundaries (default `auto` — fires when chunking with overlap) |
 | `--lcs-min-length N` | Minimum LCS length to act on (default 1; raise to 3-4 on long-silence audio where blank tokens dominate boundaries) |
 | `--parakeet-decoder ctc\|tdt\|maes` | Select decode strategy: `ctc` (CTC head), `tdt` (TDT greedy/beam, default), `maes` (MAES beam search — requires `-bs N` with N>1) |
 | `-bs N`, `--beam-size N` | Parakeet TDT/RNNT beam search width (default 1 = greedy). `2`–`4` recommended with hotwords or MAES. CTC decode is frame-synchronous and always greedy |
+
+#### Reusing VAD boundaries across backends (#227)
+
+VAD (or the fixed-chunk fallback) runs on every invocation. To compare
+several backends on the same audio without paying that cost each time,
+export the boundaries once and import them afterwards:
+
+```bash
+# Run 1: compute VAD once and save the boundaries.
+crispasr -m whisper.gguf -f talk.wav --vad --vad-export talk.vad.json
+
+# Runs 2..N: reuse the same boundaries (no VAD model loaded).
+crispasr -m parakeet.gguf -f talk.wav --vad-import talk.vad.json
+crispasr -m moonshine.gguf -f talk.wav --vad-import talk.vad.json
+```
+
+The JSON records each segment's sample offsets plus absolute centisecond
+timestamps; boundaries are clamped to the imported audio and rescaled if
+the sample rate differs. `--vad-export` also works without `--vad` (it
+then captures the fixed-chunk boundaries).
 
 ### MAES beam search (§134)
 
