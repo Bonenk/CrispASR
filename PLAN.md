@@ -1,5 +1,18 @@
 # CrispASR — Pending work
 
+## #266 follow-up — hoist speaker orchestration into the library (PARKED, LOW)
+
+The #266 rework (closed-roster, cluster-level speaker identification — DONE,
+see `docs/speaker-db-clusters/PLAN.md` + HISTORY) left one parked item (F9):
+the diarize → merge → global-cluster → identify orchestration lives in the CLI
+(`crispasr_apply_global_speaker_stages()`, examples/cli/crispasr_run.cpp).
+Session-ABI/bindings compose the primitives themselves; the server exposes no
+speaker-db (deliberate). If a binding or the server ever needs the full named
+pipeline, hoist the orchestration into src/ (the parakeet_orchestrate
+pattern / multi-surface lesson) rather than duplicating it per surface. The
+compliance invariants (consent + `--expect-speakers` closed roster + post-only)
+must move with it — see `docs/diarization-speakers.md` §2.
+
 Pending roadmap items. Each is self-contained with files, approach, and
 effort estimate. Completed items have been moved to `HISTORY.md`.
 
