@@ -10,6 +10,82 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Two writers on one output field at different pipeline stages = an ordering bug — fix the ORDER, don't bolt on provenance (#266 speaker labels, 2026-07-17)
+
+`--speaker-db` wrote matched names into `seg.speaker` per slice (pre-merge);
+global clustering rewrote the same field per segment post-merge. Result: mixed
+slices got one identity, then clustering destroyed the names anyway. The
+tempting fix is a structured label (`{cluster_id, name?, source, score}`) with
+precedence rules — a real refactor across every output writer. The actual fix
+was smaller and stronger: **make the two writers one ordered chain** (cluster
+first, identify per CLUSTER after, nothing label-touching downstream). Once
+identification consumes clustering's output instead of racing it, "later
+stages must not overwrite matched names" holds by construction and the string
+field is fine. Generalization: when two features fight over one field, first
+ask whether they're actually *stages* of one pipeline in the wrong order;
+provenance/priority metadata is the fallback, not the default. Bonus from the
+same change: the identification stage reuses the embeddings clustering already
+computed (centroid per cluster) — correct architecture was also the cheaper
+one (no second embedding pass).
+
+## Path-filtered CI workflows ROT — the first re-triggering change inherits ALL the debt accumulated since the last run (Go bindings, 2026-07-17)
+
+`Bindings Tests (Go)` only runs when `bindings/go/**` changes. Nobody had
+touched it since 2026-07-14, so three independent breaks sat invisible until
+the #266 ABI sweep re-triggered it, and they surfaced ONE AT A TIME (each fix
+revealed the next): (1) a cgo-preamble decl used `crispasr_session*` where the
+preamble's opaque typedef is `CrispasrSession` — gcc rejects the whole
+preamble; (2) the same old commit declared `func (s *Session)` for a type
+named `CrispasrSession` — plain Go compile error; (3) `whisper.go` cgo LDFLAGS
+had drifted when the c2pa-audio lib was added (the drift-check job had never
+run either). Lessons: (a) when your change re-awakens a dormant path-filtered
+workflow, budget for paying down its debt — the red X on YOUR commit is
+usually not (only) your bug; check `git log` since the workflow's last
+successful run before debugging your own diff; (b) a cgo preamble is compiled
+C — `gcc -fsyntax-only` on the extracted comment block reproduces CI's
+preamble errors locally in seconds, no cgo build needed; (c) for LDFLAGS
+regeneration on macOS, the documented recipe (`-DGGML_METAL=OFF
+-DGGML_BLAS=OFF -DGGML_CUDA=OFF` + `--dot`) really does keep Metal/BLAS out
+of the linux line — verify the diff adds only the intended `-l<newlib>`.
+
+## Scoped `ctest -R` on a PARTIALLY BUILT tree has two name-collision traps: configure-time add_test and catch_discover NOT_BUILT placeholders (first Windows unit-test leg, 2026-07-17)
+
+To run just the speaker-db tests on the (never-unit-tested) Windows CI job we
+built 3 of ~200 test targets and filtered `ctest -R "speaker|..."`. Two
+non-obvious classes of test still match such a filter without being built:
+(1) **plain `add_test(NAME ... COMMAND script)` entries register at CONFIGURE
+time** regardless of what was built — `test-speaker-id-live` (a bash script)
+matched "speaker" and would have been exec'd on Windows; (2)
+**`catch_discover_tests` writes a failing `<target>_NOT_BUILT-<hash>`
+placeholder** for targets that were configured but never built — the unbuilt
+`test-crispasr-speaker-resample` placeholder matched "speaker" and failed the
+first real run 38/39. The robust pattern for a scoped leg:
+`ctest -R "<positive>" -E "live|NOT_BUILT"` + register POSIX-script tests
+`if(NOT WIN32)`. Also: enumerate what a regex matches BEFORE shipping it —
+resolving every TEST_CASE name + add_test registration against the filter
+(a 15-line python pass over tests/CMakeLists.txt) caught trap (1) pre-push;
+trap (2) only a real run could catch. Positive result worth keeping: the
+speaker-db suite (incl. the `.spkr` v2 `CreateDirectoryA` path) passes on
+windows-latest — the `_WIN32` code paths were correct all along, just never
+executed.
+
+## A binding wrapper that has never been EXECUTED is untested code — and parallel agents produce cross-cutting conflicts only the verifier can see (#266 hardening, 2026-07-17)
+
+The hand-updated Python `SpeakerDB` wrapper passed symbol-parity checks and
+eyeball review, yet its first-ever runtime execution found two real bugs in
+minutes: the class was never re-exported from `crispasr/__init__.py`
+(ImportError on the documented usage), and `__init__` raised (consent gate)
+before setting `self._db`, so every refused instance crashed `__del__` at GC.
+Symbol lists and signatures verify LINKAGE, not behavior — when touching an
+ABI, write one runtime smoke per wrapper you changed (ctypes + a shared-lib
+build is enough; `build-shared` with warm ccache is mostly link time). Second
+lesson from the same session: two agents in isolated worktrees each did
+correct work that CONFLICTED — agent A added a POSIX gate-test script whose
+ctest name matched agent B's new Windows `ctest -R "speaker|..."` filter.
+Neither could see the other's diff. The verifier's job is not just re-running
+each agent's tests but explicitly checking the INTERACTION of concurrently
+produced diffs (grep each diff's new identifiers against the other's).
+
 ## Deterministic DROPOUT of whole words/tokens (not garble) = a zeroed weight BLOCK in the shipped GGUF — scan converted tensors for zero-norm rows BEFORE debugging the port (OmniVoice #254 `token_embd`, 2026-07-15)
 
 OmniVoice TTS silently dropped specific words ("quick", "started", "One", "See";

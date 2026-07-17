@@ -26,6 +26,22 @@ binding wrappers updated). `.spkr` v2 records the consent attestation +
 enrollment timestamp. Details: `docs/speaker-db-clusters/PLAN.md`,
 `docs/diarization-speakers.md`.
 
+**Same-day hardening follow-ups (F1–F8, two delegated agents + main-session
+verification):** automated CLI gate tests (exit 26/27 + no-consent warn,
+model-free); live validation on the real `samples/multispeaker.wav` (named
+cluster cos 0.97 vs unmatched 0.05) + an env-gated live test; parallel-path
+parity; legacy-path warning; docs caveats; every binding wrapper checked —
+the never-executed Python `SpeakerDB` had two real bugs (missing re-export,
+`__del__` crash on consent refusal), fixed + runtime-tested. The Windows CI
+job ran unit tests for the FIRST time (scoped to the three speaker-db
+targets): 38 tests green incl. the `.spkr` v2 `CreateDirectoryA` path, after
+excluding configure-time `add_test` scripts and `catch_discover` `NOT_BUILT`
+placeholders from the filter. Re-triggering the dormant path-filtered Go
+workflow surfaced + fixed three unrelated latent breaks (cgo preamble type,
+`*Session` receiver typo, c2pa LDFLAGS drift). Lessons distilled in
+LEARNINGS.md (ordering-not-provenance; path-filtered CI rot; scoped-ctest
+traps; execute-your-wrappers / verify agent-diff interactions).
+
 ## 2026-07-15 — #254: OmniVoice dropped whole words = 4094 zeroed rows in the shipped `token_embd`
 
 Reporter: long English prompts dropped words ("started", "One", "See", "pick";
