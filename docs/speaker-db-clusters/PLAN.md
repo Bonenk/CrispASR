@@ -19,8 +19,11 @@ the 5/5 Python tests).
   targets (`ctest -R "speaker|cluster|centroid|whisper_params" -E "live"`);
   main session added the `-E live` exclusion (configure-time-registered
   `test-speaker-id-live` would otherwise match) and gated the new F1 gate
-  script `NOT WIN32` (POSIX shell). PENDING: first green windows CI run
-  confirms empirically.
+  script `NOT WIN32` (POSIX shell). CONFIRMED green (CI on 3a204824c):
+  38 speaker-db tests pass on windows-latest, incl. the `.spkr` v2
+  CreateDirectoryA write path — after excluding catch_discover
+  `NOT_BUILT` placeholders from the filter (first run failed only on the
+  unbuilt test-crispasr-speaker-resample placeholder matching 'speaker').
 - **F8**: release-notes draft ready below (Earlier section) — pick it up at
   the next `scripts/bump-version.sh` release.
 - **F9**: parked (library-level orchestration hoist; separate change).
