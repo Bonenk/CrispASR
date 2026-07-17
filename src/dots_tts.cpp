@@ -1638,6 +1638,11 @@ static void dots_run_fused_dit(dots_tts_context* ctx, dots_fused_dit_graph& g, c
 //   pos_ids:       (fm_total_len) RoPE ids or nullptr (arange).
 //   noise:         (patch_size, latent_dim) ODE initial coordinate (caller-seeded).
 // Writes the raw (un-denormalized) latent (patch_size, latent_dim) to out_latent.
+
+// Fused-step gate override for the in-process A/B hook (-1 = use the env /
+// backend default). A plain global instead of setenv — MSVC has no setenv.
+static int g_dots_fused_override = -1;
+
 static void dots_flow_match_core(dots_tts_context* ctx, const float* input_seq, const float* cfg_seq, int fm_total_len,
                                  int latent_start, const float* attn_mask_add, const int32_t* pos_ids,
                                  const float* noise, int num_steps, float cfg_scale, float* out_latent,
@@ -1692,6 +1697,8 @@ static void dots_flow_match_core(dots_tts_context* ctx, const float* input_seq, 
     const bool fused_step = [&] {
         if (!ctx->dit.time_mlp_0_w || !ctx->dit.in_proj_w || !ctx->dit.final_proj_w)
             return false; // legacy path carries the null-tensor diagnostics
+        if (g_dots_fused_override >= 0)
+            return g_dots_fused_override != 0; // in-process A/B hook (portable, no setenv)
         const char* e = std::getenv("CRISPASR_DOTS_FUSED_STEP");
         if (e && *e)
             return *e != '0';
@@ -3133,13 +3140,20 @@ extern "C" int dots_tts_flowmatch_diff(const char* model_gguf, const char* ref_g
     // one model load instead of two full runs.
     const char* ab_env = std::getenv("CRISPASR_DOTS_FM_AB");
     if (ab_env && *ab_env && *ab_env != '0') {
-        const char* cur_gate = std::getenv("CRISPASR_DOTS_FUSED_STEP");
-        const bool cur_fused = cur_gate && *cur_gate && *cur_gate != '0';
-        setenv("CRISPASR_DOTS_FUSED_STEP", cur_fused ? "0" : "1", 1);
+        // Resolve the gate the primary run ACTUALLY used (env override, else
+        // the backend default) — deriving it from the raw env alone would
+        // compare fused-vs-fused when the env is unset on CPU/Metal.
+        const bool cur_fused = [&] {
+            const char* cur_gate = std::getenv("CRISPASR_DOTS_FUSED_STEP");
+            if (cur_gate && *cur_gate)
+                return *cur_gate != '0';
+            return !(ctx->backend && std::strstr(ggml_backend_name(ctx->backend), "CUDA") != nullptr);
+        }();
+        g_dots_fused_override = cur_fused ? 0 : 1; // force the OTHER path (portable, no setenv)
         std::vector<float> other((size_t)out_n, 0.0f);
         dots_flow_match_core(ctx, in_seq.data(), cfg_seq.data(), total_len, latent_start, mask.data(), pos.data(),
                              noise.data(), num_steps, cfg_scale, other.data());
-        setenv("CRISPASR_DOTS_FUSED_STEP", cur_fused ? "1" : "0", 1);
+        g_dots_fused_override = -1;
         const bool same = std::memcmp(got.data(), other.data(), (size_t)out_n * sizeof(float)) == 0;
         std::fprintf(stderr, "dots-tts flow-match A/B (%s vs %s): %s\n", cur_fused ? "fused" : "legacy",
                      cur_fused ? "legacy" : "fused", same ? "BYTE-IDENTICAL" : "DIFFERS");
