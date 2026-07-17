@@ -32,6 +32,8 @@
 #include "core/wav_reader.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h"
+#include "core/tts_ref_cache.h" // shared content-addressed reference-voice cache (issue #265)
+#include "core/crispasr_env.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -63,11 +65,11 @@ namespace {
 // ---------------------------------------------------------------------------
 
 bool env_bool(const char* k) {
-    const char* v = std::getenv(k);
+    const char* v = crispasr_env::get(k);
     return v && *v && std::strcmp(v, "0") != 0;
 }
 const char* env_str(const char* k) {
-    const char* v = std::getenv(k);
+    const char* v = crispasr_env::get(k);
     return (v && *v) ? v : nullptr;
 }
 
@@ -78,7 +80,7 @@ const char* env_str(const char* k) {
 static bool ov_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("OMNIVOICE_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -937,7 +939,7 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
 // Gated for regression bisection, default ON. OMNIVOICE_CODEC_FASTCONV=0 = legacy.
 
 static bool codec_fastconv_enabled() {
-    const char* e = std::getenv("OMNIVOICE_CODEC_FASTCONV");
+    const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_CODEC_FASTCONV");
     return !(e && e[0] == '0');
 }
 
@@ -949,7 +951,7 @@ static bool codec_fastconv_enabled() {
 // perf-discipline before flipping. Enable with OMNIVOICE_CODEC_GPU=1 (requires
 // --use-gpu / GPU main backend). Pairs with FASTCONV (baked F32 kernels).
 static bool codec_gpu_enabled() {
-    const char* e = std::getenv("OMNIVOICE_CODEC_GPU");
+    const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_CODEC_GPU");
     return e && e[0] && e[0] != '0';
 }
 
@@ -1019,7 +1021,7 @@ static std::vector<float> higgs_decode(omnivoice_context* ctx, const int32_t* co
 
     // DAC decoder: conv1 → 5 blocks → snake → conv2
     // Input conv: Conv1d(256, 1024, k=7, p=3)
-    if (env_bool("OMNIVOICE_DEBUG")) {
+    if (env_bool("CRISPASR_OMNIVOICE_DEBUG")) {
         fprintf(stderr, "  decode: pre-fc2 z_q ne=[%ld,%ld]\n", z_q->ne[0], z_q->ne[1]);
         fprintf(stderr, "  decode: fc2_w ne=[%ld,%ld] fc2_b ne=[%ld]\n", tok.fc2_w->ne[0], tok.fc2_w->ne[1],
                 tok.fc2_b ? tok.fc2_b->ne[0] : -1);
@@ -1233,7 +1235,7 @@ static int estimate_target_tokens(const std::string& text, const std::string& re
     } else {
         rt = "Nice to meet you.";
         rd = 25.0;
-        if (const char* e = std::getenv("OMNIVOICE_FRAMES_PER_CHAR")) {
+        if (const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_FRAMES_PER_CHAR")) {
             float v = (float)atof(e);
             if (v > 0.0f)
                 rd = v * duration_text_weight(rt); // env = frames per weighted char
@@ -1560,7 +1562,7 @@ struct ov_gen_result {
 static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::string& text) {
     auto& hp = ctx->hp;
     auto& gen = ctx->gen;
-    bool debug = env_bool("OMNIVOICE_DEBUG");
+    bool debug = env_bool("CRISPASR_OMNIVOICE_DEBUG");
 
     ov_gen_result result;
     result.n_codebooks = (int)hp.n_codebooks;
@@ -1696,7 +1698,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         g.ctx0 = nullptr;
     };
     const bool persistent = [] {
-        const char* e = getenv("OMNIVOICE_PERSISTENT_GRAPH");
+        const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_PERSISTENT_GRAPH");
         return !(e && e[0] == '0');
     }();
     // Unified CFG: fuse cond + uncond into ONE graph (seq-concat + per-block
@@ -1705,7 +1707,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     // there; on Metal/CPU the forward is compute-bound and fusion is ~3% slower, so
     // 2-forward stays the default. Override with OMNIVOICE_UNIFIED_CFG=0/1.
     const bool unified_cfg = [&] {
-        const char* e = getenv("OMNIVOICE_UNIFIED_CFG");
+        const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_UNIFIED_CFG");
         if (e && e[0])
             return e[0] != '0'; // explicit override
         return ctx->backend && std::strstr(ggml_backend_name(ctx->backend), "CUDA") != nullptr;
@@ -1718,7 +1720,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     // and validated by ASR + listening, never a silent default. Only applies to
     // the 2-forward path (unified fuses cond+uncond, so K>1 forces 2-forward).
     const int cfg_interval = [&] {
-        const char* e = getenv("OMNIVOICE_CFG_INTERVAL");
+        const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_CFG_INTERVAL");
         int k = e ? atoi(e) : 1;
         return k >= 1 ? k : 1;
     }();
@@ -1736,7 +1738,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     // AND on CUDA by the #254 reporter (RTX 5070 Ti, cmp identical, gen
     // 3.55 s → 1.53 s, RTF 0.17 → 0.07, single CUDA-graph warmup).
     const bool fused_step = [&] {
-        const char* e = getenv("OMNIVOICE_FUSED_STEP");
+        const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_FUSED_STEP");
         if (e && e[0])
             return e[0] != '0';
         return persistent; // fused graphs are persistent-only
@@ -1780,7 +1782,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         }
         if (!persistent)
             fwd_free(g);
-        if (getenv("OMNIVOICE_DEBUG_SUM")) {
+        if (crispasr_env::get("CRISPASR_OMNIVOICE_DEBUG_SUM")) {
             double s = 0;
             for (float v : tgt)
                 s += v;
@@ -2371,7 +2373,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
 
     // Byte-exact A/B hook: dump the raw generated codes to a file so two runs
     // (e.g. OMNIVOICE_FUSED_STEP=0 vs 1) can be diffed with cmp.
-    if (const char* dump_path = env_str("OMNIVOICE_DUMP_CODES")) {
+    if (const char* dump_path = env_str("CRISPASR_OMNIVOICE_DUMP_CODES")) {
         if (FILE* f = fopen(dump_path, "wb")) {
             fwrite(tokens.data(), sizeof(int32_t), tokens.size(), f);
             fclose(f);
@@ -2379,7 +2381,7 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
         }
     }
 
-    if (getenv("OMNIVOICE_DEBUG_CODES")) {
+    if (crispasr_env::get("CRISPASR_OMNIVOICE_DEBUG_CODES")) {
         int n_mask = 0;
         std::map<int32_t, int> hist;
         for (int32_t t : tokens) {
@@ -3028,7 +3030,7 @@ static int run_encode_diff(omnivoice_context* ctx, const char* ref_path) {
 
     // --- Stage HuBERT frontend: feed ref wav16k_pad (isolates resampling) →
     //     hb_featextract + hb_featproj. Uses a separate archive via env. ---
-    if (const char* hp = getenv("OMNIVOICE_HUBERT_REF")) {
+    if (const char* hp = crispasr_env::get("CRISPASR_OMNIVOICE_HUBERT_REF")) {
         ov_ref_gguf href;
         if (href.load(hp)) {
             ggml_tensor* r_wav = href.get("wav16k_pad");
@@ -3085,7 +3087,7 @@ static int run_encode_diff(omnivoice_context* ctx, const char* ref_path) {
             int T_out = 0;
             // Optional per-block bisect vs a separate intermediates archive.
             std::vector<ov_dbg_tensor> dbg;
-            const char* bisect = getenv("OMNIVOICE_ACENC_BISECT");
+            const char* bisect = crispasr_env::get("CRISPASR_OMNIVOICE_ACENC_BISECT");
             auto mine = higgs_acoustic_encode(ctx, (const float*)r_wav->data, T_samp, &T_out, bisect ? &dbg : nullptr);
             if (bisect) {
                 ov_ref_gguf bref;
@@ -3322,15 +3324,15 @@ struct omnivoice_context* omnivoice_init_from_file(const char* path_model, struc
 
     // Diagnostic env overrides (can set exact 0, unlike the CLI which treats 0 as
     // "use default"). Used to bisect the #254 word-dropping (CFG vs forward).
-    if (const char* e = getenv("OMNIVOICE_GUIDANCE"))
+    if (const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_GUIDANCE"))
         ctx->gen.guidance_scale = (float)atof(e);
-    if (const char* e = getenv("OMNIVOICE_POS_TEMP"))
+    if (const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_POS_TEMP"))
         ctx->gen.position_temperature = (float)atof(e);
-    if (const char* e = getenv("OMNIVOICE_CLASS_TEMP"))
+    if (const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_CLASS_TEMP"))
         ctx->gen.class_temperature = (float)atof(e);
     // num_steps is the dominant speed lever (stage0 = num_steps × 2 forwards).
     // Env override for quick A/B; the CLI --tts-steps / session setter also drive it.
-    if (const char* e = getenv("OMNIVOICE_NUM_STEPS")) {
+    if (const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_NUM_STEPS")) {
         int n = atoi(e);
         if (n > 0)
             ctx->gen.num_steps = n;
@@ -3400,16 +3402,21 @@ int omnivoice_set_voice_prompt(struct omnivoice_context* ctx, const char* wav_pa
     // Reference-voice disk cache (#254 reporter request; omnivoice.cpp
     // --ref-rvq parity, but automatic). The RVQ encode (HuBERT + DAC + 8-stage
     // RVQ over the whole reference) is the expensive part of voice cloning and
-    // its result is deterministic, so cache the codes content-addressed:
-    // FNV-1a over the PREPROCESSED pcm (post resample/RMS/clip — robust to
-    // container differences) + an encoder-weight fingerprint (re-encode after
-    // a tokenizer re-conversion). Same pattern & cache-dir resolution as
-    // pocket_tts voice latents. CRISPASR_OMNIVOICE_VOICE_CACHE=0 disables.
-    std::string codes_cache_path;
+    // its result is deterministic, so cache the codes content-addressed.
+    // Content-addressed key = FNV-1a over the PREPROCESSED pcm (post
+    // resample/RMS/clip — robust to container differences) + an encoder-weight
+    // fingerprint (re-encode after a tokenizer re-conversion). Issue #265:
+    // stored via the shared crispasr_ref_cache so OmniVoice now uses the SAME
+    // <temp>/crispasr-tts-refcache dir (or CRISPASR_TTS_REF_CACHE_DIR) and the
+    // SAME CRISPASR_TTS_REF_CACHE=0 disable switch as every other TTS backend.
+    // CRISPASR_OMNIVOICE_VOICE_CACHE=0 is kept as a backward-compat alias.
+    uint64_t cache_key = 0;
+    bool cache_on = false;
     {
-        const char* e = std::getenv("CRISPASR_OMNIVOICE_VOICE_CACHE");
-        const bool cache_on = !(e && *e && *e == '0');
-        if (cache_on && ctx->tokenizer.enc_conv1_w) {
+        const char* legacy = std::getenv("CRISPASR_OMNIVOICE_VOICE_CACHE");
+        const bool legacy_off = legacy && *legacy && *legacy == '0';
+        cache_on = !legacy_off && !crispasr_ref_cache::disabled() && ctx->tokenizer.enc_conv1_w != nullptr;
+        if (cache_on) {
             uint64_t h = 1469598103934665603ull; // FNV-1a 64
             auto mix = [&h](const void* p, size_t n) {
                 const uint8_t* b = (const uint8_t*)p;
@@ -3428,41 +3435,23 @@ int omnivoice_set_voice_prompt(struct omnivoice_context* ctx, const char* wav_pa
             mix(fp_buf.data(), fp_n);
             uint64_t total = (uint64_t)ggml_nbytes(fp);
             mix(&total, sizeof(total));
-
-            char name[64];
-            snprintf(name, sizeof(name), "omnivoice-voice-%016llx.codes", (unsigned long long)h);
-            std::string cdir;
-            if (const char* d = std::getenv("CRISPASR_CACHE_DIR"); d && *d)
-                cdir = d;
-            else if (const char* d2 = std::getenv("CRISPASR_MODELS_DIR"); d2 && *d2)
-                cdir = d2;
-            else if (const char* home = std::getenv("HOME"); home && *home)
-                cdir = std::string(home) + "/.cache/crispasr";
-            std::error_code ec;
-            if (!cdir.empty() &&
-                (std::filesystem::is_directory(cdir, ec) || std::filesystem::create_directories(cdir, ec)))
-                codes_cache_path = cdir + "/" + name;
+            cache_key = h;
         }
     }
 
     int T_ref = 0;
     std::vector<int32_t> codes;
-    if (!codes_cache_path.empty()) {
-        if (FILE* f = fopen(codes_cache_path.c_str(), "rb")) {
-            uint32_t magic = 0, ncb = 0, nT = 0;
-            if (fread(&magic, 4, 1, f) == 1 && magic == 0x3143564fu /* 'OVC1' */ && fread(&ncb, 4, 1, f) == 1 &&
-                fread(&nT, 4, 1, f) == 1 && ncb == ctx->hp.n_codebooks && nT > 0 && nT < 1000000) {
-                codes.resize((size_t)ncb * nT);
-                if (fread(codes.data(), sizeof(int32_t), codes.size(), f) == codes.size()) {
-                    T_ref = (int)nT;
-                    if (ctx->verbosity >= 1)
-                        fprintf(stderr, "omnivoice: voice codes loaded from cache (%d ref frames)\n", T_ref);
-                } else {
-                    codes.clear();
-                    T_ref = 0;
-                }
-            }
-            fclose(f);
+    if (cache_on) {
+        std::vector<uint32_t> shape;
+        std::vector<uint8_t> payload;
+        if (crispasr_ref_cache::get_bytes("omnivoice-voice", &cache_key, sizeof(cache_key), shape, payload) &&
+            shape.size() == 2 && shape[0] == (uint32_t)ctx->hp.n_codebooks && shape[1] > 0 &&
+            payload.size() == (size_t)shape[0] * shape[1] * sizeof(int32_t)) {
+            T_ref = (int)shape[1];
+            codes.resize((size_t)shape[0] * shape[1]);
+            std::memcpy(codes.data(), payload.data(), payload.size());
+            if (ctx->verbosity >= 1)
+                fprintf(stderr, "omnivoice: voice codes loaded from cache (%d ref frames)\n", T_ref);
         }
     }
     if (codes.empty()) {
@@ -3474,19 +3463,10 @@ int omnivoice_set_voice_prompt(struct omnivoice_context* ctx, const char* wav_pa
         if (ctx->verbosity >= 1)
             fprintf(stderr, "omnivoice: voice prompt encoded — %d ref frames (%d codebooks)\n", T_ref,
                     (int)ctx->hp.n_codebooks);
-        if (!codes_cache_path.empty()) {
-            std::string tmp = codes_cache_path + ".tmp";
-            if (FILE* f = fopen(tmp.c_str(), "wb")) {
-                uint32_t magic = 0x3143564fu, ncb = (uint32_t)ctx->hp.n_codebooks, nT = (uint32_t)T_ref;
-                bool ok = fwrite(&magic, 4, 1, f) == 1 && fwrite(&ncb, 4, 1, f) == 1 && fwrite(&nT, 4, 1, f) == 1 &&
-                          fwrite(codes.data(), sizeof(int32_t), codes.size(), f) == codes.size();
-                fclose(f);
-                if (ok)
-                    rename(tmp.c_str(), codes_cache_path.c_str());
-                else
-                    remove(tmp.c_str());
-            }
-        }
+        if (cache_on)
+            crispasr_ref_cache::put_bytes("omnivoice-voice", &cache_key, sizeof(cache_key),
+                                          {(uint32_t)ctx->hp.n_codebooks, (uint32_t)T_ref}, codes.data(),
+                                          codes.size() * sizeof(int32_t));
     }
     ctx->ref_audio_codes = std::move(codes);
     ctx->ref_T = T_ref;

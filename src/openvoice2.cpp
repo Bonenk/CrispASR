@@ -25,6 +25,7 @@
 #include "core/fft.h"     // core_fft::fft_radix2_wrapper (STFT: FFT instead of O(N^2) DFT)
 #include "core/gguf_loader.h"
 #include "core/tts_ref_cache.h" // content-addressed reference-embedding cache
+#include "core/crispasr_env.h"
 
 #if defined(HAVE_ACCELERATE)
 #include <Accelerate/Accelerate.h>
@@ -49,7 +50,7 @@
 static bool openvoice2_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("OPENVOICE2_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_OPENVOICE2_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -282,7 +283,7 @@ extern "C" struct openvoice2_context* openvoice2_init_from_file(const char* path
     ctx->verbosity = params.verbosity;
     ctx->tau = params.tau;
     {
-        const char* e = std::getenv("OV2_TAU");
+        const char* e = crispasr_env::get("CRISPASR_OV2_TAU");
         if (e)
             ctx->tau = (float)std::atof(e);
     }
@@ -547,7 +548,7 @@ static void stft_magnitude(const float* pcm, int n_samples, int fft_size, int ho
 // OV2_FORCE_SCALAR=1 to validate scalar == GEMM or run on non-Apple.
 static bool ov2_use_scalar() {
 #if defined(HAVE_ACCELERATE)
-    static const bool fs = std::getenv("OV2_FORCE_SCALAR") != nullptr;
+    static const bool fs = crispasr_env::get("CRISPASR_OV2_FORCE_SCALAR") != nullptr;
     return fs;
 #else
     return true;
@@ -1366,7 +1367,7 @@ extern "C" bool openvoice2_convert(struct openvoice2_context* ctx, const float* 
     // The voice converter produces weak output (±0.3) on synthetic MeloTTS input;
     // normalization makes it audible without amplifying noise beyond tanh clipping.
     {
-        const char* no_norm = std::getenv("OV2_NO_NORMALIZE");
+        const char* no_norm = crispasr_env::get("CRISPASR_OV2_NO_NORMALIZE");
         if (!no_norm || std::strcmp(no_norm, "1") != 0) {
             float peak = 0.0f;
             for (auto v : pcm) {

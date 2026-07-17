@@ -48,6 +48,7 @@
 #include "core/lstm.h"
 #include "core/wav_reader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 
 #include <algorithm>
 #include <cassert>
@@ -71,7 +72,7 @@
 static bool dots_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("DOTS_TTS_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_DOTS_TTS_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;

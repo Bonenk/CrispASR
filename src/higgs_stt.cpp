@@ -13,6 +13,7 @@
 // See qwen3-asr-todo.md for the full plan.
 
 #include "higgs_stt.h"
+#include "core/crispasr_env.h"
 #include "../crisp_audio/include/crisp_audio.h"
 
 #ifndef M_PI
@@ -53,7 +54,7 @@
 static bool higgs_stt_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("HIGGS_STT_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_HIGGS_STT_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -1646,7 +1647,7 @@ extern "C" char* higgs_stt_transcribe(higgs_stt_context* ctx, const float* sampl
 
     // ---- detokenize + post-process ----
     std::string text = core_bpe::detokenize(ctx->vocab.id_to_token, out_ids.data(), out_ids.size());
-    if (getenv("HIGGS_DEBUG")) {
+    if (crispasr_env::get("CRISPASR_HIGGS_DEBUG")) {
         fprintf(stderr, "[higgs] raw %zu tokens, raw text:\n>>>%s<<<\n", out_ids.size(), text.c_str());
     }
     // Strip an optional <think>...</think> reasoning block.

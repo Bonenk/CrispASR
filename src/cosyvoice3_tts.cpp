@@ -40,6 +40,7 @@
 #include "core/mel.h"
 #include "core/wav_reader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 #include "chatterbox_campplus.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
@@ -78,7 +79,7 @@ namespace {
 static bool cosyvoice3_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("COSYVOICE3_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_COSYVOICE3_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -1306,7 +1307,7 @@ extern "C" float* cosyvoice3_tts_step_speech(struct cosyvoice3_tts_context* ctx,
     // 256-token bucket to the T=1 attention graph. The graph is rebuilt when
     // generation crosses a bucket boundary; short requests avoid attending
     // over the entire (normally 512-token) CLI budget on every step.
-    const char* kv_bucket_env = std::getenv("COSYVOICE3_KV_BUCKET");
+    const char* kv_bucket_env = crispasr_env::get("CRISPASR_COSYVOICE3_KV_BUCKET");
     const bool use_kv_bucket = !kv_bucket_env || strcmp(kv_bucket_env, "0") != 0;
     const int kv_bucket = ((n_past + 1 + 255) / 256) * 256;
     const int fixed_kv = use_kv_bucket ? std::min(ctx->kv_max_ctx, kv_bucket) : ctx->kv_max_ctx;
@@ -3474,7 +3475,7 @@ float* cv3_run_solve_euler(cosyvoice3_tts_context* ctx, const float* mu, int T_m
     std::vector<float> mu_zero(mel_n, 0.0f);
     std::vector<float> cond_zero(mel_n, 0.0f);
     std::vector<float> spks_zero((size_t)spk_out, 0.0f);
-    const char* cfg_batch_env = std::getenv("COSYVOICE3_CFG_BATCH");
+    const char* cfg_batch_env = crispasr_env::get("CRISPASR_COSYVOICE3_CFG_BATCH");
     bool use_cfg_batch = !cfg_batch_env || strcmp(cfg_batch_env, "0") != 0;
 
     // Interval-CFG (opt-in, APPROXIMATE — mirrors OMNIVOICE_CFG_INTERVAL): recompute
@@ -5566,7 +5567,7 @@ float* cv3_synth_with_voice(cosyvoice3_tts_context* ctx, const char* text, const
         fprintf(stderr, "cosyvoice3_tts: synth: generated %zu speech tokens\n", gen_tokens.size());
     }
 
-    if (const char* dump = std::getenv("COSYVOICE3_DUMP_TOKENS")) {
+    if (const char* dump = crispasr_env::get("CRISPASR_COSYVOICE3_DUMP_TOKENS")) {
         FILE* f = std::fopen(dump, "w");
         if (f) {
             std::fprintf(f, "text_ids(%zu):", text_ids.size());
@@ -5629,7 +5630,7 @@ float* cv3_synth_with_voice(cosyvoice3_tts_context* ctx, const char* text, const
     // min() also respects a model GGUF that ships fewer steps. Override with
     // COSYVOICE3_FLOW_STEPS.
     int flow_steps = std::min((int)ctx->flow.hp.cfm_n_steps, 6);
-    if (const char* env_steps = std::getenv("COSYVOICE3_FLOW_STEPS")) {
+    if (const char* env_steps = crispasr_env::get("CRISPASR_COSYVOICE3_FLOW_STEPS")) {
         char* end = nullptr;
         const long parsed = std::strtol(env_steps, &end, 10);
         if (end != env_steps && *end == '\0' && parsed >= 1 && parsed <= 100) {

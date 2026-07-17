@@ -54,6 +54,7 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 - [Streaming & live transcription](docs/streaming.md)
 - [Server mode (HTTP API)](docs/server.md)
 - [CLI reference](docs/cli.md) — flags, VAD, CTC alignment, output formats, auto-download, audio formats
+- [Environment variables](docs/environment-variables.md) — the `CRISPASR_<BACKEND>_<FEATURE>` convention, global knobs, and every per-backend variable
 - [Language bindings](docs/bindings.md) — Python / Rust / Dart / Go / Java / JavaScript / Ruby / mobile
 - [Architecture](docs/architecture.md) — layered layout, `src/core/` primitives, regression discipline
 - [Contributing — adding a new backend](docs/contributing.md) — 5-file recipe, ground-truth diff workflow

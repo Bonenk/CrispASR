@@ -896,6 +896,7 @@ CA_EXPORT unsigned char* crispasr_pcm_to_wav(const float* pcm, int n_samples, in
 }
 
 #include "core/crispasr_lcs.h"
+#include "core/crispasr_env.h"
 
 CA_EXPORT int crispasr_lcs_dedup_prefix_count(const int32_t* prev_tail_tokens, int n_prev, const int32_t* curr_tokens,
                                               int n_curr, int min_lcs_length) {
@@ -2826,7 +2827,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         // "…and forth"). Keeping a single source of truth means the defaults-audit
         // test (which checks the library default) also guards this path. Opt in
         // to >1 with TADA_NUM_CANDIDATES for A/B only.
-        if (const char* env = std::getenv("TADA_NUM_CANDIDATES"); env && *env) {
+        if (const char* env = crispasr_env::get("CRISPASR_TADA_NUM_CANDIDATES"); env && *env) {
             int n = atoi(env);
             if (n >= 1)
                 p.num_acoustic_candidates = n;
@@ -2835,15 +2836,15 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         // upstream InferenceOptions values so bindings/server don't loop or
         // hallucinate (#197). Honour the same env overrides.
         p.text_do_sample = true;
-        if (const char* e = std::getenv("TADA_DO_SAMPLE"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_DO_SAMPLE"); e && *e)
             p.text_do_sample = !(e[0] == '0' || e[0] == 'f' || e[0] == 'F' || e[0] == 'n' || e[0] == 'N');
-        if (const char* e = std::getenv("TADA_TEMPERATURE"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_TEMPERATURE"); e && *e)
             p.temperature = (float)atof(e);
-        if (const char* e = std::getenv("TADA_TOP_P"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_TOP_P"); e && *e)
             p.text_top_p = (float)atof(e);
-        if (const char* e = std::getenv("TADA_TOP_K"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_TOP_K"); e && *e)
             p.text_top_k = atoi(e);
-        if (const char* e = std::getenv("TADA_REPETITION_PENALTY"); e && *e)
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_REPETITION_PENALTY"); e && *e)
             p.text_repetition_penalty = (float)atof(e);
         s->tada_ctx = tada_init_from_file(model_path, p);
         if (!s->tada_ctx) {
@@ -3259,7 +3260,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         // Try to load BERT companion from MELOTTS_BERT env var or
         // bert-base-uncased.gguf next to the model.
         {
-            const char* bert_env = std::getenv("MELOTTS_BERT");
+            const char* bert_env = crispasr_env::get("CRISPASR_MELOTTS_BERT");
             std::string bert_path;
             if (bert_env && *bert_env) {
                 bert_path = bert_env;

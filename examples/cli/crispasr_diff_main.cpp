@@ -88,6 +88,7 @@
 #endif
 
 #include "core/gguf_loader.h"
+#include "core/crispasr_env.h"
 
 #include "common-crispasr.h"
 
@@ -1320,7 +1321,7 @@ int main(int argc, char** argv) {
         // CHATTERBOX_LANG=<code> selects the multilingual path (prepends [lang]
         // + enables NFKD normalization, #170). Required for the t3_text_tokens
         // stage to match a multilingual reference archive. Empty = English.
-        if (const char* env_lang = std::getenv("CHATTERBOX_LANG")) {
+        if (const char* env_lang = crispasr_env::get("CRISPASR_CHATTERBOX_LANG")) {
             if (*env_lang) {
                 chatterbox_set_language(ctx, env_lang);
                 fprintf(stderr, "[crispasr-diff] CHATTERBOX_LANG=%s -> multilingual path\n", env_lang);
@@ -1494,7 +1495,7 @@ int main(int argc, char** argv) {
             // python ref was generated from, so the embedding shapes match.
             // Fall back to the env var, then the legacy "Hello world." default.
             std::string syn_text_buf;
-            const char* syn_text = std::getenv("CHATTERBOX_SYN_TEXT");
+            const char* syn_text = crispasr_env::get("CRISPASR_CHATTERBOX_SYN_TEXT");
             if (!syn_text || !*syn_text) {
                 syn_text_buf = ref.meta("chatterbox_syn_text");
                 if (!syn_text_buf.empty()) {
@@ -1576,7 +1577,7 @@ int main(int argc, char** argv) {
                     // Per-row cosine for diagnostics — gated on CHATTERBOX_DEBUG
                     // (the same backend-DEBUG env-var convention used by
                     // fireredpunc, parakeet, vibevoice, orpheus, cohere etc.).
-                    if (std::getenv("CHATTERBOX_DEBUG")) {
+                    if (crispasr_env::get("CRISPASR_CHATTERBOX_DEBUG")) {
                         auto pr = ref.get_f32("t3_prefill_emb");
                         if (pr.first) {
                             printf("[PER-ROW t3_prefill_emb[0]] (cond=0..%d, text=%d..%d, speech_start=%d):\n",
@@ -1765,7 +1766,7 @@ int main(int argc, char** argv) {
                             // Per-row cosine dump for the worst-K rows + boundary rows. Gated on
                             // CHATTERBOX_DEBUG so the normal diff output stays compact. Helps localize
                             // which time-steps drift in the upsample/resblock chain.
-                            if (std::getenv("CHATTERBOX_DEBUG") && rep.found && rep.cos_mean < 0.999f) {
+                            if (crispasr_env::get("CRISPASR_CHATTERBOX_DEBUG") && rep.found && rep.cos_mean < 0.999f) {
                                 auto pr = ref.get_f32(s.name);
                                 if (pr.first) {
                                     const size_t n_total = std::min((size_t)stage_r.data.size(), pr.second);
@@ -2164,7 +2165,7 @@ int main(int argc, char** argv) {
             fprintf(stderr, "failed to load qwen3-tts model\n");
             return 4;
         }
-        const char* codec_gguf = std::getenv("QWEN3_TTS_CODEC_GGUF");
+        const char* codec_gguf = crispasr_env::get("CRISPASR_QWEN3_TTS_CODEC_GGUF");
         if (codec_gguf && *codec_gguf) {
             if (qwen3_tts_set_codec_path(ctx, codec_gguf) != 0) {
                 fprintf(stderr, "failed to load qwen3-tts codec '%s'\n", codec_gguf);
@@ -2579,7 +2580,7 @@ int main(int argc, char** argv) {
         // ---- qwen3-tts-cenc (codec ENCODER: audio → codes) ----
         // Uses the same fixed 3s slice of clone.wav as the Python reference.
     } else if (backend_name == "qwen3-tts-cenc") {
-        const char* codec_gguf = std::getenv("QWEN3_TTS_CODEC_GGUF");
+        const char* codec_gguf = crispasr_env::get("CRISPASR_QWEN3_TTS_CODEC_GGUF");
         if (!codec_gguf) {
             fprintf(stderr, "qwen3-tts-cenc: set QWEN3_TTS_CODEC_GGUF=<codec.gguf>\n");
             return 4;
@@ -2678,7 +2679,7 @@ int main(int argc, char** argv) {
         // Runs the codec decoder on T=10 all-zero codes and compares
         // each named intermediate tensor against the Python reference dump.
     } else if (backend_name == "qwen3-tts-codec") {
-        const char* codec_gguf = std::getenv("QWEN3_TTS_CODEC_GGUF");
+        const char* codec_gguf = crispasr_env::get("CRISPASR_QWEN3_TTS_CODEC_GGUF");
         if (!codec_gguf) {
             fprintf(stderr, "qwen3-tts-codec: set QWEN3_TTS_CODEC_GGUF=<path/to/codec.gguf>\n");
             return 4;
@@ -2737,7 +2738,7 @@ int main(int argc, char** argv) {
         qwen3_tts_free(ctx);
 
     } else if (backend_name == "tada-tts" || backend_name == "tada") {
-        const char* env_codec = std::getenv("TADA_CODEC_GGUF");
+        const char* env_codec = crispasr_env::get("CRISPASR_TADA_CODEC_GGUF");
         std::string codec_path = env_codec && *env_codec ? env_codec : dirname_of(model_path) + "/tada-codec-f16.gguf";
         if (!file_exists(codec_path)) {
             fprintf(stderr, "tada-tts: codec not found at '%s'; set TADA_CODEC_GGUF=<path/to/tada-codec-f16.gguf>\n",
@@ -2761,7 +2762,7 @@ int main(int argc, char** argv) {
             token_masks[t] = ss > 0.0 ? 1 : 0;
         }
 
-        const char* env_text = std::getenv("TADA_DIFF_TEXT");
+        const char* env_text = crispasr_env::get("CRISPASR_TADA_DIFF_TEXT");
         std::string synth_text = env_text && *env_text ? env_text : ref.meta("tada_tts_syn_text");
         if (synth_text.empty())
             synth_text = "Hello world.";
@@ -2796,7 +2797,7 @@ int main(int argc, char** argv) {
             return 4;
         }
         std::string prompt_path;
-        if (const char* prompt = std::getenv("TADA_PROMPT_CACHE"); prompt && *prompt)
+        if (const char* prompt = crispasr_env::get("CRISPASR_TADA_PROMPT_CACHE"); prompt && *prompt)
             prompt_path = prompt;
         else if (ref.has("prompt_token_values"))
             prompt_path = ref_path;
@@ -3185,7 +3186,7 @@ int main(int argc, char** argv) {
         // verified safe. The qwen3-tts kernel_conv_transpose_1d watchdog hang
         // shape is comparable to MiMo's conv2 / down_sample. Opt in with
         // MIMO_TOKENIZER_GPU=1.
-        cp.use_gpu = std::getenv("MIMO_TOKENIZER_GPU") != nullptr;
+        cp.use_gpu = crispasr_env::get("CRISPASR_MIMO_TOKENIZER_GPU") != nullptr;
         mimo_tokenizer_context* ctx = mimo_tokenizer_init_from_file(model_path.c_str(), cp);
         if (!ctx) {
             fprintf(stderr, "failed to load mimo-tokenizer model '%s'\n", model_path.c_str());
@@ -3222,7 +3223,7 @@ int main(int argc, char** argv) {
         auto cp = mimo_asr_context_default_params();
         cp.n_threads = 4;
         cp.verbosity = 0;
-        cp.use_gpu = std::getenv("MIMO_ASR_GPU") != nullptr;
+        cp.use_gpu = crispasr_env::get("CRISPASR_MIMO_ASR_GPU") != nullptr;
         mimo_asr_context* ctx = mimo_asr_init_from_file(model_path.c_str(), cp);
         if (!ctx) {
             fprintf(stderr, "failed to load mimo-asr model '%s'\n", model_path.c_str());
@@ -3302,7 +3303,7 @@ int main(int argc, char** argv) {
         auto cp = ark_asr_context_default_params();
         cp.n_threads = 4;
         cp.verbosity = 0;
-        cp.use_gpu = std::getenv("ARKASR_GPU") != nullptr;
+        cp.use_gpu = crispasr_env::get("CRISPASR_ARKASR_GPU") != nullptr;
         ark_asr_context* ctx = ark_asr_init_from_file(model_path.c_str(), cp);
         if (!ctx) {
             fprintf(stderr, "failed to load ark-asr model '%s'\n", model_path.c_str());
@@ -4091,7 +4092,7 @@ int main(int argc, char** argv) {
                             "Re-dump with KOKORO_PHONEMES=<ipa> set.\n");
             return 4;
         }
-        const char* voice_env = std::getenv("KOKORO_VOICE_GGUF");
+        const char* voice_env = crispasr_env::get("CRISPASR_KOKORO_VOICE_GGUF");
         const std::string voice_gguf =
             (voice_env && *voice_env) ? voice_env : "/tmp/kokoro_voices/kokoro-voice-af_heart.gguf";
 
@@ -4103,7 +4104,7 @@ int main(int argc, char** argv) {
         // to bisect Metal-specific kokoro regressions by running the
         // same per-stage diff in both modes and comparing where each
         // first diverges from the PyTorch reference.
-        const char* gpu_env = std::getenv("KOKORO_USE_GPU");
+        const char* gpu_env = crispasr_env::get("CRISPASR_KOKORO_USE_GPU");
         if (gpu_env && (*gpu_env == '0' || *gpu_env == 0))
             cp.use_gpu = false;
         kokoro_context* ctx = kokoro_init_from_file(model_path.c_str(), cp);
@@ -4182,7 +4183,7 @@ int main(int argc, char** argv) {
             {"phase", 0.95f},
             {"audio_out", 0.95f},
         };
-        const char* dump_dir = std::getenv("KOKORO_DUMP_STAGES");
+        const char* dump_dir = crispasr_env::get("CRISPASR_KOKORO_DUMP_STAGES");
         for (const auto& s : kokoro_stages) {
             int n_stage = 0;
             float* mine = kokoro_extract_stage(ctx, phonemes.c_str(), s.name, &n_stage);
@@ -4239,7 +4240,7 @@ int main(int argc, char** argv) {
         snac_decoder_params sp = snac_decoder_default_params();
         sp.n_threads = 4;
         sp.verbosity = 0;
-        sp.use_gpu = std::getenv("ORPHEUS_SNAC_GPU") != nullptr;
+        sp.use_gpu = crispasr_env::get("CRISPASR_ORPHEUS_SNAC_GPU") != nullptr;
         snac_decoder_ctx* ctx = snac_decoder_init_from_file(model_path.c_str(), sp);
         if (!ctx) {
             fprintf(stderr, "failed to load SNAC codec from '%s'\n", model_path.c_str());
@@ -4251,8 +4252,12 @@ int main(int argc, char** argv) {
         //   slot 0     → codes_0    (1 entry / super-frame)
         //   slot 1, 4  → codes_1    (2 / super-frame)
         //   slot 2,3,5,6 → codes_2  (4 / super-frame)
-        const int T_super = std::getenv("ORPHEUS_SNAC_T_SUPER") ? std::atoi(std::getenv("ORPHEUS_SNAC_T_SUPER")) : 4;
-        const int fill_code = std::getenv("ORPHEUS_SNAC_CODE") ? std::atoi(std::getenv("ORPHEUS_SNAC_CODE")) : 0;
+        const int T_super = crispasr_env::get("CRISPASR_ORPHEUS_SNAC_T_SUPER")
+                                ? std::atoi(crispasr_env::get("CRISPASR_ORPHEUS_SNAC_T_SUPER"))
+                                : 4;
+        const int fill_code = crispasr_env::get("CRISPASR_ORPHEUS_SNAC_CODE")
+                                  ? std::atoi(crispasr_env::get("CRISPASR_ORPHEUS_SNAC_CODE"))
+                                  : 0;
         const int code = ((fill_code % 4096) + 4096) % 4096;
         std::vector<int32_t> c0((size_t)T_super, code);
         std::vector<int32_t> c1((size_t)T_super * 2, code);
@@ -4324,11 +4329,11 @@ int main(int argc, char** argv) {
         // Default CPU (parity baseline); ORPHEUS_DIFF_GPU=1 runs the talker AR
         // loop on the GPU — used to reproduce/localize the CUDA 0-byte failure
         // (compare GPU vs CPU vs the PyTorch ground truth).
-        cp.use_gpu = std::getenv("ORPHEUS_DIFF_GPU") != nullptr;
+        cp.use_gpu = crispasr_env::get("CRISPASR_ORPHEUS_DIFF_GPU") != nullptr;
         // gen_codes covers the first frames only; cap the AR loop so we don't
         // run the full ~8192-step default (override via ORPHEUS_DIFF_MAXGEN).
         {
-            const char* mg = std::getenv("ORPHEUS_DIFF_MAXGEN");
+            const char* mg = crispasr_env::get("CRISPASR_ORPHEUS_DIFF_MAXGEN");
             cp.max_audio_tokens = mg && mg[0] ? std::atoi(mg) : 96;
         }
         orpheus_context* octx = orpheus_init_from_file(model_path.c_str(), cp);
@@ -4574,7 +4579,7 @@ int main(int argc, char** argv) {
         // Allow forcing the CPU backend for the VAE graph isolation test
         // (lets us attribute the vae_only_graph cos drop to Metal precision
         // vs CPU SIMD reordering).
-        if (std::getenv("VOXCPM2_CPU_ONLY")) {
+        if (crispasr_env::get("CRISPASR_VOXCPM2_CPU_ONLY")) {
             cp.use_gpu = false;
         }
         struct voxcpm2_context* ctx = voxcpm2_init_from_file(model_path.c_str(), cp);
@@ -4591,7 +4596,7 @@ int main(int argc, char** argv) {
         // VoxCPM2 is a TTS model — the audio arg is only used for voice cloning.
         // When VOXCPM2_USE_REF=1 we pass the loaded WAV through as the cloning
         // reference; otherwise we run zero-shot (ref_samples=nullptr).
-        const char* use_ref_env = std::getenv("VOXCPM2_USE_REF");
+        const char* use_ref_env = crispasr_env::get("CRISPASR_VOXCPM2_USE_REF");
         const bool use_ref_clone = (use_ref_env && std::atoi(use_ref_env) != 0);
         const float* ref_audio = use_ref_clone ? samples.data() : nullptr;
         int ref_n_audio = use_ref_clone ? (int)samples.size() : 0;
@@ -4995,7 +5000,7 @@ int main(int argc, char** argv) {
             return 4;
         }
         std::string flow_path;
-        if (const char* env = std::getenv("CV3_FLOW_GGUF"); env && *env) {
+        if (const char* env = crispasr_env::get("CRISPASR_CV3_FLOW_GGUF"); env && *env) {
             flow_path = env;
         } else {
             flow_path = model_path;
@@ -5013,7 +5018,7 @@ int main(int argc, char** argv) {
         // flow so phase 4-A diffs work even when the hift GGUF isn't
         // alongside the LLM/flow GGUFs in the model dir).
         std::string hift_path;
-        if (const char* env = std::getenv("CV3_HIFT_GGUF"); env && *env) {
+        if (const char* env = crispasr_env::get("CRISPASR_CV3_HIFT_GGUF"); env && *env) {
             hift_path = env;
         } else {
             hift_path = model_path;
@@ -5490,7 +5495,7 @@ int main(int argc, char** argv) {
         // rides in s3tok_mel_in as (128, T) channel-major == ggml ne=(T,128).
         {
             std::string s3_path;
-            if (const char* env = std::getenv("CV3_S3TOK_GGUF"); env && *env) {
+            if (const char* env = crispasr_env::get("CRISPASR_CV3_S3TOK_GGUF"); env && *env) {
                 s3_path = env;
             } else {
                 s3_path = model_path;
@@ -5719,11 +5724,14 @@ int main(int argc, char** argv) {
         // CSM_WAV_OUT is set (reuses this build since the main CLI's crispasr
         // target is stale in some build dirs). CSM_WAV_TEXT overrides the text,
         // CSM_WAV_TEMP the temperature (default 0.9), CSM_WAV_FRAMES the cap.
-        if (const char* wav_out = getenv("CSM_WAV_OUT")) {
-            const char* wtext = getenv("CSM_WAV_TEXT");
+        if (const char* wav_out = crispasr_env::get("CRISPASR_CSM_WAV_OUT")) {
+            const char* wtext = crispasr_env::get("CRISPASR_CSM_WAV_TEXT");
             std::string syn_text = wtext ? wtext : (text.empty() ? "Hello, how are you?" : text);
-            float temp = getenv("CSM_WAV_TEMP") ? (float)atof(getenv("CSM_WAV_TEMP")) : 0.9f;
-            int fcap = getenv("CSM_WAV_FRAMES") ? atoi(getenv("CSM_WAV_FRAMES")) : 64;
+            float temp = crispasr_env::get("CRISPASR_CSM_WAV_TEMP")
+                             ? (float)atof(crispasr_env::get("CRISPASR_CSM_WAV_TEMP"))
+                             : 0.9f;
+            int fcap =
+                crispasr_env::get("CRISPASR_CSM_WAV_FRAMES") ? atoi(crispasr_env::get("CRISPASR_CSM_WAV_FRAMES")) : 64;
             int ns = csm_tts_diag_synth_wav(ctx, syn_text.c_str(), wav_out, temp, fcap);
             if (ns > 0) {
                 printf("[INFO] synth_wav                wrote %d samples (%.2fs) to %s\n", ns, ns / 24000.0, wav_out);
@@ -5782,7 +5790,7 @@ int main(int argc, char** argv) {
         // gen_codes_20 only needs the first 20 frames; cap generation so the diff
         // doesn't run the full ~2580-step default (override via PARLER_DIFF_MAXGEN).
         {
-            const char* mg = std::getenv("PARLER_DIFF_MAXGEN");
+            const char* mg = crispasr_env::get("CRISPASR_PARLER_DIFF_MAXGEN");
             cp.max_audio_tokens = mg && mg[0] ? std::atoi(mg) : 40;
         }
 
@@ -5867,7 +5875,7 @@ int main(int argc, char** argv) {
         kp.verbosity = 0;
         kp.use_gpu = true;
         kp.flash_attn = true;
-        if (std::getenv("KUGELAUDIO_CPU_ONLY"))
+        if (crispasr_env::get("CRISPASR_KUGELAUDIO_CPU_ONLY"))
             kp.use_gpu = false;
 
         kugelaudio_context* ctx = kugelaudio_init_from_file(model_path.c_str(), kp);
@@ -6025,7 +6033,7 @@ int main(int argc, char** argv) {
         // ---- mel_spectrogram ----
         int n_mels = 0, T_mel = 0;
         float* mel = nullptr;
-        const char* mel_override = std::getenv("MOSS_AUDIO_MEL_FILE");
+        const char* mel_override = crispasr_env::get("CRISPASR_MOSS_AUDIO_MEL_FILE");
         if (mel_override) {
             FILE* mf = fopen(mel_override, "rb");
             if (mf) {
@@ -6357,7 +6365,7 @@ int main(int argc, char** argv) {
 
         // Resolve synthesis text
         std::string syn_text;
-        const char* env_text = std::getenv("ZONOS_TTS_TEXT");
+        const char* env_text = crispasr_env::get("CRISPASR_ZONOS_TTS_TEXT");
         if (env_text && *env_text) {
             syn_text = env_text;
         } else {
@@ -6369,7 +6377,7 @@ int main(int argc, char** argv) {
 
         // How many AR steps to compare (must match Python ZONOS_DIFF_N_STEPS)
         int n_diff_steps = 10;
-        if (const char* ns = std::getenv("ZONOS_DIFF_N_STEPS"))
+        if (const char* ns = crispasr_env::get("CRISPASR_ZONOS_DIFF_N_STEPS"))
             n_diff_steps = std::atoi(ns);
 
         // Stage: conditioning_prefix

@@ -10,6 +10,7 @@
 #include "core/ffn.h"
 #include "core/bpe.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 
 #include "ggml.h"
 #include "ggml-backend.h"
@@ -49,7 +50,7 @@ namespace {
 static bool tada_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("TADA_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_TADA_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -2654,7 +2655,7 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
 
     // Prompt text tokens (transcript of reference audio for voice conditioning)
     std::vector<int32_t> prompt_text_ids;
-    const char* prompt_text_env = getenv("TADA_PROMPT_TEXT");
+    const char* prompt_text_env = crispasr_env::get("CRISPASR_TADA_PROMPT_TEXT");
     if (prompt_text_env && ctx->n_prompt > 0) {
         prompt_text_ids = tokenize(ctx, tada_normalize_text(std::string(prompt_text_env)));
     } else if (!ctx->prompt_text.empty() && ctx->n_prompt > 0) {
@@ -2719,7 +2720,7 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
     std::vector<int> time_before_list;
     std::vector<tada_fm_dump_record> fm_dump_records;
     const bool dump_fm_steps = []() {
-        const char* path = std::getenv("TADA_DUMP_FM_STEPS");
+        const char* path = crispasr_env::get("CRISPASR_TADA_DUMP_FM_STEPS");
         return path && path[0];
     }();
 
@@ -3236,7 +3237,7 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
     }
 
     if (dump_fm_steps) {
-        const char* dump_path = std::getenv("TADA_DUMP_FM_STEPS");
+        const char* dump_path = crispasr_env::get("CRISPASR_TADA_DUMP_FM_STEPS");
         if (FILE* f = fopen(dump_path, "wb")) {
             uint32_t hdr[4] = {(uint32_t)fm_dump_records.size(), (uint32_t)lat, (uint32_t)hp.fm_hidden,
                                (uint32_t)hp.time_dim};
@@ -3316,7 +3317,7 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
     // Use only features from skip_frames onwards
     std::vector<std::vector<float>> decode_feats(acoustic_features.begin() + skip_frames, acoustic_features.end());
 
-    if (const char* dump_acoustic_path = getenv("TADA_DUMP_ACOUSTIC_FEATURES");
+    if (const char* dump_acoustic_path = crispasr_env::get("CRISPASR_TADA_DUMP_ACOUSTIC_FEATURES");
         dump_acoustic_path && dump_acoustic_path[0]) {
         if (FILE* f = fopen(dump_acoustic_path, "wb")) {
             uint32_t hdr[2] = {(uint32_t)acoustic_features.size(), (uint32_t)ad};
@@ -3334,7 +3335,8 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
         }
     }
 
-    if (const char* dump_time_path = getenv("TADA_DUMP_TIME_BEFORE"); dump_time_path && dump_time_path[0]) {
+    if (const char* dump_time_path = crispasr_env::get("CRISPASR_TADA_DUMP_TIME_BEFORE");
+        dump_time_path && dump_time_path[0]) {
         if (FILE* f = fopen(dump_time_path, "wb")) {
             std::vector<float> dump_times;
             dump_times.reserve(all_times.size() + (all_times.empty() ? 0 : 1));
@@ -3391,7 +3393,7 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
     // of crashing the machine.
     {
         int max_expanded = 16384;
-        if (const char* e = getenv("TADA_MAX_EXPANDED_FRAMES"); e && e[0])
+        if (const char* e = crispasr_env::get("CRISPASR_TADA_MAX_EXPANDED_FRAMES"); e && e[0])
             max_expanded = atoi(e);
         if (max_expanded > 0 && n_expanded > max_expanded) {
             fprintf(stderr,
@@ -3432,7 +3434,7 @@ float* tada_synthesize(struct tada_context* ctx, const char* text, int* out_n_sa
     // Optional feature dump for diff harness (TADA_DUMP_FEATURES=/path/to/file).
     // Python side: tools/reference_backends/tada_codec_diff.py --features <path>
     {
-        const char* dump_path = getenv("TADA_DUMP_FEATURES");
+        const char* dump_path = crispasr_env::get("CRISPASR_TADA_DUMP_FEATURES");
         if (dump_path && n_expanded > 0) {
             FILE* df = fopen(dump_path, "wb");
             if (df) {

@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "core/bpe.h"
+#include "core/crispasr_env.h"
 
 // ===========================================================================
 // Bench instrumentation — `GLM_ASR_BENCH=1` for per-stage timings.
@@ -47,7 +48,7 @@
 static bool glm_asr_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("GLM_ASR_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_GLM_ASR_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;

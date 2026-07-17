@@ -38,6 +38,7 @@
 #include "core/gguf_loader.h"
 #include "core/lstm.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -69,7 +70,7 @@
 namespace {
 
 bool env_bool(const char* k) {
-    const char* v = std::getenv(k);
+    const char* v = crispasr_env::get(k);
     return v && *v && std::strcmp(v, "0") != 0 && std::strcmp(v, "false") != 0;
 }
 
@@ -80,7 +81,7 @@ bool env_bool(const char* k) {
 bool kokoro_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("KOKORO_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_KOKORO_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -1345,7 +1346,7 @@ static ggml_cgraph* kokoro_build_graph_f0n(kokoro_context* c, int T_frames, int 
     // production builds pay zero cost. Used to bisect the ggml_norm
     // Metal regression — keep available for the next per-op-level bug.
     static const bool s_dbg = []() {
-        const char* v = std::getenv("KOKORO_DEBUG_INTERMEDIATES");
+        const char* v = crispasr_env::get("CRISPASR_KOKORO_DEBUG_INTERMEDIATES");
         return v && *v && *v != '0';
     }();
     auto run_stack = [&](const char* prefix, const char* stage_branch, ggml_tensor* in) -> ggml_tensor* {
@@ -2356,7 +2357,7 @@ static float* kokoro_run_generator(kokoro_context* c, const int32_t* raw_ids, in
     }
 
     // 3. Build `har` (22, T_har) on CPU.
-    const char* seed_env = std::getenv("KOKORO_SEED");
+    const char* seed_env = crispasr_env::get("CRISPASR_KOKORO_SEED");
     uint32_t seed = seed_env ? (uint32_t)std::strtoul(seed_env, nullptr, 0) : 0x12345u;
     std::mt19937 rng(seed);
     int T_har = 0;
@@ -2568,7 +2569,7 @@ extern "C" struct kokoro_context_params kokoro_context_default_params(void) {
     //                              the M1 hang doesn't apply and CPU path
     //                              is dramatically slower than the GPU.
     // Mirrors the QWEN3_TTS_CODEC_GPU pattern from the qwen3-tts codec.
-    p.gen_force_metal = env_bool("KOKORO_GEN_FORCE_METAL") || env_bool("KOKORO_GEN_GPU");
+    p.gen_force_metal = env_bool("CRISPASR_KOKORO_GEN_FORCE_METAL") || env_bool("CRISPASR_KOKORO_GEN_GPU");
     p.flash_attn = true;
     p.length_scale = 1.0f;
     std::strncpy(p.espeak_lang, "en-us", sizeof(p.espeak_lang) - 1);
@@ -2803,9 +2804,9 @@ extern "C" struct kokoro_context* kokoro_init_from_file(const char* path_model, 
         if (c->gen_backend != c->backend_cpu) {
             // Disambiguate which env var was set so the log line tells the
             // operator which knob is in effect.
-            if (env_bool("KOKORO_GEN_GPU"))
+            if (env_bool("CRISPASR_KOKORO_GEN_GPU"))
                 gpu_label = "GPU (KOKORO_GEN_GPU)";
-            else if (env_bool("KOKORO_GEN_FORCE_METAL"))
+            else if (env_bool("CRISPASR_KOKORO_GEN_FORCE_METAL"))
                 gpu_label = "GPU (KOKORO_GEN_FORCE_METAL)";
         }
         fprintf(stderr, "kokoro: loaded %zu tensors from '%s'  gen=%s\n", c->tensors.size(), path_model,

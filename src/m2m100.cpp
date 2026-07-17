@@ -26,6 +26,7 @@
 #include <cassert>
 #include <chrono>
 #include "core/sentencepiece.h"
+#include "core/crispasr_env.h"
 
 #include <cmath>
 #include <cstdio>
@@ -43,7 +44,7 @@
 static bool m2m100_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("M2M100_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_M2M100_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;

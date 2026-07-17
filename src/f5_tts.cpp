@@ -31,6 +31,7 @@
 
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/crispasr_env.h"
 
 #if defined(HAVE_ACCELERATE)
 #include <Accelerate/Accelerate.h>
@@ -59,7 +60,7 @@
 static bool f5_bench_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("F5_BENCH");
+        const char* e = crispasr_env::get("CRISPASR_F5_BENCH");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -69,7 +70,7 @@ static bool f5_bench_enabled() {
 static bool f5_batch_cfg_enabled() {
     static int v = -1;
     if (v < 0) {
-        const char* e = std::getenv("F5_BATCH_CFG");
+        const char* e = crispasr_env::get("CRISPASR_F5_BATCH_CFG");
         v = (e && *e && *e != '0') ? 1 : 0;
     }
     return v != 0;
@@ -880,7 +881,7 @@ static std::vector<float> compute_mel_spectrogram(const float* pcm_24k, int n_sa
 // F5_FORCE_SCALAR=1.
 static bool f5_use_scalar() {
 #if defined(HAVE_ACCELERATE)
-    static const bool force_scalar = std::getenv("F5_FORCE_SCALAR") != nullptr;
+    static const bool force_scalar = crispasr_env::get("CRISPASR_F5_FORCE_SCALAR") != nullptr;
     return force_scalar;
 #else
     return true;
