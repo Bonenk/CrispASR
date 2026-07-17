@@ -160,6 +160,22 @@ centroid scores below it stays anonymous). Enroll and identify must use the
 same embedder family (TitaNet 192-d by default) so dimensions match; a
 mismatched `--diarize-embedder` (e.g. 512-d ECAPA) simply never matches.
 
+### Caveats
+
+- **Over-split clusters can both get the same name.** Global clustering is
+  imperfect: if it splits one physical speaker's audio into two clusters
+  (e.g. their voice drifts across a long recording), each cluster is matched
+  independently against the roster, so **both** may match the same enrolled
+  name. This is intentional, not a bug — both clusters genuinely are that
+  speaker, and per-cluster matching has no way (or need) to notice they were
+  once the same person.
+- **Very short segments keep their local diarize label.** Segments shorter
+  than about 0.25 s can't be embedded (below TitaNet's reliable floor), so
+  they never take part in cluster matching and keep whatever local
+  `(speaker N)` label the diarizer assigned. A transcript can therefore
+  occasionally mix a matched `(Alice)` with a leftover `(speaker N)` for the
+  same physical speaker, on short interjections ("mm-hmm", "yeah").
+
 ### Legal & privacy obligations (not legal advice)
 
 Storing voiceprints to identify named people means you are processing
