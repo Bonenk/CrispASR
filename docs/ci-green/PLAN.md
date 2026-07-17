@@ -40,6 +40,17 @@ Branch `fix/ci-green`. Goal: every GitHub Actions workflow green.
   (07-10→07-16) were purely parakeet-ja + bark-small — confirmed via the 07-16
   run's failed-job list (only those two).
 
+- **Nightly regression / pocket-tts-en** — THIRD persistent failure (red since
+  07-13; missed earlier because the one 07-16 run I sampled had it *cancelled*,
+  not failed). Same class as bark: `pocket-tts-english-NOVC` (no voice clone),
+  but the manifest set `voice_preset: default` → `--voice default` → nonexistent
+  WAV → degraded synth. Even with `no_voice` + low temp + fixed seed it produces
+  near-silent unintelligible output (RMS ~80; amplify x26 → still empty ASR) —
+  the novc model's synthesis quality, not stochastic. Fixes: `no_voice: true`
+  (new harness flag — a no-voice-clone model synths with its baked default and
+  gets no --voice), determinism (temp+seed), and `advisory: true`. Not masking a
+  bug; parakeet gate stays hard.
+
 ## Verification
 - parakeet-ja: build clean, 987/987 unit tests, fixture byte-equal cer 0.000
   locally; **completed/success on the CI Linux runner** (dispatched nightly
