@@ -1814,6 +1814,11 @@ struct crispasr_session {
 #endif
 #ifdef CA_HAVE_TADA
     tada_context* tada_ctx = nullptr;
+    // #201: optional explicit encoder/aligner GGUF paths for on-the-fly voice
+    // cloning from a WAV + transcript. When empty, set_voice auto-resolves them
+    // next to the model / in the cache dir.
+    std::string tada_makeref_encoder;
+    std::string tada_makeref_aligner;
 #endif
 #ifdef CA_HAVE_KOKORO
     kokoro_context* kokoro_ctx = nullptr;
@@ -7151,7 +7156,7 @@ CA_EXPORT int crispasr_session_set_codec_path(crispasr_session* s, const char* p
     return 0; // not applicable
 }
 
-#if defined(CA_HAVE_INDEXTTS) || defined(CA_HAVE_VOXCPM2) || defined(CA_HAVE_POCKET)
+#if defined(CA_HAVE_INDEXTTS) || defined(CA_HAVE_VOXCPM2) || defined(CA_HAVE_POCKET) || defined(CA_HAVE_TADA)
 // crispasr_audio_load lives in crispasr_audio.cpp (same shared lib);
 // forward-declare it so set_voice can decode a reference WAV without
 // pulling in the audio header.
@@ -7272,9 +7277,75 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
 #endif
 #ifdef CA_HAVE_TADA
     if (s->tada_ctx) {
-        if (ends_with_wav(path))
+        if (!ends_with_wav(path)) {
+            // Pre-baked voice reference GGUF.
+            return tada_load_prompt(s->tada_ctx, path);
+        }
+        // #201: on-the-fly clone from a reference WAV + its transcript — the
+        // in-memory equivalent of the CLI --make-ref pipeline (no temp GGUF).
+        // Opt-in, default OFF: without CRISPASR_TADA_WAV_CLONE=1 the historical
+        // -2 reject of a .wav is preserved, so default behaviour is unchanged
+        // until the decoded-output roundtrip has validated this path (#201).
+        if (const char* g = crispasr_env::get("CRISPASR_TADA_WAV_CLONE"); !g || atoi(g) == 0) {
+            fprintf(stderr, "crispasr: tada .wav voice cloning is opt-in — set CRISPASR_TADA_WAV_CLONE=1 "
+                            "to enable (experimental; validate the output before relying on it)\n");
             return -2;
-        return tada_load_prompt(s->tada_ctx, path);
+        }
+        if (!ref_text_or_null || !ref_text_or_null[0]) {
+            fprintf(stderr, "crispasr: tada .wav voice cloning requires the reference transcript "
+                            "(pass it as ref_text)\n");
+            return -2;
+        }
+        auto file_exists = [](const std::string& p) -> bool {
+            if (p.empty())
+                return false;
+            FILE* f = fopen(p.c_str(), "rb");
+            if (f) {
+                fclose(f);
+                return true;
+            }
+            return false;
+        };
+        std::string model_dir;
+        {
+            auto sep = s->model_path.find_last_of("/\\");
+            model_dir = (sep == std::string::npos) ? std::string(".") : s->model_path.substr(0, sep);
+        }
+        const std::string cache = crispasr_cache::dir();
+        auto resolve = [&](const std::string& configured, const std::string& fname) -> std::string {
+            if (file_exists(configured))
+                return configured;
+            std::string local = model_dir + "/" + fname;
+            if (file_exists(local))
+                return local;
+            std::string cached = cache + "/" + fname;
+            if (file_exists(cached))
+                return cached;
+            return std::string();
+        };
+        const std::string enc = resolve(s->tada_makeref_encoder, "tada-encoder-f16.gguf");
+        const std::string lang = s->source_language.empty() ? std::string("en") : s->source_language;
+        std::string ali = resolve(s->tada_makeref_aligner, "tada-aligner-" + lang + ".gguf");
+        if (ali.empty() && lang != "en")
+            ali = resolve(s->tada_makeref_aligner, "tada-aligner-en.gguf");
+        if (enc.empty() || ali.empty()) {
+            fprintf(stderr, "crispasr: tada .wav cloning needs the encoder + aligner GGUFs — place "
+                            "tada-encoder-f16.gguf + tada-aligner-<lang>.gguf next to the model or in the cache "
+                            "dir, or set them via crispasr_session_tada_set_makeref_models()\n");
+            return -3;
+        }
+        // Decode the reference WAV straight to 24 kHz mono (the encoder's rate).
+        float* pcm = nullptr;
+        int n = 0, sr = 0;
+        if (crispasr_audio_load_at_rate(path, 24000, &pcm, &n, &sr) != 0 || !pcm || n <= 0) {
+            fprintf(stderr, "crispasr: tada .wav cloning: failed to decode '%s'\n", path);
+            if (pcm)
+                free(pcm);
+            return -1;
+        }
+        int rc = tada_make_ref_from_pcm(s->tada_ctx, enc.c_str(), ali.c_str(), pcm, n, ref_text_or_null);
+        free(pcm);
+        return rc;
     }
 #endif
 #ifdef CA_HAVE_KOKORO
@@ -7396,6 +7467,28 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
     }
 #endif
     return -3;
+}
+
+// #201: configure the TADA encoder + aligner GGUF paths used for on-the-fly
+// voice cloning (crispasr_session_set_voice with a `.wav` + ref_text). Either
+// path may be NULL/empty to clear it and fall back to auto-resolution (next to
+// the model, then the cache dir). The aligner is language-specific
+// (tada-aligner-<lang>.gguf) — match it to the reference audio's language.
+// Returns 0 on success, -1 if the session is invalid or has no TADA backend.
+CA_EXPORT int crispasr_session_tada_set_makeref_models(crispasr_session* s, const char* encoder_gguf,
+                                                       const char* aligner_gguf) {
+    if (!s)
+        return -1;
+#ifdef CA_HAVE_TADA
+    if (s->tada_ctx) {
+        s->tada_makeref_encoder = encoder_gguf ? encoder_gguf : "";
+        s->tada_makeref_aligner = aligner_gguf ? aligner_gguf : "";
+        return 0;
+    }
+#endif
+    (void)encoder_gguf;
+    (void)aligner_gguf;
+    return -1;
 }
 
 // Select a fixed/preset speaker by NAME for backends that bake speakers

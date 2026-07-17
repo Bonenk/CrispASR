@@ -1515,7 +1515,9 @@ add_library(tada-tts STATIC tada_tts.h tada_tts.cpp)
 set_target_properties(tada-tts PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(tada-tts PUBLIC .)
 target_compile_features   (tada-tts PUBLIC cxx_std_17)
-target_link_libraries     (tada-tts PUBLIC tada-codec crispasr-core ggml ggml-base ggml-cpu)
+# tada-encoder (declared below) provides the in-memory make-ref path (#201:
+# tada_make_ref_from_pcm). PUBLIC so crispasr-lib picks it up transitively.
+target_link_libraries     (tada-tts PUBLIC tada-codec tada-encoder crispasr-core ggml ggml-base ggml-cpu)
 if(NOT MSVC)
     target_compile_options(tada-tts PRIVATE -O3)
 endif()

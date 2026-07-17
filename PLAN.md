@@ -127,24 +127,38 @@ TODO (partial — status verified 2026-07-17):
 
 ---
 
-## #201 follow-up — generate a TADA voice ref from audio+transcript at query time (OPEN — only server/C-ABI path left)
+## #201 follow-up — generate a TADA voice ref from audio+transcript at query time (C-ABI DONE gated; server half OPEN)
 
 Switch-voice, offline `--make-ref`, `--align`, and CLI query-time inline cloning
-(`--tts "…" --voice sample.wav --ref-text "…"`) all shipped. Remaining OPEN half:
-the **server / C-ABI on-the-fly path** — accept raw audio (+transcript) and bake a
-ref in-memory, no temp GGUF.
+(`--tts "…" --voice sample.wav --ref-text "…"`) all shipped.
 
-**TO DO (server/C-ABI):**
-- Load encoder + aligner GGUFs in TADA backend `init()` when configured — reuse
-  the already-parsed `--make-ref-encoder` / `--make-ref-aligner` flags. Keep
-  optional: only pay ~1.3 GB (178 MB encoder + 1.1 GB aligner) when enabled.
-- In `synthesize()` / server handler, when `voice` is a `.wav`, run in-memory
-  make-ref → prompt_values/positions fed straight into context (skip GGUF
-  round-trip). Needs a transcript from a new `ref_text` request field on
+**C-ABI / session half — DONE (opt-in, `feat/tada-201-server-abi`).** In-memory
+make-ref, no temp GGUF:
+- `tada_set_prompt_values()` — in-memory counterpart of `tada_load_prompt`
+  (the latter now reuses it, so file + in-memory paths are identical).
+- `tada_make_ref_from_pcm()` in `src/tada_tts.{h,cpp}` — `tada_encoder_encode`
+  (validated) → `tada_set_prompt_values`. Provably equivalent to
+  `write_ref_gguf()+load_prompt()` (same tensors), so no new graph math.
+- `crispasr_session_set_voice(s, "ref.wav", "<transcript>")` decodes to 24 kHz,
+  resolves encoder + language-matched aligner (explicit → next-to-model → cache),
+  and bakes the prompt. `crispasr_session_tada_set_makeref_models()` sets the
+  GGUF paths; Python `Session.set_voice(path, ref_text)` already routes here.
+- **Gated default-OFF: `CRISPASR_TADA_WAV_CLONE=1`** — without it a `.wav` voice
+  keeps the historical `-2` reject, so default behaviour is byte-identical.
+
+**Remaining before flipping the gate on by default:**
+- **Decoded-output roundtrip (HARD RULE #3)** — synth reference → set_voice(wav,
+  text) → synth clone → ASR + `speaker-cosine(clone,ref) > cosine(baseline,ref)`
+  via the Python `Session` API on `tada-1b` (+ `tada-encoder-f16.gguf` +
+  `tada-aligner-en.gguf`). Not run on the dev box (memory-pressured).
+
+**TO DO (server half, still OPEN):**
+- The HTTP server uses the backend *adapter* (`crispasr_backend_tada.cpp`), a
+  distinct surface from the session C-ABI. Wire its `.wav` synth case through
+  `tada_make_ref_from_pcm` (same gate), add a `ref_text` field to
   `/v1/audio/speech` (consent gate + `consent_attestation` already exist).
-- Add a `tada_make_ref_from_pcm` entry in `src/tada_tts.{h,cpp}` that returns
-  prompt state without a GGUF.
-- Cache baked ref keyed by (audio hash, transcript) to skip re-running aligner.
+- Optionally cache baked ref keyed by (audio hash, transcript) to skip
+  re-running the aligner.
 
 **Files:** `examples/cli/crispasr_backend_tada.cpp`, `examples/cli/crispasr_server.cpp`,
 `src/tada_tts.{h,cpp}`, `src/tada_encoder.*`. Aligner is language-specific

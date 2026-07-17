@@ -5,6 +5,7 @@
 
 #include "tada_tts.h"
 #include "tada_codec.h"
+#include "tada_encoder.h" // in-memory make-ref (#201): encoder + aligner over PCM
 #include "core/gguf_loader.h"
 #include "core/attention.h"
 #include "core/ffn.h"
@@ -2295,7 +2296,7 @@ int tada_load_prompt(struct tada_context* ctx, const char* path) {
     gguf_context* meta = core_gguf::open_metadata(path);
     if (!meta)
         return -1;
-    ctx->prompt_text = core_gguf::kv_str(meta, "crispasr.ref.tada_tts_prompt_text", "");
+    const std::string prompt_text = core_gguf::kv_str(meta, "crispasr.ref.tada_tts_prompt_text", "");
     core_gguf::free_metadata(meta);
 
     core_gguf::WeightLoad wl;
@@ -2314,36 +2315,20 @@ int tada_load_prompt(struct tada_context* ctx, const char* path) {
 
     const int ad = (int)ctx->hp.acoustic_dim;
     const int np = (int)(ggml_nelements(tv) / ad);
-    ctx->n_prompt = np;
 
-    // Read token values
-    ctx->prompt_values.resize(np * ad);
-    ggml_backend_tensor_get(tv, ctx->prompt_values.data(), 0, (size_t)np * ad * sizeof(float));
-
-    // Read positions and compute time gaps
+    // Read token values + positions into host memory, then apply through the
+    // shared in-memory setter so the file path and the on-the-fly clone path
+    // (#201) compute the time-gap conditioning identically.
+    std::vector<float> values((size_t)np * ad);
+    ggml_backend_tensor_get(tv, values.data(), 0, (size_t)np * ad * sizeof(float));
+    std::vector<float> positions;
+    const float* pos_ptr = nullptr;
     if (tp) {
-        std::vector<float> pos(np);
-        ggml_backend_tensor_get(tp, pos.data(), 0, (size_t)np * sizeof(float));
-
-        // Time gaps: time_before[i] = positions[i] - positions[i-1], clamped to [0, num_time_classes-1]
-        int max_t = (int)ctx->hp.num_time_classes - 1;
-        ctx->prompt_time_before.resize(np + 1, 0);
-        ctx->prompt_time_after.resize(np + 1, 0);
-        for (int i = 0; i < np; i++) {
-            int p_cur = (int)pos[i];
-            int p_prev = (i > 0) ? (int)pos[i - 1] : 1;
-            int gap = std::min(std::max(p_cur - p_prev, 0), max_t);
-            ctx->prompt_time_before[i + 1] = gap; // shifted by 1 (index 0 is padding)
-        }
-        // time_after[i] = time_before[i+1]
-        for (int i = 0; i < np; i++) {
-            ctx->prompt_time_after[i] =
-                (i + 1 < (int)ctx->prompt_time_before.size()) ? ctx->prompt_time_before[i + 1] : 1;
-        }
+        positions.resize(np);
+        ggml_backend_tensor_get(tp, positions.data(), 0, (size_t)np * sizeof(float));
+        pos_ptr = positions.data();
     }
-
-    // Masks: all 1 for prompt tokens
-    ctx->prompt_masks.assign(np, 1);
+    int rc = tada_set_prompt_values(ctx, values.data(), np, ad, pos_ptr, prompt_text.c_str());
 
     // Clean up
     if (wl.buf)
@@ -2351,10 +2336,74 @@ int tada_load_prompt(struct tada_context* ctx, const char* path) {
     if (wl.ctx)
         ggml_free(wl.ctx);
 
-    if (ctx->params.verbosity >= 1) {
+    if (rc == 0 && ctx->params.verbosity >= 1) {
         fprintf(stderr, "tada: loaded prompt with %d tokens from %s\n", np, path);
     }
+    return rc;
+}
+
+int tada_set_prompt_values(struct tada_context* ctx, const float* token_values, int n_tokens, int embed_dim,
+                           const float* token_positions, const char* prompt_text) {
+    if (!ctx || !token_values || n_tokens <= 0 || embed_dim <= 0)
+        return -1;
+    const int ad = (int)ctx->hp.acoustic_dim;
+    if (embed_dim != ad) {
+        fprintf(stderr, "tada: prompt embed_dim %d != acoustic_dim %d\n", embed_dim, ad);
+        return -1;
+    }
+    ctx->prompt_text = prompt_text ? prompt_text : "";
+    ctx->n_prompt = n_tokens;
+    ctx->prompt_values.assign(token_values, token_values + (size_t)n_tokens * ad);
+
+    if (token_positions) {
+        // Time gaps: time_before[i] = positions[i] - positions[i-1], clamped to
+        // [0, num_time_classes-1]. Mirrors the former tada_load_prompt body.
+        const int max_t = (int)ctx->hp.num_time_classes - 1;
+        ctx->prompt_time_before.assign(n_tokens + 1, 0);
+        ctx->prompt_time_after.assign(n_tokens + 1, 0);
+        for (int i = 0; i < n_tokens; i++) {
+            int p_cur = (int)token_positions[i];
+            int p_prev = (i > 0) ? (int)token_positions[i - 1] : 1;
+            int gap = std::min(std::max(p_cur - p_prev, 0), max_t);
+            ctx->prompt_time_before[i + 1] = gap; // shifted by 1 (index 0 is padding)
+        }
+        for (int i = 0; i < n_tokens; i++) {
+            ctx->prompt_time_after[i] =
+                (i + 1 < (int)ctx->prompt_time_before.size()) ? ctx->prompt_time_before[i + 1] : 1;
+        }
+    } else {
+        ctx->prompt_time_before.clear();
+        ctx->prompt_time_after.clear();
+    }
+
+    // Masks: all 1 for prompt tokens
+    ctx->prompt_masks.assign(n_tokens, 1);
     return 0;
+}
+
+int tada_make_ref_from_pcm(struct tada_context* ctx, const char* encoder_gguf, const char* aligner_gguf,
+                           const float* audio_24k, int n_samples_24k, const char* transcript) {
+    if (!ctx || !encoder_gguf || !aligner_gguf || !audio_24k || n_samples_24k <= 0 || !transcript || !transcript[0])
+        return -1;
+
+    tada_encoder_params ep = tada_encoder_default_params();
+    ep.n_threads = ctx->params.n_threads > 0 ? ctx->params.n_threads : ep.n_threads;
+    ep.verbosity = ctx->params.verbosity;
+    tada_encoder_context* ectx = tada_encoder_init(encoder_gguf, ep);
+    if (!ectx) {
+        fprintf(stderr, "tada: make-ref: failed to load encoder '%s'\n", encoder_gguf);
+        return -2;
+    }
+    tada_encoder_result result;
+    int rc = tada_encoder_encode(ectx, aligner_gguf, audio_24k, n_samples_24k, transcript, result);
+    tada_encoder_free(ectx);
+    if (rc != 0) {
+        fprintf(stderr, "tada: make-ref: encode failed (rc=%d)\n", rc);
+        return rc;
+    }
+    // Apply exactly what write_ref_gguf(result)+load_prompt would have, in memory.
+    return tada_set_prompt_values(ctx, result.token_values.data(), result.n_tokens, result.embed_dim,
+                                  result.token_positions.data(), transcript);
 }
 
 void tada_set_seed(struct tada_context* ctx, uint64_t seed) {

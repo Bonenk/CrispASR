@@ -323,6 +323,16 @@ CRISPASR_SESSION_API int crispasr_session_set_parakeet_att_context(crispasr_sess
 CRISPASR_SESSION_API int crispasr_session_set_codec_path(crispasr_session* s, const char* path);
 CRISPASR_SESSION_API int crispasr_session_set_voice(crispasr_session* s, const char* path,
                                                     const char* ref_text_or_null);
+// #201: configure the TADA encoder + aligner GGUFs used for on-the-fly voice
+// cloning, i.e. crispasr_session_set_voice(s, "ref.wav", "<transcript>") on a
+// TADA session. The .wav clone path is opt-in (experimental) — enable it with
+// the env var CRISPASR_TADA_WAV_CLONE=1; otherwise a .wav voice is rejected as
+// before. Either path may be NULL to clear it and fall back to
+// auto-resolution (next to the model, then the cache dir). The aligner is
+// language-specific (tada-aligner-<lang>.gguf); the language follows the
+// session's source-language hint. No-op (returns -1) for non-TADA sessions.
+CRISPASR_SESSION_API int crispasr_session_tada_set_makeref_models(crispasr_session* s, const char* encoder_gguf,
+                                                                  const char* aligner_gguf);
 CRISPASR_SESSION_API int crispasr_session_set_speaker_name(crispasr_session* s, const char* name);
 CRISPASR_SESSION_API int crispasr_session_set_speaker_id(crispasr_session* s, int id);
 CRISPASR_SESSION_API int crispasr_session_n_speakers(crispasr_session* s);
