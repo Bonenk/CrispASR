@@ -451,6 +451,40 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         return result;
     }
 
+    // #91: offset_t_ms / duration_ms request params — restrict processing to a
+    // time window of the upload (mirrors the CLI dispatcher crispasr_run.cpp,
+    // which the server path previously skipped). Applied to the decoded 16 kHz
+    // PCM before slicing so VAD/chunking/transcribe all operate on the window;
+    // reported segment timestamps are shifted back by the offset at the end so
+    // they stay in original-audio time. No backend adapter applies the offset
+    // itself (only the legacy whisper CLI path did), so this is the sole
+    // application — no double-shift.
+    if (rp.offset_t_ms > 0 || rp.duration_ms > 0) {
+        const int64_t total = (int64_t)pcmf32.size();
+        int64_t off = (int64_t)rp.offset_t_ms * 16000 / 1000;
+        if (off < 0)
+            off = 0;
+        if (off >= total) {
+            // Window starts past end-of-audio: nothing to transcribe.
+            result.ok = true;
+            return result;
+        }
+        int64_t len = (rp.duration_ms > 0) ? (int64_t)rp.duration_ms * 16000 / 1000 : (total - off);
+        if (len > total - off)
+            len = total - off;
+        auto window = [off, len](std::vector<float>& v) {
+            if (v.empty())
+                return;
+            const int64_t o = std::min<int64_t>(off, (int64_t)v.size());
+            const int64_t e = std::min<int64_t>(o + len, (int64_t)v.size());
+            std::vector<float> w(v.begin() + o, v.begin() + e);
+            v.swap(w);
+        };
+        window(pcmf32);
+        for (auto& ch : pcmf32s)
+            window(ch);
+    }
+
     result.duration_s = (double)pcmf32.size() / 16000.0;
 
     const bool want_auto_lang = rp.detect_language || rp.language == "auto";
@@ -717,6 +751,28 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
 
         auto t1 = std::chrono::steady_clock::now();
         result.elapsed_s = std::chrono::duration<double>(t1 - t0).count();
+    }
+
+    // #91: shift reported timestamps back into original-audio time when a
+    // --offset-t window trimmed the buffer above. Done here, after all
+    // slice-relative processing (diarize re-walk matches segments by the
+    // unshifted slice t0_cs).
+    if (rp.offset_t_ms > 0) {
+        const int64_t off_cs = (int64_t)rp.offset_t_ms / 10;
+        for (auto& seg : result.segs) {
+            seg.t0 += off_cs;
+            seg.t1 += off_cs;
+            for (auto& w : seg.words) {
+                w.t0 += off_cs;
+                w.t1 += off_cs;
+            }
+            for (auto& tok : seg.tokens) {
+                if (tok.t0 >= 0)
+                    tok.t0 += off_cs;
+                if (tok.t1 >= 0)
+                    tok.t1 += off_cs;
+            }
+        }
     }
 
     result.ok = true;
