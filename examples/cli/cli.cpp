@@ -2324,6 +2324,22 @@ int main(int argc, char** argv) {
     }
     // -----------------------------------------------------------------------
 
+    // The legacy whisper-native path below (issue #266) has never wired up
+    // named speaker identification: it predates crispasr_apply_global_speaker_stages()
+    // and does not run the post-merge cluster-matching stage the unified
+    // dispatcher (crispasr_run_backend / crispasr_run.cpp) uses. Warn once so
+    // --speaker-db doesn't silently do nothing.
+    if (!params.speaker_db.empty()) {
+        static bool warned_legacy_speaker_db = false;
+        if (!warned_legacy_speaker_db) {
+            warned_legacy_speaker_db = true;
+            fprintf(stderr, "crispasr: warning: --speaker-db is ignored on the legacy whisper path "
+                            "(no --backend given). Named speaker identification is only supported via "
+                            "the unified backend dispatch — pass --backend whisper (or any other "
+                            "backend) to use --speaker-db.\n");
+        }
+    }
+
     if (params.language != "auto" && whisper_lang_id(params.language.c_str()) == -1) {
         fprintf(stderr, "error: unknown language '%s'\n", params.language.c_str());
         whisper_print_usage(argc, argv, params);
