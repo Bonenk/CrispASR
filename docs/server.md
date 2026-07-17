@@ -94,6 +94,8 @@ curl http://localhost:8080/v1/audio/transcriptions \
 | `max_tokens` | Generated-token cap for supported autoregressive ASR backends |
 | `max_new_tokens` | Alias for `max_tokens` |
 | `frequency_penalty` | Opt-in repeated generated-token penalty for supported autoregressive ASR backends (`0.0` disabled) |
+| `offset_t_ms` | Start transcription this many ms into the audio (default: 0). Reported timestamps stay in original-audio time |
+| `duration_ms` | Transcribe only this many ms from `offset_t_ms` (default: 0 = to end) |
 | `translate` | `true`/`false` — translate to English (backends with `CAP_TRANSLATE`) |
 | `source_lang` | Source language for AST backends (canary, cohere) |
 | `target_lang` | Target language for AST backends |

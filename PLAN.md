@@ -953,14 +953,27 @@ the next parity-pass audit doesn't re-discover them. (`--alt N` shipped — see
 HISTORY.)
 
 **TO DO (open parity gaps):**
-- ~~`--offset-t MS` / `--duration MS`~~ — DONE (feat/offset-duration). The CLI
-  general path (`crispasr_run.cpp process_one_input`) now windows the decoded
-  PCM to `[offset, offset+duration)` before VAD/chunking and shifts reported
-  segment/word/token timestamps back into original-audio time. Was
-  whisper-internal only. Offset-past-end exits cleanly. Verified on parakeet-ctc
-  + jfk (offset skips leading audio, timestamps land at 5.0–11.0 s; word-level
-  JSON offsets shifted too). Docs in `docs/cli.md`. **Still open:** the Dart
-  binding + CrisperWeaver UI rows (out of this repo's scope).
+- ~~`--offset-t MS` / `--duration MS`~~ — DONE on **both** dispatch surfaces
+  (multi-surface trap — the server has its own slice loop, see
+  [[multi-surface-dispatch-trap]]):
+  - **CLI** (`crispasr_run.cpp process_one_input`, feat/offset-duration): windows
+    the decoded PCM to `[offset, offset+duration)` before VAD/chunking and shifts
+    reported segment/word/token timestamps back into original-audio time. Was
+    whisper-internal only (`cli.cpp` → `wparams.offset_ms`). Offset-past-end exits
+    cleanly. Verified on parakeet-ctc + jfk: timestamps land at 5.0–11.0 s;
+    word-level JSON offsets shifted too.
+  - **HTTP server** (`crispasr_server.cpp do_transcribe`,
+    feat/server-offset-duration): `offset_t_ms` / `duration_ms` form fields were
+    parsed but never applied. Same window + shift, applied after the per-slice
+    diarize re-walk (which matches segments by the unshifted slice `t0_cs`).
+    Verified live via `crispasr --server --backend moonshine` + curl:
+    `offset_t_ms=5000` → seg 5.00–11.00; `offset_t_ms=4000&duration_ms=3000` →
+    seg 4.00–7.00; offset past end → `{"text": ""}`.
+
+  No session-C-ABI change needed: `crispasr_session_transcribe` is a low-level
+  PCM-buffer primitive — windowing is the caller's concern there. Docs in
+  `docs/cli.md` + `docs/server.md`. **Still open:** the Dart binding +
+  CrisperWeaver UI rows (out of this repo's scope).
 - Whisper decoder fallback knobs (`--word-thold`, `--entropy-thold`,
   `--logprob-thold`, `--no-speech-thold`, `--no-fallback`, `--temperature-inc`)
   — already in Dart binding's TranscribeOptions; just add UI rows + l10n in
