@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `b6a6f5a3de8ba9d3565a6f752f1151aefc86ea08` (Merge origin/main into feature/dart-pure-mp3).
+Synced at upstream commit: `1435a57df11fcc14199cc7fb160c167cd0e2ba39` (ci: auto-tag glint_audio on version bump → fully-automatic pub.dev publish).
