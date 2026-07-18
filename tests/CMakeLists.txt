@@ -631,6 +631,34 @@ catch_discover_tests(test-diarize-global
     PROPERTIES LABELS "unit;diarize"
 )
 
+# ─── test-diarize-align-order — Catch2 unit tests for issue #267
+# (diarize-after-align ordering). Compiles crispasr_diarize_cli.cpp
+# directly so the test can call crispasr_apply_diarize with synthetic
+# sherpa caches. Links the same libraries as the CLI target minus the
+# backend-specific ones.
+add_executable(test-diarize-align-order
+    test_diarize_align_order.cpp
+    ${PROJECT_SOURCE_DIR}/examples/cli/crispasr_diarize_cli.cpp
+)
+target_include_directories(test-diarize-align-order PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-diarize-align-order PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+    common
+    pyannote-seg
+    titanet
+)
+catch_discover_tests(test-diarize-align-order
+    TEST_SPEC "[issue267]"
+    PROPERTIES LABELS "unit;diarize;issue267"
+)
+
 # ─── test - paraformer — live integration tests for paraformer backend
 add_executable(test-paraformer
     test_paraformer.cpp

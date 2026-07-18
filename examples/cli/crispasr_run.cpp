@@ -919,11 +919,61 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             }
         }
 
+        // Issue #267: diarize the stitched result AFTER alignment so
+        // word timestamps are available for speaker-turn splitting.
+        // The stitched path transcribes all VAD segments as one buffer,
+        // so diarize operates on the whole result with original-audio
+        // timestamps already remapped.
+        if (params.diarize && !segs.empty()) {
+            // Build caches over the full original audio (same logic as
+            // the per-slice path below, but scoped to the stitched block
+            // since it returns before the per-slice declarations).
+            CrispasrSherpaCache stitch_sherpa_cache;
+            if (params.diarize_method == "sherpa" || params.diarize_method == "sherpa-onnx" ||
+                params.diarize_method == "ecapa") {
+                const float* full = samples.data();
+                std::vector<float> mono_buf;
+                if (have_stereo && !stereo[0].empty() && !stereo[1].empty()) {
+                    const size_t n = std::min(stereo[0].size(), stereo[1].size());
+                    mono_buf.resize(n);
+                    for (size_t mi = 0; mi < n; mi++)
+                        mono_buf[mi] = 0.5f * (stereo[0][mi] + stereo[1][mi]);
+                    full = mono_buf.data();
+                }
+                if (!crispasr_compute_sherpa_cache(full, (int)samples.size(), params, stitch_sherpa_cache))
+                    stitch_sherpa_cache = {};
+            }
+            CrispasrPyannoteCache stitch_pyannote_cache;
+            if (params.diarize_method == "pyannote") {
+                const float* full = samples.data();
+                std::vector<float> mono_buf;
+                if (have_stereo && !stereo[0].empty() && !stereo[1].empty()) {
+                    const size_t n = std::min(stereo[0].size(), stereo[1].size());
+                    mono_buf.resize(n);
+                    for (size_t mi = 0; mi < n; mi++)
+                        mono_buf[mi] = 0.5f * (stereo[0][mi] + stereo[1][mi]);
+                    full = mono_buf.data();
+                }
+                if (!crispasr_compute_pyannote_cache(full, (int)samples.size(), params, stitch_pyannote_cache))
+                    stitch_pyannote_cache = {};
+            }
+            const CrispasrPyannoteCache* pya_ptr = stitch_pyannote_cache.valid() ? &stitch_pyannote_cache : nullptr;
+            const CrispasrSherpaCache* shp_ptr = stitch_sherpa_cache.valid() ? &stitch_sherpa_cache : nullptr;
+            if (have_stereo) {
+                crispasr_apply_diarize(stereo[0], stereo[1], /*is_stereo=*/true, 0, segs, params, pya_ptr, shp_ptr);
+            } else {
+                crispasr_apply_diarize(samples, samples, /*is_stereo=*/false, 0, segs, params, pya_ptr, shp_ptr);
+            }
+        }
+
         // Fall through to the shared output path below by wrapping
         // the stitched result into per_slice / all_segs.
         std::vector<std::vector<crispasr_segment>> stitched_per_slice(1);
         stitched_per_slice[0] = std::move(segs);
         auto all_segs = merge_segments(std::move(stitched_per_slice), slices);
+
+        // Issue #267: global speaker stages for the stitched path too.
+        crispasr_apply_global_speaker_stages(all_segs, samples, params);
 
         apply_punc_model(punc_ctx, all_segs);
         apply_truecase_model(tc_ctx, all_segs);
@@ -1167,27 +1217,12 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                 crispasr_gap_fill_slice(be, params, samples.data(), (int)samples.size(), SR, sl, segs);
         }
 
-        if (params.diarize && !segs.empty()) {
-            const CrispasrPyannoteCache* pya_ptr = pyannote_cache.valid() ? &pyannote_cache : nullptr;
-            const CrispasrSherpaCache* shp_ptr = sherpa_cache.valid() ? &sherpa_cache : nullptr;
-            if (have_stereo) {
-                std::vector<float> sl_l(stereo[0].begin() + sl.start, stereo[0].begin() + sl.end);
-                std::vector<float> sl_r(stereo[1].begin() + sl.start, stereo[1].begin() + sl.end);
-                crispasr_apply_diarize(sl_l, sl_r, /*is_stereo=*/true, sl.t0_cs, segs, params, pya_ptr, shp_ptr);
-            } else {
-                std::vector<float> mono_slice(samples.begin() + sl.start, samples.begin() + sl.end);
-                crispasr_apply_diarize(mono_slice, mono_slice,
-                                       /*is_stereo=*/false, sl.t0_cs, segs, params, pya_ptr, shp_ptr);
-            }
-        }
-
-        // NOTE (issue #266): speaker-db identification no longer runs here.
-        // One embedding per dispatcher slice assigned a single identity to
-        // every segment in the slice — wrong for mixed-speaker slices — and
-        // global clustering later overwrote the names anyway. Identification
-        // now runs once, post-merge, per global speaker cluster: see
-        // crispasr_apply_global_speaker_stages().
-
+        // Issue #267: run external CTC alignment BEFORE diarization so
+        // that word timestamps are available when the diarize step splits
+        // segments at speaker-turn boundaries. Previously diarize ran
+        // first and could only assign a dominant speaker to whole ASR
+        // segments; now it can split at word boundaries.
+        //
         // Issue #62: --force-aligner bypasses CAP gate + already-aligned skip.
         const bool want_align =
             !params.aligner_model.empty() && ((backend.capabilities() & CAP_TIMESTAMPS_CTC) || params.force_aligner);
@@ -1209,6 +1244,32 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                 }
             }
         }
+
+        // Issue #267: diarize AFTER alignment so word timestamps (native
+        // or externally aligned) are available for speaker-turn splitting.
+        // When no words are present (no aligner, no native timestamps),
+        // the diarize code falls back to segment-level dominant-speaker
+        // assignment — the same behaviour as before.
+        if (params.diarize && !segs.empty()) {
+            const CrispasrPyannoteCache* pya_ptr = pyannote_cache.valid() ? &pyannote_cache : nullptr;
+            const CrispasrSherpaCache* shp_ptr = sherpa_cache.valid() ? &sherpa_cache : nullptr;
+            if (have_stereo) {
+                std::vector<float> sl_l(stereo[0].begin() + sl.start, stereo[0].begin() + sl.end);
+                std::vector<float> sl_r(stereo[1].begin() + sl.start, stereo[1].begin() + sl.end);
+                crispasr_apply_diarize(sl_l, sl_r, /*is_stereo=*/true, sl.t0_cs, segs, params, pya_ptr, shp_ptr);
+            } else {
+                std::vector<float> mono_slice(samples.begin() + sl.start, samples.begin() + sl.end);
+                crispasr_apply_diarize(mono_slice, mono_slice,
+                                       /*is_stereo=*/false, sl.t0_cs, segs, params, pya_ptr, shp_ptr);
+            }
+        }
+
+        // NOTE (issue #266): speaker-db identification no longer runs here.
+        // One embedding per dispatcher slice assigned a single identity to
+        // every segment in the slice — wrong for mixed-speaker slices — and
+        // global clustering later overwrote the names anyway. Identification
+        // now runs once, post-merge, per global speaker cluster: see
+        // crispasr_apply_global_speaker_stages().
 
         // #91: shift reported timestamps back into original-audio time when
         // a --offset-t window trimmed the buffer (segs are in window-relative
@@ -3737,34 +3798,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     per_slice_logits.push_back({});
             }
 
-            // Apply the generic diarize post-step. Stereo-only methods
-            // (energy, xcorr) need have_stereo == true; mono-friendly
-            // methods (vad-turns, future sherpa/pyannote) work either
-            // way. Pass both channel buffers and an is_stereo hint;
-            // when have_stereo is false we point both at the mono
-            // buffer so the helper has data to look at without
-            // special-casing.
-            if (params.diarize && !segs.empty()) {
-                if (have_stereo) {
-                    std::vector<float> sl_l(stereo[0].begin() + sl.start,
-                                            stereo[0].begin() + sl.end);
-                    std::vector<float> sl_r(stereo[1].begin() + sl.start,
-                                            stereo[1].begin() + sl.end);
-                    crispasr_apply_diarize(sl_l, sl_r, /*is_stereo=*/true,
-                                           sl.t0_cs, segs, params);
-                } else {
-                    std::vector<float> mono_slice(samples.begin() + sl.start,
-                                                  samples.begin() + sl.end);
-                    crispasr_apply_diarize(mono_slice, mono_slice,
-                                           /*is_stereo=*/false,
-                                           sl.t0_cs, segs, params);
-                }
-            }
-
-            // Optional CTC forced alignment to attach word-level timestamps.
-            // Applies to backends that expose CAP_TIMESTAMPS_CTC and don't
-            // already have words populated. Runs per slice so absolute
-            // timestamps come out right.
+            // Issue #267: run CTC alignment BEFORE diarization so word
+            // timestamps are available for speaker-turn splitting.
+            //
             // Issue #62: --force-aligner overrides both gates so users
             // can prefer aligner timing over native timestamps.
             const bool want_align =
@@ -3793,6 +3829,27 @@ int crispasr_run_backend(const whisper_params& params_in) {
                         seg.t1 = words.back().t1;
                         seg.words = std::move(words);
                     }
+                }
+            }
+
+            // Issue #267: diarize AFTER alignment so word timestamps
+            // (native or externally aligned) are available for
+            // speaker-turn splitting. Without words, falls back to
+            // segment-level dominant-speaker assignment.
+            if (params.diarize && !segs.empty()) {
+                if (have_stereo) {
+                    std::vector<float> sl_l(stereo[0].begin() + sl.start,
+                                            stereo[0].begin() + sl.end);
+                    std::vector<float> sl_r(stereo[1].begin() + sl.start,
+                                            stereo[1].begin() + sl.end);
+                    crispasr_apply_diarize(sl_l, sl_r, /*is_stereo=*/true,
+                                           sl.t0_cs, segs, params);
+                } else {
+                    std::vector<float> mono_slice(samples.begin() + sl.start,
+                                                  samples.begin() + sl.end);
+                    crispasr_apply_diarize(mono_slice, mono_slice,
+                                           /*is_stereo=*/false,
+                                           sl.t0_cs, segs, params);
                 }
             }
 
