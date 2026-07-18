@@ -924,23 +924,7 @@ static char* glm_asr_transcribe_impl(struct glm_asr_context* ctx, const float* s
         // Skip special tokens (no text contribution and no out-vector entry).
         if (tok.size() >= 2 && tok[0] == '<' && tok[1] == '|')
             continue;
-        for (size_t ci = 0; ci < tok.size();) {
-            unsigned char c = (unsigned char)tok[ci];
-            if (c == 0xC4 && ci + 1 < tok.size()) {
-                unsigned char c2 = (unsigned char)tok[ci + 1];
-                if (c2 == 0xA0) {
-                    result += ' '; // Ġ = U+0120 = space
-                    ci += 2;
-                    continue;
-                } else if (c2 == 0x8A) {
-                    result += '\n'; // Ċ = U+010A = newline
-                    ci += 2;
-                    continue;
-                }
-            }
-            result += (char)c;
-            ci++;
-        }
+        result += core_bpe::token_bytes_to_utf8(tok);
         if (out_token_ids && out_token_probs) {
             out_token_ids->push_back(id);
             out_token_probs->push_back(gi < gen_probs.size() ? gen_probs[gi] : 0.0f);

@@ -5987,28 +5987,10 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         toks.reserve((size_t)gr->n_tokens);
         for (int i = 0; i < gr->n_tokens; i++) {
             ca_token_record tk;
-            // GLM uses GPT-2 byte-level BPE: Ġ→space, Ċ→newline.
+            // GLM uses GPT-2 byte-level BPE — full table decode (CJK, etc.).
             const char* raw = glm_asr_token_text((glm_asr_context*)s->glmasr_ctx, gr->token_ids[i]);
-            if (raw) {
-                for (size_t ci = 0; raw[ci] != '\0';) {
-                    unsigned char c = (unsigned char)raw[ci];
-                    if (c == 0xC4 && raw[ci + 1] != '\0') {
-                        unsigned char c2 = (unsigned char)raw[ci + 1];
-                        if (c2 == 0xA0) {
-                            tk.text += ' ';
-                            ci += 2;
-                            continue;
-                        }
-                        if (c2 == 0x8A) {
-                            tk.text += '\n';
-                            ci += 2;
-                            continue;
-                        }
-                    }
-                    tk.text += (char)c;
-                    ci++;
-                }
-            }
+            if (raw)
+                tk.text = gpt2_byte_decode(raw);
             tk.t0 = -1;
             tk.t1 = -1;
             tk.p = gr->token_probs[i];
