@@ -353,6 +353,7 @@ all other vars derive from it unless individually overridden.
 | `CRISPASR_MODEL_WHISPER` | Beam search + VAD tests |
 | `PARAFORMER_MODEL` | Paraformer live tests |
 | `CRISPASR_TEST_DIARIZE_MODEL` | Diarization live tests |
+| `CRISPASR_MODEL_ALIGNER` | CTC aligner live tests (canary-ctc-aligner) |
 | `CRISPASR_CHAT_TEST_MODEL` | Chat (LLM) smoke test |
 
 Tests that use `SKIP()` return exit code 4 (Catch2 convention). The
