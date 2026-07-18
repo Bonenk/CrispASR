@@ -785,8 +785,10 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.vad_stitch = true;
     } else if (arg == "--vad-export") {
         params.vad_export_file = ARGV_NEXT;
+        params.vad = true; // #227: export implies VAD
     } else if (arg == "--vad-import") {
         params.vad_import_file = ARGV_NEXT;
+        params.vad = true; // #227: import implies VAD
     } else {
         return false;
     }
@@ -2279,6 +2281,15 @@ int main(int argc, char** argv) {
             params.backend = "whisper"; // any backend, enrollment exits before init
         const int rc = crispasr_run_backend(params);
         return rc;
+    }
+
+    // Issue #227: --vad-export is a standalone verb that only needs audio +
+    // Silero VAD — no ASR model required. Route to crispasr_run_backend()
+    // which handles the short circuit before backend init.
+    if (!params.vad_export_file.empty() && !params.fname_inp.empty()) {
+        if (params.backend.empty())
+            params.backend = "whisper"; // any backend name, export exits before init
+        return crispasr_run_backend(params);
     }
 
     // crispasr backend dispatch ---------------------------------------------

@@ -825,19 +825,9 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         slices = crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, slice_chunk_seconds, params);
     }
 
-    // Issue #227: persist the computed boundaries for reuse on a later run.
-    if (!params.vad_export_file.empty()) {
-        std::ofstream out(params.vad_export_file, std::ios::binary | std::ios::trunc);
-        if (!out) {
-            fprintf(stderr, "crispasr: warning: cannot write --vad-export file '%s'\n", params.vad_export_file.c_str());
-        } else {
-            out << crispasr_serialize_vad_slices(slices, SR);
-            if (!params.no_prints) {
-                fprintf(stderr, "crispasr: exported %zu VAD segment(s) to '%s'\n", slices.size(),
-                        params.vad_export_file.c_str());
-            }
-        }
-    }
+    // NOTE: --vad-export is now handled before backend init
+    // (crispasr_run_backend, issue #227). This site is no longer reached
+    // when vad_export_file is set.
 
     if (slices.empty()) {
         fprintf(stderr, "crispasr: warning: no speech detected in '%s'\n", fname_inp.c_str());
@@ -2328,6 +2318,46 @@ int crispasr_run_backend(const whisper_params& params_in) {
                         tmp.c_str());
             params.tts_voice = tmp; // backend init() now sees a .gguf reference
         }
+    }
+
+    // Issue #227: VAD-export-only short circuit. --vad-export computes
+    // speech boundaries and writes them to a JSON file — no ASR model
+    // needed. The user can import the result on a second run with
+    // --vad-import. Loading the audio and running Silero VAD is cheap;
+    // loading an ASR backend is not, so we return before backend init.
+    if (!params.vad_export_file.empty()) {
+        int vad_rc = 0;
+        for (size_t fi = 0; fi < params.fname_inp.size(); fi++) {
+            const auto& fname = params.fname_inp[fi];
+            std::vector<float> samples;
+            std::vector<std::vector<float>> stereo_dummy;
+            if (!read_audio_data(fname, samples, stereo_dummy, false)) {
+                fprintf(stderr, "crispasr: error: cannot read audio '%s'\n", fname.c_str());
+                vad_rc = 20;
+                continue;
+            }
+            constexpr int SR = 16000;
+            const float slice_chunk = params.chunk_seconds > 0.0f ? params.chunk_seconds : 30.0f;
+            auto slices = crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, slice_chunk, params);
+            // Multi-file: each input gets its own export path derived
+            // from the input name. Single-file: use the explicit path.
+            std::string export_path = params.vad_export_file;
+            if (params.fname_inp.size() > 1) {
+                export_path = crispasr_make_out_path(fname, ".vad.json");
+            }
+            std::ofstream out(export_path, std::ios::binary | std::ios::trunc);
+            if (!out) {
+                fprintf(stderr, "crispasr: warning: cannot write --vad-export file '%s'\n", export_path.c_str());
+                vad_rc = 1;
+            } else {
+                out << crispasr_serialize_vad_slices(slices, SR);
+                if (!params.no_prints) {
+                    fprintf(stderr, "crispasr: exported %zu VAD segment(s) to '%s'\n", slices.size(),
+                            export_path.c_str());
+                }
+            }
+        }
+        return vad_rc;
     }
 
     // Create and init the backend.
