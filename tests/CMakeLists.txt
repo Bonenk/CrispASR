@@ -482,7 +482,11 @@ add_executable(test-vad-boundaries
     test-vad-boundaries.cpp
 )
 target_include_directories(test-vad-boundaries PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
     ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+    ${PROJECT_SOURCE_DIR}/examples/cli
 )
 target_link_libraries(test-vad-boundaries PRIVATE
     Catch2::Catch2WithMain

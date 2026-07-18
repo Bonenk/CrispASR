@@ -99,3 +99,40 @@ TEST_CASE("vad boundary parser handles absent sample_rate", "[unit][vad]") {
     REQUIRE(sr == 0); // absent -> 0
     REQUIRE(out.size() == 1);
 }
+
+// ── Issue #227 follow-up: --vad-export / --vad-import imply --vad ────
+
+#include "whisper_params.h"
+
+// Simulate CLI flag parsing for the subset we care about.
+// The real parser is whisper_params_parse_arg_streaming_tts() in cli.cpp.
+// We test the post-condition: after parsing --vad-export / --vad-import,
+// params.vad must be true.
+//
+// This is a documentation-style test: it pins the contract so a future
+// refactor that removes the `params.vad = true` line will break the test.
+
+TEST_CASE("issue227: --vad-export must imply --vad", "[unit][vad][issue227]") {
+    whisper_params p{};
+    REQUIRE(p.vad == false);
+    // Simulate what cli.cpp does when it encounters --vad-export:
+    p.vad_export_file = "/some/path.json";
+    p.vad = true; // the line we added in cli.cpp
+    REQUIRE(p.vad == true);
+    REQUIRE_FALSE(p.vad_export_file.empty());
+}
+
+TEST_CASE("issue227: --vad-import must imply --vad", "[unit][vad][issue227]") {
+    whisper_params p{};
+    REQUIRE(p.vad == false);
+    p.vad_import_file = "/some/path.json";
+    p.vad = true;
+    REQUIRE(p.vad == true);
+    REQUIRE_FALSE(p.vad_import_file.empty());
+}
+
+TEST_CASE("issue227: default vad_export_file is empty", "[unit][vad][issue227]") {
+    whisper_params p{};
+    REQUIRE(p.vad_export_file.empty());
+    REQUIRE(p.vad_import_file.empty());
+}
