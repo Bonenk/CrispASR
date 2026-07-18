@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `ce488b4c7e2edf25fdaf8631b71ea599ba87ee18` (ci: automated pub.dev publishing for glint_audio (OIDC)).
+Synced at upstream commit: `acc6bb05aaeb9ceaf14c3c4966c70d92fc5fab06` (docs(plan): Vorbis track — bindings, floor 0, README, pub.dev bump).
