@@ -6358,30 +6358,10 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 toks.reserve((size_t)mr->n_tokens);
                 for (int i = 0; i < mr->n_tokens; i++) {
                     ca_token_record tk;
+                    // Mimo uses Qwen2 tokenizer (GPT-2 byte-level BPE) — full table decode.
                     const char* piece = mimo_asr_token_text(s->mimo_asr_ctx, mr->token_ids[i]);
-                    if (piece) {
-                        std::string p = piece;
-                        // Mimo uses Qwen2 tokenizer (GPT-2 byte-level BPE):
-                        // Ġ (0xC4 0xA0) → space, Ċ (0xC4 0x8A) → newline.
-                        for (size_t ci = 0; ci < p.size();) {
-                            unsigned char c = (unsigned char)p[ci];
-                            if (c == 0xC4 && ci + 1 < p.size()) {
-                                unsigned char c2 = (unsigned char)p[ci + 1];
-                                if (c2 == 0xA0) {
-                                    tk.text += ' ';
-                                    ci += 2;
-                                    continue;
-                                }
-                                if (c2 == 0x8A) {
-                                    tk.text += '\n';
-                                    ci += 2;
-                                    continue;
-                                }
-                            }
-                            tk.text += (char)c;
-                            ci++;
-                        }
-                    }
+                    if (piece)
+                        tk.text = gpt2_byte_decode(piece);
                     tk.t0 = -1;
                     tk.t1 = -1;
                     tk.p = mr->token_probs[i];
