@@ -2,6 +2,23 @@
 
 **Claimed:** M1/Metal session, 2026-07-19. New category: `--task separate`.
 
+## STATUS: PORTED + WIRED IN (2026-07-19)
+
+Every forward stage validated cos=1.0 vs the pinned reference; reconstructed
+waveform bit-exact (2.4e-7). `crispasr --separate -m <mbr.gguf> -f mix.wav`
+writes `<input>_{vocals,other}.wav` (2ch@44.1k) — on a speech clip vocals
+rms=0.218 vs other rms=0.005 (41x). Go LDFLAGS drift clean.
+
+Done: C API + forward + separate(); `--separate` dispatcher (mel-band-roformer
++ htdemucs) + flags + help + early-route; CMake link into crispasr-lib; Go
+LDFLAGS; README; live test; reference dumper + converter.
+
+Deferred (non-blocking): HF upload of the GGUF + optional registry `-m auto`
+entry (`-m <path>` works now); portable BLAS for the Linux CPU forward
+(Accelerate on Mac today, scalar fallback elsewhere). Coordination: the
+CAP_SEPARATE htdemucs adapter divergence is flagged in
+docs/source-separation-surface.md for the maintainer to converge.
+
 ## NOW — active work
 
 - [x] License due diligence (below) — cleared (code = MIT lucidrains; NOT Kim's
