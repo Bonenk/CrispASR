@@ -116,6 +116,56 @@ small integer arrays.
 - Complex multiply, Tanh MLP, GLU halving, value residuals — each is a silent
   divergence if missed.
 
+## ⚠ Reference env pin: `bs-roformer==0.3.10` (do not re-derive)
+
+The Kim vocals checkpoint (KimberleyJSN/melbandroformer, MIT) predates
+hyper-connections. Loading it into the WRONG bs-roformer version runs the diff
+on mostly-random init and lies. Measured strict-load key mismatch vs the ckpt:
+
+| version | missing | unexpected |
+|---|---|---|
+| 0.3.10  | **0** | **0** ✅ |
+| 0.4.0 / 0.4.1 / 0.5.x | 90 | 30 |
+| ≥0.6.x (hyper-connections) | 462 | 120 |
+
+So the reference dumper MUST run under `bs-roformer==0.3.10`. Acceptance for a
+valid reference run = `load_state_dict(strict=False)` reports 0 missing AND 0
+unexpected (the dumper prints these; treat any nonzero as a failed run).
+The `torch.stft` "rectangular window" warning is benign — it comes from a
+one-time shape-probe in `__init__`, not the forward (which uses Hann).
+
+Fixture persisted at
+`/Volumes/backups/ai/crispasr-models/melbandroformer/{MelBandRoformer.ckpt,
+config.yaml,ref_mbr.gguf,clip2s.wav}` (off /tmp, survives reboot).
+
+## Checkpoint tensor map (684 tensors — for the converter)
+
+```
+band_split.to_features.{b}.0.gamma        (dim_in_b,)     RMSNorm per band
+band_split.to_features.{b}.1.{weight,bias}(384, dim_in_b) Linear dim_in_b -> dim
+  dim_in_b = 2 * num_freqs_in_band_b * channels  (band 0 = 28, i.e. 7 freqs)
+
+mask_estimators.0.to_freqs.{b}.0.{0,2,4}.{weight,bias}    MLP (depth 2):
+  .0 Linear 384->1536 | .2 Linear 1536->1536 | .4 Linear 1536->(2*dim_in_b)
+  then GLU(-1) halves back to dim_in_b. Activation = Tanh (net between linears).
+
+layers.{L}.{M}   L in 0..5 (depth 6), M in {0=time, 1=freq}  (NO linear xf)
+  .layers.0.0  attention:  norm.gamma (pre-RMSNorm)
+               to_qkv.weight (1536,384) = 3*512 (inner = heads8 * dim_head64)
+               to_gates.{weight,bias} (8,384) per-head output gate
+               to_out.0.weight (384,512)
+               rotary_embed.freqs (32,)  RoPE (dim_head/2)
+  .layers.0.1  ffn: net.0.gamma (RMSNorm) | net.1 Linear 384->1536
+               | net.4 Linear 1536->384   (GELU between)
+  .norm.gamma  post-stack RMSNorm on the (time|freq) transformer
+```
+
+All of this maps onto `core_attn` (GQA/RoPE), `ffn.h` (SwiGLU/GELU FFN), and a
+RMSNorm helper — only the per-band linears + band gather/scatter are new.
+`freq_indices` (int32, 3958) and `num_bands_per_freq` (int32, 1025) get **baked
+into the GGUF** (see the band-layout note above — reproducing librosa's mel
+edges in C++ is a needless divergence class).
+
 ## Reuse (DRY — do not write new DSP)
 
 `src/core/fft.h` (STFT), `src/core/istft.h` (iSTFT), `core_attn` (attention),
