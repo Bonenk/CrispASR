@@ -283,6 +283,10 @@
 #include "glm_asr.h"
 #define CA_HAVE_GLMASR 1
 #endif
+#if __has_include("htdemucs.h")
+#include "htdemucs.h"
+#define CA_HAVE_HTDEMUCS 1
+#endif
 #if __has_include("kyutai_stt.h")
 #include "kyutai_stt.h"
 #define CA_HAVE_KYUTAI 1
@@ -1792,6 +1796,10 @@ struct crispasr_session {
 #ifdef CA_HAVE_GLMASR
     void* glmasr_ctx = nullptr;
 #endif
+#ifdef CA_HAVE_HTDEMUCS
+    htdemucs_context* htdemucs_ctx = nullptr;
+    htdemucs_result* htdemucs_last_result = nullptr;
+#endif
 #ifdef CA_HAVE_KYUTAI
     void* kyutai_ctx = nullptr;
 #endif
@@ -2637,6 +2645,19 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.flash_attn = g_open_flash_attn_tls;
         s->omnivoice_ctx = omnivoice_init_from_file(model_path, p);
         if (!s->omnivoice_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_HTDEMUCS
+    if (s->backend == "htdemucs" || s->backend == "demucs") {
+        htdemucs_params hp = htdemucs_default_params();
+        hp.n_threads = s->n_threads;
+        hp.use_gpu = s->use_gpu;
+        s->htdemucs_ctx = htdemucs_init_from_file(model_path, hp);
+        if (!s->htdemucs_ctx) {
             delete s;
             return nullptr;
         }
@@ -3732,6 +3753,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_GLMASR
     list += ",glm-asr";
+#endif
+#ifdef CA_HAVE_HTDEMUCS
+    list += ",htdemucs";
 #endif
 #ifdef CA_HAVE_KYUTAI
     list += ",kyutai-stt";
@@ -8380,6 +8404,71 @@ CA_EXPORT crispasr_stream* crispasr_session_stream_open(crispasr_session* s, int
     return nullptr;
 }
 
+// ---------------------------------------------------------------------------
+// Source separation session API
+// ---------------------------------------------------------------------------
+
+CA_EXPORT int crispasr_session_separate(crispasr_session* s, const float* pcm_stereo, int n_samples) {
+    if (!s || !pcm_stereo || n_samples <= 0)
+        return -1;
+#ifdef CA_HAVE_HTDEMUCS
+    if (s->htdemucs_ctx) {
+        if (s->htdemucs_last_result) {
+            htdemucs_result_free(s->htdemucs_last_result);
+            s->htdemucs_last_result = nullptr;
+        }
+        s->htdemucs_last_result = htdemucs_separate(s->htdemucs_ctx, pcm_stereo, n_samples);
+        return s->htdemucs_last_result ? s->htdemucs_last_result->n_sources : -1;
+    }
+#endif
+    return -1;
+}
+
+CA_EXPORT int crispasr_session_separate_n_stems(crispasr_session* s) {
+    if (!s)
+        return 0;
+#ifdef CA_HAVE_HTDEMUCS
+    if (s->htdemucs_last_result)
+        return s->htdemucs_last_result->n_sources;
+#endif
+    return 0;
+}
+
+CA_EXPORT const char* crispasr_session_separate_stem_name(crispasr_session* s, int stem_idx) {
+    if (!s)
+        return nullptr;
+#ifdef CA_HAVE_HTDEMUCS
+    if (s->htdemucs_last_result && stem_idx >= 0 && stem_idx < s->htdemucs_last_result->n_sources)
+        return s->htdemucs_last_result->source_names[stem_idx];
+#endif
+    return nullptr;
+}
+
+CA_EXPORT const float* crispasr_session_separate_stem(crispasr_session* s, int stem_idx, int* out_n_samples) {
+    if (!s)
+        return nullptr;
+#ifdef CA_HAVE_HTDEMUCS
+    if (s->htdemucs_last_result && stem_idx >= 0 && stem_idx < s->htdemucs_last_result->n_sources) {
+        if (out_n_samples)
+            *out_n_samples = s->htdemucs_last_result->n_samples;
+        return s->htdemucs_last_result->sources[stem_idx];
+    }
+#endif
+    if (out_n_samples)
+        *out_n_samples = 0;
+    return nullptr;
+}
+
+CA_EXPORT int crispasr_session_separate_sample_rate(crispasr_session* s) {
+    if (!s)
+        return 0;
+#ifdef CA_HAVE_HTDEMUCS
+    if (s->htdemucs_ctx)
+        return htdemucs_sample_rate(s->htdemucs_ctx);
+#endif
+    return 0;
+}
+
 CA_EXPORT void crispasr_session_close(crispasr_session* s) {
     if (!s)
         return;
@@ -8504,6 +8593,12 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_GLMASR
     if (s->glmasr_ctx)
         glm_asr_free((glm_asr_context*)s->glmasr_ctx);
+#endif
+#ifdef CA_HAVE_HTDEMUCS
+    if (s->htdemucs_last_result)
+        htdemucs_result_free(s->htdemucs_last_result);
+    if (s->htdemucs_ctx)
+        htdemucs_free(s->htdemucs_ctx);
 #endif
 #ifdef CA_HAVE_KYUTAI
     if (s->kyutai_ctx)
