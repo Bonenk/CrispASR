@@ -2437,6 +2437,12 @@ endif()
 if (TARGET htdemucs)
     target_link_libraries(crispasr-lib PUBLIC htdemucs)
 endif()
+# miotts: crispasr_c_api.cpp calls miotts_init_from_file / _free /
+# _context_default_params, but the library was never linked, so libcrispasr
+# failed to link with undefined _miotts_* symbols.
+if (TARGET miotts)
+    target_link_libraries(crispasr-lib PUBLIC miotts)
+endif()
 if (TARGET mini-omni2)
     target_link_libraries(crispasr-lib PUBLIC mini-omni2)
 endif()
