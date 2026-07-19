@@ -225,6 +225,7 @@ target_link_libraries(crispasr-diff PRIVATE
     mini-omni2
     dots-tts
     miotts
+    miocodec
     crispasr-diff-lib
     ${FFMPEG_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}

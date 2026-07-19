@@ -456,22 +456,31 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         if (!result)
             return nullptr;
 
-        // Get weight data from ggml tensors
+        // Get weight data from ggml tensors (handle F16 → F32 dequant)
         std::vector<float> proj_w(out_dim * 5);
         std::vector<float> proj_b(out_dim);
-        ggml_backend_tensor_get(ctx->weights.fsq_proj_out_w, proj_w.data(), 0, sizeof(float) * out_dim * 5);
-        ggml_backend_tensor_get(ctx->weights.fsq_proj_out_b, proj_b.data(), 0, sizeof(float) * out_dim);
+
+        ggml_tensor* tw = ctx->weights.fsq_proj_out_w;
+        ggml_tensor* tb = ctx->weights.fsq_proj_out_b;
+        if (tw->type == GGML_TYPE_F16) {
+            std::vector<uint16_t> tmp(out_dim * 5);
+            ggml_backend_tensor_get(tw, tmp.data(), 0, sizeof(uint16_t) * out_dim * 5);
+            for (size_t i = 0; i < tmp.size(); i++)
+                proj_w[i] = ggml_fp16_to_fp32(tmp[i]);
+        } else {
+            ggml_backend_tensor_get(tw, proj_w.data(), 0, sizeof(float) * out_dim * 5);
+        }
+        // Bias is always F32
+        ggml_backend_tensor_get(tb, proj_b.data(), 0, sizeof(float) * out_dim);
 
         // result[t, d] = sum_k(codes[t, k] * W[d, k]) + bias[d]
-        // W is stored as [768, 5] in ggml (ne[0]=768 fast axis = row-major (5, 768))
-        // Actually ggml stores Linear weights as [out_features, in_features] with ne[0]=out_features
-        // So W shape in ggml is ne[0]=768, ne[1]=5 → memory layout is 768 floats per row, 5 rows
-        // This means W[k][d] = proj_w[k * 768 + d] for k=0..4, d=0..767
+        // GGUF shape is [5, 768] meaning ne[0]=5, ne[1]=768.
+        // Memory layout: element at (d, k) is proj_w[d * 5 + k].
         for (int t = 0; t < n_tokens; t++) {
             for (int d = 0; d < out_dim; d++) {
                 float sum = proj_b[d];
                 for (int k = 0; k < 5; k++) {
-                    sum += codes[t * 5 + k] * proj_w[k * out_dim + d];
+                    sum += codes[t * 5 + k] * proj_w[d * 5 + k];
                 }
                 result[t * out_dim + d] = sum;
             }

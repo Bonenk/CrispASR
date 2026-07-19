@@ -82,6 +82,7 @@
 #include "tada_encoder.h"
 #include "tada_tts.h"
 #include "dots_tts.h"
+#include "miocodec.h"
 #include "miotts.h"
 #if __has_include("kugelaudio.h")
 #include "kugelaudio.h"
@@ -7168,6 +7169,75 @@ int main(int argc, char** argv) {
 
         miotts_free(ctx);
 
+        // ---- miocodec — MioCodec v2 decode pipeline ----
+    } else if (backend_name == "miocodec") {
+        auto cp = miocodec_default_params();
+        cp.n_threads = 4;
+        cp.verbosity = 1;
+        cp.use_gpu = false;
+        miocodec_context* ctx = miocodec_init_from_file(model_path.c_str(), cp);
+        if (!ctx) {
+            fprintf(stderr, "miocodec: init failed\n");
+            return 4;
+        }
+
+        // Get input tokens and global embedding from the reference
+        auto tok_pair = ref.get_f32("content_tokens");
+        auto emb_pair = ref.get_f32("global_embedding");
+        if (!tok_pair.first || tok_pair.second == 0) {
+            fprintf(stderr, "miocodec: no content_tokens in reference\n");
+            miocodec_free(ctx);
+            return 4;
+        }
+        if (!emb_pair.first || emb_pair.second < 128) {
+            fprintf(stderr, "miocodec: no global_embedding in reference\n");
+            miocodec_free(ctx);
+            return 4;
+        }
+
+        int n_tokens = (int)tok_pair.second;
+        std::vector<int32_t> tokens(n_tokens);
+        for (int i = 0; i < n_tokens; i++)
+            tokens[i] = (int32_t)std::lrint(tok_pair.first[i]);
+        const float* global_emb = emb_pair.first;
+
+        printf("miocodec: %d tokens, global_emb dim=%zu\n", n_tokens, emb_pair.second);
+
+        // Compare each stage that exists in the reference
+        const char* stages[] = {"fsq_decoded",      "wave_prenet_out",  "wave_prior_net_out",
+                                "wave_decoder_out", "wave_post_net_out", "wave_upsampler_out",
+                                "istft_mag_phase",  "output_waveform"};
+        for (const char* stage : stages) {
+            auto ref_pair = ref.get_f32(stage);
+            if (!ref_pair.first || ref_pair.second == 0) {
+                printf("[SKIP] %-25s (not in reference)\n", stage);
+                n_skip++;
+                continue;
+            }
+
+            int out_n = 0;
+            float* cpp_data = miocodec_extract_stage(ctx, tokens.data(), n_tokens, global_emb, 0, stage, &out_n);
+            if (!cpp_data || out_n == 0) {
+                printf("[SKIP] %-25s (stage not implemented)\n", stage);
+                n_skip++;
+                continue;
+            }
+
+            if ((size_t)out_n != ref_pair.second) {
+                printf("[FAIL] %-25s size mismatch: cpp=%d ref=%zu\n", stage, out_n, ref_pair.second);
+                free(cpp_data);
+                n_fail++;
+                continue;
+            }
+
+            auto rep = ref.compare(stage, cpp_data, out_n);
+            print_row(stage, rep, COS_THRESHOLD);
+            record(rep);
+            free(cpp_data);
+        }
+
+        miocodec_free(ctx);
+
     } else {
         fprintf(stderr,
                 "crispasr-diff: backend '%s' is not recognised. "
@@ -7175,7 +7245,7 @@ int main(int argc, char** argv) {
                 "granite-4.1, granite-nle, parakeet, canary, canary-qwen, cohere, gemma4, mimo-tokenizer, mimo-asr, "
                 "orpheus, moonshine, moonshine-streaming, lid-cld3, glm-asr, firered-asr, voxcpm2-tts, funasr, "
                 "paraformer, sensevoice, cosyvoice3-tts, melotts, parler-tts, moss-audio, kugelaudio, zonos-tts, "
-                "lfm2-audio, mini-omni2, nemotron, kyutai-stt, moss-diarize, miotts.\n",
+                "lfm2-audio, mini-omni2, nemotron, kyutai-stt, moss-diarize, miotts, miocodec.\n",
                 backend_name.c_str());
         return 5;
     }
