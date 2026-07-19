@@ -550,11 +550,12 @@ static ggml_cgraph* build_graph_llm(miotts_context* c, int n_past, int n_tokens)
     ggml_set_name(positions, "positions");
     ggml_set_input(positions);
 
-    // Causal mask (only for prefill, T > 1)
+    // Causal mask for manual attention (F32 for ggml_add to scores)
+    // Shape: (T, T) — added to scores which are (T_kv, T_q, n_heads)
+    // For prefill: T_kv = T_q = T
     ggml_tensor* causal_mask = nullptr;
     if (T > 1) {
-        const int Lk = n_past + T;
-        causal_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, Lk, T);
+        causal_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, T, T);
         ggml_set_name(causal_mask, "causal_mask");
         ggml_set_input(causal_mask);
     }
@@ -581,10 +582,97 @@ static ggml_cgraph* build_graph_llm(miotts_context* c, int n_past, int n_tokens)
         ggml_tensor* x = ggml_rms_norm(ctx0, cur, eps);
         x = ggml_mul(ctx0, x, b.attn_norm_w);
 
-        ggml_tensor* attn = core_attn::kv_self_attn(
-            ctx0, gf, x, b.attn_q_w, b.attn_k_w, b.attn_v_w, b.attn_output_w, b.attn_q_norm_w, b.attn_k_norm_w,
-            positions, T > 1 ? causal_mask : nullptr, c->kv_k, c->kv_v, (int)il, n_past, kvp);
-        cur = ggml_add(ctx0, residual, attn);
+        // For T=1 (decode), use kv_self_attn which handles KV cache read.
+        // For T>1 (prefill), use manual attention + KV cache write.
+        if (T == 1) {
+            ggml_tensor* attn = core_attn::kv_self_attn(ctx0, gf, x, b.attn_q_w, b.attn_k_w, b.attn_v_w,
+                                                        b.attn_output_w, b.attn_q_norm_w, b.attn_k_norm_w, positions,
+                                                        nullptr, c->kv_k, c->kv_v, (int)il, n_past, kvp);
+            cur = ggml_add(ctx0, residual, attn);
+        } else {
+            // Manual attention (avoids flash_attn_ext output layout issue for T>1)
+            ggml_tensor* Q = ggml_mul_mat(ctx0, b.attn_q_w, x); // (n_q*hd, T)
+            ggml_tensor* K = ggml_mul_mat(ctx0, b.attn_k_w, x);
+            ggml_tensor* V = ggml_mul_mat(ctx0, b.attn_v_w, x);
+
+            Q = ggml_reshape_3d(ctx0, Q, hd, n_q, T);
+            K = ggml_reshape_3d(ctx0, K, hd, n_kv, T);
+            V = ggml_reshape_3d(ctx0, V, hd, n_kv, T);
+
+            // Q/K RMSNorm (Qwen3)
+            if (b.attn_q_norm_w) {
+                Q = ggml_rms_norm(ctx0, Q, eps);
+                Q = ggml_mul(ctx0, Q, b.attn_q_norm_w);
+            }
+            if (b.attn_k_norm_w) {
+                K = ggml_rms_norm(ctx0, K, eps);
+                K = ggml_mul(ctx0, K, b.attn_k_norm_w);
+            }
+
+            // RoPE (NEOX for Qwen3 LLM)
+            Q = ggml_rope_ext(ctx0, Q, positions, nullptr, hd, GGML_ROPE_TYPE_NEOX, (int)hp.max_pos, theta, 1.0f, 0.0f,
+                              1.0f, 32.0f, 1.0f);
+            K = ggml_rope_ext(ctx0, K, positions, nullptr, hd, GGML_ROPE_TYPE_NEOX, (int)hp.max_pos, theta, 1.0f, 0.0f,
+                              1.0f, 32.0f, 1.0f);
+
+            // Write K/V to cache for subsequent decode steps
+            // K shape: (hd, n_kv, T), cache shape: (hd, n_kv, max_ctx, n_layers)
+            {
+                // Write K: permute to (hd, T, n_kv) and copy into cache slice [n_past..n_past+T]
+                ggml_tensor* K_perm = ggml_permute(ctx0, K, 0, 2, 1, 3); // (hd, T, n_kv)
+                ggml_tensor* V_perm = ggml_permute(ctx0, V, 0, 2, 1, 3); // (hd, T, n_kv)
+                // View into KV cache at this layer
+                const size_t kv_stride_ctx = c->kv_k->nb[2];   // stride per context position
+                const size_t kv_stride_layer = c->kv_k->nb[3]; // stride per layer
+                const size_t offset = (size_t)il * kv_stride_layer + (size_t)n_past * kv_stride_ctx;
+                ggml_tensor* k_cache_view =
+                    ggml_view_3d(ctx0, c->kv_k, hd, T, n_kv, c->kv_k->nb[1], kv_stride_ctx, offset);
+                ggml_tensor* v_cache_view =
+                    ggml_view_3d(ctx0, c->kv_v, hd, T, n_kv, c->kv_v->nb[1], kv_stride_ctx, offset);
+                // Copy (will cast F32 → F16 since cache is F16)
+                ggml_build_forward_expand(gf, ggml_cpy(ctx0, K_perm, k_cache_view));
+                ggml_build_forward_expand(gf, ggml_cpy(ctx0, V_perm, v_cache_view));
+            }
+
+            // GQA: expand KV heads to match Q heads
+            if (n_kv_grp > 1) {
+                ggml_tensor* K4 = ggml_reshape_4d(ctx0, K, hd, 1, n_kv, T);
+                ggml_tensor* V4 = ggml_reshape_4d(ctx0, V, hd, 1, n_kv, T);
+                K4 = ggml_repeat_4d(ctx0, K4, hd, n_kv_grp, n_kv, T);
+                V4 = ggml_repeat_4d(ctx0, V4, hd, n_kv_grp, n_kv, T);
+                K = ggml_cont(ctx0, ggml_reshape_3d(ctx0, K4, hd, n_q, T));
+                V = ggml_cont(ctx0, ggml_reshape_3d(ctx0, V4, hd, n_q, T));
+            }
+
+            // Permute for attention: (hd, n_heads, T) → (hd, T, n_heads)
+            Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
+            K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
+            V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
+
+            // Scores: Q @ K^T → (T, T, n_heads)
+            ggml_tensor* scores = ggml_mul_mat(ctx0, K, Q);
+            scores = ggml_scale(ctx0, scores, attn_scale);
+
+            // Causal mask
+            if (causal_mask) {
+                scores = ggml_add(ctx0, scores, causal_mask);
+            }
+
+            scores = ggml_soft_max(ctx0, scores);
+
+            // Attention output: V^T @ scores → (hd, T, n_heads)
+            ggml_tensor* V_t = ggml_cont(ctx0, ggml_permute(ctx0, V, 1, 0, 2, 3));
+            ggml_tensor* attn = ggml_mul_mat(ctx0, V_t, scores);
+
+            // Reshape: (hd, T, n_heads) → permute to (hd, n_heads, T) → (d_model, T)
+            attn = ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3));
+            attn = ggml_reshape_2d(ctx0, attn, n_q * hd, T);
+
+            // Output projection
+            attn = ggml_mul_mat(ctx0, b.attn_output_w, attn);
+
+            cur = ggml_add(ctx0, residual, attn);
+        } // end T>1 manual attention
 
         residual = cur;
         x = ggml_rms_norm(ctx0, cur, eps);
@@ -1062,17 +1150,17 @@ float* miotts_forward_logits(miotts_context* ctx, const int32_t* token_ids, int 
         pos[i] = i;
     ggml_backend_tensor_set(positions_t, pos.data(), 0, n_tokens * sizeof(int32_t));
 
-    // Causal mask
+    // Causal mask (F32 for manual attention ggml_add)
     if (n_tokens > 1) {
         ggml_tensor* mask_t = ggml_graph_get_tensor(gf, "causal_mask");
         const int Lk = n_tokens;
-        std::vector<ggml_fp16_t> mask(Lk * n_tokens);
+        std::vector<float> mask(Lk * n_tokens);
         for (int q = 0; q < n_tokens; q++) {
             for (int k = 0; k < Lk; k++) {
-                mask[q * Lk + k] = (k <= q) ? ggml_fp32_to_fp16(0.0f) : ggml_fp32_to_fp16(-INFINITY);
+                mask[q * Lk + k] = (k <= q) ? 0.0f : -INFINITY;
             }
         }
-        ggml_backend_tensor_set(mask_t, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
+        ggml_backend_tensor_set(mask_t, mask.data(), 0, mask.size() * sizeof(float));
     }
 
     ggml_backend_sched_graph_compute(ctx->sched, gf);
@@ -1713,7 +1801,10 @@ float* miotts_synthesize(miotts_context* ctx, const char* text, int* out_n) {
     // 2. Tokenize
     std::vector<int32_t> input_ids = miotts_tokenize(ctx, prompt);
     if (ctx->params.verbosity >= 1)
-        fprintf(stderr, "miotts: prompt tokens: %zu\n", input_ids.size());
+        fprintf(stderr, "miotts: prompt tokens: %zu = {", input_ids.size());
+    for (size_t ii = 0; ii < input_ids.size(); ii++)
+        fprintf(stderr, "%s%d", ii ? "," : "", input_ids[ii]);
+    fprintf(stderr, "}\n");
 
     // 3. Autoregressive LLM generation
     const int max_new = ctx->params.max_tokens > 0 ? ctx->params.max_tokens : 750;
@@ -1740,15 +1831,15 @@ float* miotts_synthesize(miotts_context* ctx, const char* text, int* out_n) {
         for (size_t i = 0; i < input_ids.size(); i++)
             pos[i] = (int32_t)i;
         ggml_backend_tensor_set(pos_t, pos.data(), 0, pos.size() * sizeof(int32_t));
-        // Causal mask
+        // Causal mask (F32 for manual attention ggml_add)
         ggml_tensor* mask_t = ggml_graph_get_tensor(gf, "causal_mask");
         if (mask_t) {
             const int T = (int)input_ids.size();
-            std::vector<ggml_fp16_t> mask(T * T);
+            std::vector<float> mask(T * T);
             for (int q = 0; q < T; q++)
                 for (int k = 0; k < T; k++)
-                    mask[q * T + k] = (k <= q) ? ggml_fp32_to_fp16(0.0f) : ggml_fp32_to_fp16(-INFINITY);
-            ggml_backend_tensor_set(mask_t, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
+                    mask[q * T + k] = (k <= q) ? 0.0f : -INFINITY;
+            ggml_backend_tensor_set(mask_t, mask.data(), 0, mask.size() * sizeof(float));
         }
         ggml_backend_sched_graph_compute(ctx->sched, gf);
         // Sample first token
@@ -1756,6 +1847,10 @@ float* miotts_synthesize(miotts_context* ctx, const char* text, int* out_n) {
         std::vector<float> logits(hp.vocab_size);
         ggml_backend_tensor_get(logits_t, logits.data(), 0, hp.vocab_size * sizeof(float));
         int32_t next_id = sample_token(logits.data(), (int)hp.vocab_size, ctx->params.temperature, rng);
+        {
+            int32_t argmax = (int32_t)(std::max_element(logits.data(), logits.data() + hp.vocab_size) - logits.data());
+            fprintf(stderr, "miotts: prefill argmax=%d (%.4f) sampled=%d\n", argmax, logits[argmax], next_id);
+        }
         input_ids.push_back(next_id);
     }
 
@@ -1780,6 +1875,11 @@ float* miotts_synthesize(miotts_context* ctx, const char* text, int* out_n) {
         std::vector<float> logits(hp.vocab_size);
         ggml_backend_tensor_get(logits_t, logits.data(), 0, hp.vocab_size * sizeof(float));
         int32_t next_id = sample_token(logits.data(), (int)hp.vocab_size, ctx->params.temperature, rng);
+        if (step <= 5) {
+            int32_t argmax = (int32_t)(std::max_element(logits.data(), logits.data() + hp.vocab_size) - logits.data());
+            fprintf(stderr, "miotts: decode step %d: argmax=%d (%.4f) sampled=%d\n", step, argmax, logits[argmax],
+                    next_id);
+        }
         input_ids.push_back(next_id);
         n_past++;
     }
