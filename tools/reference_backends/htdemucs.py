@@ -33,6 +33,8 @@ DEFAULT_STAGES = [
     "pre_transformer_z", "pre_transformer_xt",
     "post_transformer_z", "post_transformer_xt",
     "dec_freq_0", "dec_freq_1", "dec_freq_2", "dec_freq_3",
+    "spec_drums", "spec_bass", "spec_other", "spec_vocals",
+    "time_drums", "time_bass", "time_other", "time_vocals",
     "output_drums", "output_bass", "output_other", "output_vocals",
 ]
 
@@ -261,6 +263,10 @@ def dump(model_dir, audio, stages, max_new_tokens=None, **kwargs):
         output = xt + x_spec
 
         for s_idx, source_name in enumerate(model.sources):
+            # Split the two branches so a divergence can be attributed to the
+            # spectrogram path (iSTFT) or the waveform path independently.
+            maybe_capture(f"spec_{source_name}", x_spec[:, s_idx])
+            maybe_capture(f"time_{source_name}", xt[:, s_idx])
             maybe_capture(f"output_{source_name}", output[:, s_idx])
 
     print(f"htdemucs ref: captured {len(captures)} stages")

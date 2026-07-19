@@ -631,9 +631,11 @@ static stft_result compute_stft(const float* pcm_channels, int n_channels, int n
 
 // Inverse STFT
 static void compute_istft(const float* real, const float* imag, int n_channels, int n_freqs, int n_frames, int nfft,
-                          int hop, const float* window, int output_length, float* out) {
-    float norm_factor = 1.0f / sqrtf((float)nfft);
-    int pad = nfft / 2;
+                          int hop, const float* window, int output_length, int start_offset, float* out) {
+    // torch.stft(normalized=True) DIVIDES the forward transform by sqrt(nfft)
+    // (see compute_stft), so the inverse must MULTIPLY by it. Dividing again
+    // here scaled every separated stem down by 1/nfft = 1/4096.
+    float norm_factor = sqrtf((float)nfft);
 
     std::vector<float> fft_re(nfft), fft_im(nfft);
     std::vector<float> win_sum;
@@ -681,10 +683,12 @@ static void compute_istft(const float* real, const float* imag, int n_channels, 
                 signal[i] /= win_sum[i];
         }
 
-        // Remove center padding and copy to output
+        // Copy out starting at the caller-supplied offset. This absorbs both the
+        // center=True trim (nfft/2) and _spec()'s reflect pre-padding.
         float* dst = out + (size_t)ch * output_length;
         for (int i = 0; i < output_length; i++) {
-            dst[i] = signal[pad + i];
+            const int j = start_offset + i;
+            dst[i] = (j >= 0 && j < out_len) ? signal[j] : 0.0f;
         }
     }
 }
@@ -1281,6 +1285,17 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     x_C, x_Fq, x_T, xt_C, xt_T, freq ? 1 : 0, freqs_cur, ker, stri, pad_val);
         }
 
+        // Python records the time length BEFORE the tencoder runs
+        //   (`lengths_t.append(xt.shape[-1])` precedes `xt = tenc(xt)`),
+        // and the decoder pops it to crop each ConvTranspose1d back to its
+        // layer's INPUT length. Recording the OUTPUT length instead shifted the
+        // whole stack by one level, so the last tdecoder produced 85995 samples
+        // instead of 343980 — which silently failed the
+        // `xt_T >= n_samples` guard below and dropped the time branch from
+        // every stem.
+        if (idx < (int)m.tencoder.size())
+            lengths_time.push_back(xt_T);
+
         // --- Time branch encoder (runs before freq branch) ---
         std::vector<float> inject_buf; // injection from time→freq at merge point
         bool has_inject = false;
@@ -1541,8 +1556,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         saved_freq.push_back({x_buf, x_C, x_Fq, x_T});
         // Time branch: save non-empty tencoder outputs
         if (idx < (int)m.tencoder.size() && !m.tencoder[idx].empty) {
-            saved_time.push_back({xt_buf, xt_C, 1, xt_T});
-            lengths_time.push_back(xt_T);
+            saved_time.push_back({xt_buf, xt_C, 1, xt_T}); // length recorded above
         }
 
         // Update freq tracking
@@ -2484,6 +2498,25 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         ggml_gallocr_free(dalloc);
         ggml_free(dg);
 
+        // DConv, which the decoder was skipping entirely. HDecLayer.forward is
+        //   x+skip -> GLU(norm1(rewrite)) -> dconv -> conv_tr
+        // and every decoder layer has a real DConv. Same per-frequency-band
+        // treatment as the encoder: pre_buf is (C, Fq, T) with t fastest.
+        if (!dec.empty && !dec.dconv.layers.empty()) {
+            std::vector<float> slice((size_t)pre_T * pre_C);
+            for (int fq = 0; fq < pre_Fq; fq++) {
+                for (int c = 0; c < pre_C; c++)
+                    for (int t = 0; t < pre_T; t++)
+                        slice[t + (size_t)c * pre_T] = pre_buf[t + (size_t)fq * pre_T + (size_t)c * pre_T * pre_Fq];
+
+                cpu_dconv_inplace(slice, pre_C, pre_T, dec.dconv);
+
+                for (int c = 0; c < pre_C; c++)
+                    for (int t = 0; t < pre_T; t++)
+                        pre_buf[t + (size_t)fq * pre_T + (size_t)c * pre_T * pre_Fq] = slice[t + (size_t)c * pre_T];
+            }
+        }
+
         if (htdemucs_debug()) {
             int nc = 0;
             float mx = 0;
@@ -2674,6 +2707,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     }
                 }
 
+                // DConv, also missing on the time decoder (see the freq branch).
+                if (!tdec.empty && !tdec.dconv.layers.empty())
+                    cpu_dconv_inplace(xt_buf, xt_C, xt_T, tdec.dconv);
+
                 // ConvTranspose1d on time axis
                 int ct_K = (int)tdec.conv_tr_w->ne[0]; // kernel size
                 int ct_OC = (int)tdec.conv_tr_w->ne[1];
@@ -2788,8 +2825,13 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         // Extract per-source complex spectrogram (ac channels × Fq × T)
         // Need to add back the dropped freq bin (Fq → Fq+1) with zeros
         int n_freqs_full = Fq + 1; // restore to nfft/2+1
-        std::vector<float> src_real(ac * n_freqs_full * x_T, 0.0f);
-        std::vector<float> src_imag(ac * n_freqs_full * x_T, 0.0f);
+        // _ispec pads 2 zero frames on each side: F.pad(z, (2, 2)). They are not
+        // merely trimmed later — they change the window-sum normalisation in the
+        // first/last nfft samples, which is exactly the region we crop into.
+        const int istft_frame_pad = 2;
+        const int n_frames_pad = x_T + 2 * istft_frame_pad;
+        std::vector<float> src_real((size_t)ac * n_freqs_full * n_frames_pad, 0.0f);
+        std::vector<float> src_imag((size_t)ac * n_freqs_full * n_frames_pad, 0.0f);
 
         for (int c = 0; c < ac; c++) {
             for (int fq = 0; fq < Fq; fq++) {
@@ -2799,21 +2841,32 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     int ch_im = s * ch_per_source + c * 2 + 1;
                     float re = x_buf[t + (size_t)fq * x_T + (size_t)ch_re * x_T * x_Fq];
                     float im = x_buf[t + (size_t)fq * x_T + (size_t)ch_im * x_T * x_Fq];
-                    // Output spec layout for iSTFT: (ch, freqs, frames)
-                    src_real[(size_t)c * n_freqs_full * x_T + (size_t)fq * x_T + t] = re;
-                    src_imag[(size_t)c * n_freqs_full * x_T + (size_t)fq * x_T + t] = im;
+                    // Output spec layout for iSTFT: (ch, freqs, frames), written
+                    // at frame offset istft_frame_pad.
+                    const size_t di =
+                        (size_t)c * n_freqs_full * n_frames_pad + (size_t)fq * n_frames_pad + (istft_frame_pad + t);
+                    src_real[di] = re;
+                    src_imag[di] = im;
                 }
             }
         }
 
-        // iSTFT: complex spec → waveform
-        // Python _ispec: F.pad(z, (0,0,0,1)) adds back the dropped freq bin,
-        // F.pad(z, (2,2)) adds 2 frames on each side, then ispectro with length.
-        // We've already restored the freq bin; for the frame padding we skip it
-        // (the added frames are zeros anyway and get trimmed).
-        std::vector<float> src_pcm(ac * work_length, 0.0f);
-        compute_istft(src_real.data(), src_imag.data(), ac, n_freqs_full, x_T, nfft, hop, ctx->hann_window.data(),
-                      work_length, src_pcm.data());
+        // iSTFT mirroring _ispec: the freq bin and the 2+2 frames are restored
+        // above; here we drop the center=True pad (nfft/2) and then _spec()'s
+        // reflect pre-padding (hop/2*3), which is _ispec's x[pad : pad+length].
+        const int istft_start = nfft / 2 + pre_pad_left;
+        std::vector<float> src_pcm((size_t)ac * work_length, 0.0f);
+        compute_istft(src_real.data(), src_imag.data(), ac, n_freqs_full, n_frames_pad, nfft, hop,
+                      ctx->hann_window.data(), work_length, istft_start, src_pcm.data());
+
+        // Capture the spectrogram branch alone, before the time branch is added.
+        if (ctx->capture_stages) {
+            std::vector<float> cm((size_t)ac * n_samples);
+            for (int c = 0; c < ac; c++)
+                for (int i = 0; i < n_samples; i++)
+                    cm[(size_t)c * n_samples + i] = src_pcm[(size_t)c * work_length + i];
+            htd_capture(ctx, ("spec_" + m.source_names[s]).c_str(), cm.data(), cm.size());
+        }
 
         // Denormalize time branch and add to freq branch
         // xt_buf: (xt_T, xt_C) where xt_C = S * ac = 4 * 2 = 8
@@ -2828,6 +2881,18 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     src_pcm[(size_t)c * work_length + i] += tv;
                 }
             }
+        } else if (htdemucs_debug()) {
+            fprintf(stderr, "htdemucs: TIME BRANCH SKIPPED (xt_C=%d need>=%d, xt_T=%d need>=%d)\n", xt_C, S * ac, xt_T,
+                    n_samples);
+        }
+
+        // Capture the time branch alone (denormalized), for the same reason.
+        if (ctx->capture_stages && xt_C >= S * ac && xt_T >= n_samples) {
+            std::vector<float> cm((size_t)ac * n_samples);
+            for (int c = 0; c < ac; c++)
+                for (int i = 0; i < n_samples; i++)
+                    cm[(size_t)c * n_samples + i] = xt_buf[i + (size_t)(s * ac + c) * xt_T] * time_std + time_mean;
+            htd_capture(ctx, ("time_" + m.source_names[s]).c_str(), cm.data(), cm.size());
         }
 
         // Capture channel-major (ac, n_samples) to match the reference layout,
@@ -3030,8 +3095,11 @@ int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audi
     report("post_transformer_xt");
     for (int i = 0; i < 4; i++)
         report(("dec_freq_" + std::to_string(i)).c_str());
-    for (const char* s : {"drums", "bass", "other", "vocals"})
+    for (const char* s : {"drums", "bass", "other", "vocals"}) {
+        report(("spec_" + std::string(s)).c_str());
+        report(("time_" + std::string(s)).c_str());
         report(("output_" + std::string(s)).c_str());
+    }
 
     fprintf(stderr, "\n%d/%d stages passed", n_run - n_fail, n_run);
     if (n_missing)
