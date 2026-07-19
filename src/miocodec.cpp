@@ -524,15 +524,10 @@ static std::pair<ggml_tensor*, ggml_tensor*> miocodec_adaln_modulate(ggml_contex
     if (return_gate)
         gate_t = ggml_view_2d(ctx0, params, dim, T, nb1, 2 * dim * ggml_type_size(params->type));
 
-    // modulated = norm(x) * (1 + scale) + shift
+    // modulated = norm(x) * (1 + scale) + shift = x_norm + x_norm*scale + shift
     ggml_tensor* x_norm = ggml_norm(ctx0, x, 1e-5f);
-    // (1 + scale): scale is (dim, T), add scalar 1.0 via ggml_scale + add
-    ggml_tensor* one_plus_scale = ggml_add(ctx0, ggml_scale(ctx0, ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, 1), 0.0f),
-                                           scale); // hack: 0-scalar + scale doesn't work
-    // Simpler: just add 1 to each element of scale
-    one_plus_scale = ggml_add1(ctx0, scale, ggml_new_f32(ctx0, 1.0f));
-
-    ggml_tensor* modulated = ggml_add(ctx0, ggml_mul(ctx0, x_norm, one_plus_scale), shift);
+    ggml_tensor* modulated = ggml_add(ctx0, ggml_add(ctx0, x_norm, ggml_mul(ctx0, x_norm, scale)), shift);
+    return {modulated, gate_t};
     return {modulated, gate_t};
 }
 
@@ -589,28 +584,28 @@ static ggml_tensor* miocodec_adaln_transformer_layer(ggml_context* ctx0, ggml_te
 
     return ggml_add(ctx0, h, ggml_mul(ctx0, ffn_gate, ffn_out));
 }
-
-// ResNet block: GroupNorm → SiLU → Conv1d → GroupNorm → SiLU → Conv1d + residual
-// Input shape: (T, C, 1) for ggml_group_norm / ggml_conv_1d
-// ggml_group_norm expects (width, channels, batch) — so input is (T, C, 1)
-// ggml_conv_1d(kernel, input, stride, pad, dilation) — kernel shape (C_out, C_in/groups, K)
 static ggml_tensor* miocodec_resnet_block(ggml_context* ctx0, ggml_tensor* x, const miocodec_weights::resnet_block& b,
                                           int n_groups) {
+    const int64_t C = x->ne[0];
+    const int64_t T = x->ne[1];
     ggml_tensor* residual = x;
-    // x is (T, C, 1) for group_norm
-    // norm1
-    x = ggml_group_norm(ctx0, x, n_groups, 1e-6f);
+    ggml_tensor* xt = ggml_cont(ctx0, ggml_transpose(ctx0, x));
+    xt = ggml_group_norm(ctx0, ggml_reshape_3d(ctx0, xt, T, 1, C), n_groups, 1e-6f);
+    x = ggml_cont(ctx0, ggml_transpose(ctx0, ggml_reshape_2d(ctx0, xt, T, C)));
     x = ggml_mul(ctx0, x, b.norm1_w);
     x = ggml_add(ctx0, x, b.norm1_b);
     x = ggml_silu(ctx0, x);
-    x = ggml_conv_1d(ctx0, b.conv1_w, x, 1, 1, 1);
+    xt = ggml_conv_1d(ctx0, b.conv1_w, ggml_cont(ctx0, ggml_transpose(ctx0, x)), 1, 1, 1);
+    x = ggml_cont(ctx0, ggml_transpose(ctx0, ggml_reshape_2d(ctx0, xt, T, C)));
     x = ggml_add(ctx0, x, b.conv1_b);
-    // norm2
-    x = ggml_group_norm(ctx0, x, n_groups, 1e-6f);
+    xt = ggml_cont(ctx0, ggml_transpose(ctx0, x));
+    xt = ggml_group_norm(ctx0, ggml_reshape_3d(ctx0, xt, T, 1, C), n_groups, 1e-6f);
+    x = ggml_cont(ctx0, ggml_transpose(ctx0, ggml_reshape_2d(ctx0, xt, T, C)));
     x = ggml_mul(ctx0, x, b.norm2_w);
     x = ggml_add(ctx0, x, b.norm2_b);
     x = ggml_silu(ctx0, x);
-    x = ggml_conv_1d(ctx0, b.conv2_w, x, 1, 1, 1);
+    xt = ggml_conv_1d(ctx0, b.conv2_w, ggml_cont(ctx0, ggml_transpose(ctx0, x)), 1, 1, 1);
+    x = ggml_cont(ctx0, ggml_transpose(ctx0, ggml_reshape_2d(ctx0, xt, T, C)));
     x = ggml_add(ctx0, x, b.conv2_b);
     return ggml_add(ctx0, residual, x);
 }
@@ -905,33 +900,26 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
             ggml_set_input(dec_mask);
         }
 
-        // Step 1: ConvTranspose1d(512, 512, k=2, s=2) → upsample 2×
-        // ggml_conv_transpose_1d expects kernel (C_out, C_in, K) and data (..., C_in, T_in)
-        // Reshape x from (512, T) to (T, 512, 1) for conv ops
-        ggml_tensor* x_conv =
-            ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, x, dim_pre, T_pre, 1), 1, 0, 2, 3));
-        x_conv = ggml_conv_transpose_1d(ctx0, ctx->weights.wave_conv_up_w, x_conv, 2, 0, 1);
-        // TODO: add bias (needs broadcast along channel dim)
-        // x_conv shape: (T_up, 512, 1) after conv_transpose
+        // Step 1: ConvTranspose1d — (C=512,T) → transpose → conv → reshape → transpose back
+        ggml_tensor* xt2 = ggml_cont(ctx0, ggml_transpose(ctx0, x));
+        xt2 = ggml_conv_transpose_1d(ctx0, ctx->weights.wave_conv_up_w, xt2, 2, 0, 1);
+        xt2 = ggml_reshape_2d(ctx0, xt2, T_up, dim_pre);
+        ggml_tensor* x_up = ggml_cont(ctx0, ggml_transpose(ctx0, xt2));
+        x_up = ggml_add(ctx0, x_up, ctx->weights.wave_conv_up_b);
 
-        // Step 2: Interpolate to T_stft
-        // ggml_interpolate: resize ne[0] dimension (T axis in our layout)
-        x_conv = ggml_interpolate(ctx0, x_conv, T_stft, dim_pre, 1, 1, 0 /* nearest/linear */);
-
-        // Step 3: Wave prior_net (ResNet blocks) — operates on (T, C, 1)
-        for (int i = 0; i < n_resnet; i++) {
-            x_conv = miocodec_resnet_block(ctx0, x_conv, ctx->weights.wave_prior_net[i], n_groups);
+        // Step 2: Interpolate T_up → T_stft
+        if (T_up != T_stft) {
+            x_up = ggml_interpolate(ctx0, x_up, dim_pre, T_stft, 1, 1, 0);
+            x_up = ggml_reshape_2d(ctx0, x_up, dim_pre, T_stft);
         }
+        // Step 3: Prior_net ResNet — now takes (C=512, T_stft) input
+        for (int i = 0; i < n_resnet; i++)
+            x_up = miocodec_resnet_block(ctx0, x_up, ctx->weights.wave_prior_net[i], n_groups);
+        ggml_set_name(x_up, "wave_prior_net_out");
+        ggml_set_output(x_up);
 
-        // Mark wave_prior_net_out
-        ggml_tensor* prior_out = x_conv;
-        ggml_set_name(prior_out, "wave_prior_net_out");
-        ggml_set_output(prior_out);
-
-        // Step 4: Permute back to (dim, T) for Transformer decoder
-        ggml_tensor* x_dec = ggml_cont(ctx0, ggml_permute(ctx0, x_conv, 1, 0, 2, 3));
-        x_dec = ggml_reshape_2d(ctx0, x_dec, dim_pre, T_stft);
-
+        // Step 4: Decoder — already (C=512, T_stft)
+        ggml_tensor* x_dec = x_up;
         // Wave decoder: 8L Transformer with AdaLN-Zero
         for (int i = 0; i < n_dec_layers; i++) {
             x_dec = miocodec_adaln_transformer_layer(ctx0, x_dec, global_cond, ctx->weights.wave_dec_layers[i],
@@ -949,24 +937,15 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         ggml_set_name(x_dec, "wave_decoder_out");
         ggml_set_output(x_dec);
 
-        // Step 5: Permute to (T, C, 1) for post_net ResNet
-        ggml_tensor* x_post =
-            ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, x_dec, dim_pre, T_stft, 1), 1, 0, 2, 3));
-        for (int i = 0; i < n_resnet; i++) {
+        // Step 5: Post_net ResNet — already (C=512, T_stft)
+        ggml_tensor* x_post = x_dec;
+        for (int i = 0; i < n_resnet; i++)
             x_post = miocodec_resnet_block(ctx0, x_post, ctx->weights.wave_post_net[i], n_groups);
-        }
         ggml_set_name(x_post, "wave_post_net_out");
         ggml_set_output(x_post);
 
-        // Step 6: Upsampler (SnakeBeta + ConvTranspose stages)
-        // TODO: implement SnakeBeta upsampler stages
-        // For now, just mark the ISTFT linear projection
-
-        // Step 7: ISTFT head — Linear(512, 394) on the post_net output
-        // Permute to (dim, T) for matmul
-        ggml_tensor* x_istft = ggml_cont(ctx0, ggml_permute(ctx0, x_post, 1, 0, 2, 3));
-        x_istft = ggml_reshape_2d(ctx0, x_istft, dim_pre, T_stft);
-        x_istft = ggml_mul_mat(ctx0, ctx->weights.istft_out_w, x_istft);
+        // Step 7: ISTFT head Linear(512, 394) — data already (C=512, T_stft)
+        ggml_tensor* x_istft = ggml_mul_mat(ctx0, ctx->weights.istft_out_w, x_post);
         x_istft = ggml_add(ctx0, x_istft, ctx->weights.istft_out_b);
         ggml_set_name(x_istft, "istft_mag_phase");
         ggml_set_output(x_istft);
