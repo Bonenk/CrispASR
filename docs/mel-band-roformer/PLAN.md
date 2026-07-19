@@ -4,12 +4,32 @@
 
 ## NOW — active work
 
-- [x] License due diligence (below) — **cleared, with a caveat on which code to read**
+- [x] License due diligence (below) — cleared (code = MIT lucidrains; NOT Kim's
+      unlicensed inference repo; weights = MIT)
 - [x] HARD RULE #1: Python blueprint read line-by-line (below)
-- [ ] `tools/reference_backends/mel_band_roformer.py` per-stage dumper
-- [ ] `models/convert-mel-band-roformer-to-gguf.py`
-- [ ] `src/mel_band_roformer.{h,cpp}` + per-stage diff
+- [x] Band layout verified from librosa (load-bearing mel[0,0] tweak found)
+- [x] `tools/reference_backends/mel_band_roformer.py` — per-stage dumper, run
+      on-box (no OOM, peak 1.6 GB), clean 0/0 load under **bs-roformer==0.3.10**
+- [x] `models/convert-mel-band-roformer-to-gguf.py` — 435.8 MB f16 GGUF, 684
+      tensors + 3 baked aux int32 arrays; band-width assert passed vs ckpt
+- [x] Shared separation surface designed + additive core landed
+      (`docs/source-separation-surface.md`, `src/core/separation_io.h`,
+      multi-channel WAV writer, `tests/test-separation-io.cpp` 9/9) — maintainer
+      chose "design the shared surface now"; htdemucs session to adopt it
+- [ ] **NEXT: `src/mel_band_roformer.{h,cpp}`** — C API mirroring `htdemucs.h`
+      (`mel_band_roformer_{init_from_file,separate}` → same result shape), built
+      incrementally against the diff harness: stage 0 band gather → band_split →
+      time/freq transformers (RoPE + to_gates + value-residual) → mask (Tanh MLP
+      + GLU) → scatter-average → complex-mul → iSTFT. First-divergence debugging
+      vs `ref_mbr.gguf` (persisted). Reuse core/fft.h, istft.h, core_attn, ffn.h.
+- [ ] Dispatcher `examples/cli/crispasr_separate_cli.{h,cpp}` + `--separate`
+      hook; wire htdemucs (C API ready) + MBR through `crispasr_separation_view`
 - [ ] Roundtrip acceptance (SDR / ASR on the vocal stem) — the ONLY gate that counts
+- [ ] 12-point checklist (CMake, registry, README, bindings docstrings, Go LDFLAGS)
+
+Fixtures (persisted off /tmp, survive reboot):
+`/Volumes/backups/ai/crispasr-models/melbandroformer/{MelBandRoformer.ckpt,
+config.yaml, mel-band-roformer-vocals-f16.gguf, ref_mbr.gguf, clip2s.wav}`
 
 ## Licensing (verified 2026-07-19, do not re-derive)
 
