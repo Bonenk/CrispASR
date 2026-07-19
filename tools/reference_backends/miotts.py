@@ -80,8 +80,8 @@ def dump(args):
     print(f"[miotts-ref] Prompt: {repr(prompt[:80])}...")
     print(f"[miotts-ref] Input IDs shape: {input_ids.shape}")
 
-    # Dump input_ids
-    writer.add_tensor("input_ids", input_ids[0].numpy().astype(np.int32))
+    # Dump input_ids (stored as float32 for diff harness compatibility)
+    writer.add_tensor("input_ids", input_ids[0].numpy().astype(np.int32).astype(np.float32))
 
     # Load model
     print("[miotts-ref] Loading model (this may take a moment on 8GB RAM)...")
@@ -114,7 +114,7 @@ def dump(args):
             pad_token_id=tokenizer.pad_token_id or 0,
         )
     generated_ids = generated[0].numpy().astype(np.int32)
-    writer.add_tensor("generated_ids", generated_ids)
+    writer.add_tensor("generated_ids", generated_ids.astype(np.float32))
     print(f"[miotts-ref] Generated {len(generated_ids)} tokens total")
 
     # Extract speech token indices
@@ -124,7 +124,7 @@ def dump(args):
     new_tokens = generated_ids[input_ids.shape[1]:]
     speech_mask = (new_tokens >= speech_start) & (new_tokens < speech_end)
     speech_token_ids = new_tokens[speech_mask] - speech_start
-    writer.add_tensor("speech_tokens", speech_token_ids.astype(np.int32))
+    writer.add_tensor("speech_tokens", speech_token_ids.astype(np.float32))
     print(f"[miotts-ref] Speech tokens: {len(speech_token_ids)}")
 
     if len(speech_token_ids) == 0:

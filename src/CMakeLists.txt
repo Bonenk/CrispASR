@@ -1461,6 +1461,18 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# miotts — Aratako/MioTTS (Qwen3 LLM + MioCodec FSQ → 24kHz waveform)
+# ---------------------------------------------------------------------------
+add_library(miotts STATIC miotts.h miotts.cpp)
+set_target_properties(miotts PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(miotts PUBLIC .)
+target_compile_features   (miotts PUBLIC cxx_std_17)
+target_link_libraries     (miotts PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(miotts PRIVATE -O3)
+endif()
+
+# ---------------------------------------------------------------------------
 # omnivoice — k2-fsa/OmniVoice (Qwen3 + masked iterative multi-codebook TTS)
 # ---------------------------------------------------------------------------
 add_library(omnivoice STATIC omnivoice.h omnivoice.cpp)

@@ -1,0 +1,66 @@
+#pragma once
+
+// MioTTS public C ABI.
+//
+// Aratako/MioTTS-{0.6B,1.7B} — LLM-based TTS (Qwen3 backbone) that generates
+// speech tokens from text, decoded by MioCodec into 24kHz waveform.
+//
+// Architecture (0.6B):
+//   LLM: Qwen3ForCausalLM, 28 layers, 1024 hidden, GQA 16/8, vocab 164480
+//        (Qwen3 BPE text tokens + 12800 speech tokens <|s_0|>..<|s_12799|>)
+//   Codec: MioCodec-25Hz-24kHz — FSQ(levels=[8,8,8,5,5]) dequant → wave_prenet
+//        transformer → conv_upsample → ResNet → wave_decoder transformer
+//        (AdaLN-Zero conditioned on 128-d speaker embedding) → ResNet → iSTFT
+//
+// The model generates speech tokens by autoregressive sampling from the
+// LLM's full vocabulary. Speaker identity (voice cloning) is injected at
+// codec decode time via a global embedding extracted from reference audio.
+
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct miotts_context;
+
+struct miotts_context_params {
+    int n_threads;
+    int verbosity; // 0=silent, 1=normal, 2=verbose
+    bool use_gpu;
+    float temperature; // 0 = greedy
+    uint64_t seed;     // RNG seed (0 = use default 42)
+    int max_tokens;    // upper bound on AR decode steps; 0 = default (750 = 30s at 25Hz)
+    bool flash_attn;
+};
+
+struct miotts_context_params miotts_context_default_params(void);
+
+// Initialise from a GGUF containing both LLM + codec weights.
+struct miotts_context* miotts_init_from_file(const char* path_model, struct miotts_context_params params);
+
+// Set reference audio for voice cloning. The codec extracts a 128-d global
+// embedding from this audio to condition the waveform decoder.
+// Pass nullptr/0 to clear (uses a zero embedding = default voice).
+// Returns 0 on success.
+int miotts_set_reference(struct miotts_context* ctx, const float* audio_24k, int n_samples);
+
+// Synthesize speech from text. Returns a freshly allocated float buffer of
+// 24kHz mono PCM (caller must free with miotts_free_audio). *out_n receives
+// the sample count. Returns nullptr on failure.
+float* miotts_synthesize(struct miotts_context* ctx, const char* text, int* out_n);
+
+void miotts_free_audio(float* pcm);
+void miotts_free(struct miotts_context* ctx);
+
+// For the diff harness: run the LLM forward on the given token IDs and return
+// the logits for the last position. Caller must free with miotts_free_audio.
+float* miotts_forward_logits(struct miotts_context* ctx, const int32_t* token_ids, int n_tokens, int* out_vocab);
+
+// For the diff harness: run FSQ dequant on speech token indices and return
+// the content embedding. Caller must free with miotts_free_audio.
+float* miotts_fsq_dequant(struct miotts_context* ctx, const int32_t* indices, int n_indices, int* out_dim);
+
+#ifdef __cplusplus
+}
+#endif

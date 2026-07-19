@@ -82,6 +82,7 @@
 #include "tada_encoder.h"
 #include "tada_tts.h"
 #include "dots_tts.h"
+#include "miotts.h"
 #if __has_include("kugelaudio.h")
 #include "kugelaudio.h"
 #define CA_HAVE_KUGELAUDIO 1
@@ -7081,6 +7082,72 @@ int main(int argc, char** argv) {
         }
 
         moss_diarize_free(ctx);
+
+        // ---- miotts — MioTTS LLM forward + FSQ dequant ----
+    } else if (backend_name == "miotts") {
+        auto cp = miotts_context_default_params();
+        cp.n_threads = 4;
+        cp.verbosity = 0;
+        cp.use_gpu = false;
+        miotts_context* ctx = miotts_init_from_file(model_path.c_str(), cp);
+        if (!ctx) {
+            fprintf(stderr, "miotts: init failed\n");
+            return 4;
+        }
+
+        // Stage 1: logits_step_0 — LLM forward on the reference input_ids
+        {
+            auto ids_pair = ref.get_f32("input_ids");
+            if (ids_pair.first && ids_pair.second > 0) {
+                // Convert float-stored IDs to int32
+                std::vector<int32_t> input_ids(ids_pair.second);
+                for (size_t i = 0; i < ids_pair.second; i++)
+                    input_ids[i] = (int32_t)std::lrint(ids_pair.first[i]);
+
+                int vocab = 0;
+                float* logits = miotts_forward_logits(ctx, input_ids.data(), (int)input_ids.size(), &vocab);
+                if (logits && vocab > 0) {
+                    auto rep = ref.compare("logits_step_0", logits, vocab);
+                    print_row("logits_step_0", rep, COS_THRESHOLD);
+                    record(rep);
+                    miotts_free_audio(logits);
+                } else {
+                    printf("[ERR ] logits_step_0           forward returned null\n");
+                    n_fail++;
+                }
+            } else {
+                printf("[SKIP] logits_step_0           (no input_ids in reference)\n");
+                n_skip++;
+            }
+        }
+
+        // Stage 2: fsq_embedding — FSQ dequant of speech tokens
+        {
+            auto sp_pair = ref.get_f32("speech_tokens");
+            if (sp_pair.first && sp_pair.second > 0) {
+                std::vector<int32_t> speech_tokens(sp_pair.second);
+                for (size_t i = 0; i < sp_pair.second; i++)
+                    speech_tokens[i] = (int32_t)std::lrint(sp_pair.first[i]);
+
+                int dim = 0;
+                float* emb = miotts_fsq_dequant(ctx, speech_tokens.data(), (int)speech_tokens.size(), &dim);
+                if (emb && dim > 0) {
+                    auto rep = ref.compare("fsq_embedding", emb, (int)speech_tokens.size() * dim);
+                    print_row("fsq_embedding", rep, COS_THRESHOLD);
+                    record(rep);
+                    miotts_free_audio(emb);
+                } else {
+                    printf("[ERR ] fsq_embedding           dequant returned null\n");
+                    n_fail++;
+                }
+            } else {
+                printf("[SKIP] fsq_embedding           (no speech_tokens in reference)\n");
+                n_skip++;
+            }
+        }
+
+        miotts_free(ctx);
+
     } else {
         fprintf(stderr,
                 "crispasr-diff: backend '%s' is not recognised. "
@@ -7088,7 +7155,7 @@ int main(int argc, char** argv) {
                 "granite-4.1, granite-nle, parakeet, canary, canary-qwen, cohere, gemma4, mimo-tokenizer, mimo-asr, "
                 "orpheus, moonshine, moonshine-streaming, lid-cld3, glm-asr, firered-asr, voxcpm2-tts, funasr, "
                 "paraformer, sensevoice, cosyvoice3-tts, melotts, parler-tts, moss-audio, kugelaudio, zonos-tts, "
-                "lfm2-audio, mini-omni2, nemotron, kyutai-stt, moss-diarize.\n",
+                "lfm2-audio, mini-omni2, nemotron, kyutai-stt, moss-diarize, miotts.\n",
                 backend_name.c_str());
         return 5;
     }
