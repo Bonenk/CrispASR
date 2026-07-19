@@ -328,6 +328,11 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # hop) is not recoverable from the weights alone. Audio arg = mixed music
     # WAV (any rate; resampled to the config's rate, stereo, internally).
     "mel-band-roformer": "reference_backends.mel_band_roformer",
+    # MioCodec v2 (§249): neural audio codec. model_dir = HF repo ID
+    # ("Aratako/MioCodec-25Hz-44.1kHz-v2") or local snapshot dir.
+    # Audio arg = mono WAV at 44100 Hz. Captures decode path intermediates
+    # (FSQ→prenet→decoder→upsampler→ISTFT) for per-stage parity testing.
+    "miocodec": "reference_backends.miocodec",
 }
 
 DEFAULT_STAGES_BY_BACKEND: Dict[str, List[str]] = {}  # populated at import
