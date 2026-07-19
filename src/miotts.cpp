@@ -467,11 +467,27 @@ float* miotts_fsq_dequant(miotts_context* ctx, const int32_t* indices, int n_ind
         return result;
     }
 
-    // Read projection weights from the backend tensor
-    std::vector<float> proj_w(embed_dim * fsq_dim);
+    // Read projection weights — handle F16 storage by reading raw bytes
+    // then converting if needed.
+    const size_t w_nelem = (size_t)embed_dim * fsq_dim;
+    std::vector<float> proj_w(w_nelem);
     std::vector<float> proj_b(embed_dim);
-    ggml_backend_tensor_get(ctx->fsq_proj_out_w, proj_w.data(), 0, proj_w.size() * sizeof(float));
-    ggml_backend_tensor_get(ctx->fsq_proj_out_b, proj_b.data(), 0, proj_b.size() * sizeof(float));
+
+    // proj_out.weight
+    {
+        const size_t nbytes = ggml_nbytes(ctx->fsq_proj_out_w);
+        std::vector<uint8_t> raw(nbytes);
+        ggml_backend_tensor_get(ctx->fsq_proj_out_w, raw.data(), 0, nbytes);
+        if (ctx->fsq_proj_out_w->type == GGML_TYPE_F16) {
+            const ggml_fp16_t* src = (const ggml_fp16_t*)raw.data();
+            for (size_t i = 0; i < w_nelem; i++)
+                proj_w[i] = ggml_fp16_to_fp32(src[i]);
+        } else {
+            memcpy(proj_w.data(), raw.data(), w_nelem * sizeof(float));
+        }
+    }
+    // proj_out.bias (always F32 — norms/biases are kept F32 by convention)
+    ggml_backend_tensor_get(ctx->fsq_proj_out_b, proj_b.data(), 0, embed_dim * sizeof(float));
 
     float* result = (float*)malloc(n_indices * embed_dim * sizeof(float));
     // Matrix multiply: result[t, d] = sum_k(codes[t, k] * proj_w[d, k]) + proj_b[d]
