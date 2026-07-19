@@ -495,3 +495,72 @@ backend their small per-call graphs (time encoder conv, decoder rewrite) pay
 launch overhead — the "per-step GPU dispatch of small matmuls is launch-bound"
 effect in the dev guide. Porting those too, or splitting weight placement, is
 the follow-up.
+
+
+## Unified ggml graph — frequency path complete
+
+With `CRISPASR_HTDEMUCS_GGML=1` the **encoder, CrossTransformer and decoder**
+all run as ggml graphs on the selected backend (`CRISPASR_HTDEMUCS_GPU=1` for
+Metal/CUDA/Vulkan).
+
+### How each op maps
+
+| op | ggml expression |
+|----|-----------------|
+| freq encoder conv | `ggml_conv_2d`, kernel `(1,K,IC,OC)`, `s1=stride`, `p1=pad` |
+| DConv dilated conv | `ggml_conv_2d`, kernel `(K,1,C,hidden)`, `d0=dilation` |
+| DConv 1x1 / rewrite | `ggml_conv_2d` with a 1x1 kernel |
+| per-band GroupNorm(1) | permute to `(T, C, Fq)`, `ggml_group_norm(n_groups=n_bands)` |
+| GLU | views on `ne[2]` + `ggml_sigmoid` + `ggml_mul` |
+| attention | `ggml_mul_mat` + `ggml_soft_max_ext` |
+| norm_out GroupNorm(1) | flatten to 1D + `ggml_group_norm(1)` + affine |
+| **ConvTranspose2d [K,1]/[S,1]** | **K x 1x1 conv + `ggml_acc` strided scatter** |
+
+`KH = 1` on the DConv is what keeps frequency bands independent — the graph
+equivalent of Python's `y.permute(0,2,1,3).reshape(-1, C, T)`.
+
+### The ConvTranspose decomposition
+
+This was the only genuine gap: ggml has just `ggml_conv_transpose_2d_p0`
+(one stride, zero padding), but the model needs kernel `[K,1]` with stride
+`[S,1]` on the frequency axis. Using the same identity as the CPU
+GEMM+scatter path:
+
+    out_raw[t, fq_in*S + kh, oc] += sum_ic W[ic][oc][kh] * x[t, fq_in, ic]
+
+For a FIXED `kh` the inner sum is exactly a 1x1 conv over channels, and the
+placement is a `ggml_acc` into a view with frequency stride `S`. Scattering
+into the **uncropped** output is the trick that keeps every offset
+non-negative — `z[..., pad:-pad, :]` then becomes a plain view.
+
+### Correctness
+
+| backend | result |
+|---------|--------|
+| Metal | **45/45**, `dec_freq_0..3` >= 0.999999, `output_drums` 0.999959 |
+| CPU | 44/45 — identical except `output_drums` 0.998132 |
+
+The CPU-backend miss is numerics, not structure: `max_abs` is 1.7e-4 on the
+QUIETEST stem (-73 dBFS), where a fixed absolute error dominates the cosine.
+`output_vocals` and `dec_freq_3` are 1.000000 on both. It reflects a different
+summation order in ggml's CPU conv; Metal — the backend this path targets — is
+clean. Worth resolving before the gate could ever become default.
+
+ASR acceptance on the Metal full-graph path: word-for-word correct.
+
+### Still on the CPU
+
+- **Time branch** encoder/decoder (its convs would map the same way; it is
+  ~8-10% of the forward).
+- **STFT / iSTFT** — DSP rather than NN, and 0.2% of the profile.
+- The CaC unmask / output assembly.
+
+### Performance — still no verdict
+
+Attempts to A/B the full-graph GPU path against CPU+BLAS on this machine were
+worthless: the load average moved between 45 and **354** during the runs, and
+the timings tracked load far more than configuration. Nothing is claimed. This
+needs a quiet box or a Kaggle CUDA run, which is also the right place to
+exercise the CUDA backend for the first time (CUDA has stricter contiguity
+asserts than CPU/Metal — see the `get_rows` note in the dev guide, so a
+Metal-clean graph is NOT proof CUDA is clean).
