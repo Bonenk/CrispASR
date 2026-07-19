@@ -157,7 +157,8 @@ struct miocodec_context {
 
     ggml_backend_t backend = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
-    ggml_context* ctx_w = nullptr; // weight context
+    ggml_context* ctx_w = nullptr;        // weight context
+    ggml_backend_sched_t sched = nullptr; // scheduler for graph compute
 
     int verbosity = 0;
 };
@@ -356,6 +357,10 @@ struct miocodec_context* miocodec_init_from_file(const char* path, struct miocod
     w.wave_upsampler_out_snake_alpha = T("wave_upsampler.out_snake.alpha");
     w.wave_upsampler_out_snake_beta = T("wave_upsampler.out_snake.beta");
 
+    // Create scheduler for graph compute (handles weight buffer + compute buffer)
+    ggml_backend_t backends[] = {ctx->backend};
+    ctx->sched = ggml_backend_sched_new(backends, nullptr, 1, 8192, false, false);
+
     if (params.verbosity > 0) {
         fprintf(stderr, "miocodec: loaded model from '%s'\n", path);
         fprintf(stderr, "  sample_rate=%u, n_fft=%u, hop=%u\n", hp.sample_rate, hp.n_fft, hp.hop_length);
@@ -369,6 +374,8 @@ struct miocodec_context* miocodec_init_from_file(const char* path, struct miocod
 void miocodec_free(struct miocodec_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->sched)
+        ggml_backend_sched_free(ctx->sched);
     if (ctx->ctx_w)
         ggml_free(ctx->ctx_w);
     if (ctx->buf_w)
@@ -686,19 +693,24 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         ggml_set_name(x, "wave_prenet_out");
         ggml_set_output(x);
 
-        // Build and run graph
-        ggml_cgraph* gf = ggml_new_graph(ctx0);
+        // Build and run graph via sched (handles weight buffer automatically)
+        ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 4096, false);
         ggml_build_forward_expand(gf, x);
 
-        ggml_gallocr_t galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
-        ggml_gallocr_alloc_graph(galloc, gf);
+        ggml_backend_sched_reset(ctx->sched);
+        if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+            fprintf(stderr, "miocodec: wave_prenet graph alloc failed\n");
+            ggml_free(ctx0);
+            *out_n = 0;
+            return nullptr;
+        }
 
         // Set input data
         ggml_tensor* input_t = ggml_graph_get_tensor(gf, "prenet_input");
         ggml_backend_tensor_set(input_t, fsq_emb.data(), 0, sizeof(float) * T * dim);
 
         // Compute
-        ggml_backend_graph_compute(ctx->backend, gf);
+        ggml_backend_sched_graph_compute(ctx->sched, gf);
 
         // Extract output
         ggml_tensor* out_t = ggml_graph_get_tensor(gf, "wave_prenet_out");
@@ -706,7 +718,6 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         float* result = (float*)malloc(sizeof(float) * n_out);
         ggml_backend_tensor_get(out_t, result, 0, sizeof(float) * n_out);
 
-        ggml_gallocr_free(galloc);
         ggml_free(ctx0);
 
         *out_n = n_out;
