@@ -3235,6 +3235,15 @@ set_tests_properties(test-qwen3-tts-seed-live PROPERTIES
     LABELS "live;server;tts;qwen3-tts;determinism"
     TIMEOUT 300)
 
+# ─── test-separate-live — §248 source separation smoke test. SKIPs cleanly
+# without a mel-band-roformer model (CRISPASR_MBR_MODEL / CRISPASR_MODELS_DIR).
+add_test(NAME test-separate-live
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-separate-live.sh
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-separate-live PROPERTIES
+    LABELS "live;separation"
+    TIMEOUT 300)
+
 # ─── test-release-workflow — validate release.yml targets (issue #131).
 # Static test: no binary or model needed, just parses YAML.
 add_test(NAME test-release-workflow

@@ -2669,6 +2669,15 @@ if (TARGET text-lid-dispatch AND NOT TARGET crisp_lid)
     target_link_libraries(crispasr-lib PUBLIC text-lid-dispatch)
 endif()
 
+# §248 source-separation backends — driven by the --separate CLI dispatcher
+# (examples/cli/crispasr_separate_cli.cpp), arch auto-detected from the GGUF.
+if (TARGET mel-band-roformer)
+    target_link_libraries(crispasr-lib PUBLIC mel-band-roformer)
+endif()
+if (TARGET htdemucs)
+    target_link_libraries(crispasr-lib PUBLIC htdemucs)
+endif()
+
 # Text-LLM chat backend — PRIVATE link: llama.h identifiers are
 # absorbed into libcrispasr and don't bleed into the public surface.
 # Symbols downstream consumers see are only the `crispasr_chat_*` ABI
