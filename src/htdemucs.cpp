@@ -811,6 +811,101 @@ static std::vector<float> read_tensor_f32(ggml_tensor* t) {
 }
 
 // ---------------------------------------------------------------------------
+// GEMM for the CrossTransformer hot path.
+//
+// The transformer is ~86% of a forward pass (self-attn 52%, cross-attn 33%,
+// measured with CRISPASR_HTDEMUCS_PROFILE=1), and every matmul in it was a
+// scalar triple loop whose innermost stride was seq_len floats — ~10 KB, so a
+// cache miss per multiply-add. Routing them through cblas_sgemm fixes both the
+// FLOP rate and the access pattern.
+//
+// Gated by CRISPASR_HTDEMUCS_BLAS (default ON where Accelerate is available).
+// Set it to 0 to fall back to the scalar path — that is the A/B lever and the
+// regression-bisection mechanism; do not remove it.
+// ---------------------------------------------------------------------------
+static bool htdemucs_use_blas() {
+#if defined(HAVE_ACCELERATE)
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("CRISPASR_HTDEMUCS_BLAS");
+        v = (e && atoi(e) == 0) ? 0 : 1; // default ON
+    }
+    return v != 0;
+#else
+    return false;
+#endif
+}
+
+// C[M,N] = A[M,K] * B[K,N], all row-major. Falls back to a cache-blocked scalar
+// loop when Accelerate is unavailable or the gate is off.
+static void htd_gemm(int M, int N, int K, const float* A, const float* B, float* C) {
+#if defined(HAVE_ACCELERATE)
+    if (htdemucs_use_blas()) {
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, A, K, B, N, 0.0f, C, N);
+        return;
+    }
+#endif
+    std::fill(C, C + (size_t)M * N, 0.0f);
+    for (int i = 0; i < M; i++)
+        for (int k = 0; k < K; k++) {
+            const float a = A[(size_t)i * K + k];
+            if (a == 0.0f)
+                continue;
+            const float* brow = B + (size_t)k * N;
+            float* crow = C + (size_t)i * N;
+            for (int j = 0; j < N; j++)
+                crow[j] += a * brow[j];
+        }
+}
+
+// ---------------------------------------------------------------------------
+// Weight cache — read_tensor_f32() copies (and for F16, converts) a whole
+// tensor on every call, and the DConv stacks call it from INSIDE their
+// per-frequency-band loop: 9 reads x 680 band invocations per encoder layer is
+// ~6k redundant dequant+copy passes over the same few weights.
+//
+// Cache by tensor pointer. Weights are immutable after load, so this is safe
+// and the cache lives for the process. Gated CRISPASR_HTDEMUCS_WCACHE
+// (default ON) so the old behaviour stays A/B-able.
+// ---------------------------------------------------------------------------
+// FASTCONV: batched im2col + gemm for the CPU convs (default ON). Set
+// CRISPASR_HTDEMUCS_FASTCONV=0 for the original per-frame scalar path.
+static bool htdemucs_fastconv() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("CRISPASR_HTDEMUCS_FASTCONV");
+        v = (e && atoi(e) == 0) ? 0 : 1; // default ON
+    }
+    return v != 0;
+}
+
+static bool htdemucs_use_wcache() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("CRISPASR_HTDEMUCS_WCACHE");
+        v = (e && atoi(e) == 0) ? 0 : 1; // default ON
+    }
+    return v != 0;
+}
+
+// Returns a reference to the cached F32 copy of `t`. The caller must NOT
+// mutate it (all current uses are read-only weight reads).
+static const std::vector<float>& cached_tensor_f32(ggml_tensor* t) {
+    static std::map<const ggml_tensor*, std::vector<float>> cache;
+    if (!htdemucs_use_wcache()) {
+        // Gate OFF: re-read every time (the original behaviour). Still stored so
+        // the returned reference stays valid for the caller.
+        cache[t] = read_tensor_f32(t);
+        return cache[t];
+    }
+    auto it = cache.find(t);
+    if (it != cache.end())
+        return it->second;
+    return cache.emplace(t, read_tensor_f32(t)).first->second;
+}
+
+
+// ---------------------------------------------------------------------------
 // CPU Conv2d for freq encoder (avoids ggml im2col OOM on 8 GB VPS).
 // Conv2d with kernel [OC, IC, K, 1], stride [S, 1], pad [P, 0]:
 // Only convolves on the freq (H) axis; time (W) axis passes through.
@@ -822,48 +917,85 @@ static std::vector<float> read_tensor_f32(ggml_tensor* t) {
 //   where Fq_out = (Fq + 2*P - K) / S + 1
 static std::vector<float> cpu_conv2d_freq(const std::vector<float>& x, int T, int Fq, int IC, ggml_tensor* w_tensor,
                                           ggml_tensor* b_tensor, int stride, int pad, int& out_Fq) {
-    fprintf(stderr, "htdemucs: cpu_conv2d_freq T=%d Fq=%d IC=%d w_ne=(%d,%d,%d,%d) type=%d\n", T, Fq, IC,
-            (int)w_tensor->ne[0], (int)w_tensor->ne[1], (int)w_tensor->ne[2], (int)w_tensor->ne[3], w_tensor->type);
-    auto w = read_tensor_f32(w_tensor);
+    if (htdemucs_debug())
+        fprintf(stderr, "htdemucs: cpu_conv2d_freq T=%d Fq=%d IC=%d w_ne=(%d,%d,%d,%d) type=%d\n", T, Fq, IC,
+                (int)w_tensor->ne[0], (int)w_tensor->ne[1], (int)w_tensor->ne[2], (int)w_tensor->ne[3], w_tensor->type);
+    const std::vector<float>& w = cached_tensor_f32(w_tensor);
     int K = (int)w_tensor->ne[1];
     int OC = (int)w_tensor->ne[3];
     out_Fq = (Fq + 2 * pad - K) / stride + 1;
-    fprintf(stderr, "htdemucs: cpu_conv2d_freq K=%d OC=%d out_Fq=%d out_size=%zu\n", K, OC, out_Fq,
-            (size_t)T * out_Fq * OC);
+    if (htdemucs_debug())
+        fprintf(stderr, "htdemucs: cpu_conv2d_freq K=%d OC=%d out_Fq=%d out_size=%zu\n", K, OC, out_Fq,
+                (size_t)T * out_Fq * OC);
 
-    // Matmul-based conv: per-frame im2col + matmul (cache-friendly, fits in RAM)
-    int patch_cols = IC * K;
-    std::vector<float> out((size_t)T * out_Fq * OC, 0.0f);
-    std::vector<float> patches(out_Fq * patch_cols);
-
-    for (int t = 0; t < T; t++) {
-        // Build im2col patches for this time frame: patches[fo, ic*K+kh]
-        for (int fo = 0; fo < out_Fq; fo++) {
-            for (int ic = 0; ic < IC; ic++) {
-                for (int kh = 0; kh < K; kh++) {
-                    int fi = fo * stride + kh - pad;
-                    float val = (fi >= 0 && fi < Fq) ? x[t + (size_t)fi * T + (size_t)ic * T * Fq] : 0.0f;
-                    patches[fo * patch_cols + ic * K + kh] = val;
+    // FASTCONV path (CRISPASR_HTDEMUCS_FASTCONV, default ON): batched im2col +
+    // ONE gemm. The original per-time-frame path below rebuilt patches and ran a
+    // dot-product loop 336x per layer; enc.conv2d was 21.5% of the forward and is
+    // ~0.2% here. The old path is KEPT and reachable with FASTCONV=0 — it is the
+    // A/B and regression-bisection lever.
+    const int patch_cols = IC * K;
+    if (!htdemucs_fastconv()) {
+        std::vector<float> out((size_t)T * out_Fq * OC, 0.0f);
+        std::vector<float> patches((size_t)out_Fq * patch_cols);
+        for (int t = 0; t < T; t++) {
+            for (int fo = 0; fo < out_Fq; fo++)
+                for (int ic = 0; ic < IC; ic++)
+                    for (int kh = 0; kh < K; kh++) {
+                        const int fi = fo * stride + kh - pad;
+                        patches[fo * patch_cols + ic * K + kh] =
+                            (fi >= 0 && fi < Fq) ? x[t + (size_t)fi * T + (size_t)ic * T * Fq] : 0.0f;
+                    }
+            for (int fo = 0; fo < out_Fq; fo++) {
+                const float* pp = patches.data() + fo * patch_cols;
+                for (int oc = 0; oc < OC; oc++) {
+                    const float* wr = w.data() + (size_t)oc * patch_cols;
+                    float sum = 0;
+                    for (int c = 0; c < patch_cols; c++)
+                        sum += pp[c] * wr[c];
+                    out[t + (size_t)fo * T + (size_t)oc * T * out_Fq] = sum;
                 }
             }
         }
-        // Matmul: patches(out_Fq, patch_cols) × w(OC, patch_cols)^T → (out_Fq, OC)
-        for (int fo = 0; fo < out_Fq; fo++) {
-            const float* p = patches.data() + fo * patch_cols;
-            for (int oc = 0; oc < OC; oc++) {
-                const float* wr = w.data() + oc * patch_cols;
-                float sum = 0;
-                for (int c = 0; c < patch_cols; c++)
-                    sum += p[c] * wr[c];
-                out[t + (size_t)fo * T + (size_t)oc * T * out_Fq] = sum;
+        if (b_tensor) {
+            const std::vector<float>& b = cached_tensor_f32(b_tensor);
+            for (int oc = 0; oc < OC; oc++)
+                for (size_t sp = 0; sp < (size_t)T * out_Fq; sp++)
+                    out[sp + (size_t)oc * T * out_Fq] += b[oc];
+        }
+        return out;
+    }
+    const size_t n_pos = (size_t)out_Fq * T;
+    std::vector<float> out(n_pos * OC, 0.0f);
+
+    // patches[(ic*K + kh), (fo*T + t)] — K-major rows, position-major columns,
+    // which is exactly the B operand layout sgemm wants.
+    std::vector<float> patches((size_t)patch_cols * n_pos);
+    for (int ic = 0; ic < IC; ic++)
+        for (int kh = 0; kh < K; kh++) {
+            float* prow = patches.data() + (size_t)(ic * K + kh) * n_pos;
+            for (int fo = 0; fo < out_Fq; fo++) {
+                const int fi = fo * stride + kh - pad;
+                float* pdst = prow + (size_t)fo * T;
+                if (fi >= 0 && fi < Fq) {
+                    const float* xsrc = x.data() + (size_t)fi * T + (size_t)ic * T * Fq;
+                    memcpy(pdst, xsrc, (size_t)T * sizeof(float));
+                } else {
+                    memset(pdst, 0, (size_t)T * sizeof(float));
+                }
             }
         }
-    }
+
+    // out_tmp[oc, (fo*T + t)] = sum_c w[oc, c] * patches[c, (fo*T + t)]
+    htd_gemm(OC, (int)n_pos, patch_cols, w.data(), patches.data(), out.data());
+
     if (b_tensor) {
-        auto b = read_tensor_f32(b_tensor);
-        for (int oc = 0; oc < OC; oc++)
-            for (size_t s = 0; s < (size_t)T * out_Fq; s++)
-                out[s + (size_t)oc * T * out_Fq] += b[oc];
+        const std::vector<float>& b = cached_tensor_f32(b_tensor);
+        for (int oc = 0; oc < OC; oc++) {
+            float* orow = out.data() + (size_t)oc * n_pos;
+            const float bv = b[oc];
+            for (size_t i = 0; i < n_pos; i++)
+                orow[i] += bv;
+        }
     }
     return out;
 }
@@ -876,18 +1008,24 @@ static std::vector<float> cpu_conv2d_1x1(const std::vector<float>& x, int spatia
     // empty result — that is how the tdecoder rewrite used to null-deref.
     GGML_ASSERT(w_tensor->ne[0] == 1 && w_tensor->ne[1] == 1 &&
                 "cpu_conv2d_1x1 requires a 1x1 Conv2d kernel; use cpu_conv1d_time for Conv1d");
-    auto w = read_tensor_f32(w_tensor);
+    const std::vector<float>& w = cached_tensor_f32(w_tensor);
     out_C = (int)w_tensor->ne[3];
     std::vector<float> out((size_t)spatial * out_C, 0.0f);
-    for (int oc = 0; oc < out_C; oc++)
-        for (int s = 0; s < spatial; s++) {
-            float sum = 0;
-            for (int ic = 0; ic < IC; ic++)
-                sum += w[(size_t)oc * IC + ic] * x[s + (size_t)ic * spatial];
-            out[s + (size_t)oc * spatial] = sum;
-        }
+    // A 1x1 conv is a pure channel matmul: (out_C, IC) x (IC, spatial).
+    // Gated CRISPASR_HTDEMUCS_FASTCONV (default ON); the scalar path is kept.
+    if (htdemucs_fastconv()) {
+        htd_gemm(out_C, spatial, IC, w.data(), x.data(), out.data());
+    } else {
+        for (int oc = 0; oc < out_C; oc++)
+            for (int sp = 0; sp < spatial; sp++) {
+                float sum = 0;
+                for (int ic = 0; ic < IC; ic++)
+                    sum += w[(size_t)oc * IC + ic] * x[sp + (size_t)ic * spatial];
+                out[sp + (size_t)oc * spatial] = sum;
+            }
+    }
     if (b_tensor) {
-        auto b = read_tensor_f32(b_tensor);
+        const std::vector<float>& b = cached_tensor_f32(b_tensor);
         for (int oc = 0; oc < out_C; oc++)
             for (int s = 0; s < spatial; s++)
                 out[s + (size_t)oc * spatial] += b[oc];
@@ -969,54 +1107,6 @@ static void cpu_group_norm1_inplace(std::vector<float>& x, int C, int T, const f
     cpu_group_norm1_inplace(x.data(), C, T, w, b, eps);
 }
 
-// ---------------------------------------------------------------------------
-// GEMM for the CrossTransformer hot path.
-//
-// The transformer is ~86% of a forward pass (self-attn 52%, cross-attn 33%,
-// measured with CRISPASR_HTDEMUCS_PROFILE=1), and every matmul in it was a
-// scalar triple loop whose innermost stride was seq_len floats — ~10 KB, so a
-// cache miss per multiply-add. Routing them through cblas_sgemm fixes both the
-// FLOP rate and the access pattern.
-//
-// Gated by CRISPASR_HTDEMUCS_BLAS (default ON where Accelerate is available).
-// Set it to 0 to fall back to the scalar path — that is the A/B lever and the
-// regression-bisection mechanism; do not remove it.
-// ---------------------------------------------------------------------------
-static bool htdemucs_use_blas() {
-#if defined(HAVE_ACCELERATE)
-    static int v = -1;
-    if (v < 0) {
-        const char* e = getenv("CRISPASR_HTDEMUCS_BLAS");
-        v = (e && atoi(e) == 0) ? 0 : 1; // default ON
-    }
-    return v != 0;
-#else
-    return false;
-#endif
-}
-
-// C[M,N] = A[M,K] * B[K,N], all row-major. Falls back to a cache-blocked scalar
-// loop when Accelerate is unavailable or the gate is off.
-static void htd_gemm(int M, int N, int K, const float* A, const float* B, float* C) {
-#if defined(HAVE_ACCELERATE)
-    if (htdemucs_use_blas()) {
-        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, A, K, B, N, 0.0f, C, N);
-        return;
-    }
-#endif
-    std::fill(C, C + (size_t)M * N, 0.0f);
-    for (int i = 0; i < M; i++)
-        for (int k = 0; k < K; k++) {
-            const float a = A[(size_t)i * K + k];
-            if (a == 0.0f)
-                continue;
-            const float* brow = B + (size_t)k * N;
-            float* crow = C + (size_t)i * N;
-            for (int j = 0; j < N; j++)
-                crow[j] += a * brow[j];
-        }
-}
-
 // CPU DConv residual stack over a channel-major (C, T) buffer, in place.
 //
 // Mirrors demucs.demucs.DConv: for each sublayer d,
@@ -1038,7 +1128,7 @@ static void cpu_dconv_inplace(std::vector<float>& x, int C, int T, const htdemuc
         const int hidden = (int)sl.conv1_w->ne[2];
 
         // Dilated Conv1d(C -> hidden) with padding = dilation * (K/2).
-        auto w1 = read_tensor_f32(sl.conv1_w);
+        const std::vector<float>& w1 = cached_tensor_f32(sl.conv1_w);
         std::vector<float> h((size_t)T * hidden, 0.0f);
         for (int t_out = 0; t_out < T; t_out++)
             for (int hc = 0; hc < hidden; hc++) {
@@ -1053,23 +1143,21 @@ static void cpu_dconv_inplace(std::vector<float>& x, int C, int T, const htdemuc
                 h[t_out + (size_t)hc * T] = sum;
             }
         if (sl.conv1_b) {
-            auto b1 = read_tensor_f32(sl.conv1_b);
+            const std::vector<float>& b1 = cached_tensor_f32(sl.conv1_b);
             for (int hc = 0; hc < hidden; hc++)
                 for (int t = 0; t < T; t++)
                     h[t + (size_t)hc * T] += b1[hc];
         }
 
         if (sl.norm1_w) {
-            auto n1w = read_tensor_f32(sl.norm1_w);
-            std::vector<float> n1b;
-            if (sl.norm1_b)
-                n1b = read_tensor_f32(sl.norm1_b);
-            cpu_group_norm1_inplace(h, hidden, T, n1w.data(), sl.norm1_b ? n1b.data() : nullptr);
+            const std::vector<float>& n1w = cached_tensor_f32(sl.norm1_w);
+            cpu_group_norm1_inplace(h, hidden, T, n1w.data(),
+                                    sl.norm1_b ? cached_tensor_f32(sl.norm1_b).data() : nullptr);
         }
         cpu_gelu_inplace(h);
 
         // Conv1d(hidden -> 2C, K=1) == a per-timestep matmul.
-        auto w2 = read_tensor_f32(sl.conv2_w);
+        const std::vector<float>& w2 = cached_tensor_f32(sl.conv2_w);
         const int out2C = (int)sl.conv2_w->ne[2];
         std::vector<float> h2((size_t)T * out2C, 0.0f);
         for (int oc = 0; oc < out2C; oc++)
@@ -1080,18 +1168,16 @@ static void cpu_dconv_inplace(std::vector<float>& x, int C, int T, const htdemuc
                 h2[t + (size_t)oc * T] = sum;
             }
         if (sl.conv2_b) {
-            auto b2 = read_tensor_f32(sl.conv2_b);
+            const std::vector<float>& b2 = cached_tensor_f32(sl.conv2_b);
             for (int oc = 0; oc < out2C; oc++)
                 for (int t = 0; t < T; t++)
                     h2[t + (size_t)oc * T] += b2[oc];
         }
 
         if (sl.norm2_w) {
-            auto n2w = read_tensor_f32(sl.norm2_w);
-            std::vector<float> n2b;
-            if (sl.norm2_b)
-                n2b = read_tensor_f32(sl.norm2_b);
-            cpu_group_norm1_inplace(h2, out2C, T, n2w.data(), sl.norm2_b ? n2b.data() : nullptr);
+            const std::vector<float>& n2w = cached_tensor_f32(sl.norm2_w);
+            cpu_group_norm1_inplace(h2, out2C, T, n2w.data(),
+                                    sl.norm2_b ? cached_tensor_f32(sl.norm2_b).data() : nullptr);
         }
 
         // GLU on the channel dim -> C channels, then LayerScale + residual.
@@ -1103,11 +1189,9 @@ static void cpu_dconv_inplace(std::vector<float>& x, int C, int T, const htdemuc
                 const float b = h2[t + (size_t)(half + c) * T];
                 gl[t + (size_t)c * T] = a / (1.0f + expf(-b));
             }
-        std::vector<float> sc;
-        if (sl.scale)
-            sc = read_tensor_f32(sl.scale);
+        const std::vector<float>* sc = sl.scale ? &cached_tensor_f32(sl.scale) : nullptr;
         for (int c = 0; c < C; c++) {
-            const float s = sl.scale ? sc[c] : 1.0f;
+            const float s = sc ? (*sc)[c] : 1.0f;
             for (int t = 0; t < T; t++)
                 x[t + (size_t)c * T] += s * gl[t + (size_t)c * T];
         }

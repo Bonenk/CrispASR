@@ -507,6 +507,26 @@ suffixes.
 
 - `CRISPASR_HIFT_FULL_IDFT`
 
+### HTDemucs (source separation)
+
+- `CRISPASR_HTDEMUCS_BLAS` — route the CrossTransformer matmuls through
+  `cblas_sgemm` (default **ON** where Accelerate is available). `=0` selects the
+  scalar path. The transformer is ~86% of an unoptimised forward pass, so this is
+  the dominant knob (measured 44x on the transformer, 4.6x overall).
+- `CRISPASR_HTDEMUCS_FASTCONV` — batched im2col + one GEMM for the CPU convs
+  (default **ON**). `=0` selects the original per-time-frame scalar path.
+  Measured `enc.conv2d` 10.0 s -> 0.17 s and `enc.rewrite` 12.2 s -> 0.30 s.
+- `CRISPASR_HTDEMUCS_WCACHE` — cache F32 copies of weight tensors by pointer
+  (default **ON**). `=0` re-reads and re-converts on every access, which the
+  DConv stacks do ~6k times per encoder layer.
+- `CRISPASR_HTDEMUCS_PROFILE` — print a per-phase wall-time breakdown of one
+  forward pass (stft / enc / transformer / dec / istft).
+- `CRISPASR_HTDEMUCS_DEBUG` — verbose per-layer shape and NaN diagnostics.
+- `CRISPASR_HTDEMUCS_SKIP_TIME` — skip the time branch (bisection aid).
+
+All three optimisation gates are output-equivalent: the per-stage diff reports
+45/45 stages passing with them ON or OFF.
+
 ### Higgs STT
 
 - `CRISPASR_HIGGS_DEBUG`
