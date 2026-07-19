@@ -1280,10 +1280,177 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
     fprintf(stderr, "htdemucs: encoder %s, output (%d, %d, %d)\n", encoder_ok ? "OK" : "FAILED", x_C, x_Fq, x_T);
 
-    // Step 7: Skip CrossTransformer for first pass (TODO Phase 3)
-    // The transformer modifies x (freq bottleneck) and xt (time bottleneck).
-    // Without it, the decoder will use the encoder bottleneck directly.
-    fprintf(stderr, "htdemucs: CrossTransformer skipped (Phase 3 TODO)\n");
+    // Step 7: CrossTransformer
+    //
+    // At the bottleneck: x = (x_T, x_Fq, x_C, 1) = (336, 8, 384, 1)
+    //                    xt = (xt_T, xt_C) = (1344, 384)
+    //
+    // Python flow:
+    //   1. channel_upsampler:   x (C=384) → x (C=512) via 1x1 Conv
+    //   2. channel_upsampler_t: xt (C=384) → xt (C=512)
+    //   3. Flatten+permute spec: (B,C,Fr,T) → (B, T*Fr, C)
+    //   4. Add 2D sin pos emb + LayerNorm
+    //   5. Permute time: (B,C,T) → (B, T, C), add 1D sin pos emb + LayerNorm
+    //   6. 5 transformer layers (alternating self/cross attn)
+    //   7. channel_downsampler:   x (C=512) → x (C=384)
+    //   8. channel_downsampler_t: xt (C=512) → xt (C=384)
+    //
+    // For this first implementation, skip the transformer and just run
+    // the channel up/downsamplers (identity if bottom_channels == transformer_channels).
+    // The transformer layers will be added in Phase 3.
+    //
+    // Actually, let me implement the channel up/down at minimum, since they
+    // are simple 1x1 convolutions and affect the output.
+
+    if (m.channel_up_w && m.channel_down_w) {
+        // Channel upsample: 1x1 Conv on flattened freq branch
+        // x: (x_T, x_Fq, x_C, 1) → flatten to (x_T*x_Fq, x_C) → conv → (x_T*x_Fq, bottom_ch)
+        // Then reshape back to (x_T, x_Fq, bottom_ch, 1)
+        int flat_len = x_T * x_Fq;
+        int bot_ch = hp.bottom_channels; // 512
+
+        // Freq branch: flatten spatial, conv1d upsample
+        {
+            size_t g_size = ggml_tensor_overhead() * 16 + ggml_graph_overhead();
+            ggml_init_params gp = {g_size, nullptr, true};
+            ggml_context* cg = ggml_init(gp);
+
+            ggml_tensor* flat_in = ggml_new_tensor_2d(cg, GGML_TYPE_F32, flat_len, x_C);
+            ggml_set_input(flat_in);
+            ggml_tensor* up = ggml_conv_1d(cg, m.channel_up_w, flat_in, 1, 0, 1);
+            if (m.channel_up_b) {
+                ggml_tensor* ub = ggml_reshape_2d(cg, m.channel_up_b, 1, bot_ch);
+                up = ggml_add(cg, up, ub);
+            }
+            ggml_set_output(up);
+
+            ggml_cgraph* gf = ggml_new_graph(cg);
+            ggml_build_forward_expand(gf, up);
+            ggml_gallocr_t al = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+            if (ggml_gallocr_alloc_graph(al, gf)) {
+                // Reshape x_buf from (T, Fq, C) to (T*Fq, C) for the 1x1 conv
+                // x_buf layout is already (T, Fq, C) flattened, which when viewed as
+                // (T*Fq, C) is contiguous in the T*Fq dimension = correct for conv
+                ggml_backend_tensor_set(flat_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
+                ggml_backend_graph_compute(ctx->backend, gf);
+                int up_len = (int)up->ne[0];
+                int up_C = (int)up->ne[1];
+                x_buf.resize((size_t)up_len * up_C);
+                ggml_backend_tensor_get(up, x_buf.data(), 0, x_buf.size() * sizeof(float));
+                // Reshape back conceptually: (T*Fq, bot_ch) → (T, Fq, bot_ch)
+                x_C = up_C;
+            }
+            ggml_gallocr_free(al);
+            ggml_free(cg);
+        }
+
+        // Time branch: conv1d upsample
+        {
+            size_t g_size = ggml_tensor_overhead() * 16 + ggml_graph_overhead();
+            ggml_init_params gp = {g_size, nullptr, true};
+            ggml_context* cg = ggml_init(gp);
+
+            ggml_tensor* xt_in2 = ggml_new_tensor_2d(cg, GGML_TYPE_F32, xt_T, xt_C);
+            ggml_set_input(xt_in2);
+            ggml_tensor* up_t = ggml_conv_1d(cg, m.channel_up_t_w, xt_in2, 1, 0, 1);
+            if (m.channel_up_t_b) {
+                ggml_tensor* utb = ggml_reshape_2d(cg, m.channel_up_t_b, 1, bot_ch);
+                up_t = ggml_add(cg, up_t, utb);
+            }
+            ggml_set_output(up_t);
+
+            ggml_cgraph* gf = ggml_new_graph(cg);
+            ggml_build_forward_expand(gf, up_t);
+            ggml_gallocr_t al = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+            if (ggml_gallocr_alloc_graph(al, gf)) {
+                ggml_backend_tensor_set(xt_in2, xt_buf.data(), 0, xt_buf.size() * sizeof(float));
+                ggml_backend_graph_compute(ctx->backend, gf);
+                int up_T = (int)up_t->ne[0];
+                int up_C = (int)up_t->ne[1];
+                xt_buf.resize((size_t)up_T * up_C);
+                ggml_backend_tensor_get(up_t, xt_buf.data(), 0, xt_buf.size() * sizeof(float));
+                xt_C = up_C;
+                xt_T = up_T;
+            }
+            ggml_gallocr_free(al);
+            ggml_free(cg);
+        }
+
+        fprintf(stderr, "htdemucs: channel upsample → freq (%d,%d,%d), time (%d,%d)\n", x_C, x_Fq, x_T, xt_C, xt_T);
+
+        // TODO Phase 3: transformer layers here (5 layers alternating self/cross attn)
+        // For now, just pass through with channel up/down
+
+        // Channel downsample: 1x1 Conv back to transformer_channels
+        // Freq branch
+        {
+            size_t g_size = ggml_tensor_overhead() * 16 + ggml_graph_overhead();
+            ggml_init_params gp = {g_size, nullptr, true};
+            ggml_context* cg = ggml_init(gp);
+
+            ggml_tensor* flat_in = ggml_new_tensor_2d(cg, GGML_TYPE_F32, x_T * x_Fq, x_C);
+            ggml_set_input(flat_in);
+            ggml_tensor* dn = ggml_conv_1d(cg, m.channel_down_w, flat_in, 1, 0, 1);
+            if (m.channel_down_b) {
+                int dn_C = (int)m.channel_down_w->ne[2];
+                ggml_tensor* db = ggml_reshape_2d(cg, m.channel_down_b, 1, dn_C);
+                dn = ggml_add(cg, dn, db);
+            }
+            ggml_set_output(dn);
+
+            ggml_cgraph* gf = ggml_new_graph(cg);
+            ggml_build_forward_expand(gf, dn);
+            ggml_gallocr_t al = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+            if (ggml_gallocr_alloc_graph(al, gf)) {
+                ggml_backend_tensor_set(flat_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
+                ggml_backend_graph_compute(ctx->backend, gf);
+                int dn_len = (int)dn->ne[0];
+                int dn_C = (int)dn->ne[1];
+                x_buf.resize((size_t)dn_len * dn_C);
+                ggml_backend_tensor_get(dn, x_buf.data(), 0, x_buf.size() * sizeof(float));
+                x_C = dn_C;
+            }
+            ggml_gallocr_free(al);
+            ggml_free(cg);
+        }
+
+        // Time branch downsample
+        {
+            size_t g_size = ggml_tensor_overhead() * 16 + ggml_graph_overhead();
+            ggml_init_params gp = {g_size, nullptr, true};
+            ggml_context* cg = ggml_init(gp);
+
+            ggml_tensor* xt_in2 = ggml_new_tensor_2d(cg, GGML_TYPE_F32, xt_T, xt_C);
+            ggml_set_input(xt_in2);
+            ggml_tensor* dn_t = ggml_conv_1d(cg, m.channel_down_t_w, xt_in2, 1, 0, 1);
+            if (m.channel_down_t_b) {
+                int dn_C = (int)m.channel_down_t_w->ne[2];
+                ggml_tensor* dtb = ggml_reshape_2d(cg, m.channel_down_t_b, 1, dn_C);
+                dn_t = ggml_add(cg, dn_t, dtb);
+            }
+            ggml_set_output(dn_t);
+
+            ggml_cgraph* gf = ggml_new_graph(cg);
+            ggml_build_forward_expand(gf, dn_t);
+            ggml_gallocr_t al = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+            if (ggml_gallocr_alloc_graph(al, gf)) {
+                ggml_backend_tensor_set(xt_in2, xt_buf.data(), 0, xt_buf.size() * sizeof(float));
+                ggml_backend_graph_compute(ctx->backend, gf);
+                int dn_T = (int)dn_t->ne[0];
+                int dn_C = (int)dn_t->ne[1];
+                xt_buf.resize((size_t)dn_T * dn_C);
+                ggml_backend_tensor_get(dn_t, xt_buf.data(), 0, xt_buf.size() * sizeof(float));
+                xt_C = dn_C;
+                xt_T = dn_T;
+            }
+            ggml_gallocr_free(al);
+            ggml_free(cg);
+        }
+
+        fprintf(stderr, "htdemucs: channel downsample → freq (%d,%d,%d), time (%d,%d)\n", x_C, x_Fq, x_T, xt_C, xt_T);
+    } else {
+        fprintf(stderr, "htdemucs: no channel up/downsamplers (bottom_channels=0?)\n");
+    }
 
     // Step 8: Decoder (reverse of encoder, with skip connections)
     // Decoder index 0 is the innermost (smallest spatial dims), matching
@@ -1525,10 +1692,25 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         }
 
         if (htdemucs_debug()) {
-            fprintf(stderr, "htdemucs: dec[%d] output (%d, %d, %d)\n", idx, x_C, x_Fq, x_T);
+            int nc = 0;
+            for (size_t i = 0; i < x_buf.size() && nc < 3; i++)
+                if (std::isnan(x_buf[i]) || std::isinf(x_buf[i]))
+                    nc++;
+            fprintf(stderr, "htdemucs: dec[%d] output (%d, %d, %d)%s\n", idx, x_C, x_Fq, x_T,
+                    nc > 0 ? " *** HAS NaN ***" : "");
         }
     }
 
+    // NaN check after decoder
+    {
+        int nan_count = 0;
+        for (size_t i = 0; i < x_buf.size() && nan_count < 5; i++) {
+            if (std::isnan(x_buf[i]) || std::isinf(x_buf[i]))
+                nan_count++;
+        }
+        if (nan_count > 0)
+            fprintf(stderr, "htdemucs: WARNING: %d NaN/Inf in decoder output\n", nan_count);
+    }
     fprintf(stderr, "htdemucs: decoder done, output (%d, %d, %d)\n", x_C, x_Fq, x_T);
 
     // Step 9: CaC unmask → iSTFT → denormalize → sum branches → output
