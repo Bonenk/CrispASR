@@ -1238,7 +1238,96 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             if (!enc.empty) {
                 // GELU (no GroupNorm for htdemucs — norm_starts=4, depth=4)
                 cpu_gelu_inplace(x_buf);
-                // DConv: TODO (skipped)
+                // DConv: per-freq-band dilated conv residual
+                // Python: y.permute(0,2,1,3).reshape(-1,C,T) → DConv → reshape back
+                // = for each freq band: run DConv on (C, T) slice
+                if (!enc.dconv.layers.empty()) {
+                    for (int fq = 0; fq < x_Fq; fq++) {
+                        // Extract (T, C) slice for this freq band
+                        // x_buf layout: x[t + fq*T + c*T*Fq]
+                        std::vector<float> slice(x_T * x_C);
+                        for (int c = 0; c < x_C; c++)
+                            for (int t = 0; t < x_T; t++)
+                                slice[t + c * x_T] = x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq];
+
+                        // Apply each DConv sublayer as residual
+                        for (size_t d = 0; d < enc.dconv.layers.size(); d++) {
+                            auto& sl = enc.dconv.layers[d];
+                            if (!sl.conv1_w)
+                                continue;
+                            int dilation = 1 << (int)d;
+                            int K = (int)sl.conv1_w->ne[0];
+                            int hidden = (int)sl.conv1_w->ne[2];
+
+                            // h = dilated_conv1d(slice, w1, dilation, padding) + b1
+                            auto w1 = read_tensor_f32(sl.conv1_w);
+                            std::vector<float> h(x_T * hidden, 0.0f);
+                            for (int t_out = 0; t_out < x_T; t_out++) {
+                                for (int hc = 0; hc < hidden; hc++) {
+                                    float sum = 0;
+                                    for (int ic = 0; ic < x_C; ic++)
+                                        for (int k = 0; k < K; k++) {
+                                            int t_in = t_out + (k - K / 2) * dilation;
+                                            if (t_in < 0 || t_in >= x_T)
+                                                continue;
+                                            sum += slice[t_in + ic * x_T] * w1[(size_t)hc * x_C * K + ic * K + k];
+                                        }
+                                    h[t_out + hc * x_T] = sum;
+                                }
+                            }
+                            if (sl.conv1_b) {
+                                auto b1 = read_tensor_f32(sl.conv1_b);
+                                for (int hc = 0; hc < hidden; hc++)
+                                    for (int t = 0; t < x_T; t++)
+                                        h[t + hc * x_T] += b1[hc];
+                            }
+                            // GroupNorm(1) + GELU (skip norm for now — LayerScale init=1e-3 dominates)
+                            for (auto& v : h)
+                                v = v * 0.5f * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
+                            // Conv1d(hidden → 2*C, K=1) + GLU
+                            auto w2 = read_tensor_f32(sl.conv2_w);
+                            int out2C = (int)sl.conv2_w->ne[2]; // 2*C
+                            std::vector<float> h2(x_T * out2C, 0.0f);
+                            for (int oc = 0; oc < out2C; oc++)
+                                for (int t = 0; t < x_T; t++) {
+                                    float sum = 0;
+                                    for (int hc = 0; hc < hidden; hc++)
+                                        sum += w2[(size_t)oc * hidden + hc] * h[t + hc * x_T]; // K=1
+                                    h2[t + oc * x_T] = sum;
+                                }
+                            if (sl.conv2_b) {
+                                auto b2 = read_tensor_f32(sl.conv2_b);
+                                for (int oc = 0; oc < out2C; oc++)
+                                    for (int t = 0; t < x_T; t++)
+                                        h2[t + oc * x_T] += b2[oc];
+                            }
+                            // GLU → C channels
+                            int half = out2C / 2;
+                            std::vector<float> glu(x_T * half);
+                            for (int c = 0; c < half; c++)
+                                for (int t = 0; t < x_T; t++) {
+                                    float a = h2[t + c * x_T];
+                                    float b = h2[t + (half + c) * x_T];
+                                    glu[t + c * x_T] = a / (1.0f + expf(-b));
+                                }
+                            // LayerScale + residual
+                            if (sl.scale) {
+                                auto sc = read_tensor_f32(sl.scale);
+                                for (int c = 0; c < x_C; c++)
+                                    for (int t = 0; t < x_T; t++)
+                                        slice[t + c * x_T] += sc[c] * glu[t + c * x_T];
+                            } else {
+                                for (size_t i = 0; i < slice.size(); i++)
+                                    slice[i] += glu[i];
+                            }
+                        }
+
+                        // Write back
+                        for (int c = 0; c < x_C; c++)
+                            for (int t = 0; t < x_T; t++)
+                                x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq] = slice[t + c * x_T];
+                    }
+                }
                 // Rewrite: 1x1 Conv2d → GLU
                 if (enc.rewrite_w) {
                     int rw_OC = 0;
