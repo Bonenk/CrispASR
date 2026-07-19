@@ -573,7 +573,7 @@ static ggml_tensor* miocodec_adaln_transformer_layer(ggml_context* ctx0, ggml_te
     attn_out = ggml_mul_mat(ctx0, L.wo, attn_out);
 
     // Residual with gate
-    ggml_tensor* h = ggml_add(ctx0, x, ggml_mul(ctx0, attn_gate, attn_out));
+    ggml_tensor* h = ggml_add(ctx0, x, ggml_mul(ctx0, attn_out, attn_gate));
 
     // FFN AdaLN-Zero
     auto [ffn_in, ffn_gate] = miocodec_adaln_modulate(ctx0, h, cond, L.ffn_adaln_w, L.ffn_adaln_b, true);
@@ -582,7 +582,7 @@ static ggml_tensor* miocodec_adaln_transformer_layer(ggml_context* ctx0, ggml_te
     ggml_tensor* up2 = ggml_mul_mat(ctx0, L.ffn_w3, ffn_in);
     ggml_tensor* ffn_out = ggml_mul_mat(ctx0, L.ffn_w2, ggml_mul(ctx0, gate2, up2));
 
-    return ggml_add(ctx0, h, ggml_mul(ctx0, ffn_gate, ffn_out));
+    return ggml_add(ctx0, h, ggml_mul(ctx0, ffn_out, ffn_gate));
 }
 static ggml_tensor* miocodec_resnet_block(ggml_context* ctx0, ggml_tensor* x, const miocodec_weights::resnet_block& b,
                                           int n_groups) {
