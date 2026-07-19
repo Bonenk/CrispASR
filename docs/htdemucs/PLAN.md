@@ -348,10 +348,68 @@ onnxruntime CPUExecutionProvider, same 343980-sample segment:
 So the optimised CPU path is now in the same order of magnitude as ORT rather
 than ~15x behind it. A like-for-like claim still needs the quiet-box rerun above.
 
+### Round 2 — after the DConv / ConvTranspose / conv1d work
+
+Adding a wall-clock row to the profiler exposed that the round-1 "5.29 s"
+was **instrumented phases only**. The decoder ConvTranspose2d had never been
+timed and was 68% of the real forward. Two further mis-readings followed, both
+caused by scope boundaries rather than by the code:
+
+- `tenc(total)` and the outer `channel_up/down` scope were **nested totals**
+  (the latter wrapped the entire transformer section — upsample, all 5 layers,
+  downsample), so they read 41-51% and sent me after the K=1 samplers. Measured
+  in isolation the samplers are **18 ms**. Nested rows are now labelled
+  `[nested]`, excluded from the uninstrumented total, and every phase has its
+  own scope.
+
+Lesson: a profile row is only as trustworthy as the scope boundary behind it,
+and "total" must be stated against wall clock or it will flatter you.
+
+| phase | round 1 | round 2 |
+|-------|---------|---------|
+| dec.convtranspose  | 294 360 ms (untimed) | 168 ms |
+| tdec.rewrite       | 7 824 ms | 149 ms |
+| tdec.convtranspose | 3 094 ms | 152 ms |
+| dec.dconv          | 28 848 ms | 783 ms |
+| enc.dconv          | 7 872 ms | 955 ms |
+| chan.up/down (K=1) | — | 18 ms |
+
+`tdec.rewrite` is worth calling out: it was *this branch's own* scalar
+`cpu_conv1d_time`, written while fixing the K=3 Conv1d bug, and it became the
+single largest phase once everything around it got faster.
+
+### Measured result
+
+Benchmark protocol per the dev guide: warm-up discarded, median of 5, load
+recorded per run. Box load 16-19 (shared machine, could not get below ~9).
+
+| | one 343980-sample segment |
+|---|---|
+| original (all gates OFF) | ~615 s |
+| **optimised (all gates ON)** | **median 14.1 s** (best 12.2 s) |
+| ONNX Runtime CPU, ORT_ENABLE_ALL | ~43 s |
+| ONNX Runtime CPU, ORT_DISABLE_ALL | ~103 s |
+
+So roughly **44x** over the original and, on this box, ~3x faster than ORT with
+full graph optimisations. Caveat on the ORT comparison: those figures were
+measured separately and their load conditions are not known to me, and ORT is
+multi-threaded by default while this runtime is entirely single-threaded — so
+treat the ratio as indicative, not as a controlled benchmark.
+
+Parity is unchanged throughout: **45/45 stages, min cos 0.999963**, in every
+gate combination, and the separated stems are bit-identical to the
+pre-optimisation build (vocals rms 0.13962 / other 0.00521 / drums 0.00021 /
+bass 0.00010) with the ASR round-trip still word-for-word correct.
+
 ### Next targets (unstarted)
 
-`dec.dconv`, `enc.dconv` and `tenc.dconv` are now the largest remaining phases.
-The DConv dilated convolution is still a scalar loop and is the obvious next
-GEMM/im2col candidate. Beyond that: threading (the per-frequency-band loops are
-embarrassingly parallel), and actually honouring `use_gpu` — the ggml graph path
-exists but the backend is pinned to CPU.
+The profile is now flat — no phase dominates, and the remaining scalar work is
+small. The two big structural levers left are both untouched:
+
+- **Threading.** Everything is single-threaded. The per-frequency-band loops and
+  the per-source output loop are embarrassingly parallel, and Accelerate's sgemm
+  is already multi-threaded internally for large matrices but is being handed
+  work serially. `params.n_threads` is still a dead field.
+- **GPU.** `params.use_gpu` is still never read; the backend is hardcoded
+  `ggml_backend_cpu_init()`. Now that the hot ops are all GEMM-shaped, a ggml
+  graph port is far more tractable than it was against the scalar loops.
