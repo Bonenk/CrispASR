@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `6c0d418717cd2c80b94b1fbe0f0733e2236f4d3f` (feat: short blocks in stereo + joint (M/S); v0.6.0).
+Synced at upstream commit: `9ce8d93d31a43f71f4cf3b254f4a736e34e70709` (docs: benchmark table vs LAME/ffmpeg on real audio).
