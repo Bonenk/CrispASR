@@ -82,7 +82,7 @@ lines per backend.
 - `mel_band_roformer_{init,separate}` (the C API mirroring `htdemucs.h`) lands
   with the MBR C++ backend; until then the dispatcher's MBR branch is stubbed.
 
-## ⚠ DIVERGENCE TO RECONCILE (2026-07-19)
+## RESOLVED — one surface (2026-07-19)
 
 The `--separate` dispatcher (this spec) shipped and drives BOTH backends. But
 the htdemucs session independently took a **different** surface:
