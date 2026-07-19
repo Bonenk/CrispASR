@@ -284,11 +284,35 @@ def install_build_toolchain() -> dict:
     return {"ninja": _HAS_NINJA, "ccache": _HAS_CCACHE, "mold": _HAS_MOLD}
 
 
+def crispasr_cmake_flags() -> list[str]:
+    """CrispASR-specific cmake flags every Kaggle kernel wants.
+
+    `-DCRISPASR_NO_C2PA_NATIVE=ON`: src/CMakeLists.txt builds the native C2PA
+    signer from the `third_party/c2pa-audio` **git submodule**. Most kernels
+    clone with `--depth 1` and init only `ggml` (or no submodule at all), so
+    cmake generate dies with:
+
+        Cannot find source file: .../third_party/c2pa-audio/src/c2pa_native.cpp
+        No SOURCES given to target: crispasr_c2pa_native
+
+    C2PA provenance signing is irrelevant to a benchmark / conversion / A-B
+    kernel, and disabling it skips the target entirely — cheaper than fetching
+    another submodule. Kernels that DO want C2PA should clone `--recursive`
+    instead. (Confirmed fix on chr1str/crispasr-issue81-onnx-bench, 2026-07-18.)
+    """
+    return ["-DCRISPASR_NO_C2PA_NATIVE=ON"]
+
+
 def cache_and_link_flags() -> list[str]:
     """ccache compiler-launcher flags + mold linker flags, for whatever
     install_build_toolchain() detected. Safe to call even if it wasn't —
-    returns [] for anything unavailable."""
-    flags: list[str] = []
+    returns [] for anything unavailable.
+
+    Also folds in crispasr_cmake_flags() so the ~20 existing kernels that
+    already call this get the c2pa-submodule fix without an edit each. New
+    kernels should call crispasr_cmake_flags() explicitly for clarity.
+    """
+    flags: list[str] = list(crispasr_cmake_flags())
     if _HAS_CCACHE:
         flags += [
             "-DCMAKE_C_COMPILER_LAUNCHER=ccache",

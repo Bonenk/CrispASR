@@ -201,9 +201,24 @@ the §232 campaign. Verified against current code, not carried from this doc.
 - **chatterbox flash "stub"** — false: `chatterbox.cpp:1806,2662`, default ON.
 - **tada "two sequential B=1 FM passes"** — false: opt-in B=2 graph exists
   (`tada_tts.cpp:238`).
-- **Batched TDT/RNNT decode is env-gated, not GPU-gated** — it is a CPU
-  sgemm-batching win (370 sgemv → 26 sgemm), `CRISPASR_TDT_BATCH` /
-  `CRISPASR_RNNT_BATCH`, default OFF (parakeet.cpp:3179; nemotron.cpp:2526).
+- **Batched TDT/RNNT decode (`CRISPASR_TDT_BATCH` / `CRISPASR_RNNT_BATCH`,
+  default OFF) is a MEASURED CPU LOSS for parakeet TDT — keep it OFF, do NOT
+  flip.** The "370 sgemv → 26 sgemm" framing predicted a CPU win; the #81 A/B on
+  a clean Kaggle CPU (P100 box, `chr1str/crispasr-issue81-onnx-bench`,
+  2026-07-18) measured the opposite on parakeet-tdt-0.6b, transcript
+  byte-identical in both arms:
+
+  | clip | default decode | `TDT_BATCH=1` | ratio |
+  |------|---------------|---------------|-------|
+  | jfk 11 s   | **4.0×** RT | 3.2× RT | 0.80× (20% slower) |
+  | long 134 s | **3.0×** RT | 2.2× RT | 0.73× (27% slower) |
+
+  Why: batching the joint over ALL T encoder frames does strictly more work than
+  TDT's duration-skipping greedy decode, which visits far fewer frames. One big
+  sgemm does not pay for the extra frames. (parakeet-ctc is unaffected, 0.99× —
+  it never enters the TDT decode.) The batched fn stays available as an opt-in
+  and is still used by the long-form streamed path; the short-form default
+  (parakeet.cpp:3607/3984) must stay per-frame greedy.
 
 ### Verified state
 
@@ -288,7 +303,8 @@ the §232 campaign. Verified against current code, not carried from this doc.
 | **P1** | f5/dots/kugelaudio/pocket | CFG serial / no persistent graph — un-migrated §232 targets | ~halves DiT time |
 | **P1** | granite/moss Metal decode | Per-op dispatch ~100ms/step; ggml-metal has no ICB replay | Dominant Metal decode cost |
 | **P2** | Scalar CPU hotpaths | RNN-T LSTM pred+joint; granite cpu_linear+depthwise; paraformer CIF; rvq encode; istft IRFFT; titanet mel front-end; diarize `apply_xcorr` | Per-token/frame scalar loops |
-| **P2** | parakeet/nemotron | Batched sgemm decode opt-in default-OFF — validate + flip on | Unshipped CPU win |
+| ~~P2~~ **CLOSED** | parakeet | Batched TDT decode validated on Kaggle CPU (#81, 2026-07-18): **0.73–0.80× = SLOWER**, byte-identical → keep default OFF, do NOT flip | Predicted win, measured a loss |
+| **OPEN** | parakeet CPU vs onnx-asr | crispasr parakeet-tdt CPU 4.0×/3.0× vs onnx-asr int8 8.6×/5.8× ⇒ **~2.1× slower on CPU** (the real #81 residual). Needs a CPU BLAS/kernel lever — batched decode is ruled out | GPU is fine (P100 36.9×/50.9×) |
 | **P2** | align_wav2vec2_ctc | **Reloads the 300MB–1GB model every call** (`crispasr_aligner.cpp:315`) — missing the §176e ctx-cache | Concrete single-file win |
 | **P2** | paraformer / voxcpm2 | CPU-only, no GPU backend (paraformer leaks 256MB buffer) | GPU offload available |
 | **P3** | Threading | Hardcoded default 4 threads in ~90 sites; only whisper-core caps to `min(4, hw)` | Idle cores on big hosts |
