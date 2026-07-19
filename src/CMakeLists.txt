@@ -1472,6 +1472,14 @@ if(NOT MSVC)
     target_compile_options(miotts PRIVATE -O3)
 endif()
 
+# miocodec — Aratako/MioCodec-25Hz-44.1kHz-v2 (MIT, 133M params)
+# Standalone audio codec: FSQ → Transformer + AdaLN-Zero → iSTFT → 44.1kHz
+add_library(miocodec STATIC miocodec.h miocodec.cpp)
+set_target_properties(miocodec PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(miocodec PUBLIC .)
+target_compile_features   (miocodec PUBLIC cxx_std_17)
+target_link_libraries     (miocodec PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+
 # ---------------------------------------------------------------------------
 # omnivoice — k2-fsa/OmniVoice (Qwen3 + masked iterative multi-codebook TTS)
 # ---------------------------------------------------------------------------
