@@ -740,27 +740,38 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
 
     // NOTE: for T_up == T_stft (which it is for 25Hz codec), interpolation is identity.
 
-    // ── wave_prior_net (2 ResNet blocks) ────────────────────────────
-    // ResNetBlock: GroupNorm → SiLU → Conv1d(k=3,p=1) → GroupNorm → SiLU → Conv1d(k=3,p=1) + residual
-    // GroupNorm normalises over ne[0] = channel dim when cur is (d, T).
-    // ggml_conv_1d expects input (T, C_in) and kernel (K, C_in, C_out),
-    // so transpose around each conv call.
-    // ResNet block: GroupNorm → SiLU → Conv1d(k=3,p=1) → (repeat) → residual
-    // Data layout: (C=d, T) channel-first. ggml_group_norm needs specific 3D
-    // layout; for PyTorch GroupNorm(32, 512) on (1, 512, T):
-    // We use ggml_norm per-channel-group by reshaping (d, T) → (group_dim, n_groups, T)
-    // and applying norm along ne[0]=group_dim per (n_groups, T) slice.
-    // Simpler: just use ggml_norm (LayerNorm over ne[0]) on each group separately.
-    // For now, use a full-channel LayerNorm approximation (GroupNorm with groups=1).
-    // TODO: implement proper 32-group GroupNorm. The approximation is acceptable
-    // for initial parity testing since the ResNet is a small correction to the
-    // transformer output.
+    // ── Proper GroupNorm via reshape ──────────────────────────────────
+    // PyTorch GroupNorm(32, 512) on (1, C=512, T): normalises each group of
+    // 16 channels independently over T. ggml_norm normalises over ne[0].
+    // Reshape (C=512, T) → (ch_per_group=16, n_groups=32, T), apply ggml_norm
+    // over ne[0]=16, then reshape back. The affine weight/bias (512,) is
+    // reshaped to (16, 32, 1) for broadcasting.
+    const int n_groups = 32;
+    const int cpg = d / n_groups; // channels_per_group = 16
+
+    // GroupNorm: normalise each group of 16 channels over ALL time steps.
+    // Reshape (C=512, T) → (cpg*T, n_groups) = (16*T, 32), ggml_norm over ne[0],
+    // then reshape back. This matches PyTorch GroupNorm(32, 512) on (1, 512, T).
+    auto group_norm_op = [&](ggml_tensor* x, ggml_tensor* w, ggml_tensor* b) -> ggml_tensor* {
+        const int64_t T_cur = x->ne[1];
+        // (C, T) → (cpg, n_groups, T) → permute to (cpg, T, n_groups) → reshape (cpg*T, n_groups)
+        x = ggml_reshape_3d(ctx0, x, cpg, n_groups, T_cur);           // (16, 32, T)
+        x = ggml_cont(ctx0, ggml_permute(ctx0, x, 0, 2, 1, 3));       // (16, T, 32)
+        x = ggml_reshape_2d(ctx0, x, (int64_t)cpg * T_cur, n_groups); // (16*T, 32)
+        x = ggml_norm(ctx0, x, 1e-6f);                                // norm over ne[0]=16*T per group
+        x = ggml_reshape_3d(ctx0, x, cpg, T_cur, n_groups);           // (16, T, 32)
+        x = ggml_cont(ctx0, ggml_permute(ctx0, x, 0, 2, 1, 3));       // (16, 32, T)
+        // Affine: weight/bias (512,) → (16, 32, 1) for broadcasting over T
+        x = ggml_mul(ctx0, x, ggml_reshape_3d(ctx0, w, cpg, n_groups, 1));
+        x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, b, cpg, n_groups, 1));
+        return ggml_reshape_2d(ctx0, x, d, T_cur);
+    };
+
+    // ── ResNet block ────────────────────────────────────────────────
     auto resnet_block = [&](ggml_tensor* x, const miotts_resnet_block& blk) -> ggml_tensor* {
-        ggml_tensor* res = x; // (d, T) = (512, 58)
-        // Approximate GroupNorm as LayerNorm over channel dim (ne[0]=512)
-        x = ggml_norm(ctx0, x, 1e-6f);
-        x = ggml_mul(ctx0, x, blk.norm1_w);
-        x = ggml_add(ctx0, x, blk.norm1_b);
+        ggml_tensor* res = x; // (d=512, T)
+        // GroupNorm1 + SiLU
+        x = group_norm_op(x, blk.norm1_w, blk.norm1_b);
         x = ggml_silu(ctx0, x);
         // Conv1d: transpose (d,T) → (T,d), conv, back
         x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
@@ -768,10 +779,8 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
         x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, blk.conv1_b, 1, d, 1));
         x = ggml_reshape_2d(ctx0, x, (int64_t)x->ne[0], d);
         x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
-        // GroupNorm2 (approximated as LayerNorm)
-        x = ggml_norm(ctx0, x, 1e-6f);
-        x = ggml_mul(ctx0, x, blk.norm2_w);
-        x = ggml_add(ctx0, x, blk.norm2_b);
+        // GroupNorm2 + SiLU
+        x = group_norm_op(x, blk.norm2_w, blk.norm2_b);
         x = ggml_silu(ctx0, x);
         // Conv1d
         x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
