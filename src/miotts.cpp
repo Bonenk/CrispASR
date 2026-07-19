@@ -577,7 +577,7 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
     const int d_out = 512;         // output dim (after output_proj)
     const int n_heads = 12;        // prenet heads
     const int hd = d_in / n_heads; // 64
-    (void)0; // window_size (62 on each side) — used for mask setup
+    (void)0;                       // window_size (62 on each side) — used for mask setup
     const float eps = 1e-5f;
     const int T = T_in;
 
@@ -590,18 +590,22 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
     ggml_set_name(input, "prenet_input");
     ggml_set_input(input);
 
-    // Window mask — needed for windowed attention
+    // Window mask + positions — needed for windowed attention
     ggml_tensor* win_mask = nullptr;
+    ggml_tensor* positions = nullptr;
     const size_t n_prenet_layers = c->wave_prenet_layers.size();
     if (n_prenet_layers > 0) {
         win_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T);
         ggml_set_name(win_mask, "win_mask");
         ggml_set_input(win_mask);
+        positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
+        ggml_set_name(positions, "positions");
+        ggml_set_input(positions);
     }
 
     ggml_tensor* cur = input;
 
-    for (size_t il = 0; il < 1 /* TEMP: 1 layer only */; il++) {
+    for (size_t il = 0; il < n_prenet_layers; il++) {
         const auto& b = c->wave_prenet_layers[il];
         ggml_tensor* residual = cur;
 
@@ -609,8 +613,6 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
         ggml_tensor* x = ggml_norm(ctx0, cur, eps);
         x = ggml_mul(ctx0, x, b.attn_norm_w);
         x = ggml_add(ctx0, x, b.attn_norm_b);
-        // TEMP: skip attention, just do FFN to isolate bug
-        #if 0
         // Q/K/V projections
         ggml_tensor* Q = ggml_mul_mat(ctx0, b.wq, x); // (d_in, T)
         ggml_tensor* K = ggml_mul_mat(ctx0, b.wk, x);
@@ -621,8 +623,11 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
         K = ggml_reshape_3d(ctx0, K, hd, n_heads, T);
         V = ggml_reshape_3d(ctx0, V, hd, n_heads, T);
 
-        // RoPE — TEMPORARILY DISABLED for debugging
-        // TODO: re-enable once attention is verified without RoPE
+        // RoPE (NORMAL = adjacent-pair complex rotation, theta=10000)
+        Q = ggml_rope_ext(ctx0, Q, positions, nullptr, hd, GGML_ROPE_TYPE_NORMAL, 512, 10000.0f, 1.0f, 0.0f, 1.0f,
+                          32.0f, 1.0f);
+        K = ggml_rope_ext(ctx0, K, positions, nullptr, hd, GGML_ROPE_TYPE_NORMAL, 512, 10000.0f, 1.0f, 0.0f, 1.0f,
+                          32.0f, 1.0f);
 
         // Permute to flash-attn layout (hd, T, n_heads)
         Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
@@ -631,19 +636,35 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
 
         // Flash attention with window mask
         float scale = 1.0f / std::sqrt((float)hd);
-        // Use nullptr mask since T=29 < window=125 (all positions visible)
-        ggml_tensor* attn = ggml_flash_attn_ext(ctx0, Q, K, V, /*mask=*/nullptr, scale, 0.0f, 0.0f);
+        // Manual attention (avoid flash_attn_ext for debugging):
+        // scores = Q @ K^T * scale → softmax → @ V
+        // Q, K, V are (hd=64, T=29, n_heads=12)
+        // Scores: (T, T, n_heads)
+        ggml_tensor* scores = ggml_mul_mat(ctx0, K, Q); // (T, T, n_heads)
+        scores = ggml_scale(ctx0, scores, scale);
+        scores = ggml_soft_max(ctx0, scores); // softmax over dim 0 (K positions)
+        // V needs to be (T, hd, n_heads) for: output = V^T @ scores → (hd, T, n_heads)
+        // Actually: ggml_mul_mat(V_permuted, scores) where V_permuted is (hd, T, n_heads)
+        // ggml_mul_mat(A, B) = B @ A^T over last 2 dims
+        // A = V with shape (hd, T, n_heads), B = scores with shape (T, T, n_heads)
+        // Result: (hd, T, n_heads) — each head: scores^T(T,T) @ V(T,hd) → but that's wrong dims
+        // Let me use the standard approach:
+        // Transpose V to (T, hd, n_heads) then mul_mat(V_T, scores) → (hd, T, n_heads)
+        ggml_tensor* V_t = ggml_cont(ctx0, ggml_permute(ctx0, V, 1, 0, 2, 3)); // (T, hd, n_heads)
+        ggml_tensor* attn = ggml_mul_mat(ctx0, V_t, scores);                   // (hd, T, n_heads)
 
-        // Reshape back to (d_in, T)
-        attn = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3)), d_in, T);
+        // Reshape to (d_in, T): (64, 12, 29) → output is (hd, n_heads, T)?
+        // No — ggml_mul_mat on 3D: result ne = [V_t.ne[1], scores.ne[1], n_heads]
+        // = [hd, T, n_heads] = (64, 29, 12)
+        // We need (hd*n_heads, T) = (768, 29). Permute (64,29,12) → (64,12,29) → reshape
+        attn = ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3)); // (64, 12, 29)
+        attn = ggml_reshape_2d(ctx0, attn, d_in, T);                  // (768, 29)
 
         // Output projection
         attn = ggml_mul_mat(ctx0, b.wo, attn);
 
-        // Residual (attn skipped)
-        // cur = ggml_add(ctx0, residual, attn);
-        cur = residual; // no attention for debugging
-        #endif
+        // Residual
+        cur = ggml_add(ctx0, residual, attn);
 
         // FFN: LayerNorm + SwiGLU
         residual = cur;
