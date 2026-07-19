@@ -7095,11 +7095,10 @@ int main(int argc, char** argv) {
             return 4;
         }
 
-        // Stage 1: logits_step_0 — LLM forward on the reference input_ids
+        // Stage 1: LLM forward — compare token_embed + logits_step_0
         {
             auto ids_pair = ref.get_f32("input_ids");
             if (ids_pair.first && ids_pair.second > 0) {
-                // Convert float-stored IDs to int32
                 std::vector<int32_t> input_ids(ids_pair.second);
                 for (size_t i = 0; i < ids_pair.second; i++)
                     input_ids[i] = (int32_t)std::lrint(ids_pair.first[i]);

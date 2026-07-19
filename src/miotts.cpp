@@ -105,7 +105,11 @@ struct miotts_context {
     // Global embedding for voice cloning (128-d, set by miotts_set_reference)
     std::vector<float> global_embedding;
 
-    // Compute scratch
+    // Scheduler (handles weight buffer + compute buffer together)
+    ggml_backend_sched_t sched = nullptr;
+    ggml_backend_t backend_cpu = nullptr; // CPU fallback for split graphs
+
+    // Compute scratch (metadata arena for graph building)
     std::vector<uint8_t> compute_meta;
 
     // GGUF contexts (kept alive for weight buffer lifetime)
@@ -113,6 +117,8 @@ struct miotts_context {
     ggml_context* ctx_kv = nullptr;
 
     ~miotts_context() {
+        if (sched)
+            ggml_backend_sched_free(sched);
         if (buf_kv)
             ggml_backend_buffer_free(buf_kv);
         if (buf_weights)
@@ -121,6 +127,8 @@ struct miotts_context {
             ggml_free(ctx_kv);
         if (ctx_weights)
             ggml_free(ctx_weights);
+        if (backend_cpu && backend_cpu != backend)
+            ggml_backend_free(backend_cpu);
         if (backend)
             ggml_backend_free(backend);
     }
@@ -305,8 +313,22 @@ miotts_context* miotts_init_from_file(const char* path_model, miotts_context_par
         ggml_backend_tensor_set(c->kv_v, std::vector<uint8_t>(ggml_nbytes(c->kv_v), 0).data(), 0, ggml_nbytes(c->kv_v));
     }
 
-    // Compute scratch
-    c->compute_meta.resize(512 * 1024 * 1024); // 512 MB compute arena
+    // Compute scratch — metadata arena for graph building (no_alloc=true).
+    // Size = enough tensor overhead entries for the graph.
+    c->compute_meta.resize(ggml_tensor_overhead() * 16384 + ggml_graph_overhead_custom(16384, false));
+
+    // Create scheduler. CPU-only on this VPS.
+    c->backend_cpu = ggml_backend_cpu_init();
+    {
+        ggml_backend_t backends[2] = {c->backend, c->backend_cpu};
+        int n_be = (c->backend && c->backend != c->backend_cpu) ? 2 : 1;
+        c->sched = ggml_backend_sched_new(backends, nullptr, n_be, 16384, false, false);
+        if (!c->sched) {
+            fprintf(stderr, "miotts: failed to create scheduler\n");
+            gguf_free(meta);
+            return nullptr;
+        }
+    }
 
     // Init global embedding to zeros (no voice cloning by default)
     c->global_embedding.resize(hp.codec_global_dim, 0.0f);
@@ -346,6 +368,8 @@ static ggml_cgraph* build_graph_llm(miotts_context* c, int n_past, int n_tokens)
 
     // Embedding lookup
     ggml_tensor* embeds = ggml_get_rows(ctx0, c->token_embd, input_ids);
+    ggml_set_name(embeds, "token_embed");
+    ggml_set_output(embeds); // expose for diff harness
 
     // Position IDs
     ggml_tensor* positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
@@ -515,10 +539,9 @@ float* miotts_forward_logits(miotts_context* ctx, const int32_t* token_ids, int 
 
     ggml_cgraph* gf = build_graph_llm(ctx, /*n_past=*/0, n_tokens);
 
-    ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
-    if (!ggml_gallocr_alloc_graph(alloc, gf)) {
-        fprintf(stderr, "miotts: graph alloc failed\n");
-        ggml_gallocr_free(alloc);
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        fprintf(stderr, "miotts: sched alloc failed\n");
         return nullptr;
     }
 
@@ -545,7 +568,7 @@ float* miotts_forward_logits(miotts_context* ctx, const int32_t* token_ids, int 
         ggml_backend_tensor_set(mask_t, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
     }
 
-    ggml_backend_graph_compute(ctx->backend, gf);
+    ggml_backend_sched_graph_compute(ctx->sched, gf);
 
     // Read logits
     ggml_tensor* logits_t = ggml_graph_get_tensor(gf, "logits");
@@ -556,7 +579,6 @@ float* miotts_forward_logits(miotts_context* ctx, const int32_t* token_ids, int 
     if (out_vocab)
         *out_vocab = vocab;
 
-    ggml_gallocr_free(alloc);
     return result;
 }
 
