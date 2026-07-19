@@ -703,6 +703,26 @@ void htdemucs_free(htdemucs_context* ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Tensor read helper — reads any ggml tensor as F32 regardless of storage type
+// ---------------------------------------------------------------------------
+static std::vector<float> read_tensor_f32(ggml_tensor* t) {
+    int64_t n = ggml_nelements(t);
+    std::vector<float> out(n);
+    if (t->type == GGML_TYPE_F32) {
+        ggml_backend_tensor_get(t, out.data(), 0, n * sizeof(float));
+    } else if (t->type == GGML_TYPE_F16) {
+        std::vector<ggml_fp16_t> tmp(n);
+        ggml_backend_tensor_get(t, tmp.data(), 0, n * sizeof(ggml_fp16_t));
+        for (int64_t i = 0; i < n; i++)
+            out[i] = ggml_fp16_to_fp32(tmp[i]);
+    } else {
+        // Fallback: zero-fill for unsupported types
+        fprintf(stderr, "htdemucs: WARNING: unsupported tensor type %d for '%s'\n", t->type, t->name);
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
 // ggml graph helpers for the encoder/decoder/transformer
 // ---------------------------------------------------------------------------
 
@@ -1500,8 +1520,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // qkv = tmp @ in_proj_weight^T + in_proj_bias
                 // tmp is (dim, seq), weight is (dim, 3*dim) in ggml ne → transposed: (3*dim, dim)
                 int out_dim = 3 * dim;
-                std::vector<float> w_data(dim * out_dim);
-                ggml_backend_tensor_get(sa.in_proj_w, w_data.data(), 0, w_data.size() * sizeof(float));
+                std::vector<float> w_data = read_tensor_f32(sa.in_proj_w);
                 // w_data ggml layout: ne[0]=dim, ne[1]=3*dim → w[out_d][in_d] = w_data[in_d * out_dim + out_d]
                 // Wait, ggml stores row-major with ne[0] as fast. So w_data[i] accesses
                 // element at (i % ne[0], i / ne[0]) = (in_d, out_d). So w[out_d][in_d] = w_data[out_d * dim + in_d].
@@ -1577,8 +1596,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
                 // 5. Output projection: out_proj_weight (dim, dim)
                 {
-                    std::vector<float> ow(dim * dim);
-                    ggml_backend_tensor_get(sa.out_proj_w, ow.data(), 0, ow.size() * sizeof(float));
+                    std::vector<float> ow = read_tensor_f32(sa.out_proj_w);
                     std::vector<float> proj(dim * seq_len, 0.0f);
                     for (int o = 0; o < dim; o++)
                         for (int s = 0; s < seq_len; s++) {
@@ -1620,8 +1638,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // linear1: (dim → hidden), GELU, linear2: (hidden → dim)
                 int hidden = (int)sa.linear1_w->ne[1]; // ne = (dim, hidden)
                 {
-                    std::vector<float> w1(dim * hidden), b1(hidden);
-                    ggml_backend_tensor_get(sa.linear1_w, w1.data(), 0, w1.size() * sizeof(float));
+                    std::vector<float> w1 = read_tensor_f32(sa.linear1_w);
+                    std::vector<float> b1(hidden);
                     if (sa.linear1_b)
                         ggml_backend_tensor_get(sa.linear1_b, b1.data(), 0, b1.size() * sizeof(float));
                     std::vector<float> h(hidden * seq_len, 0.0f);
@@ -1638,8 +1656,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                         h[i] = v * 0.5f * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
                     }
                     // linear2
-                    std::vector<float> w2(hidden * dim), b2(dim);
-                    ggml_backend_tensor_get(sa.linear2_w, w2.data(), 0, w2.size() * sizeof(float));
+                    std::vector<float> w2 = read_tensor_f32(sa.linear2_w);
+                    std::vector<float> b2(dim);
                     if (sa.linear2_b)
                         ggml_backend_tensor_get(sa.linear2_b, b2.data(), 0, b2.size() * sizeof(float));
                     std::vector<float> ffn_out(dim * seq_len, 0.0f);
@@ -1707,8 +1725,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     // 2. QKV projection from in_proj_weight (3*dim, dim)
                     // Q from q_normed, K and V from k_normed
                     int out3 = 3 * dim;
-                    std::vector<float> w_data(dim * out3);
-                    ggml_backend_tensor_get(ca.cross_attn_in_proj_w, w_data.data(), 0, w_data.size() * sizeof(float));
+                    std::vector<float> w_data = read_tensor_f32(ca.cross_attn_in_proj_w);
                     std::vector<float> bias(out3, 0.0f);
                     if (ca.cross_attn_in_proj_b)
                         ggml_backend_tensor_get(ca.cross_attn_in_proj_b, bias.data(), 0, out3 * sizeof(float));
@@ -1779,8 +1796,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
                     // 4. Output projection
                     {
-                        std::vector<float> ow(dim * dim);
-                        ggml_backend_tensor_get(ca.cross_attn_out_proj_w, ow.data(), 0, ow.size() * sizeof(float));
+                        std::vector<float> ow = read_tensor_f32(ca.cross_attn_out_proj_w);
                         std::vector<float> proj(dim * q_seq, 0.0f);
                         for (int o = 0; o < dim; o++)
                             for (int s = 0; s < q_seq; s++) {
@@ -1822,8 +1838,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     }
                     int hidden = (int)ca.linear1_w->ne[1];
                     {
-                        std::vector<float> w1(dim * hidden), b1(hidden);
-                        ggml_backend_tensor_get(ca.linear1_w, w1.data(), 0, w1.size() * sizeof(float));
+                        std::vector<float> w1 = read_tensor_f32(ca.linear1_w);
+                        std::vector<float> b1(hidden);
                         if (ca.linear1_b)
                             ggml_backend_tensor_get(ca.linear1_b, b1.data(), 0, b1.size() * sizeof(float));
                         std::vector<float> hbuf(hidden * q_seq, 0.0f);
@@ -1838,8 +1854,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                             float v = hbuf[i];
                             hbuf[i] = v * 0.5f * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
                         }
-                        std::vector<float> w2(hidden * dim), b2(dim);
-                        ggml_backend_tensor_get(ca.linear2_w, w2.data(), 0, w2.size() * sizeof(float));
+                        std::vector<float> w2 = read_tensor_f32(ca.linear2_w);
+                        std::vector<float> b2(dim);
                         if (ca.linear2_b)
                             ggml_backend_tensor_get(ca.linear2_b, b2.data(), 0, b2.size() * sizeof(float));
                         std::vector<float> ffn_out(dim * q_seq, 0.0f);

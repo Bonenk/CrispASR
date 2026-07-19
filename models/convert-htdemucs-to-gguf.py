@@ -98,7 +98,7 @@ def load_model(name_or_path):
 
 def should_keep_f32(name):
     """Biases, norms, LayerScale, small embeddings → always F32."""
-    if name.endswith(".bias"):
+    if name.endswith(".bias") or name.endswith("_bias"):
         return True
     if ".norm" in name and ".weight" in name:
         return True
