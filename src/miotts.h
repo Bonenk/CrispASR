@@ -37,7 +37,13 @@ struct miotts_context_params {
 struct miotts_context_params miotts_context_default_params(void);
 
 // Initialise from a GGUF containing both LLM + codec weights.
+// tokenizer_json_path is optional — if non-null, loads the Qwen3 BPE
+// tokenizer from this file. If null, the tokenizer is loaded from the
+// GGUF (if embedded) or synthesis requires pre-tokenized input.
 struct miotts_context* miotts_init_from_file(const char* path_model, struct miotts_context_params params);
+
+// Load tokenizer from a tokenizer.json file (Qwen3 BPE). Returns 0 on success.
+int miotts_load_tokenizer(struct miotts_context* ctx, const char* tokenizer_json_path);
 
 // Set reference audio for voice cloning. The codec extracts a 128-d global
 // embedding from this audio to condition the waveform decoder.

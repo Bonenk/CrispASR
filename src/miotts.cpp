@@ -10,6 +10,7 @@
 #include "miotts.h"
 
 #include "core/attention.h"
+#include "core/bpe.h"
 #include "core/ffn.h"
 #include "core/gguf_loader.h"
 #include "core/istft.h"
@@ -28,6 +29,7 @@
 #include <memory>
 #include <random>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 // ── Hyperparameters ─────────────────────────────────────────────────
@@ -158,6 +160,14 @@ struct miotts_context {
 
     // Global embedding for voice cloning (128-d, set by miotts_set_reference)
     std::vector<float> global_embedding;
+
+    // Tokenizer (Qwen3 BPE loaded from GGUF)
+    struct {
+        std::vector<std::string> id_to_token;
+        std::unordered_map<std::string, int32_t> token_to_id;
+        std::unordered_map<std::string, int32_t> merge_rank;
+        bool loaded = false;
+    } vocab;
 
     // Scheduler (handles weight buffer + compute buffer together)
     ggml_backend_sched_t sched = nullptr;
@@ -462,6 +472,38 @@ miotts_context* miotts_init_from_file(const char* path_model, miotts_context_par
 
     // Init global embedding to zeros (no voice cloning by default)
     c->global_embedding.resize(hp.codec_global_dim, 0.0f);
+
+    // Try to load tokenizer from GGUF (if embedded with compatible format)
+    {
+        auto tokens = core_gguf::kv_str_array(meta, "tokenizer.ggml.tokens");
+        if (!tokens.empty()) {
+            c->vocab.id_to_token = std::move(tokens);
+            c->vocab.token_to_id.reserve(c->vocab.id_to_token.size());
+            for (int i = 0; i < (int)c->vocab.id_to_token.size(); i++)
+                c->vocab.token_to_id[c->vocab.id_to_token[i]] = i;
+            auto merges = core_gguf::kv_str_array(meta, "tokenizer.ggml.merges");
+            for (int i = 0; i < (int)merges.size(); i++)
+                c->vocab.merge_rank[merges[i]] = i;
+            c->vocab.loaded = true;
+            if (params.verbosity >= 1)
+                fprintf(stderr, "miotts: tokenizer (GGUF): %zu tokens, %zu merges\n", c->vocab.id_to_token.size(),
+                        c->vocab.merge_rank.size());
+        }
+    }
+    // Auto-load tokenizer.json from same directory as model if not embedded
+    if (!c->vocab.loaded) {
+        std::string model_dir(path_model);
+        auto slash = model_dir.find_last_of("/\\");
+        if (slash != std::string::npos)
+            model_dir = model_dir.substr(0, slash);
+        else
+            model_dir = ".";
+        std::string tok_path = model_dir + "/tokenizer.json";
+        if (miotts_load_tokenizer(c.get(), tok_path.c_str()) == 0) {
+            if (params.verbosity >= 1)
+                fprintf(stderr, "miotts: tokenizer (auto): loaded from %s\n", tok_path.c_str());
+        }
+    }
 
     gguf_free(meta);
 
@@ -1059,6 +1101,217 @@ float* miotts_forward_logits(miotts_context* ctx, const int32_t* token_ids, int 
 
 // ── Synthesize ──────────────────────────────────────────────────────
 
+int miotts_load_tokenizer(miotts_context* ctx, const char* tokenizer_json_path) {
+    if (!ctx || !tokenizer_json_path)
+        return -1;
+
+    FILE* f = fopen(tokenizer_json_path, "rb");
+    if (!f)
+        return -1;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    std::string json_str(sz, '\0');
+    if ((long)fread(&json_str[0], 1, sz, f) != sz) {
+        fclose(f);
+        return -1;
+    }
+    fclose(f);
+
+    // Minimal JSON parsing for tokenizer.json: extract model.vocab and model.merges.
+    // This is NOT a full JSON parser — it handles the specific structure of HF tokenizer.json.
+    auto find_key = [&](const std::string& key) -> size_t {
+        std::string search = "\"" + key + "\"";
+        return json_str.find(search);
+    };
+
+    // Parse vocab: {"model": {"vocab": {"token": id, ...}}}
+    size_t vocab_pos = find_key("vocab");
+    if (vocab_pos == std::string::npos)
+        return -1;
+
+    // Find the opening { after "vocab":
+    size_t brace = json_str.find('{', vocab_pos + 7);
+    if (brace == std::string::npos)
+        return -1;
+
+    // Parse key-value pairs until matching }
+    std::unordered_map<std::string, int32_t> token_map;
+    int max_id = 0;
+    size_t pos = brace + 1;
+    while (pos < json_str.size()) {
+        // Skip whitespace
+        while (pos < json_str.size() && (json_str[pos] == ' ' || json_str[pos] == '\n' || json_str[pos] == '\r' ||
+                                         json_str[pos] == '\t' || json_str[pos] == ','))
+            pos++;
+        if (pos >= json_str.size() || json_str[pos] == '}')
+            break;
+        // Parse key string
+        if (json_str[pos] != '"')
+            break;
+        size_t key_start = pos + 1;
+        size_t key_end = json_str.find('"', key_start);
+        if (key_end == std::string::npos)
+            break;
+        std::string key = json_str.substr(key_start, key_end - key_start);
+        // Handle escape sequences in key
+        std::string unescaped;
+        for (size_t k = 0; k < key.size(); k++) {
+            if (key[k] == '\\' && k + 1 < key.size()) {
+                k++;
+                switch (key[k]) {
+                case 'n':
+                    unescaped += '\n';
+                    break;
+                case 'r':
+                    unescaped += '\r';
+                    break;
+                case 't':
+                    unescaped += '\t';
+                    break;
+                case '\\':
+                    unescaped += '\\';
+                    break;
+                case '"':
+                    unescaped += '"';
+                    break;
+                case 'u': {
+                    if (k + 4 < key.size()) {
+                        char hex[5] = {key[k + 1], key[k + 2], key[k + 3], key[k + 4], 0};
+                        uint32_t cp = (uint32_t)strtoul(hex, nullptr, 16);
+                        core_bpe::utf8_encode(cp, unescaped);
+                        k += 4;
+                    }
+                    break;
+                }
+                default:
+                    unescaped += '\\';
+                    unescaped += key[k];
+                    break;
+                }
+            } else {
+                unescaped += key[k];
+            }
+        }
+        // Skip ": "
+        pos = key_end + 1;
+        while (pos < json_str.size() && (json_str[pos] == ':' || json_str[pos] == ' '))
+            pos++;
+        // Parse integer value
+        int32_t id = 0;
+        bool neg = false;
+        if (pos < json_str.size() && json_str[pos] == '-') {
+            neg = true;
+            pos++;
+        }
+        while (pos < json_str.size() && json_str[pos] >= '0' && json_str[pos] <= '9') {
+            id = id * 10 + (json_str[pos] - '0');
+            pos++;
+        }
+        if (neg)
+            id = -id;
+        token_map[unescaped] = id;
+        if (id > max_id)
+            max_id = id;
+    }
+
+    if (token_map.empty())
+        return -1;
+
+    // Build id_to_token
+    ctx->vocab.id_to_token.resize(max_id + 1);
+    ctx->vocab.token_to_id.clear();
+    ctx->vocab.token_to_id.reserve(token_map.size());
+    for (auto& [tok, id] : token_map) {
+        if (id >= 0 && id <= max_id) {
+            ctx->vocab.id_to_token[id] = tok;
+            ctx->vocab.token_to_id[tok] = id;
+        }
+    }
+
+    // Parse merges: {"model": {"merges": ["a b", "c d", ...]}}
+    size_t merges_pos = find_key("merges");
+    if (merges_pos != std::string::npos) {
+        size_t arr_start = json_str.find('[', merges_pos);
+        if (arr_start != std::string::npos) {
+            pos = arr_start + 1;
+            int merge_idx = 0;
+            while (pos < json_str.size()) {
+                while (pos < json_str.size() &&
+                       (json_str[pos] == ' ' || json_str[pos] == '\n' || json_str[pos] == '\r' ||
+                        json_str[pos] == ',' || json_str[pos] == '\t'))
+                    pos++;
+                if (pos >= json_str.size() || json_str[pos] == ']')
+                    break;
+                if (json_str[pos] == '"') {
+                    size_t ms = pos + 1;
+                    size_t me = json_str.find('"', ms);
+                    if (me == std::string::npos)
+                        break;
+                    ctx->vocab.merge_rank[json_str.substr(ms, me - ms)] = merge_idx++;
+                    pos = me + 1;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    // Also add added_tokens (speech tokens etc.)
+    size_t added_pos = find_key("added_tokens");
+    if (added_pos != std::string::npos) {
+        // Parse array of objects with "id" and "content" fields
+        size_t arr = json_str.find('[', added_pos);
+        if (arr != std::string::npos) {
+            pos = arr;
+            while (pos < json_str.size()) {
+                size_t obj = json_str.find('{', pos);
+                if (obj == std::string::npos)
+                    break;
+                size_t obj_end = json_str.find('}', obj);
+                if (obj_end == std::string::npos)
+                    break;
+                std::string chunk = json_str.substr(obj, obj_end - obj + 1);
+                // Extract "id" and "content"
+                size_t id_pos = chunk.find("\"id\"");
+                size_t ct_pos = chunk.find("\"content\"");
+                if (id_pos != std::string::npos && ct_pos != std::string::npos) {
+                    // Parse id
+                    size_t id_val_start = chunk.find(':', id_pos + 4);
+                    int32_t at_id = 0;
+                    if (id_val_start != std::string::npos) {
+                        id_val_start++;
+                        while (id_val_start < chunk.size() && chunk[id_val_start] == ' ')
+                            id_val_start++;
+                        while (id_val_start < chunk.size() && chunk[id_val_start] >= '0' &&
+                               chunk[id_val_start] <= '9') {
+                            at_id = at_id * 10 + (chunk[id_val_start] - '0');
+                            id_val_start++;
+                        }
+                    }
+                    // Parse content
+                    size_t ct_val = chunk.find('"', ct_pos + 9);
+                    if (ct_val != std::string::npos) {
+                        ct_val++;
+                        size_t ct_end = chunk.find('"', ct_val);
+                        if (ct_end != std::string::npos) {
+                            std::string content = chunk.substr(ct_val, ct_end - ct_val);
+                            if (at_id >= (int32_t)ctx->vocab.id_to_token.size())
+                                ctx->vocab.id_to_token.resize(at_id + 1);
+                            ctx->vocab.id_to_token[at_id] = content;
+                            ctx->vocab.token_to_id[content] = at_id;
+                        }
+                    }
+                }
+                pos = obj_end + 1;
+            }
+        }
+    }
+
+    ctx->vocab.loaded = true;
+    return 0;
+}
+
 int miotts_set_reference(miotts_context* ctx, const float* audio_24k, int n_samples) {
     if (!ctx)
         return -1;
@@ -1224,6 +1477,136 @@ float* miotts_codec_decode(miotts_context* ctx, const float* prenet_out, int T_p
     return result;
 }
 
+// ── Qwen3 BPE tokenizer (reused from moss_tts.cpp pattern) ─────────
+
+static std::vector<std::string> miotts_qwen_pretokenize(const std::string& s) {
+    std::vector<std::string> out;
+    const size_t n = s.size();
+    auto is_letter = [](unsigned char c) { return std::isalpha(c) != 0 || c >= 0x80; };
+    auto is_digit = [](unsigned char c) { return std::isdigit(c) != 0; };
+    auto is_space = [](unsigned char c) { return std::isspace(c) != 0; };
+    auto is_nl = [](unsigned char c) { return c == '\r' || c == '\n'; };
+    size_t i = 0;
+    while (i < n) {
+        const unsigned char c = (unsigned char)s[i];
+        if (c == '\'' && i + 1 < n) {
+            static const char* cons[] = {"'s", "'t", "'re", "'ve", "'m", "'ll", "'d"};
+            bool matched = false;
+            for (const char* cc : cons) {
+                const size_t len = std::strlen(cc);
+                if (i + len > n)
+                    continue;
+                bool eq = true;
+                for (size_t k = 0; k < len; k++)
+                    if (std::tolower((unsigned char)s[i + k]) != std::tolower((unsigned char)cc[k])) {
+                        eq = false;
+                        break;
+                    }
+                if (eq) {
+                    out.push_back(s.substr(i, len));
+                    i += len;
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched)
+                continue;
+        }
+        {
+            size_t j = i;
+            if (j < n && !is_nl((unsigned char)s[j]) && !is_letter((unsigned char)s[j]) &&
+                !is_digit((unsigned char)s[j]))
+                j++;
+            if (j < n && is_letter((unsigned char)s[j])) {
+                while (j < n && is_letter((unsigned char)s[j]))
+                    j++;
+                out.push_back(s.substr(i, j - i));
+                i = j;
+                continue;
+            }
+        }
+        if (is_digit(c)) {
+            out.push_back(s.substr(i, 1));
+            i++;
+            continue;
+        }
+        if (is_nl(c)) {
+            size_t j = i;
+            while (j < n && is_nl((unsigned char)s[j]))
+                j++;
+            out.push_back(s.substr(i, j - i));
+            i = j;
+            continue;
+        }
+        if (is_space(c)) {
+            size_t j = i;
+            while (j < n && is_space((unsigned char)s[j]))
+                j++;
+            out.push_back(s.substr(i, j - i));
+            i = j;
+            continue;
+        }
+        out.push_back(s.substr(i, 1));
+        i++;
+    }
+    return out;
+}
+
+static std::vector<int32_t> miotts_tokenize(miotts_context* ctx, const std::string& text) {
+    const auto& v = ctx->vocab;
+    std::vector<int32_t> result;
+
+    auto match_special = [&](const std::string& str, size_t pos, int32_t& id) -> size_t {
+        if (str[pos] != '<')
+            return 0;
+        const bool pipe_form = pos + 1 < str.size() && str[pos + 1] == '|';
+        const size_t close = pipe_form ? str.find("|>", pos + 2) : str.find('>', pos + 1);
+        if (close == std::string::npos)
+            return 0;
+        const size_t len = close + (pipe_form ? 2 : 1) - pos;
+        if (!pipe_form && len > 24)
+            return 0;
+        auto it = v.token_to_id.find(str.substr(pos, len));
+        if (it == v.token_to_id.end())
+            return 0;
+        id = it->second;
+        return len;
+    };
+
+    size_t i = 0;
+    while (i < text.size()) {
+        if (text[i] == '<') {
+            int32_t sp_id = 0;
+            const size_t sp_len = match_special(text, i, sp_id);
+            if (sp_len > 0) {
+                result.push_back(sp_id);
+                i += sp_len;
+                continue;
+            }
+        }
+        size_t j = i;
+        if (text[j] == '<')
+            j++;
+        while (j < text.size()) {
+            if (text[j] == '<') {
+                int32_t sp_id = 0;
+                if (match_special(text, j, sp_id) > 0)
+                    break;
+            }
+            j++;
+        }
+        std::string chunk = text.substr(i, j - i);
+        i = j;
+        if (chunk.empty())
+            continue;
+        for (const std::string& pre : miotts_qwen_pretokenize(chunk)) {
+            std::string encoded = core_bpe::bytes_to_unicode(pre.data(), pre.size());
+            core_bpe::bpe_one(v.token_to_id, v.merge_rank, encoded, result);
+        }
+    }
+    return result;
+}
+
 // ── Synthesize (full pipeline) ──────────────────────────────────────
 
 float* miotts_synthesize(miotts_context* ctx, const char* text, int* out_n) {
@@ -1231,10 +1614,132 @@ float* miotts_synthesize(miotts_context* ctx, const char* text, int* out_n) {
         return nullptr;
     *out_n = 0;
 
-    // TODO: tokenizer integration. For now, require pre-tokenized input
-    // via miotts_forward_logits + miotts_fsq_dequant + miotts_codec_decode.
-    fprintf(stderr, "miotts: synthesize not yet wired (need Qwen3 BPE tokenizer)\n");
-    return nullptr;
+    if (!ctx->vocab.loaded) {
+        fprintf(stderr, "miotts: error: no tokenizer in GGUF (re-convert with updated converter)\n");
+        return nullptr;
+    }
+
+    const auto& hp = ctx->hp;
+
+    // 1. Build ChatML prompt: <|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n
+    std::string prompt = "<|im_start|>user\n";
+    prompt += text;
+    prompt += "<|im_end|>\n<|im_start|>assistant\n";
+
+    // 2. Tokenize
+    std::vector<int32_t> input_ids = miotts_tokenize(ctx, prompt);
+    if (ctx->params.verbosity >= 1)
+        fprintf(stderr, "miotts: prompt tokens: %zu\n", input_ids.size());
+
+    // 3. Autoregressive LLM generation
+    const int max_new = ctx->params.max_tokens > 0 ? ctx->params.max_tokens : 750;
+    const uint64_t seed = ctx->params.seed > 0 ? ctx->params.seed : 42;
+    std::mt19937 rng(seed);
+
+    // Prefill
+    ggml_backend_tensor_set(ctx->kv_k, std::vector<uint8_t>(ggml_nbytes(ctx->kv_k), 0).data(), 0,
+                            ggml_nbytes(ctx->kv_k));
+    ggml_backend_tensor_set(ctx->kv_v, std::vector<uint8_t>(ggml_nbytes(ctx->kv_v), 0).data(), 0,
+                            ggml_nbytes(ctx->kv_v));
+
+    {
+        ggml_cgraph* gf = build_graph_llm(ctx, 0, (int)input_ids.size());
+        ggml_backend_sched_reset(ctx->sched);
+        if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+            fprintf(stderr, "miotts: prefill alloc failed\n");
+            return nullptr;
+        }
+        ggml_tensor* ids_t = ggml_graph_get_tensor(gf, "input_ids");
+        ggml_backend_tensor_set(ids_t, input_ids.data(), 0, input_ids.size() * sizeof(int32_t));
+        ggml_tensor* pos_t = ggml_graph_get_tensor(gf, "positions");
+        std::vector<int32_t> pos(input_ids.size());
+        for (size_t i = 0; i < input_ids.size(); i++)
+            pos[i] = (int32_t)i;
+        ggml_backend_tensor_set(pos_t, pos.data(), 0, pos.size() * sizeof(int32_t));
+        // Causal mask
+        ggml_tensor* mask_t = ggml_graph_get_tensor(gf, "causal_mask");
+        if (mask_t) {
+            const int T = (int)input_ids.size();
+            std::vector<ggml_fp16_t> mask(T * T);
+            for (int q = 0; q < T; q++)
+                for (int k = 0; k < T; k++)
+                    mask[q * T + k] = (k <= q) ? ggml_fp32_to_fp16(0.0f) : ggml_fp32_to_fp16(-INFINITY);
+            ggml_backend_tensor_set(mask_t, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
+        }
+        ggml_backend_sched_graph_compute(ctx->sched, gf);
+        // Sample first token
+        ggml_tensor* logits_t = ggml_graph_get_tensor(gf, "logits");
+        std::vector<float> logits(hp.vocab_size);
+        ggml_backend_tensor_get(logits_t, logits.data(), 0, hp.vocab_size * sizeof(float));
+        int32_t next_id = sample_token(logits.data(), (int)hp.vocab_size, ctx->params.temperature, rng);
+        input_ids.push_back(next_id);
+    }
+
+    // Decode loop
+    int n_past = (int)input_ids.size() - 1;
+    for (int step = 1; step < max_new; step++) {
+        int32_t last_id = input_ids.back();
+        if (last_id == (int32_t)hp.eos_token_id)
+            break;
+        ggml_cgraph* gf = build_graph_llm(ctx, n_past, 1);
+        ggml_backend_sched_reset(ctx->sched);
+        if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
+            break;
+        ggml_tensor* ids_t = ggml_graph_get_tensor(gf, "input_ids");
+        ggml_backend_tensor_set(ids_t, &last_id, 0, sizeof(int32_t));
+        ggml_tensor* pos_t = ggml_graph_get_tensor(gf, "positions");
+        int32_t pos_val = n_past;
+        ggml_backend_tensor_set(pos_t, &pos_val, 0, sizeof(int32_t));
+        ggml_backend_sched_graph_compute(ctx->sched, gf);
+        ggml_tensor* logits_t = ggml_graph_get_tensor(gf, "logits");
+        std::vector<float> logits(hp.vocab_size);
+        ggml_backend_tensor_get(logits_t, logits.data(), 0, hp.vocab_size * sizeof(float));
+        int32_t next_id = sample_token(logits.data(), (int)hp.vocab_size, ctx->params.temperature, rng);
+        input_ids.push_back(next_id);
+        n_past++;
+    }
+
+    // 4. Extract speech token indices
+    const int prompt_len = (int)(input_ids.size() - (input_ids.size() - n_past - 1));
+    // Actually: first prompt_len tokens are the prompt, rest are generated
+    // Let me just find speech tokens in the generated portion
+    std::vector<int32_t> speech_indices;
+    for (size_t i = 0; i < input_ids.size(); i++) {
+        int32_t id = input_ids[i];
+        if (id >= (int32_t)hp.speech_token_start && id < (int32_t)hp.speech_token_end)
+            speech_indices.push_back(id - (int32_t)hp.speech_token_start);
+    }
+
+    if (ctx->params.verbosity >= 1)
+        fprintf(stderr, "miotts: generated %zu tokens, %zu speech tokens\n", input_ids.size(), speech_indices.size());
+
+    if (speech_indices.empty()) {
+        fprintf(stderr, "miotts: no speech tokens generated\n");
+        return nullptr;
+    }
+
+    // 5. FSQ dequant
+    int fsq_dim = 0;
+    float* fsq_emb = miotts_fsq_dequant(ctx, speech_indices.data(), (int)speech_indices.size(), &fsq_dim);
+    if (!fsq_emb)
+        return nullptr;
+
+    // 6. Wave prenet
+    int prenet_dim = 0;
+    float* prenet_out = miotts_wave_prenet_forward(ctx, fsq_emb, (int)speech_indices.size(), &prenet_dim);
+    free(fsq_emb);
+    if (!prenet_out)
+        return nullptr;
+
+    // 7. Codec decode (conv → ResNet → decoder → ResNet → iSTFT)
+    int n_samples = 0;
+    float* audio = miotts_codec_decode(ctx, prenet_out, (int)speech_indices.size(), &n_samples);
+    free(prenet_out);
+    if (!audio)
+        return nullptr;
+
+    *out_n = n_samples;
+    return audio;
 }
 
 void miotts_free_audio(float* pcm) {

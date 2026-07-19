@@ -254,6 +254,12 @@ def main():
     # EOS token for generation stopping
     writer.add_uint32("miotts.eos_token_id", config.get("eos_token_id", 151645))
 
+    # NOTE: tokenizer is loaded from tokenizer.json at runtime by the C++ code
+    # (miotts_load_tokenizer). We don't embed it in the GGUF because the gguf
+    # Python library v0.19 writes string arrays as GGUF type 9 which our
+    # vendored ggml C reader doesn't support. Place tokenizer.json next to
+    # the GGUF or in the same directory as the source model.
+
     print("\nConverting LLM weights...")
     convert_llm(writer, llm_dir, args.dtype)
 
