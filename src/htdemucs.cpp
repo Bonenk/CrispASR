@@ -1068,6 +1068,47 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             x_Fq = out_Fq;
             x_T = out_T;
 
+            // Freq embedding (after layer 0 only)
+            // Python: emb = freq_emb(arange(Fq)).t()[None,:,:,None].expand_as(x)
+            //         x = x + freq_emb_scale * emb
+            // Embedding: (n_freqs, C) → lookup frs 0..Fq-1 → (Fq, C) → t → (C, Fq)
+            // Broadcast over T: x[t,fq,c] += scale * emb_w[fq, c]
+            if (idx == 0 && m.freq_emb_w) {
+                // Read embedding weights
+                int emb_n_freqs = (int)m.freq_emb_w->ne[0]; // columns
+                int emb_C = (int)m.freq_emb_w->ne[1];       // rows
+                // The embedding has emb_scale built into the weights (ScaledEmbedding)
+                // but freq_emb_scale is an additional multiplier.
+                std::vector<float> emb_data(emb_n_freqs * emb_C);
+                ggml_backend_tensor_get(m.freq_emb_w, emb_data.data(), 0, emb_data.size() * sizeof(float));
+                float scale = hp.freq_emb_scale;
+                // ScaledEmbedding weight is already scaled by `self.scale` (=10) in __init__,
+                // but at forward time it multiplies by `self.scale` again. The GGUF stores
+                // the raw (unscaled) weight. So effective embedding = weight * scale_emb.
+                // In the converter we stored the raw weight. The ScaledEmbedding.forward() does
+                // `self.embedding(x) * self.scale`. And then `x + freq_emb_scale * emb`.
+                // For the SMOOTH variant: weights are cumsum → normalized. But stored as-is in GGUF.
+                // The ScaledEmbedding stores weight/=scale in __init__, then forward *= scale.
+                // So GGUF weight = nn.Embedding.weight.data / scale (after smooth processing).
+                // Forward: output = GGUF_weight * scale_emb_init (=10) * freq_emb_scale (=0.2)
+                float total_scale = 10.0f * scale; // scale_emb(10) * freq_emb_scale(0.2) = 2.0
+                // x_buf layout: (T, Fq, C) flattened. Add emb[fq][c] * total_scale.
+                int n_freq_to_use = std::min(out_Fq, emb_n_freqs);
+                for (int fq = 0; fq < n_freq_to_use; fq++) {
+                    for (int c = 0; c < out_C && c < emb_C; c++) {
+                        float e = emb_data[(size_t)fq * emb_C + c] * total_scale;
+                        for (int t = 0; t < out_T; t++) {
+                            // x_buf index: t + fq * out_T + c * out_T * out_Fq
+                            x_buf[t + (size_t)fq * out_T + (size_t)c * out_T * out_Fq] += e;
+                        }
+                    }
+                }
+                if (htdemucs_debug()) {
+                    fprintf(stderr, "htdemucs: freq_emb added (%d freqs, %d ch, scale=%.2f)\n", n_freq_to_use, emb_C,
+                            total_scale);
+                }
+            }
+
             if (htdemucs_debug()) {
                 fprintf(stderr, "htdemucs: enc[%d] output (%d, %d, %d) = %zu floats\n", idx, x_C, x_Fq, x_T, out_n);
             }
