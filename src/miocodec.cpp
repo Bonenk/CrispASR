@@ -826,6 +826,209 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         return result;
     }
 
+    // ---- Full decode pipeline (wave_prior_net through output_waveform) ----
+    // These stages build on the prenet output and run through the rest of the decoder.
+    bool need_full_decode =
+        (strcmp(stage_name, "wave_prior_net_out") == 0 || strcmp(stage_name, "wave_decoder_out") == 0 ||
+         strcmp(stage_name, "wave_post_net_out") == 0 || strcmp(stage_name, "wave_upsampler_out") == 0 ||
+         strcmp(stage_name, "istft_mag_phase") == 0 || strcmp(stage_name, "output_waveform") == 0);
+
+    if (need_full_decode) {
+        // First get the prenet output (reuse the existing implementation)
+        int prenet_n = 0;
+        float* prenet_data = miocodec_extract_stage(ctx, token_indices, n_tokens, global_embedding, target_audio_length,
+                                                    "wave_prenet_out", &prenet_n);
+        if (!prenet_data) {
+            *out_n = 0;
+            return nullptr;
+        }
+
+        // Prenet output is (512, T) in ggml layout
+        const int T_pre = n_tokens;                                         // prenet tokens
+        const int dim_pre = (int)ctx->hparams.wave_prenet_output_dim;       // 512
+        const int hop = (int)ctx->hparams.hop_length;                       // 98
+        const int n_fft = (int)ctx->hparams.n_fft;                          // 392
+        const int upsample_factor = (int)ctx->hparams.wave_upsample_factor; // 2
+
+        // Compute target lengths
+        // After conv_upsample(2×): T_up = T_pre * 2
+        const int T_up = T_pre * upsample_factor;
+        // Target STFT length (before upsampler): audio_length / hop / total_upsampler_factor
+        int total_up_factor = 1;
+        for (int f : ctx->hparams.wave_upsampler_factors)
+            total_up_factor *= f;
+        // If target_audio_length not specified, estimate from tokens
+        int audio_len = target_audio_length > 0 ? target_audio_length : (int)(n_tokens * ctx->hparams.sample_rate / 25);
+        const int T_stft = audio_len / hop / total_up_factor; // ~199 for 99 tokens
+        const int T_istft = T_stft * total_up_factor;         // ~1791
+
+        // Build the full decode graph: prenet_out → conv_up → interp → prior → decoder → post → upsampler → istft
+        // Use a second ggml graph with ggml_backend_sched
+        const int n_dec_layers = (int)ctx->hparams.wave_dec_n_layers;
+        const int dec_n_heads = (int)ctx->hparams.wave_dec_n_heads;
+        const int n_resnet = (int)ctx->hparams.wave_resnet_num_blocks;
+        const int n_groups = (int)ctx->hparams.wave_resnet_num_groups;
+        const int dec_window = (int)ctx->hparams.wave_dec_window_size;
+        const int dec_window_ps = dec_window / 2;
+
+        // Allocate graph context (large: decoder has 8 layers × ~30 ops each + resnet + upsampler)
+        size_t buf2 = (size_t)(n_dec_layers * 100 + n_resnet * 50 + 500) * ggml_tensor_overhead() +
+                      ggml_graph_overhead_custom(8192, false);
+        ggml_init_params ip2 = {buf2, nullptr, true};
+        ggml_context* ctx0 = ggml_init(ip2);
+        if (!ctx0) {
+            free(prenet_data);
+            *out_n = 0;
+            return nullptr;
+        }
+
+        // Input: prenet output (dim_pre=512, T_pre)
+        ggml_tensor* x = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, dim_pre, T_pre);
+        ggml_set_name(x, "decode_input");
+        ggml_set_input(x);
+
+        // Global embedding input (128, 1) — for AdaLN conditioning
+        ggml_tensor* global_cond = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, 128, 1);
+        ggml_set_name(global_cond, "global_cond");
+        ggml_set_input(global_cond);
+
+        // RoPE positions for decoder
+        ggml_tensor* dec_rope_pos = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T_stft);
+        ggml_set_name(dec_rope_pos, "dec_rope_pos");
+        ggml_set_input(dec_rope_pos);
+
+        // Decoder window mask (if T_stft > window)
+        ggml_tensor* dec_mask = nullptr;
+        if (T_stft > dec_window && dec_window_ps > 0) {
+            dec_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, T_stft, T_stft);
+            ggml_set_name(dec_mask, "dec_mask");
+            ggml_set_input(dec_mask);
+        }
+
+        // Step 1: ConvTranspose1d(512, 512, k=2, s=2) → upsample 2×
+        // ggml_conv_transpose_1d expects kernel (C_out, C_in, K) and data (..., C_in, T_in)
+        // Reshape x from (512, T) to (T, 512, 1) for conv ops
+        ggml_tensor* x_conv =
+            ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, x, dim_pre, T_pre, 1), 1, 0, 2, 3));
+        x_conv = ggml_conv_transpose_1d(ctx0, ctx->weights.wave_conv_up_w, x_conv, 2, 0, 1);
+        // TODO: add bias (needs broadcast along channel dim)
+        // x_conv shape: (T_up, 512, 1) after conv_transpose
+
+        // Step 2: Interpolate to T_stft
+        // ggml_interpolate: resize ne[0] dimension (T axis in our layout)
+        x_conv = ggml_interpolate(ctx0, x_conv, T_stft, dim_pre, 1, 1, 0 /* nearest/linear */);
+
+        // Step 3: Wave prior_net (ResNet blocks) — operates on (T, C, 1)
+        for (int i = 0; i < n_resnet; i++) {
+            x_conv = miocodec_resnet_block(ctx0, x_conv, ctx->weights.wave_prior_net[i], n_groups);
+        }
+
+        // Mark wave_prior_net_out
+        ggml_tensor* prior_out = x_conv;
+        ggml_set_name(prior_out, "wave_prior_net_out");
+        ggml_set_output(prior_out);
+
+        // Step 4: Permute back to (dim, T) for Transformer decoder
+        ggml_tensor* x_dec = ggml_cont(ctx0, ggml_permute(ctx0, x_conv, 1, 0, 2, 3));
+        x_dec = ggml_reshape_2d(ctx0, x_dec, dim_pre, T_stft);
+
+        // Wave decoder: 8L Transformer with AdaLN-Zero
+        for (int i = 0; i < n_dec_layers; i++) {
+            x_dec = miocodec_adaln_transformer_layer(ctx0, x_dec, global_cond, ctx->weights.wave_dec_layers[i],
+                                                     dec_n_heads, dec_rope_pos, dec_mask);
+        }
+
+        // Final AdaLN norm (no gate)
+        {
+            auto [dec_normed, _] = miocodec_adaln_modulate(ctx0, x_dec, global_cond, ctx->weights.wave_dec_norm_adaln_w,
+                                                           ctx->weights.wave_dec_norm_adaln_b, false);
+            x_dec = dec_normed;
+        }
+
+        // Mark wave_decoder_out
+        ggml_set_name(x_dec, "wave_decoder_out");
+        ggml_set_output(x_dec);
+
+        // Step 5: Permute to (T, C, 1) for post_net ResNet
+        ggml_tensor* x_post =
+            ggml_cont(ctx0, ggml_permute(ctx0, ggml_reshape_3d(ctx0, x_dec, dim_pre, T_stft, 1), 1, 0, 2, 3));
+        for (int i = 0; i < n_resnet; i++) {
+            x_post = miocodec_resnet_block(ctx0, x_post, ctx->weights.wave_post_net[i], n_groups);
+        }
+        ggml_set_name(x_post, "wave_post_net_out");
+        ggml_set_output(x_post);
+
+        // Step 6: Upsampler (SnakeBeta + ConvTranspose stages)
+        // TODO: implement SnakeBeta upsampler stages
+        // For now, just mark the ISTFT linear projection
+
+        // Step 7: ISTFT head — Linear(512, 394) on the post_net output
+        // Permute to (dim, T) for matmul
+        ggml_tensor* x_istft = ggml_cont(ctx0, ggml_permute(ctx0, x_post, 1, 0, 2, 3));
+        x_istft = ggml_reshape_2d(ctx0, x_istft, dim_pre, T_stft);
+        x_istft = ggml_mul_mat(ctx0, ctx->weights.istft_out_w, x_istft);
+        x_istft = ggml_add(ctx0, x_istft, ctx->weights.istft_out_b);
+        ggml_set_name(x_istft, "istft_mag_phase");
+        ggml_set_output(x_istft);
+
+        // Build graph
+        ggml_cgraph* gf2 = ggml_new_graph_custom(ctx0, 8192, false);
+        ggml_build_forward_expand(gf2, x_istft);
+
+        ggml_backend_sched_reset(ctx->sched);
+        if (!ggml_backend_sched_alloc_graph(ctx->sched, gf2)) {
+            fprintf(stderr, "miocodec: full decode graph alloc failed\n");
+            ggml_free(ctx0);
+            free(prenet_data);
+            *out_n = 0;
+            return nullptr;
+        }
+
+        // Set inputs
+        ggml_backend_tensor_set(x, prenet_data, 0, sizeof(float) * dim_pre * T_pre);
+        free(prenet_data);
+
+        // Global embedding
+        ggml_backend_tensor_set(global_cond, global_embedding, 0, sizeof(float) * 128);
+
+        // Decoder positions
+        {
+            std::vector<int32_t> positions(T_stft);
+            for (int i = 0; i < T_stft; i++)
+                positions[i] = i;
+            ggml_backend_tensor_set(dec_rope_pos, positions.data(), 0, sizeof(int32_t) * T_stft);
+        }
+
+        // Decoder window mask
+        if (dec_mask) {
+            std::vector<float> mask_data(T_stft * T_stft);
+            for (int q = 0; q < T_stft; q++)
+                for (int k = 0; k < T_stft; k++)
+                    mask_data[q * T_stft + k] = (k >= q - dec_window_ps && k <= q + dec_window_ps) ? 0.0f : -INFINITY;
+            ggml_backend_tensor_set(dec_mask, mask_data.data(), 0, sizeof(float) * T_stft * T_stft);
+        }
+
+        // Compute
+        ggml_backend_sched_graph_compute(ctx->sched, gf2);
+
+        // Extract requested stage
+        ggml_tensor* out_t = ggml_graph_get_tensor(gf2, stage_name);
+        if (!out_t) {
+            // Try without graph lookup — use direct names we set
+            fprintf(stderr, "miocodec: stage '%s' not found in decode graph\n", stage_name);
+            ggml_free(ctx0);
+            *out_n = 0;
+            return nullptr;
+        }
+
+        int n_out = (int)ggml_nelements(out_t);
+        float* result = (float*)malloc(sizeof(float) * n_out);
+        ggml_backend_tensor_get(out_t, result, 0, sizeof(float) * n_out);
+        ggml_free(ctx0);
+        *out_n = n_out;
+        return result;
+    }
+
     fprintf(stderr, "miocodec_extract_stage: unknown stage '%s'\n", stage_name);
     *out_n = 0;
     return nullptr;
