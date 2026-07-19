@@ -36,6 +36,7 @@ import numpy as np
 DEFAULT_STAGES = [
     "freq_indices",
     "num_bands_per_freq",
+    "input_audio",
     "stft_packed",
     "band_gathered",
     "band_split_out",
@@ -97,6 +98,13 @@ def dump(model_dir, audio, stages, max_new_tokens=None, **kwargs):
         wav = torchaudio.functional.resample(wav, 16000, sr)
     stereo = bool(getattr(model, "stereo", True))
     wav = wav.expand(2 if stereo else 1, -1).unsqueeze(0).contiguous()  # (1, s, t)
+
+    # ---- stage: the EXACT resampled model input (s, t) --------------------
+    # Emitted so the C++ diff can start its STFT from the identical waveform and
+    # not eat torchaudio-vs-our-resampler drift (gate input alignment BEFORE
+    # trusting per-layer cos — the diff-harness rule).
+    if want("input_audio"):
+        out["input_audio"] = _np(wav[0])
 
     # ---- stage: packed STFT (replicates the traced forward exactly) --------
     if want("stft_packed"):
