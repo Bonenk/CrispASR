@@ -114,15 +114,10 @@ def dump(args):
         writer.add_tensor("token_embed", embeds[0].float().numpy())
         print(f"[miotts-ref] token_embed shape: {embeds[0].shape}")
 
-    # Get first-step logits for embedding/layer sanity check
+    # Get first-step logits
     with torch.no_grad():
-        outputs = model(input_ids, output_hidden_states=True)
+        outputs = model(input_ids, output_hidden_states=False)
         logits_step_0 = outputs.logits[0, -1, :].float().numpy()
-        # Dump hidden state after first block for debugging
-        if outputs.hidden_states and len(outputs.hidden_states) > 1:
-            h1 = outputs.hidden_states[1][0, -1, :].float().numpy()  # after layer 0
-            writer.add_tensor("hidden_after_block0", h1)
-            print(f"[miotts-ref] hidden_after_block0 shape: {h1.shape}")
     writer.add_tensor("logits_step_0", logits_step_0)
     print(f"[miotts-ref] logits_step_0 shape: {logits_step_0.shape}")
 

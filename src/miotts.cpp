@@ -16,6 +16,7 @@
 #include "ggml.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
+#include "ggml-cpu.h"
 
 #include <algorithm>
 #include <cassert>
@@ -569,6 +570,16 @@ float* miotts_forward_logits(miotts_context* ctx, const int32_t* token_ids, int 
     }
 
     ggml_backend_sched_graph_compute(ctx->sched, gf);
+
+    // Optionally read token_embed for diff harness debugging
+    ggml_tensor* embed_t = ggml_graph_get_tensor(gf, "token_embed");
+    if (embed_t && ctx->params.verbosity >= 2) {
+        const size_t ne = ggml_nelements(embed_t);
+        std::vector<float> emb(ne);
+        ggml_backend_tensor_get(embed_t, emb.data(), 0, ne * sizeof(float));
+        fprintf(stderr, "miotts: token_embed[0..3] = %.6f %.6f %.6f %.6f (ne=%zu)\n", emb[0], emb[1], emb[2], emb[3],
+                ne);
+    }
 
     // Read logits
     ggml_tensor* logits_t = ggml_graph_get_tensor(gf, "logits");
