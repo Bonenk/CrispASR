@@ -2473,6 +2473,53 @@ class Session:
             self._lib.crispasr_pcm_free(ptr)
         return arr
 
+    def separate(self, pcm_stereo: "np.ndarray") -> dict:
+        """Source separation: split audio into named stems.
+
+        Input is stereo interleaved float32 PCM at the model's native
+        sample rate (44100 Hz for ``htdemucs``).  Returns a dict mapping
+        stem names (``"drums"``, ``"bass"``, ``"other"``, ``"vocals"``)
+        to stereo interleaved float32 numpy arrays.
+
+        Works with separation-capable backends — ``htdemucs``.
+        """
+        lib = self._lib
+        lib.crispasr_session_separate.argtypes = [
+            ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int,
+        ]
+        lib.crispasr_session_separate.restype = ctypes.c_int
+        lib.crispasr_session_separate_n_stems.argtypes = [ctypes.c_void_p]
+        lib.crispasr_session_separate_n_stems.restype = ctypes.c_int
+        lib.crispasr_session_separate_stem_name.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        lib.crispasr_session_separate_stem_name.restype = ctypes.c_char_p
+        lib.crispasr_session_separate_stem.argtypes = [
+            ctypes.c_void_p, ctypes.c_int, ctypes.POINTER(ctypes.c_int),
+        ]
+        lib.crispasr_session_separate_stem.restype = ctypes.POINTER(ctypes.c_float)
+        lib.crispasr_session_separate_sample_rate.argtypes = [ctypes.c_void_p]
+        lib.crispasr_session_separate_sample_rate.restype = ctypes.c_int
+
+        data = pcm_stereo.astype(np.float32)
+        n_samples = len(data) // 2  # stereo interleaved
+        n_stems = lib.crispasr_session_separate(
+            self._handle, data.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), n_samples,
+        )
+        if n_stems <= 0:
+            raise RuntimeError(f"separate failed for backend {self.backend!r}")
+
+        result = {}
+        for i in range(n_stems):
+            name_ptr = lib.crispasr_session_separate_stem_name(self._handle, i)
+            name = name_ptr.decode("utf-8") if name_ptr else f"stem{i}"
+            n_out = ctypes.c_int(0)
+            ptr = lib.crispasr_session_separate_stem(self._handle, i, ctypes.byref(n_out))
+            if ptr and n_out.value > 0:
+                sr = lib.crispasr_session_separate_sample_rate(self._handle)
+                n_ch = 2  # stereo
+                arr = np.ctypeslib.as_array(ptr, shape=(n_out.value * n_ch,)).copy()
+                result[name] = arr
+        return result
+
     def speech_to_speech(self, input_pcm: "np.ndarray", language: str = None) -> tuple:
         """Speech-to-speech: audio in → audio out via a single model pass.
 
