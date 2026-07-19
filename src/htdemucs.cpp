@@ -919,29 +919,140 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     int xt_C = hp.audio_channels, xt_T = work_length;
 
     int freqs_cur = nfft / 2;
-    for (int idx = 0; idx < hp.depth; idx++) {
+    bool encoder_ok = true;
+
+    for (int idx = 0; idx < hp.depth && encoder_ok; idx++) {
+        auto& enc = m.encoder[idx];
         bool freq = (freqs_cur > 1);
         int stri = freq ? hp.stride : 2;
         int ker = freq ? hp.kernel_size : 4;
+        int pad_val = ker / 4;
+        bool last_freq = false;
+        (void)last_freq;
+
         if (freq && freqs_cur <= hp.kernel_size) {
             ker = freqs_cur;
+            pad_val = 0;
+            last_freq = true;
         }
 
         if (htdemucs_debug()) {
-            fprintf(stderr, "htdemucs: enc[%d] x=(%d,%d,%d) xt=(%d,%d) freq=%d freqs=%d\n", idx, x_C, x_Fq, x_T, xt_C,
-                    xt_T, freq ? 1 : 0, freqs_cur);
+            fprintf(stderr, "htdemucs: enc[%d] x=(%d,%d,%d) xt=(%d,%d) freq=%d freqs=%d ker=%d stri=%d pad=%d\n", idx,
+                    x_C, x_Fq, x_T, xt_C, xt_T, freq ? 1 : 0, freqs_cur, ker, stri, pad_val);
         }
 
-        // TODO: run Conv2d/Conv1d + DConv + rewrite via ggml per-layer graph
-        // For now just track dims
-        (void)ker;
-        (void)stri;
+        // --- Per-layer ggml graph for freq encoder ---
+        if (!enc.conv_w) {
+            encoder_ok = false;
+            break;
+        }
+        {
+            // Allocate a small ggml context for this layer's graph
+            size_t n_tensors_est = 64;
+            size_t ctx_size = ggml_tensor_overhead() * n_tensors_est + ggml_graph_overhead();
+            ggml_init_params gp = {ctx_size, nullptr, true};
+            ggml_context* g = ggml_init(gp);
+
+            // Input: x_buf is laid out as (x_C, x_Fq, x_T) channel-major.
+            // ggml Conv2d expects b: [N, IC, IH, IW] → ne = (IW, IH, IC, N)
+            // Our data: IW=x_T, IH=x_Fq, IC=x_C, N=1
+            ggml_tensor* x_in = ggml_new_tensor_4d(g, GGML_TYPE_F32, x_T, x_Fq, x_C, 1);
+            ggml_set_name(x_in, "enc_in");
+            ggml_set_input(x_in);
+
+            // Conv2d: kernel ne = (KW, KH, IC, OC), stride=(s0=1, s1=stri), pad=(p0=0, p1=pad_val)
+            // For freq branch: kernel [Cout, Cin, K, 1] → ggml ne: (1, K, Cin, Cout)
+            // s0=1 (W=time axis, no stride), s1=stri (H=freq axis, stride=4)
+            // p0=0, p1=pad_val
+            ggml_tensor* y = ggml_conv_2d(g, enc.conv_w, x_in, 1, stri, 0, pad_val, 1, 1);
+            if (enc.conv_b) {
+                // Bias shape: (OC,) → broadcast: reshape to (1, 1, OC, 1)
+                ggml_tensor* bias_4d = ggml_reshape_4d(g, enc.conv_b, 1, 1, (int)enc.conv_b->ne[0], 1);
+                y = ggml_add(g, y, bias_4d);
+            }
+
+            if (!enc.empty) {
+                // GroupNorm + GELU
+                if (enc.norm1_w) {
+                    int n_groups = (enc.norm1_w->ne[0] <= 4) ? 1 : 4;
+                    (void)n_groups;
+                    // ggml_group_norm expects (ne[0]=C, ...) — but our tensor is (T, Fq, C, 1)
+                    // GroupNorm normalizes over the channel dim. ggml_group_norm works on ne[2] for 4D.
+                    // Actually, ggml_group_norm normalizes over ne[0] (the channel dim in the ggml convention
+                    // where ne[0] is the innermost/fastest dimension). For a 4D tensor (T, Fq, C, N),
+                    // the channel dim is ne[2]=C. But ggml_group_norm works on ne[0].
+                    // We need to permute to put channels in ne[0], apply norm, permute back.
+                    // This is complex — for now, skip GroupNorm and just apply GELU.
+                    // TODO: implement GroupNorm correctly for 4D tensors.
+                    // For a first pass, use CPU-side GroupNorm instead of ggml.
+                }
+                y = ggml_gelu(g, y);
+
+                // DConv: operates on time axis per-freq-band.
+                // Python: y.permute(0,2,1,3).reshape(-1,C,T) → DConv → reshape back
+                // For now skip DConv — we'll add it after Conv2d parity is validated.
+
+                // Rewrite: 1x1 Conv2d → 2*C, then GLU
+                if (enc.rewrite_w) {
+                    ggml_tensor* rw = ggml_conv_2d(g, enc.rewrite_w, y, 1, 1, 0, 0, 1, 1);
+                    if (enc.rewrite_b) {
+                        ggml_tensor* rwb = ggml_reshape_4d(g, enc.rewrite_b, 1, 1, (int)enc.rewrite_b->ne[0], 1);
+                        rw = ggml_add(g, rw, rwb);
+                    }
+                    // TODO: GroupNorm on rewrite output, then GLU
+                    // For now just pass through (no GLU = wrong output, but validates graph build)
+                    y = rw;
+                }
+            }
+
+            ggml_set_name(y, "enc_out");
+            ggml_set_output(y);
+
+            // Build and run graph
+            ggml_cgraph* gf = ggml_new_graph(g);
+            ggml_build_forward_expand(gf, y);
+
+            ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+            if (!ggml_gallocr_alloc_graph(alloc, gf)) {
+                fprintf(stderr, "htdemucs: enc[%d] graph alloc failed\n", idx);
+                ggml_gallocr_free(alloc);
+                ggml_free(g);
+                encoder_ok = false;
+                break;
+            }
+
+            // Upload input data
+            ggml_backend_tensor_set(x_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
+
+            // Compute
+            ggml_backend_graph_compute(ctx->backend, gf);
+
+            // Read output
+            int out_T = (int)y->ne[0];
+            int out_Fq = (int)y->ne[1];
+            int out_C = (int)y->ne[2];
+            size_t out_n = (size_t)out_T * out_Fq * out_C;
+            x_buf.resize(out_n);
+            ggml_backend_tensor_get(y, x_buf.data(), 0, out_n * sizeof(float));
+            x_C = out_C;
+            x_Fq = out_Fq;
+            x_T = out_T;
+
+            if (htdemucs_debug()) {
+                fprintf(stderr, "htdemucs: enc[%d] output (%d, %d, %d) = %zu floats\n", idx, x_C, x_Fq, x_T, out_n);
+            }
+
+            ggml_gallocr_free(alloc);
+            ggml_free(g);
+        }
+
+        // Update freq tracking
         if (freq) {
             freqs_cur = (freqs_cur <= hp.kernel_size) ? 1 : freqs_cur / hp.stride;
         }
     }
 
-    fprintf(stderr, "htdemucs: encoder dims tracked, ggml graph TODO (Phase 2c)\n");
+    fprintf(stderr, "htdemucs: encoder %s, output (%d, %d, %d)\n", encoder_ok ? "OK" : "FAILED", x_C, x_Fq, x_T);
 
     // Return stub result
     auto r = new htdemucs_result();
