@@ -2062,6 +2062,22 @@ target_include_directories(crispasr-vad-encdec PUBLIC .)
 target_compile_features   (crispasr-vad-encdec PUBLIC cxx_std_17)
 target_link_libraries     (crispasr-vad-encdec PUBLIC ggml ggml-base ggml-cpu)
 
+# webrtc-vad — WebRTC GMM-based VAD (no model file, pure algorithmic)
+set(_webrtc_vad_dir ${CMAKE_SOURCE_DIR}/third_party/webrtc)
+file(GLOB_RECURSE _webrtc_vad_c_sources ${_webrtc_vad_dir}/*.c)
+add_library(webrtc-vad STATIC
+    webrtc_vad.h webrtc_vad.cpp
+    ${_webrtc_vad_c_sources})
+set_target_properties(webrtc-vad PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(webrtc-vad PUBLIC .)
+target_include_directories(webrtc-vad PRIVATE ${CMAKE_SOURCE_DIR}/third_party)
+target_compile_features(webrtc-vad PUBLIC cxx_std_17)
+target_compile_definitions(webrtc-vad PRIVATE WEBRTC_POSIX)
+if(NOT MSVC)
+    set_source_files_properties(${_webrtc_vad_c_sources}
+        PROPERTIES COMPILE_OPTIONS "-w")
+endif()
+
 # ---------------------------------------------------------------------------
 # firered-lid — FireRedLID (120-language identification)
 # ---------------------------------------------------------------------------
@@ -2351,6 +2367,9 @@ if (TARGET marblenet-vad)
 endif()
 if (TARGET crispasr-vad-encdec)
     target_link_libraries(crispasr-lib PUBLIC crispasr-vad-encdec)
+endif()
+if (TARGET webrtc-vad)
+    target_link_libraries(crispasr-lib PUBLIC webrtc-vad)
 endif()
 if (TARGET firered-lid)
     target_link_libraries(crispasr-lib PUBLIC firered-lid)
