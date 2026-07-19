@@ -427,6 +427,14 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
     //   - llm.output_norm.weight (small, F32 anyway)
     const bool is_mini_omni2 = (arch.find("mini-omni2") != std::string::npos);
 
+    // MioTTS: Qwen3 LLM + MioCodec vocoder. The codec (wave_prenet,
+    // wave_decoder, wave_prior/post_net, wave_upsampler, istft_head) is
+    // precision-sensitive — SnakeBeta's sin²(exp(α)*x) amplifies F16
+    // rounding through the UpSampler ConvTranspose chain. Keep all
+    // codec.* weights at original precision; only the LLM layers (blk.*)
+    // and output/embedding can be quantized.
+    const bool is_miotts = (arch.find("miotts") != std::string::npos);
+
     // Canary-Qwen: FastConformer encoder + linear projection + Qwen3-1.7B LLM.
     // The encoder is precision-sensitive (conformer drift), keep at source.
     // Only LLM block projections (blk.*.attn_*, blk.*.ffn_*) should be quantized.
@@ -718,6 +726,7 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             !(is_orpheus && sname.find("talker.token_embd") == 0) &&
             !(is_arkasr && (sname.find("dec.embed.") == 0 || sname.find("enc.") == 0 || sname.find("adapter.") == 0)) &&
             !(is_higgs && (sname == "token_embd.weight" || sname == "output.weight")) &&
+            !(is_miotts && sname.find("codec.") == 0) &&
             !(is_parakeet && parakeet_is_rnnt && !parakeet_quant_all &&
               (sname.find("joint.") == 0 || sname.find("decoder.embed") == 0)) &&
             !(is_tada && !tada_quant_all && (sname.find("talker.token_embd") == 0 || sname.find("tada.") == 0)) &&
