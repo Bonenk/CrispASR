@@ -1678,10 +1678,204 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 cpu_self_attn_layer(xt_buf.data(), xt_seq, layer_t.self_attn);
             } else {
                 // Cross-attention: spec attends to time, time attends to spec.
-                // For cross-attn: Q comes from one branch, K/V from the other.
-                // This is more complex — skip for now, the self-attention layers
-                // should already stabilize the features enough.
-                // TODO: implement cross-attention (layers 1, 3)
+                // Spec layer: Q=norm1(x), K=V=norm2(xt) → CA → gamma1 + residual → FFN
+                // Time layer: Q=norm1(xt), K=V=norm2(old_x) → CA → gamma1 + residual → FFN
+                auto cpu_cross_attn_layer = [&](float* q_data, int q_seq, const float* k_data, int k_seq,
+                                                const htdemucs_cross_attn_layer& ca) {
+                    if (!ca.cross_attn_in_proj_w)
+                        return;
+
+                    // 1. norm1(q) → q_normed, norm2(k) → k_normed
+                    std::vector<float> q_normed(dim * q_seq), k_normed(dim * k_seq);
+                    memcpy(q_normed.data(), q_data, q_normed.size() * sizeof(float));
+                    memcpy(k_normed.data(), k_data, k_normed.size() * sizeof(float));
+                    {
+                        std::vector<float> nw(dim), nb(dim);
+                        ggml_backend_tensor_get(ca.norm1_w, nw.data(), 0, dim * sizeof(float));
+                        if (ca.norm1_b)
+                            ggml_backend_tensor_get(ca.norm1_b, nb.data(), 0, dim * sizeof(float));
+                        cpu_layernorm(q_normed.data(), dim, q_seq, nw.data(), ca.norm1_b ? nb.data() : nullptr);
+                    }
+                    {
+                        std::vector<float> nw(dim), nb(dim);
+                        ggml_backend_tensor_get(ca.norm2_w, nw.data(), 0, dim * sizeof(float));
+                        if (ca.norm2_b)
+                            ggml_backend_tensor_get(ca.norm2_b, nb.data(), 0, dim * sizeof(float));
+                        cpu_layernorm(k_normed.data(), dim, k_seq, nw.data(), ca.norm2_b ? nb.data() : nullptr);
+                    }
+
+                    // 2. QKV projection from in_proj_weight (3*dim, dim)
+                    // Q from q_normed, K and V from k_normed
+                    int out3 = 3 * dim;
+                    std::vector<float> w_data(dim * out3);
+                    ggml_backend_tensor_get(ca.cross_attn_in_proj_w, w_data.data(), 0, w_data.size() * sizeof(float));
+                    std::vector<float> bias(out3, 0.0f);
+                    if (ca.cross_attn_in_proj_b)
+                        ggml_backend_tensor_get(ca.cross_attn_in_proj_b, bias.data(), 0, out3 * sizeof(float));
+
+                    // Q = W_q @ q_normed + b_q  (first dim rows of weight)
+                    std::vector<float> Q(dim * q_seq, 0.0f);
+                    for (int o = 0; o < dim; o++)
+                        for (int s = 0; s < q_seq; s++) {
+                            float sum = bias[o];
+                            for (int d = 0; d < dim; d++)
+                                sum += w_data[(size_t)o * dim + d] * q_normed[(size_t)d * q_seq + s];
+                            Q[(size_t)o * q_seq + s] = sum;
+                        }
+                    // K = W_k @ k_normed + b_k  (second dim rows)
+                    std::vector<float> K(dim * k_seq, 0.0f);
+                    for (int o = 0; o < dim; o++)
+                        for (int s = 0; s < k_seq; s++) {
+                            float sum = bias[dim + o];
+                            for (int d = 0; d < dim; d++)
+                                sum += w_data[(size_t)(dim + o) * dim + d] * k_normed[(size_t)d * k_seq + s];
+                            K[(size_t)o * k_seq + s] = sum;
+                        }
+                    // V = W_v @ k_normed + b_v  (third dim rows)
+                    std::vector<float> V(dim * k_seq, 0.0f);
+                    for (int o = 0; o < dim; o++)
+                        for (int s = 0; s < k_seq; s++) {
+                            float sum = bias[2 * dim + o];
+                            for (int d = 0; d < dim; d++)
+                                sum += w_data[(size_t)(2 * dim + o) * dim + d] * k_normed[(size_t)d * k_seq + s];
+                            V[(size_t)o * k_seq + s] = sum;
+                        }
+
+                    // 3. Multi-head cross-attention
+                    float scale = 1.0f / sqrtf((float)head_dim);
+                    std::vector<float> attn_out(dim * q_seq, 0.0f);
+                    for (int h = 0; h < n_heads; h++) {
+                        int hoff = h * head_dim;
+                        // scores[q_s, k_s] for this head
+                        std::vector<float> scores(q_seq * k_seq);
+                        for (int qs = 0; qs < q_seq; qs++) {
+                            for (int ks = 0; ks < k_seq; ks++) {
+                                float dot = 0;
+                                for (int hd = 0; hd < head_dim; hd++)
+                                    dot += Q[(size_t)(hoff + hd) * q_seq + qs] * K[(size_t)(hoff + hd) * k_seq + ks];
+                                scores[(size_t)qs * k_seq + ks] = dot * scale;
+                            }
+                            // softmax over ks
+                            float mx = -1e30f;
+                            for (int ks = 0; ks < k_seq; ks++)
+                                mx = std::max(mx, scores[(size_t)qs * k_seq + ks]);
+                            float se = 0;
+                            for (int ks = 0; ks < k_seq; ks++) {
+                                scores[(size_t)qs * k_seq + ks] = expf(scores[(size_t)qs * k_seq + ks] - mx);
+                                se += scores[(size_t)qs * k_seq + ks];
+                            }
+                            for (int ks = 0; ks < k_seq; ks++)
+                                scores[(size_t)qs * k_seq + ks] /= se;
+                        }
+                        // weighted sum of V
+                        for (int qs = 0; qs < q_seq; qs++)
+                            for (int hd = 0; hd < head_dim; hd++) {
+                                float sum = 0;
+                                for (int ks = 0; ks < k_seq; ks++)
+                                    sum += scores[(size_t)qs * k_seq + ks] * V[(size_t)(hoff + hd) * k_seq + ks];
+                                attn_out[(size_t)(hoff + hd) * q_seq + qs] = sum;
+                            }
+                    }
+
+                    // 4. Output projection
+                    {
+                        std::vector<float> ow(dim * dim);
+                        ggml_backend_tensor_get(ca.cross_attn_out_proj_w, ow.data(), 0, ow.size() * sizeof(float));
+                        std::vector<float> proj(dim * q_seq, 0.0f);
+                        for (int o = 0; o < dim; o++)
+                            for (int s = 0; s < q_seq; s++) {
+                                float sum = 0;
+                                for (int d = 0; d < dim; d++)
+                                    sum += ow[(size_t)o * dim + d] * attn_out[(size_t)d * q_seq + s];
+                                proj[(size_t)o * q_seq + s] = sum;
+                            }
+                        if (ca.cross_attn_out_proj_b) {
+                            std::vector<float> ob(dim);
+                            ggml_backend_tensor_get(ca.cross_attn_out_proj_b, ob.data(), 0, dim * sizeof(float));
+                            for (int o = 0; o < dim; o++)
+                                for (int s = 0; s < q_seq; s++)
+                                    proj[(size_t)o * q_seq + s] += ob[o];
+                        }
+                        attn_out = std::move(proj);
+                    }
+
+                    // 5. gamma1 + residual
+                    if (ca.gamma1_scale) {
+                        std::vector<float> gs(dim);
+                        ggml_backend_tensor_get(ca.gamma1_scale, gs.data(), 0, dim * sizeof(float));
+                        for (int d = 0; d < dim; d++)
+                            for (int s = 0; s < q_seq; s++)
+                                attn_out[(size_t)d * q_seq + s] *= gs[d];
+                    }
+                    for (size_t i = 0; i < (size_t)dim * q_seq; i++)
+                        q_data[i] += attn_out[i];
+
+                    // 6. FFN: norm3 → linear1 → GELU → linear2 → gamma2 + residual
+                    std::vector<float> tmp(dim * q_seq);
+                    memcpy(tmp.data(), q_data, tmp.size() * sizeof(float));
+                    {
+                        std::vector<float> nw(dim), nb(dim);
+                        ggml_backend_tensor_get(ca.norm3_w, nw.data(), 0, dim * sizeof(float));
+                        if (ca.norm3_b)
+                            ggml_backend_tensor_get(ca.norm3_b, nb.data(), 0, dim * sizeof(float));
+                        cpu_layernorm(tmp.data(), dim, q_seq, nw.data(), ca.norm3_b ? nb.data() : nullptr);
+                    }
+                    int hidden = (int)ca.linear1_w->ne[1];
+                    {
+                        std::vector<float> w1(dim * hidden), b1(hidden);
+                        ggml_backend_tensor_get(ca.linear1_w, w1.data(), 0, w1.size() * sizeof(float));
+                        if (ca.linear1_b)
+                            ggml_backend_tensor_get(ca.linear1_b, b1.data(), 0, b1.size() * sizeof(float));
+                        std::vector<float> hbuf(hidden * q_seq, 0.0f);
+                        for (int o = 0; o < hidden; o++)
+                            for (int s = 0; s < q_seq; s++) {
+                                float sum = 0;
+                                for (int d = 0; d < dim; d++)
+                                    sum += w1[(size_t)o * dim + d] * tmp[(size_t)d * q_seq + s];
+                                hbuf[(size_t)o * q_seq + s] = sum + (ca.linear1_b ? b1[o] : 0.0f);
+                            }
+                        for (size_t i = 0; i < hbuf.size(); i++) {
+                            float v = hbuf[i];
+                            hbuf[i] = v * 0.5f * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
+                        }
+                        std::vector<float> w2(hidden * dim), b2(dim);
+                        ggml_backend_tensor_get(ca.linear2_w, w2.data(), 0, w2.size() * sizeof(float));
+                        if (ca.linear2_b)
+                            ggml_backend_tensor_get(ca.linear2_b, b2.data(), 0, b2.size() * sizeof(float));
+                        std::vector<float> ffn_out(dim * q_seq, 0.0f);
+                        for (int o = 0; o < dim; o++)
+                            for (int s = 0; s < q_seq; s++) {
+                                float sum = 0;
+                                for (int d = 0; d < hidden; d++)
+                                    sum += w2[(size_t)o * hidden + d] * hbuf[(size_t)d * q_seq + s];
+                                ffn_out[(size_t)o * q_seq + s] = sum + (ca.linear2_b ? b2[o] : 0.0f);
+                            }
+                        if (ca.gamma2_scale) {
+                            std::vector<float> gs(dim);
+                            ggml_backend_tensor_get(ca.gamma2_scale, gs.data(), 0, dim * sizeof(float));
+                            for (int d = 0; d < dim; d++)
+                                for (int s = 0; s < q_seq; s++)
+                                    ffn_out[(size_t)d * q_seq + s] *= gs[d];
+                        }
+                        for (size_t i = 0; i < (size_t)dim * q_seq; i++)
+                            q_data[i] += ffn_out[i];
+                    }
+
+                    // norm_out
+                    if (ca.norm_out_w) {
+                        std::vector<float> nw(dim), nb(dim);
+                        ggml_backend_tensor_get(ca.norm_out_w, nw.data(), 0, dim * sizeof(float));
+                        if (ca.norm_out_b)
+                            ggml_backend_tensor_get(ca.norm_out_b, nb.data(), 0, dim * sizeof(float));
+                        cpu_layernorm(q_data, dim, q_seq, nw.data(), ca.norm_out_b ? nb.data() : nullptr);
+                    }
+                };
+
+                // Cross-attention: spec layer attends to time, time layer attends to spec
+                // Save old_x for the time layer's cross-attention (time attends to old spec)
+                std::vector<float> old_x(x_buf);
+                cpu_cross_attn_layer(x_buf.data(), x_seq, xt_buf.data(), xt_seq, layer_s.cross_attn);
+                cpu_cross_attn_layer(xt_buf.data(), xt_seq, old_x.data(), x_seq, layer_t.cross_attn);
             }
         }
 
