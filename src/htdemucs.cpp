@@ -702,14 +702,120 @@ void htdemucs_free(htdemucs_context* ctx) {
     delete ctx;
 }
 
+// ---------------------------------------------------------------------------
+// ggml graph helpers for the encoder/decoder/transformer
+// ---------------------------------------------------------------------------
+
+// GroupNorm + affine: y = weight * group_norm(x) + bias
+static ggml_tensor* ggml_group_norm_affine(ggml_context* g, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b,
+                                           int n_groups, float eps) {
+    ggml_tensor* y = ggml_group_norm(g, x, n_groups, eps);
+    if (w)
+        y = ggml_mul(g, y, w);
+    if (b)
+        y = ggml_add(g, y, b);
+    return y;
+}
+
+// LayerNorm (= GroupNorm with groups=1, applied on last dim)
+static ggml_tensor* ggml_layer_norm_affine(ggml_context* g, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b, float eps) {
+    ggml_tensor* y = ggml_norm(g, x, eps);
+    if (w)
+        y = ggml_mul(g, y, w);
+    if (b)
+        y = ggml_add(g, y, b);
+    return y;
+}
+
+// DConv residual block: x = x + LayerScale * GLU(Norm(Conv1d(GELU(Norm(DilConv(x))))))
+// Applied on time axis for both freq and time branches (freq branch reshapes to apply DConv per-freq-band).
+static ggml_tensor* apply_dconv(ggml_context* g, ggml_tensor* x, const htdemucs_dconv& dc) {
+    for (size_t d = 0; d < dc.layers.size(); d++) {
+        auto& sl = dc.layers[d];
+        if (!sl.conv1_w)
+            continue;
+        // Residual: x = x + scale * GLU(norm2(conv2(GELU(norm1(conv1(x))))))
+        int dilation = 1 << (int)d;
+        int K = (int)sl.conv1_w->ne[0];
+        int pad = dilation * (K / 2);
+
+        ggml_tensor* h = ggml_conv_1d(g, sl.conv1_w, x, 1, pad, dilation);
+        if (sl.conv1_b)
+            h = ggml_add(g, h, sl.conv1_b);
+        if (sl.norm1_w)
+            h = ggml_group_norm_affine(g, h, sl.norm1_w, sl.norm1_b, 1, 1e-5f);
+        h = ggml_gelu(g, h);
+        // 1x1 conv → 2*channels
+        h = ggml_conv_1d(g, sl.conv2_w, h, 1, 0, 1);
+        if (sl.conv2_b)
+            h = ggml_add(g, h, sl.conv2_b);
+        if (sl.norm2_w)
+            h = ggml_group_norm_affine(g, h, sl.norm2_w, sl.norm2_b, 1, 1e-5f);
+        // GLU on channel dim (dim=1 for (C, T), but ggml is (T, 2*C) → split on ne[0] axis)
+        // Actually ggml tensors from conv_1d come out as (T_out, C_out).
+        // GLU splits the channel dim in half.
+        // For ggml: conv_1d output is (T, 2*C). GLU along dim 0 (the channel dim in ggml).
+        // ggml doesn't have GLU directly. GLU(x) = x[:C] * sigmoid(x[C:])
+        int C_half = (int)h->ne[0] / 2;
+        int T_out = (int)h->ne[1];
+        ggml_tensor* a = ggml_view_2d(g, h, C_half, T_out, h->nb[1], 0);
+        ggml_tensor* b_gate = ggml_view_2d(g, h, C_half, T_out, h->nb[1], C_half * ggml_element_size(h));
+        h = ggml_mul(g, ggml_cont(g, a), ggml_sigmoid(g, ggml_cont(g, b_gate)));
+        // LayerScale
+        if (sl.scale)
+            h = ggml_mul(g, h, sl.scale);
+        x = ggml_add(g, x, h);
+    }
+    return x;
+}
+
+// ---------------------------------------------------------------------------
+// Full forward pass (Phase 2b — in progress)
+// ---------------------------------------------------------------------------
+
+// The full forward is built as a ggml graph. This is the core of the
+// separation engine. It mirrors htdemucs.py:HTDemucs.forward() exactly.
+//
+// Input:  stereo PCM at 44100 Hz (2 channels, n_samples per channel).
+// Output: 4 × stereo PCM (drums, bass, other, vocals).
+
 htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stereo, int n_samples) {
     if (!ctx || !pcm_stereo || n_samples <= 0)
         return nullptr;
 
-    // TODO Phase 2: full forward pass
-    // For now, return a stub result with zeros to verify the pipeline compiles
-
     auto& hp = ctx->model.hparams;
+    auto& m = ctx->model;
+
+    // Step 1: deinterleave stereo to channel-major
+    int training_length = hp.training_length();
+    int work_length = std::max(n_samples, training_length);
+    std::vector<float> pcm_ch(2 * work_length, 0.0f);
+    for (int i = 0; i < n_samples; i++) {
+        pcm_ch[i] = pcm_stereo[2 * i];                   // L
+        pcm_ch[work_length + i] = pcm_stereo[2 * i + 1]; // R
+    }
+
+    // Step 2: STFT
+    int nfft = hp.nfft;
+    int hop = hp.hop_length();
+    stft_result spec = compute_stft(pcm_ch.data(), 2, work_length, nfft, hop, ctx->hann_window.data());
+
+    // Step 3: CaC (complex as channels): split real/imag → 4 channels
+    // spec is (2, n_freqs, n_frames). CaC makes it (4, n_freqs, n_frames).
+    // But we need (4, nfft/2, n_frames) — drop the last freq bin ([..., :-1, :]).
+    int Fq = nfft / 2; // 2048
+    int T = spec.n_frames;
+
+    // TODO: the Python STFT has custom padding (reflect pad = hl//2*3, then
+    // z[..., 2:2+le] frame slicing). We must match it exactly for parity.
+    // For now, produce stub output to verify the pipeline builds.
+    (void)Fq;
+    (void)T;
+
+    fprintf(stderr, "htdemucs: STFT → %d freqs × %d frames, CaC → %d channels\n", Fq, T, hp.cac ? 4 : 2);
+    fprintf(stderr, "htdemucs: forward pass graph not yet wired (Phase 2b in progress)\n");
+
+    // Return stub result
     auto r = new htdemucs_result();
     r->n_sources = hp.n_sources;
     r->n_channels = hp.audio_channels;
@@ -720,12 +826,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     r->source_names = new const char*[hp.n_sources];
     for (int s = 0; s < hp.n_sources; s++) {
         size_t sz = (size_t)hp.audio_channels * n_samples;
-        r->sources[s] = new float[sz](); // zero-init
-        r->source_names[s] = ctx->model.source_names[s].c_str();
+        r->sources[s] = new float[sz]();
+        r->source_names[s] = m.source_names[s].c_str();
     }
-
-    fprintf(stderr, "htdemucs: separated %d samples → %d sources (STUB — weights not loaded yet)\n", n_samples,
-            hp.n_sources);
 
     return r;
 }
