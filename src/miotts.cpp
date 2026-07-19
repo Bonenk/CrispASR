@@ -538,6 +538,12 @@ float* miotts_forward_logits(miotts_context* ctx, const int32_t* token_ids, int 
     if (!ctx || !token_ids || n_tokens <= 0)
         return nullptr;
 
+    // Zero KV cache before each forward to avoid stale data from prior calls.
+    ggml_backend_tensor_set(ctx->kv_k, std::vector<uint8_t>(ggml_nbytes(ctx->kv_k), 0).data(), 0,
+                            ggml_nbytes(ctx->kv_k));
+    ggml_backend_tensor_set(ctx->kv_v, std::vector<uint8_t>(ggml_nbytes(ctx->kv_v), 0).data(), 0,
+                            ggml_nbytes(ctx->kv_v));
+
     ggml_cgraph* gf = build_graph_llm(ctx, /*n_past=*/0, n_tokens);
 
     ggml_backend_sched_reset(ctx->sched);
@@ -571,14 +577,14 @@ float* miotts_forward_logits(miotts_context* ctx, const int32_t* token_ids, int 
 
     ggml_backend_sched_graph_compute(ctx->sched, gf);
 
-    // Optionally read token_embed for diff harness debugging
+    // Read token_embed for diff harness debugging
     ggml_tensor* embed_t = ggml_graph_get_tensor(gf, "token_embed");
-    if (embed_t && ctx->params.verbosity >= 2) {
+    if (embed_t) {
         const size_t ne = ggml_nelements(embed_t);
         std::vector<float> emb(ne);
         ggml_backend_tensor_get(embed_t, emb.data(), 0, ne * sizeof(float));
-        fprintf(stderr, "miotts: token_embed[0..3] = %.6f %.6f %.6f %.6f (ne=%zu)\n", emb[0], emb[1], emb[2], emb[3],
-                ne);
+        fprintf(stderr, "miotts: C++ token_embed[0..7] = %.6f %.6f %.6f %.6f %.6f %.6f %.6f %.6f (ne=%zu type=%d)\n",
+                emb[0], emb[1], emb[2], emb[3], emb[4], emb[5], emb[6], emb[7], ne, (int)embed_t->type);
     }
 
     // Read logits
