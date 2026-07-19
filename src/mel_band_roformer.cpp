@@ -19,6 +19,7 @@
 
 #include "core/fft.h"         // fft_radix2_wrapper (r2c, interleaved full spectrum)
 #include "core/gguf_loader.h" // core_gguf::{open_metadata,kv_u32,load_weights}
+#include "core/istft.h"       // core_istft::istft (torch center=True match)
 
 #if defined(__APPLE__)
 #include <Accelerate/Accelerate.h> // cblas_sgemm for the diff-probe forward
@@ -879,7 +880,62 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
         }
     }
 
-    fprintf(stderr, "  [PENDING] output_vocals — scatter-average + complex mask + iSTFT.\n");
+    // --- output_vocals : scatter-average + complex mask + iSTFT ---
+    // Input-aligned off the REFERENCE stft_packed + mask_raw, so this tests only
+    // the DSP tail. mask_raw (T, 2N) is complex per gather-index k; scatter-add
+    // into the full packed spectrum at freq_indices (summing overlapping bands),
+    // divide by num_bands_per_freq, complex-multiply the stft, split channels,
+    // iSTFT (torch center=True). Stem 0 = vocals.
+    {
+        std::vector<float> ref_sp, ref_mr, ref_ov;
+        int64_t n1 = 0, n2 = 0, n3 = 0;
+        if (ref_get(rw, "stft_packed", ref_sp, n1) && ref_get(rw, "mask_raw", ref_mr, n2) &&
+            ref_get(rw, "output_vocals", ref_ov, n3)) {
+            const int rows = n_freqs * channels; // 2050
+            const int N = (int)ctx->freq_indices.size();
+            // scatter-average complex mask into the full packed rows.
+            std::vector<double> msum_re((size_t)rows * T, 0.0), msum_im((size_t)rows * T, 0.0);
+            for (int t = 0; t < T; t++)
+                for (int k = 0; k < N; k++) {
+                    const int r = ctx->freq_indices[k];
+                    msum_re[(size_t)r * T + t] += ref_mr[(size_t)t * (2 * N) + 2 * k + 0];
+                    msum_im[(size_t)r * T + t] += ref_mr[(size_t)t * (2 * N) + 2 * k + 1];
+                }
+            // complex-multiply stft_packed by the averaged mask, per row/time.
+            std::vector<float> mspec_re((size_t)rows * T), mspec_im((size_t)rows * T);
+            for (int r = 0; r < rows; r++) {
+                const double denom = std::max((double)ctx->num_bands_per_freq[r / channels], 1e-8);
+                for (int t = 0; t < T; t++) {
+                    const double mr_re = msum_re[(size_t)r * T + t] / denom;
+                    const double mr_im = msum_im[(size_t)r * T + t] / denom;
+                    const float sr = ref_sp[((size_t)r * T + t) * 2 + 0];
+                    const float si = ref_sp[((size_t)r * T + t) * 2 + 1];
+                    mspec_re[(size_t)r * T + t] = (float)(sr * mr_re - si * mr_im);
+                    mspec_im[(size_t)r * T + t] = (float)(sr * mr_im + si * mr_re);
+                }
+            }
+            // per channel: build (T, n_freqs) mag/phase, iSTFT.
+            std::vector<float> out((size_t)channels * T_samp, 0.0f);
+            std::vector<float> mag((size_t)T * n_freqs), phase((size_t)T * n_freqs), win;
+            win.resize(hp.n_fft);
+            core_istft::hann_periodic(hp.n_fft, win.data());
+            for (int s = 0; s < channels; s++) {
+                for (int t = 0; t < T; t++)
+                    for (int f = 0; f < n_freqs; f++) {
+                        const int r = f * channels + s;
+                        const float re = mspec_re[(size_t)r * T + t], im = mspec_im[(size_t)r * T + t];
+                        mag[(size_t)t * n_freqs + f] = std::sqrt(re * re + im * im);
+                        phase[(size_t)t * n_freqs + f] = std::atan2(im, re);
+                    }
+                std::vector<float> wav = core_istft::istft(mag.data(), phase.data(), hp.n_fft, hp.hop, T, win.data(),
+                                                           core_istft::TRIM_CENTER);
+                for (int i = 0; i < T_samp && i < (int)wav.size(); i++)
+                    out[(size_t)s * T_samp + i] = wav[i];
+            }
+            report("output_vocals", out, ref_ov);
+        }
+    }
+
 
     if (rw.buf)
         ggml_backend_buffer_free(rw.buf);
