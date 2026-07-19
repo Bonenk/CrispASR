@@ -3251,6 +3251,26 @@ set_tests_properties(test-qwen3-tts-seed-live PROPERTIES
     LABELS "live;server;tts;qwen3-tts;determinism"
     TIMEOUT 300)
 
+# ─── test-omnivoice-seed — live: #281 seed determinism at the AR codes stage.
+# Same seed → byte-identical omnivoice_synthesize_codes output; different seed →
+# different. Text→codes only (no DAC decode), so cheap. SKIPs (exit 0) without
+# CRISPASR_TEST_OMNIVOICE_MODEL.
+add_executable(test-omnivoice-seed
+    test-omnivoice-seed.cpp
+)
+target_include_directories(test-omnivoice-seed PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-omnivoice-seed PRIVATE
+    omnivoice
+)
+add_test(NAME test-omnivoice-seed
+    COMMAND test-omnivoice-seed
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-omnivoice-seed PROPERTIES
+    LABELS "live;tts;omnivoice;determinism"
+    TIMEOUT 600)
+
 # ─── test-separate-live — §248 source separation smoke test. SKIPs cleanly
 # without a mel-band-roformer model (CRISPASR_MBR_MODEL / CRISPASR_MODELS_DIR).
 add_test(NAME test-separate-live
