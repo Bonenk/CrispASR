@@ -709,7 +709,10 @@ static std::vector<float> read_tensor_f32(ggml_tensor* t) {
     int64_t n = ggml_nelements(t);
     std::vector<float> out(n);
     if (t->type == GGML_TYPE_F32) {
-        ggml_backend_tensor_get(t, out.data(), 0, n * sizeof(float));
+        {
+            auto _rd = read_tensor_f32(t);
+            memcpy(out.data(), _rd.data(), std::min(out.size(), _rd.size()) * sizeof(float));
+        }
     } else if (t->type == GGML_TYPE_F16) {
         std::vector<ggml_fp16_t> tmp(n);
         ggml_backend_tensor_get(t, tmp.data(), 0, n * sizeof(ggml_fp16_t));
@@ -974,7 +977,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         // --- Time branch encoder (runs before freq branch) ---
         std::vector<float> inject_buf; // injection from time→freq at merge point
         bool has_inject = false;
-        if (idx < (int)m.tencoder.size() && m.tencoder[idx].conv_w) {
+        if (idx < (int)m.tencoder.size() && m.tencoder[idx].conv_w && !getenv("CRISPASR_HTDEMUCS_SKIP_TIME")) {
             auto& tenc = m.tencoder[idx];
 
             // Pad xt so length is divisible by stride
@@ -1073,7 +1076,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 int tout_C = (int)ty->ne[1];
                 size_t tout_n = (size_t)tout_T * tout_C;
                 xt_buf.resize(tout_n);
-                ggml_backend_tensor_get(ty, xt_buf.data(), 0, tout_n * sizeof(float));
+                {
+                    auto _rd = read_tensor_f32(ty);
+                    memcpy(xt_buf.data(), _rd.data(), std::min(xt_buf.size(), _rd.size()) * sizeof(float));
+                }
                 xt_C = tout_C;
                 xt_T = tout_T;
 
@@ -1093,6 +1099,17 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         }
 
         // --- Per-layer ggml graph for freq encoder ---
+        if (htdemucs_debug()) {
+            // Print RSS before graph alloc
+            FILE* sf = fopen("/proc/self/status", "r");
+            if (sf) {
+                char buf[256];
+                while (fgets(buf, sizeof(buf), sf))
+                    if (strncmp(buf, "VmRSS:", 6) == 0 || strncmp(buf, "VmPeak:", 7) == 0)
+                        fprintf(stderr, "htdemucs: %s", buf);
+                fclose(sf);
+            }
+        }
         if (!enc.conv_w) {
             encoder_ok = false;
             break;
@@ -1229,7 +1246,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             int out_C = (int)y->ne[2];
             size_t out_n = (size_t)out_T * out_Fq * out_C;
             x_buf.resize(out_n);
-            ggml_backend_tensor_get(y, x_buf.data(), 0, out_n * sizeof(float));
+            {
+                auto _rd = read_tensor_f32(y);
+                memcpy(x_buf.data(), _rd.data(), std::min(x_buf.size(), _rd.size()) * sizeof(float));
+            }
             x_C = out_C;
             x_Fq = out_Fq;
             x_T = out_T;
@@ -1246,7 +1266,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // The embedding has emb_scale built into the weights (ScaledEmbedding)
                 // but freq_emb_scale is an additional multiplier.
                 std::vector<float> emb_data(emb_n_freqs * emb_C);
-                ggml_backend_tensor_get(m.freq_emb_w, emb_data.data(), 0, emb_data.size() * sizeof(float));
+                {
+                    auto _rd = read_tensor_f32(m.freq_emb_w);
+                    memcpy(emb_data.data(), _rd.data(), std::min(emb_data.size(), _rd.size()) * sizeof(float));
+                }
                 float scale = hp.freq_emb_scale;
                 // ScaledEmbedding weight is already scaled by `self.scale` (=10) in __init__,
                 // but at forward time it multiplies by `self.scale` again. The GGUF stores
@@ -1356,7 +1379,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 int up_len = (int)up->ne[0];
                 int up_C = (int)up->ne[1];
                 x_buf.resize((size_t)up_len * up_C);
-                ggml_backend_tensor_get(up, x_buf.data(), 0, x_buf.size() * sizeof(float));
+                {
+                    auto _rd = read_tensor_f32(up);
+                    memcpy(x_buf.data(), _rd.data(), std::min(x_buf.size(), _rd.size()) * sizeof(float));
+                }
                 // Reshape back conceptually: (T*Fq, bot_ch) → (T, Fq, bot_ch)
                 x_C = up_C;
             }
@@ -1388,7 +1414,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 int up_T = (int)up_t->ne[0];
                 int up_C = (int)up_t->ne[1];
                 xt_buf.resize((size_t)up_T * up_C);
-                ggml_backend_tensor_get(up_t, xt_buf.data(), 0, xt_buf.size() * sizeof(float));
+                {
+                    auto _rd = read_tensor_f32(up_t);
+                    memcpy(xt_buf.data(), _rd.data(), std::min(xt_buf.size(), _rd.size()) * sizeof(float));
+                }
                 xt_C = up_C;
                 xt_T = up_T;
             }
@@ -1479,16 +1508,26 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
         if (m.norm_in_w) {
             std::vector<float> nw(dim), nb(dim);
-            ggml_backend_tensor_get(m.norm_in_w, nw.data(), 0, dim * sizeof(float));
-            if (m.norm_in_b)
-                ggml_backend_tensor_get(m.norm_in_b, nb.data(), 0, dim * sizeof(float));
+            {
+                auto _rd = read_tensor_f32(m.norm_in_w);
+                memcpy(nw.data(), _rd.data(), std::min(nw.size(), _rd.size()) * sizeof(float));
+            }
+            if (m.norm_in_b) {
+                auto _rd = read_tensor_f32(m.norm_in_b);
+                memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
+            }
             cpu_layernorm(x_buf.data(), dim, x_seq, nw.data(), m.norm_in_b ? nb.data() : nullptr);
         }
         if (m.norm_in_t_w) {
             std::vector<float> nw(dim), nb(dim);
-            ggml_backend_tensor_get(m.norm_in_t_w, nw.data(), 0, dim * sizeof(float));
-            if (m.norm_in_t_b)
-                ggml_backend_tensor_get(m.norm_in_t_b, nb.data(), 0, dim * sizeof(float));
+            {
+                auto _rd = read_tensor_f32(m.norm_in_t_w);
+                memcpy(nw.data(), _rd.data(), std::min(nw.size(), _rd.size()) * sizeof(float));
+            }
+            if (m.norm_in_t_b) {
+                auto _rd = read_tensor_f32(m.norm_in_t_b);
+                memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
+            }
             cpu_layernorm(xt_buf.data(), dim, xt_seq, nw.data(), m.norm_in_t_b ? nb.data() : nullptr);
         }
 
@@ -1510,9 +1549,14 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 memcpy(tmp.data(), x_data, tmp.size() * sizeof(float));
                 {
                     std::vector<float> nw(dim), nb(dim);
-                    ggml_backend_tensor_get(sa.norm1_w, nw.data(), 0, dim * sizeof(float));
-                    if (sa.norm1_b)
-                        ggml_backend_tensor_get(sa.norm1_b, nb.data(), 0, dim * sizeof(float));
+                    {
+                        auto _rd = read_tensor_f32(sa.norm1_w);
+                        memcpy(nw.data(), _rd.data(), std::min(nw.size(), _rd.size()) * sizeof(float));
+                    }
+                    if (sa.norm1_b) {
+                        auto _rd = read_tensor_f32(sa.norm1_b);
+                        memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
+                    }
                     cpu_layernorm(tmp.data(), dim, seq_len, nw.data(), sa.norm1_b ? nb.data() : nullptr);
                 }
 
@@ -1542,7 +1586,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // Add bias
                 if (sa.in_proj_b) {
                     std::vector<float> bias(out_dim);
-                    ggml_backend_tensor_get(sa.in_proj_b, bias.data(), 0, out_dim * sizeof(float));
+                    {
+                        auto _rd = read_tensor_f32(sa.in_proj_b);
+                        memcpy(bias.data(), _rd.data(), std::min(bias.size(), _rd.size()) * sizeof(float));
+                    }
                     for (int o = 0; o < out_dim; o++)
                         for (int s = 0; s < seq_len; s++)
                             qkv[(size_t)o * seq_len + s] += bias[o];
@@ -1607,7 +1654,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                         }
                     if (sa.out_proj_b) {
                         std::vector<float> ob(dim);
-                        ggml_backend_tensor_get(sa.out_proj_b, ob.data(), 0, dim * sizeof(float));
+                        {
+                            auto _rd = read_tensor_f32(sa.out_proj_b);
+                            memcpy(ob.data(), _rd.data(), std::min(ob.size(), _rd.size()) * sizeof(float));
+                        }
                         for (int o = 0; o < dim; o++)
                             for (int s = 0; s < seq_len; s++)
                                 proj[(size_t)o * seq_len + s] += ob[o];
@@ -1618,7 +1668,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // 6. LayerScale gamma1 + residual
                 if (sa.gamma1_scale) {
                     std::vector<float> gs(dim);
-                    ggml_backend_tensor_get(sa.gamma1_scale, gs.data(), 0, dim * sizeof(float));
+                    {
+                        auto _rd = read_tensor_f32(sa.gamma1_scale);
+                        memcpy(gs.data(), _rd.data(), std::min(gs.size(), _rd.size()) * sizeof(float));
+                    }
                     for (int d = 0; d < dim; d++)
                         for (int s = 0; s < seq_len; s++)
                             attn_out[(size_t)d * seq_len + s] *= gs[d];
@@ -1630,9 +1683,14 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 memcpy(tmp.data(), x_data, tmp.size() * sizeof(float));
                 {
                     std::vector<float> nw(dim), nb(dim);
-                    ggml_backend_tensor_get(sa.norm2_w, nw.data(), 0, dim * sizeof(float));
-                    if (sa.norm2_b)
-                        ggml_backend_tensor_get(sa.norm2_b, nb.data(), 0, dim * sizeof(float));
+                    {
+                        auto _rd = read_tensor_f32(sa.norm2_w);
+                        memcpy(nw.data(), _rd.data(), std::min(nw.size(), _rd.size()) * sizeof(float));
+                    }
+                    if (sa.norm2_b) {
+                        auto _rd = read_tensor_f32(sa.norm2_b);
+                        memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
+                    }
                     cpu_layernorm(tmp.data(), dim, seq_len, nw.data(), sa.norm2_b ? nb.data() : nullptr);
                 }
                 // linear1: (dim → hidden), GELU, linear2: (hidden → dim)
@@ -1640,8 +1698,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 {
                     std::vector<float> w1 = read_tensor_f32(sa.linear1_w);
                     std::vector<float> b1(hidden);
-                    if (sa.linear1_b)
-                        ggml_backend_tensor_get(sa.linear1_b, b1.data(), 0, b1.size() * sizeof(float));
+                    if (sa.linear1_b) {
+                        auto _rd = read_tensor_f32(sa.linear1_b);
+                        memcpy(b1.data(), _rd.data(), std::min(b1.size(), _rd.size()) * sizeof(float));
+                    }
                     std::vector<float> h(hidden * seq_len, 0.0f);
                     for (int o = 0; o < hidden; o++)
                         for (int s = 0; s < seq_len; s++) {
@@ -1658,8 +1718,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     // linear2
                     std::vector<float> w2 = read_tensor_f32(sa.linear2_w);
                     std::vector<float> b2(dim);
-                    if (sa.linear2_b)
-                        ggml_backend_tensor_get(sa.linear2_b, b2.data(), 0, b2.size() * sizeof(float));
+                    if (sa.linear2_b) {
+                        auto _rd = read_tensor_f32(sa.linear2_b);
+                        memcpy(b2.data(), _rd.data(), std::min(b2.size(), _rd.size()) * sizeof(float));
+                    }
                     std::vector<float> ffn_out(dim * seq_len, 0.0f);
                     for (int o = 0; o < dim; o++)
                         for (int s = 0; s < seq_len; s++) {
@@ -1671,7 +1733,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     // gamma2 + residual
                     if (sa.gamma2_scale) {
                         std::vector<float> gs(dim);
-                        ggml_backend_tensor_get(sa.gamma2_scale, gs.data(), 0, dim * sizeof(float));
+                        {
+                            auto _rd = read_tensor_f32(sa.gamma2_scale);
+                            memcpy(gs.data(), _rd.data(), std::min(gs.size(), _rd.size()) * sizeof(float));
+                        }
                         for (int d = 0; d < dim; d++)
                             for (int s = 0; s < seq_len; s++)
                                 ffn_out[(size_t)d * seq_len + s] *= gs[d];
@@ -1683,9 +1748,14 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // norm_out (if present)
                 if (sa.norm_out_w) {
                     std::vector<float> nw(dim), nb(dim);
-                    ggml_backend_tensor_get(sa.norm_out_w, nw.data(), 0, dim * sizeof(float));
-                    if (sa.norm_out_b)
-                        ggml_backend_tensor_get(sa.norm_out_b, nb.data(), 0, dim * sizeof(float));
+                    {
+                        auto _rd = read_tensor_f32(sa.norm_out_w);
+                        memcpy(nw.data(), _rd.data(), std::min(nw.size(), _rd.size()) * sizeof(float));
+                    }
+                    if (sa.norm_out_b) {
+                        auto _rd = read_tensor_f32(sa.norm_out_b);
+                        memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
+                    }
                     cpu_layernorm(x_data, dim, seq_len, nw.data(), sa.norm_out_b ? nb.data() : nullptr);
                 }
             };
@@ -1709,16 +1779,26 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     memcpy(k_normed.data(), k_data, k_normed.size() * sizeof(float));
                     {
                         std::vector<float> nw(dim), nb(dim);
-                        ggml_backend_tensor_get(ca.norm1_w, nw.data(), 0, dim * sizeof(float));
-                        if (ca.norm1_b)
-                            ggml_backend_tensor_get(ca.norm1_b, nb.data(), 0, dim * sizeof(float));
+                        {
+                            auto _rd = read_tensor_f32(ca.norm1_w);
+                            memcpy(nw.data(), _rd.data(), std::min(nw.size(), _rd.size()) * sizeof(float));
+                        }
+                        if (ca.norm1_b) {
+                            auto _rd = read_tensor_f32(ca.norm1_b);
+                            memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
+                        }
                         cpu_layernorm(q_normed.data(), dim, q_seq, nw.data(), ca.norm1_b ? nb.data() : nullptr);
                     }
                     {
                         std::vector<float> nw(dim), nb(dim);
-                        ggml_backend_tensor_get(ca.norm2_w, nw.data(), 0, dim * sizeof(float));
-                        if (ca.norm2_b)
-                            ggml_backend_tensor_get(ca.norm2_b, nb.data(), 0, dim * sizeof(float));
+                        {
+                            auto _rd = read_tensor_f32(ca.norm2_w);
+                            memcpy(nw.data(), _rd.data(), std::min(nw.size(), _rd.size()) * sizeof(float));
+                        }
+                        if (ca.norm2_b) {
+                            auto _rd = read_tensor_f32(ca.norm2_b);
+                            memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
+                        }
                         cpu_layernorm(k_normed.data(), dim, k_seq, nw.data(), ca.norm2_b ? nb.data() : nullptr);
                     }
 
@@ -1727,8 +1807,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     int out3 = 3 * dim;
                     std::vector<float> w_data = read_tensor_f32(ca.cross_attn_in_proj_w);
                     std::vector<float> bias(out3, 0.0f);
-                    if (ca.cross_attn_in_proj_b)
-                        ggml_backend_tensor_get(ca.cross_attn_in_proj_b, bias.data(), 0, out3 * sizeof(float));
+                    if (ca.cross_attn_in_proj_b) {
+                        auto _rd = read_tensor_f32(ca.cross_attn_in_proj_b);
+                        memcpy(bias.data(), _rd.data(), std::min(bias.size(), _rd.size()) * sizeof(float));
+                    }
 
                     // Q = W_q @ q_normed + b_q  (first dim rows of weight)
                     std::vector<float> Q(dim * q_seq, 0.0f);
@@ -1807,7 +1889,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                             }
                         if (ca.cross_attn_out_proj_b) {
                             std::vector<float> ob(dim);
-                            ggml_backend_tensor_get(ca.cross_attn_out_proj_b, ob.data(), 0, dim * sizeof(float));
+                            {
+                                auto _rd = read_tensor_f32(ca.cross_attn_out_proj_b);
+                                memcpy(ob.data(), _rd.data(), std::min(ob.size(), _rd.size()) * sizeof(float));
+                            }
                             for (int o = 0; o < dim; o++)
                                 for (int s = 0; s < q_seq; s++)
                                     proj[(size_t)o * q_seq + s] += ob[o];
@@ -1818,7 +1903,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     // 5. gamma1 + residual
                     if (ca.gamma1_scale) {
                         std::vector<float> gs(dim);
-                        ggml_backend_tensor_get(ca.gamma1_scale, gs.data(), 0, dim * sizeof(float));
+                        {
+                            auto _rd = read_tensor_f32(ca.gamma1_scale);
+                            memcpy(gs.data(), _rd.data(), std::min(gs.size(), _rd.size()) * sizeof(float));
+                        }
                         for (int d = 0; d < dim; d++)
                             for (int s = 0; s < q_seq; s++)
                                 attn_out[(size_t)d * q_seq + s] *= gs[d];
@@ -1831,17 +1919,24 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     memcpy(tmp.data(), q_data, tmp.size() * sizeof(float));
                     {
                         std::vector<float> nw(dim), nb(dim);
-                        ggml_backend_tensor_get(ca.norm3_w, nw.data(), 0, dim * sizeof(float));
-                        if (ca.norm3_b)
-                            ggml_backend_tensor_get(ca.norm3_b, nb.data(), 0, dim * sizeof(float));
+                        {
+                            auto _rd = read_tensor_f32(ca.norm3_w);
+                            memcpy(nw.data(), _rd.data(), std::min(nw.size(), _rd.size()) * sizeof(float));
+                        }
+                        if (ca.norm3_b) {
+                            auto _rd = read_tensor_f32(ca.norm3_b);
+                            memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
+                        }
                         cpu_layernorm(tmp.data(), dim, q_seq, nw.data(), ca.norm3_b ? nb.data() : nullptr);
                     }
                     int hidden = (int)ca.linear1_w->ne[1];
                     {
                         std::vector<float> w1 = read_tensor_f32(ca.linear1_w);
                         std::vector<float> b1(hidden);
-                        if (ca.linear1_b)
-                            ggml_backend_tensor_get(ca.linear1_b, b1.data(), 0, b1.size() * sizeof(float));
+                        if (ca.linear1_b) {
+                            auto _rd = read_tensor_f32(ca.linear1_b);
+                            memcpy(b1.data(), _rd.data(), std::min(b1.size(), _rd.size()) * sizeof(float));
+                        }
                         std::vector<float> hbuf(hidden * q_seq, 0.0f);
                         for (int o = 0; o < hidden; o++)
                             for (int s = 0; s < q_seq; s++) {
@@ -1856,8 +1951,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                         }
                         std::vector<float> w2 = read_tensor_f32(ca.linear2_w);
                         std::vector<float> b2(dim);
-                        if (ca.linear2_b)
-                            ggml_backend_tensor_get(ca.linear2_b, b2.data(), 0, b2.size() * sizeof(float));
+                        if (ca.linear2_b) {
+                            auto _rd = read_tensor_f32(ca.linear2_b);
+                            memcpy(b2.data(), _rd.data(), std::min(b2.size(), _rd.size()) * sizeof(float));
+                        }
                         std::vector<float> ffn_out(dim * q_seq, 0.0f);
                         for (int o = 0; o < dim; o++)
                             for (int s = 0; s < q_seq; s++) {
@@ -1868,7 +1965,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                             }
                         if (ca.gamma2_scale) {
                             std::vector<float> gs(dim);
-                            ggml_backend_tensor_get(ca.gamma2_scale, gs.data(), 0, dim * sizeof(float));
+                            {
+                                auto _rd = read_tensor_f32(ca.gamma2_scale);
+                                memcpy(gs.data(), _rd.data(), std::min(gs.size(), _rd.size()) * sizeof(float));
+                            }
                             for (int d = 0; d < dim; d++)
                                 for (int s = 0; s < q_seq; s++)
                                     ffn_out[(size_t)d * q_seq + s] *= gs[d];
@@ -1880,9 +1980,14 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     // norm_out
                     if (ca.norm_out_w) {
                         std::vector<float> nw(dim), nb(dim);
-                        ggml_backend_tensor_get(ca.norm_out_w, nw.data(), 0, dim * sizeof(float));
-                        if (ca.norm_out_b)
-                            ggml_backend_tensor_get(ca.norm_out_b, nb.data(), 0, dim * sizeof(float));
+                        {
+                            auto _rd = read_tensor_f32(ca.norm_out_w);
+                            memcpy(nw.data(), _rd.data(), std::min(nw.size(), _rd.size()) * sizeof(float));
+                        }
+                        if (ca.norm_out_b) {
+                            auto _rd = read_tensor_f32(ca.norm_out_b);
+                            memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
+                        }
                         cpu_layernorm(q_data, dim, q_seq, nw.data(), ca.norm_out_b ? nb.data() : nullptr);
                     }
                 };
@@ -1952,7 +2057,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 int dn_len = (int)dn->ne[0];
                 int dn_C = (int)dn->ne[1];
                 x_buf.resize((size_t)dn_len * dn_C);
-                ggml_backend_tensor_get(dn, x_buf.data(), 0, x_buf.size() * sizeof(float));
+                {
+                    auto _rd = read_tensor_f32(dn);
+                    memcpy(x_buf.data(), _rd.data(), std::min(x_buf.size(), _rd.size()) * sizeof(float));
+                }
                 x_C = dn_C;
             }
             ggml_gallocr_free(al);
@@ -1984,7 +2092,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 int dn_T = (int)dn_t->ne[0];
                 int dn_C = (int)dn_t->ne[1];
                 xt_buf.resize((size_t)dn_T * dn_C);
-                ggml_backend_tensor_get(dn_t, xt_buf.data(), 0, xt_buf.size() * sizeof(float));
+                {
+                    auto _rd = read_tensor_f32(dn_t);
+                    memcpy(xt_buf.data(), _rd.data(), std::min(xt_buf.size(), _rd.size()) * sizeof(float));
+                }
                 xt_C = dn_C;
                 xt_T = dn_T;
             }
@@ -2104,7 +2215,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         int pre_T = (int)dy->ne[0], pre_Fq = (int)dy->ne[1], pre_C = (int)dy->ne[2];
         size_t pre_n = (size_t)pre_T * pre_Fq * pre_C;
         std::vector<float> pre_buf(pre_n);
-        ggml_backend_tensor_get(dy, pre_buf.data(), 0, pre_n * sizeof(float));
+        {
+            auto _rd = read_tensor_f32(dy);
+            memcpy(pre_buf.data(), _rd.data(), std::min(pre_buf.size(), _rd.size()) * sizeof(float));
+        }
         ggml_gallocr_free(dalloc);
         ggml_free(dg);
 
@@ -2150,7 +2264,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 for (size_t i = 0; i < w_n; i++)
                     w_data[i] = ggml_fp16_to_fp32(w_f16[i]);
             } else {
-                ggml_backend_tensor_get(dec.conv_tr_w, w_data.data(), 0, w_n * sizeof(float));
+                {
+                    auto _rd = read_tensor_f32(dec.conv_tr_w);
+                    memcpy(w_data.data(), _rd.data(), std::min(w_data.size(), _rd.size()) * sizeof(float));
+                }
             }
 
             // Output buffer: (pre_T, ct_Fq_out, ct_OC) = (T, Fq_out, OC)
@@ -2182,7 +2299,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             // Add bias
             if (dec.conv_tr_b) {
                 std::vector<float> bias(ct_OC);
-                ggml_backend_tensor_get(dec.conv_tr_b, bias.data(), 0, ct_OC * sizeof(float));
+                {
+                    auto _rd = read_tensor_f32(dec.conv_tr_b);
+                    memcpy(bias.data(), _rd.data(), std::min(bias.size(), _rd.size()) * sizeof(float));
+                }
                 for (int oc = 0; oc < ct_OC; oc++) {
                     for (int fq = 0; fq < ct_Fq_out; fq++) {
                         for (int t = 0; t < pre_T; t++) {
@@ -2208,9 +2328,14 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             // CPU GroupNorm: normalize per group of channels over (Fq × T) spatial dims
             int ng = 4;
             std::vector<float> norm_w(x_C), norm_b(x_C);
-            ggml_backend_tensor_get(dec.norm2_w, norm_w.data(), 0, x_C * sizeof(float));
-            if (dec.norm2_b)
-                ggml_backend_tensor_get(dec.norm2_b, norm_b.data(), 0, x_C * sizeof(float));
+            {
+                auto _rd = read_tensor_f32(dec.norm2_w);
+                memcpy(norm_w.data(), _rd.data(), std::min(norm_w.size(), _rd.size()) * sizeof(float));
+            }
+            if (dec.norm2_b) {
+                auto _rd = read_tensor_f32(dec.norm2_b);
+                memcpy(norm_b.data(), _rd.data(), std::min(norm_b.size(), _rd.size()) * sizeof(float));
+            }
             int ch_per_group = x_C / ng;
             size_t spatial = (size_t)x_Fq * x_T;
             for (int grp = 0; grp < ng; grp++) {
