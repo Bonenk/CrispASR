@@ -746,31 +746,30 @@ static std::vector<float> cpu_conv2d_freq(const std::vector<float>& x, int T, in
     fprintf(stderr, "htdemucs: cpu_conv2d_freq K=%d OC=%d out_Fq=%d out_size=%zu\n", K, OC, out_Fq,
             (size_t)T * out_Fq * OC);
 
+    // Matmul-based conv: per-frame im2col + matmul (cache-friendly, fits in RAM)
+    int patch_cols = IC * K;
     std::vector<float> out((size_t)T * out_Fq * OC, 0.0f);
-    fprintf(stderr, "htdemucs: cpu_conv2d_freq allocated %zu bytes, w has %zu elements\n", out.size() * sizeof(float),
-            w.size());
-    // Quick bounds check
-    size_t max_x_idx = (T - 1) + (size_t)(Fq - 1) * T + (size_t)(IC - 1) * T * Fq;
-    size_t max_w_idx = (size_t)(OC - 1) * IC * K + (IC - 1) * K + (K - 1);
-    size_t max_o_idx = (T - 1) + (size_t)(out_Fq - 1) * T + (size_t)(OC - 1) * T * out_Fq;
-    fprintf(stderr, "htdemucs: bounds: x_max=%zu/%zu w_max=%zu/%zu o_max=%zu/%zu\n", max_x_idx, x.size(), max_w_idx,
-            w.size(), max_o_idx, out.size());
-    if (max_x_idx >= x.size() || max_w_idx >= w.size() || max_o_idx >= out.size()) {
-        fprintf(stderr, "htdemucs: BOUNDS CHECK FAILED\n");
-        return out;
-    }
+    std::vector<float> patches(out_Fq * patch_cols);
+
     for (int t = 0; t < T; t++) {
+        // Build im2col patches for this time frame: patches[fo, ic*K+kh]
         for (int fo = 0; fo < out_Fq; fo++) {
-            for (int oc = 0; oc < OC; oc++) {
-                float sum = 0;
-                for (int ic = 0; ic < IC; ic++) {
-                    for (int kh = 0; kh < K; kh++) {
-                        int fi = fo * stride + kh - pad;
-                        if (fi < 0 || fi >= Fq)
-                            continue;
-                        sum += x[t + (size_t)fi * T + (size_t)ic * T * Fq] * w[(size_t)oc * IC * K + ic * K + kh];
-                    }
+            for (int ic = 0; ic < IC; ic++) {
+                for (int kh = 0; kh < K; kh++) {
+                    int fi = fo * stride + kh - pad;
+                    float val = (fi >= 0 && fi < Fq) ? x[t + (size_t)fi * T + (size_t)ic * T * Fq] : 0.0f;
+                    patches[fo * patch_cols + ic * K + kh] = val;
                 }
+            }
+        }
+        // Matmul: patches(out_Fq, patch_cols) × w(OC, patch_cols)^T → (out_Fq, OC)
+        for (int fo = 0; fo < out_Fq; fo++) {
+            const float* p = patches.data() + fo * patch_cols;
+            for (int oc = 0; oc < OC; oc++) {
+                const float* wr = w.data() + oc * patch_cols;
+                float sum = 0;
+                for (int c = 0; c < patch_cols; c++)
+                    sum += p[c] * wr[c];
                 out[t + (size_t)fo * T + (size_t)oc * T * out_Fq] = sum;
             }
         }
