@@ -2655,7 +2655,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
     if (s->backend == "htdemucs" || s->backend == "demucs") {
         htdemucs_params hp = htdemucs_default_params();
         hp.n_threads = s->n_threads;
-        hp.use_gpu = s->use_gpu;
+        hp.use_gpu = g_open_use_gpu_tls; // crispasr_session has no use_gpu member; use the open-time TLS flag
         s->htdemucs_ctx = htdemucs_init_from_file(model_path, hp);
         if (!s->htdemucs_ctx) {
             delete s;
