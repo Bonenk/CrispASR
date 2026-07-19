@@ -116,6 +116,13 @@ struct whisper_params {
     bool vad_export_inline = false;
     std::string vad_import_json = "";
 
+    // §248 source separation. --separate routes to the separation dispatcher
+    // (crispasr_separate_cli) BEFORE any transcribe backend is built; the model
+    // arch (mel-band-roformer / htdemucs) is auto-detected from the GGUF.
+    bool separate = false;
+    std::string stems;          // comma-separated stem subset; empty/"all" = every stem
+    std::string sep_output_dir; // output dir for stems; empty = alongside input
+
     std::string backend;
     std::string source_lang;
     std::string target_lang;

@@ -19,6 +19,7 @@
 #include "crispasr_mic_cli.h"
 #include "crispasr_speaker.h"
 #include "crispasr_popen.h"
+#include "crispasr_separate_cli.h"
 #include "crispasr_vad_cli.h"
 #include "crispasr_output.h"
 #include "crispasr_punctuation_policy.h"
@@ -1675,6 +1676,11 @@ static int tada_run_aligner_pipeline(const whisper_params& params, const std::st
 
 int crispasr_run_backend(const whisper_params& params_in) {
     whisper_params params = params_in;
+
+    // §248: source separation is its own task (audio out, not transcripts).
+    // Route to the separation dispatcher before any transcribe backend is built.
+    if (params.separate)
+        return crispasr_run_separate(params);
 
     // ── Speaker-db policy gates (issue #266) ──────────────────────────────
     // Named identification is recorded-file only, consent-gated, and a
