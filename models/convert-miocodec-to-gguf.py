@@ -205,15 +205,12 @@ def main():
     for name in sorted(sf.keys()):
         tensor = sf.get_tensor(name).float().numpy()
 
-        if should_keep_f32(name):
-            dtype = GGMLQuantizationType.F32
+        if should_keep_f32(name) or args.dtype == "f32":
+            data = tensor.astype(np.float32)
         else:
-            dtype = gguf_dtype
+            data = tensor.astype(np.float16)
 
-        # Rename: strip any leading module. prefix, keep as-is otherwise
-        gguf_name = name
-
-        writer.add_tensor(gguf_name, tensor, raw_dtype=dtype)
+        writer.add_tensor(name, data)
         n_tensors += 1
         total_bytes += tensor.nbytes
         if n_tensors % 50 == 0:
