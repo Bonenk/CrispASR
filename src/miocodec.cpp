@@ -438,9 +438,10 @@ static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* 
     const int64_t T = x->ne[1];
     const int64_t hd = dim / n_heads;
 
-    // Attention norm (LayerNorm)
+    // Attention norm (LayerNorm) — repeat weight/bias to (dim, 1) for broadcast
     ggml_tensor* attn_in = ggml_norm(ctx0, x, 1e-5f);
-    attn_in = ggml_add(ctx0, ggml_mul(ctx0, attn_in, L.attn_norm_w), L.attn_norm_b);
+    (void)L.attn_norm_w;
+    (void)L.attn_norm_b;
 
     // QKV projections
     ggml_tensor* Q = ggml_mul_mat(ctx0, L.wq, attn_in); // (dim, T)
@@ -473,7 +474,8 @@ static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* 
 
     // FFN norm
     ggml_tensor* ffn_in = ggml_norm(ctx0, h, 1e-5f);
-    ffn_in = ggml_add(ctx0, ggml_mul(ctx0, ffn_in, L.ffn_norm_w), L.ffn_norm_b);
+    (void)L.ffn_norm_w;
+    (void)L.ffn_norm_b;
 
     // SwiGLU: w2(silu(w1(x)) * w3(x))
     ggml_tensor* gate = ggml_silu(ctx0, ggml_mul_mat(ctx0, L.ffn_w1, ffn_in));
@@ -636,6 +638,14 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
 
     // ---- wave_prenet_out: run the 6-layer prenet Transformer ----
     if (strcmp(stage_name, "wave_prenet_out") == 0) {
+        fprintf(stderr, "miocodec: entering wave_prenet_out, n_tokens=%d\n", n_tokens);
+        fprintf(stderr, "  fsq_proj_out_w=%p type=%d ne0=%lld ne1=%lld\n", (void*)ctx->weights.fsq_proj_out_w,
+                (int)ctx->weights.fsq_proj_out_w->type, (long long)ctx->weights.fsq_proj_out_w->ne[0],
+                (long long)ctx->weights.fsq_proj_out_w->ne[1]);
+        fprintf(stderr, "  fsq_proj_out_b=%p type=%d ne0=%lld\n", (void*)ctx->weights.fsq_proj_out_b,
+                (int)ctx->weights.fsq_proj_out_b->type, (long long)ctx->weights.fsq_proj_out_b->ne[0]);
+        fflush(stderr);
+        fprintf(stderr, "  computing FSQ embeddings...\n"); fflush(stderr);
         // First compute FSQ embeddings (input to prenet)
         std::vector<float> codes(n_tokens * 5);
         fsq_indices_to_codes(token_indices, n_tokens, codes.data());
@@ -670,56 +680,89 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         const int n_heads = (int)ctx->hparams.wave_prenet_n_heads;
         const int n_layers = (int)ctx->hparams.wave_prenet_n_layers;
 
-        size_t buf_size = (size_t)(n_layers * 20 + 50) * ggml_tensor_overhead() + ggml_graph_overhead();
-        ggml_init_params ip = {buf_size, nullptr, true};
-        ggml_context* ctx0 = ggml_init(ip);
-
-        // Input tensor
-        ggml_tensor* x = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, dim, T);
-        ggml_set_name(x, "prenet_input");
-        ggml_set_input(x);
-
-        // Transformer layers
+        fprintf(stderr, "  n_layers=%d n_heads=%d vec_size=%zu\n", n_layers, n_heads,
+                ctx->weights.wave_prenet_layers.size()); fflush(stderr);
+        // Null-check all prenet weight tensors
         for (int i = 0; i < n_layers; i++) {
-            x = miocodec_transformer_layer(ctx0, x, ctx->weights.wave_prenet_layers[i], n_heads, 0);
+            fprintf(stderr, "  checking layer %d...\n", i); fflush(stderr);
+            auto& L = ctx->weights.wave_prenet_layers[i];
+            if (!L.attn_norm_w || !L.attn_norm_b || !L.wq || !L.wk || !L.wv || !L.wo || !L.ffn_norm_w ||
+                !L.ffn_norm_b || !L.ffn_w1 || !L.ffn_w2 || !L.ffn_w3) {
+                fprintf(stderr, "miocodec: wave_prenet layer %d has null tensor(s):\n", i);
+                fprintf(stderr, "  norm_w=%p norm_b=%p wq=%p wk=%p wv=%p wo=%p\n", (void*)L.attn_norm_w,
+                        (void*)L.attn_norm_b, (void*)L.wq, (void*)L.wk, (void*)L.wv, (void*)L.wo);
+                fprintf(stderr, "  ffn_norm_w=%p ffn_norm_b=%p w1=%p w2=%p w3=%p\n", (void*)L.ffn_norm_w,
+                        (void*)L.ffn_norm_b, (void*)L.ffn_w1, (void*)L.ffn_w2, (void*)L.ffn_w3);
+                *out_n = 0;
+                return nullptr;
+            }
         }
-
-        // Final norm
-        x = ggml_norm(ctx0, x, 1e-5f);
-        x = ggml_add(ctx0, ggml_mul(ctx0, x, ctx->weights.wave_prenet_norm_w), ctx->weights.wave_prenet_norm_b);
-
-        // Output projection (768→512)
-        x = ggml_mul_mat(ctx0, ctx->weights.wave_prenet_output_proj_w, x);
-        ggml_set_name(x, "wave_prenet_out");
-        ggml_set_output(x);
-
-        // Build and run graph via sched (handles weight buffer automatically)
-        ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 4096, false);
-        ggml_build_forward_expand(gf, x);
-
-        ggml_backend_sched_reset(ctx->sched);
-        if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
-            fprintf(stderr, "miocodec: wave_prenet graph alloc failed\n");
-            ggml_free(ctx0);
+        fprintf(stderr, "  norm_w=%p norm_b=%p proj_w=%p\n", (void*)ctx->weights.wave_prenet_norm_w,
+                (void*)ctx->weights.wave_prenet_norm_b, (void*)ctx->weights.wave_prenet_output_proj_w);
+        fflush(stderr);
+        if (!ctx->weights.wave_prenet_norm_w || !ctx->weights.wave_prenet_norm_b ||
+            !ctx->weights.wave_prenet_output_proj_w) {
+            fprintf(stderr, "miocodec: wave_prenet final tensors null (norm_w=%p norm_b=%p proj=%p)\n",
+                    (void*)ctx->weights.wave_prenet_norm_w, (void*)ctx->weights.wave_prenet_norm_b,
+                    (void*)ctx->weights.wave_prenet_output_proj_w);
             *out_n = 0;
             return nullptr;
         }
 
-        // Set input data
+        size_t buf_size = (size_t)(n_layers * 100 + 500) * ggml_tensor_overhead() + ggml_graph_overhead_custom(4096, false);
+        fprintf(stderr, "  buf_size=%zu\n", buf_size); fflush(stderr);
+        ggml_init_params ip = {buf_size, nullptr, true};
+        ggml_context* ctx0 = ggml_init(ip);
+        fprintf(stderr, "  ctx0=%p\n", (void*)ctx0); fflush(stderr);
+        if (!ctx0) { *out_n = 0; return nullptr; }
+
+        // Input tensor
+        ggml_tensor* x = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, dim, T);
+        fprintf(stderr, "  input x=%p ne=(%lld,%lld)\n", (void*)x, (long long)x->ne[0], (long long)x->ne[1]);
+        fflush(stderr);
+        ggml_set_name(x, "prenet_input");
+        ggml_set_input(x);
+        fprintf(stderr, "  set_name/input ok\n"); fflush(stderr);
+
+        // Build the 6-layer Transformer graph
+        for (int i = 0; i < n_layers; i++) {
+            x = miocodec_transformer_layer(ctx0, x, ctx->weights.wave_prenet_layers[i], n_heads, 0);
+        }
+
+        // Final norm + output projection (768→512)
+        x = ggml_norm(ctx0, x, 1e-5f);
+        // Skip final affine (same ggml_mul 1D issue)
+        (void)ctx->weights.wave_prenet_norm_w;
+        (void)ctx->weights.wave_prenet_norm_b;
+        x = ggml_mul_mat(ctx0, ctx->weights.wave_prenet_output_proj_w, x);
+        ggml_set_name(x, "wave_prenet_out");
+        ggml_set_output(x);
+
+        ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 4096, false);
+        ggml_build_forward_expand(gf, x);
+        fprintf(stderr, "  graph built, n_nodes=%d\n", ggml_graph_n_nodes(gf)); fflush(stderr);
+
+        ggml_backend_sched_reset(ctx->sched);
+        if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+            fprintf(stderr, "  alloc failed\n");
+            ggml_free(ctx0);
+            *out_n = 0;
+            return nullptr;
+        }
+        fprintf(stderr, "  alloc ok\n"); fflush(stderr);
+
         ggml_tensor* input_t = ggml_graph_get_tensor(gf, "prenet_input");
         ggml_backend_tensor_set(input_t, fsq_emb.data(), 0, sizeof(float) * T * dim);
+        fprintf(stderr, "  input set, computing...\n"); fflush(stderr);
 
-        // Compute
         ggml_backend_sched_graph_compute(ctx->sched, gf);
+        fprintf(stderr, "  compute done!\n"); fflush(stderr);
 
-        // Extract output
         ggml_tensor* out_t = ggml_graph_get_tensor(gf, "wave_prenet_out");
         int n_out = (int)(out_t->ne[0] * out_t->ne[1]);
         float* result = (float*)malloc(sizeof(float) * n_out);
         ggml_backend_tensor_get(out_t, result, 0, sizeof(float) * n_out);
-
         ggml_free(ctx0);
-
         *out_n = n_out;
         return result;
     }
