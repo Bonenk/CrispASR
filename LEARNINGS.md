@@ -13310,3 +13310,30 @@ medians settled it (the tell: the arms' identical decode code differing 3.8×);
 and `curl -C -` resume on top of a 29-byte HTML error stub produces a
 GGUF-with-garbage-prefix that parses as `invalid magic 'Inva'` — delete before
 retrying, never resume a file you haven't validated.
+
+## `git apply --3way` STAGES its result — a later `git add X && git commit` sweeps it up
+
+Applying a patch with `git apply --3way` leaves the result **staged**, not just
+in the working tree. So a subsequent `git add <unrelated files> && git commit`
+commits the patch too, under a message that says nothing about it. That is how
+the `group_words_into_speaker_runs` diarize DRY refactor landed inside
+`29e3e7af6`, a commit labelled "mel-band-roformer reference dumper" — and it
+was pushed to shared `main` before its unit tests had been run (they pass:
+21/21, including the pre-existing `apply_pyannote` / `score_speaker_for_range`
+cases, which is what makes the refactor provably behaviour-preserving — but the
+verification happened in the wrong order).
+
+Habits: after `git apply --3way`, run `git status` and either commit the patch
+deliberately on its own or `git restore --staged` the parts you are not ready
+to ship; and prefer `git commit <explicit paths>` over `git add X && git commit`
+when the tree holds more than one logical change. On a repo with concurrent
+sessions pushing to `main`, the mistake is not fixable by amending — history is
+already shared — so the correction has to be additive, like this note.
+
+The refactor itself is real and worth knowing about: the word→speaker-run
+grouping + short-run stability fold used by the pyannote/sherpa segment
+splitters now lives in one pure, unit-testable helper,
+`crispasr_diarize_internal::group_words_into_speaker_runs()`
+(`src/crispasr_diarize.cpp` / `_internal.h`), instead of being duplicated per
+splitter. `min_run_cs <= 0` disables the fold (split on every speaker change);
+50 cs is the pyannote default that suppresses one-word track-index flips.
