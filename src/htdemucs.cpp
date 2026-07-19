@@ -81,15 +81,19 @@ struct htd_prof {
         for (auto& kv : ms)
             tot += kv.second;
         const double wall = t_start > 0.0 ? htd_now_ms() - t_start : 0.0;
-        fprintf(stderr, "\n=== htdemucs phase profile (instrumented %.2f s of %.2f s wall) ===\n", tot / 1000.0,
-                wall / 1000.0);
+        fprintf(stderr, "\n=== htdemucs phase profile (wall %.2f s; [nested] rows double-count) ===\n", wall / 1000.0);
         for (const auto& k : order) {
             const double v = ms.at(k);
             fprintf(stderr, "  %-22s %8.1f ms  %5.1f%%\n", k.c_str(), v, wall > 0 ? 100.0 * v / wall : 0.0);
         }
-        if (wall > tot)
-            fprintf(stderr, "  %-22s %8.1f ms  %5.1f%%  (uninstrumented)\n", "[other]", wall - tot,
-                    100.0 * (wall - tot) / wall);
+        double nested = 0;
+        for (const auto& k : order)
+            if (k.find("[nested") != std::string::npos)
+                nested += ms.at(k);
+        const double covered = tot - nested;
+        if (wall > covered)
+            fprintf(stderr, "  %-22s %8.1f ms  %5.1f%%  (uninstrumented)\n", "[other]", wall - covered,
+                    100.0 * (wall - covered) / wall);
     }
 };
 } // namespace
@@ -1057,22 +1061,39 @@ static std::vector<float> cpu_conv1d_time(const std::vector<float>& x, int T, in
     const int K = (int)w_tensor->ne[0];
     out_C = (int)w_tensor->ne[2];
     out_T = T + 2 * pad - K + 1;
-    auto w = read_tensor_f32(w_tensor);
+    const std::vector<float>& w = cached_tensor_f32(w_tensor);
     std::vector<float> out((size_t)out_T * out_C, 0.0f);
-    for (int oc = 0; oc < out_C; oc++)
-        for (int t_out = 0; t_out < out_T; t_out++) {
-            float sum = 0;
-            for (int ic = 0; ic < IC; ic++)
-                for (int k = 0; k < K; k++) {
-                    const int t_in = t_out + k - pad;
-                    if (t_in < 0 || t_in >= T)
-                        continue;
-                    sum += x[t_in + (size_t)ic * T] * w[((size_t)oc * IC + ic) * K + k];
-                }
-            out[t_out + (size_t)oc * out_T] = sum;
-        }
+    if (htdemucs_fastconv()) {
+        // im2col + one GEMM: (out_C, IC*K) x (IC*K, out_T). The scalar form below
+        // was 45% of the forward once everything else was optimised — this is the
+        // tdecoder rewrite, a K=3 conv over ~344k time steps at the last layer.
+        std::vector<float> patches((size_t)IC * K * out_T, 0.0f);
+        for (int ic = 0; ic < IC; ic++)
+            for (int k = 0; k < K; k++) {
+                float* prow = patches.data() + (size_t)(ic * K + k) * out_T;
+                const float* xsrc = x.data() + (size_t)ic * T;
+                const int lo = std::max(0, pad - k);
+                const int hi = std::min(out_T, T + pad - k);
+                for (int t_out = lo; t_out < hi; t_out++)
+                    prow[t_out] = xsrc[t_out + k - pad];
+            }
+        htd_gemm(out_C, out_T, IC * K, w.data(), patches.data(), out.data());
+    } else {
+        for (int oc = 0; oc < out_C; oc++)
+            for (int t_out = 0; t_out < out_T; t_out++) {
+                float sum = 0;
+                for (int ic = 0; ic < IC; ic++)
+                    for (int k = 0; k < K; k++) {
+                        const int t_in = t_out + k - pad;
+                        if (t_in < 0 || t_in >= T)
+                            continue;
+                        sum += x[t_in + (size_t)ic * T] * w[((size_t)oc * IC + ic) * K + k];
+                    }
+                out[t_out + (size_t)oc * out_T] = sum;
+            }
+    }
     if (b_tensor) {
-        auto b = read_tensor_f32(b_tensor);
+        const std::vector<float>& b = cached_tensor_f32(b_tensor);
         for (int oc = 0; oc < out_C; oc++)
             for (int t = 0; t < out_T; t++)
                 out[t + (size_t)oc * out_T] += b[oc];
@@ -1113,6 +1134,27 @@ static void cpu_group_norm1_inplace(float* x, int C, int T, const float* w, cons
 static void cpu_group_norm1_inplace(std::vector<float>& x, int C, int T, const float* w, const float* b,
                                     float eps = 1e-5f) {
     cpu_group_norm1_inplace(x.data(), C, T, w, b, eps);
+}
+
+// A K=1 ggml_conv_1d is a pure channel matmul; routing it through
+// ggml_conv_1d materialises an im2col that is just a copy of the input (the
+// dev-guide "K=1 conv is a channel matmul" rule). These four channel
+// up/down-samplers measured 41% of the forward once everything else was
+// optimised. Operates in place on a (C, spatial) buffer.
+static void htd_k1_conv(std::vector<float>& buf, int& C_io, int spatial, ggml_tensor* w, ggml_tensor* b) {
+    const int oc_n = (int)w->ne[2]; // Conv1d weight ne = (K=1, IC, OC)
+    std::vector<float> out((size_t)oc_n * spatial, 0.0f);
+    htd_gemm(oc_n, spatial, C_io, cached_tensor_f32(w).data(), buf.data(), out.data());
+    if (b) {
+        const std::vector<float>& bb = cached_tensor_f32(b);
+        for (int o = 0; o < oc_n; o++) {
+            float* r = out.data() + (size_t)o * spatial;
+            for (int i = 0; i < spatial; i++)
+                r[i] += bb[o];
+        }
+    }
+    buf = std::move(out);
+    C_io = oc_n;
 }
 
 // CPU DConv residual stack over a channel-major (C, T) buffer, in place.
@@ -1644,7 +1686,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         std::vector<float> inject_buf; // injection from time→freq at merge point
         bool has_inject = false;
         if (idx < (int)m.tencoder.size() && m.tencoder[idx].conv_w && !getenv("CRISPASR_HTDEMUCS_SKIP_TIME")) {
-            HTD_PROF(prof, "tenc(total)");
+            HTD_PROF(prof, "tenc[nested total]");
             auto& tenc = m.tencoder[idx];
 
             // Pad xt so length is divisible by stride
@@ -1663,6 +1705,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
             // --- Graph 1: Conv1d + bias + GELU (norm1 is Identity for htdemucs) ---
             {
+                HTD_PROF(prof, "tenc.conv(ggml)");
                 size_t t_ctx_size = ggml_tensor_overhead() * 64 + ggml_graph_overhead();
                 ggml_init_params tgp = {t_ctx_size, nullptr, true};
                 ggml_context* tg = ggml_init(tgp);
@@ -1721,6 +1764,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
             // --- Graph 2: rewrite Conv1d(K=1) + norm2 + GLU ---
             if (!tenc.empty && tenc.rewrite_w) {
+                HTD_PROF(prof, "tenc.rewrite(ggml)");
                 size_t t_ctx_size = ggml_tensor_overhead() * 64 + ggml_graph_overhead();
                 ggml_init_params tgp = {t_ctx_size, nullptr, true};
                 ggml_context* tg = ggml_init(tgp);
@@ -1956,6 +2000,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     // are simple 1x1 convolutions and affect the output.
 
     if (m.channel_up_w && m.channel_down_w) {
+        HTD_PROF(prof, "transformer[nested total]");
         // Channel upsample: 1x1 Conv on flattened freq branch
         // x: (x_T, x_Fq, x_C, 1) → flatten to (x_T*x_Fq, x_C) → conv → (x_T*x_Fq, bottom_ch)
         // Then reshape back to (x_T, x_Fq, bottom_ch, 1)
@@ -1963,7 +2008,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         int bot_ch = hp.bottom_channels; // 512
 
         // Freq branch: flatten spatial, conv1d upsample
-        {
+        if (htdemucs_fastconv()) {
+            HTD_PROF(prof, "chan.up/down(k1)");
+            htd_k1_conv(x_buf, x_C, flat_len, m.channel_up_w, m.channel_up_b);
+        } else {
             size_t g_size = ggml_tensor_overhead() * 16 + ggml_graph_overhead();
             ggml_init_params gp = {g_size, nullptr, true};
             ggml_context* cg = ggml_init(gp);
@@ -2001,7 +2049,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         }
 
         // Time branch: conv1d upsample
-        {
+        if (htdemucs_fastconv()) {
+            HTD_PROF(prof, "chan.up/down(k1)");
+            htd_k1_conv(xt_buf, xt_C, xt_T, m.channel_up_t_w, m.channel_up_t_b);
+        } else {
             size_t g_size = ggml_tensor_overhead() * 16 + ggml_graph_overhead();
             ggml_init_params gp = {g_size, nullptr, true};
             ggml_context* cg = ggml_init(gp);
@@ -2169,6 +2220,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
 
         htd_capture(ctx, "ct_in_z", x_buf.data(), x_buf.size());
+        // (norm_in + positional embedding happen just above)
         htd_capture(ctx, "ct_in_xt", xt_buf.data(), xt_buf.size());
 
         // 5 transformer layers
@@ -2685,7 +2737,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
         // Channel downsample: 1x1 Conv back to transformer_channels
         // Freq branch
-        {
+        if (htdemucs_fastconv()) {
+            HTD_PROF(prof, "chan.up/down(k1)");
+            htd_k1_conv(x_buf, x_C, x_T * x_Fq, m.channel_down_w, m.channel_down_b);
+        } else {
             size_t g_size = ggml_tensor_overhead() * 16 + ggml_graph_overhead();
             ggml_init_params gp = {g_size, nullptr, true};
             ggml_context* cg = ggml_init(gp);
@@ -2720,7 +2775,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         }
 
         // Time branch downsample
-        {
+        if (htdemucs_fastconv()) {
+            HTD_PROF(prof, "chan.up/down(k1)");
+            htd_k1_conv(xt_buf, xt_C, xt_T, m.channel_down_t_w, m.channel_down_t_b);
+        } else {
             size_t g_size = ggml_tensor_overhead() * 16 + ggml_graph_overhead();
             ggml_init_params gp = {g_size, nullptr, true};
             ggml_context* cg = ggml_init(gp);
@@ -3114,6 +3172,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     // Rewrite + GLU. This is a Conv1d(chin, 2*chin, 1+2*context)
                     // with padding=context — NOT a 1x1 conv (context=1 => K=3).
                     if (tdec.rewrite_w) {
+                        HTD_PROF(prof, "tdec.rewrite");
                         int rw_OC = 0, rw_T = 0;
                         auto rw_out = cpu_conv1d_time(xt_buf, xt_T, xt_C, tdec.rewrite_w, tdec.rewrite_b, hp.context,
                                                       rw_OC, rw_T);
@@ -3142,22 +3201,50 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 if (!lengths_time.empty())
                     lengths_time.pop_back();
 
-                auto ct_w = read_tensor_f32(tdec.conv_tr_w);
+                const std::vector<float>& ct_w = cached_tensor_f32(tdec.conv_tr_w);
                 // ConvTranspose1d: out[oc, t_out] = sum_{ic, k} x[ic, t_in] * w[k, oc, ic]
                 // where t_out = t_in * stride + k
-                std::vector<float> ct_out(ct_OC * t_out_raw, 0.0f);
-                for (int ic = 0; ic < ct_IC; ic++)
-                    for (int t_in = 0; t_in < xt_T; t_in++) {
-                        float x_val = xt_buf[t_in + (size_t)ic * xt_T];
+                std::vector<float> ct_out((size_t)ct_OC * t_out_raw, 0.0f);
+                if (htdemucs_fastconv()) {
+                    // Same GEMM + scatter-add shape as the freq ConvTranspose:
+                    //   tmp[(oc*K + k), t_in] = sum_ic W[ic][oc][k] * x[ic, t_in]
+                    // xt_buf is already (IC, xt_T), so it is the B operand as-is;
+                    // the scatter then adds each (oc, k) row at stride `stri`.
+                    std::vector<float> wt((size_t)ct_OC * ct_K * ct_IC);
+                    for (int ic = 0; ic < ct_IC; ic++)
+                        for (int oc = 0; oc < ct_OC; oc++)
+                            for (int k = 0; k < ct_K; k++)
+                                wt[(size_t)(oc * ct_K + k) * ct_IC + ic] =
+                                    ct_w[(size_t)ic * ct_OC * ct_K + oc * ct_K + k];
+
+                    std::vector<float> tmp((size_t)ct_OC * ct_K * xt_T, 0.0f);
+                    htd_gemm(ct_OC * ct_K, xt_T, ct_IC, wt.data(), xt_buf.data(), tmp.data());
+
+                    for (int oc = 0; oc < ct_OC; oc++)
                         for (int k = 0; k < ct_K; k++) {
-                            int t_o = t_in * stri + k;
-                            if (t_o >= t_out_raw)
-                                continue;
-                            for (int oc = 0; oc < ct_OC; oc++)
-                                ct_out[t_o + (size_t)oc * t_out_raw] +=
-                                    x_val * ct_w[(size_t)ic * ct_OC * ct_K + oc * ct_K + k];
+                            const float* srow = tmp.data() + (size_t)(oc * ct_K + k) * xt_T;
+                            float* drow = ct_out.data() + (size_t)oc * t_out_raw;
+                            for (int t_in = 0; t_in < xt_T; t_in++) {
+                                const int t_o = t_in * stri + k;
+                                if (t_o >= t_out_raw)
+                                    break;
+                                drow[t_o] += srow[t_in];
+                            }
                         }
-                    }
+                } else {
+                    for (int ic = 0; ic < ct_IC; ic++)
+                        for (int t_in = 0; t_in < xt_T; t_in++) {
+                            float x_val = xt_buf[t_in + (size_t)ic * xt_T];
+                            for (int k = 0; k < ct_K; k++) {
+                                int t_o = t_in * stri + k;
+                                if (t_o >= t_out_raw)
+                                    continue;
+                                for (int oc = 0; oc < ct_OC; oc++)
+                                    ct_out[t_o + (size_t)oc * t_out_raw] +=
+                                        x_val * ct_w[(size_t)ic * ct_OC * ct_K + oc * ct_K + k];
+                            }
+                        }
+                }
                 if (tdec.conv_tr_b) {
                     auto b = read_tensor_f32(tdec.conv_tr_b);
                     for (int oc = 0; oc < ct_OC; oc++)
