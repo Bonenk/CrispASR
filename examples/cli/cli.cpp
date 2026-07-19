@@ -2597,8 +2597,10 @@ int main(int argc, char** argv) {
             // FireRedVAD (GGUF) is not compatible with whisper's internal
             // Silero-only VAD loader (#34). Detect and warn.
             const bool firered_vad = crispasr_vad_is_firered(params);
-            const std::string resolved_vad_path = firered_vad ? "" : crispasr_resolve_vad_model(params);
-            wparams.vad = firered_vad ? false : params.vad;
+            const bool webrtc_vad = crispasr_vad_is_webrtc(params);
+            const bool external_vad = firered_vad || webrtc_vad;
+            const std::string resolved_vad_path = external_vad ? "" : crispasr_resolve_vad_model(params);
+            wparams.vad = external_vad ? false : params.vad;
             wparams.vad_model_path = resolved_vad_path.c_str();
             if (firered_vad) {
                 fprintf(stderr, "crispasr: warning: FireRedVAD is not supported in the legacy whisper path.\n"
