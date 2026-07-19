@@ -51,6 +51,9 @@ int miotts_load_tokenizer(struct miotts_context* ctx, const char* tokenizer_json
 // Returns 0 on success.
 int miotts_set_reference(struct miotts_context* ctx, const float* audio_24k, int n_samples);
 
+// Load a preset speaker embedding from a .emb.gguf or raw binary file.
+int miotts_load_preset_embedding(struct miotts_context* ctx, const char* emb_path);
+
 // Synthesize speech from text. Returns a freshly allocated float buffer of
 // 24kHz mono PCM (caller must free with miotts_free_audio). *out_n receives
 // the sample count. Returns nullptr on failure.

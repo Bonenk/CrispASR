@@ -161,18 +161,48 @@ def convert_codec(writer: GGUFWriter, codec_dir: Path, dtype: str):
             "wave_conv_upsample.",
             "wave_prior_net.",
             "wave_post_net.",
+            "wave_upsampler.",
             "istft_head.",
             "global_encoder.",
         )
 
         count = 0
+        # Fuse weight_norm parametrizations at convert time:
+        # actual_weight = original0 * original1 / norm(original1, dim=1, keepdim=True)
+        fused_wn = {}
+        for key in sorted(keys):
+            if "parametrizations.weight.original" in key:
+                # e.g. wave_upsampler.upsample_layers.0.parametrizations.weight.original0
+                base = key.rsplit(".parametrizations.weight.", 1)[0]
+                suffix = key.rsplit(".", 1)[1]  # original0 or original1
+                if base not in fused_wn:
+                    fused_wn[base] = {}
+                fused_wn[base][suffix] = load_tensor(sf, key)
+
         for key in sorted(keys):
             if not any(key.startswith(p) for p in decode_prefixes):
                 continue
+            if "parametrizations.weight.original" in key:
+                continue  # handled via fusion below
             data = load_tensor(sf, key)
             gguf_name = f"codec.{key}"
             write_tensor(writer, gguf_name, data, dtype)
             count += 1
+
+        # Write fused weight_norm weights
+        for base, parts in fused_wn.items():
+            if not any(base.startswith(p) for p in decode_prefixes):
+                continue
+            if "original0" in parts and "original1" in parts:
+                g = parts["original0"]  # (out_ch, 1, 1) scale
+                v = parts["original1"]  # (out_ch, in_ch, k) weight
+                # weight_norm: w = g * v / ||v||_2
+                norm = np.sqrt(np.sum(v * v, axis=(1, 2), keepdims=True) + 1e-12)
+                fused = g * v / norm
+                gguf_name = f"codec.{base}.weight"
+                write_tensor(writer, gguf_name, fused, dtype)
+                count += 1
+                print(f"  [fused weight_norm] {base} → {fused.shape}")
 
         print(f"  Codec decode tensors written: {count}")
 
@@ -233,11 +263,25 @@ def main():
     writer.add_float32("miotts.rms_norm_eps", rms_norm_eps)
     writer.add_uint32("miotts.context_length", config.get("max_position_embeddings", 32768))
 
-    # Codec params (from MioCodec config)
-    writer.add_uint32("miotts.codec.sample_rate", 24000)
+    # Codec params — detect from config.yaml if available, else use v2 defaults
+    codec_dir = Path(args.codec)
+    codec_cfg_path = codec_dir / "config.yaml"
+    codec_sr = 44100
+    codec_n_fft = 392
+    codec_hop = 98
+    if codec_cfg_path.exists():
+        import re
+        cfg_text = codec_cfg_path.read_text()
+        m = re.search(r'sample_rate:\s*(\d+)', cfg_text)
+        if m: codec_sr = int(m.group(1))
+        m = re.search(r'n_fft:\s*(\d+)', cfg_text)
+        if m: codec_n_fft = int(m.group(1))
+        m = re.search(r'hop_length:\s*(\d+)', cfg_text)
+        if m: codec_hop = int(m.group(1))
+    writer.add_uint32("miotts.codec.sample_rate", codec_sr)
     writer.add_uint32("miotts.codec.frame_rate", 25)
-    writer.add_uint32("miotts.codec.n_fft", 1920)
-    writer.add_uint32("miotts.codec.hop_length", 480)
+    writer.add_uint32("miotts.codec.n_fft", codec_n_fft)
+    writer.add_uint32("miotts.codec.hop_length", codec_hop)
     writer.add_uint32("miotts.codec.codebook_size", 12800)
     # FSQ levels: [8, 8, 8, 5, 5]
     writer.add_array("miotts.codec.fsq_levels", [8, 8, 8, 5, 5])
