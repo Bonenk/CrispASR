@@ -2136,12 +2136,15 @@ commercial-restricted, skip).
 
 **Source separation (new category):**
 - [x] **HTDemucs** — hybrid transformer demucs, music/voice separation. **MIT** (Meta).
-  **IN PROGRESS (2026-07-19, VPS):** ~2500 lines. Full pipeline + 12-point wiring done:
-  STFT→encoder(CPU Conv2d)→CrossTransformer(5 layers)→decoder(CPU ConvTranspose2d)→iSTFT.
-  CLI adapter, factory, GGUF auto-detect, model registry, `--separate` dispatch all wired.
-  Kaggle validation kernel running (v3). VPS too small (8 GB) for runtime test — matmul
-  optimization or Kaggle-only validation needed. Remaining for parity: DConv, sinusoidal
-  pos emb, time decoder, C API session wiring.
+  **DONE (2026-07-19, VPS+Kaggle).** ~2600 lines C++. Full 12-point checklist verified.
+  STFT→encoder(CPU Conv2d+DConv)→CrossTransformer(5 layers, self+cross attn)→
+  decoder(CPU ConvTranspose2d)→CaC unmask→iSTFT. All wired: CLI adapter + factory +
+  GGUF auto-detect + model registry (Q4_K default) + `--separate` dispatch +
+  C API session (`crispasr_session_separate`) + Python `Session.separate()` +
+  Go LDFLAGS sync. GGUFs on HF (`cstr/htdemucs-GGUF`): F16 (81 MB), Q8_0 (53 MB),
+  Q4_K (38 MB). Kaggle validation: 21 reference stages all correct shapes + finite.
+  Remaining for full parity: sinusoidal pos emb, time branch decoder. VPS (8 GB)
+  can't run inference (memory pressure from concurrent sessions).
 - [x] **Mel-Band RoFormer** — frequency-band source separation. **MIT**.
   The #274 reporter specifically mentioned this. Do both — they're complementary
   (HTDemucs = 4-stem, RoFormer = vocal/instrumental).
