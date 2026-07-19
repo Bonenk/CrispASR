@@ -2282,6 +2282,18 @@ if(NOT MSVC)
     target_compile_options(ctc-align PRIVATE -O3)
 endif()
 # ---------------------------------------------------------------------------
+# htdemucs — HTDemucs source separation (Meta Demucs v4)
+# ---------------------------------------------------------------------------
+add_library(htdemucs STATIC htdemucs.h htdemucs.cpp)
+set_target_properties(htdemucs PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(htdemucs PUBLIC .)
+target_compile_features   (htdemucs PUBLIC cxx_std_17)
+target_link_libraries     (htdemucs PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(htdemucs PRIVATE -O3)
+endif()
+
+# ---------------------------------------------------------------------------
 # Multi-backend linkage (consumed by CLI + Dart + Python + Rust)
 #
 # Non-Whisper CrispASR backends become reachable through the `crispasr_*`
