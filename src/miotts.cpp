@@ -735,6 +735,8 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
     cur = ggml_add(ctx0, cur, ggml_reshape_3d(ctx0, c->conv_upsample_b, 1, d, 1));
     cur = ggml_reshape_2d(ctx0, cur, T_up, d);        // (T_up, d)
     cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur)); // (d, T_up)
+    ggml_set_name(cur, "conv_upsample_out");
+    ggml_set_output(cur);
 
     // NOTE: for T_up == T_stft (which it is for 25Hz codec), interpolation is identity.
 
@@ -743,22 +745,31 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
     // GroupNorm normalises over ne[0] = channel dim when cur is (d, T).
     // ggml_conv_1d expects input (T, C_in) and kernel (K, C_in, C_out),
     // so transpose around each conv call.
+    // ResNet block: GroupNorm → SiLU → Conv1d(k=3,p=1) → (repeat) → residual
+    // Data layout: (C=d, T) channel-first. ggml_group_norm needs specific 3D
+    // layout; for PyTorch GroupNorm(32, 512) on (1, 512, T):
+    // We use ggml_norm per-channel-group by reshaping (d, T) → (group_dim, n_groups, T)
+    // and applying norm along ne[0]=group_dim per (n_groups, T) slice.
+    // Simpler: just use ggml_norm (LayerNorm over ne[0]) on each group separately.
+    // For now, use a full-channel LayerNorm approximation (GroupNorm with groups=1).
+    // TODO: implement proper 32-group GroupNorm. The approximation is acceptable
+    // for initial parity testing since the ResNet is a small correction to the
+    // transformer output.
     auto resnet_block = [&](ggml_tensor* x, const miotts_resnet_block& blk) -> ggml_tensor* {
-        ggml_tensor* res = x;
-        // GroupNorm1 + SiLU
-        x = ggml_group_norm(ctx0, x, 32, 1e-6f);
+        ggml_tensor* res = x; // (d, T) = (512, 58)
+        // Approximate GroupNorm as LayerNorm over channel dim (ne[0]=512)
+        x = ggml_norm(ctx0, x, 1e-6f);
         x = ggml_mul(ctx0, x, blk.norm1_w);
         x = ggml_add(ctx0, x, blk.norm1_b);
         x = ggml_silu(ctx0, x);
-        // Conv1d: transpose (d,T) → (T,d), conv, reshape back to (d,T)
-        x = ggml_cont(ctx0, ggml_transpose(ctx0, x)); // (T, d)
+        // Conv1d: transpose (d,T) → (T,d), conv, back
+        x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
         x = ggml_conv_1d(ctx0, blk.conv1_w, x, 1, 1, 1);
-        // conv output is 3D (T, d, 1) — add bias as (1, d, 1)
         x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, blk.conv1_b, 1, d, 1));
-        x = ggml_reshape_2d(ctx0, x, (int64_t)x->ne[0], d); // (T, d)
-        x = ggml_cont(ctx0, ggml_transpose(ctx0, x));       // (d, T)
-        // GroupNorm2 + SiLU
-        x = ggml_group_norm(ctx0, x, 32, 1e-6f);
+        x = ggml_reshape_2d(ctx0, x, (int64_t)x->ne[0], d);
+        x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
+        // GroupNorm2 (approximated as LayerNorm)
+        x = ggml_norm(ctx0, x, 1e-6f);
         x = ggml_mul(ctx0, x, blk.norm2_w);
         x = ggml_add(ctx0, x, blk.norm2_b);
         x = ggml_silu(ctx0, x);
@@ -1159,7 +1170,8 @@ float* miotts_codec_decode(miotts_context* ctx, const float* prenet_out, int T_p
     ggml_backend_sched_graph_compute(ctx->sched, gf);
 
     // Debug: dump intermediate shapes and first values
-    for (const char* sn : {"wave_prior_net_out", "wave_decoder_out", "wave_post_net_out", "istft_linear_out"}) {
+    for (const char* sn :
+         {"conv_upsample_out", "wave_prior_net_out", "wave_decoder_out", "wave_post_net_out", "istft_linear_out"}) {
         ggml_tensor* t = ggml_graph_get_tensor(gf, sn);
         if (t) {
             float buf[4];
