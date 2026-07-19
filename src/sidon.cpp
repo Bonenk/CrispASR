@@ -630,6 +630,27 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     std::vector<float> feats = make_features(ctx->model, normalized.data(), n_samples, T);
     if (T <= 0)
         return {};
+
+    // Guard against O(T^2) attention blowup. The predictor materializes a T*T
+    // relative-index buffer plus (heads, T, T) attention scores, so cost grows
+    // quadratically in the feature-frame count T (~50 frames/sec of input).
+    // Restoration is utterance-scale; a multi-minute clip would allocate tens of
+    // GB and OOM. Cap T and fail cleanly instead of crashing. The default ~3000
+    // frames is ~60 s of audio (~2.3 GB peak); override with the env var when a
+    // longer input and more memory are available.
+    int max_frames = 3000;
+    if (const char* e = getenv("CRISPASR_SIDON_MAX_FRAMES"); e && e[0]) {
+        const int v = atoi(e);
+        if (v > 0)
+            max_frames = v;
+    }
+    if (T > max_frames) {
+        fprintf(stderr,
+                "sidon: input too long — %d feature frames (~%.1f s) exceeds the %d-frame cap; "
+                "O(T^2) attention would OOM. Split the audio or raise CRISPASR_SIDON_MAX_FRAMES.\n",
+                T, (double)T / 50.0, max_frames);
+        return {};
+    }
     const auto frontend_done = clock::now();
 
     if (!prepare_graphs(ctx, T))

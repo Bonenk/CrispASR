@@ -61,5 +61,18 @@ TEST_CASE("sidon speech restoration", "[integration][sidon]") {
         peak = std::max(peak, std::fabs(sample));
     CHECK(peak > 0.01f);
 
+    // O(T^2) length cap: an over-long input (well past the ~60 s / 3000-frame
+    // default) must fail cleanly with an empty result — never OOM/crash. The
+    // guard trips right after the cheap STFT front-end, so this stays fast even
+    // with the model loaded. ~90 s of silence @ 16 kHz ⇒ T ≈ 4500 > 3000.
+    SECTION("over-long input is rejected cleanly, not OOM") {
+        std::vector<float> too_long(16000 * 90, 0.0f);
+        // A little energy so peak-normalization doesn't divide near-zero.
+        for (size_t i = 0; i < too_long.size(); i += 160)
+            too_long[i] = 0.1f;
+        const auto capped = sidon_restore(ctx, too_long.data(), (int)too_long.size());
+        CHECK(capped.empty());
+    }
+
     sidon_free(ctx);
 }
