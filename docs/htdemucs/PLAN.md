@@ -413,3 +413,85 @@ small. The two big structural levers left are both untouched:
 - **GPU.** `params.use_gpu` is still never read; the backend is hardcoded
   `ggml_backend_cpu_init()`. Now that the hot ops are all GEMM-shaped, a ggml
   graph port is far more tractable than it was against the scalar loops.
+
+
+## ggml graph port (CRISPASR_HTDEMUCS_GGML)
+
+The CrossTransformer now has a real ggml graph implementation, and the backend
+is finally selectable — `ggml_backend_cpu_init()` was hardcoded, so `use_gpu`
+and `n_threads` were dead fields and Metal/CUDA/Vulkan could never engage.
+
+### What the graph does
+
+All `t_layers` of BOTH branches in ONE build+alloc: LayerNorm, QKV projection,
+multi-head attention via `ggml_soft_max_ext`, output projection, LayerScale
+residuals, FFN, and `norm_out`. Self- and cross-attention alternate on
+`classic_parity`, with `old_x` captured before `x` is overwritten so the time
+branch attends to the pre-update spectrogram branch.
+
+Two details that matter:
+
+- **Layout.** The CPU buffers are (dim-slow, seq-fast), index `d*seq + s`, but
+  ggml contracts `mul_mat` on `ne[0]`, so the graph wants `ne = (dim, seq)` =
+  index `s*dim + d`. Transposed once on upload and once on download.
+- **norm_out** is `GroupNorm(num_groups=1)` over all channels AND tokens
+  jointly, so it is a flatten-to-1D + `ggml_group_norm(1)` + per-channel affine.
+  Using `ggml_norm` would be per-token — the exact bug that cost the original
+  CPU implementation its parity.
+
+Every layer is marked `set_output` **only when the diff is capturing**, so the
+graph is diffable layer by layer without preventing gallocr from reusing those
+buffers in normal runs.
+
+### Correctness — verified on both backends
+
+| backend | result |
+|---------|--------|
+| CPU  | 45/45, `ct_l0..l4` cos 1.000000 |
+| Metal (MTL0) | 45/45, `ct_l0..l4` cos 1.000000 |
+
+CLI acceptance on Metal: ASR round-trip word-for-word, stem RMS matching the
+CPU path to 5 decimals (vocals 0.13963 vs 0.13962).
+
+The GPU path also exposed a real leak: `htdemucs_diff` never freed the
+reference `WeightLoad`, whose buffer is allocated on `ctx->backend`. Invisible
+on CPU; on Metal it tripped the device destructor's live-resource assert at
+exit (`GGML_ASSERT([rsets->data count] == 0)`, exit 134). Now freed on every
+return path, before the backend it belongs to.
+
+### Speed — NO VERDICT on this box, default stays OFF
+
+Transformer phase only, same run, load ~32:
+
+| path | ct phase |
+|------|----------|
+| CPU + Accelerate BLAS (default) | 10.9 s |
+| ggml graph, CPU backend | 17.4 s |
+| ggml graph, Metal | 7.0 s |
+
+So ggml-on-CPU is clearly **slower** than Accelerate (expected — Accelerate's
+sgemm is very well tuned), and Metal beats BLAS on the transformer by ~1.6x.
+
+Total wall time is **inconclusive**. A first single-shot pair suggested Metal
+45.7 s vs BLAS 97.6 s, but load drifted 21 -> 56 between the arms. Interleaving
+flipped the result (BLAS won all 3 rounds) — and then load was climbing
+monotonically with Metal always second. Alternating the order gave times that
+track the load average far more closely than the config:
+
+    META 58.2s load=87   BLAS 62.4s load=65   BLAS 59.1s load=78
+    META 36.3s load=57   META 31.2s load=44   BLAS 24.3s load=35
+
+This is precisely the dev-guide failure mode ("a quiet-CPU-vs-loaded-GPU
+comparison invented a false 2x win"). A verdict needs a quiet box or a Kaggle
+CUDA run.
+
+Per the inverse-default rule, **`CRISPASR_HTDEMUCS_GGML` stays default OFF**:
+verified correct, not yet proven faster overall. The CPU/BLAS path is untouched
+and remains the default.
+
+Plausible reason total wall does not follow the transformer win: only the
+transformer is a graph. The encoder/decoder still run on CPU, and with a GPU
+backend their small per-call graphs (time encoder conv, decoder rewrite) pay
+launch overhead — the "per-step GPU dispatch of small matmuls is launch-bound"
+effect in the dev guide. Porting those too, or splitting weight placement, is
+the follow-up.
