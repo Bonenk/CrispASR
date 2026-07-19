@@ -3033,6 +3033,18 @@ set_tests_properties(benchmark-quick PROPERTIES
     LABELS "benchmark"
     TIMEOUT 600)
 
+# ─── test-htdemucs-smoke — HTDemucs separation smoke test. This file existed
+# but was never registered in any CMakeLists, so it had never been compiled or
+# run; building it would have caught the read_tensor_f32 infinite recursion that
+# made every F32 GGUF crash on the first weight read.
+add_executable(test-htdemucs-smoke test_htdemucs_smoke.cpp)
+target_include_directories(test-htdemucs-smoke PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(test-htdemucs-smoke PRIVATE htdemucs)
+
 # --- test-f5-tts --- standalone F5-TTS DiT+Vocos smoke test
 add_executable(test-f5-tts test-f5-tts.cpp)
 target_include_directories(test-f5-tts PRIVATE
