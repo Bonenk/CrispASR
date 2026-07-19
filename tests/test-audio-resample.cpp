@@ -42,4 +42,14 @@ TEST_CASE("polyphase resampling preserves DC gain", "[unit][audio-resample]") {
         REQUIRE(output.size() == 96000);
         REQUIRE(interior_mean(output) == Catch::Approx(level).margin(5e-4f));
     }
+
+    // The source-separation surface (--separate) resamples the separator's
+    // 44.1 kHz stems against 48 kHz host audio. This is the non-trivial
+    // downsample (gcd 300 → L=147, M=160) that the up=max(L,M) bug silently
+    // over-attenuated, so guard it explicitly.
+    SECTION("48 kHz to 44.1 kHz") {
+        const auto output = core_audio::resample_polyphase(input.data(), static_cast<int>(input.size()), 48000, 44100);
+        REQUIRE(output.size() == 44100);
+        REQUIRE(interior_mean(output) == Catch::Approx(level).margin(5e-4f));
+    }
 }
