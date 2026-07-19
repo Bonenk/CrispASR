@@ -427,6 +427,152 @@ bool band_split_cpu(core_gguf::WeightLoad& mw, const std::vector<float>& gathere
     return true;
 }
 
+// y[t][o] = sum_i x[t][i] * W[o][i] + (bias ? bias[o] : 0). W row-major (dout,din).
+void linear(const std::vector<float>& x, int T, int din, const std::vector<float>& W, const std::vector<float>* bias,
+            int dout, std::vector<float>& y) {
+    y.assign((size_t)T * dout, 0.0f);
+    for (int t = 0; t < T; t++) {
+        const float* xr = x.data() + (size_t)t * din;
+        float* yr = y.data() + (size_t)t * dout;
+        for (int o = 0; o < dout; o++) {
+            double acc = bias ? (*bias)[o] : 0.0;
+            const float* wr = W.data() + (size_t)o * din;
+            for (int i = 0; i < din; i++)
+                acc += (double)wr[i] * xr[i];
+            yr[o] = (float)acc;
+        }
+    }
+}
+
+// Exact GELU (nn.GELU default, erf form): 0.5*x*(1+erf(x/sqrt2)).
+void gelu_erf_inplace(std::vector<float>& v) {
+    for (auto& x : v)
+        x = 0.5f * x * (1.0f + std::erf(x * 0.70710678118654752440f));
+}
+
+// RMSNorm each of T rows of width dim, in place.
+void rms_rows(std::vector<float>& x, int T, int dim, const std::vector<float>& gamma) {
+    for (int t = 0; t < T; t++)
+        rms_norm_inplace(x.data() + (size_t)t * dim, dim, gamma.data());
+}
+
+// Adjacent-pair RoPE (rotary_embedding_torch: theta=10000, dim=dim_head, full
+// rotation) applied to one head's [T, dim_head] slice in place. inv_freq[i] =
+// theta^-(2i/dim_head); pair (2i,2i+1) rotated by angle m*inv_freq[i].
+void rope_head(float* qh, int T, int dim_head) {
+    const int half = dim_head / 2;
+    for (int m = 0; m < T; m++) {
+        float* row = qh + (size_t)m * dim_head;
+        for (int i = 0; i < half; i++) {
+            const double inv = std::pow(10000.0, -(double)(2 * i) / (double)dim_head);
+            const double ang = (double)m * inv;
+            const double c = std::cos(ang), s = std::sin(ang);
+            const float a = row[2 * i], b = row[2 * i + 1];
+            row[2 * i] = (float)(a * c - b * s);
+            row[2 * i + 1] = (float)(b * c + a * s);
+        }
+    }
+}
+
+// One RoFormer block (attention + FFN, both pre-RMSNorm, residual) over a
+// [T, dim] sequence for a SINGLE band/batch element. Layer 0 only (is_first:
+// no value-residual input). `pre` = e.g. "layers.0.0.layers.0.". Modifies x.
+bool roformer_block(core_gguf::WeightLoad& mw, const std::string& pre, std::vector<float>& x, int T, int dim, int heads,
+                    int dim_head) {
+    const int inner = heads * dim_head;
+    std::vector<float> nrm_g, qkv_w, gate_w, gate_b, out_w;
+    std::vector<float> ff_g, ff1_w, ff1_b, ff4_w, ff4_b;
+    if (!read_f32(mw, pre + "0.norm.gamma", nrm_g) || !read_f32(mw, pre + "0.to_qkv.weight", qkv_w) ||
+        !read_f32(mw, pre + "0.to_gates.weight", gate_w) || !read_f32(mw, pre + "0.to_gates.bias", gate_b) ||
+        !read_f32(mw, pre + "0.to_out.0.weight", out_w) || !read_f32(mw, pre + "1.net.0.gamma", ff_g) ||
+        !read_f32(mw, pre + "1.net.1.weight", ff1_w) || !read_f32(mw, pre + "1.net.1.bias", ff1_b) ||
+        !read_f32(mw, pre + "1.net.4.weight", ff4_w) || !read_f32(mw, pre + "1.net.4.bias", ff4_b))
+        return false;
+
+    // --- attention ---
+    std::vector<float> xn = x;
+    rms_rows(xn, T, dim, nrm_g);
+    std::vector<float> qkv;
+    linear(xn, T, dim, qkv_w, nullptr, inner * 3, qkv); // (T, 3*inner)
+    // split into per-head q,k,v: index (qkv*heads + h)*dim_head + d
+    std::vector<float> q(inner * T), k(inner * T), v(inner * T); // per head contiguous: [h][T][dh]
+    for (int t = 0; t < T; t++)
+        for (int h = 0; h < heads; h++)
+            for (int d = 0; d < dim_head; d++) {
+                const int col = h * dim_head + d;
+                q[((size_t)h * T + t) * dim_head + d] = qkv[(size_t)t * inner * 3 + 0 * inner + col];
+                k[((size_t)h * T + t) * dim_head + d] = qkv[(size_t)t * inner * 3 + 1 * inner + col];
+                v[((size_t)h * T + t) * dim_head + d] = qkv[(size_t)t * inner * 3 + 2 * inner + col];
+            }
+    for (int h = 0; h < heads; h++) {
+        rope_head(q.data() + (size_t)h * T * dim_head, T, dim_head);
+        rope_head(k.data() + (size_t)h * T * dim_head, T, dim_head);
+    }
+    // attention per head, scale = dim_head^-0.5, full (no mask)
+    const double scale = 1.0 / std::sqrt((double)dim_head);
+    std::vector<float> attn(inner * T, 0.0f); // [h][T][dh] like q
+    std::vector<double> scores(T);
+    for (int h = 0; h < heads; h++) {
+        const float* qh = q.data() + (size_t)h * T * dim_head;
+        const float* kh = k.data() + (size_t)h * T * dim_head;
+        const float* vh = v.data() + (size_t)h * T * dim_head;
+        float* oh = attn.data() + (size_t)h * T * dim_head;
+        for (int m = 0; m < T; m++) {
+            double mx = -1e30;
+            for (int n = 0; n < T; n++) {
+                double dot = 0;
+                for (int d = 0; d < dim_head; d++)
+                    dot += (double)qh[(size_t)m * dim_head + d] * kh[(size_t)n * dim_head + d];
+                scores[n] = dot * scale;
+                if (scores[n] > mx)
+                    mx = scores[n];
+            }
+            double sum = 0;
+            for (int n = 0; n < T; n++) {
+                scores[n] = std::exp(scores[n] - mx);
+                sum += scores[n];
+            }
+            for (int d = 0; d < dim_head; d++) {
+                double acc = 0;
+                for (int n = 0; n < T; n++)
+                    acc += scores[n] * vh[(size_t)n * dim_head + d];
+                oh[(size_t)m * dim_head + d] = (float)(acc / sum);
+            }
+        }
+    }
+    // per-head gating: out[t,h,:] *= sigmoid(gates[t,h]); gates = xn @ gate_w.T + b
+    std::vector<float> gates;
+    linear(xn, T, dim, gate_w, &gate_b, heads, gates); // (T, heads)
+    for (int t = 0; t < T; t++)
+        for (int h = 0; h < heads; h++) {
+            const double g = 1.0 / (1.0 + std::exp(-(double)gates[(size_t)t * heads + h]));
+            for (int d = 0; d < dim_head; d++)
+                attn[((size_t)h * T + t) * dim_head + d] *= (float)g;
+        }
+    // reshape [h][T][dh] -> [T][h*dh] then to_out
+    std::vector<float> attn_flat((size_t)T * inner);
+    for (int t = 0; t < T; t++)
+        for (int h = 0; h < heads; h++)
+            for (int d = 0; d < dim_head; d++)
+                attn_flat[(size_t)t * inner + h * dim_head + d] = attn[((size_t)h * T + t) * dim_head + d];
+    std::vector<float> attn_out;
+    linear(attn_flat, T, inner, out_w, nullptr, dim, attn_out); // (T, dim)
+    for (size_t i = 0; i < x.size(); i++)
+        x[i] += attn_out[i]; // residual
+
+    // --- FFN ---
+    std::vector<float> fn = x;
+    rms_rows(fn, T, dim, ff_g);
+    std::vector<float> h1;
+    linear(fn, T, dim, ff1_w, &ff1_b, (int)ff1_b.size(), h1);
+    gelu_erf_inplace(h1);
+    std::vector<float> h2;
+    linear(h1, T, (int)ff1_b.size(), ff4_w, &ff4_b, dim, h2);
+    for (size_t i = 0; i < x.size(); i++)
+        x[i] += h2[i]; // residual
+    return true;
+}
+
 } // namespace
 
 int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const char* audio_wav, int verbosity) {
@@ -541,7 +687,36 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
         }
     }
 
-    fprintf(stderr, "  [PENDING] layer*_time/freq, mask_raw, output_vocals — Phase 2 transformer graph.\n");
+    // --- layer0_time (band 0) : the time RoFormer block of layer 0 ---
+    // INPUT-ALIGNED off the reference band_split_out (its RMSNorm amplifies
+    // upstream float error). The dumper hook captured [0] = band 0's output, and
+    // the time transformer attends over T within each band independently, so we
+    // reproduce band 0's (T, dim) sequence only. Layer 0 is is_first -> no
+    // value-residual input. Block = attn+ffn (depth 1) then the final RMSNorm.
+    {
+        std::vector<float> ref_bso;
+        int64_t nn = 0;
+        std::vector<float> ref_lt;
+        int64_t mm = 0;
+        if (ref_get(rw, "band_split_out", ref_bso, nn) && ref_get(rw, "layer0_time", ref_lt, mm)) {
+            const int nb = hp.num_bands;
+            // band 0 sequence: band_split_out[t, 0, :] -> (T, dim)
+            std::vector<float> x0((size_t)T * hp.dim);
+            for (int t = 0; t < T; t++)
+                for (int d = 0; d < hp.dim; d++)
+                    x0[(size_t)t * hp.dim + d] = ref_bso[((size_t)t * nb + 0) * hp.dim + d];
+            std::vector<float> final_g;
+            if (roformer_block(ctx->weights, "layers.0.0.layers.0.", x0, T, hp.dim, hp.heads, hp.dim_head) &&
+                read_f32(ctx->weights, "layers.0.0.norm.gamma", final_g)) {
+                rms_rows(x0, T, hp.dim, final_g); // Transformer final norm
+                report("layer0_time", x0, ref_lt);
+            } else {
+                fprintf(stderr, "  layer0_time: SKIP (a weight was missing)\n");
+            }
+        }
+    }
+
+    fprintf(stderr, "  [PENDING] layer0_freq, layer1/5_*, mask_raw, output_vocals — Phase 2 cont.\n");
 
     if (rw.buf)
         ggml_backend_buffer_free(rw.buf);
