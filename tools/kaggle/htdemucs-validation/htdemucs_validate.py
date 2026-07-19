@@ -1,79 +1,99 @@
 #!/usr/bin/env python3
 """Kaggle kernel: validate HTDemucs C++ against Python reference.
 
-Builds CrispASR, converts HTDemucs model, runs the C++ smoke test,
-and compares spec_input / encoder outputs against the Python reference
-dumper's GGUF.
+Builds CrispASR (htdemucs target only), converts HTDemucs model,
+runs the C++ smoke test, and compares spec_input / encoder outputs
+against the Python reference dumper's GGUF.
 """
-import os, sys, subprocess, shutil
+import os, sys, subprocess, time
 from pathlib import Path
 
+os.environ["PYTHONUNBUFFERED"] = "1"
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+    sys.stderr.reconfigure(line_buffering=True)
+except (AttributeError, ValueError):
+    pass
+
 WORK = Path("/kaggle/working")
+REPO = WORK / "CrispASR"
+BUILD = REPO / "build"
 os.chdir(str(WORK))
 
 # ── Clone CrispASR ──────────────────────────────────────────────────
 CRISPASR_URL = "https://github.com/CrispStrobe/CrispASR.git"
-_CRISPASR_DIR = WORK / "CrispASR"
-if not _CRISPASR_DIR.exists():
+if not REPO.exists():
     try:
         subprocess.check_call(["git", "clone", "--depth", "1",
-            CRISPASR_URL, str(_CRISPASR_DIR)])
+            CRISPASR_URL, str(REPO)])
         subprocess.check_call(["git", "submodule", "update", "--init", "ggml"],
-                              cwd=str(_CRISPASR_DIR))
-        sys.path.insert(0, str(_CRISPASR_DIR / "tools" / "kaggle"))
+                              cwd=str(REPO))
+        sys.path.insert(0, str(REPO / "tools" / "kaggle"))
     except Exception:
-        pass
+        pass  # fall through to bundled copy
 
-if str(_CRISPASR_DIR / "tools" / "kaggle") not in sys.path:
+if str(REPO / "tools" / "kaggle") not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaggle_harness as kh
 kh.init_progress()
 
 # ── Install deps ────────────────────────────────────────────────────
-kh.step("Installing deps...")
+kh.step("install_deps")
 subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet",
                        "demucs", "gguf", "einops", "julius", "dora-search",
                        "--no-deps"])
 
-# ── Build CrispASR ──────────────────────────────────────────────────
-kh.step("Building CrispASR...")
-os.chdir(str(_CRISPASR_DIR))
-kh.install_build_toolchain()
+# ── HF token (for model downloads with rate limits) ─────────────────
+hf_token = kh.resolve_hf_token()
+if hf_token:
+    os.environ["HF_TOKEN"] = hf_token
+    kh.step("hf_token_resolved")
 
-build_dir = _CRISPASR_DIR / "build"
-cmake_flags = [
-    "-DCMAKE_BUILD_TYPE=Release",
-    "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
-    "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
-    "-DCRISPASR_NO_C2PA_NATIVE=ON",
-]
-subprocess.check_call(["cmake", "-G", "Ninja", "-B", str(build_dir)] + cmake_flags)
+# ── Build toolchain ─────────────────────────────────────────────────
+kh.step("install_toolchain")
+toolchain = kh.install_build_toolchain()
+
+# ── Build CrispASR (htdemucs target only) ───────────────────────────
+kh.step("cmake_configure")
+build_flags = kh.cache_and_link_flags()  # ccache + mold + CRISPASR_NO_C2PA_NATIVE
+
+with kh.build_heartbeat("cmake.configure"):
+    kh.sh(
+        f"cmake -S {REPO} -B {BUILD} -G Ninja "
+        f"-DCMAKE_BUILD_TYPE=Release "
+        + " ".join(build_flags)
+    )
+
+kh.step("cmake_build")
 import multiprocessing
 jobs = str(multiprocessing.cpu_count())
-subprocess.check_call(["cmake", "--build", str(build_dir), "-j", jobs,
-                       "--target", "htdemucs"])
-kh.step(f"Build complete (htdemucs target, -j{jobs})")
+with kh.build_heartbeat("cmake.build"):
+    kh.sh_with_progress(
+        f"stdbuf -oL -eL cmake --build {BUILD} "
+        f"--target htdemucs crispasr-core -j{jobs}"
+    )
+
+kh.step(f"build_complete (htdemucs, -j{jobs})")
 
 # ── Convert HTDemucs model ──────────────────────────────────────────
-kh.step("Converting HTDemucs model to GGUF (F32)...")
+kh.step("convert_model")
 model_path = WORK / "htdemucs-f32.gguf"
-subprocess.check_call([sys.executable,
-    str(_CRISPASR_DIR / "models" / "convert-htdemucs-to-gguf.py"),
-    "--model", "htdemucs",
-    "--output", str(model_path),
-    "--dtype", "f32"])
-kh.step(f"Converted: {model_path} ({model_path.stat().st_size / 1e6:.1f} MB)")
+kh.sh(
+    f"{sys.executable} {REPO / 'models' / 'convert-htdemucs-to-gguf.py'} "
+    f"--model htdemucs --output {model_path} --dtype f32"
+)
+kh.step(f"converted ({model_path.stat().st_size / 1e6:.1f} MB)")
 
 # ── Generate Python reference ───────────────────────────────────────
-kh.step("Generating Python reference dump...")
+kh.step("reference_dump")
 ref_path = WORK / "htdemucs-ref.gguf"
 
-# We need a test audio file — use a synthetic sine wave
+# Synthetic test audio (3s sine at 16 kHz mono — harness resamples to 44100 stereo)
 import numpy as np
 import wave
 test_wav = WORK / "test_sine.wav"
 sr = 16000
-t = np.arange(sr * 3) / sr  # 3 seconds
+t = np.arange(sr * 3) / sr
 pcm = (0.5 * np.sin(2 * np.pi * 440 * t)).astype(np.float32)
 pcm_i16 = (pcm * 32767).astype(np.int16)
 with wave.open(str(test_wav), "wb") as wf:
@@ -82,63 +102,54 @@ with wave.open(str(test_wav), "wb") as wf:
     wf.setframerate(sr)
     wf.writeframes(pcm_i16.tobytes())
 
-subprocess.check_call([sys.executable,
-    str(_CRISPASR_DIR / "tools" / "dump_reference.py"),
-    "--backend", "htdemucs",
-    "--model-dir", "htdemucs",
-    "--audio", str(test_wav),
-    "--output", str(ref_path)])
-kh.step(f"Reference dump: {ref_path} ({ref_path.stat().st_size / 1e6:.1f} MB)")
+kh.sh(
+    f"{sys.executable} {REPO / 'tools' / 'dump_reference.py'} "
+    f"--backend htdemucs --model-dir htdemucs "
+    f"--audio {test_wav} --output {ref_path}"
+)
+kh.step(f"reference_dump_done ({ref_path.stat().st_size / 1e6:.1f} MB)")
 
 # ── Build and run C++ smoke test ────────────────────────────────────
-kh.step("Building smoke test...")
-smoke_src = _CRISPASR_DIR / "tests" / "test_htdemucs_smoke.cpp"
-smoke_bin = build_dir / "bin" / "test_htdemucs_smoke"
-subprocess.check_call([
-    "g++", "-std=c++17", "-O2",
-    "-I", str(_CRISPASR_DIR / "src"),
-    "-I", str(_CRISPASR_DIR / "ggml" / "include"),
-    str(smoke_src),
-    "-L", str(build_dir / "src"), "-lhtdemucs", "-lcrispasr-core",
-    "-L", str(build_dir / "ggml" / "src"), "-lggml",
-    "-L", str(build_dir / "ggml" / "src" / "ggml-base"), "-lggml-base",
-    "-L", str(build_dir / "ggml" / "src" / "ggml-cpu"), "-lggml-cpu",
-    "-lpthread", "-lm", "-ldl",
-    "-o", str(smoke_bin)
-])
+kh.step("build_smoke_test")
+smoke_src = REPO / "tests" / "test_htdemucs_smoke.cpp"
+smoke_bin = BUILD / "bin" / "test_htdemucs_smoke"
+# Static link to avoid LD_LIBRARY_PATH issues
+kh.sh(
+    f"g++ -std=c++17 -O2 "
+    f"-I {REPO / 'src'} -I {REPO / 'ggml' / 'include'} "
+    f"{smoke_src} "
+    f"-L {BUILD / 'src'} -l:libhtdemucs.a -l:libcrispasr-core.a "
+    f"-L {BUILD / 'ggml' / 'src'} -l:libggml.a "
+    f"-L {BUILD / 'ggml' / 'src' / 'ggml-base'} -l:libggml-base.a "
+    f"-L {BUILD / 'ggml' / 'src' / 'ggml-cpu'} -l:libggml-cpu.a "
+    f"-lpthread -lm -ldl "
+    f"-o {smoke_bin}"
+)
 
-kh.step("Running HTDemucs smoke test...")
+kh.step("run_smoke_test")
 env = os.environ.copy()
 env["CRISPASR_HTDEMUCS_DEBUG"] = "1"
-env["OMP_NUM_THREADS"] = "4"
-# Set LD_LIBRARY_PATH for shared ggml libs
-ld_paths = [
-    str(build_dir / "ggml" / "src"),
-    str(build_dir / "ggml" / "src" / "ggml-base"),
-    str(build_dir / "ggml" / "src" / "ggml-cpu"),
-    str(build_dir / "src"),
-]
-env["LD_LIBRARY_PATH"] = ":".join(ld_paths) + ":" + env.get("LD_LIBRARY_PATH", "")
+env["OMP_NUM_THREADS"] = jobs
 result = subprocess.run([str(smoke_bin), str(model_path)],
                        capture_output=True, text=True, env=env, timeout=600)
 print(result.stderr)
 if result.returncode != 0:
-    kh.step(f"Smoke test FAILED (exit {result.returncode})")
+    kh.step(f"smoke_test_FAILED (exit {result.returncode})")
 else:
-    kh.step("Smoke test PASSED")
+    kh.step("smoke_test_PASSED")
 
 # ── Compare reference stages ────────────────────────────────────────
-kh.step("Comparing reference stages...")
+kh.step("compare_reference")
 try:
     from gguf import GGUFReader
     ref = GGUFReader(str(ref_path))
     ref_tensors = {t.name: np.array(t.data, dtype=np.float32) for t in ref.tensors}
-    kh.step(f"Reference has {len(ref_tensors)} stages: {list(ref_tensors.keys())}")
+    kh.step(f"reference_loaded ({len(ref_tensors)} stages)")
 
     for name, data in sorted(ref_tensors.items()):
         kh.step(f"  {name}: shape={data.shape}, mean={data.mean():.6f}, std={data.std():.6f}")
 except Exception as e:
-    kh.step(f"Reference comparison failed: {e}")
+    kh.step(f"reference_compare_FAILED: {e}")
 
 # ── Write progress file ─────────────────────────────────────────────
 with open(WORK / "progress.txt", "w") as f:
@@ -146,5 +157,6 @@ with open(WORK / "progress.txt", "w") as f:
     f.write(f"Model: {model_path}\n")
     f.write(f"Reference: {ref_path}\n")
     f.write(f"Smoke test exit code: {result.returncode}\n")
+    f.write(f"Smoke test stderr:\n{result.stderr}\n")
 
-kh.step("Done!")
+kh.step("done")
