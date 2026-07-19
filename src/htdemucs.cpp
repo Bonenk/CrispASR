@@ -263,8 +263,221 @@ static bool load_hparams(htdemucs_hparams& hp, gguf_context* meta) {
     return true;
 }
 
-// Placeholder: full weight loading will be Phase 2.
-// For now just load hparams and verify the GGUF structure.
+// ---------------------------------------------------------------------------
+// Weight binding (Phase 2)
+// ---------------------------------------------------------------------------
+
+static void bind_dconv(htdemucs_dconv& dc, const core_gguf::tensor_map& t, const std::string& prefix, int depth) {
+    dc.layers.resize(depth);
+    for (int d = 0; d < depth; d++) {
+        auto& sl = dc.layers[d];
+        std::string p = prefix + "." + std::to_string(d);
+        // Sequential: [0]=dilated_conv, [1]=groupnorm, [2]=GELU, [3]=1x1_conv, [4]=groupnorm, [5]=GLU, [6]=LayerScale
+        sl.conv1_w = core_gguf::try_get(t, (p + ".0.weight").c_str());
+        sl.conv1_b = core_gguf::try_get(t, (p + ".0.bias").c_str());
+        sl.norm1_w = core_gguf::try_get(t, (p + ".1.weight").c_str());
+        sl.norm1_b = core_gguf::try_get(t, (p + ".1.bias").c_str());
+        sl.conv2_w = core_gguf::try_get(t, (p + ".3.weight").c_str());
+        sl.conv2_b = core_gguf::try_get(t, (p + ".3.bias").c_str());
+        sl.norm2_w = core_gguf::try_get(t, (p + ".4.weight").c_str());
+        sl.norm2_b = core_gguf::try_get(t, (p + ".4.bias").c_str());
+        sl.scale = core_gguf::try_get(t, (p + ".6.scale").c_str());
+    }
+}
+
+static void bind_enc_layer(htdemucs_enc_layer& el, const core_gguf::tensor_map& t, const std::string& prefix) {
+    el.conv_w = core_gguf::try_get(t, (prefix + ".conv.weight").c_str());
+    el.conv_b = core_gguf::try_get(t, (prefix + ".conv.bias").c_str());
+    el.norm1_w = core_gguf::try_get(t, (prefix + ".norm1.weight").c_str());
+    el.norm1_b = core_gguf::try_get(t, (prefix + ".norm1.bias").c_str());
+    el.rewrite_w = core_gguf::try_get(t, (prefix + ".rewrite.weight").c_str());
+    el.rewrite_b = core_gguf::try_get(t, (prefix + ".rewrite.bias").c_str());
+    el.norm2_w = core_gguf::try_get(t, (prefix + ".norm2.weight").c_str());
+    el.norm2_b = core_gguf::try_get(t, (prefix + ".norm2.bias").c_str());
+    el.has_norm = el.norm1_w != nullptr;
+    el.empty = (el.norm1_w == nullptr && el.rewrite_w == nullptr);
+}
+
+static void bind_dec_layer(htdemucs_dec_layer& dl, const core_gguf::tensor_map& t, const std::string& prefix) {
+    dl.conv_tr_w = core_gguf::try_get(t, (prefix + ".conv_tr.weight").c_str());
+    dl.conv_tr_b = core_gguf::try_get(t, (prefix + ".conv_tr.bias").c_str());
+    dl.norm2_w = core_gguf::try_get(t, (prefix + ".norm2.weight").c_str());
+    dl.norm2_b = core_gguf::try_get(t, (prefix + ".norm2.bias").c_str());
+    dl.rewrite_w = core_gguf::try_get(t, (prefix + ".rewrite.weight").c_str());
+    dl.rewrite_b = core_gguf::try_get(t, (prefix + ".rewrite.bias").c_str());
+    dl.norm1_w = core_gguf::try_get(t, (prefix + ".norm1.weight").c_str());
+    dl.norm1_b = core_gguf::try_get(t, (prefix + ".norm1.bias").c_str());
+    dl.empty = (dl.rewrite_w == nullptr);
+}
+
+static void bind_self_attn_layer(htdemucs_self_attn_layer& sa, const core_gguf::tensor_map& t,
+                                 const std::string& prefix) {
+    sa.in_proj_w = core_gguf::try_get(t, (prefix + ".self_attn.in_proj_weight").c_str());
+    sa.in_proj_b = core_gguf::try_get(t, (prefix + ".self_attn.in_proj_bias").c_str());
+    sa.out_proj_w = core_gguf::try_get(t, (prefix + ".self_attn.out_proj.weight").c_str());
+    sa.out_proj_b = core_gguf::try_get(t, (prefix + ".self_attn.out_proj.bias").c_str());
+    sa.norm1_w = core_gguf::try_get(t, (prefix + ".norm1.weight").c_str());
+    sa.norm1_b = core_gguf::try_get(t, (prefix + ".norm1.bias").c_str());
+    sa.norm2_w = core_gguf::try_get(t, (prefix + ".norm2.weight").c_str());
+    sa.norm2_b = core_gguf::try_get(t, (prefix + ".norm2.bias").c_str());
+    sa.linear1_w = core_gguf::try_get(t, (prefix + ".linear1.weight").c_str());
+    sa.linear1_b = core_gguf::try_get(t, (prefix + ".linear1.bias").c_str());
+    sa.linear2_w = core_gguf::try_get(t, (prefix + ".linear2.weight").c_str());
+    sa.linear2_b = core_gguf::try_get(t, (prefix + ".linear2.bias").c_str());
+    sa.gamma1_scale = core_gguf::try_get(t, (prefix + ".gamma_1.scale").c_str());
+    sa.gamma2_scale = core_gguf::try_get(t, (prefix + ".gamma_2.scale").c_str());
+    sa.norm_out_w = core_gguf::try_get(t, (prefix + ".norm_out.weight").c_str());
+    sa.norm_out_b = core_gguf::try_get(t, (prefix + ".norm_out.bias").c_str());
+}
+
+static void bind_cross_attn_layer(htdemucs_cross_attn_layer& ca, const core_gguf::tensor_map& t,
+                                  const std::string& prefix) {
+    ca.cross_attn_in_proj_w = core_gguf::try_get(t, (prefix + ".cross_attn.in_proj_weight").c_str());
+    ca.cross_attn_in_proj_b = core_gguf::try_get(t, (prefix + ".cross_attn.in_proj_bias").c_str());
+    ca.cross_attn_out_proj_w = core_gguf::try_get(t, (prefix + ".cross_attn.out_proj.weight").c_str());
+    ca.cross_attn_out_proj_b = core_gguf::try_get(t, (prefix + ".cross_attn.out_proj.bias").c_str());
+    ca.norm1_w = core_gguf::try_get(t, (prefix + ".norm1.weight").c_str());
+    ca.norm1_b = core_gguf::try_get(t, (prefix + ".norm1.bias").c_str());
+    ca.norm2_w = core_gguf::try_get(t, (prefix + ".norm2.weight").c_str());
+    ca.norm2_b = core_gguf::try_get(t, (prefix + ".norm2.bias").c_str());
+    ca.norm3_w = core_gguf::try_get(t, (prefix + ".norm3.weight").c_str());
+    ca.norm3_b = core_gguf::try_get(t, (prefix + ".norm3.bias").c_str());
+    ca.linear1_w = core_gguf::try_get(t, (prefix + ".linear1.weight").c_str());
+    ca.linear1_b = core_gguf::try_get(t, (prefix + ".linear1.bias").c_str());
+    ca.linear2_w = core_gguf::try_get(t, (prefix + ".linear2.weight").c_str());
+    ca.linear2_b = core_gguf::try_get(t, (prefix + ".linear2.bias").c_str());
+    ca.gamma1_scale = core_gguf::try_get(t, (prefix + ".gamma_1.scale").c_str());
+    ca.gamma2_scale = core_gguf::try_get(t, (prefix + ".gamma_2.scale").c_str());
+    ca.norm_out_w = core_gguf::try_get(t, (prefix + ".norm_out.weight").c_str());
+    ca.norm_out_b = core_gguf::try_get(t, (prefix + ".norm_out.bias").c_str());
+}
+
+static bool bind_weights(htdemucs_model& m, const core_gguf::tensor_map& t) {
+    auto& hp = m.hparams;
+    int bound = 0;
+
+    // Encoder (freq branch)
+    m.encoder.resize(hp.depth);
+    for (int i = 0; i < hp.depth; i++) {
+        std::string p = "encoder." + std::to_string(i);
+        bind_enc_layer(m.encoder[i], t, p);
+        if (m.encoder[i].conv_w)
+            bound++;
+        // DConv
+        if (core_gguf::try_get(t, (p + ".dconv.layers.0.0.weight").c_str())) {
+            bind_dconv(m.encoder[i].dconv, t, p + ".dconv.layers", hp.dconv_depth);
+        }
+        // Determine freq vs time, kernel/stride/pad from weight shape
+        m.encoder[i].freq = (m.encoder[i].conv_w && ggml_n_dims(m.encoder[i].conv_w) == 4);
+    }
+
+    // Encoder (time branch) — as many layers as freq>1 layers.
+    // For depth=4, nfft=4096: freqs = 2048→512→128→32→8→1 but depth=4 so:
+    // layer 0: freq=True (2048→512), layer 1: freq=True (512→128),
+    // layer 2: freq=True (128→32), layer 3: freq=True (32→8, last_freq=True, ker=32→8)
+    // Wait, let me re-check: nfft/2=2048, stride=4:
+    // layer 0: freqs=2048, freq=True. 2048>kernel_size(8). freqs=2048/4=512
+    // layer 1: freqs=512, freq=True. 512>8. freqs=512/4=128
+    // layer 2: freqs=128, freq=True. 128>8. freqs=128/4=32
+    // layer 3: freqs=32, freq=True. 32>8. freqs=32/4=8
+    // But depth=4, so we stop. The time encoders exist for layers where freq=True,
+    // which is all 4 layers. But the LAST freq layer that makes freqs<=kernel_size
+    // has empty=True for the time encoder.
+    // Let me just count from the GGUF:
+    m.tencoder.resize(0);
+    for (int i = 0; i < hp.depth; i++) {
+        std::string p = "tencoder." + std::to_string(i);
+        auto* w = core_gguf::try_get(t, (p + ".conv.weight").c_str());
+        if (!w)
+            break;
+        m.tencoder.resize(i + 1);
+        bind_enc_layer(m.tencoder[i], t, p);
+        m.tencoder[i].freq = false; // time branch always Conv1d
+        if (core_gguf::try_get(t, (p + ".dconv.layers.0.0.weight").c_str())) {
+            bind_dconv(m.tencoder[i].dconv, t, p + ".dconv.layers", hp.dconv_depth);
+        }
+        bound++;
+    }
+
+    // Decoder (freq branch)
+    m.decoder.resize(hp.depth);
+    for (int i = 0; i < hp.depth; i++) {
+        std::string p = "decoder." + std::to_string(i);
+        bind_dec_layer(m.decoder[i], t, p);
+        m.decoder[i].freq = (m.decoder[i].conv_tr_w && ggml_n_dims(m.decoder[i].conv_tr_w) == 4);
+        m.decoder[i].last = (i == hp.depth - 1);
+        if (core_gguf::try_get(t, (p + ".dconv.layers.0.0.weight").c_str())) {
+            bind_dconv(m.decoder[i].dconv, t, p + ".dconv.layers", hp.dconv_depth);
+        }
+        if (m.decoder[i].conv_tr_w)
+            bound++;
+    }
+
+    // Decoder (time branch)
+    m.tdecoder.resize(0);
+    for (int i = 0; i < hp.depth; i++) {
+        std::string p = "tdecoder." + std::to_string(i);
+        auto* w = core_gguf::try_get(t, (p + ".conv_tr.weight").c_str());
+        if (!w)
+            break;
+        m.tdecoder.resize(i + 1);
+        bind_dec_layer(m.tdecoder[i], t, p);
+        m.tdecoder[i].freq = false;
+        m.tdecoder[i].last = (i == 0); // tdecoder is reversed
+        if (core_gguf::try_get(t, (p + ".dconv.layers.0.0.weight").c_str())) {
+            bind_dconv(m.tdecoder[i].dconv, t, p + ".dconv.layers", hp.dconv_depth);
+        }
+        bound++;
+    }
+
+    // Frequency embedding
+    m.freq_emb_w = core_gguf::try_get(t, "freq_emb.embedding.weight");
+
+    // Channel up/downsamplers
+    m.channel_up_w = core_gguf::try_get(t, "channel_upsampler.weight");
+    m.channel_up_b = core_gguf::try_get(t, "channel_upsampler.bias");
+    m.channel_down_w = core_gguf::try_get(t, "channel_downsampler.weight");
+    m.channel_down_b = core_gguf::try_get(t, "channel_downsampler.bias");
+    m.channel_up_t_w = core_gguf::try_get(t, "channel_upsampler_t.weight");
+    m.channel_up_t_b = core_gguf::try_get(t, "channel_upsampler_t.bias");
+    m.channel_down_t_w = core_gguf::try_get(t, "channel_downsampler_t.weight");
+    m.channel_down_t_b = core_gguf::try_get(t, "channel_downsampler_t.bias");
+
+    // CrossTransformer norm_in
+    m.norm_in_w = core_gguf::try_get(t, "crosstransformer.norm_in.weight");
+    m.norm_in_b = core_gguf::try_get(t, "crosstransformer.norm_in.bias");
+    m.norm_in_t_w = core_gguf::try_get(t, "crosstransformer.norm_in_t.weight");
+    m.norm_in_t_b = core_gguf::try_get(t, "crosstransformer.norm_in_t.bias");
+
+    // CrossTransformer layers (spec + time)
+    m.ct_layers.resize(hp.t_layers);
+    m.ct_layers_t.resize(hp.t_layers);
+    for (int i = 0; i < hp.t_layers; i++) {
+        bool is_cross = (i % 2 != hp.t_classic_parity);
+        // Spec layers
+        m.ct_layers[i].is_cross = is_cross;
+        std::string sp = "crosstransformer.layers." + std::to_string(i);
+        if (is_cross) {
+            bind_cross_attn_layer(m.ct_layers[i].cross_attn, t, sp);
+        } else {
+            bind_self_attn_layer(m.ct_layers[i].self_attn, t, sp);
+        }
+        // Time layers
+        m.ct_layers_t[i].is_cross = is_cross;
+        std::string tp_str = "crosstransformer.layers_t." + std::to_string(i);
+        if (is_cross) {
+            bind_cross_attn_layer(m.ct_layers_t[i].cross_attn, t, tp_str);
+        } else {
+            bind_self_attn_layer(m.ct_layers_t[i].self_attn, t, tp_str);
+        }
+    }
+
+    fprintf(stderr,
+            "htdemucs: bound %d enc/dec layers, %d tenc, %d tdec, "
+            "%d transformer layers\n",
+            bound, (int)m.tencoder.size(), (int)m.tdecoder.size(), hp.t_layers);
+    return true;
+}
 
 static htdemucs_context* htdemucs_init_impl(const char* model_path, htdemucs_params params) {
     auto ctx = new htdemucs_context();
@@ -305,7 +518,11 @@ static htdemucs_context* htdemucs_init_impl(const char* model_path, htdemucs_par
 
     fprintf(stderr, "htdemucs: loaded %zu tensors\n", wl.tensors.size());
 
-    // TODO: bind named tensors into model struct fields
+    if (!bind_weights(ctx->model, wl.tensors)) {
+        fprintf(stderr, "htdemucs: failed to bind weights\n");
+        delete ctx;
+        return nullptr;
+    }
 
     // Source names
     ctx->model.source_names = {"drums", "bass", "other", "vocals"};
