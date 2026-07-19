@@ -979,8 +979,11 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             int t_stri = hp.stride;
             int t_pad = t_ker / 4;
             ggml_tensor* ty = ggml_conv_1d(tg, tenc.conv_w, xt_in, t_stri, t_pad, 1);
-            if (tenc.conv_b)
-                ty = ggml_add(tg, ty, tenc.conv_b);
+            if (tenc.conv_b) {
+                // Bias (C,) → (1, C) for broadcast over time dim
+                ggml_tensor* tb = ggml_reshape_2d(tg, tenc.conv_b, 1, (int)tenc.conv_b->ne[0]);
+                ty = ggml_add(tg, ty, tb);
+            }
 
             if (!tenc.empty) {
                 // GroupNorm + GELU + Rewrite + GLU (same as freq but 2D)
@@ -1005,8 +1008,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // Rewrite + GLU
                 if (tenc.rewrite_w) {
                     ggml_tensor* trw = ggml_conv_1d(tg, tenc.rewrite_w, ty, 1, 0, 1);
-                    if (tenc.rewrite_b)
-                        trw = ggml_add(tg, trw, tenc.rewrite_b);
+                    if (tenc.rewrite_b) {
+                        ggml_tensor* trb = ggml_reshape_2d(tg, tenc.rewrite_b, 1, (int)tenc.rewrite_b->ne[0]);
+                        trw = ggml_add(tg, trw, trb);
+                    }
                     if (tenc.norm2_w) {
                         int trw_T = (int)trw->ne[0], trw_C = (int)trw->ne[1];
                         trw = ggml_reshape_4d(tg, trw, trw_T, 1, trw_C, 1);
@@ -1328,9 +1333,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             // x = x + skip
             dy = ggml_add(dg, dy, skip_in);
 
-            // Rewrite: 1x1 Conv2d → 2*C → GroupNorm → GLU
+            // Rewrite: Conv2d(C→2*C, [1+2*ctx, 1+2*ctx], stride=1, pad=[ctx,ctx]) → GroupNorm → GLU
             if (dec.rewrite_w) {
-                ggml_tensor* drw = ggml_conv_2d(dg, dec.rewrite_w, dy, 1, 1, 0, 0, 1, 1);
+                int ctx_pad = hp.context; // context=1 for decoder
+                ggml_tensor* drw = ggml_conv_2d(dg, dec.rewrite_w, dy, 1, 1, ctx_pad, ctx_pad, 1, 1);
                 if (dec.rewrite_b) {
                     ggml_tensor* drwb = ggml_reshape_4d(dg, dec.rewrite_b, 1, 1, (int)dec.rewrite_b->ne[0], 1);
                     drw = ggml_add(dg, drw, drwb);
@@ -1525,20 +1531,82 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
     fprintf(stderr, "htdemucs: decoder done, output (%d, %d, %d)\n", x_C, x_Fq, x_T);
 
-    // Return stub result
+    // Step 9: CaC unmask → iSTFT → denormalize → sum branches → output
+    //
+    // Decoder output x_buf: (T, Fq, C, 1) where C = n_sources * audio_channels * 2
+    // (CaC = 2× for real/imag). For 4 sources × 2 channels × 2 (real/imag) = 16 channels.
+    // Reshape: (B, S, C*2//S, Fq, T) → for each source: (2, Fq, T) complex spec
+    // Then iSTFT each source independently.
+
+    int S = hp.n_sources;       // 4
+    int ac = hp.audio_channels; // 2
+    int ch_per_source = ac * 2; // 4 (2 audio channels × 2 for CaC real/imag)
+
+    // Denormalize: x = x * std + mean
+    for (size_t i = 0; i < x_buf.size(); i++) {
+        x_buf[i] = x_buf[i] * spec_std + spec_mean;
+    }
+
+    // CaC unmask: decoder output → per-source complex spectrogram → iSTFT
+    // x_buf layout: (x_T, x_Fq, x_C) where x_C = S * ch_per_source = 16
+    // For source s, audio channel c: real = x_buf[..., s*ch_per_source + c*2]
+    //                                 imag = x_buf[..., s*ch_per_source + c*2+1]
     auto r = new htdemucs_result();
-    r->n_sources = hp.n_sources;
-    r->n_channels = hp.audio_channels;
+    r->n_sources = S;
+    r->n_channels = ac;
     r->n_samples = n_samples;
     r->sample_rate = hp.samplerate;
+    r->sources = new float*[S];
+    r->source_names = new const char*[S];
 
-    r->sources = new float*[hp.n_sources];
-    r->source_names = new const char*[hp.n_sources];
-    for (int s = 0; s < hp.n_sources; s++) {
-        size_t sz = (size_t)hp.audio_channels * n_samples;
-        r->sources[s] = new float[sz]();
+    for (int s = 0; s < S; s++) {
         r->source_names[s] = m.source_names[s].c_str();
+
+        // Extract per-source complex spectrogram (ac channels × Fq × T)
+        // Need to add back the dropped freq bin (Fq → Fq+1) with zeros
+        int n_freqs_full = Fq + 1; // restore to nfft/2+1
+        std::vector<float> src_real(ac * n_freqs_full * x_T, 0.0f);
+        std::vector<float> src_imag(ac * n_freqs_full * x_T, 0.0f);
+
+        for (int c = 0; c < ac; c++) {
+            for (int fq = 0; fq < Fq; fq++) {
+                for (int t = 0; t < x_T; t++) {
+                    // x_buf index: t + fq * x_T + ch * x_T * x_Fq
+                    int ch_re = s * ch_per_source + c * 2;
+                    int ch_im = s * ch_per_source + c * 2 + 1;
+                    float re = x_buf[t + (size_t)fq * x_T + (size_t)ch_re * x_T * x_Fq];
+                    float im = x_buf[t + (size_t)fq * x_T + (size_t)ch_im * x_T * x_Fq];
+                    // Output spec layout for iSTFT: (ch, freqs, frames)
+                    src_real[(size_t)c * n_freqs_full * x_T + (size_t)fq * x_T + t] = re;
+                    src_imag[(size_t)c * n_freqs_full * x_T + (size_t)fq * x_T + t] = im;
+                }
+            }
+        }
+
+        // iSTFT: complex spec → waveform
+        // Python _ispec: F.pad(z, (0,0,0,1)) adds back the dropped freq bin,
+        // F.pad(z, (2,2)) adds 2 frames on each side, then ispectro with length.
+        // We've already restored the freq bin; for the frame padding we skip it
+        // (the added frames are zeros anyway and get trimmed).
+        std::vector<float> src_pcm(ac * work_length, 0.0f);
+        compute_istft(src_real.data(), src_imag.data(), ac, n_freqs_full, x_T, nfft, hop, ctx->hann_window.data(),
+                      work_length, src_pcm.data());
+
+        // Denormalize time branch and add (if time decoder was run)
+        // For now, time branch output is not wired through the decoder,
+        // so we skip the time branch addition.
+        // TODO Phase 3: add time branch decoder output
+
+        // Trim to original length and interleave stereo
+        r->sources[s] = new float[(size_t)ac * n_samples];
+        for (int i = 0; i < n_samples; i++) {
+            for (int c = 0; c < ac; c++) {
+                r->sources[s][i * ac + c] = src_pcm[(size_t)c * work_length + i];
+            }
+        }
     }
+
+    fprintf(stderr, "htdemucs: separated %d samples → %d sources (%d ch @ %d Hz)\n", n_samples, S, ac, hp.samplerate);
 
     return r;
 }
