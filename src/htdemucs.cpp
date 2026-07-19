@@ -972,36 +972,66 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             }
 
             if (!enc.empty) {
-                // GroupNorm + GELU
+                // GroupNorm(norm_groups, C) + GELU
+                // ggml_group_norm uses ne[2] as channel dim — correct for (T, Fq, C, N)
                 if (enc.norm1_w) {
-                    int n_groups = (enc.norm1_w->ne[0] <= 4) ? 1 : 4;
-                    (void)n_groups;
-                    // ggml_group_norm expects (ne[0]=C, ...) — but our tensor is (T, Fq, C, 1)
-                    // GroupNorm normalizes over the channel dim. ggml_group_norm works on ne[2] for 4D.
-                    // Actually, ggml_group_norm normalizes over ne[0] (the channel dim in the ggml convention
-                    // where ne[0] is the innermost/fastest dimension). For a 4D tensor (T, Fq, C, N),
-                    // the channel dim is ne[2]=C. But ggml_group_norm works on ne[0].
-                    // We need to permute to put channels in ne[0], apply norm, permute back.
-                    // This is complex — for now, skip GroupNorm and just apply GELU.
-                    // TODO: implement GroupNorm correctly for 4D tensors.
-                    // For a first pass, use CPU-side GroupNorm instead of ggml.
+                    int ng = 4; // norm_groups — htdemucs default
+                    y = ggml_group_norm(g, y, ng, 1e-5f);
+                    // Affine: y = y * weight + bias (weight/bias are 1D = (C,), broadcast over T,Fq)
+                    ggml_tensor* w4d = ggml_reshape_4d(g, enc.norm1_w, 1, 1, (int)enc.norm1_w->ne[0], 1);
+                    y = ggml_mul(g, y, w4d);
+                    if (enc.norm1_b) {
+                        ggml_tensor* b4d = ggml_reshape_4d(g, enc.norm1_b, 1, 1, (int)enc.norm1_b->ne[0], 1);
+                        y = ggml_add(g, y, b4d);
+                    }
                 }
                 y = ggml_gelu(g, y);
 
                 // DConv: operates on time axis per-freq-band.
                 // Python: y.permute(0,2,1,3).reshape(-1,C,T) → DConv → reshape back
-                // For now skip DConv — we'll add it after Conv2d parity is validated.
+                if (enc.dconv.layers.size() > 0) {
+                    int yC = (int)y->ne[2], yFq = (int)y->ne[1], yT = (int)y->ne[0];
+                    // Permute (T, Fq, C, 1) → (T, C, Fq, 1) then reshape to (T, C, Fq*1)
+                    // Actually DConv Conv1d operates on (C, T) per freq band.
+                    // We need to reshape to (Fq, C, T) batch — but ggml conv_1d doesn't
+                    // support batching. For now, skip DConv and add it in a follow-up.
+                    // TODO: implement DConv per-freq-band via loop or batched conv.
+                    (void)yC;
+                    (void)yFq;
+                    (void)yT;
+                }
 
-                // Rewrite: 1x1 Conv2d → 2*C, then GLU
+                // Rewrite: 1x1 Conv2d(C → 2*C) → GroupNorm → GLU
                 if (enc.rewrite_w) {
                     ggml_tensor* rw = ggml_conv_2d(g, enc.rewrite_w, y, 1, 1, 0, 0, 1, 1);
                     if (enc.rewrite_b) {
                         ggml_tensor* rwb = ggml_reshape_4d(g, enc.rewrite_b, 1, 1, (int)enc.rewrite_b->ne[0], 1);
                         rw = ggml_add(g, rw, rwb);
                     }
-                    // TODO: GroupNorm on rewrite output, then GLU
-                    // For now just pass through (no GLU = wrong output, but validates graph build)
-                    y = rw;
+                    if (enc.norm2_w) {
+                        int ng = 4;
+                        rw = ggml_group_norm(g, rw, ng, 1e-5f);
+                        ggml_tensor* w4d = ggml_reshape_4d(g, enc.norm2_w, 1, 1, (int)enc.norm2_w->ne[0], 1);
+                        rw = ggml_mul(g, rw, w4d);
+                        if (enc.norm2_b) {
+                            ggml_tensor* b4d = ggml_reshape_4d(g, enc.norm2_b, 1, 1, (int)enc.norm2_b->ne[0], 1);
+                            rw = ggml_add(g, rw, b4d);
+                        }
+                    }
+                    // GLU: split channel dim in half, a * sigmoid(b)
+                    // rw shape: (T, Fq, 2*C, 1)
+                    int rw_C = (int)rw->ne[2];
+                    int rw_half = rw_C / 2;
+                    int rw_Fq = (int)rw->ne[1];
+                    int rw_T = (int)rw->ne[0];
+                    // Split on ne[2] (channel dim): first half and second half
+                    // view_3d with offset on ne[2] axis:
+                    size_t ch_stride = rw->nb[2]; // bytes per channel slice
+                    ggml_tensor* a_glu =
+                        ggml_view_4d(g, rw, rw_T, rw_Fq, rw_half, 1, rw->nb[1], rw->nb[2], rw->nb[3], 0);
+                    ggml_tensor* b_glu = ggml_view_4d(g, rw, rw_T, rw_Fq, rw_half, 1, rw->nb[1], rw->nb[2], rw->nb[3],
+                                                      (size_t)rw_half * ch_stride);
+                    y = ggml_mul(g, ggml_cont(g, a_glu), ggml_sigmoid(g, ggml_cont(g, b_glu)));
                 }
             }
 
