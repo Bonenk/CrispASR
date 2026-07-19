@@ -215,12 +215,93 @@ def dump(args):
     writer.add_tensor("fsq_embedding", fsq_embedding.numpy())
     print(f"[miotts-ref] FSQ embedding shape: {fsq_embedding.shape}")
 
-    # For now, dump the intermediate stages. Full codec forward requires
-    # implementing the transformer + iSTFT which is the C++ port's job.
-    # The diff harness will compare up to fsq_embedding initially, then
-    # extend as we implement each codec stage in C++.
+    # ─── wave_prenet forward (6 layers, 768d, windowed attention) ──────
+    # This is a standard bidirectional transformer with SwiGLU FFN.
+    # We implement it step-by-step against the safetensors weights.
+    print("[miotts-ref] Running wave_prenet (6 layers)...")
 
-    print(f"[miotts-ref] Dumped {len(DEFAULT_STAGES)} stage slots")
+    def layer_norm(x, w, b, eps=1e-5):
+        mean = x.mean(-1, keepdim=True)
+        var = x.var(-1, keepdim=True, unbiased=False)
+        return (x - mean) / (var + eps).sqrt() * w + b
+
+    def swiglu_ffn(x, w1, w2, w3):
+        # SwiGLU: gate = silu(x @ w1.T), up = x @ w3.T, out = (gate * up) @ w2.T
+        gate = torch.nn.functional.silu(x @ w1.T)
+        up = x @ w3.T
+        return (gate * up) @ w2.T
+
+    def rope_freqs(seq_len, dim, theta=10000.0):
+        freqs = 1.0 / (theta ** (torch.arange(0, dim, 2, dtype=torch.float32) / dim))
+        t = torch.arange(seq_len, dtype=torch.float32)
+        freqs = torch.outer(t, freqs)
+        return torch.complex(torch.cos(freqs), torch.sin(freqs))
+
+    def apply_rope(x, freqs_cis):
+        # x: (T, n_heads, head_dim) → complex view
+        x_ = torch.view_as_complex(x.float().reshape(*x.shape[:-1], -1, 2))
+        freqs = freqs_cis[:x_.shape[0]].unsqueeze(1)  # (T, 1, head_dim//2)
+        return torch.view_as_real(x_ * freqs).flatten(-2).type_as(x)
+
+    def windowed_attention(x, wq, wk, wv, wo, n_heads, window_size=65):
+        T, d = x.shape
+        hd = d // n_heads
+        Q = (x @ wq.T).reshape(T, n_heads, hd)
+        K = (x @ wk.T).reshape(T, n_heads, hd)
+        V = (x @ wv.T).reshape(T, n_heads, hd)
+        # RoPE
+        freqs = rope_freqs(T, hd, theta=10000.0)
+        Q = apply_rope(Q, freqs)
+        K = apply_rope(K, freqs)
+        # Attention with window mask
+        Q = Q.permute(1, 0, 2)  # (n_heads, T, hd)
+        K = K.permute(1, 0, 2)
+        V = V.permute(1, 0, 2)
+        scale = hd ** -0.5
+        scores = torch.matmul(Q, K.transpose(-2, -1)) * scale  # (n_heads, T, T)
+        # Window mask: only attend within window_size//2 on each side
+        w = window_size // 2
+        mask = torch.ones(T, T, dtype=torch.bool)
+        mask = torch.triu(mask, diagonal=-w) & torch.tril(mask, diagonal=w)
+        scores = scores.masked_fill(~mask.unsqueeze(0), float('-inf'))
+        attn = torch.softmax(scores, dim=-1)
+        out = torch.matmul(attn, V)  # (n_heads, T, hd)
+        out = out.permute(1, 0, 2).reshape(T, d)  # (T, d)
+        return out @ wo.T
+
+    x = fsq_embedding  # (T, 768)
+    for il in range(6):
+        prefix = f"wave_prenet.layers.{il}"
+        # Pre-attention LayerNorm
+        an_w = sf.get_tensor(f"{prefix}.attention_norm.weight").float()
+        an_b = sf.get_tensor(f"{prefix}.attention_norm.bias").float()
+        wq = sf.get_tensor(f"{prefix}.attention.wq.weight").float()
+        wk = sf.get_tensor(f"{prefix}.attention.wk.weight").float()
+        wv = sf.get_tensor(f"{prefix}.attention.wv.weight").float()
+        wo = sf.get_tensor(f"{prefix}.attention.wo.weight").float()
+        fn_w = sf.get_tensor(f"{prefix}.ffn_norm.weight").float()
+        fn_b = sf.get_tensor(f"{prefix}.ffn_norm.bias").float()
+        w1 = sf.get_tensor(f"{prefix}.feed_forward.w1.weight").float()
+        w2 = sf.get_tensor(f"{prefix}.feed_forward.w2.weight").float()
+        w3 = sf.get_tensor(f"{prefix}.feed_forward.w3.weight").float()
+        # Attention
+        h = layer_norm(x, an_w, an_b)
+        attn_out = windowed_attention(h, wq, wk, wv, wo, n_heads=12, window_size=125)
+        x = x + attn_out
+        # FFN
+        h = layer_norm(x, fn_w, fn_b)
+        ffn_out = swiglu_ffn(h, w1, w2, w3)
+        x = x + ffn_out
+
+    # Output projection (768 → 512)
+    proj_w = sf.get_tensor("wave_prenet.output_proj.weight").float()
+    proj_b = sf.get_tensor("wave_prenet.output_proj.bias").float()
+    x = x @ proj_w.T + proj_b  # (T, 512)
+
+    writer.add_tensor("wave_prenet_out", x.numpy())
+    print(f"[miotts-ref] wave_prenet_out shape: {x.shape}")
+
+    print(f"[miotts-ref] Dumped stages up to wave_prenet_out")
     print(f"[miotts-ref] Writing to {args.output}...")
 
     writer.write_header_to_file()
