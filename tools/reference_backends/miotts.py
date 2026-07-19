@@ -65,11 +65,25 @@ def dump(args):
 
     # ─── Stage 1: LLM inference ─────────────────────────────────────
     print("[miotts-ref] Loading LLM...")
-    from transformers import AutoTokenizer, AutoModelForCausalLM
+    from transformers import AutoModelForCausalLM, PreTrainedTokenizerFast
 
-    tokenizer = AutoTokenizer.from_pretrained(
-        args.llm_dir, trust_remote_code=True
+    tokenizer = PreTrainedTokenizerFast(
+        tokenizer_file=str(Path(args.llm_dir) / "tokenizer.json"),
     )
+    # Load tokenizer_config.json for chat_template
+    import json as _json
+    _tok_cfg_path = Path(args.llm_dir) / "tokenizer_config.json"
+    if _tok_cfg_path.exists():
+        with open(_tok_cfg_path) as _f:
+            _tok_cfg = _json.load(_f)
+        if "chat_template" in _tok_cfg:
+            tokenizer.chat_template = _tok_cfg["chat_template"]
+        if "eos_token" in _tok_cfg:
+            tokenizer.eos_token = _tok_cfg["eos_token"]
+        if "pad_token" in _tok_cfg:
+            tokenizer.pad_token = _tok_cfg["pad_token"]
+        elif tokenizer.eos_token:
+            tokenizer.pad_token = tokenizer.eos_token
 
     # Build ChatML prompt: <|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n
     messages = [{"role": "user", "content": args.text}]
@@ -88,15 +102,27 @@ def dump(args):
     model = AutoModelForCausalLM.from_pretrained(
         args.llm_dir,
         torch_dtype=torch.float32,
-        device_map="cpu",
+        device_map={"": "cpu"},
         trust_remote_code=True,
+        local_files_only=True,
     )
     model.eval()
 
+    # Dump the embedding lookup for the input_ids (structural gate)
+    with torch.no_grad():
+        embeds = model.model.embed_tokens(input_ids)  # (1, T, d_model)
+        writer.add_tensor("token_embed", embeds[0].float().numpy())
+        print(f"[miotts-ref] token_embed shape: {embeds[0].shape}")
+
     # Get first-step logits for embedding/layer sanity check
     with torch.no_grad():
-        outputs = model(input_ids, output_hidden_states=False)
+        outputs = model(input_ids, output_hidden_states=True)
         logits_step_0 = outputs.logits[0, -1, :].float().numpy()
+        # Dump hidden state after first block for debugging
+        if outputs.hidden_states and len(outputs.hidden_states) > 1:
+            h1 = outputs.hidden_states[1][0, -1, :].float().numpy()  # after layer 0
+            writer.add_tensor("hidden_after_block0", h1)
+            print(f"[miotts-ref] hidden_after_block0 shape: {h1.shape}")
     writer.add_tensor("logits_step_0", logits_step_0)
     print(f"[miotts-ref] logits_step_0 shape: {logits_step_0.shape}")
 
