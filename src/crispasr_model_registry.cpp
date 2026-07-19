@@ -49,6 +49,12 @@ constexpr Entry k_registry[] = {
     // SOTA upgrade (imperceptible + robust neural watermark). #260.
     {"audioseal", "audioseal.gguf",
      "https://huggingface.co/cstr/audioseal-GGUF/resolve/main/audioseal.gguf", "~89 MB", nullptr, nullptr},
+    // §248 source separation (--separate). Mel-Band RoFormer vocal/instrumental
+    // split; MIT weights (KimberleyJSN) + MIT code (lucidrains). Resolved when
+    // `--separate` runs with the default separation backend key.
+    {"mel-band-roformer", "mel-band-roformer-vocals-f16.gguf",
+     "https://huggingface.co/cstr/mel-band-roformer-vocals-GGUF/resolve/main/mel-band-roformer-vocals-f16.gguf",
+     "~436 MB", nullptr, nullptr},
     {"nemotron", "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
      "https://huggingface.co/cstr/nemotron-3.5-asr-streaming-0.6b-GGUF/resolve/main/nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
      "~458 MB", nullptr, nullptr},
