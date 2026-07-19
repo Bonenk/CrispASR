@@ -356,6 +356,19 @@ CRISPASR_SESSION_API void crispasr_pcm_free(float* pcm);
 CRISPASR_SESSION_API float* crispasr_session_speech_to_speech(crispasr_session* s, const float* in_samples,
                                                               int n_in_samples, char** out_text, int* out_n_samples);
 CRISPASR_SESSION_API int crispasr_session_set_hotwords(crispasr_session* s, const char* hotwords, float boost);
+
+// Source separation: split audio into N stems (drums, bass, other, vocals).
+// Input: stereo interleaved PCM at the model's native rate (44100 Hz for htdemucs).
+// Returns stem count (>0) on success, -1 on error. Call crispasr_session_separate_stem
+// to retrieve individual stem PCM after a successful separate call.
+CRISPASR_SESSION_API int crispasr_session_separate(crispasr_session* s, const float* pcm_stereo, int n_samples);
+CRISPASR_SESSION_API int crispasr_session_separate_n_stems(crispasr_session* s);
+CRISPASR_SESSION_API const char* crispasr_session_separate_stem_name(crispasr_session* s, int stem_idx);
+// Returns pointer to interleaved stereo PCM for stem_idx. Owned by the session;
+// valid until the next separate() call or session close. *out_n_samples receives
+// the per-channel sample count.
+CRISPASR_SESSION_API const float* crispasr_session_separate_stem(crispasr_session* s, int stem_idx, int* out_n_samples);
+CRISPASR_SESSION_API int crispasr_session_separate_sample_rate(crispasr_session* s);
 CRISPASR_SESSION_API const char* crispasr_session_last_synth_error(crispasr_session* s);
 CRISPASR_SESSION_API char* crispasr_session_translate_text(crispasr_session* s, const char* text, const char* src_lang,
                                                            const char* tgt_lang, int max_tokens);
