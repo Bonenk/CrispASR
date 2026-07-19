@@ -171,6 +171,41 @@ bool read_i32(core_gguf::WeightLoad& wl, const char* name, std::vector<int32_t>&
     return true;
 }
 
+// Read a weight tensor (F32 or F16) into a host f32 vector. Returns false if
+// missing or an unhandled dtype.
+bool read_f32(core_gguf::WeightLoad& wl, const std::string& name, std::vector<float>& out) {
+    auto it = wl.tensors.find(name);
+    if (it == wl.tensors.end() || !it->second)
+        return false;
+    ggml_tensor* t = it->second;
+    const int64_t n = ggml_nelements(t);
+    out.resize((size_t)n);
+    if (t->type == GGML_TYPE_F32) {
+        ggml_backend_tensor_get(t, out.data(), 0, (size_t)n * sizeof(float));
+    } else if (t->type == GGML_TYPE_F16) {
+        std::vector<ggml_fp16_t> tmp((size_t)n);
+        ggml_backend_tensor_get(t, tmp.data(), 0, (size_t)n * sizeof(ggml_fp16_t));
+        for (int64_t i = 0; i < n; i++)
+            out[(size_t)i] = ggml_fp16_to_fp32(tmp[(size_t)i]);
+    } else {
+        return false;
+    }
+    return true;
+}
+
+// lucidrains RMSNorm: F.normalize(x, dim=-1) * sqrt(dim) * gamma. Algebraically
+// x / sqrt(mean(x^2)) * gamma, but the eps lives INSIDE the L2 norm (F.normalize
+// default 1e-12), not added to the mean-square — match that exactly.
+void rms_norm_inplace(float* x, int dim, const float* gamma) {
+    double ss = 0;
+    for (int i = 0; i < dim; i++)
+        ss += (double)x[i] * x[i];
+    const double denom = std::sqrt(ss) + 1e-12; // F.normalize eps
+    const double scale = std::sqrt((double)dim);
+    for (int i = 0; i < dim; i++)
+        x[i] = (float)((double)x[i] / denom * scale) * gamma[i];
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -353,6 +388,45 @@ bool ref_get(core_gguf::WeightLoad& rw, const char* name, std::vector<float>& ou
     return true;
 }
 
+// BandSplit: split the (T, sum(band_width)) gathered tensor into per-band
+// chunks, RMSNorm each, project to `dim` via the band's Linear, stack ->
+// (T, num_bands, dim). Returns false if any band weight is missing. Contiguous
+// per-band because freq_indices is band-major (see the PLAN band-layout note).
+bool band_split_cpu(core_gguf::WeightLoad& mw, const std::vector<float>& gathered, const std::vector<int>& band_width,
+                    int T, int dim, std::vector<float>& out) {
+    const int nb = (int)band_width.size();
+    out.assign((size_t)T * nb * dim, 0.0f);
+    std::vector<float> gamma, wt, bias, x;
+    for (int b = 0; b < nb; b++) {
+        const int din = band_width[b];
+        const std::string pre = "band_split.to_features." + std::to_string(b);
+        if (!read_f32(mw, pre + ".0.gamma", gamma) || !read_f32(mw, pre + ".1.weight", wt) ||
+            !read_f32(mw, pre + ".1.bias", bias))
+            return false;
+        // column offset of band b within the gathered feature axis.
+        int off = 0;
+        for (int j = 0; j < b; j++)
+            off += band_width[j];
+        x.resize(din);
+        for (int t = 0; t < T; t++) {
+            const float* g = gathered.data() + ((size_t)t * (gathered.size() / T)) + off;
+            for (int i = 0; i < din; i++)
+                x[i] = g[i];
+            rms_norm_inplace(x.data(), din, gamma.data());
+            // Linear: out[o] = sum_i wt[o*din + i] * x[i] + bias[o]
+            float* o = out.data() + ((size_t)t * nb + b) * dim;
+            for (int oi = 0; oi < dim; oi++) {
+                double acc = bias[oi];
+                const float* wrow = wt.data() + (size_t)oi * din;
+                for (int i = 0; i < din; i++)
+                    acc += (double)wrow[i] * x[i];
+                o[oi] = (float)acc;
+            }
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const char* audio_wav, int verbosity) {
@@ -443,8 +517,31 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
         if (ref_get(rw, "band_gathered", ref_bg, nn))
             report("band_gathered", gathered, ref_bg);
     }
+    // --- band_split_out (T, num_bands, dim) ---
+    // INPUT-ALIGNED: fed the REFERENCE band_gathered, not our STFT output. The
+    // band_split RMSNorm divides by each band's norm, so it amplifies the ~5e-4
+    // float-level difference between our FFT and torch's on near-silent bands
+    // (a uniform ±5e-4 perturbation alone drops this cos to ~0.73). Diffing off
+    // the ref input isolates the band_split MATH; the STFT is validated
+    // separately by the stft_packed stage. (Diff-harness rule: gate input
+    // alignment before trusting a per-layer cos.)
+    {
+        std::vector<float> ref_bg_in;
+        int64_t nn = 0;
+        if (ref_get(rw, "band_gathered", ref_bg_in, nn)) {
+            std::vector<float> bso;
+            if (band_split_cpu(ctx->weights, ref_bg_in, ctx->band_width, T, hp.dim, bso)) {
+                std::vector<float> ref_bso;
+                int64_t mm = 0;
+                if (ref_get(rw, "band_split_out", ref_bso, mm))
+                    report("band_split_out", bso, ref_bso);
+            } else {
+                fprintf(stderr, "  band_split_out: SKIP (a band weight was missing)\n");
+            }
+        }
+    }
 
-    fprintf(stderr, "  [PENDING] band_split_out, layer*_time/freq, mask_raw, output_vocals — Phase 2 graph.\n");
+    fprintf(stderr, "  [PENDING] layer*_time/freq, mask_raw, output_vocals — Phase 2 transformer graph.\n");
 
     if (rw.buf)
         ggml_backend_buffer_free(rw.buf);
