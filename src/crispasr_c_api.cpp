@@ -1526,6 +1526,7 @@ struct crispasr_session {
     std::string backend; // "whisper", "parakeet", ...
     std::string model_path;
     int n_threads = 4;
+    bool use_gpu = true; // plumbed to backend init (issue: firered-asr use_gpu)
 
     // Sample rate of the PCM the caller is about to pass to transcribe.
     // Set via crispasr_session_set_pcm_sample_rate() so backends that
