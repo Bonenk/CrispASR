@@ -191,8 +191,8 @@ document (issue #228).
 | `-vt F` | VAD threshold (default 0.5) |
 | `-vspd N` | VAD min speech duration (ms, default 250) |
 | `-vsd N` | VAD min silence duration (ms, default 100) |
-| `--vad-export FILE` | Write the computed VAD/chunk segment boundaries to `FILE` as JSON |
-| `--vad-import FILE` | Read segment boundaries from `FILE` instead of running VAD — reuse boundaries across backends without recomputing VAD (issue #227) |
+| `--vad-export FILE` | Compute VAD boundaries and write them to `FILE` as JSON, then exit. Implies `--vad`. No ASR model needed — standalone verb |
+| `--vad-import FILE` | Read segment boundaries from `FILE` instead of running VAD — reuse boundaries across backends without recomputing VAD (issue #227). Implies `--vad` |
 | `-ck N`, `--chunk-seconds N` | Fallback chunk size when VAD is off (default: 30 s for whisper, disabled for other backends) |
 | `--chunk-overlap F` | Overlap context (seconds) at chunk boundaries (default 3.0) |
 | `--lcs-dedup auto\|on\|off` | NeMo-style sub-word LCS dedup across chunk boundaries (default `auto` — fires when chunking with overlap) |
@@ -202,23 +202,23 @@ document (issue #228).
 
 #### Reusing VAD boundaries across backends (#227)
 
-VAD (or the fixed-chunk fallback) runs on every invocation. To compare
-several backends on the same audio without paying that cost each time,
-export the boundaries once and import them afterwards:
+`--vad-export` is a standalone verb: it runs Silero VAD on the audio,
+writes the boundaries, and exits — no ASR model download or load needed.
+To compare several backends on the same audio without recomputing VAD:
 
 ```bash
-# Run 1: compute VAD once and save the boundaries.
-crispasr -m whisper.gguf -f talk.wav --vad --vad-export talk.vad.json
+# Step 1: export VAD boundaries (no model needed, ~300 ms).
+crispasr -f talk.wav --vad-export talk.vad.json
 
-# Runs 2..N: reuse the same boundaries (no VAD model loaded).
+# Step 2: transcribe with multiple backends using the same boundaries.
 crispasr -m parakeet.gguf -f talk.wav --vad-import talk.vad.json
 crispasr -m moonshine.gguf -f talk.wav --vad-import talk.vad.json
 ```
 
-The JSON records each segment's sample offsets plus absolute centisecond
-timestamps; boundaries are clamped to the imported audio and rescaled if
-the sample rate differs. `--vad-export` also works without `--vad` (it
-then captures the fixed-chunk boundaries).
+Both `--vad-export` and `--vad-import` imply `--vad`, so the separate
+`--vad` flag is not required. The JSON records each segment's sample
+offsets plus absolute centisecond timestamps; boundaries are clamped to
+the imported audio and rescaled if the sample rate differs.
 
 #### Transcribing a time window (`--offset-t` / `--duration`, #91)
 
