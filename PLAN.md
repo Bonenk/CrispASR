@@ -2167,11 +2167,23 @@ commercial-restricted, skip).
 **TTS:**
 - [ ] **Supertonic 3** — claims 200×+ realtime on CUDA. **OpenRAIL** (Supertone/
   supertonic-3 on HF). OpenRAIL is permissive enough. High priority speed target.
-- [x] **MioTTS** — voice cloning TTS. **Apache-2.0** (Aratako/MioTTS-1.7B, also 0.1B–
-  1.2B sizes). Clean license, multiple sizes = good for resource-constrained deploys.
-  **TAKEN** (VPS session, 2026-07-19). Starting with 0.1B — fits in 8 GB RAM for
-  Python reference dump + C++ port. Architecture: LLM (Qwen2-based) + MioCodec
-  vocoder. Diff harness regime: read Python → converter → backend → roundtrip.
+- [x] **MioTTS** — voice cloning TTS. **Apache-2.0** (Aratako/MioTTS-0.6B, Qwen3-based).
+  **IN PROGRESS** (VPS session, 2026-07-19). Using 0.6B (Apache-2.0, Qwen3ForCausalLM).
+  Architecture: Qwen3 LLM (28L, 1024d, GQA 16/8, head_dim=128, vocab=164480 incl
+  12800 speech tokens) + MioCodec-25Hz-24kHz (FSQ → transformer → iSTFT → 24kHz).
+  **Done so far:**
+  - GGUF converter (`models/convert-miotts-to-gguf.py`) — 1.33 GB F16 GGUF
+  - Python reference dumper (`tools/reference_backends/miotts.py`) — runs on VPS
+  - C++ backend scaffold (`src/miotts.{h,cpp}`) — LLM forward + FSQ dequant
+  - Diff harness entry in crispasr_diff_main.cpp
+  - **FSQ dequant: cos=1.0 PASS** (exact match with Python)
+  - LLM forward: cos=0.86 — needs `ggml_backend_sched` (gallocr+KV issue)
+  **Remaining:**
+  - Fix LLM forward (switch to sched-based allocation like qwen3_tts.cpp)
+  - MioCodec wave decoder (transformer + AdaLN-Zero + iSTFT)
+  - Tokenizer integration (Qwen3 BPE + ChatML prompt construction)
+  - CLI adapter, registry, 12-point checklist, tests
+  - HF upload: F16 + Q8_0 + Q4_K GGUFs with README
 
 **Audio codec:**
 - [ ] **MioCodec v2** — standalone audio codec. License TBD (not on HF card yet, same
