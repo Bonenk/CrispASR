@@ -2102,3 +2102,81 @@ registry, collect `MUL_MAT f16` % per backend) → fix top offenders → (4)/(3)
 wins alongside → (5) after the §246 CUDA per-stage data.
 
 ---
+
+## §248 — audio.cpp competitive benchmark + gap analysis (NOT STARTED)
+
+**Context:** #274 flagged [0xShug0/audio.cpp](https://github.com/0xShug0/audio.cpp) as
+a comparable C++ inference engine. Audit performed 2026-07-19. They share ~6 ASR and ~12
+TTS models with us; the rest is non-overlapping. CrispASR is broader on ASR (43 vs ~6)
+and TTS (48 vs ~12) but audio.cpp covers categories we don't touch yet.
+
+### (A) Head-to-head benchmark (shared models)
+
+Must-compare on Kaggle (GPU + CPU kernels):
+
+| Model | audio.cpp claim | Our backend | Metric |
+|-------|----------------|-------------|--------|
+| Voxtral Realtime | RTF 0.089 (11.2×), 15.7× Q8_0 | `voxtral4b` | RTF, WER on librispeech-test-clean |
+| VibeVoice TTS 1.5B | 5.15× realtime (93.9 min podcast in 18.2 min) | `vibevoice-tts` / `vibevoice-1.5b` | RTF, MOS-proxy (ASR roundtrip) |
+| Qwen3-ASR | (no claim) | `qwen3` | WER, RTF |
+| Higgs Audio STT | (no claim) | `higgs-stt` | WER, RTF |
+| Nemotron 3.5 | (no claim) | `nemotron` | WER, RTF |
+| Chatterbox TTS | (no claim) | `chatterbox` | RTF, ASR roundtrip |
+| IndexTTS2 | (no claim) | `indextts` | RTF, ASR roundtrip |
+| OmniVoice | (no claim) | `omnivoice` | RTF, ASR roundtrip |
+
+**Approach:** build audio.cpp on Kaggle (their CMake), run their CLI on the same WAV
+files we use, collect wall-clock + output text, compare WER/RTF side-by-side.
+
+### (B) Models they have that we lack — new backends to port
+
+All licenses verified 2026-07-19. Only open-licensed models listed (Vevo2 is
+CC-BY-NC-4.0 = non-commercial, skip; Stable Audio is Stability Community License =
+commercial-restricted, skip).
+
+**Source separation (new category):**
+- [ ] **HTDemucs** — hybrid transformer demucs, music/voice separation. **MIT** (Meta).
+  Would add `--task separate` / `--backend htdemucs`. Medium effort (UNet + transformer
+  + STFT/iSTFT, no LLM). facebook/demucs on GitHub.
+- [ ] **Mel-Band RoFormer** — frequency-band source separation. **MIT**.
+  The #274 reporter specifically mentioned this. Do both — they're complementary
+  (HTDemucs = 4-stem, RoFormer = vocal/instrumental).
+
+**Voice conversion (new category):**
+- [ ] **Seed-VC** — zero-shot voice conversion. **GPL-3.0** (Plachta/Seed-VC on HF).
+  Encoder + flow-matching + vocoder. Medium effort. GPL is fine for our Apache-2.0
+  project as long as the model weights are loaded at runtime (not statically linked).
+
+**TTS:**
+- [ ] **Supertonic 3** — claims 200×+ realtime on CUDA. **OpenRAIL** (Supertone/
+  supertonic-3 on HF). OpenRAIL is permissive enough. High priority speed target.
+- [ ] **MioTTS** — voice cloning TTS. **Apache-2.0** (Aratako/MioTTS-1.7B, also 0.1B–
+  1.2B sizes). Clean license, multiple sizes = good for resource-constrained deploys.
+
+**Audio codec:**
+- [ ] **MioCodec v2** — standalone audio codec. License TBD (not on HF card yet, same
+  authors as MioTTS = likely Apache-2.0, confirm before porting).
+
+**Music generation:**
+- [ ] **ACE-Step 1.5** — music generation. **Apache-2.0**. New category but clean license.
+- [ ] **HeartMuLa** — music generation. **Apache-2.0** (HeartMuLa/HeartMuLa-oss-3B).
+
+**Diarization:**
+- [ ] **Sortformer** — NVIDIA dedicated diarization. **Apache-2.0** (NeMo). We have
+  `moss-diarize` + pyannote; evaluate quality delta before full port.
+
+**Skipped (license incompatible):**
+- ~~Vevo2~~ — CC-BY-NC-4.0 (non-commercial only)
+- ~~Stable Audio 3~~ — Stability Community License (commercial requires separate agreement)
+
+### (C) Priority
+
+1. **Benchmark first** — head-to-head on shared models (Kaggle GPU kernel). If we're
+   slower on Voxtral/VibeVoice, fix perf before adding scope.
+2. **Source separation** — HTDemucs + Mel-Band RoFormer (both MIT, #274's ask).
+3. **TTS** — Supertonic 3 (speed benchmark), MioTTS (voice cloning, Apache-2.0).
+4. **Voice conversion** — Seed-VC (GPL-3.0, runtime-loaded weights = OK).
+5. **Music generation** — ACE-Step + HeartMuLa (both Apache-2.0, new category).
+6. **Diarization** — Sortformer (evaluate vs moss-diarize first).
+
+---
