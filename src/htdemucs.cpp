@@ -63,6 +63,9 @@ static bool htdemucs_profile() {
 
 static double htd_now_ms();
 static bool htdemucs_use_ggml();
+static bool htdemucs_enc_freq_ggml(struct htdemucs_context* ctx, const struct htdemucs_enc_layer& enc,
+                                   std::vector<float>& x_buf, int& x_C, int& x_Fq, int x_T, int stride, int pad,
+                                   const std::vector<float>* inject, int inject_C, int idx);
 static bool htdemucs_transformer_ggml(struct htdemucs_context* ctx, std::vector<float>& x_buf, int x_seq,
                                       std::vector<float>& xt_buf, int xt_seq, int dim, int n_heads, int n_layers,
                                       int classic_parity);
@@ -1873,7 +1876,13 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             encoder_ok = false;
             break;
         }
-        {
+        bool enc_done = false;
+        if (htdemucs_use_ggml() && enc.conv_w) {
+            HTD_PROF(prof, "enc.ggml_graph");
+            enc_done = htdemucs_enc_freq_ggml(ctx, enc, x_buf, x_C, x_Fq, x_T, stri, pad_val,
+                                              has_inject ? &inject_buf : nullptr, has_inject ? x_C : 0, idx);
+        }
+        if (!enc_done) {
             // CPU Conv2d (avoids ggml im2col OOM on 8 GB VPS)
             int new_Fq = 0;
             {
@@ -1942,58 +1951,59 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     htd_capture(ctx, "enc0_rewrite", x_buf.data(), x_buf.size());
             }
 
-            // Freq embedding (after layer 0 only)
-            // Python: emb = freq_emb(arange(Fq)).t()[None,:,:,None].expand_as(x)
-            //         x = x + freq_emb_scale * emb
-            // Embedding: (n_freqs, C) → lookup frs 0..Fq-1 → (Fq, C) → t → (C, Fq)
-            // Broadcast over T: x[t,fq,c] += scale * emb_w[fq, c]
-            if (idx == 0 && m.freq_emb_w) {
-                // nn.Embedding weight is (num_embeddings, embedding_dim) row-major
-                // = ggml ne(embedding_dim, num_embeddings), so ne[0] is the
-                // CHANNEL count and ne[1] is the frequency count — not the
-                // other way round.
-                int emb_C = (int)m.freq_emb_w->ne[0];       // embedding_dim  (48 channels)
-                int emb_n_freqs = (int)m.freq_emb_w->ne[1]; // num_embeddings (512 freqs)
-                // The embedding has emb_scale built into the weights (ScaledEmbedding)
-                // but freq_emb_scale is an additional multiplier.
-                std::vector<float> emb_data(emb_n_freqs * emb_C);
-                {
-                    auto _rd = read_tensor_f32(m.freq_emb_w);
-                    memcpy(emb_data.data(), _rd.data(), std::min(emb_data.size(), _rd.size()) * sizeof(float));
-                }
-                float scale = hp.freq_emb_scale;
-                // ScaledEmbedding weight is already scaled by `self.scale` (=10) in __init__,
-                // but at forward time it multiplies by `self.scale` again. The GGUF stores
-                // the raw (unscaled) weight. So effective embedding = weight * scale_emb.
-                // In the converter we stored the raw weight. The ScaledEmbedding.forward() does
-                // `self.embedding(x) * self.scale`. And then `x + freq_emb_scale * emb`.
-                // For the SMOOTH variant: weights are cumsum → normalized. But stored as-is in GGUF.
-                // The ScaledEmbedding stores weight/=scale in __init__, then forward *= scale.
-                // So GGUF weight = nn.Embedding.weight.data / scale (after smooth processing).
-                // Forward: output = GGUF_weight * scale_emb_init (=10) * freq_emb_scale (=0.2)
-                float total_scale = 10.0f * scale; // scale_emb(10) * freq_emb_scale(0.2) = 2.0
-                // x_buf layout: (T, Fq, C) flattened. Add emb[fq][c] * total_scale.
-                int n_freq_to_use = std::min(x_Fq, emb_n_freqs);
-                for (int fq = 0; fq < n_freq_to_use; fq++) {
-                    for (int c = 0; c < x_C && c < emb_C; c++) {
-                        // Row-major (n_freqs, emb_C): stride by emb_C, not n_freqs.
-                        float e = emb_data[(size_t)fq * emb_C + c] * total_scale;
-                        for (int t = 0; t < x_T; t++) {
-                            x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq] += e;
-                        }
-                    }
-                }
-                if (htdemucs_debug()) {
-                    fprintf(stderr, "htdemucs: freq_emb added (%d freqs, %d ch, scale=%.2f)\n", n_freq_to_use, emb_C,
-                            total_scale);
-                }
-            }
-
             if (htdemucs_debug()) {
                 fprintf(stderr, "htdemucs: enc[%d] output (%d, %d, %d) = %zu floats\n", idx, x_C, x_Fq, x_T,
                         x_buf.size());
             }
         }
+
+        // Freq embedding (after layer 0 only)
+        // Python: emb = freq_emb(arange(Fq)).t()[None,:,:,None].expand_as(x)
+        //         x = x + freq_emb_scale * emb
+        // Embedding: (n_freqs, C) → lookup frs 0..Fq-1 → (Fq, C) → t → (C, Fq)
+        // Broadcast over T: x[t,fq,c] += scale * emb_w[fq, c]
+        if (idx == 0 && m.freq_emb_w) {
+            // nn.Embedding weight is (num_embeddings, embedding_dim) row-major
+            // = ggml ne(embedding_dim, num_embeddings), so ne[0] is the
+            // CHANNEL count and ne[1] is the frequency count — not the
+            // other way round.
+            int emb_C = (int)m.freq_emb_w->ne[0];       // embedding_dim  (48 channels)
+            int emb_n_freqs = (int)m.freq_emb_w->ne[1]; // num_embeddings (512 freqs)
+            // The embedding has emb_scale built into the weights (ScaledEmbedding)
+            // but freq_emb_scale is an additional multiplier.
+            std::vector<float> emb_data(emb_n_freqs * emb_C);
+            {
+                auto _rd = read_tensor_f32(m.freq_emb_w);
+                memcpy(emb_data.data(), _rd.data(), std::min(emb_data.size(), _rd.size()) * sizeof(float));
+            }
+            float scale = hp.freq_emb_scale;
+            // ScaledEmbedding weight is already scaled by `self.scale` (=10) in __init__,
+            // but at forward time it multiplies by `self.scale` again. The GGUF stores
+            // the raw (unscaled) weight. So effective embedding = weight * scale_emb.
+            // In the converter we stored the raw weight. The ScaledEmbedding.forward() does
+            // `self.embedding(x) * self.scale`. And then `x + freq_emb_scale * emb`.
+            // For the SMOOTH variant: weights are cumsum → normalized. But stored as-is in GGUF.
+            // The ScaledEmbedding stores weight/=scale in __init__, then forward *= scale.
+            // So GGUF weight = nn.Embedding.weight.data / scale (after smooth processing).
+            // Forward: output = GGUF_weight * scale_emb_init (=10) * freq_emb_scale (=0.2)
+            float total_scale = 10.0f * scale; // scale_emb(10) * freq_emb_scale(0.2) = 2.0
+            // x_buf layout: (T, Fq, C) flattened. Add emb[fq][c] * total_scale.
+            int n_freq_to_use = std::min(x_Fq, emb_n_freqs);
+            for (int fq = 0; fq < n_freq_to_use; fq++) {
+                for (int c = 0; c < x_C && c < emb_C; c++) {
+                    // Row-major (n_freqs, emb_C): stride by emb_C, not n_freqs.
+                    float e = emb_data[(size_t)fq * emb_C + c] * total_scale;
+                    for (int t = 0; t < x_T; t++) {
+                        x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq] += e;
+                    }
+                }
+            }
+            if (htdemucs_debug()) {
+                fprintf(stderr, "htdemucs: freq_emb added (%d freqs, %d ch, scale=%.2f)\n", n_freq_to_use, emb_C,
+                        total_scale);
+            }
+        }
+
 
         htd_capture(ctx, ("enc_freq_" + std::to_string(idx)).c_str(), x_buf.data(), x_buf.size());
 
@@ -3505,6 +3515,181 @@ const char* htdemucs_source_name(const htdemucs_context* ctx, int idx) {
     if (!ctx || idx < 0 || idx >= (int)ctx->model.source_names.size())
         return nullptr;
     return ctx->model.source_names[idx].c_str();
+}
+
+// ---------------------------------------------------------------------------
+// Frequency encoder layer as a ggml graph (CRISPASR_HTDEMUCS_GGML=1)
+//
+// The CPU buffer layout (t + fq*T + c*T*Fq) is ALREADY ggml's ne = (T, Fq, C),
+// so nothing has to be transposed here — unlike the transformer, this maps
+// straight onto ggml_conv_2d with W = time and H = frequency.
+//
+//   conv        kernel (1, K, IC, OC), s1 = stride, p1 = pad   [freq axis only]
+//   dconv conv1 kernel (K, 1, C, hidden), d0 = dilation        [time axis only]
+//   dconv conv2 kernel (1, 1, hidden, 2C)                      [1x1 = matmul]
+//   rewrite     kernel (1, 1, C, 2C)
+//
+// KH = 1 on the DConv is what makes each frequency band independent, which is
+// exactly Python's `y.permute(0,2,1,3).reshape(-1, C, T)` per-band treatment.
+// ---------------------------------------------------------------------------
+
+// GroupNorm(num_groups=1) applied PER frequency band. x is (T, Fq, C); permute
+// to (T, C, Fq) so the bands sit on ne[2], then ask for one group per band —
+// each group then reduces over ne[0]*ne[1] = T*C, which is the per-band
+// semantics. Affine is per-channel.
+static ggml_tensor* g_dconv_groupnorm(ggml_context* g, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b, int n_bands,
+                                      float eps) {
+    ggml_tensor* p = ggml_cont(g, ggml_permute(g, x, 0, 2, 1, 3)); // (T, C, Fq)
+    p = ggml_group_norm(g, p, n_bands, eps);
+    if (w)
+        p = ggml_mul(g, p, ggml_reshape_3d(g, w, 1, (int)w->ne[0], 1));
+    if (b)
+        p = ggml_add(g, p, ggml_reshape_3d(g, b, 1, (int)b->ne[0], 1));
+    return ggml_cont(g, ggml_permute(g, p, 0, 2, 1, 3)); // back to (T, Fq, C)
+}
+
+// GLU over the channel axis (ne[2]) of a (T, Fq, 2C) tensor -> (T, Fq, C).
+static ggml_tensor* g_glu_c(ggml_context* g, ggml_tensor* x) {
+    const int T = (int)x->ne[0], F = (int)x->ne[1], half = (int)x->ne[2] / 2;
+    ggml_tensor* a = ggml_view_3d(g, x, T, F, half, x->nb[1], x->nb[2], 0);
+    ggml_tensor* b = ggml_view_3d(g, x, T, F, half, x->nb[1], x->nb[2], (size_t)half * x->nb[2]);
+    return ggml_mul(g, ggml_cont(g, a), ggml_sigmoid(g, ggml_cont(g, b)));
+}
+
+// The DConv residual stack on a (T, Fq, C) tensor.
+static ggml_tensor* g_dconv(ggml_context* g, ggml_tensor* x, const htdemucs_dconv& dc, int n_bands) {
+    for (size_t d = 0; d < dc.layers.size(); d++) {
+        const auto& sl = dc.layers[d];
+        if (!sl.conv1_w || !sl.conv2_w)
+            continue;
+        const int dilation = 1 << (int)d;
+        const int K = (int)sl.conv1_w->ne[0];
+        const int C = (int)sl.conv1_w->ne[1];
+        const int hidden = (int)sl.conv1_w->ne[2];
+
+        // Conv1d(C -> hidden, K, dilation) along time only: KH = 1.
+        ggml_tensor* w1 = ggml_reshape_4d(g, sl.conv1_w, K, 1, C, hidden);
+        ggml_tensor* h = ggml_conv_2d(g, w1, x, 1, 1, dilation * (K / 2), 0, dilation, 1);
+        if (sl.conv1_b)
+            h = ggml_add(g, h, ggml_reshape_3d(g, sl.conv1_b, 1, 1, hidden));
+        if (sl.norm1_w)
+            h = g_dconv_groupnorm(g, h, sl.norm1_w, sl.norm1_b, n_bands, 1e-5f);
+        h = ggml_gelu(g, h);
+
+        const int out2C = (int)sl.conv2_w->ne[2];
+        ggml_tensor* w2 = ggml_reshape_4d(g, sl.conv2_w, 1, 1, hidden, out2C);
+        ggml_tensor* h2 = ggml_conv_2d(g, w2, h, 1, 1, 0, 0, 1, 1);
+        if (sl.conv2_b)
+            h2 = ggml_add(g, h2, ggml_reshape_3d(g, sl.conv2_b, 1, 1, out2C));
+        if (sl.norm2_w)
+            h2 = g_dconv_groupnorm(g, h2, sl.norm2_w, sl.norm2_b, n_bands, 1e-5f);
+
+        ggml_tensor* y = g_glu_c(g, h2);
+        if (sl.scale)
+            y = ggml_mul(g, y, ggml_reshape_3d(g, sl.scale, 1, 1, (int)sl.scale->ne[0]));
+        x = ggml_add(g, x, y);
+    }
+    return x;
+}
+
+// One frequency-encoder layer, entirely in-graph. x_buf is the CPU (C, Fq, T)
+// buffer and is updated in place; x_C / x_Fq are updated to the new dims.
+// Returns false if the graph could not be built or allocated.
+static bool htdemucs_enc_freq_ggml(htdemucs_context* ctx, const htdemucs_enc_layer& enc, std::vector<float>& x_buf,
+                                   int& x_C, int& x_Fq, int x_T, int stride, int pad, const std::vector<float>* inject,
+                                   int inject_C, int idx) {
+    const size_t n_nodes = 2048;
+    const size_t ctx_size = ggml_tensor_overhead() * n_nodes + ggml_graph_overhead_custom(n_nodes, false);
+    ggml_init_params gp = {ctx_size, nullptr, true};
+    ggml_context* g = ggml_init(gp);
+    if (!g)
+        return false;
+
+    ggml_tensor* X = ggml_new_tensor_3d(g, GGML_TYPE_F32, x_T, x_Fq, x_C);
+    ggml_set_name(X, "enc_in");
+    ggml_set_input(X);
+
+    // Conv2d over the frequency axis only: kernel (KW=1, KH=K, IC, OC).
+    ggml_tensor* x = ggml_conv_2d(g, enc.conv_w, X, 1, stride, 0, pad, 1, 1);
+    const int OC = (int)enc.conv_w->ne[3];
+    if (enc.conv_b)
+        x = ggml_add(g, x, ggml_reshape_3d(g, enc.conv_b, 1, 1, OC));
+
+    ggml_tensor* INJ = nullptr;
+    if (inject) {
+        // Time-branch injection broadcasts over the frequency axis.
+        INJ = ggml_new_tensor_3d(g, GGML_TYPE_F32, x_T, 1, inject_C);
+        ggml_set_name(INJ, "enc_inject");
+        ggml_set_input(INJ);
+        x = ggml_add(g, x, INJ);
+    }
+
+    const int out_Fq = (int)x->ne[1];
+    // Layer-0 sub-stages for the diff harness. set_output is required or gallocr
+    // recycles the buffers before we read them.
+    const bool cap0 = ctx->capture_stages && idx == 0;
+    std::vector<std::pair<const char*, ggml_tensor*>> subs;
+    if (cap0) {
+        ggml_set_output(x);
+        subs.emplace_back("enc0_conv", x);
+    }
+    if (!enc.empty) {
+        x = ggml_gelu(g, x);
+        if (cap0) {
+            ggml_set_output(x);
+            subs.emplace_back("enc0_gelu", x);
+        }
+        if (!enc.dconv.layers.empty())
+            x = g_dconv(g, x, enc.dconv, out_Fq);
+        if (cap0) {
+            ggml_set_output(x);
+            subs.emplace_back("enc0_dconv", x);
+        }
+        if (enc.rewrite_w) {
+            ggml_tensor* rw = ggml_conv_2d(g, enc.rewrite_w, x, 1, 1, 0, 0, 1, 1);
+            if (enc.rewrite_b)
+                rw = ggml_add(g, rw, ggml_reshape_3d(g, enc.rewrite_b, 1, 1, (int)enc.rewrite_w->ne[3]));
+            x = g_glu_c(g, rw);
+        }
+        if (cap0) {
+            ggml_set_output(x);
+            subs.emplace_back("enc0_rewrite", x);
+        }
+    }
+
+    ggml_set_name(x, "enc_out");
+    ggml_set_output(x);
+    ggml_cgraph* gf = ggml_new_graph_custom(g, n_nodes, false);
+    ggml_build_forward_expand(gf, x);
+    for (auto& kv : subs)
+        ggml_build_forward_expand(gf, kv.second);
+
+    ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+    if (!ggml_gallocr_alloc_graph(alloc, gf)) {
+        fprintf(stderr, "htdemucs: enc graph alloc failed — falling back to CPU\n");
+        ggml_gallocr_free(alloc);
+        ggml_free(g);
+        return false;
+    }
+    ggml_backend_tensor_set(X, x_buf.data(), 0, x_buf.size() * sizeof(float));
+    if (INJ && inject)
+        ggml_backend_tensor_set(INJ, inject->data(), 0, inject->size() * sizeof(float));
+    ggml_backend_graph_compute(ctx->backend, gf);
+
+    for (auto& kv : subs) {
+        std::vector<float> tmp(ggml_nelements(kv.second));
+        ggml_backend_tensor_get(kv.second, tmp.data(), 0, tmp.size() * sizeof(float));
+        htd_capture(ctx, kv.first, tmp.data(), tmp.size());
+    }
+
+    x_C = (int)x->ne[2];
+    x_Fq = (int)x->ne[1];
+    x_buf.assign((size_t)x_C * x_Fq * x_T, 0.0f);
+    ggml_backend_tensor_get(x, x_buf.data(), 0, x_buf.size() * sizeof(float));
+
+    ggml_gallocr_free(alloc);
+    ggml_free(g);
+    return true;
 }
 
 // ---------------------------------------------------------------------------
