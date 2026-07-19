@@ -22,6 +22,7 @@ Stages dumped:
 import numpy as np
 
 DEFAULT_STAGES = [
+    "input_wav",
     "spec_input", "time_input",
     "enc_freq_0", "enc_freq_1", "enc_freq_2", "enc_freq_3",
     "enc_time_0", "enc_time_1", "enc_time_2",
@@ -84,6 +85,11 @@ def dump(model_dir, audio, stages, max_new_tokens=None, **kwargs):
                 captures[name] = tensor.squeeze(0).numpy().astype(np.float32)
             else:
                 captures[name] = np.asarray(tensor, dtype=np.float32)
+
+    # Dump the exact 44.1 kHz stereo waveform fed to the model. The C++ diff
+    # replays THIS instead of re-running its own 16k->44.1k resampler, so a
+    # resampler mismatch can never masquerade as a model parity failure.
+    maybe_capture("input_wav", wav)
 
     # Manual forward with intermediate capture (mirrors htdemucs.py forward())
     with torch.no_grad():

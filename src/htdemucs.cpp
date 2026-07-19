@@ -21,6 +21,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -231,7 +232,22 @@ struct htdemucs_context {
 
     // Precomputed Hann window (nfft)
     std::vector<float> hann_window;
+
+    // Per-stage intermediate capture for the parity diff harness. Off in the
+    // normal path (separate() never touches the map), so this costs nothing
+    // outside htdemucs_diff().
+    bool capture_stages = false;
+    std::map<std::string, std::vector<float>> captures;
 };
+
+// Record a stage intermediate under `name`. All captures are stored in the
+// PyTorch reference layout so the diff is a straight elementwise compare —
+// see htdemucs_diff() for the layout contract.
+static void htd_capture(htdemucs_context* ctx, const char* name, const float* data, size_t n) {
+    if (!ctx || !ctx->capture_stages)
+        return;
+    ctx->captures[name].assign(data, data + n);
+}
 
 // ---------------------------------------------------------------------------
 // GGUF loading
@@ -709,10 +725,7 @@ static std::vector<float> read_tensor_f32(ggml_tensor* t) {
     int64_t n = ggml_nelements(t);
     std::vector<float> out(n);
     if (t->type == GGML_TYPE_F32) {
-        {
-            auto _rd = read_tensor_f32(t);
-            memcpy(out.data(), _rd.data(), std::min(out.size(), _rd.size()) * sizeof(float));
-        }
+        ggml_backend_tensor_get(t, out.data(), 0, n * sizeof(float));
     } else if (t->type == GGML_TYPE_F16) {
         std::vector<ggml_fp16_t> tmp(n);
         ggml_backend_tensor_get(t, tmp.data(), 0, n * sizeof(ggml_fp16_t));
@@ -1012,6 +1025,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     for (size_t i = 0; i < spec_n; i++) {
         cac_mag[i] = (cac_mag[i] - spec_mean) / (1e-5f + spec_std);
     }
+    // cac_mag is already (C, Fq, T) with t fastest — the reference layout.
+    htd_capture(ctx, "spec_input", cac_mag.data(), spec_n);
 
     // Step 5: Normalize time branch
     float time_mean = 0.0f, time_var = 0.0f;
@@ -1027,6 +1042,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     for (size_t i = 0; i < time_n; i++) {
         pcm_ch[i] = (pcm_ch[i] - time_mean) / (1e-5f + time_std);
     }
+    // pcm_ch is (2, work_length), channel-major — the reference layout.
+    htd_capture(ctx, "time_input", pcm_ch.data(), time_n);
 
     if (htdemucs_debug()) {
         fprintf(stderr, "htdemucs: spec_norm mean=%.6f std=%.6f, time_norm mean=%.6f std=%.6f\n", spec_mean, spec_std,
@@ -1190,6 +1207,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     inject_buf = xt_buf;
                     has_inject = true;
                 }
+
+                // xt_buf is (C, T) channel-major — the reference layout.
+                htd_capture(ctx, ("enc_time_" + std::to_string(idx)).c_str(), xt_buf.data(), xt_buf.size());
 
                 if (htdemucs_debug()) {
                     fprintf(stderr, "htdemucs: tenc[%d] output (%d, %d) empty=%d\n", idx, xt_C, xt_T,
@@ -1386,6 +1406,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             }
         }
 
+        htd_capture(ctx, ("enc_freq_" + std::to_string(idx)).c_str(), x_buf.data(), x_buf.size());
+
         // Save skip connections
         lengths_freq.push_back(x_T); // save BEFORE the dim change (actually, Python saves after — TODO: verify)
         saved_freq.push_back({x_buf, x_C, x_Fq, x_T});
@@ -1402,6 +1424,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     }
 
     fprintf(stderr, "htdemucs: encoder %s, output (%d, %d, %d)\n", encoder_ok ? "OK" : "FAILED", x_C, x_Fq, x_T);
+
+    htd_capture(ctx, "pre_transformer_z", x_buf.data(), x_buf.size());
+    htd_capture(ctx, "pre_transformer_xt", xt_buf.data(), xt_buf.size());
 
     // Step 7: CrossTransformer
     //
@@ -2227,6 +2252,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         fprintf(stderr, "htdemucs: no channel up/downsamplers (bottom_channels=0?)\n");
     }
 
+    htd_capture(ctx, "post_transformer_z", x_buf.data(), x_buf.size());
+    htd_capture(ctx, "post_transformer_xt", xt_buf.data(), xt_buf.size());
+
     // Step 8: Decoder (reverse of encoder, with skip connections)
     // Decoder index 0 is the innermost (smallest spatial dims), matching
     // encoder index depth-1. The freq dims grow back: 8→32→128→512→2048.
@@ -2592,6 +2620,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             fprintf(stderr, "htdemucs: dec[%d] output (%d, %d, %d)%s\n", idx, x_C, x_Fq, x_T,
                     nc > 0 ? " *** HAS NaN ***" : "");
         }
+
+        htd_capture(ctx, ("dec_freq_" + std::to_string(idx)).c_str(), x_buf.data(), x_buf.size());
     }
 
     // NaN check after decoder
@@ -2682,6 +2712,16 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             }
         }
 
+        // Capture channel-major (ac, n_samples) to match the reference layout,
+        // before the interleave below.
+        if (ctx->capture_stages) {
+            std::vector<float> chan_major((size_t)ac * n_samples);
+            for (int c = 0; c < ac; c++)
+                for (int i = 0; i < n_samples; i++)
+                    chan_major[(size_t)c * n_samples + i] = src_pcm[(size_t)c * work_length + i];
+            htd_capture(ctx, ("output_" + m.source_names[s]).c_str(), chan_major.data(), chan_major.size());
+        }
+
         // Trim to original length and interleave stereo
         r->sources[s] = new float[(size_t)ac * n_samples];
         for (int i = 0; i < n_samples; i++) {
@@ -2718,4 +2758,156 @@ const char* htdemucs_source_name(const htdemucs_context* ctx, int idx) {
     if (!ctx || idx < 0 || idx >= (int)ctx->model.source_names.size())
         return nullptr;
     return ctx->model.source_names[idx].c_str();
+}
+
+// ---------------------------------------------------------------------------
+// Parity diff harness (tools/reference_backends/htdemucs.py is the reference)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+double htd_cosine(const float* a, const float* b, int64_t n) {
+    double dot = 0, na = 0, nb = 0;
+    for (int64_t i = 0; i < n; i++) {
+        dot += (double)a[i] * b[i];
+        na += (double)a[i] * a[i];
+        nb += (double)b[i] * b[i];
+    }
+    if (na == 0 || nb == 0)
+        return (na == 0 && nb == 0) ? 1.0 : 0.0;
+    return dot / (std::sqrt(na) * std::sqrt(nb));
+}
+
+double htd_max_abs_diff(const float* a, const float* b, int64_t n) {
+    double m = 0;
+    for (int64_t i = 0; i < n; i++)
+        m = std::max(m, (double)std::fabs(a[i] - b[i]));
+    return m;
+}
+
+double htd_l2_norm(const float* a, int64_t n) {
+    double s = 0;
+    for (int64_t i = 0; i < n; i++)
+        s += (double)a[i] * a[i];
+    return std::sqrt(s);
+}
+
+bool htd_ref_get(core_gguf::WeightLoad& rw, const char* name, std::vector<float>& out, int64_t& nelem) {
+    auto it = rw.tensors.find(name);
+    if (it == rw.tensors.end() || !it->second)
+        return false;
+    ggml_tensor* t = it->second;
+    nelem = ggml_nelements(t);
+    out.resize((size_t)nelem);
+    ggml_backend_tensor_get(t, out.data(), 0, (size_t)nelem * sizeof(float));
+    return true;
+}
+
+} // namespace
+
+int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audio_wav, int verbosity) {
+    (void)audio_wav; // The waveform is replayed FROM the reference (input-aligned).
+
+    htdemucs_context* ctx = htdemucs_init_from_file(model_gguf, htdemucs_default_params());
+    if (!ctx) {
+        fprintf(stderr, "htdemucs_diff: failed to load model %s\n", model_gguf);
+        return 2;
+    }
+
+    core_gguf::WeightLoad rw;
+    if (!core_gguf::load_weights(ref_gguf, ctx->backend, "htdemucs_ref", rw)) {
+        fprintf(stderr, "htdemucs_diff: failed to load reference %s\n", ref_gguf);
+        htdemucs_free(ctx);
+        return 2;
+    }
+
+    // Replay the exact 44.1 kHz stereo waveform the reference ran on, so a
+    // resampler mismatch can never be mistaken for a model parity failure.
+    std::vector<float> in_wav;
+    int64_t in_n = 0;
+    if (!htd_ref_get(rw, "input_wav", in_wav, in_n)) {
+        fprintf(stderr, "htdemucs_diff: reference has no input_wav stage — re-dump with the updated dumper\n");
+        htdemucs_free(ctx);
+        return 2;
+    }
+    const int ac = ctx->model.hparams.audio_channels;
+    const int n_samples = (int)(in_n / ac);
+    std::vector<float> interleaved((size_t)n_samples * ac);
+    for (int c = 0; c < ac; c++)
+        for (int i = 0; i < n_samples; i++)
+            interleaved[(size_t)i * ac + c] = in_wav[(size_t)c * n_samples + i];
+
+    fprintf(stderr, "htdemucs_diff: replaying reference input (%d ch × %d samples)\n", ac, n_samples);
+
+    ctx->capture_stages = true;
+    htdemucs_result* res = htdemucs_separate(ctx, interleaved.data(), n_samples);
+    if (!res) {
+        fprintf(stderr, "htdemucs_diff: separate() failed\n");
+        htdemucs_free(ctx);
+        return 2;
+    }
+
+    // F32 gate per the dev guide. Stages are compared in reference order so the
+    // FIRST failure is the earliest divergence = the bug.
+    const double COS_MIN = 0.999;
+    int n_fail = 0, n_missing = 0, n_run = 0;
+    const char* first_fail = nullptr;
+
+    auto report = [&](const char* stage) {
+        std::vector<float> ref;
+        int64_t rn = 0;
+        if (!htd_ref_get(rw, stage, ref, rn))
+            return; // stage not in this dump
+        auto it = ctx->captures.find(stage);
+        if (it == ctx->captures.end()) {
+            fprintf(stderr, "  %-20s MISSING (no C++ capture)\n", stage);
+            n_missing++;
+            return;
+        }
+        const std::vector<float>& mine = it->second;
+        const int64_t n = (int64_t)std::min(mine.size(), (size_t)rn);
+        const double cos = htd_cosine(mine.data(), ref.data(), n);
+        const double mad = htd_max_abs_diff(mine.data(), ref.data(), n);
+        const bool same_size = mine.size() == (size_t)rn;
+        const bool ok = cos >= COS_MIN && same_size;
+        n_run++;
+        if (!ok) {
+            n_fail++;
+            if (!first_fail)
+                first_fail = stage;
+        }
+        // Always print both magnitudes: a 10-30x outlier on either side means
+        // "same name, wrong data" (a harness bug), not a runtime bug.
+        fprintf(stderr, "  %-20s %s cos=%.6f max_abs=%.3e  mine=%zu ref=%lld  |mine|=%.4f |ref|=%.4f%s\n", stage,
+                ok ? "PASS" : "FAIL", cos, mad, mine.size(), (long long)rn, htd_l2_norm(mine.data(), n),
+                htd_l2_norm(ref.data(), n), same_size ? "" : "  *** SHAPE MISMATCH ***");
+        (void)verbosity;
+    };
+
+    fprintf(stderr, "\n=== htdemucs per-stage parity (cos_min >= %.3f) ===\n", COS_MIN);
+    report("spec_input");
+    report("time_input");
+    for (int i = 0; i < 4; i++)
+        report(("enc_freq_" + std::to_string(i)).c_str());
+    for (int i = 0; i < 3; i++)
+        report(("enc_time_" + std::to_string(i)).c_str());
+    report("pre_transformer_z");
+    report("pre_transformer_xt");
+    report("post_transformer_z");
+    report("post_transformer_xt");
+    for (int i = 0; i < 4; i++)
+        report(("dec_freq_" + std::to_string(i)).c_str());
+    for (const char* s : {"drums", "bass", "other", "vocals"})
+        report(("output_" + std::string(s)).c_str());
+
+    fprintf(stderr, "\n%d/%d stages passed", n_run - n_fail, n_run);
+    if (n_missing)
+        fprintf(stderr, ", %d missing", n_missing);
+    if (first_fail)
+        fprintf(stderr, " — FIRST DIVERGENCE: %s", first_fail);
+    fprintf(stderr, "\n");
+
+    htdemucs_result_free(res);
+    htdemucs_free(ctx);
+    return n_fail > 0 ? 1 : 0;
 }

@@ -54,6 +54,13 @@ int htdemucs_sample_rate(const htdemucs_context* ctx);
 int htdemucs_n_sources(const htdemucs_context* ctx);
 const char* htdemucs_source_name(const htdemucs_context* ctx, int idx);
 
+// Per-stage parity diff against a Python reference dump
+// (tools/reference_backends/htdemucs.py). Replays the 44.1 kHz waveform stored
+// in the reference's `input_wav` stage, so the comparison is input-aligned and
+// independent of any resampler. Returns 0 if every stage passes, 1 on a parity
+// failure, 2 on a load error.
+int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audio_wav, int verbosity);
+
 #ifdef __cplusplus
 }
 #endif

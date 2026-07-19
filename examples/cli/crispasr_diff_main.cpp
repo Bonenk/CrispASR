@@ -37,6 +37,7 @@
 
 #include "voxtral.h"
 #include "voxtral4b.h"
+#include "htdemucs.h"
 #include "voxtral_tts.h"
 #include "higgs_stt.h"
 #include "moss_transcribe_diarize.h"
@@ -1094,6 +1095,13 @@ int main(int argc, char** argv) {
         // model_path = voxtral-tts GGUF (F16 for a clean structural diff), ref_path =
         // ref GGUF from tools/reference_backends/voxtral_tts.py. Per-layer frame-0 LLM cos.
         return voxtral_tts_llm_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
+    }
+    if (backend_name == "htdemucs") {
+        // model_path = htdemucs GGUF (f32 for a clean structural diff), ref_path =
+        // ref GGUF from tools/reference_backends/htdemucs.py. The 44.1 kHz stereo
+        // input is replayed from the reference's input_wav stage, so audio_path is
+        // unused and the diff is resampler-independent.
+        return htdemucs_diff(model_path.c_str(), ref_path.c_str(), audio_path.c_str(), /*verbosity=*/2);
     }
 
     // Load the reference archive.
@@ -7290,7 +7298,7 @@ int main(int argc, char** argv) {
                 "granite-4.1, granite-nle, parakeet, canary, canary-qwen, cohere, gemma4, mimo-tokenizer, mimo-asr, "
                 "orpheus, moonshine, moonshine-streaming, lid-cld3, glm-asr, firered-asr, voxcpm2-tts, funasr, "
                 "paraformer, sensevoice, cosyvoice3-tts, melotts, parler-tts, moss-audio, kugelaudio, zonos-tts, "
-                "lfm2-audio, mini-omni2, nemotron, kyutai-stt, moss-diarize, miotts, miocodec.\n",
+                "lfm2-audio, mini-omni2, nemotron, kyutai-stt, moss-diarize, miotts, miocodec, htdemucs.\n",
                 backend_name.c_str());
         return 5;
     }
