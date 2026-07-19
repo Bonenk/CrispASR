@@ -2163,10 +2163,19 @@ commercial-restricted, skip).
 - [ ] **Seed-VC** — zero-shot voice conversion. **GPL-3.0** (Plachta/Seed-VC on HF).
   Encoder + flow-matching + vocoder. Medium effort. GPL is fine for our Apache-2.0
   project as long as the model weights are loaded at runtime (not statically linked).
+  **Scoped 2026-07-19:** Tiny XLSR variant = 142 MB (25M params), fits 8GB VPS (~3 GB
+  RAM with PyTorch). Architecture: XLSR→CAMPPlus speaker emb→length regulator→DiT
+  UViT flow-matching (30 ODE steps)→HiFi-GAN vocoder. Risk: flow-matching requires
+  noise pinning for deterministic diffs; FunASR+ModelScope deps are heavy. Repo archived.
 
 **TTS:**
-- [ ] **Supertonic 3** — claims 200×+ realtime on CUDA. **OpenRAIL** (Supertone/
-  supertonic-3 on HF). OpenRAIL is permissive enough. High priority speed target.
+- [ ] **Supertonic 3** — claims 200×+ realtime on CUDA. **OpenRAIL-M** (Supertone/
+  supertonic-3 on HF). Permissive (attribution + responsible use).
+  **Scoped 2026-07-19:** ~400 MB total (4 ONNX components: text_encoder 36 MB,
+  duration_predictor 4 MB, vector_estimator 257 MB, vocoder 101 MB). Non-autoregressive
+  flow-matching (5-12 steps). 44.1 kHz output, 31 languages, 10 voices. Runs on
+  Raspberry Pi (~800 MB RAM). ONNX-only distribution = custom ref approach needed
+  (dump ONNX intermediate tensors, no PyTorch hooks). Deterministic diffs. **VPS-ready.**
 - [x] **MioTTS** — voice cloning TTS. **Apache-2.0** (Aratako/MioTTS-0.6B, Qwen3-based).
   **IN PROGRESS** (VPS session, 2026-07-19). Using 0.6B (Apache-2.0, Qwen3ForCausalLM).
   Architecture: Qwen3 LLM (28L, 1024d, GQA 16/8, head_dim=128, vocab=164480 incl
@@ -2186,16 +2195,29 @@ commercial-restricted, skip).
   - HF upload: F16 + Q8_0 + Q4_K GGUFs with README
 
 **Audio codec:**
-- [ ] **MioCodec v2** — standalone audio codec. License TBD (not on HF card yet, same
-  authors as MioTTS = likely Apache-2.0, confirm before porting).
+- [x] **MioCodec v2** — standalone audio codec. **MIT** (confirmed on HF + GitHub).
+  **TAKEN** (VPS session, 2026-07-19). 133M params, ~530 MB F32. Architecture:
+  WavLM-base+ encoder → FSQ quantizer (1 codebook, 12800 vocab, 25 Hz) → iSTFT
+  decoder. Encode+decode is the full pipeline (no external vocoder for v2). Also does
+  standalone voice conversion (swap global embedding). ~1.2 GB RAM — fits easily.
+  Unblocks MioTTS port (shared codec). Deterministic diffs (feed-forward, no sampling).
+  Regime: read Python → converter → backend → per-stage diff → roundtrip (encode→decode
+  parity with original audio).
 
 **Music generation:**
-- [ ] **ACE-Step 1.5** — music generation. **Apache-2.0**. New category but clean license.
+- [ ] **ACE-Step 1.5** — music generation. **Apache-2.0**. 3.5B params, 8.3 GB.
+  **Scoped 2026-07-19:** mT5 text encoder + 3.5B linear transformer flow-matching +
+  DCAE latent codec + vocoder. Kaggle-only (weights alone exceed 8GB RAM). 4 min max.
 - [ ] **HeartMuLa** — music generation. **Apache-2.0** (HeartMuLa/HeartMuLa-oss-3B).
+  **Scoped 2026-07-19:** 4B params, ~16 GB F32. AR LM + HeartCodec (12.5 Hz). Kaggle-only.
 
 **Diarization:**
-- [ ] **Sortformer** — NVIDIA dedicated diarization. **Apache-2.0** (NeMo). We have
-  `moss-diarize` + pyannote; evaluate quality delta before full port.
+- [ ] **Sortformer** — NVIDIA dedicated diarization. **NOT Apache-2.0** — streaming v2
+  is CC-BY-4.0, v2.1 is NVIDIA Open Model License. ~470 MB, 4-speaker hard cap.
+  **Scoped 2026-07-19:** End-to-end (no VAD/clustering pipeline). Fast-Conformer 18L +
+  Transformer 18L → per-frame 4-speaker labels. Community ONNX exports exist. ~750 MB
+  RAM via ONNX, ~125 MB Q4_K GGUF. VPS-feasible but: (a) license isn't Apache-2.0,
+  (b) 4-speaker cap vs pyannote/MOSS unlimited, (c) need quality eval first.
 
 **Skipped (license incompatible):**
 - ~~Vevo2~~ — CC-BY-NC-4.0 (non-commercial only)
