@@ -795,25 +795,122 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         pcm_ch[work_length + i] = pcm_stereo[2 * i + 1]; // R
     }
 
-    // Step 2: STFT
+    // Step 2: HTDemucs-specific STFT (matches _spec() in htdemucs.py)
+    //
+    // The Python _spec() does:
+    //   le = ceil(T / hop_length)
+    //   pad = hop_length // 2 * 3   (= 1536 for hop=1024)
+    //   x = pad1d(x, (pad, pad + le*hop - T), mode="reflect")
+    //   z = spectro(x, nfft, hop)   (center=True, normalized=True)
+    //   z = z[..., :-1, :]          (drop last freq bin: 2049 → 2048)
+    //   z = z[..., 2:2+le]          (trim to le frames)
+    //
+    // spectro's center=True adds nfft/2 reflect pad on each side internally.
+    // So total padding before the raw STFT is:
+    //   left:  pad + nfft/2 = 1536 + 2048 = 3584
+    //   right: (pad + le*hop - T) + nfft/2
+
     int nfft = hp.nfft;
     int hop = hp.hop_length();
-    stft_result spec = compute_stft(pcm_ch.data(), 2, work_length, nfft, hop, ctx->hann_window.data());
+    int le = (int)ceil((double)work_length / hop);
 
-    // Step 3: CaC (complex as channels): split real/imag → 4 channels
-    // spec is (2, n_freqs, n_frames). CaC makes it (4, n_freqs, n_frames).
-    // But we need (4, nfft/2, n_frames) — drop the last freq bin ([..., :-1, :]).
-    int Fq = nfft / 2; // 2048
-    int T = spec.n_frames;
+    // Apply _spec() pre-padding (reflect) to each channel
+    int pre_pad_left = hop / 2 * 3; // 1536
+    int pre_pad_right = pre_pad_left + le * hop - work_length;
+    int pre_padded_len = work_length + pre_pad_left + pre_pad_right;
+    std::vector<float> pre_padded(2 * pre_padded_len);
 
-    // TODO: the Python STFT has custom padding (reflect pad = hl//2*3, then
-    // z[..., 2:2+le] frame slicing). We must match it exactly for parity.
-    // For now, produce stub output to verify the pipeline builds.
-    (void)Fq;
-    (void)T;
+    for (int ch = 0; ch < 2; ch++) {
+        const float* src = pcm_ch.data() + (size_t)ch * work_length;
+        float* dst = pre_padded.data() + (size_t)ch * pre_padded_len;
+        for (int i = 0; i < pre_padded_len; i++) {
+            int idx = i - pre_pad_left;
+            // Reflect padding (matches pad1d with mode="reflect")
+            if (idx < 0)
+                idx = -idx;
+            if (idx >= work_length)
+                idx = 2 * work_length - 2 - idx;
+            idx = std::max(0, std::min(work_length - 1, idx));
+            dst[i] = src[idx];
+        }
+    }
+
+    // Now run the raw STFT with center=True on the pre-padded signal
+    stft_result spec = compute_stft(pre_padded.data(), 2, pre_padded_len, nfft, hop, ctx->hann_window.data());
+
+    // z[..., :-1, :] — drop the last frequency bin (2049 → 2048)
+    int Fq = nfft / 2; // 2048 (was nfft/2+1 = 2049)
+
+    // z[..., 2:2+le] — take frames 2..2+le (the _spec frame slicing)
+    int T = le;
+    int frame_offset = 2;
+
+    // Build CaC magnitude: (B, C*2, Fq, T) from complex spectrogram.
+    // For B=1, C=2: we get 4 channels — [real_L, real_R, imag_L, imag_R]
+    // Actually Python does: view_as_real(z).permute(0,1,4,2,3).reshape(B, C*2, Fr, T)
+    // where view_as_real gives (B, C, Fr, T, 2), permute → (B, C, 2, Fr, T),
+    // reshape → (B, C*2, Fr, T) = (1, 4, 2048, le)
+    // So channel order is: [L_real, L_imag, R_real, R_imag]
+    int n_cac_ch = hp.audio_channels * 2; // 4
+    std::vector<float> cac_mag(n_cac_ch * Fq * T, 0.0f);
+
+    for (int ch = 0; ch < 2; ch++) {
+        for (int fq = 0; fq < Fq; fq++) {
+            for (int t = 0; t < T; t++) {
+                size_t src_idx =
+                    (size_t)ch * spec.n_freqs * spec.n_frames + (size_t)fq * spec.n_frames + (frame_offset + t);
+                float re_val = spec.real[src_idx];
+                float im_val = spec.imag[src_idx];
+                // CaC channel order: [ch*2] = real, [ch*2+1] = imag
+                cac_mag[((size_t)(ch * 2) * Fq + fq) * T + t] = re_val;
+                cac_mag[((size_t)(ch * 2 + 1) * Fq + fq) * T + t] = im_val;
+            }
+        }
+    }
+
+    if (htdemucs_debug()) {
+        fprintf(stderr, "htdemucs: STFT spec %d×%d, CaC %d×%d×%d\n", spec.n_freqs, spec.n_frames, n_cac_ch, Fq, T);
+    }
 
     fprintf(stderr, "htdemucs: STFT → %d freqs × %d frames, CaC → %d channels\n", Fq, T, hp.cac ? 4 : 2);
-    fprintf(stderr, "htdemucs: forward pass graph not yet wired (Phase 2b in progress)\n");
+    // Step 4: Normalize spec branch (mean/std over all dims)
+    float spec_mean = 0.0f, spec_var = 0.0f;
+    size_t spec_n = (size_t)n_cac_ch * Fq * T;
+    for (size_t i = 0; i < spec_n; i++)
+        spec_mean += cac_mag[i];
+    spec_mean /= (float)spec_n;
+    for (size_t i = 0; i < spec_n; i++) {
+        float d = cac_mag[i] - spec_mean;
+        spec_var += d * d;
+    }
+    float spec_std = sqrtf(spec_var / (float)spec_n);
+    for (size_t i = 0; i < spec_n; i++) {
+        cac_mag[i] = (cac_mag[i] - spec_mean) / (1e-5f + spec_std);
+    }
+
+    // Step 5: Normalize time branch
+    float time_mean = 0.0f, time_var = 0.0f;
+    size_t time_n = (size_t)2 * work_length;
+    for (size_t i = 0; i < time_n; i++)
+        time_mean += pcm_ch[i];
+    time_mean /= (float)time_n;
+    for (size_t i = 0; i < time_n; i++) {
+        float d = pcm_ch[i] - time_mean;
+        time_var += d * d;
+    }
+    float time_std = sqrtf(time_var / (float)time_n);
+    for (size_t i = 0; i < time_n; i++) {
+        pcm_ch[i] = (pcm_ch[i] - time_mean) / (1e-5f + time_std);
+    }
+
+    if (htdemucs_debug()) {
+        fprintf(stderr, "htdemucs: spec_norm mean=%.6f std=%.6f, time_norm mean=%.6f std=%.6f\n", spec_mean, spec_std,
+                time_mean, time_std);
+    }
+
+    // Step 6: Build ggml compute graph for encoder → transformer → decoder
+    // TODO: this is the next major piece. For now produce stub output.
+    fprintf(stderr, "htdemucs: normalized, encoder graph TODO (Phase 2c)\n");
 
     // Return stub result
     auto r = new htdemucs_result();
