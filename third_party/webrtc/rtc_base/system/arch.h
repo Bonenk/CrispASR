@@ -47,6 +47,14 @@
 #elif defined(__pnacl__)
 #define WEBRTC_ARCH_32_BITS
 #define WEBRTC_ARCH_LITTLE_ENDIAN
+#elif defined(__wasm__) || defined(__wasm32__) || defined(__EMSCRIPTEN__)
+// WebAssembly (emscripten): 32-bit, little-endian. Only the GMM VAD's portable
+// C is compiled — the X86/ARM SIMD paths are gated on WEBRTC_ARCH_*_FAMILY,
+// which stay undefined here, so it falls back to scalar. Fixes the WASM build
+// (Build WASM workflow) after third_party/webrtc was vendored for the WebRTC
+// VAD backend.
+#define WEBRTC_ARCH_32_BITS
+#define WEBRTC_ARCH_LITTLE_ENDIAN
 #else
 #error Please add support for your architecture in typedefs.h
 #endif
