@@ -941,6 +941,122 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     x_C, x_Fq, x_T, xt_C, xt_T, freq ? 1 : 0, freqs_cur, ker, stri, pad_val);
         }
 
+        // --- Time branch encoder (runs before freq branch) ---
+        std::vector<float> inject_buf; // injection from time→freq at merge point
+        bool has_inject = false;
+        if (idx < (int)m.tencoder.size() && m.tencoder[idx].conv_w) {
+            auto& tenc = m.tencoder[idx];
+
+            // Pad xt so length is divisible by stride
+            int xt_pad = 0;
+            if (xt_T % hp.stride != 0) {
+                xt_pad = hp.stride - (xt_T % hp.stride);
+            }
+            int xt_padded_T = xt_T + xt_pad;
+
+            // Build time encoder graph
+            size_t t_ctx_size = ggml_tensor_overhead() * 64 + ggml_graph_overhead();
+            ggml_init_params tgp = {t_ctx_size, nullptr, true};
+            ggml_context* tg = ggml_init(tgp);
+
+            // Time input: (xt_T, xt_C) in ggml ne order → padded to (xt_padded_T, xt_C)
+            ggml_tensor* xt_in = ggml_new_tensor_2d(tg, GGML_TYPE_F32, xt_padded_T, xt_C);
+            ggml_set_name(xt_in, "tenc_in");
+            ggml_set_input(xt_in);
+
+            // Conv1d: kernel ne = (K, IC, OC), data ne = (T, IC)
+            int t_ker = hp.kernel_size;
+            int t_stri = hp.stride;
+            int t_pad = t_ker / 4;
+            ggml_tensor* ty = ggml_conv_1d(tg, tenc.conv_w, xt_in, t_stri, t_pad, 1);
+            if (tenc.conv_b)
+                ty = ggml_add(tg, ty, tenc.conv_b);
+
+            if (!tenc.empty) {
+                // GroupNorm + GELU + Rewrite + GLU (same as freq but 2D)
+                if (tenc.norm1_w) {
+                    // For 2D (T, C): ggml_group_norm uses ne[2] which doesn't exist for 2D.
+                    // Reshape to 3D: (T, C, 1) so ne[2]=1 — but that's wrong for GroupNorm.
+                    // Actually for 2D tensors, group_norm uses ne[0] as the spatial dim and ne[1] doesn't exist...
+                    // Let me reshape to (T, 1, C, 1) so ne[2]=C for group_norm.
+                    int ty_T = (int)ty->ne[0], ty_C = (int)ty->ne[1];
+                    ty = ggml_reshape_4d(tg, ty, ty_T, 1, ty_C, 1);
+                    ty = ggml_group_norm(tg, ty, 4, 1e-5f);
+                    ggml_tensor* w4d = ggml_reshape_4d(tg, tenc.norm1_w, 1, 1, (int)tenc.norm1_w->ne[0], 1);
+                    ty = ggml_mul(tg, ty, w4d);
+                    if (tenc.norm1_b) {
+                        ggml_tensor* b4d = ggml_reshape_4d(tg, tenc.norm1_b, 1, 1, (int)tenc.norm1_b->ne[0], 1);
+                        ty = ggml_add(tg, ty, b4d);
+                    }
+                    ty = ggml_reshape_2d(tg, ty, ty_T, ty_C);
+                }
+                ty = ggml_gelu(tg, ty);
+
+                // Rewrite + GLU
+                if (tenc.rewrite_w) {
+                    ggml_tensor* trw = ggml_conv_1d(tg, tenc.rewrite_w, ty, 1, 0, 1);
+                    if (tenc.rewrite_b)
+                        trw = ggml_add(tg, trw, tenc.rewrite_b);
+                    if (tenc.norm2_w) {
+                        int trw_T = (int)trw->ne[0], trw_C = (int)trw->ne[1];
+                        trw = ggml_reshape_4d(tg, trw, trw_T, 1, trw_C, 1);
+                        trw = ggml_group_norm(tg, trw, 4, 1e-5f);
+                        ggml_tensor* w4d = ggml_reshape_4d(tg, tenc.norm2_w, 1, 1, (int)tenc.norm2_w->ne[0], 1);
+                        trw = ggml_mul(tg, trw, w4d);
+                        if (tenc.norm2_b) {
+                            ggml_tensor* b4d = ggml_reshape_4d(tg, tenc.norm2_b, 1, 1, (int)tenc.norm2_b->ne[0], 1);
+                            trw = ggml_add(tg, trw, b4d);
+                        }
+                        trw = ggml_reshape_2d(tg, trw, trw_T, trw_C);
+                    }
+                    // GLU: split channel dim
+                    int trw_C = (int)trw->ne[1];
+                    int trw_half = trw_C / 2;
+                    int trw_T = (int)trw->ne[0];
+                    ggml_tensor* ta = ggml_view_2d(tg, trw, trw_T, trw_half, trw->nb[1], 0);
+                    ggml_tensor* tb = ggml_view_2d(tg, trw, trw_T, trw_half, trw->nb[1], (size_t)trw_half * trw->nb[1]);
+                    ty = ggml_mul(tg, ggml_cont(tg, ta), ggml_sigmoid(tg, ggml_cont(tg, tb)));
+                }
+            }
+
+            ggml_set_name(ty, "tenc_out");
+            ggml_set_output(ty);
+
+            ggml_cgraph* tgf = ggml_new_graph(tg);
+            ggml_build_forward_expand(tgf, ty);
+            ggml_gallocr_t talloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+            if (ggml_gallocr_alloc_graph(talloc, tgf)) {
+                // Upload padded time input
+                std::vector<float> xt_padded(xt_C * xt_padded_T, 0.0f);
+                for (int c = 0; c < xt_C; c++)
+                    memcpy(xt_padded.data() + c * xt_padded_T, xt_buf.data() + c * xt_T, xt_T * sizeof(float));
+                ggml_backend_tensor_set(xt_in, xt_padded.data(), 0, xt_padded.size() * sizeof(float));
+                ggml_backend_graph_compute(ctx->backend, tgf);
+
+                // Read output
+                int tout_T = (int)ty->ne[0];
+                int tout_C = (int)ty->ne[1];
+                size_t tout_n = (size_t)tout_T * tout_C;
+                xt_buf.resize(tout_n);
+                ggml_backend_tensor_get(ty, xt_buf.data(), 0, tout_n * sizeof(float));
+                xt_C = tout_C;
+                xt_T = tout_T;
+
+                if (tenc.empty) {
+                    // Merge point: inject time output into freq encoder
+                    inject_buf = xt_buf;
+                    has_inject = true;
+                }
+
+                if (htdemucs_debug()) {
+                    fprintf(stderr, "htdemucs: tenc[%d] output (%d, %d) empty=%d\n", idx, xt_C, xt_T,
+                            tenc.empty ? 1 : 0);
+                }
+            }
+            ggml_gallocr_free(talloc);
+            ggml_free(tg);
+        }
+
         // --- Per-layer ggml graph for freq encoder ---
         if (!enc.conv_w) {
             encoder_ok = false;
@@ -966,9 +1082,21 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             // p0=0, p1=pad_val
             ggml_tensor* y = ggml_conv_2d(g, enc.conv_w, x_in, 1, stri, 0, pad_val, 1, 1);
             if (enc.conv_b) {
-                // Bias shape: (OC,) → broadcast: reshape to (1, 1, OC, 1)
                 ggml_tensor* bias_4d = ggml_reshape_4d(g, enc.conv_b, 1, 1, (int)enc.conv_b->ne[0], 1);
                 y = ggml_add(g, y, bias_4d);
+            }
+
+            // Inject time branch output (at merge point only)
+            ggml_tensor* inject_in = nullptr;
+            if (has_inject) {
+                // inject_buf is (xt_T, xt_C). Conv2d output y is (y_T, y_Fq, y_C, 1).
+                // Python: inject = inject[:,:,None] → (B,C,1,T) then y = y + inject.
+                // In ggml ne: inject as (y_T, 1, y_C, 1) to broadcast over Fq.
+                int y_T_now = (int)y->ne[0], y_C_now = (int)y->ne[2];
+                inject_in = ggml_new_tensor_4d(g, GGML_TYPE_F32, y_T_now, 1, y_C_now, 1);
+                ggml_set_name(inject_in, "inject");
+                ggml_set_input(inject_in);
+                y = ggml_add(g, y, inject_in);
             }
 
             if (!enc.empty) {
@@ -1053,6 +1181,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
             // Upload input data
             ggml_backend_tensor_set(x_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
+            if (inject_in && has_inject) {
+                ggml_backend_tensor_set(inject_in, inject_buf.data(), 0, inject_buf.size() * sizeof(float));
+            }
 
             // Compute
             ggml_backend_graph_compute(ctx->backend, gf);
