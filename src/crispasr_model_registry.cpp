@@ -576,6 +576,10 @@ constexpr Entry k_registry[] = {
     // degrades audio earlier than the backbone). Default download is the Q4_K
     // backbone (~5 GB) paired with the F16 codec. (URLs populated at ship after
     // the GGUF upload — see Phase 6.)
+    // MioCodec v2 — standalone audio codec (44.1kHz, 25Hz tokens, MIT).
+    {"miocodec", "miocodec-v2-44k-q8_0.gguf",
+     "https://huggingface.co/cstr/miocodec-v2-44k-GGUF/resolve/main/miocodec-v2-44k-q8_0.gguf",
+     "~155 MB"},
     // MioTTS-0.6B (Qwen3 LLM + MioCodec-25Hz-24kHz, Apache-2.0).
     // Single GGUF, tokenizer.json loaded at runtime.
     {"miotts", "miotts-0.6b-q8_0.gguf",
