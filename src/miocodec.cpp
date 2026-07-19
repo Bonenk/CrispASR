@@ -433,7 +433,7 @@ static void fsq_indices_to_codes(const int32_t* indices, int n, float* out_codes
 // Build a single Transformer layer (no AdaLN): LN → Attn → residual → LN → FFN → residual
 static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* x,
                                                const miocodec_weights::transformer_layer& L, int n_heads,
-                                               int /*window_size*/) {
+                                               int /*window_size*/, ggml_tensor* attn_mask = nullptr) {
     const int64_t dim = x->ne[0];
     const int64_t T = x->ne[1];
     const int64_t hd = dim / n_heads;
@@ -467,7 +467,7 @@ static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* 
     V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
 
     float scale = 1.0f / sqrtf((float)hd);
-    ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, scale, 0.0f, 0.0f);
+    ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, attn_mask, scale, 0.0f, 0.0f);
 
     // Back to (dim, T): (hd, T, n_heads) → permute(0,2,1,3) → (hd, n_heads, T) → reshape(dim, T)
     attn_out = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn_out, 0, 2, 1, 3)), dim, T);
@@ -706,9 +706,18 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         ggml_set_name(x, "prenet_input");
         ggml_set_input(x);
 
+        // Build windowed attention mask (window_size=65, ±32 positions)
+        const int window_per_side = (int)ctx->hparams.wave_prenet_window_size / 2; // 32
+        ggml_tensor* win_mask = nullptr;
+        if (T > 1 && window_per_side > 0) {
+            win_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T);
+            ggml_set_name(win_mask, "win_mask");
+            ggml_set_input(win_mask);
+        }
+
         // Build the 6-layer Transformer graph
         for (int i = 0; i < n_layers; i++) {
-            x = miocodec_transformer_layer(ctx0, x, ctx->weights.wave_prenet_layers[i], n_heads, 0);
+            x = miocodec_transformer_layer(ctx0, x, ctx->weights.wave_prenet_layers[i], n_heads, 0, win_mask);
         }
 
         // Final norm + output projection (768→512)
@@ -740,6 +749,20 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
             for (int i = 0; i < T; i++)
                 positions[i] = i;
             ggml_backend_tensor_set(pos_t, positions.data(), 0, sizeof(int32_t) * T);
+        }
+
+        // Set windowed attention mask
+        ggml_tensor* mask_t = ggml_graph_get_tensor(gf, "win_mask");
+        if (mask_t) {
+            const int wps = window_per_side;
+            std::vector<ggml_fp16_t> mask_data(T * T);
+            for (int q = 0; q < T; q++) {
+                for (int k = 0; k < T; k++) {
+                    bool in_window = (k >= q - wps) && (k <= q + wps);
+                    mask_data[q * T + k] = ggml_fp32_to_fp16(in_window ? 0.0f : -INFINITY);
+                }
+            }
+            ggml_backend_tensor_set(mask_t, mask_data.data(), 0, sizeof(ggml_fp16_t) * T * T);
         }
 
         ggml_backend_sched_graph_compute(ctx->sched, gf);
