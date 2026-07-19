@@ -2150,8 +2150,11 @@ commercial-restricted, skip).
 **TTS:**
 - [ ] **Supertonic 3** — claims 200×+ realtime on CUDA. **OpenRAIL** (Supertone/
   supertonic-3 on HF). OpenRAIL is permissive enough. High priority speed target.
-- [ ] **MioTTS** — voice cloning TTS. **Apache-2.0** (Aratako/MioTTS-1.7B, also 0.1B–
+- [x] **MioTTS** — voice cloning TTS. **Apache-2.0** (Aratako/MioTTS-1.7B, also 0.1B–
   1.2B sizes). Clean license, multiple sizes = good for resource-constrained deploys.
+  **TAKEN** (VPS session, 2026-07-19). Starting with 0.1B — fits in 8 GB RAM for
+  Python reference dump + C++ port. Architecture: LLM (Qwen2-based) + MioCodec
+  vocoder. Diff harness regime: read Python → converter → backend → roundtrip.
 
 **Audio codec:**
 - [ ] **MioCodec v2** — standalone audio codec. License TBD (not on HF card yet, same
