@@ -13,6 +13,7 @@
 #include "ggml-cpu.h"
 #include "core/gguf_loader.h"
 #include "core/fft.h"
+#include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend
 
 #if defined(HAVE_ACCELERATE)
 #include <Accelerate/Accelerate.h> // cblas_sgemm — CrossTransformer is 86% of runtime
@@ -61,6 +62,10 @@ static bool htdemucs_profile() {
 }
 
 static double htd_now_ms();
+static bool htdemucs_use_ggml();
+static bool htdemucs_transformer_ggml(struct htdemucs_context* ctx, std::vector<float>& x_buf, int x_seq,
+                                      std::vector<float>& xt_buf, int xt_seq, int dim, int n_heads, int n_layers,
+                                      int classic_parity);
 
 namespace {
 struct htd_prof {
@@ -312,6 +317,8 @@ struct htdemucs_context {
 
     // Precomputed Hann window (nfft)
     std::vector<float> hann_window;
+
+    bool is_gpu = false;
 
     // Per-stage intermediate capture for the parity diff harness. Off in the
     // normal path (separate() never touches the map), so this costs nothing
@@ -601,8 +608,28 @@ static htdemucs_context* htdemucs_init_impl(const char* model_path, htdemucs_par
             "samplerate=%d, segment=%.1f, t_layers=%d\n",
             hp.depth, hp.channels, hp.nfft, hp.samplerate, hp.segment, hp.t_layers);
 
-    // Pass 2: load weights
-    ctx->backend = ggml_backend_cpu_init();
+    // Pass 2: load weights.
+    //
+    // Backend selection now honours params.use_gpu (it was hardcoded to CPU, so
+    // use_gpu and n_threads were dead fields). crispasr_init_gpu_backend() tries
+    // the compiled backends in priority order (CUDA > Metal > Vulkan) and falls
+    // back to CPU. Gated by CRISPASR_HTDEMUCS_GGML because only the graph path
+    // benefits — the CPU/BLAS path wants a CPU backend for its weight reads.
+    // GPU only makes sense with the graph path: under the CPU/BLAS path the
+    // weights would live on the GPU and every scalar/BLAS kernel would pay a
+    // device->host read. CRISPASR_HTDEMUCS_GPU=1 requests it without having to
+    // thread a flag through all three surfaces (CLI, session C-ABI, server).
+    const char* gpu_env = getenv("CRISPASR_HTDEMUCS_GPU");
+    const bool want_gpu = (params.use_gpu || (gpu_env && atoi(gpu_env) != 0));
+    if (want_gpu && htdemucs_use_ggml()) {
+        ctx->backend = crispasr_init_gpu_backend();
+        if (!ctx->backend)
+            ctx->backend = ggml_backend_cpu_init();
+    } else {
+        ctx->backend = ggml_backend_cpu_init();
+    }
+    ctx->is_gpu = !ggml_backend_is_cpu(ctx->backend);
+    fprintf(stderr, "htdemucs: backend = %s\n", ggml_backend_name(ctx->backend));
     core_gguf::WeightLoad wl;
     if (!core_gguf::load_weights(model_path, ctx->backend, "htdemucs", wl)) {
         fprintf(stderr, "htdemucs: failed to load weights from %s\n", model_path);
@@ -880,6 +907,18 @@ static void htd_gemm(int M, int N, int K, const float* A, const float* B, float*
 // and the cache lives for the process. Gated CRISPASR_HTDEMUCS_WCACHE
 // (default ON) so the old behaviour stays A/B-able.
 // ---------------------------------------------------------------------------
+// GGML graph port for the CrossTransformer (CRISPASR_HTDEMUCS_GGML).
+// Default OFF pending a full A/B: per the dev-guide inverse-default rule a
+// verified-but-not-yet-faster path stays opt-in and the old path stays default.
+static bool htdemucs_use_ggml() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("CRISPASR_HTDEMUCS_GGML");
+        v = (e && atoi(e) != 0) ? 1 : 0; // default OFF
+    }
+    return v != 0;
+}
+
 // FASTCONV: batched im2col + gemm for the CPU convs (default ON). Set
 // CRISPASR_HTDEMUCS_FASTCONV=0 for the original per-frame scalar path.
 static bool htdemucs_fastconv() {
@@ -2223,8 +2262,18 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         // (norm_in + positional embedding happen just above)
         htd_capture(ctx, "ct_in_xt", xt_buf.data(), xt_buf.size());
 
+        // GGML graph port (opt-in). Runs every layer of both branches in one
+        // graph on ctx->backend; falls through to the CPU/BLAS path below if the
+        // graph cannot be built or allocated.
+        bool ct_done = false;
+        if (htdemucs_use_ggml()) {
+            HTD_PROF(prof, "ct.ggml_graph");
+            ct_done = htdemucs_transformer_ggml(ctx, x_buf, x_seq, xt_buf, xt_seq, dim, n_heads, hp.t_layers,
+                                                hp.t_classic_parity);
+        }
+
         // 5 transformer layers
-        for (int li = 0; li < hp.t_layers; li++) {
+        for (int li = 0; li < hp.t_layers && !ct_done; li++) {
             auto& layer_s = m.ct_layers[li];   // spec branch layer
             auto& layer_t = m.ct_layers_t[li]; // time branch layer
 
@@ -3459,6 +3508,252 @@ const char* htdemucs_source_name(const htdemucs_context* ctx, int idx) {
 }
 
 // ---------------------------------------------------------------------------
+// CrossTransformer as a ggml graph (CRISPASR_HTDEMUCS_GGML=1)
+//
+// The CPU/BLAS path stays the default; this is the opt-in graph port that lets
+// the transformer run on Metal/CUDA/Vulkan instead of Accelerate.
+//
+// LAYOUT. The CPU buffers are (dim-slow, seq-fast): index d*seq + s. ggml
+// contracts mul_mat on ne[0], so the graph wants ne = (dim, seq), i.e. memory
+// index s*dim + d — the transpose of the CPU layout. We transpose once on
+// upload and once on download (1.4M floats, negligible next to the layers).
+//
+// Weight tensors are already ggml tensors on ctx->backend from load_weights, so
+// nothing is re-uploaded per call.
+// ---------------------------------------------------------------------------
+
+// LayerNorm over ne[0] (the channel axis) with per-channel affine.
+static ggml_tensor* g_layernorm(ggml_context* g, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b, float eps) {
+    ggml_tensor* y = ggml_norm(g, x, eps);
+    if (w)
+        y = ggml_mul(g, y, ggml_reshape_2d(g, w, (int)w->ne[0], 1));
+    if (b)
+        y = ggml_add(g, y, ggml_reshape_2d(g, b, (int)b->ne[0], 1));
+    return y;
+}
+
+// norm_out: GroupNorm(num_groups=1) over ALL channels AND tokens jointly, then
+// a per-channel affine. Flattening to 1D and asking for one group makes
+// ggml_group_norm reduce over the whole tensor, which is the semantics we
+// need (see the norm_out bug in the parity work).
+static ggml_tensor* g_groupnorm1(ggml_context* g, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b, int dim, int seq,
+                                 float eps) {
+    ggml_tensor* flat = ggml_reshape_4d(g, x, dim * seq, 1, 1, 1);
+    flat = ggml_group_norm(g, flat, 1, eps);
+    ggml_tensor* y = ggml_reshape_2d(g, flat, dim, seq);
+    if (w)
+        y = ggml_mul(g, y, ggml_reshape_2d(g, w, dim, 1));
+    if (b)
+        y = ggml_add(g, y, ggml_reshape_2d(g, b, dim, 1));
+    return y;
+}
+
+// Multi-head attention. Q is (dim, q_seq); K, V are (dim, k_seq). Returns
+// (dim, q_seq). mask = nullptr is correct here: this model attends over the
+// full sequence, there is no causal or padding mask.
+static ggml_tensor* g_mha(ggml_context* g, ggml_tensor* Q, ggml_tensor* K, ggml_tensor* V, int dim, int n_heads,
+                          int q_seq, int k_seq) {
+    const int hd = dim / n_heads;
+    const float scale = 1.0f / sqrtf((float)hd);
+
+    ggml_tensor* q = ggml_cont(g, ggml_permute(g, ggml_reshape_3d(g, Q, hd, n_heads, q_seq), 0, 2, 1, 3));
+    ggml_tensor* k = ggml_cont(g, ggml_permute(g, ggml_reshape_3d(g, K, hd, n_heads, k_seq), 0, 2, 1, 3));
+    ggml_tensor* scores = ggml_mul_mat(g, k, q); // (k_seq, q_seq, nh)
+    scores = ggml_soft_max_ext(g, scores, nullptr, scale, 0.0f);
+    ggml_tensor* v = ggml_cont(g, ggml_permute(g, ggml_reshape_3d(g, V, hd, n_heads, k_seq), 1, 2, 0, 3));
+    ggml_tensor* out = ggml_mul_mat(g, v, scores); // (hd, q_seq, nh)
+    return ggml_reshape_2d(g, ggml_cont(g, ggml_permute(g, out, 0, 2, 1, 3)), dim, q_seq);
+}
+
+static ggml_tensor* g_linear(ggml_context* g, ggml_tensor* w, ggml_tensor* b, ggml_tensor* x) {
+    ggml_tensor* y = ggml_mul_mat(g, w, x);
+    if (b)
+        y = ggml_add(g, y, ggml_reshape_2d(g, b, (int)b->ne[0], 1));
+    return y;
+}
+
+// x = x + gamma * y   (LayerScale is per-channel)
+static ggml_tensor* g_layerscale_add(ggml_context* g, ggml_tensor* x, ggml_tensor* y, ggml_tensor* gamma, int dim) {
+    if (gamma)
+        y = ggml_mul(g, y, ggml_reshape_2d(g, gamma, dim, 1));
+    return ggml_add(g, x, y);
+}
+
+// One norm_first self-attention layer:
+//   x = x + g1*SA(ln1(x)); x = x + g2*FFN(ln2(x)); x = norm_out(x)
+static ggml_tensor* g_self_attn_layer(ggml_context* g, ggml_tensor* x, const htdemucs_self_attn_layer& sa, int dim,
+                                      int n_heads, int seq) {
+    ggml_tensor* cur = g_layernorm(g, x, sa.norm1_w, sa.norm1_b, 1e-5f);
+    ggml_tensor* qkv = g_linear(g, sa.in_proj_w, sa.in_proj_b, cur); // (3*dim, seq)
+    const size_t off = (size_t)dim * ggml_element_size(qkv);
+    ggml_tensor* Q = ggml_view_2d(g, qkv, dim, seq, qkv->nb[1], 0);
+    ggml_tensor* K = ggml_view_2d(g, qkv, dim, seq, qkv->nb[1], off);
+    ggml_tensor* V = ggml_view_2d(g, qkv, dim, seq, qkv->nb[1], 2 * off);
+    ggml_tensor* att = g_mha(g, ggml_cont(g, Q), ggml_cont(g, K), ggml_cont(g, V), dim, n_heads, seq, seq);
+    att = g_linear(g, sa.out_proj_w, sa.out_proj_b, att);
+    x = g_layerscale_add(g, x, att, sa.gamma1_scale, dim);
+
+    cur = g_layernorm(g, x, sa.norm2_w, sa.norm2_b, 1e-5f);
+    cur = ggml_gelu(g, g_linear(g, sa.linear1_w, sa.linear1_b, cur));
+    cur = g_linear(g, sa.linear2_w, sa.linear2_b, cur);
+    x = g_layerscale_add(g, x, cur, sa.gamma2_scale, dim);
+
+    if (sa.norm_out_w)
+        x = g_groupnorm1(g, x, sa.norm_out_w, sa.norm_out_b, dim, seq, 1e-5f);
+    return x;
+}
+
+// One cross-attention layer: Q from `x` via norm1, K/V from `other` via norm2,
+// FFN gated by norm3.
+static ggml_tensor* g_cross_attn_layer(ggml_context* g, ggml_tensor* x, ggml_tensor* other,
+                                       const htdemucs_cross_attn_layer& ca, int dim, int n_heads, int q_seq,
+                                       int k_seq) {
+    ggml_tensor* qn = g_layernorm(g, x, ca.norm1_w, ca.norm1_b, 1e-5f);
+    ggml_tensor* kn = g_layernorm(g, other, ca.norm2_w, ca.norm2_b, 1e-5f);
+
+    ggml_tensor* W = ca.cross_attn_in_proj_w; // (dim, 3*dim)
+    ggml_tensor* Wq = ggml_view_2d(g, W, dim, dim, W->nb[1], 0);
+    ggml_tensor* Wk = ggml_view_2d(g, W, dim, dim, W->nb[1], (size_t)dim * W->nb[1]);
+    ggml_tensor* Wv = ggml_view_2d(g, W, dim, dim, W->nb[1], (size_t)2 * dim * W->nb[1]);
+
+    ggml_tensor* Q = ggml_mul_mat(g, ggml_cont(g, Wq), qn);
+    ggml_tensor* K = ggml_mul_mat(g, ggml_cont(g, Wk), kn);
+    ggml_tensor* V = ggml_mul_mat(g, ggml_cont(g, Wv), kn);
+    if (ca.cross_attn_in_proj_b) {
+        ggml_tensor* b = ca.cross_attn_in_proj_b;
+        const size_t es = ggml_element_size(b);
+        Q = ggml_add(g, Q, ggml_reshape_2d(g, ggml_cont(g, ggml_view_1d(g, b, dim, 0)), dim, 1));
+        K = ggml_add(g, K, ggml_reshape_2d(g, ggml_cont(g, ggml_view_1d(g, b, dim, (size_t)dim * es)), dim, 1));
+        V = ggml_add(g, V, ggml_reshape_2d(g, ggml_cont(g, ggml_view_1d(g, b, dim, (size_t)2 * dim * es)), dim, 1));
+    }
+
+    ggml_tensor* att = g_mha(g, Q, K, V, dim, n_heads, q_seq, k_seq);
+    att = g_linear(g, ca.cross_attn_out_proj_w, ca.cross_attn_out_proj_b, att);
+    x = g_layerscale_add(g, x, att, ca.gamma1_scale, dim);
+
+    ggml_tensor* cur = g_layernorm(g, x, ca.norm3_w, ca.norm3_b, 1e-5f);
+    cur = ggml_gelu(g, g_linear(g, ca.linear1_w, ca.linear1_b, cur));
+    cur = g_linear(g, ca.linear2_w, ca.linear2_b, cur);
+    x = g_layerscale_add(g, x, cur, ca.gamma2_scale, dim);
+
+    if (ca.norm_out_w)
+        x = g_groupnorm1(g, x, ca.norm_out_w, ca.norm_out_b, dim, q_seq, 1e-5f);
+    return x;
+}
+
+// Runs all t_layers on both branches in ONE graph. x_buf/xt_buf are the CPU
+// (dim-slow, seq-fast) buffers and are updated in place. Returns false if the
+// graph could not be built or allocated, so the caller can fall back.
+static bool htdemucs_transformer_ggml(htdemucs_context* ctx, std::vector<float>& x_buf, int x_seq,
+                                      std::vector<float>& xt_buf, int xt_seq, int dim, int n_heads, int n_layers,
+                                      int classic_parity) {
+    auto& m = ctx->model;
+    const size_t n_nodes = 8192;
+    const size_t ctx_size = ggml_tensor_overhead() * n_nodes + ggml_graph_overhead_custom(n_nodes, false);
+    ggml_init_params gp = {ctx_size, nullptr, true};
+    ggml_context* g = ggml_init(gp);
+    if (!g)
+        return false;
+
+    ggml_tensor* X = ggml_new_tensor_2d(g, GGML_TYPE_F32, dim, x_seq);
+    ggml_tensor* XT = ggml_new_tensor_2d(g, GGML_TYPE_F32, dim, xt_seq);
+    ggml_set_name(X, "ct_x");
+    ggml_set_name(XT, "ct_xt");
+    ggml_set_input(X);
+    ggml_set_input(XT);
+
+    ggml_tensor* x = X;
+    ggml_tensor* xt = XT;
+    // Per-layer outputs for the diff harness. They MUST be set_output when we
+    // intend to read them back, or gallocr will have recycled their buffers by
+    // the time we look (the classic "snapshot reads another layer's data" trap).
+    std::vector<ggml_tensor*> lay_x, lay_xt;
+    const bool cap = ctx->capture_stages;
+    for (int li = 0; li < n_layers; li++) {
+        const auto& ls = m.ct_layers[li];
+        const auto& lt = m.ct_layers_t[li];
+        if ((li % 2) == classic_parity) {
+            x = g_self_attn_layer(g, x, ls.self_attn, dim, n_heads, x_seq);
+            xt = g_self_attn_layer(g, xt, lt.self_attn, dim, n_heads, xt_seq);
+        } else {
+            // old_x feeds the time branch — capture BEFORE x is overwritten.
+            ggml_tensor* old_x = x;
+            x = g_cross_attn_layer(g, x, xt, ls.cross_attn, dim, n_heads, x_seq, xt_seq);
+            xt = g_cross_attn_layer(g, xt, old_x, lt.cross_attn, dim, n_heads, xt_seq, x_seq);
+        }
+        if (cap) {
+            ggml_set_output(x);
+            ggml_set_output(xt);
+            lay_x.push_back(x);
+            lay_xt.push_back(xt);
+        }
+    }
+    ggml_set_name(x, "ct_x_out");
+    ggml_set_name(xt, "ct_xt_out");
+    ggml_set_output(x);
+    ggml_set_output(xt);
+
+    ggml_cgraph* gf = ggml_new_graph_custom(g, n_nodes, false);
+    ggml_build_forward_expand(gf, x);
+    ggml_build_forward_expand(gf, xt);
+    for (auto* t : lay_x)
+        ggml_build_forward_expand(gf, t);
+    for (auto* t : lay_xt)
+        ggml_build_forward_expand(gf, t);
+
+    ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+    if (!ggml_gallocr_alloc_graph(alloc, gf)) {
+        fprintf(stderr, "htdemucs: transformer graph alloc failed — falling back to CPU path\n");
+        ggml_gallocr_free(alloc);
+        ggml_free(g);
+        return false;
+    }
+
+    // Upload transposed: CPU (d*seq + s) -> ggml (s*dim + d).
+    auto upload = [&](ggml_tensor* t, const std::vector<float>& src, int seq) {
+        std::vector<float> tmp((size_t)dim * seq);
+        for (int d = 0; d < dim; d++)
+            for (int s = 0; s < seq; s++)
+                tmp[(size_t)s * dim + d] = src[(size_t)d * seq + s];
+        ggml_backend_tensor_set(t, tmp.data(), 0, tmp.size() * sizeof(float));
+    };
+    upload(X, x_buf, x_seq);
+    upload(XT, xt_buf, xt_seq);
+
+    ggml_backend_graph_compute(ctx->backend, gf);
+
+    auto download = [&](ggml_tensor* t, std::vector<float>& dst, int seq) {
+        std::vector<float> tmp((size_t)dim * seq);
+        ggml_backend_tensor_get(t, tmp.data(), 0, tmp.size() * sizeof(float));
+        dst.assign((size_t)dim * seq, 0.0f);
+        for (int d = 0; d < dim; d++)
+            for (int s = 0; s < seq; s++)
+                dst[(size_t)d * seq + s] = tmp[(size_t)s * dim + d];
+    };
+    if (cap) {
+        auto grab = [&](ggml_tensor* t, int seq, const std::string& name) {
+            std::vector<float> tmp((size_t)dim * seq), out((size_t)dim * seq);
+            ggml_backend_tensor_get(t, tmp.data(), 0, tmp.size() * sizeof(float));
+            for (int d = 0; d < dim; d++)
+                for (int sI = 0; sI < seq; sI++)
+                    out[(size_t)d * seq + sI] = tmp[(size_t)sI * dim + d];
+            htd_capture(ctx, name.c_str(), out.data(), out.size());
+        };
+        for (size_t i = 0; i < lay_x.size(); i++) {
+            grab(lay_x[i], x_seq, "ct_l" + std::to_string(i) + "_z");
+            grab(lay_xt[i], xt_seq, "ct_l" + std::to_string(i) + "_xt");
+        }
+    }
+
+    download(x, x_buf, x_seq);
+    download(xt, xt_buf, xt_seq);
+
+    ggml_gallocr_free(alloc);
+    ggml_free(g);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
 // Parity diff harness (tools/reference_backends/htdemucs.py is the reference)
 // ---------------------------------------------------------------------------
 
@@ -3525,6 +3820,7 @@ int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audi
     int64_t in_n = 0;
     if (!htd_ref_get(rw, "input_wav", in_wav, in_n)) {
         fprintf(stderr, "htdemucs_diff: reference has no input_wav stage — re-dump with the updated dumper\n");
+        core_gguf::free_weights(rw);
         htdemucs_free(ctx);
         return 2;
     }
@@ -3541,6 +3837,7 @@ int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audi
     htdemucs_result* res = htdemucs_separate(ctx, interleaved.data(), n_samples);
     if (!res) {
         fprintf(stderr, "htdemucs_diff: separate() failed\n");
+        core_gguf::free_weights(rw);
         htdemucs_free(ctx);
         return 2;
     }
@@ -3624,6 +3921,10 @@ int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audi
     fprintf(stderr, "\n");
 
     htdemucs_result_free(res);
+    // The reference weights live in a buffer on ctx->backend, so they MUST be
+    // released before the backend. Leaking them is invisible on CPU but trips
+    // Metal's live-resource assert in the device destructor at exit.
+    core_gguf::free_weights(rw);
     htdemucs_free(ctx);
     return n_fail > 0 ? 1 : 0;
 }
