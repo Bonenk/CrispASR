@@ -695,6 +695,29 @@ catch_discover_tests(test-diarize-align-order
     PROPERTIES LABELS "unit;diarize;issue267"
 )
 
+# ─── test-miotts-live — live integration tests for MioTTS backend
+add_executable(test-miotts-live
+    test_miotts_live.cpp
+)
+target_include_directories(test-miotts-live PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-miotts-live PRIVATE
+    Catch2::Catch2WithMain
+    miotts
+    crispasr-lib
+    common
+)
+catch_discover_tests(test-miotts-live
+    TEST_SPEC "[miotts]"
+    PROPERTIES LABELS "live;miotts"
+    PROPERTIES SKIP_RETURN_CODE 4
+)
+
 # ─── test - paraformer — live integration tests for paraformer backend
 add_executable(test-paraformer
     test_paraformer.cpp

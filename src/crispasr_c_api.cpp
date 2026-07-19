@@ -156,6 +156,10 @@
 #include "qwen3_tts.h"
 #define CA_HAVE_QWEN3_TTS 1
 #endif
+#if __has_include("miotts.h")
+#include "miotts.h"
+#define CA_HAVE_MIOTTS 1
+#endif
 #if __has_include("moss_tts.h")
 #include "moss_tts.h"
 #define CA_HAVE_MOSS_TTS 1
@@ -1406,6 +1410,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "qwen3-tts";
     else if (strcmp(arch, "moss-tts-local") == 0 || strcmp(arch, "moss_tts_local") == 0)
         backend = "moss-tts-local";
+    else if (strcmp(arch, "miotts") == 0 || strcmp(arch, "mio-tts") == 0)
+        backend = "miotts";
     else if (strcmp(arch, "moss-tts") == 0 || strcmp(arch, "moss_tts") == 0 || strcmp(arch, "moss-tts-delay") == 0)
         backend = "moss-tts";
     else if (strcmp(arch, "omnivoice") == 0 || strcmp(arch, "omnivoice-tts") == 0)
@@ -1814,6 +1820,9 @@ struct crispasr_session {
 #ifdef CA_HAVE_QWEN3_TTS
     qwen3_tts_context* qwen3_tts_ctx = nullptr;
     bool qwen3_tts_voice_loaded = false;
+#endif
+#ifdef CA_HAVE_MIOTTS
+    miotts_context* miotts_ctx = nullptr;
 #endif
 #ifdef CA_HAVE_MOSS_TTS
     moss_tts_context* moss_tts_ctx = nullptr;
@@ -2649,6 +2658,21 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         }
         // Codec must be loaded before synthesise. Caller does so via
         // `crispasr_session_set_codec_path` after open.
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_MIOTTS
+    if (s->backend == "miotts" || s->backend == "mio-tts") {
+        miotts_context_params p = miotts_context_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = s->use_gpu;
+        p.temperature = 0.8f;
+        s->miotts_ctx = miotts_init_from_file(model_path, p);
+        if (!s->miotts_ctx) {
+            delete s;
+            return nullptr;
+        }
         return s;
     }
 #endif
@@ -3793,6 +3817,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_QWEN3_TTS
     list += ",qwen3-tts";
+#endif
+#ifdef CA_HAVE_MIOTTS
+    list += ",miotts";
 #endif
 #ifdef CA_HAVE_MOSS_TTS
     list += ",moss-tts";
@@ -7818,6 +7845,15 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
         return pcm;
     }
 #endif
+#ifdef CA_HAVE_MIOTTS
+    if (s->miotts_ctx) {
+        int n = 0;
+        float* pcm = miotts_synthesize(s->miotts_ctx, text, &n);
+        if (out_n_samples)
+            *out_n_samples = n;
+        return pcm;
+    }
+#endif
 #ifdef CA_HAVE_MOSS_TTS_LOCAL
     if (s->moss_tts_local_ctx) {
         moss_tts_local_synth_params p = moss_tts_local_synth_default_params();
@@ -8660,6 +8696,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_QWEN3_TTS
     if (s->qwen3_tts_ctx)
         qwen3_tts_free(s->qwen3_tts_ctx);
+#endif
+#ifdef CA_HAVE_MIOTTS
+    if (s->miotts_ctx)
+        miotts_free(s->miotts_ctx);
 #endif
 #ifdef CA_HAVE_MOSS_TTS
     if (s->moss_tts_ctx)

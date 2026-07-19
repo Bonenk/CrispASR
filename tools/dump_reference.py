@@ -102,6 +102,7 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # under a delay pattern + 1.6B transformer codec. The greedy code grid
     # ("codes") is the Phase-3 byte-parity target; "waveform" (needs the codec)
     # is the Phase-4 decoded reference. Text from $MOSS_TTS_TEXT; --audio ignored.
+    "miotts":     "reference_backends.miotts",
     "moss-tts":   "reference_backends.moss_tts",
     "qwen3":      "reference_backends.qwen3",
     "higgs-stt":  "reference_backends.higgs_stt",
