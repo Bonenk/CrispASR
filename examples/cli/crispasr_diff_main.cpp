@@ -7216,8 +7216,31 @@ int main(int argc, char** argv) {
                     n_fail++;
                 }
             } else {
-                printf("[SKIP] audio_output            (no wave_prenet_out in reference)\n");
-                n_skip++;
+                // Try full pipeline from fsq_embedding → prenet → codec → audio
+                auto emb_pair = ref.get_f32("fsq_embedding");
+                if (emb_pair.first && emb_pair.second > 0) {
+                    const int T_codec = (int)(emb_pair.second / 768);
+                    int prenet_dim = 0;
+                    float* prenet =
+                        miotts_wave_prenet_forward(ctx, emb_pair.first, T_codec, &prenet_dim);
+                    if (prenet && prenet_dim > 0) {
+                        int n_pcm = 0;
+                        float* pcm = miotts_codec_decode(ctx, prenet, T_codec, &n_pcm);
+                        if (pcm && n_pcm > 0) {
+                            auto rep = ref.compare("audio_output", pcm, (size_t)n_pcm);
+                            print_row("audio_output(full)", rep, COS_THRESHOLD);
+                            record(rep);
+                            miotts_free_audio(pcm);
+                        } else {
+                            printf("[ERR ] audio_output(full)      codec_decode returned null\n");
+                            n_fail++;
+                        }
+                        miotts_free_audio(prenet);
+                    }
+                } else {
+                    printf("[SKIP] audio_output            (no wave_prenet_out or fsq_embedding)\n");
+                    n_skip++;
+                }
             }
         }
 
