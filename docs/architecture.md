@@ -630,6 +630,17 @@ Qwen3 talker LM + 12 Hz RVQ speech tokenizer. Three variants:
 - `qwen3-tts-1.7b-base` — 1.7B talker, higher quality
 - `qwen3-tts-1.7b-voicedesign` — natural-language voice description via `--instruct`
 
+### miotts
+
+`Aratako/MioTTS-0.6B` (Apache-2.0) — **Qwen3** (28L, 1024d, GQA 16/8)
+generating speech tokens decoded by **MioCodec-25Hz-24kHz** (FSQ + transformer +
+iSTFT → 24kHz). Single GGUF, tokenizer.json loaded at runtime.
+
+- Zero-shot voice cloning via 128-d global embedding (codec-side conditioning)
+- 0.6B/1.7B variants (Apache-2.0 license on Qwen3-based models)
+- Q8_0: 723 MB, Q4_K: 397 MB (fits 8 GB VPS)
+- `--backend miotts -m miotts-0.6b-q8_0.gguf --tts "Hello world"`
+
 ### moss-tts
 
 `OpenMOSS-Team/MOSS-TTS-v1.5` (MossTTSDelay, Apache-2.0) — a **Qwen3-8B**
