@@ -322,20 +322,6 @@ const char* mel_band_roformer_source_name(const mel_band_roformer_context* ctx, 
     return ctx->source_names_storage[idx].c_str();
 }
 
-mel_band_roformer_result* mel_band_roformer_separate(mel_band_roformer_context* ctx, const float* pcm, int n_samples,
-                                                     int in_channels) {
-    (void)pcm;
-    (void)n_samples;
-    (void)in_channels;
-    // Phase 2: transformer graph + mask + iSTFT. The front-end (STFT + gather)
-    // is implemented and diff-validated; the decode graph is built next,
-    // stage-by-stage against ref_mbr.gguf. Return null until then rather than
-    // emit unvalidated audio.
-    fprintf(stderr, "mel_band_roformer_separate: forward graph not yet implemented (Phase 2)\n");
-    (void)ctx;
-    return nullptr;
-}
-
 void mel_band_roformer_result_free(mel_band_roformer_result* r) {
     if (!r)
         return;
@@ -677,7 +663,134 @@ bool mask_estimator(core_gguf::WeightLoad& mw, const std::vector<float>& x, int 
     return true;
 }
 
+// Apply the estimated mask to the packed STFT and iSTFT back to `channels`
+// waveforms of `T_samp` samples each. `packed` is (rows=n_freqs*channels, T, 2);
+// `mask_raw` is (T, 2N) complex per gather-index. Shared by separate() and the
+// diff's output_vocals stage.
+void synthesize(mel_band_roformer_context* ctx, const std::vector<float>& packed, const std::vector<float>& mask_raw,
+                int T, int T_samp, std::vector<float>& out /* channels*T_samp */) {
+    const int channels = ctx->hp.audio_channels;
+    const int n_freqs = ctx->n_freqs();
+    const int rows = n_freqs * channels;
+    const int N = (int)ctx->freq_indices.size();
+
+    std::vector<double> msum_re((size_t)rows * T, 0.0), msum_im((size_t)rows * T, 0.0);
+    for (int t = 0; t < T; t++)
+        for (int k = 0; k < N; k++) {
+            const int r = ctx->freq_indices[k];
+            msum_re[(size_t)r * T + t] += mask_raw[(size_t)t * (2 * N) + 2 * k + 0];
+            msum_im[(size_t)r * T + t] += mask_raw[(size_t)t * (2 * N) + 2 * k + 1];
+        }
+    std::vector<float> mspec_re((size_t)rows * T), mspec_im((size_t)rows * T);
+    for (int r = 0; r < rows; r++) {
+        const double denom = std::max((double)ctx->num_bands_per_freq[r / channels], 1e-8);
+        for (int t = 0; t < T; t++) {
+            const double mr = msum_re[(size_t)r * T + t] / denom, mi = msum_im[(size_t)r * T + t] / denom;
+            const float sr = packed[((size_t)r * T + t) * 2 + 0], si = packed[((size_t)r * T + t) * 2 + 1];
+            mspec_re[(size_t)r * T + t] = (float)(sr * mr - si * mi);
+            mspec_im[(size_t)r * T + t] = (float)(sr * mi + si * mr);
+        }
+    }
+    out.assign((size_t)channels * T_samp, 0.0f);
+    std::vector<float> mag((size_t)T * n_freqs), phase((size_t)T * n_freqs), win(ctx->hp.n_fft);
+    core_istft::hann_periodic(ctx->hp.n_fft, win.data());
+    for (int s = 0; s < channels; s++) {
+        for (int t = 0; t < T; t++)
+            for (int f = 0; f < n_freqs; f++) {
+                const int r = f * channels + s;
+                const float re = mspec_re[(size_t)r * T + t], im = mspec_im[(size_t)r * T + t];
+                mag[(size_t)t * n_freqs + f] = std::sqrt(re * re + im * im);
+                phase[(size_t)t * n_freqs + f] = std::atan2(im, re);
+            }
+        std::vector<float> wav = core_istft::istft(mag.data(), phase.data(), ctx->hp.n_fft, ctx->hp.hop, T, win.data(),
+                                                   core_istft::TRIM_CENTER);
+        for (int i = 0; i < T_samp && i < (int)wav.size(); i++)
+            out[(size_t)s * T_samp + i] = wav[i];
+    }
+}
+
+// Full validated forward on real per-channel PCM (chan[s] has T_samp samples).
+// Produces the vocal stem interleaved (channels-interleaved, T_samp frames).
+bool run_forward(mel_band_roformer_context* ctx, const std::vector<std::vector<float>>& chan, int T_samp,
+                 std::vector<float>& vocals_interleaved) {
+    const auto& hp = ctx->hp;
+    const int channels = hp.audio_channels, dim = hp.dim, nb = hp.num_bands;
+    const int n_freqs = ctx->n_freqs();
+    const int T = stft_n_frames(T_samp, hp.hop);
+
+    std::vector<float> window;
+    hann_periodic(hp.win, window);
+    std::vector<std::vector<float>> chan_spec(channels);
+    for (int s = 0; s < channels; s++)
+        stft_one_channel(chan[s].data(), T_samp, hp.n_fft, hp.hop, window, T, n_freqs, chan_spec[s]);
+    std::vector<float> packed;
+    pack_stft(chan_spec, n_freqs, T, channels, packed);
+    std::vector<float> gathered;
+    band_gather(packed, ctx->freq_indices, T, gathered);
+    std::vector<float> x;
+    if (!band_split_cpu(ctx->weights, gathered, ctx->band_width, T, dim, x))
+        return false;
+    for (int L = 0; L < hp.depth; L++)
+        if (!run_time(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head) ||
+            !run_freq(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head))
+            return false;
+    std::vector<float> mask_raw;
+    if (!mask_estimator(ctx->weights, x, T, nb, dim, ctx->band_width, mask_raw))
+        return false;
+
+    std::vector<float> out_planar; // channels * T_samp
+    synthesize(ctx, packed, mask_raw, T, T_samp, out_planar);
+    // interleave
+    vocals_interleaved.assign((size_t)T_samp * channels, 0.0f);
+    for (int i = 0; i < T_samp; i++)
+        for (int s = 0; s < channels; s++)
+            vocals_interleaved[(size_t)i * channels + s] = out_planar[(size_t)s * T_samp + i];
+    return true;
+}
+
 } // namespace
+
+mel_band_roformer_result* mel_band_roformer_separate(mel_band_roformer_context* ctx, const float* pcm, int n_samples,
+                                                     int in_channels) {
+    if (!ctx || !pcm || n_samples <= 0)
+        return nullptr;
+    const int channels = ctx->hp.audio_channels;
+    // De-interleave input, up/down-mixing to the model's channel count.
+    std::vector<std::vector<float>> chan(channels, std::vector<float>(n_samples, 0.0f));
+    for (int i = 0; i < n_samples; i++)
+        for (int s = 0; s < channels; s++) {
+            int src = (in_channels <= 0) ? 0 : (s < in_channels ? s : in_channels - 1);
+            chan[s][i] = pcm[(size_t)i * (in_channels > 0 ? in_channels : 1) + src];
+        }
+
+    std::vector<float> vocals; // interleaved
+    if (!run_forward(ctx, chan, n_samples, vocals))
+        return nullptr;
+
+    // Stem 0 = vocals (model output). Stem 1 = other = input - vocals (residual).
+    const int n_sources = 2;
+    auto* r = (mel_band_roformer_result*)calloc(1, sizeof(mel_band_roformer_result));
+    r->n_sources = n_sources;
+    r->n_channels = channels;
+    r->n_samples = n_samples;
+    r->sample_rate = ctx->hp.sample_rate;
+    r->sources = (float**)calloc(n_sources, sizeof(float*));
+    r->source_names = (const char**)calloc(n_sources, sizeof(char*));
+    const size_t nf = (size_t)n_samples * channels;
+    r->sources[0] = (float*)malloc(nf * sizeof(float));
+    r->sources[1] = (float*)malloc(nf * sizeof(float));
+    for (size_t i = 0; i < nf; i++)
+        r->sources[0][i] = vocals[i];
+    // residual = original (interleaved, mixed to model channels) - vocals
+    for (int i = 0; i < n_samples; i++)
+        for (int s = 0; s < channels; s++) {
+            const size_t idx = (size_t)i * channels + s;
+            r->sources[1][idx] = chan[s][i] - vocals[idx];
+        }
+    r->source_names[0] = ctx->source_names_storage[0].c_str();
+    r->source_names[1] = ctx->source_names_storage.size() > 1 ? ctx->source_names_storage[1].c_str() : "other";
+    return r;
+}
 
 int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const char* audio_wav, int verbosity) {
     (void)audio_wav; // Phase 1 reads input_audio FROM the ref (input-aligned).
