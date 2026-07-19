@@ -279,6 +279,15 @@ Work with all backends.
 | **GlotLID-V3** | Text language ID | fastText supervised, flat softmax | 2102 ISO 639-3 + script | Apache-2.0 | [`cstr/glotlid-GGUF`](https://huggingface.co/cstr/glotlid-GGUF) |
 | **LID-176** | Text language ID | fastText supervised, hierarchical softmax | 176 ISO 639-1 | CC-BY-SA-3.0 | [`cstr/fasttext-lid176-GGUF`](https://huggingface.co/cstr/fasttext-lid176-GGUF) |
 
+### Audio codecs
+
+Shared codec modules used by TTS backends. Also available standalone for encode/decode.
+
+| Model | Architecture | Sample Rate | Token Rate | License | HuggingFace |
+|---|---|---|---|---|---|
+| **MioCodec v2** | WavLM encoder → FSQ(12800) → Transformer decoder + AdaLN-Zero + SnakeBeta upsampler + iSTFT | 44.1 kHz | 25 Hz (341 bps) | MIT | [`cstr/miocodec-v2-44k-GGUF`](https://huggingface.co/cstr/miocodec-v2-44k-GGUF) |
+| **SNAC 24 kHz** | 3-codebook RVQ + decoder blocks (stride 8/8/4/2) | 24 kHz | 3×12.5 Hz | MIT | [`cstr/snac-24khz-GGUF`](https://huggingface.co/cstr/snac-24khz-GGUF) |
+
 All runtimes share ggml-based inference. The speech-LLM backends (**qwen3**, **voxtral**, **voxtral4b**, **granite**, **glm-asr**, **kyutai-stt**) inject audio encoder frames directly into an autoregressive language model's input embeddings, instead of using a dedicated CTC/transducer/seq2seq decoder. The **fastconformer-ctc** backend hosts the NeMo FastConformer-CTC standalone ASR family — `stt_en_fastconformer_ctc_{large,xlarge,xxlarge}` and the architecturally-identical `parakeet-ctc-{0.6b,1.1b}` (different training data + tokenizer, same encoder + head shape) — with greedy CTC decoding. Same C++ runtime as the canary-ctc aligner.
 
 ## Feature matrix
