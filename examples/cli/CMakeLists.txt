@@ -57,6 +57,7 @@ add_executable(${TARGET}
     crispasr_backend_m2m100.cpp
     crispasr_backend_t5.cpp
     crispasr_backend_glm_asr.cpp
+    crispasr_backend_htdemucs.cpp
     crispasr_backend_kyutai_stt.cpp
     crispasr_backend_firered_asr.cpp
     crispasr_backend_moonshine.cpp
