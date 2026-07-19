@@ -1118,6 +1118,135 @@ static void cpu_group_norm1_inplace(std::vector<float>& x, int C, int T, const f
 //
 // Used by BOTH the frequency branch (once per frequency band, matching
 // Python's `y.permute(0,2,1,3).reshape(-1, C, T)`) and the time branch.
+// GroupNorm(num_groups=1) over one band of a (rows, n_cols) buffer whose columns
+// for that band are the contiguous span [col0, col0+T). Mean/var are taken over
+// all rows AND those T columns jointly, matching torch GroupNorm(1, rows) applied
+// per batch element. Affine is per-row.
+static void cpu_group_norm1_strided(float* buf, int rows, int n_cols, int col0, int T, const float* w, const float* b,
+                                    float eps = 1e-5f) {
+    const size_t n = (size_t)rows * T;
+    if (n == 0)
+        return;
+    double mean = 0.0;
+    for (int r = 0; r < rows; r++) {
+        const float* p = buf + (size_t)r * n_cols + col0;
+        for (int t = 0; t < T; t++)
+            mean += p[t];
+    }
+    mean /= (double)n;
+    double var = 0.0;
+    for (int r = 0; r < rows; r++) {
+        const float* p = buf + (size_t)r * n_cols + col0;
+        for (int t = 0; t < T; t++) {
+            const double d = p[t] - mean;
+            var += d * d;
+        }
+    }
+    var /= (double)n;
+    const float inv = 1.0f / std::sqrt((float)var + eps);
+    const float mf = (float)mean;
+    for (int r = 0; r < rows; r++) {
+        float* p = buf + (size_t)r * n_cols + col0;
+        const float wr = w ? w[r] : 1.0f;
+        const float br = b ? b[r] : 0.0f;
+        for (int t = 0; t < T; t++)
+            p[t] = (p[t] - mf) * inv * wr + br;
+    }
+}
+
+// Batched DConv over ALL frequency bands at once, operating directly on the
+// (C, Fq, T) buffer (index t + fq*T + c*T*Fq) with no per-band copy.
+//
+// The per-band version ran the whole stack 512/128/32/8 times per encoder layer
+// — 680 invocations of two tiny convs each. Here conv1 and conv2 become ONE GEMM
+// apiece across every band, since both are linear with band-independent weights:
+//
+//   conv1: (hidden, C*K)  x (C*K, n_bands*T)   [im2col over dilated taps]
+//   conv2: (2C,     hidden) x (hidden, n_bands*T)
+//
+// GroupNorm stays per-band (num_groups=1 normalises each band separately);
+// GELU/GLU are elementwise; LayerScale is per-channel and shared across bands.
+static void cpu_dconv_bands(std::vector<float>& x, int n_bands, int C, int T, const htdemucs_dconv& dc) {
+    const size_t n_cols = (size_t)n_bands * T;
+    for (size_t d = 0; d < dc.layers.size(); d++) {
+        const auto& sl = dc.layers[d];
+        if (!sl.conv1_w || !sl.conv2_w)
+            continue;
+        const int dilation = 1 << (int)d;
+        const int K = (int)sl.conv1_w->ne[0];
+        const int hidden = (int)sl.conv1_w->ne[2];
+        const int patch_rows = C * K;
+
+        // im2col: patches[(ic*K + k), (fq*T + t_out)], read straight out of the
+        // (C, Fq, T) buffer. Out-of-range taps are the conv's zero padding.
+        std::vector<float> patches((size_t)patch_rows * n_cols, 0.0f);
+        for (int ic = 0; ic < C; ic++)
+            for (int k = 0; k < K; k++) {
+                float* prow = patches.data() + (size_t)(ic * K + k) * n_cols;
+                const int shift = (k - K / 2) * dilation;
+                for (int fq = 0; fq < n_bands; fq++) {
+                    const float* xsrc = x.data() + (size_t)fq * T + (size_t)ic * T * n_bands;
+                    float* pdst = prow + (size_t)fq * T;
+                    const int lo = std::max(0, -shift);
+                    const int hi = std::min(T, T - shift);
+                    for (int t = lo; t < hi; t++)
+                        pdst[t] = xsrc[t + shift];
+                }
+            }
+
+        std::vector<float> h((size_t)hidden * n_cols, 0.0f);
+        htd_gemm(hidden, (int)n_cols, patch_rows, cached_tensor_f32(sl.conv1_w).data(), patches.data(), h.data());
+        if (sl.conv1_b) {
+            const std::vector<float>& b1 = cached_tensor_f32(sl.conv1_b);
+            for (int hc = 0; hc < hidden; hc++) {
+                float* hr = h.data() + (size_t)hc * n_cols;
+                for (size_t i = 0; i < n_cols; i++)
+                    hr[i] += b1[hc];
+            }
+        }
+        if (sl.norm1_w) {
+            const std::vector<float>& n1w = cached_tensor_f32(sl.norm1_w);
+            const float* n1b = sl.norm1_b ? cached_tensor_f32(sl.norm1_b).data() : nullptr;
+            for (int fq = 0; fq < n_bands; fq++)
+                cpu_group_norm1_strided(h.data(), hidden, (int)n_cols, fq * T, T, n1w.data(), n1b);
+        }
+        cpu_gelu_inplace(h);
+
+        const int out2C = (int)sl.conv2_w->ne[2];
+        std::vector<float> h2((size_t)out2C * n_cols, 0.0f);
+        htd_gemm(out2C, (int)n_cols, hidden, cached_tensor_f32(sl.conv2_w).data(), h.data(), h2.data());
+        if (sl.conv2_b) {
+            const std::vector<float>& b2 = cached_tensor_f32(sl.conv2_b);
+            for (int oc = 0; oc < out2C; oc++) {
+                float* hr = h2.data() + (size_t)oc * n_cols;
+                for (size_t i = 0; i < n_cols; i++)
+                    hr[i] += b2[oc];
+            }
+        }
+        if (sl.norm2_w) {
+            const std::vector<float>& n2w = cached_tensor_f32(sl.norm2_w);
+            const float* n2b = sl.norm2_b ? cached_tensor_f32(sl.norm2_b).data() : nullptr;
+            for (int fq = 0; fq < n_bands; fq++)
+                cpu_group_norm1_strided(h2.data(), out2C, (int)n_cols, fq * T, T, n2w.data(), n2b);
+        }
+
+        // GLU + LayerScale + residual, straight back into the (C, Fq, T) buffer.
+        const int half = out2C / 2;
+        const std::vector<float>* sc = sl.scale ? &cached_tensor_f32(sl.scale) : nullptr;
+        for (int c = 0; c < half; c++) {
+            const float* a = h2.data() + (size_t)c * n_cols;
+            const float* g = h2.data() + (size_t)(half + c) * n_cols;
+            const float s = sc ? (*sc)[c] : 1.0f;
+            for (int fq = 0; fq < n_bands; fq++) {
+                float* xdst = x.data() + (size_t)fq * T + (size_t)c * T * n_bands;
+                const size_t col = (size_t)fq * T;
+                for (int t = 0; t < T; t++)
+                    xdst[t] += s * (a[col + t] / (1.0f + expf(-g[col + t])));
+            }
+        }
+    }
+}
+
 static void cpu_dconv_inplace(std::vector<float>& x, int C, int T, const htdemucs_dconv& dc) {
     for (size_t d = 0; d < dc.layers.size(); d++) {
         const auto& sl = dc.layers[d];
@@ -1570,7 +1699,14 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             // --- CPU DConv (was missing entirely: the time branch skipped it) ---
             if (!tenc.empty && !tenc.dconv.layers.empty()) {
                 HTD_PROF(prof, "tenc.dconv");
-                cpu_dconv_inplace(xt_buf, xt_C, xt_T, tenc.dconv);
+                // The time branch is a single band, so there is nothing to batch,
+                // but cpu_dconv_bands still gets the im2col+GEMM treatment for the
+                // two convs. Its (C, Fq, T) indexing collapses to (C, T) at
+                // n_bands = 1, which is exactly xt_buf's layout.
+                if (htdemucs_fastconv())
+                    cpu_dconv_bands(xt_buf, 1, xt_C, xt_T, tenc.dconv);
+                else
+                    cpu_dconv_inplace(xt_buf, xt_C, xt_T, tenc.dconv);
             }
 
             // --- Graph 2: rewrite Conv1d(K=1) + norm2 + GLU ---
@@ -1677,7 +1813,11 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // DConv: per-freq-band dilated conv residual
                 // Python: y.permute(0,2,1,3).reshape(-1,C,T) → DConv → reshape back
                 // = for each freq band: run DConv on (C, T) slice
-                if (!enc.dconv.layers.empty()) {
+                if (!enc.dconv.layers.empty() && htdemucs_fastconv()) {
+                    // Batched across all frequency bands (one GEMM per conv).
+                    HTD_PROF(prof, "enc.dconv");
+                    cpu_dconv_bands(x_buf, x_Fq, x_C, x_T, enc.dconv);
+                } else if (!enc.dconv.layers.empty()) {
                     HTD_PROF(prof, "enc.dconv");
                     for (int fq = 0; fq < x_Fq; fq++) {
                         // Extract the (C, T) slice for this frequency band,
@@ -2734,7 +2874,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         //   x+skip -> GLU(norm1(rewrite)) -> dconv -> conv_tr
         // and every decoder layer has a real DConv. Same per-frequency-band
         // treatment as the encoder: pre_buf is (C, Fq, T) with t fastest.
-        if (!dec.empty && !dec.dconv.layers.empty()) {
+        if (!dec.empty && !dec.dconv.layers.empty() && htdemucs_fastconv()) {
+            HTD_PROF(prof, "dec.dconv");
+            cpu_dconv_bands(pre_buf, pre_Fq, pre_C, pre_T, dec.dconv);
+        } else if (!dec.empty && !dec.dconv.layers.empty()) {
             HTD_PROF(prof, "dec.dconv");
             std::vector<float> slice((size_t)pre_T * pre_C);
             for (int fq = 0; fq < pre_Fq; fq++) {
@@ -2941,8 +3084,12 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 }
 
                 // DConv, also missing on the time decoder (see the freq branch).
-                if (!tdec.empty && !tdec.dconv.layers.empty())
-                    cpu_dconv_inplace(xt_buf, xt_C, xt_T, tdec.dconv);
+                if (!tdec.empty && !tdec.dconv.layers.empty()) {
+                    if (htdemucs_fastconv())
+                        cpu_dconv_bands(xt_buf, 1, xt_C, xt_T, tdec.dconv);
+                    else
+                        cpu_dconv_inplace(xt_buf, xt_C, xt_T, tdec.dconv);
+                }
 
                 // ConvTranspose1d on time axis
                 int ct_K = (int)tdec.conv_tr_w->ne[0]; // kernel size
