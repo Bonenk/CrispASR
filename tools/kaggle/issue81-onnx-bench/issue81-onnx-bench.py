@@ -42,6 +42,16 @@ if (REPO / "tools" / "kaggle").is_dir():
     sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
 import kaggle_harness as kh  # noqa: E402
 
+kh.init_progress()  # structured progress + heartbeat plumbing (kaggle_usage.md regime)
+# 3-tier HF auth (env -> Kaggle secret -> attached ${KAGGLE_ACCOUNT}/crispasr-hf-token
+# dataset) so Phase 3's GGUF pulls are authenticated (avoids anon rate limits;
+# the token dataset is attached specifically for this).
+kh.resolve_hf_token()
+# resolve_hf_token() force-enables hf_transfer, which wedges multi-GB Kaggle
+# downloads with no resume (kaggle_usage.md / hf-download note). Some GGUFs here
+# are ~1-3 GB, so fall back to the plain resumable downloader.
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
+
 BUILD = TEMP / "build"
 BUILD.mkdir(parents=True, exist_ok=True)
 
@@ -76,7 +86,10 @@ print(f"  CUDA available: {has_cuda}")
 if has_cuda:
     arch = kh.detect_cuda_arch()
     flags = kh.cuda_build_flags(arch) + kh.cache_and_link_flags()
-    cmake_flags = "-DCMAKE_BUILD_TYPE=Release " + " ".join(flags)
+    # C2PA provenance signing is irrelevant to a benchmark; disabling it avoids
+    # the third_party/c2pa-audio submodule (the clone below inits only ggml, so
+    # requiring c2pa's sources fails cmake generate — the v1 error).
+    cmake_flags = "-DCMAKE_BUILD_TYPE=Release -DCRISPASR_NO_C2PA_NATIVE=ON " + " ".join(flags)
     ret = subprocess.call(f"cmake -G Ninja -B {BUILD} -S {REPO} {cmake_flags}", shell=True)
     if ret != 0:
         print("  CUDA cmake failed, falling back to CPU")
@@ -86,7 +99,8 @@ if has_cuda:
 
 if not has_cuda:
     subprocess.check_call(
-        f"cmake -G Ninja -B {BUILD} -S {REPO} -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF",
+        f"cmake -G Ninja -B {BUILD} -S {REPO} -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=OFF "
+        "-DCRISPASR_NO_C2PA_NATIVE=ON",
         shell=True, stdout=subprocess.DEVNULL)
 
 n_jobs = min(os.cpu_count() or 2, 4)
@@ -211,15 +225,21 @@ print("\n=== Phase 4: benchmark CrispASR fleet ===", flush=True)
 gpu_flag = "--gpu-backend cuda" if has_cuda else ""
 
 def bench_crispasr(backend, model_path, audio_path, audio_dur, label, extra_flags="",
-                   n_warmup=1, n_runs=3):
+                   n_warmup=1, n_runs=3, env_prefix="", force_cpu=False):
     """Benchmark one CrispASR backend. Returns a dict with BOTH:
       wall_rtf  = audio_dur / subprocess walltime (INCLUDES model load each call)
       cli_rtf   = the CLI's own '(Nx realtime)' (load-EXCLUDED, per LEARNINGS #19)
     onnx-asr is timed in-process (load once), so cli_rtf is the fair apples-to-
     apples number; wall_rtf shows the per-call load tax. NOTE: dropped --no-prints
     so the 'transcribed .. in X.Xs (Y.Yx realtime)' line reaches stderr; the
-    transcript still comes on stdout."""
-    cmd = f"{CRISPASR} --backend {backend} {gpu_flag} -m {model_path} -f {audio_path} {extra_flags}"
+    transcript still comes on stdout.
+
+    env_prefix: shell env-var assignments prepended to the command (e.g.
+      'CRISPASR_TDT_BATCH=1 ') so an A/B arm toggles a decode path without a
+      rebuild. force_cpu: run '--no-gpu' regardless of the global gpu_flag —
+      issue #81's real gap is x86 CPU (OpenBLAS), so the TDT_BATCH A/B is CPU-only."""
+    this_gpu = "--no-gpu" if force_cpu else gpu_flag
+    cmd = f"{env_prefix}{CRISPASR} --backend {backend} {this_gpu} -m {model_path} -f {audio_path} {extra_flags}"
 
     for _ in range(n_warmup):
         subprocess.run(cmd, shell=True, capture_output=True, timeout=120)
@@ -285,6 +305,58 @@ for backend, repo, fname, label in CRISPASR_MODELS:
     else:
         print(f"    FAILED")
         results[label] = {"rtf_jfk": None, "text": "FAILED"}
+
+# ── Phase 4b: parakeet TDT decode A/B on CPU (issue #81) ─────────────────────
+# The real #81 gap is x86 CPU (OpenBLAS): the default per-frame greedy TDT
+# decode issues T tiny joint-head sgemms. parakeet_tdt_decode_batched
+# (CRISPASR_TDT_BATCH=1) issues one big sgemm over the joint head — better
+# BLAS utilization. It already runs unconditionally on the long-form streamed
+# path; here we A/B it for short-form to decide whether to flip the default.
+# A flip is only safe if it is FASTER *and* byte-equal in transcript (rule 3/4).
+print("\n=== Phase 4b: parakeet TDT decode A/B (CPU, issue #81) ===", flush=True)
+
+def _norm_text(t):
+    return " ".join((t or "").split()).lower()
+
+tdt_ab = {}
+for backend, repo, fname, label in CRISPASR_MODELS:
+    if "parakeet" not in label or label not in model_paths:
+        continue
+    mp = model_paths[label]
+    extra = ""
+    print(f"\n  [{label}] CPU baseline vs CRISPASR_TDT_BATCH=1")
+    for tag, dur, wav in (("jfk", duration, jfk_wav), ("long", long_dur, long_wav)):
+        if wav is None:
+            continue
+        base = bench_crispasr(backend, mp, wav, dur, label, extra,
+                              n_warmup=1, n_runs=3, force_cpu=True)
+        batch = bench_crispasr(backend, mp, wav, dur, label, extra,
+                               n_warmup=1, n_runs=3, env_prefix="CRISPASR_TDT_BATCH=1 ",
+                               force_cpu=True)
+        if not base or not batch:
+            print(f"    {tag}: FAILED (base={bool(base)} batch={bool(batch)})")
+            continue
+        # Proof-of-work: identical transcript, and a speedup expressed on the
+        # load-excluded CLI RTF (falls back to wall RTF if the RTF line was
+        # absent). Speedup > 1 => batched is faster.
+        identical = _norm_text(base["text"]) == _norm_text(batch["text"])
+        b_rtf = base["cli_rtf"] or base["wall_rtf"]
+        n_rtf = batch["cli_rtf"] or batch["wall_rtf"]
+        speedup = (n_rtf / b_rtf) if (b_rtf and n_rtf) else None
+        bw, nw = len((base["text"] or "").split()), len((batch["text"] or "").split())
+        print(f"    {tag} {dur:.0f}s CPU: base cli {base['cli_rtf']}x ({bw}w) | "
+              f"batch cli {batch['cli_rtf']}x ({nw}w) | "
+              f"speedup {speedup:.2f}x | identical={identical}")
+        if not identical:
+            print(f"      ⚠ TRANSCRIPTS DIFFER — batched decode NOT output-equivalent, do NOT flip default")
+            print(f"        base : {(base['text'] or '')[:160]!r}")
+            print(f"        batch: {(batch['text'] or '')[:160]!r}")
+        tdt_ab[f"{label}:{tag}"] = {
+            "base_rtf": base["cli_rtf"], "batch_rtf": batch["cli_rtf"],
+            "speedup": speedup, "identical": identical,
+            "base_words": bw, "batch_words": nw,
+        }
+results["tdt_batch_ab"] = tdt_ab
 
 # ── Phase 5: Benchmark onnx-asr (head-to-head models) ───────────────────────
 # CPU int8 (the original #81 baseline) AND, when the CUDA EP is available, GPU
