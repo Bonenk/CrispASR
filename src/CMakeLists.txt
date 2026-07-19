@@ -2092,7 +2092,15 @@ set_target_properties(webrtc-vad PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(webrtc-vad PUBLIC .)
 target_include_directories(webrtc-vad PRIVATE ${CMAKE_SOURCE_DIR}/third_party)
 target_compile_features(webrtc-vad PUBLIC cxx_std_17)
-target_compile_definitions(webrtc-vad PRIVATE WEBRTC_POSIX)
+# WEBRTC_POSIX makes the vendored spl_init.c take its `#include <pthread.h>`
+# branch (spl_init.c:95); on Windows/MSVC there is no pthread.h, so it must fall
+# through to the native `#elif defined(_WIN32)` CRITICAL_SECTION branch
+# (spl_init.c:103) instead. Only define WEBRTC_POSIX off-Windows. (Diagnosed in
+# PR #279 by KevinAHM; verified against the vendored source. Paired with the
+# [[noreturn]] fix already on main, this closes the Windows CI/Release leg.)
+if(NOT WIN32)
+    target_compile_definitions(webrtc-vad PRIVATE WEBRTC_POSIX)
+endif()
 if(NOT MSVC)
     set_source_files_properties(${_webrtc_vad_c_sources}
         PROPERTIES COMPILE_OPTIONS "-w")
