@@ -24,7 +24,10 @@ extern "C" {
 // symbol must still exist for the linker.
 #if !defined(RTC_FATAL_PROVIDED)
 #define RTC_FATAL_PROVIDED
-__attribute__((noreturn)) void rtc_FatalMessage(const char* file, int line, const char* msg) {
+// [[noreturn]] is standard C++11 — portable across MSVC/GCC/Clang, unlike
+// __attribute__((noreturn)) which MSVC rejects with C2143 (broke the Windows
+// CI leg of the WebRTC VAD backend).
+[[noreturn]] void rtc_FatalMessage(const char* file, int line, const char* msg) {
     fprintf(stderr, "WebRTC fatal: %s:%d: %s\n", file, line, msg);
     abort();
 }
