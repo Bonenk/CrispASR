@@ -2180,22 +2180,20 @@ commercial-restricted, skip).
   Raspberry Pi (~800 MB RAM). ONNX-only distribution = custom ref approach needed
   (dump ONNX intermediate tensors, no PyTorch hooks). Deterministic diffs. **VPS-ready.**
 - [x] **MioTTS** — voice cloning TTS. **Apache-2.0** (Aratako/MioTTS-0.6B, Qwen3-based).
-  **IN PROGRESS** (VPS session, 2026-07-19). Using 0.6B (Apache-2.0, Qwen3ForCausalLM).
-  Architecture: Qwen3 LLM (28L, 1024d, GQA 16/8, head_dim=128, vocab=164480 incl
-  12800 speech tokens) + MioCodec-25Hz-24kHz (FSQ → transformer → iSTFT → 24kHz).
-  **Done so far:**
-  - GGUF converter (`models/convert-miotts-to-gguf.py`) — 1.33 GB F16 GGUF
-  - Python reference dumper (`tools/reference_backends/miotts.py`) — runs on VPS
-  - C++ backend scaffold (`src/miotts.{h,cpp}`) — LLM forward + FSQ dequant
-  - Diff harness entry in crispasr_diff_main.cpp
-  - **FSQ dequant: cos=1.0 PASS** (exact match with Python)
-  - LLM forward: cos=0.86 — needs `ggml_backend_sched` (gallocr+KV issue)
-  **Remaining:**
-  - Fix LLM forward (switch to sched-based allocation like qwen3_tts.cpp)
-  - MioCodec wave decoder (transformer + AdaLN-Zero + iSTFT)
-  - Tokenizer integration (Qwen3 BPE + ChatML prompt construction)
-  - CLI adapter, registry, 12-point checklist, tests
-  - HF upload: F16 + Q8_0 + Q4_K GGUFs with README
+  **CODEC PARITY ACHIEVED** (2026-07-19). Full pipeline: Qwen3 LLM (28L, 1024d, GQA
+  16/8, head_dim=128, vocab=164480) + MioCodec-25Hz-24kHz (FSQ → wave_prenet → conv →
+  ResNet → AdaLN-Zero decoder → ResNet → iSTFT → 24kHz waveform).
+  **Parity results (diff harness):**
+  - FSQ dequant: cos=1.0, wave_prenet: cos=1.0, audio: cos=0.999 (F32)
+  - Q8_0 (723 MB): audio cos=0.954 — acceptable for TTS
+  - Q4_K (397 MB): audio cos=0.069 — codec needs F16 for quality
+  - LLM forward: argmax matches Python (tokens correct), tail-cos lower
+  **Remaining (non-blocking for audio generation):**
+  - Tokenizer integration (Qwen3 BPE + ChatML) for `miotts_synthesize()`
+  - CLI adapter (`crispasr_backend_miotts.cpp`) + registry + 12-point checklist
+  - Mixed quantization (LLM=Q4_K + codec=F16) for optimal quality/size
+  - HF upload: F16 + Q8_0 GGUFs with README
+  - Voice cloning: global encoder (reference audio → 128-d embedding)
 
 **Audio codec:**
 - [x] **MioCodec v2** — standalone audio codec. **MIT** (confirmed on HF + GitHub).
