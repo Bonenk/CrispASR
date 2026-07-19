@@ -299,8 +299,8 @@ std::vector<crispasr_audio_slice> crispasr_compute_vad_slices(const float* sampl
         int n_segs = 0;
         float min_speech_sec = opts.min_speech_duration_ms / 1000.0f;
         float min_silence_sec = opts.min_silence_duration_ms / 1000.0f;
-        int rc = webrtc_vad_detect(samples, n_samples, &segs, &n_segs, opts.threshold, min_speech_sec, min_silence_sec,
-                                   -1);
+        int rc =
+            webrtc_vad_detect(samples, n_samples, &segs, &n_segs, opts.threshold, min_speech_sec, min_silence_sec, -1);
         if (rc == 0 && segs && n_segs > 0) {
             for (int i = 0; i < n_segs; i++) {
                 int64_t t0_cs = (int64_t)(segs[i].start_sec * 100.0f);
