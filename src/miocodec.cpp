@@ -7,6 +7,7 @@
 #include "miocodec.h"
 
 #include "core/gguf_loader.h"
+#include "core/istft.h"
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -1166,9 +1167,42 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
                         sum += w_d[d * D_in + k] * up_dat[t * D_in + k];
                     result[d * T_is + t] = sum;
                 }
+            if (strcmp(stage_name, "istft_mag_phase") == 0) {
+                ggml_free(ctx0);
+                *out_n = D_out * T_is;
+                return result;
+            }
+
+            // output_waveform: apply exp(mag), clamp, cos/sin(phase), then ISTFT
+            int n_freq = D_out / 2;                     // 197 = n_fft/2 + 1
+            int n_fft_val = (int)ctx->hparams.n_fft;    // 392
+            int hop_val = (int)ctx->hparams.hop_length; // 98
+
+            // result is (394, T_is) = (D_out, T) with D_out=394, first 197=mag, second 197=phase
+            // Rearrange to (T_is, n_freq) for mag and phase separately
+            std::vector<float> mag_arr(T_is * n_freq), phase_arr(T_is * n_freq);
+            for (int t = 0; t < T_is; t++) {
+                for (int f = 0; f < n_freq; f++) {
+                    float lm = result[f * T_is + t];            // log-magnitude
+                    float ph = result[(f + n_freq) * T_is + t]; // phase
+                    float m = std::exp(lm);
+                    if (m > 100.0f)
+                        m = 100.0f;
+                    mag_arr[t * n_freq + f] = m;
+                    phase_arr[t * n_freq + f] = ph;
+                }
+            }
+            free(result);
+
+            // ISTFT with "same" padding → trim pad from each side
+            auto pcm = core_istft::istft(mag_arr.data(), phase_arr.data(), n_fft_val, hop_val, T_is, nullptr,
+                                         core_istft::TRIM_SAME);
+
+            float* wav = (float*)malloc(sizeof(float) * pcm.size());
+            memcpy(wav, pcm.data(), sizeof(float) * pcm.size());
             ggml_free(ctx0);
-            *out_n = D_out * T_is;
-            return result;
+            *out_n = (int)pcm.size();
+            return wav;
         }
 
         // Extract other stages using direct tensor pointers
