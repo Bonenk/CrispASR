@@ -458,8 +458,8 @@ static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* 
     ggml_set_name(pos, "rope_pos");
     ggml_set_input(pos);
 
-    Q = ggml_rope_ext(ctx0, Q, pos, nullptr, (int)hd, GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
-    K = ggml_rope_ext(ctx0, K, pos, nullptr, (int)hd, GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+    Q = ggml_rope_ext(ctx0, Q, pos, nullptr, (int)hd, GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+    K = ggml_rope_ext(ctx0, K, pos, nullptr, (int)hd, GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
 
     // flash_attn_ext expects (hd, T, n_heads) — permute from (hd, n_heads, T)
     Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3)); // (hd, T, n_heads)
@@ -518,9 +518,9 @@ static ggml_tensor* miocodec_adaln_transformer_layer(ggml_context* ctx0, ggml_te
     V = ggml_reshape_3d(ctx0, V, hd, n_heads, T);
 
     Q = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
-                      GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+                      GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
     K = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
-                      GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+                      GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
 
     V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
     float scale = 1.0f / sqrtf((float)hd);
