@@ -5,10 +5,13 @@ Builds CrispASR (htdemucs target only), converts HTDemucs model,
 runs the C++ smoke test, and compares spec_input / encoder outputs
 against the Python reference dumper's GGUF.
 """
-import os, sys, subprocess, time
+import os, sys, subprocess, time, traceback
 from pathlib import Path
 
 os.environ["PYTHONUNBUFFERED"] = "1"
+# Crash breadcrumb — written before anything else can fail
+with open("/kaggle/working/started.txt", "w") as _f:
+    _f.write(f"started at {time.time()}\npython={sys.version}\n")
 try:
     sys.stdout.reconfigure(line_buffering=True)
     sys.stderr.reconfigure(line_buffering=True)
@@ -113,16 +116,20 @@ kh.step(f"reference_dump_done ({ref_path.stat().st_size / 1e6:.1f} MB)")
 kh.step("build_smoke_test")
 smoke_src = REPO / "tests" / "test_htdemucs_smoke.cpp"
 smoke_bin = BUILD / "bin" / "test_htdemucs_smoke"
-# Static link to avoid LD_LIBRARY_PATH issues
+# Link with rpath so the binary finds shared libs at runtime
+ggml_lib = BUILD / "ggml" / "src"
+ggml_base = ggml_lib / "ggml-base"
+ggml_cpu = ggml_lib / "ggml-cpu"
+rpath = f"-Wl,-rpath,{ggml_lib},-rpath,{ggml_base},-rpath,{ggml_cpu},-rpath,{BUILD / 'src'}"
 kh.sh(
     f"g++ -std=c++17 -O2 "
     f"-I {REPO / 'src'} -I {REPO / 'ggml' / 'include'} "
     f"{smoke_src} "
-    f"-L {BUILD / 'src'} -l:libhtdemucs.a -l:libcrispasr-core.a "
-    f"-L {BUILD / 'ggml' / 'src'} -l:libggml.a "
-    f"-L {BUILD / 'ggml' / 'src' / 'ggml-base'} -l:libggml-base.a "
-    f"-L {BUILD / 'ggml' / 'src' / 'ggml-cpu'} -l:libggml-cpu.a "
-    f"-lpthread -lm -ldl "
+    f"-L {BUILD / 'src'} -lhtdemucs -lcrispasr-core "
+    f"-L {ggml_lib} -lggml "
+    f"-L {ggml_base} -lggml-base "
+    f"-L {ggml_cpu} -lggml-cpu "
+    f"-lpthread -lm -ldl {rpath} "
     f"-o {smoke_bin}"
 )
 
