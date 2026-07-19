@@ -867,8 +867,7 @@ static std::vector<float> cpu_conv1d_time(const std::vector<float>& x, int T, in
 // channels, so mean/var are taken jointly over every (c, t) element — not
 // per-channel. Matches torch.nn.GroupNorm(1, C, eps=1e-5) as used by the
 // DConv sublayers (demucs.demucs.DConv).
-static void cpu_group_norm1_inplace(std::vector<float>& x, int C, int T, const float* w, const float* b,
-                                    float eps = 1e-5f) {
+static void cpu_group_norm1_inplace(float* x, int C, int T, const float* w, const float* b, float eps = 1e-5f) {
     const size_t n = (size_t)C * T;
     if (n == 0)
         return;
@@ -887,10 +886,15 @@ static void cpu_group_norm1_inplace(std::vector<float>& x, int C, int T, const f
     for (int c = 0; c < C; c++) {
         const float wc = w ? w[c] : 1.0f;
         const float bc = b ? b[c] : 0.0f;
-        float* row = x.data() + (size_t)c * T;
+        float* row = x + (size_t)c * T;
         for (int t = 0; t < T; t++)
             row[t] = (row[t] - mf) * inv * wc + bc;
     }
+}
+
+static void cpu_group_norm1_inplace(std::vector<float>& x, int C, int T, const float* w, const float* b,
+                                    float eps = 1e-5f) {
+    cpu_group_norm1_inplace(x.data(), C, T, w, b, eps);
 }
 
 // CPU DConv residual stack over a channel-major (C, T) buffer, in place.
@@ -1672,84 +1676,18 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         int n_heads = hp.t_heads;     // 8
         int head_dim = dim / n_heads; // 64
 
-        // Transpose x_buf: (seq, dim) → (dim, seq)
-        {
-            std::vector<float> tmp(x_buf.size());
-            for (int s = 0; s < x_seq; s++)
-                for (int d = 0; d < dim; d++)
-                    tmp[(size_t)d * x_seq + s] = x_buf[(size_t)s * dim + d];
-            // Actually, wait — my x_buf after conv1d upsample has ne[0]=seq, ne[1]=dim.
-            // This is already (seq, dim) in C memory. For ggml, ne[0] is the fast axis.
-            // ggml_mul_mat(A, B) = B × A^T where A=(ne0_a, ne1_a), B=(ne0_b, ne1_b).
-            // For in_proj: A=weight(dim, 3*dim), B=x(dim, seq) → result=(3*dim, seq).
-            // But our x has ne[0]=seq, ne[1]=dim. If I feed it as-is to mul_mat with
-            // weight (dim, 3*dim): mul_mat does B×A^T = (seq, dim) × (3*dim, dim)^T
-            // = (seq, dim) × (dim, 3*dim) = (seq, 3*dim). That gives ne[0]=seq, ne[1]=3*dim.
-            // Then I need to reshape for multi-head attention.
-            //
-            // Actually this works! ggml_mul_mat contracts on ne[0]. If both A and B have
-            // ne[0]=dim, it gives C with ne[0]=ne1_A, ne[1]=ne1_B. So:
-            // A=weight(dim, 3*dim), B=x(dim, seq): B's ne[0]=dim matches A's ne[0]=dim.
-            // But B's ne[0] is seq, not dim. I need to transpose B.
-            //
-            // Let me just transpose to (dim, seq) for the transformer.
-            x_buf = std::move(tmp);
-        }
-        {
-            std::vector<float> tmp(xt_buf.size());
-            for (int s = 0; s < xt_seq; s++)
-                for (int d = 0; d < dim; d++)
-                    tmp[(size_t)d * xt_seq + s] = xt_buf[(size_t)s * dim + d];
-            xt_buf = std::move(tmp);
-        }
-
-        // 2D sinusoidal position embedding for freq branch
-        // Python: create_2d_sin_embedding(C, Fr, T1, max_period=10000)
-        // pe[0:C/2:2, :, :] = sin(pos_w * div_term)  (width=T1 positions)
-        // pe[1:C/2:2, :, :] = cos(pos_w * div_term)
-        // pe[C/2::2, :, :]  = sin(pos_h * div_term)  (height=Fr positions)
-        // pe[C/2+1::2, :, :] = cos(pos_h * div_term)
-        // Then rearranged: (1, C, Fr, T1) → (1, T1*Fr, C) = (1, x_seq, dim)
-        // x_buf is (dim, x_seq) after transpose. Add pe in same layout.
-        {
-            int Fr = x_Fq, T1 = x_T;
-            int half_d = dim / 2;
-            float max_period = hp.t_max_period;
-            // Precompute div_term for half_d/2 entries
-            std::vector<float> div_term(half_d / 2);
-            for (int i = 0; i < half_d / 2; i++)
-                div_term[i] = expf(-(float)(2 * i) * logf(max_period) / (float)half_d);
-
-            for (int t = 0; t < T1; t++) {
-                for (int fr = 0; fr < Fr; fr++) {
-                    int s = t * Fr + fr; // sequence position in flattened (T1*Fr)
-                    for (int i = 0; i < half_d / 2; i++) {
-                        float phase_w = (float)t * div_term[i];
-                        float phase_h = (float)fr * div_term[i];
-                        // Width dims: pe[2*i] = sin, pe[2*i+1] = cos
-                        x_buf[(size_t)(2 * i) * x_seq + s] += hp.t_weight_pos_embed * sinf(phase_w);
-                        x_buf[(size_t)(2 * i + 1) * x_seq + s] += hp.t_weight_pos_embed * cosf(phase_w);
-                        // Height dims: pe[half_d + 2*i] = sin, pe[half_d + 2*i+1] = cos
-                        x_buf[(size_t)(half_d + 2 * i) * x_seq + s] += hp.t_weight_pos_embed * sinf(phase_h);
-                        x_buf[(size_t)(half_d + 2 * i + 1) * x_seq + s] += hp.t_weight_pos_embed * cosf(phase_h);
-                    }
-                }
-            }
-        }
-        // 1D sinusoidal position embedding for time branch
-        // Python: create_sin_embedding(T2, C, shift=0, max_period=10000)
-        // pos[t] / (max_period^(d / (C/2-1))), then [cos, sin] concat
-        {
-            int half_d = dim / 2;
-            float max_period = hp.t_max_period;
-            for (int s = 0; s < xt_seq; s++) {
-                for (int d = 0; d < half_d; d++) {
-                    float phase = (float)s / powf(max_period, (float)d / (float)(half_d - 1));
-                    xt_buf[(size_t)d * xt_seq + s] += hp.t_weight_pos_embed * cosf(phase);
-                    xt_buf[(size_t)(half_d + d) * xt_seq + s] += hp.t_weight_pos_embed * sinf(phase);
-                }
-            }
-        }
+        // NOTE: no transpose here. ggml_conv_1d's output has ne[0]=seq (the FAST
+        // axis), so the channel upsampler already left x_buf/xt_buf in C memory as
+        // [dim][seq] (index d*seq + s) — exactly what the attention code below
+        // indexes. The previous code read that as (seq, dim) and "transposed" it,
+        // scrambling both branches before every transformer layer.
+        //
+        // The freq sequence index is our native spatial order s = fr*T1 + t1
+        // (Python flattens as (t1 fr) instead). Token order is irrelevant here:
+        // self-attention is permutation-equivariant, cross-attention sums over the
+        // whole key/value set, and FFN/LayerNorm are per-token — so as long as the
+        // position embedding is applied to the correct (t1, fr) pair and the
+        // decoder reads back the same order, the result is identical.
 
         // LayerNorm on both branches (norm_in / norm_in_t)
         // x: (dim, seq) — normalize over dim (ne[0])
@@ -1798,6 +1736,63 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             }
             cpu_layernorm(xt_buf.data(), dim, xt_seq, nw.data(), m.norm_in_t_b ? nb.data() : nullptr);
         }
+
+        // Reference order is norm_in FIRST, then `x = x + weight_pos_embed * pos_emb`
+        // (CrossTransformerEncoder.forward). The previous code added the position
+        // embedding before the LayerNorm, which renormalised it away.
+        // 2D sinusoidal position embedding for freq branch
+        // Python: create_2d_sin_embedding(C, Fr, T1, max_period=10000)
+        // pe[0:C/2:2, :, :] = sin(pos_w * div_term)  (width=T1 positions)
+        // pe[1:C/2:2, :, :] = cos(pos_w * div_term)
+        // pe[C/2::2, :, :]  = sin(pos_h * div_term)  (height=Fr positions)
+        // pe[C/2+1::2, :, :] = cos(pos_h * div_term)
+        // Then rearranged: (1, C, Fr, T1) → (1, T1*Fr, C) = (1, x_seq, dim)
+        // x_buf is (dim, x_seq) after transpose. Add pe in same layout.
+        {
+            int Fr = x_Fq, T1 = x_T;
+            int half_d = dim / 2;
+            float max_period = hp.t_max_period;
+            // Precompute div_term for half_d/2 entries
+            std::vector<float> div_term(half_d / 2);
+            for (int i = 0; i < half_d / 2; i++)
+                div_term[i] = expf(-(float)(2 * i) * logf(max_period) / (float)half_d);
+
+            for (int t = 0; t < T1; t++) {
+                for (int fr = 0; fr < Fr; fr++) {
+                    // Our spatial order is fr-major (see the note above), not
+                    // Python's (t1 fr). phase_w still comes from t, phase_h from fr.
+                    int s = fr * T1 + t;
+                    for (int i = 0; i < half_d / 2; i++) {
+                        float phase_w = (float)t * div_term[i];
+                        float phase_h = (float)fr * div_term[i];
+                        // Width dims: pe[2*i] = sin, pe[2*i+1] = cos
+                        x_buf[(size_t)(2 * i) * x_seq + s] += hp.t_weight_pos_embed * sinf(phase_w);
+                        x_buf[(size_t)(2 * i + 1) * x_seq + s] += hp.t_weight_pos_embed * cosf(phase_w);
+                        // Height dims: pe[half_d + 2*i] = sin, pe[half_d + 2*i+1] = cos
+                        x_buf[(size_t)(half_d + 2 * i) * x_seq + s] += hp.t_weight_pos_embed * sinf(phase_h);
+                        x_buf[(size_t)(half_d + 2 * i + 1) * x_seq + s] += hp.t_weight_pos_embed * cosf(phase_h);
+                    }
+                }
+            }
+        }
+        // 1D sinusoidal position embedding for time branch
+        // Python: create_sin_embedding(T2, C, shift=0, max_period=10000)
+        // pos[t] / (max_period^(d / (C/2-1))), then [cos, sin] concat
+        {
+            int half_d = dim / 2;
+            float max_period = hp.t_max_period;
+            for (int s = 0; s < xt_seq; s++) {
+                for (int d = 0; d < half_d; d++) {
+                    float phase = (float)s / powf(max_period, (float)d / (float)(half_d - 1));
+                    xt_buf[(size_t)d * xt_seq + s] += hp.t_weight_pos_embed * cosf(phase);
+                    xt_buf[(size_t)(half_d + d) * xt_seq + s] += hp.t_weight_pos_embed * sinf(phase);
+                }
+            }
+        }
+
+
+        htd_capture(ctx, "ct_in_z", x_buf.data(), x_buf.size());
+        htd_capture(ctx, "ct_in_xt", xt_buf.data(), xt_buf.size());
 
         // 5 transformer layers
         for (int li = 0; li < hp.t_layers; li++) {
@@ -2024,7 +2019,12 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                         auto _rd = read_tensor_f32(sa.norm_out_b);
                         memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
                     }
-                    cpu_layernorm(x_data, dim, seq_len, nw.data(), sa.norm_out_b ? nb.data() : nullptr);
+                    // norm_out is MyGroupNorm(num_groups=1) — ONE mean/std over all
+                    // channels AND all tokens jointly — not a per-token LayerNorm.
+                    // Using cpu_layernorm here left ~1% error in every layer, which
+                    // layer 4 then amplified enormously (its pre-norm activations are
+                    // outlier-dominated, norm ~85k -> ~78).
+                    cpu_group_norm1_inplace(x_data, dim, seq_len, nw.data(), sa.norm_out_b ? nb.data() : nullptr);
                 }
             };
 
@@ -2256,7 +2256,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                             auto _rd = read_tensor_f32(ca.norm_out_b);
                             memcpy(nb.data(), _rd.data(), std::min(nb.size(), _rd.size()) * sizeof(float));
                         }
-                        cpu_layernorm(q_data, dim, q_seq, nw.data(), ca.norm_out_b ? nb.data() : nullptr);
+                        // norm_out is GroupNorm(1) over all channels+tokens (see above).
+                        cpu_group_norm1_inplace(q_data, dim, q_seq, nw.data(), ca.norm_out_b ? nb.data() : nullptr);
                     }
                 };
 
@@ -2266,6 +2267,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 cpu_cross_attn_layer(x_buf.data(), x_seq, xt_buf.data(), xt_seq, layer_s.cross_attn);
                 cpu_cross_attn_layer(xt_buf.data(), xt_seq, old_x.data(), x_seq, layer_t.cross_attn);
             }
+
+            htd_capture(ctx, ("ct_l" + std::to_string(li) + "_z").c_str(), x_buf.data(), x_buf.size());
+            htd_capture(ctx, ("ct_l" + std::to_string(li) + "_xt").c_str(), xt_buf.data(), xt_buf.size());
         }
 
         if (htdemucs_debug()) {
@@ -2283,21 +2287,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             fprintf(stderr, "htdemucs: post-transformer freq max=%.2f, time max=%.2f\n", mx, mxt);
         }
 
-        // Transpose back: (dim, seq) → (seq, dim)
-        {
-            std::vector<float> tmp(x_buf.size());
-            for (int d = 0; d < dim; d++)
-                for (int s = 0; s < x_seq; s++)
-                    tmp[(size_t)s * dim + d] = x_buf[(size_t)d * x_seq + s];
-            x_buf = std::move(tmp);
-        }
-        {
-            std::vector<float> tmp(xt_buf.size());
-            for (int d = 0; d < dim; d++)
-                for (int s = 0; s < xt_seq; s++)
-                    tmp[(size_t)s * dim + d] = xt_buf[(size_t)d * xt_seq + s];
-            xt_buf = std::move(tmp);
-        }
+        // No transpose back either — see the note above; the buffers stay
+        // [dim][seq], which is what the channel downsampler expects.
 
         // Channel downsample: 1x1 Conv back to transformer_channels
         // Freq branch
@@ -3028,6 +3019,13 @@ int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audi
         report(("enc_time_" + std::to_string(i)).c_str());
     report("pre_transformer_z");
     report("pre_transformer_xt");
+    // CrossTransformer bisection.
+    report("ct_in_z");
+    report("ct_in_xt");
+    for (int i = 0; i < 5; i++) {
+        report(("ct_l" + std::to_string(i) + "_z").c_str());
+        report(("ct_l" + std::to_string(i) + "_xt").c_str());
+    }
     report("post_transformer_z");
     report("post_transformer_xt");
     for (int i = 0; i < 4; i++)
