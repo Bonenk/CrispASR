@@ -25,9 +25,10 @@ could not run it (8 GB, OOM). This branch does that validation on the M1.
       (freq + time, all 4 layers) and both pre_transformer_* at cos >= 0.999998
 - [x] **CROSSTRANSFORMER NOW FULLY PASSES** — all 5 layers + post_transformer_*
       at cos = 1.000000 (BUGS 7, 8, 9)
-- [ ] IN FLIGHT: decoder — dec_freq_0..3 cos 0.96 -> 0.90, and the final
-      outputs are ~100x too small (|mine|=0.0015 vs |ref|=0.1543), which looks
-      like a separate CaC-unmask / iSTFT / denormalize issue
+- [x] **DECODER + OUTPUT NOW PASS** (BUGS 10, 11, 12)
+- [x] **45/45 STAGES PASS** — full end-to-end F32 parity
+- [ ] Decoded-output roundtrip (HARD RULE #3) — cos is necessary, not sufficient
+- [ ] BUG 3: register the smoke test in CMake
 - [ ] BUG 3: `tests/test_htdemucs_smoke.cpp` never registered in CMake
 
 ## Bugs found
@@ -177,3 +178,56 @@ Fixing the normalization alone took the whole transformer to cos = 1.000000:
 Lesson: a uniform ~1% per-layer error is worth chasing as structural, not
 written off as drift — the amplifying stage downstream is the symptom, not
 the cause.
+
+### BUG 10 — decoder skipped DConv entirely (FIXED)
+
+`HDecLayer.forward` is `x+skip -> GLU(norm1(rewrite)) -> dconv -> conv_tr`, and
+every decoder AND tdecoder layer has a real DConv. The C++ decoder loop
+referenced `dconv` zero times even though `bind_dec_layer` populated it — the
+same class of omission as BUG 4. Applying it (per frequency band on the freq
+side, directly on the time side, both via `cpu_dconv_inplace`) took
+`dec_freq_0..3` from cos 0.960/0.903 to >= 0.999999.
+
+### BUG 11 — iSTFT scale and _ispec alignment (FIXED)
+
+Three separate errors in the output stage:
+
+1. `compute_istft` used `norm_factor = 1/sqrt(nfft)`. `torch.stft(normalized=
+   True)` already DIVIDES by `sqrt(nfft)` on the way in, so the inverse must
+   MULTIPLY — every stem came out `1/nfft` = 1/4096 too quiet. (Cosine is
+   scale-invariant, which is why `spec_input` passing at 1.000000 did not
+   catch it; the `|mine|` vs `|ref|` columns did.)
+2. `_ispec` pads 2 zero frames on each side before the inverse transform. These
+   are not merely trimmed afterwards — they change the window-sum normalisation
+   in the first/last `nfft` samples, which is exactly the region cropped into.
+3. The output was taken at offset `nfft/2` = 2048, but `_ispec` crops
+   `hop/2*3` = 1536 to undo `_spec`'s reflect pre-padding — a 512-sample
+   misalignment.
+
+### BUG 12 — time-branch lengths off by one level, silently dropping the branch (FIXED)
+
+Python records the time length BEFORE each tencoder runs
+(`lengths_t.append(xt.shape[-1])` precedes `xt = tenc(xt)`); the C++ recorded it
+after. The decoder pops these to crop each `ConvTranspose1d` back to its layer's
+input length, so the whole stack was shifted one level and the last tdecoder
+produced 85995 samples instead of 343980.
+
+That then failed this guard silently:
+
+```cpp
+if (xt_C >= S * ac && xt_T >= n_samples) {   // 85995 >= 343980 -> false
+```
+
+so the time branch was dropped from every stem with no error. It went unnoticed
+because `output_vocals` still passed at cos 0.999879 — for speech the
+spectrogram branch dominates that one stem. The quiet stems were pure
+spectrogram output, wrong by 10-40x. Adding an `else` debug branch to that
+silent guard is what surfaced it.
+
+Lesson: a `>=` guard that silently skips a whole branch should always have a
+diagnostic on the else path.
+
+## RESULT — 45/45 stages pass (F32)
+
+Every stage from `spec_input` through all four stems at cos >= 0.999989,
+most at 1.000000. Full table in `run14.log` / this branch's commits.
