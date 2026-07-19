@@ -573,6 +573,94 @@ bool roformer_block(core_gguf::WeightLoad& mw, const std::string& pre, std::vect
     return true;
 }
 
+// Run a Transformer (one roformer_block + final RMSNorm) over the TIME axis:
+// x is (T, nb, dim); each band's (T, dim) sequence is transformed independently.
+bool run_time(core_gguf::WeightLoad& mw, int L, std::vector<float>& x, int T, int nb, int dim, int heads,
+              int dim_head) {
+    const std::string pre = "layers." + std::to_string(L) + ".0.";
+    std::vector<float> fg;
+    if (!read_f32(mw, pre + "norm.gamma", fg))
+        return false;
+    std::vector<float> seq((size_t)T * dim);
+    for (int b = 0; b < nb; b++) {
+        for (int t = 0; t < T; t++)
+            for (int d = 0; d < dim; d++)
+                seq[(size_t)t * dim + d] = x[((size_t)t * nb + b) * dim + d];
+        if (!roformer_block(mw, pre + "layers.0.", seq, T, dim, heads, dim_head))
+            return false;
+        rms_rows(seq, T, dim, fg);
+        for (int t = 0; t < T; t++)
+            for (int d = 0; d < dim; d++)
+                x[((size_t)t * nb + b) * dim + d] = seq[(size_t)t * dim + d];
+    }
+    return true;
+}
+
+// Run a Transformer over the FREQ (band) axis: x is (T, nb, dim); each time
+// step's (nb, dim) band sequence is transformed independently.
+bool run_freq(core_gguf::WeightLoad& mw, int L, std::vector<float>& x, int T, int nb, int dim, int heads,
+              int dim_head) {
+    const std::string pre = "layers." + std::to_string(L) + ".1.";
+    std::vector<float> fg;
+    if (!read_f32(mw, pre + "norm.gamma", fg))
+        return false;
+    std::vector<float> seq((size_t)nb * dim);
+    for (int t = 0; t < T; t++) {
+        std::memcpy(seq.data(), x.data() + (size_t)t * nb * dim, (size_t)nb * dim * sizeof(float));
+        if (!roformer_block(mw, pre + "layers.0.", seq, nb, dim, heads, dim_head))
+            return false;
+        rms_rows(seq, nb, dim, fg);
+        std::memcpy(x.data() + (size_t)t * nb * dim, seq.data(), (size_t)nb * dim * sizeof(float));
+    }
+    return true;
+}
+
+// Mask estimator (stem 0): per band, MLP (Linear->Tanh->Linear->Tanh->Linear to
+// 2*din) then GLU(-1) -> din. Concat over bands -> (T, sum(din)) = mask_raw.
+// x is the post-stack (T, nb, dim).
+bool mask_estimator(core_gguf::WeightLoad& mw, const std::vector<float>& x, int T, int nb, int dim,
+                    const std::vector<int>& band_width, std::vector<float>& mask_raw) {
+    int total = 0;
+    for (int w : band_width)
+        total += w;
+    mask_raw.assign((size_t)T * total, 0.0f);
+    std::vector<float> w0, b0, w2, b2, w4, b4, in, h;
+    for (int b = 0; b < nb; b++) {
+        const std::string pre = "mask_estimators.0.to_freqs." + std::to_string(b) + ".0.";
+        if (!read_f32(mw, pre + "0.weight", w0) || !read_f32(mw, pre + "0.bias", b0) ||
+            !read_f32(mw, pre + "2.weight", w2) || !read_f32(mw, pre + "2.bias", b2) ||
+            !read_f32(mw, pre + "4.weight", w4) || !read_f32(mw, pre + "4.bias", b4))
+            return false;
+        const int din2 = (int)b4.size(); // 2*din
+        const int hid = (int)b0.size();  // 1536
+        const int din = din2 / 2;        // band width
+        int off = 0;                     // column offset in mask_raw
+        for (int j = 0; j < b; j++)
+            off += band_width[j];
+        // input = x[:, b, :] (T, dim)
+        in.resize((size_t)T * dim);
+        for (int t = 0; t < T; t++)
+            for (int d = 0; d < dim; d++)
+                in[(size_t)t * dim + d] = x[((size_t)t * nb + b) * dim + d];
+        std::vector<float> a, c, e;
+        linear(in, T, dim, w0, &b0, hid, a);
+        for (auto& z : a)
+            z = std::tanh(z);
+        linear(a, T, hid, w2, &b2, hid, c);
+        for (auto& z : c)
+            z = std::tanh(z);
+        linear(c, T, hid, w4, &b4, din2, e); // (T, 2*din)
+        // GLU(-1): out[:din] * sigmoid(out[din:])
+        for (int t = 0; t < T; t++) {
+            const float* er = e.data() + (size_t)t * din2;
+            float* mr = mask_raw.data() + (size_t)t * total + off;
+            for (int i = 0; i < din; i++)
+                mr[i] = er[i] * (float)(1.0 / (1.0 + std::exp(-(double)er[i + din])));
+        }
+    }
+    return true;
+}
+
 } // namespace
 
 int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const char* audio_wav, int verbosity) {
@@ -755,7 +843,28 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
         }
     }
 
-    fprintf(stderr, "  [PENDING] layer1/5_*, mask_raw, output_vocals — Phase 2 cont.\n");
+    // --- mask_raw : full 6-layer stack + mask estimator (the whole learned
+    // forward), input-aligned off the reference band_split_out. Validates the
+    // entire transformer stack (no value residuals in 0.3.10) + mask MLP+GLU. ---
+    {
+        std::vector<float> x, ref_mr;
+        int64_t n1 = 0, n2 = 0;
+        if (ref_get(rw, "band_split_out", x, n1) && ref_get(rw, "mask_raw", ref_mr, n2)) {
+            const int nb = hp.num_bands, dim = hp.dim;
+            bool ok = true;
+            for (int L = 0; L < hp.depth && ok; L++) {
+                ok = run_time(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head) &&
+                     run_freq(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head);
+            }
+            std::vector<float> mr;
+            if (ok && mask_estimator(ctx->weights, x, T, nb, dim, ctx->band_width, mr))
+                report("mask_raw", mr, ref_mr);
+            else
+                fprintf(stderr, "  mask_raw: SKIP (a weight was missing)\n");
+        }
+    }
+
+    fprintf(stderr, "  [PENDING] output_vocals — scatter-average + complex mask + iSTFT.\n");
 
     if (rw.buf)
         ggml_backend_buffer_free(rw.buf);
