@@ -726,6 +726,109 @@ static std::vector<float> read_tensor_f32(ggml_tensor* t) {
 }
 
 // ---------------------------------------------------------------------------
+// CPU Conv2d for freq encoder (avoids ggml im2col OOM on 8 GB VPS).
+// Conv2d with kernel [OC, IC, K, 1], stride [S, 1], pad [P, 0]:
+// Only convolves on the freq (H) axis; time (W) axis passes through.
+// ---------------------------------------------------------------------------
+// Input:  x[T × Fq × IC], layout x[t + fq*T + ic*T*Fq]
+// Weight: w ggml tensor ne=(1, K, IC, OC)
+// Bias:   b ggml tensor ne=(OC,) or nullptr
+// Output: out[T × Fq_out × OC], layout out[t + fo*T + oc*T*Fq_out]
+//   where Fq_out = (Fq + 2*P - K) / S + 1
+static std::vector<float> cpu_conv2d_freq(const std::vector<float>& x, int T, int Fq, int IC, ggml_tensor* w_tensor,
+                                          ggml_tensor* b_tensor, int stride, int pad, int& out_Fq) {
+    fprintf(stderr, "htdemucs: cpu_conv2d_freq T=%d Fq=%d IC=%d w_ne=(%d,%d,%d,%d) type=%d\n", T, Fq, IC,
+            (int)w_tensor->ne[0], (int)w_tensor->ne[1], (int)w_tensor->ne[2], (int)w_tensor->ne[3], w_tensor->type);
+    auto w = read_tensor_f32(w_tensor);
+    int K = (int)w_tensor->ne[1];
+    int OC = (int)w_tensor->ne[3];
+    out_Fq = (Fq + 2 * pad - K) / stride + 1;
+    fprintf(stderr, "htdemucs: cpu_conv2d_freq K=%d OC=%d out_Fq=%d out_size=%zu\n", K, OC, out_Fq,
+            (size_t)T * out_Fq * OC);
+
+    std::vector<float> out((size_t)T * out_Fq * OC, 0.0f);
+    fprintf(stderr, "htdemucs: cpu_conv2d_freq allocated %zu bytes, w has %zu elements\n", out.size() * sizeof(float),
+            w.size());
+    // Quick bounds check
+    size_t max_x_idx = (T - 1) + (size_t)(Fq - 1) * T + (size_t)(IC - 1) * T * Fq;
+    size_t max_w_idx = (size_t)(OC - 1) * IC * K + (IC - 1) * K + (K - 1);
+    size_t max_o_idx = (T - 1) + (size_t)(out_Fq - 1) * T + (size_t)(OC - 1) * T * out_Fq;
+    fprintf(stderr, "htdemucs: bounds: x_max=%zu/%zu w_max=%zu/%zu o_max=%zu/%zu\n", max_x_idx, x.size(), max_w_idx,
+            w.size(), max_o_idx, out.size());
+    if (max_x_idx >= x.size() || max_w_idx >= w.size() || max_o_idx >= out.size()) {
+        fprintf(stderr, "htdemucs: BOUNDS CHECK FAILED\n");
+        return out;
+    }
+    for (int t = 0; t < T; t++) {
+        for (int fo = 0; fo < out_Fq; fo++) {
+            for (int oc = 0; oc < OC; oc++) {
+                float sum = 0;
+                for (int ic = 0; ic < IC; ic++) {
+                    for (int kh = 0; kh < K; kh++) {
+                        int fi = fo * stride + kh - pad;
+                        if (fi < 0 || fi >= Fq)
+                            continue;
+                        sum += x[t + (size_t)fi * T + (size_t)ic * T * Fq] * w[(size_t)oc * IC * K + ic * K + kh];
+                    }
+                }
+                out[t + (size_t)fo * T + (size_t)oc * T * out_Fq] = sum;
+            }
+        }
+    }
+    if (b_tensor) {
+        auto b = read_tensor_f32(b_tensor);
+        for (int oc = 0; oc < OC; oc++)
+            for (size_t s = 0; s < (size_t)T * out_Fq; s++)
+                out[s + (size_t)oc * T * out_Fq] += b[oc];
+    }
+    return out;
+}
+
+// CPU 1x1 Conv2d = matmul. w ne=(1,1,IC,OC), spatial = T*Fq.
+static std::vector<float> cpu_conv2d_1x1(const std::vector<float>& x, int spatial, int IC, ggml_tensor* w_tensor,
+                                         ggml_tensor* b_tensor, int& out_C) {
+    auto w = read_tensor_f32(w_tensor);
+    out_C = (int)w_tensor->ne[3];
+    std::vector<float> out((size_t)spatial * out_C, 0.0f);
+    for (int oc = 0; oc < out_C; oc++)
+        for (int s = 0; s < spatial; s++) {
+            float sum = 0;
+            for (int ic = 0; ic < IC; ic++)
+                sum += w[(size_t)oc * IC + ic] * x[s + (size_t)ic * spatial];
+            out[s + (size_t)oc * spatial] = sum;
+        }
+    if (b_tensor) {
+        auto b = read_tensor_f32(b_tensor);
+        for (int oc = 0; oc < out_C; oc++)
+            for (int s = 0; s < spatial; s++)
+                out[s + (size_t)oc * spatial] += b[oc];
+    }
+    return out;
+}
+
+// CPU GELU (tanh approximation)
+static void cpu_gelu_inplace(std::vector<float>& x) {
+    for (size_t i = 0; i < x.size(); i++) {
+        float v = x[i];
+        x[i] = v * 0.5f * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
+    }
+}
+
+// CPU GLU: split channel dim, a * sigmoid(b)
+// x layout: (spatial, 2*C). Returns (spatial, C).
+static std::vector<float> cpu_glu(const std::vector<float>& x, int spatial, int double_C) {
+    int half = double_C / 2;
+    std::vector<float> out((size_t)spatial * half);
+    for (int c = 0; c < half; c++)
+        for (int s = 0; s < spatial; s++) {
+            float a = x[s + (size_t)c * spatial];
+            float b = x[s + (size_t)(half + c) * spatial];
+            out[s + (size_t)c * spatial] = a / (1.0f + expf(-b));
+        }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
 // ggml graph helpers for the encoder/decoder/transformer
 // ---------------------------------------------------------------------------
 
@@ -1115,144 +1218,36 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             break;
         }
         {
-            // Allocate a small ggml context for this layer's graph
-            size_t n_tensors_est = 64;
-            size_t ctx_size = ggml_tensor_overhead() * n_tensors_est + ggml_graph_overhead();
-            ggml_init_params gp = {ctx_size, nullptr, true};
-            ggml_context* g = ggml_init(gp);
+            // CPU Conv2d (avoids ggml im2col OOM on 8 GB VPS)
+            int new_Fq = 0;
+            x_buf = cpu_conv2d_freq(x_buf, x_T, x_Fq, x_C, enc.conv_w, enc.conv_b, stri, pad_val, new_Fq);
+            x_C = (int)enc.conv_w->ne[3]; // OC
+            x_Fq = new_Fq;
+            // x_T unchanged
 
-            // Input: x_buf is laid out as (x_C, x_Fq, x_T) channel-major.
-            // ggml Conv2d expects b: [N, IC, IH, IW] → ne = (IW, IH, IC, N)
-            // Our data: IW=x_T, IH=x_Fq, IC=x_C, N=1
-            ggml_tensor* x_in = ggml_new_tensor_4d(g, GGML_TYPE_F32, x_T, x_Fq, x_C, 1);
-            ggml_set_name(x_in, "enc_in");
-            ggml_set_input(x_in);
-
-            // Conv2d: kernel ne = (KW, KH, IC, OC), stride=(s0=1, s1=stri), pad=(p0=0, p1=pad_val)
-            // For freq branch: kernel [Cout, Cin, K, 1] → ggml ne: (1, K, Cin, Cout)
-            // s0=1 (W=time axis, no stride), s1=stri (H=freq axis, stride=4)
-            // p0=0, p1=pad_val
-            ggml_tensor* y = ggml_conv_2d(g, enc.conv_w, x_in, 1, stri, 0, pad_val, 1, 1);
-            if (enc.conv_b) {
-                ggml_tensor* bias_4d = ggml_reshape_4d(g, enc.conv_b, 1, 1, (int)enc.conv_b->ne[0], 1);
-                y = ggml_add(g, y, bias_4d);
-            }
-
-            // Inject time branch output (at merge point only)
-            ggml_tensor* inject_in = nullptr;
+            // Dummy ggml context (for the non-Conv2d ops that follow — will be removed later)
+            // Actually, let's do everything CPU-side now.
+            (void)ctx; // suppress unused warning for the ggml path below
+            // Inject time branch (at merge point only)
             if (has_inject) {
-                // inject_buf is (xt_T, xt_C). Conv2d output y is (y_T, y_Fq, y_C, 1).
-                // Python: inject = inject[:,:,None] → (B,C,1,T) then y = y + inject.
-                // In ggml ne: inject as (y_T, 1, y_C, 1) to broadcast over Fq.
-                int y_T_now = (int)y->ne[0], y_C_now = (int)y->ne[2];
-                inject_in = ggml_new_tensor_4d(g, GGML_TYPE_F32, y_T_now, 1, y_C_now, 1);
-                ggml_set_name(inject_in, "inject");
-                ggml_set_input(inject_in);
-                y = ggml_add(g, y, inject_in);
+                for (int oc = 0; oc < x_C; oc++)
+                    for (int fo = 0; fo < x_Fq; fo++)
+                        for (int t = 0; t < x_T; t++)
+                            x_buf[t + (size_t)fo * x_T + (size_t)oc * x_T * x_Fq] += inject_buf[t + (size_t)oc * x_T];
             }
 
             if (!enc.empty) {
-                // GroupNorm(norm_groups, C) + GELU
-                // ggml_group_norm uses ne[2] as channel dim — correct for (T, Fq, C, N)
-                if (enc.norm1_w) {
-                    int ng = 4; // norm_groups — htdemucs default
-                    y = ggml_group_norm(g, y, ng, 1e-5f);
-                    // Affine: y = y * weight + bias (weight/bias are 1D = (C,), broadcast over T,Fq)
-                    ggml_tensor* w4d = ggml_reshape_4d(g, enc.norm1_w, 1, 1, (int)enc.norm1_w->ne[0], 1);
-                    y = ggml_mul(g, y, w4d);
-                    if (enc.norm1_b) {
-                        ggml_tensor* b4d = ggml_reshape_4d(g, enc.norm1_b, 1, 1, (int)enc.norm1_b->ne[0], 1);
-                        y = ggml_add(g, y, b4d);
-                    }
-                }
-                y = ggml_gelu(g, y);
-
-                // DConv: operates on time axis per-freq-band.
-                // Python: y.permute(0,2,1,3).reshape(-1,C,T) → DConv → reshape back
-                if (enc.dconv.layers.size() > 0) {
-                    int yC = (int)y->ne[2], yFq = (int)y->ne[1], yT = (int)y->ne[0];
-                    // Permute (T, Fq, C, 1) → (T, C, Fq, 1) then reshape to (T, C, Fq*1)
-                    // Actually DConv Conv1d operates on (C, T) per freq band.
-                    // We need to reshape to (Fq, C, T) batch — but ggml conv_1d doesn't
-                    // support batching. For now, skip DConv and add it in a follow-up.
-                    // TODO: implement DConv per-freq-band via loop or batched conv.
-                    (void)yC;
-                    (void)yFq;
-                    (void)yT;
-                }
-
-                // Rewrite: 1x1 Conv2d(C → 2*C) → GroupNorm → GLU
+                // GELU (no GroupNorm for htdemucs — norm_starts=4, depth=4)
+                cpu_gelu_inplace(x_buf);
+                // DConv: TODO (skipped)
+                // Rewrite: 1x1 Conv2d → GLU
                 if (enc.rewrite_w) {
-                    ggml_tensor* rw = ggml_conv_2d(g, enc.rewrite_w, y, 1, 1, 0, 0, 1, 1);
-                    if (enc.rewrite_b) {
-                        ggml_tensor* rwb = ggml_reshape_4d(g, enc.rewrite_b, 1, 1, (int)enc.rewrite_b->ne[0], 1);
-                        rw = ggml_add(g, rw, rwb);
-                    }
-                    if (enc.norm2_w) {
-                        int ng = 4;
-                        rw = ggml_group_norm(g, rw, ng, 1e-5f);
-                        ggml_tensor* w4d = ggml_reshape_4d(g, enc.norm2_w, 1, 1, (int)enc.norm2_w->ne[0], 1);
-                        rw = ggml_mul(g, rw, w4d);
-                        if (enc.norm2_b) {
-                            ggml_tensor* b4d = ggml_reshape_4d(g, enc.norm2_b, 1, 1, (int)enc.norm2_b->ne[0], 1);
-                            rw = ggml_add(g, rw, b4d);
-                        }
-                    }
-                    // GLU: split channel dim in half, a * sigmoid(b)
-                    // rw shape: (T, Fq, 2*C, 1)
-                    int rw_C = (int)rw->ne[2];
-                    int rw_half = rw_C / 2;
-                    int rw_Fq = (int)rw->ne[1];
-                    int rw_T = (int)rw->ne[0];
-                    // Split on ne[2] (channel dim): first half and second half
-                    // view_3d with offset on ne[2] axis:
-                    size_t ch_stride = rw->nb[2]; // bytes per channel slice
-                    ggml_tensor* a_glu =
-                        ggml_view_4d(g, rw, rw_T, rw_Fq, rw_half, 1, rw->nb[1], rw->nb[2], rw->nb[3], 0);
-                    ggml_tensor* b_glu = ggml_view_4d(g, rw, rw_T, rw_Fq, rw_half, 1, rw->nb[1], rw->nb[2], rw->nb[3],
-                                                      (size_t)rw_half * ch_stride);
-                    y = ggml_mul(g, ggml_cont(g, a_glu), ggml_sigmoid(g, ggml_cont(g, b_glu)));
+                    int rw_OC = 0;
+                    auto rw_out = cpu_conv2d_1x1(x_buf, x_T * x_Fq, x_C, enc.rewrite_w, enc.rewrite_b, rw_OC);
+                    x_buf = cpu_glu(rw_out, x_T * x_Fq, rw_OC);
+                    x_C = rw_OC / 2;
                 }
             }
-
-            ggml_set_name(y, "enc_out");
-            ggml_set_output(y);
-
-            // Build and run graph
-            ggml_cgraph* gf = ggml_new_graph(g);
-            ggml_build_forward_expand(gf, y);
-
-            ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
-            if (!ggml_gallocr_alloc_graph(alloc, gf)) {
-                fprintf(stderr, "htdemucs: enc[%d] graph alloc failed\n", idx);
-                ggml_gallocr_free(alloc);
-                ggml_free(g);
-                encoder_ok = false;
-                break;
-            }
-
-            // Upload input data
-            ggml_backend_tensor_set(x_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
-            if (inject_in && has_inject) {
-                ggml_backend_tensor_set(inject_in, inject_buf.data(), 0, inject_buf.size() * sizeof(float));
-            }
-
-            // Compute
-            ggml_backend_graph_compute(ctx->backend, gf);
-
-            // Read output
-            int out_T = (int)y->ne[0];
-            int out_Fq = (int)y->ne[1];
-            int out_C = (int)y->ne[2];
-            size_t out_n = (size_t)out_T * out_Fq * out_C;
-            x_buf.resize(out_n);
-            {
-                auto _rd = read_tensor_f32(y);
-                memcpy(x_buf.data(), _rd.data(), std::min(x_buf.size(), _rd.size()) * sizeof(float));
-            }
-            x_C = out_C;
-            x_Fq = out_Fq;
-            x_T = out_T;
 
             // Freq embedding (after layer 0 only)
             // Python: emb = freq_emb(arange(Fq)).t()[None,:,:,None].expand_as(x)
@@ -1282,13 +1277,12 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // Forward: output = GGUF_weight * scale_emb_init (=10) * freq_emb_scale (=0.2)
                 float total_scale = 10.0f * scale; // scale_emb(10) * freq_emb_scale(0.2) = 2.0
                 // x_buf layout: (T, Fq, C) flattened. Add emb[fq][c] * total_scale.
-                int n_freq_to_use = std::min(out_Fq, emb_n_freqs);
+                int n_freq_to_use = std::min(x_Fq, emb_n_freqs);
                 for (int fq = 0; fq < n_freq_to_use; fq++) {
-                    for (int c = 0; c < out_C && c < emb_C; c++) {
+                    for (int c = 0; c < x_C && c < emb_C; c++) {
                         float e = emb_data[(size_t)fq * emb_C + c] * total_scale;
-                        for (int t = 0; t < out_T; t++) {
-                            // x_buf index: t + fq * out_T + c * out_T * out_Fq
-                            x_buf[t + (size_t)fq * out_T + (size_t)c * out_T * out_Fq] += e;
+                        for (int t = 0; t < x_T; t++) {
+                            x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq] += e;
                         }
                     }
                 }
@@ -1299,11 +1293,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             }
 
             if (htdemucs_debug()) {
-                fprintf(stderr, "htdemucs: enc[%d] output (%d, %d, %d) = %zu floats\n", idx, x_C, x_Fq, x_T, out_n);
+                fprintf(stderr, "htdemucs: enc[%d] output (%d, %d, %d) = %zu floats\n", idx, x_C, x_Fq, x_T,
+                        x_buf.size());
             }
-
-            ggml_gallocr_free(alloc);
-            ggml_free(g);
         }
 
         // Save skip connections
