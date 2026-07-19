@@ -70,13 +70,13 @@ def dump(args):
     tokenizer = PreTrainedTokenizerFast(
         tokenizer_file=str(Path(args.llm_dir) / "tokenizer.json"),
     )
-    # Load tokenizer_config.json for chat_template
+    # Load chat template and special tokens
     import json as _json
     _tok_cfg_path = Path(args.llm_dir) / "tokenizer_config.json"
     if _tok_cfg_path.exists():
         with open(_tok_cfg_path) as _f:
             _tok_cfg = _json.load(_f)
-        if "chat_template" in _tok_cfg:
+        if "chat_template" in _tok_cfg and _tok_cfg["chat_template"]:
             tokenizer.chat_template = _tok_cfg["chat_template"]
         if "eos_token" in _tok_cfg:
             tokenizer.eos_token = _tok_cfg["eos_token"]
@@ -84,6 +84,22 @@ def dump(args):
             tokenizer.pad_token = _tok_cfg["pad_token"]
         elif tokenizer.eos_token:
             tokenizer.pad_token = tokenizer.eos_token
+    # Fallback: load chat_template.jinja if not in tokenizer_config
+    if not getattr(tokenizer, 'chat_template', None):
+        _jinja_path = Path(args.llm_dir) / "chat_template.jinja"
+        if _jinja_path.exists():
+            with open(_jinja_path) as _f:
+                tokenizer.chat_template = _f.read()
+    # Final fallback: hardcode ChatML template
+    if not getattr(tokenizer, 'chat_template', None):
+        tokenizer.chat_template = (
+            "{% for message in messages %}"
+            "{{ '<|im_start|>' + message['role'] + '\n' + message['content'] + '<|im_end|>\n' }}"
+            "{% endfor %}"
+            "{% if add_generation_prompt %}"
+            "{{ '<|im_start|>assistant\n' }}"
+            "{% endif %}"
+        )
 
     # Build ChatML prompt: <|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n
     messages = [{"role": "user", "content": args.text}]
