@@ -18,7 +18,7 @@ if not _CRISPASR_DIR.exists():
     try:
         subprocess.check_call(["git", "clone", "--depth", "1",
             CRISPASR_URL, str(_CRISPASR_DIR)])
-        subprocess.check_call(["git", "submodule", "update", "--init", "--recursive"],
+        subprocess.check_call(["git", "submodule", "update", "--init", "ggml"],
                               cwd=str(_CRISPASR_DIR))
         sys.path.insert(0, str(_CRISPASR_DIR / "tools" / "kaggle"))
     except Exception:
@@ -45,13 +45,12 @@ cmake_flags = [
     "-DCMAKE_BUILD_TYPE=Release",
     "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
     "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
-    "-DCRISPASR_BUILD_TESTS=OFF",
-    "-DCRISPASR_BUILD_EXAMPLES=OFF",
-    "-DCRISPASR_BUILD_SERVER=OFF",
+    "-DCRISPASR_NO_C2PA_NATIVE=ON",
 ]
 subprocess.check_call(["cmake", "-G", "Ninja", "-B", str(build_dir)] + cmake_flags)
-jobs = kh.safe_build_jobs(gpu=False)
-subprocess.check_call(["cmake", "--build", str(build_dir), "-j", str(jobs),
+import multiprocessing
+jobs = str(multiprocessing.cpu_count())
+subprocess.check_call(["cmake", "--build", str(build_dir), "-j", jobs,
                        "--target", "htdemucs"])
 kh.step(f"Build complete (htdemucs target, -j{jobs})")
 
