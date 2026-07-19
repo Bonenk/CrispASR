@@ -84,23 +84,20 @@ lines per backend.
 
 ## RESOLVED — one surface (2026-07-19)
 
-The `--separate` dispatcher (this spec) shipped and drives BOTH backends. But
-the htdemucs session independently took a **different** surface:
-`examples/cli/crispasr_backend_htdemucs.cpp` — an `HtdemucsBackend :
-CrispasrBackend` with a `CAP_SEPARATE` capability whose `transcribe()` runs
-separation and returns a synthetic `"[separated: …]"` segment (the audio can't
-travel through the transcript path, so the stems are stashed for the CLI to
-pull out separately). So there are now TWO ways to separate:
+Two surfaces briefly coexisted: the `--separate` dispatcher (this spec, which
+drives BOTH backends) and an independent `CAP_SEPARATE` transcribe-adapter the
+htdemucs session added (`crispasr_backend_htdemucs.cpp` ran `htdemucs_separate`
+inside `transcribe()` and returned a synthetic `"[separated: …]"` segment).
 
-| surface | trigger | shape |
-|---|---|---|
-| **`--separate`** (this spec, agreed) | `--separate` | standalone task, audio out, both backends via one dispatcher |
-| `CAP_SEPARATE` adapter | `--backend htdemucs` | routed through `transcribe()`, fake text segment, stem-stash hack |
+**Evaluated both (maintainer: keep the better). The adapter was non-functional:**
+its `get_last_result()` had **zero callers**, so the stems it computed were
+**never written** — it only printed the fake text segment; and it fed the
+pipeline's mono 16 kHz to a model needing stereo 44.1 kHz. `--separate` is the
+only functional surface (resamples, both backends, writes correct stems,
+validated cos=1.0 + a working CLI producing vocals rms 0.218 vs other 0.005).
 
-They don't crash together (`--separate` early-routes in `cli.cpp` before
-backend detection), but shipping two is confusing and the adapter fights the
-transcribe contract. **Per the maintainer's decision that `--separate` is the
-shared surface, the `CAP_SEPARATE` transcribe-adapter should be removed and
-`--backend htdemucs` (if kept at all) should just point users at `--separate`.**
-Not deleting the other session's active file unilaterally — flagged here for the
-maintainer to have that session converge, or to authorize this session to do it.
+**Resolution:** `crispasr_backend_htdemucs.cpp` is now a thin redirect shim —
+it keeps htdemucs in `--list-backends` with `CAP_SEPARATE`, and `--backend
+htdemucs` without `--separate` prints "run it with --separate" instead of doing
+broken separation-through-transcribe. `src/htdemucs.*` (the real backend) is
+untouched. One surface: `--separate`.
