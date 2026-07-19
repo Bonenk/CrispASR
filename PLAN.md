@@ -2199,3 +2199,24 @@ commercial-restricted, skip).
 6. **Diarization** — Sortformer (evaluate vs moss-diarize first).
 
 ---
+
+## §249 WebRTC VAD backend (DONE — 2026-07-19)
+
+Vendored Google's WebRTC VAD (BSD-3, ~2K LOC pure C GMM) as a zero-dependency
+VAD alternative. No model file, no download, no ggml — just algorithmic.
+
+**Commits:**
+- `045be764` feat(vad): add WebRTC GMM-based VAD backend (BSD-3, no model file)
+- `3dcd66e4` feat(vad): wire WebRTC VAD into CLI (`--vad -vm webrtc`)
+
+**Usage:** `crispasr --vad -vm webrtc -m <model> -f audio.wav`
+
+**Env vars:** `CRISPASR_WEBRTC_VAD_MODE` (0=least aggressive, 3=most; default 1)
+
+**Status:** DONE — builds, 943 unit tests pass, live tested on jfk.wav.
+
+**Remaining:**
+- [ ] `tools/sync_go_cgo_ldflags.py` — add `-lwebrtc-vad` (CI will flag)
+- [ ] Dedicated live test comparing segment boundaries vs Silero/FireRed
+
+---
