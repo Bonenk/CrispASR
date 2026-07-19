@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -40,6 +41,69 @@ static bool htdemucs_debug() {
     }
     return v != 0;
 }
+
+// ---------------------------------------------------------------------------
+// Phase profiler — CRISPASR_HTDEMUCS_PROFILE=1 prints a per-phase wall-time
+// breakdown of one forward pass. Zero cost when off (the accumulate is guarded
+// and the clock read only happens inside the guard).
+// ---------------------------------------------------------------------------
+static bool htdemucs_profile() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("CRISPASR_HTDEMUCS_PROFILE");
+        v = (e && atoi(e) != 0) ? 1 : 0;
+    }
+    return v != 0;
+}
+
+namespace {
+struct htd_prof {
+    std::map<std::string, double> ms;
+    std::vector<std::string> order;
+    void add(const char* k, double v) {
+        auto it = ms.find(k);
+        if (it == ms.end()) {
+            ms[k] = v;
+            order.push_back(k);
+        } else {
+            it->second += v;
+        }
+    }
+    void report() const {
+        double tot = 0;
+        for (auto& kv : ms)
+            tot += kv.second;
+        fprintf(stderr, "\n=== htdemucs phase profile (total %.2f s) ===\n", tot / 1000.0);
+        for (const auto& k : order) {
+            const double v = ms.at(k);
+            fprintf(stderr, "  %-22s %8.1f ms  %5.1f%%\n", k.c_str(), v, tot > 0 ? 100.0 * v / tot : 0.0);
+        }
+    }
+};
+} // namespace
+
+static double htd_now_ms() {
+    return (double)std::chrono::duration_cast<std::chrono::microseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+               .count() /
+           1000.0;
+}
+
+namespace {
+// RAII phase timer. Constructed with a null prof when profiling is off.
+struct htd_scope {
+    htd_prof* p;
+    const char* n;
+    double t0;
+    htd_scope(htd_prof* prof, const char* name) : p(prof), n(name), t0(p ? htd_now_ms() : 0.0) {}
+    ~htd_scope() {
+        if (p)
+            p->add(n, htd_now_ms() - t0);
+    }
+};
+} // namespace
+
+#define HTD_PROF(prof, name) htd_scope _htd_scope_guard(htdemucs_profile() ? &(prof) : nullptr, name)
 
 // ---------------------------------------------------------------------------
 // Hparams
@@ -1115,6 +1179,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
     auto& hp = ctx->model.hparams;
     auto& m = ctx->model;
+    htd_prof prof;
 
     // Step 1: deinterleave stereo to channel-major
     int training_length = hp.training_length();
@@ -1166,7 +1231,11 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     }
 
     // Now run the raw STFT with center=True on the pre-padded signal
-    stft_result spec = compute_stft(pre_padded.data(), 2, pre_padded_len, nfft, hop, ctx->hann_window.data());
+    stft_result spec;
+    {
+        HTD_PROF(prof, "stft");
+        spec = compute_stft(pre_padded.data(), 2, pre_padded_len, nfft, hop, ctx->hann_window.data());
+    }
 
     // z[..., :-1, :] — drop the last frequency bin (2049 → 2048)
     int Fq = nfft / 2; // 2048 (was nfft/2+1 = 2049)
@@ -1300,6 +1369,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         std::vector<float> inject_buf; // injection from time→freq at merge point
         bool has_inject = false;
         if (idx < (int)m.tencoder.size() && m.tencoder[idx].conv_w && !getenv("CRISPASR_HTDEMUCS_SKIP_TIME")) {
+            HTD_PROF(prof, "tenc(total)");
             auto& tenc = m.tencoder[idx];
 
             // Pad xt so length is divisible by stride
@@ -1362,8 +1432,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             }
 
             // --- CPU DConv (was missing entirely: the time branch skipped it) ---
-            if (!tenc.empty && !tenc.dconv.layers.empty())
+            if (!tenc.empty && !tenc.dconv.layers.empty()) {
+                HTD_PROF(prof, "tenc.dconv");
                 cpu_dconv_inplace(xt_buf, xt_C, xt_T, tenc.dconv);
+            }
 
             // --- Graph 2: rewrite Conv1d(K=1) + norm2 + GLU ---
             if (!tenc.empty && tenc.rewrite_w) {
@@ -1439,7 +1511,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         {
             // CPU Conv2d (avoids ggml im2col OOM on 8 GB VPS)
             int new_Fq = 0;
-            x_buf = cpu_conv2d_freq(x_buf, x_T, x_Fq, x_C, enc.conv_w, enc.conv_b, stri, pad_val, new_Fq);
+            {
+                HTD_PROF(prof, "enc.conv2d");
+                x_buf = cpu_conv2d_freq(x_buf, x_T, x_Fq, x_C, enc.conv_w, enc.conv_b, stri, pad_val, new_Fq);
+            }
             x_C = (int)enc.conv_w->ne[3]; // OC
             x_Fq = new_Fq;
             // x_T unchanged
@@ -1467,6 +1542,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // Python: y.permute(0,2,1,3).reshape(-1,C,T) → DConv → reshape back
                 // = for each freq band: run DConv on (C, T) slice
                 if (!enc.dconv.layers.empty()) {
+                    HTD_PROF(prof, "enc.dconv");
                     for (int fq = 0; fq < x_Fq; fq++) {
                         // Extract the (C, T) slice for this frequency band,
                         // run the DConv stack on it, write it back.
@@ -1487,6 +1563,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
                 // Rewrite: 1x1 Conv2d → GLU
                 if (enc.rewrite_w) {
+                    HTD_PROF(prof, "enc.rewrite");
                     int rw_OC = 0;
                     auto rw_out = cpu_conv2d_1x1(x_buf, x_T * x_Fq, x_C, enc.rewrite_w, enc.rewrite_b, rw_OC);
                     x_buf = cpu_glu(rw_out, x_T * x_Fq, rw_OC);
@@ -2044,6 +2121,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
             if (!layer_s.is_cross) {
                 // Self-attention: each branch independently
+                HTD_PROF(prof, "ct.self_attn");
                 cpu_self_attn_layer(x_buf.data(), x_seq, layer_s.self_attn);
                 cpu_self_attn_layer(xt_buf.data(), xt_seq, layer_t.self_attn);
             } else {
@@ -2278,6 +2356,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // Cross-attention: spec layer attends to time, time layer attends to spec
                 // Save old_x for the time layer's cross-attention (time attends to old spec)
                 std::vector<float> old_x(x_buf);
+                HTD_PROF(prof, "ct.cross_attn");
                 cpu_cross_attn_layer(x_buf.data(), x_seq, xt_buf.data(), xt_seq, layer_s.cross_attn);
                 cpu_cross_attn_layer(xt_buf.data(), xt_seq, old_x.data(), x_seq, layer_t.cross_attn);
             }
@@ -2483,9 +2562,12 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             ggml_free(dg);
             break;
         }
-        ggml_backend_tensor_set(dx_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
-        ggml_backend_tensor_set(skip_in, skip_f.data.data(), 0, skip_f.data.size() * sizeof(float));
-        ggml_backend_graph_compute(ctx->backend, dgf);
+        {
+            HTD_PROF(prof, "dec.rewrite(ggml)");
+            ggml_backend_tensor_set(dx_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
+            ggml_backend_tensor_set(skip_in, skip_f.data.data(), 0, skip_f.data.size() * sizeof(float));
+            ggml_backend_graph_compute(ctx->backend, dgf);
+        }
 
         // Read pre-ConvTranspose result
         int pre_T = (int)dy->ne[0], pre_Fq = (int)dy->ne[1], pre_C = (int)dy->ne[2];
@@ -2503,6 +2585,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         // and every decoder layer has a real DConv. Same per-frequency-band
         // treatment as the encoder: pre_buf is (C, Fq, T) with t fastest.
         if (!dec.empty && !dec.dconv.layers.empty()) {
+            HTD_PROF(prof, "dec.dconv");
             std::vector<float> slice((size_t)pre_T * pre_C);
             for (int fq = 0; fq < pre_Fq; fq++) {
                 for (int c = 0; c < pre_C; c++)
@@ -2856,8 +2939,11 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         // reflect pre-padding (hop/2*3), which is _ispec's x[pad : pad+length].
         const int istft_start = nfft / 2 + pre_pad_left;
         std::vector<float> src_pcm((size_t)ac * work_length, 0.0f);
-        compute_istft(src_real.data(), src_imag.data(), ac, n_freqs_full, n_frames_pad, nfft, hop,
-                      ctx->hann_window.data(), work_length, istft_start, src_pcm.data());
+        {
+            HTD_PROF(prof, "istft");
+            compute_istft(src_real.data(), src_imag.data(), ac, n_freqs_full, n_frames_pad, nfft, hop,
+                          ctx->hann_window.data(), work_length, istft_start, src_pcm.data());
+        }
 
         // Capture the spectrogram branch alone, before the time branch is added.
         if (ctx->capture_stages) {
@@ -2915,6 +3001,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     }
 
     fprintf(stderr, "htdemucs: separated %d samples → %d sources (%d ch @ %d Hz)\n", n_samples, S, ac, hp.samplerate);
+
+    if (htdemucs_profile())
+        prof.report();
 
     return r;
 }
