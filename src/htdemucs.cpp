@@ -1281,10 +1281,17 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     fprintf(stderr, "htdemucs: CrossTransformer skipped (Phase 3 TODO)\n");
 
     // Step 8: Decoder (reverse of encoder, with skip connections)
+    // Decoder index 0 is the innermost (smallest spatial dims), matching
+    // encoder index depth-1. The freq dims grow back: 8→32→128→512→2048.
+    int dec_strides[] = {4, 4, 4, 4}; // same stride pattern as encoder (all freq layers)
     for (int idx = 0; idx < hp.depth && encoder_ok; idx++) {
         auto& dec = m.decoder[idx];
         if (!dec.conv_tr_w)
             break;
+
+        // Stride for this decoder layer (reverse of encoder)
+        int stri = dec_strides[idx];                 // TODO: derive properly from encoder
+        int pad_val = (int)dec.conv_tr_w->ne[1] / 4; // K/4
 
         // Pop skip from end (LIFO order)
         auto skip_f = saved_freq.back();
@@ -1351,62 +1358,169 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             // Empty decoder: dy stays as input (no skip add, no rewrite)
         }
 
-        // ConvTranspose2d: upsample
-        // ggml doesn't have conv_transpose_2d. For freq branch with kernel [Cout, Cin, K, 1]:
-        // this is effectively ConvTranspose1d on the freq axis.
-        // TODO: implement ConvTranspose2d properly.
-        // For now, use conv_transpose_1d after reshaping: (T, Fq, C, 1) → treat as (Fq, C) per T frame.
-        // Actually, ggml has no conv_transpose_2d at all. This is a blocker for the decoder.
+        // ConvTranspose2d on freq axis (kernel [K, 1], stride [S, 1]).
+        // ggml lacks conv_transpose_2d with asymmetric stride, so we do this
+        // CPU-side: run the ggml graph up to here, read back dy, apply
+        // ConvTranspose1d on the freq axis per-time-frame, write new dy.
         //
-        // WORKAROUND: Since the kernel is [K, 1], the transpose conv only upsamples on the
-        // freq axis. We can reshape (T, Fq, C) → (Fq, C*T) and use conv_transpose_1d, then
-        // reshape back. But this is complex.
-        //
-        // ALTERNATIVE: Use the conv.h helper (convt1d_crop) after reshaping.
-        // For this first pass, just pass dy through without upsampling.
-        // The output shape will be wrong but it validates the graph build.
+        // This is the approach taken by the first-pass parity build.
+        // Phase 5 (GPU perf) will fuse this into a single graph.
 
-        // GroupNorm after ConvTranspose
-        if (dec.norm2_w) {
-            dy = ggml_group_norm(dg, dy, 4, 1e-5f);
-            ggml_tensor* w4d = ggml_reshape_4d(dg, dec.norm2_w, 1, 1, (int)dec.norm2_w->ne[0], 1);
-            dy = ggml_mul(dg, dy, w4d);
-            if (dec.norm2_b) {
-                ggml_tensor* b4d = ggml_reshape_4d(dg, dec.norm2_b, 1, 1, (int)dec.norm2_b->ne[0], 1);
-                dy = ggml_add(dg, dy, b4d);
-            }
-        }
-
-        // GELU (not on last layer)
-        if (!is_last) {
-            dy = ggml_gelu(dg, dy);
-        }
-
-        ggml_set_name(dy, "dec_out");
+        // First: finalize the pre-convtranspose ggml graph
+        ggml_set_name(dy, "dec_pre_ct");
         ggml_set_output(dy);
-
         ggml_cgraph* dgf = ggml_new_graph(dg);
         ggml_build_forward_expand(dgf, dy);
         ggml_gallocr_t dalloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
-        if (ggml_gallocr_alloc_graph(dalloc, dgf)) {
-            ggml_backend_tensor_set(dx_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
-            ggml_backend_tensor_set(skip_in, skip_f.data.data(), 0, skip_f.data.size() * sizeof(float));
-            ggml_backend_graph_compute(ctx->backend, dgf);
-
-            int dout_T = (int)dy->ne[0], dout_Fq = (int)dy->ne[1], dout_C = (int)dy->ne[2];
-            size_t dout_n = (size_t)dout_T * dout_Fq * dout_C;
-            x_buf.resize(dout_n);
-            ggml_backend_tensor_get(dy, x_buf.data(), 0, dout_n * sizeof(float));
-            x_C = dout_C;
-            x_Fq = dout_Fq;
-            x_T = dout_T;
-
-            if (htdemucs_debug()) {
-                fprintf(stderr, "htdemucs: dec[%d] output (%d, %d, %d)\n", idx, x_C, x_Fq, x_T);
-            }
+        if (!ggml_gallocr_alloc_graph(dalloc, dgf)) {
+            fprintf(stderr, "htdemucs: dec[%d] pre-CT graph alloc failed\n", idx);
+            ggml_gallocr_free(dalloc);
+            ggml_free(dg);
+            break;
         }
+        ggml_backend_tensor_set(dx_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
+        ggml_backend_tensor_set(skip_in, skip_f.data.data(), 0, skip_f.data.size() * sizeof(float));
+        ggml_backend_graph_compute(ctx->backend, dgf);
+
+        // Read pre-ConvTranspose result
+        int pre_T = (int)dy->ne[0], pre_Fq = (int)dy->ne[1], pre_C = (int)dy->ne[2];
+        size_t pre_n = (size_t)pre_T * pre_Fq * pre_C;
+        std::vector<float> pre_buf(pre_n);
+        ggml_backend_tensor_get(dy, pre_buf.data(), 0, pre_n * sizeof(float));
         ggml_gallocr_free(dalloc);
         ggml_free(dg);
+
+        // CPU ConvTranspose2d with kernel [K,1], stride [S,1]
+        // Weight layout in GGUF: ne = (1, K, OC, IC) for ConvTranspose2d
+        // PyTorch ConvTranspose2d(IC, OC, [K,1], [S,1]) weight shape: (IC, OC, K, 1)
+        // In ggml ne order: (KW=1, KH=K, ne2=OC, ne3=IC)
+        {
+            int ct_K = (int)dec.conv_tr_w->ne[1]; // KH
+            int ct_OC = (int)dec.conv_tr_w->ne[2];
+            int ct_IC = (int)dec.conv_tr_w->ne[3];
+            int ct_S = stri;
+            int ct_pad = pad_val;
+
+            // Output freq size: Fq_out = (Fq_in - 1) * S + K - 2*pad
+            // For htdemucs: pad = K/4 (symmetric), but ConvTranspose2d has no padding param.
+            // Actually PyTorch ConvTranspose2d uses: Fq_out = (Fq_in - 1) * S - 2*P + K
+            // where P = pad_val from the encoder. The decoder uses the same kernel_size and
+            // the forward does: z = conv_tr(y), then crops: z[..., pad:-pad, :]
+            // So the ConvTranspose output is (Fq_in-1)*S + K, then cropped by pad on each side.
+            int ct_Fq_raw = (pre_Fq - 1) * ct_S + ct_K;
+            int ct_Fq_out = ct_Fq_raw - 2 * ct_pad;
+
+            // Read weight data (may be F16)
+            size_t w_n = (size_t)ct_K * ct_OC * ct_IC;
+            std::vector<float> w_data(w_n);
+            if (dec.conv_tr_w->type == GGML_TYPE_F16) {
+                std::vector<ggml_fp16_t> w_f16(w_n);
+                ggml_backend_tensor_get(dec.conv_tr_w, w_f16.data(), 0, w_n * sizeof(ggml_fp16_t));
+                for (size_t i = 0; i < w_n; i++)
+                    w_data[i] = ggml_fp16_to_fp32(w_f16[i]);
+            } else {
+                ggml_backend_tensor_get(dec.conv_tr_w, w_data.data(), 0, w_n * sizeof(float));
+            }
+
+            // Output buffer: (pre_T, ct_Fq_out, ct_OC) = (T, Fq_out, OC)
+            size_t ct_out_n = (size_t)pre_T * ct_Fq_out * ct_OC;
+            std::vector<float> ct_out(ct_out_n, 0.0f);
+
+            // ConvTranspose1d on freq axis: for each time frame t:
+            // y[oc, fq_out, t] = sum_ic sum_kh x[ic, fq_in, t] * w[ic, oc, kh]
+            // where fq_out = fq_in * S + kh - pad
+            // Weight indexing: w_data[ic * OC * K + oc * K + kh] (ggml ne order: (1, K, OC, IC))
+            // → w[ic][oc][kh] = w_data[ic * ct_OC * ct_K + oc * ct_K + kh]
+            for (int t = 0; t < pre_T; t++) {
+                for (int ic = 0; ic < ct_IC; ic++) {
+                    for (int fq_in = 0; fq_in < pre_Fq; fq_in++) {
+                        float x_val = pre_buf[t + (size_t)fq_in * pre_T + (size_t)ic * pre_T * pre_Fq];
+                        for (int kh = 0; kh < ct_K; kh++) {
+                            int fq_out = fq_in * ct_S + kh - ct_pad;
+                            if (fq_out < 0 || fq_out >= ct_Fq_out)
+                                continue;
+                            for (int oc = 0; oc < ct_OC; oc++) {
+                                float w_val = w_data[(size_t)ic * ct_OC * ct_K + oc * ct_K + kh];
+                                ct_out[t + (size_t)fq_out * pre_T + (size_t)oc * pre_T * ct_Fq_out] += x_val * w_val;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Add bias
+            if (dec.conv_tr_b) {
+                std::vector<float> bias(ct_OC);
+                ggml_backend_tensor_get(dec.conv_tr_b, bias.data(), 0, ct_OC * sizeof(float));
+                for (int oc = 0; oc < ct_OC; oc++) {
+                    for (int fq = 0; fq < ct_Fq_out; fq++) {
+                        for (int t = 0; t < pre_T; t++) {
+                            ct_out[t + (size_t)fq * pre_T + (size_t)oc * pre_T * ct_Fq_out] += bias[oc];
+                        }
+                    }
+                }
+            }
+
+            x_buf = std::move(ct_out);
+            x_C = ct_OC;
+            x_Fq = ct_Fq_out;
+            x_T = pre_T;
+
+            if (htdemucs_debug()) {
+                fprintf(stderr, "htdemucs: dec[%d] ConvTranspose K=%d S=%d pad=%d: (%d,%d,%d) → (%d,%d,%d)\n", idx,
+                        ct_K, ct_S, ct_pad, ct_IC, pre_Fq, pre_T, ct_OC, ct_Fq_out, pre_T);
+            }
+        }
+
+        // GroupNorm after ConvTranspose (CPU-side)
+        if (dec.norm2_w) {
+            // CPU GroupNorm: normalize per group of channels over (Fq × T) spatial dims
+            int ng = 4;
+            std::vector<float> norm_w(x_C), norm_b(x_C);
+            ggml_backend_tensor_get(dec.norm2_w, norm_w.data(), 0, x_C * sizeof(float));
+            if (dec.norm2_b)
+                ggml_backend_tensor_get(dec.norm2_b, norm_b.data(), 0, x_C * sizeof(float));
+            int ch_per_group = x_C / ng;
+            size_t spatial = (size_t)x_Fq * x_T;
+            for (int grp = 0; grp < ng; grp++) {
+                int c_start = grp * ch_per_group;
+                int c_end = c_start + ch_per_group;
+                // Compute mean/var over channels in this group and all spatial positions
+                double sum = 0, sum2 = 0;
+                size_t count = (size_t)(c_end - c_start) * spatial;
+                for (int c = c_start; c < c_end; c++)
+                    for (size_t s = 0; s < spatial; s++) {
+                        float v = x_buf[s + (size_t)c * spatial];
+                        sum += v;
+                        sum2 += (double)v * v;
+                    }
+                float mean_g = (float)(sum / count);
+                float var_g = (float)(sum2 / count - (double)mean_g * mean_g);
+                float inv_std = 1.0f / sqrtf(var_g + 1e-5f);
+                for (int c = c_start; c < c_end; c++)
+                    for (size_t s = 0; s < spatial; s++) {
+                        size_t i = s + (size_t)c * spatial;
+                        x_buf[i] = (x_buf[i] - mean_g) * inv_std * norm_w[c] + (dec.norm2_b ? norm_b[c] : 0.0f);
+                    }
+            }
+        }
+
+        // Crop freq padding from ConvTranspose output
+        // Python: if self.freq and self.pad: z = z[..., self.pad:-self.pad, :]
+        // Already handled in the ConvTranspose code above (ct_Fq_out = ct_Fq_raw - 2*pad)
+
+        // GELU (not on last layer)
+        if (!is_last) {
+            for (size_t i = 0; i < x_buf.size(); i++) {
+                float v = x_buf[i];
+                // GELU(x) = x * Φ(x) ≈ x * 0.5 * (1 + tanh(sqrt(2/π) * (x + 0.044715 * x³)))
+                x_buf[i] = v * 0.5f * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
+            }
+        }
+
+        if (htdemucs_debug()) {
+            fprintf(stderr, "htdemucs: dec[%d] output (%d, %d, %d)\n", idx, x_C, x_Fq, x_T);
+        }
     }
 
     fprintf(stderr, "htdemucs: decoder done, output (%d, %d, %d)\n", x_C, x_Fq, x_T);
