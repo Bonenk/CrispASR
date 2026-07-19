@@ -513,6 +513,22 @@ catch_discover_tests(test-audio-window
     PROPERTIES LABELS "unit;audio-window"
 )
 
+# §248 shared source-separation output surface (stem naming, --stems selection,
+# multi-channel WAV). Header-only helpers; no model, no audio.
+add_executable(test-separation-io
+    test-separation-io.cpp
+)
+target_include_directories(test-separation-io PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-separation-io PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-separation-io
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;separation"
+)
+
 # Named-voiceprint profile DB used by the opt-in --speaker-db path. Drives
 # enroll/load/match on synthetic embeddings; no model, no audio, no network.
 add_executable(test-speaker-db
