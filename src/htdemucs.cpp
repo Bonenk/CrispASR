@@ -1563,6 +1563,19 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         ggml_gallocr_free(dalloc);
         ggml_free(dg);
 
+        if (htdemucs_debug()) {
+            int nc = 0;
+            float mx = 0;
+            for (size_t i = 0; i < pre_n; i++) {
+                if (std::isnan(pre_buf[i]))
+                    nc++;
+                float av = fabsf(pre_buf[i]);
+                if (av > mx)
+                    mx = av;
+            }
+            fprintf(stderr, "htdemucs: dec[%d] pre-CT (%d,%d,%d) max=%.2f nan=%d\n", idx, pre_C, pre_Fq, pre_T, mx, nc);
+        }
+
         // CPU ConvTranspose2d with kernel [K,1], stride [S,1]
         // Weight layout in GGUF: ne = (1, K, OC, IC) for ConvTranspose2d
         // PyTorch ConvTranspose2d(IC, OC, [K,1], [S,1]) weight shape: (IC, OC, K, 1)
