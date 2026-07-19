@@ -1036,6 +1036,12 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
             cur = ggml_view_2d(ctx0, cur, T_up, d_up, cur->nb[1], 3 * cur->nb[0]);
             cur = ggml_cont(ctx0, cur);
             cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur)); // (d_up, T_up)
+            {
+                char nm[32];
+                snprintf(nm, sizeof(nm), "after_convt_%zu", si);
+                ggml_set_name(cur, nm);
+                ggml_set_output(cur);
+            }
 
             // SnakeBeta: x + (1/exp(β)) * sin²(exp(α) * x)
             // α,β are (d_up,) in log scale; broadcast over T
@@ -1047,6 +1053,13 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
                 ggml_tensor* sinax = ggml_sin(ctx0, ax);
                 ggml_tensor* sin2 = ggml_mul(ctx0, sinax, sinax); // sin²(α*x)
                 cur = ggml_add(ctx0, cur, ggml_mul(ctx0, sin2, beta_inv));
+            }
+
+            {
+                char nm[32];
+                snprintf(nm, sizeof(nm), "after_snake_%zu", si);
+                ggml_set_name(cur, nm);
+                ggml_set_output(cur);
             }
 
             // ResNet block at this channel width
@@ -1715,8 +1728,8 @@ float* miotts_codec_decode(miotts_context* ctx, const float* prenet_out, int T_p
     ggml_backend_sched_graph_compute(ctx->sched, gf);
 
     // Debug: dump intermediate shapes and first values
-    for (const char* sn :
-         {"conv_upsample_out", "wave_prior_net_out", "wave_decoder_out", "wave_post_net_out", "istft_linear_out"}) {
+    for (const char* sn : {"conv_upsample_out", "wave_prior_net_out", "wave_decoder_out", "wave_post_net_out",
+                           "after_convt_0", "after_snake_0", "after_convt_1", "after_snake_1", "istft_linear_out"}) {
         ggml_tensor* t = ggml_graph_get_tensor(gf, sn);
         if (t) {
             float buf[4];
