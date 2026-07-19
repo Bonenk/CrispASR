@@ -468,81 +468,34 @@ void split_segments_on_pyannote_turns(std::vector<crispasr_segment>& segs, const
             }
         }
 
-        // Stability filter: pyannote-seg without speaker embeddings
-        // can flip its local track index mid-phrase, producing one-word
-        // "(speaker 2)" stubs inside a contiguous "(speaker 1)" run.
-        // We collapse any run shorter than MIN_RUN_CS into the longer
-        // adjacent run before emitting sub-segments. Tuned at 50 cs
-        // (0.5 s) — long enough to suppress per-word flips, short enough
-        // to keep genuine turns in fast back-and-forth conversation.
+        // Stability filter (#107/#267): pyannote-seg without speaker
+        // embeddings can flip its local track index mid-phrase, producing
+        // one-word "(speaker 2)" stubs inside a contiguous "(speaker 1)"
+        // run. group_words_into_speaker_runs folds any run shorter than
+        // MIN_RUN_CS (0.5 s) into the longer adjacent run — long enough to
+        // suppress per-word flips, short enough to keep genuine turns in
+        // fast back-and-forth conversation.
         constexpr int64_t MIN_RUN_CS = 50;
-        auto word_duration_cs = [&](size_t a, size_t b /*exclusive*/) -> int64_t {
-            if (b <= a || b > word_spk.size())
-                return 0;
-            int64_t t0 = seg.words[a].t0;
-            int64_t t1 = seg.words[b - 1].t1;
-            if (t0 <= 0)
-                t0 = seg.t0;
-            if (t1 <= 0)
-                t1 = seg.t1;
-            return std::max<int64_t>(0, t1 - t0);
-        };
-        // Build initial runs as [start, end_exclusive, speaker] triples.
-        struct Run {
-            size_t s, e;
-            int spk;
-        };
-        std::vector<Run> runs;
-        {
-            size_t rs = 0;
-            while (rs < word_spk.size()) {
-                const int rspk = word_spk[rs];
-                size_t re = rs + 1;
-                while (re < word_spk.size() && word_spk[re] == rspk)
-                    re++;
-                runs.push_back({rs, re, rspk});
-                rs = re;
-            }
+        // Sanitize per-word bounds (fall back to segment bounds for missing
+        // word timestamps) so each run's span is well-defined.
+        std::vector<int64_t> word_t0(seg.words.size()), word_t1(seg.words.size());
+        for (size_t i = 0; i < seg.words.size(); i++) {
+            word_t0[i] = seg.words[i].t0 > 0 ? seg.words[i].t0 : seg.t0;
+            word_t1[i] = seg.words[i].t1 > 0 ? seg.words[i].t1 : seg.t1;
         }
-        // Iterate: fold every run shorter than MIN_RUN_CS into the
-        // longer neighbour. Repeat until stable.
-        bool changed = true;
-        while (changed && runs.size() >= 2) {
-            changed = false;
-            for (size_t i = 0; i < runs.size(); i++) {
-                if (word_duration_cs(runs[i].s, runs[i].e) >= MIN_RUN_CS)
-                    continue;
-                int merge_into = -1;
-                if (i == 0)
-                    merge_into = (int)i + 1;
-                else if (i == runs.size() - 1)
-                    merge_into = (int)i - 1;
-                else {
-                    int64_t prev_dur = word_duration_cs(runs[i - 1].s, runs[i - 1].e);
-                    int64_t next_dur = word_duration_cs(runs[i + 1].s, runs[i + 1].e);
-                    merge_into = (prev_dur >= next_dur) ? (int)i - 1 : (int)i + 1;
-                }
-                if (merge_into == (int)i + 1) {
-                    runs[i + 1].s = runs[i].s;
-                } else if (merge_into == (int)i - 1) {
-                    runs[i - 1].e = runs[i].e;
-                }
-                runs.erase(runs.begin() + i);
-                changed = true;
-                break;
-            }
-        }
+        const auto runs =
+            crispasr_diarize_internal::group_words_into_speaker_runs(word_spk, word_t0, word_t1, MIN_RUN_CS);
 
         // Collect distinct speakers across the (now-filtered) runs to
         // decide whether to actually split.
         int first_spk = -1;
         bool multi = false;
         for (const auto& r : runs) {
-            if (r.spk < 0)
+            if (r.speaker < 0)
                 continue;
             if (first_spk < 0) {
-                first_spk = r.spk;
-            } else if (r.spk != first_spk) {
+                first_spk = r.speaker;
+            } else if (r.speaker != first_spk) {
                 multi = true;
                 break;
             }
@@ -555,9 +508,9 @@ void split_segments_on_pyannote_turns(std::vector<crispasr_segment>& segs, const
 
         // Emit one sub-segment per run.
         for (size_t ri = 0; ri < runs.size(); ri++) {
-            const size_t run_start = runs[ri].s;
-            const size_t run_end = runs[ri].e;
-            const int run_spk = runs[ri].spk;
+            const size_t run_start = runs[ri].start;
+            const size_t run_end = runs[ri].end;
+            const int run_spk = runs[ri].speaker;
 
             crispasr_segment sub;
             sub.t0 = seg.words[run_start].t0 > 0 ? seg.words[run_start].t0 : seg.t0;
