@@ -2262,34 +2262,51 @@ VAD alternative. No model file, no download, no ggml — just algorithmic.
 
 ---
 
-## §250 MioCodec v2 audio codec (IN PROGRESS — 2026-07-19)
+## §250 MioCodec v2 audio codec (DONE — 2026-07-19)
 
 133M param audio codec (MIT, Aratako). Encode 44.1kHz audio → 25Hz tokens (12800 vocab);
-decode tokens + speaker embedding → waveform. Q4_K ~75 MB, fits 8GB VPS easily.
+decode tokens + speaker embedding → waveform. Decoder-only C++ port; encoder uses WavLM
+(Python-side for now, WavLM GGUF port is separate future work).
 
-**Commits on main:**
-- GGUF converter (258 MB F16, 350 tensors)
-- Reference dumper (10 decode stages, deterministic)
-- C++ backend (weight loading + FSQ decode + wave_prenet Transformer)
-- Diff harness wiring (all 8 stages dispatched)
-- Key fix: `ggml_flash_attn_ext` broken for this layout → manual attention (cos=1.0)
-- Key fix: null RoPE positions, RoPE type NEOX→NORMAL
-- Full decode pipeline scaffolded (conv_upsample→interp→ResNet→decoder→post→upsampler→istft)
+**HuggingFace:** `cstr/miocodec-v2-44k-GGUF` — F16 (259 MB), Q8_0 (155 MB), Q4_K (99 MB)
 
-**Parity results:**
-- `fsq_decoded`: **cos=1.000000 PASS**
-- `wave_prenet_out` (6L Transformer): **cos=1.000000 PASS** (T=1/30/99 all verified)
-- Remaining stages: graph structure done, hitting ggml tensor layout issues in ResNet
+**Parity (F16 vs Python F32 reference):**
 
-**Remaining (in order):**
-- [ ] ResNet blocks: implement CPU-side (avoid ggml group_norm shape issues) or use
-      seanet transpose-before-conv pattern. Small compute: 2 blocks × 2 Conv(512,512,k=3).
-- [ ] wave_decoder (8L AdaLN Transformer): same pattern as prenet (proven), needs AdaLN
-      `ggml_add1` fix verified. Should hit cos>0.999 on first try.
-- [ ] SnakeBeta upsampler: ConvTranspose1d + `x + sin²(αx)/β` — element-wise
-- [ ] ISTFTHead: Linear(512→394) + CPU-side `core_istft::istft`
-- [ ] output_waveform: full pipeline end-to-end, judge by listen + ASR roundtrip
-- [ ] Quantize: Q4_K (~75 MB) and verify inference still passes
-- [ ] CLI adapter + registry + 12-point checklist
+| Stage | cos |
+|-------|-----|
+| fsq_decoded | 1.000000 |
+| wave_prenet_out (6L Transformer) | 1.000000 |
+| wave_decoder_out (8L AdaLN-Zero Transformer) | 1.000000 |
+| wave_upsampler_out (SnakeBeta + weight_norm) | 1.000000 |
+| istft_mag_phase (Linear 512→394) | 1.000000 |
+| output_waveform (175518 samples) | 0.999998 |
+
+**ASR roundtrip (JFK 11s speech, Python WavLM encode → C++ decode → Whisper ASR):**
+All quants (F16, Q8_0, Q4_K) produce identical transcript:
+  "And so my fellow Americans ask not what your country can do for you
+   ask what you can do for your country."
+
+**Key implementation details:**
+- Manual attention (not flash_attn_ext — broken for this layout in our ggml)
+- RoPE type NORMAL (adjacent-pair complex multiply), explicit I32 positions
+- AdaLN-Zero: `x_norm + x_norm*scale + shift` (no deprecated ggml_add1)
+- SnakeBeta: `x + exp(-β) * sin²(exp(α) * x)` via ggml sin/sqr/exp/neg
+- Weight-norm: fused `w = g*v/||v||` at init for F16/F32, skipped for quantized
+- ISTFT: CPU-side via `core_istft::istft` with TRIM_SAME padding
+- GroupNorm: transpose→reshape3d(T,1,C)→gn→reshape2d→transpose pattern
+- Conv1d/ConvTranspose1d: transpose before/after (keep (C,T) layout throughout)
+- Generic `miocodec_dequant_tensor()` for F16/F32/quantized weight reads
+
+**Completed checklist:**
+- [x] `src/miocodec.{h,cpp}` — C runtime (decode-only)
+- [x] `src/CMakeLists.txt` — libmiocodec target
+- [x] `examples/cli/CMakeLists.txt` — crispasr-diff linked
+- [x] `examples/cli/crispasr_diff_main.cpp` — 8 stages dispatched
+- [x] `models/convert-miocodec-to-gguf.py` — GGUF converter
+- [x] `tools/reference_backends/miocodec.py` — 10-stage reference dumper
+- [x] `tools/dump_reference.py` — backend registered
+- [x] `src/crispasr_model_registry.cpp` — auto-download entry
+- [x] `bindings/go/whisper.go` — cgo LDFLAGS synced
+- [x] HuggingFace upload — 3 quants + README
 
 ---
