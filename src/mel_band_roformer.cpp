@@ -20,6 +20,10 @@
 #include "core/fft.h"         // fft_radix2_wrapper (r2c, interleaved full spectrum)
 #include "core/gguf_loader.h" // core_gguf::{open_metadata,kv_u32,load_weights}
 
+#if defined(__APPLE__)
+#include <Accelerate/Accelerate.h> // cblas_sgemm for the diff-probe forward
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -431,6 +435,16 @@ bool band_split_cpu(core_gguf::WeightLoad& mw, const std::vector<float>& gathere
 void linear(const std::vector<float>& x, int T, int din, const std::vector<float>& W, const std::vector<float>* bias,
             int dout, std::vector<float>& y) {
     y.assign((size_t)T * dout, 0.0f);
+#if defined(__APPLE__)
+    // y = x @ W^T (x is T x din row-major, W is dout x din row-major). Accelerate
+    // sgemm makes the naive 264-GFLOP scalar forward practical for the diff.
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, T, dout, din, 1.0f, x.data(), din, W.data(), din, 0.0f,
+                y.data(), dout);
+    if (bias)
+        for (int t = 0; t < T; t++)
+            for (int o = 0; o < dout; o++)
+                y[(size_t)t * dout + o] += (*bias)[o];
+#else
     for (int t = 0; t < T; t++) {
         const float* xr = x.data() + (size_t)t * din;
         float* yr = y.data() + (size_t)t * dout;
@@ -442,6 +456,7 @@ void linear(const std::vector<float>& x, int T, int din, const std::vector<float
             yr[o] = (float)acc;
         }
     }
+#endif
 }
 
 // Exact GELU (nn.GELU default, erf form): 0.5*x*(1+erf(x/sqrt2)).
