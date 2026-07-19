@@ -21,6 +21,10 @@
 #include "crispasr_vad_encdec.h" // Whisper-encoder + decoder VAD (ONNX-converted)
 #define CA_HAVE_WVAD_ENCDEC 1
 #endif
+#if __has_include("webrtc_vad.h")
+#include "webrtc_vad.h" // WebRTC GMM-based VAD (no model file)
+#define CA_HAVE_WEBRTC_VAD 1
+#endif
 
 #include <algorithm>
 #include <cctype>
@@ -285,6 +289,30 @@ std::vector<crispasr_audio_slice> crispasr_compute_vad_slices(const float* sampl
                 free(segs);
             // Do NOT free vctx — it's cached.
         }
+    }
+#endif
+#ifdef CA_HAVE_WEBRTC_VAD
+    else if (vpath.find("webrtc") != std::string::npos) {
+        // WebRTC VAD: pure algorithmic GMM, no model file needed.
+        // The "model path" is just a sentinel (e.g. "webrtc" or "--vad-model webrtc").
+        webrtc_vad_segment* segs = nullptr;
+        int n_segs = 0;
+        float min_speech_sec = opts.min_speech_duration_ms / 1000.0f;
+        float min_silence_sec = opts.min_silence_duration_ms / 1000.0f;
+        int rc = webrtc_vad_detect(samples, n_samples, &segs, &n_segs, opts.threshold, min_speech_sec, min_silence_sec,
+                                   -1);
+        if (rc == 0 && segs && n_segs > 0) {
+            for (int i = 0; i < n_segs; i++) {
+                int64_t t0_cs = (int64_t)(segs[i].start_sec * 100.0f);
+                int64_t t1_cs = (int64_t)(segs[i].end_sec * 100.0f);
+                int s = std::max(0, (int)(segs[i].start_sec * sample_rate));
+                int e = std::min(n_samples, (int)(segs[i].end_sec * sample_rate));
+                if (e > s)
+                    slices.push_back({s, e, t0_cs, t1_cs});
+            }
+        }
+        if (segs)
+            free(segs);
     }
 #endif
     else {
