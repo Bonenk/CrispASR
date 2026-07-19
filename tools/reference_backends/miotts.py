@@ -301,7 +301,167 @@ def dump(args):
     writer.add_tensor("wave_prenet_out", x.numpy())
     print(f"[miotts-ref] wave_prenet_out shape: {x.shape}")
 
-    print(f"[miotts-ref] Dumped stages up to wave_prenet_out")
+    # ─── conv_upsample (ConvTranspose1d, 512→512, k=2, s=2) ─────────
+    print("[miotts-ref] Running conv_upsample...")
+    conv_w = sf.get_tensor("wave_conv_upsample.weight").float()  # (512, 512, 2)
+    conv_b = sf.get_tensor("wave_conv_upsample.bias").float()    # (512,)
+    # ConvTranspose1d: x is (T, 512) → reshape to (1, 512, T) for conv
+    x_conv = x.unsqueeze(0).permute(0, 2, 1)  # (1, 512, T)
+    x_conv = torch.nn.functional.conv_transpose1d(x_conv, conv_w, conv_b, stride=2)  # (1, 512, T*2)
+    x = x_conv.squeeze(0).permute(1, 0)  # (T*2, 512)
+    print(f"[miotts-ref] after conv_upsample: {x.shape}")
+
+    # ─── Interpolate to STFT frame length ────────────────────────────
+    # target_audio_length = T_codec * (sample_rate / codec_frame_rate)
+    # T_codec = 29, sr=24000, frame_rate=25 → audio_length = 29 * 960 = 27840
+    # stft_length = (audio_length + hop_length - 1) // hop_length
+    # with hop=480: stft_length = (27840 + 479) // 480 = 59
+    T_codec = len(speech_token_ids)
+    audio_length = T_codec * (24000 // 25)  # = T_codec * 960
+    stft_length = (audio_length + 480 - 1) // 480
+    x_interp = x.unsqueeze(0).permute(0, 2, 1)  # (1, 512, T*2)
+    x_interp = torch.nn.functional.interpolate(x_interp, size=stft_length, mode='linear', align_corners=False)
+    x = x_interp.squeeze(0).permute(1, 0)  # (stft_length, 512)
+    print(f"[miotts-ref] after interpolate: {x.shape} (stft_length={stft_length})")
+
+    # ─── wave_prior_net (ResNetStack, 2 blocks) ─────────────────────
+    print("[miotts-ref] Running wave_prior_net...")
+    def group_norm(x_in, w, b, num_groups=32, eps=1e-6):
+        # x_in: (T, C) → (1, C, T) for group_norm
+        return torch.nn.functional.group_norm(
+            x_in.unsqueeze(0).permute(0, 2, 1), num_groups, w, b, eps
+        ).permute(0, 2, 1).squeeze(0)
+
+    def resnet_block(x_in, prefix):
+        n1_w = sf.get_tensor(f"{prefix}.norm1.weight").float()
+        n1_b = sf.get_tensor(f"{prefix}.norm1.bias").float()
+        c1_w = sf.get_tensor(f"{prefix}.conv1.weight").float()
+        c1_b = sf.get_tensor(f"{prefix}.conv1.bias").float()
+        n2_w = sf.get_tensor(f"{prefix}.norm2.weight").float()
+        n2_b = sf.get_tensor(f"{prefix}.norm2.bias").float()
+        c2_w = sf.get_tensor(f"{prefix}.conv2.weight").float()
+        c2_b = sf.get_tensor(f"{prefix}.conv2.bias").float()
+        residual = x_in
+        h = group_norm(x_in, n1_w, n1_b)
+        h = torch.nn.functional.silu(h)
+        # Conv1d: (T, 512) → (1, 512, T) → conv → (1, 512, T) → (T, 512)
+        h = h.unsqueeze(0).permute(0, 2, 1)
+        h = torch.nn.functional.conv1d(h, c1_w, c1_b, padding=1)
+        h = h.permute(0, 2, 1).squeeze(0)
+        h = group_norm(h, n2_w, n2_b)
+        h = torch.nn.functional.silu(h)
+        h = h.unsqueeze(0).permute(0, 2, 1)
+        h = torch.nn.functional.conv1d(h, c2_w, c2_b, padding=1)
+        h = h.permute(0, 2, 1).squeeze(0)
+        return residual + h
+
+    for i in range(2):
+        x = resnet_block(x, f"wave_prior_net.blocks.{i}")
+    writer.add_tensor("wave_prior_net_out", x.numpy())
+    print(f"[miotts-ref] wave_prior_net_out shape: {x.shape}")
+
+    # ─── wave_decoder (8 layers, 512d, AdaLN-Zero) ──────────────────
+    print("[miotts-ref] Running wave_decoder (8 layers, AdaLN-Zero)...")
+    # Use zero global embedding (no voice cloning reference)
+    global_emb = torch.zeros(128)
+
+    def adaln_zero_modulate(x_in, cond, proj_w, proj_b):
+        # AdaLN-Zero: SiLU(cond) → Linear → (shift, scale, gate)
+        c = torch.nn.functional.silu(cond)
+        c = c @ proj_w.T + proj_b  # (3*dim,)
+        shift, scale, gate = c.chunk(3, dim=-1)
+        # LayerNorm (no learned params) + modulate
+        mean = x_in.mean(-1, keepdim=True)
+        var = x_in.var(-1, keepdim=True, unbiased=False)
+        x_norm = (x_in - mean) / (var + 1e-5).sqrt()
+        x_mod = x_norm * (1 + scale) + shift
+        return x_mod, gate
+
+    for il in range(8):
+        prefix = f"wave_decoder.layers.{il}"
+        wq = sf.get_tensor(f"{prefix}.attention.wq.weight").float()
+        wk = sf.get_tensor(f"{prefix}.attention.wk.weight").float()
+        wv = sf.get_tensor(f"{prefix}.attention.wv.weight").float()
+        wo = sf.get_tensor(f"{prefix}.attention.wo.weight").float()
+        w1 = sf.get_tensor(f"{prefix}.feed_forward.w1.weight").float()
+        w2 = sf.get_tensor(f"{prefix}.feed_forward.w2.weight").float()
+        w3 = sf.get_tensor(f"{prefix}.feed_forward.w3.weight").float()
+        adaln_attn_w = sf.get_tensor(f"{prefix}.attention_norm.condition_proj.1.weight").float()
+        adaln_attn_b = sf.get_tensor(f"{prefix}.attention_norm.condition_proj.1.bias").float()
+        adaln_ffn_w = sf.get_tensor(f"{prefix}.ffn_norm.condition_proj.1.weight").float()
+        adaln_ffn_b = sf.get_tensor(f"{prefix}.ffn_norm.condition_proj.1.bias").float()
+
+        residual = x
+        # AdaLN-Zero attention norm
+        x_mod, gate_attn = adaln_zero_modulate(x, global_emb, adaln_attn_w, adaln_attn_b)
+
+        # Windowed attention (8 heads, hd=64, window=65)
+        attn_out = windowed_attention(x_mod, wq, wk, wv, wo, n_heads=8, window_size=65)
+        x = residual + gate_attn * attn_out
+
+        # AdaLN-Zero FFN norm
+        residual = x
+        x_mod, gate_ffn = adaln_zero_modulate(x, global_emb, adaln_ffn_w, adaln_ffn_b)
+        ffn_out = swiglu_ffn(x_mod, w1, w2, w3)
+        x = residual + gate_ffn * ffn_out
+
+    writer.add_tensor("wave_decoder_out", x.numpy())
+    print(f"[miotts-ref] wave_decoder_out shape: {x.shape}")
+
+    # ─── wave_post_net (ResNetStack, 2 blocks) ──────────────────────
+    print("[miotts-ref] Running wave_post_net...")
+    for i in range(2):
+        x = resnet_block(x, f"wave_post_net.blocks.{i}")
+    writer.add_tensor("wave_post_net_out", x.numpy())
+    print(f"[miotts-ref] wave_post_net_out shape: {x.shape}")
+
+    # ─── iSTFT head (Linear 512→1922, split mag+phase, iSTFT) ───────
+    print("[miotts-ref] Running iSTFT head...")
+    istft_w = sf.get_tensor("istft_head.out.weight").float()  # (1922, 512)
+    istft_b = sf.get_tensor("istft_head.out.bias").float()    # (1922,)
+    stft_out = x @ istft_w.T + istft_b  # (stft_length, 1922)
+    # Split into magnitude and phase (each n_fft//2 + 1 = 961 bins)
+    mag_log, phase = stft_out[:, :961], stft_out[:, 961:]
+    mag = torch.exp(mag_log).clamp(max=100.0)
+
+    # Reconstruct complex STFT
+    real = mag * torch.cos(phase)
+    imag = mag * torch.sin(phase)
+    spec = torch.complex(real, imag)  # (stft_length, 961)
+
+    # iSTFT with "same" padding
+    n_fft = 1920
+    hop_length = 480
+    win_length = n_fft
+    window = torch.hann_window(win_length)
+    pad = (win_length - hop_length) // 2  # = 720
+
+    spec_t = spec.T.unsqueeze(0)  # (1, 961, stft_length)
+    # Use torch.fft.irfft for each frame
+    ifft = torch.fft.irfft(spec_t, n_fft, dim=1, norm="backward")  # (1, n_fft, stft_length)
+    ifft = ifft * window[None, :, None]
+
+    # Overlap-add via fold
+    T_stft = spec_t.shape[2]
+    output_size = (T_stft - 1) * hop_length + win_length
+    y = torch.nn.functional.fold(
+        ifft, output_size=(1, output_size),
+        kernel_size=(1, win_length), stride=(1, hop_length)
+    )[:, 0, 0, pad:-pad]
+
+    # Window envelope normalization
+    window_sq = window.square().expand(1, T_stft, -1).transpose(1, 2)
+    window_envelope = torch.nn.functional.fold(
+        window_sq, output_size=(1, output_size),
+        kernel_size=(1, win_length), stride=(1, hop_length)
+    ).squeeze()[pad:-pad]
+    y = y / window_envelope
+
+    audio = y.squeeze(0)
+    writer.add_tensor("audio_output", audio.numpy())
+    print(f"[miotts-ref] audio_output shape: {audio.shape} ({audio.shape[0]/24000:.2f}s at 24kHz)")
+
+    print(f"[miotts-ref] Full codec decode complete!")
     print(f"[miotts-ref] Writing to {args.output}...")
 
     writer.write_header_to_file()
