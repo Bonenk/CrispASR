@@ -286,3 +286,72 @@ rules) vs 168 MB F32.
 - The diff replays `input_wav` from the reference, so it never exercises the
   16k->44.1k resampler. That is deliberate (it isolates model parity) but means
   resampler parity is separately unverified.
+
+## Performance
+
+### Baseline profile (CRISPASR_HTDEMUCS_PROFILE=1, one 343980-sample segment)
+
+The runtime was correctness-first: ggml was used mostly for weight loading and
+7 small graphs, while every expensive op was a hand-written scalar loop. The
+backend is hardcoded `ggml_backend_cpu_init()`; `params.use_gpu` and
+`params.n_threads` are set in the defaults and never read again.
+
+Profiling said the bottleneck was NOT the convolutions:
+
+| phase | before | share |
+|-------|--------|-------|
+| ct.self_attn  | 322.3 s | 52.4% |
+| ct.cross_attn | 205.7 s | 33.4% |
+| enc.rewrite   |  25.3 s |  4.1% |
+| enc.conv2d    |  20.1 s |  3.3% |
+| everything else | ~42 s | ~7% |
+| **total** | **615.5 s** | |
+
+### What was done (all gated, all output-equivalent)
+
+1. `CRISPASR_HTDEMUCS_BLAS` — the CrossTransformer's matmuls (QKV, QK^T,
+   attn·V, out-proj, both FFN linears, self- and cross-attention) through
+   `cblas_sgemm`. The scalar versions strode `seq_len` floats (~10 KB) in their
+   innermost loop — roughly a cache miss per multiply-add.
+   **ct.self_attn 322.3 s -> 8.5 s, ct.cross_attn 205.7 s -> 3.5 s.**
+2. `CRISPASR_HTDEMUCS_FASTCONV` — batched im2col + one GEMM instead of
+   per-time-frame im2col + dot-product loops; 1x1 convs emitted as channel
+   matmuls. **enc.conv2d 10.0 s -> 0.17 s, enc.rewrite 12.2 s -> 0.30 s.**
+3. `CRISPASR_HTDEMUCS_WCACHE` — cache F32 weight copies by tensor pointer.
+   The DConv stacks called `read_tensor_f32` from inside their per-band loop:
+   9 reads x 680 bands ~ 6k redundant dequant+copy passes per encoder layer.
+
+Every original path is preserved behind its gate, per the project rule. A/B
+verified in both directions — **45/45 stages pass in every gate combination**,
+so the fast paths are output-equivalent and the gates are usable for
+regression bisection.
+
+### Measured totals — READ THE CAVEAT
+
+| configuration | total |
+|---------------|-------|
+| all gates OFF (original code) | 338 s |
+| all gates ON  | **41.5 s** |
+
+Both from the per-stage diff on the same box. This machine is shared with other
+active sessions and its load average swung between 19 and 100 during this work;
+a repeat of the all-ON run at load 94 read 293 s. Per the dev guide's A/B rule
+these numbers are indicative, NOT a benchmark: a trustworthy figure needs a
+quiet box (or Kaggle) with a warm-up discarded and a median of >= 3.
+
+### Comparison to ONNX Runtime
+
+For reference, `timcsy/demucs-web-onnx` htdemucs_embedded.onnx on
+onnxruntime CPUExecutionProvider, same 343980-sample segment:
+**~43 s/segment with ORT_ENABLE_ALL, 103 s with ORT_DISABLE_ALL.**
+
+So the optimised CPU path is now in the same order of magnitude as ORT rather
+than ~15x behind it. A like-for-like claim still needs the quiet-box rerun above.
+
+### Next targets (unstarted)
+
+`dec.dconv`, `enc.dconv` and `tenc.dconv` are now the largest remaining phases.
+The DConv dilated convolution is still a scalar loop and is the obvious next
+GEMM/im2col candidate. Beyond that: threading (the per-frequency-band loops are
+embarrassingly parallel), and actually honouring `use_gpu` — the ggml graph path
+exists but the backend is pinned to CPU.
