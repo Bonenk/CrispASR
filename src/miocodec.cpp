@@ -909,7 +909,7 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
 
         // Step 2: Interpolate T_up → T_stft
         if (T_up != T_stft) {
-            x_up = ggml_interpolate(ctx0, x_up, dim_pre, T_stft, 1, 1, 0);
+            x_up = ggml_interpolate(ctx0, x_up, dim_pre, T_stft, 1, 1, GGML_SCALE_MODE_BILINEAR);
             x_up = ggml_reshape_2d(ctx0, x_up, dim_pre, T_stft);
         }
         // Step 3: Prior_net ResNet — now takes (C=512, T_stft) input
