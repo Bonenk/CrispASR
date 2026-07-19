@@ -2258,3 +2258,35 @@ VAD alternative. No model file, no download, no ggml — just algorithmic.
 - [ ] Dedicated live test comparing segment boundaries vs Silero/FireRed
 
 ---
+
+## §250 MioCodec v2 audio codec (IN PROGRESS — 2026-07-19)
+
+133M param audio codec (MIT, Aratako). Encode 44.1kHz audio → 25Hz tokens (12800 vocab);
+decode tokens + speaker embedding → waveform. Q4_K ~75 MB, fits 8GB VPS easily.
+
+**Commits on main:**
+- GGUF converter (258 MB F16, 350 tensors)
+- Reference dumper (10 decode stages, deterministic)
+- C++ backend (weight loading + FSQ decode + wave_prenet Transformer)
+- Diff harness wiring (all 8 stages dispatched)
+- Key fix: `ggml_flash_attn_ext` broken for this layout → manual attention (cos=1.0)
+- Key fix: null RoPE positions, RoPE type NEOX→NORMAL
+- Full decode pipeline scaffolded (conv_upsample→interp→ResNet→decoder→post→upsampler→istft)
+
+**Parity results:**
+- `fsq_decoded`: **cos=1.000000 PASS**
+- `wave_prenet_out` (6L Transformer): **cos=1.000000 PASS** (T=1/30/99 all verified)
+- Remaining stages: graph structure done, hitting ggml tensor layout issues in ResNet
+
+**Remaining (in order):**
+- [ ] ResNet blocks: implement CPU-side (avoid ggml group_norm shape issues) or use
+      seanet transpose-before-conv pattern. Small compute: 2 blocks × 2 Conv(512,512,k=3).
+- [ ] wave_decoder (8L AdaLN Transformer): same pattern as prenet (proven), needs AdaLN
+      `ggml_add1` fix verified. Should hit cos>0.999 on first try.
+- [ ] SnakeBeta upsampler: ConvTranspose1d + `x + sin²(αx)/β` — element-wise
+- [ ] ISTFTHead: Linear(512→394) + CPU-side `core_istft::istft`
+- [ ] output_waveform: full pipeline end-to-end, judge by listen + ASR roundtrip
+- [ ] Quantize: Q4_K (~75 MB) and verify inference still passes
+- [ ] CLI adapter + registry + 12-point checklist
+
+---
