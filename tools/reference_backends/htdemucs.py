@@ -24,6 +24,7 @@ import numpy as np
 DEFAULT_STAGES = [
     "input_wav",
     "spec_input", "time_input",
+    "enc0_conv", "enc0_gelu", "enc0_dconv", "enc0_rewrite",
     "enc_freq_0", "enc_freq_1", "enc_freq_2", "enc_freq_3",
     "enc_time_0", "enc_time_1", "enc_time_2",
     "pre_transformer_z", "pre_transformer_xt",
@@ -132,6 +133,23 @@ def dump(model_dir, audio, stages, max_new_tokens=None, **kwargs):
                 else:
                     inject = xt
                 maybe_capture(f"enc_time_{idx}", xt)
+            if idx == 0:
+                # Bisect encoder layer 0 by replicating HEncLayer.forward so a
+                # divergence can be pinned to conv / dconv / rewrite / freq_emb.
+                import torch.nn.functional as _F
+                _y = encode.conv(x)
+                maybe_capture("enc0_conv", _y)
+                _y = _F.gelu(encode.norm1(_y))
+                maybe_capture("enc0_gelu", _y)
+                _b, _c, _fr, _t = _y.shape
+                _d = _y.permute(0, 2, 1, 3).reshape(-1, _c, _t)
+                _d = encode.dconv(_d)
+                _y = _d.view(_b, _fr, _c, _t).permute(0, 2, 1, 3)
+                maybe_capture("enc0_dconv", _y)
+                _z = encode.norm2(encode.rewrite(_y))
+                _z = _F.glu(_z, dim=1)
+                maybe_capture("enc0_rewrite", _z)
+
             x = encode(x, inject)
             if idx == 0 and model.freq_emb is not None:
                 frs = torch.arange(x.shape[-2], device=x.device)

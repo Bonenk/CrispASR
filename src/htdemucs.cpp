@@ -799,6 +799,11 @@ static std::vector<float> cpu_conv2d_freq(const std::vector<float>& x, int T, in
 // CPU 1x1 Conv2d = matmul. w ne=(1,1,IC,OC), spatial = T*Fq.
 static std::vector<float> cpu_conv2d_1x1(const std::vector<float>& x, int spatial, int IC, ggml_tensor* w_tensor,
                                          ggml_tensor* b_tensor, int& out_C) {
+    // Conv2d weights are ne=(KW, KH, IC, OC). A Conv1d weight is ne=(K, IC, OC)
+    // with ne[3]==1, so passing one here would silently yield out_C = 1 and an
+    // empty result — that is how the tdecoder rewrite used to null-deref.
+    GGML_ASSERT(w_tensor->ne[0] == 1 && w_tensor->ne[1] == 1 &&
+                "cpu_conv2d_1x1 requires a 1x1 Conv2d kernel; use cpu_conv1d_time for Conv1d");
     auto w = read_tensor_f32(w_tensor);
     out_C = (int)w_tensor->ne[3];
     std::vector<float> out((size_t)spatial * out_C, 0.0f);
@@ -826,6 +831,165 @@ static void cpu_gelu_inplace(std::vector<float>& x) {
     }
 }
 
+// CPU Conv1d over a channel-major (C, T) buffer with symmetric zero padding.
+// Weight ne = (K, IC, OC), row-major w[oc][ic][k]. Returns (OC, T_out) with
+// T_out = T + 2*pad - K + 1 (stride 1, as used by the decoder rewrites).
+static std::vector<float> cpu_conv1d_time(const std::vector<float>& x, int T, int IC, ggml_tensor* w_tensor,
+                                          ggml_tensor* b_tensor, int pad, int& out_C, int& out_T) {
+    const int K = (int)w_tensor->ne[0];
+    out_C = (int)w_tensor->ne[2];
+    out_T = T + 2 * pad - K + 1;
+    auto w = read_tensor_f32(w_tensor);
+    std::vector<float> out((size_t)out_T * out_C, 0.0f);
+    for (int oc = 0; oc < out_C; oc++)
+        for (int t_out = 0; t_out < out_T; t_out++) {
+            float sum = 0;
+            for (int ic = 0; ic < IC; ic++)
+                for (int k = 0; k < K; k++) {
+                    const int t_in = t_out + k - pad;
+                    if (t_in < 0 || t_in >= T)
+                        continue;
+                    sum += x[t_in + (size_t)ic * T] * w[((size_t)oc * IC + ic) * K + k];
+                }
+            out[t_out + (size_t)oc * out_T] = sum;
+        }
+    if (b_tensor) {
+        auto b = read_tensor_f32(b_tensor);
+        for (int oc = 0; oc < out_C; oc++)
+            for (int t = 0; t < out_T; t++)
+                out[t + (size_t)oc * out_T] += b[oc];
+    }
+    return out;
+}
+
+// CPU GroupNorm with num_groups=1 over a channel-major (C, T) buffer, followed
+// by the per-channel affine. num_groups=1 means the single group spans ALL
+// channels, so mean/var are taken jointly over every (c, t) element — not
+// per-channel. Matches torch.nn.GroupNorm(1, C, eps=1e-5) as used by the
+// DConv sublayers (demucs.demucs.DConv).
+static void cpu_group_norm1_inplace(std::vector<float>& x, int C, int T, const float* w, const float* b,
+                                    float eps = 1e-5f) {
+    const size_t n = (size_t)C * T;
+    if (n == 0)
+        return;
+    double mean = 0.0;
+    for (size_t i = 0; i < n; i++)
+        mean += x[i];
+    mean /= (double)n;
+    double var = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        const double d = x[i] - mean;
+        var += d * d;
+    }
+    var /= (double)n; // biased, as torch normalization layers use
+    const float inv = 1.0f / std::sqrt((float)var + eps);
+    const float mf = (float)mean;
+    for (int c = 0; c < C; c++) {
+        const float wc = w ? w[c] : 1.0f;
+        const float bc = b ? b[c] : 0.0f;
+        float* row = x.data() + (size_t)c * T;
+        for (int t = 0; t < T; t++)
+            row[t] = (row[t] - mf) * inv * wc + bc;
+    }
+}
+
+// CPU DConv residual stack over a channel-major (C, T) buffer, in place.
+//
+// Mirrors demucs.demucs.DConv: for each sublayer d,
+//   h = Conv1d(C -> hidden, K, dilation=2^d, padding=dilation*(K/2))(x)
+//   h = GELU(GroupNorm(1, hidden)(h))
+//   h = Conv1d(hidden -> 2C, K=1)(h)
+//   h = GLU(GroupNorm(1, 2C)(h))
+//   x = x + LayerScale * h
+//
+// Used by BOTH the frequency branch (once per frequency band, matching
+// Python's `y.permute(0,2,1,3).reshape(-1, C, T)`) and the time branch.
+static void cpu_dconv_inplace(std::vector<float>& x, int C, int T, const htdemucs_dconv& dc) {
+    for (size_t d = 0; d < dc.layers.size(); d++) {
+        const auto& sl = dc.layers[d];
+        if (!sl.conv1_w || !sl.conv2_w)
+            continue;
+        const int dilation = 1 << (int)d;
+        const int K = (int)sl.conv1_w->ne[0];
+        const int hidden = (int)sl.conv1_w->ne[2];
+
+        // Dilated Conv1d(C -> hidden) with padding = dilation * (K/2).
+        auto w1 = read_tensor_f32(sl.conv1_w);
+        std::vector<float> h((size_t)T * hidden, 0.0f);
+        for (int t_out = 0; t_out < T; t_out++)
+            for (int hc = 0; hc < hidden; hc++) {
+                float sum = 0;
+                for (int ic = 0; ic < C; ic++)
+                    for (int k = 0; k < K; k++) {
+                        const int t_in = t_out + (k - K / 2) * dilation;
+                        if (t_in < 0 || t_in >= T)
+                            continue;
+                        sum += x[t_in + (size_t)ic * T] * w1[(size_t)hc * C * K + ic * K + k];
+                    }
+                h[t_out + (size_t)hc * T] = sum;
+            }
+        if (sl.conv1_b) {
+            auto b1 = read_tensor_f32(sl.conv1_b);
+            for (int hc = 0; hc < hidden; hc++)
+                for (int t = 0; t < T; t++)
+                    h[t + (size_t)hc * T] += b1[hc];
+        }
+
+        if (sl.norm1_w) {
+            auto n1w = read_tensor_f32(sl.norm1_w);
+            std::vector<float> n1b;
+            if (sl.norm1_b)
+                n1b = read_tensor_f32(sl.norm1_b);
+            cpu_group_norm1_inplace(h, hidden, T, n1w.data(), sl.norm1_b ? n1b.data() : nullptr);
+        }
+        cpu_gelu_inplace(h);
+
+        // Conv1d(hidden -> 2C, K=1) == a per-timestep matmul.
+        auto w2 = read_tensor_f32(sl.conv2_w);
+        const int out2C = (int)sl.conv2_w->ne[2];
+        std::vector<float> h2((size_t)T * out2C, 0.0f);
+        for (int oc = 0; oc < out2C; oc++)
+            for (int t = 0; t < T; t++) {
+                float sum = 0;
+                for (int hc = 0; hc < hidden; hc++)
+                    sum += w2[(size_t)oc * hidden + hc] * h[t + (size_t)hc * T];
+                h2[t + (size_t)oc * T] = sum;
+            }
+        if (sl.conv2_b) {
+            auto b2 = read_tensor_f32(sl.conv2_b);
+            for (int oc = 0; oc < out2C; oc++)
+                for (int t = 0; t < T; t++)
+                    h2[t + (size_t)oc * T] += b2[oc];
+        }
+
+        if (sl.norm2_w) {
+            auto n2w = read_tensor_f32(sl.norm2_w);
+            std::vector<float> n2b;
+            if (sl.norm2_b)
+                n2b = read_tensor_f32(sl.norm2_b);
+            cpu_group_norm1_inplace(h2, out2C, T, n2w.data(), sl.norm2_b ? n2b.data() : nullptr);
+        }
+
+        // GLU on the channel dim -> C channels, then LayerScale + residual.
+        const int half = out2C / 2;
+        std::vector<float> gl((size_t)T * half);
+        for (int c = 0; c < half; c++)
+            for (int t = 0; t < T; t++) {
+                const float a = h2[t + (size_t)c * T];
+                const float b = h2[t + (size_t)(half + c) * T];
+                gl[t + (size_t)c * T] = a / (1.0f + expf(-b));
+            }
+        std::vector<float> sc;
+        if (sl.scale)
+            sc = read_tensor_f32(sl.scale);
+        for (int c = 0; c < C; c++) {
+            const float s = sl.scale ? sc[c] : 1.0f;
+            for (int t = 0; t < T; t++)
+                x[t + (size_t)c * T] += s * gl[t + (size_t)c * T];
+        }
+    }
+}
+
 // CPU GLU: split channel dim, a * sigmoid(b)
 // x layout: (spatial, 2*C). Returns (spatial, C).
 static std::vector<float> cpu_glu(const std::vector<float>& x, int spatial, int double_C) {
@@ -845,6 +1009,26 @@ static std::vector<float> cpu_glu(const std::vector<float>& x, int spatial, int 
 // ---------------------------------------------------------------------------
 
 // GroupNorm + affine: y = weight * group_norm(x) + bias
+// GroupNorm(num_groups=1) + per-channel affine for a 2D (T, C) tensor.
+// Reshapes to (T, 1, C, 1) so ggml_group_norm's single group spans all C
+// channels (normalizing jointly over T*C, matching torch GroupNorm(1, C)), then
+// applies the affine with the weight reshaped to (1, 1, C, 1) so it broadcasts
+// along the channel axis rather than against ne[0].
+//
+// Unused for htdemucs itself (norm_starts=4 with depth=4 leaves every encoder
+// norm as Identity), but kept correct so a model with norms enabled works.
+static ggml_tensor* ggml_group_norm_affine_2d(ggml_context* g, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b,
+                                              float eps) {
+    const int T = (int)x->ne[0], C = (int)x->ne[1];
+    ggml_tensor* y = ggml_reshape_4d(g, x, T, 1, C, 1);
+    y = ggml_group_norm(g, y, 1, eps);
+    if (w)
+        y = ggml_mul(g, y, ggml_reshape_4d(g, w, 1, 1, (int)w->ne[0], 1));
+    if (b)
+        y = ggml_add(g, y, ggml_reshape_4d(g, b, 1, 1, (int)b->ne[0], 1));
+    return ggml_reshape_2d(g, y, T, C);
+}
+
 static ggml_tensor* ggml_group_norm_affine(ggml_context* g, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b,
                                            int n_groups, float eps) {
     ggml_tensor* y = ggml_group_norm(g, x, n_groups, eps);
@@ -1106,118 +1290,115 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             }
             int xt_padded_T = xt_T + xt_pad;
 
-            // Build time encoder graph
-            size_t t_ctx_size = ggml_tensor_overhead() * 64 + ggml_graph_overhead();
-            ggml_init_params tgp = {t_ctx_size, nullptr, true};
-            ggml_context* tg = ggml_init(tgp);
+            // The time encoder is split into two ggml graphs so the DConv stack
+            // can run on the CPU between them, matching HEncLayer.forward:
+            //   conv -> GELU(norm1) -> dconv -> GLU(norm2(rewrite))
+            // ggml's (T, C) 2D layout is flat `t + c*T`, i.e. exactly the
+            // channel-major (C, T) convention xt_buf uses, so no transpose is
+            // needed when handing buffers between the graphs and the CPU code.
 
-            // Time input: (xt_T, xt_C) in ggml ne order → padded to (xt_padded_T, xt_C)
-            ggml_tensor* xt_in = ggml_new_tensor_2d(tg, GGML_TYPE_F32, xt_padded_T, xt_C);
-            ggml_set_name(xt_in, "tenc_in");
-            ggml_set_input(xt_in);
+            // --- Graph 1: Conv1d + bias + GELU (norm1 is Identity for htdemucs) ---
+            {
+                size_t t_ctx_size = ggml_tensor_overhead() * 64 + ggml_graph_overhead();
+                ggml_init_params tgp = {t_ctx_size, nullptr, true};
+                ggml_context* tg = ggml_init(tgp);
 
-            // Conv1d: kernel ne = (K, IC, OC), data ne = (T, IC)
-            int t_ker = hp.kernel_size;
-            int t_stri = hp.stride;
-            int t_pad = t_ker / 4;
-            ggml_tensor* ty = ggml_conv_1d(tg, tenc.conv_w, xt_in, t_stri, t_pad, 1);
-            if (tenc.conv_b) {
-                // Bias (C,) → (1, C) for broadcast over time dim
-                ggml_tensor* tb = ggml_reshape_2d(tg, tenc.conv_b, 1, (int)tenc.conv_b->ne[0]);
-                ty = ggml_add(tg, ty, tb);
+                ggml_tensor* xt_in = ggml_new_tensor_2d(tg, GGML_TYPE_F32, xt_padded_T, xt_C);
+                ggml_set_name(xt_in, "tenc_in");
+                ggml_set_input(xt_in);
+
+                int t_ker = hp.kernel_size;
+                int t_stri = hp.stride;
+                int t_pad = t_ker / 4;
+                ggml_tensor* ty = ggml_conv_1d(tg, tenc.conv_w, xt_in, t_stri, t_pad, 1);
+                if (tenc.conv_b) {
+                    ggml_tensor* tb = ggml_reshape_2d(tg, tenc.conv_b, 1, (int)tenc.conv_b->ne[0]);
+                    ty = ggml_add(tg, ty, tb);
+                }
+                if (!tenc.empty) {
+                    if (tenc.norm1_w)
+                        ty = ggml_group_norm_affine_2d(tg, ty, tenc.norm1_w, tenc.norm1_b, 1e-5f);
+                    ty = ggml_gelu(tg, ty);
+                }
+
+                ggml_set_name(ty, "tenc_pre_dconv");
+                ggml_set_output(ty);
+                ggml_cgraph* tgf = ggml_new_graph(tg);
+                ggml_build_forward_expand(tgf, ty);
+                ggml_gallocr_t talloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+                if (ggml_gallocr_alloc_graph(talloc, tgf)) {
+                    std::vector<float> xt_padded((size_t)xt_C * xt_padded_T, 0.0f);
+                    for (int c = 0; c < xt_C; c++)
+                        memcpy(xt_padded.data() + (size_t)c * xt_padded_T, xt_buf.data() + (size_t)c * xt_T,
+                               (size_t)xt_T * sizeof(float));
+                    ggml_backend_tensor_set(xt_in, xt_padded.data(), 0, xt_padded.size() * sizeof(float));
+                    ggml_backend_graph_compute(ctx->backend, tgf);
+
+                    xt_T = (int)ty->ne[0];
+                    xt_C = (int)ty->ne[1];
+                    xt_buf = read_tensor_f32(ty);
+                }
+                ggml_gallocr_free(talloc);
+                ggml_free(tg);
             }
 
-            if (!tenc.empty) {
-                // GroupNorm + GELU + Rewrite + GLU (same as freq but 2D)
-                if (tenc.norm1_w) {
-                    // For 2D (T, C): ggml_group_norm uses ne[2] which doesn't exist for 2D.
-                    // Reshape to 3D: (T, C, 1) so ne[2]=1 — but that's wrong for GroupNorm.
-                    // Actually for 2D tensors, group_norm uses ne[0] as the spatial dim and ne[1] doesn't exist...
-                    // Let me reshape to (T, 1, C, 1) so ne[2]=C for group_norm.
-                    int ty_T = (int)ty->ne[0], ty_C = (int)ty->ne[1];
-                    ty = ggml_reshape_4d(tg, ty, ty_T, 1, ty_C, 1);
-                    ty = ggml_group_norm(tg, ty, 4, 1e-5f);
-                    ggml_tensor* w4d = ggml_reshape_4d(tg, tenc.norm1_w, 1, 1, (int)tenc.norm1_w->ne[0], 1);
-                    ty = ggml_mul(tg, ty, w4d);
-                    if (tenc.norm1_b) {
-                        ggml_tensor* b4d = ggml_reshape_4d(tg, tenc.norm1_b, 1, 1, (int)tenc.norm1_b->ne[0], 1);
-                        ty = ggml_add(tg, ty, b4d);
-                    }
-                    ty = ggml_reshape_2d(tg, ty, ty_T, ty_C);
-                }
-                ty = ggml_gelu(tg, ty);
+            // --- CPU DConv (was missing entirely: the time branch skipped it) ---
+            if (!tenc.empty && !tenc.dconv.layers.empty())
+                cpu_dconv_inplace(xt_buf, xt_C, xt_T, tenc.dconv);
 
-                // Rewrite + GLU
-                if (tenc.rewrite_w) {
-                    ggml_tensor* trw = ggml_conv_1d(tg, tenc.rewrite_w, ty, 1, 0, 1);
-                    if (tenc.rewrite_b) {
-                        ggml_tensor* trb = ggml_reshape_2d(tg, tenc.rewrite_b, 1, (int)tenc.rewrite_b->ne[0]);
-                        trw = ggml_add(tg, trw, trb);
-                    }
-                    if (tenc.norm2_w) {
-                        int trw_T = (int)trw->ne[0], trw_C = (int)trw->ne[1];
-                        trw = ggml_reshape_4d(tg, trw, trw_T, 1, trw_C, 1);
-                        trw = ggml_group_norm(tg, trw, 4, 1e-5f);
-                        ggml_tensor* w4d = ggml_reshape_4d(tg, tenc.norm2_w, 1, 1, (int)tenc.norm2_w->ne[0], 1);
-                        trw = ggml_mul(tg, trw, w4d);
-                        if (tenc.norm2_b) {
-                            ggml_tensor* b4d = ggml_reshape_4d(tg, tenc.norm2_b, 1, 1, (int)tenc.norm2_b->ne[0], 1);
-                            trw = ggml_add(tg, trw, b4d);
-                        }
-                        trw = ggml_reshape_2d(tg, trw, trw_T, trw_C);
-                    }
-                    // GLU: split channel dim
-                    int trw_C = (int)trw->ne[1];
-                    int trw_half = trw_C / 2;
-                    int trw_T = (int)trw->ne[0];
-                    ggml_tensor* ta = ggml_view_2d(tg, trw, trw_T, trw_half, trw->nb[1], 0);
-                    ggml_tensor* tb = ggml_view_2d(tg, trw, trw_T, trw_half, trw->nb[1], (size_t)trw_half * trw->nb[1]);
-                    ty = ggml_mul(tg, ggml_cont(tg, ta), ggml_sigmoid(tg, ggml_cont(tg, tb)));
+            // --- Graph 2: rewrite Conv1d(K=1) + norm2 + GLU ---
+            if (!tenc.empty && tenc.rewrite_w) {
+                size_t t_ctx_size = ggml_tensor_overhead() * 64 + ggml_graph_overhead();
+                ggml_init_params tgp = {t_ctx_size, nullptr, true};
+                ggml_context* tg = ggml_init(tgp);
+
+                ggml_tensor* rw_in = ggml_new_tensor_2d(tg, GGML_TYPE_F32, xt_T, xt_C);
+                ggml_set_name(rw_in, "tenc_rewrite_in");
+                ggml_set_input(rw_in);
+
+                ggml_tensor* trw = ggml_conv_1d(tg, tenc.rewrite_w, rw_in, 1, 0, 1);
+                if (tenc.rewrite_b) {
+                    ggml_tensor* trb = ggml_reshape_2d(tg, tenc.rewrite_b, 1, (int)tenc.rewrite_b->ne[0]);
+                    trw = ggml_add(tg, trw, trb);
                 }
+                if (tenc.norm2_w)
+                    trw = ggml_group_norm_affine_2d(tg, trw, tenc.norm2_w, tenc.norm2_b, 1e-5f);
+
+                // GLU over the channel dim (ne[1]).
+                int trw_T = (int)trw->ne[0];
+                int trw_half = (int)trw->ne[1] / 2;
+                ggml_tensor* ta = ggml_view_2d(tg, trw, trw_T, trw_half, trw->nb[1], 0);
+                ggml_tensor* tb = ggml_view_2d(tg, trw, trw_T, trw_half, trw->nb[1], (size_t)trw_half * trw->nb[1]);
+                ggml_tensor* ty = ggml_mul(tg, ggml_cont(tg, ta), ggml_sigmoid(tg, ggml_cont(tg, tb)));
+
+                ggml_set_name(ty, "tenc_out");
+                ggml_set_output(ty);
+                ggml_cgraph* tgf = ggml_new_graph(tg);
+                ggml_build_forward_expand(tgf, ty);
+                ggml_gallocr_t talloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+                if (ggml_gallocr_alloc_graph(talloc, tgf)) {
+                    ggml_backend_tensor_set(rw_in, xt_buf.data(), 0, xt_buf.size() * sizeof(float));
+                    ggml_backend_graph_compute(ctx->backend, tgf);
+                    xt_T = (int)ty->ne[0];
+                    xt_C = (int)ty->ne[1];
+                    xt_buf = read_tensor_f32(ty);
+                }
+                ggml_gallocr_free(talloc);
+                ggml_free(tg);
             }
 
-            ggml_set_name(ty, "tenc_out");
-            ggml_set_output(ty);
-
-            ggml_cgraph* tgf = ggml_new_graph(tg);
-            ggml_build_forward_expand(tgf, ty);
-            ggml_gallocr_t talloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
-            if (ggml_gallocr_alloc_graph(talloc, tgf)) {
-                // Upload padded time input
-                std::vector<float> xt_padded(xt_C * xt_padded_T, 0.0f);
-                for (int c = 0; c < xt_C; c++)
-                    memcpy(xt_padded.data() + c * xt_padded_T, xt_buf.data() + c * xt_T, xt_T * sizeof(float));
-                ggml_backend_tensor_set(xt_in, xt_padded.data(), 0, xt_padded.size() * sizeof(float));
-                ggml_backend_graph_compute(ctx->backend, tgf);
-
-                // Read output
-                int tout_T = (int)ty->ne[0];
-                int tout_C = (int)ty->ne[1];
-                size_t tout_n = (size_t)tout_T * tout_C;
-                xt_buf.resize(tout_n);
-                {
-                    auto _rd = read_tensor_f32(ty);
-                    memcpy(xt_buf.data(), _rd.data(), std::min(xt_buf.size(), _rd.size()) * sizeof(float));
-                }
-                xt_C = tout_C;
-                xt_T = tout_T;
-
-                if (tenc.empty) {
-                    // Merge point: inject time output into freq encoder
-                    inject_buf = xt_buf;
-                    has_inject = true;
-                }
-
-                // xt_buf is (C, T) channel-major — the reference layout.
-                htd_capture(ctx, ("enc_time_" + std::to_string(idx)).c_str(), xt_buf.data(), xt_buf.size());
-
-                if (htdemucs_debug()) {
-                    fprintf(stderr, "htdemucs: tenc[%d] output (%d, %d) empty=%d\n", idx, xt_C, xt_T,
-                            tenc.empty ? 1 : 0);
-                }
+            if (tenc.empty) {
+                // Merge point: inject time output into freq encoder
+                inject_buf = xt_buf;
+                has_inject = true;
             }
-            ggml_gallocr_free(talloc);
-            ggml_free(tg);
+
+            // xt_buf is (C, T) channel-major — the reference layout.
+            htd_capture(ctx, ("enc_time_" + std::to_string(idx)).c_str(), xt_buf.data(), xt_buf.size());
+
+            if (htdemucs_debug()) {
+                fprintf(stderr, "htdemucs: tenc[%d] output (%d, %d) empty=%d\n", idx, xt_C, xt_T, tenc.empty ? 1 : 0);
+            }
         }
 
         // --- Per-layer ggml graph for freq encoder ---
@@ -1255,99 +1436,36 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                             x_buf[t + (size_t)fo * x_T + (size_t)oc * x_T * x_Fq] += inject_buf[t + (size_t)oc * x_T];
             }
 
+            if (idx == 0)
+                htd_capture(ctx, "enc0_conv", x_buf.data(), x_buf.size());
+
             if (!enc.empty) {
                 // GELU (no GroupNorm for htdemucs — norm_starts=4, depth=4)
                 cpu_gelu_inplace(x_buf);
+                if (idx == 0)
+                    htd_capture(ctx, "enc0_gelu", x_buf.data(), x_buf.size());
                 // DConv: per-freq-band dilated conv residual
                 // Python: y.permute(0,2,1,3).reshape(-1,C,T) → DConv → reshape back
                 // = for each freq band: run DConv on (C, T) slice
                 if (!enc.dconv.layers.empty()) {
                     for (int fq = 0; fq < x_Fq; fq++) {
-                        // Extract (T, C) slice for this freq band
-                        // x_buf layout: x[t + fq*T + c*T*Fq]
-                        std::vector<float> slice(x_T * x_C);
+                        // Extract the (C, T) slice for this frequency band,
+                        // run the DConv stack on it, write it back.
+                        std::vector<float> slice((size_t)x_T * x_C);
                         for (int c = 0; c < x_C; c++)
                             for (int t = 0; t < x_T; t++)
-                                slice[t + c * x_T] = x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq];
+                                slice[t + (size_t)c * x_T] = x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq];
 
-                        // Apply each DConv sublayer as residual
-                        for (size_t d = 0; d < enc.dconv.layers.size(); d++) {
-                            auto& sl = enc.dconv.layers[d];
-                            if (!sl.conv1_w)
-                                continue;
-                            int dilation = 1 << (int)d;
-                            int K = (int)sl.conv1_w->ne[0];
-                            int hidden = (int)sl.conv1_w->ne[2];
+                        cpu_dconv_inplace(slice, x_C, x_T, enc.dconv);
 
-                            // h = dilated_conv1d(slice, w1, dilation, padding) + b1
-                            auto w1 = read_tensor_f32(sl.conv1_w);
-                            std::vector<float> h(x_T * hidden, 0.0f);
-                            for (int t_out = 0; t_out < x_T; t_out++) {
-                                for (int hc = 0; hc < hidden; hc++) {
-                                    float sum = 0;
-                                    for (int ic = 0; ic < x_C; ic++)
-                                        for (int k = 0; k < K; k++) {
-                                            int t_in = t_out + (k - K / 2) * dilation;
-                                            if (t_in < 0 || t_in >= x_T)
-                                                continue;
-                                            sum += slice[t_in + ic * x_T] * w1[(size_t)hc * x_C * K + ic * K + k];
-                                        }
-                                    h[t_out + hc * x_T] = sum;
-                                }
-                            }
-                            if (sl.conv1_b) {
-                                auto b1 = read_tensor_f32(sl.conv1_b);
-                                for (int hc = 0; hc < hidden; hc++)
-                                    for (int t = 0; t < x_T; t++)
-                                        h[t + hc * x_T] += b1[hc];
-                            }
-                            // GroupNorm(1) + GELU (skip norm for now — LayerScale init=1e-3 dominates)
-                            for (auto& v : h)
-                                v = v * 0.5f * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
-                            // Conv1d(hidden → 2*C, K=1) + GLU
-                            auto w2 = read_tensor_f32(sl.conv2_w);
-                            int out2C = (int)sl.conv2_w->ne[2]; // 2*C
-                            std::vector<float> h2(x_T * out2C, 0.0f);
-                            for (int oc = 0; oc < out2C; oc++)
-                                for (int t = 0; t < x_T; t++) {
-                                    float sum = 0;
-                                    for (int hc = 0; hc < hidden; hc++)
-                                        sum += w2[(size_t)oc * hidden + hc] * h[t + hc * x_T]; // K=1
-                                    h2[t + oc * x_T] = sum;
-                                }
-                            if (sl.conv2_b) {
-                                auto b2 = read_tensor_f32(sl.conv2_b);
-                                for (int oc = 0; oc < out2C; oc++)
-                                    for (int t = 0; t < x_T; t++)
-                                        h2[t + oc * x_T] += b2[oc];
-                            }
-                            // GLU → C channels
-                            int half = out2C / 2;
-                            std::vector<float> glu(x_T * half);
-                            for (int c = 0; c < half; c++)
-                                for (int t = 0; t < x_T; t++) {
-                                    float a = h2[t + c * x_T];
-                                    float b = h2[t + (half + c) * x_T];
-                                    glu[t + c * x_T] = a / (1.0f + expf(-b));
-                                }
-                            // LayerScale + residual
-                            if (sl.scale) {
-                                auto sc = read_tensor_f32(sl.scale);
-                                for (int c = 0; c < x_C; c++)
-                                    for (int t = 0; t < x_T; t++)
-                                        slice[t + c * x_T] += sc[c] * glu[t + c * x_T];
-                            } else {
-                                for (size_t i = 0; i < slice.size(); i++)
-                                    slice[i] += glu[i];
-                            }
-                        }
-
-                        // Write back
                         for (int c = 0; c < x_C; c++)
                             for (int t = 0; t < x_T; t++)
-                                x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq] = slice[t + c * x_T];
+                                x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq] = slice[t + (size_t)c * x_T];
                     }
                 }
+                if (idx == 0)
+                    htd_capture(ctx, "enc0_dconv", x_buf.data(), x_buf.size());
+
                 // Rewrite: 1x1 Conv2d → GLU
                 if (enc.rewrite_w) {
                     int rw_OC = 0;
@@ -1355,6 +1473,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     x_buf = cpu_glu(rw_out, x_T * x_Fq, rw_OC);
                     x_C = rw_OC / 2;
                 }
+                if (idx == 0)
+                    htd_capture(ctx, "enc0_rewrite", x_buf.data(), x_buf.size());
             }
 
             // Freq embedding (after layer 0 only)
@@ -1363,9 +1483,12 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             // Embedding: (n_freqs, C) → lookup frs 0..Fq-1 → (Fq, C) → t → (C, Fq)
             // Broadcast over T: x[t,fq,c] += scale * emb_w[fq, c]
             if (idx == 0 && m.freq_emb_w) {
-                // Read embedding weights
-                int emb_n_freqs = (int)m.freq_emb_w->ne[0]; // columns
-                int emb_C = (int)m.freq_emb_w->ne[1];       // rows
+                // nn.Embedding weight is (num_embeddings, embedding_dim) row-major
+                // = ggml ne(embedding_dim, num_embeddings), so ne[0] is the
+                // CHANNEL count and ne[1] is the frequency count — not the
+                // other way round.
+                int emb_C = (int)m.freq_emb_w->ne[0];       // embedding_dim  (48 channels)
+                int emb_n_freqs = (int)m.freq_emb_w->ne[1]; // num_embeddings (512 freqs)
                 // The embedding has emb_scale built into the weights (ScaledEmbedding)
                 // but freq_emb_scale is an additional multiplier.
                 std::vector<float> emb_data(emb_n_freqs * emb_C);
@@ -1388,6 +1511,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 int n_freq_to_use = std::min(x_Fq, emb_n_freqs);
                 for (int fq = 0; fq < n_freq_to_use; fq++) {
                     for (int c = 0; c < x_C && c < emb_C; c++) {
+                        // Row-major (n_freqs, emb_C): stride by emb_C, not n_freqs.
                         float e = emb_data[(size_t)fq * emb_C + c] * total_scale;
                         for (int t = 0; t < x_T; t++) {
                             x_buf[t + (size_t)fq * x_T + (size_t)c * x_T * x_Fq] += e;
@@ -2547,12 +2671,15 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                             for (int t = 0; t < xt_T; t++)
                                 xt_buf[t + (size_t)c * xt_T] += skip_t.data[t + (size_t)c * skip_t.T];
                     }
-                    // Rewrite (1x1 conv) + GLU
+                    // Rewrite + GLU. This is a Conv1d(chin, 2*chin, 1+2*context)
+                    // with padding=context — NOT a 1x1 conv (context=1 => K=3).
                     if (tdec.rewrite_w) {
-                        int rw_OC = 0;
-                        auto rw_out = cpu_conv2d_1x1(xt_buf, xt_T, xt_C, tdec.rewrite_w, tdec.rewrite_b, rw_OC);
-                        xt_buf = cpu_glu(rw_out, xt_T, rw_OC);
+                        int rw_OC = 0, rw_T = 0;
+                        auto rw_out = cpu_conv1d_time(xt_buf, xt_T, xt_C, tdec.rewrite_w, tdec.rewrite_b, hp.context,
+                                                      rw_OC, rw_T);
+                        xt_buf = cpu_glu(rw_out, rw_T, rw_OC);
                         xt_C = rw_OC / 2;
+                        xt_T = rw_T;
                     }
                 }
 
@@ -2851,7 +2978,10 @@ int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audi
     // FIRST failure is the earliest divergence = the bug.
     const double COS_MIN = 0.999;
     int n_fail = 0, n_missing = 0, n_run = 0;
-    const char* first_fail = nullptr;
+    // std::string, not const char*: the stage names below are built from
+    // temporaries like ("enc_freq_" + std::to_string(i)).c_str(), so storing the
+    // pointer would dangle and mis-report the first divergence.
+    std::string first_fail;
 
     auto report = [&](const char* stage) {
         std::vector<float> ref;
@@ -2873,7 +3003,7 @@ int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audi
         n_run++;
         if (!ok) {
             n_fail++;
-            if (!first_fail)
+            if (first_fail.empty())
                 first_fail = stage;
         }
         // Always print both magnitudes: a 10-30x outlier on either side means
@@ -2887,6 +3017,11 @@ int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audi
     fprintf(stderr, "\n=== htdemucs per-stage parity (cos_min >= %.3f) ===\n", COS_MIN);
     report("spec_input");
     report("time_input");
+    // Encoder layer 0 bisection: conv -> gelu -> dconv -> rewrite -> freq_emb.
+    report("enc0_conv");
+    report("enc0_gelu");
+    report("enc0_dconv");
+    report("enc0_rewrite");
     for (int i = 0; i < 4; i++)
         report(("enc_freq_" + std::to_string(i)).c_str());
     for (int i = 0; i < 3; i++)
@@ -2903,8 +3038,8 @@ int htdemucs_diff(const char* model_gguf, const char* ref_gguf, const char* audi
     fprintf(stderr, "\n%d/%d stages passed", n_run - n_fail, n_run);
     if (n_missing)
         fprintf(stderr, ", %d missing", n_missing);
-    if (first_fail)
-        fprintf(stderr, " — FIRST DIVERGENCE: %s", first_fail);
+    if (!first_fail.empty())
+        fprintf(stderr, " — FIRST DIVERGENCE: %s", first_fail.c_str());
     fprintf(stderr, "\n");
 
     htdemucs_result_free(res);
