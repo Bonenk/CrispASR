@@ -326,8 +326,8 @@ constexpr Entry k_registry[] = {
      nullptr, nullptr,
      "CC-BY-NC-4.0 — NON-COMMERCIAL use only (base model mistralai/Voxtral-4B-TTS-2603; see "
      "https://huggingface.co/mistralai/Voxtral-4B-TTS-2603)"},
-    {"htdemucs", "htdemucs-f16.gguf",
-     "https://huggingface.co/cstr/htdemucs-GGUF/resolve/main/htdemucs-f16.gguf", "~80 MB", nullptr, nullptr},
+    {"htdemucs", "htdemucs-q4_k.gguf",
+     "https://huggingface.co/cstr/htdemucs-GGUF/resolve/main/htdemucs-q4_k.gguf", "~38 MB", nullptr, nullptr},
     {"glm-asr", "glm-asr-nano-q4_k.gguf",
      "https://huggingface.co/cstr/glm-asr-nano-GGUF/resolve/main/glm-asr-nano-q4_k.gguf", "~1.2 GB", nullptr, nullptr},
     {"moonshine", "moonshine-tiny-q4_k.gguf",
