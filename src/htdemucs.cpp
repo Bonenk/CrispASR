@@ -1554,14 +1554,53 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             xt_buf = std::move(tmp);
         }
 
-        // Add sinusoidal position embeddings (CPU-side)
-        // 2D sin pos emb for freq branch: create_2d_sin_embedding(C, Fr, T1)
-        // 1D sin pos emb for time branch: create_sin_embedding(T2, C)
-        // Then add with weight_pos_embed scale.
-        //
-        // For now, skip positional embeddings — they help quality but aren't
-        // strictly required for the forward to produce finite values.
-        // TODO: add sin pos embeddings for full parity.
+        // 2D sinusoidal position embedding for freq branch
+        // Python: create_2d_sin_embedding(C, Fr, T1, max_period=10000)
+        // pe[0:C/2:2, :, :] = sin(pos_w * div_term)  (width=T1 positions)
+        // pe[1:C/2:2, :, :] = cos(pos_w * div_term)
+        // pe[C/2::2, :, :]  = sin(pos_h * div_term)  (height=Fr positions)
+        // pe[C/2+1::2, :, :] = cos(pos_h * div_term)
+        // Then rearranged: (1, C, Fr, T1) → (1, T1*Fr, C) = (1, x_seq, dim)
+        // x_buf is (dim, x_seq) after transpose. Add pe in same layout.
+        {
+            int Fr = x_Fq, T1 = x_T;
+            int half_d = dim / 2;
+            float max_period = hp.t_max_period;
+            // Precompute div_term for half_d/2 entries
+            std::vector<float> div_term(half_d / 2);
+            for (int i = 0; i < half_d / 2; i++)
+                div_term[i] = expf(-(float)(2 * i) * logf(max_period) / (float)half_d);
+
+            for (int t = 0; t < T1; t++) {
+                for (int fr = 0; fr < Fr; fr++) {
+                    int s = t * Fr + fr; // sequence position in flattened (T1*Fr)
+                    for (int i = 0; i < half_d / 2; i++) {
+                        float phase_w = (float)t * div_term[i];
+                        float phase_h = (float)fr * div_term[i];
+                        // Width dims: pe[2*i] = sin, pe[2*i+1] = cos
+                        x_buf[(size_t)(2 * i) * x_seq + s] += hp.t_weight_pos_embed * sinf(phase_w);
+                        x_buf[(size_t)(2 * i + 1) * x_seq + s] += hp.t_weight_pos_embed * cosf(phase_w);
+                        // Height dims: pe[half_d + 2*i] = sin, pe[half_d + 2*i+1] = cos
+                        x_buf[(size_t)(half_d + 2 * i) * x_seq + s] += hp.t_weight_pos_embed * sinf(phase_h);
+                        x_buf[(size_t)(half_d + 2 * i + 1) * x_seq + s] += hp.t_weight_pos_embed * cosf(phase_h);
+                    }
+                }
+            }
+        }
+        // 1D sinusoidal position embedding for time branch
+        // Python: create_sin_embedding(T2, C, shift=0, max_period=10000)
+        // pos[t] / (max_period^(d / (C/2-1))), then [cos, sin] concat
+        {
+            int half_d = dim / 2;
+            float max_period = hp.t_max_period;
+            for (int s = 0; s < xt_seq; s++) {
+                for (int d = 0; d < half_d; d++) {
+                    float phase = (float)s / powf(max_period, (float)d / (float)(half_d - 1));
+                    xt_buf[(size_t)d * xt_seq + s] += hp.t_weight_pos_embed * cosf(phase);
+                    xt_buf[(size_t)(half_d + d) * xt_seq + s] += hp.t_weight_pos_embed * sinf(phase);
+                }
+            }
+        }
 
         // LayerNorm on both branches (norm_in / norm_in_t)
         // x: (dim, seq) — normalize over dim (ne[0])
@@ -2454,6 +2493,97 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             }
         }
 
+        // Time branch decoder
+        int tdec_offset = hp.depth - (int)m.tdecoder.size();
+        if (idx >= tdec_offset && (idx - tdec_offset) < (int)m.tdecoder.size()) {
+            auto& tdec = m.tdecoder[idx - tdec_offset];
+            if (tdec.conv_tr_w) {
+                if (tdec.empty) {
+                    // Empty tdecoder: take pre_buf (freq pre-ConvTranspose output),
+                    // squeeze freq dim (Fq must be 1), run ConvTranspose1d
+                    // pre_buf: (pre_T, pre_Fq, pre_C) where pre_Fq=1 (innermost layer)
+                    // Squeeze → (pre_T, pre_C) = time signal
+                    xt_buf.resize((size_t)pre_T * pre_C);
+                    for (int c = 0; c < pre_C; c++)
+                        for (int t = 0; t < pre_T; t++)
+                            xt_buf[t + (size_t)c * pre_T] = pre_buf[t + (size_t)c * pre_T * pre_Fq];
+                    xt_C = pre_C;
+                    xt_T = pre_T;
+                } else {
+                    // Non-empty: xt = xt + skip_t, then rewrite + GLU
+                    if (!saved_time.empty()) {
+                        auto skip_t = saved_time.back();
+                        saved_time.pop_back();
+                        // xt + skip
+                        for (int c = 0; c < xt_C; c++)
+                            for (int t = 0; t < xt_T; t++)
+                                xt_buf[t + (size_t)c * xt_T] += skip_t.data[t + (size_t)c * skip_t.T];
+                    }
+                    // Rewrite (1x1 conv) + GLU
+                    if (tdec.rewrite_w) {
+                        int rw_OC = 0;
+                        auto rw_out = cpu_conv2d_1x1(xt_buf, xt_T, xt_C, tdec.rewrite_w, tdec.rewrite_b, rw_OC);
+                        xt_buf = cpu_glu(rw_out, xt_T, rw_OC);
+                        xt_C = rw_OC / 2;
+                    }
+                }
+
+                // ConvTranspose1d on time axis
+                int ct_K = (int)tdec.conv_tr_w->ne[0]; // kernel size
+                int ct_OC = (int)tdec.conv_tr_w->ne[1];
+                int ct_IC = (int)tdec.conv_tr_w->ne[2];
+                int ct_pad = ct_K / 4;
+                int t_out_raw = (xt_T - 1) * stri + ct_K;
+                int t_length = !lengths_time.empty() ? lengths_time.back() : (t_out_raw - 2 * ct_pad);
+                if (!lengths_time.empty())
+                    lengths_time.pop_back();
+
+                auto ct_w = read_tensor_f32(tdec.conv_tr_w);
+                // ConvTranspose1d: out[oc, t_out] = sum_{ic, k} x[ic, t_in] * w[k, oc, ic]
+                // where t_out = t_in * stride + k
+                std::vector<float> ct_out(ct_OC * t_out_raw, 0.0f);
+                for (int ic = 0; ic < ct_IC; ic++)
+                    for (int t_in = 0; t_in < xt_T; t_in++) {
+                        float x_val = xt_buf[t_in + (size_t)ic * xt_T];
+                        for (int k = 0; k < ct_K; k++) {
+                            int t_o = t_in * stri + k;
+                            if (t_o >= t_out_raw)
+                                continue;
+                            for (int oc = 0; oc < ct_OC; oc++)
+                                ct_out[t_o + (size_t)oc * t_out_raw] +=
+                                    x_val * ct_w[(size_t)ic * ct_OC * ct_K + oc * ct_K + k];
+                        }
+                    }
+                if (tdec.conv_tr_b) {
+                    auto b = read_tensor_f32(tdec.conv_tr_b);
+                    for (int oc = 0; oc < ct_OC; oc++)
+                        for (int t = 0; t < t_out_raw; t++)
+                            ct_out[t + (size_t)oc * t_out_raw] += b[oc];
+                }
+                // Crop padding: out[pad : pad + length]
+                xt_T = std::min(t_length, t_out_raw - 2 * ct_pad);
+                xt_C = ct_OC;
+                std::vector<float> cropped(xt_C * xt_T);
+                for (int oc = 0; oc < xt_C; oc++)
+                    for (int t = 0; t < xt_T; t++)
+                        cropped[t + (size_t)oc * xt_T] = ct_out[(ct_pad + t) + (size_t)oc * t_out_raw];
+                xt_buf = std::move(cropped);
+
+                // GroupNorm (skip — norm_starts=4) + GELU (not on last layer)
+                bool tdec_last = (idx == hp.depth - 1);
+                if (!tdec_last) {
+                    for (size_t i = 0; i < xt_buf.size(); i++) {
+                        float v = xt_buf[i];
+                        xt_buf[i] = v * 0.5f * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
+                    }
+                }
+
+                if (htdemucs_debug()) {
+                    fprintf(stderr, "htdemucs: tdec[%d] output (%d, %d)\n", idx - tdec_offset, xt_C, xt_T);
+                }
+            }
+        }
+
         if (htdemucs_debug()) {
             int nc = 0;
             for (size_t i = 0; i < x_buf.size() && nc < 3; i++)
@@ -2537,10 +2667,20 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         compute_istft(src_real.data(), src_imag.data(), ac, n_freqs_full, x_T, nfft, hop, ctx->hann_window.data(),
                       work_length, src_pcm.data());
 
-        // Denormalize time branch and add (if time decoder was run)
-        // For now, time branch output is not wired through the decoder,
-        // so we skip the time branch addition.
-        // TODO Phase 3: add time branch decoder output
+        // Denormalize time branch and add to freq branch
+        // xt_buf: (xt_T, xt_C) where xt_C = S * ac = 4 * 2 = 8
+        // Reshape to per-source: xt[s][c][t] = xt_buf[t + (s*ac+c)*xt_T]
+        // Denormalize: xt = xt * time_std + time_mean
+        if (xt_C >= S * ac && xt_T >= n_samples) {
+            int src_ch = s * ac;
+            for (int c = 0; c < ac; c++) {
+                for (int i = 0; i < n_samples; i++) {
+                    float tv = xt_buf[i + (size_t)(src_ch + c) * xt_T];
+                    tv = tv * time_std + time_mean;
+                    src_pcm[(size_t)c * work_length + i] += tv;
+                }
+            }
+        }
 
         // Trim to original length and interleave stereo
         r->sources[s] = new float[(size_t)ac * n_samples];
