@@ -918,6 +918,16 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     std::vector<float> xt_buf(pcm_ch.begin(), pcm_ch.begin() + 2 * work_length);
     int xt_C = hp.audio_channels, xt_T = work_length;
 
+    // Skip connection storage for decoder
+    struct saved_activation {
+        std::vector<float> data;
+        int C, Fq, T;
+    };
+    std::vector<saved_activation> saved_freq; // freq branch skips
+    std::vector<saved_activation> saved_time; // time branch skips
+    std::vector<int> lengths_freq;            // saved input T for decoder
+    std::vector<int> lengths_time;
+
     int freqs_cur = nfft / 2;
     bool encoder_ok = true;
 
@@ -1248,6 +1258,15 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             ggml_free(g);
         }
 
+        // Save skip connections
+        lengths_freq.push_back(x_T); // save BEFORE the dim change (actually, Python saves after — TODO: verify)
+        saved_freq.push_back({x_buf, x_C, x_Fq, x_T});
+        // Time branch: save non-empty tencoder outputs
+        if (idx < (int)m.tencoder.size() && !m.tencoder[idx].empty) {
+            saved_time.push_back({xt_buf, xt_C, 1, xt_T});
+            lengths_time.push_back(xt_T);
+        }
+
         // Update freq tracking
         if (freq) {
             freqs_cur = (freqs_cur <= hp.kernel_size) ? 1 : freqs_cur / hp.stride;
@@ -1255,6 +1274,17 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     }
 
     fprintf(stderr, "htdemucs: encoder %s, output (%d, %d, %d)\n", encoder_ok ? "OK" : "FAILED", x_C, x_Fq, x_T);
+
+    // Step 7: Skip CrossTransformer for first pass (TODO Phase 3)
+    // The transformer modifies x (freq bottleneck) and xt (time bottleneck).
+    // Without it, the decoder will use the encoder bottleneck directly.
+    fprintf(stderr, "htdemucs: CrossTransformer skipped (Phase 3 TODO)\n");
+
+    // Step 8: Decoder (reverse of encoder, with skip connections)
+    // TODO Phase 2h: decoder ConvTranspose2d/1d + skip connections
+    // The decoder reverses the encoder, consuming saved skip connections.
+    // For now, skip to produce stub output — decoder will be wired next.
+    fprintf(stderr, "htdemucs: decoder TODO (Phase 2h)\n");
 
     // Return stub result
     auto r = new htdemucs_result();
