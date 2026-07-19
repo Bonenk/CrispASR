@@ -504,26 +504,50 @@ static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* 
     return ggml_add(ctx0, h, ffn_out);
 }
 
+// AdaLN-Zero modulate: norm(x) * (1 + scale) + shift, returning (modulated, gate)
+// adaln_w/adaln_b produce 3*dim output (shift, scale, gate).
+// cond shape: (cond_dim, T) — typically (128, T) broadcast from (128, 1).
+static std::pair<ggml_tensor*, ggml_tensor*> miocodec_adaln_modulate(ggml_context* ctx0, ggml_tensor* x,
+                                                                     ggml_tensor* cond, ggml_tensor* adaln_w,
+                                                                     ggml_tensor* adaln_b, bool return_gate) {
+    const int64_t dim = x->ne[0];
+    // condition_proj: SiLU(cond) → linear → (3*dim or 2*dim, T)
+    ggml_tensor* params = ggml_mul_mat(ctx0, adaln_w, ggml_silu(ctx0, cond));
+    params = ggml_add(ctx0, params, adaln_b);
+    // params shape: (3*dim, T) for return_gate=true, (2*dim, T) for false
+    // Split: use ggml_view_2d (params is a computed tensor in ctx0, so view works)
+    const int64_t T = params->ne[1];
+    const size_t nb1 = params->nb[1]; // stride between rows = ne[0] * sizeof(float)
+    ggml_tensor* shift = ggml_view_2d(ctx0, params, dim, T, nb1, 0);
+    ggml_tensor* scale = ggml_view_2d(ctx0, params, dim, T, nb1, dim * ggml_type_size(params->type));
+    ggml_tensor* gate_t = nullptr;
+    if (return_gate)
+        gate_t = ggml_view_2d(ctx0, params, dim, T, nb1, 2 * dim * ggml_type_size(params->type));
+
+    // modulated = norm(x) * (1 + scale) + shift
+    ggml_tensor* x_norm = ggml_norm(ctx0, x, 1e-5f);
+    // (1 + scale): scale is (dim, T), add scalar 1.0 via ggml_scale + add
+    ggml_tensor* one_plus_scale = ggml_add(ctx0, ggml_scale(ctx0, ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, 1), 0.0f),
+                                           scale); // hack: 0-scalar + scale doesn't work
+    // Simpler: just add 1 to each element of scale
+    one_plus_scale = ggml_add1(ctx0, scale, ggml_new_f32(ctx0, 1.0f));
+
+    ggml_tensor* modulated = ggml_add(ctx0, ggml_mul(ctx0, x_norm, one_plus_scale), shift);
+    return {modulated, gate_t};
+}
+
 // AdaLN-Zero Transformer layer (for wave_decoder)
 static ggml_tensor* miocodec_adaln_transformer_layer(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* cond,
-                                                     const miocodec_weights::transformer_layer& L, int n_heads) {
+                                                     const miocodec_weights::transformer_layer& L, int n_heads,
+                                                     ggml_tensor* rope_pos, ggml_tensor* attn_mask) {
     const int64_t dim = x->ne[0];
     const int64_t T = x->ne[1];
     const int64_t hd = dim / n_heads;
 
-    // AdaLN-Zero for attention: condition_proj(SiLU(cond)) → shift, scale, gate
-    ggml_tensor* attn_params = ggml_mul_mat(ctx0, L.attn_adaln_w, ggml_silu(ctx0, cond));
-    attn_params = ggml_add(ctx0, attn_params, L.attn_adaln_b);
-    // Split into shift, scale, gate (each dim)
-    ggml_tensor* attn_shift = ggml_view_2d(ctx0, attn_params, dim, T, attn_params->nb[1], 0);
-    ggml_tensor* attn_scale = ggml_view_2d(ctx0, attn_params, dim, T, attn_params->nb[1], dim * sizeof(float));
-    ggml_tensor* attn_gate = ggml_view_2d(ctx0, attn_params, dim, T, attn_params->nb[1], 2 * dim * sizeof(float));
+    // AdaLN-Zero for attention
+    auto [attn_in, attn_gate] = miocodec_adaln_modulate(ctx0, x, cond, L.attn_adaln_w, L.attn_adaln_b, true);
 
-    // LayerNorm (no affine) + modulation
-    ggml_tensor* attn_in = ggml_norm(ctx0, x, 1e-5f);
-    attn_in = ggml_add(ctx0, ggml_mul(ctx0, attn_in, ggml_add(ctx0, attn_scale, ggml_new_f32(ctx0, 1.0f))), attn_shift);
-
-    // Attention (same as non-AdaLN version)
+    // Manual attention (same as non-AdaLN version)
     ggml_tensor* Q = ggml_mul_mat(ctx0, L.wq, attn_in);
     ggml_tensor* K = ggml_mul_mat(ctx0, L.wk, attn_in);
     ggml_tensor* V = ggml_mul_mat(ctx0, L.wv, attn_in);
@@ -532,14 +556,24 @@ static ggml_tensor* miocodec_adaln_transformer_layer(ggml_context* ctx0, ggml_te
     K = ggml_reshape_3d(ctx0, K, hd, n_heads, T);
     V = ggml_reshape_3d(ctx0, V, hd, n_heads, T);
 
-    Q = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
-                      GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
-    K = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
-                      GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+    Q = ggml_rope_ext(ctx0, Q, rope_pos, nullptr, (int)hd, GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+                      0.0f);
+    K = ggml_rope_ext(ctx0, K, rope_pos, nullptr, (int)hd, GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+                      0.0f);
 
+    Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
+    K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
     V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
+
     float scale = 1.0f / sqrtf((float)hd);
-    ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, scale, 0.0f, 0.0f);
+    ggml_tensor* scores = ggml_mul_mat(ctx0, K, Q);
+    scores = ggml_scale(ctx0, scores, scale);
+    if (attn_mask)
+        scores = ggml_add(ctx0, scores, attn_mask);
+    scores = ggml_soft_max(ctx0, scores);
+
+    V = ggml_cont(ctx0, ggml_permute(ctx0, V, 1, 0, 2, 3));
+    ggml_tensor* attn_out = ggml_mul_mat(ctx0, V, scores);
     attn_out = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn_out, 0, 2, 1, 3)), dim, T);
     attn_out = ggml_mul_mat(ctx0, L.wo, attn_out);
 
@@ -547,16 +581,8 @@ static ggml_tensor* miocodec_adaln_transformer_layer(ggml_context* ctx0, ggml_te
     ggml_tensor* h = ggml_add(ctx0, x, ggml_mul(ctx0, attn_gate, attn_out));
 
     // FFN AdaLN-Zero
-    ggml_tensor* ffn_params = ggml_mul_mat(ctx0, L.ffn_adaln_w, ggml_silu(ctx0, cond));
-    ffn_params = ggml_add(ctx0, ffn_params, L.ffn_adaln_b);
-    ggml_tensor* ffn_shift = ggml_view_2d(ctx0, ffn_params, dim, T, ffn_params->nb[1], 0);
-    ggml_tensor* ffn_scale = ggml_view_2d(ctx0, ffn_params, dim, T, ffn_params->nb[1], dim * sizeof(float));
-    ggml_tensor* ffn_gate = ggml_view_2d(ctx0, ffn_params, dim, T, ffn_params->nb[1], 2 * dim * sizeof(float));
+    auto [ffn_in, ffn_gate] = miocodec_adaln_modulate(ctx0, h, cond, L.ffn_adaln_w, L.ffn_adaln_b, true);
 
-    ggml_tensor* ffn_in = ggml_norm(ctx0, h, 1e-5f);
-    ffn_in = ggml_add(ctx0, ggml_mul(ctx0, ffn_in, ggml_add(ctx0, ffn_scale, ggml_new_f32(ctx0, 1.0f))), ffn_shift);
-
-    // SwiGLU
     ggml_tensor* gate2 = ggml_silu(ctx0, ggml_mul_mat(ctx0, L.ffn_w1, ffn_in));
     ggml_tensor* up2 = ggml_mul_mat(ctx0, L.ffn_w3, ffn_in);
     ggml_tensor* ffn_out = ggml_mul_mat(ctx0, L.ffn_w2, ggml_mul(ctx0, gate2, up2));
@@ -565,24 +591,27 @@ static ggml_tensor* miocodec_adaln_transformer_layer(ggml_context* ctx0, ggml_te
 }
 
 // ResNet block: GroupNorm → SiLU → Conv1d → GroupNorm → SiLU → Conv1d + residual
-// Input/output shape: (C, T) where C=512
+// Input shape: (T, C, 1) for ggml_group_norm / ggml_conv_1d
+// ggml_group_norm expects (width, channels, batch) — so input is (T, C, 1)
+// ggml_conv_1d(kernel, input, stride, pad, dilation) — kernel shape (C_out, C_in/groups, K)
 static ggml_tensor* miocodec_resnet_block(ggml_context* ctx0, ggml_tensor* x, const miocodec_weights::resnet_block& b,
                                           int n_groups) {
     ggml_tensor* residual = x;
-    // norm1 → silu → conv1
+    // x is (T, C, 1) for group_norm
+    // norm1
     x = ggml_group_norm(ctx0, x, n_groups, 1e-6f);
-    x = ggml_add(ctx0, ggml_mul(ctx0, x, ggml_reshape_3d(ctx0, b.norm1_w, 1, x->ne[0], 1)),
-                 ggml_reshape_3d(ctx0, b.norm1_b, 1, x->ne[0], 1));
+    x = ggml_mul(ctx0, x, b.norm1_w);
+    x = ggml_add(ctx0, x, b.norm1_b);
     x = ggml_silu(ctx0, x);
-    x = ggml_conv_1d(ctx0, b.conv1_w, x, 1, 1, 1); // stride=1, pad=1, dilation=1
-    x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, b.conv1_b, 1, b.conv1_b->ne[0], 1));
-    // norm2 → silu → conv2
+    x = ggml_conv_1d(ctx0, b.conv1_w, x, 1, 1, 1);
+    x = ggml_add(ctx0, x, b.conv1_b);
+    // norm2
     x = ggml_group_norm(ctx0, x, n_groups, 1e-6f);
-    x = ggml_add(ctx0, ggml_mul(ctx0, x, ggml_reshape_3d(ctx0, b.norm2_w, 1, x->ne[0], 1)),
-                 ggml_reshape_3d(ctx0, b.norm2_b, 1, x->ne[0], 1));
+    x = ggml_mul(ctx0, x, b.norm2_w);
+    x = ggml_add(ctx0, x, b.norm2_b);
     x = ggml_silu(ctx0, x);
     x = ggml_conv_1d(ctx0, b.conv2_w, x, 1, 1, 1);
-    x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, b.conv2_b, 1, b.conv2_b->ne[0], 1));
+    x = ggml_add(ctx0, x, b.conv2_b);
     return ggml_add(ctx0, residual, x);
 }
 
