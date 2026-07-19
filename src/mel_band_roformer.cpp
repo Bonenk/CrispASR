@@ -716,7 +716,46 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
         }
     }
 
-    fprintf(stderr, "  [PENDING] layer0_freq, layer1/5_*, mask_raw, output_vocals — Phase 2 cont.\n");
+    // --- layer0_freq (time step 0) : the freq RoFormer block of layer 0 ---
+    // The freq transformer attends over the 60 bands per time step (RoPE on band
+    // positions). Its input is the FULL time-transformer output; the dumper hook
+    // captured only band 0 of layer0_time, so here we CHAIN our own (validated)
+    // time block over all bands and take the t=0 band-sequence as the freq
+    // input. Time outputs aren't near-silent, so RMSNorm amplification is mild;
+    // if this ever drifts, dump the full layer0_time and input-align instead.
+    {
+        std::vector<float> ref_bso, ref_lf, tfinal_g;
+        int64_t n1 = 0, n2 = 0;
+        if (ref_get(rw, "band_split_out", ref_bso, n1) && ref_get(rw, "layer0_freq", ref_lf, n2) &&
+            read_f32(ctx->weights, "layers.0.0.norm.gamma", tfinal_g)) {
+            const int nb = hp.num_bands, dim = hp.dim;
+            // freq input at t=0: run the time block on each band, take t=0.
+            std::vector<float> freq_in((size_t)nb * dim, 0.0f);
+            bool ok = true;
+            for (int b = 0; b < nb && ok; b++) {
+                std::vector<float> xb((size_t)T * dim);
+                for (int t = 0; t < T; t++)
+                    for (int d = 0; d < dim; d++)
+                        xb[(size_t)t * dim + d] = ref_bso[((size_t)t * nb + b) * dim + d];
+                ok = roformer_block(ctx->weights, "layers.0.0.layers.0.", xb, T, dim, hp.heads, hp.dim_head);
+                if (!ok)
+                    break;
+                rms_rows(xb, T, dim, tfinal_g);
+                for (int d = 0; d < dim; d++)
+                    freq_in[(size_t)b * dim + d] = xb[(size_t)0 * dim + d]; // t=0
+            }
+            std::vector<float> ffinal_g;
+            if (ok && roformer_block(ctx->weights, "layers.0.1.layers.0.", freq_in, nb, dim, hp.heads, hp.dim_head) &&
+                read_f32(ctx->weights, "layers.0.1.norm.gamma", ffinal_g)) {
+                rms_rows(freq_in, nb, dim, ffinal_g);
+                report("layer0_freq(chain)", freq_in, ref_lf);
+            } else {
+                fprintf(stderr, "  layer0_freq: SKIP (a weight was missing)\n");
+            }
+        }
+    }
+
+    fprintf(stderr, "  [PENDING] layer1/5_*, mask_raw, output_vocals — Phase 2 cont.\n");
 
     if (rw.buf)
         ggml_backend_buffer_free(rw.buf);
