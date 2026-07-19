@@ -140,11 +140,16 @@ struct miotts_context {
 
     // Codec: wave_prenet (6 layers, 768d → 512d)
     std::vector<miotts_codec_layer> wave_prenet_layers;
+    ggml_tensor* wave_prenet_norm_w = nullptr; // final LayerNorm before output_proj
+    ggml_tensor* wave_prenet_norm_b = nullptr;
     ggml_tensor* wave_prenet_out_proj_w = nullptr;
     ggml_tensor* wave_prenet_out_proj_b = nullptr;
 
     // Codec: wave_decoder (8 layers, 512d, AdaLN-Zero conditioned on 128-d)
     std::vector<miotts_codec_layer> wave_decoder_layers;
+    // wave_decoder final norm (AdaLN-Zero without gate)
+    ggml_tensor* wave_decoder_norm_w = nullptr;
+    ggml_tensor* wave_decoder_norm_b = nullptr;
 
     // Codec: conv_upsample (ConvTranspose1d, 512→512, k=2, s=2)
     ggml_tensor* conv_upsample_w = nullptr;
@@ -391,6 +396,8 @@ miotts_context* miotts_init_from_file(const char* path_model, miotts_context_par
         b.ffn_w2 = cn("feed_forward.w2.weight");
         b.ffn_w3 = cn("feed_forward.w3.weight");
     }
+    c->wave_prenet_norm_w = T("codec.wave_prenet.norm.weight");
+    c->wave_prenet_norm_b = T("codec.wave_prenet.norm.bias");
     c->wave_prenet_out_proj_w = T("codec.wave_prenet.output_proj.weight");
     c->wave_prenet_out_proj_b = T("codec.wave_prenet.output_proj.bias");
 
@@ -416,6 +423,10 @@ miotts_context* miotts_init_from_file(const char* path_model, miotts_context_par
         b.adaln_ffn_w = cn("ffn_norm.condition_proj.1.weight");
         b.adaln_ffn_b = cn("ffn_norm.condition_proj.1.bias");
     }
+
+    // Decoder final norm (AdaLN-Zero: condition_proj → shift, scale, no gate)
+    c->wave_decoder_norm_w = T("codec.wave_decoder.norm.condition_proj.1.weight");
+    c->wave_decoder_norm_b = T("codec.wave_decoder.norm.condition_proj.1.bias");
 
     // Resolve ResNet stacks
     auto load_resnet = [&](std::vector<miotts_resnet_block>& blocks, const char* prefix, int n) {
@@ -784,6 +795,12 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
         cur = ggml_add(ctx0, residual, ffn_out);
     }
 
+    // Final LayerNorm (before output_proj)
+    if (c->wave_prenet_norm_w) {
+        cur = ggml_norm(ctx0, cur, 1e-5f);
+        cur = ggml_mul(ctx0, cur, c->wave_prenet_norm_w);
+        cur = ggml_add(ctx0, cur, c->wave_prenet_norm_b);
+    }
     // Output projection (768 → 512)
     cur = ggml_mul_mat(ctx0, c->wave_prenet_out_proj_w, cur);
     cur = ggml_add(ctx0, cur, c->wave_prenet_out_proj_b);
@@ -971,6 +988,20 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
         ggml_tensor* ffn_out = ggml_mul_mat(ctx0, b.ffn_w2, ggml_mul(ctx0, gate_ffn, up_ffn));
 
         cur = ggml_add(ctx0, residual, ggml_mul(ctx0, ffn_out, gate_f));
+    }
+
+    // Decoder final norm: AdaLN-Zero without gate
+    // SiLU(cond) → Linear → (shift, scale) — 2-way, no gate
+    if (c->wave_decoder_norm_w) {
+        ggml_tensor* cond = ggml_silu(ctx0, global_emb);
+        ggml_tensor* adaln_final = ggml_mul_mat(ctx0, c->wave_decoder_norm_w, cond);
+        adaln_final = ggml_add(ctx0, adaln_final, c->wave_decoder_norm_b);
+        // Split into shift, scale (each d=512) — output dim is 1024 = 2*512
+        const int d_dec = d;
+        ggml_tensor* shift_fn = ggml_view_1d(ctx0, adaln_final, d_dec, 0);
+        ggml_tensor* scale_fn = ggml_view_1d(ctx0, adaln_final, d_dec, (size_t)d_dec * sizeof(float));
+        ggml_tensor* x = ggml_norm(ctx0, cur, 1e-5f);
+        cur = ggml_add(ctx0, ggml_add(ctx0, x, ggml_mul(ctx0, x, scale_fn)), shift_fn);
     }
 
     ggml_set_name(cur, "wave_decoder_out");
