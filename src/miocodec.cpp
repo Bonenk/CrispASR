@@ -448,15 +448,22 @@ static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* 
     ggml_tensor* K = ggml_mul_mat(ctx0, L.wk, attn_in); // (dim, T)
     ggml_tensor* V = ggml_mul_mat(ctx0, L.wv, attn_in); // (dim, T)
 
-    // Reshape to (hd, T, n_heads) for attention
+    // Reshape to (hd, n_heads, T) for attention
+    if (!Q || !K || !V) { fprintf(stderr, "QKV null!\n"); return x; }
     Q = ggml_reshape_3d(ctx0, Q, hd, n_heads, T);
+    if (!Q) { fprintf(stderr, "reshape Q null!\n"); return x; }
     K = ggml_reshape_3d(ctx0, K, hd, n_heads, T);
     V = ggml_reshape_3d(ctx0, V, hd, n_heads, T);
 
     // RoPE (NEOX style = complex-pair interleave)
-    Q = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
+    // Position tensor: [0, 1, 2, ..., T-1]
+    ggml_tensor* pos = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
+    ggml_set_name(pos, "rope_pos");
+    ggml_set_input(pos);
+
+    Q = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3)), pos, nullptr, (int)hd,
                       GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
-    K = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
+    K = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3)), pos, nullptr, (int)hd,
                       GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
 
     // Attention: Q (hd, T, n_heads), K (hd, T, n_heads), V needs permute
@@ -753,6 +760,15 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
 
         ggml_tensor* input_t = ggml_graph_get_tensor(gf, "prenet_input");
         ggml_backend_tensor_set(input_t, fsq_emb.data(), 0, sizeof(float) * T * dim);
+
+        // Set RoPE positions [0, 1, 2, ..., T-1]
+        ggml_tensor* pos_t = ggml_graph_get_tensor(gf, "rope_pos");
+        if (pos_t) {
+            std::vector<int32_t> positions(T);
+            for (int i = 0; i < T; i++)
+                positions[i] = i;
+            ggml_backend_tensor_set(pos_t, positions.data(), 0, sizeof(int32_t) * T);
+        }
         fprintf(stderr, "  input set, computing...\n"); fflush(stderr);
 
         ggml_backend_sched_graph_compute(ctx->sched, gf);
