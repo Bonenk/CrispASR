@@ -18,6 +18,8 @@ if not _CRISPASR_DIR.exists():
     try:
         subprocess.check_call(["git", "clone", "--depth", "1",
             CRISPASR_URL, str(_CRISPASR_DIR)])
+        subprocess.check_call(["git", "submodule", "update", "--init", "--recursive"],
+                              cwd=str(_CRISPASR_DIR))
         sys.path.insert(0, str(_CRISPASR_DIR / "tools" / "kaggle"))
     except Exception:
         pass
@@ -43,6 +45,9 @@ cmake_flags = [
     "-DCMAKE_BUILD_TYPE=Release",
     "-DCMAKE_C_COMPILER_LAUNCHER=ccache",
     "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
+    "-DCRISPASR_BUILD_TESTS=OFF",
+    "-DCRISPASR_BUILD_EXAMPLES=OFF",
+    "-DCRISPASR_BUILD_SERVER=OFF",
 ]
 subprocess.check_call(["cmake", "-G", "Ninja", "-B", str(build_dir)] + cmake_flags)
 jobs = kh.safe_build_jobs(gpu=False)
