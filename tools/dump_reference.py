@@ -317,6 +317,11 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # MOSS-Transcribe-Diarize: Whisper-Medium encoder + VQAdaptor + Qwen3-0.6B.
     # Joint ASR + diarization + timestamps. model_dir = OpenMOSS-Team/MOSS-Transcribe-Diarize.
     "moss-diarize": "reference_backends.moss_diarize",
+    # HTDemucs (Meta Demucs v4): hybrid transformer source separation.
+    # 4-stem (drums, bass, other, vocals). model_dir = pretrained name
+    # ("htdemucs", "htdemucs_ft") or local checkpoint. Audio arg = mixed
+    # music WAV (any sample rate; resampled to 44100 Hz stereo internally).
+    "htdemucs":    "reference_backends.htdemucs",
 }
 
 DEFAULT_STAGES_BY_BACKEND: Dict[str, List[str]] = {}  # populated at import
