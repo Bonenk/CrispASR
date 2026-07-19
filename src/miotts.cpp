@@ -1150,7 +1150,18 @@ int miotts_load_tokenizer(miotts_context* ctx, const char* tokenizer_json_path) 
         if (json_str[pos] != '"')
             break;
         size_t key_start = pos + 1;
-        size_t key_end = json_str.find('"', key_start);
+        // Escape-aware string end finder
+        size_t key_end = std::string::npos;
+        for (size_t p = key_start; p < json_str.size(); p++) {
+            if (json_str[p] == '\\' && p + 1 < json_str.size()) {
+                p++;
+                continue;
+            }
+            if (json_str[p] == '"') {
+                key_end = p;
+                break;
+            }
+        }
         if (key_end == std::string::npos)
             break;
         std::string key = json_str.substr(key_start, key_end - key_start);
@@ -1235,23 +1246,80 @@ int miotts_load_tokenizer(miotts_context* ctx, const char* tokenizer_json_path) 
         size_t arr_start = json_str.find('[', merges_pos);
         if (arr_start != std::string::npos) {
             pos = arr_start + 1;
+            // Merges are stored as arrays: [["left","right"], ...]
+            // core_bpe expects merge_rank keyed by "left right" (space-joined)
             int merge_idx = 0;
             while (pos < json_str.size()) {
+                // Skip whitespace/comma
                 while (pos < json_str.size() &&
                        (json_str[pos] == ' ' || json_str[pos] == '\n' || json_str[pos] == '\r' ||
                         json_str[pos] == ',' || json_str[pos] == '\t'))
                     pos++;
                 if (pos >= json_str.size() || json_str[pos] == ']')
                     break;
-                if (json_str[pos] == '"') {
-                    size_t ms = pos + 1;
-                    size_t me = json_str.find('"', ms);
-                    if (me == std::string::npos)
+                if (json_str[pos] == '[') {
+                    // Parse ["left", "right"] — handle escaped quotes
+                    auto find_str_end = [&](size_t start) -> size_t {
+                        for (size_t p = start; p < json_str.size(); p++) {
+                            if (json_str[p] == '\\' && p + 1 < json_str.size()) {
+                                p++; // skip escaped char
+                                continue;
+                            }
+                            if (json_str[p] == '"')
+                                return p;
+                        }
+                        return std::string::npos;
+                    };
+                    auto unescape = [](const std::string& s) -> std::string {
+                        std::string r;
+                        for (size_t i = 0; i < s.size(); i++) {
+                            if (s[i] == '\\' && i + 1 < s.size()) {
+                                i++;
+                                if (s[i] == '"')
+                                    r += '"';
+                                else if (s[i] == '\\')
+                                    r += '\\';
+                                else if (s[i] == 'n')
+                                    r += '\n';
+                                else {
+                                    r += '\\';
+                                    r += s[i];
+                                }
+                            } else {
+                                r += s[i];
+                            }
+                        }
+                        return r;
+                    };
+                    pos++; // skip [
+                    while (pos < json_str.size() && json_str[pos] != '"')
+                        pos++;
+                    if (pos >= json_str.size())
                         break;
-                    ctx->vocab.merge_rank[json_str.substr(ms, me - ms)] = merge_idx++;
-                    pos = me + 1;
+                    size_t s1 = pos + 1;
+                    size_t e1 = find_str_end(s1);
+                    if (e1 == std::string::npos)
+                        break;
+                    std::string left = unescape(json_str.substr(s1, e1 - s1));
+                    pos = e1 + 1;
+                    while (pos < json_str.size() && json_str[pos] != '"')
+                        pos++;
+                    if (pos >= json_str.size())
+                        break;
+                    size_t s2 = pos + 1;
+                    size_t e2 = find_str_end(s2);
+                    if (e2 == std::string::npos)
+                        break;
+                    std::string right = unescape(json_str.substr(s2, e2 - s2));
+                    pos = e2 + 1;
+                    // Skip to ]
+                    while (pos < json_str.size() && json_str[pos] != ']')
+                        pos++;
+                    if (pos < json_str.size())
+                        pos++; // skip ]
+                    ctx->vocab.merge_rank[left + " " + right] = merge_idx++;
                 } else {
-                    break;
+                    pos++; // skip unexpected char
                 }
             }
         }
@@ -1309,6 +1377,22 @@ int miotts_load_tokenizer(miotts_context* ctx, const char* tokenizer_json_path) 
     }
 
     ctx->vocab.loaded = true;
+
+    // Verify special tokens loaded
+    auto check = [&](const char* name, int32_t expected) {
+        auto it = ctx->vocab.token_to_id.find(name);
+        if (it == ctx->vocab.token_to_id.end())
+            fprintf(stderr, "miotts: WARNING: special token '%s' not found in vocab\n", name);
+        else if (it->second != expected)
+            fprintf(stderr, "miotts: WARNING: '%s' has id %d, expected %d\n", name, it->second, expected);
+    };
+    check("<|im_start|>", 151644);
+    check("<|im_end|>", 151645);
+    check("<|endoftext|>", 151643);
+
+    fprintf(stderr, "miotts: tokenizer: %zu tokens, %zu merges, %zu token_to_id entries\n",
+            ctx->vocab.id_to_token.size(), ctx->vocab.merge_rank.size(), ctx->vocab.token_to_id.size());
+
     return 0;
 }
 
@@ -1679,7 +1763,8 @@ float* miotts_synthesize(miotts_context* ctx, const char* text, int* out_n) {
     int n_past = (int)input_ids.size() - 1;
     for (int step = 1; step < max_new; step++) {
         int32_t last_id = input_ids.back();
-        if (last_id == (int32_t)hp.eos_token_id)
+        // MioTTS uses two EOS tokens: <|im_end|> (151645) and <|endoftext|> (151643)
+        if (last_id == (int32_t)hp.eos_token_id || last_id == 151643)
             break;
         ggml_cgraph* gf = build_graph_llm(ctx, n_past, 1);
         ggml_backend_sched_reset(ctx->sched);
