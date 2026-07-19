@@ -1134,10 +1134,57 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         // Compute
         ggml_backend_sched_graph_compute(ctx->sched, gf2);
 
-        // Extract requested stage
-        ggml_tensor* out_t = ggml_graph_get_tensor(gf2, stage_name);
+        // For istft_mag_phase/output_waveform: extract upsampler output and compute CPU-side
+        // (avoids ggml graph buffer reuse corrupting the ISTFT matmul input)
+        if (strcmp(stage_name, "istft_mag_phase") == 0 || strcmp(stage_name, "output_waveform") == 0) {
+            // Get upsampler output (which is cos=1.0)
+            ggml_tensor* up_t = x_upsamp;
+            int up_n = (int)ggml_nelements(up_t);
+            std::vector<float> up_dat(up_n);
+            ggml_backend_tensor_get(up_t, up_dat.data(), 0, up_n * sizeof(float));
+            int T_is = up_n / 512;
+            int D_out = (int)ctx->weights.istft_out_w->ne[1]; // 394
+            int D_in = 512;
+            // Read weight & bias
+            std::vector<float> w_d(D_in * D_out), b_d(D_out);
+            if (ctx->weights.istft_out_w->type == GGML_TYPE_F16) {
+                std::vector<uint16_t> tmp(D_in * D_out);
+                ggml_backend_tensor_get(ctx->weights.istft_out_w, tmp.data(), 0, D_in * D_out * 2);
+                for (int i = 0; i < D_in * D_out; i++)
+                    w_d[i] = ggml_fp16_to_fp32(tmp[i]);
+            } else {
+                ggml_backend_tensor_get(ctx->weights.istft_out_w, w_d.data(), 0, D_in * D_out * 4);
+            }
+            ggml_backend_tensor_get(ctx->weights.istft_out_b, b_d.data(), 0, D_out * 4);
+            // Linear: result[d, t] = sum_k W[d,k] * up[t,k] + b[d]
+            // Store in (D_out, T) layout = (394, T) matching Python's transpose(0,1) output
+            float* result = (float*)malloc(sizeof(float) * D_out * T_is);
+            for (int d = 0; d < D_out; d++)
+                for (int t = 0; t < T_is; t++) {
+                    float sum = b_d[d];
+                    for (int k = 0; k < D_in; k++)
+                        sum += w_d[d * D_in + k] * up_dat[t * D_in + k];
+                    result[d * T_is + t] = sum;
+                }
+            ggml_free(ctx0);
+            *out_n = D_out * T_is;
+            return result;
+        }
+
+        // Extract other stages using direct tensor pointers
+        ggml_tensor* out_t = nullptr;
+        if (strcmp(stage_name, "wave_upsampler_out") == 0)
+            out_t = x_upsamp;
+        else if (strcmp(stage_name, "wave_decoder_out") == 0)
+            out_t = x_dec;
+        else if (strcmp(stage_name, "wave_post_net_out") == 0)
+            out_t = x_post;
+        else if (strcmp(stage_name, "wave_prior_net_out") == 0)
+            out_t = x_up; // prior_net = x_up after ResNet
+        else
+            out_t = ggml_graph_get_tensor(gf2, stage_name);
+
         if (!out_t) {
-            // Try without graph lookup — use direct names we set
             fprintf(stderr, "miocodec: stage '%s' not found in decode graph\n", stage_name);
             ggml_free(ctx0);
             *out_n = 0;
