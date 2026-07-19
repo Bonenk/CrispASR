@@ -1284,9 +1284,17 @@ CA_EXPORT void crispasr_parakeet_result_free(parakeet_result* r) {
 
 #ifdef CA_HAVE_NEMOTRON
 
+// Forward decl — the lazy dynamic-plugin loader is defined further down (next
+// to the session-open TLS state). Direct C-ABI inits that take their own
+// use_gpu flag must load GPU plugins too (multi-surface dispatch: the unified
+// session path is not the only GPU entry point). Defined once via call_once.
+static void ensure_dynamic_backends_loaded();
+
 CA_EXPORT nemotron_context* crispasr_nemotron_init(const char* model_path, int n_threads, int use_gpu) {
     if (!model_path)
         return nullptr;
+    if (use_gpu)
+        ensure_dynamic_backends_loaded();
     nemotron_context_params p = nemotron_context_default_params();
     p.n_threads = n_threads > 0 ? n_threads : 4;
     p.use_gpu = use_gpu != 0;
@@ -1318,6 +1326,9 @@ CA_EXPORT nemotron_result* crispasr_nemotron_transcribe(nemotron_context* ctx, c
 // the architecture is unknown.
 
 #include "ggml.h"
+// ggml_backend_load_all() lives here; include it explicitly rather than relying
+// on the transitive include via wav2vec2-ggml.h (which is behind __has_include).
+#include "ggml-backend.h"
 #include "gguf.h"
 
 CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name, int out_cap) {
