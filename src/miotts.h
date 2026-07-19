@@ -61,6 +61,10 @@ float* miotts_forward_logits(struct miotts_context* ctx, const int32_t* token_id
 // the content embedding. Caller must free with miotts_free_audio.
 float* miotts_fsq_dequant(struct miotts_context* ctx, const int32_t* indices, int n_indices, int* out_dim);
 
+// For the diff harness: run MioCodec wave_prenet on FSQ embeddings.
+// Input: fsq_emb is (T * 768) floats. Output: (T * 512) floats.
+float* miotts_wave_prenet_forward(struct miotts_context* ctx, const float* fsq_emb, int T, int* out_dim);
+
 #ifdef __cplusplus
 }
 #endif

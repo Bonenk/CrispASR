@@ -80,6 +80,38 @@ struct miotts_layer {
 
 // ── Context ─────────────────────────────────────────────────────────
 
+// ── Codec layer weight structures (before context for lambda visibility) ────
+
+struct miotts_codec_layer {
+    ggml_tensor* attn_norm_w = nullptr;
+    ggml_tensor* attn_norm_b = nullptr;
+    ggml_tensor* wq = nullptr;
+    ggml_tensor* wk = nullptr;
+    ggml_tensor* wv = nullptr;
+    ggml_tensor* wo = nullptr;
+    ggml_tensor* ffn_norm_w = nullptr;
+    ggml_tensor* ffn_norm_b = nullptr;
+    ggml_tensor* ffn_w1 = nullptr;
+    ggml_tensor* ffn_w2 = nullptr;
+    ggml_tensor* ffn_w3 = nullptr;
+    // AdaLN-Zero (wave_decoder only)
+    ggml_tensor* adaln_attn_w = nullptr;
+    ggml_tensor* adaln_attn_b = nullptr;
+    ggml_tensor* adaln_ffn_w = nullptr;
+    ggml_tensor* adaln_ffn_b = nullptr;
+};
+
+struct miotts_resnet_block {
+    ggml_tensor* norm1_w = nullptr;
+    ggml_tensor* norm1_b = nullptr;
+    ggml_tensor* conv1_w = nullptr;
+    ggml_tensor* conv1_b = nullptr;
+    ggml_tensor* norm2_w = nullptr;
+    ggml_tensor* norm2_b = nullptr;
+    ggml_tensor* conv2_w = nullptr;
+    ggml_tensor* conv2_b = nullptr;
+};
+
 struct miotts_context {
     miotts_context_params params;
     miotts_hparams hp;
@@ -102,6 +134,26 @@ struct miotts_context {
     // Codec weights (FSQ dequant projection)
     ggml_tensor* fsq_proj_out_w = nullptr; // (768, 5)
     ggml_tensor* fsq_proj_out_b = nullptr; // (768,)
+
+    // Codec: wave_prenet (6 layers, 768d → 512d)
+    std::vector<miotts_codec_layer> wave_prenet_layers;
+    ggml_tensor* wave_prenet_out_proj_w = nullptr;
+    ggml_tensor* wave_prenet_out_proj_b = nullptr;
+
+    // Codec: wave_decoder (8 layers, 512d, AdaLN-Zero conditioned on 128-d)
+    std::vector<miotts_codec_layer> wave_decoder_layers;
+
+    // Codec: conv_upsample (ConvTranspose1d, 512→512, k=2, s=2)
+    ggml_tensor* conv_upsample_w = nullptr;
+    ggml_tensor* conv_upsample_b = nullptr;
+
+    // Codec: ResNet stacks (prior_net + post_net, 2 blocks each)
+    std::vector<miotts_resnet_block> wave_prior_net;
+    std::vector<miotts_resnet_block> wave_post_net;
+
+    // Codec: iSTFT head (Linear 512→1922)
+    ggml_tensor* istft_out_w = nullptr;
+    ggml_tensor* istft_out_b = nullptr;
 
     // Global embedding for voice cloning (128-d, set by miotts_set_reference)
     std::vector<float> global_embedding;
@@ -292,6 +344,82 @@ miotts_context* miotts_init_from_file(const char* path_model, miotts_context_par
     c->fsq_proj_out_w = T("codec.local_quantizer.proj_out.weight");
     c->fsq_proj_out_b = T("codec.local_quantizer.proj_out.bias");
 
+    // Resolve codec wave_prenet weights (6 layers)
+    c->wave_prenet_layers.resize(hp.codec_wave_prenet_layers);
+    for (uint32_t il = 0; il < hp.codec_wave_prenet_layers; il++) {
+        auto& b = c->wave_prenet_layers[il];
+        char buf[128];
+        auto cn = [&](const char* suffix) {
+            snprintf(buf, sizeof(buf), "codec.wave_prenet.layers.%u.%s", il, suffix);
+            return T(buf);
+        };
+        b.attn_norm_w = cn("attention_norm.weight");
+        b.attn_norm_b = cn("attention_norm.bias");
+        b.wq = cn("attention.wq.weight");
+        b.wk = cn("attention.wk.weight");
+        b.wv = cn("attention.wv.weight");
+        b.wo = cn("attention.wo.weight");
+        b.ffn_norm_w = cn("ffn_norm.weight");
+        b.ffn_norm_b = cn("ffn_norm.bias");
+        b.ffn_w1 = cn("feed_forward.w1.weight");
+        b.ffn_w2 = cn("feed_forward.w2.weight");
+        b.ffn_w3 = cn("feed_forward.w3.weight");
+    }
+    c->wave_prenet_out_proj_w = T("codec.wave_prenet.output_proj.weight");
+    c->wave_prenet_out_proj_b = T("codec.wave_prenet.output_proj.bias");
+
+    // Resolve codec wave_decoder weights (8 layers, with AdaLN-Zero)
+    c->wave_decoder_layers.resize(hp.codec_wave_decoder_layers);
+    for (uint32_t il = 0; il < hp.codec_wave_decoder_layers; il++) {
+        auto& b = c->wave_decoder_layers[il];
+        char buf[128];
+        auto cn = [&](const char* suffix) {
+            snprintf(buf, sizeof(buf), "codec.wave_decoder.layers.%u.%s", il, suffix);
+            return T(buf);
+        };
+        b.wq = cn("attention.wq.weight");
+        b.wk = cn("attention.wk.weight");
+        b.wv = cn("attention.wv.weight");
+        b.wo = cn("attention.wo.weight");
+        b.ffn_w1 = cn("feed_forward.w1.weight");
+        b.ffn_w2 = cn("feed_forward.w2.weight");
+        b.ffn_w3 = cn("feed_forward.w3.weight");
+        // AdaLN-Zero conditioning (produces shift, scale, gate from 128-d embedding)
+        b.adaln_attn_w = cn("attention_norm.condition_proj.1.weight");
+        b.adaln_attn_b = cn("attention_norm.condition_proj.1.bias");
+        b.adaln_ffn_w = cn("ffn_norm.condition_proj.1.weight");
+        b.adaln_ffn_b = cn("ffn_norm.condition_proj.1.bias");
+    }
+
+    // Resolve ResNet stacks
+    auto load_resnet = [&](std::vector<miotts_resnet_block>& blocks, const char* prefix, int n) {
+        blocks.resize(n);
+        for (int i = 0; i < n; i++) {
+            auto& b = blocks[i];
+            char buf[128];
+            auto rn = [&](const char* suffix) {
+                snprintf(buf, sizeof(buf), "codec.%s.blocks.%d.%s", prefix, i, suffix);
+                return T(buf);
+            };
+            b.norm1_w = rn("norm1.weight");
+            b.norm1_b = rn("norm1.bias");
+            b.conv1_w = rn("conv1.weight");
+            b.conv1_b = rn("conv1.bias");
+            b.norm2_w = rn("norm2.weight");
+            b.norm2_b = rn("norm2.bias");
+            b.conv2_w = rn("conv2.weight");
+            b.conv2_b = rn("conv2.bias");
+        }
+    };
+    load_resnet(c->wave_prior_net, "wave_prior_net", 2);
+    load_resnet(c->wave_post_net, "wave_post_net", 2);
+
+    // Resolve conv_upsample + iSTFT head
+    c->conv_upsample_w = T("codec.wave_conv_upsample.weight");
+    c->conv_upsample_b = T("codec.wave_conv_upsample.bias");
+    c->istft_out_w = T("codec.istft_head.out.weight");
+    c->istft_out_b = T("codec.istft_head.out.bias");
+
     // Allocate KV cache
     {
         const int max_ctx = 4096; // sufficient for TTS (30s @ 25Hz = 750 codec tokens + prompt)
@@ -337,8 +465,10 @@ miotts_context* miotts_init_from_file(const char* path_model, miotts_context_par
     gguf_free(meta);
 
     if (params.verbosity >= 1) {
-        fprintf(stderr, "miotts: loaded OK (%zu LLM layers, FSQ proj %s)\n", c->layers.size(),
-                c->fsq_proj_out_w ? "yes" : "NO");
+        fprintf(stderr, "miotts: loaded OK (%zu LLM layers, FSQ proj %s, prenet[0].wq %s, prenet_out_proj %s)\n",
+                c->layers.size(), c->fsq_proj_out_w ? "yes" : "NO",
+                c->wave_prenet_layers.empty() ? "EMPTY" : (c->wave_prenet_layers[0].wq ? "yes" : "NO"),
+                c->wave_prenet_out_proj_w ? "yes" : "NO");
     }
 
     return c.release();
@@ -433,6 +563,122 @@ static ggml_cgraph* build_graph_llm(miotts_context* c, int n_past, int n_tokens)
     ggml_set_name(logits, "logits");
     ggml_set_output(logits);
     ggml_build_forward_expand(gf, logits);
+
+    return gf;
+}
+
+// ── Codec: wave_prenet graph build ──────────────────────────────────
+// Bidirectional windowed-attention transformer (6 layers, 768d→512d).
+// No KV cache (full attention computed each call). Window=125 (62 each side).
+// LayerNorm + SwiGLU FFN + RoPE (theta=10000).
+
+static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
+    const int d_in = 768;          // input dim (FSQ embedding)
+    const int d_out = 512;         // output dim (after output_proj)
+    const int n_heads = 12;        // prenet heads
+    const int hd = d_in / n_heads; // 64
+    const int window = 125;        // window_size (62 on each side)
+    const float eps = 1e-5f;
+    const int T = T_in;
+
+    ggml_init_params ip = {c->compute_meta.size(), c->compute_meta.data(), true};
+    ggml_context* ctx0 = ggml_init(ip);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 16384, false);
+
+    // Input: FSQ embeddings (d_in, T)
+    ggml_tensor* input = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, d_in, T);
+    ggml_set_name(input, "prenet_input");
+    ggml_set_input(input);
+
+    // Window mask: bidirectional, window//2 on each side
+    // Shape (T, T) F16 — 0 for allowed, -inf for masked
+    ggml_tensor* win_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T);
+    ggml_set_name(win_mask, "win_mask");
+    ggml_set_input(win_mask);
+
+    // Positions for RoPE
+    ggml_tensor* positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
+    ggml_set_name(positions, "positions");
+    ggml_set_input(positions);
+
+    ggml_tensor* cur = input;
+
+    if (!c->wave_prenet_layers.empty()) {
+        fprintf(stderr, "miotts: prenet layer0: wq=%p norm_w=%p ffn_w1=%p out_proj=%p\n",
+                (void*)c->wave_prenet_layers[0].wq, (void*)c->wave_prenet_layers[0].attn_norm_w,
+                (void*)c->wave_prenet_layers[0].ffn_w1, (void*)c->wave_prenet_out_proj_w);
+    }
+
+    for (size_t il = 0; il < c->wave_prenet_layers.size(); il++) {
+        const auto& b = c->wave_prenet_layers[il];
+        ggml_tensor* residual = cur;
+
+        // Pre-attention LayerNorm (affine)
+        ggml_tensor* x = ggml_norm(ctx0, cur, eps);
+        x = ggml_mul(ctx0, x, b.attn_norm_w);
+        x = ggml_add(ctx0, x, b.attn_norm_b);
+
+        // Q/K/V projections
+        ggml_tensor* Q = ggml_mul_mat(ctx0, b.wq, x); // (d_in, T)
+        ggml_tensor* K = ggml_mul_mat(ctx0, b.wk, x);
+        ggml_tensor* V = ggml_mul_mat(ctx0, b.wv, x);
+
+        // Reshape to (hd, n_heads, T)
+        Q = ggml_reshape_3d(ctx0, Q, hd, n_heads, T);
+        K = ggml_reshape_3d(ctx0, K, hd, n_heads, T);
+        V = ggml_reshape_3d(ctx0, V, hd, n_heads, T);
+
+        // RoPE (NEOX = half-split interleaved, theta=10000)
+        // MioCodec's apply_rotary_emb uses view_as_complex which pairs adjacent
+        // elements. ggml GGML_ROPE_TYPE_NEOX interleaves the same way when
+        // n_dims == head_dim (full rotation). The key: ggml's NEOX mode with
+        // n_dims=hd rotates ALL elements using the [-x2,x1] pattern which IS
+        // equivalent to the complex multiplication on adjacent pairs.
+        // TODO: verify with a standalone RoPE unit test.
+        Q = ggml_rope_ext(ctx0, Q, positions, nullptr, hd, GGML_ROPE_TYPE_NEOX, /*n_ctx*/ 512, /*theta*/ 10000.0f, 1.0f,
+                          0.0f, 1.0f, 32.0f, 1.0f);
+        K = ggml_rope_ext(ctx0, K, positions, nullptr, hd, GGML_ROPE_TYPE_NEOX, 512, 10000.0f, 1.0f, 0.0f, 1.0f, 32.0f,
+                          1.0f);
+
+        // Permute to flash-attn layout (hd, T, n_heads)
+        Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
+        K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
+        V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
+
+        // Flash attention with window mask
+        float scale = 1.0f / std::sqrt((float)hd);
+        ggml_tensor* attn = ggml_flash_attn_ext(ctx0, Q, K, V, win_mask, scale, 0.0f, 0.0f);
+
+        // Reshape back to (d_in, T)
+        attn = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3)), d_in, T);
+
+        // Output projection
+        attn = ggml_mul_mat(ctx0, b.wo, attn);
+
+        // Residual
+        cur = ggml_add(ctx0, residual, attn);
+
+        // FFN: LayerNorm + SwiGLU
+        residual = cur;
+        x = ggml_norm(ctx0, cur, eps);
+        x = ggml_mul(ctx0, x, b.ffn_norm_w);
+        x = ggml_add(ctx0, x, b.ffn_norm_b);
+
+        // SwiGLU: gate = silu(x @ w1.T), up = x @ w3.T, out = (gate * up) @ w2.T
+        ggml_tensor* gate = ggml_silu(ctx0, ggml_mul_mat(ctx0, b.ffn_w1, x));
+        ggml_tensor* up = ggml_mul_mat(ctx0, b.ffn_w3, x);
+        ggml_tensor* ffn_out = ggml_mul_mat(ctx0, b.ffn_w2, ggml_mul(ctx0, gate, up));
+
+        cur = ggml_add(ctx0, residual, ffn_out);
+    }
+
+    // Output projection (768 → 512)
+    cur = ggml_mul_mat(ctx0, c->wave_prenet_out_proj_w, cur);
+    cur = ggml_add(ctx0, cur, c->wave_prenet_out_proj_b);
+
+    ggml_set_name(cur, "wave_prenet_out");
+    ggml_set_output(cur);
+    ggml_build_forward_expand(gf, cur);
 
     return gf;
 }
@@ -613,6 +859,64 @@ int miotts_set_reference(miotts_context* ctx, const float* audio_24k, int n_samp
     fprintf(stderr, "miotts: warning: reference audio encoding not yet implemented, using default voice\n");
     return 0;
 }
+
+// ── Wave prenet forward (diff harness) ──────────────────────────────
+
+float* miotts_wave_prenet_forward(miotts_context* ctx, const float* fsq_emb, int T, int* out_dim) {
+    if (!ctx || !fsq_emb || T <= 0)
+        return nullptr;
+
+    const int d_in = 768;
+    const int d_out = 512;
+
+    ggml_cgraph* gf = build_graph_wave_prenet(ctx, T);
+
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        fprintf(stderr, "miotts: wave_prenet sched alloc failed\n");
+        return nullptr;
+    }
+
+    // Set input: FSQ embeddings (d_in=768, T) — ggml layout is column-major
+    ggml_tensor* input_t = ggml_graph_get_tensor(gf, "prenet_input");
+    ggml_backend_tensor_set(input_t, fsq_emb, 0, (size_t)T * d_in * sizeof(float));
+
+    // Set positions [0, 1, 2, ..., T-1]
+    ggml_tensor* pos_t = ggml_graph_get_tensor(gf, "positions");
+    std::vector<int32_t> pos(T);
+    for (int i = 0; i < T; i++)
+        pos[i] = i;
+    ggml_backend_tensor_set(pos_t, pos.data(), 0, T * sizeof(int32_t));
+
+    // Build window mask: bidirectional, window=125 (62 on each side)
+    ggml_tensor* mask_t = ggml_graph_get_tensor(gf, "win_mask");
+    const int w = 62; // window_size // 2
+    std::vector<ggml_fp16_t> mask(T * T);
+    for (int q = 0; q < T; q++) {
+        for (int k = 0; k < T; k++) {
+            bool in_window = (k >= q - w) && (k <= q + w);
+            mask[q * T + k] = in_window ? ggml_fp32_to_fp16(0.0f) : ggml_fp32_to_fp16(-INFINITY);
+        }
+    }
+    ggml_backend_tensor_set(mask_t, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
+
+    ggml_backend_sched_graph_compute(ctx->sched, gf);
+
+    // Read output
+    ggml_tensor* out_t = ggml_graph_get_tensor(gf, "wave_prenet_out");
+    const size_t n_out = (size_t)T * d_out;
+    float* result = (float*)malloc(n_out * sizeof(float));
+    ggml_backend_tensor_get(out_t, result, 0, n_out * sizeof(float));
+
+    fprintf(stderr, "miotts: C++ prenet_out[0..7] = %.4f %.4f %.4f %.4f %.4f %.4f %.4f %.4f\n", result[0], result[1],
+            result[2], result[3], result[4], result[5], result[6], result[7]);
+
+    if (out_dim)
+        *out_dim = d_out;
+    return result;
+}
+
+// ── Synthesize ──────────────────────────────────────────────────────
 
 float* miotts_synthesize(miotts_context* ctx, const char* text, int* out_n) {
     if (!ctx || !text || !out_n)

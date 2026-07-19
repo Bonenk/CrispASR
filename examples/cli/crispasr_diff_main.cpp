@@ -7113,9 +7113,8 @@ int main(int argc, char** argv) {
                 // Compare token_embed if available in the reference
                 auto embed_ref = ref.get_f32("token_embed");
                 if (embed_ref.first && embed_ref.second > 0) {
-                    printf("miotts: ref token_embed[0..3] = %.6f %.6f %.6f %.6f (n=%zu)\n",
-                           embed_ref.first[0], embed_ref.first[1], embed_ref.first[2], embed_ref.first[3],
-                           embed_ref.second);
+                    printf("miotts: ref token_embed[0..3] = %.6f %.6f %.6f %.6f (n=%zu)\n", embed_ref.first[0],
+                           embed_ref.first[1], embed_ref.first[2], embed_ref.first[3], embed_ref.second);
                 }
 
                 int vocab = 0;
@@ -7167,6 +7166,28 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Stage 3: wave_prenet_out — MioCodec wave prenet transformer
+        {
+            auto emb_pair = ref.get_f32("fsq_embedding");
+            if (emb_pair.first && emb_pair.second > 0) {
+                const int T_codec = (int)(emb_pair.second / 768);
+                int dim = 0;
+                float* prenet_out = miotts_wave_prenet_forward(ctx, emb_pair.first, T_codec, &dim);
+                if (prenet_out && dim > 0) {
+                    auto rep = ref.compare("wave_prenet_out", prenet_out, (size_t)T_codec * dim);
+                    print_row("wave_prenet_out", rep, COS_THRESHOLD);
+                    record(rep);
+                    miotts_free_audio(prenet_out);
+                } else {
+                    printf("[ERR ] wave_prenet_out         forward returned null\n");
+                    n_fail++;
+                }
+            } else {
+                printf("[SKIP] wave_prenet_out         (no fsq_embedding in reference)\n");
+                n_skip++;
+            }
+        }
+
         miotts_free(ctx);
 
         // ---- miocodec — MioCodec v2 decode pipeline ----
@@ -7204,9 +7225,8 @@ int main(int argc, char** argv) {
         printf("miocodec: %d tokens, global_emb dim=%zu\n", n_tokens, emb_pair.second);
 
         // Compare each stage that exists in the reference
-        const char* stages[] = {"fsq_decoded",      "wave_prenet_out",  "wave_prior_net_out",
-                                "wave_decoder_out", "wave_post_net_out", "wave_upsampler_out",
-                                "istft_mag_phase",  "output_waveform"};
+        const char* stages[] = {"fsq_decoded",       "wave_prenet_out",    "wave_prior_net_out", "wave_decoder_out",
+                                "wave_post_net_out", "wave_upsampler_out", "istft_mag_phase",    "output_waveform"};
         for (const char* stage : stages) {
             auto ref_pair = ref.get_f32(stage);
             if (!ref_pair.first || ref_pair.second == 0) {
