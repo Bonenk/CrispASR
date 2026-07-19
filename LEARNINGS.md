@@ -13337,3 +13337,27 @@ splitters now lives in one pure, unit-testable helper,
 (`src/crispasr_diarize.cpp` / `_internal.h`), instead of being duplicated per
 splitter. `min_run_cs <= 0` disables the fold (split on every speaker change);
 50 cs is the pyannote default that suppresses one-word track-index flips.
+
+## A normalization stage amplifies upstream float error — input-align it before trusting its cos (§248 MBR)
+
+Mel-Band RoFormer's `band_split` starts with RMSNorm
+(`F.normalize(x,-1)*sqrt(dim)*gamma`). Diffing `band_split_out` off OUR STFT
+scored cos=0.976 and looked like a port bug — but the band_split MATH was
+already proven exact (an identical numpy recompute from the fixture's own
+`band_gathered` matched to cos=1.0). Cause: RMSNorm divides by each band's L2
+norm, so on near-silent bands it amplifies the ~5e-4 float-level difference
+between our radix-2 FFT and torch's STFT into a large relative error. Measured:
+a *uniform* ±5e-4 perturbation on `band_gathered` alone tanks band_split to
+cos 0.73 (our real, correlated error did better at 0.976).
+
+Lesson (a sharper form of "gate input alignment before trusting per-layer cos"):
+when a stage BEGINS with a normalization (RMS/Layer/L2), a cos taken off your
+own upstream output conflates two things — your stage's correctness and the
+upstream's float rounding, magnified. Diff that stage fed the REFERENCE's input
+tensor, so it tests only its own math; validate the upstream separately by its
+own pre-norm stage (here stft_packed, cos=1.0). After input-aligning,
+band_split_out was cos=1.000000 (max_abs 1.5e-3 = f16 weight rounding). The
+same input-alignment applies to every later MBR stage (each RoFormer block also
+opens with RMSNorm). General rule for the harness: prefer feeding each stage the
+reference input over chaining your own outputs, whenever the stage's first op is
+scale-sensitive.
