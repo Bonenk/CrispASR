@@ -154,7 +154,22 @@ struct miotts_context {
     std::vector<miotts_resnet_block> wave_prior_net;
     std::vector<miotts_resnet_block> wave_post_net;
 
-    // Codec: iSTFT head (Linear 512→1922)
+    // Codec: UpSampler (v2 44.1kHz — ConvTranspose1d + SnakeBeta + ResNet, 2 stages)
+    struct UpsampleStage {
+        ggml_tensor* conv_w = nullptr; // fused weight_norm weight
+        ggml_tensor* conv_b = nullptr;
+        ggml_tensor* snake_alpha = nullptr;
+        ggml_tensor* snake_beta = nullptr;
+    };
+    std::vector<UpsampleStage> upsampler_stages;
+    std::vector<miotts_resnet_block> upsampler_resnets;
+    ggml_tensor* upsampler_out_proj_w = nullptr;
+    ggml_tensor* upsampler_out_proj_b = nullptr;
+    ggml_tensor* upsampler_out_snake_alpha = nullptr;
+    ggml_tensor* upsampler_out_snake_beta = nullptr;
+    bool has_upsampler = false;
+
+    // Codec: iSTFT head
     ggml_tensor* istft_out_w = nullptr;
     ggml_tensor* istft_out_b = nullptr;
 
@@ -430,6 +445,50 @@ miotts_context* miotts_init_from_file(const char* path_model, miotts_context_par
     c->conv_upsample_b = T("codec.wave_conv_upsample.bias");
     c->istft_out_w = T("codec.istft_head.out.weight");
     c->istft_out_b = T("codec.istft_head.out.bias");
+
+    // UpSampler (v2 44.1kHz codec — optional, not present in 24kHz codec)
+    {
+        ggml_tensor* us0_w = T("codec.wave_upsampler.upsample_layers.0.weight");
+        if (us0_w) {
+            c->has_upsampler = true;
+            c->upsampler_stages.resize(2);
+            for (int i = 0; i < 2; i++) {
+                auto& s = c->upsampler_stages[i];
+                char buf[128];
+                snprintf(buf, sizeof(buf), "codec.wave_upsampler.upsample_layers.%d.weight", i);
+                s.conv_w = T(buf);
+                snprintf(buf, sizeof(buf), "codec.wave_upsampler.upsample_layers.%d.bias", i);
+                s.conv_b = T(buf);
+                snprintf(buf, sizeof(buf), "codec.wave_upsampler.snake_activations.%d.alpha", i);
+                s.snake_alpha = T(buf);
+                snprintf(buf, sizeof(buf), "codec.wave_upsampler.snake_activations.%d.beta", i);
+                s.snake_beta = T(buf);
+            }
+            c->upsampler_resnets.resize(2);
+            for (int i = 0; i < 2; i++) {
+                auto& b = c->upsampler_resnets[i];
+                char buf[128];
+                auto rn = [&](const char* suffix) {
+                    snprintf(buf, sizeof(buf), "codec.wave_upsampler.resnet_blocks.%d.%s", i, suffix);
+                    return T(buf);
+                };
+                b.norm1_w = rn("norm1.weight");
+                b.norm1_b = rn("norm1.bias");
+                b.conv1_w = rn("conv1.weight");
+                b.conv1_b = rn("conv1.bias");
+                b.norm2_w = rn("norm2.weight");
+                b.norm2_b = rn("norm2.bias");
+                b.conv2_w = rn("conv2.weight");
+                b.conv2_b = rn("conv2.bias");
+            }
+            c->upsampler_out_proj_w = T("codec.wave_upsampler.out_proj.weight");
+            c->upsampler_out_proj_b = T("codec.wave_upsampler.out_proj.bias");
+            c->upsampler_out_snake_alpha = T("codec.wave_upsampler.out_snake.alpha");
+            c->upsampler_out_snake_beta = T("codec.wave_upsampler.out_snake.beta");
+            if (params.verbosity >= 1)
+                fprintf(stderr, "miotts: UpSampler loaded (44.1kHz v2 codec)\n");
+        }
+    }
 
     // Allocate KV cache
     {
@@ -796,41 +855,38 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
     // GroupNorm: normalise each group of 16 channels over ALL time steps.
     // Reshape (C=512, T) → (cpg*T, n_groups) = (16*T, 32), ggml_norm over ne[0],
     // then reshape back. This matches PyTorch GroupNorm(32, 512) on (1, 512, T).
-    auto group_norm_op = [&](ggml_tensor* x, ggml_tensor* w, ggml_tensor* b) -> ggml_tensor* {
+    auto group_norm_op = [&](ggml_tensor* x, ggml_tensor* w, ggml_tensor* b, int ng = 32) -> ggml_tensor* {
+        const int64_t C = x->ne[0];
         const int64_t T_cur = x->ne[1];
-        // (C, T) → (cpg, n_groups, T) → permute to (cpg, T, n_groups) → reshape (cpg*T, n_groups)
-        x = ggml_reshape_3d(ctx0, x, cpg, n_groups, T_cur);           // (16, 32, T)
-        x = ggml_cont(ctx0, ggml_permute(ctx0, x, 0, 2, 1, 3));       // (16, T, 32)
-        x = ggml_reshape_2d(ctx0, x, (int64_t)cpg * T_cur, n_groups); // (16*T, 32)
-        x = ggml_norm(ctx0, x, 1e-6f);                                // norm over ne[0]=16*T per group
-        x = ggml_reshape_3d(ctx0, x, cpg, T_cur, n_groups);           // (16, T, 32)
-        x = ggml_cont(ctx0, ggml_permute(ctx0, x, 0, 2, 1, 3));       // (16, 32, T)
-        // Affine: weight/bias (512,) → (16, 32, 1) for broadcasting over T
-        x = ggml_mul(ctx0, x, ggml_reshape_3d(ctx0, w, cpg, n_groups, 1));
-        x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, b, cpg, n_groups, 1));
-        return ggml_reshape_2d(ctx0, x, d, T_cur);
+        const int ch_pg = (int)(C / ng);
+        x = ggml_reshape_3d(ctx0, x, ch_pg, ng, T_cur);
+        x = ggml_cont(ctx0, ggml_permute(ctx0, x, 0, 2, 1, 3));
+        x = ggml_reshape_2d(ctx0, x, (int64_t)ch_pg * T_cur, ng);
+        x = ggml_norm(ctx0, x, 1e-6f);
+        x = ggml_reshape_3d(ctx0, x, ch_pg, T_cur, ng);
+        x = ggml_cont(ctx0, ggml_permute(ctx0, x, 0, 2, 1, 3));
+        x = ggml_mul(ctx0, x, ggml_reshape_3d(ctx0, w, ch_pg, ng, 1));
+        x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, b, ch_pg, ng, 1));
+        return ggml_reshape_2d(ctx0, x, C, T_cur);
     };
 
     // ── ResNet block ────────────────────────────────────────────────
-    auto resnet_block = [&](ggml_tensor* x, const miotts_resnet_block& blk) -> ggml_tensor* {
-        ggml_tensor* res = x; // (d=512, T)
-        // GroupNorm1 + SiLU
-        x = group_norm_op(x, blk.norm1_w, blk.norm1_b);
+    auto resnet_block = [&](ggml_tensor* x, const miotts_resnet_block& blk, int ng = 32) -> ggml_tensor* {
+        const int64_t ch = x->ne[0]; // channel dim
+        ggml_tensor* res = x;
+        x = group_norm_op(x, blk.norm1_w, blk.norm1_b, ng);
         x = ggml_silu(ctx0, x);
-        // Conv1d: transpose (d,T) → (T,d), conv, back
         x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
         x = ggml_conv_1d(ctx0, blk.conv1_w, x, 1, 1, 1);
-        x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, blk.conv1_b, 1, d, 1));
-        x = ggml_reshape_2d(ctx0, x, (int64_t)x->ne[0], d);
+        x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, blk.conv1_b, 1, ch, 1));
+        x = ggml_reshape_2d(ctx0, x, (int64_t)x->ne[0], ch);
         x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
-        // GroupNorm2 + SiLU
-        x = group_norm_op(x, blk.norm2_w, blk.norm2_b);
+        x = group_norm_op(x, blk.norm2_w, blk.norm2_b, ng);
         x = ggml_silu(ctx0, x);
-        // Conv1d
         x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
         x = ggml_conv_1d(ctx0, blk.conv2_w, x, 1, 1, 1);
-        x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, blk.conv2_b, 1, d, 1));
-        x = ggml_reshape_2d(ctx0, x, (int64_t)x->ne[0], d);
+        x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, blk.conv2_b, 1, ch, 1));
+        x = ggml_reshape_2d(ctx0, x, (int64_t)x->ne[0], ch);
         x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
         return ggml_add(ctx0, x, res);
     };
@@ -927,8 +983,83 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
     ggml_set_name(cur, "wave_post_net_out");
     ggml_set_output(cur);
 
-    // ── iSTFT head (Linear 512→1922) ────────────────────────────────
-    // The actual iSTFT is done on CPU after reading the linear output.
+    // ── UpSampler (v2 44.1kHz codec: 9× temporal upsampling) ─────────
+    // Two stages of ConvTranspose1d(s=3) + SnakeBeta + ResNet → total 3×3=9× upsample.
+    // Then out_proj(128→512) + out_snake, making output (512, T*9).
+    if (c->has_upsampler) {
+        // SnakeBeta: x + (1/exp(β)) * sin²(exp(α) * x) — per-channel, α/β in log scale
+        // cur is (d, T) channel-first. ConvTranspose needs (T, d) input.
+        for (size_t si = 0; si < c->upsampler_stages.size(); si++) {
+            const auto& stage = c->upsampler_stages[si];
+            // ConvTranspose1d(stride=3, k=9, pad=(9-3)/2=3)
+            cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur)); // (T, d)
+            // ConvTranspose1d(s=3, k=9, p=3): ggml needs p=0, then trim 3 from each end
+            cur = ggml_conv_transpose_1d(ctx0, stage.conv_w, cur, /*s=*/3, /*p=*/0, /*d=*/1);
+            cur = ggml_add(ctx0, cur, ggml_reshape_3d(ctx0, stage.conv_b, 1, (int64_t)stage.conv_b->ne[0], 1));
+            // Output is 3D (T_raw, d_up, 1). Reshape to 2D, trim padding, transpose.
+            const int64_t d_up = (int64_t)stage.conv_b->ne[0];
+            cur = ggml_reshape_2d(ctx0, cur, cur->ne[0], d_up); // (T_raw, d_up)
+            const int64_t T_raw = cur->ne[0];
+            const int64_t T_up = T_raw - 6; // trim 3 from each end
+            // View: skip first 3 elements along T dim
+            cur = ggml_view_2d(ctx0, cur, T_up, d_up, cur->nb[1], 3 * cur->nb[0]);
+            cur = ggml_cont(ctx0, cur);
+            cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur)); // (d_up, T_up)
+
+            // SnakeBeta: x + (1/exp(β)) * sin²(exp(α) * x)
+            // α,β are (d_up,) in log scale; broadcast over T
+            {
+                ggml_tensor* alpha = ggml_exp(ctx0, stage.snake_alpha);
+                ggml_tensor* neg_beta = ggml_scale(ctx0, stage.snake_beta, -1.0f);
+                ggml_tensor* beta_inv = ggml_exp(ctx0, neg_beta);
+                ggml_tensor* ax = ggml_mul(ctx0, cur, alpha); // (d_up, T_up)
+                ggml_tensor* sinax = ggml_sin(ctx0, ax);
+                ggml_tensor* sin2 = ggml_mul(ctx0, sinax, sinax); // sin²(α*x)
+                cur = ggml_add(ctx0, cur, ggml_mul(ctx0, sin2, beta_inv));
+            }
+
+            // ResNet block at this channel width
+            if (si < c->upsampler_resnets.size()) {
+                const auto& blk = c->upsampler_resnets[si];
+                ggml_tensor* res = cur;
+                // GroupNorm + SiLU + Conv1d + GroupNorm + SiLU + Conv1d + residual
+                const int ng = std::min(32, (int)d_up); // adjust groups for smaller channel count
+                cur = group_norm_op(cur, blk.norm1_w, blk.norm1_b);
+                cur = ggml_silu(ctx0, cur);
+                cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur));
+                cur = ggml_conv_1d(ctx0, blk.conv1_w, cur, 1, 1, 1);
+                cur = ggml_add(ctx0, cur, ggml_reshape_3d(ctx0, blk.conv1_b, 1, d_up, 1));
+                cur = ggml_reshape_2d(ctx0, cur, (int64_t)cur->ne[0], d_up);
+                cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur));
+                cur = group_norm_op(cur, blk.norm2_w, blk.norm2_b);
+                cur = ggml_silu(ctx0, cur);
+                cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur));
+                cur = ggml_conv_1d(ctx0, blk.conv2_w, cur, 1, 1, 1);
+                cur = ggml_add(ctx0, cur, ggml_reshape_3d(ctx0, blk.conv2_b, 1, d_up, 1));
+                cur = ggml_reshape_2d(ctx0, cur, (int64_t)cur->ne[0], d_up);
+                cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur));
+                cur = ggml_add(ctx0, cur, res);
+            }
+        }
+
+        // out_proj: Linear(128→512) — cur is (128, T) channel-first
+        cur = ggml_mul_mat(ctx0, c->upsampler_out_proj_w, cur); // → (512, T)
+        cur = ggml_add(ctx0, cur, c->upsampler_out_proj_b);
+
+        // out_snake: SnakeBeta(512)
+        {
+            ggml_tensor* alpha = ggml_exp(ctx0, c->upsampler_out_snake_alpha);
+            ggml_tensor* neg_beta_out = ggml_scale(ctx0, c->upsampler_out_snake_beta, -1.0f);
+            ggml_tensor* beta_inv = ggml_exp(ctx0, neg_beta_out);
+            ggml_tensor* ax = ggml_mul(ctx0, cur, alpha);
+            ggml_tensor* sinax = ggml_sin(ctx0, ax);
+            ggml_tensor* sin2 = ggml_mul(ctx0, sinax, sinax);
+            cur = ggml_add(ctx0, cur, ggml_mul(ctx0, sin2, beta_inv));
+        }
+    }
+
+    // ── iSTFT head ──────────────────────────────────────────────────
+    // Linear d→(n_fft+2): 512→394 for 44.1kHz or 512→1922 for 24kHz
     cur = ggml_mul_mat(ctx0, c->istft_out_w, cur);
     cur = ggml_add(ctx0, cur, c->istft_out_b);
 
@@ -1405,10 +1536,45 @@ int miotts_set_reference(miotts_context* ctx, const float* audio_24k, int n_samp
         std::fill(ctx->global_embedding.begin(), ctx->global_embedding.end(), 0.0f);
         return 0;
     }
-    // TODO: run the global encoder on the reference audio to extract the 128-d embedding.
-    // For now, zero embedding (default voice).
     fprintf(stderr, "miotts: warning: reference audio encoding not yet implemented, using default voice\n");
     return 0;
+}
+
+int miotts_load_preset_embedding(miotts_context* ctx, const char* emb_path) {
+    if (!ctx || !emb_path)
+        return -1;
+    // Try raw binary first (128 floats = 512 bytes)
+    FILE* f = fopen(emb_path, "rb");
+    if (!f)
+        return -1;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz == (long)(ctx->hp.codec_global_dim * sizeof(float))) {
+        if (fread(ctx->global_embedding.data(), sizeof(float), ctx->hp.codec_global_dim, f) ==
+            ctx->hp.codec_global_dim) {
+            fclose(f);
+            return 0;
+        }
+    }
+    fclose(f);
+    // Try GGUF format (.emb.gguf with tensor "mio.global_embedding")
+    gguf_init_params gip = {/*.no_alloc=*/false, /*.ctx=*/nullptr};
+    ggml_context* emb_ctx = nullptr;
+    gguf_init_params gip2 = {false, &emb_ctx};
+    gguf_context* meta = gguf_init_from_file(emb_path, gip2);
+    if (meta && emb_ctx) {
+        ggml_tensor* t = ggml_get_tensor(emb_ctx, "mio.global_embedding");
+        if (t && ggml_nelements(t) == (int64_t)ctx->hp.codec_global_dim) {
+            memcpy(ctx->global_embedding.data(), t->data, ctx->hp.codec_global_dim * sizeof(float));
+            gguf_free(meta);
+            ggml_free(emb_ctx);
+            return 0;
+        }
+        gguf_free(meta);
+        ggml_free(emb_ctx);
+    }
+    return -1;
 }
 
 // ── Wave prenet forward (diff harness) ──────────────────────────────
