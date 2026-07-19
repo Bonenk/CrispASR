@@ -28,13 +28,13 @@ import kaggle_harness as kh
 kh.init_progress()
 
 # ── Install deps ────────────────────────────────────────────────────
-kh.log("Installing deps...")
+kh.step("Installing deps...")
 subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet",
                        "demucs", "gguf", "einops", "julius", "dora-search",
                        "--no-deps"])
 
 # ── Build CrispASR ──────────────────────────────────────────────────
-kh.log("Building CrispASR...")
+kh.step("Building CrispASR...")
 os.chdir(str(_CRISPASR_DIR))
 kh.install_build_toolchain()
 
@@ -48,20 +48,20 @@ subprocess.check_call(["cmake", "-G", "Ninja", "-B", str(build_dir)] + cmake_fla
 jobs = kh.safe_build_jobs(gpu=False)
 subprocess.check_call(["cmake", "--build", str(build_dir), "-j", str(jobs),
                        "--target", "htdemucs"])
-kh.log(f"Build complete (htdemucs target, -j{jobs})")
+kh.step(f"Build complete (htdemucs target, -j{jobs})")
 
 # ── Convert HTDemucs model ──────────────────────────────────────────
-kh.log("Converting HTDemucs model to GGUF (F32)...")
+kh.step("Converting HTDemucs model to GGUF (F32)...")
 model_path = WORK / "htdemucs-f32.gguf"
 subprocess.check_call([sys.executable,
     str(_CRISPASR_DIR / "models" / "convert-htdemucs-to-gguf.py"),
     "--model", "htdemucs",
     "--output", str(model_path),
     "--dtype", "f32"])
-kh.log(f"Converted: {model_path} ({model_path.stat().st_size / 1e6:.1f} MB)")
+kh.step(f"Converted: {model_path} ({model_path.stat().st_size / 1e6:.1f} MB)")
 
 # ── Generate Python reference ───────────────────────────────────────
-kh.log("Generating Python reference dump...")
+kh.step("Generating Python reference dump...")
 ref_path = WORK / "htdemucs-ref.gguf"
 
 # We need a test audio file — use a synthetic sine wave
@@ -84,10 +84,10 @@ subprocess.check_call([sys.executable,
     "--model-dir", "htdemucs",
     "--audio", str(test_wav),
     "--output", str(ref_path)])
-kh.log(f"Reference dump: {ref_path} ({ref_path.stat().st_size / 1e6:.1f} MB)")
+kh.step(f"Reference dump: {ref_path} ({ref_path.stat().st_size / 1e6:.1f} MB)")
 
 # ── Build and run C++ smoke test ────────────────────────────────────
-kh.log("Building smoke test...")
+kh.step("Building smoke test...")
 smoke_src = _CRISPASR_DIR / "tests" / "test_htdemucs_smoke.cpp"
 smoke_bin = build_dir / "bin" / "test_htdemucs_smoke"
 subprocess.check_call([
@@ -103,7 +103,7 @@ subprocess.check_call([
     "-o", str(smoke_bin)
 ])
 
-kh.log("Running HTDemucs smoke test...")
+kh.step("Running HTDemucs smoke test...")
 env = os.environ.copy()
 env["CRISPASR_HTDEMUCS_DEBUG"] = "1"
 env["OMP_NUM_THREADS"] = "4"
@@ -111,22 +111,22 @@ result = subprocess.run([str(smoke_bin), str(model_path)],
                        capture_output=True, text=True, env=env, timeout=600)
 print(result.stderr)
 if result.returncode != 0:
-    kh.log(f"Smoke test FAILED (exit {result.returncode})")
+    kh.step(f"Smoke test FAILED (exit {result.returncode})")
 else:
-    kh.log("Smoke test PASSED")
+    kh.step("Smoke test PASSED")
 
 # ── Compare reference stages ────────────────────────────────────────
-kh.log("Comparing reference stages...")
+kh.step("Comparing reference stages...")
 try:
     from gguf import GGUFReader
     ref = GGUFReader(str(ref_path))
     ref_tensors = {t.name: np.array(t.data, dtype=np.float32) for t in ref.tensors}
-    kh.log(f"Reference has {len(ref_tensors)} stages: {list(ref_tensors.keys())}")
+    kh.step(f"Reference has {len(ref_tensors)} stages: {list(ref_tensors.keys())}")
 
     for name, data in sorted(ref_tensors.items()):
-        kh.log(f"  {name}: shape={data.shape}, mean={data.mean():.6f}, std={data.std():.6f}")
+        kh.step(f"  {name}: shape={data.shape}, mean={data.mean():.6f}, std={data.std():.6f}")
 except Exception as e:
-    kh.log(f"Reference comparison failed: {e}")
+    kh.step(f"Reference comparison failed: {e}")
 
 # ── Write progress file ─────────────────────────────────────────────
 with open(WORK / "progress.txt", "w") as f:
@@ -135,4 +135,4 @@ with open(WORK / "progress.txt", "w") as f:
     f.write(f"Reference: {ref_path}\n")
     f.write(f"Smoke test exit code: {result.returncode}\n")
 
-kh.log("Done!")
+kh.step("Done!")
