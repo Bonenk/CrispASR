@@ -111,6 +111,14 @@ kh.step("Running HTDemucs smoke test...")
 env = os.environ.copy()
 env["CRISPASR_HTDEMUCS_DEBUG"] = "1"
 env["OMP_NUM_THREADS"] = "4"
+# Set LD_LIBRARY_PATH for shared ggml libs
+ld_paths = [
+    str(build_dir / "ggml" / "src"),
+    str(build_dir / "ggml" / "src" / "ggml-base"),
+    str(build_dir / "ggml" / "src" / "ggml-cpu"),
+    str(build_dir / "src"),
+]
+env["LD_LIBRARY_PATH"] = ":".join(ld_paths) + ":" + env.get("LD_LIBRARY_PATH", "")
 result = subprocess.run([str(smoke_bin), str(model_path)],
                        capture_output=True, text=True, env=env, timeout=600)
 print(result.stderr)
