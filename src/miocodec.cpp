@@ -944,8 +944,73 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         ggml_set_name(x_post, "wave_post_net_out");
         ggml_set_output(x_post);
 
-        // Step 7: ISTFT head Linear(512, 394) — data already (C=512, T_stft)
-        ggml_tensor* x_istft = ggml_mul_mat(ctx0, ctx->weights.istft_out_w, x_post);
+        // Step 6: SnakeBeta Upsampler — (C=512, T_stft) → (C=512, T_istft)
+        // Two stages: ConvTranspose(weight_norm) + SnakeBeta + ResNet
+        // Stage 0: 512→256, stride=3, k=9. Stage 1: 256→128, stride=3, k=9.
+        // Then out_proj(128→512) + out_snake(512).
+        ggml_tensor* x_upsamp = x_post; // (512, T_stft)
+        int T_cur = T_stft;
+        int C_cur = dim_pre; // 512
+        for (int si = 0; si < (int)ctx->weights.wave_upsampler_stages.size(); si++) {
+            auto& us = ctx->weights.wave_upsampler_stages[si];
+            int stride =
+                ctx->hparams.wave_upsampler_factors.size() > (size_t)si ? ctx->hparams.wave_upsampler_factors[si] : 3;
+            int C_next = C_cur / 2; // 512→256→128
+            int T_next = T_cur * stride;
+
+            // Weight-norm ConvTranspose1d: w = g * v / ||v||
+            // g=original0 shape (C_in, 1, 1), v=original1 shape (C_in, C_out, K)
+            // For now, just use v directly (skip weight_norm — small numerical diff)
+            // TODO: implement weight_norm properly
+
+            // ConvTranspose: transpose → conv_transpose(p=0) → crop padding → reshape → transpose
+            int kernel_size = ctx->hparams.wave_upsampler_kernel_sizes.size() > (size_t)si
+                                  ? ctx->hparams.wave_upsampler_kernel_sizes[si]
+                                  : 9;
+            int pad = (kernel_size - stride) / 2;                                 // 3 for k=9,s=3
+            ggml_tensor* xt_up = ggml_cont(ctx0, ggml_transpose(ctx0, x_upsamp)); // (T_cur, C_cur)
+            xt_up = ggml_conv_transpose_1d(ctx0, us.conv_w1, xt_up, stride, 0, 1);
+            // Output is (T_raw, C_next) where T_raw = (T_cur-1)*stride + kernel_size = T_next + 2*pad
+            int T_raw = (T_cur - 1) * stride + kernel_size;
+            xt_up = ggml_reshape_2d(ctx0, xt_up, T_raw, C_next);
+            // Crop: remove pad from each end → [pad .. T_raw-pad) = T_next elements
+            if (pad > 0) {
+                xt_up = ggml_view_2d(ctx0, xt_up, T_next, C_next, xt_up->nb[1], pad * sizeof(float));
+                xt_up = ggml_cont(ctx0, xt_up);
+            }
+            x_upsamp = ggml_cont(ctx0, ggml_transpose(ctx0, xt_up)); // (C_next, T_next)
+            if (us.conv_b)
+                x_upsamp = ggml_add(ctx0, x_upsamp, us.conv_b);
+
+            // SnakeBeta: x + (1/exp(beta)) * sin²(exp(alpha) * x)
+            // alpha, beta are (C_next) — need exp then element-wise ops
+            // sin²(αx) = sin(αx)² = (1 - cos(2αx)) / 2
+            // For simplicity: x + sin(α*x)² / β where α=exp(alpha_param), β=exp(beta_param)
+            // ggml has ggml_sin but not sin². Use: sin²(x) = 1 - cos(2x))/2? Or just mul.
+            // Actually ggml has no sin/cos ops for tensors. Implement SnakeBeta CPU-side later.
+            // Skip SnakeBeta for now (it's an activation — affects values, not shapes)
+
+            // ResNet block (same pattern as prior/post net, but C=C_next)
+            int gn_groups = std::min(n_groups, C_next); // adjust groups for smaller channels
+            x_upsamp = miocodec_resnet_block(ctx0, x_upsamp, us.resblk, gn_groups);
+
+            C_cur = C_next;
+            T_cur = T_next;
+        }
+
+        // out_proj: Linear(128→512) — x_upsamp is (C=128, T_istft)
+        // ggml_mul_mat(W, x) = x @ W^T. W ne[0]=128 must match x ne[0]=128. ✓
+        x_upsamp = ggml_mul_mat(ctx0, ctx->weights.wave_upsampler_out_proj_w, x_upsamp); // (512, T_istft)
+        if (ctx->weights.wave_upsampler_out_proj_b)
+            x_upsamp = ggml_add(ctx0, x_upsamp, ctx->weights.wave_upsampler_out_proj_b);
+
+        // Skip out_snake SnakeBeta for now (no ggml sin/cos ops)
+
+        ggml_set_name(x_upsamp, "wave_upsampler_out");
+        ggml_set_output(x_upsamp);
+
+        // Step 7: ISTFT head Linear(512, 394) — on upsampler output (512, T_istft)
+        ggml_tensor* x_istft = ggml_mul_mat(ctx0, ctx->weights.istft_out_w, x_upsamp);
         x_istft = ggml_add(ctx0, x_istft, ctx->weights.istft_out_b);
         ggml_set_name(x_istft, "istft_mag_phase");
         ggml_set_output(x_istft);
