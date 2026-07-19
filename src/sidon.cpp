@@ -673,6 +673,23 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     ggml_backend_sched_synchronize(ctx->predictor_sched);
     const auto predictor_done = clock::now();
 
+    // Diff-harness hook: dump the predictor handoff (raw f32 + ne dims on a
+    // header line to stderr) so it can be compared against the upstream
+    // reference (sidon-ref.gguf: predictor_feats) to localize any port
+    // divergence to the predictor vs the DAC decoder. See
+    // tools/reference_backends/sidon_ref_dump.py.
+    if (const char* dp = getenv("CRISPASR_SIDON_DUMP_HANDOFF"); dp && dp[0]) {
+        const int64_t ne0 = ctx->predictor_output->ne[0], ne1 = ctx->predictor_output->ne[1];
+        std::vector<float> h((size_t)ggml_nelements(ctx->predictor_output));
+        ggml_backend_tensor_get(ctx->predictor_output, h.data(), 0, h.size() * sizeof(float));
+        if (FILE* f = fopen(dp, "wb")) {
+            fwrite(h.data(), sizeof(float), h.size(), f);
+            fclose(f);
+            fprintf(stderr, "sidon: dumped predictor handoff ne=[%lld,%lld] (%zu floats) -> %s\n", (long long)ne0,
+                    (long long)ne1, h.size(), dp);
+        }
+    }
+
     ggml_backend_tensor_copy(ctx->predictor_output, ctx->decoder_input);
     const auto handoff_done = clock::now();
     if (ggml_backend_sched_graph_compute(ctx->decoder_sched, ctx->decoder_graph) != GGML_STATUS_SUCCESS) {
