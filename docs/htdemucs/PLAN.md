@@ -27,8 +27,12 @@ could not run it (8 GB, OOM). This branch does that validation on the M1.
       at cos = 1.000000 (BUGS 7, 8, 9)
 - [x] **DECODER + OUTPUT NOW PASS** (BUGS 10, 11, 12)
 - [x] **45/45 STAGES PASS** — full end-to-end F32 parity
-- [ ] Decoded-output roundtrip (HARD RULE #3) — cos is necessary, not sufficient
-- [ ] BUG 3: register the smoke test in CMake
+- [x] Decoded-output roundtrip (HARD RULE #3) — ASR of the separated vocals
+      stem is byte-identical to ASR of the original mix
+- [x] F16 verified: 45/45, min cos 0.999961
+- [x] BUG 3: smoke test registered in CMake and passing
+
+**STATUS: COMPLETE.** Branch `feat/htdemucs-parity-diff`, not yet merged.
 - [ ] BUG 3: `tests/test_htdemucs_smoke.cpp` never registered in CMake
 
 ## Bugs found
@@ -231,3 +235,54 @@ diagnostic on the else path.
 
 Every stage from `spec_input` through all four stems at cos >= 0.999989,
 most at 1.000000. Full table in `run14.log` / this branch's commits.
+
+## Acceptance (HARD RULE #3 — decoded output, not just cosine)
+
+Per-stage cosine is necessary but not sufficient, so the stems were checked
+as audio. `--separate` on the full 11 s `samples/jfk.wav` (485100 samples, which
+also exercises the chunking path rather than the padded 343980-sample segment):
+
+| stem   | rms     | dBFS   |
+|--------|---------|--------|
+| vocals | 0.13962 | -17.10 |
+| other  | 0.00521 | -45.66 |
+| drums  | 0.00021 | -73.57 |
+| bass   | 0.00010 | -79.62 |
+
+That is the correct physical answer for a speech clip: essentially all energy in
+vocals, drums and bass silent. Sum-of-stems rms 0.13998 vs mixture rms 0.14210 —
+the stems reconstruct the input.
+
+ASR round-trip (`ggml-tiny.en`):
+
+- mix:          "And so my fellow Americans ask not what your country can do for
+                 you / ask what you can do for your country."
+- vocals stem:  identical, word for word.
+
+Smoke test on a synthetic 440/880 Hz stereo tone separates it into `other`
+(rms 0.293) with drums/bass/vocals ~5e-4 — also the right answer.
+
+## Quantization
+
+| build | stages | min cos |
+|-------|--------|---------|
+| F32   | 45/45  | 0.999989 |
+| F16   | 45/45  | 0.999961 |
+
+F16 GGUF is 84 MB (156 F16 tensors; norms/biases stay F32 per the quantizer
+rules) vs 168 MB F32.
+
+## Notes for whoever picks this up
+
+- The runtime is CPU-side for the convolutions, the DConv stacks and the whole
+  CrossTransformer, all written as scalar loops. A full 7.8 s segment takes
+  minutes on an M1 and was ~25 min when the box was at load 100+. There is a lot
+  of headroom (e.g. `read_tensor_f32` re-reads and re-converts the same weights
+  inside the per-frequency-band DConv loop, ~4096 redundant reads per encoder).
+  Perf work should follow the A/B rules in the dev guide — gate it, don't replace.
+- `apply_dconv()` (the ggml DConv) is still dead code and still has the GLU-axis
+  bug described under BUG 4. It is left in place rather than deleted so the ggml
+  path survives for a future perf pass; do not call it without fixing the split.
+- The diff replays `input_wav` from the reference, so it never exercises the
+  16k->44.1k resampler. That is deliberate (it isolates model parity) but means
+  resampler parity is separately unverified.
