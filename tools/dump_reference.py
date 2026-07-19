@@ -322,6 +322,12 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # ("htdemucs", "htdemucs_ft") or local checkpoint. Audio arg = mixed
     # music WAV (any sample rate; resampled to 44100 Hz stereo internally).
     "htdemucs":    "reference_backends.htdemucs",
+    # Mel-Band RoFormer (§248): frequency-band source separation, vocal/
+    # instrumental. model_dir = a directory (or .ckpt path) holding the
+    # checkpoint AND its YAML config — the band layout (num_bands / n_fft /
+    # hop) is not recoverable from the weights alone. Audio arg = mixed music
+    # WAV (any rate; resampled to the config's rate, stereo, internally).
+    "mel-band-roformer": "reference_backends.mel_band_roformer",
 }
 
 DEFAULT_STAGES_BY_BACKEND: Dict[str, List[str]] = {}  # populated at import
