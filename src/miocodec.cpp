@@ -100,6 +100,7 @@ struct miocodec_weights {
     // Wave prenet
     ggml_tensor* wave_prenet_input_proj_w = nullptr; // input_proj if dim != input_dim
     ggml_tensor* wave_prenet_output_proj_w = nullptr;
+    ggml_tensor* wave_prenet_output_proj_b = nullptr;
     ggml_tensor* wave_prenet_norm_w = nullptr;
     ggml_tensor* wave_prenet_norm_b = nullptr;
     std::vector<transformer_layer> wave_prenet_layers;
@@ -241,6 +242,7 @@ struct miocodec_context* miocodec_init_from_file(const char* path, struct miocod
     w.wave_prenet_norm_w = T("wave_prenet.norm.weight");
     w.wave_prenet_norm_b = T("wave_prenet.norm.bias");
     w.wave_prenet_output_proj_w = T("wave_prenet.output_proj.weight");
+    w.wave_prenet_output_proj_b = T("wave_prenet.output_proj.bias");
     for (uint32_t i = 0; i < hp.wave_prenet_n_layers; i++) {
         auto& L = w.wave_prenet_layers[i];
         char buf[256];
@@ -433,7 +435,7 @@ static void fsq_indices_to_codes(const int32_t* indices, int n, float* out_codes
 // Build a single Transformer layer (no AdaLN): LN → Attn → residual → LN → FFN → residual
 static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* x,
                                                const miocodec_weights::transformer_layer& L, int n_heads,
-                                               int /*window_size*/, ggml_tensor* attn_mask = nullptr) {
+                                               ggml_tensor* rope_pos, ggml_tensor* attn_mask = nullptr) {
     const int64_t dim = x->ne[0];
     const int64_t T = x->ne[1];
     const int64_t hd = dim / n_heads;
@@ -454,22 +456,35 @@ static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* 
     V = ggml_reshape_3d(ctx0, V, hd, n_heads, T);
 
     // RoPE on (hd, n_heads, T) — ne[2]=T matches positions length
-    ggml_tensor* pos = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
-    ggml_set_name(pos, "rope_pos");
-    ggml_set_input(pos);
+    Q = ggml_rope_ext(ctx0, Q, rope_pos, nullptr, (int)hd, GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+                      0.0f);
+    K = ggml_rope_ext(ctx0, K, rope_pos, nullptr, (int)hd, GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f,
+                      0.0f);
 
-    Q = ggml_rope_ext(ctx0, Q, pos, nullptr, (int)hd, GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
-    K = ggml_rope_ext(ctx0, K, pos, nullptr, (int)hd, GGML_ROPE_TYPE_NORMAL, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
-
-    // flash_attn_ext expects (hd, T, n_heads) — permute from (hd, n_heads, T)
+    // Manual attention: Q,K,V are (hd, n_heads, T) after RoPE
+    // Permute to (hd, T, n_heads) for mul_mat
     Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3)); // (hd, T, n_heads)
     K = ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3));
     V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
 
     float scale = 1.0f / sqrtf((float)hd);
-    ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, attn_mask, scale, 0.0f, 0.0f);
+    // scores = Q @ K^T → (T, T, n_heads)
+    ggml_tensor* scores = ggml_mul_mat(ctx0, K, Q);
+    scores = ggml_scale(ctx0, scores, scale);
 
-    // Back to (dim, T): (hd, T, n_heads) → permute(0,2,1,3) → (hd, n_heads, T) → reshape(dim, T)
+    // Apply windowed mask if provided
+    if (attn_mask) {
+        scores = ggml_add(ctx0, scores, attn_mask);
+    }
+
+    // Softmax over ne[0] (T_k dimension)
+    scores = ggml_soft_max(ctx0, scores);
+
+    // attn_out = scores @ V^T → V is (hd, T, n_heads), need V^T = (T, hd, n_heads)
+    V = ggml_cont(ctx0, ggml_permute(ctx0, V, 1, 0, 2, 3)); // (T, hd, n_heads)
+    ggml_tensor* attn_out = ggml_mul_mat(ctx0, V, scores);  // (hd, T, n_heads)
+
+    // Back to (dim, T)
     attn_out = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn_out, 0, 2, 1, 3)), dim, T);
 
     // Output projection + residual
@@ -702,22 +717,28 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         }
 
         // Input tensor
-        ggml_tensor* x = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, dim, T);
-        ggml_set_name(x, "prenet_input");
-        ggml_set_input(x);
+        ggml_tensor* input_x = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, dim, T);
+        ggml_set_name(input_x, "prenet_input");
+        ggml_set_input(input_x);
+        ggml_tensor* x = input_x;
+
+        // RoPE positions (shared across all layers)
+        ggml_tensor* rope_pos = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
+        ggml_set_name(rope_pos, "rope_pos");
+        ggml_set_input(rope_pos);
 
         // Build windowed attention mask (window_size=65, ±32 positions)
         const int window_per_side = (int)ctx->hparams.wave_prenet_window_size / 2; // 32
         ggml_tensor* win_mask = nullptr;
         if (T > 1 && window_per_side > 0) {
-            win_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T);
+            win_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, T, T);
             ggml_set_name(win_mask, "win_mask");
             ggml_set_input(win_mask);
         }
 
         // Build the 6-layer Transformer graph
         for (int i = 0; i < n_layers; i++) {
-            x = miocodec_transformer_layer(ctx0, x, ctx->weights.wave_prenet_layers[i], n_heads, 0, win_mask);
+            x = miocodec_transformer_layer(ctx0, x, ctx->weights.wave_prenet_layers[i], n_heads, rope_pos, win_mask);
         }
 
         // Final norm + output projection (768→512)
@@ -725,6 +746,8 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         x = ggml_mul(ctx0, x, ctx->weights.wave_prenet_norm_w);
         x = ggml_add(ctx0, x, ctx->weights.wave_prenet_norm_b);
         x = ggml_mul_mat(ctx0, ctx->weights.wave_prenet_output_proj_w, x);
+        if (ctx->weights.wave_prenet_output_proj_b)
+            x = ggml_add(ctx0, x, ctx->weights.wave_prenet_output_proj_b);
         ggml_set_name(x, "wave_prenet_out");
         ggml_set_output(x);
 
@@ -739,30 +762,28 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
             return nullptr;
         }
 
-        ggml_tensor* input_t = ggml_graph_get_tensor(gf, "prenet_input");
-        ggml_backend_tensor_set(input_t, fsq_emb.data(), 0, sizeof(float) * T * dim);
+        // Set inputs using direct tensor pointers
+        ggml_backend_tensor_set(input_x, fsq_emb.data(), 0, sizeof(float) * T * dim);
 
         // Set RoPE positions [0, 1, 2, ..., T-1]
-        ggml_tensor* pos_t = ggml_graph_get_tensor(gf, "rope_pos");
-        if (pos_t) {
+        {
             std::vector<int32_t> positions(T);
             for (int i = 0; i < T; i++)
                 positions[i] = i;
-            ggml_backend_tensor_set(pos_t, positions.data(), 0, sizeof(int32_t) * T);
+            ggml_backend_tensor_set(rope_pos, positions.data(), 0, sizeof(int32_t) * T);
         }
 
-        // Set windowed attention mask
-        ggml_tensor* mask_t = ggml_graph_get_tensor(gf, "win_mask");
-        if (mask_t) {
+        // Set windowed attention mask (F32, additive: 0=attend, -inf=mask)
+        if (win_mask) {
             const int wps = window_per_side;
-            std::vector<ggml_fp16_t> mask_data(T * T);
+            std::vector<float> mask_data(T * T);
             for (int q = 0; q < T; q++) {
                 for (int k = 0; k < T; k++) {
                     bool in_window = (k >= q - wps) && (k <= q + wps);
-                    mask_data[q * T + k] = ggml_fp32_to_fp16(in_window ? 0.0f : -INFINITY);
+                    mask_data[q * T + k] = in_window ? 0.0f : -INFINITY;
                 }
             }
-            ggml_backend_tensor_set(mask_t, mask_data.data(), 0, sizeof(ggml_fp16_t) * T * T);
+            ggml_backend_tensor_set(win_mask, mask_data.data(), 0, sizeof(float) * T * T);
         }
 
         ggml_backend_sched_graph_compute(ctx->sched, gf);
