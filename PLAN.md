@@ -2136,10 +2136,10 @@ commercial-restricted, skip).
 
 **Source separation (new category):**
 - [x] **HTDemucs** — hybrid transformer demucs, music/voice separation. **MIT** (Meta).
-  **IN PROGRESS (2026-07-19, VPS):** End-to-end pipeline running: converter (80 MB F16),
-  21-stage ref dumper, C++ with STFT+encoder+decoder+iSTFT producing 4-source stereo PCM.
-  All shapes match Python. Remaining for parity: DConv, CrossTransformer (Phase 3),
-  time branch decoder, then CLI adapter + 12-point checklist (Phase 4).
+  **IN PROGRESS (2026-07-19, VPS):** Full pipeline implemented (~2360 lines):
+  STFT→encoder→CrossTransformer(5 layers, self+cross attn)→decoder→iSTFT.
+  All shapes match Python. Pending test (storage mount down). Remaining for parity:
+  DConv, sinusoidal pos emb, time branch decoder. Then CLI + 12-point (Phase 4).
 - [x] **Mel-Band RoFormer** — frequency-band source separation. **MIT**.
   The #274 reporter specifically mentioned this. Do both — they're complementary
   (HTDemucs = 4-stem, RoFormer = vocal/instrumental).
