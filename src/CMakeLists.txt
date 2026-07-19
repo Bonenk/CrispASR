@@ -2314,6 +2314,26 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# mel-band-roformer — Mel-Band RoFormer source separation (§248)
+# ---------------------------------------------------------------------------
+add_library(mel-band-roformer STATIC mel_band_roformer.h mel_band_roformer.cpp)
+set_target_properties(mel-band-roformer PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(mel-band-roformer PUBLIC .)
+target_compile_features   (mel-band-roformer PUBLIC cxx_std_17)
+target_link_libraries     (mel-band-roformer PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(mel-band-roformer PRIVATE -O3)
+endif()
+
+# Standalone front-end diff probe (§248 Phase 1). Opt-in so it doesn't add to
+# the default build: cmake -DCRISPASR_BUILD_MBR_PROBE=ON.
+option(CRISPASR_BUILD_MBR_PROBE "Build the mel-band-roformer diff probe" OFF)
+if(CRISPASR_BUILD_MBR_PROBE)
+    add_executable(mbr-diff-probe ${CMAKE_CURRENT_SOURCE_DIR}/../tools/mbr_diff_probe.cpp)
+    target_link_libraries(mbr-diff-probe PRIVATE mel-band-roformer)
+endif()
+
+# ---------------------------------------------------------------------------
 # Multi-backend linkage (consumed by CLI + Dart + Python + Rust)
 #
 # Non-Whisper CrispASR backends become reachable through the `crispasr_*`
