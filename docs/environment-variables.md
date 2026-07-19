@@ -519,6 +519,13 @@ suffixes.
 - `CRISPASR_HTDEMUCS_WCACHE` — cache F32 copies of weight tensors by pointer
   (default **ON**). `=0` re-reads and re-converts on every access, which the
   DConv stacks do ~6k times per encoder layer.
+- `CRISPASR_HTDEMUCS_GGML` — run the CrossTransformer as a ggml graph instead of
+  the CPU/BLAS path (default **OFF**). Verified correct on CPU and Metal (45/45
+  stages, every layer cos 1.000000) but not yet proven faster overall, so it
+  stays opt-in per the inverse-default rule.
+- `CRISPASR_HTDEMUCS_GPU` — request a GPU backend (CUDA > Metal > Vulkan, CPU
+  fallback). Only meaningful together with `_GGML=1`: under the CPU/BLAS path
+  the weights would sit on the device and every kernel would pay a read back.
 - `CRISPASR_HTDEMUCS_PROFILE` — print a per-phase wall-time breakdown of one
   forward pass (stft / enc / transformer / dec / istft).
 - `CRISPASR_HTDEMUCS_DEBUG` — verbose per-layer shape and NaN diagnostics.
