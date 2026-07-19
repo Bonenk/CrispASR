@@ -92,7 +92,6 @@ std::vector<float> resample_polyphase(const float* in, int n_in, int src_rate, i
 
     auto h = build_filter(L, M, num_zeros, kaiser_beta);
     const int half_len = ((int)h.size() - 1) / 2;
-    const int up = std::max(L, M);
 
     // For each output sample at index `i` (in dst_rate samples), the
     // corresponding fractional position in the upsampled stream
