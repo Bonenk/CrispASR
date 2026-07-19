@@ -55,6 +55,11 @@ constexpr Entry k_registry[] = {
     {"mel-band-roformer", "mel-band-roformer-vocals-f16.gguf",
      "https://huggingface.co/cstr/mel-band-roformer-vocals-GGUF/resolve/main/mel-band-roformer-vocals-f16.gguf",
      "~436 MB", nullptr, nullptr},
+    // Sidon v0.1 (SaruLab) speech restoration (--s2s). w2v-BERT predictor +
+    // continuous DAC decoder; MIT. Q8_0 is the best-fidelity practical quant
+    // (predictor cos 0.998 vs the upstream F32; ASR round-trip identical). #283.
+    {"sidon", "sidon-v0.1-q8_0.gguf",
+     "https://huggingface.co/cstr/Sidon-GGUF/resolve/main/sidon-v0.1-q8_0.gguf", "~335 MB", nullptr, nullptr},
     {"nemotron", "nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
      "https://huggingface.co/cstr/nemotron-3.5-asr-streaming-0.6b-GGUF/resolve/main/nemotron-3.5-asr-streaming-0.6b-q4_k.gguf",
      "~458 MB", nullptr, nullptr},
