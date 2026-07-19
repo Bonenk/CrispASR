@@ -2310,3 +2310,21 @@ All quants (F16, Q8_0, Q4_K) produce identical transcript:
 - [x] HuggingFace upload — 3 quants + README
 
 ---
+
+## §250 — Music transcription backends (piano_transcription + Basic Pitch)
+
+**Context:** CometBeat TRANSCRIPTION_SOTA_HANDOFF.md lists these as CrispASR
+ggml port targets. New category: audio → note events (MIDI).
+
+**Models:**
+- [x] **piano_transcription_inference** (ByteDance/Kong, Apache-2.0). CRNN: 4×
+  (4-layer Conv2d + 2-layer BiGRU) sub-networks (frame/onset/offset/velocity),
+  88-key output at 100fps. ~172 MB checkpoint, ~86 MB F16 GGUF. **TAKEN** (VPS
+  session, 2026-07-19).
+- [ ] **Basic Pitch** (Spotify, Apache-2.0). Lightweight CNN (~10 MB). Polyphonic
+  audio → MIDI. After piano_transcription.
+- [ ] **MT3** (Google, Apache-2.0). Seq2seq multi-instrument. Large (~1 GB+).
+  Feasibility check first.
+
+**New CLI surface:** `--task transcribe-music` / `--backend piano-transcription`
+→ MIDI output file.
