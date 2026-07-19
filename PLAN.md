@@ -2138,9 +2138,25 @@ commercial-restricted, skip).
 - [ ] **HTDemucs** — hybrid transformer demucs, music/voice separation. **MIT** (Meta).
   Would add `--task separate` / `--backend htdemucs`. Medium effort (UNet + transformer
   + STFT/iSTFT, no LLM). facebook/demucs on GitHub.
-- [ ] **Mel-Band RoFormer** — frequency-band source separation. **MIT**.
+- [x] **Mel-Band RoFormer** — frequency-band source separation. **MIT**.
   The #274 reporter specifically mentioned this. Do both — they're complementary
   (HTDemucs = 4-stem, RoFormer = vocal/instrumental).
+  **TAKEN** (M1/Metal session, 2026-07-19). Picked for this box because it is
+  **non-autoregressive** — no sampling, so the diff harness gives deterministic
+  per-stage cos verdicts with no torch-vs-mt19937 RNG mismatch (unlike an AR TTS
+  port), and the model is small enough to run the Python reference and the C++
+  port in 16 GB. No NeMo dependency (NeMo import is broken on this Mac).
+  Regime: read the Python blueprint line-by-line → `tools/reference_backends/
+  mel_band_roformer.py` dumper → converter → C++ backend → per-stage diff →
+  **acceptance = decoded-output roundtrip** (separated stems judged by SDR/ASR
+  on the vocal stem, not by cos alone — HARD RULE #3).
+  > **Coordination with the in-flight HTDemucs work (same category):** HTDemucs
+  > is unchecked above but IS being worked (converter `a6a447587` + 21-stage
+  > reference dumper `60ada0a06`). We share the new `--task separate` surface
+  > (CLI flag, stem output/WAV writing, backend-capability bit). **Whoever lands
+  > that scaffolding first owns it; the second builds on it rather than adding a
+  > parallel one.** Per-backend files (`src/mel_band_roformer.*`, converter,
+  > reference dumper, registry/CMake entries) are additive and conflict-free.
 
 **Voice conversion (new category):**
 - [ ] **Seed-VC** — zero-shot voice conversion. **GPL-3.0** (Plachta/Seed-VC on HF).
