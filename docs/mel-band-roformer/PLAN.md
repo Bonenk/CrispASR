@@ -79,6 +79,33 @@ attn_dropout 0      ff_dropout 0        flash_attn true
 12. Optional `zero_dc`: `index_fill(freq=0, 0.)`.
 13. `torch.istft(..., length=raw_audio_length)` → `'(b n s) t -> b n s t'`.
 
+## Verified band layout (librosa, no weights — sr 44100 / n_fft 2048 / 60 bands)
+
+Computed and checked before touching the weights, because it needs no model at
+all and it is where an off-by-one hides:
+
+```
+mel filterbank            (60, 1025)
+mel[0,0]   0.000000e+00 -> 1.252268e-03   (tweak is LOAD-BEARING, see below)
+mel[-1,-1] 1.809571e-18 -> 2.677714e-06   (membership unchanged; already > 0)
+freq_indices              1979 mono / 3958 stereo, max index 2049
+num_freqs_per_band        min 6   max 130  sum 1979
+num_bands_per_freq        min 1   max 2    (so the overlap denominator is 1 or 2)
+band input widths         min 24  max 520  sum 7916   (= 2*1979*2 ✓)
+```
+
+⚠ **The `mel[0,0]` tweak is not cosmetic.** Before it, `mel[0,0]` is *exactly
+0.0*, so DC (bin 0) belongs to **no** band and the reference's own
+`assert freqs_per_band.any(dim=0).all()` would fail. Any C++/converter path
+that rebuilds the filterbank without this line produces a different — and
+silently wrong — `freq_indices`.
+
+**Design decision:** bake `freq_indices` + `num_bands_per_freq` into the GGUF
+rather than recomputing librosa's mel in C++. Their construction depends on
+librosa's exact mel edge placement *plus* the two tweaks; reproducing that in
+C++ buys nothing and risks a whole class of silent divergence. They are two
+small integer arrays.
+
 ## Port gotchas (carry into the C++ port)
 
 - Band membership depends on librosa's mel edges **and** the two hand-tweaks —

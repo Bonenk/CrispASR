@@ -187,14 +187,30 @@ def _load(model_dir):
     from bs_roformer.mel_band_roformer import MelBandRoformer
     model = MelBandRoformer(**cfg)
 
-    sd = torch.load(str(ckpt_path), map_location="cpu", weights_only=False)
+    # Memory discipline: this checkpoint is ~870 MB fp32 and the constructed
+    # model is another ~900 MB, so a naive load peaks ~2 GB and can OOM a
+    # RAM-tight box. mmap=True keeps the checkpoint storage on disk and
+    # assign=True hands those tensors straight to the module (freeing the
+    # freshly-allocated params) instead of copying into them — roughly halving
+    # peak. Falls back if the checkpoint predates zipfile serialization.
+    try:
+        sd = torch.load(str(ckpt_path), map_location="cpu", mmap=True, weights_only=False)
+        assign = True
+    except Exception as e:
+        print(f"  mmap load unavailable ({type(e).__name__}), falling back to full read")
+        sd = torch.load(str(ckpt_path), map_location="cpu", weights_only=False)
+        assign = False
     if isinstance(sd, dict):
         for key in ("state_dict", "model", "model_state_dict"):
             if key in sd and isinstance(sd[key], dict):
                 sd = sd[key]
                 break
     sd = { (k[len("module."):] if k.startswith("module.") else k): v for k, v in sd.items() }
-    missing, unexpected = model.load_state_dict(sd, strict=False)
+    try:
+        missing, unexpected = model.load_state_dict(sd, strict=False, assign=assign)
+    except TypeError:  # torch < 2.1 has no assign=
+        missing, unexpected = model.load_state_dict(sd, strict=False)
+    del sd
     if missing:
         print(f"  WARNING missing keys: {len(missing)} (first: {missing[:3]})")
     if unexpected:
