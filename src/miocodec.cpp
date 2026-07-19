@@ -359,6 +359,64 @@ struct miocodec_context* miocodec_init_from_file(const char* path, struct miocod
     w.wave_upsampler_out_snake_alpha = T("wave_upsampler.out_snake.alpha");
     w.wave_upsampler_out_snake_beta = T("wave_upsampler.out_snake.beta");
 
+    // Precompute weight-norm for upsampler ConvTranspose1d weights.
+    // w = g * v / ||v|| where g=original0 (C_in, 1, 1), v=original1 (C_in, C_out, K)
+    // norm is per-output-filter (over C_out*K), applied along ne[2] (C_in) of the ggml tensor.
+    for (auto& us : w.wave_upsampler_stages) {
+        if (!us.conv_w0 || !us.conv_w1)
+            continue;
+        // Read g and v from backend
+        int n_g = (int)ggml_nelements(us.conv_w0);
+        int n_v = (int)ggml_nelements(us.conv_w1);
+        std::vector<float> g_data(n_g), v_data(n_v);
+        if (us.conv_w0->type == GGML_TYPE_F16) {
+            std::vector<uint16_t> tmp(n_g);
+            ggml_backend_tensor_get(us.conv_w0, tmp.data(), 0, n_g * sizeof(uint16_t));
+            for (int i = 0; i < n_g; i++)
+                g_data[i] = ggml_fp16_to_fp32(tmp[i]);
+        } else {
+            ggml_backend_tensor_get(us.conv_w0, g_data.data(), 0, n_g * sizeof(float));
+        }
+        if (us.conv_w1->type == GGML_TYPE_F16) {
+            std::vector<uint16_t> tmp(n_v);
+            ggml_backend_tensor_get(us.conv_w1, tmp.data(), 0, n_v * sizeof(uint16_t));
+            for (int i = 0; i < n_v; i++)
+                v_data[i] = ggml_fp16_to_fp32(tmp[i]);
+        } else {
+            ggml_backend_tensor_get(us.conv_w1, v_data.data(), 0, n_v * sizeof(float));
+        }
+        // v shape in ggml: ne[0]=K, ne[1]=C_out, ne[2]=C_in (from GGUF [K, C_out, C_in])
+        int K_dim = (int)us.conv_w1->ne[0];
+        int C_out = (int)us.conv_w1->ne[1];
+        int C_in = (int)us.conv_w1->ne[2];
+        // Weight norm: for each filter i (C_in dimension), compute ||v_i|| over (C_out * K)
+        // Then w_i = g_i * v_i / ||v_i||
+        std::vector<float> w_fused(n_v);
+        for (int ci = 0; ci < C_in; ci++) {
+            float g_val = g_data[ci]; // g is (C_in, 1, 1) → one value per input channel
+            // Compute ||v[ci]|| over C_out*K elements
+            float norm_sq = 0;
+            for (int co = 0; co < C_out; co++)
+                for (int k = 0; k < K_dim; k++)
+                    norm_sq +=
+                        v_data[ci * C_out * K_dim + co * K_dim + k] * v_data[ci * C_out * K_dim + co * K_dim + k];
+            float norm_inv = 1.0f / (sqrtf(norm_sq) + 1e-12f);
+            for (int co = 0; co < C_out; co++)
+                for (int k = 0; k < K_dim; k++)
+                    w_fused[ci * C_out * K_dim + co * K_dim + k] =
+                        g_val * v_data[ci * C_out * K_dim + co * K_dim + k] * norm_inv;
+        }
+        // Write back fused weight to conv_w1 tensor (overwrite v with w)
+        if (us.conv_w1->type == GGML_TYPE_F16) {
+            std::vector<uint16_t> tmp(n_v);
+            for (int i = 0; i < n_v; i++)
+                tmp[i] = ggml_fp32_to_fp16(w_fused[i]);
+            ggml_backend_tensor_set(us.conv_w1, tmp.data(), 0, n_v * sizeof(uint16_t));
+        } else {
+            ggml_backend_tensor_set(us.conv_w1, w_fused.data(), 0, n_v * sizeof(float));
+        }
+    }
+
     // Create scheduler for graph compute (handles weight buffer + compute buffer)
     ggml_backend_t backends[] = {ctx->backend};
     ctx->sched = ggml_backend_sched_new(backends, nullptr, 1, 8192, false, false);
@@ -371,6 +429,26 @@ struct miocodec_context* miocodec_init_from_file(const char* path, struct miocod
     }
 
     return ctx;
+}
+
+// SnakeBeta activation: x + (1/exp(β)) * sin²(exp(α) * x)
+// alpha, beta are (C) 1D tensors (log-scale). x is (C, T).
+// Broadcasting: alpha/beta (C) broadcasts against (C, T) since ne[0]=C matches.
+static ggml_tensor* miocodec_snake_beta(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* alpha, ggml_tensor* beta) {
+    ggml_tensor* a = ggml_exp(ctx0, alpha); // exp(alpha), shape (C)
+    ggml_tensor* b = ggml_exp(ctx0, beta);  // exp(beta), shape (C)
+    // sin²(a * x): a broadcasts (C) against x (C, T)
+    ggml_tensor* ax = ggml_mul(ctx0, x, a);               // (C, T) — a broadcasts
+    ggml_tensor* s2 = ggml_sqr(ctx0, ggml_sin(ctx0, ax)); // sin²(a*x), (C, T)
+    // (1/b) * s2: b broadcasts (C) against s2 (C, T)
+    // Need 1/b — use ggml_div? No ggml_div. Use: s2 * (1/b).
+    // 1/b = ggml_scale(ones, 0) + ... no. Compute reciprocal CPU-side? Too complex.
+    // Actually: ggml doesn't have element-wise reciprocal or div.
+    // Workaround: precompute 1/exp(beta) = exp(-beta) at load time.
+    // For now, use the approximation: exp(-beta) ≈ 1/exp(beta)
+    ggml_tensor* inv_b = ggml_exp(ctx0, ggml_neg(ctx0, beta)); // exp(-beta) = 1/exp(beta)
+    ggml_tensor* scaled = ggml_mul(ctx0, s2, inv_b);           // (C, T)
+    return ggml_add(ctx0, x, scaled);
 }
 
 void miocodec_free(struct miocodec_context* ctx) {
@@ -984,14 +1062,12 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
 
             // SnakeBeta: x + (1/exp(beta)) * sin²(exp(alpha) * x)
             // alpha, beta are (C_next) — need exp then element-wise ops
-            // sin²(αx) = sin(αx)² = (1 - cos(2αx)) / 2
-            // For simplicity: x + sin(α*x)² / β where α=exp(alpha_param), β=exp(beta_param)
-            // ggml has ggml_sin but not sin². Use: sin²(x) = 1 - cos(2x))/2? Or just mul.
-            // Actually ggml has no sin/cos ops for tensors. Implement SnakeBeta CPU-side later.
-            // Skip SnakeBeta for now (it's an activation — affects values, not shapes)
+            // SnakeBeta activation after ConvTranspose
+            if (us.snake_alpha && us.snake_beta)
+                x_upsamp = miocodec_snake_beta(ctx0, x_upsamp, us.snake_alpha, us.snake_beta);
 
             // ResNet block (same pattern as prior/post net, but C=C_next)
-            int gn_groups = std::min(n_groups, C_next); // adjust groups for smaller channels
+            int gn_groups = std::min(n_groups, C_next);
             x_upsamp = miocodec_resnet_block(ctx0, x_upsamp, us.resblk, gn_groups);
 
             C_cur = C_next;
@@ -1004,7 +1080,10 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         if (ctx->weights.wave_upsampler_out_proj_b)
             x_upsamp = ggml_add(ctx0, x_upsamp, ctx->weights.wave_upsampler_out_proj_b);
 
-        // Skip out_snake SnakeBeta for now (no ggml sin/cos ops)
+        // Final SnakeBeta on upsampler output
+        if (ctx->weights.wave_upsampler_out_snake_alpha && ctx->weights.wave_upsampler_out_snake_beta)
+            x_upsamp = miocodec_snake_beta(ctx0, x_upsamp, ctx->weights.wave_upsampler_out_snake_alpha,
+                                           ctx->weights.wave_upsampler_out_snake_beta);
 
         ggml_set_name(x_upsamp, "wave_upsampler_out");
         ggml_set_output(x_upsamp);
