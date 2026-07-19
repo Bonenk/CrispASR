@@ -577,7 +577,7 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
     const int d_out = 512;         // output dim (after output_proj)
     const int n_heads = 12;        // prenet heads
     const int hd = d_in / n_heads; // 64
-    const int window = 125;        // window_size (62 on each side)
+    (void)0; // window_size (62 on each side) — used for mask setup
     const float eps = 1e-5f;
     const int T = T_in;
 
@@ -590,26 +590,18 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
     ggml_set_name(input, "prenet_input");
     ggml_set_input(input);
 
-    // Window mask: bidirectional, window//2 on each side
-    // Shape (T, T) F16 — 0 for allowed, -inf for masked
-    ggml_tensor* win_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T);
-    ggml_set_name(win_mask, "win_mask");
-    ggml_set_input(win_mask);
-
-    // Positions for RoPE
-    ggml_tensor* positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
-    ggml_set_name(positions, "positions");
-    ggml_set_input(positions);
+    // Window mask — needed for windowed attention
+    ggml_tensor* win_mask = nullptr;
+    const size_t n_prenet_layers = c->wave_prenet_layers.size();
+    if (n_prenet_layers > 0) {
+        win_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, T, T);
+        ggml_set_name(win_mask, "win_mask");
+        ggml_set_input(win_mask);
+    }
 
     ggml_tensor* cur = input;
 
-    if (!c->wave_prenet_layers.empty()) {
-        fprintf(stderr, "miotts: prenet layer0: wq=%p norm_w=%p ffn_w1=%p out_proj=%p\n",
-                (void*)c->wave_prenet_layers[0].wq, (void*)c->wave_prenet_layers[0].attn_norm_w,
-                (void*)c->wave_prenet_layers[0].ffn_w1, (void*)c->wave_prenet_out_proj_w);
-    }
-
-    for (size_t il = 0; il < c->wave_prenet_layers.size(); il++) {
+    for (size_t il = 0; il < 1 /* TEMP: 1 layer only */; il++) {
         const auto& b = c->wave_prenet_layers[il];
         ggml_tensor* residual = cur;
 
@@ -617,7 +609,8 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
         ggml_tensor* x = ggml_norm(ctx0, cur, eps);
         x = ggml_mul(ctx0, x, b.attn_norm_w);
         x = ggml_add(ctx0, x, b.attn_norm_b);
-
+        // TEMP: skip attention, just do FFN to isolate bug
+        #if 0
         // Q/K/V projections
         ggml_tensor* Q = ggml_mul_mat(ctx0, b.wq, x); // (d_in, T)
         ggml_tensor* K = ggml_mul_mat(ctx0, b.wk, x);
@@ -628,17 +621,8 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
         K = ggml_reshape_3d(ctx0, K, hd, n_heads, T);
         V = ggml_reshape_3d(ctx0, V, hd, n_heads, T);
 
-        // RoPE (NEOX = half-split interleaved, theta=10000)
-        // MioCodec's apply_rotary_emb uses view_as_complex which pairs adjacent
-        // elements. ggml GGML_ROPE_TYPE_NEOX interleaves the same way when
-        // n_dims == head_dim (full rotation). The key: ggml's NEOX mode with
-        // n_dims=hd rotates ALL elements using the [-x2,x1] pattern which IS
-        // equivalent to the complex multiplication on adjacent pairs.
-        // TODO: verify with a standalone RoPE unit test.
-        Q = ggml_rope_ext(ctx0, Q, positions, nullptr, hd, GGML_ROPE_TYPE_NEOX, /*n_ctx*/ 512, /*theta*/ 10000.0f, 1.0f,
-                          0.0f, 1.0f, 32.0f, 1.0f);
-        K = ggml_rope_ext(ctx0, K, positions, nullptr, hd, GGML_ROPE_TYPE_NEOX, 512, 10000.0f, 1.0f, 0.0f, 1.0f, 32.0f,
-                          1.0f);
+        // RoPE — TEMPORARILY DISABLED for debugging
+        // TODO: re-enable once attention is verified without RoPE
 
         // Permute to flash-attn layout (hd, T, n_heads)
         Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
@@ -647,7 +631,8 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
 
         // Flash attention with window mask
         float scale = 1.0f / std::sqrt((float)hd);
-        ggml_tensor* attn = ggml_flash_attn_ext(ctx0, Q, K, V, win_mask, scale, 0.0f, 0.0f);
+        // Use nullptr mask since T=29 < window=125 (all positions visible)
+        ggml_tensor* attn = ggml_flash_attn_ext(ctx0, Q, K, V, /*mask=*/nullptr, scale, 0.0f, 0.0f);
 
         // Reshape back to (d_in, T)
         attn = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3)), d_in, T);
@@ -655,8 +640,10 @@ static ggml_cgraph* build_graph_wave_prenet(miotts_context* c, int T_in) {
         // Output projection
         attn = ggml_mul_mat(ctx0, b.wo, attn);
 
-        // Residual
-        cur = ggml_add(ctx0, residual, attn);
+        // Residual (attn skipped)
+        // cur = ggml_add(ctx0, residual, attn);
+        cur = residual; // no attention for debugging
+        #endif
 
         // FFN: LayerNorm + SwiGLU
         residual = cur;
@@ -881,24 +868,36 @@ float* miotts_wave_prenet_forward(miotts_context* ctx, const float* fsq_emb, int
     ggml_tensor* input_t = ggml_graph_get_tensor(gf, "prenet_input");
     ggml_backend_tensor_set(input_t, fsq_emb, 0, (size_t)T * d_in * sizeof(float));
 
+    // Verify input was set correctly
+    {
+        float check[4];
+        ggml_backend_tensor_get(input_t, check, 0, 4 * sizeof(float));
+        fprintf(stderr, "miotts: prenet input verify[0:4] = %.6f %.6f %.6f %.6f\n", check[0], check[1], check[2],
+                check[3]);
+    }
+
     // Set positions [0, 1, 2, ..., T-1]
     ggml_tensor* pos_t = ggml_graph_get_tensor(gf, "positions");
-    std::vector<int32_t> pos(T);
-    for (int i = 0; i < T; i++)
-        pos[i] = i;
-    ggml_backend_tensor_set(pos_t, pos.data(), 0, T * sizeof(int32_t));
+    if (pos_t) {
+        std::vector<int32_t> pos(T);
+        for (int i = 0; i < T; i++)
+            pos[i] = i;
+        ggml_backend_tensor_set(pos_t, pos.data(), 0, T * sizeof(int32_t));
+    }
 
     // Build window mask: bidirectional, window=125 (62 on each side)
     ggml_tensor* mask_t = ggml_graph_get_tensor(gf, "win_mask");
-    const int w = 62; // window_size // 2
-    std::vector<ggml_fp16_t> mask(T * T);
-    for (int q = 0; q < T; q++) {
-        for (int k = 0; k < T; k++) {
-            bool in_window = (k >= q - w) && (k <= q + w);
-            mask[q * T + k] = in_window ? ggml_fp32_to_fp16(0.0f) : ggml_fp32_to_fp16(-INFINITY);
+    if (mask_t) {
+        const int w = 62; // window_size // 2
+        std::vector<ggml_fp16_t> mask(T * T);
+        for (int q = 0; q < T; q++) {
+            for (int k = 0; k < T; k++) {
+                bool in_window = (k >= q - w) && (k <= q + w);
+                mask[q * T + k] = in_window ? ggml_fp32_to_fp16(0.0f) : ggml_fp32_to_fp16(-INFINITY);
+            }
         }
+        ggml_backend_tensor_set(mask_t, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
     }
-    ggml_backend_tensor_set(mask_t, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
 
     ggml_backend_sched_graph_compute(ctx->sched, gf);
 
