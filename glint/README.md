@@ -34,4 +34,4 @@ is behind glint main. To sync by hand, run `tools/sync-glint.sh` —
 never `cp` from a glint working tree (it may hold another session's
 WIP; the script always takes a committed state).
 
-Synced at upstream commit: `023de75df24d50a30e181732dd773df003237385` (Merge origin/main).
+Synced at upstream commit: `42fdd502d2972b55dcd506ddf6aa086e9d3dcb9f` (feat: decoder + joint stereo (sync from app); v0.4.0).
