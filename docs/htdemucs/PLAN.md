@@ -23,8 +23,11 @@ could not run it (8 GB, OOM). This branch does that validation on the M1.
 - [x] **BUG 6 FIXED** — freq_emb ne[] swapped
 - [x] **ENCODER NOW FULLY PASSES** — 15/25 stages, every encoder stage
       (freq + time, all 4 layers) and both pre_transformer_* at cos >= 0.999998
-- [ ] IN FLIGHT: CrossTransformer — `post_transformer_z` cos=0.035,
-      |mine|=715.5 vs |ref|=86.5 (8x magnitude blowup => structural, not drift)
+- [x] **CROSSTRANSFORMER NOW FULLY PASSES** — all 5 layers + post_transformer_*
+      at cos = 1.000000 (BUGS 7, 8, 9)
+- [ ] IN FLIGHT: decoder — dec_freq_0..3 cos 0.96 -> 0.90, and the final
+      outputs are ~100x too small (|mine|=0.0015 vs |ref|=0.1543), which looks
+      like a separate CaC-unmask / iSTFT / denormalize issue
 - [ ] BUG 3: `tests/test_htdemucs_smoke.cpp` never registered in CMake
 
 ## Bugs found
@@ -129,3 +132,48 @@ The summary reported `FIRST DIVERGENCE: output_vocals` when the real first
 failure was `enc_freq_0`. `first_fail` was a `const char*` assigned from
 `("enc_freq_" + std::to_string(i)).c_str()` — a pointer into a temporary that
 dies at the end of the full expression. Now a `std::string`.
+
+### BUG 7 — transformer input: pos-emb added BEFORE norm_in (FIXED)
+
+`CrossTransformerEncoder.forward` is `x = norm_in(x)` **then**
+`x = x + weight_pos_embed * pos_emb`. The C++ added the position embedding
+first and then LayerNorm'd it, which renormalised the embedding away. Both sin
+embedding formulas themselves were already correct (verified term by term
+against `create_2d_sin_embedding` / `create_sin_embedding`).
+
+### BUG 8 — spurious transpose scrambled both transformer branches (FIXED)
+
+`ggml_conv_1d` output has `ne[0] = seq`, i.e. seq is the **fast** axis, so the
+channel upsampler already left the buffers as `[dim][seq]` in C memory — exactly
+what the attention code indexes (`tmp[d*seq_len + s]`). The code read that as
+`(seq, dim)` and transposed it (with a matching transpose back before
+`channel_down`, so the two cancelled and the shapes stayed plausible) — meaning
+every transformer layer ran on scrambled data. Both transposes removed.
+
+The freq branch keeps its native `s = fr*T1 + t1` order rather than Python's
+`(t1 fr)`; the position embedding is indexed to match. Token order is otherwise
+irrelevant (self-attn is permutation-equivariant, cross-attn sums over the whole
+key/value set, FFN/LayerNorm are per-token) and the decoder reads the same order.
+
+### BUG 9 — norm_out is GroupNorm(1), not LayerNorm (FIXED) — the big one
+
+Each transformer layer ends with `norm_out`, a `MyGroupNorm(num_groups=1)`:
+**one mean/std over all channels AND all tokens jointly**. The C++ applied
+`cpu_layernorm`, which computes a **separate mean/std per token**. That left
+~1% error in every layer.
+
+Why it looked like a layer-4 bug: layer 4's pre-`norm_out` activations are
+outlier-dominated (norm ~85,589 normalised down to ~78), so that step amplifies
+any upstream relative error enormously — `ct_l3_z` cos 0.992 became `ct_l4_z`
+cos 0.217. Verified with forward hooks on the real module that this collapse is
+genuine reference behaviour, NOT a reference-replication artifact, before
+concluding the fault was upstream.
+
+Fixing the normalization alone took the whole transformer to cos = 1.000000:
+
+  ct_l0_z 0.987908 -> 1.000000      ct_l4_z 0.217092 -> 1.000000
+  post_transformer_z 0.406606 -> 1.000000
+
+Lesson: a uniform ~1% per-layer error is worth chasing as structural, not
+written off as drift — the amplifying stage downstream is the symptom, not
+the cause.

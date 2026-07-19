@@ -25,6 +25,9 @@ DEFAULT_STAGES = [
     "input_wav",
     "spec_input", "time_input",
     "enc0_conv", "enc0_gelu", "enc0_dconv", "enc0_rewrite",
+    "ct_in_z", "ct_in_xt",
+    "ct_l0_z", "ct_l1_z", "ct_l2_z", "ct_l3_z", "ct_l4_z",
+    "ct_l0_xt", "ct_l1_xt", "ct_l2_xt", "ct_l3_xt", "ct_l4_xt",
     "enc_freq_0", "enc_freq_1", "enc_freq_2", "enc_freq_3",
     "enc_time_0", "enc_time_1", "enc_time_2",
     "pre_transformer_z", "pre_transformer_xt",
@@ -171,7 +174,51 @@ def dump(model_dir, audio, stages, max_new_tokens=None, **kwargs):
                 x = rearrange(x, "b c (f t)-> b c f t", f=f)
                 xt = model.channel_upsampler_t(xt)
 
-            x, xt = model.crosstransformer(x, xt)
+            # Replicate CrossTransformerEncoder.forward with per-layer capture.
+            # Intermediates are rearranged back to (C, Fr, T1) / (C, T2) so they
+            # match the C++ buffers elementwise: the runtime flattens the freq
+            # branch fr-major (s = fr*T1 + t1) rather than Python's (t1 fr), and
+            # (C, Fr, T1) row-major is exactly that layout.
+            from einops import rearrange as _rr
+            from demucs.transformer import create_2d_sin_embedding as _c2d
+            ct = model.crosstransformer
+            _B, _C, _Fr, _T1 = x.shape
+
+            def _cap_z(name, t):
+                maybe_capture(name, _rr(t, "b (t1 fr) c -> b c fr t1", t1=_T1))
+
+            def _cap_t(name, t):
+                maybe_capture(name, _rr(t, "b t2 c -> b c t2"))
+
+            pe2d = _c2d(_C, _Fr, _T1, x.device, ct.max_period)
+            pe2d = _rr(pe2d, "b c fr t1 -> b (t1 fr) c")
+            xz = _rr(x, "b c fr t1 -> b (t1 fr) c")
+            xz = ct.norm_in(xz)
+            xz = xz + ct.weight_pos_embed * pe2d
+
+            _B2, _C2, _T2 = xt.shape
+            xtt = _rr(xt, "b c t2 -> b t2 c")
+            pe1d = ct._get_pos_embedding(_T2, _B2, _C2, x.device)
+            pe1d = _rr(pe1d, "t2 b c -> b t2 c")
+            xtt = ct.norm_in_t(xtt)
+            xtt = xtt + ct.weight_pos_embed * pe1d
+
+            _cap_z("ct_in_z", xz)
+            _cap_t("ct_in_xt", xtt)
+
+            for _i in range(ct.num_layers):
+                if _i % 2 == ct.classic_parity:
+                    xz = ct.layers[_i](xz)
+                    xtt = ct.layers_t[_i](xtt)
+                else:
+                    _old = xz
+                    xz = ct.layers[_i](xz, xtt)
+                    xtt = ct.layers_t[_i](xtt, _old)
+                _cap_z(f"ct_l{_i}_z", xz)
+                _cap_t(f"ct_l{_i}_xt", xtt)
+
+            x = _rr(xz, "b (t1 fr) c -> b c fr t1", t1=_T1)
+            xt = _rr(xtt, "b t2 c -> b c t2")
 
             if model.bottom_channels:
                 x = rearrange(x, "b c f t-> b c (f t)")
