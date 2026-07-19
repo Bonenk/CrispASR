@@ -178,8 +178,19 @@ def _load(model_dir):
             "(num_bands, n_fft, hop) is not recoverable from the weights alone."
         )
 
+    # The upstream configs use `!!python/tuple` (multi_stft_resolutions_window_sizes),
+    # which plain safe_load rejects. Teach SafeLoader that one tag rather than
+    # dropping to unsafe_load, so the rest of the document stays safely parsed.
+    class _Loader(yaml.SafeLoader):
+        pass
+
+    _Loader.add_constructor(
+        "tag:yaml.org,2002:python/tuple",
+        lambda loader, node: tuple(loader.construct_sequence(node)),
+    )
+
     with open(yaml_path) as f:
-        cfg_all = yaml.safe_load(f)
+        cfg_all = yaml.load(f, Loader=_Loader)
     cfg = dict(cfg_all.get("model", {}))
     audio_cfg = cfg_all.get("audio", {}) or {}
     cfg.setdefault("sample_rate", audio_cfg.get("sample_rate", 44100))
