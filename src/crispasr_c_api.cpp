@@ -160,6 +160,10 @@
 #include "miotts.h"
 #define CA_HAVE_MIOTTS 1
 #endif
+#if __has_include("piano_transcription.h")
+#include "piano_transcription.h"
+#define CA_HAVE_PIANO_TRANSCRIPTION 1
+#endif
 #if __has_include("moss_tts.h")
 #include "moss_tts.h"
 #define CA_HAVE_MOSS_TTS 1
@@ -3820,6 +3824,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_MIOTTS
     list += ",miotts";
+#endif
+#ifdef CA_HAVE_PIANO_TRANSCRIPTION
+    list += ",piano-transcription";
 #endif
 #ifdef CA_HAVE_MOSS_TTS
     list += ",moss-tts";

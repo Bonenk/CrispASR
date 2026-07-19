@@ -1519,6 +1519,18 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# piano_transcription — ByteDance/Kong piano transcription (Apache-2.0, ~86M F16)
+# ---------------------------------------------------------------------------
+add_library(piano-transcription STATIC piano_transcription.h piano_transcription.cpp)
+set_target_properties(piano-transcription PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(piano-transcription PUBLIC .)
+target_compile_features   (piano-transcription PUBLIC cxx_std_17)
+target_link_libraries     (piano-transcription PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(piano-transcription PRIVATE -O3)
+endif()
+
+# ---------------------------------------------------------------------------
 # audioseal — Meta AudioSeal watermark generator + detector (MIT, ~5M params)
 # ---------------------------------------------------------------------------
 add_library(audioseal STATIC audioseal.h audioseal.cpp)
@@ -2480,6 +2492,9 @@ if (TARGET omniasr)
 endif()
 if (TARGET vibevoice)
     target_link_libraries(crispasr-lib PUBLIC vibevoice)
+endif()
+if (TARGET piano-transcription)
+    target_link_libraries(crispasr-lib PUBLIC piano-transcription)
 endif()
 if (TARGET kugelaudio)
     target_link_libraries(crispasr-lib PUBLIC kugelaudio)

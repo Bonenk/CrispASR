@@ -3410,6 +3410,26 @@ if (CRISPASR_FUZZ)
     target_link_options(crispasr-fuzz-tokenizer PRIVATE -fsanitize=fuzzer)
 endif()
 
+# ─── test - piano-transcription — live integration tests
+add_executable(test-piano-transcription
+    test_piano_transcription_live.cpp
+)
+target_include_directories(test-piano-transcription PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+)
+target_link_libraries(test-piano-transcription PRIVATE
+    Catch2::Catch2WithMain
+    piano-transcription
+)
+catch_discover_tests(test-piano-transcription
+    TEST_SPEC "[piano-transcription]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── C2PA native-JS signer — unit + live parity tests (node --test) ──────────
 # The signer (bindings/javascript/c2pa.mjs) re-implements C2PA signing in pure
 # WebCrypto so the wasm build needs no c2pa-rs. Unit tests are hermetic (CBOR
