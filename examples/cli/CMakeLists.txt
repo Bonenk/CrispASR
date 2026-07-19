@@ -224,6 +224,7 @@ target_link_libraries(crispasr-diff PRIVATE
     parler-tts
     mini-omni2
     dots-tts
+    miotts
     crispasr-diff-lib
     ${FFMPEG_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
@@ -344,6 +345,7 @@ target_link_libraries(${TARGET} PRIVATE
     moss_tts_local
     moss_transcribe
     moss_transcribe_diarize
+    miotts
     ${FFMPEG_LIBRARIES}
     ${CMAKE_THREAD_LIBS_INIT}
     $<$<BOOL:${WIN32}>:winhttp>
