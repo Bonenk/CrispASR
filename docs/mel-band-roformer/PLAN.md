@@ -16,12 +16,28 @@
       (`docs/source-separation-surface.md`, `src/core/separation_io.h`,
       multi-channel WAV writer, `tests/test-separation-io.cpp` 9/9) — maintainer
       chose "design the shared surface now"; htdemucs session to adopt it
-- [ ] **NEXT: `src/mel_band_roformer.{h,cpp}`** — C API mirroring `htdemucs.h`
-      (`mel_band_roformer_{init_from_file,separate}` → same result shape), built
-      incrementally against the diff harness: stage 0 band gather → band_split →
-      time/freq transformers (RoPE + to_gates + value-residual) → mask (Tanh MLP
-      + GLU) → scatter-average → complex-mul → iSTFT. First-divergence debugging
-      vs `ref_mbr.gguf` (persisted). Reuse core/fft.h, istft.h, core_attn, ffn.h.
+- [x] **`src/mel_band_roformer.{h,cpp}` — C API + CPU forward, diffed stage by
+      stage** (opt-in probe `mbr-diff-probe`, `CRISPASR_BUILD_MBR_PROBE=ON`).
+      All input-aligned vs `ref_mbr.gguf`; PASS = cos ≥ 0.9995:
+      ```
+      freq_indices   cos=1.000000   stft_packed    cos=1.000000
+      band_gathered  cos=1.000000   band_split_out cos=1.000000
+      layer0_time    cos=1.000000   (full RoFormer block — RoPE + gating + GELU-erf FFN)
+      ```
+      RMSNorm-amplification lesson applied throughout (feed each stage the ref
+      input, not our chained output). CPU helpers: linear, gelu_erf, rms_rows,
+      rope_head, roformer_block, band_split_cpu.
+- [ ] **NEXT stages** (same validated block, different axis / accumulation):
+      - `layer0_freq` — freq transformer attends over the 60 bands per time step.
+        Its input is the full (all-bands) time-transformer output, but the dumper
+        hook currently captures only `[0]` (band 0). **TODO: dumper captures full
+        transformer intermediates** so freq + later layers input-align cleanly;
+        re-dump; then diff.
+      - value residuals: layers 1..5 consume layer-0's attention values
+        (`add_value_residual and not is_first`) — thread them through.
+      - mask estimator (per-band Tanh MLP → GLU), scatter-add → average by
+        num_bands_per_freq, complex mask multiply, iSTFT (reuse core_istft).
+      - wire `mel_band_roformer_separate()` (currently a Phase-2 null stub).
 - [ ] Dispatcher `examples/cli/crispasr_separate_cli.{h,cpp}` + `--separate`
       hook; wire htdemucs (C API ready) + MBR through `crispasr_separation_view`
 - [ ] Roundtrip acceptance (SDR / ASR on the vocal stem) — the ONLY gate that counts
