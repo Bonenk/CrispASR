@@ -53,18 +53,41 @@ def as_np(t) -> np.ndarray:
     return np.ascontiguousarray(t.detach().float().cpu().numpy())
 
 
-def try_forward(mod, pcm: np.ndarray):
-    """Call a traced module trying a few input conventions; return first that works."""
-    t1d = torch.from_numpy(pcm)
-    candidates = [t1d, t1d.unsqueeze(0), t1d.unsqueeze(0).unsqueeze(0)]
+def seamless_mel(pcm: np.ndarray) -> torch.Tensor:
+    """160-dim SeamlessM4T log-mel features [1, T, 160] — the w2v-BERT input."""
+    from transformers import SeamlessM4TFeatureExtractor
+
+    fx = SeamlessM4TFeatureExtractor.from_pretrained("facebook/w2v-bert-2.0")
+    out = fx(pcm, sampling_rate=16000, return_tensors="pt")
+    return out["input_features"]
+
+
+def pick_hidden(d):
+    """From the w2v-BERT dict output, pick the [.,.,1024] predictor handoff."""
+    if torch.is_tensor(d):
+        return d
+    items = list(d.items())
+    for k, v in items:
+        if torch.is_tensor(v) and v.dim() == 3 and v.shape[-1] == 1024:
+            return v
+    # fall back to the first 3-D tensor
+    for k, v in items:
+        if torch.is_tensor(v) and v.dim() == 3:
+            return v
+    raise RuntimeError(f"no hidden-state tensor in fe output: {[(k, tuple(v.shape)) for k, v in items]}")
+
+
+def run_decoder(dec, hidden: torch.Tensor):
+    """Call the decoder trying a few conventions on the predictor handoff."""
+    cands = [hidden, hidden.transpose(1, 2)]
     last = None
-    for c in candidates:
+    for c in cands:
         try:
             with torch.no_grad():
-                return as_np(mod(c)), tuple(c.shape)
+                return as_np(dec(c)), tuple(c.shape)
         except Exception as e:  # noqa: BLE001
             last = e
-    raise RuntimeError(f"all input conventions failed; last error: {last}")
+    raise RuntimeError(f"decoder conventions failed; last: {last}")
 
 
 def main() -> int:
@@ -90,13 +113,21 @@ def main() -> int:
     pcm = load_wav_16k(args.wav)
     print(f"[input] {pcm.shape[0]} samples @16k", file=sys.stderr)
 
-    feats, fe_in = try_forward(fe, pcm)
-    print(f"[fe] in={fe_in} -> feats{feats.shape} ({feats.dtype})", file=sys.stderr)
+    mel = seamless_mel(pcm)
+    print(f"[mel] input_features {tuple(mel.shape)} ({mel.dtype})", file=sys.stderr)
 
     with torch.no_grad():
-        out = as_np(dec(torch.from_numpy(feats)))
+        fe_out = fe(mel)
+    if isinstance(fe_out, dict):
+        print(f"[fe] dict keys: {[(k, tuple(v.shape)) for k, v in fe_out.items() if torch.is_tensor(v)]}",
+              file=sys.stderr)
+    hidden = pick_hidden(fe_out)
+    feats = as_np(hidden)
+    print(f"[fe] handoff features {feats.shape}", file=sys.stderr)
+
+    out, dec_in = run_decoder(dec, hidden)
     out = out.reshape(-1)
-    print(f"[dec] feats -> out{out.shape} 48k, {out.shape[0] / 48000:.2f}s", file=sys.stderr)
+    print(f"[dec] in={dec_in} -> out{out.shape} 48k, {out.shape[0] / 48000:.2f}s", file=sys.stderr)
 
     write_wav(args.out_wav, out, 48000)
 
