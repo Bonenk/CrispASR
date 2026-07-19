@@ -81,3 +81,26 @@ lines per backend.
   path. If it has already started one, we reconcile to THIS spec (one surface).
 - `mel_band_roformer_{init,separate}` (the C API mirroring `htdemucs.h`) lands
   with the MBR C++ backend; until then the dispatcher's MBR branch is stubbed.
+
+## ⚠ DIVERGENCE TO RECONCILE (2026-07-19)
+
+The `--separate` dispatcher (this spec) shipped and drives BOTH backends. But
+the htdemucs session independently took a **different** surface:
+`examples/cli/crispasr_backend_htdemucs.cpp` — an `HtdemucsBackend :
+CrispasrBackend` with a `CAP_SEPARATE` capability whose `transcribe()` runs
+separation and returns a synthetic `"[separated: …]"` segment (the audio can't
+travel through the transcript path, so the stems are stashed for the CLI to
+pull out separately). So there are now TWO ways to separate:
+
+| surface | trigger | shape |
+|---|---|---|
+| **`--separate`** (this spec, agreed) | `--separate` | standalone task, audio out, both backends via one dispatcher |
+| `CAP_SEPARATE` adapter | `--backend htdemucs` | routed through `transcribe()`, fake text segment, stem-stash hack |
+
+They don't crash together (`--separate` early-routes in `cli.cpp` before
+backend detection), but shipping two is confusing and the adapter fights the
+transcribe contract. **Per the maintainer's decision that `--separate` is the
+shared surface, the `CAP_SEPARATE` transcribe-adapter should be removed and
+`--backend htdemucs` (if kept at all) should just point users at `--separate`.**
+Not deleting the other session's active file unilaterally — flagged here for the
+maintainer to have that session converge, or to authorize this session to do it.
