@@ -576,6 +576,11 @@ constexpr Entry k_registry[] = {
     // degrades audio earlier than the backbone). Default download is the Q4_K
     // backbone (~5 GB) paired with the F16 codec. (URLs populated at ship after
     // the GGUF upload — see Phase 6.)
+    // MioTTS-0.6B (Qwen3 LLM + MioCodec-25Hz-24kHz, Apache-2.0).
+    // Single GGUF, tokenizer.json loaded at runtime.
+    {"miotts", "miotts-0.6b-q8_0.gguf",
+     "https://huggingface.co/cstr/miotts-0.6b-GGUF/resolve/main/miotts-0.6b-q8_0.gguf",
+     "~723 MB"},
     {"moss-tts", "moss-tts-v1.5-q4_k.gguf",
      "https://huggingface.co/cstr/moss-tts-v1.5-GGUF/resolve/main/moss-tts-v1.5-q4_k.gguf",
      "~5 GB",

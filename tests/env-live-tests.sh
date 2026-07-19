@@ -82,6 +82,8 @@ export CRISPASR_MODEL_MOSS_DIARIZE="${CRISPASR_MODEL_MOSS_DIARIZE:-$CRISPASR_MOD
 
 # MOSS-TTS-v1.5 (OpenMOSS-Team/MOSS-TTS-v1.5): TTS — Qwen3-8B backbone + 32 RVQ
 # codebooks + transformer codec companion (validated by ASR round-trip, #249).
+# MioTTS-0.6B (Qwen3 + MioCodec, Apache-2.0)
+export CRISPASR_MODEL_MIOTTS="${CRISPASR_MODEL_MIOTTS:-$CRISPASR_MODELS_DIR/miotts-0.6b-q8_0.gguf}"
 export CRISPASR_MODEL_MOSS_TTS="${CRISPASR_MODEL_MOSS_TTS:-$CRISPASR_MODELS_DIR/moss-tts-v1.5-q4_k.gguf}"
 export CRISPASR_MODEL_MOSS_TTS_CODEC="${CRISPASR_MODEL_MOSS_TTS_CODEC:-$CRISPASR_MODELS_DIR/moss-tts-v1.5-codec.gguf}"
 export CRISPASR_MODEL_MOSS_TTS_LOCAL="${CRISPASR_MODEL_MOSS_TTS_LOCAL:-$CRISPASR_MODELS_DIR/moss-tts-local-v1.5-q4_k.gguf}"

@@ -66,6 +66,7 @@ add_executable(${TARGET}
     crispasr_backend_omniasr.cpp
     crispasr_backend_mimo_asr.cpp
     crispasr_backend_ark_asr.cpp
+    crispasr_backend_miotts.cpp
     crispasr_backend_moss_audio.cpp
     crispasr_backend_moss_tts.cpp
     crispasr_backend_moss_tts_local.cpp

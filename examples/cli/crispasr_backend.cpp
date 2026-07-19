@@ -55,6 +55,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_funasr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_paraformer_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_sensevoice_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_sidon_backend();
+std::unique_ptr<CrispasrBackend> crispasr_create_miotts_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_voxcpm2_tts_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_cosyvoice3_tts_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_piper_backend();
@@ -145,6 +146,8 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         name == "qwen3-tts-1.7b-customvoice" || name == "qwen3-tts-1.7b-cv" || name == "qwen3-tts-1.7b-voicedesign" ||
         name == "qwen3-tts-voicedesign" || name == "qwen3-tts-vd")
         return crispasr_make_qwen3_tts_backend();
+    if (name == "miotts" || name == "mio-tts" || name == "mio_tts" || name == "miotts-0.6b")
+        return crispasr_create_miotts_backend();
     if (name == "moss-tts-local" || name == "moss_tts_local" || name == "moss-tts-local-v1.5" ||
         name == "mosstts-local" || name == "moss-tts-local-transformer")
         return crispasr_make_moss_tts_local_backend();
@@ -281,6 +284,7 @@ std::vector<std::string> crispasr_list_backends() {
         "vibevoice",
         "kugelaudio",
         "qwen3-tts",
+        "miotts",
         "moss-tts",
         "moss-tts-local",
         "vibevoice-1.5b",
@@ -679,6 +683,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "moss-tts";
     if (contains_ci("moss") && contains_ci("audio"))
         return "moss-audio";
+    if (contains_ci("miotts"))
+        return "miotts";
     if (contains_ci("ggml-") && contains_ci(".bin"))
         return "whisper";
 
@@ -732,6 +738,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "qwen3";
             else if (a == "qwen3-tts" || a == "qwen3_tts" || a == "qwen3tts")
                 result = "qwen3-tts";
+            else if (a == "miotts" || a == "mio-tts")
+                result = "miotts";
             else if (a == "moss-tts-local" || a == "moss_tts_local")
                 result = "moss-tts-local";
             else if (a == "moss-tts" || a == "moss_tts" || a == "moss-tts-delay")
