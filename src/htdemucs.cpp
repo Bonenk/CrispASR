@@ -60,6 +60,8 @@ static bool htdemucs_profile() {
     return v != 0;
 }
 
+static double htd_now_ms();
+
 namespace {
 struct htd_prof {
     std::map<std::string, double> ms;
@@ -73,15 +75,21 @@ struct htd_prof {
             it->second += v;
         }
     }
+    double t_start = 0.0;
     void report() const {
         double tot = 0;
         for (auto& kv : ms)
             tot += kv.second;
-        fprintf(stderr, "\n=== htdemucs phase profile (total %.2f s) ===\n", tot / 1000.0);
+        const double wall = t_start > 0.0 ? htd_now_ms() - t_start : 0.0;
+        fprintf(stderr, "\n=== htdemucs phase profile (instrumented %.2f s of %.2f s wall) ===\n", tot / 1000.0,
+                wall / 1000.0);
         for (const auto& k : order) {
             const double v = ms.at(k);
-            fprintf(stderr, "  %-22s %8.1f ms  %5.1f%%\n", k.c_str(), v, tot > 0 ? 100.0 * v / tot : 0.0);
+            fprintf(stderr, "  %-22s %8.1f ms  %5.1f%%\n", k.c_str(), v, wall > 0 ? 100.0 * v / wall : 0.0);
         }
+        if (wall > tot)
+            fprintf(stderr, "  %-22s %8.1f ms  %5.1f%%  (uninstrumented)\n", "[other]", wall - tot,
+                    100.0 * (wall - tot) / wall);
     }
 };
 } // namespace
@@ -1445,6 +1453,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     auto& hp = ctx->model.hparams;
     auto& m = ctx->model;
     htd_prof prof;
+    if (htdemucs_profile())
+        prof.t_start = htd_now_ms();
 
     // Step 1: deinterleave stereo to channel-major
     int training_length = hp.training_length();
@@ -2911,6 +2921,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         // PyTorch ConvTranspose2d(IC, OC, [K,1], [S,1]) weight shape: (IC, OC, K, 1)
         // In ggml ne order: (KW=1, KH=K, ne2=OC, ne3=IC)
         {
+            HTD_PROF(prof, "dec.convtranspose");
             int ct_K = (int)dec.conv_tr_w->ne[1]; // KH
             int ct_OC = (int)dec.conv_tr_w->ne[2];
             int ct_IC = (int)dec.conv_tr_w->ne[3];
@@ -2927,19 +2938,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             int ct_Fq_out = ct_Fq_raw - 2 * ct_pad;
 
             // Read weight data (may be F16)
-            size_t w_n = (size_t)ct_K * ct_OC * ct_IC;
-            std::vector<float> w_data(w_n);
-            if (dec.conv_tr_w->type == GGML_TYPE_F16) {
-                std::vector<ggml_fp16_t> w_f16(w_n);
-                ggml_backend_tensor_get(dec.conv_tr_w, w_f16.data(), 0, w_n * sizeof(ggml_fp16_t));
-                for (size_t i = 0; i < w_n; i++)
-                    w_data[i] = ggml_fp16_to_fp32(w_f16[i]);
-            } else {
-                {
-                    auto _rd = read_tensor_f32(dec.conv_tr_w);
-                    memcpy(w_data.data(), _rd.data(), std::min(w_data.size(), _rd.size()) * sizeof(float));
-                }
-            }
+            // read_tensor_f32 already handles the F16 -> F32 conversion; cache it
+            // so the whole kernel is not re-converted on every decoder call.
+            const std::vector<float>& w_data = cached_tensor_f32(dec.conv_tr_w);
 
             // Output buffer: (pre_T, ct_Fq_out, ct_OC) = (T, Fq_out, OC)
             size_t ct_out_n = (size_t)pre_T * ct_Fq_out * ct_OC;
@@ -2950,17 +2951,56 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             // where fq_out = fq_in * S + kh - pad
             // Weight indexing: w_data[ic * OC * K + oc * K + kh] (ggml ne order: (1, K, OC, IC))
             // → w[ic][oc][kh] = w_data[ic * ct_OC * ct_K + oc * ct_K + kh]
-            for (int t = 0; t < pre_T; t++) {
-                for (int ic = 0; ic < ct_IC; ic++) {
-                    for (int fq_in = 0; fq_in < pre_Fq; fq_in++) {
-                        float x_val = pre_buf[t + (size_t)fq_in * pre_T + (size_t)ic * pre_T * pre_Fq];
-                        for (int kh = 0; kh < ct_K; kh++) {
-                            int fq_out = fq_in * ct_S + kh - ct_pad;
+            if (htdemucs_fastconv()) {
+                // ConvTranspose as ONE GEMM + a strided scatter-add. The scalar
+                // form above is a 5-deep loop with a scattered innermost WRITE;
+                // it measured 68% of the whole forward. Reformulated:
+                //
+                //   tmp[(oc*K + kh), (fq_in*T + t)] = sum_ic W[ic][oc][kh] * x[ic, fq_in, t]
+                //
+                // The x operand is already (IC, Fq_in*T) in memory — pre_buf is
+                // indexed t + fq_in*T + ic*T*Fq_in — so no packing is needed, and
+                // the IC reduction (the only contraction) goes through sgemm.
+                // The remaining scatter walks contiguous T-runs.
+                std::vector<float> wt((size_t)ct_OC * ct_K * ct_IC);
+                for (int ic = 0; ic < ct_IC; ic++)
+                    for (int oc = 0; oc < ct_OC; oc++)
+                        for (int kh = 0; kh < ct_K; kh++)
+                            wt[(size_t)(oc * ct_K + kh) * ct_IC + ic] =
+                                w_data[(size_t)ic * ct_OC * ct_K + oc * ct_K + kh];
+
+                const size_t ncol = (size_t)pre_Fq * pre_T;
+                std::vector<float> tmp((size_t)ct_OC * ct_K * ncol, 0.0f);
+                htd_gemm(ct_OC * ct_K, (int)ncol, ct_IC, wt.data(), pre_buf.data(), tmp.data());
+
+                for (int oc = 0; oc < ct_OC; oc++)
+                    for (int kh = 0; kh < ct_K; kh++) {
+                        const float* src = tmp.data() + (size_t)(oc * ct_K + kh) * ncol;
+                        float* dstc = ct_out.data() + (size_t)oc * pre_T * ct_Fq_out;
+                        for (int fq_in = 0; fq_in < pre_Fq; fq_in++) {
+                            const int fq_out = fq_in * ct_S + kh - ct_pad;
                             if (fq_out < 0 || fq_out >= ct_Fq_out)
                                 continue;
-                            for (int oc = 0; oc < ct_OC; oc++) {
-                                float w_val = w_data[(size_t)ic * ct_OC * ct_K + oc * ct_K + kh];
-                                ct_out[t + (size_t)fq_out * pre_T + (size_t)oc * pre_T * ct_Fq_out] += x_val * w_val;
+                            const float* srow = src + (size_t)fq_in * pre_T;
+                            float* drow = dstc + (size_t)fq_out * pre_T;
+                            for (int t = 0; t < pre_T; t++)
+                                drow[t] += srow[t];
+                        }
+                    }
+            } else {
+                for (int t = 0; t < pre_T; t++) {
+                    for (int ic = 0; ic < ct_IC; ic++) {
+                        for (int fq_in = 0; fq_in < pre_Fq; fq_in++) {
+                            float x_val = pre_buf[t + (size_t)fq_in * pre_T + (size_t)ic * pre_T * pre_Fq];
+                            for (int kh = 0; kh < ct_K; kh++) {
+                                int fq_out = fq_in * ct_S + kh - ct_pad;
+                                if (fq_out < 0 || fq_out >= ct_Fq_out)
+                                    continue;
+                                for (int oc = 0; oc < ct_OC; oc++) {
+                                    float w_val = w_data[(size_t)ic * ct_OC * ct_K + oc * ct_K + kh];
+                                    ct_out[t + (size_t)fq_out * pre_T + (size_t)oc * pre_T * ct_Fq_out] +=
+                                        x_val * w_val;
+                                }
                             }
                         }
                     }
@@ -3092,6 +3132,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 }
 
                 // ConvTranspose1d on time axis
+                HTD_PROF(prof, "tdec.convtranspose");
                 int ct_K = (int)tdec.conv_tr_w->ne[0]; // kernel size
                 int ct_OC = (int)tdec.conv_tr_w->ne[1];
                 int ct_IC = (int)tdec.conv_tr_w->ne[2];
@@ -3202,6 +3243,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     for (int s = 0; s < S; s++) {
         r->source_names[s] = m.source_names[s].c_str();
 
+        HTD_PROF(prof, "cac_unmask");
         // Extract per-source complex spectrogram (ac channels × Fq × T)
         // Need to add back the dropped freq bin (Fq → Fq+1) with zeros
         int n_freqs_full = Fq + 1; // restore to nfft/2+1
