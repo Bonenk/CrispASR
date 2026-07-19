@@ -419,18 +419,155 @@ static void fsq_indices_to_codes(const int32_t* indices, int n, float* out_codes
     }
 }
 
+// ============================================================================
+// ggml graph helpers for the decode pipeline
+// ============================================================================
+
+// Build a single Transformer layer (no AdaLN): LN → Attn → residual → LN → FFN → residual
+static ggml_tensor* miocodec_transformer_layer(ggml_context* ctx0, ggml_tensor* x,
+                                               const miocodec_weights::transformer_layer& L, int n_heads,
+                                               int /*window_size*/) {
+    const int64_t dim = x->ne[0];
+    const int64_t T = x->ne[1];
+    const int64_t hd = dim / n_heads;
+
+    // Attention norm (LayerNorm)
+    ggml_tensor* attn_in = ggml_norm(ctx0, x, 1e-5f);
+    attn_in = ggml_add(ctx0, ggml_mul(ctx0, attn_in, L.attn_norm_w), L.attn_norm_b);
+
+    // QKV projections
+    ggml_tensor* Q = ggml_mul_mat(ctx0, L.wq, attn_in); // (dim, T)
+    ggml_tensor* K = ggml_mul_mat(ctx0, L.wk, attn_in); // (dim, T)
+    ggml_tensor* V = ggml_mul_mat(ctx0, L.wv, attn_in); // (dim, T)
+
+    // Reshape to (hd, T, n_heads) for attention
+    Q = ggml_reshape_3d(ctx0, Q, hd, n_heads, T);
+    K = ggml_reshape_3d(ctx0, K, hd, n_heads, T);
+    V = ggml_reshape_3d(ctx0, V, hd, n_heads, T);
+
+    // RoPE (NEOX style = complex-pair interleave)
+    Q = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
+                      GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+    K = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
+                      GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+
+    // Attention: Q (hd, T, n_heads), K (hd, T, n_heads), V needs permute
+    // Use flash_attn_ext: Q(hd,T,nh), K(hd,T,nh), V(hd,T,nh) → out(hd,T,nh)
+    V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3)); // (hd, T, n_heads)
+    float scale = 1.0f / sqrtf((float)hd);
+    ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, scale, 0.0f, 0.0f);
+
+    // Reshape back to (dim, T)
+    attn_out = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn_out, 0, 2, 1, 3)), dim, T);
+
+    // Output projection + residual
+    attn_out = ggml_mul_mat(ctx0, L.wo, attn_out);
+    ggml_tensor* h = ggml_add(ctx0, x, attn_out);
+
+    // FFN norm
+    ggml_tensor* ffn_in = ggml_norm(ctx0, h, 1e-5f);
+    ffn_in = ggml_add(ctx0, ggml_mul(ctx0, ffn_in, L.ffn_norm_w), L.ffn_norm_b);
+
+    // SwiGLU: w2(silu(w1(x)) * w3(x))
+    ggml_tensor* gate = ggml_silu(ctx0, ggml_mul_mat(ctx0, L.ffn_w1, ffn_in));
+    ggml_tensor* up = ggml_mul_mat(ctx0, L.ffn_w3, ffn_in);
+    ggml_tensor* ffn_out = ggml_mul_mat(ctx0, L.ffn_w2, ggml_mul(ctx0, gate, up));
+
+    return ggml_add(ctx0, h, ffn_out);
+}
+
+// AdaLN-Zero Transformer layer (for wave_decoder)
+static ggml_tensor* miocodec_adaln_transformer_layer(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* cond,
+                                                     const miocodec_weights::transformer_layer& L, int n_heads) {
+    const int64_t dim = x->ne[0];
+    const int64_t T = x->ne[1];
+    const int64_t hd = dim / n_heads;
+
+    // AdaLN-Zero for attention: condition_proj(SiLU(cond)) → shift, scale, gate
+    ggml_tensor* attn_params = ggml_mul_mat(ctx0, L.attn_adaln_w, ggml_silu(ctx0, cond));
+    attn_params = ggml_add(ctx0, attn_params, L.attn_adaln_b);
+    // Split into shift, scale, gate (each dim)
+    ggml_tensor* attn_shift = ggml_view_2d(ctx0, attn_params, dim, T, attn_params->nb[1], 0);
+    ggml_tensor* attn_scale = ggml_view_2d(ctx0, attn_params, dim, T, attn_params->nb[1], dim * sizeof(float));
+    ggml_tensor* attn_gate = ggml_view_2d(ctx0, attn_params, dim, T, attn_params->nb[1], 2 * dim * sizeof(float));
+
+    // LayerNorm (no affine) + modulation
+    ggml_tensor* attn_in = ggml_norm(ctx0, x, 1e-5f);
+    attn_in = ggml_add(ctx0, ggml_mul(ctx0, attn_in, ggml_add(ctx0, attn_scale, ggml_new_f32(ctx0, 1.0f))), attn_shift);
+
+    // Attention (same as non-AdaLN version)
+    ggml_tensor* Q = ggml_mul_mat(ctx0, L.wq, attn_in);
+    ggml_tensor* K = ggml_mul_mat(ctx0, L.wk, attn_in);
+    ggml_tensor* V = ggml_mul_mat(ctx0, L.wv, attn_in);
+
+    Q = ggml_reshape_3d(ctx0, Q, hd, n_heads, T);
+    K = ggml_reshape_3d(ctx0, K, hd, n_heads, T);
+    V = ggml_reshape_3d(ctx0, V, hd, n_heads, T);
+
+    Q = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
+                      GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+    K = ggml_rope_ext(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, K, 0, 2, 1, 3)), nullptr, nullptr, (int)hd,
+                      GGML_ROPE_TYPE_NEOX, 0, 10000.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f);
+
+    V = ggml_cont(ctx0, ggml_permute(ctx0, V, 0, 2, 1, 3));
+    float scale = 1.0f / sqrtf((float)hd);
+    ggml_tensor* attn_out = ggml_flash_attn_ext(ctx0, Q, K, V, nullptr, scale, 0.0f, 0.0f);
+    attn_out = ggml_reshape_2d(ctx0, ggml_cont(ctx0, ggml_permute(ctx0, attn_out, 0, 2, 1, 3)), dim, T);
+    attn_out = ggml_mul_mat(ctx0, L.wo, attn_out);
+
+    // Residual with gate
+    ggml_tensor* h = ggml_add(ctx0, x, ggml_mul(ctx0, attn_gate, attn_out));
+
+    // FFN AdaLN-Zero
+    ggml_tensor* ffn_params = ggml_mul_mat(ctx0, L.ffn_adaln_w, ggml_silu(ctx0, cond));
+    ffn_params = ggml_add(ctx0, ffn_params, L.ffn_adaln_b);
+    ggml_tensor* ffn_shift = ggml_view_2d(ctx0, ffn_params, dim, T, ffn_params->nb[1], 0);
+    ggml_tensor* ffn_scale = ggml_view_2d(ctx0, ffn_params, dim, T, ffn_params->nb[1], dim * sizeof(float));
+    ggml_tensor* ffn_gate = ggml_view_2d(ctx0, ffn_params, dim, T, ffn_params->nb[1], 2 * dim * sizeof(float));
+
+    ggml_tensor* ffn_in = ggml_norm(ctx0, h, 1e-5f);
+    ffn_in = ggml_add(ctx0, ggml_mul(ctx0, ffn_in, ggml_add(ctx0, ffn_scale, ggml_new_f32(ctx0, 1.0f))), ffn_shift);
+
+    // SwiGLU
+    ggml_tensor* gate2 = ggml_silu(ctx0, ggml_mul_mat(ctx0, L.ffn_w1, ffn_in));
+    ggml_tensor* up2 = ggml_mul_mat(ctx0, L.ffn_w3, ffn_in);
+    ggml_tensor* ffn_out = ggml_mul_mat(ctx0, L.ffn_w2, ggml_mul(ctx0, gate2, up2));
+
+    return ggml_add(ctx0, h, ggml_mul(ctx0, ffn_gate, ffn_out));
+}
+
+// ResNet block: GroupNorm → SiLU → Conv1d → GroupNorm → SiLU → Conv1d + residual
+// Input/output shape: (C, T) where C=512
+static ggml_tensor* miocodec_resnet_block(ggml_context* ctx0, ggml_tensor* x, const miocodec_weights::resnet_block& b,
+                                          int n_groups) {
+    ggml_tensor* residual = x;
+    // norm1 → silu → conv1
+    x = ggml_group_norm(ctx0, x, n_groups, 1e-6f);
+    x = ggml_add(ctx0, ggml_mul(ctx0, x, ggml_reshape_3d(ctx0, b.norm1_w, 1, x->ne[0], 1)),
+                 ggml_reshape_3d(ctx0, b.norm1_b, 1, x->ne[0], 1));
+    x = ggml_silu(ctx0, x);
+    x = ggml_conv_1d(ctx0, b.conv1_w, x, 1, 1, 1); // stride=1, pad=1, dilation=1
+    x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, b.conv1_b, 1, b.conv1_b->ne[0], 1));
+    // norm2 → silu → conv2
+    x = ggml_group_norm(ctx0, x, n_groups, 1e-6f);
+    x = ggml_add(ctx0, ggml_mul(ctx0, x, ggml_reshape_3d(ctx0, b.norm2_w, 1, x->ne[0], 1)),
+                 ggml_reshape_3d(ctx0, b.norm2_b, 1, x->ne[0], 1));
+    x = ggml_silu(ctx0, x);
+    x = ggml_conv_1d(ctx0, b.conv2_w, x, 1, 1, 1);
+    x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, b.conv2_b, 1, b.conv2_b->ne[0], 1));
+    return ggml_add(ctx0, residual, x);
+}
+
 float* miocodec_decode(struct miocodec_context* ctx, const int32_t* token_indices, int n_tokens,
                        const float* global_embedding, int target_audio_length, int* out_n_samples) {
     if (!ctx || !token_indices || n_tokens <= 0 || !global_embedding || !out_n_samples)
         return nullptr;
 
-    // TODO: implement full decode graph (Transformer + ResNet + Upsampler + ISTFT)
-    // For now, just implement FSQ decode as the first stage to verify parity.
-
+    // TODO: implement full decode graph
     (void)target_audio_length;
     *out_n_samples = 0;
 
-    fprintf(stderr, "miocodec_decode: not yet implemented (use miocodec_extract_stage for per-stage testing)\n");
+    fprintf(stderr, "miocodec_decode: not yet fully implemented\n");
     return nullptr;
 }
 
@@ -487,6 +624,92 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         }
 
         *out_n = n_tokens * out_dim;
+        return result;
+    }
+
+    // ---- wave_prenet_out: run the 6-layer prenet Transformer ----
+    if (strcmp(stage_name, "wave_prenet_out") == 0) {
+        // First compute FSQ embeddings (input to prenet)
+        std::vector<float> codes(n_tokens * 5);
+        fsq_indices_to_codes(token_indices, n_tokens, codes.data());
+        std::vector<float> fsq_emb(n_tokens * 768);
+        {
+            std::vector<float> proj_w(768 * 5), proj_b(768);
+            ggml_tensor* tw = ctx->weights.fsq_proj_out_w;
+            ggml_tensor* tb = ctx->weights.fsq_proj_out_b;
+            if (tw->type == GGML_TYPE_F16) {
+                std::vector<uint16_t> tmp(768 * 5);
+                ggml_backend_tensor_get(tw, tmp.data(), 0, sizeof(uint16_t) * 768 * 5);
+                for (size_t i = 0; i < tmp.size(); i++)
+                    proj_w[i] = ggml_fp16_to_fp32(tmp[i]);
+            } else {
+                ggml_backend_tensor_get(tw, proj_w.data(), 0, sizeof(float) * 768 * 5);
+            }
+            ggml_backend_tensor_get(tb, proj_b.data(), 0, sizeof(float) * 768);
+            for (int t = 0; t < n_tokens; t++) {
+                for (int d = 0; d < 768; d++) {
+                    float sum = proj_b[d];
+                    for (int k = 0; k < 5; k++)
+                        sum += codes[t * 5 + k] * proj_w[d * 5 + k];
+                    fsq_emb[t * 768 + d] = sum;
+                }
+            }
+        }
+
+        // Build ggml graph for wave_prenet: 6L Transformer(768→512)
+        const int T = n_tokens;
+        const int dim = 768;
+        const int out_d = 512;
+        const int n_heads = (int)ctx->hparams.wave_prenet_n_heads;
+        const int n_layers = (int)ctx->hparams.wave_prenet_n_layers;
+
+        size_t buf_size = (size_t)(n_layers * 20 + 50) * ggml_tensor_overhead() + ggml_graph_overhead();
+        ggml_init_params ip = {buf_size, nullptr, true};
+        ggml_context* ctx0 = ggml_init(ip);
+
+        // Input tensor
+        ggml_tensor* x = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, dim, T);
+        ggml_set_name(x, "prenet_input");
+        ggml_set_input(x);
+
+        // Transformer layers
+        for (int i = 0; i < n_layers; i++) {
+            x = miocodec_transformer_layer(ctx0, x, ctx->weights.wave_prenet_layers[i], n_heads, 0);
+        }
+
+        // Final norm
+        x = ggml_norm(ctx0, x, 1e-5f);
+        x = ggml_add(ctx0, ggml_mul(ctx0, x, ctx->weights.wave_prenet_norm_w), ctx->weights.wave_prenet_norm_b);
+
+        // Output projection (768→512)
+        x = ggml_mul_mat(ctx0, ctx->weights.wave_prenet_output_proj_w, x);
+        ggml_set_name(x, "wave_prenet_out");
+        ggml_set_output(x);
+
+        // Build and run graph
+        ggml_cgraph* gf = ggml_new_graph(ctx0);
+        ggml_build_forward_expand(gf, x);
+
+        ggml_gallocr_t galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+        ggml_gallocr_alloc_graph(galloc, gf);
+
+        // Set input data
+        ggml_tensor* input_t = ggml_graph_get_tensor(gf, "prenet_input");
+        ggml_backend_tensor_set(input_t, fsq_emb.data(), 0, sizeof(float) * T * dim);
+
+        // Compute
+        ggml_backend_graph_compute(ctx->backend, gf);
+
+        // Extract output
+        ggml_tensor* out_t = ggml_graph_get_tensor(gf, "wave_prenet_out");
+        int n_out = (int)(out_t->ne[0] * out_t->ne[1]);
+        float* result = (float*)malloc(sizeof(float) * n_out);
+        ggml_backend_tensor_get(out_t, result, 0, sizeof(float) * n_out);
+
+        ggml_gallocr_free(galloc);
+        ggml_free(ctx0);
+
+        *out_n = n_out;
         return result;
     }
 
