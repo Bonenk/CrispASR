@@ -7103,9 +7103,30 @@ int main(int argc, char** argv) {
                 for (size_t i = 0; i < ids_pair.second; i++)
                     input_ids[i] = (int32_t)std::lrint(ids_pair.first[i]);
 
+                // Print the input IDs for sanity
+                printf("miotts: input_ids[%zu] = {", input_ids.size());
+                for (size_t i = 0; i < std::min(input_ids.size(), (size_t)12); i++)
+                    printf("%s%d", i ? "," : "", input_ids[i]);
+                printf("}\n");
+
+                // Compare token_embed if available in the reference
+                auto embed_ref = ref.get_f32("token_embed");
+                if (embed_ref.first && embed_ref.second > 0) {
+                    printf("miotts: ref token_embed[0..3] = %.6f %.6f %.6f %.6f (n=%zu)\n",
+                           embed_ref.first[0], embed_ref.first[1], embed_ref.first[2], embed_ref.first[3],
+                           embed_ref.second);
+                }
+
                 int vocab = 0;
                 float* logits = miotts_forward_logits(ctx, input_ids.data(), (int)input_ids.size(), &vocab);
                 if (logits && vocab > 0) {
+                    // Print top-3 for manual comparison
+                    int top1 = 0;
+                    for (int i = 1; i < vocab; i++)
+                        if (logits[i] > logits[top1])
+                            top1 = i;
+                    printf("miotts: C++ logits argmax=%d val=%.4f\n", top1, logits[top1]);
+
                     auto rep = ref.compare("logits_step_0", logits, vocab);
                     print_row("logits_step_0", rep, COS_THRESHOLD);
                     record(rep);
