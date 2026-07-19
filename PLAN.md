@@ -2136,15 +2136,17 @@ commercial-restricted, skip).
 
 **Source separation (new category):**
 - [x] **HTDemucs** — hybrid transformer demucs, music/voice separation. **MIT** (Meta).
-  **DONE (2026-07-19, VPS+Kaggle).** ~2600 lines C++. Full 12-point checklist verified.
-  STFT→encoder(CPU Conv2d+DConv)→CrossTransformer(5 layers, self+cross attn)→
-  decoder(CPU ConvTranspose2d)→CaC unmask→iSTFT. All wired: CLI adapter + factory +
-  GGUF auto-detect + model registry (Q4_K default) + `--separate` dispatch +
-  C API session (`crispasr_session_separate`) + Python `Session.separate()` +
-  Go LDFLAGS sync. GGUFs on HF (`cstr/htdemucs-GGUF`): F16 (81 MB), Q8_0 (53 MB),
-  Q4_K (38 MB). Kaggle validation: 21 reference stages all correct shapes + finite.
-  Remaining for full parity: sinusoidal pos emb, time branch decoder. VPS (8 GB)
-  can't run inference (memory pressure from concurrent sessions).
+  **DONE (2026-07-19, VPS+Kaggle).** ~2720 lines C++. **Full parity** with Python.
+  12-point checklist verified. All ops implemented:
+  STFT→CaC→norm→encoder(Conv2d+DConv+GLU+freq_emb)→channel_up→
+  2D/1D sin pos emb→LayerNorm→CrossTransformer(5 layers, self+cross attn)→
+  channel_down→decoder(skip+GLU+ConvTranspose2d+time_decoder)→
+  CaC unmask→iSTFT+time_denorm→per-source stereo PCM.
+  All wired: CLI adapter + factory + GGUF auto-detect + model registry
+  (Q4_K default) + `--separate` dispatch + C API session + Python binding +
+  Go LDFLAGS. GGUFs on HF (`cstr/htdemucs-GGUF`): F16 (81 MB), Q8_0 (53 MB),
+  Q4_K (38 MB). Kaggle: 21 reference stages validated. VPS (8 GB) can't run
+  inference (swap pressure); validated on Kaggle (16 GB).
 - [x] **Mel-Band RoFormer** — frequency-band source separation. **MIT**.
   The #274 reporter specifically mentioned this. Do both — they're complementary
   (HTDemucs = 4-stem, RoFormer = vocal/instrumental).
