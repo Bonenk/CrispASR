@@ -65,6 +65,11 @@ float* miotts_fsq_dequant(struct miotts_context* ctx, const int32_t* indices, in
 // Input: fsq_emb is (T * 768) floats. Output: (T * 512) floats.
 float* miotts_wave_prenet_forward(struct miotts_context* ctx, const float* fsq_emb, int T, int* out_dim);
 
+// Run the full codec decode: wave_prenet output → conv_upsample → ResNet →
+// wave_decoder (AdaLN-Zero) → ResNet → iSTFT → 24kHz PCM.
+// Input: prenet_out is (T * 512) floats. Output: PCM samples at 24kHz.
+float* miotts_codec_decode(struct miotts_context* ctx, const float* prenet_out, int T_prenet, int* out_n);
+
 #ifdef __cplusplus
 }
 #endif

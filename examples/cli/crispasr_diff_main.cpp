@@ -7188,6 +7188,31 @@ int main(int argc, char** argv) {
             }
         }
 
+        // Stage 4: codec decode — wave_prenet_out → audio
+        {
+            auto prenet_pair = ref.get_f32("wave_prenet_out");
+            if (prenet_pair.first && prenet_pair.second > 0) {
+                const int T_prenet = (int)(prenet_pair.second / 512);
+                int n_pcm = 0;
+                float* pcm = miotts_codec_decode(ctx, prenet_pair.first, T_prenet, &n_pcm);
+                if (pcm && n_pcm > 0) {
+                    // Compare intermediate stages if available
+                    // wave_prior_net_out, wave_decoder_out, wave_post_net_out are
+                    // inside the graph — we compare the final audio instead.
+                    auto rep = ref.compare("audio_output", pcm, (size_t)n_pcm);
+                    print_row("audio_output", rep, COS_THRESHOLD);
+                    record(rep);
+                    miotts_free_audio(pcm);
+                } else {
+                    printf("[ERR ] audio_output            codec_decode returned null\n");
+                    n_fail++;
+                }
+            } else {
+                printf("[SKIP] audio_output            (no wave_prenet_out in reference)\n");
+                n_skip++;
+            }
+        }
+
         miotts_free(ctx);
 
         // ---- miocodec — MioCodec v2 decode pipeline ----

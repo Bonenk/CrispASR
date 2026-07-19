@@ -12,6 +12,7 @@
 #include "core/attention.h"
 #include "core/ffn.h"
 #include "core/gguf_loader.h"
+#include "core/istft.h"
 
 #include "ggml.h"
 #include "ggml-alloc.h"
@@ -726,68 +727,52 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
     // w shape: (in_ch=512, out_ch=512, k=2) → PyTorch convention
     // For stride=2 k=2: output[t] = x[t//2] @ w[:, :, t%2] + bias
     // We'll compute this directly as two matmuls interleaved.
-    // Actually simpler: reshape input, multiply, reshape output.
-    // ConvTranspose1d with k=s=2 is just: scatter each input sample into
-    // two output positions via the two kernel columns.
-    ggml_tensor* cur = input; // (512, T_prenet)
+    // ── conv_upsample: ConvTranspose1d(512→512, k=2, s=2) ─────────
+    // Input (d=512, T_prenet) → transpose to (T_prenet, d) for ggml_conv_transpose_1d
+    ggml_tensor* cur = ggml_cont(ctx0, ggml_transpose(ctx0, input)); // (T_prenet, d)
+    cur = ggml_conv_transpose_1d(ctx0, c->conv_upsample_w, cur, /*s=*/2, /*p=*/0, /*d=*/1);
+    // Output shape: (T_up, d, 1) — add bias, reshape, transpose back
+    cur = ggml_add(ctx0, cur, ggml_reshape_3d(ctx0, c->conv_upsample_b, 1, d, 1));
+    cur = ggml_reshape_2d(ctx0, cur, T_up, d);        // (T_up, d)
+    cur = ggml_cont(ctx0, ggml_transpose(ctx0, cur)); // (d, T_up)
 
-    // Interleave: for each input position, produce 2 output positions
-    // x_t @ w[:,:,0] goes to output[2t], x_t @ w[:,:,1] goes to output[2t+1]
-    // w is stored as (512, 512, 2) in ggml = ne[0]=512, ne[1]=512, ne[2]=2
-    // Column 0: w[:,:,0] = first 512*512 values = (512, 512) matrix
-    // Column 1: w[:,:,1] = next 512*512 values
-    ggml_tensor* w0 = ggml_view_2d(ctx0, c->conv_upsample_w, d, d, c->conv_upsample_w->nb[1], 0);
-    ggml_tensor* w1 =
-        ggml_view_2d(ctx0, c->conv_upsample_w, d, d, c->conv_upsample_w->nb[1], (size_t)d * d * sizeof(float));
-    // Actually for F16 weights the offset calculation is different. Let me use ne[2] stride:
-    // nb[2] = stride to next kernel position = d * d * type_size
-    w0 = ggml_view_2d(ctx0, c->conv_upsample_w, d, d, c->conv_upsample_w->nb[1], 0);
-    w1 = ggml_view_2d(ctx0, c->conv_upsample_w, d, d, c->conv_upsample_w->nb[1], c->conv_upsample_w->nb[2]);
-
-    // even positions: input @ w0^T + bias
-    ggml_tensor* even = ggml_mul_mat(ctx0, w0, cur); // (512, T_prenet)
-    even = ggml_add(ctx0, even, c->conv_upsample_b);
-    // odd positions: input @ w1^T + bias
-    ggml_tensor* odd = ggml_mul_mat(ctx0, w1, cur); // (512, T_prenet)
-    odd = ggml_add(ctx0, odd, c->conv_upsample_b);
-
-    // Interleave even and odd: (512, T_prenet) + (512, T_prenet) → (512, T_up=2*T_prenet)
-    // Stack along time dim: cat([even, odd], dim=1) then reshape/permute to interleave
-    // even[:,t] goes to pos 2t, odd[:,t] goes to pos 2t+1
-    // Reshape each to (512, 1, T_prenet), cat → (512, 2, T_prenet), reshape → (512, T_up)
-    even = ggml_reshape_3d(ctx0, even, d, 1, T_prenet);
-    odd = ggml_reshape_3d(ctx0, odd, d, 1, T_prenet);
-    ggml_tensor* interleaved = ggml_concat(ctx0, even, odd, 1); // (512, 2, T_prenet)
-    // Permute to (512, T_prenet, 2) then reshape to (512, T_up)
-    interleaved = ggml_cont(ctx0, ggml_permute(ctx0, interleaved, 0, 2, 1, 3)); // (512, T_prenet, 2)
-    cur = ggml_reshape_2d(ctx0, interleaved, d, T_up);                          // (512, T_up)
-
-    // NOTE: for T_up == T_stft (which it is for 25Hz codec), interpolation is identity
-    // If they differ, we'd need ggml_interpolate here.
+    // NOTE: for T_up == T_stft (which it is for 25Hz codec), interpolation is identity.
 
     // ── wave_prior_net (2 ResNet blocks) ────────────────────────────
     // ResNetBlock: GroupNorm → SiLU → Conv1d(k=3,p=1) → GroupNorm → SiLU → Conv1d(k=3,p=1) + residual
-    // GroupNorm with 32 groups on 512 channels = 16 channels/group
-    // ggml has ggml_group_norm(x, num_groups) which normalizes along ne[0]
-    for (size_t i = 0; i < c->wave_prior_net.size(); i++) {
-        const auto& blk = c->wave_prior_net[i];
-        ggml_tensor* res = cur;
-        // GroupNorm1 + SiLU + Conv1d
-        cur = ggml_group_norm(ctx0, cur, 32, 1e-6f);
-        cur = ggml_mul(ctx0, cur, blk.norm1_w);
-        cur = ggml_add(ctx0, cur, blk.norm1_b);
-        cur = ggml_silu(ctx0, cur);
-        cur = ggml_conv_1d(ctx0, blk.conv1_w, cur, 1, 1, 1); // stride=1, pad=1, dilation=1
-        cur = ggml_add(ctx0, cur, ggml_reshape_2d(ctx0, blk.conv1_b, d, 1));
-        // GroupNorm2 + SiLU + Conv1d
-        cur = ggml_group_norm(ctx0, cur, 32, 1e-6f);
-        cur = ggml_mul(ctx0, cur, blk.norm2_w);
-        cur = ggml_add(ctx0, cur, blk.norm2_b);
-        cur = ggml_silu(ctx0, cur);
-        cur = ggml_conv_1d(ctx0, blk.conv2_w, cur, 1, 1, 1);
-        cur = ggml_add(ctx0, cur, ggml_reshape_2d(ctx0, blk.conv2_b, d, 1));
-        cur = ggml_add(ctx0, cur, res);
-    }
+    // GroupNorm normalises over ne[0] = channel dim when cur is (d, T).
+    // ggml_conv_1d expects input (T, C_in) and kernel (K, C_in, C_out),
+    // so transpose around each conv call.
+    auto resnet_block = [&](ggml_tensor* x, const miotts_resnet_block& blk) -> ggml_tensor* {
+        ggml_tensor* res = x;
+        // GroupNorm1 + SiLU
+        x = ggml_group_norm(ctx0, x, 32, 1e-6f);
+        x = ggml_mul(ctx0, x, blk.norm1_w);
+        x = ggml_add(ctx0, x, blk.norm1_b);
+        x = ggml_silu(ctx0, x);
+        // Conv1d: transpose (d,T) → (T,d), conv, reshape back to (d,T)
+        x = ggml_cont(ctx0, ggml_transpose(ctx0, x)); // (T, d)
+        x = ggml_conv_1d(ctx0, blk.conv1_w, x, 1, 1, 1);
+        // conv output is 3D (T, d, 1) — add bias as (1, d, 1)
+        x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, blk.conv1_b, 1, d, 1));
+        x = ggml_reshape_2d(ctx0, x, (int64_t)x->ne[0], d); // (T, d)
+        x = ggml_cont(ctx0, ggml_transpose(ctx0, x));       // (d, T)
+        // GroupNorm2 + SiLU
+        x = ggml_group_norm(ctx0, x, 32, 1e-6f);
+        x = ggml_mul(ctx0, x, blk.norm2_w);
+        x = ggml_add(ctx0, x, blk.norm2_b);
+        x = ggml_silu(ctx0, x);
+        // Conv1d
+        x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
+        x = ggml_conv_1d(ctx0, blk.conv2_w, x, 1, 1, 1);
+        x = ggml_add(ctx0, x, ggml_reshape_3d(ctx0, blk.conv2_b, 1, d, 1));
+        x = ggml_reshape_2d(ctx0, x, (int64_t)x->ne[0], d);
+        x = ggml_cont(ctx0, ggml_transpose(ctx0, x));
+        return ggml_add(ctx0, x, res);
+    };
+
+    for (size_t i = 0; i < c->wave_prior_net.size(); i++)
+        cur = resnet_block(cur, c->wave_prior_net[i]);
 
     ggml_set_name(cur, "wave_prior_net_out");
     ggml_set_output(cur);
@@ -817,7 +802,7 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
 
         // LayerNorm (no affine) + modulate
         ggml_tensor* x = ggml_norm(ctx0, cur, 1e-5f);
-        x = ggml_add(ctx0, ggml_mul(ctx0, x, ggml_add(ctx0, scale_a, ggml_new_f32(ctx0, 1.0f))), shift_a);
+        x = ggml_add(ctx0, ggml_add(ctx0, x, ggml_mul(ctx0, x, scale_a)), shift_a);
 
         // Attention (same pattern as wave_prenet but 8 heads)
         ggml_tensor* Q = ggml_mul_mat(ctx0, b.wq, x);
@@ -858,7 +843,7 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
         ggml_tensor* gate_f = ggml_view_1d(ctx0, adaln_ffn, d, 2 * (size_t)d * sizeof(float));
 
         x = ggml_norm(ctx0, cur, 1e-5f);
-        x = ggml_add(ctx0, ggml_mul(ctx0, x, ggml_add(ctx0, scale_f, ggml_new_f32(ctx0, 1.0f))), shift_f);
+        x = ggml_add(ctx0, ggml_add(ctx0, x, ggml_mul(ctx0, x, scale_f)), shift_f);
 
         // SwiGLU FFN
         ggml_tensor* gate_ffn = ggml_silu(ctx0, ggml_mul_mat(ctx0, b.ffn_w1, x));
@@ -872,23 +857,8 @@ static ggml_cgraph* build_graph_codec_decode(miotts_context* c, int T_prenet) {
     ggml_set_output(cur);
 
     // ── wave_post_net (2 ResNet blocks) ─────────────────────────────
-    for (size_t i = 0; i < c->wave_post_net.size(); i++) {
-        const auto& blk = c->wave_post_net[i];
-        ggml_tensor* res = cur;
-        cur = ggml_group_norm(ctx0, cur, 32, 1e-6f);
-        cur = ggml_mul(ctx0, cur, blk.norm1_w);
-        cur = ggml_add(ctx0, cur, blk.norm1_b);
-        cur = ggml_silu(ctx0, cur);
-        cur = ggml_conv_1d(ctx0, blk.conv1_w, cur, 1, 1, 1);
-        cur = ggml_add(ctx0, cur, ggml_reshape_2d(ctx0, blk.conv1_b, d, 1));
-        cur = ggml_group_norm(ctx0, cur, 32, 1e-6f);
-        cur = ggml_mul(ctx0, cur, blk.norm2_w);
-        cur = ggml_add(ctx0, cur, blk.norm2_b);
-        cur = ggml_silu(ctx0, cur);
-        cur = ggml_conv_1d(ctx0, blk.conv2_w, cur, 1, 1, 1);
-        cur = ggml_add(ctx0, cur, ggml_reshape_2d(ctx0, blk.conv2_b, d, 1));
-        cur = ggml_add(ctx0, cur, res);
-    }
+    for (size_t i = 0; i < c->wave_post_net.size(); i++)
+        cur = resnet_block(cur, c->wave_post_net[i]);
 
     ggml_set_name(cur, "wave_post_net_out");
     ggml_set_output(cur);
@@ -1150,24 +1120,99 @@ float* miotts_wave_prenet_forward(miotts_context* ctx, const float* fsq_emb, int
     return result;
 }
 
-// ── Synthesize ──────────────────────────────────────────────────────
+// ── Codec decode (wave_prenet output → audio) ──────────────────────
+
+float* miotts_codec_decode(miotts_context* ctx, const float* prenet_out, int T_prenet, int* out_n) {
+    if (!ctx || !prenet_out || T_prenet <= 0)
+        return nullptr;
+
+    const int d = 512;
+    const int n_fft = (int)ctx->hp.codec_n_fft;
+    const int hop = (int)ctx->hp.codec_hop_length;
+    const int n_bins = n_fft / 2 + 1; // 961
+
+    ggml_cgraph* gf = build_graph_codec_decode(ctx, T_prenet);
+
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        fprintf(stderr, "miotts: codec decode sched alloc failed\n");
+        return nullptr;
+    }
+
+    // Set inputs
+    ggml_tensor* input_t = ggml_graph_get_tensor(gf, "codec_input");
+    ggml_backend_tensor_set(input_t, prenet_out, 0, (size_t)T_prenet * d * sizeof(float));
+
+    ggml_tensor* emb_t = ggml_graph_get_tensor(gf, "global_emb");
+    ggml_backend_tensor_set(emb_t, ctx->global_embedding.data(), 0, ctx->global_embedding.size() * sizeof(float));
+
+    // Positions for decoder RoPE
+    ggml_tensor* pos_t = ggml_graph_get_tensor(gf, "dec_positions");
+    if (pos_t) {
+        const int T_stft = T_prenet * 2;
+        std::vector<int32_t> pos(T_stft);
+        for (int i = 0; i < T_stft; i++)
+            pos[i] = i;
+        ggml_backend_tensor_set(pos_t, pos.data(), 0, T_stft * sizeof(int32_t));
+    }
+
+    ggml_backend_sched_graph_compute(ctx->sched, gf);
+
+    // Debug: dump intermediate shapes and first values
+    for (const char* sn : {"wave_prior_net_out", "wave_decoder_out", "wave_post_net_out", "istft_linear_out"}) {
+        ggml_tensor* t = ggml_graph_get_tensor(gf, sn);
+        if (t) {
+            float buf[4];
+            ggml_backend_tensor_get(t, buf, 0, 4 * sizeof(float));
+            fprintf(stderr, "miotts: %s[0:4] = %.4f %.4f %.4f %.4f (ne0=%lld ne1=%lld)\n", sn, buf[0], buf[1], buf[2],
+                    buf[3], (long long)t->ne[0], (long long)t->ne[1]);
+        }
+    }
+
+    // Read iSTFT linear output: (1922, T_stft)
+    ggml_tensor* stft_t = ggml_graph_get_tensor(gf, "istft_linear_out");
+    const int T_stft = (int)stft_t->ne[1];
+    const int out_dim = (int)stft_t->ne[0]; // 1922
+    std::vector<float> stft_data((size_t)T_stft * out_dim);
+    ggml_backend_tensor_get(stft_t, stft_data.data(), 0, stft_data.size() * sizeof(float));
+
+    // Split into magnitude (log) and phase
+    std::vector<float> mag(T_stft * n_bins);
+    std::vector<float> phase(T_stft * n_bins);
+    for (int t = 0; t < T_stft; t++) {
+        for (int b = 0; b < n_bins; b++) {
+            float log_mag = stft_data[t * out_dim + b];
+            float ph = stft_data[t * out_dim + n_bins + b];
+            float m = std::exp(log_mag);
+            if (m > 100.0f)
+                m = 100.0f;
+            mag[t * n_bins + b] = m;
+            phase[t * n_bins + b] = ph;
+        }
+    }
+
+    // CPU iSTFT using core_istft (Hann window, "same" padding trim)
+    auto pcm = core_istft::istft(mag.data(), phase.data(), n_fft, hop, T_stft,
+                                 /*window=*/nullptr, core_istft::TRIM_SAME);
+
+    if (out_n)
+        *out_n = (int)pcm.size();
+
+    float* result = (float*)malloc(pcm.size() * sizeof(float));
+    memcpy(result, pcm.data(), pcm.size() * sizeof(float));
+    return result;
+}
+
+// ── Synthesize (full pipeline) ──────────────────────────────────────
 
 float* miotts_synthesize(miotts_context* ctx, const char* text, int* out_n) {
     if (!ctx || !text || !out_n)
         return nullptr;
     *out_n = 0;
 
-    const auto& hp = ctx->hp;
-
-    // TODO: implement full synthesis pipeline:
-    // 1. Tokenize text with Qwen3 BPE (ChatML: <|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n)
-    // 2. Run LLM forward to generate speech tokens
-    // 3. Extract speech token indices from generated IDs
-    // 4. Run MioCodec decode (FSQ dequant → transformer → iSTFT)
-    // The diff harness validates each stage independently first via
-    // miotts_forward_logits() and miotts_fsq_dequant().
-    (void)hp;
-    fprintf(stderr, "miotts: synthesize not yet fully implemented (need tokenizer + codec decode)\n");
+    // TODO: tokenizer integration. For now, require pre-tokenized input
+    // via miotts_forward_logits + miotts_fsq_dequant + miotts_codec_decode.
+    fprintf(stderr, "miotts: synthesize not yet wired (need Qwen3 BPE tokenizer)\n");
     return nullptr;
 }
 
