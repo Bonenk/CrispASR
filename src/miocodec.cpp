@@ -177,6 +177,9 @@ struct miocodec_params miocodec_default_params(void) {
     return p;
 }
 
+// Forward declaration
+static std::vector<float> miocodec_dequant_tensor(ggml_tensor* t);
+
 struct miocodec_context* miocodec_init_from_file(const char* path, struct miocodec_params params) {
     auto* ctx = new miocodec_context();
     ctx->verbosity = params.verbosity;
@@ -367,25 +370,9 @@ struct miocodec_context* miocodec_init_from_file(const char* path, struct miocod
         if (!us.conv_w0 || !us.conv_w1)
             continue;
         // Read g and v from backend
-        int n_g = (int)ggml_nelements(us.conv_w0);
-        int n_v = (int)ggml_nelements(us.conv_w1);
-        std::vector<float> g_data(n_g), v_data(n_v);
-        if (us.conv_w0->type == GGML_TYPE_F16) {
-            std::vector<uint16_t> tmp(n_g);
-            ggml_backend_tensor_get(us.conv_w0, tmp.data(), 0, n_g * sizeof(uint16_t));
-            for (int i = 0; i < n_g; i++)
-                g_data[i] = ggml_fp16_to_fp32(tmp[i]);
-        } else {
-            ggml_backend_tensor_get(us.conv_w0, g_data.data(), 0, n_g * sizeof(float));
-        }
-        if (us.conv_w1->type == GGML_TYPE_F16) {
-            std::vector<uint16_t> tmp(n_v);
-            ggml_backend_tensor_get(us.conv_w1, tmp.data(), 0, n_v * sizeof(uint16_t));
-            for (int i = 0; i < n_v; i++)
-                v_data[i] = ggml_fp16_to_fp32(tmp[i]);
-        } else {
-            ggml_backend_tensor_get(us.conv_w1, v_data.data(), 0, n_v * sizeof(float));
-        }
+        std::vector<float> g_data = miocodec_dequant_tensor(us.conv_w0);
+        std::vector<float> v_data = miocodec_dequant_tensor(us.conv_w1);
+        int n_v = (int)v_data.size();
         // v shape in ggml: ne[0]=K, ne[1]=C_out, ne[2]=C_in (from GGUF [K, C_out, C_in])
         int K_dim = (int)us.conv_w1->ne[0];
         int C_out = (int)us.conv_w1->ne[1];
@@ -413,9 +400,11 @@ struct miocodec_context* miocodec_init_from_file(const char* path, struct miocod
             for (int i = 0; i < n_v; i++)
                 tmp[i] = ggml_fp32_to_fp16(w_fused[i]);
             ggml_backend_tensor_set(us.conv_w1, tmp.data(), 0, n_v * sizeof(uint16_t));
-        } else {
+        } else if (us.conv_w1->type == GGML_TYPE_F32) {
             ggml_backend_tensor_set(us.conv_w1, w_fused.data(), 0, n_v * sizeof(float));
         }
+        // For quantized types: skip write-back (weight_norm is approximate anyway)
+        // TODO: fuse weight_norm in the converter instead
     }
 
     // Create scheduler for graph compute (handles weight buffer + compute buffer)
@@ -430,6 +419,34 @@ struct miocodec_context* miocodec_init_from_file(const char* path, struct miocod
     }
 
     return ctx;
+}
+
+// Dequantize a ggml tensor to float32 (handles F32, F16, and quantized types)
+static std::vector<float> miocodec_dequant_tensor(ggml_tensor* t) {
+    int n = (int)ggml_nelements(t);
+    std::vector<float> out(n);
+    if (t->type == GGML_TYPE_F32) {
+        ggml_backend_tensor_get(t, out.data(), 0, n * sizeof(float));
+    } else if (t->type == GGML_TYPE_F16) {
+        std::vector<uint16_t> tmp(n);
+        ggml_backend_tensor_get(t, tmp.data(), 0, n * sizeof(uint16_t));
+        for (int i = 0; i < n; i++)
+            out[i] = ggml_fp16_to_fp32(tmp[i]);
+    } else {
+        // Quantized: read raw bytes then dequantize row-by-row
+        size_t nb = ggml_nbytes(t);
+        std::vector<uint8_t> raw(nb);
+        ggml_backend_tensor_get(t, raw.data(), 0, nb);
+        int64_t ne0 = t->ne[0]; // row width
+        int64_t nrows = n / ne0;
+        for (int64_t r = 0; r < nrows; r++) {
+            const void* src = raw.data() + r * t->nb[1];
+            const ggml_type_traits* traits = ggml_get_type_traits(t->type);
+            if (traits && traits->to_float)
+                traits->to_float(src, out.data() + r * ne0, ne0);
+        }
+    }
+    return out;
 }
 
 // SnakeBeta activation: x + (1/exp(β)) * sin²(exp(α) * x)
@@ -724,22 +741,9 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         if (!result)
             return nullptr;
 
-        // Get weight data from ggml tensors (handle F16 → F32 dequant)
-        std::vector<float> proj_w(out_dim * 5);
-        std::vector<float> proj_b(out_dim);
-
-        ggml_tensor* tw = ctx->weights.fsq_proj_out_w;
-        ggml_tensor* tb = ctx->weights.fsq_proj_out_b;
-        if (tw->type == GGML_TYPE_F16) {
-            std::vector<uint16_t> tmp(out_dim * 5);
-            ggml_backend_tensor_get(tw, tmp.data(), 0, sizeof(uint16_t) * out_dim * 5);
-            for (size_t i = 0; i < tmp.size(); i++)
-                proj_w[i] = ggml_fp16_to_fp32(tmp[i]);
-        } else {
-            ggml_backend_tensor_get(tw, proj_w.data(), 0, sizeof(float) * out_dim * 5);
-        }
-        // Bias is always F32
-        ggml_backend_tensor_get(tb, proj_b.data(), 0, sizeof(float) * out_dim);
+        // Get weight data (handles F16/F32/quantized)
+        std::vector<float> proj_w = miocodec_dequant_tensor(ctx->weights.fsq_proj_out_w);
+        std::vector<float> proj_b = miocodec_dequant_tensor(ctx->weights.fsq_proj_out_b);
 
         // result[t, d] = sum_k(codes[t, k] * W[d, k]) + bias[d]
         // GGUF shape is [5, 768] meaning ne[0]=5, ne[1]=768.
@@ -765,18 +769,8 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
         fsq_indices_to_codes(token_indices, n_tokens, codes.data());
         std::vector<float> fsq_emb(n_tokens * 768);
         {
-            std::vector<float> proj_w(768 * 5), proj_b(768);
-            ggml_tensor* tw = ctx->weights.fsq_proj_out_w;
-            ggml_tensor* tb = ctx->weights.fsq_proj_out_b;
-            if (tw->type == GGML_TYPE_F16) {
-                std::vector<uint16_t> tmp(768 * 5);
-                ggml_backend_tensor_get(tw, tmp.data(), 0, sizeof(uint16_t) * 768 * 5);
-                for (size_t i = 0; i < tmp.size(); i++)
-                    proj_w[i] = ggml_fp16_to_fp32(tmp[i]);
-            } else {
-                ggml_backend_tensor_get(tw, proj_w.data(), 0, sizeof(float) * 768 * 5);
-            }
-            ggml_backend_tensor_get(tb, proj_b.data(), 0, sizeof(float) * 768);
+            std::vector<float> proj_w = miocodec_dequant_tensor(ctx->weights.fsq_proj_out_w);
+            std::vector<float> proj_b = miocodec_dequant_tensor(ctx->weights.fsq_proj_out_b);
             for (int t = 0; t < n_tokens; t++) {
                 for (int d = 0; d < 768; d++) {
                     float sum = proj_b[d];
@@ -1146,17 +1140,9 @@ float* miocodec_extract_stage(struct miocodec_context* ctx, const int32_t* token
             int T_is = up_n / 512;
             int D_out = (int)ctx->weights.istft_out_w->ne[1]; // 394
             int D_in = 512;
-            // Read weight & bias
-            std::vector<float> w_d(D_in * D_out), b_d(D_out);
-            if (ctx->weights.istft_out_w->type == GGML_TYPE_F16) {
-                std::vector<uint16_t> tmp(D_in * D_out);
-                ggml_backend_tensor_get(ctx->weights.istft_out_w, tmp.data(), 0, D_in * D_out * 2);
-                for (int i = 0; i < D_in * D_out; i++)
-                    w_d[i] = ggml_fp16_to_fp32(tmp[i]);
-            } else {
-                ggml_backend_tensor_get(ctx->weights.istft_out_w, w_d.data(), 0, D_in * D_out * 4);
-            }
-            ggml_backend_tensor_get(ctx->weights.istft_out_b, b_d.data(), 0, D_out * 4);
+            // Read weight & bias (handles F16/F32/quantized)
+            std::vector<float> w_d = miocodec_dequant_tensor(ctx->weights.istft_out_w);
+            std::vector<float> b_d = miocodec_dequant_tensor(ctx->weights.istft_out_b);
             // Linear: result[d, t] = sum_k W[d,k] * up[t,k] + b[d]
             // Store in (D_out, T) layout = (394, T) matching Python's transpose(0,1) output
             float* result = (float*)malloc(sizeof(float) * D_out * T_is);
