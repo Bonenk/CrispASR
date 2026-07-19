@@ -2331,6 +2331,16 @@ set_target_properties(htdemucs PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(htdemucs PUBLIC .)
 target_compile_features   (htdemucs PUBLIC cxx_std_17)
 target_link_libraries     (htdemucs PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+# The CrossTransformer is ~86% of htdemucs runtime (measured with
+# CRISPASR_HTDEMUCS_PROFILE=1). Link Accelerate so its projections and attention
+# run through cblas_sgemm instead of scalar loops.
+if(APPLE)
+    if(NOT ACCELERATE_LIB)
+        find_library(ACCELERATE_LIB Accelerate REQUIRED)
+    endif()
+    target_link_libraries(htdemucs PUBLIC ${ACCELERATE_LIB})
+    target_compile_definitions(htdemucs PRIVATE HAVE_ACCELERATE ACCELERATE_NEW_LAPACK)
+endif()
 if(NOT MSVC)
     target_compile_options(htdemucs PRIVATE -O3)
 endif()

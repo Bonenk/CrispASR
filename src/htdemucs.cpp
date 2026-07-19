@@ -14,6 +14,10 @@
 #include "core/gguf_loader.h"
 #include "core/fft.h"
 
+#if defined(HAVE_ACCELERATE)
+#include <Accelerate/Accelerate.h> // cblas_sgemm — CrossTransformer is 86% of runtime
+#endif
+
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -963,6 +967,54 @@ static void cpu_group_norm1_inplace(float* x, int C, int T, const float* w, cons
 static void cpu_group_norm1_inplace(std::vector<float>& x, int C, int T, const float* w, const float* b,
                                     float eps = 1e-5f) {
     cpu_group_norm1_inplace(x.data(), C, T, w, b, eps);
+}
+
+// ---------------------------------------------------------------------------
+// GEMM for the CrossTransformer hot path.
+//
+// The transformer is ~86% of a forward pass (self-attn 52%, cross-attn 33%,
+// measured with CRISPASR_HTDEMUCS_PROFILE=1), and every matmul in it was a
+// scalar triple loop whose innermost stride was seq_len floats — ~10 KB, so a
+// cache miss per multiply-add. Routing them through cblas_sgemm fixes both the
+// FLOP rate and the access pattern.
+//
+// Gated by CRISPASR_HTDEMUCS_BLAS (default ON where Accelerate is available).
+// Set it to 0 to fall back to the scalar path — that is the A/B lever and the
+// regression-bisection mechanism; do not remove it.
+// ---------------------------------------------------------------------------
+static bool htdemucs_use_blas() {
+#if defined(HAVE_ACCELERATE)
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("CRISPASR_HTDEMUCS_BLAS");
+        v = (e && atoi(e) == 0) ? 0 : 1; // default ON
+    }
+    return v != 0;
+#else
+    return false;
+#endif
+}
+
+// C[M,N] = A[M,K] * B[K,N], all row-major. Falls back to a cache-blocked scalar
+// loop when Accelerate is unavailable or the gate is off.
+static void htd_gemm(int M, int N, int K, const float* A, const float* B, float* C) {
+#if defined(HAVE_ACCELERATE)
+    if (htdemucs_use_blas()) {
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, 1.0f, A, K, B, N, 0.0f, C, N);
+        return;
+    }
+#endif
+    std::fill(C, C + (size_t)M * N, 0.0f);
+    for (int i = 0; i < M; i++)
+        for (int k = 0; k < K; k++) {
+            const float a = A[(size_t)i * K + k];
+            if (a == 0.0f)
+                continue;
+            const float* brow = B + (size_t)k * N;
+            float* crow = C + (size_t)i * N;
+            for (int j = 0; j < N; j++)
+                crow[j] += a * brow[j];
+        }
 }
 
 // CPU DConv residual stack over a channel-major (C, T) buffer, in place.
@@ -1927,16 +1979,9 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 // matmul: qkv[o, s] = sum_d w[d, o] * tmp[d, s] for d in [0, dim)
                 // = sum_d w_data[o * dim + d] * tmp[d * seq_len + s]
 
-                std::vector<float> qkv(out_dim * seq_len, 0.0f);
-                for (int o = 0; o < out_dim; o++) {
-                    for (int s = 0; s < seq_len; s++) {
-                        float sum = 0;
-                        for (int d = 0; d < dim; d++) {
-                            sum += w_data[(size_t)o * dim + d] * tmp[(size_t)d * seq_len + s];
-                        }
-                        qkv[(size_t)o * seq_len + s] = sum;
-                    }
-                }
+                // qkv[o,s] = sum_d W[o,d] * tmp[d,s]  ->  (3dim,dim) x (dim,seq)
+                std::vector<float> qkv((size_t)out_dim * seq_len, 0.0f);
+                htd_gemm(out_dim, seq_len, dim, w_data.data(), tmp.data(), qkv.data());
                 // Add bias
                 if (sa.in_proj_b) {
                     std::vector<float> bias(out_dim);
@@ -1958,19 +2003,31 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 float scale = 1.0f / sqrtf((float)head_dim);
                 std::vector<float> attn_out(dim * seq_len, 0.0f);
 
+                std::vector<float> scores((size_t)seq_len * seq_len);
                 for (int h = 0; h < n_heads; h++) {
                     int hoff = h * head_dim;
-                    // Q_h[hd, s], K_h[hd, s], V_h[hd, s] are slices of Q/K/V
-                    // scores[s1, s2] = sum_hd Q_h[hd, s1] * K_h[hd, s2] * scale
-                    std::vector<float> scores(seq_len * seq_len);
-                    for (int s1 = 0; s1 < seq_len; s1++) {
-                        for (int s2 = 0; s2 < seq_len; s2++) {
-                            float dot = 0;
-                            for (int hd = 0; hd < head_dim; hd++) {
-                                dot += Q[(size_t)(hoff + hd) * seq_len + s1] * K[(size_t)(hoff + hd) * seq_len + s2];
+                    // Q/K/V are (dim, seq) row-major, so a head slice is a
+                    // (head_dim, seq) block with row stride seq_len. scores =
+                    // Q_h^T * K_h -> (seq, seq); sgemm reads the slices in place
+                    // via lda/ldb, no packing needed.
+#if defined(HAVE_ACCELERATE)
+                    if (htdemucs_use_blas()) {
+                        cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, seq_len, seq_len, head_dim, scale,
+                                    Q + (size_t)hoff * seq_len, seq_len, K + (size_t)hoff * seq_len, seq_len, 0.0f,
+                                    scores.data(), seq_len);
+                    } else
+#endif
+                    {
+                        for (int s1 = 0; s1 < seq_len; s1++)
+                            for (int s2 = 0; s2 < seq_len; s2++) {
+                                float dot = 0;
+                                for (int hd = 0; hd < head_dim; hd++)
+                                    dot +=
+                                        Q[(size_t)(hoff + hd) * seq_len + s1] * K[(size_t)(hoff + hd) * seq_len + s2];
+                                scores[(size_t)s1 * seq_len + s2] = dot * scale;
                             }
-                            scores[(size_t)s1 * seq_len + s2] = dot * scale;
-                        }
+                    }
+                    for (int s1 = 0; s1 < seq_len; s1++) {
                         // Softmax over s2 for each s1
                         float max_s = -1e30f;
                         for (int s2 = 0; s2 < seq_len; s2++)
@@ -1983,29 +2040,31 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                         for (int s2 = 0; s2 < seq_len; s2++)
                             scores[(size_t)s1 * seq_len + s2] /= sum_exp;
                     }
-                    // attn_out_h[hd, s1] = sum_s2 scores[s1, s2] * V_h[hd, s2]
-                    for (int s1 = 0; s1 < seq_len; s1++) {
-                        for (int hd = 0; hd < head_dim; hd++) {
-                            float sum = 0;
-                            for (int s2 = 0; s2 < seq_len; s2++) {
-                                sum += scores[(size_t)s1 * seq_len + s2] * V[(size_t)(hoff + hd) * seq_len + s2];
+                    // attn_out_h[hd, s1] = sum_s2 V_h[hd, s2] * scores[s1, s2]
+                    //   = V_h (head_dim, seq) * scores^T (seq, seq)
+#if defined(HAVE_ACCELERATE)
+                    if (htdemucs_use_blas()) {
+                        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, head_dim, seq_len, seq_len, 1.0f,
+                                    V + (size_t)hoff * seq_len, seq_len, scores.data(), seq_len, 0.0f,
+                                    attn_out.data() + (size_t)hoff * seq_len, seq_len);
+                    } else
+#endif
+                    {
+                        for (int s1 = 0; s1 < seq_len; s1++)
+                            for (int hd = 0; hd < head_dim; hd++) {
+                                float sum = 0;
+                                for (int s2 = 0; s2 < seq_len; s2++)
+                                    sum += scores[(size_t)s1 * seq_len + s2] * V[(size_t)(hoff + hd) * seq_len + s2];
+                                attn_out[(size_t)(hoff + hd) * seq_len + s1] = sum;
                             }
-                            attn_out[(size_t)(hoff + hd) * seq_len + s1] = sum;
-                        }
                     }
                 }
 
                 // 5. Output projection: out_proj_weight (dim, dim)
                 {
                     std::vector<float> ow = read_tensor_f32(sa.out_proj_w);
-                    std::vector<float> proj(dim * seq_len, 0.0f);
-                    for (int o = 0; o < dim; o++)
-                        for (int s = 0; s < seq_len; s++) {
-                            float sum = 0;
-                            for (int d = 0; d < dim; d++)
-                                sum += ow[(size_t)o * dim + d] * attn_out[(size_t)d * seq_len + s];
-                            proj[(size_t)o * seq_len + s] = sum;
-                        }
+                    std::vector<float> proj((size_t)dim * seq_len, 0.0f);
+                    htd_gemm(dim, seq_len, dim, ow.data(), attn_out.data(), proj.data());
                     if (sa.out_proj_b) {
                         std::vector<float> ob(dim);
                         {
@@ -2056,14 +2115,12 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                         auto _rd = read_tensor_f32(sa.linear1_b);
                         memcpy(b1.data(), _rd.data(), std::min(b1.size(), _rd.size()) * sizeof(float));
                     }
-                    std::vector<float> h(hidden * seq_len, 0.0f);
-                    for (int o = 0; o < hidden; o++)
-                        for (int s = 0; s < seq_len; s++) {
-                            float sum = 0;
-                            for (int d = 0; d < dim; d++)
-                                sum += w1[(size_t)o * dim + d] * tmp[(size_t)d * seq_len + s];
-                            h[(size_t)o * seq_len + s] = sum + (sa.linear1_b ? b1[o] : 0.0f);
-                        }
+                    std::vector<float> h((size_t)hidden * seq_len, 0.0f);
+                    htd_gemm(hidden, seq_len, dim, w1.data(), tmp.data(), h.data());
+                    if (sa.linear1_b)
+                        for (int o = 0; o < hidden; o++)
+                            for (int s = 0; s < seq_len; s++)
+                                h[(size_t)o * seq_len + s] += b1[o];
                     // GELU
                     for (size_t i = 0; i < h.size(); i++) {
                         float v = h[i];
@@ -2076,14 +2133,12 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                         auto _rd = read_tensor_f32(sa.linear2_b);
                         memcpy(b2.data(), _rd.data(), std::min(b2.size(), _rd.size()) * sizeof(float));
                     }
-                    std::vector<float> ffn_out(dim * seq_len, 0.0f);
-                    for (int o = 0; o < dim; o++)
-                        for (int s = 0; s < seq_len; s++) {
-                            float sum = 0;
-                            for (int d = 0; d < hidden; d++)
-                                sum += w2[(size_t)o * hidden + d] * h[(size_t)d * seq_len + s];
-                            ffn_out[(size_t)o * seq_len + s] = sum + (sa.linear2_b ? b2[o] : 0.0f);
-                        }
+                    std::vector<float> ffn_out((size_t)dim * seq_len, 0.0f);
+                    htd_gemm(dim, seq_len, hidden, w2.data(), h.data(), ffn_out.data());
+                    if (sa.linear2_b)
+                        for (int o = 0; o < dim; o++)
+                            for (int s = 0; s < seq_len; s++)
+                                ffn_out[(size_t)o * seq_len + s] += b2[o];
                     // gamma2 + residual
                     if (sa.gamma2_scale) {
                         std::vector<float> gs(dim);
@@ -2173,47 +2228,49 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     }
 
                     // Q = W_q @ q_normed + b_q  (first dim rows of weight)
-                    std::vector<float> Q(dim * q_seq, 0.0f);
+                    std::vector<float> Q((size_t)dim * q_seq, 0.0f);
+                    htd_gemm(dim, q_seq, dim, w_data.data(), q_normed.data(), Q.data());
                     for (int o = 0; o < dim; o++)
-                        for (int s = 0; s < q_seq; s++) {
-                            float sum = bias[o];
-                            for (int d = 0; d < dim; d++)
-                                sum += w_data[(size_t)o * dim + d] * q_normed[(size_t)d * q_seq + s];
-                            Q[(size_t)o * q_seq + s] = sum;
-                        }
+                        for (int s = 0; s < q_seq; s++)
+                            Q[(size_t)o * q_seq + s] += bias[o];
                     // K = W_k @ k_normed + b_k  (second dim rows)
-                    std::vector<float> K(dim * k_seq, 0.0f);
+                    std::vector<float> K((size_t)dim * k_seq, 0.0f);
+                    htd_gemm(dim, k_seq, dim, w_data.data() + (size_t)dim * dim, k_normed.data(), K.data());
                     for (int o = 0; o < dim; o++)
-                        for (int s = 0; s < k_seq; s++) {
-                            float sum = bias[dim + o];
-                            for (int d = 0; d < dim; d++)
-                                sum += w_data[(size_t)(dim + o) * dim + d] * k_normed[(size_t)d * k_seq + s];
-                            K[(size_t)o * k_seq + s] = sum;
-                        }
+                        for (int s = 0; s < k_seq; s++)
+                            K[(size_t)o * k_seq + s] += bias[dim + o];
                     // V = W_v @ k_normed + b_v  (third dim rows)
-                    std::vector<float> V(dim * k_seq, 0.0f);
+                    std::vector<float> V((size_t)dim * k_seq, 0.0f);
+                    htd_gemm(dim, k_seq, dim, w_data.data() + (size_t)2 * dim * dim, k_normed.data(), V.data());
                     for (int o = 0; o < dim; o++)
-                        for (int s = 0; s < k_seq; s++) {
-                            float sum = bias[2 * dim + o];
-                            for (int d = 0; d < dim; d++)
-                                sum += w_data[(size_t)(2 * dim + o) * dim + d] * k_normed[(size_t)d * k_seq + s];
-                            V[(size_t)o * k_seq + s] = sum;
-                        }
+                        for (int s = 0; s < k_seq; s++)
+                            V[(size_t)o * k_seq + s] += bias[2 * dim + o];
 
                     // 3. Multi-head cross-attention
                     float scale = 1.0f / sqrtf((float)head_dim);
                     std::vector<float> attn_out(dim * q_seq, 0.0f);
                     for (int h = 0; h < n_heads; h++) {
                         int hoff = h * head_dim;
-                        // scores[q_s, k_s] for this head
-                        std::vector<float> scores(q_seq * k_seq);
+                        // scores[q_s, k_s] = Q_h^T * K_h for this head
+                        std::vector<float> scores((size_t)q_seq * k_seq);
+#if defined(HAVE_ACCELERATE)
+                        if (htdemucs_use_blas()) {
+                            cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans, q_seq, k_seq, head_dim, scale,
+                                        Q.data() + (size_t)hoff * q_seq, q_seq, K.data() + (size_t)hoff * k_seq, k_seq,
+                                        0.0f, scores.data(), k_seq);
+                        } else
+#endif
+                        {
+                            for (int qs = 0; qs < q_seq; qs++)
+                                for (int ks = 0; ks < k_seq; ks++) {
+                                    float dot = 0;
+                                    for (int hd = 0; hd < head_dim; hd++)
+                                        dot +=
+                                            Q[(size_t)(hoff + hd) * q_seq + qs] * K[(size_t)(hoff + hd) * k_seq + ks];
+                                    scores[(size_t)qs * k_seq + ks] = dot * scale;
+                                }
+                        }
                         for (int qs = 0; qs < q_seq; qs++) {
-                            for (int ks = 0; ks < k_seq; ks++) {
-                                float dot = 0;
-                                for (int hd = 0; hd < head_dim; hd++)
-                                    dot += Q[(size_t)(hoff + hd) * q_seq + qs] * K[(size_t)(hoff + hd) * k_seq + ks];
-                                scores[(size_t)qs * k_seq + ks] = dot * scale;
-                            }
                             // softmax over ks
                             float mx = -1e30f;
                             for (int ks = 0; ks < k_seq; ks++)
@@ -2226,27 +2283,30 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                             for (int ks = 0; ks < k_seq; ks++)
                                 scores[(size_t)qs * k_seq + ks] /= se;
                         }
-                        // weighted sum of V
-                        for (int qs = 0; qs < q_seq; qs++)
-                            for (int hd = 0; hd < head_dim; hd++) {
-                                float sum = 0;
-                                for (int ks = 0; ks < k_seq; ks++)
-                                    sum += scores[(size_t)qs * k_seq + ks] * V[(size_t)(hoff + hd) * k_seq + ks];
-                                attn_out[(size_t)(hoff + hd) * q_seq + qs] = sum;
-                            }
+                        // weighted sum of V: V_h (head_dim, k_seq) * scores^T (k_seq, q_seq)
+#if defined(HAVE_ACCELERATE)
+                        if (htdemucs_use_blas()) {
+                            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, head_dim, q_seq, k_seq, 1.0f,
+                                        V.data() + (size_t)hoff * k_seq, k_seq, scores.data(), k_seq, 0.0f,
+                                        attn_out.data() + (size_t)hoff * q_seq, q_seq);
+                        } else
+#endif
+                        {
+                            for (int qs = 0; qs < q_seq; qs++)
+                                for (int hd = 0; hd < head_dim; hd++) {
+                                    float sum = 0;
+                                    for (int ks = 0; ks < k_seq; ks++)
+                                        sum += scores[(size_t)qs * k_seq + ks] * V[(size_t)(hoff + hd) * k_seq + ks];
+                                    attn_out[(size_t)(hoff + hd) * q_seq + qs] = sum;
+                                }
+                        }
                     }
 
                     // 4. Output projection
                     {
                         std::vector<float> ow = read_tensor_f32(ca.cross_attn_out_proj_w);
-                        std::vector<float> proj(dim * q_seq, 0.0f);
-                        for (int o = 0; o < dim; o++)
-                            for (int s = 0; s < q_seq; s++) {
-                                float sum = 0;
-                                for (int d = 0; d < dim; d++)
-                                    sum += ow[(size_t)o * dim + d] * attn_out[(size_t)d * q_seq + s];
-                                proj[(size_t)o * q_seq + s] = sum;
-                            }
+                        std::vector<float> proj((size_t)dim * q_seq, 0.0f);
+                        htd_gemm(dim, q_seq, dim, ow.data(), attn_out.data(), proj.data());
                         if (ca.cross_attn_out_proj_b) {
                             std::vector<float> ob(dim);
                             {
@@ -2297,14 +2357,17 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                             auto _rd = read_tensor_f32(ca.linear1_b);
                             memcpy(b1.data(), _rd.data(), std::min(b1.size(), _rd.size()) * sizeof(float));
                         }
-                        std::vector<float> hbuf(hidden * q_seq, 0.0f);
-                        for (int o = 0; o < hidden; o++)
-                            for (int s = 0; s < q_seq; s++) {
-                                float sum = 0;
-                                for (int d = 0; d < dim; d++)
-                                    sum += w1[(size_t)o * dim + d] * tmp[(size_t)d * q_seq + s];
-                                hbuf[(size_t)o * q_seq + s] = sum + (ca.linear1_b ? b1[o] : 0.0f);
-                            }
+                        std::vector<float> hbuf((size_t)hidden * q_seq, 0.0f);
+
+                        htd_gemm(hidden, q_seq, dim, w1.data(), tmp.data(), hbuf.data());
+
+                        if (ca.linear1_b)
+
+                            for (int o = 0; o < hidden; o++)
+
+                                for (int s = 0; s < q_seq; s++)
+
+                                    hbuf[(size_t)o * q_seq + s] += b1[o];
                         for (size_t i = 0; i < hbuf.size(); i++) {
                             float v = hbuf[i];
                             hbuf[i] = v * 0.5f * (1.0f + tanhf(0.7978845608f * (v + 0.044715f * v * v * v)));
@@ -2315,14 +2378,17 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                             auto _rd = read_tensor_f32(ca.linear2_b);
                             memcpy(b2.data(), _rd.data(), std::min(b2.size(), _rd.size()) * sizeof(float));
                         }
-                        std::vector<float> ffn_out(dim * q_seq, 0.0f);
-                        for (int o = 0; o < dim; o++)
-                            for (int s = 0; s < q_seq; s++) {
-                                float sum = 0;
-                                for (int d = 0; d < hidden; d++)
-                                    sum += w2[(size_t)o * hidden + d] * hbuf[(size_t)d * q_seq + s];
-                                ffn_out[(size_t)o * q_seq + s] = sum + (ca.linear2_b ? b2[o] : 0.0f);
-                            }
+                        std::vector<float> ffn_out((size_t)dim * q_seq, 0.0f);
+
+                        htd_gemm(dim, q_seq, hidden, w2.data(), hbuf.data(), ffn_out.data());
+
+                        if (ca.linear2_b)
+
+                            for (int o = 0; o < dim; o++)
+
+                                for (int s = 0; s < q_seq; s++)
+
+                                    ffn_out[(size_t)o * q_seq + s] += b2[o];
                         if (ca.gamma2_scale) {
                             std::vector<float> gs(dim);
                             {
