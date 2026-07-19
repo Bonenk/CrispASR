@@ -908,9 +908,40 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                 time_mean, time_std);
     }
 
-    // Step 6: Build ggml compute graph for encoder → transformer → decoder
-    // TODO: this is the next major piece. For now produce stub output.
-    fprintf(stderr, "htdemucs: normalized, encoder graph TODO (Phase 2c)\n");
+    // Step 6: Encoder forward (dimension tracking for now, ggml graphs next)
+    //
+    // Freq branch: cac_mag[n_cac_ch × Fq × T], Time branch: pcm_ch[2 × work_length]
+    // Each encoder layer changes dims; we track them for decoder symmetry.
+
+    std::vector<float> x_buf(cac_mag);
+    int x_C = n_cac_ch, x_Fq = Fq, x_T = T;
+    std::vector<float> xt_buf(pcm_ch.begin(), pcm_ch.begin() + 2 * work_length);
+    int xt_C = hp.audio_channels, xt_T = work_length;
+
+    int freqs_cur = nfft / 2;
+    for (int idx = 0; idx < hp.depth; idx++) {
+        bool freq = (freqs_cur > 1);
+        int stri = freq ? hp.stride : 2;
+        int ker = freq ? hp.kernel_size : 4;
+        if (freq && freqs_cur <= hp.kernel_size) {
+            ker = freqs_cur;
+        }
+
+        if (htdemucs_debug()) {
+            fprintf(stderr, "htdemucs: enc[%d] x=(%d,%d,%d) xt=(%d,%d) freq=%d freqs=%d\n", idx, x_C, x_Fq, x_T, xt_C,
+                    xt_T, freq ? 1 : 0, freqs_cur);
+        }
+
+        // TODO: run Conv2d/Conv1d + DConv + rewrite via ggml per-layer graph
+        // For now just track dims
+        (void)ker;
+        (void)stri;
+        if (freq) {
+            freqs_cur = (freqs_cur <= hp.kernel_size) ? 1 : freqs_cur / hp.stride;
+        }
+    }
+
+    fprintf(stderr, "htdemucs: encoder dims tracked, ggml graph TODO (Phase 2c)\n");
 
     // Return stub result
     auto r = new htdemucs_result();
