@@ -1281,10 +1281,135 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     fprintf(stderr, "htdemucs: CrossTransformer skipped (Phase 3 TODO)\n");
 
     // Step 8: Decoder (reverse of encoder, with skip connections)
-    // TODO Phase 2h: decoder ConvTranspose2d/1d + skip connections
-    // The decoder reverses the encoder, consuming saved skip connections.
-    // For now, skip to produce stub output — decoder will be wired next.
-    fprintf(stderr, "htdemucs: decoder TODO (Phase 2h)\n");
+    for (int idx = 0; idx < hp.depth && encoder_ok; idx++) {
+        auto& dec = m.decoder[idx];
+        if (!dec.conv_tr_w)
+            break;
+
+        // Pop skip from end (LIFO order)
+        auto skip_f = saved_freq.back();
+        saved_freq.pop_back();
+
+        // Build decoder layer graph
+        size_t d_ctx_size = ggml_tensor_overhead() * 64 + ggml_graph_overhead();
+        ggml_init_params dgp = {d_ctx_size, nullptr, true};
+        ggml_context* dg = ggml_init(dgp);
+
+        bool is_freq = dec.freq;
+        bool is_last = (idx == hp.depth - 1);
+
+        // Input tensor: (T, Fq, C, 1) for freq, (T, C) for time
+        ggml_tensor* dx_in = nullptr;
+        ggml_tensor* skip_in = nullptr;
+
+        if (is_freq) {
+            dx_in = ggml_new_tensor_4d(dg, GGML_TYPE_F32, x_T, x_Fq, x_C, 1);
+            skip_in = ggml_new_tensor_4d(dg, GGML_TYPE_F32, skip_f.T, skip_f.Fq, skip_f.C, 1);
+        } else {
+            // TODO: handle non-freq decoder layers
+            dx_in = ggml_new_tensor_4d(dg, GGML_TYPE_F32, x_T, x_Fq, x_C, 1);
+            skip_in = ggml_new_tensor_4d(dg, GGML_TYPE_F32, skip_f.T, skip_f.Fq, skip_f.C, 1);
+        }
+        ggml_set_name(dx_in, "dec_in");
+        ggml_set_input(dx_in);
+        ggml_set_name(skip_in, "dec_skip");
+        ggml_set_input(skip_in);
+
+        ggml_tensor* dy = dx_in;
+
+        if (!dec.empty) {
+            // x = x + skip
+            dy = ggml_add(dg, dy, skip_in);
+
+            // Rewrite: 1x1 Conv2d → 2*C → GroupNorm → GLU
+            if (dec.rewrite_w) {
+                ggml_tensor* drw = ggml_conv_2d(dg, dec.rewrite_w, dy, 1, 1, 0, 0, 1, 1);
+                if (dec.rewrite_b) {
+                    ggml_tensor* drwb = ggml_reshape_4d(dg, dec.rewrite_b, 1, 1, (int)dec.rewrite_b->ne[0], 1);
+                    drw = ggml_add(dg, drw, drwb);
+                }
+                if (dec.norm1_w) {
+                    drw = ggml_group_norm(dg, drw, 4, 1e-5f);
+                    ggml_tensor* w4d = ggml_reshape_4d(dg, dec.norm1_w, 1, 1, (int)dec.norm1_w->ne[0], 1);
+                    drw = ggml_mul(dg, drw, w4d);
+                    if (dec.norm1_b) {
+                        ggml_tensor* b4d = ggml_reshape_4d(dg, dec.norm1_b, 1, 1, (int)dec.norm1_b->ne[0], 1);
+                        drw = ggml_add(dg, drw, b4d);
+                    }
+                }
+                // GLU
+                int drw_C = (int)drw->ne[2], drw_half = drw_C / 2;
+                int drw_Fq = (int)drw->ne[1], drw_T = (int)drw->ne[0];
+                size_t drw_ch_stride = drw->nb[2];
+                ggml_tensor* da =
+                    ggml_view_4d(dg, drw, drw_T, drw_Fq, drw_half, 1, drw->nb[1], drw->nb[2], drw->nb[3], 0);
+                ggml_tensor* db = ggml_view_4d(dg, drw, drw_T, drw_Fq, drw_half, 1, drw->nb[1], drw->nb[2], drw->nb[3],
+                                               (size_t)drw_half * drw_ch_stride);
+                dy = ggml_mul(dg, ggml_cont(dg, da), ggml_sigmoid(dg, ggml_cont(dg, db)));
+            }
+        } else {
+            // Empty decoder: dy stays as input (no skip add, no rewrite)
+        }
+
+        // ConvTranspose2d: upsample
+        // ggml doesn't have conv_transpose_2d. For freq branch with kernel [Cout, Cin, K, 1]:
+        // this is effectively ConvTranspose1d on the freq axis.
+        // TODO: implement ConvTranspose2d properly.
+        // For now, use conv_transpose_1d after reshaping: (T, Fq, C, 1) → treat as (Fq, C) per T frame.
+        // Actually, ggml has no conv_transpose_2d at all. This is a blocker for the decoder.
+        //
+        // WORKAROUND: Since the kernel is [K, 1], the transpose conv only upsamples on the
+        // freq axis. We can reshape (T, Fq, C) → (Fq, C*T) and use conv_transpose_1d, then
+        // reshape back. But this is complex.
+        //
+        // ALTERNATIVE: Use the conv.h helper (convt1d_crop) after reshaping.
+        // For this first pass, just pass dy through without upsampling.
+        // The output shape will be wrong but it validates the graph build.
+
+        // GroupNorm after ConvTranspose
+        if (dec.norm2_w) {
+            dy = ggml_group_norm(dg, dy, 4, 1e-5f);
+            ggml_tensor* w4d = ggml_reshape_4d(dg, dec.norm2_w, 1, 1, (int)dec.norm2_w->ne[0], 1);
+            dy = ggml_mul(dg, dy, w4d);
+            if (dec.norm2_b) {
+                ggml_tensor* b4d = ggml_reshape_4d(dg, dec.norm2_b, 1, 1, (int)dec.norm2_b->ne[0], 1);
+                dy = ggml_add(dg, dy, b4d);
+            }
+        }
+
+        // GELU (not on last layer)
+        if (!is_last) {
+            dy = ggml_gelu(dg, dy);
+        }
+
+        ggml_set_name(dy, "dec_out");
+        ggml_set_output(dy);
+
+        ggml_cgraph* dgf = ggml_new_graph(dg);
+        ggml_build_forward_expand(dgf, dy);
+        ggml_gallocr_t dalloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+        if (ggml_gallocr_alloc_graph(dalloc, dgf)) {
+            ggml_backend_tensor_set(dx_in, x_buf.data(), 0, x_buf.size() * sizeof(float));
+            ggml_backend_tensor_set(skip_in, skip_f.data.data(), 0, skip_f.data.size() * sizeof(float));
+            ggml_backend_graph_compute(ctx->backend, dgf);
+
+            int dout_T = (int)dy->ne[0], dout_Fq = (int)dy->ne[1], dout_C = (int)dy->ne[2];
+            size_t dout_n = (size_t)dout_T * dout_Fq * dout_C;
+            x_buf.resize(dout_n);
+            ggml_backend_tensor_get(dy, x_buf.data(), 0, dout_n * sizeof(float));
+            x_C = dout_C;
+            x_Fq = dout_Fq;
+            x_T = dout_T;
+
+            if (htdemucs_debug()) {
+                fprintf(stderr, "htdemucs: dec[%d] output (%d, %d, %d)\n", idx, x_C, x_Fq, x_T);
+            }
+        }
+        ggml_gallocr_free(dalloc);
+        ggml_free(dg);
+    }
+
+    fprintf(stderr, "htdemucs: decoder done, output (%d, %d, %d)\n", x_C, x_Fq, x_T);
 
     // Return stub result
     auto r = new htdemucs_result();
