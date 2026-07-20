@@ -869,9 +869,27 @@ silently mis-folding.
 
 ### Remaining work
 
-- [ ] `src/beat_this.{h,cpp}` — ggml graph. Reusable: `core/attention.h` (QKV +
-  RoPE), `core/ffn.h`, `core/mel.h` + `core/fft.h` for the front end. The per-head
-  gating and the `norm_output` RMSNorm need writing by hand.
+- [x] **Front end DONE** — `beat_this_logmel`, **cos = 1.00000000** vs torchaudio
+  (max_abs 1.2e-4). Built and validated before any network code, since a wrong
+  window / squared magnitude / wrong normalization yields a plausible
+  spectrogram and wrong beats.
+- [x] **Per-stage reference DONE** — `tools/reference_backends/beat_this.py`
+  dumps every stage so the graph comes up incrementally (first divergence = the
+  bug). Checkpoint loads with **0 missing / 0 unexpected** keys, confirming the
+  traced architecture. Contract the graph must reproduce, for a 101-frame input:
+
+  | stage | shape |
+  |---|---|
+  | `stem` | (1, 32, 32, 101) |
+  | `blk0` / `blk1` / `blk2` | (1, 64, 16, 101) / (1, 128, 8, 101) / (1, 256, 4, 101) |
+  | `linear` | (1, 101, 512) |
+  | `transformer` | (1, 101, 512) |
+  | `out_beat`, `out_downbeat` | (1, 101) each |
+
+- [ ] `src/beat_this.{h,cpp}` — the ggml graph itself. Reusable:
+  `core/attention.h` (QKV + RoPE), `core/ffn.h`. The per-head attention gating
+  and the `norm_output` RMSNorm need writing by hand — see the two
+  silent-failure subtleties above.
 - [ ] Front end: 22050 Hz mono, **arithmetic-mean downmix**, STFT n_fft 1024 /
   hop 441 / periodic Hann / `normalized='frame_length'`, project onto the baked
   filterbank, `log1p(1000*x)`. 50 fps.
