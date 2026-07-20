@@ -2343,12 +2343,20 @@ and Mel-Band RoFormer separation, piano_transcription (§250).
 
 ### Phase 0 — shared DSP (blocks the rest)
 
-- [ ] **`core/cqt.h`** — constant-Q / log-frequency transform. **Highest value:
-  the only thing blocking BTC harmony**, and CometBeat is blocked on the exact
-  same gap in Dart ("the crux"). Must match librosa's CQT closely
-  (`n_bins=144, bins_per_octave=24, hop=2048`, sr 22050 for BTC) or the model
-  degrades. Ship the parity fixtures — CometBeat can reuse them as their Dart
-  oracle.
+- [x] **`core/cqt.h`** — constant-Q transform. **DONE** (`src/core/cqt.h`,
+  `tests/test-core-cqt.cpp` 726 assertions, `tools/cqt_librosa_parity.py`).
+  Direct time-domain Brown kernels, not librosa's recursive downsampling.
+  Measured vs librosa 0.11.0 at BTC params: **per-frame shape correlation median
+  0.9999** (mean 0.9721, min 0.1136), **peak-bin exact match 97.6%**. The mean is
+  dragged down by exactly 3 transition frames + the tail frame, where librosa's
+  per-octave group delay differs from our uniform centring — steady state agrees
+  to 0.9999, and for 10 s BTC segments that latency is immaterial. Frame count
+  differs by one at the tail; align on the leading edge. **CometBeat can reuse
+  `tools/cqt_librosa_parity.py` as their Dart CQT oracle** — it is the exact
+  parity harness their handover asks them to budget for.
+  ⚠️ Cost is O(n_bins · N_k)/frame; N_k ≈ 24k samples at the bottom bin. Fine
+  offline at hop 2048, NOT a real-time path — add a sparse spectral-kernel
+  variant behind a flag if one is ever needed.
 - [ ] **`core/gru.h`** — uni/bidirectional GRU, mirroring `core/lstm.h`. Needed
   by RMVPE-class models and by any future CRNN. (piano_transcription landed with
   its own BiGRU; fold it in when convenient, do NOT refactor it blind.)
