@@ -215,6 +215,38 @@ non-commercial weights redistributable.
 
 ---
 
+## 9b. CORRECTION: two agreed parameters cannot work as specified
+
+Both were agreed in good faith; reading the reference shows the contract needs
+amending. Neither is a blocker for v1.
+
+### `protect` is a NO-OP without the FAISS index
+
+`pipeline.py` clones `feats0` BEFORE index retrieval, then blends:
+`feats = feats * pitchff + feats0 * (1 - pitchff)`. With no index — which §3
+puts out of scope for v1 — `feats == feats0`, so the blend is the identity for
+any value of `protect`. Exposing it now would ship a knob that provably does
+nothing. **Proposal: omit it until index retrieval lands**, then add it with the
+0.33 default. (The constant is verified correct: `modules.py:61`.)
+
+### `rms_mix_rate` needs the SOURCE AUDIO, which our seam never receives
+
+`change_rms(data1, sr1, data2, sr2, rate)` takes **data1 = the source waveform
+at 16 kHz** and blends its RMS envelope into the output. Our seam receives
+ContentVec FEATURES, not audio — so CrispASR structurally cannot compute it.
+
+Three options, in order of preference:
+
+1. **CometBeat applies it in Dart.** They already hold the source waveform, and
+   `change_rms` is ~10 lines of RMS + interpolate + multiply. No contract change.
+2. Add an optional `source_audio_16k` input to `convert()` purely to enable it.
+   Widens the wire format for one post-processing step.
+3. Drop it. `rate == 1` skips `change_rms` entirely upstream, so "off" is a
+   legitimate configuration and is what the batch path already defaults to.
+
+**Recommending (1).** Note the default is contested anyway — §6 records three
+different upstream values (0.25 / 1 / 0.0) for the same parameter.
+
 ## 10. API additions CometBeat asked for
 
 Both are guards they cannot implement from Dart:
@@ -222,8 +254,8 @@ Both are guards they cannot implement from Dart:
 | entry point | purpose |
 |---|---|
 | `convert_content_dim()` | the checkpoint's expected ContentVec dim (256 or 768). A v1/v2 mismatch must **refuse loudly**, not run and sound subtly wrong. Mirrors `convert_n_speakers()`. |
-| `protect` parameter | reference default **0.33** (`modules.py:61`, verified) |
-| `rms_mix_rate` parameter | ship **0.25**; see the caveat in §6 |
+| ~~`protect` parameter~~ | **deferred — provably inert without the FAISS index, see §9b** |
+| ~~`rms_mix_rate` parameter~~ | **cannot be done on our side — needs the source waveform, see §9b** |
 
 Length mismatch stays **min + log**, as specced in §2.
 
