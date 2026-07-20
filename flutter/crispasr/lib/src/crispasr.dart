@@ -2084,6 +2084,19 @@ class StreamingSession {
 /// silent 32/64-bit mismatch that reads garbage.
 typedef PitchFrame = ({double timeMs, double f0Hz, double voicedProb});
 
+/// One transcribed note, as returned by [CrispasrSession.pianoNotes].
+///
+/// - `midi` — MIDI note number, 21–108 (A0–C8).
+/// - `onMs` / `offMs` — onset and offset, in milliseconds from the start of
+///   the input.
+/// - `velocity` — MIDI velocity, 0–127.
+///
+/// Shaped to drop into the `NoteEvent` contract used by downstream music
+/// notation apps. Note that `velocity` is **not** a confidence: it is the
+/// model's loudness estimate. If a consumer's contract wants a confidence
+/// field, decide the mapping explicitly rather than reusing this value.
+typedef PianoNote = ({int midi, double onMs, double offMs, int velocity});
+
 /// One separated source stem, as returned by [CrispasrSession.separate].
 ///
 /// - `name` — the model's own label for the stem (`drums`, `bass`, `other`,
@@ -4073,6 +4086,94 @@ class CrispasrSession {
       calloc.free(inPtr);
       calloc.free(nPtr);
     }
+  }
+
+  /// Transcribe polyphonic piano audio into note events.
+  ///
+  /// Requires a piano-capable backend (`piano-transcription`). [pcm16k] must
+  /// be mono float32 at the model's native rate — 16000 Hz; query
+  /// [pianoSampleRate] rather than hard-coding it.
+  ///
+  /// Returns notes in the model's order (not guaranteed sorted), copied into
+  /// Dart-owned memory, so they stay valid after the next call or [close].
+  ///
+  /// This is the structured seam. The `--backend piano-transcription`
+  /// transcribe path also works, but it renders each note into segment text
+  /// like `"C4 v=80"`, and parsing that back is lossy — prefer this.
+  ///
+  /// ```dart
+  /// final s = CrispasrSession.open(path, backend: 'piano-transcription');
+  /// final notes = s.pianoNotes(pcm16k);
+  /// ```
+  ///
+  /// Throws [UnsupportedError] when the loaded dylib predates the piano API,
+  /// [StateError] when the session is closed, and [Exception] when the
+  /// backend has no piano arm (the C side returns -1). An empty result is
+  /// returned as an empty list, not an error — "ran, found no notes" is a
+  /// legitimate outcome on silence.
+  List<PianoNote> pianoNotes(Float32List pcm16k) {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_piano')) {
+      throw UnsupportedError(
+          'Piano transcription API not available in this libcrispasr build');
+    }
+    if (pcm16k.isEmpty) return const <PianoNote>[];
+    final pianoFn = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Pointer<Float>, Int32),
+        int Function(Pointer<Void>, Pointer<Float>, int)>(
+      'crispasr_session_piano',
+    );
+    final notesFn = _lib.lookupFunction<
+        Pointer<Float> Function(Pointer<Void>, Pointer<Int32>),
+        Pointer<Float> Function(Pointer<Void>, Pointer<Int32>)>(
+      'crispasr_session_piano_notes',
+    );
+    final inPtr = calloc<Float>(pcm16k.length);
+    final nPtr = calloc<Int32>();
+    try {
+      inPtr.asTypedList(pcm16k.length).setAll(0, pcm16k);
+      final n = pianoFn(_handle, inPtr, pcm16k.length);
+      if (n < 0) {
+        throw Exception('piano transcription failed for backend $_backend — '
+            'the model is probably not piano-capable '
+            '(expected `piano-transcription`)');
+      }
+      if (n == 0) return const <PianoNote>[];
+      final ptr = notesFn(_handle, nPtr);
+      final nNotes = nPtr.value;
+      if (ptr == nullptr || nNotes <= 0) return const <PianoNote>[];
+      // Flat, session-owned: 4 floats per note, note-major, as
+      // {onset_ms, offset_ms, midi, velocity}. All four lanes are float even
+      // though midi/velocity are logically ints — a mixed struct read through
+      // a float view would misread the int lanes, so the C side flattens.
+      final flat = ptr.asTypedList(nNotes * 4);
+      return List<PianoNote>.generate(
+        nNotes,
+        (i) => (
+          onMs: flat[i * 4],
+          offMs: flat[i * 4 + 1],
+          midi: flat[i * 4 + 2].round(),
+          velocity: flat[i * 4 + 3].round(),
+        ),
+        growable: false,
+      );
+    } finally {
+      calloc.free(inPtr);
+      calloc.free(nPtr);
+    }
+  }
+
+  /// Native input sample rate the loaded piano model expects, in Hz (16000).
+  ///
+  /// Returns 0 when the session's backend has no piano arm, or when the
+  /// loaded dylib predates the piano API — so this doubles as a capability
+  /// probe that never throws.
+  int get pianoSampleRate {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_piano_sample_rate')) return 0;
+    final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>),
+        int Function(Pointer<Void>)>('crispasr_session_piano_sample_rate');
+    return fn(_handle);
   }
 
   /// Native sample rate the loaded separation model expects, in Hz

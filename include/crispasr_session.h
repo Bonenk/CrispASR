@@ -389,6 +389,30 @@ CRISPASR_SESSION_API int crispasr_session_pitch_frame(crispasr_session* s, int i
 // frame-major. Owned by the session. *out_n_frames receives the frame count.
 CRISPASR_SESSION_API const float* crispasr_session_pitch_frames(crispasr_session* s, int* out_n_frames);
 CRISPASR_SESSION_API int crispasr_session_pitch_sample_rate(crispasr_session* s);
+
+// Polyphonic piano transcription: mono PCM at the model's native rate
+// (16000 Hz for piano-transcription) -> note events.
+//
+// Returns note count (>0) on success, 0 for "ran, found nothing", -1 on error
+// or a backend with no piano arm. Retrieve the notes with
+// crispasr_session_piano_notes after a successful call.
+//
+// This exists so consumers get STRUCTURED note events. The CLI adapter renders
+// each note into a crispasr_segment whose text reads like "C4 v=80"; parsing
+// that string back into a note is lossy and was never the intended seam.
+CRISPASR_SESSION_API int crispasr_session_piano(crispasr_session* s, const float* pcm_16k, int n_samples);
+CRISPASR_SESSION_API int crispasr_session_piano_n_notes(crispasr_session* s);
+// Flat, session-owned view of the last result: 4 floats per note, note-major,
+// as {onset_ms, offset_ms, midi_note, velocity}. Valid until the next
+// crispasr_session_piano call or session close — copy if you need to keep it.
+//
+// All four fields are float even though midi_note and velocity are logically
+// integers. That is deliberate: a mixed int/float struct read through a flat
+// float view misreads the int lanes, and this layout lets a binding do one
+// typed-array read (the same reason crispasr_session_pitch_frames is flat).
+// midi_note is 21-108 (A0-C8); velocity is 0-127.
+CRISPASR_SESSION_API const float* crispasr_session_piano_notes(crispasr_session* s, int* out_n_notes);
+CRISPASR_SESSION_API int crispasr_session_piano_sample_rate(crispasr_session* s);
 CRISPASR_SESSION_API const char* crispasr_session_last_synth_error(crispasr_session* s);
 CRISPASR_SESSION_API char* crispasr_session_translate_text(crispasr_session* s, const char* text, const char* src_lang,
                                                            const char* tgt_lang, int max_tokens);
