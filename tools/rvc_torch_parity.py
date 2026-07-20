@@ -190,6 +190,28 @@ def main():
     if zeroed:
         print(f"NOTE: {len(zeroed)} draw(s) fell back to zeros (no buffer of that shape supplied): {set(zeroed)}")
 
+    # ---- numpy spec vs torch, for enc_p ----
+    from gguf import GGUFReader
+    G = {t.name: np.array(t.data, dtype=np.float32).reshape([int(d) for d in reversed(t.shape)])
+         for t in GGUFReader(gguf_path).tensors}
+    mp_np, logs_np = enc_p_numpy(
+        G, phone[0], pitch_coarse[0], m["hidden_channels"], m["n_heads"], m["n_layers"],
+        window=(G["enc_p.encoder.attn_layers.0.emb_rel_k"].shape[1] - 1) // 2,
+        out_channels=inter,
+    )
+    print("\nNUMPY SPEC vs TORCH (enc_p):")
+    ok = True
+    for name, mine, ref in (("m_p", mp_np, sa["m_p"][0]), ("logs_p", logs_np, sa["logs_p"][0])):
+        a, b = mine.ravel(), ref.ravel().astype(np.float64)
+        cos = float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+        mad = float(np.abs(a - b).max())
+        good = cos > 0.99999
+        ok &= good
+        print(f"  {name:8} {'PASS' if good else 'FAIL'} cos={cos:.8f} max_abs={mad:.3e} "
+              f"|mine|={np.linalg.norm(a):.4f} |ref|={np.linalg.norm(b):.4f}")
+    if not ok:
+        sys.exit("FAIL: the numpy enc_p spec does not match torch — fix the spec before any ggml.")
+
     if len(sys.argv) > 5:
         import gguf as _g
         stages = {"input_phone": phone[0], "input_f0": f0_hz, "input_pitch": pitch_coarse.astype(np.float32),
@@ -203,6 +225,113 @@ def main():
         print(f"wrote reference dump {sys.argv[5]}: {len(stages)} stages "
               f"(inputs + BOTH noise buffers + latents + audio)")
     print("PASS")
+
+
+# ---------------------------------------------------------------------------
+# numpy reimplementation — enc_p (TextEncoder)
+#
+# Traps this encodes, each a silent accuracy bug if assumed:
+#   * LeakyReLU slope is 0.1, NOT torch's 0.01 default (models.py:38).
+#   * x is scaled by sqrt(hidden_channels) BEFORE the lrelu (models.py:62-63).
+#   * Residuals are POST-norm: x = norm(x + sublayer(x)), not pre-norm.
+#   * Attention is RELATIVE-position (window 10), not absolute PE.
+#   * FFN convs use SAME padding and a plain ReLU (activation is not "gelu"),
+#     and the output is re-masked.
+#   * LayerNorm is over the CHANNEL dim (modules.py:29-32 transposes first).
+# ---------------------------------------------------------------------------
+
+def _layer_norm(x, gamma, beta, eps=1e-5):
+    """x: (C, T) -> normalise over C per time step (their LayerNorm transposes)."""
+    xt = x.T                                    # (T, C)
+    mu = xt.mean(-1, keepdims=True)
+    var = xt.var(-1, keepdims=True)
+    y = (xt - mu) / np.sqrt(var + eps) * gamma + beta
+    return y.T
+
+
+def _conv1d(x, w, b, pad):
+    """x: (Cin, T), w: (Cout, Cin, K) -> (Cout, T) with SAME zero padding."""
+    Cin, T = x.shape
+    Cout, _, K = w.shape
+    xp = np.pad(x, ((0, 0), (pad, pad)))
+    out = np.zeros((Cout, T), dtype=np.float64)
+    for k in range(K):
+        out += w[:, :, k] @ xp[:, k : k + T]
+    return out + b[:, None]
+
+
+def _get_relative_embeddings(emb, T, window):
+    """emb: (1, 2w+1, d) -> (2T-1, d), padded/sliced exactly as upstream."""
+    pad_len = max(T - (window + 1), 0)
+    start = max((window + 1) - T, 0)
+    e = emb[0]
+    if pad_len > 0:
+        e = np.pad(e, ((pad_len, pad_len), (0, 0)))
+    return e[start : start + 2 * T - 1]
+
+
+def _rel_to_abs(x):
+    """x: (H, T, 2T-1) -> (H, T, T). The skew from relative to absolute indexing."""
+    H, T, _ = x.shape
+    x = np.pad(x, ((0, 0), (0, 0), (0, 1)))          # (H, T, 2T)
+    flat = x.reshape(H, T * 2 * T)
+    flat = np.pad(flat, ((0, 0), (0, T - 1)))        # (H, T*2T + T-1)
+    return flat.reshape(H, T + 1, 2 * T - 1)[:, :T, T - 1 :]
+
+
+def enc_p_numpy(G, phone, pitch, hidden, n_heads, n_layers, window, out_channels):
+    """phone: (T, content_dim), pitch: (T,) int -> (m_p, logs_p), each (out, T)."""
+    W = lambda k: G[k].astype(np.float64)
+    x = phone.astype(np.float64) @ W("enc_p.emb_phone.weight").T + W("enc_p.emb_phone.bias")
+    x = x + W("enc_p.emb_pitch.weight")[pitch]          # embedding lookup
+    x = x * np.sqrt(hidden)                             # BEFORE the lrelu
+    x = np.where(x < 0, 0.1 * x, x)                     # LeakyReLU(0.1), not 0.01
+    x = x.T                                             # (C, T)
+
+    hd = hidden // n_heads
+    for i in range(n_layers):
+        p = f"enc_p.encoder.attn_layers.{i}."
+        q = _conv1d(x, W(p + "conv_q.weight"), W(p + "conv_q.bias"), 0)
+        k = _conv1d(x, W(p + "conv_k.weight"), W(p + "conv_k.bias"), 0)
+        v = _conv1d(x, W(p + "conv_v.weight"), W(p + "conv_v.bias"), 0)
+        T = x.shape[1]
+        qh = q.reshape(n_heads, hd, T).transpose(0, 2, 1)   # (H, T, hd)
+        kh = k.reshape(n_heads, hd, T).transpose(0, 2, 1)
+        vh = v.reshape(n_heads, hd, T).transpose(0, 2, 1)
+        scores = (qh / np.sqrt(hd)) @ kh.transpose(0, 2, 1)
+        rel_k = _get_relative_embeddings(W(p + "emb_rel_k"), T, window)
+        scores = scores + _rel_to_abs((qh / np.sqrt(hd)) @ rel_k.T)
+        e = np.exp(scores - scores.max(-1, keepdims=True))
+        attn = e / e.sum(-1, keepdims=True)
+        out = attn @ vh                                     # (H, T, hd)
+        # relative VALUES: upstream adds them via the inverse skew
+        rel_v = _get_relative_embeddings(W(p + "emb_rel_v"), T, window)
+        out = out + _abs_to_rel(attn) @ rel_v
+        out = out.transpose(0, 2, 1).reshape(hidden, T)
+        y = _conv1d(out, W(p + "conv_o.weight"), W(p + "conv_o.bias"), 0)
+        n1 = f"enc_p.encoder.norm_layers_1.{i}."
+        x = _layer_norm(x + y, W(n1 + "gamma"), W(n1 + "beta"))     # POST-norm
+
+        f = f"enc_p.encoder.ffn_layers.{i}."
+        w1 = W(f + "conv_1.weight")
+        h = _conv1d(x, w1, W(f + "conv_1.bias"), (w1.shape[2] - 1) // 2)
+        h = np.maximum(h, 0.0)                                       # plain ReLU
+        w2 = W(f + "conv_2.weight")
+        y = _conv1d(h, w2, W(f + "conv_2.bias"), (w2.shape[2] - 1) // 2)
+        n2 = f"enc_p.encoder.norm_layers_2.{i}."
+        x = _layer_norm(x + y, W(n2 + "gamma"), W(n2 + "beta"))
+
+    stats = _conv1d(x, W("enc_p.proj.weight"), W("enc_p.proj.bias"), 0)
+    return stats[:out_channels], stats[out_channels:]
+
+
+def _abs_to_rel(x):
+    """(H, T, T) -> (H, T, 2T-1); inverse of _rel_to_abs, for relative values."""
+    H, T, _ = x.shape
+    x = np.pad(x, ((0, 0), (0, 0), (0, T - 1)))
+    flat = x.reshape(H, T * (2 * T - 1))
+    flat = np.pad(flat, ((0, 0), (T, 0)))
+    return flat.reshape(H, T, 2 * T)[:, :, 1:]
 
 
 def coarse_pitch(f0):

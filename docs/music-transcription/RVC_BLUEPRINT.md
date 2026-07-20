@@ -173,6 +173,24 @@ with every 2-D BatchNorm at the wrong epsilon.
 
 ---
 
+## 2b. enc_p traps — VALIDATED in the numpy spec (cos 1.00000000)
+
+`tools/rvc_torch_parity.py` reimplements `enc_p` in numpy and scores it against
+torch: **m_p and logs_p both cos 1.00000000**, max_abs ~3e-6 (f32 vs f64). Six
+details it had to get right, each a silent accuracy bug if assumed:
+
+| detail | value | why it bites |
+|---|---|---|
+| LeakyReLU slope | **0.1** (`models.py:38`) | torch's default is 0.01 — a 10x difference on every negative activation |
+| scale before lrelu | `x *= sqrt(hidden)` (`:62`) | applied BEFORE the activation, so it is not a no-op that cancels later |
+| residual style | **POST-norm** `x = norm(x + f(x))` | pre-norm is the modern default and would be the natural assumption |
+| attention | **relative position**, window 10 | not absolute/sinusoidal PE; needs the skew helpers for keys AND values |
+| FFN | SAME padding, plain **ReLU** | `activation != "gelu"` here, so the x*sigmoid(1.702x) branch is dead |
+| LayerNorm | over the **channel** dim | `modules.py:29-32` transposes first, so a naive last-dim norm is wrong |
+
+The relative-VALUE path (`_abs_to_rel`) is the easiest of these to omit
+entirely — attention still "works" without it and merely gets worse.
+
 ## 3. Numerical hazards spotted in the trace
 
 - **Phase accumulation by `cumsum`** (SineGen): phase is accumulated over the
