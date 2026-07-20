@@ -45,6 +45,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_gemma4_e2b_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_omniasr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_mimo_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_htdemucs_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_mel_band_roformer_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_crepe_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_btc_chords_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_ark_asr_backend();
@@ -206,6 +207,8 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_glm_asr_backend();
     if (name == "htdemucs" || name == "demucs" || name == "htdemucs-ft")
         return crispasr_make_htdemucs_backend();
+    if (name == "mel-band-roformer" || name == "mel_band_roformer" || name == "melbandroformer" || name == "mbr")
+        return crispasr_make_mel_band_roformer_backend();
     if (name == "crepe" || name == "crepe-tiny" || name == "crepe-full" || name == "pitch")
         return crispasr_make_crepe_backend();
     if (name == "btc-chords" || name == "btc" || name == "chords" || name == "btc-chords-large" ||
@@ -364,6 +367,7 @@ std::vector<std::string> crispasr_list_backends() {
         "omnivoice",
         "omnivoice-singing",
         "htdemucs",
+        "mel-band-roformer",
         "crepe",
         "btc-chords",
     };
@@ -554,6 +558,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
 
     if (contains_ci("htdemucs") || contains_ci("demucs"))
         return "htdemucs";
+    if (contains_ci("mel-band-roformer") || contains_ci("mel_band_roformer") || contains_ci("roformer"))
+        return "mel-band-roformer";
     if (contains_ci("crepe"))
         return "crepe";
     if (contains_ci("btc"))
@@ -820,6 +826,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "glm-asr";
             else if (a == "htdemucs" || a == "demucs")
                 result = "htdemucs";
+            else if (a == "mel-band-roformer" || a == "mel_band_roformer")
+                result = "mel-band-roformer";
             else if (a == "crepe")
                 result = "crepe";
             else if (a == "btc")

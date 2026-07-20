@@ -57,9 +57,13 @@ ggml/GGUF backends.
   `[geometry]` tests; GGUFs carry `btc.inst_len_sec` and were re-uploaded.
 - **Published**: `cstr/btc-chords-GGUF` — 4 GGUFs (170/25-class x f16/f32) +
   model card, all 13/13 at cos 1.000000. Licence gate verified live.
-- **Next**: upload `cstr/crepe-GGUF` (the registry URLs point at it but the repo
-  is not published yet); quantize (q8_0/q4_k) and re-measure; then the Dart FFI +
-  WASM surfaces. `core/stft.h` extraction is independent (CREPE needs no STFT).
+- **Done**: `cstr/crepe-GGUF` is PUBLISHED (verified 2026-07-20: f16 + q8_0 +
+  q4_k for both tiny and full, 7 files). The earlier "not published yet" note
+  was stale -- another session landed it. NOTE: the registry only lists the f16
+  variants; the q8_0/q4_k uploads have no registry entry, so `-m auto` can
+  never select them.
+- **Next**: `core/stft.h` extraction is independent (CREPE needs no STFT).
+  Consider registry entries for the crepe q8_0/q4_k variants.
 
 ### Performance — measured, M1, quiet box (load 4.0), 10 s audio, median of 3
 
