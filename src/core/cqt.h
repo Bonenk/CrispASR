@@ -12,6 +12,11 @@
 // scores this implementation against librosa and MUST be re-run after any edit
 // here.
 //
+// NOTE: `l1_normalize` also applies librosa's `scale=True` sqrt(N_k) factor —
+// see the comment at the normalisation itself. `tools/cqt_librosa_parity.py`
+// now asserts per-bin MAGNITUDE as well as shape; a scale-only regression is
+// invisible to correlation and peak-bin match, and one shipped here once.
+//
 // MEASURED vs librosa 0.11.0 (three sustained tones an octave apart, BTC params):
 //   per-frame shape correlation  median 0.9999, mean 0.9721, min 0.1136
 //   peak-bin exact match         97.6%
@@ -109,7 +114,23 @@ inline std::vector<Kernel> build_kernels(const Params& p) {
             l1 += std::sqrt(re * re + im * im);
         }
         if (p.l1_normalize && l1 > 0.0) {
-            const float inv = (float)(1.0 / l1);
+            // librosa `norm=1` L1-normalises each filter, AND `scale=True`
+            // (its default) then divides the response by sqrt(filter length):
+            //   librosa/core/constantq.py: `V /= np.sqrt(lengths)`.
+            //
+            // librosa normalises its basis over a buffer padded to n_fft, so
+            // the net difference against an L1 norm over the UNPADDED kernel
+            // here is exactly a factor of sqrt(N_k). Measured on white noise
+            // (all bins active) the ratio librosa/ours was sqrt(N_k) to within
+            // 0.5% across the full range: bin 0 152.52 vs 151.69, bin 60 63.70
+            // vs 63.78, bin 143 19.29 vs 19.26.
+            //
+            // Folding it into the kernel keeps magnitude() untouched. Without
+            // it every bin was low by sqrt(N_k) — up to 152x at the bottom —
+            // which pushed BTC's features out of the distribution its scalar
+            // mean/std assume, so it predicted "no chord" everywhere while the
+            // reference predicted real chords.
+            const float inv = (float)(std::sqrt((double)N) / l1);
             for (int n = 0; n < N; n++) {
                 kern.re[(size_t)n] *= inv;
                 kern.im[(size_t)n] *= inv;
