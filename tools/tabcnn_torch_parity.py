@@ -49,7 +49,7 @@ import numpy as np
 
 COS_TOL = 0.9999
 RATIO_TOL = 0.01          # |median(|ref|/|spec|) - 1|
-SR = 44100
+SR = 22050
 HOP = 512
 N_BINS = 192
 BINS_PER_OCTAVE = 24
@@ -64,7 +64,7 @@ def spec_cqt(audio, sample_rate):
     import librosa
     if sample_rate != SR:
         audio = librosa.resample(y=audio, orig_sr=sample_rate, target_sr=SR)
-    fmin = librosa.note_to_hz("E2")
+    fmin = librosa.note_to_hz("C1")
     spec = np.abs(librosa.vqt(y=audio, sr=SR, hop_length=HOP, fmin=fmin,
                               n_bins=N_BINS, bins_per_octave=BINS_PER_OCTAVE,
                               gamma=0))
@@ -198,7 +198,7 @@ def main():
     import librosa
     a44 = librosa.resample(y=audio, orig_sr=sr, target_sr=SR) if sr != SR else audio
     ref_cqt = np.squeeze(CQT(sample_rate=SR, hop_length=HOP, decibels=True,
-                             fmin=librosa.note_to_hz("E2"), n_bins=N_BINS,
+                             fmin=librosa.note_to_hz("C1"), n_bins=N_BINS,
                              bins_per_octave=BINS_PER_OCTAVE).process_audio(a44))
     n = min(cqt.shape[1], ref_cqt.shape[1])
     rows = [compare("cqt_db", cqt[:, :n], ref_cqt[:, :n])]

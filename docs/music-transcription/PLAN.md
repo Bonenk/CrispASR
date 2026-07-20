@@ -177,49 +177,44 @@ ggml/GGUF backends.
   ⚠️ **Open design constraint**: `ref=np.max` is a **per-clip** normalisation, so
   the feature cannot be computed chunked without changing it. Settle the
   long-audio strategy BEFORE writing the runtime.
-- **⛔ BLOCKED (guitar tab)**: the end-to-end evaluation does not work yet, and
-  until it does NO front-end verdict is trustworthy. Running the real TabCNN on
-  EGSet12 track 01 with ground truth from amt_tools own pipeline
-  (`load_stacked_notes_jams` -> `stacked_notes_to_stacked_multi_pitch` ->
-  `stacked_multi_pitch_to_tablature`) yields **tablature F1 0.0008, TP=1 of
-  1251** where DAFx-24 reports **0.447** for this model+set. Random guessing over
-  21 classes would score ~5%, so this is a harness/setup fault, not model
-  performance. Predictions are heavily skewed — active counts per string
-  [542, 604, 107, 29, 4, 0] against ground truth [64, 440, 172, 229, 229, 117].
-  Ruled out so far: string order (reversing is worse), time alignment (best
-  shift over ±6 frames still TP=7), silence sentinel (amt_tools uses **−1**, the
-  model uses class 20 — that WAS a real bug in my eval and is fixed), framing
-  (`framify_activations` pad_center matches the hand-rolled window), and the CQT
-  itself (octave energy sits 52.9 % in 164–329 Hz, correct for guitar).
-  **Both leading suspects eliminated, and the harness is now exonerated.** The
-  EGSet12 stereo is dual-mono (channel correlation 0.99999, identical RMS/peak),
-  so averaging was harmless; and normalisation cancels under
-  `amplitude_to_db(ref=np.max)` anyway. More decisively, the whole path was
-  rerun **amt_tools-native end to end** — their `CQT.process_audio`, their
-  `TabCNN.pre_proc` (which does `framify_activations` plus two axis transposes I
-  had hand-rolled), their `SoftmaxGroups.finalize_output`, their GT pipeline —
-  and produces **bit-identical output to my version**: active-per-string
-  [542, 604, 107, 29, 4, 0], F1 0.0008. So the inference code is correct.
-  Also ruled out: output layout (finalize_output confirms `view(B,T,6,21)`,
-  argmax last dim, class 20 → −1, exactly as implemented) and the front-end
-  config (swept sr ∈ {22050, 44100} × bins_per_octave ∈ {24, 36}; every viable
-  combination scores F1 ≤ 0.004).
-  **What remains is the checkpoint itself.** It stores no feature config
-  (`dim_in`, `frame_width`, `profile` only — no sample_rate/hop/fmin/bpo), was
-  saved at `iter = 2500` and with `training = True`. Either it expects a
-  front-end configuration that cannot be recovered from the file, or it is not
-  the general-purpose model the EGSet12 record's filename implies. Resolving
-  this needs the DAFx-24 authors' inference config, not more guessing.
-  ⚠️ **Consequence for the CQT decision**: the earlier paired comparison
-  (core/cqt.h vs librosa features through the same model) is internally
-  consistent — both arms share every downstream step — and it showed the
-  disagreements are near-ties: 146 flips, ref top1−top2 margin median **0.100**
-  at flips vs **0.965** where they agree, **zero** confident flips at margin
-  >0.8. That means my earlier "core/cqt.h changes 6.7 % of played notes, it is
-  unusable" verdict was **OVERSTATED**. But "the outputs barely change" is weak
-  evidence when the model is not demonstrably working at all, so the honest
-  position is: **fix the absolute evaluation first, then re-take the front-end
-  verdict.** Do not start the librosa-compatible CQT rewrite on this basis.
+- **Done**: ✅ 🎸 **UNBLOCKED — root cause was a wrong `fmin`, and `core/cqt.h`
+  is fine.** The end-to-end evaluation had been scoring **F1 0.0008 (TP=1 of
+  1251)** against a published 0.447. Everything I suspected was innocent: the
+  harness (rerun amt_tools-native end to end — their CQT, `pre_proc`,
+  `finalize_output`, GT pipeline — reproduced my numbers exactly), the stereo
+  (EGSet12 is dual-mono, channel corr 0.99999), normalisation (cancels under
+  `ref=np.max`), the output layout, and string order.
+  The fault was a **front-end constant I inferred instead of read**: I used
+  `fmin = E2` (the guitar's lowest string — physically motivated and wrong) at
+  44.1 kHz. DAFx-24 states plainly *"resampled to the 22050Hz sampling rate
+  expected by TabCNN"*, and 192 bins at 24/oct only fit under that Nyquist from
+  a much lower `fmin`. Measured on EGSet12 track 01 vs its JAMS ground truth:
+
+  | config | tablature F1 | TP |
+  |---|---|---|
+  | sr 44100, fmin E2 (what I had) | 0.0008 | 1 |
+  | sr 22050, fmin E1 | 0.0403 | 29 |
+  | **sr 22050, fmin C1 (correct)** | **0.7708** | **533** |
+
+  Note `fmin = C1` is *already* `core/cqt.h`'s default — TabCNN's front end is
+  BTC's config except `n_bins` 192 vs 144 and `hop` 512 vs 2048.
+- **Done**: ✅ **`core/cqt.h` needs NO librosa-compatible rewrite.** Re-taking the
+  comparison at the correct params, through the real model against ground truth:
+  librosa F1 **0.7708** vs core/cqt.h **0.7732** (**ΔF1 +0.0024**, core marginally
+  better, within noise), prediction agreement **98.57 %**, feature cos 0.99880.
+  The earlier "core/cqt.h changes 6.7 % of played notes, unusable" verdict was an
+  artifact of running at the wrong front-end config — it is **withdrawn**. The
+  planned option-1 DSP rewrite (librosa recursive per-octave downsampling) is
+  **cancelled as unnecessary**; it would have been days of work to fix a
+  non-problem.
+  Constants corrected in `tools/reference_backends/tabcnn.py`,
+  `models/convert-tabcnn-to-gguf.py`, `tools/tabcnn_torch_parity.py` and
+  `tests/test-core-cqt.cpp`. Dumper front end re-verified bit-exact vs
+  `amt_tools.features.CQT` (cos 1.0000000000, max|diff| 0.0); parity gate still
+  11/11 PASS.
+  **Durable lesson**: every wrong `fmin` still RAN and produced plausible-looking
+  tensors. Only the task-level score against ground truth exposed it — cosine,
+  shapes and stage parity were all green throughout. HARD RULE #3.
 - **Next (guitar tab)**: blockers cleared, so the audio arm can start. Order:
   (1) ✅ done: weights pulled + tensor layout pinned; (2) `models/convert-tabcnn-to-gguf.py` +
   `tools/tabcnn_torch_parity.py` — and per the BTC/CQT lesson assert on the

@@ -47,7 +47,8 @@ replayed features.
 
 The exact front end, read from amt_tools source:
 
-    librosa.vqt(y, sr, hop_length, fmin, n_bins, bins_per_octave, gamma=0)
+    librosa.vqt(y, sr=22050, hop=512, fmin=C1(32.70 Hz), n_bins=192,
+                bins_per_octave=24, gamma=0)
     -> np.abs(...)
     -> librosa.core.amplitude_to_db(feats, ref=np.max)   # -> [-80, 0]
     -> feats / 80 + 1                                    # -> [0, 1]
@@ -87,11 +88,15 @@ DEFAULT_STAGES = [
 #                                       -> 6 groups x (20+1) = 126 outputs
 #   model.dim_in=192, frame_width=9; TabCNN's (dim_in-6)//2 = 93 matches the
 #   observed pool height, so 192 bins is confirmed end-to-end.
-# 192 bins at 24/octave from E2 spans to 21096 Hz, which fits under the 22050 Hz
-# Nyquist ONLY at 44.1 kHz. An earlier draft of this file assumed 22.05 kHz and
-# librosa correctly refused ("would exceed the Nyquist frequency") — the sample
-# rate is load-bearing, do not "simplify" it.
-_SR = 44100
+# fmin is C1 (32.70 Hz), NOT E2. Assuming the guitar's lowest string is the
+# obvious guess and it is wrong: 192 bins at 24/octave from E2 reaches 21096 Hz,
+# which cannot fit under the 22050 Hz Nyquist that the DAFx-24 paper states
+# TabCNN expects ("resampled to the 22050Hz sampling rate expected by TabCNN").
+# From C1 the top bin is 8372 Hz and it fits. Measured end-to-end on EGSet12
+# track 01 against its JAMS ground truth: fmin C1 -> tablature F1 0.771,
+# E1 -> 0.040, E2 at 44.1 kHz -> 0.0008. The whole chain is worthless if this
+# constant is wrong, and every wrong value still RUNS.
+_SR = 22050
 _HOP = 512
 _N_BINS = 192
 _BINS_PER_OCTAVE = 24
@@ -125,7 +130,7 @@ def _cqt_db(audio, sample_rate):
 
     if sample_rate != _SR:
         audio = librosa.resample(y=audio, orig_sr=sample_rate, target_sr=_SR)
-    fmin = librosa.note_to_hz("E2")
+    fmin = librosa.note_to_hz("C1")
     vqt = librosa.vqt(y=audio, sr=_SR, hop_length=_HOP, fmin=fmin,
                       n_bins=_N_BINS, bins_per_octave=_BINS_PER_OCTAVE, gamma=0)
     feats = np.abs(vqt)
