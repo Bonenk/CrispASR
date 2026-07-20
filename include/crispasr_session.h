@@ -440,6 +440,11 @@ CRISPASR_SESSION_API const float* crispasr_session_beats_events(crispasr_session
 // than two beats. Median rather than mean: a single missed or doubled beat
 // skews a mean badly and both are routine.
 CRISPASR_SESSION_API float crispasr_session_beats_tempo_bpm(crispasr_session* s);
+// Native input rate the loaded beat model expects, in Hz (22050 for
+// beat-this), or 0 when the backend has no beat arm — so it doubles as a
+// capability probe. crispasr_session_beats REJECTS a mismatch rather than
+// resampling: silently resampling audio would move every beat time.
+CRISPASR_SESSION_API int crispasr_session_beats_sample_rate(crispasr_session* s);
 
 // Polyphonic piano transcription: mono PCM at the model's native rate
 // (16000 Hz for piano-transcription) -> note events.

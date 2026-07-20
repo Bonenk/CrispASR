@@ -9004,6 +9004,16 @@ CA_EXPORT const float* crispasr_session_beats_events(crispasr_session* s, int* o
     return nullptr;
 }
 
+CA_EXPORT int crispasr_session_beats_sample_rate(crispasr_session* s) {
+    if (!s)
+        return 0;
+#ifdef CA_HAVE_BEAT_THIS
+    if (s->beat_ctx)
+        return beat_this_sample_rate(s->beat_ctx);
+#endif
+    return 0;
+}
+
 CA_EXPORT float crispasr_session_beats_tempo_bpm(crispasr_session* s) {
     if (!s)
         return 0.0f;
