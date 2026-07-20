@@ -250,9 +250,32 @@ def _warm_ccache_from_dataset(ccache_dir: Path) -> None:
         if tar_path.exists():
             try:
                 with tarfile.open(tar_path, "r") as tf:
-                    tf.extractall(str(ccache_dir))
+                    # The tar roots everything at ".ccache/" (both the documented
+                    # `tar cf ccache.tar .ccache/` recipe and export_ccache_tar).
+                    # ccache_dir is ITSELF the .ccache directory, so a plain
+                    # extractall(ccache_dir) lands the objects at
+                    # <ccache_dir>/.ccache/... — one level too deep, and ccache
+                    # then sees an empty cache. This is why the tar path never
+                    # worked and why both seed datasets ended up as loose trees
+                    # (the fallback that then hit the 500-file page cap).
+                    # Strip the leading component; a tar without it passes through.
+                    members = []
+                    for m in tf.getmembers():
+                        if m.name in (".ccache", "./.ccache"):
+                            continue
+                        for pre in (".ccache/", "./.ccache/"):
+                            if m.name.startswith(pre):
+                                m.name = m.name[len(pre):]
+                                break
+                        if m.name and m.name != ".":
+                            members.append(m)
+                    tf.extractall(str(ccache_dir), members=members)
                 n = sum(1 for _ in ccache_dir.rglob("*") if _.is_file())
                 print(f"  ccache: warmed from {tar_path} ({n} files)", flush=True)
+                if n == 0:
+                    print("  ccache: ⚠ WARNING — tar extracted to 0 files; the seed "
+                          "is empty or wrongly rooted (expect a cold build).",
+                          flush=True)
                 return
             except Exception as e:
                 print(f"  ccache: failed to extract {tar_path}: {e}", flush=True)
