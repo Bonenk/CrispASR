@@ -843,19 +843,51 @@ void htdemucs_free(htdemucs_context* ctx) {
 // ---------------------------------------------------------------------------
 // Tensor read helper — reads any ggml tensor as F32 regardless of storage type
 // ---------------------------------------------------------------------------
-static std::vector<float> read_tensor_f32(ggml_tensor* t) {
-    int64_t n = ggml_nelements(t);
-    std::vector<float> out(n);
+// Returns false (and leaves `out` zeroed) only for a type ggml itself cannot
+// dequantize. Callers MUST treat that as fatal — see the note below.
+static bool read_tensor_f32_checked(ggml_tensor* t, std::vector<float>& out) {
+    const int64_t n = ggml_nelements(t);
+    out.assign((size_t)n, 0.0f);
     if (t->type == GGML_TYPE_F32) {
         ggml_backend_tensor_get(t, out.data(), 0, n * sizeof(float));
-    } else if (t->type == GGML_TYPE_F16) {
-        std::vector<ggml_fp16_t> tmp(n);
+        return true;
+    }
+    if (t->type == GGML_TYPE_F16) {
+        std::vector<ggml_fp16_t> tmp((size_t)n);
         ggml_backend_tensor_get(t, tmp.data(), 0, n * sizeof(ggml_fp16_t));
         for (int64_t i = 0; i < n; i++)
-            out[i] = ggml_fp16_to_fp32(tmp[i]);
-    } else {
-        // Fallback: zero-fill for unsupported types
-        fprintf(stderr, "htdemucs: WARNING: unsupported tensor type %d for '%s'\n", t->type, t->name);
+            out[(size_t)i] = ggml_fp16_to_fp32(tmp[(size_t)i]);
+        return true;
+    }
+    // Any QUANTIZED type: dequantize through ggml's own type traits rather than
+    // enumerating formats here. This is what made htdemucs-q4_k.gguf produce
+    // garbage — Q4_K (type 12) fell through to the old zero-fill fallback, so
+    // all 40 CrossTransformer attention/FFN weight tensors loaded as SILENT
+    // ZEROS and separation output was ~100x amplified noise. A warning is not
+    // enough for a missing weight; see the caller, which now aborts the load.
+    const ggml_type_traits* tr = ggml_get_type_traits(t->type);
+    if (tr && tr->to_float) {
+        std::vector<uint8_t> raw((size_t)ggml_nbytes(t));
+        ggml_backend_tensor_get(t, raw.data(), 0, raw.size());
+        tr->to_float(raw.data(), out.data(), n);
+        return true;
+    }
+    fprintf(stderr, "htdemucs: ERROR: tensor '%s' has type %d which ggml cannot dequantize\n", t->name, (int)t->type);
+    return false;
+}
+
+// Back-compat wrapper for the many existing call sites. A tensor that cannot be
+// read is a corrupt/incompatible model, so this is loud and fatal rather than
+// quietly returning zeros — the previous silent-zero behaviour shipped a broken
+// default quantisation for months without anyone noticing.
+static std::vector<float> read_tensor_f32(ggml_tensor* t) {
+    std::vector<float> out;
+    if (!read_tensor_f32_checked(t, out)) {
+        fprintf(stderr,
+                "htdemucs: FATAL: refusing to run with an unreadable weight tensor ('%s'). "
+                "Re-quantize the model or use the F16 build.\n",
+                t->name);
+        std::abort();
     }
     return out;
 }
@@ -1552,7 +1584,13 @@ static ggml_tensor* apply_dconv(ggml_context* g, ggml_tensor* x, const htdemucs_
 // Input:  stereo PCM at 44100 Hz (2 channels, n_samples per channel).
 // Output: 4 × stereo PCM (drums, bass, other, vocals).
 
-htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stereo, int n_samples) {
+// Whole-buffer forward: one graph over the entire input. Peak memory and time
+// both grow with length (time QUADRATICALLY -- the CrossTransformer attends
+// over all time frames), so htdemucs_separate below only calls this directly
+// for inputs at or under one segment. Measured on M1 before segmentation:
+// 2 s 1.13 GB / 10 s 1.44 GB / 30 s 3.39 GB / 60 s 7.62 GB, and 30 s -> 60 s
+// took 51.9 s -> 197 s for 2x the audio.
+static htdemucs_result* htdemucs_separate_full(htdemucs_context* ctx, const float* pcm_stereo, int n_samples) {
     if (!ctx || !pcm_stereo || n_samples <= 0)
         return nullptr;
 
@@ -3588,6 +3626,140 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     if (htdemucs_profile())
         prof.report();
 
+    return r;
+}
+
+// Segmented forward with weighted overlap-add.
+//
+// Ported from upstream Demucs `apply_model(..., split=True)` in demucs/apply.py
+// (MIT), whose defaults are overlap=0.25 and transition_power=1.0:
+//
+//   segment_length = int(samplerate * model.segment)      // 7.8 s * 44100
+//   stride         = int((1 - overlap) * segment_length)
+//   weight         = concat(arange(1, L/2+1), arange(L - L/2, 0, -1))
+//   weight         = (weight / weight.max()) ** transition_power
+//   out[off : off+L]        += weight[:n] * chunk_out
+//   sum_weight[off : off+L] += weight[:n]
+//   out /= sum_weight
+//
+// i.e. a triangle peaking mid-segment, normalised by the accumulated weight so
+// every output sample is a proper weighted average regardless of how many
+// segments covered it. (0xShug0/audio.cpp, Apache-2.0, arrives at the same
+// shape independently -- make_triangular_overlap_window + overlap_add.)
+//
+// WHY: the whole-buffer path is O(T^2) in time and grows ~0.12 GB per second of
+// audio, so a 3.5-minute song needs ~26 GB and simply OOMs. Segmenting bounds
+// peak memory to one segment's working set and makes time linear in length.
+//
+// Short inputs (<= one segment) still take the whole-buffer path, so their
+// output is bit-identical to before this change -- there is no regression
+// surface for the case that already worked. CRISPASR_HTDEMUCS_NO_SEGMENT=1
+// forces the old behaviour everywhere for A/B.
+htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stereo, int n_samples) {
+    if (!ctx || !pcm_stereo || n_samples <= 0)
+        return nullptr;
+
+    const auto& hp = ctx->model.hparams;
+    const int seg_len = hp.training_length();
+    const bool no_seg = std::getenv("CRISPASR_HTDEMUCS_NO_SEGMENT") != nullptr;
+
+    if (no_seg || n_samples <= seg_len || seg_len <= 0)
+        return htdemucs_separate_full(ctx, pcm_stereo, n_samples);
+
+    const float overlap = 0.25f;
+    int stride = (int)((1.0f - overlap) * (float)seg_len);
+    if (stride <= 0)
+        stride = seg_len;
+
+    // Triangular weight, peaking mid-segment. Built exactly as upstream:
+    // ascending 1..L/2 then descending (L - L/2)..1, then scaled by the max.
+    std::vector<float> weight((size_t)seg_len);
+    {
+        const int half = seg_len / 2;
+        for (int i = 0; i < half; i++)
+            weight[(size_t)i] = (float)(i + 1);
+        for (int i = half; i < seg_len; i++)
+            weight[(size_t)i] = (float)(seg_len - i);
+        float wmax = 0.0f;
+        for (float w : weight)
+            wmax = std::max(wmax, w);
+        if (wmax > 0.0f)
+            for (float& w : weight)
+                w /= wmax;
+    }
+
+    int n_sources = 0, n_ch = 0, sr = hp.samplerate;
+    std::vector<std::vector<float>> acc; // per source, interleaved
+    std::vector<float> sum_weight((size_t)n_samples, 0.0f);
+    std::vector<const char*> names;
+    std::vector<float> chunk((size_t)seg_len * 2, 0.0f);
+
+    for (int off = 0; off < n_samples; off += stride) {
+        // Zero-pad the tail chunk to a full segment, as TensorChunk.padded does.
+        const int valid = std::min(seg_len, n_samples - off);
+        std::fill(chunk.begin(), chunk.end(), 0.0f);
+        std::memcpy(chunk.data(), pcm_stereo + (size_t)off * 2, (size_t)valid * 2 * sizeof(float));
+
+        htdemucs_result* part = htdemucs_separate_full(ctx, chunk.data(), seg_len);
+        if (!part) {
+            for (auto& a : acc)
+                a.clear();
+            return nullptr;
+        }
+        if (acc.empty()) {
+            n_sources = part->n_sources;
+            n_ch = part->n_channels;
+            sr = part->sample_rate;
+            acc.assign((size_t)n_sources, std::vector<float>((size_t)n_samples * n_ch, 0.0f));
+            names.assign(part->source_names, part->source_names + n_sources);
+        }
+        const int n = std::min(valid, part->n_samples);
+        for (int s = 0; s < n_sources; s++) {
+            const float* src = part->sources[s];
+            float* dst = acc[(size_t)s].data();
+            for (int i = 0; i < n; i++) {
+                const float w = weight[(size_t)i];
+                for (int c = 0; c < n_ch; c++)
+                    dst[(size_t)(off + i) * n_ch + c] += w * src[(size_t)i * n_ch + c];
+            }
+        }
+        for (int i = 0; i < n; i++)
+            sum_weight[(size_t)(off + i)] += weight[(size_t)i];
+
+        htdemucs_result_free(part);
+    }
+
+    if (acc.empty())
+        return nullptr;
+
+    // Normalise. sum_weight is positive everywhere the loop covered; guard
+    // anyway so a pathological stride can never divide by zero.
+    for (int s = 0; s < n_sources; s++) {
+        float* dst = acc[(size_t)s].data();
+        for (int i = 0; i < n_samples; i++) {
+            const float w = sum_weight[(size_t)i];
+            if (w <= 0.0f)
+                continue;
+            for (int c = 0; c < n_ch; c++)
+                dst[(size_t)i * n_ch + c] /= w;
+        }
+    }
+
+    auto* r = new htdemucs_result();
+    r->n_sources = n_sources;
+    r->n_channels = n_ch;
+    r->n_samples = n_samples;
+    r->sample_rate = sr;
+    r->sources = new float*[n_sources];
+    r->source_names = new const char*[n_sources];
+    for (int s = 0; s < n_sources; s++) {
+        const size_t nfl = (size_t)n_samples * n_ch;
+        r->sources[s] = new float[nfl];
+        std::memcpy(r->sources[s], acc[(size_t)s].data(), nfl * sizeof(float));
+        r->source_names[s] = names[(size_t)s];
+    }
+    fprintf(stderr, "htdemucs: segmented %d samples into %d chunks of %d (stride %d)\n", n_samples,
+            (n_samples + stride - 1) / stride, seg_len, stride);
     return r;
 }
 
