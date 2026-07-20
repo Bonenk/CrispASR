@@ -323,14 +323,15 @@ static std::vector<float> gru_forward(const float* x, int input_size, int T, int
             gates_hh[g] = sum;
         }
 
-        // z = sigmoid(gates_ih[0:H] + gates_hh[0:H])        (update gate)
-        // r = sigmoid(gates_ih[H:2H] + gates_hh[H:2H])      (reset gate)
+        // PyTorch GRU gate order: [r, z, n] (reset, update, new)
+        // r = sigmoid(gates_ih[0:H] + gates_hh[0:H])        (reset gate)
+        // z = sigmoid(gates_ih[H:2H] + gates_hh[H:2H])      (update gate)
         // n = tanh(gates_ih[2H:3H] + r * gates_hh[2H:3H])   (new gate)
         // h = (1 - z) * n + z * h_prev
         int H = hidden_size;
         for (int i = 0; i < H; i++) {
-            float z = 1.0f / (1.0f + std::exp(-(gates_ih[i] + gates_hh[i])));
-            float r = 1.0f / (1.0f + std::exp(-(gates_ih[H + i] + gates_hh[H + i])));
+            float r = 1.0f / (1.0f + std::exp(-(gates_ih[i] + gates_hh[i])));
+            float z = 1.0f / (1.0f + std::exp(-(gates_ih[H + i] + gates_hh[H + i])));
             float n = std::tanh(gates_ih[2 * H + i] + r * gates_hh[2 * H + i]);
             h[i] = (1.0f - z) * n + z * h[i];
         }
@@ -824,7 +825,12 @@ static std::vector<float> compute_mel_with_bn0(piano_transcription_ctx* ctx, con
 
     auto mel = core_mel::compute(pcm, n_samples, ctx->hann.data(), hp.n_fft, ctx->mel_fb.data(), n_freqs, piano_fft_r2c,
                                  mel_params, T_out);
-    // mel is [T, n_mels] with values = 10 * log10(max(power, 1e-10))
+    // core_mel with Log10 + MaxClip produces log10(max(power, 1e-10)).
+    // torchlibrosa's power_to_db uses 10 * log10(max(S, amin)) — the standard
+    // dB conversion. Scale by 10 to match.
+    for (int i = 0; i < T_out * (int)hp.n_mels; i++) {
+        mel[i] *= 10.0f;
+    }
 
     // Apply BN0: the original model transposes to (1, 229, T, 1) for BN2d
     // then back. For our [T, n_mels] layout, BN operates per-mel-bin across T.
