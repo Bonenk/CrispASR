@@ -564,3 +564,42 @@ needs a quiet box or a Kaggle CUDA run, which is also the right place to
 exercise the CUDA backend for the first time (CUDA has stricter contiguity
 asserts than CPU/Metal — see the `get_rows` note in the dev guide, so a
 Metal-clean graph is NOT proof CUDA is clean).
+
+
+## Perf check on the graph path (2026-07-20)
+
+Wall-clock A/B on this box remains unusable (load moved 3.6 -> 54 mid-run;
+BLAS ranged 10.95 s to 121.1 s for the SAME config). But **within-run phase
+ratios are load-robust**, and those reproduce cleanly across three paired runs:
+
+| phase | BLAS (CPU) x3 | Metal full-graph x3 | verdict |
+|-------|---------------|---------------------|---------|
+| transformer | 4909 / 6744 / 3672 ms | 1008 / 1122 / 1122 ms | Metal **3.3-6x faster** |
+| encoder | 1035 / 1837 / 1078 ms | 2200 / 2168 / 2221 ms | Metal **1.2-2.1x slower** |
+| decoder | 2459 / 4704 / 3023 ms | 3237 / 3539 / 3272 ms | ~parity |
+
+Two findings:
+
+1. **The transformer win is real and large.** One big graph of dense matmuls is
+   exactly what a GPU is for.
+2. **The encoder graph is consistently SLOWER than CPU+Accelerate**, and the
+   decoder is no better than parity. The reason is structural, not the ops: the
+   port currently builds a graph PER LAYER, so every layer pays a graph build +
+   gallocr alloc and a full host<->device roundtrip of its activations (encoder
+   layer 0 alone is 8.2M floats = 33 MB each way). That is the dev guide's
+   "per-step GPU dispatch is launch-bound" / cross-backend-traffic effect: the
+   data movement dominates the per-layer compute.
+
+Also worth recording: **Metal timings are far more STABLE under contention**
+(~5% spread) than the CPU path (~2x spread), because the GPU work is insulated
+from CPU load. That is why earlier A/B attempts kept flipping — minimum-of-N
+sampling favours BLAS (it captures the quiet moments), while typical loaded
+conditions favour Metal.
+
+### Next step — fuse into ONE graph
+
+The remaining work is not more ops, it is removing the host roundtrips: build
+encoder + transformer + decoder as a SINGLE graph so activations never leave
+the device between layers, with skip connections kept as in-graph tensors
+rather than downloaded and re-uploaded. That is what should convert the
+transformer-only win into an end-to-end one.
