@@ -107,6 +107,12 @@ int tabcnn_compute_argmax(struct tabcnn_context* ctx, const float* pcm, int n_sa
 int tabcnn_extract_stage(struct tabcnn_context* ctx, const float* pcm, int n_samples, int sample_rate,
                          const char* stage, float* out, int max_elems);
 
+// crispasr-diff entry point: score this runtime against a reference archive
+// from tools/reference_backends/tabcnn.py. Runs from the `audio` stage in the
+// archive, NOT from replayed features, so the CQT front end is covered too.
+// Returns 0 when every stage passes.
+int tabcnn_diff(const char* model_gguf, const char* ref_gguf, int verbosity);
+
 #ifdef __cplusplus
 }
 #endif

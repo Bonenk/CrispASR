@@ -186,7 +186,14 @@ def dump(model_dir, audio, stages, max_new_tokens=None, sample_rate=16000, **kwa
 
     cqt = _cqt_db(audio, sample_rate)
     if "cqt_db" in want:
-        out["cqt_db"] = cqt
+        # Emitted TRANSPOSED to [T, n_bins]. librosa and amt_tools produce
+        # [n_bins, T], but core/cqt.h emits frame-major [T, n_bins], and this
+        # archive exists to be diffed against the C++ runtime. Comparing the two
+        # layouts flat is apples-to-oranges: it reads cos 0.66 with the norms
+        # matching to 0.3%, which is the transpose signature and is exactly how
+        # it presented the first time. Keep this aligned with the runtime, not
+        # with librosa.
+        out["cqt_db"] = np.ascontiguousarray(cqt.T)
 
     model = torch.load(_resolve_model_path(model_dir), map_location="cpu",
                        weights_only=False)

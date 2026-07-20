@@ -191,6 +191,7 @@ target_link_libraries(crispasr-diff-lib PUBLIC
     crispasr-core
     ggml
  btc-chords
+    tabcnn
     rvc-svc)
 set_target_properties(crispasr-diff-lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
