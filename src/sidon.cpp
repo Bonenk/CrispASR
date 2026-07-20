@@ -671,12 +671,19 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     float peak = 0.0f;
     for (int i = 0; i < n_samples; ++i)
         peak = std::max(peak, std::fabs(samples[i]));
-    std::vector<float> normalized((size_t)n_samples);
+    // Match the released Sidon inference recipe: add 10 ms of frontend
+    // context on both sides and 1.5 s of right-side lookahead. Without that
+    // lookahead, the DAC decodes the predictor boundary response directly and
+    // emits a loud transient at the end of otherwise valid audio. The padded
+    // inference result is cropped back to the exact input duration below.
+    constexpr int frontend_pad_samples = 160;
+    constexpr int lookahead_samples = 24000;
+    std::vector<float> normalized((size_t)n_samples + 2 * frontend_pad_samples + lookahead_samples, 0.0f);
     const float gain = peak > 1e-9f ? 0.9f / peak : 1.0f;
     for (int i = 0; i < n_samples; ++i)
-        normalized[(size_t)i] = samples[i] * gain;
+        normalized[(size_t)frontend_pad_samples + i] = samples[i] * gain;
     int T = 0;
-    std::vector<float> feats = make_features(ctx->model, normalized.data(), n_samples, T);
+    std::vector<float> feats = make_features(ctx->model, normalized.data(), (int)normalized.size(), T);
     if (T <= 0)
         return {};
 
@@ -684,8 +691,9 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     // (heads, T, T) relative indices and attention scores, so cost grows
     // quadratically in the feature-frame count T (~50 frames/sec of input).
     // Restoration is utterance-scale; cap T and fail cleanly rather than let a
-    // multi-minute clip exhaust memory. The default ~3000 frames is ~60 s of
-    // audio; override it only when the selected backend has sufficient memory.
+    // multi-minute clip exhaust memory. After the required 1.5 s lookahead,
+    // the default ~3000-frame cap permits ~58.5 s of user audio; override it
+    // only when the selected backend has sufficient memory.
     int max_frames = 3000;
     if (const char* e = getenv("CRISPASR_SIDON_MAX_FRAMES"); e && e[0]) {
         const int v = atoi(e);
@@ -800,6 +808,13 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     }
     const auto decoder_done = clock::now();
 
+    const size_t target_samples = (size_t)n_samples * ctx->model.hp.output_rate / ctx->model.hp.input_rate;
+    if (pcm.size() < target_samples) {
+        std::fprintf(stderr, "sidon: padded decoder output is shorter than the requested duration\n");
+        release_decoder_workspace(ctx);
+        return {};
+    }
+    pcm.resize(target_samples);
     const auto download_done = clock::now();
     if (!release_decoder_workspace(ctx)) {
         std::fprintf(stderr, "sidon: failed to release decoder workspace\n");
