@@ -10,6 +10,87 @@ document is about what we have to BUILD.
 
 ---
 
+## 0. RESOLUTIONS (CometBeat, 2026-07-20)
+
+Both findings below are answered; recorded here so the doc reads as settled.
+
+- **Finding 1 — CrispASR owns all three** (`enc_p` + `flow` + `dec`). The frozen
+  contract stands: they send ContentVec features + F0 (Hz, 100 Hz) + speaker id,
+  **not `z`**. Their reasoning is performance and it is sound: their pure-Dart
+  `rvc.dart` already runs all three at **152x slower than real time**, with the
+  transformer `enc_p` and the flow a large share of that — so a vocoder-only
+  split would leave the transformer as a Dart bottleneck and still miss
+  real-time. The right Dart↔native boundary is the ContentVec output, the one
+  checkpoint-agnostic reusable piece; `enc_p`/`flow`/`dec` are all
+  checkpoint-specific and belong together. Sending `z` would also leak a 192-ch
+  model-internal latent into the wire format.
+- **Finding 2 — replay the noise**, agreed. Both live RNG sites must be
+  injectable in our ggml graph. **They have offered a cross-impl oracle**:
+  `rvc.dart` runs the full generator deterministically from an injected noise
+  buffer (`rvcSeededNoise` → the ONNX graph's `rnd [1,192,T]` input, cos
+  0.99994), enabling a three-way deterministic harness — Python reference → their
+  Dart-offline → our ggml graph, all fed identical noise. Production
+  `convert()` stays random by design.
+- Their offline impl already pins `F.interpolate` to 2x-**nearest**
+  (`rvcAlignFeatures`) and the coarse-pitch mel map 50–1100 Hz
+  (`rvcCoarsePitch`) — independent agreement with §3 and SVC_RECORD_SHAPES §4.
+
+### CONFIRMED EMPIRICALLY (tools/rvc_torch_parity.py)
+
+The noise-replay design is proven, not just proposed. Intercepting every RNG
+call during `infer()` gives exactly three draws:
+
+```
+randn_like   (1, 192, 64)      <- Site A: z_p latent          (1, inter, T)
+rand         (1, 1)            <- SineGen phase: ONE element
+randn_like   (1, 25600, 1)     <- Site B: additive noise      (1, T*upp, 1)
+
+two runs with identical injected noise -> BIT-IDENTICAL, max_abs 0.000e+00
+```
+
+The `(1, 1)` draw is the `harmonic_num=0` prediction confirmed from the running
+model: the phase RNG is a single element, and because the model's next line
+zeroes it, injecting zeros there is provably equivalent — the bit-identical
+result is the proof. `check_phase_is_deterministic()` asserts
+`harmonic_num == 0 and dim == 1` against the built model so this cannot regress
+silently if someone loads a differently-configured checkpoint.
+
+### Answer to their SineGen phase question — it is ZERO, by construction
+
+They asked whether to zero or replay the SineGen initial phase, having noticed
+their ONNX export appears to fix it. **There was never any randomness there to
+fold away, for this architecture:**
+
+`GeneratorNSF` hardcodes `SourceModuleHnNSF(sampling_rate=sr, harmonic_num=0)`
+(`models.py:439-441`). With `harmonic_num = 0`:
+
+- `SineGen.dim = harmonic_num + 1 = 1` (`models.py:294`) — fundamental only, no
+  overtones.
+- `rand_ini` is therefore shape `(batch, 1)` (`:325`), and the very next line is
+  `rand_ini[:, 0] = 0` (`:328`).
+
+So `rand_ini` is **identically zero**. The random-phase code is live only for
+`harmonic_num > 0`, which RVC never uses. Both implementations should use zero
+phase, and they will match bit-for-bit without any agreement being needed —
+this is determined by the source, not a convention.
+
+**That leaves exactly TWO live RNG sites, not three:** the `z_p` latent sample,
+and SineGen's ADDITIVE noise (`:358`), which is ungated and always runs:
+
+```python
+noise_amp = uv * self.noise_std + (1 - uv) * self.sine_amp / 3
+noise     = noise_amp * torch.randn_like(sine_waves)
+sine_waves = sine_waves * uv + noise
+```
+
+Note it is voicing-dependent: voiced frames get sine + noise at `noise_std`
+(0.003), unvoiced get pure noise at `sine_amp/3` (0.0333). Their ONNX export
+exposes only `rnd` (the z_p noise), so **this second site is the one their path
+may differ on** — worth confirming whether their export also folded the
+additive noise away, because that IS a real randomness source, unlike the phase.
+
+---
+
 ## 1. FINDING: the ask is ~3x bigger than "the NSF-HiFi-GAN generator"
 
 CometBeat asked us to port "the RVC NSF-HiFi-GAN generator". But the seam they
@@ -32,10 +113,8 @@ sid ─────────> emb_g ─────────────> 
 ```
 
 Only #3 is a vocoder. #1 is a transformer encoder and #2 is a flow — neither is
-covered by "HiFi-GAN". **This is worth confirming with CometBeat**: if they
-expected us to own only the vocoder and to run enc_p/flow in Dart, the split is
-different from what the note implies (and their side would then need to send
-`z`, not ContentVec features).
+covered by "HiFi-GAN". **RESOLVED (§0): we own all three.** "Vocoder" was loose
+wording; they always meant the whole `infer()`.
 
 Note `emb_pitch = nn.Embedding(256, hidden_channels)` (`models.py:40`) — this is exactly why the coarse 1..255 quantisation must be
 bit-right: it indexes an embedding table, so an off-by-one is a different
@@ -54,7 +133,10 @@ before any graph is written.
 z_p = (m_p + torch.exp(logs_p) * torch.randn_like(m_p) * 0.66666) * x_mask
 ```
 
-**Site B — the sine source** (`models.py`, SineGen.forward ~325 and ~358):
+**Site B — the sine source** (`models.py`, SineGen.forward ~325 and ~358).
+**CORRECTION, see §0:** the `rand_ini` phase term below is DEAD for RVC —
+`harmonic_num=0` makes it a single element that the next line zeroes. Only the
+additive `noise` is a live RNG site.
 
 ```python
 rand_ini = torch.rand(f0_buf.shape[0], f0_buf.shape[2], ...)   # random INITIAL PHASE per harmonic
@@ -91,6 +173,41 @@ with every 2-D BatchNorm at the wrong epsilon.
 
 ---
 
+## 2b. enc_p traps — VALIDATED in the numpy spec (cos 1.00000000)
+
+`tools/rvc_torch_parity.py` reimplements `enc_p` in numpy and scores it against
+torch: **m_p and logs_p both cos 1.00000000**, max_abs ~3e-6 (f32 vs f64). Six
+details it had to get right, each a silent accuracy bug if assumed:
+
+| detail | value | why it bites |
+|---|---|---|
+| LeakyReLU slope | **0.1** (`models.py:38`) | torch's default is 0.01 — a 10x difference on every negative activation |
+| scale before lrelu | `x *= sqrt(hidden)` (`:62`) | applied BEFORE the activation, so it is not a no-op that cancels later |
+| residual style | **POST-norm** `x = norm(x + f(x))` | pre-norm is the modern default and would be the natural assumption |
+| attention | **relative position**, window 10 | not absolute/sinusoidal PE; needs the skew helpers for keys AND values |
+| FFN | SAME padding, plain **ReLU** | `activation != "gelu"` here, so the x*sigmoid(1.702x) branch is dead |
+| LayerNorm | over the **channel** dim | `modules.py:29-32` transposes first, so a naive last-dim norm is wrong |
+
+The relative-VALUE path (`_abs_to_rel`) is the easiest of these to omit
+entirely — attention still "works" without it and merely gets worse.
+
+## 2c. flow traps — VALIDATED (cos 1.00000000)
+
+The reverse pass also matches torch exactly. Five details:
+
+- **`mean_only=True`** (models.py), so `logs` is ZERO and the coupling is purely
+  ADDITIVE. The reverse is `x1 = x1 - m`, **not** `(x1 - m) * exp(-logs)` — the
+  general VITS formula would be wrong here.
+- `flows` interleaves `[Coupling, Flip] x 4`; the reverse walks the whole list
+  backwards, so **Flip comes first**.
+- Flip reverses the **channel** axis.
+- The WaveNet is **gated**: `tanh(first half) * sigmoid(second half)` of
+  `(x_in + g_l)`, with the speaker conditioning projected once and then sliced
+  per layer.
+- `ResidualCouplingBlock(inter, hidden, 5, 1, 3, ...)` — kernel 5, dilation
+  rate 1, 3 layers are **hardcoded in models.py:624**, not config-derived, so
+  they hold for every checkpoint.
+
 ## 3. Numerical hazards spotted in the trace
 
 - **Phase accumulation by `cumsum`** (SineGen): phase is accumulated over the
@@ -113,6 +230,45 @@ with every 2-D BatchNorm at the wrong epsilon.
   assumed.
 
 ---
+
+## 3b. Checkpoint structure (measured on the official v2 `f0G40k.pth`)
+
+560 tensors: `enc_p` 113, `dec` 243, `enc_q` 103, `flow` 100, `emb_g` 1.
+
+- **`enc_q` (103) is the PosteriorEncoder — TRAINING ONLY**, never called by
+  `infer()`. Dead weight, like BTC's `output_layer.lstm.*`.
+- **`dec` and `flow` are weight-normalised**: they store `weight_g`/`weight_v`,
+  not `weight` (`dec.ups.0.weight` does not exist). Fuse at convert time,
+  `w = g * v / ||v||` with the norm over every dim except 0. Some layers in the
+  SAME module (`conv_pre`, `noise_convs`, `conv_post`) carry a plain `.weight`,
+  so both forms must be handled. 104 pairs in this checkpoint.
+- **`enc_p` uses RELATIVE positional attention**, not absolute PE:
+  `emb_rel_k/v` are `(1, 2w+1, d)` with **w = 10**.
+- Geometry read off the weights: `emb_phone` (192, 768) → content dim 768,
+  hidden 192; `emb_pitch` (256, 192) → the coarse pitch is an EMBEDDING INDEX;
+  `emb_g` (109, 256) → 109 speakers, gin 256.
+
+### Upsample rates are NOT recoverable from the checkpoint
+
+The 40k ConvTranspose1d kernels are `16,16,4,4`, while the rates are
+`10,10,2,2`. Assuming `kernel == 2*rate` gives `8,8,2,2` — a silently wrong
+model. The rates come from the config JSON (note v2 ships only 32k/48k; 40k
+lives under `configs/v1/`).
+
+They CAN be verified, though: `noise_convs[i]` has kernel `2*prod(rates[i+1:])`
+(1 for the last stage). Checked against the real checkpoint:
+
+| stage | kernel | 2·prod(rates[i+1:]) |
+|---|---|---|
+| 0 | 80 | 2·40 = 80 |
+| 1 | 8 | 2·4 = 8 |
+| 2 | 4 | 2·2 = 4 |
+| 3 | 1 | 1 |
+
+The converter asserts this, so a mismatched config fails loudly. Independently,
+`sr / prod(rates)` is **exactly 100.0** for every shipped config (32k/40k/48k) —
+a second, independent confirmation of the 100 Hz wire rate that
+SVC_RECORD_SHAPES derives from `pipeline.window = 160`.
 
 ## 4. Proposed order of work
 
