@@ -73,6 +73,25 @@ int beat_this_n_frames(int n_samples);
 // tools/reference_backends/beat_this.py.
 int beat_this_debug_stem(struct beat_this_context* ctx, const float* logmel, int T, float* out);
 
+// Debug/parity: run the frontend and return one named intermediate. Stages:
+//
+//   "stem"                          ne (t, f, c)
+//   "blk<N>_attnF" / "blk<N>_ffF"   ne (c, f, t)   N = 0..2
+//   "blk<N>_attnT" / "blk<N>_ffT"   ne (c, t, f)
+//   "blk<N>_partial"                ne (t, f, c)
+//   "blk<N>"                        ne (t, f, c)   after conv+BN+GELU
+//
+// The attn/ff stages are the residual BRANCH, matching the reference's forward
+// hooks — they are `attnF(x)`, NOT `x + attnF(x)`. Comparing a branch against a
+// post-residual activation is the trap this port was designed around.
+//
+// Writes the tensor's ggml ne into `ne_out[4]` (may be NULL) and returns the
+// element count, or 0 on error or an unknown stage. Because ggml ne is the
+// reverse of torch's shape, reshaping the dump to reversed(ne) in numpy lands
+// exactly on the reference's layout with no transpose.
+int beat_this_debug_stage(struct beat_this_context* ctx, const float* logmel, int T, const char* stage, float* out,
+                          int max_out, int64_t* ne_out);
+
 // Full pipeline: audio -> events. Returns the event count, or 0/-1 on error.
 int beat_this_track(struct beat_this_context* ctx, const float* pcm_22k, int n_samples, struct beat_this_event* out,
                     int max_events);
