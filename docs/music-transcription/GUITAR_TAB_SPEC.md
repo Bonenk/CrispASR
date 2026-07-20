@@ -350,7 +350,48 @@ practice).
 3. **Can a clean-room corpus avoid DadaGP entirely?** ✅ **Materially yes (R3)** —
    GuitarSet + EGSet12 + Guitar-TECHS + GOAT are all CC BY 4.0. What is still
    open is the *sufficiency* question: is that enough data to train a usable
-   emission scorer, and does SynthTab offer a licensable synthesis path.
+   emission scorer.
+
+### R4 SynthTab — the METHOD is the prize, the DATASET is unusable
+
+SynthTab (Zang, Zhong, Cwitkowitz & Duan, ICASSP 2024, arXiv 2309.09085,
+synthtab.dev) is **both** a synthesis pipeline and a dataset. It renders
+symbolic tablature into audio that "faithfully adheres to the original
+fingerings and a subset of techniques", so the fingering ground truth is exact
+*by construction* rather than annotated. Scale is enormous next to GuitarSet's
+~3 hours: **13,113 hours across 20,715 tracks and 23 timbral profiles.**
+
+Reported result: TabCNNx4 pre-trained on SynthTab then fine-tuned on GuitarSet
+reaches **tablature F1 80.1 %, multi-pitch F1 84.5 %**, and the authors report
+that pre-training "significantly mitigates issues with overfitting" across
+datasets.
+
+⚠️ Do not read 80.1 % as a pure pre-training delta against TabCNN's 0.748:
+**TabCNNx4 is a 4x-widened variant**, not the model in §1.1, and the paper does
+not establish that its protocol matches the 6-fold player-wise CV of §1.2. It
+is evidence that synthetic pre-training helps, not a like-for-like number.
+
+**Licensing — TWO stacked encumbrances, and no source addresses either.**
+
+1. It is *derived from DadaGP* ("we used a portion of DadaGP, which contains
+   26,181 songs"), so it inherits §2.3 in full.
+2. It is rendered with **commercial Ample Sound plugins** (acoustic L/T/M/SJ,
+   electric SH/LP/TC/VC/PF/SC/E). Whether 13,000 hours of their rendered output
+   may be redistributed as a corpus is governed by that EULA, not by us.
+
+The paper states no licence, no redistribution terms and no copyright position;
+synthtab.dev likewise states none and simply offers "Download Full SynthTab
+Set". Silence is not a grant. **SynthTab-derived weights are not shippable.**
+
+**But the pipeline answers the question the dataset cannot.** A renderer that
+turns symbolic tab into audio with exact fingering labels is precisely what a
+clean-room corpus needs: point it at licensable symbolic input instead of
+DadaGP, and at a plugin whose EULA permits it, and it produces training audio
+we may actually ship from. That is the strongest lead for the audio arm beyond
+EGSet12 — and it converges with §1.3: SynthTab's timbral diversity and
+GuitarProFX's real-tone re-rendering are the same finding (timbre variety, not
+architecture, is what generalises), reached independently, with Cwitkowitz on
+both papers.
 
 ---
 
