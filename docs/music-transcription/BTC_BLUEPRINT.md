@@ -23,7 +23,11 @@ for, so the front end is already done.
 
 ## The five details that are NOT the obvious default
 
-1. **It is NOT full bidirectional attention.** Each of the 8 layers runs TWO
+1. **It is NOT full bidirectional attention.** (Confirmed at `btc_model.py:73`:
+   the backward block is constructed with
+   `torch.transpose(_gen_bias_mask(max_length), dim0=2, dim1=3)`, and at line 89
+   it is fed the SAME `x` — bidirectionality comes from the transposed mask, not
+   from reversing the sequence.) Each of the 8 layers runs TWO
    self-attention blocks: a forward one masked with
    `np.triu(np.full([L,L], -inf), 1)` (upper triangle above the diagonal is
    -inf, i.e. **causal — attend to past + self**) and a backward one using the
@@ -40,9 +44,14 @@ for, so the front end is already done.
    `log_timescale_increment = log(max_timescale/min_timescale) / (n - 1)`.
 
 3. **The FFN is CONVOLUTIONAL with kernel 3, not a 1x1 linear.**
-   `PositionwiseFeedForward(layer_config='cc')` = Conv(k=3) -> ReLU -> Conv(k=3),
-   with **left padding** (`pad_type='left'`), i.e. causal padding. A linear FFN
-   would be the wrong op AND the wrong receptive field.
+   `PositionwiseFeedForward(layer_config='cc')` = Conv(k=3) -> ReLU -> Conv(k=3).
+   A linear FFN would be the wrong op AND the wrong receptive field.
+
+   **Padding is SYMMETRIC, not causal.** `transformer_modules.py` documents a
+   `pad_type='left'` option — `padding = (k-1, 0)` — but `btc_model.py:14`
+   passes **`padding='both'`**, giving `(k//2, (k-1)//2)` = **(1, 1)** for k=3.
+   Reading only the module docstring gives causal padding and a one-frame
+   output shift. Read the CALL SITE, not the option list.
 
 4. **Attention scaling is applied to Q, not to the scores**, as
    `queries *= (total_key_depth // num_heads) ** -0.5`. Numerically equivalent

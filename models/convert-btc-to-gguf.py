@@ -18,7 +18,7 @@ Details that are NOT the obvious default (see BTC_BLUEPRINT.md):
   * `mean`/`std` are stored ALONGSIDE the weights and normalise the log-CQT.
   * Each layer has a FORWARD block (causal mask) and a BACKWARD block
     (transposed mask), concatenated then projected 256->128.
-  * The FFN is Conv(k=3) -> ReLU -> Conv(k=3) with LEFT padding, not a linear.
+  * The FFN is Conv(k=3) -> ReLU -> Conv(k=3) with SYMMETRIC (1,1) padding.
   * The output layer is a bidirectional LSTM followed by the classifier.
   * Attention linears are bias-free; LayerNorm eps is 1e-6.
 """
