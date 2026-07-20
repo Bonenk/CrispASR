@@ -240,6 +240,10 @@
 #include "voxcpm2_tts.h"
 #define CA_HAVE_VOXCPM2 1
 #endif
+#if __has_include("voxcpm2_vae.h")
+#include "voxcpm2_vae.h"
+#define CA_HAVE_VOXCPM2_VAE 1
+#endif
 #if __has_include("cosyvoice3_tts.h")
 #include "cosyvoice3_tts.h"
 #define CA_HAVE_COSYVOICE3 1
@@ -1443,6 +1447,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "chatterbox";
     else if (strcmp(arch, "outetts") == 0)
         backend = "outetts";
+    else if (strcmp(arch, "voxcpm2-vae") == 0 || strcmp(arch, "voxcpm2_vae") == 0)
+        backend = "voxcpm2-vae";
     else if (strcmp(arch, "voxcpm2") == 0 || strcmp(arch, "voxcpm2-tts") == 0)
         backend = "voxcpm2-tts";
     else if (strcmp(arch, "cosyvoice3-llm") == 0 || strcmp(arch, "cosyvoice3") == 0 ||
@@ -1985,6 +1991,9 @@ struct crispasr_session {
 #ifdef CA_HAVE_VOXCPM2
     voxcpm2_context* voxcpm2_ctx = nullptr;
     std::vector<float> voxcpm2_ref_pcm; // 16 kHz mono cloning reference
+#endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    voxcpm2_vae_context* voxcpm2_vae_ctx = nullptr;
 #endif
 #ifdef CA_HAVE_COSYVOICE3
     cosyvoice3_tts_context* cosyvoice3_ctx = nullptr;
@@ -3335,6 +3344,21 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         return s;
     }
 #endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    if (s->backend == "voxcpm2-vae" || s->backend == "voxcpm2_vae" || s->backend == "voxcpm2-upscaler") {
+        s->backend = "voxcpm2-vae";
+        voxcpm2_vae_context_params p = voxcpm2_vae_context_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
+        s->voxcpm2_vae_ctx = voxcpm2_vae_init_from_file(model_path, p);
+        if (!s->voxcpm2_vae_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
 #ifdef CA_HAVE_COSYVOICE3
     if (s->backend == "cosyvoice3-tts" || s->backend == "cosyvoice3" || s->backend == "cosyvoice3-llm") {
         s->backend = "cosyvoice3-tts";
@@ -4050,6 +4074,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_VOXCPM2
     list += ",voxcpm2-tts";
+#endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    list += ",voxcpm2-vae";
 #endif
 #ifdef CA_HAVE_COSYVOICE3
     list += ",cosyvoice3-tts";
@@ -7148,6 +7175,47 @@ CA_EXPORT int crispasr_registry_list_backends_abi(char* out_csv, int32_t out_cap
     return (int)acc.size();
 }
 
+CA_EXPORT int crispasr_registry_default_bundle_info_abi(const char* backend, char* out_backend, int32_t backend_cap,
+                                                        char* out_license, int32_t license_cap,
+                                                        int32_t* out_requires_acceptance) {
+    if (!backend || !out_backend || backend_cap <= 0 || !out_license || license_cap <= 0 || !out_requires_acceptance)
+        return -1;
+    CrispasrRegistryBundle bundle;
+    if (!crispasr_registry_default_bundle(backend, bundle))
+        return 0;
+    if ((int)bundle.backend.size() + 1 > backend_cap || (int)bundle.license.size() + 1 > license_cap)
+        return -2;
+    std::memcpy(out_backend, bundle.backend.c_str(), bundle.backend.size());
+    out_backend[bundle.backend.size()] = '\0';
+    std::memcpy(out_license, bundle.license.c_str(), bundle.license.size());
+    out_license[bundle.license.size()] = '\0';
+    *out_requires_acceptance = bundle.requires_license_acceptance ? 1 : 0;
+    return (int)bundle.artifacts.size();
+}
+
+CA_EXPORT int crispasr_registry_default_bundle_artifact_abi(const char* backend, int32_t index, int32_t* out_kind,
+                                                            char* out_filename, int32_t filename_cap, char* out_url,
+                                                            int32_t url_cap, char* out_size, int32_t size_cap) {
+    if (!backend || index < 0 || !out_kind || !out_filename || filename_cap <= 0 || !out_url || url_cap <= 0 ||
+        !out_size || size_cap <= 0)
+        return -1;
+    CrispasrRegistryBundle bundle;
+    if (!crispasr_registry_default_bundle(backend, bundle) || index >= (int32_t)bundle.artifacts.size())
+        return 1;
+    const CrispasrRegistryArtifact& artifact = bundle.artifacts[index];
+    if ((int)artifact.filename.size() + 1 > filename_cap || (int)artifact.url.size() + 1 > url_cap ||
+        (int)artifact.approx_size.size() + 1 > size_cap)
+        return 2;
+    *out_kind = (int32_t)artifact.kind;
+    std::memcpy(out_filename, artifact.filename.c_str(), artifact.filename.size());
+    out_filename[artifact.filename.size()] = '\0';
+    std::memcpy(out_url, artifact.url.c_str(), artifact.url.size());
+    out_url[artifact.url.size()] = '\0';
+    std::memcpy(out_size, artifact.approx_size.c_str(), artifact.approx_size.size());
+    out_size[artifact.approx_size.size()] = '\0';
+    return 0;
+}
+
 CA_EXPORT int crispasr_session_result_n_segments(crispasr_session_result* r) {
     return r ? (int)r->segments.size() : 0;
 }
@@ -8472,6 +8540,29 @@ CA_EXPORT float* crispasr_session_speech_to_speech(crispasr_session* s, const fl
         return pcm;
     }
 #endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    if (s->voxcpm2_vae_ctx) {
+        const float* vae_input = in_samples;
+        int vae_input_count = n_in_samples;
+        std::vector<float> resampled;
+        if (s->pcm_sample_rate != 16000) {
+            resampled = core_audio::resample_polyphase(in_samples, n_in_samples, s->pcm_sample_rate, 16000);
+            vae_input = resampled.data();
+            vae_input_count = (int)resampled.size();
+        }
+
+        int n = 0;
+        float* pcm = voxcpm2_vae_upscale(s->voxcpm2_vae_ctx, vae_input, vae_input_count, &n);
+        if (!pcm || n <= 0) {
+            s->last_synth_error = "VoxCPM2 AudioVAE upscaler produced no audio";
+            voxcpm2_vae_pcm_free(pcm);
+            return nullptr;
+        }
+        if (out_n_samples)
+            *out_n_samples = n;
+        return pcm;
+    }
+#endif
 #ifdef CA_HAVE_SIDON
     if (s->sidon_ctx) {
         const float* sidon_input = in_samples;
@@ -9350,6 +9441,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
     if (s->voxcpm2_ctx)
         voxcpm2_free(s->voxcpm2_ctx);
 #endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    if (s->voxcpm2_vae_ctx)
+        voxcpm2_vae_free(s->voxcpm2_vae_ctx);
+#endif
 #ifdef CA_HAVE_COSYVOICE3
     if (s->cosyvoice3_ctx)
         cosyvoice3_tts_free(s->cosyvoice3_ctx);
@@ -9536,6 +9631,9 @@ CA_EXPORT int crispasr_transcribe_parallel(struct whisper_context* ctx, struct w
 // =========================================================================
 
 CA_EXPORT const char* crispasr_c_api_version(void) {
+    // 0.7.0 — Adds exact canonical default-bundle enumeration for the
+    // model registry (primary, companion, extras, and licence gate).
+    // Pure addition; no symbol renames or signature changes.
     // 0.6.0 — Adds CrisperWeaver parity: crispasr_get_progress /
     // crispasr_reset_progress (atomic progress polling for Dart FFI),
     // crispasr_audio_load_stereo (stereo PCM decode),
@@ -9551,7 +9649,7 @@ CA_EXPORT const char* crispasr_c_api_version(void) {
     // `crispasr_detect_language_pcm` return-code contract.
     // 0.5.1 — Adds `crispasr_session_translate_text_free`.
     // Pure addition; no symbol renames or signature changes.
-    return "0.6.0";
+    return "0.7.0";
 }
 
 // Backwards-compatibility alias. The Dart smoke test and any 0.4.x-era

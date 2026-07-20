@@ -71,7 +71,7 @@ all consume the same symbols.
 | `text_lid_dispatch.{h,cpp}` | Backend-agnostic façade over `lid_fasttext` and `lid_cld3`. Peeks `general.architecture` at load time and dispatches to the matching backend; one C ABI for any text-LID GGUF. Powers `crispasr-lid` and `--lid-on-transcript`. |
 | `crispasr_aligner.{h,cpp}` | canary-CTC + Qwen3-ForcedAligner + wav2vec2 forced alignment behind one entry point; filename-based dispatch. Also the engine behind `--align-only` (standalone alignment without ASR, issue #217). |
 | `crispasr_cache.{h,cpp}` | WinHTTP / curl / wget download into `~/.cache/crispasr/`; zombie-file detection. |
-| `crispasr_model_registry.{h,cpp}` | Backend → canonical GGUF URL table; fuzzy filename lookup for "did you mean …?" hints. |
+| `crispasr_model_registry.{h,cpp}` | Backend → canonical GGUF URL table; exact default-bundle enumeration (primary, companion, extras, licence policy); fuzzy filename lookup for "did you mean …?" hints. |
 | `whisper_params.h` | Shared params struct (extracted from cli.cpp, extended). |
 
 ## `examples/cli/` — presentation + policy
@@ -1035,6 +1035,41 @@ continuous diffusion + BigVGAN vocoder. Zero-shot voice cloning from
 reference WAV. Output is 48 kHz, decimated to 24 kHz for the standard
 CrispASR TTS pipeline.
 
+### voxcpm2-vae
+
+The standalone VoxCPM2 AudioVAE backend exposes the model's causal VAE as a
+speech-to-speech upscaler. Its encoder consumes 16 kHz mono PCM with rates
+`[2, 5, 8, 8]` (640x downsampling); its sample-rate-conditioned decoder uses
+rates `[8, 6, 5, 2, 2, 2]` (1920x upsampling), producing 48 kHz mono PCM.
+The output is cropped to exactly three times the 16 kHz input sample count.
+One call is capped at 960,000 input samples (60 seconds) before graph or
+activation allocation: the convolutional working set grows linearly but can
+still reach several GiB. Split longer audio, or override the cap with
+`CRISPASR_VOXCPM2_VAE_MAX_SAMPLES` when sufficient RAM/VRAM is available.
+
+`voxcpm2-vae` has its own opaque context, backend handle, weight buffers,
+allocators, and reconstructed-weight caches. It can therefore coexist with a
+full `voxcpm2-tts` context without sharing live model state. Internally, both
+contexts call the same VAE graph implementation so fixes to the codec math do
+not need to be duplicated.
+
+The selective loader accepts either a full VoxCPM2 GGUF or an AudioVAE-only
+GGUF, but allocates only `vae.*` tensors. A VAE-only conversion is smaller and
+auto-detects through `general.architecture = "voxcpm2-vae"`:
+
+```bash
+python models/convert-voxcpm2-to-gguf.py \
+  --input openbmb/VoxCPM2 \
+  --output voxcpm2-vae-f32.gguf \
+  --vae-only
+crispasr -m voxcpm2-vae-f32.gguf -f input.wav \
+  --s2s --s2s-output upscaled.wav
+```
+
+When using a full VoxCPM2 GGUF, select the component explicitly with
+`--backend voxcpm2-vae`; automatic detection of a full model intentionally
+continues to choose `voxcpm2-tts`.
+
 ### cosyvoice3-tts
 
 CosyVoice3 0.5B (FunAudioLLM, Apache-2.0): three-stage pipeline — Qwen2-0.5B
@@ -1234,6 +1269,44 @@ restores bandwidth while preserving speaker identity.
 - **Execution:** CPU, CUDA, and Vulkan. The Vulkan graph decomposes affine
   normalization and relative-position gather operations into supported GGML
   primitives; both predictor and DAC execute fully on Vulkan.
+- **Input padding:** inference prepends one predictor frame of context and
+  appends 1.5 s of lookahead, then crops both back off. Without the lookahead
+  the predictor's boundary response reaches the DAC directly and the last
+  ~12 ms of every clip is a full-scale click (on `samples/jfk.wav` it is the
+  peak sample of the whole file). The leading pad is a *whole* predictor frame
+  because the front end decimates raw mel frames by 2 taking even indices — a
+  half-frame pad would change which mel frames the predictor sees. Both pads
+  are cropped; dropping only the tail leaves the result delayed and truncates
+  the same amount of real audio. Set `CRISPASR_SIDON_LOOKAHEAD=0` to disable
+  the padding (A/B, and for reproducing pre-padding reference dumps). The
+  lookahead consumes ~75 frames of the input-duration cap.
+
+- **Working memory:** two independent bounds, each measured at `T≈2825`
+  (~55 s) with `sidon-v0.1-q8_0` on Metal. Use `CRISPASR_SIDON_DEBUG=1` to
+  print the per-stage scheduler workspace; process RSS is *not* a usable proxy
+  because Metal compute buffers are not attributed to the process footprint.
+
+  - *Predictor* — relative-position logits are evaluated once per clipped
+    distance bucket rather than expanding `distance_w` to `[head_dim, T, T]`:
+    **3064 → 2042 MiB**. `CRISPASR_SIDON_RPE` selects the formulation:
+    `bucket-direct` (default), `bucket` (same algebra, builds the gather
+    index's head dimension with an in-graph `REPEAT`), or `expand` (the legacy
+    expansion, which also retains the Vulkan-specific `mul_mat` batching
+    branch). All three are algebraically identical and produce identical ASR
+    transcripts; they differ only in float summation order.
+  - *DAC* — decoded in bounded cores with the decoder's exact latent
+    receptive field, then cropped: **4491 → 787 MiB**. The receptive field is
+    derived from the decoder config (`dac_receptive_frames()`), not tuned.
+    `CRISPASR_SIDON_DECODER_CHUNK_FRAMES` sets the maximum core size (default
+    512); `0` decodes the whole utterance in one graph. Cores are spread
+    evenly over the fewest chunks that fit the budget — with a fixed core size
+    a `T` just past a multiple leaves a final window that is nearly all
+    context (at `T=625`, core 256 decoded 840 frames for 625 frames of audio).
+    Chunked output is **bit-exact** against the whole-utterance decode, which
+    the live test asserts.
+
+  The predictor remains global-attention and retains the existing
+  input-duration safety cap.
 
 The CLI auto-detects `general.architecture = "sidon"` and exposes `CAP_S2S`:
 

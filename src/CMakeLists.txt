@@ -1719,7 +1719,7 @@ target_link_libraries     (kugelaudio PUBLIC crispasr-core ggml ggml-base ggml-c
 # ---------------------------------------------------------------------------
 # voxcpm2_tts — openbmb/VoxCPM2 (diffusion AR TTS, 30 languages, 48kHz)
 # ---------------------------------------------------------------------------
-add_library(voxcpm2_tts STATIC voxcpm2_tts.h voxcpm2_tts.cpp)
+add_library(voxcpm2_tts STATIC voxcpm2_tts.h voxcpm2_vae.h voxcpm2_tts.cpp)
 set_target_properties(voxcpm2_tts PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(voxcpm2_tts PUBLIC .)
 target_compile_features   (voxcpm2_tts PUBLIC cxx_std_17)

@@ -121,7 +121,7 @@ backend doesn't expose that knob, but the call is safe to make.
 ```python
 from crispasr import (
     Session, diarize_segments, detect_language_pcm,
-    align_words, cache_ensure_file, registry_lookup,
+    align_words, cache_ensure_file, registry_default_bundle,
     # Diarize pipeline primitives (#107):
     SpeakerEmbedder, PyannoteCache, agglomerative_cluster,
 )
@@ -137,9 +137,13 @@ lang = detect_language_pcm(pcm, model_path="ggml-tiny.bin")
 diarize_segments(my_segs, pcm, method=DiarizeMethod.VAD_TURNS)
 words = align_words("canary-ctc-aligner.gguf", "hello world", pcm)
 
-# Auto-download a canonical model
-entry = registry_lookup("parakeet")
-path  = cache_ensure_file(entry.filename, entry.url)
+# Inspect the canonical bundle used by `-m auto` (no quant suffix).
+# NOTE: this does not apply a preferred quant, so it does NOT reproduce
+# `-m auto:q8_0` — that rewrites both filename and URL. Use registry_lookup()
+# with a preferred quant for those.
+bundle = registry_default_bundle("omnivoice")
+assert not bundle.requires_acceptance  # prompt/attest before restricted downloads
+paths = [cache_ensure_file(a.filename, a.url) for a in bundle.artifacts]
 
 # Custom diarize pipeline: pluggable embedder + cosine clustering.
 # Same building blocks as `--diarize-embedder` in the CLI.
@@ -157,7 +161,7 @@ Install: `pip install crispasr` (or build locally from `python/`).
 use crispasr::{
     Session, DiarizeMethod, DiarizeOptions, DiarizeSegment,
     LidMethod, detect_language_pcm, align_words,
-    cache_ensure_file, registry_lookup,
+    cache_ensure_file, registry_default_bundle,
     // Diarize pipeline primitives (#107):
     SpeakerEmbedder, PyannoteCache, agglomerative_cluster,
 };
@@ -167,8 +171,11 @@ sess.set_max_new_tokens(256)?;
 sess.set_frequency_penalty(0.4)?;
 let segs = sess.transcribe_vad(&pcm, "silero-v6.2.0.bin", None)?;
 
-let entry = registry_lookup("canary")?.unwrap();
-let path  = cache_ensure_file(&entry.filename, &entry.url, false, None)?;
+let bundle = registry_default_bundle("canary")?.unwrap();
+assert!(!bundle.requires_acceptance); // obtain explicit acceptance when true
+for artifact in bundle.artifacts {
+    cache_ensure_file(&artifact.filename, &artifact.url, false, None)?;
+}
 
 // Custom diarize pipeline: pluggable embedder + cosine clustering.
 let emb = SpeakerEmbedder::new("auto", 4, None)?;     // "titanet"/"indextts"/.gguf
@@ -380,7 +387,8 @@ dedicated wrapper yet — the C ABI above is the surface for all of them.
 
 ## Speech-to-speech
 
-Backends with S2S capability (`lfm2-audio`, `mini-omni2`, `sidon`) support
+Backends with S2S capability (`lfm2-audio`, `mini-omni2`, `sidon`,
+`voxcpm2-vae`) support
 end-to-end audio-in → audio-out transformation through a single model
 pass. Available in Python, Go, Dart/Flutter, and the HTTP server
 (`POST /v1/audio/speech-to-speech`).
@@ -389,9 +397,10 @@ pass. Available in Python, Go, Dart/Flutter, and the HTTP server
   (`crispasr_session_speech_to_speech`)
 
 Input defaults to 16 kHz mono float32 PCM. Python callers with another input
-rate call `set_pcm_sample_rate(rate)` before `speech_to_speech()`; Sidon then
-resamples internally to 16 kHz. Conversational S2S backends return 24 kHz;
-Sidon returns restored 48 kHz audio and an empty transcript.
+rate call `set_pcm_sample_rate(rate)` before `speech_to_speech()`; Sidon and
+VoxCPM2 AudioVAE then resample internally to 16 kHz. Conversational S2S
+backends return 24 kHz; Sidon and VoxCPM2 AudioVAE return 48 kHz audio and an
+empty transcript.
 
 ```python
 # Python
@@ -410,6 +419,15 @@ audio, sr = sf.read("input.wav", dtype="float32")
 s.set_pcm_sample_rate(sr)
 restored, _ = s.speech_to_speech(audio)
 sf.write("restored.wav", restored, 48000)
+```
+
+```python
+# VoxCPM2 AudioVAE upscaling
+s = crispasr.Session("voxcpm2-vae-f32.gguf")
+audio, sr = sf.read("input.wav", dtype="float32")
+s.set_pcm_sample_rate(sr)
+upscaled, _ = s.speech_to_speech(audio)
+sf.write("upscaled.wav", upscaled, 48000)
 ```
 
 ```go

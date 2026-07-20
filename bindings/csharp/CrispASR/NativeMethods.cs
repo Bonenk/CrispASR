@@ -433,6 +433,21 @@ namespace CrispASR
             byte[] outSize, int sizeCap);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_registry_default_bundle_info_abi(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string backend,
+            byte[] outBackend, int backendCap,
+            byte[] outLicense, int licenseCap,
+            out int outRequiresAcceptance);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_registry_default_bundle_artifact_abi(
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string backend,
+            int index, out int outKind,
+            byte[] outFilename, int filenameCap,
+            byte[] outUrl, int urlCap,
+            byte[] outSize, int sizeCap);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int crispasr_cache_ensure_file_abi(
             [MarshalAs(UnmanagedType.LPUTF8Str)] string filename,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string url,

@@ -887,6 +887,25 @@ catch_discover_tests(test-sidon-live
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-voxcpm2-vae-live — AudioVAE upscaling + TTS coexistence
+add_executable(test-voxcpm2-vae-live
+    test_voxcpm2_vae_live.cpp
+)
+target_include_directories(test-voxcpm2-vae-live PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-voxcpm2-vae-live PRIVATE
+    Catch2::Catch2WithMain
+    voxcpm2_tts
+)
+catch_discover_tests(test-voxcpm2-vae-live
+    TEST_SPEC "[voxcpm2-vae]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test - snac — unit + live tests for core/snac.h (SNAC 24kHz decoder)
 add_executable(test-snac
     test_snac_unit.cpp
@@ -1451,6 +1470,12 @@ target_include_directories(test-voxcpm2-tts-params PRIVATE ${PROJECT_SOURCE_DIR}
 target_link_libraries(test-voxcpm2-tts-params PRIVATE Catch2::Catch2WithMain voxcpm2_tts)
 catch_discover_tests(test-voxcpm2-tts-params
     TEST_SPEC "[unit]" PROPERTIES LABELS "unit;voxcpm2-tts")
+
+add_executable(test-voxcpm2-vae-params test-voxcpm2-vae-params.cpp)
+target_include_directories(test-voxcpm2-vae-params PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-voxcpm2-vae-params PRIVATE Catch2::Catch2WithMain voxcpm2_tts)
+catch_discover_tests(test-voxcpm2-vae-params
+    TEST_SPEC "[unit]" PROPERTIES LABELS "unit;voxcpm2-vae")
 
 add_executable(test-firered-asr-params test-firered-asr-params.cpp)
 target_include_directories(test-firered-asr-params PRIVATE ${PROJECT_SOURCE_DIR}/src)
@@ -2539,6 +2564,21 @@ endif()
 catch_discover_tests(test-registry
     TEST_SPEC "[unit]"
     PROPERTIES LABELS "unit"
+)
+
+# Pin the public default-bundle ABI against the same registry used by the
+# shipped shared library. No network or model files are required.
+add_executable(test-registry-c-abi test-registry-c-abi.cpp)
+target_include_directories(test-registry-c-abi PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(test-registry-c-abi PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-registry-c-abi
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;registry;c-abi"
 )
 
 # ─── test-companion-resolve — Catch2 unit tests for companion resolution (#146 / #148)

@@ -279,6 +279,12 @@ extern int crispasr_registry_lookup_abi(const char* backend, char* out_filename,
 extern int crispasr_registry_lookup_by_filename_abi(const char* filename, char* out_filename, int32_t filename_cap,
                                                     char* out_url, int32_t url_cap, char* out_size, int32_t size_cap);
 extern int crispasr_registry_list_backends_abi(char* out_csv, int32_t out_cap);
+extern int crispasr_registry_default_bundle_info_abi(const char* backend, char* out_backend, int32_t backend_cap,
+                                                     char* out_license, int32_t license_cap,
+                                                     int32_t* out_requires_acceptance);
+extern int crispasr_registry_default_bundle_artifact_abi(const char* backend, int32_t index, int32_t* out_kind,
+                                                         char* out_filename, int32_t filename_cap, char* out_url,
+                                                         int32_t url_cap, char* out_size, int32_t size_cap);
 extern int crispasr_cache_ensure_file_abi(const char* filename, const char* url, int32_t quiet,
                                           const char* cache_dir_override, char* out_buf, int32_t out_cap);
 extern int crispasr_cache_dir_abi(const char* cache_dir_override, char* out_buf, int32_t out_cap);
