@@ -2787,6 +2787,17 @@ catch_discover_tests(test-core-wordpiece
     PROPERTIES LABELS "unit;wordpiece"
 )
 
+# ─── test-core-gru — core/gru.h vs a real PyTorch nn.GRU fixture ──────────────
+# Parity case skips unless CRISPASR_GRU_REF points at a fixture from
+# tools/gen_gru_reference.py, so CI needs neither torch nor network.
+add_executable(test-core-gru test-core-gru.cpp)
+target_include_directories(test-core-gru PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-core-gru PRIVATE Catch2::Catch2WithMain ggml ggml-base ggml-cpu)
+catch_discover_tests(test-core-gru
+    TEST_PREFIX "core-gru: "
+    PROPERTIES LABELS "unit;core"
+)
+
 # ─── test-core-cqt — core/cqt.h constant-Q transform ──────────────────────────
 # Deterministic properties only (geometric bins, tone->bin mapping, octave
 # spacing, L1 normalisation). librosa cross-check is a separate manual step:
