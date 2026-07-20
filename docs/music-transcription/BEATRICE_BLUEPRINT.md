@@ -15,8 +15,9 @@ ggml graph yet. `PhoneExtractor`, `VectorQuantizer`, `ConverterNetwork` and
 |---|---|
 | `models/convert-beatrice-to-gguf.py` | pitch_estimator: 88 tensors, 36 dropped as fusion-neutralised (124 total, balances) |
 | `tools/beatrice_torch_parity.py` | 36-stage reference dump, spec reproduces `forward()` **bit-identically** |
-| ggml graph (`src/beatrice_pitch.{h,cpp}`) | NOT STARTED |
-| `crispasr-diff beatrice` | NOT STARTED |
+| `src/beatrice_pitch.{h,cpp}` | **DONE** — 30 stages + end-to-end, 0 failed |
+| `crispasr-diff beatrice` | **DONE** |
+| PhoneExtractor / ConverterNetwork / Vocoder | NOT STARTED |
 
 ---
 
@@ -295,6 +296,80 @@ A third "control" was invalid and worth recording as a trap: re-applying
 `gamma` after the fusion is a **no-op by construction** (post-merge `gamma` is
 all-ones), so it passed bit-identically. It tested nothing. A negative control
 has to break something the code actually depends on.
+
+## The ggml port — result and what it cost
+
+`crispasr-diff beatrice <model.gguf> <ref.gguf> <any.wav>` → **30 stages + end
+to end, 0 FAILED**. Host DSP at cos 1.00000000; every network stage ≥
+0.9999998; `estimate_e2e_logits` cos 0.99999990.
+
+Two structural notes for the components still to come:
+
+* **The DSP needs no inverse FFT.** The reference's
+  `irfft(rfft(flip(y)) * rfft(y[-304:]))[304:]` reduces exactly to
+  `corr[t] = sum_j y[256+j] * y[256+j-(t+1)]` — verified against torch at 1e-15
+  relative. The difference function is then formed directly as
+  `sum (y[a+j] - y[a-lag+j])^2`, which is algebraically identical but cannot
+  suffer the cancellation the reference's `clamp(min=0)` exists to paper over.
+  Only the instfreq branch needs a forward rFFT — of length 560, which is NOT a
+  power of two (560 = 2^4 · 35), so `core_fft::fft_nonpow2_r2c` is required.
+* `ggml_gelu` **is** PyTorch's `approximate="tanh"` (verified in
+  `ggml/src/ggml-cpu/vec.h`), and `ggml_conv_1d_dw` is correct for this
+  depthwise k=33 case despite its upstream "very likely wrong for some cases"
+  comment — `block*_dwconv` passes at every block.
+
+### Three bugs the harness caught, and how each announced itself
+
+1. **Captured intermediates were being recycled.** Every intermediate failed
+   while `backbone_final_norm` and `logits` passed — impossible if the
+   intermediates were genuinely wrong, since the final stages are computed from
+   them. The graph allocator reuses a tensor's buffer once its last consumer has
+   run; captures need `ggml_set_output`. *The pattern is the diagnosis.*
+2. **The host DSP was written frame-major** (`t*C + c`) while the reference is
+   time-fastest (`c*T + t`) — the transpose trap, a fourth time, in a file whose
+   header warns about it. `dsp_energy` **passed** while the other two DSP stages
+   failed: energy is single-channel and therefore the only layout-invariant
+   stage. *The one passing stage localised it.*
+3. **`sample_pitch` indexed the logits frame-major** for the same reason;
+   400/400 frames differed. Fixed → 1/400.
+
+### Judging a tie-prone integer output
+
+The surviving 1/400 was not a tie by any fixed threshold (band margin 1.9e-02),
+yet running the same algorithm on the *reference's own* logits reproduced the
+reference exactly (0/400) — so the logic was right and the flip came from f32
+logit noise propagating into a close decision.
+
+A fixed tolerance cannot arbitrate this: 113 of 400 frames sit inside 1e-3
+(minimum 3.4e-06), so exact-match is permanently red, and any hand-picked margin
+is just a number chosen to make the test green. The harness instead **measures
+the perturbation the f32 difference actually induces** in band-score and
+bin-probability space and accepts a mismatch only when the reference's own
+preference is no larger than that.
+
+That criterion was itself wrong on the first attempt, and only a negative
+control showed it: `sample_pitch` decides in **two** stages (which band, then
+which bin within it), and checking only the band choice waved through a plain
+argmax substituted for the within-band argmax — the band is identical, so the
+gap was 0. Now both stages are checked, and the bin comparison is **absolute**:
+if our bin scores *higher* than the reference's, that is not a tie, it is the
+band mask being ignored.
+
+### What this harness cannot see (HARD RULE #3b)
+
+* **The unvoiced path is untested.** `p[bin 0]` is 0.0000 on every frame of
+  `samples/jfk.wav`, so `p[0] = -100` — the exclusion of the unvoiced class —
+  can be deleted with no effect. Removing it was tried as a negative control and
+  passed, *not* because the harness is weak but because this reference audio
+  cannot exercise it. A reference over audio with genuine unvoiced/silent
+  stretches is needed before that line is trusted.
+* Only one clip, one length (4 s / 400 frames), f32 only, CPU only. Nothing here
+  covers streaming, chunk boundaries, or the `delay > 0` lookahead geometry
+  (`embed_trim` is 0 for this checkpoint, so `padding != trim` is never
+  exercised even though the code handles it).
+* Cosine ≥ 0.9999 is the stage gate; per the negative controls in the section
+  above, cosine alone would pass a wrong GELU. Stage max_abs is printed and
+  should be read alongside it.
 
 ### Layout convention
 
