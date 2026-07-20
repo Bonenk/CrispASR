@@ -117,6 +117,11 @@ struct WeightLoad {
     // PLAN #69a layer offload: optional second backend buffer for tensors
     // routed off-GPU. Non-null only when load_weights_split() was used.
     ggml_backend_buffer_t buf_cpu = nullptr;
+    // Issue #276: extra buffers from chunked allocation in load_weights_split().
+    // AMD Vulkan (proprietary driver) caps per-allocation at 2 GiB; models
+    // larger than that are split across multiple backend buffers. The first
+    // GPU/CPU buffer is in buf/buf_cpu; any overflow chunks live here.
+    std::vector<ggml_backend_buffer_t> split_bufs;
     tensor_map tensors;
 };
 
