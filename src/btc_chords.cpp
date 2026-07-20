@@ -32,6 +32,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -144,7 +145,23 @@ struct btc_chords_context {
     ggml_context* ctx_w = nullptr;
     std::vector<std::string> names; // vocabulary, filled at load
     std::vector<const char*> name_ptrs;
+
+    // Per-stage capture for the parity diff. Off in the normal path.
+    bool capture = false;
+    std::map<std::string, std::vector<float>> captures;
 };
+
+// Record an intermediate. Graph tensors MUST be ggml_set_output before being
+// read back, or gallocr will have recycled the buffer by the time we look.
+static void btc_capture(btc_chords_context* ctx, const char* name, ggml_tensor* t) {
+    if (!ctx || !ctx->capture || !t)
+        return;
+    std::vector<float> v((size_t)ggml_nelements(t));
+    ggml_backend_tensor_get(t, v.data(), 0, v.size() * sizeof(float));
+    ctx->captures[name] = std::move(v);
+}
+
+static bool btc_forward_block(btc_chords_context* ctx, const float* feat, int T, std::vector<float>& logits_out);
 
 static bool btc_debug() {
     static int v = -1;
@@ -174,13 +191,17 @@ static bool btc_maj_min() {
 // NOT ggml_norm — that is (x - mu)/sqrt(var_biased + eps), which differs both
 // in the eps placement and the denominator (n vs n-1). At width 128 the
 // biased/unbiased gap alone is max_abs 1.5e-2 vs 5.3e-7 against the reference.
-static ggml_tensor* btc_layer_norm(ggml_context* g, ggml_tensor* x, ggml_tensor* gamma, ggml_tensor* beta, float eps) {
+static ggml_tensor* btc_layer_norm(ggml_context* g, ggml_tensor* x, ggml_tensor* gamma, ggml_tensor* beta,
+                                   ggml_tensor* eps) {
     const int n = (int)x->ne[0];
     ggml_tensor* mu = ggml_mean(g, x); // (1, T)
     ggml_tensor* d = ggml_sub(g, x, ggml_repeat(g, mu, x));
     ggml_tensor* var = ggml_mean(g, ggml_sqr(g, d));     // biased
     var = ggml_scale(g, var, (float)n / (float)(n - 1)); // -> unbiased
-    ggml_tensor* sd = ggml_add1(g, ggml_sqrt(g, var), ggml_new_f32(g, eps));
+    // eps arrives as a 1-element INPUT tensor: the graph context is no_alloc,
+    // so ggml_new_f32 (which writes data immediately) would abort.
+    ggml_tensor* sq = ggml_sqrt(g, var);
+    ggml_tensor* sd = ggml_add(g, sq, ggml_repeat(g, eps, sq)); // ggml_add1 is deprecated
     ggml_tensor* y = ggml_div(g, d, ggml_repeat(g, sd, d));
     y = ggml_mul(g, y, ggml_repeat(g, ggml_reshape_2d(g, gamma, n, 1), y));
     return ggml_add(g, y, ggml_repeat(g, ggml_reshape_2d(g, beta, n, 1), y));
@@ -226,10 +247,10 @@ static ggml_tensor* btc_ffn(ggml_context* g, ggml_tensor* x, const btc_attn_bloc
 }
 
 static ggml_tensor* btc_block(ggml_context* g, ggml_tensor* x, const btc_attn_block& b, ggml_tensor* mask,
-                              const btc_hparams& hp, int T) {
-    ggml_tensor* xn = btc_layer_norm(g, x, b.norm_mha_g, b.norm_mha_b, hp.eps);
+                              const btc_hparams& hp, int T, ggml_tensor* eps) {
+    ggml_tensor* xn = btc_layer_norm(g, x, b.norm_mha_g, b.norm_mha_b, eps);
     x = ggml_add(g, x, btc_attention(g, xn, b, mask, hp.hidden_size, hp.n_heads, T));
-    xn = btc_layer_norm(g, x, b.norm_ffn_g, b.norm_ffn_b, hp.eps);
+    xn = btc_layer_norm(g, x, b.norm_ffn_g, b.norm_ffn_b, eps);
     return ggml_add(g, x, btc_ffn(g, xn, b));
 }
 
@@ -399,26 +420,51 @@ static bool btc_forward_block(btc_chords_context* ctx, const float* feat, int T,
     ggml_tensor* MB = ggml_new_tensor_2d(g, GGML_TYPE_F16, T, T);
     ggml_set_input(MF);
     ggml_set_input(MB);
+    ggml_tensor* EPS = ggml_new_tensor_1d(g, GGML_TYPE_F32, 1);
+    ggml_set_input(EPS);
+
+    std::vector<std::pair<std::string, ggml_tensor*>> taps;
+    const bool cap = ctx->capture;
 
     ggml_tensor* x = ggml_mul_mat(g, m.embed_w, X); // (hidden, T), no bias
     x = ggml_add(g, x, POS);
+    if (cap) {
+        ggml_set_output(x);
+        taps.emplace_back("embed_posenc", x);
+    }
 
     for (int i = 0; i < hp.n_layers; i++) {
-        ggml_tensor* f = btc_block(g, x, m.layers[i].fwd, MF, hp, T);
-        ggml_tensor* b = btc_block(g, x, m.layers[i].bwd, MB, hp, T);
+        ggml_tensor* f = btc_block(g, x, m.layers[i].fwd, MF, hp, T, EPS);
+        ggml_tensor* b = btc_block(g, x, m.layers[i].bwd, MB, hp, T, EPS);
+        if (cap && i == 0) {
+            ggml_set_output(f);
+            ggml_set_output(b);
+            taps.emplace_back("layer0_fwd", f);
+            taps.emplace_back("layer0_bwd", b);
+        }
         ggml_tensor* cat = ggml_concat(g, f, b, 0); // (256, T)
         x = ggml_mul_mat(g, m.layers[i].proj_w, cat);
         x = ggml_add(g, x, ggml_reshape_2d(g, m.layers[i].proj_b, hp.hidden_size, 1));
+        if (cap) {
+            ggml_set_output(x);
+            taps.emplace_back("layer" + std::to_string(i) + "_out", x);
+        }
     }
 
     if (m.final_g)
-        x = btc_layer_norm(g, x, m.final_g, m.final_b, hp.eps);
+        x = btc_layer_norm(g, x, m.final_g, m.final_b, EPS);
+    if (cap) {
+        ggml_set_output(x);
+        taps.emplace_back("final_norm", x);
+    }
     ggml_tensor* out = ggml_mul_mat(g, m.out_w, x);
     out = ggml_add(g, out, ggml_reshape_2d(g, m.out_b, hp.n_chords, 1));
     ggml_set_output(out);
 
     ggml_cgraph* gf = ggml_new_graph_custom(g, n_nodes, false);
     ggml_build_forward_expand(gf, out);
+    for (auto& kv : taps)
+        ggml_build_forward_expand(gf, kv.second);
     ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
     if (!ggml_gallocr_alloc_graph(alloc, gf)) {
         fprintf(stderr, "btc: graph alloc failed\n");
@@ -448,8 +494,13 @@ static bool btc_forward_block(btc_chords_context* ctx, const float* feat, int T,
         }
     ggml_backend_tensor_set(MF, mf.data(), 0, mf.size() * sizeof(ggml_fp16_t));
     ggml_backend_tensor_set(MB, mb.data(), 0, mb.size() * sizeof(ggml_fp16_t));
+    ggml_backend_tensor_set(EPS, &hp.eps, 0, sizeof(float));
 
     ggml_backend_graph_compute(ctx->backend, gf);
+
+    for (auto& kv : taps)
+        btc_capture(ctx, kv.first.c_str(), kv.second);
+    btc_capture(ctx, "logits", out);
 
     logits_out.assign((size_t)ggml_nelements(out), 0.0f);
     ggml_backend_tensor_get(out, logits_out.data(), 0, logits_out.size() * sizeof(float));
@@ -560,4 +611,131 @@ void btc_chords_result_free(btc_chords_result* r) {
         return;
     delete[] r->spans;
     delete r;
+}
+
+// ---------------------------------------------------------------------------
+// Parity diff against tools/btc_torch_parity.py's reference dump
+// ---------------------------------------------------------------------------
+namespace {
+
+double btc_cosine(const float* a, const float* b, int64_t n) {
+    double dot = 0, na = 0, nb = 0;
+    for (int64_t i = 0; i < n; i++) {
+        dot += (double)a[i] * b[i];
+        na += (double)a[i] * a[i];
+        nb += (double)b[i] * b[i];
+    }
+    if (na == 0 || nb == 0)
+        return (na == 0 && nb == 0) ? 1.0 : 0.0;
+    return dot / (std::sqrt(na) * std::sqrt(nb));
+}
+
+double btc_max_abs(const float* a, const float* b, int64_t n) {
+    double m = 0;
+    for (int64_t i = 0; i < n; i++)
+        m = std::max(m, (double)std::fabs(a[i] - b[i]));
+    return m;
+}
+
+bool btc_ref_get(core_gguf::WeightLoad& rw, const char* name, std::vector<float>& out) {
+    auto it = rw.tensors.find(name);
+    if (it == rw.tensors.end() || !it->second)
+        return false;
+    const int64_t n = ggml_nelements(it->second);
+    out.resize((size_t)n);
+    ggml_backend_tensor_get(it->second, out.data(), 0, (size_t)n * sizeof(float));
+    return true;
+}
+
+} // namespace
+
+int btc_chords_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
+    btc_chords_params p = btc_chords_default_params();
+    p.use_gpu = false; // structural diff on CPU first
+    btc_chords_context* ctx = btc_chords_init_from_file(model_gguf, p);
+    if (!ctx) {
+        fprintf(stderr, "btc_diff: failed to load %s\n", model_gguf);
+        return 2;
+    }
+    core_gguf::WeightLoad rw;
+    if (!core_gguf::load_weights(ref_gguf, ctx->backend, "btc_ref", rw)) {
+        fprintf(stderr, "btc_diff: failed to load reference %s\n", ref_gguf);
+        btc_chords_free(ctx);
+        return 2;
+    }
+
+    // Replay the reference's OWN features so a CQT front-end difference can
+    // never masquerade as a model parity failure.
+    std::vector<float> feat;
+    if (!btc_ref_get(rw, "input_feat", feat)) {
+        fprintf(stderr, "btc_diff: reference has no input_feat — re-dump with the updated spec\n");
+        core_gguf::free_weights(rw);
+        btc_chords_free(ctx);
+        return 2;
+    }
+    const btc_hparams& hp = ctx->model.hp;
+    const int T = (int)(feat.size() / (size_t)hp.feature_size);
+
+    ctx->capture = true;
+    std::vector<float> logits;
+    if (!btc_forward_block(ctx, feat.data(), T, logits)) {
+        fprintf(stderr, "btc_diff: forward failed\n");
+        core_gguf::free_weights(rw);
+        btc_chords_free(ctx);
+        return 2;
+    }
+
+    const double COS_MIN = 0.999;
+    int n_fail = 0, n_run = 0;
+    std::string first_fail;
+
+    auto report = [&](const char* stage) {
+        std::vector<float> ref;
+        if (!btc_ref_get(rw, stage, ref))
+            return;
+        auto it = ctx->captures.find(stage);
+        if (it == ctx->captures.end()) {
+            fprintf(stderr, "  %-16s MISSING (no C++ capture)\n", stage);
+            return;
+        }
+        const std::vector<float>& mine = it->second;
+        const int64_t n = (int64_t)std::min(mine.size(), ref.size());
+        const double cos = btc_cosine(mine.data(), ref.data(), n);
+        const bool ok = cos >= COS_MIN && mine.size() == ref.size();
+        n_run++;
+        if (!ok) {
+            n_fail++;
+            if (first_fail.empty())
+                first_fail = stage;
+        }
+        // Print both magnitudes: an outlier on either side means "same name,
+        // wrong data" (a harness bug), not a runtime bug.
+        double na = 0, nb = 0;
+        for (int64_t i = 0; i < n; i++) {
+            na += (double)mine[i] * mine[i];
+            nb += (double)ref[i] * ref[i];
+        }
+        fprintf(stderr, "  %-16s %s cos=%.6f max_abs=%.3e  mine=%zu ref=%zu  |mine|=%.4f |ref|=%.4f%s\n", stage,
+                ok ? "PASS" : "FAIL", cos, btc_max_abs(mine.data(), ref.data(), n), mine.size(), ref.size(),
+                std::sqrt(na), std::sqrt(nb), mine.size() == ref.size() ? "" : "  *** SHAPE MISMATCH ***");
+        (void)verbosity;
+    };
+
+    fprintf(stderr, "\n=== btc per-stage parity (cos_min >= %.3f, T=%d) ===\n", COS_MIN, T);
+    report("embed_posenc");
+    report("layer0_fwd");
+    report("layer0_bwd");
+    for (int i = 0; i < hp.n_layers; i++)
+        report(("layer" + std::to_string(i) + "_out").c_str());
+    report("final_norm");
+    report("logits");
+
+    fprintf(stderr, "\n%d/%d stages passed", n_run - n_fail, n_run);
+    if (!first_fail.empty())
+        fprintf(stderr, " — FIRST DIVERGENCE: %s", first_fail.c_str());
+    fprintf(stderr, "\n");
+
+    core_gguf::free_weights(rw);
+    btc_chords_free(ctx);
+    return n_fail > 0 ? 1 : 0;
 }
