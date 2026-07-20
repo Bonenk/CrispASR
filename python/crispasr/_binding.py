@@ -2565,11 +2565,11 @@ class Session:
         """Speech-to-speech: audio in → audio out via a single model pass.
 
         Supported on backends with S2S capability (``lfm2-audio``,
-        ``mini-omni2``, ``sidon``). Input is mono float32 PCM; call
+        ``mini-omni2``, ``sidon``, ``voxcpm2-vae``). Input is mono float32 PCM; call
         :meth:`set_pcm_sample_rate` first when it is not 16 kHz. Returns a
         tuple ``(output_pcm, transcript)`` where *output_pcm* is a
         float32 numpy array at the backend's output sample rate (24 kHz
-        for conversational S2S, 48 kHz for Sidon) and *transcript* is the
+        for conversational S2S, 48 kHz for Sidon and VoxCPM2 AudioVAE) and *transcript* is the
         intermediate ASR text (may be
         empty if the backend doesn't produce one).
 

@@ -60,6 +60,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_sidon_backend();
 std::unique_ptr<CrispasrBackend> crispasr_create_miotts_backend();
 std::unique_ptr<CrispasrBackend> crispasr_create_piano_transcription_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_voxcpm2_tts_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_voxcpm2_vae_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_cosyvoice3_tts_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_piper_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_melotts_backend();
@@ -194,6 +195,8 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_fastpitch_backend();
     if (name == "voxcpm2-tts" || name == "voxcpm2" || name == "voxcpm" || name == "voxcpm2_tts")
         return crispasr_make_voxcpm2_tts_backend();
+    if (name == "voxcpm2-vae" || name == "voxcpm2_vae" || name == "voxcpm2-upscaler")
+        return crispasr_make_voxcpm2_vae_backend();
     if (name == "cosyvoice3" || name == "cosyvoice3-tts" || name == "cosyvoice3_tts" || name == "cv3" ||
         name == "cv3-tts")
         return crispasr_make_cosyvoice3_tts_backend();
@@ -324,6 +327,7 @@ std::vector<std::string> crispasr_list_backends() {
         "piper",
         "outetts",
         "voxcpm2-tts",
+        "voxcpm2-vae",
         "cosyvoice3-tts",
         "m2m100",
         "m2m100-wmt21",
@@ -651,6 +655,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "kokoro";
     if (contains_ci("styletts") && contains_ci("ljspeech"))
         return "kokoro";
+    if (contains_ci("voxcpm2-vae") || contains_ci("voxcpm2_vae"))
+        return "voxcpm2-vae";
     if (contains_ci("voxcpm2") || contains_ci("voxcpm"))
         return "voxcpm2-tts";
     if (contains_ci("cosyvoice3") || contains_ci("cosyvoice-3") || contains_ci("cv3"))
@@ -772,6 +778,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "orpheus";
             else if (a == "kokoro" || a == "styletts2" || a == "styletts2-ljspeech")
                 result = "kokoro";
+            else if (a == "voxcpm2-vae" || a == "voxcpm2_vae")
+                result = "voxcpm2-vae";
             else if (a == "voxcpm2" || a == "voxcpm2_tts" || a == "voxcpm2-tts")
                 result = "voxcpm2-tts";
             else if (a == "cosyvoice3" || a == "cosyvoice3-tts" || a == "cosyvoice3_tts" || a == "cosyvoice3-llm")

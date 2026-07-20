@@ -622,7 +622,8 @@ CRISPASR_API float* crispasr_session_synthesize_raw(struct crispasr_session* s, 
 CRISPASR_API void crispasr_pcm_free(float* pcm);
 
 // Speech-to-Speech — audio in → audio out via a single model pass.
-// Supported on backends with S2S capability (lfm2-audio, mini-omni2, sidon).
+// Supported on backends with S2S capability (lfm2-audio, mini-omni2, sidon,
+// voxcpm2-vae).
 // Returns malloc'd float32 PCM; caller frees with crispasr_pcm_free().
 // out_text (optional): if non-null, receives the intermediate transcript
 // (malloc'd, caller frees with free()). Returns nullptr on failure or

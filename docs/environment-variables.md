@@ -1004,6 +1004,8 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
 - `CRISPASR_VOXCPM2_INFERENCE_STEPS`
 - `CRISPASR_VOXCPM2_MAX_LEN`
 - `CRISPASR_VOXCPM2_USE_REF`
+- `CRISPASR_VOXCPM2_VAE_MAX_SAMPLES` - maximum 16 kHz input samples accepted by one `voxcpm2-vae` upscaling call
+  (default `960000`, or 60 seconds). Split longer audio, or raise this only when enough RAM/VRAM is available.
 
 ### Voxtral / Voxtral-TTS
 
