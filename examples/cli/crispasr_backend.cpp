@@ -48,6 +48,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_htdemucs_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_mel_band_roformer_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_crepe_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_btc_chords_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_tabcnn_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_rvc_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_beat_this_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_ark_asr_backend();
@@ -219,6 +220,8 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
     if (name == "btc-chords" || name == "btc" || name == "chords" || name == "btc-chords-large" ||
         name == "btc-chords-majmin")
         return crispasr_make_btc_chords_backend();
+    if (name == "tabcnn" || name == "tab" || name == "tablature")
+        return crispasr_make_tabcnn_backend();
     if (name == "rvc-svc" || name == "rvc" || name == "svc")
         return crispasr_make_rvc_backend();
     if (name == "beat-this" || name == "beatthis" || name == "beat_this" || name == "beats")
@@ -380,6 +383,7 @@ std::vector<std::string> crispasr_list_backends() {
         "mel-band-roformer",
         "crepe",
         "btc-chords",
+        "tabcnn",
         "rvc-svc",
         "beat-this",
     };
@@ -418,6 +422,7 @@ static constexpr feature_col kFeatures[] = {
     {"pitch", CAP_PITCH},
     {"chords", CAP_CHORDS},
     {"beats", CAP_BEATS},
+    {"tab", CAP_TAB},
     {"piano", CAP_PIANO},
 };
 
@@ -499,6 +504,7 @@ static constexpr cap_slug kCapSlugs[] = {
     {"pitch", CAP_PITCH},
     {"chords", CAP_CHORDS},
     {"beats", CAP_BEATS},
+    {"tab", CAP_TAB},
     {"piano", CAP_PIANO},
 };
 
@@ -580,6 +586,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "crepe";
     if (contains_ci("btc"))
         return "btc-chords";
+    if (contains_ci("tabcnn"))
+        return "tabcnn";
     if (contains_ci("beat-this") || contains_ci("beat_this") || contains_ci("beatthis"))
         return "beat-this";
     if (contains_ci("voxtral") && contains_ci("tts"))
@@ -854,6 +862,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "crepe";
             else if (a == "btc")
                 result = "btc-chords";
+            else if (a == "tabcnn")
+                result = "tabcnn";
             else if (a == "rvc")
                 result = "rvc-svc";
             else if (a == "beat-this")

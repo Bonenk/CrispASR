@@ -147,6 +147,14 @@ struct whisper_params {
     bool beats = false;
     std::string beats_format; // "text" (default) or "json"
 
+    // Guitar tablature. --tab routes to the tab dispatcher (crispasr_tab_cli)
+    // BEFORE any transcribe backend is built, for the same reason as --chords:
+    // the output is a per-frame per-string grid of fret SCORES, not text
+    // segments. The CLI display argmaxes it; real consumers take the
+    // log-probabilities through the C ABI and run their own constrained decoder.
+    bool tab = false;
+    std::string tab_format; // "text" (default) or "json"
+
     bool pitch = false;
     std::string pitch_format;   // "text" (default) or "json"
     float pitch_hop_ms = 10.0f; // CREPE reference hop

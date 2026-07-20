@@ -91,6 +91,8 @@ add_executable(${TARGET}
     crispasr_separate_cli.cpp
     crispasr_beats_cli.cpp
     crispasr_chords_cli.cpp
+    crispasr_tab_cli.cpp
+    crispasr_backend_tabcnn.cpp
     crispasr_pitch_cli.cpp
     crispasr_lid_cli.cpp
     crispasr_diarize_cli.cpp

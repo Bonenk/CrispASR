@@ -316,6 +316,10 @@
 #include "btc_chords.h"
 #define CA_HAVE_BTC_CHORDS 1
 #endif
+#if __has_include("tabcnn.h")
+#include "tabcnn.h"
+#define CA_HAVE_TABCNN 1
+#endif
 #if __has_include("beat_this.h")
 #include "beat_this.h"
 #define CA_HAVE_BEAT_THIS 1
@@ -1897,6 +1901,13 @@ struct crispasr_session {
     rvc_svc_context* rvc_ctx = nullptr;
     rvc_svc_result* rvc_last = nullptr;
 #endif
+#ifdef CA_HAVE_TABCNN
+    // Emission scores from the last crispasr_session_tab() call, kept alive so
+    // the flat view below stays valid until the next call or session close.
+    tabcnn_context* tabcnn_ctx = nullptr;
+    std::vector<float> tabcnn_last_logp;
+    int tabcnn_last_frames = 0;
+#endif
 #ifdef CA_HAVE_BTC_CHORDS
     btc_chords_context* btc_ctx = nullptr;
     // Flat {start_ms, end_ms, label, confidence} per span. Built once per
@@ -2859,6 +2870,16 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.use_gpu = g_open_use_gpu_tls;
         s->rvc_ctx = rvc_svc_init_from_file(model_path, p);
         if (!s->rvc_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_TABCNN
+    if (s->backend == "tabcnn" || s->backend == "tab" || s->backend == "tablature") {
+        s->tabcnn_ctx = tabcnn_init(model_path, s->n_threads);
+        if (!s->tabcnn_ctx) {
             delete s;
             return nullptr;
         }
@@ -4025,6 +4046,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_BTC_CHORDS
     list += ",btc-chords";
+#endif
+#ifdef CA_HAVE_TABCNN
+    list += ",tabcnn";
 #endif
 #ifdef CA_HAVE_RVC_SVC
     list += ",rvc-svc";
@@ -9070,6 +9094,115 @@ CA_EXPORT int crispasr_session_convert_sample_rate(crispasr_session* s) {
 // separate name lookup because the labels are strings.
 // ---------------------------------------------------------------------------
 
+// --- Guitar tablature (--tab) -------------------------------------------
+//
+// Task-shaped surface per docs/contributing.md §7: a run call returning a
+// count, an n_* accessor, and a FLAT all-float view for the bulk read. Flat and
+// all-float on purpose — a mixed int/float struct read through a float view
+// misreads the int lanes in every binding.
+//
+// ⚠️ What crosses this boundary is EMISSION SCORES, not a decided tablature.
+// The grid is [frame][string][class] log-probabilities; the constrained
+// Viterbi/DP that picks a playable fingering (one note per string, fret range,
+// capo, hand span) is the caller's. Do not argmax this and call it a tab.
+CA_EXPORT int crispasr_session_tab(crispasr_session* s, const float* pcm, int n_samples, int sample_rate) {
+    if (!s || !pcm || n_samples <= 0 || sample_rate <= 0)
+        return -1;
+#ifdef CA_HAVE_TABCNN
+    if (s->tabcnn_ctx) {
+        s->tabcnn_last_logp.clear();
+        s->tabcnn_last_frames = 0;
+        const int n = tabcnn_n_frames(s->tabcnn_ctx, n_samples, sample_rate);
+        if (n <= 0)
+            return -1;
+        s->tabcnn_last_logp.resize((size_t)n * TABCNN_NUM_STRINGS * TABCNN_NUM_CLASSES);
+        const int got = tabcnn_compute(s->tabcnn_ctx, pcm, n_samples, sample_rate, s->tabcnn_last_logp.data(), n);
+        if (got <= 0) {
+            s->tabcnn_last_logp.clear();
+            return -1;
+        }
+        s->tabcnn_last_logp.resize((size_t)got * TABCNN_NUM_STRINGS * TABCNN_NUM_CLASSES);
+        s->tabcnn_last_frames = got;
+        return got;
+    }
+#endif
+    (void)sample_rate;
+    return -1;
+}
+
+CA_EXPORT int crispasr_session_tab_n_frames(crispasr_session* s) {
+    if (!s)
+        return 0;
+#ifdef CA_HAVE_TABCNN
+    return s->tabcnn_last_frames;
+#else
+    return 0;
+#endif
+}
+
+// Flat view: [frame][string][class] log-probabilities, frame-major. Valid until
+// the next crispasr_session_tab call or session close.
+CA_EXPORT const float* crispasr_session_tab_emissions(crispasr_session* s, int* out_n_frames, int* out_n_strings,
+                                                      int* out_n_classes) {
+    if (out_n_frames)
+        *out_n_frames = 0;
+    if (out_n_strings)
+        *out_n_strings = 0;
+    if (out_n_classes)
+        *out_n_classes = 0;
+    if (!s)
+        return nullptr;
+#ifdef CA_HAVE_TABCNN
+    if (s->tabcnn_last_frames > 0 && !s->tabcnn_last_logp.empty()) {
+        if (out_n_frames)
+            *out_n_frames = s->tabcnn_last_frames;
+        if (out_n_strings)
+            *out_n_strings = TABCNN_NUM_STRINGS;
+        if (out_n_classes)
+            *out_n_classes = TABCNN_NUM_CLASSES;
+        return s->tabcnn_last_logp.data();
+    }
+#endif
+    return nullptr;
+}
+
+// The class index meaning "string not played". A decoder that guesses this
+// wrong emits confidently wrong tablature with no error anywhere.
+CA_EXPORT int crispasr_session_tab_silent_class(crispasr_session* s) {
+    if (!s)
+        return -1;
+#ifdef CA_HAVE_TABCNN
+    if (s->tabcnn_ctx)
+        return tabcnn_silent_class(s->tabcnn_ctx);
+#endif
+    return -1;
+}
+
+// Seconds per frame, so a caller can place emissions on its own timeline.
+CA_EXPORT float crispasr_session_tab_frame_period(crispasr_session* s) {
+    if (!s)
+        return 0.0f;
+#ifdef CA_HAVE_TABCNN
+    if (s->tabcnn_ctx)
+        return tabcnn_frame_period(s->tabcnn_ctx);
+#endif
+    return 0.0f;
+}
+
+// Open-string MIDI pitch per string (0 = lowest), or -1. A capo/transpose-aware
+// decoder needs these rather than hardcoding standard tuning.
+CA_EXPORT int crispasr_session_tab_string_open_midi(crispasr_session* s, int string) {
+    if (!s)
+        return -1;
+#ifdef CA_HAVE_TABCNN
+    if (s->tabcnn_ctx)
+        return tabcnn_string_open_midi(s->tabcnn_ctx, string);
+#else
+    (void)string;
+#endif
+    return -1;
+}
+
 CA_EXPORT int crispasr_session_chords(crispasr_session* s, const float* pcm, int n_samples, int sample_rate) {
     if (!s || !pcm || n_samples <= 0 || sample_rate <= 0)
         return -1;
@@ -9453,6 +9586,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_BTC_CHORDS
     if (s->btc_ctx)
         btc_chords_free(s->btc_ctx);
+#endif
+#ifdef CA_HAVE_TABCNN
+    if (s->tabcnn_ctx)
+        tabcnn_free(s->tabcnn_ctx);
 #endif
 #ifdef CA_HAVE_BEAT_THIS
     if (s->beat_ctx)
