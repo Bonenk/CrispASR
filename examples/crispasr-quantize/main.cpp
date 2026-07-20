@@ -255,6 +255,7 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
     // (K*IC, OC) the way `pw_conv3d` does below, which also needs src/crepe.cpp
     // to stop deriving the im2col geometry from the kernel's own shape.
     const bool is_crepe = (arch == "crepe");
+    const bool is_tabcnn = (arch == "tabcnn");
 
     // BTC chords: a 12 MB model whose weight matrices are all 128x128 or
     // 128x256 — small enough that quantisation buys little, and the FFN convs
@@ -698,6 +699,21 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             // dense classifier matrix. conv*.bias / conv*_BN.scale / .offset /
             // classifier.bias stay F32 (per-channel affines; see is_crepe note).
             !(is_crepe && !(crepe_conv3d || sname == "classifier.weight")) &&
+            // TabCNN: keep head.weight (the 128->126 output layer) at source
+            // precision. Only TWO tensors are quantizable here at all -- the conv
+            // stack is 3x3 so ne0=3, far below any block size -- and head.weight
+            // is 16 k of 834 k params, so preserving it costs ~1.6 % of the file.
+            // Measured on EGSet12 track 01 against JAMS ground truth with BOTH
+            // quantized: f16 F1 0.7732 (100 % argmax agreement, free),
+            // q8_0 0.7676 (-0.0057), q4_0 0.7153 (-0.0579). The output layer
+            // directly determines the 21-way per-string softmax, so it is the
+            // wrong place to spend precision.
+            //
+            // NOTE k-quants are IMPOSSIBLE for this model: no tensor has
+            // ne0 % 256 == 0 (dense0.weight is 5952; 5952 % 256 == 64), so
+            // `--q4_k` silently falls back to Q4_0. That fallback is why the q4
+            // row costs so much -- it is Q4_0, not a k-quant.
+            !(is_tabcnn && sname == "head.weight") &&
             !(is_granite_family && !granite_quant_all && sname.find("enc.") == 0) &&
             // MOSS-Audio: keep encoder + adapter + deepstack at F16
             !(arch == "moss_audio" &&
