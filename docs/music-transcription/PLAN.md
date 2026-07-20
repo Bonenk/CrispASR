@@ -22,7 +22,12 @@ ggml/GGUF backends.
   `crispasr_backend.cpp`, the session C ABI (`crispasr_session_pitch*` in
   `src/crispasr_c_api.cpp` + `include/crispasr_session.h`), registry entries for
   `cstr/crepe-GGUF` (**tiny is the default**), CMake linkage, README + docs/cli.md.
-- **In flight**: nothing.
+- **In flight**: 🚧 **BTC chord recognition** (branch `feat/cqt-and-chords`) —
+  unblocked now that `core/cqt.h` (ba633914e) and the licence-acceptance gate
+  (90d1a0c9e) have both landed. Files: `models/convert-btc-to-gguf.py`,
+  `src/btc_chords.{h,cpp}`, `tools/btc_torch_parity.py`,
+  `tests/test_btc_parity.cpp`. Weights are CC-BY-NC-SA (Isophonics-trained) and
+  ship behind `--accept-license cc-by-nc-sa-4.0`.
 - **Next**: upload `cstr/crepe-GGUF` (the registry URLs point at it but the repo
   is not published yet); quantize (q8_0/q4_k) and re-measure; then the Dart FFI +
   WASM surfaces. `core/stft.h` extraction is independent (CREPE needs no STFT).
