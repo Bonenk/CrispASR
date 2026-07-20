@@ -886,10 +886,39 @@ silently mis-folding.
   | `transformer` | (1, 101, 512) |
   | `out_beat`, `out_downbeat` | (1, 101) each |
 
-- [ ] `src/beat_this.{h,cpp}` — the ggml graph itself. Reusable:
-  `core/attention.h` (QKV + RoPE), `core/ffn.h`. The per-head attention gating
-  and the `norm_output` RMSNorm need writing by hand — see the two
-  silent-failure subtleties above.
+- [x] **Stem DONE** — `beat_this_debug_stem`, **cos = 0.99999982** vs torch
+  (max_abs 2.5e-3, |mine| 210.3733 vs |ref| 210.3613). Validates the layout
+  mapping, the folded BN, the exact-erf GELU and the conv stride/pad convention
+  in one shot. Compare with `tools/cmp_beat_this_stages.py`, which prints
+  |mine| AND |ref| — a magnitude outlier says "same name, wrong data" instantly
+  where cosine alone reads as plausible drift.
+
+- [ ] **NEXT: `PartialFTTransformer`** (3x, one per frontend block). Forward,
+  traced from source and confirmed against sub-block references:
+
+  ```
+  x (b, c, f, t)
+    -> rearrange "b c f t -> (b t) f c"     # FREQUENCY is the sequence axis
+    x = x + attnF(x);  x = x + ffF(x)
+    -> rearrange "(b t) f c -> (b f) t c"   # TIME is the sequence axis
+    x = x + attnT(x);  x = x + ffT(x)
+    -> rearrange "(b f) t c -> b c f t"
+  ```
+
+  Confirmed sub-block shapes for a 101-frame input, block 0 (dim 32):
+  `attnF`/`ffF` = (101, 32, 32) — 101 sequences of length 32;
+  `attnT`/`ffT` = (32, 101, 32) — 32 sequences of length 101.
+  Batch is FOLDED into the sequence count, so ggml batches along ne[2].
+  ⚠️ The reference hooks capture the sub-block OUTPUT, i.e. the residual BRANCH
+  before `x + branch` — not the post-residual activation. Compare like for like.
+
+  Per sub-block: RMSNorm -> to_qkv(no bias) -> RoPE(q,k) -> attend
+  -> `* sigmoid(to_gates(x))` PER HEAD -> to_out(no bias). Reusable:
+  `core/attention.h` (QKV + RoPE), `core/ffn.h`; the per-head gating and the
+  `norm_output` RMSNorm need writing by hand.
+
+- [ ] Then: `frontend.linear` (1024->512), 6 roformer layers, SumHead.
+- [ ] Then: 1500-frame windowing (border 6, keep_first) + peak-picking.
 - [ ] Front end: 22050 Hz mono, **arithmetic-mean downmix**, STFT n_fft 1024 /
   hop 441 / periodic Hann / `normalized='frame_length'`, project onto the baked
   filterbank, `log1p(1000*x)`. 50 fps.
