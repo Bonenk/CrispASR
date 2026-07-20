@@ -67,6 +67,12 @@ int beat_this_logmel(struct beat_this_context* ctx, const float* pcm_22k, int n_
 // Frames the front end will produce for `n_samples` (center=true: 1 + n/hop).
 int beat_this_n_frames(int n_samples);
 
+// Debug/parity: stem forward only. Writes T*32*32 floats as ne (t, f, c)
+// — the reverse of the reference's torch (b, c, f, t). Returns the element
+// count. Used by tests/test_beat_this_stages.cpp against
+// tools/reference_backends/beat_this.py.
+int beat_this_debug_stem(struct beat_this_context* ctx, const float* logmel, int T, float* out);
+
 // Full pipeline: audio -> events. Returns the event count, or 0/-1 on error.
 int beat_this_track(struct beat_this_context* ctx, const float* pcm_22k, int n_samples, struct beat_this_event* out,
                     int max_events);

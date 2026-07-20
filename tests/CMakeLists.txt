@@ -2787,6 +2787,11 @@ catch_discover_tests(test-core-wordpiece
     PROPERTIES LABELS "unit;wordpiece"
 )
 
+# ─── test-beat-this-stages — per-stage graph parity vs the torch reference ────
+add_executable(test-beat-this-stages test_beat_this_stages.cpp)
+target_include_directories(test-beat-this-stages PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-beat-this-stages PRIVATE beat-this crispasr-core ggml ggml-base ggml-cpu)
+
 # ─── test-beat-this-frontend — log-mel vs torchaudio ──────────────────────────
 # Needs a model + fixtures, so not a ctest case; it is the acceptance gate for
 # the front end. Generate fixtures with tools/gen_beat_this_frontend_ref.py.
