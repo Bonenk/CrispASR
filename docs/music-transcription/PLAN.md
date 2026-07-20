@@ -593,3 +593,67 @@ implementations diff-checkable against each other.
 Everything above is CPU/Metal-verifiable locally. The **Kaggle/CUDA run should
 wait until this roster is complete**, so one clean CUDA session covers every
 backend at once rather than being repeated per port.
+
+---
+
+## CometBeat Q&A — answers as of 2026-07-20 (§251)
+
+Four asks came back from the CometBeat agent. Answers, with the facts checked
+against `origin/main` rather than assumed:
+
+**1. `separate()` Dart binding — DONE, stop shelling out to the CLI.**
+Landed on main (`05ee77b17`). `CrispasrSession.separate(Float32List pcmStereo)
+-> List<Stem>` where `Stem = ({String name, Float32List pcm})`, plus a
+`separateSampleRate` probe. Verified end-to-end through the real FFI against
+`cstr/htdemucs-GGUF` q4_k: 4 stems (drums/bass/other/vocals), interleaved
+lengths exactly matching the input, ~4 s for 2 s of audio.
+⚠️ Two contract points: input is **interleaved** stereo (`L,R,L,R…`) at 44100 Hz,
+and the native side counts samples **per channel** — an odd-length buffer now
+throws `ArgumentError` rather than being misread. To chain into `pitch()`,
+downmix to mono and resample 44100→16000 first; the dartdoc carries the recipe.
+**Not on pub.dev yet — it needs an 0.8.17 release.**
+
+**2. Piano — bindable TODAY, but through `transcribe()`, not a note-event API.**
+`piano-transcription` is session-openable now (`crispasr_session_open(path,
+backend: "piano-transcription")`; it is in the C ABI backend list). There is
+**no dedicated note-event C ABI**. The CLI adapter converts each detected note
+into one `crispasr_segment`: `t0`/`t1` are onset/offset, and `text` is the note
+name plus velocity (e.g. `"C4 v=80"`), with `CAP_TIMESTAMPS_NATIVE`.
+So `loadCrispasrPiano` can be un-stubbed immediately by opening that backend and
+parsing segments — but string-parsing `"C4 v=80"` back into a `NoteEvent` is
+lossy and ugly. **A proper `crispasr_session_piano_notes*` C ABI returning
+`{midi, onMs, offMs, velocity}` is the right fix and is now a §251 item.** Say if
+you want it prioritised — it is small, and it is the difference between a hack
+and a real seam.
+
+**3. The dylib — correcting an assumption: the pub package does NOT ship or
+download one.** `crispasr` is a pure Dart FFI package; it opens whatever native
+library the host app provides. `CrispasrSession.open` probes, in order:
+`libcrispasr.dylib`, `crispasr.framework/crispasr`, `libwhisper.dylib`,
+`whisper.framework/whisper` on macOS/iOS (`libcrispasr.so` on Linux/Android), or
+you pass `libPath:` explicitly. **Canonical filename: `libcrispasr.dylib`.**
+Your cached 0.8.10 has no `crispasr_session_pitch`, which is exactly why your
+fallback fires — correct behaviour. You need a dylib built from **0.8.16+** for
+pitch + the `crepe` registry entry, and **0.8.17+ for `separate()`**. Build it
+from the repo (`cmake --build build --target crispasr`) and bundle
+`build/src/libcrispasr.dylib`. Your `tiny-q8_0` (~0.50 MB) choice is right —
+q4_k moves the argmax pitch bin on ~1 frame in 7 at tiny.
+
+**4. BTC licensing — your read is correct.** Keep your MIT ONNX BTC plus the
+chroma-template fallback for the commercially-clean tier; do not ship our
+weights. Our port gates them behind an attestation precisely so the two can
+coexist. Cross-checking your `harmony_cqt.dart` against
+`tools/cqt_librosa_parity.py` is worthwhile even though yours is already
+librosa-validated — ours agrees with librosa at median 0.9999 per-frame shape
+correlation and 97.6% exact peak-bin, with disagreement confined to
+tone-transition frames (librosa's per-octave recursive downsampling gives each
+octave a different group delay; our direct kernels are centred uniformly). If
+your numbers differ materially at the transitions, that difference is expected
+and not a bug in either.
+
+### New §251 item from this exchange
+
+- [ ] **`crispasr_session_piano_notes*` C ABI** — return structured note events
+  (`{midi, onMs, offMs, velocity}`) instead of forcing consumers to parse
+  `"C4 v=80"` out of segment text. Then bind it in Dart mirroring `pitch()`.
+  Blocks CometBeat's `loadCrispasrPiano` from being a clean seam.
