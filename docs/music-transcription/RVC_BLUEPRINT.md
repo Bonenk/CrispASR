@@ -317,6 +317,42 @@ The converter asserts this, so a mismatched config fails loudly. Independently,
 a second, independent confirmation of the 100 Hz wire rate that
 SVC_RECORD_SHAPES derives from `pipeline.window = 160`.
 
+## 3c. ggml port — DONE for the graph, 47 stages at cos 1.00000000
+
+`crispasr-diff rvc <model.gguf> <ref.gguf> <any.wav>` compares enc_p (per
+sublayer + attention internals), all 4 flow coupling blocks, every dec upsample
+and noise-conv stage, and **output_audio at max_abs 1.5e-08**.
+
+ggml-specific findings, all of which cost a debug cycle:
+
+| issue | fix |
+|---|---|
+| A kernel-1 Conv1d is stored WITH the kernel axis: GGUF `(out,in,1)` → ggml `[1,in,out]` | reshape to `[in,out]` before `mul_mat`, else it contracts over 1 and aborts |
+| `_get_relative_embeddings` pads SYMMETRICALLY; `ggml_pad` only appends | front pad via `ggml_concat` of a zero block |
+| `ggml_conv_1d` wants `[length, channels]`; our layout is `[channels, time]` | transpose in/out, add bias AFTER transposing back |
+| **`ggml_conv_transpose_1d` ASSERTS `p0 == 0`** — no padding support | express torch's padding as a symmetric CROP: `core_convt::convt1d_crop` |
+| `core_hifigan::resblock_forward` is TIME-major | transpose around it rather than reimplementing the MRF block |
+| no flip op, no negative-stride views | channel Flip = transpose → `get_rows(reversed idx)` → transpose |
+| tap tensors unreachable from the output are never allocated | `ggml_build_forward_expand` over every capture AND every output |
+
+### The lesson that actually mattered
+
+**Two of the three "graph bugs" were HARNESS bugs.** Both `enc_p` and `flow`
+reported cos ≈ 0 on a *correct* graph because the comparison was wrong:
+
+- torch stores `(b, C, T)` with TIME fastest; our layout is `[C, T]` with
+  CHANNELS fastest — exact transposes. `encp_lrelu` passed only by accident,
+  because torch's lrelu runs while the tensor is still `(b, T, hidden)`.
+- `register_forward_hook` DOES NOT FIRE on the flow: the reverse pass calls
+  `flow.forward(...)` directly (`models.py:126`), bypassing `nn.Module.__call__`
+  where hooks dispatch. The harness then reported "0 FAILED" while comparing
+  NOTHING — the worst possible failure mode. Wrap the bound method instead.
+
+Both were found in one bisect step each once per-stage intermediates existed in
+a registered `crispasr-diff` branch. Before that, with only endpoints and an
+ad-hoc test binary, the same bug consumed a whole session and I concluded the
+graph was broken when it was not.
+
 ## 4. Proposed order of work
 
 Standard order, unchanged by the above:
