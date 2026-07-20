@@ -267,7 +267,51 @@ everything below follows it.
   `crispasr_session_pitch*`. Output is a `crepe_frame` series
   (`{time_ms, f0_hz, voiced_prob}`), laid out to match the CometBeat Dart
   `PitchFrame` record field-for-field so the FFI binding is a reinterpret
-  rather than a marshal. See `### crepe` below and
+  rather than a marshal. See `### tabcnn
+
+Guitar tablature **emission scorer** (`--tab`). TabCNN (Wiggins & Kim, ISMIR
+2019), 833,982 params — the smallest backend in the tree.
+
+- **Front end:** CQT via `core/cqt.h` — sr 22050, hop 512, 192 bins,
+  24/octave, **fmin C1 (32.70 Hz)** — then `amplitude_to_db(ref = max of the
+  whole clip)` → `[-80, 0]` → `/80 + 1` → `[0, 1]`, framed into 9-frame centred
+  context windows.
+- **Graph:** `Conv2d(1,32,3) ReLU → Conv2d(32,64,3) ReLU → Conv2d(64,64,3) ReLU
+  → MaxPool2d(2,2)` (192×9 → 93×1) → flatten 5952 → `Linear(5952,128) ReLU` →
+  `Linear(128,126)` → reshape `[6, 21]` → per-string softmax.
+- **Output:** `[T, 6, 21]` log-probabilities. **No decoder** — no inter-string
+  coupling, no temporal model, no search.
+
+**⚠️ `fmin` is C1, not the guitar's low E.** Assuming E2 is the obvious guess
+and it is wrong. Every wrong value still *runs*, producing plausible tensors
+that pass shape and cosine checks while the model emits garbage: measured on
+EGSet12 track 01, fmin C1 → tablature F1 **0.771**, E1 → 0.040, E2 at 44.1 kHz
+→ **0.001**. All front-end constants are stored as GGUF metadata and read back
+at load, so the runtime cannot drift from the reference dumper.
+
+**⚠️ Not a streaming surface.** `ref = max of the whole clip` is a per-clip
+normalisation, so features cannot be computed chunked without changing them —
+two-pass by construction. Chunking here would reproduce the BTC chunked-CQT bug.
+
+**Validation.** `crispasr-diff tabcnn` runs the full pipeline **from the
+waveform**, not replayed features: `model.frontend` is empty, the CQT lives
+outside the network, and a feature-replaying diff would never test it. All
+stages pass (`cqt_db` 0.9989 … `logits` 0.9997). End to end against EGSet12
+JAMS ground truth: tablature F1 **0.7732** vs the torch reference's 0.7708
+(Δ +0.0024, argmax agreement 98.57 %); the residual is the front end —
+direct Brown-kernel CQT against librosa's recursive downsampling.
+
+**Quantization.** Only two tensors are quantizable (`dense0.weight` 761 k and
+`head.weight` 16 k); the conv stack is 3×3 so `ne0=3`. K-quants are impossible
+— no tensor is 256-aligned, so `--q4_k` falls back to Q4_0.
+`crispasr-quantize` preserves `head.weight`: quantizing it costs 5.8 F1 points
+at Q4_0, while `dense0` costs nothing.
+
+Weights are CC BY 4.0 (<https://zenodo.org/records/11406378>), attribution
+required. See [docs/cli.md](cli.md#guitar-tablature---tab) and
+[music-transcription/GUITAR_TAB_SPEC.md](music-transcription/GUITAR_TAB_SPEC.md).
+
+### crepe` below and
   `docs/music-transcription/PLAN.md`.
 
 Both are steps in the same music-transcription chain (separate → F0 →

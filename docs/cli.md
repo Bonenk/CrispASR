@@ -1199,6 +1199,85 @@ the CLI the same fidelity. The old path still works.
 high-resolution piano transcription, 16 kHz mono, CRNN + BiGRU with four heads
 (frame/onset/offset/velocity) plus onset- and frame-refinement GRUs.
 
+## Guitar tablature (`--tab`)
+
+Per-frame, per-string fret **scores** from guitar audio, via **TabCNN**
+(Wiggins & Kim, ISMIR 2019). Backend key `tabcnn`; the architecture is
+auto-detected from the GGUF, so `-m <file>` alone is enough.
+
+```bash
+crispasr --tab -m tabcnn-f16.gguf -f guitar.wav
+crispasr --tab -m auto --auto-download -f guitar.wav      # fetches cstr/tabcnn-GGUF
+crispasr --tab -m tabcnn-f16.gguf -f guitar.wav --tab-format json
+```
+
+Text output is one line per frame, tab-separated: the frame time in seconds,
+then one column per string from low E to high E, with `-` for a string that is
+not played.
+
+```
+0.023   1   -   -   -   -   -
+0.046   1   -   -   -   -   -
+```
+
+`--tab-format json` adds the per-string log-probability of each displayed fret,
+plus `frame_period_sec`, `n_strings`, `n_classes` and `silent_class`.
+
+### ⚠️ These are emission scores, not a tablature
+
+The model has **no decoder**: six independent softmaxes per frame, no
+inter-string coupling, no temporal model, no search. The frets the CLI prints
+are a plain `argmax` — they exist so the CLI has something to show and they
+ignore every playability constraint (one note per string, fret range, capo, hand
+span). Because the strings are scored independently, the grid can contain
+physically impossible combinations.
+
+For real use, take the log-probabilities through the C ABI and run your own
+constrained Viterbi/DP:
+
+```c
+int n = crispasr_session_tab(s, pcm, n_samples, sample_rate);
+int frames, strings, classes;
+const float* emissions =
+    crispasr_session_tab_emissions(s, &frames, &strings, &classes);
+int silent = crispasr_session_tab_silent_class(s);   // read it, never assume
+float hop  = crispasr_session_tab_frame_period(s);
+int open0  = crispasr_session_tab_string_open_midi(s, 0);  // for capo/transpose
+```
+
+`emissions` is `[frame][string][class]` log-probabilities, frame-major, valid
+until the next call or session close.
+
+### Model and licence
+
+Weights are **CC BY 4.0** from the EGSet12 record
+(<https://zenodo.org/records/11406378>) — commercial use permitted,
+**attribution required**. This is the GuitarProFX-augmented variant; the
+baseline collapses from tablature F1 0.748 to 0.447 on real electric guitar,
+while the augmented one recovers to 0.585 (DAFx-24). Cite:
+
+> Pedroza HE, Abreu W, Corey R, Roman IR. "Leveraging real electric guitar tones
+> and effects to improve robustness in guitar tablature transcription modeling."
+> DAFx, 2024.
+
+| variant | size | tablature F1 |
+|---|---|---|
+| `tabcnn-f16.gguf` | 1.78 MB | 0.7732 (default) |
+| `tabcnn-q8_0.gguf` | 1.10 MB | 0.7749 |
+| `tabcnn-q4_k.gguf` | 0.72 MB | 0.7749 |
+
+Quantization preserves `head.weight` at full precision — quantizing the output
+layer costs 5.8 F1 points at Q4_0, while `dense0` costs nothing.
+
+### Limitations
+
+- Solo guitar; mixed music is out of domain.
+- Not a streaming surface. The CQT is normalised against the **whole clip's**
+  maximum (`amplitude_to_db(ref=np.max)`), so features cannot be computed
+  chunked without changing them — `--tab` is two-pass by construction.
+- GuitarSet-reported numbers overstate real-world accuracy; EGSet12 is the
+  honest reference point.
+
 ## Chord recognition (`--chords`)
 
 Another standalone task: audio in, a chord timeline out. Like `--pitch` and

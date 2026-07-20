@@ -82,6 +82,7 @@ archived at `cstr/chatterbox-GGUF/diff-harness-ref/`.
 | `tada-tts` | `tools/reference_backends/tada_tts.py` | — | — | **no** | torch, torchaudio, transformers |
 | `titanet` | `tools/reference_backends/titanet.py` | — | — | **no** | nemo, torch |
 | `vibevoice` | `tools/reference_backends/vibevoice.py` | — | — | **no** | librosa, safetensors, torch |
+| `tabcnn` | `tools/reference_backends/tabcnn.py` | — | — | yes | amt-tools, librosa, torch |
 | `voxcpm2-tts` | `tools/reference_backends/voxcpm2_tts.py` | — | — | yes | torch, voxcpm |
 | `voxcpm2-vae` | `tools/reference_backends/voxcpm2_vae.py` | — | — | **dumper only — see note** | torch, voxcpm |
 | `voxtral` | `tools/reference_backends/voxtral.py` | — | — | yes | torch, transformers |
@@ -142,6 +143,7 @@ code starts working.
 - `qwen3-tts-codec` — `tools/bootstrap_ref_env.sh qwen3-tts-codec` then `python tools/dump_reference.py --backend qwen3-tts-codec --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/qwen3-tts-codec-ref.gguf`
 - `qwen3-tts-spk` — `tools/bootstrap_ref_env.sh qwen3-tts-spk` then `python tools/dump_reference.py --backend qwen3-tts-spk --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/qwen3-tts-spk-ref.gguf`
 - `sensevoice` — `tools/bootstrap_ref_env.sh sensevoice` then `python tools/dump_reference.py --backend sensevoice --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/sensevoice-ref.gguf`
+- `tabcnn` — `pip install amt-tools librosa` then `python tools/dump_reference.py --backend tabcnn --model-dir <best_TabCNN_tablature_trancription_model> --audio <guitar.wav> --output /Volumes/backups/ai/tabcnn-ref.gguf`, then `build/bin/crispasr-diff tabcnn tabcnn-f32.gguf /Volumes/backups/ai/tabcnn-ref.gguf <guitar.wav>`. The archive stores the raw `audio`, and the diff runs the FULL pipeline from the waveform rather than replaying features — `model.frontend` is empty, so the CQT lives outside the network and a feature-replaying diff would never test it (the BTC blind spot). ⚠️ `cqt_db` is stored TRANSPOSED to `[T, n_bins]` to match `core/cqt.h`; librosa's native `[n_bins, T]` compared flat reads cos 0.66 with the norms matching, which is the transpose signature.
 - `voxcpm2-tts` — `tools/bootstrap_ref_env.sh voxcpm2-tts` then `python tools/dump_reference.py --backend voxcpm2-tts --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/voxcpm2-tts-ref.gguf`
 - `voxcpm2-vae` — ⚠️ **dumper only, no C++ consumer.** `tools/reference_backends/voxcpm2_vae.py` is registered in
   `dump_reference.py` and produces `input_16k` / `vae_latent_patches` / `output_48k`, but
