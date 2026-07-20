@@ -320,10 +320,22 @@ def main():
     if not go_ok and not is_macos:
         print("   run: python tools/sync_go_cgo_ldflags.py   (see docs/contributing.md)")
 
-    fail = bool(required_fail) or bool(capi_only) or bool(lib_fail) or (not go_ok and not is_macos)
+    # Name the ACTUAL cause. This used to print "FAIL (required gap)" for all
+    # four conditions, so a run whose only problem was Go LDFLAGS drift reported
+    # a required *wiring* gap two lines below "✅ REQUIRED wiring: ..." — the
+    # reader then hunts through the advisory list for a gap that isn't there.
+    causes = []
+    if required_fail:
+        causes.append("required wiring gap")
+    if capi_only:
+        causes.append("c_api-only backend")
+    if lib_fail:
+        causes.append("missing symbol in shipped library")
+    if not go_ok and not is_macos:
+        causes.append("Go cgo LDFLAGS drift")
     print()
-    print("RESULT:", "FAIL (required gap)" if fail else "PASS")
-    return 1 if fail else 0
+    print("RESULT:", f"FAIL ({'; '.join(causes)})" if causes else "PASS")
+    return 1 if causes else 0
 
 
 if __name__ == "__main__":
