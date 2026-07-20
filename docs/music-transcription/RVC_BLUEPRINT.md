@@ -191,6 +191,23 @@ details it had to get right, each a silent accuracy bug if assumed:
 The relative-VALUE path (`_abs_to_rel`) is the easiest of these to omit
 entirely — attention still "works" without it and merely gets worse.
 
+## 2c. flow traps — VALIDATED (cos 1.00000000)
+
+The reverse pass also matches torch exactly. Five details:
+
+- **`mean_only=True`** (models.py), so `logs` is ZERO and the coupling is purely
+  ADDITIVE. The reverse is `x1 = x1 - m`, **not** `(x1 - m) * exp(-logs)` — the
+  general VITS formula would be wrong here.
+- `flows` interleaves `[Coupling, Flip] x 4`; the reverse walks the whole list
+  backwards, so **Flip comes first**.
+- Flip reverses the **channel** axis.
+- The WaveNet is **gated**: `tanh(first half) * sigmoid(second half)` of
+  `(x_in + g_l)`, with the speaker conditioning projected once and then sliced
+  per layer.
+- `ResidualCouplingBlock(inter, hidden, 5, 1, 3, ...)` — kernel 5, dilation
+  rate 1, 3 layers are **hardcoded in models.py:624**, not config-derived, so
+  they hold for every checkpoint.
+
 ## 3. Numerical hazards spotted in the trace
 
 - **Phase accumulation by `cumsum`** (SineGen): phase is accumulated over the
