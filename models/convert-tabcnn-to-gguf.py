@@ -28,7 +28,7 @@ Usage:
 
 Geometry (read from the loaded object, see tools/reference_backends/tabcnn.py):
 
-    front end   librosa.vqt(sr=44100, hop=512, fmin=E2, n_bins=192,
+    front end   librosa.vqt(sr=22050, hop=512, fmin=C1, n_bins=192,
                             bins_per_octave=24, gamma=0) -> abs
                 -> amplitude_to_db(ref=np.max)   -> [-80, 0]
                 -> /80 + 1                       -> [0, 1]
@@ -53,15 +53,17 @@ from pathlib import Path
 import numpy as np
 
 # Front-end constants. These are NOT free parameters — they are read from
-# amt_tools (GuitarSet.py: sample_rate=44100, hop_length=512) and from the
-# checkpoint (dim_in=192, frame_width=9, GuitarProfile). 192 bins at 24 per
-# octave from E2 reaches 21096 Hz, which fits under Nyquist only at 44.1 kHz.
-SAMPLE_RATE = 44100
+# the DAFx-24 paper ("resampled to the 22050Hz sampling rate expected by
+# TabCNN") and the checkpoint (dim_in=192, frame_width=9, GuitarProfile).
+# fmin is C1, not the guitar's low E: from C1 the 192nd bin sits at 8372 Hz and
+# fits under the 11025 Hz Nyquist. Verified end-to-end -- see the converter's
+# module docstring and tools/reference_backends/tabcnn.py.
+SAMPLE_RATE = 22050
 HOP_LENGTH = 512
 N_BINS = 192
 BINS_PER_OCTAVE = 24
 FRAME_WIDTH = 9
-FMIN_NOTE = "E2"
+FMIN_NOTE = "C1"
 DB_FLOOR = 80.0  # librosa amplitude_to_db top_db, and the /80 rescale divisor
 
 # name in the torch state_dict -> name in the GGUF

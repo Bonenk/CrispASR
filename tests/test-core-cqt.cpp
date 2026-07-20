@@ -425,8 +425,8 @@ TEST_CASE("cqt: output is finite for a full-scale and a DC signal", "[core][cqt]
 // is exactly the case that comment says is the known gap.
 core_cqt::Params tabcnn_params() {
     core_cqt::Params p;
-    p.sample_rate = 44100;
-    p.fmin = 82.4068892282175f; // E2, the guitar's lowest open string
+    p.sample_rate = 22050;
+    p.fmin = 32.703195662574829f; // C1 -- NOT the guitar low E; see below
     p.n_bins = 192;
     p.bins_per_octave = 24;
     p.hop_length = 512;
