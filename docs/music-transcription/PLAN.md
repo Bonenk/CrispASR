@@ -686,7 +686,8 @@ and not a bug in either.
 
 ### New §251 item from this exchange
 
-- [ ] **`crispasr_session_piano_notes*` C ABI** — return structured note events
+- [x] **`crispasr_session_piano_notes*` C ABI** — SHIPPED (`include/crispasr_session.h:440`,
+  Dart `pianoNotes()`). Return structured note events
   (`{midi, onMs, offMs, velocity}`) instead of forcing consumers to parse
   `"C4 v=80"` out of segment text. Then bind it in Dart mirroring `pitch()`.
   Blocks CometBeat's `loadCrispasrPiano` from being a clean seam.

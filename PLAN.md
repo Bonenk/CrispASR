@@ -117,6 +117,32 @@ chunk_seconds=4` → 4 slices returned; feeding them back via `vad_import` →
 identical transcript + same 4 segments; malformed → `invalid_request_error`; no
 flag → no field. Documented in `docs/server.md`.
 
+## Backend-wiring audit — remaining blind spot (OPEN, SMALL)
+
+`tools/check-backend-wiring.py` now checks two directions: every CLI backend
+has its c_api/factory/matrix wiring, and every backend the c_api ADVERTISES is
+reachable from the CLI. A backend in **neither** list is still invisible to
+both — which is exactly how mel-band-roformer stayed session-unreachable while
+being the default `--separate` model (fixed in 4eccc60cb).
+
+Two candidate signals were measured and BOTH are too noisy to gate on as-is:
+
+- registry keys not matching a backend name: **103 of 196** — most are
+  legitimate model variants (`crepe-tiny`, `btc-chords-majmin`, the
+  fastconformer-aligner language set, component GGUFs).
+- `src/*.h` declaring `<x>_init_from_file` with no matching backend name:
+  **21 of 76** — most are components, not backends (`miocodec`,
+  `snac_decoder`, `tada_codec`, `wavtok_decoder`, `mimo_tokenizer`,
+  `chatterbox_s3gen`, `lid_*`, `ma_sound`), and the naive match also misses
+  aliases (`fastpitch_tts` -> `fastpitch`, `irodori_tts` -> `irodori-tts`).
+
+**Do not ship either as a required check** — a gate with 21 false positives
+trains everyone to ignore the audit, which is worse than no gate. The workable
+version needs the empirical `cli_resolves()` probe (already in the script)
+plus an explicit component allowlist in the repo, so "this is a sub-module,
+not a backend" is a recorded decision rather than a silent omission. Estimated
+small; the allowlist is the actual work.
+
 ## CometBeat handoff — singing-voice-conversion vocoders (OPEN, NOT STARTED)
 
 Requested by the CometBeat `opus` (voice-svc) agent via its `docs/PLAN.md`
@@ -2436,18 +2462,23 @@ and Mel-Band RoFormer separation, piano_transcription (§250).
   with NO recurrent layer* (the paper's GRU is absent), so it ports cleanly.
   Input is a 128-bin mel — nearly free for us via `core/mel.h`. 361 MB f32 →
   ~180 MB q8_0 / ~90 MB q4_k. Wire as a second capacity behind `--pitch`.
-- [ ] **BTC chord recognition** (MIT, BTC-ISMIR19). Small bidirectional
-  transformer, `cqt[1,108,144] → chord[1,108,25 or 170]`. Blocked on
-  `core/cqt.h`. New `ChordEvent` result surface; do NOT layer onto transcribe().
+- [x] **BTC chord recognition** — SHIPPED 2026-07-20. `--chords` + session C ABI
+  + wasm; `crispasr-diff btc` 13/13 at cos 1.000000 (f16 and f32); 98.6-99.2 %
+  `mir_eval` agreement with the torch reference on real music. Weights are
+  CC-BY-NC-SA and ship behind `--accept-license`; published as
+  `cstr/btc-chords-GGUF`. `core/cqt.h` landed and was NOT the last blocker --
+  the real bugs were a missing `scale=True` and a chunked-vs-continuous
+  front-end mismatch. See `docs/music-transcription/PLAN.md`.
 - [ ] **Basic Pitch** — see §250, claimed there.
 - [ ] **MT3** — feasibility memo on T5X/JAX checkpoint conversion BEFORE any C++.
 
 ### Phase 2 — surfaces
 
-- [ ] **Bind `crispasr_session_separate*` in the Dart package.** Only the CLI,
-  C ABI and Python have separation today; Dart does not. This is what CometBeat
-  actually needs for "vocals-only → crepeF0 the melody", and it is far smaller
-  than the Open-Unmix ONNX path they were about to build. Mirror `pitch()`.
+- [x] **Bind `crispasr_session_separate*` in the Dart package** — SHIPPED
+  (`flutter/crispasr/lib/src/crispasr.dart:4031`, `separate()` returning
+  `List<Stem>`). NOTE: until 4eccc60cb this reached htdemucs ONLY -- the session
+  ABI had no mel-band-roformer arm, so the MIT vocals/instrumental model (the
+  CLI default) was unreachable from Dart. Now both.
 - [ ] **CREPE perf**: per-node profile (never done — the RTF numbers came from
   FLOP arithmetic, not measurement) and sweep `kBatch` (64 was a guess).
 - [ ] **CUDA validation** for the CREPE path and both ggml conv fixes
