@@ -674,6 +674,18 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.translate_source_lang = whisper_param_turn_lowercase(ARGV_NEXT);
     } else if (arg == "-trtl" || arg == "--tr-tl" || arg == "--translate-target-lang") {
         params.translate_target_lang = whisper_param_turn_lowercase(ARGV_NEXT);
+    } else if (arg == "--accept-license") {
+        if (++i >= argc) {
+            fprintf(stderr, "error: --accept-license requires an SPDX tag (or \"all\")\n");
+            return false;
+        }
+        params.accept_license = argv[i];
+        // Publish via the env var the library already consults rather than
+        // calling into crispasr-lib: cli.cpp links ahead of it (see the
+        // left-to-right static-link note in examples/cli/CMakeLists.txt), and
+        // this reaches every resolve path — CLI, session C-ABI, server —
+        // without threading a parameter through 46 call sites.
+        setenv("CRISPASR_ACCEPT_LICENSE", params.accept_license.c_str(), /*overwrite=*/1);
     } else if (arg == "--auto-download") {
         params.auto_download = true;
     } else if (arg == "--hf-repo" || arg == "-hfr") {
@@ -1233,13 +1245,16 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "             --voice PATH            [%-7s] voice prompt: GGUF voice pack or reference WAV\n"
             "                                                 (.wav → 1.5B WAV cloning; .gguf → voice pack)\n",
             params.tts_voice.c_str());
-    fprintf(stderr,
-            "             --i-have-rights                    required for voice cloning (.wav); attests consent\n"
-            "                                                 of the cloned speaker or that it is your own voice\n"
-            "             --no-spoken-disclaimer              skip audible AI-disclosure prefix on voice-cloned\n"
-            "                                                 output (watermark + C2PA provenance still applied)\n"
-            "             --no-watermark                     disable AI-content watermark on TTS output; marking\n"
-            "                                                 responsibility then rests with the operator\n");
+    fprintf(
+        stderr,
+        "             --i-have-rights                    required for voice cloning (.wav); attests consent\n"
+        "             --accept-license TAG                accept a restricted model licence (SPDX tag, or 'all');\n"
+        "                                                required before downloading cc-by-nc-*/gemma/llama* weights\n"
+        "                                                 of the cloned speaker or that it is your own voice\n"
+        "             --no-spoken-disclaimer              skip audible AI-disclosure prefix on voice-cloned\n"
+        "                                                 output (watermark + C2PA provenance still applied)\n"
+        "             --no-watermark                     disable AI-content watermark on TTS output; marking\n"
+        "                                                 responsibility then rests with the operator\n");
     fprintf(stderr,
             "             --ref-text \"TEXT\"        reference transcription (qwen3-tts/f5-tts; auto-transcribed "
             "if omitted)\n");
