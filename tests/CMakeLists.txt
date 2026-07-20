@@ -2863,6 +2863,11 @@ catch_discover_tests(test-core-gru
 #   ./build/bin/test-core-cqt --dump /tmp/cqt.bin
 #   python tools/cqt_librosa_parity.py /tmp/cqt.bin
 # Defines its own main() for --dump, so links Catch2::Catch2 not Catch2WithMain.
+# C++ half of the TabCNN parity check (not a Catch2 test -- see the file header).
+add_executable(test-tabcnn-dump test-tabcnn-dump.cpp)
+target_include_directories(test-tabcnn-dump PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-tabcnn-dump PRIVATE tabcnn)
+
 add_executable(test-core-cqt test-core-cqt.cpp)
 target_include_directories(test-core-cqt PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(test-core-cqt PRIVATE Catch2::Catch2)
