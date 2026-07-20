@@ -7,9 +7,16 @@ and trained models alike.
 This is the HARD RULE #1 read: every claim below was checked against that file
 or measured, not summarised. Where a detail is a silent-bug risk it says so.
 
-Status: **blueprint read in progress.** No converter, no graph, no harness yet.
-`PitchEstimator` and the shared conv primitives are covered; `PhoneExtractor`,
-`VectorQuantizer`, `ConverterNetwork` and `Vocoder` are not yet read in full.
+Status: **`PitchEstimator` converter + reference dump DONE and validated.** No
+ggml graph yet. `PhoneExtractor`, `VectorQuantizer`, `ConverterNetwork` and
+`Vocoder` are not yet read in full.
+
+| artifact | state |
+|---|---|
+| `models/convert-beatrice-to-gguf.py` | pitch_estimator: 88 tensors, 36 dropped as fusion-neutralised (124 total, balances) |
+| `tools/beatrice_torch_parity.py` | 36-stage reference dump, spec reproduces `forward()` **bit-identically** |
+| ggml graph (`src/beatrice_pitch.{h,cpp}`) | NOT STARTED |
+| `crispasr-diff beatrice` | NOT STARTED |
 
 ---
 
@@ -226,6 +233,76 @@ backend. See [[tts-parity-not-by-audio-corr]].
 Note the output is stochastic enough that ASR transcribed two runs of the *same*
 speaker differently — so acceptance thresholds must be set against the floor,
 not against a single golden run.
+
+---
+
+## PitchEstimator — the port target, verified
+
+```
+wav 16k -> extract_pitch_features (DSP) -> instfreq[192,T] + corr_diff[256,T] + energy[1,T]
+   instfreq -> conv1x1 -> gelu_tanh -> conv1x1  \
+                                                 + -> gelu_tanh -> ConvNeXtStack(9) -> head 1x1 -> logits[448,T]
+   corr_diff -> conv1x1 -> gelu_tanh -> conv1x1 /
+```
+
+`ConvNeXtStack`: `embed` CausalConv1d(k=3, delay=1) -> LayerNorm(**with affine**)
+-> 9 x block -> `final_layer_norm` (**with affine**). Each block:
+depthwise CausalConv1d(k=33, groups=192, delay=0, strictly causal) -> LayerNorm
+(**affine folded away — normalise only**) -> Linear 192->384 -> gelu_tanh ->
+Linear 384->192 -> residual add.
+
+**The two LayerNorm forms are not interchangeable.** `merge_weights()` folds the
+per-block affine into `pwconv1` but leaves the stack-level `norm` and
+`final_layer_norm` affine intact. Using one form throughout is wrong in one
+place or the other.
+
+Fusion verified output-preserving on the real checkpoint before being baked into
+the converter: **cos 1.0000000000, max_abs 7.6e-06** (f32 noise), and afterwards
+`gamma`, `pre_scale`, `post_scale`, `post_scale_weight` are all identically 1.0
+and the per-block LayerNorm affine is identity — so all 36 are dropped and the
+runtime graph never sees them.
+
+## Negative controls — the gate had two holes
+
+The reference dumper re-implements the forward pass step by step and refuses to
+write a file unless it reproduces the module's own `forward()`. Control:
+**max_abs 0.000e+00**, bit-identical.
+
+A first-run pass proves nothing ([[parity-harness-negative-control]]), so each
+guard was tested by breaking a load-bearing detail. Two of the breaks initially
+*passed*:
+
+| break | first result | after fix |
+|---|---|---|
+| tanh-approx GELU -> exact erf (detail 2) | **PASSED**, cos 0.9999996, max_abs 2.4e-02 | FAILS (rel 1.65e-03) |
+| drop the `1e-5` in delta_spec normalisation | **PASSED**, wrote an all-NaN reference, exit 0 | FAILS, names the stage |
+| skip the per-block LayerNorm | FAILS, cos -0.53 | FAILS |
+| drop the causal trim (detail 3) | raises (shape 432 vs 400) | raises |
+
+Both fixes generalise to the ggml harness:
+
+1. **Gate on relative max-abs, not cosine.** Both arms are torch on the same
+   weights, so the control is bit-identical and anything above f32 rounding is
+   real. A genuinely wrong activation scored cos 0.9999996 — through any
+   `cos > 0.999999` check — while carrying 2.4e-02 of absolute error. HARD RULE
+   #2b in the concrete.
+2. **Check finiteness before any tolerance test.** Every NaN comparison is
+   `False`, so `rel > TOL` is `False` for NaN and a divide-by-zero spec wrote a
+   reference full of NaN and exited 0. A tolerance check structurally cannot
+   catch this.
+
+A third "control" was invalid and worth recording as a trap: re-applying
+`gamma` after the fusion is a **no-op by construction** (post-merge `gamma` is
+all-ones), so it passed bit-identically. It tested nothing. A negative control
+has to break something the code actually depends on.
+
+### Layout convention
+
+Torch stores `[batch, channels, time]` with **time fastest**; stages are dumped
+in exactly that memory order, landing in ggml as `ne = [time, channels]` — what
+`ggml_conv_1d` expects. **Do not transpose on either side.** Three separate RVC
+port bugs came from transposing here, each producing ~0 cosine on a graph that
+was correct.
 
 ---
 
