@@ -2762,6 +2762,9 @@ endif()
 if (TARGET crepe)
     target_link_libraries(crispasr-lib PUBLIC crepe)
 endif()
+if (TARGET btc-chords)
+    target_link_libraries(crispasr-lib PUBLIC btc-chords)
+endif()
 
 # Text-LLM chat backend — PRIVATE link: llama.h identifiers are
 # absorbed into libcrispasr and don't bleed into the public surface.

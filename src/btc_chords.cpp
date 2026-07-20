@@ -539,9 +539,22 @@ btc_chords_result* btc_chords_recognize(btc_chords_context* ctx, const float* pc
     if (n_frames <= 0)
         return nullptr;
 
-    // BTC trains on log-magnitude CQT.
+    // BTC trains on log(|CQT| + 1e-6) — epsilon ADDED, not a floor
+    // (audio_file_to_features: np.log(np.abs(feature) + 1e-6)).
     for (auto& v : mag)
-        v = std::log(std::max(v, 1e-6f));
+        v = std::log(v + 1e-6f);
+
+    if (const char* dp = getenv("CRISPASR_BTC_DUMP_FEAT")) {
+        // Front-end comparison hook: the per-stage diff replays the reference's
+        // own input_feat by design, so it cannot catch a CQT mismatch. This
+        // dumps what the front end actually produced, to be scored against
+        // librosa directly.
+        if (FILE* f = fopen(dp, "wb")) {
+            fwrite(mag.data(), sizeof(float), mag.size(), f);
+            fclose(f);
+            fprintf(stderr, "btc: dumped %d x %d features to %s\n", n_frames, hp.feature_size, dp);
+        }
+    }
 
     const bool reduce = hp.n_chords > 25 && btc_maj_min();
     const double frame_ms = 1000.0 * (double)hp.cqt_hop_length / (double)hp.sample_rate;

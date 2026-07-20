@@ -807,6 +807,10 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.stems = ARGV_NEXT;
     } else if (arg == "--sep-output-dir") {
         params.sep_output_dir = ARGV_NEXT;
+    } else if (arg == "--chords") {
+        params.chords = true; // chord recognition task — btc
+    } else if (arg == "--chords-format") {
+        params.chords_format = ARGV_NEXT;
     } else if (arg == "--pitch") {
         params.pitch = true; // pitch (F0) task — crepe
     } else if (arg == "--pitch-format") {
@@ -1387,6 +1391,13 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.pitch_format.empty() ? "text" : params.pitch_format.c_str());
     fprintf(stderr, "             --pitch-hop-ms MS           [%-7.1f] pitch analysis hop in milliseconds\n",
             params.pitch_hop_ms);
+    fprintf(stderr,
+            "             --chords                    [%-7s] chord recognition; prints start/end/chord per span "
+            "(btc, arch auto-detected). Weights are CC-BY-NC-SA — needs "
+            "--accept-license cc-by-nc-sa-4.0\n",
+            params.chords ? "true" : "false");
+    fprintf(stderr, "             --chords-format FMT         [%-7s] chord output format: text or json\n",
+            params.chords_format.empty() ? "text" : params.chords_format.c_str());
     fprintf(stderr, "\n");
 }
 
@@ -2321,6 +2332,14 @@ int main(int argc, char** argv) {
     // --pitch is a standalone pitch-estimation verb, same shape as --separate:
     // audio in, pitch frames out. Route before any ASR backend detection.
     if (params.pitch) {
+        return crispasr_run_backend(params);
+    }
+
+    // --chords is a standalone chord-recognition verb, same shape as --pitch:
+    // audio in, a chord timeline out. Route before any ASR backend detection —
+    // otherwise the BTC GGUF is handed to whisper_model_load, which rejects it
+    // as "invalid model data (bad magic)".
+    if (params.chords) {
         return crispasr_run_backend(params);
     }
 

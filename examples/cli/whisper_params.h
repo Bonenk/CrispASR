@@ -126,6 +126,13 @@ struct whisper_params {
     // Pitch (F0) estimation. --pitch routes to the pitch dispatcher
     // (crispasr_pitch_cli) BEFORE any transcribe backend is built; the model
     // arch (crepe) is auto-detected from the GGUF.
+    // Chord recognition. --chords routes to the chord dispatcher
+    // (crispasr_chords_cli) BEFORE any transcribe backend is built, mirroring
+    // --pitch. The BTC weights are CC-BY-NC-SA, so this path needs
+    // --accept-license cc-by-nc-sa-4.0 to auto-download.
+    bool chords = false;
+    std::string chords_format; // "text" (default) or "json"
+
     bool pitch = false;
     std::string pitch_format;   // "text" (default) or "json"
     float pitch_hop_ms = 10.0f; // CREPE reference hop

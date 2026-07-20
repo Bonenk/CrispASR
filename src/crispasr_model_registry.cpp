@@ -337,6 +337,24 @@ constexpr Entry k_registry[] = {
      "https://huggingface.co/mistralai/Voxtral-4B-TTS-2603)"},
     {"htdemucs", "htdemucs-q4_k.gguf",
      "https://huggingface.co/cstr/htdemucs-GGUF/resolve/main/htdemucs-q4_k.gguf", "~38 MB", nullptr, nullptr},
+    // BTC chord recognition (--chords). Upstream CODE is MIT, but the SHIPPED
+    // WEIGHTS are CC-BY-NC-SA: they were trained on Isophonics / Robbie
+    // Williams / UsPop2002 chord annotations, which are non-commercial. The
+    // licence field below is what arms the acceptance gate — without it these
+    // would download silently to commercial users.
+    //
+    // DEFAULT IS THE 170-CLASS MODEL: it collapses to the 25-class maj/min
+    // vocabulary on demand (CRISPASR_BTC_MAJ_MIN=1), whereas a 25-class model
+    // can never be expanded. One model, two output modes.
+    {"btc-chords", "btc-chords-large-f16.gguf",
+     "https://huggingface.co/cstr/btc-chords-GGUF/resolve/main/btc-chords-large-f16.gguf", "~6 MB", nullptr, nullptr,
+     nullptr, "cc-by-nc-sa-4.0"},
+    {"btc-chords-large", "btc-chords-large-f16.gguf",
+     "https://huggingface.co/cstr/btc-chords-GGUF/resolve/main/btc-chords-large-f16.gguf", "~6 MB", nullptr, nullptr,
+     nullptr, "cc-by-nc-sa-4.0"},
+    {"btc-chords-majmin", "btc-chords-f16.gguf",
+     "https://huggingface.co/cstr/btc-chords-GGUF/resolve/main/btc-chords-f16.gguf", "~6 MB", nullptr, nullptr, nullptr,
+     "cc-by-nc-sa-4.0"},
     // CREPE monophonic F0 (--pitch). MIT weights + MIT code (torchcrepe).
     // DEFAULT IS TINY: measured RTF 0.28 on Metal vs 2.0 for full, and full is
     // 38x the MACs per frame. `full` stays available for offline accuracy.
