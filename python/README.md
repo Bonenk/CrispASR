@@ -64,6 +64,7 @@ for seg in s.transcribe_pcm(pcm_f32, sample_rate=16000):
 - `TitaNet` / `SpeakerDB` — standalone speaker verification + closed-roster profile matching (consent-gated; requires `expected_names` + `consent=True`, see docs/diarization-speakers.md)
 - `detect_language_pcm(...)` — language ID
 - `registry_lookup(...)` — auto-download known models from the model hub
+- `registry_default_bundle(...)` — enumerate the exact primary, companion, and extra files used by `-m auto`, including licence-acceptance policy
 
 See the [main repo](https://github.com/CrispStrobe/CrispASR) for full documentation, model registry, and CLI.
 
