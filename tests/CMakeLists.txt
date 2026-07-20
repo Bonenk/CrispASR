@@ -3574,6 +3574,27 @@ catch_discover_tests(test-rvc-svc
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test - tabcnn — live integration tests (session C-ABI)
+add_executable(test-tabcnn
+    test_tabcnn_live.cpp
+)
+target_include_directories(test-tabcnn PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/examples
+)
+target_link_libraries(test-tabcnn PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-tabcnn
+    TEST_SPEC "[tabcnn]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test - btc-chords — live integration tests (session C-ABI)
 add_executable(test-btc-chords
     test_btc_chords_live.cpp
