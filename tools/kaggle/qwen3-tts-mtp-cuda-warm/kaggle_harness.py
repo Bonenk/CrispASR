@@ -226,8 +226,11 @@ def _warm_ccache_from_dataset(ccache_dir: Path) -> None:
         "dataset_sources": ["chr1str/crispasr-ccache", ...]
     Shaves ~15 min off incremental CUDA builds.
 
-    A bare `.ccache/` tree in the dataset is a BROKEN dataset, not an
-    alternative layout — see the warning emitted below."""
+    Kaggle AUTO-EXTRACTS archives uploaded to a dataset, so the ccache.tar you
+    upload arrives mounted as a bare `.ccache/` tree. That is the normal case
+    and it is handled correctly; the tar branch below only fires for a tar that
+    somehow survives unextracted. What signals a broken seed is the file COUNT,
+    not the layout — see the warning."""
     import tarfile
     # Owner-agnostic scan. The hard-coded owner list this replaced is the same
     # bug already fixed in kaggle_token_from_dataset(): it silently missed any
@@ -285,21 +288,23 @@ def _warm_ccache_from_dataset(ccache_dir: Path) -> None:
                 shutil.copytree(str(bare_dir), str(ccache_dir), dirs_exist_ok=True)
                 n = sum(1 for _ in ccache_dir.rglob("*") if _.is_file())
                 print(f"  ccache: warmed from {bare_dir} ({n} files)", flush=True)
-                # A bare tree means the dataset was built from a truncated
-                # `kaggle kernels output` download: that API page-caps at 500
-                # files and does not auto-continue, so a loose .ccache/ tree in
-                # /kaggle/working buries ccache.tar past the cap. Warn LOUDLY —
-                # this used to print like a success and every CUDA build since
-                # has silently run near-cold (both account copies were broken
-                # this way, found 2026-07-20).
-                print("  ccache: ⚠ WARNING — seed is a bare .ccache/ tree, not "
-                      "ccache.tar. This dataset is TRUNCATED/BROKEN; expect a "
-                      "near-cold build.", flush=True)
+                # A bare tree is NORMAL, not a defect: Kaggle auto-extracts any
+                # archive uploaded to a dataset, so a ccache.tar you upload
+                # arrives here already unpacked to .ccache/. copytree lands it
+                # at the right depth, so this branch is the usual path.
+                #
+                # What IS diagnostic is the file COUNT. `kaggle kernels output`
+                # pages at 500 files with no auto-continue, so a dataset built
+                # by downloading a kernel's loose /kaggle/working tree gets
+                # truncated at exactly that boundary. Both account copies were
+                # found stuck at ~500 objects on 2026-07-20, silently costing
+                # every CUDA build a near-cold start. A healthy CrispASR cache
+                # is a few thousand objects.
                 if n <= 501:
-                    print(f"  ccache: ⚠ {n} files is at/below the 500-file "
-                          "kernels-output page cap — near-certain truncation. "
-                          "Refresh the dataset from export_ccache_tar().",
-                          flush=True)
+                    print(f"  ccache: ⚠ WARNING — only {n} files, at/below the "
+                          "500-file kernels-output page cap. This seed is almost "
+                          "certainly TRUNCATED; expect a near-cold build. Rebuild "
+                          "it with tools/kaggle/ccache-refresh.", flush=True)
                 return
             except Exception as e:
                 print(f"  ccache: failed to copy {bare_dir}: {e}", flush=True)
