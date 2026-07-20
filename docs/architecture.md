@@ -1269,14 +1269,44 @@ restores bandwidth while preserving speaker identity.
 - **Execution:** CPU, CUDA, and Vulkan. The Vulkan graph decomposes affine
   normalization and relative-position gather operations into supported GGML
   primitives; both predictor and DAC execute fully on Vulkan.
-- **Working memory:** relative-position logits are evaluated once per clipped
-  distance bucket instead of expanding a `head_dim x T x T` tensor. The DAC is
-  decoded in 256-frame cores with the exact 10-frame receptive-field context,
-  so convolution IM2COL workspace is bounded rather than growing with the full
-  utterance. Set `CRISPASR_SIDON_DECODER_CHUNK_FRAMES` to a positive core size;
-  set it to `0` to use one full decoder graph for parity diagnostics. The
-  predictor remains global-attention and retains the existing input-duration
-  safety cap.
+- **Input padding:** inference prepends one predictor frame of context and
+  appends 1.5 s of lookahead, then crops both back off. Without the lookahead
+  the predictor's boundary response reaches the DAC directly and the last
+  ~12 ms of every clip is a full-scale click (on `samples/jfk.wav` it is the
+  peak sample of the whole file). The leading pad is a *whole* predictor frame
+  because the front end decimates raw mel frames by 2 taking even indices — a
+  half-frame pad would change which mel frames the predictor sees. Both pads
+  are cropped; dropping only the tail leaves the result delayed and truncates
+  the same amount of real audio. Set `CRISPASR_SIDON_LOOKAHEAD=0` to disable
+  the padding (A/B, and for reproducing pre-padding reference dumps). The
+  lookahead consumes ~75 frames of the input-duration cap.
+
+- **Working memory:** two independent bounds, each measured at `T≈2825`
+  (~55 s) with `sidon-v0.1-q8_0` on Metal. Use `CRISPASR_SIDON_DEBUG=1` to
+  print the per-stage scheduler workspace; process RSS is *not* a usable proxy
+  because Metal compute buffers are not attributed to the process footprint.
+
+  - *Predictor* — relative-position logits are evaluated once per clipped
+    distance bucket rather than expanding `distance_w` to `[head_dim, T, T]`:
+    **3064 → 2042 MiB**. `CRISPASR_SIDON_RPE` selects the formulation:
+    `bucket-direct` (default), `bucket` (same algebra, builds the gather
+    index's head dimension with an in-graph `REPEAT`), or `expand` (the legacy
+    expansion, which also retains the Vulkan-specific `mul_mat` batching
+    branch). All three are algebraically identical and produce identical ASR
+    transcripts; they differ only in float summation order.
+  - *DAC* — decoded in bounded cores with the decoder's exact latent
+    receptive field, then cropped: **4491 → 787 MiB**. The receptive field is
+    derived from the decoder config (`dac_receptive_frames()`), not tuned.
+    `CRISPASR_SIDON_DECODER_CHUNK_FRAMES` sets the maximum core size (default
+    512); `0` decodes the whole utterance in one graph. Cores are spread
+    evenly over the fewest chunks that fit the budget — with a fixed core size
+    a `T` just past a multiple leaves a final window that is nearly all
+    context (at `T=625`, core 256 decoded 840 frames for 625 frames of audio).
+    Chunked output is **bit-exact** against the whole-utterance decode, which
+    the live test asserts.
+
+  The predictor remains global-attention and retains the existing
+  input-duration safety cap.
 
 The CLI auto-detects `general.architecture = "sidon"` and exposes `CAP_S2S`:
 

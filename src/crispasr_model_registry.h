@@ -66,9 +66,17 @@ bool crispasr_license_accepted(const std::string& license, const std::string& ac
 bool crispasr_registry_lookup(const std::string& backend, CrispasrRegistryEntry& out,
                               const std::string& preferred_quant = "");
 
-/// Return the exact default artifact bundle downloaded by `-m auto` for a
-/// backend: primary model, inline companion (if any), then extra companions.
-/// This deliberately does not apply a preferred quant or infer a recommendation.
+/// Return the default artifact bundle for a backend: primary model, inline
+/// companion (if any), then extra companions.
+///
+/// This is the bundle `-m auto` downloads *with no quant suffix*. It
+/// deliberately does not apply a preferred quant or infer a recommendation, so
+/// it does NOT reproduce `-m auto:<quant>`: that path threads `preferred_quant`
+/// through crispasr_registry_lookup(), which rewrites both the filename and the
+/// URL of the primary and its companion. Callers mirroring `-m auto:<quant>`
+/// must go through crispasr_registry_lookup() instead — the filenames here
+/// would be wrong for them.
+///
 /// Returns false when the backend has no registry entry.
 bool crispasr_registry_default_bundle(const std::string& backend, CrispasrRegistryBundle& out);
 

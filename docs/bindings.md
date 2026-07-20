@@ -137,7 +137,10 @@ lang = detect_language_pcm(pcm, model_path="ggml-tiny.bin")
 diarize_segments(my_segs, pcm, method=DiarizeMethod.VAD_TURNS)
 words = align_words("canary-ctc-aligner.gguf", "hello world", pcm)
 
-# Inspect the exact canonical bundle used by `-m auto`
+# Inspect the canonical bundle used by `-m auto` (no quant suffix).
+# NOTE: this does not apply a preferred quant, so it does NOT reproduce
+# `-m auto:q8_0` — that rewrites both filename and URL. Use registry_lookup()
+# with a preferred quant for those.
 bundle = registry_default_bundle("omnivoice")
 assert not bundle.requires_acceptance  # prompt/attest before restricted downloads
 paths = [cache_ensure_file(a.filename, a.url) for a in bundle.artifacts]

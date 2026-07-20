@@ -36,6 +36,16 @@ jobs:
       - name: Smoke test - list backends
         run: ./build/bin/crispasr --list-backends
 
+      # Guards the drift docs/contributing.md warns about: a backend reachable
+      # from the CLI factory but missing from the c_api dispatch, the
+      # available_backends list, or the generated feature matrix (and the
+      # reverse — advertised by the C ABI but unreachable from the CLI). Exits 1
+      # only on a REQUIRED gap; registry/test/README gaps stay advisory. Run on
+      # Linux deliberately: the script's Go cgo-LDFLAGS drift check is unreliable
+      # on macOS, where Metal/BLAS default on and pollute the linux link line.
+      - name: Backend wiring audit
+        run: python3 tools/check-backend-wiring.py --crispasr ./build/bin/crispasr
+
   # ===========================================================================
   # Linux x86_64 — AMR opencore FetchContent static build (opt-in gate guard)
   # ===========================================================================
