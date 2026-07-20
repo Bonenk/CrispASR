@@ -3484,6 +3484,27 @@ if (CRISPASR_FUZZ)
     target_link_options(crispasr-fuzz-tokenizer PRIVATE -fsanitize=fuzzer)
 endif()
 
+# ─── test - btc-chords — live integration tests (session C-ABI)
+add_executable(test-btc-chords
+    test_btc_chords_live.cpp
+)
+target_include_directories(test-btc-chords PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/examples
+)
+target_link_libraries(test-btc-chords PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-btc-chords
+    TEST_SPEC "[btc-chords]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test - piano-transcription — live integration tests
 add_executable(test-piano-transcription
     test_piano_transcription_live.cpp

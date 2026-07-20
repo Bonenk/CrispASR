@@ -21,6 +21,7 @@ when you don't pass `--backend`, whisper is the default.
 - [Threading & processors](#threading--processors)
 - [Whisper-only flags](#whisper-only-flags)
 - [Pitch / F0 estimation (`--pitch`)](#pitch--f0-estimation---pitch) — CREPE pitch track
+- [Chord recognition (`--chords`)](#chord-recognition---chords) — BTC chord timeline (**non-commercial weights**)
 - [Auto-download (`-m auto`)](#auto-download--m-auto) — registry table
 - [Audio formats](#audio-formats) — WAV / FLAC / MP3 / OGG / Opus / M4A
 - [Memory footprint](#memory-footprint) — KV quant, mmap, recommended combos
@@ -1105,6 +1106,62 @@ same three fields per frame.
 CREPE is compute-heavy per frame (282 GFLOP per second of audio for `full`,
 7.3 for `tiny`), so tiny is the shipping default and the GPU path is not
 optional — on CPU even tiny runs at roughly RTF 2.4.
+
+## Chord recognition (`--chords`)
+
+Another standalone task: audio in, a chord timeline out. Like `--pitch` and
+`--separate` it routes to its own dispatcher before any ASR backend is built.
+
+> **⚠ The weights are non-commercial.** CrispASR is MIT and the upstream BTC
+> code (jayg996/BTC-ISMIR19) is MIT, but the *checkpoints* are CC-BY-NC-SA:
+> they were trained on the Isophonics / Robbie Williams / UsPop2002 chord
+> annotations, whose licences forbid commercial use. The registry refuses to
+> download them unless you explicitly accept that licence, and a commercial
+> product must train or supply its own weights. See
+> [docs/music-transcription/PLAN.md](music-transcription/PLAN.md).
+
+```bash
+# Accept the non-commercial licence and auto-download the default model
+crispasr --chords -m auto --auto-download --accept-license cc-by-nc-sa-4.0 -f song.wav
+
+# Explicit model, JSON output
+crispasr --chords -m btc-chords-large-f32.gguf --chords-format json -f song.wav
+
+# Collapse the 170-class output to plain maj/min
+CRISPASR_BTC_MAJ_MIN=1 crispasr --chords -m btc-chords-large-f32.gguf -f song.wav
+```
+
+The backend (`btc`) is auto-detected from the GGUF `general.architecture`;
+input is decoded to BTC's native 22.05 kHz mono automatically.
+
+| Flag | Meaning |
+|---|---|
+| `--chords` | Enable the chord task |
+| `--chords-format FMT` | `text` (default) or `json` |
+| `--accept-license SPDX` | Required to download the CC-BY-NC-SA weights (or `all`) |
+
+Default output is one tab-separated line per span — `start_sec`, `end_sec`,
+`chord` — which is exactly the `.lab` layout the chord datasets (Isophonics et
+al.) use, so it drops straight into `mir_eval`:
+
+```
+0.000	1.950	C
+1.950	3.901	G
+3.901	8.081	N
+```
+
+`N` means "no chord". `--chords-format json` emits
+`{file, vocabulary, n_spans, chords: [...]}` with a `confidence` per span.
+
+**Models** (`cstr/btc-chords-GGUF`, weights CC-BY-NC-SA, code MIT):
+
+| Registry key | File | Size | Notes |
+|---|---|---|---|
+| `btc-chords` | `btc-chords-large-f32.gguf` | ~85 MB | **default** — 170-class vocabulary |
+| `btc-chords-small` | `btc-chords-small-f32.gguf` | ~85 MB | 25-class (maj/min + N) |
+
+The 170-class model is the default deliberately: it reduces to maj/min with
+`CRISPASR_BTC_MAJ_MIN=1`, whereas a 25-class model can never be expanded.
 
 ## Auto-download (`-m auto`)
 

@@ -300,6 +300,10 @@
 #include "htdemucs.h"
 #define CA_HAVE_HTDEMUCS 1
 #endif
+#if __has_include("btc_chords.h")
+#include "btc_chords.h"
+#define CA_HAVE_BTC_CHORDS 1
+#endif
 #if __has_include("crepe.h")
 #include "crepe.h"
 #define CA_HAVE_CREPE 1
@@ -1472,6 +1476,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "crepe";
     else if (strcmp(arch, "htdemucs") == 0)
         backend = "htdemucs";
+    else if (strcmp(arch, "btc") == 0)
+        backend = "btc-chords";
 
     std::strncpy(out_name, backend, out_cap - 1);
     out_name[out_cap - 1] = '\0';
@@ -1858,6 +1864,15 @@ struct crispasr_session {
 #ifdef CA_HAVE_HTDEMUCS
     htdemucs_context* htdemucs_ctx = nullptr;
     htdemucs_result* htdemucs_last_result = nullptr;
+#endif
+#ifdef CA_HAVE_BTC_CHORDS
+    btc_chords_context* btc_ctx = nullptr;
+    // Flat {start_ms, end_ms, label, confidence} per span. Built once per
+    // recognize() so crispasr_session_chords_spans can hand out a typed-array
+    // view, for the same reason piano_notes is flat: a mixed int/float struct
+    // read through a float view misreads the int lane.
+    std::vector<float> btc_last_spans;
+    std::vector<std::string> btc_last_names;
 #endif
 #ifdef CA_HAVE_CREPE
     crepe_context* crepe_ctx = nullptr;
@@ -2774,6 +2789,18 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         hp.use_gpu = g_open_use_gpu_tls; // crispasr_session has no use_gpu member; use the open-time TLS flag
         s->htdemucs_ctx = htdemucs_init_from_file(model_path, hp);
         if (!s->htdemucs_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_BTC_CHORDS
+    if (s->backend == "btc" || s->backend == "btc-chords" || s->backend == "chords") {
+        btc_chords_params p = btc_chords_default_params();
+        p.n_threads = s->n_threads;
+        s->btc_ctx = btc_chords_init_from_file(model_path, p);
+        if (!s->btc_ctx) {
             delete s;
             return nullptr;
         }
@@ -3894,6 +3921,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_CREPE
     list += ",crepe";
+#endif
+#ifdef CA_HAVE_BTC_CHORDS
+    list += ",btc-chords";
 #endif
 #ifdef CA_HAVE_KYUTAI
     list += ",kyutai-stt";
@@ -8751,6 +8781,89 @@ CA_EXPORT int crispasr_session_pitch_sample_rate(crispasr_session* s) {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Chord recognition session API
+//
+// A chord timeline is not crispasr_segments either, so it follows pitch and
+// piano: its own entry points, a flat float view for the bulk read, and a
+// separate name lookup because the labels are strings.
+// ---------------------------------------------------------------------------
+
+CA_EXPORT int crispasr_session_chords(crispasr_session* s, const float* pcm, int n_samples, int sample_rate) {
+    if (!s || !pcm || n_samples <= 0 || sample_rate <= 0)
+        return -1;
+#ifdef CA_HAVE_BTC_CHORDS
+    if (s->btc_ctx) {
+        s->btc_last_spans.clear();
+        s->btc_last_names.clear();
+        btc_chords_result* r = btc_chords_recognize(s->btc_ctx, pcm, n_samples, sample_rate);
+        if (!r)
+            return -1;
+        s->btc_last_spans.reserve((size_t)r->n_spans * 4);
+        s->btc_last_names.reserve((size_t)r->n_spans);
+        for (int i = 0; i < r->n_spans; i++) {
+            const btc_chord_span& sp = r->spans[i];
+            s->btc_last_spans.push_back((float)sp.start_ms);
+            s->btc_last_spans.push_back((float)sp.end_ms);
+            s->btc_last_spans.push_back((float)sp.label);
+            s->btc_last_spans.push_back(sp.confidence);
+            const char* nm = btc_chords_label_name(s->btc_ctx, sp.label);
+            s->btc_last_names.emplace_back(nm ? nm : "N");
+        }
+        const int n = r->n_spans;
+        btc_chords_result_free(r);
+        return n;
+    }
+#endif
+    (void)sample_rate;
+    return -1;
+}
+
+CA_EXPORT int crispasr_session_chords_n_spans(crispasr_session* s) {
+    if (!s)
+        return 0;
+#ifdef CA_HAVE_BTC_CHORDS
+    return (int)s->btc_last_names.size();
+#else
+    return 0;
+#endif
+}
+
+CA_EXPORT const float* crispasr_session_chords_spans(crispasr_session* s, int* out_n_spans) {
+    if (out_n_spans)
+        *out_n_spans = 0;
+    if (!s)
+        return nullptr;
+#ifdef CA_HAVE_BTC_CHORDS
+    if (!s->btc_last_names.empty()) {
+        if (out_n_spans)
+            *out_n_spans = (int)s->btc_last_names.size();
+        return s->btc_last_spans.data();
+    }
+#endif
+    return nullptr;
+}
+
+CA_EXPORT const char* crispasr_session_chords_span_name(crispasr_session* s, int idx) {
+    if (!s || idx < 0)
+        return nullptr;
+#ifdef CA_HAVE_BTC_CHORDS
+    if (idx < (int)s->btc_last_names.size())
+        return s->btc_last_names[(size_t)idx].c_str();
+#endif
+    return nullptr;
+}
+
+CA_EXPORT int crispasr_session_chords_vocab_size(crispasr_session* s) {
+    if (!s)
+        return 0;
+#ifdef CA_HAVE_BTC_CHORDS
+    if (s->btc_ctx)
+        return btc_chords_vocab_size(s->btc_ctx);
+#endif
+    return 0;
+}
+
 CA_EXPORT int crispasr_session_piano(crispasr_session* s, const float* pcm_16k, int n_samples) {
     if (!s || !pcm_16k || n_samples <= 0)
         return -1;
@@ -8958,6 +9071,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
         htdemucs_result_free(s->htdemucs_last_result);
     if (s->htdemucs_ctx)
         htdemucs_free(s->htdemucs_ctx);
+#endif
+#ifdef CA_HAVE_BTC_CHORDS
+    if (s->btc_ctx)
+        btc_chords_free(s->btc_ctx);
 #endif
 #ifdef CA_HAVE_CREPE
     if (s->crepe_ctx)

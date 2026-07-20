@@ -74,6 +74,15 @@ const char* crispasr_session_token_text(CrispasrSession* s, int id);
 int crispasr_session_pitch(CrispasrSession* s, const float* pcm_16k, int n_samples, float hop_ms);
 const float* crispasr_session_pitch_frames(CrispasrSession* s, int* out_n_frames);
 int crispasr_session_pitch_sample_rate(CrispasrSession* s);
+
+// Chord recognition — BTC. `chords` runs the timeline and returns the span
+// count; `chords_spans` hands back a session-owned flat array of 4 floats per
+// span ({startMs, endMs, label, confidence}). The label is an index; resolve
+// it with chords_span_name, since the names are strings.
+int crispasr_session_chords(CrispasrSession* s, const float* pcm, int n_samples, int sample_rate);
+const float* crispasr_session_chords_spans(CrispasrSession* s, int* out_n_spans);
+const char* crispasr_session_chords_span_name(CrispasrSession* s, int idx);
+int crispasr_session_chords_vocab_size(CrispasrSession* s);
 CrispasrSession* crispasr_session_open_explicit(const char* model_path, const char* backend_name, int n_threads);
 CrispasrSession* crispasr_session_open_with_params(const char* model_path, const char* backend_name,
                                                    const void* params);
@@ -1014,6 +1023,50 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // 0 when the session has no pitch arm — doubles as a capability probe.
     emscripten::function("sessionPitchSampleRate", emscripten::optional_override([]() {
                              return g_tts_session ? crispasr_session_pitch_sample_rate(g_tts_session) : 0;
+                         }));
+
+    // --- Chord recognition (BTC) ---
+    //
+    // NOTE: the shipped BTC weights are CC-BY-NC-SA, not MIT like this
+    // library. A commercial deployment must supply its own weights; the
+    // registry will not download these without an explicit licence
+    // acceptance. See docs/music-transcription/PLAN.md.
+    emscripten::function("sessionChords", emscripten::optional_override([](emscripten::val audio, int sampleRate) {
+                             emscripten::val out = emscripten::val::array();
+                             if (!g_tts_session)
+                                 return out;
+                             const int n = audio["length"].as<int>();
+                             if (n <= 0 || sampleRate <= 0)
+                                 return out;
+                             std::vector<float> pcmf32(n);
+                             emscripten::val heap = emscripten::val::module_property("HEAPU8");
+                             emscripten::val memory = heap["buffer"];
+                             emscripten::val view =
+                                 audio["constructor"].new_(memory, reinterpret_cast<uintptr_t>(pcmf32.data()), n);
+                             view.call<void>("set", audio);
+
+                             if (crispasr_session_chords(g_tts_session, pcmf32.data(), n, sampleRate) <= 0)
+                                 return out;
+                             int n_spans = 0;
+                             const float* spans = crispasr_session_chords_spans(g_tts_session, &n_spans);
+                             if (!spans || n_spans <= 0)
+                                 return out;
+                             for (int i = 0; i < n_spans; i++) {
+                                 emscripten::val c = emscripten::val::object();
+                                 c.set("startMs", (double)spans[i * 4 + 0]);
+                                 c.set("endMs", (double)spans[i * 4 + 1]);
+                                 const char* nm = crispasr_session_chords_span_name(g_tts_session, i);
+                                 c.set("chord", std::string(nm ? nm : "N"));
+                                 c.set("confidence", (double)spans[i * 4 + 3]);
+                                 out.call<void>("push", c);
+                             }
+                             return out;
+                         }));
+
+    // 25 or 170, or 0 when the session has no chord arm — capability probe,
+    // mirroring sessionPitchSampleRate.
+    emscripten::function("sessionChordsVocabSize", emscripten::optional_override([]() {
+                             return g_tts_session ? crispasr_session_chords_vocab_size(g_tts_session) : 0;
                          }));
 
     // --- Available backends ---
