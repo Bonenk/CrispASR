@@ -80,7 +80,54 @@ ggml/GGUF backends.
   music). **q4_k deliberately NOT published**: 95.46 % tetrads for 0.6 MB
   saved. Quantize BTC from the f16 — only 73/213 tensors are quantizable, so a
   q8_0 from f32 lands at 7.5 MB, larger than the f16.
+- **Done**: 📋 **Guitar tablature scoped — `GUITAR_TAB_SPEC.md` (§GT1).** A caller
+  asked whether CrispASR should ship a `(string, fret)` **emission scorer** while
+  their Viterbi/DP applies the hard constraints. Verdict is split by arm.
+  **Audio → tab: adopt as proposed.** TabCNN (ISMIR 2019, ~0.8 M params) *is*
+  already an emission scorer — six independent per-string softmaxes over 21 fret
+  classes, no coupling, no CRF, no temporal model, **no decoding of any kind** —
+  so our Viterbi over its output is a strict improvement on the published argmax.
+  GuitarSet 6-fold player-wise: tab F1 0.748, TDR 0.899, multipitch 0.826.
+  **But GuitarSet massively overstates**: zero-shot on EGSet12 (real electric
+  guitar) tab F1 collapses 0.748 → **0.447**, TDR 0.899 → 0.695, and the fix is
+  **data not architecture** — re-rendering with real tones/effects recovers to
+  0.585 / 0.819 with the architecture held constant. So the shippable artifact is
+  the **GuitarProFX-augmented** TabCNN, whose weights are public. FretNet does
+  NOT supersede it on the headline tab metric (0.727 vs 0.717 like-for-like, and
+  marginally worse on frame multipitch); its win is note-level via an onset head,
+  and ⚠ its tablature head is *not* a per-string softmax.
+  **Symbolic → tab: do NOT ship.** DadaGP is a dataset+tokenizer with *no*
+  playability metric and *no* baseline comparison — it is zero evidence that
+  neural beats classical. Its encoding is lossy where it matters (93.7 % of key
+  signatures auto-assigned C major; 3/4 vs 6/8 indistinguishable; rare tunings
+  dropped). And it is a **live licensing blocker**: Zenodo request-gated "FOR
+  RESEARCH PURPOSES", *no* license on the 26,181 scraped GuitarPro files, MIT
+  covers only the codec code, CC-BY-4.0 is arXiv's manuscript license, commercial
+  fair use explicitly unresolved. Same shape as the BTC provenance problem —
+  except BTC at least had a nameable license to gate on; **an `--accept-license`
+  tag cannot launder an unlicensed scrape**. The two strongest symbolic models
+  (MIDI-to-Tab ISMIR 2024, Fretting-Transformer ICMC 2025) are both ggml-sized
+  but release **no weights** and both depend on DadaGP.
+  **The interesting move**: the canonical HMM fingering decoder has *degenerate
+  0/1 emissions* — all playability knowledge sits in hand-designed transitions —
+  so there is an empty slot that learned per-(string,fret) emissions drop into
+  without changing the DP. Nobody in the surveyed literature has run that
+  experiment, and the 2016 data-scarcity reason for hand-designing is gone.
+  ⛔ **Two blockers before any C++**: (1) **GuitarSet's license was never
+  verified** and it is the training corpus for *every* audio candidate — cheap to
+  check, and it can invalidate the audio arm outright; (2) the 2024–26 wave
+  (Guitar-TECHS, GOAT, **TART** = audio→tab direct competitor, arXiv 2510.02597)
+  is unverified, so any "SOTA" claim is conditional.
+  Method note: 104 claims extracted from 21 primary sources, 25 adversarially
+  verified, **5 killed** — including this session's own initial reading that
+  DadaGP's baked-in `string:fret` tokens make the split *fatally* adverse
+  (refuted 0-3). The opposite claim also died 0-3, so the verdict is "lossy and
+  awkward", not "impossible". ⚠ Never table symbolic and audio numbers together —
+  they share no metric, and MIDI-to-Tab *consumes GuitarSet's training split*.
 - **Next**: `core/stft.h` extraction is independent (CREPE needs no STFT).
+- **Next (guitar tab)**: resolve the two §GT1 blockers before writing any code —
+  GuitarSet licence, then whether TART supersedes TabCNN. Both are reading tasks,
+  not engineering.
 
 ### Performance — measured, M1, quiet box (load 4.0), 10 s audio, median of 3
 
@@ -622,6 +669,22 @@ implementations diff-checkable against each other.
   path already exists in the app. If the ChoCo permissive subset proves thin,
   shipping DSP chords + a documented "premium tier later" may be the better
   trade than a weak model with clean provenance.
+- **Guitar tab — GuitarSet's licence (§GT1 blocker 1).** Never verified, and it
+  is the training corpus for *every* audio-arm candidate. If it forbids
+  commercial use of derived weights, the audio arm dies with it. Same question
+  for EGSet12 (Zenodo 11406378). Cheap to answer; answer it before any code.
+- **Guitar tab — does TART supersede TabCNN (§GT1 blocker 2)?** arXiv 2510.02597
+  is audio→tab and therefore the direct competitor. Also unread: Guitar-TECHS
+  (2501.03720), GOAT (2509.22655). Any 2026 "SOTA" claim in §GT1 is conditional
+  on these.
+- **Guitar tab — can a clean-room corpus avoid DadaGP?** Is GuitarSet + Riley
+  enough to train a usable emission scorer, and does SynthTab offer a licensable
+  synthesis path? This is the same "train rather than port" answer the chord
+  problem reached, and for the same reason.
+- **Guitar tab — does a learned emission scorer actually beat the hand-designed
+  DP?** The classical HMM's emissions are degenerate 0/1, so the slot is empty
+  and the experiment is architecturally trivial. Nobody has run it, and there is
+  no agreed playability metric to score it with — which is itself the blocker.
 
 ## Suggested order (highest leverage first)
 
