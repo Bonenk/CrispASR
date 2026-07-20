@@ -72,8 +72,15 @@ ggml/GGUF backends.
   was stale -- another session landed it. NOTE: the registry only lists the f16
   variants; the q8_0/q4_k uploads have no registry entry, so `-m auto` can
   never select them.
+- **Done**: ✅ registry/packaging gaps closed. The four crepe quants were on HF
+  with no registry entry (`-m auto` could never pick them) — now listed, each
+  measured against the f16 of its capacity: tiny q8_0 cos 0.999993, tiny q4_k
+  0.998757, full q8_0 0.999999, full q4_k 0.999933. BTC gained **q8_0 only**
+  (4.5 MB, root 99.17 % / tetrads 98.52 % vs f16's 99.17 / 98.56 on real
+  music). **q4_k deliberately NOT published**: 95.46 % tetrads for 0.6 MB
+  saved. Quantize BTC from the f16 — only 73/213 tensors are quantizable, so a
+  q8_0 from f32 lands at 7.5 MB, larger than the f16.
 - **Next**: `core/stft.h` extraction is independent (CREPE needs no STFT).
-  Consider registry entries for the crepe q8_0/q4_k variants.
 
 ### Performance — measured, M1, quiet box (load 4.0), 10 s audio, median of 3
 

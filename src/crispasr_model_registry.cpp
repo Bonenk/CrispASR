@@ -359,6 +359,18 @@ constexpr Entry k_registry[] = {
     {"btc-chords-majmin", "btc-chords-f16.gguf",
      "https://huggingface.co/cstr/btc-chords-GGUF/resolve/main/btc-chords-f16.gguf", "~6 MB", nullptr, nullptr, nullptr,
      "cc-by-nc-sa-4.0"},
+    // q8_0 — 4.5 MB, and indistinguishable from f16: 13/13 diff stages, and on
+    // 257 s of real music vs the torch reference root 99.17 % / tetrads
+    // 98.52 % (f16 is 99.17 / 98.56). NO q4_k is published: it costs 3.1 points
+    // of tetrad accuracy (95.46 %) to save 0.6 MB. Quantize from the f16 — only
+    // 73/213 tensors are quantizable, so a q8_0 built from f32 lands at 7.5 MB,
+    // LARGER than the f16 it was meant to shrink.
+    {"btc-chords-q8_0", "btc-chords-large-q8_0.gguf",
+     "https://huggingface.co/cstr/btc-chords-GGUF/resolve/main/btc-chords-large-q8_0.gguf", "~4.5 MB", nullptr, nullptr,
+     nullptr, "cc-by-nc-sa-4.0"},
+    {"btc-chords-majmin-q8_0", "btc-chords-q8_0.gguf",
+     "https://huggingface.co/cstr/btc-chords-GGUF/resolve/main/btc-chords-q8_0.gguf", "~4.4 MB", nullptr, nullptr,
+     nullptr, "cc-by-nc-sa-4.0"},
     // Beat This! beat/downbeat tracking (--beats). MIT for code AND weights,
     // so no licence gate — deliberately unlike btc-chords above. The reason it
     // can be MIT at all is that it needs no DBN: madmom's is Boeck-patented and
@@ -386,6 +398,26 @@ constexpr Entry k_registry[] = {
      "MIT"},
     {"crepe-full", "crepe-full-f16.gguf",
      "https://huggingface.co/cstr/crepe-GGUF/resolve/main/crepe-full-f16.gguf", "~44.5 MB", nullptr, nullptr, nullptr,
+     "MIT"},
+    // Quantized CREPE. These were uploaded to cstr/crepe-GGUF but had NO
+    // registry entry, so `-m auto` could never select them. Measured against
+    // the f16 of the same capacity on a 3 s tone (test-crepe-parity):
+    //   tiny q8_0  cos 0.999993   f0 872.54 vs 872.44 Hz
+    //   tiny q4_k  cos 0.998757   f0 871.84 vs 872.44 Hz
+    //   full q8_0  cos 0.999999   f0 880.69 vs 880.69 Hz (identical)
+    //   full q4_k  cos 0.999933   f0 880.87 vs 880.69 Hz
+    // All four are usable; q4_k tiny at 0.26 MB is the mobile pick.
+    {"crepe-tiny-q8_0", "crepe-tiny-q8_0.gguf",
+     "https://huggingface.co/cstr/crepe-GGUF/resolve/main/crepe-tiny-q8_0.gguf", "~0.5 MB", nullptr, nullptr, nullptr,
+     "MIT"},
+    {"crepe-tiny-q4_k", "crepe-tiny-q4_k.gguf",
+     "https://huggingface.co/cstr/crepe-GGUF/resolve/main/crepe-tiny-q4_k.gguf", "~0.3 MB", nullptr, nullptr, nullptr,
+     "MIT"},
+    {"crepe-full-q8_0", "crepe-full-q8_0.gguf",
+     "https://huggingface.co/cstr/crepe-GGUF/resolve/main/crepe-full-q8_0.gguf", "~22.6 MB", nullptr, nullptr, nullptr,
+     "MIT"},
+    {"crepe-full-q4_k", "crepe-full-q4_k.gguf",
+     "https://huggingface.co/cstr/crepe-GGUF/resolve/main/crepe-full-q4_k.gguf", "~12.0 MB", nullptr, nullptr, nullptr,
      "MIT"},
     {"glm-asr", "glm-asr-nano-q4_k.gguf",
      "https://huggingface.co/cstr/glm-asr-nano-GGUF/resolve/main/glm-asr-nano-q4_k.gguf", "~1.2 GB", nullptr, nullptr},
