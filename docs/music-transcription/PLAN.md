@@ -142,9 +142,43 @@ ggml/GGUF backends.
   awkward", not "impossible". ⚠ Never table symbolic and audio numbers together —
   they share no metric, and MIDI-to-Tab *consumes GuitarSet's training split*.
 - **Next**: `core/stft.h` extraction is independent (CREPE needs no STFT).
+- **Done**: 🎸 **TabCNN ground-truth harness + converter landed.** The
+  crispasr-diff regime works here — no golden oracle needed.
+  **Provenance correction**: the EGSet12 weights are a pickled
+  `amt_tools.models.tabcnn.TabCNN`, NOT the Keras `andywiggins/tab-cnn`. So the
+  reference implementation is **amt-tools (MIT)** and **no clean-room constraint
+  applies** — better than §GT1 §0 assumed. Weights stay CC BY 4.0.
+  `tools/reference_backends/tabcnn.py` dumps 13 stages (audio → cqt_db → conv ×3
+  → pool → dense → logits → `[T,6,21]`), registered in `dump_reference.py`.
+  **Two front-end traps, both found by reading the MIT source instead of
+  inferring**: (1) `model.frontend` is an **EMPTY Sequential** — the CQT lives
+  outside the model, so a diff starting at features would never test our CQT,
+  exactly the blind spot that cost BTC 86.63 %→98.56 % and broke
+  piano-transcription; the dumper therefore emits `audio` and `cqt_db` as stages
+  so the C++ is diffed from the waveform. (2) `post_proc` does **not** stop at
+  `amplitude_to_db(ref=np.max)` — it affinely rescales `[-80,0]` dB to `[0,1]`
+  via `/80 + 1`. My first reimplementation omitted it and measured **cos =
+  −0.544**, median per-bin magnitude ratio **0.0047**, inputs ~180× out of
+  range. Cosine alone would have partly hidden a pure scale error; the
+  **|mine| = 15895 vs |ref| = 88** magnitudes made it obvious — HARD RULE 2b
+  working as designed. Now **cos = 1.0000000000, max|diff| = 0.0, magnitude
+  ratio = 1.0000000000** vs `amt_tools.features.CQT`.
+  Geometry pinned from the object + amt_tools sources, not guessed: 833,982
+  params, `dim_in=192`, `frame_width=9`, GuitarProfile E2-A2-D3-G3-B3-E4,
+  `num_pitches=20` → SoftmaxGroups(6×21)=126, and `(192−6)//2 = 93` matches the
+  observed pool height. **`sample_rate` is 44100, not 22050** — 192 bins at
+  24/oct from E2 reaches 21096 Hz and only fits under Nyquist at 44.1 kHz; an
+  earlier draft assumed 22.05 kHz and librosa correctly refused.
+  `models/convert-tabcnn-to-gguf.py` → 10 tensors, **1.78 MB f16**, round-trip
+  verified per tensor (conv + all biases **exact**, the two f16 matrices at
+  2.6e-4 / 3.3e-4). It refuses to write on any geometry disagreement. Front-end
+  constants, `silent_class` and the tuning array are written into the GGUF so
+  the runtime cannot drift from the dumper.
+  ⚠️ **Open design constraint**: `ref=np.max` is a **per-clip** normalisation, so
+  the feature cannot be computed chunked without changing it. Settle the
+  long-audio strategy BEFORE writing the runtime.
 - **Next (guitar tab)**: blockers cleared, so the audio arm can start. Order:
-  (1) pull the CC-BY-4.0 augmented-TabCNN weights from the EGSet12 Zenodo record
-  and inspect the tensor layout; (2) `models/convert-tabcnn-to-gguf.py` +
+  (1) ✅ done: weights pulled + tensor layout pinned; (2) `models/convert-tabcnn-to-gguf.py` +
   `tools/tabcnn_torch_parity.py` — and per the BTC/CQT lesson assert on the
   **median per-bin magnitude ratio**, not just cosine, since the front end is a
   CQT and cosine is scale-blind; (3) `src/tabcnn.{h,cpp}` emitting `[T, 6, 21]`
