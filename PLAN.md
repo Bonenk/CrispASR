@@ -256,10 +256,21 @@ speaker id + replayed noise alone. Live test: 4 cases / 12825 assertions.
 Deliberately NO CLI verb — the input is ContentVec features, which we do not
 produce. `docs/bindings.md` documents the session surface.
 
+ARTIFACTS: stored in the **PRIVATE** repo `cstr/rvc-svc-GGUF` (verified
+`private: True` server-side before upload) — `rvc-40k-f32.gguf` (105 MB) plus
+`rvc-ref.gguf` (23 MB), the 60-stage parity reference. That reference is the
+valuable half: `crispasr-diff rvc <model> <ref> <wav>` re-runs all 48
+comparisons with **no torch, no checkpoint and no RVC repo**.
+
 REMAINING (packaging, not correctness):
-- Registry entries. BLOCKED on a licence-scoped checkpoint: the parity work used
-  the pretrained base (`lj1995/VoiceConversionWebUI pretrained_v2/f0G40k.pth`)
-  converted with `--license other`, which should not ship as-is.
+- Registry entries. BLOCKED, and deliberately so on two counts: the checkpoint's
+  licence is unscoped (converted `--license other`), AND the repo is private, so
+  a registry URL would fail auto-download for anyone without auth. Scoping the
+  base checkpoint's terms and re-stamping the tag comes first.
+- F32 ONLY. An f16 GGUF converts but the graph is F32-only today (ggml_scale is
+  F32-only; an F16 operand reaching ggml_add trips
+  `GGML_ASSERT(src1->type == GGML_TYPE_F32)`). It REFUSES rather than producing
+  subtly wrong audio, and is noted as such in the header.
 - Dart/Flutter wrapper for `crispasr_session_convert*` (CometBeat is the
   consumer; the C ABI they need is done).
 - Two agreed parameters were CORRECTED rather than implemented — `protect` is
