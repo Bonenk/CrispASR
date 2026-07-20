@@ -121,7 +121,7 @@ backend doesn't expose that knob, but the call is safe to make.
 ```python
 from crispasr import (
     Session, diarize_segments, detect_language_pcm,
-    align_words, cache_ensure_file, registry_lookup,
+    align_words, cache_ensure_file, registry_default_bundle,
     # Diarize pipeline primitives (#107):
     SpeakerEmbedder, PyannoteCache, agglomerative_cluster,
 )
@@ -137,9 +137,10 @@ lang = detect_language_pcm(pcm, model_path="ggml-tiny.bin")
 diarize_segments(my_segs, pcm, method=DiarizeMethod.VAD_TURNS)
 words = align_words("canary-ctc-aligner.gguf", "hello world", pcm)
 
-# Auto-download a canonical model
-entry = registry_lookup("parakeet")
-path  = cache_ensure_file(entry.filename, entry.url)
+# Inspect the exact canonical bundle used by `-m auto`
+bundle = registry_default_bundle("omnivoice")
+assert not bundle.requires_acceptance  # prompt/attest before restricted downloads
+paths = [cache_ensure_file(a.filename, a.url) for a in bundle.artifacts]
 
 # Custom diarize pipeline: pluggable embedder + cosine clustering.
 # Same building blocks as `--diarize-embedder` in the CLI.
@@ -157,7 +158,7 @@ Install: `pip install crispasr` (or build locally from `python/`).
 use crispasr::{
     Session, DiarizeMethod, DiarizeOptions, DiarizeSegment,
     LidMethod, detect_language_pcm, align_words,
-    cache_ensure_file, registry_lookup,
+    cache_ensure_file, registry_default_bundle,
     // Diarize pipeline primitives (#107):
     SpeakerEmbedder, PyannoteCache, agglomerative_cluster,
 };
@@ -167,8 +168,11 @@ sess.set_max_new_tokens(256)?;
 sess.set_frequency_penalty(0.4)?;
 let segs = sess.transcribe_vad(&pcm, "silero-v6.2.0.bin", None)?;
 
-let entry = registry_lookup("canary")?.unwrap();
-let path  = cache_ensure_file(&entry.filename, &entry.url, false, None)?;
+let bundle = registry_default_bundle("canary")?.unwrap();
+assert!(!bundle.requires_acceptance); // obtain explicit acceptance when true
+for artifact in bundle.artifacts {
+    cache_ensure_file(&artifact.filename, &artifact.url, false, None)?;
+}
 
 // Custom diarize pipeline: pluggable embedder + cosine clustering.
 let emb = SpeakerEmbedder::new("auto", 4, None)?;     // "titanet"/"indextts"/.gguf
