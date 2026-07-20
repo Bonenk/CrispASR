@@ -74,8 +74,39 @@ struct sidon_model {
     std::vector<float> window, mel_filters;
 };
 
+// Frontend framing constants, shared by make_features() and the inference
+// padding so the two cannot drift. One predictor frame spans
+// sidon_frontend_decim STFT hops of the log-mel front end.
+static constexpr int sidon_frontend_hop = 160;
+static constexpr int sidon_frontend_decim = 2;
+
+// Relative-position-bias formulation. All three are numerically equivalent;
+// they differ only in what the graph materialises. Selected by
+// CRISPASR_SIDON_RPE (expand | bucket | bucket-direct).
+enum class sidon_rpe_mode {
+    expand,       // legacy: expand distance_w to [head_dim, T, T] before the dot product
+    bucket,       // dot per bucket, head dimension of the gather index built via in-graph REPEAT
+    bucket_direct // dot per bucket, gather index supplied host-side already shaped [T, T, H]
+};
+
+static sidon_rpe_mode parse_rpe_mode() {
+    const char* e = getenv("CRISPASR_SIDON_RPE");
+    if (!e || !e[0])
+        return sidon_rpe_mode::bucket_direct;
+    if (std::strcmp(e, "expand") == 0)
+        return sidon_rpe_mode::expand;
+    if (std::strcmp(e, "bucket") == 0)
+        return sidon_rpe_mode::bucket;
+    if (std::strcmp(e, "bucket-direct") == 0)
+        return sidon_rpe_mode::bucket_direct;
+    std::fprintf(stderr, "sidon: unknown CRISPASR_SIDON_RPE='%s' (expand|bucket|bucket-direct); using bucket-direct\n",
+                 e);
+    return sidon_rpe_mode::bucket_direct;
+}
+
 struct sidon_context {
     sidon_context_params params{};
+    sidon_rpe_mode rpe_mode = sidon_rpe_mode::bucket_direct;
     sidon_model model;
     core_dac::fastconv_cache decoder_fc;
     ggml_backend_t backend = nullptr, decoder_backend = nullptr, backend_cpu = nullptr;
@@ -88,6 +119,43 @@ struct sidon_context {
     ggml_tensor *predictor_input = nullptr, *relative_indices = nullptr;
     ggml_tensor *predictor_output = nullptr, *decoder_input = nullptr, *decoder_output = nullptr;
 };
+
+// One-sided receptive field of the DAC decoder, expressed in LATENT frames.
+//
+// Derived from the architecture rather than tuned on a signal: a threshold
+// picked by ear ("10 works, 9 audibly does not") encodes the property the
+// almost-broken build happens to satisfy, and gives no margin when the config
+// changes. Walk the decoder and accumulate each layer's one-sided radius,
+// divided by the cumulative upsampling at that layer:
+//
+//   input Conv1d k=7            -> 3 samples at the latent rate
+//   per block, ConvTranspose1d(k=2s, stride=s): each output depends on
+//                                  ceil(k/s)=2 inputs -> ~1 frame at the
+//                                  block's INPUT rate
+//   per block, 3x ResidualUnit  -> Conv1d k=7 dilated by d -> 3*d samples at
+//                                  the block's OUTPUT rate
+//   output Conv1d k=7           -> 3 samples at the audio rate
+//
+// For Sidon's [8,5,4,3,2] / hop 960 decoder this sums to ~10.4 frames, which
+// is why 10 was marginal and 9 audibly broke the joins.
+static int dac_receptive_frames(const core_dac::DacWeights& dac) {
+    const core_dac::DacConfig& cfg = dac.config;
+    double radius = 3.0; // input Conv1d k=7
+    double upsample = 1.0;
+    for (int b = 0; b < cfg.n_decoder_blocks; ++b) {
+        const int stride = cfg.upsampling_ratios[b];
+        if (stride <= 0)
+            break;
+        radius += 1.0 / upsample; // ConvTranspose1d, at this block's input rate
+        upsample *= stride;
+        for (const int dilation : cfg.residual_dilations)
+            radius += 3.0 * dilation / upsample; // ResidualUnit Conv1d k=7, dilated
+    }
+    radius += 3.0 / upsample; // output Conv1d k=7
+    // Round up, then one frame of margin so an exactly-integral radius is still
+    // strictly covered.
+    return (int)std::ceil(radius) + 1;
+}
 
 static ggml_tensor* req(sidon_model& m, const std::string& name) {
     ggml_tensor* tensor = core_gguf::require(m.tensors, name.c_str(), "sidon");
@@ -230,7 +298,7 @@ static bool load_model(sidon_model& m, const char* path, ggml_backend_t backend)
 
 // Exact SeamlessM4T feature frontend used by w2v-BERT 2.0.
 static std::vector<float> make_features(const sidon_model& m, const float* pcm, int n, int& T) {
-    constexpr int win = 400, hop = 160, nfft = 512, bins = 257;
+    constexpr int win = 400, hop = sidon_frontend_hop, nfft = 512, bins = 257;
     const int M = m.hp.mel_bins;
     if (n < win) {
         T = 0;
@@ -282,7 +350,7 @@ static std::vector<float> make_features(const sidon_model& m, const float* pcm, 
         for (int t = 0; t < raw_T; ++t)
             raw[(size_t)t * M + mel] = (raw[(size_t)t * M + mel] - (float)mean) * inv;
     }
-    T = raw_T / 2;
+    T = raw_T / sidon_frontend_decim;
     std::vector<float> out((size_t)T * m.hp.feature_dim);
     for (int t = 0; t < T; ++t)
         std::memcpy(out.data() + (size_t)t * m.hp.feature_dim, raw.data() + (size_t)(2 * t) * M,
@@ -321,7 +389,22 @@ static ggml_cgraph* build_predictor_graph(sidon_context* ctx, ggml_context* c, i
     ggml_tensor* in = ggml_new_tensor_2d(c, GGML_TYPE_F32, m.hp.feature_dim, T);
     ggml_set_name(in, "sidon_features");
     ggml_set_input(in);
-    ggml_tensor* rel_idx = ggml_new_tensor_2d(c, GGML_TYPE_I32, T, T);
+    // Relative-position index layout depends on the RPE formulation (see
+    // sidon_rpe_mode): the expand path indexes a flat [T*T] gather, the bucket
+    // paths index per (key, query) with heads either repeated in-graph or
+    // supplied directly.
+    ggml_tensor* rel_idx = nullptr;
+    switch (ctx->rpe_mode) {
+    case sidon_rpe_mode::expand:
+        rel_idx = ggml_new_tensor_1d(c, GGML_TYPE_I32, (int64_t)T * T);
+        break;
+    case sidon_rpe_mode::bucket:
+        rel_idx = ggml_new_tensor_2d(c, GGML_TYPE_I32, T, T);
+        break;
+    case sidon_rpe_mode::bucket_direct:
+        rel_idx = ggml_new_tensor_3d(c, GGML_TYPE_I32, T, T, H);
+        break;
+    }
     ggml_set_name(rel_idx, "sidon_rel_indices");
     ggml_set_input(rel_idx);
 
@@ -341,16 +424,51 @@ static ggml_cgraph* build_predictor_graph(sidon_context* ctx, ggml_context* c, i
         V = ggml_cont(c, ggml_permute(c, ggml_reshape_3d(c, V, hd, H, T), 0, 2, 1, 3));
         ggml_tensor* scores = ggml_mul_mat(c, K, Q);
 
-        // The relative-distance table has far fewer rows than T.  Compute the
-        // query/table dot products once per (bucket, query, head), then gather
-        // the bucket selected for each key.  The previous formulation first
-        // expanded the table to [head_dim, T, T], consuming 64*T*T floats and
-        // redundantly repeating the same dot product for every key in a bucket.
-        ggml_tensor* distance_w_f32 = ggml_cast(c, l.distance_w, GGML_TYPE_F32);
-        ggml_tensor* bucket_logits = ggml_mul_mat(c, distance_w_f32, Q); // [bucket, query, head]
-        bucket_logits = ggml_reshape_4d(c, bucket_logits, 1, bucket_logits->ne[0], T, H);
-        ggml_tensor* rel_idx_heads = ggml_repeat_4d(c, rel_idx, T, T, H, 1);
-        ggml_tensor* bias = ggml_reshape_3d(c, ggml_get_rows(c, bucket_logits, rel_idx_heads), T, T, H);
+        // Relative-position bias. All three formulations compute the same
+        // quantity: bias[key, query, head] = dot(distance_w[:, bucket(key,
+        // query)], Q[:, query, head]).
+        ggml_tensor* bias = nullptr;
+        if (ctx->rpe_mode == sidon_rpe_mode::expand) {
+            // Materialise the distance table per (key, query) first. Costs
+            // 4*head_dim*T^2 bytes and repeats the same dot product for every
+            // key that falls in the same clipped bucket.
+            ggml_tensor* rpe = ggml_get_rows(c, l.distance_w, rel_idx);
+            rpe = ggml_reshape_4d(c, rpe, hd, T, T, 1);
+            ggml_tensor* q4 = ggml_reshape_4d(c, Q, hd, 1, T, H);
+            if (ctx->predictor_vulkan) {
+                // Vulkan MUL_MAT requires equal ne[3] batch dimensions and does
+                // not implement rpe[..., 1] broadcasting over H heads.  Fold
+                // (T,H) into ne[2] instead, with heads as the inner batch because
+                // GGML maps repeated ne[2] batches with i02 = i12/H.  This avoids
+                // materialising an H-times-larger positional tensor.
+                ggml_tensor* q_th = ggml_cont(c, ggml_permute(c, q4, 0, 1, 3, 2));
+                ggml_tensor* q_flat = ggml_reshape_3d(c, q_th, hd, 1, (int64_t)T * H);
+                ggml_tensor* bias_ht = ggml_reshape_3d(c, ggml_mul_mat(c, rpe, q_flat), T, H, T);
+                bias = ggml_cont(c, ggml_permute(c, bias_ht, 0, 2, 1, 3));
+            } else {
+                bias = ggml_reshape_3d(c, ggml_mul_mat(c, rpe, q4), T, T, H);
+            }
+        } else {
+            // The distance table has n_buckets rows, and n_buckets << T. Take
+            // the query/table dot products once per (bucket, query, head) —
+            // a [n_buckets, T, H] tensor — then gather the bucket each key
+            // selects. Never materialises the [head_dim, T, T] expansion.
+            //
+            // distance_w is left in its stored dtype: ggml_mul_mat consumes a
+            // quantized/F16 src0 natively, and ggml_cast on a k-quant aborts on
+            // Metal (no k-quant CPY kernel), so casting here would be both
+            // redundant and a portability hazard.
+            ggml_tensor* bucket_logits = ggml_mul_mat(c, l.distance_w, Q); // [bucket, query, head]
+            bucket_logits = ggml_reshape_4d(c, bucket_logits, 1, bucket_logits->ne[0], T, H);
+            // ggml_get_rows batches on (ne2, ne3), so the index must carry the
+            // head dimension. bucket_direct supplies it as a plain input (the
+            // host fill is a memcpy per head); bucket materialises it with an
+            // in-graph REPEAT, which costs an extra 4*H*T^2-byte I32 tensor per
+            // layer and, having no Metal I32 kernel, lands on the CPU backend.
+            ggml_tensor* idx =
+                ctx->rpe_mode == sidon_rpe_mode::bucket_direct ? rel_idx : ggml_repeat_4d(c, rel_idx, T, T, H, 1);
+            bias = ggml_reshape_3d(c, ggml_get_rows(c, bucket_logits, idx), T, T, H);
+        }
         scores = ggml_soft_max_ext(c, ggml_add(c, scores, bias), nullptr, scale, 0.0f);
         ggml_tensor* vt = ggml_cont(c, ggml_permute(c, V, 1, 0, 2, 3));
         x = ggml_mul_mat(c, vt, scores);
@@ -481,6 +599,29 @@ static ggml_backend_sched_t make_stage_scheduler(ggml_backend_t primary, ggml_ba
     return ggml_backend_sched_new(backends, nullptr, n_backends, 32768, false, false);
 }
 
+// Report the compute-buffer bytes a stage's scheduler actually reserved, per
+// backend. Process-level RSS / "peak memory footprint" is NOT a usable proxy
+// here: on Metal the compute buffers are MTLBuffers that the macOS footprint
+// accounting does not attribute to the process, so a graph-shape change can
+// look like a memory win or loss purely from where the bytes live. Gated by
+// CRISPASR_SIDON_DEBUG so it can be A/B'd without a rebuild.
+static void report_workspace(sidon_context* ctx, ggml_backend_sched_t sched, const char* stage) {
+    const char* e = getenv("CRISPASR_SIDON_DEBUG");
+    if (!(e && e[0]) || !sched)
+        return;
+    ggml_backend_t backends[2] = {stage[0] == 'p' ? ctx->backend : ctx->decoder_backend, ctx->backend_cpu};
+    size_t total = 0;
+    for (int i = 0; i < 2; ++i) {
+        if (!backends[i] || (i == 1 && backends[1] == backends[0]))
+            continue;
+        const size_t sz = ggml_backend_sched_get_buffer_size(sched, backends[i]);
+        total += sz;
+        std::fprintf(stderr, "sidon: workspace %s [%s] = %.1f MiB\n", stage, ggml_backend_name(backends[i]),
+                     (double)sz / (1024.0 * 1024.0));
+    }
+    std::fprintf(stderr, "sidon: workspace %s TOTAL = %.1f MiB\n", stage, (double)total / (1024.0 * 1024.0));
+}
+
 static bool release_predictor_workspace(sidon_context* ctx) {
     clear_predictor_graph(ctx);
     if (ctx->predictor_sched)
@@ -547,6 +688,7 @@ static bool prepare_predictor_graph(sidon_context* ctx, int T) {
         clear_graphs(ctx);
         return false;
     }
+    report_workspace(ctx, ctx->predictor_sched, "predictor");
 
     ctx->predictor_input = ggml_graph_get_tensor(ctx->predictor_graph, "sidon_features");
     ctx->relative_indices = ggml_graph_get_tensor(ctx->predictor_graph, "sidon_rel_indices");
@@ -584,6 +726,7 @@ static bool prepare_decoder_graph(sidon_context* ctx, int T) {
         clear_decoder_graph(ctx);
         return false;
     }
+    report_workspace(ctx, ctx->decoder_sched, "decoder");
     ctx->decoder_input = ggml_graph_get_tensor(ctx->decoder_graph, "sidon_decoder_features");
     ctx->decoder_output = ggml_graph_get_tensor(ctx->decoder_graph, "dac_pcm");
     if (!ctx->decoder_input || !ctx->decoder_output) {
@@ -627,6 +770,7 @@ sidon_context* sidon_init_from_file(const char* path, sidon_context_params param
         return nullptr;
     }
     prepare_fastconv(ctx);
+    ctx->rpe_mode = parse_rpe_mode();
     ctx->predictor_sched = make_stage_scheduler(ctx->backend, ctx->backend_cpu);
     ctx->decoder_sched = make_stage_scheduler(ctx->decoder_backend, ctx->backend_cpu);
     if (!ctx->predictor_sched || !ctx->decoder_sched) {
@@ -671,14 +815,27 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     float peak = 0.0f;
     for (int i = 0; i < n_samples; ++i)
         peak = std::max(peak, std::fabs(samples[i]));
-    // Match the released Sidon inference recipe: add 10 ms of frontend
-    // context on both sides and 1.5 s of right-side lookahead. Without that
-    // lookahead, the DAC decodes the predictor boundary response directly and
-    // emits a loud transient at the end of otherwise valid audio. The padded
-    // inference result is cropped back to the exact input duration below.
-    constexpr int frontend_pad_samples = 160;
-    constexpr int lookahead_samples = 24000;
-    std::vector<float> normalized((size_t)n_samples + 2 * frontend_pad_samples + lookahead_samples, 0.0f);
+    // Pad the input with a whole predictor frame of leading context and 1.5 s
+    // of right-side lookahead, then crop both back off after decoding.
+    //
+    // Without the lookahead the predictor's boundary response reaches the DAC
+    // directly and the last ~12 ms of every clip is a full-scale click (on
+    // samples/jfk.wav it is the peak sample of the whole file). The leading pad
+    // is a WHOLE predictor frame — sidon_frontend_decim STFT hops, not one —
+    // because make_features decimates raw mel frames by taking even indices, so
+    // a half-frame shift would change WHICH mel frames the predictor sees
+    // rather than just delaying them.
+    //
+    // Gated so the unpadded path stays available for A/B and for reproducing
+    // the pre-padding reference dumps.
+    int lead_frames = 1;
+    int lookahead_samples = ctx->model.hp.input_rate * 3 / 2; // 1.5 s
+    if (const char* e = getenv("CRISPASR_SIDON_LOOKAHEAD"); e && e[0] && atoi(e) == 0) {
+        lead_frames = 0;
+        lookahead_samples = 0;
+    }
+    const int frontend_pad_samples = lead_frames * sidon_frontend_decim * sidon_frontend_hop;
+    std::vector<float> normalized((size_t)n_samples + frontend_pad_samples + lookahead_samples, 0.0f);
     const float gain = peak > 1e-9f ? 0.9f / peak : 1.0f;
     for (int i = 0; i < n_samples; ++i)
         normalized[(size_t)frontend_pad_samples + i] = samples[i] * gain;
@@ -717,11 +874,19 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     const auto graph_done = clock::now();
 
     ggml_backend_tensor_set(ctx->predictor_input, feats.data(), 0, feats.size() * sizeof(float));
-    std::vector<int32_t> indices((size_t)T * T);
+    // Clipped relative-distance bucket per (key, query). Identical table for
+    // every head; bucket_direct wants it replicated H times because
+    // ggml_get_rows batches the index on (ne2, ne3).
+    const int n_heads = ctx->model.hp.heads;
+    const size_t plane = (size_t)T * T;
+    const size_t n_planes = ctx->rpe_mode == sidon_rpe_mode::bucket_direct ? (size_t)n_heads : 1;
+    std::vector<int32_t> indices(plane * n_planes);
     for (int q = 0; q < T; ++q)
         for (int k = 0; k < T; ++k)
             indices[(size_t)q * T + k] =
                 std::max(-ctx->model.hp.rel_left, std::min(ctx->model.hp.rel_right, k - q)) + ctx->model.hp.rel_left;
+    for (size_t h = 1; h < n_planes; ++h)
+        std::memcpy(indices.data() + h * plane, indices.data(), plane * sizeof(int32_t));
     ggml_backend_tensor_set(ctx->relative_indices, indices.data(), 0, indices.size() * sizeof(int32_t));
     const auto predictor_start = clock::now();
     if (ggml_backend_sched_graph_compute(ctx->predictor_sched, ctx->predictor_graph) != GGML_STATUS_SUCCESS) {
@@ -759,26 +924,60 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     }
     const auto handoff_done = clock::now();
 
-    // DAC is fully convolutional. Decode bounded cores with the exact latent
-    // receptive-field context, then crop the overlap. Ten feature frames are
-    // sufficient for this five-block [8,5,4,3,2] decoder; nine measurably alter
-    // joins. This bounds ggml_conv_1d's explicit IM2COL workspace independently
-    // of utterance length.
-    int decoder_chunk_frames = 256;
+    // DAC is fully convolutional, so a bounded core plus the decoder's latent
+    // receptive field reconstructs exactly the samples that core owns. Decode
+    // core-sized pieces with context on both sides and crop the overlap away.
+    // This bounds ggml_conv_1d's explicit IM2COL workspace independently of
+    // utterance length: at T≈2825 the whole-utterance graph reserves ~4.5 GiB
+    // against ~0.44 GiB chunked, a 10x reduction.
+    //
+    // decoder_context_frames is derived, not tuned: see dac_receptive_frames().
+    //
+    // The knob is the MAXIMUM core size (a workspace budget: the decoder graph
+    // costs roughly 1.6 MiB per window frame). 0 means "one graph for the whole
+    // utterance", which is what the parity test uses.
+    int max_core_frames = 512;
     if (const char* e = getenv("CRISPASR_SIDON_DECODER_CHUNK_FRAMES"); e && e[0]) {
         const int v = atoi(e);
-        decoder_chunk_frames = v > 0 ? v : T;
+        max_core_frames = v > 0 ? v : T;
     }
-    const int decoder_context_frames = 10;
+    const int decoder_context_frames = dac_receptive_frames(ctx->model.dac);
     const int decoder_hop = ctx->model.dac.config.hop_length;
     const int hidden = ctx->model.hp.hidden;
+
+    // Split into the FEWEST chunks that respect the budget, then spread the
+    // cores evenly over them. Even cores matter: with a fixed core size, a T
+    // just past a multiple of the core leaves a final window that is nearly all
+    // context and almost no payload — at T=625 / core=256 that decoded 840
+    // frames' worth of graph for 625 frames of audio (+34%). Balancing gives
+    // ceil(625/512)=2 chunks of 313 (+7.8%).
+    const int n_chunks = (T + max_core_frames - 1) / max_core_frames;
+    const int core_frames = (T + n_chunks - 1) / n_chunks;
+
+    // Every chunk uses the SAME window length, so at the edges the window slides
+    // inward rather than shrinking. The cropped core is identical either way.
+    //
+    // The graph is rebuilt per chunk on purpose. Building it once and reusing it
+    // across chunks looks like an obvious win and is NOT correct here: the
+    // scheduler hands the decoder input buffer to a later intermediate as
+    // scratch, so from the second chunk on the decode runs on clobbered input.
+    // Measured on samples/jfk.wav that cost max|diff| 0.476 vs the
+    // whole-utterance decode and dropped spectral correlation to the source from
+    // 0.928 to 0.795 — and it bought nothing: with balanced cores the rebuild is
+    // free (DAC 42234 ms rebuilding vs 42253 ms reusing). Do not "optimize" this
+    // back without a bit-exactness check against CRISPASR_SIDON_DECODER_CHUNK_FRAMES=0.
+    const int window_frames = std::min(T, core_frames + 2 * decoder_context_frames);
+
     std::vector<float> pcm;
     pcm.reserve((size_t)T * decoder_hop);
-    for (int core_start = 0; core_start < T; core_start += decoder_chunk_frames) {
-        const int core_end = std::min(T, core_start + decoder_chunk_frames);
-        const int chunk_start = std::max(0, core_start - decoder_context_frames);
-        const int chunk_end = std::min(T, core_end + decoder_context_frames);
-        const int chunk_frames = chunk_end - chunk_start;
+    std::vector<float> chunk_pcm;
+    for (int core_start = 0; core_start < T; core_start += core_frames) {
+        const int core_end = std::min(T, core_start + core_frames);
+        int chunk_start = std::max(0, core_start - decoder_context_frames);
+        if (chunk_start + window_frames > T)
+            chunk_start = T - window_frames;
+        const int chunk_frames = window_frames;
+        const int chunk_end = chunk_start + chunk_frames;
         if (!prepare_decoder_graph(ctx, chunk_frames)) {
             release_decoder_workspace(ctx);
             return {};
@@ -792,8 +991,11 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
         }
         ggml_backend_sched_synchronize(ctx->decoder_sched);
 
-        std::vector<float> chunk_pcm((size_t)ggml_nelements(ctx->decoder_output));
+        chunk_pcm.resize((size_t)ggml_nelements(ctx->decoder_output));
         ggml_backend_tensor_get(ctx->decoder_output, chunk_pcm.data(), 0, chunk_pcm.size() * sizeof(float));
+        // Crop to the samples this CORE owns. Keyed on core_end, not chunk_end:
+        // once the window starts sliding inward several consecutive chunks share
+        // chunk_end == T, and only the final core may run to the buffer end.
         const size_t crop_begin = (size_t)(core_start - chunk_start) * decoder_hop;
         const size_t crop_end =
             core_end == T ? chunk_pcm.size() : crop_begin + (size_t)(core_end - core_start) * decoder_hop;
@@ -808,12 +1010,20 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     }
     const auto decoder_done = clock::now();
 
+    // Crop the padding back off. The leading pad is a whole predictor frame, so
+    // it maps to exactly lead_frames * decoder_hop output samples; dropping only
+    // the tail (as the original padding change did) would leave the result
+    // delayed by that much AND truncate the same amount of real audio off the
+    // end.
     const size_t target_samples = (size_t)n_samples * ctx->model.hp.output_rate / ctx->model.hp.input_rate;
-    if (pcm.size() < target_samples) {
-        std::fprintf(stderr, "sidon: padded decoder output is shorter than the requested duration\n");
+    const size_t lead_samples = (size_t)lead_frames * decoder_hop;
+    if (pcm.size() < lead_samples + target_samples) {
+        std::fprintf(stderr, "sidon: padded decoder output is shorter than the requested duration (%zu < %zu)\n",
+                     pcm.size(), lead_samples + target_samples);
         release_decoder_workspace(ctx);
         return {};
     }
+    pcm.erase(pcm.begin(), pcm.begin() + (std::ptrdiff_t)lead_samples);
     pcm.resize(target_samples);
     const auto download_done = clock::now();
     if (!release_decoder_workspace(ctx)) {

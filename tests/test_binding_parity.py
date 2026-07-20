@@ -5,6 +5,16 @@ Does NOT instantiate models or run inference — purely checks that the
 binding declares (and can look up) all 152 symbols in this smoke-test set.
 Requires CRISPASR_LIB_PATH pointing at a built libcrispasr.{so,dylib}.
 
+KNOWN GAP: this list is a curated subset, NOT the full export surface.
+src/crispasr_c_api.cpp currently declares 199 distinct CA_EXPORT symbols, so
+~47 are unlisted and this test would not notice if a binding stopped exposing
+one of them. Treat a green run as "the listed symbols are reachable", not as
+"the ABI is fully covered". When adding symbols here, prefer closing the gap
+over matching the existing count. Regenerate the true export list with:
+
+    grep -oE 'CA_EXPORT[[:space:]]+[A-Za-z_]+[[:space:]*]+crispasr_[A-Za-z0-9_]+' \\
+        src/crispasr_c_api.cpp | grep -oE 'crispasr_[A-Za-z0-9_]+' | sort -u
+
     CRISPASR_LIB_PATH=build/src/libcrispasr.so python -m pytest tests/test_binding_parity.py -v
 """
 

@@ -42,20 +42,47 @@ struct ScopedTestEnv {
     ~ScopedTestEnv() { set_test_env(name.c_str(), had_previous ? previous.c_str() : nullptr); }
 };
 
+// Walk the RIFF chunk list to find `data`. A fixed 44-byte skip is wrong for
+// real files: samples/jfk.wav carries a 26-byte LIST chunk between `fmt ` and
+// `data`, so audio actually starts at byte 78 and a 44-byte skip feeds 17
+// samples of chunk header into the model as though they were loud audio.
 static std::vector<float> load_wav_16k(const char* path) {
     FILE* f = fopen(path, "rb");
     if (!f)
         return {};
 
-    fseek(f, 0, SEEK_END);
-    const long size = ftell(f) - 44;
-    fseek(f, 44, SEEK_SET);
-    if (size <= 0 || size % (long)sizeof(int16_t) != 0) {
+    char riff[12];
+    if (fread(riff, 1, sizeof(riff), f) != sizeof(riff) || memcmp(riff, "RIFF", 4) != 0 ||
+        memcmp(riff + 8, "WAVE", 4) != 0) {
         fclose(f);
         return {};
     }
 
-    std::vector<int16_t> raw((size_t)size / sizeof(int16_t));
+    uint32_t data_bytes = 0;
+    for (;;) {
+        char id[4];
+        uint32_t chunk_size = 0;
+        if (fread(id, 1, sizeof(id), f) != sizeof(id) || fread(&chunk_size, sizeof(chunk_size), 1, f) != 1) {
+            fclose(f);
+            return {};
+        }
+        if (memcmp(id, "data", 4) == 0) {
+            data_bytes = chunk_size;
+            break;
+        }
+        // Chunks are word-aligned: an odd size is followed by a pad byte.
+        if (fseek(f, (long)chunk_size + (chunk_size & 1u), SEEK_CUR) != 0) {
+            fclose(f);
+            return {};
+        }
+    }
+
+    if (data_bytes == 0 || data_bytes % sizeof(int16_t) != 0) {
+        fclose(f);
+        return {};
+    }
+
+    std::vector<int16_t> raw(data_bytes / sizeof(int16_t));
     const size_t read = fread(raw.data(), sizeof(int16_t), raw.size(), f);
     fclose(f);
     if (read != raw.size())
@@ -98,20 +125,86 @@ TEST_CASE("sidon speech restoration", "[integration][sidon]") {
         tail_peak = std::max(tail_peak, std::fabs(output[i]));
     CHECK(tail_peak < 0.05f);
 
-    // The bounded DAC path must preserve the full-graph decoder output. This
-    // also exercises scheduler teardown/recreation on a persistent context.
+    // Restoration must be time-ALIGNED with the input, not merely the right
+    // length. Inference pads the input (a leading predictor frame plus 1.5 s of
+    // lookahead) and crops the padding back off afterwards; cropping only the
+    // tail leaves the whole result delayed by the leading pad and silently drops
+    // the same amount of real audio off the end. Length checks and the
+    // chunked/whole parity check are both blind to that, so compare the speech
+    // onset on both sides.
+    {
+        // Speech onset from a 5 ms windowed-RMS envelope. A bare
+        // first-sample-over-threshold test is useless here: jfk.wav opens on
+        // broadband noise whose very first sample already clears any sane
+        // fraction of the peak.
+        auto onset = [](const std::vector<float>& x, int win) {
+            std::vector<float> env;
+            for (size_t i = 0; i + (size_t)win <= x.size(); i += (size_t)win) {
+                double sum = 0.0;
+                for (int j = 0; j < win; ++j)
+                    sum += (double)x[i + (size_t)j] * x[i + (size_t)j];
+                env.push_back((float)std::sqrt(sum / win));
+            }
+            if (env.empty())
+                return (long)0;
+            const float loudest = *std::max_element(env.begin(), env.end());
+            const float threshold = 0.10f * loudest;
+            for (size_t i = 0; i < env.size(); ++i)
+                if (env[i] > threshold)
+                    return (long)(i * (size_t)win);
+            return (long)x.size();
+        };
+        const long in_onset = onset(input, 80) * 3; // 5 ms @ 16 kHz -> 48 kHz
+        const long out_onset = onset(output, 240);  // 5 ms @ 48 kHz
+        const long skew = std::labs(out_onset - in_onset);
+        INFO("onset input(x3)=" << in_onset << " output=" << out_onset << " skew=" << skew << " samples");
+        CHECK(skew < 480); // < 10 ms @ 48 kHz
+    }
+
+    // The bounded DAC path must reproduce the whole-utterance decode EXACTLY.
+    // It decodes each core with the decoder's full latent receptive field, so
+    // the only difference is where the graph is cut — not the arithmetic. Assert
+    // bit-exactness rather than a cosine: a global cosine over the whole
+    // waveform is the wrong instrument here, because a join discontinuity is
+    // local and a handful of bad samples out of 528000 barely moves it. When
+    // graph reuse silently corrupted the joins, max|diff| was 0.476 while the
+    // cosine still read 0.978.
+    //
+    // This also exercises scheduler teardown/recreation on a persistent context.
     {
         ScopedTestEnv full_decode("CRISPASR_SIDON_DECODER_CHUNK_FRAMES", "0");
         const auto full_output = sidon_restore(ctx, input.data(), (int)input.size());
         REQUIRE(full_output.size() == output.size());
-        double dot = 0.0, chunked_norm = 0.0, full_norm = 0.0;
+        float max_abs_diff = 0.0f;
+        for (size_t i = 0; i < output.size(); ++i)
+            max_abs_diff = std::max(max_abs_diff, std::fabs(output[i] - full_output[i]));
+        INFO("max|chunked - whole-utterance| = " << max_abs_diff);
+        CHECK(max_abs_diff == 0.0f);
+    }
+
+    // The relative-position-bias formulations are algebraically identical; they
+    // differ only in what the graph materialises. `expand` keeps the legacy
+    // [head_dim, T, T] expansion (and the Vulkan-specific branch), `bucket`
+    // evaluates one dot product per distance bucket, `bucket-direct` also skips
+    // the in-graph REPEAT of the gather index. Reordered float arithmetic means
+    // these are close, not identical, and the DAC amplifies the difference — so
+    // check the magnitudes too, since cosine alone is scale-blind.
+    for (const char* mode : {"expand", "bucket-direct"}) {
+        ScopedTestEnv rpe("CRISPASR_SIDON_RPE", mode);
+        const auto alt = sidon_restore(ctx, input.data(), (int)input.size());
+        REQUIRE(alt.size() == output.size());
+        double dot = 0.0, alt_sq = 0.0, ref_sq = 0.0;
         for (size_t i = 0; i < output.size(); ++i) {
-            dot += (double)output[i] * full_output[i];
-            chunked_norm += (double)output[i] * output[i];
-            full_norm += (double)full_output[i] * full_output[i];
+            dot += (double)output[i] * alt[i];
+            alt_sq += (double)alt[i] * alt[i];
+            ref_sq += (double)output[i] * output[i];
         }
-        const double cosine = dot / std::sqrt(chunked_norm * full_norm);
-        CHECK(cosine > 0.999);
+        const double cosine = dot / std::sqrt(alt_sq * ref_sq);
+        const double magnitude_ratio = std::sqrt(alt_sq) / std::sqrt(ref_sq);
+        INFO("RPE mode " << mode << ": cos=" << cosine << " |alt|/|ref|=" << magnitude_ratio);
+        CHECK(cosine > 0.99);
+        CHECK(magnitude_ratio > 0.98);
+        CHECK(magnitude_ratio < 1.02);
     }
 
     // O(T^2) length cap: an over-long input (well past the ~58.5 s / 3000-frame
