@@ -177,6 +177,35 @@ ggml/GGUF backends.
   ⚠️ **Open design constraint**: `ref=np.max` is a **per-clip** normalisation, so
   the feature cannot be computed chunked without changing it. Settle the
   long-audio strategy BEFORE writing the runtime.
+- **⛔ BLOCKED (guitar tab)**: the end-to-end evaluation does not work yet, and
+  until it does NO front-end verdict is trustworthy. Running the real TabCNN on
+  EGSet12 track 01 with ground truth from amt_tools own pipeline
+  (`load_stacked_notes_jams` -> `stacked_notes_to_stacked_multi_pitch` ->
+  `stacked_multi_pitch_to_tablature`) yields **tablature F1 0.0008, TP=1 of
+  1251** where DAFx-24 reports **0.447** for this model+set. Random guessing over
+  21 classes would score ~5%, so this is a harness/setup fault, not model
+  performance. Predictions are heavily skewed — active counts per string
+  [542, 604, 107, 29, 4, 0] against ground truth [64, 440, 172, 229, 229, 117].
+  Ruled out so far: string order (reversing is worse), time alignment (best
+  shift over ±6 frames still TP=7), silence sentinel (amt_tools uses **−1**, the
+  model uses class 20 — that WAS a real bug in my eval and is fixed), framing
+  (`framify_activations` pad_center matches the hand-rolled window), and the CQT
+  itself (octave energy sits 52.9 % in 164–329 Hz, correct for guitar).
+  Still open: audio preparation. amt_tools GuitarSet loader calls
+  `load_normalize_audio(..., norm=audio_norm)` and EGSet12 is 48 kHz **stereo**
+  24-bit — channel averaging and the missing normalisation are the leading
+  suspects, along with the possibility that this checkpoint is not the
+  general-purpose model assumed.
+  ⚠️ **Consequence for the CQT decision**: the earlier paired comparison
+  (core/cqt.h vs librosa features through the same model) is internally
+  consistent — both arms share every downstream step — and it showed the
+  disagreements are near-ties: 146 flips, ref top1−top2 margin median **0.100**
+  at flips vs **0.965** where they agree, **zero** confident flips at margin
+  >0.8. That means my earlier "core/cqt.h changes 6.7 % of played notes, it is
+  unusable" verdict was **OVERSTATED**. But "the outputs barely change" is weak
+  evidence when the model is not demonstrably working at all, so the honest
+  position is: **fix the absolute evaluation first, then re-take the front-end
+  verdict.** Do not start the librosa-compatible CQT rewrite on this basis.
 - **Next (guitar tab)**: blockers cleared, so the audio arm can start. Order:
   (1) ✅ done: weights pulled + tensor layout pinned; (2) `models/convert-tabcnn-to-gguf.py` +
   `tools/tabcnn_torch_parity.py` — and per the BTC/CQT lesson assert on the
