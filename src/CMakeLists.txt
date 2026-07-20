@@ -2360,6 +2360,17 @@ endif()
 # ---------------------------------------------------------------------------
 # crepe — CREPE monophonic F0 estimation (music transcription)
 # ---------------------------------------------------------------------------
+# btc_chords — BTC chord recognition (ISMIR 2019). Weights are CC-BY-NC-SA;
+# the registry gate refuses to download them without --accept-license.
+add_library(btc-chords STATIC btc_chords.h btc_chords.cpp)
+set_target_properties(btc-chords PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(btc-chords PUBLIC .)
+target_compile_features   (btc-chords PUBLIC cxx_std_17)
+target_link_libraries     (btc-chords PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(btc-chords PRIVATE -O3)
+endif()
+
 add_library(crepe STATIC crepe.h crepe.cpp)
 set_target_properties(crepe PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(crepe PUBLIC .)
