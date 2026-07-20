@@ -302,6 +302,11 @@ struct whisper_params {
     // CRISPASR_FIRERED_VAD_DEBUG env var directly).
     bool firered_vad_debug = false;
     bool auto_download = false;
+    // Attests acceptance of a RESTRICTED model licence (cc-by-nc-*, gemma,
+    // llama*, lfm1.0, other): the exact SPDX-ish tag, or "all". Separate from
+    // --i-have-rights, which attests SPEAKER CONSENT for voice cloning — one
+    // flag must not grant two unrelated permissions.
+    std::string accept_license;
     bool dry_run_resolve = false;
     bool dry_run_ignore_cache = false;
     std::string cache_dir;

@@ -5,6 +5,10 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 #include <cstdio>
 #include <vector>
 
@@ -1364,8 +1368,105 @@ void download_extras(const Entry& e, bool quiet, const std::string& cache_dir_ov
     }
 }
 
+// ---------------------------------------------------------------------------
+// Restricted-licence acceptance gate.
+//
+// Mirrors CrispEmbed's examples/cli/model_mgr.{h,cpp} so the two repos behave
+// identically: acceptance is per-licence (an exact SPDX tag, or "all"), keyed
+// off a tag rather than a substring, and `allow_download` alone is NEVER
+// sufficient for a restricted model.
+//
+// Registry entries carry human prose today (e.g. "CC-BY-NC-4.0 — NON-COMMERCIAL
+// use only (base model ...)"), so normalise to the leading SPDX-ish token first
+// rather than rewriting every entry. New entries should use a bare tag.
+// ---------------------------------------------------------------------------
+
+static std::string license_tag(const std::string& lic) {
+    std::string t;
+    for (char c : lic) {
+        if (c == ' ' || c == '\t' || c == '(' || c == ',')
+            break;
+        if ((unsigned char)c >= 0x80) // em-dash and friends
+            break;
+        t += (char)tolower((unsigned char)c);
+    }
+    while (!t.empty() && (t.back() == '-' || t.back() == '.'))
+        t.pop_back();
+    return t;
+}
+
+// True when the tag designates a licence the user must explicitly accept.
+// Same list as CrispEmbed, so a future gemma/llama model is gated on arrival
+// instead of shipping ungated.
+static bool license_requires_acceptance_tag(const std::string& tag) {
+    if (tag.rfind("cc-by-nc", 0) == 0)
+        return true;
+    if (tag.rfind("llama", 0) == 0)
+        return true;
+    static const char* restricted[] = {"gemma", "qwen-research", "mistral-ai-research", "lfm1.0", "other", nullptr};
+    for (const char** p = restricted; *p; ++p)
+        if (tag == *p)
+            return true;
+    return false;
+}
+
 static bool license_is_nc(const std::string& lic) {
-    return lic.find("NC") != std::string::npos || lic.find("NonCommercial") != std::string::npos;
+    return license_requires_acceptance_tag(license_tag(lic));
+}
+
+// Has the user accepted this specific licence? Exact tag, or "all" / "*".
+// Checked against the caller-supplied string, then the process-level setting,
+// then CRISPASR_ACCEPT_LICENSE.
+static bool license_accepted(const std::string& lic, const std::string& accepted_arg) {
+    const std::string tag = license_tag(lic);
+    auto matches = [&](const std::string& acc) {
+        if (acc.empty())
+            return false;
+        if (acc == "all" || acc == "*")
+            return true;
+        return license_tag(acc) == tag;
+    };
+    if (matches(accepted_arg))
+        return true;
+    if (const char* env = std::getenv("CRISPASR_ACCEPT_LICENSE"))
+        if (matches(env))
+            return true;
+    return false;
+}
+
+// Gate a restricted model BEFORE any bytes are fetched. Returns true to
+// proceed. On a TTY the user is shown the licence and prompted; otherwise the
+// download is refused with instructions. `allow_download` alone is NOT enough.
+static bool license_gate_allows_download(const CrispasrRegistryEntry& e, const std::string& accepted_license) {
+    if (e.license.empty() || !license_is_nc(e.license))
+        return true;
+    if (license_accepted(e.license, accepted_license))
+        return true;
+
+    const std::string tag = license_tag(e.license);
+    fprintf(stderr, "crispasr: model '%s' is released under a restricted licence:\n", e.filename.c_str());
+    fprintf(stderr, "  Licence: %s\n", e.license.c_str());
+    if (tag.rfind("cc-by-nc", 0) == 0)
+        fprintf(stderr, "  Notice:  NON-COMMERCIAL USE ONLY — see the upstream model card for terms.\n");
+    else
+        fprintf(stderr, "  Notice:  review the upstream model card for the full licence terms.\n");
+
+    if (isatty(fileno(stdin))) {
+        fprintf(stderr, "Download %s (%s) and accept this licence? [y/N] ", e.filename.c_str(), e.approx_size.c_str());
+        fflush(stderr);
+        int c = fgetc(stdin);
+        if (c == 'y' || c == 'Y')
+            return true;
+        fprintf(stderr, "crispasr: declined — not downloading.\n");
+        return false;
+    }
+
+    fprintf(stderr,
+            "crispasr: refusing to download without explicit licence acceptance.\n"
+            "  Pass --accept-license %s (or set CRISPASR_ACCEPT_LICENSE=%s).\n"
+            "  --auto-download / -m auto alone is NOT sufficient for a restricted licence.\n",
+            tag.c_str(), tag.c_str());
+    return false;
 }
 
 void print_license_note(const CrispasrRegistryEntry& e, bool quiet) {
@@ -1382,6 +1483,18 @@ void print_license_note(const CrispasrRegistryEntry& e, bool quiet) {
 }
 
 } // namespace
+
+std::string crispasr_license_tag(const std::string& license) {
+    return license_tag(license);
+}
+
+bool crispasr_license_requires_acceptance(const std::string& license) {
+    return license_is_nc(license);
+}
+
+bool crispasr_license_accepted(const std::string& license, const std::string& accepted) {
+    return license_accepted(license, accepted);
+}
 
 bool crispasr_registry_lookup(const std::string& backend, CrispasrRegistryEntry& out,
                               const std::string& preferred_quant) {
@@ -1448,7 +1561,7 @@ bool crispasr_find_cached_model(CrispasrRegistryEntry& out, const std::string& c
 
 std::string crispasr_resolve_model(const std::string& model_arg, const std::string& backend_name, bool quiet,
                                    const std::string& cache_dir_override, bool allow_download,
-                                   const std::string& preferred_quant) {
+                                   const std::string& preferred_quant, const std::string& accepted_license) {
     // Concrete path that exists on disk — pass through.
     if (model_arg != "auto" && model_arg != "default") {
         FILE* f = fopen(model_arg.c_str(), "rb");
@@ -1474,11 +1587,19 @@ std::string crispasr_resolve_model(const std::string& model_arg, const std::stri
 
         if (have_match) {
             const std::string cached = crispasr_cache::dir(cache_dir_override) + "/" + match.filename;
-            if (crispasr_cache::file_present(cached))
+            if (crispasr_cache::file_present(cached)) {
+                // A previously-downloaded restricted model used to load in
+                // total silence — state the licence on every load, not just
+                // the one where it happened to be fetched.
+                print_license_note(match, quiet);
                 return cached;
+            }
         }
 
         if (have_match && allow_download) {
+            // Restricted-licence gate BEFORE any bytes are fetched.
+            if (!license_gate_allows_download(match, accepted_license))
+                return "";
             if (!quiet) {
                 fprintf(stderr, "crispasr: model '%s' not found locally — downloading %s (%s)\n", model_arg.c_str(),
                         match.filename.c_str(), match.approx_size.c_str());
@@ -1508,6 +1629,12 @@ std::string crispasr_resolve_model(const std::string& model_arg, const std::stri
                 backend_name.c_str());
         return "";
     }
+
+    // Restricted-licence gate BEFORE any bytes are fetched. Skipped when the
+    // file is already cached (acceptance happened at download time).
+    if (!crispasr_cache::file_present(crispasr_cache::dir(cache_dir_override) + "/" + e.filename) &&
+        !license_gate_allows_download(e, accepted_license))
+        return "";
 
     if (!quiet)
         fprintf(stderr, "crispasr: resolving %s (%s) via -m auto\n", e.filename.c_str(), e.approx_size.c_str());

@@ -27,6 +27,20 @@ struct CrispasrRegistryEntry {
     std::string license;               // empty = permissive; non-empty = printed to stderr on download
 };
 
+/// Normalise a registry `license` string to its leading SPDX-ish tag,
+/// lowercased (e.g. "CC-BY-NC-4.0 — NON-COMMERCIAL ..." -> "cc-by-nc-4.0").
+std::string crispasr_license_tag(const std::string& license);
+
+/// True when the licence designates a RESTRICTED model the user must
+/// explicitly accept before download: cc-by-nc-*, gemma, llama*,
+/// qwen-research, mistral-ai-research, lfm1.0, other.
+/// Same list as CrispEmbed's crispembed_mgr::license_requires_acceptance.
+bool crispasr_license_requires_acceptance(const std::string& license);
+
+/// True when `accepted` attests this licence: the exact tag, or "all" / "*".
+/// Falls back to the CRISPASR_ACCEPT_LICENSE env var.
+bool crispasr_license_accepted(const std::string& license, const std::string& accepted);
+
 /// Look up a registry entry by backend name. Returns true on hit.
 bool crispasr_registry_lookup(const std::string& backend, CrispasrRegistryEntry& out,
                               const std::string& preferred_quant = "");
@@ -64,6 +78,12 @@ bool crispasr_find_cached_model(CrispasrRegistryEntry& out, const std::string& c
 /// decide what to do (prompt on TTY, raise an error, etc.).
 ///
 /// Returns an empty string on unrecoverable failure.
+/// `accepted_license` attests acceptance of a RESTRICTED licence (cc-by-nc-*,
+/// gemma, llama*, lfm1.0, other): pass the exact SPDX-ish tag, or "all".
+/// Falls back to the `CRISPASR_ACCEPT_LICENSE` env var. For such models
+/// `allow_download` alone is NOT sufficient — without acceptance the download
+/// is refused (non-TTY) or prompted (TTY), BEFORE any bytes are fetched.
+/// Mirrors CrispEmbed's crispembed_mgr::resolve_model.
 std::string crispasr_resolve_model(const std::string& model_arg, const std::string& backend_name, bool quiet,
                                    const std::string& cache_dir_override = "", bool allow_download = false,
-                                   const std::string& preferred_quant = "");
+                                   const std::string& preferred_quant = "", const std::string& accepted_license = "");
