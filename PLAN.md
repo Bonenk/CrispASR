@@ -139,8 +139,14 @@ transcribe(), plus the CLI dispatcher and the wasm/Go arms. Note the
 `crispasr_detect_backend_from_gguf` trap — register the arch there too, not just
 in the CLI (see the BTC entry in `docs/music-transcription/PLAN.md`).
 
-**Blocking coordination:** the feature/F0 record shapes must be agreed with the
-opus agent BEFORE their API freeze. Pin down, in writing: ContentVec feature
+**Blocking coordination — DRAFTED, awaiting their reply:** see
+`docs/music-transcription/SVC_RECORD_SHAPES.md`, a concrete proposal for every
+record shape (layout, dims, frame rate, F0 units, unvoiced encoding, speaker id,
+return PCM) with reasons, so it can be accepted or amended rather than discussed
+in the abstract. Items we have not yet verified against the RVC reference are
+marked [UNVERIFIED] and must not be built against. The sharpest open question is
+§3: who resamples F0 onto the feature timebase. The feature/F0 record shapes
+must be agreed with the opus agent BEFORE their API freeze. Pin down, in writing: ContentVec feature
 rate + dimensionality + dtype, F0 units (Hz vs cents vs MIDI) and hop, whether
 F0 is voiced-masked, speaker-id encoding, and the sample rate of the returned
 audio. Do this first — it is cheap now and expensive after the freeze.

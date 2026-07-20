@@ -296,6 +296,10 @@
 #include "glm_asr.h"
 #define CA_HAVE_GLMASR 1
 #endif
+#if __has_include("mel_band_roformer.h")
+#include "mel_band_roformer.h"
+#define CA_HAVE_MEL_BAND_ROFORMER 1
+#endif
 #if __has_include("htdemucs.h")
 #include "htdemucs.h"
 #define CA_HAVE_HTDEMUCS 1
@@ -1476,6 +1480,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "crepe";
     else if (strcmp(arch, "htdemucs") == 0)
         backend = "htdemucs";
+    else if (strcmp(arch, "mel-band-roformer") == 0)
+        backend = "mel-band-roformer";
     else if (strcmp(arch, "btc") == 0)
         backend = "btc-chords";
 
@@ -1860,6 +1866,10 @@ struct crispasr_session {
 #endif
 #ifdef CA_HAVE_GLMASR
     void* glmasr_ctx = nullptr;
+#endif
+#ifdef CA_HAVE_MEL_BAND_ROFORMER
+    mel_band_roformer_context* mbr_ctx = nullptr;
+    mel_band_roformer_result* mbr_last_result = nullptr;
 #endif
 #ifdef CA_HAVE_HTDEMUCS
     htdemucs_context* htdemucs_ctx = nullptr;
@@ -2776,6 +2786,21 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.seed = g_open_seed_tls;
         s->omnivoice_ctx = omnivoice_init_from_file(model_path, p);
         if (!s->omnivoice_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_MEL_BAND_ROFORMER
+    // The CLI's --separate dispatcher reads the GGUF arch itself, so
+    // mel-band-roformer worked there while being absent from BOTH arch-detect
+    // tables and from every session arm -- separation from any binding was
+    // htdemucs-only. Multi-surface trap; see docs/contributing.md section 7.
+    if (s->backend == "mel-band-roformer" || s->backend == "mel_band_roformer" || s->backend == "melbandroformer" ||
+        s->backend == "mbr") {
+        s->mbr_ctx = mel_band_roformer_init_from_file(model_path, mel_band_roformer_default_params());
+        if (!s->mbr_ctx) {
             delete s;
             return nullptr;
         }
@@ -3918,6 +3943,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_HTDEMUCS
     list += ",htdemucs";
+#endif
+#ifdef CA_HAVE_MEL_BAND_ROFORMER
+    list += ",mel-band-roformer";
 #endif
 #ifdef CA_HAVE_CREPE
     list += ",crepe";
@@ -8644,6 +8672,16 @@ CA_EXPORT int crispasr_session_separate(crispasr_session* s, const float* pcm_st
         return s->htdemucs_last_result ? s->htdemucs_last_result->n_sources : -1;
     }
 #endif
+#ifdef CA_HAVE_MEL_BAND_ROFORMER
+    if (s->mbr_ctx) {
+        if (s->mbr_last_result) {
+            mel_band_roformer_result_free(s->mbr_last_result);
+            s->mbr_last_result = nullptr;
+        }
+        s->mbr_last_result = mel_band_roformer_separate(s->mbr_ctx, pcm_stereo, n_samples, /*in_channels=*/2);
+        return s->mbr_last_result ? s->mbr_last_result->n_sources : -1;
+    }
+#endif
     return -1;
 }
 
@@ -8654,6 +8692,10 @@ CA_EXPORT int crispasr_session_separate_n_stems(crispasr_session* s) {
     if (s->htdemucs_last_result)
         return s->htdemucs_last_result->n_sources;
 #endif
+#ifdef CA_HAVE_MEL_BAND_ROFORMER
+    if (s->mbr_last_result)
+        return s->mbr_last_result->n_sources;
+#endif
     return 0;
 }
 
@@ -8663,6 +8705,10 @@ CA_EXPORT const char* crispasr_session_separate_stem_name(crispasr_session* s, i
 #ifdef CA_HAVE_HTDEMUCS
     if (s->htdemucs_last_result && stem_idx >= 0 && stem_idx < s->htdemucs_last_result->n_sources)
         return s->htdemucs_last_result->source_names[stem_idx];
+#endif
+#ifdef CA_HAVE_MEL_BAND_ROFORMER
+    if (s->mbr_last_result && stem_idx >= 0 && stem_idx < s->mbr_last_result->n_sources)
+        return s->mbr_last_result->source_names[stem_idx];
 #endif
     return nullptr;
 }
@@ -8677,6 +8723,13 @@ CA_EXPORT const float* crispasr_session_separate_stem(crispasr_session* s, int s
         return s->htdemucs_last_result->sources[stem_idx];
     }
 #endif
+#ifdef CA_HAVE_MEL_BAND_ROFORMER
+    if (s->mbr_last_result && stem_idx >= 0 && stem_idx < s->mbr_last_result->n_sources) {
+        if (out_n_samples)
+            *out_n_samples = s->mbr_last_result->n_samples;
+        return s->mbr_last_result->sources[stem_idx];
+    }
+#endif
     if (out_n_samples)
         *out_n_samples = 0;
     return nullptr;
@@ -8688,6 +8741,10 @@ CA_EXPORT int crispasr_session_separate_sample_rate(crispasr_session* s) {
 #ifdef CA_HAVE_HTDEMUCS
     if (s->htdemucs_ctx)
         return htdemucs_sample_rate(s->htdemucs_ctx);
+#endif
+#ifdef CA_HAVE_MEL_BAND_ROFORMER
+    if (s->mbr_ctx)
+        return mel_band_roformer_sample_rate(s->mbr_ctx);
 #endif
     return 0;
 }
@@ -9071,6 +9128,12 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
         htdemucs_result_free(s->htdemucs_last_result);
     if (s->htdemucs_ctx)
         htdemucs_free(s->htdemucs_ctx);
+#endif
+#ifdef CA_HAVE_MEL_BAND_ROFORMER
+    if (s->mbr_last_result)
+        mel_band_roformer_result_free(s->mbr_last_result);
+    if (s->mbr_ctx)
+        mel_band_roformer_free(s->mbr_ctx);
 #endif
 #ifdef CA_HAVE_BTC_CHORDS
     if (s->btc_ctx)

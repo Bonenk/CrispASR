@@ -60,6 +60,7 @@ add_executable(${TARGET}
     crispasr_backend_htdemucs.cpp
     crispasr_backend_crepe.cpp
     crispasr_backend_btc.cpp
+    crispasr_backend_mel_band_roformer.cpp
     crispasr_backend_kyutai_stt.cpp
     crispasr_backend_firered_asr.cpp
     crispasr_backend_moonshine.cpp
