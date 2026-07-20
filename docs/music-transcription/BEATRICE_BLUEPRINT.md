@@ -165,6 +165,70 @@ because dumps are what circulate.
 
 ---
 
+## Reference evaluation — is it any good?
+
+Run before committing to the port, per [[tts-advisory-check-blueprint-first]].
+**Verdict: yes on clean input, and the port target is well defined.**
+
+There is **no inference CLI** — `__main__.py`'s argparse is training-only
+(`-d/-o/-r/-c`). Driving it takes: build `PhoneExtractor` + `PitchEstimator`,
+load their two checkpoints, build `ConverterNetwork(pe, pi, n_speakers=200,
+pitch_bins=448, hidden_channels=256, vq_topk=4)`, load `net_g`, then
+**`net_g.enable_hook()`** to activate the VectorQuantizer. Only extra dep is
+`pyworld`. Scripts: `run_ref.py` / `probe2.py` (scratchpad).
+
+**`load_state_dict` reports 0 missing, 0 unexpected** against the 177-tensor
+`net_g`. The architecture read above therefore matches the shipped checkpoint
+exactly — the converter can and should assert exact key coverage rather than
+using `strict=False` tolerance. This also resolves blueprint item 7:
+`embed_quantized_pitch.weight` **is present** (448x256), so the converter does
+not need to rebuild the sinusoidal table (but must not assume that for
+checkpoints from other training runs).
+
+ASR roundtrip (whisper base), same sentence, 24 kHz output:
+
+| input | transcript of the CONVERTED audio |
+|---|---|
+| clean TTS speech (in domain) | "And so my fellow **in Erickons**, ask not what your country can do for you, ask what you can do for your country." |
+| `samples/jfk.wav` (1961 archival, out of domain) | "And so might fellow **Annacats**, **airsp** not. What your country can do for you..." |
+
+So: on clean input, one degraded word out of twenty and everything else
+verbatim. On noisy archival audio it degrades badly and inconsistently. Two
+fairness caveats before calling that a quality ceiling: jfk.wav is far out of
+domain for a LibriTTS-R model, and **the 151 checkpoint is a `pretrained_file`
+bootstrap for fine-tuning, not a finished voice** — Beatrice's actual workflow
+trains a target speaker on top of it.
+
+Prepending 1 s of silence did **not** repair the archival degradation (it got
+slightly worse), so it is not a simple warmup transient.
+
+Speaker conditioning is real: `embed_speaker` rows differ from row 0 by mean L2
+1.98 (a copied/untrained table would be 0.0), and cross-speaker log-mel distance
+runs **2.4x-3.7x the RNG floor**.
+
+### Measuring anything here needs an RNG floor
+
+First attempt used **waveform correlation** and produced ~0.00 for every pair —
+including a same-input/same-speaker rerun that should have been ~1.0. Cause:
+`overlap_add`'s random initial phase (detail 4 above) fully decorrelates the
+phase while the audio sounds identical. The measure was invalid, and its
+near-zero readings would have been easy to misread as "speakers differ hugely"
+or "padding changed everything".
+
+**The discipline that fixes it:** use a phase-invariant measure (log-mel), and
+run the *same input twice* first to establish the **floor** — the distance
+attributable purely to the RNG. Here the floor is 0.374; every real comparison
+is then quoted as a multiple of it. Without the floor, "padded vs raw = 0.565"
+means nothing; against it, it is 1.5x — real but small next to the 2.4-3.7x of
+an actual speaker change. Applies to the §CB2 harness and to any stochastic
+backend. See [[tts-parity-not-by-audio-corr]].
+
+Note the output is stochastic enough that ASR transcribed two runs of the *same*
+speaker differently — so acceptance thresholds must be set against the floor,
+not against a single golden run.
+
+---
+
 ## Order of work
 
 Per component, smallest and most frozen first:
