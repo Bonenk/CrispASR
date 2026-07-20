@@ -90,6 +90,36 @@ would read as "the model is weak on diminished chords", not as a typo.
 Same shape as the OmniVoice zeroed-`token_embd` lesson (a data defect wearing a
 model defect's clothes), but from the other end of the pipeline.
 
+**And the blind spot is not only at the END of the harness — it is at the
+START.** The BTC reference dump deliberately includes `input_feat` so the
+runtime replays the exact features the spec scored, which stops a front-end
+difference masquerading as a model parity failure. That is the right design,
+and it means the harness NEVER TESTED OUR FRONT END. Two real bugs lived there
+through 13/13 at cos 1.000000:
+
+- The reference CQTs each 10 s chunk INDEPENDENTLY and concatenates
+  (`audio_file_to_features`). Because librosa centres every call, each chunk
+  carries its own edge padding, so this is NOT a continuous transform: 2778
+  frames vs 2770 on a 257 s clip. We had implemented `librosa.cqt` correctly
+  and `audio_file_to_features` not at all — our features scored **cos 0.9993
+  against a continuous librosa CQT and 0.8815 against the actual reference
+  pipeline**.
+- Frame duration is `inst_len / timestep` (10/108 = 0.0925926 s), NOT
+  `hop / sample_rate` (2048/22050 = 0.0928798 s). A 0.31 % difference — 0.79 s
+  of accumulated drift over a four-minute song, every chord boundary
+  progressively late.
+
+Neither is visible in a per-stage logit diff. Both were found only by running
+the reference pipeline end-to-end on real audio and comparing chord timelines
+with `mir_eval`: **86.63 % → 98.56 % (tetrads)** once fixed.
+
+So the rule has two halves. Port the reference's PIPELINE, not just its
+mathematical operation — the wrapper around `librosa.cqt` was as load-bearing
+as the transform. And when a harness pins an input to isolate a stage, write
+down what that pinning excludes, because that is now untested surface. Ours is
+covered by `tests/test-btc-vocab.cpp` (geometry, hermetic) plus the real-music
+`mir_eval` comparison.
+
 So: **for every port, list what the diff harness structurally cannot see, and
 cover that separately.** Here that meant extracting the pure vocabulary +
 positional-encoding helpers into `src/btc_chord_vocab.h` purely so they could be
