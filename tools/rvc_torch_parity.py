@@ -303,6 +303,17 @@ def main():
         # every captured enc_p sublayer, squeezed of the batch dim
         for _k, _v in ENCP_TAPS.items():
             stages[_k] = _v
+        # dec stages: the source module and every upsample/noise-conv stage.
+        for _k in ("har_source", "sine_raw", "conv_pre"):
+            if _k in caps:
+                _v = caps[_k]
+                stages["dec_" + _k] = _v[0] if _v.ndim >= 2 and _v.shape[0] == 1 else _v
+        for _i in range(len(m["upsample_rates"])):
+            for _pfx in ("ups", "nc"):
+                _k = f"{_pfx}{_i}"
+                if _k in caps:
+                    _v = caps[_k]
+                    stages["dec_" + _k] = _v[0] if _v.ndim >= 2 and _v.shape[0] == 1 else _v
         for _k, _v in caps.items():
             if _k.startswith("flow_"):
                 stages[_k] = _v[0] if _v.ndim >= 2 and _v.shape[0] == 1 else _v

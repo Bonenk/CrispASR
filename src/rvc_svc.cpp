@@ -8,6 +8,7 @@
 #include "rvc_svc.h"
 
 #include "core/gguf_loader.h"
+#include "core/hifigan.h"
 #include "core/gpu_backend_pref.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
@@ -39,6 +40,8 @@ struct rvc_hparams {
     std::vector<int> upsample_rates;
     std::vector<int> upsample_kernel_sizes;
     std::vector<int> resblock_kernel_sizes;
+    std::vector<int> resblock_dilations; // flattened n_kernels x n_dilations
+    int resblock_n_dilations = 3;
     // Flow geometry is HARDCODED upstream (models.py:624 —
     // ResidualCouplingBlock(inter, hidden, 5, 1, 3)), not config-derived, so
     // these hold for every checkpoint rather than just the one we converted.
@@ -161,6 +164,8 @@ rvc_svc_context* rvc_svc_init_from_file(const char* model_path, rvc_svc_params p
     hp.upsample_rates = read_i32_array(meta, "rvc.upsample_rates");
     hp.upsample_kernel_sizes = read_i32_array(meta, "rvc.upsample_kernel_sizes");
     hp.resblock_kernel_sizes = read_i32_array(meta, "rvc.resblock_kernel_sizes");
+    hp.resblock_dilations = read_i32_array(meta, "rvc.resblock_dilations");
+    hp.resblock_n_dilations = core_gguf::kv_u32(meta, "rvc.resblock_n_dilations", 3);
     core_gguf::free_metadata(meta);
 
     if (hp.upsample_rates.empty() || hp.upsample_rates.size() != hp.upsample_kernel_sizes.size()) {
@@ -438,6 +443,72 @@ ggml_tensor* rvc_enc_p_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* c
 } // namespace
 
 // ---------------------------------------------------------------------------
+// SineGen — the NSF source signal.
+//
+// Computed on the HOST, not in ggml: it is signal generation (cumsum, linear
+// interpolation, modulo, wrap detection), not a learned layer — the same call
+// as BTC's CQT front end. Doing it in ggml would mean expressing a running
+// phase accumulation with no matching op, for no benefit.
+//
+// The phase logic CANNOT be paraphrased. A plausible rewrite scored cos -0.04
+// against torch (right amplitude, uncorrelated phase). The real sequence
+// (models.py:329-351):
+//   1. rad = (f0/sr) % 1                       at FRAME rate
+//   2. tmp = cumsum(rad) * upp                 still frame rate
+//   3. tmp -> LINEAR interpolate to out rate, align_corners=True
+//   4. rad -> NEAREST interpolate to out rate
+//   5. tmp %= 1; wrap points are where diff(tmp) < 0
+//   6. phase = cumsum(rad_up + shift), shift = -1 at each wrap
+//   7. sine = sin(phase * 2*pi)
+// The linear-interpolated cumsum locates the WRAPS only; the phase accumulates
+// over the NEAREST-upsampled values. The two interpolations use DIFFERENT
+// modes. Accumulate in double: the running sum grows without bound while only
+// its fraction matters.
+//
+// harmonic_num is 0, so the random initial phase is identically zero and the
+// only live noise here is the ADDITIVE term (voicing-dependent).
+// ---------------------------------------------------------------------------
+
+namespace {
+
+void rvc_sine_gen(const float* f0_hz, int T, int upp, int sr, const float* noise, float sine_amp, float noise_std,
+                  std::vector<float>& out_sine, std::vector<float>& out_uv) {
+    const int64_t N = (int64_t)T * upp;
+    std::vector<double> rad((size_t)T), tmp((size_t)T);
+    double acc = 0.0;
+    for (int t = 0; t < T; t++) {
+        rad[(size_t)t] = std::fmod((double)f0_hz[t] / (double)sr, 1.0);
+        acc += rad[(size_t)t];
+        tmp[(size_t)t] = acc * upp;
+    }
+    // linear interpolate `tmp` to the output rate, align_corners=True
+    std::vector<double> tmp_up((size_t)N);
+    for (int64_t i = 0; i < N; i++) {
+        const double x = (T > 1) ? (double)i * (double)(T - 1) / (double)(N - 1) : 0.0;
+        const int64_t i0 = (int64_t)std::floor(x);
+        const int64_t i1 = std::min<int64_t>(i0 + 1, T - 1);
+        const double fr = x - (double)i0;
+        tmp_up[(size_t)i] = tmp[(size_t)i0] * (1.0 - fr) + tmp[(size_t)i1] * fr;
+        tmp_up[(size_t)i] = tmp_up[(size_t)i] - std::floor(tmp_up[(size_t)i]); // %= 1
+    }
+    out_sine.assign((size_t)N, 0.0f);
+    out_uv.assign((size_t)N, 0.0f);
+    double phase = 0.0;
+    for (int64_t i = 0; i < N; i++) {
+        const double r = rad[(size_t)(i / upp)]; // NEAREST upsample
+        const double shift = (i > 0 && (tmp_up[(size_t)i] - tmp_up[(size_t)i - 1]) < 0.0) ? -1.0 : 0.0;
+        phase += r + shift;
+        const double uv = (f0_hz[i / upp] > 0.0f) ? 1.0 : 0.0;
+        const double na = uv * noise_std + (1.0 - uv) * sine_amp / 3.0;
+        const double s = std::sin(phase * 2.0 * M_PI) * sine_amp;
+        out_sine[(size_t)i] = (float)(s * uv + na * (noise ? (double)noise[i] : 0.0));
+        out_uv[(size_t)i] = (float)uv;
+    }
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------------
 // flow — ResidualCouplingBlock, REVERSE pass
 //
 // Traps (RVC_BLUEPRINT.md 2c):
@@ -561,6 +632,108 @@ ggml_tensor* rvc_flow_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* z_
 } // namespace
 
 // ---------------------------------------------------------------------------
+// dec — GeneratorNSF (NSF-HiFi-GAN)
+//
+// Traps (RVC_BLUEPRINT.md 2d):
+//   * TWO different LeakyReLU slopes in ONE function: per-stage and ResBlock use
+//     LRELU_SLOPE = 0.1, but the FINAL pre-conv_post call is a bare
+//     F.leaky_relu(x) -> torch's 0.01 default (models.py:529).
+//   * dec.cond HAS a bias (nn.Conv1d default). Omitting it is a constant
+//     per-channel offset, invisible structurally, and cost cos 0.998 in numpy.
+//   * conv_post is bias=False (models.py:484).
+//   * The source is added AFTER the transpose-conv, via noise_convs[i] whose
+//     stride is prod(rates[i+1:]) and padding stride/2.
+//   * Each stage sums num_kernels ResBlocks and DIVIDES by num_kernels.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+ggml_tensor* rvc_dec_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* z, ggml_tensor* har, ggml_tensor* gemb,
+                           int T) {
+    const rvc_hparams& hp = c->hp;
+    auto W = [&](const std::string& n) -> ggml_tensor* {
+        auto it = c->t.find(n);
+        if (it == c->t.end()) {
+            fprintf(stderr, "rvc: missing tensor %s\n", n.c_str());
+            return nullptr;
+        }
+        return it->second;
+    };
+    auto TAPD = [&](const std::string& nm, ggml_tensor* v) {
+        if (c->capture) {
+            ggml_tensor* o = ggml_cont(g, ggml_transpose(g, v));
+            ggml_set_output(o);
+            c->caps[nm] = o;
+        }
+        return v;
+    };
+
+    // m_source: tanh(l_linear(sine)). harmonic_num=0 so this is 1 -> 1.
+    ggml_tensor* hs = ggml_mul_mat(g, W("dec.m_source.l_linear.weight"), har);
+    hs = ggml_tanh(g, ggml_add(g, hs, W("dec.m_source.l_linear.bias"))); // [1, T*upp]
+    TAPD("dec_har_source", hs);
+
+    // conv_pre + speaker cond (WITH its bias)
+    ggml_tensor* cpw = W("dec.conv_pre.weight");
+    ggml_tensor* x = ggml_conv_1d(g, cpw, ggml_cont(g, ggml_transpose(g, z)), 1, ((int)cpw->ne[0] - 1) / 2, 1);
+    x = ggml_add(g, ggml_cont(g, ggml_transpose(g, x)), W("dec.conv_pre.bias"));
+    TAPD("dec_conv_pre", x);
+    ggml_tensor* cond =
+        ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W("dec.cond.weight")), gemb), W("dec.cond.bias"));
+    x = ggml_add(g, x, cond);
+
+    const int nk = (int)hp.resblock_kernel_sizes.size();
+    for (int i = 0; i < (int)hp.upsample_rates.size(); i++) {
+        const int u = hp.upsample_rates[i];
+        const int k = hp.upsample_kernel_sizes[i];
+        x = ggml_leaky_relu(g, x, 0.1f, false); // LRELU_SLOPE
+        // ConvTranspose1d(stride=u, padding=(k-u)/2). ggml_conv_transpose_1d
+        // ASSERTS p0 == 0 — it has no padding support — so the torch padding is
+        // expressed as a symmetric CROP of the unpadded output, which is what
+        // core_convt::convt1d_crop does (and it takes/returns [C, T] directly).
+        ggml_tensor* uw = W("dec.ups." + std::to_string(i) + ".weight");
+        const int crop = (k - u) / 2;
+        x = core_convt::convt1d_crop(g, x, uw, W("dec.ups." + std::to_string(i) + ".bias"), u, crop, crop);
+        TAPD("dec_ups" + std::to_string(i), x);
+
+        // source injection: strided conv over har
+        int stride = 1;
+        for (int j = i + 1; j < (int)hp.upsample_rates.size(); j++)
+            stride *= hp.upsample_rates[j];
+        ggml_tensor* nw = W("dec.noise_convs." + std::to_string(i) + ".weight");
+        ggml_tensor* xs =
+            ggml_conv_1d(g, nw, ggml_cont(g, ggml_transpose(g, hs)), stride, stride > 1 ? stride / 2 : 0, 1);
+        xs = ggml_add(g, ggml_cont(g, ggml_transpose(g, xs)), W("dec.noise_convs." + std::to_string(i) + ".bias"));
+        TAPD("dec_nc" + std::to_string(i), xs);
+        x = ggml_add(g, x, xs);
+
+        // core_hifigan::resblock_forward works TIME-MAJOR (T, C) while this
+        // graph is channel-major, so transpose around it rather than
+        // reimplementing the MRF block.
+        ggml_tensor* xt = ggml_cont(g, ggml_transpose(g, x)); // (T, C)
+        ggml_tensor* acc = nullptr;
+        for (int j = 0; j < nk; j++) {
+            const int idx = i * nk + j;
+            std::vector<int> dils(hp.resblock_dilations.begin() + (size_t)j * hp.resblock_n_dilations,
+                                  hp.resblock_dilations.begin() + (size_t)(j + 1) * hp.resblock_n_dilations);
+            ggml_tensor* rb = core_hifigan::resblock_forward(g, xt, c->t, "dec.resblocks." + std::to_string(idx),
+                                                             hp.resblock_kernel_sizes[j], dils, 0.1f);
+            acc = acc ? ggml_add(g, acc, rb) : rb;
+        }
+        // divide by num_kernels, then back to channel-major
+        x = ggml_cont(g, ggml_transpose(g, ggml_scale(g, acc, 1.0f / (float)nk)));
+    }
+
+    x = ggml_leaky_relu(g, x, 0.01f, false); // BARE F.leaky_relu -> 0.01, NOT 0.1
+    ggml_tensor* pw = W("dec.conv_post.weight");
+    x = ggml_conv_1d(g, pw, ggml_cont(g, ggml_transpose(g, x)), 1, ((int)pw->ne[0] - 1) / 2, 1);
+    x = ggml_cont(g, ggml_transpose(g, x)); // conv_post is bias=False
+    return ggml_tanh(g, x);
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------------
 // Per-stage diff. Input-aligned: the reference carries input_phone/input_pitch
 // AND both noise buffers, which we replay, so the comparison is deterministic
 // even though the model is stochastic.
@@ -640,6 +813,9 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
     std::vector<float> ref_zp;
     ggml_tensor* z_out = nullptr;
     ggml_tensor* zp_in = nullptr;
+    ggml_tensor* z_in = nullptr;
+    ggml_tensor* har_in = nullptr;
+    ggml_tensor* audio_out = nullptr;
     if (rvc_ref_get(rw, "z_p", ref_zp)) {
         // The reference z_p is (inter, T) row-major -> TIME fastest, whereas
         // our working layout is [inter, T] with CHANNELS fastest. Declare the
@@ -664,6 +840,20 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
         }
         z_out = rvc_flow_graph_conds(g, c, zp_ct, conds, rev, T);
         ggml_set_output(z_out);
+
+        // dec: input-aligned on the reference z AND the host SineGen output,
+        // so a flow difference cannot masquerade as a vocoder failure.
+        std::vector<float> ref_z, ref_f0, ref_noise;
+        if (rvc_ref_get(rw, "z", ref_z) && rvc_ref_get(rw, "input_f0", ref_f0) &&
+            rvc_ref_get(rw, "noise_sine", ref_noise)) {
+            z_in = ggml_new_tensor_2d(g, GGML_TYPE_F32, T, hp.inter); // ref order
+            ggml_set_input(z_in);
+            har_in = ggml_new_tensor_2d(g, GGML_TYPE_F32, 1, (int64_t)T * hp.upp());
+            ggml_set_input(har_in);
+            ggml_tensor* z_ct = ggml_cont(g, ggml_transpose(g, z_in)); // [inter, T]
+            audio_out = rvc_dec_graph(g, c, z_ct, har_in, gemb, T);
+            ggml_set_output(audio_out);
+        }
     }
     if (!stats) {
         ggml_free(g);
@@ -681,6 +871,10 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
     // ggml_backend_tensor_get aborts with "tensor buffer not set".
     for (auto& kv : c->caps)
         ggml_build_forward_expand(gf, kv.second);
+    if (z_out)
+        ggml_build_forward_expand(gf, z_out);
+    if (audio_out)
+        ggml_build_forward_expand(gf, audio_out);
 
     ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(c->backend));
     if (!ggml_gallocr_alloc_graph(alloc, gf)) {
@@ -702,6 +896,16 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
         for (int i = 0; i < hp.inter; i++)
             rev[(size_t)i] = hp.inter - 1 - i;
         ggml_backend_tensor_set(c->rev_idx_tensor, rev.data(), 0, rev.size() * sizeof(int32_t));
+    }
+    if (z_in && har_in) {
+        std::vector<float> rz, rf0, rn;
+        rvc_ref_get(rw, "z", rz);
+        rvc_ref_get(rw, "input_f0", rf0);
+        rvc_ref_get(rw, "noise_sine", rn);
+        ggml_backend_tensor_set(z_in, rz.data(), 0, rz.size() * sizeof(float));
+        std::vector<float> sine, uv;
+        rvc_sine_gen(rf0.data(), T, hp.upp(), hp.sample_rate, rn.data(), hp.sine_amp, hp.add_noise_std, sine, uv);
+        ggml_backend_tensor_set(har_in, sine.data(), 0, sine.size() * sizeof(float));
     }
     ggml_backend_graph_compute(c->backend, gf);
 
@@ -774,7 +978,55 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
     if (rvc_ref_get(rw, "logs_p", ref_logs))
         report("logs_p", out.data() + (size_t)hp.inter * T, ref_logs);
 
-    fprintf(stderr, "  NOTE: dec (NSF vocoder) graph is not implemented yet — enc_p + flow only.\n");
+    // dec: validate the HOST SineGen before anything is built on it.
+    {
+        std::vector<float> f0, noise, ref_sine;
+        if (rvc_ref_get(rw, "input_f0", f0) && rvc_ref_get(rw, "noise_sine", noise) &&
+            rvc_ref_get(rw, "dec_sine_raw", ref_sine)) {
+            std::vector<float> sine, uv;
+            rvc_sine_gen(f0.data(), T, hp.upp(), hp.sample_rate, noise.data(), hp.sine_amp, hp.add_noise_std, sine, uv);
+            const int64_t n = (int64_t)std::min(sine.size(), ref_sine.size());
+            const double cs = rvc_cos(sine.data(), ref_sine.data(), n);
+            const bool ok = cs >= COS_MIN && sine.size() == ref_sine.size();
+            if (!ok)
+                n_fail++;
+            fprintf(stderr, "  %-16s %s cos=%.8f max_abs=%.3e (mine=%zu ref=%zu)\n", "dec_sine_raw",
+                    ok ? "PASS" : "FAIL", cs, rvc_max_abs(sine.data(), ref_sine.data(), n), sine.size(),
+                    ref_sine.size());
+        }
+    }
+
+    // dec stages, earliest first
+    {
+        std::vector<std::string> dorder = {"dec_har_source", "dec_conv_pre"};
+        for (int i = 0; i < (int)hp.upsample_rates.size(); i++) {
+            dorder.push_back("dec_ups" + std::to_string(i));
+            dorder.push_back("dec_nc" + std::to_string(i));
+        }
+        for (const auto& nm : dorder) {
+            auto it = c->caps.find(nm);
+            std::vector<float> ref;
+            if (it == c->caps.end() || !rvc_ref_get(rw, nm.c_str(), ref))
+                continue;
+            std::vector<float> mine((size_t)ggml_nelements(it->second));
+            ggml_backend_tensor_get(it->second, mine.data(), 0, mine.size() * sizeof(float));
+            const int64_t n = (int64_t)std::min(mine.size(), ref.size());
+            const double cs = rvc_cos(mine.data(), ref.data(), n);
+            const bool ok = cs >= COS_MIN && mine.size() == ref.size();
+            if (!ok)
+                n_fail++;
+            fprintf(stderr, "  %-16s %s cos=%.8f max_abs=%.3e (mine=%zu ref=%zu)\n", nm.c_str(), ok ? "PASS" : "FAIL",
+                    cs, rvc_max_abs(mine.data(), ref.data(), n), mine.size(), ref.size());
+        }
+    }
+    if (audio_out) {
+        std::vector<float> ref_audio;
+        if (rvc_ref_get(rw, "output_audio", ref_audio)) {
+            std::vector<float> mine((size_t)ggml_nelements(audio_out));
+            ggml_backend_tensor_get(audio_out, mine.data(), 0, mine.size() * sizeof(float));
+            report("output_audio", mine.data(), ref_audio);
+        }
+    }
 
     ggml_gallocr_free(alloc);
     ggml_free(g);
