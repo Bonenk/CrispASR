@@ -74,7 +74,17 @@ def main():
 
     m.frontend.stem.register_forward_hook(hook("stem"))
     for i in range(3):
-        m.frontend.blocks[i].partial.register_forward_hook(hook(f"blk{i}_partial"))
+        pt = m.frontend.blocks[i].partial
+        # Sub-block granularity: attnF/ffF/attnT/ffT are where the port's real
+        # failure modes live (RoPE axis, per-head gating, residual placement),
+        # so each gets its own reference rather than only the fused output.
+        # NOTE these capture the sub-block OUTPUT, i.e. the residual BRANCH
+        # value before `x + branch`, not the post-residual activation.
+        pt.attnF.register_forward_hook(hook(f"blk{i}_attnF"))
+        pt.ffF.register_forward_hook(hook(f"blk{i}_ffF"))
+        pt.attnT.register_forward_hook(hook(f"blk{i}_attnT"))
+        pt.ffT.register_forward_hook(hook(f"blk{i}_ffT"))
+        pt.register_forward_hook(hook(f"blk{i}_partial"))
         m.frontend.blocks[i].register_forward_hook(hook(f"blk{i}"))
     m.frontend.linear.register_forward_hook(hook("linear"))
     m.transformer_blocks.register_forward_hook(hook("transformer"))
