@@ -1057,9 +1057,61 @@ silently mis-folding.
 - [x] Parity harness vs the torch reference — `test-beat-this-stages` (19
   network stages) and `test-beat-this-track` (windowing + postprocessing).
 
-- [ ] **NOW — active work.** The runtime is complete and at parity; what remains
-  is surfaces only, no more numerics. In order: a `--beats` CLI surface, the
-  session C ABI, and the Dart binding mirroring `pitch()`. Per
-  [[multi-surface-dispatch-trap]] all three must land together and be checked
-  with `test-surface-parity.sh`, and `beat_this_track()` no longer returns -1
-  so nothing gates on that sentinel any more.
+- [x] **Surfaces DONE** — `--beats` CLI (+ `--beats-format text|json`), the
+  backend shim and all four registration sites, the session C ABI
+  (`crispasr_session_beats` / `_n_events` / `_events` / `_tempo_bpm` /
+  `_sample_rate`), README + docs/cli.md, a regenerated feature matrix, and the
+  Dart binding (`beats()`, `beatsSampleRate`, `beatsTempoBpm`, the `Beat`
+  record) with a live test. `tools/check-backend-wiring.py` REQUIRED passes.
+
+  That tool landed on `main` mid-task and immediately earned its keep: it
+  caught beat-this missing from c_api dispatch, `available_backends` and the
+  feature-matrix regen — three of the four sites in exactly the trap
+  `crispasr_backend_btc.cpp`'s header warns about. **Run it before claiming a
+  backend is wired**; the CLI working proves nothing about the other surfaces.
+
+  Dart live test on a 20 s 120 BPM click track: 38 beats, 14 downbeats,
+  tempo 120.00 BPM. CLI on the 45 s fixture: 91 beats, 25 downbeats, 120.0 BPM.
+
+- [x] **Two memory bugs, found only by running the CLI on real audio.**
+
+  1. **A heap overflow that had been live since the front end was signed off.**
+     `beat_this_logmel` sized its FFT output `2 * n_freqs` (1026 floats), but
+     `core_fft::fft_radix2_wrapper` writes the FULL complex spectrum —
+     `2 * n_fft` = 2048 floats. Every frame overwrote ~4 KB past the vector.
+
+     **It scored cos = 1.00000000 the whole time**, because the corrupted bytes
+     are past the ones read back. The 101-frame fixture never crashed; a 45 s
+     file (2251 frames) corrupted the heap reliably, surfacing as an
+     intermittent wild-pointer `memmove` and a nonsense 4.39e18 allocation.
+     Every other `core_fft` caller in the tree already sized this `2*fft_size`.
+
+     **The lesson worth keeping: a parity harness cannot see this class of bug.**
+     Perfect cosine says the arithmetic is right, not that the memory is. Run
+     the real surface on real, LONG input before believing "verified".
+
+  2. Latent: `bt_run` sized its position-id scratch by `T`, but the frequency
+     axis is always 32 entries, so audio under ~0.64 s overran it. Now
+     `max(T, 32)`, covered by a 0.2 s smoke test.
+
+  I initially misdiagnosed (1) as memory pressure from the attention matrices
+  and went looking at ggml's flash-attention kernel. Recorded because the
+  misdiagnosis was plausible and cost real time: the giveaway that it was heap
+  corruption rather than exhaustion was the *nonsense* size (4.4 exabytes), not
+  a merely large one.
+
+- [x] **Flash attention** — kept on its own merits after it turned out not to be
+  the segfault fix. Upstream's `Attend()` is `F.scaled_dot_product_attention`,
+  which never materialises the N x N scores; N is the 1500-frame chunk, so the
+  attnT scores alone are 288 MB and the graph's compute buffer measured
+  **322 MB**. `ggml_flash_attn_ext` takes the same graph to **47.6 MB** (6.8x),
+  which matters because the downstream consumer is a mobile app. Its output is
+  already `(D, H, N, B)`, removing a permute and simplifying the per-head
+  gating. Parity unchanged to 7 digits.
+
+- [ ] **NOW — active work.** One advisory gap left: the
+  `src/crispasr_model_registry.cpp` entry, which needs `beat-this-f16.gguf`
+  (41 MB) published to HuggingFace first. Deliberately NOT added yet — a
+  registry URL that 404s is worse than no `--auto-download`. Publishing is the
+  user's call since it is outward-facing; everything else ships and works
+  today with an explicit `-m <path>`.
