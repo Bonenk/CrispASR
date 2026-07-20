@@ -44,6 +44,16 @@ ggml/GGUF backends.
   like the htdemucs iSTFT scale bug that cosine let through. It now asserts on
   the median per-bin magnitude ratio; reverting the fix drives that median to
   0.0131, a 76× margin.
+- **Done**: ✅ **piano-transcription per-stage validated — and it was BROKEN.**
+  `piano_transcription_diff()` + registration in the diff binary (the reference
+  dumper already existed but nothing consumed it). First run: mel PASS
+  cos 1.000000, `conv_block_output` FAIL cos 0.810. Root cause: upstream passes
+  momentum POSITIONALLY to `nn.BatchNorm2d`, where the second positional
+  parameter is `eps` — so all 33 BatchNorm2d run at **eps=0.01**, while the 4
+  BatchNorm1d (built with an explicit keyword) keep 1e-5. We hardcoded 1e-5
+  everywhere; with running variances ~0.003 that is a 2.09x error per layer.
+  Now **8/8 stages at cos 1.000000**. The weights were trained with the slip,
+  so it is reproduced deliberately, like BTC's trailing ReLU.
 - **Done**: ✅ **Real-music acceptance + two front-end parity bugs fixed.** The
   diff harness replays `input_feat` by design, so it never tested our CQT.
   Running the torch reference end-to-end on its own 257 s test clip exposed
