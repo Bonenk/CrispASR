@@ -176,6 +176,45 @@ with every 2-D BatchNorm at the wrong epsilon.
 
 ---
 
+## 3b. Checkpoint structure (measured on the official v2 `f0G40k.pth`)
+
+560 tensors: `enc_p` 113, `dec` 243, `enc_q` 103, `flow` 100, `emb_g` 1.
+
+- **`enc_q` (103) is the PosteriorEncoder — TRAINING ONLY**, never called by
+  `infer()`. Dead weight, like BTC's `output_layer.lstm.*`.
+- **`dec` and `flow` are weight-normalised**: they store `weight_g`/`weight_v`,
+  not `weight` (`dec.ups.0.weight` does not exist). Fuse at convert time,
+  `w = g * v / ||v||` with the norm over every dim except 0. Some layers in the
+  SAME module (`conv_pre`, `noise_convs`, `conv_post`) carry a plain `.weight`,
+  so both forms must be handled. 104 pairs in this checkpoint.
+- **`enc_p` uses RELATIVE positional attention**, not absolute PE:
+  `emb_rel_k/v` are `(1, 2w+1, d)` with **w = 10**.
+- Geometry read off the weights: `emb_phone` (192, 768) → content dim 768,
+  hidden 192; `emb_pitch` (256, 192) → the coarse pitch is an EMBEDDING INDEX;
+  `emb_g` (109, 256) → 109 speakers, gin 256.
+
+### Upsample rates are NOT recoverable from the checkpoint
+
+The 40k ConvTranspose1d kernels are `16,16,4,4`, while the rates are
+`10,10,2,2`. Assuming `kernel == 2*rate` gives `8,8,2,2` — a silently wrong
+model. The rates come from the config JSON (note v2 ships only 32k/48k; 40k
+lives under `configs/v1/`).
+
+They CAN be verified, though: `noise_convs[i]` has kernel `2*prod(rates[i+1:])`
+(1 for the last stage). Checked against the real checkpoint:
+
+| stage | kernel | 2·prod(rates[i+1:]) |
+|---|---|---|
+| 0 | 80 | 2·40 = 80 |
+| 1 | 8 | 2·4 = 8 |
+| 2 | 4 | 2·2 = 4 |
+| 3 | 1 | 1 |
+
+The converter asserts this, so a mismatched config fails loudly. Independently,
+`sr / prod(rates)` is **exactly 100.0** for every shipped config (32k/40k/48k) —
+a second, independent confirmation of the 100 Hz wire rate that
+SVC_RECORD_SHAPES derives from `pipeline.window = 160`.
+
 ## 4. Proposed order of work
 
 Standard order, unchanged by the above:
