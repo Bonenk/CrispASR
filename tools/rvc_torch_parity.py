@@ -209,8 +209,22 @@ def main():
         ok &= good
         print(f"  {name:8} {'PASS' if good else 'FAIL'} cos={cos:.8f} max_abs={mad:.3e} "
               f"|mine|={np.linalg.norm(a):.4f} |ref|={np.linalg.norm(b):.4f}")
+    # ---- flow (reverse) ----
+    g_emb = G["emb_g.weight"][0][:, None].astype(np.float64)  # sid 0
+    # (5, 1, 3) = kernel_size, dilation_rate, n_layers -- HARDCODED in
+    # models.py:624 (ResidualCouplingBlock(inter, hidden, 5, 1, 3, ...)), not
+    # config-derived, so these hold for every checkpoint.
+    z_np = flow_numpy(G, sa["z_p"][0], g_emb, n_flows=4, hidden=m["hidden_channels"],
+                      n_layers=3, kernel_size=5, dilation_rate=1)
+    a, b = z_np.ravel(), sa["z"][0].ravel().astype(np.float64)
+    cos = float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b)))
+    good = cos > 0.99999
+    ok &= good
+    print(f"NUMPY SPEC vs TORCH (flow, reverse):\n  {'z':8} {'PASS' if good else 'FAIL'} "
+          f"cos={cos:.8f} max_abs={np.abs(a-b).max():.3e} |mine|={np.linalg.norm(a):.4f} |ref|={np.linalg.norm(b):.4f}")
+
     if not ok:
-        sys.exit("FAIL: the numpy enc_p spec does not match torch — fix the spec before any ggml.")
+        sys.exit("FAIL: a numpy spec does not match torch — fix the spec before any ggml.")
 
     if len(sys.argv) > 5:
         import gguf as _g
@@ -323,6 +337,69 @@ def enc_p_numpy(G, phone, pitch, hidden, n_heads, n_layers, window, out_channels
 
     stats = _conv1d(x, W("enc_p.proj.weight"), W("enc_p.proj.bias"), 0)
     return stats[:out_channels], stats[out_channels:]
+
+
+# ---------------------------------------------------------------------------
+# numpy reimplementation — flow (ResidualCouplingBlock, REVERSE pass)
+#
+# Traps:
+#   * mean_only=True (models.py), so `logs` is ZERO and the coupling is purely
+#     ADDITIVE. The reverse is x1 = (x1 - m), not (x1 - m) * exp(-logs).
+#   * `flows` interleaves [Coupling, Flip] x 4; the reverse pass walks the whole
+#     list backwards, so Flip comes FIRST.
+#   * Flip reverses the CHANNEL axis (torch.flip(x, [1])).
+#   * The WaveNet is gated: tanh(first half) * sigmoid(second half) of
+#     (x_in + g_l), with the speaker conditioning sliced per layer.
+#   * Dilated convs with padding = (k*d - d)/2, i.e. SAME for odd k.
+# ---------------------------------------------------------------------------
+
+def _wn_numpy(G, prefix, x, g, hidden, n_layers, kernel_size, dilation_rate):
+    """WaveNet residual stack. x: (hidden, T), g: (gin, 1) speaker embedding."""
+    W = lambda k: G[k].astype(np.float64)
+    T = x.shape[1]
+    output = np.zeros_like(x)
+    # cond_layer projects g once to 2*hidden*n_layers, then each layer slices it.
+    gc = W(prefix + "cond_layer.weight")[:, :, 0] @ g[:, 0] + W(prefix + "cond_layer.bias")
+    for i in range(n_layers):
+        d = dilation_rate ** i
+        pad = int((kernel_size * d - d) / 2)
+        w = W(prefix + f"in_layers.{i}.weight")
+        b = W(prefix + f"in_layers.{i}.bias")
+        xp = np.pad(x, ((0, 0), (pad, pad)))
+        x_in = np.zeros((w.shape[0], T), dtype=np.float64)
+        for k in range(w.shape[2]):
+            x_in += w[:, :, k] @ xp[:, k * d : k * d + T]
+        x_in += b[:, None]
+        g_l = gc[i * 2 * hidden : (i + 1) * 2 * hidden][:, None]
+        in_act = x_in + g_l
+        acts = np.tanh(in_act[:hidden]) * (1.0 / (1.0 + np.exp(-in_act[hidden:])))
+        rw = W(prefix + f"res_skip_layers.{i}.weight")[:, :, 0]
+        rb = W(prefix + f"res_skip_layers.{i}.bias")
+        rs = rw @ acts + rb[:, None]
+        if i < n_layers - 1:
+            x = x + rs[:hidden]
+            output = output + rs[hidden:]
+        else:
+            output = output + rs
+    return output
+
+
+def flow_numpy(G, z_p, g, n_flows, hidden, n_layers, kernel_size, dilation_rate):
+    """Reverse pass. z_p: (C, T) -> z: (C, T)."""
+    W = lambda k: G[k].astype(np.float64)
+    x = z_p.astype(np.float64)
+    half = x.shape[0] // 2
+    # flows = [Coupling, Flip] * n_flows; reverse traversal hits Flip first.
+    for idx in range(n_flows - 1, -1, -1):
+        x = x[::-1]                                     # Flip: reverse channels
+        p = f"flow.flows.{idx * 2}."
+        x0, x1 = x[:half], x[half:]
+        h = W(p + "pre.weight")[:, :, 0] @ x0 + W(p + "pre.bias")[:, None]
+        h = _wn_numpy(G, p + "enc.", h, g, hidden, n_layers, kernel_size, dilation_rate)
+        m = W(p + "post.weight")[:, :, 0] @ h + W(p + "post.bias")[:, None]
+        x1 = x1 - m                                     # mean_only => no exp(-logs)
+        x = np.concatenate([x0, x1], axis=0)
+    return x
 
 
 def _abs_to_rel(x):
