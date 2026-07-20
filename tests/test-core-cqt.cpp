@@ -77,7 +77,12 @@ std::vector<float> tone(int n, double f, double amp = 0.5) {
 }
 
 // Must match tools/cqt_librosa_parity.py test_signal() exactly.
-std::vector<float> shared_test_signal(int n) {
+// `sr` defaults to the BTC rate so every existing caller is unchanged. It is a
+// parameter because the TabCNN front end runs at 44.1 kHz: baking SR into the
+// phase term would place the tones at half their intended frequency there, and
+// a parity run against librosa would then be comparing two different signals
+// while looking like a front-end disagreement.
+std::vector<float> shared_test_signal(int n, int sr = SR) {
     std::vector<float> x((size_t)n, 0.0f);
     const double fs[3] = {130.8127826502993, 261.6255653005986, 523.2511306011972};
     const int third = n / 3;
@@ -85,7 +90,7 @@ std::vector<float> shared_test_signal(int n) {
         const int lo = i * third;
         const int hi = (i < 2) ? (i + 1) * third : n;
         for (int s = lo; s < hi; s++)
-            x[(size_t)s] = (float)(0.5 * std::sin(2.0 * M_PI * fs[i] * (double)s / (double)SR));
+            x[(size_t)s] = (float)(0.5 * std::sin(2.0 * M_PI * fs[i] * (double)s / (double)sr));
     }
     return x;
 }
@@ -409,8 +414,69 @@ TEST_CASE("cqt: output is finite for a full-scale and a DC signal", "[core][cqt]
 
 // `test-core-cqt --dump <file>` writes the shared signal's magnitude matrix for
 // tools/cqt_librosa_parity.py. Not part of the Catch2 run.
+// TabCNN's front end, which is NOT BTC's. Read from the checkpoint and from
+// amt_tools/datasets/GuitarSet.py — see tools/reference_backends/tabcnn.py.
+// The two differ in ways that matter for reuse: hop 512 vs 2048 means 86 fps
+// instead of 10.8, so `core/cqt.h`'s documented transition-frame divergence
+// (per-frame correlation min 0.1136 at tone boundaries, from librosa's
+// recursive per-octave downsampling giving each octave a different group
+// delay) is far more consequential here. BTC scores 10-second chord segments
+// where boundary latency is immaterial; a frame-level tablature model at 86 fps
+// is exactly the case that comment says is the known gap.
+core_cqt::Params tabcnn_params() {
+    core_cqt::Params p;
+    p.sample_rate = 44100;
+    p.fmin = 82.4068892282175f; // E2, the guitar's lowest open string
+    p.n_bins = 192;
+    p.bins_per_octave = 24;
+    p.hop_length = 512;
+    return p;
+}
+
 int main(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
+        if (std::strcmp(argv[i], "--dump-tabcnn") == 0 && i + 1 < argc) {
+            const auto p = tabcnn_params();
+            const int T_target = 40;
+            // Optional third arg: a raw float32 mono file already at
+            // p.sample_rate. Synthetic tones are a harsh, unrepresentative
+            // leakage test -- most bins carry only sidelobe energy -- so the
+            // parity verdict has to be re-taken on real guitar audio before it
+            // means anything. Python does the decode/resample; this stays a
+            // dependency-free raw read.
+            std::vector<float> x;
+            if (i + 2 < argc) {
+                FILE* in = std::fopen(argv[i + 2], "rb");
+                if (!in) {
+                    std::fprintf(stderr, "cannot open %s\n", argv[i + 2]);
+                    return 1;
+                }
+                std::fseek(in, 0, SEEK_END);
+                const long bytes = std::ftell(in);
+                std::fseek(in, 0, SEEK_SET);
+                x.resize((size_t)bytes / sizeof(float));
+                if (std::fread(x.data(), sizeof(float), x.size(), in) != x.size()) {
+                    std::fclose(in);
+                    std::fprintf(stderr, "short read on %s\n", argv[i + 2]);
+                    return 1;
+                }
+                std::fclose(in);
+                std::fprintf(stderr, "read %zu samples from %s\n", x.size(), argv[i + 2]);
+            } else {
+                x = shared_test_signal(T_target * p.hop_length, p.sample_rate);
+            }
+            std::vector<float> m;
+            const int T = core_cqt::magnitude(p, x.data(), (int)x.size(), m);
+            FILE* f = std::fopen(argv[i + 1], "wb");
+            if (!f)
+                return 1;
+            const int32_t hdr[2] = {(int32_t)T, (int32_t)p.n_bins};
+            std::fwrite(hdr, sizeof(int32_t), 2, f);
+            std::fwrite(m.data(), sizeof(float), m.size(), f);
+            std::fclose(f);
+            std::printf("wrote %s (%d frames x %d bins, TabCNN params)\n", argv[i + 1], T, p.n_bins);
+            return 0;
+        }
         if (std::strcmp(argv[i], "--dump") == 0 && i + 1 < argc) {
             const auto p = btc_params();
             const int T_target = 40;
