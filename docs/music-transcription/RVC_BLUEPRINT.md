@@ -35,6 +35,26 @@ Both findings below are answered; recorded here so the doc reads as settled.
   (`rvcAlignFeatures`) and the coarse-pitch mel map 50–1100 Hz
   (`rvcCoarsePitch`) — independent agreement with §3 and SVC_RECORD_SHAPES §4.
 
+### CONFIRMED EMPIRICALLY (tools/rvc_torch_parity.py)
+
+The noise-replay design is proven, not just proposed. Intercepting every RNG
+call during `infer()` gives exactly three draws:
+
+```
+randn_like   (1, 192, 64)      <- Site A: z_p latent          (1, inter, T)
+rand         (1, 1)            <- SineGen phase: ONE element
+randn_like   (1, 25600, 1)     <- Site B: additive noise      (1, T*upp, 1)
+
+two runs with identical injected noise -> BIT-IDENTICAL, max_abs 0.000e+00
+```
+
+The `(1, 1)` draw is the `harmonic_num=0` prediction confirmed from the running
+model: the phase RNG is a single element, and because the model's next line
+zeroes it, injecting zeros there is provably equivalent — the bit-identical
+result is the proof. `check_phase_is_deterministic()` asserts
+`harmonic_num == 0 and dim == 1` against the built model so this cannot regress
+silently if someone loads a differently-configured checkpoint.
+
 ### Answer to their SineGen phase question — it is ZERO, by construction
 
 They asked whether to zero or replay the SineGen initial phase, having noticed
