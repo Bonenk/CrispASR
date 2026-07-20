@@ -168,6 +168,18 @@ def main():
             o = out[0] if isinstance(out,tuple) else out
             caps[name] = o.detach().numpy()
         return f
+    # PER-STAGE intermediates for crispasr-diff (HARD RULE #2: start at the
+    # earliest layer, first divergence = the bug). Endpoints alone are useless
+    # for bisecting -- that is exactly what stalled the first enc_p graph.
+    net.enc_p.emb_phone.register_forward_hook(_hook("encp_emb_phone"))
+    net.enc_p.lrelu.register_forward_hook(_hook("encp_lrelu"))
+    for _l in range(m["n_layers"]):
+        net.enc_p.encoder.attn_layers[_l].register_forward_hook(_hook(f"encp_L{_l}_attn"))
+        net.enc_p.encoder.norm_layers_1[_l].register_forward_hook(_hook(f"encp_L{_l}_norm1"))
+        net.enc_p.encoder.ffn_layers[_l].register_forward_hook(_hook(f"encp_L{_l}_ffn"))
+        net.enc_p.encoder.norm_layers_2[_l].register_forward_hook(_hook(f"encp_L{_l}_norm2"))
+    net.enc_p.proj.register_forward_hook(_hook("encp_proj"))
+
     net.dec.m_source.register_forward_hook(_hook("har_source"))
     net.dec.m_source.l_sin_gen.register_forward_hook(_hook("sine_raw"))
     net.dec.conv_pre.register_forward_hook(_hook("conv_pre"))
@@ -274,6 +286,12 @@ def main():
                   "noise_zp": noise_zp, "noise_sine": noise_sine,
                   "m_p": sa["m_p"][0], "logs_p": sa["logs_p"][0], "z_p": sa["z_p"][0], "z": sa["z"][0],
                   "output_audio": a[0]}
+        # every captured enc_p sublayer, squeezed of the batch dim
+        for _k, _v in ENCP_TAPS.items():
+            stages[_k] = _v
+        for _k, _v in caps.items():
+            if _k.startswith("encp_"):
+                stages[_k] = _v[0] if _v.ndim >= 2 and _v.shape[0] == 1 else _v
         w = _g.GGUFWriter(sys.argv[5], "rvc-ref")
         for k, v in stages.items():
             w.add_tensor(k, np.ascontiguousarray(v, dtype=np.float32))
@@ -335,6 +353,9 @@ def _rel_to_abs(x):
     return flat.reshape(H, T + 1, 2 * T - 1)[:, :T, T - 1 :]
 
 
+ENCP_TAPS = {}
+
+
 def enc_p_numpy(G, phone, pitch, hidden, n_heads, n_layers, window, out_channels):
     """phone: (T, content_dim), pitch: (T,) int -> (m_p, logs_p), each (out, T)."""
     W = lambda k: G[k].astype(np.float64)
@@ -355,15 +376,30 @@ def enc_p_numpy(G, phone, pitch, hidden, n_heads, n_layers, window, out_channels
         kh = k.reshape(n_heads, hd, T).transpose(0, 2, 1)
         vh = v.reshape(n_heads, hd, T).transpose(0, 2, 1)
         scores = (qh / np.sqrt(hd)) @ kh.transpose(0, 2, 1)
+        if i == 0:
+            ENCP_TAPS["encp_L0_q"] = q.copy()
+            ENCP_TAPS["encp_L0_scores_norel"] = scores.copy()
         rel_k = _get_relative_embeddings(W(p + "emb_rel_k"), T, window)
-        scores = scores + _rel_to_abs((qh / np.sqrt(hd)) @ rel_k.T)
+        rl = (qh / np.sqrt(hd)) @ rel_k.T
+        if i == 0:
+            ENCP_TAPS["encp_L0_rl"] = rl.copy()
+        scores = scores + _rel_to_abs(rl)
+        if i == 0:
+            ENCP_TAPS["encp_L0_scores"] = scores.copy()
         e = np.exp(scores - scores.max(-1, keepdims=True))
         attn = e / e.sum(-1, keepdims=True)
+        if i == 0:
+            ENCP_TAPS["encp_L0_attn_w"] = attn.copy()
         out = attn @ vh                                     # (H, T, hd)
+        if i == 0:
+            ENCP_TAPS["encp_L0_v"] = vh.copy()      # (H, T, hd) — hd fastest
+            ENCP_TAPS["encp_L0_agg"] = out.copy()   # (H, T, hd) — pre rel_v
         # relative VALUES: upstream adds them via the inverse skew
         rel_v = _get_relative_embeddings(W(p + "emb_rel_v"), T, window)
         out = out + _abs_to_rel(attn) @ rel_v
         out = out.transpose(0, 2, 1).reshape(hidden, T)
+        if i == 0:
+            ENCP_TAPS["encp_L0_ctx"] = out.copy()   # pre conv_o
         y = _conv1d(out, W(p + "conv_o.weight"), W(p + "conv_o.bias"), 0)
         n1 = f"enc_p.encoder.norm_layers_1.{i}."
         x = _layer_norm(x + y, W(n1 + "gamma"), W(n1 + "beta"))     # POST-norm

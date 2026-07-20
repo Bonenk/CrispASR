@@ -41,6 +41,7 @@
 #include "mel_band_roformer.h"
 #include "btc_chords.h"
 #include "piano_transcription.h"
+#include "rvc_svc.h"
 #include "voxtral_tts.h"
 #include "higgs_stt.h"
 #include "moss_transcribe_diarize.h"
@@ -1116,6 +1117,13 @@ int main(int argc, char** argv) {
         // the same gap htdemucs had (present in the dumper, absent from the
         // diff binary), so the backend shipped with no per-stage evidence.
         return mel_band_roformer_diff(model_path.c_str(), ref_path.c_str(), audio_path.c_str(), /*verbosity=*/2);
+    }
+    if (backend_name == "rvc" || backend_name == "rvc-svc") {
+        // model_path = rvc GGUF, ref_path = dump from tools/rvc_torch_parity.py.
+        // Input-aligned AND noise-aligned: the reference carries input_phone,
+        // input_pitch and BOTH RNG buffers, which the runtime replays — the
+        // only way to diff a stochastic model at all. audio_path unused.
+        return rvc_svc_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
     }
     if (backend_name == "piano" || backend_name == "piano-transcription") {
         // model_path = piano-transcription GGUF, ref_path = ref.gguf from
