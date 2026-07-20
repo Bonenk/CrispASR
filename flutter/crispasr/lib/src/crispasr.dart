@@ -5010,8 +5010,13 @@ class CrispasrC2pa {
     final signFn = lib.lookupFunction<
         Pointer<Uint8> Function(Pointer<Uint8>, IntPtr, Pointer<Utf8>,
             Pointer<Utf8>, Pointer<Utf8>, Pointer<IntPtr>),
-        Pointer<Uint8> Function(Pointer<Uint8>, int, Pointer<Utf8>,
-            Pointer<Utf8>, Pointer<Utf8>, Pointer<IntPtr>)>('crispasr_c2pa_sign');
+        Pointer<Uint8> Function(
+            Pointer<Uint8>,
+            int,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+            Pointer<Utf8>,
+            Pointer<IntPtr>)>('crispasr_c2pa_sign');
 
     final freeFn = lib.lookupFunction<Void Function(Pointer<Uint8>),
         void Function(Pointer<Uint8>)>('crispasr_c2pa_free');
