@@ -2401,6 +2401,18 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# beatrice-pitch — Beatrice v2 PitchEstimator (§CB2). MIT, source and weights.
+# First of three components; deterministic (the RNG is in the vocoder).
+add_library(beatrice-pitch STATIC beatrice_pitch.h beatrice_pitch.cpp)
+set_target_properties(beatrice-pitch PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(beatrice-pitch PUBLIC .)
+target_compile_features   (beatrice-pitch PUBLIC cxx_std_17)
+target_link_libraries     (beatrice-pitch PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(beatrice-pitch PRIVATE -O3)
+endif()
+
+# ---------------------------------------------------------------------------
 # crepe — CREPE monophonic F0 estimation (music transcription)
 # ---------------------------------------------------------------------------
 # btc_chords — BTC chord recognition (ISMIR 2019). Weights are CC-BY-NC-SA;
@@ -2821,6 +2833,9 @@ if (TARGET btc-chords)
 endif()
 if (TARGET tabcnn)
     target_link_libraries(crispasr-lib PUBLIC tabcnn)
+endif()
+if (TARGET beatrice-pitch)
+    target_link_libraries(crispasr-lib PUBLIC beatrice-pitch)
 endif()
 if (TARGET rvc-svc)
     target_link_libraries(crispasr-lib PUBLIC rvc-svc)
