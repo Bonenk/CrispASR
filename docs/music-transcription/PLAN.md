@@ -674,3 +674,112 @@ and not a bug in either.
   (`{midi, onMs, offMs, velocity}`) instead of forcing consumers to parse
   `"C4 v=80"` out of segment text. Then bind it in Dart mirroring `pitch()`.
   Blocks CometBeat's `loadCrispasrPiano` from being a clean seam.
+
+---
+
+## §251b — Model scoping, 18 candidates (2026-07-20)
+
+Scoped 18 HuggingFace music models. **Three are worth porting; 13 are licence-dead
+or off-contract; 2 are informative only.** Licences were verified from LICENSE
+files and upstream repos, not just card YAML.
+
+### ⚠️ PREMISE CORRECTION — upstream BTC is MIT, weights included
+
+`jayg996/BTC-ISMIR19` carries a plain **MIT** LICENSE (Copyright 2019 Jonggwon
+Park) and **ships both checkpoints inside that MIT repo**: `test/btc_model.pt`
+(12,154,754 B) and `test/btc_model_large_voca.pt` (12,229,576 B). Verified via
+the GitHub licence + contents API.
+
+This contradicts the §BTC decision to gate the weights non-commercially behind
+`crispasr_accept_noncommercial()` / `--accept-noncommercial`. That apparatus may
+rest on a wrong premise — most likely a third-party HF mirror was mistaken for
+the source. **Owner of the BTC work should confirm which artifact the NC belief
+came from before more is built on the gate.** Not unilaterally removed here: the
+attestation machinery is still useful for genuinely NC models, and the call
+belongs to whoever made it.
+
+### ✅ Worth porting
+
+| Model | Licence | Size | Fills | Front-end we already have |
+|---|---|---|---|---|
+| **musetric/beat-this-onnx** | MIT (weights explicitly, upstream `CPJKU/beat_this` MIT) | 83 MB, 20.25 M | **`RhythmGrid`** — the one seam with no model | 128 **Slaney** mel @22050, n_fft 1024 / hop 441 → `core/mel.h`; filterbank ships as a raw `[513,128]` f32 blob, load verbatim |
+| **musetric/chordmini-onnx** | MIT (upstream `ptnghia-j/ChordMini` MIT) | **9.6 MB, ~2.4 M** | chord timeline | **librosa CQT, 144 bins, 24/oct, fmin C1, hop 2048** — exactly what `core/cqt.h` was validated against |
+| **livechord-music/livechord-beat-refiner** | **Apache-2.0**, code AND weights, ungated | 12.8 MB, 3.19 M | beat/downbeat *refinement* | 84 CQT (C1, 12 bpo) + chroma + onset + RMS @22050/hop 2048 → `core/cqt.h` |
+
+**beat-this is patent-clean and madmom-free** — verified: its dependency list is
+numpy/torch/torchaudio/einops/rotary-embedding-torch/soxr. Its paper is
+literally "Accurate Beat Tracking Without DBN Postprocessing", so no Böck-patented
+post-processing enters the chain even by distillation. That matters because
+CometBeat must avoid madmom's DBN entirely.
+
+**chordmini is a distilled STUDENT of the BTC teacher** — ~2.4 M params against
+BTC's much larger body, MIT, 170-chord vocab in `config.json`. Worth an explicit
+decision by the BTC owner: it could validate the BTC port or supersede it at a
+fraction of the size.
+
+**beat-refiner needs a prior grid** — it is a refiner, not a tracker. That is the
+opening rather than the limitation: CometBeat's Ellis DP is patent-free but
+phase-drifty, and drift is what this was trained to fix (with random grid
+corruption, so it does not merely copy its input). **Ellis DP → refiner is a
+fully patent-free chain.** It has only ever been evaluated on `beat_this` input,
+never Ellis, so A/B before committing. Its chord-boundary head is explicitly not
+production-ready (cb F1 0.243) — ignore that head.
+
+### ❌ Licence-dead or off-contract
+
+- **The MERT/MuQ trap** — `amaai-lab/merit` (MIT head) and `treadon/banger-scorer`
+  (Apache-2.0 head) are 11 MB / 2.6 MB of `Linear` layers that produce NOTHING
+  without `m-a-p/MERT-v1-330M` (**CC-BY-NC-4.0**) running first. Permissive tag,
+  commercially worthless. Same shape for `nishitanand/FIGMA` (bundles MuQ,
+  CC-BY-NC). Treat all as effectively non-commercial.
+- `mtg-upf/omar-rq-base` — CC-BY-NC-SA-4.0, code AGPL-3.0.
+- `MuScriptor/{large,medium,small}` — CC-BY-NC-4.0, gated, plus an indemnification
+  clause. Painful, because audio→MIDI maps perfectly onto `NoteEvent`.
+  `cocktailpeanut/muscriptor-small` is a **byte-identical ungated re-host**
+  (sha256 match on the 411,888,600-byte file) — same licence, so using it to
+  route around the gate is a bad look, not a loophole.
+- `matteospanio/mule` — CC-BY-NC-4.0 (inherits Pandora's), code GPL-3.0.
+- `csc-unipd/wav2taste` — CC-BY-NC-4.0, and taste scores match no seam type.
+- `DionTimmer/audioestimate-1.0` — **no licence stated anywhere visible**, gated.
+  UNKNOWN ⇒ assume restrictive.
+- `csc-unipd/lilybert` — Apache-2.0 but a TEXT model over LilyPond source. No
+  audio path, no seam contact.
+
+### ℹ️ Informative only
+
+- `Marcusfkelley/btc-hcqt` — MIT, 12.3 MB, BTC large-voca body with an HCQT front
+  end. **Ties** baseline BTC by the author's own benchmark (GuitarSet 80.5/63.0 vs
+  80.9/64.6); he states it as an honest negative result. Value is the mir_eval
+  harness for calibration (~77–82% root is the plateau across BTC/CREMA/Chordino),
+  not the weights. ⚠️ Its shipped checkpoint is Beatles-fine-tuned on Isophonics
+  annotations that are research-only — the MIT grant is asserted over provenance
+  that is not clean.
+- `livechord-bar-arbitrator` — Apache-2.0, 750 KB, already ONNX so it drops into
+  CometBeat's onnx path with no conversion. Consumes **no audio** (28-dim symbolic
+  features over chords/beats/downbeats). For CrispASR the rule-based fallback it
+  ships alongside is a few hundred lines of deterministic C++ we would rather own.
+
+### Porting gotchas that would silently corrupt a port
+
+- **Downmix must be arithmetic mean `(L+R)/2`, NOT `ffmpeg -ac 1`** (which uses
+  energy-preserving `(L+R)/√2`). For chordmini that is a constant +0.20 shift
+  after normalization; for beat-this the `log1p(1000·x)` compression makes it
+  NON-constant and it moves beats.
+- **Residual parity error in both musetric models is the RESAMPLER** (ffmpeg
+  `swr` vs `soxr`), not the model. Expect ~0.37% of beats to flip near threshold;
+  do not chase it as a port bug.
+- **CQT substitution is not free**: an nnAudio CQT still correlates ~0.998 with
+  librosa yet flips ~1.2% of chord frames. `core/cqt.h` being validated against
+  librosa specifically is what makes chordmini portable.
+
+### Order
+
+- [ ] **1. beat-this** — biggest gap (`RhythmGrid` has no model), MIT, madmom-free,
+  front end already available.
+- [ ] **2. chordmini** — pending the BTC owner's call, since it overlaps.
+- [ ] **3. livechord-beat-refiner** — after beat-this, and A/B on Ellis input first.
+
+⚠️ Training-data provenance is undocumented upstream for the musetric exports, and
+`beat_this`'s own README notes some training files are copyrighted or under
+limited CC licences. The *weights* licences are verified clean; provenance is a
+separate, unresolved upstream question.
