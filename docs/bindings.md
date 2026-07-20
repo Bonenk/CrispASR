@@ -340,6 +340,44 @@ s.set_voice("ref.wav", ref_text="exact transcription of ref.wav")
 pcm = s.synthesize("Clone my voice.")
 ```
 
+## Chord recognition
+
+The `btc-chords` backend is a standalone task (CLI `--chords`) — audio in, a
+chord timeline out. It is exposed on the session C-ABI
+(`include/crispasr_session.h`) and, on top of that, in the WASM/JS binding:
+
+- `crispasr_session_chords(s, pcm, n_samples, sample_rate)` — returns the span
+  count, `-1` on error or on a backend with no chord arm. Input is mono
+  float32 at any rate; it is resampled internally to the model's 22050 Hz.
+- `crispasr_session_chords_n_spans(s)`
+- `crispasr_session_chords_spans(s, &n)` — flat, session-owned float view,
+  4 floats per span: `{start_ms, end_ms, label, confidence}`.
+- `crispasr_session_chords_span_name(s, idx)` — resolves `label` to a chord
+  name (`"C"`, `"Am"`, `"G:7"`, `"N"` for no-chord).
+- `crispasr_session_chords_vocab_size(s)` — `25` or `170`, `0` if the session
+  has no chord arm; usable as a capability probe.
+
+`CRISPASR_BTC_MAJ_MIN=1` collapses the 170-class output to the 25-class
+maj/min vocabulary (default off — full 170-class).
+
+```js
+// JavaScript / WASM (bindings/javascript/emscripten.cpp)
+const vocab = Module.sessionChordsVocabSize();   // 25 | 170 | 0 (no chord arm)
+const spans = Module.sessionChords(audio, sampleRate);
+// [{ startMs, endMs, chord, confidence }, ...]
+```
+
+The Go binding links `-lbtc-chords` (cgo LDFLAGS resynced) but adds no
+hand-written wrapper function; Python, Rust, Dart, Java and Ruby have no
+dedicated wrapper yet — the C ABI above is the surface for all of them.
+
+> **Weights are non-commercial.** The upstream BTC code is MIT and CrispASR
+> itself is MIT, but the shipped weights (`cstr/btc-chords-GGUF`) are
+> CC-BY-NC-SA — trained on Isophonics / Robbie Williams / UsPop2002 chord
+> annotations. The registry refuses to download them without
+> `--accept-license cc-by-nc-sa-4.0` (or the `CRISPASR_ACCEPT_LICENSE` env
+> var). A commercial product must supply its own weights.
+
 ## Speech-to-speech
 
 Backends with S2S capability (`lfm2-audio`, `mini-omni2`, `sidon`) support

@@ -117,6 +117,54 @@ chunk_seconds=4` → 4 slices returned; feeding them back via `vad_import` →
 identical transcript + same 4 segments; malformed → `invalid_request_error`; no
 flag → no field. Documented in `docs/server.md`.
 
+## CometBeat handoff — singing-voice-conversion vocoders (OPEN, NOT STARTED)
+
+Requested by the CometBeat `opus` (voice-svc) agent via its `docs/PLAN.md`
+coordination note (read 2026-07-20). CometBeat is splitting a singing-voice-
+conversion stack into pure-Dart (lightweight/offline) and native-via-CrispASR
+halves. **We own the real-time-critical heavy vocoders**; they keep the
+HuBERT/ContentVec encoder, Harvest F0, and a lightweight DDSP-SVC synth as the
+web/offline fallback.
+
+### §CB1 — RVC NSF-HiFi-GAN generator (real-time SVC)
+
+**What:** port the RVC NSF-HiFi-GAN generator to ggml/native-FFI. CometBeat
+feeds us ContentVec features (from their `hubert.dart`), F0 (from RMVPE —
+already done on their side) and a speaker id; we return converted audio.
+
+**Seam:** they expect a `CrispasrSession.convert(...)`-style entry point. That
+is a THIRD task-shaped surface after `--separate`/`--pitch`/`--chords`, so it
+follows the same pattern: its own session entry points rather than riding on
+transcribe(), plus the CLI dispatcher and the wasm/Go arms. Note the
+`crispasr_detect_backend_from_gguf` trap — register the arch there too, not just
+in the CLI (see the BTC entry in `docs/music-transcription/PLAN.md`).
+
+**Blocking coordination:** the feature/F0 record shapes must be agreed with the
+opus agent BEFORE their API freeze. Pin down, in writing: ContentVec feature
+rate + dimensionality + dtype, F0 units (Hz vs cents vs MIDI) and hop, whether
+F0 is voiced-masked, speaker-id encoding, and the sample rate of the returned
+audio. Do this first — it is cheap now and expensive after the freeze.
+
+**Licence:** RVC's own code is MIT, but the WEIGHTS in circulation are a mess
+(many community models are of unclear provenance, and some RVC forks carry
+non-commercial terms). Scope licences per-checkpoint before shipping any
+registry entry, exactly as the music-transcription scoping pass did.
+
+### §CB2 — Beatrice v2 (low-latency voice conversion)
+
+**What:** port Beatrice v2; its low-latency design suits the native path.
+
+**Licence:** custom/NON-COMMERCIAL → registry entry + acceptance gate, the same
+mechanism BTC uses (`--accept-license`, `license_requires_acceptance_tag` in
+`src/crispasr_model_registry.cpp`). Read the actual Beatrice terms and add its
+SPDX-ish tag rather than reusing `cc-by-nc-sa-4.0` if they differ — the gate
+matches on the tag, so a wrong tag silently grants or withholds the wrong thing.
+
+**Effort:** both are unestimated until the blueprints are read. Follow the
+usual order: read the Python reference line-by-line, write the numpy/torch
+executable spec, then the ggml graph, then the per-stage diff harness. Do NOT
+start either port before §CB1's record shapes are agreed.
+
 ## Gemma-4 12B (gemma4_unified) ASR support (OPEN)
 
 The remaining open item for full 12B support (a new converter map + backend audio path for the 640-dim unified

@@ -46,6 +46,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_omniasr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_mimo_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_htdemucs_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_crepe_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_btc_chords_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_ark_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_audio_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_tts_backend();
@@ -207,6 +208,9 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_htdemucs_backend();
     if (name == "crepe" || name == "crepe-tiny" || name == "crepe-full" || name == "pitch")
         return crispasr_make_crepe_backend();
+    if (name == "btc-chords" || name == "btc" || name == "chords" || name == "btc-chords-large" ||
+        name == "btc-chords-majmin")
+        return crispasr_make_btc_chords_backend();
     if (name == "kyutai-stt" || name == "kyutai" || name == "moshi-stt" || name == "kyutai-stt-2.6b")
         return crispasr_make_kyutai_stt_backend();
     if (name == "firered-asr" || name == "firered")
@@ -361,6 +365,7 @@ std::vector<std::string> crispasr_list_backends() {
         "omnivoice-singing",
         "htdemucs",
         "crepe",
+        "btc-chords",
     };
 }
 
@@ -395,6 +400,7 @@ static constexpr feature_col kFeatures[] = {
     {"streaming", CAP_STREAMING},
     {"separate", CAP_SEPARATE},
     {"pitch", CAP_PITCH},
+    {"chords", CAP_CHORDS},
 };
 
 void crispasr_print_backend_matrix() {
@@ -473,6 +479,7 @@ static constexpr cap_slug kCapSlugs[] = {
     {"streaming", CAP_STREAMING},
     {"separate", CAP_SEPARATE},
     {"pitch", CAP_PITCH},
+    {"chords", CAP_CHORDS},
 };
 
 void crispasr_print_backend_matrix_json() {
@@ -549,6 +556,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "htdemucs";
     if (contains_ci("crepe"))
         return "crepe";
+    if (contains_ci("btc"))
+        return "btc-chords";
     if (contains_ci("voxtral") && contains_ci("tts"))
         return "voxtral-tts";
     if (contains_ci("voxtral") && contains_ci("4b"))
@@ -813,6 +822,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "htdemucs";
             else if (a == "crepe")
                 result = "crepe";
+            else if (a == "btc")
+                result = "btc-chords";
             else if (a == "kyutai-stt" || a == "kyutai_stt" || a == "kyutaistt")
                 result = "kyutai-stt";
             else if (a == "firered-asr" || a == "firered_asr" || a == "firereadasr" || a == "firered-lid" ||

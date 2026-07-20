@@ -6,6 +6,60 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-20 — BTC chord recognition shipped; CQT was missing librosa's `scale=True`
+
+**Shipped** `--chords`: BTC (Bi-directional Transformer for Chord recognition,
+Park et al., ISMIR 2019) end-to-end. Converter (`models/convert-btc-to-gguf.py`,
+213 tensors, 8 skipped as dead weight), executable numpy spec
+(`tools/btc_torch_parity.py`, cos 0.99999995 / 1.00000004 vs torch), ggml
+runtime (`src/btc_chords.{h,cpp}`), `--chords` dispatcher, session C ABI,
+wasm bindings, CLI shim + `CAP_CHORDS`, docs, live + unit tests.
+**`crispasr-diff btc` = 13/13 stages at cos 1.000000 in both f32 and f16.**
+
+Output is `.lab`-shaped (`start end chord`), so it drops straight into
+mir_eval. Defaults to the **170-class** vocabulary with `CRISPASR_BTC_MAJ_MIN=1`
+collapsing to maj/min — 170 reduces on demand, a 25-class model can never be
+expanded.
+
+**Weights are CC-BY-NC-SA** (Isophonics / Robbie Williams / UsPop2002
+annotations) although the upstream code and CrispASR are both MIT, so they ship
+behind the `--accept-license cc-by-nc-sa-4.0` registry gate.
+
+### The real bug: `core/cqt.h` had no `scale=True`
+
+Every CQT bin was low by `sqrt(N_k)` — 152x at the bottom octave — because the
+kernels were L1-normalised but never given librosa's default
+`V /= np.sqrt(lengths)`. BTC saw near-silence and emitted "N" for every frame.
+
+It survived because **every guard was scale-invariant**: the parity tool checked
+correlation (0.9999) and peak-bin match (97.6%), and the unit suite passed 726
+assertions. Same blind spot that let the htdemucs iSTFT scale inversion through
+`spec_input` at cos 1.000000. Fixed by folding `sqrt(N)` into the kernel
+normalisation; verified against librosa (per-bin ratio median 1.0002, magnitude
+cos 0.999941).
+
+Guards added, written to fail on the broken build first: a per-bin magnitude
+ratio in `tools/cqt_librosa_parity.py` (asserted on the median — reverting the
+fix drives it 1.0043 -> 0.0131), and an exact kernel-norm identity in
+`tests/test-core-cqt.cpp` (post-normalisation L1 must equal `sqrt(N_k)`, pure
+arithmetic, no signal). One existing test compared the right quantity with a
+tolerance wider than the defect AND was named for the law the *buggy* build
+satisfies; it is replaced by the exact scale law `peak == (A/2)*sqrt(N_k)`.
+See LEARNINGS.md.
+
+### Gaps closed on the second pass
+
+- `btc` was in `crispasr_detect_backend_from_gguf` but **nowhere** in
+  `examples/cli/crispasr_backend.cpp` — no roster entry, no capability bit, so
+  `--list-backends` did not know it existed and the auto-generated
+  `docs/feature-matrix.md` would have dropped any hand-written row. Added
+  `CAP_CHORDS`, a redirect shim (`crispasr_backend_btc.cpp`), and the four
+  registration sites. The multi-surface trap, again.
+- Published sizes in `docs/cli.md` were wrong (~85 MB claimed; f16 is 5.6 MB).
+- Vocabulary + positional encoding extracted to `src/btc_chord_vocab.h` so they
+  can be unit-tested without weights — the diff harness compares logits and is
+  structurally blind to the name tables downstream of them.
+
 ## 2026-07-17 — #266: speaker-db moved to cluster-level, closed-roster identification
 
 Reporter (confirmed by trace): `--speaker-db` embedded each dispatcher slice

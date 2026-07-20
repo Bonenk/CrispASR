@@ -216,6 +216,7 @@ honored as deprecated aliases:
 | `CRISPASR_AUDIOSEAL_GGUF` | AudioSeal test model path. |
 | `CRISPASR_PIPER_TEST_MODEL` | Piper phonemize test model path. |
 | `CRISPASR_OV2_DUMP_DIR` | OpenVoice2 HiFi test dump directory. |
+| `CRISPASR_MODEL_BTC_CHORDS` | BTC chord-recognition test model path. Defaults to `$CRISPASR_MODELS_DIR/btc-chords-large-f32.gguf`. |
 
 ---
 
@@ -262,6 +263,19 @@ suffixes.
 ### BERT encoder
 
 - `CRISPASR_BERT_ENCODER_BENCH`
+
+### BTC chord recognition
+
+- `CRISPASR_BTC_MAJ_MIN` — collapse the 170-class chord output to the 25-class
+  maj/min vocabulary. Default off (full 170-class output): 170 reduces to
+  maj/min at runtime, but a 25-class model can never be expanded, so the
+  170-class checkpoint is the shipping default.
+
+> The shipped BTC weights are **CC-BY-NC-SA** (trained on Isophonics / Robbie
+> Williams / UsPop2002 chord annotations) even though the upstream BTC code and
+> CrispASR itself are MIT. The registry refuses to download them without
+> `--accept-license cc-by-nc-sa-4.0` (or `CRISPASR_ACCEPT_LICENSE`). A
+> commercial product must supply its own weights.
 
 ### Canary / Canary-CTC / Canary-Qwen
 

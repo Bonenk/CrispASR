@@ -113,6 +113,9 @@ enum crispasr_capability : uint32_t {
                                         // pitch frames out). Like CAP_SEPARATE this is a task
                                         // marker for --list-backends, NOT a transcribe() path:
                                         // routing happens in the --pitch dispatcher.
+    CAP_CHORDS = 1u << 25,              // chord recognition (audio in -> chord timeline out).
+                                        // Same task-marker role as CAP_PITCH/CAP_SEPARATE;
+                                        // routing happens in the --chords dispatcher.
 };
 
 // ---------------------------------------------------------------------------

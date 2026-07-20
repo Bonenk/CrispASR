@@ -17,6 +17,8 @@
 
 #include "btc_chords.h"
 
+#include "btc_chord_vocab.h"
+
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -41,47 +43,12 @@
 // ---------------------------------------------------------------------------
 namespace {
 
-const char* kRoots[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
-const char* kQualities[14] = {"min",     "maj",  "dim", "aug",  "min6",  "maj6", "min7",
-                              "minmaj7", "maj7", "7",   "dim7", "hdim7", "sus2", "sus4"};
-
-// 170-class: idx 0..167 = root*14 + quality, 168 = X (unknown), 169 = N (none).
-// Quality index 1 ("maj") renders as the bare root, matching idx2voca_chord().
-std::string voca_name(int i) {
-    if (i == 169)
-        return "N";
-    if (i == 168)
-        return "X";
-    const int root = i / 14, q = i % 14;
-    if (root < 0 || root >= 12)
-        return "X";
-    return q == 1 ? std::string(kRoots[root]) : std::string(kRoots[root]) + ":" + kQualities[q];
-}
-
-// 25-class: C, C:min, C#, C#:min, ... B, B:min, N.
-std::string maj_min_name(int i) {
-    if (i >= 24)
-        return "N";
-    return (i % 2 == 0) ? std::string(kRoots[i / 2]) : std::string(kRoots[i / 2]) + ":min";
-}
-
-// Collapse a 170-class label to the 25-class maj/min vocabulary. This is why
-// 170 ships as the DEFAULT: it is strictly more expressive and can be reduced
-// on demand, whereas a 25-class model can never be expanded.
-//
-// Quality mapping follows the usual mir_eval maj/min convention: the minor
-// third qualities (min, dim, min6, min7, minmaj7, dim7, hdim7) go to :min and
-// everything else (maj, aug, maj6, maj7, 7, sus2, sus4) to major. Suspended
-// and augmented chords have no third, so their assignment is a convention, not
-// a fact — documented here rather than buried.
-int voca_to_maj_min(int i) {
-    if (i >= 168)
-        return 24; // X and N both become N
-    const int root = i / 14, q = i % 14;
-    static const bool kIsMinor[14] = {true, false, true,  false, true, false, true,
-                                      true, false, false, true,  true, false, false};
-    return root * 2 + (kIsMinor[q] ? 1 : 0);
-}
+// Chord vocabulary and positional encoding live in btc_chord_vocab.h so they
+// can be unit-tested without the weights (tests/test-btc-vocab.cpp). Thin
+// aliases here keep the call sites below unchanged.
+using btc_vocab::maj_min_name;
+using btc_vocab::voca_name;
+using btc_vocab::voca_to_maj_min;
 
 } // namespace
 
@@ -256,15 +223,7 @@ static ggml_tensor* btc_block(ggml_context* g, ggml_tensor* x, const btc_attn_bl
 
 // concat([sin(t*inv), cos(t*inv)]) — two contiguous halves, NOT interleaved.
 static void btc_timing_signal(int length, int channels, std::vector<float>& out) {
-    const int n = channels / 2;
-    const float inc = std::log(1.0e4f / 1.0f) / (float)(n - 1);
-    out.assign((size_t)length * channels, 0.0f);
-    for (int t = 0; t < length; t++)
-        for (int i = 0; i < n; i++) {
-            const float scaled = (float)t * std::exp((float)i * -inc);
-            out[(size_t)t * channels + i] = std::sin(scaled);
-            out[(size_t)t * channels + n + i] = std::cos(scaled);
-        }
+    btc_vocab::timing_signal(length, channels, out);
 }
 
 // ---------------------------------------------------------------------------

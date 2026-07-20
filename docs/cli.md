@@ -1157,8 +1157,11 @@ al.) use, so it drops straight into `mir_eval`:
 
 | Registry key | File | Size | Notes |
 |---|---|---|---|
-| `btc-chords` | `btc-chords-large-f32.gguf` | ~85 MB | **default** — 170-class vocabulary |
-| `btc-chords-small` | `btc-chords-small-f32.gguf` | ~85 MB | 25-class (maj/min + N) |
+| `btc-chords`, `btc-chords-large` | `btc-chords-large-f16.gguf` | 5.6 MB | **default** — 170-class vocabulary |
+| `btc-chords-majmin` | `btc-chords-f16.gguf` | 5.6 MB | 25-class (maj/min + N) |
+
+f32 variants (11.7 MB) are also published. Both dtypes pass the per-stage diff
+harness at cos 1.000000 on all 13 stages, so f16 is the shipping default.
 
 The 170-class model is the default deliberately: it reduces to maj/min with
 `CRISPASR_BTC_MAJ_MIN=1`, whereas a 25-class model can never be expanded.

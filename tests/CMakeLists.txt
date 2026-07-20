@@ -3484,6 +3484,17 @@ if (CRISPASR_FUZZ)
     target_link_options(crispasr-fuzz-tokenizer PRIVATE -fsanitize=fuzzer)
 endif()
 
+# ─── test-btc-vocab — chord vocabulary + positional encoding (hermetic, unit)
+add_executable(test-btc-vocab test-btc-vocab.cpp)
+target_include_directories(test-btc-vocab PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-btc-vocab PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-btc-vocab
+    TEST_SPEC "[btc]"
+    PROPERTIES
+        LABELS unit
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test - btc-chords — live integration tests (session C-ABI)
 add_executable(test-btc-chords
     test_btc_chords_live.cpp

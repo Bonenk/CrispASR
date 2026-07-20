@@ -323,9 +323,68 @@ python tools/check-backend-wiring.py --crispasr ./build/bin/crispasr   # exit 1 
 > the shared `.git/index` — this clobbered the entire §135 CSM landing
 > (commit `100b9ee5`). `git config pull.rebase true` is set in this repo.
 
+## 7. Task-shaped backends (`--separate`, `--pitch`, `--chords`)
+
+Everything above assumes the backend produces TEXT and therefore fits
+`transcribe()`. Some do not: source separation returns stems, pitch returns F0
+frames, chord recognition returns a chord timeline. None of those can be
+expressed as `crispasr_segment`s, so they get their OWN task surface instead of
+being forced through the transcribe contract. Precedents:
+`htdemucs`/`mel-band-roformer` (`--separate`), `crepe` (`--pitch`), `btc-chords`
+(`--chords`).
+
+The trap: because such a backend never appears in a transcribe path, it is easy
+to ship it working end-to-end while it remains invisible to the CLI's backend
+registry. `btc-chords` did exactly that — runtime, `--chords` dispatcher,
+session C ABI and wasm bindings all shipped and verified, while `btc` appeared
+NOWHERE in `examples/cli/crispasr_backend.cpp`. `--list-backends` did not know
+it existed, and `docs/feature-matrix.md` is generated from
+`--list-backends-json`, so any hand-written row for it would have been silently
+dropped on the next regeneration.
+
+Wire ALL of the following:
+
+1. **Task dispatcher** — `examples/cli/crispasr_<task>_cli.{h,cpp}`, called from
+   `crispasr_run_backend()` **and** from an early route in `cli.cpp`, before any
+   transcribe backend is constructed. Both: a dispatch in `crispasr_run.cpp`
+   alone still falls through to whisper and dies on "invalid model data".
+2. **Capability bit** — a new `CAP_<TASK>` in `examples/cli/crispasr_backend.h`,
+   added to BOTH capability-name tables in `crispasr_backend.cpp` (the text one
+   and the JSON one) so it shows up in `--list-backends` and the matrix.
+3. **Redirect shim** — `examples/cli/crispasr_backend_<name>.cpp` implementing
+   `CrispasrBackend` whose `init()` prints "run it with `--<task>`" and returns
+   false, with `capabilities()` returning the task bit. This is what puts the
+   backend in `--list-backends` and gives `--backend X` (without the task flag)
+   a clear error instead of a confusing one. Copy
+   `crispasr_backend_crepe.cpp` or `crispasr_backend_btc.cpp`.
+4. **Factory + roster** — the `if (name == ...)` alias line and the roster list
+   entry in `crispasr_backend.cpp`, plus the shim's forward declaration, plus
+   the file in `examples/cli/CMakeLists.txt`.
+5. **Both detect passes** — filename heuristic and GGUF `general.architecture`,
+   in `crispasr_backend.cpp` AND in `crispasr_detect_backend_from_gguf()` in
+   `src/crispasr_c_api.cpp`. These are two different functions in two different
+   files; the c_api one is what every binding uses, and its own source comment
+   records that crepe and htdemucs were once wired in the CLI but not there, so
+   every binding got a null session.
+6. **Session C ABI** — task-specific entry points, NOT `transcribe()`. Follow
+   `crispasr_session_pitch*` / `crispasr_session_chords*`: a `run` call
+   returning a count, an `n_*` accessor, a FLAT float view for the bulk read,
+   and any string lookup separately. Flat views must be all-float even when a
+   field is logically an integer — a mixed int/float struct read through a float
+   view misreads the int lanes.
+7. **Regenerate the matrix** — `python tools/gen-feature-matrix.py`. Do not
+   hand-edit `docs/feature-matrix.md`; it is generated and says so at the top.
+
+Then run the audit, which now checks the reverse direction too (advertised by
+the C ABI but unreachable from the CLI):
+
+```bash
+python tools/check-backend-wiring.py --crispasr ./build/bin/crispasr
+```
+
 ## Running integration / live tests
 
-Unit tests (429 of them) need no models and pass unconditionally. The
+Unit tests (1063 of them) need no models and pass unconditionally. The
 ~25 integration ("live") tests need real GGUF models on disk and are
 env-var-gated — they SKIP cleanly when the env vars are unset.
 
