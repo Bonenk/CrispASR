@@ -38,6 +38,7 @@
 #include "voxtral.h"
 #include "voxtral4b.h"
 #include "htdemucs.h"
+#include "mel_band_roformer.h"
 #include "btc_chords.h"
 #include "voxtral_tts.h"
 #include "higgs_stt.h"
@@ -1103,6 +1104,17 @@ int main(int argc, char** argv) {
         // model_path = voxtral-tts GGUF (F16 for a clean structural diff), ref_path =
         // ref GGUF from tools/reference_backends/voxtral_tts.py. Per-layer frame-0 LLM cos.
         return voxtral_tts_llm_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
+    }
+    if (backend_name == "mel-band-roformer" || backend_name == "mbr") {
+        // model_path = mel-band-roformer GGUF, ref_path = ref GGUF from
+        // tools/reference_backends/mel_band_roformer.py. Input-aligned: the
+        // reference carries input_audio, which the runtime replays, so
+        // audio_path is unused and the diff is resampler-independent.
+        //
+        // mel_band_roformer_diff() was implemented but NEVER REGISTERED here --
+        // the same gap htdemucs had (present in the dumper, absent from the
+        // diff binary), so the backend shipped with no per-stage evidence.
+        return mel_band_roformer_diff(model_path.c_str(), ref_path.c_str(), audio_path.c_str(), /*verbosity=*/2);
     }
     if (backend_name == "htdemucs") {
         // model_path = htdemucs GGUF (f32 for a clean structural diff), ref_path =
