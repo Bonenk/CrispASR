@@ -63,6 +63,10 @@ static bool htdemucs_profile() {
 
 static double htd_now_ms();
 static bool htdemucs_use_ggml();
+static bool htdemucs_use_fused();
+static bool htdemucs_fused_ggml(struct htdemucs_context* ctx, std::vector<float>& x_buf, int& x_C, int& x_Fq, int x_T,
+                                std::vector<float>& xt_buf, int& xt_C, int xt_T,
+                                const std::vector<float>& freq_emb_bcast);
 static bool htdemucs_dec_freq_ggml(struct htdemucs_context* ctx, const struct htdemucs_dec_layer& dec,
                                    std::vector<float>& x_buf, const std::vector<float>& skip_buf, int& x_C, int& x_Fq,
                                    int x_T, int stride, int pad, bool is_last, std::vector<float>* pre_out, int* pre_C,
@@ -926,6 +930,20 @@ static bool htdemucs_use_ggml() {
     return v != 0;
 }
 
+// FUSED: run encoder + transformer + decoder as ONE graph so activations never
+// leave the device (CRISPASR_HTDEMUCS_FUSED, default OFF, requires _GGML=1).
+// The per-layer graphs pay a host<->device roundtrip per layer, which measured
+// SLOWER than CPU+Accelerate for the encoder despite the transformer being
+// 3.3-6x faster.
+static bool htdemucs_use_fused() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("CRISPASR_HTDEMUCS_FUSED");
+        v = (e && atoi(e) != 0) ? 1 : 0; // default OFF
+    }
+    return v != 0;
+}
+
 // FASTCONV: batched im2col + gemm for the CPU convs (default ON). Set
 // CRISPASR_HTDEMUCS_FASTCONV=0 for the original per-frame scalar path.
 static bool htdemucs_fastconv() {
@@ -1697,6 +1715,26 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     int freqs_cur = nfft / 2;
     bool encoder_ok = true;
 
+    // FUSED path: the whole frequency chain runs as one graph after the time
+    // encoder, so keep the untouched spec_input and pre-build the freq_emb
+    // broadcast (1, Fq, C) with the 10 * freq_emb_scale factor applied.
+    const bool fused = htdemucs_use_ggml() && htdemucs_use_fused();
+    std::vector<float> fused_spec_in;
+    std::vector<float> fused_freq_emb;
+    if (fused) {
+        fused_spec_in = x_buf;
+        if (m.freq_emb_w) {
+            const int emb_C = (int)m.freq_emb_w->ne[0];
+            const int emb_F = (int)m.freq_emb_w->ne[1];
+            const std::vector<float>& ew = cached_tensor_f32(m.freq_emb_w);
+            const float ts = 10.0f * hp.freq_emb_scale;
+            fused_freq_emb.assign((size_t)emb_F * emb_C, 0.0f);
+            for (int f = 0; f < emb_F; f++)
+                for (int c = 0; c < emb_C; c++)
+                    fused_freq_emb[(size_t)c * emb_F + f] = ew[(size_t)f * emb_C + c] * ts;
+        }
+    }
+
     for (int idx = 0; idx < hp.depth && encoder_ok; idx++) {
         auto& enc = m.encoder[idx];
         bool freq = (freqs_cur > 1);
@@ -1880,8 +1918,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
             encoder_ok = false;
             break;
         }
-        bool enc_done = false;
-        if (htdemucs_use_ggml() && enc.conv_w) {
+        bool enc_done = fused; // fused runs the whole freq chain later
+        if (!fused && htdemucs_use_ggml() && enc.conv_w) {
             HTD_PROF(prof, "enc.ggml_graph");
             enc_done = htdemucs_enc_freq_ggml(ctx, enc, x_buf, x_C, x_Fq, x_T, stri, pad_val,
                                               has_inject ? &inject_buf : nullptr, has_inject ? x_C : 0, idx);
@@ -1966,7 +2004,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         //         x = x + freq_emb_scale * emb
         // Embedding: (n_freqs, C) → lookup frs 0..Fq-1 → (Fq, C) → t → (C, Fq)
         // Broadcast over T: x[t,fq,c] += scale * emb_w[fq, c]
-        if (idx == 0 && m.freq_emb_w) {
+        if (!fused && idx == 0 && m.freq_emb_w) {
             // nn.Embedding weight is (num_embeddings, embedding_dim) row-major
             // = ggml ne(embedding_dim, num_embeddings), so ne[0] is the
             // CHANNEL count and ne[1] is the frequency count — not the
@@ -2009,11 +2047,13 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         }
 
 
-        htd_capture(ctx, ("enc_freq_" + std::to_string(idx)).c_str(), x_buf.data(), x_buf.size());
+        if (!fused) // fused computes the freq encoder inside its graph
+            htd_capture(ctx, ("enc_freq_" + std::to_string(idx)).c_str(), x_buf.data(), x_buf.size());
 
-        // Save skip connections
-        lengths_freq.push_back(x_T); // save BEFORE the dim change (actually, Python saves after — TODO: verify)
-        saved_freq.push_back({x_buf, x_C, x_Fq, x_T});
+        // Save skip connections (fused keeps them as in-graph tensors)
+        lengths_freq.push_back(x_T);
+        if (!fused)
+            saved_freq.push_back({x_buf, x_C, x_Fq, x_T});
         // Time branch: save non-empty tencoder outputs
         if (idx < (int)m.tencoder.size() && !m.tencoder[idx].empty) {
             saved_time.push_back({xt_buf, xt_C, 1, xt_T}); // length recorded above
@@ -2027,8 +2067,25 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
 
     fprintf(stderr, "htdemucs: encoder %s, output (%d, %d, %d)\n", encoder_ok ? "OK" : "FAILED", x_C, x_Fq, x_T);
 
-    htd_capture(ctx, "pre_transformer_z", x_buf.data(), x_buf.size());
-    htd_capture(ctx, "pre_transformer_xt", xt_buf.data(), xt_buf.size());
+    bool fused_done = false;
+    if (fused) {
+        HTD_PROF(prof, "fused.graph");
+        x_buf = std::move(fused_spec_in);
+        x_C = n_cac_ch;
+        x_Fq = Fq;
+        fused_done = htdemucs_fused_ggml(ctx, x_buf, x_C, x_Fq, x_T, xt_buf, xt_C, xt_T, fused_freq_emb);
+        if (!fused_done)
+            fprintf(stderr, "htdemucs: FUSED graph unavailable for this model — cannot continue\n");
+    }
+
+    if (!fused_done) {
+        // On the fused path these buffers already hold the FINAL decoder output,
+        // so capturing here would report a wrong value rather than an absent one.
+        // The fused graph is validated on the output_* stages instead; per-stage
+        // capture would need set_output taps inside the fused graph.
+        htd_capture(ctx, "pre_transformer_z", x_buf.data(), x_buf.size());
+        htd_capture(ctx, "pre_transformer_xt", xt_buf.data(), xt_buf.size());
+    }
 
     // Step 7: CrossTransformer
     //
@@ -2052,7 +2109,7 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
     // Actually, let me implement the channel up/down at minimum, since they
     // are simple 1x1 convolutions and affect the output.
 
-    if (m.channel_up_w && m.channel_down_w) {
+    if (!fused_done && m.channel_up_w && m.channel_down_w) {
         HTD_PROF(prof, "transformer[nested total]");
         // Channel upsample: 1x1 Conv on flattened freq branch
         // x: (x_T, x_Fq, x_C, 1) → flatten to (x_T*x_Fq, x_C) → conv → (x_T*x_Fq, bottom_ch)
@@ -2881,8 +2938,10 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         fprintf(stderr, "htdemucs: no channel up/downsamplers (bottom_channels=0?)\n");
     }
 
-    htd_capture(ctx, "post_transformer_z", x_buf.data(), x_buf.size());
-    htd_capture(ctx, "post_transformer_xt", xt_buf.data(), xt_buf.size());
+    if (!fused_done) {
+        htd_capture(ctx, "post_transformer_z", x_buf.data(), x_buf.size());
+        htd_capture(ctx, "post_transformer_xt", xt_buf.data(), xt_buf.size());
+    }
 
     // Step 8: Decoder (reverse of encoder, with skip connections)
     // Decoder index 0 is the innermost (smallest spatial dims), matching
@@ -2897,9 +2956,13 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         int stri = dec_strides[idx];                 // TODO: derive properly from encoder
         int pad_val = (int)dec.conv_tr_w->ne[1] / 4; // K/4
 
-        // Pop skip from end (LIFO order)
-        auto skip_f = saved_freq.back();
-        saved_freq.pop_back();
+        // Pop skip from end (LIFO order). Fused keeps skips as in-graph tensors,
+        // so saved_freq is empty on that path.
+        saved_activation skip_f;
+        if (!saved_freq.empty()) {
+            skip_f = saved_freq.back();
+            saved_freq.pop_back();
+        }
 
         // Full in-graph decoder layer (opt-in). Produces both the layer output
         // and `pre`, which the time decoder consumes.
@@ -2908,13 +2971,13 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
         // Shared by both paths; the time decoder reads these below.
         std::vector<float> pre_buf;
         int pre_T = x_T, pre_Fq = 0, pre_C = 0;
-        bool dec_done = false;
-        if (htdemucs_use_ggml() && dec.conv_tr_w) {
+        bool dec_done = fused_done; // fused already produced the decoder output
+        if (!fused_done && htdemucs_use_ggml() && dec.conv_tr_w) {
             HTD_PROF(prof, "dec.ggml_graph");
             dec_done = htdemucs_dec_freq_ggml(ctx, dec, x_buf, skip_f.data, x_C, x_Fq, x_T, stri, pad_val,
                                               idx == hp.depth - 1, &pre_buf_g, &pre_C_g, &pre_Fq_g);
         }
-        if (dec_done) {
+        if (dec_done && !fused_done) {
             htd_capture(ctx, ("dec_freq_" + std::to_string(idx)).c_str(), x_buf.data(), x_buf.size());
         }
 
@@ -3377,7 +3440,8 @@ htdemucs_result* htdemucs_separate(htdemucs_context* ctx, const float* pcm_stere
                     nc > 0 ? " *** HAS NaN ***" : "");
         }
 
-        htd_capture(ctx, ("dec_freq_" + std::to_string(idx)).c_str(), x_buf.data(), x_buf.size());
+        if (!fused_done) // fused captures nothing per-layer; it is validated on output_*
+            htd_capture(ctx, ("dec_freq_" + std::to_string(idx)).c_str(), x_buf.data(), x_buf.size());
     }
 
     // NaN check after decoder
@@ -4104,6 +4168,325 @@ static bool htdemucs_transformer_ggml(htdemucs_context* ctx, std::vector<float>&
     ggml_gallocr_free(alloc);
     ggml_free(g);
     return true;
+}
+
+static bool htdemucs_fused_run(htdemucs_context* ctx, ggml_context* g, ggml_cgraph* gf, ggml_gallocr_t alloc,
+                               ggml_tensor* X, ggml_tensor* XT, ggml_tensor* out, ggml_tensor* xt_out,
+                               std::vector<float>& x_buf, int& x_C, int& x_Fq, int x_T, std::vector<float>& xt_buf,
+                               int& xt_C, int xt_T, const std::vector<float>& freq_emb_bcast);
+
+// Fills the fused graph's inputs (looked up by name, since they are created
+// deep inside the builder), computes, and reads the two outputs back.
+static bool htdemucs_fused_run(htdemucs_context* ctx, ggml_context* g, ggml_cgraph* gf, ggml_gallocr_t alloc,
+                               ggml_tensor* X, ggml_tensor* XT, ggml_tensor* out, ggml_tensor* xt_out,
+                               std::vector<float>& x_buf, int& x_C, int& x_Fq, int x_T, std::vector<float>& xt_buf,
+                               int& xt_C, int xt_T, const std::vector<float>& freq_emb_bcast) {
+    auto& m = ctx->model;
+
+    ggml_backend_tensor_set(X, x_buf.data(), 0, x_buf.size() * sizeof(float));
+    ggml_backend_tensor_set(XT, xt_buf.data(), 0, xt_buf.size() * sizeof(float));
+
+    if (ggml_tensor* e = ggml_get_tensor(g, "fused_freq_emb"))
+        ggml_backend_tensor_set(e, freq_emb_bcast.data(), 0,
+                                std::min(freq_emb_bcast.size(), (size_t)ggml_nelements(e)) * sizeof(float));
+
+    // Position embeddings: same formulas as the CPU path, prepared host-side
+    // into the (dim, seq) layout the graph uses.
+    if (ggml_tensor* pz = ggml_get_tensor(g, "fused_pos_z")) {
+        const int dim = (int)pz->ne[0], seq = (int)pz->ne[1];
+        const int half = dim / 2, Fr = seq / x_T, T1 = x_T;
+        std::vector<float> pe((size_t)dim * seq, 0.0f);
+        std::vector<float> dt(half / 2);
+        for (int i = 0; i < half / 2; i++)
+            dt[i] = expf(-(float)(2 * i) * logf(ctx->model.hparams.t_max_period) / (float)half);
+        for (int t = 0; t < T1; t++)
+            for (int fr = 0; fr < Fr; fr++) {
+                const int sidx = fr * T1 + t; // native fr-major order
+                for (int i = 0; i < half / 2; i++) {
+                    const float pw = (float)t * dt[i], ph = (float)fr * dt[i];
+                    float* col = pe.data() + (size_t)sidx * dim;
+                    col[2 * i] = ctx->model.hparams.t_weight_pos_embed * sinf(pw);
+                    col[2 * i + 1] = ctx->model.hparams.t_weight_pos_embed * cosf(pw);
+                    col[half + 2 * i] = ctx->model.hparams.t_weight_pos_embed * sinf(ph);
+                    col[half + 2 * i + 1] = ctx->model.hparams.t_weight_pos_embed * cosf(ph);
+                }
+            }
+        ggml_backend_tensor_set(pz, pe.data(), 0, pe.size() * sizeof(float));
+    }
+    if (ggml_tensor* pt = ggml_get_tensor(g, "fused_pos_xt")) {
+        const int dim = (int)pt->ne[0], seq = (int)pt->ne[1], half = dim / 2;
+        std::vector<float> pe((size_t)dim * seq, 0.0f);
+        for (int sI = 0; sI < seq; sI++)
+            for (int d = 0; d < half; d++) {
+                const float ph = (float)sI / powf(ctx->model.hparams.t_max_period, (float)d / (float)(half - 1));
+                pe[(size_t)sI * dim + d] = ctx->model.hparams.t_weight_pos_embed * cosf(ph);
+                pe[(size_t)sI * dim + half + d] = ctx->model.hparams.t_weight_pos_embed * sinf(ph);
+            }
+        ggml_backend_tensor_set(pt, pe.data(), 0, pe.size() * sizeof(float));
+    }
+
+    // Per-layer ConvTranspose zero accumulators and 1x1 tap kernels.
+    for (int idx = 0; idx < ctx->model.hparams.depth; idx++) {
+        if (ggml_tensor* z = ggml_get_tensor(g, ("fused_zero_" + std::to_string(idx)).c_str())) {
+            std::vector<float> zeros(ggml_nelements(z), 0.0f);
+            ggml_backend_tensor_set(z, zeros.data(), 0, zeros.size() * sizeof(float));
+        }
+        const auto& dec = m.decoder[idx];
+        if (!dec.conv_tr_w)
+            continue;
+        const int ct_K = (int)dec.conv_tr_w->ne[1];
+        const int ct_OC = (int)dec.conv_tr_w->ne[2];
+        const int ct_IC = (int)dec.conv_tr_w->ne[3];
+        const std::vector<float>& w = cached_tensor_f32(dec.conv_tr_w);
+        std::vector<float> slice((size_t)ct_IC * ct_OC);
+        for (int kh = 0; kh < ct_K; kh++) {
+            ggml_tensor* wk =
+                ggml_get_tensor(g, ("fused_wk_" + std::to_string(idx) + "_" + std::to_string(kh)).c_str());
+            if (!wk)
+                continue;
+            for (int oc = 0; oc < ct_OC; oc++)
+                for (int ic = 0; ic < ct_IC; ic++)
+                    slice[(size_t)oc * ct_IC + ic] = w[(size_t)ic * ct_OC * ct_K + oc * ct_K + kh];
+            ggml_backend_tensor_set(wk, slice.data(), 0, slice.size() * sizeof(float));
+        }
+    }
+
+    ggml_backend_graph_compute(ctx->backend, gf);
+
+    xt_C = (int)xt_out->ne[0];
+    xt_buf.assign(ggml_nelements(xt_out), 0.0f);
+    {
+        // graph holds (dim, seq); the CPU time decoder wants (C, T).
+        std::vector<float> tmp(xt_buf.size());
+        ggml_backend_tensor_get(xt_out, tmp.data(), 0, tmp.size() * sizeof(float));
+        for (int d = 0; d < xt_C; d++)
+            for (int t = 0; t < xt_T; t++)
+                xt_buf[(size_t)d * xt_T + t] = tmp[(size_t)t * xt_C + d];
+    }
+
+    x_C = (int)out->ne[2];
+    x_Fq = (int)out->ne[1];
+    x_buf.assign(ggml_nelements(out), 0.0f);
+    ggml_backend_tensor_get(out, x_buf.data(), 0, x_buf.size() * sizeof(float));
+
+    ggml_gallocr_free(alloc);
+    ggml_free(g);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// FUSED forward: encoder + CrossTransformer + decoder in ONE ggml graph
+// (CRISPASR_HTDEMUCS_GGML=1, requires CRISPASR_HTDEMUCS_FUSED=1)
+//
+// The per-layer graphs were measured SLOWER than CPU+Accelerate for the
+// encoder (1.2-2.1x) despite the transformer being 3.3-6x faster, because each
+// layer paid a graph build + gallocr alloc and a full host<->device roundtrip
+// of its activations — encoder layer 0 alone is 8.2M floats = 33 MB each way.
+// Fusing removes ~16 roundtrips, leaving:
+//
+//   upload   spec_input, xt (pre-transformer), freq_emb table
+//   download post-transformer xt, final decoder output
+//
+// Skip connections stay as in-graph tensors instead of being downloaded and
+// re-uploaded, which is the whole point.
+//
+// `pre` (the tdecoder's alternative input) is NOT produced here: it is only
+// consumed when a tdecoder layer is `empty`, and htdemucs has none. Models
+// that do have one fall back to the per-layer path.
+// ---------------------------------------------------------------------------
+static bool htdemucs_fused_ggml(htdemucs_context* ctx, std::vector<float>& x_buf, int& x_C, int& x_Fq, int x_T,
+                                std::vector<float>& xt_buf, int& xt_C, int xt_T,
+                                const std::vector<float>& freq_emb_bcast) {
+    auto& hp = ctx->model.hparams;
+    auto& m = ctx->model;
+
+    for (const auto& td : m.tdecoder)
+        if (td.empty)
+            return false; // `pre` would be needed; use the per-layer path
+
+    const size_t n_nodes = 16384;
+    const size_t ctx_size = ggml_tensor_overhead() * n_nodes + ggml_graph_overhead_custom(n_nodes, false);
+    ggml_init_params gp = {ctx_size, nullptr, true};
+    ggml_context* g = ggml_init(gp);
+    if (!g)
+        return false;
+
+    ggml_tensor* X = ggml_new_tensor_3d(g, GGML_TYPE_F32, x_T, x_Fq, x_C);
+    ggml_set_name(X, "fused_spec_in");
+    ggml_set_input(X);
+    ggml_tensor* XT = ggml_new_tensor_2d(g, GGML_TYPE_F32, xt_T, xt_C);
+    ggml_set_name(XT, "fused_xt_in");
+    ggml_set_input(XT);
+
+    ggml_tensor* x = X;
+
+    // ---------------- encoder ----------------
+    std::vector<ggml_tensor*> skips;
+    int freqs_cur = hp.nfft / 2;
+    for (int idx = 0; idx < hp.depth; idx++) {
+        const auto& enc = m.encoder[idx];
+        if (!enc.conv_w) {
+            ggml_free(g);
+            return false;
+        }
+        const bool freq = (freqs_cur > 1);
+        int stri = freq ? hp.stride : 2;
+        int ker = freq ? hp.kernel_size : 4;
+        int pad_val = ker / 4;
+        if (freq && freqs_cur <= hp.kernel_size) {
+            ker = freqs_cur;
+            pad_val = 0;
+        }
+
+        x = ggml_conv_2d(g, enc.conv_w, x, 1, stri, 0, pad_val, 1, 1);
+        if (enc.conv_b)
+            x = ggml_add(g, x, ggml_reshape_3d(g, enc.conv_b, 1, 1, (int)enc.conv_w->ne[3]));
+        const int nb = (int)x->ne[1];
+        if (!enc.empty) {
+            x = ggml_gelu(g, x);
+            if (!enc.dconv.layers.empty())
+                x = g_dconv(g, x, enc.dconv, nb);
+            if (enc.rewrite_w) {
+                ggml_tensor* rw = ggml_conv_2d(g, enc.rewrite_w, x, 1, 1, 0, 0, 1, 1);
+                if (enc.rewrite_b)
+                    rw = ggml_add(g, rw, ggml_reshape_3d(g, enc.rewrite_b, 1, 1, (int)enc.rewrite_w->ne[3]));
+                x = g_glu_c(g, rw);
+            }
+        }
+        if (idx == 0 && m.freq_emb_w && !freq_emb_bcast.empty()) {
+            // (1, Fq, C) broadcast over the time axis; prepared host-side with
+            // the 10 * freq_emb_scale factor already applied.
+            ggml_tensor* EMB = ggml_new_tensor_3d(g, GGML_TYPE_F32, 1, (int)x->ne[1], (int)x->ne[2]);
+            ggml_set_name(EMB, "fused_freq_emb");
+            ggml_set_input(EMB);
+            x = ggml_add(g, x, EMB);
+        }
+        skips.push_back(x);
+        if (freq)
+            freqs_cur = (freqs_cur <= hp.kernel_size) ? 1 : freqs_cur / hp.stride;
+    }
+
+    const int enc_C = (int)x->ne[2], enc_Fq = (int)x->ne[1];
+    const int x_seq = x_T * enc_Fq;
+
+    // ---------------- channel up + transformer + channel down ----------------
+    // (T, Fq, C) -> (T*Fq, C) is a pure reshape; the transformer wants
+    // ne = (dim, seq), so transpose once here and once back.
+    ggml_tensor* xf = ggml_reshape_2d(g, x, x_seq, enc_C);
+    // xt_buf is channel-major (C, T), i.e. ggml ne = (T, C); the transformer
+    // and the channel samplers contract on ne[0], so it must be (C, T).
+    ggml_tensor* xtc = ggml_cont(g, ggml_transpose(g, XT));
+    if (m.channel_up_w && m.channel_down_w) {
+        xf = ggml_cont(g, ggml_transpose(g, xf)); // (C, seq)
+        xf = g_linear(g, ggml_reshape_2d(g, m.channel_up_w, (int)m.channel_up_w->ne[1], (int)m.channel_up_w->ne[2]),
+                      m.channel_up_b, xf);
+        xtc = g_linear(g,
+                       ggml_reshape_2d(g, m.channel_up_t_w, (int)m.channel_up_t_w->ne[1], (int)m.channel_up_t_w->ne[2]),
+                       m.channel_up_t_b, xtc);
+
+        const int dim = (int)xf->ne[0];
+        const int n_heads = hp.t_heads;
+        // norm_in then + weight_pos_embed * pos_emb (order matters).
+        // Position embeddings are uploaded rather than generated in-graph.
+        ggml_tensor* PZ = ggml_new_tensor_2d(g, GGML_TYPE_F32, dim, x_seq);
+        ggml_tensor* PT = ggml_new_tensor_2d(g, GGML_TYPE_F32, dim, xt_T);
+        ggml_set_name(PZ, "fused_pos_z");
+        ggml_set_name(PT, "fused_pos_xt");
+        ggml_set_input(PZ);
+        ggml_set_input(PT);
+        xf = ggml_add(g, g_layernorm(g, xf, m.norm_in_w, m.norm_in_b, 1e-5f), PZ);
+        xtc = ggml_add(g, g_layernorm(g, xtc, m.norm_in_t_w, m.norm_in_t_b, 1e-5f), PT);
+
+        for (int li = 0; li < hp.t_layers; li++) {
+            const auto& ls = m.ct_layers[li];
+            const auto& lt = m.ct_layers_t[li];
+            if ((li % 2) == hp.t_classic_parity) {
+                xf = g_self_attn_layer(g, xf, ls.self_attn, dim, n_heads, x_seq);
+                xtc = g_self_attn_layer(g, xtc, lt.self_attn, dim, n_heads, xt_T);
+            } else {
+                ggml_tensor* old_x = xf;
+                xf = g_cross_attn_layer(g, xf, xtc, ls.cross_attn, dim, n_heads, x_seq, xt_T);
+                xtc = g_cross_attn_layer(g, xtc, old_x, lt.cross_attn, dim, n_heads, xt_T, x_seq);
+            }
+        }
+        xf = g_linear(g,
+                      ggml_reshape_2d(g, m.channel_down_w, (int)m.channel_down_w->ne[1], (int)m.channel_down_w->ne[2]),
+                      m.channel_down_b, xf);
+        xtc = g_linear(
+            g, ggml_reshape_2d(g, m.channel_down_t_w, (int)m.channel_down_t_w->ne[1], (int)m.channel_down_t_w->ne[2]),
+            m.channel_down_t_b, xtc);
+        xf = ggml_cont(g, ggml_transpose(g, xf)); // back to (seq, C)
+    }
+    ggml_set_name(xtc, "fused_xt_out");
+    ggml_set_output(xtc);
+    x = ggml_reshape_3d(g, xf, x_T, enc_Fq, (int)(ggml_nelements(xf) / ((size_t)x_T * enc_Fq)));
+
+    // ---------------- decoder ----------------
+    for (int idx = 0; idx < hp.depth; idx++) {
+        const auto& dec = m.decoder[idx];
+        if (!dec.conv_tr_w) {
+            ggml_free(g);
+            return false;
+        }
+        ggml_tensor* skip = skips[hp.depth - 1 - idx];
+        const int in_Fq = (int)x->ne[1];
+        const int stride = hp.stride;
+        const int pad = (int)dec.conv_tr_w->ne[1] / 4;
+
+        ggml_tensor* y = x;
+        if (!dec.empty) {
+            y = ggml_add(g, y, skip);
+            if (dec.rewrite_w) {
+                ggml_tensor* rw = ggml_conv_2d(g, dec.rewrite_w, y, 1, 1, hp.context, hp.context, 1, 1);
+                if (dec.rewrite_b)
+                    rw = ggml_add(g, rw, ggml_reshape_3d(g, dec.rewrite_b, 1, 1, (int)dec.rewrite_w->ne[3]));
+                y = g_glu_c(g, rw);
+            }
+            if (!dec.dconv.layers.empty())
+                y = g_dconv(g, y, dec.dconv, in_Fq);
+        }
+
+        const int ct_K = (int)dec.conv_tr_w->ne[1];
+        const int ct_OC = (int)dec.conv_tr_w->ne[2];
+        const int ct_IC = (int)dec.conv_tr_w->ne[3];
+        const int fq_raw = (in_Fq - 1) * stride + ct_K;
+
+        ggml_tensor* ZERO = ggml_new_tensor_3d(g, GGML_TYPE_F32, x_T, fq_raw, ct_OC);
+        ggml_set_name(ZERO, ("fused_zero_" + std::to_string(idx)).c_str());
+        ggml_set_input(ZERO);
+        ggml_tensor* acc = ZERO;
+        for (int kh = 0; kh < ct_K; kh++) {
+            ggml_tensor* Wk = ggml_new_tensor_4d(g, GGML_TYPE_F32, 1, 1, ct_IC, ct_OC);
+            ggml_set_name(Wk, ("fused_wk_" + std::to_string(idx) + "_" + std::to_string(kh)).c_str());
+            ggml_set_input(Wk);
+            ggml_tensor* part = ggml_conv_2d(g, Wk, y, 1, 1, 0, 0, 1, 1);
+            acc = ggml_acc(g, acc, part, (size_t)stride * x_T * sizeof(float), (size_t)x_T * fq_raw * sizeof(float),
+                           (size_t)x_T * fq_raw * ct_OC * sizeof(float), (size_t)kh * x_T * sizeof(float));
+        }
+        if (dec.conv_tr_b)
+            acc = ggml_add(g, acc, ggml_reshape_3d(g, dec.conv_tr_b, 1, 1, ct_OC));
+        x = ggml_cont(g, ggml_view_3d(g, acc, x_T, fq_raw - 2 * pad, ct_OC, acc->nb[1], acc->nb[2],
+                                      (size_t)pad * x_T * sizeof(float)));
+        if (idx != hp.depth - 1)
+            x = ggml_gelu(g, x);
+    }
+
+    ggml_set_name(x, "fused_out");
+    ggml_set_output(x);
+
+    ggml_cgraph* gf = ggml_new_graph_custom(g, n_nodes, false);
+    ggml_build_forward_expand(gf, x);
+    ggml_build_forward_expand(gf, xtc);
+
+    ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+    if (!ggml_gallocr_alloc_graph(alloc, gf)) {
+        fprintf(stderr, "htdemucs: FUSED graph alloc failed — falling back to per-layer path\n");
+        ggml_gallocr_free(alloc);
+        ggml_free(g);
+        return false;
+    }
+    return htdemucs_fused_run(ctx, g, gf, alloc, X, XT, x, xtc, x_buf, x_C, x_Fq, x_T, xt_buf, xt_C, xt_T,
+                              freq_emb_bcast);
 }
 
 // ---------------------------------------------------------------------------
