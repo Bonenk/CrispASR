@@ -144,6 +144,15 @@ export CRISPASR_MODEL_CREPE_FULL="${CRISPASR_MODEL_CREPE_FULL:-$CRISPASR_MODELS_
 # --accept-license cc-by-nc-sa-4.0 (or CRISPASR_ACCEPT_LICENSE).
 # The 170-class model is the default: it collapses to maj/min with
 # CRISPASR_BTC_MAJ_MIN=1, whereas the 25-class one can never be expanded.
+# ── RVC voice conversion (§CB1) ──
+# LICENCE VARIES PER CHECKPOINT. RVC's code is MIT but circulating voice models
+# do not share one licence; the GGUF carries its own tag and the registry gate
+# matches on it. The pretrained base (lj1995/VoiceConversionWebUI
+# pretrained_v2/f0G40k.pth) is what the parity work used.
+# No CLI verb: the input is ContentVec features, so the session C ABI is the
+# only surface. See docs/music-transcription/SVC_RECORD_SHAPES.md.
+export CRISPASR_MODEL_RVC="${CRISPASR_MODEL_RVC:-$CRISPASR_MODELS_DIR/rvc-40k-f32.gguf}"
+
 export CRISPASR_MODEL_BTC_CHORDS="${CRISPASR_MODEL_BTC_CHORDS:-$CRISPASR_MODELS_DIR/btc-chords-large-f32.gguf}"
 
 echo "Live test env configured (CRISPASR_MODELS_DIR=$CRISPASR_MODELS_DIR)"

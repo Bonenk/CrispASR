@@ -3554,6 +3554,21 @@ catch_discover_tests(test-btc-vocab
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-rvc-svc — live integration tests (session C-ABI, the only surface)
+add_executable(test-rvc-svc test_rvc_svc_live.cpp)
+target_include_directories(test-rvc-svc PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(test-rvc-svc PRIVATE Catch2::Catch2WithMain crispasr-lib)
+catch_discover_tests(test-rvc-svc
+    TEST_SPEC "[rvc]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test - btc-chords — live integration tests (session C-ABI)
 add_executable(test-btc-chords
     test_btc_chords_live.cpp
