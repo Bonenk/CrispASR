@@ -2389,6 +2389,18 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# rvc-svc — RVC voice conversion (§CB1). Full infer(): enc_p + flow + dec.
+# Weights vary in licence; the GGUF carries its own tag and the registry gates.
+add_library(rvc-svc STATIC rvc_svc.h rvc_svc.cpp)
+set_target_properties(rvc-svc PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(rvc-svc PUBLIC .)
+target_compile_features   (rvc-svc PUBLIC cxx_std_17)
+target_link_libraries     (rvc-svc PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(rvc-svc PRIVATE -O3)
+endif()
+
+# ---------------------------------------------------------------------------
 # crepe — CREPE monophonic F0 estimation (music transcription)
 # ---------------------------------------------------------------------------
 # btc_chords — BTC chord recognition (ISMIR 2019). Weights are CC-BY-NC-SA;
@@ -2795,6 +2807,9 @@ if (TARGET crepe)
 endif()
 if (TARGET btc-chords)
     target_link_libraries(crispasr-lib PUBLIC btc-chords)
+endif()
+if (TARGET rvc-svc)
+    target_link_libraries(crispasr-lib PUBLIC rvc-svc)
 endif()
 if (TARGET beat-this)
     target_link_libraries(crispasr-lib PUBLIC beat-this)
