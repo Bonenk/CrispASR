@@ -2414,6 +2414,17 @@ if(NOT MSVC)
     target_compile_options(btc-chords PRIVATE -O3)
 endif()
 
+# TabCNN guitar tablature emission scorer (--tab). Weights are CC BY 4.0
+# (EGSet12, doi:10.5281/zenodo.11406378) and require attribution.
+add_library(tabcnn STATIC tabcnn.h tabcnn.cpp)
+set_target_properties(tabcnn PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(tabcnn PUBLIC .)
+target_compile_features   (tabcnn PUBLIC cxx_std_17)
+target_link_libraries     (tabcnn PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(tabcnn PRIVATE -O3)
+endif()
+
 add_library(crepe STATIC crepe.h crepe.cpp)
 set_target_properties(crepe PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(crepe PUBLIC .)
