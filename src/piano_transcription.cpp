@@ -179,7 +179,26 @@ struct bn_fused {
     std::vector<float> shift;
 };
 
-static bn_fused fuse_bn(const piano_bn_weights& bn, float eps = 1e-5f) {
+// BatchNorm epsilon — NOT the PyTorch default for this model.
+//
+// Upstream builds every 2-D BN as `nn.BatchNorm2d(out_channels, momentum)`
+// (models.py:74-75, 186). BatchNorm2d's SECOND POSITIONAL parameter is `eps`,
+// not `momentum`, so that intended-momentum 0.01 actually lands on eps and
+// momentum keeps its 0.1 default. bn5 is built as
+// `nn.BatchNorm1d(768, momentum=momentum)` with an explicit keyword, so it
+// keeps eps = 1e-5. Confirmed on the loaded checkpoint: 33 BatchNorm2d at
+// eps=0.01, 4 BatchNorm1d at eps=1e-5.
+//
+// It is an upstream slip, but the weights were TRAINED with it, so it must be
+// reproduced exactly — the same reasoning as BTC's trailing ReLU. It matters a
+// lot here because the running variances are tiny (~0.003), so eps dominates
+// the denominator: sqrt(0.00295 + 1e-5) = 0.0544 vs sqrt(0.00295 + 0.01) =
+// 0.1138, a 2.09x error per layer. Using 1e-5 inflated conv-block-1 output by
+// 2.44x and dragged the final onset head to cos 0.72 against the reference.
+static constexpr float PIANO_BN2D_EPS = 0.01f; // ALL BatchNorm2d (bn0 + conv blocks)
+static constexpr float PIANO_BN1D_EPS = 1e-5f; // BatchNorm1d (bn5) only
+
+static bn_fused fuse_bn(const piano_bn_weights& bn, float eps) {
     int C = (int)ggml_nelements(bn.weight);
     auto w = tensor_to_f32(bn.weight);
     auto b = tensor_to_f32(bn.bias);
@@ -409,8 +428,19 @@ static std::vector<float> linear(const float* x, int T, int in_feat, const float
 // Run one AcousticModelCRnn8Dropout in inference mode (no dropout).
 // Input: [T, 229] mel spectrogram after BN0.
 // Output: [T, 88] sigmoid-activated.
+// Optional intermediate taps for the diff harness. All nullptr in normal use,
+// so the inference path is unchanged. Named for the reference dumper's stage
+// names (tools/reference_backends/piano_transcription.py) so the mapping is
+// obvious at the call site.
+struct piano_acoustic_taps {
+    std::vector<float>* conv_block_output = nullptr; // [C=128, T, W=14], channel-first
+    std::vector<float>* fc5_output = nullptr;        // [T, 768] post BN1d+ReLU
+    std::vector<float>* gru_output = nullptr;        // [T, 512] BiGRU output
+};
+
 static std::vector<float> acoustic_model_forward(const float* mel_bn, int T, int n_mels,
-                                                 const piano_acoustic_model& model, int hidden_size) {
+                                                 const piano_acoustic_model& model, int hidden_size,
+                                                 piano_acoustic_taps* taps = nullptr) {
     // mel_bn: [T, n_mels] row-major
 
     // Convert to [1, T, n_mels] → treat as [C=1, H=T, W=n_mels]
@@ -427,8 +457,8 @@ static std::vector<float> acoustic_model_forward(const float* mel_bn, int T, int
 
         auto conv1_w = tensor_to_f32(model.conv_blocks[blk].conv1_w);
         auto conv2_w = tensor_to_f32(model.conv_blocks[blk].conv2_w);
-        auto bn1 = fuse_bn(model.conv_blocks[blk].bn1);
-        auto bn2 = fuse_bn(model.conv_blocks[blk].bn2);
+        auto bn1 = fuse_bn(model.conv_blocks[blk].bn1, PIANO_BN2D_EPS);
+        auto bn2 = fuse_bn(model.conv_blocks[blk].bn2, PIANO_BN2D_EPS);
 
         // Conv1: [IC, H, W] → [OC, H, W]
         auto h = conv2d_3x3_pad1(x.data(), IC, H, W, conv1_w.data(), OC);
@@ -445,6 +475,9 @@ static std::vector<float> acoustic_model_forward(const float* mel_bn, int T, int
         C = OC;
         W = W / 2;
     }
+
+    if (taps && taps->conv_block_output)
+        *taps->conv_block_output = x; // [C, T, W] channel-first, as the reference dumps it
 
     // After 4 ConvBlocks: x is [C=128, H=T, W=n_mels/16]
     // W should be 229/16 = 14 (229 → 114 → 57 → 28 → 14)
@@ -470,7 +503,7 @@ static std::vector<float> acoustic_model_forward(const float* mel_bn, int T, int
     // BN1d: normalize over T per channel (768 channels)
     // fc5_out is [T, 768]. BN1d expects [N, C, T] = [1, 768, T].
     // Transpose to [768, T], apply BN, transpose back.
-    auto bn5 = fuse_bn(model.bn5);
+    auto bn5 = fuse_bn(model.bn5, PIANO_BN1D_EPS); // BatchNorm1d — keeps the 1e-5 default
     std::vector<float> transposed(768 * T);
     for (int t = 0; t < T; t++) {
         for (int c = 0; c < 768; c++) {
@@ -487,7 +520,13 @@ static std::vector<float> acoustic_model_forward(const float* mel_bn, int T, int
     }
 
     // BiGRU (2 layers): [T, 768] → [T, 512]
+    if (taps && taps->fc5_output)
+        *taps->fc5_output = fc5_out; // [T, 768] after BN1d + ReLU
+
     auto gru_out = bigru_2layer(fc5_out.data(), T, 768, hidden_size, model.gru);
+
+    if (taps && taps->gru_output)
+        *taps->gru_output = gru_out; // [T, 512]
 
     // FC: [T, 512] → [T, 88] + sigmoid
     auto fc_w = tensor_to_f32(model.fc_w);
@@ -835,7 +874,7 @@ static std::vector<float> compute_mel_with_bn0(piano_transcription_ctx* ctx, con
     // Apply BN0: the original model transposes to (1, 229, T, 1) for BN2d
     // then back. For our [T, n_mels] layout, BN operates per-mel-bin across T.
     // This is equivalent to BN1d with C=n_mels.
-    auto bn0 = fuse_bn(ctx->weights.note_bn0);
+    auto bn0 = fuse_bn(ctx->weights.note_bn0, PIANO_BN2D_EPS);
     // mel is [T, n_mels] row-major. We need to apply scale[m] * x[t,m] + shift[m]
     for (int t = 0; t < T_out; t++) {
         for (uint32_t m = 0; m < hp.n_mels; m++) {
@@ -1178,4 +1217,199 @@ float* piano_transcription_acoustic_model(struct piano_transcription_ctx* ctx, c
     float* ret = (float*)malloc(out.size() * sizeof(float));
     std::memcpy(ret, out.data(), out.size() * sizeof(float));
     return ret;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Diff harness — per-stage parity against tools/reference_backends/piano_transcription.py
+//
+// NOTE ON INPUT ALIGNMENT. Unlike the btc and mel-band-roformer harnesses, the
+// piano reference dump carries NO input_audio stage, so this cannot replay the
+// reference's exact samples — it recomputes the front end from the same WAV.
+// That is fine while both sides read an already-16 kHz mono file (no resampler
+// in the path), and `mel_spectrogram` is compared FIRST precisely so a
+// front-end difference shows up as itself rather than as a model failure.
+// If the reference ever gains an input_audio stage, replay it instead.
+//
+// The reference runs ONE forward pass over the whole clip. transcribe() instead
+// splits audio into overlapping segments, so this deliberately calls the
+// internals directly rather than going through transcribe() — comparing against
+// a segmented+deframed result would diff two different computations.
+// ───────────────────────────────────────────────────────────────────────────
+
+namespace {
+
+double piano_cosine(const float* a, const float* b, int64_t n) {
+    double dot = 0, na = 0, nb = 0;
+    for (int64_t i = 0; i < n; i++) {
+        dot += (double)a[i] * b[i];
+        na += (double)a[i] * a[i];
+        nb += (double)b[i] * b[i];
+    }
+    const double den = std::sqrt(na) * std::sqrt(nb);
+    return den > 0 ? dot / den : (na == 0 && nb == 0 ? 1.0 : 0.0);
+}
+
+double piano_max_abs(const float* a, const float* b, int64_t n) {
+    double m = 0;
+    for (int64_t i = 0; i < n; i++)
+        m = std::max(m, (double)std::fabs(a[i] - b[i]));
+    return m;
+}
+
+double piano_l2(const float* a, int64_t n) {
+    double s = 0;
+    for (int64_t i = 0; i < n; i++)
+        s += (double)a[i] * a[i];
+    return std::sqrt(s);
+}
+
+bool piano_ref_get(core_gguf::WeightLoad& rw, const char* name, std::vector<float>& out) {
+    auto it = rw.tensors.find(name);
+    if (it == rw.tensors.end() || !it->second)
+        return false;
+    const int64_t n = ggml_nelements(it->second);
+    out.resize((size_t)n);
+    ggml_backend_tensor_get(it->second, out.data(), 0, (size_t)n * sizeof(float));
+    return true;
+}
+
+} // namespace
+
+int piano_transcription_diff(const char* model_gguf, const char* ref_gguf, const float* pcm_16k, int n_samples,
+                             int verbosity) {
+    piano_transcription_params p = piano_transcription_default_params();
+    p.verbosity = 0;
+    piano_transcription_ctx* ctx = piano_transcription_init_from_file(model_gguf, p);
+    if (!ctx) {
+        fprintf(stderr, "piano_diff: failed to load model %s\n", model_gguf);
+        return 2;
+    }
+    core_gguf::WeightLoad rw;
+    if (!core_gguf::load_weights(ref_gguf, ctx->backend, "piano_ref", rw)) {
+        fprintf(stderr, "piano_diff: failed to load reference %s\n", ref_gguf);
+        piano_transcription_free(ctx);
+        return 2;
+    }
+
+    const auto& hp = ctx->hp;
+    const auto& w = ctx->weights;
+    int n_fail = 0;
+    const double COS_MIN = 0.999;
+
+    auto report = [&](const char* stage, const std::vector<float>& mine, const std::vector<float>& ref) {
+        const int64_t n = (int64_t)std::min(mine.size(), ref.size());
+        const double cos = piano_cosine(mine.data(), ref.data(), n);
+        const double mad = piano_max_abs(mine.data(), ref.data(), n);
+        const bool ok = cos >= COS_MIN && mine.size() == ref.size();
+        if (!ok)
+            n_fail++;
+        if (verbosity >= 1 || !ok) {
+            fprintf(stderr, "  %-20s %s cos=%.6f max_abs=%.3e  (mine=%zu ref=%zu)", stage, ok ? "PASS" : "FAIL", cos,
+                    mad, mine.size(), ref.size());
+            if (verbosity >= 2)
+                // Absolute magnitudes next to the cosine: cosine is scale-blind,
+                // so a uniform gain error passes it silently.
+                fprintf(stderr, "  |mine|=%.6f |ref|=%.6f", piano_l2(mine.data(), n), piano_l2(ref.data(), n));
+            fprintf(stderr, "\n");
+        }
+    };
+
+    int T = 0;
+    auto mel_bn = compute_mel_with_bn0(ctx, pcm_16k, n_samples, T);
+    fprintf(stderr, "piano_transcription diff (n_samples=%d, T=%d, n_mels=%u, classes=%u):\n", n_samples, T, hp.n_mels,
+            hp.classes_num);
+
+    {
+        std::vector<float> ref_mel;
+        if (piano_ref_get(rw, "mel_spectrogram", ref_mel))
+            report("mel_spectrogram", mel_bn, ref_mel);
+        else
+            fprintf(stderr, "  mel_spectrogram      SKIP (absent from reference)\n");
+    }
+
+    // The reference dumps conv/fc5/gru for the ONSET model as representative.
+    piano_acoustic_taps taps;
+    std::vector<float> conv_out, fc5_out, gru_out;
+    taps.conv_block_output = &conv_out;
+    taps.fc5_output = &fc5_out;
+    taps.gru_output = &gru_out;
+
+    auto onset_raw = acoustic_model_forward(mel_bn.data(), T, hp.n_mels, w.onset, hp.gru_hidden, &taps);
+    auto frame_raw = acoustic_model_forward(mel_bn.data(), T, hp.n_mels, w.frame, hp.gru_hidden);
+    auto offset_out = acoustic_model_forward(mel_bn.data(), T, hp.n_mels, w.offset, hp.gru_hidden);
+    auto velocity_out = acoustic_model_forward(mel_bn.data(), T, hp.n_mels, w.velocity, hp.gru_hidden);
+
+    {
+        std::vector<float> r;
+        if (piano_ref_get(rw, "conv_block_output", r))
+            report("conv_block_output", conv_out, r);
+        if (piano_ref_get(rw, "fc5_output", r))
+            report("fc5_output", fc5_out, r);
+        if (piano_ref_get(rw, "gru_output", r))
+            report("gru_output", gru_out, r);
+        // offset/velocity are NOT refined upstream, so the raw head IS the output.
+        if (piano_ref_get(rw, "offset_output", r))
+            report("offset_output", offset_out, r);
+        if (piano_ref_get(rw, "velocity_output", r))
+            report("velocity_output", velocity_out, r);
+    }
+
+    // Onset refinement: cat(onset, sqrt(onset)*velocity) -> BiGRU -> FC -> sigmoid
+    const int refine_in = (int)hp.classes_num * 2;
+    std::vector<float> onset_refine_input((size_t)T * refine_in);
+    for (int t = 0; t < T; t++)
+        for (uint32_t k = 0; k < hp.classes_num; k++) {
+            const float o = onset_raw[(size_t)t * hp.classes_num + k];
+            const float v = velocity_out[(size_t)t * hp.classes_num + k];
+            onset_refine_input[(size_t)t * refine_in + k] = o;
+            onset_refine_input[(size_t)t * refine_in + hp.classes_num + k] = std::sqrt(o) * v;
+        }
+    auto onset_gru = bigru_forward(onset_refine_input.data(), T, refine_in, hp.gru_hidden, w.onset_refine_gru);
+    auto o_fc_w = tensor_to_f32(w.onset_refine_fc_w);
+    auto o_fc_b = tensor_to_f32(w.onset_refine_fc_b);
+    auto onset_final =
+        linear(onset_gru.data(), T, 2 * (int)hp.gru_hidden, o_fc_w.data(), o_fc_b.data(), (int)hp.classes_num);
+    sigmoid_inplace(onset_final.data(), (size_t)T * hp.classes_num);
+
+    // Frame refinement: cat(frame, onset_final, offset) -> BiGRU -> FC -> sigmoid
+    const int frame_refine_in = (int)hp.classes_num * 3;
+    std::vector<float> frame_in((size_t)T * frame_refine_in);
+    for (int t = 0; t < T; t++)
+        for (uint32_t k = 0; k < hp.classes_num; k++) {
+            frame_in[(size_t)t * frame_refine_in + k] = frame_raw[(size_t)t * hp.classes_num + k];
+            frame_in[(size_t)t * frame_refine_in + hp.classes_num + k] = onset_final[(size_t)t * hp.classes_num + k];
+            frame_in[(size_t)t * frame_refine_in + 2 * hp.classes_num + k] = offset_out[(size_t)t * hp.classes_num + k];
+        }
+    auto frame_gru = bigru_forward(frame_in.data(), T, frame_refine_in, hp.gru_hidden, w.frame_refine_gru);
+    auto f_fc_w = tensor_to_f32(w.frame_refine_fc_w);
+    auto f_fc_b = tensor_to_f32(w.frame_refine_fc_b);
+    auto frame_final =
+        linear(frame_gru.data(), T, 2 * (int)hp.gru_hidden, f_fc_w.data(), f_fc_b.data(), (int)hp.classes_num);
+    sigmoid_inplace(frame_final.data(), (size_t)T * hp.classes_num);
+
+    {
+        std::vector<float> r;
+        if (piano_ref_get(rw, "onset_output", r))
+            report("onset_output", onset_final, r);
+        if (piano_ref_get(rw, "frame_output", r))
+            report("frame_output", frame_final, r);
+    }
+
+    // Declare the coverage gap rather than implying full coverage: the pedal
+    // sub-model is dumped by the reference but this runtime path does not
+    // produce it here.
+    {
+        std::vector<float> tmp;
+        std::string present;
+        for (const char* nm : {"pedal_onset_output", "pedal_offset_output", "pedal_frame_output"})
+            if (piano_ref_get(rw, nm, tmp))
+                present += (present.empty() ? "" : ", ") + std::string(nm);
+        if (!present.empty())
+            fprintf(stderr, "  NOTE: in the reference but not compared: %s\n", present.c_str());
+    }
+
+    core_gguf::free_weights(rw);
+    piano_transcription_free(ctx);
+    fprintf(stderr, "piano_transcription diff: %d stage(s) FAILED.\n", n_fail);
+    return n_fail == 0 ? 0 : 1;
 }

@@ -10,6 +10,49 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## A positional arg landing on the WRONG parameter is invisible in review and baked into the weights (piano-transcription BN eps, 2026-07-20)
+
+The first per-stage validation of a backend we had already shipped found it
+wrong. `crispasr-diff piano` reported mel PASS at cos 1.000000 and then
+`conv_block_output` FAIL at **cos 0.810** — first divergence = the bug, exactly
+as the harness is supposed to work.
+
+Upstream builds every 2-D BN as `nn.BatchNorm2d(out_channels, momentum)`
+(models.py:74). `BatchNorm2d`'s second POSITIONAL parameter is **`eps`**, not
+`momentum`. So the intended momentum 0.01 silently became **eps = 0.01** and
+momentum kept its 0.1 default. One line later, `nn.BatchNorm1d(768,
+momentum=momentum)` passes it as a KEYWORD, so that layer keeps eps = 1e-5.
+The loaded checkpoint confirms it: **33 BatchNorm2d at eps=0.01, 4 BatchNorm1d
+at eps=1e-5.**
+
+Our runtime hardcoded the PyTorch default 1e-5 everywhere. It mattered enormously
+because the running variances are tiny (~0.003), so eps DOMINATES the
+denominator: `sqrt(0.00295 + 1e-5) = 0.0544` vs `sqrt(0.00295 + 0.01) = 0.1138`
+— a 2.09x error per layer, compounding to 2.44x by conv block 1 and dragging
+the onset head to cos 0.72.
+
+Three transferable points:
+
+1. **An upstream slip that the weights were TRAINED with is not a bug to fix —
+   it is a spec to reproduce.** Same as BTC's trailing ReLU. Read what the code
+   DOES, not what it evidently meant.
+2. **Never assume a framework default for a hyperparameter you can read off the
+   loaded module.** `[m.eps for m in model.modules() if isinstance(m, _BatchNorm)]`
+   is one line and would have caught this at port time. Defaults are the least
+   reliable thing in a port.
+3. **"It produces plausible output" is not validation.** A downstream consumer
+   had reported this very backend "recognised the Für Elise motif" on a real
+   build — while every 2-D BN was wrong. Plausible-but-wrong is the failure mode
+   per-stage diffing exists for.
+
+Bisecting it is worth copying: mel PASSed, so the input was right; a numpy spec
+built from the GGUF weights matched our C++ at cos 1.000000 (so the C++ was a
+faithful implementation of the WRONG algorithm); then stepping conv1 -> bn1
+inside block 1 showed conv1 exact and bn1 diverged — three comparisons to go
+from "somewhere in an 8-layer stack" to one constant.
+
+---
+
 ## "Linked in CMake" is NOT evidence the code SHIPS — the linker drops an object nothing references (mel-band-roformer, 2026-07-20)
 
 `crispasr-lib` linked the `mel-band-roformer` target, exactly as the CMakeLists

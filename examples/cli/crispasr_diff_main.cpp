@@ -40,6 +40,7 @@
 #include "htdemucs.h"
 #include "mel_band_roformer.h"
 #include "btc_chords.h"
+#include "piano_transcription.h"
 #include "voxtral_tts.h"
 #include "higgs_stt.h"
 #include "moss_transcribe_diarize.h"
@@ -1115,6 +1116,23 @@ int main(int argc, char** argv) {
         // the same gap htdemucs had (present in the dumper, absent from the
         // diff binary), so the backend shipped with no per-stage evidence.
         return mel_band_roformer_diff(model_path.c_str(), ref_path.c_str(), audio_path.c_str(), /*verbosity=*/2);
+    }
+    if (backend_name == "piano" || backend_name == "piano-transcription") {
+        // model_path = piano-transcription GGUF, ref_path = ref.gguf from
+        // tools/reference_backends/piano_transcription.py.
+        //
+        // UNLIKE the input-aligned backends above, that reference carries no
+        // input_audio stage, so we must load the SAME 16 kHz mono WAV the
+        // reference ran on and recompute the front end. mel_spectrogram is the
+        // first stage compared, so a front-end difference surfaces as itself.
+        std::vector<float> pcm;
+        std::vector<std::vector<float>> stereo_unused;
+        if (!read_audio_data(audio_path, pcm, stereo_unused, /*stereo=*/false)) {
+            fprintf(stderr, "crispasr-diff: failed to read audio '%s'\n", audio_path.c_str());
+            return 2;
+        }
+        return piano_transcription_diff(model_path.c_str(), ref_path.c_str(), pcm.data(), (int)pcm.size(),
+                                        /*verbosity=*/2);
     }
     if (backend_name == "htdemucs") {
         // model_path = htdemucs GGUF (f32 for a clean structural diff), ref_path =
