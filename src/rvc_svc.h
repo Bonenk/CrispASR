@@ -72,12 +72,12 @@ void rvc_svc_result_free(rvc_svc_result* r);
 // cross-check; the conversion path applies it internally.
 void rvc_svc_coarse_pitch(const float* f0_hz, int n, int* out_coarse);
 
-// STATUS: the FULL path passes — enc_p + flow + dec, 47 per-stage comparisons
-// at cos 1.00000000 including output_audio (max_abs 1.5e-08). Run it with
-// `crispasr-diff rvc <model.gguf> <ref.gguf> <any.wav>`.
+// STATUS: the FULL path passes, INCLUDING rvc_svc_convert() end to end —
+// 48 comparisons at cos 1.00000000, of which convert_e2e runs this very API
+// with the reference'''s noise and reproduces its audio (max_abs 1.4e-05).
+// Run it with `crispasr-diff rvc <model.gguf> <ref.gguf> <any.wav>`.
 //
-// rvc_svc_convert() is still a stub and nothing is wired into the CLI, the
-// session C ABI or any binding — that is the next step, not a validation gap.
+// Not yet wired into the CLI, the session C ABI or any binding.
 //
 // Per-stage parity diff against tools/rvc_torch_parity.py's reference dump.
 // The reference carries BOTH noise buffers, which the runtime replays, so the

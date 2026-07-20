@@ -282,14 +282,17 @@ def main():
             c = float(u[:nn_] @ v[:nn_] / (np.linalg.norm(u[:nn_]) * np.linalg.norm(v[:nn_])))
             flag = "" if c > 0.99999 else "   <-- FIRST DIVERGENCE" if c < 0.99999 else ""
             print(f"  BISECT {nm:10} cos={c:.6f} len mine={len(u)} ref={len(v)}{flag}")
-    a, b = audio_np.ravel(), a_ref.ravel().astype(np.float64)
-    n = min(len(a), len(b))
-    cos = float(a[:n] @ b[:n] / (np.linalg.norm(a[:n]) * np.linalg.norm(b[:n])))
+    # NB: scratch names here must NOT be `a` — `a`/`a_ref` hold the reference
+    # audio used by the stage dump below, and shadowing it silently reduced
+    # "output_audio" to a single float (making its diff comparison vacuous).
+    _u, _v = audio_np.ravel(), a_ref.ravel().astype(np.float64)
+    n = min(len(_u), len(_v))
+    cos = float(_u[:n] @ _v[:n] / (np.linalg.norm(_u[:n]) * np.linalg.norm(_v[:n])))
     good = cos > 0.999
     ok &= good
     print(f"NUMPY SPEC vs TORCH (dec, audio):\n  {'audio':8} {'PASS' if good else 'FAIL'} "
-          f"cos={cos:.8f} max_abs={np.abs(a[:n]-b[:n]).max():.3e} "
-          f"|mine|={np.linalg.norm(a[:n]):.4f} |ref|={np.linalg.norm(b[:n]):.4f} n={n}")
+          f"cos={cos:.8f} max_abs={np.abs(_u[:n]-_v[:n]).max():.3e} "
+          f"|mine|={np.linalg.norm(_u[:n]):.4f} |ref|={np.linalg.norm(_v[:n]):.4f} n={n}")
 
     if not ok:
         sys.exit("FAIL: a numpy spec does not match torch — fix the spec before any ggml.")
@@ -299,7 +302,7 @@ def main():
         stages = {"input_phone": phone[0], "input_f0": f0_hz, "input_pitch": pitch_coarse.astype(np.float32),
                   "noise_zp": noise_zp, "noise_sine": noise_sine,
                   "m_p": sa["m_p"][0], "logs_p": sa["logs_p"][0], "z_p": sa["z_p"][0], "z": sa["z"][0],
-                  "output_audio": a[0]}
+                  "output_audio": a_ref[0]}
         # every captured enc_p sublayer, squeezed of the batch dim
         for _k, _v in ENCP_TAPS.items():
             stages[_k] = _v
