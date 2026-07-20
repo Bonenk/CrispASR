@@ -1862,6 +1862,12 @@ struct crispasr_session {
 #ifdef CA_HAVE_CREPE
     crepe_context* crepe_ctx = nullptr;
     std::vector<crepe_frame> crepe_last_frames;
+#ifdef CA_HAVE_PIANO_TRANSCRIPTION
+    // Flattened {onset_ms, offset_ms, midi, velocity} per note. Flattened
+    // rather than kept as piano_note_event[] so the C ABI can hand out one
+    // contiguous float view (see crispasr_session_piano_notes).
+    std::vector<float> piano_last_notes;
+#endif
 #endif
 #ifdef CA_HAVE_KYUTAI
     void* kyutai_ctx = nullptr;
@@ -8744,6 +8750,71 @@ CA_EXPORT int crispasr_session_pitch_sample_rate(crispasr_session* s) {
 #endif
     return 0;
 }
+
+CA_EXPORT int crispasr_session_piano(crispasr_session* s, const float* pcm_16k, int n_samples) {
+    if (!s || !pcm_16k || n_samples <= 0)
+        return -1;
+#ifdef CA_HAVE_PIANO_TRANSCRIPTION
+    if (s->piano_ctx) {
+        s->piano_last_notes.clear();
+        piano_transcription_result res{};
+        if (piano_transcription_transcribe(s->piano_ctx, pcm_16k, n_samples, &res) != 0)
+            return -1;
+        s->piano_last_notes.reserve((size_t)res.n_notes * 4);
+        for (int i = 0; i < res.n_notes; i++) {
+            const piano_note_event& e = res.note_events[i];
+            // Runtime reports seconds; the C ABI is milliseconds throughout
+            // (crispasr_session_pitch_frames is ms too) so convert once here
+            // rather than leaving every binding to guess the unit.
+            s->piano_last_notes.push_back(e.onset_time * 1000.0f);
+            s->piano_last_notes.push_back(e.offset_time * 1000.0f);
+            s->piano_last_notes.push_back((float)e.midi_note);
+            s->piano_last_notes.push_back((float)e.velocity);
+        }
+        const int n = res.n_notes;
+        piano_transcription_result_free(&res);
+        return n;
+    }
+#endif
+    return -1;
+}
+
+CA_EXPORT int crispasr_session_piano_n_notes(crispasr_session* s) {
+    if (!s)
+        return 0;
+#ifdef CA_HAVE_PIANO_TRANSCRIPTION
+    return (int)(s->piano_last_notes.size() / 4);
+#else
+    return 0;
+#endif
+}
+
+CA_EXPORT const float* crispasr_session_piano_notes(crispasr_session* s, int* out_n_notes) {
+    if (out_n_notes)
+        *out_n_notes = 0;
+    if (!s)
+        return nullptr;
+#ifdef CA_HAVE_PIANO_TRANSCRIPTION
+    if (s->piano_last_notes.empty())
+        return nullptr;
+    if (out_n_notes)
+        *out_n_notes = (int)(s->piano_last_notes.size() / 4);
+    return s->piano_last_notes.data();
+#else
+    return nullptr;
+#endif
+}
+
+CA_EXPORT int crispasr_session_piano_sample_rate(crispasr_session* s) {
+    if (!s)
+        return 0;
+#ifdef CA_HAVE_PIANO_TRANSCRIPTION
+    if (s->piano_ctx)
+        return (int)piano_transcription_sample_rate(s->piano_ctx);
+#endif
+    return 0;
+}
+
 
 CA_EXPORT void crispasr_session_close(crispasr_session* s) {
     if (!s)
