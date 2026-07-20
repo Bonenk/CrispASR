@@ -808,6 +808,10 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.stems = ARGV_NEXT;
     } else if (arg == "--sep-output-dir") {
         params.sep_output_dir = ARGV_NEXT;
+    } else if (arg == "--beats") {
+        params.beats = true; // beat / downbeat tracking task — beat-this
+    } else if (arg == "--beats-format") {
+        params.beats_format = ARGV_NEXT;
     } else if (arg == "--chords") {
         params.chords = true; // chord recognition task — btc
     } else if (arg == "--chords-format") {
@@ -1399,6 +1403,12 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.chords ? "true" : "false");
     fprintf(stderr, "             --chords-format FMT         [%-7s] chord output format: text or json\n",
             params.chords_format.empty() ? "text" : params.chords_format.c_str());
+    fprintf(stderr,
+            "             --beats                     [%-7s] beat/downbeat tracking; prints time and beat|downbeat "
+            "per line (beat-this, arch auto-detected). MIT weights, no DBN\n",
+            params.beats ? "true" : "false");
+    fprintf(stderr, "             --beats-format FMT          [%-7s] beat output format: text or json\n",
+            params.beats_format.empty() ? "text" : params.beats_format.c_str());
     fprintf(stderr, "\n");
 }
 
@@ -2341,6 +2351,14 @@ int main(int argc, char** argv) {
     // otherwise the BTC GGUF is handed to whisper_model_load, which rejects it
     // as "invalid model data (bad magic)".
     if (params.chords) {
+        return crispasr_run_backend(params);
+    }
+
+    // --beats is a standalone beat-tracking verb, same shape as --chords:
+    // audio in, a beat/downbeat grid out. Route before any ASR backend
+    // detection — otherwise the beat-this GGUF is handed to
+    // whisper_model_load, which rejects it as "invalid model data (bad magic)".
+    if (params.beats) {
         return crispasr_run_backend(params);
     }
 

@@ -1110,6 +1110,54 @@ CREPE is compute-heavy per frame (282 GFLOP per second of audio for `full`,
 7.3 for `tiny`), so tiny is the shipping default and the GPU path is not
 optional — on CPU even tiny runs at roughly RTF 2.4.
 
+## Beat tracking (`--beats`)
+
+A standalone task: audio in, a beat and downbeat grid out. Like `--chords`,
+`--pitch` and `--separate` it routes to its own dispatcher before any ASR
+backend is built.
+
+> **No DBN, and that is the point.** Nearly every published beat tracker
+> post-processes its framewise logits with madmom's Dynamic Bayesian Network,
+> which is Böck-patented and licensed non-commercially. **Beat This!** (CPJKU,
+> ISMIR 2024) reaches state-of-the-art *without* one, and its postprocessing
+> here is peak-picking only. Both the code and the published weights are MIT,
+> and the dependency list contains no part of madmom — so unlike `--chords`
+> there is no licence gate on this task.
+
+```bash
+# Explicit model
+crispasr --beats -m beat-this-f16.gguf -f song.wav
+
+# JSON, including the median-interval tempo estimate
+crispasr --beats -m beat-this-f16.gguf --beats-format json -f song.wav
+```
+
+The backend (`beat-this`) is auto-detected from the GGUF
+`general.architecture`; input is decoded to the model's native 22.05 kHz mono
+automatically, and long files are internally split into 1500-frame chunks with
+a 6-frame border overlap, matching upstream so results do not drift at seams.
+
+| Flag | Meaning |
+|---|---|
+| `--beats` | Enable the beat task |
+| `--beats-format FMT` | `text` (default) or `json` |
+
+Default output is one tab-separated line per beat — `time_sec` and either
+`beat` or `downbeat` — which is the `.beats` layout the MIR beat datasets
+(Ballroom, GTZAN-Rhythm) use, so it drops straight into `mir_eval.beat`:
+
+```
+0.000	downbeat
+0.540	beat
+1.020	beat
+1.520	beat
+2.020	downbeat
+```
+
+**Every downbeat is also emitted as a beat.** The postprocessor snaps each
+downbeat onto its nearest detected beat, so downbeats are a strict subset of
+beats and you never have to merge two lists to reconstruct the grid.
+
 ## Chord recognition (`--chords`)
 
 Another standalone task: audio in, a chord timeline out. Like `--pitch` and

@@ -797,12 +797,49 @@ jobs:
             -exec cp -P {} "$OUT/ggml/src/" \;
           # Headers so binding authors can extend the FFI without
           # vendoring the whole CrispASR repo.
+          # NOTE: there are deliberately no libogg/libopus copies here. They
+          # are STATIC archives linked into libcrispasr (src/CMakeLists.txt
+          # forces BUILD_SHARED_LIBS=OFF around the FetchContent block), so
+          # they must not appear as separate dylibs. If they ever do, the
+          # @rpath gate below fails the release rather than shipping a bundle
+          # that cannot dlopen — which is what happened in v0.8.17.
+          # Headers so binding authors can extend the FFI without
+          # vendoring the whole CrispASR repo.
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
           cp THIRD_PARTY_NOTICES.txt "$OUT/"
+
+          # GATE: every @rpath dependency must actually be in the bundle.
+          # Copying a hand-written list is what failed before -- a dep gets
+          # added and nobody updates the list. This derives the requirement
+          # from the binary itself, so the next new dependency fails the
+          # RELEASE rather than the downstream consumer's dlopen.
+          echo "verifying @rpath closure of the bundle ..."
+          missing=0
+          for lib in "$OUT"/src/*.dylib "$OUT"/ggml/src/*.dylib; do
+            [ -f "$lib" ] || continue
+            # `|| true` on grep: a dylib with NO @rpath deps makes grep exit 1,
+            # and this step runs under `set -euo pipefail`, so without it a
+            # dependency-free library would fail the gate spuriously.
+            otool -L "$lib" | { grep -o '@rpath/[^ ]*' || true; } | sed 's|@rpath/||' | sort -u |
+            while read -r dep; do
+              if [ ! -e "$OUT/src/$dep" ] && [ ! -e "$OUT/ggml/src/$dep" ]; then
+                echo "  MISSING: $dep  (needed by $(basename "$lib"))"
+                exit 1
+              fi
+            done || missing=1
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "ERROR: the bundle has unresolved @rpath dependencies (see above)."
+            echo "       A consumer running dlopen on libcrispasr.dylib would fail."
+            exit 1
+          fi
+          echo "  all @rpath dependencies present"
+
           cd release && tar czf libcrispasr-macos-arm64.tar.gz libcrispasr-macos-arm64/
           ls -lh libcrispasr-macos-arm64.tar.gz
+          echo "bundle contents:"; tar tzf libcrispasr-macos-arm64.tar.gz | sed 's/^/  /'
 
       - uses: actions/upload-artifact@v4
         with:
