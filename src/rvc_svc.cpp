@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <random>
 #include <string>
 #include <vector>
 
@@ -1019,6 +1020,33 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
                     cs, rvc_max_abs(mine.data(), ref.data(), n), mine.size(), ref.size());
         }
     }
+    // END-TO-END through the REAL entry point. The per-stage checks above are
+    // all input-aligned (they feed the reference's z_p / z / har), so none of
+    // them exercises the CHAINING. This runs rvc_svc_convert() with the
+    // reference's own noise buffers: if the chaining is right it must reproduce
+    // the reference audio.
+    {
+        std::vector<float> ph, f0, nzp, nsine, ref_audio;
+        if (rvc_ref_get(rw, "input_phone", ph) && rvc_ref_get(rw, "input_f0", f0) && rvc_ref_get(rw, "noise_zp", nzp) &&
+            rvc_ref_get(rw, "noise_sine", nsine) && rvc_ref_get(rw, "output_audio", ref_audio)) {
+            rvc_svc_result* res = rvc_svc_convert(c, ph.data(), T, f0.data(), 0, nzp.data(), nsine.data());
+            if (!res) {
+                fprintf(stderr, "  %-16s FAIL (convert returned null)\n", "convert_e2e");
+                n_fail++;
+            } else {
+                const int64_t n = (int64_t)std::min((size_t)res->n_samples, ref_audio.size());
+                const double cs = rvc_cos(res->pcm, ref_audio.data(), n);
+                const bool ok = cs >= COS_MIN && (size_t)res->n_samples == ref_audio.size();
+                if (!ok)
+                    n_fail++;
+                fprintf(stderr, "  %-16s %s cos=%.8f max_abs=%.3e (mine=%d ref=%zu)\n", "convert_e2e",
+                        ok ? "PASS" : "FAIL", cs, rvc_max_abs(res->pcm, ref_audio.data(), n), res->n_samples,
+                        ref_audio.size());
+                rvc_svc_result_free(res);
+            }
+        }
+    }
+
     if (audio_out) {
         std::vector<float> ref_audio;
         if (rvc_ref_get(rw, "output_audio", ref_audio)) {
@@ -1034,4 +1062,131 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
     rvc_svc_free(c);
     fprintf(stderr, "rvc diff: %d stage(s) FAILED.\n", n_fail);
     return n_fail == 0 ? 0 : 1;
+}
+
+// ---------------------------------------------------------------------------
+// convert() — the real entry point: enc_p -> sample z_p -> flow -> dec.
+//
+// One graph, one compute. The z_p sample happens IN-GRAPH from an uploaded
+// noise tensor, so passing the reference's buffers reproduces the reference
+// audio bit-for-bit; passing NULL draws fresh noise, which is what production
+// wants (the model is stochastic by design).
+// ---------------------------------------------------------------------------
+
+rvc_svc_result* rvc_svc_convert(rvc_svc_context* c, const float* content, int n_frames, const float* f0_hz,
+                                int speaker_id, const float* noise_zp, const float* noise_sine) {
+    if (!c || !content || !f0_hz || n_frames <= 0)
+        return nullptr;
+    const rvc_hparams& hp = c->hp;
+    if (speaker_id < 0 || speaker_id >= hp.n_speakers) {
+        fprintf(stderr, "rvc: speaker_id %d out of range (0..%d)\n", speaker_id, hp.n_speakers - 1);
+        return nullptr;
+    }
+    const int T = n_frames;
+    const int upp = hp.upp();
+
+    // Noise: supplied (deterministic replay) or drawn.
+    std::vector<float> zp_noise((size_t)hp.inter * T), sine_noise((size_t)T * upp);
+    if (noise_zp) {
+        std::memcpy(zp_noise.data(), noise_zp, zp_noise.size() * sizeof(float));
+    } else {
+        std::mt19937 rng{std::random_device{}()};
+        std::normal_distribution<float> nd(0.0f, 1.0f);
+        for (auto& v : zp_noise)
+            v = nd(rng);
+    }
+    if (noise_sine) {
+        std::memcpy(sine_noise.data(), noise_sine, sine_noise.size() * sizeof(float));
+    } else {
+        std::mt19937 rng{std::random_device{}()};
+        std::normal_distribution<float> nd(0.0f, 1.0f);
+        for (auto& v : sine_noise)
+            v = nd(rng);
+    }
+
+    // SineGen on the host (see rvc_sine_gen).
+    std::vector<float> sine, uv;
+    rvc_sine_gen(f0_hz, T, upp, hp.sample_rate, sine_noise.data(), hp.sine_amp, hp.add_noise_std, sine, uv);
+
+    std::vector<int> coarse((size_t)T);
+    rvc_svc_coarse_pitch(f0_hz, T, coarse.data());
+
+    const size_t mem = (size_t)1024 * 1024 * 1024;
+    std::vector<uint8_t> buf(mem);
+    ggml_init_params ip{mem, buf.data(), true};
+    ggml_context* g = ggml_init(ip);
+    if (!g)
+        return nullptr;
+
+    ggml_tensor* t_content = ggml_new_tensor_2d(g, GGML_TYPE_F32, hp.content_dim, T);
+    ggml_tensor* t_pitch = ggml_new_tensor_1d(g, GGML_TYPE_I32, T);
+    // The z_p noise is (inter, T) row-major on the wire (TIME fastest) — that
+    // is how the reference dumps it and how a caller naturally lays it out —
+    // whereas our graph layout is channels-fastest. Declare it in wire order
+    // and transpose in-graph. Feeding it raw gave cos 0.40 end-to-end while
+    // every per-stage check still passed, because the stage checks are all
+    // input-aligned and never exercise this path.
+    ggml_tensor* t_noise = ggml_new_tensor_2d(g, GGML_TYPE_F32, T, hp.inter);
+    ggml_tensor* t_har = ggml_new_tensor_2d(g, GGML_TYPE_F32, 1, (int64_t)T * upp);
+    ggml_tensor* t_rev = ggml_new_tensor_1d(g, GGML_TYPE_I32, hp.inter);
+    for (ggml_tensor* t : {t_content, t_pitch, t_noise, t_har, t_rev})
+        ggml_set_input(t);
+
+    c->capture = false; // no taps on the production path
+    ggml_tensor* stats = rvc_enc_p_graph(g, c, t_content, t_pitch, T);
+    if (!stats) {
+        ggml_free(g);
+        return nullptr;
+    }
+    // stats is [2*inter, T]; split channel-wise.
+    ggml_tensor* m_p = ggml_cont(g, ggml_view_2d(g, stats, hp.inter, T, stats->nb[1], 0));
+    ggml_tensor* logs_p =
+        ggml_cont(g, ggml_view_2d(g, stats, hp.inter, T, stats->nb[1], (size_t)hp.inter * stats->nb[0]));
+    // z_p = m_p + exp(logs_p) * noise * noise_scale   (models.py:684)
+    ggml_tensor* noise_ct = ggml_cont(g, ggml_transpose(g, t_noise)); // [inter, T]
+    ggml_tensor* z_p = ggml_add(g, m_p, ggml_scale(g, ggml_mul(g, ggml_exp(g, logs_p), noise_ct), hp.noise_scale));
+
+    ggml_tensor* gemb = ggml_cont(
+        g, ggml_view_1d(g, c->t["emb_g.weight"], hp.gin, (size_t)speaker_id * hp.gin * c->t["emb_g.weight"]->nb[0]));
+    std::vector<ggml_tensor*> conds;
+    for (int i = 0; i < hp.flow_n_flows; i++) {
+        const std::string b = "flow.flows." + std::to_string(i * 2) + ".enc.cond_layer.";
+        conds.push_back(
+            ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, c->t[b + "weight"]), gemb), c->t[b + "bias"]));
+    }
+    ggml_tensor* z = rvc_flow_graph_conds(g, c, z_p, conds, t_rev, T);
+    ggml_tensor* audio = rvc_dec_graph(g, c, z, t_har, gemb, T);
+    ggml_set_output(audio);
+
+    ggml_cgraph* gf = ggml_new_graph_custom(g, 16384, false);
+    ggml_build_forward_expand(gf, audio);
+    ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(c->backend));
+    if (!ggml_gallocr_alloc_graph(alloc, gf)) {
+        fprintf(stderr, "rvc: graph allocation failed\n");
+        ggml_gallocr_free(alloc);
+        ggml_free(g);
+        return nullptr;
+    }
+
+    ggml_backend_tensor_set(t_content, content, 0, (size_t)hp.content_dim * T * sizeof(float));
+    std::vector<int32_t> pi(coarse.begin(), coarse.end());
+    ggml_backend_tensor_set(t_pitch, pi.data(), 0, pi.size() * sizeof(int32_t));
+    ggml_backend_tensor_set(t_noise, zp_noise.data(), 0, zp_noise.size() * sizeof(float));
+    ggml_backend_tensor_set(t_har, sine.data(), 0, sine.size() * sizeof(float));
+    std::vector<int32_t> rev((size_t)hp.inter);
+    for (int i = 0; i < hp.inter; i++)
+        rev[(size_t)i] = hp.inter - 1 - i;
+    ggml_backend_tensor_set(t_rev, rev.data(), 0, rev.size() * sizeof(int32_t));
+
+    ggml_backend_graph_compute(c->backend, gf);
+
+    const int64_t n_out = ggml_nelements(audio);
+    auto* r = new rvc_svc_result();
+    r->n_samples = (int)n_out;
+    r->pcm = (float*)malloc((size_t)n_out * sizeof(float));
+    ggml_backend_tensor_get(audio, r->pcm, 0, (size_t)n_out * sizeof(float));
+
+    ggml_gallocr_free(alloc);
+    ggml_free(g);
+    return r;
 }
