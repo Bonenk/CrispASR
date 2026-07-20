@@ -816,6 +816,10 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.piano = true; // piano transcription task — note events out
     } else if (arg == "--piano-format") {
         params.piano_format = ARGV_NEXT;
+    } else if (arg == "--tab") {
+        params.tab = true; // guitar tablature task — tabcnn
+    } else if (arg == "--tab-format") {
+        params.tab_format = ARGV_NEXT;
     } else if (arg == "--chords") {
         params.chords = true; // chord recognition task — btc
     } else if (arg == "--chords-format") {
@@ -1413,6 +1417,13 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.chords ? "true" : "false");
     fprintf(stderr, "             --chords-format FMT         [%-7s] chord output format: text or json\n",
             params.chords_format.empty() ? "text" : params.chords_format.c_str());
+    fprintf(stderr,
+            "             --tab                       [%-7s] guitar tablature; prints per-frame fret per string "
+            "(tabcnn, arch auto-detected). Emission SCORES — displayed frets are a plain argmax with no "
+            "playability constraints; use the C ABI for a real decoder. CC BY 4.0, attribution required\n",
+            params.tab ? "true" : "false");
+    fprintf(stderr, "             --tab-format FMT            [%-7s] tab output format: text or json\n",
+            params.tab_format.empty() ? "text" : params.tab_format.c_str());
     fprintf(stderr,
             "             --beats                     [%-7s] beat/downbeat tracking; prints time and beat|downbeat "
             "per line (beat-this, arch auto-detected). MIT weights, no DBN\n",

@@ -445,6 +445,27 @@ CRISPASR_SESSION_API int crispasr_session_convert_sample_rate(crispasr_session* 
 // this library is MIT. The registry refuses to download them without an
 // explicit licence acceptance (CLI: --accept-license cc-by-nc-sa-4.0; env:
 // CRISPASR_ACCEPT_LICENSE). A commercial product must ship its own weights.
+// --- Guitar tablature (tabcnn) -------------------------------------------
+//
+// EMISSION SCORES, not a decided tablature. crispasr_session_tab() runs the
+// model and returns the frame count; crispasr_session_tab_emissions() hands
+// back a flat [frame][string][class] grid of LOG-probabilities, valid until the
+// next call or session close. The constrained Viterbi/DP that turns those into
+// a playable fingering (one note per string, fret range, capo, hand span) is
+// yours — argmaxing this grid ignores every playability constraint.
+//
+// Weights are CC BY 4.0 (EGSet12, doi:10.5281/zenodo.11406378): attribution
+// required when redistributing.
+CRISPASR_SESSION_API int crispasr_session_tab(crispasr_session* s, const float* pcm, int n_samples, int sample_rate);
+CRISPASR_SESSION_API int crispasr_session_tab_n_frames(crispasr_session* s);
+CRISPASR_SESSION_API const float* crispasr_session_tab_emissions(crispasr_session* s, int* out_n_frames,
+                                                                 int* out_n_strings, int* out_n_classes);
+// Class index meaning "string not played" — read it, never assume it.
+CRISPASR_SESSION_API int crispasr_session_tab_silent_class(crispasr_session* s);
+CRISPASR_SESSION_API float crispasr_session_tab_frame_period(crispasr_session* s);
+// Open-string MIDI pitch per string (0 = lowest), or -1 if unknown.
+CRISPASR_SESSION_API int crispasr_session_tab_string_open_midi(crispasr_session* s, int string);
+
 CRISPASR_SESSION_API int crispasr_session_chords(crispasr_session* s, const float* pcm, int n_samples, int sample_rate);
 CRISPASR_SESSION_API int crispasr_session_chords_n_spans(crispasr_session* s);
 // Flat, session-owned view of the last result: 4 floats per span, span-major,

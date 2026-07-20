@@ -122,6 +122,12 @@ enum crispasr_capability : uint32_t {
     CAP_BEATS = 1u << 26,               // beat / downbeat tracking (audio in -> beat grid out).
                                         // Same task-marker role as CAP_CHORDS; routing happens
                                         // in the --beats dispatcher.
+    CAP_TAB = 1u << 28,                 // guitar tablature emission scoring (audio in ->
+                                        // per-frame per-string fret SCORES out). Task marker
+                                        // like CAP_CHORDS; routing happens in the --tab
+                                        // dispatcher. Note this backend emits scores, not a
+                                        // decided tablature: the constrained Viterbi/DP that
+                                        // picks a playable fingering belongs to the caller.
 };
 
 // ---------------------------------------------------------------------------

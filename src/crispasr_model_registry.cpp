@@ -381,6 +381,13 @@ constexpr Entry k_registry[] = {
     // drift). f32 is exact (cos = 1.00000000, rel err ~1e-6) and is kept for
     // parity debugging, not for production — it is 2x the size for no
     // measurable difference in detected beats.
+    // TabCNN guitar tablature (--tab). Weights are CC BY 4.0 from the EGSet12
+    // record (doi:10.5281/zenodo.11406378) — attribution required, commercial
+    // use permitted. This is the GuitarProFX-augmented variant: the vanilla
+    // GuitarSet-trained model collapses from tablature F1 0.748 to 0.447 on
+    // real electric guitar, the augmented one recovers to 0.585 (DAFx-24).
+    {"tabcnn", "tabcnn-f16.gguf", "https://huggingface.co/cstr/tabcnn-GGUF/resolve/main/tabcnn-f16.gguf", "~1.8 MB",
+     nullptr, nullptr, nullptr, "cc-by-4.0"},
     {"beat-this", "beat-this-f16.gguf",
      "https://huggingface.co/cstr/beat-this-GGUF/resolve/main/beat-this-f16.gguf", "~41 MB", nullptr, nullptr, nullptr,
      "MIT"},
