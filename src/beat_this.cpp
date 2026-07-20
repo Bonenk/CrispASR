@@ -184,18 +184,28 @@ ggml_tensor* bt_attention(ggml_context* c, const bt_attn& a, ggml_tensor* x, ggm
     ggml_tensor* k = ggml_rope(c, slab(1), pos, (int)D, GGML_ROPE_TYPE_NORMAL);
     ggml_tensor* v = slab(2);
 
-    // (D, H, N, B) -> (D, N, H, B), the shape mul_mat wants per head.
+    // (D, H, N, B) -> (D, N, H, B), the layout flash_attn_ext wants.
     q = ggml_cont(c, ggml_permute(c, q, 0, 2, 1, 3));
     k = ggml_cont(c, ggml_permute(c, k, 0, 2, 1, 3));
+    v = ggml_cont(c, ggml_permute(c, v, 0, 2, 1, 3));
 
-    // Attend() is plain SDPA with the default 1/sqrt(head_dim) scale: the
-    // `scale` argument is never passed, so Attention.scale is dead code.
-    ggml_tensor* kq = ggml_mul_mat(c, k, q); // (N_k, N_q, H, B)
-    kq = ggml_soft_max_ext(c, kq, nullptr, 1.0f / std::sqrt((float)D), 0.0f);
-
-    // v as (N, D, H, B) so mul_mat contracts over the key axis.
-    ggml_tensor* vt = ggml_cont(c, ggml_permute(c, v, 1, 2, 0, 3));
-    ggml_tensor* out = ggml_mul_mat(c, vt, kq); // (D, N_q, H, B)
+    // FLASH ATTENTION, NOT AN EXPLICIT mul_mat + softmax. Upstream's Attend()
+    // is F.scaled_dot_product_attention, which never materialises the N x N
+    // score matrix — and here N is the CHUNK LENGTH, 1500 frames. Materialised,
+    // the attnT scores are (1500, 1500, heads, freqs) = 288 MB for ONE
+    // sub-block and the graph's compute buffer measured 322 MB; with flash
+    // attention the same graph measures 47.6 MB. That 6.8x matters for the
+    // downstream consumer, which is a mobile app.
+    //
+    // Attend() passes no `scale`, so SDPA's default 1/sqrt(head_dim) applies;
+    // Attention.scale is computed in __init__ and never used.
+    ggml_tensor* out = ggml_flash_attn_ext(c, q, k, v, /*mask*/ nullptr, 1.0f / std::sqrt((float)D),
+                                           /*max_bias*/ 0.0f, /*logit_softcap*/ 0.0f);
+    // Accumulate in F32: the default permits F16 accumulation, which is a
+    // silent precision loss over a 1500-key softmax.
+    ggml_flash_attn_ext_set_prec(out, GGML_PREC_F32);
+    // out ne = (D, H, N, B) — flash_attn_ext already emits the permuted layout
+    // that "b h n d -> b n (h d)" wants, so no permute+cont is needed below.
 
     // PER-HEAD SIGMOID GATING. to_gates is Linear(dim -> heads): one scalar
     // per head, broadcast over that head's head_dim and over the sequence, and
@@ -203,12 +213,10 @@ ggml_tensor* bt_attention(ggml_context* c, const bt_attn& a, ggml_tensor* x, ggm
     // wrong — it scales rather than reshapes the activation.
     ggml_tensor* g = ggml_add(c, ggml_mul_mat(c, a.gates_w, xn), a.gates_b); // (H, N, B)
     g = ggml_sigmoid(c, g);
-    // (H, N, B) -> (1, N, H, B) so it broadcasts along head_dim.
-    g = ggml_cont(c, ggml_permute(c, ggml_reshape_4d(c, g, 1, H, N, B), 0, 2, 1, 3));
-    out = ggml_mul(c, out, g);
+    out = ggml_mul(c, out, ggml_reshape_4d(c, g, 1, H, N, B)); // broadcasts over head_dim
 
-    // "b h n d -> b n (h d)"
-    out = ggml_cont(c, ggml_permute(c, out, 0, 2, 1, 3)); // (D, H, N, B)
+    // "b h n d -> b n (h d)": D is fastest and H next, so the flattened row is
+    // already (h d) per token and this is a pure reshape.
     out = ggml_reshape_3d(c, out, D * H, N, B);
     return ggml_mul_mat(c, a.out_w, out);
 }
@@ -316,7 +324,17 @@ extern "C" int beat_this_logmel(struct beat_this_context* ctx, const float* pcm,
     // features are log1p(1000*x), does NOT cancel downstream.
     const float norm = 1.0f / std::sqrt((float)n_fft);
 
-    std::vector<float> frame((size_t)n_fft), spec((size_t)2 * n_freqs), mag((size_t)n_freqs);
+    // `spec` MUST hold 2*n_fft, not 2*n_freqs. fft_radix2_wrapper emits the
+    // FULL complex spectrum — interleaved re/im for all N bins, so 2*N floats —
+    // even though only the first n_freqs = N/2+1 are the non-redundant half we
+    // go on to read. Sizing it 2*n_freqs overflows the heap by ~4 KB PER FRAME
+    // while still producing a numerically perfect log-mel, because the bytes it
+    // corrupts are past the ones read back: the front-end fixture scored
+    // cos = 1.00000000 with this bug live, and it only surfaced as an
+    // intermittent wild-pointer crash once a 45 s file made it 2251 frames of
+    // corruption instead of 101. Every other core_fft caller in the tree sizes
+    // this 2*fft_size; this was the one that did not.
+    std::vector<float> frame((size_t)n_fft), spec((size_t)2 * n_fft), mag((size_t)n_freqs);
     const int half = n_fft / 2;
 
     for (int t = 0; t < T; t++) {
@@ -610,14 +628,23 @@ static bool bt_run(struct beat_this_context* ctx, const float* logmel, int T, co
         ggml_build_forward_expand(gf, t);
     }
 
+    if (ctx->debug)
+        fprintf(stderr, "beat_this: T=%d graph nodes=%d/%zu ctx_mem=%zu/%zu\n", T, ggml_graph_n_nodes(gf), nodes,
+                ggml_used_mem(c0), ip.mem_size);
+
     ggml_gallocr_t ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
     bool ok = ga && ggml_gallocr_alloc_graph(ga, gf);
+    if (ctx->debug && ga)
+        fprintf(stderr, "beat_this: compute buffer %.1f MB\n", ggml_gallocr_get_buffer_size(ga, 0) / 1048576.0);
     if (ok) {
         ggml_backend_tensor_set(x, logmel, 0, (size_t)T * M * sizeof(float));
         // Only the stages upstream of the requested ones are in the graph, so
         // later blocks' position inputs may be unallocated — writing to those
         // would be a null-deref, not a no-op.
-        std::vector<int32_t> p((size_t)T);
+        // Sized for the LONGEST position vector, not for T: the frequency axis
+        // is 32 entries regardless of how short the audio is, so sizing this T
+        // would overrun for anything under ~0.64 s.
+        std::vector<int32_t> p((size_t)std::max(T, 32));
         auto fill_pos = [&](ggml_tensor* t) {
             if (!t->data)
                 return;
