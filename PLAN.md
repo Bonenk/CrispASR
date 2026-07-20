@@ -2328,3 +2328,61 @@ ggml port targets. New category: audio → note events (MIDI).
 
 **New CLI surface:** `--task transcribe-music` / `--backend piano-transcription`
 → MIDI output file.
+
+---
+
+## §251 — Music-analysis infrastructure + the remaining CometBeat roster
+
+**Context:** §250 covers note-event models. This covers the shared DSP those
+models need, plus the roster items still absent. Status reply written back to
+CometBeat: `mus-textbook/docs/TRANSCRIPTION_CRISPASR_STATUS.md`.
+
+**Already shipped, for the record** (so nobody re-ports them): CREPE F0
+(`src/crepe.cpp`, `--pitch`, Dart + WASM + pub.dev `crispasr 0.8.16`), HTDemucs
+and Mel-Band RoFormer separation, piano_transcription (§250).
+
+### Phase 0 — shared DSP (blocks the rest)
+
+- [ ] **`core/cqt.h`** — constant-Q / log-frequency transform. **Highest value:
+  the only thing blocking BTC harmony**, and CometBeat is blocked on the exact
+  same gap in Dart ("the crux"). Must match librosa's CQT closely
+  (`n_bins=144, bins_per_octave=24, hop=2048`, sr 22050 for BTC) or the model
+  degrades. Ship the parity fixtures — CometBeat can reuse them as their Dart
+  oracle.
+- [ ] **`core/gru.h`** — uni/bidirectional GRU, mirroring `core/lstm.h`. Needed
+  by RMVPE-class models and by any future CRNN. (piano_transcription landed with
+  its own BiGRU; fold it in when convenient, do NOT refactor it blind.)
+- [ ] **`core/stft.h`** — forward STFT. `core/istft.h` covers only the inverse.
+  htdemucs and mel-band-roformer each carry a private copy already, so a third
+  consumer makes it the third duplicate. ⚠️ **This refactors two SHIPPED
+  backends** — requires byte-identical stem output on both before it lands, or
+  it ships gated. Lower priority than cqt/gru precisely because of that risk.
+
+### Phase 1 — models
+
+- [ ] **RMVPE** (MIT, lj1995/VoiceConversionWebUI). Robust vocal F0; **same
+  360-bin salience as CREPE**, so it reuses `crepe_decode_local_average`
+  unchanged and drops into the same `--pitch` surface. CometBeat's vet
+  correction is important and correct: the *shipped ONNX is a pure conv U-Net
+  with NO recurrent layer* (the paper's GRU is absent), so it ports cleanly.
+  Input is a 128-bin mel — nearly free for us via `core/mel.h`. 361 MB f32 →
+  ~180 MB q8_0 / ~90 MB q4_k. Wire as a second capacity behind `--pitch`.
+- [ ] **BTC chord recognition** (MIT, BTC-ISMIR19). Small bidirectional
+  transformer, `cqt[1,108,144] → chord[1,108,25 or 170]`. Blocked on
+  `core/cqt.h`. New `ChordEvent` result surface; do NOT layer onto transcribe().
+- [ ] **Basic Pitch** — see §250, claimed there.
+- [ ] **MT3** — feasibility memo on T5X/JAX checkpoint conversion BEFORE any C++.
+
+### Phase 2 — surfaces
+
+- [ ] **Bind `crispasr_session_separate*` in the Dart package.** Only the CLI,
+  C ABI and Python have separation today; Dart does not. This is what CometBeat
+  actually needs for "vocals-only → crepeF0 the melody", and it is far smaller
+  than the Open-Unmix ONNX path they were about to build. Mirror `pitch()`.
+- [ ] **CREPE perf**: per-node profile (never done — the RTF numbers came from
+  FLOP arithmetic, not measurement) and sweep `kBatch` (64 was a guess).
+- [ ] **CUDA validation** for the CREPE path and both ggml conv fixes
+  (`ggml_conv_1d` batch reshape, `ggml_conv_1d_dw` batch support). Everything so
+  far is M1/Metal only, and LEARNING 35 says Metal-correct is not CUDA-correct.
+- [ ] **File the upstream ggml PR** drafted at
+  `tools/upstream-prs/24-conv-1d-batch-reshape.md`.
