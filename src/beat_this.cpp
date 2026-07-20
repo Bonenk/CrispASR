@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <array>
 #include <cstring>
 #include <string>
 #include <utility>
@@ -92,6 +93,20 @@ struct beat_this_context {
     ggml_tensor* stem_b = nullptr; // (32)
 
     bt_block blocks[3];
+
+    ggml_tensor* linear_w = nullptr; // frontend.linear, 1024 -> 512
+    ggml_tensor* linear_b = nullptr;
+
+    // The 6 main roformer layers: dim 512, 16 heads, same Attention/FeedForward
+    // as the frontend's partial transformers with only the dims changed. The
+    // checkpoint numbers them positionally, .0 = attention and .1 = ff.
+    struct bt_layer {
+        bt_attn attn;
+        bt_ff ff;
+    } layers[BEAT_THIS_N_LAYERS];
+    ggml_tensor* out_norm = nullptr; // transformer_blocks.norm.gamma
+    ggml_tensor* head_w = nullptr;   // task_heads.beat_downbeat_lin, 512 -> 2
+    ggml_tensor* head_b = nullptr;
 };
 
 namespace {
@@ -412,6 +427,25 @@ extern "C" struct beat_this_context* beat_this_init(const char* model_path, int 
         }
     }
 
+    ctx->linear_w = core_gguf::require(ctx->wl.tensors, "frontend.linear.weight", "beat-this");
+    ctx->linear_b = core_gguf::require(ctx->wl.tensors, "frontend.linear.bias", "beat-this");
+    ctx->out_norm = core_gguf::require(ctx->wl.tensors, "transformer_blocks.norm.gamma", "beat-this");
+    ctx->head_w = core_gguf::require(ctx->wl.tensors, "task_heads.beat_downbeat_lin.weight", "beat-this");
+    ctx->head_b = core_gguf::require(ctx->wl.tensors, "task_heads.beat_downbeat_lin.bias", "beat-this");
+    if (!ctx->linear_w || !ctx->linear_b || !ctx->out_norm || !ctx->head_w || !ctx->head_b) {
+        beat_this_free(ctx);
+        return nullptr;
+    }
+
+    for (int i = 0; i < BEAT_THIS_N_LAYERS; i++) {
+        const std::string lp = "transformer_blocks.layers." + std::to_string(i);
+        if (!bt_bind_attn(ctx->wl.tensors, lp + ".0", BEAT_THIS_DIM, ctx->layers[i].attn) ||
+            !bt_bind_ff(ctx->wl.tensors, lp + ".1", ctx->layers[i].ff)) {
+            beat_this_free(ctx);
+            return nullptr;
+        }
+    }
+
     if (ctx->debug)
         fprintf(stderr, "beat_this: sr=%d n_fft=%d hop=%d mel=%d fb=%dx%d\n", ctx->sample_rate, ctx->n_fft, ctx->hop,
                 ctx->mel_bins, ctx->fb_freqs, (int)(n / (size_t)std::max(1, ctx->fb_freqs)));
@@ -464,10 +498,15 @@ extern "C" float beat_this_tempo_bpm(const struct beat_this_event* ev, int n) {
 // GELU IS THE EXACT (erf) FORM. torch nn.GELU defaults to approximate='none';
 // ggml_gelu is the TANH approximation and would drift. See the GELU-variant
 // entry in the common-divergence list in docs/contributing.md.
-extern "C" int beat_this_debug_stage(struct beat_this_context* ctx, const float* logmel, int T, const char* stage,
-                                     float* out, int max_out, int64_t* ne_out) {
-    if (!ctx || !logmel || T <= 0 || !out || !stage)
-        return 0;
+//
+// Builds the whole forward once and reads back any set of named stages from a
+// single compute. `track()` asks for out_beat and out_downbeat together, which
+// is why this takes a list rather than one stage: the two logits share the
+// entire network and computing them in separate passes would double the work.
+static bool bt_run(struct beat_this_context* ctx, const float* logmel, int T, const std::vector<std::string>& names,
+                   std::vector<std::vector<float>>& outs, std::vector<std::array<int64_t, 4>>* nes) {
+    if (!ctx || !logmel || T <= 0 || names.empty())
+        return false;
     const int M = ctx->mel_bins;
 
     const size_t nodes = 1024;
@@ -522,33 +561,62 @@ extern "C" int beat_this_debug_stage(struct beat_this_context* ctx, const float*
         sm.add("blk" + std::to_string(i), h);
     }
 
-    ggml_tensor* want = sm.get(stage);
-    if (!want) {
-        fprintf(stderr, "beat_this: unknown debug stage '%s'\n", stage);
-        ggml_free(c0);
-        return 0;
-    }
-    if (ne_out)
-        for (int i = 0; i < 4; i++)
-            ne_out[i] = want->ne[i];
-    if ((int)ggml_nelements(want) > max_out) {
-        fprintf(stderr, "beat_this: stage '%s' needs %d floats, buffer holds %d\n", stage, (int)ggml_nelements(want),
-                max_out);
-        ggml_free(c0);
-        return 0;
-    }
+    // Rearrange "b c f t -> b t (c f)". The flattened index is c*F + f, i.e.
+    // FREQUENCY varies fastest inside each channel — so in ggml, whose ne[0] is
+    // the fastest axis, the target is ne = (f, c, t) before the reshape. The
+    // opposite order transposes the 1024-vector and produces a plausible but
+    // wrong projection, and this is the only genuinely new risk in the tail:
+    // the layers below are the frontend's code at different dims.
+    h = ggml_cont(c0, ggml_permute(c0, h, 2, 0, 1, 3)); // (t,f,c) -> (f,c,t)
+    h = ggml_reshape_2d(c0, h, h->ne[0] * h->ne[1], T);
+    h = ggml_add(c0, ggml_mul_mat(c0, ctx->linear_w, h), ctx->linear_b);
+    h = ggml_reshape_3d(c0, h, BEAT_THIS_DIM, T, 1);
+    sm.add("linear", h);
 
-    ggml_set_output(want);
-    ggml_build_forward_expand(gf, want);
+    for (int i = 0; i < BEAT_THIS_N_LAYERS; i++) {
+        h = ggml_add(c0, h, bt_attention(c0, ctx->layers[i].attn, h, pos_t));
+        h = ggml_add(c0, h, bt_feedforward(c0, ctx->layers[i].ff, h));
+    }
+    // norm_output: the reference hook sits on transformer_blocks as a whole, so
+    // its `transformer` capture is AFTER this final RMSNorm, not before it.
+    h = bt_norm(c0, h, ctx->out_norm);
+    sm.add("transformer", h);
+
+    // SumHead. beat is the SUM of both logits, downbeat is the second alone —
+    // upstream's stated reason is to suppress downbeats that are not beats. It
+    // is not a two-way softmax and the two outputs are not independent.
+    ggml_tensor* bd = ggml_add(c0, ggml_mul_mat(c0, ctx->head_w, h), ctx->head_b); // (2, T, 1)
+    const size_t bsz = ggml_element_size(bd);
+    // Each logit row is a strided column of `bd`; cont then reshape to ne (T,1)
+    // so the dump reverses to the reference's (1, T).
+    auto logit = [&](size_t off) {
+        return ggml_reshape_2d(c0, ggml_cont(c0, ggml_view_2d(c0, bd, 1, T, bd->nb[1], off)), T, 1);
+    };
+    ggml_tensor *lb = logit(0), *ld = logit(bsz);
+    sm.add("out_downbeat", ld);
+    sm.add("out_beat", ggml_add(c0, lb, ld));
+
+    std::vector<ggml_tensor*> want;
+    want.reserve(names.size());
+    for (const std::string& n : names) {
+        ggml_tensor* t = sm.get(n);
+        if (!t) {
+            fprintf(stderr, "beat_this: unknown stage '%s'\n", n.c_str());
+            ggml_free(c0);
+            return false;
+        }
+        want.push_back(t);
+        ggml_set_output(t);
+        ggml_build_forward_expand(gf, t);
+    }
 
     ggml_gallocr_t ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
     bool ok = ga && ggml_gallocr_alloc_graph(ga, gf);
-    int n = 0;
     if (ok) {
         ggml_backend_tensor_set(x, logmel, 0, (size_t)T * M * sizeof(float));
-        // Only the stages upstream of `want` are in the graph, so the later
-        // blocks' position inputs may be unallocated — writing to those would
-        // be a null-deref, not a no-op.
+        // Only the stages upstream of the requested ones are in the graph, so
+        // later blocks' position inputs may be unallocated — writing to those
+        // would be a null-deref, not a no-op.
         std::vector<int32_t> p((size_t)T);
         auto fill_pos = [&](ggml_tensor* t) {
             if (!t->data)
@@ -564,33 +632,232 @@ extern "C" int beat_this_debug_stage(struct beat_this_context* ctx, const float*
         ok = ggml_backend_graph_compute(ctx->backend, gf) == GGML_STATUS_SUCCESS;
     }
     if (ok) {
-        n = (int)ggml_nelements(want);
-        ggml_backend_tensor_get(want, out, 0, (size_t)n * sizeof(float));
-        if (ctx->debug)
-            fprintf(stderr, "beat_this: %s ne=(%lld,%lld,%lld,%lld)\n", stage, (long long)want->ne[0],
-                    (long long)want->ne[1], (long long)want->ne[2], (long long)want->ne[3]);
+        outs.resize(want.size());
+        if (nes)
+            nes->resize(want.size());
+        for (size_t i = 0; i < want.size(); i++) {
+            const size_t n = (size_t)ggml_nelements(want[i]);
+            outs[i].resize(n);
+            ggml_backend_tensor_get(want[i], outs[i].data(), 0, n * sizeof(float));
+            if (nes)
+                for (int d = 0; d < 4; d++)
+                    (*nes)[i][(size_t)d] = want[i]->ne[d];
+            if (ctx->debug)
+                fprintf(stderr, "beat_this: %s ne=(%lld,%lld,%lld,%lld)\n", names[i].c_str(), (long long)want[i]->ne[0],
+                        (long long)want[i]->ne[1], (long long)want[i]->ne[2], (long long)want[i]->ne[3]);
+        }
     }
     if (ga)
         ggml_gallocr_free(ga);
     ggml_free(c0);
-    return n;
+    return ok;
+}
+
+extern "C" int beat_this_debug_stage(struct beat_this_context* ctx, const float* logmel, int T, const char* stage,
+                                     float* out, int max_out, int64_t* ne_out) {
+    if (!ctx || !logmel || T <= 0 || !out || !stage)
+        return 0;
+    std::vector<std::vector<float>> outs;
+    std::vector<std::array<int64_t, 4>> nes;
+    if (!bt_run(ctx, logmel, T, {std::string(stage)}, outs, &nes) || outs.empty())
+        return 0;
+    if (ne_out)
+        for (int i = 0; i < 4; i++)
+            ne_out[i] = nes[0][(size_t)i];
+    if ((int)outs[0].size() > max_out) {
+        fprintf(stderr, "beat_this: stage '%s' needs %d floats, buffer holds %d\n", stage, (int)outs[0].size(),
+                max_out);
+        return 0;
+    }
+    std::memcpy(out, outs[0].data(), outs[0].size() * sizeof(float));
+    return (int)outs[0].size();
 }
 
 extern "C" int beat_this_debug_stem(struct beat_this_context* ctx, const float* logmel, int T, float* out) {
     return beat_this_debug_stage(ctx, logmel, T, "stem", out, T * 32 * 32, nullptr);
 }
 
+// Framewise logits for a whole piece, reproducing upstream `split_piece` /
+// `aggregate_prediction` (beat_this/inference.py) exactly.
+//
+// WHY THE WINDOWING IS NOT OPTIONAL. The model was not trained on its input
+// edges — the max-pool in the training loss discards `border_size` frames on
+// each side — so the first and last 6 frames of any chunk's prediction are
+// untrusted. Chunks therefore OVERLAP by 2*border and each chunk's border is
+// cut before it is written. Getting this wrong does not fail loudly; it
+// produces drifting or doubled beats at every 30-second seam.
+extern "C" int beat_this_logits(struct beat_this_context* ctx, const float* logmel, int T, float* beat,
+                                float* downbeat) {
+    if (!ctx || !logmel || T <= 0 || !beat || !downbeat)
+        return 0;
+    const int chunk = BEAT_THIS_CHUNK_FRAMES, border = BEAT_THIS_BORDER_FRAMES;
+    const int stride = chunk - 2 * border;
+
+    // starts = arange(-border, T - border, stride)
+    std::vector<int> starts;
+    for (int s = -border; s < T - border; s += stride)
+        starts.push_back(s);
+    if (starts.empty())
+        starts.push_back(-border);
+    // avoid_short_end: pull the last chunk left so it ends at the piece end,
+    // rather than running a short (and therefore differently-normalised) chunk.
+    if (T > stride)
+        starts.back() = T - (chunk - border);
+
+    // -1000 is upstream's "no prediction here" sentinel: it is a logit, so it
+    // is probability zero even in float64 and can never win a peak-pick. Any
+    // frame left at -1000 would mean a coverage gap in the chunking.
+    for (int i = 0; i < T; i++)
+        beat[i] = downbeat[i] = -1000.0f;
+
+    // keep_first: walk in REVERSE so earlier chunks overwrite later ones, which
+    // is what upstream's reversed() achieves.
+    std::vector<float> pad((size_t)chunk * BEAT_THIS_MEL_BINS);
+    for (int ci = (int)starts.size() - 1; ci >= 0; ci--) {
+        const int start = starts[(size_t)ci];
+        const int lo = std::max(start, 0), hi = std::min(start + chunk, T);
+        const int left = std::max(0, -start);
+        const int len = hi - lo;
+        const int right = std::max(0, std::min(border, start + chunk - T));
+        const int clen = left + len + right;
+
+        std::fill(pad.begin(), pad.begin() + (size_t)clen * BEAT_THIS_MEL_BINS, 0.0f);
+        std::memcpy(pad.data() + (size_t)left * BEAT_THIS_MEL_BINS, logmel + (size_t)lo * BEAT_THIS_MEL_BINS,
+                    (size_t)len * BEAT_THIS_MEL_BINS * sizeof(float));
+
+        std::vector<std::vector<float>> outs;
+        if (!bt_run(ctx, pad.data(), clen, {"out_beat", "out_downbeat"}, outs, nullptr))
+            return 0;
+
+        // Discard `border` frames on each side, then write the remainder at
+        // [start+border, start+chunk-border) — clamped, because for a piece
+        // shorter than a chunk that range runs past the end (upstream relies on
+        // Python slice clamping doing this implicitly).
+        const int keep = clen - 2 * border;
+        for (int j = 0; j < keep; j++) {
+            const int dst = start + border + j;
+            if (dst < 0 || dst >= T)
+                continue;
+            beat[dst] = outs[0][(size_t)(border + j)];
+            downbeat[dst] = outs[1][(size_t)(border + j)];
+        }
+    }
+    return T;
+}
+
+namespace {
+
+// Peak-pick: keep frames that equal the max over a +/-3 frame window and are
+// above logit 0 (probability 0.5). NOTE the comparison upstream is `!=` against
+// the max-pool, not `>` against the neighbours — a plateau of equal values
+// therefore keeps EVERY frame in the plateau, and deduplicate_peaks below is
+// what collapses it. Using a strict local maximum would silently drop beats
+// that land exactly between two frames.
+void bt_pick_peaks(const float* logit, int T, std::vector<int>& peaks) {
+    peaks.clear();
+    for (int i = 0; i < T; i++) {
+        if (!(logit[i] > 0.0f))
+            continue;
+        float mx = logit[i];
+        for (int j = std::max(0, i - 3); j <= std::min(T - 1, i + 3); j++)
+            mx = std::max(mx, logit[j]);
+        if (logit[i] == mx)
+            peaks.push_back(i);
+    }
+}
+
+// Collapse runs of peaks no more than `width` frames apart into their MEAN
+// frame index — which is fractional, and deliberately so: a beat whose energy
+// straddles two frames lands between them, and rounding to the first frame
+// would bias every such beat 10 ms early. Upstream's condition compares the
+// next peak against the RUNNING MEAN, not against the previous peak.
+void bt_deduplicate_peaks(const std::vector<int>& peaks, int width, std::vector<double>& out) {
+    out.clear();
+    if (peaks.empty())
+        return;
+    double p = peaks[0];
+    int c = 1;
+    for (size_t i = 1; i < peaks.size(); i++) {
+        const double p2 = peaks[i];
+        if (p2 - p <= (double)width) {
+            c++;
+            p += (p2 - p) / c; // incremental mean
+        } else {
+            out.push_back(p);
+            p = p2;
+            c = 1;
+        }
+    }
+    out.push_back(p);
+}
+
+} // namespace
+
+extern "C" int beat_this_events_from_logits(const float* lb, const float* ld, int T, struct beat_this_event* out,
+                                            int max_events) {
+    if (!lb || !ld || T <= 0 || !out || max_events <= 0)
+        return -1;
+
+    std::vector<int> bp, dp;
+    bt_pick_peaks(lb, T, bp);
+    bt_pick_peaks(ld, T, dp);
+    std::vector<double> bf, df;
+    bt_deduplicate_peaks(bp, 1, bf);
+    bt_deduplicate_peaks(dp, 1, df);
+
+    const double fps = (double)BEAT_THIS_FPS;
+    std::vector<double> bt_s, dt_s;
+    for (double f : bf)
+        bt_s.push_back(f / fps);
+    for (double f : df)
+        dt_s.push_back(f / fps);
+
+    // Snap each downbeat to its NEAREST BEAT, in seconds and after dedup — a
+    // downbeat that is not also a beat is not representable downstream, and the
+    // reference makes the same guarantee. Then drop downbeats that collapsed
+    // onto the same beat.
+    for (double& d : dt_s) {
+        if (bt_s.empty())
+            break;
+        double best = bt_s[0];
+        for (double b : bt_s)
+            if (std::fabs(b - d) < std::fabs(best - d))
+                best = b;
+        d = best;
+    }
+    std::sort(dt_s.begin(), dt_s.end());
+    dt_s.erase(std::unique(dt_s.begin(), dt_s.end()), dt_s.end());
+
+    // Emit every beat once, flagging those that are also downbeats. Downbeats
+    // are a subset of beats by construction after the snap above.
+    int n = 0;
+    size_t di = 0;
+    for (double b : bt_s) {
+        if (n >= max_events)
+            break;
+        while (di < dt_s.size() && dt_s[di] < b)
+            di++;
+        const bool is_db = di < dt_s.size() && dt_s[di] == b;
+        out[n].time_s = (float)b;
+        out[n].is_downbeat = is_db ? 1 : 0;
+        n++;
+    }
+    return n;
+}
+
 extern "C" int beat_this_track(struct beat_this_context* ctx, const float* pcm, int n_samples,
                                struct beat_this_event* out, int max_events) {
-    (void)ctx;
-    (void)pcm;
-    (void)n_samples;
-    (void)out;
-    (void)max_events;
-    // TODO(§251b-1): ggml graph + 1500-frame windowing (border 6, keep_first)
-    // + peak-picking. The front end above is done and validated; this is the
-    // remaining half. Returning -1 rather than 0 so a caller cannot mistake
-    // "not implemented" for "no beats found".
-    fprintf(stderr, "beat_this: track() not implemented yet — the ggml graph is pending (§251b-1)\n");
-    return -1;
+    if (!ctx || !pcm || n_samples <= 0 || !out || max_events <= 0)
+        return -1;
+
+    const int T = beat_this_n_frames(n_samples);
+    std::vector<float> lm((size_t)T * BEAT_THIS_MEL_BINS);
+    if (beat_this_logmel(ctx, pcm, n_samples, lm.data()) != T)
+        return -1;
+
+    std::vector<float> lb((size_t)T), ld((size_t)T);
+    if (beat_this_logits(ctx, lm.data(), T, lb.data(), ld.data()) != T)
+        return -1;
+
+    return beat_this_events_from_logits(lb.data(), ld.data(), T, out, max_events);
 }
