@@ -344,6 +344,15 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # ⚠️ Only the raw activation is dumped: torchcrepe.convert.bins_to_cents
     # dithers, so any decoded Hz would be non-deterministic.
     "crepe": "reference_backends.crepe",
+    # TabCNN (Wiggins & Kim 2019) guitar tablature: six per-string softmaxes
+    # over 21 fret classes per frame. `model_dir` is the CHECKPOINT FILE from
+    # the EGSet12 Zenodo record (CC BY 4.0); the reference implementation is
+    # amt-tools (MIT), `pip install amt-tools`.
+    # ⚠️ The model's own `frontend` is an EMPTY Sequential — the CQT lives
+    # outside it — so this dumper emits `audio` and `cqt_db` too. Diff from the
+    # waveform, not from replayed features, or the front end is never tested
+    # (the BTC/piano blind spot).
+    "tabcnn": "reference_backends.tabcnn",
 }
 
 DEFAULT_STAGES_BY_BACKEND: Dict[str, List[str]] = {}  # populated at import
