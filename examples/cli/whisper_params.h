@@ -133,6 +133,14 @@ struct whisper_params {
     bool chords = false;
     std::string chords_format; // "text" (default) or "json"
 
+    // Piano transcription. --piano routes to the piano dispatcher
+    // (crispasr_piano_cli) BEFORE any transcribe backend is built, for the same
+    // reason as --chords: the output is note EVENTS (onset/offset/midi/
+    // velocity), not text segments. Reaching it through transcribe() renders
+    // each note as text like "C4 v=80", which is lossy.
+    bool piano = false;
+    std::string piano_format; // "text" (default) or "json"
+
     // Beat / downbeat tracking. --beats routes to the beat dispatcher
     // (crispasr_beats_cli) BEFORE any transcribe backend is built, for the
     // same reason as --chords: the output is a beat grid, not text segments.

@@ -21,6 +21,7 @@
 #include "crispasr_popen.h"
 #include "crispasr_beats_cli.h"
 #include "crispasr_chords_cli.h"
+#include "crispasr_piano_cli.h"
 #include "crispasr_pitch_cli.h"
 #include "crispasr_separate_cli.h"
 #include "crispasr_vad_cli.h"
@@ -1689,6 +1690,11 @@ int crispasr_run_backend(const whisper_params& params_in) {
     // transcripts). Same early-dispatch rule as --separate.
     if (params.chords)
         return crispasr_run_chords(params);
+
+    // Piano transcription is its own task (note EVENTS out, not transcripts).
+    // Same early-dispatch rule as --chords.
+    if (params.piano)
+        return crispasr_run_piano(params);
 
     // Beat tracking is its own task (a beat/downbeat grid out, not
     // transcripts). Same early-dispatch rule as --chords.

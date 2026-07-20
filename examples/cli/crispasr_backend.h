@@ -116,6 +116,9 @@ enum crispasr_capability : uint32_t {
     CAP_CHORDS = 1u << 25,              // chord recognition (audio in -> chord timeline out).
                                         // Same task-marker role as CAP_PITCH/CAP_SEPARATE;
                                         // routing happens in the --chords dispatcher.
+    CAP_PIANO = 1u << 27,               // polyphonic piano transcription (audio in -> note
+                                        // events out). Task marker like CAP_CHORDS/CAP_PITCH;
+                                        // routing happens in the --piano dispatcher.
     CAP_BEATS = 1u << 26,               // beat / downbeat tracking (audio in -> beat grid out).
                                         // Same task-marker role as CAP_CHORDS; routing happens
                                         // in the --beats dispatcher.
