@@ -49,7 +49,8 @@ The exact front end, read from amt_tools source:
 
     librosa.vqt(y, sr, hop_length, fmin, n_bins, bins_per_octave, gamma=0)
     -> np.abs(...)
-    -> librosa.core.amplitude_to_db(feats, ref=np.max)
+    -> librosa.core.amplitude_to_db(feats, ref=np.max)   # -> [-80, 0]
+    -> feats / 80 + 1                                    # -> [0, 1]
 
 ⚠️⚠️ `ref=np.max` is a PER-CLIP normalisation: the dB scale is relative to the
 maximum of the WHOLE clip's CQT. Two consequences the C++ must honour:
@@ -80,9 +81,17 @@ DEFAULT_STAGES = [
     "tablature",
 ]
 
-# Defaults for the released TabCNN. dim_in=192 with 24 bins/octave = 8 octaves
-# from E2, the standard GuitarSet configuration; hop 512 @ 22.05 kHz = 23.2 ms.
-_SR = 22050
+# Read from the loaded checkpoint + amt_tools sources, NOT inferred:
+#   amt_tools/datasets/GuitarSet.py  -> sample_rate=44100, hop_length=512
+#   model.profile (GuitarProfile)    -> tuning E2 A2 D3 G3 B3 E4, num_pitches=20
+#                                       -> 6 groups x (20+1) = 126 outputs
+#   model.dim_in=192, frame_width=9; TabCNN's (dim_in-6)//2 = 93 matches the
+#   observed pool height, so 192 bins is confirmed end-to-end.
+# 192 bins at 24/octave from E2 spans to 21096 Hz, which fits under the 22050 Hz
+# Nyquist ONLY at 44.1 kHz. An earlier draft of this file assumed 22.05 kHz and
+# librosa correctly refused ("would exceed the Nyquist frequency") — the sample
+# rate is load-bearing, do not "simplify" it.
+_SR = 44100
 _HOP = 512
 _N_BINS = 192
 _BINS_PER_OCTAVE = 24
@@ -122,6 +131,14 @@ def _cqt_db(audio, sample_rate):
     feats = np.abs(vqt)
     # ⚠️ per-clip reference — see module docstring
     feats = librosa.core.amplitude_to_db(feats, ref=np.max)
+    # ⚠️⚠️ amt_tools FeatureModule.post_proc does NOT stop at dB. It affinely
+    # rescales the assumed [-80, 0] dB range into [0, 1]. Omitting these two
+    # lines feeds the CNN inputs ~180x out of range: measured cos = -0.544 and
+    # a median per-bin magnitude ratio of 0.0047 against the real module.
+    # Cosine alone would have partly hidden a pure scale error — it was the
+    # |mine| vs |ref| magnitudes (15895 vs 88) that made it obvious.
+    feats = feats / 80
+    feats = feats + 1
     return feats.astype(np.float32)
 
 
