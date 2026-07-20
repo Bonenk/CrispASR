@@ -780,6 +780,10 @@ void free_weights(WeightLoad& wl) {
         ggml_backend_buffer_free(wl.buf_cpu);
         wl.buf_cpu = nullptr;
     }
+    // Issue #276: free any overflow chunk buffers from split allocation.
+    for (auto* b : wl.split_bufs)
+        ggml_backend_buffer_free(b);
+    wl.split_bufs.clear();
     if (wl.ctx) {
         ggml_free(wl.ctx);
         wl.ctx = nullptr;
@@ -862,48 +866,89 @@ bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backe
     // Allocate per-partition backend buffers. Tensor alignment within the
     // buffer follows the backend buffer-type's alignment requirement;
     // pad each per-tensor offset up to that alignment.
+    //
+    // Issue #276: AMD Vulkan (proprietary driver on Windows) caps a single
+    // device allocation at 2 GiB (maxMemoryAllocationSize). Models larger
+    // than that need to be split across multiple backend buffers. We chunk
+    // tensors into groups of <= 1.5 GiB each and allocate one buffer per
+    // chunk; the 1.5 GiB limit leaves headroom for alignment padding.
+    static constexpr size_t max_alloc_chunk = (size_t)1536 * 1024 * 1024; // 1.5 GiB
+
     auto round_up = [](size_t n, size_t a) { return (n + a - 1) & ~(a - 1); };
-    auto bind_partition = [&](ggml_backend_t be, const std::vector<ggml_tensor*>& tensors, size_t total,
-                              ggml_backend_buffer_t* out_buf) -> bool {
+    auto bind_partition = [&](ggml_backend_t be, const std::vector<ggml_tensor*>& tensors,
+                              std::vector<ggml_backend_buffer_t>& out_bufs) -> bool {
         if (tensors.empty())
             return true;
         const size_t align = ggml_backend_get_alignment(be);
-        // Compute final size with per-tensor alignment slack.
-        size_t aligned_total = 0;
-        for (ggml_tensor* t : tensors)
-            aligned_total = round_up(aligned_total, align) + ggml_nbytes(t);
-        (void)total;
-        ggml_backend_buffer_t buf = ggml_backend_alloc_buffer(be, aligned_total);
-        if (!buf) {
-            fprintf(stderr, "%s: failed to allocate %zu MiB backend buffer\n", tag, aligned_total / 1048576);
-            return false;
-        }
-        char* base = (char*)ggml_backend_buffer_get_base(buf);
-        size_t cursor = 0;
+
+        // Partition tensors into chunks that each fit under max_alloc_chunk.
+        struct Chunk {
+            std::vector<ggml_tensor*> ts;
+            size_t aligned_total = 0;
+        };
+        std::vector<Chunk> chunks(1);
         for (ggml_tensor* t : tensors) {
-            cursor = round_up(cursor, align);
-            ggml_backend_tensor_alloc(buf, t, base + cursor);
-            cursor += ggml_nbytes(t);
+            const size_t nb = ggml_nbytes(t);
+            const size_t next = round_up(chunks.back().aligned_total, align) + nb;
+            if (next > max_alloc_chunk && !chunks.back().ts.empty()) {
+                // Start a new chunk.
+                chunks.push_back({});
+                chunks.back().ts.push_back(t);
+                chunks.back().aligned_total = nb;
+            } else {
+                chunks.back().ts.push_back(t);
+                chunks.back().aligned_total = next;
+            }
         }
-        *out_buf = buf;
+
+        for (auto& chunk : chunks) {
+            ggml_backend_buffer_t buf = ggml_backend_alloc_buffer(be, chunk.aligned_total);
+            if (!buf) {
+                fprintf(stderr, "%s: failed to allocate %zu MiB backend buffer\n", tag, chunk.aligned_total / 1048576);
+                for (auto* b : out_bufs)
+                    ggml_backend_buffer_free(b);
+                out_bufs.clear();
+                return false;
+            }
+            char* base = (char*)ggml_backend_buffer_get_base(buf);
+            size_t cursor = 0;
+            for (ggml_tensor* t : chunk.ts) {
+                cursor = round_up(cursor, align);
+                ggml_backend_tensor_alloc(buf, t, base + cursor);
+                cursor += ggml_nbytes(t);
+            }
+            out_bufs.push_back(buf);
+        }
         return true;
     };
 
-    if (!bind_partition(gpu_backend, gpu_tensors, gpu_size, &out.buf)) {
+    std::vector<ggml_backend_buffer_t> gpu_bufs, cpu_bufs;
+    if (!bind_partition(gpu_backend, gpu_tensors, gpu_bufs)) {
         gguf_free(gctx);
         ggml_free(out.ctx);
         out.ctx = nullptr;
         return false;
     }
-    if (!bind_partition(cpu_backend, cpu_tensors, cpu_size, &out.buf_cpu)) {
-        if (out.buf) {
-            ggml_backend_buffer_free(out.buf);
-            out.buf = nullptr;
-        }
+    if (!bind_partition(cpu_backend, cpu_tensors, cpu_bufs)) {
+        for (auto* b : gpu_bufs)
+            ggml_backend_buffer_free(b);
         gguf_free(gctx);
         ggml_free(out.ctx);
         out.ctx = nullptr;
         return false;
+    }
+
+    // First buffer of each partition goes into the canonical fields;
+    // any overflow chunks go into split_bufs for lifetime management.
+    if (!gpu_bufs.empty()) {
+        out.buf = gpu_bufs[0];
+        for (size_t i = 1; i < gpu_bufs.size(); i++)
+            out.split_bufs.push_back(gpu_bufs[i]);
+    }
+    if (!cpu_bufs.empty()) {
+        out.buf_cpu = cpu_bufs[0];
+        for (size_t i = 1; i < cpu_bufs.size(); i++)
+            out.split_bufs.push_back(cpu_bufs[i]);
     }
 
     // Copy tensor data from the file. Use mmap when available for zero-
