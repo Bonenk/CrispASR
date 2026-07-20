@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <utility>
@@ -71,7 +72,33 @@ constexpr int kNumLayers = 6;
 // which is what lets BLAS/Metal reach useful throughput on a model that costs
 // ~2.8 GFLOP per frame. Tail batches are zero-padded and the extra outputs
 // discarded, so a single persistent graph covers every call.
-constexpr int kBatch = 64;
+// Frames per graph dispatch. 64 was an initial GUESS, never swept; the sweep
+// lives in tools/crepe_batch_sweep.sh and the measured table is in
+// docs/music-transcription/PLAN.md. Override with CRISPASR_CREPE_BATCH to
+// re-measure without a rebuild. Clamped to [1, 512]: conv2's im2col is the
+// memory driver (batch * 128 * 64 * 128 floats), so an unbounded value would
+// balloon the compute buffer.
+// The optimum is CAPACITY-DEPENDENT, which the original fixed 64 missed.
+// Measured on M1/Metal, 10 s audio, median of 3, quiet box:
+//   tiny:  b=1 3.31s | b=8 1.77 | b=32 1.30 | b=64 1.28 | b=128 1.28 | b=256 1.79
+//   full:  b=16 17.94s | b=64 24.59 | b=128 38.36
+// tiny is flat across 32-128; full degrades HARD above 16 because it has 8x
+// the channels, so conv2's im2col (batch * C * K * T floats) goes
+// memory-bound. Using 64 everywhere cost `full` ~37%.
+constexpr int kBatchTiny = 64;
+constexpr int kBatchFull = 16;
+// `full` has in_features 2048 vs tiny's 256; split on the midpoint.
+constexpr int kBigInFeatures = 1024;
+
+inline int crepe_batch(int in_features) {
+    int b = (in_features >= kBigInFeatures) ? kBatchFull : kBatchTiny;
+    if (const char* e = crispasr_env::get("CRISPASR_CREPE_BATCH")) {
+        const int v = std::atoi(e);
+        if (v >= 1 && v <= 512)
+            b = v;
+    }
+    return b;
+}
 
 struct crepe_layer {
     ggml_tensor* w = nullptr;         // (K, IC, OC)
@@ -99,7 +126,9 @@ struct crepe_context {
     ggml_tensor* cls_w = nullptr;
     ggml_tensor* cls_b = nullptr;
 
-    // Persistent single-frame graph, built once in crepe_init.
+    int batch = kBatchTiny; // resolved from capacity once in crepe_init
+
+    // Persistent graph, built once in crepe_init.
     ggml_context* g_ctx = nullptr;
     ggml_cgraph* gf = nullptr;
     ggml_gallocr_t galloc = nullptr;
@@ -263,6 +292,7 @@ int crepe_run(crepe_context* ctx, const float* pcm, int n_samples, float hop_ms,
         return 0;
 
     activations.assign((size_t)n_frames * ctx->pitch_bins, 0.0f);
+    const int kBatch = ctx->batch;
     std::vector<float> frames((size_t)kBatch * ctx->window_size);
     std::vector<float> out_buf((size_t)kBatch * ctx->pitch_bins);
 
@@ -348,6 +378,8 @@ extern "C" struct crepe_context* crepe_init(const char* model_path, int n_thread
         return nullptr;
     }
 
+    ctx->batch = crepe_batch(ctx->in_features);
+
     // Bake F32 copies of the conv kernels once at load.
     //
     // ggml_conv_1d casts an F16 kernel to F32 *inside the graph* when the
@@ -414,7 +446,7 @@ extern "C" struct crepe_context* crepe_init(const char* model_path, int n_thread
             return nullptr;
         }
         ctx->gf = ggml_new_graph_custom(ctx->g_ctx, nodes, false);
-        ctx->g_out = crepe_build_graph(ctx, ctx->g_ctx, ctx->gf, kBatch, &ctx->g_in);
+        ctx->g_out = crepe_build_graph(ctx, ctx->g_ctx, ctx->gf, ctx->batch, &ctx->g_in);
 
         ctx->galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
         if (!ctx->galloc || !ggml_gallocr_alloc_graph(ctx->galloc, ctx->gf)) {
