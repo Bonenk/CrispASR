@@ -2787,6 +2787,13 @@ catch_discover_tests(test-core-wordpiece
     PROPERTIES LABELS "unit;wordpiece"
 )
 
+# ─── test-beat-this-frontend — log-mel vs torchaudio ──────────────────────────
+# Needs a model + fixtures, so not a ctest case; it is the acceptance gate for
+# the front end. Generate fixtures with tools/gen_beat_this_frontend_ref.py.
+add_executable(test-beat-this-frontend test_beat_this_frontend.cpp)
+target_include_directories(test-beat-this-frontend PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-beat-this-frontend PRIVATE beat-this crispasr-core ggml ggml-base ggml-cpu)
+
 # ─── test-core-gru — core/gru.h vs a real PyTorch nn.GRU fixture ──────────────
 # Parity case skips unless CRISPASR_GRU_REF points at a fixture from
 # tools/gen_gru_reference.py, so CI needs neither torch nor network.
