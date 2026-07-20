@@ -7137,14 +7137,13 @@ CA_EXPORT void crispasr_session_result_free(crispasr_session_result* r) {
 // `*out_n_samples` is set on success. Caller frees with `crispasr_pcm_free`.
 // Returns nullptr if the active backend doesn't support TTS or synthesis fails.
 //
-// `crispasr_session_set_voice` accepts:
-//   - a *.gguf voice pack (vibevoice or qwen3-tts), or
-//   - a *.wav reference audio. For qwen3-tts the reference transcription is
-//     required and goes through `ref_text_or_null`. Pass nullptr for a
-//     voice pack.
+// `crispasr_session_set_voice` accepts the active backend's native voice
+// format: a baked voice pack/profile, a preset name, or a *.wav reference.
+// Backends that condition on a reference transcript consume it through
+// `ref_text_or_null`.
 //
-// `crispasr_session_set_codec_path` forwards the codec GGUF path to the
-// active backend (qwen3-tts, orpheus, zonos, dia, tada, outetts, indextts).
+// `crispasr_session_set_codec_path` forwards the companion GGUF path to the
+// active backend (including OmniVoice's tokenizer and Chatterbox's S3Gen).
 // For Zonos and Dia the codec is auto-discovered as a sibling on open;
 // call this only to override the discovered path.
 
@@ -7178,6 +7177,10 @@ CA_EXPORT int crispasr_session_set_codec_path(crispasr_session* s, const char* p
 #ifdef CA_HAVE_MOSS_TTS_LOCAL
     if (s->moss_tts_local_ctx)
         return moss_tts_local_set_codec_path(s->moss_tts_local_ctx, path) ? 0 : -1;
+#endif
+#ifdef CA_HAVE_OMNIVOICE
+    if (s->omnivoice_ctx)
+        return omnivoice_set_tokenizer_path(s->omnivoice_ctx, path);
 #endif
 #ifdef CA_HAVE_ORPHEUS
     if (s->orpheus_ctx) {
@@ -7326,6 +7329,22 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
         if (!ends_with_wav(path))
             return -2;
         return dots_tts_set_voice_prompt(s->dots_tts_ctx, path);
+    }
+#endif
+#ifdef CA_HAVE_CHATTERBOX
+    if (s->chatterbox_ctx) {
+        // Accept either a baked conditioning GGUF or a reference WAV. The
+        // backend installs all available conditioning tensors atomically.
+        return chatterbox_set_voice_from_wav(s->chatterbox_ctx, path);
+    }
+#endif
+#ifdef CA_HAVE_OMNIVOICE
+    if (s->omnivoice_ctx) {
+        // OmniVoice cloning uses a WAV plus its transcript. An empty path
+        // clears an existing prompt, matching the native backend API.
+        if (path[0] && !ends_with_wav(path))
+            return -2;
+        return omnivoice_set_voice_prompt(s->omnivoice_ctx, path, ref_text_or_null);
     }
 #endif
 #ifdef CA_HAVE_QWEN3_TTS
