@@ -72,11 +72,11 @@ void rvc_svc_result_free(rvc_svc_result* r);
 // cross-check; the conversion path applies it internally.
 void rvc_svc_coarse_pitch(const float* f0_hz, int n, int* out_coarse);
 
-// STATUS: the enc_p graph is WRITTEN BUT DOES NOT YET MATCH the reference
-// (m_p cos 0.013, logs_p cos 0.587 as of the last run). flow and dec are not
-// implemented at all. Nothing here is wired into the CLI, the session C ABI or
-// any binding, so it cannot affect users; it is scaffolding plus a working
-// harness to finish against. Do not wire it up until the diff passes.
+// STATUS: enc_p PASSES — 26 per-stage comparisons at cos 1.00000000 including
+// m_p/logs_p (`crispasr-diff rvc <model> <ref> <any.wav>`). flow and dec are
+// not implemented yet, so rvc_svc_convert() is still a stub. Nothing is wired
+// into the CLI, the session C ABI or any binding; do not wire it up until the
+// whole path passes.
 //
 // Per-stage parity diff against tools/rvc_torch_parity.py's reference dump.
 // The reference carries BOTH noise buffers, which the runtime replays, so the
