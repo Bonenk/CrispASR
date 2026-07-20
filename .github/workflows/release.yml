@@ -797,14 +797,12 @@ jobs:
             -exec cp -P {} "$OUT/ggml/src/" \;
           # Headers so binding authors can extend the FFI without
           # vendoring the whole CrispASR repo.
-          # Codec libs — CRISPASR_OPUS_FETCH=ON builds libogg/libopus and
-          # libcrispasr links them via @rpath, but nothing here collected
-          # them, so the tarball did not load standalone (reported against
-          # v0.8.17 by a downstream consumer). They live under _deps/ with
-          # FetchContent, so search the whole build tree rather than guess.
-          find build-libs -name 'libogg*.dylib' -o -name 'libopus*.dylib' \
-            \( -type f -o -type l \) 2>/dev/null \
-            | while read -r f; do cp -P "$f" "$OUT/src/" 2>/dev/null || true; done
+          # NOTE: there are deliberately no libogg/libopus copies here. They
+          # are STATIC archives linked into libcrispasr (src/CMakeLists.txt
+          # forces BUILD_SHARED_LIBS=OFF around the FetchContent block), so
+          # they must not appear as separate dylibs. If they ever do, the
+          # @rpath gate below fails the release rather than shipping a bundle
+          # that cannot dlopen — which is what happened in v0.8.17.
           # Headers so binding authors can extend the FFI without
           # vendoring the whole CrispASR repo.
           cp include/crispasr.h "$OUT/include/"
