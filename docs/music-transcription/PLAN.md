@@ -782,3 +782,90 @@ production-ready (cb F1 0.243) — ignore that head.
 `beat_this`'s own README notes some training files are copyrighted or under
 limited CC licences. The *weights* licences are verified clean; provenance is a
 separate, unresolved upstream question.
+
+---
+
+## §251b-1 — beat-this port: traced blueprint (converter DONE, runtime TODO)
+
+`models/convert-beat-this-to-gguf.py` is landed and validated (147 tensors,
+40.8 MB f16; fold exact at f32, rel 1.9e-4 at f16). What follows is the forward
+pass traced from `beat_this/model/{beat_tracker,roformer}.py` so the runtime can
+be written without re-deriving it.
+
+### Two subtleties that would silently break the port
+
+**1. `RMSNorm` here is written in a form that does not look like RMSNorm.**
+
+```python
+self.scale = size ** 0.5
+self.gamma = nn.Parameter(torch.ones(size))
+forward: F.normalize(x, dim=-1) * self.scale * self.gamma
+```
+
+`F.normalize` divides by the L2 norm, and RMS = L2 / sqrt(size), so
+`normalize(x) * sqrt(size) == x / RMS(x)`. It **is** algebraically standard
+RMSNorm times gamma, and maps to `ggml_rms_norm` + `ggml_mul`. Do not
+reimplement the L2 form literally and do not assume a bias — there is none.
+
+**2. Attention has PER-HEAD sigmoid gating, applied before the out-projection.**
+
+```python
+gates = self.to_gates(x)                    # Linear(dim -> heads), WITH bias
+out = out * gates.sigmoid()                 # broadcast over (head_dim, seq)
+out = to_out(out)                           # Linear(dim_inner -> dim), NO bias
+```
+
+`to_gates` emits ONE scalar per head (not per channel), sigmoided and broadcast
+across that head's `head_dim` and sequence. Miss it and the output is plausible
+but wrong. Note the bias asymmetry: `to_qkv` and `to_out` are bias-free, `to_gates`
+has a bias.
+
+### Block order
+
+```
+Attention(x):  RMSNorm -> to_qkv(no bias) -> RoPE(q), RoPE(k) -> attend
+               -> * sigmoid(to_gates(x)) per head -> to_out(no bias)
+FeedForward:   RMSNorm(net.0.gamma) -> Linear(net.1) -> GELU -> Linear(net.4)
+               (indices 1 and 4 are the checkpoint's own numbering)
+```
+
+Frontend `PartialFTTransformer` runs `attnF/ffF` over the FREQUENCY axis then
+`attnT/ffT` over TIME, per block, with a shared `RotaryEmbedding(32)`.
+
+### Tensor names (from the checkpoint, verified)
+
+```
+frontend.stem.bn1d.{scale,offset}                 <- pre-conv per-FREQ affine, NOT folded
+frontend.stem.conv2d.{weight,bias}                <- BN folded in
+frontend.blocks.{0,1,2}.partial.{attnF,attnT}.norm.gamma
+frontend.blocks.{0,1,2}.partial.{attnF,attnT}.to_qkv.weight
+frontend.blocks.{0,1,2}.partial.{attnF,attnT}.to_gates.{weight,bias}
+frontend.blocks.{0,1,2}.partial.{attnF,attnT}.to_out.0.weight
+frontend.blocks.{0,1,2}.partial.{ffF,ffT}.net.{0.gamma,1.weight,1.bias,4.weight,4.bias}
+frontend.blocks.{0,1,2}.conv2d.{weight,bias}      <- BN (named `norm`!) folded in
+frontend.linear.{weight,bias}                     <- 1024 -> 512
+transformer_blocks.layers.{0..5}.{0=attn,1=ff}.*
+transformer_blocks.norm.gamma                     <- norm_output
+task_heads.beat_downbeat_lin.{weight,bias}        <- 512 -> 2
+aux.mel_filterbank                                <- [513,128] baked verbatim
+```
+
+⚠️ The BN module name differs by location: `bn2d` in the stem, **`norm`** in the
+frontend blocks. Found only because the converter's guard aborted rather than
+silently mis-folding.
+
+### Remaining work
+
+- [ ] `src/beat_this.{h,cpp}` — ggml graph. Reusable: `core/attention.h` (QKV +
+  RoPE), `core/ffn.h`, `core/mel.h` + `core/fft.h` for the front end. The per-head
+  gating and the `norm_output` RMSNorm need writing by hand.
+- [ ] Front end: 22050 Hz mono, **arithmetic-mean downmix**, STFT n_fft 1024 /
+  hop 441 / periodic Hann / `normalized='frame_length'`, project onto the baked
+  filterbank, `log1p(1000*x)`. 50 fps.
+- [ ] Windowing: 1500-frame chunks, `borderSize` 6, `keep_first` overlap. Must
+  reproduce `split_piece` / `aggregate_prediction` or results drift at seams.
+- [ ] Postprocess: peak-pick maxima within ±3 frames (kernel 7), threshold 0,
+  dedupe ≤1 frame, frames→seconds at 50 fps, snap each downbeat to its nearest
+  beat. **No DBN** — that is the point of the model and the patent constraint.
+- [ ] Parity harness vs the torch reference, then a `--beats` CLI surface + C ABI
+  + Dart binding mirroring `pitch()`.
