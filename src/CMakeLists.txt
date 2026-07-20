@@ -341,6 +341,19 @@ if (CRISPASR_OPUS)
         # its two dependencies match.
         set(_crispasr_save_shared "${BUILD_SHARED_LIBS}")
         set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+        # Forcing them STATIC (above) is only half the story: a static library
+        # defaults to NON-PIC, and crispasr-lib is frequently a shared object.
+        # Linking non-PIC objects into a .so is a hard ld error on Linux/ELF —
+        #   relocation R_X86_64_PC32 against `silk_LBRR_flags_iCDF_ptr'
+        #   can not be used when making a shared object; recompile with -fPIC
+        # — which broke the linux-opus-fetch CI job the moment BUILD_SHARED_LIBS
+        # was forced OFF here. It does NOT reproduce on macOS, where everything
+        # is position-independent anyway, so the STATIC fix looked clean locally.
+        # opusfile below already sets POSITION_INDEPENDENT_CODE explicitly; ogg
+        # and opus arrive via FetchContent_MakeAvailable and need the directory
+        # default set before that call.
+        set(_crispasr_save_pic "${CMAKE_POSITION_INDEPENDENT_CODE}")
+        set(CMAKE_POSITION_INDEPENDENT_CODE ON)
         # Emscripten: Opus cmake auto-detects x86 and enables AVX2/FMA sources
         # that fail under wasm32 clang. Disable all intrinsics.
         if (EMSCRIPTEN)
@@ -375,6 +388,7 @@ if (CRISPASR_OPUS)
         # declared — leaving it OFF would silently make every later target
         # static too.
         set(BUILD_SHARED_LIBS "${_crispasr_save_shared}" CACHE BOOL "" FORCE)
+        set(CMAKE_POSITION_INDEPENDENT_CODE "${_crispasr_save_pic}")
 
         if (_crispasr_save_build_testing STREQUAL "__UNSET__")
             unset(BUILD_TESTING CACHE)
