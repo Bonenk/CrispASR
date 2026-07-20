@@ -416,6 +416,36 @@ CRISPASR_SESSION_API const char* crispasr_session_chords_span_name(crispasr_sess
 // CRISPASR_BTC_MAJ_MIN=1 to collapse the output to maj/min.
 CRISPASR_SESSION_API int crispasr_session_chords_vocab_size(crispasr_session* s);
 
+// Beat and downbeat tracking: mono PCM at the model's native rate (22050 Hz
+// for beat-this) -> a beat grid. Returns the beat count, or -1 on error, on a
+// sample-rate mismatch, or on a backend with no beat arm.
+//
+// NO DBN. The postprocessing is peak-picking only, which is the point of the
+// model: madmom's Dynamic Bayesian Network is Boeck-patented and licensed
+// non-commercially, so a beat tracker that used one could not ship in a
+// commercial product. beat-this is MIT for code AND weights and depends on no
+// part of madmom, so unlike the chord arm above there is no licence gate here.
+CRISPASR_SESSION_API int crispasr_session_beats(crispasr_session* s, const float* pcm, int n_samples, int sample_rate);
+CRISPASR_SESSION_API int crispasr_session_beats_n_events(crispasr_session* s);
+// Flat, session-owned view of the last result: 2 floats per beat, beat-major,
+// as {time_s, is_downbeat}. Valid until the next crispasr_session_beats call
+// or session close. is_downbeat is 0.0f or 1.0f — a float, for the same reason
+// chords' label is: a mixed int/float struct misreads through a flat view.
+//
+// EVERY DOWNBEAT IS ALSO A BEAT. The postprocessor snaps each downbeat onto
+// its nearest beat, so the downbeats are a strict subset and callers never
+// have to merge two lists to reconstruct the grid.
+CRISPASR_SESSION_API const float* crispasr_session_beats_events(crispasr_session* s, int* out_n_events);
+// Median-interval tempo estimate in BPM from the last result, or 0 with fewer
+// than two beats. Median rather than mean: a single missed or doubled beat
+// skews a mean badly and both are routine.
+CRISPASR_SESSION_API float crispasr_session_beats_tempo_bpm(crispasr_session* s);
+// Native input rate the loaded beat model expects, in Hz (22050 for
+// beat-this), or 0 when the backend has no beat arm — so it doubles as a
+// capability probe. crispasr_session_beats REJECTS a mismatch rather than
+// resampling: silently resampling audio would move every beat time.
+CRISPASR_SESSION_API int crispasr_session_beats_sample_rate(crispasr_session* s);
+
 // Polyphonic piano transcription: mono PCM at the model's native rate
 // (16000 Hz for piano-transcription) -> note events.
 //
