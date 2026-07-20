@@ -72,23 +72,37 @@ The architecture docs do not mention any of these. Inspecting
    log-CQT features are normalised `(x - mean) / std` before the embedding
    projection. Nothing in the README or config says so.
 
-7. **The output layer contains a BIDIRECTIONAL LSTM.** The docs call it merely
-   a "SoftmaxOutputLayer classifying over num_chords classes", but the tensors
-   are `output_layer.lstm.weight_ih_l0 (256,128)`, `weight_hh_l0 (256,64)` plus
-   `_reverse` twins, then `output_layer.output_projection (25|170, 128)`. So
-   hidden is 64 per direction (256 = 4 gates x 64), concatenated to 128 before
-   the classifier. `core/lstm.h` already has bidirectional LSTM.
+7. **The checkpoint's bidirectional LSTM is DEAD WEIGHT — do not implement it.**
+   `output_layer.lstm.*` is present (8 tensors: `weight_ih_l0 (256,128)`,
+   `weight_hh_l0 (256,64)` and `_reverse` twins), which looks like a biLSTM
+   head. It is constructed in `OutputLayer.__init__`
+   (`transformer_modules.py:64`) but **`SoftmaxOutputLayer.forward` never calls
+   it** — line 75 is just `logits = self.output_projection(hidden)`.
+
+   So the real head is a bare Linear(128 -> n_chords). Implementing the LSTM
+   would be wasted work AND would produce wrong output. The converter therefore
+   SKIPS those 8 tensors deliberately.
+
+   (Mirror image of the htdemucs DConv bug, where bound-but-unused norms had to
+   be wired IN. Same lesson from the opposite side: whether a weight is used is
+   a property of the forward pass, not of the checkpoint.)
 
 8. **Attention linears are bias-free** — q/k/v/output each have `.weight` only.
 
 ### Actual end-to-end shape
 
-    CQT(144) -> (x - mean)/std -> embedding_proj(144->128) -> + posenc
+    CQT(144) -> (x - mean)/std -> embedding_proj(144->128, no bias) -> + posenc
       -> 8 x [ fwd attn block || bwd attn block -> concat(256) -> linear(256->128) ]
-      -> biLSTM(128 -> 64x2) -> output_projection(128 -> 25 or 170)
+      -> final LayerNorm -> output_projection(128 -> 25 or 170)
 
-221 tensors: 8 layers x 26, plus embedding_proj, the 8 LSTM tensors and the
-2 projection tensors.
+Processed in fixed blocks of `timestep` = 108 frames (`test.py:71` slices
+`feature[:, 108*t : 108*(t+1), :]`), NOT a sliding window — the bias mask is
+built for exactly that length.
+
+No sqrt(d) embedding scaling: `embedding_proj(x)` then `x += timing_signal`.
+
+213 converted tensors: 8 layers x 26, plus embedding_proj, the final LayerNorm
+pair and the 2 projection tensors. The 8 unused LSTM tensors are skipped.
 
 ## Licence
 

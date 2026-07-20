@@ -19,7 +19,7 @@ Details that are NOT the obvious default (see BTC_BLUEPRINT.md):
   * Each layer has a FORWARD block (causal mask) and a BACKWARD block
     (transposed mask), concatenated then projected 256->128.
   * The FFN is Conv(k=3) -> ReLU -> Conv(k=3) with SYMMETRIC (1,1) padding.
-  * The output layer is a bidirectional LSTM followed by the classifier.
+  * output_layer.lstm.* is DEAD WEIGHT (never called) and is skipped.
   * Attention linears are bias-free; LayerNorm eps is 1e-6.
 """
 
@@ -65,10 +65,9 @@ def main() -> None:
         if k.startswith("self_attn_layers.self_attn_layers.")
     )
     ffn = int(sd["self_attn_layers.self_attn_layers.0.attn_block.positionwise_convolution.layers.0.conv.weight"].shape[0])
-    lstm_hidden = int(sd["output_layer.lstm.weight_hh_l0"].shape[1])
 
     print(f"btc: {feat}->{hidden}, {n_layers} layers, ffn {ffn}, "
-          f"{n_chords} chords, lstm {lstm_hidden}/dir, mean {mean:.6f} std {std:.6f}")
+          f"{n_chords} chords, mean {mean:.6f} std {std:.6f}")
 
     w = gguf.GGUFWriter(args.output, ARCH)
     w.add_uint32("btc.feature_size", feat)
@@ -78,7 +77,6 @@ def main() -> None:
     w.add_uint32("btc.filter_size", ffn)
     w.add_uint32("btc.n_chords", n_chords)
     w.add_uint32("btc.timestep", 108)       # training sequence length
-    w.add_uint32("btc.lstm_hidden", lstm_hidden)
     w.add_float32("btc.norm_mean", mean)
     w.add_float32("btc.norm_std", std)
     w.add_float32("btc.layer_norm_eps", 1e-6)
@@ -95,6 +93,8 @@ def main() -> None:
         "jayg996/BTC-ISMIR19 is MIT.",
     )
 
+    emitted = []
+
     def emit(name: str, t: torch.Tensor, force_f32: bool = False) -> None:
         a = t.detach().cpu().float().numpy()
         if args.dtype == "f16" and not force_f32 and a.ndim >= 2:
@@ -102,6 +102,7 @@ def main() -> None:
         else:
             a = a.astype(np.float32)
         w.add_tensor(name, a)
+        emitted.append(name)
 
     emit("embedding_proj.weight", sd["self_attn_layers.embedding_proj.weight"])
 
@@ -143,19 +144,20 @@ def main() -> None:
         emit(dst, sd[src], force_f32=True)
         seen.add(src)
 
+    # output_layer.lstm.* is DEAD WEIGHT: nn.LSTM is constructed in
+    # OutputLayer.__init__ (transformer_modules.py:64) but SoftmaxOutputLayer
+    # .forward never calls it — line 75 is just output_projection(hidden).
+    # Skipped deliberately; converting it would invite someone to implement a
+    # layer the reference never runs.
+    for k in list(sd):
+        if k.startswith("output_layer.lstm."):
+            seen.add(k)
+
     for src, dst in (
-        ("output_layer.lstm.weight_ih_l0", "output.lstm.w_ih"),
-        ("output_layer.lstm.weight_hh_l0", "output.lstm.w_hh"),
-        ("output_layer.lstm.bias_ih_l0", "output.lstm.b_ih"),
-        ("output_layer.lstm.bias_hh_l0", "output.lstm.b_hh"),
-        ("output_layer.lstm.weight_ih_l0_reverse", "output.lstm.w_ih_rev"),
-        ("output_layer.lstm.weight_hh_l0_reverse", "output.lstm.w_hh_rev"),
-        ("output_layer.lstm.bias_ih_l0_reverse", "output.lstm.b_ih_rev"),
-        ("output_layer.lstm.bias_hh_l0_reverse", "output.lstm.b_hh_rev"),
         ("output_layer.output_projection.weight", "output.proj.weight"),
         ("output_layer.output_projection.bias", "output.proj.bias"),
     ):
-        emit(dst, sd[src], force_f32=("bias" in dst or "b_" in dst))
+        emit(dst, sd[src], force_f32=dst.endswith("bias"))
         seen.add(src)
 
     # Fail loudly rather than silently dropping a tensor — a missing weight
@@ -168,7 +170,8 @@ def main() -> None:
     w.write_kv_data_to_file()
     w.write_tensors_to_file()
     w.close()
-    print(f"wrote {args.output}: {len(seen)} tensors, {n_chords} chords, dtype {args.dtype}")
+    print(f"wrote {args.output}: {len(emitted)} tensors emitted "
+          f"({len(seen) - len(emitted)} skipped as unused), {n_chords} chords, dtype {args.dtype}")
     print("NOTE: weights are CC BY-NC-SA — non-commercial use only.")
 
 
