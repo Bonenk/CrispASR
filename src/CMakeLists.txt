@@ -2358,6 +2358,18 @@ if(NOT MSVC)
 endif()
 
 # ---------------------------------------------------------------------------
+# beat-this — Beat This! beat/downbeat tracking (§251b)
+# ---------------------------------------------------------------------------
+add_library(beat-this STATIC beat_this.h beat_this.cpp)
+set_target_properties(beat-this PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(beat-this PUBLIC .)
+target_compile_features   (beat-this PUBLIC cxx_std_17)
+target_link_libraries     (beat-this PUBLIC crispasr-core ggml ggml-base ggml-cpu)
+if(NOT MSVC)
+    target_compile_options(beat-this PRIVATE -O3)
+endif()
+
+# ---------------------------------------------------------------------------
 # crepe — CREPE monophonic F0 estimation (music transcription)
 # ---------------------------------------------------------------------------
 # btc_chords — BTC chord recognition (ISMIR 2019). Weights are CC-BY-NC-SA;
