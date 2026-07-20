@@ -866,6 +866,18 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
         if (ref_get(rw, "freq_indices", ref_fi, nn))
             report("freq_indices", mine_fi, ref_fi);
     }
+    // --- num_bands_per_freq (overlap denominator) as float compare ---
+    // Structural, like freq_indices, and the reference dumper calls out why it
+    // matters: it is the denominator used when scattering bands back to the
+    // spectrogram, so an off-by-one silently corrupts every downstream band.
+    // It was captured by the dumper but never compared here.
+    {
+        std::vector<float> mine_nb(ctx->num_bands_per_freq.begin(), ctx->num_bands_per_freq.end());
+        std::vector<float> ref_nb;
+        int64_t nn = 0;
+        if (ref_get(rw, "num_bands_per_freq", ref_nb, nn))
+            report("num_bands_per_freq", mine_nb, ref_nb);
+    }
     // --- stft_packed (f*s, T, 2) ---
     {
         std::vector<float> ref_sp;
@@ -1049,6 +1061,30 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
         }
     }
 
+
+    // Declare the coverage gap rather than letting a screen of PASS lines imply
+    // full coverage. The dumper captures layer1_* and layer5_*; comparing them
+    // would mean chaining our own time blocks through five layers (the
+    // layer0_freq path already does this for one), which buys localisation but
+    // not detection -- output_vocals is compared end to end, so a regression in
+    // any intermediate layer still fails the run. Listed so the next person
+    // knows where a failure would NOT be pinpointed.
+    {
+        const char* uncompared[] = {"layer1_time", "layer1_freq", "layer5_time", "layer5_freq"};
+        std::string present;
+        for (const char* nm : uncompared) {
+            std::vector<float> tmp;
+            int64_t nn = 0;
+            if (ref_get(rw, nm, tmp, nn))
+                present += (present.empty() ? "" : ", ") + std::string(nm);
+        }
+        if (!present.empty())
+            fprintf(stderr,
+                    "  NOTE: in the reference but not compared: %s\n"
+                    "        (end-to-end output_vocals IS compared, so a regression there still\n"
+                    "         fails -- these would only localise it to a layer)\n",
+                    present.c_str());
+    }
 
     if (rw.buf)
         ggml_backend_buffer_free(rw.buf);
