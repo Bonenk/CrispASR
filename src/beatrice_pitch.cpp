@@ -17,6 +17,7 @@
 
 #include "beatrice_pitch.h"
 
+#include "core/beatrice_ops.h"
 #include "core/fft.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h"
@@ -70,8 +71,6 @@ struct beatrice_pitch_context {
 };
 
 namespace {
-
-constexpr float kLayerNormEps = 1e-5f; // torch nn.LayerNorm default
 
 // ---------------------------------------------------------------------------
 // DSP front end (extract_pitch_features), host side
@@ -192,38 +191,6 @@ void extract_pitch_features(const beatrice_pitch_hparams& hp, const float* pcm, 
 // Graph helpers
 // ---------------------------------------------------------------------------
 
-// A pointwise (1x1) projection over the channel axis.
-// x is [T, Cin]; w is the conv/linear weight as ggml [Cin, Cout]; returns
-// [T, Cout]. mul_mat contracts over ne0, hence the transposes.
-ggml_tensor* pointwise(ggml_context* ctx, ggml_tensor* x, ggml_tensor* w, ggml_tensor* b) {
-    ggml_tensor* xt = ggml_cont(ctx, ggml_transpose(ctx, x)); // [Cin, T]
-    ggml_tensor* y = ggml_mul_mat(ctx, w, xt);                // [Cout, T]
-    if (b)
-        y = ggml_add(ctx, y, b);
-    return ggml_cont(ctx, ggml_transpose(ctx, y)); // [T, Cout]
-}
-
-// LayerNorm over the channel axis of an [T, C] tensor. `g`/`b` may be null,
-// which is the case INSIDE the blocks: merge_weights() folds the per-block
-// affine into pwconv1, leaving normalise-only. The stack-level norms keep
-// theirs. Getting this backwards is wrong in exactly one of the two places.
-ggml_tensor* layernorm_tc(ggml_context* ctx, ggml_tensor* x, ggml_tensor* g, ggml_tensor* b) {
-    ggml_tensor* xt = ggml_cont(ctx, ggml_transpose(ctx, x)); // [C, T]
-    xt = ggml_norm(ctx, xt, kLayerNormEps);                   // normalises over ne0 = C
-    if (g)
-        xt = ggml_mul(ctx, xt, g);
-    if (b)
-        xt = ggml_add(ctx, xt, b);
-    return ggml_cont(ctx, ggml_transpose(ctx, xt)); // [T, C]
-}
-
-// Trim `n` frames off the END of a [T, C] tensor — the CausalConv1d trim.
-ggml_tensor* trim_tail(ggml_context* ctx, ggml_tensor* x, int n) {
-    if (n <= 0)
-        return x;
-    const int64_t T = x->ne[0] - n;
-    return ggml_cont(ctx, ggml_view_2d(ctx, x, T, x->ne[1], x->nb[1], 0));
-}
 
 } // namespace
 
@@ -397,16 +364,18 @@ ggml_cgraph* build_graph(beatrice_pitch_context* c, ggml_context* ctx, int T, gr
         return w ? ggml_reshape_2d(ctx, w, w->ne[1], w->ne[2]) : nullptr;
     };
 
-    ggml_tensor* xi = pointwise(ctx, io.instfreq, conv1x1_w("instfreq_embed_0.weight"), W("instfreq_embed_0.bias"));
+    ggml_tensor* xi =
+        beatrice_ops::pointwise(ctx, io.instfreq, conv1x1_w("instfreq_embed_0.weight"), W("instfreq_embed_0.bias"));
     xi = ggml_gelu(ctx, xi); // tanh approximation — matches approximate="tanh"
     cap("instfreq_embed_0_gelu", xi);
-    xi = pointwise(ctx, xi, conv1x1_w("instfreq_embed_1.weight"), W("instfreq_embed_1.bias"));
+    xi = beatrice_ops::pointwise(ctx, xi, conv1x1_w("instfreq_embed_1.weight"), W("instfreq_embed_1.bias"));
     cap("instfreq_embed_1", xi);
 
-    ggml_tensor* xc = pointwise(ctx, io.corr_diff, conv1x1_w("corr_embed_0.weight"), W("corr_embed_0.bias"));
+    ggml_tensor* xc =
+        beatrice_ops::pointwise(ctx, io.corr_diff, conv1x1_w("corr_embed_0.weight"), W("corr_embed_0.bias"));
     xc = ggml_gelu(ctx, xc);
     cap("corr_embed_0_gelu", xc);
-    xc = pointwise(ctx, xc, conv1x1_w("corr_embed_1.weight"), W("corr_embed_1.bias"));
+    xc = beatrice_ops::pointwise(ctx, xc, conv1x1_w("corr_embed_1.weight"), W("corr_embed_1.bias"));
     cap("corr_embed_1", xc);
 
     ggml_tensor* x = ggml_gelu(ctx, ggml_add(ctx, xi, xc));
@@ -415,10 +384,10 @@ ggml_cgraph* build_graph(beatrice_pitch_context* c, ggml_context* ctx, int T, gr
     // --- ConvNeXtStack: embed -> norm(with affine) -> blocks -> final norm
     x = ggml_conv_1d(ctx, W("backbone.embed.weight"), x, 1, hp.embed_padding, 1);
     x = ggml_add(ctx, x, ggml_reshape_2d(ctx, W("backbone.embed.bias"), 1, hp.channels));
-    x = trim_tail(ctx, x, hp.embed_trim);
+    x = beatrice_ops::trim_tail(ctx, x, hp.embed_trim);
     cap("backbone_embed", x);
 
-    x = layernorm_tc(ctx, x, W("backbone.norm.weight"), W("backbone.norm.bias"));
+    x = beatrice_ops::layernorm_tc(ctx, x, W("backbone.norm.weight"), W("backbone.norm.bias"));
     cap("backbone_norm", x);
 
     for (int i = 0; i < hp.n_blocks; i++) {
@@ -430,26 +399,26 @@ ggml_cgraph* build_graph(beatrice_pitch_context* c, ggml_context* ctx, int T, gr
         // emits both so this never silently re-derives one from the other.
         ggml_tensor* h = ggml_conv_1d_dw(ctx, W(p + "dwconv.weight"), x, 1, hp.dw_padding, 1);
         h = ggml_add(ctx, h, ggml_reshape_2d(ctx, W(p + "dwconv.bias"), 1, hp.channels));
-        h = trim_tail(ctx, h, hp.dw_trim);
+        h = beatrice_ops::trim_tail(ctx, h, hp.dw_trim);
         cap(("block" + std::to_string(i) + "_dwconv").c_str(), h);
 
         // Per-block LayerNorm: affine already folded into pwconv1, so
         // normalise only. Passing the (identity) affine here would be harmless
         // but it is not stored at all.
-        h = layernorm_tc(ctx, h, nullptr, nullptr);
-        h = pointwise(ctx, h, W(p + "pwconv1.weight"), W(p + "pwconv1.bias"));
+        h = beatrice_ops::layernorm_tc(ctx, h, nullptr, nullptr);
+        h = beatrice_ops::pointwise(ctx, h, W(p + "pwconv1.weight"), W(p + "pwconv1.bias"));
         h = ggml_gelu(ctx, h);
-        h = pointwise(ctx, h, W(p + "pwconv2.weight"), W(p + "pwconv2.bias"));
+        h = beatrice_ops::pointwise(ctx, h, W(p + "pwconv2.weight"), W(p + "pwconv2.bias"));
         // gamma / pre_scale / post_scale / post_scale_weight are identically 1
         // after merge_weights and are not present in the GGUF.
         x = ggml_add(ctx, h, identity);
         cap(("block" + std::to_string(i) + "_out").c_str(), x);
     }
 
-    x = layernorm_tc(ctx, x, W("backbone.final_layer_norm.weight"), W("backbone.final_layer_norm.bias"));
+    x = beatrice_ops::layernorm_tc(ctx, x, W("backbone.final_layer_norm.weight"), W("backbone.final_layer_norm.bias"));
     cap("backbone_final_norm", x);
 
-    io.logits = pointwise(ctx, x, conv1x1_w("head.weight"), W("head.bias"));
+    io.logits = beatrice_ops::pointwise(ctx, x, conv1x1_w("head.weight"), W("head.bias"));
     cap("logits", io.logits);
     ggml_build_forward_expand(gf, io.logits);
     return gf;

@@ -42,6 +42,7 @@
 #include "btc_chords.h"
 #include "tabcnn.h"
 #include "piano_transcription.h"
+#include "beatrice_phone.h"
 #include "beatrice_pitch.h"
 #include "rvc_svc.h"
 #include "voxtral_tts.h"
@@ -1135,6 +1136,11 @@ int main(int argc, char** argv) {
         // input_pitch and BOTH RNG buffers, which the runtime replays — the
         // only way to diff a stochastic model at all. audio_path unused.
         return rvc_svc_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
+    }
+    if (backend_name == "beatrice-phone") {
+        // model_path = beatrice phone_extractor GGUF, ref_path = dump from
+        // tools/beatrice_torch_parity.py --component phone_extractor.
+        return beatrice_phone_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
     }
     if (backend_name == "beatrice" || backend_name == "beatrice-pitch") {
         // model_path = beatrice pitch_estimator GGUF, ref_path = dump from

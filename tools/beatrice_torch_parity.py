@@ -175,6 +175,11 @@ def spec_phone_extractor(m, wav, d):
         h = blk.attn_norm(h)
         h, _ = blk.mha(h, h, h, attn_mask=attn_mask, is_causal=True, need_weights=False)
         h = h.view(B_, 4, L_ // 4, C_).permute(0, 3, 2, 1).reshape(B_, C_, L_)
+        # Dump the BRANCH OUTPUT as well as the post-residual sum. The sum is
+        # residual-dominated and nearly blind to the attention: a broken
+        # interleave still scores cos 0.99999986 there while wrecking 41 later
+        # stages. The delta is what actually tests the MHA.
+        d(f"pblock{i}_attn_delta", h)
         x = h + identity
         d(f"pblock{i}_attn", x)
 

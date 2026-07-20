@@ -2417,7 +2417,7 @@ endif()
 # ---------------------------------------------------------------------------
 # beatrice-pitch — Beatrice v2 PitchEstimator (§CB2). MIT, source and weights.
 # First of three components; deterministic (the RNG is in the vocoder).
-add_library(beatrice-pitch STATIC beatrice_pitch.h beatrice_pitch.cpp)
+add_library(beatrice-pitch STATIC beatrice_pitch.h beatrice_pitch.cpp beatrice_phone.h beatrice_phone.cpp)
 set_target_properties(beatrice-pitch PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(beatrice-pitch PUBLIC .)
 target_compile_features   (beatrice-pitch PUBLIC cxx_std_17)
