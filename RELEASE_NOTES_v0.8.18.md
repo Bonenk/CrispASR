@@ -1,13 +1,12 @@
-# CrispASR v0.9.0
+# CrispASR v0.8.18
 
 121 commits since v0.8.17. Headline: **three new backends and two new task
 surfaces** — RVC voice conversion, Beat This! beat tracking, and TabCNN guitar
 tablature — plus a piano-transcription verb, a Beatrice pitch-estimator port,
 and a round of build/release and CI-integrity fixes. Four community PRs merged.
 
-The version bump to 0.9.0 (rather than 0.8.18) reflects the new public surface:
-`--tab`, `--piano` and `--beats` verbs, a voice-conversion capability, and six
-new `crispasr_session_*` entry points.
+Kept as a patch release: everything below is **additive**. No API breaks, no
+changed defaults, no removed flags — existing callers upgrade untouched.
 
 ## New backend — RVC voice conversion (§CB1)
 
@@ -128,4 +127,12 @@ saved.
 
 No API breaks. New entry points are additive: `crispasr_session_tab*` (6),
 `crispasr_session_beats*`, and the RVC `convert()` dispatch. `--tab`, `--beats`
-and `--piano` are new verbs; existing flags are unchanged.
+and `--piano` are new verbs; existing flags are unchanged. Nothing in this
+release requires a caller to change anything.
+
+One behaviour change worth knowing about if you use **sidon**: `--s2s` output is
+now correctly time-aligned (the leading inference pad was previously never
+cropped, so results were delayed and lost the same amount of audio off the end),
+and the DAC decode is chunked by default, bounded at ~0.79 GiB instead of
+~4.5 GiB at 55 s. Output is bit-exact against the whole-utterance path; set
+`CRISPASR_SIDON_DECODER_CHUNK_FRAMES=0` to restore the single-graph decode.
