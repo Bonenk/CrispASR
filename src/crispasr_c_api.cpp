@@ -308,6 +308,10 @@
 #include "htdemucs.h"
 #define CA_HAVE_HTDEMUCS 1
 #endif
+#if __has_include("rvc_svc.h")
+#include "rvc_svc.h"
+#define CA_HAVE_RVC_SVC 1
+#endif
 #if __has_include("btc_chords.h")
 #include "btc_chords.h"
 #define CA_HAVE_BTC_CHORDS 1
@@ -1494,6 +1498,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "mel-band-roformer";
     else if (strcmp(arch, "btc") == 0)
         backend = "btc-chords";
+    else if (strcmp(arch, "rvc") == 0)
+        backend = "rvc-svc";
     else if (strcmp(arch, "beat-this") == 0)
         backend = "beat-this";
 
@@ -1886,6 +1892,10 @@ struct crispasr_session {
 #ifdef CA_HAVE_HTDEMUCS
     htdemucs_context* htdemucs_ctx = nullptr;
     htdemucs_result* htdemucs_last_result = nullptr;
+#endif
+#ifdef CA_HAVE_RVC_SVC
+    rvc_svc_context* rvc_ctx = nullptr;
+    rvc_svc_result* rvc_last = nullptr;
 #endif
 #ifdef CA_HAVE_BTC_CHORDS
     btc_chords_context* btc_ctx = nullptr;
@@ -2836,6 +2846,19 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         hp.use_gpu = g_open_use_gpu_tls; // crispasr_session has no use_gpu member; use the open-time TLS flag
         s->htdemucs_ctx = htdemucs_init_from_file(model_path, hp);
         if (!s->htdemucs_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_RVC_SVC
+    if (s->backend == "rvc" || s->backend == "rvc-svc" || s->backend == "svc") {
+        rvc_svc_params p = rvc_svc_default_params();
+        p.n_threads = s->n_threads;
+        p.use_gpu = g_open_use_gpu_tls;
+        s->rvc_ctx = rvc_svc_init_from_file(model_path, p);
+        if (!s->rvc_ctx) {
             delete s;
             return nullptr;
         }
@@ -4002,6 +4025,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_BTC_CHORDS
     list += ",btc-chords";
+#endif
+#ifdef CA_HAVE_RVC_SVC
+    list += ",rvc-svc";
 #endif
 #ifdef CA_HAVE_KYUTAI
     list += ",kyutai-stt";
@@ -8956,6 +8982,87 @@ CA_EXPORT int crispasr_session_pitch_sample_rate(crispasr_session* s) {
 }
 
 // ---------------------------------------------------------------------------
+// Voice conversion (SVC) session API
+//
+// This is the PRIMARY surface for RVC — deliberately not a CLI verb. The input
+// is ContentVec features, which CrispASR does not produce (the consumer owns
+// the content encoder), so a standalone command line could not run it.
+//
+// STOCHASTIC BY DESIGN: two RNG sites mean output varies run to run. Pass NULL
+// for the noise buffers in production; pass explicit buffers to replay a draw,
+// which is the only way to compare against another implementation.
+// ---------------------------------------------------------------------------
+
+CA_EXPORT int crispasr_session_convert(crispasr_session* s, const float* content, int n_frames, const float* f0_hz,
+                                       int speaker_id, const float* noise_zp, const float* noise_sine) {
+    if (!s || !content || !f0_hz || n_frames <= 0)
+        return -1;
+#ifdef CA_HAVE_RVC_SVC
+    if (s->rvc_ctx) {
+        if (s->rvc_last) {
+            rvc_svc_result_free(s->rvc_last);
+            s->rvc_last = nullptr;
+        }
+        s->rvc_last = rvc_svc_convert(s->rvc_ctx, content, n_frames, f0_hz, speaker_id, noise_zp, noise_sine);
+        return s->rvc_last ? s->rvc_last->n_samples : -1;
+    }
+#endif
+    (void)speaker_id;
+    (void)noise_zp;
+    (void)noise_sine;
+    return -1;
+}
+
+CA_EXPORT const float* crispasr_session_convert_audio(crispasr_session* s, int* out_n_samples) {
+    if (out_n_samples)
+        *out_n_samples = 0;
+    if (!s)
+        return nullptr;
+#ifdef CA_HAVE_RVC_SVC
+    if (s->rvc_last) {
+        if (out_n_samples)
+            *out_n_samples = s->rvc_last->n_samples;
+        return s->rvc_last->pcm;
+    }
+#endif
+    return nullptr;
+}
+
+// The checkpoint's expected ContentVec dim (256 = v1/layer-9, 768 = v2/layer-12).
+// Requested so a v1/v2 mismatch refuses LOUDLY rather than sounding subtly
+// wrong — a consumer cannot make that check from its side.
+CA_EXPORT int crispasr_session_convert_content_dim(crispasr_session* s) {
+#ifdef CA_HAVE_RVC_SVC
+    if (s && s->rvc_ctx)
+        return rvc_svc_content_dim(s->rvc_ctx);
+#else
+    (void)s;
+#endif
+    return 0;
+}
+
+CA_EXPORT int crispasr_session_convert_n_speakers(crispasr_session* s) {
+#ifdef CA_HAVE_RVC_SVC
+    if (s && s->rvc_ctx)
+        return rvc_svc_n_speakers(s->rvc_ctx);
+#else
+    (void)s;
+#endif
+    return 0;
+}
+
+// Output rate is a property of the checkpoint (32k/40k/48k), not a constant.
+CA_EXPORT int crispasr_session_convert_sample_rate(crispasr_session* s) {
+#ifdef CA_HAVE_RVC_SVC
+    if (s && s->rvc_ctx)
+        return rvc_svc_sample_rate(s->rvc_ctx);
+#else
+    (void)s;
+#endif
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 // Chord recognition session API
 //
 // A chord timeline is not crispasr_segments either, so it follows pitch and
@@ -9336,6 +9443,12 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
         mel_band_roformer_result_free(s->mbr_last_result);
     if (s->mbr_ctx)
         mel_band_roformer_free(s->mbr_ctx);
+#endif
+#ifdef CA_HAVE_RVC_SVC
+    if (s->rvc_last)
+        rvc_svc_result_free(s->rvc_last);
+    if (s->rvc_ctx)
+        rvc_svc_free(s->rvc_ctx);
 #endif
 #ifdef CA_HAVE_BTC_CHORDS
     if (s->btc_ctx)

@@ -61,6 +61,7 @@ add_executable(${TARGET}
     crispasr_backend_htdemucs.cpp
     crispasr_backend_crepe.cpp
     crispasr_backend_btc.cpp
+    crispasr_backend_rvc.cpp
     crispasr_piano_cli.cpp
     crispasr_backend_beat_this.cpp
     crispasr_backend_mel_band_roformer.cpp

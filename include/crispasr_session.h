@@ -410,6 +410,31 @@ CRISPASR_SESSION_API int crispasr_session_pitch_frame(crispasr_session* s, int i
 CRISPASR_SESSION_API const float* crispasr_session_pitch_frames(crispasr_session* s, int* out_n_frames);
 CRISPASR_SESSION_API int crispasr_session_pitch_sample_rate(crispasr_session* s);
 
+// Voice conversion (SVC, RVC). Input is CONTENTVEC FEATURES, not audio: the
+// consumer owns the content encoder, which is why this has no CLI verb.
+// `content` is n_frames * content_dim frame-major; `f0_hz` is n_frames values
+// in Hz with 0.0 marking unvoiced (the coarse mel-quantised pitch is derived
+// internally — those constants are model-side and replicating them in the
+// caller guarantees drift). Returns the sample count (>0), -1 on error.
+//
+// STOCHASTIC BY DESIGN. Pass NULL for both noise buffers in production. Passing
+// explicit buffers replays a specific draw, which is the only way to compare
+// against another implementation — waveform correlation against a reference run
+// is invalid here because the reference disagrees with itself.
+//   noise_zp   : inter_channels * n_frames, or NULL
+//   noise_sine : n_frames * upsample_product, or NULL
+CRISPASR_SESSION_API int crispasr_session_convert(crispasr_session* s, const float* content, int n_frames,
+                                                  const float* f0_hz, int speaker_id, const float* noise_zp,
+                                                  const float* noise_sine);
+// Session-owned mono PCM from the last convert(), at convert_sample_rate().
+CRISPASR_SESSION_API const float* crispasr_session_convert_audio(crispasr_session* s, int* out_n_samples);
+// 256 (v1, layer 9 + final_proj) or 768 (v2, final layer). Check this against
+// your encoder before calling: a v1/v2 mismatch is silent otherwise.
+CRISPASR_SESSION_API int crispasr_session_convert_content_dim(crispasr_session* s);
+CRISPASR_SESSION_API int crispasr_session_convert_n_speakers(crispasr_session* s);
+// The checkpoint's native rate (32k/40k/48k) — not a constant.
+CRISPASR_SESSION_API int crispasr_session_convert_sample_rate(crispasr_session* s);
+
 // Chord recognition: mono PCM at any rate (resampled internally to the
 // model's 22050 Hz) -> a chord timeline. Returns the span count (>0) on
 // success, 0 for "ran, found nothing", -1 on error or a backend with no
