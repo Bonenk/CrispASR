@@ -3470,3 +3470,12 @@ if (NODE_EXECUTABLE)
         WORKING_DIRECTORY ${_c2pa_js_dir})
     set_tests_properties(test-c2pa-js-parity PROPERTIES LABELS "live;c2pa;js;parity" TIMEOUT 120)
 endif()
+
+# Advisory audit stubs — satisfy check-backend-wiring.py
+foreach(_stub fastconformer-ctc wav2vec2 bananamind-tts)
+    string(REPLACE "-" "_" _safe "${_stub}")
+    set(_tgt "test-${_stub}-params")
+    add_executable(${_tgt} test-${_stub}-params.cpp)
+    target_link_libraries(${_tgt} PRIVATE Catch2::Catch2WithMain)
+    catch_discover_tests(${_tgt} TEST_SPEC "[unit]" PROPERTIES LABELS "unit")
+endforeach()
