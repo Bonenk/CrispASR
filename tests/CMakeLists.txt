@@ -2787,6 +2787,20 @@ catch_discover_tests(test-core-wordpiece
     PROPERTIES LABELS "unit;wordpiece"
 )
 
+# ─── test-core-cqt — core/cqt.h constant-Q transform ──────────────────────────
+# Deterministic properties only (geometric bins, tone->bin mapping, octave
+# spacing, L1 normalisation). librosa cross-check is a separate manual step:
+#   ./build/bin/test-core-cqt --dump /tmp/cqt.bin
+#   python tools/cqt_librosa_parity.py /tmp/cqt.bin
+# Defines its own main() for --dump, so links Catch2::Catch2 not Catch2WithMain.
+add_executable(test-core-cqt test-core-cqt.cpp)
+target_include_directories(test-core-cqt PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-core-cqt PRIVATE Catch2::Catch2)
+catch_discover_tests(test-core-cqt
+    TEST_PREFIX "core-cqt: "
+    PROPERTIES LABELS "unit;core"
+)
+
 # ─── test-core-istft — core/istft.h inverse-STFT overlap-add ──────────────────
 # Verifies the extracted iSTFT against an independent full-DFT reference
 # (fuzzed) + a forward-STFT→iSTFT sinusoid round-trip.
