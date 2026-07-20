@@ -172,6 +172,12 @@ def main():
     w.add_array("rvc.upsample_rates", [int(r) for r in rates])
     w.add_array("rvc.upsample_kernel_sizes", [int(k) for k in m["upsample_kernel_sizes"]])
     w.add_array("rvc.resblock_kernel_sizes", [int(k) for k in m["resblock_kernel_sizes"]])
+    # Dilations are NOT recoverable from the weights (a dilated conv has the same
+    # shape as an undilated one), so they must be carried explicitly. Flattened
+    # row-major, n_kernels x n_dilations.
+    _dil = m["resblock_dilation_sizes"]
+    w.add_array("rvc.resblock_dilations", [int(d) for row in _dil for d in row])
+    w.add_uint32("rvc.resblock_n_dilations", int(len(_dil[0])))
     w.add_uint32("rvc.upsample_initial_channel", int(m["upsample_initial_channel"]))
     w.add_string("rvc.resblock", str(m["resblock"]))
     w.add_uint32("rvc.n_layers", int(m["n_layers"]))

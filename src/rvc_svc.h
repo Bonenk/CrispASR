@@ -72,11 +72,12 @@ void rvc_svc_result_free(rvc_svc_result* r);
 // cross-check; the conversion path applies it internally.
 void rvc_svc_coarse_pitch(const float* f0_hz, int n, int* out_coarse);
 
-// STATUS: enc_p AND flow PASS — 30 per-stage comparisons at cos 1.00000000 including
-// m_p/logs_p and all 4 coupling blocks (`crispasr-diff rvc <model> <ref>
-// <any.wav>`). dec is not implemented yet, so rvc_svc_convert() is still a stub. Nothing is wired
-// into the CLI, the session C ABI or any binding; do not wire it up until the
-// whole path passes.
+// STATUS: the FULL path passes — enc_p + flow + dec, 47 per-stage comparisons
+// at cos 1.00000000 including output_audio (max_abs 1.5e-08). Run it with
+// `crispasr-diff rvc <model.gguf> <ref.gguf> <any.wav>`.
+//
+// rvc_svc_convert() is still a stub and nothing is wired into the CLI, the
+// session C ABI or any binding — that is the next step, not a validation gap.
 //
 // Per-stage parity diff against tools/rvc_torch_parity.py's reference dump.
 // The reference carries BOTH noise buffers, which the runtime replays, so the
