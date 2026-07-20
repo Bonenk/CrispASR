@@ -981,23 +981,85 @@ silently mis-folding.
   `core/attention.h` (QKV + RoPE), `core/ffn.h`; the per-head gating and the
   `norm_output` RMSNorm need writing by hand.
 
-- [ ] **NOW — active work.** Next is `frontend.linear` (concat 256*4=1024 ->
-  512) then the 6 roformer layers at dim 512 / 16 heads + `transformer_blocks
-  .norm.gamma`. The layers reuse `bt_attention`/`bt_feedforward` unchanged —
-  only dims differ — so the remaining risk is the `b c f t -> b t (c f)`
-  concat order, not the attention. `beat_this_debug_stage` already threads the
-  whole frontend, so add `"linear"` / `"transformer"` / `"out"` stages to the
-  same `bt_stages` map and score against the existing `bt_stages.npz`.
+- [x] **Transformer body + head DONE** — `frontend.linear`, the 6 roformer
+  layers (dim 512, 16 heads), `norm_output` and `SumHead`. The whole network is
+  now at parity:
 
-- [ ] Then: `frontend.linear` (1024->512), 6 roformer layers, SumHead.
-- [ ] Then: 1500-frame windowing (border 6, keep_first) + peak-picking.
+  | stage | cos | rel_max | \|mine\| / \|ref\| |
+  |---|---|---|---|
+  | `linear` | 0.99999999 | 2.1e-4 | 1678.9711 / 1678.8176 |
+  | `transformer` | 0.99999999 | 1.2e-4 | 197.9073 / 197.9059 |
+  | `out_beat` | 0.99999978 | 7.3e-4 | 6.5327 / 6.5318 |
+  | `out_downbeat` | 0.99999996 | 3.9e-4 | 17.8942 / 17.8894 |
+
+  The layers reuse `bt_attention`/`bt_feedforward` verbatim. The only new risk
+  was the concat: `"b c f t -> b t (c f)"` flattens with **frequency fastest**,
+  so in ggml the target is ne = (f, c, t) before the reshape. The opposite order
+  transposes the 1024-vector and yields a plausible, wrong projection.
+
+  Also worth recording: `SumHead` makes `beat` the **SUM** of both logits and
+  `downbeat` the second alone. The two outputs are not independent and it is
+  not a 2-way softmax — upstream's reason is to suppress downbeats that are not
+  beats.
+
+- [x] **Windowing + postprocessing DONE** — `beat_this_logits` and
+  `beat_this_events_from_logits`, reproducing `split_piece` /
+  `aggregate_prediction` / `Postprocessor(type="minimal")`. Scored on a 45 s
+  synthetic 120 BPM click track (2251 frames = **2 chunks**, 725-frame overlap;
+  `tools/gen_beat_this_track_ref.py`, `tools/cmp_beat_this_track.py`):
+
+  | check | result |
+  |---|---|
+  | chunk coverage | 0 frames left at the -1000 sentinel |
+  | beat logits | cos 0.99999993, max_abs 1.07e-2 |
+  | downbeat logits | cos 0.99999997, max_abs 9.34e-3 |
+  | postproc on the reference's OWN logits | 91 beats / 25 downbeats, **max_dt 0.000000 s** |
+  | end to end | 91 / 25, max_dt 0.000000 s, tempo 120.00 BPM |
+
+  Feeding the reference's own logits through our peak-picker is what makes the
+  postprocessing independently falsifiable — otherwise a peak-pick bug and a
+  numerical difference are the same symptom.
+
+  **Traps found by reading `inference.py` / `postprocessor.py` rather than the
+  paraphrase:**
+
+  1. **`deduplicate_peaks` AVERAGES a run, it does not keep the first.** The
+     resulting frame index is FRACTIONAL (`p += (p2-p)/c`, a running mean), and
+     the grouping test compares the next peak against that **running mean**,
+     not against the previous peak. "Keep first" would bias every straddled
+     beat 10–20 ms early.
+  2. **The peak test is `!= max_pool1d`, not `> neighbours`.** A plateau of
+     equal logits keeps EVERY frame in the plateau, and dedup is what collapses
+     it. A strict local maximum silently drops beats landing between frames.
+  3. **Downbeat snapping happens in SECONDS, after dedup**, then `np.unique`
+     removes downbeats that collapsed onto the same beat.
+  4. **The -1000 initialiser is a coverage assertion.** It is a logit, so it can
+     never win a peak-pick — meaning a chunking gap is invisible at the event
+     level. `cmp_beat_this_track.py` therefore counts surviving -1000 frames.
+  5. `split_piece`'s `avoid_short_end` makes the LAST chunk overlap the previous
+     one by more than 2*border. Chunk starts here are `[-6, 757]`, not evenly
+     spaced — an evenly-spaced assumption still covers the piece and still
+     drifts.
+
+  **Negative control (run, then reverted):** flipping the aggregation to
+  `keep_last` leaves the beat **count unchanged at 91** and the tempo still
+  reading exactly 120.00 BPM, while logits fall to cos 0.9954 and a beat moves
+  a full frame (0.02 s). Count and tempo are therefore *not* adequate gates for
+  a seam bug — only per-event times and the logits are.
 - [ ] Front end: 22050 Hz mono, **arithmetic-mean downmix**, STFT n_fft 1024 /
   hop 441 / periodic Hann / `normalized='frame_length'`, project onto the baked
   filterbank, `log1p(1000*x)`. 50 fps.
 - [ ] Windowing: 1500-frame chunks, `borderSize` 6, `keep_first` overlap. Must
   reproduce `split_piece` / `aggregate_prediction` or results drift at seams.
-- [ ] Postprocess: peak-pick maxima within ±3 frames (kernel 7), threshold 0,
-  dedupe ≤1 frame, frames→seconds at 50 fps, snap each downbeat to its nearest
-  beat. **No DBN** — that is the point of the model and the patent constraint.
-- [ ] Parity harness vs the torch reference, then a `--beats` CLI surface + C ABI
-  + Dart binding mirroring `pitch()`.
+- [x] Postprocess — done and exact; see the windowing entry above for the
+  ways the ±3/threshold-0/dedupe description understates the real algorithm.
+  **No DBN** — that is the point of the model and the patent constraint.
+- [x] Parity harness vs the torch reference — `test-beat-this-stages` (19
+  network stages) and `test-beat-this-track` (windowing + postprocessing).
+
+- [ ] **NOW — active work.** The runtime is complete and at parity; what remains
+  is surfaces only, no more numerics. In order: a `--beats` CLI surface, the
+  session C ABI, and the Dart binding mirroring `pitch()`. Per
+  [[multi-surface-dispatch-trap]] all three must land together and be checked
+  with `test-surface-parity.sh`, and `beat_this_track()` no longer returns -1
+  so nothing gates on that sentinel any more.

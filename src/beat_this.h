@@ -38,6 +38,15 @@ struct beat_this_context;
 #define BEAT_THIS_HOP 441
 #define BEAT_THIS_MEL_BINS 128
 #define BEAT_THIS_FPS 50
+#define BEAT_THIS_DIM 512
+#define BEAT_THIS_N_LAYERS 6
+
+// Windowing, from upstream Spect2Frames.spect2frames. `border` frames are
+// discarded from each end of every chunk's prediction because the model was
+// never trained on its input edges (the training loss max-pools them away), so
+// consecutive chunks overlap by 2*border to cover the discarded region.
+#define BEAT_THIS_CHUNK_FRAMES 1500
+#define BEAT_THIS_BORDER_FRAMES 6
 
 // One detected event. `is_downbeat` marks a beat that also starts a bar; every
 // downbeat is also reported as a beat, matching the reference's convention of
@@ -91,6 +100,26 @@ int beat_this_debug_stem(struct beat_this_context* ctx, const float* logmel, int
 // exactly on the reference's layout with no transpose.
 int beat_this_debug_stage(struct beat_this_context* ctx, const float* logmel, int T, const char* stage, float* out,
                           int max_out, int64_t* ne_out);
+
+// Framewise beat/downbeat LOGITS for a whole piece, with upstream's 1500-frame
+// chunking (border 6, keep_first overlap) applied. `beat` and `downbeat` must
+// each hold T floats. Returns T, or 0 on error.
+//
+// Exposed separately from beat_this_track() so the windowing can be tested
+// against the reference independently of the peak-picking: a seam bug and a
+// threshold bug both show up as "wrong beats" at the event level.
+int beat_this_logits(struct beat_this_context* ctx, const float* logmel, int T, float* beat, float* downbeat);
+
+// Peak-pick framewise logits into events. Needs no model, so postprocessing can
+// be scored against the reference's OWN logits — which is the only way to tell
+// a peak-picking bug apart from an upstream numerical difference.
+//
+// Reproduces upstream Postprocessor(type="minimal"): maxima over a +/-3 frame
+// window, logit > 0, runs of peaks <=1 frame apart collapsed to their MEAN
+// frame index (fractional, deliberately), /50 for seconds, then each downbeat
+// snapped to its nearest beat. NO DBN — see the header note above.
+int beat_this_events_from_logits(const float* beat, const float* downbeat, int T, struct beat_this_event* out,
+                                 int max_events);
 
 // Full pipeline: audio -> events. Returns the event count, or 0/-1 on error.
 int beat_this_track(struct beat_this_context* ctx, const float* pcm_22k, int n_samples, struct beat_this_event* out,

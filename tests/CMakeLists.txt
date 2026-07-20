@@ -2792,6 +2792,13 @@ add_executable(test-beat-this-stages test_beat_this_stages.cpp)
 target_include_directories(test-beat-this-stages PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(test-beat-this-stages PRIVATE beat-this crispasr-core ggml ggml-base ggml-cpu)
 
+# ─── test-beat-this-track — windowing + postprocessing vs the reference ──────
+# Needs a model + the long fixture from tools/gen_beat_this_track_ref.py; the
+# 101-frame front-end fixture is a single chunk and exercises no seams.
+add_executable(test-beat-this-track test_beat_this_track.cpp)
+target_include_directories(test-beat-this-track PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-beat-this-track PRIVATE beat-this crispasr-core ggml ggml-base ggml-cpu)
+
 # ─── test-beat-this-frontend — log-mel vs torchaudio ──────────────────────────
 # Needs a model + fixtures, so not a ctest case; it is the acceptance gate for
 # the front end. Generate fixtures with tools/gen_beat_this_frontend_ref.py.
