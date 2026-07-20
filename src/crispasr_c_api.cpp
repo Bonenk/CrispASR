@@ -1828,6 +1828,9 @@ struct crispasr_session {
 #ifdef CA_HAVE_MIOTTS
     miotts_context* miotts_ctx = nullptr;
 #endif
+#ifdef CA_HAVE_PIANO_TRANSCRIPTION
+    piano_transcription_ctx* piano_ctx = nullptr;
+#endif
 #ifdef CA_HAVE_MOSS_TTS
     moss_tts_context* moss_tts_ctx = nullptr;
 #endif
@@ -2674,6 +2677,20 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.temperature = 0.8f;
         s->miotts_ctx = miotts_init_from_file(model_path, p);
         if (!s->miotts_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_PIANO_TRANSCRIPTION
+    if (s->backend == "piano-transcription" || s->backend == "piano_transcription") {
+        piano_transcription_params p = piano_transcription_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = s->use_gpu;
+        s->piano_ctx = piano_transcription_init_from_file(model_path, p);
+        if (!s->piano_ctx) {
             delete s;
             return nullptr;
         }
@@ -8726,6 +8743,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_MIOTTS
     if (s->miotts_ctx)
         miotts_free(s->miotts_ctx);
+#endif
+#ifdef CA_HAVE_PIANO_TRANSCRIPTION
+    if (s->piano_ctx)
+        piano_transcription_free(s->piano_ctx);
 #endif
 #ifdef CA_HAVE_MOSS_TTS
     if (s->moss_tts_ctx)
