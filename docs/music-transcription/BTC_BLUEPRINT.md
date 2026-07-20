@@ -53,6 +53,34 @@ for, so the front end is already done.
 Ordering is pre-norm: LayerNorm -> attention -> dropout -> residual ->
 LayerNorm -> FFN -> dropout -> residual.
 
+## Three MORE details that only the CHECKPOINT reveals
+
+The architecture docs do not mention any of these. Inspecting
+`test/btc_model.pt` directly was necessary:
+
+6. **Scalar input normalisation ships WITH the checkpoint.** The `.pt` has
+   top-level `mean = -2.2279364` and `std = 1.7191066` alongside `model`. The
+   log-CQT features are normalised `(x - mean) / std` before the embedding
+   projection. Nothing in the README or config says so.
+
+7. **The output layer contains a BIDIRECTIONAL LSTM.** The docs call it merely
+   a "SoftmaxOutputLayer classifying over num_chords classes", but the tensors
+   are `output_layer.lstm.weight_ih_l0 (256,128)`, `weight_hh_l0 (256,64)` plus
+   `_reverse` twins, then `output_layer.output_projection (25|170, 128)`. So
+   hidden is 64 per direction (256 = 4 gates x 64), concatenated to 128 before
+   the classifier. `core/lstm.h` already has bidirectional LSTM.
+
+8. **Attention linears are bias-free** — q/k/v/output each have `.weight` only.
+
+### Actual end-to-end shape
+
+    CQT(144) -> (x - mean)/std -> embedding_proj(144->128) -> + posenc
+      -> 8 x [ fwd attn block || bwd attn block -> concat(256) -> linear(256->128) ]
+      -> biLSTM(128 -> 64x2) -> output_projection(128 -> 25 or 170)
+
+221 tensors: 8 layers x 26, plus embedding_proj, the 8 LSTM tensors and the
+2 projection tensors.
+
 ## Licence
 
 Code MIT; the shipped `test/btc_model{,_large_voca}.pt` checkpoints were trained
