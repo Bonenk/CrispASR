@@ -256,10 +256,21 @@ speaker id + replayed noise alone. Live test: 4 cases / 12825 assertions.
 Deliberately NO CLI verb — the input is ContentVec features, which we do not
 produce. `docs/bindings.md` documents the session surface.
 
+ARTIFACTS: stored in the **PRIVATE** repo `cstr/rvc-svc-GGUF` (verified
+`private: True` server-side before upload) — `rvc-40k-f32.gguf` (105 MB) plus
+`rvc-ref.gguf` (23 MB), the 60-stage parity reference. That reference is the
+valuable half: `crispasr-diff rvc <model> <ref> <wav>` re-runs all 48
+comparisons with **no torch, no checkpoint and no RVC repo**.
+
 REMAINING (packaging, not correctness):
-- Registry entries. BLOCKED on a licence-scoped checkpoint: the parity work used
-  the pretrained base (`lj1995/VoiceConversionWebUI pretrained_v2/f0G40k.pth`)
-  converted with `--license other`, which should not ship as-is.
+- Registry entries. BLOCKED, and deliberately so on two counts: the checkpoint's
+  licence is unscoped (converted `--license other`), AND the repo is private, so
+  a registry URL would fail auto-download for anyone without auth. Scoping the
+  base checkpoint's terms and re-stamping the tag comes first.
+- F32 ONLY. An f16 GGUF converts but the graph is F32-only today (ggml_scale is
+  F32-only; an F16 operand reaching ggml_add trips
+  `GGML_ASSERT(src1->type == GGML_TYPE_F32)`). It REFUSES rather than producing
+  subtly wrong audio, and is noted as such in the header.
 - Dart/Flutter wrapper for `crispasr_session_convert*` (CometBeat is the
   consumer; the C ABI they need is done).
 - Two agreed parameters were CORRECTED rather than implemented — `protect` is
@@ -326,16 +337,70 @@ registry entry, exactly as the music-transcription scoping pass did.
 
 **What:** port Beatrice v2; its low-latency design suits the native path.
 
-**Licence:** custom/NON-COMMERCIAL → registry entry + acceptance gate, the same
-mechanism BTC uses (`--accept-license`, `license_requires_acceptance_tag` in
-`src/crispasr_model_registry.cpp`). Read the actual Beatrice terms and add its
-SPDX-ish tag rather than reusing `cc-by-nc-sa-4.0` if they differ — the gate
-matches on the tag, so a wrong tag silently grants or withholds the wrong thing.
+**Licence: MIT — this entry previously said "custom/NON-COMMERCIAL" and that was
+wrong.** `fierce-cats/beatrice-trainer` ships `LICENSE` = MIT (Copyright (c) 2024
+Project Beatrice), and its README states in terms that *"このリポジトリ内の
+ソースコードおよび**学習済みモデル**は MIT License のもとで公開されています"* —
+the source **and the trained models**. So **no acceptance gate is needed**; a
+`cc-by-nc-sa-4.0`-style tag here would have withheld permission the licence
+actually grants.
 
-**Effort:** both are unestimated until the blueprints are read. Follow the
-usual order: read the Python reference line-by-line, write the numpy/torch
-executable spec, then the ggml graph, then the per-stage diff harness. Do NOT
-start either port before §CB1's record shapes are agreed.
+Two real non-MIT signals exist but neither applies to this port: `beatrice.lib`
+(the closed inference engine used by the VST "under permission") is irrelevant
+because we port from the MIT source, not that binary; and the "Beatrice JVS
+Corpus Edition" carve-out is a *different distribution*, not this repo.
+
+**Feasibility: CONFIRMED — architecture and weights are both published.** An
+earlier WebFetch summary of this same repo claimed it held "training scripts
+only, not inference code or the model architecture". That summary was false;
+`beatrice_trainer/__main__.py` is 4519 lines and defines the entire path
+(`PhoneExtractor`, `PitchEstimator`, `VectorQuantizer`, `ConverterNetwork`,
+`Vocoder`). Another instance of [[blueprint-summary-is-not-the-source]] — the
+file listing settled in one call what the summary got backwards.
+
+Weights (`assets/pretrained/`), all MIT, are **split per component** — the
+obvious "load the checkpoint" assumption fails:
+
+| file | contents |
+|---|---|
+| `122_checkpoint_03000000.pt` (14.7 MB) | `phone_extractor` **only** |
+| `104_3_checkpoint_00300000.pt` (7.1 MB) | `pitch_estimator` **only** |
+| `151_checkpoint_libritts_r_200_02750000.pt.gz` (153 MB) | `net_g` (177 tensors, the multi-speaker LibriTTS-R base) + `net_d` (discriminator, training-only → skip) |
+
+**Scope is larger than §CB1, and the wire contract is different.**
+`ConverterNetwork.forward` takes **raw waveform** (`x: [batch, 1, wav_length]`,
+plus `target_speaker_id`, `formant_shift_semitone`, optional
+`pitch_shift_semitone`) and returns 24 kHz audio. Beatrice therefore owns phone
+extraction and pitch estimation itself — unlike RVC, it needs **no ContentVec
+from the caller**, which simplifies CometBeat's side but means porting three
+networks rather than one.
+
+Non-obvious details to verify while reading (each a silent bug if assumed):
+
+* `CausalConv1d` / `WSConv1d` — **weight-standardised** causal convs, not
+  standard `nn.Conv1d`. The standardisation is part of the forward pass.
+* `VectorQuantizer` is injected into `phone_extractor.head` via a **forward
+  hook** (`enable_hook`). This session already lost time twice to hooks that
+  silently never fire; the numpy spec must confirm the hook is active by
+  asserting the quantised path *changes* the output, not by trusting it ran.
+* `embed_quantized_pitch` is a **fixed sinusoidal** table (built in `__init__`,
+  `requires_grad_(False)`) — it may or may not be present in the checkpoint, so
+  the converter must rebuild it rather than assume it was saved.
+* `key_value_speaker_embedding` is initialised with every speaker row **copied
+  from row 0**, so speakers look identical until trained — an untrained-looking
+  A/B is not necessarily a port bug.
+* `self.melspectrograms` is **loss-only**; it is not on the inference path.
+* Output rate is hardcoded 24000 with `hop_length = 24000/100` — the same 100 Hz
+  frame rate §CB1 uses, so the record shapes carry over.
+
+**Next step:** HARD RULE #1 on `beatrice_trainer/__main__.py`, then the numpy
+spec, the ggml graph, and the per-stage diff harness — in that order, and per
+component (pitch_estimator first: it is smallest and fully frozen). Reuse §CB1's
+noise-injection discipline if any RNG site turns up.
+
+**Effort:** unestimated until the blueprint read is done, but larger than §CB1
+(three networks, custom conv variants). Do NOT start before §CB1's record shapes
+are agreed.
 
 ## Gemma-4 12B (gemma4_unified) ASR support (OPEN)
 
