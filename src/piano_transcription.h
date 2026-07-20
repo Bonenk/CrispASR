@@ -87,6 +87,14 @@ int piano_transcription_transcribe(struct piano_transcription_ctx* ctx, const fl
 // Free a result's internal allocations.
 void piano_transcription_result_free(struct piano_transcription_result* result);
 
+// Per-stage parity diff against tools/reference_backends/piano_transcription.py.
+// The reference dump carries no input_audio, so the caller passes the SAME
+// 16 kHz mono PCM the reference ran on; mel_spectrogram is compared first so a
+// front-end difference cannot masquerade as a model failure.
+// Returns 0 when every stage passes, 1 on a parity failure, 2 on a load error.
+int piano_transcription_diff(const char* model_gguf, const char* ref_gguf, const float* pcm_16k, int n_samples,
+                             int verbosity);
+
 // Return expected sample rate (always 16000).
 uint32_t piano_transcription_sample_rate(const struct piano_transcription_ctx* ctx);
 
