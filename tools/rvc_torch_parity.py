@@ -179,6 +179,20 @@ def main():
         net.enc_p.encoder.ffn_layers[_l].register_forward_hook(_hook(f"encp_L{_l}_ffn"))
         net.enc_p.encoder.norm_layers_2[_l].register_forward_hook(_hook(f"encp_L{_l}_norm2"))
     net.enc_p.proj.register_forward_hook(_hook("encp_proj"))
+    # flow: register_forward_hook does NOT fire here. ResidualCouplingBlock's
+    # reverse pass calls `flow.forward(...)` DIRECTLY (models.py:125), and
+    # calling .forward() bypasses nn.Module.__call__, which is what dispatches
+    # hooks. Wrap the bound method instead.
+    def _wrap_flow(mod, name):
+        orig = mod.forward
+        def wrapped(*a, **k):
+            out = orig(*a, **k)
+            o_ = out[0] if isinstance(out, tuple) else out
+            caps[name] = o_.detach().numpy()
+            return out
+        mod.forward = wrapped
+    for _fi in range(0, 8, 2):
+        _wrap_flow(net.flow.flows[_fi], f"flow_c{_fi // 2}")
 
     net.dec.m_source.register_forward_hook(_hook("har_source"))
     net.dec.m_source.l_sin_gen.register_forward_hook(_hook("sine_raw"))
@@ -289,6 +303,9 @@ def main():
         # every captured enc_p sublayer, squeezed of the batch dim
         for _k, _v in ENCP_TAPS.items():
             stages[_k] = _v
+        for _k, _v in caps.items():
+            if _k.startswith("flow_"):
+                stages[_k] = _v[0] if _v.ndim >= 2 and _v.shape[0] == 1 else _v
         for _k, _v in caps.items():
             if _k.startswith("encp_"):
                 stages[_k] = _v[0] if _v.ndim >= 2 and _v.shape[0] == 1 else _v

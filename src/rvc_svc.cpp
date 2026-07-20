@@ -73,6 +73,7 @@ struct rvc_svc_context {
     // just endpoints — endpoints alone cannot localise anything).
     bool capture = false;
     std::map<std::string, ggml_tensor*> caps;
+    ggml_tensor* rev_idx_tensor = nullptr; // channel-reversal indices for Flip
 };
 
 namespace {
@@ -437,6 +438,129 @@ ggml_tensor* rvc_enc_p_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* c
 } // namespace
 
 // ---------------------------------------------------------------------------
+// flow — ResidualCouplingBlock, REVERSE pass
+//
+// Traps (RVC_BLUEPRINT.md 2c):
+//   * mean_only=True, so `logs` is ZERO and the coupling is purely ADDITIVE:
+//     the reverse is x1 = x1 - m, NOT (x1 - m) * exp(-logs).
+//   * flows interleaves [Coupling, Flip] x 4 and the reverse walks it
+//     backwards, so Flip comes FIRST.
+//   * Flip reverses the CHANNEL axis.
+//   * The WaveNet is gated: tanh(first half) * sigmoid(second half) of
+//     (x_in + g_l), with the speaker conditioning projected once then sliced
+//     per layer.
+//   * kernel 5 / dilation rate 1 / 3 layers are hardcoded at models.py:624.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Reverse the CHANNEL axis. ggml has no flip, and a negative-stride view is not
+// expressible, so transpose -> get_rows(reversed index) -> transpose back.
+ggml_tensor* rvc_flip_channels(ggml_context* g, ggml_tensor* x, ggml_tensor* rev_idx) {
+    ggml_tensor* xt = ggml_cont(g, ggml_transpose(g, x)); // [T, C]
+    ggml_tensor* f = ggml_get_rows(g, xt, rev_idx);       // [T, C] channels reversed
+    return ggml_cont(g, ggml_transpose(g, f));            // [C, T]
+}
+
+ggml_tensor* rvc_wn(ggml_context* g, rvc_svc_context* c, const std::string& pre, ggml_tensor* x, ggml_tensor* gcond,
+                    int hidden, int n_layers, int kernel, int dil_rate) {
+    auto W = [&](const std::string& n) -> ggml_tensor* {
+        auto it = c->t.find(n);
+        return it == c->t.end() ? nullptr : it->second;
+    };
+    ggml_tensor* output = nullptr;
+    for (int i = 0; i < n_layers; i++) {
+        const int d = (int)std::pow((double)dil_rate, (double)i);
+        const int pad = (kernel * d - d) / 2;
+        ggml_tensor* w = W(pre + "in_layers." + std::to_string(i) + ".weight");
+        // conv_1d wants [length, channels]; our layout is [channels, time].
+        ggml_tensor* xin = ggml_conv_1d(g, w, ggml_cont(g, ggml_transpose(g, x)), 1, pad, d);
+        xin = ggml_add(g, ggml_cont(g, ggml_transpose(g, xin)),
+                       W(pre + "in_layers." + std::to_string(i) + ".bias")); // [2*hidden, T]
+
+        // speaker conditioning: one projection, sliced per layer
+        ggml_tensor* gl = ggml_cont(g, ggml_view_1d(g, gcond, 2 * hidden, (size_t)i * 2 * hidden * gcond->nb[0]));
+        xin = ggml_add(g, xin, gl);
+
+        const int64_t T = xin->ne[1];
+        ggml_tensor* ta = ggml_cont(g, ggml_view_2d(g, xin, hidden, T, xin->nb[1], 0));
+        ggml_tensor* sa = ggml_cont(g, ggml_view_2d(g, xin, hidden, T, xin->nb[1], (size_t)hidden * xin->nb[0]));
+        ggml_tensor* acts = ggml_mul(g, ggml_tanh(g, ta), ggml_sigmoid(g, sa)); // gated
+
+        ggml_tensor* rw = W(pre + "res_skip_layers." + std::to_string(i) + ".weight");
+        ggml_tensor* rs = ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, rw), acts),
+                                   W(pre + "res_skip_layers." + std::to_string(i) + ".bias"));
+        if (i < n_layers - 1) {
+            ggml_tensor* res = ggml_cont(g, ggml_view_2d(g, rs, hidden, T, rs->nb[1], 0));
+            ggml_tensor* skp = ggml_cont(g, ggml_view_2d(g, rs, hidden, T, rs->nb[1], (size_t)hidden * rs->nb[0]));
+            x = ggml_add(g, x, res);
+            output = output ? ggml_add(g, output, skp) : skp;
+        } else {
+            output = output ? ggml_add(g, output, rs) : rs;
+        }
+    }
+    return output;
+}
+
+ggml_tensor* rvc_flow_graph_conds(ggml_context* g, rvc_svc_context* c, ggml_tensor* z_p,
+                                  const std::vector<ggml_tensor*>& conds, ggml_tensor* rev_idx, int T) {
+    const rvc_hparams& hp = c->hp;
+    auto W = [&](const std::string& n) -> ggml_tensor* {
+        auto it = c->t.find(n);
+        return it == c->t.end() ? nullptr : it->second;
+    };
+    ggml_tensor* x = z_p;
+    const int half = hp.inter / 2;
+    for (int idx = hp.flow_n_flows - 1; idx >= 0; idx--) {
+        x = rvc_flip_channels(g, x, rev_idx); // Flip comes FIRST in reverse
+        const std::string p = "flow.flows." + std::to_string(idx * 2) + ".";
+        ggml_tensor* x0 = ggml_cont(g, ggml_view_2d(g, x, half, T, x->nb[1], 0));
+        ggml_tensor* x1 = ggml_cont(g, ggml_view_2d(g, x, half, T, x->nb[1], (size_t)half * x->nb[0]));
+        ggml_tensor* h =
+            ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W(p + "pre.weight")), x0), W(p + "pre.bias"));
+        h = rvc_wn(g, c, p + "enc.", h, conds[idx], hp.hidden, hp.flow_n_layers, hp.flow_kernel, hp.flow_dilation_rate);
+        ggml_tensor* m =
+            ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W(p + "post.weight")), h), W(p + "post.bias"));
+        x1 = ggml_sub(g, x1, m); // mean_only => no exp(-logs)
+        x = ggml_concat(g, x0, x1, 0);
+        if (c->capture) {
+            ggml_tensor* cap = ggml_cont(g, ggml_transpose(g, x));
+            ggml_set_output(cap);
+            c->caps["flow_c" + std::to_string(idx)] = cap;
+        }
+    }
+    return x;
+}
+
+ggml_tensor* rvc_flow_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* z_p, ggml_tensor* gcond,
+                            ggml_tensor* rev_idx, int T) {
+    const rvc_hparams& hp = c->hp;
+    auto W = [&](const std::string& n) -> ggml_tensor* {
+        auto it = c->t.find(n);
+        return it == c->t.end() ? nullptr : it->second;
+    };
+    ggml_tensor* x = z_p;
+    const int half = hp.inter / 2;
+    for (int idx = hp.flow_n_flows - 1; idx >= 0; idx--) {
+        x = rvc_flip_channels(g, x, rev_idx); // Flip comes FIRST in reverse
+        const std::string p = "flow.flows." + std::to_string(idx * 2) + ".";
+        ggml_tensor* x0 = ggml_cont(g, ggml_view_2d(g, x, half, T, x->nb[1], 0));
+        ggml_tensor* x1 = ggml_cont(g, ggml_view_2d(g, x, half, T, x->nb[1], (size_t)half * x->nb[0]));
+
+        ggml_tensor* h =
+            ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W(p + "pre.weight")), x0), W(p + "pre.bias"));
+        h = rvc_wn(g, c, p + "enc.", h, gcond, hp.hidden, hp.flow_n_layers, hp.flow_kernel, hp.flow_dilation_rate);
+        ggml_tensor* m =
+            ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W(p + "post.weight")), h), W(p + "post.bias"));
+        x1 = ggml_sub(g, x1, m); // mean_only => no exp(-logs)
+        x = ggml_concat(g, x0, x1, 0);
+    }
+    return x;
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------------
 // Per-stage diff. Input-aligned: the reference carries input_phone/input_pitch
 // AND both noise buffers, which we replay, so the comparison is deterministic
 // even though the model is stochastic.
@@ -510,6 +634,37 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
     ggml_set_input(pitch);
     c->capture = true;
     ggml_tensor* stats = rvc_enc_p_graph(g, c, content, pitch, T);
+
+    // flow is INPUT-ALIGNED on the reference's z_p: it is drawn with the
+    // model's own noise, so recomputing it here would diverge by construction.
+    std::vector<float> ref_zp;
+    ggml_tensor* z_out = nullptr;
+    ggml_tensor* zp_in = nullptr;
+    if (rvc_ref_get(rw, "z_p", ref_zp)) {
+        // The reference z_p is (inter, T) row-major -> TIME fastest, whereas
+        // our working layout is [inter, T] with CHANNELS fastest. Declare the
+        // input in the reference's order and transpose in-graph, rather than
+        // uploading a transposed buffer and getting cos ~0 on a correct graph
+        // (the same trap that made enc_p look broken).
+        zp_in = ggml_new_tensor_2d(g, GGML_TYPE_F32, T, hp.inter); // [T, inter]
+        ggml_set_input(zp_in);
+        ggml_tensor* zp_ct = ggml_cont(g, ggml_transpose(g, zp_in)); // [inter, T]
+        // speaker embedding -> cond projection, done once and sliced per layer
+        ggml_tensor* gemb = ggml_cont(g, ggml_view_1d(g, c->t["emb_g.weight"], hp.gin, 0)); // sid 0
+        ggml_tensor* rev = ggml_new_tensor_1d(g, GGML_TYPE_I32, hp.inter);
+        ggml_set_input(rev);
+        c->rev_idx_tensor = rev;
+        // one cond_layer per coupling block; project inside rvc_wn's caller
+        std::vector<ggml_tensor*> conds;
+        for (int i = 0; i < hp.flow_n_flows; i++) {
+            const std::string cp = "flow.flows." + std::to_string(i * 2) + ".enc.cond_layer.weight";
+            ggml_tensor* cw = rvc_conv1x1_as_linear(g, c->t[cp]);
+            ggml_tensor* cb = c->t["flow.flows." + std::to_string(i * 2) + ".enc.cond_layer.bias"];
+            conds.push_back(ggml_add(g, ggml_mul_mat(g, cw, gemb), cb));
+        }
+        z_out = rvc_flow_graph_conds(g, c, zp_ct, conds, rev, T);
+        ggml_set_output(z_out);
+    }
     if (!stats) {
         ggml_free(g);
         core_gguf::free_weights(rw);
@@ -541,6 +696,13 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
     for (int i = 0; i < T; i++)
         pi[(size_t)i] = (int32_t)std::lround(in_pitch[(size_t)i]);
     ggml_backend_tensor_set(pitch, pi.data(), 0, pi.size() * sizeof(int32_t));
+    if (zp_in) {
+        ggml_backend_tensor_set(zp_in, ref_zp.data(), 0, ref_zp.size() * sizeof(float));
+        std::vector<int32_t> rev((size_t)hp.inter);
+        for (int i = 0; i < hp.inter; i++)
+            rev[(size_t)i] = hp.inter - 1 - i;
+        ggml_backend_tensor_set(c->rev_idx_tensor, rev.data(), 0, rev.size() * sizeof(int32_t));
+    }
     ggml_backend_graph_compute(c->backend, gf);
 
     std::vector<float> out((size_t)ggml_nelements(stats));
@@ -581,6 +743,8 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
             order.push_back(L + "_ffn");
             order.push_back(L + "_norm2");
         }
+        for (int i = hp.flow_n_flows - 1; i >= 0; i--)
+            order.push_back("flow_c" + std::to_string(i));
         bool first = true;
         for (const auto& nm : order) {
             auto it = c->caps.find(nm);
@@ -610,7 +774,7 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
     if (rvc_ref_get(rw, "logs_p", ref_logs))
         report("logs_p", out.data() + (size_t)hp.inter * T, ref_logs);
 
-    fprintf(stderr, "  NOTE: flow and dec graphs are not implemented yet — enc_p only.\n");
+    fprintf(stderr, "  NOTE: dec (NSF vocoder) graph is not implemented yet — enc_p + flow only.\n");
 
     ggml_gallocr_free(alloc);
     ggml_free(g);
