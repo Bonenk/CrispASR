@@ -308,6 +308,10 @@
 #include "btc_chords.h"
 #define CA_HAVE_BTC_CHORDS 1
 #endif
+#if __has_include("beat_this.h")
+#include "beat_this.h"
+#define CA_HAVE_BEAT_THIS 1
+#endif
 #if __has_include("crepe.h")
 #include "crepe.h"
 #define CA_HAVE_CREPE 1
@@ -1484,6 +1488,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "mel-band-roformer";
     else if (strcmp(arch, "btc") == 0)
         backend = "btc-chords";
+    else if (strcmp(arch, "beat-this") == 0)
+        backend = "beat-this";
 
     std::strncpy(out_name, backend, out_cap - 1);
     out_name[out_cap - 1] = '\0';
@@ -1883,6 +1889,13 @@ struct crispasr_session {
     // read through a float view misreads the int lane.
     std::vector<float> btc_last_spans;
     std::vector<std::string> btc_last_names;
+#endif
+#ifdef CA_HAVE_BEAT_THIS
+    beat_this_context* beat_ctx = nullptr;
+    // Flat {time_s, is_downbeat} per beat, for the same reason btc_last_spans
+    // is flat: a mixed int/float struct read through a float view misreads the
+    // int lane. is_downbeat is therefore 0.0f or 1.0f, not an int.
+    std::vector<float> beat_last_events;
 #endif
 #ifdef CA_HAVE_CREPE
     crepe_context* crepe_ctx = nullptr;
@@ -2826,6 +2839,16 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         p.n_threads = s->n_threads;
         s->btc_ctx = btc_chords_init_from_file(model_path, p);
         if (!s->btc_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_BEAT_THIS
+    if (s->backend == "beat-this" || s->backend == "beatthis" || s->backend == "beats") {
+        s->beat_ctx = beat_this_init(model_path, s->n_threads);
+        if (!s->beat_ctx) {
             delete s;
             return nullptr;
         }
@@ -3949,6 +3972,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_CREPE
     list += ",crepe";
+#endif
+#ifdef CA_HAVE_BEAT_THIS
+    list += ",beat-this";
 #endif
 #ifdef CA_HAVE_BTC_CHORDS
     list += ",btc-chords";
@@ -8921,6 +8947,81 @@ CA_EXPORT int crispasr_session_chords_vocab_size(crispasr_session* s) {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// beats: audio in, a beat/downbeat grid out. Flat float view like chords, but
+// with no name table — a beat has no label, only a time and a downbeat flag.
+// ---------------------------------------------------------------------------
+
+CA_EXPORT int crispasr_session_beats(crispasr_session* s, const float* pcm, int n_samples, int sample_rate) {
+    if (!s || !pcm || n_samples <= 0 || sample_rate <= 0)
+        return -1;
+#ifdef CA_HAVE_BEAT_THIS
+    if (s->beat_ctx) {
+        if (sample_rate != beat_this_sample_rate(s->beat_ctx))
+            return -1; // caller resamples; the CLI path uses read_audio_data for this
+        s->beat_last_events.clear();
+        // One event per frame is the peak-picker's hard ceiling, so this can
+        // never truncate a real result.
+        const int max_events = beat_this_n_frames(n_samples);
+        std::vector<beat_this_event> ev((size_t)(max_events > 0 ? max_events : 1));
+        const int n = beat_this_track(s->beat_ctx, pcm, n_samples, ev.data(), (int)ev.size());
+        if (n < 0)
+            return -1;
+        s->beat_last_events.reserve((size_t)n * 2);
+        for (int i = 0; i < n; i++) {
+            s->beat_last_events.push_back(ev[(size_t)i].time_s);
+            s->beat_last_events.push_back(ev[(size_t)i].is_downbeat ? 1.0f : 0.0f);
+        }
+        return n;
+    }
+#endif
+    (void)sample_rate;
+    return -1;
+}
+
+CA_EXPORT int crispasr_session_beats_n_events(crispasr_session* s) {
+    if (!s)
+        return 0;
+#ifdef CA_HAVE_BEAT_THIS
+    return (int)(s->beat_last_events.size() / 2);
+#else
+    return 0;
+#endif
+}
+
+CA_EXPORT const float* crispasr_session_beats_events(crispasr_session* s, int* out_n_events) {
+    if (out_n_events)
+        *out_n_events = 0;
+    if (!s)
+        return nullptr;
+#ifdef CA_HAVE_BEAT_THIS
+    if (!s->beat_last_events.empty()) {
+        if (out_n_events)
+            *out_n_events = (int)(s->beat_last_events.size() / 2);
+        return s->beat_last_events.data();
+    }
+#endif
+    return nullptr;
+}
+
+CA_EXPORT float crispasr_session_beats_tempo_bpm(crispasr_session* s) {
+    if (!s)
+        return 0.0f;
+#ifdef CA_HAVE_BEAT_THIS
+    const int n = (int)(s->beat_last_events.size() / 2);
+    if (n < 2)
+        return 0.0f;
+    std::vector<beat_this_event> ev((size_t)n);
+    for (int i = 0; i < n; i++) {
+        ev[(size_t)i].time_s = s->beat_last_events[(size_t)i * 2];
+        ev[(size_t)i].is_downbeat = s->beat_last_events[(size_t)i * 2 + 1] != 0.0f;
+    }
+    return beat_this_tempo_bpm(ev.data(), n);
+#else
+    return 0.0f;
+#endif
+}
+
 CA_EXPORT int crispasr_session_piano(crispasr_session* s, const float* pcm_16k, int n_samples) {
     if (!s || !pcm_16k || n_samples <= 0)
         return -1;
@@ -9138,6 +9239,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_BTC_CHORDS
     if (s->btc_ctx)
         btc_chords_free(s->btc_ctx);
+#endif
+#ifdef CA_HAVE_BEAT_THIS
+    if (s->beat_ctx)
+        beat_this_free(s->beat_ctx);
 #endif
 #ifdef CA_HAVE_CREPE
     if (s->crepe_ctx)
