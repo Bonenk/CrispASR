@@ -390,6 +390,32 @@ CRISPASR_SESSION_API int crispasr_session_pitch_frame(crispasr_session* s, int i
 CRISPASR_SESSION_API const float* crispasr_session_pitch_frames(crispasr_session* s, int* out_n_frames);
 CRISPASR_SESSION_API int crispasr_session_pitch_sample_rate(crispasr_session* s);
 
+// Chord recognition: mono PCM at any rate (resampled internally to the
+// model's 22050 Hz) -> a chord timeline. Returns the span count (>0) on
+// success, 0 for "ran, found nothing", -1 on error or a backend with no
+// chord arm.
+//
+// NOTE ON WEIGHTS: the shipped BTC weights are CC-BY-NC-SA (trained on
+// Isophonics et al.), so they are NOT licensed for commercial use even though
+// this library is MIT. The registry refuses to download them without an
+// explicit licence acceptance (CLI: --accept-license cc-by-nc-sa-4.0; env:
+// CRISPASR_ACCEPT_LICENSE). A commercial product must ship its own weights.
+CRISPASR_SESSION_API int crispasr_session_chords(crispasr_session* s, const float* pcm, int n_samples, int sample_rate);
+CRISPASR_SESSION_API int crispasr_session_chords_n_spans(crispasr_session* s);
+// Flat, session-owned view of the last result: 4 floats per span, span-major,
+// as {start_ms, end_ms, label, confidence}. Valid until the next
+// crispasr_session_chords call or session close. `label` is an index into the
+// vocabulary and is a float for the same reason piano_notes' midi_note is —
+// a mixed int/float struct misreads through a flat float view. Resolve it to
+// a chord name with crispasr_session_chords_span_name.
+CRISPASR_SESSION_API const float* crispasr_session_chords_spans(crispasr_session* s, int* out_n_spans);
+// Chord name for span `idx`, e.g. "C", "Am", "G:7", or "N" for no-chord.
+// Session-owned; NULL if idx is out of range.
+CRISPASR_SESSION_API const char* crispasr_session_chords_span_name(crispasr_session* s, int idx);
+// 25 (maj/min + N) or 170 (full quality set). The shipped default is 170; set
+// CRISPASR_BTC_MAJ_MIN=1 to collapse the output to maj/min.
+CRISPASR_SESSION_API int crispasr_session_chords_vocab_size(crispasr_session* s);
+
 // Polyphonic piano transcription: mono PCM at the model's native rate
 // (16000 Hz for piano-transcription) -> note events.
 //

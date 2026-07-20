@@ -132,6 +132,15 @@ export CRISPASR_MODEL_SIDON="${CRISPASR_MODEL_SIDON:-$CRISPASR_MODELS_DIR/sidon-
 export CRISPASR_MODEL_CREPE="${CRISPASR_MODEL_CREPE:-$CRISPASR_MODELS_DIR/crepe-tiny-f16.gguf}"
 export CRISPASR_MODEL_CREPE_FULL="${CRISPASR_MODEL_CREPE_FULL:-$CRISPASR_MODELS_DIR/crepe-full-f16.gguf}"
 
+# ── BTC chord recognition (cstr/btc-chords-GGUF) ──
+# NON-COMMERCIAL WEIGHTS. The BTC checkpoints are CC-BY-NC-SA (trained on
+# Isophonics / Robbie Williams / UsPop2002 annotations) even though the
+# upstream code and this library are MIT. Downloading them requires
+# --accept-license cc-by-nc-sa-4.0 (or CRISPASR_ACCEPT_LICENSE).
+# The 170-class model is the default: it collapses to maj/min with
+# CRISPASR_BTC_MAJ_MIN=1, whereas the 25-class one can never be expanded.
+export CRISPASR_MODEL_BTC_CHORDS="${CRISPASR_MODEL_BTC_CHORDS:-$CRISPASR_MODELS_DIR/btc-chords-large-f32.gguf}"
+
 echo "Live test env configured (CRISPASR_MODELS_DIR=$CRISPASR_MODELS_DIR)"
 
 # qwen3-tts live tests

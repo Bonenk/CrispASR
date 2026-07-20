@@ -22,13 +22,30 @@ ggml/GGUF backends.
   `crispasr_backend.cpp`, the session C ABI (`crispasr_session_pitch*` in
   `src/crispasr_c_api.cpp` + `include/crispasr_session.h`), registry entries for
   `cstr/crepe-GGUF` (**tiny is the default**), CMake linkage, README + docs/cli.md.
-- **In flight**: 🚧 **BTC chord recognition** (branch `feat/cqt-and-chords`) —
-  unblocked now that `core/cqt.h` (ba633914e) and the licence-acceptance gate
-  (90d1a0c9e) have both landed. Files: `models/convert-btc-to-gguf.py`,
-  `src/btc_chords.{h,cpp}`, `tools/btc_torch_parity.py`,
-  `tests/test_btc_parity.cpp`. Weights are CC-BY-NC-SA (Isophonics-trained) and
-  ship behind `--accept-license cc-by-nc-sa-4.0`.
-- **Next**: upload `cstr/crepe-GGUF` (the registry URLs point at it but the repo
+- **Done**: ✅ **BTC chord recognition** (branch `feat/cqt-and-chords`), full
+  12-point checklist. `models/convert-btc-to-gguf.py` (213 tensors, both
+  checkpoints), `tools/btc_torch_parity.py` (numpy spec, cos 0.99999995 /
+  1.00000004 vs torch), `src/btc_chords.{h,cpp}`, the `--chords` early
+  dispatcher (`examples/cli/crispasr_chords_cli.{h,cpp}`), arch auto-detect
+  (`btc` → `btc-chords`) in **both** `crispasr_backend.cpp` and
+  `crispasr_detect_backend_from_gguf`, session C ABI
+  (`crispasr_session_chords*`), wasm bindings (`sessionChords`), Go cgo
+  LDFLAGS, registry entries, CMake linkage, README + docs/cli.md,
+  `tests/test_btc_chords_live.cpp` + `CRISPASR_MODEL_BTC_CHORDS`.
+  **`crispasr-diff btc` = 13/13 stages at cos 1.000000**; live session test
+  41 assertions. Weights are CC-BY-NC-SA and ship behind
+  `--accept-license cc-by-nc-sa-4.0`. Defaults to the **170-class** vocabulary
+  (`CRISPASR_BTC_MAJ_MIN=1` collapses to maj/min — the reverse is impossible).
+- **Done**: 🐞 **`core/cqt.h` was missing librosa's `scale=True`** — every bin
+  came out low by `sqrt(N_k)` (152× at bin 0), so BTC read the features as
+  near-silence and emitted `N` for every frame. Fixed by folding `sqrt(N)` into
+  the kernel normalisation; verified against librosa (per-bin ratio median
+  1.0002, magnitude cos 0.999941). **`tools/cqt_librosa_parity.py` could not
+  see this**: correlation and peak-bin match are both scale-invariant, exactly
+  like the htdemucs iSTFT scale bug that cosine let through. It now asserts on
+  the median per-bin magnitude ratio; reverting the fix drives that median to
+  0.0131, a 76× margin.
+- **Next**: upload `cstr/btc-chords-GGUF` and `cstr/crepe-GGUF` (the registry URLs point at it but the repo
   is not published yet); quantize (q8_0/q4_k) and re-measure; then the Dart FFI +
   WASM surfaces. `core/stft.h` extraction is independent (CREPE needs no STFT).
 
