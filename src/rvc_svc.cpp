@@ -235,3 +235,299 @@ void rvc_svc_result_free(rvc_svc_result* r) {
     free(r->pcm);
     delete r;
 }
+
+// ---------------------------------------------------------------------------
+// enc_p — TextEncoder (relative-position transformer)
+//
+// Validated stage-for-stage against tools/rvc_torch_parity.py (itself cos
+// 1.00000000 vs torch). Traps encoded here, all from RVC_BLUEPRINT.md 2b:
+//   * LeakyReLU slope 0.1, NOT torch's 0.01 default.
+//   * x *= sqrt(hidden) BEFORE the lrelu.
+//   * POST-norm residuals: x = norm(x + f(x)).
+//   * Relative-position attention over keys AND values (window 10).
+//   * FFN is SAME-padded with a plain ReLU.
+//   * LayerNorm is over the CHANNEL dim.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// A kernel-1 Conv1d IS a linear, but it is stored with the kernel axis:
+// GGUF (out, in, 1) -> ggml ne = [1, in, out]. Drop the leading 1 so mul_mat
+// contracts over `in` instead of aborting on a 1-vs-in mismatch.
+ggml_tensor* rvc_conv1x1_as_linear(ggml_context* g, ggml_tensor* w) {
+    if (w->ne[0] == 1 && w->ne[2] > 1)
+        return ggml_reshape_2d(g, w, w->ne[1], w->ne[2]);
+    return w;
+}
+
+ggml_tensor* rvc_layer_norm(ggml_context* g, ggml_tensor* x, ggml_tensor* gamma, ggml_tensor* beta, float eps) {
+    // x: [C, T]. Their LayerNorm transposes so the stats are over C.
+    x = ggml_norm(g, x, eps);
+    x = ggml_mul(g, x, gamma);
+    return ggml_add(g, x, beta);
+}
+
+// Slice/pad emb_rel to 2T-1 entries, exactly as _get_relative_embeddings.
+// NOTE: the padding is SYMMETRIC (pad_len on BOTH sides). ggml_pad only
+// appends, so the front pad is a concat — getting this wrong reads past the
+// tensor and trips ggml's view-bounds assert.
+ggml_tensor* rvc_rel_embeddings(ggml_context* g, ggml_tensor* emb, int T, int window) {
+    const int pad_len = std::max(T - (window + 1), 0);
+    const int start = std::max((window + 1) - T, 0);
+    // emb: GGUF (1, 2w+1, d) -> ggml ne = [d, 2w+1, 1]
+    ggml_tensor* e = ggml_reshape_2d(g, emb, emb->ne[0], emb->ne[1]);
+    if (pad_len > 0) {
+        ggml_tensor* pre = ggml_new_tensor_2d(g, GGML_TYPE_F32, e->ne[0], pad_len);
+        pre = ggml_scale(g, pre, 0.0f);
+        e = ggml_concat(g, pre, e, 1);        // front pad
+        e = ggml_pad(g, e, 0, pad_len, 0, 0); // back pad
+    }
+    return ggml_cont(g, ggml_view_2d(g, e, e->ne[0], 2 * T - 1, e->nb[1], (size_t)start * e->nb[1]));
+}
+
+// [2T-1, T, H] -> [T, T, H]: the skew from relative to absolute indexing.
+ggml_tensor* rvc_rel_to_abs(ggml_context* g, ggml_tensor* x, int T) {
+    x = ggml_pad(g, x, 1, 0, 0, 0); // [2T, T, H]
+    const int64_t H = x->ne[2];
+    x = ggml_cont(g, ggml_reshape_2d(g, x, 2 * T * T, H)); // flatten
+    x = ggml_pad(g, x, T - 1, 0, 0, 0);                    // [2T*T + T-1, H]
+    x = ggml_cont(g, ggml_reshape_3d(g, x, 2 * T - 1, T + 1, H));
+    return ggml_cont(g, ggml_view_3d(g, x, T, T, H, x->nb[1], x->nb[2], (size_t)(T - 1) * x->nb[0]));
+}
+
+// [T, T, H] -> [2T-1, T, H]: the inverse skew, for relative VALUES.
+ggml_tensor* rvc_abs_to_rel(ggml_context* g, ggml_tensor* x, int T) {
+    const int64_t H = x->ne[2];
+    x = ggml_pad(g, x, T - 1, 0, 0, 0); // [2T-1, T, H]
+    x = ggml_cont(g, ggml_reshape_2d(g, x, T * (2 * T - 1), H));
+    // pad the FRONT by T: ggml_pad only appends, so pad the end of a reversed
+    // view is not available either — build it with a zero prefix concat.
+    ggml_tensor* pre = ggml_new_tensor_2d(g, GGML_TYPE_F32, T, H);
+    pre = ggml_scale(g, pre, 0.0f);
+    x = ggml_concat(g, pre, x, 0); // [T*(2T-1)+T, H]
+    x = ggml_cont(g, ggml_reshape_3d(g, x, 2 * T, T, H));
+    return ggml_cont(g, ggml_view_3d(g, x, 2 * T - 1, T, H, x->nb[1], x->nb[2], (size_t)1 * x->nb[0]));
+}
+
+} // namespace
+
+namespace {
+
+// Build the enc_p graph. content: [content_dim, T] f32, pitch: [T] i32.
+// Returns stats [2*inter, T]; caller splits into m_p / logs_p.
+ggml_tensor* rvc_enc_p_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* content, ggml_tensor* pitch, int T) {
+    const rvc_hparams& hp = c->hp;
+    auto W = [&](const std::string& n) -> ggml_tensor* {
+        auto it = c->t.find(n);
+        if (it == c->t.end()) {
+            fprintf(stderr, "rvc: missing tensor %s\n", n.c_str());
+            return nullptr;
+        }
+        return it->second;
+    };
+
+    // emb_phone is a Linear: [content_dim, hidden] weight in ggml layout.
+    ggml_tensor* x = ggml_mul_mat(g, W("enc_p.emb_phone.weight"), content); // [hidden, T]
+    x = ggml_add(g, x, W("enc_p.emb_phone.bias"));
+    // emb_pitch is an EMBEDDING lookup, not a matmul.
+    x = ggml_add(g, x, ggml_get_rows(g, W("enc_p.emb_pitch.weight"), pitch));
+    x = ggml_scale(g, x, std::sqrt((float)hp.hidden)); // BEFORE the lrelu
+    x = ggml_leaky_relu(g, x, 0.1f, false);            // slope 0.1, not 0.01
+
+    const int H = hp.n_heads;
+    const int hd = hp.hidden / H;
+    const float scale = 1.0f / std::sqrt((float)hd);
+
+    for (int l = 0; l < hp.n_layers; l++) {
+        const std::string p = "enc_p.encoder.attn_layers." + std::to_string(l) + ".";
+        // k=1 convs are plain linears over the channel dim.
+        ggml_tensor* q =
+            ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W(p + "conv_q.weight")), x), W(p + "conv_q.bias"));
+        ggml_tensor* k =
+            ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W(p + "conv_k.weight")), x), W(p + "conv_k.bias"));
+        ggml_tensor* v =
+            ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W(p + "conv_v.weight")), x), W(p + "conv_v.bias"));
+
+        // [hidden, T] -> [hd, T, H] -> heads on ne2
+        q = ggml_cont(g, ggml_permute(g, ggml_reshape_3d(g, q, hd, H, T), 0, 2, 1, 3));
+        k = ggml_cont(g, ggml_permute(g, ggml_reshape_3d(g, k, hd, H, T), 0, 2, 1, 3));
+        v = ggml_cont(g, ggml_permute(g, ggml_reshape_3d(g, v, hd, H, T), 0, 2, 1, 3));
+
+        ggml_tensor* qs = ggml_scale(g, q, scale);
+        ggml_tensor* scores = ggml_mul_mat(g, k, qs); // [T_k, T_q, H]
+
+        ggml_tensor* rel_k = rvc_rel_embeddings(g, W(p + "emb_rel_k"), T, hp.rel_window); // [hd, 2T-1]
+        ggml_tensor* rl = ggml_mul_mat(g, rel_k, qs);                                     // [2T-1, T, H]
+        scores = ggml_add(g, scores, rvc_rel_to_abs(g, rl, T));
+
+        ggml_tensor* attn = ggml_soft_max(g, scores);                                 // [T_k, T_q, H]
+        ggml_tensor* out = ggml_mul_mat(g, ggml_cont(g, ggml_transpose(g, v)), attn); // [hd, T_q, H]
+
+        // relative VALUES — omitting this still "works" and merely degrades.
+        ggml_tensor* rel_v = rvc_rel_embeddings(g, W(p + "emb_rel_v"), T, hp.rel_window); // [hd, 2T-1]
+        ggml_tensor* ar = rvc_abs_to_rel(g, attn, T);                                     // [2T-1, T, H]
+        out = ggml_add(g, out, ggml_mul_mat(g, ggml_cont(g, ggml_transpose(g, rel_v)), ar));
+
+        out = ggml_cont(g, ggml_permute(g, out, 0, 2, 1, 3)); // [hd, H, T]
+        out = ggml_reshape_2d(g, out, hp.hidden, T);
+        ggml_tensor* y =
+            ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W(p + "conv_o.weight")), out), W(p + "conv_o.bias"));
+
+        const std::string n1 = "enc_p.encoder.norm_layers_1." + std::to_string(l) + ".";
+        x = rvc_layer_norm(g, ggml_add(g, x, y), W(n1 + "gamma"), W(n1 + "beta"), 1e-5f); // POST-norm
+
+        const std::string f = "enc_p.encoder.ffn_layers." + std::to_string(l) + ".";
+        // ggml_conv_1d takes input as [length, channels]; our working layout
+        // is [channels, time], so transpose in and back out. The bias is added
+        // AFTER transposing back so it broadcasts over time, not over channels.
+        ggml_tensor* w1 = W(f + "conv_1.weight");
+        const int k1 = (int)w1->ne[0];
+        ggml_tensor* h = ggml_conv_1d(g, w1, ggml_cont(g, ggml_transpose(g, x)), 1, (k1 - 1) / 2, 1);
+        h = ggml_add(g, ggml_cont(g, ggml_transpose(g, h)), W(f + "conv_1.bias"));
+        h = ggml_relu(g, h); // plain ReLU: activation != "gelu" here
+        ggml_tensor* w2 = W(f + "conv_2.weight");
+        const int k2 = (int)w2->ne[0];
+        ggml_tensor* y2 = ggml_conv_1d(g, w2, ggml_cont(g, ggml_transpose(g, h)), 1, (k2 - 1) / 2, 1);
+        y2 = ggml_add(g, ggml_cont(g, ggml_transpose(g, y2)), W(f + "conv_2.bias"));
+
+        const std::string n2 = "enc_p.encoder.norm_layers_2." + std::to_string(l) + ".";
+        x = rvc_layer_norm(g, ggml_add(g, x, y2), W(n2 + "gamma"), W(n2 + "beta"), 1e-5f);
+    }
+
+    ggml_tensor* stats =
+        ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W("enc_p.proj.weight")), x), W("enc_p.proj.bias"));
+    return stats; // [2*inter, T]
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------------
+// Per-stage diff. Input-aligned: the reference carries input_phone/input_pitch
+// AND both noise buffers, which we replay, so the comparison is deterministic
+// even though the model is stochastic.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+double rvc_cos(const float* a, const float* b, int64_t n) {
+    double d = 0, na = 0, nb = 0;
+    for (int64_t i = 0; i < n; i++) {
+        d += (double)a[i] * b[i];
+        na += (double)a[i] * a[i];
+        nb += (double)b[i] * b[i];
+    }
+    const double den = std::sqrt(na) * std::sqrt(nb);
+    return den > 0 ? d / den : (na == 0 && nb == 0 ? 1.0 : 0.0);
+}
+
+double rvc_max_abs(const float* a, const float* b, int64_t n) {
+    double m = 0;
+    for (int64_t i = 0; i < n; i++)
+        m = std::max(m, (double)std::fabs(a[i] - b[i]));
+    return m;
+}
+
+bool rvc_ref_get(core_gguf::WeightLoad& rw, const char* name, std::vector<float>& out) {
+    auto it = rw.tensors.find(name);
+    if (it == rw.tensors.end() || !it->second)
+        return false;
+    const int64_t n = ggml_nelements(it->second);
+    out.resize((size_t)n);
+    ggml_backend_tensor_get(it->second, out.data(), 0, (size_t)n * sizeof(float));
+    return true;
+}
+
+} // namespace
+
+int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
+    rvc_svc_params p = rvc_svc_default_params();
+    p.use_gpu = false; // structural diff on CPU first
+    rvc_svc_context* c = rvc_svc_init_from_file(model_gguf, p);
+    if (!c) {
+        fprintf(stderr, "rvc_diff: failed to load %s\n", model_gguf);
+        return 2;
+    }
+    core_gguf::WeightLoad rw;
+    if (!core_gguf::load_weights(ref_gguf, c->backend, "rvc_ref", rw)) {
+        fprintf(stderr, "rvc_diff: failed to load reference %s\n", ref_gguf);
+        rvc_svc_free(c);
+        return 2;
+    }
+
+    std::vector<float> in_phone, in_pitch, ref_mp, ref_logs;
+    if (!rvc_ref_get(rw, "input_phone", in_phone) || !rvc_ref_get(rw, "input_pitch", in_pitch)) {
+        fprintf(stderr, "rvc_diff: reference lacks input_phone/input_pitch — re-dump with the current spec\n");
+        core_gguf::free_weights(rw);
+        rvc_svc_free(c);
+        return 2;
+    }
+    const rvc_hparams& hp = c->hp;
+    const int T = (int)(in_phone.size() / (size_t)hp.content_dim);
+
+    // Graph
+    const size_t mem = (size_t)512 * 1024 * 1024;
+    std::vector<uint8_t> buf(mem);
+    ggml_init_params ip{mem, buf.data(), true};
+    ggml_context* g = ggml_init(ip);
+    ggml_tensor* content = ggml_new_tensor_2d(g, GGML_TYPE_F32, hp.content_dim, T);
+    ggml_tensor* pitch = ggml_new_tensor_1d(g, GGML_TYPE_I32, T);
+    ggml_set_input(content);
+    ggml_set_input(pitch);
+    ggml_tensor* stats = rvc_enc_p_graph(g, c, content, pitch, T);
+    if (!stats) {
+        ggml_free(g);
+        core_gguf::free_weights(rw);
+        rvc_svc_free(c);
+        return 2;
+    }
+    ggml_set_output(stats);
+    ggml_cgraph* gf = ggml_new_graph_custom(g, 8192, false);
+    ggml_build_forward_expand(gf, stats);
+
+    ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(c->backend));
+    if (!ggml_gallocr_alloc_graph(alloc, gf)) {
+        fprintf(stderr, "rvc_diff: graph allocation failed\n");
+        ggml_gallocr_free(alloc);
+        ggml_free(g);
+        core_gguf::free_weights(rw);
+        rvc_svc_free(c);
+        return 2;
+    }
+    ggml_backend_tensor_set(content, in_phone.data(), 0, in_phone.size() * sizeof(float));
+    std::vector<int32_t> pi((size_t)T);
+    for (int i = 0; i < T; i++)
+        pi[(size_t)i] = (int32_t)std::lround(in_pitch[(size_t)i]);
+    ggml_backend_tensor_set(pitch, pi.data(), 0, pi.size() * sizeof(int32_t));
+    ggml_backend_graph_compute(c->backend, gf);
+
+    std::vector<float> out((size_t)ggml_nelements(stats));
+    ggml_backend_tensor_get(stats, out.data(), 0, out.size() * sizeof(float));
+
+    int n_fail = 0;
+    const double COS_MIN = 0.9999;
+    auto report = [&](const char* stage, const float* mine, const std::vector<float>& ref) {
+        const int64_t n = (int64_t)ref.size();
+        const double cs = rvc_cos(mine, ref.data(), n);
+        const bool ok = cs >= COS_MIN;
+        if (!ok)
+            n_fail++;
+        if (verbosity >= 1 || !ok)
+            fprintf(stderr, "  %-10s %s cos=%.8f max_abs=%.3e\n", stage, ok ? "PASS" : "FAIL", cs,
+                    rvc_max_abs(mine, ref.data(), n));
+    };
+
+    fprintf(stderr, "rvc diff (T=%d, content_dim=%d, inter=%d):\n", T, hp.content_dim, hp.inter);
+    if (rvc_ref_get(rw, "m_p", ref_mp))
+        report("m_p", out.data(), ref_mp);
+    if (rvc_ref_get(rw, "logs_p", ref_logs))
+        report("logs_p", out.data() + (size_t)hp.inter * T, ref_logs);
+
+    fprintf(stderr, "  NOTE: flow and dec graphs are not implemented yet — enc_p only.\n");
+
+    ggml_gallocr_free(alloc);
+    ggml_free(g);
+    core_gguf::free_weights(rw);
+    rvc_svc_free(c);
+    fprintf(stderr, "rvc diff: %d stage(s) FAILED.\n", n_fail);
+    return n_fail == 0 ? 0 : 1;
+}
