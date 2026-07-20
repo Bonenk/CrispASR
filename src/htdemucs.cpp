@@ -998,6 +998,8 @@ static bool htdemucs_use_wcache() {
 
 // Returns a reference to the cached F32 copy of `t`. The caller must NOT
 // mutate it (all current uses are read-only weight reads).
+static size_t g_wcache_bytes = 0; // instrumentation only (CRISPASR_HTDEMUCS_MEMSTATS=1)
+
 static const std::vector<float>& cached_tensor_f32(ggml_tensor* t) {
     static std::map<const ggml_tensor*, std::vector<float>> cache;
     if (!htdemucs_use_wcache()) {
@@ -1009,7 +1011,12 @@ static const std::vector<float>& cached_tensor_f32(ggml_tensor* t) {
     auto it = cache.find(t);
     if (it != cache.end())
         return it->second;
-    return cache.emplace(t, read_tensor_f32(t)).first->second;
+    const std::vector<float>& v = cache.emplace(t, read_tensor_f32(t)).first->second;
+    g_wcache_bytes += v.size() * sizeof(float);
+    if (std::getenv("CRISPASR_HTDEMUCS_MEMSTATS"))
+        fprintf(stderr, "htdemucs: wcache += %8.2f MB (total %7.2f MB) %s\n", v.size() * 4.0 / 1048576.0,
+                g_wcache_bytes / 1048576.0, t->name);
+    return v;
 }
 
 
