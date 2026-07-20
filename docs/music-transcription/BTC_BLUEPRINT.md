@@ -104,6 +104,50 @@ No sqrt(d) embedding scaling: `embedding_proj(x)` then `x += timing_signal`.
 213 converted tensors: 8 layers x 26, plus embedding_proj, the final LayerNorm
 pair and the 2 projection tensors. The 8 unused LSTM tensors are skipped.
 
+## Two MORE found by the numpy parity spec
+
+Neither is visible in the architecture; only diffing stage-by-stage against the
+torch model surfaced them.
+
+9. **LayerNorm std is UNBIASED (ddof=1)** — it is `torch.std`, which defaults to
+   the n-1 denominator. numpy's `.std()` defaults to n. At width 128 that is a
+   0.4% error, worth `max_abs` 1.5e-2 vs 5.3e-7. Small enough to look like
+   "drift" and be written off; structural enough to fail the gate.
+
+10. **The FFN has a TRAILING ReLU after the second conv.** Upstream:
+
+    ```python
+    for i, layer in enumerate(self.layers):
+        x = layer(x)
+        if i < len(self.layers):     # always true: i maxes at len-1
+            x = self.relu(x)
+    ```
+
+    The guard was clearly meant to be `len(self.layers) - 1`, so ReLU fires
+    after the LAST conv as well. It is an upstream bug, but it was baked into
+    the trained weights, so it MUST be reproduced. Without it the block scores
+    cos 0.461.
+
+### Bisection that found them
+
+    embed+posenc      cos=1.000000   <- exact
+    layer0 fwd block  cos=0.874472   <- diverges here
+      +-- norm (ddof=0) max_abs 1.5e-2 / (ddof=1) 5.3e-7   <- finding 9
+      +-- attention   cos=1.000000                          <- exact
+      +-- ffn         cos=0.461213                          <- finding 10
+
+## Verified
+
+`tools/btc_torch_parity.py` scores the numpy spec against the real PyTorch
+model. Both checkpoints:
+
+| variant | cos | max_abs | argmax agreement |
+|---|---|---|---|
+| `btc_model.pt` (25 chords) | 0.99999995 | 3.3e-06 | 1.0000 |
+| `btc_model_large_voca.pt` (170) | 1.00000004 | 1.7e-05 | 1.0000 |
+
+That spec is what `src/btc_chords.cpp` must match; keep the two in lockstep.
+
 ## Licence
 
 Code MIT; the shipped `test/btc_model{,_large_voca}.pt` checkpoints were trained
