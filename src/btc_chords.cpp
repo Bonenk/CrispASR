@@ -1,0 +1,563 @@
+// src/btc_chords.cpp — BTC chord recognition runtime.
+//
+// Must match tools/btc_torch_parity.py, which is scored against the PyTorch
+// reference at cos >= 0.99999. If this graph changes, change that spec FIRST
+// and re-run it. The ten non-obvious details it encodes are in
+// docs/music-transcription/BTC_BLUEPRINT.md; the four that bite hardest:
+//
+//   * Two attention blocks per layer over the SAME input — forward masked
+//     causally, backward with that mask TRANSPOSED — concatenated to 256 and
+//     projected back to 128. mask=nullptr would silently give full attention.
+//   * LayerNorm is gamma*(x-mu)/(std + eps) + beta with eps OUTSIDE the sqrt
+//     and UNBIASED std (n-1). ggml_norm does (x-mu)/sqrt(var_biased + eps),
+//     so it CANNOT be used here — the norm is built from primitives below.
+//   * The FFN is Conv(k=3) -> ReLU -> Conv(k=3) -> ReLU, symmetric (1,1)
+//     padding. The TRAILING ReLU is an upstream bug baked into the weights.
+//   * Positional encoding is concat([sin, cos]), not interleaved.
+
+#include "btc_chords.h"
+
+#include "ggml-alloc.h"
+#include "ggml-backend.h"
+#include "ggml-cpu.h"
+#include "ggml.h"
+
+#include "core/audio_resample.h"
+#include "core/cqt.h"
+#include "core/gguf_loader.h"
+#include "core/gpu_backend_pref.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
+
+// ---------------------------------------------------------------------------
+// Chord vocabularies (utils/mir_eval_modules.py)
+// ---------------------------------------------------------------------------
+namespace {
+
+const char* kRoots[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+const char* kQualities[14] = {"min",     "maj",  "dim", "aug",  "min6",  "maj6", "min7",
+                              "minmaj7", "maj7", "7",   "dim7", "hdim7", "sus2", "sus4"};
+
+// 170-class: idx 0..167 = root*14 + quality, 168 = X (unknown), 169 = N (none).
+// Quality index 1 ("maj") renders as the bare root, matching idx2voca_chord().
+std::string voca_name(int i) {
+    if (i == 169)
+        return "N";
+    if (i == 168)
+        return "X";
+    const int root = i / 14, q = i % 14;
+    if (root < 0 || root >= 12)
+        return "X";
+    return q == 1 ? std::string(kRoots[root]) : std::string(kRoots[root]) + ":" + kQualities[q];
+}
+
+// 25-class: C, C:min, C#, C#:min, ... B, B:min, N.
+std::string maj_min_name(int i) {
+    if (i >= 24)
+        return "N";
+    return (i % 2 == 0) ? std::string(kRoots[i / 2]) : std::string(kRoots[i / 2]) + ":min";
+}
+
+// Collapse a 170-class label to the 25-class maj/min vocabulary. This is why
+// 170 ships as the DEFAULT: it is strictly more expressive and can be reduced
+// on demand, whereas a 25-class model can never be expanded.
+//
+// Quality mapping follows the usual mir_eval maj/min convention: the minor
+// third qualities (min, dim, min6, min7, minmaj7, dim7, hdim7) go to :min and
+// everything else (maj, aug, maj6, maj7, 7, sus2, sus4) to major. Suspended
+// and augmented chords have no third, so their assignment is a convention, not
+// a fact — documented here rather than buried.
+int voca_to_maj_min(int i) {
+    if (i >= 168)
+        return 24; // X and N both become N
+    const int root = i / 14, q = i % 14;
+    static const bool kIsMinor[14] = {true, false, true,  false, true, false, true,
+                                      true, false, false, true,  true, false, false};
+    return root * 2 + (kIsMinor[q] ? 1 : 0);
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------------
+// Model
+// ---------------------------------------------------------------------------
+struct btc_hparams {
+    int feature_size = 144;
+    int hidden_size = 128;
+    int n_layers = 8;
+    int n_heads = 4;
+    int filter_size = 128;
+    int n_chords = 170;
+    int timestep = 108;
+    float norm_mean = 0.0f;
+    float norm_std = 1.0f;
+    float eps = 1e-6f;
+    int cqt_n_bins = 144;
+    int cqt_bins_per_octave = 24;
+    int cqt_hop_length = 2048;
+    int sample_rate = 22050;
+};
+
+struct btc_attn_block {
+    ggml_tensor* q = nullptr;
+    ggml_tensor* k = nullptr;
+    ggml_tensor* v = nullptr;
+    ggml_tensor* o = nullptr;
+    ggml_tensor* ffn0_w = nullptr;
+    ggml_tensor* ffn0_b = nullptr;
+    ggml_tensor* ffn1_w = nullptr;
+    ggml_tensor* ffn1_b = nullptr;
+    ggml_tensor* norm_mha_g = nullptr;
+    ggml_tensor* norm_mha_b = nullptr;
+    ggml_tensor* norm_ffn_g = nullptr;
+    ggml_tensor* norm_ffn_b = nullptr;
+};
+
+struct btc_layer {
+    btc_attn_block fwd;
+    btc_attn_block bwd;
+    ggml_tensor* proj_w = nullptr;
+    ggml_tensor* proj_b = nullptr;
+};
+
+struct btc_model {
+    btc_hparams hp;
+    ggml_tensor* embed_w = nullptr;
+    std::vector<btc_layer> layers;
+    ggml_tensor* final_g = nullptr;
+    ggml_tensor* final_b = nullptr;
+    ggml_tensor* out_w = nullptr;
+    ggml_tensor* out_b = nullptr;
+};
+
+struct btc_chords_context {
+    btc_model model;
+    btc_chords_params params;
+    ggml_backend_t backend = nullptr;
+    ggml_backend_buffer_t buf_w = nullptr;
+    ggml_context* ctx_w = nullptr;
+    std::vector<std::string> names; // vocabulary, filled at load
+    std::vector<const char*> name_ptrs;
+};
+
+static bool btc_debug() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("CRISPASR_BTC_DEBUG");
+        v = (e && atoi(e) != 0) ? 1 : 0;
+    }
+    return v != 0;
+}
+
+// Reduce the 170-class output to maj/min. Opt-in via CRISPASR_BTC_MAJ_MIN=1;
+// the richer vocabulary is the default (see voca_to_maj_min).
+static bool btc_maj_min() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = getenv("CRISPASR_BTC_MAJ_MIN");
+        v = (e && atoi(e) != 0) ? 1 : 0;
+    }
+    return v != 0;
+}
+
+// ---------------------------------------------------------------------------
+// Graph pieces
+// ---------------------------------------------------------------------------
+
+// BTC LayerNorm: gamma * (x - mu) / (std_unbiased + eps) + beta.
+// NOT ggml_norm — that is (x - mu)/sqrt(var_biased + eps), which differs both
+// in the eps placement and the denominator (n vs n-1). At width 128 the
+// biased/unbiased gap alone is max_abs 1.5e-2 vs 5.3e-7 against the reference.
+static ggml_tensor* btc_layer_norm(ggml_context* g, ggml_tensor* x, ggml_tensor* gamma, ggml_tensor* beta, float eps) {
+    const int n = (int)x->ne[0];
+    ggml_tensor* mu = ggml_mean(g, x); // (1, T)
+    ggml_tensor* d = ggml_sub(g, x, ggml_repeat(g, mu, x));
+    ggml_tensor* var = ggml_mean(g, ggml_sqr(g, d));     // biased
+    var = ggml_scale(g, var, (float)n / (float)(n - 1)); // -> unbiased
+    ggml_tensor* sd = ggml_add1(g, ggml_sqrt(g, var), ggml_new_f32(g, eps));
+    ggml_tensor* y = ggml_div(g, d, ggml_repeat(g, sd, d));
+    y = ggml_mul(g, y, ggml_repeat(g, ggml_reshape_2d(g, gamma, n, 1), y));
+    return ggml_add(g, y, ggml_repeat(g, ggml_reshape_2d(g, beta, n, 1), y));
+}
+
+// Multi-head self-attention with an additive mask. x is (hidden, T).
+static ggml_tensor* btc_attention(ggml_context* g, ggml_tensor* x, const btc_attn_block& b, ggml_tensor* mask,
+                                  int hidden, int heads, int T) {
+    const int hd = hidden / heads;
+    ggml_tensor* q = ggml_mul_mat(g, b.q, x);
+    ggml_tensor* k = ggml_mul_mat(g, b.k, x);
+    ggml_tensor* v = ggml_mul_mat(g, b.v, x);
+
+    q = ggml_cont(g, ggml_permute(g, ggml_reshape_3d(g, q, hd, heads, T), 0, 2, 1, 3)); // (hd, T, heads)
+    k = ggml_cont(g, ggml_permute(g, ggml_reshape_3d(g, k, hd, heads, T), 0, 2, 1, 3));
+
+    // Upstream scales Q rather than the logits; soft_max_ext's `scale` applies
+    // the same factor to the logits, which is equivalent.
+    ggml_tensor* scores = ggml_mul_mat(g, k, q); // (T, T, heads)
+    scores = ggml_soft_max_ext(g, scores, mask, 1.0f / sqrtf((float)hd), 0.0f);
+
+    v = ggml_cont(g, ggml_permute(g, ggml_reshape_3d(g, v, hd, heads, T), 1, 2, 0, 3)); // (T, hd, heads)
+    ggml_tensor* out = ggml_mul_mat(g, v, scores);                                      // (hd, T, heads)
+    out = ggml_reshape_2d(g, ggml_cont(g, ggml_permute(g, out, 0, 2, 1, 3)), hidden, T);
+    return ggml_mul_mat(g, b.o, out);
+}
+
+// Conv(k=3) -> ReLU -> Conv(k=3) -> ReLU, symmetric (1,1) padding.
+// ggml_conv_1d wants data as (T, C), so transpose in and out; the attention
+// path works in (C, T).
+static ggml_tensor* btc_ffn(ggml_context* g, ggml_tensor* x, const btc_attn_block& b) {
+    ggml_tensor* t = ggml_cont(g, ggml_transpose(g, x)); // (T, C)
+    ggml_tensor* h = ggml_conv_1d(g, b.ffn0_w, t, 1, 1, 1);
+    h = ggml_add(g, h, ggml_reshape_2d(g, b.ffn0_b, 1, (int)b.ffn0_b->ne[0]));
+    h = ggml_relu(g, h);
+    h = ggml_conv_1d(g, b.ffn1_w, h, 1, 1, 1);
+    h = ggml_add(g, h, ggml_reshape_2d(g, b.ffn1_b, 1, (int)b.ffn1_b->ne[0]));
+    // TRAILING ReLU — upstream's loop guard `i < len(self.layers)` is always
+    // true, so ReLU fires after the last conv too. Baked into the weights;
+    // omitting it scores cos 0.461 on the block.
+    h = ggml_relu(g, h);
+    return ggml_cont(g, ggml_transpose(g, h)); // back to (C, T)
+}
+
+static ggml_tensor* btc_block(ggml_context* g, ggml_tensor* x, const btc_attn_block& b, ggml_tensor* mask,
+                              const btc_hparams& hp, int T) {
+    ggml_tensor* xn = btc_layer_norm(g, x, b.norm_mha_g, b.norm_mha_b, hp.eps);
+    x = ggml_add(g, x, btc_attention(g, xn, b, mask, hp.hidden_size, hp.n_heads, T));
+    xn = btc_layer_norm(g, x, b.norm_ffn_g, b.norm_ffn_b, hp.eps);
+    return ggml_add(g, x, btc_ffn(g, xn, b));
+}
+
+// concat([sin(t*inv), cos(t*inv)]) — two contiguous halves, NOT interleaved.
+static void btc_timing_signal(int length, int channels, std::vector<float>& out) {
+    const int n = channels / 2;
+    const float inc = std::log(1.0e4f / 1.0f) / (float)(n - 1);
+    out.assign((size_t)length * channels, 0.0f);
+    for (int t = 0; t < length; t++)
+        for (int i = 0; i < n; i++) {
+            const float scaled = (float)t * std::exp((float)i * -inc);
+            out[(size_t)t * channels + i] = std::sin(scaled);
+            out[(size_t)t * channels + n + i] = std::cos(scaled);
+        }
+}
+
+// ---------------------------------------------------------------------------
+// Load
+// ---------------------------------------------------------------------------
+static bool btc_bind(btc_model& m, const core_gguf::tensor_map& t) {
+    auto get = [&](const std::string& n) { return core_gguf::try_get(t, n.c_str()); };
+    m.embed_w = get("embedding_proj.weight");
+    m.final_g = get("final_norm.gamma");
+    m.final_b = get("final_norm.beta");
+    m.out_w = get("output.proj.weight");
+    m.out_b = get("output.proj.bias");
+    if (!m.embed_w || !m.out_w)
+        return false;
+
+    m.layers.resize(m.hp.n_layers);
+    for (int i = 0; i < m.hp.n_layers; i++) {
+        const std::string p = "layers." + std::to_string(i);
+        for (int dir = 0; dir < 2; dir++) {
+            btc_attn_block& b = dir == 0 ? m.layers[i].fwd : m.layers[i].bwd;
+            const std::string d = p + (dir == 0 ? ".fwd" : ".bwd");
+            b.q = get(d + ".attn.q.weight");
+            b.k = get(d + ".attn.k.weight");
+            b.v = get(d + ".attn.v.weight");
+            b.o = get(d + ".attn.o.weight");
+            b.ffn0_w = get(d + ".ffn.0.weight");
+            b.ffn0_b = get(d + ".ffn.0.bias");
+            b.ffn1_w = get(d + ".ffn.1.weight");
+            b.ffn1_b = get(d + ".ffn.1.bias");
+            b.norm_mha_g = get(d + ".norm_mha.gamma");
+            b.norm_mha_b = get(d + ".norm_mha.beta");
+            b.norm_ffn_g = get(d + ".norm_ffn.gamma");
+            b.norm_ffn_b = get(d + ".norm_ffn.beta");
+            if (!b.q || !b.ffn0_w || !b.norm_mha_g)
+                return false;
+        }
+        m.layers[i].proj_w = get(p + ".proj.weight");
+        m.layers[i].proj_b = get(p + ".proj.bias");
+        if (!m.layers[i].proj_w)
+            return false;
+    }
+    return true;
+}
+
+btc_chords_params btc_chords_default_params(void) {
+    btc_chords_params p;
+    p.n_threads = 0;
+    p.use_gpu = true;
+    p.gpu_device = 0;
+    return p;
+}
+
+btc_chords_context* btc_chords_init_from_file(const char* model_path, btc_chords_params params) {
+    gguf_context* meta = core_gguf::open_metadata(model_path);
+    if (!meta) {
+        fprintf(stderr, "btc: failed to read metadata from %s\n", model_path);
+        return nullptr;
+    }
+    auto* ctx = new btc_chords_context();
+    ctx->params = params;
+    btc_hparams& hp = ctx->model.hp;
+    hp.feature_size = core_gguf::kv_u32(meta, "btc.feature_size", 144);
+    hp.hidden_size = core_gguf::kv_u32(meta, "btc.hidden_size", 128);
+    hp.n_layers = core_gguf::kv_u32(meta, "btc.n_layers", 8);
+    hp.n_heads = core_gguf::kv_u32(meta, "btc.n_heads", 4);
+    hp.filter_size = core_gguf::kv_u32(meta, "btc.filter_size", 128);
+    hp.n_chords = core_gguf::kv_u32(meta, "btc.n_chords", 170);
+    hp.timestep = core_gguf::kv_u32(meta, "btc.timestep", 108);
+    hp.norm_mean = core_gguf::kv_f32(meta, "btc.norm_mean", 0.0f);
+    hp.norm_std = core_gguf::kv_f32(meta, "btc.norm_std", 1.0f);
+    hp.eps = core_gguf::kv_f32(meta, "btc.layer_norm_eps", 1e-6f);
+    hp.cqt_n_bins = core_gguf::kv_u32(meta, "btc.cqt_n_bins", 144);
+    hp.cqt_bins_per_octave = core_gguf::kv_u32(meta, "btc.cqt_bins_per_octave", 24);
+    hp.cqt_hop_length = core_gguf::kv_u32(meta, "btc.cqt_hop_length", 2048);
+    hp.sample_rate = core_gguf::kv_u32(meta, "btc.sample_rate", 22050);
+    gguf_free(meta);
+
+    ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : nullptr;
+    if (!ctx->backend)
+        ctx->backend = ggml_backend_cpu_init();
+
+    core_gguf::WeightLoad wl;
+    if (!core_gguf::load_weights(model_path, ctx->backend, "btc", wl)) {
+        fprintf(stderr, "btc: failed to load weights from %s\n", model_path);
+        btc_chords_free(ctx);
+        return nullptr;
+    }
+    ctx->ctx_w = wl.ctx;
+    ctx->buf_w = wl.buf;
+    if (!btc_bind(ctx->model, wl.tensors)) {
+        fprintf(stderr, "btc: missing tensors in %s\n", model_path);
+        btc_chords_free(ctx);
+        return nullptr;
+    }
+
+    const bool reduce = hp.n_chords > 25 && btc_maj_min();
+    const int n_out = reduce ? 25 : hp.n_chords;
+    ctx->names.reserve(n_out);
+    for (int i = 0; i < n_out; i++)
+        ctx->names.push_back(n_out == 25 ? maj_min_name(i) : voca_name(i));
+    ctx->name_ptrs.reserve(n_out);
+    for (auto& s : ctx->names)
+        ctx->name_ptrs.push_back(s.c_str());
+
+    fprintf(stderr, "btc: %d chords%s, %d layers, backend %s\n", hp.n_chords, reduce ? " (reduced to 25 maj/min)" : "",
+            hp.n_layers, ggml_backend_name(ctx->backend));
+    return ctx;
+}
+
+void btc_chords_free(btc_chords_context* ctx) {
+    if (!ctx)
+        return;
+    if (ctx->buf_w)
+        ggml_backend_buffer_free(ctx->buf_w);
+    if (ctx->ctx_w)
+        ggml_free(ctx->ctx_w);
+    if (ctx->backend)
+        ggml_backend_free(ctx->backend);
+    delete ctx;
+}
+
+int btc_chords_vocab_size(const btc_chords_context* ctx) {
+    return ctx ? (int)ctx->names.size() : 0;
+}
+
+const char* btc_chords_label_name(const btc_chords_context* ctx, int label) {
+    if (!ctx || label < 0 || label >= (int)ctx->names.size())
+        return "N";
+    return ctx->names[label].c_str();
+}
+
+// ---------------------------------------------------------------------------
+// Forward: one block of `timestep` frames
+// ---------------------------------------------------------------------------
+static bool btc_forward_block(btc_chords_context* ctx, const float* feat, int T, std::vector<float>& logits_out) {
+    const btc_hparams& hp = ctx->model.hp;
+    btc_model& m = ctx->model;
+
+    const size_t n_nodes = 8192;
+    ggml_init_params gp = {ggml_tensor_overhead() * n_nodes + ggml_graph_overhead_custom(n_nodes, false), nullptr,
+                           true};
+    ggml_context* g = ggml_init(gp);
+    if (!g)
+        return false;
+
+    ggml_tensor* X = ggml_new_tensor_2d(g, GGML_TYPE_F32, hp.feature_size, T);
+    ggml_set_input(X);
+    ggml_tensor* POS = ggml_new_tensor_2d(g, GGML_TYPE_F32, hp.hidden_size, T);
+    ggml_set_input(POS);
+    // Two masks: causal for the forward blocks, its transpose for the backward
+    // ones. F16 is what soft_max_ext expects for the mask.
+    ggml_tensor* MF = ggml_new_tensor_2d(g, GGML_TYPE_F16, T, T);
+    ggml_tensor* MB = ggml_new_tensor_2d(g, GGML_TYPE_F16, T, T);
+    ggml_set_input(MF);
+    ggml_set_input(MB);
+
+    ggml_tensor* x = ggml_mul_mat(g, m.embed_w, X); // (hidden, T), no bias
+    x = ggml_add(g, x, POS);
+
+    for (int i = 0; i < hp.n_layers; i++) {
+        ggml_tensor* f = btc_block(g, x, m.layers[i].fwd, MF, hp, T);
+        ggml_tensor* b = btc_block(g, x, m.layers[i].bwd, MB, hp, T);
+        ggml_tensor* cat = ggml_concat(g, f, b, 0); // (256, T)
+        x = ggml_mul_mat(g, m.layers[i].proj_w, cat);
+        x = ggml_add(g, x, ggml_reshape_2d(g, m.layers[i].proj_b, hp.hidden_size, 1));
+    }
+
+    if (m.final_g)
+        x = btc_layer_norm(g, x, m.final_g, m.final_b, hp.eps);
+    ggml_tensor* out = ggml_mul_mat(g, m.out_w, x);
+    out = ggml_add(g, out, ggml_reshape_2d(g, m.out_b, hp.n_chords, 1));
+    ggml_set_output(out);
+
+    ggml_cgraph* gf = ggml_new_graph_custom(g, n_nodes, false);
+    ggml_build_forward_expand(gf, out);
+    ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+    if (!ggml_gallocr_alloc_graph(alloc, gf)) {
+        fprintf(stderr, "btc: graph alloc failed\n");
+        ggml_gallocr_free(alloc);
+        ggml_free(g);
+        return false;
+    }
+
+    // Normalise with the checkpoint's own scalar stats.
+    std::vector<float> norm((size_t)T * hp.feature_size);
+    for (size_t i = 0; i < norm.size(); i++)
+        norm[i] = (feat[i] - hp.norm_mean) / hp.norm_std;
+    ggml_backend_tensor_set(X, norm.data(), 0, norm.size() * sizeof(float));
+
+    std::vector<float> pos;
+    btc_timing_signal(T, hp.hidden_size, pos);
+    ggml_backend_tensor_set(POS, pos.data(), 0, pos.size() * sizeof(float));
+
+    std::vector<ggml_fp16_t> mf((size_t)T * T), mb((size_t)T * T);
+    const ggml_fp16_t zero = ggml_fp32_to_fp16(0.0f);
+    const ggml_fp16_t ninf = ggml_fp32_to_fp16(-INFINITY);
+    for (int q = 0; q < T; q++)
+        for (int k = 0; k < T; k++) {
+            // mask[q][k] laid out with k fastest. Causal: forbid k > q.
+            mf[(size_t)q * T + k] = (k > q) ? ninf : zero;
+            mb[(size_t)q * T + k] = (k < q) ? ninf : zero;
+        }
+    ggml_backend_tensor_set(MF, mf.data(), 0, mf.size() * sizeof(ggml_fp16_t));
+    ggml_backend_tensor_set(MB, mb.data(), 0, mb.size() * sizeof(ggml_fp16_t));
+
+    ggml_backend_graph_compute(ctx->backend, gf);
+
+    logits_out.assign((size_t)ggml_nelements(out), 0.0f);
+    ggml_backend_tensor_get(out, logits_out.data(), 0, logits_out.size() * sizeof(float));
+
+    ggml_gallocr_free(alloc);
+    ggml_free(g);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+btc_chords_result* btc_chords_recognize(btc_chords_context* ctx, const float* pcm, int n_samples, int sample_rate) {
+    if (!ctx || !pcm || n_samples <= 0)
+        return nullptr;
+    const btc_hparams& hp = ctx->model.hp;
+
+    std::vector<float> mono;
+    const float* src = pcm;
+    int n = n_samples;
+    if (sample_rate != hp.sample_rate) {
+        // librosa.load(sr=22050) is what the model was trained through, and
+        // resample_polyphase's default num_zeros=14 matches its kaiser_fast.
+        mono = core_audio::resample_polyphase(pcm, n_samples, sample_rate, hp.sample_rate);
+        src = mono.data();
+        n = (int)mono.size();
+    }
+
+    core_cqt::Params cp;
+    cp.sample_rate = hp.sample_rate;
+    cp.n_bins = hp.cqt_n_bins;
+    cp.bins_per_octave = hp.cqt_bins_per_octave;
+    cp.hop_length = hp.cqt_hop_length;
+    std::vector<float> mag;
+    const int n_frames = core_cqt::magnitude(cp, src, n, mag);
+    if (n_frames <= 0)
+        return nullptr;
+
+    // BTC trains on log-magnitude CQT.
+    for (auto& v : mag)
+        v = std::log(std::max(v, 1e-6f));
+
+    const bool reduce = hp.n_chords > 25 && btc_maj_min();
+    const double frame_ms = 1000.0 * (double)hp.cqt_hop_length / (double)hp.sample_rate;
+
+    std::vector<int> labels;
+    std::vector<float> confs;
+    labels.reserve(n_frames);
+    confs.reserve(n_frames);
+
+    // Fixed `timestep` blocks, matching test.py's
+    // feature[:, 108*t : 108*(t+1), :] — NOT a sliding window; the bias mask is
+    // built for exactly that length. A short tail block is run at its own
+    // length, which the mask construction handles.
+    for (int start = 0; start < n_frames; start += hp.timestep) {
+        const int T = std::min(hp.timestep, n_frames - start);
+        std::vector<float> logits;
+        if (!btc_forward_block(ctx, mag.data() + (size_t)start * hp.feature_size, T, logits))
+            return nullptr;
+        for (int t = 0; t < T; t++) {
+            const float* row = logits.data() + (size_t)t * hp.n_chords;
+            int best = 0;
+            float mx = row[0];
+            for (int c = 1; c < hp.n_chords; c++)
+                if (row[c] > mx) {
+                    mx = row[c];
+                    best = c;
+                }
+            double sum = 0.0;
+            for (int c = 0; c < hp.n_chords; c++)
+                sum += std::exp((double)row[c] - mx);
+            labels.push_back(reduce ? voca_to_maj_min(best) : best);
+            confs.push_back((float)(1.0 / sum));
+        }
+    }
+
+    // Merge runs of identical labels into spans.
+    std::vector<btc_chord_span> spans;
+    for (size_t i = 0; i < labels.size();) {
+        size_t j = i;
+        double conf = 0.0;
+        while (j < labels.size() && labels[j] == labels[i]) {
+            conf += confs[j];
+            j++;
+        }
+        btc_chord_span s;
+        s.start_ms = (double)i * frame_ms;
+        s.end_ms = (double)j * frame_ms;
+        s.label = labels[i];
+        s.confidence = (float)(conf / (double)(j - i));
+        spans.push_back(s);
+        i = j;
+    }
+
+    auto* r = new btc_chords_result();
+    r->n_spans = (int)spans.size();
+    r->spans = new btc_chord_span[spans.size()];
+    std::copy(spans.begin(), spans.end(), r->spans);
+    r->n_chords = (int)ctx->names.size();
+    r->chord_names = ctx->name_ptrs.data();
+    if (btc_debug())
+        fprintf(stderr, "btc: %d frames -> %d spans\n", n_frames, r->n_spans);
+    return r;
+}
+
+void btc_chords_result_free(btc_chords_result* r) {
+    if (!r)
+        return;
+    delete[] r->spans;
+    delete r;
+}
