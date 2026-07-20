@@ -41,7 +41,8 @@ public:
         fprintf(stderr, "crispasr: tabcnn is a guitar-tablature model — run it with --tab\n"
                         "  (e.g. `crispasr --tab -m <tabcnn-f16.gguf> -f guitar.wav`), not as a\n"
                         "  transcribe backend. --tab prints per-frame string/fret scores.\n"
-                        "  NOTE: the weights are CC BY 4.0 (EGSet12, doi:10.5281/zenodo.11406378)\n"
+                        "  NOTE: the weights are CC BY 4.0 (EGSet12,\n"
+                        "  https://zenodo.org/records/11406378) and\n"
                         "  and REQUIRE attribution when redistributed.\n");
         return false;
     }

@@ -7,7 +7,7 @@ emission scorer for CrispASR's `--tab` surface; the constrained Viterbi/DP that
 turns emissions into a playable fingering lives in the caller.
 
   weights   `best_TabCNN_tablature_trancription_model` (sic) from the EGSet12
-            Zenodo record, doi:10.5281/zenodo.11406378 — **CC BY 4.0**.
+            Zenodo record https://zenodo.org/records/11406378 — **CC BY 4.0**.
             This is the GuitarProFX-augmented variant, which is the one worth
             shipping: the vanilla GuitarSet-trained model collapses from
             tablature F1 0.748 to 0.447 on real electric guitar, while the
@@ -47,6 +47,7 @@ the runtime cannot drift from the reference.
 """
 
 import argparse
+import hashlib
 import sys
 from pathlib import Path
 
@@ -65,6 +66,22 @@ BINS_PER_OCTAVE = 24
 FRAME_WIDTH = 9
 FMIN_NOTE = "C1"
 DB_FLOOR = 80.0  # librosa amplitude_to_db top_db, and the /80 rescale divisor
+
+# The EXACT upstream artifact. CC BY 4.0 attribution has to be CHECKABLE: a
+# reader must be able to fetch these bytes and hash them.
+#
+# ⚠️ The record has NO Zenodo DOI. An earlier version of this file cited
+# `10.5281/zenodo.11406378`, which was invented by pattern-matching Zenodo's
+# usual DOI format -- it 404s. The record's real DOI is the arXiv one below
+# (verified HTTP 200), and the authoritative locator is the record URL. Cite
+# what resolves, not what looks plausible.
+SOURCE_RECORD_URL = "https://zenodo.org/records/11406378"
+SOURCE_FILE_URL = ("https://zenodo.org/records/11406378/files/"
+                   "best_TabCNN_tablature_trancription_model?download=1")
+SOURCE_DOI = "10.48550/arXiv.2405.14679"
+# Upstream-published checksum, from the Zenodo API for this file. Independent of
+# anything we compute locally, so a reader can verify the chain end to end.
+SOURCE_MD5 = "ce168b2cd426f81a2a78499214e40605"
 
 # name in the torch state_dict -> name in the GGUF
 TENSOR_MAP = {
@@ -147,8 +164,19 @@ def main():
     # The last class is "not played" — a decoder must know which index that is
     # rather than assuming it is the highest.
     w.add_uint32("tabcnn.silent_class", num_classes - 1)
+    # Provenance must be VERIFIABLE, not merely cited. A DOI points at the
+    # whole EGSet12 record (37 files); it does not say which artifact this GGUF
+    # was converted from, so a downstream user cannot check the claim. Record
+    # the exact file URL and the sha256 of the bytes we read, computed here from
+    # the actual input rather than pasted.
+    src_sha = hashlib.sha256(Path(args.model).read_bytes()).hexdigest()
     w.add_string("general.license", "cc-by-4.0")
-    w.add_string("general.source.url", "https://doi.org/10.5281/zenodo.11406378")
+    w.add_string("general.source.url", SOURCE_FILE_URL)
+    w.add_string("general.source.record_url", SOURCE_RECORD_URL)
+    w.add_string("general.source.doi", SOURCE_DOI)
+    w.add_string("general.source.md5_upstream", SOURCE_MD5)
+    w.add_string("general.source.filename", Path(args.model).name)
+    w.add_string("general.source.sha256", src_sha)
     w.add_description(
         "TabCNN guitar tablature emission scorer (Wiggins & Kim, ISMIR 2019); "
         "GuitarProFX-augmented weights from EGSet12 (CC BY 4.0). Emits six "
@@ -181,6 +209,7 @@ def main():
     print(f"wrote {args.output}  ({n_written} tensors, {total:,} params, "
           f"{args.output.stat().st_size / 1e6:.2f} MB)")
     print(f"  strings={num_strings} classes={num_classes} silent_class={num_classes - 1}")
+    print(f"  source sha256: {src_sha}")
     print(f"  front end: {SAMPLE_RATE} Hz, hop {HOP_LENGTH}, {N_BINS} bins @ "
           f"{BINS_PER_OCTAVE}/oct from {FMIN_NOTE} ({fmin_hz:.2f} Hz)")
     if tuning:

@@ -8,7 +8,9 @@ plain forward pass with leaf-module hooks.
 Provenance (see docs/music-transcription/GUITAR_TAB_SPEC.md §0):
 
   weights   the GuitarProFX-augmented model from the EGSet12 Zenodo record
-            (10.5281/zenodo.11406378), **CC BY 4.0** — attribution required.
+            (https://zenodo.org/records/11406378), **CC BY 4.0** — attribution required.
+            ⚠ There is NO Zenodo DOI; `10.5281/zenodo.11406378` 404s.
+            The record DOI is the arXiv one, 10.48550/arXiv.2405.14679.
             File: `best_TabCNN_tablature_trancription_model` (sic, 3.3 MB).
   code      `amt-tools` (github.com/cwitkowitz/amt-tools), **MIT**.
             `pip install amt-tools`.

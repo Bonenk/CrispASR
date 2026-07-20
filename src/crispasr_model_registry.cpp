@@ -382,7 +382,7 @@ constexpr Entry k_registry[] = {
     // parity debugging, not for production — it is 2x the size for no
     // measurable difference in detected beats.
     // TabCNN guitar tablature (--tab). Weights are CC BY 4.0 from the EGSet12
-    // record (doi:10.5281/zenodo.11406378) — attribution required, commercial
+    // record (https://zenodo.org/records/11406378) — attribution required, commercial
     // use permitted. This is the GuitarProFX-augmented variant: the vanilla
     // GuitarSet-trained model collapses from tablature F1 0.748 to 0.447 on
     // real electric guitar, the augmented one recovers to 0.585 (DAFx-24).
