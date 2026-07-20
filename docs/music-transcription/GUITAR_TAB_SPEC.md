@@ -21,6 +21,82 @@ and one was mine.
 
 ---
 
+## 0. RESOLUTIONS (2026-07-20) — both blockers cleared, audio arm is GO
+
+The two gates in §5 were reading tasks. Both are now answered from primary
+sources, and the answers are better than the spec assumed.
+
+### R1 ✅ Licensing is clean end-to-end — the audio arm survives
+
+Every corpus in the audio chain is **CC BY 4.0**, open access, no NonCommercial
+and no ShareAlike:
+
+| artifact | licence | note |
+|---|---|---|
+| **GuitarSet** v1.1.0 (Zenodo 3371780) | Creative Commons Attribution 4.0 International | training corpus for every audio candidate |
+| **EGSet12** (Zenodo 11406378) | Creative Commons Attribution 4.0 International | ⭐ **also ships the trained model** |
+| **Guitar-TECHS** (arXiv 2501.03720) | CC-BY-4.0 | dataset |
+| **GOAT** (arXiv 2509.22655) | CC BY 4.0 | dataset, 5.9 h direct-input audio |
+
+The EGSet12 record contains not just audio + tablature annotations but **a
+trained machine-learning model** — i.e. the GuitarProFX-augmented TabCNN of
+§1.3, the exact variant §1 recommends shipping, under CC BY 4.0. **That is the
+shippable artifact, and its provenance is clean.** Attribution is required
+(registry `license` field + model card), nothing more.
+
+⚠ **Code licences differ from weight licences here — mind the gap.**
+
+- FretNet (`cwitkowitz/guitar-transcription-continuous`): **MIT**, code only, no
+  weights.
+- TabCNN (`andywiggins/tab-cnn`): **no licence file found** — treat as
+  all-rights-reserved until verified. Code only; it tells you to train yourself.
+
+So the correct build path is the repo's existing **clean-room protocol** (the
+Transcoda precedent: permissive weights, non-permissive reference code): take
+the *weights* from the CC BY 4.0 Zenodo record, implement the graph in ggml from
+the **ISMIR paper** (§3.3–3.5 fully specify it), and use the MIT FretNet repo —
+not the unlicensed TabCNN repo — as the readable reference. Do not transcribe
+unlicensed source.
+
+### R2 ✅ Nothing in the 2024–26 wave supersedes TabCNN
+
+- **TART** (arXiv 2510.02597, Oct 2025) — the presumed direct competitor.
+  **It is not a competitor on this axis.** No GuitarSet 6-fold player-wise CV
+  (it uses plain 80/20 splits), **no tablature P/R/F1 and no TDR at all** (only
+  note-level P50/R50/F50 for its audio→MIDI stage), and **no comparison against
+  TabCNN or FretNet**. Its final tablature stage is a *rule-based generator*
+  validated on "synthetic MIDI example".
+  Crucially, its string/fret stage **is the Fretting-Transformer** — the same
+  autoregressive T5 already in §2.4 — trained on "SynthTab and DadaGP", so it
+  **inherits the §2.3 licensing blocker**. Tab accuracy **42.1 %** on the DadaGP
+  acoustic subset. No code, no weights, no licence.
+  → TART is a *pipeline paper*, and it independently reproduces this spec's
+  central finding: even the newest "comprehensive audio-to-tab tool" delegates
+  string/fret to an autoregressive symbolic model, and scores poorly.
+- **Guitar-TECHS** and **GOAT** are **datasets, not models**. Neither benchmarks
+  against TabCNN/FretNet on GuitarSet 6-fold.
+
+**So TabCNN (GuitarProFX-augmented) stands as the audio-arm recommendation, and
+§6's comparability warning gets sharper, not weaker: TART cannot be tabled
+against TabCNN either.**
+
+### R3 🎯 A clean-room corpus without DadaGP now exists
+
+Open question §5.3 asked whether training could avoid DadaGP. The answer arrived
+with R2: **GuitarSet + EGSet12 + Guitar-TECHS + GOAT are all CC BY 4.0**. That
+is a genuine multi-source, commercially-usable corpus — which did not exist when
+the DadaGP-dependent symbolic models were trained. It does not make the symbolic
+*architecture* fit the contract any better (§4.2 stands), but it removes the
+licensing reason to abandon the symbolic arm permanently, and it is exactly the
+material a purpose-trained sequence labeler (§4.3 option a) would need.
+
+### What remains open
+
+Only §5.3's second half and the §7.4 metric question. Nothing blocks starting
+the audio arm.
+
+---
+
 ## 1. Audio → tab: the contract is a perfect fit
 
 ### 1.1 TabCNN is the emission scorer, not something to be adapted into one
@@ -257,22 +333,24 @@ practice).
 
 ---
 
-## 5. ⛔ Blockers — resolve before any C++
+## 5. Blockers — ✅ both cleared, see §0
 
-1. **GuitarSet's actual license is UNVERIFIED.** It is the training corpus for
-   *every* audio-arm candidate (TabCNN, FretNet, and the augmented variants).
-   If it forbids commercial use of derived weights, the audio arm dies too.
-   Same question for EGSet12 (Zenodo 11406378) and the Riley et al. curated set.
-   **This is a hard gate — check it first, it is cheap, and it can invalidate
-   §1 entirely.**
-2. **The 2024–26 wave is unverified in depth.** Guitar-TECHS
-   (arXiv 2501.03720), GOAT (arXiv 2509.22655), **TART** (arXiv 2510.02597 —
-   audio→tab, the direct competitor to §1), and "A Machine Learning Approach for
-   MIDI to Guitar Tablature Conversion" (arXiv 2510.10619). Any "SOTA as of
-   2026" claim here is conditional on these not superseding TabCNN.
-3. **Can a clean-room corpus avoid DadaGP entirely?** Is GuitarSet + Riley
-   sufficient to train a usable emission scorer? Does SynthTab offer a
-   licensable synthesis path?
+1. ~~**GuitarSet's license is UNVERIFIED**~~ ✅ **RESOLVED (R1)** — CC BY 4.0,
+   open access, no NC/SA. So are EGSet12, Guitar-TECHS and GOAT. The audio arm
+   survives, and EGSet12 ships the recommended trained model under CC BY 4.0.
+   Residual care: TabCNN's *code* repo has no licence file — use the clean-room
+   path (paper + MIT FretNet as reference), not that source.
+2. ~~**The 2024–26 wave is unverified**~~ ✅ **RESOLVED (R2)** — TART does not
+   benchmark on GuitarSet 6-fold, reports no tablature F1 or TDR, never compares
+   to TabCNN/FretNet, and delegates string/fret to the DadaGP-trained
+   Fretting-Transformer. Guitar-TECHS and GOAT are datasets. Nothing supersedes
+   TabCNN. Still unread: "A Machine Learning Approach for MIDI to Guitar
+   Tablature Conversion" (arXiv 2510.10619) — symbolic arm only, so it cannot
+   change the audio recommendation.
+3. **Can a clean-room corpus avoid DadaGP entirely?** ✅ **Materially yes (R3)** —
+   GuitarSet + EGSet12 + Guitar-TECHS + GOAT are all CC BY 4.0. What is still
+   open is the *sufficiency* question: is that enough data to train a usable
+   emission scorer, and does SynthTab offer a licensable synthesis path.
 
 ---
 
