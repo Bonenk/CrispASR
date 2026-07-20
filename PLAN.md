@@ -2357,9 +2357,16 @@ and Mel-Band RoFormer separation, piano_transcription (§250).
   ⚠️ Cost is O(n_bins · N_k)/frame; N_k ≈ 24k samples at the bottom bin. Fine
   offline at hop 2048, NOT a real-time path — add a sparse spectral-kernel
   variant behind a flag if one is ever needed.
-- [ ] **`core/gru.h`** — uni/bidirectional GRU, mirroring `core/lstm.h`. Needed
-  by RMVPE-class models and by any future CRNN. (piano_transcription landed with
-  its own BiGRU; fold it in when convenient, do NOT refactor it blind.)
+- [x] **`core/gru.h`** — uni/bidirectional GRU. **DONE**, validated against a
+  real `torch.nn.GRU` fixture: **max_abs < 1e-5**
+  (`tools/gen_gru_reference.py` → `CRISPASR_GRU_REF` → `tests/test-core-gru.cpp`;
+  the parity case skips without the fixture so CI needs no torch/network).
+  Two traps documented inline because both yield plausible-but-wrong output:
+  (1) the reset gate multiplies the RECURRENT TERM `r*(W_hn h + b_hn)`, not
+  `W_hn(r*h)` as the textbook GRU does; (2) `b_ih`/`b_hh` CANNOT be pre-summed
+  the way core/lstm.h folds them, since `b_hn` sits inside the `r` product.
+  (piano_transcription landed with its own BiGRU; fold it in when convenient,
+  do NOT refactor it blind.)
 - [ ] **`core/stft.h`** — forward STFT. `core/istft.h` covers only the inverse.
   htdemucs and mel-band-roformer each carry a private copy already, so a third
   consumer makes it the third duplicate. ⚠️ **This refactors two SHIPPED
