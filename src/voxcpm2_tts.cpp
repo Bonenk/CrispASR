@@ -3896,7 +3896,9 @@ static std::vector<float> vae_decode_graph(voxcpm2_context* ctx, const std::vect
     // dispatch assertion in ggml-vulkan.cpp fires. Fall back to the CPU path
     // which has no such limit — the VAE is <5% of total synthesis time anyway.
     const int64_t out_samples = (int64_t)T_lat * 1920;
-    if (out_samples > 500000 && !ggml_backend_is_cpu(ctx->backend)) {
+    const char* backend_name = ggml_backend_name(ctx->backend);
+    const bool is_cuda = backend_name && std::strncmp(backend_name, "CUDA", 4) == 0;
+    if (out_samples > 500000 && !ggml_backend_is_cpu(ctx->backend) && !is_cuda) {
         if (ctx->verbosity >= 1)
             fprintf(stderr,
                     "voxcpm2: VAE output too long for GPU dispatch "
@@ -4947,7 +4949,9 @@ static std::vector<float> vae_encode_graph(voxcpm2_context* ctx, const float* pc
     // Workgroup guard (#164): conv0 runs on the full padded length. Very long
     // refs can overflow Vulkan/Metal dispatch limits; the encoder is a small
     // slice of synthesis time, so fall back to CPU for pathological lengths.
-    if (padded_n > 500000 && !ggml_backend_is_cpu(ctx->backend)) {
+    const char* backend_name = ggml_backend_name(ctx->backend);
+    const bool is_cuda = backend_name && std::strncmp(backend_name, "CUDA", 4) == 0;
+    if (padded_n > 500000 && !ggml_backend_is_cpu(ctx->backend) && !is_cuda) {
         if (ctx->verbosity >= 1)
             fprintf(stderr, "voxcpm2: VAE encode input too long for GPU dispatch (%d samples); using CPU\n", padded_n);
         return vae_encode_uncached(ctx, pcm, n_samples, out_T_patches);
