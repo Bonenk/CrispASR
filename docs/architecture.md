@@ -71,7 +71,7 @@ all consume the same symbols.
 | `text_lid_dispatch.{h,cpp}` | Backend-agnostic façade over `lid_fasttext` and `lid_cld3`. Peeks `general.architecture` at load time and dispatches to the matching backend; one C ABI for any text-LID GGUF. Powers `crispasr-lid` and `--lid-on-transcript`. |
 | `crispasr_aligner.{h,cpp}` | canary-CTC + Qwen3-ForcedAligner + wav2vec2 forced alignment behind one entry point; filename-based dispatch. Also the engine behind `--align-only` (standalone alignment without ASR, issue #217). |
 | `crispasr_cache.{h,cpp}` | WinHTTP / curl / wget download into `~/.cache/crispasr/`; zombie-file detection. |
-| `crispasr_model_registry.{h,cpp}` | Backend → canonical GGUF URL table; fuzzy filename lookup for "did you mean …?" hints. |
+| `crispasr_model_registry.{h,cpp}` | Backend → canonical GGUF URL table; exact default-bundle enumeration (primary, companion, extras, licence policy); fuzzy filename lookup for "did you mean …?" hints. |
 | `whisper_params.h` | Shared params struct (extracted from cli.cpp, extended). |
 
 ## `examples/cli/` — presentation + policy

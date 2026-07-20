@@ -1,8 +1,8 @@
-"""Smoke test: every CA_EXPORT symbol from crispasr_c_api.cpp is reachable
-from the Python ctypes binding.
+"""Smoke test: the maintained shared C-ABI symbol set is reachable from
+the Python ctypes binding.
 
 Does NOT instantiate models or run inference — purely checks that the
-binding declares (and can look up) all 150 exported C-ABI functions.
+binding declares (and can look up) all 152 symbols in this smoke-test set.
 Requires CRISPASR_LIB_PATH pointing at a built libcrispasr.{so,dylib}.
 
     CRISPASR_LIB_PATH=build/src/libcrispasr.so python -m pytest tests/test_binding_parity.py -v
@@ -14,7 +14,7 @@ import sys
 
 import pytest
 
-# All 150 CA_EXPORT symbols (sorted, from:
+# Maintained shared C-ABI smoke-test symbols (sorted; additions can be found with:
 #   grep -oP 'CA_EXPORT\s+\w+[\s*]+\K(crispasr_\w+)' src/crispasr_c_api.cpp | sort -u
 # )
 ALL_SYMBOLS = [
@@ -78,6 +78,8 @@ ALL_SYMBOLS = [
     "crispasr_pyannote_cache_apply_abi",
     "crispasr_pyannote_cache_compute_abi",
     "crispasr_pyannote_cache_free_abi",
+    "crispasr_registry_default_bundle_artifact_abi",
+    "crispasr_registry_default_bundle_info_abi",
     "crispasr_registry_list_backends_abi",
     "crispasr_registry_lookup_abi",
     "crispasr_registry_lookup_by_filename_abi",
@@ -196,8 +198,8 @@ def test_symbol_resolves(lib, symbol):
 
 
 def test_symbol_count(lib):
-    """Sanity: we expect exactly 150 crispasr_* symbols."""
-    assert len(ALL_SYMBOLS) == 150, f"expected 150 symbols, got {len(ALL_SYMBOLS)}"
+    """Sanity-check accidental edits to the maintained symbol set."""
+    assert len(ALL_SYMBOLS) == 152, f"expected 152 symbols, got {len(ALL_SYMBOLS)}"
 
 
 def test_python_binding_imports():

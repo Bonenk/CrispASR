@@ -7122,6 +7122,47 @@ CA_EXPORT int crispasr_registry_list_backends_abi(char* out_csv, int32_t out_cap
     return (int)acc.size();
 }
 
+CA_EXPORT int crispasr_registry_default_bundle_info_abi(const char* backend, char* out_backend, int32_t backend_cap,
+                                                        char* out_license, int32_t license_cap,
+                                                        int32_t* out_requires_acceptance) {
+    if (!backend || !out_backend || backend_cap <= 0 || !out_license || license_cap <= 0 || !out_requires_acceptance)
+        return -1;
+    CrispasrRegistryBundle bundle;
+    if (!crispasr_registry_default_bundle(backend, bundle))
+        return 0;
+    if ((int)bundle.backend.size() + 1 > backend_cap || (int)bundle.license.size() + 1 > license_cap)
+        return -2;
+    std::memcpy(out_backend, bundle.backend.c_str(), bundle.backend.size());
+    out_backend[bundle.backend.size()] = '\0';
+    std::memcpy(out_license, bundle.license.c_str(), bundle.license.size());
+    out_license[bundle.license.size()] = '\0';
+    *out_requires_acceptance = bundle.requires_license_acceptance ? 1 : 0;
+    return (int)bundle.artifacts.size();
+}
+
+CA_EXPORT int crispasr_registry_default_bundle_artifact_abi(const char* backend, int32_t index, int32_t* out_kind,
+                                                            char* out_filename, int32_t filename_cap, char* out_url,
+                                                            int32_t url_cap, char* out_size, int32_t size_cap) {
+    if (!backend || index < 0 || !out_kind || !out_filename || filename_cap <= 0 || !out_url || url_cap <= 0 ||
+        !out_size || size_cap <= 0)
+        return -1;
+    CrispasrRegistryBundle bundle;
+    if (!crispasr_registry_default_bundle(backend, bundle) || index >= (int32_t)bundle.artifacts.size())
+        return 1;
+    const CrispasrRegistryArtifact& artifact = bundle.artifacts[index];
+    if ((int)artifact.filename.size() + 1 > filename_cap || (int)artifact.url.size() + 1 > url_cap ||
+        (int)artifact.approx_size.size() + 1 > size_cap)
+        return 2;
+    *out_kind = (int32_t)artifact.kind;
+    std::memcpy(out_filename, artifact.filename.c_str(), artifact.filename.size());
+    out_filename[artifact.filename.size()] = '\0';
+    std::memcpy(out_url, artifact.url.c_str(), artifact.url.size());
+    out_url[artifact.url.size()] = '\0';
+    std::memcpy(out_size, artifact.approx_size.c_str(), artifact.approx_size.size());
+    out_size[artifact.approx_size.size()] = '\0';
+    return 0;
+}
+
 CA_EXPORT int crispasr_session_result_n_segments(crispasr_session_result* r) {
     return r ? (int)r->segments.size() : 0;
 }
@@ -9421,6 +9462,9 @@ CA_EXPORT int crispasr_transcribe_parallel(struct whisper_context* ctx, struct w
 // =========================================================================
 
 CA_EXPORT const char* crispasr_c_api_version(void) {
+    // 0.7.0 — Adds exact canonical default-bundle enumeration for the
+    // model registry (primary, companion, extras, and licence gate).
+    // Pure addition; no symbol renames or signature changes.
     // 0.6.0 — Adds CrisperWeaver parity: crispasr_get_progress /
     // crispasr_reset_progress (atomic progress polling for Dart FFI),
     // crispasr_audio_load_stereo (stereo PCM decode),
@@ -9436,7 +9480,7 @@ CA_EXPORT const char* crispasr_c_api_version(void) {
     // `crispasr_detect_language_pcm` return-code contract.
     // 0.5.1 — Adds `crispasr_session_translate_text_free`.
     // Pure addition; no symbol renames or signature changes.
-    return "0.6.0";
+    return "0.7.0";
 }
 
 // Backwards-compatibility alias. The Dart smoke test and any 0.4.x-era

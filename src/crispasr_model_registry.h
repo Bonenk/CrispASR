@@ -15,6 +15,27 @@
 #pragma once
 
 #include <string>
+#include <vector>
+
+enum class CrispasrRegistryArtifactKind {
+    Primary = 0,
+    Companion = 1,
+    Extra = 2,
+};
+
+struct CrispasrRegistryArtifact {
+    CrispasrRegistryArtifactKind kind;
+    std::string filename;
+    std::string url;
+    std::string approx_size; // empty when the registry does not record one
+};
+
+struct CrispasrRegistryBundle {
+    std::string backend; // canonical registry key (aliases are resolved)
+    std::string license;
+    bool requires_license_acceptance = false;
+    std::vector<CrispasrRegistryArtifact> artifacts;
+};
 
 struct CrispasrRegistryEntry {
     std::string backend;
@@ -44,6 +65,12 @@ bool crispasr_license_accepted(const std::string& license, const std::string& ac
 /// Look up a registry entry by backend name. Returns true on hit.
 bool crispasr_registry_lookup(const std::string& backend, CrispasrRegistryEntry& out,
                               const std::string& preferred_quant = "");
+
+/// Return the exact default artifact bundle downloaded by `-m auto` for a
+/// backend: primary model, inline companion (if any), then extra companions.
+/// This deliberately does not apply a preferred quant or infer a recommendation.
+/// Returns false when the backend has no registry entry.
+bool crispasr_registry_default_bundle(const std::string& backend, CrispasrRegistryBundle& out);
 
 /// Number of entries in the static registry.
 int crispasr_registry_count();
