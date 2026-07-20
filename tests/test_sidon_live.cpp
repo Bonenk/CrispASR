@@ -81,13 +81,22 @@ TEST_CASE("sidon speech restoration", "[integration][sidon]") {
     REQUIRE(!input.empty());
 
     const auto output = sidon_restore(ctx, input.data(), (int)input.size());
-    REQUIRE(output.size() > input.size() * 2);
+    REQUIRE(output.size() == input.size() * 3);
     REQUIRE(std::all_of(output.begin(), output.end(), [](float sample) { return std::isfinite(sample); }));
 
     float peak = 0.0f;
     for (float sample : output)
         peak = std::max(peak, std::fabs(sample));
     CHECK(peak > 0.01f);
+
+    // samples/jfk.wav ends in silence. Decoding without Sidon's prescribed
+    // right-side lookahead used to expose the model boundary response here,
+    // producing a near-full-scale transient in the final ~12 ms.
+    float tail_peak = 0.0f;
+    const size_t tail_samples = std::min<size_t>(output.size(), 48 * 12);
+    for (size_t i = output.size() - tail_samples; i < output.size(); ++i)
+        tail_peak = std::max(tail_peak, std::fabs(output[i]));
+    CHECK(tail_peak < 0.05f);
 
     // The bounded DAC path must preserve the full-graph decoder output. This
     // also exercises scheduler teardown/recreation on a persistent context.
@@ -105,10 +114,10 @@ TEST_CASE("sidon speech restoration", "[integration][sidon]") {
         CHECK(cosine > 0.999);
     }
 
-    // O(T^2) length cap: an over-long input (well past the ~60 s / 3000-frame
+    // O(T^2) length cap: an over-long input (well past the ~58.5 s / 3000-frame
     // default) must fail cleanly with an empty result — never OOM/crash. The
     // guard trips right after the cheap STFT front-end, so this stays fast even
-    // with the model loaded. ~90 s of silence @ 16 kHz ⇒ T ≈ 4500 > 3000.
+    // with the model loaded. ~90 s of silence plus lookahead ⇒ T ≈ 4575 > 3000.
     {
         std::vector<float> too_long(16000 * 90, 0.0f);
         // A little energy so peak-normalization doesn't divide near-zero.
