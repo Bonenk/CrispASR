@@ -10,6 +10,44 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## "Linked in CMake" is NOT evidence the code SHIPS — the linker drops an object nothing references (mel-band-roformer, 2026-07-20)
+
+`crispasr-lib` linked the `mel-band-roformer` target, exactly as the CMakeLists
+reads. But nothing in `src/crispasr_c_api.cpp` ever referenced its symbols, so
+the linker dropped the whole object from the shared library. Verified against
+the **released v0.8.17 artifact**: `mel_band_roformer_separate` is simply not
+in `libcrispasr.dylib`.
+
+So the backend was not merely "unreachable from the session API" — the code was
+**not present in the shipped library at all**, for every consumer of it. The CLI
+worked the whole time because `crispasr-cli` links the static lib directly, and
+`--separate` reads the GGUF arch in its own dispatcher. A working CLI proved
+nothing about the artifact every binding loads.
+
+Three things follow:
+
+1. **Verify a release artifact by SYMBOL, not by version number or changelog.**
+   `nm -gU libcrispasr.dylib | c++filt | grep <fn>` answers "is this actually in
+   the build" in one line. We asked the question this way and learned that
+   v0.8.17 ships chords but not MBR separation — which no amount of reading the
+   tag or the notes would have revealed.
+2. **Demangle before concluding.** Some runtimes are C++-linkage, not
+   `extern "C"`: `sidon_init_from_file` appears only as
+   `__Z20sidon_init_from_file...`. A raw `nm | grep _name` reports a shipped
+   backend as missing. My first pass did exactly that and produced a false
+   alarm on sidon.
+3. **Source-text audits are structurally blind to this.** Every other check in
+   `tools/check-backend-wiring.py` greps source, and the source looked correct.
+   The new shipped-library check compares declared backends against symbols in
+   the built dylib — ground truth, so it has NO alias false positives (the
+   name-matching alternative produced 21/76 noise; this one produces 0/63).
+   Proven both directions: PASS clean, FAIL when the c_api arm is removed.
+
+The residual blind spot is unchanged and recorded in PLAN.md: a backend in
+NEITHER the CLI roster NOR the c_api list is invisible to all three checks.
+
+---
+
 ## Cosine, correlation and peak-match are ALL scale-invariant — a uniform gain error passes every one of them (CQT `scale=True`, 2026-07-20)
 
 `core/cqt.h` normalised each constant-Q kernel by its L1 norm but never applied

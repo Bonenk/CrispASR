@@ -144,6 +144,50 @@ def main():
 
     capi_only = sorted(n for n in capi_flat if n not in cli_names and not cli_resolves(n))
 
+    # ---------------------------------------------------------------------
+    # SHIPPED-LIBRARY check: is the backend's runtime actually IN the dylib?
+    #
+    # Every other check in this file reads SOURCE TEXT, and source text cannot
+    # see this failure. mel-band-roformer was linked into crispasr-lib by
+    # CMake, exactly as it looked in the CMakeLists -- but nothing in
+    # crispasr_c_api.cpp referenced its symbols, so the linker dropped the
+    # whole object from the shared library. It was not merely unreachable from
+    # the session API: it was NOT PRESENT IN THE SHIPPED .dylib AT ALL, while
+    # the CLI worked because crispasr-cli links the static lib directly.
+    # Confirmed against the released v0.8.17 artifact, where
+    # mel_band_roformer_separate is absent.
+    #
+    # Symbol presence is ground truth, so this has no alias false positives --
+    # unlike name-matching, which produced 21/76 noise. Demangling matters:
+    # some runtimes are C++-linkage, so `sidon_init_from_file` appears only as
+    # `__Z20sidon_init_from_file...` and a raw grep misses it.
+    lib_fail = []
+    libpath = None
+    for c in ("build/src/libcrispasr.dylib", "build/src/libcrispasr.so",
+              "build/src/libcrispasr.1.dylib"):
+        if (ROOT / c).exists():
+            libpath = ROOT / c
+            break
+    if libpath:
+        raw = subprocess.run(["nm", "-gU", str(libpath)], capture_output=True, text=True).stdout
+        dem = subprocess.run(["c++filt"], input=raw, capture_output=True, text=True).stdout
+        inits = {}
+        for h in (ROOT / "src").glob("*.h"):
+            try:
+                for m in re.finditer(r"\b([a-z0-9_]+)_init_from_file\s*\(", h.read_text(errors="ignore")):
+                    inits[m.group(1)] = h.name
+            except OSError:
+                pass
+
+        def runtime_stem(n):
+            b = n.replace("-", "_")
+            return [b, b.replace("_tts", ""), b + "_tts", b.replace("_asr", ""), b + "_asr"]
+
+        for name, _caps in backends:
+            hit = next((v for v in runtime_stem(name) if v in inits), None)
+            if hit and (hit + "_init_from_file") not in dem:
+                lib_fail.append((name, hit))
+
     required_fail = []   # (name, [missing required checks])
     advisory_gap = []    # (name, [missing advisory checks])
     n_canonical = 0
@@ -235,6 +279,16 @@ def main():
     print()
     print(f"Backends: {len(backends)} total — {n_canonical} canonical (audited), "
           f"{n_alias} aliases/variants (reachable, skipped).")
+    if lib_fail:
+        print(f"\n❌ Declared as a backend but ABSENT from the shipped library ({len(lib_fail)}):")
+        for name, stem in lib_fail:
+            print(f"   {name:24} {stem}_init_from_file not in {libpath.name if libpath else '?'}")
+        print("   The linker drops a static-lib object nothing references, so CMake linkage\n"
+              "   is NOT evidence the code ships. Reference it from src/crispasr_c_api.cpp\n"
+              "   (a session arm), then rebuild and re-check.")
+    elif not libpath:
+        print("\n(shipped-library check skipped: no built libcrispasr found — build it to enable)")
+
     if capi_only:
         print(f"\n❌ Advertised by the C ABI but ABSENT from the CLI roster ({len(capi_only)}):")
         for name in capi_only:
@@ -266,7 +320,7 @@ def main():
     if not go_ok and not is_macos:
         print("   run: python tools/sync_go_cgo_ldflags.py   (see docs/contributing.md)")
 
-    fail = bool(required_fail) or bool(capi_only) or (not go_ok and not is_macos)
+    fail = bool(required_fail) or bool(capi_only) or bool(lib_fail) or (not go_ok and not is_macos)
     print()
     print("RESULT:", "FAIL (required gap)" if fail else "PASS")
     return 1 if fail else 0

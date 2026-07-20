@@ -125,7 +125,18 @@ reachable from the CLI. A backend in **neither** list is still invisible to
 both — which is exactly how mel-band-roformer stayed session-unreachable while
 being the default `--separate` model (fixed in 4eccc60cb).
 
-Two candidate signals were measured and BOTH are too noisy to gate on as-is:
+**PARTLY CLOSED (2026-07-20)** by a third check: declared backends vs symbols
+actually present in the built `libcrispasr.dylib`. Symbol presence is ground
+truth, so it has no alias false positives — 0 violations across the 63 backends
+that map to a runtime header, versus 21/76 noise from name-matching. It catches
+the state mel-band-roformer was in once registered (in `--list-backends`, but
+its object dropped by the linker), proven by removing the c_api arm and
+watching the audit fail. Demangle first: C++-linkage runtimes like `sidon` only
+appear as `__Z20sidon_init_from_file...`.
+
+Still open: a backend in NEITHER the CLI roster NOR the c_api list is invisible
+to all three checks. Two candidate signals for THAT were measured and both are
+too noisy to gate on as-is:
 
 - registry keys not matching a backend name: **103 of 196** — most are
   legitimate model variants (`crepe-tiny`, `btc-chords-majmin`, the
