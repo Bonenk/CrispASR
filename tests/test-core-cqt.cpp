@@ -438,7 +438,33 @@ int main(int argc, char** argv) {
         if (std::strcmp(argv[i], "--dump-tabcnn") == 0 && i + 1 < argc) {
             const auto p = tabcnn_params();
             const int T_target = 40;
-            const auto x = shared_test_signal(T_target * p.hop_length, p.sample_rate);
+            // Optional third arg: a raw float32 mono file already at
+            // p.sample_rate. Synthetic tones are a harsh, unrepresentative
+            // leakage test -- most bins carry only sidelobe energy -- so the
+            // parity verdict has to be re-taken on real guitar audio before it
+            // means anything. Python does the decode/resample; this stays a
+            // dependency-free raw read.
+            std::vector<float> x;
+            if (i + 2 < argc) {
+                FILE* in = std::fopen(argv[i + 2], "rb");
+                if (!in) {
+                    std::fprintf(stderr, "cannot open %s\n", argv[i + 2]);
+                    return 1;
+                }
+                std::fseek(in, 0, SEEK_END);
+                const long bytes = std::ftell(in);
+                std::fseek(in, 0, SEEK_SET);
+                x.resize((size_t)bytes / sizeof(float));
+                if (std::fread(x.data(), sizeof(float), x.size(), in) != x.size()) {
+                    std::fclose(in);
+                    std::fprintf(stderr, "short read on %s\n", argv[i + 2]);
+                    return 1;
+                }
+                std::fclose(in);
+                std::fprintf(stderr, "read %zu samples from %s\n", x.size(), argv[i + 2]);
+            } else {
+                x = shared_test_signal(T_target * p.hop_length, p.sample_rate);
+            }
             std::vector<float> m;
             const int T = core_cqt::magnitude(p, x.data(), (int)x.size(), m);
             FILE* f = std::fopen(argv[i + 1], "wb");
