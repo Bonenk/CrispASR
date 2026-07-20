@@ -428,26 +428,47 @@ Training a clean model on the ChoCo CC-BY subset (option 1 above) remains the
 target for a *commercially usable* chord tier. It is now a follow-up, not a
 prerequisite, and the BTC port is what proves the architecture + surface first.
 
-#### Required mechanism — attestation BEFORE download
+#### Required mechanism — MIRROR CrispEmbed, do not invent one
 
-The existing `print_license_note()` fires AFTER `ensure_cached_file()`, so today
-an NC model is already on disk by the time the warning prints. For chords that
-is not good enough; the gate must precede the fetch.
+**`--i-have-rights` is the WRONG flag.** It attests *speaker consent for voice
+cloning* — a third-party-rights question. Licence compliance is unrelated, and
+one flag must not silently grant two different permissions. A separate mechanism
+is required.
 
-Add to `crispasr_model_registry.cpp`, in the library so **all three surfaces**
-(CLI, session C-ABI, server) inherit it — the multi-surface rule:
+**CrispEmbed already has the right one** (`examples/cli/model_mgr.{h,cpp}`), and
+it is stricter than anything CrispASR does today. Mirror it rather than inventing
+a parallel design — the two repos should behave identically:
 
-- `crispasr_accept_noncommercial()` — reads `CRISPASR_ACCEPT_NONCOMMERCIAL`
-  (the `CRISPASR_<...>` env convention) plus a process-level setter the CLI flag
-  calls.
-- `--accept-noncommercial` CLI flag, mirroring `--i-have-rights`.
-- In `crispasr_resolve_model()`, BEFORE `ensure_cached_file()`: if the resolved
-  entry `license_is_nc()` and no attestation is present, print what the licence
-  is, what it forbids, and how to attest — then **refuse and return empty**.
-  No partial download, no cached file.
-- Registry entry carries the full string, e.g.
-  `"CC-BY-NC-SA-4.0 (weights; trained on Isophonics/RWilliams/UsPop NC annotations)"`,
-  so the reason is visible without reading this document.
+| CrispEmbed (existing) | CrispASR (to add) |
+|---|---|
+| `license_requires_acceptance(spdx)` — `cc-by-nc*`, `gemma`, `llama*`, `lfm1.0`, `other` | same predicate, same tag list |
+| `resolve_model(arg, auto_download, accepted_license)` | extend `crispasr_resolve_model()` with the same parameter |
+| `--accept-license <spdx>` | `--accept-license <spdx>` |
+| `CRISPEMBED_ACCEPT_LICENSE` env fallback | `CRISPASR_ACCEPT_LICENSE` |
+| accepts the exact SPDX tag, or `all` / `*` | same |
+| TTY: prints licence + model-card URL, prompts `[y/N]` | same |
+| non-TTY without acceptance: **refuses** | same |
+| **`auto_download` alone is NOT sufficient** | same — this is the key property |
+
+Two things CrispEmbed's design gets right that a blanket NC flag would not:
+
+1. **Acceptance is per-licence, not blanket.** The user attests to a *specific*
+   SPDX tag; `all` exists but is opt-in.
+2. **SPDX tags, not substring matching.** CrispASR currently tests
+   `license.find("NC")`, and that same NC-detection logic is duplicated in three
+   places (`crispasr_model_registry.cpp` + two spots in
+   `crispasr_model_mgr_cli.cpp`). Moving to SPDX tags de-duplicates it.
+
+What CrispASR must change:
+
+- Registry `license` becomes an SPDX tag (`cc-by-nc-sa-4.0`) with the prose
+  reason kept separately, so the predicate is exact rather than a substring hit.
+- `print_license_note()` currently fires AFTER `ensure_cached_file()` — an NC
+  model is already on disk when the warning prints. The gate must precede the
+  fetch, and must also cover the **cached-hit early return**, which today skips
+  the notice entirely.
+- Put the predicate + acceptance check in the library so CLI, session C-ABI and
+  server all inherit it (the multi-surface rule).
 
 CometBeat mirrors the same gate in its model store before fetching, and states
 the restriction in the UI at the point of download — not buried in an About box.
@@ -491,8 +512,10 @@ Priority: RMVPE > FCPE, and neither is urgent while CREPE-tiny hits RTF 0.28.
 
 ## Suggested order (highest leverage first)
 
-0. **NC attestation gate** — land BEFORE any NC weights are registered, so
-   there is never a window in which they are downloadable ungated.
+0. **Licence-acceptance gate, ported from CrispEmbed** — land BEFORE any NC
+   weights are registered, so there is never a window in which they are
+   downloadable ungated. Also de-duplicates CrispASR's three copies of
+   substring-based NC detection.
 1. **`core/cqt.h`** — unblocks Basic Pitch AND the chord model. Infrastructure,
    no licence risk, reusable.
 2. **BTC chords** — architecture from the paper, weights gated NC.
