@@ -23,6 +23,7 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 
 ### What's new (v0.8.9)
 
+- **Piano transcription (§250, new task):** transcribe piano audio to MIDI note events — 88 keys at 100fps using ByteDance/Kong's CRNN architecture (4× ConvBlock + BiGRU + regression post-processing). F16 GGUF = 77 MB. `--backend piano-transcription -m piano-transcription-f16.gguf -f piano.wav`.
 - **Source separation (§248, new task):** `--separate` splits a mix into stems (`<input>_<stem>.wav`) — **mel-band-roformer** (vocal/instrumental, MIT) and **htdemucs** (4-stem), architecture auto-detected from the GGUF. Mel-Band RoFormer diff harness validated end-to-end (every stage cos=1.0, reconstructed waveform bit-exact). `--stems vocals,drums` selects a subset; `--sep-output-dir` sets the output location.
 - **MOSS-Transcribe-Diarize (#242, v0.8.9):** joint ASR + speaker diarization + timestamps in a single 0.9B model. Stock Whisper encoder + VQAdaptor + Qwen3-0.6B. Diff harness 4/4 cos=1.0. `--backend moss-diarize -m auto`.
 - **dots.tts full pipeline (#200, v0.8.9):** PatchEncoder RoPE + QK-norm fix, BigVGAN vocoder working e2e, voice cloning via CAM++ speaker encoder. `--tts-steps` / `--tts-cfg-scale` wired.

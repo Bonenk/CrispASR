@@ -630,6 +630,20 @@ Qwen3 talker LM + 12 Hz RVQ speech tokenizer. Three variants:
 - `qwen3-tts-1.7b-base` — 1.7B talker, higher quality
 - `qwen3-tts-1.7b-voicedesign` — natural-language voice description via `--instruct`
 
+### piano-transcription
+
+`ByteDance/Kong piano_transcription_inference` (Apache-2.0) — CRNN-based piano
+transcription producing MIDI note events (88 keys, 100fps).
+
+- **Input:** 16 kHz mono → STFT(2048, hop=160) → LogMel(229 bins, 30–8000 Hz) → BN
+- **4× AcousticModelCRnn8Dropout** (frame/onset/offset/velocity):
+  4× ConvBlock(Conv2d 3×3 + BN2d + ReLU + AvgPool2d(1,2)) → FC(1792→768) + BN1d + ReLU → 2-layer BiGRU(768→256) → FC(512→88) → sigmoid
+- **Onset refinement:** cat(onset, √onset·velocity) → 1-layer BiGRU(176→256) → FC → sigmoid
+- **Frame refinement:** cat(frame, onset, offset) → 1-layer BiGRU(264→256) → FC → sigmoid
+- **Post-processing:** regression binarization (monotonicity check) → note detection (onset/offset/frame thresholds) → MIDI events
+- F16 GGUF: 77 MB, F32: 154 MB
+- `--backend piano-transcription -m piano-transcription-f16.gguf -f piano.wav`
+
 ### miotts
 
 `Aratako/MioTTS-0.6B` (Apache-2.0) — **Qwen3** (28L, 1024d, GQA 16/8)
