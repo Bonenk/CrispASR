@@ -30,7 +30,9 @@
 // surface. Chunking would reproduce the BTC chunked-CQT bug.
 //
 // GGUF: tabcnn-f16.gguf. Weights are CC BY 4.0 (EGSet12,
-// doi:10.5281/zenodo.11406378) and REQUIRE attribution.
+// https://zenodo.org/records/11406378) and REQUIRE attribution.
+// ⚠ There is NO Zenodo DOI: `10.5281/zenodo.11406378` looks plausible and 404s.
+// The record DOI is the arXiv one, 10.48550/arXiv.2405.14679.
 // Blueprint, licence chain and benchmark context:
 //   docs/music-transcription/GUITAR_TAB_SPEC.md
 // Executable spec for this graph (keep in lockstep):

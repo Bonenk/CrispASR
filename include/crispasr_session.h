@@ -454,7 +454,7 @@ CRISPASR_SESSION_API int crispasr_session_convert_sample_rate(crispasr_session* 
 // a playable fingering (one note per string, fret range, capo, hand span) is
 // yours — argmaxing this grid ignores every playability constraint.
 //
-// Weights are CC BY 4.0 (EGSet12, doi:10.5281/zenodo.11406378): attribution
+// Weights are CC BY 4.0 (EGSet12, https://zenodo.org/records/11406378): attribution
 // required when redistributing.
 CRISPASR_SESSION_API int crispasr_session_tab(crispasr_session* s, const float* pcm, int n_samples, int sample_rate);
 CRISPASR_SESSION_API int crispasr_session_tab_n_frames(crispasr_session* s);
