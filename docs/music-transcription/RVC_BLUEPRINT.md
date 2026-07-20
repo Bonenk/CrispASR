@@ -10,6 +10,67 @@ document is about what we have to BUILD.
 
 ---
 
+## 0. RESOLUTIONS (CometBeat, 2026-07-20)
+
+Both findings below are answered; recorded here so the doc reads as settled.
+
+- **Finding 1 — CrispASR owns all three** (`enc_p` + `flow` + `dec`). The frozen
+  contract stands: they send ContentVec features + F0 (Hz, 100 Hz) + speaker id,
+  **not `z`**. Their reasoning is performance and it is sound: their pure-Dart
+  `rvc.dart` already runs all three at **152x slower than real time**, with the
+  transformer `enc_p` and the flow a large share of that — so a vocoder-only
+  split would leave the transformer as a Dart bottleneck and still miss
+  real-time. The right Dart↔native boundary is the ContentVec output, the one
+  checkpoint-agnostic reusable piece; `enc_p`/`flow`/`dec` are all
+  checkpoint-specific and belong together. Sending `z` would also leak a 192-ch
+  model-internal latent into the wire format.
+- **Finding 2 — replay the noise**, agreed. Both live RNG sites must be
+  injectable in our ggml graph. **They have offered a cross-impl oracle**:
+  `rvc.dart` runs the full generator deterministically from an injected noise
+  buffer (`rvcSeededNoise` → the ONNX graph's `rnd [1,192,T]` input, cos
+  0.99994), enabling a three-way deterministic harness — Python reference → their
+  Dart-offline → our ggml graph, all fed identical noise. Production
+  `convert()` stays random by design.
+- Their offline impl already pins `F.interpolate` to 2x-**nearest**
+  (`rvcAlignFeatures`) and the coarse-pitch mel map 50–1100 Hz
+  (`rvcCoarsePitch`) — independent agreement with §3 and SVC_RECORD_SHAPES §4.
+
+### Answer to their SineGen phase question — it is ZERO, by construction
+
+They asked whether to zero or replay the SineGen initial phase, having noticed
+their ONNX export appears to fix it. **There was never any randomness there to
+fold away, for this architecture:**
+
+`GeneratorNSF` hardcodes `SourceModuleHnNSF(sampling_rate=sr, harmonic_num=0)`
+(`models.py:439-441`). With `harmonic_num = 0`:
+
+- `SineGen.dim = harmonic_num + 1 = 1` (`models.py:294`) — fundamental only, no
+  overtones.
+- `rand_ini` is therefore shape `(batch, 1)` (`:325`), and the very next line is
+  `rand_ini[:, 0] = 0` (`:328`).
+
+So `rand_ini` is **identically zero**. The random-phase code is live only for
+`harmonic_num > 0`, which RVC never uses. Both implementations should use zero
+phase, and they will match bit-for-bit without any agreement being needed —
+this is determined by the source, not a convention.
+
+**That leaves exactly TWO live RNG sites, not three:** the `z_p` latent sample,
+and SineGen's ADDITIVE noise (`:358`), which is ungated and always runs:
+
+```python
+noise_amp = uv * self.noise_std + (1 - uv) * self.sine_amp / 3
+noise     = noise_amp * torch.randn_like(sine_waves)
+sine_waves = sine_waves * uv + noise
+```
+
+Note it is voicing-dependent: voiced frames get sine + noise at `noise_std`
+(0.003), unvoiced get pure noise at `sine_amp/3` (0.0333). Their ONNX export
+exposes only `rnd` (the z_p noise), so **this second site is the one their path
+may differ on** — worth confirming whether their export also folded the
+additive noise away, because that IS a real randomness source, unlike the phase.
+
+---
+
 ## 1. FINDING: the ask is ~3x bigger than "the NSF-HiFi-GAN generator"
 
 CometBeat asked us to port "the RVC NSF-HiFi-GAN generator". But the seam they
@@ -32,10 +93,8 @@ sid ─────────> emb_g ─────────────> 
 ```
 
 Only #3 is a vocoder. #1 is a transformer encoder and #2 is a flow — neither is
-covered by "HiFi-GAN". **This is worth confirming with CometBeat**: if they
-expected us to own only the vocoder and to run enc_p/flow in Dart, the split is
-different from what the note implies (and their side would then need to send
-`z`, not ContentVec features).
+covered by "HiFi-GAN". **RESOLVED (§0): we own all three.** "Vocoder" was loose
+wording; they always meant the whole `infer()`.
 
 Note `emb_pitch = nn.Embedding(256, hidden_channels)` (`models.py:40`) — this is exactly why the coarse 1..255 quantisation must be
 bit-right: it indexes an embedding table, so an off-by-one is a different
@@ -54,7 +113,10 @@ before any graph is written.
 z_p = (m_p + torch.exp(logs_p) * torch.randn_like(m_p) * 0.66666) * x_mask
 ```
 
-**Site B — the sine source** (`models.py`, SineGen.forward ~325 and ~358):
+**Site B — the sine source** (`models.py`, SineGen.forward ~325 and ~358).
+**CORRECTION, see §0:** the `rand_ini` phase term below is DEAD for RVC —
+`harmonic_num=0` makes it a single element that the next line zeroes. Only the
+additive `noise` is a live RNG site.
 
 ```python
 rand_ini = torch.rand(f0_buf.shape[0], f0_buf.shape[2], ...)   # random INITIAL PHASE per harmonic

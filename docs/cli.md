@@ -21,6 +21,7 @@ when you don't pass `--backend`, whisper is the default.
 - [Threading & processors](#threading--processors)
 - [Whisper-only flags](#whisper-only-flags)
 - [Pitch / F0 estimation (`--pitch`)](#pitch--f0-estimation---pitch) — CREPE pitch track
+- [Piano transcription (`--piano`)](#piano-transcription---piano) — note events (onset/offset/pitch/velocity)
 - [Chord recognition (`--chords`)](#chord-recognition---chords) — BTC chord timeline (**non-commercial weights**)
 - [Auto-download (`-m auto`)](#auto-download--m-auto) — registry table
 - [Audio formats](#audio-formats) — WAV / FLAC / MP3 / OGG / Opus / M4A
@@ -1157,6 +1158,46 @@ Default output is one tab-separated line per beat — `time_sec` and either
 **Every downbeat is also emitted as a beat.** The postprocessor snaps each
 downbeat onto its nearest detected beat, so downbeats are a strict subset of
 beats and you never have to merge two lists to reconstruct the grid.
+
+## Piano transcription (`--piano`)
+
+Another standalone task: audio in, **note events** out — onset, offset, MIDI
+pitch, name and velocity. Routes to its own dispatcher before any ASR backend
+is built, like `--pitch` / `--chords` / `--separate`.
+
+```bash
+crispasr --piano -m auto --auto-download -f piano.wav
+crispasr --piano --piano-format json -m piano-transcription-f16.gguf -f piano.wav
+```
+
+Default output is one tab-separated line per note — `onset_sec`, `offset_sec`,
+`midi`, `name`, `velocity`:
+
+```
+1.406	1.455	60	C4	32
+2.597	4.990	42	F#2	74
+```
+
+Deliberately **not** the `.lab` layout `--chords` uses: a chord timeline is
+contiguous non-overlapping spans, whereas piano notes overlap freely, so
+reusing that shape would imply a structure the data does not have.
+`--piano-format json` adds pedal events.
+
+| Flag | Meaning |
+|---|---|
+| `--piano` | Enable the piano-transcription task |
+| `--piano-format FMT` | `text` (default) or `json` |
+
+Before this verb existed the model was reachable only as `--backend
+piano-transcription` through `transcribe()`, which rendered each note as a
+segment whose text read `"C4 v=80"` — parsing that back is lossy, and it was
+never the intended seam. The structured session API
+(`crispasr_session_piano_notes`) already existed for bindings; `--piano` gives
+the CLI the same fidelity. The old path still works.
+
+**Model** (`cstr/piano-transcription-GGUF`, Apache-2.0): ByteDance/Kong
+high-resolution piano transcription, 16 kHz mono, CRNN + BiGRU with four heads
+(frame/onset/offset/velocity) plus onset- and frame-refinement GRUs.
 
 ## Chord recognition (`--chords`)
 

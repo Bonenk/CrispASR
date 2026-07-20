@@ -414,6 +414,7 @@ static constexpr feature_col kFeatures[] = {
     {"pitch", CAP_PITCH},
     {"chords", CAP_CHORDS},
     {"beats", CAP_BEATS},
+    {"piano", CAP_PIANO},
 };
 
 void crispasr_print_backend_matrix() {
@@ -494,6 +495,7 @@ static constexpr cap_slug kCapSlugs[] = {
     {"pitch", CAP_PITCH},
     {"chords", CAP_CHORDS},
     {"beats", CAP_BEATS},
+    {"piano", CAP_PIANO},
 };
 
 void crispasr_print_backend_matrix_json() {
