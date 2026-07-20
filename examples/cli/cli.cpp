@@ -11,6 +11,7 @@
 #include "crispasr_stream_punc.h"      // streaming punctuation mode helpers (#112)
 #include "crispasr_cache.h"            // crispasr_cache::ensure_cached_file (for --hf-repo, #128)
 #include "core/gpu_backend_pref.h"     // crispasr_set_gpu_backend_pref (#214)
+#include "core/win_compat.h"           // setenv/unsetenv shims for MSVC
 #include "crispasr_model_mgr_cli.h"
 #include "crispasr_model_registry.h"
 #include "crispasr_output.h"   // crispasr_make_disp_segments — split-on-punct (#29)
