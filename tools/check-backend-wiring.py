@@ -36,6 +36,7 @@ Exit code: 0 if all REQUIRED checks pass, 1 otherwise (advisory gaps never fail)
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -113,6 +114,35 @@ def main():
 
     def has_adapter(name):
         return f"crispasr_backend_{name.replace('-', '_')}.cpp" in adapters
+
+    # REVERSE CHECK: backends the C ABI advertises but the CLI does not know.
+    #
+    # Every other check in this file iterates the CLI's --list-backends-json, so
+    # a backend missing from the CLI roster is not "canonical" and is never
+    # audited at all -- the audit is blind to it BY CONSTRUCTION. That is not
+    # hypothetical: btc-chords shipped with a runtime, a --chords dispatcher, a
+    # session C ABI and wasm bindings while being absent from the CLI factory
+    # and roster, so --list-backends did not know it existed and this script
+    # reported PASS. Walking the c_api list and checking the other direction
+    # closes the loop.
+    capi_names = set(re.findall(r'list \+= ",([^"]+)"', capi))
+    capi_flat = {n.strip() for entry in capi_names for n in entry.split(",") if n.strip()}
+    cli_names = {name for name, _caps in backends}
+    # A name is fine if the CLI ROSTER lists it *or* the CLI FACTORY resolves it
+    # as an alias -- several backends are advertised by the c_api under an alias
+    # (canary-ctc, irodori-tts, vibevoice-tts, omniasr-llm-unlimited) and are
+    # genuinely reachable. Only a name with NEITHER is unreachable from the CLI,
+    # which is the state btc-chords was in.
+    # Reachability is decided by ASKING THE BINARY, not by parsing the dispatch
+    # chain: some backends resolve by prefix (`name.rfind("omniasr", 0) == 0`)
+    # or through multi-alias conditions that no regex will reliably cover.
+    # Only the handful not already in the roster need probing.
+    def cli_resolves(name):
+        r = subprocess.run([args.crispasr, "--backend", name, "-m", os.devnull, "-f", os.devnull],
+                           capture_output=True, text=True)
+        return f"unknown backend '{name}'" not in (r.stderr + r.stdout)
+
+    capi_only = sorted(n for n in capi_flat if n not in cli_names and not cli_resolves(n))
 
     required_fail = []   # (name, [missing required checks])
     advisory_gap = []    # (name, [missing advisory checks])
@@ -205,6 +235,14 @@ def main():
     print()
     print(f"Backends: {len(backends)} total — {n_canonical} canonical (audited), "
           f"{n_alias} aliases/variants (reachable, skipped).")
+    if capi_only:
+        print(f"\n❌ Advertised by the C ABI but ABSENT from the CLI roster ({len(capi_only)}):")
+        for name in capi_only:
+            print(f"   {name:24} add a factory entry + roster line in examples/cli/crispasr_backend.cpp")
+        print("   (A task-shaped backend still needs a redirect shim + capability bit so it\n"
+              "    appears in --list-backends and the generated docs/feature-matrix.md.\n"
+              "    See examples/cli/crispasr_backend_btc.cpp for the pattern.)")
+
     if required_fail:
         print(f"\n❌ REQUIRED wiring gaps ({len(required_fail)}):")
         for name, miss in required_fail:
@@ -228,7 +266,7 @@ def main():
     if not go_ok and not is_macos:
         print("   run: python tools/sync_go_cgo_ldflags.py   (see docs/contributing.md)")
 
-    fail = bool(required_fail) or (not go_ok and not is_macos)
+    fail = bool(required_fail) or bool(capi_only) or (not go_ok and not is_macos)
     print()
     print("RESULT:", "FAIL (required gap)" if fail else "PASS")
     return 1 if fail else 0

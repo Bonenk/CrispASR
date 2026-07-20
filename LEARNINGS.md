@@ -10,6 +10,100 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## Cosine, correlation and peak-match are ALL scale-invariant — a uniform gain error passes every one of them (CQT `scale=True`, 2026-07-20)
+
+`core/cqt.h` normalised each constant-Q kernel by its L1 norm but never applied
+librosa's `scale=True` factor (`V /= np.sqrt(lengths)`, the default). Every bin
+came out low by `sqrt(N_k)` — **152x at the bottom octave**. BTC read its
+features as near-silence and emitted "no chord" for every frame of every file.
+
+The bug is trivial. What it cost was the second half-day, and that came from
+the guards being structurally unable to see it:
+
+- **`tools/cqt_librosa_parity.py`** checked per-frame shape correlation and
+  peak-bin match. Both are scale-invariant *by construction*. It reported
+  correlation 0.9999 and 97.6% peak match against a build that was wrong by
+  two orders of magnitude.
+- **`tests/test-core-cqt.cpp`** passed **726 assertions** against the same
+  build. Six test cases, none of which pinned an absolute magnitude.
+
+This is the THIRD time this exact class has bitten us. The htdemucs iSTFT scale
+was inverted (`1/sqrt(nfft)` for `sqrt(nfft)`) and `spec_input` passed at
+cos 1.000000 the whole time; it was caught only by printing `|mine|` vs `|ref|`
+alongside the cosine. Different backend, different year, same blind spot.
+
+**The rule: any metric that normalises its inputs cannot validate the scale of
+those inputs.** Cosine similarity, Pearson correlation, argmax agreement, SNR
+against a normalised reference, "does the peak land in the right bin" — every
+one divides the magnitude out. If a stage can be wrong by a constant factor,
+something must compare an ABSOLUTE quantity: `|mine|` vs `|ref|` next to the
+cosine (our diff harness prints exactly this — use it), or a per-bin magnitude
+ratio, or an analytic value.
+
+Two sharper corollaries, both learned the hard way in this same fix:
+
+**1. Assert the invariant, not a bound on a signal.** The strongest test here
+turned out to need no signal at all: after normalisation each kernel's L1 norm
+must equal `sqrt(N_k)` exactly, because the code multiplies by `sqrt(N)/l1`.
+That is arithmetic on the coefficients — no window leakage, no tolerance to
+argue about, and it fails by a factor of up to 152 the moment the scale factor
+is dropped. Reach for the algebraic identity before reaching for a threshold.
+
+**2. A tolerance wider than the defect is not a test — and a test NAME can
+encode the wrong law.** One existing case, "L1 normalisation makes bins
+comparable across kernel lengths", compared peak magnitude two octaves apart
+and required `ratio < 3`. It measured exactly the right quantity. It passed
+anyway, because the correct and broken builds sit on *opposite sides of it*:
+
+|                        | response         | two-octave ratio |
+|------------------------|------------------|------------------|
+| L1 only (the bug)      | flat across bins | 1.0              |
+| L1 x sqrt(N) (librosa) | ~ `sqrt(N_k)`    | 2.0              |
+
+Both under 3. Worse, the property the test was NAMED for — equal-amplitude
+tones giving equal magnitude — is the one the **buggy** build satisfies;
+`scale=True` deliberately does not have it. I nearly re-broke the code
+"fixing" that test to `< 1.5` before measuring. The replacement asserts the
+exact law (`peak == (A/2) * sqrt(N_k)`, which holds to four decimals across
+the whole range) instead of a bound.
+
+**Write the guard before the fix.** The magnitude check went into the parity
+tool first, so it failed on the broken build, and reverting the fix afterwards
+still drives its asserted median from 1.0043 to 0.0131 — a 76x margin. A guard
+authored after the fix has never been observed to fail, which means it has
+never been observed to work.
+
+See `docs/music-transcription/PLAN.md` and the header comments in
+`src/core/cqt.h` + `tests/test-core-cqt.cpp`.
+
+---
+
+## A logits-level diff harness at cos 1.000000 says nothing about the TABLE that turns logits into labels (BTC chord vocabulary, 2026-07-20)
+
+`crispasr-diff btc` passes 13/13 stages at cos 1.000000. That validates the
+transformer completely and the user-visible output not at all: the last step is
+`argmax -> index -> name`, and the name tables live outside the graph. A wrong
+entry in the 170-class quality table, or one flipped bool in the maj/min
+collapse, produces byte-identical logits and mislabels a chord forever. It
+would read as "the model is weak on diminished chords", not as a typo.
+
+Same shape as the OmniVoice zeroed-`token_embd` lesson (a data defect wearing a
+model defect's clothes), but from the other end of the pipeline.
+
+So: **for every port, list what the diff harness structurally cannot see, and
+cover that separately.** Here that meant extracting the pure vocabulary +
+positional-encoding helpers into `src/btc_chord_vocab.h` purely so they could be
+unit-tested without weights (`tests/test-btc-vocab.cpp`), and asserting
+properties a table typo breaks: all 170 names distinct, the root surviving the
+maj/min collapse, every one of the 25 collapsed labels reachable (an
+unreachable one = a chord that can never be emitted), and the positional
+encoding's halves being concatenated rather than interleaved.
+
+Cheap, hermetic, no model, no GPU — and it covers the only part of the chain
+the expensive harness is blind to.
+
+---
+
 ## PLAN "OPEN" items are frequently already shipped — audit against the CODE, never the prose (2026-07-17)
 
 A single session found **~11 PLAN items marked OPEN / NOT STARTED / SURVEY-ONLY

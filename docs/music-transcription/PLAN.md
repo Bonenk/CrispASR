@@ -27,8 +27,7 @@ ggml/GGUF backends.
   checkpoints), `tools/btc_torch_parity.py` (numpy spec, cos 0.99999995 /
   1.00000004 vs torch), `src/btc_chords.{h,cpp}`, the `--chords` early
   dispatcher (`examples/cli/crispasr_chords_cli.{h,cpp}`), arch auto-detect
-  (`btc` → `btc-chords`) in **both** `crispasr_backend.cpp` and
-  `crispasr_detect_backend_from_gguf`, session C ABI
+  (`btc` → `btc-chords`) in `crispasr_detect_backend_from_gguf`, session C ABI
   (`crispasr_session_chords*`), wasm bindings (`sessionChords`), Go cgo
   LDFLAGS, registry entries, CMake linkage, README + docs/cli.md,
   `tests/test_btc_chords_live.cpp` + `CRISPASR_MODEL_BTC_CHORDS`.

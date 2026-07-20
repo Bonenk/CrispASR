@@ -94,6 +94,17 @@ because the reference archive is missing. Bootstrap the env, dump an
 archive, place it where the harness expects, and the existing diff
 code starts working.
 
+- `btc` (alias `btc-chords`) — **no frozen archive by design**: the reference
+  dump is regenerated on demand by passing a 4th argument (the output path) to
+  `python tools/btc_torch_parity.py`, which also doubles as the numpy/torch
+  spec for the port. Run with `crispasr-diff btc <model.gguf> <ref.gguf>
+  <audio>`; the branch lives in `examples/cli/crispasr_diff_main.cpp` and the
+  comparison itself in `btc_chords_diff()` (`src/btc_chords.cpp`). The tool
+  dumps 14 stages and 13 are scored (`input_feat` is replayed as the input
+  rather than scored). **RESULT: 13/13 stages pass at cos 1.000000, in both f32
+  and f16.** Weights (`cstr/btc-chords-GGUF`) are CC-BY-NC-SA — the registry
+  needs `--accept-license cc-by-nc-sa-4.0` / `CRISPASR_ACCEPT_LICENSE` to fetch
+  them; the upstream BTC code and CrispASR itself are MIT.
 - `canary` — `tools/bootstrap_ref_env.sh canary` then `python tools/dump_reference.py --backend canary --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/canary-ref.gguf`
 - `chatterbox` — `tools/bootstrap_ref_env.sh chatterbox` then `python tools/dump_reference.py --backend chatterbox --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/chatterbox-ref.gguf`
 - `cohere` — `tools/bootstrap_ref_env.sh cohere` then `python tools/dump_reference.py --backend cohere --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/cohere-ref.gguf`
