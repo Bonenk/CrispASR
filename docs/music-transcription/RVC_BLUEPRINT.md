@@ -208,6 +208,53 @@ The reverse pass also matches torch exactly. Five details:
   rate 1, 3 layers are **hardcoded in models.py:624**, not config-derived, so
   they hold for every checkpoint.
 
+## 2d. dec traps — VALIDATED (audio cos 1.00000000)
+
+The full path now matches torch: **m_p / logs_p / z / audio all cos
+1.00000000**. Two of the traps below were found the hard way, by bisection,
+after a plausible-looking implementation scored badly.
+
+### SineGen phase — an approximation scored cos -0.04
+
+The phase logic cannot be paraphrased. The real sequence (`models.py:329-351`):
+
+1. `rad = (f0/sr) % 1` at FRAME rate
+2. `tmp = cumsum(rad) * upp` — still frame rate
+3. `tmp` → **LINEAR** interpolate to output rate, **`align_corners=True`**
+4. `rad` → **NEAREST** interpolate to output rate
+5. `tmp %= 1`; wrap points are where `diff(tmp) < 0`
+6. `phase = cumsum(rad_up + shift)`, `shift = -1` at each wrap
+7. `sine = sin(phase * 2*pi)`
+
+The linear-interpolated cumsum is used **only to LOCATE the wraps**; the phase
+itself accumulates over the **nearest**-upsampled per-frame values. The two
+interpolations use DIFFERENT modes. A rewrite that interpolated the cumsum and
+used it directly as phase produced the right amplitude and **cos -0.04** —
+uncorrelated noise that still looks like a sine source.
+
+Accumulate in float64: the running sum grows without bound while only its
+fraction matters.
+
+### `dec.cond` has a BIAS
+
+`self.cond = nn.Conv1d(gin_channels, upsample_initial_channel, 1)` — default
+bias. Omitting it is a constant per-channel offset, structurally invisible, and
+it cost cos 0.9999 at `ups0` and 0.998 on the final audio. Bisecting stage by
+stage was what localised it: `conv_pre` and every `noise_convs` were exact while
+`ups0` was not, and the transposed convolution itself tested exact (1e-16)
+against torch in isolation — so the only remaining suspect was its input.
+
+### Other dec details
+
+- **TWO different LeakyReLU slopes in ONE function**: per-stage and ResBlock use
+  `LRELU_SLOPE = 0.1`, but the FINAL pre-`conv_post` call is a bare
+  `F.leaky_relu(x)` — torch's **0.01** default (`models.py:529`).
+- `conv_post` is **`bias=False`** (`models.py:484`).
+- ConvTranspose1d: `stride=u`, `padding=(k-u)//2`.
+- `noise_convs[i]`: `kernel=2*stride_f0`, `stride=stride_f0`, `padding=stride_f0//2`.
+- Each stage sums `num_kernels` ResBlocks and **divides by `num_kernels`**.
+- ResBlock1's `convs1` carry the dilations; `convs2` are always dilation 1.
+
 ## 3. Numerical hazards spotted in the trace
 
 - **Phase accumulation by `cumsum`** (SineGen): phase is accumulated over the
