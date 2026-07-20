@@ -1,7 +1,9 @@
 # SVC handoff — feature/F0 record shapes (CrispASR ↔ CometBeat)
 
-**Status: PROPOSAL, awaiting confirmation from the CometBeat voice-svc side.
-Blocking their API freeze — see PLAN.md §CB1.**
+**Status: CONFIRMED 2026-07-20 by the CometBeat voice-svc side. No longer
+blocking their freeze — see PLAN.md §CB1.** Every `[OPEN]` below is resolved;
+the resolutions are recorded inline as **[AGREED]**. Two API additions they
+asked for are in §10.
 
 CometBeat asked CrispASR to port the real-time-critical vocoders (RVC
 NSF-HiFi-GAN, Beatrice v2) behind a `CrispasrSession.convert(...)` seam, with
@@ -64,8 +66,10 @@ Consequences for the contract:
 
 - **F0 is native at 100 Hz.** It does NOT need resampling to meet the features;
   the features are brought up to meet it.
-- The **[OPEN]** question is only *who does the 2x duplication*. Proposal:
+- **[AGREED]** *who does the 2x duplication*:
   **CometBeat sends ContentVec at its native 50 Hz and CrispASR duplicates**,
+  with F0 sent at its native 100 Hz. Their pure-Dart RVC fallback already does
+  the duplication internally, so both paths agree.
   because the duplication is part of the model's input contract and belongs
   next to the generator that depends on it. That also keeps the wire format the
   encoder's natural output, with nothing to get wrong in Dart.
@@ -89,16 +93,16 @@ by a frame, and the reference silently takes the shorter. Match the reference.
 | layout | `Float32List`, frame-major flat (`n_frames * n_dims`) **[OPEN]** | our choice; matches `crispasr_session_pitch_frames` / `_chords_spans` |
 | normalisation | raw encoder output — RVC applies none before the generator | `pipeline.py` `vc()` |
 
-**Decision needed: v1 or v2.** They are different feature dimensionalities and
-different extraction paths, and a checkpoint is trained for one of them. The
-Dart `hubert.dart` must declare which it emits; we should carry it as a GGUF
-field and refuse a mismatch loudly rather than run and sound subtly wrong.
+**[AGREED] Both.** CometBeat supports v1 (256 = vec-256-layer-9) and v2
+(768 = vec-768-layer-12) and carries the dim on the wire. **They asked us to
+expose `convert_content_dim()`** so a v1/v2 mismatch refuses loudly instead of
+sounding subtly wrong — they cannot make that check from the Dart side. See
+§10.
 
 There is also an optional **FAISS index retrieval** step
 (`pipeline.py`, `index.search(npy, k=8)`, inverse-square-distance weighting,
-blended by `index_rate`). It is off when no index is supplied. **[OPEN]** —
-proposal: out of scope for v1 of the seam; note it so nobody assumes we dropped
-it by accident.
+blended by `index_rate`). It is off when no index is supplied.
+**[AGREED] out of scope for v1** — noted, not dropped.
 
 ---
 
@@ -131,7 +135,7 @@ constants above are model-side, and replicating them in Dart guarantees drift.
 | units | **Hz, float32** — matches `nsff0` |
 | unvoiced | **0.0** (the reference's `f0_mel <= 1 -> 1` path handles it) |
 | rate | **100 Hz / 10 ms**, matching `window=160` at 16 kHz |
-| voicing | optional confidence in [0,1] **[OPEN]** — see below |
+| voicing | **[AGREED] not sent** — 0.0 marks unvoiced, no separate array |
 
 RVC has a `protect` mechanism that blends the pre-index features back in at
 unvoiced frames (`pipeline.py`, `pitchff`, default `protect=0.33`) to reduce
@@ -162,21 +166,37 @@ Proposal: **return mono float32 at the checkpoint's native rate**, with a
 use. CometBeat resamples for playback; we do not guess a device rate.
 
 Note `change_rms` (`pipeline.py:373`, `rms_mix_rate`) blends the source's
-envelope back into the output. **[OPEN]** — proposal: expose as a parameter with
-the reference default rather than hardcoding.
+envelope back into the output. **[AGREED] expose as a parameter**, with
+`convert_sample_rate()` returning the checkpoint's native `tgt_sr` (CometBeat
+resamples for playback).
+
+**CAREFUL WITH THE DEFAULT — upstream has three, and they disagree:**
+
+| surface | `rms_mix_rate` |
+|---|---|
+| webui single inference (`webui.py:1324`) | **0.25** |
+| webui batch inference (`webui.py:1428`) | 1 |
+| realtime GUI (`realtime_gui.py:58`) | 0.0 |
+
+`rate` is the proportion of the OUTPUT envelope kept
+(`pipeline.py:22`, "rate是2的占比"), and `rate == 1` SKIPS `change_rms`
+entirely (`if rms_mix_rate != 1`). So batch's 1 means "off", realtime's 0.0
+means "fully adopt the source envelope", and 0.25 is the interactive default.
+We ship **0.25** as agreed, but there is no single canonical upstream value and
+this table is why.
 
 ---
 
-## 7. Streaming vs one-shot **[OPEN]**
+## 7. Streaming vs one-shot — **[AGREED] one-shot**
 
 Not yet discussed, and it changes the ABI. RVC's own pipeline is chunked with
 padding and crossfade (`x_pad`, `t_query`, `t_center`), and the repo has a
 separate `infer/rtrvc.py` for the real-time path — so streaming is a distinct
 code path upstream too, not a wrapper.
 
-Proposal: **build one-shot first and name it as one-shot**, so a later streaming
-entry point is an addition rather than a breaking change. If CometBeat needs
-true real-time in v1, say so now — that changes the port target to `rtrvc.py`.
+**[AGREED]:** one-shot first, named as one-shot; real-time is NOT needed in v1,
+so the port target is **`pipeline.py`, not `rtrvc.py`**. A later streaming entry
+point is additive.
 
 ---
 
@@ -195,10 +215,21 @@ non-commercial weights redistributable.
 
 ---
 
+## 10. API additions CometBeat asked for
+
+Both are guards they cannot implement from Dart:
+
+| entry point | purpose |
+|---|---|
+| `convert_content_dim()` | the checkpoint's expected ContentVec dim (256 or 768). A v1/v2 mismatch must **refuse loudly**, not run and sound subtly wrong. Mirrors `convert_n_speakers()`. |
+| `protect` parameter | reference default **0.33** (`modules.py:61`, verified) |
+| `rms_mix_rate` parameter | ship **0.25**; see the caveat in §6 |
+
+Length mismatch stays **min + log**, as specced in §2.
+
 ## 9. Next steps
 
-1. Confirm or amend §2 (who duplicates), §3 (v1 vs v2), §7 (streaming) —
-   **blocking**.
+1. ~~Confirm §2 / §3 / §7~~ — **DONE, all agreed (2026-07-20).**
 2. Write the numpy/torch executable spec for the generator, then the ggml
    graph, then the per-stage diff harness. Standard order.
 3. Wire `convert()` across CLI + session C ABI + wasm together, registering the
