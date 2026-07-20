@@ -347,6 +347,60 @@ s.set_voice("ref.wav", ref_text="exact transcription of ref.wav")
 pcm = s.synthesize("Clone my voice.")
 ```
 
+## Voice conversion (SVC / RVC)
+
+**The session C ABI is the only surface — there is no CLI verb.** RVC's input is
+ContentVec features, which CrispASR does not produce (the caller owns the
+content encoder), so a command line has nothing to feed it.
+
+```c
+// content: n_frames * content_dim, frame-major. f0_hz: n_frames, 0.0 = unvoiced.
+// The coarse mel-quantised pitch is derived internally — those constants are
+// model-side and replicating them in the caller guarantees drift.
+int crispasr_session_convert(crispasr_session* s, const float* content, int n_frames,
+                             const float* f0_hz, int speaker_id,
+                             const float* noise_zp, const float* noise_sine);
+const float* crispasr_session_convert_audio(crispasr_session* s, int* out_n_samples);
+int crispasr_session_convert_content_dim(crispasr_session* s);   // 256 (v1) or 768 (v2)
+int crispasr_session_convert_n_speakers(crispasr_session* s);
+int crispasr_session_convert_sample_rate(crispasr_session* s);   // 32k/40k/48k
+```
+
+### Check `convert_content_dim()` before you call
+
+256 means v1 (ContentVec layer 9 + `final_proj`); 768 means v2 (final layer).
+Feeding a v2 encoder's features to a v1 checkpoint is **silent** — it produces
+audio that merely sounds poor. This accessor exists so the mismatch can be
+refused loudly, which the caller cannot detect on its own.
+
+### Conversion is STOCHASTIC — that is not a bug
+
+Two independent RNG sites (the latent sample and the sine source's additive
+noise) mean output varies run to run by design. Pass `NULL` for both noise
+buffers in production.
+
+Passing explicit buffers replays a specific draw and makes the call
+**bit-identical**. That is the only way to compare against another
+implementation: correlating waveforms against a reference run is invalid here,
+because the reference disagrees with itself.
+
+| buffer | size |
+|---|---|
+| `noise_zp` | `inter_channels * n_frames` (192 × N for every shipped config) |
+| `noise_sine` | `n_frames * (sample_rate / 100)` |
+
+Feature and F0 rate is **100 Hz** — derived as `sample_rate / prod(upsample_rates)`,
+not configured. See `docs/music-transcription/SVC_RECORD_SHAPES.md` for the full
+wire contract and `RVC_BLUEPRINT.md` for the ~15 implementation details the port
+reproduces.
+
+### Licence
+
+RVC's code is MIT, but **checkpoints are not uniformly so** — community voice
+models have unclear provenance and some forks add non-commercial terms. Each
+GGUF carries its own tag and the registry gate matches on it, exactly as for the
+BTC chord weights.
+
 ## Chord recognition
 
 The `btc-chords` backend is a standalone task (CLI `--chords`) — audio in, a
