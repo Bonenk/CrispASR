@@ -17,9 +17,55 @@ ggml graph yet. `PhoneExtractor`, `VectorQuantizer`, `ConverterNetwork` and
 | `tools/beatrice_torch_parity.py` | 36-stage reference dump, spec reproduces `forward()` **bit-identically** |
 | `src/beatrice_pitch.{h,cpp}` | **DONE** — 30 stages + end-to-end, 0 failed |
 | `crispasr-diff beatrice` | **DONE** |
-| PhoneExtractor converter + 53-stage reference | **DONE** (spec bit-identical) |
-| PhoneExtractor ggml graph | NOT STARTED |
+| PhoneExtractor converter + 73-stage reference | **DONE** (spec bit-identical) |
+| `src/beatrice_phone.{h,cpp}` | **DONE** — 69 stages + end-to-end, 0 failed |
 | ConverterNetwork / Vocoder | NOT STARTED |
+
+Shared ConvNeXt primitives live in `src/core/beatrice_ops.h`; both backends use
+one copy.
+
+## A residual branch can hide a completely broken sub-graph
+
+The PhoneExtractor blocks are `x = attn(x) + x` then `x = conv(x) + x`. The
+reference originally dumped only the **post-residual** sums, and against those
+the port reported **0 stages failed, end-to-end cos 0.99999970** — while the
+attention branch had never been meaningfully compared.
+
+The tell was in the numbers: `pblock0_attn` had max_abs 7.699e-04 against
+`backbone_norm`'s 7.700e-04 — the same value to four figures, which is what you
+see when a branch adds nothing observable. Proof came from a negative control:
+substituting a **chunked** split for the **strided** interleave broke 41 later
+stages while `pblock0_attn` still passed at **cos 0.99999986**. A stage
+dominated by its residual cannot see its own branch.
+
+Fix: dump and compare the branch output *before* the residual add
+(`pblock*_attn_delta`). Control there is **cos 1.00000000, max_abs 4.3e-07**;
+the same broken interleave now localises to `pblock1_attn_delta` at cos 0.9946,
+rel 0.487. **Generalises to any residual architecture** — comparing only
+post-residual tensors is close to comparing nothing.
+
+### One more capture artifact, and how it announced itself
+
+The first `attn_delta` run reported **cos −0.012** — apparently 20 broken
+attention blocks. It was not: `back` is a reshape **view**, and `ggml_set_output`
+on a view does not stop the allocator recycling the parent's buffer, so the
+capture read recycled memory. The contradiction is what gave it away — a branch
+differing by max_abs 1.2 whose post-residual sum matched at cos 0.9999999 cannot
+both be true. Materialising with `ggml_cont` before capture fixed it. (This is
+the second allocator-recycling bug in this port; the first was a missing
+`ggml_set_output` altogether.)
+
+### The gate is cosine, and that is a compromise
+
+A relative max-abs gate was tried at 1e-4 and **reverted — it failed the control
+on 65 stages.** f32 noise on the waveform convolutions legitimately reaches rel
+2.7e-04 (`fe_conv0`) and 1.3e-03 end to end, while the broken interleave carries
+6.3e-04 at `attn_delta` — i.e. the bug's error sits *below* the control's own
+noise at other stages, so no single global threshold separates them.
+
+So `rel` is printed but not gated. Read the numbers per stage: on `attn_delta`
+the control runs 4e-07 to ~3e-05, and either negative control (chunked
+interleave, or missing causal mask) jumps to ~6e-04 and trips 60 stages.
 
 ## PhoneExtractor — upstream's own fusion is an approximation
 
