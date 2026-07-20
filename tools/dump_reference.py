@@ -245,6 +245,9 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # model_dir = openbmb/VoxCPM2 HF snapshot. Audio arg = reference WAV
     # for voice cloning (optional). Synth text from VOXCPM2_SYN_TEXT env.
     "voxcpm2-tts": "reference_backends.voxcpm2_tts",
+    # AudioVAE-only 16 kHz -> 48 kHz S2S upscaler. Mirrors the official
+    # VoxCPM2 encode padding/layout and audio_vae decode round trip.
+    "voxcpm2-vae": "reference_backends.voxcpm2_vae",
     # CosyVoice3 TTS — Phase 3b: single-DiT-block stages only (flow
     # model is the only thing wired through extract_stage so far).
     # model_dir = FunAudioLLM/Fun-CosyVoice3-0.5B-2512 HF snapshot.

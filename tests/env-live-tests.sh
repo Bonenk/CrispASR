@@ -125,6 +125,11 @@ export CRISPASR_MODEL_WAVTOK="${CRISPASR_MODEL_WAVTOK:-$CRISPASR_MODELS_DIR/wavt
 # ── Sidon speech restoration ──
 export CRISPASR_MODEL_SIDON="${CRISPASR_MODEL_SIDON:-$CRISPASR_MODELS_DIR/sidon-v0.1-f16.gguf}"
 
+# ── VoxCPM2 AudioVAE speech upscaler ──
+export CRISPASR_MODEL_VOXCPM2_VAE="${CRISPASR_MODEL_VOXCPM2_VAE:-$CRISPASR_MODELS_DIR/voxcpm2-vae-f32.gguf}"
+# Optional full-model path for the simultaneous TTS + upscaler lifecycle test.
+export CRISPASR_MODEL_VOXCPM2_FULL="${CRISPASR_MODEL_VOXCPM2_FULL:-}"
+
 # ── CREPE monophonic F0 / pitch (cstr/crepe-GGUF) ──
 # `tiny` is the shipping default: `full` is 38x the compute for the same
 # geometry (see docs/music-transcription/PLAN.md). CRISPASR_MODEL_CREPE_FULL is

@@ -384,7 +384,8 @@ dedicated wrapper yet — the C ABI above is the surface for all of them.
 
 ## Speech-to-speech
 
-Backends with S2S capability (`lfm2-audio`, `mini-omni2`, `sidon`) support
+Backends with S2S capability (`lfm2-audio`, `mini-omni2`, `sidon`,
+`voxcpm2-vae`) support
 end-to-end audio-in → audio-out transformation through a single model
 pass. Available in Python, Go, Dart/Flutter, and the HTTP server
 (`POST /v1/audio/speech-to-speech`).
@@ -393,9 +394,10 @@ pass. Available in Python, Go, Dart/Flutter, and the HTTP server
   (`crispasr_session_speech_to_speech`)
 
 Input defaults to 16 kHz mono float32 PCM. Python callers with another input
-rate call `set_pcm_sample_rate(rate)` before `speech_to_speech()`; Sidon then
-resamples internally to 16 kHz. Conversational S2S backends return 24 kHz;
-Sidon returns restored 48 kHz audio and an empty transcript.
+rate call `set_pcm_sample_rate(rate)` before `speech_to_speech()`; Sidon and
+VoxCPM2 AudioVAE then resample internally to 16 kHz. Conversational S2S
+backends return 24 kHz; Sidon and VoxCPM2 AudioVAE return 48 kHz audio and an
+empty transcript.
 
 ```python
 # Python
@@ -414,6 +416,15 @@ audio, sr = sf.read("input.wav", dtype="float32")
 s.set_pcm_sample_rate(sr)
 restored, _ = s.speech_to_speech(audio)
 sf.write("restored.wav", restored, 48000)
+```
+
+```python
+# VoxCPM2 AudioVAE upscaling
+s = crispasr.Session("voxcpm2-vae-f32.gguf")
+audio, sr = sf.read("input.wav", dtype="float32")
+s.set_pcm_sample_rate(sr)
+upscaled, _ = s.speech_to_speech(audio)
+sf.write("upscaled.wav", upscaled, 48000)
 ```
 
 ```go
