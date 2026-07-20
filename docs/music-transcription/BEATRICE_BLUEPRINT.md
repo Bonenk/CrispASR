@@ -17,7 +17,53 @@ ggml graph yet. `PhoneExtractor`, `VectorQuantizer`, `ConverterNetwork` and
 | `tools/beatrice_torch_parity.py` | 36-stage reference dump, spec reproduces `forward()` **bit-identically** |
 | `src/beatrice_pitch.{h,cpp}` | **DONE** — 30 stages + end-to-end, 0 failed |
 | `crispasr-diff beatrice` | **DONE** |
-| PhoneExtractor / ConverterNetwork / Vocoder | NOT STARTED |
+| PhoneExtractor converter + 53-stage reference | **DONE** (spec bit-identical) |
+| PhoneExtractor ggml graph | NOT STARTED |
+| ConverterNetwork / Vocoder | NOT STARTED |
+
+## PhoneExtractor — upstream's own fusion is an approximation
+
+`PhoneExtractor` is 6 weight-normed strided convs (÷160 → the same 100 Hz), a
+`FeatureProjection` LayerNorm, a **20-block** ConvNeXt stack with
+`use_mha=True`, and a weight-normed 1×1 head applied after a GELU.
+
+Its fusion must **not** be applied wholesale. Bisected on the real checkpoint:
+
+| transform | relative error |
+|---|---|
+| `remove_weight_norm()` | 0.000e+00 (exact) |
+| `backbone.merge_weights()` | 1.15e-06 (f32 noise) |
+| **full `merge_weights()`** | **1.71e-02 — breaks the model** |
+
+The full method additionally folds `feature_projection.norm`'s affine into
+`backbone.embed`, adding `sum_{i,k} W[o,i,k] · norm_bias[i]` to the conv bias.
+That is correct only if every kernel tap sees `norm_bias` — but the sequence is
+**zero-padded**, so the taps hanging off the ends see 0. It is an edge
+approximation, and because this backbone is `use_mha=True`, attention spreads
+the edge error across the whole sequence: ~3e-04 mid-sequence, ~3e-03 at the
+start.
+
+So the converter skips that one fold and keeps `feature_projection.norm`
+explicit. **Our path is exact where upstream's is not** — relevant when
+comparing against a `.beatrice` dump, which carries the approximation.
+
+### The dumper's gate cannot see a bad fusion — the converter now can
+
+This was nearly missed. Applying upstream's full `merge_weights()` in the
+reference dumper still reports **cos 1.0000000000, max_abs 0.000e+00**: the gate
+compares its step-by-step spec against the module's own `forward()`, and a
+fusion changes *both arms identically*. It is structurally blind to this class
+of bug, and the 1.7e-02 error was found only by a manual bisect.
+
+`convert-beatrice-to-gguf.py` therefore runs the model **before and after** its
+transforms on a fixed input and refuses to write a GGUF if they diverge beyond
+1e-4. Verified by negative control: substituting the full `merge_weights()`
+gives `rel=1.860e-02`, exit 1, and **no file written**. Correct conversions
+report ~6e-07.
+
+The MHA path was negative-controlled too: a chunked split instead of the
+**strided** interleave (frame `t` → subsequence `t%4`, position `t//4`) gives
+cos 0.693, and dropping the causal mask gives cos 0.910. Both correctly refuse.
 
 ---
 

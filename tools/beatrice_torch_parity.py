@@ -124,6 +124,81 @@ def spec_pitch_estimator(m, wav, d):
     return logits, energy
 
 
+def spec_phone_extractor(m, wav, d):
+    """Step-by-step PhoneExtractor.forward, dumping every boundary.
+
+    NOTE the feature_projection LayerNorm is applied EXPLICITLY here and is NOT
+    folded into backbone.embed. Upstream's PhoneExtractor.merge_weights() folds
+    it, but that fold is only valid where every kernel tap sees the LayerNorm
+    bias -- the zero-padded sequence edges do not, and with use_mha=True
+    attention spreads the edge error across the whole sequence (rel 1.7e-02
+    measured). The converter skips that fold for the same reason, so reference
+    and port agree and both are exact.
+    """
+    d("input_wav", wav)
+
+    # --- FeatureExtractor: 6 strided convs, /160 overall -> 100 Hz
+    fe = m.feature_extractor
+    x = F.pad(wav, (40, 40))
+    for i in range(6):
+        conv = getattr(fe, f"conv{i}")
+        x = F.gelu(conv(x), approximate="tanh")
+        d(f"fe_conv{i}", x)
+
+    # --- FeatureProjection: LayerNorm over channels (Dropout is eval-inert)
+    x = m.feature_projection.norm(x.transpose(1, 2)).transpose(1, 2)
+    d("feature_projection", x)
+
+    # --- ConvNeXtStack with MHA
+    bb = m.backbone
+    x = bb.embed(x)
+    d("backbone_embed", x)
+    x = bb.norm(x.transpose(1, 2)).transpose(1, 2)
+    d("backbone_norm", x)
+
+    # the stack zero-pads the TIME axis up to a multiple of 4 because the MHA
+    # reshapes into 4 interleaved subsequences, and trims it back afterwards
+    pad_length = -x.size(2) % 4
+    if pad_length:
+        x = F.pad(x, (0, pad_length))
+    t40 = x.size(2) // 4
+    attn_mask = torch.ones((t40, t40), dtype=torch.bool, device=x.device).triu(1)
+    d("attn_pad_len", torch.tensor([[float(pad_length)]]))
+
+    for i, blk in enumerate(bb.convnext):
+        B_, C_, L_ = x.size()
+        identity = x
+        # interleave: frame t goes to subsequence t%4, position t//4. This is a
+        # STRIDED split, not a chunked one -- each of the 4 sequences sees every
+        # 4th frame, which is what makes a causal mask over t40 meaningful.
+        h = x.view(B_, C_, L_ // 4, 4).permute(0, 3, 2, 1).reshape(B_ * 4, L_ // 4, C_)
+        h = blk.attn_norm(h)
+        h, _ = blk.mha(h, h, h, attn_mask=attn_mask, is_causal=True, need_weights=False)
+        h = h.view(B_, 4, L_ // 4, C_).permute(0, 3, 2, 1).reshape(B_, C_, L_)
+        x = h + identity
+        d(f"pblock{i}_attn", x)
+
+        identity = x
+        h = blk.dwconv(x)
+        h = h.transpose(1, 2)
+        h = blk.norm(h)
+        h = blk.pwconv1(h)
+        h = F.gelu(h, approximate="tanh")
+        h = blk.pwconv2(h)
+        h = h.transpose(1, 2)
+        x = h + identity
+        d(f"pblock{i}_out", x)
+
+    if pad_length:
+        x = x[:, :, :-pad_length]
+    x = bb.final_layer_norm(x.transpose(1, 2)).transpose(1, 2)
+    d("backbone_final_norm", x)
+
+    phone = m.head(F.gelu(x, approximate="tanh"))
+    d("phone", phone)
+    return phone
+
+
 def m_extract(m, wav, d):
     """extract_pitch_features, dumped. Constants are the function's defaults."""
     hop, win = 160, 560
@@ -173,7 +248,8 @@ def m_extract(m, wav, d):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
-    ap.add_argument("--component", default="pitch_estimator", choices=["pitch_estimator"])
+    ap.add_argument("--component", default="pitch_estimator",
+                    choices=["pitch_estimator", "phone_extractor"])
     ap.add_argument("--audio", required=True)
     ap.add_argument("--output", required=True)
     ap.add_argument("--trainer-path")
@@ -185,18 +261,28 @@ def main():
     import beatrice_trainer.__main__ as bt
 
     ck = torch.load(args.model, map_location="cpu", weights_only=False)
+    if args.component not in ck:
+        sys.exit(f"error: {args.model} has {list(ck.keys())}, not '{args.component}'")
     sd = ck[args.component]
-    m = bt.PitchEstimator(
-        pitch_bins=sd["head.weight"].shape[0],
-        channels=sd["head.weight"].shape[1],
-        n_blocks=1 + max(int(k.split(".")[2]) for k in sd if k.startswith("backbone.convnext.")),
-    )
+    n_blocks = 1 + max(int(k.split(".")[2]) for k in sd if k.startswith("backbone.convnext."))
+    if args.component == "pitch_estimator":
+        m = bt.PitchEstimator(pitch_bins=sd["head.weight"].shape[0],
+                              channels=sd["head.weight"].shape[1], n_blocks=n_blocks)
+    else:
+        m = bt.PhoneExtractor(
+            phone_channels=sd["head.weight_v"].shape[0] if "head.weight_v" in sd else sd["head.weight"].shape[0],
+            hidden_channels=sd["backbone.embed.weight"].shape[0], n_blocks=n_blocks)
     m.load_state_dict(sd)
     m.eval()
     # Fuse exactly as the converter does, so the reference describes the SHIPPED
     # weights. Dumping pre-merge intermediates would compare the port against a
-    # model it is not running.
-    m.merge_weights()
+    # model it is not running. The phone_extractor path deliberately skips the
+    # feature_projection fold -- see convert-beatrice-to-gguf.py:fuse_model.
+    if args.component == "pitch_estimator":
+        m.merge_weights()
+    else:
+        m.remove_weight_norm()
+        m.backbone.merge_weights()
 
     wav, sr = torchaudio.load(args.audio)
     if wav.shape[0] > 1:
@@ -208,8 +294,19 @@ def main():
 
     d = Dump()
     with torch.inference_mode():
-        logits, energy = spec_pitch_estimator(m, wav, d)
-        ref_logits, ref_energy = m(wav)
+        if args.component == "pitch_estimator":
+            logits, energy = spec_pitch_estimator(m, wav, d)
+            ref_logits, ref_energy = m(wav)
+        else:
+            # wav_length must be a multiple of 160 or the extractor warns and the
+            # frame count is ambiguous; trim rather than pad so no invented audio
+            # reaches the reference.
+            n160 = (wav.shape[-1] // 160) * 160
+            wav = wav[..., :n160]
+            d.stages.clear()
+            logits = spec_phone_extractor(m, wav, d)
+            ref_logits = m(wav, return_stats=False)
+            energy = ref_energy = torch.zeros(1)
 
     # THE GATE. If the step-by-step spec disagrees with the module's own
     # forward, this reference is wrong and must not be written.
@@ -243,10 +340,21 @@ def main():
         f"rel={rel:.2e}  energy cos={c_en:.10f}"
     )
     TOL = 1e-6
-    if rel > TOL or c_en < 0.999999:
+    # `energy` is a pitch_estimator output only; the phone path has none, so do
+    # not fabricate a check for it. An earlier version compared a zeros(1) stand-in
+    # and failed a bit-identical spec while blaming relative max-abs -- a gate that
+    # reports the wrong reason is worse than one that does not fire.
+    fail_rel = rel > TOL
+    fail_energy = args.component == "pitch_estimator" and c_en < 0.999999
+    if fail_rel or fail_energy:
+        why = []
+        if fail_rel:
+            why.append(f"relative max-abs {rel:.2e} > {TOL:.0e}")
+        if fail_energy:
+            why.append(f"energy cos {c_en:.8f} < 0.999999")
         sys.exit(
-            f"error: the step-by-step spec does NOT reproduce the module's forward() "
-            f"(relative max-abs {rel:.2e} > {TOL:.0e}).\n"
+            "error: the step-by-step spec does NOT reproduce the module's forward() ("
+            + "; ".join(why) + ").\n"
             "       Refusing to write a reference file -- a wrong reference makes a "
             "broken port look correct.\n"
             "       NOTE cosine can look perfect here; check max_abs, not cos."

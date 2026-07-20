@@ -74,6 +74,81 @@ DROP_SUFFIXES = (
 )
 
 
+def fuse_model(component, m):
+    """Apply the convert-time weight transforms for `component`, and ONLY the
+    ones verified to preserve the output.
+
+    pitch_estimator: merge_weights() wholesale (verified cos 1.0000000000).
+
+    phone_extractor: NOT wholesale. Bisected on the real checkpoint:
+
+        remove_weight_norm()        rel 0.000e+00   exact
+        backbone.merge_weights()    rel 1.15e-06    f32 noise
+        merge_weights()  (full)     rel 1.71e-02    BREAKS THE MODEL
+
+    The full method additionally folds `feature_projection.norm`'s affine into
+    `backbone.embed`. That fold adds `sum_{i,k} W[o,i,k] * norm_bias[i]` to the
+    conv bias, which is only correct if EVERY kernel tap sees norm_bias -- but
+    the sequence edges are ZERO-padded, so the taps hanging off the end see 0.
+    It is an edge approximation, and because this backbone is `use_mha=True`,
+    attention propagates the edge error to every frame: ~3e-04 mid-sequence,
+    ~3e-03 at the start.
+
+    So we skip that one fold and keep feature_projection.norm explicit in the
+    graph. The result is EXACT where upstream's own inference path is not --
+    worth knowing when comparing against a `.beatrice` dump, which carries the
+    approximation.
+    """
+    if component == "pitch_estimator":
+        m.merge_weights()
+        return ["merge_weights"]
+    if component == "phone_extractor":
+        m.remove_weight_norm()
+        m.backbone.merge_weights()  # deliberately NOT m.merge_weights()
+        return ["remove_weight_norm", "backbone.merge_weights (NOT full merge_weights -- see fuse_model)"]
+    sys.exit(f"error: no fusion defined for {component}")
+
+
+def verify_fusion(component, bt, sd, build, fuse):
+    """Run the model BEFORE and AFTER the weight transforms and refuse to write
+    a GGUF if they disagree.
+
+    This exists because nothing else can catch a bad fusion. The parity dumper's
+    gate compares its step-by-step spec against the module's own forward(), and
+    a fusion changes BOTH arms identically -- so it passes a fusion that has
+    silently altered the model. That is not hypothetical: applying upstream's
+    full PhoneExtractor.merge_weights() here moves the output by rel 1.7e-02 and
+    the dumper's gate still reports cos 1.0000000000, max_abs 0.000e+00.
+
+    The check is cheap, deterministic, and runs on every conversion.
+    """
+    torch.manual_seed(0)
+    m0, _ = build(bt, component, sd)
+    m0.load_state_dict(sd)
+    m0.eval()
+    # wav_length a multiple of 160 (the feature extractor warns otherwise) and
+    # long enough that the post-/160 length is a multiple of 4 for the MHA path.
+    wav = torch.randn(1, 1, 160 * 200) * 0.1
+    with torch.inference_mode():
+        before = m0(wav, return_stats=False) if component == "phone_extractor" else m0(wav)[0]
+    fuse(component, m0)
+    with torch.inference_mode():
+        after = m0(wav, return_stats=False) if component == "phone_extractor" else m0(wav)[0]
+
+    peak = float(before.abs().max())
+    mx = float((before - after).abs().max())
+    rel = mx / peak if peak > 0 else float("inf")
+    TOL = 1e-4
+    print(f"fusion check: max_abs={mx:.3e} rel={rel:.3e} (tol {TOL:.0e})")
+    if not (rel <= TOL):
+        sys.exit(
+            f"error: the weight transforms CHANGE THE MODEL (relative {rel:.3e} > {TOL:.0e}).\n"
+            "       Refusing to write a GGUF. Bisect which transform is responsible before\n"
+            "       shipping it -- see fuse_model()'s docstring for the phone_extractor case,\n"
+            "       where upstream's own merge_weights() is an edge approximation."
+        )
+
+
 def build_component(bt, component, sd):
     """Instantiate the module for `component`, geometry read off the weights."""
     if component == "pitch_estimator":
@@ -91,7 +166,17 @@ def build_component(bt, component, sd):
         }
         return m, meta
     if component == "phone_extractor":
-        return bt.PhoneExtractor(), {}
+        phone_channels = sd["head.weight_v"].shape[0] if "head.weight_v" in sd else sd["head.weight"].shape[0]
+        hidden = sd["backbone.embed.weight"].shape[0]
+        n_blocks = 1 + max(int(k.split(".")[2]) for k in sd if k.startswith("backbone.convnext."))
+        m = bt.PhoneExtractor(phone_channels=phone_channels, hidden_channels=hidden, n_blocks=n_blocks)
+        n_heads = m.backbone.convnext[0].mha.num_heads
+        return m, {
+            "phone_channels": phone_channels,
+            "hidden_channels": hidden,
+            "n_blocks": n_blocks,
+            "n_heads": n_heads,
+        }
     sys.exit(f"error: --component {component} not implemented yet")
 
 
@@ -146,20 +231,30 @@ def main():
     model.load_state_dict(sd)  # strict: the architecture must match exactly
     model.eval()
 
-    # Fuse. Everything in DROP_SUFFIXES becomes identically 1.0 after this.
-    model.merge_weights()
+    verify_fusion(args.component, bt, sd, build_component, fuse_model)
+    transforms = fuse_model(args.component, model)
     fused = model.state_dict()
 
-    # Verify the fusion actually neutralised what we are about to drop, rather
-    # than trusting that merge_weights did what its name says.
+    # Decide what to drop by PROVING it is neutral, not by trusting a method
+    # name. Anything the fusion left as an exact identity is dead weight the
+    # runtime must not re-apply; anything else is kept even if we expected it to
+    # vanish.
+    def is_identity(name, t):
+        if name.endswith(DROP_SUFFIXES):  # scalars/vectors folded to 1.0
+            return bool(torch.allclose(t, torch.ones_like(t)))
+        if name.endswith(".attn_norm.weight"):  # folded into mha.in_proj
+            return bool(torch.allclose(t, torch.ones_like(t)))
+        if name.endswith(".attn_norm.bias"):
+            return bool(torch.allclose(t, torch.zeros_like(t)))
+        return False
+
     for k, t in fused.items():
-        if k.endswith(DROP_SUFFIXES):
-            if not torch.allclose(t, torch.ones_like(t)):
-                sys.exit(
-                    f"error: {k} is not all-ones after merge_weights() "
-                    f"(max deviation {float((t - 1).abs().max()):.3e}).\n"
-                    "       Dropping it would silently change the model."
-                )
+        if k.endswith(DROP_SUFFIXES) and not is_identity(k, t):
+            sys.exit(
+                f"error: {k} is not all-ones after fusion "
+                f"(max deviation {float((t - 1).abs().max()):.3e}).\n"
+                "       Dropping it would silently change the model."
+            )
 
     w = GGUFWriter(str(args.output), ARCH)
     w.add_string("beatrice.component", args.component)
@@ -200,7 +295,7 @@ def main():
 
     emitted, dropped = 0, []
     for k, t in fused.items():
-        if k.endswith(DROP_SUFFIXES):
+        if is_identity(k, t):
             dropped.append(k)
             continue
         a = t.detach().cpu().float().numpy()
@@ -222,9 +317,10 @@ def main():
         )
 
     print(f"beatrice/{args.component}: " + " ".join(f"{k}={v}" for k, v in meta.items()))
+    print(f"transforms applied: {', '.join(transforms)}")
     print(
-        f"wrote {args.output}: {emitted} tensors, {len(dropped)} dropped as neutralised "
-        f"by merge_weights (gamma/pre_scale/post_scale/post_scale_weight), dtype {args.dtype}"
+        f"wrote {args.output}: {emitted} tensors, {len(dropped)} dropped as PROVEN identity "
+        f"after fusion, dtype {args.dtype}"
     )
     print(f"NOTE: weights licensed '{args.license}'.")
 
