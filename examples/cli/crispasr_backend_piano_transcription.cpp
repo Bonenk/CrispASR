@@ -28,7 +28,10 @@ public:
     }
 
     const char* name() const override { return "piano-transcription"; }
-    uint32_t capabilities() const override { return CAP_TIMESTAMPS_NATIVE; }
+    // CAP_PIANO marks the task; --piano is the real surface (note events).
+    // CAP_TIMESTAMPS_NATIVE stays because the legacy transcribe() path still
+    // renders notes as timestamped segments for callers that used it.
+    uint32_t capabilities() const override { return CAP_PIANO | CAP_TIMESTAMPS_NATIVE | CAP_AUTO_DOWNLOAD; }
     int input_sample_rate() const override { return 16000; }
 
     std::vector<crispasr_segment> transcribe(const float* pcm, int n_samples, int64_t /*t0_ms*/,
