@@ -256,6 +256,14 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
     // to stop deriving the im2col geometry from the kernel's own shape.
     const bool is_crepe = (arch == "crepe");
 
+    // BTC chords: a 12 MB model whose weight matrices are all 128x128 or
+    // 128x256 — small enough that quantisation buys little, and the FFN convs
+    // are (3, 128, 128) whose K=3 does not tile a Q4_K 32-element block any
+    // better than CREPE's 64-tap kernels do. Norms/biases stay F32 as
+    // everywhere else. F16 is the intended shipping format; the tool will still
+    // run on it but do not expect much.
+    const bool is_btc = (arch == "btc");
+
     const bool is_chatterbox =
         (arch.find("chatterbox") != std::string::npos || arch.find("kartoffelbox") != std::string::npos);
     // CosyVoice3: the three sub-models live in separate GGUFs but share the

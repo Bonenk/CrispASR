@@ -154,3 +154,49 @@ Code MIT; the shipped `test/btc_model{,_large_voca}.pt` checkpoints were trained
 on Isophonics / Robbie Williams / UsPop2002 annotations, which are
 **CC BY-NC-SA**. Ships behind `--accept-license cc-by-nc-sa-4.0` (the gate
 landed in 90d1a0c9e). See the licence scoping in `PLAN.md`.
+
+## Front end: core/cqt.h has a per-bin scale mismatch vs librosa
+
+Found by the end-to-end acceptance test, NOT by the per-stage diff — the diff
+replays the reference's own `input_feat` by design, so it cannot see a front-end
+error. Two separate gates are needed and this is why.
+
+Dumping the runtime's features (`CRISPASR_BTC_DUMP_FEAT=<path>`) and scoring
+them against `librosa.cqt` on the same file:
+
+    frame count   87 vs 87          exact
+    cos           0.986230
+    librosa       mean -8.144  std 3.233
+    core/cqt.h    mean -11.389 std 2.988
+
+The gap is a PER-BIN scale factor, not a global one, and it tracks
+`log(sqrt(N_k))` where `N_k` is bin k's filter length:
+
+    bin   0   offset 4.897   log(sqrt(N_k)) 5.022
+    bin 143   offset 3.011   log(sqrt(N_k)) 2.958
+
+i.e. librosa's magnitudes are larger by roughly `sqrt(N_k)`. librosa's
+`scale=True` (its default) normalises each bin by the square root of its filter
+length; `core/cqt.h` normalises by the L1 norm instead, and the two disagree
+per bin.
+
+**Why `tools/cqt_librosa_parity.py` passes anyway:** it scores per-frame shape
+CORRELATION and PEAK-BIN match. Both are scale-invariant, so a per-bin
+magnitude error is invisible to it. This is the same class of miss as the
+htdemucs iSTFT `1/sqrt(nfft)` bug, which cosine also could not see and only the
+`|mine|` vs `|ref|` magnitude columns caught.
+
+**Consequences.** BTC normalises with the checkpoint's own scalar stats
+(mean -2.228, std 1.719), so a shifted feature distribution pushes the input
+out of distribution: on a synthetic I-V-vi-IV tone the reference torch model
+predicts N/G/C while this runtime predicts N everywhere.
+
+**Fix (not yet applied — `core/cqt.h` is shared and owned elsewhere):**
+1. Add a SCALE-SENSITIVE assertion to `cqt_librosa_parity.py` — max relative
+   magnitude error per bin, not just correlation — so this cannot recur.
+2. Match librosa's `scale=True` normalisation, or expose it as a `Params` flag
+   with librosa-compatible defaults since the header names BTC as its primary
+   consumer.
+3. Re-run both the CQT parity tool and the BTC acceptance test.
+
+The BTC graph itself is unaffected: 13/13 stages at cos 1.000000.
