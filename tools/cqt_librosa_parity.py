@@ -6,7 +6,9 @@ Usage:
 
 The C++ side (tests/test-core-cqt.cpp --dump) writes a raw float32 magnitude
 matrix for a deterministic test signal; this script computes librosa's CQT on
-the identical signal and reports per-bin correlation.
+the identical signal and reports per-bin correlation AND per-bin magnitude
+ratio. The magnitude check is not optional: correlation and peak-bin match are
+scale-invariant and once hid a sqrt(N_k) per-bin scale error here.
 
 Why correlation and not cosine-to-1.0: librosa's CQT uses recursive downsampling
 with a different normalisation lineage, so an exact match is not the target. The
@@ -74,12 +76,55 @@ def main():
     print(f"peak-bin exact match : {peak_match:.1%}")
     print(f"peak-bin within +/-1 : {peak_close:.1%}")
 
+    # SCALE-SENSITIVE check. Correlation and peak-bin match are both invariant
+    # to magnitude, so on their own they cannot see a per-bin scale error --
+    # and one lived here undetected: core/cqt.h was missing librosa's
+    # scale=True normalisation, leaving every bin off by sqrt(N_k) (bin 0 was
+    # 152x). BTC then fed out-of-distribution features to the model and
+    # predicted N everywhere while the reference predicted real chords.
+    #
+    # Same class of miss as the htdemucs iSTFT 1/sqrt(nfft) bug, which cosine
+    # also could not see. Any parity tool that only scores shape needs a
+    # magnitude assertion beside it.
+    # Scale can only be verified where there IS signal. This reference tone is
+    # sparse (three sustained pitches), so most bins sit on the epsilon floor
+    # and their ratio is meaningless noise -- judging those would fail the
+    # check for no reason. Test a bin only when its own peak carries real
+    # energy, and inside such a bin use only the frames that do.
+    testable, ratios = [], []
+    for k in range(a.shape[1]):
+        col_ref = b[:, k]
+        if col_ref.max() < b.max() * 0.05:
+            continue
+        m = col_ref > col_ref.max() * 0.5
+        if not m.any():
+            continue
+        testable.append(k)
+        ratios.append(float(np.median(a[m, k] / np.maximum(col_ref[m], 1e-12))))
+    if ratios:
+        ratios = np.array(ratios)
+        # Assert on the MEDIAN, report the worst. A normalisation error is
+        # SYSTEMATIC -- the sqrt(N_k) one moved this median to 152 at the
+        # bottom octave -- so the median catches it with enormous margin.
+        # Individual bins on a tone's skirt can differ by tens of percent for a
+        # legitimate reason: librosa uses recursive per-octave downsampling
+        # while these are direct kernels, so the two disagree in group delay
+        # (the same effect that drags the shape-correlation MIN down while the
+        # median stays 0.9999). Asserting the worst bin would fail on that.
+        scale_err = float(np.abs(np.median(ratios) - 1.0))
+        print(f"per-bin magnitude ratio: {len(testable)} bins with real energy, "
+              f"median {np.median(ratios):.4f} (asserted)  "
+              f"worst |ratio-1| {float(np.max(np.abs(ratios - 1.0))):.4f} (informational)")
+    else:
+        scale_err = 0.0
+        print("per-bin magnitude ratio: no bin carried enough energy to test")
+
     # Where the expected tones land, as an absolute sanity check.
     for f in (130.8127826502993, 261.6255653005986, 523.2511306011972):
         k = int(round(BPO * np.log2(f / FMIN)))
         print(f"  {f:8.2f} Hz -> bin {k:3d}")
 
-    ok = cors.mean() > 0.9 and peak_close > 0.9
+    ok = cors.mean() > 0.9 and peak_close > 0.9 and scale_err < 0.05
     print("\n" + ("PASS" if ok else "FAIL") + " (shape corr > 0.9 and peak within 1 bin > 90%)")
     return 0 if ok else 1
 
