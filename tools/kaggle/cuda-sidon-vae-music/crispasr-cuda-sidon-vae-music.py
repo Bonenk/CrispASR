@@ -630,6 +630,17 @@ record("D3b.vocal_stem_recovers_speech", overlap(voc_txt) >= 0.7,
        instrumental_overlap=overlap(inst_txt), vocal_transcript=voc_txt[:200])
 record("D3c.separation_improves_over_mix", overlap(voc_txt) >= overlap(mix_txt),
        vocal=overlap(voc_txt), mix=overlap(mix_txt))
+# The assertion with actual discriminating power. D3a-c ALL pass for a no-op
+# separation that copies the input into both stems: the mix already transcribes
+# cleanly at this music level, so "vocals recovers speech" and "vocals >= mix"
+# are satisfied by a passthrough. Requiring the OTHER stem to be empty of speech
+# is what proves separation happened. Verified locally on M1: mix and
+# mix_vocals both yield the full JFK line, mix_other yields "(upbeat music)".
+record("D3d.instrumental_stem_excludes_speech",
+       bool(inst) and overlap(inst_txt) < 0.3,
+       instrumental_overlap=overlap(inst_txt), vocal_overlap=overlap(voc_txt),
+       instrumental_transcript=inst_txt[:120],
+       note="a no-op separation passes D3a-c but fails here")
 RESULTS["bench"].append({"backend": "mel-band-roformer", "device": "cuda",
                          "wall_s": s_cuda["wall_s"], "audio_s": round(len(mix) / SR, 2),
                          "stems": stems})
