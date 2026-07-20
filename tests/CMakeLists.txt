@@ -334,6 +334,26 @@ catch_discover_tests(test-gguf-bounds
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-gguf-split-alloc — regression guard for issue #276 ───────────────────
+# Verifies load_weights_split() correctly partitions tensors across GPU/CPU
+# backend buffers, respects the is_gpu predicate, and that free_weights cleans
+# up the split_bufs overflow vector (chunked allocation for AMD Vulkan 2 GiB
+# per-allocation cap).
+add_executable(test-gguf-split-alloc test-gguf-split-alloc.cpp)
+target_include_directories(test-gguf-split-alloc PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+)
+target_link_libraries(test-gguf-split-alloc PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+    ggml
+)
+catch_discover_tests(test-gguf-split-alloc
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-vibevoice-quant-carveout — regression guard for issue #171 ──────────
 # Asserts crispasr-quantize keeps the VibeVoice diffusion prediction head and
 # connectors/EOS (pred.*, at_conn.*, se_conn.*, tts_eos.*, tts_types.*) at source
