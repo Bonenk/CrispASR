@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.8.15
+## 0.8.16
 
 - Pitch (F0) estimation: `CrispasrSession.pitch()` returns a monophonic
   pitch track from mono 16 kHz float32 PCM, backed by the CREPE backend.
