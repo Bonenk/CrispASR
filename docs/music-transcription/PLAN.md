@@ -406,11 +406,54 @@ this project set. Three options, in order of preference:
    `chroma_analysis.dart` / `analyze()`) as the default and treat the neural
    chord model as a later premium tier.
 
-**Recommendation:** do NOT port BTC's shipped weights. Port the *architecture*
-(cheap, and it is the same CQT + attention stack Basic Pitch needs), then train
-on the ChoCo CC-BY subset and publish Apache-2.0. Timebox the ChoCo extraction
-first — if the permissive subset turns out too small once NC rows are dropped,
-fall back to option 3 rather than shipping encumbered weights.
+### DECISION (2026-07-20): port BTC now, gate the weights non-commercially
+
+Superseding the "train first" recommendation above. We ship the BTC port with
+its upstream checkpoints, treated as **non-commercial weights behind a
+download-time attestation** — the same posture the repo already takes for
+Voxtral-4B-TTS (CC-BY-NC-4.0) and the German moonshine models (CC-BY-NC-SA-4.0).
+
+Why this is sound:
+
+- **Our code stays MIT.** The BTC architecture is written from the paper into
+  the CrispASR ggml stack; nothing GPL/AGPL is copied. CrispASR and CometBeat
+  can both be commercial.
+- **The restriction rides with the WEIGHTS, not the software.** Users obtain
+  NC weights only after attesting they will not use them commercially, and the
+  restriction is stated in the registry, the model card and the CLI.
+- **Commercial users are not blocked** — they get the chroma-template path
+  (already in `crisp_notation`), and later the ChoCo-trained Apache-2.0 model.
+
+Training a clean model on the ChoCo CC-BY subset (option 1 above) remains the
+target for a *commercially usable* chord tier. It is now a follow-up, not a
+prerequisite, and the BTC port is what proves the architecture + surface first.
+
+#### Required mechanism — attestation BEFORE download
+
+The existing `print_license_note()` fires AFTER `ensure_cached_file()`, so today
+an NC model is already on disk by the time the warning prints. For chords that
+is not good enough; the gate must precede the fetch.
+
+Add to `crispasr_model_registry.cpp`, in the library so **all three surfaces**
+(CLI, session C-ABI, server) inherit it — the multi-surface rule:
+
+- `crispasr_accept_noncommercial()` — reads `CRISPASR_ACCEPT_NONCOMMERCIAL`
+  (the `CRISPASR_<...>` env convention) plus a process-level setter the CLI flag
+  calls.
+- `--accept-noncommercial` CLI flag, mirroring `--i-have-rights`.
+- In `crispasr_resolve_model()`, BEFORE `ensure_cached_file()`: if the resolved
+  entry `license_is_nc()` and no attestation is present, print what the licence
+  is, what it forbids, and how to attest — then **refuse and return empty**.
+  No partial download, no cached file.
+- Registry entry carries the full string, e.g.
+  `"CC-BY-NC-SA-4.0 (weights; trained on Isophonics/RWilliams/UsPop NC annotations)"`,
+  so the reason is visible without reading this document.
+
+CometBeat mirrors the same gate in its model store before fetching, and states
+the restriction in the UI at the point of download — not buried in an About box.
+
+Follow-up once the ChoCo-trained model exists: it is Apache-2.0, needs no gate,
+and becomes the default; BTC stays as the opt-in higher-accuracy NC tier.
 
 ### CQT is the shared unlock
 
@@ -448,16 +491,18 @@ Priority: RMVPE > FCPE, and neither is urgent while CREPE-tiny hits RTF 0.28.
 
 ## Suggested order (highest leverage first)
 
+0. **NC attestation gate** — land BEFORE any NC weights are registered, so
+   there is never a window in which they are downloadable ungated.
 1. **`core/cqt.h`** — unblocks Basic Pitch AND the chord model. Infrastructure,
    no licence risk, reusable.
-2. **Finish piano_transcription** — currently cos 0.971, below the 0.999 gate.
+2. **BTC chords** — architecture from the paper, weights gated NC.
+3. **Finish piano_transcription** — currently cos 0.971, below the 0.999 gate.
    It is the closest thing to a finished port that is not yet finished.
-3. **Basic Pitch** — Apache-2.0 end to end, and the app already depends on it
+4. **Basic Pitch** — Apache-2.0 end to end, and the app already depends on it
    via ONNX, so this is a like-for-like replacement with a known-good oracle.
-4. **ChoCo licence extraction (timeboxed)** — decide the chord path on evidence
-   before writing chord C++.
 5. **RMVPE** — clean licence, real quality win on sung f0 over accompaniment.
-6. **MT3** — feasibility memo on the T5X checkpoint conversion FIRST.
+6. **ChoCo-trained chord model** — the commercially-clean tier, Apache-2.0.
+7. **MT3** — feasibility memo on the T5X checkpoint conversion FIRST.
 
 Everything above is CPU/Metal-verifiable locally. The **Kaggle/CUDA run should
 wait until this roster is complete**, so one clean CUDA session covers every
