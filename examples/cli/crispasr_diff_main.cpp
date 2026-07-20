@@ -38,6 +38,7 @@
 #include "voxtral.h"
 #include "voxtral4b.h"
 #include "htdemucs.h"
+#include "btc_chords.h"
 #include "voxtral_tts.h"
 #include "higgs_stt.h"
 #include "moss_transcribe_diarize.h"
@@ -1091,6 +1092,12 @@ int main(int argc, char** argv) {
     if (backend_name == "dots-tts-spk") {
         // model_path = speaker encoder GGUF, ref_path = spk-ref GGUF.
         return dots_tts_spk_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
+    }
+    if (backend_name == "btc" || backend_name == "btc-chords") {
+        // model_path = btc-chords GGUF, ref_path = dump from
+        // tools/btc_torch_parity.py. The reference carries its own input_feat,
+        // which the runtime replays, so audio_path is unused.
+        return btc_chords_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
     }
     if (backend_name == "voxtral-tts") {
         // model_path = voxtral-tts GGUF (F16 for a clean structural diff), ref_path =
@@ -7222,8 +7229,7 @@ int main(int argc, char** argv) {
                 if (emb_pair.first && emb_pair.second > 0) {
                     const int T_codec = (int)(emb_pair.second / 768);
                     int prenet_dim = 0;
-                    float* prenet =
-                        miotts_wave_prenet_forward(ctx, emb_pair.first, T_codec, &prenet_dim);
+                    float* prenet = miotts_wave_prenet_forward(ctx, emb_pair.first, T_codec, &prenet_dim);
                     if (prenet && prenet_dim > 0) {
                         int n_pcm = 0;
                         float* pcm = miotts_codec_decode(ctx, prenet, T_codec, &n_pcm);

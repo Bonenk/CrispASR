@@ -2,7 +2,12 @@
 """Executable spec for the BTC chord ggml graph — validates it against PyTorch.
 
 Usage:
-    python tools/btc_torch_parity.py <btc-chords.gguf> <btc_model.pt> <BTC-ISMIR19 dir>
+    python tools/btc_torch_parity.py <btc-chords.gguf> <btc_model.pt> <BTC-ISMIR19 dir> [ref-dump.gguf]
+
+Passing a fourth argument writes a per-stage reference GGUF for the C++ diff
+(`crispasr-diff btc`). The dump includes `input_feat`, so the runtime replays
+the EXACT features the spec scored rather than recomputing a CQT — a front-end
+difference can then never masquerade as a model parity failure.
 
 Reimplements the BTC forward pass in numpy EXACTLY as src/btc_chords.cpp must
 build it, reading the weights back out of the converted GGUF, and scores it
@@ -37,7 +42,7 @@ import sys
 import numpy as np
 from gguf import GGUFReader
 
-if len(sys.argv) != 4:
+if len(sys.argv) not in (4, 5):
     sys.exit(__doc__)
 GGUF_PATH, CKPT_PATH, BTC_DIR = sys.argv[1:4]
 
@@ -130,11 +135,16 @@ def block(x, p, mask):
     return x + ffn(xn, p)
 
 
+STAGES = {}
+
+
 def btc_numpy(feat):
     """feat: (T, 144) raw log-CQT, BEFORE normalisation."""
+    STAGES["input_feat"] = feat.astype(np.float32)
     x = (feat - MEAN) / STD
     x = x @ W["embedding_proj.weight"].T            # no bias, no sqrt(d) scaling
     x = x + timing_signal(x.shape[0], HIDDEN)
+    STAGES["embed_posenc"] = x.astype(np.float32)
 
     causal = np.triu(np.full((T, T), -np.inf, dtype=np.float32), 1)
     anti = causal.T.copy()
@@ -144,11 +154,18 @@ def btc_numpy(feat):
     for i in range(LAYERS):
         fwd = block(x, f"layers.{i}.fwd", causal)
         bwd = block(x, f"layers.{i}.bwd", anti)
+        if i == 0:
+            STAGES["layer0_fwd"] = fwd.astype(np.float32)
+            STAGES["layer0_bwd"] = bwd.astype(np.float32)
         cat = np.concatenate([fwd, bwd], axis=1)     # (n, 256)
         x = cat @ W[f"layers.{i}.proj.weight"].T + W[f"layers.{i}.proj.bias"]
+        STAGES[f"layer{i}_out"] = x.astype(np.float32)
 
     x = layer_norm(x, W["final_norm.gamma"], W["final_norm.beta"])
-    return x @ W["output.proj.weight"].T + W["output.proj.bias"]
+    STAGES["final_norm"] = x.astype(np.float32)
+    out = x @ W["output.proj.weight"].T + W["output.proj.bias"]
+    STAGES["logits"] = out.astype(np.float32)
+    return out
 
 
 # ---------------------------------------------------------------- torch oracle
@@ -191,6 +208,18 @@ den = float(np.linalg.norm(mine) * np.linalg.norm(ref))
 cos = num / den if den else 0.0
 mx = float(np.abs(mine - ref).max())
 agree = float((mine.argmax(-1) == ref.argmax(-1)).mean())
+
+# Optional reference dump for the C++ per-stage diff (crispasr-diff btc).
+if len(sys.argv) > 4:
+    import gguf as _g
+    w = _g.GGUFWriter(sys.argv[4], "btc-ref")
+    for k, v in STAGES.items():
+        w.add_tensor(k, np.ascontiguousarray(v, dtype=np.float32))
+    w.write_header_to_file()
+    w.write_kv_data_to_file()
+    w.write_tensors_to_file()
+    w.close()
+    print(f"wrote reference dump {sys.argv[4]}: {len(STAGES)} stages")
 
 print(f"btc parity: cos={cos:.8f} max_abs={mx:.3e} argmax_agree={agree:.4f} "
       f"shape={mine.shape} chords={mine.shape[-1]}")
