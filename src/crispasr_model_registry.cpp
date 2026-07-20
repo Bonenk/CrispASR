@@ -355,6 +355,22 @@ constexpr Entry k_registry[] = {
     {"btc-chords-majmin", "btc-chords-f16.gguf",
      "https://huggingface.co/cstr/btc-chords-GGUF/resolve/main/btc-chords-f16.gguf", "~6 MB", nullptr, nullptr, nullptr,
      "cc-by-nc-sa-4.0"},
+    // Beat This! beat/downbeat tracking (--beats). MIT for code AND weights,
+    // so no licence gate — deliberately unlike btc-chords above. The reason it
+    // can be MIT at all is that it needs no DBN: madmom's is Boeck-patented and
+    // non-commercial, and this model reaches SOTA without one.
+    //
+    // DEFAULT IS F16: cos >= 0.9999997 per stage against the torch reference,
+    // with the residual flat across all 12 sub-blocks (weight quantisation, not
+    // drift). f32 is exact (cos = 1.00000000, rel err ~1e-6) and is kept for
+    // parity debugging, not for production — it is 2x the size for no
+    // measurable difference in detected beats.
+    {"beat-this", "beat-this-f16.gguf",
+     "https://huggingface.co/cstr/beat-this-GGUF/resolve/main/beat-this-f16.gguf", "~41 MB", nullptr, nullptr, nullptr,
+     "MIT"},
+    {"beat-this-f32", "beat-this-f32.gguf",
+     "https://huggingface.co/cstr/beat-this-GGUF/resolve/main/beat-this-f32.gguf", "~81 MB", nullptr, nullptr, nullptr,
+     "MIT"},
     // CREPE monophonic F0 (--pitch). MIT weights + MIT code (torchcrepe).
     // DEFAULT IS TINY: measured RTF 0.28 on Metal vs 2.0 for full, and full is
     // 38x the MACs per frame. `full` stays available for offline accuracy.
