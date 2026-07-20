@@ -205,6 +205,25 @@ jobs:
       - name: Check bundled harness copies match canonical
         run: python tools/check-kaggle-harness-sync.py
 
+  # The wiring audit checks a registry ROW EXISTS; nothing checked the URL
+  # resolves. A registry entry naming a HuggingFace repo that had never been
+  # created shipped to main and `-m auto` would have 404'd (tabcnn, 2026-07-20).
+  # Network-dependent and third-party, so soft-fire like readme-langs: a flaky
+  # HF API should not block a PR.
+  registry-urls:
+    name: model-registry URLs resolve
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: HEAD every registry download URL
+        run: python tools/check-registry-urls.py --jobs 8 --timeout 25
+
   readme-langs:
     name: README language metadata
     runs-on: ubuntu-latest
