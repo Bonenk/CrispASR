@@ -349,6 +349,87 @@ conversion viability) **before** any C++ is written.
 
 ---
 
+## Licence scoping of the remaining roster (2026-07-20)
+
+Every candidate below was checked against the CometBeat HARD RULE — patent-free
+and MIT/Apache-2.0-compatible — by reading the actual LICENSE file or HF card,
+not from memory. **Code licence and WEIGHTS licence are tracked separately**,
+because for chords they diverge and that divergence is the whole problem.
+
+| Component | Code | Weights | Verdict |
+|---|---|---|---|
+| CREPE (marl, torchcrepe) | MIT | MIT | ✅ shipped |
+| onnxcrepe (yqzhishen) | MIT | converted from torchcrepe + TF CREPE | ✅ useful as an ONNX cross-check |
+| mangio-crepe (Mangio-RVC-Fork) | MIT | — same CREPE weights | ✅ **nothing to port** — see below |
+| RMVPE (Dream-High) | **Apache-2.0** | **MIT** (`lj1995/VoiceConversionWebUI`) | ✅ clean — best quality tier |
+| FCPE (CNChTu/TorchFCPE) | MIT | MIT repo | ✅ clean — cheapest tier |
+| w-okada/voice-changer | MIT (6 holders incl. RVC, yxlllc) | mixed; **Beatrice v2 is a custom licence** | ⚠️ integration *reference* only — do NOT vendor |
+| anyf0 (SoulMelody) | MIT | wraps crepe/fcpe/rmvpe | ✅ good reference implementation |
+| Basic Pitch (Spotify) | Apache-2.0 | Apache-2.0 | ✅ clean — blocked on CQT, not licence |
+| piano_transcription (Kong) | MIT | MIT | ✅ clean — in flight |
+| **BTC-ISMIR19 (chords)** | **MIT**, ships `btc_model{,_large_voca}.pt` | trained on **Isophonics = CC BY-NC-SA** | ⚠️ **THE GATE** |
+| MT3 | Apache-2.0 | T5X/JAX gin checkpoint | ⚠️ converter is the whole job |
+| madmom / Essentia / aubio / Vamp | GPL/AGPL + Böck patents | — | ❌ excluded by the hard rule |
+
+### mangio-crepe needs no port
+
+It is **not a different model**. Mangio-RVC-Fork's contribution is a
+*configurable `crepe_hop_length`* on the same MIT CREPE weights; its own README
+recommends upstream RVC's CREPE for artifact handling. Our `src/crepe.cpp`
+already exposes hop as a parameter, so this is covered. Worth stating plainly so
+nobody spends a week on it.
+
+### The chord problem is DATA provenance, not code
+
+BTC-ISMIR19 is the obvious port — MIT code, pretrained checkpoints committed to
+the repo, architecture we can already build (bi-directional self-attention over
+CQT; every op exists in the CrispASR ggml stack). The catch is upstream of the
+code: its checkpoints were trained on **Isophonics annotations, which are
+CC BY-NC-SA** (non-commercial, share-alike), as are Robbie Williams and
+UsPop2002.
+
+Whether NC-licensed *annotations* encumber the resulting weights is legally
+unsettled, and the repo ships them under MIT. But "unsettled" is not the bar
+this project set. Three options, in order of preference:
+
+1. **Retrain on ChoCo's permissive subset.** ChoCo aggregates 18 chord corpora
+   under **CC BY 4.0**, with only three NC exceptions to exclude (Chordify
+   Annotator Subjectivity, Mozart Piano Sonata, JAAH). That leaves Billboard,
+   Real Book, RWC-Pop, Weimar Jazz, Wikifonia, iReal Pro, Band-in-a-Box, When in
+   Rome, Rock Corpus, Nottingham, Schubert-Winterreise — ample for a small CRNN,
+   with commercially-clean provenance we can state in the model card.
+2. **Synthetic audio.** There is recent work on training chord recognisers on
+   artificially generated audio (arXiv 2508.05878). Rendering progressions from
+   permissive symbolic sources gives *fully* clean provenance and pairs well
+   with option 1 as augmentation.
+3. **Ship the chroma-template path** (already in `crisp_notation`
+   `chroma_analysis.dart` / `analyze()`) as the default and treat the neural
+   chord model as a later premium tier.
+
+**Recommendation:** do NOT port BTC's shipped weights. Port the *architecture*
+(cheap, and it is the same CQT + attention stack Basic Pitch needs), then train
+on the ChoCo CC-BY subset and publish Apache-2.0. Timebox the ChoCo extraction
+first — if the permissive subset turns out too small once NC rows are dropped,
+fall back to option 3 rather than shipping encumbered weights.
+
+### CQT is the shared unlock
+
+Basic Pitch and the chord CRNN both need a **constant-Q transform**, which
+`core/` does not have (only `core/mel.h` and `core/fft.h`). Building
+`core/cqt.h` once unblocks BOTH, and is the highest-leverage remaining
+infrastructure item — ahead of either model port.
+
+### F0 tier — CREPE is shipped, RMVPE is the quality upgrade
+
+The handoff already flags RMVPE as "the quality tier after CREPE", and the
+licence check confirms it is clean (Apache-2.0 code, MIT weights). It is also
+what w-okada's guide recommends for all-purpose use, and it is robust to
+accompaniment — which matters because our W-SEP stems are not perfectly clean.
+FCPE is the cheap tier if CREPE-tiny proves too slow on low-end hardware.
+Priority: RMVPE > FCPE, and neither is urgent while CREPE-tiny hits RTF 0.28.
+
+---
+
 ## Open questions
 
 - **Where does the app call this from?** CrispASR has Dart/Flutter bindings, so
@@ -356,5 +437,28 @@ conversion viability) **before** any C++ is written.
   pure-Dart web fallback — CrispASR's WASM build could actually *remove* that
   caveat. Worth confirming with the app author before designing the binding.
 - **Model hosting.** Existing convention is `cstr/<name>-GGUF` on HF with a
-  `license:` YAML tag that must be verified post-upload. CREPE (MIT) and Basic
-  Pitch (Apache-2.0) are clean; the chord checkpoint is the one to vet.
+  `license:` YAML tag that must be verified post-upload. CREPE (MIT), RMVPE
+  (MIT weights), Basic Pitch (Apache-2.0) and piano_transcription (MIT) are all
+  clean. The chord checkpoint is the one that does NOT survive vetting — see the
+  licence scoping above; the plan is to train rather than port those weights.
+- **Does the chord model need to be neural at all for v1?** The chroma-template
+  path already exists in the app. If the ChoCo permissive subset proves thin,
+  shipping DSP chords + a documented "premium tier later" may be the better
+  trade than a weak model with clean provenance.
+
+## Suggested order (highest leverage first)
+
+1. **`core/cqt.h`** — unblocks Basic Pitch AND the chord model. Infrastructure,
+   no licence risk, reusable.
+2. **Finish piano_transcription** — currently cos 0.971, below the 0.999 gate.
+   It is the closest thing to a finished port that is not yet finished.
+3. **Basic Pitch** — Apache-2.0 end to end, and the app already depends on it
+   via ONNX, so this is a like-for-like replacement with a known-good oracle.
+4. **ChoCo licence extraction (timeboxed)** — decide the chord path on evidence
+   before writing chord C++.
+5. **RMVPE** — clean licence, real quality win on sung f0 over accompaniment.
+6. **MT3** — feasibility memo on the T5X checkpoint conversion FIRST.
+
+Everything above is CPU/Metal-verifiable locally. The **Kaggle/CUDA run should
+wait until this roster is complete**, so one clean CUDA session covers every
+backend at once rather than being repeated per port.
