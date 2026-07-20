@@ -2541,6 +2541,21 @@ catch_discover_tests(test-registry
     PROPERTIES LABELS "unit"
 )
 
+# Pin the public default-bundle ABI against the same registry used by the
+# shipped shared library. No network or model files are required.
+add_executable(test-registry-c-abi test-registry-c-abi.cpp)
+target_include_directories(test-registry-c-abi PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(test-registry-c-abi PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-registry-c-abi
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;registry;c-abi"
+)
+
 # ─── test-companion-resolve — Catch2 unit tests for companion resolution (#146 / #148)
 #
 # Verifies the companion pre-download guard: sibling discovery, cache probe,

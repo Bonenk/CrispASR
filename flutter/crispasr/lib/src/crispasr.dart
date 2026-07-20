@@ -335,6 +335,37 @@ class RegistryEntry {
   });
 }
 
+/// Role of one artifact in a canonical model download bundle.
+enum RegistryArtifactKind { primary, companion, extra }
+
+/// One file in a backend's canonical default download bundle.
+class RegistryArtifact {
+  final RegistryArtifactKind kind;
+  final String filename;
+  final String url;
+  final String approxSize;
+  const RegistryArtifact({
+    required this.kind,
+    required this.filename,
+    required this.url,
+    required this.approxSize,
+  });
+}
+
+/// The exact artifact bundle downloaded by `-m auto`.
+class RegistryBundle {
+  final String backend;
+  final String license;
+  final bool requiresAcceptance;
+  final List<RegistryArtifact> artifacts;
+  const RegistryBundle({
+    required this.backend,
+    required this.license,
+    required this.requiresAcceptance,
+    required this.artifacts,
+  });
+}
+
 /// Look up the canonical GGUF for a backend (whisper, parakeet, canary,
 /// voxtral, voxtral4b, granite, qwen3, cohere, nemotron, wav2vec2). Returns null
 /// on miss.
@@ -347,6 +378,80 @@ RegistryEntry? registryLookup(String backend, {DynamicLibrary? lib}) =>
 RegistryEntry? registryLookupByFilename(String filename,
         {DynamicLibrary? lib}) =>
     _registryCall('crispasr_registry_lookup_by_filename_abi', filename, lib);
+
+/// Return the backend's exact canonical `-m auto` artifact bundle.
+/// No preferred quant is applied. Returns null for an unknown backend.
+RegistryBundle? registryDefaultBundle(String backend, {DynamicLibrary? lib}) {
+  if (backend.isEmpty) return null;
+  lib ??= DynamicLibrary.open(CrispASR.defaultLibName());
+  const infoSymbol = 'crispasr_registry_default_bundle_info_abi';
+  const artifactSymbol = 'crispasr_registry_default_bundle_artifact_abi';
+  if (!lib.providesSymbol(infoSymbol) || !lib.providesSymbol(artifactSymbol)) {
+    return null;
+  }
+
+  final backendPtr = backend.toNativeUtf8();
+  final canonicalBuf = calloc<Uint8>(256);
+  final licenseBuf = calloc<Uint8>(1024);
+  final requiresAcceptancePtr = calloc<Int32>();
+  final info = lib.lookupFunction<
+      Int32 Function(Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<Uint8>,
+          Int32, Pointer<Int32>),
+      int Function(Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>,
+          int, Pointer<Int32>)>(infoSymbol);
+  try {
+    final count = info(backendPtr, canonicalBuf, 256, licenseBuf, 1024,
+        requiresAcceptancePtr);
+    if (count == 0) return null;
+    if (count < 0) {
+      throw StateError('Default registry bundle lookup failed (rc=$count).');
+    }
+
+    final artifactFn = lib.lookupFunction<
+        Int32 Function(Pointer<Utf8>, Int32, Pointer<Int32>, Pointer<Uint8>,
+            Int32, Pointer<Uint8>, Int32, Pointer<Uint8>, Int32),
+        int Function(Pointer<Utf8>, int, Pointer<Int32>, Pointer<Uint8>, int,
+            Pointer<Uint8>, int, Pointer<Uint8>, int)>(artifactSymbol);
+    final artifacts = <RegistryArtifact>[];
+    for (var index = 0; index < count; index++) {
+      final kindPtr = calloc<Int32>();
+      final filenameBuf = calloc<Uint8>(256);
+      final urlBuf = calloc<Uint8>(2048);
+      final sizeBuf = calloc<Uint8>(64);
+      try {
+        final rc = artifactFn(backendPtr, index, kindPtr, filenameBuf, 256,
+            urlBuf, 2048, sizeBuf, 64);
+        if (rc != 0 || kindPtr.value < 0 || kindPtr.value > 2) {
+          throw StateError(
+              'Default registry bundle artifact $index failed '
+              '(rc=$rc, kind=${kindPtr.value}).');
+        }
+        artifacts.add(RegistryArtifact(
+          kind: RegistryArtifactKind.values[kindPtr.value],
+          filename: filenameBuf.cast<Utf8>().toDartString(),
+          url: urlBuf.cast<Utf8>().toDartString(),
+          approxSize: sizeBuf.cast<Utf8>().toDartString(),
+        ));
+      } finally {
+        calloc.free(kindPtr);
+        calloc.free(filenameBuf);
+        calloc.free(urlBuf);
+        calloc.free(sizeBuf);
+      }
+    }
+    return RegistryBundle(
+      backend: canonicalBuf.cast<Utf8>().toDartString(),
+      license: licenseBuf.cast<Utf8>().toDartString(),
+      requiresAcceptance: requiresAcceptancePtr.value != 0,
+      artifacts: List.unmodifiable(artifacts),
+    );
+  } finally {
+    calloc.free(backendPtr);
+    calloc.free(canonicalBuf);
+    calloc.free(licenseBuf);
+    calloc.free(requiresAcceptancePtr);
+  }
+}
 
 /// Every backend name in the registry, in declaration order. Each name
 /// can be passed back to [registryLookup] for full details.

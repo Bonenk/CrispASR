@@ -147,6 +147,13 @@ public final class CrispasrSession implements AutoCloseable {
         // --- Registry + cache (PLAN #59) ---
         int crispasr_registry_lookup_abi(String backend, byte[] outFilename, int filenameCap,
                                          byte[] outUrl, int urlCap, byte[] outSize, int sizeCap);
+        int crispasr_registry_default_bundle_info_abi(String backend, byte[] outBackend, int backendCap,
+                                                       byte[] outLicense, int licenseCap,
+                                                       int[] outRequiresAcceptance);
+        int crispasr_registry_default_bundle_artifact_abi(String backend, int index, int[] outKind,
+                                                           byte[] outFilename, int filenameCap,
+                                                           byte[] outUrl, int urlCap,
+                                                           byte[] outSize, int sizeCap);
         int crispasr_cache_ensure_file_abi(String filename, String url, int quiet,
                                            String cacheDirOverride, byte[] outBuf, int outCap);
         int crispasr_cache_dir_abi(String cacheDirOverride, byte[] outBuf, int outCap);

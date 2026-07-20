@@ -276,6 +276,11 @@ int crispasr_registry_lookup_abi(const char* backend, char* out_filename, int fi
 int crispasr_registry_lookup_by_filename_abi(const char* filename, char* out_filename, int filename_cap, char* out_url,
                                              int url_cap, char* out_size, int size_cap);
 int crispasr_registry_list_backends_abi(char* out_csv, int out_cap);
+int crispasr_registry_default_bundle_info_abi(const char* backend, char* out_backend, int backend_cap,
+                                              char* out_license, int license_cap, int* out_requires_acceptance);
+int crispasr_registry_default_bundle_artifact_abi(const char* backend, int index, int* out_kind, char* out_filename,
+                                                  int filename_cap, char* out_url, int url_cap, char* out_size,
+                                                  int size_cap);
 int crispasr_cache_ensure_file_abi(const char* filename, const char* url, int quiet, const char* cache_dir_override,
                                    char* out_buf, int out_cap);
 int crispasr_cache_dir_abi(const char* cache_dir_override, char* out_buf, int out_cap);

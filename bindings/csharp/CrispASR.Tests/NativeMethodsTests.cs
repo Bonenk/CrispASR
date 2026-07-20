@@ -215,6 +215,8 @@ namespace CrispASR.Tests
         [InlineData("crispasr_session_translate_text")]
         [InlineData("crispasr_session_translate_text_free")]
         [InlineData("crispasr_registry_lookup_abi")]
+        [InlineData("crispasr_registry_default_bundle_info_abi")]
+        [InlineData("crispasr_registry_default_bundle_artifact_abi")]
         [InlineData("crispasr_cache_ensure_file_abi")]
         [InlineData("crispasr_cache_dir_abi")]
         public void PInvoke_MethodExists(string entryPoint)
