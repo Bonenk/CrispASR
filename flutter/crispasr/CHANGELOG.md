@@ -11,6 +11,17 @@
   (`L,R,L,R,…`) at 44100 Hz, and the native side counts samples *per
   channel*. To feed a stem to `pitch()`, downmix to mono and resample to
   16 kHz first — the dartdoc has the recipe.
+- Piano transcription: `CrispasrSession.pianoNotes()` returns structured
+  note events — `PianoNote = ({int midi, double onMs, double offMs, int
+  velocity})` — plus a `pianoSampleRate` probe. Previously the only route
+  out of the piano backend was `transcribe()`, whose segment text reads
+  like `"C4 v=80"`; parsing that back was lossy.
+- Native fixes that ship with this release: htdemucs now segments long
+  audio (7.8 s windows, 25% overlap, weighted overlap-add), so separating a
+  full song no longer needs tens of GB — peak memory is flat instead of
+  growing with length. And the htdemucs loader no longer silently zero-fills
+  quantized tensors it cannot read, which had made the q4_k model produce
+  garbage; unreadable weights are now fatal.
 
 ## 0.8.16
 
