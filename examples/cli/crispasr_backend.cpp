@@ -48,6 +48,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_htdemucs_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_mel_band_roformer_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_crepe_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_btc_chords_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_rvc_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_beat_this_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_ark_asr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_moss_audio_backend();
@@ -218,6 +219,8 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
     if (name == "btc-chords" || name == "btc" || name == "chords" || name == "btc-chords-large" ||
         name == "btc-chords-majmin")
         return crispasr_make_btc_chords_backend();
+    if (name == "rvc-svc" || name == "rvc" || name == "svc")
+        return crispasr_make_rvc_backend();
     if (name == "beat-this" || name == "beatthis" || name == "beat_this" || name == "beats")
         return crispasr_make_beat_this_backend();
     if (name == "kyutai-stt" || name == "kyutai" || name == "moshi-stt" || name == "kyutai-stt-2.6b")
@@ -377,6 +380,7 @@ std::vector<std::string> crispasr_list_backends() {
         "mel-band-roformer",
         "crepe",
         "btc-chords",
+        "rvc-svc",
         "beat-this",
     };
 }
@@ -850,6 +854,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "crepe";
             else if (a == "btc")
                 result = "btc-chords";
+            else if (a == "rvc")
+                result = "rvc-svc";
             else if (a == "beat-this")
                 result = "beat-this";
             else if (a == "kyutai-stt" || a == "kyutai_stt" || a == "kyutaistt")
