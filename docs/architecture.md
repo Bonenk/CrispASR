@@ -1234,6 +1234,14 @@ restores bandwidth while preserving speaker identity.
 - **Execution:** CPU, CUDA, and Vulkan. The Vulkan graph decomposes affine
   normalization and relative-position gather operations into supported GGML
   primitives; both predictor and DAC execute fully on Vulkan.
+- **Working memory:** relative-position logits are evaluated once per clipped
+  distance bucket instead of expanding a `head_dim x T x T` tensor. The DAC is
+  decoded in 256-frame cores with the exact 10-frame receptive-field context,
+  so convolution IM2COL workspace is bounded rather than growing with the full
+  utterance. Set `CRISPASR_SIDON_DECODER_CHUNK_FRAMES` to a positive core size;
+  set it to `0` to use one full decoder graph for parity diagnostics. The
+  predictor remains global-attention and retains the existing input-duration
+  safety cap.
 
 The CLI auto-detects `general.architecture = "sidon"` and exposes `CAP_S2S`:
 
