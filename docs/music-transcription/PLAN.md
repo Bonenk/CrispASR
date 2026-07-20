@@ -113,11 +113,28 @@ ggml/GGUF backends.
   so there is an empty slot that learned per-(string,fret) emissions drop into
   without changing the DP. Nobody in the surveyed literature has run that
   experiment, and the 2016 data-scarcity reason for hand-designing is gone.
-  ⛔ **Two blockers before any C++**: (1) **GuitarSet's license was never
-  verified** and it is the training corpus for *every* audio candidate — cheap to
-  check, and it can invalidate the audio arm outright; (2) the 2024–26 wave
-  (Guitar-TECHS, GOAT, **TART** = audio→tab direct competitor, arXiv 2510.02597)
-  is unverified, so any "SOTA" claim is conditional.
+  ✅ **Both blockers now CLEARED (§GT1 §0) — the audio arm is GO.**
+  (1) **Licensing is clean end-to-end**: GuitarSet v1.1.0 (Zenodo 3371780),
+  EGSet12 (11406378), Guitar-TECHS and GOAT are **all CC BY 4.0**, open access,
+  no NC/SA. Better still, the **EGSet12 record ships the trained model** — the
+  GuitarProFX-augmented TabCNN this spec recommends — under CC BY 4.0. So the
+  shippable weights have clean provenance and need only attribution. ⚠ Mind the
+  code/weights gap: FretNet's repo is MIT but **TabCNN's has no licence file**,
+  so build via the repo's existing **clean-room protocol** (Transcoda precedent)
+  — weights from Zenodo, graph implemented from the ISMIR paper (§3.3–3.5 fully
+  specify it), MIT FretNet as the readable reference, never transcribe the
+  unlicensed source. (2) **Nothing in the 2024–26 wave supersedes TabCNN.**
+  TART (2510.02597) turned out not to be a competitor on this axis at all: no
+  GuitarSet 6-fold CV (plain 80/20), **no tablature F1 and no TDR whatsoever**,
+  no comparison to TabCNN/FretNet, a *rule-based* final tab stage validated on a
+  synthetic example — and its string/fret stage **is** the DadaGP-trained
+  Fretting-Transformer, so it inherits the licensing blocker and scores 42.1 %
+  tab accuracy. Guitar-TECHS and GOAT are datasets, not models. TART actually
+  reproduces this spec's central finding independently: even the newest
+  "comprehensive audio-to-tab tool" delegates string/fret to an autoregressive
+  symbolic model. (3) Bonus: those four CC-BY-4.0 corpora together are a
+  genuine **clean-room training set that avoids DadaGP entirely** — which did
+  not exist when the DadaGP-dependent symbolic models were trained.
   Method note: 104 claims extracted from 21 primary sources, 25 adversarially
   verified, **5 killed** — including this session's own initial reading that
   DadaGP's baked-in `string:fret` tokens make the split *fatally* adverse
@@ -125,9 +142,15 @@ ggml/GGUF backends.
   awkward", not "impossible". ⚠ Never table symbolic and audio numbers together —
   they share no metric, and MIDI-to-Tab *consumes GuitarSet's training split*.
 - **Next**: `core/stft.h` extraction is independent (CREPE needs no STFT).
-- **Next (guitar tab)**: resolve the two §GT1 blockers before writing any code —
-  GuitarSet licence, then whether TART supersedes TabCNN. Both are reading tasks,
-  not engineering.
+- **Next (guitar tab)**: blockers cleared, so the audio arm can start. Order:
+  (1) pull the CC-BY-4.0 augmented-TabCNN weights from the EGSet12 Zenodo record
+  and inspect the tensor layout; (2) `models/convert-tabcnn-to-gguf.py` +
+  `tools/tabcnn_torch_parity.py` — and per the BTC/CQT lesson assert on the
+  **median per-bin magnitude ratio**, not just cosine, since the front end is a
+  CQT and cosine is scale-blind; (3) `src/tabcnn.{h,cpp}` emitting `[T, 6, 21]`
+  **log-probs**; (4) `--tab` task surface per `contributing.md` §7. Acceptance is
+  **EGSet12 zero-shot**, not GuitarSet — GuitarSet is the training protocol and
+  flatters by ~0.30 F1. Symbolic arm stays parked (§GT1 §4.2/§2.3).
 
 ### Performance — measured, M1, quiet box (load 4.0), 10 s audio, median of 3
 
@@ -669,18 +692,22 @@ implementations diff-checkable against each other.
   path already exists in the app. If the ChoCo permissive subset proves thin,
   shipping DSP chords + a documented "premium tier later" may be the better
   trade than a weak model with clean provenance.
-- **Guitar tab — GuitarSet's licence (§GT1 blocker 1).** Never verified, and it
-  is the training corpus for *every* audio-arm candidate. If it forbids
-  commercial use of derived weights, the audio arm dies with it. Same question
-  for EGSet12 (Zenodo 11406378). Cheap to answer; answer it before any code.
-- **Guitar tab — does TART supersede TabCNN (§GT1 blocker 2)?** arXiv 2510.02597
-  is audio→tab and therefore the direct competitor. Also unread: Guitar-TECHS
-  (2501.03720), GOAT (2509.22655). Any 2026 "SOTA" claim in §GT1 is conditional
-  on these.
-- **Guitar tab — can a clean-room corpus avoid DadaGP?** Is GuitarSet + Riley
-  enough to train a usable emission scorer, and does SynthTab offer a licensable
-  synthesis path? This is the same "train rather than port" answer the chord
-  problem reached, and for the same reason.
+- ~~**Guitar tab — GuitarSet's licence**~~ ✅ **ANSWERED 2026-07-20**: CC BY 4.0,
+  as are EGSet12, Guitar-TECHS and GOAT. EGSet12 additionally ships the trained
+  augmented-TabCNN weights under CC BY 4.0. Unlike the chord problem, this one
+  vets clean — port, don't retrain.
+- ~~**Guitar tab — does TART supersede TabCNN?**~~ ✅ **ANSWERED**: no. No
+  GuitarSet 6-fold, no tab F1/TDR, no TabCNN/FretNet comparison, rule-based
+  final stage, DadaGP-trained string/fret stage at 42.1 % tab accuracy.
+  Guitar-TECHS and GOAT are datasets. Still unread: arXiv 2510.10619 (symbolic
+  only, cannot move the audio recommendation).
+- **Guitar tab — is the clean-room corpus SUFFICIENT?** Licensing is solved
+  (GuitarSet + EGSet12 + Guitar-TECHS + GOAT, all CC BY 4.0), so the open part
+  is now purely empirical: is that enough data to train a symbolic emission
+  scorer, and does SynthTab offer a licensable synthesis path? Note this is the
+  *opposite* outcome to the chord problem — there the licence forced "train
+  rather than port"; here the weights vet clean, so port first and treat
+  training as the symbolic-arm option.
 - **Guitar tab — does a learned emission scorer actually beat the hand-designed
   DP?** The classical HMM's emissions are degenerate 0/1, so the slot is empty
   and the experiment is architecturally trivial. Nobody has run it, and there is
