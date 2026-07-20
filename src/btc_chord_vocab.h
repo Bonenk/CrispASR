@@ -96,4 +96,46 @@ inline void timing_signal(int length, int channels, std::vector<float>& out) {
         }
 }
 
+// ---------------------------------------------------------------------------
+// Pipeline geometry
+//
+// BTC's reference front end (utils/mir_eval_modules.audio_file_to_features)
+// CQTs each `inst_len`-second chunk INDEPENDENTLY and concatenates. Because
+// librosa centres every call, each chunk carries its own edge padding, so this
+// does NOT equal a continuous transform of the whole signal -- it yields more
+// frames, and the difference grows with duration. Measured on the upstream
+// 257 s test clip: 2778 frames chunked vs 2770 continuous.
+// ---------------------------------------------------------------------------
+
+// Frames a centred CQT emits for `n_samples` at `hop`. Mirrors librosa's
+// centre convention (core_cqt::n_frames).
+inline int centred_n_frames(int n_samples, int hop) {
+    if (n_samples <= 0 || hop <= 0)
+        return 0;
+    return 1 + n_samples / hop;
+}
+
+// Total frames the CHUNKED pipeline emits. The reference always makes a final
+// call for the remainder, even when it is empty.
+inline int chunked_n_frames(int n_samples, int hop, int chunk) {
+    if (chunk <= 0)
+        return centred_n_frames(n_samples, hop);
+    int total = 0, cur = 0;
+    while (n_samples > cur + chunk) {
+        total += centred_n_frames(chunk, hop);
+        cur += chunk;
+    }
+    return total + centred_n_frames(n_samples - cur, hop);
+}
+
+// Seconds per output frame. The reference derives this from the CHUNK geometry
+// (feature_per_second = inst_len / timestep), NOT from hop/sample_rate. They
+// differ by 0.31 % -- 10/108 = 0.0925926 vs 2048/22050 = 0.0928798 -- which is
+// 0.79 s of accumulated drift over a 4-minute song.
+inline double frame_seconds(float inst_len_sec, int timestep, int hop, int sample_rate) {
+    if (inst_len_sec > 0.0f && timestep > 0)
+        return (double)inst_len_sec / (double)timestep;
+    return (double)hop / (double)sample_rate;
+}
+
 } // namespace btc_vocab

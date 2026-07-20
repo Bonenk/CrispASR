@@ -44,7 +44,20 @@ ggml/GGUF backends.
   like the htdemucs iSTFT scale bug that cosine let through. It now asserts on
   the median per-bin magnitude ratio; reverting the fix drives that median to
   0.0131, a 76× margin.
-- **Next**: upload `cstr/btc-chords-GGUF` and `cstr/crepe-GGUF` (the registry URLs point at it but the repo
+- **Done**: ✅ **Real-music acceptance + two front-end parity bugs fixed.** The
+  diff harness replays `input_feat` by design, so it never tested our CQT.
+  Running the torch reference end-to-end on its own 257 s test clip exposed
+  both: (1) `audio_file_to_features` CQTs each 10 s chunk INDEPENDENTLY and
+  concatenates (2778 frames vs our continuous 2770); (2) frame duration is
+  `inst_len/timestep` = 0.0925926 s, not `hop/sample_rate` = 0.0928798 s
+  (0.79 s drift over 4 minutes). Our features scored cos 0.9993 vs a continuous
+  librosa CQT but only **0.8815 vs the reference pipeline**; now 0.9993 vs the
+  pipeline with an exact frame-count match. `mir_eval` agreement with the torch
+  reference went **86.63 % → 98.56 %** (tetrads), 99.17 % root. Guarded by
+  `[geometry]` tests; GGUFs carry `btc.inst_len_sec` and were re-uploaded.
+- **Published**: `cstr/btc-chords-GGUF` — 4 GGUFs (170/25-class x f16/f32) +
+  model card, all 13/13 at cos 1.000000. Licence gate verified live.
+- **Next**: upload `cstr/crepe-GGUF` (the registry URLs point at it but the repo
   is not published yet); quantize (q8_0/q4_k) and re-measure; then the Dart FFI +
   WASM surfaces. `core/stft.h` extraction is independent (CREPE needs no STFT).
 

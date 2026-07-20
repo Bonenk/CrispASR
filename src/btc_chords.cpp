@@ -70,6 +70,9 @@ struct btc_hparams {
     int cqt_bins_per_octave = 24;
     int cqt_hop_length = 2048;
     int sample_rate = 22050;
+    // Chunk length the reference splits audio into before CQT (mp3.inst_len in
+    // run_config.yaml). Also sets the frame duration together with timestep.
+    float inst_len_sec = 10.0f;
 };
 
 struct btc_attn_block {
@@ -299,6 +302,7 @@ btc_chords_context* btc_chords_init_from_file(const char* model_path, btc_chords
     hp.cqt_bins_per_octave = core_gguf::kv_u32(meta, "btc.cqt_bins_per_octave", 24);
     hp.cqt_hop_length = core_gguf::kv_u32(meta, "btc.cqt_hop_length", 2048);
     hp.sample_rate = core_gguf::kv_u32(meta, "btc.sample_rate", 22050);
+    hp.inst_len_sec = core_gguf::kv_f32(meta, "btc.inst_len_sec", 10.0f);
     gguf_free(meta);
 
     ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : nullptr;
@@ -493,8 +497,39 @@ btc_chords_result* btc_chords_recognize(btc_chords_context* ctx, const float* pc
     cp.n_bins = hp.cqt_n_bins;
     cp.bins_per_octave = hp.cqt_bins_per_octave;
     cp.hop_length = hp.cqt_hop_length;
+
+    // CHUNKED CQT — this reproduces the reference PIPELINE, not just the
+    // reference transform. utils/mir_eval_modules.audio_file_to_features CQTs
+    // each `inst_len` (10 s) segment INDEPENDENTLY and concatenates the
+    // results; because librosa centres each call, every chunk carries its own
+    // edge padding, so a continuous transform of the whole signal is NOT the
+    // same thing. Measured on the upstream test clip (257 s): chunked gives
+    // 2778 frames, continuous 2770, and our continuous output scored cos 0.8815
+    // against the reference pipeline while scoring 0.9993 against a continuous
+    // librosa CQT. In other words the transform was right and the pipeline was
+    // wrong -- and the per-stage diff harness could not see it, because its
+    // reference dump replays `input_feat` by design.
+    const int chunk = (int)((double)hp.inst_len_sec * (double)hp.sample_rate);
+    const auto kernels = core_cqt::build_kernels(cp);
     std::vector<float> mag;
-    const int n_frames = core_cqt::magnitude(cp, src, n, mag);
+    int n_frames = 0;
+    if (chunk > 0) {
+        int cur = 0;
+        std::vector<float> part;
+        while (n > cur + chunk) {
+            const int got = core_cqt::magnitude(cp, kernels, src + cur, chunk, part);
+            mag.insert(mag.end(), part.begin(), part.end());
+            n_frames += got;
+            cur += chunk;
+        }
+        // Trailing partial chunk -- the reference always emits this final call,
+        // even when the remainder is empty.
+        const int got = core_cqt::magnitude(cp, kernels, src + cur, n - cur, part);
+        mag.insert(mag.end(), part.begin(), part.end());
+        n_frames += got;
+    } else {
+        n_frames = core_cqt::magnitude(cp, kernels, src, n, mag);
+    }
     if (n_frames <= 0)
         return nullptr;
 
@@ -516,7 +551,14 @@ btc_chords_result* btc_chords_recognize(btc_chords_context* ctx, const float* pc
     }
 
     const bool reduce = hp.n_chords > 25 && btc_maj_min();
-    const double frame_ms = 1000.0 * (double)hp.cqt_hop_length / (double)hp.sample_rate;
+    // Frame duration is inst_len/timestep, NOT hop/sample_rate. The reference
+    // derives it from the chunk geometry (feature_per_second = inst_len /
+    // timestep in audio_file_to_features), and the two differ by 0.31 % --
+    // 2048/22050 = 0.0928798 s vs 10/108 = 0.0925926 s. That is 0.79 s of
+    // accumulated drift over a 4-minute song, i.e. every chord boundary lands
+    // progressively late.
+    const double frame_ms =
+        1000.0 * btc_vocab::frame_seconds(hp.inst_len_sec, hp.timestep, hp.cqt_hop_length, hp.sample_rate);
 
     std::vector<int> labels;
     std::vector<float> confs;

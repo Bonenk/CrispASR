@@ -85,6 +85,10 @@ def main() -> None:
     w.add_uint32("btc.cqt_bins_per_octave", 24)
     w.add_uint32("btc.cqt_hop_length", 2048)
     w.add_uint32("btc.sample_rate", 22050)
+    # Chunk length the reference splits audio into before the CQT (mp3.inst_len).
+    # Also fixes the output frame rate: feature_per_second = inst_len / timestep,
+    # which is NOT hop/sample_rate -- see docs/music-transcription/BTC_BLUEPRINT.md.
+    w.add_float32("btc.inst_len_sec", 10.0)
     w.add_string("general.license", "cc-by-nc-sa-4.0")
     w.add_string(
         "general.license.description",

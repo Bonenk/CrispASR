@@ -47,6 +47,27 @@ tolerance wider than the defect AND was named for the law the *buggy* build
 satisfies; it is replaced by the exact scale law `peak == (A/2)*sqrt(N_k)`.
 See LEARNINGS.md.
 
+### Real-music acceptance exposed two FRONT-END parity bugs
+
+The per-stage harness replays the reference's `input_feat` by design (so a CQT
+difference cannot masquerade as a model failure) — which means it never tested
+our front end. Running the torch reference end-to-end on its own 257 s test
+clip found two bugs living under 13/13 at cos 1.000000:
+
+1. `audio_file_to_features` CQTs each 10 s chunk INDEPENDENTLY and
+   concatenates; librosa centres each call, so every chunk carries its own edge
+   padding. 2778 frames vs our continuous 2770.
+2. Frame duration is `inst_len/timestep` (10/108 = 0.0925926 s), not
+   `hop/sample_rate` (2048/22050 = 0.0928798 s) — 0.79 s of drift over four
+   minutes, every boundary progressively late.
+
+Our features scored cos 0.9993 against a *continuous* librosa CQT and only
+**0.8815** against the actual reference pipeline: the transform was right, the
+pipeline was wrong. Fixed by chunking the CQT and deriving the frame rate from
+the chunk geometry. `mir_eval` agreement with the torch reference on real
+music: **86.63 % → 98.56 %** (tetrads), 99.17 % root. GGUFs now carry
+`btc.inst_len_sec`; all four re-converted, re-verified 13/13, re-uploaded.
+
 ### Gaps closed on the second pass
 
 - `btc` was in `crispasr_detect_backend_from_gguf` but **nowhere** in

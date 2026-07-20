@@ -131,6 +131,59 @@ TEST_CASE("btc vocab: every 25-class label is reachable from the 170-class set",
         REQUIRE(reachable.count(m) == 1);
 }
 
+// ---------------------------------------------------------------------------
+// Pipeline geometry. These pin the numbers MEASURED against the reference
+// implementation on its own 257 s test clip, so a regression is caught here
+// rather than as a few percent of chord accuracy nobody attributes to the
+// front end.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("btc geometry: chunked frame count matches the reference pipeline", "[unit][btc][geometry]") {
+    const int SR = 22050, HOP = 2048;
+    const int chunk = (int)(10.0 * SR); // inst_len = 10 s
+
+    // The upstream test clip: 257.201474 s at 22050 Hz. librosa's own chunked
+    // audio_file_to_features emits 2778 frames for it; a CONTINUOUS transform
+    // of the same signal emits 2770. Both numbers were measured, not derived.
+    const int n = (int)(257.201474 * SR);
+    REQUIRE(btc_vocab::chunked_n_frames(n, HOP, chunk) == 2778);
+    REQUIRE(btc_vocab::centred_n_frames(n, HOP) == 2770);
+
+    // 2778 decomposes exactly as 25 full chunks x 108 frames + a 78-frame
+    // remainder. (The 8-frame gap versus the continuous transform has no tidy
+    // closed form -- it falls out of per-chunk centring -- so the decomposition
+    // is asserted instead of a formula for the difference.)
+    const int full = n / chunk;
+    REQUIRE(full == 25);
+    REQUIRE(btc_vocab::centred_n_frames(chunk, HOP) == 108);
+    REQUIRE(btc_vocab::centred_n_frames(n - full * chunk, HOP) == 78);
+    REQUIRE(full * 108 + 78 == 2778);
+
+    // Exactly one chunk of audio gives exactly `timestep` frames -- that
+    // equality is what makes feature_per_second = inst_len / timestep hold.
+    REQUIRE(btc_vocab::chunked_n_frames(chunk, HOP, chunk) == 108);
+
+    // chunk <= 0 degrades to the continuous transform rather than looping.
+    REQUIRE(btc_vocab::chunked_n_frames(n, HOP, 0) == btc_vocab::centred_n_frames(n, HOP));
+    REQUIRE(btc_vocab::chunked_n_frames(0, HOP, chunk) == 0);
+}
+
+TEST_CASE("btc geometry: frame duration comes from inst_len/timestep", "[unit][btc][geometry]") {
+    // 10/108 = 0.0925926, NOT 2048/22050 = 0.0928798. The 0.31 % difference is
+    // 0.79 s of drift over a 4-minute song, and fixing it moved agreement with
+    // the torch reference from 86.63 % to 98.56 % (mir_eval tetrads).
+    const double fs = btc_vocab::frame_seconds(10.0f, 108, 2048, 22050);
+    REQUIRE_THAT(fs, Catch::Matchers::WithinRel(10.0 / 108.0, 1e-12));
+
+    const double wrong = 2048.0 / 22050.0;
+    REQUIRE(std::abs(fs - wrong) > 1e-5); // they must NOT be interchangeable
+    REQUIRE_THAT(std::abs(fs - wrong) * 257.2 / wrong, Catch::Matchers::WithinAbs(0.79, 0.02));
+
+    // Fallback only when the chunk geometry is unavailable.
+    REQUIRE_THAT(btc_vocab::frame_seconds(0.0f, 108, 2048, 22050), Catch::Matchers::WithinRel(wrong, 1e-12));
+    REQUIRE_THAT(btc_vocab::frame_seconds(10.0f, 0, 2048, 22050), Catch::Matchers::WithinRel(wrong, 1e-12));
+}
+
 TEST_CASE("btc positional encoding: halves are concatenated, not interleaved", "[unit][btc][posenc]") {
     const int T = 16, C = 128, n = C / 2;
     std::vector<float> pe;

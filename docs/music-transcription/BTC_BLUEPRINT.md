@@ -200,3 +200,38 @@ predicts N/G/C while this runtime predicts N everywhere.
 3. Re-run both the CQT parity tool and the BTC acceptance test.
 
 The BTC graph itself is unaffected: 13/13 stages at cos 1.000000.
+
+---
+
+## 11. The front end is a CHUNKED CQT, not a continuous one
+
+`utils/mir_eval_modules.audio_file_to_features` splits the signal into
+`mp3.inst_len` (10 s) segments, CQTs **each one independently**, and
+concatenates. librosa centres every call, so each chunk carries its own edge
+padding — the result is not equal to a single CQT of the whole signal.
+
+Measured on the upstream 257 s test clip:
+
+| | frames |
+|---|---|
+| chunked (the reference) | 2778 |
+| continuous (single `librosa.cqt`) | 2770 |
+
+Implementing `librosa.cqt` faithfully but calling it once is a silent accuracy
+bug: our features scored cos **0.9993** against a continuous transform and only
+**0.8815** against the reference pipeline. This is invisible to
+`crispasr-diff btc`, whose reference dump replays `input_feat` by design.
+
+## 12. Frame duration is `inst_len / timestep`, not `hop / sample_rate`
+
+`feature_per_second = config.mp3['inst_len'] / config.model['timestep']`
+= 10/108 = **0.0925926 s**. The obvious `hop/sample_rate` = 2048/22050 =
+**0.0928798 s** is 0.31 % larger — 0.79 s of accumulated drift over a
+four-minute song, so every chord boundary lands progressively late.
+
+The two are related but not equal: one 10 s chunk yields exactly `timestep`
+= 108 frames, which is what makes the chunk-derived rate the correct one.
+
+Fixing 11 and 12 moved agreement with the PyTorch reference on real music from
+**86.63 % to 98.56 %** (`mir_eval` tetrads). Guarded by
+`tests/test-btc-vocab.cpp` `[geometry]`.
