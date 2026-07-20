@@ -335,6 +335,35 @@ ggml-specific findings, all of which cost a debug cycle:
 | no flip op, no negative-stride views | channel Flip = transpose → `get_rows(reversed idx)` → transpose |
 | tap tensors unreachable from the output are never allocated | `ggml_build_forward_expand` over every capture AND every output |
 
+### A vacuous PASS, and the test that caught it
+
+`output_audio` reported **PASS cos 1.00000000** while comparing **one sample**.
+The dumper had `a, b = audio_np.ravel(), ...` a few lines above
+`"output_audio": a[0]` — shadowing the variable holding the reference audio, so
+`a[0]` became a single float. The harness dutifully compared 1 element against
+25600 and passed.
+
+This is the failure mode to fear most: not a red number, a GREEN one that means
+nothing. Nothing in the run looked wrong. It surfaced only because a NEW check
+printed `ref=1` next to `mine=25600` — the size columns, not the cosine.
+
+**Print sizes next to every cosine.** A comparison over the wrong length is
+invisible in the metric and obvious in the shape.
+
+### Per-stage checks do not test CHAINING
+
+Every stage check here is input-aligned: it feeds the reference's own `z_p`,
+`z` and `har`. So all 47 could pass while the code that WIRES the stages
+together is broken — and it was. With the audio reference finally intact,
+`convert_e2e` (the real `rvc_svc_convert()`, fed only ContentVec + F0 + speaker
+id + noise) failed at **cos 0.40** with every per-stage check still green. The
+cause was the third instance of the same transpose trap, this time on the
+`noise_zp` input.
+
+So the acceptance test must run the REAL entry point, not a hand-assembled path
+through validated pieces. That is HARD RULE #3 (decoded-output roundtrip)
+applied to a port whose output happens to be audio rather than text.
+
 ### The lesson that actually mattered
 
 **Two of the three "graph bugs" were HARNESS bugs.** Both `enc_p` and `flow`
