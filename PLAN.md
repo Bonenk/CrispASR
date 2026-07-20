@@ -245,7 +245,28 @@ halves. **We own the real-time-critical heavy vocoders**; they keep the
 HuBERT/ContentVec encoder, Harvest F0, and a lightweight DDSP-SVC synth as the
 web/offline fallback.
 
-### §CB1 — RVC voice conversion — BLUEPRINT TRACED, two findings block step 1
+### §CB1 — RVC voice conversion — PORTED AND VALIDATED (packaging left)
+
+Converter -> numpy spec -> ggml graphs -> convert() -> session C ABI, every
+step at cos 1.00000000 against torch. `crispasr-diff rvc <model> <ref> <wav>`
+reports 48 stages, including `convert_e2e` which runs the real
+`rvc_svc_convert()` and reproduces the reference audio from ContentVec + F0 +
+speaker id + replayed noise alone. Live test: 4 cases / 12825 assertions.
+
+Deliberately NO CLI verb — the input is ContentVec features, which we do not
+produce. `docs/bindings.md` documents the session surface.
+
+REMAINING (packaging, not correctness):
+- Registry entries. BLOCKED on a licence-scoped checkpoint: the parity work used
+  the pretrained base (`lj1995/VoiceConversionWebUI pretrained_v2/f0G40k.pth`)
+  converted with `--license other`, which should not ship as-is.
+- Dart/Flutter wrapper for `crispasr_session_convert*` (CometBeat is the
+  consumer; the C ABI they need is done).
+- Two agreed parameters were CORRECTED rather than implemented — `protect` is
+  provably inert without the FAISS index, and `rms_mix_rate` needs the source
+  waveform our seam never receives. See SVC_RECORD_SHAPES §9b.
+
+### §CB1-history — original framing and the two findings that reshaped it
 
 Contract CONFIRMED (see `docs/music-transcription/SVC_RECORD_SHAPES.md`).
 Source traced; see `docs/music-transcription/RVC_BLUEPRINT.md`. Two findings
