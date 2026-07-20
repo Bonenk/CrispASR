@@ -603,3 +603,54 @@ encoder + transformer + decoder as a SINGLE graph so activations never leave
 the device between layers, with skip connections kept as in-graph tensors
 rather than downloaded and re-uploaded. That is what should convert the
 transformer-only win into an end-to-end one.
+
+
+## FINAL benchmark (2026-07-20, quiet box) — CPU+Accelerate wins on M1
+
+First measurement all session taken under genuinely controlled conditions:
+load stable 9.5-12 across every sample (spread ~2.5, versus 9-354 earlier),
+Firefox's WebRender GPU-compositor process idle at 0% (it had been at 74%,
+which contends for the very GPU under test and penalises ONLY the Metal arm),
+6 samples per config, balanced order, warm-up discarded.
+
+Each config was proven live before timing — the profiler must show its own
+phase marker (`ct.self_attn` / `enc.ggml_graph` / `fused.graph`), so no config
+can silently be another. That check exists because a stale `test-htdemucs-smoke`
+had previously made an entire three-way benchmark measure the per-layer path
+twice while labelled FUSED.
+
+| config | min | median |
+|--------|-----|--------|
+| **CPU + Accelerate (default)** | **3.95 s** | **4.12 s** |
+| fused single graph (Metal) | 5.21 s | 5.62 s |
+| per-layer graphs (Metal) | 5.33 s | 5.71 s |
+
+Proof of work: both arms produce identical stems (drums 0.000569, bass
+0.000276, other 0.292620/0.292617, vocals 0.000798/0.000799), so the times
+reflect real separation, not a short-circuit.
+
+### Verdict
+
+- **CPU+Accelerate is the fastest path on Apple Silicon**, by ~36% over the
+  best GPU path. `CRISPASR_HTDEMUCS_GGML` correctly stays default OFF.
+- **Fusion bought ~2%** (5.71 -> 5.62 s median), i.e. nothing. The reason is
+  M1's unified memory: the host<->device "roundtrips" fusion removes are not
+  real transfers there, so the overhead I predicted was largely absent. What
+  fusion does remove — per-layer graph build + gallocr alloc — was small next
+  to compute.
+- Metal loses to Accelerate because the M1 AMX matrix coprocessor makes FP32
+  sgemm extremely fast, and this model's per-layer work is modest (42M params).
+
+This does NOT mean the graph port was wasted. It is the prerequisite for CUDA,
+where both assumptions invert: transfers are real PCIe traffic (so fusion
+should matter a lot) and a discrete GPU has a far larger advantage over server
+CPU BLAS than Metal has over AMX. That is the measurement worth taking next.
+
+### Headline
+
+    original (all gates OFF)            ~615 s
+    optimised CPU+Accelerate (default)  4.12 s median   -> ~149x
+    ONNX Runtime CPU, ORT_ENABLE_ALL    ~43 s           -> ~10x faster than ORT
+
+The ORT figure was measured separately under unknown load; treat the 10x as
+indicative rather than a controlled head-to-head.
