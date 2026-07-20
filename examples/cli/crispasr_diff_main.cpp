@@ -42,6 +42,7 @@
 #include "btc_chords.h"
 #include "tabcnn.h"
 #include "piano_transcription.h"
+#include "beatrice_pitch.h"
 #include "rvc_svc.h"
 #include "voxtral_tts.h"
 #include "higgs_stt.h"
@@ -1134,6 +1135,16 @@ int main(int argc, char** argv) {
         // input_pitch and BOTH RNG buffers, which the runtime replays — the
         // only way to diff a stochastic model at all. audio_path unused.
         return rvc_svc_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
+    }
+    if (backend_name == "beatrice" || backend_name == "beatrice-pitch") {
+        // model_path = beatrice pitch_estimator GGUF, ref_path = dump from
+        // tools/beatrice_torch_parity.py. Unlike rvc this component is
+        // DETERMINISTIC (Beatrice's RNG lives in the vocoder), so no noise
+        // replay is needed. The harness drives the network from the
+        // reference's own DSP output, and separately checks the host DSP
+        // against it, so a front-end bug cannot masquerade as a network bug.
+        // audio_path unused.
+        return beatrice_pitch_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
     }
     if (backend_name == "piano" || backend_name == "piano-transcription") {
         // model_path = piano-transcription GGUF, ref_path = ref.gguf from
