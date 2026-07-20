@@ -196,7 +196,7 @@ Gate tested both directions locally under `set -euo pipefail`, including the
 
 **Needs a 0.8.18 release to reach consumers.**
 
-### DB2 — SIGABRT at process exit when a session is still open (OPEN)
+### DB2 — SIGABRT at process exit when a session is still open — FIXED
 
 `GGML_ASSERT([rsets->data count] == 0)` in `ggml_metal_rsets_free`
 (`ggml/src/ggml-metal/ggml-metal-device.m:690`), reached from
@@ -219,16 +219,22 @@ deallocated all Metal resources before exiting."
 (`crispasr_session_close`). That is a one-line finalizer on the Dart side and
 makes the abort go away entirely.
 
-**Why not patched here yet.** A robust fix means tracking live sessions in a
-global registry and closing them from an `atexit` registered AFTER ggml's
-device static is constructed (atexit is LIFO, so ours would then run first).
-That is new lifetime management in the session C ABI, with double-free and
-thread-safety exposure, and it is not something to rush — a hasty version of
-exactly this class of change introduced a use-after-free in the mel-band-roformer
-diff harness earlier the same day. Alternatives: patch the vendored ggml
-submodule (divergence from a pinned upstream), or raise it upstream, where the
-real argument is that a library aborting its host process because the consumer
-kept a resource alive is hostile for FFI use.
+**FIXED in the ggml fork** (`CrispStrobe/ggml` @ bfe8ea22, submodule bumped):
+`ggml_metal_rsets_free` now warns instead of asserting. Releasing the array is
+correct refcounting either way — a residency set a live buffer still references
+stays alive by its own retain — so the abort bought nothing but a dead process.
+Precedent: 1dc4cb93 ("gguf: reject empty keys instead of asserting").
+
+Chosen over the alternative — a session registry closed from an `atexit`
+registered after ggml's device static (LIFO ordering) — because that adds new
+lifetime management to the session C ABI with double-free exposure, and would
+REGRESS a consumer that closes correctly from its own late static destructor:
+we would free the session first and they would then close a dangling pointer.
+The ggml patch has no such failure mode.
+
+Verified both ways on macOS/Metal: closing the session exits 0 silently;
+leaking it exits 0 with one actionable warning, where it previously exited 134
+with a backtrace. A real leak is still diagnosable — the message names the fix.
 
 ## CometBeat handoff — singing-voice-conversion vocoders (OPEN, NOT STARTED)
 
