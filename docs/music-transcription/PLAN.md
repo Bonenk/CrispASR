@@ -494,6 +494,64 @@ Priority: RMVPE > FCPE, and neither is urgent while CREPE-tiny hits RTF 0.28.
 
 ---
 
+## Additional CrispASR tasks from the cross-runtime scoping (2026-07-20)
+
+Fell out of scoping which models CometBeat's **pure-Dart** ONNX runtime can
+carry. That runtime can afford ~10–15 min for an offline whole-song analysis
+job, which is a very different budget from interactive use — and it changes what
+is worth having on the CrispASR side too.
+
+### A cheap-separator tier
+
+CrispASR has the two *best* separators (HTDemucs, Mel-Band RoFormer) and neither
+of the *cheap* ones. That is a real gap for low-end hardware and for the
+pure-Dart path:
+
+| Candidate | Licence | Architecture | Why |
+|---|---|---|---|
+| **Spleeter 4-stem** (Deezer) | **MIT** | 12-layer U-Net on magnitude spectrograms — all convs | Cheapest separator that exists; 100x realtime on GPU. All-conv maps straight onto the existing im2col/GEMM path — no new op families. |
+| **Open-Unmix** (`umx`/`umxhq`) | **MIT** | 3-layer BiLSTM on magnitude spectrograms | Named in the handoff. Cheaper than HTDemucs but SEQUENTIAL, so it parallelises badly; expect it to lose to Spleeter despite fewer FLOPs. |
+
+Task: port **Spleeter first** (`core/lstm.h` is not even needed — it is pure
+conv), measure against HTDemucs on the same clip, and register it as the
+low-resource separation default. Open-Unmix only if Spleeter's TF-checkpoint
+conversion turns out awkward.
+
+Reference point for why this matters: HTDemucs costs ~103 s per 7.8 s segment in
+a pure-Dart runtime — ~45 min for a 3.5-minute song, over any usable budget —
+while an all-conv U-Net is roughly an order of magnitude cheaper.
+
+### Pitch tiers below and above CREPE
+
+- **`CRISPASR_CREPE_HOP` knob.** CREPE's cost is linear in frame count, so
+  doubling the hop from the reference 10 ms to 20 ms halves the work for a
+  modest resolution loss. Cheapest possible quality/speed lever on an already
+  shipped backend; expose it and document the tradeoff.
+- **FCPE** (CNChTu/TorchFCPE, **MIT**) — explicitly designed to be fast; the
+  tier BELOW crepe-tiny for constrained devices.
+- **RMVPE** (Dream-High, **Apache-2.0** code / **MIT** weights via
+  `lj1995/VoiceConversionWebUI`) — the quality tier ABOVE CREPE, robust to
+  accompaniment, which matters because our W-SEP stems are not perfectly clean.
+  Non-autoregressive, so it fits an offline budget.
+
+### Not worth porting
+
+- **MT3.** Already flagged as frontier; the scoping sharpens *why*: it is
+  autoregressive seq2seq, and token-by-token decoding is the one shape where a
+  generous offline budget does not help. Deprioritise below everything above.
+- **mangio-crepe.** Not a distinct model — a configurable hop on the same MIT
+  CREPE weights (see the licence scoping). The `_HOP` knob above covers it.
+
+### Division of labour with the pure-Dart runtime
+
+CrispASR is the native/performance path; the Dart runtime is the web/WASM path
+and the fallback. They should NOT both chase the same models. CrispASR keeps the
+heavy, highest-quality engines (HTDemucs, Mel-Band RoFormer, RMVPE, and MT3 if
+it ever lands); the Dart runtime takes the small permissive ones it can actually
+finish in-budget (Basic Pitch, CREPE-tiny, BTC chords, Spleeter). `core/cqt.h`
+and a Dart CQT are the one piece both need — worth keeping the two
+implementations diff-checkable against each other.
+
 ## Open questions
 
 - **Where does the app call this from?** CrispASR has Dart/Flutter bindings, so
@@ -512,7 +570,7 @@ Priority: RMVPE > FCPE, and neither is urgent while CREPE-tiny hits RTF 0.28.
 
 ## Suggested order (highest leverage first)
 
-0. **Licence-acceptance gate, ported from CrispEmbed** — land BEFORE any NC
+0. ~~**Licence-acceptance gate, ported from CrispEmbed**~~ ✅ **DONE** — land BEFORE any NC
    weights are registered, so there is never a window in which they are
    downloadable ungated. Also de-duplicates CrispASR's three copies of
    substring-based NC detection.
