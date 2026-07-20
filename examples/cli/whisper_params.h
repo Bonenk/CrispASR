@@ -133,6 +133,12 @@ struct whisper_params {
     bool chords = false;
     std::string chords_format; // "text" (default) or "json"
 
+    // Beat / downbeat tracking. --beats routes to the beat dispatcher
+    // (crispasr_beats_cli) BEFORE any transcribe backend is built, for the
+    // same reason as --chords: the output is a beat grid, not text segments.
+    bool beats = false;
+    std::string beats_format; // "text" (default) or "json"
+
     bool pitch = false;
     std::string pitch_format;   // "text" (default) or "json"
     float pitch_hop_ms = 10.0f; // CREPE reference hop

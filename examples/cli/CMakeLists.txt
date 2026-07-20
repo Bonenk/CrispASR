@@ -60,6 +60,7 @@ add_executable(${TARGET}
     crispasr_backend_htdemucs.cpp
     crispasr_backend_crepe.cpp
     crispasr_backend_btc.cpp
+    crispasr_backend_beat_this.cpp
     crispasr_backend_mel_band_roformer.cpp
     crispasr_backend_kyutai_stt.cpp
     crispasr_backend_firered_asr.cpp
@@ -85,6 +86,7 @@ add_executable(${TARGET}
     crispasr_aligner_cli.cpp
     crispasr_vad_cli.cpp
     crispasr_separate_cli.cpp
+    crispasr_beats_cli.cpp
     crispasr_chords_cli.cpp
     crispasr_pitch_cli.cpp
     crispasr_lid_cli.cpp
