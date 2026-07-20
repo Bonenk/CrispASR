@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
@@ -320,7 +321,7 @@ static ggml_cgraph* build_predictor_graph(sidon_context* ctx, ggml_context* c, i
     ggml_tensor* in = ggml_new_tensor_2d(c, GGML_TYPE_F32, m.hp.feature_dim, T);
     ggml_set_name(in, "sidon_features");
     ggml_set_input(in);
-    ggml_tensor* rel_idx = ggml_new_tensor_1d(c, GGML_TYPE_I32, (int64_t)T * T);
+    ggml_tensor* rel_idx = ggml_new_tensor_2d(c, GGML_TYPE_I32, T, T);
     ggml_set_name(rel_idx, "sidon_rel_indices");
     ggml_set_input(rel_idx);
 
@@ -339,23 +340,17 @@ static ggml_cgraph* build_predictor_graph(sidon_context* ctx, ggml_context* c, i
         K = ggml_cont(c, ggml_permute(c, ggml_reshape_3d(c, K, hd, H, T), 0, 2, 1, 3));
         V = ggml_cont(c, ggml_permute(c, ggml_reshape_3d(c, V, hd, H, T), 0, 2, 1, 3));
         ggml_tensor* scores = ggml_mul_mat(c, K, Q);
-        ggml_tensor* rpe = ggml_get_rows(c, l.distance_w, rel_idx);
-        rpe = ggml_reshape_4d(c, rpe, hd, T, T, 1);
-        ggml_tensor* q4 = ggml_reshape_4d(c, Q, hd, 1, T, H);
-        ggml_tensor* bias = nullptr;
-        if (ctx->predictor_vulkan) {
-            // Vulkan MUL_MAT requires equal ne[3] batch dimensions and does
-            // not implement rpe[..., 1] broadcasting over H heads.  Fold
-            // (T,H) into ne[2] instead, with heads as the inner batch because
-            // GGML maps repeated ne[2] batches with i02 = i12/H.  This avoids
-            // materialising an H-times-larger positional tensor.
-            ggml_tensor* q_th = ggml_cont(c, ggml_permute(c, q4, 0, 1, 3, 2));
-            ggml_tensor* q_flat = ggml_reshape_3d(c, q_th, hd, 1, (int64_t)T * H);
-            ggml_tensor* bias_ht = ggml_reshape_3d(c, ggml_mul_mat(c, rpe, q_flat), T, H, T);
-            bias = ggml_cont(c, ggml_permute(c, bias_ht, 0, 2, 1, 3));
-        } else {
-            bias = ggml_reshape_3d(c, ggml_mul_mat(c, rpe, q4), T, T, H);
-        }
+
+        // The relative-distance table has far fewer rows than T.  Compute the
+        // query/table dot products once per (bucket, query, head), then gather
+        // the bucket selected for each key.  The previous formulation first
+        // expanded the table to [head_dim, T, T], consuming 64*T*T floats and
+        // redundantly repeating the same dot product for every key in a bucket.
+        ggml_tensor* distance_w_f32 = ggml_cast(c, l.distance_w, GGML_TYPE_F32);
+        ggml_tensor* bucket_logits = ggml_mul_mat(c, distance_w_f32, Q); // [bucket, query, head]
+        bucket_logits = ggml_reshape_4d(c, bucket_logits, 1, bucket_logits->ne[0], T, H);
+        ggml_tensor* rel_idx_heads = ggml_repeat_4d(c, rel_idx, T, T, H, 1);
+        ggml_tensor* bias = ggml_reshape_3d(c, ggml_get_rows(c, bucket_logits, rel_idx_heads), T, T, H);
         scores = ggml_soft_max_ext(c, ggml_add(c, scores, bias), nullptr, scale, 0.0f);
         ggml_tensor* vt = ggml_cont(c, ggml_permute(c, V, 1, 0, 2, 3));
         x = ggml_mul_mat(c, vt, scores);
@@ -449,24 +444,57 @@ static void prepare_fastconv(sidon_context* ctx) {
         std::fprintf(stderr, "sidon: FASTCONV %s (%zu baked kernels)\n", k1_only ? "k1" : "full", kernels.size());
 }
 
-static void clear_graphs(sidon_context* ctx) {
+static void clear_predictor_graph(sidon_context* ctx) {
     if (ctx->predictor_sched)
         ggml_backend_sched_reset(ctx->predictor_sched);
-    if (ctx->decoder_sched)
-        ggml_backend_sched_reset(ctx->decoder_sched);
     if (ctx->predictor_ctx)
         ggml_free(ctx->predictor_ctx);
-    if (ctx->decoder_ctx)
-        ggml_free(ctx->decoder_ctx);
     ctx->predictor_ctx = nullptr;
-    ctx->decoder_ctx = nullptr;
     ctx->predictor_graph = nullptr;
-    ctx->decoder_graph = nullptr;
     ctx->predictor_input = nullptr;
     ctx->relative_indices = nullptr;
     ctx->predictor_output = nullptr;
+}
+
+static void clear_decoder_graph(sidon_context* ctx) {
+    if (ctx->decoder_sched)
+        ggml_backend_sched_reset(ctx->decoder_sched);
+    if (ctx->decoder_ctx)
+        ggml_free(ctx->decoder_ctx);
+    ctx->decoder_ctx = nullptr;
+    ctx->decoder_graph = nullptr;
     ctx->decoder_input = nullptr;
     ctx->decoder_output = nullptr;
+}
+
+static void clear_graphs(sidon_context* ctx) {
+    clear_predictor_graph(ctx);
+    clear_decoder_graph(ctx);
+}
+
+static ggml_backend_sched_t make_stage_scheduler(ggml_backend_t primary, ggml_backend_t cpu) {
+    ggml_backend_t backends[2];
+    int n_backends = 0;
+    backends[n_backends++] = primary;
+    if (cpu && cpu != primary)
+        backends[n_backends++] = cpu;
+    return ggml_backend_sched_new(backends, nullptr, n_backends, 32768, false, false);
+}
+
+static bool release_predictor_workspace(sidon_context* ctx) {
+    clear_predictor_graph(ctx);
+    if (ctx->predictor_sched)
+        ggml_backend_sched_free(ctx->predictor_sched);
+    ctx->predictor_sched = make_stage_scheduler(ctx->backend, ctx->backend_cpu);
+    return ctx->predictor_sched != nullptr;
+}
+
+static bool release_decoder_workspace(sidon_context* ctx) {
+    clear_decoder_graph(ctx);
+    if (ctx->decoder_sched)
+        ggml_backend_sched_free(ctx->decoder_sched);
+    ctx->decoder_sched = make_stage_scheduler(ctx->decoder_backend, ctx->backend_cpu);
+    return ctx->decoder_sched != nullptr;
 }
 
 static int report_unsupported_vulkan_ops(sidon_context* ctx, ggml_backend_t backend, ggml_cgraph* graph,
@@ -492,31 +520,30 @@ static int report_unsupported_vulkan_ops(sidon_context* ctx, ggml_backend_t back
     return unsupported;
 }
 
-static bool prepare_graphs(sidon_context* ctx, int T) {
+static bool prepare_predictor_graph(sidon_context* ctx, int T) {
     clear_graphs(ctx);
+    if (!ctx->predictor_sched)
+        ctx->predictor_sched = make_stage_scheduler(ctx->backend, ctx->backend_cpu);
+    if (!ctx->predictor_sched) {
+        std::fprintf(stderr, "sidon: predictor scheduler allocation failed\n");
+        return false;
+    }
     const size_t meta_size = ggml_tensor_overhead() * 32768 + ggml_graph_overhead_custom(32768, false);
     ctx->predictor_meta.assign(meta_size, 0);
-    ctx->decoder_meta.assign(meta_size, 0);
 
     ggml_init_params pred_ip = {ctx->predictor_meta.size(), ctx->predictor_meta.data(), true};
-    ggml_init_params dec_ip = {ctx->decoder_meta.size(), ctx->decoder_meta.data(), true};
     ctx->predictor_ctx = ggml_init(pred_ip);
-    ctx->decoder_ctx = ggml_init(dec_ip);
-    if (!ctx->predictor_ctx || !ctx->decoder_ctx) {
-        std::fprintf(stderr, "sidon: graph context allocation failed\n");
+    if (!ctx->predictor_ctx) {
+        std::fprintf(stderr, "sidon: predictor graph context allocation failed\n");
         clear_graphs(ctx);
         return false;
     }
 
     ctx->predictor_graph = build_predictor_graph(ctx, ctx->predictor_ctx, T);
-    ctx->decoder_graph = build_decoder_graph(ctx, ctx->decoder_ctx, T);
-    if (ctx->predictor_vulkan) {
+    if (ctx->predictor_vulkan)
         report_unsupported_vulkan_ops(ctx, ctx->backend, ctx->predictor_graph, "predictor");
-        report_unsupported_vulkan_ops(ctx, ctx->decoder_backend, ctx->decoder_graph, "DAC");
-    }
-    if (!ggml_backend_sched_alloc_graph(ctx->predictor_sched, ctx->predictor_graph) ||
-        !ggml_backend_sched_alloc_graph(ctx->decoder_sched, ctx->decoder_graph)) {
-        std::fprintf(stderr, "sidon: graph allocation failed\n");
+    if (!ggml_backend_sched_alloc_graph(ctx->predictor_sched, ctx->predictor_graph)) {
+        std::fprintf(stderr, "sidon: predictor graph allocation failed\n");
         clear_graphs(ctx);
         return false;
     }
@@ -524,12 +551,44 @@ static bool prepare_graphs(sidon_context* ctx, int T) {
     ctx->predictor_input = ggml_graph_get_tensor(ctx->predictor_graph, "sidon_features");
     ctx->relative_indices = ggml_graph_get_tensor(ctx->predictor_graph, "sidon_rel_indices");
     ctx->predictor_output = ggml_graph_get_tensor(ctx->predictor_graph, "sidon_predictor_output");
+    if (!ctx->predictor_input || !ctx->relative_indices || !ctx->predictor_output) {
+        std::fprintf(stderr, "sidon: predictor graph is missing a required tensor\n");
+        clear_graphs(ctx);
+        return false;
+    }
+    return true;
+}
+
+static bool prepare_decoder_graph(sidon_context* ctx, int T) {
+    clear_decoder_graph(ctx);
+    if (!ctx->decoder_sched)
+        ctx->decoder_sched = make_stage_scheduler(ctx->decoder_backend, ctx->backend_cpu);
+    if (!ctx->decoder_sched) {
+        std::fprintf(stderr, "sidon: decoder scheduler allocation failed\n");
+        return false;
+    }
+    const size_t meta_size = ggml_tensor_overhead() * 32768 + ggml_graph_overhead_custom(32768, false);
+    ctx->decoder_meta.assign(meta_size, 0);
+    ggml_init_params dec_ip = {ctx->decoder_meta.size(), ctx->decoder_meta.data(), true};
+    ctx->decoder_ctx = ggml_init(dec_ip);
+    if (!ctx->decoder_ctx) {
+        std::fprintf(stderr, "sidon: decoder graph context allocation failed\n");
+        clear_decoder_graph(ctx);
+        return false;
+    }
+    ctx->decoder_graph = build_decoder_graph(ctx, ctx->decoder_ctx, T);
+    if (ctx->predictor_vulkan)
+        report_unsupported_vulkan_ops(ctx, ctx->decoder_backend, ctx->decoder_graph, "DAC");
+    if (!ggml_backend_sched_alloc_graph(ctx->decoder_sched, ctx->decoder_graph)) {
+        std::fprintf(stderr, "sidon: decoder graph allocation failed\n");
+        clear_decoder_graph(ctx);
+        return false;
+    }
     ctx->decoder_input = ggml_graph_get_tensor(ctx->decoder_graph, "sidon_decoder_features");
     ctx->decoder_output = ggml_graph_get_tensor(ctx->decoder_graph, "dac_pcm");
-    if (!ctx->predictor_input || !ctx->relative_indices || !ctx->predictor_output || !ctx->decoder_input ||
-        !ctx->decoder_output) {
-        std::fprintf(stderr, "sidon: stage graph is missing a required tensor\n");
-        clear_graphs(ctx);
+    if (!ctx->decoder_input || !ctx->decoder_output) {
+        std::fprintf(stderr, "sidon: decoder graph is missing a required tensor\n");
+        clear_decoder_graph(ctx);
         return false;
     }
     return true;
@@ -568,18 +627,8 @@ sidon_context* sidon_init_from_file(const char* path, sidon_context_params param
         return nullptr;
     }
     prepare_fastconv(ctx);
-    ggml_backend_t predictor_bes[2];
-    int predictor_nbe = 0;
-    predictor_bes[predictor_nbe++] = ctx->backend;
-    if (ctx->backend_cpu && ctx->backend_cpu != ctx->backend)
-        predictor_bes[predictor_nbe++] = ctx->backend_cpu;
-    ggml_backend_t decoder_bes[2];
-    int decoder_nbe = 0;
-    decoder_bes[decoder_nbe++] = ctx->decoder_backend;
-    if (ctx->backend_cpu && ctx->backend_cpu != ctx->decoder_backend)
-        decoder_bes[decoder_nbe++] = ctx->backend_cpu;
-    ctx->predictor_sched = ggml_backend_sched_new(predictor_bes, nullptr, predictor_nbe, 32768, false, false);
-    ctx->decoder_sched = ggml_backend_sched_new(decoder_bes, nullptr, decoder_nbe, 32768, false, false);
+    ctx->predictor_sched = make_stage_scheduler(ctx->backend, ctx->backend_cpu);
+    ctx->decoder_sched = make_stage_scheduler(ctx->decoder_backend, ctx->backend_cpu);
     if (!ctx->predictor_sched || !ctx->decoder_sched) {
         sidon_free(ctx);
         return nullptr;
@@ -631,13 +680,12 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     if (T <= 0)
         return {};
 
-    // Guard against O(T^2) attention blowup. The predictor materializes a T*T
-    // relative-index buffer plus (heads, T, T) attention scores, so cost grows
+    // Guard against O(T^2) attention blowup. The predictor materializes
+    // (heads, T, T) relative indices and attention scores, so cost grows
     // quadratically in the feature-frame count T (~50 frames/sec of input).
-    // Restoration is utterance-scale; a multi-minute clip would allocate tens of
-    // GB and OOM. Cap T and fail cleanly instead of crashing. The default ~3000
-    // frames is ~60 s of audio (~2.3 GB peak); override with the env var when a
-    // longer input and more memory are available.
+    // Restoration is utterance-scale; cap T and fail cleanly rather than let a
+    // multi-minute clip exhaust memory. The default ~3000 frames is ~60 s of
+    // audio; override it only when the selected backend has sufficient memory.
     int max_frames = 3000;
     if (const char* e = getenv("CRISPASR_SIDON_MAX_FRAMES"); e && e[0]) {
         const int v = atoi(e);
@@ -653,8 +701,11 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     }
     const auto frontend_done = clock::now();
 
-    if (!prepare_graphs(ctx, T))
+    if (!prepare_predictor_graph(ctx, T)) {
+        release_predictor_workspace(ctx);
+        release_decoder_workspace(ctx);
         return {};
+    }
     const auto graph_done = clock::now();
 
     ggml_backend_tensor_set(ctx->predictor_input, feats.data(), 0, feats.size() * sizeof(float));
@@ -667,11 +718,16 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     const auto predictor_start = clock::now();
     if (ggml_backend_sched_graph_compute(ctx->predictor_sched, ctx->predictor_graph) != GGML_STATUS_SUCCESS) {
         std::fprintf(stderr, "sidon: predictor graph compute failed\n");
-        clear_graphs(ctx);
+        release_predictor_workspace(ctx);
+        release_decoder_workspace(ctx);
         return {};
     }
     ggml_backend_sched_synchronize(ctx->predictor_sched);
     const auto predictor_done = clock::now();
+
+    std::vector<float> predictor_features((size_t)ggml_nelements(ctx->predictor_output));
+    ggml_backend_tensor_get(ctx->predictor_output, predictor_features.data(), 0,
+                            predictor_features.size() * sizeof(float));
 
     // Diff-harness hook: dump the predictor handoff (raw f32 + ne dims on a
     // header line to stderr) so it can be compared against the upstream
@@ -680,30 +736,75 @@ std::vector<float> sidon_restore(sidon_context* ctx, const float* samples, int n
     // tools/reference_backends/sidon_ref_dump.py.
     if (const char* dp = getenv("CRISPASR_SIDON_DUMP_HANDOFF"); dp && dp[0]) {
         const int64_t ne0 = ctx->predictor_output->ne[0], ne1 = ctx->predictor_output->ne[1];
-        std::vector<float> h((size_t)ggml_nelements(ctx->predictor_output));
-        ggml_backend_tensor_get(ctx->predictor_output, h.data(), 0, h.size() * sizeof(float));
         if (FILE* f = fopen(dp, "wb")) {
-            fwrite(h.data(), sizeof(float), h.size(), f);
+            fwrite(predictor_features.data(), sizeof(float), predictor_features.size(), f);
             fclose(f);
             fprintf(stderr, "sidon: dumped predictor handoff ne=[%lld,%lld] (%zu floats) -> %s\n", (long long)ne0,
-                    (long long)ne1, h.size(), dp);
+                    (long long)ne1, predictor_features.size(), dp);
         }
     }
 
-    ggml_backend_tensor_copy(ctx->predictor_output, ctx->decoder_input);
-    const auto handoff_done = clock::now();
-    if (ggml_backend_sched_graph_compute(ctx->decoder_sched, ctx->decoder_graph) != GGML_STATUS_SUCCESS) {
-        std::fprintf(stderr, "sidon: decoder graph compute failed\n");
-        clear_graphs(ctx);
+    if (!release_predictor_workspace(ctx)) {
+        std::fprintf(stderr, "sidon: failed to release predictor workspace\n");
+        release_decoder_workspace(ctx);
         return {};
     }
-    ggml_backend_sched_synchronize(ctx->decoder_sched);
+    const auto handoff_done = clock::now();
+
+    // DAC is fully convolutional. Decode bounded cores with the exact latent
+    // receptive-field context, then crop the overlap. Ten feature frames are
+    // sufficient for this five-block [8,5,4,3,2] decoder; nine measurably alter
+    // joins. This bounds ggml_conv_1d's explicit IM2COL workspace independently
+    // of utterance length.
+    int decoder_chunk_frames = 256;
+    if (const char* e = getenv("CRISPASR_SIDON_DECODER_CHUNK_FRAMES"); e && e[0]) {
+        const int v = atoi(e);
+        decoder_chunk_frames = v > 0 ? v : T;
+    }
+    const int decoder_context_frames = 10;
+    const int decoder_hop = ctx->model.dac.config.hop_length;
+    const int hidden = ctx->model.hp.hidden;
+    std::vector<float> pcm;
+    pcm.reserve((size_t)T * decoder_hop);
+    for (int core_start = 0; core_start < T; core_start += decoder_chunk_frames) {
+        const int core_end = std::min(T, core_start + decoder_chunk_frames);
+        const int chunk_start = std::max(0, core_start - decoder_context_frames);
+        const int chunk_end = std::min(T, core_end + decoder_context_frames);
+        const int chunk_frames = chunk_end - chunk_start;
+        if (!prepare_decoder_graph(ctx, chunk_frames)) {
+            release_decoder_workspace(ctx);
+            return {};
+        }
+        const float* chunk_features = predictor_features.data() + (size_t)chunk_start * hidden;
+        ggml_backend_tensor_set(ctx->decoder_input, chunk_features, 0, (size_t)chunk_frames * hidden * sizeof(float));
+        if (ggml_backend_sched_graph_compute(ctx->decoder_sched, ctx->decoder_graph) != GGML_STATUS_SUCCESS) {
+            std::fprintf(stderr, "sidon: decoder graph compute failed\n");
+            release_decoder_workspace(ctx);
+            return {};
+        }
+        ggml_backend_sched_synchronize(ctx->decoder_sched);
+
+        std::vector<float> chunk_pcm((size_t)ggml_nelements(ctx->decoder_output));
+        ggml_backend_tensor_get(ctx->decoder_output, chunk_pcm.data(), 0, chunk_pcm.size() * sizeof(float));
+        const size_t crop_begin = (size_t)(core_start - chunk_start) * decoder_hop;
+        const size_t crop_end =
+            core_end == T ? chunk_pcm.size() : crop_begin + (size_t)(core_end - core_start) * decoder_hop;
+        if (crop_begin > crop_end || crop_end > chunk_pcm.size()) {
+            std::fprintf(stderr, "sidon: invalid decoder chunk crop [%zu,%zu) of %zu\n", crop_begin, crop_end,
+                         chunk_pcm.size());
+            release_decoder_workspace(ctx);
+            return {};
+        }
+        pcm.insert(pcm.end(), chunk_pcm.begin() + (std::ptrdiff_t)crop_begin,
+                   chunk_pcm.begin() + (std::ptrdiff_t)crop_end);
+    }
     const auto decoder_done = clock::now();
 
-    std::vector<float> pcm((size_t)ggml_nelements(ctx->decoder_output));
-    ggml_backend_tensor_get(ctx->decoder_output, pcm.data(), 0, pcm.size() * sizeof(float));
     const auto download_done = clock::now();
-    clear_graphs(ctx);
+    if (!release_decoder_workspace(ctx)) {
+        std::fprintf(stderr, "sidon: failed to release decoder workspace\n");
+        return {};
+    }
     const auto total_done = clock::now();
     if (ctx->params.verbosity) {
         const auto ms = [](auto a, auto b) { return std::chrono::duration<double, std::milli>(b - a).count(); };
