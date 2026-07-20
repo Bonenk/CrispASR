@@ -162,6 +162,19 @@ def main():
     noise_zp = rng.standard_normal((1, inter, T)).astype(np.float32)
     noise_sine = rng.standard_normal((1, T * upp, 1)).astype(np.float32)
 
+    caps = {}
+    def _hook(name):
+        def f(_m,_i,out):
+            o = out[0] if isinstance(out,tuple) else out
+            caps[name] = o.detach().numpy()
+        return f
+    net.dec.m_source.register_forward_hook(_hook("har_source"))
+    net.dec.m_source.l_sin_gen.register_forward_hook(_hook("sine_raw"))
+    net.dec.conv_pre.register_forward_hook(_hook("conv_pre"))
+    for _i in range(len(m["upsample_rates"])):
+        net.dec.ups[_i].register_forward_hook(_hook(f"ups{_i}"))
+        net.dec.noise_convs[_i].register_forward_hook(_hook(f"nc{_i}"))
+
     def run():
         with make_injector([noise_zp.copy(), noise_sine.copy()]) as inj, torch.no_grad():
             o, x_mask, (z, z_p, m_p, logs_p) = net.infer(
@@ -171,8 +184,9 @@ def main():
             )
         return o.numpy(), dict(z=z.numpy(), z_p=z_p.numpy(), m_p=m_p.numpy(), logs_p=logs_p.numpy()), inj.log
 
-    a, sa, log1 = run()
+    a_ref, sa, log1 = run()
     b, sb, log2 = run()
+    a = a_ref
 
     print("  RNG draws intercepted (site, shape), in call order:")
     for site, shape in log1:
@@ -222,6 +236,34 @@ def main():
     ok &= good
     print(f"NUMPY SPEC vs TORCH (flow, reverse):\n  {'z':8} {'PASS' if good else 'FAIL'} "
           f"cos={cos:.8f} max_abs={np.abs(a-b).max():.3e} |mine|={np.linalg.norm(a):.4f} |ref|={np.linalg.norm(b):.4f}")
+
+    # ---- bisect the source module first ----
+    har_np, uv_np = sine_gen_numpy(f0_hz[0], upp, sr, noise_sine)
+    for nm, mine in (("sine_raw", har_np),):
+        ref = caps[nm][0].ravel() if nm in caps else None
+        if ref is not None:
+            nn_ = min(len(mine), len(ref)); u,v = mine[:nn_], ref[:nn_].astype(np.float64)
+            c = float(u@v/(np.linalg.norm(u)*np.linalg.norm(v)))
+            print(f"  BISECT {nm:12} cos={c:.6f} |mine|={np.linalg.norm(u):.4f} |ref|={np.linalg.norm(v):.4f}")
+
+    # ---- dec (NSF vocoder) ----
+    dtaps = {}
+    audio_np = dec_numpy(G, sa["z"][0], f0_hz[0], g_emb, cfg, noise_sine, taps=dtaps)
+    for nm in ["conv_pre"] + [f"{p_}{i}" for i in range(len(m["upsample_rates"])) for p_ in ("ups","nc")]:
+        if nm in dtaps and nm in caps:
+            u = dtaps[nm].ravel(); v = caps[nm][0].ravel().astype(np.float64)
+            nn_ = min(len(u), len(v))
+            c = float(u[:nn_] @ v[:nn_] / (np.linalg.norm(u[:nn_]) * np.linalg.norm(v[:nn_])))
+            flag = "" if c > 0.99999 else "   <-- FIRST DIVERGENCE" if c < 0.99999 else ""
+            print(f"  BISECT {nm:10} cos={c:.6f} len mine={len(u)} ref={len(v)}{flag}")
+    a, b = audio_np.ravel(), a_ref.ravel().astype(np.float64)
+    n = min(len(a), len(b))
+    cos = float(a[:n] @ b[:n] / (np.linalg.norm(a[:n]) * np.linalg.norm(b[:n])))
+    good = cos > 0.999
+    ok &= good
+    print(f"NUMPY SPEC vs TORCH (dec, audio):\n  {'audio':8} {'PASS' if good else 'FAIL'} "
+          f"cos={cos:.8f} max_abs={np.abs(a[:n]-b[:n]).max():.3e} "
+          f"|mine|={np.linalg.norm(a[:n]):.4f} |ref|={np.linalg.norm(b[:n]):.4f} n={n}")
 
     if not ok:
         sys.exit("FAIL: a numpy spec does not match torch — fix the spec before any ggml.")
@@ -400,6 +442,168 @@ def flow_numpy(G, z_p, g, n_flows, hidden, n_layers, kernel_size, dilation_rate)
         x1 = x1 - m                                     # mean_only => no exp(-logs)
         x = np.concatenate([x0, x1], axis=0)
     return x
+
+
+# ---------------------------------------------------------------------------
+# numpy reimplementation — dec (GeneratorNSF)
+#
+# Traps:
+#   * TWO different LeakyReLU slopes in ONE function: the per-stage and ResBlock
+#     ones use LRELU_SLOPE = 0.1, but the FINAL pre-conv_post call is a bare
+#     F.leaky_relu(x) — torch's 0.01 default (models.py:529).
+#   * SineGen accumulates phase with cumsum at the FRAME rate, multiplies by
+#     upp, then linear-interpolates to the output rate. Accumulate in float64:
+#     the running sum grows without bound while only its fraction matters.
+#   * ConvTranspose1d stride=u, padding=(k-u)//2 (models.py:452-459).
+#   * Each stage sums num_kernels ResBlocks and DIVIDES by num_kernels.
+#   * The source signal is added AFTER the transpose-conv, via noise_convs[i]
+#     whose stride is prod(rates[i+1:]).
+# ---------------------------------------------------------------------------
+
+def sine_gen_numpy(f0_hz, upp, sr, noise, sine_amp=0.1, noise_std=0.003, voiced_th=0.0):
+    """f0_hz: (T,) -> (sine source (T*upp,), uv (T*upp,)). Mirrors SineGen.forward.
+
+    The phase logic is subtle and an approximation does NOT work (a plausible
+    rewrite scored cos -0.04 against torch — right amplitude, wrong phase):
+
+      1. rad = (f0/sr) % 1                      at FRAME rate
+      2. tmp = cumsum(rad) * upp                still frame rate
+      3. tmp -> LINEAR interpolate to out rate, align_corners=True
+      4. rad -> NEAREST interpolate to out rate
+      5. tmp %= 1; wrap points are where diff(tmp) < 0
+      6. phase = cumsum(rad_up + shift), shift = -1 at each wrap point
+      7. sine = sin(phase * 2*pi)
+
+    So the linear-interpolated cumsum is used ONLY to LOCATE the wraps; the
+    phase itself accumulates over the NEAREST-upsampled per-frame values. Note
+    the two interpolations use DIFFERENT modes, and align_corners=True changes
+    the sample mapping.
+    """
+    T = f0_hz.shape[0]
+    f0 = f0_hz.astype(np.float64)
+    rad = (f0 / sr) % 1.0                                   # (T,), dim == 1
+    tmp = np.cumsum(rad) * upp                              # float64: f32 drifts
+
+    N = T * upp
+    # linear, align_corners=True: x maps 0..T-1 across 0..N-1
+    if T > 1:
+        xs = np.arange(N, dtype=np.float64) * (T - 1) / (N - 1)
+        tmp_up = np.interp(xs, np.arange(T, dtype=np.float64), tmp)
+    else:
+        tmp_up = np.repeat(tmp, upp)
+    rad_up = np.repeat(rad, upp)                            # nearest
+
+    tmp_up = tmp_up % 1.0
+    shift = np.zeros(N, dtype=np.float64)
+    shift[1:] = np.where(np.diff(tmp_up) < 0, -1.0, 0.0)
+
+    sines = np.sin(np.cumsum(rad_up + shift) * 2 * np.pi) * sine_amp
+
+    uv = np.repeat((f0 > voiced_th).astype(np.float64), upp)   # nearest
+    noise_amp = uv * noise_std + (1 - uv) * sine_amp / 3
+    sines = sines * uv + noise_amp * noise.astype(np.float64).ravel()
+    return sines, uv
+
+
+def _conv1d_d(x, w, b, pad, dil=1):
+    Cin, T = x.shape
+    Cout, _, K = w.shape
+    xp = np.pad(x, ((0, 0), (pad, pad)))
+    out = np.zeros((Cout, T), dtype=np.float64)
+    for k in range(K):
+        out += w[:, :, k] @ xp[:, k * dil : k * dil + T]
+    return out + b[:, None]
+
+
+def _conv1d_stride(x, w, b, stride, pad, out_len):
+    """Strided Conv1d: w is (Cout, Cin, K)."""
+    Cin, T = x.shape
+    Cout, _, K = w.shape
+    xp = np.pad(x, ((0, 0), (pad, pad)))
+    out = np.zeros((Cout, out_len), dtype=np.float64)
+    for o in range(out_len):
+        seg = xp[:, o * stride : o * stride + K]
+        if seg.shape[1] < K:
+            seg = np.pad(seg, ((0, 0), (0, K - seg.shape[1])))
+        out[:, o] = np.tensordot(w, seg, axes=([1, 2], [0, 1]))
+    return out + b[:, None]
+
+
+def _conv_transpose1d(x, w, b, stride, pad):
+    """w: (Cin, Cout, K). Matches torch ConvTranspose1d with output_padding=0."""
+    Cin, T = x.shape
+    _, Cout, K = w.shape
+    full = np.zeros((Cout, (T - 1) * stride + K), dtype=np.float64)
+    for t in range(T):
+        full[:, t * stride : t * stride + K] += np.tensordot(x[:, t], w, axes=([0], [0]))
+    out = full[:, pad : full.shape[1] - pad] if pad else full
+    return out + b[:, None]
+
+
+def _lrelu(x, slope):
+    return np.where(x < 0, slope * x, x)
+
+
+def dec_numpy(G, z, f0_hz, g, cfg, noise_sine, taps=None):
+    W = lambda k: G[k].astype(np.float64)
+    m = cfg["model"]
+    rates, kers = m["upsample_rates"], m["upsample_kernel_sizes"]
+    rk, rd = m["resblock_kernel_sizes"], m["resblock_dilation_sizes"]
+    upp = int(np.prod(rates))
+    num_kernels = len(rk)
+    LRELU = 0.1
+
+    har, _uv = sine_gen_numpy(f0_hz, upp, cfg["data"]["sampling_rate"], noise_sine)
+    # SourceModuleHnNSF: tanh(linear(sine)), dim 1 -> 1
+    har = np.tanh(har[:, None] @ W("dec.m_source.l_linear.weight").T
+                  + W("dec.m_source.l_linear.bias"))[:, 0][None, :]   # (1, T*upp)
+
+    x = _conv1d_d(z.astype(np.float64), W("dec.conv_pre.weight"), W("dec.conv_pre.bias"), 3)
+    if taps is not None:
+        taps["conv_pre"] = x.copy()
+    # cond is nn.Conv1d(gin, upsample_initial_channel, 1) -- it HAS a bias.
+    # Omitting it is a constant per-channel offset: structurally invisible,
+    # cost cos 0.9999 at ups0 and 0.998 on the final audio.
+    x = x + (W("dec.cond.weight")[:, :, 0] @ g[:, 0] + W("dec.cond.bias"))[:, None]
+
+    for i, (u, k) in enumerate(zip(rates, kers)):
+        x = _lrelu(x, LRELU)
+        x = _conv_transpose1d(x, W(f"dec.ups.{i}.weight"), W(f"dec.ups.{i}.bias"), u, (k - u) // 2)
+        if taps is not None:
+            taps[f"ups{i}"] = x.copy()
+        nw = W(f"dec.noise_convs.{i}.weight")
+        stride = int(np.prod(rates[i + 1:])) if i + 1 < len(rates) else 1
+        pad = (nw.shape[2] - stride) // 2 if stride > 1 else 0
+        xs_src = _conv1d_stride(har, nw, W(f"dec.noise_convs.{i}.bias"), stride, pad, x.shape[1])
+        if taps is not None:
+            taps[f"nc{i}"] = xs_src.copy()
+        x = x + xs_src
+        acc = None
+        for j in range(num_kernels):
+            idx = i * num_kernels + j
+            h = x
+            for d in rd[j]:
+                for (c1, c2) in ((0, 0),):
+                    pass
+            # ResBlock1: 3 (convs1, convs2) pairs, dilations rd[j] on convs1
+            for di, dil in enumerate(rd[j]):
+                xt = _lrelu(h, LRELU)
+                w1 = W(f"dec.resblocks.{idx}.convs1.{di}.weight")
+                xt = _conv1d_d(xt, w1, W(f"dec.resblocks.{idx}.convs1.{di}.bias"),
+                               (w1.shape[2] * dil - dil) // 2, dil)
+                xt = _lrelu(xt, LRELU)
+                w2 = W(f"dec.resblocks.{idx}.convs2.{di}.weight")
+                xt = _conv1d_d(xt, w2, W(f"dec.resblocks.{idx}.convs2.{di}.bias"),
+                               (w2.shape[2] - 1) // 2, 1)
+                h = xt + h
+            acc = h if acc is None else acc + h
+        x = acc / num_kernels
+
+    x = _lrelu(x, 0.01)          # BARE F.leaky_relu -> torch default 0.01, NOT 0.1
+    # conv_post is bias=False (models.py:484)
+    cpw = W("dec.conv_post.weight")
+    x = _conv1d_d(x, cpw, np.zeros(cpw.shape[0]), 3)
+    return np.tanh(x)
 
 
 def _abs_to_rel(x):
