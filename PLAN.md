@@ -170,8 +170,24 @@ step only collected `libcrispasr*`, `libwhisper`, and `libggml*`. The tarball
 therefore does not `dlopen` standalone. CometBeat worked around it by copying
 Homebrew's copies into a flat rpath dir and re-signing.
 
-Fixed in `.github/workflows/release.yml`: collect the codec dylibs, **and** add
-a gate that derives the requirement from the binaries themselves — every
+**Root cause was deeper than packaging, and the first fix was wrong.** The
+option is documented as building ogg/opus/opusfile *statically*, and
+THIRD_PARTY_NOTICES.txt states they are "statically compiled into libcrispasr
+... all official release binaries". Neither was true: `opusfile` is an explicit
+`add_library(... STATIC)`, but ogg and opus arrive via
+`FetchContent_MakeAvailable`, which INHERITS `BUILD_SHARED_LIBS` — and every
+shared-lib release job passes `-DBUILD_SHARED_LIBS=ON`. So they silently built
+as dylibs, creating @rpath deps nobody packaged.
+
+Fixed in `src/CMakeLists.txt` by forcing `BUILD_SHARED_LIBS=OFF` around the
+FetchContent block (save/restore, mirroring the existing BUILD_TESTING
+pattern). Verified under the exact release flags: `libopus.a` + `libogg.a`
+static archives, and **0 ogg/opus @rpath deps** in libcrispasr.dylib. The
+bundle now loads standalone with nothing extra shipped, and the
+THIRD_PARTY_NOTICES claim becomes true.
+
+Also in `.github/workflows/release.yml`: a gate that derives the requirement
+from the binaries themselves — every
 `@rpath` dep of every packaged dylib must exist in the bundle, or the release
 job fails. A hand-maintained copy list is what failed here; the next new
 dependency now breaks the RELEASE instead of the consumer.

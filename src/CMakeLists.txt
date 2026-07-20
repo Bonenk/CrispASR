@@ -327,6 +327,20 @@ if (CRISPASR_OPUS)
         endif()
         set(BUILD_TESTING       OFF CACHE BOOL "" FORCE)
         set(OPUS_BUILD_TESTING  OFF CACHE BOOL "" FORCE)
+        # Force the fetched codecs STATIC, as this option's name and docs
+        # promise ("build opus/ogg/opusfile statically"). ogg/opus come in via
+        # FetchContent_MakeAvailable and honour the INHERITED BUILD_SHARED_LIBS,
+        # so a parent configured with -DBUILD_SHARED_LIBS=ON (every official
+        # shared-lib release job) silently built them as DYLIBS instead. That
+        # gave libcrispasr @rpath/libogg.0.dylib + @rpath/libopus.0.dylib
+        # dependencies which the release tarball never packaged, so the shipped
+        # macOS bundle would not dlopen standalone (reported against v0.8.17).
+        # It also made THIRD_PARTY_NOTICES.txt's "statically compiled into
+        # libcrispasr ... all official release binaries" untrue.
+        # opusfile is already an explicit STATIC add_library below; this makes
+        # its two dependencies match.
+        set(_crispasr_save_shared "${BUILD_SHARED_LIBS}")
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
         # Emscripten: Opus cmake auto-detects x86 and enables AVX2/FMA sources
         # that fail under wasm32 clang. Disable all intrinsics.
         if (EMSCRIPTEN)
@@ -357,6 +371,11 @@ if (CRISPASR_OPUS)
         message(STATUS "CrispASR: .opus via FetchContent static opus/ogg/opusfile")
         # Restore BUILD_TESTING so include(CTest) in the root CMakeLists
         # defaults correctly (it checks the cache variable).
+        # Restore the parent's BUILD_SHARED_LIBS before anything else is
+        # declared — leaving it OFF would silently make every later target
+        # static too.
+        set(BUILD_SHARED_LIBS "${_crispasr_save_shared}" CACHE BOOL "" FORCE)
+
         if (_crispasr_save_build_testing STREQUAL "__UNSET__")
             unset(BUILD_TESTING CACHE)
         else()
