@@ -191,11 +191,25 @@ ggml/GGUF backends.
   model uses class 20 — that WAS a real bug in my eval and is fixed), framing
   (`framify_activations` pad_center matches the hand-rolled window), and the CQT
   itself (octave energy sits 52.9 % in 164–329 Hz, correct for guitar).
-  Still open: audio preparation. amt_tools GuitarSet loader calls
-  `load_normalize_audio(..., norm=audio_norm)` and EGSet12 is 48 kHz **stereo**
-  24-bit — channel averaging and the missing normalisation are the leading
-  suspects, along with the possibility that this checkpoint is not the
-  general-purpose model assumed.
+  **Both leading suspects eliminated, and the harness is now exonerated.** The
+  EGSet12 stereo is dual-mono (channel correlation 0.99999, identical RMS/peak),
+  so averaging was harmless; and normalisation cancels under
+  `amplitude_to_db(ref=np.max)` anyway. More decisively, the whole path was
+  rerun **amt_tools-native end to end** — their `CQT.process_audio`, their
+  `TabCNN.pre_proc` (which does `framify_activations` plus two axis transposes I
+  had hand-rolled), their `SoftmaxGroups.finalize_output`, their GT pipeline —
+  and produces **bit-identical output to my version**: active-per-string
+  [542, 604, 107, 29, 4, 0], F1 0.0008. So the inference code is correct.
+  Also ruled out: output layout (finalize_output confirms `view(B,T,6,21)`,
+  argmax last dim, class 20 → −1, exactly as implemented) and the front-end
+  config (swept sr ∈ {22050, 44100} × bins_per_octave ∈ {24, 36}; every viable
+  combination scores F1 ≤ 0.004).
+  **What remains is the checkpoint itself.** It stores no feature config
+  (`dim_in`, `frame_width`, `profile` only — no sample_rate/hop/fmin/bpo), was
+  saved at `iter = 2500` and with `training = True`. Either it expects a
+  front-end configuration that cannot be recovered from the file, or it is not
+  the general-purpose model the EGSet12 record's filename implies. Resolving
+  this needs the DAFx-24 authors' inference config, not more guessing.
   ⚠️ **Consequence for the CQT decision**: the earlier paired comparison
   (core/cqt.h vs librosa features through the same model) is internally
   consistent — both arms share every downstream step — and it showed the
