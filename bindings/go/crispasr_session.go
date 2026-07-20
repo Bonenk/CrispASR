@@ -1011,7 +1011,8 @@ type SpeechToSpeechResult struct {
 }
 
 // SpeechToSpeech runs end-to-end audio-in → audio-out on backends with
-// S2S capability (lfm2-audio, mini-omni2). Input is 16 kHz mono float32 PCM.
+// S2S capability (lfm2-audio, mini-omni2, sidon, voxcpm2-vae). Input is
+// 16 kHz mono float32 PCM.
 func (s *CrispasrSession) SpeechToSpeech(samples []float32) (*SpeechToSpeechResult, error) {
 	if len(samples) == 0 {
 		return nil, errors.New("SpeechToSpeech: empty input")

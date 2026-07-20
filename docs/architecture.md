@@ -1035,6 +1035,41 @@ continuous diffusion + BigVGAN vocoder. Zero-shot voice cloning from
 reference WAV. Output is 48 kHz, decimated to 24 kHz for the standard
 CrispASR TTS pipeline.
 
+### voxcpm2-vae
+
+The standalone VoxCPM2 AudioVAE backend exposes the model's causal VAE as a
+speech-to-speech upscaler. Its encoder consumes 16 kHz mono PCM with rates
+`[2, 5, 8, 8]` (640x downsampling); its sample-rate-conditioned decoder uses
+rates `[8, 6, 5, 2, 2, 2]` (1920x upsampling), producing 48 kHz mono PCM.
+The output is cropped to exactly three times the 16 kHz input sample count.
+One call is capped at 960,000 input samples (60 seconds) before graph or
+activation allocation: the convolutional working set grows linearly but can
+still reach several GiB. Split longer audio, or override the cap with
+`CRISPASR_VOXCPM2_VAE_MAX_SAMPLES` when sufficient RAM/VRAM is available.
+
+`voxcpm2-vae` has its own opaque context, backend handle, weight buffers,
+allocators, and reconstructed-weight caches. It can therefore coexist with a
+full `voxcpm2-tts` context without sharing live model state. Internally, both
+contexts call the same VAE graph implementation so fixes to the codec math do
+not need to be duplicated.
+
+The selective loader accepts either a full VoxCPM2 GGUF or an AudioVAE-only
+GGUF, but allocates only `vae.*` tensors. A VAE-only conversion is smaller and
+auto-detects through `general.architecture = "voxcpm2-vae"`:
+
+```bash
+python models/convert-voxcpm2-to-gguf.py \
+  --input openbmb/VoxCPM2 \
+  --output voxcpm2-vae-f32.gguf \
+  --vae-only
+crispasr -m voxcpm2-vae-f32.gguf -f input.wav \
+  --s2s --s2s-output upscaled.wav
+```
+
+When using a full VoxCPM2 GGUF, select the component explicitly with
+`--backend voxcpm2-vae`; automatic detection of a full model intentionally
+continues to choose `voxcpm2-tts`.
+
 ### cosyvoice3-tts
 
 CosyVoice3 0.5B (FunAudioLLM, Apache-2.0): three-stage pipeline — Qwen2-0.5B
