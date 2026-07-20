@@ -874,9 +874,123 @@ silently mis-folding.
 
 ### Remaining work
 
-- [ ] `src/beat_this.{h,cpp}` — ggml graph. Reusable: `core/attention.h` (QKV +
-  RoPE), `core/ffn.h`, `core/mel.h` + `core/fft.h` for the front end. The per-head
-  gating and the `norm_output` RMSNorm need writing by hand.
+- [x] **Front end DONE** — `beat_this_logmel`, **cos = 1.00000000** vs torchaudio
+  (max_abs 1.2e-4). Built and validated before any network code, since a wrong
+  window / squared magnitude / wrong normalization yields a plausible
+  spectrogram and wrong beats.
+- [x] **Per-stage reference DONE** — `tools/reference_backends/beat_this.py`
+  dumps every stage so the graph comes up incrementally (first divergence = the
+  bug). Checkpoint loads with **0 missing / 0 unexpected** keys, confirming the
+  traced architecture. Contract the graph must reproduce, for a 101-frame input:
+
+  | stage | shape |
+  |---|---|
+  | `stem` | (1, 32, 32, 101) |
+  | `blk0` / `blk1` / `blk2` | (1, 64, 16, 101) / (1, 128, 8, 101) / (1, 256, 4, 101) |
+  | `linear` | (1, 101, 512) |
+  | `transformer` | (1, 101, 512) |
+  | `out_beat`, `out_downbeat` | (1, 101) each |
+
+- [x] **Stem DONE** — `beat_this_debug_stem`, **cos = 0.99999982** vs torch
+  (max_abs 2.5e-3, |mine| 210.3733 vs |ref| 210.3613). Validates the layout
+  mapping, the folded BN, the exact-erf GELU and the conv stride/pad convention
+  in one shot. Compare with `tools/cmp_beat_this_stages.py`, which prints
+  |mine| AND |ref| — a magnitude outlier says "same name, wrong data" instantly
+  where cosine alone reads as plausible drift.
+
+- [x] **`PartialFTTransformer` DONE** — all 3 frontend blocks, plus each
+  block's conv+BN+GELU. Every stage matches the torch reference on the first
+  run, with magnitudes agreeing to 4–5 digits (2026-07-20):
+
+  | stage | cos | rel_max | \|mine\| / \|ref\| |
+  |---|---|---|---|
+  | `blk0_attnF` | 0.99999998 | 4.7e-4 | 35.5585 / 35.5532 |
+  | `blk0_ffF`   | 0.99999990 | 7.9e-4 | 56.1502 / 56.1553 |
+  | `blk0_attnT` | 0.99999973 | 5.8e-4 | 66.3518 / 66.3425 |
+  | `blk0_ffT`   | 0.99999983 | 5.2e-4 | 30.2276 / 30.2300 |
+  | `blk0_partial` | 0.99999989 | 2.5e-4 | 218.4039 / 218.3973 |
+  | `blk0` | 0.99999987 | 1.8e-4 | 224.5992 / 224.5963 |
+  | `blk1_partial` | 0.99999986 | 2.1e-4 | 238.5764 / 238.5707 |
+  | `blk1` | 0.99999987 | 3.1e-4 | 229.2125 / 229.1943 |
+  | `blk2_partial` | 0.99999990 | 3.1e-4 | 374.8126 / 374.7980 |
+  | `blk2` | 0.99999988 | 4.7e-4 | 235.7255 / 235.7066 |
+
+  Relative error stays flat at ~1e-4 across all **12** sub-blocks rather than
+  compounding, which is the signature of f16 weight rounding and not of a
+  systematic graph bug. (Blocks 1/2 are the same code at 2 and 4 heads.)
+
+  Reproduce:
+
+  ```bash
+  ./build/bin/test-beat-this-stages $S/beat-this-f16.gguf $S/fe_ref.bin $S/bt/ \
+      stem blk0_attnF blk0_ffF blk0_attnT blk0_ffT blk0_partial blk0 ... blk2
+  python tools/cmp_beat_this_stages.py $S/bt_stages.npz --prefix $S/bt/ <stages...>
+  ```
+
+  **Traps that this stage actually hit or nearly hit — worth keeping:**
+
+  1. **The gate reads the NORMED x.** Upstream rebinds `x = self.norm(x)` at the
+     top of `Attention.forward`, so `to_gates(x)` sees the post-RMSNorm value,
+     not the sub-block input. Feeding it the raw input is a one-token slip that
+     produces a plausible activation.
+  2. **RoPE is the INTERLEAVED convention** = `GGML_ROPE_TYPE_NORMAL`, *not*
+     NEOX. `rotary-embedding-torch`'s `rotate_half` regroups `... (d r)` with
+     `r=2` and repeats each frequency pairwise, i.e. adjacent-pair rotation.
+     NEOX rotates split halves and would be silently wrong. Also verified: the
+     checkpoint's 12 `rotary_embed.freqs` tensors are byte-identical to each
+     other AND bit-exact against the analytic `10000^(-2i/32)` schedule, so
+     ggml's internal theta table needs no override and the "shared instance"
+     note costs nothing to honour.
+  3. **`Attention.scale` is dead code.** It is computed in `__init__` but never
+     passed to `Attend`, which therefore uses SDPA's default `1/sqrt(dim_head)`.
+     Reading the constructor rather than the call site would have applied a
+     scale twice.
+  4. **Dump `ne` and reshape to `reversed(ne)`.** `cmp_beat_this_stages.py` no
+     longer hand-transposes per stage; because ggml `ne` is the exact reverse of
+     torch's shape, `reshape(reversed(ne))` lands on the reference layout with
+     no transpose at all, and the F/T phases then differ only in which axis is
+     ne[1]. Per-stage transposes were the likelier bug than the arithmetic.
+
+  **Negative control (run, then reverted).** Deleting only the per-head gating
+  multiply gives `blk0_attnF` cos = **0.977** — which reads as ordinary drift —
+  but |mine| 90.8 vs |ref| 35.6, a 2.6× tell; at `blk2_attnF` (4 heads) it is
+  cos 0.714 and 432.3 vs 46.6. This is the concrete case for the project rule
+  that **cosine alone is not a gate and magnitude must always be printed**.
+  It also confirms the harness has teeth rather than passing degenerately.
+
+  Forward, traced from source and confirmed against sub-block references:
+
+  ```
+  x (b, c, f, t)
+    -> rearrange "b c f t -> (b t) f c"     # FREQUENCY is the sequence axis
+    x = x + attnF(x);  x = x + ffF(x)
+    -> rearrange "(b t) f c -> (b f) t c"   # TIME is the sequence axis
+    x = x + attnT(x);  x = x + ffT(x)
+    -> rearrange "(b f) t c -> b c f t"
+  ```
+
+  Confirmed sub-block shapes for a 101-frame input, block 0 (dim 32):
+  `attnF`/`ffF` = (101, 32, 32) — 101 sequences of length 32;
+  `attnT`/`ffT` = (32, 101, 32) — 32 sequences of length 101.
+  Batch is FOLDED into the sequence count, so ggml batches along ne[2].
+  ⚠️ The reference hooks capture the sub-block OUTPUT, i.e. the residual BRANCH
+  before `x + branch` — not the post-residual activation. Compare like for like.
+
+  Per sub-block: RMSNorm -> to_qkv(no bias) -> RoPE(q,k) -> attend
+  -> `* sigmoid(to_gates(x))` PER HEAD -> to_out(no bias). Reusable:
+  `core/attention.h` (QKV + RoPE), `core/ffn.h`; the per-head gating and the
+  `norm_output` RMSNorm need writing by hand.
+
+- [ ] **NOW — active work.** Next is `frontend.linear` (concat 256*4=1024 ->
+  512) then the 6 roformer layers at dim 512 / 16 heads + `transformer_blocks
+  .norm.gamma`. The layers reuse `bt_attention`/`bt_feedforward` unchanged —
+  only dims differ — so the remaining risk is the `b c f t -> b t (c f)`
+  concat order, not the attention. `beat_this_debug_stage` already threads the
+  whole frontend, so add `"linear"` / `"transformer"` / `"out"` stages to the
+  same `bt_stages` map and score against the existing `bt_stages.npz`.
+
+- [ ] Then: `frontend.linear` (1024->512), 6 roformer layers, SumHead.
+- [ ] Then: 1500-frame windowing (border 6, keep_first) + peak-picking.
 - [ ] Front end: 22050 Hz mono, **arithmetic-mean downmix**, STFT n_fft 1024 /
   hop 441 / periodic Hann / `normalized='frame_length'`, project onto the baked
   filterbank, `log1p(1000*x)`. 50 fps.
