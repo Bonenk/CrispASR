@@ -245,7 +245,33 @@ halves. **We own the real-time-critical heavy vocoders**; they keep the
 HuBERT/ContentVec encoder, Harvest F0, and a lightweight DDSP-SVC synth as the
 web/offline fallback.
 
-### §CB1 — RVC NSF-HiFi-GAN generator (real-time SVC)
+### §CB1 — RVC voice conversion — BLUEPRINT TRACED, two findings block step 1
+
+Contract CONFIRMED (see `docs/music-transcription/SVC_RECORD_SHAPES.md`).
+Source traced; see `docs/music-transcription/RVC_BLUEPRINT.md`. Two findings
+change the job before any code:
+
+1. **The ask is ~3x bigger than "the vocoder".** The seam CometBeat wants
+   (features + F0 + speaker -> audio) is `SynthesizerTrnMs768NSFsid.infer()`
+   (`models.py:664`), which runs a **transformer encoder** (`enc_p`, with a
+   `nn.Embedding(256, ...)` on the coarse pitch), a **normalizing flow**
+   (4x coupling + flip, reversed), AND the NSF vocoder. Only the third is
+   HiFi-GAN. **Ask CometBeat whether they want all three or only `dec`** — if
+   only `dec`, they must send `z`, not ContentVec features, which changes the
+   contract we just froze.
+2. **Inference is STOCHASTIC, at two independent sites**: the latent sample
+   `z_p = m_p + exp(logs_p) * randn * 0.66666` (`models.py:684`), and SineGen's
+   random initial phase `rand_ini` (`:325`) plus additive noise (`:358`). So
+   output is not reproducible run-to-run, waveform correlation is an invalid
+   acceptance test, and the diff harness MUST replay the reference's noise
+   (same pattern as `input_feat` in btc / `input_audio` in mel-band-roformer).
+   Settle this before the graph, not after.
+
+Numerical hazards already spotted (phase `cumsum` drift in f32, `F.interpolate`
+mode, `upp = prod(upsample_rates)` derived not configured, `noise_convs`
+stride schedule) are itemised in the blueprint.
+
+### §CB1-old — RVC NSF-HiFi-GAN generator (original framing)
 
 **What:** port the RVC NSF-HiFi-GAN generator to ggml/native-FFI. CometBeat
 feeds us ContentVec features (from their `hubert.dart`), F0 (from RMVPE —
