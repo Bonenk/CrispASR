@@ -437,7 +437,8 @@ resp.stream_to_file("out.wav")
 ## Speech-to-speech endpoint
 
 `POST /v1/audio/speech-to-speech` runs end-to-end audio-in → audio-out
-on S2S-capable backends (`lfm2-audio`, `mini-omni2`). Non-S2S backends
+on S2S-capable backends (`lfm2-audio`, `mini-omni2`, `sidon`,
+`voxcpm2-vae`). Non-S2S backends
 return 400.
 
 ```bash

@@ -240,6 +240,10 @@
 #include "voxcpm2_tts.h"
 #define CA_HAVE_VOXCPM2 1
 #endif
+#if __has_include("voxcpm2_vae.h")
+#include "voxcpm2_vae.h"
+#define CA_HAVE_VOXCPM2_VAE 1
+#endif
 #if __has_include("cosyvoice3_tts.h")
 #include "cosyvoice3_tts.h"
 #define CA_HAVE_COSYVOICE3 1
@@ -1435,6 +1439,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "chatterbox";
     else if (strcmp(arch, "outetts") == 0)
         backend = "outetts";
+    else if (strcmp(arch, "voxcpm2-vae") == 0 || strcmp(arch, "voxcpm2_vae") == 0)
+        backend = "voxcpm2-vae";
     else if (strcmp(arch, "voxcpm2") == 0 || strcmp(arch, "voxcpm2-tts") == 0)
         backend = "voxcpm2-tts";
     else if (strcmp(arch, "cosyvoice3-llm") == 0 || strcmp(arch, "cosyvoice3") == 0 ||
@@ -1962,6 +1968,9 @@ struct crispasr_session {
 #ifdef CA_HAVE_VOXCPM2
     voxcpm2_context* voxcpm2_ctx = nullptr;
     std::vector<float> voxcpm2_ref_pcm; // 16 kHz mono cloning reference
+#endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    voxcpm2_vae_context* voxcpm2_vae_ctx = nullptr;
 #endif
 #ifdef CA_HAVE_COSYVOICE3
     cosyvoice3_tts_context* cosyvoice3_ctx = nullptr;
@@ -3287,6 +3296,21 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         return s;
     }
 #endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    if (s->backend == "voxcpm2-vae" || s->backend == "voxcpm2_vae" || s->backend == "voxcpm2-upscaler") {
+        s->backend = "voxcpm2-vae";
+        voxcpm2_vae_context_params p = voxcpm2_vae_context_default_params();
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
+        s->voxcpm2_vae_ctx = voxcpm2_vae_init_from_file(model_path, p);
+        if (!s->voxcpm2_vae_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
 #ifdef CA_HAVE_COSYVOICE3
     if (s->backend == "cosyvoice3-tts" || s->backend == "cosyvoice3" || s->backend == "cosyvoice3-llm") {
         s->backend = "cosyvoice3-tts";
@@ -3996,6 +4020,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_VOXCPM2
     list += ",voxcpm2-tts";
+#endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    list += ",voxcpm2-vae";
 #endif
 #ifdef CA_HAVE_COSYVOICE3
     list += ",cosyvoice3-tts";
@@ -8418,6 +8445,29 @@ CA_EXPORT float* crispasr_session_speech_to_speech(crispasr_session* s, const fl
         return pcm;
     }
 #endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    if (s->voxcpm2_vae_ctx) {
+        const float* vae_input = in_samples;
+        int vae_input_count = n_in_samples;
+        std::vector<float> resampled;
+        if (s->pcm_sample_rate != 16000) {
+            resampled = core_audio::resample_polyphase(in_samples, n_in_samples, s->pcm_sample_rate, 16000);
+            vae_input = resampled.data();
+            vae_input_count = (int)resampled.size();
+        }
+
+        int n = 0;
+        float* pcm = voxcpm2_vae_upscale(s->voxcpm2_vae_ctx, vae_input, vae_input_count, &n);
+        if (!pcm || n <= 0) {
+            s->last_synth_error = "VoxCPM2 AudioVAE upscaler produced no audio";
+            voxcpm2_vae_pcm_free(pcm);
+            return nullptr;
+        }
+        if (out_n_samples)
+            *out_n_samples = n;
+        return pcm;
+    }
+#endif
 #ifdef CA_HAVE_SIDON
     if (s->sidon_ctx) {
         const float* sidon_input = in_samples;
@@ -9171,6 +9221,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_VOXCPM2
     if (s->voxcpm2_ctx)
         voxcpm2_free(s->voxcpm2_ctx);
+#endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    if (s->voxcpm2_vae_ctx)
+        voxcpm2_vae_free(s->voxcpm2_vae_ctx);
 #endif
 #ifdef CA_HAVE_COSYVOICE3
     if (s->cosyvoice3_ctx)
