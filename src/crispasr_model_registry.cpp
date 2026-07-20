@@ -388,6 +388,16 @@ constexpr Entry k_registry[] = {
     // real electric guitar, the augmented one recovers to 0.585 (DAFx-24).
     {"tabcnn", "tabcnn-f16.gguf", "https://huggingface.co/cstr/tabcnn-GGUF/resolve/main/tabcnn-f16.gguf", "~1.8 MB",
      nullptr, nullptr, nullptr, "cc-by-4.0"},
+    // Quants get their OWN entries or `-m auto` can never reach them — the exact
+    // gap that left crepe's q8_0/q4_k unreachable on HF for weeks. Both preserve
+    // head.weight at f32; measured on EGSet12 track 01 they are indistinguishable
+    // from f16 (F1 0.7749 vs 0.7732, within noise), so q4_k is the size pick.
+    // NOTE the "q4_k" file is really Q4_0 — no tensor is 256-aligned, so k-quants
+    // fall back. The name follows the request, not the content.
+    {"tabcnn-q8_0", "tabcnn-q8_0.gguf", "https://huggingface.co/cstr/tabcnn-GGUF/resolve/main/tabcnn-q8_0.gguf",
+     "~1.1 MB", nullptr, nullptr, nullptr, "cc-by-4.0"},
+    {"tabcnn-q4_k", "tabcnn-q4_k.gguf", "https://huggingface.co/cstr/tabcnn-GGUF/resolve/main/tabcnn-q4_k.gguf",
+     "~0.7 MB", nullptr, nullptr, nullptr, "cc-by-4.0"},
     {"beat-this", "beat-this-f16.gguf",
      "https://huggingface.co/cstr/beat-this-GGUF/resolve/main/beat-this-f16.gguf", "~41 MB", nullptr, nullptr, nullptr,
      "MIT"},
