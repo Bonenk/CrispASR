@@ -14,6 +14,7 @@
 #include "core/fft.h"
 #include "core/gguf_loader.h"
 #include "ggml-backend.h"
+#include "ggml-alloc.h"
 #include "ggml-cpu.h"
 #include "ggml.h"
 
@@ -44,6 +45,12 @@ struct beat_this_context {
 
     std::vector<float> hann; // periodic, length n_fft
     bool debug = false;
+
+    // --- graph weights (bound in beat_this_init) -------------------------
+    ggml_tensor* bn1d_scale = nullptr; // (128) per-FREQUENCY, pre-conv
+    ggml_tensor* bn1d_offset = nullptr;
+    ggml_tensor* stem_w = nullptr; // ne (kt=3, kf=4, ic=1, oc=32)
+    ggml_tensor* stem_b = nullptr; // (32)
 };
 
 namespace {
@@ -182,6 +189,17 @@ extern "C" struct beat_this_context* beat_this_init(const char* model_path, int 
 
     build_hann_periodic(ctx->n_fft, ctx->hann);
 
+    // Bind the stem weights. require() is loud on a miss: a silently-absent
+    // weight would compute a plausible-looking activation from zeros.
+    ctx->bn1d_scale = core_gguf::require(ctx->wl.tensors, "frontend.stem.bn1d.scale", "beat-this");
+    ctx->bn1d_offset = core_gguf::require(ctx->wl.tensors, "frontend.stem.bn1d.offset", "beat-this");
+    ctx->stem_w = core_gguf::require(ctx->wl.tensors, "frontend.stem.conv2d.weight", "beat-this");
+    ctx->stem_b = core_gguf::require(ctx->wl.tensors, "frontend.stem.conv2d.bias", "beat-this");
+    if (!ctx->bn1d_scale || !ctx->bn1d_offset || !ctx->stem_w || !ctx->stem_b) {
+        beat_this_free(ctx);
+        return nullptr;
+    }
+
     if (ctx->debug)
         fprintf(stderr, "beat_this: sr=%d n_fft=%d hop=%d mel=%d fb=%dx%d\n", ctx->sample_rate, ctx->n_fft, ctx->hop,
                 ctx->mel_bins, ctx->fb_freqs, (int)(n / (size_t)std::max(1, ctx->fb_freqs)));
@@ -218,6 +236,73 @@ extern "C" float beat_this_tempo_bpm(const struct beat_this_event* ev, int n) {
     std::sort(iois.begin(), iois.end());
     const float med = iois[iois.size() / 2];
     return med > 0.0f ? 60.0f / med : 0.0f;
+}
+
+// Stem forward: log-mel (T,128) -> (T, 32 freq, 32 ch).
+//
+// LAYOUT. The reference is torch (b, c, f, t); ggml is the reverse, so the
+// stem output here is ne = (t, f, c). The log-mel arrives row-major (T,128),
+// i.e. ne = (128, T) with mel fastest, and conv2d wants ne[0] = W = TIME — so
+// it is transposed first.
+//
+// The conv kernel is stored as torch (oc, ic, kf, kt) row-major, which is
+// already ggml ne = (kt, kf, ic, oc) — exactly ggml_conv_2d's expectation,
+// with s0/p0 acting along time and s1/p1 along frequency. No permute needed.
+//
+// GELU IS THE EXACT (erf) FORM. torch nn.GELU defaults to approximate='none';
+// ggml_gelu is the TANH approximation and would drift. See the GELU-variant
+// entry in the common-divergence list in docs/contributing.md.
+extern "C" int beat_this_debug_stem(struct beat_this_context* ctx, const float* logmel, int T, float* out) {
+    if (!ctx || !logmel || T <= 0 || !out)
+        return 0;
+    const int M = ctx->mel_bins;
+
+    const size_t nodes = 256;
+    ggml_init_params ip = {nodes * ggml_tensor_overhead() + ggml_graph_overhead_custom(nodes, false), nullptr, true};
+    ggml_context* c0 = ggml_init(ip);
+    if (!c0)
+        return 0;
+    ggml_cgraph* gf = ggml_new_graph_custom(c0, nodes, false);
+
+    // (128, T) as stored; ne[0] = mel.
+    ggml_tensor* x = ggml_new_tensor_2d(c0, GGML_TYPE_F32, M, T);
+    ggml_set_name(x, "logmel");
+    ggml_set_input(x);
+
+    // bn1d is per-FREQUENCY and applies BEFORE any conv, so it acts on the mel
+    // axis while that axis is still ne[0].
+    ggml_tensor* h = ggml_add(c0, ggml_mul(c0, x, ctx->bn1d_scale), ctx->bn1d_offset);
+
+    // -> ne (T, 128, 1, 1): time fastest, as conv2d wants.
+    h = ggml_cont(c0, ggml_transpose(c0, h));
+    h = ggml_reshape_4d(c0, h, T, M, 1, 1);
+
+    // stride (time=1, freq=4), pad (time=1, freq=0) -> (T, 32, 32, 1)
+    h = ggml_conv_2d(c0, ctx->stem_w, h, /*s0*/ 1, /*s1*/ 4, /*p0*/ 1, /*p1*/ 0, /*d0*/ 1, /*d1*/ 1);
+    h = ggml_add(c0, h, ggml_reshape_3d(c0, ctx->stem_b, 1, 1, ctx->stem_b->ne[0]));
+    h = ggml_gelu_erf(c0, h);
+
+    ggml_set_output(h);
+    ggml_build_forward_expand(gf, h);
+
+    ggml_gallocr_t ga = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+    bool ok = ga && ggml_gallocr_alloc_graph(ga, gf);
+    int n = 0;
+    if (ok) {
+        ggml_backend_tensor_set(x, logmel, 0, (size_t)T * M * sizeof(float));
+        ok = ggml_backend_graph_compute(ctx->backend, gf) == GGML_STATUS_SUCCESS;
+    }
+    if (ok) {
+        n = (int)ggml_nelements(h);
+        ggml_backend_tensor_get(h, out, 0, (size_t)n * sizeof(float));
+        if (ctx->debug)
+            fprintf(stderr, "beat_this: stem ne=(%lld,%lld,%lld,%lld)\n", (long long)h->ne[0], (long long)h->ne[1],
+                    (long long)h->ne[2], (long long)h->ne[3]);
+    }
+    if (ga)
+        ggml_gallocr_free(ga);
+    ggml_free(c0);
+    return n;
 }
 
 extern "C" int beat_this_track(struct beat_this_context* ctx, const float* pcm, int n_samples,
