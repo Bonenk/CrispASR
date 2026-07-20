@@ -192,7 +192,8 @@ target_link_libraries(crispasr-diff-lib PUBLIC
     ggml
  btc-chords
     tabcnn
-    rvc-svc)
+    rvc-svc
+    beatrice-pitch)
 set_target_properties(crispasr-diff-lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # ---------------------------------------------------------------------------
