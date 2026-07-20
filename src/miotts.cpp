@@ -565,7 +565,8 @@ miotts_context* miotts_init_from_file(const char* path_model, miotts_context_par
         std::string model_dir(path_model);
         auto slash = model_dir.find_last_of("/\\");
         if (slash != std::string::npos)
-            model_dir = model_dir.substr(0, slash);
+            model_dir.resize(slash); // not substr(0, slash) — that builds a temporary to assign a
+                                     // prefix of the string to itself (cppcheck uselessCallsSubstr)
         else
             model_dir = ".";
         std::string tok_path = model_dir + "/tokenizer.json";
