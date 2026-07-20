@@ -69,6 +69,10 @@ struct rvc_svc_context {
     ggml_context* ctx_w = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
     std::map<std::string, ggml_tensor*> t; // name -> weight
+    // Per-stage capture for the diff harness (HARD RULE #2: intermediates, not
+    // just endpoints — endpoints alone cannot localise anything).
+    bool capture = false;
+    std::map<std::string, ggml_tensor*> caps;
 };
 
 namespace {
@@ -327,12 +331,31 @@ ggml_tensor* rvc_enc_p_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* c
     };
 
     // emb_phone is a Linear: [content_dim, hidden] weight in ggml layout.
+    // TAP records a tensor for the diff. `chan_time` marks stages whose
+    // REFERENCE is stored as row-major (channels, time) — i.e. time fastest —
+    // which is how torch stores a (b, C, T) tensor. Our working layout is
+    // [C, T] with CHANNELS fastest, the exact transpose, so those stages must
+    // be transposed before comparison or the cosine is meaningless.
+    // Getting this wrong reads as a catastrophic FAIL (cos ~0) on a correct
+    // graph: `agg` passed and `ctx` "failed" purely because the first is
+    // compared against a numpy (H,T,hd) buffer that happens to share our order
+    // and the second against a (C,T) one that does not.
+    auto TAP = [&](const std::string& nm, ggml_tensor* v, bool chan_time = false) {
+        if (c->capture) {
+            ggml_tensor* o = chan_time ? ggml_cont(g, ggml_transpose(g, v)) : v;
+            ggml_set_output(o);
+            c->caps[nm] = o;
+        }
+        return v;
+    };
+
     ggml_tensor* x = ggml_mul_mat(g, W("enc_p.emb_phone.weight"), content); // [hidden, T]
     x = ggml_add(g, x, W("enc_p.emb_phone.bias"));
     // emb_pitch is an EMBEDDING lookup, not a matmul.
     x = ggml_add(g, x, ggml_get_rows(g, W("enc_p.emb_pitch.weight"), pitch));
     x = ggml_scale(g, x, std::sqrt((float)hp.hidden)); // BEFORE the lrelu
     x = ggml_leaky_relu(g, x, 0.1f, false);            // slope 0.1, not 0.01
+    TAP("encp_lrelu", x);
 
     const int H = hp.n_heads;
     const int hd = hp.hidden / H;
@@ -360,8 +383,14 @@ ggml_tensor* rvc_enc_p_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* c
         ggml_tensor* rl = ggml_mul_mat(g, rel_k, qs);                                     // [2T-1, T, H]
         scores = ggml_add(g, scores, rvc_rel_to_abs(g, rl, T));
 
-        ggml_tensor* attn = ggml_soft_max(g, scores);                                 // [T_k, T_q, H]
+        ggml_tensor* attn = ggml_soft_max(g, scores); // [T_k, T_q, H]
+        if (l == 0)
+            TAP("encp_L0_attn_w", attn);
+        if (l == 0)
+            TAP("encp_L0_v", v);
         ggml_tensor* out = ggml_mul_mat(g, ggml_cont(g, ggml_transpose(g, v)), attn); // [hd, T_q, H]
+        if (l == 0)
+            TAP("encp_L0_agg", out);
 
         // relative VALUES — omitting this still "works" and merely degrades.
         ggml_tensor* rel_v = rvc_rel_embeddings(g, W(p + "emb_rel_v"), T, hp.rel_window); // [hd, 2T-1]
@@ -370,11 +399,15 @@ ggml_tensor* rvc_enc_p_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* c
 
         out = ggml_cont(g, ggml_permute(g, out, 0, 2, 1, 3)); // [hd, H, T]
         out = ggml_reshape_2d(g, out, hp.hidden, T);
+        if (l == 0)
+            TAP("encp_L0_ctx", out, /*chan_time=*/true);
         ggml_tensor* y =
             ggml_add(g, ggml_mul_mat(g, rvc_conv1x1_as_linear(g, W(p + "conv_o.weight")), out), W(p + "conv_o.bias"));
+        TAP("encp_L" + std::to_string(l) + "_attn", y, /*chan_time=*/true);
 
         const std::string n1 = "enc_p.encoder.norm_layers_1." + std::to_string(l) + ".";
         x = rvc_layer_norm(g, ggml_add(g, x, y), W(n1 + "gamma"), W(n1 + "beta"), 1e-5f); // POST-norm
+        TAP("encp_L" + std::to_string(l) + "_norm1", x, /*chan_time=*/true);
 
         const std::string f = "enc_p.encoder.ffn_layers." + std::to_string(l) + ".";
         // ggml_conv_1d takes input as [length, channels]; our working layout
@@ -391,7 +424,9 @@ ggml_tensor* rvc_enc_p_graph(ggml_context* g, rvc_svc_context* c, ggml_tensor* c
         y2 = ggml_add(g, ggml_cont(g, ggml_transpose(g, y2)), W(f + "conv_2.bias"));
 
         const std::string n2 = "enc_p.encoder.norm_layers_2." + std::to_string(l) + ".";
+        TAP("encp_L" + std::to_string(l) + "_ffn", y2, /*chan_time=*/true);
         x = rvc_layer_norm(g, ggml_add(g, x, y2), W(n2 + "gamma"), W(n2 + "beta"), 1e-5f);
+        TAP("encp_L" + std::to_string(l) + "_norm2", x, /*chan_time=*/true);
     }
 
     ggml_tensor* stats =
@@ -473,6 +508,7 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
     ggml_tensor* pitch = ggml_new_tensor_1d(g, GGML_TYPE_I32, T);
     ggml_set_input(content);
     ggml_set_input(pitch);
+    c->capture = true;
     ggml_tensor* stats = rvc_enc_p_graph(g, c, content, pitch, T);
     if (!stats) {
         ggml_free(g);
@@ -480,9 +516,16 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
         rvc_svc_free(c);
         return 2;
     }
+    // m_p/logs_p in the reference are (inter, T) row-major -> transpose.
+    stats = ggml_cont(g, ggml_transpose(g, stats)); // [T, 2*inter]
     ggml_set_output(stats);
     ggml_cgraph* gf = ggml_new_graph_custom(g, 8192, false);
     ggml_build_forward_expand(gf, stats);
+    // The transposed tap copies are not reachable from `stats`, so expand the
+    // graph over them too — otherwise gallocr never allocates their buffers and
+    // ggml_backend_tensor_get aborts with "tensor buffer not set".
+    for (auto& kv : c->caps)
+        ggml_build_forward_expand(gf, kv.second);
 
     ggml_gallocr_t alloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(c->backend));
     if (!ggml_gallocr_alloc_graph(alloc, gf)) {
@@ -517,6 +560,51 @@ int rvc_svc_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
     };
 
     fprintf(stderr, "rvc diff (T=%d, content_dim=%d, inter=%d):\n", T, hp.content_dim, hp.inter);
+
+    // Per-stage, EARLIEST FIRST — the first FAIL is the bug (HARD RULE #2).
+    {
+        std::vector<std::string> order;
+        order.push_back("encp_lrelu");
+        // inside layer 0's attention, earliest first
+        order.push_back("encp_L0_q");
+        order.push_back("encp_L0_scores_norel");
+        order.push_back("encp_L0_rl");
+        order.push_back("encp_L0_scores");
+        order.push_back("encp_L0_attn_w");
+        order.push_back("encp_L0_v");
+        order.push_back("encp_L0_agg");
+        order.push_back("encp_L0_ctx");
+        for (int l = 0; l < hp.n_layers; l++) {
+            const std::string L = "encp_L" + std::to_string(l);
+            order.push_back(L + "_attn");
+            order.push_back(L + "_norm1");
+            order.push_back(L + "_ffn");
+            order.push_back(L + "_norm2");
+        }
+        bool first = true;
+        for (const auto& nm : order) {
+            auto it = c->caps.find(nm);
+            std::vector<float> ref;
+            if (it == c->caps.end() || !rvc_ref_get(rw, nm.c_str(), ref))
+                continue;
+            std::vector<float> mine((size_t)ggml_nelements(it->second));
+            ggml_backend_tensor_get(it->second, mine.data(), 0, mine.size() * sizeof(float));
+            const int64_t n = (int64_t)std::min(mine.size(), ref.size());
+            const double cs = rvc_cos(mine.data(), ref.data(), n);
+            const bool ok = cs >= COS_MIN && mine.size() == ref.size();
+            if (!ok)
+                n_fail++;
+            if (verbosity >= 1 || !ok) {
+                fprintf(stderr, "  %-16s %s cos=%.8f max_abs=%.3e (mine=%zu ref=%zu)%s\n", nm.c_str(),
+                        ok ? "PASS" : "FAIL", cs, rvc_max_abs(mine.data(), ref.data(), n), mine.size(), ref.size(),
+                        (!ok && first) ? "  <-- FIRST DIVERGENCE" : "");
+            }
+            if (!ok)
+                first = false;
+        }
+    }
+    // stats is now [T, 2*inter] with T fastest: rows 0..inter-1 are m_p,
+    // inter..2*inter-1 are logs_p, each T-contiguous — matching the reference.
     if (rvc_ref_get(rw, "m_p", ref_mp))
         report("m_p", out.data(), ref_mp);
     if (rvc_ref_get(rw, "logs_p", ref_logs))
