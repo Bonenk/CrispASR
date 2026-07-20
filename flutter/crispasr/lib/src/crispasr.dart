@@ -2189,6 +2189,20 @@ class StreamingSession {
 /// silent 32/64-bit mismatch that reads garbage.
 typedef PitchFrame = ({double timeMs, double f0Hz, double voicedProb});
 
+/// One detected beat, as returned by [CrispasrSession.beats].
+///
+/// [timeS] is seconds from the start of the audio. [isDownbeat] marks a beat
+/// that also starts a bar.
+///
+/// **Every downbeat is also a beat.** The model's postprocessor snaps each
+/// downbeat onto its nearest detected beat, so downbeats are a strict subset
+/// of this list — filter on [isDownbeat] to get the bar grid, and never merge
+/// two separate lists to reconstruct the full grid.
+///
+/// On the C side this is a flat pair of **32-bit** floats; [beats] widens them
+/// to Dart doubles on read and turns the second into a bool.
+typedef Beat = ({double timeS, bool isDownbeat});
+
 /// One transcribed note, as returned by [CrispasrSession.pianoNotes].
 ///
 /// - `midi` — MIDI note number, 21–108 (A0–C8).
@@ -4096,6 +4110,114 @@ class CrispasrSession {
     if (!_lib.providesSymbol('crispasr_session_pitch_sample_rate')) return 0;
     final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>),
         int Function(Pointer<Void>)>('crispasr_session_pitch_sample_rate');
+    return fn(_handle);
+  }
+
+  /// Track beats and downbeats in mono float32 PCM.
+  ///
+  /// Requires a beat-capable backend (`beat-this`). [pcm22k] must be mono
+  /// float32 at the model's native rate — 22050 Hz for Beat This!; query
+  /// [beatsSampleRate] to confirm rather than hard-coding it. The native
+  /// side REJECTS a rate mismatch rather than resampling, because silently
+  /// resampling would move every beat time.
+  ///
+  /// Returns one [Beat] per detected beat, in time order, copied into
+  /// Dart-owned memory so the result stays valid after the next [beats]
+  /// call or [close]. Long inputs are chunked internally, so there is no
+  /// length limit and no seam handling for the caller to get right.
+  ///
+  /// Postprocessing is peak-picking only — there is deliberately **no DBN**.
+  /// madmom's Dynamic Bayesian Network is patent-encumbered and licensed
+  /// non-commercially; Beat This! is MIT for both code and weights and
+  /// reaches state-of-the-art without one, which is why this arm can ship in
+  /// a commercial app where most beat trackers cannot.
+  ///
+  /// Open the session with an explicit `backend: 'beat-this'`:
+  ///
+  /// ```dart
+  /// final s = CrispasrSession.open(path, backend: 'beat-this');
+  /// final grid = s.beats(pcm);
+  /// final bars = grid.where((b) => b.isDownbeat);
+  /// print('${s.beatsTempoBpm.toStringAsFixed(1)} BPM');
+  /// ```
+  ///
+  /// Throws [UnsupportedError] when the loaded dylib predates the beat API,
+  /// [StateError] when the session is closed, and [Exception] when the
+  /// backend has no beat arm or the sample rate does not match (the C side
+  /// returns -1 for both).
+  List<Beat> beats(Float32List pcm22k) {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_beats')) {
+      throw UnsupportedError(
+          'Beat API not available in this libcrispasr build');
+    }
+    if (pcm22k.isEmpty) return const <Beat>[];
+    final rate = beatsSampleRate;
+    final beatsFn = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Pointer<Float>, Int32, Int32),
+        int Function(Pointer<Void>, Pointer<Float>, int, int)>(
+      'crispasr_session_beats',
+    );
+    final eventsFn = _lib.lookupFunction<
+        Pointer<Float> Function(Pointer<Void>, Pointer<Int32>),
+        Pointer<Float> Function(Pointer<Void>, Pointer<Int32>)>(
+      'crispasr_session_beats_events',
+    );
+    final inPtr = calloc<Float>(pcm22k.length);
+    final nPtr = calloc<Int32>();
+    try {
+      // Bulk view-then-copy, not an element-by-element loop — same
+      // reasoning as [synthesize].
+      inPtr.asTypedList(pcm22k.length).setAll(0, pcm22k);
+      final n = beatsFn(_handle, inPtr, pcm22k.length, rate > 0 ? rate : 22050);
+      if (n < 0) {
+        throw Exception('beats failed for backend $_backend — the model is '
+            'probably not beat-capable (expected `beat-this`), or the PCM is '
+            'not at ${rate > 0 ? rate : 22050} Hz');
+      }
+      if (n == 0) return const <Beat>[];
+      final evPtr = eventsFn(_handle, nPtr);
+      final nEv = nPtr.value;
+      if (evPtr == nullptr || nEv <= 0) return const <Beat>[];
+      // Flat, session-owned view: two 32-bit floats per beat, beat-major, as
+      // {time_s, is_downbeat}. It is a float pair rather than a struct
+      // because a mixed int/float struct misreads through a flat float view.
+      final flat = evPtr.asTypedList(nEv * 2);
+      return List<Beat>.generate(
+        nEv,
+        (i) => (timeS: flat[i * 2], isDownbeat: flat[i * 2 + 1] != 0.0),
+        growable: false,
+      );
+    } finally {
+      calloc.free(inPtr);
+      calloc.free(nPtr);
+    }
+  }
+
+  /// Native input sample rate the loaded beat model expects, in Hz
+  /// (22050 for Beat This!).
+  ///
+  /// Returns 0 when the session's backend has no beat arm, or when the
+  /// loaded dylib predates the beat API — so this doubles as a capability
+  /// probe that never throws.
+  int get beatsSampleRate {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_beats_sample_rate')) return 0;
+    final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>),
+        int Function(Pointer<Void>)>('crispasr_session_beats_sample_rate');
+    return fn(_handle);
+  }
+
+  /// Median inter-beat tempo estimate in BPM from the last [beats] call, or
+  /// 0 with fewer than two beats.
+  ///
+  /// Median rather than mean: a single missed or doubled beat skews a mean
+  /// badly, and beat sequences routinely have both.
+  double get beatsTempoBpm {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_beats_tempo_bpm')) return 0.0;
+    final fn = _lib.lookupFunction<Float Function(Pointer<Void>),
+        double Function(Pointer<Void>)>('crispasr_session_beats_tempo_bpm');
     return fn(_handle);
   }
 

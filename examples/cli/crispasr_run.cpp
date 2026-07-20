@@ -19,6 +19,7 @@
 #include "crispasr_mic_cli.h"
 #include "crispasr_speaker.h"
 #include "crispasr_popen.h"
+#include "crispasr_beats_cli.h"
 #include "crispasr_chords_cli.h"
 #include "crispasr_pitch_cli.h"
 #include "crispasr_separate_cli.h"
@@ -1688,6 +1689,11 @@ int crispasr_run_backend(const whisper_params& params_in) {
     // transcripts). Same early-dispatch rule as --separate.
     if (params.chords)
         return crispasr_run_chords(params);
+
+    // Beat tracking is its own task (a beat/downbeat grid out, not
+    // transcripts). Same early-dispatch rule as --chords.
+    if (params.beats)
+        return crispasr_run_beats(params);
 
     // Pitch (F0) is its own task too (pitch frames out, not transcripts).
     // Same early-dispatch rule as --separate.

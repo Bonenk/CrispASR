@@ -154,6 +154,88 @@ plus an explicit component allowlist in the repo, so "this is a sub-module,
 not a backend" is a recorded decision rather than a silent omission. Estimated
 small; the allowlist is the actual work.
 
+## Delivery bugs found by CometBeat against the released v0.8.17 dylib (2026-07-20)
+
+They validated the real macOS arm64 release artifact — pitch/piano/separate all
+work (CREPE gave a clean 2-octave scale, piano recognised the Für Elise motif)
+— and hit two packaging/teardown bugs. Independent confirmation that those
+three backends function end to end on a shipped build, which we did not have
+before.
+
+### DB1 — release tarball missing libogg/libopus — FIXED (not yet released)
+
+`libcrispasr-macos-arm64.tar.gz` links `@rpath/libogg.0.dylib` and
+`@rpath/libopus.0.dylib` (CRISPASR_OPUS_FETCH=ON builds them) but the Package
+step only collected `libcrispasr*`, `libwhisper`, and `libggml*`. The tarball
+therefore does not `dlopen` standalone. CometBeat worked around it by copying
+Homebrew's copies into a flat rpath dir and re-signing.
+
+**Root cause was deeper than packaging, and the first fix was wrong.** The
+option is documented as building ogg/opus/opusfile *statically*, and
+THIRD_PARTY_NOTICES.txt states they are "statically compiled into libcrispasr
+... all official release binaries". Neither was true: `opusfile` is an explicit
+`add_library(... STATIC)`, but ogg and opus arrive via
+`FetchContent_MakeAvailable`, which INHERITS `BUILD_SHARED_LIBS` — and every
+shared-lib release job passes `-DBUILD_SHARED_LIBS=ON`. So they silently built
+as dylibs, creating @rpath deps nobody packaged.
+
+Fixed in `src/CMakeLists.txt` by forcing `BUILD_SHARED_LIBS=OFF` around the
+FetchContent block (save/restore, mirroring the existing BUILD_TESTING
+pattern). Verified under the exact release flags: `libopus.a` + `libogg.a`
+static archives, and **0 ogg/opus @rpath deps** in libcrispasr.dylib. The
+bundle now loads standalone with nothing extra shipped, and the
+THIRD_PARTY_NOTICES claim becomes true.
+
+Also in `.github/workflows/release.yml`: a gate that derives the requirement
+from the binaries themselves — every
+`@rpath` dep of every packaged dylib must exist in the bundle, or the release
+job fails. A hand-maintained copy list is what failed here; the next new
+dependency now breaks the RELEASE instead of the consumer.
+Gate tested both directions locally under `set -euo pipefail`, including the
+`grep`-returns-1 case that would otherwise fail a dependency-free dylib.
+
+**Needs a 0.8.18 release to reach consumers.**
+
+### DB2 — SIGABRT at process exit when a session is still open — FIXED
+
+`GGML_ASSERT([rsets->data count] == 0)` in `ggml_metal_rsets_free`
+(`ggml/src/ggml-metal/ggml-metal-device.m:690`), reached from
+`ggml_metal_device_free`. Fires AFTER correct output, during teardown.
+
+Reproduced and root-caused:
+
+| case | result |
+|---|---|
+| open session, **close it**, exit | exit 0, no assert |
+| open session, exit **without closing** | **exit 134 (SIGABRT)** + backtrace |
+
+`ggml_metal_device_get` holds the device in a **function-local static**
+(`static std::vector<ggml_metal_device_ptr> devs`, ggml-metal-device.cpp:21),
+so its destructor runs at static-destruction time and asserts if any Metal
+buffer is still alive. The assert comment says as much: "you haven't
+deallocated all Metal resources before exiting."
+
+**Immediate workaround for consumers: close every session before process exit**
+(`crispasr_session_close`). That is a one-line finalizer on the Dart side and
+makes the abort go away entirely.
+
+**FIXED in the ggml fork** (`CrispStrobe/ggml` @ bfe8ea22, submodule bumped):
+`ggml_metal_rsets_free` now warns instead of asserting. Releasing the array is
+correct refcounting either way — a residency set a live buffer still references
+stays alive by its own retain — so the abort bought nothing but a dead process.
+Precedent: 1dc4cb93 ("gguf: reject empty keys instead of asserting").
+
+Chosen over the alternative — a session registry closed from an `atexit`
+registered after ggml's device static (LIFO ordering) — because that adds new
+lifetime management to the session C ABI with double-free exposure, and would
+REGRESS a consumer that closes correctly from its own late static destructor:
+we would free the session first and they would then close a dangling pointer.
+The ggml patch has no such failure mode.
+
+Verified both ways on macOS/Metal: closing the session exits 0 silently;
+leaking it exits 0 with one actionable warning, where it previously exited 134
+with a backtrace. A real leak is still diagnosable — the message names the fix.
+
 ## CometBeat handoff — singing-voice-conversion vocoders (OPEN, NOT STARTED)
 
 Requested by the CometBeat `opus` (voice-svc) agent via its `docs/PLAN.md`
