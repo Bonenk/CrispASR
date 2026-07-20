@@ -77,7 +77,12 @@ void rvc_svc_coarse_pitch(const float* f0_hz, int n, int* out_coarse);
 // with the reference'''s noise and reproduces its audio (max_abs 1.4e-05).
 // Run it with `crispasr-diff rvc <model.gguf> <ref.gguf> <any.wav>`.
 //
-// Not yet wired into the CLI, the session C ABI or any binding.
+// F32 ONLY for now. An f16 GGUF converts fine but aborts at runtime: several
+// ops on this path require F32 operands (ggml_scale is F32-only, and an F16
+// embedding/bias reaching ggml_add trips
+// GGML_ASSERT(src1->type == GGML_TYPE_F32)). Casting the relative-position
+// tables fixed the first of those; the rest needs per-op work. Convert with
+// --dtype f32 until then — the f16 path is NOT silently wrong, it refuses.
 //
 // Per-stage parity diff against tools/rvc_torch_parity.py's reference dump.
 // The reference carries BOTH noise buffers, which the runtime replays, so the

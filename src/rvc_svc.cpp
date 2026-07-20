@@ -287,7 +287,17 @@ ggml_tensor* rvc_rel_embeddings(ggml_context* g, ggml_tensor* emb, int T, int wi
     const int start = std::max((window + 1) - T, 0);
     // emb: GGUF (1, 2w+1, d) -> ggml ne = [d, 2w+1, 1]
     ggml_tensor* e = ggml_reshape_2d(g, emb, emb->ne[0], emb->ne[1]);
+    // Cast to F32 up front. In an f16 GGUF emb_rel_* is F16, and the zero-pad
+    // below needs ggml_scale, which is F32-only — so an f16 checkpoint aborted
+    // inside ggml_compute_forward_scale. These are small tables ((2w+1) x d)
+    // and every consumer of them downstream is F32, so the cast is cheap and
+    // removes the whole dtype question.
+    if (e->type != GGML_TYPE_F32)
+        e = ggml_cast(g, e, GGML_TYPE_F32);
     if (pad_len > 0) {
+        // Match the SOURCE dtype: emb_rel_* is F16 in an f16 GGUF and
+        // ggml_concat requires both operands to share a type. Hardcoding F32
+        // aborted on every f16 checkpoint while f32 worked fine.
         ggml_tensor* pre = ggml_new_tensor_2d(g, GGML_TYPE_F32, e->ne[0], pad_len);
         pre = ggml_scale(g, pre, 0.0f);
         e = ggml_concat(g, pre, e, 1);        // front pad
