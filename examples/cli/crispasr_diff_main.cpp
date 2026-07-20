@@ -40,6 +40,7 @@
 #include "htdemucs.h"
 #include "mel_band_roformer.h"
 #include "btc_chords.h"
+#include "tabcnn.h"
 #include "piano_transcription.h"
 #include "rvc_svc.h"
 #include "voxtral_tts.h"
@@ -1095,6 +1096,15 @@ int main(int argc, char** argv) {
     if (backend_name == "dots-tts-spk") {
         // model_path = speaker encoder GGUF, ref_path = spk-ref GGUF.
         return dots_tts_spk_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
+    }
+    if (backend_name == "tabcnn" || backend_name == "tab") {
+        // model_path = tabcnn GGUF, ref_path = dump from
+        // tools/reference_backends/tabcnn.py. Unlike btc, the reference carries
+        // the raw `audio` and the diff runs the FULL pipeline from the
+        // waveform, so the CQT front end is covered rather than replayed --
+        // model.frontend is empty, so a feature-replaying diff would never
+        // test it.
+        return tabcnn_diff(model_path.c_str(), ref_path.c_str(), /*verbosity=*/2);
     }
     if (backend_name == "btc" || backend_name == "btc-chords") {
         // model_path = btc-chords GGUF, ref_path = dump from

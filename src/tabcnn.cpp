@@ -456,3 +456,124 @@ int tabcnn_extract_stage(struct tabcnn_context* ctx, const float* pcm, int n_sam
     std::memcpy(out, src.data(), (size_t)n * sizeof(float));
     return n;
 }
+
+// ---------------------------------------------------------------------------
+// crispasr-diff entry point
+// ---------------------------------------------------------------------------
+//
+// Runs from the WAVEFORM stored in the reference archive, not from replayed
+// features. That is deliberate: model.frontend is empty, so the CQT lives
+// outside the network, and a diff that starts at cqt_db would never test it.
+// BTC learned this the expensive way -- its harness replayed input_feat by
+// design and a front-end mismatch survived all the way to a real-music run
+// (mir_eval 86.63% -> 98.56% once the CQT was fixed).
+//
+// Prints |mine| and |ref| alongside the cosine on every stage. Cosine is
+// scale-blind, and this backend has already produced one scale bug that cosine
+// alone would have passed (the missing /80 + 1 rescale, cos -0.544 with the
+// magnitudes 15895 vs 88 giving it away).
+
+namespace {
+
+bool tabcnn_ref_get(core_gguf::WeightLoad& rw, const char* name, std::vector<float>& out) {
+    auto it = rw.tensors.find(name);
+    if (it == rw.tensors.end() || !it->second)
+        return false;
+    const int64_t n = ggml_nelements(it->second);
+    out.resize((size_t)n);
+    ggml_backend_tensor_get(it->second, out.data(), 0, (size_t)n * sizeof(float));
+    return true;
+}
+
+// cos plus the two magnitudes. Returns cos.
+double tabcnn_cmp(const char* stage, const std::vector<float>& mine, const std::vector<float>& ref, int verbosity,
+                  double tol) {
+    const size_t n = std::min(mine.size(), ref.size());
+    if (n == 0) {
+        if (verbosity)
+            fprintf(stderr, "  %-14s SKIP (empty)\n", stage);
+        return -1.0;
+    }
+    double dot = 0.0, na = 0.0, nb = 0.0, maxd = 0.0;
+    for (size_t i = 0; i < n; i++) {
+        const double a = mine[i], b = ref[i];
+        dot += a * b;
+        na += a * a;
+        nb += b * b;
+        maxd = std::max(maxd, std::fabs(a - b));
+    }
+    const double cos = (na > 0 && nb > 0) ? dot / std::sqrt(na * nb) : 0.0;
+    if (verbosity)
+        fprintf(stderr, "  %-14s n=%-9zu cos=%.9f  |mine|=%11.3f |ref|=%11.3f  max|d|=%.3e%s\n", stage, n, cos,
+                std::sqrt(na), std::sqrt(nb), maxd, cos >= tol ? "  PASS" : "  FAIL");
+    return cos;
+}
+
+} // namespace
+
+int tabcnn_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
+    tabcnn_context* ctx = tabcnn_init(model_gguf, 4);
+    if (!ctx) {
+        fprintf(stderr, "tabcnn_diff: failed to load %s\n", model_gguf);
+        return 1;
+    }
+    core_gguf::WeightLoad rw;
+    if (!core_gguf::load_weights(ref_gguf, ctx->backend, "tabcnn_ref", rw)) {
+        fprintf(stderr, "tabcnn_diff: failed to load reference %s\n", ref_gguf);
+        tabcnn_free(ctx);
+        return 1;
+    }
+
+    std::vector<float> audio;
+    if (!tabcnn_ref_get(rw, "audio", audio) || audio.empty()) {
+        fprintf(stderr, "tabcnn_diff: reference has no `audio` stage — re-dump with\n"
+                        "  tools/reference_backends/tabcnn.py, which emits it precisely so the\n"
+                        "  front end is covered rather than replayed.\n");
+        core_gguf::free_weights(rw);
+        tabcnn_free(ctx);
+        return 1;
+    }
+
+    // The dumper writes audio at the ORIGINAL rate it was handed; the runtime
+    // resamples internally, so feed the model's own rate to keep one resampler
+    // out of the comparison.
+    const int sr = TABCNN_SAMPLE_RATE;
+    if (verbosity)
+        fprintf(stderr, "tabcnn_diff: %zu samples @ %d Hz\n", audio.size(), sr);
+
+    int fails = 0;
+    static const char* kStages[] = {"cqt_db", "conv0_relu",  "conv1_relu", "conv2_relu",
+                                    "pool",   "dense0_relu", "logits"};
+    for (const char* stage : kStages) {
+        std::vector<float> ref;
+        if (!tabcnn_ref_get(rw, stage, ref))
+            continue; // stage not in this dump
+        std::vector<float> mine(ref.size() + 16);
+        const int got =
+            tabcnn_extract_stage(ctx, audio.data(), (int)audio.size(), sr, stage, mine.data(), (int)mine.size());
+        if (got <= 0) {
+            fprintf(stderr, "  %-14s FAIL (runtime produced nothing)\n", stage);
+            fails++;
+            continue;
+        }
+        mine.resize((size_t)got);
+        // Thresholds encode a KNOWN difference, not a guess. core/cqt.h is an
+        // independent CQT (direct Brown kernels) versus librosa's recursive
+        // downsampling, so the front end agrees to ~0.9988 and every graph
+        // stage inherits that. Measured end to end this costs nothing that
+        // matters: tablature F1 0.7732 vs the torch reference's 0.7708
+        // (delta +0.0024) with 98.57% argmax agreement on EGSet12 track 01.
+        // The acceptance gate for this backend is that task metric, NOT these
+        // cosines -- they exist to localise a graph bug, and a graph bug shows
+        // up as one stage collapsing, not as a uniform 0.98.
+        const double tol = std::strcmp(stage, "cqt_db") == 0 ? 0.998 : 0.96;
+        if (tabcnn_cmp(stage, mine, ref, verbosity, tol) < tol)
+            fails++;
+    }
+
+    core_gguf::free_weights(rw);
+    tabcnn_free(ctx);
+    if (verbosity)
+        fprintf(stderr, "tabcnn_diff: %s\n", fails == 0 ? "ALL STAGES PASS" : "FAILURES PRESENT");
+    return fails == 0 ? 0 : 1;
+}
