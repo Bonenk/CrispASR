@@ -1109,9 +1109,25 @@ silently mis-folding.
   already `(D, H, N, B)`, removing a permute and simplifying the per-head
   gating. Parity unchanged to 7 digits.
 
-- [ ] **NOW — active work.** One advisory gap left: the
-  `src/crispasr_model_registry.cpp` entry, which needs `beat-this-f16.gguf`
-  (41 MB) published to HuggingFace first. Deliberately NOT added yet — a
-  registry URL that 404s is worse than no `--auto-download`. Publishing is the
-  user's call since it is outward-facing; everything else ships and works
-  today with an explicit `-m <path>`.
+- [x] **Weights published + registry entry DONE.** `cstr/beat-this-GGUF` is
+  public with `beat-this-f16.gguf` (41 MB, default) and `beat-this-f32.gguf`
+  (81 MB, parity reference), both SHA-256-verified against the local artifacts
+  that the parity runs used. `--beats -m auto --auto-download` fetches into a
+  clean cache and reproduces the local result exactly (91 beats / 25 downbeats
+  / 120.0 BPM). No licence gate — MIT for code AND weights, unlike btc-chords.
+
+  **f32 closes the numerics question.** Every stage scores
+  **cos = 1.00000000, rel err ~1e-6** at f32 vs ~5e-4 at f16, with norms equal
+  to 4 decimals. That is the proof the f16 residual was weight quantisation and
+  the graph itself is exact — worth having as a shipped artifact rather than a
+  claim, which is why f32 is published rather than just measured.
+
+  `tools/check-backend-wiring.py` is now clean for beat-this on BOTH tiers
+  (required and advisory).
+
+- [ ] **NOW — active work.** §251b is complete and shipped. Nothing is blocked.
+  The only remaining optional step is a release: `scripts/bump-version.sh` to
+  0.8.18 plus BOTH tags (`v0.8.18` **and** `crispasr-v0.8.18` — the publish
+  workflow triggers on the latter, the bump script only creates the former) to
+  put the Dart `beats()` API on pub.dev. Held pending an explicit go-ahead,
+  since a pub.dev version cannot be unpublished.
