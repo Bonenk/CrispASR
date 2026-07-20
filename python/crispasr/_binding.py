@@ -515,6 +515,24 @@ class RegistryEntry:
     approx_size: str
 
 
+@dataclass
+class RegistryArtifact:
+    """One file in a backend's canonical default download bundle."""
+    kind: str
+    filename: str
+    url: str
+    approx_size: str
+
+
+@dataclass
+class RegistryBundle:
+    """The exact artifact bundle downloaded by ``-m auto``."""
+    backend: str
+    license: str
+    requires_acceptance: bool
+    artifacts: List[RegistryArtifact]
+
+
 def registry_lookup(backend: str, *, lib_path: Optional[str] = None) -> Optional[RegistryEntry]:
     """Look up the canonical GGUF for a backend. Returns ``None`` on miss."""
     return _registry_call("crispasr_registry_lookup_abi", backend, lib_path)
@@ -523,6 +541,91 @@ def registry_lookup(backend: str, *, lib_path: Optional[str] = None) -> Optional
 def registry_lookup_by_filename(filename: str, *, lib_path: Optional[str] = None) -> Optional[RegistryEntry]:
     """Look up the canonical GGUF by filename (exact, then fuzzy substring)."""
     return _registry_call("crispasr_registry_lookup_by_filename_abi", filename, lib_path)
+
+
+def registry_default_bundle(
+    backend: str, *, lib_path: Optional[str] = None
+) -> Optional[RegistryBundle]:
+    """Return the backend's exact canonical ``-m auto`` artifact bundle.
+
+    Artifacts are ordered as downloaded: primary model, inline companion,
+    then any extra companions. This API does not rewrite quant suffixes or
+    infer a recommendation. Returns ``None`` for an unknown backend.
+    """
+    if not backend:
+        return None
+    lib = ctypes.CDLL(lib_path or _find_lib())
+    info_symbol = "crispasr_registry_default_bundle_info_abi"
+    artifact_symbol = "crispasr_registry_default_bundle_artifact_abi"
+    if not hasattr(lib, info_symbol) or not hasattr(lib, artifact_symbol):
+        raise RuntimeError(
+            "default-bundle registry API not in loaded library — rebuild CrispASR."
+        )
+
+    info = getattr(lib, info_symbol)
+    info.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_char_p, ctypes.c_int32,
+        ctypes.c_char_p, ctypes.c_int32,
+        ctypes.POINTER(ctypes.c_int32),
+    ]
+    info.restype = ctypes.c_int
+    backend_buf = ctypes.create_string_buffer(256)
+    license_buf = ctypes.create_string_buffer(1024)
+    requires_acceptance = ctypes.c_int32()
+    count = info(
+        backend.encode("utf-8"),
+        backend_buf, len(backend_buf),
+        license_buf, len(license_buf),
+        ctypes.byref(requires_acceptance),
+    )
+    if count == 0:
+        return None
+    if count < 0:
+        raise RuntimeError(f"default-bundle registry lookup failed (rc={count}).")
+
+    artifact_fn = getattr(lib, artifact_symbol)
+    artifact_fn.argtypes = [
+        ctypes.c_char_p, ctypes.c_int32, ctypes.POINTER(ctypes.c_int32),
+        ctypes.c_char_p, ctypes.c_int32,
+        ctypes.c_char_p, ctypes.c_int32,
+        ctypes.c_char_p, ctypes.c_int32,
+    ]
+    artifact_fn.restype = ctypes.c_int
+    kinds = {0: "primary", 1: "companion", 2: "extra"}
+    artifacts = []
+    for index in range(count):
+        kind = ctypes.c_int32()
+        filename_buf = ctypes.create_string_buffer(256)
+        url_buf = ctypes.create_string_buffer(2048)
+        size_buf = ctypes.create_string_buffer(64)
+        rc = artifact_fn(
+            backend.encode("utf-8"), index, ctypes.byref(kind),
+            filename_buf, len(filename_buf),
+            url_buf, len(url_buf),
+            size_buf, len(size_buf),
+        )
+        if rc != 0:
+            raise RuntimeError(
+                f"default-bundle artifact {index} lookup failed (rc={rc})."
+            )
+        if kind.value not in kinds:
+            raise RuntimeError(
+                f"default-bundle artifact {index} has unknown kind {kind.value}."
+            )
+        artifacts.append(RegistryArtifact(
+            kind=kinds[kind.value],
+            filename=filename_buf.value.decode("utf-8"),
+            url=url_buf.value.decode("utf-8"),
+            approx_size=size_buf.value.decode("utf-8"),
+        ))
+
+    return RegistryBundle(
+        backend=backend_buf.value.decode("utf-8"),
+        license=license_buf.value.decode("utf-8"),
+        requires_acceptance=requires_acceptance.value != 0,
+        artifacts=artifacts,
+    )
 
 
 def list_known_models(*, lib_path: Optional[str] = None) -> list:
@@ -2565,11 +2668,11 @@ class Session:
         """Speech-to-speech: audio in → audio out via a single model pass.
 
         Supported on backends with S2S capability (``lfm2-audio``,
-        ``mini-omni2``, ``sidon``). Input is mono float32 PCM; call
+        ``mini-omni2``, ``sidon``, ``voxcpm2-vae``). Input is mono float32 PCM; call
         :meth:`set_pcm_sample_rate` first when it is not 16 kHz. Returns a
         tuple ``(output_pcm, transcript)`` where *output_pcm* is a
         float32 numpy array at the backend's output sample rate (24 kHz
-        for conversational S2S, 48 kHz for Sidon) and *transcript* is the
+        for conversational S2S, 48 kHz for Sidon and VoxCPM2 AudioVAE) and *transcript* is the
         intermediate ASR text (may be
         empty if the backend doesn't produce one).
 

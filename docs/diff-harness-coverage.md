@@ -83,6 +83,7 @@ archived at `cstr/chatterbox-GGUF/diff-harness-ref/`.
 | `titanet` | `tools/reference_backends/titanet.py` | — | — | **no** | nemo, torch |
 | `vibevoice` | `tools/reference_backends/vibevoice.py` | — | — | **no** | librosa, safetensors, torch |
 | `voxcpm2-tts` | `tools/reference_backends/voxcpm2_tts.py` | — | — | yes | torch, voxcpm |
+| `voxcpm2-vae` | `tools/reference_backends/voxcpm2_vae.py` | — | — | **dumper only — see note** | torch, voxcpm |
 | `voxtral` | `tools/reference_backends/voxtral.py` | — | — | yes | torch, transformers |
 | `voxtral4b` | `tools/reference_backends/voxtral4b.py` | — | — | yes | torch, transformers |
 | `zonos-tts` | `tools/reference_backends/zonos_tts_reference.py` | — | — | yes | soundfile, torch, torchaudio |
@@ -142,6 +143,12 @@ code starts working.
 - `qwen3-tts-spk` — `tools/bootstrap_ref_env.sh qwen3-tts-spk` then `python tools/dump_reference.py --backend qwen3-tts-spk --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/qwen3-tts-spk-ref.gguf`
 - `sensevoice` — `tools/bootstrap_ref_env.sh sensevoice` then `python tools/dump_reference.py --backend sensevoice --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/sensevoice-ref.gguf`
 - `voxcpm2-tts` — `tools/bootstrap_ref_env.sh voxcpm2-tts` then `python tools/dump_reference.py --backend voxcpm2-tts --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/voxcpm2-tts-ref.gguf`
+- `voxcpm2-vae` — ⚠️ **dumper only, no C++ consumer.** `tools/reference_backends/voxcpm2_vae.py` is registered in
+  `dump_reference.py` and produces `input_16k` / `vae_latent_patches` / `output_48k`, but
+  `examples/cli/crispasr_diff_main.cpp` has no `voxcpm2-vae` branch and `src/voxcpm2_vae.h` exposes no
+  stage-extraction entry point, so nothing can read the archive back. Producing a `ref.gguf` today therefore
+  proves nothing about the runtime. Closing this needs a `voxcpm2_vae_extract_stage()` alongside
+  `voxcpm2_extract_stage()` plus the diff-main branch — track it before treating the VAE as harness-covered.
 - `voxtral` — `tools/bootstrap_ref_env.sh voxtral` then `python tools/dump_reference.py --backend voxtral --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/voxtral-ref.gguf`
 - `voxtral4b` — `tools/bootstrap_ref_env.sh voxtral4b` then `python tools/dump_reference.py --backend voxtral4b --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/voxtral4b-ref.gguf`
 - `zonos-tts` — `tools/bootstrap_ref_env.sh zonos-tts` then `python tools/dump_reference.py --backend zonos-tts --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/zonos-tts-ref.gguf`

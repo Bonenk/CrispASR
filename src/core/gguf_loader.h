@@ -133,6 +133,18 @@ struct WeightLoad {
 // model_tag is used only in error messages ("parakeet: ...").
 bool load_weights(const char* path, ggml_backend_t backend, const char* model_tag, WeightLoad& out);
 
+// Load only tensors accepted by `include_tensor`. Metadata keys remain
+// available through the caller's separate open_metadata() pass, while the
+// returned ggml context and any allocated backend buffers contain only the
+// selected tensors. This is intended for independently usable components
+// embedded in a larger GGUF (for example an audio codec stored alongside an
+// LLM), where loading the parent model would waste RAM/VRAM. Whole-file
+// preload, readahead, and mlock hints are deliberately suppressed for this
+// path so excluded parent tensors do not become resident as a side effect.
+using IncludeTensor = bool (*)(const char* tensor_name, void* user);
+bool load_weights_filtered(const char* path, ggml_backend_t backend, IncludeTensor include_tensor, void* user,
+                           const char* model_tag, WeightLoad& out);
+
 // PLAN #69a: layer-residency-aware weight loader. Tensors for which
 // `is_gpu(tensor_name, user) == true` go on the GPU backend; the rest
 // go on the CPU backend. ggml_backend_sched then auto-routes ops to

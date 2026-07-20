@@ -287,6 +287,26 @@ CRISPASR_SESSION_API int crispasr_registry_lookup_by_filename_abi(const char* fi
                                                                   int32_t filename_cap, char* out_url, int32_t url_cap,
                                                                   char* out_size, int32_t size_cap);
 CRISPASR_SESSION_API int crispasr_registry_list_backends_abi(char* out_csv, int32_t out_cap);
+typedef enum crispasr_registry_artifact_kind {
+    CRISPASR_REGISTRY_ARTIFACT_PRIMARY = 0,
+    CRISPASR_REGISTRY_ARTIFACT_COMPANION = 1,
+    CRISPASR_REGISTRY_ARTIFACT_EXTRA = 2,
+} crispasr_registry_artifact_kind;
+// Return the artifact count for a backend's exact `-m auto` default bundle,
+// or 0 when the backend is unknown. On success, also writes the canonical
+// backend key and registry licence (which may be empty). Negative values are
+// argument/buffer errors.
+CRISPASR_SESSION_API int crispasr_registry_default_bundle_info_abi(const char* backend, char* out_backend,
+                                                                   int32_t backend_cap, char* out_license,
+                                                                   int32_t license_cap,
+                                                                   int32_t* out_requires_acceptance);
+// Return one default-bundle artifact by index. 0 = success, 1 = unknown
+// backend/index, -1 = invalid arguments, 2 = an output buffer is too small.
+CRISPASR_SESSION_API int crispasr_registry_default_bundle_artifact_abi(const char* backend, int32_t index,
+                                                                       int32_t* out_kind, char* out_filename,
+                                                                       int32_t filename_cap, char* out_url,
+                                                                       int32_t url_cap, char* out_size,
+                                                                       int32_t size_cap);
 CRISPASR_SESSION_API int crispasr_session_result_n_segments(crispasr_session_result* r);
 CRISPASR_SESSION_API const char* crispasr_session_result_segment_text(crispasr_session_result* r, int i);
 CRISPASR_SESSION_API int64_t crispasr_session_result_segment_t0(crispasr_session_result* r, int i);

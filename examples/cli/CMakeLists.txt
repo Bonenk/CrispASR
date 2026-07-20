@@ -50,6 +50,7 @@ add_executable(${TARGET}
     crispasr_backend_dia.cpp
     crispasr_backend_dots_tts.cpp
     crispasr_backend_voxcpm2_tts.cpp
+    crispasr_backend_voxcpm2_vae.cpp
     crispasr_backend_cosyvoice3.cpp
     crispasr_backend_kokoro.cpp
     crispasr_backend_piper.cpp

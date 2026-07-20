@@ -305,6 +305,11 @@ int  crispasr_kokoro_lang_has_native_voice_abi(const char* lang);
 int crispasr_registry_lookup_by_filename_abi(const char* filename, char* out_filename, int filename_cap,
                                              char* out_url, int url_cap, char* out_size, int size_cap);
 int crispasr_registry_list_backends_abi(char* out_csv, int out_cap);
+int crispasr_registry_default_bundle_info_abi(const char* backend, char* out_backend, int backend_cap,
+                                              char* out_license, int license_cap, int* out_requires_acceptance);
+int crispasr_registry_default_bundle_artifact_abi(const char* backend, int index, int* out_kind,
+                                                  char* out_filename, int filename_cap, char* out_url,
+                                                  int url_cap, char* out_size, int size_cap);
 
 // --- Session extras ---
 int crispasr_session_available_backends(char* out_csv, int out_cap);
@@ -1006,7 +1011,8 @@ type SpeechToSpeechResult struct {
 }
 
 // SpeechToSpeech runs end-to-end audio-in → audio-out on backends with
-// S2S capability (lfm2-audio, mini-omni2). Input is 16 kHz mono float32 PCM.
+// S2S capability (lfm2-audio, mini-omni2, sidon, voxcpm2-vae). Input is
+// 16 kHz mono float32 PCM.
 func (s *CrispasrSession) SpeechToSpeech(samples []float32) (*SpeechToSpeechResult, error) {
 	if len(samples) == 0 {
 		return nil, errors.New("SpeechToSpeech: empty input")
@@ -1646,6 +1652,31 @@ type RegistryEntry struct {
 	Size     string
 }
 
+// RegistryArtifactKind identifies an artifact's role in a default bundle.
+type RegistryArtifactKind int
+
+const (
+	RegistryArtifactPrimary RegistryArtifactKind = iota
+	RegistryArtifactCompanion
+	RegistryArtifactExtra
+)
+
+// RegistryArtifact is one file in a backend's canonical default bundle.
+type RegistryArtifact struct {
+	Kind     RegistryArtifactKind
+	Filename string
+	URL      string
+	Size     string
+}
+
+// RegistryBundle is the exact artifact set downloaded by `-m auto`.
+type RegistryBundle struct {
+	Backend            string
+	License            string
+	RequiresAcceptance bool
+	Artifacts          []RegistryArtifact
+}
+
 // RegistryLookup returns the default model filename + download URL for a backend.
 func RegistryLookup(backend string) (RegistryEntry, error) {
 	cb := C.CString(backend)
@@ -1660,6 +1691,61 @@ func RegistryLookup(backend string) (RegistryEntry, error) {
 		URL:      C.GoString(&url[0]),
 		Size:     C.GoString(&sz[0]),
 	}, nil
+}
+
+// RegistryDefaultBundle returns the backend's exact canonical `-m auto`
+// artifact bundle. It does not apply a preferred quant.
+func RegistryDefaultBundle(backend string) (RegistryBundle, error) {
+	cb := C.CString(backend)
+	defer C.free(unsafe.Pointer(cb))
+	var canonical [256]C.char
+	var license [1024]C.char
+	var requiresAcceptance C.int
+	count := C.crispasr_registry_default_bundle_info_abi(
+		cb, &canonical[0], C.int(len(canonical)), &license[0], C.int(len(license)),
+		&requiresAcceptance,
+	)
+	if count == 0 {
+		return RegistryBundle{}, fmt.Errorf("no default registry bundle for backend %q", backend)
+	}
+	if count < 0 {
+		return RegistryBundle{}, fmt.Errorf(
+			"default registry bundle lookup failed for backend %q (rc=%d)",
+			backend, int(count),
+		)
+	}
+
+	bundle := RegistryBundle{
+		Backend:            C.GoString(&canonical[0]),
+		License:            C.GoString(&license[0]),
+		RequiresAcceptance: requiresAcceptance != 0,
+		Artifacts:          make([]RegistryArtifact, 0, int(count)),
+	}
+	for index := C.int(0); index < count; index++ {
+		var kind C.int
+		var filename [256]C.char
+		var url [2048]C.char
+		var size [64]C.char
+		rc := C.crispasr_registry_default_bundle_artifact_abi(
+			cb, index, &kind,
+			&filename[0], C.int(len(filename)),
+			&url[0], C.int(len(url)),
+			&size[0], C.int(len(size)),
+		)
+		if rc != 0 || kind < 0 || kind > 2 {
+			return RegistryBundle{}, fmt.Errorf(
+				"default registry bundle artifact %d failed (rc=%d, kind=%d)",
+				int(index), int(rc), int(kind),
+			)
+		}
+		bundle.Artifacts = append(bundle.Artifacts, RegistryArtifact{
+			Kind:     RegistryArtifactKind(kind),
+			Filename: C.GoString(&filename[0]),
+			URL:      C.GoString(&url[0]),
+			Size:     C.GoString(&size[0]),
+		})
+	}
+	return bundle, nil
 }
 
 // CacheEnsureFile downloads a file into the model cache if not already present.

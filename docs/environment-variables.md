@@ -888,6 +888,18 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
 
 - `CRISPASR_SIDON_FASTCONV` — DAC convolution mode (`off`, `k1-f16`, `k1-f32`, or `full`). Unset defaults to
   `k1-f16` on CUDA and `off` on Vulkan/CPU.
+- `CRISPASR_SIDON_RPE` — relative-position-bias formulation: `bucket-direct` (default), `bucket`, or `expand`
+  (legacy `[head_dim, T, T]` expansion, ~1 GiB more predictor workspace at `T≈2825`; keeps the Vulkan
+  `mul_mat` batching branch). All three are algebraically equivalent.
+- `CRISPASR_SIDON_DECODER_CHUNK_FRAMES` — maximum DAC core size in feature frames (default `512`). `0` decodes
+  the whole utterance in one graph (~4.5 GiB at `T≈2825` vs ~0.79 GiB chunked). Chunked output is bit-exact
+  against the whole-utterance decode.
+- `CRISPASR_SIDON_LOOKAHEAD` — set to `0` to disable the input padding (one leading predictor frame plus 1.5 s
+  of right-side lookahead). Padding is on by default; without it the last ~12 ms of every clip is a full-scale
+  transient.
+- `CRISPASR_SIDON_MAX_FRAMES` — predictor input cap in feature frames (default `3000`, ~58.5 s after the
+  lookahead). Guards the `O(T^2)` attention.
+- `CRISPASR_SIDON_DEBUG` — print per-stage scheduler workspace sizes (per backend) after graph allocation.
 
 ### Sherpa
 
@@ -1004,6 +1016,8 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
 - `CRISPASR_VOXCPM2_INFERENCE_STEPS`
 - `CRISPASR_VOXCPM2_MAX_LEN`
 - `CRISPASR_VOXCPM2_USE_REF`
+- `CRISPASR_VOXCPM2_VAE_MAX_SAMPLES` - maximum 16 kHz input samples accepted by one `voxcpm2-vae` upscaling call
+  (default `960000`, or 60 seconds). Split longer audio, or raise this only when enough RAM/VRAM is available.
 
 ### Voxtral / Voxtral-TTS
 

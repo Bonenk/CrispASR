@@ -6,7 +6,11 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
-#ifndef _WIN32
+#ifdef _WIN32
+#include <io.h>
+#define isatty _isatty
+#define fileno _fileno
+#else
 #include <unistd.h>
 #endif
 #include <cstdio>
@@ -1536,6 +1540,30 @@ bool crispasr_registry_lookup(const std::string& backend, CrispasrRegistryEntry&
     if (!e)
         return false;
     fill(out, *e, preferred_quant);
+    return true;
+}
+
+bool crispasr_registry_default_bundle(const std::string& backend, CrispasrRegistryBundle& out) {
+    const Entry* e = find_by_backend(backend);
+    if (!e)
+        return false;
+
+    out = {};
+    out.backend = e->backend;
+    out.license = e->license ? e->license : "";
+    out.requires_license_acceptance = crispasr_license_requires_acceptance(out.license);
+    out.artifacts.push_back(
+        {CrispasrRegistryArtifactKind::Primary, e->filename, e->url, e->approx_size ? e->approx_size : ""});
+
+    if (e->companion_file && e->companion_url) {
+        out.artifacts.push_back({CrispasrRegistryArtifactKind::Companion, e->companion_file, e->companion_url,
+                                 e->companion_size ? e->companion_size : (e->approx_size ? e->approx_size : "")});
+    }
+
+    if (const ExtraCompanion* extras = find_extras(e->backend)) {
+        for (const ExtraCompanion* it = extras; it->file && it->url; ++it)
+            out.artifacts.push_back({CrispasrRegistryArtifactKind::Extra, it->file, it->url, ""});
+    }
     return true;
 }
 
