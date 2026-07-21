@@ -186,21 +186,29 @@ TEST_CASE("vad boundaries: chunk gate compares like with like", "[unit][vad]") {
     float chunk = 0.0f;
     REQUIRE(crispasr_parse_vad_slices(json, out, nullptr, &chunk));
 
-    // the comparison the CLI performs: requested vs requested
-    auto requested = [](int chunk_seconds) { return chunk_seconds > 0 ? (float)chunk_seconds : 30.0f; };
-    auto mismatches = [&](float imported, int run_chunk_seconds) {
-        return imported > 0.0f && std::fabs(imported - requested(run_chunk_seconds)) > 0.01f;
-    };
+    // Exercise the REAL shared decision function both surfaces call, not a copy
+    // of its logic -- a test that reimplements the rule cannot catch a bug in
+    // the rule. `requested` mirrors the CLI/server "0 means the 30 s default".
+    auto req = [](int chunk_seconds) { return chunk_seconds > 0 ? (float)chunk_seconds : 30.0f; };
 
-    REQUIRE_FALSE(mismatches(chunk, 30)); // same explicit length -> reuse
-    REQUIRE_FALSE(mismatches(chunk, 0));  // unset defaults to 30 -> reuse
-    REQUIRE(mismatches(chunk, 5));        // different length -> refuse
-    REQUIRE(mismatches(chunk, 12));
+    REQUIRE_FALSE(crispasr_vad_chunk_mismatch(chunk, req(30))); // same explicit length -> reuse
+    REQUIRE_FALSE(crispasr_vad_chunk_mismatch(chunk, req(0)));  // unset defaults to 30 -> reuse
+    REQUIRE(crispasr_vad_chunk_mismatch(chunk, req(5)));        // different -> mismatch
+    REQUIRE(crispasr_vad_chunk_mismatch(chunk, req(12)));
 
-    // A legacy file (no chunk_cs -> 0) must never be rejected: the gate is
-    // "unknown means don't judge", not "unknown means wrong".
-    REQUIRE_FALSE(mismatches(0.0f, 5));
-    REQUIRE_FALSE(mismatches(0.0f, 30));
+    // The function applies the "0 requested -> 30" default itself, so a raw 0
+    // must behave the same as req(0).
+    REQUIRE_FALSE(crispasr_vad_chunk_mismatch(chunk, 0.0f));
+
+    // A legacy file (no chunk_cs -> imported 0) is NEVER a mismatch: unknown
+    // means "don't judge", not "wrong".
+    REQUIRE_FALSE(crispasr_vad_chunk_mismatch(0.0f, req(5)));
+    REQUIRE_FALSE(crispasr_vad_chunk_mismatch(0.0f, req(30)));
+    REQUIRE_FALSE(crispasr_vad_chunk_mismatch(0.0f, 0.0f));
+
+    // Just inside vs just outside the 0.01 s tolerance.
+    REQUIRE_FALSE(crispasr_vad_chunk_mismatch(30.005f, 30.0f));
+    REQUIRE(crispasr_vad_chunk_mismatch(30.02f, 30.0f));
 }
 
 // Guards the round trip at a non-integer chunk length, since chunk_cs is stored

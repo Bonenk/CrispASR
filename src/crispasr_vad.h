@@ -192,3 +192,13 @@ std::string crispasr_serialize_vad_slices(const std::vector<crispasr_audio_slice
 // is non-null it receives the serialized sample rate (0 if absent).
 bool crispasr_parse_vad_slices(const std::string& text, std::vector<crispasr_audio_slice>& out, int* sample_rate_out,
                                float* chunk_seconds_out);
+
+// Issue #227: should a --vad-import be rejected/warned because its chunk length
+// differs from the run's? Shared by the CLI and the server so the two cannot
+// drift (the multi-surface-dispatch rule). Returns true when the run should
+// treat it as a mismatch. `imported_chunk` <= 0 means the file predates the
+// chunk_cs field ("unknown"), which is NEVER a mismatch. `requested_chunk` is
+// the run's REQUESTED chunk length (0 -> the 30 s default), not the effective
+// one -- the exporter runs before backend init and cannot know the effective
+// value.
+bool crispasr_vad_chunk_mismatch(float imported_chunk, float requested_chunk);

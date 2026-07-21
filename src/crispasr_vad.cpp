@@ -33,6 +33,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <cmath>
 #include <string>
 
 // ---- FireRed VAD context cache (§176e) ----
@@ -504,6 +505,11 @@ int64_t crispasr_vad_remap_timestamp(const std::vector<crispasr_vad_mapping>& ma
 }
 
 // ---- VAD segment boundary export / import (issue #227) ----
+
+bool crispasr_vad_chunk_mismatch(float imported_chunk, float requested_chunk) {
+    const float req = requested_chunk > 0.0f ? requested_chunk : 30.0f;
+    return imported_chunk > 0.0f && std::fabs(imported_chunk - req) > 0.01f;
+}
 
 std::string crispasr_serialize_vad_slices(const std::vector<crispasr_audio_slice>& slices, int sample_rate,
                                           float chunk_seconds) {

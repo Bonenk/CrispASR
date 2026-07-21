@@ -103,6 +103,12 @@ struct whisper_params {
     int vad_speech_pad_ms = 30;
     float vad_samples_overlap = 0.1f;
     bool vad_stitch = false;
+    // #227: a --vad-import file whose chunk length differs from this run WARNS
+    // by default and is used anyway -- refusing would break existing scripts
+    // and clients that upgraded into the check. Opt in to a hard failure with
+    // --vad-import-strict (CLI) or the vad_import_strict form field (server);
+    // both surfaces share this field and must stay in agreement.
+    bool vad_import_strict = false;
     // Issue #227: reuse VAD segment boundaries across ASR runs. --vad-export
     // writes the computed slices to a JSON file; --vad-import reads slices from
     // one instead of running VAD (skips the VAD model entirely).

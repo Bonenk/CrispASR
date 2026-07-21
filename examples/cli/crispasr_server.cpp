@@ -551,12 +551,23 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         // payload exported under a different chunk length does not carry over --
         // reusing it silently re-chunks the audio wrongly. Rejecting here keeps
         // the server and CLI from disagreeing about what an import means.
-        if (imported_chunk > 0.0f && std::fabs(imported_chunk - (float)effective_chunk_seconds) > 0.01f) {
-            result.ok = false;
-            result.error = "vad_import was exported at chunk_seconds " + std::to_string(imported_chunk) +
-                           " but this request uses " + std::to_string(effective_chunk_seconds) +
-                           "; re-export or match the chunk length";
-            return result;
+        // #227: same policy as the CLI -- WARN by default, refuse only when the
+        // caller opts in with vad_import_strict. Compare the REQUESTED chunk on
+        // both sides: the exporter runs before backend init and cannot know the
+        // effective value (see crispasr_run.cpp).
+        const float requested_chunk = rp.chunk_seconds > 0 ? (float)rp.chunk_seconds : 30.0f;
+        if (crispasr_vad_chunk_mismatch(imported_chunk, requested_chunk)) {
+            if (rp.vad_import_strict) {
+                result.ok = false;
+                result.error = "vad_import was exported at chunk_seconds " + std::to_string(imported_chunk) +
+                               " but this request uses " + std::to_string(requested_chunk) +
+                               "; re-export, match the chunk length, or drop vad_import_strict";
+                return result;
+            }
+            fprintf(stderr,
+                    "crispasr-server: warning: vad_import exported at chunk_seconds %.2f, request uses %.2f — "
+                    "chunking will not match\n",
+                    imported_chunk, requested_chunk);
         }
         if (imported_sr > 0 && imported_sr != SR) {
             for (auto& s : slices) {
@@ -590,7 +601,8 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
     // #227: hand the boundaries back when asked, so the next request (same
     // audio, different backend) can skip VAD via `vad_import`.
     if (rp.vad_export_inline)
-        result.vad_segments_json = crispasr_serialize_vad_slices(slices, SR, (float)effective_chunk_seconds);
+        result.vad_segments_json =
+            crispasr_serialize_vad_slices(slices, SR, rp.chunk_seconds > 0 ? (float)rp.chunk_seconds : 30.0f);
 
     if (slices.empty()) {
         result.ok = true;
@@ -1360,6 +1372,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // boundaries under `vad_segments`; `vad_import=<that object>` reuses
         // them and skips VAD entirely.
         rp.vad_export_inline = form_bool(req, "vad_export", rp.vad_export_inline);
+        rp.vad_import_strict = form_bool(req, "vad_import_strict", rp.vad_import_strict);
         rp.vad_import_json = form_string(req, "vad_import", rp.vad_import_json);
         rp.max_context = form_int(req, "max_context", rp.max_context);
         rp.audio_ctx = form_int(req, "audio_ctx", rp.audio_ctx);
@@ -1543,6 +1556,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // boundaries under `vad_segments`; `vad_import=<that object>` reuses
         // them and skips VAD entirely.
         rp.vad_export_inline = form_bool(req, "vad_export", rp.vad_export_inline);
+        rp.vad_import_strict = form_bool(req, "vad_import_strict", rp.vad_import_strict);
         rp.vad_import_json = form_string(req, "vad_import", rp.vad_import_json);
         rp.max_context = form_int(req, "max_context", rp.max_context);
         rp.audio_ctx = form_int(req, "audio_ctx", rp.audio_ctx);
