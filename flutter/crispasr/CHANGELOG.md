@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.19
+
+- Beat and downbeat tracking: `CrispasrSession.beats()` returns a beat grid
+  from mono 22050 Hz float32 PCM, backed by the Beat This! backend. Adds the
+  `Beat` record typedef (`timeS`, `isDownbeat`), a `beatsSampleRate`
+  capability probe and a `beatsTempoBpm` median-interval tempo estimate.
+  Previously beat tracking was reachable only from the CLI and the C ABI.
+- Every downbeat is also reported as a beat: the postprocessor snaps each
+  downbeat onto its nearest detected beat, so downbeats are a strict subset —
+  filter on `isDownbeat` for the bar grid, and never merge two lists.
+- Beat This! is **MIT for code and weights** and uses **no DBN** (postprocessing
+  is peak-picking only), so unlike most beat trackers this arm carries none of
+  madmom's patent-encumbered, non-commercially-licensed machinery.
+- The native GGUF architecture auto-detect recognises `beat-this`, so plain
+  `CrispasrSession.open()` works for beat models; `backend: 'beat-this'`
+  remains valid and is required against an older native library.
+
 ## 0.8.17
 
 - Source separation: `CrispasrSession.separate()` splits interleaved stereo

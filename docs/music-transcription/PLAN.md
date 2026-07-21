@@ -1304,9 +1304,16 @@ silently mis-folding.
   `tools/check-backend-wiring.py` is now clean for beat-this on BOTH tiers
   (required and advisory).
 
-- [ ] **NOW — active work.** §251b is complete and shipped. Nothing is blocked.
-  The only remaining optional step is a release: `scripts/bump-version.sh` to
-  0.8.18 plus BOTH tags (`v0.8.18` **and** `crispasr-v0.8.18` — the publish
-  workflow triggers on the latter, the bump script only creates the former) to
-  put the Dart `beats()` API on pub.dev. Held pending an explicit go-ahead,
-  since a pub.dev version cannot be unpublished.
+- [ ] **NOW — active work.** §251b is complete and shipped; the runtime, all
+  surfaces and the published weights are on `main` and green (1080/1080 units,
+  wiring audit PASS, all 226 registry URLs resolve). The `beats()` Dart API and
+  its CHANGELOG entry are in at version 0.8.19.
+
+  One optional step remains, and it is the user's call because it is
+  irreversible: **publishing the Dart package to pub.dev.** `VERSION` is already
+  0.8.19 and the `v0.8.18`/`v0.8.19` tags exist, but there is **no
+  `crispasr-v0.8.19` tag** — the publish workflow triggers on that `crispasr-v*`
+  tag, and the last one pushed was `crispasr-v0.8.17`. So everything since 0.8.17
+  (beats, and the intervening native fixes) is on `main` but NOT on pub.dev.
+  Pushing `crispasr-v0.8.19` would publish it; a pub.dev version cannot be
+  unpublished, so it waits for an explicit go-ahead.
