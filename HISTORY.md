@@ -6,6 +6,53 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-21 — v0.8.18 → v0.8.20 release train: canary-qwen #290, lib delivery, iOS, C# #291
+
+Four releases in one session, each a genuine fix that only surfaced on a real
+tag run. All shipped to GitHub; **v0.8.20 also to pub.dev** (`crispasr 0.8.20`;
+0.8.18/0.8.19 were GitHub-only — pub.dev's prior version was 0.8.17).
+
+- **#290 canary-qwen long audio** (v0.8.19). The backend advertised
+  `CAP_INTERNAL_CHUNKING` with no chunker, disabling both dispatcher safety nets
+  → a single full-length encoder pass, O(T²) attention (RSS 384 MiB → 10.2 GiB
+  with clip length) and near-empty transcripts. Fix: drop the false capability.
+  Verified by the capability bitmask with parakeet/canary as controls.
+
+- **Lib-delivery bugs** (v0.8.19 rpath, v0.8.20 flat layout + gpu). CometBeat's
+  FFI integration found the released `libcrispasr` bundles could not be loaded:
+  macOS baked the CI runner's build path into `LC_RPATH`; all 5 Linux bundles
+  used `$ORIGIN/../../ggml/src` (one level too high). 6 of 7 bundles affected.
+  The old packaging gate only checked deps were PRESENT. New
+  `tools/verify-lib-bundle.sh` relocates + dlopens (with a driver/OpenMP
+  allowlist for cuda/hip); `tools/package-lib-bundle.sh` flattens to `lib/` with
+  compat symlinks and rewrites rpaths loader-relative. Also fixed the opus/ogg
+  non-PIC link (the static-build fix from DB1 made them non-PIC → broke the
+  Linux .so link) and a Go LDFLAGS drift (`-lbeatrice-pitch`).
+
+- **iOS shipped for the first time** (v0.8.20). Added a `build-xcframework` job to
+  release.yml — build.yml has the xcframework build but is deliberately
+  tag-excluded (its release: job would race and inject ggml artifacts). Fixed
+  `build-xcframework.sh` to include `libglint.a` in the combined archive (glint
+  is the in-tree C codec, linked PUBLIC but missing from the static-lib roots).
+  Ships a 7-slice xcframework (iOS device+sim, macOS, tvOS, visionOS).
+
+- **#291 C# binding neglect** (v0.8.20). `VadSegments` returned centiseconds
+  while its own doc-comment promised seconds (fix: ÷100). Added `CrispASR.Logging`
+  (over `whisper_log_set`, which also routes ggml logs). Bound the 7 task
+  backends — tab/beats/chords/piano/pitch/separate/convert — in a new
+  `SessionMusic.cs` (`Session` made `partial`), each a `readonly struct` result
+  with time normalised to seconds. Root cause: C# was absent from
+  contributing.md's binding-parity list AND had no CI at all — added
+  `.github/workflows/bindings-csharp.yml`, the first build/test of the C#
+  binding, which is why a doc-vs-code units bug had shipped unseen.
+
+The transferable lesson (LEARNINGS.md "a green release job is not a shipped
+artifact"): every failure this session reported success — cancelled CI reading
+as green, a presence-gate that never tested loadability, a capability with no
+implementation, a release job green while attaching nothing, and a pub.dev
+dry-run against a stale CHANGELOG. Each was caught by a gate that tests the
+delivered artifact directly.
+
 ## 2026-07-20 — BTC chord recognition shipped; CQT was missing librosa's `scale=True`
 
 **Shipped** `--chords`: BTC (Bi-directional Transformer for Chord recognition,

@@ -21,7 +21,34 @@ effort estimate. Completed items have been moved to `HISTORY.md`.
 > independent sequences and numbers may collide. When in doubt, PLAN
 > items are always written as `§N` and GitHub issues as `#N`.
 
-**Latest release: v0.8.12** (tag `v0.8.12`). Release notes live on the tag.
+**Latest release: v0.8.20** (tag `v0.8.20`, + pub.dev `crispasr 0.8.20`). Release
+notes live on each tag; per-version `RELEASE_NOTES_v0.8.*.md` at repo root.
+The v0.8.18 → v0.8.20 train shipped in one session (2026-07-21): each patch was
+a genuine fix that only surfaced on a real tag run — see "Recent completions"
+and `LEARNINGS.md` "a green release job is not a shipped artifact".
+
+**Recent completions (2026-07-21):**
+- **#290 canary-qwen long audio** — SHIPPED (v0.8.19). The backend declared
+  `CAP_INTERNAL_CHUNKING` with no chunker (`src/canary_qwen.cpp` has zero
+  chunking code vs 62 hits in parakeet.cpp), disabling BOTH dispatcher safety
+  nets → one full-length encoder pass → O(T²) attention (384 MiB→10.2 GiB) and
+  sparse output. Fix: drop the false capability. See `LEARNINGS.md`
+  "a capability flag is a promise".
+- **Lib-delivery bugs (CometBeat)** — SHIPPED (v0.8.19 rpath, v0.8.20 flat+gpu).
+  6 of 7 lib bundles were unloadable as delivered: macOS baked the CI runner's
+  build path into LC_RPATH; all 5 Linux bundles used `$ORIGIN/../../ggml/src`
+  (one level too high). The old gate only checked deps were PRESENT, never that
+  the loader could FIND them. New `tools/verify-lib-bundle.sh` relocates +
+  dlopens; `tools/package-lib-bundle.sh` flattens to `lib/` + rewrites rpaths.
+  See `LEARNINGS.md` "presence is not resolvability".
+- **iOS shipping for the first time** — SHIPPED (v0.8.20). Added a
+  `build-xcframework` job to release.yml (build.yml is tag-excluded by design);
+  fixed `build-xcframework.sh` to include `libglint.a` in the combined archive.
+- **#291 C# binding neglect** — SHIPPED (v0.8.20). VadSegments returned
+  centiseconds while documented as seconds; added `CrispASR.Logging`; bound the
+  7 task backends (tab/beats/chords/piano/pitch/separate/convert) in
+  `SessionMusic.cs`; added the first-ever C# CI. C# was also missing from the
+  contributing.md binding-parity list. See memory [[csharp-binding-neglect]].
 
 **Recent completions (2026-07-17):**
 - **Roadmap accuracy sweep** — audited the PLAN's OPEN/NOT-STARTED headers against
@@ -156,13 +183,22 @@ small; the allowlist is the actual work.
 
 ## Delivery bugs found by CometBeat against the released v0.8.17 dylib (2026-07-20)
 
-They validated the real macOS arm64 release artifact — pitch/piano/separate all
-work (CREPE gave a clean 2-octave scale, piano recognised the Für Elise motif)
-— and hit two packaging/teardown bugs. Independent confirmation that those
-three backends function end to end on a shipped build, which we did not have
-before.
+**STATUS: all SHIPPED (v0.8.19 + v0.8.20).** They validated the real macOS arm64
+release artifact — pitch/piano/separate all work (CREPE gave a clean 2-octave
+scale, piano recognised the Für Elise motif) — and hit two packaging/teardown
+bugs. Independent confirmation that those three backends function end to end on
+a shipped build, which we did not have before.
 
-### DB1 — release tarball missing libogg/libopus — FIXED (not yet released)
+> The DB1 static-build fix below UNCOVERED a deeper delivery bug (2026-07-21):
+> forcing ogg/opus static also made them non-PIC (broke the Linux shared link),
+> and separately, 6 of 7 lib bundles had a broken run-path and could not be
+> loaded as delivered. The old @rpath gate only checked that dependencies were
+> PRESENT, never that the loader could FIND them. Fixed with a relocate+dlopen
+> gate (`tools/verify-lib-bundle.sh`) and a flatten+rpath packager
+> (`tools/package-lib-bundle.sh`), shipped v0.8.19/v0.8.20. See the 2026-07-21
+> completions block above and `LEARNINGS.md` "presence is not resolvability".
+
+### DB1 — release tarball missing libogg/libopus — FIXED + SHIPPED (v0.8.19)
 
 `libcrispasr-macos-arm64.tar.gz` links `@rpath/libogg.0.dylib` and
 `@rpath/libopus.0.dylib` (CRISPASR_OPUS_FETCH=ON builds them) but the Package

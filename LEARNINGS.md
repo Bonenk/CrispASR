@@ -10,6 +10,92 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## A green release job is not a shipped artifact — verify what you DELIVER, not what the workflow says (v0.8.18–v0.8.20 release train, 2026-07-21)
+
+Four releases in one session, and every real failure REPORTED SUCCESS. The
+pattern is the lesson: a workflow conclusion describes the workflow, not the
+artifact. Each was caught by a gate that tested the delivered thing directly.
+
+- **Presence is not resolvability.** The lib-bundle gate checked that every
+  `@rpath`/`DT_NEEDED` dependency was PRESENT in the tarball. It was — and 6 of 7
+  bundles still could not be `dlopen`ed. macOS baked the CI runner's build path
+  into `LC_RPATH` (`/Users/runner/work/...`); all 5 Linux bundles used
+  `$ORIGIN/../../ggml/src`, one level too high. The file was in the box; the map
+  didn't lead to it. Fix: `tools/verify-lib-bundle.sh` RELOCATES the bundle to an
+  unrelated dir and dlopens it — loading in place succeeds by accident on the
+  machine that built it, which is exactly how it shipped.
+- **A green job can attach nothing.** The `build-xcframework` job went green
+  having uploaded ZERO assets: the file is `crispasr-<tag>-xcframework.zip`
+  (dash) but the attach glob was `*.xcframework.zip` (dot), and
+  `fail_on_unmatched_files: false` let it pass empty. For an asset that is the
+  whole point of a job, set `fail_on_unmatched_files: true` — a glob matching
+  nothing must FAIL, not ship the feature nowhere.
+- **The irreversible step deserves an independent gate.** pub.dev publishing is
+  irreversible, so the check that matters runs BEFORE it: download the shipped
+  bundles, dlopen them, confirm the xcframework's slices exist. The pub.dev
+  publish itself failed at its DRY RUN (stale `flutter/crispasr/CHANGELOG.md`
+  missing the version — `bump-version.sh` doesn't touch it), which is the safe
+  failure: nothing published. Cross-platform caveat: on macOS you can only
+  closure-check a Linux ELF bundle, not dlopen it — the native dlopen ran in the
+  release job on Linux; don't misread "slice is not valid mach-o" as a defect.
+
+Transferable: after any release, verify the downloaded artifact does the thing a
+consumer does (loads / links / exists). "Release: success" is the beginning of
+verification, not the end. Same family as [[cmake-link-not-shipped]] and the
+cancelled-CI-reads-as-green trap. See `PLAN.md` 2026-07-21 completions and memory
+[[release-packaging-gotchas]].
+
+---
+
+## A capability flag is a PROMISE the backend must keep — an unimplemented cap disables the safety nets keyed off it (canary-qwen #290, 2026-07-21)
+
+`canary-qwen` declared `CAP_INTERNAL_CHUNKING` but `src/canary_qwen.cpp` has NO
+chunking code — 0 hits for `chunk_seconds`, vs 62 in `src/parakeet.cpp` and a
+real chunker in `src/canary.cpp`. The flag asserts "I slice long audio myself,"
+so the dispatcher trusted it and disabled BOTH of its own safeguards: the #257
+gate handed over the whole clip when `--chunk-seconds` was given, and
+`should_auto_chunk_long()` bailed at the `CAP_INTERNAL_CHUNKING` branch when it
+wasn't. canary-qwen also doesn't `prefers_vad()`, so the auto-VAD net was out
+too. Result: one full-length FastConformer pass — O(T²) attention, RSS growing
+384 MiB → 6.3 → 10.2 GiB with clip length, and text degraded past the encoder's
+trained window. Reproduced either way BECAUSE one false flag killed every net.
+
+Two transferable points. (1) A capability is not documentation — code dispatches
+on it, so declaring one you don't implement is worse than declaring nothing.
+Grep the backend's own source for the feature before trusting its cap
+(`chunk_seconds` count was decisive here). (2) The fix that WROTE the gate
+(`1a2b3dcea`, for parakeet) was correct; it keyed on the capability, so the bug
+was always the false declaration, not the gate. When a shared gate misbehaves
+for one backend, suspect that backend's inputs to the gate, not the gate.
+
+Verified by the capability BITMASK with parakeet/canary/fastconformer-ctc as
+controls (they keep bit 20; canary-qwen no longer does) — a first-run unit-test
+pass proves nothing without a control. Memory [[check-blueprint-before-backend-feature]].
+
+---
+
+## Moving a release tag is CLEAN when the fix touches only release TOOLING — the test is provenance, not "never move a tag" (v0.8.20, 2026-07-21)
+
+At v0.8.18 I refused to move a tag: assets were built from source the moved tag
+wouldn't match. At v0.8.20 I moved it THREE times, correctly — because each fix
+touched only `release.yml` / `verify-lib-bundle.sh` / `build-xcframework.sh`,
+never binary-producing source. Every already-built asset was byte-identical to
+what the new commit produces, so there was no provenance mismatch and no reason
+to burn a new version number. The user pushed back on my reflexive "cut v0.8.21"
+and was right.
+
+The rule is provenance, stated as a check:
+`git diff --name-only <oldtag>..<newcommit> | grep -E '\.(cpp|h|c|cu)$|CMakeLists'`
+returning nothing ⇒ safe to force-move the `v*` tag and re-run the release (all
+assets rebuild identically; the fixed jobs now succeed/attach). If it returns
+source files, DON'T move — the shipped binaries would then disagree with the
+tagged source. A corollary for pub.dev: the CHANGELOG fix moved ONLY the
+`crispasr-v<x>` tag, not the `v<x>` GH tag — a Dart-package doc change shouldn't
+trigger a 40-min binary rebuild, and the two tags legitimately differing by one
+doc commit is fine. Memory [[release-packaging-gotchas]].
+
+---
+
 ## A positional arg landing on the WRONG parameter is invisible in review and baked into the weights (piano-transcription BN eps, 2026-07-20)
 
 The first per-stage validation of a backend we had already shipped found it
