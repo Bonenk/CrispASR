@@ -202,6 +202,8 @@ document (issue #228).
 | `-vsd N` | VAD min silence duration (ms, default 100) |
 | `--vad-export FILE` | Compute VAD boundaries and write them to `FILE` as JSON, then exit. Implies `--vad`. No ASR model needed — standalone verb |
 | `--vad-import FILE` | Read segment boundaries from `FILE` instead of running VAD — reuse boundaries across backends without recomputing VAD (issue #227). Implies `--vad` |
+| `--vad-import-strict` | With `--vad-import`, refuse (rather than warn) if the file's chunk length differs from this run |
+| `--vad-export-raw FILE` | Like `--vad-export`, but writes raw VAD **speech segments** (chunk-length-independent). Imports at any `--chunk-seconds`, re-chunked per run. Implies `--vad` |
 | `-ck N`, `--chunk-seconds N` | Fallback chunk size when VAD is off (default: 30 s for whisper, disabled for other backends) |
 | `--chunk-overlap F` | Overlap context (seconds) at chunk boundaries (default 3.0) |
 | `--lcs-dedup auto\|on\|off` | NeMo-style sub-word LCS dedup across chunk boundaries (default `auto` — fires when chunking with overlap) |
@@ -228,6 +230,27 @@ Both `--vad-export` and `--vad-import` imply `--vad`, so the separate
 `--vad` flag is not required. The JSON records each segment's sample
 offsets plus absolute centisecond timestamps; boundaries are clamped to
 the imported audio and rescaled if the sample rate differs.
+
+**Two export forms.** `--vad-export` writes **chunk boundaries** (a `"kind":
+"chunks"` file): the VAD segments already split to the run's `--chunk-seconds`.
+These are only valid for that chunk length — importing them under a different
+`--chunk-seconds` warns (and, with `--vad-import-strict`, refuses), because the
+chunking would not match.
+
+`--vad-export-raw` writes the raw VAD **speech segments** (`"kind":
+"vad_segments"`), before any chunking. One raw file imports cleanly at *any*
+`--chunk-seconds` — it is re-chunked for each run exactly as a fresh VAD pass
+would be — so it is the form to keep when the same audio will be transcribed by
+backends that want different chunk sizes:
+
+```bash
+crispasr -f talk.wav --vad-export-raw talk.vad.json          # once
+crispasr -m parakeet.gguf -f talk.wav --vad-import talk.vad.json --chunk-seconds 12
+crispasr -m whisper.gguf  -f talk.wav --vad-import talk.vad.json --chunk-seconds 30
+```
+
+Files written before `"kind"` existed are read as `chunks` (the historical
+behaviour), so older exports keep working.
 
 #### Transcribing a time window (`--offset-t` / `--duration`, #91)
 

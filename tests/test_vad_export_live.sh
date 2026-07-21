@@ -195,7 +195,38 @@ else
     echo "$WARN" | grep -qi 'warning'; check "mismatch default: prints a warning" test "$?" -eq 0
     check "mismatch strict: refuses (nonzero exit)" test "$RC_STRICT" -ne 0
     check "legacy file (no chunk_cs) accepted even under strict" test "$RC_LEGACY" -eq 0
+
+    # ─── Test 8: --vad-export-raw is chunk-independent (issue #227) ──
+    # Raw export writes VAD SPEECH SEGMENTS, not chunk boundaries. The same
+    # file imports cleanly at ANY chunk length (re-chunked per run), so it is
+    # the model- and chunk-independent artifact #227 actually asked for.
+    echo ""
+    echo "--- Test 8: --vad-export-raw reuse across chunk lengths ---"
+    RAW="$TMPDIR/raw.json"
+    $CRISPASR --vad-export-raw "$RAW" -f "$JFK_WAV" >/dev/null 2>&1
+    check "raw export tagged kind=vad_segments" grep -q '"kind": "vad_segments"' "$RAW"
+    check "raw export omits chunk_cs" bash -c "! grep -q chunk_cs '$RAW'"
+
+    set +e
+    # Import at two DIFFERENT chunk lengths; neither may warn (raw carries no
+    # chunk length to mismatch), and the re-chunk must match a fresh run.
+    OUT5="$($CRISPASR --vad --vad-import "$RAW" -f "$JFK_WAV" --chunk-seconds 5 -m "$MODEL" 2>&1)"; RC5=$?
+    OUT2="$($CRISPASR --vad --vad-import "$RAW" -f "$JFK_WAV" --chunk-seconds 2 -m "$MODEL" 2>&1)"; RC2=$?
+    # A fresh chunk export at 5 s, to compare slice counts.
+    FRESH5="$TMPDIR/fresh5.json"
+    $CRISPASR --vad --vad-export "$FRESH5" -f "$JFK_WAV" --chunk-seconds 5 >/dev/null 2>&1
+    set -e
+
+    check "raw import @5 succeeds" test "$RC5" -eq 0
+    check "raw import @2 succeeds" test "$RC2" -eq 0
+    check "raw import @5 does not warn (chunk-independent)" bash -c "! echo \"$OUT5\" | grep -qi warning"
+    check "raw import @2 does not warn" bash -c "! echo \"$OUT2\" | grep -qi warning"
+
+    N_RAW5=$(echo "$OUT5" | grep -oi 'imported [0-9]*' | grep -o '[0-9]*')
+    N_FRESH5=$(grep -o '"start"' "$FRESH5" | wc -l | tr -d ' ')
+    check "raw@5 re-chunk equals a fresh chunk export @5 ($N_RAW5 == $N_FRESH5)" test "$N_RAW5" = "$N_FRESH5"
 fi
+
 
 # ─── Cleanup ─────────────────────────────────────────────────────────
 rm -rf "$TMPDIR"

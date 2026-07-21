@@ -107,6 +107,8 @@ curl http://localhost:8080/v1/audio/transcriptions \
 | `diarize_max_speakers` | Upper bound on speaker cluster count (default: 8) |
 | `vad_export` | `true`/`false` — include the computed VAD/chunk boundaries in the JSON response under `vad_segments` (default: `false`) |
 | `vad_import` | The `vad_segments` object from an earlier `vad_export` response. Reuses those boundaries and skips VAD entirely |
+| `vad_export_raw` | `true`/`false` — with `vad_export`, return raw VAD speech segments (chunk-independent, re-chunked per request) instead of chunk boundaries (default: `false`) |
+| `vad_import_strict` | `true`/`false` — with `vad_import`, reject (rather than warn) a chunk-boundary payload whose chunk length differs from this request (default: `false`) |
 | `vad` | `true`/`false` — enable VAD pre-processing |
 | `vad_threshold` | VAD speech probability threshold (default: 0.5) |
 | `vad_min_speech_duration_ms` | Minimum speech segment duration in ms (default: 250) |

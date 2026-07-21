@@ -543,7 +543,8 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         // CLI's --vad-import (crispasr_run.cpp); same wire format.
         int imported_sr = 0;
         float imported_chunk = 0.0f;
-        if (!crispasr_parse_vad_slices(rp.vad_import_json, slices, &imported_sr, &imported_chunk)) {
+        bool imported_raw = false;
+        if (!crispasr_parse_vad_slices(rp.vad_import_json, slices, &imported_sr, &imported_chunk, &imported_raw)) {
             result.error = "malformed vad_import (expected the vad_segments object from a vad_export response)";
             return result;
         }
@@ -556,7 +557,7 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         // both sides: the exporter runs before backend init and cannot know the
         // effective value (see crispasr_run.cpp).
         const float requested_chunk = rp.chunk_seconds > 0 ? (float)rp.chunk_seconds : 30.0f;
-        if (crispasr_vad_chunk_mismatch(imported_chunk, requested_chunk)) {
+        if (!imported_raw && crispasr_vad_chunk_mismatch(imported_chunk, requested_chunk)) {
             if (rp.vad_import_strict) {
                 result.ok = false;
                 result.error = "vad_import was exported at chunk_seconds " + std::to_string(imported_chunk) +
@@ -590,6 +591,11 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
                 clean.push_back(s);
         }
         slices = std::move(clean);
+        // #227: a raw-segment payload carries no chunking; re-chunk it for THIS
+        // request exactly as a fresh VAD pass would, so it is reusable across
+        // requests with different chunk lengths (mirrors the CLI).
+        if (imported_raw && effective_chunk_seconds > 0)
+            slices = crispasr_rechunk_slices(slices, pcmf32.data(), n_samples, SR, effective_chunk_seconds);
     } else {
         // #261: Silero/MarbleNet VAD runs on the CPU ggml backend inside slicing —
         // breadcrumb it so a native-instruction fault (SIGILL) is attributed
@@ -600,9 +606,13 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
 
     // #227: hand the boundaries back when asked, so the next request (same
     // audio, different backend) can skip VAD via `vad_import`.
-    if (rp.vad_export_inline)
-        result.vad_segments_json =
-            crispasr_serialize_vad_slices(slices, SR, rp.chunk_seconds > 0 ? (float)rp.chunk_seconds : 30.0f);
+    if (rp.vad_export_inline) {
+        // A raw export makes the payload reusable across requests with different
+        // chunk lengths; the default (chunk boundaries) matches the older
+        // response shape, so this is additive.
+        const float exp_chunk = rp.vad_export_raw ? 0.0f : (rp.chunk_seconds > 0 ? (float)rp.chunk_seconds : 30.0f);
+        result.vad_segments_json = crispasr_serialize_vad_slices(slices, SR, exp_chunk, rp.vad_export_raw);
+    }
 
     if (slices.empty()) {
         result.ok = true;
@@ -1373,6 +1383,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // them and skips VAD entirely.
         rp.vad_export_inline = form_bool(req, "vad_export", rp.vad_export_inline);
         rp.vad_import_strict = form_bool(req, "vad_import_strict", rp.vad_import_strict);
+        rp.vad_export_raw = form_bool(req, "vad_export_raw", rp.vad_export_raw);
         rp.vad_import_json = form_string(req, "vad_import", rp.vad_import_json);
         rp.max_context = form_int(req, "max_context", rp.max_context);
         rp.audio_ctx = form_int(req, "audio_ctx", rp.audio_ctx);
@@ -1557,6 +1568,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // them and skips VAD entirely.
         rp.vad_export_inline = form_bool(req, "vad_export", rp.vad_export_inline);
         rp.vad_import_strict = form_bool(req, "vad_import_strict", rp.vad_import_strict);
+        rp.vad_export_raw = form_bool(req, "vad_export_raw", rp.vad_export_raw);
         rp.vad_import_json = form_string(req, "vad_import", rp.vad_import_json);
         rp.max_context = form_int(req, "max_context", rp.max_context);
         rp.audio_ctx = form_int(req, "audio_ctx", rp.audio_ctx);

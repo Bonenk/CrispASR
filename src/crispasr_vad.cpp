@@ -361,39 +361,52 @@ std::vector<crispasr_audio_slice> crispasr_compute_vad_slices(const float* sampl
     slices = crispasr_post_merge_vad_slices(slices, sample_rate, opts);
 
     // Post-split: break any VAD segment that exceeds chunk_seconds into
-    // sub-segments. Prevents OOM on very long continuous speech (10+ min
-    // lectures). Cuts land on the lowest-RMS 100 ms inside a ±2 s search
-    // window around each target instead of equal parts, so a cut inside
-    // continuous speech doesn't slice mid-word (issue #89: the words
-    // spanning an arbitrary cut are lost by both adjacent slices).
-    if (opts.chunk_seconds > 0) {
-        const int max_samples = opts.chunk_seconds * sample_rate;
-        const size_t search_window_samples = (size_t)(2.0 * sample_rate);
-        const size_t energy_win_samples = (size_t)((double)sample_rate * 0.1); // 100 ms
-        std::vector<crispasr_audio_slice> split;
-        for (auto& sl : slices) {
-            const int dur = sl.end - sl.start;
-            if (dur <= max_samples) {
-                split.push_back(sl);
-            } else {
-                auto ranges = audio_chunking::split_at_energy_minima(
-                    samples + sl.start, (size_t)dur, (size_t)max_samples, search_window_samples, energy_win_samples);
-                for (auto& r : ranges) {
-                    const int s = sl.start + (int)r.first;
-                    const int e = sl.start + (int)r.second;
-                    split.push_back({
-                        s,
-                        e,
-                        (int64_t)((double)s / sample_rate * 100.0),
-                        (int64_t)((double)e / sample_rate * 100.0),
-                    });
-                }
-            }
-        }
-        slices = std::move(split);
-    }
+    // sub-segments. See crispasr_rechunk_slices — the same step is reused on the
+    // import path so a raw-segment export (issue #227) can be re-chunked to
+    // whatever chunk length the importing run wants.
+    if (opts.chunk_seconds > 0)
+        slices = crispasr_rechunk_slices(slices, samples, n_samples, sample_rate, opts.chunk_seconds);
 
     return slices;
+}
+
+std::vector<crispasr_audio_slice> crispasr_rechunk_slices(const std::vector<crispasr_audio_slice>& in,
+                                                          const float* samples, int n_samples, int sample_rate,
+                                                          int chunk_seconds) {
+    // Break any segment longer than chunk_seconds into sub-segments. Prevents
+    // OOM on very long continuous speech (10+ min lectures). Cuts land on the
+    // lowest-RMS 100 ms inside a ±2 s window around each target rather than at
+    // equal parts, so a cut inside continuous speech does not slice mid-word
+    // (issue #89: words spanning an arbitrary cut are lost by both adjacent
+    // slices). Segments already within the limit pass through untouched, so a
+    // raw-VAD-segment export re-chunked at any length reproduces exactly what a
+    // fresh run at that length would have computed.
+    if (chunk_seconds <= 0 || n_samples <= 0)
+        return in;
+    const int max_samples = chunk_seconds * sample_rate;
+    const size_t search_window_samples = (size_t)(2.0 * sample_rate);
+    const size_t energy_win_samples = (size_t)((double)sample_rate * 0.1); // 100 ms
+    std::vector<crispasr_audio_slice> split;
+    for (const auto& sl : in) {
+        const int dur = sl.end - sl.start;
+        if (dur <= max_samples || sl.start < 0 || sl.end > n_samples) {
+            split.push_back(sl);
+        } else {
+            auto ranges = audio_chunking::split_at_energy_minima(samples + sl.start, (size_t)dur, (size_t)max_samples,
+                                                                 search_window_samples, energy_win_samples);
+            for (auto& r : ranges) {
+                const int s = sl.start + (int)r.first;
+                const int e = sl.start + (int)r.second;
+                split.push_back({
+                    s,
+                    e,
+                    (int64_t)((double)s / sample_rate * 100.0),
+                    (int64_t)((double)e / sample_rate * 100.0),
+                });
+            }
+        }
+    }
+    return split;
 }
 
 std::vector<crispasr_audio_slice> crispasr_fixed_chunk_slices(int n_samples, int sample_rate, int chunk_seconds) {
@@ -512,18 +525,27 @@ bool crispasr_vad_chunk_mismatch(float imported_chunk, float requested_chunk) {
 }
 
 std::string crispasr_serialize_vad_slices(const std::vector<crispasr_audio_slice>& slices, int sample_rate,
-                                          float chunk_seconds) {
+                                          float chunk_seconds, bool is_raw_segments) {
     std::string out;
-    out.reserve(64 + slices.size() * 96);
+    out.reserve(80 + slices.size() * 96);
     out += "{\n  \"crispasr_vad\": {\n";
     out += "    \"version\": 1,\n";
+    // "kind" distinguishes the two exportable forms (issue #227):
+    //   "chunks"       -- chunk boundaries; valid only for the chunk length that
+    //                     produced them, hence chunk_cs and the import gate.
+    //   "vad_segments" -- raw speech segments; chunk-length-independent, re-chunked
+    //                     per run on import. chunk_cs is 0/absent for these.
+    // Absent "kind" (files written before this field) is read as "chunks", which
+    // is the historical behaviour.
+    out += std::string("    \"kind\": \"") + (is_raw_segments ? "vad_segments" : "chunks") + "\",\n";
     out += "    \"sample_rate\": " + std::to_string(sample_rate) + ",\n";
     // The slices are CHUNK boundaries, not raw speech segments, so they depend
     // on the chunk length that produced them (issue #227: exporting at 30 s and
     // importing at 5 s silently reuses the wrong chunking). Recorded in
     // centiseconds so the existing integer field parser can read it back; 0
     // means "written by a version that did not record it".
-    out += "    \"chunk_cs\": " + std::to_string((long long)(chunk_seconds * 100.0f + 0.5f)) + ",\n";
+    if (!is_raw_segments)
+        out += "    \"chunk_cs\": " + std::to_string((long long)(chunk_seconds * 100.0f + 0.5f)) + ",\n";
     out += "    \"num_slices\": " + std::to_string(slices.size()) + ",\n";
     out += "    \"slices\": [";
     for (size_t i = 0; i < slices.size(); ++i) {
@@ -577,12 +599,18 @@ bool ca_vad_find_int(const std::string& text, size_t from, size_t end, const cha
 } // namespace
 
 bool crispasr_parse_vad_slices(const std::string& text, std::vector<crispasr_audio_slice>& out, int* sample_rate_out,
-                               float* chunk_seconds_out) {
+                               float* chunk_seconds_out, bool* is_raw_segments_out) {
     out.clear();
     if (sample_rate_out)
         *sample_rate_out = 0;
     if (chunk_seconds_out)
         *chunk_seconds_out = 0.0f;
+    if (is_raw_segments_out) {
+        // Default "chunks": a file with no "kind" predates the field and is a
+        // chunk export by definition.
+        size_t arr0 = text.find("\"slices\"");
+        *is_raw_segments_out = arr0 != std::string::npos && text.rfind("\"vad_segments\"", arr0) != std::string::npos;
+    }
 
     // Optional top-level sample_rate (before the slices array).
     size_t arr = text.find("\"slices\"");
