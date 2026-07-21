@@ -104,13 +104,18 @@ template <typename T> std::vector<T> middle(const std::vector<T>& v) {
     return std::vector<T>(v.begin() + (long)v.size() / 4, v.end() - (long)v.size() / 4);
 }
 
-std::vector<double> run_beatrice(beatrice_pitch_context* ctx, const std::vector<float>& pcm) {
+// `unvoiced_thresh` > 0 gates on pitch_features[0] via beatrice_pitch_to_f0_hz,
+// which writes 0.0 for unvoiced -- the rvc_svc_convert() convention. Without it
+// the model reports a confident pitch for silence.
+std::vector<double> run_beatrice(beatrice_pitch_context* ctx, const std::vector<float>& pcm, float unvoiced_thresh) {
     std::vector<double> out;
     beatrice_pitch_result* r = beatrice_pitch_estimate(ctx, pcm.data(), (int)pcm.size());
     if (!r)
         return out;
+    std::vector<float> f0((size_t)r->n_frames);
+    beatrice_pitch_to_f0_hz(r, unvoiced_thresh, f0.data());
     for (int i = 0; i < r->n_frames; i++)
-        out.push_back(beatrice_bin_to_hz(r->quantized[i]));
+        out.push_back(f0[(size_t)i] > 0.0f ? (double)f0[(size_t)i] : -1.0);
     beatrice_pitch_result_free(r);
     return middle(out);
 }
@@ -131,7 +136,8 @@ std::vector<double> run_crepe(crepe_context* ctx, const std::vector<float>& pcm,
 
 int main(int argc, char** argv) {
     std::string crepe_path, beatrice_path, wav_path;
-    double conf_min = 0.0; // CREPE reports every frame; do not silently drop any
+    double conf_min = 0.0;          // CREPE reports every frame; do not silently drop any
+    float unvoiced_thresh = -99.0f; // beatrice voicing gate: ENERGY (see beatrice_pitch.h)
     for (int i = 1; i < argc; i++) {
         const std::string a = argv[i];
         auto next = [&]() { return i + 1 < argc ? argv[++i] : ""; };
@@ -143,6 +149,8 @@ int main(int argc, char** argv) {
             wav_path = next();
         else if (a == "--crepe-conf")
             conf_min = atof(next());
+        else if (a == "--beatrice-energy")
+            unvoiced_thresh = (float)atof(next());
         else {
             fprintf(stderr, "usage: crispasr-f0-eval [--crepe m.gguf] [--beatrice m.gguf] [--wav f.wav]\n");
             return 2;
@@ -199,7 +207,7 @@ int main(int argc, char** argv) {
         const std::vector<float> pcm = sawtooth(f0, 1.0);
         printf("%9.1f |", f0);
         if (bc) {
-            const Score s = score(run_beatrice(bc, pcm), f0);
+            const Score s = score(run_beatrice(bc, pcm, unvoiced_thresh), f0);
             printf("  %8.1f %7.1f %6.1f     |", s.median_cents, s.stab_cents, s.octave_pct);
             b_err.push_back(s.median_cents);
         }
@@ -240,7 +248,7 @@ int main(int argc, char** argv) {
         } else if (sr != kSR) {
             printf("  (wav is %d Hz; this tool needs %d Hz)\n", sr, kSR);
         } else if (bc && cc) {
-            const std::vector<double> b = run_beatrice(bc, pcm);
+            const std::vector<double> b = run_beatrice(bc, pcm, unvoiced_thresh);
             const std::vector<double> c = run_crepe(cc, pcm, conf_min);
             const size_t n = std::min(b.size(), c.size());
             std::vector<double> d;
