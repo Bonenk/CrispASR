@@ -595,6 +595,20 @@ catch_discover_tests(test-speaker-db
 # scoped `ctest -R "speaker|..."` leg would otherwise match it by name and
 # fail trying to exec a shebang script.
 if(CRISPASR_BUILD_EXAMPLES AND NOT WIN32)
+    # Issue #227: VAD export/import at the CLI SURFACE. Unit tests cover the
+    # wire format and the chunk-gate rule; only this catches a flag reaching a
+    # code path that ignores it (--vad-import was silently a no-op without
+    # --backend). SKIPs cleanly when no whisper model is available.
+    add_test(NAME test-vad-export-live
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test_vad_export_live.sh
+            $<TARGET_FILE:crispasr-cli>
+            ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-vad-export-live PROPERTIES
+        LABELS "unit;vad;regression-227"
+        TIMEOUT 120)
+endif()
+
+if(CRISPASR_BUILD_EXAMPLES AND NOT WIN32)
     add_test(NAME test-speaker-db-gates
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test-speaker-db-gates.sh
             $<TARGET_FILE:crispasr-cli>

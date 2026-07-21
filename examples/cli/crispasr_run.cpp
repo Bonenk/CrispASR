@@ -809,15 +809,21 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         // whisper + --vad the effective value collapses to 0, so a correct
         // reuse was rejected with the advice "run with --chunk-seconds 0.00".
         const float requested_chunk = params.chunk_seconds > 0 ? (float)params.chunk_seconds : 30.0f;
-        if (imported_chunk > 0.0f && std::fabs(imported_chunk - requested_chunk) > 0.01f) {
+        if (crispasr_vad_chunk_mismatch(imported_chunk, requested_chunk)) {
+            // WARN, do not fail, unless asked. The boundaries are still usable
+            // -- they are just chunked differently than this run requested --
+            // and turning a working --vad-import script into rc=1 on upgrade is
+            // a worse outcome than a wrong chunk size the user can see.
             fprintf(stderr,
-                    "crispasr: error: --vad-import file was exported at --chunk-seconds %.2f but this run requests "
+                    "crispasr: %s: --vad-import file was exported at --chunk-seconds %.2f but this run requests "
                     "%.2f.\n"
-                    "       The exported boundaries are chunk boundaries, not raw speech segments, so they do not "
-                    "carry over.\n"
-                    "       Re-export at %.2f, or run with --chunk-seconds %.2f.\n",
-                    imported_chunk, requested_chunk, requested_chunk, imported_chunk);
-            return 1;
+                    "       The exported boundaries are chunk boundaries, not raw speech segments, so the "
+                    "chunking will not match this run.\n"
+                    "       Re-export at %.2f, or pass --chunk-seconds %.2f, to make them agree.\n",
+                    params.vad_import_strict ? "error" : "warning", imported_chunk, requested_chunk, requested_chunk,
+                    imported_chunk);
+            if (params.vad_import_strict)
+                return 1;
         }
 
         // Boundaries are sample indices at the rate they were computed. If that

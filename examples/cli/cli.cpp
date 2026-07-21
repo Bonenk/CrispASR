@@ -802,6 +802,8 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
     } else if (arg == "--vad-import") {
         params.vad_import_file = ARGV_NEXT;
         params.vad = true; // #227: import implies VAD
+    } else if (arg == "--vad-import-strict") {
+        params.vad_import_strict = true; // #227: refuse a chunk-length mismatch
     } else if (arg == "--separate") {
         params.separate = true; // §248 source separation task
     } else if (arg == "--stems") {
@@ -1384,7 +1386,8 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.vad_export_file.empty() ? "none" : params.vad_export_file.c_str());
     fprintf(
         stderr,
-        "             --vad-import FILE            [%-7s] read segment boundaries from FILE instead of running VAD\n",
+        "             --vad-import FILE            [%-7s] read segment boundaries from FILE instead of running VAD\n"
+        "             --vad-import-strict          [%-7s] refuse (not warn) if the file's chunk length differs\n",
         params.vad_import_file.empty() ? "none" : params.vad_import_file.c_str());
     fprintf(stderr,
             "             --separate                  [%-7s] source separation task; writes <input>_<stem>.wav "

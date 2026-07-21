@@ -16,9 +16,10 @@
 
 set -e
 
-CRISPASR="${CRISPASR_BIN:-build/bin/crispasr}"
-JFK_WAV="samples/jfk.wav"
-TMPDIR="/mnt/volume1/tmp-overflow/test227"
+CRISPASR="${1:-${CRISPASR_BIN:-build/bin/crispasr}}"
+SRC_DIR="${2:-.}"
+JFK_WAV="$SRC_DIR/samples/jfk.wav"
+TMPDIR="$(mktemp -d "${TMPDIR_BASE:-/tmp}/test227.XXXXXX")"
 
 PASS=0
 FAIL=0
@@ -142,6 +143,58 @@ if [ -f "$EXPORT_FILE4" ]; then
 else
     echo "[FAIL] export file not created"
     FAIL=$((FAIL + 1))
+fi
+
+
+# ─── Test 6: --vad-import is HONOURED on the default path (issue #227) ─
+# The bug: --vad-import was silently ignored unless --backend was passed,
+# because the legacy whisper path never reached the import code. A flag that
+# is accepted and does nothing is worse than one that errors, and no unit
+# test can see it -- it only shows at the CLI surface.
+echo ""
+echo "--- Test 6: --vad-import not silently ignored ---"
+MODEL="${CRISPASR_MODEL_WHISPER:-}"
+if [ -z "$MODEL" ]; then
+    for m in ggml-base.bin models/ggml-base.en.bin /Volumes/backups/ai/CrispASR/ggml-base.bin; do
+        [ -f "$m" ] && MODEL="$m" && break
+    done
+fi
+if [ -z "$MODEL" ]; then
+    skip "--vad-import dispatch" "no whisper model (set CRISPASR_MODEL_WHISPER)"
+else
+    # A nonexistent import file MUST make the run fail. If it exits 0 and
+    # transcribes, --vad-import was ignored -- the original bug.
+    if $CRISPASR --vad --vad-import /nonexistent-227.json -f "$JFK_WAV" -m "$MODEL" >/dev/null 2>&1; then
+        echo "[FAIL] --vad-import /nonexistent silently ignored (returned 0)"
+        FAIL=$((FAIL + 1))
+    else
+        echo "[PASS] --vad-import /nonexistent is not ignored (nonzero exit)"
+        PASS=$((PASS + 1))
+    fi
+
+    # Round trip: export at 30, import at 30 -> must succeed and say "imported".
+    RT="$TMPDIR/rt30.json"
+    $CRISPASR --vad --vad-export "$RT" -f "$JFK_WAV" --chunk-seconds 30 >/dev/null 2>&1
+    OUT="$($CRISPASR --vad --vad-import "$RT" -f "$JFK_WAV" --chunk-seconds 30 -m "$MODEL" 2>&1)"
+    check "matched --vad-import round-trips" bash -c "echo \"$OUT\" | grep -qi 'imported'"
+
+    # ─── Test 7: chunk-length gate policy ───────────────────────────
+    # Default: WARN and still transcribe (rc 0). Strict: refuse (rc != 0).
+    # Breaking a working script on upgrade is worse than a visible warning.
+    echo ""
+    echo "--- Test 7: chunk mismatch warns by default, refuses under --vad-import-strict ---"
+    set +e
+    WARN="$($CRISPASR --vad --vad-import "$RT" -f "$JFK_WAV" --chunk-seconds 5 -m "$MODEL" 2>&1)"; RC_WARN=$?
+    $CRISPASR --vad --vad-import "$RT" -f "$JFK_WAV" --chunk-seconds 5 --vad-import-strict -m "$MODEL" >/dev/null 2>&1; RC_STRICT=$?
+    LEGACY="$TMPDIR/legacy.json"
+    printf '{"crispasr_vad":{"version":1,"sample_rate":16000,"slices":[{"start":5120,"end":169920,"t0_cs":32,"t1_cs":1062}]}}' > "$LEGACY"
+    $CRISPASR --vad --vad-import "$LEGACY" -f "$JFK_WAV" --chunk-seconds 5 --vad-import-strict -m "$MODEL" >/dev/null 2>&1; RC_LEGACY=$?
+    set -e
+
+    check "mismatch default: exit 0 (used anyway)" test "$RC_WARN" -eq 0
+    echo "$WARN" | grep -qi 'warning'; check "mismatch default: prints a warning" test "$?" -eq 0
+    check "mismatch strict: refuses (nonzero exit)" test "$RC_STRICT" -ne 0
+    check "legacy file (no chunk_cs) accepted even under strict" test "$RC_LEGACY" -eq 0
 fi
 
 # ─── Cleanup ─────────────────────────────────────────────────────────
