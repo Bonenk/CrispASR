@@ -329,6 +329,17 @@ namespace CrispASR
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void crispasr_vad_free(IntPtr spans);
 
+        // ---- Logging ----
+        // ggml_log_callback: void (*)(ggml_log_level level, const char* text, void* user_data)
+        // Cdecl is mandatory: native calls this back with the C calling convention,
+        // and the delegate default (StdCall) would corrupt the stack on every log
+        // line on the platforms CrispASR actually ships to.
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        internal delegate void GgmlLogCallback(int level, [MarshalAs(UnmanagedType.LPUTF8Str)] string? text, IntPtr userData);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void whisper_log_set(GgmlLogCallback? logCallback, IntPtr userData);
+
         // ---- Streaming ----
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr crispasr_session_stream_open(

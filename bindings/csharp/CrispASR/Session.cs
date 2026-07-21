@@ -38,6 +38,22 @@ namespace CrispASR
         /// <summary>
         /// Open a session with automatic backend detection from GGUF metadata.
         /// </summary>
+        /// <remarks>
+        /// The model is loaded once and stays resident for the life of the
+        /// <see cref="Session"/>. To transcribe many clips WITHOUT reloading the
+        /// model (issue #291), open one session and call
+        /// <see cref="Transcribe(float[])"/> repeatedly:
+        /// <code>
+        /// using var asr = Session.Open("parakeet.gguf");
+        /// foreach (var clip in clips)
+        ///     Process(asr.Transcribe(clip));   // model loaded once, reused
+        /// </code>
+        /// A <see cref="Session"/> is not thread-safe; use one per thread, or
+        /// serialize calls. Standalone <see cref="VadSegments"/> is the exception —
+        /// it loads and frees its VAD model on every call, so a hot VAD-only loop
+        /// still reloads. Prefer session-integrated VAD (the vad transcribe path)
+        /// when you also transcribe, so the one session covers both.
+        /// </remarks>
         public static Session Open(string modelPath, int nThreads = 4)
         {
             var p = NativeMethods.crispasr_session_open(modelPath, nThreads);
@@ -541,8 +557,14 @@ namespace CrispASR
                 var raw = new float[n * 2];
                 Marshal.Copy(outSpans[0], raw, 0, n * 2);
                 var spans = new VadSpan[n];
+                // The native crispasr_vad_segments ABI returns CENTISECONDS
+                // (start_cs, end_cs — see crispasr.h), the raw whisper.cpp VAD
+                // unit. Every other time value in this binding (Segment/Word T0/T1)
+                // is seconds, and this method's own doc-comment promises seconds,
+                // so convert here. Reported as issue #291: without this the spans
+                // came back as ms/10 and silently disagreed with Session times.
                 for (int i = 0; i < n; i++)
-                    spans[i] = new VadSpan(raw[i * 2], raw[i * 2 + 1]);
+                    spans[i] = new VadSpan(raw[i * 2] / 100.0, raw[i * 2 + 1] / 100.0);
                 return spans;
             }
             finally

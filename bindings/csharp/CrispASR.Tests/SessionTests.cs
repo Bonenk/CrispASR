@@ -300,5 +300,48 @@ namespace CrispASR.Tests
             stream.Feed(new float[16000]);
             stream.Flush();
         }
+
+        private static string? VadModel =>
+            Environment.GetEnvironmentVariable("CRISPASR_VAD_MODEL");
+
+        // Regression guard for issue #291: VadSegments must return SECONDS, not
+        // the raw whisper centiseconds. With a 4 s clip, a span end in seconds is
+        // <= ~4; if the centisecond bug returned, it would be ~400. Skips without
+        // a VAD model so the suite still runs where none is provisioned.
+        [Fact]
+        public void VadSegments_ReturnsSeconds_NotCentiseconds()
+        {
+            if (!CanLoadLibrary() || string.IsNullOrEmpty(VadModel)) return;
+            const int sr = 16000;
+            const int seconds = 4;
+            var pcm = new float[sr * seconds];
+            // A 300 ms tone burst near the start so VAD has something to find.
+            for (int i = sr / 2; i < sr / 2 + sr * 3 / 10; i++)
+                pcm[i] = 0.3f * MathF.Sin(2f * MathF.PI * 220f * i / sr);
+
+            var spans = Session.VadSegments(VadModel!, pcm, sr);
+            foreach (var span in spans)
+            {
+                Assert.True(span.T0 >= 0.0 && span.T0 <= seconds + 0.5,
+                    $"T0={span.T0} out of seconds range for a {seconds}s clip (centisecond bug?)");
+                Assert.True(span.T1 >= span.T0 && span.T1 <= seconds + 0.5,
+                    $"T1={span.T1} out of seconds range for a {seconds}s clip (centisecond bug?)");
+            }
+        }
+
+        // Logging control (issue #291): these must not throw and must leave the
+        // native side in a usable state. Runs without any model.
+        [Fact]
+        public void Logging_Controls_DoNotThrow()
+        {
+            if (!CanLoadLibrary()) return;
+            CrispASR.Logging.Silence();
+            CrispASR.Logging.SetMinLevel(CrispASR.LogLevel.Warn);
+            var captured = new System.Collections.Generic.List<string>();
+            CrispASR.Logging.SetCallback((lvl, msg) => captured.Add(msg));
+            // Trigger some native logging via a backend query, then restore default.
+            _ = Session.AvailableBackends();
+            CrispASR.Logging.SetCallback(null);
+        }
     }
 }
