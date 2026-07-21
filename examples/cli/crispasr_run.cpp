@@ -792,10 +792,34 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         std::ostringstream ss;
         ss << in.rdbuf();
         int imported_sr = 0;
-        if (!crispasr_parse_vad_slices(ss.str(), slices, &imported_sr)) {
+        float imported_chunk = 0.0f;
+        if (!crispasr_parse_vad_slices(ss.str(), slices, &imported_sr, &imported_chunk)) {
             fprintf(stderr, "crispasr: error: malformed --vad-import file '%s'\n", params.vad_import_file.c_str());
             return 1;
         }
+        // Issue #227: the slices are CHUNK boundaries, so they are only valid
+        // for the chunk length that produced them. Reusing a 30 s export under
+        // --chunk-seconds 5 would silently transcribe with the wrong chunking,
+        // which looks like a model regression rather than a stale file.
+        // Compare the REQUESTED chunk length on both sides, not the effective
+        // one. --vad-export runs before backend init (it needs no ASR model),
+        // so it cannot know the effective value -- that depends on the
+        // backend's CAP_UNBOUNDED_INPUT and vad_slice_cap_seconds. Comparing
+        // export-requested against import-EFFECTIVE is apples to oranges: with
+        // whisper + --vad the effective value collapses to 0, so a correct
+        // reuse was rejected with the advice "run with --chunk-seconds 0.00".
+        const float requested_chunk = params.chunk_seconds > 0 ? (float)params.chunk_seconds : 30.0f;
+        if (imported_chunk > 0.0f && std::fabs(imported_chunk - requested_chunk) > 0.01f) {
+            fprintf(stderr,
+                    "crispasr: error: --vad-import file was exported at --chunk-seconds %.2f but this run requests "
+                    "%.2f.\n"
+                    "       The exported boundaries are chunk boundaries, not raw speech segments, so they do not "
+                    "carry over.\n"
+                    "       Re-export at %.2f, or run with --chunk-seconds %.2f.\n",
+                    imported_chunk, requested_chunk, requested_chunk, imported_chunk);
+            return 1;
+        }
+
         // Boundaries are sample indices at the rate they were computed. If that
         // differs from this run's rate, rescale to keep them aligned in time
         // (t0_cs/t1_cs are rate-independent centiseconds — left as-is).
@@ -2198,7 +2222,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 fprintf(stderr, "crispasr: warning: cannot write --vad-export file '%s'\n", export_path.c_str());
                 vad_rc = 1;
             } else {
-                out << crispasr_serialize_vad_slices(slices, SR);
+                out << crispasr_serialize_vad_slices(slices, SR, slice_chunk);
                 if (!params.no_prints) {
                     fprintf(stderr, "crispasr: exported %zu VAD segment(s) to '%s'\n", slices.size(),
                             export_path.c_str());

@@ -2446,8 +2446,14 @@ int main(int argc, char** argv) {
             }
         }
 
+        // --vad-import is implemented in crispasr_run.cpp's process_one_input,
+        // which the LEGACY whisper path below never reaches. Without this the
+        // flag was accepted and silently did nothing: `--vad-import
+        // /nonexistent.json` returned 0 and transcribed normally, so the whole
+        // point of #227 (pay VAD once, reuse across models) was a no-op in the
+        // most ordinary invocation. Route those runs through the dispatch.
         if (explicit_backend || model_is_auto || auto_detected_non_whisper || params.stream ||
-            !params.tts_text.empty()) {
+            !params.tts_text.empty() || !params.vad_import_file.empty()) {
             const int rc = crispasr_run_backend(params);
 #if defined(_WIN32)
             // Bypass global C++ destructors (ggml Vulkan device teardown can

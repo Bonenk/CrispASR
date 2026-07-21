@@ -183,10 +183,12 @@ void crispasr_vad_free_cache();
 //
 // `start`/`end` are sample indices into the full PCM buffer at
 // `sample_rate`; `t0_cs`/`t1_cs` are absolute centisecond timestamps.
-std::string crispasr_serialize_vad_slices(const std::vector<crispasr_audio_slice>& slices, int sample_rate);
+std::string crispasr_serialize_vad_slices(const std::vector<crispasr_audio_slice>& slices, int sample_rate,
+                                          float chunk_seconds);
 
 // Parse a document produced by crispasr_serialize_vad_slices back into a
 // slice list. Tolerant of whitespace and field ordering. Returns false on
 // malformed input (in which case `out` is left empty). When `sample_rate_out`
 // is non-null it receives the serialized sample rate (0 if absent).
-bool crispasr_parse_vad_slices(const std::string& text, std::vector<crispasr_audio_slice>& out, int* sample_rate_out);
+bool crispasr_parse_vad_slices(const std::string& text, std::vector<crispasr_audio_slice>& out, int* sample_rate_out,
+                               float* chunk_seconds_out);

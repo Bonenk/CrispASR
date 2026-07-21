@@ -1,4 +1,5 @@
 // test-vad-boundaries.cpp — unit tests for VAD segment boundary
+#include <cmath>
 // export/import serialization (issue #227).
 //
 // Pure string <-> struct round-trip; no model, no audio. Links against
@@ -33,18 +34,18 @@ static bool slices_equal(const slices_t& a, const slices_t& b) {
 
 TEST_CASE("vad boundary round-trip preserves every field", "[unit][vad]") {
     const slices_t in = sample_slices();
-    const std::string json = crispasr_serialize_vad_slices(in, 16000);
+    const std::string json = crispasr_serialize_vad_slices(in, 16000, 30.0f);
 
     slices_t out;
     int sr = 0;
-    REQUIRE(crispasr_parse_vad_slices(json, out, &sr));
+    REQUIRE(crispasr_parse_vad_slices(json, out, &sr, nullptr));
     REQUIRE(sr == 16000);
     REQUIRE(out.size() == in.size());
     REQUIRE(slices_equal(in, out));
 }
 
 TEST_CASE("vad boundary serialization is well-formed JSON-ish", "[unit][vad]") {
-    const std::string json = crispasr_serialize_vad_slices(sample_slices(), 22050);
+    const std::string json = crispasr_serialize_vad_slices(sample_slices(), 22050, 30.0f);
     REQUIRE(json.find("\"crispasr_vad\"") != std::string::npos);
     REQUIRE(json.find("\"sample_rate\": 22050") != std::string::npos);
     REQUIRE(json.find("\"num_slices\": 3") != std::string::npos);
@@ -54,10 +55,10 @@ TEST_CASE("vad boundary serialization is well-formed JSON-ish", "[unit][vad]") {
 
 TEST_CASE("vad boundary empty list round-trips", "[unit][vad]") {
     const slices_t in;
-    const std::string json = crispasr_serialize_vad_slices(in, 16000);
+    const std::string json = crispasr_serialize_vad_slices(in, 16000, 30.0f);
     slices_t out;
     int sr = -1;
-    REQUIRE(crispasr_parse_vad_slices(json, out, &sr));
+    REQUIRE(crispasr_parse_vad_slices(json, out, &sr, nullptr));
     REQUIRE(out.empty());
     REQUIRE(sr == 16000);
 }
@@ -70,7 +71,7 @@ TEST_CASE("vad boundary parser tolerates whitespace and reordered fields", "[uni
     ]}})";
     slices_t out;
     int sr = 0;
-    REQUIRE(crispasr_parse_vad_slices(json, out, &sr));
+    REQUIRE(crispasr_parse_vad_slices(json, out, &sr, nullptr));
     REQUIRE(sr == 8000);
     REQUIRE(out.size() == 2);
     REQUIRE(out[0].start == 10);
@@ -84,10 +85,10 @@ TEST_CASE("vad boundary parser tolerates whitespace and reordered fields", "[uni
 TEST_CASE("vad boundary parser rejects malformed input", "[unit][vad]") {
     slices_t out;
     // No slices array at all.
-    REQUIRE_FALSE(crispasr_parse_vad_slices("{\"nope\": true}", out, nullptr));
+    REQUIRE_FALSE(crispasr_parse_vad_slices("{\"nope\": true}", out, nullptr, nullptr));
     REQUIRE(out.empty());
     // Slices array present but an object is missing a required field.
-    REQUIRE_FALSE(crispasr_parse_vad_slices(R"({"slices":[{"start":0,"end":10,"t0_cs":0}]})", out, nullptr));
+    REQUIRE_FALSE(crispasr_parse_vad_slices(R"({"slices":[{"start":0,"end":10,"t0_cs":0}]})", out, nullptr, nullptr));
     REQUIRE(out.empty());
 }
 
@@ -95,7 +96,7 @@ TEST_CASE("vad boundary parser handles absent sample_rate", "[unit][vad]") {
     const std::string json = R"({"slices":[{"start":0,"end":100,"t0_cs":0,"t1_cs":1}]})";
     slices_t out;
     int sr = 12345;
-    REQUIRE(crispasr_parse_vad_slices(json, out, &sr));
+    REQUIRE(crispasr_parse_vad_slices(json, out, &sr, nullptr));
     REQUIRE(sr == 0); // absent -> 0
     REQUIRE(out.size() == 1);
 }
@@ -135,4 +136,82 @@ TEST_CASE("issue227: default vad_export_file is empty", "[unit][vad][issue227]")
     whisper_params p{};
     REQUIRE(p.vad_export_file.empty());
     REQUIRE(p.vad_import_file.empty());
+}
+
+// Issue #227: the exported slices are CHUNK boundaries, not raw speech
+// segments, so they are only valid for the chunk length that produced them.
+// Both the CLI and the server refuse an import whose chunk length differs --
+// without this field they could not tell, and would silently re-chunk the audio
+// wrongly, which presents as a model regression rather than a stale file.
+TEST_CASE("vad boundaries: chunk_seconds round-trips", "[unit][vad]") {
+    const std::string json = crispasr_serialize_vad_slices(sample_slices(), 16000, 12.5f);
+    std::vector<crispasr_audio_slice> out;
+    int sr = 0;
+    float chunk = 0.0f;
+    REQUIRE(crispasr_parse_vad_slices(json, out, &sr, &chunk));
+    REQUIRE(sr == 16000);
+    REQUIRE(std::fabs(chunk - 12.5f) < 1e-6f);
+}
+
+TEST_CASE("vad boundaries: a file without chunk_cs reports 0, not a wrong value", "[unit][vad]") {
+    // Files written before chunk_cs existed must stay importable. 0 is the
+    // "unknown" sentinel and callers skip the mismatch check rather than
+    // rejecting every legacy file.
+    const std::string legacy =
+        R"({"crispasr_vad":{"version":1,"sample_rate":16000,"slices":[{"start":0,"end":10,"t0_cs":0,"t1_cs":1}]}})";
+    std::vector<crispasr_audio_slice> out;
+    float chunk = -1.0f;
+    REQUIRE(crispasr_parse_vad_slices(legacy, out, nullptr, &chunk));
+    REQUIRE(chunk == 0.0f);
+    REQUIRE(out.size() == 1);
+}
+
+// ---------------------------------------------------------------------------
+// Issue #227 regression guards. Both bugs below shipped as SILENT no-ops --
+// exit 0, plausible output, nothing in the log -- so they are exactly the kind
+// that only a test catches.
+// ---------------------------------------------------------------------------
+
+// The chunk-length gate compares the REQUESTED chunk on both sides. --vad-export
+// runs before backend init (it needs no ASR model), so it cannot know the
+// EFFECTIVE chunk -- that depends on the backend's CAP_UNBOUNDED_INPUT and
+// vad_slice_cap_seconds. An earlier version compared export-requested against
+// import-effective, which for whisper + --vad collapses to 0 and rejected a
+// correct reuse with the advice "run with --chunk-seconds 0.00".
+TEST_CASE("vad boundaries: chunk gate compares like with like", "[unit][vad]") {
+    const float exported_chunk = 30.0f;
+    const std::string json = crispasr_serialize_vad_slices(sample_slices(), 16000, exported_chunk);
+
+    std::vector<crispasr_audio_slice> out;
+    float chunk = 0.0f;
+    REQUIRE(crispasr_parse_vad_slices(json, out, nullptr, &chunk));
+
+    // the comparison the CLI performs: requested vs requested
+    auto requested = [](int chunk_seconds) { return chunk_seconds > 0 ? (float)chunk_seconds : 30.0f; };
+    auto mismatches = [&](float imported, int run_chunk_seconds) {
+        return imported > 0.0f && std::fabs(imported - requested(run_chunk_seconds)) > 0.01f;
+    };
+
+    REQUIRE_FALSE(mismatches(chunk, 30)); // same explicit length -> reuse
+    REQUIRE_FALSE(mismatches(chunk, 0));  // unset defaults to 30 -> reuse
+    REQUIRE(mismatches(chunk, 5));        // different length -> refuse
+    REQUIRE(mismatches(chunk, 12));
+
+    // A legacy file (no chunk_cs -> 0) must never be rejected: the gate is
+    // "unknown means don't judge", not "unknown means wrong".
+    REQUIRE_FALSE(mismatches(0.0f, 5));
+    REQUIRE_FALSE(mismatches(0.0f, 30));
+}
+
+// Guards the round trip at a non-integer chunk length, since chunk_cs is stored
+// in centiseconds and a float->int conversion is an easy place to lose 0.5 s.
+TEST_CASE("vad boundaries: fractional chunk lengths survive the round trip", "[unit][vad]") {
+    for (float c : {0.5f, 2.25f, 7.5f, 12.5f, 30.0f, 120.0f}) {
+        const std::string json = crispasr_serialize_vad_slices(sample_slices(), 16000, c);
+        std::vector<crispasr_audio_slice> out;
+        float back = 0.0f;
+        REQUIRE(crispasr_parse_vad_slices(json, out, nullptr, &back));
+        INFO("chunk " << c);
+        REQUIRE(std::fabs(back - c) < 0.011f); // centisecond quantisation
+    }
 }
