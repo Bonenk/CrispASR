@@ -437,8 +437,17 @@ jobs:
             -exec cp -P {} "$OUT/ggml/src/" \;
           for f in "$OUT"/src/*.so* "$OUT"/ggml/src/*.so*; do
             [ -L "$f" ] && continue
-            patchelf --set-rpath '$ORIGIN:$ORIGIN/../../ggml/src' "$f" 2>/dev/null || true
+            # ../ggml/src, NOT ../../ — libs live at $OUT/src and $OUT/ggml/src,
+            # so from $ORIGIN=$OUT/src the ggml dir is ONE level up. The old
+            # ../../ pointed outside the bundle entirely and nothing resolved;
+            # it survived because the packaging gate only checked that the .so
+            # was PRESENT, never that RUNPATH could find it (see #290-adjacent
+            # dylib report from the CometBeat FFI integration).
+            patchelf --set-rpath '$ORIGIN:$ORIGIN/../ggml/src' "$f" 2>/dev/null || true
           done
+          # Prove it LOADS after relocation, not merely that the deps are
+          # present. Fails the release rather than the consumer.
+          bash tools/verify-lib-bundle.sh "$OUT"
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
@@ -810,6 +819,38 @@ jobs:
           cp LICENSE "$OUT/"
           cp THIRD_PARTY_NOTICES.txt "$OUT/"
 
+          # Rewrite LC_RPATH to be @loader_path-relative so the bundle resolves
+          # WHEREVER it is extracted. CMake bakes the build-tree rpath into the
+          # artifacts, and we copy them straight out of build-libs/ without a
+          # `cmake --install`, so a shipped v0.8.18 dylib carried
+          #   LC_RPATH = /Users/runner/work/CrispASR/CrispASR/build-libs/ggml/src
+          # Those paths exist only on the CI runner, so `@rpath/libggml.0.dylib`
+          # resolved to nothing and DynamicLibrary.open / dlopen failed for every
+          # downstream consumer (reported by the CometBeat FFI integration).
+          #
+          # Each lib gets BOTH anchors so the same treatment works from either
+          # directory: `@loader_path` finds siblings (ggml libs reference each
+          # other), `@loader_path/../ggml/src` lets src/libcrispasr reach them.
+          # Deleting the absolute entries matters as much as adding the relative
+          # ones: a stale absolute rpath that happens to exist on a consumer's
+          # box would silently load THAT copy instead of the bundled one.
+          echo "rewriting rpaths to @loader_path ..."
+          for lib in "$OUT"/src/*.dylib "$OUT"/ggml/src/*.dylib; do
+            [ -f "$lib" ] || continue          # -f skips the symlinks
+            otool -l "$lib" | awk '/LC_RPATH/{f=1} f&&/ path /{print $2; f=0}' |
+              while read -r old; do
+                case "$old" in
+                  @*) : ;;                      # already relative — keep
+                  *) install_name_tool -delete_rpath "$old" "$lib" 2>/dev/null || true ;;
+                esac
+              done
+            install_name_tool -add_rpath "@loader_path" "$lib" 2>/dev/null || true
+            install_name_tool -add_rpath "@loader_path/../ggml/src" "$lib" 2>/dev/null || true
+            # install_name_tool invalidates the signature, and arm64 macOS
+            # refuses to load an incorrectly-signed dylib. Re-sign ad-hoc.
+            codesign --force --sign - "$lib" 2>/dev/null || true
+          done
+
           # GATE: every @rpath dependency must actually be in the bundle.
           # Copying a hand-written list is what failed before -- a dep gets
           # added and nobody updates the list. This derives the requirement
@@ -836,6 +877,16 @@ jobs:
             exit 1
           fi
           echo "  all @rpath dependencies present"
+
+          # GATE 2: actually dlopen it, from a directory unrelated to the build
+          # tree. The presence check above proves each dependency is IN the
+          # bundle; it says nothing about whether LC_RPATH can FIND it, which is
+          # exactly how v0.8.18 shipped a bundle that passed the gate and still
+          # failed for every consumer. Presence is not resolvability — this is
+          # the only check that exercises what a downstream FFI actually does.
+          # Same script the Linux lib jobs run, so both platforms are held to
+          # one definition of "loads".
+          bash tools/verify-lib-bundle.sh "$OUT"
 
           cd release && tar czf libcrispasr-macos-arm64.tar.gz libcrispasr-macos-arm64/
           ls -lh libcrispasr-macos-arm64.tar.gz
@@ -902,8 +953,17 @@ jobs:
           # LD_LIBRARY_PATH (matches build-python-linux convention).
           for f in "$OUT"/src/*.so* "$OUT"/ggml/src/*.so*; do
             [ -L "$f" ] && continue
-            patchelf --set-rpath '$ORIGIN:$ORIGIN/../../ggml/src' "$f" 2>/dev/null || true
+            # ../ggml/src, NOT ../../ — libs live at $OUT/src and $OUT/ggml/src,
+            # so from $ORIGIN=$OUT/src the ggml dir is ONE level up. The old
+            # ../../ pointed outside the bundle entirely and nothing resolved;
+            # it survived because the packaging gate only checked that the .so
+            # was PRESENT, never that RUNPATH could find it (see #290-adjacent
+            # dylib report from the CometBeat FFI integration).
+            patchelf --set-rpath '$ORIGIN:$ORIGIN/../ggml/src' "$f" 2>/dev/null || true
           done
+          # Prove it LOADS after relocation, not merely that the deps are
+          # present. Fails the release rather than the consumer.
+          bash tools/verify-lib-bundle.sh "$OUT"
           # Headers so binding authors can extend the FFI without
           # vendoring the whole CrispASR repo.
           cp include/crispasr.h "$OUT/include/"
@@ -968,8 +1028,17 @@ jobs:
             -exec cp -P {} "$OUT/ggml/src/" \;
           for f in "$OUT"/src/*.so* "$OUT"/ggml/src/*.so*; do
             [ -L "$f" ] && continue
-            patchelf --set-rpath '$ORIGIN:$ORIGIN/../../ggml/src' "$f" 2>/dev/null || true
+            # ../ggml/src, NOT ../../ — libs live at $OUT/src and $OUT/ggml/src,
+            # so from $ORIGIN=$OUT/src the ggml dir is ONE level up. The old
+            # ../../ pointed outside the bundle entirely and nothing resolved;
+            # it survived because the packaging gate only checked that the .so
+            # was PRESENT, never that RUNPATH could find it (see #290-adjacent
+            # dylib report from the CometBeat FFI integration).
+            patchelf --set-rpath '$ORIGIN:$ORIGIN/../ggml/src' "$f" 2>/dev/null || true
           done
+          # Prove it LOADS after relocation, not merely that the deps are
+          # present. Fails the release rather than the consumer.
+          bash tools/verify-lib-bundle.sh "$OUT"
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
@@ -1036,8 +1105,17 @@ jobs:
           # LD_LIBRARY_PATH (matches build-libs-linux-x86_64 convention).
           for f in "$OUT"/src/*.so* "$OUT"/ggml/src/*.so*; do
             [ -L "$f" ] && continue
-            patchelf --set-rpath '$ORIGIN:$ORIGIN/../../ggml/src' "$f" 2>/dev/null || true
+            # ../ggml/src, NOT ../../ — libs live at $OUT/src and $OUT/ggml/src,
+            # so from $ORIGIN=$OUT/src the ggml dir is ONE level up. The old
+            # ../../ pointed outside the bundle entirely and nothing resolved;
+            # it survived because the packaging gate only checked that the .so
+            # was PRESENT, never that RUNPATH could find it (see #290-adjacent
+            # dylib report from the CometBeat FFI integration).
+            patchelf --set-rpath '$ORIGIN:$ORIGIN/../ggml/src' "$f" 2>/dev/null || true
           done
+          # Prove it LOADS after relocation, not merely that the deps are
+          # present. Fails the release rather than the consumer.
+          bash tools/verify-lib-bundle.sh "$OUT"
           # Headers so binding authors can extend the FFI without
           # vendoring the whole CrispASR repo.
           cp include/crispasr.h "$OUT/include/"
@@ -1285,8 +1363,17 @@ jobs:
             -exec cp -P {} "$OUT/ggml/src/" \;
           for f in "$OUT"/src/*.so* "$OUT"/ggml/src/*.so*; do
             [ -L "$f" ] && continue
-            patchelf --set-rpath '$ORIGIN:$ORIGIN/../../ggml/src' "$f" 2>/dev/null || true
+            # ../ggml/src, NOT ../../ — libs live at $OUT/src and $OUT/ggml/src,
+            # so from $ORIGIN=$OUT/src the ggml dir is ONE level up. The old
+            # ../../ pointed outside the bundle entirely and nothing resolved;
+            # it survived because the packaging gate only checked that the .so
+            # was PRESENT, never that RUNPATH could find it (see #290-adjacent
+            # dylib report from the CometBeat FFI integration).
+            patchelf --set-rpath '$ORIGIN:$ORIGIN/../ggml/src' "$f" 2>/dev/null || true
           done
+          # Prove it LOADS after relocation, not merely that the deps are
+          # present. Fails the release rather than the consumer.
+          bash tools/verify-lib-bundle.sh "$OUT"
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
