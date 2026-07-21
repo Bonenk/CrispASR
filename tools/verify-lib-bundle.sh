@@ -52,10 +52,13 @@ import ctypes, glob, os, re, subprocess, sys
 root = sys.argv[1]
 IS_MAC = sys.platform == "darwin"
 
-# Driver / loader-provided sonames that are correctly NOT in any bundle.
+# Driver / loader-provided sonames that are correctly NOT in any bundle: GPU
+# drivers, plus toolchain and OpenMP runtimes that ship with the compiler/system
+# (libomp/libgomp are the LLVM/GNU OpenMP runtimes — same category as libstdc++,
+# pulled in by GGML_OPENMP and provided by the user's toolchain, never bundled).
 EXTERNAL = re.compile(
     r"^(libcuda|libamdhip64|libhsa-runtime|librocm|libnvidia|libcudart|libcublas|"
-    r"librt|libdl|libpthread|libm|libc|libstdc\+\+|libgcc_s|libSystem)\b"
+    r"libomp|libgomp|librt|libdl|libpthread|libm|libc|libstdc\+\+|libgcc_s|libSystem)\b"
 )
 
 
