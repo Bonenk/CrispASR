@@ -463,6 +463,52 @@ band mask being ignored.
   above, cosine alone would pass a wrong GELU. Stage max_abs is printed and
   should be read alongside it.
 
+## How good is the pitch detector, actually?
+
+Parity says the port matches torch; it says nothing about the model. Measured
+separately (torch reference — legitimate, since the port is bit-parity with it).
+
+**Frequency mapping, recovered empirically:** `f = 55 · 2**(bin / 96)` — 96
+bins/octave anchored at A1, **12.5 cents per bin**. The trainer source never
+states this. It came from octave *pairs* (220→192 and 440→288 differ by exactly
+96; 65.4→24 / 130.8→120 likewise). A global least-squares fit gave a confidently
+wrong 57.6 bins/octave, because one out-of-range outlier dragged the line —
+octave pairs are robust to that, a fit is not.
+
+**Accuracy: at the quantisation floor.** On off-grid sawtooth tones (chosen
+*not* to align with the bin grid — equal-tempered notes land exactly on bins at
+8 bins/semitone, so testing those flatters it), max error is **5.3 cents**
+against a ±6.25-cent quantisation limit. Zero octave errors on synthetic input.
+
+**Usable range: ~62–784 Hz.**
+
+| | |
+|---|---|
+| 55 Hz | +12.5 cents (one bin off) — below the `16000/256 = 62.5 Hz` floor implied by `max_corr_period` |
+| 62–784 Hz | within a few cents, stable (frame-to-frame std 0.0–0.14 bins) |
+| 880 Hz | **collapses** — bin 53 instead of 384, std 19.4 |
+| 1046 Hz | median correct but unstable (std 52.9) |
+
+Bins 1..447 nominally span 55–1387 Hz, so the upper failure is the *model*, not
+the representation — unsurprising for one trained on speech.
+
+**On real speech** (jfk.wav) against pyworld Harvest as an independent oracle:
+median |error| 18.4 cents, 69.7 % of voiced frames within 50 cents, 51.6 %
+within 20, and only **1.7 % octave disagreements**. Read that as a *loose lower
+bound*: Harvest is not ground truth, jfk.wav is a noisy 1961 archival recording,
+and no frame-alignment offset between the two was corrected.
+
+### The quantised output carries no voicing
+
+`sample_pitch` **never returns 0**. Bin 0 is the unvoiced class and is forced to
+−100 before the argmax, so it is excluded by construction — measured 0 zeros
+across 1100 frames of jfk.wav *including its silent stretches* (minimum bin 8).
+`beatrice_pitch.h` claimed "0 marks unvoiced"; that was wrong and is corrected.
+
+Voicing lives in `sample_pitch(return_features=True)`'s `unvoiced_proba`, which
+the current API does not expose. **ConverterNetwork needs it** — it is channel 0
+of the 4 that `embed_pitch_features` consumes — so the port below must add it.
+
 ## ConverterNetwork + Vocoder — read, not started
 
 The remaining component, and the largest. Read against the source; **nothing is

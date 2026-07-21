@@ -46,7 +46,22 @@ struct beatrice_pitch_result {
     // This is the ggml-native layout of the graph output and matches the parity
     // reference, so nothing has to transpose. It is NOT frame-major.
     float* logits;  // n_bins * n_frames
-    int* quantized; // n_frames, banded argmax; 0 marks unvoiced
+    // n_frames, banded argmax. NOTE: this NEVER returns 0. sample_pitch forces
+    // bin 0 (the unvoiced class) to -100 before the argmax, so it is excluded by
+    // construction -- measured: 0 zeros over 1100 frames of jfk.wav INCLUDING
+    // its silent stretches, minimum bin 8. There is therefore NO voicing
+    // information here; an earlier version of this comment said 0 meant
+    // unvoiced and was simply wrong.
+    //
+    // Voicing lives in sample_pitch(return_features=True)'s unvoiced_proba,
+    // which this API does not expose yet. ConverterNetwork needs it (channel 0
+    // of the 4 that embed_pitch_features consumes), so the §CB3 port must add
+    // it.
+    //
+    // Frequency: f = 55 * 2**(bin / 96) Hz -- 96 bins/octave anchored at A1,
+    // 12.5 cents per bin. Recovered empirically from octave pairs; the trainer
+    // source never states it.
+    int* quantized;
     float* energy;  // n_frames
     int n_frames;
     int n_bins;
