@@ -268,7 +268,7 @@ endif()
 
 ### Bindings — adding a new *session setter* (`crispasr_session_set_*`)
 A new setter is **not** auto-discovered; every wrapper exposes it explicitly
-and they are kept at full parity. Add the new method to **all six** wrappers
+and they are kept at full parity. Add the new method to **all seven** wrappers
 (mirror the nearest existing setter in each — argtypes/restype, error-on-rc≠0):
 - `python/crispasr/_binding.py` — ctypes method on `Session`.
 - `bindings/go/crispasr_session.go` — the cgo-preamble `int crispasr_session_set_X(...)`
@@ -279,12 +279,21 @@ and they are kept at full parity. Add the new method to **all six** wrappers
 - `bindings/java/.../CrispasrSession.java` — JNA `Lib` interface decl + method.
 - `bindings/ruby/ext/ruby_crispasr_session.c` — `extern` decl, `rb_session_set_X`,
   and a `rb_define_singleton_method` registration.
+- `bindings/csharp/CrispASR/NativeMethods.cs` — `[DllImport]` P/Invoke, **and**
+  the public method on `Session` in `Session.cs`. Callback delegates need
+  `[UnmanagedFunctionPointer(CallingConvention.Cdecl)]` and a static field to
+  survive GC; `const char*` params are `[MarshalAs(UnmanagedType.LPUTF8Str)]`.
 - The HTTP server (`examples/cli/crispasr_server.cpp`) exposes the equivalent as
   a per-request `form_*` field on the transcription endpoints (or a startup flag
   for resident post-processors).
 - `bindings/javascript/emscripten.cpp` — WASM/JS (built with emcc).
 The canonical surface is `include/crispasr_session.h`; `docs/bindings.md` has the
 per-wrapper setter table.
+
+**C# is CI-tested** (`.github/workflows/bindings-csharp.yml`) — it compiles the
+binding against the ABI and runs `CrispASR.Tests`. Do not let it drift; it was
+unbuilt for a long time and shipped a units bug (#291) precisely because nothing
+compiled the wrapper against the header.
 
 ### Docs
 - `README.md` — model-table row (TTS or ASR section).
@@ -372,7 +381,19 @@ Wire ALL of the following:
    and any string lookup separately. Flat views must be all-float even when a
    field is logically an integer — a mixed int/float struct read through a float
    view misreads the int lanes.
-7. **Regenerate the matrix** — `python tools/gen-feature-matrix.py`. Do not
+7. **Language-wrapper binding** — UNLIKE a plain transcribe/synthesize backend
+   (which the wrappers pick up automatically via the generic dispatch), a task
+   surface adds NEW functions that each wrapper must bind explicitly, or the
+   backend is C-only. This is where C# sat neglected: `tab`/`beats`/`chords`/
+   `piano`/`pitch`/`separate`/`convert` were in the C ABI but bound in no
+   managed wrapper. When you add a task surface, bind its run call + getters in
+   every wrapper that exposes typed methods — `bindings/csharp` (`SessionMusic.cs`
+   is the precedent: one P/Invoke per native function, a `readonly struct` result
+   type, one `Marshal.Copy` of the flat view), plus python/go/flutter/etc. as
+   applicable. **Normalise time to seconds** in the wrapper even when the flat
+   view is milliseconds (chords/piano/pitch are ms; beats is already seconds) —
+   an inconsistent unit across methods is the #291 bug.
+8. **Regenerate the matrix** — `python tools/gen-feature-matrix.py`. Do not
    hand-edit `docs/feature-matrix.md`; it is generated and says so at the top.
 
 Then run the audit, which now checks the reverse direction too (advertised by
