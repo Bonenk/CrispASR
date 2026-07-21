@@ -509,6 +509,63 @@ Voicing lives in `sample_pitch(return_features=True)`'s `unvoiced_proba`, which
 the current API does not expose. **ConverterNetwork needs it** — it is channel 0
 of the 4 that `embed_pitch_features` consumes — so the port below must add it.
 
+## F0 backend comparison — measured, and it decides the wiring
+
+`crispasr-f0-eval` (examples/cli) drives the **shipped C++ path**, not torch.
+Off-grid sawtooth tones, 1 s each, 16 kHz.
+
+| | beatrice-pitch | crepe-tiny |
+|---|---|---|
+| median error, all tones | **2.4 cents** | 2.6 cents |
+| within 10 cents | 17/19 | **19/19** |
+| frame-to-frame jitter | **0.0 cents** | 0.2–1.8 cents |
+| 833 Hz / 971 Hz | **fails** (2780 / 4746 cents) | fine |
+| wall clock, 11 s audio (incl. load) | **0.72 s** | 1.99 s |
+| reports voicing | **no** | yes (`voiced_prob`) |
+
+This also **confirms the earlier torch-side numbers on the real C++ path** — the
+bit-parity inference held, but it had never been checked directly.
+
+In the speech range (58–708 Hz) Beatrice matches CREPE on accuracy, is
+*perfectly* stable (it quantises to bins, so it locks rather than jitters), and
+is ~2.8× faster. Above ~780 Hz it collapses; CREPE does not. Beatrice's zero
+jitter is a consequence of quantisation, not superior estimation — the flip side
+is 12.5-cent granularity where CREPE is continuous.
+
+### Agreement on real speech is a voicing story, not a pitch story
+
+Against CREPE on `samples/jfk.wav`, filtered by CREPE's own confidence:
+
+| CREPE confidence ≥ | frames | median disagreement | within 50c | octave |
+|---|---|---|---|---|
+| 0.0 (everything) | 550 | **461.9 cents** | 38.4 % | 2.0 % |
+| 0.5 | 308 | 56.5 cents | 49.0 % | 1.0 % |
+| 0.8 (confidently voiced) | 64 | **9.3 cents** | 95.3 % | 0.0 % |
+
+The two backends agree to **9.3 cents on confidently-voiced speech**. The
+alarming unfiltered number is entirely unvoiced frames — Beatrice emits a pitch
+for silence because, as established above, its quantised output carries no
+voicing at all. Quoting the 461.9 without that decomposition would be
+straightforwardly misleading.
+
+### Wiring decision: NOT yet, and the numbers say why
+
+`rvc_svc_convert()` takes `f0_hz` with **0.0 meaning unvoiced**, at exactly the
+100 Hz rate Beatrice produces — so Beatrice looks like a drop-in native F0
+source, removing the caller's Harvest dependency. The measurements say don't:
+with no voicing output it would feed spurious pitch through every silent frame,
+driving the vocoder's sine source where it should be off. That is the 461.9-cent
+column, and it is audible, not cosmetic.
+
+Two options, in order of preference:
+
+1. **Expose `unvoiced_proba`** — `sample_pitch(return_features=True)` already
+   computes it, and `ConverterNetwork` needs the same 4 pitch-feature channels
+   anyway, so this is work §CB3 must do regardless. Then Beatrice becomes the
+   better choice for speech-range real-time: faster, stabler, 7 MB.
+2. **Use CREPE for RVC's F0 today** — it has `voiced_prob` and a wider usable
+   range. It is ~2.8× slower here, which may or may not matter.
+
 ## ConverterNetwork + Vocoder — read, not started
 
 The remaining component, and the largest. Read against the source; **nothing is

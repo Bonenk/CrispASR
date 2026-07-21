@@ -453,3 +453,7 @@ target_link_libraries(crispasr-chat PRIVATE
 )
 include(DefaultTargetOptions)
 install(TARGETS crispasr-chat RUNTIME BUNDLE DESTINATION bin)
+
+add_executable(crispasr-f0-eval crispasr_f0_eval.cpp)
+target_link_libraries(crispasr-f0-eval PRIVATE crispasr-lib crepe beatrice-pitch)
+target_include_directories(crispasr-f0-eval PRIVATE ${CMAKE_SOURCE_DIR}/src)
