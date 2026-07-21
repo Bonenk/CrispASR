@@ -393,10 +393,35 @@ Non-obvious details to verify while reading (each a silent bug if assumed):
 * Output rate is hardcoded 24000 with `hop_length = 24000/100` — the same 100 Hz
   frame rate §CB1 uses, so the record shapes carry over.
 
-**Next step:** HARD RULE #1 on `beatrice_trainer/__main__.py`, then the numpy
-spec, the ggml graph, and the per-stage diff harness — in that order, and per
-component (pitch_estimator first: it is smallest and fully frozen). Reuse §CB1's
-noise-injection discipline if any RNG site turns up.
+**Progress:** two of three components ported and validated.
+
+| component | state |
+|---|---|
+| `PitchEstimator` | **DONE** — `crispasr-diff beatrice`, 30 stages + e2e, 0 failed |
+| `PhoneExtractor` | **DONE** — `crispasr-diff beatrice-phone`, 69 stages + e2e, 0 failed |
+| `ConverterNetwork` + `Vocoder` | blueprint read done; converter and graph NOT started |
+
+**Next step:** the ConverterNetwork/Vocoder port. It is the largest of the three
+and differs in kind from the two frozen extractors:
+
+* The vocoder is a **source-filter / impulse-response synthesiser**, not a
+  HiFi-GAN — a 512-tap IR per frame plus aperiodicity and post-filter, driven by
+  `overlap_add`. That is why Beatrice is real-time-cheap.
+* It uses **`WSConv1d`/`WSLinear`**, which neither ported component does, so the
+  unbiased-variance trap (`torch.var_mean` is ddof=1, numpy defaults to 0 →
+  uniform ~20 % weight mis-scale) becomes live for the first time.
+* Its attention is **`CrossAttention`** over the speaker embedding, not
+  `nn.MultiheadAttention`; the PhoneExtractor's `mha_subsequence()` does not
+  transfer.
+* `overlap_add` draws a **random initial phase**, so this component needs §CB1's
+  injectable-noise discipline — and the injector must patch `torch.rand`, not
+  just `randn_like`.
+* The **lookahead alignment** (energy shifted 1 frame, quantised pitch and pitch
+  features 2, all reflect-padded) is the highest-risk silent bug: getting it
+  wrong misaligns content against pitch by 10–20 ms and no input-aligned
+  per-stage check can see it.
+
+Details in `docs/music-transcription/BEATRICE_BLUEPRINT.md`.
 
 **Effort:** unestimated until the blueprint read is done, but larger than §CB1
 (three networks, custom conv variants). Do NOT start before §CB1's record shapes

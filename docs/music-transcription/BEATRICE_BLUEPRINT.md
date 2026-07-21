@@ -19,7 +19,7 @@ ggml graph yet. `PhoneExtractor`, `VectorQuantizer`, `ConverterNetwork` and
 | `crispasr-diff beatrice` | **DONE** |
 | PhoneExtractor converter + 73-stage reference | **DONE** (spec bit-identical) |
 | `src/beatrice_phone.{h,cpp}` | **DONE** — 69 stages + end-to-end, 0 failed |
-| ConverterNetwork / Vocoder | NOT STARTED |
+| ConverterNetwork / Vocoder | blueprint read done; **no converter, no graph** |
 
 Shared ConvNeXt primitives live in `src/core/beatrice_ops.h`; both backends use
 one copy.
@@ -462,6 +462,96 @@ band mask being ignored.
 * Cosine ≥ 0.9999 is the stage gate; per the negative controls in the section
   above, cosine alone would pass a wrong GELU. Stage max_abs is printed and
   should be read alongside it.
+
+## ConverterNetwork + Vocoder — read, not started
+
+The remaining component, and the largest. Read against the source; **nothing is
+implemented**. Two surprises worth knowing before anyone estimates it.
+
+### The Vocoder is NOT a HiFi-GAN
+
+It is a **source-filter / impulse-response synthesiser**, which is what makes
+Beatrice cheap enough to be real-time. No transposed-conv upsampling stack at
+all:
+
+| module | what it produces |
+|---|---|
+| `prenet` | ConvNeXtStack, 4 blocks, `delay=2` (20 ms), **cross-attention to the speaker embedding** (`kv_channels=128`) |
+| `ir_generator` + `ir_generator_post` | a **512-tap impulse response** per frame (`WSConv1d(channels, 512, 1)`), windowed by the learned `ir_window` (512) |
+| `aperiodicity_generator` + post | `WSConv1d(channels, hop_length=240, 1, bias=False)` |
+| `post_filter_generator` + post | `WSConv1d(channels, 512, 1, bias=False)` |
+
+Fixed scales live as **buffers**, not weights: `ir_scale=1.0`,
+`aperiodicity_scale=0.005`, `post_filter_scale=0.01`. Synthesis is
+`overlap_add()` driven by the pitch contour.
+
+Two consequences for the port:
+
+* **`WSConv1d`/`WSLinear` are live here for the first time.** Neither
+  PitchEstimator nor PhoneExtractor uses them, so the unbiased-variance detail
+  (§1 above) has not yet mattered. In this component it does: `np.var`'s
+  `ddof=0` default would mis-scale every impulse-response weight by ~20 %,
+  uniformly — which sounds like a slightly wrong voice, not like a bug. The
+  `merge_weights()` path folds standardisation, so verify with the converter's
+  fusion check rather than trusting it.
+* **The attention here is `CrossAttention`, not `nn.MultiheadAttention`** — a
+  different module with its own `dump_layer` handling and its own
+  `merge_weights` fold (`q_projection` absorbs `attn_norm`). The
+  `mha_subsequence()` written for PhoneExtractor does **not** transfer as-is.
+
+### The lookahead alignment is the dangerous detail
+
+`ConverterNetwork.forward` shifts three signals before combining them, because
+the three frozen extractors look ahead by different amounts (the source comments
+this: phone 2.5 ms, energy 12.5 ms, pitch_features 22.5 ms):
+
+```python
+energy         = F.pad(energy[:, :, :-1],       (1, 0), mode="reflect")   # shift 1
+quantized_pitch= F.pad(quantized_pitch[:, :-2], (2, 0), mode="reflect")   # shift 2
+pitch_features = F.pad(pitch_features[:, :, :-2], (2, 0), mode="reflect") # shift 2
+```
+
+Note the padding is **reflect**, not zero. Omitting these shifts misaligns
+content against pitch by 10–20 ms — audible as smeared articulation, and
+invisible to any per-stage cosine check that feeds each stage its own reference
+input.
+
+`pitch_features` is then `cat([energy, pitch_features])` → the 4 channels
+`embed_pitch_features = nn.Conv1d(4, hidden, 1)` expects.
+
+### Rest of the inference path
+
+```
+phone = phone_extractor.units(x).transpose(1,2)        # VQ hook fires inside .head
+phone *= 1/sqrt(mean(phone^2, dim=1) + eps)            # RMS norm over CHANNELS
+pitch, energy = pitch_estimator(x)
+quantized_pitch, pitch_features = pitch_estimator.sample_pitch(pitch, return_features=True)
+<the three shifts above>
+formant_shift_indices = round((formant_shift_semitone + 2.0) * 2.0)   # index into embed_formant_shift(9)
+x = embed_phone(phone) + embed_quantized_pitch(quantized_pitch).transpose(1,2)
+      + embed_pitch_features(pitch_features)
+      + (embed_speaker(id) + embed_formant_shift(idx))[:, :, None]
+x = F.silu(x)                                          # SiLU here, NOT gelu
+speaker_embedding = key_value_speaker_embedding(id).view(B, 384, 128)
+y = vocoder(x, pitch, speaker_embedding)               # NOTE: raw pitch LOGITS, not quantised
+```
+
+Two easy mistakes: the activation is **SiLU** (every other activation in this
+model is tanh-GELU), and the vocoder receives the **raw `pitch` logits**, not
+`quantized_pitch`.
+
+### Validation will need noise injection
+
+`overlap_add` draws a random initial phase (`torch.rand`, §4 above), so unlike
+the two frozen components this one **cannot** be validated by direct comparison.
+It needs RVC's injectable-draw discipline: `tools/rvc_torch_parity.py` is the
+template, and the injector must patch `torch.rand` — patching only `randn_like`,
+as the RVC port did, would miss this site entirely and silently compare against
+a different phase.
+
+Also note the training-only paths that must NOT be ported: the
+`phone_noise_ratio` augmentation, the whole pitch-shift/resample augmentation
+block, and `slice_segments` — all guarded by `if self.training`.
 
 ### Layout convention
 
