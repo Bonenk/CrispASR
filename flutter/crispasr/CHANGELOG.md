@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.20
+
+- **iOS is now supported.** The release ships an Apple `crispasr.xcframework`
+  (device + simulator slices for iOS, plus macOS/tvOS/visionOS) for the first
+  time, so a Flutter iOS app can link the native library. Earlier releases
+  shipped no iOS artifact at all.
+- **Prebuilt native library bundles load as delivered.** The macOS and Linux
+  `libcrispasr` bundles had a broken embedded run-path and could not be
+  `dlopen`ed after extraction; they now resolve their bundled `ggml` libraries
+  relative to their own location. Android and the desktop bundles are laid out
+  as a flat `lib/` directory.
+- **canary-qwen long audio fixed.** Clips longer than ~30 s no longer skip
+  chunking, return near-empty transcripts, or grow memory without bound — the
+  backend had advertised an internal chunker it did not implement (#290).
+- No Dart API changes; existing code upgrades untouched.
+
 ## 0.8.19
 
 - Beat and downbeat tracking: `CrispasrSession.beats()` returns a beat grid
