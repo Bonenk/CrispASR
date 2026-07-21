@@ -19,7 +19,7 @@ namespace CrispASR
     /// </code>
     /// </para>
     /// </summary>
-    public sealed class Session : IDisposable
+    public sealed partial class Session : IDisposable
     {
         private IntPtr _handle;
 
