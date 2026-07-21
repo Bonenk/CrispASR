@@ -779,18 +779,27 @@ jobs:
           # build-apple so the archive root is crispasr.xcframework, not a path.
           ( cd build-apple && zip --symlinks -r "$GITHUB_WORKSPACE/release-ios/crispasr-${TAG}-xcframework.zip" crispasr.xcframework )
           ls -lh release-ios/
+          # Guard: the zip name is crispasr-<TAG>-xcframework.zip (a DASH before
+          # xcframework). The attach glob below must match that; an earlier
+          # `*.xcframework.zip` (dot) matched nothing and, with
+          # fail_on_unmatched_files:false, the job went green having attached NO
+          # iOS asset. Assert the file exists here so a naming slip fails loudly.
+          test -n "$(ls release-ios/*xcframework.zip 2>/dev/null)" || { echo "no xcframework zip produced"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
           name: crispasr-xcframework
-          path: release-ios/*.xcframework.zip
+          path: release-ios/*xcframework.zip
 
       - name: Attach xcframework to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
-          files: release-ios/*.xcframework.zip
-          fail_on_unmatched_files: false
+          files: release-ios/*xcframework.zip
+          # true, not false: this is the headline iOS asset — a glob that matches
+          # nothing must FAIL the release, not ship it silently (that is exactly
+          # how the first v0.8.20 run "succeeded" with no xcframework attached).
+          fail_on_unmatched_files: true
 
   # ── Shared-library bundle for macOS arm64 (Metal) ────────────────────────────
   #
