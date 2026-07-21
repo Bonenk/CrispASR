@@ -55,11 +55,17 @@ import ctypes, glob, os, sys
 
 root = sys.argv[1]
 pats = ("libcrispasr.*.dylib", "libcrispasr.so.*")
+# lib/ is the flattened layout; src/ is the historical one (and, after
+# package-lib-bundle.sh, a symlink to lib/). Check both so this script works on
+# a bundle from either era.
 cands = []
-for p in pats:
-    cands += [f for f in glob.glob(os.path.join(root, "src", p)) if not os.path.islink(f)]
+for sub in ("lib", "src"):
+    for p in pats:
+        cands += [f for f in glob.glob(os.path.join(root, sub, p)) if not os.path.islink(f)]
+    if cands:
+        break
 if not cands:
-    print("  ERROR: no concrete libcrispasr library found in <bundle>/src")
+    print("  ERROR: no concrete libcrispasr library found in <bundle>/lib or <bundle>/src")
     sys.exit(1)
 
 lib = sorted(cands)[0]
