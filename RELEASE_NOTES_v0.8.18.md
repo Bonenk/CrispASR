@@ -116,6 +116,25 @@ failed**.
   source.
 - **Metal teardown** warns instead of `SIGABRT` when resources outlive the
   device.
+- **Fetched opus/ogg are now built PIC.** Forcing them STATIC (above) also made
+  them non-PIC, and `crispasr-lib` is frequently a shared object, so `ld`
+  rejected the link outright (`relocation R_X86_64_PC32 against
+  'silk_LBRR_flags_iCDF_ptr' ... recompile with -fPIC`). Invisible on macOS,
+  where everything is position-independent anyway — so the STATIC fix looked
+  clean locally and only broke on Linux.
+- **`miotts`** used `substr` to assign a prefix of a string to itself; now
+  `resize()`.
+- **The wiring audit named the wrong failure.** It printed
+  `RESULT: FAIL (required gap)` for any of four independent causes, so a run
+  whose only problem was Go LDFLAGS drift reported a required *wiring* gap two
+  lines below `✅ REQUIRED wiring: ...`. It now names the actual cause.
+
+A process note worth recording, since it shaped this release: `main` took ~120
+commits in one day, and CI runs were repeatedly cancelled by the next push
+(`concurrency: cancel-in-progress`). **Every Lint run on `main` that day was
+cancelled**, which hid the `miotts` finding for two days — a cancelled check
+looks much like a passing one in the runs list. This release was cut from a tree
+verified green job-by-job, not from a run summary.
 
 ## Registry
 
