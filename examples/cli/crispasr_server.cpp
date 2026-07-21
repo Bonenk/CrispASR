@@ -542,8 +542,20 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         // `vad_segments` — reuse them instead of running VAD again. Mirrors the
         // CLI's --vad-import (crispasr_run.cpp); same wire format.
         int imported_sr = 0;
-        if (!crispasr_parse_vad_slices(rp.vad_import_json, slices, &imported_sr)) {
+        float imported_chunk = 0.0f;
+        if (!crispasr_parse_vad_slices(rp.vad_import_json, slices, &imported_sr, &imported_chunk)) {
             result.error = "malformed vad_import (expected the vad_segments object from a vad_export response)";
+            return result;
+        }
+        // #227: same gate as the CLI. The boundaries are CHUNK boundaries, so a
+        // payload exported under a different chunk length does not carry over --
+        // reusing it silently re-chunks the audio wrongly. Rejecting here keeps
+        // the server and CLI from disagreeing about what an import means.
+        if (imported_chunk > 0.0f && std::fabs(imported_chunk - (float)effective_chunk_seconds) > 0.01f) {
+            result.ok = false;
+            result.error = "vad_import was exported at chunk_seconds " + std::to_string(imported_chunk) +
+                           " but this request uses " + std::to_string(effective_chunk_seconds) +
+                           "; re-export or match the chunk length";
             return result;
         }
         if (imported_sr > 0 && imported_sr != SR) {
@@ -578,7 +590,7 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
     // #227: hand the boundaries back when asked, so the next request (same
     // audio, different backend) can skip VAD via `vad_import`.
     if (rp.vad_export_inline)
-        result.vad_segments_json = crispasr_serialize_vad_slices(slices, SR);
+        result.vad_segments_json = crispasr_serialize_vad_slices(slices, SR, (float)effective_chunk_seconds);
 
     if (slices.empty()) {
         result.ok = true;

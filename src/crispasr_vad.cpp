@@ -505,12 +505,19 @@ int64_t crispasr_vad_remap_timestamp(const std::vector<crispasr_vad_mapping>& ma
 
 // ---- VAD segment boundary export / import (issue #227) ----
 
-std::string crispasr_serialize_vad_slices(const std::vector<crispasr_audio_slice>& slices, int sample_rate) {
+std::string crispasr_serialize_vad_slices(const std::vector<crispasr_audio_slice>& slices, int sample_rate,
+                                          float chunk_seconds) {
     std::string out;
     out.reserve(64 + slices.size() * 96);
     out += "{\n  \"crispasr_vad\": {\n";
     out += "    \"version\": 1,\n";
     out += "    \"sample_rate\": " + std::to_string(sample_rate) + ",\n";
+    // The slices are CHUNK boundaries, not raw speech segments, so they depend
+    // on the chunk length that produced them (issue #227: exporting at 30 s and
+    // importing at 5 s silently reuses the wrong chunking). Recorded in
+    // centiseconds so the existing integer field parser can read it back; 0
+    // means "written by a version that did not record it".
+    out += "    \"chunk_cs\": " + std::to_string((long long)(chunk_seconds * 100.0f + 0.5f)) + ",\n";
     out += "    \"num_slices\": " + std::to_string(slices.size()) + ",\n";
     out += "    \"slices\": [";
     for (size_t i = 0; i < slices.size(); ++i) {
@@ -563,10 +570,13 @@ bool ca_vad_find_int(const std::string& text, size_t from, size_t end, const cha
 
 } // namespace
 
-bool crispasr_parse_vad_slices(const std::string& text, std::vector<crispasr_audio_slice>& out, int* sample_rate_out) {
+bool crispasr_parse_vad_slices(const std::string& text, std::vector<crispasr_audio_slice>& out, int* sample_rate_out,
+                               float* chunk_seconds_out) {
     out.clear();
     if (sample_rate_out)
         *sample_rate_out = 0;
+    if (chunk_seconds_out)
+        *chunk_seconds_out = 0.0f;
 
     // Optional top-level sample_rate (before the slices array).
     size_t arr = text.find("\"slices\"");
@@ -577,6 +587,12 @@ bool crispasr_parse_vad_slices(const std::string& text, std::vector<crispasr_aud
         size_t tmp = 0;
         if (ca_vad_find_int(text, 0, arr, "sample_rate", sr, tmp))
             *sample_rate_out = (int)sr;
+    }
+    if (chunk_seconds_out) {
+        int64_t cs = 0;
+        size_t tmp = 0;
+        if (ca_vad_find_int(text, 0, arr, "chunk_cs", cs, tmp))
+            *chunk_seconds_out = (float)cs / 100.0f;
     }
 
     size_t lb = text.find('[', arr);
