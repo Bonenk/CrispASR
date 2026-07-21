@@ -121,6 +121,13 @@ def spec_pitch_estimator(m, wav, d):
 
     quantized = m.sample_pitch(logits.clone())
     d("quantized_pitch", quantized.float())
+    # The 3 pitch features: [unvoiced_proba, half_pitch_proba, double_pitch_proba].
+    # unvoiced_proba is the ONLY voicing signal the model produces -- the
+    # quantised bin never returns 0, so without this a consumer cannot tell
+    # speech from silence. ConverterNetwork prepends energy to make the 4
+    # channels embed_pitch_features consumes.
+    _, features = m.sample_pitch(logits.clone(), return_features=True)
+    d("pitch_features", features)
     return logits, energy
 
 

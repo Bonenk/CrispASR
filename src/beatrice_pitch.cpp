@@ -433,8 +433,20 @@ ggml_cgraph* build_graph(beatrice_pitch_context* c, ggml_context* ctx, int T, gr
 // frame. That is the ggml-native layout of the [T, bins] graph output, and the
 // reference dump's layout too. Indexing it frame-major (f*n_bins + k) is the
 // natural-looking thing to write and is wrong -- it made all 400 frames differ.
-void sample_pitch(const float* logits, int n_bins, int n_frames, int band_width, int* out) {
+// `features`, when non-null, receives the 3 pitch features in CHANNEL-MAJOR,
+// TIME-FASTEST order: [unvoiced_proba | half_pitch_proba | double_pitch_proba],
+// each n_frames long.
+//
+// unvoiced_proba is the ONLY voicing signal this model produces. The quantised
+// bin never returns 0 (bin 0 is forced to -100 before the argmax), so without
+// this a consumer cannot distinguish speech from silence -- measured, that gap
+// turns a 9.3-cent agreement with CREPE on voiced frames into 461.9 cents
+// overall. ConverterNetwork prepends energy to make the 4 channels
+// embed_pitch_features consumes.
+void sample_pitch(const float* logits, int n_bins, int n_frames, int band_width, int bins_per_octave, int* out,
+                  float* features) {
     std::vector<double> p((size_t)n_bins);
+    std::vector<double> band;
     for (int f = 0; f < n_frames; f++) {
         auto at = [&](int k) { return (double)logits[(size_t)k * (size_t)n_frames + (size_t)f]; };
         double mx = at(0);
@@ -447,15 +459,20 @@ void sample_pitch(const float* logits, int n_bins, int n_frames, int band_width,
         }
         for (int k = 0; k < n_bins; k++)
             p[(size_t)k] /= sum;
+        // Captured BEFORE bin 0 is suppressed -- it is the real softmax
+        // probability of the unvoiced class, not the -100 sentinel.
+        const double unvoiced = p[0];
         p[0] = -100.0; // unvoiced class excluded from the pitch argmax
 
+        const int n_band = n_bins - band_width + 1;
+        band.assign((size_t)n_band, 0.0);
         int best = 0;
         double best_v = -1e300;
-        const int n_band = n_bins - band_width + 1;
         for (int k = 0; k < n_band; k++) {
             double acc = 0.0;
             for (int j = 0; j < band_width; j++)
                 acc += p[(size_t)(k + j)];
+            band[(size_t)k] = acc;
             if (acc > best_v) {
                 best_v = acc;
                 best = k;
@@ -470,6 +487,29 @@ void sample_pitch(const float* logits, int n_bins, int n_frames, int band_width,
             }
         }
         out[f] = arg;
+
+        if (features) {
+            // The two clamps are ASYMMETRIC in the reference and copying one to
+            // the other is a silent bug: half clamps the index to min 1, double
+            // clamps to max (n_bins - band_width).
+            const double band_proba = band[(size_t)best];
+            double half = 0.0, dbl = 0.0;
+            if (best > bins_per_octave) {
+                int idx = best - bins_per_octave;
+                if (idx < 1)
+                    idx = 1;
+                half = band[(size_t)idx] / (band_proba + 1e-6);
+            }
+            if (best <= n_bins - band_width - bins_per_octave) {
+                int idx = best + bins_per_octave;
+                if (idx > n_bins - band_width)
+                    idx = n_bins - band_width;
+                dbl = band[(size_t)idx] / (band_proba + 1e-6);
+            }
+            features[(size_t)0 * n_frames + (size_t)f] = (float)unvoiced;
+            features[(size_t)1 * n_frames + (size_t)f] = (float)half;
+            features[(size_t)2 * n_frames + (size_t)f] = (float)dbl;
+        }
     }
 }
 
@@ -590,13 +630,29 @@ beatrice_pitch_result* beatrice_pitch_estimate(beatrice_pitch_context* c, const 
     r->logits = (float*)malloc((size_t)T * c->hp.pitch_bins * sizeof(float));
     r->quantized = (int*)malloc((size_t)T * sizeof(int));
     r->energy = (float*)malloc((size_t)T * sizeof(float));
+    r->pitch_features = (float*)malloc((size_t)3 * T * sizeof(float));
     ggml_backend_tensor_get(io.logits, r->logits, 0, (size_t)T * c->hp.pitch_bins * sizeof(float));
     std::memcpy(r->energy, feat.energy.data(), (size_t)T * sizeof(float));
-    sample_pitch(r->logits, c->hp.pitch_bins, T, 4, r->quantized);
+    sample_pitch(r->logits, c->hp.pitch_bins, T, 4, c->hp.bins_per_octave, r->quantized, r->pitch_features);
 
     ggml_gallocr_free(alloc);
     ggml_free(ctx);
     return r;
+}
+
+float beatrice_pitch_bin_to_hz(int bin) {
+    return 55.0f * std::pow(2.0f, (float)bin / 96.0f);
+}
+
+void beatrice_pitch_to_f0_hz(const beatrice_pitch_result* r, float energy_threshold, float* out_f0_hz) {
+    if (!r || !out_f0_hz)
+        return;
+    for (int i = 0; i < r->n_frames; i++) {
+        // See the header: unvoiced_proba is inert on this checkpoint (max
+        // 8.9e-07 measured), so energy is the gate that actually works.
+        const bool unvoiced = r->energy && r->energy[i] < energy_threshold;
+        out_f0_hz[i] = unvoiced ? 0.0f : beatrice_pitch_bin_to_hz(r->quantized[i]);
+    }
 }
 
 void beatrice_pitch_result_free(beatrice_pitch_result* r) {
@@ -605,6 +661,7 @@ void beatrice_pitch_result_free(beatrice_pitch_result* r) {
     free(r->logits);
     free(r->quantized);
     free(r->energy);
+    free(r->pitch_features);
     delete r;
 }
 
@@ -760,6 +817,9 @@ int beatrice_pitch_diff(const char* model_gguf, const char* ref_gguf, int verbos
                 report("estimate_e2e_logits", r->logits, ref_logits, (size_t)r->n_frames * r->n_bins);
             if (ref_get(rw, "energy", ref_energy_e2e))
                 report("estimate_e2e_energy", r->energy, ref_energy_e2e, (size_t)r->n_frames);
+            std::vector<float> ref_feats;
+            if (ref_get(rw, "pitch_features", ref_feats))
+                report("estimate_e2e_pitch_features", r->pitch_features, ref_feats, (size_t)3 * r->n_frames);
             // sample_pitch is a banded argmax, not an argmax -- a distinct code
             // path that no tensor comparison above touches. Compare as EXACT
             // integers: a bin index that is off by one is a different learned
