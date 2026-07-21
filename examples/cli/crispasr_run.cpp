@@ -793,7 +793,8 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         ss << in.rdbuf();
         int imported_sr = 0;
         float imported_chunk = 0.0f;
-        if (!crispasr_parse_vad_slices(ss.str(), slices, &imported_sr, &imported_chunk)) {
+        bool imported_raw = false;
+        if (!crispasr_parse_vad_slices(ss.str(), slices, &imported_sr, &imported_chunk, &imported_raw)) {
             fprintf(stderr, "crispasr: error: malformed --vad-import file '%s'\n", params.vad_import_file.c_str());
             return 1;
         }
@@ -809,7 +810,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         // whisper + --vad the effective value collapses to 0, so a correct
         // reuse was rejected with the advice "run with --chunk-seconds 0.00".
         const float requested_chunk = params.chunk_seconds > 0 ? (float)params.chunk_seconds : 30.0f;
-        if (crispasr_vad_chunk_mismatch(imported_chunk, requested_chunk)) {
+        if (!imported_raw && crispasr_vad_chunk_mismatch(imported_chunk, requested_chunk)) {
             // WARN, do not fail, unless asked. The boundaries are still usable
             // -- they are just chunked differently than this run requested --
             // and turning a working --vad-import script into rc=1 on upgrade is
@@ -852,8 +853,18 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         }
         const size_t dropped = slices.size() - clean.size();
         slices = std::move(clean);
+
+        // A raw-segment export carries no chunking, so re-chunk it for THIS run
+        // exactly as a fresh VAD pass would (issue #227). This is what makes a
+        // raw export reusable across runs with different chunk lengths without
+        // ever tripping the mismatch gate: the segments are the model output,
+        // the chunking is re-derived here.
+        if (imported_raw && slice_chunk_seconds > 0) {
+            slices = crispasr_rechunk_slices(slices, samples.data(), (int)samples.size(), SR, slice_chunk_seconds);
+        }
         if (!params.no_prints) {
-            fprintf(stderr, "crispasr: imported %zu VAD segment(s) from '%s'%s\n", slices.size(),
+            fprintf(stderr, "crispasr: imported %zu %s from '%s'%s\n", slices.size(),
+                    imported_raw ? "VAD speech segment(s)" : "chunk boundary/boundaries",
                     params.vad_import_file.c_str(),
                     dropped ? (" (" + std::to_string(dropped) + " out-of-range dropped)").c_str() : "");
         }
@@ -2215,8 +2226,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 continue;
             }
             constexpr int SR = 16000;
-            const float slice_chunk = params.chunk_seconds > 0.0f ? params.chunk_seconds : 30.0f;
-            auto slices = crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, slice_chunk, params);
+            // Raw export computes with chunk 0 so no post-split runs -- the
+            // result is merged VAD speech segments, independent of chunk length.
+            const float slice_chunk = params.vad_export_raw         ? 0.0f
+                                      : params.chunk_seconds > 0.0f ? params.chunk_seconds
+                                                                    : 30.0f;
+            auto slices =
+                crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, (int)slice_chunk, params);
             // Multi-file: each input gets its own export path derived
             // from the input name. Single-file: use the explicit path.
             std::string export_path = params.vad_export_file;
@@ -2228,9 +2244,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 fprintf(stderr, "crispasr: warning: cannot write --vad-export file '%s'\n", export_path.c_str());
                 vad_rc = 1;
             } else {
-                out << crispasr_serialize_vad_slices(slices, SR, slice_chunk);
+                out << crispasr_serialize_vad_slices(slices, SR, slice_chunk, params.vad_export_raw);
                 if (!params.no_prints) {
-                    fprintf(stderr, "crispasr: exported %zu VAD segment(s) to '%s'\n", slices.size(),
+                    // Say which kind: they are NOT the same thing, and calling a
+                    // 30 s chunk a "VAD segment" is what made this confusing in
+                    // the first place (issue #227).
+                    fprintf(stderr, "crispasr: exported %zu %s to '%s'\n", slices.size(),
+                            params.vad_export_raw ? "VAD speech segment(s)" : "chunk boundary/boundaries",
                             export_path.c_str());
                 }
             }

@@ -223,3 +223,68 @@ TEST_CASE("vad boundaries: fractional chunk lengths survive the round trip", "[u
         REQUIRE(std::fabs(back - c) < 0.011f); // centisecond quantisation
     }
 }
+
+// ---------------------------------------------------------------------------
+// Issue #227, additive raw-segment export. --vad-export-raw writes VAD speech
+// segments (chunk-independent) instead of chunk boundaries; they are re-chunked
+// per run on import, so one export is reusable at any chunk length.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("vad boundaries: kind round-trips and controls chunk_cs", "[unit][vad]") {
+    // Raw: kind=vad_segments, NO chunk_cs (it would be meaningless and would
+    // falsely trip the mismatch gate).
+    const std::string raw = crispasr_serialize_vad_slices(sample_slices(), 16000, 0.0f, /*is_raw=*/true);
+    REQUIRE(raw.find("\"vad_segments\"") != std::string::npos);
+    REQUIRE(raw.find("chunk_cs") == std::string::npos);
+
+    std::vector<crispasr_audio_slice> out;
+    bool is_raw = false;
+    float chunk = -1.0f;
+    REQUIRE(crispasr_parse_vad_slices(raw, out, nullptr, &chunk, &is_raw));
+    REQUIRE(is_raw);
+    REQUIRE(chunk == 0.0f);
+
+    // Chunk export: kind=chunks, chunk_cs present.
+    const std::string chunks = crispasr_serialize_vad_slices(sample_slices(), 16000, 30.0f, /*is_raw=*/false);
+    REQUIRE(chunks.find("\"chunks\"") != std::string::npos);
+    REQUIRE(chunks.find("chunk_cs") != std::string::npos);
+    bool is_raw2 = true;
+    REQUIRE(crispasr_parse_vad_slices(chunks, out, nullptr, nullptr, &is_raw2));
+    REQUIRE_FALSE(is_raw2);
+
+    // A legacy file (no "kind") is read as chunks -- the historical behaviour.
+    const std::string legacy =
+        R"({"crispasr_vad":{"version":1,"sample_rate":16000,"slices":[{"start":0,"end":10,"t0_cs":0,"t1_cs":1}]}})";
+    bool is_raw3 = true;
+    REQUIRE(crispasr_parse_vad_slices(legacy, out, nullptr, nullptr, &is_raw3));
+    REQUIRE_FALSE(is_raw3);
+}
+
+TEST_CASE("vad boundaries: rechunk splits only over-long segments", "[unit][vad]") {
+    const int sr = 16000;
+    // A silent buffer is fine: the split lands on energy minima, and all-zero
+    // means "any minimum", which still produces valid contiguous sub-ranges.
+    std::vector<float> audio((size_t)sr * 20, 0.0f); // 20 s
+    std::vector<crispasr_audio_slice> in = {
+        {0, 2 * sr, 0, 200},          // 2 s -> untouched at chunk 5
+        {2 * sr, 20 * sr, 200, 2000}, // 18 s -> split at chunk 5
+    };
+
+    // chunk_seconds <= 0 is identity.
+    REQUIRE(crispasr_rechunk_slices(in, audio.data(), (int)audio.size(), sr, 0).size() == in.size());
+
+    const auto out5 = crispasr_rechunk_slices(in, audio.data(), (int)audio.size(), sr, 5);
+    // The 2 s segment survives; the 18 s one becomes >= 4 pieces (18/5).
+    REQUIRE(out5.size() > in.size());
+    for (const auto& s : out5) {
+        REQUIRE(s.end > s.start);
+        REQUIRE(s.end - s.start <= 5 * sr + 1); // no piece exceeds the chunk
+    }
+    // Coverage is preserved: first start and last end are unchanged.
+    REQUIRE(out5.front().start == in.front().start);
+    REQUIRE(out5.back().end == in.back().end);
+
+    // Re-chunking at a length longer than every segment is a no-op.
+    const auto out60 = crispasr_rechunk_slices(in, audio.data(), (int)audio.size(), sr, 60);
+    REQUIRE(out60.size() == in.size());
+}

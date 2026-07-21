@@ -804,6 +804,10 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.vad = true; // #227: import implies VAD
     } else if (arg == "--vad-import-strict") {
         params.vad_import_strict = true; // #227: refuse a chunk-length mismatch
+    } else if (arg == "--vad-export-raw") {
+        params.vad_export_file = ARGV_NEXT;
+        params.vad_export_raw = true; // #227: export raw speech segments, not chunks
+        params.vad = true;
     } else if (arg == "--separate") {
         params.separate = true; // §248 source separation task
     } else if (arg == "--stems") {
@@ -1387,8 +1391,11 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(
         stderr,
         "             --vad-import FILE            [%-7s] read segment boundaries from FILE instead of running VAD\n"
-        "             --vad-import-strict          [%-7s] refuse (not warn) if the file's chunk length differs\n",
-        params.vad_import_file.empty() ? "none" : params.vad_import_file.c_str());
+        "             --vad-import-strict          [%-7s] refuse (not warn) if the file's chunk length differs\n"
+        "             --vad-export-raw FILE        [%-7s] export RAW speech segments (chunk-independent, re-chunked on "
+        "import)\n",
+        params.vad_import_file.empty() ? "none" : params.vad_import_file.c_str(),
+        params.vad_import_strict ? "true" : "false", params.vad_export_raw ? "true" : "false");
     fprintf(stderr,
             "             --separate                  [%-7s] source separation task; writes <input>_<stem>.wav "
             "(mel-band-roformer / htdemucs, arch auto-detected)\n",

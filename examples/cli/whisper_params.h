@@ -109,6 +109,11 @@ struct whisper_params {
     // --vad-import-strict (CLI) or the vad_import_strict form field (server);
     // both surfaces share this field and must stay in agreement.
     bool vad_import_strict = false;
+    // #227: --vad-export-raw exports RAW VAD speech segments instead of chunk
+    // boundaries. These are model- AND chunk-length-independent, so one export
+    // can be imported by any run and is re-chunked per run. Non-breaking:
+    // --vad-export keeps its chunk-boundary behaviour.
+    bool vad_export_raw = false;
     // Issue #227: reuse VAD segment boundaries across ASR runs. --vad-export
     // writes the computed slices to a JSON file; --vad-import reads slices from
     // one instead of running VAD (skips the VAD model entirely).
