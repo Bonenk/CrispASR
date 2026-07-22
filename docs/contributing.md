@@ -103,6 +103,31 @@ std::unique_ptr<CrispasrBackend> crispasr_make_yourmodel_backend() {
 }
 ```
 
+**Forward the generation cap — do NOT hardcode the decode limit.** An
+autoregressive/LLM ASR backend has a decode loop bounded by some `max_new`. If
+you hardcode it (`const int max_new = 512;`), a user transcribing long audio in
+a single pass (`--chunk-seconds 0`) is silently truncated and `--max-new-tokens`
+does nothing — this was #292, found in **10 backends at once**. Instead:
+
+- put the cap on the context as a field defaulting to the backend's sensible
+  value (`int max_new_tokens = 512;` — keep whatever the old constant was, so
+  the default does not regress), and read it for BOTH the decode loop bound and
+  the KV-context sizing;
+- add a `yourmodel_set_max_new_tokens(ctx, n)` setter (mirror `set_beam_size`),
+  declared in the header;
+- in the adapter's `transcribe()`, forward it **only when the user set it
+  explicitly**:
+  `yourmodel_set_max_new_tokens(ctx_, p.max_new_tokens_explicit ? p.max_new_tokens : 0);`
+  The `max_new_tokens_explicit` flag exists precisely so the CLI's global 512
+  default never SHRINKS a backend whose own default is higher (diarize is 1024).
+  Pass `<= 0` to keep the backend default.
+- forward it on the session path too (`src/crispasr_c_api.cpp`, next to where the
+  backend's other setters are called): `yourmodel_set_max_new_tokens(s->yourmodel_ctx, s->max_new_tokens);`
+  — the session default is 0, so no explicit flag is needed there.
+
+The same rule applies to any other decode knob (temperature, beam) — the audit
+for #292 confirmed those were already forwarded; max_new_tokens was the one gap.
+
 ## 3. Register with the factory
 
 In `examples/cli/crispasr_backend.cpp`:

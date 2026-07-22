@@ -56,8 +56,8 @@ struct crispasr_segment {
     std::string text;
     int64_t t0 = 0; // centiseconds, absolute
     int64_t t1 = 0;
-    std::string speaker;                // empty if no diarization
-    bool speaker_turn_next = false;     // whisper tinydiarize
+    std::string speaker;            // empty if no diarization
+    bool speaker_turn_next = false; // whisper tinydiarize
     // #292: which chunk/slice this segment came from, or -1 for a single-pass
     // (unchunked) run. Speaker labels like "(speaker 1)" are CHUNK-LOCAL — they
     // restart per chunk — so a consumer needs chunk_id to tell "same speaker,
