@@ -236,6 +236,8 @@ struct canary_qwen_context {
     float decode_temperature = 0.0f;
     uint64_t decode_seed = 0;
     int beam_size = 1;
+    // #292: decode cap; forwarded from --max-new-tokens when set, else this default.
+    int max_new_tokens = 256;
 };
 
 // ===========================================================================
@@ -1128,7 +1130,7 @@ static canary_qwen_result* canary_qwen_transcribe_impl(canary_qwen_context* ctx,
     }
 
     // 4. Allocate KV cache
-    const int max_new_tokens = 256;
+    const int max_new_tokens = ctx->max_new_tokens > 0 ? ctx->max_new_tokens : 256; // #292
     const int max_ctx = total_prompt + max_new_tokens;
     if (!ctx->kv_k || ctx->kv_max_ctx < max_ctx) {
         if (ctx->kv_buf) {
@@ -1363,6 +1365,11 @@ extern "C" void canary_qwen_set_temperature(struct canary_qwen_context* ctx, flo
         ctx->decode_temperature = temperature;
         ctx->decode_seed = seed;
     }
+}
+
+extern "C" void canary_qwen_set_max_new_tokens(struct canary_qwen_context* ctx, int n) {
+    if (ctx && n > 0) // #292: <= 0 keeps the backend's 256 default
+        ctx->max_new_tokens = n;
 }
 
 extern "C" void canary_qwen_set_beam_size(struct canary_qwen_context* ctx, int n) {

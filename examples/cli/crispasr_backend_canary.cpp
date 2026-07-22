@@ -76,6 +76,8 @@ public:
         // Sticky decode-time sampling controls.
         canary_set_temperature(ctx_, params.temperature, params.seed);
         canary_set_beam_size(ctx_, params.beam_size > 0 ? params.beam_size : 1);
+        // #292: forward --max-new-tokens only when explicit; 0 keeps the default.
+        canary_set_max_new_tokens(ctx_, params.max_new_tokens_explicit ? params.max_new_tokens : 0);
 
         // Resolve src/tgt language with the fallback chain:
         //   source_lang -> language

@@ -58,6 +58,12 @@ struct crispasr_segment {
     int64_t t1 = 0;
     std::string speaker;                // empty if no diarization
     bool speaker_turn_next = false;     // whisper tinydiarize
+    // #292: which chunk/slice this segment came from, or -1 for a single-pass
+    // (unchunked) run. Speaker labels like "(speaker 1)" are CHUNK-LOCAL — they
+    // restart per chunk — so a consumer needs chunk_id to tell "same speaker,
+    // same chunk" (continuity) from "speaker 1 in chunk 0" vs "speaker 1 in
+    // chunk 2" (which may be different people). Only set when there is >1 chunk.
+    int chunk_id = -1;
     std::vector<crispasr_word> words;   // may be empty
     std::vector<crispasr_token> tokens; // may be empty
     // Multi-task ASR metadata (SenseVoice and similar). Empty when the

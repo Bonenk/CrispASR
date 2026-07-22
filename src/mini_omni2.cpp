@@ -193,6 +193,8 @@ struct mini_omni2_context {
 
     int n_threads = 4;
     std::string ask; // custom instruction (empty = default)
+    // #292: decode cap; forwarded from --max-new-tokens when set, else this default.
+    int max_new_tokens = 512;
 
     // SNAC decoder for TTS/S2S output
     void* snac_ctx = nullptr; // snac_decoder_ctx*
@@ -442,6 +444,12 @@ extern "C" void mini_omni2_set_ask(struct mini_omni2_context* ctx, const char* p
     if (!ctx)
         return;
     ctx->ask = (prompt && *prompt) ? prompt : "";
+}
+
+// #292: forward --max-new-tokens; <= 0 keeps the backend's 512 default.
+extern "C" void mini_omni2_set_max_new_tokens(struct mini_omni2_context* ctx, int n) {
+    if (ctx && n > 0)
+        ctx->max_new_tokens = n;
 }
 
 extern "C" bool mini_omni2_load_snac(struct mini_omni2_context* ctx, const char* snac_path) {
@@ -1208,8 +1216,8 @@ extern "C" char* mini_omni2_transcribe(struct mini_omni2_context* ctx, const flo
     if (!logits)
         return nullptr;
 
-    // Greedy decode
-    const int max_tokens = 512;
+    // Greedy decode  (#292: honor --max-new-tokens; text tokens only)
+    const int max_tokens = ctx->max_new_tokens > 0 ? ctx->max_new_tokens : 512;
     std::vector<int32_t> gen_ids;
 
     // Only look at text logits (first text_vocab_size)

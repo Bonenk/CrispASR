@@ -392,6 +392,7 @@ static bool whisper_params_parse_arg_backend_vad(int argc, char** argv, int& i, 
         params.no_auto_aligner = true;
     } else if (arg == "-n" || arg == "--max-new-tokens") {
         params.max_new_tokens = std::stoi(ARGV_NEXT);
+        params.max_new_tokens_explicit = true;
     } else if (arg == "--frequency-penalty") {
         params.frequency_penalty = std::stof(ARGV_NEXT);
     } else if (arg == "-ck" || arg == "--chunk-seconds") {

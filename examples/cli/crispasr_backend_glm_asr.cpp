@@ -86,6 +86,8 @@ public:
         } else {
             glm_asr_set_ask(ctx_, nullptr);
         }
+        // #292: forward --max-new-tokens only when explicit; 0 keeps the backend default.
+        glm_asr_set_max_new_tokens(ctx_, params.max_new_tokens_explicit ? params.max_new_tokens : 0);
 
         // Best-of-N: when temperature > 0 and best_of > 1, run N seeded
         // decodes (process-global libc rand reseeded per run) and keep the

@@ -233,6 +233,8 @@ struct moss_transcribe_context {
     int n_threads = 4;
     std::string model_path;
     int beam_size = 1;
+    // #292: decode cap; forwarded from --max-new-tokens when set, else this default.
+    int max_new_tokens = 512;
 
     // Encoder attention path. flash_attn_ext is fast on CPU/Metal/CUDA but
     // segfaults on Vulkan during graph/command-pool cleanup (issue #215, both
@@ -1380,7 +1382,8 @@ static char* moss_transcribe_impl(struct moss_transcribe_context* ctx, const flo
     free(audio_embeds);
 
     // 6. KV cache + prefill
-    int max_ctx = n_prompt + 512;
+    const int max_new = ctx->max_new_tokens > 0 ? ctx->max_new_tokens : 512;
+    int max_ctx = n_prompt + max_new;
     if (ctx->kv_k) {
         if (ctx->kv_max_ctx < max_ctx) {
             if (ctx->kv_buf)
@@ -1405,9 +1408,8 @@ static char* moss_transcribe_impl(struct moss_transcribe_context* ctx, const flo
     if (!logits)
         return nullptr;
 
-    // 7. Decode
+    // 7. Decode  (max_new computed above, honors --max-new-tokens, #292)
     std::vector<int32_t> generated;
-    const int max_new = 512;
     if (ctx->beam_size > 1) {
         auto replay = [&vocab](moss_transcribe_context* c, const int32_t* toks, int n, int prompt_len) -> float* {
             float* emb = moss_transcribe_embed_tokens(c, toks, n);
@@ -1614,4 +1616,12 @@ extern "C" void moss_transcribe_free(struct moss_transcribe_context* ctx) {
 extern "C" void moss_transcribe_set_beam_size(struct moss_transcribe_context* ctx, int beam_size) {
     if (ctx)
         ctx->beam_size = beam_size > 0 ? beam_size : 1;
+}
+
+// #292: forward the user's --max-new-tokens. Pass <= 0 to keep the 512 default
+// (the caller decides "explicit" — see the CLI adapter's max_new_tokens_explicit
+// gate, so an unset CLI default does not silently change this backend).
+extern "C" void moss_transcribe_set_max_new_tokens(struct moss_transcribe_context* ctx, int max_new_tokens) {
+    if (ctx && max_new_tokens > 0)
+        ctx->max_new_tokens = max_new_tokens;
 }

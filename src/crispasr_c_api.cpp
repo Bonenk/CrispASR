@@ -6730,6 +6730,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             } else {
                 moss_diarize_set_ask(s->moss_diarize_ctx, nullptr);
             }
+            // #292: forward the session's max_new_tokens (crispasr_session_set_max_new_tokens).
+            // <= 0 keeps the backend's 1024 default, matching the CLI adapter.
+            moss_diarize_set_max_new_tokens(s->moss_diarize_ctx, s->max_new_tokens);
             // Language hint not auto-injected — model auto-detects language.
             // Only inject when explicitly set by the caller (not LID-resolved).
             text = moss_diarize_transcribe(s->moss_diarize_ctx, pcm, n_samples);
