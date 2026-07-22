@@ -200,6 +200,11 @@ struct whisper_params {
     // DTW path (no second forward pass, no ~442 MB download).
     bool no_auto_aligner = false;
     int32_t max_new_tokens = 512;
+    // Whether the user passed --max-new-tokens. Backends whose sensible default
+    // differs from 512 (e.g. moss-diarize wants 1024) forward the CLI value only
+    // when this is set, so an unset default never SHRINKS a backend below its own
+    // (#292). Mirrors chunk_seconds_explicit.
+    bool max_new_tokens_explicit = false;
     float frequency_penalty = 0.0f;
     int32_t chunk_seconds = 30;
     bool chunk_seconds_explicit = false; // true when user passed --chunk-seconds

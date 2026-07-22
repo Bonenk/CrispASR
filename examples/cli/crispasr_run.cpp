@@ -1331,6 +1331,13 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             }
         }
 
+        // #292: stamp the chunk index so a consumer can tell that "(speaker N)"
+        // labels are chunk-local and restart per chunk. Only when there is more
+        // than one chunk — a single-pass run leaves chunk_id at its -1 default.
+        if (slices.size() > 1)
+            for (auto& seg : segs)
+                seg.chunk_id = (int)i;
+
         per_slice[i] = std::move(segs);
 
         // Per-slice progress for unified backends (whisper uses its own

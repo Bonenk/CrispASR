@@ -69,6 +69,10 @@ struct moonshine_context {
     bool use_gpu = false;
     float temperature = 0.0f; // 0 = greedy argmax; > 0 = multinomial sampling
     int beam_size = 1;        // 1 = greedy/sampled; >1 = beam search (deterministic)
+    // #292: ceiling on generated tokens. Moonshine is a short-form model, so the
+    // default 194 (~30 s) is architectural; --max-new-tokens raises the ceiling
+    // for callers who force single-pass long audio.
+    int max_new_tokens = 194;
     // Sticky per-call seed override for best-of-N. 0 = derive deterministically
     // from the input audio buffer (the historical default — repeated calls
     // with the same input give identical samples). Non-zero values let the
@@ -1082,8 +1086,9 @@ static int moonshine_transcribe_impl(struct moonshine_context* ctx, const float*
 
     // 2. Init KV caches
     int max_gen = (int)(ceil((double)n_samples / 16000.0 * 6.5));
-    if (max_gen > 194) {
-        max_gen = 194;
+    const int gen_ceiling = ctx->max_new_tokens > 0 ? ctx->max_new_tokens : 194; // #292
+    if (max_gen > gen_ceiling) {
+        max_gen = gen_ceiling;
     }
     int max_len = max_gen + 1; // +1 for BOS
 
@@ -1382,6 +1387,12 @@ extern "C" void moonshine_set_temperature(struct moonshine_context* ctx, float t
 extern "C" void moonshine_set_seed(struct moonshine_context* ctx, uint64_t seed) {
     if (ctx)
         ctx->seed_override = seed;
+}
+
+// #292: forward --max-new-tokens. <= 0 keeps the 194 short-form default.
+extern "C" void moonshine_set_max_new_tokens(struct moonshine_context* ctx, int max_new_tokens) {
+    if (ctx && max_new_tokens > 0)
+        ctx->max_new_tokens = max_new_tokens;
 }
 
 extern "C" void moonshine_set_beam_size(struct moonshine_context* ctx, int beam_size) {

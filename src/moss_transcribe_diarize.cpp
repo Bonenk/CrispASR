@@ -214,6 +214,11 @@ struct moss_diarize_context {
     int n_threads = 4;
     std::string model_path;
     int beam_size = 1;
+    // Decode cap. Diarize output is long (speaker tags + timestamps + text), so
+    // the default is 1024 rather than the global 512 — a single-pass 300 s file
+    // otherwise truncated (#292). The CLI/session forwards --max-new-tokens here
+    // when the user set it explicitly; unset keeps this 1024 default.
+    int max_new_tokens = 1024;
     std::string hotwords;
     std::string ask_override; // custom system instruction (set_ask)
     std::string language;     // language hint
@@ -1391,7 +1396,8 @@ static char* moss_diarize_impl(struct moss_diarize_context* ctx, const float* sa
     free(audio_embeds);
 
     // 6. KV cache + prefill
-    int max_ctx = n_prompt + 1024;
+    const int max_new = ctx->max_new_tokens > 0 ? ctx->max_new_tokens : 1024;
+    int max_ctx = n_prompt + max_new;
     if (ctx->kv_k) {
         if (ctx->kv_max_ctx < max_ctx) {
             if (ctx->kv_buf)
@@ -1416,9 +1422,8 @@ static char* moss_diarize_impl(struct moss_diarize_context* ctx, const float* sa
     if (!logits)
         return nullptr;
 
-    // 7. Decode
+    // 7. Decode  (max_new computed above, honors --max-new-tokens, #292)
     std::vector<int32_t> generated;
-    const int max_new = 1024; // diarize output can be longer
     if (ctx->beam_size > 1) {
         auto replay = [&vocab](moss_diarize_context* c, const int32_t* toks, int n, int prompt_len) -> float* {
             float* emb = moss_diarize_embed_tokens(c, toks, n);
@@ -1528,6 +1533,14 @@ extern "C" void moss_diarize_set_hotwords(struct moss_diarize_context* ctx, cons
 extern "C" void moss_diarize_set_beam_size(struct moss_diarize_context* ctx, int beam_size) {
     if (ctx)
         ctx->beam_size = beam_size > 0 ? beam_size : 1;
+}
+
+// #292: forward the user's --max-new-tokens. Pass <= 0 to keep the 1024 default
+// (the caller decides "explicit" — see the CLI adapter's max_new_tokens_explicit
+// gate, so an unset CLI default of 512 does not silently shrink this backend).
+extern "C" void moss_diarize_set_max_new_tokens(struct moss_diarize_context* ctx, int max_new_tokens) {
+    if (ctx && max_new_tokens > 0)
+        ctx->max_new_tokens = max_new_tokens;
 }
 
 extern "C" void moss_diarize_set_ask(struct moss_diarize_context* ctx, const char* instruction) {

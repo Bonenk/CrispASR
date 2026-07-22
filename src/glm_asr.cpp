@@ -191,6 +191,8 @@ struct glm_asr_context {
     ggml_tensor* kv_v = nullptr;
 
     int n_threads = 4;
+    // #292: decode cap; forwarded from --max-new-tokens when set, else this default.
+    int max_new_tokens = 512;
     std::string ask; // custom instruction (empty = use default)
 
     // §176s: cached encoder graph — reused when T_mel matches.
@@ -850,7 +852,7 @@ static char* glm_asr_transcribe_impl(struct glm_asr_context* ctx, const float* s
     glm_asr_bench_stage _b_dec("ar_decode");
     std::vector<int32_t> gen_ids;
     std::vector<float> gen_probs;
-    const int max_tokens = 512;
+    const int max_tokens = ctx->max_new_tokens > 0 ? ctx->max_new_tokens : 512; // #292
     const int beam_size = ctx->params.beam_size > 0 ? ctx->params.beam_size : 1;
 
     if (beam_size > 1) {
@@ -1025,6 +1027,12 @@ extern "C" void glm_asr_set_seed(struct glm_asr_context* ctx, unsigned int seed)
 extern "C" void glm_asr_set_beam_size(struct glm_asr_context* ctx, int beam_size) {
     if (ctx)
         ctx->params.beam_size = (beam_size > 0) ? beam_size : 1;
+}
+
+// #292: forward --max-new-tokens. <= 0 keeps the backend's 512 default.
+extern "C" void glm_asr_set_max_new_tokens(struct glm_asr_context* ctx, int n) {
+    if (ctx && n > 0)
+        ctx->max_new_tokens = n;
 }
 
 extern "C" void glm_asr_set_ask(struct glm_asr_context* ctx, const char* prompt) {

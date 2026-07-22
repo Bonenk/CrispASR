@@ -203,6 +203,8 @@ struct mimo_asr_context {
     ggml_tensor* kv_v = nullptr;
     int kv_max_ctx = 0;
     int kv_n_used = 0;
+    // #292: decode cap; forwarded from --max-new-tokens when set, else this default.
+    int max_new_tokens = 256;
 
     // 51b' cached T=1 step graph. Built lazily on first decode step of a
     // transcribe call with fixed_kv_len = kv_max_ctx so the topology is
@@ -1286,6 +1288,12 @@ extern "C" int mimo_asr_set_tokenizer_path(struct mimo_asr_context* ctx, const c
     return 0;
 }
 
+// #292: forward --max-new-tokens. n <= 0 keeps the backend's 256 default.
+extern "C" void mimo_asr_set_max_new_tokens(struct mimo_asr_context* ctx, int n) {
+    if (ctx && n > 0)
+        ctx->max_new_tokens = n;
+}
+
 // ===========================================================================
 // PLAN #51 step 8 — full transcribe pipeline.
 //
@@ -1766,7 +1774,7 @@ static char* mimo_asr_transcribe_impl(struct mimo_asr_context* ctx, const float*
 
     // 4. KV cache budget: prompt groups + max_new_tokens (one new group
     // per generated text token).
-    const int max_new = 256;
+    const int max_new = ctx->max_new_tokens > 0 ? ctx->max_new_tokens : 256;
     if (!mimo_asr_kv_init(ctx, T_total / gs + max_new + 16))
         return nullptr;
 

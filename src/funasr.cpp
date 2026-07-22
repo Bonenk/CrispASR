@@ -262,6 +262,8 @@ struct funasr_context {
     ggml_tensor* kv_v = nullptr;
     int kv_max_ctx = 0;
     int beam_size = 1;
+    // #292: decode cap; forwarded from --max-new-tokens when set, else this default.
+    int max_new_tokens = 512;
 
     // Cached per-step LLM decode graph (PLAN funasr-perf #1). Built once
     // at first decode call (via funasr_ensure_step_graph) using
@@ -1855,7 +1857,7 @@ static std::string funasr_transcribe_impl(funasr_context* ctx, const float* pcm,
     }
 
     // KV cache sized for prompt + up to max_new_tokens.
-    const int max_new_tokens = 512;
+    const int max_new_tokens = ctx->max_new_tokens > 0 ? ctx->max_new_tokens : 512;
     {
         funasr_bench_stage s("kv_init");
         // Tight kv_max_ctx — only allocate what this session actually needs.
@@ -2192,6 +2194,11 @@ extern "C" void funasr_set_beam_size(funasr_context* ctx, int beam_size) {
     if (!ctx)
         return;
     ctx->beam_size = beam_size > 1 ? beam_size : 1;
+}
+
+extern "C" void funasr_set_max_new_tokens(funasr_context* ctx, int n) {
+    if (ctx && n > 0)
+        ctx->max_new_tokens = n;
 }
 
 extern "C" void funasr_set_language(funasr_context* ctx, const char* lang) {
