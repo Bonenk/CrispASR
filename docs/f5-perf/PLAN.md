@@ -65,9 +65,40 @@ which need a CUDA verdict).
   K steps + first/last. MEASURED @32 steps: K=2 → 1.9× perfect, K=3 → 2.7× minor artifact.
   BUT ≈ equivalent to just using fewer EPSS steps (K=2@32 ≈ `--tts-steps 16`): same
   forward-count reduction, so validated + gated but not strongly additive to EPSS. The
-  branch-skip half (skip attention/FFN within blocks) would need per-block graph variants;
-  not done.
+  branch-skip half (skip attention/FFN within blocks) — see below.
 - Reference length is a real lever (joint ref+gen DiT sequence). Confirmed.
+
+### DiTReducio branch-skip (in progress)
+
+**Goal:** skip the FFN (or attention) branch within blocks on some steps, reusing the
+cached branch delta — surgical vs. temporal-skip's whole-step reuse. Potential value:
+push past temporal-skip's quality wall (K=3 artifacted) in the aggressive regime.
+
+**Architectural finding:** a static ggml graph executes every node, so branch-skip can't be
+a runtime `if` — it needs either (a) a 2nd "no-FFN" graph variant reading cached branch
+deltas kept as **persistent on-device tensors** shared between graphs (host round-trip of
+22×[dim,T] ≈ 150 MB/step would exceed the compute saved), or (b) the cheap probe below.
+Ceiling per skipped branch ≈ 25–30% (vs temporal-skip's 50%).
+
+**Plan (chosen: prototype cheaply first):** gated `CRISPASR_F5_FFN_SKIP=K` probe that kept the
+FFN matmuls running (NO speed win) but blended a cached FFN delta on skip steps via graph I/O
+(fresh delta out, cached delta in, `use_cache` scalar), host round-trip. Purpose: measure the
+QUALITY of FFN-skip vs temporal-skip at aggressive K before committing to the on-device
+dual-graph build.
+
+**Findings (M1 Metal, 32 steps, quality probe — decisive NEGATIVE):**
+
+| K | temporal-skip (DIT_SKIP) | FFN-skip (branch) |
+|---|--------------------------|-------------------|
+| 2 | perfect | perfect |
+| 3 | "quick-**brand**" minor artifact | "**Quickback**" similar artifact |
+| 4 | — | "park junk, oh, they lay lazy" badly degraded |
+
+FFN-skip does **not** hold quality past the point temporal-skip does — it hits the same wall at
+K=3 and degrades worse at K=4 — AND its speed ceiling is lower (~25–30% vs 50%). So the expensive
+on-device dual-graph build is **NOT worth it**: strictly worse than the temporal-skip already
+shipped. Probe reverted (diagnostic only, no speedup; fast path stays byte-identical). Decision:
+**do not build branch-skip.** Temporal-skip + EPSS + EMBED_GPU are the levers to ship.
 - No verified Candle/burn F5 port, no vLLM/SGLang. MLX port ~8× RT on M3 Max.
 
 **Conclusion: F5 is already well-optimized; the real wins are configuration
