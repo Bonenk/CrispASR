@@ -60,8 +60,13 @@ which need a CUDA verdict).
   just needs validation + recommendation, no new kernel.
 - **Guidance-free / interval CFG** halves per-step cost; interval form is portable and
   we already have `CRISPASR_F5_CFG_INTERVAL`. Paper RTF 0.31→0.17 by dropping uncond.
-- **Layer caching across steps** (DiTReducio 2509.09748) — training-free, NEW lever we
-  lack. Complex + quality-risky. Future direction.
+- **Layer caching across steps** (DiTReducio 2509.09748) — implemented the temporal-skip
+  half (`CRISPASR_F5_DIT_SKIP=K`): reuse the cached full step-velocity, recompute every
+  K steps + first/last. MEASURED @32 steps: K=2 → 1.9× perfect, K=3 → 2.7× minor artifact.
+  BUT ≈ equivalent to just using fewer EPSS steps (K=2@32 ≈ `--tts-steps 16`): same
+  forward-count reduction, so validated + gated but not strongly additive to EPSS. The
+  branch-skip half (skip attention/FFN within blocks) would need per-block graph variants;
+  not done.
 - Reference length is a real lever (joint ref+gen DiT sequence). Confirmed.
 - No verified Candle/burn F5 port, no vLLM/SGLang. MLX port ~8× RT on M3 Max.
 

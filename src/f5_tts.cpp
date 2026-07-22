@@ -1303,7 +1303,6 @@ static bool f5_embed_cache_build(f5_tts_context* ctx, int T) {
     ec.reset();
     const auto& hp = ctx->hp;
     const auto& w = ctx->w;
-    const int dim = hp.dim;
     const int cat_dim = hp.mel_dim + hp.mel_dim + hp.text_dim;
 
     struct ggml_init_params p = {4 * 1024 * 1024, nullptr, true};
@@ -1794,6 +1793,29 @@ static std::vector<float> euler_solve(f5_tts_context* ctx,
                 "quality — use one lever or the other (low --tts-steps OR interval CFG), not both.\n",
                 cfg_interval, n_steps);
 
+    // DiTReducio-style temporal skipping (opt-in, APPROXIMATE — #294). Consecutive
+    // ODE steps produce near-identical DiT velocities, so recompute the full step
+    // velocity (BOTH CFG arms) only every K steps + first/last, and reuse the cached
+    // velocity in between — skipping the entire DiT forward on reuse steps (unlike
+    // interval-CFG, which only skips the uncond arm). ~K× fewer forwards at stride K.
+    // Same stale-reuse risk as interval-CFG: fine near the default step count, breaks
+    // at aggressive low NFE. Default OFF (K=1 = exact, legacy path byte-identical).
+    const int dit_skip = [] {
+        const char* e = std::getenv("CRISPASR_F5_DIT_SKIP");
+        const int k = e ? atoi(e) : 1;
+        return k < 1 ? 1 : k;
+    }();
+    const bool dit_skip_on = dit_skip > 1;
+    std::vector<float> v_step_cache; // last full step velocity [T*mel_dim], reused on skip steps
+    if (dit_skip_on && ctx->verbosity >= 1)
+        fprintf(stderr, "f5_tts: DiT temporal-skip K=%d (full velocity recomputed every %d steps; first+last always)\n",
+                dit_skip, dit_skip);
+    if (dit_skip_on && n_steps < 16)
+        fprintf(stderr,
+                "f5_tts: WARNING DiT temporal-skip (CRISPASR_F5_DIT_SKIP=%d) with only %d ODE steps degrades "
+                "quality — pair it with a higher --tts-steps, not an aggressive low count.\n",
+                dit_skip, n_steps);
+
     // Initial noise y0 ~ N(0, 1)
     std::vector<float> x(T * mel_dim);
     if (!ctx->ref_init_noise.empty() && (int)ctx->ref_init_noise.size() == T * mel_dim) {
@@ -1822,6 +1844,17 @@ static std::vector<float> euler_solve(f5_tts_context* ctx,
             dump_stage(ctx, "time_embed", time_emb.data(), time_emb.size());
         }
 
+        // DiTReducio temporal skip: on a reuse step, apply the cached full velocity
+        // and skip both DiT forwards entirely.
+        if (dit_skip_on && step != 0 && step != n_steps - 1 && (step % dit_skip) != 0 && !v_step_cache.empty()) {
+            for (size_t i = 0; i < x.size(); i++)
+                x[i] += v_step_cache[i] * dt;
+            char lbl[64];
+            snprintf(lbl, sizeof(lbl), "ode_step_%d", step + 1);
+            dump_stage(ctx, lbl, x.data(), x.size());
+            continue;
+        }
+
         if (ctx->cfg_strength < 1e-5f) {
             // No CFG: single forward pass
             auto velocity = dit_forward(ctx, x.data(), T, mel_dim, cond.data(), text_emb.data(), text_dim,
@@ -1832,6 +1865,8 @@ static std::vector<float> euler_solve(f5_tts_context* ctx,
             for (size_t i = 0; i < x.size(); i++) {
                 x[i] += velocity[i] * dt;
             }
+            if (dit_skip_on)
+                v_step_cache.assign(velocity.begin(), velocity.end());
         } else {
             // CFG: conditioned + unconditioned forward. The DiT is identical
             // per arm (the cond/uncond difference is baked into `hidden` on the
@@ -1890,9 +1925,13 @@ static std::vector<float> euler_solve(f5_tts_context* ctx,
 
             // CFG: v = v_cond + cfg * (v_cond - v_uncond)
             float cfg = ctx->cfg_strength;
+            if (dit_skip_on)
+                v_step_cache.resize(x.size());
             for (size_t i = 0; i < x.size(); i++) {
                 float v = v_cond[i] + cfg * (v_cond[i] - v_unc_ptr[i]);
                 x[i] += v * dt;
+                if (dit_skip_on)
+                    v_step_cache[i] = v;
             }
         }
 
