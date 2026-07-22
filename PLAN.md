@@ -27,6 +27,21 @@ The v0.8.18 → v0.8.20 train shipped in one session (2026-07-21): each patch wa
 a genuine fix that only surfaced on a real tag run — see "Recent completions"
 and `LEARNINGS.md` "a green release job is not a shipped artifact".
 
+**Recent completions (2026-07-22):**
+- **#292 --max-new-tokens ignored** — SHIPPED. moss-diarize (and 9 more ASR
+  backends) hardcoded the decode cap, so `--max-new-tokens` did nothing and a
+  long single-pass truncated (reporter's 300 s file stopped at 164 s). Fixed
+  across all 10: context `max_new_tokens` field defaulting to the old constant
+  (no regression) + setter + cap/KV read it; CLI forwards only when
+  `max_new_tokens_explicit`; session C-ABI forwards `s->max_new_tokens`.
+  moonshine excluded (its 194 is an architectural short-form limit). Also added
+  `chunk_id` to segments (part 2: diarize speaker labels are chunk-local).
+  **CUDA-validated** on the reporter's exact backend (moss-diarize q4_k):
+  `--max-new-tokens` 64→4096 raised output 216→366 words CPU / 232→382 CUDA,
+  chunk_id 4 distinct, tabcnn CPU/CUDA parity 0 mismatches (6/6, ~18 min,
+  `tools/kaggle/cuda-292-maxnewtokens/`). See `LEARNINGS.md` "a hardcoded decode
+  cap" + memory [[kaggle-full-harness-regime]].
+
 **Recent completions (2026-07-21):**
 - **#290 canary-qwen long audio** — SHIPPED (v0.8.19). The backend declared
   `CAP_INTERNAL_CHUNKING` with no chunker (`src/canary_qwen.cpp` has zero

@@ -6,6 +6,32 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-22 — #292: --max-new-tokens honored across 10 ASR backends; chunk_id; CUDA-validated
+
+moss-diarize ignored `--max-new-tokens` (hardcoded 1024), truncating a long
+single-pass run. The audit found the SAME hardcoded decode cap in 9 more ASR
+backends (canary, canary-qwen, glm-asr, funasr, mimo-asr, moss-transcribe,
+mini-omni2, higgs-stt, higgs). All fixed to a per-context `max_new_tokens` field
+defaulting to each backend's OWN old constant (no regression), forwarded from the
+CLI only when explicitly set (`max_new_tokens_explicit`, so the global 512
+default can't shrink a backend) and from the session C-ABI (`s->max_new_tokens`).
+Several needed the KV cache grown alongside the cap or a raised value overflows
+`kv_max_ctx`. moonshine was correctly EXCLUDED — its 194 is a length-derived
+architectural short-form limit, not a naive constant. Part 2: `crispasr_segment`
+gained `chunk_id` (diarize `(speaker N)` labels are chunk-local, so a consumer
+needs it to tell continuity from an ID swap), stamped per slice on multi-chunk
+runs and emitted in the .json.
+
+CUDA-validated under the full Kaggle harness on the reporter's exact backend
+(moss-diarize q4_k): `--max-new-tokens` 64→4096 raised output 216→366 words (CPU)
+/ 232→382 (CUDA) — a deterministic causal increase (equal counts would be the
+bug); chunk_id 4 distinct in a chunked diarize JSON; tabcnn `--tab` CPU-vs-CUDA
+fret parity 0 mismatches. 6/6. The first run wasted hours on a self-inflicted
+download bug (single-connection curl at 355k/s after disabling the harness's
+hf_transfer) — fixed to hf_hub_download at 16.5 mbps, ~18 min total. A multi-
+writer fork tangle during the edit was reconciled to a clean history (the tree
+built + CI-green throughout).
+
 ## 2026-07-21 — v0.8.18 → v0.8.20 release train: canary-qwen #290, lib delivery, iOS, C# #291
 
 Four releases in one session, each a genuine fix that only surfaced on a real
