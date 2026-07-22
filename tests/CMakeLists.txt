@@ -3220,6 +3220,15 @@ target_include_directories(test-htdemucs-smoke PRIVATE
 )
 target_link_libraries(test-htdemucs-smoke PRIVATE htdemucs)
 
+# --- test-mel-band-roformer-smoke --- links the backend (artifact guard) + API smoke
+add_executable(test-mel-band-roformer-smoke test_mel_band_roformer_smoke.cpp)
+target_include_directories(test-mel-band-roformer-smoke PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/include
+)
+target_link_libraries(test-mel-band-roformer-smoke PRIVATE mel-band-roformer)
+
 # --- test-f5-tts --- standalone F5-TTS DiT+Vocos smoke test
 add_executable(test-f5-tts test-f5-tts.cpp)
 target_include_directories(test-f5-tts PRIVATE
