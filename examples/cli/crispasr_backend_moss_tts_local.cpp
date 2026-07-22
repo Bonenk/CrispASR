@@ -123,7 +123,9 @@ public:
             sp.text_temperature = params.temperature;
             sp.audio_temperature = params.temperature;
         }
-        if (params.max_new_tokens > 0)
+        // Explicit-only: whisper_params default 512 vs moss-tts-local default 4096
+        // — `> 0` would shrink every synthesis to 512 frames. Gate on the flag (#292).
+        if (params.max_new_tokens_explicit)
             sp.max_new_frames = params.max_new_tokens;
         if (params.tts_max_speech_tokens >= 0)
             sp.max_audio_frames = params.tts_max_speech_tokens;
