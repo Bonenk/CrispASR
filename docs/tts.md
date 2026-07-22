@@ -977,10 +977,13 @@ format; see the model README). All speed comes from *fewer / smaller passes*:
 | `CRISPASR_F5_CFG_INTERVAL=2` | ~1.3× | reuse the unconditional CFG velocity between steps | intact at ≥16 steps |
 | shorter reference clip (3–5 s) | scales with T | the DiT denoises ref+gen jointly, so a long ref inflates *every* pass (attention is O(T²)) | intact |
 | `CRISPASR_F5_BATCH_CFG=1` | GPU-dependent | one 2×-batch CFG forward (matches upstream) instead of two; try on CUDA | intact |
+| `CRISPASR_F5_EMBED_GPU=1` | ~1.3× (more on slow-CPU) | run the InputEmbedding (input_proj + conv-pos) on the GPU instead of the CPU; removes the per-step CPU stall | intact (byte-identical gate-off; roundtrip-identical gate-on). GPU builds only |
+| `CRISPASR_F5_DIT_SKIP=2` | ~1.9× | DiTReducio temporal skip — reuse the cached step velocity every other step | intact at 32 steps; ≈ using `--tts-steps 16`, so use one or the other |
 
-Stacking: `~4 s ref` + `--tts-steps 7` compound. **Do not** combine a low step count
-with `CFG_INTERVAL` — too few non-uniform steps + a stale uncond degrades to noise
-(the runtime warns when interval-CFG runs with <16 steps).
+Stacking: `~4 s ref` + `--tts-steps 7` (+ `CRISPASR_F5_EMBED_GPU=1` on a GPU) compound.
+**Do not** combine a low step count with `CFG_INTERVAL` or `DIT_SKIP` — too few
+non-uniform steps + a stale/reused velocity degrades to noise (the runtime warns
+below 16 steps). `EMBED_GPU` is orthogonal and stacks with any step setting.
 
 `CRISPASR_F5_BENCH=1` prints the per-stage split (host_embed / dit_graph / vocos).
 `-nfa` has no effect on F5 — the DiT always uses flash attention.
