@@ -159,7 +159,11 @@ public:
             sp.text_temperature = params.temperature;
             sp.audio_temperature = params.temperature;
         }
-        if (params.max_new_tokens > 0)
+        // Only when the user EXPLICITLY set --max-new-tokens: the whisper_params
+        // default is 512, but moss-tts's own default is 4096, so `> 0` (always
+        // true) would silently shrink every synthesis to 512 frames (~41 s). Same
+        // trap as #292 — gate on the explicit flag, not the value.
+        if (params.max_new_tokens_explicit)
             sp.max_new_tokens = params.max_new_tokens;
         // Duration control: max_speech_tokens maps to MOSS-TTS max_audio_frames.
         // 1s ≈ 12.5 tokens, so max_audio_frames is the token-level AR cap.
