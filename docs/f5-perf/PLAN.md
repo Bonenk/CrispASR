@@ -74,7 +74,7 @@ which need a CUDA verdict).
 |---|--------|------|--------|
 | 4 | F16 activations in DiT matmuls | `CRISPASR_F5_F16_ACT` | built + gated. **Metal: byte-identical + ~17% SLOWER** (ggml already casts RHS to F16 internally). Committed, default OFF, CUDA-A/B-only. |
 | 6 | stable-alloc (skip per-step re-alloc for CUDA-graph replay) | `CRISPASR_F5_STABLE_ALLOC` | **REVERTED — correctness bug**: pos_in clobbered after step 0 → garbage ("(wind blowing)"). Proper fix needs persistent input tensors on a dedicated buffer (omnivoice §245 pattern); CUDA-only value, unverifiable on Metal. Not worth it now. |
-| 2 | host-embed → GPU graph | — | NOT DONE — ggml has no grouped conv1d (F5 conv-pos groups=16 ⇒ 16 sliced convs + concat in-graph), invasive + correctness-risky + only a CUDA win. Deprioritized vs config levers. |
+| 2 | host-embed → GPU graph | `CRISPASR_F5_EMBED_GPU` | **DONE + WINS.** Cached embed graph (input_proj + 2× grouped conv-pos + Mish + residual) on ctx->backend, reusing the cosyvoice3 grouped-conv-pos pattern (symmetric pad=15). MEASURED M1: host_embed 15.6→3.9 s, **ode_solve 60.9→48.3 s (1.26×)**, roundtrip perfect, gate-off byte-identical (e249). Wins even on M1 (removes the serial CPU stall between GPU dispatches); bigger expected on fast-GPU/slow-CPU. Default OFF (CPU-only builds would run the graph on CPU); recommend with a GPU backend, flip default after CUDA confirm. |
 | batched CFG default (CUDA) | `CRISPASR_F5_BATCH_CFG` | exists; validating correctness. Matches upstream. Candidate CUDA default. |
 | EPSS low-NFE + interval | (knobs) | validating quality at n=7/10/12 (+interval). Primary recommendation. |
 
