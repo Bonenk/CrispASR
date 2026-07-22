@@ -226,7 +226,12 @@ def main():
             adv_missing.append("test")
         if not any_file_has(refs_dir, name):
             adv_missing.append("ref-dumper")
-        if f'"{name}"' not in registry:
+        # Convert-only backends ship no published GGUF — the user converts them
+        # locally (documented in the README), so there is nothing to auto-download
+        # and a registry entry would be a dead URL. voxcpm2-vae is converted from
+        # openbmb/VoxCPM2 with `--vae-only`; exempt it from the registry advisory.
+        CONVERT_ONLY = {"voxcpm2-vae"}
+        if name not in CONVERT_ONLY and f'"{name}"' not in registry:
             adv_missing.append("registry")
         # env-live-tests.sh: only flag if the backend has a *_live.cpp test
         # that actually needs model env vars (params-only tests don't need them)
