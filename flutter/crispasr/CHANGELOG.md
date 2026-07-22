@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.21
+
+- **`--max-new-tokens` is honored across all ASR backends.** Ten backends
+  (moss-diarize, canary, canary-qwen, glm-asr, funasr, mimo-asr, moss-transcribe,
+  mini-omni2, higgs-stt, higgs) previously hardcoded their decode cap, so a long
+  single-pass transcription truncated. Each now forwards the value while keeping
+  its own default, so nothing regresses.
+- **MOSS TTS synthesis params wired** — moss-tts / moss-tts-local now honor
+  max-new-tokens, duration (max-speech-tokens), top-p, top-k, and
+  repetition-penalty instead of staying at hardcoded defaults.
+- **Chunk-local speaker scope** — diarized segments now carry a `chunk_id`;
+  `(Speaker N)` labels are chunk-local, so a consumer uses `chunk_id` to tell
+  continuity from an ID swap.
+- No Dart API changes.
+
 ## 0.8.20
 
 - **iOS is now supported.** The release ships an Apple `crispasr.xcframework`
