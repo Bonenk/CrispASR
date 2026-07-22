@@ -97,6 +97,24 @@ static bool f5_f16_act_enabled() {
     return v != 0;
 }
 
+// Opt-in (#294): compute the InputEmbedding (input_proj + 2× grouped conv-pos +
+// Mish + residual) on the GPU backend instead of host BLAS/scalar. On the default
+// (32 steps) that host stage is ~26% of the ODE loop on M1 and a larger share on a
+// fast-GPU/slow-CPU box (the #294 reporter's RTX 5060 Ti + Ryzen 2600). Moving it
+// to ctx->backend frees the CPU stall between GPU DiT dispatches. Reuses the proven
+// grouped-conv-pos graph pattern from cosyvoice3_tts (identical
+// Conv1d(dim,dim,k=31,groups=16)+Mish module), adapted to F5's SYMMETRIC pad=15.
+// Default OFF pending a CUDA A/B (on M1 the GPU is already the bottleneck, so this
+// is expected to regress locally while winning on the reporter's hardware).
+static bool f5_embed_gpu_enabled() {
+    static int v = -1;
+    if (v < 0) {
+        const char* e = crispasr_env::get("CRISPASR_F5_EMBED_GPU");
+        v = (e && *e && *e != '0') ? 1 : 0;
+    }
+    return v != 0;
+}
+
 struct f5_bench_stage {
     const char* name;
     std::chrono::steady_clock::time_point t0;
@@ -288,6 +306,34 @@ struct f5_dit_graph_cache {
     ~f5_dit_graph_cache() { reset(); }
 };
 
+// #294: GPU InputEmbedding graph (opt-in CRISPASR_F5_EMBED_GPU). Built once per
+// (T,B), reused across forwards. Input = the concatenated [x|cond'|text] (cat_dim,
+// T, B); output = hidden (dim, T, B). input_proj + conv-pos weights already live on
+// ctx->backend, so this keeps the whole embed on-device.
+struct f5_embed_graph_cache {
+    int T_cached = -1;
+    int B_cached = -1;
+    ggml_context* gctx = nullptr;
+    ggml_cgraph* gf = nullptr;
+    ggml_gallocr_t galloc = nullptr;
+    ggml_tensor* cat_in = nullptr;     // (cat_dim, T, B) — concatenated input
+    ggml_tensor* hidden_out = nullptr; // (dim, T, B) — embedded hidden
+    void reset() {
+        if (galloc) {
+            ggml_gallocr_free(galloc);
+            galloc = nullptr;
+        }
+        if (gctx) {
+            ggml_free(gctx);
+            gctx = nullptr;
+        }
+        gf = nullptr;
+        cat_in = hidden_out = nullptr;
+        T_cached = B_cached = -1;
+    }
+    ~f5_embed_graph_cache() { reset(); }
+};
+
 // ── Context ──────────────────────────────────────────────────────
 
 struct f5_tts_context {
@@ -321,6 +367,7 @@ struct f5_tts_context {
 
     // Cached fused DiT graph (rebuilt only when T changes)
     f5_dit_graph_cache dit_cache;
+    f5_embed_graph_cache embed_cache; // #294 GPU InputEmbedding (opt-in)
 
     // Pre-dequantized F32 input-embedding weights.
     // Avoids 64× read_tensor_f32 per synthesis (conv_pos tensors are 7.7 MB each).
@@ -1213,6 +1260,115 @@ static std::vector<float> f5_dit_run(f5_tts_context* ctx, const float* hidden, i
 static int64_t g_f5_hostembed_us = 0;
 static int64_t g_f5_ditgraph_us = 0;
 
+// ── GPU InputEmbedding (#294, opt-in) ────────────────────────────
+// Mish = x * tanh(softplus(x)).
+static ggml_tensor* f5_mish_graph(ggml_context* g, ggml_tensor* x) {
+    return ggml_mul(g, x, ggml_tanh(g, ggml_softplus(g, x)));
+}
+
+// Symmetric ("same") grouped Conv1d for F5's ConvPositionEmbedding.
+// h: (C, T) F32 — channel-first. w: (K, C_per_group, C). b: (C,). pad = (K-1)/2 so
+// output length == T. Mirrors cosyvoice3_tts::cv3_causal_grouped_conv1d but with
+// symmetric padding instead of causal left-pad.
+static ggml_tensor* f5_sym_grouped_conv1d_graph(ggml_context* g, ggml_tensor* h, ggml_tensor* w, ggml_tensor* b) {
+    const int K = (int)w->ne[0];
+    const int C_per_g = (int)w->ne[1];
+    const int C = (int)w->ne[2];
+    const int T = (int)h->ne[1];
+    const int G = C / C_per_g;
+    const int pad = (K - 1) / 2;
+    ggml_tensor* out = nullptr;
+    for (int grp = 0; grp < G; grp++) {
+        const size_t c0 = (size_t)grp * C_per_g;
+        ggml_tensor* h_g = ggml_view_2d(g, h, C_per_g, T, h->nb[1], c0 * h->nb[0]);
+        h_g = ggml_cont(g, ggml_transpose(g, h_g)); // (T, C_per_g)
+        ggml_tensor* w_g = ggml_view_3d(g, w, K, C_per_g, C_per_g, w->nb[1], w->nb[2], c0 * w->nb[2]);
+        w_g = ggml_cont(g, w_g);
+        ggml_tensor* y = ggml_conv_1d(g, w_g, h_g, /*s*/ 1, /*p*/ pad, /*d*/ 1); // (T, C_per_g)
+        y = ggml_cont(g, ggml_transpose(g, y));                                  // (C_per_g, T)
+        ggml_tensor* b_g = ggml_view_1d(g, b, C_per_g, c0 * b->nb[0]);
+        y = ggml_add(g, y, b_g);
+        out = out ? ggml_concat(g, out, y, 0) : y;
+    }
+    return out;
+}
+
+// Build the cached GPU embed graph (once per T). B is always 1 here — the CFG arms
+// call this separately. cat_in (cat_dim,T,1) → input_proj → 2×(grouped conv + Mish)
+// + residual → hidden_out (dim,T,1).
+static bool f5_embed_cache_build(f5_tts_context* ctx, int T) {
+    auto& ec = ctx->embed_cache;
+    if (ec.T_cached == T && ec.B_cached == 1 && ec.galloc)
+        return true;
+    ec.reset();
+    const auto& hp = ctx->hp;
+    const auto& w = ctx->w;
+    const int dim = hp.dim;
+    const int cat_dim = hp.mel_dim + hp.mel_dim + hp.text_dim;
+
+    struct ggml_init_params p = {4 * 1024 * 1024, nullptr, true};
+    ec.gctx = ggml_init(p);
+    if (!ec.gctx)
+        return false;
+
+    ec.cat_in = ggml_new_tensor_2d(ec.gctx, GGML_TYPE_F32, cat_dim, T);
+    ggml_set_name(ec.cat_in, "cat_in");
+    ggml_set_input(ec.cat_in);
+
+    // input_proj: (cat_dim,T) → (dim,T)
+    ggml_tensor* h = ggml_mul_mat(ec.gctx, w.input_proj_weight, ec.cat_in);
+    h = ggml_add(ec.gctx, h, w.input_proj_bias);
+    ggml_tensor* proj_out = h;
+    // 2 × (grouped conv-pos + Mish)
+    h = f5_mish_graph(ec.gctx, f5_sym_grouped_conv1d_graph(ec.gctx, h, w.conv_pos_0_weight, w.conv_pos_0_bias));
+    h = f5_mish_graph(ec.gctx, f5_sym_grouped_conv1d_graph(ec.gctx, h, w.conv_pos_1_weight, w.conv_pos_1_bias));
+    h = ggml_add(ec.gctx, h, proj_out); // residual
+    ggml_set_name(h, "hidden_out");
+    ggml_set_output(h);
+    ec.hidden_out = h;
+
+    ec.gf = ggml_new_graph_custom(ec.gctx, 2048, false);
+    ggml_build_forward_expand(ec.gf, ec.hidden_out);
+    ec.galloc = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+    if (!ggml_gallocr_reserve(ec.galloc, ec.gf) || !ggml_gallocr_alloc_graph(ec.galloc, ec.gf)) {
+        ec.reset();
+        return false;
+    }
+    ec.T_cached = T;
+    ec.B_cached = 1;
+    return true;
+}
+
+// GPU equivalent of f5_compute_hidden (one arm). Builds the cat on host (trivial,
+// no FLOP), uploads, runs input_proj + conv-pos on the backend, returns hidden
+// [T*dim] in the same layout as the host path.
+static std::vector<float> f5_compute_hidden_gpu(f5_tts_context* ctx, const float* x_data, int T, int mel_dim,
+                                                const float* cond_data, const float* text_data, int text_dim,
+                                                bool drop_audio_cond) {
+    const int dim = ctx->hp.dim;
+    const int cat_dim = mel_dim + mel_dim + text_dim;
+    if (!f5_embed_cache_build(ctx, T))
+        return {};
+    auto& ec = ctx->embed_cache;
+    if (!ggml_gallocr_alloc_graph(ec.galloc, ec.gf))
+        return {};
+    std::vector<float> cat_input((size_t)T * cat_dim);
+    for (int t = 0; t < T; t++) {
+        for (int d = 0; d < mel_dim; d++)
+            cat_input[t * cat_dim + d] = x_data[t * mel_dim + d];
+        for (int d = 0; d < mel_dim; d++)
+            cat_input[t * cat_dim + mel_dim + d] = drop_audio_cond ? 0.0f : cond_data[t * mel_dim + d];
+        for (int d = 0; d < text_dim; d++)
+            cat_input[t * cat_dim + mel_dim + mel_dim + d] = text_data[t * text_dim + d];
+    }
+    ggml_backend_tensor_set(ec.cat_in, cat_input.data(), 0, cat_input.size() * sizeof(float));
+    if (ggml_backend_graph_compute(ctx->backend, ec.gf) != GGML_STATUS_SUCCESS)
+        return {};
+    std::vector<float> hidden((size_t)T * dim);
+    ggml_backend_tensor_get(ec.hidden_out, hidden.data(), 0, hidden.size() * sizeof(float));
+    return hidden;
+}
+
 // Host-side InputEmbedding: cat(x, cond, text) → input_proj → +conv_pos_embed.
 // Returns `hidden` [dim,T] (== ggml [dim,T] memory layout). Shared by the plain
 // per-pass path and the batched-CFG path (which computes it once per arm).
@@ -1220,6 +1376,9 @@ static std::vector<float> f5_compute_hidden(f5_tts_context* ctx, const float* x_
                                             const float* cond_data, const float* text_data, int text_dim,
                                             bool drop_audio_cond, bool drop_text, int step_idx) {
     (void)drop_text;
+    // #294 opt-in: run the whole InputEmbedding on the GPU backend.
+    if (f5_embed_gpu_enabled())
+        return f5_compute_hidden_gpu(ctx, x_data, T, mel_dim, cond_data, text_data, text_dim, drop_audio_cond);
     const int dim = ctx->hp.dim;
 
     // Concatenate along feature dim: (T, mel_dim + mel_dim + text_dim) = (T, 712)
