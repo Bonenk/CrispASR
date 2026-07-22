@@ -10,6 +10,46 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## A hardcoded decode cap silently ignores --max-new-tokens — and forwarding it naively SHRINKS a backend (#292, 10 ASR backends, 2026-07-22)
+
+An autoregressive/LLM ASR backend caps its decode loop at some `const int max_new
+= N`. If N is hardcoded, `--max-new-tokens` does nothing and a long SINGLE-PASS
+run (`--chunk-seconds 0`) truncates — the reporter's 300 s file stopped at 164 s
+against moss-diarize's baked-in 1024. The audit found the identical pattern in
+**10 backends** (moss-diarize, canary, canary-qwen, glm-asr, funasr, mimo-asr,
+moss-transcribe, mini-omni2, higgs-stt, higgs); it hides because with default
+chunking each ~30 s chunk fits the cap, so it only bites single-pass or unusually
+dense audio.
+
+Three transferable points:
+
+1. **The fix is a context field + setter + adapter forward + session forward, per
+   backend** — mirror an existing `set_beam_size`. The field defaults to the
+   backend's OWN old constant, so nothing regresses; the decode loop AND any
+   coupled KV-cache sizing must both read it (funasr/higgs/moss-transcribe sized
+   the KV as `prompt + 1024` separately — miss it and a raised cap overflows
+   `kv_max_ctx` → GGML_ASSERT).
+
+2. **Naive forwarding is a SECOND bug.** `whisper_params.max_new_tokens` defaults
+   to 512, but several backends default HIGHER (diarize 1024). Forwarding 512
+   unconditionally SHRINKS them. The gate is a `max_new_tokens_explicit` flag
+   (set only when the user passed `-n`), so the CLI default never overrides a
+   backend's own — mirrors `chunk_seconds_explicit`. The session path needs no
+   flag: its default is 0 = unset.
+
+3. **Not every cap is a bug.** moonshine's `ceil(n_samples/16000*6.5)` clamped to
+   194 is LENGTH-DERIVED and 194 is its architectural short-form limit — forcing
+   more exceeds its trained window. Grep each backend's source before "fixing" a
+   constant; a length-derived or architectural bound is correct.
+
+CUDA-validated the flag is honored by measuring word count at
+`--max-new-tokens 64` vs `4096` (both single-pass): a deterministic causal
+increase (216→366) — equal counts would be the bug, independent of clip length.
+A first gate demanding `>2x` wrongly FAILed the real 1.7x; validate the ORACLE
+(the threshold) before believing a red result — see [[parity-harness-negative-control]].
+
+---
+
 ## A green release job is not a shipped artifact — verify what you DELIVER, not what the workflow says (v0.8.18–v0.8.20 release train, 2026-07-21)
 
 Four releases in one session, and every real failure REPORTED SUCCESS. The
