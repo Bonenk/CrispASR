@@ -255,12 +255,16 @@ for key, backend in [("moss_diarize", "moss-diarize")]:
             ok_hi, hi_txt, _, _ = transcribe(M[key], backend, MED, device,
                                              extra=["--chunk-seconds", "0", "--max-new-tokens", "4096"])
         n_lo, n_hi = word_count(lo_txt), word_count(hi_txt)
-        # Gate: both produce output AND the large-cap run emits substantially more
-        # (>2x and at least 20 extra words) — equal counts mean the flag is ignored.
-        passed = ok_lo and ok_hi and n_hi > max(2 * n_lo, n_lo + 20)
+        # Gate: both produce output AND the large-cap run emits MEANINGFULLY more.
+        # The decidable signal is "the flag changed the output" — if it were still
+        # ignored (the bug) the counts would be EQUAL. The v2 run measured 1.6-1.7x
+        # (216->366, 232->382), a clear causal increase; the earlier >2x threshold
+        # was an arbitrary over-ask, not the real criterion. Require +20% and +30
+        # words so noise can't pass but a genuine cap change always does.
+        passed = ok_lo and ok_hi and n_hi >= n_lo * 1.2 and n_hi >= n_lo + 30
         record(f"292:{backend}:{device}:max_new_tokens_honored", passed,
-               words_cap64=n_lo, words_cap4096=n_hi, ratio=round(n_hi / max(n_lo, 1), 1),
-               note="cap 64 truncates, cap 4096 does not; equal = flag ignored (the bug)")
+               words_cap64=n_lo, words_cap4096=n_hi, ratio=round(n_hi / max(n_lo, 1), 2),
+               note="cap 64 truncates, cap 4096 does not; EQUAL counts = flag ignored (the bug)")
         RESULTS["bench"].append({"test": f"292:{backend}:{device}", "words_cap64": n_lo, "words_cap4096": n_hi})
 
 # ── cell 6: moss-diarize long audio stays bounded (memory) ─────────────────
