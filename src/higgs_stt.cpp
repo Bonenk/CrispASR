@@ -256,7 +256,7 @@ struct higgs_stt_context {
     int kv_n_used = 0;
 
     int n_threads = 4;
-    int beam_size = 1; // 1 = greedy (default); >1 = beam search (core_beam_decode)
+    int beam_size = 1;         // 1 = greedy (default); >1 = beam search (core_beam_decode)
     int max_new_tokens = 1024; // #292: decode cap; forwarded from --max-new-tokens when set, else this default.
 
     // Shared audio-tower runtime (loaded lazily on first audio call). The

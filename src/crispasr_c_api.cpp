@@ -5408,6 +5408,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         const std::string tgt = !s->target_language.empty() ? s->target_language : src;
         if (s->beam_size > 1)
             canary_set_beam_size(s->canary_ctx, s->beam_size);
+        canary_set_max_new_tokens(s->canary_ctx, s->max_new_tokens); // #292
         canary_result* cr =
             canary_transcribe_ex(s->canary_ctx, pcm, n_samples, src.c_str(), tgt.c_str(), s->punctuation, 0);
         if (!cr) {
@@ -5440,6 +5441,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
     if (s->backend == "canary-qwen" && s->canary_qwen_ctx) {
         if (s->beam_size > 1)
             canary_qwen_set_beam_size(s->canary_qwen_ctx, s->beam_size);
+        canary_qwen_set_max_new_tokens(s->canary_qwen_ctx, s->max_new_tokens); // #292
         canary_qwen_result* cqr = canary_qwen_transcribe_ex(s->canary_qwen_ctx, pcm, n_samples);
         if (!cqr) {
             delete r;
@@ -5503,6 +5505,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
 #ifdef CA_HAVE_MINI_OMNI2
     if ((s->backend == "mini-omni2" || s->backend == "mini_omni2" || s->backend == "miniomni2") && s->mini_omni2_ctx) {
         mini_omni2_set_ask(s->mini_omni2_ctx, s->ask.empty() ? nullptr : s->ask.c_str());
+        mini_omni2_set_max_new_tokens(s->mini_omni2_ctx, s->max_new_tokens); // #292
         char* text = mini_omni2_transcribe(s->mini_omni2_ctx, pcm, n_samples);
         if (!text) {
             delete r;
@@ -5537,6 +5540,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 higgs_stt_set_ask(s->higgs_ctx, nullptr);
             }
         }
+        higgs_stt_set_max_new_tokens(s->higgs_ctx, s->max_new_tokens); // #292
         char* text = higgs_stt_transcribe(s->higgs_ctx, pcm, n_samples);
         if (!text) {
             delete r;
@@ -6302,6 +6306,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 glm_asr_set_ask((glm_asr_context*)s->glmasr_ctx, nullptr);
             }
         }
+        glm_asr_set_max_new_tokens((glm_asr_context*)s->glmasr_ctx, s->max_new_tokens); // #292
         glm_asr_result* gr = glm_asr_transcribe_with_probs((glm_asr_context*)s->glmasr_ctx, pcm, n_samples);
         if (!gr || !gr->text) {
             if (gr)
@@ -6436,6 +6441,8 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         if (s->beam_size > 1) {
             moonshine_set_beam_size((moonshine_context*)s->moonshine_ctx, s->beam_size);
         }
+        // #292: forward the session's max_new_tokens (0 keeps the 194 default).
+        moonshine_set_max_new_tokens((moonshine_context*)s->moonshine_ctx, s->max_new_tokens);
         moonshine_result* mr = moonshine_transcribe_with_probs((moonshine_context*)s->moonshine_ctx, pcm, n_samples);
         if (!mr || !mr->text) {
             if (mr)
@@ -6541,6 +6548,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                 funasr_set_beam_size(s->funasr_ctx, s->beam_size);
             if (!s->source_language.empty())
                 funasr_set_language(s->funasr_ctx, s->source_language.c_str());
+            funasr_set_max_new_tokens(s->funasr_ctx, s->max_new_tokens); // #292
             text = funasr_transcribe(s->funasr_ctx, pcm, n_samples);
             need_free = true;
         }
@@ -6675,6 +6683,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
                     mimo_asr_set_ask(s->mimo_asr_ctx, nullptr);
                 }
             }
+            mimo_asr_set_max_new_tokens(s->mimo_asr_ctx, s->max_new_tokens); // #292
             mimo_asr_result* mr = mimo_asr_transcribe_with_probs(s->mimo_asr_ctx, pcm, n_samples);
             if (mr && mr->text) {
                 std::vector<ca_token_record> toks;
@@ -6719,6 +6728,7 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
 #ifdef CA_HAVE_MOSS_TRANSCRIBE
         if (!text && s->moss_transcribe_ctx) {
             // ASR-only (promptless legacy layout); language/ask hints are ignored.
+            moss_transcribe_set_max_new_tokens(s->moss_transcribe_ctx, s->max_new_tokens); // #292
             text = moss_transcribe_transcribe(s->moss_transcribe_ctx, pcm, n_samples);
             need_free = true;
         }
