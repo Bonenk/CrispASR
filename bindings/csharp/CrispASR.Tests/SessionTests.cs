@@ -343,5 +343,30 @@ namespace CrispASR.Tests
             _ = Session.AvailableBackends();
             CrispASR.Logging.SetCallback(null);
         }
+
+        // Task backends (tab/beats/chords/piano/pitch/separate/convert) were bound
+        // in SessionMusic.cs but never live-tested. This runs Session.Tab against a
+        // real tabcnn model when CRISPASR_MODEL_TABCNN is set, asserting the flat
+        // emission grid the C++/CUDA path already validates round-trips through the
+        // C# marshalling (shape, silent_class, per-string open MIDI). Skips cleanly
+        // without a model, like every other live test here.
+        private static string? TabModel =>
+            Environment.GetEnvironmentVariable("CRISPASR_MODEL_TABCNN");
+
+        [Fact]
+        public void Tab_EmissionsHaveExpectedShape()
+        {
+            if (!CanLoadLibrary() || string.IsNullOrEmpty(TabModel)) return;
+            using var s = Session.Open(TabModel!, "tabcnn", 2);
+            const int sr = 22050;
+            var pcm = new float[sr]; // 1 s of silence is enough to exercise the path
+            var emis = s.Tab(pcm, sr);
+            Assert.Equal(6, emis.Strings);            // 6 guitar strings
+            Assert.Equal(21, emis.Classes);           // silent + 20 frets
+            Assert.True(emis.Frames > 0, "expected >0 frames");
+            Assert.Equal(emis.Frames * emis.Strings * emis.Classes, emis.LogProbs.Length);
+            Assert.InRange(emis.SilentClass, 0, emis.Classes - 1);
+            Assert.Equal(6, emis.StringOpenMidi.Length);
+        }
     }
 }
