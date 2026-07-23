@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.8.22
+
+- **TTS provenance opt-out now requires a marking attestation.** Synthesis is
+  provenance-marked by default; raw (unmarked) synthesis and an explicit
+  marking-responsibility affirmation are exposed for callers that take
+  responsibility for labeling AI-generated audio. Marked-output flows are
+  unchanged.
+- Native improvements that ship with this release (no Dart API change):
+  - **Tiron** — a new multi-speaker meeting-ASR model (Whisper large-v3 + inline
+    speaker markers, `--diarize` cross-window speaker linking) is reachable via
+    `CrispasrSession.open()` on the whisper path.
+  - **Source separation ~26× faster** on Linux/Windows — `CrispasrSession.separate()`
+    with mel-band-roformer no longer runs the naive scalar path (BLAS + FFT iSTFT
+    + threading), output bit-identical.
+  - **NaN-robust ASR decode** — canary-qwen and 7 other backends no longer emit
+    garbage when a quantized weight goes non-finite.
+- No breaking Dart API changes beyond the provenance gate above.
+
 ## 0.8.21
 
 - **`--max-new-tokens` is honored across all ASR backends.** Ten backends
