@@ -197,6 +197,17 @@ namespace CrispASR
             IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string text,
             out int outNSamples);
 
+        // UNMARKED synthesis — hard-refused unless accept_marking_responsibility was called first.
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr crispasr_session_synthesize_raw(
+            IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string text,
+            out int outNSamples);
+
+        // Attest acceptance of AI-content marking/disclosure duty (EU AI Act Art. 50).
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_session_accept_marking_responsibility(
+            IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string attestation);
+
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void crispasr_pcm_free(IntPtr pcm);
 

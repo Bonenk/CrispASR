@@ -2586,6 +2586,45 @@ class Session:
             self._lib.crispasr_pcm_free(ptr)
         return arr
 
+    def accept_marking_responsibility(self, attestation: str = "") -> None:
+        """Attest acceptance of AI-content marking/disclosure responsibility
+        (EU AI Act Art. 50). REQUIRED before :meth:`synthesize_raw` will return
+        unmarked audio; the default :meth:`synthesize` is watermarked and needs
+        no attestation. ``attestation`` is recorded for audit."""
+        if not hasattr(self._lib, "crispasr_session_accept_marking_responsibility"):
+            raise RuntimeError("marking-attestation API not present in this libcrispasr build")
+        self._lib.crispasr_session_accept_marking_responsibility.argtypes = [
+            ctypes.c_void_p, ctypes.c_char_p,
+        ]
+        self._lib.crispasr_session_accept_marking_responsibility.restype = ctypes.c_int
+        self._lib.crispasr_session_accept_marking_responsibility(self._handle, attestation.encode("utf-8"))
+
+    def synthesize_raw(self, text: str) -> "np.ndarray":
+        """UNMARKED synthesis (no watermark), for callers that post-process
+        before embedding the mark themselves. Hard-refused unless
+        :meth:`accept_marking_responsibility` was called first. Prefer
+        :meth:`synthesize` for the default watermarked output."""
+        if not hasattr(self._lib, "crispasr_session_synthesize_raw"):
+            raise RuntimeError("TTS raw API not present in this libcrispasr build")
+        self._lib.crispasr_session_synthesize_raw.argtypes = [
+            ctypes.c_void_p, ctypes.c_char_p, ctypes.POINTER(ctypes.c_int),
+        ]
+        self._lib.crispasr_session_synthesize_raw.restype = ctypes.POINTER(ctypes.c_float)
+        self._lib.crispasr_pcm_free.argtypes = [ctypes.POINTER(ctypes.c_float)]
+        self._lib.crispasr_pcm_free.restype = None
+        n = ctypes.c_int(0)
+        ptr = self._lib.crispasr_session_synthesize_raw(self._handle, text.encode("utf-8"), ctypes.byref(n))
+        if not ptr or n.value <= 0:
+            raise RuntimeError(
+                "synthesize_raw returned no audio (attestation required? "
+                "call accept_marking_responsibility() first)"
+            )
+        try:
+            arr = np.ctypeslib.as_array(ptr, shape=(n.value,)).copy()
+        finally:
+            self._lib.crispasr_pcm_free(ptr)
+        return arr
+
     def separate(self, pcm_stereo: "np.ndarray") -> dict:
         """Source separation: split audio into named stems.
 
