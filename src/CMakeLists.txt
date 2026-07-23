@@ -2475,6 +2475,12 @@ target_link_libraries     (mel-band-roformer PUBLIC crispasr-core ggml ggml-base
 if(NOT MSVC)
     target_compile_options(mel-band-roformer PRIVATE -O3)
 endif()
+# #296: parallelise the band/time Transformer loops (run_time/run_freq) when
+# OpenMP is available; the pragmas are #ifdef _OPENMP-guarded so non-OMP builds
+# keep the serial path. Turns a multi-minute single-threaded forward into ~1 min.
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(mel-band-roformer PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 # Standalone front-end diff probe (§248 Phase 1). Opt-in so it doesn't add to
 # the default build: cmake -DCRISPASR_BUILD_MBR_PROBE=ON.
