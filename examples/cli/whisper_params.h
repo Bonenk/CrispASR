@@ -447,6 +447,14 @@ struct whisper_params {
     bool tts_marking_responsibility_accepted = false;
     std::string tts_marking_attestation;
 
+    // Disable C2PA Content Credentials signing on synthesized output. A provenance
+    // opt-out like --no-watermark: REQUIRES tts_marking_responsibility_accepted,
+    // else refused. On the CLI the watertight rule still forces the audio watermark
+    // on when C2PA is off, so output is never fully unmarked; on the server the
+    // operator takes on the marking duty for every response.
+    // CLI/server launch: --no-c2pa
+    bool tts_no_c2pa = false;
+
     // Server mode: directory containing voice profiles for /v1/audio/speech.
     // Each profile is a sibling pair: <name>.wav + <name>.txt (the WAV is
     // the reference audio, the TXT is its transcription used by Qwen3-TTS

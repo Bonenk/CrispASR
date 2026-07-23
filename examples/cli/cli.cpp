@@ -651,11 +651,13 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.tts_no_watermark = true;
     } else if (arg == "--accept-marking-responsibility") {
         // Explicit attestation required to honor any provenance opt-out
-        // (--no-watermark / --no-spoken-disclaimer). By passing this the
-        // operator affirms AI-content marking/disclosure responsibility is theirs.
+        // (--no-watermark / --no-spoken-disclaimer / --no-c2pa). By passing this
+        // the operator affirms AI-content marking/disclosure responsibility is theirs.
         params.tts_marking_responsibility_accepted = true;
         if (params.tts_marking_attestation.empty())
             params.tts_marking_attestation = "CLI --accept-marking-responsibility flag";
+    } else if (arg == "--no-c2pa") {
+        params.tts_no_c2pa = true;
     } else if (arg == "--cors-origin") {
         params.server_cors_origin = ARGV_NEXT;
     } else if (arg == "--chat-model") {
@@ -1291,9 +1293,14 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
         "                                                 (WAV/MP3/M4A/MP4); for raw .aac/.opus and --tts-stream\n"
         "                                                 it is overridden (watermark kept) so no CLI output is\n"
         "                                                 ever fully unmarked.\n"
+        "             --no-c2pa                          disable C2PA Content Credentials signing on synthesized\n"
+        "                                                 output. REQUIRES --accept-marking-responsibility. On the\n"
+        "                                                 CLI the audio watermark is then forced on (watertight);\n"
+        "                                                 on the server the operator takes on the marking duty.\n"
         "             --accept-marking-responsibility   explicit attestation REQUIRED to honor any provenance\n"
-        "                                                 opt-out (--no-watermark / --no-spoken-disclaimer): you\n"
-        "                                                 affirm AI-content marking/disclosure duty is yours.\n");
+        "                                                 opt-out (--no-watermark / --no-spoken-disclaimer /\n"
+        "                                                 --no-c2pa): you affirm AI-content marking/disclosure\n"
+        "                                                 duty is yours.\n");
     fprintf(stderr,
             "             --ref-text \"TEXT\"        reference transcription (qwen3-tts/f5-tts; auto-transcribed "
             "if omitted)\n");
