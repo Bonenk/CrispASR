@@ -1533,6 +1533,13 @@ jobs:
           submodules: recursive
           ref: ${{ inputs.tag || github.ref }}
 
+      # #296: OpenBLAS makes mel-band-roformer --separate ~26x faster (SGEMM).
+      # Non-fatal: if this fails, the CMake below silently falls back to the
+      # (slow but correct) scalar path — the build never breaks over BLAS.
+      - name: Install OpenBLAS (vcpkg)
+        continue-on-error: true
+        run: vcpkg install openblas:x64-windows
+
       - name: Build
         run: |
           cmake -S . -B build `
@@ -1540,7 +1547,8 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF `
             -DGGML_NATIVE=OFF `
             -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON `
-            -DCRISPASR_OPUS_FETCH=ON
+            -DCRISPASR_OPUS_FETCH=ON `
+            -DCMAKE_PREFIX_PATH="$env:VCPKG_INSTALLATION_ROOT/installed/x64-windows"
           cmake --build build --config Release --target crispasr-cli crispasr-quantize -j $env:NUMBER_OF_PROCESSORS
 
       - name: Package
@@ -1548,6 +1556,10 @@ jobs:
           New-Item -ItemType Directory -Force release\crispasr-windows-x86_64-cpu
           Copy-Item build\bin\Release\crispasr.exe release\crispasr-windows-x86_64-cpu\
           Copy-Item build\bin\Release\crispasr-quantize.exe release\crispasr-windows-x86_64-cpu\
+          # #296: bundle the OpenBLAS runtime DLLs (and any transitive deps vcpkg
+          # installed) next to the exe so the fast SGEMM path loads on any machine.
+          Get-ChildItem "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin\*.dll" -ErrorAction SilentlyContinue |
+            Copy-Item -Destination release\crispasr-windows-x86_64-cpu\
           Copy-Item LICENSE release\crispasr-windows-x86_64-cpu\
           Copy-Item THIRD_PARTY_NOTICES.txt release\crispasr-windows-x86_64-cpu\
           Compress-Archive -Path release\crispasr-windows-x86_64-cpu -DestinationPath release\crispasr-windows-x86_64-cpu.zip -CompressionLevel Optimal
