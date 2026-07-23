@@ -111,7 +111,9 @@ static std::string crispasr_resolve_watermark_model(const whisper_params& params
 // audio watermark is the only robust AI mark, so --no-watermark must not strip
 // it (see crispasr_wm_dispatch::set_forced). Must mirror the container decision
 // in crispasr_write_synth_audio below.
-static bool crispasr_output_carries_c2pa(const std::string& out_path) {
+static bool crispasr_output_carries_c2pa(const std::string& out_path, bool no_c2pa = false) {
+    if (no_c2pa)
+        return false; // C2PA signing disabled (--no-c2pa) ⇒ watermark is the only floor
     if (out_path.empty())
         return false; // no container (e.g. raw PCM --tts-stream) ⇒ no manifest
 #if defined(CRISPASR_HAVE_C2PA) || !defined(CRISPASR_NO_C2PA_NATIVE)
@@ -141,7 +143,7 @@ static bool crispasr_output_carries_c2pa(const std::string& out_path) {
 // one robust machine-readable mark remains. Call once, after set_disabled(), and
 // before the watermark embed for that output. Pass an empty path for --tts-stream.
 static void crispasr_enforce_cli_watermark_floor(const std::string& out_path, const whisper_params& params) {
-    const bool carries = crispasr_output_carries_c2pa(out_path);
+    const bool carries = crispasr_output_carries_c2pa(out_path, params.tts_no_c2pa);
     crispasr_wm_dispatch::set_forced(!carries);
     if (!carries && (params.tts_no_watermark || std::getenv("CRISPASR_NO_WATERMARK") != nullptr)) {
         fprintf(stderr,
@@ -161,6 +163,7 @@ static void crispasr_enforce_cli_watermark_floor(const std::string& out_path, co
 static int crispasr_check_marking_attestation(const whisper_params& params) {
     const char* which = params.tts_no_watermark           ? "--no-watermark"
                         : params.tts_no_spoken_disclaimer ? "--no-spoken-disclaimer"
+                        : params.tts_no_c2pa              ? "--no-c2pa"
                                                           : nullptr;
     if (!which)
         return 0; // no opt-out requested → nothing to attest
@@ -177,9 +180,9 @@ static int crispasr_check_marking_attestation(const whisper_params& params) {
     std::time_t t = std::time(nullptr);
     char ts[64];
     std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
-    fprintf(stderr, "[MARKING] ts=%s no_watermark=%s no_spoken_disclaimer=%s attestation=\"%s\"\n", ts,
+    fprintf(stderr, "[MARKING] ts=%s no_watermark=%s no_spoken_disclaimer=%s no_c2pa=%s attestation=\"%s\"\n", ts,
             params.tts_no_watermark ? "yes" : "no", params.tts_no_spoken_disclaimer ? "yes" : "no",
-            params.tts_marking_attestation.c_str());
+            params.tts_no_c2pa ? "yes" : "no", params.tts_marking_attestation.c_str());
     return 0;
 }
 
@@ -192,7 +195,7 @@ static int crispasr_check_marking_attestation(const whisper_params& params) {
 // (caller's exit code).
 static int crispasr_write_synth_audio(const std::string& out_path, const float* pcm, int n_samples, int sample_rate,
                                       const std::string& c2pa_cert, const std::string& c2pa_key,
-                                      const std::string& cache_dir = "") {
+                                      const std::string& cache_dir = "", bool sign_c2pa = true) {
     auto has_ext = [&](const char* lo, const char* up) {
         return out_path.size() >= 4 &&
                (out_path.compare(out_path.size() - 4, 4, lo) == 0 || out_path.compare(out_path.size() - 4, 4, up) == 0);
@@ -279,7 +282,15 @@ static int crispasr_write_synth_audio(const std::string& out_path, const float* 
     // compiled in) an auto-provisioned per-install self-signed cert. Signing is
     // best-effort provenance: any failure or an unembeddable container leaves
     // the watermark + metadata tag as the provenance signal.
-    if (c2pa_fmt && *c2pa_fmt) {
+    if (!sign_c2pa) {
+        // --no-c2pa: attested provenance opt-out. On the CLI the audio watermark
+        // is forced on (crispasr_enforce_cli_watermark_floor) so output is still
+        // marked; here we simply skip embedding the manifest.
+        fprintf(stderr,
+                "crispasr: note: C2PA signing disabled (--no-c2pa); '%s' written without a manifest "
+                "(audio watermark still applied)\n",
+                path.c_str());
+    } else if (c2pa_fmt && *c2pa_fmt) {
         crispasr_c2pa_sign_auto(blob, c2pa_fmt, c2pa_cert, c2pa_key, cache_dir);
     } else if (!c2pa_cert.empty() || !c2pa_key.empty()) {
         fprintf(stderr,
@@ -2965,7 +2976,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // Write output audio (backend-native sample rate, mono) — WAV by
         // default, MP3/AAC when --tts-output ends in .mp3/.aac.
         if (int rc = crispasr_write_synth_audio(out_path, audio.data(), (int)audio.size(), sr_in, params.c2pa_cert,
-                                                params.c2pa_key, params.cache_dir))
+                                                params.c2pa_key, params.cache_dir, !params.tts_no_c2pa))
             return rc;
 
         // Post-embed watermark verification: re-detect on the in-memory
@@ -3059,7 +3070,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // Write output audio — WAV by default, MP3/AAC when --s2s-output
         // ends in .mp3/.aac.
         if (int rc = crispasr_write_synth_audio(out_path, audio.data(), (int)audio.size(), sr_out, params.c2pa_cert,
-                                                params.c2pa_key, params.cache_dir))
+                                                params.c2pa_key, params.cache_dir, !params.tts_no_c2pa))
             return rc;
 
         if (!params.no_prints)

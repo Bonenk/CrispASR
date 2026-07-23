@@ -1095,17 +1095,23 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     // for every response the process serves — so, like the CLI, it requires the
     // explicit --accept-marking-responsibility attestation. Refuse to start
     // otherwise, rather than silently serving unmarked audio.
-    if (params.tts_no_watermark && !params.tts_marking_responsibility_accepted) {
-        fprintf(stderr, "crispasr: error: server launched with --no-watermark requires "
-                        "--accept-marking-responsibility (the operator accepts AI-content marking "
-                        "responsibility for every response served). Refusing to start.\n");
+    // --no-c2pa is the same class of opt-out as --no-watermark (disables the
+    // machine-readable C2PA manifest floor on every response), so it requires the
+    // same attestation.
+    if ((params.tts_no_watermark || params.tts_no_c2pa) && !params.tts_marking_responsibility_accepted) {
+        fprintf(stderr,
+                "crispasr: error: server launched with %s requires --accept-marking-responsibility "
+                "(the operator accepts AI-content marking responsibility for every response served). "
+                "Refusing to start.\n",
+                params.tts_no_watermark ? "--no-watermark" : "--no-c2pa");
         return 1;
     }
-    if (params.tts_no_watermark) {
+    if (params.tts_no_watermark || params.tts_no_c2pa) {
         std::time_t t = std::time(nullptr);
         char ts[64];
         std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
-        fprintf(stderr, "[MARKING] ts=%s scope=server no_watermark=yes attestation=\"%s\"\n", ts,
+        fprintf(stderr, "[MARKING] ts=%s scope=server no_watermark=%s no_c2pa=%s attestation=\"%s\"\n", ts,
+                params.tts_no_watermark ? "yes" : "no", params.tts_no_c2pa ? "yes" : "no",
                 params.tts_marking_attestation.c_str());
     }
     crispasr_wm_dispatch::set_disabled(params.tts_no_watermark);
@@ -2474,7 +2480,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             std::string wav = crispasr_make_wav_int16(pcm.data(), (int)pcm.size(), sr_out);
             // C2PA Content Credentials signing (when c2pa-c is available
             // and --c2pa-cert / --c2pa-key are configured)
-            crispasr_c2pa_sign_auto(wav, "audio/wav", params.c2pa_cert, params.c2pa_key, params.cache_dir);
+            if (!params.tts_no_c2pa) // --no-c2pa: attested opt-out of the manifest floor
+                crispasr_c2pa_sign_auto(wav, "audio/wav", params.c2pa_cert, params.c2pa_key, params.cache_dir);
             res.set_content(std::move(wav), "audio/wav");
         }
     });
@@ -2617,7 +2624,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             res.set_content(std::move(opus), ct);
         } else {
             std::string wav = crispasr_make_wav_int16(pcm.data(), (int)pcm.size(), sr_out);
-            crispasr_c2pa_sign_auto(wav, "audio/wav", params.c2pa_cert, params.c2pa_key, params.cache_dir);
+            if (!params.tts_no_c2pa) // --no-c2pa: attested opt-out of the manifest floor
+                crispasr_c2pa_sign_auto(wav, "audio/wav", params.c2pa_cert, params.c2pa_key, params.cache_dir);
             res.set_content(std::move(wav), "audio/wav");
         }
     });
