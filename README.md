@@ -21,24 +21,6 @@ Multithreaded, runs entirely client-side with COOP/COEP headers.
 **Demo**: [HuggingFace Space](https://huggingface.co/spaces/cstr/CrispASR) —
 live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 
-### What's new (v0.8.9)
-
-- **Piano transcription (§250, new task):** transcribe piano audio to MIDI note events — 88 keys at 100fps using ByteDance/Kong's CRNN architecture (4× ConvBlock + BiGRU + regression post-processing). F16 GGUF = 77 MB. `--backend piano-transcription -m piano-transcription-f16.gguf -f piano.wav`.
-- **Source separation (§248, new task):** `--separate` splits a mix into stems (`<input>_<stem>.wav`) — **mel-band-roformer** (vocal/instrumental, MIT) and **htdemucs** (4-stem), architecture auto-detected from the GGUF. Mel-Band RoFormer diff harness validated end-to-end (every stage cos=1.0, reconstructed waveform bit-exact). `--stems vocals,drums` selects a subset; `--sep-output-dir` sets the output location.
-- **Guitar tablature (new task):** `--tab` prints a per-frame fret-per-string grid (`time_sec`, then one column per string, `-` for unplayed; `--tab-format json` for JSON with per-string confidences) via **TabCNN** (Wiggins & Kim, ISMIR 2019; backend key `tabcnn`), architecture auto-detected from the GGUF. **CC BY 4.0 weights** from the EGSet12 record — attribution required, commercial use permitted. What the backend emits is **emission scores, not a decided tablature**: the CLI's displayed frets are a plain argmax with no playability constraints applied. Real consumers take the log-probabilities through `crispasr_session_tab_emissions()` and run their own constrained Viterbi/DP (one note per string, fret range, capo, hand span). Validated end to end against EGSet12 ground truth at tablature F1 0.773 vs the torch reference's 0.771. See [docs/cli.md](docs/cli.md#guitar-tablature---tab).
-- **Beat / downbeat tracking (new task):** `--beats` prints a beat grid (`time_sec`, `beat|downbeat` per line; `--beats-format json` for JSON) via **Beat This!** (CPJKU, ISMIR 2024; backend key `beat-this`), architecture auto-detected from the GGUF. **MIT for code AND weights**, and critically **no DBN**: postprocessing is peak-picking only, so unlike most beat trackers it carries none of madmom's patented, non-commercially-licensed Dynamic Bayesian Network. Every downbeat is also reported as a beat. See [docs/cli.md](docs/cli.md#beat-tracking---beats).
-- **Chord recognition (new task):** `--chords` prints a chord timeline in `.lab` layout (`start_sec`, `end_sec`, `chord`; `--chords-format json` for JSON) via **BTC** (Bi-directional Transformer, ISMIR 2019), architecture auto-detected from the GGUF. Defaults to the 170-class vocabulary, reducible to maj/min with `CRISPASR_BTC_MAJ_MIN=1`. **The weights are CC-BY-NC-SA (non-commercial)** even though this library and the upstream code are MIT — downloading them requires `--accept-license cc-by-nc-sa-4.0`. See [docs/cli.md](docs/cli.md#chord-recognition---chords).
-- **Pitch / F0 estimation (new task):** `--pitch` prints a monophonic pitch track (`time_ms`, `f0_hz`, `voiced_prob` per frame; `--pitch-format json` for JSON) via **CREPE** (MIT), architecture auto-detected from the GGUF. Ships `crepe-tiny-f16.gguf` (~1.0 MB, RTF 0.28 on Metal) as the default with `crepe-full-f16.gguf` (~44.5 MB) available from `cstr/crepe-GGUF`. See [docs/cli.md](docs/cli.md#pitch--f0-estimation---pitch).
-- **MOSS-Transcribe-Diarize (#242, v0.8.9):** joint ASR + speaker diarization + timestamps in a single 0.9B model. Stock Whisper encoder + VQAdaptor + Qwen3-0.6B. Diff harness 4/4 cos=1.0. `--backend moss-diarize -m auto`.
-- **dots.tts full pipeline (#200, v0.8.9):** PatchEncoder RoPE + QK-norm fix, BigVGAN vocoder working e2e, voice cloning via CAM++ speaker encoder. `--tts-steps` / `--tts-cfg-scale` wired.
-- **Irodori-TTS VoiceDesign (v0.8.9):** caption-conditioned voice design for Irodori TTS.
-- **gallocr UAF audit (#215e, v0.8.9):** fixed stale-buffer use-after-free in 7 backends (canary, canary_ctc, kyutai_stt, moonshine_streaming, nemotron, paraformer, sensevoice). All 19 cached-graph sites audited.
-- **Generation-health gate (v0.8.9):** `core/generation_health.h` — 5 objective quality checks (empty, duration, n-gram loop, truncation, TTS duration) with 16 unit tests.
-- **Audio format expansion (v0.8.3):** `.opus`, `.webm`, `.au`, `.amr`, `.m4a`/`.aac` decode — no ffmpeg.
-- **Hotwords (#98):** `--hotwords "Tokyo,CrispASR"` for CTC/TDT contextual biasing + LLM prompt injection.
-- **Global diarization (#110):** `--diarize-method sherpa` / `pyannote` / `moss-diarize` (native) for consistent speaker IDs.
-- **Generation controls:** `--seed`, `--beam-size`, `--frequency-penalty`, `--max-new-tokens` wired through all backends.
-
 ### Ecosystem
 
 | Project | What it does |
@@ -52,7 +34,7 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 
 ## Table of contents
 
-- [Supported backends](#supported-backends) — [ASR](#asr-backends) + [TTS](#text-to-speech-models) + [translation](#translation) + [post-processing](#post-processing-models)
+- [Supported backends](#supported-backends) — [ASR](#asr-backends) + [TTS](#text-to-speech-models) + [translation](#translation) + [post-processing](#post-processing-models) + [music & audio analysis](#music--audio-analysis)
 - [Feature matrix](#feature-matrix)
 - [Install & build](#install--build) — quick install (full guide in [docs/install.md](docs/install.md))
 - [Quick start — ASR](#quick-start)
@@ -303,6 +285,28 @@ Shared codec modules used by TTS backends. Also available standalone for encode/
 
 All runtimes share ggml-based inference. The speech-LLM backends (**qwen3**, **voxtral**, **voxtral4b**, **granite**, **glm-asr**, **kyutai-stt**) inject audio encoder frames directly into an autoregressive language model's input embeddings, instead of using a dedicated CTC/transducer/seq2seq decoder. The **fastconformer-ctc** backend hosts the NeMo FastConformer-CTC standalone ASR family — `stt_en_fastconformer_ctc_{large,xlarge,xxlarge}` and the architecturally-identical `parakeet-ctc-{0.6b,1.1b}` (different training data + tokenizer, same encoder + head shape) — with greedy CTC decoding. Same C++ runtime as the canary-ctc aligner.
 
+### Music & audio analysis
+
+Beyond speech, CrispASR runs several music/audio analysis tasks — each a small
+GGUF with the architecture auto-detected, no Python. See [`docs/cli.md`](docs/cli.md)
+for the per-task flags and output formats.
+
+- **Source separation** (`--separate`) — split a mix into stems
+  (`<input>_<stem>.wav`) via **mel-band-roformer** (vocal/instrumental, MIT) or
+  **htdemucs** (4-stem). `--stems vocals,drums` selects a subset;
+  `--sep-output-dir` sets the output location.
+- **Piano transcription** (`--backend piano-transcription`) — piano audio → MIDI
+  note events (88 keys @ 100 fps, ByteDance/Kong CRNN; F16 GGUF ≈ 77 MB).
+- **Guitar tablature** (`--tab`) — per-frame fret-per-string grid via **TabCNN**
+  (Wiggins & Kim, ISMIR 2019; CC BY 4.0 weights). The backend emits per-string
+  emission scores, not a decided tablature — run your own constrained Viterbi via
+  `crispasr_session_tab_emissions()` for playable output.
+- **Beat / downbeat tracking** (`--beats`) — beat grid via **Beat This!** (CPJKU,
+  ISMIR 2024; MIT for code *and* weights, no patent-encumbered DBN).
+- **Chord recognition** (`--chords`) — chord timeline (`.lab`) via **BTC** (ISMIR
+  2019). Weights are CC-BY-NC-SA, gated behind `--accept-license cc-by-nc-sa-4.0`.
+- **Pitch / F0 estimation** (`--pitch`) — monophonic pitch track via **CREPE** (MIT).
+
 ## Feature matrix
 
 Run `crispasr --list-backends` to see it live. Each backend declares capabilities at runtime; if you ask for a feature the selected backend does not support, CrispASR prints a warning and silently ignores the flag.
@@ -336,7 +340,7 @@ The static table below is a curated subset focusing on the ASR backends and the 
 | mmap weights (`CRISPASR_GGUF_MMAP`) | | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | TTS | | | | | | | | | | | | | | | | | | | ✔ | | | | | |
 
-The matrix above covers 24 ASR backends. **Additional ASR backends** not shown: `nemotron` (39-lang streaming ASR with cache-aware FastConformer + RNN-T), `lfm2-audio` (ASR + TTS + S2S in one model), `moss-audio` (audio understanding + ASR), `moss-transcribe` (Qwen3-Omni encoder + Qwen3-1.7B ASR), `mini-omni2` (ASR + TTS + S2S), `kugelaudio` (7B audio understanding). See [`docs/feature-matrix.md`](docs/feature-matrix.md) for the full 85-backend matrix. **TTS-only backends** (`kokoro`, `qwen3-tts` + variants, `vibevoice-tts`, `orpheus` + DE variants, `chatterbox` / `chatterbox-turbo` / `kartoffelbox-turbo` / `lahgtna-chatterbox`, `dia`, `bark`, `outetts`, `zonos`, `csm`, `f5-tts`, `irodori-tts`, `parler-tts`, `speecht5`, `piper`, `fastpitch`, `pocket-tts`, `melotts`, `cosyvoice3`, `voxcpm2`, `tada-tts`) all carry the TTS, AUTO_DOWNLOAD, TEMPERATURE, and FLASH_ATTN caps; per-backend cloning + voice-pack support is documented in the [Text-to-Speech models](#text-to-speech-models) table above and [`docs/tts.md`](docs/tts.md). The vibevoice and lfm2-audio columns mark dual-mode (ASR + TTS) backends.
+The matrix above covers 24 ASR backends. **Additional ASR backends** not shown: `nemotron` (39-lang streaming ASR with cache-aware FastConformer + RNN-T), `lfm2-audio` (ASR + TTS + S2S in one model), `moss-audio` (audio understanding + ASR), `moss-transcribe` (Qwen3-Omni encoder + Qwen3-1.7B ASR), `mini-omni2` (ASR + TTS + S2S), `kugelaudio` (7B audio understanding). See [`docs/feature-matrix.md`](docs/feature-matrix.md) for the full 91-backend matrix. **TTS-only backends** (`kokoro`, `qwen3-tts` + variants, `vibevoice-tts`, `orpheus` + DE variants, `chatterbox` / `chatterbox-turbo` / `kartoffelbox-turbo` / `lahgtna-chatterbox`, `dia`, `bark`, `outetts`, `zonos`, `csm`, `f5-tts`, `irodori-tts`, `parler-tts`, `speecht5`, `piper`, `fastpitch`, `pocket-tts`, `melotts`, `cosyvoice3`, `voxcpm2`, `tada-tts`) all carry the TTS, AUTO_DOWNLOAD, TEMPERATURE, and FLASH_ATTN caps; per-backend cloning + voice-pack support is documented in the [Text-to-Speech models](#text-to-speech-models) table above and [`docs/tts.md`](docs/tts.md). The vibevoice and lfm2-audio columns mark dual-mode (ASR + TTS) backends.
 
 **Key:** ✔ = native/built-in, `-am` = via CTC forced aligner (`-am canary-ctc-aligner.gguf` or `-am qwen3-forced-aligner.gguf`), **LID** = via external language identification pre-step (`-l auto`), **pp** = via `--punc-model` post-processor (FireRedPunc or fullstop-punc), * = experimental or partial support, † = PLUS variant only (native `[T:N]` word timestamps with `-owts`; base uses `-am`). granite-4.1 covers both the regular and `-plus` variants; granite-4.1-nar is a non-autoregressive variant with encoder+projector only (no LLM decode features). The **KV quant** row marks backends that honor `CRISPASR_KV_QUANT={f16,q8_0,q4_0}` — CTC-style backends without a KV cache (parakeet, fc-ctc, wav2vec2, kyutai-stt, firered, moonshine variants, omniasr-CTC) don't apply. The same backends also honor the per-half `CRISPASR_KV_QUANT_K` / `CRISPASR_KV_QUANT_V` overrides (llama.cpp `--cache-type-k` / `--cache-type-v` parity) for asymmetric K-vs-V precision; common recipe `K=q8_0 V=q4_0` saves ~40 % more KV memory than symmetric Q8_0. The **mmap weights** row marks backends consuming `core_gguf::load_weights()` and therefore honoring `CRISPASR_GGUF_MMAP=1`; whisper itself uses upstream's loader and is unaffected. See [`docs/cli.md`](docs/cli.md) Memory footprint for usage + recommended combos.
 
