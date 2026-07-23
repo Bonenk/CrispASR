@@ -1277,8 +1277,12 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
         "                                                 of the cloned speaker or that it is your own voice\n"
         "             --no-spoken-disclaimer              skip audible AI-disclosure prefix on voice-cloned\n"
         "                                                 output (watermark + C2PA provenance still applied)\n"
-        "             --no-watermark                     disable AI-content watermark on TTS output; marking\n"
-        "                                                 responsibility then rests with the operator\n");
+        "             --no-watermark                     disable AI-content audio watermark on TTS output;\n"
+        "                                                 marking responsibility then rests with the operator.\n"
+        "                                                 Honored only when the output still carries a C2PA\n"
+        "                                                 manifest (WAV/MP3/M4A/MP4). For raw .aac/.opus and\n"
+        "                                                 --tts-stream it is overridden (watermark kept) so no\n"
+        "                                                 CLI output is ever fully unmarked.\n");
     fprintf(stderr,
             "             --ref-text \"TEXT\"        reference transcription (qwen3-tts/f5-tts; auto-transcribed "
             "if omitted)\n");

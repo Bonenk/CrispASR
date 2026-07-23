@@ -103,6 +103,56 @@ static std::string crispasr_resolve_watermark_model(const whisper_params& params
     return params.watermark_model;
 }
 
+// True if the container implied by `out_path` will carry a C2PA manifest under
+// the current build and CRISPASR_NO_C2PA_REMUX setting. WAV/MP3/M4A/MP4 always
+// can; raw ADTS .aac / Ogg .opus can only when remux to MP4 is enabled (the
+// default). When C2PA is compiled out (CRISPASR_NO_C2PA_NATIVE and no c2pa-rs)
+// nothing carries it. Used to keep the CLI watertight: when this is false the
+// audio watermark is the only robust AI mark, so --no-watermark must not strip
+// it (see crispasr_wm_dispatch::set_forced). Must mirror the container decision
+// in crispasr_write_synth_audio below.
+static bool crispasr_output_carries_c2pa(const std::string& out_path) {
+    if (out_path.empty())
+        return false; // no container (e.g. raw PCM --tts-stream) ⇒ no manifest
+#if defined(CRISPASR_HAVE_C2PA) || !defined(CRISPASR_NO_C2PA_NATIVE)
+    auto ends_ci = [&](const char* suf) {
+        const size_t n = std::strlen(suf);
+        if (out_path.size() < n)
+            return false;
+        for (size_t i = 0; i < n; ++i)
+            if (std::tolower((unsigned char)out_path[out_path.size() - n + i]) != std::tolower((unsigned char)suf[i]))
+                return false;
+        return true;
+    };
+    const bool is_aac = ends_ci(".aac");
+    const bool is_opus = ends_ci(".opus") || ends_ci(".ogg");
+    if (is_aac || is_opus)
+        return std::getenv("CRISPASR_NO_C2PA_REMUX") == nullptr; // raw container ⇒ no manifest
+    return true; // wav/mp3/m4a/mp4 (and the wav default) all carry a manifest
+#else
+    (void)out_path;
+    return false;
+#endif
+}
+
+// Watertight-CLI guarantee: no CLI output path may ever emit a fully unmarked
+// AI file/stream. If `out_path` can't carry a C2PA manifest, force the audio
+// watermark on (overriding --no-watermark / CRISPASR_NO_WATERMARK) so at least
+// one robust machine-readable mark remains. Call once, after set_disabled(), and
+// before the watermark embed for that output. Pass an empty path for --tts-stream.
+static void crispasr_enforce_cli_watermark_floor(const std::string& out_path, const whisper_params& params) {
+    const bool carries = crispasr_output_carries_c2pa(out_path);
+    crispasr_wm_dispatch::set_forced(!carries);
+    if (!carries && (params.tts_no_watermark || std::getenv("CRISPASR_NO_WATERMARK") != nullptr)) {
+        fprintf(stderr,
+                "crispasr: note: '%s' can't carry a C2PA manifest, so --no-watermark is "
+                "overridden — the audio watermark is kept so the output stays marked as "
+                "AI-generated. Use a C2PA-capable container (WAV/MP3/M4A/MP4, the default) "
+                "to allow --no-watermark.\n",
+                out_path.empty() ? "<pcm-stream>" : out_path.c_str());
+    }
+}
+
 // Serialize synthesized (TTS/S2S) float32 PCM to `out_path` — WAV by
 // default, MP3 or AAC-LC/ADTS (in-tree glint encoder) when the path
 // ends in .mp3 / .aac. All carry AI-provenance metadata (WAV LIST/INFO
@@ -2765,6 +2815,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
         if (params.tts_stream) {
             if (!params.no_prints)
                 fprintf(stderr, "crispasr: streaming TTS as s16le mono @ %d Hz to stdout\n", sr_in);
+            // Raw PCM stream carries no container ⇒ no C2PA floor. Keep the audio
+            // watermark on regardless of --no-watermark so the stream stays marked.
+            crispasr_enforce_cli_watermark_floor("", params);
             auto emit = [&](std::vector<float>& pcm) {
                 if (pcm.empty())
                     return;
@@ -2866,12 +2919,17 @@ int crispasr_run_backend(const whisper_params& params_in) {
             }
         }
 
+        // Resolve the output path first so we can enforce the watertight floor
+        // BEFORE embedding: if this container can't carry C2PA, --no-watermark is
+        // overridden so the file is never fully unmarked.
+        std::string out_path = params.tts_output.empty() ? "tts_output.wav" : params.tts_output;
+        crispasr_enforce_cli_watermark_floor(out_path, params);
+
         // Embed watermark (AudioSeal if loaded, otherwise spread-spectrum)
         crispasr_wm_dispatch::embed(audio.data(), (int)audio.size(), sr_in);
 
         // Write output audio (backend-native sample rate, mono) — WAV by
         // default, MP3/AAC when --tts-output ends in .mp3/.aac.
-        std::string out_path = params.tts_output.empty() ? "tts_output.wav" : params.tts_output;
         if (int rc = crispasr_write_synth_audio(out_path, audio.data(), (int)audio.size(), sr_in, params.c2pa_cert,
                                                 params.c2pa_key, params.cache_dir))
             return rc;
@@ -2953,12 +3011,15 @@ int crispasr_run_backend(const whisper_params& params_in) {
             printf("%s\n", transcript.c_str());
         }
 
+        // Resolve output path + enforce the watertight floor before embedding.
+        std::string out_path = params.s2s_output.empty() ? "s2s_output.wav" : params.s2s_output;
+        crispasr_enforce_cli_watermark_floor(out_path, params);
+
         // Embed watermark
         crispasr_wm_dispatch::embed(audio.data(), (int)audio.size(), sr_out);
 
         // Write output audio — WAV by default, MP3/AAC when --s2s-output
         // ends in .mp3/.aac.
-        std::string out_path = params.s2s_output.empty() ? "s2s_output.wav" : params.s2s_output;
         if (int rc = crispasr_write_synth_audio(out_path, audio.data(), (int)audio.size(), sr_out, params.c2pa_cert,
                                                 params.c2pa_key, params.cache_dir))
             return rc;
