@@ -153,6 +153,36 @@ static void crispasr_enforce_cli_watermark_floor(const std::string& out_path, co
     }
 }
 
+// Enforce the marking-responsibility attestation (hard-refuse policy, #294
+// follow-up). Any provenance opt-out (--no-watermark / --no-spoken-disclaimer)
+// requires an explicit --accept-marking-responsibility, mirroring the voice-clone
+// --i-have-rights gate. Returns 0 if OK, or an exit code to hard-refuse. Emits a
+// [MARKING] audit line (parallel to [CONSENT]) when an opt-out is honored.
+static int crispasr_check_marking_attestation(const whisper_params& params) {
+    const char* which = params.tts_no_watermark           ? "--no-watermark"
+                        : params.tts_no_spoken_disclaimer ? "--no-spoken-disclaimer"
+                                                          : nullptr;
+    if (!which)
+        return 0; // no opt-out requested → nothing to attest
+    if (!params.tts_marking_responsibility_accepted) {
+        fprintf(stderr,
+                "crispasr: error: %s requires --accept-marking-responsibility.\n"
+                "  Disabling AI-content provenance marking shifts the marking/disclosure\n"
+                "  duty to you, the operator. By passing --accept-marking-responsibility\n"
+                "  you affirm you accept that responsibility for this output.\n"
+                "  Usage: crispasr --tts \"text\" %s --accept-marking-responsibility\n",
+                which, which);
+        return 12;
+    }
+    std::time_t t = std::time(nullptr);
+    char ts[64];
+    std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+    fprintf(stderr, "[MARKING] ts=%s no_watermark=%s no_spoken_disclaimer=%s attestation=\"%s\"\n", ts,
+            params.tts_no_watermark ? "yes" : "no", params.tts_no_spoken_disclaimer ? "yes" : "no",
+            params.tts_marking_attestation.c_str());
+    return 0;
+}
+
 // Serialize synthesized (TTS/S2S) float32 PCM to `out_path` — WAV by
 // default, MP3 or AAC-LC/ADTS (in-tree glint encoder) when the path
 // ends in .mp3 / .aac. All carry AI-provenance metadata (WAV LIST/INFO
@@ -2765,6 +2795,10 @@ int crispasr_run_backend(const whisper_params& params_in) {
         if (!params.watermark_model.empty()) {
             crispasr_wm_dispatch::init(crispasr_resolve_watermark_model(params));
         }
+        // Any provenance opt-out requires the explicit marking attestation
+        // (hard-refuse without it), before we honor --no-watermark.
+        if (int rc = crispasr_check_marking_attestation(params))
+            return rc;
         // Honor the --no-watermark opt-out (equivalent to CRISPASR_NO_WATERMARK).
         crispasr_wm_dispatch::set_disabled(params.tts_no_watermark);
 
@@ -2992,6 +3026,10 @@ int crispasr_run_backend(const whisper_params& params_in) {
         if (!params.watermark_model.empty()) {
             crispasr_wm_dispatch::init(crispasr_resolve_watermark_model(params));
         }
+        // Any provenance opt-out requires the explicit marking attestation
+        // (hard-refuse without it), before we honor --no-watermark.
+        if (int rc = crispasr_check_marking_attestation(params))
+            return rc;
         // Honor the --no-watermark opt-out (equivalent to CRISPASR_NO_WATERMARK).
         crispasr_wm_dispatch::set_disabled(params.tts_no_watermark);
 

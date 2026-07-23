@@ -437,6 +437,16 @@ struct whisper_params {
     // CLI: --no-watermark
     bool tts_no_watermark = false;
 
+    // Explicit attestation that the operator accepts AI-content marking/disclosure
+    // responsibility. REQUIRED to honor ANY provenance opt-out (--no-watermark or
+    // --no-spoken-disclaimer); without it those opt-outs are hard-refused. Mirrors
+    // the voice-clone --i-have-rights consent gate.
+    // CLI: --accept-marking-responsibility
+    // Server: request field "marking_attestation": "<text>" (per-request spoken
+    //   disclaimer opt-out), or the launch flag for a server-level --no-watermark.
+    bool tts_marking_responsibility_accepted = false;
+    std::string tts_marking_attestation;
+
     // Server mode: directory containing voice profiles for /v1/audio/speech.
     // Each profile is a sibling pair: <name>.wav + <name>.txt (the WAV is
     // the reference audio, the TXT is its transcription used by Qwen3-TTS

@@ -649,6 +649,13 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.tts_no_spoken_disclaimer = true;
     } else if (arg == "--no-watermark") {
         params.tts_no_watermark = true;
+    } else if (arg == "--accept-marking-responsibility") {
+        // Explicit attestation required to honor any provenance opt-out
+        // (--no-watermark / --no-spoken-disclaimer). By passing this the
+        // operator affirms AI-content marking/disclosure responsibility is theirs.
+        params.tts_marking_responsibility_accepted = true;
+        if (params.tts_marking_attestation.empty())
+            params.tts_marking_attestation = "CLI --accept-marking-responsibility flag";
     } else if (arg == "--cors-origin") {
         params.server_cors_origin = ARGV_NEXT;
     } else if (arg == "--chat-model") {
@@ -1279,10 +1286,14 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
         "                                                 output (watermark + C2PA provenance still applied)\n"
         "             --no-watermark                     disable AI-content audio watermark on TTS output;\n"
         "                                                 marking responsibility then rests with the operator.\n"
-        "                                                 Honored only when the output still carries a C2PA\n"
-        "                                                 manifest (WAV/MP3/M4A/MP4). For raw .aac/.opus and\n"
-        "                                                 --tts-stream it is overridden (watermark kept) so no\n"
-        "                                                 CLI output is ever fully unmarked.\n");
+        "                                                 REQUIRES --accept-marking-responsibility. Honored only\n"
+        "                                                 when the output still carries a C2PA manifest\n"
+        "                                                 (WAV/MP3/M4A/MP4); for raw .aac/.opus and --tts-stream\n"
+        "                                                 it is overridden (watermark kept) so no CLI output is\n"
+        "                                                 ever fully unmarked.\n"
+        "             --accept-marking-responsibility   explicit attestation REQUIRED to honor any provenance\n"
+        "                                                 opt-out (--no-watermark / --no-spoken-disclaimer): you\n"
+        "                                                 affirm AI-content marking/disclosure duty is yours.\n");
     fprintf(stderr,
             "             --ref-text \"TEXT\"        reference transcription (qwen3-tts/f5-tts; auto-transcribed "
             "if omitted)\n");
