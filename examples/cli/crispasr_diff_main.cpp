@@ -1052,6 +1052,99 @@ static std::string dirname_of(const std::string& path) {
     return path.substr(0, pos);
 }
 
+// ── Tiron (#295): decoded-output acceptance diff (HARD RULE #3). ─────────────
+// Whisper's forward is already proven and the token stream is validated
+// byte-exact elsewhere; the harness-visible stage that MATTERS is the decoded
+// transcript. We run whisper_full with the tiron grammar and compare the word
+// content against the reference's `generated_text` metadata (present-in overlap,
+// which tolerates the CLI's timestamp-as-segment rendering vs the reference's
+// inline <|t.tt|>). mel/encoder are F32/whisper-internal (no public getter) so
+// they aren't diffed here.
+#include "crispasr.h"
+#include <cctype>
+#include <regex>
+#include <set>
+static std::vector<std::string> tiron_words(const std::string& s) {
+    static const std::regex ctrl(R"(<\|[^|]*\|>)");
+    std::string t = std::regex_replace(s, ctrl, " ");
+    std::vector<std::string> w;
+    std::string cur;
+    for (unsigned char c : t) {
+        if (std::isalnum(c)) {
+            cur += (char)std::tolower(c);
+        } else if (!cur.empty()) {
+            w.push_back(cur);
+            cur.clear();
+        }
+    }
+    if (!cur.empty())
+        w.push_back(cur);
+    return w;
+}
+static int tiron_diff(const std::string& model, const std::string& ref_path, const std::string& /*audio*/) {
+    crispasr_diff::Ref ref;
+    if (!ref.load(ref_path)) {
+        fprintf(stderr, "tiron-diff: failed to load reference '%s'\n", ref_path.c_str());
+        return 1;
+    }
+    const std::string ref_text = ref.meta("generated_text");
+    if (ref_text.empty()) {
+        fprintf(stderr, "tiron-diff: reference has no generated_text metadata\n");
+        return 1;
+    }
+    // Reuse the reference's raw_audio, minus its 0.75 s onset pad (whisper_full
+    // re-applies the pad for a speaker vocab), so both sides see the same signal.
+    auto ra = ref.get_f32("raw_audio");
+    if (!ra.first || ra.second == 0) {
+        fprintf(stderr, "tiron-diff: reference has no raw_audio\n");
+        return 1;
+    }
+    const int pad = (int)(0.75f * 16000);
+    const int off = (int)ra.second > pad ? pad : 0;
+    std::vector<float> audio(ra.first + off, ra.first + ra.second);
+
+    whisper_context* ctx = whisper_init_from_file_with_params(model.c_str(), whisper_context_default_params());
+    if (!ctx) {
+        fprintf(stderr, "tiron-diff: failed to load model '%s'\n", model.c_str());
+        return 1;
+    }
+    whisper_full_params p = whisper_full_default_params(CRISPASR_SAMPLING_GREEDY);
+    p.print_special = true;
+    p.print_progress = false;
+    p.print_realtime = false;
+    p.no_timestamps = false;
+    p.language = "en";
+    p.n_threads = 4;
+    if (whisper_full(ctx, p, audio.data(), (int)audio.size()) != 0) {
+        fprintf(stderr, "tiron-diff: whisper_full failed\n");
+        whisper_free(ctx);
+        return 1;
+    }
+    std::string got;
+    for (int i = 0; i < whisper_full_n_segments(ctx); i++) {
+        got += whisper_full_get_segment_text(ctx, i);
+        got += ' ';
+    }
+    whisper_free(ctx);
+
+    const auto rw = tiron_words(ref_text);
+    const auto gw = tiron_words(got);
+    std::set<std::string> gset(gw.begin(), gw.end());
+    size_t hit = 0;
+    for (const auto& w : rw)
+        if (gset.count(w))
+            hit++;
+    const double overlap = rw.empty() ? 0.0 : (double)hit / rw.size();
+    printf("tiron-diff: reference words=%zu, runtime words=%zu, present-in overlap=%.3f\n", rw.size(), gw.size(),
+           overlap);
+    printf("  ref: %.160s\n", ref_text.c_str());
+    printf("  got: %.160s\n", got.c_str());
+    const bool pass = overlap >= 0.90;
+    printf("%s decoded-output acceptance (overlap %.3f %s 0.90)\n", pass ? "[PASS]" : "[FAIL]", overlap,
+           pass ? ">=" : "<");
+    return pass ? 0 : 1;
+}
+
 int main(int argc, char** argv) {
     if (argc < 5) {
         fprintf(stderr,
@@ -1073,6 +1166,11 @@ int main(int argc, char** argv) {
     const std::string model_path = argv[2];
     const std::string ref_path = argv[3];
     const std::string audio_path = argv[4];
+
+    // tiron (#295): decoded-output acceptance vs the reference transcript.
+    if (backend_name == "tiron") {
+        return tiron_diff(model_path, ref_path, audio_path);
+    }
 
     // dots-tts: self-contained per-stage parity checks (no audio needed). The
     // reference is the isolated component dump from
