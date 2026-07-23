@@ -32,6 +32,14 @@
 #include <cblas.h>
 #endif
 
+// #296: run_time/run_freq parallelise the band/time loops with OpenMP and each
+// block calls BLAS — a threaded BLAS would nest and oversubscribe cores. Pin BLAS
+// to one thread. Weak so it's a harmless no-op with reference cblas / MKL /
+// Accelerate (which aren't OpenBLAS).
+#if defined(HAVE_BLAS) && !defined(__APPLE__)
+extern "C" void openblas_set_num_threads(int) __attribute__((weak));
+#endif
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -523,12 +531,40 @@ bool roformer_block(core_gguf::WeightLoad& mw, const std::string& pre, std::vect
         rope_head(q.data() + (size_t)h * T * dim_head, T, dim_head);
         rope_head(k.data() + (size_t)h * T * dim_head, T, dim_head);
     }
-    // attention per head, scale = dim_head^-0.5, full (no mask). Accumulate in
-    // float (not double) — the torch reference is float32, so float is both ~2x
-    // faster (vectorizable) AND closer to the reference. #296: this O(T^2) loop
-    // was the scalar hot path behind the apparent "hang".
+    // attention per head, scale = dim_head^-0.5, full (no mask).
     const float scale = 1.0f / std::sqrt((float)dim_head);
     std::vector<float> attn(inner * T, 0.0f); // [h][T][dh] like q
+#if defined(HAVE_BLAS)
+    // #296: per head, S = scale * Q_h @ K_h^T (T x T) -> softmax rows -> O_h =
+    // S @ V_h (T x dim_head). Two SGEMMs replace the scalar O(T^2*dim_head) triple
+    // loop that dominated run_time; softmax stays in float (matches the reference).
+    std::vector<float> S((size_t)T * T);
+    for (int h = 0; h < heads; h++) {
+        const float* qh = q.data() + (size_t)h * T * dim_head;
+        const float* kh = k.data() + (size_t)h * T * dim_head;
+        const float* vh = v.data() + (size_t)h * T * dim_head;
+        float* oh = attn.data() + (size_t)h * T * dim_head;
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, T, T, dim_head, scale, qh, dim_head, kh, dim_head, 0.0f,
+                    S.data(), T);
+        for (int m = 0; m < T; m++) {
+            float* sr = S.data() + (size_t)m * T;
+            float mx = -1e30f;
+            for (int n = 0; n < T; n++)
+                if (sr[n] > mx)
+                    mx = sr[n];
+            float sum = 0.0f;
+            for (int n = 0; n < T; n++) {
+                sr[n] = std::exp(sr[n] - mx);
+                sum += sr[n];
+            }
+            const float inv = 1.0f / sum;
+            for (int n = 0; n < T; n++)
+                sr[n] *= inv;
+        }
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, T, dim_head, T, 1.0f, S.data(), T, vh, dim_head, 0.0f,
+                    oh, dim_head);
+    }
+#else
     std::vector<float> scores(T);
     for (int h = 0; h < heads; h++) {
         const float* qh = q.data() + (size_t)h * T * dim_head;
@@ -558,6 +594,7 @@ bool roformer_block(core_gguf::WeightLoad& mw, const std::string& pre, std::vect
             }
         }
     }
+#endif
     // per-head gating: out[t,h,:] *= sigmoid(gates[t,h]); gates = xn @ gate_w.T + b
     std::vector<float> gates;
     linear(xn, T, dim, gate_w, &gate_b, heads, gates); // (T, heads)
@@ -802,6 +839,13 @@ bool run_forward(mel_band_roformer_context* ctx, const std::vector<std::vector<f
     const int channels = hp.audio_channels, dim = hp.dim, nb = hp.num_bands;
     const int n_freqs = ctx->n_freqs();
     const int T = stft_n_frames(T_samp, hp.hop);
+
+#if defined(HAVE_BLAS) && !defined(__APPLE__)
+    // Coarse OpenMP parallelism (band/time loops) does the threading; keep each
+    // per-block BLAS call serial so they don't oversubscribe. No-op if not OpenBLAS.
+    if (openblas_set_num_threads)
+        openblas_set_num_threads(1);
+#endif
 
     // #296: per-stage profiling (CRISPASR_MBR_PROFILE=1) to localise where the
     // forward spends time — the separation was silently slow and the bottleneck
