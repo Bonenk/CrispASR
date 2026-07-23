@@ -701,6 +701,51 @@ bool mask_estimator(core_gguf::WeightLoad& mw, const std::vector<float>& x, int 
     return true;
 }
 
+// FFT-based inverse STFT for a power-of-2 n_fft. Numerically equivalent to
+// core_istft::istft(..., TRIM_CENTER) — same Hann overlap-add, COLA window-sum
+// normalization and center trim — but O(n_fft log n_fft) per frame instead of the
+// shared header's naive O(n_fft^2) irfft. #296: at n_fft=2048 that DFT was ~1/3 of
+// the whole separation time. Inverse via the forward FFT:
+//   ifft(X) = conj(fft(conj(X)))/N,  and X is Hermitian ⇒ the output is real, so
+//   x[n] = Re(fft(conj(Xfull)))[n] / N.
+std::vector<float> istft_fft(const float* mag, const float* phase, int n_fft, int hop, int T_frames,
+                             const float* window) {
+    const int n_freq = n_fft / 2 + 1;
+    const int ola_len = (T_frames - 1) * hop + n_fft;
+    std::vector<float> output((size_t)ola_len, 0.0f), win_sum((size_t)ola_len, 0.0f);
+    std::vector<float> re((size_t)n_fft), im((size_t)n_fft);
+    const float invN = 1.0f / (float)n_fft;
+    for (int t = 0; t < T_frames; t++) {
+        const float* m = mag + (size_t)t * n_freq;
+        const float* p = phase + (size_t)t * n_freq;
+        // conj of the half spectrum (bins 0..N/2)
+        for (int f = 0; f < n_freq; f++) {
+            re[(size_t)f] = m[f] * std::cos(p[f]);
+            im[(size_t)f] = -(m[f] * std::sin(p[f]));
+        }
+        // Hermitian mirror of the conjugated spectrum (bins 1..N/2-1 -> N-f)
+        for (int f = 1; f < n_freq - 1; f++) {
+            re[(size_t)(n_fft - f)] = re[(size_t)f];
+            im[(size_t)(n_fft - f)] = -im[(size_t)f];
+        }
+        core_fft::fft_radix2_inplace(re.data(), im.data(), n_fft);
+        const int offset = t * hop;
+        for (int i = 0; i < n_fft && (offset + i) < ola_len; i++) {
+            const float w = window[i];
+            output[(size_t)offset + i] += re[(size_t)i] * invN * w;
+            win_sum[(size_t)offset + i] += w * w;
+        }
+    }
+    for (int i = 0; i < ola_len; i++)
+        if (win_sum[(size_t)i] > 1e-8f)
+            output[(size_t)i] /= win_sum[(size_t)i];
+    const int pad = n_fft / 2; // TRIM_CENTER
+    const int final_len = ola_len - 2 * pad;
+    if (final_len <= 0)
+        return {};
+    return std::vector<float>(output.begin() + pad, output.begin() + pad + final_len);
+}
+
 // Apply the estimated mask to the packed STFT and iSTFT back to `channels`
 // waveforms of `T_samp` samples each. `packed` is (rows=n_freqs*channels, T, 2);
 // `mask_raw` is (T, 2N) complex per gather-index. Shared by separate() and the
@@ -740,8 +785,10 @@ void synthesize(mel_band_roformer_context* ctx, const std::vector<float>& packed
                 mag[(size_t)t * n_freqs + f] = std::sqrt(re * re + im * im);
                 phase[(size_t)t * n_freqs + f] = std::atan2(im, re);
             }
-        std::vector<float> wav = core_istft::istft(mag.data(), phase.data(), ctx->hp.n_fft, ctx->hp.hop, T, win.data(),
-                                                   core_istft::TRIM_CENTER);
+        const bool pow2 = ctx->hp.n_fft > 0 && (ctx->hp.n_fft & (ctx->hp.n_fft - 1)) == 0;
+        std::vector<float> wav = pow2 ? istft_fft(mag.data(), phase.data(), ctx->hp.n_fft, ctx->hp.hop, T, win.data())
+                                      : core_istft::istft(mag.data(), phase.data(), ctx->hp.n_fft, ctx->hp.hop, T,
+                                                          win.data(), core_istft::TRIM_CENTER);
         for (int i = 0; i < T_samp && i < (int)wav.size(); i++)
             out[(size_t)s * T_samp + i] = wav[i];
     }
