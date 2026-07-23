@@ -2477,9 +2477,30 @@ if(NOT MSVC)
 endif()
 # #296: parallelise the band/time Transformer loops (run_time/run_freq) when
 # OpenMP is available; the pragmas are #ifdef _OPENMP-guarded so non-OMP builds
-# keep the serial path. Turns a multi-minute single-threaded forward into ~1 min.
+# keep the serial path.
 if(OpenMP_CXX_FOUND)
     target_link_libraries(mel-band-roformer PUBLIC OpenMP::OpenMP_CXX)
+endif()
+# #296 (the real fix): route linear() through cblas_sgemm — the forward is
+# ~264 GFLOP of matmul, fast on macOS/Accelerate but a ~24-min scalar loop
+# elsewhere. Link a BLAS the same way cohere does (Accelerate on Apple,
+# OpenBLAS/MKL via crispasr_prefer_cblas elsewhere); HAVE_BLAS gates the fast path.
+if(APPLE)
+    if(NOT ACCELERATE_LIB)
+        find_library(ACCELERATE_LIB Accelerate REQUIRED)
+    endif()
+    target_link_libraries(mel-band-roformer PUBLIC ${ACCELERATE_LIB})
+    target_compile_definitions(mel-band-roformer PRIVATE HAVE_BLAS ACCELERATE_NEW_LAPACK)
+else()
+    crispasr_prefer_cblas(QUIET)
+    find_path(CBLAS_INCLUDE_DIR cblas.h PATH_SUFFIXES openblas)
+    if(BLAS_FOUND AND CBLAS_INCLUDE_DIR)
+        target_link_libraries(mel-band-roformer PUBLIC ${BLAS_LIBRARIES})
+        target_include_directories(mel-band-roformer PRIVATE ${CBLAS_INCLUDE_DIR})
+        target_compile_definitions(mel-band-roformer PRIVATE HAVE_BLAS)
+    else()
+        message(STATUS "mel-band-roformer: no BLAS found — linear() uses the scalar fallback (slow separation)")
+    endif()
 endif()
 
 # Standalone front-end diff probe (§248 Phase 1). Opt-in so it doesn't add to
