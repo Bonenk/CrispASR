@@ -6,7 +6,7 @@ import numpy as np
 TEMP = Path("/kaggle/temp"); OUT = Path("/kaggle/working")
 REPO = TEMP / "CrispASR"; MODELS = TEMP / "models"
 for d in (TEMP, OUT, MODELS): d.mkdir(parents=True, exist_ok=True)
-REF = "08a695e1a"; FIX = "fa137c2b3"
+REF = "b8e015a79"; FIX = "8ca36951f"
 import traceback as _tb
 def _eh(et, ev, tb):
     try: (OUT/"error.txt").write_text("".join(_tb.format_exception(et,ev,tb)))
