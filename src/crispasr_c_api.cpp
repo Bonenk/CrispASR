@@ -1622,6 +1622,16 @@ struct crispasr_session {
     // of the generic "no audio produced". Cleared on every synthesize call.
     std::string last_synth_error;
 
+    // Marking-responsibility attestation. TTS/S2S output is watermarked by
+    // DEFAULT on every ABI path (crispasr_session_synthesize / _streaming /
+    // speech_to_speech), matching the CLI/server. The only way to obtain UNMARKED
+    // PCM is crispasr_session_synthesize_raw, which is hard-refused unless the
+    // integrator first attests via crispasr_session_accept_marking_responsibility()
+    // — affirming they take on the AI-content marking/disclosure duty (they are
+    // the provider/deployer). Mirrors the CLI --accept-marking-responsibility gate.
+    bool marking_responsibility_accepted = false;
+    std::string marking_attestation;
+
     // Sticky session-level state (PLAN #59 partial unblock — the
     // capabilities matrix items that were previously CLI-only). Per-call
     // args still win when supplied; these are the fallback.
@@ -8480,11 +8490,46 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
     return nullptr;
 }
 
-// Synthesize without watermark — for callers that need DSP (speed change,
-// mixing, concatenation) before embedding the watermark themselves via
-// crispasr_watermark_embed(). Most callers should use
-// crispasr_session_synthesize() instead, which auto-watermarks.
+// Explicit attestation that the integrator accepts AI-content marking/disclosure
+// responsibility. REQUIRED before crispasr_session_synthesize_raw() will return
+// UNMARKED PCM; the default synthesize/streaming/S2S paths always watermark and
+// are unaffected. `attestation` is a human-readable affirmation recorded for
+// audit (an empty/NULL string still enables the opt-out but is logged as such).
+// Mirrors the CLI --accept-marking-responsibility gate. Returns 0, or -1 on bad
+// session.
+CA_EXPORT int crispasr_session_accept_marking_responsibility(crispasr_session* s, const char* attestation) {
+    if (!s)
+        return -1;
+    s->marking_responsibility_accepted = true;
+    s->marking_attestation = attestation ? attestation : "(unspecified)";
+    std::time_t t = std::time(nullptr);
+    char ts[64];
+    std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+    fprintf(stderr, "[MARKING] ts=%s scope=abi attestation=\"%s\"\n", ts, s->marking_attestation.c_str());
+    return 0;
+}
+
+// Synthesize WITHOUT the watermark — an explicit provenance opt-out for callers
+// that must DSP (speed change, mixing, concatenation) before embedding the mark
+// themselves via crispasr_watermark_embed(). Because it yields unmarked PCM it is
+// HARD-REFUSED (returns nullptr) unless the integrator first attests via
+// crispasr_session_accept_marking_responsibility(). Most callers should use
+// crispasr_session_synthesize() instead, which auto-watermarks by default.
 CA_EXPORT float* crispasr_session_synthesize_raw(crispasr_session* s, const char* text, int* out_n_samples) {
+    if (!s) {
+        if (out_n_samples)
+            *out_n_samples = 0;
+        return nullptr;
+    }
+    if (!s->marking_responsibility_accepted) {
+        s->last_synth_error = "crispasr_session_synthesize_raw returns UNMARKED audio and requires a prior "
+                              "crispasr_session_accept_marking_responsibility() attestation (you accept the "
+                              "AI-content marking/disclosure duty). Use crispasr_session_synthesize() for "
+                              "watermarked output.";
+        if (out_n_samples)
+            *out_n_samples = 0;
+        return nullptr;
+    }
     return crispasr_session_synthesize_raw_impl(s, text, out_n_samples);
 }
 
@@ -8564,8 +8609,8 @@ CA_EXPORT int crispasr_session_synthesize_streaming(crispasr_session* s, const c
 // Speech-to-Speech — audio in → audio out via a single model pass.
 // =========================================================================
 
-CA_EXPORT float* crispasr_session_speech_to_speech(crispasr_session* s, const float* in_samples, int n_in_samples,
-                                                   char** out_text, int* out_n_samples) {
+static float* crispasr_session_speech_to_speech_impl(crispasr_session* s, const float* in_samples, int n_in_samples,
+                                                     char** out_text, int* out_n_samples) {
     if (!s || !in_samples || n_in_samples <= 0)
         return nullptr;
     if (out_n_samples)
@@ -8656,6 +8701,18 @@ CA_EXPORT float* crispasr_session_speech_to_speech(crispasr_session* s, const fl
 
     s->last_synth_error = "backend '" + s->backend + "' does not support speech-to-speech";
     return nullptr;
+}
+
+// Speech-to-speech with default-on AI-content watermark (EU AI Act Art. 50),
+// consistent with the CLI/server and crispasr_session_synthesize. There is no
+// unmarked S2S opt-out on the ABI; callers needing to post-process before marking
+// should synthesize/convert via the raw+attested path instead.
+CA_EXPORT float* crispasr_session_speech_to_speech(crispasr_session* s, const float* in_samples, int n_in_samples,
+                                                   char** out_text, int* out_n_samples) {
+    float* pcm = crispasr_session_speech_to_speech_impl(s, in_samples, n_in_samples, out_text, out_n_samples);
+    if (pcm && out_n_samples && *out_n_samples > 0)
+        crispasr_watermark_embed(pcm, *out_n_samples, -1.0f);
+    return pcm;
 }
 
 // =========================================================================

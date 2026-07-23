@@ -1092,7 +1092,22 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     }
     // Honor the --no-watermark opt-out (equivalent to CRISPASR_NO_WATERMARK).
     // A server operator that disables it takes on the AI-content marking duty
-    // for every response the process serves.
+    // for every response the process serves — so, like the CLI, it requires the
+    // explicit --accept-marking-responsibility attestation. Refuse to start
+    // otherwise, rather than silently serving unmarked audio.
+    if (params.tts_no_watermark && !params.tts_marking_responsibility_accepted) {
+        fprintf(stderr, "crispasr: error: server launched with --no-watermark requires "
+                        "--accept-marking-responsibility (the operator accepts AI-content marking "
+                        "responsibility for every response served). Refusing to start.\n");
+        return 1;
+    }
+    if (params.tts_no_watermark) {
+        std::time_t t = std::time(nullptr);
+        char ts[64];
+        std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+        fprintf(stderr, "[MARKING] ts=%s scope=server no_watermark=yes attestation=\"%s\"\n", ts,
+                params.tts_marking_attestation.c_str());
+    }
     crispasr_wm_dispatch::set_disabled(params.tts_no_watermark);
 
     std::vector<std::string> api_keys = split_api_keys(params.server_api_keys);
@@ -2046,6 +2061,29 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                     log_sanitize(voice_name).c_str(), log_sanitize(consent_attestation).c_str(),
                     spoken_disclaimer ? "yes" : "no");
         }
+        // Marking-responsibility attestation (parallel to voice-clone consent):
+        // opting out of the spoken AI-disclaimer on a voice clone requires an
+        // explicit 'marking_attestation' field — the requester accepts the
+        // disclosure duty. Refused otherwise (hard-refuse policy).
+        std::string marking_attestation = body.value("marking_attestation", "");
+        if (is_voice_clone && !spoken_disclaimer && marking_attestation.empty()) {
+            json_error(res, 400,
+                       "disabling the spoken AI-disclaimer ('spoken_disclaimer': false) on a voice clone "
+                       "requires a 'marking_attestation' field affirming you accept the AI-content "
+                       "disclosure responsibility. "
+                       "Example: {\"marking_attestation\": \"I will disclose this is AI-generated\"}",
+                       "marking_attestation_required", "marking_attestation");
+            return;
+        }
+        if (is_voice_clone && !spoken_disclaimer) {
+            auto now = std::chrono::system_clock::now();
+            auto t = std::chrono::system_clock::to_time_t(now);
+            char ts[64];
+            std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+            fprintf(stderr, "[MARKING] ts=%s scope=request no_spoken_disclaimer=yes attestation=\"%s\"\n", ts,
+                    log_sanitize(marking_attestation).c_str());
+        }
+
         std::string response_format = body.value("response_format", std::string("wav"));
         if (response_format != "wav" && response_format != "pcm" && response_format != "f32" &&
             response_format != "mp3" && response_format != "aac" && response_format != "opus") {

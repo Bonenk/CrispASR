@@ -366,8 +366,11 @@ CRISPASR_SESSION_API const char* crispasr_session_get_speaker_name(crispasr_sess
 CRISPASR_SESSION_API int crispasr_session_set_instruct(crispasr_session* s, const char* instruct);
 CRISPASR_SESSION_API int crispasr_session_is_custom_voice(crispasr_session* s);
 CRISPASR_SESSION_API int crispasr_session_is_voice_design(crispasr_session* s);
+// UNMARKED synthesis — hard-refused unless crispasr_session_accept_marking_responsibility() was called first.
 CRISPASR_SESSION_API float* crispasr_session_synthesize_raw(crispasr_session* s, const char* text, int* out_n_samples);
 CRISPASR_SESSION_API float* crispasr_session_synthesize(crispasr_session* s, const char* text, int* out_n_samples);
+// Attest acceptance of AI-content marking/disclosure duty (required for _raw); recorded for audit.
+CRISPASR_SESSION_API int crispasr_session_accept_marking_responsibility(crispasr_session* s, const char* attestation);
 
 // Streaming synthesis: fires `cb` once per sentence chunk with that chunk's
 // watermarked PCM (backend-native sample rate, same as synthesize) as it is
