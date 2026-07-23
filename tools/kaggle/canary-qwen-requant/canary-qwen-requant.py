@@ -19,15 +19,13 @@ Full-harness utilities; CPU build (validation is CPU-fine, no CUDA needed).
 import json
 import os
 import re
+import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 
-import kaggle_harness as kh
-
 _T0 = time.time()
-kh.init_progress()
-kh.step("start")
 
 REPO = Path("/kaggle/working/CrispASR")
 BUILD = REPO / "build"
@@ -44,17 +42,28 @@ def run(cmd, **kw):
     return subprocess.run(cmd, **kw)
 
 
+# ── clone FIRST, then import the harness from the clone (repo carries it) ────
+print(json.dumps({"step": "start"}), flush=True)
+if REPO.exists():
+    shutil.rmtree(REPO)
+run(["git", "clone", "--recursive", "--depth", "1",
+     "https://github.com/CrispStrobe/CrispASR.git", str(REPO)], capture_output=False)
+run(["git", "-C", str(REPO), "submodule", "update", "--init", "--recursive", "--depth", "1"],
+    capture_output=False, timeout=1800)
+
+sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
+if str(Path(__file__).resolve().parent) not in sys.path:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+import kaggle_harness as kh  # noqa: E402
+
+kh.init_progress()
+sha = subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True).strip()
+kh.step("cloned", sha=sha)
+
 # ── toolchain + token ───────────────────────────────────────────────────────
 kh.install_build_toolchain()
 TOKEN = kh.resolve_hf_token("HF_TOKEN")
 from huggingface_hub import HfApi, hf_hub_download, CommitOperationAdd, CommitOperationDelete  # noqa: E402
-
-# ── source checkout (this branch: NaN-guarded argmax) ───────────────────────
-kh.step("clone")
-if not REPO.exists():
-    run(["git", "clone", "--recursive", "--depth", "1",
-         "https://github.com/CrispStrobe/CrispASR.git", str(REPO)], capture_output=False)
-run(["git", "-C", str(REPO), "submodule", "update", "--init", "--recursive", "--depth", "1"], capture_output=False)
 
 # ── build (CPU): crispasr-cli + crispasr-quantize ───────────────────────────
 kh.step("configure")
