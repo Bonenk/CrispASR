@@ -500,17 +500,33 @@ void rope_head(float* qh, int T, int dim_head) {
 // One RoFormer block (attention + FFN, both pre-RMSNorm, residual) over a
 // [T, dim] sequence for a SINGLE band/batch element. Layer 0 only (is_first:
 // no value-residual input). `pre` = e.g. "layers.0.0.layers.0.". Modifies x.
-bool roformer_block(core_gguf::WeightLoad& mw, const std::string& pre, std::vector<float>& x, int T, int dim, int heads,
-                    int dim_head) {
-    const int inner = heads * dim_head;
+// #296: a block's weights, read (and F16->F32 dequantized) ONCE per layer instead
+// of on every one of the num_bands / T roformer_block calls — the redundant reads
+// were a large O(T) cost in run_freq.
+struct RoformerBlockW {
     std::vector<float> nrm_g, qkv_w, gate_w, gate_b, out_w;
     std::vector<float> ff_g, ff1_w, ff1_b, ff4_w, ff4_b;
-    if (!read_f32(mw, pre + "0.norm.gamma", nrm_g) || !read_f32(mw, pre + "0.to_qkv.weight", qkv_w) ||
-        !read_f32(mw, pre + "0.to_gates.weight", gate_w) || !read_f32(mw, pre + "0.to_gates.bias", gate_b) ||
-        !read_f32(mw, pre + "0.to_out.0.weight", out_w) || !read_f32(mw, pre + "1.net.0.gamma", ff_g) ||
-        !read_f32(mw, pre + "1.net.1.weight", ff1_w) || !read_f32(mw, pre + "1.net.1.bias", ff1_b) ||
-        !read_f32(mw, pre + "1.net.4.weight", ff4_w) || !read_f32(mw, pre + "1.net.4.bias", ff4_b))
-        return false;
+};
+bool read_block_weights(core_gguf::WeightLoad& mw, const std::string& pre, RoformerBlockW& w) {
+    return read_f32(mw, pre + "0.norm.gamma", w.nrm_g) && read_f32(mw, pre + "0.to_qkv.weight", w.qkv_w) &&
+           read_f32(mw, pre + "0.to_gates.weight", w.gate_w) && read_f32(mw, pre + "0.to_gates.bias", w.gate_b) &&
+           read_f32(mw, pre + "0.to_out.0.weight", w.out_w) && read_f32(mw, pre + "1.net.0.gamma", w.ff_g) &&
+           read_f32(mw, pre + "1.net.1.weight", w.ff1_w) && read_f32(mw, pre + "1.net.1.bias", w.ff1_b) &&
+           read_f32(mw, pre + "1.net.4.weight", w.ff4_w) && read_f32(mw, pre + "1.net.4.bias", w.ff4_b);
+}
+
+bool roformer_block(const RoformerBlockW& w, std::vector<float>& x, int T, int dim, int heads, int dim_head) {
+    const int inner = heads * dim_head;
+    const auto& nrm_g = w.nrm_g;
+    const auto& qkv_w = w.qkv_w;
+    const auto& gate_w = w.gate_w;
+    const auto& gate_b = w.gate_b;
+    const auto& out_w = w.out_w;
+    const auto& ff_g = w.ff_g;
+    const auto& ff1_w = w.ff1_w;
+    const auto& ff1_b = w.ff1_b;
+    const auto& ff4_w = w.ff4_w;
+    const auto& ff4_b = w.ff4_b;
 
     // --- attention ---
     std::vector<float> xn = x;
@@ -636,10 +652,12 @@ bool run_time(core_gguf::WeightLoad& mw, int L, std::vector<float>& x, int T, in
     std::vector<float> fg;
     if (!read_f32(mw, pre + "norm.gamma", fg))
         return false;
+    RoformerBlockW bw; // read the block weights ONCE, reuse across all bands (#296)
+    if (!read_block_weights(mw, pre + "layers.0.", bw))
+        return false;
     // Each band is an independent Transformer over the T-axis: distinct bands
-    // write disjoint b-strides of x, and roformer_block/read_f32 only READ the
-    // shared weights, so the band loop is embarrassingly parallel. seq is
-    // thread-local. #296: parallelizing this (+ run_freq) is the main speedup.
+    // write disjoint b-strides of x, and roformer_block reads only the shared
+    // (const) bw, so the band loop is embarrassingly parallel. seq is thread-local.
     std::atomic<bool> ok{true};
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
@@ -651,7 +669,7 @@ bool run_time(core_gguf::WeightLoad& mw, int L, std::vector<float>& x, int T, in
         for (int t = 0; t < T; t++)
             for (int d = 0; d < dim; d++)
                 seq[(size_t)t * dim + d] = x[((size_t)t * nb + b) * dim + d];
-        if (!roformer_block(mw, pre + "layers.0.", seq, T, dim, heads, dim_head)) {
+        if (!roformer_block(bw, seq, T, dim, heads, dim_head)) {
             ok.store(false, std::memory_order_relaxed);
             continue;
         }
@@ -671,6 +689,9 @@ bool run_freq(core_gguf::WeightLoad& mw, int L, std::vector<float>& x, int T, in
     std::vector<float> fg;
     if (!read_f32(mw, pre + "norm.gamma", fg))
         return false;
+    RoformerBlockW bw; // read the block weights ONCE, reuse across all T steps (#296)
+    if (!read_block_weights(mw, pre + "layers.0.", bw))
+        return false;
     // Each time step is an independent Transformer over the band-axis: distinct
     // t write disjoint nb*dim slabs of x. Parallel over T (see run_time note).
     std::atomic<bool> ok{true};
@@ -682,7 +703,7 @@ bool run_freq(core_gguf::WeightLoad& mw, int L, std::vector<float>& x, int T, in
             continue;
         std::vector<float> seq((size_t)nb * dim);
         std::memcpy(seq.data(), x.data() + (size_t)t * nb * dim, (size_t)nb * dim * sizeof(float));
-        if (!roformer_block(mw, pre + "layers.0.", seq, nb, dim, heads, dim_head)) {
+        if (!roformer_block(bw, seq, nb, dim, heads, dim_head)) {
             ok.store(false, std::memory_order_relaxed);
             continue;
         }
@@ -1096,7 +1117,9 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
                 for (int d = 0; d < hp.dim; d++)
                     x0[(size_t)t * hp.dim + d] = ref_bso[((size_t)t * nb + 0) * hp.dim + d];
             std::vector<float> final_g;
-            if (roformer_block(ctx->weights, "layers.0.0.layers.0.", x0, T, hp.dim, hp.heads, hp.dim_head) &&
+            RoformerBlockW tbw;
+            if (read_block_weights(ctx->weights, "layers.0.0.layers.0.", tbw) &&
+                roformer_block(tbw, x0, T, hp.dim, hp.heads, hp.dim_head) &&
                 read_f32(ctx->weights, "layers.0.0.norm.gamma", final_g)) {
                 rms_rows(x0, T, hp.dim, final_g); // Transformer final norm
                 report("layer0_time", x0, ref_lt);
@@ -1121,13 +1144,14 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
             const int nb = hp.num_bands, dim = hp.dim;
             // freq input at t=0: run the time block on each band, take t=0.
             std::vector<float> freq_in((size_t)nb * dim, 0.0f);
-            bool ok = true;
+            RoformerBlockW tbw;
+            bool ok = read_block_weights(ctx->weights, "layers.0.0.layers.0.", tbw);
             for (int b = 0; b < nb && ok; b++) {
                 std::vector<float> xb((size_t)T * dim);
                 for (int t = 0; t < T; t++)
                     for (int d = 0; d < dim; d++)
                         xb[(size_t)t * dim + d] = ref_bso[((size_t)t * nb + b) * dim + d];
-                ok = roformer_block(ctx->weights, "layers.0.0.layers.0.", xb, T, dim, hp.heads, hp.dim_head);
+                ok = roformer_block(tbw, xb, T, dim, hp.heads, hp.dim_head);
                 if (!ok)
                     break;
                 rms_rows(xb, T, dim, tfinal_g);
@@ -1135,7 +1159,9 @@ int mel_band_roformer_diff(const char* model_gguf, const char* ref_gguf, const c
                     freq_in[(size_t)b * dim + d] = xb[(size_t)0 * dim + d]; // t=0
             }
             std::vector<float> ffinal_g;
-            if (ok && roformer_block(ctx->weights, "layers.0.1.layers.0.", freq_in, nb, dim, hp.heads, hp.dim_head) &&
+            RoformerBlockW fbw;
+            if (ok && read_block_weights(ctx->weights, "layers.0.1.layers.0.", fbw) &&
+                roformer_block(fbw, freq_in, nb, dim, hp.heads, hp.dim_head) &&
                 read_f32(ctx->weights, "layers.0.1.norm.gamma", ffinal_g)) {
                 rms_rows(freq_in, nb, dim, ffinal_g);
                 report("layer0_freq(chain)", freq_in, ref_lf);
