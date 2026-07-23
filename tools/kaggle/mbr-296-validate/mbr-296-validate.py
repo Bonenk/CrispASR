@@ -1,21 +1,18 @@
-"""#296 mel-band-roformer: validate the parallelize+float+progress fix.
+"""#296 mel-band-roformer: PROFILE where the forward spends time (with OpenBLAS).
 
-A/B on Kaggle (Linux, OpenMP): build the PRE-FIX commit (single-threaded, double
-attention) and the FIX commit; separate the SAME short clip on both to get
-  - correctness: cos(vocals_base, vocals_fix) must be ~1.0 (float change is benign)
-  - speedup: base_time / fix_time
-then time the full 11s jfk on the fix build to prove it completes (not a hang) with
-per-layer progress. Model: mel-band-roformer f16 (compute is quant-independent).
+The prior A/B showed cos=1.0 but only 24->10 min: the build had linked the SLOW
+reference libcblas.so, not OpenBLAS. This build prefers OpenBLAS and adds
+CRISPASR_MBR_PROFILE per-stage timing. Runs a short clip with profiling ON (prints
+the stft/band_split/run_time/run_freq/mask/synthesize breakdown) and times 11s jfk.
 """
-import json, os, re, shutil, subprocess, sys, time, wave
+import json, os, re, shutil, subprocess, sys, time
 from pathlib import Path
-import numpy as np
 
 _T0 = time.time()
 TEMP = Path("/kaggle/temp"); OUT = Path("/kaggle/working")
-REPO = TEMP / "CrispASR"; MODELS = TEMP / "models"
+REPO = TEMP / "CrispASR"; MODELS = TEMP / "models"; BUILD = TEMP / "build"
 for d in (TEMP, OUT, MODELS): d.mkdir(parents=True, exist_ok=True)
-PARENT = "ebe082d25"; FIX = "432de88f6"  # ref (float/OMP, cos=1.0 vs orig) vs BLAS build
+FIX = "17e3ce277"
 
 import traceback as _tb
 def _eh(et, ev, tb):
@@ -30,95 +27,62 @@ def run(cmd, **kw):
 
 print(json.dumps({"step": "start"}), flush=True)
 if REPO.exists(): shutil.rmtree(REPO)
-run(["git", "clone", "--depth", "5", "https://github.com/CrispStrobe/CrispASR.git", str(REPO)], capture_output=False)
+run(["git", "clone", "--depth", "3", "https://github.com/CrispStrobe/CrispASR.git", str(REPO)], capture_output=False)
+run(["git", "-C", str(REPO), "checkout", "-q", FIX], capture_output=False)
 run(["git", "-C", str(REPO), "submodule", "update", "--init", "--recursive", "--depth", "1"], capture_output=False, timeout=1800)
 sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
 import kaggle_harness as kh
-kh.init_progress(); kh.step("cloned")
+kh.init_progress(); kh.step("cloned", fix=FIX)
 kh.install_build_toolchain()
-# #296: the fix routes linear() through cblas_sgemm, which only compiles in when
-# CMake finds cblas.h. Kaggle's base image ships OpenBLAS runtime (numpy) but not
-# the dev headers — install them so HAVE_BLAS is defined and the fast path builds.
 run(["apt-get", "install", "-y", "-q", "libopenblas-dev"], capture_output=False)
 kh.step("blas.installed")
 
+# configure — WATCH the log for 'mel-band-roformer: linking OpenBLAS'
+cfg = ["cmake", "-G", "Ninja", "-B", str(BUILD), "-S", str(REPO),
+       "-DCMAKE_BUILD_TYPE=Release", "-DCRISPASR_NO_C2PA_NATIVE=ON"] + kh.cache_and_link_flags()
+r = run(cfg, capture_output=False)
+if r.returncode: kh.step("configure.FAIL"); raise SystemExit(1)
 JOBS = str(min(4, os.cpu_count() or 2))
-def build_at(commit, bdir):
-    run(["git", "-C", str(REPO), "checkout", "-q", commit], capture_output=False)
-    cfg = ["cmake", "-G", "Ninja", "-B", str(bdir), "-S", str(REPO),
-           "-DCMAKE_BUILD_TYPE=Release", "-DCRISPASR_NO_C2PA_NATIVE=ON"] + kh.cache_and_link_flags()
-    r = run(cfg, capture_output=False)
-    if r.returncode: kh.step(f"configure.FAIL.{commit}"); raise SystemExit(1)
-    with kh.build_heartbeat(f"build.{commit}"):
-        r = run(["cmake", "--build", str(bdir), "--target", "crispasr-cli", "-j", JOBS], capture_output=False)
-    if r.returncode: kh.step(f"build.FAIL.{commit}"); raise SystemExit(1)
-    cli = bdir / "bin" / "crispasr"
-    if not cli.exists():
-        c = [p for p in bdir.rglob("crispasr") if p.is_file() and os.access(p, os.X_OK)]
-        cli = c[0] if c else None
-    if cli is None: kh.step(f"build.MISSING.{commit}"); raise SystemExit(1)
-    return cli
+with kh.build_heartbeat("build"):
+    r = run(["cmake", "--build", str(BUILD), "--target", "crispasr-cli", "-j", JOBS], capture_output=False)
+if r.returncode: kh.step("build.FAIL"); raise SystemExit(1)
+CLI = BUILD / "bin" / "crispasr"
+if not CLI.exists():
+    c = [p for p in BUILD.rglob("crispasr") if p.is_file() and os.access(p, os.X_OK)]; CLI = c[0] if c else None
+if CLI is None: kh.step("build.MISSING"); raise SystemExit(1)
+kh.step("build.done", cli=str(CLI))
 
-# model (f16) via HF
 from huggingface_hub import hf_hub_download
-kh.step("download.begin")
 with kh.build_heartbeat("download"):
     MODEL = Path(hf_hub_download(repo_id="cstr/mel-band-roformer-vocals-GGUF",
                                  filename="mel-band-roformer-vocals-f16.gguf", local_dir=str(MODELS)))
-kh.step("download.done", mb=round(MODEL.stat().st_size / 1e6))
-
 JFK = REPO / "samples" / "jfk.wav"
 CLIP4 = TEMP / "jfk4.wav"
 run(["ffmpeg", "-y", "-i", str(JFK), "-t", "4", str(CLIP4)], capture_output=False)
 
-def separate(cli, bdir, clip, tag, threads=None):
-    env = {**os.environ, "LD_LIBRARY_PATH": f"{bdir}/src:{os.environ.get('LD_LIBRARY_PATH','')}"}
-    if threads is not None: env["OMP_NUM_THREADS"] = str(threads)
+def separate(clip, tag, profile=False, timeout=2400):
+    env = {**os.environ, "LD_LIBRARY_PATH": f"{BUILD}/src:{os.environ.get('LD_LIBRARY_PATH','')}"}
+    if profile: env["CRISPASR_MBR_PROFILE"] = "1"
     odir = TEMP / f"stems_{tag}"; odir.mkdir(exist_ok=True)
     t0 = time.time()
-    r = run([str(cli), "--separate", "-m", str(MODEL), "-f", str(clip), "--sep-output-dir", str(odir)],
-            env=env, timeout=2400)
+    r = run([str(CLI), "--separate", "-m", str(MODEL), "-f", str(clip), "--sep-output-dir", str(odir)],
+            env=env, timeout=timeout)
     dt = time.time() - t0
-    voc = odir / (Path(clip).stem + "_vocals.wav")
-    return dt, (voc if voc.exists() else None), r
+    return dt, r
 
-def read_wav(p):
-    with wave.open(str(p), "rb") as w:
-        return np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32)
+# 4s WITH profiling — print the per-stage breakdown
+d4, r4 = separate(CLIP4, "prof", profile=True)
+prof_lines = [l for l in (r4.stderr or "").splitlines() if "mbr-prof" in l or "layer" in l]
+print(f"=== 4s clip: {d4:.1f}s ===", flush=True)
+for l in prof_lines: print("  ", l, flush=True)
+kh.step("prof.4s", secs=round(d4, 1), lines=prof_lines[:20])
 
-def cos(a, b):
-    n = min(len(a), len(b)); a, b = a[:n], b[:n]
-    d = np.linalg.norm(a) * np.linalg.norm(b)
-    return float(np.dot(a, b) / d) if d > 0 else 0.0
+# 11s timing (no profiling noise, default threads)
+d11, r11 = separate(JFK, "jfk11")
+kh.step("jfk11", secs=round(d11, 1), rc=r11.returncode)
 
-R = {}
-# baseline: pre-fix (serial, double)
-base_cli = build_at(PARENT, TEMP / "build-base")
-bt, bvoc, br = separate(base_cli, TEMP / "build-base", CLIP4, "base")
-kh.step("base.sep", secs=round(bt, 1), voc=bool(bvoc), rc=br.returncode)
-# fix: parallel + float
-fix_cli = build_at(FIX, TEMP / "build-fix")
-ft, fvoc, fr = separate(fix_cli, TEMP / "build-fix", CLIP4, "fix")
-kh.step("fix.sep", secs=round(ft, 1), voc=bool(fvoc), rc=fr.returncode)
-# correctness + speedup on the 4s clip
-c = cos(read_wav(bvoc), read_wav(fvoc)) if (bvoc and fvoc) else None
-R["clip4"] = {"base_s": round(bt, 1), "fix_s": round(ft, 1),
-              "speedup": round(bt / ft, 2) if ft else None, "cos_base_vs_fix": c}
-kh.step("ab.done", **R["clip4"])
-# fix serial vs parallel to isolate threading scaling
-st, svoc, _ = separate(fix_cli, TEMP / "build-fix", CLIP4, "fix1", threads=1)
-R["clip4"]["fix_1thread_s"] = round(st, 1)
-R["clip4"]["thread_scaling"] = round(st / ft, 2) if ft else None
-# full 11s on the fix build (non-hang proof, default threads)
-f11, v11, r11 = separate(fix_cli, TEMP / "build-fix", JFK, "fix11")
-R["jfk11_fix_s"] = round(f11, 1); R["jfk11_completed"] = bool(v11)
-kh.step("jfk11.done", secs=round(f11, 1), completed=bool(v11))
-
-R["verdict"] = {
-    "correct": (c is not None and c > 0.999),
-    "not_hung": bool(v11) and f11 < 300,
-    "cos": c, "clip4_speedup": R["clip4"]["speedup"], "jfk11_s": R.get("jfk11_fix_s"),
-}
+R = {"clip4_s": round(d4, 1), "jfk11_s": round(d11, 1), "profile": prof_lines,
+     "openblas": ("linking OpenBLAS" in (r4.stderr or "") or None)}
 (OUT / "results.json").write_text(json.dumps(R, indent=2))
-print(json.dumps({"step": "done", **R["verdict"]}), flush=True)
-kh.step("done", **R["verdict"])
+print(json.dumps({"step": "done", "clip4_s": R["clip4_s"], "jfk11_s": R["jfk11_s"]}), flush=True)
+kh.step("done", clip4_s=R["clip4_s"], jfk11_s=R["jfk11_s"])
