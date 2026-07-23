@@ -85,18 +85,23 @@ TOKEN = kh.resolve_hf_token("HF_TOKEN")
 from huggingface_hub import HfApi, hf_hub_download, CommitOperationAdd, CommitOperationDelete  # noqa: E402
 
 # ── build (CPU): crispasr-cli + crispasr-quantize ───────────────────────────
+# Stream the build to the console log (capture_output=False) so any Kaggle-only
+# compile/link error is visible — the previous run captured stdout and logged
+# only the (empty) stderr, hiding the real cause. Build targets one at a time
+# (older cmake mishandles multi-target `--target`).
 kh.step("configure")
 cfg = ["cmake", "-G", "Ninja", "-B", str(BUILD), "-S", str(REPO),
        "-DCMAKE_BUILD_TYPE=Release", "-DCRISPASR_NO_C2PA_NATIVE=ON"] + kh.cache_and_link_flags()
-r = run(cfg)
+r = run(cfg, capture_output=False)
 if r.returncode != 0:
-    kh.step("configure.FAIL", tail=(r.stderr or "")[-800:]); raise SystemExit(1)
-kh.step("build")
-with kh.build_heartbeat("build"):
-    r = run(["cmake", "--build", str(BUILD), "--target", "crispasr-cli", "crispasr-quantize", "-j",
-             str(os.cpu_count())])
-if r.returncode != 0:
-    kh.step("build.FAIL", tail=(r.stderr or "")[-1200:]); raise SystemExit(1)
+    kh.step("configure.FAIL"); raise SystemExit(1)
+jobs = str(min(4, os.cpu_count() or 2))  # CPU C++ TUs on the ~16 GB Kaggle box
+for tgt in ("crispasr-cli", "crispasr-quantize"):
+    kh.step(f"build.{tgt}")
+    with kh.build_heartbeat(f"build.{tgt}"):
+        r = run(["cmake", "--build", str(BUILD), "--target", tgt, "-j", jobs], capture_output=False)
+    if r.returncode != 0:
+        kh.step(f"build.{tgt}.FAIL", rc=r.returncode); raise SystemExit(1)
 # The CLI target is `crispasr-cli` but OUTPUT_NAME is `crispasr`, emitted into
 # RUNTIME_OUTPUT_DIRECTORY (build/bin). Resolve robustly across layouts.
 def find_bin(name):
