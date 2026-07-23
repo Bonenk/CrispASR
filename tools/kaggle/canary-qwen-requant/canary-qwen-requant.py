@@ -27,13 +27,32 @@ from pathlib import Path
 
 _T0 = time.time()
 
-REPO = Path("/kaggle/working/CrispASR")
+# gotcha #22: the repo clone + build (thousands of files) and the multi-GB GGUFs
+# ALL stage under /kaggle/temp so /kaggle/working stays tiny — only results.json
+# + error.txt land there, so `kaggle kernels output` is fast and always carries
+# the diagnostics even when the run errors.
+TEMP = Path("/kaggle/temp")
+OUT = Path("/kaggle/working")
+REPO = TEMP / "CrispASR"
 BUILD = REPO / "build"
-WORK = Path("/kaggle/temp")  # gotcha #22: stage big files off /kaggle/working
-WORK.mkdir(parents=True, exist_ok=True)
-MODELS = WORK / "models"
-MODELS.mkdir(parents=True, exist_ok=True)
+MODELS = TEMP / "models"
+for d in (TEMP, OUT, MODELS):
+    d.mkdir(parents=True, exist_ok=True)
 HF_REPO = "cstr/canary-qwen-2.5b-GGUF"
+
+# Any uncaught exception -> a small retrievable file in /kaggle/working.
+import traceback as _tb  # noqa: E402
+
+
+def _excepthook(et, ev, tb):
+    try:
+        (OUT / "error.txt").write_text("".join(_tb.format_exception(et, ev, tb)))
+    except Exception:
+        pass
+    sys.__excepthook__(et, ev, tb)
+
+
+sys.excepthook = _excepthook
 
 
 def run(cmd, **kw):
@@ -78,12 +97,22 @@ with kh.build_heartbeat("build"):
              str(os.cpu_count())])
 if r.returncode != 0:
     kh.step("build.FAIL", tail=(r.stderr or "")[-1200:]); raise SystemExit(1)
-CLI = BUILD / "bin" / "crispasr-cli"
-QUANT = BUILD / "bin" / "crispasr-quantize"
-for b in (CLI, QUANT):
-    if not b.exists():
-        kh.step("build.MISSING", missing=str(b)); raise SystemExit(1)
-kh.step("build.done")
+# The CLI target is `crispasr-cli` but OUTPUT_NAME is `crispasr`, emitted into
+# RUNTIME_OUTPUT_DIRECTORY (build/bin). Resolve robustly across layouts.
+def find_bin(name):
+    p = BUILD / "bin" / name
+    if p.exists():
+        return p
+    cands = [c for c in BUILD.rglob(name) if c.is_file() and os.access(c, os.X_OK)]
+    return cands[0] if cands else None
+
+
+CLI = find_bin("crispasr")
+QUANT = find_bin("crispasr-quantize")
+if CLI is None or QUANT is None:
+    kh.step("build.MISSING", cli=str(CLI), quant=str(QUANT)); raise SystemExit(1)
+os.environ["LD_LIBRARY_PATH"] = f"{BUILD / 'src'}:{os.environ.get('LD_LIBRARY_PATH', '')}"
+kh.step("build.done", cli=str(CLI), quant=str(QUANT))
 
 # ── download F16 source ─────────────────────────────────────────────────────
 kh.step("download.f16.begin")
@@ -160,6 +189,6 @@ else:
     kh.step("deleted.q4_k", action="no k-quant passed; removed broken q4_k, q8_0 remains")
 
 RESULTS = {"results": results, "winner": winner, "wall_s": round(time.time() - _T0, 1)}
-(WORK / "results.json").write_text(json.dumps(RESULTS, indent=2))
+(OUT / "results.json").write_text(json.dumps(RESULTS, indent=2))
 print(json.dumps({"step": "done", "winner": winner, "results": results}), flush=True)
 kh.step("done", winner=winner or "none")
