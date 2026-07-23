@@ -528,11 +528,17 @@ green at cos≥0.999 across 8 multilingual smoke samples.
 ## Install & build
 
 ```bash
-git clone https://github.com/CrispStrobe/CrispASR
+git clone --recursive https://github.com/CrispStrobe/CrispASR
 cd CrispASR
+# already cloned without --recursive? initialize the bundled ggml submodule:
+#   git submodule update --init --recursive
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 ```
+
+The `ggml/` submodule is required. If you cloned without `--recursive`, run
+`git submodule update --init --recursive` first — otherwise CMake stops with a
+message telling you to do exactly that.
 
 Produces `build/bin/crispasr` (main CLI), `build/bin/crispasr-quantize`,
 and `build/bin/crispasr-diff`. No Python, PyTorch, or pip required at

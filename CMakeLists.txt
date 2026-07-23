@@ -235,6 +235,19 @@ if (NOT TARGET ggml)
         endif()
         add_library(ggml ALIAS ggml::ggml)
     else()
+        # #298: a clone without submodules leaves ggml/ empty, so add_subdirectory
+        # fails with a cryptic "does not contain a CMakeLists.txt file" (and then
+        # cascades into an empty-install-DESTINATION error). Fail early with an
+        # actionable message instead.
+        if (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ggml/CMakeLists.txt")
+            message(FATAL_ERROR
+                "The bundled 'ggml' submodule is not initialized "
+                "(${CMAKE_CURRENT_SOURCE_DIR}/ggml/CMakeLists.txt is missing).\n"
+                "Fetch the submodules and re-run cmake:\n"
+                "    git submodule update --init --recursive\n"
+                "or re-clone with:\n"
+                "    git clone --recursive https://github.com/CrispStrobe/CrispASR")
+        endif()
         add_subdirectory(ggml)
         if(WIN32)
             # The following adds a _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR macro and is a workaround for
@@ -255,6 +268,14 @@ if (NOT TARGET ggml)
     endif()
     # ... otherwise assume ggml is added by a parent CMakeLists.txt
 endif()
+
+# Define CMAKE_INSTALL_* (LIBDIR / INCLUDEDIR / …) BEFORE add_subdirectory(src):
+# src/CMakeLists.txt's install() rules reference them. This previously relied on
+# ggml's own include(GNUInstallDirs) running first via add_subdirectory(ggml), so
+# an absent/incomplete ggml left those DESTINATIONs empty and install() errored
+# with "install FILES given no DESTINATION" (#298). Including it here is
+# idempotent with the later include in the install section.
+include(GNUInstallDirs)
 add_subdirectory(src)
 
 # ---------------------------------------------------------------------------
