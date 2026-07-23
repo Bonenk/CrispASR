@@ -21,8 +21,15 @@
 #include "core/gguf_loader.h" // core_gguf::{open_metadata,kv_u32,load_weights}
 #include "core/istft.h"       // core_istft::istft (torch center=True match)
 
+// BLAS for the linear() SGEMM. #296: the forward is ~264 GFLOP of matmul; without
+// a BLAS backend linear() falls back to a scalar loop that took ~24 min on an 11s
+// clip (Linux/Windows), while macOS was fast via Accelerate. Use the portable
+// cblas the same way cohere/crispasr-core do: Accelerate on Apple, <cblas.h>
+// (OpenBLAS/MKL) elsewhere when the build found one (HAVE_BLAS).
 #if defined(__APPLE__)
-#include <Accelerate/Accelerate.h> // cblas_sgemm for the diff-probe forward
+#include <Accelerate/Accelerate.h> // cblas + vDSP, no external deps
+#elif defined(HAVE_BLAS)
+#include <cblas.h>
 #endif
 
 #include <algorithm>
@@ -423,9 +430,11 @@ bool band_split_cpu(core_gguf::WeightLoad& mw, const std::vector<float>& gathere
 void linear(const std::vector<float>& x, int T, int din, const std::vector<float>& W, const std::vector<float>* bias,
             int dout, std::vector<float>& y) {
     y.assign((size_t)T * dout, 0.0f);
-#if defined(__APPLE__)
-    // y = x @ W^T (x is T x din row-major, W is dout x din row-major). Accelerate
-    // sgemm makes the naive 264-GFLOP scalar forward practical for the diff.
+#if defined(HAVE_BLAS)
+    // y = x @ W^T (x is T x din row-major, W is dout x din row-major). This SGEMM
+    // is ~264 GFLOP for a full clip and is the entire reason --separate was fast
+    // on macOS (Accelerate) but "hung" for ~24 min elsewhere (#296) — route it
+    // through cblas on every platform that has a BLAS.
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, T, dout, din, 1.0f, x.data(), din, W.data(), din, 0.0f,
                 y.data(), dout);
     if (bias)
@@ -433,15 +442,17 @@ void linear(const std::vector<float>& x, int T, int din, const std::vector<float
             for (int o = 0; o < dout; o++)
                 y[(size_t)t * dout + o] += (*bias)[o];
 #else
+    // No-BLAS fallback: float (not double) accumulation — the torch reference is
+    // float32, so this matches it and vectorizes; still far slower than a BLAS.
     for (int t = 0; t < T; t++) {
         const float* xr = x.data() + (size_t)t * din;
         float* yr = y.data() + (size_t)t * dout;
         for (int o = 0; o < dout; o++) {
-            double acc = bias ? (*bias)[o] : 0.0;
+            float acc = bias ? (*bias)[o] : 0.0f;
             const float* wr = W.data() + (size_t)o * din;
             for (int i = 0; i < din; i++)
-                acc += (double)wr[i] * xr[i];
-            yr[o] = (float)acc;
+                acc += wr[i] * xr[i];
+            yr[o] = acc;
         }
     }
 #endif
