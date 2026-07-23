@@ -30,12 +30,18 @@ No Python, PyTorch, or pip is required at runtime.
 ## Linux / macOS
 
 ```bash
-git clone https://github.com/CrispStrobe/CrispASR
+git clone --recursive https://github.com/CrispStrobe/CrispASR
 cd CrispASR
+# if you already cloned without --recursive:
+#   git submodule update --init --recursive
 
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 ```
+
+> The bundled `ggml/` submodule is required. A non-recursive clone leaves it
+> empty; CMake now stops early with a message telling you to run
+> `git submodule update --init --recursive`.
 
 The default build produces every CLI target. Binaries land in
 `build/bin/`:
@@ -227,7 +233,7 @@ version of its own, so it builds cleanly against whatever glibc your
 distro ships.
 
 ```bash
-git clone https://github.com/CrispStrobe/CrispASR
+git clone --recursive https://github.com/CrispStrobe/CrispASR
 cd CrispASR
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
