@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -755,6 +756,20 @@ bool run_forward(mel_band_roformer_context* ctx, const std::vector<std::vector<f
     const int n_freqs = ctx->n_freqs();
     const int T = stft_n_frames(T_samp, hp.hop);
 
+    // #296: per-stage profiling (CRISPASR_MBR_PROFILE=1) to localise where the
+    // forward spends time — the separation was silently slow and the bottleneck
+    // was not where it looked.
+    const bool prof = std::getenv("CRISPASR_MBR_PROFILE") != nullptr;
+    using clk = std::chrono::steady_clock;
+    auto tick = clk::now();
+    auto lap = [&](const char* what) {
+        if (prof) {
+            auto n = clk::now();
+            fprintf(stderr, "  [mbr-prof] %-14s %7lld ms\n", what,
+                    (long long)std::chrono::duration_cast<std::chrono::milliseconds>(n - tick).count());
+            tick = n;
+        }
+    };
     std::vector<float> window;
     hann_periodic(hp.win, window);
     std::vector<std::vector<float>> chan_spec(channels);
@@ -762,27 +777,39 @@ bool run_forward(mel_band_roformer_context* ctx, const std::vector<std::vector<f
         stft_one_channel(chan[s].data(), T_samp, hp.n_fft, hp.hop, window, T, n_freqs, chan_spec[s]);
     std::vector<float> packed;
     pack_stft(chan_spec, n_freqs, T, channels, packed);
+    lap("stft+pack");
     std::vector<float> gathered;
     band_gather(packed, ctx->freq_indices, T, gathered);
     std::vector<float> x;
     if (!band_split_cpu(ctx->weights, gathered, ctx->band_width, T, dim, x))
         return false;
-    // #296: the separation forward is compute-heavy (O(T^2) attention over
-    // T~=frames*depth) and was previously silent, so a long clip looked like a
-    // hang. Emit per-layer progress to stderr.
+    lap("band_split");
+    // Compute-heavy Transformer stack; emit per-layer progress so it never looks
+    // hung, and (under profiling) split run_time vs run_freq time.
     fprintf(stderr, "mel_band_roformer: separating (T=%d frames, %d layers, %d bands)...\n", T, hp.depth, nb);
+    double t_time = 0, t_freq = 0;
     for (int L = 0; L < hp.depth; L++) {
         fprintf(stderr, "mel_band_roformer: layer %d/%d\n", L + 1, hp.depth);
-        if (!run_time(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head) ||
-            !run_freq(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head))
+        auto a = clk::now();
+        if (!run_time(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head))
             return false;
+        auto b = clk::now();
+        if (!run_freq(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head))
+            return false;
+        auto c = clk::now();
+        t_time += std::chrono::duration_cast<std::chrono::milliseconds>(b - a).count();
+        t_freq += std::chrono::duration_cast<std::chrono::milliseconds>(c - b).count();
     }
+    if (prof)
+        fprintf(stderr, "  [mbr-prof] run_time(all)  %7.0f ms\n  [mbr-prof] run_freq(all)  %7.0f ms\n", t_time, t_freq);
+    tick = clk::now();
     std::vector<float> mask_raw;
     if (!mask_estimator(ctx->weights, x, T, nb, dim, ctx->band_width, mask_raw))
         return false;
-
+    lap("mask_est");
     std::vector<float> out_planar; // channels * T_samp
     synthesize(ctx, packed, mask_raw, T, T_samp, out_planar);
+    lap("synthesize");
     // interleave
     vocals_interleaved.assign((size_t)T_samp * channels, 0.0f);
     for (int i = 0; i < T_samp; i++)
