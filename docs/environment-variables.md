@@ -437,7 +437,10 @@ suffixes.
 - `CRISPASR_F5_BATCH_CFG`
 - `CRISPASR_F5_BENCH`
 - `CRISPASR_F5_CFG_INTERVAL`
+- `CRISPASR_F5_DURATION_CLAMP` — clamp the per-char speech rate into a sane English band so a reference whose audio/transcript lengths are mismatched can't truncate (or balloon) the output (#294). Default on; set `0` to restore the exact upstream `ref_T / ref_text_len * gen_text_len / speed` estimate.
 - `CRISPASR_F5_FORCE_SCALAR`
+- `CRISPASR_F5_REF_MAX_SEC` — clip the reference audio to this many seconds before it drives the duration estimate (upstream parity: 12 s). Default `12`; set `0` to disable the clip.
+- `CRISPASR_F5_REF_TRIM_SILENCE` — strip leading/trailing silence and collapse internal silences >~1 s in the reference audio (upstream parity). Default on; set `0` to disable.
 
 ### FastConformer (shared encoder)
 
