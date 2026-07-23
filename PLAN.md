@@ -1,5 +1,31 @@
 # CrispASR — Pending work
 
+## NOW — active work (2026-07-23): canary-qwen q4_k NaN
+
+**Symptom:** canary-qwen emits all-`!` (token id 0) on jfk. **Root-caused** via
+Kaggle quant-diff (`tools/kaggle/cuda-canary-quant-diff`): **q8_0 (registry
+default) transcribes perfectly; only q4_k is NaN-corrupt.** Not a runtime bug
+(FUSED_QKV/PW_Q8 toggles ruled out). GGUF header shows tensor *types* are correct
+(token_embd/output F16, output_norm F32, encoder kept; only the 196 Qwen3-1.7B
+LLM projections Q4_K) → it is 4-bit *precision* on the small LLM, not a
+wrong-tensor policy bug.
+
+**DONE + pushed:**
+- NaN-robust greedy argmax in `canary_qwen.cpp` (seed −inf, skip non-finite,
+  abort on all-non-finite) — a NaN no longer silently spews `!`.
+- Swept the same guard into 7 sibling backends sharing `best_val = logits[0]`
+  (lfm2_audio, m2m100, moonshine, moss_transcribe{,_diarize}, moss_audio,
+  t5_translate). All compile+link clean.
+
+**IN FLIGHT:** Kaggle `chr1str/canary-qwen-requant` — re-quantize F16 →
+q4_k/q5_k/q6_k, validate each on jfk with the NaN-guarded binary, upload the
+smallest passing variant (q4_k overwrites broken in place; else atomic
+delete-broken + add smallest working k-quant). q8_0 default is safe throughout.
+
+**NEXT:** on result, update model registry/docs if the fixed variant changes
+name; fold into the next release notes. The broken HF file:
+`cstr/canary-qwen-2.5b-GGUF/canary-qwen-2.5b-q4_k.gguf` sha256 `9cafd0f77e14…`.
+
 ## #266 follow-up — hoist speaker orchestration into the library (PARKED, LOW)
 
 The #266 rework (closed-roster, cluster-level speaker identification — DONE,
