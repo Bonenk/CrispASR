@@ -2309,16 +2309,26 @@ int f5_tts_synthesize(struct f5_tts_context* ctx, const char* text, float** pcm_
     // transcript length from audio duration at ~13 chars/sec (typical English
     // including spaces — calibrated against F5-TTS upstream defaults).
     int ref_T = ctx->ref_mel_T;
+    const float mel_fps = (float)ctx->hp.sample_rate / (float)ctx->hp.hop_length; // ~93.75 (24k / hop 256)
+    const float fixed_rate = mel_fps / 13.0f; // ~7.2 mel frames/char (English ~13 chars/s)
     int ref_text_len;
     if (ref_text.empty()) {
-        float mel_fps = (float)ctx->hp.sample_rate / (float)ctx->hp.hop_length;
         float ref_secs = (float)ref_T / mel_fps;
         ref_text_len = std::max(1, (int)(ref_secs * 13.0f));
     } else {
         ref_text_len = (int)ref_text.size();
     }
     int gen_text_len = (int)strlen(text);
-    int duration = ref_T + (int)((float)ref_T / (float)ref_text_len * (float)gen_text_len / ctx->speed);
+    // Per-char speech rate derived from the reference (mel frames per char).
+    // #294: a reference clip whose AUDIO is much shorter than its transcript
+    // implies collapses this rate and TRUNCATES the generated speech (a full
+    // sentence came out ~0.7 s). Clamp the rate into a sane English band so the
+    // generated length can't collapse (or balloon) on a mismatched ref; an
+    // over-estimate only adds trailing silence, which is trimmed. A ref that
+    // matches its transcript sits inside the band and is unaffected.
+    float rate = (float)ref_T / (float)std::max(1, ref_text_len);
+    rate = std::min(std::max(rate, fixed_rate * 0.75f), fixed_rate * 2.5f);
+    int duration = ref_T + (int)(rate * (float)gen_text_len / ctx->speed);
 
     if (ctx->verbosity >= 1) {
         fprintf(stderr, "f5_tts: ref_T=%d duration=%d tokens=%zu text='%s'\n", ref_T, duration, tokens.size(),
