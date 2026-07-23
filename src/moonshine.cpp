@@ -17,6 +17,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -1255,22 +1256,30 @@ static int moonshine_transcribe_impl(struct moonshine_context* ctx, const float*
             const int V = (int)hp.vocab_size;
 
             if (!sample) {
-                // Greedy argmax (with probs requested)
-                int32_t best = 0;
-                float best_val = logits[0];
-                for (int i = 1; i < V; i++) {
-                    if (logits[i] > best_val) {
+                // Greedy argmax — NaN-robust (see canary_qwen note): seed -inf,
+                // skip non-finite. If the whole row is non-finite, route through
+                // the EOS path below to terminate cleanly instead of spewing 0.
+                int32_t best = -1;
+                float best_val = -std::numeric_limits<float>::infinity();
+                for (int i = 0; i < V; i++) {
+                    if (std::isfinite(logits[i]) && logits[i] > best_val) {
                         best_val = logits[i];
                         best = i;
                     }
                 }
-                picked = best;
-                if (out_token_probs) {
-                    float mx = best_val;
-                    float s = 0.f;
-                    for (int i = 0; i < V; i++)
-                        s += expf(logits[i] - mx);
-                    picked_prob = 1.0f / s;
+                if (best < 0) {
+                    fprintf(stderr, "moonshine: non-finite logits — stopping decode\n");
+                    picked = (int32_t)hp.eos_token_id;
+                } else {
+                    picked = best;
+                    if (out_token_probs) {
+                        float mx = best_val;
+                        float s = 0.f;
+                        for (int i = 0; i < V; i++)
+                            if (std::isfinite(logits[i]))
+                                s += expf(logits[i] - mx);
+                        picked_prob = 1.0f / s;
+                    }
                 }
             } else {
                 // Multinomial sample from softmax(logits / T).
