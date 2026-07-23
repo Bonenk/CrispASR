@@ -3937,6 +3937,82 @@ class CrispasrSession {
     }
   }
 
+  /// Attest acceptance of AI-content marking/disclosure responsibility (EU AI
+  /// Act Art. 50). REQUIRED before [synthesizeRaw] will return unmarked audio;
+  /// the default [synthesize] is watermarked and needs no attestation.
+  /// [attestation] is a human-readable affirmation recorded for audit.
+  void acceptMarkingResponsibility([String attestation = '']) {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_accept_marking_responsibility')) {
+      throw UnsupportedError(
+          'marking-attestation API not available in this libcrispasr build');
+    }
+    final fn = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Pointer<Utf8>),
+        int Function(Pointer<Void>, Pointer<Utf8>)>(
+      'crispasr_session_accept_marking_responsibility',
+    );
+    final aPtr = attestation.toNativeUtf8();
+    try {
+      fn(_handle, aPtr);
+    } finally {
+      calloc.free(aPtr);
+    }
+  }
+
+  /// UNMARKED synthesis (no watermark), for callers that must post-process
+  /// before embedding the mark themselves. Hard-refused (throws) unless
+  /// [acceptMarkingResponsibility] was called first. Prefer [synthesize] for
+  /// the default watermarked output.
+  Float32List synthesizeRaw(String text) {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_synthesize_raw')) {
+      throw UnsupportedError(
+          'TTS raw synthesize API not available in this libcrispasr build');
+    }
+    final synFn = _lib.lookupFunction<
+        Pointer<Float> Function(Pointer<Void>, Pointer<Utf8>, Pointer<Int32>),
+        Pointer<Float> Function(Pointer<Void>, Pointer<Utf8>, Pointer<Int32>)>(
+      'crispasr_session_synthesize_raw',
+    );
+    final freeFn = _lib.lookupFunction<Void Function(Pointer<Float>),
+        void Function(Pointer<Float>)>('crispasr_pcm_free');
+    final textPtr = text.toNativeUtf8();
+    final nPtr = calloc<Int32>();
+    try {
+      final pcmPtr = synFn(_handle, textPtr, nPtr);
+      final n = nPtr.value;
+      if (pcmPtr == nullptr || n <= 0) {
+        String reason = '';
+        if (_lib.providesSymbol('crispasr_session_last_synth_error')) {
+          final errFn = _lib.lookupFunction<
+              Pointer<Utf8> Function(Pointer<Void>),
+              Pointer<Utf8> Function(Pointer<Void>)>(
+            'crispasr_session_last_synth_error',
+          );
+          final errPtr = errFn(_handle);
+          if (errPtr != nullptr) {
+            final msg = errPtr.toDartString();
+            if (msg.isNotEmpty) reason = msg;
+          }
+        }
+        throw Exception(reason.isNotEmpty
+            ? reason
+            : 'synthesizeRaw returned no audio (attestation required? '
+                'call acceptMarkingResponsibility first)');
+      }
+      try {
+        final view = pcmPtr.asTypedList(n);
+        return Float32List.fromList(view);
+      } finally {
+        freeFn(pcmPtr);
+      }
+    } finally {
+      calloc.free(textPtr);
+      calloc.free(nPtr);
+    }
+  }
+
   /// Speech-to-Speech: audio in → audio out via a single model pass.
   ///
   /// Supported on backends with S2S capability (lfm2-audio, mini-omni2).

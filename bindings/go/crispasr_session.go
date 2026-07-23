@@ -74,6 +74,8 @@ int              crispasr_session_set_instruct(CrispasrSession* s, const char* i
 int              crispasr_session_is_custom_voice(CrispasrSession* s);
 int              crispasr_session_is_voice_design(CrispasrSession* s);
 float*           crispasr_session_synthesize(CrispasrSession* s, const char* text, int* out_n_samples);
+float*           crispasr_session_synthesize_raw(CrispasrSession* s, const char* text, int* out_n_samples);
+int              crispasr_session_accept_marking_responsibility(CrispasrSession* s, const char* attestation);
 float*           crispasr_session_speech_to_speech(CrispasrSession* s, const float* in_samples, int n_in_samples,
                                                     char** out_text, int* out_n_samples);
 void             crispasr_session_translate_text_free(char* text);
@@ -996,6 +998,38 @@ func (s *CrispasrSession) Synthesize(text string) ([]float32, error) {
 	ptr := C.crispasr_session_synthesize(s.handle, ctext, &n)
 	if ptr == nil || n <= 0 {
 		return nil, errors.New("crispasr_session_synthesize: no audio produced")
+	}
+	defer C.crispasr_pcm_free(ptr)
+	samples := make([]float32, int(n))
+	src := unsafe.Slice((*float32)(unsafe.Pointer(ptr)), int(n))
+	copy(samples, src)
+	return samples, nil
+}
+
+// AcceptMarkingResponsibility attests that the caller accepts AI-content
+// marking/disclosure responsibility (EU AI Act Art. 50). It is REQUIRED before
+// SynthesizeRaw will return UNMARKED audio; the default Synthesize (watermarked)
+// is unaffected. `attestation` is a human-readable affirmation recorded for audit.
+func (s *CrispasrSession) AcceptMarkingResponsibility(attestation string) error {
+	ca := C.CString(attestation)
+	defer C.free(unsafe.Pointer(ca))
+	if C.crispasr_session_accept_marking_responsibility(s.handle, ca) != 0 {
+		return errors.New("crispasr_session_accept_marking_responsibility failed")
+	}
+	return nil
+}
+
+// SynthesizeRaw converts `text` to UNMARKED 24 kHz mono PCM (no watermark), for
+// callers that must post-process (speed/mix/concat) before embedding the mark
+// themselves. It is hard-refused unless AcceptMarkingResponsibility was called
+// first. Most callers should use Synthesize, which watermarks by default.
+func (s *CrispasrSession) SynthesizeRaw(text string) ([]float32, error) {
+	ctext := C.CString(text)
+	defer C.free(unsafe.Pointer(ctext))
+	var n C.int
+	ptr := C.crispasr_session_synthesize_raw(s.handle, ctext, &n)
+	if ptr == nil || n <= 0 {
+		return nil, errors.New("crispasr_session_synthesize_raw: no audio (attestation required? call AcceptMarkingResponsibility first)")
 	}
 	defer C.crispasr_pcm_free(ptr)
 	samples := make([]float32, int(n))

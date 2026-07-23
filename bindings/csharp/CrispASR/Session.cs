@@ -326,6 +326,40 @@ namespace CrispASR
             }
         }
 
+        /// <summary>
+        /// Attest acceptance of AI-content marking/disclosure responsibility (EU
+        /// AI Act Art. 50). REQUIRED before <see cref="SynthesizeRaw"/> will return
+        /// unmarked audio; the default <see cref="Synthesize"/> is watermarked and
+        /// needs no attestation. <paramref name="attestation"/> is recorded for audit.
+        /// </summary>
+        public void AcceptMarkingResponsibility(string attestation = "")
+            => Check(NativeMethods.crispasr_session_accept_marking_responsibility(Handle, attestation ?? ""),
+                     "accept_marking_responsibility");
+
+        /// <summary>
+        /// UNMARKED synthesis (no watermark), for callers that post-process before
+        /// embedding the mark themselves. Hard-refused (throws) unless
+        /// <see cref="AcceptMarkingResponsibility"/> was called first. Prefer
+        /// <see cref="Synthesize"/> for the default watermarked output.
+        /// </summary>
+        public float[] SynthesizeRaw(string text)
+        {
+            var ptr = NativeMethods.crispasr_session_synthesize_raw(Handle, text, out int nSamples);
+            if (ptr == IntPtr.Zero || nSamples <= 0)
+                throw new InvalidOperationException(
+                    "SynthesizeRaw returned no audio (attestation required? call AcceptMarkingResponsibility first)");
+            try
+            {
+                var pcm = new float[nSamples];
+                Marshal.Copy(ptr, pcm, 0, nSamples);
+                return pcm;
+            }
+            finally
+            {
+                NativeMethods.crispasr_pcm_free(ptr);
+            }
+        }
+
         // ----------------------------------------------------------------
         // ASR Transcription
         // ----------------------------------------------------------------
