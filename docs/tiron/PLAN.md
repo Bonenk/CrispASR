@@ -20,7 +20,7 @@ Branch: `feat/tiron-asr` · worktree `.claude/worktrees/feat-tiron`
 | 7 registry | ✅ tiron row (cstr/tiron-GGML) |
 | 8 quantize rules | ✅ uses `crispasr-legacy-quantize` (whisper-bin quantizer) |
 | 9 reference dumper (py) | ✅ `tools/reference_backends/tiron.py` + registered |
-| 9 crispasr-diff C++ branch | ⬜ DEFERRED — decode validated BYTE-EXACT via token dump vs the published ref.gguf (equiv. rigor); a C++ branch needs whisper mel/encoder stage APIs (re-validates the already-proven forward) |
+| 9 crispasr-diff C++ branch | ✅ `crispasr-diff tiron <model> <ref.gguf> <audio>` — decoded-output word overlap vs generated_text (q8_0 -> 1.000 PASS) |
 | 10 bindings docstrings | ✅ functional (dynamic dispatch); documented in README + architecture.md |
 | 11 go LDFLAGS | N/A — tiron_link.cpp is in crispasr-lib (no new -l) |
 | 12 README / architecture / live test / env | ✅ README (experimental row), architecture.md section, `tests/test-tiron-live.sh` + ctest + `CRISPASR_MODEL_TIRON` |
