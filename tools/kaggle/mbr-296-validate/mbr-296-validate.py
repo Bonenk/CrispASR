@@ -15,7 +15,7 @@ _T0 = time.time()
 TEMP = Path("/kaggle/temp"); OUT = Path("/kaggle/working")
 REPO = TEMP / "CrispASR"; MODELS = TEMP / "models"
 for d in (TEMP, OUT, MODELS): d.mkdir(parents=True, exist_ok=True)
-PARENT = "6fca326a0"; FIX = "ebe082d25"
+PARENT = "ebe082d25"; FIX = "432de88f6"  # ref (float/OMP, cos=1.0 vs orig) vs BLAS build
 
 import traceback as _tb
 def _eh(et, ev, tb):
@@ -36,6 +36,11 @@ sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
 import kaggle_harness as kh
 kh.init_progress(); kh.step("cloned")
 kh.install_build_toolchain()
+# #296: the fix routes linear() through cblas_sgemm, which only compiles in when
+# CMake finds cblas.h. Kaggle's base image ships OpenBLAS runtime (numpy) but not
+# the dev headers — install them so HAVE_BLAS is defined and the fast path builds.
+run(["apt-get", "install", "-y", "-q", "libopenblas-dev"], capture_output=False)
+kh.step("blas.installed")
 
 JOBS = str(min(4, os.cpu_count() or 2))
 def build_at(commit, bdir):
