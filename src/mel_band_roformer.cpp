@@ -26,6 +26,7 @@
 #endif
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -510,35 +511,38 @@ bool roformer_block(core_gguf::WeightLoad& mw, const std::string& pre, std::vect
         rope_head(q.data() + (size_t)h * T * dim_head, T, dim_head);
         rope_head(k.data() + (size_t)h * T * dim_head, T, dim_head);
     }
-    // attention per head, scale = dim_head^-0.5, full (no mask)
-    const double scale = 1.0 / std::sqrt((double)dim_head);
+    // attention per head, scale = dim_head^-0.5, full (no mask). Accumulate in
+    // float (not double) — the torch reference is float32, so float is both ~2x
+    // faster (vectorizable) AND closer to the reference. #296: this O(T^2) loop
+    // was the scalar hot path behind the apparent "hang".
+    const float scale = 1.0f / std::sqrt((float)dim_head);
     std::vector<float> attn(inner * T, 0.0f); // [h][T][dh] like q
-    std::vector<double> scores(T);
+    std::vector<float> scores(T);
     for (int h = 0; h < heads; h++) {
         const float* qh = q.data() + (size_t)h * T * dim_head;
         const float* kh = k.data() + (size_t)h * T * dim_head;
         const float* vh = v.data() + (size_t)h * T * dim_head;
         float* oh = attn.data() + (size_t)h * T * dim_head;
         for (int m = 0; m < T; m++) {
-            double mx = -1e30;
+            float mx = -1e30f;
             for (int n = 0; n < T; n++) {
-                double dot = 0;
+                float dot = 0.0f;
                 for (int d = 0; d < dim_head; d++)
-                    dot += (double)qh[(size_t)m * dim_head + d] * kh[(size_t)n * dim_head + d];
+                    dot += qh[(size_t)m * dim_head + d] * kh[(size_t)n * dim_head + d];
                 scores[n] = dot * scale;
                 if (scores[n] > mx)
                     mx = scores[n];
             }
-            double sum = 0;
+            float sum = 0.0f;
             for (int n = 0; n < T; n++) {
                 scores[n] = std::exp(scores[n] - mx);
                 sum += scores[n];
             }
             for (int d = 0; d < dim_head; d++) {
-                double acc = 0;
+                float acc = 0.0f;
                 for (int n = 0; n < T; n++)
                     acc += scores[n] * vh[(size_t)n * dim_head + d];
-                oh[(size_t)m * dim_head + d] = (float)(acc / sum);
+                oh[(size_t)m * dim_head + d] = acc / sum;
             }
         }
     }
@@ -583,19 +587,31 @@ bool run_time(core_gguf::WeightLoad& mw, int L, std::vector<float>& x, int T, in
     std::vector<float> fg;
     if (!read_f32(mw, pre + "norm.gamma", fg))
         return false;
-    std::vector<float> seq((size_t)T * dim);
+    // Each band is an independent Transformer over the T-axis: distinct bands
+    // write disjoint b-strides of x, and roformer_block/read_f32 only READ the
+    // shared weights, so the band loop is embarrassingly parallel. seq is
+    // thread-local. #296: parallelizing this (+ run_freq) is the main speedup.
+    std::atomic<bool> ok{true};
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
     for (int b = 0; b < nb; b++) {
+        if (!ok.load(std::memory_order_relaxed))
+            continue;
+        std::vector<float> seq((size_t)T * dim);
         for (int t = 0; t < T; t++)
             for (int d = 0; d < dim; d++)
                 seq[(size_t)t * dim + d] = x[((size_t)t * nb + b) * dim + d];
-        if (!roformer_block(mw, pre + "layers.0.", seq, T, dim, heads, dim_head))
-            return false;
+        if (!roformer_block(mw, pre + "layers.0.", seq, T, dim, heads, dim_head)) {
+            ok.store(false, std::memory_order_relaxed);
+            continue;
+        }
         rms_rows(seq, T, dim, fg);
         for (int t = 0; t < T; t++)
             for (int d = 0; d < dim; d++)
                 x[((size_t)t * nb + b) * dim + d] = seq[(size_t)t * dim + d];
     }
-    return true;
+    return ok.load();
 }
 
 // Run a Transformer over the FREQ (band) axis: x is (T, nb, dim); each time
@@ -606,15 +622,25 @@ bool run_freq(core_gguf::WeightLoad& mw, int L, std::vector<float>& x, int T, in
     std::vector<float> fg;
     if (!read_f32(mw, pre + "norm.gamma", fg))
         return false;
-    std::vector<float> seq((size_t)nb * dim);
+    // Each time step is an independent Transformer over the band-axis: distinct
+    // t write disjoint nb*dim slabs of x. Parallel over T (see run_time note).
+    std::atomic<bool> ok{true};
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
     for (int t = 0; t < T; t++) {
+        if (!ok.load(std::memory_order_relaxed))
+            continue;
+        std::vector<float> seq((size_t)nb * dim);
         std::memcpy(seq.data(), x.data() + (size_t)t * nb * dim, (size_t)nb * dim * sizeof(float));
-        if (!roformer_block(mw, pre + "layers.0.", seq, nb, dim, heads, dim_head))
-            return false;
+        if (!roformer_block(mw, pre + "layers.0.", seq, nb, dim, heads, dim_head)) {
+            ok.store(false, std::memory_order_relaxed);
+            continue;
+        }
         rms_rows(seq, nb, dim, fg);
         std::memcpy(x.data() + (size_t)t * nb * dim, seq.data(), (size_t)nb * dim * sizeof(float));
     }
-    return true;
+    return ok.load();
 }
 
 // Mask estimator (stem 0): per band, MLP (Linear->Tanh->Linear->Tanh->Linear to
@@ -730,10 +756,16 @@ bool run_forward(mel_band_roformer_context* ctx, const std::vector<std::vector<f
     std::vector<float> x;
     if (!band_split_cpu(ctx->weights, gathered, ctx->band_width, T, dim, x))
         return false;
-    for (int L = 0; L < hp.depth; L++)
+    // #296: the separation forward is compute-heavy (O(T^2) attention over
+    // T~=frames*depth) and was previously silent, so a long clip looked like a
+    // hang. Emit per-layer progress to stderr.
+    fprintf(stderr, "mel_band_roformer: separating (T=%d frames, %d layers, %d bands)...\n", T, hp.depth, nb);
+    for (int L = 0; L < hp.depth; L++) {
+        fprintf(stderr, "mel_band_roformer: layer %d/%d\n", L + 1, hp.depth);
         if (!run_time(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head) ||
             !run_freq(ctx->weights, L, x, T, nb, dim, hp.heads, hp.dim_head))
             return false;
+    }
     std::vector<float> mask_raw;
     if (!mask_estimator(ctx->weights, x, T, nb, dim, ctx->band_width, mask_raw))
         return false;
