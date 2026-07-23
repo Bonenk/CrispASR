@@ -2256,9 +2256,96 @@ void f5_tts_free(struct f5_tts_context* ctx) {
     delete ctx;
 }
 
+// Port of upstream F5-TTS preprocess_ref_audio_text (audio side): strip silence
+// and clip the reference to a max length before it drives the duration estimate.
+// Upstream splits the ref on >=1 s silences, keeps the leading speech, and clips
+// to 12 s (src/f5_tts/infer/utils_infer.py). We approximate that here: trim
+// leading/trailing silence, collapse internal silences longer than ~1 s down to
+// ~0.2 s, then clip to `max_sec`. Bounding ref_mel_T to actual speech keeps the
+// `ref_T / ref_text_len` speech-rate estimate honest (a ref padded with silence
+// otherwise inflates the estimate). Returns the processed PCM.
+static std::vector<float> f5_preprocess_ref_audio(const float* pcm, int n, int sr, float max_sec, bool trim_silence) {
+    std::vector<float> out(pcm, pcm + n);
+    if (trim_silence && n > 0) {
+        const int win = std::max(1, sr / 100); // 10 ms analysis window
+        const int n_win = n / win;
+        if (n_win > 2) {
+            std::vector<float> rms(n_win, 0.0f);
+            float peak = 1e-9f;
+            for (int w = 0; w < n_win; ++w) {
+                double s = 0;
+                for (int i = 0; i < win; ++i) {
+                    float x = pcm[w * win + i];
+                    s += (double)x * x;
+                }
+                rms[w] = (float)std::sqrt(s / win);
+                peak = std::max(peak, rms[w]);
+            }
+            // -50 dBFS full-scale silence gate, but never above 5 % of the ref's
+            // own peak so a quiet recording isn't wiped out entirely.
+            const float thr = std::min(0.00316f, peak * 0.05f);
+            auto silent = [&](int w) { return rms[w] < thr; };
+            const int min_sil = std::max(1, sr / win);        // 1 s of windows
+            const int keep_pad = std::max(1, (sr / win) / 5); // 0.2 s kept around gaps
+            int first = 0;
+            while (first < n_win && silent(first))
+                ++first;
+            int last = n_win - 1;
+            while (last >= 0 && silent(last))
+                --last;
+            if (first <= last) {
+                std::vector<float> keep;
+                keep.reserve((size_t)n);
+                int w = first;
+                while (w <= last) {
+                    if (!silent(w)) {
+                        int s = w;
+                        while (w <= last && !silent(w))
+                            ++w;
+                        keep.insert(keep.end(), pcm + (size_t)s * win, pcm + (size_t)w * win);
+                    } else {
+                        int s = w;
+                        while (w <= last && silent(w))
+                            ++w;
+                        int len = w - s;                            // internal silent run
+                        int kw = (len >= min_sil) ? keep_pad : len; // collapse long gaps only
+                        keep.insert(keep.end(), pcm + (size_t)s * win, pcm + (size_t)(s + kw) * win);
+                    }
+                }
+                if (!keep.empty())
+                    out.swap(keep);
+            }
+        }
+    }
+    if (max_sec > 0.0f) {
+        size_t maxn = (size_t)(max_sec * (float)sr);
+        if (out.size() > maxn)
+            out.resize(maxn);
+    }
+    return out;
+}
+
 int f5_tts_set_reference(struct f5_tts_context* ctx, const float* pcm_24k, int n_samples, const char* ref_text) {
     if (!ctx || !pcm_24k || n_samples <= 0)
         return -1;
+
+    // Reference preprocessing (upstream parity): silence-strip + clip. Gated so
+    // it can be turned off for byte-exact comparison against pre-#294 behavior.
+    // CRISPASR_F5_REF_MAX_SEC: clip length in seconds (default 12, matches
+    //   upstream; 0 disables the clip). CRISPASR_F5_REF_TRIM_SILENCE: 0 disables
+    //   the silence strip (default on).
+    const char* max_env = crispasr_env::get("CRISPASR_F5_REF_MAX_SEC");
+    float ref_max_sec = max_env ? (float)atof(max_env) : 12.0f;
+    const char* trim_env = crispasr_env::get("CRISPASR_F5_REF_TRIM_SILENCE");
+    bool ref_trim = !(trim_env && std::strcmp(trim_env, "0") == 0);
+    std::vector<float> ref_pcm =
+        f5_preprocess_ref_audio(pcm_24k, n_samples, ctx->hp.sample_rate, ref_max_sec, ref_trim);
+    if (ctx->verbosity >= 1 && (int)ref_pcm.size() != n_samples) {
+        fprintf(stderr, "f5_tts: ref preprocess %d -> %zu samples (%.2f -> %.2f s)\n", n_samples, ref_pcm.size(),
+                (float)n_samples / (float)ctx->hp.sample_rate, (float)ref_pcm.size() / (float)ctx->hp.sample_rate);
+    }
+    pcm_24k = ref_pcm.data();
+    n_samples = (int)ref_pcm.size();
 
     // Compute mel spectrogram of reference audio
     int T_ref;
@@ -2327,7 +2414,13 @@ int f5_tts_synthesize(struct f5_tts_context* ctx, const char* text, float** pcm_
     // over-estimate only adds trailing silence, which is trimmed. A ref that
     // matches its transcript sits inside the band and is unaffected.
     float rate = (float)ref_T / (float)std::max(1, ref_text_len);
-    rate = std::min(std::max(rate, fixed_rate * 0.75f), fixed_rate * 2.5f);
+    // The clamp is an ADD-ON over the upstream formula (which has no clamp); gate
+    // it so it can be switched off. CRISPASR_F5_DURATION_CLAMP=0 restores the
+    // exact upstream `ref_T / ref_text_len * gen_text_len / speed` estimate.
+    const char* clamp_env = crispasr_env::get("CRISPASR_F5_DURATION_CLAMP");
+    bool duration_clamp = !(clamp_env && std::strcmp(clamp_env, "0") == 0);
+    if (duration_clamp)
+        rate = std::min(std::max(rate, fixed_rate * 0.75f), fixed_rate * 2.5f);
     int duration = ref_T + (int)(rate * (float)gen_text_len / ctx->speed);
 
     if (ctx->verbosity >= 1) {
