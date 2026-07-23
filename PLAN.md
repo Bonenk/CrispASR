@@ -1,5 +1,33 @@
 # CrispASR — Pending work
 
+## #296 mel-band-roformer — follow-ups PROMISED on the issue (do not drop)
+
+`--separate` (mel-band-roformer) was ~24 min for 11 s on Linux/Windows (fast only
+on macOS/Accelerate). Root cause: CPU-only forward with an Apple-only BLAS gate +
+naive O(N²) iSTFT + scalar attention + redundant weight de-quant. FIXED on main to
+**24 min → 56 s (~26×), cos=1.0** via: portable OpenBLAS `linear()`, FFT iSTFT,
+attention→SGEMM + BLAS-thread-pin, per-layer weight hoist. Validated on Kaggle
+(cos + per-stage profile each round). Replied on the issue
+(`#296` comments 5062263388 / 5062697259).
+
+**Explicitly PROMISED on the issue — must follow through:**
+1. **OpenBLAS in the shipped binaries.** The speedup only reaches users if the
+   release binary links a real OpenBLAS. Status: Linux release jobs already
+   `apt-get install libopenblas-dev` (engages); **Linux tarball does not bundle
+   `libopenblas.so`** (self-containment) and **Windows CLI jobs set up NO BLAS**
+   (`build-windows-cpu*` in `.github/workflows/release.yml` — needs vcpkg
+   `openblas` + `-DCMAKE_TOOLCHAIN_FILE` + bundling `openblas.dll`). Until Windows
+   is wired, the #296 reporter (Windows) still gets the scalar fallback. Verify
+   each shipped artifact actually loads OpenBLAS (`-- mel-band-roformer: linking
+   OpenBLAS` at configure; `ldd`/`dumpbin /dependents` on the packaged binary).
+2. **GPU / ggml-graph port** (the real long-term fix, promised as "a GPU path is
+   tracked"). Rewrite the forward (transformer + iSTFT) as a ggml graph → SIMD +
+   threads + GPU everywhere, eliminating the scalar/BLAS/OpenMP scaffolding. Same
+   Apple-only-BLAS pattern also slows **htdemucs** (the other `--separate`
+   backend) on Linux/Windows — the ggml port is the template that fixes both.
+   Needed for full-song latency (56 s/11 s still extrapolates to ~15 min/song).
+   Validate with the mel-band-roformer diff harness (per-stage cos≥0.9995).
+
 ## NOW — active work (2026-07-23): canary-qwen q4_k NaN
 
 **Symptom:** canary-qwen emits all-`!` (token id 0) on jfk. **Root-caused** via
