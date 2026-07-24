@@ -69,6 +69,32 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Check whether this version is already on PyPI
+        id: pypi_check
+        run: |
+          PACKAGE_VERSION=$(python - <<'PY'
+          import tomllib
+          with open("python/pyproject.toml", "rb") as f:
+              print(tomllib.load(f)["project"]["version"])
+          PY
+          )
+          python - "$PACKAGE_VERSION" <<'PY'
+          import json
+          import sys
+          import urllib.request
+
+          version = sys.argv[1]
+          try:
+              with urllib.request.urlopen("https://pypi.org/pypi/crispasr/json") as response:
+                  releases = json.load(response)["releases"]
+          except Exception:
+              releases = {}
+          exists = bool(releases.get(version))
+          print(f"PyPI release {version}: {'already present' if exists else 'not present'}")
+          with open(__import__('os').environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"exists={'true' if exists else 'false'}\n")
+          PY
+
       - name: Build sdist + wheel
         run: |
           cd python
@@ -76,6 +102,7 @@ jobs:
           python -m build
 
       - name: Publish to PyPI
+        if: steps.pypi_check.outputs.exists != 'true'
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
