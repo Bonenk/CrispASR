@@ -185,10 +185,40 @@ jobs:
             exit 78
           fi
 
+      - name: Check whether this version is already on pub.dev
+        id: pub_check
+        run: |
+          PACKAGE_VERSION=$(python - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path("flutter/crispasr/pubspec.yaml").read_text()
+          print(re.search(r"^version:\s*(\S+)", text, re.MULTILINE).group(1))
+          PY
+          )
+          python - "$PACKAGE_VERSION" <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.request
+
+          version = sys.argv[1]
+          try:
+              with urllib.request.urlopen("https://pub.dev/api/packages/crispasr") as response:
+                  versions = {item["version"] for item in json.load(response)["versions"]}
+          except Exception:
+              versions = set()
+          exists = version in versions
+          print(f"pub.dev release {version}: {'already present' if exists else 'not present'}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"exists={'true' if exists else 'false'}\n")
+          PY
+
       - name: Set up Dart
         uses: dart-lang/setup-dart@v1
 
       - name: Publish
+        if: steps.pub_check.outputs.exists != 'true'
         working-directory: flutter/crispasr
         run: |
           dart pub get
