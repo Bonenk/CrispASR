@@ -13,9 +13,8 @@ name: Release language wrappers
 # tag push auto-publishes via this workflow.
 #
 # Prerequisites (one-time setup before the first tag):
-#   - PyPI:     configure a trusted publisher at
-#               https://pypi.org/manage/account/publishing/ pointing to this repo
-#               + workflow file + the `pypi` environment.
+#   - PyPI:     add the `PYPI_API_TOKEN` repository secret with a PyPI token
+#               scoped to the `crispasr` project.
 #   - crates.io: add `CARGO_REGISTRY_TOKEN` repo secret (cargo login token)
 #               AND manually `cargo publish` v0 of crispasr-sys + crispasr
 #               from a workstation first.
@@ -25,7 +24,7 @@ name: Release language wrappers
 #               https://pub.dev/packages/crispasr/admin pointing to this repo
 #               + tag pattern `v{{version}}`.
 #
-# Each job below uses `continue-on-error: true` so a single misconfigured
+# The non-PyPI jobs use `continue-on-error: true` so a single misconfigured
 # registry doesn't fail the whole workflow — the others still attempt to
 # publish. Each job also runs a fast precheck that prints a clear
 # "skipping: <registry> not configured" message instead of letting `cargo`
@@ -56,35 +55,14 @@ jobs:
   publish-pypi:
     name: Publish Python wrapper to PyPI
     runs-on: ubuntu-latest
-    continue-on-error: true
     environment:
       name: pypi
       url: https://pypi.org/p/crispasr
-    permissions:
-      id-token: write  # for PyPI trusted publishing (OIDC)
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
           ref: ${{ inputs.tag || github.ref }}
-
-      # Probe whether the trusted publisher is configured AND the package
-      # exists. Brand-new packages need either a "pending publisher"
-      # bootstrap on PyPI's side (https://pypi.org/manage/account/publishing/)
-      # or an existing package with a publisher mapping. We can't check the
-      # OIDC config from inside the job, but we CAN check whether the
-      # package exists; if it 404s the bootstrap is missing.
-      - name: PyPI bootstrap check
-        id: pypi_check
-        run: |
-          if curl -sf -o /dev/null https://pypi.org/pypi/crispasr/json; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "::warning::PyPI package 'crispasr' does not exist yet."
-            echo "::warning::See PLAN.md §66 for bootstrap steps."
-            echo "::warning::Note: a configured pending-publisher CAN bootstrap PyPI; this run will still try."
-          fi
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -98,9 +76,12 @@ jobs:
           python -m build
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: python/dist/
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m pip install --upgrade twine
+          python -m twine upload python/dist/*
 
   publish-crates-io:
     name: Publish Rust wrapper to crates.io
