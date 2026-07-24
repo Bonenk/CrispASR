@@ -2,7 +2,7 @@
 
 Python bindings for [CrispASR](https://github.com/CrispStrobe/CrispASR) — lightweight on-device speech recognition via ggml.
 
-Supports 17 ASR backends including Whisper, Qwen3-ASR, FastConformer, Canary, Parakeet, Cohere, Granite-Speech, Voxtral, wav2vec2, GLM-ASR, Kyutai-STT, Moonshine, FireRed, OmniASR, and VibeVoice-ASR.
+Supports the ASR backends compiled into the linked CrispASR library, including Whisper, Qwen3-ASR, FastConformer, Canary, Parakeet, Cohere, Granite-Speech, Voxtral, wav2vec2, GLM-ASR, Kyutai-STT, Moonshine, FireRed, OmniASR, and VibeVoice-ASR.
 
 ## Install
 
@@ -55,7 +55,7 @@ for seg in s.transcribe_pcm(pcm_f32, sample_rate=16000):
 ## API
 
 - `CrispASR` — Whisper-compatible high-level API
-- `Session` — unified API across all 17 backends
+- `Session` — unified API across all backends compiled into `libcrispasr`
 - `align_words(...)` — word-level CTC alignment
 - `diarize_segments(...)` — speaker diarization (energy / xcorr / vad-turns / pyannote)
 - `SpeakerEmbedder(spec)` — pluggable embedder ("auto"/"titanet", "indextts"/"ecapa", or a `.gguf` path)
