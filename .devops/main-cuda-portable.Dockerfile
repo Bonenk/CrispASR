@@ -56,7 +56,7 @@ RUN jobs="${CRISPASR_BUILD_JOBS:-$(nproc)}" && \
     cmake -S . -B build -G Ninja -DCRISPASR_BUILD_TESTS=OFF -DGGML_CUDA=1 \
         -DGGML_NATIVE=OFF -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF \
         -DGGML_BMI2=OFF -DGGML_SSE42=OFF -DGGML_AVX=OFF -DGGML_AVX512=OFF \
-        -DCMAKE_CUDA_ARCHITECTURES="75-real;80-real;86-real;89-real;90-real;120-real;120-virtual" \
+        -DCMAKE_CUDA_ARCHITECTURES="61-real;70-real;75-real;80-real;86-real;89-real;90-real;120-real;120-virtual" \
         -DCMAKE_EXE_LINKER_FLAGS="-Wl,--allow-shlib-undefined" && \
     cmake --build build -j"${jobs}" --target crispasr-cli
 # --allow-shlib-undefined: libggml-cuda.so links against libcuda.so.1
