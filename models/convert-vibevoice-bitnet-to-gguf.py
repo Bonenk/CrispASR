@@ -107,6 +107,12 @@ def main():
     parser.add_argument("--input", required=True,
                         help="HF model ID or local path")
     parser.add_argument("--output", "-o", required=True)
+    parser.add_argument("--vae-quant", default="q8_0",
+                        choices=["f16", "q8_0", "q5_0", "q5_1", "q4_0", "q4_1"],
+                        help="Quantization for VAE encoder weights (default: q8_0)")
+    parser.add_argument("--embed-quant", default="f16",
+                        choices=["f16", "q8_0", "q5_0", "q5_1", "q4_0", "q4_1"],
+                        help="Quantization for LM embedding (default: f16)")
     args = parser.parse_args()
 
     # Resolve model directory
@@ -260,67 +266,70 @@ def main():
                     skipped += 1
                     continue
 
-                # Decide storage type:
-                #  - norms / biases / gammas / 1D tensors → F32
-                #  - LM projection weights (BitNet keywords) → TQ2_0
-                #  - VAE weights / embeddings (2D+) → Q8_0
+                # Resolve quant type enum from CLI flag
+                QTYPE_MAP = {
+                    "q4_0": gguf.GGMLQuantizationType.Q4_0,
+                    "q4_1": gguf.GGMLQuantizationType.Q4_1,
+                    "q5_0": gguf.GGMLQuantizationType.Q5_0,
+                    "q5_1": gguf.GGMLQuantizationType.Q5_1,
+                    "q8_0": gguf.GGMLQuantizationType.Q8_0,
+                }
+                # Block sizes: Q4_0/Q4_1/Q5_0/Q5_1/Q8_0 all use blocks of 32
+                QBLOCK = 32
+
                 is_keep_f32 = (
                     "norm" in name or "gamma" in name or
                     name.endswith(".bias") or raw.ndim <= 1 or
                     "scaling_factor" in name or "bias_factor" in name
                 )
                 is_bitnet_proj = any(kw in name for kw in BITNET_WEIGHT_KEYWORDS)
-                # Q8_0 candidates: VAE conv/FFN weights (not LM embeddings —
-                # those stay F16 to avoid OOM during quantization on 8 GB RAM).
                 is_vae_weight = (
                     "at_enc." in gguf_name or "st_enc." in gguf_name or
                     "at_conn." in gguf_name or "se_conn." in gguf_name
                 )
-                is_q8_candidate = (
-                    raw.ndim >= 2 and not is_keep_f32 and not is_bitnet_proj
-                    and is_vae_weight
-                )
+                is_embed = ("tok_emb" in gguf_name)
 
+                # Pick target quant for this tensor
+                target_q = None
+                if is_keep_f32:
+                    pass  # F32
+                elif is_bitnet_proj:
+                    pass  # TQ2_0 (handled separately)
+                elif is_vae_weight and args.vae_quant != "f16":
+                    target_q = QTYPE_MAP.get(args.vae_quant)
+                elif is_embed and args.embed_quant != "f16":
+                    target_q = QTYPE_MAP.get(args.embed_quant)
+
+                tag = ""
                 if is_keep_f32:
                     data = raw.to(torch.float32).numpy()
                     writer.add_tensor(gguf_name, data)
                 elif is_bitnet_proj:
-                    # Ternary-quantize then pack to TQ2_0
                     w_f32 = raw.to(torch.float32).numpy()
                     w_ternary = ternary_quantize(w_f32)
                     shape = w_ternary.shape
-
-                    # Quantize the full tensor (TQ2_0 blocks of QK_K=256)
                     packed = gguf.quants.quantize(w_ternary.flatten(),
                                                   gguf.GGMLQuantizationType.TQ2_0)
-
-                    # Reshape to (nrow, bytes_per_row) so gguf writer
-                    # can validate the row byte count.
                     nrow = shape[0]
                     bytes_per_row = len(packed) // nrow
                     packed = packed.reshape(nrow, bytes_per_row)
-
                     writer.add_tensor(gguf_name, packed,
                                       raw_dtype=gguf.GGMLQuantizationType.TQ2_0)
                     tq2_count += 1
-                elif is_q8_candidate:
-                    # Q8_0 quantization for VAE weights.
-                    # Q8_0 block_size=32: row length must be a multiple of 32.
+                    tag = " [TQ2_0]"
+                elif target_q is not None and raw.ndim >= 2:
                     w_f32 = raw.to(torch.float32).numpy()
                     shape = w_f32.shape
                     ncol = shape[-1] if len(shape) > 1 else shape[0]
-                    if ncol % 32 == 0:
-                        packed = gguf.quants.quantize(
-                            w_f32.flatten(),
-                            gguf.GGMLQuantizationType.Q8_0)
+                    if ncol % QBLOCK == 0:
+                        packed = gguf.quants.quantize(w_f32.flatten(), target_q)
                         nrow = shape[0]
                         bytes_per_row = len(packed) // nrow
                         packed = packed.reshape(nrow, bytes_per_row)
-                        writer.add_tensor(gguf_name, packed,
-                                          raw_dtype=gguf.GGMLQuantizationType.Q8_0)
+                        writer.add_tensor(gguf_name, packed, raw_dtype=target_q)
                         q8_count += 1
+                        tag = f" [{target_q.name}]"
                     else:
-                        # Fall back to F16 for small/misaligned tensors
                         data = w_f32.astype(np.float16)
                         writer.add_tensor(gguf_name, data)
                 else:
@@ -330,7 +339,6 @@ def main():
                 tensor_count += 1
                 del raw
                 if tensor_count <= 5 or tensor_count % 50 == 0:
-                    tag = " [TQ2_0]" if is_bitnet_proj else (" [Q8_0]" if is_q8_candidate else "")
                     print(f"    [{tensor_count}] {gguf_name}{tag}")
 
         gc.collect()
