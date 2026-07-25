@@ -559,37 +559,6 @@ static std::vector<float> compute_time_embed(f5_tts_context* ctx, float t_val) {
     return result;
 }
 
-// ── Text tokenization ────────────────────────────────────────────
-
-static std::vector<int32_t> tokenize_text(const f5_vocab& vocab, const std::string& text) {
-    // Character-level tokenization matching list_str_to_idx
-    std::vector<int32_t> tokens;
-    size_t i = 0;
-    while (i < text.size()) {
-        // Try to match multi-byte UTF-8 characters
-        int len = 1;
-        if ((text[i] & 0x80) == 0)
-            len = 1;
-        else if ((text[i] & 0xE0) == 0xC0)
-            len = 2;
-        else if ((text[i] & 0xF0) == 0xE0)
-            len = 3;
-        else if ((text[i] & 0xF8) == 0xF0)
-            len = 4;
-        if (i + len > text.size())
-            break;
-
-        std::string ch = text.substr(i, len);
-        auto it = vocab.char_to_idx.find(ch);
-        if (it != vocab.char_to_idx.end()) {
-            tokens.push_back(it->second);
-        } else {
-            tokens.push_back(0); // unknown → 0
-        }
-        i += len;
-    }
-    return tokens;
-}
 
 // ── pinyin conversion ────────────────────────────────────────────
 // #294: for text containing Han characters, run the real g2p (jieba-min +
@@ -2386,14 +2355,20 @@ int f5_tts_synthesize(struct f5_tts_context* ctx, const char* text, float** pcm_
     }
     std::string full_text = ref_text + text;
 
-    // Convert to pinyin chars
+    // Convert to the list_str_to_idx units: for English each element is a single
+    // character; for Chinese each element is a full pinyin syllable (e.g.
+    // "zhong1") that is a SINGLE vocab entry. #294: map each element DIRECTLY to
+    // its vocab id — concatenating the list and re-splitting per UTF-8 byte (the
+    // old path) shatters a multi-char pinyin token into individual letters
+    // ("zhong1" → z,h,o,n,g,1), which produced garbled Chinese. English is
+    // unaffected (its elements are already single characters).
     auto pinyin_chars = convert_to_pinyin(full_text);
-    std::string flat_text;
-    for (auto& c : pinyin_chars)
-        flat_text += c;
-
-    // Tokenize
-    auto tokens = tokenize_text(ctx->vocab, flat_text);
+    std::vector<int32_t> tokens;
+    tokens.reserve(pinyin_chars.size());
+    for (const auto& unit : pinyin_chars) {
+        auto it = ctx->vocab.char_to_idx.find(unit);
+        tokens.push_back(it != ctx->vocab.char_to_idx.end() ? it->second : 0);
+    }
 
     // ── Duration estimation ──
     // The formula estimates speech rate from (ref_T / ref_text_len) mel frames
