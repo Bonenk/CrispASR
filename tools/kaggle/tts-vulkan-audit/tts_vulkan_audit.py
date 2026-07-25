@@ -140,8 +140,21 @@ def overlap(a, b):
     wa, wb = words(a), words(b)
     return round(len(wa & wb) / len(wa), 3) if wa else 0.0
 
-CLONE_ARGS = ["--voice", REF_WAV, "--ref-text", JFK_TEXT, "--i-have-rights"]
-CLONE_NOTEXT = ["--voice", REF_WAV, "--i-have-rights"]
+# Short 3 s reference — the 11 s jfk.wav makes every clone-synth enormous
+# (huge DiT/AR sequence) and burns GPU quota (gotcha #1). Trimmed in main().
+REF3 = str(TMP / "ref3s.wav")
+JFK3_TEXT = "And so my fellow Americans, ask not what your country can do for you"
+
+def make_ref3():
+    w = wave.open(REF_WAV, "rb")
+    sr, n = w.getframerate(), min(w.getnframes(), int(3.0 * w.getframerate()))
+    frames = w.readframes(n)
+    o = wave.open(REF3, "wb")
+    o.setnchannels(w.getnchannels()); o.setsampwidth(w.getsampwidth()); o.setframerate(sr)
+    o.writeframes(frames); o.close()
+
+CLONE_ARGS = ["--voice", "{ref}", "--ref-text", JFK3_TEXT, "--i-have-rights"]
+CLONE_NOTEXT = ["--voice", "{ref}", "--i-have-rights"]
 
 BACKENDS = [
     dict(name="cosyvoice3-tts", repo="cstr/cosyvoice3-0.5b-2512-GGUF",
@@ -180,7 +193,7 @@ def run_synth(binp, cfg, mdir, mode):
     out = str(TMP / f"{cfg['name']}.{mode}.wav")
     if os.path.exists(out):
         os.remove(out)
-    args = [a.replace("{dir}", mdir) for a in cfg["args"]]
+    args = [a.replace("{dir}", mdir).replace("{ref}", REF3) for a in cfg["args"]]
     gpuflag = ["--gpu-backend", "vulkan"] if mode == "vulkan" else ["--no-gpu"]
     cmd = ([binp, "-m", f"{mdir}/{cfg['main']}", "--backend", cfg["name"]]
            + gpuflag + args + ["--tts", SENT, "--tts-output", out])
@@ -188,7 +201,7 @@ def run_synth(binp, cfg, mdir, mode):
     if mode == "vulkan":
         e["GGML_VK_VISIBLE_DEVICES"] = "0"
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=1500, env=e)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=360, env=e)
         rc, err = r.returncode, r.stderr or ""
     except subprocess.TimeoutExpired:
         return out, "timeout", "", ""
@@ -211,7 +224,7 @@ def audit_backend(binp, whisp, cfg):
         rec["error"] = f"download failed: {e}"
         step("backend.download_failed", backend=name, err=str(e))
         return rec
-    for mode in ("cpu", "vulkan"):
+    def one(mode):
         with kh.build_heartbeat(f"{name}.synth.{mode}", interval_s=30):
             out, rc, ntok, tail = run_synth(binp, cfg, mdir, mode)
         st = wav_stats(out) if os.path.exists(out) else dict(dur=0, peak=0, rms=0)
@@ -223,9 +236,13 @@ def audit_backend(binp, whisp, cfg):
              peak=st.get("peak"), overlap=ov, asr=tx[:60])
         if rc not in (0,):
             step(f"backend.{mode}.stderr", backend=name, tail=tail)
-    cpu, vk = rec.get("cpu", {}), rec.get("vulkan", {})
-    cpu_ok = isinstance(cpu.get("overlap_sent"), float) and cpu["overlap_sent"] >= 0.5 and (cpu.get("peak") or 0) > 0.02
-    vk_ok = isinstance(vk.get("overlap_sent"), float) and vk["overlap_sent"] >= 0.5 and (vk.get("peak") or 0) > 0.02
+        return isinstance(ov, float) and ov >= 0.5 and (st.get("peak") or 0) > 0.02
+    # Vulkan first (the thing under test). If Vulkan already works, skip the
+    # CPU baseline entirely — saves ~half the GPU-quota (gotcha #1). Only run
+    # the CPU baseline when Vulkan looks broken, to confirm it isn't a bad
+    # invocation.
+    vk_ok = one("vulkan")
+    cpu_ok = True if vk_ok else one("cpu")
     rec["verdict"] = ("VULKAN_BROKEN" if cpu_ok and not vk_ok else
                       "vulkan_ok" if cpu_ok and vk_ok else
                       "cpu_baseline_failed(inconclusive)" if not cpu_ok else "unclear")
@@ -236,8 +253,10 @@ def audit_backend(binp, whisp, cfg):
 def main():
     devs, nvidia = enable_vulkan()
     binp, whisp = fetch_binaries()
+    make_ref3()
+    step("ref.trimmed", path=REF3, stats=wav_stats(REF3))
     results = dict(release=RELEASE, sentence=SENT, vulkan_devices=devs,
-                   vulkan_is_nvidia=nvidia, backends=[])
+                   vulkan_is_nvidia=nvidia, ref_seconds=3, backends=[])
     for cfg in BACKENDS:
         try:
             results["backends"].append(audit_backend(binp, whisp, cfg))
