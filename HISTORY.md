@@ -6,6 +6,41 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-25 — #294: F5-TTS Chinese g2p + English de-truncation (audio-confirmed)
+
+Two quality bugs the reporter hit after the speed work. **Chinese** produced no
+audio: F5 needs Han text as pinyin (jieba + pypinyin TONE3 + sandhi, like upstream
+`convert_char_to_pinyin`) but CrispASR passed raw characters → unknown token →
+silence. Added `src/core/pinyin_g2p.*` — jieba-min forward-max-match segmentation +
+pypinyin TONE3 + 不/一/third-tone sandhi, with 41.6k char + 47.1k phrase readings
+embedded from pypinyin via `tools/gen_pinyin_data.py` (`pinyin_data.inc`, 3.3 MB);
+99.8% token parity vs the reference (`tests/test-pinyin-g2p`). That alone still
+gave garbled audio — f5 was concatenating the token list and re-tokenizing per
+UTF-8 byte, shattering each syllable (`zhong1`→`z,h,o,n,g,1`); fixed by mapping each
+element to its vocab id directly (`3167d014`). **English** "leaves out parts of
+sentences": a CrispASR-only rate clamp (`fixed_rate*2.5`, no upstream equivalent)
+cut the tail of a slow reference — made asymmetric/loose (`CRISPASR_F5_DURATION_CLAMP=0`
+= exact upstream). Audio-confirmed on M1 Metal (F16 GGUF + whisper-large-v3-turbo):
+ZH `今天天气很好，我们一起去公园散步。` → ASR exact; EN full sentence, no
+truncation. Merged 9a2fd7dc + 3167d014. Lesson in LEARNINGS: token-parity ≠ working
+audio (the char-split was invisible to the g2p's own test).
+
+## 2026-07-25 — #301 + follow-ups: concurrency docs; moonshine GPU crash; unreadable --model
+
+#301 (how does CrispASR scale?) was a discoverability gap, not a missing feature:
+the `CRISPASR_SERVER_WORKERS` in-process pool already existed but lived only in a
+docker-compose env-table row. Added `docs/concurrency.md` (the full ggml-threads →
+mutex-serialized server → worker pool → replicas+LB → CLI bulk fan-out story, plus
+honest "PagedAttention isn't the fit" / "no batched multi-stream" answers) and a
+`--server-workers N` CLI flag mirroring the env var (58b85235/8715b15a). Two bugs
+found while testing: (1) moonshine SIGSEGV'd on the 2nd `/v1/audio/transcriptions`
+on a GPU sched — the §176s cached encoder cgraph reused across `sched_reset`/`alloc`
+left the input leaves on freed GPU memory; gated the cache to CPU, rebuild-each-call
+on GPU (`4b30ff8c`; see LEARNINGS). (2) `crispasr_resolve_model_cli` conflated a
+missing `-m` path with an existing-but-unreadable one (dangling symlink / EPERM) and
+silently loaded a downloadable default — now a clear error, ENOENT still routes to
+the registry (`defb1db0`).
+
 ## 2026-07-22 — #292: --max-new-tokens honored across 10 ASR backends; chunk_id; CUDA-validated
 
 moss-diarize ignored `--max-new-tokens` (hardcoded 1024), truncating a long
