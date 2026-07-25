@@ -23,6 +23,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <vector>
 
@@ -108,6 +109,13 @@ struct wvad_model {
     // Mel
     ggml_tensor* mel_window = nullptr;
     ggml_tensor* mel_filters = nullptr;
+
+    // #305 lever 4 (FASTCONV): F16 copies of the conv kernels baked once at load,
+    // so the per-window ggml_cast(F32->F16) becomes a no-op. Null = use in-graph cast.
+    ggml_context* aux_ctx = nullptr;
+    ggml_backend_buffer_t aux_buf = nullptr;
+    ggml_tensor* conv1_w_f16 = nullptr;
+    ggml_tensor* conv2_w_f16 = nullptr;
 };
 
 struct whisper_vad_encdec_context {
@@ -116,6 +124,14 @@ struct whisper_vad_encdec_context {
     ggml_backend_t backend_cpu = nullptr; // CPU fallback for the sched (#305); null when backend is already CPU
     ggml_backend_sched_t sched = nullptr;
     int n_threads = 4;
+
+    // #305 lever 2: persistent fixed-shape graph (T is always 1500). Built once,
+    // reused across windows so per-window graph construction is not repeated.
+    ggml_context* gctx = nullptr;
+    ggml_cgraph* gf = nullptr;
+    ggml_tensor* g_mel_in = nullptr;
+    ggml_tensor* g_logits = nullptr;
+    ggml_tensor* g_enc_out = nullptr;
 };
 
 // ── FFT ────────────────────────────────────────────────────────────────────
@@ -188,25 +204,46 @@ static std::vector<float> wvad_compute_mel(const float* pcm, int n_samples, cons
 
     int n_frames = (padded_len - n_fft) / hop;
     std::vector<float> mel((size_t)n_mels * n_frames, 0);
-    std::vector<float> fft_in(4 * n_fft, 0);
-    std::vector<float> fft_out(8 * n_fft, 0);
 
-    for (int t = 0; t < n_frames; t++) {
-        // Window
+    // Per-frame work: window → FFT → power → mel filterbank. Frames are fully
+    // independent and write disjoint (m, t) cells, and wvad_fft_wrap keeps its
+    // scratch in thread_local buffers — so this parallelizes with no data race
+    // and is bit-identical to the serial loop (#305 lever 3).
+    auto compute_frame = [&](int t, std::vector<float>& fin, std::vector<float>& fout, std::vector<float>& power) {
         for (int i = 0; i < n_fft; i++)
-            fft_in[i] = padded[t * hop + i] * hann[i];
-        wvad_fft_wrap(fft_in.data(), n_fft, fft_out.data());
-        // Power spectrum
-        std::vector<float> power(n_freqs);
+            fin[i] = padded[t * hop + i] * hann[i];
+        wvad_fft_wrap(fin.data(), n_fft, fout.data());
         for (int f = 0; f < n_freqs; f++)
-            power[f] = fft_out[2 * f] * fft_out[2 * f] + fft_out[2 * f + 1] * fft_out[2 * f + 1];
-        // Mel filterbank: fb is [n_freqs, n_mels]
+            power[f] = fout[2 * f] * fout[2 * f] + fout[2 * f + 1] * fout[2 * f + 1];
         for (int m = 0; m < n_mels; m++) {
             double sum = 0;
             for (int f = 0; f < n_freqs; f++)
                 sum += (double)power[f] * (double)fb[f * n_mels + m];
             mel[(size_t)m * n_frames + t] = (float)sum;
         }
+    };
+
+    unsigned hw = std::thread::hardware_concurrency();
+    int n_mel_threads = (hw == 0) ? 1 : (int)std::min(hw, 8u);
+    if (getenv("CRISPASR_VAD_ENCDEC_SERIAL_MEL") || n_mel_threads <= 1 || n_frames < 64) {
+        std::vector<float> fin(4 * n_fft, 0), fout(8 * n_fft, 0), power(n_freqs);
+        for (int t = 0; t < n_frames; t++)
+            compute_frame(t, fin, fout, power);
+    } else {
+        std::vector<std::thread> pool;
+        const int chunk = (n_frames + n_mel_threads - 1) / n_mel_threads;
+        for (int th = 0; th < n_mel_threads; th++) {
+            const int t0 = th * chunk, t1 = std::min(n_frames, t0 + chunk);
+            if (t0 >= t1)
+                break;
+            pool.emplace_back([&, t0, t1]() {
+                std::vector<float> fin(4 * n_fft, 0), fout(8 * n_fft, 0), power(n_freqs);
+                for (int t = t0; t < t1; t++)
+                    compute_frame(t, fin, fout, power);
+            });
+        }
+        for (auto& th : pool)
+            th.join();
     }
     // Log10 + clip + normalize (whisper style)
     float max_val = -1e20f;
@@ -369,6 +406,37 @@ extern "C" struct whisper_vad_encdec_context* whisper_vad_encdec_init(const char
     m.mel_window = get("mel_window");
     m.mel_filters = get("mel_filters");
 
+    // #305 lever 4 (FASTCONV): ggml_conv_1d_ph needs an F16 kernel, so the graph
+    // casts conv{1,2}_w F32->F16 every window. Bake the F16 copies once here and
+    // point the graph at them, turning the per-window cast into a no-op. Output-
+    // identical (same F16 values). Opt out with CRISPASR_VAD_ENCDEC_CONV_CAST=1.
+    if (!getenv("CRISPASR_VAD_ENCDEC_CONV_CAST") && m.conv1_w && m.conv2_w) {
+        ggml_init_params aip = {4 * ggml_tensor_overhead(), nullptr, true};
+        m.aux_ctx = ggml_init(aip);
+        auto mk_f16 = [&](ggml_tensor* src) -> ggml_tensor* {
+            return ggml_new_tensor(m.aux_ctx, GGML_TYPE_F16, ggml_n_dims(src), src->ne);
+        };
+        m.conv1_w_f16 = mk_f16(m.conv1_w);
+        m.conv2_w_f16 = mk_f16(m.conv2_w);
+        m.aux_buf = ggml_backend_alloc_ctx_tensors(m.aux_ctx, ctx->backend);
+        // Fill: read the source kernel, convert to F16 on the host, upload.
+        auto fill_f16 = [&](ggml_tensor* dst, ggml_tensor* src) {
+            const size_t n = ggml_nelements(src);
+            std::vector<ggml_fp16_t> h(n);
+            if (src->type == GGML_TYPE_F16) {
+                ggml_backend_tensor_get(src, h.data(), 0, n * sizeof(ggml_fp16_t));
+            } else {
+                std::vector<float> f(n);
+                ggml_backend_tensor_get(src, f.data(), 0, n * sizeof(float));
+                for (size_t i = 0; i < n; i++)
+                    h[i] = ggml_fp32_to_fp16(f[i]);
+            }
+            ggml_backend_tensor_set(dst, h.data(), 0, n * sizeof(ggml_fp16_t));
+        };
+        fill_f16(m.conv1_w_f16, m.conv1_w);
+        fill_f16(m.conv2_w_f16, m.conv2_w);
+    }
+
     // Scheduler
     // ggml_backend_sched requires the LAST backend to be CPU (fallback for ops
     // the GPU can't run). When compute runs on a GPU backend, add a CPU backend
@@ -395,7 +463,11 @@ struct wvad_result {
     std::vector<float> enc_emb; // encoder output [d * T] — reusable for whisper ASR
 };
 
-static wvad_result wvad_forward(whisper_vad_encdec_context* ctx, const float* mel_data, int n_frames) {
+// Build the fixed-shape VAD graph into ctx0/gf and return the input (mel) and
+// output (logits, enc_out) handles. #305 lever 2 builds this once and reuses it
+// across windows; the CRISPASR_VAD_ENCDEC_REBUILD path rebuilds per window (A/B).
+static void wvad_build_graph(whisper_vad_encdec_context* ctx, ggml_context* ctx0, ggml_cgraph* gf,
+                             ggml_tensor** out_mel, ggml_tensor** out_logits, ggml_tensor** out_enc) {
     auto& m = ctx->model;
     const int d = m.d_model;
     const int nh = m.n_heads;
@@ -403,12 +475,6 @@ static wvad_result wvad_forward(whisper_vad_encdec_context* ctx, const float* me
     const int T = m.n_frames; // always 1500
     const float eps = 1e-5f;
     const float scale = 1.0f / sqrtf((float)hd);
-
-    size_t mem = ggml_tensor_overhead() * 4096 + ggml_graph_overhead_custom(32768, false);
-    std::vector<uint8_t> meta(mem);
-    ggml_init_params ip = {mem, meta.data(), true};
-    ggml_context* ctx0 = ggml_init(ip);
-    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 32768, false);
 
     // Input mel [T*2, n_mels] — whisper pads mel to 2*n_ctx=3000 frames
     // but our mel is [n_mels, T_mel]. We need [T_mel, n_mels] for conv_1d.
@@ -423,8 +489,9 @@ static wvad_result wvad_forward(whisper_vad_encdec_context* ctx, const float* me
     };
 
     // Conv1d front-end
-    // ggml conv_1d_ph requires F16 kernel on CPU (im2col_f16 assert)
-    ggml_tensor* conv1_w_f16 = ggml_cast(ctx0, m.conv1_w, GGML_TYPE_F16);
+    // ggml conv_1d_ph requires F16 kernel on CPU (im2col_f16 assert). Use the
+    // baked F16 copy (#305 lever 4) when available; otherwise cast in-graph.
+    ggml_tensor* conv1_w_f16 = m.conv1_w_f16 ? m.conv1_w_f16 : ggml_cast(ctx0, m.conv1_w, GGML_TYPE_F16);
     ggml_tensor* h = ggml_conv_1d_ph(ctx0, conv1_w_f16, mel_in, 1, 1);
     if (m.conv1_b) {
         h = ggml_cont(ctx0, ggml_transpose(ctx0, h)); // [C, T]
@@ -432,7 +499,7 @@ static wvad_result wvad_forward(whisper_vad_encdec_context* ctx, const float* me
         h = ggml_cont(ctx0, ggml_transpose(ctx0, h));
     }
     h = ggml_gelu_erf(ctx0, h);
-    ggml_tensor* conv2_w_f16 = ggml_cast(ctx0, m.conv2_w, GGML_TYPE_F16);
+    ggml_tensor* conv2_w_f16 = m.conv2_w_f16 ? m.conv2_w_f16 : ggml_cast(ctx0, m.conv2_w, GGML_TYPE_F16);
     h = ggml_conv_1d_ph(ctx0, conv2_w_f16, h, 2, 1); // stride=2: 3000->1500
     if (m.conv2_b) {
         h = ggml_cont(ctx0, ggml_transpose(ctx0, h));
@@ -611,12 +678,53 @@ static wvad_result wvad_forward(whisper_vad_encdec_context* ctx, const float* me
     ggml_set_name(logits, "logits");
     ggml_set_output(logits);
     ggml_build_forward_expand(gf, logits);
+    *out_mel = mel_in;
+    *out_logits = logits;
+    *out_enc = enc_out;
+}
+
+static wvad_result wvad_forward(whisper_vad_encdec_context* ctx, const float* mel_data, int n_frames) {
+    auto& m = ctx->model;
+    // #305 lever 2 (persistent graph) is OPT-IN: it showed no win on M1 Metal
+    // (compute-bound) and the graph-reuse-across-sched-cycles path is only
+    // validated on Metal + CPU, not CUDA/Vulkan — so defaulting it on could
+    // regress those backends. Enable + measure with CRISPASR_VAD_ENCDEC_PERSIST=1
+    // (most useful on a fast GPU, where per-window compute is small enough that
+    // the per-window graph build/alloc it removes is a larger fraction).
+    const bool rebuild = getenv("CRISPASR_VAD_ENCDEC_PERSIST") == nullptr;
+    const size_t mem = ggml_tensor_overhead() * 4096 + ggml_graph_overhead_custom(32768, false);
+
+    ggml_context* ctx0 = nullptr;
+    ggml_cgraph* gf = nullptr;
+    ggml_tensor *mel_in = nullptr, *logits_t = nullptr, *enc_t = nullptr;
+
+    if (rebuild) {
+        // #305: per-window rebuild (A/B baseline). ggml owns the meta pool.
+        ggml_init_params ip = {mem, nullptr, true};
+        ctx0 = ggml_init(ip);
+        gf = ggml_new_graph_custom(ctx0, 32768, false);
+        wvad_build_graph(ctx, ctx0, gf, &mel_in, &logits_t, &enc_t);
+    } else {
+        // #305 lever 2: build the fixed-shape graph once, reuse across windows.
+        if (!ctx->gctx) {
+            ggml_init_params ip = {mem, nullptr, true};
+            ctx->gctx = ggml_init(ip);
+            ctx->gf = ggml_new_graph_custom(ctx->gctx, 32768, false);
+            wvad_build_graph(ctx, ctx->gctx, ctx->gf, &ctx->g_mel_in, &ctx->g_logits, &ctx->g_enc_out);
+        }
+        ctx0 = ctx->gctx;
+        gf = ctx->gf;
+        mel_in = ctx->g_mel_in;
+        logits_t = ctx->g_logits;
+        enc_t = ctx->g_enc_out;
+    }
 
     // Run graph
     ggml_backend_sched_reset(ctx->sched);
     if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
         fprintf(stderr, "whisper_vad_encdec: graph alloc failed\n");
-        ggml_free(ctx0);
+        if (rebuild)
+            ggml_free(ctx0);
         return {};
     }
 
@@ -626,32 +734,27 @@ static wvad_result wvad_forward(whisper_vad_encdec_context* ctx, const float* me
     // wvad_compute_mel is [n_mels, n_frames] with `mel[m*n_frames + t]`, i.e.
     // time is innermost on both sides — so we just memcpy each mel row into
     // the 3000-wide window (zero-padded if the actual mel is shorter).
-    //
-    // The previous fill `dst[t*n_mels + m] = src[m*n_frames + t]` swapped
-    // the axes and made conv_1d see scrambled mel input, which is what
-    // produced near-zero per-frame probabilities (issue #83).
+    // MUST be re-set every call even with a persistent graph — gallocr may hand
+    // this input's buffer to a later op as scratch after its last use (§234).
     std::vector<float> mel_padded((size_t)3000 * m.n_mels, 0);
     int T_mel = std::min(n_frames, 3000);
     for (int m_idx = 0; m_idx < m.n_mels; m_idx++) {
         memcpy(&mel_padded[(size_t)m_idx * 3000], &mel_data[(size_t)m_idx * n_frames], (size_t)T_mel * sizeof(float));
     }
-
-    ggml_tensor* mel_t = ggml_graph_get_tensor(gf, "mel");
-    ggml_backend_tensor_set(mel_t, mel_padded.data(), 0, mel_padded.size() * sizeof(float));
+    ggml_backend_tensor_set(mel_in, mel_padded.data(), 0, mel_padded.size() * sizeof(float));
 
     if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "whisper_vad_encdec: graph compute failed\n");
-        ggml_free(ctx0);
+        if (rebuild)
+            ggml_free(ctx0);
         return {};
     }
 
-    ggml_tensor* out = ggml_graph_get_tensor(gf, "logits");
-    int n_out = (int)(ggml_nelements(out));
+    int n_out = (int)(ggml_nelements(logits_t));
     std::vector<float> logits_vec(n_out);
-    ggml_backend_tensor_get(out, logits_vec.data(), 0, n_out * sizeof(float));
+    ggml_backend_tensor_get(logits_t, logits_vec.data(), 0, n_out * sizeof(float));
 
-    // Read encoder output (for reuse by whisper ASR — encoder attention layers were fine-tuned despite freeze_encoder:true in config)
-    ggml_tensor* enc_t = ggml_graph_get_tensor(gf, "enc_out");
+    // Encoder output (fine-tuned encoder layers; kept for potential reuse).
     std::vector<float> enc_vec;
     if (enc_t) {
         int enc_n = (int)ggml_nelements(enc_t);
@@ -659,7 +762,8 @@ static wvad_result wvad_forward(whisper_vad_encdec_context* ctx, const float* me
         ggml_backend_tensor_get(enc_t, enc_vec.data(), 0, enc_n * sizeof(float));
     }
 
-    ggml_free(ctx0);
+    if (rebuild)
+        ggml_free(ctx0);
 
     // Sigmoid
     std::vector<float> probs(n_out);
@@ -851,8 +955,14 @@ extern "C" int whisper_vad_encdec_detect(struct whisper_vad_encdec_context* ctx,
 extern "C" void whisper_vad_encdec_free(struct whisper_vad_encdec_context* ctx) {
     if (!ctx)
         return;
+    if (ctx->gctx) // #305 lever 2: persistent graph context
+        ggml_free(ctx->gctx);
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
+    if (ctx->model.aux_buf) // #305 lever 4: baked F16 conv kernels
+        ggml_backend_buffer_free(ctx->model.aux_buf);
+    if (ctx->model.aux_ctx)
+        ggml_free(ctx->model.aux_ctx);
     if (ctx->model.buf_w)
         ggml_backend_buffer_free(ctx->model.buf_w);
     if (ctx->model.ctx_w)
