@@ -5,9 +5,11 @@ v0.8.22 shipped without — the mel-band-roformer speedup in v0.8.22 used a
 construct MSVC rejects, so the Windows CPU release build failed and that asset
 was missing. This release carries the fix, plus a VibeVoice voice-pack
 correctness fix, native speaker labels in streaming, a clearer submodule
-build error, **F5-TTS Chinese synthesis**, and a **concurrency/scaling guide**
-with a new `--server-workers` flag. Drop-in from v0.8.22 — existing flags are
-unchanged.
+build error, **F5-TTS Chinese synthesis**, a **concurrency/scaling guide** with
+a new `--server-workers` flag, **broader NVIDIA GPU coverage** (older
+Pascal/Volta/P100 cards), and several backend fixes — CosyVoice3 on Vulkan,
+whisper-VAD GPU acceleration, and cleaner whisper punctuation. Drop-in from
+v0.8.22 — existing flags are unchanged.
 
 ## Fixed — Windows CPU release build (#296)
 
@@ -89,6 +91,41 @@ request on a GPU (a cached encoder graph reused across scheduler cycles pointed 
 freed GPU memory — now gated to CPU, rebuild-each-call on GPU); and an explicit
 `-m <path>` that exists but can't be opened (a dangling symlink or permission
 error) now prints a clear error instead of silently loading a downloadable default.
+
+## Fixed — CUDA support for older NVIDIA GPUs (#302, #307)
+
+CUDA 13 dropped the Pascal and Volta architectures, so the standard `main-cuda`
+image can't run on those cards. The CUDA releases now split correctly:
+
+- **`main-cuda-12`** (CUDA 12.x) ships **Pascal (sm_61)**, **Volta (sm_70)**, and
+  **P100 (sm_60)** SASS — use it on GTX 10-series, Quadro P-series, Tesla P100/V100.
+- **`main-cuda`** (CUDA 13) floors at **sm_75 (Turing)**, covering RTX 20-series
+  and newer including RTX 50-series (Blackwell).
+
+If `nvidia-smi` shows a pre-Turing card, pull the `-12` tag.
+
+## Fixed — CosyVoice3 blank/garbled audio on Vulkan (#304)
+
+CosyVoice3 emitted blank or garbled audio under the **Vulkan** backend (e.g. on
+Windows via SubtitleEdit's server `/v1/audio/speech`). Its flow-matching / HiFT /
+LLM stages miscompute on Vulkan (the AR decode collapses to a few near-silent
+tokens). Those stages now run on **CPU** under a Vulkan backend, which restores
+correct audio; opt back into the native path with
+`CRISPASR_COSYVOICE3_VULKAN_NATIVE=1`. Metal, CUDA, and CPU were never affected.
+
+## Improved — whisper-VAD runs on the GPU, faster (#305)
+
+The `whisper-vad-asmr` voice-activity model had a CPU-hardcoded encoder; it now
+runs on the **GPU** (Metal / CUDA / Vulkan) for ~**3.3×** faster VAD, plus a
+parallelized mel front-end. The requantized GGUF keeps the positional embeddings
+unquantized (halves the quant error on the short VAD windows).
+
+## Fixed — whisper subtitles: double capitalization + spurious full stops (#308)
+
+`--backend whisper` re-ran punctuation restoration on whisper's already-punctuated
+text, producing double capitals (`Hello` → `HEllo`) and extra full stops. Whisper
+now declares native punctuation so the redundant pass is skipped, and the
+restorer's capitalizer no longer mangles an already-capitalized first letter.
 
 ## Docs
 
