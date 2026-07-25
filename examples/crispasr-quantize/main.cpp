@@ -587,6 +587,11 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
     // at F16; quantize only the decoder attn/ffn projections.
     const bool is_arkasr = (arch.find("arkasr") != std::string::npos);
 
+    // Whisper-VAD-EncDec (#305): keep the positional embedding at F16 — see the
+    // exclusion in should_quantize below.
+    const bool is_whisper_vad =
+        (arch.find("whisper_vad") != std::string::npos || arch.find("whisper-vad") != std::string::npos);
+
     // higgs-audio-v3-stt: Whisper encoder + Qwen3-1.7B decoder with TIED
     // input/output embeddings (token_embd.weight == output.weight). Both the
     // embedding lookup and the lm_head share these rows, so quantization noise
@@ -792,6 +797,12 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                sname == "token_embd.weight" || sname == "output.weight")) &&
             !(is_orpheus && sname.find("talker.token_embd") == 0) &&
             !(is_arkasr && (sname.find("dec.embed.") == 0 || sname.find("enc.") == 0 || sname.find("adapter.") == 0)) &&
+            // Whisper-VAD-EncDec: encoder.embed_positions.weight is a per-position
+            // lookup table — quantizing it to Q4_K adds noise to every frame's
+            // position signal and forces a per-graph dequant at runtime (Metal
+            // can't cast k-quant → the pos_emb get_rows workaround, #305). Keep it
+            // at F16 like every other positional embedding.
+            !(is_whisper_vad && sname == "encoder.embed_positions.weight") &&
             !(is_higgs && (sname == "token_embd.weight" || sname == "output.weight")) &&
             !(is_miotts && sname.find("codec.") == 0) &&
             !(is_parakeet && parakeet_is_rnnt && !parakeet_quant_all &&
