@@ -9603,7 +9603,7 @@ static void whisper_exp_compute_token_level_timestamps(struct whisper_context& c
                         s0 = k;
                     }
                 } else {
-                    while (state.energy[k] < thold && k < s1) {
+                    while (k < s1 && state.energy[k] < thold) {
                         k++;
                     }
                     s0 = k;
