@@ -19,7 +19,7 @@ trade-off:
 | **`orpheus`** | Llama-3.2-3B talker + SNAC 24 kHz codec. 8 baked English speakers; expressive output. Greedy loops — pass `--temperature 0.6`. | Preset names via `--voice tara/leah/...` | ~3.5 GB via `-m auto` (talker Q8 + 26 MB SNAC) |
 | **`chatterbox`** | T3 AR + S3Gen flow-matching + HiFTGenerator. Built-in voice baked into the T3 GGUF; clones via a baked voice GGUF (see workflow below). EN/AR/DE variants share runtime. | Yes (`--voice <voice.gguf>`, baked from a WAV with `models/bake-chatterbox-voice-from-wav.py`) | ~880 MB via `-m auto` (T3 Q8 + S3Gen Q8) |
 | **`outetts`** | OuteTTS-0.3-1B: OLMo-1B LLM + WavTokenizer single-codebook VQ-GAN. Lightweight (1B params), CC BY 4.0 license. 24 kHz output. | Yes (`--voice <speaker.json>`, created with `tools/reference_backends/outetts_create_speaker.py`) | ~2.5 GB via `-m auto` (talker F16 + WavTokenizer decoder) |
-| **`f5-tts`** | F5-TTS v1 Base: 22-layer DiT flow-matching TTS + Vocos iSTFT vocoder. MIT license. High-quality zero-shot voice cloning from 3-15s reference audio. 24 kHz output, character-level tokenization. | Yes (`--voice <ref.wav> --ref-text "transcript"`) | ~953 MB via `-m auto` (single F16 GGUF, DiT + Vocos) |
+| **`f5-tts`** | F5-TTS v1 Base: 22-layer DiT flow-matching TTS + Vocos iSTFT vocoder. MIT license. High-quality zero-shot voice cloning from 3-15s reference audio. 24 kHz output. English + Chinese (built-in pinyin g2p, #294). | Yes (`--voice <ref.wav> --ref-text "transcript"`) | ~953 MB via `-m auto` (single F16 GGUF, DiT + Vocos) |
 | **`irodori-tts`** | Irodori-TTS: RF-DiT flow-matching TTS with LowRankAdaLN + JointAttention + half-RoPE + SwiGLU. 48 kHz via Semantic-DACVAE-Japanese-32dim codec. MIT license. Japanese-focused (llm-jp-3 tokenizer). Zero-shot voice cloning from any reference WAV (DAC-VAE encoder + speaker CFG); emoji emotion control; duration predictor for output length. **VoiceDesign** (600M-v3): adds caption encoder for style/emotion control via text descriptions (`--instruct "calm adult male, deep voice"`); independent text/speaker/caption CFG. | Yes (`--voice <ref.wav> --i-have-rights`) | ~526 MB Q4_K (VoiceDesign) / ~852 MB Q4_K (base) + DAC-VAE codec |
 | **`indextts`** | IndexTTS-1.5: GPT-2 AR (24L/1280d) mel-code generator + BigVGAN vocoder. Designed for Chinese+English. Zero-shot voice cloning from any reference WAV. | Yes (`--voice <ref.wav>`) | ~2.4 GB via `-m auto` (GPT F16 + BigVGAN F16) |
 | **`cosyvoice3-tts`** | Fun-CosyVoice3-0.5B-2512: Qwen2-0.5B AR speech-token LM + DiT-CFM (10-step Euler) + HiFT (NSF + iSTFT) @ 24 kHz. 9 languages + 18 Chinese dialects. Ships an 8-voice baked bank (`zero_shot` + `fleurs-{en,de,zh,ja,fr,es,ko}`). | Yes — baked-bank name via `--voice <name>`, **or** native arbitrary-WAV cloning via `--voice <ref.wav> --ref-text "..."` (ports speech_tokenizer_v3 + CAMPPlus + matcha mel to ggml; speech tokens byte-exact vs ONNX). | ~1.2 GB via `-m auto` (Q4_K LLM + Q8_0 flow + HiFT + s3tok + campplus + voices) |
@@ -956,8 +956,27 @@ ConvNeXtV2 text encoder → 22-layer Diffusion Transformer with AdaLN-Zero
 
 The `--ref-text` flag provides the transcript of the reference audio.
 This is required for F5-TTS (unlike indextts which conditions on audio
-only). The model uses character-level tokenization (2545 vocab, pinyin
-for Chinese). Output is 24 kHz mono PCM.
+only). Output is 24 kHz mono PCM.
+
+**Tokenization — English and Chinese (#294).** The model uses a 2545-entry
+character/pinyin vocab. English (and other Latin text) tokenizes per character.
+Chinese text is converted to pinyin the same way the upstream model expects
+(`convert_char_to_pinyin`): a built-in g2p (`src/core/pinyin_g2p.*`) does
+phrase-based segmentation → `pypinyin`-style TONE3 syllables (e.g. `zhong1`) with
+tone-sandhi (不/一/third-tone), embedded from `pypinyin` via
+`tools/gen_pinyin_data.py`. Token parity vs the reference is ~99.7% on the
+`tests/test-pinyin-g2p` corpus; the residual is segmentation-boundary polyphones
+that need full jieba (not embedded). Before #294 Chinese produced no audio (every
+Han char hit the unknown token). Mixed English+Chinese in one sentence works.
+
+**Output length (#294).** F5 estimates the number of mel frames from the
+reference's speech rate (`ref_frames / ref_text_len`) × the generated text
+length. A slow or expressive reference must not be truncated: the rate guard is
+asymmetric (a generous upper bound, matching upstream which has none — an
+over-estimate is just trailing silence that gets trimmed), so long sentences are
+no longer cut off. `CRISPASR_F5_DURATION_CLAMP=0` restores the exact upstream
+formula. Give an accurate `--ref-text`; a wrong/short reference transcript
+distorts the rate.
 
 **Model file:**
 [`cstr/f5-tts-GGUF`](https://huggingface.co/cstr/f5-tts-GGUF)

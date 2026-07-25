@@ -818,6 +818,9 @@ add_library(crispasr-core STATIC
             core/gguf_loader.cpp
             core/rvq.h
             core/rvq.cpp
+            # F5-TTS Chinese g2p (#294): jieba-min + pypinyin TONE3 + sandhi.
+            core/pinyin_g2p.h
+            core/pinyin_g2p.cpp
             core/kaldi_fbank.h
             core/kaldi_fbank.cpp
             core/audio_resample.h
