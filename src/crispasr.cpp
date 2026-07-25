@@ -3692,6 +3692,7 @@ static bool log_mel_spectrogram(whisper_state& wstate, const float* samples, con
     const int64_t t_start_us = ggml_time_us();
 
     // Hann window
+    // cppcheck-suppress incorrectStringBooleanError
     CRISPASR_ASSERT(frame_size == CRISPASR_N_FFT && "Unsupported frame_size");
     const float* hann = global_cache.hann_window;
 
