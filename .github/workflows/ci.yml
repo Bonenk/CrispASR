@@ -200,7 +200,13 @@ jobs:
 
       - name: Smoke fuzz (seeded from samples/, ~45s; a crash fails CI)
         env:
-          ASAN_OPTIONS: detect_leaks=0
+          # allocator_may_return_null=1: a malformed WAV/metadata chunk-size field can
+          # drive miniaudio's metadata pool to request a multi-exabyte allocation; the
+          # parser CHECKS the malloc result and returns MA_OUT_OF_MEMORY gracefully
+          # (ma_dr_wav__metadata_alloc), so "allocation-size-too-big" is a graceful OOM,
+          # not memory corruption. Let the allocation return null instead of aborting —
+          # the fuzzing-standard config for parsers over untrusted size fields.
+          ASAN_OPTIONS: detect_leaks=0:allocator_may_return_null=1
         run: |
           mkdir -p fuzz-corpus
           cp samples/jfk.wav samples/jfk.au samples/jfk.amr samples/jfk.webm \
