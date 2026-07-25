@@ -57,8 +57,13 @@ Event types:
 | `type` | When | Fields |
 |---|---|---|
 | `partial` | A streaming step produced new text for the open utterance. At most one `partial` per `utterance_id` per step — multiple VAD slices belonging to the same utterance within a step are concatenated. | `utterance_id`, `text`, `t0`, `t1` |
-| `final` | Trailing silence ≥ `--stream-final-on-silence-ms` (default `800`) after the last detected speech closed the open utterance. In the default `--stream-final-mode redecode` `text` is produced by re-running the backend on the buffered utterance PCM (covers `[t0..t1]`); in `prefix` mode `text` is a prefix accumulator stitched with the last partial. | `utterance_id`, `text`, `t0`, `t1` |
+| `final` | Trailing silence ≥ `--stream-final-on-silence-ms` (default `800`) after the last detected speech closed the open utterance. In the default `--stream-final-mode redecode` `text` is produced by re-running the backend on the buffered utterance PCM (covers `[t0..t1]`); in `prefix` mode `text` is a prefix accumulator stitched with the last partial. | `utterance_id`, `text`, `t0`, `t1`, *(optional)* `speaker` |
 | `silence` | A streaming step produced no speech slices. Emitted regardless of whether an utterance is still open, so wrappers always see a timeline heartbeat. | `t` |
+
+The optional `speaker` field on `final` events appears only with a natively
+diarizing backend (`moss-diarize`, `vibevoice`) when the finalized utterance is
+single-speaker; its ordinals are utterance-local. See
+[Speaker diarization while streaming](#speaker-diarization-while-streaming).
 
 Stream-contract guarantees:
 
@@ -313,6 +318,80 @@ Four context presets trade latency for accuracy:
 | 3      | 13 frames    | 14 frames  | ~1120 ms       | 6.93 %        |
 
 Set via `CRISPASR_NEMOTRON_CONTEXT_PRESET=N` (default: 0).
+
+## Speaker diarization while streaming
+
+Short answer: streaming supports **per-window / per-utterance speaker labels
+from natively-diarizing backends**, but **not** the cross-recording clustering
+pipeline or named-voiceprint identification — those two are recorded-file
+(offline) features by design. See [`diarization-speakers.md`](diarization-speakers.md)
+for the full diarization model.
+
+### What works in streaming
+
+The models [issue #300](https://github.com/CrispStrobe/CrispASR/issues/300)
+asked about — **`moss-diarize`** (MOSS-Transcribe-Diarize-0.9B,
+`cstr/MOSS-Transcribe-Diarize-GGUF`) and **`vibevoice`** (VibeVoice-ASR,
+`cstr/vibevoice-asr-GGUF`) — are *native* diarizing ASR backends: a single
+forward pass emits `(Speaker N)` labels inline, no separate segmenter or
+embedder. When you run one of them under `--stream` / `--mic` / `--live`, each
+decoded window carries the model's own speaker labels:
+
+```bash
+# Plain streaming — labels are prefixed inline, exactly like file-mode text output:
+ffmpeg -i meeting.wav -f s16le -ar 16000 -ac 1 - 2>/dev/null \
+  | crispasr --stream -m auto --backend moss-diarize
+# (Speaker 1) welcome everyone
+# (Speaker 2) thanks, glad to be here
+```
+
+```bash
+# Structured streaming — a `final` event gains a "speaker" field when the
+# finalized utterance is single-speaker (text stays clean, no inline labels):
+ffmpeg -i meeting.wav -f s16le -ar 16000 -ac 1 - 2>/dev/null \
+  | crispasr --stream --stream-json -m auto --backend moss-diarize \
+      --vad --vad-model auto --stream-final-on-silence-ms 800
+# {"type":"partial","utterance_id":1,"text":"welcome everyone","t0":0.30,"t1":1.80}
+# {"type":"final","utterance_id":1,"text":"welcome everyone.","speaker":"(Speaker 1)","t0":0.30,"t1":2.10}
+```
+
+The `speaker` field is **only present** on `final` events, and only when every
+segment of that utterance shares one label (the common VAD-bounded case). A
+`final` whose redecode spanned a mid-utterance speaker turn, and every
+`partial`, omit the field — parse a missing `speaker` as "unlabeled", not as a
+change of speaker. In plain (non-JSON) `--stream`, labels are prefixed inline
+into the text instead, matching the file-mode `text`/`srt`/`vtt` convention.
+
+> ⚠ **Speaker IDs are window/utterance-local, not globally stable.** No
+> cross-window clustering runs in streaming mode, so `Speaker 1` in one step is
+> not guaranteed to be the same physical voice as `Speaker 1` in a later step —
+> the same caveat the diarized file-mode JSON documents for per-chunk labels.
+> If you need recording-stable labels, transcribe the recorded file offline
+> (below), where global clustering runs across the whole audio.
+
+### What does NOT run in streaming (offline only)
+
+- **`--diarize-speakers` / `--diarize` clustering** (pyannote segmenter +
+  TitaNet embedder → globally-stable `(speaker N)` labels). Global clustering
+  needs the whole recording to assign consistent labels, so it is applied as a
+  file-mode post-processing stage and is a no-op on the streaming path.
+- **`--speaker-db` / `--enroll-speaker` named identification.** These
+  **hard-refuse** in streaming mode (`crispasr: error: --speaker-db/--enroll-speaker
+  are not available in streaming mode`) — real-time biometric identification is
+  deliberately unsupported (EU AI Act Art. 5(1)(h); see
+  [`diarization-speakers.md`](diarization-speakers.md#2-named-voiceprint-profiles---speaker-db--deliberate-opt-in)).
+
+### Recommended: near-real-time now, recording-stable labels offline
+
+For live captioning where per-utterance labels are enough, stream a native
+diarizer as above. For a transcript with **recording-stable** speaker labels
+(the same person keeps the same number end to end), run the diarizer — or any
+backend with `--diarize-speakers` — over the recorded file once capture ends:
+
+```bash
+crispasr -m auto --backend moss-diarize -f meeting.wav -ojf     # native labels + native timestamps
+crispasr -m auto --backend cohere      -f meeting.wav --diarize-speakers -ojf   # any backend + clustering
+```
 
 ## Streaming synthesized audio (out)
 
