@@ -60,9 +60,11 @@ Event types:
 | `final` | Trailing silence ≥ `--stream-final-on-silence-ms` (default `800`) after the last detected speech closed the open utterance. In the default `--stream-final-mode redecode` `text` is produced by re-running the backend on the buffered utterance PCM (covers `[t0..t1]`); in `prefix` mode `text` is a prefix accumulator stitched with the last partial. | `utterance_id`, `text`, `t0`, `t1`, *(optional)* `speaker` |
 | `silence` | A streaming step produced no speech slices. Emitted regardless of whether an utterance is still open, so wrappers always see a timeline heartbeat. | `t` |
 
-The optional `speaker` field on `final` events appears only with a natively
-diarizing backend (`moss-diarize`, `vibevoice`) when the finalized utterance is
-single-speaker; its ordinals are utterance-local. See
+The optional `speaker` field on `final` events appears only with a backend that
+populates the structured speaker label (`moss-diarize`; `granite` in
+speaker-aware `--diarize` mode) when the finalized utterance is single-speaker;
+its ordinals are utterance-local. `vibevoice`'s speaker info is inline transcript
+text, not this field. See
 [Speaker diarization while streaming](#speaker-diarization-while-streaming).
 
 Stream-contract guarantees:
@@ -321,21 +323,31 @@ Set via `CRISPASR_NEMOTRON_CONTEXT_PRESET=N` (default: 0).
 
 ## Speaker diarization while streaming
 
-Short answer: streaming supports **per-window / per-utterance speaker labels
-from natively-diarizing backends**, but **not** the cross-recording clustering
-pipeline or named-voiceprint identification — those two are recorded-file
-(offline) features by design. See [`diarization-speakers.md`](diarization-speakers.md)
-for the full diarization model.
+Short answer: streaming carries whatever speaker information a backend produces
+per window/utterance, but **not** the cross-recording clustering pipeline or
+named-voiceprint identification — those two are recorded-file (offline) features
+by design. See [`diarization-speakers.md`](diarization-speakers.md) for the full
+diarization model.
+
+Both backends [issue #300](https://github.com/CrispStrobe/CrispASR/issues/300)
+asked about produce speaker information while streaming, but by **two different
+mechanisms** — worth understanding because they behave differently downstream:
+
+| Backend | How speaker info is produced | In streaming you get |
+|---|---|---|
+| **`moss-diarize`** (MOSS-Transcribe-Diarize-0.9B, `cstr/MOSS-Transcribe-Diarize-GGUF`) | a **structured** per-segment speaker label (`seg.speaker`), parsed from the model's `[Sxx]` tags | inline `(Speaker N)` in plain `--stream`; a `"speaker"` field on `--stream-json` `final` events |
+| **`vibevoice`** (VibeVoice-ASR, `cstr/vibevoice-asr-GGUF`) | the model writes speaker info **inline in its transcript text** (its prompt asks for "Start time, End time, Speaker ID, Content") — the adapter does not split it into a structured field | that raw text verbatim in the transcript; **no** `(Speaker N)` prefix or JSON `speaker` field |
+
+Issue #300's change surfaces the **structured** `seg.speaker` field in streaming
+— so it applies to `moss-diarize` (and any backend that populates it, e.g.
+`granite` in speaker-aware `--diarize` mode). For `vibevoice` the speaker info
+was, and remains, part of the transcript text and flows through streaming
+unchanged; the change is a no-op there.
 
 ### What works in streaming
 
-The models [issue #300](https://github.com/CrispStrobe/CrispASR/issues/300)
-asked about — **`moss-diarize`** (MOSS-Transcribe-Diarize-0.9B,
-`cstr/MOSS-Transcribe-Diarize-GGUF`) and **`vibevoice`** (VibeVoice-ASR,
-`cstr/vibevoice-asr-GGUF`) — are *native* diarizing ASR backends: a single
-forward pass emits `(Speaker N)` labels inline, no separate segmenter or
-embedder. When you run one of them under `--stream` / `--mic` / `--live`, each
-decoded window carries the model's own speaker labels:
+`moss-diarize` populates the structured field, so under `--stream` / `--mic` /
+`--live` each decoded window carries its own speaker labels:
 
 ```bash
 # Plain streaming — labels are prefixed inline, exactly like file-mode text output:
