@@ -10,6 +10,44 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## A stage's token-parity says NOTHING about how the next stage ingests its output — the F5 g2p was 99.8% correct while the tokenizer shattered every pinyin syllable (#294, 2026-07-25)
+
+F5-TTS produced no Chinese audio because its `convert_to_pinyin` was an ASCII-only
+passthrough (every Han char → unknown token → silence). We added a real g2p
+(jieba-min + pypinyin TONE3 + sandhi) and unit-tested it to **99.8% token parity**
+against the reference `convert_char_to_pinyin`. Chinese was still garbled. The g2p
+was correct; the bug was one function DOWNSTREAM: `f5_tts_synthesize` concatenated
+the g2p's token list into a flat string and **re-tokenized it per UTF-8 byte**. The
+F5 vocab stores whole pinyin syllables as single entries (`zhong1`, `guo2`, `a1`,
+`ang1`, …), so `zhong1` became `z,h,o,n,g,1` → six wrong ids → recognizably-Chinese
+-but-unintelligible audio. The parity test validated the g2p's OUTPUT and never saw
+f5's CONSUMPTION of it, so it stayed green through a shipped, broken build. Only the
+TTS→ASR roundtrip caught it (ZH ASR became an exact match; token count for the clip
+dropped 146→63 = one id per syllable). Lessons: (1) a list of vocab units must be
+mapped element-wise to ids (`list_str_to_idx`), NEVER concatenated and re-split —
+the re-split silently destroys every multi-char token; (2) HARD RULE #3b in force —
+a component's own metric is blind to the seam with the next stage, so the acceptance
+gate is always the DECODED OUTPUT, not the component score. Corollary: for cross-
+lingual TTS, use a same-language reference (an English ref speaking Chinese is
+degraded regardless), and a wrong/too-short `--ref-text` garbles output outright.
+
+## Reusing a cached scheduler graph across `sched_reset`/`alloc` cycles is CPU-safe but SIGSEGVs on GPU — the reused input tensor is bound to the prior cycle's freed buffer (moonshine #301, 2026-07-25)
+
+Sibling of the #215/#235 "cached graph shares a scheduler with a larger graph"
+trap, but distinct: here a SINGLE graph is cached and re-run. moonshine's §176s
+encoder cache reused the same `ggml_cgraph` across `ggml_backend_sched_reset` +
+`ggml_backend_sched_alloc_graph` every call. On CPU this is fine; on a GPU sched
+the reused `audio_input`/`enc_pos` leaves stay bound to the PREVIOUS cycle's freed
+buffer, so the very next `ggml_backend_tensor_set` memmoves into freed memory and
+the **2nd** transcribe SIGSEGVs (1st is fine). It reproduced at
+`CRISPASR_SERVER_WORKERS=1` too, so it's repeated-call, not concurrency; a `--server`
+made it look like a server bug. Bisect tell: the rebuild branch (different
+`n_samples`) never crashes, only the exact-reuse branch does. Fix: gate the cache to
+CPU (`ggml_backend_is_cpu(ctx->backend)`); on GPU rebuild the (tiny) graph each call
+and free it. Rule: cache-and-reuse a sched cgraph across reset/alloc is a CPU-only
+optimization — GPU wants rebuild-each-call (or a genuinely persistent gallocr graph
+whose inputs you re-set every eval).
+
 ## A hardcoded decode cap silently ignores --max-new-tokens — and forwarding it naively SHRINKS a backend (#292, 10 ASR backends, 2026-07-22)
 
 An autoregressive/LLM ASR backend caps its decode loop at some `const int max_new
