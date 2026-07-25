@@ -162,13 +162,21 @@ and the shared-model `/load` restriction.
 
 ### Docker Compose
 
-The repo ships a [`docker-compose.yml`](../docker-compose.yml). Scale the
-service and put a proxy in front:
+The repo ships a [`docker-compose.yml`](../docker-compose.yml) with a service
+named `crispasr`. Scale it and put a proxy in front:
 
 ```bash
 # N independent server containers, each with the model loaded once.
 docker compose up --build --scale crispasr=4
 ```
+
+> **Port gotcha.** The shipped compose **publishes a fixed host port**
+> (`8080:8080`). Scaling as-is makes the replicas collide on that host port
+> ("port is already allocated"). The fix is to **not** publish the backend port
+> on the host and instead let the load balancer reach the replicas over the
+> compose network (as below) — remove the `ports:` mapping from the `crispasr`
+> service and publish only the proxy. (Docker's DNS round-robins the service
+> name to all replica IPs; a real LB with health checks is better.)
 
 Then front them with any load balancer. A minimal Caddy config (round-robin /
 least-conn over the replicas):
