@@ -32,6 +32,7 @@
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
 #include "core/crispasr_env.h"
+#include "core/pinyin_g2p.h" // #294: Chinese g2p (jieba-min + pypinyin TONE3)
 
 #if defined(HAVE_ACCELERATE)
 #include <Accelerate/Accelerate.h>
@@ -590,11 +591,16 @@ static std::vector<int32_t> tokenize_text(const f5_vocab& vocab, const std::stri
     return tokens;
 }
 
-// ── pinyin conversion (simplified, ASCII-only passthrough) ───────
-// For a full implementation, would need rjieba + pypinyin equivalent.
-// For now, pass ASCII text through character-by-character.
+// ── pinyin conversion ────────────────────────────────────────────
+// #294: for text containing Han characters, run the real g2p (jieba-min +
+// pypinyin TONE3 + tone-sandhi) so Chinese tokenizes to the pinyin-syllable
+// tokens the model was trained on (previously every Han char hit the unknown
+// token → no Chinese audio). Pure-ASCII/Latin text keeps the byte-identical
+// per-character passthrough below, so the working English path is unchanged.
 
 static std::vector<std::string> convert_to_pinyin(const std::string& text) {
+    if (core_pinyin::has_han(text))
+        return core_pinyin::convert_char_to_pinyin(text);
     std::vector<std::string> chars;
     size_t i = 0;
     while (i < text.size()) {
@@ -2407,12 +2413,19 @@ int f5_tts_synthesize(struct f5_tts_context* ctx, const char* text, float** pcm_
     }
     int gen_text_len = (int)strlen(text);
     // Per-char speech rate derived from the reference (mel frames per char).
-    // #294: a reference clip whose AUDIO is much shorter than its transcript
-    // implies collapses this rate and TRUNCATES the generated speech (a full
-    // sentence came out ~0.7 s). Clamp the rate into a sane English band so the
-    // generated length can't collapse (or balloon) on a mismatched ref; an
-    // over-estimate only adds trailing silence, which is trimmed. A ref that
-    // matches its transcript sits inside the band and is unaffected.
+    // #294: the guard here must be ASYMMETRIC. Under-estimating the rate makes
+    // `duration` too short and TRUNCATES the generated speech (drops the tail of
+    // the sentence); over-estimating only appends trailing silence, which is
+    // trimmed. So a too-LOW rate is harmful and a too-HIGH rate is (almost) free.
+    //
+    // The upstream formula has NO clamp (tools/reference_backends/f5_tts.py:261).
+    // The original symmetric clamp added here capped the rate at fixed_rate*2.5,
+    // which TRUNCATED slow/expressive references: the reporter's ref implies
+    // ~3x fixed_rate, so capping to 2.5x lost the end of the sentence
+    // ("sometimes leaves out parts of sentences"). Fix: keep a protective LOWER
+    // guard (a bad/too-long ref transcript must not collapse the rate to zero),
+    // but only a very loose UPPER guard that catches a garbage near-empty
+    // transcript (which would explode the duration) — not genuinely slow speech.
     float rate = (float)ref_T / (float)std::max(1, ref_text_len);
     // The clamp is an ADD-ON over the upstream formula (which has no clamp); gate
     // it so it can be switched off. CRISPASR_F5_DURATION_CLAMP=0 restores the
@@ -2420,7 +2433,7 @@ int f5_tts_synthesize(struct f5_tts_context* ctx, const char* text, float** pcm_
     const char* clamp_env = crispasr_env::get("CRISPASR_F5_DURATION_CLAMP");
     bool duration_clamp = !(clamp_env && std::strcmp(clamp_env, "0") == 0);
     if (duration_clamp)
-        rate = std::min(std::max(rate, fixed_rate * 0.75f), fixed_rate * 2.5f);
+        rate = std::min(std::max(rate, fixed_rate * 0.75f), fixed_rate * 8.0f);
     int duration = ref_T + (int)(rate * (float)gen_text_len / ctx->speed);
 
     if (ctx->verbosity >= 1) {

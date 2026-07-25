@@ -315,6 +315,26 @@ catch_discover_tests(test-core-rvq
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-pinyin-g2p — F5-TTS Chinese g2p parity vs pypinyin reference (#294) ──
+add_executable(test-pinyin-g2p
+    test-pinyin-g2p.cpp
+    ${PROJECT_SOURCE_DIR}/src/core/pinyin_g2p.cpp
+)
+target_include_directories(test-pinyin-g2p PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/core
+)
+target_compile_definitions(test-pinyin-g2p PRIVATE
+    PINYIN_PARITY_TSV="${CMAKE_CURRENT_SOURCE_DIR}/data/pinyin_parity.tsv"
+)
+target_link_libraries(test-pinyin-g2p PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-pinyin-g2p
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-gguf-bounds — regression guard for the GGUF load_weights OOB fix ─────
 # Untrusted-input hardening: a truncated/crafted GGUF must be rejected by
 # core_gguf::load_weights, not SIGBUS the mmap loader. Needs crispasr-lib (the
