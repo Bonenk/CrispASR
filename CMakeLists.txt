@@ -176,6 +176,14 @@ if (WIN32)
     add_compile_definitions(_USE_MATH_DEFINES NOMINMAX)
 endif()
 
+# Large generated tables (e.g. src/core/pinyin_g2p.cpp, #294) overflow MSVC's
+# default per-object section limit → "error C1128: number of sections exceeded
+# object file format limit". /bigobj raises the limit; it is harmless for every
+# other TU, so apply it globally on MSVC.
+if (MSVC)
+    add_compile_options(/bigobj)
+endif()
+
 # Wire COHERE_MKL into ggml's BLAS backend before add_subdirectory(ggml).
 # This must happen here so the values are visible to the ggml subproject.
 if (COHERE_MKL)
