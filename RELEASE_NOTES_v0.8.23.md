@@ -24,12 +24,12 @@ models (head_dim 128, no `tts_lm`, different conditioning mechanism). The base
 models now **error clearly** instead of emitting garbage, and clone a voice from
 a reference WAV via `--voice ref.wav` (the mechanism they actually support).
 
-## New — speaker labels while streaming (#300)
+## New — structured speaker labels while streaming (#300)
 
-Natively-diarizing ASR backends (`moss-diarize` / MOSS-Transcribe-Diarize-0.9B,
-`vibevoice` / VibeVoice-ASR) emit `(Speaker N)` labels from a single forward
-pass, but streaming dropped them. Now `--stream` / `--mic` / `--live` surface the
-model's own per-utterance speaker labels:
+Backends that produce a **structured** per-segment speaker label — `moss-diarize`
+(MOSS-Transcribe-Diarize-0.9B), and `granite` in speaker-aware `--diarize` mode —
+had that label dropped by the streaming emit path, which built text from
+`seg.text` only. Now `--stream` / `--mic` / `--live` surface it:
 
 - **Plain `--stream`** prefixes the label inline (like file-mode `text`/`srt`/`vtt`).
 - **`--stream-json`** adds an optional `"speaker"` field to `final` events when
@@ -39,6 +39,10 @@ Labels are window/utterance-local (no cross-utterance clustering runs live);
 recording-stable labels via `--diarize-speakers` and named `--speaker-db`
 identification remain recorded-file features by design. Documented in
 [`docs/streaming.md`](docs/streaming.md).
+
+Note: `vibevoice` (VibeVoice-ASR) also asked about in #300 emits speaker info
+**inline in its transcript text**, not as a structured field — that already flows
+through streaming as text, so this change is a no-op for it.
 
 ```bash
 ffmpeg -i meeting.wav -f s16le -ar 16000 -ac 1 - 2>/dev/null \
