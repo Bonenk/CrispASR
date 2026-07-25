@@ -28,31 +28,29 @@ attention→SGEMM + BLAS-thread-pin, per-layer weight hoist. Validated on Kaggle
    Needed for full-song latency (56 s/11 s still extrapolates to ~15 min/song).
    Validate with the mel-band-roformer diff harness (per-stage cos≥0.9995).
 
-## NOW — active work (2026-07-23): canary-qwen q4_k NaN
+## canary-qwen q4_k NaN — DONE (2026-07-23)
 
-**Symptom:** canary-qwen emits all-`!` (token id 0) on jfk. **Root-caused** via
-Kaggle quant-diff (`tools/kaggle/cuda-canary-quant-diff`): **q8_0 (registry
-default) transcribes perfectly; only q4_k is NaN-corrupt.** Not a runtime bug
-(FUSED_QKV/PW_Q8 toggles ruled out). GGUF header shows tensor *types* are correct
-(token_embd/output F16, output_norm F32, encoder kept; only the 196 Qwen3-1.7B
-LLM projections Q4_K) → it is 4-bit *precision* on the small LLM, not a
-wrong-tensor policy bug.
+canary-qwen emitted all-`!` (token id 0) on jfk: the published
+`cstr/canary-qwen-2.5b-GGUF/canary-qwen-2.5b-q4_k.gguf` was a **corrupt quant
+artifact** producing NaN logits (q8_0, the registry default, was always fine). The
+greedy argmax seeded `best_val = logits[0]`, so a NaN froze `best_id` at 0.
+**All shipped (v0.8.22):**
+- NaN-robust argmax in `canary_qwen.cpp` (+ swept into 7 siblings: lfm2_audio,
+  m2m100, moonshine, moss_transcribe{,_diarize}, moss_audio, t5_translate).
+- **Re-quantized q4_k, ASR-validated (4/4 on jfk), uploaded to HF replacing the
+  broken blob in place** — sha256 `9cafd0f77e14…` → `8f9e3a390b8a…` (verified).
 
-**DONE + pushed:**
-- NaN-robust greedy argmax in `canary_qwen.cpp` (seed −inf, skip non-finite,
-  abort on all-non-finite) — a NaN no longer silently spews `!`.
-- Swept the same guard into 7 sibling backends sharing `best_val = logits[0]`
-  (lfm2_audio, m2m100, moonshine, moss_transcribe{,_diarize}, moss_audio,
-  t5_translate). All compile+link clean.
+## RELEASE follow-up (open, 2026-07-25): v0.8.22 shipped with NO Windows CPU CLI
 
-**IN FLIGHT:** Kaggle `chr1str/canary-qwen-requant` — re-quantize F16 →
-q4_k/q5_k/q6_k, validate each on jfk with the NaN-guarded binary, upload the
-smallest passing variant (q4_k overwrites broken in place; else atomic
-delete-broken + add smallest working k-quant). q8_0 default is safe throughout.
-
-**NEXT:** on result, update model registry/docs if the fixed variant changes
-name; fold into the next release notes. The broken HF file:
-`cstr/canary-qwen-2.5b-GGUF/canary-qwen-2.5b-q4_k.gguf` sha256 `9cafd0f77e14…`.
+`release.yml` for v0.8.22 **failed on `build-windows-cpu`**: the mel-band-roformer
+`openblas_set_num_threads` thread-pin used `__attribute__((weak))`, which **MSVC
+rejects** — and it only bit that job (the one Windows job my vcpkg step gives
+`HAVE_BLAS`). 26 assets shipped, but the #296 reporter's Windows CPU binary is
+missing. **Fixed on main** (`3f41a0a4`, gated on portable `CRISPASR_MBR_OPENBLAS`,
+no weak). **Still needs delivery** — v0.8.22 tag has the broken code, so a **v0.8.23**
+must ship it (+ the queued #298/#299 fixes; also realigns main with the 0.8.23
+PyPI wrapper). The MSVC fix is UNVALIDATED locally — watch `build-windows-cpu` on
+the v0.8.23 release run. LESSON: [[untested-release-workflow-broke-release]].
 
 ## #266 follow-up — hoist speaker orchestration into the library (PARKED, LOW)
 
