@@ -838,6 +838,13 @@ char* fireredpunc_process(fireredpunc_context* ctx, const char* text) {
             cap_next = false;
         } else {
             fixed += c;
+            // #308: an already-uppercase letter satisfies a pending capitalisation
+            // (e.g. Whisper's sentence-cased text). Without clearing cap_next here,
+            // it stayed set past the capital and up-cased the NEXT letter too
+            // ("Hello" -> "HEllo").
+            if (c >= 'A' && c <= 'Z') {
+                cap_next = false;
+            }
             // Check for sentence enders (. ? ! and their full-width versions)
             if (c == '.' || c == '?' || c == '!') {
                 cap_next = true;
