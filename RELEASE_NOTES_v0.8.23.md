@@ -7,9 +7,10 @@ was missing. This release carries the fix, plus a VibeVoice voice-pack
 correctness fix, native speaker labels in streaming, a clearer submodule
 build error, **F5-TTS Chinese synthesis**, a **concurrency/scaling guide** with
 a new `--server-workers` flag, **broader NVIDIA GPU coverage** (older
-Pascal/Volta/P100 cards), and several backend fixes — CosyVoice3 on Vulkan,
-whisper-VAD GPU acceleration, and cleaner whisper punctuation. Drop-in from
-v0.8.22 — existing flags are unchanged.
+Pascal/Volta/P100 cards), a **VibeVoice-ASR BitNet** (2-bit ternary) conversion,
+faster VAD (whisper-VAD on GPU + a parallelized firered-vad), and several backend
+fixes — TTS on Vulkan (CosyVoice3, Qwen3-TTS, Zonos) and cleaner whisper
+punctuation. Drop-in from v0.8.22 — existing flags are unchanged.
 
 ## Fixed — Windows CPU release build (#296)
 
@@ -19,6 +20,12 @@ and v0.8.22 went out without its Windows CPU binary. Removed the weak-symbol
 construct; the Windows CPU build links OpenBLAS and ships again with the fast
 `--separate` path intact (macOS/Linux were unaffected and are unchanged).
 
+The **Windows CUDA** binary was also failing to build — sccache mis-parses ggml's
+newer `-compress-mode=size` device-fatbin flag on Windows (`nvcc fatal: A single
+input file is required…`; Linux CUDA was unaffected). Disabling CUDA fatbin
+compression on the Windows CUDA jobs restores it, so `crispasr-windows-x86_64-cuda`
+ships again alongside the CPU/CPU-legacy and Vulkan Windows builds.
+
 ## Fixed — VibeVoice base models + voice packs (#299)
 
 Passing a realtime voice pack to a **VibeVoice base model** (1.5B / 7B) produced
@@ -27,6 +34,16 @@ realtime-0.5B head (head_dim 64) and are structurally incompatible with the base
 models (head_dim 128, no `tts_lm`, different conditioning mechanism). The base
 models now **error clearly** instead of emitting garbage, and clone a voice from
 a reference WAV via `--voice ref.wav` (the mechanism they actually support).
+
+## New — VibeVoice-ASR BitNet (2-bit ternary)
+
+`microsoft/VibeVoice-ASR-BitNet` now converts to CrispASR GGUF. Its BitNet-trained
+LM projection weights are ternary `{-1, 0, 1}`, stored via ggml's native **TQ2_0**
+(2-bit, ~2.06 bpw) — standard `mul_mat` dequantizes them transparently, no custom
+kernels. With the VAE encoders at Q8_0 and the tied `lm_head` skipped, the model
+is **1.62 GB** (vs 2.66 GB naive). It routes through the existing `vibevoice`
+backend — no runtime changes — under the `vibevoice-bitnet` registry key / backend
+alias. Converter: `models/convert-vibevoice-bitnet-to-gguf.py`.
 
 ## New — structured speaker labels while streaming (#300)
 
@@ -132,6 +149,12 @@ The `whisper-vad-asmr` voice-activity model had a CPU-hardcoded encoder; it now
 runs on the **GPU** (Metal / CUDA / Vulkan) for ~**3.3×** faster VAD, plus a
 parallelized mel front-end. The requantized GGUF keeps the positional embeddings
 unquantized (halves the quant error on the short VAD windows).
+
+`firered-vad` (the CPU VAD) was then the slower of the two — its matmuls used
+multi-threaded BLAS but the depthwise FSMN memory convs and the per-frame fbank
+FFT ran single-threaded. Both are now parallelized across cores (bit-identical
+output; the reductions keep their summation order), for ~**3.7×** faster
+detection. Opt out with `CRISPASR_FIRERED_VAD_SERIAL=1`.
 
 ## Fixed — whisper subtitles: double capitalization + spurious full stops (#308)
 
