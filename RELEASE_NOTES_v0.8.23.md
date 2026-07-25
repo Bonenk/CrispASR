@@ -104,14 +104,27 @@ image can't run on those cards. The CUDA releases now split correctly:
 
 If `nvidia-smi` shows a pre-Turing card, pull the `-12` tag.
 
-## Fixed — CosyVoice3 blank/garbled audio on Vulkan (#304)
+## Fixed — TTS backends blank/garbled/hung on Vulkan (#304)
 
-CosyVoice3 emitted blank or garbled audio under the **Vulkan** backend (e.g. on
-Windows via SubtitleEdit's server `/v1/audio/speech`). Its flow-matching / HiFT /
-LLM stages miscompute on Vulkan (the AR decode collapses to a few near-silent
-tokens). Those stages now run on **CPU** under a Vulkan backend, which restores
-correct audio; opt back into the native path with
-`CRISPASR_COSYVOICE3_VULKAN_NATIVE=1`. Metal, CUDA, and CPU were never affected.
+Several TTS backends miscomputed under the **Vulkan** backend — the path
+SubtitleEdit uses for every Windows user (it ships the Vulkan build and drives
+synthesis through the crispasr server `/v1/audio/speech`). A full audit of every
+SubtitleEdit-exposed CrispASR TTS engine on a real NVIDIA Vulkan device found
+three broken; each now runs the affected stage(s) on **CPU** under a Vulkan
+backend, restoring correct audio. **Metal, CUDA, and CPU were never affected**,
+and each fix has an env override to force the native Vulkan path:
+
+- **CosyVoice3** — blank/garbled: the flow-matching / HiFT / LLM stages
+  miscompute (the AR decode collapses to a few near-silent tokens). Override:
+  `CRISPASR_COSYVOICE3_VULKAN_NATIVE=1`.
+- **Qwen3-TTS** — the talker LM runs away into a long clip of clipping noise; its
+  codec was already CPU-pinned, so only the talker moves to CPU. Override:
+  `CRISPASR_QWEN3_TTS_VULKAN_NATIVE=1`.
+- **Zonos** — a hard hang/timeout (the AR transformer + DAC-44 kHz vocoder graph
+  never completes). Override: `CRISPASR_ZONOS_VULKAN_NATIVE=1`.
+
+The other audited backends — **F5-TTS, IndexTTS, MOSS-TTS, VibeVoice, VoxCPM2** —
+render correctly on Vulkan and are unchanged.
 
 ## Improved — whisper-VAD runs on the GPU, faster (#305)
 
