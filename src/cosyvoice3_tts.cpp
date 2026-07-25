@@ -983,6 +983,29 @@ extern "C" struct cosyvoice3_tts_context* cosyvoice3_tts_init_from_file(const ch
         }
         ctx->backend = ctx->backend_cpu;
     }
+    // #304: every CosyVoice3 stage miscomputes on the Vulkan backend — the AR
+    // LLM decode collapses to ~12 near-silent speech tokens and the flow
+    // (DiT+CFM) / HiFT vocoder graphs corrupt, so synthesis is blank/garbled on
+    // BOTH q4_k and f16 (a graph-corruption signature, not quantisation). This
+    // is the same graph-scale gallocr/conv-at-length Vulkan miscompute already
+    // gated to CPU in the sibling conv-heavy TTS backends (tada-codec #192,
+    // moss #215, sidon, silero #222). SubtitleEdit ships the Vulkan Windows
+    // build to EVERY Windows user, so this was the default CV3 experience there.
+    // Metal + CUDA render correctly. Run the whole pipeline on CPU when the GPU
+    // backend is Vulkan (identical to the verified-good --no-gpu path); opt back
+    // into the native Vulkan path for debugging with
+    // CRISPASR_COSYVOICE3_VULKAN_NATIVE=1.
+    if (ctx->backend != ctx->backend_cpu && std::strstr(ggml_backend_name(ctx->backend), "Vulkan")) {
+        const char* keep = crispasr_env::get("CRISPASR_COSYVOICE3_VULKAN_NATIVE");
+        if (!(keep && keep[0] == '1')) {
+            if (params.verbosity >= 1) {
+                fprintf(stderr, "cosyvoice3_tts: Vulkan backend detected — running on CPU (#304 Vulkan "
+                                "miscompute; set CRISPASR_COSYVOICE3_VULKAN_NATIVE=1 to override)\n");
+            }
+            ggml_backend_free(ctx->backend);
+            ctx->backend = ctx->backend_cpu;
+        }
+    }
     if (ggml_backend_is_cpu(ctx->backend)) {
         ggml_backend_cpu_set_n_threads(ctx->backend, ctx->n_threads);
     }
