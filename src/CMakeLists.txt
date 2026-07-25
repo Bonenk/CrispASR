@@ -2501,7 +2501,9 @@ else()
     if(MBR_OPENBLAS AND CBLAS_INCLUDE_DIR)
         target_link_libraries(mel-band-roformer PUBLIC ${MBR_OPENBLAS})
         target_include_directories(mel-band-roformer PRIVATE ${CBLAS_INCLUDE_DIR})
-        target_compile_definitions(mel-band-roformer PRIVATE HAVE_BLAS)
+        # CRISPASR_MBR_OPENBLAS: OpenBLAS specifically is linked, so
+        # openblas_set_num_threads is guaranteed present (portable, no weak symbol).
+        target_compile_definitions(mel-band-roformer PRIVATE HAVE_BLAS CRISPASR_MBR_OPENBLAS)
         message(STATUS "mel-band-roformer: linking OpenBLAS ${MBR_OPENBLAS}")
     else()
         # Fall back to whatever cblas exists (reference is slow but correct).
