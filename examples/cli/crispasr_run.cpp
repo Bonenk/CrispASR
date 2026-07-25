@@ -749,10 +749,27 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     }
 
     // Optional language-identification pre-step.
-    const bool want_auto_lang = params.detect_language || params.language == "auto";
+    bool want_auto_lang = params.detect_language || params.language == "auto";
     const bool has_native_lid = (backend.capabilities() & CAP_LANGUAGE_DETECT) != 0;
     const bool lid_disabled = params.lid_backend == "off" || params.lid_backend == "none";
     crispasr_lid_info lid_info; // stored for JSON output
+
+    // #227: a monolingual backend (e.g. moonshine, English-only) can only emit
+    // one language, so on a plain `-l auto` transcription resolve it directly and
+    // skip external LID — no point downloading/running whisper-tiny to "detect"
+    // a language the backend can't change. An explicit --detect-language still
+    // runs LID: the user is asking for the audio's actual language, which the
+    // backend's sole output language may not reflect.
+    if (const char* sole_lang = backend.sole_language();
+        sole_lang && params.language == "auto" && !params.detect_language) {
+        params.language = sole_lang;
+        if (params.source_lang.empty())
+            params.source_lang = sole_lang;
+        want_auto_lang = false;
+        if (!params.no_prints)
+            fprintf(stderr, "crispasr: %s is %s-only — skipping language detection\n", backend.name(), sole_lang);
+    }
+
     if (want_auto_lang && !has_native_lid && !lid_disabled) {
         crispasr_lid_result lid;
         if (crispasr_detect_language_cli(samples.data(), (int)samples.size(), params, lid)) {
