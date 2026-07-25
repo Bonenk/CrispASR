@@ -48,6 +48,13 @@ kh.init_progress()
 def step(name, **extra):
     kh.step(name, **extra)
 
+# HF auth via the harness (env → Kaggle Secret → mounted crispasr-hf-token
+# dataset); exports HF_TOKEN + HUGGING_FACE_HUB_TOKEN + HF_HUB_ENABLE_HF_TRANSFER.
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "hf_transfer", "huggingface_hub"], check=False)
+HF_TOKEN = kh.resolve_hf_token()
+step("hf.token", present=bool(HF_TOKEN))
+from huggingface_hub import hf_hub_download
+
 RELEASE = "v0.8.22"
 VK_TARBALL = f"https://github.com/CrispStrobe/CrispASR/releases/download/{RELEASE}/crispasr-linux-x86_64-vulkan.tar.gz"
 WHISPER_TINY = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin"
@@ -107,12 +114,17 @@ def fetch_binaries():
     return str(binp), str(whisp)
 
 def hf_get(repo, fname, dest_dir):
-    dest = Path(dest_dir) / fname
-    if dest.exists() and dest.stat().st_size > 0:
+    # authenticated + resumable + hf_transfer (fast). Falls back to urllib if
+    # the hub call fails (public repos still work).
+    try:
+        return hf_hub_download(repo_id=repo, filename=fname, local_dir=dest_dir,
+                               token=HF_TOKEN or None)
+    except Exception as e:
+        step("hf_get.fallback_urllib", repo=repo, file=fname, err=str(e)[:120])
+        dest = Path(dest_dir) / fname
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        urllib.request.urlretrieve(f"https://huggingface.co/{repo}/resolve/main/{fname}", dest)
         return str(dest)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    urllib.request.urlretrieve(f"https://huggingface.co/{repo}/resolve/main/{fname}", dest)
-    return str(dest)
 
 def wav_stats(path):
     try:
@@ -142,37 +154,39 @@ def overlap(a, b):
 
 # Short 3 s reference — the 11 s jfk.wav makes every clone-synth enormous
 # (huge DiT/AR sequence) and burns GPU quota (gotcha #1). Trimmed in main().
-REF3 = str(TMP / "ref3s.wav")
+import audioop
+REF3 = str(TMP / "ref3s.wav")   # 3 s, mono, 24 kHz — qwen3-tts (and others) reject 16 kHz
 JFK3_TEXT = "And so my fellow Americans, ask not what your country can do for you"
+REF_RATE = 24000
 
 def make_ref3():
     w = wave.open(REF_WAV, "rb")
-    sr, n = w.getframerate(), min(w.getnframes(), int(3.0 * w.getframerate()))
-    frames = w.readframes(n)
+    sr, sw, ch = w.getframerate(), w.getsampwidth(), w.getnchannels()
+    data = w.readframes(min(w.getnframes(), int(3.0 * sr)))
+    if ch == 2:
+        data = audioop.tomono(data, sw, 0.5, 0.5)
+    if sr != REF_RATE:
+        data, _ = audioop.ratecv(data, sw, 1, sr, REF_RATE, None)
     o = wave.open(REF3, "wb")
-    o.setnchannels(w.getnchannels()); o.setsampwidth(w.getsampwidth()); o.setframerate(sr)
-    o.writeframes(frames); o.close()
+    o.setnchannels(1); o.setsampwidth(sw); o.setframerate(REF_RATE)
+    o.writeframes(data); o.close()
 
 CLONE_ARGS = ["--voice", "{ref}", "--ref-text", JFK3_TEXT, "--i-have-rights"]
 CLONE_NOTEXT = ["--voice", "{ref}", "--i-have-rights"]
 
+# Ordered fast → slow so the quick backends report before the slow/huge ones.
+# f5 (heavy DiT on CPU) and moss (10.5 GB download) run LAST.
 BACKENDS = [
     dict(name="cosyvoice3-tts", repo="cstr/cosyvoice3-0.5b-2512-GGUF",
          main="cosyvoice3-llm-q4_k.gguf",
          files=["cosyvoice3-llm-q4_k.gguf", "cosyvoice3-flow-q8_0.gguf",
                 "cosyvoice3-hift-f16.gguf", "cosyvoice3-voices.gguf"],
          args=["--voice", "zero_shot"], control=True),
-    dict(name="f5-tts", repo="cstr/f5-tts-GGUF",
-         main="f5-tts-v1-base-f16.gguf", files=["f5-tts-v1-base-f16.gguf"], args=CLONE_ARGS),
     dict(name="qwen3-tts", repo="cstr/qwen3-tts-0.6b-base-GGUF",
          main="qwen3-tts-12hz-0.6b-base-q8_0.gguf",
          files=["qwen3-tts-12hz-0.6b-base-q8_0.gguf"],
          extra=[("cstr/qwen3-tts-tokenizer-12hz-GGUF", ["qwen3-tts-tokenizer-12hz.gguf"])],
          args=CLONE_ARGS),
-    dict(name="moss-tts", repo="cstr/moss-tts-v1.5-GGUF",
-         main="moss-tts-v1.5-q4_k.gguf",
-         files=["moss-tts-v1.5-q4_k.gguf", "moss-tts-v1.5-codec.gguf"],
-         args=["--codec-model", "{dir}/moss-tts-v1.5-codec.gguf"] + CLONE_ARGS),
     dict(name="vibevoice-1.5b", repo="cstr/vibevoice-1.5b-GGUF",
          main="vibevoice-1.5b-tts-q8_0.gguf",
          files=["vibevoice-1.5b-tts-q8_0.gguf"], args=CLONE_NOTEXT),
@@ -187,6 +201,13 @@ BACKENDS = [
     dict(name="indextts", repo="cstr/indextts-1.5-GGUF",
          main="indextts-gpt-q8_0.gguf",
          files=["indextts-gpt-q8_0.gguf", "indextts-bigvgan.gguf"], args=CLONE_NOTEXT),
+    dict(name="f5-tts", repo="cstr/f5-tts-GGUF",
+         main="f5-tts-v1-base-f16.gguf", files=["f5-tts-v1-base-f16.gguf"],
+         args=CLONE_ARGS + ["--tts-steps", "8"], timeout=700),  # 8 ODE steps to fit the cap
+    dict(name="moss-tts", repo="cstr/moss-tts-v1.5-GGUF",
+         main="moss-tts-v1.5-q4_k.gguf",
+         files=["moss-tts-v1.5-q4_k.gguf", "moss-tts-v1.5-codec.gguf"],
+         args=["--codec-model", "{dir}/moss-tts-v1.5-codec.gguf"] + CLONE_ARGS, timeout=500),
 ]
 
 def run_synth(binp, cfg, mdir, mode):
@@ -201,7 +222,7 @@ def run_synth(binp, cfg, mdir, mode):
     if mode == "vulkan":
         e["GGML_VK_VISIBLE_DEVICES"] = "0"
     try:
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=360, env=e)
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=cfg.get("timeout", 300), env=e)
         rc, err = r.returncode, r.stderr or ""
     except subprocess.TimeoutExpired:
         return out, "timeout", "", ""
