@@ -143,7 +143,7 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_fastconformer_ctc_backend();
     if (name == "wav2vec2" || name == "hubert" || name == "data2vec")
         return crispasr_make_wav2vec2_backend();
-    if (name == "vibevoice")
+    if (name == "vibevoice" || name == "vibevoice-bitnet" || name == "vibevoice-asr-bitnet")
         return crispasr_make_vibevoice_backend();
     if (name == "vibevoice-tts")
         return crispasr_make_vibevoice_tts_backend();
@@ -311,6 +311,7 @@ std::vector<std::string> crispasr_list_backends() {
         "hubert",
         "data2vec",
         "vibevoice",
+        "vibevoice-bitnet",
         "kugelaudio",
         "qwen3-tts",
         "miotts",
@@ -850,7 +851,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "granite-4.1-nar";
             else if (a == "wav2vec2" || a == "wav2vec2-ctc")
                 result = "wav2vec2";
-            else if (a == "vibevoice" || a == "vibevoice-asr" || a == "vibevoice_asr")
+            else if (a == "vibevoice" || a == "vibevoice-asr" || a == "vibevoice_asr" || a == "vibevoice-bitnet" ||
+                     a == "vibevoice-asr-bitnet" || a == "vibevoice_bitnet")
                 result = "vibevoice";
             else if (a == "kugelaudio" || a == "kugelaudio-tts" || a == "kugelaudio_tts")
                 result = "kugelaudio";
