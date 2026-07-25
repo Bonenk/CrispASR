@@ -163,6 +163,17 @@ text, producing double capitals (`Hello` → `HEllo`) and extra full stops. Whis
 now declares native punctuation so the redundant pass is skipped, and the
 restorer's capitalizer no longer mangles an already-capitalized first letter.
 
+## Fixed — monolingual backends no longer download the language-ID model (#227)
+
+On `-l auto` (the default), a backend without native language detection ran a
+whisper-tiny language-ID pass first, downloading `ggml-tiny.bin`. For an
+English-only backend like **moonshine** that's pointless — it can only emit one
+language — and it surprised users of the `--vad-import` reuse workflow. Monolingual
+backends now resolve their own language and skip external LID entirely (no
+`ggml-tiny.bin`). Multilingual backends are unchanged; an explicit
+`--detect-language` still runs LID, and `-l <code>` / `--lid-backend off` skip it
+for any backend.
+
 ## Docs
 
 - README backend counts corrected to match the binary and the repo's own
