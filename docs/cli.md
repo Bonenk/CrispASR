@@ -97,6 +97,7 @@ crispasr --list-backends
 | `--s2s-output FNAME` | Output path for S2S WAV |
 | `--voice PATH` | Voice reference for TTS: GGUF voice pack or reference WAV for cloning (`--i-have-rights` required for WAV cloning) |
 | `--server` | Run as HTTP server with persistent model (see [`server.md`](server.md)) |
+| `--server-workers N` | Server: `N>1` loads N model instances so pure-ASR requests run concurrently (N× memory; env `CRISPASR_SERVER_WORKERS` overrides). See [`concurrency.md`](concurrency.md) |
 | `--ws-port N` | Server: real-time WebSocket ASR streaming port (`-1` off, `0` = HTTP port + 1) |
 | `--no-warmup` | Server: skip the startup warmup transcribe (workaround for GPU drivers that hang in warmup, #165) |
 | `--list-backends` | Print the capability matrix and exit |

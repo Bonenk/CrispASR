@@ -286,6 +286,13 @@ struct whisper_params {
     std::string server_host = "127.0.0.1";
     int32_t server_port = 8080;
     std::string server_api_keys;
+    // --server-workers N (>1): load N independent backend instances so
+    // "pure-ASR" requests (explicit language, no aligner, no punctuation/
+    // truecaser) run concurrently instead of serializing on one model. Costs
+    // N× model memory. 1 = single shared instance (default, unchanged). The
+    // CRISPASR_SERVER_WORKERS env var, when set, overrides this. See
+    // docs/concurrency.md.
+    int32_t server_workers = 1;
     // --ws-port: real-time WebSocket ASR streaming on a second port.
     //   -1 = disabled (default), 0 = server_port + 1, N = port N.
     int32_t server_ws_port = -1;

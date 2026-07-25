@@ -30,8 +30,12 @@ curl http://localhost:8080/backends
 
 The server loads the model once at startup and keeps it in memory.
 Subsequent `/inference` requests reuse the loaded model with no reload
-overhead. Requests are mutex-serialized. Use `--host 0.0.0.0` to
-accept remote connections.
+overhead. Requests are mutex-serialized by default (the HTTP layer accepts
+connections concurrently, but inference runs one-at-a-time through the single
+loaded model). To run transcriptions concurrently, or to scale out with
+replicas / bulk process fan-out, see
+**[Concurrency, parallelism & scaling](concurrency.md)** (`--server-workers N`).
+Use `--host 0.0.0.0` to accept remote connections.
 
 ## API keys
 
@@ -682,7 +686,7 @@ You can override the loaded model and startup flags through `.env`:
 | `CRISPASR_CACHE_DIR` | Where auto-downloaded models live (defaults to `/cache`) |
 | `CRISPASR_API_KEYS` | Comma-separated API keys (see [API keys](#api-keys)) |
 | `CRISPASR_EXTRA_ARGS` | Forwarded verbatim to the server CLI (e.g. `--no-punctuation`) |
-| `CRISPASR_SERVER_WORKERS` | `N>1` loads N independent ASR backend instances so **pure-ASR** requests (explicit `language`, no aligner, no punctuation/truecaser) run concurrently instead of serializing on the single model. Costs N× model memory. Only a throughput win where a single request under-utilises the box (spare cores, a GPU not saturated by one stream, smaller models); a *net loss* on a saturated memory-bandwidth-bound CPU model, where the instances contend. Requests using shared LID/aligner/post-processing stay serialized. `/load` is disabled while a pool is active (restart to change models). Default `1` = single instance. |
+| `CRISPASR_SERVER_WORKERS` | `N>1` loads N independent ASR backend instances so **pure-ASR** requests (explicit `language`, no aligner, no punctuation/truecaser) run concurrently instead of serializing on the single model. Costs N× model memory. Only a throughput win where a single request under-utilises the box (spare cores, a GPU not saturated by one stream, smaller models); a *net loss* on a saturated memory-bandwidth-bound CPU model, where the instances contend. Requests using shared LID/aligner/post-processing stay serialized. `/load` is disabled while a pool is active (restart to change models). Default `1` = single instance. Equivalent to the `--server-workers N` CLI flag (this env var overrides the flag when both are set). Full guidance: **[docs/concurrency.md](concurrency.md)**. |
 
 The service is configured to avoid serving as root by default:
 - `user: "${CRISPASR_UID:-1000}:${CRISPASR_GID:-1000}"`

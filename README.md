@@ -41,6 +41,7 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 - [**Text-to-Speech (TTS)**](docs/tts.md) — 51 engines: Kokoro, Qwen3-TTS, VibeVoice, dots.tts, Orpheus, Chatterbox, IndexTTS, Irodori, VoxCPM2, CosyVoice3, CSM, Dia, Zonos, Bark, Piper, MeloTTS, and more
 - [Streaming & live transcription](docs/streaming.md)
 - [Server mode (HTTP API)](docs/server.md)
+- [Concurrency, parallelism & scaling](docs/concurrency.md) — how one transcription uses multiple cores, concurrent server requests (`--server-workers`), bulk offline transcription, replicas behind a load balancer
 - [CLI reference](docs/cli.md) — flags, VAD, CTC alignment, output formats, auto-download, audio formats
 - [Environment variables](docs/environment-variables.md) — the `CRISPASR_<BACKEND>_<FEATURE>` convention, global knobs, and every per-backend variable
 - [Language bindings](docs/bindings.md) — Python / Rust / Dart / Go / Java / JavaScript / Ruby / mobile
@@ -724,6 +725,14 @@ CrispASR has three feature areas that warrant their own docs pages:
   CAP_TTS backend), per-request voice + speed + instructions, CORS,
   long-form sentence chunking, API keys, Docker Compose, prebuilt
   CUDA images.
+- **[Concurrency, parallelism & scaling](docs/concurrency.md)** — one
+  transcription already uses multiple cores; the server accepts requests
+  concurrently but serializes inference on one model by default;
+  `--server-workers N` runs N model instances so pure-ASR requests run
+  concurrently; and for bulk/throughput workloads, process-level fan-out
+  (`xargs -P` / GNU `parallel`) or N replicas behind a load balancer. Also
+  covers what is *not* supported (batched multi-stream inference,
+  PagedAttention) and why.
 
 Quickest taste of each:
 
