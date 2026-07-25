@@ -2494,8 +2494,11 @@ if(APPLE)
     endif()
     target_link_libraries(mel-band-roformer PUBLIC ${ACCELERATE_LIB})
     target_compile_definitions(mel-band-roformer PRIVATE HAVE_BLAS ACCELERATE_NEW_LAPACK)
-else()
-    # Prefer OpenBLAS EXPLICITLY: crispasr_prefer_cblas() / find_package(CBLAS)
+elseif(CRISPASR_MEL_BLAS)
+    # Gated on CRISPASR_MEL_BLAS (default ON) — the same switch the mel filterbank
+    # uses. OFF (e.g. the Go bindings build, which links a hand-maintained cgo lib
+    # list with no external BLAS) compiles the scalar linear()/attention() fallback
+    # so no unresolved cblas_sgemm is referenced. Prefer OpenBLAS EXPLICITLY: crispasr_prefer_cblas() / find_package(CBLAS)
     # happily returns the reference Netlib libcblas.so, whose sgemm is a naive
     # scalar loop — measured as slow as no BLAS at all (#296 validation). OpenBLAS
     # exports the cblas symbols too and is 10-50x faster, so look for it first.
@@ -2520,6 +2523,8 @@ else()
             message(STATUS "mel-band-roformer: no BLAS found — linear() uses the scalar fallback (slow separation)")
         endif()
     endif()
+else()
+    message(STATUS "mel-band-roformer: CRISPASR_MEL_BLAS=OFF — scalar fallback (slow separation)")
 endif()
 
 # Standalone front-end diff probe (§248 Phase 1). Opt-in so it doesn't add to

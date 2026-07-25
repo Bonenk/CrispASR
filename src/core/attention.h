@@ -531,6 +531,7 @@ static inline ggml_tensor* encoder_self_attn(ggml_context* ctx, ggml_tensor* x, 
     Q = ggml_permute(ctx, Q, 0, 2, 1, 3);
     K = ggml_permute(ctx, K, 0, 2, 1, 3);
     V = ggml_permute(ctx, V, 0, 2, 1, 3);
+    // cppcheck-suppress uninitvar
     if (p.permute_cont) {
         Q = ggml_cont(ctx, Q);
         K = ggml_cont(ctx, K);
