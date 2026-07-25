@@ -1217,7 +1217,9 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // language, no aligner, no post-processing) so it shares no mutable
         // state with other workers. N=1 (default) leaves `asr_pool` null →
         // every request uses the primary backend + model_mutex (unchanged).
-        int n_workers = 1;
+        // The --server-workers flag sets the default; CRISPASR_SERVER_WORKERS,
+        // when present, overrides it (env stays the ultimate gate).
+        int n_workers = std::max(1, params.server_workers);
         if (const char* e = std::getenv("CRISPASR_SERVER_WORKERS"))
             n_workers = std::max(1, atoi(e));
         if (n_workers > 1) {

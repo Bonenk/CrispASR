@@ -728,6 +728,8 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.server_ws_port = std::stoi(ARGV_NEXT);
     } else if (arg == "--wyoming-port") {
         params.wyoming_port = std::stoi(ARGV_NEXT);
+    } else if (arg == "--server-workers") {
+        params.server_workers = std::max(1, std::stoi(ARGV_NEXT));
     } else if (arg == "--api-keys") {
         params.server_api_keys = ARGV_NEXT;
     } else if (arg == "--stream-step") {
@@ -1191,6 +1193,10 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.server ? "true" : "false");
     fprintf(stderr, "  --host HOST                       [%-7s] server bind address\n", params.server_host.c_str());
     fprintf(stderr, "  --port PORT                       [%-7d] server port\n", params.server_port);
+    fprintf(stderr,
+            "  --server-workers N                [%-7d] server: N>1 loads N model instances so pure-ASR "
+            "requests run concurrently (N× memory; see docs/concurrency.md)\n",
+            params.server_workers);
     fprintf(stderr,
             "  --ws-port PORT                    [%-7d] server: real-time WebSocket ASR streaming port "
             "(-1 off, 0 = port+1)\n",
