@@ -16,6 +16,9 @@ public:
 
     const char* name() const override { return "moonshine-streaming"; }
 
+    // English-only (see MoonshineBackend) — skip external LID on -l auto. #227.
+    const char* sole_language() const override { return "en"; }
+
     uint32_t capabilities() const override {
         // Verified against src/moonshine_streaming.cpp as of 2026-05-04:
         // uses ggml_flash_attn_ext (×3); produces segments → CAP_DIARIZE
