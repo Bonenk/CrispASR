@@ -18,6 +18,13 @@ The default and recommended path is **session-scoped clustering**. The named
 path exists, is **off by default**, and should only be used deliberately and
 with the obligations in the last section understood.
 
+> **Streaming?** Both columns above are **recorded-file (offline)** features.
+> For live transcription, natively-diarizing backends (`moss-diarize`,
+> `vibevoice`) still emit their own per-utterance `(Speaker N)` labels under
+> `--stream` — but the cross-recording clustering and named-voiceprint paths
+> here do not run in real time. See
+> [`streaming.md`](streaming.md#speaker-diarization-while-streaming).
+
 ---
 
 ## 1. Session-scoped speaker clustering (recommended)

@@ -1869,6 +1869,40 @@ static int tada_run_aligner_pipeline(const whisper_params& params, const std::st
     return rc;
 }
 
+// Append a streamed segment's transcript text, prefixing its native
+// diarization label when the backend produced one. `seg.speaker` is empty
+// for non-diarizing backends (so this is a no-op there) and carries the
+// "(Speaker N) " form for native diarizers (moss-diarize, vibevoice) —
+// matching the file-mode `prefix_speaker()` convention in crispasr_output.cpp.
+// NOTE: like all streamed diarize labels, the speaker ordinals are
+// window/utterance-local — "Speaker 1" in one step is not guaranteed to be
+// the same physical voice as "Speaker 1" in a later step (no cross-window
+// clustering runs in streaming mode; see docs/streaming.md).
+static inline void crispasr_stream_append_seg(std::string& out, const crispasr_segment& s) {
+    out += s.speaker;
+    out += s.text;
+}
+
+// Distinct non-empty speaker label shared by every segment, or "" when the
+// segments carry no label or disagree (a mid-utterance speaker turn). Used to
+// attach a structured "speaker" field to a single-speaker `final` JSON event
+// without inlining labels into `text` (the JSON convention keeps `text` clean).
+static std::string crispasr_stream_common_speaker(const std::vector<crispasr_segment>& segs) {
+    std::string spk;
+    for (const auto& s : segs) {
+        if (s.speaker.empty())
+            continue;
+        if (spk.empty())
+            spk = s.speaker;
+        else if (spk != s.speaker)
+            return "";
+    }
+    // Trim a trailing space carried by the "(Speaker N) " form.
+    while (!spk.empty() && (spk.back() == ' ' || spk.back() == '\t'))
+        spk.pop_back();
+    return spk;
+}
+
 int crispasr_run_backend(const whisper_params& params_in) {
     whisper_params params = params_in;
 
@@ -3540,6 +3574,12 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     // replaced by an empty final. (Round 4 of #84: CKwasd
                     // report 2026-05-11 "empty finals on sub-2-s utterances".)
                     std::string final_text;
+                    // Native diarization label for this utterance, when the
+                    // redecode produced a single-speaker segment set. Emitted
+                    // as a structured "speaker" field so JSON consumers don't
+                    // parse inline labels; text stays clean. Window/utterance-
+                    // local (no cross-utterance clustering) — see docs.
+                    std::string final_speaker;
                     bool final_text_from_redecode = false;
                     if (params.stream_final_mode == "redecode") {
                         if ((int)utterance_pcm.size() >= crispasr::kStreamRedecodeMinSamples) {
@@ -3564,6 +3604,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                             }
                             for (const auto& s : utt_segs)
                                 final_text += s.text;
+                            final_speaker = crispasr_stream_common_speaker(utt_segs);
                             final_text_from_redecode = !final_text.empty();
                         }
                         if (final_text.empty())
@@ -3576,9 +3617,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
                         final_text = apply_punc_text(punc_ctx.get(), final_text);
                     const double t0 = (double)utterance_start_sample / (double)SR;
                     const double t1 = (double)last_speech_end_sample / (double)SR;
+                    std::string spk_field;
+                    if (!final_speaker.empty())
+                        spk_field = ",\"speaker\":\"" + crispasr_json_escape(final_speaker) + "\"";
                     fprintf(stdout,
-                            "{\"type\":\"final\",\"utterance_id\":%lld,\"text\":\"%s\",\"t0\":%.3f,\"t1\":%.3f}\n",
-                            (long long)utterance_id, crispasr_json_escape(final_text).c_str(), t0, t1);
+                            "{\"type\":\"final\",\"utterance_id\":%lld,\"text\":\"%s\"%s,\"t0\":%.3f,\"t1\":%.3f}\n",
+                            (long long)utterance_id, crispasr_json_escape(final_text).c_str(), spk_field.c_str(), t0,
+                            t1);
                     fflush(stdout);
                     emitted_event_this_step = true;
                     // Round 3 (CKwasd #1): bookmark the finalized
@@ -3788,10 +3833,11 @@ int crispasr_run_backend(const whisper_params& params_in) {
             if (segs.empty())
                 continue;
 
-            // Build output text
+            // Build output text (native diarization labels prefixed inline,
+            // matching file-mode text/srt/vtt; no-op for non-diarizers).
             std::string text;
             for (const auto& s : segs)
-                text += s.text;
+                crispasr_stream_append_seg(text, s);
 
             // Output depends on mode:
             // Continuous: print each non-empty result as a new line
@@ -3843,6 +3889,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
             // EOF path: identical redecode→stitch-fallback contract to the
             // in-loop finalize_utterance. See crispasr_stream_finalize.h.
             std::string final_text;
+            std::string final_speaker; // native diarization label (single-speaker utterance); see in-loop finalize
             bool final_text_from_redecode = false;
             if (params.stream_final_mode == "redecode") {
                 if ((int)utterance_pcm.size() >= crispasr::kStreamRedecodeMinSamples) {
@@ -3863,6 +3910,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     }
                     for (const auto& s : utt_segs)
                         final_text += s.text;
+                    final_speaker = crispasr_stream_common_speaker(utt_segs);
                     final_text_from_redecode = !final_text.empty();
                 }
                 if (final_text.empty())
@@ -3875,8 +3923,11 @@ int crispasr_run_backend(const whisper_params& params_in) {
             const double t0 = (double)utterance_start_sample / (double)SR;
             const double t1 = last_speech_end_sample > 0 ? (double)last_speech_end_sample / (double)SR
                                                          : (double)cumulative_samples / (double)SR;
-            fprintf(stdout, "{\"type\":\"final\",\"utterance_id\":%lld,\"text\":\"%s\",\"t0\":%.3f,\"t1\":%.3f}\n",
-                    (long long)utterance_id, crispasr_json_escape(final_text).c_str(), t0, t1);
+            std::string spk_field;
+            if (!final_speaker.empty())
+                spk_field = ",\"speaker\":\"" + crispasr_json_escape(final_speaker) + "\"";
+            fprintf(stdout, "{\"type\":\"final\",\"utterance_id\":%lld,\"text\":\"%s\"%s,\"t0\":%.3f,\"t1\":%.3f}\n",
+                    (long long)utterance_id, crispasr_json_escape(final_text).c_str(), spk_field.c_str(), t0, t1);
             fflush(stdout);
         }
         fprintf(stdout, "\n");
