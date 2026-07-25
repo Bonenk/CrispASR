@@ -2777,6 +2777,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
             if (fmt == "json") {
                 out = "[\n";
                 for (size_t i = 0; i < words.size(); i++) {
+                    // cppcheck-suppress containerOutOfBounds
                     double end = (i + 1 < words.size()) ? words[i + 1].start : clip_end;
                     std::string esc;
                     for (char c : words[i].text) {
@@ -2795,6 +2796,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     out += ts(w.start, false) + "\t" + w.text + "\n";
             } else { // srt (default)
                 for (size_t i = 0; i < words.size(); i++) {
+                    // cppcheck-suppress containerOutOfBounds
                     double end = (i + 1 < words.size()) ? words[i + 1].start : clip_end;
                     out += std::to_string(i + 1) + "\n" + ts(words[i].start, true) + " --> " + ts(end, true) + "\n" +
                            words[i].text + "\n\n";
