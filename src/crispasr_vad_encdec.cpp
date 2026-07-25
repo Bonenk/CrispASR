@@ -15,6 +15,8 @@
 #include "ggml-cpu.h"
 #include "gguf.h"
 
+#include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#305)
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -110,7 +112,8 @@ struct wvad_model {
 
 struct whisper_vad_encdec_context {
     wvad_model model;
-    ggml_backend_t backend = nullptr;
+    ggml_backend_t backend = nullptr;     // compute backend (GPU or CPU)
+    ggml_backend_t backend_cpu = nullptr; // CPU fallback for the sched (#305); null when backend is already CPU
     ggml_backend_sched_t sched = nullptr;
     int n_threads = 4;
 };
@@ -247,9 +250,18 @@ extern "C" struct whisper_vad_encdec_context* whisper_vad_encdec_init(const char
     m.frame_ms = (int)gu32("whisper_vad.frame_duration_ms", 20);
     gguf_free(gctx);
 
-    // Backend
-    ctx->backend = ggml_backend_cpu_init();
-    ggml_backend_cpu_set_n_threads(ctx->backend, ctx->n_threads);
+    // Backend — the encoder is a batched 1500-token Whisper-base graph, exactly
+    // the shape that wins on GPU (#305: whisper-vad-asmr was CPU-only and ~20x
+    // slower than firered). Prefer GPU (Metal/CUDA/Vulkan) via the shared helper;
+    // fall back to CPU. Opt out with CRISPASR_VAD_ENCDEC_CPU=1 for A/B.
+    ctx->backend = nullptr;
+    if (!getenv("CRISPASR_VAD_ENCDEC_CPU"))
+        ctx->backend = crispasr_init_gpu_backend();
+    if (!ctx->backend)
+        ctx->backend = ggml_backend_cpu_init();
+    if (ggml_backend_is_cpu(ctx->backend))
+        ggml_backend_cpu_set_n_threads(ctx->backend, ctx->n_threads);
+    fprintf(stderr, "whisper_vad_encdec: backend = %s\n", ggml_backend_name(ctx->backend));
 
     // Load weights
     ggml_init_params wip = {ggml_tensor_overhead() * 200 + 1024 * 1024, nullptr, true};
@@ -358,8 +370,18 @@ extern "C" struct whisper_vad_encdec_context* whisper_vad_encdec_init(const char
     m.mel_filters = get("mel_filters");
 
     // Scheduler
-    ggml_backend_t backends[1] = {ctx->backend};
-    ctx->sched = ggml_backend_sched_new(backends, nullptr, 1, 32768, false, false);
+    // ggml_backend_sched requires the LAST backend to be CPU (fallback for ops
+    // the GPU can't run). When compute runs on a GPU backend, add a CPU backend
+    // as that fallback; when it's already CPU, one entry suffices (#305).
+    ggml_backend_t backends[2];
+    int n_backends = 0;
+    backends[n_backends++] = ctx->backend;
+    if (!ggml_backend_is_cpu(ctx->backend)) {
+        ctx->backend_cpu = ggml_backend_cpu_init();
+        ggml_backend_cpu_set_n_threads(ctx->backend_cpu, ctx->n_threads);
+        backends[n_backends++] = ctx->backend_cpu;
+    }
+    ctx->sched = ggml_backend_sched_new(backends, nullptr, n_backends, 32768, false, false);
 
     fprintf(stderr, "whisper_vad_encdec: %dL enc + %dL dec, %dd, %d frames, %d ms/frame\n", m.n_enc_layers,
             m.n_dec_layers, m.d_model, m.n_frames, m.frame_ms);
@@ -424,15 +446,15 @@ static wvad_result wvad_forward(whisper_vad_encdec_context* ctx, const float* me
     // Actually after conv2 bias: we did trans→add→trans, so h is back to [T, C]=[1500, 512].
     // Need to transpose to [d, T] = [512, 1500].
     h = ggml_cont(ctx0, ggml_transpose(ctx0, h)); // [d, T]
-    // pos_emb is [d, 1500]. If T != 1500 (e.g. from shorter audio), slice pos_emb.
+    // pos_emb is [d, 1500]. Dequant via get_rows (Metal-safe for any quant type;
+    // embed_positions.weight ships as Q4_K and ggml_cast(Q4_K,F32) aborts 'CPY' on
+    // Metal — #305). arange builds the row index in-graph; also slices to T_actual
+    // (<=1500) for shorter audio, replacing the old view path.
     if (m.pos_emb) {
         int T_actual = (int)h->ne[1];
-        if (T_actual == T) {
-            h = ggml_add(ctx0, h, f32(m.pos_emb));
-        } else {
-            ggml_tensor* pe = ggml_view_2d(ctx0, m.pos_emb, d, T_actual, m.pos_emb->nb[1], 0);
-            h = ggml_add(ctx0, h, pe);
-        }
+        ggml_tensor* idx = ggml_cast(ctx0, ggml_arange(ctx0, 0.0f, (float)T_actual, 1.0f), GGML_TYPE_I32);
+        ggml_tensor* pe = ggml_get_rows(ctx0, m.pos_emb, idx); // [d, T_actual] F32
+        h = ggml_add(ctx0, h, pe);
     }
 
 
@@ -708,6 +730,9 @@ extern "C" int whisper_vad_encdec_detect(struct whisper_vad_encdec_context* ctx,
 
     std::vector<float> first_window_enc;
 
+    const bool dbg = getenv("CRISPASR_VAD_ENCDEC_DEBUG") != nullptr; // #305 A/B timing
+    int64_t t_fwd_us = 0;
+
     std::vector<float> win_pcm(kWinSamples);
     for (int w = 0; w < n_windows; w++) {
         const int s_off = w * kWinSamples;
@@ -720,7 +745,9 @@ extern "C" int whisper_vad_encdec_detect(struct whisper_vad_encdec_context* ctx,
         auto mel = wvad_compute_mel(win_pcm.data(), kWinSamples, hann.data(), fb.data(), 400, 160, 80);
         const int T_mel = (int)(mel.size() / 80);
 
+        const int64_t t_fwd0 = ggml_time_us();
         auto fwd = wvad_forward(ctx, mel.data(), T_mel);
+        t_fwd_us += ggml_time_us() - t_fwd0;
         if (fwd.probs.empty())
             return -1;
 
@@ -734,6 +761,10 @@ extern "C" int whisper_vad_encdec_detect(struct whisper_vad_encdec_context* ctx,
     }
 
     int nf = (int)probs.size();
+
+    if (dbg)
+        fprintf(stderr, "whisper_vad_encdec: forward %d window(s) on %s = %.1f ms (%.1f ms/window)\n", n_windows,
+                ggml_backend_name(ctx->backend), t_fwd_us / 1000.0, n_windows ? t_fwd_us / 1000.0 / n_windows : 0.0);
 
     // Diagnostic stats — same format as firered_vad so the two are easy
     // to compare side-by-side (issue #83).
@@ -828,5 +859,7 @@ extern "C" void whisper_vad_encdec_free(struct whisper_vad_encdec_context* ctx) 
         ggml_free(ctx->model.ctx_w);
     if (ctx->backend)
         ggml_backend_free(ctx->backend);
+    if (ctx->backend_cpu)
+        ggml_backend_free(ctx->backend_cpu);
     delete ctx;
 }
