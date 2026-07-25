@@ -192,7 +192,8 @@ jobs:
   # ── Linux x86_64 CLI — CUDA 12 variant ──────────────────────────────────────
   # Static CLI binary linked with CUDA 12.8. Useful for Kaggle / Colab /
   # any Linux box with an NVIDIA GPU: download, chmod +x, run — no build step.
-  # Targets sm_75 (T4), sm_86 (A100/3090), sm_89 (L4/4090), sm_120 (Blackwell)
+  # Targets sm_61 (Pascal: P5000/P4000/GTX 10xx), sm_70 (Volta: V100/Titan V),
+  # sm_75 (T4), sm_86 (A100/3090), sm_89 (L4/4090), sm_120 (Blackwell)
   # plus sm_120 virtual for future compat. Ships as a self-contained tarball
   # alongside crispasr-quantize so users can convert + run in one download.
   build-linux-x86_64-cuda:
@@ -224,7 +225,7 @@ jobs:
             -DGGML_CUDA=ON \
             -DGGML_OPENBLAS=ON \
             -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON \
-            -DCMAKE_CUDA_ARCHITECTURES="75-real;86-real;89-real;120-real;120-virtual" \
+            -DCMAKE_CUDA_ARCHITECTURES="61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" \
             -DCRISPASR_BUILD_TESTS=OFF \
             -DCRISPASR_BUILD_EXAMPLES=ON \
             -DCRISPASR_BUILD_SERVER=OFF \
@@ -256,7 +257,8 @@ jobs:
   # Same as build-linux-x86_64-cuda but compiled against CUDA 13.0.
   # CUDA 13 ships a new libcudart.so.13 (not ABI-compatible with .so.12),
   # so users with CUDA 13 drivers/toolkit need a separate binary.
-  # Targets sm_75 (T4), sm_86 (A100/3090), sm_89 (L4/4090), sm_120 (Blackwell)
+  # Targets sm_61 (Pascal: P5000/P4000/GTX 10xx), sm_70 (Volta: V100/Titan V),
+  # sm_75 (T4), sm_86 (A100/3090), sm_89 (L4/4090), sm_120 (Blackwell)
   # plus sm_120 virtual for future compat.
   build-linux-x86_64-cuda13:
     runs-on: ubuntu-22.04
@@ -287,7 +289,7 @@ jobs:
             -DGGML_CUDA=ON \
             -DGGML_OPENBLAS=ON \
             -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON \
-            -DCMAKE_CUDA_ARCHITECTURES="75-real;86-real;89-real;120a-real;120-virtual" \
+            -DCMAKE_CUDA_ARCHITECTURES="61-real;70-real;75-real;86-real;89-real;120a-real;120-virtual" \
             -DCRISPASR_BUILD_TESTS=OFF \
             -DCRISPASR_BUILD_EXAMPLES=ON \
             -DCRISPASR_BUILD_SERVER=OFF \
@@ -1278,7 +1280,7 @@ jobs:
           fail_on_unmatched_files: false
 
   # ── Linux x86_64 shared libs + headers (CUDA) ────────────────────────────────
-  # CUDA 12.8 toolkit (sm_75…sm_120 incl. RTX 50xx Blackwell). Bundles
+  # CUDA 12.8 toolkit (sm_61 Pascal … sm_120 incl. RTX 50xx Blackwell). Bundles
   # libggml-cuda.so alongside the standard libs/headers. Consumers must
   # have a matching CUDA driver + runtime installed on the host
   # (cudart / cublas) — we don't bundle those, since dev hosts that
@@ -1319,7 +1321,7 @@ jobs:
             -DBUILD_SHARED_LIBS=ON \
             -DGGML_CUDA=ON \
             -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON \
-            -DCMAKE_CUDA_ARCHITECTURES="75-real;86-real;89-real;120-real;120-virtual" \
+            -DCMAKE_CUDA_ARCHITECTURES="61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" \
             -DCRISPASR_BUILD_TESTS=OFF \
             -DCRISPASR_BUILD_EXAMPLES=OFF \
             -DCRISPASR_BUILD_SERVER=OFF \
@@ -1401,7 +1403,7 @@ jobs:
             -DCRISPASR_BUILD_EXAMPLES=OFF ^
             -DCRISPASR_BUILD_SERVER=OFF ^
             -DGGML_CUDA=ON ^
-            -DCMAKE_CUDA_ARCHITECTURES="75-real;86-real;89-real;120-real;120-virtual" ^
+            -DCMAKE_CUDA_ARCHITECTURES="61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" ^
             -DGGML_NATIVE=OFF ^
             -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
             -DCRISPASR_OPUS_FETCH=ON
@@ -1636,6 +1638,9 @@ jobs:
       # consumer GPUs (RTX 50xx). Earlier toolkits (12.4 etc.) only know
       # up to sm_90, so RTX 5060/5070/5080/5090 fail at runtime with
       # 'no kernel image is available'.
+      # At the low end the arch list floors at sm_61 (Pascal) + sm_70 (Volta)
+      # so older NVIDIA workstation/datacenter cards (Quadro P5000, GTX 10xx,
+      # V100) get native SASS instead of the same 'no kernel image' abort (#302).
       - name: Install CUDA Toolkit 12.8.0
         # v0.2.19 only knows up to CUDA 12.4; v0.2.35 added 12.8 + 12.9
         # support. Required for sm_120 (RTX 50xx, Blackwell consumer) builds.
@@ -1653,7 +1658,7 @@ jobs:
           cmake -S . -B build -G Ninja ^
             -DCMAKE_BUILD_TYPE=Release ^
             -DGGML_CUDA=ON ^
-            -DCMAKE_CUDA_ARCHITECTURES="75-real;86-real;89-real;120-real;120-virtual" ^
+            -DCMAKE_CUDA_ARCHITECTURES="61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" ^
             -DGGML_NATIVE=OFF ^
             -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
             -DCRISPASR_OPUS_FETCH=ON
