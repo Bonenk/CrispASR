@@ -322,7 +322,7 @@ constexpr Entry k_registry[] = {
     {"vibevoice", "vibevoice-asr-q4_k.gguf",
      "https://huggingface.co/cstr/vibevoice-asr-GGUF/resolve/main/vibevoice-asr-q4_k.gguf", "~4.5 GB", nullptr, nullptr},
     {"vibevoice-bitnet", "vibevoice-asr-bitnet-tq2.gguf",
-     "https://huggingface.co/cstr/vibevoice-asr-bitnet-GGUF/resolve/main/vibevoice-asr-bitnet-tq2.gguf", "~700 MB",
+     "https://huggingface.co/cstr/vibevoice-asr-bitnet-GGUF/resolve/main/vibevoice-asr-bitnet-tq2.gguf", "~1.6 GB",
      nullptr, nullptr},
     {"vibevoice-1.5b", "vibevoice-1.5b-tts-q4_k.gguf",
      "https://huggingface.co/cstr/vibevoice-1.5b-GGUF/resolve/main/vibevoice-1.5b-tts-q4_k.gguf", "~1.6 GB", nullptr,
