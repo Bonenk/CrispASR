@@ -82,7 +82,7 @@ sys.excepthook = _crash_handler
 
 # ── Build ────────────────────────────────────────────────────────────────
 
-kh.log("Installing build toolchain")
+print("Installing build toolchain")
 kh.install_build_toolchain()
 
 # Install converter dependencies
@@ -93,9 +93,9 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q",
 hf_token = kh.resolve_hf_token()
 if hf_token:
     os.environ["HF_TOKEN"] = hf_token
-    kh.log("HF token resolved")
+    print("HF token resolved")
 else:
-    kh.log("WARNING: no HF token — downloads may be rate-limited")
+    print("WARNING: no HF token — downloads may be rate-limited")
 
 # Stay in WORK so /kaggle/working output is clean (don't chdir into repo)
 # CPU build — GPU enabled only for internet access
@@ -110,11 +110,11 @@ cmake_cmd = (
     f"-DCRISPASR_BUILD_EXAMPLES=ON "
     f"-DCRISPASR_BUILD_SERVER=OFF"
 )
-kh.log(f"cmake configure: {cmake_cmd}")
+print(f"cmake configure: {cmake_cmd}")
 subprocess.check_call(cmake_cmd, shell=True)
 
 jobs = kh.safe_build_jobs(gpu=True)
-kh.log(f"Building with {jobs} jobs")
+print(f"Building with {jobs} jobs")
 with kh.build_heartbeat("cmake.build"):
     kh.sh_with_progress(
         f"stdbuf -oL -eL cmake --build {BUILD} "
@@ -122,7 +122,7 @@ with kh.build_heartbeat("cmake.build"):
 
 CRISPASR_BIN = BUILD / "bin" / "crispasr"
 assert CRISPASR_BIN.exists(), f"Build failed: {CRISPASR_BIN} not found"
-kh.log(f"Build OK: {CRISPASR_BIN}")
+print(f"Build OK: {CRISPASR_BIN}")
 
 # ── Generate variants ────────────────────────────────────────────────────
 
@@ -132,7 +132,7 @@ CONVERTER = REPO / "models" / "convert-vibevoice-bitnet-to-gguf.py"
 results = []
 
 for label, vae_q, embed_q in VARIANTS:
-    kh.log(f"=== Variant: {label} (VAE={vae_q}, embed={embed_q}) ===")
+    print(f"=== Variant: {label} (VAE={vae_q}, embed={embed_q}) ===")
 
     out_gguf = MODELS / f"vibeasr-bitnet-{label}.gguf"
 
@@ -149,32 +149,32 @@ for label, vae_q, embed_q in VARIANTS:
             "--vae-quant", vae_q,
             "--embed-quant", embed_q,
         ]
-        kh.log(f"  Converting: {' '.join(cmd)}")
+        print(f"  Converting: {' '.join(cmd)}")
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800,
                                env=conv_env)
             if r.returncode != 0:
-                kh.log(f"  CONVERT FAILED (rc={r.returncode})")
-                kh.log(f"  stderr: {r.stderr[-500:]}")
+                print(f"  CONVERT FAILED (rc={r.returncode})")
+                print(f"  stderr: {r.stderr[-500:]}")
                 results.append({
                     "label": label, "vae_quant": vae_q, "embed_quant": embed_q,
                     "error": f"convert failed: {r.stderr[-200:]}",
                 })
                 continue
             convert_s = time.time() - t0
-            kh.log(f"  Converted in {convert_s:.1f}s")
+            print(f"  Converted in {convert_s:.1f}s")
         except subprocess.TimeoutExpired:
-            kh.log(f"  CONVERT TIMEOUT")
+            print(f"  CONVERT TIMEOUT")
             results.append({
                 "label": label, "vae_quant": vae_q, "embed_quant": embed_q,
                 "error": "convert timeout",
             })
             continue
     else:
-        kh.log(f"  Using cached {out_gguf}")
+        print(f"  Using cached {out_gguf}")
 
     file_size_mb = out_gguf.stat().st_size / (1024 * 1024)
-    kh.log(f"  File size: {file_size_mb:.1f} MB")
+    print(f"  File size: {file_size_mb:.1f} MB")
 
     # ── Transcribe ──
     t0 = time.time()
@@ -188,7 +188,7 @@ for label, vae_q, embed_q in VARIANTS:
         "--language", "en",
         "--no-prints",
     ]
-    kh.log(f"  Transcribing...")
+    print(f"  Transcribing...")
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         wall_s = time.time() - t0
@@ -211,8 +211,8 @@ for label, vae_q, embed_q in VARIANTS:
                     pass
 
         rss_mb = rss_kb / 1024
-        kh.log(f"  Text: {text[:120]}...")
-        kh.log(f"  RSS: {rss_mb:.0f} MB, wall: {wall_s:.1f}s")
+        print(f"  Text: {text[:120]}...")
+        print(f"  RSS: {rss_mb:.0f} MB, wall: {wall_s:.1f}s")
 
         # Compute simple word overlap metric vs reference
         ref_words = set(REFERENCE_TEXT.lower().split())
@@ -235,7 +235,7 @@ for label, vae_q, embed_q in VARIANTS:
         })
 
     except subprocess.TimeoutExpired:
-        kh.log(f"  TRANSCRIBE TIMEOUT")
+        print(f"  TRANSCRIBE TIMEOUT")
         results.append({
             "label": label, "vae_quant": vae_q, "embed_quant": embed_q,
             "error": "transcribe timeout",
@@ -244,25 +244,25 @@ for label, vae_q, embed_q in VARIANTS:
     # Save incremental results
     with open(RESULTS, "w") as f:
         json.dump(results, f, indent=2)
-    kh.checkpoint(f"variant-{label}")
+    kh.step(f"variant-{label}")
 
 # ── Summary ──────────────────────────────────────────────────────────────
 
-kh.log("\n" + "=" * 80)
-kh.log("QUANTIZATION SWEEP RESULTS")
-kh.log("=" * 80)
-kh.log(f"{'Label':<12} {'VAE':<6} {'Embed':<6} {'Size MB':>8} {'RSS MB':>8} {'Overlap':>8} {'Text preview'}")
-kh.log("-" * 80)
+print("\n" + "=" * 80)
+print("QUANTIZATION SWEEP RESULTS")
+print("=" * 80)
+print(f"{'Label':<12} {'VAE':<6} {'Embed':<6} {'Size MB':>8} {'RSS MB':>8} {'Overlap':>8} {'Text preview'}")
+print("-" * 80)
 
 for r in results:
     if "error" in r:
-        kh.log(f"{r['label']:<12} {r['vae_quant']:<6} {r['embed_quant']:<6} {'ERROR':>8} {'':<8} {'':<8} {r['error']}")
+        print(f"{r['label']:<12} {r['vae_quant']:<6} {r['embed_quant']:<6} {'ERROR':>8} {'':<8} {'':<8} {r['error']}")
     else:
         preview = r.get("text", "")[:40]
-        kh.log(f"{r['label']:<12} {r['vae_quant']:<6} {r['embed_quant']:<6} "
+        print(f"{r['label']:<12} {r['vae_quant']:<6} {r['embed_quant']:<6} "
                f"{r['file_size_mb']:>8.1f} {r['rss_mb']:>8.0f} {r['word_overlap']:>8.3f} {preview}")
 
-kh.log("\nReference: " + REFERENCE_TEXT)
+print("\nReference: " + REFERENCE_TEXT)
 
 # Save final
 with open(RESULTS, "w") as f:
@@ -271,4 +271,4 @@ with open(RESULTS, "w") as f:
 # Copy results to a prominent location
 shutil.copy2(str(RESULTS), str(WORK / "vibeasr-bitnet-quant-results.json"))
 
-kh.log("\nDone.")
+print("\nDone.")
