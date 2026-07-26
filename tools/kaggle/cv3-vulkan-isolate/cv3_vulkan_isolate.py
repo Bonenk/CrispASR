@@ -274,7 +274,7 @@ def norm_wav(src, dst, target_peak=0.85):
         return src
 
 
-def run_synth(binp, llm, tag, env_extra, cli_extra=None):
+def run_synth(binp, llm, tag, env_extra, cli_extra=None, timeout=1800):
     out = TMP / f"cv3_{tag}.wav"
     mel = TMP / f"mel_{tag}.bin"
     tok = TMP / f"tok_{tag}.txt"
@@ -286,15 +286,21 @@ def run_synth(binp, llm, tag, env_extra, cli_extra=None):
            "--voice", VOICE, "--seed", str(SEED), "--tts-output", str(out)]
     if cli_extra:
         cmd += cli_extra
+    stderr, rc, timed_out = "", -1, False
     with kh.build_heartbeat(f"synth.{tag}", interval_s=30):
-        r = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=1200)
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=timeout)
+            stderr, rc = r.stderr, r.returncode
+        except subprocess.TimeoutExpired as e:
+            timed_out = True
+            stderr = (e.stderr or b"").decode("utf-8", "replace") if isinstance(e.stderr, bytes) else (e.stderr or "")
     return dict(
-        tag=tag, rc=r.returncode,
-        mel=parse_mel_stats(r.stderr),
+        tag=tag, rc=rc, timed_out=timed_out,
+        mel=parse_mel_stats(stderr),
         n_tokens=len(parse_tokens(tok)),
         tokens=parse_tokens(tok)[:16],
         audio=wav_stats(str(out)),
-        stderr_tail=r.stderr[-600:] if r.returncode != 0 else "",
+        stderr_tail=stderr[-800:] if rc != 0 else "",
         wav=str(out),
     )
 
@@ -306,15 +312,19 @@ def main():
 
     results = {"env": {"vulkan_devices": devs, "real_nvidia": nvidia}, "runs": {}}
 
-    # A) CPU reference (known-good) — explicit --no-gpu, no Vulkan involvement
-    cpu = run_synth(binp, llm, "cpu", {}, cli_extra=["--no-gpu"])
-    step("run.cpu", **{k: cpu[k] for k in ("rc", "mel", "n_tokens", "audio")})
-    results["runs"]["cpu"] = cpu
-
-    # B) native Vulkan (gallocr LM path)
-    vk = run_synth(binp, llm, "vk", {"CRISPASR_COSYVOICE3_VULKAN_NATIVE": "1"})
-    step("run.vk", **{k: vk[k] for k in ("rc", "mel", "n_tokens", "audio")})
+    # B) native Vulkan (gallocr LM path) — the ESSENTIAL run, GPU-fast. Runs
+    # FIRST so a slow CPU reference can't starve it of session time.
+    vk = run_synth(binp, llm, "vk", {"CRISPASR_COSYVOICE3_VULKAN_NATIVE": "1"}, timeout=1200)
+    step("run.vk", **{k: vk[k] for k in ("rc", "timed_out", "mel", "n_tokens", "audio")})
     results["runs"]["vk"] = vk
+    RESULTS.write_text(json.dumps(results, indent=2))  # persist before the slow CPU ref
+
+    # A) CPU reference (known-good) — explicit --no-gpu. Confirmatory only (I
+    # already have a Metal reference locally); the full CV3 pipeline on Kaggle's
+    # CPU is very slow, so it's best-effort with a generous, non-fatal timeout.
+    cpu = run_synth(binp, llm, "cpu", {}, cli_extra=["--no-gpu"], timeout=3000)
+    step("run.cpu", **{k: cpu[k] for k in ("rc", "timed_out", "mel", "n_tokens", "audio")})
+    results["runs"]["cpu"] = cpu
 
     # ASR both (+ normalized for quiet clips)
     for tag in ("cpu", "vk"):
@@ -334,12 +344,19 @@ def main():
     k = 0
     while k < min(len(ct), len(vt)) and ct[k] == vt[k]:
         k += 1
+    vk_peak = vk["audio"].get("peak", 0) or 0
+    cpu_peak = cpu["audio"].get("peak", 0) or 0
+    # HiFT is the breaker iff the Vulkan flow mel is HEALTHY yet the Vulkan audio
+    # is garbage (near-silent) — a healthy mel through a correct vocoder yields
+    # ~0.8-peak speech, so noise can only be the vocoder. The CPU reference is a
+    # bonus confirmation (it may time out on Kaggle's slow CPU).
     verdict = dict(
         lm_first_divergence=k, lm_cpu_tokens=len(ct), lm_vk_tokens=len(vt),
         flow_mel_cpu_healthy=healthy_mel(cm), flow_mel_vk_healthy=healthy_mel(vm),
-        vk_audio_peak=vk["audio"].get("peak"), cpu_audio_peak=cpu["audio"].get("peak"),
-        hift_is_breaker=bool(healthy_mel(vm) and (vk["audio"].get("peak", 0) or 0) < 0.2
-                             and (cpu["audio"].get("peak", 0) or 0) > 0.3),
+        vk_audio_peak=round(vk_peak, 4), cpu_audio_peak=round(cpu_peak, 4),
+        cpu_timed_out=cpu.get("timed_out", False),
+        hift_is_breaker=bool(healthy_mel(vm) and vk_peak < 0.2),
+        cpu_confirms=bool(cpu_peak > 0.3),
     )
     results["verdict"] = verdict
     step("verdict", **verdict)
