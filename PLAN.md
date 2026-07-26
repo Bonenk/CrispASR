@@ -19,6 +19,21 @@ scratch, reductions keep order) is **bit-identical** and a large win.
 - Audited silero (whisper.cpp native ggml, already threaded) + webrtc (subband
   GMM, no FFT) — no change needed.
 
+**STATUS: the CPU front-end parallelization vein is MINED (2026-07-26).** Full sweep
+done. Nothing clean+validatable-locally remains — do NOT keep sprinkling std::thread:
+- `core/istft.h` (shared by outetts_wavtok/kokoro/cosyvoice3 +8 vocoders) is
+  single-threaded BUT it is **overlap-add** — adjacent output frames write
+  overlapping samples (data race, unlike the mel's disjoint writes), and n_fft is
+  tiny for most consumers (kokoro=20, cosyvoice3=16) so the per-frame IRFFT is
+  already cheap. Poor risk/reward — SKIP (would need per-thread out buffers + merge
+  or a stride-coloring scheme for a marginal win).
+- Own-mel backends NOT on core_mel (f5_tts, gemma4_e2b, titanet, chatterbox_s3gen,
+  outetts_wavtok, ecapa_lid): their FFT runs ONCE on the reference clip or on TTS
+  output where the DiT/decoder dominates — marginal fractions, not the
+  per-long-audio bottleneck the ASR/VAD mel was. Not worth the churn.
+- moonshine uses a shared mel helper (no local scalar loop of its own).
+The remaining lever is TIER 2 (GPU ports) only — see below + the handover prompt.
+
 **KEY FINDING that reframes the fleet rollout:** `core/mel.h::compute` (used by
 ~28 ASR/TTS backends: parakeet, canary, canary_ctc, nemotron, qwen3_asr, cohere,
 glm_asr, granite_*, higgs_stt, ark_asr, voxtral/4b, moss_*, mini_omni2,
