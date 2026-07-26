@@ -1162,6 +1162,16 @@ extern "C" struct cosyvoice3_tts_context* cosyvoice3_tts_init_from_file(const ch
                     ctx->hift_on_cpu ? ", HiFT on CPU (hybrid)" : "");
         }
     }
+    // §304 DIAGNOSTIC: force the single-backend gallocr dispatch on ANY backend
+    // (incl. CPU/Metal) so gallocr-vs-scheduler can be A/B'd on a known-good
+    // backend — isolates a gallocr-dispatch bug from a Vulkan op miscompute.
+    if (!ctx->use_gpu_gallocr && cv3_env_true("CRISPASR_COSYVOICE3_FORCE_GALLOCR")) {
+        ctx->gpu_gallocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+        ctx->use_gpu_gallocr = ctx->gpu_gallocr != nullptr;
+        if (params.verbosity >= 1)
+            fprintf(stderr, "cosyvoice3_tts: FORCE_GALLOCR — dispatching all graphs via gallocr on %s\n",
+                    ggml_backend_name(ctx->backend));
+    }
     ctx->compute_meta.resize(ggml_tensor_overhead() * 16384 + ggml_graph_overhead_custom(16384, false));
 
     if (params.verbosity >= 1) {
