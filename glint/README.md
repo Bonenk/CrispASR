@@ -69,4 +69,4 @@ and rewrites *only* the marker line below — the prose above is
 maintained here by hand and does not auto-update, so a codec added
 upstream will not be described until this file is edited.
 
-Synced at upstream commit: `39f1feb959806b04740ebfc43131e3e5d889fa32` (feat: add clean-room FLAC decoder).
+Synced at upstream commit: `424d52980c79135e3b5613cd0a08cfa5bdbf5f73` (docs: scope a clean-room Vorbis ENCODER track (unclaimed)).
