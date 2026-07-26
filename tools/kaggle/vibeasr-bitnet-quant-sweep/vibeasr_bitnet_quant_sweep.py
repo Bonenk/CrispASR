@@ -65,12 +65,25 @@ if str(REPO / "tools" / "kaggle") not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import kaggle_harness as kh  # noqa: E402
+import traceback
 kh.init_progress()
+
+# Global crash handler: write traceback to /kaggle/working/error.txt
+_orig_excepthook = sys.excepthook
+def _crash_handler(exc_type, exc_val, exc_tb):
+    msg = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
+    try:
+        with open(WORK / "error.txt", "w") as f:
+            f.write(msg)
+    except Exception:
+        pass
+    _orig_excepthook(exc_type, exc_val, exc_tb)
+sys.excepthook = _crash_handler
 
 # ── Build ────────────────────────────────────────────────────────────────
 
-kh.log("Installing build toolchain")
-kh.install_build_toolchain()
+    kh.log("Installing build toolchain")
+    kh.install_build_toolchain()
 
 # Install converter dependencies
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
@@ -86,7 +99,7 @@ else:
 
 # Stay in WORK so /kaggle/working output is clean (don't chdir into repo)
 # CPU build — GPU enabled only for internet access
-cmake_flags = kh.cache_and_link_flags()
+cmake_flags = " ".join(kh.cache_and_link_flags())
 crispasr_flags = " ".join(kh.crispasr_cmake_flags())
 cmake_cmd = (
     f"cmake -G Ninja -S {REPO} -B {BUILD} "
