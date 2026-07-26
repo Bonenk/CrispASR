@@ -179,7 +179,6 @@ for label, vae_q, embed_q in VARIANTS:
     # ── Transcribe ──
     t0 = time.time()
     cmd = [
-        "/usr/bin/time", "-v",
         str(CRISPASR_BIN),
         "-m", str(out_gguf),
         "--backend", "vibevoice",
@@ -201,14 +200,16 @@ for label, vae_q, embed_q in VARIANTS:
                 text_lines.append(line.strip())
         text = " ".join(text_lines).strip()
 
-        # Parse RSS from time -v output
+        # Get RSS from /proc (no /usr/bin/time on Kaggle)
         rss_kb = 0
-        for line in r.stderr.split("\n"):
-            if "Maximum resident" in line:
-                try:
-                    rss_kb = int(line.strip().split()[-1])
-                except (ValueError, IndexError):
-                    pass
+        try:
+            with open("/proc/self/status") as pf:
+                for line in pf:
+                    if line.startswith("VmHWM:"):
+                        rss_kb = int(line.split()[1])
+                        break
+        except Exception:
+            pass
 
         rss_mb = rss_kb / 1024
         print(f"  Text: {text[:120]}...")
