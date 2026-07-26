@@ -87,7 +87,7 @@ kh.install_build_toolchain()
 
 # Install converter dependencies
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
-                "safetensors", "transformers"], check=False)
+                "safetensors", "transformers", "gguf"], check=False)
 
 # HF token for model downloads
 hf_token = kh.resolve_hf_token()
