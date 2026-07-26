@@ -402,6 +402,17 @@ struct cosyvoice3_tts_context {
     // scheduler entirely. Opt-in via CRISPASR_COSYVOICE3_VULKAN_NATIVE=1.
     ggml_gallocr_t gpu_gallocr = nullptr;
     bool use_gpu_gallocr = false;
+    // §304 HYBRID native-Vulkan: the LM + flow (DiT-CFM) compute correctly on
+    // Vulkan, but the HiFT vocoder's conv graphs hit the subtle ggml-vulkan
+    // conv miscompute (finite-but-wrong → noise) — verified on Tesla P100. So
+    // in native-Vulkan mode we keep LM+flow on the Vulkan gallocr (the heavy
+    // DiT-CFM is GPU-accelerated) but load the HiFT weights on CPU and dispatch
+    // its F0 + decode graphs on CPU. `hift_on_cpu` is latched at init;
+    // `dispatch_cpu` is toggled on around the HiFT compute so the cv3_sched_*
+    // shims route those graphs to cpu_gallocr + the CPU backend.
+    ggml_gallocr_t cpu_gallocr = nullptr;
+    bool hift_on_cpu = false;
+    bool dispatch_cpu = false;
     ggml_context* ctx_w = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
     ggml_backend_buffer_t buf_w_cpu = nullptr;
@@ -464,15 +475,36 @@ namespace {
 // compute at every call site (unchanged); with gallocr the graph tensors are
 // GPU-resident, so ggml_backend_graph_compute runs the whole graph on Vulkan.
 inline void cv3_sched_reset(cosyvoice3_tts_context* ctx) {
-    if (!ctx->use_gpu_gallocr)
-        cv3_sched_reset(ctx);
+    // gallocr paths (GPU, or the hybrid HiFT-on-CPU path) have no reset.
+    if (!ctx->use_gpu_gallocr && !ctx->dispatch_cpu)
+        ggml_backend_sched_reset(ctx->sched);
 }
 inline bool cv3_sched_alloc(cosyvoice3_tts_context* ctx, ggml_cgraph* gf) {
-    return ctx->use_gpu_gallocr ? ggml_gallocr_alloc_graph(ctx->gpu_gallocr, gf) : cv3_sched_alloc(ctx, gf);
+    if (ctx->dispatch_cpu) // §304 hybrid: HiFT graphs on the CPU gallocr
+        return ggml_gallocr_alloc_graph(ctx->cpu_gallocr, gf);
+    return ctx->use_gpu_gallocr ? ggml_gallocr_alloc_graph(ctx->gpu_gallocr, gf)
+                                : ggml_backend_sched_alloc_graph(ctx->sched, gf);
 }
 inline ggml_status cv3_sched_compute(cosyvoice3_tts_context* ctx, ggml_cgraph* gf) {
-    return ctx->use_gpu_gallocr ? ggml_backend_graph_compute(ctx->backend, gf) : cv3_sched_compute(ctx, gf);
+    if (ctx->dispatch_cpu) // §304 hybrid: compute HiFT on the CPU backend
+        return ggml_backend_graph_compute(ctx->backend_cpu, gf);
+    return ctx->use_gpu_gallocr ? ggml_backend_graph_compute(ctx->backend, gf)
+                                : ggml_backend_sched_graph_compute(ctx->sched, gf);
 }
+
+inline bool cv3_env_true(const char* name) {
+    const char* v = crispasr_env::get(name);
+    return v && v[0] == '1';
+}
+
+// §304 hybrid: RAII toggle of dispatch_cpu (restored on every return path) so
+// the HiFT stage functions route their graphs to the CPU gallocr/backend.
+struct cv3_dispatch_guard {
+    cosyvoice3_tts_context* ctx;
+    bool saved;
+    cv3_dispatch_guard(cosyvoice3_tts_context* c, bool cpu) : ctx(c), saved(c->dispatch_cpu) { c->dispatch_cpu = cpu; }
+    ~cv3_dispatch_guard() { ctx->dispatch_cpu = saved; }
+};
 
 uint32_t cv3_kv_u32(gguf_context* ctx, const char* key, uint32_t def) {
     int64_t id = gguf_find_key(ctx, key);
@@ -1115,8 +1147,19 @@ extern "C" struct cosyvoice3_tts_context* cosyvoice3_tts_init_from_file(const ch
     if (ctx->backend != ctx->backend_cpu && std::strstr(ggml_backend_name(ctx->backend), "Vulkan") != nullptr) {
         ctx->gpu_gallocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
         ctx->use_gpu_gallocr = ctx->gpu_gallocr != nullptr;
+        // §304 HYBRID: LM + flow run correctly on Vulkan, but the HiFT vocoder's
+        // conv graphs miscompute there (P100-verified). Keep the heavy flow on
+        // the GPU and route only HiFT to the CPU: load its weights on the CPU
+        // backend (init_hift) and dispatch its graphs via cpu_gallocr. Disable
+        // by also setting CRISPASR_COSYVOICE3_HIFT_ON_GPU=1 (for op-bisection).
+        const char* hift_gpu = crispasr_env::get("CRISPASR_COSYVOICE3_HIFT_ON_GPU");
+        if (ctx->use_gpu_gallocr && ctx->backend_cpu && !(hift_gpu && hift_gpu[0] == '1')) {
+            ctx->cpu_gallocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend_cpu));
+            ctx->hift_on_cpu = ctx->cpu_gallocr != nullptr;
+        }
         if (params.verbosity >= 1) {
-            fprintf(stderr, "cosyvoice3_tts: native Vulkan — dispatching graphs via single-backend gallocr (#304)\n");
+            fprintf(stderr, "cosyvoice3_tts: native Vulkan — LM+flow via single-backend gallocr%s (#304)\n",
+                    ctx->hift_on_cpu ? ", HiFT on CPU (hybrid)" : "");
         }
     }
     ctx->compute_meta.resize(ggml_tensor_overhead() * 16384 + ggml_graph_overhead_custom(16384, false));
@@ -1161,6 +1204,8 @@ extern "C" void cosyvoice3_tts_free(struct cosyvoice3_tts_context* ctx) {
         ggml_backend_sched_free(ctx->sched);
     if (ctx->gpu_gallocr)
         ggml_gallocr_free(ctx->gpu_gallocr);
+    if (ctx->cpu_gallocr)
+        ggml_gallocr_free(ctx->cpu_gallocr);
     if (ctx->buf_w)
         ggml_backend_buffer_free(ctx->buf_w);
     if (ctx->buf_w_cpu)
@@ -1592,7 +1637,7 @@ extern "C" int32_t* cosyvoice3_tts_generate_tokens_from_embeds(struct cosyvoice3
 
     std::vector<int32_t> out;
     out.reserve((size_t)max_steps);
-    const bool greedy = !(ctx->params.temperature > 0.0f);
+    const bool greedy = !(ctx->params.temperature > 0.0f) || cv3_env_true("CRISPASR_COSYVOICE3_GREEDY");
 
     int n_past = n_tokens;
     for (int step = 0; step < max_steps; step++) {
@@ -3753,6 +3798,7 @@ ggml_cgraph* cv3_build_hift_f0_graph(cosyvoice3_tts_context* ctx, int T_mel) {
 float* cv3_extract_hift_f0_stage(cosyvoice3_tts_context* ctx, const float* mel, int T_mel) {
     if (!ctx || !ctx->hift.loaded || !mel || T_mel <= 0)
         return nullptr;
+    cv3_dispatch_guard _dg(ctx, ctx->hift_on_cpu); // §304 hybrid: HiFT on CPU
     const int mel_dim = (int)ctx->hift.hp.mel_dim;
 
     ctx->step_t1_gf = nullptr;
@@ -4359,6 +4405,7 @@ float* cv3_extract_hift_decode_stage(cosyvoice3_tts_context* ctx, const float* m
                                      const char* stage_name, int* out_n) {
     if (!ctx || !ctx->hift.loaded || !mel || T_mel <= 0 || !s_stft_in || !stage_name || !out_n)
         return nullptr;
+    cv3_dispatch_guard _dg(ctx, ctx->hift_on_cpu); // §304 hybrid: HiFT on CPU
     *out_n = 0;
     const auto& h = ctx->hift;
     const int mel_dim = (int)h.hp.mel_dim;
@@ -4627,8 +4674,11 @@ extern "C" int cosyvoice3_tts_init_hift_from_file(struct cosyvoice3_tts_context*
     gguf_free(gctx);
 
     // ---- Weight pass ----
+    // §304 hybrid: on native Vulkan the HiFT vocoder is CPU-routed (its conv
+    // graphs miscompute on Vulkan), so load its weights on the CPU backend.
+    ggml_backend_t hift_backend = ctx->hift_on_cpu ? ctx->backend_cpu : ctx->backend;
     core_gguf::WeightLoad wl;
-    if (!core_gguf::load_weights(path, ctx->backend, "cosyvoice3_tts:hift", wl)) {
+    if (!core_gguf::load_weights(path, hift_backend, "cosyvoice3_tts:hift", wl)) {
         fprintf(stderr, "cosyvoice3_tts: init_hift: load_weights failed for '%s'\n", path);
         return -1;
     }
@@ -4755,7 +4805,9 @@ extern "C" int cosyvoice3_tts_init_hift_from_file(struct cosyvoice3_tts_context*
         kernels.reserve(fields.size());
         for (ggml_tensor** f : fields)
             kernels.push_back(*f);
-        hf.hift_fc.bake(ctx->backend, kernels, fc_on);
+        // §304 hybrid: bake onto the same backend the HiFT weights live on
+        // (CPU when hift_on_cpu) so the baked F32 kernels stay co-resident.
+        hf.hift_fc.bake(hift_backend, kernels, fc_on);
         int swapped = 0;
         for (ggml_tensor** f : fields) {
             ggml_tensor* baked = hf.hift_fc.get(*f);
@@ -5484,7 +5536,7 @@ std::vector<int32_t> cv3_generate_tokens_with_stop_floor(cosyvoice3_tts_context*
     if (!logits)
         return out;
 
-    const bool greedy = !(ctx->params.temperature > 0.0f);
+    const bool greedy = !(ctx->params.temperature > 0.0f) || cv3_env_true("CRISPASR_COSYVOICE3_GREEDY");
     int n_past = n_tokens;
     for (int step = 0; step < max_steps; step++) {
         int32_t pick = -1;
