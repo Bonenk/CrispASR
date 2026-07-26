@@ -4519,6 +4519,44 @@ float* cv3_extract_hift_inference(cosyvoice3_tts_context* ctx, const float* mel,
         fprintf(stderr, "cosyvoice3_tts: hift_inference: decode forward failed (n=%d)\n", dec_n);
         return nullptr;
     }
+
+    // #304 debug: dump per-stage stats to localize the HiFT Vulkan miscompute.
+    // s_stft carries the F0-graph (GPU) + source-path (CPU) result; the decode
+    // stages are the GPU conv stack. A garbage s_stft => F0 graph is the
+    // breaker; a healthy s_stft with garbage decode stages => decode graph.
+    if (crispasr_env::get("CRISPASR_COSYVOICE3_DUMP_HIFT")) {
+        auto stat = [](const char* nm, const float* p, int n) {
+            if (!p || n <= 0) {
+                fprintf(stderr, "  HIFT %-26s <null>\n", nm);
+                return;
+            }
+            double mn = 1e30, mx = -1e30, s = 0, sq = 0;
+            size_t nan = 0;
+            for (int i = 0; i < n; i++) {
+                float v = p[i];
+                if (std::isnan(v) || std::isinf(v)) {
+                    nan++;
+                    continue;
+                }
+                mn = std::min(mn, (double)v);
+                mx = std::max(mx, (double)v);
+                s += v;
+                sq += (double)v * v;
+            }
+            fprintf(stderr, "  HIFT %-26s n=%d min=%.4f max=%.4f mean=%.4f rms=%.4f nan=%zu\n", nm, n, mn, mx, s / n,
+                    std::sqrt(sq / n), nan);
+        };
+        stat("s_stft(F0gpu+src_cpu)", s_stft.data(), (int)s_stft.size());
+        for (const char* sn : {"hift_decode_post_stage_0_x", "hift_decode_post_stage_1_x", "hift_decode_post_stage_2_x",
+                               "hift_decode_conv_post_out", "hift_decode_mag", "hift_decode_phase"}) {
+            int sn_n = 0;
+            float* sp = cv3_extract_hift_decode_stage(ctx, mel, T_mel, s_stft.data(), sn, &sn_n);
+            stat(sn, sp, sn_n);
+            free(sp);
+        }
+        stat("audio_final", audio, T_audio);
+    }
+
     *out_n = T_audio;
     return audio;
 }
