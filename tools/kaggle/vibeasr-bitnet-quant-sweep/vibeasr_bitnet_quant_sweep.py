@@ -36,7 +36,7 @@ MODELS = WORK / "models"
 RESULTS = WORK / "results.json"
 
 REFERENCE_TEXT = "And so, my fellow Americans, ask not what your country can do for you — ask what you can do for your country."
-JFK_AUDIO = "samples/jfk.wav"
+JFK_AUDIO = "samples/jfk.wav"  # relative to REPO
 
 VARIANTS = [
     ("baseline", "q8_0", "f16"),
@@ -84,13 +84,12 @@ if hf_token:
 else:
     kh.log("WARNING: no HF token — downloads may be rate-limited")
 
-os.chdir(str(REPO))
-
-# CPU-only build (no CUDA needed for this model)
+# Stay in WORK so /kaggle/working output is clean (don't chdir into repo)
+# CPU build — GPU enabled only for internet access
 cmake_flags = kh.cache_and_link_flags()
 crispasr_flags = " ".join(kh.crispasr_cmake_flags())
 cmake_cmd = (
-    f"cmake -G Ninja -B {BUILD} "
+    f"cmake -G Ninja -S {REPO} -B {BUILD} "
     f"-DCMAKE_BUILD_TYPE=Release "
     f"{cmake_flags} "
     f"{crispasr_flags} "
@@ -101,7 +100,7 @@ cmake_cmd = (
 kh.log(f"cmake configure: {cmake_cmd}")
 subprocess.check_call(cmake_cmd, shell=True)
 
-jobs = kh.safe_build_jobs(gpu=False)
+jobs = kh.safe_build_jobs(gpu=True)
 kh.log(f"Building with {jobs} jobs")
 with kh.build_heartbeat("cmake.build"):
     kh.sh_with_progress(
