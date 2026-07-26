@@ -32,7 +32,7 @@ os.environ["PYTHONUNBUFFERED"] = "1"
 WORK = Path("/kaggle/working")
 REPO = Path("/kaggle/temp/CrispASR")  # outside /kaggle/working to keep output clean
 BUILD = REPO / "build"
-MODELS = WORK / "models"
+MODELS = Path("/kaggle/temp/models")  # outside /kaggle/working (GGUFs block API download)
 RESULTS = WORK / "results.json"
 
 REFERENCE_TEXT = "And so, my fellow Americans, ask not what your country can do for you — ask what you can do for your country."
