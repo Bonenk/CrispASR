@@ -94,12 +94,43 @@ WHISPER_REPO = "ggerganov/whisper.cpp"
 WHISPER_FILE = "ggml-tiny.en.bin"
 
 
+def install_vulkan_sdk():
+    """Install the Vulkan runtime + DEV toolchain needed to BUILD ggml-vulkan.
+    ggml/src/ggml-vulkan requires find_package(Vulkan COMPONENTS glslc) — glslc
+    is NOT a standalone Ubuntu package; it ships only in the LunarG Vulkan SDK.
+    Install each apt package individually (one bad name must not abort the rest),
+    then add the LunarG repo for glslc if it's still missing."""
+    for pkg in ("libvulkan1", "vulkan-tools", "libvulkan-dev", "glslang-tools", "spirv-tools"):
+        sh(f"DEBIAN_FRONTEND=noninteractive apt-get install -y -qq {pkg}")
+    glslc = sh("which glslc").stdout.strip()
+    if not glslc:
+        codename = sh("bash -lc '. /etc/os-release; echo $VERSION_CODENAME'").stdout.strip() or "jammy"
+        step("vulkan.lunarg_repo", codename=codename)
+        sh("wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc "
+           "| tee /etc/apt/trusted.gpg.d/lunarg.asc >/dev/null")
+        sh(f"wget -qO /etc/apt/sources.list.d/lunarg-vulkan-{codename}.list "
+           f"https://packages.lunarg.com/vulkan/lunarg-vulkan-{codename}.list")
+        sh("apt-get update -qq")
+        # vulkan-sdk pulls glslc + headers + loader dev; fall back to the
+        # narrower shaderc pkg name if the meta-package is unavailable.
+        sh("DEBIAN_FRONTEND=noninteractive apt-get install -y -qq vulkan-sdk")
+        glslc = sh("which glslc").stdout.strip()
+        if not glslc:
+            sh("DEBIAN_FRONTEND=noninteractive apt-get install -y -qq shaderc glslc")
+            glslc = sh("which glslc").stdout.strip()
+    step("vulkan.glslc", path=glslc,
+         header=bool(sh("ls /usr/include/vulkan/vulkan.h 2>/dev/null").stdout.strip()
+                     or sh("find /usr -name vulkan.h 2>/dev/null | head -1").stdout.strip()))
+    if glslc:
+        os.environ["GLSLC_PATH"] = glslc
+    return glslc
+
+
 # ── 1. Vulkan enablement: prefer real NVIDIA, fall back to llvmpipe ──────────
 def enable_vulkan():
     step("vulkan.install")
     sh("apt-get update -qq")
-    sh("DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "
-       "libvulkan1 vulkan-tools libvulkan-dev glslc spirv-tools glslang-tools")
+    install_vulkan_sdk()
     smi = sh("nvidia-smi --query-gpu=driver_version --format=csv,noheader")
     drv = (smi.stdout.strip().splitlines() or [""])[0]
     major = drv.split(".")[0] if drv else ""
@@ -135,6 +166,11 @@ def build_crispasr():
     flags = ["-DCMAKE_BUILD_TYPE=Release", "-DGGML_VULKAN=ON", "-DGGML_CUDA=OFF",
              "-DGGML_NATIVE=OFF", "-DGGML_AVX2=ON", "-DGGML_FMA=ON", "-DGGML_F16C=ON",
              "-DCRISPASR_OPUS_FETCH=ON"] + kh.cache_and_link_flags()
+    glslc = os.environ.get("GLSLC_PATH")
+    if glslc:
+        flags.append(f"-DVulkan_GLSLC_EXECUTABLE={glslc}")
+    else:
+        step("build.WARN_no_glslc")  # cmake FindVulkan will very likely fail
     cfg = f"cd {src} && cmake -G Ninja -B build-vk " + " ".join(flags)
     step("build.configure", flags=flags)
     with kh.build_heartbeat("build.cmake", interval_s=30):
