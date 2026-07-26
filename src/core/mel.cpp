@@ -153,7 +153,12 @@ std::vector<float> compute(const float* samples, int n_samples, const float* win
         if (mel_parallel && T >= 256) {
             ran_parallel = true;
 #ifdef _OPENMP
-#pragma omp parallel
+            // Scope the thread count to this region via num_threads() rather than
+            // omp_set_num_threads() so a caller-supplied budget (p.n_threads) can't
+            // race with concurrent callers of the global OpenMP state. p.n_threads=0
+            // keeps the previous omp_get_max_threads() default.
+            const int omp_nt = p.n_threads > 0 ? p.n_threads : omp_get_max_threads();
+#pragma omp parallel num_threads(omp_nt)
             {
                 std::vector<float> fft_in((size_t)n_fft);
                 std::vector<float> fft_out((size_t)n_fft * 2);
@@ -167,7 +172,8 @@ std::vector<float> compute(const float* samples, int n_samples, const float* win
             // stayed single-threaded there. Each thread owns its FFT scratch and
             // frames write disjoint `power` rows → data-race free, bit-identical.
             const unsigned hw = std::thread::hardware_concurrency();
-            const int nt = std::min((hw == 0) ? 1 : (int)std::min(hw, 8u), T);
+            const int cap = p.n_threads > 0 ? p.n_threads : (int)((hw == 0) ? 1u : std::min(hw, 8u));
+            const int nt = std::min(cap, T);
             std::vector<std::thread> pool;
             pool.reserve(nt > 0 ? nt - 1 : 0);
             const int chunk = (T + nt - 1) / nt;
@@ -200,10 +206,11 @@ std::vector<float> compute(const float* samples, int n_samples, const float* win
         int nthreads = 1;
         if (ran_parallel) {
 #ifdef _OPENMP
-            nthreads = omp_get_max_threads();
+            nthreads = p.n_threads > 0 ? p.n_threads : omp_get_max_threads();
 #else
             const unsigned hw = std::thread::hardware_concurrency();
-            nthreads = std::min((hw == 0) ? 1 : (int)std::min(hw, 8u), T);
+            const int cap = p.n_threads > 0 ? p.n_threads : (int)((hw == 0) ? 1u : std::min(hw, 8u));
+            nthreads = std::min(cap, T);
 #endif
         }
         fprintf(stderr, "core_mel: STFT %d frames (n_fft=%d) %.2f ms [%d thread(s)%s]\n", T, n_fft, stft_ms, nthreads,
