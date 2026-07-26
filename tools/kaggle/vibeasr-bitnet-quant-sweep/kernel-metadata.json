@@ -1,7 +1,7 @@
 {
   "id": "chr1s4/vibeasr-bitnet-quant-sweep",
   "title": "vibeasr-bitnet-quant-sweep",
-  "code_file": "vibeasr_bitnet_quant_sweep.py",
+  "code_file": "vibeasr_bitnet_diff.py",
   "language": "python",
   "kernel_type": "script",
   "is_private": "true",
