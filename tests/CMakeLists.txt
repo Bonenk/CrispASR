@@ -643,6 +643,17 @@ if(CRISPASR_BUILD_EXAMPLES AND NOT WIN32)
     set_tests_properties(test-vad-export-live PROPERTIES
         LABELS "unit;vad;regression-227"
         TIMEOUT 120)
+
+    # #311: strict failure semantics for required VAD / aligner / punctuation.
+    # Model-free config-validation + help always run; the strict-vs-permissive
+    # A/B is gated on a loadable whisper model and SKIPs cleanly without one.
+    add_test(NAME test-strict-pipeline
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test_strict_pipeline.sh
+            $<TARGET_FILE:crispasr-cli>
+            ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-strict-pipeline PROPERTIES
+        LABELS "unit;regression-311"
+        TIMEOUT 180)
 endif()
 
 if(CRISPASR_BUILD_EXAMPLES AND NOT WIN32)
