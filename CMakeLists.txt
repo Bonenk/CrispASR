@@ -178,10 +178,12 @@ endif()
 
 # Large generated tables (e.g. src/core/pinyin_g2p.cpp, #294) overflow MSVC's
 # default per-object section limit → "error C1128: number of sections exceeded
-# object file format limit". /bigobj raises the limit; it is harmless for every
-# other TU, so apply it globally on MSVC.
+# object file format limit". /bigobj raises the limit; harmless for every other
+# host TU. Guard to C/CXX (cl.exe) ONLY — a bare /bigobj handed to nvcc for .cu
+# files ("nvcc fatal: Unknown option") would break the Windows CUDA build; nvcc
+# would need it via -Xcompiler, and no .cu currently needs it anyway (#309).
 if (MSVC)
-    add_compile_options(/bigobj)
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/bigobj>)
 endif()
 
 # Wire COHERE_MKL into ggml's BLAS backend before add_subdirectory(ggml).
