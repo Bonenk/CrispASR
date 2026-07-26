@@ -30,7 +30,7 @@ from pathlib import Path
 os.environ["PYTHONUNBUFFERED"] = "1"
 
 WORK = Path("/kaggle/working")
-REPO = WORK / "CrispASR"
+REPO = Path("/kaggle/temp/CrispASR")  # outside /kaggle/working to keep output clean
 BUILD = REPO / "build"
 MODELS = WORK / "models"
 RESULTS = WORK / "results.json"
@@ -126,6 +126,9 @@ for label, vae_q, embed_q in VARIANTS:
     # ── Convert ──
     if not out_gguf.exists():
         t0 = time.time()
+        conv_env = os.environ.copy()
+        conv_env["TMPDIR"] = str(WORK)  # avoid /tmp (tiny tmpfs)
+        conv_env["PYTHONPATH"] = str(REPO / "ggml" / "python")  # use repo's gguf-py
         cmd = [
             sys.executable, str(CONVERTER),
             "--input", "microsoft/VibeVoice-ASR-BitNet",
@@ -135,7 +138,8 @@ for label, vae_q, embed_q in VARIANTS:
         ]
         kh.log(f"  Converting: {' '.join(cmd)}")
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800,
+                               env=conv_env)
             if r.returncode != 0:
                 kh.log(f"  CONVERT FAILED (rc={r.returncode})")
                 kh.log(f"  stderr: {r.stderr[-500:]}")
