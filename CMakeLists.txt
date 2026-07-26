@@ -183,7 +183,10 @@ endif()
 # files ("nvcc fatal: Unknown option") would break the Windows CUDA build; nvcc
 # would need it via -Xcompiler, and no .cu currently needs it anyway (#309).
 if (MSVC)
-    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/bigobj>)
+    # Single-value COMPILE_LANGUAGE genexes (CMake >=3.3) — the multi-value
+    # "C,CXX" form needs >=3.15, above this project's declared 3.10 floor.
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/bigobj>)
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:/bigobj>)
 endif()
 
 # Wire COHERE_MKL into ggml's BLAS backend before add_subdirectory(ggml).
