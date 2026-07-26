@@ -174,6 +174,18 @@ backends now resolve their own language and skip external LID entirely (no
 `--detect-language` still runs LID, and `-l <code>` / `--lid-backend off` skip it
 for any backend.
 
+## Fixed — CosyVoice3 zero-shot clones leaked the reference transcript (#310)
+
+On the zero-shot WAV-clone path (`--voice ref.wav --ref-text …`), part or all of
+the **reference** transcript was spoken before the requested text. The runtime
+clone built the LLM prompt from the bare `--ref-text`, missing the system-prompt
++ `<|endofprompt|>` boundary the CosyVoice3 LLM expects (baked preset voices carry
+it, which is why they were clean); without it the model re-rendered the reference
+as speech. A reference longer than the internal 10 s cap also gave the LLM the full
+transcript but only part of the reference speech, leaving a one-word tail. Both are
+fixed — clones now speak only the requested text, voice unchanged. Metal/CUDA/CPU;
+independent of the #304 Vulkan fix.
+
 ## Docs
 
 - README backend counts corrected to match the binary and the repo's own
