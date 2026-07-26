@@ -82,8 +82,8 @@ sys.excepthook = _crash_handler
 
 # ── Build ────────────────────────────────────────────────────────────────
 
-    kh.log("Installing build toolchain")
-    kh.install_build_toolchain()
+kh.log("Installing build toolchain")
+kh.install_build_toolchain()
 
 # Install converter dependencies
 subprocess.run([sys.executable, "-m", "pip", "install", "-q",
