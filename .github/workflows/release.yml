@@ -1406,8 +1406,7 @@ jobs:
             -DCRISPASR_BUILD_EXAMPLES=OFF ^
             -DCRISPASR_BUILD_SERVER=OFF ^
             -DGGML_CUDA=ON ^
-            -DGGML_CUDA_COMPRESSION_MODE=none ^
-            -DCMAKE_CUDA_ARCHITECTURES="60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" ^
+            -DCMAKE_CUDA_ARCHITECTURES="75-real;86-real;89-real;120-real;120-virtual" ^
             -DGGML_NATIVE=OFF ^
             -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
             -DCRISPASR_OPUS_FETCH=ON
@@ -1642,11 +1641,12 @@ jobs:
       # consumer GPUs (RTX 50xx). Earlier toolkits (12.4 etc.) only know
       # up to sm_90, so RTX 5060/5070/5080/5090 fail at runtime with
       # 'no kernel image is available'.
-      # At the low end the arch list floors at sm_60 (Tesla P100) + sm_61
-      # (Pascal: Quadro P5000, GTX 10xx) + sm_70 (Volta: V100) so older NVIDIA
-      # workstation/datacenter cards get native SASS instead of the same
-      # 'no kernel image' abort (#302, #307). CUDA 12.8 still emits their SASS;
-      # CUDA 13 dropped Pascal/Volta, which is why the cuda13 job floors at sm_75.
+      # This WINDOWS CUDA build floors at sm_75 — unlike the Linux CUDA-12 build,
+      # prepending the Pascal/Volta arches (sm_60/61/70, #302/#307) broke the
+      # Windows nvcc invocation (`nvcc fatal: A single input file is required for
+      # a non-link phase`), which dropped the crispasr-windows-x86_64-cuda asset
+      # from v0.8.22/v0.8.23 (v0.8.20/21 shipped it at sm_75+). Linux CUDA-12
+      # keeps the older arches; Windows Pascal/Volta users use the CPU/Vulkan build.
       - name: Install CUDA Toolkit 12.8.0
         # v0.2.19 only knows up to CUDA 12.4; v0.2.35 added 12.8 + 12.9
         # support. Required for sm_120 (RTX 50xx, Blackwell consumer) builds.
@@ -1664,8 +1664,7 @@ jobs:
           cmake -S . -B build -G Ninja ^
             -DCMAKE_BUILD_TYPE=Release ^
             -DGGML_CUDA=ON ^
-            -DGGML_CUDA_COMPRESSION_MODE=none ^
-            -DCMAKE_CUDA_ARCHITECTURES="60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" ^
+            -DCMAKE_CUDA_ARCHITECTURES="75-real;86-real;89-real;120-real;120-virtual" ^
             -DGGML_NATIVE=OFF ^
             -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
             -DCRISPASR_OPUS_FETCH=ON
