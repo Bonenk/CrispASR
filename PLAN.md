@@ -1,5 +1,55 @@
 # CrispASR — Pending work
 
+## NOW — VAD + mel front-end parallelization campaign (#305 → fleet-wide)
+
+Started from #305 (reporter: whisper-vad-asmr + firered-vad slow / single-core).
+The recurring pattern: the model compute is fine (ggml threads / Accelerate BLAS),
+but the **audio FRONT-END (STFT/mel/fbank) is a scalar single-threaded per-frame
+loop** — and for long audio the mel can out-cost the encoder (measured in
+whisper-vad). Parallelizing over the independent frame axis (per-thread FFT
+scratch, reductions keep order) is **bit-identical** and a large win.
+
+**DONE (per-backend, std::thread, gated + bit-identical):**
+- whisper-vad-encdec — GPU move (3.3×) + parallel mel (~30% long-audio) + requant
+  (b5eb7556 / 9f867909 / 8324719e). `CRISPASR_VAD_ENCDEC_*`.
+- firered-vad — parallel DFSMN convs + fbank FFT, ~3.7× (8c1d6a10).
+  `CRISPASR_FIRERED_VAD_SERIAL=1`.
+- marblenet-vad — parallel mel front-end, ~1.6× (7b2f11bc).
+  `CRISPASR_MARBLENET_VAD_SERIAL=1`.
+- Audited silero (whisper.cpp native ggml, already threaded) + webrtc (subband
+  GMM, no FFT) — no change needed.
+
+**KEY FINDING that reframes the fleet rollout:** `core/mel.h::compute` (used by
+~28 ASR/TTS backends: parakeet, canary, canary_ctc, nemotron, qwen3_asr, cohere,
+glm_asr, granite_*, higgs_stt, ark_asr, voxtral/4b, moss_*, mini_omni2,
+lfm2_audio, qwen3_tts, cosyvoice3, chatterbox, indextts, mimo, piano_transcription
+…) ALREADY has a §176f parallel-STFT path — but it is **`#ifdef _OPENMP` only**,
+and this macOS/AppleClang build has **`OpenMP_CXX_FLAGS=NOTFOUND`** (no libomp), so
+it is **compiled out** on macOS (and any non-libomp build). That is why ZERO
+backends set `allow_parallel_stft=true` — the flag is a no-op on the dev box. The
+mel *projection* matmul in `compute()` is serial too (not even OpenMP-gated).
+
+**TIER 1 — port core_mel STFT (+ projection) to std::thread (PORTABLE).** One
+change to `src/core/mel.cpp` speeds up all 28 backends on macOS AND Linux, not
+just OpenMP builds. Keep OpenMP path when `_OPENMP`; add a std::thread path
+otherwise; threshold T≥256 frames (skip short audio); default parallel with
+`CRISPASR_MEL_SERIAL=1` opt-out. Bit-identical (§176f audit already confirmed all
+in-tree fft callables re-entrant). Validate on local core_mel models
+(canary-ctc-aligner, parakeet-tdt-0.6b-ja, moonshine) — bit-identical + bench.
+NOTE: neutral (not negative) for heavy-LLM-decoder ASR (qwen3_asr etc., mel is a
+tiny fraction); real win for encoder-bound ASR (parakeet/canary/nemotron).
+
+**TIER 2 — CPU-hardcoded backends that could go GPU (per-model, higher effort).**
+`ggml_backend_cpu_init()` with no GPU path, conv-heavy enough to benefit:
+mel_band_roformer (source sep — STRONGEST, already promised as a GPU port under
+#296 below), piano_transcription, pyannote_seg, openvoice2, TTS codecs
+(miocodec/miotts/tada_encoder). Small classifiers (ecapa_lid, lid_fasttext,
+bert_encoder, marblenet) stay CPU (launch-bound). Each needs a ggml-graph port +
+Metal/Vulkan landmine handling + diff-harness validation.
+
+**TIER 3 — mined.** §176 runtime-opt campaign is 18/20 DONE; the 2 open are
+<2% (measure-first). Do not chase.
+
 ## #296 mel-band-roformer — follow-ups PROMISED on the issue (do not drop)
 
 `--separate` (mel-band-roformer) was ~24 min for 11 s on Linux/Windows (fast only
