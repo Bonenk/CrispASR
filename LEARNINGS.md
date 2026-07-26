@@ -13730,3 +13730,32 @@ same input-alignment applies to every later MBR stage (each RoFormer block also
 opens with RMSNorm). General rule for the harness: prefer feeding each stage the
 reference input over chaining your own outputs, whenever the stage's first op is
 scale-sensitive.
+
+
+## CI has no NVIDIA GPU — a CUDA-only graph path (mimo RVQ) is guarded by an on-Kaggle exact-parity smoke, not CI (#309)
+
+`perf(mimo-tokenizer): move RVQ to CUDA` (#309) runs MiMo's 8-stage Euclidean
+RVQ inside the encoder graph when the tokenizer weights are CUDA-resident:
+`scores = 2*(e·x) - ||e||^2` (mul_mat + scale + sub of precomputed codebook
+norms) -> `argmax` (== `argmin ||x-e||^2`) -> `get_rows` residual. The argmax
+output is contiguous, so it sidesteps the CUDA `get_rows` non-contiguous-index
+abort; `mul_mat_set_prec(F32)` keeps the dot products exact.
+
+The catch: the release CI matrix (linux-x86_64, linux-vulkan, macos, wasm, ios,
+android) has NO NVIDIA GPU, so the whole `#if defined(GGML_USE_CUDA)` RVQ branch
+COMPILES but never EXECUTES in CI. A green CI is necessary but NOT sufficient for
+this path. Its regression guard is the model smoke tool's exact CPU/CUDA compare,
+run on a CUDA box (Kaggle):
+
+```
+CRISPASR_MIMO_SMOKE_GPU=1 CRISPASR_MIMO_TOK_VERIFY_RVQ=1 \
+    ./mimo-tokenizer-smoke mimo-tokenizer-q4_k.gguf samples/jfk.wav
+# -> [ ok ] rvq_cpu_gpu_compare  codes=2208 mismatches=0
+```
+
+Validated on an RTX 2080 Ti: 2,208 codes, 0 mismatches, 5.65x faster than the CPU
+fallback. Any future edit to the RVQ or encoder graph must re-run this on real
+CUDA — do not trust CI alone. Rollback / diagnosis: `CRISPASR_MIMO_TOK_CPU_RVQ=1`
+forces the CPU argmin path. (General rule: whenever a perf change adds a
+`GGML_USE_CUDA`-gated compute path, name its Kaggle parity check in the PR, since
+CI cannot cover it — same lesson as the parakeet/nemotron ggml-decode A/Bs.)

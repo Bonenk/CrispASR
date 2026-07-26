@@ -57,9 +57,6 @@
 #include <numeric>
 #include <string>
 #include <vector>
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -362,19 +359,15 @@ static std::vector<float> compute_tokenizer_mel(const float* pcm16k, int n_in, c
     p.center_pad = true; // zero-pad; torchaudio uses reflect — minor mismatch
     p.drop_last_frame = false;
     // The FFT wrapper uses thread-local scratch, so frame-level parallelism is
-    // safe. Reuse the tokenizer's existing thread budget.
+    // safe. Reuse the tokenizer's thread budget — passed through p.n_threads so
+    // core_mel scopes it via num_threads() rather than mutating the global
+    // OpenMP thread count (which would race across concurrent tokenizer calls).
     p.allow_parallel_stft = true;
+    p.n_threads = std::max(1, n_threads);
 
     int T = 0;
-#ifdef _OPENMP
-    const int previous_omp_threads = omp_get_max_threads();
-    omp_set_num_threads(std::max(1, n_threads));
-#endif
     std::vector<float> mel = core_mel::compute(pcm24k.data(), (int)pcm24k.size(), hann.data(), win_length,
                                                mel_fb.data(), n_freqs, mimo_fft_wrapper, p, T);
-#ifdef _OPENMP
-    omp_set_num_threads(previous_omp_threads);
-#endif
     T_mel_out = T;
     return mel;
 }
