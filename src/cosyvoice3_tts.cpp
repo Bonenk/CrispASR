@@ -5259,7 +5259,16 @@ bool cv3_extract_native_runtime_voice(cosyvoice3_tts_context* ctx, const char* w
         return false;
 
     out_voice.name = "runtime";
-    out_voice.prompt_text = ref_text;
+    // #310: the CosyVoice3 LLM expects the fixed system prompt + the
+    // `<|endofprompt|>` boundary BEFORE the reference transcript — this is
+    // exactly how the baked voices store prompt_text (see
+    // convert-cosyvoice3-voices-to-gguf.py: "You are a helpful
+    // assistant.<|endofprompt|>" + <ref transcript>). The WAV-clone path stored
+    // the bare `--ref-text`, so the model ran out-of-distribution and
+    // re-rendered the reference transcript as speech before the requested text
+    // (the reference "leaked" into the start of the clone). Prepend the same
+    // prefix so the zero-shot WAV path matches the baked-voice format.
+    out_voice.prompt_text = std::string("You are a helpful assistant.<|endofprompt|>") + ref_text;
     out_voice.prompt_speech_tokens = std::move(native_tokens);
     out_voice.spk_emb = std::move(native_spk);
     out_voice.ref_mel = std::move(native_ref_mel);
@@ -5568,9 +5577,17 @@ float* cv3_synth_with_voice(cosyvoice3_tts_context* ctx, const char* text, const
     }
 
     // ---- 2. Build LM input embeddings + AR-decode speech tokens ----
+    // #310: the LLM must see the FULL reference speech tokens (matching the full
+    // reference transcript in text_ids), NOT the mel-aligned truncated set. The
+    // `prompt_token_len` cap above exists only to align the FLOW's prompt region
+    // with the (10 s-capped) reference mel; using the truncated tokens HERE would
+    // leave the LLM with more reference TEXT than reference SPEECH, so for a
+    // reference longer than the mel cap the AR decoder renders the leftover
+    // reference tail before the target (a residual of the same leak). The flow
+    // still uses the truncated `prompt_tokens` (aligned to ref_mel) below.
     std::vector<float> lm_embeds;
     int n_lm = 0;
-    if (!cv3_build_lm_input_embeds(ctx, text_ids, prompt_tokens, lm_embeds, n_lm))
+    if (!cv3_build_lm_input_embeds(ctx, text_ids, voice->prompt_speech_tokens, lm_embeds, n_lm))
         return nullptr;
 
     const int stop_floor = (int)ctx->hp.speech_codebook;
