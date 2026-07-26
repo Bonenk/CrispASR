@@ -141,8 +141,38 @@ curl http://localhost:8080/v1/audio/transcriptions \
 | `max_len` | Maximum segment length in characters |
 | `chunk_seconds` | Maximum chunk duration for long audio (default: 30) |
 | `chunk_overlap` | Overlap context (seconds) around chunk boundaries |
+| `strict_pipeline` | `true`/`false` — #311: fail the request (HTTP 400) if an explicitly-requested aux stage (VAD, forced aligner, punctuation) could not load or produce its output, instead of degrading silently (default: `false`) |
+| `require_vad` | `true`/`false` — force the VAD-load-success requirement (needs `vad`/`vad_model`) |
+| `require_word_timestamps` | `true`/`false` — fail unless every non-empty segment carries word timestamps (native or aligned) |
+| `require_punctuation` | `true`/`false` — fail unless a punctuation model is loaded (start the server with `--punc-model`) |
 
 The `/inference` endpoint accepts the same CrispASR extension fields.
+
+### Strict pipeline — fail on a required stage's failure (#311)
+
+By default the server, like the CLI, **degrades gracefully**: a VAD, forced
+aligner, or punctuation model that fails to load is skipped and the request
+still returns `200`. Integrations that treat those stages as required task
+properties can opt into strict semantics with the fields above — a required
+stage that fails to load or produce its output then returns **HTTP 400** with
+an `{"error": {...}}` body instead of a degraded `200`. A stage that ran and
+legitimately produced nothing (VAD detected no speech) stays a success. This
+mirrors the CLI's `--strict-pipeline` family (see
+[`cli.md`](cli.md#strict-pipeline--require-aux-stages-to-succeed-strict-pipeline-311));
+the strict decision is shared code (`crispasr_strict.h`), so the two front-ends
+cannot drift.
+
+```bash
+# rc-style contract over HTTP: 200 ⟺ every required stage succeeded.
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  http://localhost:8080/v1/audio/transcriptions \
+  -F file=@meeting.wav -F model=whisper \
+  -F vad=true -F strict_pipeline=true    # 400 if VAD couldn't load; 200 otherwise
+```
+
+`require_punctuation` needs the server to have been started with `--punc-model`
+(punctuation is a resident startup post-processor, not per-request) — otherwise
+the request fails fast with a clear error.
 
 ### Reusing VAD boundaries across backends (#227)
 
