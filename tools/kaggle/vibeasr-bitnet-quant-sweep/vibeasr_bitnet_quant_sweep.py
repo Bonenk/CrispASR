@@ -54,6 +54,9 @@ if not REPO.exists():
     try:
         subprocess.check_call(
             ["git", "clone", "--depth", "1", CRISPASR_URL, str(REPO)])
+        # Init ggml submodule (vendored, needed for build)
+        subprocess.check_call(
+            ["git", "submodule", "update", "--init", "ggml"], cwd=str(REPO))
         sys.path.insert(0, str(REPO / "tools" / "kaggle"))
     except Exception:
         pass
@@ -69,14 +72,28 @@ kh.init_progress()
 kh.log("Installing build toolchain")
 kh.install_build_toolchain()
 
+# Install converter dependencies
+subprocess.run([sys.executable, "-m", "pip", "install", "-q",
+                "safetensors", "transformers"], check=False)
+
+# HF token for model downloads
+hf_token = kh.resolve_hf_token()
+if hf_token:
+    os.environ["HF_TOKEN"] = hf_token
+    kh.log("HF token resolved")
+else:
+    kh.log("WARNING: no HF token — downloads may be rate-limited")
+
 os.chdir(str(REPO))
 
 # CPU-only build (no CUDA needed for this model)
 cmake_flags = kh.cache_and_link_flags()
+crispasr_flags = " ".join(kh.crispasr_cmake_flags())
 cmake_cmd = (
     f"cmake -G Ninja -B {BUILD} "
     f"-DCMAKE_BUILD_TYPE=Release "
     f"{cmake_flags} "
+    f"{crispasr_flags} "
     f"-DCRISPASR_BUILD_TESTS=OFF "
     f"-DCRISPASR_BUILD_EXAMPLES=ON "
     f"-DCRISPASR_BUILD_SERVER=OFF"
@@ -94,15 +111,6 @@ with kh.build_heartbeat("cmake.build"):
 CRISPASR_BIN = BUILD / "bin" / "crispasr"
 assert CRISPASR_BIN.exists(), f"Build failed: {CRISPASR_BIN} not found"
 kh.log(f"Build OK: {CRISPASR_BIN}")
-
-# ── Resolve HF token ────────────────────────────────────────────────────
-
-hf_token = kh.resolve_hf_token()
-if hf_token:
-    os.environ["HF_TOKEN"] = hf_token
-    kh.log("HF token resolved")
-else:
-    kh.log("WARNING: no HF token — downloads may be rate-limited")
 
 # ── Generate variants ────────────────────────────────────────────────────
 
