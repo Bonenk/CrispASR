@@ -146,14 +146,31 @@ def run_op(binp, op, env):
                            text=True, env=env, timeout=1200)
     out = r.stdout + "\n" + r.stderr
     (TMP / f"tbo_{op}.log").write_text(out)
-    # lines with the op name + OK/FAIL/error; and the "Backend N/M: <name>" markers
-    fails = [l.strip() for l in out.splitlines()
-             if op in l and re.search(r"\bFAIL|not\s+OK|error|NMSE|nan", l, re.I)]
-    oks = sum(1 for l in out.splitlines() if op in l and re.search(r"\bOK\b", l))
-    summary = [l.strip() for l in out.splitlines()
-               if re.search(r"Backend \d+/\d+|Backend name|\d+/\d+ tests passed|Vulkan", l)]
-    return dict(op=op, rc=r.returncode, n_ok=oks, n_fail=len(fails),
-                fails=fails[:20], summary=summary[-8:])
+    esc = re.compile(r"\x1b\[[0-9;]*m")
+    clean = esc.sub("", out)
+    lines = clean.splitlines()
+    # Isolate the Vulkan backend section: "Backend 1/2: Vulkan0" .. "Backend Vulkan0: OK/FAIL"
+    vk_verdict, vk_passed = None, None
+    in_vk = False
+    fail_cfgs = []
+    for l in lines:
+        if re.match(r"\s*Backend \d+/\d+:\s*Vulkan", l):
+            in_vk = True
+        elif re.match(r"\s*Backend \d+/\d+:\s*", l):
+            in_vk = False
+        if in_vk:
+            m = re.search(r"(\d+)/(\d+) tests passed", l)
+            if m:
+                vk_passed = m.group(0)
+            if re.search(rf"{op}\b.*\b(FAIL|not OK|NMSE|nan|inf)\b", l, re.I) or \
+               ("compare failed" in l.lower()) or (re.search(r"\bFAIL\b", l) and op in l):
+                fail_cfgs.append(l.strip()[:200])
+        m2 = re.match(rf"\s*Backend Vulkan\S*:\s*(OK|FAIL)", l)
+        if m2:
+            vk_verdict = m2.group(1)
+            in_vk = False
+    return dict(op=op, rc=r.returncode, vk_verdict=vk_verdict, vk_passed=vk_passed,
+                n_fail_cfgs=len(fail_cfgs), fail_cfgs=fail_cfgs[:15])
 
 
 def main():
@@ -169,7 +186,14 @@ def main():
                              capture_output=True, text=True, env=env)
     step("ops.probe", tail=(listing.stdout + listing.stderr)[-400:])
 
-    OPS = ["IM2COL", "CONV_TRANSPOSE_1D", "CONV_2D", "CONV_2D_DW", "POOL_2D", "MUL_MAT"]
+    # Flow DiT op set. The LM (correct on Vulkan) uses RMS_NORM; the flow uses
+    # NORM (LayerNorm) for adaLN — untested by the LM path, prime suspect. conv
+    # ops already confirmed OK; keep IM2COL/MUL_MAT as controls. CONV_2D dropped
+    # (aborts, and CV3 uses conv_1d only). Run per-op so one abort doesn't cascade.
+    OPS = ["NORM", "RMS_NORM", "GROUP_NORM", "L2_NORM",
+           "SOFT_MAX", "GELU", "GELU_QUICK", "SILU", "TANH", "SIGMOID",
+           "MUL", "ADD", "SUB", "DIV", "SCALE", "SQR", "SQRT", "SIN", "COS",
+           "ROPE", "CONCAT", "GET_ROWS", "CPY", "CONT", "PAD", "IM2COL", "MUL_MAT"]
     results = {"env": {"vulkan_devices": devs, "real_nvidia": nvidia}, "ops": {}}
     for op in OPS:
         try:
@@ -177,11 +201,13 @@ def main():
         except Exception as e:
             rec = dict(op=op, error=str(e)[:300])
         results["ops"][op] = rec
-        step(f"op.{op}", n_ok=rec.get("n_ok"), n_fail=rec.get("n_fail"),
-             first_fail=(rec.get("fails") or [""])[0][:160])
+        step(f"op.{op}", vk=rec.get("vk_verdict"), passed=rec.get("vk_passed"),
+             rc=rec.get("rc"), n_fail=rec.get("n_fail_cfgs"),
+             first_fail=(rec.get("fail_cfgs") or [""])[0][:150])
         RESULTS.write_text(json.dumps(results, indent=2))
 
-    step("DONE", verdict={op: {"n_ok": r.get("n_ok"), "n_fail": r.get("n_fail")}
+    step("DONE", verdict={op: f"{r.get('vk_verdict')}({r.get('vk_passed')})"
+                          + (f" rc={r.get('rc')}" if r.get('rc') else "")
                           for op, r in results["ops"].items()})
     RESULTS.write_text(json.dumps(results, indent=2))
     print(json.dumps(results, indent=2), flush=True)
