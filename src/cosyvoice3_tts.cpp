@@ -5719,6 +5719,29 @@ float* cv3_synth_with_voice(cosyvoice3_tts_context* ctx, const char* text, const
                 (size_t)T_mel_out * (size_t)mel * sizeof(float));
     free(mel_full);
 
+    // #304 debug: dump the pre-HiFT mel (raw f32 [T_mel_out, mel]) + stats so
+    // the flow (mel gen) can be isolated from HiFT (vocoder) across backends.
+    if (const char* dm = crispasr_env::get("CRISPASR_COSYVOICE3_DUMP_MEL")) {
+        double mn = 1e30, mx = -1e30, sum = 0, sq = 0;
+        size_t nnan = 0, N = mel_out.size();
+        for (float v : mel_out) {
+            if (std::isnan(v) || std::isinf(v)) {
+                nnan++;
+                continue;
+            }
+            mn = std::min(mn, (double)v);
+            mx = std::max(mx, (double)v);
+            sum += v;
+            sq += (double)v * v;
+        }
+        fprintf(stderr, "cosyvoice3_tts: MEL[%dx%d] min=%.4f max=%.4f mean=%.4f rms=%.4f nan/inf=%zu\n", T_mel_out, mel,
+                mn, mx, sum / (double)N, std::sqrt(sq / (double)N), nnan);
+        if (FILE* f = std::fopen(dm, "wb")) {
+            std::fwrite(mel_out.data(), sizeof(float), mel_out.size(), f);
+            std::fclose(f);
+        }
+    }
+
     // ---- 9. HiFT inference → 24 kHz audio ----
     float* audio;
     {
