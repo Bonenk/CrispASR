@@ -69,4 +69,4 @@ and rewrites *only* the marker line below — the prose above is
 maintained here by hand and does not auto-update, so a codec added
 upstream will not be described until this file is edited.
 
-Synced at upstream commit: `424d52980c79135e3b5613cd0a08cfa5bdbf5f73` (docs: scope a clean-room Vorbis ENCODER track (unclaimed)).
+Synced at upstream commit: `946642033e489117fe12225783ff12e130451310` (docs: correct the wasm surface in README; note the downstream consumer).
