@@ -27,6 +27,7 @@
 #include "crispasr_separate_cli.h"
 #include "crispasr_vad_cli.h"
 #include "crispasr_output.h"
+#include "crispasr_strict.h" // #311: shared strict-pipeline reqs (also used by the server)
 #include "crispasr_punctuation_policy.h"
 #include "crispasr_punc_loader.h"
 #include "crispasr_truecase_loader.h"
@@ -597,27 +598,9 @@ enum crispasr_strict_rc {
     CRISPASR_STRICT_RC_PUNC = 32,  // required punctuation model failed to load
 };
 
-struct crispasr_strict_reqs {
-    bool vad = false;   // a loaded, running VAD stage is required
-    bool words = false; // every non-empty output segment must carry word timestamps
-    bool punc = false;  // a loaded punctuation model is required
-};
-
-// Resolve the effective per-stage requirements from the flags. `--strict-pipeline`
-// requires each stage that was explicitly requested on this command line; the
-// per-stage `--require-*` flags force one requirement regardless. `--require-word-
-// timestamps` is a property of the OUTPUT (native or aligned), so it needs no
-// aligner precondition; the others need their stage to actually be requested.
-static crispasr_strict_reqs crispasr_compute_strict_reqs(const whisper_params& p) {
-    const bool vad_requested = p.vad || !p.vad_model.empty();
-    const bool align_requested = !p.aligner_model.empty() || p.force_aligner;
-    const bool punc_requested = !p.punc_model.empty();
-    crispasr_strict_reqs r;
-    r.vad = p.require_vad || (p.strict_pipeline && vad_requested);
-    r.words = p.require_word_timestamps || (p.strict_pipeline && align_requested);
-    r.punc = p.require_punctuation || (p.strict_pipeline && punc_requested);
-    return r;
-}
+// `crispasr_strict_reqs` + `crispasr_compute_strict_reqs` + the missing-word-ts
+// counter are shared with the HTTP server via crispasr_strict.h (included above)
+// so the two front-ends can't drift.
 
 // Post-hoc word-timestamp gate: when required, (a) an explicitly requested
 // aligner must have loaded (case 4 — caught even if native word timestamps
@@ -636,17 +619,7 @@ static int crispasr_strict_check_words(const std::vector<crispasr_segment>& segs
                 fname_inp.c_str());
         return CRISPASR_STRICT_RC_WORDS;
     }
-    int missing = 0;
-    for (const auto& s : segs) {
-        std::string trimmed = s.text;
-        while (!trimmed.empty() && (unsigned char)trimmed.back() <= ' ')
-            trimmed.pop_back();
-        size_t b = 0;
-        while (b < trimmed.size() && (unsigned char)trimmed[b] <= ' ')
-            b++;
-        if (b < trimmed.size() && s.words.empty())
-            missing++;
-    }
+    int missing = crispasr_count_missing_word_ts(segs);
     if (missing > 0) {
         fprintf(stderr,
                 "crispasr: error: word timestamps required (--require-word-timestamps/--strict-pipeline) but %d "

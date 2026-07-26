@@ -297,6 +297,18 @@ Strict requirements route through the unified backend dispatch, so pass an
 explicit `--backend` (any backend, including `--backend whisper`) rather than
 relying on the legacy whisper-only path.
 
+**Across surfaces.** The CLI and the **HTTP server** both auto-run these stages
+and both honour strict semantics (the server via `strict_pipeline` /
+`require_*` form fields, returning HTTP 400 — see
+[`server.md`](server.md#strict-pipeline--fail-on-a-required-stages-failure-311)).
+The decision logic is shared (`crispasr_strict.h`) so they can't drift. The
+**session C-ABI** (`crispasr_session_*`, used by the language bindings) is a
+lower-level, caller-driven primitive — it does not auto-orchestrate VAD +
+alignment + punctuation, so there is no silent degradation to guard: a binding
+caller invokes each stage explicitly (`crispasr_session_transcribe_vad`, the
+aligner, the punc setter) and already sees each one's result directly. Strict
+mode is therefore a property of the two orchestrating front-ends (CLI, server).
+
 #### Transcribing a time window (`--offset-t` / `--duration`, #91)
 
 Restrict processing to a slice of the input instead of the whole file:
