@@ -253,6 +253,50 @@ crispasr -m whisper.gguf  -f talk.wav --vad-import talk.vad.json --chunk-seconds
 Files written before `"kind"` existed are read as `chunks` (the historical
 behaviour), so older exports keep working.
 
+### Strict pipeline — require aux stages to succeed (`--strict-pipeline`, #311)
+
+By default CrispASR **degrades gracefully**: a VAD, forced-aligner, or
+punctuation model that fails to load is skipped with a stderr warning and the
+command still exits `0`. That is convenient interactively but hides failures
+from automation — a zero exit and a valid `-ojf` do **not** prove the requested
+stages ran. For integrations that treat those stages as *required task
+properties*, opt into strict semantics:
+
+| Flag | Effect |
+|---|---|
+| `--strict-pipeline` | Require every stage **explicitly requested** on this command line: VAD if `--vad`/`-vm`, word timestamps if `-am`/`--force-aligner`, punctuation if `--punc-model`. |
+| `--require-vad` | Force the VAD requirement (needs `--vad`/`-vm`). |
+| `--require-word-timestamps` | Every non-empty output segment must carry word timestamps (native **or** aligned). |
+| `--require-punctuation` | Force the punctuation-model requirement (needs `--punc-model`). |
+
+Under strict semantics a required stage that **fails to load or produce its
+output** returns a **non-zero exit** (and the output file is not written), while
+a stage that **ran and legitimately found nothing** (VAD detected no speech)
+stays a success. Nothing depends on parsing stderr, and a direct local `-m`/
+`-vm`/`-am`/`--punc-model` path is used as-is — strict mode never falls back to
+auto-download.
+
+Distinct exit codes let a caller tell *which* stage failed:
+
+| Exit | Meaning |
+|---|---|
+| `2` | Config error — a `--require-*` whose stage was never requested |
+| `30` | Required VAD model failed to load |
+| `31` | Required word timestamps missing (aligner failed to load, or no native/aligned words on a non-empty segment) |
+| `32` | Required punctuation model failed to load |
+
+```bash
+# The integration's contract: rc 0 ⟺ every required stage succeeded.
+crispasr --backend parakeet -m asr.gguf -f in.wav -l zh \
+    --vad -vm vad.gguf -am aligner.gguf --force-aligner \
+    --punc-model punc.gguf --strict-pipeline -ojf -of result
+echo "rc=$?"   # 0 = VAD ran + words present + punctuation applied; 30/31/32 = that stage failed
+```
+
+Strict requirements route through the unified backend dispatch, so pass an
+explicit `--backend` (any backend, including `--backend whisper`) rather than
+relying on the legacy whisper-only path.
+
 #### Transcribing a time window (`--offset-t` / `--duration`, #91)
 
 Restrict processing to a slice of the input instead of the whole file:

@@ -588,6 +588,76 @@ static void crispasr_apply_global_speaker_stages(std::vector<crispasr_segment>& 
     speaker_db_free(db);
 }
 
+// ── Issue #311: strict pipeline requirements ──────────────────────────────
+// Distinct non-zero exit codes so integrations can tell which required stage
+// failed without parsing stderr.
+enum crispasr_strict_rc {
+    CRISPASR_STRICT_RC_VAD = 30,   // required VAD model failed to load / run
+    CRISPASR_STRICT_RC_WORDS = 31, // required word timestamps missing on a non-empty segment
+    CRISPASR_STRICT_RC_PUNC = 32,  // required punctuation model failed to load
+};
+
+struct crispasr_strict_reqs {
+    bool vad = false;   // a loaded, running VAD stage is required
+    bool words = false; // every non-empty output segment must carry word timestamps
+    bool punc = false;  // a loaded punctuation model is required
+};
+
+// Resolve the effective per-stage requirements from the flags. `--strict-pipeline`
+// requires each stage that was explicitly requested on this command line; the
+// per-stage `--require-*` flags force one requirement regardless. `--require-word-
+// timestamps` is a property of the OUTPUT (native or aligned), so it needs no
+// aligner precondition; the others need their stage to actually be requested.
+static crispasr_strict_reqs crispasr_compute_strict_reqs(const whisper_params& p) {
+    const bool vad_requested = p.vad || !p.vad_model.empty();
+    const bool align_requested = !p.aligner_model.empty() || p.force_aligner;
+    const bool punc_requested = !p.punc_model.empty();
+    crispasr_strict_reqs r;
+    r.vad = p.require_vad || (p.strict_pipeline && vad_requested);
+    r.words = p.require_word_timestamps || (p.strict_pipeline && align_requested);
+    r.punc = p.require_punctuation || (p.strict_pipeline && punc_requested);
+    return r;
+}
+
+// Post-hoc word-timestamp gate: when required, (a) an explicitly requested
+// aligner must have loaded (case 4 — caught even if native word timestamps
+// would otherwise mask the failure), and (b) every segment with non-empty text
+// must carry word timestamps, native or aligned (case 5). Returns 0 when
+// satisfied / not required, else CRISPASR_STRICT_RC_WORDS after printing a
+// machine-stable error. Empty/no-speech transcripts pass vacuously.
+static int crispasr_strict_check_words(const std::vector<crispasr_segment>& segs, bool required,
+                                       const std::string& fname_inp, bool aligner_load_failed = false) {
+    if (!required)
+        return 0;
+    if (aligner_load_failed) {
+        fprintf(stderr,
+                "crispasr: error: the explicitly requested forced aligner failed to load for '%s' "
+                "(--require-word-timestamps/--strict-pipeline).\n",
+                fname_inp.c_str());
+        return CRISPASR_STRICT_RC_WORDS;
+    }
+    int missing = 0;
+    for (const auto& s : segs) {
+        std::string trimmed = s.text;
+        while (!trimmed.empty() && (unsigned char)trimmed.back() <= ' ')
+            trimmed.pop_back();
+        size_t b = 0;
+        while (b < trimmed.size() && (unsigned char)trimmed[b] <= ' ')
+            b++;
+        if (b < trimmed.size() && s.words.empty())
+            missing++;
+    }
+    if (missing > 0) {
+        fprintf(stderr,
+                "crispasr: error: word timestamps required (--require-word-timestamps/--strict-pipeline) but %d "
+                "non-empty segment(s) in '%s' have none — the aligner failed to load/produce words, or the backend "
+                "emitted no native word timing.\n",
+                missing, fname_inp.c_str());
+        return CRISPASR_STRICT_RC_WORDS;
+    }
+    return 0;
+}
+
 // Process a single input file end-to-end with the given backend instance.
 // Pulled out of the main loop so the parallel-processors path can call
 // it from worker threads. Each call holds its own audio buffers + segment
@@ -598,6 +668,10 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                       whisper_params params, fireredpunc_context* punc_ctx = nullptr,
                       truecaser_context* tc_ctx = nullptr, pcs_context* pcs_ctx = nullptr,
                       truecaser_crf_context* tc_crf_ctx = nullptr, truecaser_lstm_context* tc_lstm_ctx = nullptr) {
+    // #311: OR-accumulated across every forced-aligner call in this file so the
+    // strict word-timestamp gate can fail an explicitly-requested aligner that
+    // could not load, even when the backend's native word timing masks it.
+    bool aligner_load_failed = false;
     // Resolve the output path base for this input. -of FNAME (passed via
     // `fname_out`) wins; otherwise we strip the audio extension off the
     // input path and append the format extension. Mirrors the whisper
@@ -1028,7 +1102,19 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                     dropped ? (" (" + std::to_string(dropped) + " out-of-range dropped)").c_str() : "");
         }
     } else {
-        slices = crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, slice_chunk_seconds, params);
+        bool vad_load_failed = false;
+        slices = crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, slice_chunk_seconds, params,
+                                               &vad_load_failed);
+        // #311: a required VAD model that failed to load must fail the run
+        // *before* the slices.empty() no-speech path below silently succeeds
+        // (and before any energy-chunk fallback is used for transcription).
+        if (vad_load_failed && crispasr_compute_strict_reqs(params).vad) {
+            fprintf(stderr,
+                    "crispasr: error: required VAD model '%s' failed to load for '%s' "
+                    "(--require-vad/--strict-pipeline) — refusing to fall back to fixed chunking.\n",
+                    params.vad_model.c_str(), fname_inp.c_str());
+            return CRISPASR_STRICT_RC_VAD;
+        }
     }
 
     // NOTE: --vad-export is now handled before backend init
@@ -1036,6 +1122,8 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     // when vad_export_file is set.
 
     if (slices.empty()) {
+        // A loaded VAD that found no speech is a valid, successful outcome
+        // (#311 acceptance case 2) — distinct from the load failure above.
         fprintf(stderr, "crispasr: warning: no speech detected in '%s'\n", fname_inp.c_str());
         return 0;
     }
@@ -1104,8 +1192,10 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                 const int s = (int)((double)seg.t0 / 100.0 * SR);
                 const int e = std::min((int)samples.size(), (int)((double)seg.t1 / 100.0 * SR));
                 if (e > s) {
+                    bool load_failed = false;
                     auto words = crispasr_ctc_align(params.aligner_model, seg.text, samples.data() + s, e - s, seg.t0,
-                                                    params.n_threads);
+                                                    params.n_threads, &load_failed);
+                    aligner_load_failed = aligner_load_failed || load_failed;
                     if (crispasr_words_have_positive_span(words)) {
                         seg.t0 = words.front().t0;
                         seg.t1 = words.back().t1;
@@ -1202,6 +1292,10 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             else if (params.print_confidence)
                 crispasr_print_confidence(all_segs);
         }
+        // #311: fail before writing output files if required word timestamps are missing.
+        if (int rc = crispasr_strict_check_words(all_segs, crispasr_compute_strict_reqs(params).words, fname_inp,
+                                                 aligner_load_failed))
+            return rc;
         if (params.output_txt)
             crispasr_write_txt(out_path(".txt"), disp);
         if (params.output_srt)
@@ -1431,8 +1525,10 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             for (auto& seg : segs) {
                 if (!seg.words.empty() && !params.force_aligner)
                     continue;
+                bool load_failed = false;
                 auto words = crispasr_ctc_align(params.aligner_model, seg.text, samples.data() + sl.start,
-                                                sl.end - sl.start, sl.t0_cs, params.n_threads);
+                                                sl.end - sl.start, sl.t0_cs, params.n_threads, &load_failed);
+                aligner_load_failed = aligner_load_failed || load_failed;
                 if (crispasr_words_have_positive_span(words)) {
                     seg.t0 = words.front().t0;
                     seg.t1 = words.back().t1;
@@ -1670,6 +1766,10 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                     crispasr_strip_punctuation(seg);
             auto disp_all = crispasr_make_disp_segments(all_segs, params.max_len, params.split_on_punct);
 
+            // #311: fail before writing output files if required word timestamps are missing.
+            if (int rc = crispasr_strict_check_words(all_segs, crispasr_compute_strict_reqs(params).words, fname_inp,
+                                                     aligner_load_failed))
+                return rc;
             if (params.output_txt)
                 crispasr_write_txt(out_path(".txt"), disp_all);
             if (params.output_srt)
@@ -1764,6 +1864,10 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         }
     }
 
+    // #311: fail before writing output files if required word timestamps are missing.
+    if (int rc = crispasr_strict_check_words(all_segs, crispasr_compute_strict_reqs(params).words, fname_inp,
+                                             aligner_load_failed))
+        return rc;
     if (params.output_txt)
         crispasr_write_txt(out_path(".txt"), disp);
     if (params.output_srt)
@@ -1922,6 +2026,20 @@ static std::string crispasr_stream_common_speaker(const std::vector<crispasr_seg
 
 int crispasr_run_backend(const whisper_params& params_in) {
     whisper_params params = params_in;
+
+    // #311: validate strict-pipeline flag combinations up front. A per-stage
+    // --require-* whose stage was never requested is a configuration error
+    // (usage exit 2), distinct from a stage that ran and failed (exit 30-32).
+    // --require-word-timestamps has no precondition — it is a property of the
+    // output (native word timing OR the forced aligner satisfy it).
+    if (params.require_vad && !(params.vad || !params.vad_model.empty())) {
+        fprintf(stderr, "crispasr: error: --require-vad needs VAD to be requested (pass --vad or --vad-model/-vm).\n");
+        return 2;
+    }
+    if (params.require_punctuation && params.punc_model.empty()) {
+        fprintf(stderr, "crispasr: error: --require-punctuation needs a punctuation model (pass --punc-model).\n");
+        return 2;
+    }
 
     // §248: source separation is its own task (audio out, not transcripts).
     // Route to the separation dispatcher before any transcribe backend is built.
@@ -3184,6 +3302,18 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     fprintf(stderr, "crispasr: loaded PCS model '%s'\n", pcs_path.c_str());
             }
         }
+    }
+
+    // #311: strict punctuation — the two loadable kinds are fireredpunc and pcs.
+    // If punctuation is required but neither context loaded (missing/corrupt/
+    // unresolvable model), fail with a non-zero exit instead of the default
+    // "continuing without" warning.
+    if (crispasr_compute_strict_reqs(params).punc && !punc_ctx && !pcs_ctx) {
+        fprintf(stderr,
+                "crispasr: error: required punctuation model '%s' failed to load "
+                "(--require-punctuation/--strict-pipeline).\n",
+                params.punc_model.c_str());
+        return CRISPASR_STRICT_RC_PUNC;
     }
 
     // Optional truecaser post-processor.

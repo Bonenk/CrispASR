@@ -199,6 +199,26 @@ struct whisper_params {
     // README). `--no-auto-aligner` reverts to the pre-default native
     // DTW path (no second forward pass, no ~442 MB download).
     bool no_auto_aligner = false;
+    // Issue #311: machine-reliable strict failure semantics for explicitly
+    // requested auxiliary pipeline stages. By default CrispASR degrades
+    // gracefully (a VAD/aligner/punc model that fails to load is skipped with
+    // a stderr warning and a 0 exit code). Integrations that treat these stages
+    // as *required task properties* need a zero exit to actually mean "every
+    // requested stage succeeded". These opt-in flags make a failed-to-load /
+    // failed-to-produce required stage return a NON-ZERO exit instead.
+    //
+    //  * `strict_pipeline` (--strict-pipeline): require every stage that was
+    //    explicitly requested on this command line (VAD if --vad/-vm, word
+    //    timestamps if -am/--force-aligner, punctuation if --punc-model).
+    //  * the per-stage flags force one specific requirement regardless.
+    //
+    // A stage that RAN successfully but legitimately produced nothing (VAD ran
+    // and detected no speech) is NOT a failure. Direct local model paths are
+    // used as-is and never fall back to auto-download.
+    bool strict_pipeline = false;
+    bool require_vad = false;
+    bool require_word_timestamps = false;
+    bool require_punctuation = false;
     int32_t max_new_tokens = 512;
     // Whether the user passed --max-new-tokens. Backends whose sensible default
     // differs from 512 (e.g. moss-diarize wants 1024) forward the CLI value only
