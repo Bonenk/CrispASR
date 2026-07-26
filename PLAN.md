@@ -29,23 +29,31 @@ it is **compiled out** on macOS (and any non-libomp build). That is why ZERO
 backends set `allow_parallel_stft=true` — the flag is a no-op on the dev box. The
 mel *projection* matmul in `compute()` is serial too (not even OpenMP-gated).
 
-**TIER 1 — port core_mel STFT (+ projection) to std::thread (PORTABLE).** One
-change to `src/core/mel.cpp` speeds up all 28 backends on macOS AND Linux, not
-just OpenMP builds. Keep OpenMP path when `_OPENMP`; add a std::thread path
-otherwise; threshold T≥256 frames (skip short audio); default parallel with
-`CRISPASR_MEL_SERIAL=1` opt-out. Bit-identical (§176f audit already confirmed all
-in-tree fft callables re-entrant). Validate on local core_mel models
-(canary-ctc-aligner, parakeet-tdt-0.6b-ja, moonshine) — bit-identical + bench.
-NOTE: neutral (not negative) for heavy-LLM-decoder ASR (qwen3_asr etc., mel is a
-tiny fraction); real win for encoder-bound ASR (parakeet/canary/nemotron).
+**TIER 1 — port core_mel STFT to std::thread (PORTABLE) — DONE (528d672f).** One
+change to `src/core/mel.cpp`: portable std::thread STFT path (OpenMP kept when
+`_OPENMP`), DEFAULT parallel with `CRISPASR_MEL_SERIAL=1` opt-out, threshold T≥256.
+Bit-identical (disjoint power[] rows, same reduction order). The mel projection was
+already Accelerate/BLAS-threaded, so the STFT was the sole single-threaded piece.
+Validated parakeet-tdt-0.6b-ja (M1): STFT 1070-frame chunk 20.19→5.52 ms (~3.7×),
+transcript BIT-IDENTICAL serial vs parallel. Lifts all ~28 core_mel backends.
+Neutral for heavy-LLM-decoder ASR (mel is a tiny fraction); real win for
+encoder-bound ASR (parakeet/canary/nemotron) and long audio. `allow_parallel_stft`
+per-backend flag now redundant (kept for back-compat).
 
-**TIER 2 — CPU-hardcoded backends that could go GPU (per-model, higher effort).**
-`ggml_backend_cpu_init()` with no GPU path, conv-heavy enough to benefit:
-mel_band_roformer (source sep — STRONGEST, already promised as a GPU port under
-#296 below), piano_transcription, pyannote_seg, openvoice2, TTS codecs
-(miocodec/miotts/tada_encoder). Small classifiers (ecapa_lid, lid_fasttext,
-bert_encoder, marblenet) stay CPU (launch-bound). Each needs a ggml-graph port +
-Metal/Vulkan landmine handling + diff-harness validation.
+**TIER 2 — CPU-hardcoded backends that could go GPU (per-model, MAJOR effort — NOT
+started; needs models + Kaggle validation).** `ggml_backend_cpu_init()` with no GPU
+path, conv-heavy enough to benefit: **mel_band_roformer** (source sep — STRONGEST,
+already promised as a GPU port under #296 below; but 1284 lines already
+BLAS-optimized, model not local, and #296 was Kaggle-validated → a full
+transformer+iSTFT ggml-graph port is a focused multi-hour project that must be
+diff-harness + Kaggle validated, NOT doable+trustworthy locally), piano_transcription
+(cblas=0 — not even BLAS yet; a cheaper first step is BLAS/threads before GPU),
+pyannote_seg (already uses threads), openvoice2, TTS codecs (miocodec has a scalar
+FFT — VAD-style parallelize; miotts/tada_encoder). Small classifiers (ecapa_lid,
+lid_fasttext, bert_encoder, marblenet) stay CPU (launch-bound). Each needs a
+ggml-graph port + Metal/Vulkan landmine handling + diff-harness validation. RECOMMEND
+as a dedicated session per model (get the model, port, validate on Kaggle), starting
+with mel_band_roformer (highest impact, already promised).
 
 **TIER 3 — mined.** §176 runtime-opt campaign is 18/20 DONE; the 2 open are
 <2% (measure-first). Do not chase.
