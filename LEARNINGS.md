@@ -13759,3 +13759,64 @@ CUDA — do not trust CI alone. Rollback / diagnosis: `CRISPASR_MIMO_TOK_CPU_RVQ
 forces the CPU argmin path. (General rule: whenever a perf change adds a
 `GGML_USE_CUDA`-gated compute path, name its Kaggle parity check in the PR, since
 CI cannot cover it — same lesson as the parakeet/nemotron ggml-decode A/Bs.)
+
+
+## "Backend miscomputes my pipeline" ≠ "op X is broken": arbitrate with test-backend-ops, and beware aggregate precision (#304 native-Vulkan post-mortem)
+
+CosyVoice3 produces noise on the Vulkan backend (the shipped fix CPU-routes it).
+Chasing "make it run natively on Vulkan," a chain of app-level symptoms kept
+pointing at a broken op — and kept being WRONG until ggml's own unit tests
+settled it. The sequence, and the lessons:
+
+1. **LM is fine, flow/HiFT are not.** With `CRISPASR_COSYVOICE3_GREEDY=1` (forces
+   argmax so two backends yield identical tokens iff their logits agree) the LM
+   matched CPU **512/512 tokens** on both MoltenVK and a real Tesla P100 — but the
+   flow mel diverged (cosine(cpu,vk)=**0.961**, max element diff 6.78). *Greedy is
+   the tool for cross-backend determinism*: sampling hides a miscompute behind a
+   "different but valid" sequence; argmax exposes it.
+
+2. **"Healthy stats ≠ correct" (again — cf. the F5/HARD-RULE token-parity lesson).**
+   The Vulkan flow mel had a perfectly healthy RANGE (min/max/rms like CPU, no
+   NaN), so an early read said "flow works, HiFT is the breaker." False: a
+   HiFT-on-CPU hybrid fed that mel still produced noise. A healthy-looking
+   intermediate can be wrong in CONTENT. Only an element-wise cos/max-diff vs a
+   reference (same input) is trustworthy — dump raw tensors, not summaries.
+
+3. **Isolate DISPATCH from OP.** Suspecting my own single-backend `gallocr`
+   dispatch (gallocr reuses input buffers as scratch — a real footgun for
+   multi-step graphs), I added `CRISPASR_COSYVOICE3_FORCE_GALLOCR=1` to run the
+   gallocr path on the CPU backend and diff it against the CPU scheduler: **cosine
+   1.000000, max diff 0 — bit-identical.** The dispatch was never the bug.
+
+4. **The arbiter: ggml's own `test-backend-ops` on the target backend.** Built it
+   with `GGML_VULKAN=ON` and ran it on a real P100 (Kaggle). EVERY op the flow +
+   HiFT touch PASSES vs the CPU reference — IM2COL 88/88, CONV_TRANSPOSE_1D,
+   MUL_MAT 892/892, NORM(LayerNorm) 10/10, RMS_NORM, SOFT_MAX 212/212, GELU/SILU,
+   ROPE 288/288, CONCAT/GET_ROWS/CPY/PAD, all `Backend Vulkan0: OK`. There is **no
+   broken op.** My successive "it's the conv" / "it's LayerNorm" hypotheses were
+   all disproven by the op the primitive's own unit test. LESSON: before claiming
+   "ggml op X miscomputes on backend Y," RUN test-backend-ops for X on Y — it is
+   cheap, authoritative, and app-independent. An app-level divergence is evidence
+   of a *problem*, never of a *specific op*.
+
+5. **Root cause = aggregate numerical sensitivity, not a bug.** All ops pass
+   *within tolerance*, but Vulkan is not bit-exact to CPU (fp16-class accumulation
+   vs fp32). Those in-tolerance per-op deltas ACCUMULATE across the deep flow (22
+   DiT layers × 6 CFM Euler steps) and are amplified by the CFM ODE integration +
+   the log-mel HiFT vocoder's sensitivity → audible noise. The LM survives because
+   it is shallow-per-token and robust. cosine 0.961 (distributed small error, not
+   a localized drop or NaN) is the signature of accumulation, not a broken kernel.
+   There is nothing to file upstream and no single op to fix; the all-CPU route
+   stays correct. (Corollary: a numerically-sensitive generative head — flow
+   matching / diffusion + a log-domain vocoder — may be un-portable to a
+   lower-accumulation backend even when every op is individually "correct.")
+
+6. **Process bug worth remembering: a global find-replace can eat a function's own
+   body.** Converting ~15 `ggml_backend_sched_*(ctx->sched, gf)` call sites to
+   thin `cv3_sched_*(ctx, gf)` shims via a blanket string replace ALSO rewrote the
+   `ggml_backend_sched_*` calls INSIDE the shim definitions → the shims called
+   themselves → infinite recursion → stack-overflow SIGSEGV on any non-gallocr
+   (CPU/Metal) path. It hid because the gallocr branch skipped the recursion, so
+   only the "other" backend crashed — and I first misattributed it to a stale
+   build. When a blanket replace targets a name, exclude the definitions of the
+   wrappers you're routing THROUGH.
