@@ -6,6 +6,23 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-26 — #310: CosyVoice3 zero-shot clone leaked the reference transcript
+
+The `--voice ref.wav --ref-text` clone spoke part/all of the reference transcript
+before the requested text; baked presets were clean. Root cause was the LLM
+reference prompt, not the flow/HiFT numerics: the runtime clone set `prompt_text`
+to the bare `--ref-text`, missing the `"You are a helpful assistant.<|endofprompt|>"`
+system-prompt prefix the CosyVoice3 LLM expects (baked voices bake it in, per
+convert-cosyvoice3-voices-to-gguf.py) — so the model ran out-of-distribution and
+re-rendered the reference as speech. A second, smaller cause: the LLM got the
+mel-aligned *truncated* prompt speech tokens while the text carried the full
+transcript, leaving a one-word tail for references longer than the 10 s mel cap;
+fixed by feeding the LLM the full prompt speech tokens (the flow keeps the
+truncated set). Audio-confirmed on Metal (q4_k) via TTS→ASR: short + 11 s refs now
+speak only the target, voice unchanged, token counts back to normal (198→59).
+Merged 7dbb7564. The discriminator was dumping the baked voice's `prompt_text` and
+seeing it was the system prompt, not a bare transcript.
+
 ## 2026-07-25 — #294: F5-TTS Chinese g2p + English de-truncation (audio-confirmed)
 
 Two quality bugs the reporter hit after the speed work. **Chinese** produced no

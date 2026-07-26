@@ -10,7 +10,25 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
-## A stage's token-parity says NOTHING about how the next stage ingests its output — the F5 g2p was 99.8% correct while the tokenizer shattered every pinyin syllable (#294, 2026-07-25)
+## When a clone/zero-shot path misbehaves but the BAKED/preset path is clean, diff the two paths' DATA byte-for-byte — the difference IS the bug (CosyVoice3 #310, 2026-07-26)
+
+CosyVoice3 zero-shot (`--voice ref.wav`) spoke the reference transcript before the
+requested text; the baked preset voices were clean. Both paths run the identical
+`cv3_synth_with_voice`, so the bug had to be in the DATA the zero-shot extractor
+produced vs what the baker stored. Dumping the baked voice's `prompt_text` out of
+the voices GGUF settled it in one shot: it is `"You are a helpful
+assistant.<|endofprompt|>" + <transcript>`, i.e. the required CosyVoice3 system
+prompt + `<|endofprompt|>` boundary — while the runtime clone stored the bare
+`--ref-text`. Without that prefix the Qwen-based speech LM is out-of-distribution
+and re-renders the reference text as speech (the "leak"); it is intelligible in the
+right voice, so it reads like extra content, not miscompute. Lessons: (1) a working
+sibling path is a free oracle — when preset works and clone doesn't, the delta is a
+short list of stored fields, so compare them before touching the graph; (2) an
+instruct/chat speech-LM needs its EXACT training-time system-prompt wrapper — a bare
+prompt string silently degrades to "read this text aloud." (Second, smaller cause:
+the LLM was fed the mel-cap-truncated prompt speech tokens while the text kept the
+full transcript — feed the LM the full tokens, let only the flow use the truncated,
+mel-aligned set.)
 
 F5-TTS produced no Chinese audio because its `convert_to_pinyin` was an ASCII-only
 passthrough (every Han char → unknown token → silence). We added a real g2p
