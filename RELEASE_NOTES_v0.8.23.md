@@ -8,9 +8,11 @@ correctness fix, native speaker labels in streaming, a clearer submodule
 build error, **F5-TTS Chinese synthesis**, a **concurrency/scaling guide** with
 a new `--server-workers` flag, **broader NVIDIA GPU coverage** (older
 Pascal/Volta/P100 cards), a **VibeVoice-ASR BitNet** (2-bit ternary) conversion,
-faster VAD (whisper-VAD on GPU + a parallelized firered-vad), and several backend
-fixes — TTS on Vulkan (CosyVoice3, Qwen3-TTS, Zonos) and cleaner whisper
-punctuation. Drop-in from v0.8.22 — existing flags are unchanged.
+faster VAD (whisper-VAD on GPU + a parallelized firered-vad), an opt-in
+**`--strict-pipeline`** mode (fail instead of silently degrading a required
+VAD/aligner/punctuation stage), and several backend fixes — TTS on Vulkan
+(CosyVoice3, Qwen3-TTS, Zonos) and cleaner whisper punctuation. Drop-in from
+v0.8.22 — existing flags are unchanged.
 
 ## Fixed — Windows CPU release build (#296)
 
@@ -185,6 +187,22 @@ as speech. A reference longer than the internal 10 s cap also gave the LLM the f
 transcript but only part of the reference speech, leaving a one-word tail. Both are
 fixed — clones now speak only the requested text, voice unchanged. Metal/CUDA/CPU;
 independent of the #304 Vulkan fix.
+
+## New — strict pipeline semantics for required stages (#311)
+
+By default CrispASR degrades gracefully — a VAD, forced-aligner, or punctuation
+model that fails to load is skipped with a warning and the run still exits `0`,
+which hides failures from automation. New opt-in `--strict-pipeline` (plus
+`--require-vad` / `--require-word-timestamps` / `--require-punctuation`) makes an
+explicitly-requested stage that fails to load or produce its output return a
+**non-zero exit** instead (VAD=30, word-timestamps=31, punctuation=32; config
+error=2), and skips writing the output file. A stage that ran and legitimately
+found nothing (VAD → no speech) stays a success, direct local model paths are
+used as-is (never auto-downloaded), and nothing depends on parsing stderr. The
+**HTTP server** enforces the same via `strict_pipeline` / `require_*` form
+fields, returning HTTP 400 with a JSON error body; the shared decision logic
+(`crispasr_strict.h`) keeps the two front-ends from drifting. Docs:
+[`docs/cli.md`](docs/cli.md) and [`docs/server.md`](docs/server.md).
 
 ## Docs
 
