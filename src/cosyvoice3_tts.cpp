@@ -392,6 +392,16 @@ struct cosyvoice3_tts_context {
     ggml_backend_t backend = nullptr;
     ggml_backend_t backend_cpu = nullptr;
     ggml_backend_sched_t sched = nullptr;
+    // §304 native-Vulkan: ggml_backend_sched requires a CPU backend as its last
+    // entry, so it always keeps a CPU↔GPU split available — and CV3's graphs
+    // begin with a weight-less rms_norm on an input leaf, which the scheduler
+    // then mis-assigns to CPU and miscomputes the copy on Vulkan (blank/garbled
+    // synthesis, #304). When running natively on Vulkan we instead dispatch
+    // every graph through a single-backend gallocr on `backend` (all weights +
+    // KV are GPU-resident, so no cross-backend copy is needed), bypassing the
+    // scheduler entirely. Opt-in via CRISPASR_COSYVOICE3_VULKAN_NATIVE=1.
+    ggml_gallocr_t gpu_gallocr = nullptr;
+    bool use_gpu_gallocr = false;
     ggml_context* ctx_w = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
     ggml_backend_buffer_t buf_w_cpu = nullptr;
@@ -446,6 +456,23 @@ struct cosyvoice3_tts_context {
 };
 
 namespace {
+
+// §304 dispatch shims — route every compute graph through either the shared
+// scheduler (default) or, on native Vulkan, a single-backend gallocr on
+// ctx->backend that sidesteps the scheduler's mandatory CPU fallback and the
+// weight-less-first-op miscompute it triggers. Inputs are set between alloc and
+// compute at every call site (unchanged); with gallocr the graph tensors are
+// GPU-resident, so ggml_backend_graph_compute runs the whole graph on Vulkan.
+inline void cv3_sched_reset(cosyvoice3_tts_context* ctx) {
+    if (!ctx->use_gpu_gallocr)
+        cv3_sched_reset(ctx);
+}
+inline bool cv3_sched_alloc(cosyvoice3_tts_context* ctx, ggml_cgraph* gf) {
+    return ctx->use_gpu_gallocr ? ggml_gallocr_alloc_graph(ctx->gpu_gallocr, gf) : cv3_sched_alloc(ctx, gf);
+}
+inline ggml_status cv3_sched_compute(cosyvoice3_tts_context* ctx, ggml_cgraph* gf) {
+    return ctx->use_gpu_gallocr ? ggml_backend_graph_compute(ctx->backend, gf) : cv3_sched_compute(ctx, gf);
+}
 
 uint32_t cv3_kv_u32(gguf_context* ctx, const char* key, uint32_t def) {
     int64_t id = gguf_find_key(ctx, key);
@@ -639,14 +666,14 @@ float* cv3_run_embed(cosyvoice3_tts_context* ctx, ggml_tensor* table, const int3
     ctx->step_t1_gf = nullptr;
     ctx->step_t1_fixed_kv_len = 0;
     ggml_cgraph* gf = cv3_build_embed_graph(ctx, table, n_tokens);
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf)) {
         fprintf(stderr, "cosyvoice3_tts: embed alloc_graph failed\n");
         return nullptr;
     }
     ggml_tensor* ids_t = ggml_graph_get_tensor(gf, "embed_ids");
     ggml_backend_tensor_set(ids_t, ids, 0, (size_t)n_tokens * sizeof(int32_t));
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: embed compute failed\n");
         return nullptr;
     }
@@ -819,8 +846,8 @@ std::vector<int32_t> cv3_tokenize_s3tok(cosyvoice3_tts_context* ctx, const float
     ctx->step_t1_gf = nullptr;
     ctx->step_t1_fixed_kv_len = 0;
     ggml_cgraph* gf = cv3_build_s3tok_graph(ctx, T_use);
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf)) {
         fprintf(stderr, "cosyvoice3_tts: s3tok alloc_graph failed\n");
         return out;
     }
@@ -832,7 +859,7 @@ std::vector<int32_t> cv3_tokenize_s3tok(cosyvoice3_tts_context* ctx, const float
             pos[(size_t)i] = i;
         ggml_backend_tensor_set(pos_t, pos.data(), 0, pos.size() * sizeof(int32_t));
     }
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: s3tok graph compute failed\n");
         return out;
     }
@@ -1081,6 +1108,17 @@ extern "C" struct cosyvoice3_tts_context* cosyvoice3_tts_init_from_file(const ch
             backends[n_be++] = ctx->backend_cpu;
         ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 16384, false, false);
     }
+    // §304: on native Vulkan, dispatch every graph through a single-backend
+    // gallocr (see the struct comment) instead of the scheduler. Reaching here
+    // with a Vulkan GPU backend means CRISPASR_COSYVOICE3_VULKAN_NATIVE=1 kept
+    // it (the default routes Vulkan → CPU above).
+    if (ctx->backend != ctx->backend_cpu && std::strstr(ggml_backend_name(ctx->backend), "Vulkan") != nullptr) {
+        ctx->gpu_gallocr = ggml_gallocr_new(ggml_backend_get_default_buffer_type(ctx->backend));
+        ctx->use_gpu_gallocr = ctx->gpu_gallocr != nullptr;
+        if (params.verbosity >= 1) {
+            fprintf(stderr, "cosyvoice3_tts: native Vulkan — dispatching graphs via single-backend gallocr (#304)\n");
+        }
+    }
     ctx->compute_meta.resize(ggml_tensor_overhead() * 16384 + ggml_graph_overhead_custom(16384, false));
 
     if (params.verbosity >= 1) {
@@ -1121,6 +1159,8 @@ extern "C" void cosyvoice3_tts_free(struct cosyvoice3_tts_context* ctx) {
         ggml_free(ctx->kv_ctx);
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
+    if (ctx->gpu_gallocr)
+        ggml_gallocr_free(ctx->gpu_gallocr);
     if (ctx->buf_w)
         ggml_backend_buffer_free(ctx->buf_w);
     if (ctx->buf_w_cpu)
@@ -1237,8 +1277,8 @@ extern "C" float* cosyvoice3_tts_prefill_with_embeds(struct cosyvoice3_tts_conte
     ctx->step_t1_fixed_kv_len = 0;
 
     ggml_cgraph* gf = cv3_build_lm_graph(ctx, n_tokens, n_past, /*fixed_kv_len*/ 0);
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf)) {
         fprintf(stderr, "cosyvoice3_tts: prefill alloc_graph failed\n");
         return nullptr;
     }
@@ -1270,7 +1310,7 @@ extern "C" float* cosyvoice3_tts_prefill_with_embeds(struct cosyvoice3_tts_conte
     if (!set_t("lm_causal_mask", mask.data(), mask.size() * sizeof(ggml_fp16_t)))
         return nullptr;
 
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: prefill compute failed\n");
         return nullptr;
     }
@@ -1349,8 +1389,8 @@ extern "C" float* cosyvoice3_tts_step_speech(struct cosyvoice3_tts_context* ctx,
         ctx->step_t1_fixed_kv_len = fixed_kv;
     }
 
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf)) {
         fprintf(stderr, "cosyvoice3_tts: step alloc_graph failed\n");
         free(embed_alloc);
         return nullptr;
@@ -1382,7 +1422,7 @@ extern "C" float* cosyvoice3_tts_step_speech(struct cosyvoice3_tts_context* ctx,
     if (!set_t("lm_causal_mask", mask.data(), mask.size() * sizeof(ggml_fp16_t)))
         return nullptr;
 
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: step compute failed\n");
         return nullptr;
     }
@@ -1655,8 +1695,8 @@ extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ct
             return nullptr;
         const int T_use = n_embed_tokens;
         ggml_cgraph* gf = cv3_build_s3tok_graph(ctx, T_use);
-        ggml_backend_sched_reset(ctx->sched);
-        if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+        cv3_sched_reset(ctx);
+        if (!cv3_sched_alloc(ctx, gf)) {
             fprintf(stderr, "cosyvoice3_tts: %s alloc_graph failed\n", stage_name);
             return nullptr;
         }
@@ -1670,7 +1710,7 @@ extern "C" float* cosyvoice3_tts_extract_stage(struct cosyvoice3_tts_context* ct
                 pos[(size_t)i] = i;
             ggml_backend_tensor_set(pos_t, pos.data(), 0, pos.size() * sizeof(int32_t));
         }
-        if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+        if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
             fprintf(stderr, "cosyvoice3_tts: %s compute failed\n", stage_name);
             return nullptr;
         }
@@ -2362,8 +2402,8 @@ extern "C" float* cosyvoice3_tts_run_flow_dit_block(struct cosyvoice3_tts_contex
     ggml_cgraph* gf = cv3_build_flow_dit_block_graph(ctx, block_idx, T);
     if (!gf)
         return nullptr;
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf)) {
         fprintf(stderr, "cosyvoice3_tts: dit_block alloc_graph failed\n");
         return nullptr;
     }
@@ -2386,7 +2426,7 @@ extern "C" float* cosyvoice3_tts_run_flow_dit_block(struct cosyvoice3_tts_contex
     if (!set_t("dit_positions", pos.data(), pos.size() * sizeof(int32_t)))
         return nullptr;
 
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: dit_block compute failed\n");
         return nullptr;
     }
@@ -2424,8 +2464,8 @@ float* cv3_extract_flow_dit_stage(cosyvoice3_tts_context* ctx, int block_idx, co
     ggml_cgraph* gf = cv3_build_flow_dit_block_graph(ctx, block_idx, T);
     if (!gf)
         return nullptr;
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf))
         return nullptr;
 
     auto set_t = [&](const char* nm, const void* data, size_t bytes) {
@@ -2444,7 +2484,7 @@ float* cv3_extract_flow_dit_stage(cosyvoice3_tts_context* ctx, int block_idx, co
         pos[i] = i;
     if (!set_t("dit_positions", pos.data(), pos.size() * sizeof(int32_t)))
         return nullptr;
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS)
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS)
         return nullptr;
 
     ggml_tensor* out_t = ggml_graph_get_tensor(gf, tensor_name);
@@ -2685,8 +2725,8 @@ float* cv3_extract_pre_la_stage(cosyvoice3_tts_context* ctx, const int32_t* ids,
     ggml_cgraph* gf = cv3_build_pre_la_graph(ctx, T_tok);
     if (!gf)
         return nullptr;
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf))
         return nullptr;
 
     ggml_tensor* ids_t = ggml_graph_get_tensor(gf, "pre_la_ids_in");
@@ -2694,7 +2734,7 @@ float* cv3_extract_pre_la_stage(cosyvoice3_tts_context* ctx, const int32_t* ids,
         return nullptr;
     ggml_backend_tensor_set(ids_t, ids, 0, (size_t)T_tok * sizeof(int32_t));
 
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: pre_la compute failed\n");
         return nullptr;
     }
@@ -2833,8 +2873,8 @@ float* cv3_extract_in_pipe_stage(cosyvoice3_tts_context* ctx, const float* pre_l
     ggml_cgraph* gf = cv3_build_in_pipe_graph(ctx, T_mel);
     if (!gf)
         return nullptr;
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf)) {
         fprintf(stderr, "cosyvoice3_tts: in_pipe alloc_graph failed\n");
         return nullptr;
     }
@@ -2855,7 +2895,7 @@ float* cv3_extract_in_pipe_stage(cosyvoice3_tts_context* ctx, const float* pre_l
     if (!set_t("in_pipe_cond_in", cond, (size_t)mel * T_mel * sizeof(float)))
         return nullptr;
 
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: in_pipe compute failed\n");
         return nullptr;
     }
@@ -3075,8 +3115,8 @@ float* cv3_extract_dit_full_stage(cosyvoice3_tts_context* ctx, const float* x, i
     ggml_cgraph* gf = cv3_build_dit_full_graph(ctx, T_mel);
     if (!gf)
         return nullptr;
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf)) {
         fprintf(stderr, "cosyvoice3_tts: dit_full alloc_graph failed\n");
         return nullptr;
     }
@@ -3098,7 +3138,7 @@ float* cv3_extract_dit_full_stage(cosyvoice3_tts_context* ctx, const float* x, i
     if (!set_t("dit_full_positions", pos.data(), pos.size() * sizeof(int32_t)))
         return nullptr;
 
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: dit_full compute failed\n");
         return nullptr;
     }
@@ -3372,8 +3412,8 @@ float* cv3_run_estimator_cfg(cosyvoice3_tts_context* ctx, const float* x, int T_
     ggml_cgraph* gf = cv3_build_estimator_cfg_graph(ctx, T_mel);
     if (!gf)
         return nullptr;
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf))
         return nullptr;
     auto set_t = [&](const char* name, const void* data, size_t bytes) {
         ggml_tensor* t = ggml_graph_get_tensor(gf, name);
@@ -3394,7 +3434,7 @@ float* cv3_run_estimator_cfg(cosyvoice3_tts_context* ctx, const float* x, int T_
         pos[(size_t)i] = i;
     if (!set_t("cfg_positions", pos.data(), pos.size() * sizeof(int32_t)))
         return nullptr;
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: batched CFG estimator compute failed\n");
         return nullptr;
     }
@@ -3421,8 +3461,8 @@ float* cv3_run_estimator_full(cosyvoice3_tts_context* ctx, const float* x, int T
     ggml_cgraph* gf = cv3_build_estimator_full_graph(ctx, T_mel);
     if (!gf)
         return nullptr;
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf))
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf))
         return nullptr;
 
     auto set_t = [&](const char* nm, const void* data, size_t bytes) {
@@ -3449,7 +3489,7 @@ float* cv3_run_estimator_full(cosyvoice3_tts_context* ctx, const float* x, int T
     if (!set_t("est_positions", pos.data(), pos.size() * sizeof(int32_t)))
         return nullptr;
 
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: estimator_full compute failed\n");
         return nullptr;
     }
@@ -3721,8 +3761,8 @@ float* cv3_extract_hift_f0_stage(cosyvoice3_tts_context* ctx, const float* mel, 
     ggml_cgraph* gf = cv3_build_hift_f0_graph(ctx, T_mel);
     if (!gf)
         return nullptr;
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf)) {
         fprintf(stderr, "cosyvoice3_tts: hift_f0 alloc_graph failed\n");
         return nullptr;
     }
@@ -3730,7 +3770,7 @@ float* cv3_extract_hift_f0_stage(cosyvoice3_tts_context* ctx, const float* mel, 
     if (!in_t)
         return nullptr;
     ggml_backend_tensor_set(in_t, mel, 0, (size_t)mel_dim * T_mel * sizeof(float));
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: hift_f0 compute failed\n");
         return nullptr;
     }
@@ -4333,8 +4373,8 @@ float* cv3_extract_hift_decode_stage(cosyvoice3_tts_context* ctx, const float* m
     ggml_cgraph* gf = cv3_build_hift_decode_graph(ctx, T_mel);
     if (!gf)
         return nullptr;
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    cv3_sched_reset(ctx);
+    if (!cv3_sched_alloc(ctx, gf)) {
         fprintf(stderr, "cosyvoice3_tts: hift_decode alloc_graph failed\n");
         return nullptr;
     }
@@ -4344,7 +4384,7 @@ float* cv3_extract_hift_decode_stage(cosyvoice3_tts_context* ctx, const float* m
         return nullptr;
     ggml_backend_tensor_set(mel_t, mel, 0, (size_t)mel_dim * T_mel * sizeof(float));
     ggml_backend_tensor_set(s_t, s_stft_in, 0, (size_t)T_stft * s_stft_ch * sizeof(float));
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (cv3_sched_compute(ctx, gf) != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "cosyvoice3_tts: hift_decode compute failed\n");
         return nullptr;
     }
