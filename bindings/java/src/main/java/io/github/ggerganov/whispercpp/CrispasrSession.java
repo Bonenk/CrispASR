@@ -107,6 +107,9 @@ public final class CrispasrSession implements AutoCloseable {
         long         crispasr_session_result_word_t1(Pointer result, int iSeg, int iWord);
         float        crispasr_session_result_word_p(Pointer result, int iSeg, int iWord);
         float        crispasr_session_result_segment_no_speech_prob(Pointer result, int iSeg);
+        // #300: native per-segment speaker label ("(Speaker N) "), or "" when the
+        // backend does not diarize natively. Never NULL.
+        String       crispasr_session_result_segment_speaker(Pointer result, int i);
         // Per-frame CTC logits (opted in via crispasr_session_set_return_logits)
         // for backends with a dense CTC grid (Omni CTC, wav2vec2/hubert/data2vec,
         // canary-ctc). _logits returns a const float* (frame-major;
@@ -828,8 +831,15 @@ public final class CrispasrSession implements AutoCloseable {
         /** Whisper's per-segment no-speech probability (the {@code <|nospeech|>}
          *  posterior) in [0, 1]. Whisper-only; other backends leave -1.0 ("no data"). */
         public final float noSpeechProb;
-        Segment(String text, long t0, long t1, Word[] words, float noSpeechProb) {
+        /** Native per-segment speaker label from a backend that diarizes on its own,
+         *  in the {@code "(Speaker N) "} form the CLI prefixes into text/srt/vtt output,
+         *  or {@code ""} when the backend produced none. Populated today by vibevoice.
+         *  The ordinals are CHUNK-LOCAL: {@code Speaker 1} from one transcribe call is
+         *  not necessarily the same voice as {@code Speaker 1} from the next. */
+        public final String speaker;
+        Segment(String text, long t0, long t1, Word[] words, float noSpeechProb, String speaker) {
             this.text = text; this.t0 = t0; this.t1 = t1; this.words = words; this.noSpeechProb = noSpeechProb;
+            this.speaker = speaker == null ? "" : speaker;
         }
     }
 
@@ -951,7 +961,8 @@ public final class CrispasrSession implements AutoCloseable {
                     Lib.INSTANCE.crispasr_session_result_word_p(r, i, j));
             }
             float noSpeechProb = Lib.INSTANCE.crispasr_session_result_segment_no_speech_prob(r, i);
-            segs[i] = new Segment(text, t0, t1, words, noSpeechProb);
+            String speaker = Lib.INSTANCE.crispasr_session_result_segment_speaker(r, i);
+            segs[i] = new Segment(text, t0, t1, words, noSpeechProb, speaker);
         }
         return segs;
     }

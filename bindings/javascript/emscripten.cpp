@@ -148,6 +148,9 @@ long long crispasr_session_result_word_t0(struct crispasr_session_result* r, int
 long long crispasr_session_result_word_t1(struct crispasr_session_result* r, int i_seg, int i_word);
 float crispasr_session_result_word_p(struct crispasr_session_result* r, int i_seg, int i_word);
 float crispasr_session_result_segment_no_speech_prob(struct crispasr_session_result* r, int i_seg);
+// #300: native per-segment speaker label ("(Speaker N) "), "" when the backend
+// does not diarize natively. Never NULL.
+const char* crispasr_session_result_segment_speaker(struct crispasr_session_result* r, int i);
 int crispasr_session_result_word_n_alts(struct crispasr_session_result* r, int i_seg, int i_word);
 const char* crispasr_session_result_word_alt_text(struct crispasr_session_result* r, int i_seg, int i_word, int i_alt);
 float crispasr_session_result_word_alt_p(struct crispasr_session_result* r, int i_seg, int i_word, int i_alt);
@@ -849,6 +852,10 @@ EMSCRIPTEN_BINDINGS(whisper) {
                 seg.set("t0", crispasr_session_result_segment_t0(res, i) / 100.0);
                 seg.set("t1", crispasr_session_result_segment_t1(res, i) / 100.0);
                 seg.set("noSpeechProb", (double)crispasr_session_result_segment_no_speech_prob(res, i));
+                {
+                    const char* spk = crispasr_session_result_segment_speaker(res, i);
+                    seg.set("speaker", std::string(spk ? spk : ""));
+                }
                 int nw = crispasr_session_result_n_words(res, i);
                 emscripten::val words = emscripten::val::array();
                 for (int j = 0; j < nw; j++) {
@@ -908,6 +915,10 @@ EMSCRIPTEN_BINDINGS(whisper) {
                 seg.set("t0", crispasr_session_result_segment_t0(res, i) / 100.0);
                 seg.set("t1", crispasr_session_result_segment_t1(res, i) / 100.0);
                 seg.set("noSpeechProb", (double)crispasr_session_result_segment_no_speech_prob(res, i));
+                {
+                    const char* spk = crispasr_session_result_segment_speaker(res, i);
+                    seg.set("speaker", std::string(spk ? spk : ""));
+                }
                 int nw = crispasr_session_result_n_words(res, i);
                 emscripten::val words = emscripten::val::array();
                 for (int j = 0; j < nw; j++) {

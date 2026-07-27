@@ -6,6 +6,36 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-27 — #308 audit: the capitalisation fix had been living in a dead copy
+
+Auditing the remaining ASR backends for the `CAP_PUNCTUATION_NATIVE` flag #308
+asked for turned up something bigger. `moonshine-streaming` and `canary-qwen`
+were printing `ANd so, my fellow Americans…` — the exact double-capital #308 had
+fixed. The guard was right there in `src/fireredpunc.cpp`, and instrumenting it
+produced no output at all, which was the tell: **there are two copies of that
+file.** `src/CMakeLists.txt` prefers the shared `crisp_punc/` library and builds
+the `src/` copy only as a fallback for a checkout missing that directory — so
+`crisp_punc/src/fireredpunc.cpp` is what links, and #308's fix had gone into the
+other one. The two files differed by exactly that hunk. It had been dead code for
+months while the shipping copy kept the bug.
+
+Fixed in both, plus a second defect the same trace exposed: the pass appended a
+mark to text that already ended in one (`your country..`), so the label insertion
+now refuses to stack punctuation on punctuation. `tests/test-punc-copies-in-sync.cpp`
+fails if the copies ever diverge again — it was written first and watched failing
+at line 841, the missing hunk.
+
+The audit itself needed a correction too. `--no-punctuation` looked like the way
+to see a model's raw output, but it *strips* punctuation after the fact, so every
+natively-punctuating model looked unpunctuated under it — on that reading the
+whole fleet needed the flag. `FIREREDPUNC_DEBUG=1` prints the pass's actual input,
+which settled it per backend: `moonshine-streaming` and `mimo-asr` emit punctuated,
+cased text and now declare `CAP_PUNCTUATION_NATIVE`; `canary-qwen` (cased, no
+punctuation) and `firered-asr` (ALL CAPS, no punctuation) genuinely need the pass
+and would have been damaged by a blanket flag; `higgs-stt` and `ark-asr` emit
+lowercase text with a trailing stop and are fixed by the no-double-punctuation
+guard alone. Six backends verified on real audio, before and after.
+
 ## 2026-07-27 — #300 follow-up: vibevoice printed its speaker labels instead of reading them
 
 The reporter came back on the closed #300 with "What about vibevoice?" — and was
