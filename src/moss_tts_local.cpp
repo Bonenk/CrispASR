@@ -972,13 +972,19 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
     const int max_frames = sp.max_new_frames > 0 ? sp.max_new_frames : 4096;
     const int stride = 1 + n_vq;
     Rng rng(sp.seed ? sp.seed : ctx->seed);
-    const bool text_greedy = sp.text_temperature <= 0.f;
+    // CRISPASR_MOSS_TTS_LOCAL_GREEDY_TEXT=1 forces the binary stop head greedy
+    // (argmax) — used by the #249 trajectory diff so the stop decision is
+    // deterministic and directly comparable to the HF reference run greedy.
+    const bool text_greedy = (sp.text_temperature <= 0.f) || (getenv("CRISPASR_MOSS_TTS_LOCAL_GREEDY_TEXT") != nullptr);
     // CRISPASR_MOSS_TTS_LOCAL_GREEDY_AUDIO=1 forces greedy audio codebooks (A/B the
     // stop-runaway hypothesis: sampled audio feeds back and may prevent the binary
     // stop head from firing). CRISPASR_MOSS_TTS_LOCAL_DEBUG=1 traces stop logits.
     const bool audio_greedy =
         (sp.audio_temperature <= 0.f) || (getenv("CRISPASR_MOSS_TTS_LOCAL_GREEDY_AUDIO") != nullptr);
     const bool dbg = getenv("CRISPASR_MOSS_TTS_LOCAL_DEBUG") != nullptr;
+    // CRISPASR_MOSS_TTS_LOCAL_DUMP_STOP=1 emits the RAW (pre-softmax) stop-head
+    // logits every frame, parseable, for the reference-vs-port trajectory diff.
+    const bool dump_stop = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_STOP") != nullptr;
 
     std::string prompt = mtl_build_prompt(ctx, text, sp);
     int n_ids = 0;
@@ -1019,9 +1025,15 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
         }
         // Binary continue/stop head: index 0 = assistant_slot (continue), 1 = audio_end.
         float* tl = mtl_apply_head(ctx, ctx->model.local_text_head_w, lh, d, 2);
+        // Capture the RAW logits before sample_one softmaxes them in place.
+        const float raw_cont = tl ? tl[0] : 0.f;
+        const float raw_stop = tl ? tl[1] : 0.f;
         const int stop_idx =
             tl ? sample_one(tl, 2, sp.text_temperature, sp.text_top_p, sp.text_top_k, !text_greedy, rng) : 1;
-        if (dbg && tl && (f < 8 || f % 64 == 0))
+        if (dump_stop)
+            fprintf(stderr, "DUMPSTOP frame=%d cont=%.6f stop=%.6f gap=%.6f\n", f, raw_cont, raw_stop,
+                    raw_cont - raw_stop);
+        else if (dbg && tl && (f < 8 || f % 64 == 0))
             fprintf(stderr, "moss_tts_local[dbg] frame %d: stop_head continue=%.4f stop=%.4f -> %s\n", f, tl[0], tl[1],
                     stop_idx == 1 ? "STOP" : "cont");
         free(tl);
