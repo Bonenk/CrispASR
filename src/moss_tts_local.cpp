@@ -330,6 +330,15 @@ static ggml_cgraph* mtl_build_graph_llm_kv(moss_tts_local_context* ctx, int n_pa
     // #249 per-layer diff: on the prompt prefill, expose each block's output so
     // mtl_run_backbone can dump it and compare to the reference per layer.
     const bool dump_layers = (n_past == 0) && (getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_LAYERS") != nullptr);
+    // #249 option 2 — pin the layer-10 op: for one target layer, expose the
+    // attention output and the SwiGLU-MLP output (both pre-residual, last
+    // position) so the per-sublayer diff can tell whether attention or the MLP is
+    // where the block first diverges from the reference (block input matches).
+    int dump_sub = -1;
+    if (n_past == 0) {
+        if (const char* s = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_SUBLAYER"))
+            dump_sub = atoi(s);
+    }
     ggml_tensor* cur = embeds;
     for (uint32_t il = 0; il < hp.llm_layers; il++) {
         const auto& b = m.blocks[il];
@@ -341,7 +350,19 @@ static ggml_cgraph* mtl_build_graph_llm_kv(moss_tts_local_context* ctx, int n_pa
         cur = ggml_add(ctx0, residual, attn);
         residual = cur;
         x = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, eps), b.ffn_norm_w);
-        cur = ggml_add(ctx0, residual, core_ffn::swiglu(ctx0, x, b.ffn_gate_w, b.ffn_up_w, b.ffn_down_w));
+        ggml_tensor* mlp = core_ffn::swiglu(ctx0, x, b.ffn_gate_w, b.ffn_up_w, b.ffn_down_w);
+        cur = ggml_add(ctx0, residual, mlp);
+        if (dump_sub == (int)il) {
+            char nm[24];
+            snprintf(nm, sizeof(nm), "sub_attn_%u", il);
+            ggml_set_name(attn, nm);
+            ggml_set_output(attn);
+            ggml_build_forward_expand(gf, attn);
+            snprintf(nm, sizeof(nm), "sub_mlp_%u", il);
+            ggml_set_name(mlp, nm);
+            ggml_set_output(mlp);
+            ggml_build_forward_expand(gf, mlp);
+        }
         if (dump_layers) {
             char nm[24];
             snprintf(nm, sizeof(nm), "blk_%u", il);
@@ -451,6 +472,29 @@ static float* mtl_run_backbone(moss_tts_local_context* ctx, const float* inputs_
                     fprintf(lf, "\n");
                 }
                 fclose(lf);
+            }
+        }
+        // #249 option 2: dump one target layer's attention + MLP outputs.
+        if (const char* sl = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_SUBLAYER")) {
+            if (const char* sp = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_SUBLAYER_PATH")) {
+                const int il = atoi(sl);
+                if (FILE* sf = fopen(sp, "w")) {
+                    std::vector<float> buf(d);
+                    for (const char* which : {"sub_attn", "sub_mlp"}) {
+                        char nm[24];
+                        snprintf(nm, sizeof(nm), "%s_%d", which, il);
+                        ggml_tensor* t = ggml_graph_get_tensor(gf, nm);
+                        if (!t)
+                            continue;
+                        ggml_backend_tensor_get(t, buf.data(), (size_t)(n_tokens - 1) * d * sizeof(float),
+                                                (size_t)d * sizeof(float));
+                        fprintf(sf, "%s", nm);
+                        for (int i = 0; i < d; i++)
+                            fprintf(sf, " %.6f", buf[i]);
+                        fprintf(sf, "\n");
+                    }
+                    fclose(sf);
+                }
             }
         }
     }
