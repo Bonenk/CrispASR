@@ -109,6 +109,7 @@ long long    crispasr_session_result_word_t0(crispasr_session_result* r, int i_s
 long long    crispasr_session_result_word_t1(crispasr_session_result* r, int i_seg, int i_word);
 float        crispasr_session_result_word_p(crispasr_session_result* r, int i_seg, int i_word);
 float        crispasr_session_result_segment_no_speech_prob(crispasr_session_result* r, int i_seg);
+const char*  crispasr_session_result_segment_speaker(crispasr_session_result* r, int i);
 // Per-frame CTC logits (opted in via crispasr_session_set_return_logits) for
 // backends that produce a dense CTC grid (Omni CTC, wav2vec2/hubert/data2vec,
 // canary-ctc). Frame-major: logits[t * n_logit_vocab + v]. Raw pre-softmax for
@@ -1102,6 +1103,13 @@ type TranscribeSegment struct {
 	// <|nospeech|> posterior) in [0, 1]. Whisper-only; other backends leave
 	// the -1.0 "no data" sentinel.
 	NoSpeechProb float32
+	// Speaker is a native per-segment speaker label from a backend that
+	// diarizes on its own, in the "(Speaker N) " form the CLI prefixes into
+	// text/srt/vtt output, or "" when the backend produced none. Populated
+	// today by vibevoice, whose model answers with a Start/End/Speaker/Content
+	// array. The ordinals are CHUNK-LOCAL: "Speaker 1" in one transcribe call
+	// is not necessarily the same voice as "Speaker 1" in the next.
+	Speaker string
 }
 
 // TranscribeWord is one word with timing and confidence.
@@ -1241,6 +1249,7 @@ func extractResult(r *C.crispasr_session_result) *TranscribeResult {
 		seg.T0 = int64(C.crispasr_session_result_segment_t0(r, C.int(i)))
 		seg.T1 = int64(C.crispasr_session_result_segment_t1(r, C.int(i)))
 		seg.NoSpeechProb = float32(C.crispasr_session_result_segment_no_speech_prob(r, C.int(i)))
+		seg.Speaker = C.GoString(C.crispasr_session_result_segment_speaker(r, C.int(i)))
 		nWords := int(C.crispasr_session_result_n_words(r, C.int(i)))
 		seg.Words = make([]TranscribeWord, nWords)
 		for j := 0; j < nWords; j++ {

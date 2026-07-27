@@ -1,4 +1,4 @@
-// vibevoice_transcript_parse.h — turn VibeVoice-ASR's answer into segments.
+// core/vibevoice_transcript.h — turn VibeVoice-ASR's answer into segments.
 //
 // VibeVoice-ASR is prompted with "Start time, End time, Speaker ID, Content"
 // (see src/vibevoice.cpp) and answers with a JSON array, one object per
@@ -21,6 +21,12 @@
 //
 // Weight-free and self-contained on purpose — tests/test-vibevoice-transcript.cpp
 // covers it without a model, which is the tier CI actually runs.
+//
+// It lives in core/ rather than examples/cli/ because BOTH surfaces need it: the
+// CLI adapter and the session C-ABI, which reimplements each backend's
+// transcribe inline (docs/contributing.md point 6). A parse that landed only in
+// the adapter would leave every binding — Python, Go, Flutter — still handing
+// its callers the raw JSON blob.
 
 #pragma once
 
@@ -30,7 +36,7 @@
 #include <string>
 #include <vector>
 
-namespace vibevoice_transcript {
+namespace core_vibevoice {
 
 struct Utterance {
     double start_s = -1.0; // <0 when the model omitted it
@@ -271,4 +277,57 @@ inline std::vector<Utterance> parse(const std::string& raw) {
     return out;
 }
 
-} // namespace vibevoice_transcript
+// Assign decode tokens to utterances.
+//
+// The session ABI exposes a per-token confidence list alongside the transcript.
+// Once the answer is split into utterances, that list has to be split the same
+// way — otherwise a caller reading segment 2's "words" gets tokens belonging to
+// segment 0, plus every `[`, `{` and `"Speaker"` of the JSON scaffolding.
+//
+// The mapping is exact rather than heuristic: each Content is a verbatim
+// substring of the concatenated token texts (the parser only unescapes, and the
+// escapes below are handled by searching for the raw form first). So walk the
+// tokens once, accumulating character offsets, and find each Content's span in
+// that same string, resuming each search where the previous one ended. A token
+// belongs to the utterance whose span it overlaps; scaffolding tokens overlap
+// nothing and are dropped, which is the point.
+//
+// `token_texts` must be in decode order. Returns one index list per utterance
+// (parallel to `utts`); an utterance whose Content could not be located — a
+// heavily escaped Content, say — gets an empty list rather than a wrong one.
+inline std::vector<std::vector<int>> assign_tokens(const std::vector<Utterance>& utts,
+                                                   const std::vector<std::string>& token_texts) {
+    std::vector<std::vector<int>> out(utts.size());
+    std::string joined;
+    std::vector<size_t> tok_start(token_texts.size(), 0);
+    for (size_t i = 0; i < token_texts.size(); i++) {
+        tok_start[i] = joined.size();
+        joined += token_texts[i];
+    }
+    size_t search_from = 0;
+    for (size_t u = 0; u < utts.size(); u++) {
+        const std::string& needle = utts[u].text;
+        if (needle.empty())
+            continue;
+        size_t pos = joined.find(needle, search_from);
+        if (pos == std::string::npos) {
+            // Fall back to a search from the top — the model can repeat a line
+            // (our own multispeaker fixture does), so a miss ahead of the
+            // cursor is worth one retry before giving up on this utterance.
+            pos = joined.find(needle);
+            if (pos == std::string::npos)
+                continue;
+        }
+        const size_t end = pos + needle.size();
+        for (size_t i = 0; i < token_texts.size(); i++) {
+            const size_t s = tok_start[i];
+            const size_t e = s + token_texts[i].size();
+            if (e > pos && s < end) // overlap, half-open
+                out[u].push_back((int)i);
+        }
+        search_from = end;
+    }
+    return out;
+}
+
+} // namespace core_vibevoice

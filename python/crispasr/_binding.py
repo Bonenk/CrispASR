@@ -450,6 +450,14 @@ class SessionSegment:
     # in [0, 1]. Whisper-only; other backends (and older libcrispasr builds
     # without the accessor) leave the -1.0 "no data" sentinel.
     no_speech_prob: float = -1.0
+    # Native per-segment speaker label from a backend that diarizes on its own,
+    # in the "(Speaker N) " form the CLI prefixes into text/srt/vtt output, or
+    # "" when the backend produced none (and on older libcrispasr builds without
+    # the accessor). Populated today by vibevoice, whose model answers with a
+    # Start/End/Speaker/Content array. The ordinals are CHUNK-LOCAL: "Speaker 1"
+    # in one transcribe call is not necessarily the same voice as "Speaker 1" in
+    # the next — use the diarize_* helpers for cross-recording clustering.
+    speaker: str = ""
 
 
 # =========================================================================
@@ -1312,6 +1320,12 @@ class Session:
         lib.crispasr_session_result_segment_t0.restype = ctypes.c_int64
         lib.crispasr_session_result_segment_t1.argtypes = [ctypes.c_void_p, ctypes.c_int]
         lib.crispasr_session_result_segment_t1.restype = ctypes.c_int64
+        # segment_speaker was added 2026-07-27 (#300). Older libcrispasr builds
+        # don't export it — probe with hasattr at the call site and fall back to
+        # "" so a new wheel keeps working against an older system library.
+        if hasattr(lib, "crispasr_session_result_segment_speaker"):
+            lib.crispasr_session_result_segment_speaker.argtypes = [ctypes.c_void_p, ctypes.c_int]
+            lib.crispasr_session_result_segment_speaker.restype = ctypes.c_char_p
         lib.crispasr_session_result_n_words.argtypes = [ctypes.c_void_p, ctypes.c_int]
         lib.crispasr_session_result_n_words.restype = ctypes.c_int
         lib.crispasr_session_result_word_text.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_int]
@@ -1428,6 +1442,9 @@ class Session:
                 wn = self._lib.crispasr_session_result_n_words(res, i)
                 has_nsp = hasattr(self._lib, "crispasr_session_result_segment_no_speech_prob")
                 nsp = self._lib.crispasr_session_result_segment_no_speech_prob(res, i) if has_nsp else -1.0
+                spk_b = (self._lib.crispasr_session_result_segment_speaker(res, i)
+                         if hasattr(self._lib, "crispasr_session_result_segment_speaker") else None)
+                spk = spk_b.decode("utf-8") if spk_b else ""
                 words: List[SessionWord] = []
                 has_word_p = hasattr(self._lib, "crispasr_session_result_word_p")
                 for j in range(wn):
@@ -1441,7 +1458,7 @@ class Session:
                         # surface 1.0 so callers can render uniformly.
                         confidence=1.0 if raw_p < 0 else raw_p,
                     ))
-                out.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp))
+                out.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp, speaker=spk))
             return out
         finally:
             self._lib.crispasr_session_result_free(res)
@@ -1511,6 +1528,9 @@ class Session:
                 wn = self._lib.crispasr_session_result_n_words(res, i)
                 has_nsp = hasattr(self._lib, "crispasr_session_result_segment_no_speech_prob")
                 nsp = self._lib.crispasr_session_result_segment_no_speech_prob(res, i) if has_nsp else -1.0
+                spk_b = (self._lib.crispasr_session_result_segment_speaker(res, i)
+                         if hasattr(self._lib, "crispasr_session_result_segment_speaker") else None)
+                spk = spk_b.decode("utf-8") if spk_b else ""
                 words: List[SessionWord] = []
                 for j in range(wn):
                     wt = self._lib.crispasr_session_result_word_text(res, i, j)
@@ -1521,7 +1541,7 @@ class Session:
                         end=self._lib.crispasr_session_result_word_t1(res, i, j) / 100.0,
                         confidence=1.0 if raw_p < 0 else raw_p,
                     ))
-                out.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp))
+                out.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp, speaker=spk))
             return out
         finally:
             self.set_return_logits(False)
@@ -1635,6 +1655,9 @@ class Session:
                 wn = self._lib.crispasr_session_result_n_words(res, i)
                 has_nsp = hasattr(self._lib, "crispasr_session_result_segment_no_speech_prob")
                 nsp = self._lib.crispasr_session_result_segment_no_speech_prob(res, i) if has_nsp else -1.0
+                spk_b = (self._lib.crispasr_session_result_segment_speaker(res, i)
+                         if hasattr(self._lib, "crispasr_session_result_segment_speaker") else None)
+                spk = spk_b.decode("utf-8") if spk_b else ""
                 words: List[SessionWord] = []
                 has_word_p = hasattr(self._lib, "crispasr_session_result_word_p")
                 for j in range(wn):
@@ -1648,7 +1671,7 @@ class Session:
                         # surface 1.0 so callers can render uniformly.
                         confidence=1.0 if raw_p < 0 else raw_p,
                     ))
-                out.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp))
+                out.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp, speaker=spk))
             return out
         finally:
             self._lib.crispasr_session_result_free(res)
@@ -1705,6 +1728,9 @@ class Session:
                 wn = self._lib.crispasr_session_result_n_words(res, i)
                 has_nsp = hasattr(self._lib, "crispasr_session_result_segment_no_speech_prob")
                 nsp = self._lib.crispasr_session_result_segment_no_speech_prob(res, i) if has_nsp else -1.0
+                spk_b = (self._lib.crispasr_session_result_segment_speaker(res, i)
+                         if hasattr(self._lib, "crispasr_session_result_segment_speaker") else None)
+                spk = spk_b.decode("utf-8") if spk_b else ""
                 words: List[SessionWord] = []
                 for j in range(wn):
                     wt = self._lib.crispasr_session_result_word_text(res, i, j)
@@ -1715,7 +1741,7 @@ class Session:
                         end=self._lib.crispasr_session_result_word_t1(res, i, j) / 100.0,
                         confidence=1.0 if raw_p < 0 else raw_p,
                     ))
-                segs.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp))
+                segs.append(SessionSegment(text=text.strip(), start=t0, end=t1, words=words, no_speech_prob=nsp, speaker=spk))
 
             # Lift out the CTC logits (if any) before the handle is freed.
             n_frames = self._lib.crispasr_session_result_n_logit_frames(res)

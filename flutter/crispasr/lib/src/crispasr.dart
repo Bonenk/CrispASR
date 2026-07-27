@@ -919,12 +919,22 @@ class SessionSegment {
   /// in [0, 1]. Whisper-only; other backends (and older dylibs without the
   /// accessor) leave the -1.0 "no data" sentinel.
   final double noSpeechProb;
+
+  /// Native per-segment speaker label from a backend that diarizes on its own,
+  /// in the `"(Speaker N) "` form the CLI prefixes into text/srt/vtt output, or
+  /// the empty string when the backend produced none (and on older dylibs
+  /// without the accessor). Populated today by `vibevoice`, whose model answers
+  /// with a Start/End/Speaker/Content array. The ordinals are CHUNK-LOCAL:
+  /// `Speaker 1` in one transcribe call is not necessarily the same voice as
+  /// `Speaker 1` in the next.
+  final String speaker;
   const SessionSegment({
     required this.text,
     required this.start,
     required this.end,
     this.words = const [],
     this.noSpeechProb = -1.0,
+    this.speaker = '',
   });
   @override
   String toString() =>
@@ -2749,6 +2759,15 @@ class CrispasrSession {
                 double Function(Pointer<Void>,
                     int)>('crispasr_session_result_segment_no_speech_prob')
             : null;
+    // #300: native per-segment speaker label; probe like the others so a
+    // newer package keeps working against an older dylib.
+    final segSpkFn =
+        _lib.providesSymbol('crispasr_session_result_segment_speaker')
+            ? _lib.lookupFunction<
+                Pointer<Utf8> Function(Pointer<Void>, Int32),
+                Pointer<Utf8> Function(Pointer<Void>,
+                    int)>('crispasr_session_result_segment_speaker')
+            : null;
     final nWords = _lib.lookupFunction<Int32 Function(Pointer<Void>, Int32),
         int Function(Pointer<Void>, int)>('crispasr_session_result_n_words');
     final wordText = _lib.lookupFunction<
@@ -2806,6 +2825,8 @@ class CrispasrSession {
       final t0 = segT0(res, i) / 100.0;
       final t1 = segT1(res, i) / 100.0;
       final nsp = segNSPFn == null ? -1.0 : segNSPFn(res, i);
+      final spkP = segSpkFn == null ? nullptr : segSpkFn(res, i);
+      final spk = spkP == nullptr ? '' : spkP.toDartString();
       final wc = nWords(res, i);
       final words = <Word>[];
       for (var k = 0; k < wc; k++) {
@@ -2845,7 +2866,8 @@ class CrispasrSession {
           start: t0,
           end: t1,
           words: words,
-          noSpeechProb: nsp));
+          noSpeechProb: nsp,
+          speaker: spk));
     }
     return out;
   }
@@ -5698,6 +5720,15 @@ List<SessionSegment> drainStreamedSegments({String? libPath}) {
               double Function(Pointer<Void>,
                   int)>('crispasr_session_result_segment_no_speech_prob')
           : null;
+  // #300: native per-segment speaker label; probe like the others so a
+  // newer package keeps working against an older dylib.
+  final segSpkFn =
+      lib.providesSymbol('crispasr_session_result_segment_speaker')
+          ? lib.lookupFunction<
+              Pointer<Utf8> Function(Pointer<Void>, Int32),
+              Pointer<Utf8> Function(Pointer<Void>,
+                  int)>('crispasr_session_result_segment_speaker')
+          : null;
 
   final out = <SessionSegment>[];
   for (var i = 0; i < nSegs; i++) {
@@ -5706,8 +5737,14 @@ List<SessionSegment> drainStreamedSegments({String? libPath}) {
     final t0 = segT0(res, i) / 100.0;
     final t1 = segT1(res, i) / 100.0;
     final nsp = segNSPFn == null ? -1.0 : segNSPFn(res, i);
+    final spkP = segSpkFn == null ? nullptr : segSpkFn(res, i);
+    final spk = spkP == nullptr ? '' : spkP.toDartString();
     out.add(SessionSegment(
-        text: text.trim(), start: t0, end: t1, noSpeechProb: nsp));
+        text: text.trim(),
+        start: t0,
+        end: t1,
+        noSpeechProb: nsp,
+        speaker: spk));
   }
 
   // Free the result.
