@@ -60,19 +60,35 @@ jobs:
   # authoring time. NOTE: the configure step asserts the gate genuinely turned
   # ON — otherwise the [amr] test WARN-skips and hides the regression (a false
   # green), which is precisely how the original break went unnoticed.
+  #
+  # RUN IT UNDER BOTH COMPILER FAMILIES (#314). This job existed and still went
+  # green while the path was broken for every clang user: opencore-amr declares
+  # locals `register`, which C++17 REMOVED — clang makes that a hard error
+  # ("ISO C++17 does not allow 'register' storage class specifier"), GCC only
+  # warns. With g++ alone the job proves nothing about the toolchain the report
+  # came from (clang 21 on Termux). Both compilers default to C++17 here, so the
+  # matrix is the whole guard.
   linux-amr-fetch:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { cc: gcc,   cxx: g++     }
+          - { cc: clang, cxx: clang++ }
+    name: linux-amr-fetch (${{ matrix.cxx }})
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
 
       - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ libopenblas-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ clang libopenblas-dev
 
       - name: Configure (AMR FetchContent static) + assert gate enabled
         run: |
           cmake -S . -B build-amr \
+            -DCMAKE_C_COMPILER=${{ matrix.cc }} -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
             -DCMAKE_BUILD_TYPE=Release -DGGML_OPENBLAS=ON -DGGML_NATIVE=OFF \
             -DCRISPASR_BUILD_TESTS=ON -DCRISPASR_AMR=ON -DCRISPASR_AMR_FETCH=ON \
             2>&1 | tee cfg.log

@@ -10,6 +10,30 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## A guard job that runs ONE compiler family guards one compiler family (#314, 2026-07-27)
+
+`linux-amr-fetch` was written for exactly the failure it later missed: it builds
+the opt-in static opencore-amr path, links it, and decodes a real `.amr` file, so
+that "a regression fails CI at authoring time". It stayed green for months while
+that build was broken for every clang user on the planet, because it installs
+`g++` and nothing else — and the defect (`register`, removed in C++17) is an
+ERROR under clang and merely a WARNING under GCC.
+
+The general shape: **a compile-time defect can be error-vs-warning across
+compiler families, so single-compiler CI coverage of a compile-only path is a
+coin flip.** Vendored/legacy third-party sources are where this bites, because
+they are the code most likely to use constructs a newer standard removed, and
+they are usually behind an opt-in flag that only one job exercises. If a job
+exists solely to prove that some source still *compiles*, it needs a compiler
+matrix or it is proving it for one compiler.
+
+Corollary for the fix itself: probe the POSITIVE warning flag with
+`check_cxx_compiler_flag`, never the `-Wno-` form. GCC accepts unknown `-Wno-*`
+options silently and only errors later, when some unrelated diagnostic fires — so
+a `check_cxx_compiler_flag("-Wno-whatever")` returns success on a compiler that
+has never heard of it, and you ship a flag that does nothing (or breaks a build
+you never tested).
+
 ## When instrumenting the suspect file produces NO output, you are editing the wrong file — look for a second copy (#308 audit, 2026-07-27)
 
 A capitalisation bug (`And` → `ANd`) reproduced perfectly, and the guard that

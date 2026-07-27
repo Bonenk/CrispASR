@@ -6,6 +6,35 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-27 — #314: opencore-amr's `register` keyword breaks every clang C++17 build
+
+Reported from Termux/aarch64 with clang 21: `-DCRISPASR_AMR_FETCH=ON` dies with
+`az_lsp.cpp:492:5: error: ISO C++17 does not allow 'register' storage class
+specifier [-Wregister]`. The vendored opencore-amr is 2000s-era code that still
+declares locals `register`, a storage class C++17 REMOVED. Reproduced verbatim
+here — same file, same line — by forcing `-DCMAKE_CXX_STANDARD=17`; Apple clang's
+older default only warns (`-Wdeprecated-register`), which is why it had never
+surfaced locally. The break is toolchain-dependent, not architecture-dependent:
+clang >= 16 defaults to C++17, so it was latent everywhere and fired the moment a
+user's compiler default moved.
+
+Fixed by scoping `-Wno-register` (+ clang's `-Wno-deprecated-register`) to the two
+vendored codec targets. Not the issue's global `CXXFLAGS` workaround — that also
+suppresses the same mistake in our own code, and we want that diagnostic. The
+POSITIVE flag is what gets probed with `check_cxx_compiler_flag`, because GCC
+accepts an unknown `-Wno-*` silently and only complains once another diagnostic
+fires; testing `-Wno-register` would report success on compilers that don't know
+it. CXX-only via a generator expression — the same targets compile `.c` sources,
+where clang rejects the flag outright.
+
+**The interesting part is why CI missed it.** `linux-amr-fetch` already existed
+precisely to guard this path (added after §219, when an over-inclusive glob broke
+the static build) and it compiles, links and decodes `samples/jfk.amr`
+end-to-end. It went green throughout, because it installs and uses **g++ only** —
+and GCC treats `register` in C++17 as a warning while clang makes it an error. A
+guard job that exercises one compiler family proves nothing about the other. The
+job is now a `{gcc, clang}` matrix.
+
 ## 2026-07-27 — #308 audit: the capitalisation fix had been living in a dead copy
 
 Auditing the remaining ASR backends for the `CAP_PUNCTUATION_NATIVE` flag #308
