@@ -12,10 +12,11 @@ keywords = ["asr", "speech-recognition", "whisper", "ggml", "speech-to-text"]
 categories = ["multimedia::audio", "api-bindings"]
 
 # path + version dep on the sibling -sys crate. The path resolves for local
-# development AND for downstream consumers that depend on `crispasr` via a git
-# or path dependency (cargo finds crispasr-sys inside the checkout). Neither
-# crate is published on crates.io yet — the version pin is there for a future
-# publish, so consume `crispasr` via git, NOT the registry (see README.md).
+# development AND for git/path downstream consumers (cargo finds crispasr-sys
+# inside the checkout); on `cargo publish` the path is stripped and the version
+# pin resolves the crates.io release (both crates are published there). See
+# README.md for the two consumption modes (git build-from-source vs crates.io
+# release + a pre-built lib via CRISPASR_LIB_DIR).
 [dependencies]
 crispasr-sys = { path = "../crispasr-sys", version = "0.8.23" }
 

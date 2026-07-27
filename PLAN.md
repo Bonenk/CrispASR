@@ -1399,26 +1399,34 @@ Live registry state:
   `dart pub publish --force`, see `~/code/pupdev.md` handover 2026-07-15). No
   bootstrap needed for the package to exist; only the pub.dev-admin "automated
   publishing" toggle remains if tag-triggered republish is wanted.
-- **crates.io `crispasr` + `crispasr-sys` — NOT published** (both 404,
-  re-verified 2026-07-27 via the crates.io API).
+- **crates.io `crispasr` + `crispasr-sys` — DONE**, both **0.8.23** (manually
+  published 2026-07-27 with `CRISPASR_LIB_DIR` set so the verification build
+  takes build.rs path 1, no cmake). The account needed a one-time verified
+  email first. crates.io consumers must link a pre-built lib
+  (`CRISPASR_LIB_DIR`); the package does not vendor the C/C++ sources, so a
+  from-source build needs the git dependency (build.rs hardened to say so).
 - **PyPI `crispasr` — DONE**, latest **0.8.23** (also 0.8.22; both manually
   uploaded 2026-07-24, verified 2026-07-27 — the published 0.8.23 wheel is
   byte-identical to `python/crispasr/_binding.py`). Pure-Python `py3-none-any`
   wheel; the native `libcrispasr` is still installed separately by the user.
 
-So only crates.io still needs the one-time creds bootstrap below before
-CI/OIDC can take over; the pub.dev (3) and PyPI bootstraps are already satisfied.
+So all three registries (crates.io, PyPI, pub.dev) are now bootstrapped; only
+the optional CI/OIDC auto-trigger remains (below).
 
 ### TO DO — bootstrap (one-time, needs repo admin creds)
 
-1. **crates.io:**
+1. **crates.io — ALREADY DONE** (both crates first-published 2026-07-27). The
+   recipe used (needs a *verified email* on the account + a prebuilt lib so the
+   verification build skips cmake):
    ```bash
-   cargo login   # token from https://crates.io/me
-   cargo publish --manifest-path crispasr-sys/Cargo.toml --allow-dirty
+   export CARGO_REGISTRY_TOKEN=...          # token from https://crates.io/me
+   CRISPASR_LIB_DIR=/usr/local/lib cargo publish --manifest-path crispasr-sys/Cargo.toml --allow-dirty
    sleep 30
-   cargo publish --manifest-path crispasr/Cargo.toml --allow-dirty
+   CRISPASR_LIB_DIR=/usr/local/lib cargo publish --manifest-path crispasr/Cargo.toml --allow-dirty
    ```
-   Then add `CARGO_REGISTRY_TOKEN` repo secret (Settings → Secrets → Actions).
+   For tag-triggered CI, add `CARGO_REGISTRY_TOKEN` repo secret (Settings →
+   Secrets → Actions) — CI build.rs will cmake from the checkout, so no
+   `CRISPASR_LIB_DIR` needed there.
 
 2. **PyPI — ALREADY DONE** (package first-published manually, `crispasr 0.8.22`
    + `0.8.23`, 2026-07-24). Only optional remaining step for tag-triggered

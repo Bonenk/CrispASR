@@ -8,16 +8,22 @@ from source with cmake by default, or links a pre-built copy when
 
 ## Install
 
-The crates are **not on crates.io** — depend via git so `build.rs` has the
-CrispASR sources to build against:
+On [crates.io](https://crates.io/crates/crispasr-sys). `build.rs` needs either
+the CrispASR C/C++ sources (to cmake `libcrispasr`) or a pre-built copy. To
+build from source, depend via git so the sources are present:
 
 ```toml
 [dependencies]
 crispasr-sys = { git = "https://github.com/CrispStrobe/CrispASR" }
 ```
 
-To skip the cmake build and link a **pre-built** library instead, install it
-and point the linker at it:
+To use the crates.io release you must link a **pre-built** library, since the
+package does not vendor the sources — build/install it and set the linker path:
+
+```toml
+[dependencies]
+crispasr-sys = "0.8"
+```
 
 ```bash
 git clone https://github.com/CrispStrobe/CrispASR
@@ -31,7 +37,7 @@ The legacy `libwhisper` alias also works:
 export CRISPASR_LIB_NAME=whisper
 ```
 
-For the safe high-level wrapper see the [`crispasr`](https://github.com/CrispStrobe/CrispASR/tree/main/crispasr) crate.
+For the safe high-level wrapper see the [`crispasr`](https://crates.io/crates/crispasr) crate.
 
 ## License
 
