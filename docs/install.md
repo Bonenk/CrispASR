@@ -155,15 +155,19 @@ step fails (VS not found, CMake configure error, build error).
 
 ### Consuming `libcrispasr` from a language binding (Rust / Go / …)
 
-These scripts build the **CLI**. To link the shared library from a binding
-instead, use one of the two supported paths — don't try to point the binding at
-this Ninja `build\` tree (the bindings expect the MSVC `src\Release\` layout):
+These scripts build the **CLI**, but adding `-DBUILD_SHARED_LIBS=ON` also
+produces `libcrispasr` (`build\src\crispasr.lib` + the DLL). Three ways to link
+it from a binding:
 
+- **This local build** — `build-windows.bat -DBUILD_SHARED_LIBS=ON [-DGGML_CUDA=ON]`,
+  then point the binding's `CRISPASR_SYS_LIB_DIR` at the `build\` dir (its
+  `build.rs` now finds the single-config `build\src\crispasr.lib`); put the
+  directory holding `crispasr.dll` on `PATH`.
 - **Prebuilt bundle** — download `libcrispasr-windows-x86_64[-cuda].tar.gz` from
-  [Releases](https://github.com/CrispStrobe/CrispASR/releases), extract, and set
+  [Releases](https://github.com/CrispStrobe/CrispASR/releases), extract, set
   `CRISPASR_SYS_LIB_DIR` to the bundle root + put its `bin\` on `PATH`.
-- **Build from source** — depend on the crate via git so its `build.rs` runs
-  cmake for you (needs VS 2022 + CMake; honours the `cuda`/`vulkan` features).
+- **git dependency** — the binding's `build.rs` runs cmake for you (needs VS 2022
+  + CMake; honours the `cuda`/`vulkan` features).
 
 Exact per-OS environment is in the Rust
 [`crispasr-sys` README](../crispasr-sys/README.md#prebuilt-release-bundle-no-build).
