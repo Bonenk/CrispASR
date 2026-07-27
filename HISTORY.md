@@ -57,8 +57,12 @@ macOS-arm64: assemble bundle → package-lib-bundle.sh → stage → build → r
 v*`) for crates.io + pub.dev; its PyPI job removed (owned by the wheels
 workflow); fixed its crates.io existence probe (missing User-Agent → 403 → it
 always self-skipped) + added an idempotent version-exists gate. `sync-version.py`
-now also bumps `python/crispasr/__init__.py __version__`. One-time setup left to
-the operator: `PYPI_API_TOKEN` secret + enabling GitHub Pages (gh-pages branch).
+now also bumps `python/crispasr/__init__.py __version__`. Secrets set via `gh`:
+`PYPI_API_TOKEN` (pre-existing) + `CARGO_REGISTRY_TOKEN` (added, else the crates.io
+CI publish self-skipped). GPU index hosting: Pages already serves `main`/root
+(legacy Jekyll README landing), so the index is committed to `main` under `whl/`
+(Jekyll serves `.../whl/{cuda,vulkan}/`) rather than switching the Pages source —
+landing untouched. No operator setup remains.
 
 ## 2026-07-27 — #313 follow-up: published crispasr + crispasr-sys to crates.io
 

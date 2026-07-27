@@ -1461,14 +1461,20 @@ platform with `wheel tags`. CPU matrix: linux x86_64 + arm64, macOS arm64
 carrying `+cuda`/`+vulkan` local versions. Verified end-to-end locally on
 macOS-arm64 (install → `_find_lib` picks the bundled dylib → `CDLL` loads).
 
-ONE-TIME SETUP still needed:
-- **PyPI**: `PYPI_API_TOKEN` repo secret (already used by the old job).
-- **GitHub Pages**: enable Pages with source = `gh-pages` branch so the GPU
-  index is served (the workflow pushes it under `whl/`, `keep_files: true` so it
-  coexists with the wasm demo already on gh-pages).
-- Assumption to verify on first tagged run: linux wheels are labelled
-  `manylinux_2_28_*`; if the bundle needs newer glibc, bump the tag (run
-  `auditwheel show`).
+REGISTRY SECRETS (all set 2026-07-27 via `gh secret set`):
+- `PYPI_API_TOKEN` (pre-existing), `CARGO_REGISTRY_TOKEN` (added — crates.io CI
+  publish was otherwise skipped; `gh secret list` confirms both).
+
+GPU INDEX HOSTING: Pages already serves `main`/root (legacy Jekyll, the README
+landing). The GPU index is committed to `main` under `whl/` by the workflow
+(Jekyll serves it at `.../whl/{cuda,vulkan}/`), leaving the README landing
+untouched — no Pages reconfiguration. Index links point at Release-hosted
+wheels, so main only carries tiny `index.html` files, regenerated from all
+releases each run (`[skip ci]` commit, push-with-rebase-retry).
+
+Assumption to verify on the first tagged run: linux wheels are labelled
+`manylinux_2_28_*`; if a bundle needs newer glibc, bump the tag (`auditwheel
+show`).
 
 ## 67. Deferred follow-ups carry-over (mid-May 2026 session)
 
