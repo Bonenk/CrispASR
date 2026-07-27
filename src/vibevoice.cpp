@@ -213,7 +213,7 @@ struct vibevoice_context {
 extern "C" struct vibevoice_context_params vibevoice_context_default_params(void) {
     vibevoice_context_params p;
     p.n_threads = 4;
-    p.max_new_tokens = 512;
+    p.max_new_tokens = 0;
     p.verbosity = 1;
     p.use_gpu = true;
     p.tts_steps = 20;
@@ -221,6 +221,13 @@ extern "C" struct vibevoice_context_params vibevoice_context_default_params(void
     p.cfg_scale = 0.0f;
     p.flash_attn = true;
     return p;
+}
+
+extern "C" int vibevoice_resolve_max_new_tokens(int configured, int n_samples) {
+    if (configured > 0)
+        return configured;
+    const int audio_seconds = std::max(0, (int)(((int64_t)n_samples + 24000 - 1) / 24000));
+    return std::max(512, audio_seconds * 8);
 }
 
 // ===========================================================================
@@ -414,6 +421,11 @@ extern "C" void vibevoice_set_tts_steps(struct vibevoice_context* ctx, int steps
     if (steps > 100)
         steps = 100;
     ctx->params.tts_steps = steps;
+}
+
+extern "C" void vibevoice_set_max_new_tokens(struct vibevoice_context* ctx, int n) {
+    if (ctx)
+        ctx->params.max_new_tokens = n > 0 ? n : 0;
 }
 
 extern "C" void vibevoice_set_seed(struct vibevoice_context* ctx, uint32_t seed) {
@@ -1415,7 +1427,7 @@ static char* vibevoice_transcribe_impl(struct vibevoice_context* ctx, const floa
         fprintf(stderr, "vibevoice: prefix embedded (%d tokens)\n", prefix_len);
 
     // 7. Allocate KV cache for Qwen2 decoder
-    int max_gen = ctx->params.max_new_tokens > 0 ? ctx->params.max_new_tokens : 512;
+    int max_gen = vibevoice_resolve_max_new_tokens(ctx->params.max_new_tokens, n_samples);
     int max_ctx = prefix_len + max_gen;
     const ggml_type asr_kv_type = GGML_TYPE_F16;
     if (!ctx->kv_k || ctx->kv_max_ctx < max_ctx || ctx->kv_k->type != asr_kv_type) {
