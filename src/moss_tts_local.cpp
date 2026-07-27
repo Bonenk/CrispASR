@@ -378,7 +378,12 @@ static bool mtl_kv_init(moss_tts_local_context* ctx, int max_ctx) {
     const int hd = (int)hp.llm_head_dim;
     const int n_kv = (int)hp.llm_n_kv_heads;
     const int nl = (int)hp.llm_layers;
-    const ggml_type kv_type = core_attn::kv_dtype_from_env("moss_tts_local");
+    // #249: the 4B's marginal binary stop head is sensitive to KV precision —
+    // an f16 KV cache measurably delays/breaks the wind-down (an f32 KV moves
+    // the "Hello world" stop earlier, toward the reference). Default to F32 KV;
+    // CRISPASR_KV_QUANT still overrides for users who want the smaller cache.
+    const ggml_type kv_type = core_attn::kv_dtype_parse(std::getenv("CRISPASR_KV_QUANT"), "moss_tts_local",
+                                                        "CRISPASR_KV_QUANT", GGML_TYPE_F32);
     ggml_init_params ip = {ggml_tensor_overhead() * 4, nullptr, true};
     ctx->kv_ctx = ggml_init(ip);
     if (!ctx->kv_ctx)
