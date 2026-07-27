@@ -109,12 +109,18 @@ fn has_built_lib(build_dir: &Path, lib_name: &str) -> bool {
         // Legacy `whisper` alias produced by the same target.
         build_dir.join("src").join("libwhisper.dylib"),
         build_dir.join("src").join("libwhisper.so"),
-        // MSVC multi-config: import lib lives under `src/Release/`.
+        // MSVC multi-config (Visual Studio generator, e.g. the release
+        // bundle): import lib lives under `src/Release/`.
         build_dir
             .join("src")
             .join("Release")
             .join(format!("{lib_name}.lib")),
         build_dir.join("src").join("Release").join("whisper.lib"),
+        // Single-config on Windows (Ninja / NMake, e.g. `build-windows.bat`):
+        // the import lib lands directly under `src/` with no `Release/` level,
+        // so a local source build is consumable via CRISPASR_SYS_LIB_DIR too.
+        build_dir.join("src").join(format!("{lib_name}.lib")),
+        build_dir.join("src").join("whisper.lib"),
         // Flat layouts (e.g., users who pointed CRISPASR_SYS_LIB_DIR at a
         // directory that already contains the libs without the `src/`
         // prefix).
