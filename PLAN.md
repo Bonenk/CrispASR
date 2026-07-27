@@ -1399,11 +1399,15 @@ Live registry state:
   `dart pub publish --force`, see `~/code/pupdev.md` handover 2026-07-15). No
   bootstrap needed for the package to exist; only the pub.dev-admin "automated
   publishing" toggle remains if tag-triggered republish is wanted.
-- **crates.io `crispasr` + `crispasr-sys` — NOT published** (both 404).
-- **PyPI `crispasr` — NOT published** (404).
+- **crates.io `crispasr` + `crispasr-sys` — NOT published** (both 404,
+  re-verified 2026-07-27 via the crates.io API).
+- **PyPI `crispasr` — DONE**, latest **0.8.23** (also 0.8.22; both manually
+  uploaded 2026-07-24, verified 2026-07-27 — the published 0.8.23 wheel is
+  byte-identical to `python/crispasr/_binding.py`). Pure-Python `py3-none-any`
+  wheel; the native `libcrispasr` is still installed separately by the user.
 
-So only crates.io + PyPI still need the one-time creds bootstrap below before
-CI/OIDC can take over; the pub.dev bootstrap step (3) is already satisfied.
+So only crates.io still needs the one-time creds bootstrap below before
+CI/OIDC can take over; the pub.dev (3) and PyPI bootstraps are already satisfied.
 
 ### TO DO — bootstrap (one-time, needs repo admin creds)
 
@@ -1416,11 +1420,12 @@ CI/OIDC can take over; the pub.dev bootstrap step (3) is already satisfied.
    ```
    Then add `CARGO_REGISTRY_TOKEN` repo secret (Settings → Secrets → Actions).
 
-2. **PyPI (trusted publishing/OIDC):** at
-   https://pypi.org/manage/account/publishing/ create a pending publisher —
-   Owner `CrispStrobe`, Repository `CrispASR`, Workflow `release-wrappers.yml`,
-   Environment `pypi`. Push a `v*` tag; the OIDC handshake creates the package
-   (no manual twine upload).
+2. **PyPI — ALREADY DONE** (package first-published manually, `crispasr 0.8.22`
+   + `0.8.23`, 2026-07-24). Only optional remaining step for tag-triggered
+   republish: at https://pypi.org/manage/account/publishing/ create a pending
+   publisher — Owner `CrispStrobe`, Repository `CrispASR`, Workflow
+   `release-wrappers.yml`, Environment `pypi`. Manual `twine upload` of a bumped
+   version also works without it.
 
 3. **pub.dev (Dart) — ALREADY DONE** (first-published manually to `crispasr 0.8.11`).
    ~~`cd flutter/crispasr && dart pub get && dart pub publish`~~. Only remaining
