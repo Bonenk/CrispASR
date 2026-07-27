@@ -327,6 +327,9 @@ static ggml_cgraph* mtl_build_graph_llm_kv(moss_tts_local_context* ctx, int n_pa
         32.0f, 1.0f, attn_scale, eps,        core_attn::GQA_MANUAL_CONT,
     };
 
+    // #249 per-layer diff: on the prompt prefill, expose each block's output so
+    // mtl_run_backbone can dump it and compare to the reference per layer.
+    const bool dump_layers = (n_past == 0) && (getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_LAYERS") != nullptr);
     ggml_tensor* cur = embeds;
     for (uint32_t il = 0; il < hp.llm_layers; il++) {
         const auto& b = m.blocks[il];
@@ -339,6 +342,13 @@ static ggml_cgraph* mtl_build_graph_llm_kv(moss_tts_local_context* ctx, int n_pa
         residual = cur;
         x = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, eps), b.ffn_norm_w);
         cur = ggml_add(ctx0, residual, core_ffn::swiglu(ctx0, x, b.ffn_gate_w, b.ffn_up_w, b.ffn_down_w));
+        if (dump_layers) {
+            char nm[24];
+            snprintf(nm, sizeof(nm), "blk_%u", il);
+            ggml_set_name(cur, nm);
+            ggml_set_output(cur);
+            ggml_build_forward_expand(gf, cur);
+        }
     }
     cur = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, eps), m.output_norm_w);
     if (T > 1)
@@ -417,6 +427,28 @@ static float* mtl_run_backbone(moss_tts_local_context* ctx, const float* inputs_
     ggml_tensor* h_t = ggml_graph_get_tensor(gf, "hidden_last");
     float* out = (float*)malloc((size_t)d * sizeof(float));
     ggml_backend_tensor_get(h_t, out, 0, (size_t)d * sizeof(float));
+    // #249: dump each block's last-position hidden on the prompt prefill.
+    if (n_past == 0) {
+        if (const char* lp = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_LAYERS")) {
+            if (FILE* lf = fopen(lp, "w")) {
+                std::vector<float> buf(d);
+                for (uint32_t il = 0; il < ctx->model.hparams.llm_layers; il++) {
+                    char nm[24];
+                    snprintf(nm, sizeof(nm), "blk_%u", il);
+                    ggml_tensor* t = ggml_graph_get_tensor(gf, nm);
+                    if (!t)
+                        continue;
+                    ggml_backend_tensor_get(t, buf.data(), (size_t)(n_tokens - 1) * d * sizeof(float),
+                                            (size_t)d * sizeof(float));
+                    fprintf(lf, "blk_%u", il);
+                    for (int i = 0; i < d; i++)
+                        fprintf(lf, " %.6f", buf[i]);
+                    fprintf(lf, "\n");
+                }
+                fclose(lf);
+            }
+        }
+    }
     return out;
 }
 
