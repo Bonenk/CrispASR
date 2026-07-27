@@ -502,7 +502,8 @@ static float* mtl_run_backbone(moss_tts_local_context* ctx, const float* inputs_
         // self-check and the Q/K/V-vs-reference diff can localize the attention op.
         if (const char* fp = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_FA_PATH")) {
             if (FILE* ff = fopen(fp, "w")) {
-                for (const char* nm : {"DBG_Q_post_rope", "DBG_Kfull", "DBG_Vfull", "DBG_fa_out", "DBG_fa_reshaped"}) {
+                for (const char* nm : {"DBG_Q_prerope", "DBG_K_prerope", "DBG_V_new", "DBG_Q_post_rope", "DBG_Kfull",
+                                       "DBG_Vfull", "DBG_fa_out", "DBG_fa_reshaped"}) {
                     ggml_tensor* t = ggml_graph_get_tensor(gf, nm);
                     if (!t)
                         continue;

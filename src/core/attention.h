@@ -744,6 +744,28 @@ static inline ggml_tensor* kv_self_attn(ggml_context* ctx0, ggml_cgraph* gf, ggm
         V = ggml_rms_norm(ctx0, V, p.qk_norm_eps);
     }
 
+    // CrispASR debug hook (#249): tap the post-QK-norm, PRE-RoPE Q/K/V so the
+    // moss-tts-local attention diff can split projection+qk-norm from RoPE against
+    // the HF reference (q_norm / k_norm / v_proj module outputs). Same env knob as
+    // the FA dump below; read-only set_output, bit-identical when the knob is unset.
+    {
+        const char* pre_env = std::getenv("CRISPASR_CORE_ATTN_DUMP_FA_LAYER");
+        if (pre_env && (int)il == (int)std::strtol(pre_env, nullptr, 10)) {
+            ggml_tensor* Qn = ggml_cont(ctx0, Q);
+            ggml_set_name(Qn, "DBG_Q_prerope");
+            ggml_set_output(Qn);
+            ggml_build_forward_expand(gf, Qn);
+            ggml_tensor* Kn = ggml_cont(ctx0, K);
+            ggml_set_name(Kn, "DBG_K_prerope");
+            ggml_set_output(Kn);
+            ggml_build_forward_expand(gf, Kn);
+            ggml_tensor* Vn = ggml_cont(ctx0, V);
+            ggml_set_name(Vn, "DBG_V_new");
+            ggml_set_output(Vn);
+            ggml_build_forward_expand(gf, Vn);
+        }
+    }
+
     // ---- RoPE (NEOX for most models, NORMAL for fairseq2/omniasr) ----
     // p.n_rot > 0 selects partial-rotary mode (only the first n_rot
     // entries of each head are rotated; the rest pass through). 0
