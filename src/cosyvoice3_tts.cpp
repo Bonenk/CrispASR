@@ -49,6 +49,7 @@
 #include "gguf.h"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -385,6 +386,14 @@ struct cosyvoice3_tts_context {
     cosyvoice3_tts_context_params params{};
     int n_threads = 4;
     uint64_t seed = 42;
+    // #304 cross-lingual: the requested synthesis/target language (ISO-ish, e.g.
+    // "en","de","zh"). When set and it differs from the reference voice's own
+    // language, synth switches to cross-lingual mode — it keeps the "helpful
+    // assistant" framing + the reference SPEECH tokens (timbre) but DROPS the
+    // reference TRANSCRIPT, which otherwise biases phonetics toward the
+    // reference's language (the accent reported in #304). Empty = zero-shot
+    // (reference transcript kept), the same-language default.
+    std::string target_language;
 
     cv3_hp hp;
     cv3_lm lm;
@@ -1265,6 +1274,14 @@ extern "C" void cosyvoice3_tts_set_temperature(struct cosyvoice3_tts_context* ct
     if (!ctx)
         return;
     ctx->params.temperature = temperature;
+}
+
+// #304 cross-lingual: set the synthesis/target language (ISO-ish code, or "" /
+// nullptr / "auto" to clear = zero-shot). See ctx->target_language.
+extern "C" void cosyvoice3_tts_set_target_language(struct cosyvoice3_tts_context* ctx, const char* lang) {
+    if (!ctx)
+        return;
+    ctx->target_language = (lang && std::strcmp(lang, "auto") != 0) ? lang : "";
 }
 
 extern "C" int cosyvoice3_tts_get_hparams(struct cosyvoice3_tts_context* ctx, uint32_t* d_model, uint32_t* n_layers,
@@ -5108,6 +5125,82 @@ extern "C" int cosyvoice3_tts_init_campplus_from_file(struct cosyvoice3_tts_cont
 
 namespace {
 
+// #304 cross-lingual helpers ------------------------------------------------
+// Normalize a language tag to a lowercase 2-letter base for comparison
+// ("en-US"->"en", "cmn"/"zho"->"zh", "jpn"->"ja", …).
+std::string cv3_lang_norm(const std::string& s) {
+    std::string t;
+    for (char c : s) {
+        if (c == '-' || c == '_')
+            break;
+        t += (char)std::tolower((unsigned char)c);
+    }
+    if (t == "cmn" || t == "zho" || t == "chi")
+        return "zh";
+    if (t == "jpn")
+        return "ja";
+    if (t == "kor")
+        return "ko";
+    if (t == "eng")
+        return "en";
+    if (t == "deu" || t == "ger")
+        return "de";
+    if (t == "fra" || t == "fre")
+        return "fr";
+    if (t == "spa")
+        return "es";
+    return t.size() > 2 ? t.substr(0, 2) : t;
+}
+
+// Infer the reference voice's language. Built-in voices are named
+// "fleurs-<lang>"; otherwise best-effort script detection of the reference
+// transcript (the text after "<|endofprompt|>") for the non-Latin scripts.
+// Returns "" when undeterminable (Latin/unknown) → synth stays zero-shot.
+std::string cv3_voice_language(const std::string& name, const std::string& prompt_text) {
+    const std::string pfx = "fleurs-";
+    if (name.rfind(pfx, 0) == 0)
+        return cv3_lang_norm(name.substr(pfx.size()));
+    const std::string delim = "<|endofprompt|>";
+    size_t q = prompt_text.find(delim);
+    const std::string body = (q == std::string::npos) ? prompt_text : prompt_text.substr(q + delim.size());
+    bool hangul = false, kana = false, han = false, cyr = false;
+    for (size_t i = 0; i < body.size();) {
+        unsigned char c = (unsigned char)body[i];
+        uint32_t cp = c;
+        int n = 1;
+        if (c >= 0xF0) {
+            cp = c & 0x07;
+            n = 4;
+        } else if (c >= 0xE0) {
+            cp = c & 0x0F;
+            n = 3;
+        } else if (c >= 0xC0) {
+            cp = c & 0x1F;
+            n = 2;
+        }
+        for (int k = 1; k < n && i + (size_t)k < body.size(); k++)
+            cp = (cp << 6) | ((unsigned char)body[i + k] & 0x3F);
+        i += (size_t)n;
+        if (cp >= 0xAC00 && cp <= 0xD7A3)
+            hangul = true;
+        else if (cp >= 0x3040 && cp <= 0x30FF)
+            kana = true;
+        else if (cp >= 0x4E00 && cp <= 0x9FFF)
+            han = true;
+        else if (cp >= 0x0400 && cp <= 0x04FF)
+            cyr = true;
+    }
+    if (hangul)
+        return "ko";
+    if (kana)
+        return "ja";
+    if (han)
+        return "zh";
+    if (cyr)
+        return "ru";
+    return ""; // Latin or unknown — can't disambiguate en/de/fr/es here
+}
+
 // Tokenise a CV3 prompt fragment. The only special marker we expect in
 // user-supplied prompt_text is `<|endofprompt|>`; everything around it
 // is regular Qwen2 BPE. Splits on the literal substring and emits the
@@ -5689,10 +5782,30 @@ float* cv3_synth_with_voice(cosyvoice3_tts_context* ctx, const char* text, const
     const int aligned_t_ref_mel = prompt_token_len * mel_ratio;
 
     // ---- 1. Tokenise prompt_text + user_text ----
+    // #304 cross-lingual: if a target language is set and differs from the
+    // reference voice's own language, DROP the reference transcript (keep only
+    // the "You are a helpful assistant.<|endofprompt|>" framing) so the target
+    // text — not the reference language — drives the phonetics. The reference
+    // SPEECH tokens still supply the speaker timbre. Same-language (or no target
+    // set) keeps the full prompt_text (zero-shot), the higher-fidelity default.
+    std::string prompt_for_lm = voice->prompt_text;
+    {
+        const std::string tgt = cv3_lang_norm(ctx->target_language);
+        const std::string vlang = cv3_voice_language(voice->name, voice->prompt_text);
+        if (!tgt.empty() && !vlang.empty() && tgt != vlang) {
+            const std::string delim = "<|endofprompt|>";
+            const size_t eop = prompt_for_lm.find(delim);
+            prompt_for_lm = (eop == std::string::npos) ? std::string() : prompt_for_lm.substr(0, eop + delim.size());
+            if (ctx->params.verbosity >= 1)
+                fprintf(stderr,
+                        "cosyvoice3_tts: cross-lingual (voice=%s[%s] → target=%s): dropping reference transcript\n",
+                        voice->name.c_str(), vlang.c_str(), tgt.c_str());
+        }
+    }
     std::vector<int32_t> text_ids;
     {
         cosyvoice3_bench_stage _b("tokenize");
-        std::vector<int32_t> prompt_ids = cv3_tokenise_prompt(ctx->vocab, voice->prompt_text);
+        std::vector<int32_t> prompt_ids = cv3_tokenise_prompt(ctx->vocab, prompt_for_lm);
         std::vector<int32_t> user_ids = cv3_tokenise_prompt(ctx->vocab, std::string(text));
         text_ids.reserve(prompt_ids.size() + user_ids.size());
         text_ids.insert(text_ids.end(), prompt_ids.begin(), prompt_ids.end());
