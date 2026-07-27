@@ -10826,6 +10826,10 @@ CA_EXPORT int crispasr_session_set_max_new_tokens(crispasr_session* s, int n) {
     if (s->cohere_ctx)
         cohere_set_max_new_tokens(s->cohere_ctx, s->max_new_tokens);
 #endif
+#ifdef CA_HAVE_VIBEVOICE
+    if (s->vibevoice_ctx)
+        vibevoice_set_max_new_tokens(s->vibevoice_ctx, s->max_new_tokens);
+#endif
     return 0;
 }
 
