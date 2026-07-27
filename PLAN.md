@@ -2935,3 +2935,36 @@ and Mel-Band RoFormer separation, piano_transcription (§250).
   far is M1/Metal only, and LEARNING 35 says Metal-correct is not CUDA-correct.
 - [ ] **File the upstream ggml PR** drafted at
   `tools/upstream-prs/24-conv-1d-batch-reshape.md`.
+
+## §252 — CosyVoice3 native-Vulkan: fp32-accumulation lever (LOW priority, likely dead end)
+
+Background (see LEARNINGS "Backend miscomputes my pipeline ≠ op X is broken" +
+`project_304_cosyvoice3_vulkan_native_lm_vs_flow`): CV3 is CPU-routed under Vulkan
+because native synthesis is noise. This was FULLY root-caused, on a real Tesla
+P100: it is **not** a broken ggml op (test-backend-ops passes every flow/HiFT op
+on Vulkan — IM2COL, NORM, MUL_MAT, ROPE, …) and **not** my gallocr dispatch
+(`FORCE_GALLOCR` on CPU is bit-identical to the scheduler). It is **aggregate
+precision sensitivity**: Vulkan's in-tolerance per-op accumulation deltas (fp16 vs
+CPU fp32) compound across the 22-layer DiT × 6 CFM Euler steps and are amplified
+by the log-mel HiFT vocoder → flow mel cosine(cpu,vk)=0.961 → garbage. The LM
+(shallow-per-token) is bit-correct on Vulkan (512/512 greedy tokens).
+
+- [ ] **Lever (low priority, low odds):** force **fp32 accumulation** in the
+  ggml-vulkan matmul/conv path for the flow + HiFT (e.g. `GGML_PREC_F32` /
+  coopmat-f32-accum, or a build/env knob) and re-measure the flow mel cosine and
+  the audio ASR round-trip on a real NVIDIA Vulkan device (Kaggle P100). If cosine
+  climbs to ≳0.999 and audio is intelligible, native Vulkan (or at least a
+  flow+HiFT-on-Vulkan hybrid) becomes viable. **Why it's likely a dead end:** every
+  op already passes test-backend-ops *within tolerance*, so fp32-accum may not
+  shrink the per-op delta enough to stop the CFM+vocoder amplification; and it is
+  deep upstream ggml-vulkan shader work. Do NOT invest unless someone independently
+  wants native-Vulkan CV3 speed badly enough to accept the shader effort.
+- Groundwork already committed (branch `fix/304-cosyvoice3-se`, gated, NOT merged):
+  LM single-backend gallocr (proves the LM runs native-Vulkan), hybrid
+  HiFT-on-CPU infra, and diagnostics `CRISPASR_COSYVOICE3_{GREEDY,DUMP_MEL,
+  DUMP_HIFT,FORCE_GALLOCR,HIFT_ON_GPU}`. Repro kernels:
+  `tools/kaggle/cv3-vulkan-{isolate,convtest}`. A real self-recursion crash in the
+  `cv3_sched_*` shims (CPU/Metal SIGSEGV) was fixed on that branch; the shipped
+  release was never affected (shims are branch-only).
+- Default stays the shipped all-CPU route under Vulkan — correct, and the right
+  answer unless the lever above ever pays off.
