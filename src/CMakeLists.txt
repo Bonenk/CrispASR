@@ -496,9 +496,40 @@ if (CRISPASR_AMR)
         # also matched dtx_decoder_amr_wb.cpp (suffix), dropping the DTX/comfort-
         # noise decoder and breaking the link with undefined _dtx_dec_amr_wb.
         list(FILTER _amrwb_srcs EXCLUDE REGEX "pvgsm[^/]*\\.cpp$|/decoder_amr_wb\\.cpp$")
+        # #314: opencore-amr is 2000s-era code that still declares locals
+        # `register`. C++17 REMOVED that storage class, so a toolchain whose
+        # default is C++17 (clang >= 16 — the reporter hit it with clang 21 on
+        # Termux/aarch64) makes every one of them a hard error:
+        #   az_lsp.cpp:492:5: error: ISO C++17 does not allow 'register'
+        #   storage class specifier [-Wregister]
+        # while an older default only warns (-Wdeprecated-register). So the
+        # break is toolchain-dependent, not architecture-dependent, and it is
+        # latent on every platform until the compiler default moves.
+        #
+        # Silence it for the VENDORED CODEC ONLY. A global CXXFLAGS
+        # -Wno-register (the issue's workaround) also hides the same mistake in
+        # our own code, and we want that diagnostic. Probing the POSITIVE flag
+        # is deliberate: GCC accepts an unknown `-Wno-*` silently and only
+        # complains once some other diagnostic fires, so testing `-Wno-register`
+        # would report success on compilers that do not know it. GCC has
+        # -Wregister; -Wdeprecated-register is clang-only; MSVC has neither.
+        # CXX-only via a generator expression — these targets also compile .c
+        # sources, where clang rejects the flag as "valid for C++ but not C".
+        include(CheckCXXCompilerFlag)
+        check_cxx_compiler_flag("-Wregister"            CRISPASR_HAVE_WREGISTER)
+        check_cxx_compiler_flag("-Wdeprecated-register" CRISPASR_HAVE_WDEPRECATED_REGISTER)
+        set(_amr_legacy_flags "")
+        if (CRISPASR_HAVE_WREGISTER)
+            list(APPEND _amr_legacy_flags "$<$<COMPILE_LANGUAGE:CXX>:-Wno-register>")
+        endif()
+        if (CRISPASR_HAVE_WDEPRECATED_REGISTER)
+            list(APPEND _amr_legacy_flags "$<$<COMPILE_LANGUAGE:CXX>:-Wno-deprecated-register>")
+        endif()
+
         if (_amrnb_srcs AND _amrwb_srcs AND EXISTS "${_amr_src}/amrnb/wrapper.cpp")
             add_library(crispasr_amrnb STATIC
                 "${_amr_src}/amrnb/wrapper.cpp" ${_amrnb_srcs})
+            target_compile_options(crispasr_amrnb PRIVATE ${_amr_legacy_flags})
             target_compile_definitions(crispasr_amrnb PRIVATE DISABLE_AMRNB_ENCODER)
             target_include_directories(crispasr_amrnb SYSTEM PUBLIC
                 "${_amr_src}" "${_amr_src}/amrnb" "${_amr_src}/oscl"
@@ -512,6 +543,7 @@ if (CRISPASR_AMR)
 
             add_library(crispasr_amrwb STATIC
                 "${_amr_src}/amrwb/wrapper.cpp" ${_amrwb_srcs})
+            target_compile_options(crispasr_amrwb PRIVATE ${_amr_legacy_flags})
             target_include_directories(crispasr_amrwb SYSTEM PUBLIC
                 "${_amr_src}" "${_amr_src}/amrwb" "${_amr_src}/oscl"
                 "${_amr_src}/opencore/codecs_v2/audio/gsm_amr/amr_wb/dec/src"

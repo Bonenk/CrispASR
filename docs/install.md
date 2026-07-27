@@ -221,6 +221,38 @@ Container AAC (`.m4a` / `.alac` / `.caf`) decodes natively on **Apple**
 (macOS/iOS) via AudioToolbox, or via libfdk-aac (`dlopen`) on Linux/Windows —
 also no ffmpeg. See [cli.md](cli.md#audio-formats) for the full format matrix.
 
+## AMR-NB / AMR-WB support (telephony + voicemail recordings)
+
+`.amr` (AMR-NB 8 kHz) and AMR-WB 16 kHz decode via
+[opencore-amr](https://github.com/CrispStrobe/opencore-amr) (Apache-2.0) — the
+standard codecs for mobile voice recordings and voicemail. On by default
+(`CRISPASR_AMR`) when the system libraries are found via pkg-config
+(`apt install libopencore-amrnb-dev libopencore-amrwb-dev`,
+`brew install opencore-amr`). Without them, AMR is simply skipped and the build
+succeeds — the CMake status line tells you which path was taken.
+
+To build the decoder statically instead (no system packages — Windows, Android /
+Termux, iOS, WASM):
+
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCRISPASR_AMR_FETCH=ON
+```
+
+> **`register` build errors on clang ≥ 16 (fixed in v0.8.24).** opencore-amr is
+> 2000s-era code that declares locals `register`, a storage class **C++17
+> removed**. On a toolchain whose default is C++17 — clang 16 and newer,
+> including Termux's — every one of those is a hard error:
+> `error: ISO C++17 does not allow 'register' storage class specifier
+> [-Wregister]` (issue #314). Older defaults only warn, which is why this
+> surfaced as a sudden break rather than a long-standing one; it is
+> toolchain-dependent, not architecture-dependent.
+>
+> v0.8.24 scopes `-Wno-register` (and clang's `-Wno-deprecated-register`) to the
+> two vendored codec targets, so no flag of your own is needed. On an older
+> CrispASR the workaround is `export CXXFLAGS="$CXXFLAGS -Wno-register"` —
+> effective, but it silences the same mistake in *your* code too, so prefer
+> upgrading.
+
 ## ffmpeg ingestion (container AAC/M4A off-Apple, WMA, …) — optional fallback
 
 For formats with no permissive native decoder (container `.m4a` without
@@ -291,6 +323,12 @@ Strip debug symbols to reduce binary size:
 ```bash
 strip build/bin/crispasr*
 ```
+
+**Termux clang is new enough to default to C++17**, which matters if you enable
+the statically-built AMR decoder (`-DCRISPASR_AMR_FETCH=ON`): the vendored
+opencore-amr sources use the `register` storage class that C++17 removed. Fixed
+in v0.8.24 — see [AMR-NB / AMR-WB support](#amr-nb--amr-wb-support-telephony--voicemail-recordings)
+if you are building an older tag (#314).
 
 ### Cross-compiling for Android (NDK)
 
