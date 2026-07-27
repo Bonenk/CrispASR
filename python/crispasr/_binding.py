@@ -27,17 +27,19 @@ class Segment:
 def _find_lib():
     """Locate the crispasr / whisper shared library.
 
-    The wheel is pure-Python and does not bundle the native library —
-    matches crispasr's binding pattern. The user is expected to have
-    `libcrispasr.{so,dylib,dll}` on their system, either installed by
-    a package manager (Homebrew, apt) or built from source.
+    Platform wheels (CPU on PyPI, GPU on the extra index) bundle the native
+    library *next to this file*, so that copy is probed first and always wins.
+    The pure-Python sdist does not bundle it; there the user supplies
+    `libcrispasr.{so,dylib,dll}` via a package manager (Homebrew, apt), a
+    source build, or `$CRISPASR_LIB_PATH`.
 
     Probe order:
       1. $CRISPASR_LIB_PATH (explicit override — full path to the .so/.dylib/.dll)
-      2. sys.prefix/lib (pip install --user, virtualenv, conda)
-      3. Standard install prefixes (Homebrew arm64/x64, /usr/local, /usr)
-      4. Repo-relative `build/` paths (for `pip install -e .` from a clone)
-      5. The bare filename (lets the loader use $LD_LIBRARY_PATH /
+      2. This package directory (a lib bundled into the installed wheel)
+      3. sys.prefix/lib (pip install --user, virtualenv, conda)
+      4. Standard install prefixes (Homebrew arm64/x64, /usr/local, /usr)
+      5. Repo-relative `build/` paths (for `pip install -e .` from a clone)
+      6. The bare filename (lets the loader use $LD_LIBRARY_PATH /
          $DYLD_LIBRARY_PATH / PATH and the system loader cache)
 
     Both `libcrispasr.*` (preferred — all backends) and the legacy
@@ -58,15 +60,16 @@ def _find_lib():
         return override
 
     search = [
+        # A lib bundled into the installed wheel — probed first so a platform
+        # wheel is self-contained and a stray system copy can't shadow it.
+        Path(__file__).parent,
         Path(sys.prefix) / "lib",
         Path("/opt/homebrew/lib"),  # macOS arm64 Homebrew
         Path("/usr/local/lib"),     # macOS x64 Homebrew, /usr/local installs
         Path("/usr/lib"),           # apt, dnf
         Path("/usr/lib/x86_64-linux-gnu"),  # Debian/Ubuntu multiarch
         Path("/usr/lib/aarch64-linux-gnu"),
-        # Repo-relative — last so `pip install crispasr` doesn't accidentally
-        # pick up an old build/ from cwd.
-        Path(__file__).parent,
+        # Repo-relative — for `pip install -e .` from a clone.
         Path(__file__).parent.parent.parent / "build",
         Path(__file__).parent.parent.parent / "build" / "src",
         Path(__file__).parent.parent.parent / "build" / "lib",

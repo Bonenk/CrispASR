@@ -36,6 +36,30 @@ attested-honoured, unattested-denied, and the audit lines — its pre-existing
 "spoken_disclaimer=false is accepted" assertion had silently been wrong since
 v0.8.22 (a live test, so CI never ran it).
 
+## 2026-07-27 — Binding release automation: bundled PyPI wheels + GPU index + tag-triggered CI
+
+Moved the wrappers from "user installs libcrispasr separately" to self-contained
+distribution. New `release-python-wheels.yml` builds native-lib-BUNDLED Python
+wheels — CPU (linux x86_64/arm64, macOS arm64/Metal, windows x86_64) → PyPI, and
+GPU (CUDA linux+windows, Vulkan windows, carrying `+cuda`/`+vulkan` local
+versions) → a PEP 503 simple index on GitHub Pages (`pip install crispasr
+--extra-index-url .../whl/cuda/`, llama-cpp-python style) — plus a pure-Python
+sdist fallback. It REUSES the relocatable `libcrispasr-<platform>` bundles
+release.yml already attaches to the Release (no native rebuild); runs on
+`workflow_run` after release.yml. `tools/stage_libs.py` stages the libs into the
+`crispasr` package and `_binding.py:_find_lib()` now probes the package dir FIRST
+so the bundled copy always wins over a stray system lib; wheels are retagged per
+platform with `wheel tags` (ctypes package → one wheel per platform covers all
+Python 3, no cibuildwheel per-version matrix). Verified end-to-end locally on
+macOS-arm64: assemble bundle → package-lib-bundle.sh → stage → build → retag →
+`pip install` in a clean venv → `_find_lib` resolves the in-wheel dylib →
+`ctypes.CDLL` loads it. `release-wrappers.yml` auto-trigger enabled (`push: tags
+v*`) for crates.io + pub.dev; its PyPI job removed (owned by the wheels
+workflow); fixed its crates.io existence probe (missing User-Agent → 403 → it
+always self-skipped) + added an idempotent version-exists gate. `sync-version.py`
+now also bumps `python/crispasr/__init__.py __version__`. One-time setup left to
+the operator: `PYPI_API_TOKEN` secret + enabling GitHub Pages (gh-pages branch).
+
 ## 2026-07-27 — #313 follow-up: published crispasr + crispasr-sys to crates.io
 
 Reversed the "not on crates.io" state that #313 had documented: both crates are

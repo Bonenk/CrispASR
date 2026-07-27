@@ -10,25 +10,32 @@ Supports the ASR backends compiled into the linked CrispASR library, including W
 pip install crispasr
 ```
 
-This wheel is **pure Python** and does **not** bundle the native library — install `libcrispasr` separately, the same way `crispasr`'s Python bindings work:
+Platform wheels **bundle the native `libcrispasr`** — nothing else to install —
+for Linux (x86_64, arm64), macOS (Apple Silicon, Metal-accelerated), and
+Windows (x86_64).
 
-**macOS**
+### GPU wheels
+
+CUDA and Vulkan builds are published to a separate index (llama-cpp-python
+style — pass `--extra-index-url`):
+
 ```bash
-brew install crispasr        # once published; until then build from source
+# NVIDIA CUDA (Linux + Windows)
+pip install crispasr --extra-index-url https://crispstrobe.github.io/CrispASR/whl/cuda/
+# Vulkan (Windows)
+pip install crispasr --extra-index-url https://crispstrobe.github.io/CrispASR/whl/vulkan/
 ```
 
-**Linux / Windows / from source**
+### Other platforms / bring-your-own library
+
+Where no prebuilt wheel matches, pip installs the pure-Python **sdist**, which
+loads a `libcrispasr` you supply. Build/install it from source and, if it lands
+in a non-standard location, point `CRISPASR_LIB_PATH` at the file:
+
 ```bash
 git clone https://github.com/CrispStrobe/CrispASR
-cd CrispASR
-cmake -B build && cmake --build build -j
-sudo cmake --install build   # installs libcrispasr.{so,dylib,dll}
-```
-
-If `libcrispasr` is in a non-standard location, set `CRISPASR_LIB_PATH`:
-
-```bash
-export CRISPASR_LIB_PATH=/path/to/libcrispasr.so
+cd CrispASR && cmake -B build && cmake --build build -j && sudo cmake --install build
+export CRISPASR_LIB_PATH=/usr/local/lib/libcrispasr.so   # only if non-standard
 ```
 
 ## Quick start
