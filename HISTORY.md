@@ -6,6 +6,36 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-27 — #312: the marking-attestation gate 400'd every released Subtitle Edit
+
+Chatterbox voice cloning through Subtitle Edit failed with
+`400 marking_attestation_required`. Not a CUDA/Vulkan problem despite the report's
+title — the backend loaded fine and the failure is build-independent. Root cause:
+`ac232160` (shipped in v0.8.22) made `"spoken_disclaimer": false` on a voice clone
+a **hard refusal** unless the request also carried `marking_attestation`, and SE
+only started sending that field in `5b7f225a`/`8902b89e` (2026-07-26) — *after*
+its v5.1.0-rc16 release. So every released SE build hard-failed against CrispASR
+≥ 0.8.22 the moment the `voice` kept its `.wav` extension (chatterbox is SE's only
+engine that does). The reporter's log shows it exactly: the `[CONSENT]` line is
+printed, then the request 400s two lines later. The field was also undocumented —
+`docs/server.md` and `docs/tts.md` still described the opt-out with no mention of
+the attestation, so a client written from the docs was guaranteed to break.
+
+Fixed by making the unattested opt-out **denied, not refused**: the request is
+served with the spoken disclaimer applied (the documented default), and the denial
+is announced via `X-Crispasr-Spoken-Disclaimer: applied` +
+`X-Crispasr-Marking-Warning` headers and a `[MARKING] … no_spoken_disclaimer=DENIED`
+audit line. Serving the *stronger* default can never emit weaker-than-default
+output, which was the whole point of the gate, and it doesn't hard-break clients
+that predate the field. Also: a server launched with
+`--accept-marking-responsibility` now satisfies the per-request gate — the operator
+has already accepted the duty for every response the process serves, which subsumes
+the per-request field. The CLI keeps its hard refusal (there the operator can just
+add the flag). Docs updated on both surfaces; `tests/test-server-tts.sh` now covers
+attested-honoured, unattested-denied, and the audit lines — its pre-existing
+"spoken_disclaimer=false is accepted" assertion had silently been wrong since
+v0.8.22 (a live test, so CI never ran it).
+
 ## 2026-07-27 — #313 follow-up: published crispasr + crispasr-sys to crates.io
 
 Reversed the "not on crates.io" state that #313 had documented: both crates are

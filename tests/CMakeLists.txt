@@ -2683,6 +2683,23 @@ catch_discover_tests(test_server_wav_writer
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-marking-policy — Catch2 unit tests for the spoken-AI-disclaimer
+# opt-out gate (#312). Header-only decision logic from
+# examples/cli/crispasr_marking_policy.h — no server, no socket, no models, so
+# the policy is guarded on a tier CI actually runs (the live server test that
+# covered it before went four days red without anyone noticing).
+add_executable(test-marking-policy test-marking-policy.cpp)
+target_include_directories(test-marking-policy PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-marking-policy PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-marking-policy
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test_watermark — Catch2 unit tests for the spread-spectrum audio
 #watermark (embed + detect round-trip, SNR, robustness).
 #Pure CPU, no model dependencies — ~10 ms total.

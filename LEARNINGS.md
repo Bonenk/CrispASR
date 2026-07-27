@@ -10,6 +10,38 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## A new REQUIRED request field is a breaking API change on a schedule you don't control — deny the sub-feature, don't refuse the request (#312, 2026-07-27)
+
+v0.8.22 made `"spoken_disclaimer": false` on a voice clone require a companion
+`marking_attestation` field, hard-refusing with `400` otherwise. Correct policy,
+wrong failure mode: the integrator (Subtitle Edit) shipped the field a day after
+its last release, so for a full release cycle *every* SE build in users' hands got
+zero TTS output — the feature was gone, not degraded, and the user-visible symptom
+("synthesis failed 400") pointed nowhere near provenance policy.
+
+The generalisable shape: when a request asks to **weaken** a default and doesn't
+qualify, you have two failure modes — refuse the whole request, or refuse the
+*opt-out* and serve the default. The second is strictly better here, because the
+policy being enforced is "never emit weaker-than-default output," and serving the
+default satisfies it completely. Refusing outright buys no extra safety; it only
+converts a client that is one field behind into a client that is entirely broken.
+Announce the denial so it isn't silent (response headers + an audit-log line with
+`DENIED` in it), and keep the hard refusal on surfaces where the operator can fix
+it in place — the CLI's `--no-spoken-disclaimer` still exits 12, because the error
+names the flag you'd add to the very command you just typed.
+
+Two supporting rules the same issue produced. **An operator-scope attestation must
+satisfy a request-scope gate.** A server launched with
+`--accept-marking-responsibility` has accepted the duty for *every* response it
+serves, which strictly subsumes the per-request field — checking only the body
+refused requests the operator had already covered. **A gate added without docs is
+a trap with a fuse.** `marking_attestation` never made it into `docs/server.md` or
+`docs/tts.md`, so both surfaces still told integrators to send
+`"spoken_disclaimer": false` on its own — the exact request the server had started
+rejecting. And the live test that asserted that request is accepted was left
+failing for four days without anyone noticing, because live tests need models and
+CI never runs them: a policy gate wants a test on a tier that actually runs.
+
 ## When a clone/zero-shot path misbehaves but the BAKED/preset path is clean, diff the two paths' DATA byte-for-byte — the difference IS the bug (CosyVoice3 #310, 2026-07-26)
 
 CosyVoice3 zero-shot (`--voice ref.wav`) spoke the reference transcript before the

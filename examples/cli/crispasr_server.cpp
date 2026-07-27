@@ -50,6 +50,7 @@
 #include "wyoming.h"                   // Wyoming protocol for Home Assistant Assist (--wyoming-port)
 #include "core/audio_window.h"
 #include "core/crispasr_c2pa.h"
+#include "crispasr_marking_policy.h" // #312: who may skip the spoken AI-disclaimer
 #include "crispasr_tts_chunking.h"
 #include "crispasr_tts_disclaimer.h"
 #include "crispasr_watermark.h"
@@ -2015,6 +2016,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     //     "instructions":    "<voice direction prose>",  (optional, applied via params.tts_instruct)
     //     "speed":           0.25 .. 4.0,                (optional, default 1.0)
     //     "response_format": "wav"|"pcm"|"f32"|"mp3"|"aac"|"opus" (optional, default "wav")
+    //     "consent_attestation":  "<text>",              (REQUIRED when `voice` is a .wav clone)
+    //     "spoken_disclaimer":    true|false,            (optional, default true)
+    //     "marking_attestation":  "<text>",              (required to HONOR spoken_disclaimer:false
+    //                                                     on a clone; without it the opt-out is
+    //                                                     denied, not the request — see below)
     //   }
     //
     // Returns:
@@ -2022,8 +2028,13 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     //   200 audio/pcm                 — raw int16 LE PCM, 24 kHz mono (OpenAI spec)
     //   200 application/octet-stream  — raw float32 PCM (crispasr-specific f32)
     //
+    //   Response headers on a voice clone:
+    //     X-Crispasr-Spoken-Disclaimer: applied|skipped
+    //     X-Crispasr-Marking-Warning:   <set only when an unattested opt-out was denied>
+    //
     //   400 — backend lacks CAP_TTS, missing/empty input, input too long,
-    //         malformed body, unknown response_format, speed out of range
+    //         malformed body, unknown response_format, speed out of range,
+    //         voice clone without consent_attestation
     //   500 — backend->synthesize returned empty (e.g. unknown voice)
     //   503 — model still loading
     //
@@ -2098,7 +2109,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // tts_ref_text; a companion <name>.txt in --voice-dir is the fallback.
         std::string ref_text = body.value("ref_text", "");
         // spoken_disclaimer defaults to true; set to false to skip the
-        // audible AI-disclosure prefix (watermark + C2PA remain).
+        // audible AI-disclosure prefix (watermark + C2PA remain). The opt-out
+        // is only honored when attested — see the marking gate below.
         const bool spoken_disclaimer = body.value("spoken_disclaimer", true);
 
         // Voice-cloning consent gate: when the voice is a .wav reference
@@ -2115,37 +2127,59 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                        "consent_required", "consent_attestation");
             return;
         }
+        // Marking-responsibility attestation (parallel to voice-clone consent):
+        // opting out of the spoken AI-disclaimer on a voice clone requires an
+        // explicit 'marking_attestation' field — the requester accepts the
+        // disclosure duty.
+        //
+        // A server launched with --accept-marking-responsibility has already
+        // accepted that duty for EVERY response the process serves, which
+        // subsumes the per-request field — so it satisfies the gate too (the
+        // operator attestation is the broader one; demanding the per-request
+        // field on top of it refuses a request the operator already covered).
+        //
+        // #312: an UNATTESTED opt-out is DENIED, not refused — the decision, and
+        // the reasoning behind it, live in crispasr_marking_policy.h so they can
+        // be unit-tested (tests/test-marking-policy.cpp) rather than only through
+        // a live server with a model loaded.
+        const crispasr_marking::Decision marking =
+            crispasr_marking::decide(is_voice_clone, spoken_disclaimer, body.value("marking_attestation", ""),
+                                     params.tts_marking_responsibility_accepted, params.tts_marking_attestation);
         if (is_voice_clone) {
             auto now = std::chrono::system_clock::now();
             auto t = std::chrono::system_clock::to_time_t(now);
             char ts[64];
             std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+            // The audit line records what this response ACTUALLY carries, not
+            // what was asked for — a denied opt-out reads spoken_disclaimer=yes.
             fprintf(stderr, "[CONSENT] ts=%s voice=%s attestation=\"%s\" spoken_disclaimer=%s\n", ts,
                     log_sanitize(voice_name).c_str(), log_sanitize(consent_attestation).c_str(),
-                    spoken_disclaimer ? "yes" : "no");
+                    marking.apply_spoken_disclaimer ? "yes" : "no");
+            if (marking.optout_denied) {
+                fprintf(stderr,
+                        "[MARKING] ts=%s scope=request no_spoken_disclaimer=DENIED "
+                        "reason=\"no 'marking_attestation' field\" "
+                        "action=\"served with the spoken AI-disclaimer\"\n",
+                        ts);
+            } else if (marking.optout_honored) {
+                fprintf(stderr, "[MARKING] ts=%s scope=%s no_spoken_disclaimer=yes attestation=\"%s\"\n", ts,
+                        marking.scope.c_str(), log_sanitize(marking.attestation).c_str());
+            }
         }
-        // Marking-responsibility attestation (parallel to voice-clone consent):
-        // opting out of the spoken AI-disclaimer on a voice clone requires an
-        // explicit 'marking_attestation' field — the requester accepts the
-        // disclosure duty. Refused otherwise (hard-refuse policy).
-        std::string marking_attestation = body.value("marking_attestation", "");
-        if (is_voice_clone && !spoken_disclaimer && marking_attestation.empty()) {
-            json_error(res, 400,
-                       "disabling the spoken AI-disclaimer ('spoken_disclaimer': false) on a voice clone "
-                       "requires a 'marking_attestation' field affirming you accept the AI-content "
-                       "disclosure responsibility. "
-                       "Example: {\"marking_attestation\": \"I will disclose this is AI-generated\"}",
-                       "marking_attestation_required", "marking_attestation");
-            return;
-        }
-        if (is_voice_clone && !spoken_disclaimer) {
-            auto now = std::chrono::system_clock::now();
-            auto t = std::chrono::system_clock::to_time_t(now);
-            char ts[64];
-            std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
-            fprintf(stderr, "[MARKING] ts=%s scope=request no_spoken_disclaimer=yes attestation=\"%s\"\n", ts,
-                    log_sanitize(marking_attestation).c_str());
-        }
+        const bool apply_spoken_disclaimer = marking.apply_spoken_disclaimer;
+        // Tell the client what it got. Called once the response is committed to
+        // being a 200 (buffered: after synthesis; streaming: before the first
+        // chunk), so an error response never claims a disclaimer it never made.
+        auto set_marking_headers = [&marking, is_voice_clone](Response& r) {
+            if (!is_voice_clone)
+                return;
+            r.set_header("X-Crispasr-Spoken-Disclaimer", marking.apply_spoken_disclaimer ? "applied" : "skipped");
+            if (marking.optout_denied)
+                r.set_header("X-Crispasr-Marking-Warning",
+                             "'spoken_disclaimer': false ignored - it requires a 'marking_attestation' field "
+                             "(or a server launched with --accept-marking-responsibility); "
+                             "served with the spoken AI-disclaimer");
+        };
 
         std::string response_format = body.value("response_format", std::string("wav"));
         if (response_format != "wav" && response_format != "pcm" && response_format != "f32" &&
@@ -2278,6 +2312,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             const int silence_n = sr_out / 5;
             std::vector<short> silence_s16(silence_n, 0);
 
+            // Report the marking decision before the first chunk goes out — same
+            // headers as the buffered path (set_marking_headers is defined with
+            // the decision above).
+            set_marking_headers(res);
+
             // Producer/consumer streaming: a worker thread synthesizes under
             // model_mutex and pushes int16 LE PCM chunks into a bounded queue;
             // the chunked-content-provider (which httplib runs on the request
@@ -2351,8 +2390,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             // Worker thread: synthesize all sentences, enqueueing chunks as
             // they are produced. Captures by value the bits it needs so it
             // outlives the handler scope (the provider keeps `sq` alive).
-            std::thread worker([&backend, &model_mutex, sentences, rp, is_voice_clone, silence_s16, true_streaming,
-                                push_pcm, enqueue, sq, t0]() {
+            std::thread worker([&backend, &model_mutex, sentences, rp, apply_spoken_disclaimer, silence_s16,
+                                true_streaming, push_pcm, enqueue, sq, t0]() {
                 auto is_cancelled = [&] {
                     std::lock_guard<std::mutex> lk(sq->m);
                     return sq->cancelled;
@@ -2372,7 +2411,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                             if (s == "__throw_test__")
                                 throw std::runtime_error("injected streaming worker exception (test)");
                     }
-                    if (is_voice_clone) {
+                    // Same rule as the buffered path: a clone is disclaimed
+                    // unless the opt-out was attested. (Before #312 this keyed
+                    // off is_voice_clone alone, so streaming ignored an
+                    // honoured "spoken_disclaimer": false entirely.)
+                    if (apply_spoken_disclaimer) {
                         const auto& disc = crispasr_tts_get_disclaimer(backend.get(), rp);
                         if (!disc.empty()) {
                             push_pcm(disc.data(), (int)disc.size());
@@ -2461,11 +2504,14 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         }
 
         // Prepend spoken AI-disclosure for voice-cloned requests.
-        // Skipped when "spoken_disclaimer": false; watermark + C2PA
-        // provenance remain regardless.
-        if (is_voice_clone && spoken_disclaimer) {
+        // Skipped when "spoken_disclaimer": false AND the opt-out was attested;
+        // watermark + C2PA provenance remain regardless. #312: an unattested
+        // opt-out lands here as apply_spoken_disclaimer=true (denied, not
+        // refused) — the headers below tell the client which it got.
+        if (apply_spoken_disclaimer) {
             crispasr_tts_prepend_disclaimer(pcm, backend.get(), rp);
         }
+        set_marking_headers(res);
 
         // Apply speed via linear-interpolation resampler. speed=1.0 is a
         // no-op. Quality loss vs a sinc resampler is minimal at modest
