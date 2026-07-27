@@ -30,16 +30,14 @@ name: Release language wrappers
 # "skipping: <registry> not configured" message instead of letting `cargo`
 # / `twine` emit cryptic auth errors deep in the log.
 
-# Auto-trigger on tag push is DISABLED until the per-registry bootstrap
-# documented in PLAN.md §66 is complete (none of crispasr-sys / crispasr
-# / pub.dev/crispasr exist on their respective registries yet, so every
-# auto-run since v0.5.0 has failed). The workflow stays here so we can
-# manually dispatch a publish from the Actions UI for ad-hoc testing
-# during the bootstrap, and so we can flip the trigger back on (uncomment
-# `push: tags: ['v*']` below) the moment bootstrap is done.
+# Bootstrap is complete (crispasr-sys + crispasr on crates.io, crispasr on
+# pub.dev — all first-published manually 2026-07), so the tag trigger is live:
+# every `v*` tag auto-publishes the Rust + Dart wrappers. The Python wrapper is
+# published by `release-python-wheels.yml` (bundled CPU wheels + sdist to PyPI,
+# GPU wheels to the Pages index) — NOT here — to avoid a double PyPI upload.
 on:
-  # push:
-  #   tags: ['v*']
+  push:
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
@@ -52,63 +50,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish-pypi:
-    name: Publish Python wrapper to PyPI
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/crispasr
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-          ref: ${{ inputs.tag || github.ref }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Check whether this version is already on PyPI
-        id: pypi_check
-        run: |
-          PACKAGE_VERSION=$(python - <<'PY'
-          import tomllib
-          with open("python/pyproject.toml", "rb") as f:
-              print(tomllib.load(f)["project"]["version"])
-          PY
-          )
-          python - "$PACKAGE_VERSION" <<'PY'
-          import json
-          import sys
-          import urllib.request
-
-          version = sys.argv[1]
-          try:
-              with urllib.request.urlopen("https://pypi.org/pypi/crispasr/json") as response:
-                  releases = json.load(response)["releases"]
-          except Exception:
-              releases = {}
-          exists = bool(releases.get(version))
-          print(f"PyPI release {version}: {'already present' if exists else 'not present'}")
-          with open(__import__('os').environ["GITHUB_OUTPUT"], "a") as output:
-              output.write(f"exists={'true' if exists else 'false'}\n")
-          PY
-
-      - name: Build sdist + wheel
-        run: |
-          cd python
-          python -m pip install --upgrade build
-          python -m build
-
-      - name: Publish to PyPI
-        if: steps.pypi_check.outputs.exists != 'true'
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          python -m pip install --upgrade twine
-          python -m twine upload python/dist/*
+  # NOTE: the Python wrapper (PyPI) is published by release-python-wheels.yml,
+  # not here — see the header comment.
 
   publish-crates-io:
     name: Publish Rust wrapper to crates.io
@@ -122,6 +65,8 @@ jobs:
 
       # Fail fast (and clearly) if the token isn't set, instead of letting
       # cargo emit the obscure "please provide a non-empty token" message.
+      # crates.io's API returns 403 to requests without a User-Agent, so the
+      # probe MUST send one — otherwise it always reads as "does not exist".
       - name: crates.io config check
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -131,7 +76,8 @@ jobs:
             echo "skipping crates.io publish."
             exit 78  # neutral exit (some setups treat as 'skipped')
           fi
-          if ! curl -sf -o /dev/null https://crates.io/api/v1/crates/crispasr-sys; then
+          UA="crispasr-release-ci (https://github.com/${{ github.repository }})"
+          if ! curl -sf -o /dev/null -H "User-Agent: $UA" https://crates.io/api/v1/crates/crispasr-sys; then
             echo "::warning::crates.io package 'crispasr-sys' does not exist yet."
             echo "::warning::First publish must be manual (see PLAN.md §66 bootstrap)."
             echo "skipping crates.io publish."
@@ -141,18 +87,41 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
-      # crispasr-sys must be on crates.io before crispasr can resolve its
-      # path dependency. We rewrite the path dep to a version dep before
-      # publishing the high-level crate.
+      # Skip cleanly if this exact version is already on crates.io (a re-run of
+      # an already-published tag), so the job is idempotent.
+      - name: Determine crate version + whether it is already published
+        id: crate_ver
+        run: |
+          UA="crispasr-release-ci (https://github.com/${{ github.repository }})"
+          VER=$(grep -m1 '^version' crispasr-sys/Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          if curl -sf -H "User-Agent: $UA" "https://crates.io/api/v1/crates/crispasr-sys/$VER" >/dev/null 2>&1; then
+            echo "sys_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "sys_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          if curl -sf -H "User-Agent: $UA" "https://crates.io/api/v1/crates/crispasr/$VER" >/dev/null 2>&1; then
+            echo "wrap_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "wrap_exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # On CI (clean checkout) build.rs runs cmake to build libcrispasr for the
+      # verification build — submodules must be present (checkout above uses
+      # submodules: recursive). crispasr-sys must be on crates.io before the
+      # high-level crate's version dep resolves.
       - name: Publish crispasr-sys
+        if: steps.crate_ver.outputs.sys_exists != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --manifest-path crispasr-sys/Cargo.toml --allow-dirty
 
       - name: Wait for crispasr-sys to index
+        if: steps.crate_ver.outputs.sys_exists != 'true'
         run: sleep 30
 
       - name: Publish crispasr
+        if: steps.crate_ver.outputs.wrap_exists != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --manifest-path crispasr/Cargo.toml --allow-dirty

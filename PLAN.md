@@ -1442,9 +1442,33 @@ the optional CI/OIDC auto-trigger remains (below).
    this only if you want tag-triggered republish (manual `dart pub publish` works
    without it).
 
-4. **After bootstrap:** re-enable the auto-trigger by un-commenting the `push:` /
-   `tags: ['v*']` lines in `release-wrappers.yml`. Next tag push should publish all
-   three wrappers cleanly (resilience guards already landed — see HISTORY).
+4. **Auto-trigger — DONE.** `release-wrappers.yml` now runs on `push: tags:
+   ['v*']` and publishes Rust (crates.io) + Dart (pub.dev). Python is handled
+   separately by **`release-python-wheels.yml`** (see below), so the PyPI job
+   was removed from `release-wrappers.yml` to avoid a double upload.
+
+### Python wheels — `release-python-wheels.yml`
+
+Ships the model I recommended: bundled **CPU wheels → PyPI**, **GPU wheels → a
+PEP 503 index on GitHub Pages** (`--extra-index-url .../whl/{cuda,vulkan}/`),
+plus a pure-Python **sdist** fallback. It runs on `workflow_run` after
+`release.yml` finishes and REUSES the `libcrispasr-<platform>[-cuda|-vulkan]`
+bundles that release.yml attaches to the GitHub Release — no native rebuild.
+`tools/stage_libs.py` copies the libs into the `crispasr` package,
+`_binding.py:_find_lib()` probes the package dir first, wheels are retagged per
+platform with `wheel tags`. CPU matrix: linux x86_64 + arm64, macOS arm64
+(Metal), windows x86_64. GPU: CUDA (linux + windows) + Vulkan (windows),
+carrying `+cuda`/`+vulkan` local versions. Verified end-to-end locally on
+macOS-arm64 (install → `_find_lib` picks the bundled dylib → `CDLL` loads).
+
+ONE-TIME SETUP still needed:
+- **PyPI**: `PYPI_API_TOKEN` repo secret (already used by the old job).
+- **GitHub Pages**: enable Pages with source = `gh-pages` branch so the GPU
+  index is served (the workflow pushes it under `whl/`, `keep_files: true` so it
+  coexists with the wasm demo already on gh-pages).
+- Assumption to verify on first tagged run: linux wheels are labelled
+  `manylinux_2_28_*`; if the bundle needs newer glibc, bump the tag (run
+  `auditwheel show`).
 
 ## 67. Deferred follow-ups carry-over (mid-May 2026 session)
 

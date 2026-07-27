@@ -48,6 +48,12 @@ if __name__ == "__main__":
     update_file('python/pyproject.toml', [
         (r'^version = "[^"]+"', 'version = "{version}"')
     ], version)
+    # The package __version__ is hand-maintained (not read from pyproject at
+    # runtime), so keep it in lockstep too — otherwise `crispasr.__version__`
+    # drifts from the published wheel version.
+    update_file('python/crispasr/__init__.py', [
+        (r'^__version__ = "[^"]+"', '__version__ = "{version}"')
+    ], version)
     
     # Dart/Flutter
     update_file('flutter/crispasr/pubspec.yaml', [

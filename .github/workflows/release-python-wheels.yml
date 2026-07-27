@@ -1,0 +1,335 @@
+name: Release Python wheels
+
+# Builds self-contained (native-lib-bundled) Python wheels and publishes them:
+#   • CPU wheels          → PyPI (linux x86_64/arm64, macOS arm64/Metal, win x64)
+#   • GPU wheels          → a PEP 503 "simple" index on GitHub Pages
+#                           (CUDA linux+win, Vulkan win), llama-cpp-python style:
+#         pip install crispasr --extra-index-url \
+#             https://crispstrobe.github.io/CrispASR/whl/cuda/
+#         pip install crispasr --extra-index-url \
+#             https://crispstrobe.github.io/CrispASR/whl/vulkan/
+#   • a pure-Python sdist → PyPI (fallback for unlisted platforms; finds a
+#                           system-installed libcrispasr at runtime)
+#
+# These wheels REUSE the relocatable `libcrispasr-<platform>[-cuda|-vulkan]`
+# bundles that `release.yml` already builds and attaches to the GitHub Release
+# (their rpaths are rewritten to $ORIGIN / @loader_path by
+# tools/package-lib-bundle.sh). So this workflow does NOT recompile the native
+# library — it downloads the bundle, stages the libs into the `crispasr`
+# package (tools/stage_libs.py), builds a py3-none-any wheel, and retags it to
+# the platform. That means it must run AFTER `release.yml` finishes; hence the
+# `workflow_run` trigger.
+#
+# ONE-TIME SETUP:
+#   • PyPI:   `PYPI_API_TOKEN` repo secret (token scoped to the crispasr project).
+#   • Pages:  enable GitHub Pages for this repo with the source set to the
+#             `gh-pages` branch (the index is published there under `whl/`).
+#
+# NOTE ON THE manylinux TAG: the linux bundles come from release.yml's runners.
+# We label the wheels `manylinux_2_28_*` (broadly compatible). If the bundle
+# turns out to need a newer glibc, bump MANYLINUX below — verify on the first
+# tagged run with `auditwheel show`.
+
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to package (e.g. v0.8.24)'
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch || inputs.tag }}
+  cancel-in-progress: true
+
+env:
+  MANYLINUX_X86_64: manylinux_2_28_x86_64
+  MANYLINUX_AARCH64: manylinux_2_28_aarch64
+
+jobs:
+  # Only proceed if the triggering Release run succeeded (or on manual dispatch),
+  # and expose the tag to every downstream job.
+  setup:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - id: tag
+        run: |
+          TAG="${{ github.event.workflow_run.head_branch || inputs.tag }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Packaging wheels for tag: $TAG"
+
+  cpu-wheels:
+    needs: setup
+    name: CPU wheel (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            runner: ubuntu-22.04
+            asset: libcrispasr-linux-x86_64
+            plat: manylinux_2_28_x86_64
+            smoke: true
+          - name: linux-arm64
+            runner: ubuntu-22.04-arm
+            asset: libcrispasr-linux-arm64
+            plat: manylinux_2_28_aarch64
+            smoke: true
+          - name: macos-arm64
+            runner: macos-14
+            asset: libcrispasr-macos-arm64
+            plat: macosx_11_0_arm64
+            smoke: true
+          - name: windows-x86_64
+            runner: windows-latest
+            asset: libcrispasr-windows-x86_64
+            plat: win_amd64
+            smoke: false
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Download + extract the prebuilt lib bundle
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "${{ needs.setup.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "${{ matrix.asset }}.tar.gz" --dir bundle_dl
+          mkdir -p bundle
+          tar xzf "bundle_dl/${{ matrix.asset }}.tar.gz" -C bundle
+          echo "BUNDLE_DIR=bundle/${{ matrix.asset }}" >> "$GITHUB_ENV"
+
+      - name: Stage libs into the package
+        shell: bash
+        run: python python/tools/stage_libs.py --bundle "$BUNDLE_DIR"
+
+      - name: Build + retag platform wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade build wheel
+          ( cd python && python -m build --wheel )
+          python -m wheel tags --python-tag py3 --abi-tag none \
+            --platform-tag "${{ matrix.plat }}" --remove python/dist/*.whl
+          echo "built:"; ls -la python/dist
+
+      - name: Smoke test (install + locate bundled lib)
+        if: matrix.smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m venv /tmp/wt && . /tmp/wt/bin/activate
+          pip install python/dist/*.whl
+          python - <<'PY'
+          import crispasr._binding as b
+          from pathlib import Path
+          lib = b._find_lib()
+          print("resolved lib:", lib)
+          # must be the copy bundled inside the installed package
+          assert "site-packages" in lib and Path(lib).exists(), lib
+          import ctypes; ctypes.CDLL(lib)
+          print("CDLL load OK")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cpu-wheel-${{ matrix.name }}
+          path: python/dist/*.whl
+
+  sdist:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build pure-Python sdist (fallback)
+        run: |
+          python -m pip install --upgrade build
+          cd python && python -m build --sdist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: python/dist/*.tar.gz
+
+  publish-pypi:
+    needs: [cpu-wheels, sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/crispasr
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: cpu-wheel-*
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+      - name: Upload to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m pip install --upgrade twine
+          ls -la dist
+          # --skip-existing so a re-run (or the sdist already uploaded by the
+          # wrapper workflow) doesn't fail the job.
+          python -m twine upload --skip-existing dist/*
+
+  gpu-wheels:
+    needs: setup
+    name: GPU wheel (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64-cuda
+            runner: ubuntu-22.04
+            asset: libcrispasr-linux-x86_64-cuda
+            plat: manylinux_2_28_x86_64
+            local: cuda
+          - name: windows-x86_64-cuda
+            runner: windows-latest
+            asset: libcrispasr-windows-x86_64-cuda
+            plat: win_amd64
+            local: cuda
+          - name: windows-x86_64-vulkan
+            runner: windows-latest
+            asset: libcrispasr-windows-x86_64-vulkan
+            plat: win_amd64
+            local: vulkan
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Download + extract the prebuilt lib bundle
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release download "${{ needs.setup.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern "${{ matrix.asset }}.tar.gz" --dir bundle_dl
+          mkdir -p bundle
+          tar xzf "bundle_dl/${{ matrix.asset }}.tar.gz" -C bundle
+          echo "BUNDLE_DIR=bundle/${{ matrix.asset }}" >> "$GITHUB_ENV"
+
+      - name: Stage libs into the package
+        shell: bash
+        run: python python/tools/stage_libs.py --bundle "$BUNDLE_DIR"
+
+      - name: Add local version tag (+${{ matrix.local }})
+        shell: bash
+        run: |
+          python - <<'PY'
+          import re, pathlib
+          p = pathlib.Path("python/pyproject.toml")
+          t = p.read_text()
+          t = re.sub(r'(?m)^(version\s*=\s*")([^"]+)(")',
+                     lambda m: f'{m.group(1)}{m.group(2)}+${{ matrix.local }}{m.group(3)}',
+                     t, count=1)
+          p.write_text(t)
+          print(t.splitlines()[6])
+          PY
+
+      - name: Build + retag platform wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade build wheel
+          ( cd python && python -m build --wheel )
+          python -m wheel tags --python-tag py3 --abi-tag none \
+            --platform-tag "${{ matrix.plat }}" --remove python/dist/*.whl
+          echo "built:"; ls -la python/dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gpu-wheel-${{ matrix.name }}
+          path: python/dist/*.whl
+
+  publish-gpu-index:
+    needs: [setup, gpu-wheels]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # attach wheels to the release + push gh-pages
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: gpu
+          pattern: gpu-wheel-*
+          merge-multiple: true
+
+      - name: Attach GPU wheels to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -la gpu
+          gh release upload "${{ needs.setup.outputs.tag }}" gpu/*.whl \
+            --repo "${{ github.repository }}" --clobber
+
+      - name: Build PEP 503 simple index (accumulates all releases)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess, html, pathlib
+          repo = os.environ["GITHUB_REPOSITORY"]
+          # All wheels across ALL releases, so old versions stay installable.
+          rels = json.loads(subprocess.check_output(
+              ["gh", "api", "--paginate", f"repos/{repo}/releases"]))
+          buckets = {"cuda": [], "vulkan": []}
+          for r in rels:
+              for a in r.get("assets", []):
+                  n = a["name"]
+                  if not n.endswith(".whl"):
+                      continue
+                  for tag in buckets:
+                      if f"+{tag}" in n:
+                          buckets[tag].append((n, a["browser_download_url"]))
+          site = pathlib.Path("site/whl")
+          for tag, items in buckets.items():
+              proj = site / tag / "crispasr"
+              proj.mkdir(parents=True, exist_ok=True)
+              links = "\n".join(
+                  f'    <a href="{html.escape(url)}">{html.escape(name)}</a><br>'
+                  for name, url in sorted(set(items)))
+              (proj / "index.html").write_text(
+                  f"<!DOCTYPE html><html><body>\n{links}\n</body></html>\n")
+              # project listing at the index root
+              (site / tag).joinpath("index.html").write_text(
+                  '<!DOCTYPE html><html><body>\n'
+                  '    <a href="crispasr/">crispasr</a><br>\n'
+                  '</body></html>\n')
+              print(f"{tag}: {len(set(items))} wheels")
+          PY
+
+      - name: Deploy index to GitHub Pages (whl/ subdir, keep other files)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ github.token }}
+          publish_dir: ./site/whl
+          destination_dir: whl
+          keep_files: true
