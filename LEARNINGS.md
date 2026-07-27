@@ -84,17 +84,31 @@ against the HF reference (`OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5`,
    4.5, ours 9.4).
 4. **Frame-0 per-component + per-layer diff** (dump `global_hidden`/`lh`, and each
    Qwen3 block's hidden on the prompt prefill): local transformer OK, **backbone
-   diverges — layers 0–9 match to f32 precision, a step at layer 10** compounds
-   to cos 0.991 by layer 35. All hparams/RoPE(`ext_factor=0`)/QK-norm verified
-   correct, so it's a numerical issue that bites once magnitudes grow.
-5. **f16 KV cache is a partial cause** — `CRISPASR_KV_QUANT=f32` measurably moves
-   the stop earlier; shipped as the 4B default (env still overrides). Full
-   root-fix (the residual layer-10 op) is TODO. LESSON: when a marginal decision
-   (a 2-way sampled stop) misbehaves, diff the *hidden-state trajectory* against
-   the reference per-layer — the head/prompt/structure can all be correct while a
-   sub-1% backbone drift, invisible in the (robust) audio, breaks the (fragile)
-   stop. Diagnostic envs live in `moss_tts_local.cpp`
-   (`CRISPASR_MOSS_TTS_LOCAL_{DUMP_STOP,DUMP_HIDDEN,DUMP_LAYERS,FORCE_FRAMES,GREEDY_TEXT}`).
+   diverges — the block output steps at layer 10** and compounds to cos 0.991 by
+   layer 35. All hparams/RoPE(`ext_factor=0`)/QK-norm verified correct.
+5. **Per-SUBLAYER diff (attn vs MLP output, pre-residual, per layer) pinned the
+   *nature*:** the block-output error grows smoothly (l2rel 0.3%→4.6% over layers
+   0–9) then **jumps ~5× at layer 10 (attn cos 0.972, mlp cos 0.977 — both, ~equally)**
+   and persists. This rules out a single miscomputed op (a RoPE/QK-norm/GQA bug
+   would hit attention only) and rules out massive-activation corruption
+   (`ours_max ≈ ref_max` at every layer; the 23% error is spread across many tiny
+   channels, top |Δ|≈0.1, not concentrated in a few outliers).
+6. **It is NOT precision — it is a deterministic graph difference.** Converting the
+   backbone to an **f32 GGUF** and re-running the sublayer diff gave results
+   **byte-identical** to f16 (sub_attn_10 cos `0.972033` in both). So f16 weights
+   are not the cause and the "f16 KV / numerical drift" framing was wrong: the
+   layer-10 prefill divergence is an algorithmic/graph difference we haven't found
+   yet. (The f32-KV default still measurably moves the *generation-time* stop and
+   ships as the 4B default via `CRISPASR_KV_QUANT`, but it is a mitigation, not the
+   root cause.) **OPEN / next:** teacher-force the residual stream — inject the
+   reference's exact block-9 output as our block-10 input; if the 23% persists the
+   bug is inside layer 10's compute, if it collapses the 23% is amplification of
+   the accumulated 0–9 drift and the root is the milder per-layer difference.
+   LESSON: when a marginal decision (a 2-way sampled stop) misbehaves, diff the
+   *hidden-state trajectory* per-layer AND split each block into attn/MLP — and
+   before blaming precision, re-run at f32: identical numbers mean the bug is
+   logic, not rounding. Diagnostic envs live in `moss_tts_local.cpp`
+   (`CRISPASR_MOSS_TTS_LOCAL_{DUMP_STOP,DUMP_HIDDEN,DUMP_LAYERS,DUMP_SUBLAYER,FORCE_FRAMES,GREEDY_TEXT}`).
 
 ## Cross-lingual TTS needs the target language plumbed through /v1/audio/speech (#249/#304, 2026-07)
 
