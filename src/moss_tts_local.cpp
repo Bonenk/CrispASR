@@ -986,6 +986,29 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
     // logits every frame, parseable, for the reference-vs-port trajectory diff.
     const bool dump_stop = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_STOP") != nullptr;
 
+    // CRISPASR_MOSS_TTS_LOCAL_FORCE_FRAMES=<path>: teacher-forcing for the #249
+    // trajectory diff. The file is whitespace-separated audio codes, n_vq per
+    // frame; we feed those exact frames back (skipping audio sampling) and dump
+    // our stop logit per frame — directly comparable to the reference run on the
+    // SAME frames, isolating forward-correctness from the sampled-code choices.
+    std::vector<std::vector<int32_t>> forced;
+    if (const char* fp = getenv("CRISPASR_MOSS_TTS_LOCAL_FORCE_FRAMES")) {
+        if (FILE* ff = fopen(fp, "r")) {
+            std::vector<int32_t> row;
+            int v;
+            while (fscanf(ff, "%d", &v) == 1) {
+                row.push_back(v);
+                if ((int)row.size() == n_vq) {
+                    forced.push_back(row);
+                    row.clear();
+                }
+            }
+            fclose(ff);
+        }
+        if (dump_stop)
+            fprintf(stderr, "DUMPSTOP force_frames=%zu\n", forced.size());
+    }
+
     std::string prompt = mtl_build_prompt(ctx, text, sp);
     int n_ids = 0;
     int32_t* ids = moss_tts_local_tokenize(ctx, prompt.c_str(), &n_ids);
@@ -1016,6 +1039,8 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
     std::vector<std::vector<int32_t>> history_per_cb(n_vq);
 
     for (int f = 0; f < max_frames; f++) {
+        if (!forced.empty() && f >= (int)forced.size())
+            break; // teacher-forcing: dumped our stop logit for every reference frame
         // Local sequence starts with the backbone hidden (position 0).
         std::vector<float> local_seq(global_hidden, global_hidden + d);
         float* lh = mtl_local_forward(ctx, local_seq.data(), 1);
@@ -1037,7 +1062,7 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
             fprintf(stderr, "moss_tts_local[dbg] frame %d: stop_head continue=%.4f stop=%.4f -> %s\n", f, tl[0], tl[1],
                     stop_idx == 1 ? "STOP" : "cont");
         free(tl);
-        if (stop_idx == 1) { // audio_end -> stop
+        if (stop_idx == 1 && forced.empty()) { // audio_end -> stop (ignored under teacher-forcing)
             free(lh);
             if (dbg)
                 fprintf(stderr, "moss_tts_local[dbg] stop head fired at frame %d\n", f);
@@ -1054,8 +1079,9 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
             }
             if (sp.audio_repetition_penalty != 1.0f)
                 apply_repetition_penalty(al, aud_v, history_per_cb[k], sp.audio_repetition_penalty);
-            const int32_t code =
-                sample_one(al, aud_v, sp.audio_temperature, sp.audio_top_p, sp.audio_top_k, !audio_greedy, rng);
+            const int32_t code = forced.empty() ? sample_one(al, aud_v, sp.audio_temperature, sp.audio_top_p,
+                                                             sp.audio_top_k, !audio_greedy, rng)
+                                                : forced[f][k]; // teacher-forced: feed the reference's own code
             free(al);
             frame[k] = code;
             history_per_cb[k].push_back(code);
