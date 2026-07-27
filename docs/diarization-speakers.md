@@ -25,6 +25,15 @@ with the obligations in the last section understood.
 > `--stream` — but the cross-recording clustering and named-voiceprint paths
 > here do not run in real time. See [`streaming.md`](streaming.md#speaker-diarization-while-streaming).
 
+> **From a binding?** The same native label is on the session ABI from v0.8.24 —
+> `crispasr_session_result_segment_speaker(result, i)` in C, `.speaker` on
+> Python's `SessionSegment`, `.Speaker` on Go's `TranscribeSegment`, `.speaker`
+> on Dart's `SessionSegment`. It is `""` when the backend does not diarize
+> natively, and its ordinals are **chunk-local** — `Speaker 1` from one
+> `transcribe()` call is not necessarily the same voice as `Speaker 1` from the
+> next, because no cross-chunk clustering runs there. Use the `diarize_*`
+> helpers in section 1 when you need labels stable across a whole recording.
+
 ---
 
 ## 1. Session-scoped speaker clustering (recommended)

@@ -9,7 +9,7 @@
 #include "whisper_params.h"
 
 #include "vibevoice.h"
-#include "vibevoice_transcript_parse.h" // #300: Start/End/Speaker/Content → segments
+#include "core/vibevoice_transcript.h" // #300: Start/End/Speaker/Content → segments
 
 #include <cctype>
 #include <cstdlib>
@@ -162,7 +162,7 @@ public:
         // CRISPASR_VIBEVOICE_RAW_TRANSCRIPT=1 restores the pre-#300 behaviour
         // (one segment, raw model output) for anyone parsing the blob themselves.
         if (!crispasr_env::truthy("CRISPASR_VIBEVOICE_RAW_TRANSCRIPT")) {
-            for (const auto& u : vibevoice_transcript::parse(raw)) {
+            for (const auto& u : core_vibevoice::parse(raw)) {
                 std::string t = u.text;
                 while (!t.empty() && (unsigned char)t.front() <= ' ')
                     t.erase(t.begin());

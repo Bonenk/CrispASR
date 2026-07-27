@@ -42,6 +42,21 @@ The regression pin was re-captured: `expected_transcript` had been the bare
 Content since 2026-06-15, which could never have matched what the CLI actually
 printed (the blob), so that entry cannot have been passing.
 
+The session C-ABI needed the same fix and could not express it. `crispasr_c_api.cpp`
+reimplements every backend's transcribe inline (docs/contributing.md point 6), so
+the CLI-only parse left Python/Go/Flutter still receiving the raw blob — and
+`crispasr_session_seg` had no speaker field at all, so there was nowhere to put
+the label even after parsing. Added
+`crispasr_session_result_segment_speaker()` (a new accessor, so no ABI break —
+the result is opaque and read through getters), mirrored the parse in the inline
+dispatch, and split the per-token confidence list along the same utterance
+boundaries via `core_vibevoice::assign_tokens` — otherwise segment 2's "words"
+were segment 0's tokens plus every `[`, `{` and `"Speaker"` of the JSON. The
+parser moved to `src/core/vibevoice_transcript.h` so both surfaces share one copy.
+Wired through Python (`SessionSegment.speaker`), Go (`TranscribeSegment.Speaker`)
+and Dart (`SessionSegment.speaker`), each probing for the symbol so a newer
+binding keeps working against an older library.
+
 Validated on the shipping `cstr/vibevoice-asr-GGUF` q4_k both ways — Kaggle T4
 (`tools/kaggle/vibevoice-diarize-300/`, all gates PASS: raw arm 0 labels / 5 blob
 hits, new arm 4 labels / 0 blob, `--stream` 11 labels, `--stream-json` 4 of 7

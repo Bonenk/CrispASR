@@ -2702,11 +2702,12 @@ catch_discover_tests(test-marking-policy
 
 # ─── test-vibevoice-transcript — Catch2 unit tests for the VibeVoice-ASR
 # answer parser (#300). Header-only (examples/cli/vibevoice_transcript_parse.h):
-# Start/End/Speaker/Content -> utterances, incl. a truncated decode and the
+# Start/End/Speaker/Content -> utterances (+ assign_tokens, which splits the
+# per-token confidence list the same way), incl. a truncated decode and the
 # prompt's long key spellings. No model, no audio.
 add_executable(test-vibevoice-transcript test-vibevoice-transcript.cpp)
 target_include_directories(test-vibevoice-transcript PRIVATE
-    ${PROJECT_SOURCE_DIR}/examples/cli
+    ${PROJECT_SOURCE_DIR}/src
 )
 target_link_libraries(test-vibevoice-transcript PRIVATE
     Catch2::Catch2WithMain

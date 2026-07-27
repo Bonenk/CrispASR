@@ -942,6 +942,7 @@ CA_EXPORT unsigned char* crispasr_pcm_to_wav(const float* pcm, int n_samples, in
 
 #include "core/crispasr_lcs.h"
 #include "core/crispasr_env.h"
+#include "core/vibevoice_transcript.h" // #300: shared with the CLI adapter
 
 CA_EXPORT int crispasr_lcs_dedup_prefix_count(const int32_t* prev_tail_tokens, int n_prev, const int32_t* curr_tokens,
                                               int n_curr, int min_lcs_length) {
@@ -1581,6 +1582,14 @@ struct crispasr_session_seg {
     std::string text;
     int64_t t0 = 0; // centiseconds absolute
     int64_t t1 = 0;
+    // Native per-segment speaker label, "(Speaker N) " form, or empty when the
+    // backend produced none — the same field the CLI adapters populate
+    // (crispasr_segment::speaker) and the same string the CLI prefixes into
+    // text/srt/vtt output. Read via crispasr_session_result_segment_speaker().
+    // #300: added so a backend that natively diarizes can say so through the
+    // session ABI; before this the bindings had no way to express it, so
+    // vibevoice's speaker turns were only reachable as raw JSON inside `text`.
+    std::string speaker;
     // Whisper's per-segment probability that the segment is non-speech (the
     // <|nospeech|> token posterior). Only the whisper branch populates it;
     // every other backend leaves the -1.0 sentinel ("no signal", never a
@@ -6200,14 +6209,75 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             tk.p = vr->token_probs[i];
             toks.push_back(std::move(tk));
         }
-        crispasr_session_seg seg;
-        seg.text = vr->text;
-        seg.t0 = 0;
-        seg.t1 = (int64_t)((double)n_samples * 100.0 / 16000.0);
         _fire_token_callbacks(s, toks);
-        seg.words = emit_words_from_tokens(toks);
+        const std::string raw_text = vr->text;
+        const int64_t dur_cs = (int64_t)((double)n_samples * 100.0 / 16000.0);
+
+        // #300: same parse as the CLI adapter — the model answers with a
+        // Start/End/Speaker/Content array, so split it into one segment per
+        // utterance with the speaker in the structured field. Mirrored here
+        // because this ABI reimplements transcribe inline; a fix that landed
+        // only in crispasr_backend_vibevoice.cpp would leave every binding
+        // handing its callers the raw JSON blob.
+        // CRISPASR_VIBEVOICE_RAW_TRANSCRIPT=1 keeps the pre-#300 single segment.
+        bool parsed = false;
+        if (!crispasr_env::truthy("CRISPASR_VIBEVOICE_RAW_TRANSCRIPT")) {
+            const std::vector<core_vibevoice::Utterance> utts = core_vibevoice::parse(raw_text);
+            // Split the per-token confidence list the same way as the text, so
+            // segment i's words are segment i's tokens and none of the JSON
+            // scaffolding.
+            std::vector<std::string> tok_texts;
+            tok_texts.reserve(toks.size());
+            for (const auto& t : toks)
+                tok_texts.push_back(t.text);
+            const std::vector<std::vector<int>> tok_of = core_vibevoice::assign_tokens(utts, tok_texts);
+            for (size_t u = 0; u < utts.size(); u++) {
+                std::string t = utts[u].text;
+                while (!t.empty() && (unsigned char)t.front() <= ' ')
+                    t.erase(t.begin());
+                while (!t.empty() && (unsigned char)t.back() <= ' ')
+                    t.pop_back();
+                if (t.empty())
+                    continue;
+                crispasr_session_seg seg;
+                seg.text = std::move(t);
+                auto clamp_cs = [&](double sec, int64_t fallback) -> int64_t {
+                    if (sec < 0.0)
+                        return fallback;
+                    int64_t cs = (int64_t)(sec * 100.0 + 0.5);
+                    if (cs < 0)
+                        cs = 0;
+                    if (cs > dur_cs)
+                        cs = dur_cs;
+                    return cs;
+                };
+                seg.t0 = clamp_cs(utts[u].start_s, 0);
+                seg.t1 = clamp_cs(utts[u].end_s, dur_cs);
+                if (seg.t1 < seg.t0)
+                    seg.t1 = seg.t0;
+                if (utts[u].speaker >= 0) {
+                    char spk[32];
+                    snprintf(spk, sizeof(spk), "(Speaker %d) ", utts[u].speaker);
+                    seg.speaker = spk;
+                }
+                std::vector<ca_token_record> seg_toks;
+                seg_toks.reserve(tok_of[u].size());
+                for (int idx : tok_of[u])
+                    seg_toks.push_back(toks[(size_t)idx]);
+                seg.words = emit_words_from_tokens(seg_toks);
+                r->segments.push_back(std::move(seg));
+                parsed = true;
+            }
+        }
+        if (!parsed) {
+            crispasr_session_seg seg;
+            seg.text = raw_text;
+            seg.t0 = 0;
+            seg.t1 = dur_cs;
+            seg.words = emit_words_from_tokens(toks);
+            r->segments.push_back(std::move(seg));
+        }
         vibevoice_result_free(vr);
-        r->segments.push_back(std::move(seg));
         return r;
     }
 #endif
@@ -7300,6 +7370,9 @@ CA_EXPORT int64_t crispasr_session_result_segment_t0(crispasr_session_result* r,
 }
 CA_EXPORT int64_t crispasr_session_result_segment_t1(crispasr_session_result* r, int i) {
     return (r && i >= 0 && i < (int)r->segments.size()) ? r->segments[i].t1 : 0;
+}
+CA_EXPORT const char* crispasr_session_result_segment_speaker(crispasr_session_result* r, int i) {
+    return (r && i >= 0 && i < (int)r->segments.size()) ? r->segments[i].speaker.c_str() : "";
 }
 CA_EXPORT int crispasr_session_result_n_words(crispasr_session_result* r, int i_seg) {
     if (!r || i_seg < 0 || i_seg >= (int)r->segments.size())

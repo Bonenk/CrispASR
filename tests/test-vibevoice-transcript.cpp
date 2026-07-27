@@ -10,9 +10,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "vibevoice_transcript_parse.h"
+#include <initializer_list>
 
-using vibevoice_transcript::parse;
+#include "core/vibevoice_transcript.h"
+
+using core_vibevoice::parse;
 
 TEST_CASE("the recorded jfk answer parses to one utterance", "[unit][vibevoice]") {
     // Verbatim from the 2026-04-24 Q4_K end-to-end run on samples/jfk.wav.
@@ -92,4 +94,61 @@ TEST_CASE("plain prose is not a transcript blob", "[unit][vibevoice]") {
     REQUIRE(parse("").empty());
     REQUIRE(parse("[]").empty());
     REQUIRE(parse(R"([{"Start":0.0,"End":1.0,"Speaker":0}])").empty()); // no Content
+}
+
+// ── assign_tokens: split the per-token confidence list the same way as the text
+//
+// The session ABI hands callers a word/confidence list per segment. Once the
+// answer is split into utterances that list has to be split too, or segment 2's
+// "words" are segment 0's tokens plus every `[`, `{` and `"Speaker"` of the JSON.
+
+using core_vibevoice::assign_tokens;
+using core_vibevoice::Utterance;
+
+static std::vector<std::string> toks(std::initializer_list<const char*> l) {
+    return std::vector<std::string>(l.begin(), l.end());
+}
+
+TEST_CASE("tokens map to the utterance whose Content they spell", "[unit][vibevoice]") {
+    const std::string raw = R"([{"Speaker":0,"Content":"hello there"},{"Speaker":1,"Content":"bye now"}])";
+    auto u = parse(raw);
+    REQUIRE(u.size() == 2);
+    // Decode order, scaffolding included — exactly what the runtime emits.
+    auto t = toks({"[{\"", "Speaker", "\":0,\"", "Content", "\":\"", "hello", " there", "\"},{\"", "Speaker", "\":1,\"",
+                   "Content", "\":\"", "bye", " now", "\"}]"});
+    auto a = assign_tokens(u, t);
+    REQUIRE(a.size() == 2);
+    REQUIRE(a[0] == std::vector<int>{5, 6});   // "hello", " there"
+    REQUIRE(a[1] == std::vector<int>{12, 13}); // "bye", " now"
+}
+
+TEST_CASE("a repeated line still maps to distinct token spans", "[unit][vibevoice]") {
+    // samples/multispeaker.wav really does repeat the same sentence per speaker,
+    // so the second search must not re-find the first occurrence.
+    std::vector<Utterance> u(2);
+    u[0].text = "same line";
+    u[1].text = "same line";
+    auto t = toks({"same", " line", "|", "same", " line"});
+    auto a = assign_tokens(u, t);
+    REQUIRE(a[0] == std::vector<int>{0, 1});
+    REQUIRE(a[1] == std::vector<int>{3, 4});
+}
+
+TEST_CASE("a Content that cannot be located yields no tokens, not wrong ones", "[unit][vibevoice]") {
+    std::vector<Utterance> u(1);
+    u[0].text = "not present anywhere";
+    auto a = assign_tokens(u, toks({"something", " else"}));
+    REQUIRE(a.size() == 1);
+    REQUIRE(a[0].empty());
+}
+
+TEST_CASE("a token straddling a boundary is claimed by both spans it covers", "[unit][vibevoice]") {
+    // Half-open overlap: a merged token is real (BPE merges across the JSON
+    // quote), and dropping it would lose that confidence value entirely.
+    std::vector<Utterance> u(2);
+    u[0].text = "ab";
+    u[1].text = "cd";
+    auto a = assign_tokens(u, toks({"a", "bc", "d"}));
+    REQUIRE(a[0] == std::vector<int>{0, 1});
+    REQUIRE(a[1] == std::vector<int>{1, 2});
 }

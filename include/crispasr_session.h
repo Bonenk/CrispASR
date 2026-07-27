@@ -311,6 +311,15 @@ CRISPASR_SESSION_API int crispasr_session_result_n_segments(crispasr_session_res
 CRISPASR_SESSION_API const char* crispasr_session_result_segment_text(crispasr_session_result* r, int i);
 CRISPASR_SESSION_API int64_t crispasr_session_result_segment_t0(crispasr_session_result* r, int i);
 CRISPASR_SESSION_API int64_t crispasr_session_result_segment_t1(crispasr_session_result* r, int i);
+// #300: native per-segment speaker label from a backend that diarizes on its
+// own — the "(Speaker N) " form (with the trailing space, as the CLI prefixes
+// it), or "" when the backend produced none. Never NULL, so a caller can print
+// it unconditionally. Populated today by vibevoice, whose model answers with a
+// Start/End/Speaker/Content array; other backends leave it empty. The ordinals
+// are CHUNK-LOCAL: "Speaker 1" in one transcribe call is not guaranteed to be
+// the same voice as "Speaker 1" in the next, since no cross-chunk clustering
+// runs here (use crispasr_diarize_* for that).
+CRISPASR_SESSION_API const char* crispasr_session_result_segment_speaker(crispasr_session_result* r, int i);
 CRISPASR_SESSION_API int crispasr_session_result_n_words(crispasr_session_result* r, int i_seg);
 CRISPASR_SESSION_API const char* crispasr_session_result_word_text(crispasr_session_result* r, int i_seg, int i_word);
 CRISPASR_SESSION_API int64_t crispasr_session_result_word_t0(crispasr_session_result* r, int i_seg, int i_word);
