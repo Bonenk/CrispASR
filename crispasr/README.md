@@ -6,21 +6,25 @@ Supports 17 ASR backends including Whisper, Qwen3-ASR, FastConformer, Canary, Pa
 
 ## Install
 
+The crates are **not published on crates.io** — depend on them via git. The
+`crispasr-sys` `build.rs` needs the CrispASR C/C++ sources (to build
+`libcrispasr` with cmake), which only a repo checkout provides:
+
 ```toml
 [dependencies]
-crispasr = "0.1"
+crispasr = { git = "https://github.com/CrispStrobe/CrispASR" }
 ```
 
-You also need `libcrispasr` installed on the system — this crate is a thin wrapper around `libcrispasr` and does **not** build it. Same pattern as CrispASR's other language bindings.
+By default `crispasr-sys`'s `build.rs` builds `libcrispasr` from source with
+cmake (needs `cmake` + a C++ toolchain; the git dependency supplies the
+sources). To skip that and link a **pre-built** library instead, build/install
+it once and point `CRISPASR_LIB_DIR` at it:
 
 ```bash
 git clone https://github.com/CrispStrobe/CrispASR
-cd CrispASR
-cmake -B build && cmake --build build -j
-sudo cmake --install build
+cd CrispASR && cmake -B build && cmake --build build -j && sudo cmake --install build
+# then, in your project:  export CRISPASR_LIB_DIR=/usr/local/lib
 ```
-
-If `libcrispasr` is in a non-standard location, set `CRISPASR_LIB_DIR`.
 
 ## Quick start
 
