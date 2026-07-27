@@ -93,17 +93,36 @@ against the HF reference (`OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5`,
    would hit attention only) and rules out massive-activation corruption
    (`ours_max ≈ ref_max` at every layer; the 23% error is spread across many tiny
    channels, top |Δ|≈0.1, not concentrated in a few outliers).
-6. **It is NOT precision — it is a deterministic graph difference.** Converting the
-   backbone to an **f32 GGUF** and re-running the sublayer diff gave results
-   **byte-identical** to f16 (sub_attn_10 cos `0.972033` in both). So f16 weights
-   are not the cause and the "f16 KV / numerical drift" framing was wrong: the
-   layer-10 prefill divergence is an algorithmic/graph difference we haven't found
-   yet. (The f32-KV default still measurably moves the *generation-time* stop and
-   ships as the 4B default via `CRISPASR_KV_QUANT`, but it is a mitigation, not the
-   root cause.) **OPEN / next:** teacher-force the residual stream — inject the
-   reference's exact block-9 output as our block-10 input; if the 23% persists the
-   bug is inside layer 10's compute, if it collapses the 23% is amplification of
-   the accumulated 0–9 drift and the root is the milder per-layer difference.
+6. **It is NOT precision.** Converting the backbone to an **f32 GGUF** and re-running
+   the sublayer diff gave results **byte-identical** to f16 (sub_attn_10 cos
+   `0.972033` in both). So f16 weights are not the cause — the divergence is
+   deterministic, not rounding. (f32-KV still measurably moves the *generation-time*
+   stop and ships as the 4B default via `CRISPASR_KV_QUANT`, but it's a mitigation.)
+7. **Layer-0 attention-internals diff (with an EXACT input) exonerated every
+   discrete op — there is no port bug.** Tapping the shared `core_attn` FA hook +
+   HF sub-module hooks at layer 0 (input = the embeddings, so any divergence is the
+   layer's own): post-QK-norm **pre-RoPE Q/K are byte-exact** to the reference's
+   `q_norm`/`k_norm` (l2rel 0.0); **V** matches `v_proj` (l2rel 5e-6); our
+   `flash_attn_ext` **== numpy eager** softmax (cos 1.0); and — checked *locally* in
+   numpy from the dumped Q — our `ggml_rope_ext` output **== standard HF half-split
+   rope byte-exact** (cos 1.0, vs 0.68 for interleaved), so the "RoPE by
+   elimination" lead was WRONG. Positions match too: the reference's no-mask path
+   (`qwen3_decoder.py`) sets an all-ones mask then `cumsum(ones)-1 = 0..T-1`,
+   identical to ours. The layer-0 attn-output deviation is only **cos 0.999995 (a
+   ~5e-6 accumulation-level difference**, which l2rel merely re-expresses as 0.3%).
+8. **Conclusion: the runaway is amplified irreducible ggml-vs-torch f32
+   accumulation, not a fixable op.** ~5e-6/op differences compound through the
+   residual stream and blow up ~1000× at a numerically sensitive backbone layer
+   (~10 — consistent with peaked/attention-sink softmax where a sub-ε logit shift
+   flips which key wins), which is enough to flip the model's fragile 2-way stop
+   margin. The audio is robust to this; only the binary stop is fragile — exactly
+   why the reference stops ~18 and we run to ~55 despite identical math. Practical
+   consequence: don't keep hunting an op (there isn't one). The real fix is
+   **stop-robustness** (match the reference's exact stop threshold/hysteresis, or
+   force the backbone attention to accumulate closer to torch), not a weight or
+   graph correction. **UNTESTED caveat:** flash-vs-eager was verified equal only at
+   layer 0; a single kernel at `DUMP_FA_LAYER=10` (the peaked layer) would confirm
+   ggml flash doesn't diverge from eager under saturation before fully closing this.
    LESSON: when a marginal decision (a 2-way sampled stop) misbehaves, diff the
    *hidden-state trajectory* per-layer AND split each block into attn/MLP — and
    before blaming precision, re-run at f32: identical numbers mean the bug is
