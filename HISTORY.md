@@ -6,6 +6,23 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-27 — #313 follow-up: published crispasr + crispasr-sys to crates.io
+
+Reversed the "not on crates.io" state that #313 had documented: both crates are
+now live at 0.8.23. First hardened `crispasr-sys/build.rs` so the published
+crate degrades sanely off-repo — a `DOCS_RS` short-circuit (compile the FFI
+rlib without link directives so docs.rs builds) and, before the cmake fallback,
+a check for a parent `CMakeLists.txt`; absent, it panics with an actionable
+message (set `CRISPASR_LIB_DIR` or use the git dependency) instead of a cryptic
+cmake error. Published with `CRISPASR_LIB_DIR=/usr/local/lib` set so the
+isolated verification build takes build.rs path 1 (no cmake, no vendored
+sources needed). One gotcha: crates.io rejects a first publish until the
+account has a *verified email* (400 Bad Request). Consumption is now two modes:
+git dep = build-from-source (build.rs cmakes it), or `crispasr = "0.8"` from
+crates.io + a pre-built lib via `CRISPASR_LIB_DIR` (the package does not vendor
+the C/C++ sources). PyPI (0.8.23) and pub.dev (0.8.11) were already live, so all
+three registries are bootstrapped.
+
 ## 2026-07-27 — #313: Rust bindings docs pointed at an unpublished crates.io crate
 
 The reporter's `cargo` failed with "no matching package named `crispasr-sys`,

@@ -190,11 +190,12 @@ let labels = agglomerative_cluster(&flat, (flat.len() / emb.dim() as usize) as i
 ```
 
 Crates: `crispasr-sys/` (raw FFI) + `crispasr/` (high-level) at the repo
-root. They are **not on crates.io** — depend on `crispasr` via git:
-`crispasr = { git = "https://github.com/CrispStrobe/CrispASR" }`. The `-sys`
-crate's `build.rs` builds `libcrispasr` with cmake from the checkout (or links
-a pre-built copy when `CRISPASR_LIB_DIR` is set), so a registry-only publish
-could not build on its own.
+root, both published on crates.io. The `-sys` crate's `build.rs` builds
+`libcrispasr` with cmake from the CrispASR sources, or links a pre-built copy
+when `CRISPASR_LIB_DIR` is set. The crates.io package does not vendor the C/C++
+sources, so consume via a **git dependency** to build from source
+(`crispasr = { git = "https://github.com/CrispStrobe/CrispASR" }`), or use
+`crispasr = "0.8"` from crates.io together with a pre-built lib + `CRISPASR_LIB_DIR`.
 
 ## Dart / Flutter
 
