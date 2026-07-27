@@ -537,6 +537,31 @@ tok_emb shape (vocab_size + 3). Supports arbitrarily long audio input.
 σ-VAE ConvNeXt encoders + Qwen2.5-7B decoder. Dual-mode: ASR (with
 timestamps, diarization, hotwords) and TTS (DPM-Solver++ flow matching).
 
+**The ASR answer is JSON, and the adapter parses it.** The system prompt says
+"transcribes audio input into text output in JSON format" and the user turn asks
+for the keys `Start time, End time, Speaker ID, Content`, so the model replies
+with an array of utterances:
+
+```json
+[{"Start":0.0,"End":10.99,"Speaker":0,"Content":"…"},
+ {"Start":11.32,"End":15.65,"Speaker":1,"Content":"…"}]
+```
+
+`core_vibevoice::parse` (`src/core/vibevoice_transcript.h`) turns that into one
+`crispasr_segment` per utterance — timings from Start/End offset into the chunk,
+speaker as the structured `"(Speaker N) "` label — which is what makes the
+diarization reachable in file output, `--stream`, `--stream-json` and the
+bindings. Until v0.8.24 the whole blob was one segment's `text` (#300), so the
+labels were literal JSON and `seg.speaker` was never set.
+
+It is a deliberately tolerant scanner rather than a strict JSON reader: a decode
+that hits the token cap ends mid-array, and a strict parse would discard every
+complete utterance before the cut. Unparseable output falls back to the raw
+string, and `CRISPASR_VIBEVOICE_RAW_TRANSCRIPT=1` restores the pre-v0.8.24
+single-segment behaviour for callers that parse the blob themselves. Because the
+model punctuates and sentence-cases its own Content, the adapter declares
+`CAP_PUNCTUATION_NATIVE` so the CLI's FireRedPunc pass does not run over it.
+
 ### mimo-asr
 
 6L input_local_transformer (1024d) + 36L Qwen2 LM (4096d, 32Q/8KV);
