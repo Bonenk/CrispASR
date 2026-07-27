@@ -156,7 +156,7 @@ lyr0 = model.transformer.layers[0]
 attn_mod = getattr(lyr0, "self_attn", None) or getattr(lyr0, "attn", None)
 if attn_mod is not None:
     attn_mod.register_forward_hook(mk("attn_out"))
-    for sub in ("q_norm", "k_norm"):
+    for sub in ("q_norm", "k_norm", "v_proj"):
         m = getattr(attn_mod, sub, None)
         if m is not None:
             m.register_forward_hook(mk(sub))
@@ -175,15 +175,54 @@ def cos(a, b):
     return round(float(a @ b / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-9)), 6)
 
 
+def l2r(a, b):
+    if a is None or b is None or a.shape != b.shape:
+        return None
+    return round(float(np.linalg.norm(a - b) / (np.linalg.norm(b) + 1e-9)), 6)
+
+
+def last_pos(entry):
+    # entry = (ne, flat); tensor is (ne0, ne1, ne2=T) row-fastest ne0 -> last-pos = ne0*ne1 values [h,d]
+    if entry is None:
+        return None
+    ne, flat = entry
+    per = ne[0] * ne[1]
+    T = ne[2] if ne[2] > 0 else 1
+    return flat[(T - 1) * per: T * per]
+
+
+# our post-qk-norm pre-RoPE Q/K/V (last position) vs the reference module outputs
+oq = last_pos(fa.get("DBG_Q_prerope"))
+ok = last_pos(fa.get("DBG_K_prerope"))
+ov = last_pos(fa.get("DBG_V_new"))
+result["prerope"] = {
+    "Q_vs_qnorm": {"cos": cos(oq, ref.get("q_norm")), "l2rel": l2r(oq, ref.get("q_norm"))},
+    "K_vs_knorm": {"cos": cos(ok, ref.get("k_norm")), "l2rel": l2r(ok, ref.get("k_norm"))},
+    "V_vs_vproj": {"cos": cos(ov, ref.get("v_proj")), "l2rel": l2r(ov, ref.get("v_proj"))},
+    "sizes": {"oq": None if oq is None else len(oq), "ref_q": None if ref.get("q_norm") is None else len(ref["q_norm"]),
+              "ok": None if ok is None else len(ok), "ov": None if ov is None else len(ov)},
+}
 result["attn_out_vs_ref"] = cos(subo.get("sub_attn_0"), ref.get("attn_out"))
-verdict = "?"
-fve = result["flash_vs_eager"]
-if fve is not None:
-    if fve["cos_last"] < 0.9995:
-        verdict = f"FLASH_ATTN is the bug: our fa_out != numpy-eager (cos_last {fve['cos_last']}, l2rel {fve['l2rel']})"
-    else:
-        verdict = (f"flash==eager (cos_last {fve['cos_last']}); the 0.3% is UPSTREAM in Q/K/V "
-                   f"(rope/qk-norm) — attn_out vs ref cos {result['attn_out_vs_ref']}")
+
+pr = result["prerope"]
+BAD = 0.999  # cosine below this = a real divergence at this stage
+
+
+def bad(x):
+    return x is not None and x < BAD
+
+
+if bad(pr["V_vs_vproj"]["cos"]):
+    verdict = f"V_PROJ diverges (cos {pr['V_vs_vproj']['cos']}) — value projection / weight-layout bug"
+elif bad(pr["Q_vs_qnorm"]["cos"]) or bad(pr["K_vs_knorm"]["cos"]):
+    verdict = (f"PROJECTION+QK-NORM diverges pre-RoPE (Q cos {pr['Q_vs_qnorm']['cos']}, "
+               f"K cos {pr['K_vs_knorm']['cos']}) — q/k proj or qk-norm is the bug")
+elif result["flash_vs_eager"] and result["flash_vs_eager"]["cos_last"] >= 0.9995:
+    verdict = (f"BY ELIMINATION = RoPE: pre-RoPE Q/K/V all match ref "
+               f"(Q {pr['Q_vs_qnorm']['cos']}, K {pr['K_vs_knorm']['cos']}, V {pr['V_vs_vproj']['cos']}), "
+               f"flash==eager, yet attn_out vs ref = {result['attn_out_vs_ref']} -> RoPE differs")
+else:
+    verdict = "inconclusive — check sizes/layout in result"
 (WORK / "attn_internals.json").write_text(json.dumps({"verdict": verdict, **result}, indent=2))
-step("done", verdict=verdict, attn_out_vs_ref=result["attn_out_vs_ref"])
+step("done", verdict=verdict, prerope=result["prerope"], attn_out_vs_ref=result["attn_out_vs_ref"])
 print("DONE", verdict, flush=True)
