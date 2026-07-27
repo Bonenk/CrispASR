@@ -16,7 +16,7 @@ from pathlib import Path
 REPO = Path("/kaggle/temp/CrispASR")
 WORK = Path("/kaggle/working")
 REF = os.environ.get("CRISPASR_REF", "fix/249-moss")
-LAYERS = [9, 10, 11]
+LAYERS = [0, 1, 2, 4, 6, 8, 9, 10]
 if not REPO.exists():
     subprocess.check_call(["git", "clone", "--recursive", "--depth", "1", "--branch", REF,
                            "https://github.com/CrispStrobe/CrispASR.git", str(REPO)])
@@ -134,12 +134,27 @@ def l2rel(a, b):
     return round(num / den, 6)
 
 
+def top_div(a, b, n=3):
+    # top-n channels by |a-b|, with the reference magnitude there (outlier test)
+    if not a or not b or len(a) != len(b):
+        return None
+    idx = sorted(range(len(a)), key=lambda i: abs(a[i] - b[i]), reverse=True)[:n]
+    return [{"ch": i, "ours": round(a[i], 3), "ref": round(b[i], 3),
+             "|d|": round(abs(a[i] - b[i]), 3)} for i in idx]
+
+
+def maxabs(v):
+    return round(max(abs(x) for x in v), 3) if v else None
+
+
 table = []
 for L in LAYERS:
     for which in ("sub_attn", "sub_mlp"):
         k = f"{which}_{L}"
-        table.append({"key": k, "cos": cos(ours.get(k), ref.get(k)),
-                      "l2rel": l2rel(ours.get(k), ref.get(k)),
+        o, r = ours.get(k), ref.get(k)
+        table.append({"key": k, "cos": cos(o, r), "l2rel": l2rel(o, r),
+                      "ref_maxabs": maxabs(r), "ours_maxabs": maxabs(o),
+                      "top_div": top_div(o, r),
                       "have_ours": k in ours, "have_ref": k in ref})
 
 # verdict: at the first diverging layer, which sub-op drops first
