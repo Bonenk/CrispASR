@@ -28,7 +28,11 @@ WORK = Path("/kaggle/working")
 CRISPASR_URL = "https://github.com/CrispStrobe/CrispASR.git"
 REPO = WORK / "CrispASR"
 if not REPO.exists():
-    subprocess.check_call(["git", "clone", "--depth", "1", CRISPASR_URL, str(REPO)])
+    subprocess.check_call(["git", "clone", "--recursive", "--depth", "1", CRISPASR_URL, str(REPO)])
+    # cmake needs the ggml submodule; --recursive above usually gets it, but init
+    # explicitly so a shallow-submodule hiccup doesn't leave ggml/ empty.
+    subprocess.check_call(["git", "-C", str(REPO), "submodule", "update", "--init",
+                           "--recursive", "--depth", "1"], timeout=1800)
 sys.path.insert(0, str(REPO / "tools" / "kaggle"))
 import kaggle_harness as kh  # noqa: E402
 
