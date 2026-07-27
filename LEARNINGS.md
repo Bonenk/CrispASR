@@ -38,6 +38,55 @@ that genuinely need the punctuation pass, silently deleting their commas. Print
 what the stage actually receives instead of inferring it from a flag whose job is
 to change the output.
 
+## MOSS-TTS-Local 4B stop runaway is a *backbone forward* bug at layer 10, not the head/quant (#249, 2026-07)
+
+The 4B's binary continue/stop head fires unreliably (q6_k/q8_0 run away, q4_k is
+a coin-flip per text) so those quants couldn't ship. A long methodical diff
+against the HF reference (`OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5`,
+`trust_remote_code`) localized it precisely — do this, in order, next time:
+
+1. **Reference stop reliability** (CPU, `attn_implementation="eager"` — no
+   flash_attn on Kaggle). It stops reliably at ~frame 15–19 (and at f16 too), so
+   the runaway is OURS, not model fragility.
+2. **The stop head is NOT the bug.** The reference OVERWRITES `local_text_lm_head`
+   at load with `text_lm_head[[assistant_slot,audio_end]]` — but only at
+   `__init__` on random weights; `from_pretrained` then loads the STORED head
+   over it and does not re-derive (`live_equals_stored: True`). So the checkpoint
+   head IS what inference uses, and our converter shipping it verbatim is correct.
+   (Reverted a wrong "derive from embed rows" converter fix once this showed.)
+3. **Teacher-forcing** (feed the reference's own frames into our C++, compare
+   per-frame stop logits) proved a real FORWARD divergence — matches for 11
+   frames, then our backbone under-collapses at the wind-down (frame 13: ref gap
+   4.5, ours 9.4).
+4. **Frame-0 per-component + per-layer diff** (dump `global_hidden`/`lh`, and each
+   Qwen3 block's hidden on the prompt prefill): local transformer OK, **backbone
+   diverges — layers 0–9 match to f32 precision, a step at layer 10** compounds
+   to cos 0.991 by layer 35. All hparams/RoPE(`ext_factor=0`)/QK-norm verified
+   correct, so it's a numerical issue that bites once magnitudes grow.
+5. **f16 KV cache is a partial cause** — `CRISPASR_KV_QUANT=f32` measurably moves
+   the stop earlier; shipped as the 4B default (env still overrides). Full
+   root-fix (the residual layer-10 op) is TODO. LESSON: when a marginal decision
+   (a 2-way sampled stop) misbehaves, diff the *hidden-state trajectory* against
+   the reference per-layer — the head/prompt/structure can all be correct while a
+   sub-1% backbone drift, invisible in the (robust) audio, breaks the (fragile)
+   stop. Diagnostic envs live in `moss_tts_local.cpp`
+   (`CRISPASR_MOSS_TTS_LOCAL_{DUMP_STOP,DUMP_HIDDEN,DUMP_LAYERS,FORCE_FRAMES,GREEDY_TEXT}`).
+
+## Cross-lingual TTS needs the target language plumbed through /v1/audio/speech (#249/#304, 2026-07)
+
+subof: CosyVoice3 + MOSS-TTS clones reading a language ≠ the reference voice's
+sounded heavily accented. Both engines already convey the target language (MOSS
+via a `- Language:` prompt field; CV3 drops the reference transcript when the
+target differs) driven by the CLI `-l`/`-tl` → `params.language`. The gap was
+purely the server: `/v1/audio/speech` parsed `input`/`voice`/`instructions` but
+NOT `language`, so a SubtitleEdit-style client couldn't select it. Fix: forward a
+`language` (or `target_lang` alias) field to `rp.language`. LESSON: when a
+capability works on the CLI but users hit it through the server/SE, check the
+OpenAI-compat endpoint actually plumbs the field — the backend adapter consumes
+`params.language` either way.
+
+---
+
 ## "The model emits it inline as text" is a claim to VERIFY, not to document — structured data you never parsed looks identical to a model limitation (#300 follow-up, 2026-07-27)
 
 vibevoice was written off in #300 as "speaker info is part of the transcript text,
