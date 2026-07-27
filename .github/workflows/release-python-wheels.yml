@@ -22,8 +22,10 @@ name: Release Python wheels
 #
 # ONE-TIME SETUP:
 #   • PyPI:   `PYPI_API_TOKEN` repo secret (token scoped to the crispasr project).
-#   • Pages:  enable GitHub Pages for this repo with the source set to the
-#             `gh-pages` branch (the index is published there under `whl/`).
+#   • Pages:  none needed — Pages already serves `main`/root (legacy Jekyll).
+#             The GPU index is committed to `main` under `whl/`, so Jekyll serves
+#             it at https://crispstrobe.github.io/CrispASR/whl/{cuda,vulkan}/ and
+#             the existing README landing page is left untouched.
 #
 # NOTE ON THE manylinux TAG: the linux bundles come from release.yml's runners.
 # We label the wheels `manylinux_2_28_*` (broadly compatible). If the bundle
@@ -273,8 +275,13 @@ jobs:
     needs: [setup, gpu-wheels]
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # attach wheels to the release + push gh-pages
+      contents: write   # attach wheels to the release + commit whl/ to main
     steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          token: ${{ github.token }}
+
       - uses: actions/download-artifact@v4
         with:
           path: gpu
@@ -290,14 +297,16 @@ jobs:
           gh release upload "${{ needs.setup.outputs.tag }}" gpu/*.whl \
             --repo "${{ github.repository }}" --clobber
 
-      - name: Build PEP 503 simple index (accumulates all releases)
+      - name: Regenerate the PEP 503 index under whl/ (all releases)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python - <<'PY'
-          import json, os, subprocess, html, pathlib
+          import json, os, subprocess, html, pathlib, shutil
           repo = os.environ["GITHUB_REPOSITORY"]
-          # All wheels across ALL releases, so old versions stay installable.
+          # Rebuild from ALL releases' assets, so old versions stay installable
+          # and a deleted release drops out. Links point at the Release-hosted
+          # wheels (absolute URLs), so main only carries tiny index.html files.
           rels = json.loads(subprocess.check_output(
               ["gh", "api", "--paginate", f"repos/{repo}/releases"]))
           buckets = {"cuda": [], "vulkan": []}
@@ -309,27 +318,41 @@ jobs:
                   for tag in buckets:
                       if f"+{tag}" in n:
                           buckets[tag].append((n, a["browser_download_url"]))
-          site = pathlib.Path("site/whl")
           for tag, items in buckets.items():
-              proj = site / tag / "crispasr"
+              root = pathlib.Path("whl") / tag
+              if root.exists():
+                  shutil.rmtree(root)
+              proj = root / "crispasr"
               proj.mkdir(parents=True, exist_ok=True)
               links = "\n".join(
                   f'    <a href="{html.escape(url)}">{html.escape(name)}</a><br>'
                   for name, url in sorted(set(items)))
               (proj / "index.html").write_text(
                   f"<!DOCTYPE html><html><body>\n{links}\n</body></html>\n")
-              # project listing at the index root
-              (site / tag).joinpath("index.html").write_text(
+              (root / "index.html").write_text(
                   '<!DOCTYPE html><html><body>\n'
                   '    <a href="crispasr/">crispasr</a><br>\n'
                   '</body></html>\n')
               print(f"{tag}: {len(set(items))} wheels")
           PY
 
-      - name: Deploy index to GitHub Pages (whl/ subdir, keep other files)
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ github.token }}
-          publish_dir: ./site/whl
-          destination_dir: whl
-          keep_files: true
+      # Pages serves main/root (legacy Jekyll), so commit the index there. Only
+      # this job ever writes whl/, but retry on a race with concurrent pushes.
+      # [skip ci] keeps the index commit from re-triggering other workflows.
+      - name: Commit + push whl/ to main
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add whl
+          if git diff --cached --quiet; then
+            echo "no index changes"; exit 0
+          fi
+          git commit -m "ci: publish GPU wheel index for ${{ needs.setup.outputs.tag }} [skip ci]"
+          for i in 1 2 3 4 5; do
+            if git push origin HEAD:main; then echo "pushed"; exit 0; fi
+            echo "push rejected — rebasing (attempt $i)"
+            git pull --rebase origin main || true
+            sleep $((i * 5))
+          done
+          echo "::error::could not push GPU wheel index to main"; exit 1
