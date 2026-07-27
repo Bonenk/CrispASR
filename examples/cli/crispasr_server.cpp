@@ -2229,6 +2229,18 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             rp.tts_ref_text = ref_text;
         if (!instructions.empty())
             rp.tts_instruct = instructions;
+        // #249/#304: forward a target language to the TTS backend. MOSS-TTS sets
+        // its "- Language:" prompt field from it; CosyVoice3 compares it to the
+        // voice's own language to engage cross-lingual synthesis (dropping the
+        // reference transcript so the clone speaks the target language, not the
+        // reference's). Language-agnostic backends ignore it. Without this a
+        // SubtitleEdit-style client could not pick the target language, so a
+        // cross-lingual clone came out heavily accented. `target_lang` is an alias.
+        {
+            const std::string tts_lang = body.value("language", body.value("target_lang", std::string()));
+            if (!tts_lang.empty())
+                rp.language = tts_lang;
+        }
         if (body.contains("seed") && body["seed"].is_number_integer())
             rp.seed = body["seed"].get<uint64_t>();
         if (body.contains("temperature") && body["temperature"].is_number())
