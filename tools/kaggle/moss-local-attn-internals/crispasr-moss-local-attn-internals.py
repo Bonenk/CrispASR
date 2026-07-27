@@ -34,8 +34,39 @@ step("start", ref=REF)
 TOKEN = kh.resolve_hf_token("HF_TOKEN")
 kh.install_build_toolchain()
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "huggingface_hub", "hf_transfer"])
-os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
-from huggingface_hub import hf_hub_download  # noqa: E402
+
+
+def robust_download(repo, fname, local_dir, token, tries=3, timeout=900):
+    # Run hf_hub_download in a child process with a HARD timeout so an
+    # hf_transfer/xet stall (free_gb flat for 56 min — the trap that ate a
+    # session) can't hang forever. First try uses hf_transfer; retries disable it
+    # (and xet) for a plain, socket-timeout-respecting resumable download.
+    import multiprocessing as mp
+
+    def _dl(q, use_ht):
+        os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1" if use_ht else "0"
+        os.environ["HF_HUB_DISABLE_XET"] = "0" if use_ht else "1"
+        try:
+            from huggingface_hub import hf_hub_download
+            q.put(("ok", hf_hub_download(repo, fname, local_dir=local_dir, token=token)))
+        except Exception as e:  # noqa: BLE001
+            q.put(("err", repr(e)))
+
+    for i in range(tries):
+        q = mp.Queue()
+        p = mp.Process(target=_dl, args=(q, i == 0))
+        p.start()
+        p.join(timeout)
+        if p.is_alive():
+            p.terminate(); p.join()
+            step("dl.hang.retry", repo=repo, file=fname, attempt=i)
+            continue
+        if not q.empty():
+            statv, val = q.get()
+            if statv == "ok":
+                return val
+            step("dl.err.retry", repo=repo, file=fname, attempt=i, err=val[:200])
+    raise RuntimeError(f"download failed after {tries} tries: {repo}/{fname}")
 
 BUILD = REPO / "build"
 step("cmake.configure")
@@ -49,8 +80,8 @@ step("build.done")
 
 MODELS = Path("/kaggle/temp/models"); MODELS.mkdir(parents=True, exist_ok=True)
 with kh.build_heartbeat("download"):
-    F16 = hf_hub_download("cstr/moss-tts-local-v1.5-GGUF", "moss-tts-local-v1.5-f16.gguf", local_dir=str(MODELS))
-    CODEC = hf_hub_download("cstr/moss-tts-local-v1.5-GGUF", "moss-tts-local-v1.5-codec.gguf", local_dir=str(MODELS))
+    CODEC = robust_download("cstr/moss-tts-local-v1.5-GGUF", "moss-tts-local-v1.5-codec.gguf", str(MODELS), TOKEN)
+    F16 = robust_download("cstr/moss-tts-local-v1.5-GGUF", "moss-tts-local-v1.5-f16.gguf", str(MODELS), TOKEN)
 
 # ── our layer-0 attention-internals dump ──────────────────────────────────────
 fa_path = WORK / "ours_fa0.txt"
