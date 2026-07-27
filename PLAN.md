@@ -1,5 +1,38 @@
 # CrispASR — Pending work
 
+## LANDED 2026-07-27 — #300 vibevoice diarization + the #308 punctuation audit
+
+Merged to `main`; listed here because three follow-ups are still open (below).
+
+- **#300** (`88e31121`): vibevoice's model answers with a
+  `Start/End/Speaker/Content` JSON array that nobody parsed — the blob was one
+  segment's `text`, so `seg.speaker` was empty and the #300 streaming `"speaker"`
+  field could never fire for it. Now parsed into per-utterance segments across
+  CLI, `--stream`, `--stream-json`, server, and the session ABI (new
+  `crispasr_session_result_segment_speaker()` + all seven wrappers).
+  `CRISPASR_VIBEVOICE_RAW_TRANSCRIPT=1` keeps the old blob.
+- **#308 audit** (`762d9e27`): the capitalisation fix had been applied to
+  `src/fireredpunc.cpp` while `crisp_punc/src/fireredpunc.cpp` — the copy that
+  actually links — kept the bug. Fixed in both, plus a no-double-punctuation
+  guard, plus `tests/test-punc-copies-in-sync.cpp` so they cannot diverge again.
+  `moonshine-streaming` + `mimo-asr` gained `CAP_PUNCTUATION_NATIVE`.
+
+**OPEN follow-ups:**
+1. **C# and WASM bindings are source-only-verified.** No `dotnet` or emsdk on the
+   Mac, so the `IntPtr`/`PtrToUtf8` marshalling in
+   `bindings/csharp/CrispASR/NativeMethods.cs` and the two `emscripten.cpp` sites
+   were not compiled. `bindings-csharp.yml` is the real check — watch that job.
+2. **Three ASR backends still unaudited for `CAP_PUNCTUATION_NATIVE`**:
+   `lfm2-audio`, `fastconformer-ctc`, `wav2vec2` — no local GGUFs. The CTC pair
+   almost certainly needs the pass (unpunctuated by construction); `lfm2-audio`
+   is an LLM decoder and is the likely one to need the flag. Method:
+   `FIREREDPUNC_DEBUG=1 … | grep PUNCDBG` and read `in=` — do NOT use
+   `--no-punctuation`, it strips after the fact and inverts the answer.
+3. **`src/fireredpunc.cpp` vs `crisp_punc/` duplication is contained, not
+   removed.** The same shape exists for `crisp_lid/` and `crisp_truecase/`; only
+   the punc pair has a sync test. Extending the test (or deleting the fallbacks)
+   is unclaimed.
+
 ## NOW — VAD + mel front-end parallelization campaign (#305 → fleet-wide)
 
 Started from #305 (reporter: whisper-vad-asmr + firered-vad slow / single-core).

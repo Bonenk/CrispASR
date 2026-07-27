@@ -42,6 +42,35 @@ backend doesn't expose that knob, but the call is safe to make.
 | `set_hotwords(words, boost)` | `set_hotwords` / `set_hotwords` / `SetHotwords` / `setHotwords` | Comma-separated contextual-biasing hotwords, boosted per token match (parakeet CTC/TDT trie; LLM-backend prompt injection). Empty string clears. (All six wrappers.) |
 | `set_g2p_dict(source)` | `set_g2p_dict` / `set_g2p_dict` / `SetG2PDict` / `setG2pDict` | Select the G2P pronunciation dictionary for TTS phonemization (`olaph`/`open-dict`/path). (All six wrappers.) |
 
+## Result field reference
+
+Everything a transcription result carries is read back through per-index
+accessors on the opaque `crispasr_session_result`, so adding a field is a new
+symbol rather than a layout change — old callers keep working. Every wrapper
+exposes them as struct/class members on its segment type.
+
+| C-ABI accessor | Member (Python/Rust/Go/Dart/Java/C#/Ruby) | Notes |
+|---|---|---|
+| `result_segment_text(r, i)` | `text` / `text` / `Text` / `text` / `text` / `Text` / `:text` | The segment transcript. |
+| `result_segment_t0/t1(r, i)` | `start`,`end` / `start`,`end` / `T0`,`T1` / `start`,`end` / `t0`,`t1` / `T0`,`T1` / `:t0`,`:t1` | Centiseconds on the C ABI; Python/Rust/Dart divide to seconds. |
+| `result_segment_no_speech_prob(r, i)` | `no_speech_prob` / … / `NoSpeechProb` / `noSpeechProb` / … / `:no_speech_prob` | Whisper only; `-1.0` sentinel = no data. |
+| `result_segment_speaker(r, i)` | `speaker` / `speaker` / `Speaker` / `speaker` / `speaker` / `Speaker` / `:speaker` | **New in v0.8.24.** Native per-segment speaker label in the `"(Speaker N) "` form, `""` when the backend does not diarize natively. |
+| `result_n_words` + `result_word_*` | `words` (list of word objects) | Per-word text/timings/confidence, plus `alts` where the backend emits them. |
+
+> **`speaker` ordinals are CHUNK-LOCAL.** They come from the backend's own
+> per-call diarization, so `Speaker 1` in one `transcribe()` is not guaranteed to
+> be the same voice as `Speaker 1` in the next — nothing clusters across calls
+> here. Use `diarize_segments` / `DiarizeSegments` (§ session-scoped clustering
+> in [`diarization-speakers.md`](diarization-speakers.md)) when you need labels
+> stable across a whole recording. Populated today by `vibevoice`, whose model
+> answers with a Start/End/Speaker/Content array; `moss-diarize` and `granite`
+> in `--diarize` mode populate it on the CLI/server surfaces.
+
+> **Older libraries.** Each wrapper probes for `result_segment_speaker` before
+> calling it and falls back to `""`, so a wrapper built after v0.8.24 still runs
+> against a pre-v0.8.24 `libcrispasr`. The reverse (old wrapper, new library) is
+> always fine — it simply ignores the symbol.
+
 > **Tip — chunk-boundary dedup for bindings.** When a binding drives a
 > CAP_UNBOUNDED_INPUT backend (parakeet, canary, …) chunk-by-chunk and
 > needs to stitch the output, call `crispasr_lcs_dedup_prefix_count`
