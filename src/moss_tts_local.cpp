@@ -1048,6 +1048,24 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
             free(global_hidden);
             return false;
         }
+        // CRISPASR_MOSS_TTS_LOCAL_DUMP_HIDDEN=<path>: dump frame-0 backbone hidden
+        // (global) + local-transformer output (local) for the #249 per-component
+        // diff vs the HF reference — localizes whether the backbone or the depth
+        // transformer diverges.
+        if (f == 0) {
+            if (const char* dhp = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_HIDDEN")) {
+                if (FILE* hf = fopen(dhp, "w")) {
+                    fprintf(hf, "GLOBAL");
+                    for (int i = 0; i < d; i++)
+                        fprintf(hf, " %.6f", global_hidden[i]);
+                    fprintf(hf, "\nLOCAL");
+                    for (int i = 0; i < d; i++)
+                        fprintf(hf, " %.6f", lh[i]);
+                    fprintf(hf, "\n");
+                    fclose(hf);
+                }
+            }
+        }
         // Binary continue/stop head: index 0 = assistant_slot (continue), 1 = audio_end.
         float* tl = mtl_apply_head(ctx, ctx->model.local_text_head_w, lh, d, 2);
         // Capture the RAW logits before sample_one softmaxes them in place.
