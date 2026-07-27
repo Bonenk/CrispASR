@@ -6,6 +6,22 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-27 — #313: Rust bindings docs pointed at an unpublished crates.io crate
+
+The reporter's `cargo` failed with "no matching package named `crispasr-sys`,
+location searched: crates.io index". Root cause was docs, not code: both crate
+READMEs said `crispasr = "0.1"` / `crispasr-sys = "0.1"` and `docs/bindings.md`
+claimed the crates were "published on crates.io" — but neither is published
+(both 404, confirmed via the crates.io API), so a registry dependency can never
+resolve. The `crispasr-sys` `build.rs` also *needs* the CrispASR C/C++ checkout
+to cmake `libcrispasr`, so a registry-only publish could not build even if it
+existed — the correct consumption model is a **git dependency**
+(`crispasr = { git = "https://github.com/CrispStrobe/CrispASR" }`), which was
+verified to resolve `crispasr → crispasr-sys` cleanly via `cargo tree`. Fixed
+the two READMEs (git dep + accurate build story: `build.rs` cmakes by default,
+or links a pre-built lib via `CRISPASR_LIB_DIR`), `docs/bindings.md`, and the
+misleading `crispasr/Cargo.toml` comment. Docs-only; no engine change.
+
 ## 2026-07-26 — #310: CosyVoice3 zero-shot clone leaked the reference transcript
 
 The `--voice ref.wav --ref-text` clone spoke part/all of the reference transcript
