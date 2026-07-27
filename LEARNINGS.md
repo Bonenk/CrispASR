@@ -10,6 +10,34 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## When instrumenting the suspect file produces NO output, you are editing the wrong file — look for a second copy (#308 audit, 2026-07-27)
+
+A capitalisation bug (`And` → `ANd`) reproduced perfectly, and the guard that
+prevents it was visibly present in `src/fireredpunc.cpp`. Adding a debug print to
+that file and rebuilding produced **nothing** — and that silence was the whole
+answer. `crisp_punc/src/fireredpunc.cpp` is a second copy of the same
+implementation, it is the one `src/CMakeLists.txt` prefers, and the fix had never
+been applied to it. The `src/` copy is a fallback for checkouts missing the
+sibling directory, so it compiles, links into nothing, and reads as authoritative.
+
+The durable habit: **a debug print that does not appear is evidence, not a build
+problem.** Before re-checking your build flags, ask whether the symbol you
+instrumented is the symbol being called — `strings` the shipped library for your
+marker, or check for a duplicate source file. Any repo with vendored/mirrored
+sibling libraries has this shape, and a fix in the wrong copy passes review,
+passes the build, and changes nothing.
+
+Two corollaries. **Duplication needs a test, not discipline.** The two files
+differed by exactly one hunk and nobody noticed for months; a file-comparison
+test costs nothing, fails loudly, and is the only thing that actually holds. Write
+it before the fix and watch it fail at the right line. **And a diagnostic flag can
+lie about the thing it seems to diagnose:** `--no-punctuation` strips punctuation
+*after* restoration, so it makes a natively-punctuating model look unpunctuated.
+Using it as the discriminator would have put `CAP_PUNCTUATION_NATIVE` on backends
+that genuinely need the punctuation pass, silently deleting their commas. Print
+what the stage actually receives instead of inferring it from a flag whose job is
+to change the output.
+
 ## "The model emits it inline as text" is a claim to VERIFY, not to document — structured data you never parsed looks identical to a model limitation (#300 follow-up, 2026-07-27)
 
 vibevoice was written off in #300 as "speaker info is part of the transcript text,

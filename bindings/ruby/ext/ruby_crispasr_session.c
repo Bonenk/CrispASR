@@ -101,6 +101,9 @@ extern int64_t crispasr_session_result_word_t0(struct crispasr_session_result* r
 extern int64_t crispasr_session_result_word_t1(struct crispasr_session_result* r, int i_seg, int i_word);
 extern float crispasr_session_result_word_p(struct crispasr_session_result* r, int i_seg, int i_word);
 extern float crispasr_session_result_segment_no_speech_prob(struct crispasr_session_result* r, int i_seg);
+/* #300: native per-segment speaker label ("(Speaker N) "), "" when the backend
+   does not diarize natively. Never NULL. */
+extern const char* crispasr_session_result_segment_speaker(struct crispasr_session_result* r, int i);
 // Per-frame CTC logits (opted in via set_return_logits) for backends with a
 // dense CTC grid (Omni CTC, wav2vec2/hubert/data2vec, canary-ctc); frame-major:
 // logits[t * n_logit_vocab + v]. Raw pre-softmax for Omni & wav2vec2;
@@ -754,6 +757,10 @@ static VALUE rb_session_transcribe(VALUE self, VALUE handle, VALUE pcm_arr) {
         rb_hash_aset(seg, ID2SYM(rb_intern("t1")), LL2NUM(crispasr_session_result_segment_t1(r, i)));
         rb_hash_aset(seg, ID2SYM(rb_intern("no_speech_prob")),
                      DBL2NUM((double)crispasr_session_result_segment_no_speech_prob(r, i)));
+        {
+            const char* spk = crispasr_session_result_segment_speaker(r, i);
+            rb_hash_aset(seg, ID2SYM(rb_intern("speaker")), rb_utf8_str_new_cstr(spk ? spk : ""));
+        }
 
         int n_words = crispasr_session_result_n_words(r, i);
         VALUE words = rb_ary_new_capa(n_words);
@@ -805,6 +812,10 @@ static VALUE rb_session_transcribe_with_logits(VALUE self, VALUE handle, VALUE p
         rb_hash_aset(seg, ID2SYM(rb_intern("t1")), LL2NUM(crispasr_session_result_segment_t1(r, i)));
         rb_hash_aset(seg, ID2SYM(rb_intern("no_speech_prob")),
                      DBL2NUM((double)crispasr_session_result_segment_no_speech_prob(r, i)));
+        {
+            const char* spk = crispasr_session_result_segment_speaker(r, i);
+            rb_hash_aset(seg, ID2SYM(rb_intern("speaker")), rb_utf8_str_new_cstr(spk ? spk : ""));
+        }
 
         int n_words = crispasr_session_result_n_words(r, i);
         VALUE words = rb_ary_new_capa(n_words);
@@ -896,6 +907,10 @@ static VALUE rb_session_transcribe_chunked(VALUE self, VALUE handle, VALUE pcm_a
         rb_hash_aset(seg, ID2SYM(rb_intern("t1")), LL2NUM(crispasr_session_result_segment_t1(r, i)));
         rb_hash_aset(seg, ID2SYM(rb_intern("no_speech_prob")),
                      DBL2NUM((double)crispasr_session_result_segment_no_speech_prob(r, i)));
+        {
+            const char* spk = crispasr_session_result_segment_speaker(r, i);
+            rb_hash_aset(seg, ID2SYM(rb_intern("speaker")), rb_utf8_str_new_cstr(spk ? spk : ""));
+        }
 
         int n_words = crispasr_session_result_n_words(r, i);
         VALUE words = rb_ary_new_capa(n_words);

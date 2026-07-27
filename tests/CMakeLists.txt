@@ -2700,6 +2700,23 @@ catch_discover_tests(test-marking-policy
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-punc-copies-in-sync — the two fireredpunc implementations must not
+# drift. crisp_punc/src/fireredpunc.cpp is what normally links; src/fireredpunc.cpp
+# is the partial-checkout fallback. #308's capitalisation fix landed in the
+# fallback ONLY and was dead code for months (found while fixing #300). Pure file
+# comparison — no model, no linkage.
+add_executable(test-punc-copies-in-sync test-punc-copies-in-sync.cpp)
+target_compile_definitions(test-punc-copies-in-sync PRIVATE
+    CRISPASR_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+target_link_libraries(test-punc-copies-in-sync PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-punc-copies-in-sync
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-vibevoice-transcript — Catch2 unit tests for the VibeVoice-ASR
 # answer parser (#300). Header-only (examples/cli/vibevoice_transcript_parse.h):
 # Start/End/Speaker/Content -> utterances (+ assign_tokens, which splits the

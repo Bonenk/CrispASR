@@ -267,6 +267,13 @@ namespace CrispASR
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern float crispasr_session_result_segment_no_speech_prob(IntPtr result, int iSeg);
 
+        // #300: native per-segment speaker label ("(Speaker N) "), or "" when the
+        // backend does not diarize natively. Never NULL. Returned as IntPtr and
+        // marshalled via PtrToUtf8 like the other const char* getters — a
+        // [return: MarshalAs(LPUTF8Str)] would make the CLR try to free it.
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr crispasr_session_result_segment_speaker(IntPtr result, int i);
+
         // Per-frame CTC logits (opted in via crispasr_session_set_return_logits)
         // for backends with a dense CTC grid (Omni CTC, wav2vec2/hubert/data2vec,
         // canary-ctc). _logits returns a const float* (frame-major;

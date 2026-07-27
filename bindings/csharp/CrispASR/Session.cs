@@ -466,7 +466,8 @@ namespace CrispASR
                         alts);
                 }
                 float noSpeechProb = NativeMethods.crispasr_session_result_segment_no_speech_prob(r, i);
-                segs[i] = new Segment(text, t0, t1, words, noSpeechProb);
+                string speaker = NativeMethods.PtrToUtf8(NativeMethods.crispasr_session_result_segment_speaker(r, i)) ?? "";
+                segs[i] = new Segment(text, t0, t1, words, noSpeechProb, speaker);
             }
             return segs;
         }
@@ -715,10 +716,17 @@ namespace CrispASR
         /// <summary>Whisper's per-segment no-speech probability (the &lt;|nospeech|&gt;
         /// posterior) in [0, 1]. Whisper-only; other backends leave -1.0 ("no data").</summary>
         public float NoSpeechProb { get; }
+        /// <summary>Native per-segment speaker label from a backend that diarizes on
+        /// its own, in the "(Speaker N) " form the CLI prefixes into text/srt/vtt
+        /// output, or "" when the backend produced none. Populated today by vibevoice.
+        /// The ordinals are CHUNK-LOCAL: "Speaker 1" from one transcribe call is not
+        /// necessarily the same voice as "Speaker 1" from the next.</summary>
+        public string Speaker { get; }
 
-        public Segment(string text, long t0, long t1, Word[] words, float noSpeechProb = -1.0f)
+        public Segment(string text, long t0, long t1, Word[] words, float noSpeechProb = -1.0f,
+                       string speaker = "")
         {
-            Text = text; T0 = t0; T1 = t1; Words = words; NoSpeechProb = noSpeechProb;
+            Text = text; T0 = t0; T1 = t1; Words = words; NoSpeechProb = noSpeechProb; Speaker = speaker ?? "";
         }
 
         public override string ToString() => $"[{T0}-{T1}] {Text}";
