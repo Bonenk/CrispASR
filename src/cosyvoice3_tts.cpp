@@ -5782,25 +5782,30 @@ float* cv3_synth_with_voice(cosyvoice3_tts_context* ctx, const char* text, const
     const int aligned_t_ref_mel = prompt_token_len * mel_ratio;
 
     // ---- 1. Tokenise prompt_text + user_text ----
-    // #304 cross-lingual: if a target language is set and differs from the
-    // reference voice's own language, DROP the reference transcript (keep only
-    // the "You are a helpful assistant.<|endofprompt|>" framing) so the target
-    // text — not the reference language — drives the phonetics. The reference
-    // SPEECH tokens still supply the speaker timbre. Same-language (or no target
-    // set) keeps the full prompt_text (zero-shot), the higher-fidelity default.
+    // #304 cross-lingual: when a target language is set and differs from the
+    // reference voice's language, mirror upstream frontend_cross_lingual — it
+    // deletes BOTH prompt_text AND llm_prompt_speech_token, keeping only the
+    // flow's reference speech (timbre). So here we (a) DROP the reference
+    // transcript from the LM text (keep the "You are a helpful
+    // assistant.<|endofprompt|>" framing, required per #310), and (b) feed the
+    // LM EMPTY reference speech tokens below — the flow still gets the reference
+    // tokens + ref_mel for timbre. Dropping the transcript but keeping the LM's
+    // reference speech tokens (the first attempt) leaves them un-anchored to any
+    // text and collapses the AR decode to 1-2 tokens. Same-language / no target
+    // set stays full zero-shot (reference transcript + speech), the default.
     std::string prompt_for_lm = voice->prompt_text;
-    {
-        const std::string tgt = cv3_lang_norm(ctx->target_language);
-        const std::string vlang = cv3_voice_language(voice->name, voice->prompt_text);
-        if (!tgt.empty() && !vlang.empty() && tgt != vlang) {
-            const std::string delim = "<|endofprompt|>";
-            const size_t eop = prompt_for_lm.find(delim);
-            prompt_for_lm = (eop == std::string::npos) ? std::string() : prompt_for_lm.substr(0, eop + delim.size());
-            if (ctx->params.verbosity >= 1)
-                fprintf(stderr,
-                        "cosyvoice3_tts: cross-lingual (voice=%s[%s] → target=%s): dropping reference transcript\n",
-                        voice->name.c_str(), vlang.c_str(), tgt.c_str());
-        }
+    const std::string cv3_tgt = cv3_lang_norm(ctx->target_language);
+    const std::string cv3_vlang = cv3_voice_language(voice->name, voice->prompt_text);
+    const bool cross_lingual = !cv3_tgt.empty() && !cv3_vlang.empty() && cv3_tgt != cv3_vlang;
+    if (cross_lingual) {
+        const std::string delim = "<|endofprompt|>";
+        const size_t eop = prompt_for_lm.find(delim);
+        prompt_for_lm = (eop == std::string::npos) ? std::string() : prompt_for_lm.substr(0, eop + delim.size());
+        if (ctx->params.verbosity >= 1)
+            fprintf(stderr,
+                    "cosyvoice3_tts: cross-lingual (voice=%s[%s] → target=%s): dropping reference transcript + LM "
+                    "reference speech tokens (flow keeps them for timbre)\n",
+                    voice->name.c_str(), cv3_vlang.c_str(), cv3_tgt.c_str());
     }
     std::vector<int32_t> text_ids;
     {
@@ -5821,9 +5826,13 @@ float* cv3_synth_with_voice(cosyvoice3_tts_context* ctx, const char* text, const
     }
 
     // ---- 2. Build LM input embeddings + AR-decode speech tokens ----
+    // #304 cross-lingual: the LM gets EMPTY reference speech tokens (upstream
+    // deletes llm_prompt_speech_token); the flow below still uses prompt_tokens
+    // + ref_mel for timbre.
+    const std::vector<int32_t> lm_prompt_tokens = cross_lingual ? std::vector<int32_t>() : prompt_tokens;
     std::vector<float> lm_embeds;
     int n_lm = 0;
-    if (!cv3_build_lm_input_embeds(ctx, text_ids, prompt_tokens, lm_embeds, n_lm))
+    if (!cv3_build_lm_input_embeds(ctx, text_ids, lm_prompt_tokens, lm_embeds, n_lm))
         return nullptr;
 
     const int stop_floor = (int)ctx->hp.speech_codebook;
