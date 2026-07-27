@@ -497,6 +497,27 @@ static float* mtl_run_backbone(moss_tts_local_context* ctx, const float* inputs_
                 }
             }
         }
+        // #249 option 2: dump the shared-attention debug tensors (named by the
+        // core_attn CRISPASR_CORE_ATTN_DUMP_FA_LAYER hook) so a numpy flash-vs-eager
+        // self-check and the Q/K/V-vs-reference diff can localize the attention op.
+        if (const char* fp = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_FA_PATH")) {
+            if (FILE* ff = fopen(fp, "w")) {
+                for (const char* nm : {"DBG_Q_post_rope", "DBG_Kfull", "DBG_Vfull", "DBG_fa_out", "DBG_fa_reshaped"}) {
+                    ggml_tensor* t = ggml_graph_get_tensor(gf, nm);
+                    if (!t)
+                        continue;
+                    const int64_t n = ggml_nelements(t);
+                    std::vector<float> buf((size_t)n);
+                    ggml_backend_tensor_get(t, buf.data(), 0, (size_t)n * sizeof(float));
+                    fprintf(ff, "%s %lld %lld %lld %lld", nm, (long long)t->ne[0], (long long)t->ne[1],
+                            (long long)t->ne[2], (long long)t->ne[3]);
+                    for (int64_t i = 0; i < n; i++)
+                        fprintf(ff, " %.6f", buf[(size_t)i]);
+                    fprintf(ff, "\n");
+                }
+                fclose(ff);
+            }
+        }
     }
     return out;
 }
