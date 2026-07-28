@@ -291,10 +291,18 @@ endif()
   docstring. Dart uses `DynamicLibrary.lookupFunction` with symbol-presence
   checks, so new C-ABI functions are discovered automatically.
 
-### Bindings — adding a new *session setter* (`crispasr_session_set_*`)
-A new setter is **not** auto-discovered; every wrapper exposes it explicitly
-and they are kept at full parity. Add the new method to **all seven** wrappers
-(mirror the nearest existing setter in each — argtypes/restype, error-on-rc≠0):
+### Bindings — adding a new *session setter* (`crispasr_session_set_*`) or *method*
+This applies to any explicit session entry point — the `crispasr_session_set_*`
+setters **and** the data-returning session methods such as
+`crispasr_session_synthesize`, `crispasr_session_synthesize_raw`, and
+`crispasr_session_speech_to_speech`. None of these are auto-discovered (only a new
+*backend* is — see the section above); every wrapper exposes them explicitly and
+they are kept at **full parity**. When you add one, add it to **all seven** wrappers
+(plus the WASM/JS binding and the server, listed below — mirror the nearest existing
+setter/method in each: argtypes/restype, error-on-rc≠0,
+and for PCM-returning methods copy `synthesize`: return the malloc'd `float*` as an
+owned buffer then free via `crispasr_pcm_free`; free any `out_text` via
+`crispasr_session_translate_text_free`):
 - `python/crispasr/_binding.py` — ctypes method on `Session`.
 - `bindings/go/crispasr_session.go` — the cgo-preamble `int crispasr_session_set_X(...)`
   declaration **and** the `Set X` method.
