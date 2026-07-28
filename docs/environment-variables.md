@@ -137,6 +137,7 @@ These are not tied to a single backend.
 | `CRISPASR_G2P_DICT_SOURCE` / `_G2P_MODEL_PATH` | G2P dictionary source / neural G2P model path. |
 | `CRISPASR_ESPEAK_DATA_PATH` | eSpeak-NG data directory. |
 | `CRISPASR_KOKORO_G2P` | Kokoro G2P backend selection. |
+| `CRISPASR_KOKORO_MISAKI_IPA` | `0` disables the espeak-IPA → misaki-alphabet conversion Kokoro needs (#316), restoring the raw G2P spelling for A/B. On by default. |
 
 ### Watermark / provenance
 

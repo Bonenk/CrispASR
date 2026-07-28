@@ -10,6 +10,41 @@ If a lesson is still "live" (affects current work), it's linked from
 
 ---
 
+## The diff harness starts where its INPUT starts — check what it is fed before trusting parity (#316, 2026-07-28)
+
+Kokoro was dropping numbers and speaking with the wrong accent, and
+`crispasr-diff kokoro` could not have caught either: its reference dumper takes
+`KOKORO_PHONEMES` and embeds that string in the GGUF so both sides consume
+identical phonemes. Every dumped stage is downstream of the G2P. Perfect
+per-stage cosine there means "given the same phonemes we compute the same
+acoustics" — true the entire time the audio was wrong.
+
+So before answering "are we at parity?", **look at what the harness's first stage
+consumes.** If the first dumped tensor derives from an input the harness itself
+supplies, everything upstream of that input is outside the comparison and a green
+diff is not evidence about it. Here the cheap substitute beat the harness anyway:
+feed the reference implementation's phoneme string into our acoustic path and
+listen. Correct audio proved the acoustics in one run and pinned the fault to the
+front end.
+
+**A shared front end serves models that disagree.** Our G2P is "tuned to match
+espeak-ng output for piper compatibility"; Kokoro was trained on misaki's
+alphabet — different spellings of the same sounds (`tʃ` vs `ʧ`, `oʊ` vs `O`, and
+misaki has no length marks). Both spellings are IN Kokoro's vocabulary, so the
+mismatch could not fail loudly: no unknown token, no drop, no error, just tokens
+the model never saw in training and audio that drifts. When one component feeds
+several models, its output convention is part of the interface — make the dialect
+explicit (an enum, incumbent as the identity) instead of letting whichever
+consumer came first define the format for everyone.
+
+**Measure the front end against the reference, symbol by symbol.** "Do we cover
+every phoneme?" is answerable: run both G2Ps over a corpus and diff the symbol
+inventories. Two invariants are worth keeping forever — nothing we emit is
+outside the model's vocab (else it is silently dropped), and nothing we emit is
+outside what the reference emits (else it is out-of-distribution). Exact-match
+rate is the weaker, noisier number; the inventory invariants catch a whole class
+of silent breakage.
+
 ## A guard job that runs ONE compiler family guards one compiler family (#314, 2026-07-27)
 
 `linux-amr-fetch` was written for exactly the failure it later missed: it builds

@@ -2717,6 +2717,18 @@ catch_discover_tests(test-punc-copies-in-sync
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-kokoro-g2p-316 — number expansion + Kokoro's phoneme alphabet (#316).
+# Kokoro dropped numbers and drifted British; both were G2P defects that
+# crispasr-diff cannot see (it is phoneme-IN, so it starts downstream of them).
+# Every expectation is misaki's own output. No model, no audio.
+add_executable(test-kokoro-g2p-316 test-kokoro-g2p-316.cpp)
+target_include_directories(test-kokoro-g2p-316 PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-kokoro-g2p-316 PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-kokoro-g2p-316
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-vibevoice-transcript — Catch2 unit tests for the VibeVoice-ASR
 # answer parser (#300). Header-only (examples/cli/vibevoice_transcript_parse.h):
 # Start/End/Speaker/Content -> utterances (+ assign_tokens, which splits the

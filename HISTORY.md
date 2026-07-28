@@ -6,6 +6,79 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-28 — #316: Kokoro skipped numbers and drifted British — both in the G2P
+
+Reported as "speaks like old English" and "it just skips the 82". Two separate
+G2P defects, and **neither is visible to `crispasr-diff`**: the kokoro harness is
+phoneme-IN (`KOKORO_PHONEMES` is embedded in the reference GGUF and both sides
+are fed the same string), so it starts at `token_ids`, downstream of everything
+that was wrong. It would have reported perfect parity while the audio was broken
+— HARD RULE 3b in its purest form.
+
+Scoped it by feeding misaki's phoneme string for the reporter's sentence into our
+own acoustic path: the audio came out correct, "82" included. Same model, same
+voice, only the phonemes differed. So the acoustic side was never at fault.
+
+1. **Numbers phonemized to the empty string.** Digits are in no pronunciation
+   dictionary and no letter-to-sound rule, so `"82"` produced NO phonemes and the
+   word simply vanished. Nothing errored. `core/num2words_en.h` spells numbers
+   out first, following misaki's reading — read off its behaviour, not guessed,
+   because the non-obvious cases are the audible ones: 1234 is "twelve thirty
+   four" but 1005 is "one thousand five"; 1100 is "eleven hundred" while 1000
+   stays "one thousand". This was a gap in the SHARED G2P, so piper dropped
+   numbers too.
+
+2. **We spoke the wrong phoneme alphabet.** Kokoro was trained on misaki's
+   output, which uses `ʧ`, `O`, `A`, `T` and NO length marks; our G2P emits
+   textbook espeak IPA (`tʃ`, `oʊ`, `ɾ`, `ː`) because it is "tuned to match
+   espeak-ng output for piper compatibility". Every one of those symbols is in
+   Kokoro's vocab, so nothing was dropped and nothing errored — the model just
+   received tokens from outside its training distribution and drifted. `ː` is the
+   RP length mark, which is most of "she becomes British", and it explains why
+   `CRISPASR_KOKORO_G2P=espeak-only` helped the reporter without fixing it:
+   espeak is a better G2P, still the wrong alphabet.
+
+Fixing the alphabet was only half of it. Even with the right symbols, our
+CMUdict-based G2P and misaki disagreed about stress and unstressed vowels on 42%
+of words, so kokoro was still being fed pronunciations from outside its training
+distribution. Closing that took four more measured steps — misaki's own lexicon
+as Tier 0 (Apache-2.0, generated locally by tools/convert-misaki-lexicon.py), a
+morphological fallback because that lexicon stores STEMS (only 46% of inflected
+forms are listed verbatim, against 100% in CMUdict), the contextual function-word
+rules, and Unicode-punctuation tokenization. Final agreement with misaki: **99.30%
+on a held-out 10k frequency list, 99.12% on 400 sentences of real prose**, from
+81.6%.
+
+The step that mattered most was the one I got wrong first. Having measured that
+86% of the residual errors were stress marks, I concluded they needed a
+part-of-speech tagger and were out of reach. Reading `Lexicon.__call__` showed
+misaki derives stress from **capitalisation** — `lowercase` keeps the lexicon
+form, `Titlecase` inserts secondary stress, `ALLCAPS` primary — so `and`/`And`/
+`AND` are `ænd`/`ˌænd`/`ˈænd`. Trivially computable, and worth 5.5 points. Its
+sibling: misaki's `'None'` lexicon key is not a POS tag either but the
+phrase-final reading (32 entries). What genuinely does need a tagger was left
+alone and measured rather than guessed — `that` wants `ðˈæt` 31% of the time and
+`ðæt` 68%, so DEFAULT is the better single choice and flipping it would lose two
+tokens for every one gained.
+
+The fix is a phoneme DIALECT (`core/phoneme_dialect.h`), not a kokoro-local hack:
+one G2P feeds several models that disagree about spelling. `EspeakIpa` is the
+identity and stays the default (piper would regress otherwise); `Misaki` is what
+Kokoro asks for. Measured over a 1508-word corpus against misaki 0.9.4: nothing
+we emit is outside Kokoro's vocab, nothing we emit is outside misaki's inventory,
+exact whole-word match 55.9% → 58.3% (a `ɜː`→`ɜɹ` NURSE rule alone recovered 56
+missing rhotics — "world" was `wˈɜld`, an r short of `wˈɜɹld`). The residue is
+dictionary-level — CMUdict stress and unstressed vowels vs misaki's lexicon —
+plus misaki's two reduced vowels `ᵊ`/`ᵻ`, which we never emit and which are worth
+about 5 more points.
+
+Also added `--tts-phonemes` (kokoro): synthesize a phoneme string verbatim,
+skipping the G2P. That seam separates "our G2P is wrong" from "our model is
+wrong" in one run, and it is how this was scoped — it had existed only as a stale
+comment and a throwaway harness. It refuses on backends without a phonemes-in
+entry point rather than silently synthesizing the text, because a silent fallback
+makes an A/B look like the phonemes changed nothing.
+
 ## 2026-07-27 — #314: opencore-amr's `register` keyword breaks every clang C++17 build
 
 Reported from Termux/aarch64 with clang 21: `-DCRISPASR_AMR_FETCH=ON` dies with

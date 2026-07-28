@@ -21,7 +21,11 @@
 #include <cstring>
 #include <map>
 #include <string>
+#include <functional>
 #include <vector>
+
+#include "core/g2p_ctxwords.h"
+#include "core/num2words_en.h"
 
 namespace g2p_en {
 
@@ -768,8 +772,16 @@ inline int load_ipa_dict_file(ipa_dict& dict, const std::string& path) {
     char line[512];
     int count = 0;
     while (fgets(line, sizeof(line), f)) {
-        if (line[0] == '#' || line[0] == 'w' || line[0] == '\n')
-            continue; // skip header/comments
+        // Skip comments, blank lines, and a literal "word<TAB>..." CSV header.
+        // The header test used to be `line[0] == 'w'`, which silently dropped
+        // EVERY entry whose word begins with w — "with", "was", "world",
+        // "would", "water"… ~2% of a real lexicon, and among the most common
+        // words in English. They fell through to the lower G2P tiers, so
+        // nothing looked broken; the dict just quietly did not cover them.
+        if (line[0] == '#' || line[0] == '\n')
+            continue;
+        if (strncmp(line, "word\t", 5) == 0)
+            continue;
         size_t len = strlen(line);
         while (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r'))
             line[--len] = 0;
@@ -806,6 +818,24 @@ struct context {
     ipa_dict espeak_ipa; // Pre-generated espeak IPA (highest priority)
     cmudict dict;        // CMUdict ARPAbet (converted to IPA)
     neural_model neural; // Neural G2P for OOV
+
+    // #316: optional Tier 0.5 — pronounce a regular inflection from its stem
+    // when the Tier-0 dict has the stem but not the inflected form. Empty by
+    // default, so the espeak/piper path is byte-for-byte unchanged; the misaki
+    // path sets it because that lexicon stores stems (only 46% of inflected
+    // forms are listed verbatim, against 100% in CMUdict). See
+    // core/g2p_inflect.h.
+    std::function<std::string(const std::string&)> inflect_fallback;
+
+    // #316: apply the contextual function-word rules (the/to/a/an/in), which
+    // need to see the NEXT word's phonemes. Off by default — piper's dict is
+    // espeak-derived and already encodes its own reductions.
+    bool context_words = false;
+
+    // #316: phrase-final pronunciations — misaki's "None" lexicon key, chosen
+    // when NOTHING follows the word ("…is she?" -> ʃˌi). 32 entries; empty
+    // unless the companion dict is loaded.
+    ipa_dict phrase_final;
 };
 
 // ── Text normalization (technical tokens) ──────────────────────────
@@ -898,17 +928,23 @@ inline bool is_word_end(const std::string& text, size_t pos) {
            next == '-' || next == '\n' || next == '\t' || next == '(' || next == ')' || next == '"' || next == '\'';
 }
 
+// #316: spell numbers out first. Digits are in no pronunciation dictionary and
+// no letter-to-sound rule, so a numeric token used to phonemize to the EMPTY
+// string and disappear from the audio entirely ("with 82 million" was spoken
+// "with million"). core_num2words_en follows misaki's reading, including the
+// year-style pair rule for four-digit numbers.
 inline std::string normalize_technical_tokens(const std::string& text) {
+    const std::string expanded = core_num2words_en::expand(text);
     std::string result;
-    result.reserve(text.size() + 32);
+    result.reserve(expanded.size() + 32);
     const auto& rules = tech_token_rules();
     size_t i = 0;
-    while (i < text.size()) {
+    while (i < expanded.size()) {
         bool matched = false;
-        if (is_word_start(text, i)) {
+        if (is_word_start(expanded, i)) {
             for (const auto& rule : rules) {
                 size_t plen = strlen(rule.pattern);
-                if (match_icase(text, i, rule.pattern, plen) && is_word_end(text, i + plen)) {
+                if (match_icase(expanded, i, rule.pattern, plen) && is_word_end(expanded, i + plen)) {
                     result += rule.replacement;
                     i += plen;
                     matched = true;
@@ -917,14 +953,53 @@ inline std::string normalize_technical_tokens(const std::string& text) {
             }
         }
         if (!matched)
-            result += text[i++];
+            result += expanded[i++];
     }
     return result;
 }
 
 // ── Tokenizer ───────────────────────────────────────────────────────
 
-inline std::vector<std::string> tokenize(const std::string& text) {
+// #316: real prose is not ASCII. Gutenberg-class text is full of em dashes and
+// curly quotes, and the tokenizer used to split on ASCII punctuation only — so
+// "always—most" arrived as ONE token, missed every dictionary, and came out of
+// the letter-to-sound rules as `ˈælwAsmɑst`, two words fused into noise. Curly
+// apostrophes did the same to contractions ("she'd" -> `ʃ`). Normalizing them to
+// their ASCII equivalents first costs nothing and fixes both.
+inline std::string normalize_unicode_punct(const std::string& text) {
+    static const struct {
+        const char* from;
+        const char* to;
+    } kMap[] = {
+        {"\xe2\x80\x94", "-"}, // — em dash
+        {"\xe2\x80\x93", "-"}, // – en dash
+        {"\xe2\x80\x99", "'"}, // ’ right single quote (apostrophe)
+        {"\xe2\x80\x98", " "}, // ‘ left single quote
+        {"\xe2\x80\x9c", " "}, // " left double quote
+        {"\xe2\x80\x9d", " "}, // " right double quote
+        {"\xe2\x80\xa6", " "}, // … ellipsis
+    };
+    std::string out;
+    out.reserve(text.size());
+    for (size_t i = 0; i < text.size();) {
+        bool hit = false;
+        for (const auto& m : kMap) {
+            const size_t n = strlen(m.from);
+            if (text.compare(i, n, m.from) == 0) {
+                out += m.to;
+                i += n;
+                hit = true;
+                break;
+            }
+        }
+        if (!hit)
+            out += text[i++];
+    }
+    return out;
+}
+
+inline std::vector<std::string> tokenize(const std::string& text_raw) {
+    const std::string text = normalize_unicode_punct(text_raw);
     std::vector<std::string> tokens;
     std::string cur;
     for (char c : text) {
@@ -982,6 +1057,16 @@ inline std::string word_to_ipa(const context& ctx, const std::string& word) {
         auto it = ctx.espeak_ipa.entries.find(lower);
         if (it != ctx.espeak_ipa.entries.end())
             return it->second;
+    }
+
+    // Tier 0.5: regular inflection from a stem in the Tier-0 dict (#316).
+    // Deliberately ABOVE CMUdict: falling through to CMUdict is exactly what
+    // used to lose the misaki-lexicon agreement for every plural and past
+    // tense.
+    if (ctx.inflect_fallback) {
+        std::string infl = ctx.inflect_fallback(lower);
+        if (!infl.empty())
+            return infl;
     }
 
     // Tier 1: espeak override table (handful of irregular words)
@@ -1083,18 +1168,68 @@ inline std::string word_to_ipa(const context& ctx, const std::string& word) {
 // Convert full text to IPA string.
 inline std::string text_to_ipa(const context& ctx, const std::string& text) {
     auto words = tokenize(normalize_technical_tokens(text));
-    std::string ipa;
+    // Two passes: a contextual function word ("the", "to") needs to know
+    // whether the FOLLOWING word starts with a vowel, so every word is
+    // phonemized first and the rules are applied afterwards (#316).
+    std::vector<std::string> parts;
+    std::vector<bool> is_punct;
+    parts.reserve(words.size());
+    is_punct.reserve(words.size());
     for (const auto& w : words) {
-        if (w.size() == 1 &&
-            (w[0] == ',' || w[0] == '.' || w[0] == '!' || w[0] == '?' || w[0] == ';' || w[0] == ':' || w[0] == '-')) {
-            // Keep punctuation as-is (piper's phoneme map includes them)
+        const bool punct = w.size() == 1 && (w[0] == ',' || w[0] == '.' || w[0] == '!' || w[0] == '?' || w[0] == ';' ||
+                                             w[0] == ':' || w[0] == '-');
+        is_punct.push_back(punct);
+        parts.push_back(punct ? std::string() : word_to_ipa(ctx, w));
+    }
+    if (ctx.context_words) {
+        for (size_t i = 0; i < words.size(); i++) {
+            if (is_punct[i])
+                continue;
+            std::string lower = words[i];
+            for (auto& c : lower)
+                c = (char)tolower((unsigned char)c);
+            // The next PRONOUNCED word decides the reduction; punctuation in
+            // between is not a word, but it does end the phrase, so treat a
+            // following punctuation mark as "nothing follows".
+            auto next = core_g2p_ctxwords::NextVowel::Unknown;
+            for (size_t j = i + 1; j < words.size(); j++) {
+                if (is_punct[j])
+                    break;
+                next = core_g2p_ctxwords::starts_with_vowel(parts[j]) ? core_g2p_ctxwords::NextVowel::Yes
+                                                                      : core_g2p_ctxwords::NextVowel::No;
+                break;
+            }
+            // Phrase-final variant first: it is the lexicon's own answer for
+            // "nothing follows", so it outranks the capitalisation rule.
+            if (next == core_g2p_ctxwords::NextVowel::Unknown && ctx.phrase_final.loaded) {
+                auto pf = ctx.phrase_final.entries.find(lower);
+                if (pf != ctx.phrase_final.entries.end()) {
+                    parts[i] = pf->second;
+                    continue;
+                }
+            }
+            std::string over = core_g2p_ctxwords::lookup(lower, next, parts[i]);
+            if (!over.empty()) {
+                // A special-cased word takes its contextual form and NOTHING
+                // else: misaki's get_special_case returns before apply_stress,
+                // so "The box" is `ðə bˈɑks`, never `ðˌə`. Applying the
+                // capitalisation rule on top was worth 29 wrong tokens.
+                parts[i] = over;
+            } else {
+                parts[i] = core_g2p_ctxwords::apply_caps_stress(words[i], parts[i]);
+            }
+        }
+    }
+    std::string ipa;
+    for (size_t i = 0; i < parts.size(); i++) {
+        if (is_punct[i]) {
             if (!ipa.empty() && ipa.back() != ' ')
                 ipa += ' ';
             continue;
         }
         if (!ipa.empty())
             ipa += ' ';
-        ipa += word_to_ipa(ctx, w);
+        ipa += parts[i];
     }
     return ipa;
 }

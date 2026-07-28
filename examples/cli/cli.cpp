@@ -626,6 +626,8 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.text_file = ARGV_NEXT;
     } else if (arg == "--instruct") {
         params.tts_instruct = ARGV_NEXT;
+    } else if (arg == "--tts-phonemes") {
+        params.tts_phonemes = ARGV_NEXT;
     } else if (arg == "--voice-dir") {
         params.tts_voice_dir = ARGV_NEXT;
     } else if (arg == "--tts-max-input-chars") {
@@ -1322,6 +1324,8 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.tts_ref_asr.empty() ? "whisper" : params.tts_ref_asr.c_str());
     fprintf(stderr, "             --instruct \"TEXT\"        natural-language voice/style description "
                     "(qwen3-tts: VoiceDesign = voice description; CustomVoice = style control)\n");
+    fprintf(stderr, "             --tts-phonemes \"IPA\"     synthesize these phonemes verbatim, skipping the "
+                    "G2P (kokoro; use to A/B a pronunciation against another implementation)\n");
     fprintf(
         stderr,
         "             --make-ref                create a TADA voice reference GGUF (with --voice <audio.wav>\n"

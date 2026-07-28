@@ -3,6 +3,7 @@
 #include "phonemizer.h"
 #include "espeak_dlopen.h"
 #include "core/g2p_en.h"
+#include "core/g2p_inflect.h" // #316: pronounce regular inflections from their stems
 #include "core/g2p_de.h"
 #include "core/g2p_fr.h"
 #include "core/g2p_es.h"
@@ -208,6 +209,108 @@ static void ensure_cmudict_loaded() {
         }
     }
 #endif
+}
+
+// ── misaki lexicon (Kokoro) ──────────────────────────────────────────
+//
+// #316: Kokoro was trained on misaki's output, and our CMUdict-based G2P agrees
+// with misaki on only ~58% of words — not because the conversion is wrong but
+// because CMUdict makes different stress and unstressed-vowel choices. misaki
+// ships its own lexicon (Apache-2.0); loading it as Tier 0 of a SEPARATE
+// context takes agreement to ~94% on ordinary prose. Separate because piper
+// must keep the espeak pronunciations: same G2P, different consumer.
+//
+// Generate the file with tools/convert-misaki-lexicon.py.
+static g2p_en::context g_g2p_misaki_ctx;
+static std::mutex g_g2p_misaki_mu;
+static bool g_g2p_misaki_tried = false;
+
+static void ensure_misaki_lexicon_loaded() {
+    if (g_g2p_misaki_tried)
+        return;
+    g_g2p_misaki_tried = true;
+    std::string path;
+    if (const char* env = std::getenv("CRISPASR_MISAKI_DICT_PATH"); env && *env) {
+        path = env;
+    } else {
+        const char* home = std::getenv("HOME");
+        if (!home)
+            home = std::getenv("USERPROFILE");
+        if (home)
+            path = std::string(home) + "/.cache/crispasr/misaki-us.txt";
+    }
+    if (!path.empty()) {
+        int n = g2p_en::load_ipa_dict_file(g_g2p_misaki_ctx.espeak_ipa, path);
+        if (n > 0) {
+            g_g2p_misaki_ctx.espeak_ipa.loaded = true;
+            fprintf(stderr, "g2p: loaded misaki lexicon (%d entries) from %s\n", n, path.c_str());
+        }
+    }
+#ifdef CRISPASR_HAS_CACHE
+    if (!g_g2p_misaki_ctx.espeak_ipa.loaded) {
+        // Same route as the other G2P dicts. Apache-2.0 (hexgrad/misaki), so
+        // redistribution is fine with the attribution the file header carries.
+        static const char* MISAKI_URL = "https://huggingface.co/datasets/cstr/g2p-dicts/resolve/main/misaki_us.txt";
+        std::string p2 =
+            crispasr_cache::ensure_cached_file("misaki-us.txt", MISAKI_URL, /*quiet=*/true, "crispasr", "");
+        if (!p2.empty()) {
+            int n = g2p_en::load_ipa_dict_file(g_g2p_misaki_ctx.espeak_ipa, p2);
+            if (n > 0) {
+                g_g2p_misaki_ctx.espeak_ipa.loaded = true;
+                fprintf(stderr, "g2p: loaded misaki lexicon (%d entries) from %s\n", n, p2.c_str());
+            }
+        }
+    }
+#endif
+    // #316: the lexicon stores STEMS — only 46% of inflected forms are listed
+    // verbatim (CMUdict lists 100%, which is why the espeak path does not need
+    // this). Without the fallback every plural and past tense dropped to
+    // CMUdict and lost the agreement with Kokoro's training data. Worth +9.7
+    // points of whole-word phoneme agreement with misaki.
+    g_g2p_misaki_ctx.inflect_fallback = [](const std::string& w) -> std::string {
+        core_g2p_inflect::Params p;
+        p.reduced_vowel = "ᵻ"; // misaki's reduced vowel
+        p.flap = "T";          // misaki's flap
+        return core_g2p_inflect::inflect(
+            w,
+            [](const std::string& stem) -> std::string {
+                auto it = g_g2p_misaki_ctx.espeak_ipa.entries.find(stem);
+                return it == g_g2p_misaki_ctx.espeak_ipa.entries.end() ? std::string() : it->second;
+            },
+            p);
+    };
+
+    // Words outside the lexicon still need SOME pronunciation; reuse the same
+    // CMUdict + LTS tiers the default path uses.
+    g2p_en::load_cmudict_file(g_g2p_misaki_ctx.dict, [] {
+        if (const char* e = std::getenv("CRISPASR_CMUDICT_PATH"); e && *e)
+            return std::string(e);
+        const char* home = std::getenv("HOME");
+        if (!home)
+            home = std::getenv("USERPROFILE");
+        return home ? std::string(home) + "/.cache/crispasr/cmudict.dict" : std::string();
+    }());
+}
+
+// True when the misaki lexicon is actually available — callers fall back to
+// phonemize_builtin_en() otherwise rather than silently using worse data.
+bool misaki_lexicon_available() {
+    std::lock_guard<std::mutex> g(g_g2p_misaki_mu);
+    ensure_misaki_lexicon_loaded();
+    return g_g2p_misaki_ctx.espeak_ipa.loaded;
+}
+
+bool phonemize_misaki_en(const std::string& lang, const std::string& text, std::string& out) {
+    if (!lang.empty() && lang.find("en") == std::string::npos && lang != "auto")
+        return false;
+    {
+        std::lock_guard<std::mutex> g(g_g2p_misaki_mu);
+        ensure_misaki_lexicon_loaded();
+        if (!g_g2p_misaki_ctx.espeak_ipa.loaded)
+            return false;
+        out = g2p_en::text_to_ipa(g_g2p_misaki_ctx, text);
+    }
+    return !out.empty();
 }
 
 bool phonemize_builtin_en(const std::string& lang, const std::string& text, std::string& out) {

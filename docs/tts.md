@@ -313,6 +313,100 @@ Dictionaries are auto-downloaded from
 [cstr/g2p-dicts](https://huggingface.co/datasets/cstr/g2p-dicts)
 on first use and cached at `~/.cache/crispasr/`.
 
+### Numbers are spelled out first
+
+Digits appear in no pronunciation dictionary and no letter-to-sound rule, so
+before v0.8.24 a numeric token produced **no phonemes at all** and vanished from
+the audio — "a model with 82 million parameters" was spoken as "…with million
+parameters" (#316). Numbers are now expanded to words ahead of phonemization,
+following misaki's reading:
+
+| input | spoken | | input | spoken |
+|---|---|---|---|---|
+| `82` | eighty two | | `1234` | twelve thirty four |
+| `101` | one hundred one | | `1005` | one thousand five |
+| `1984` | nineteen eighty four | | `1100` | eleven hundred |
+| `2026` | twenty twenty six | | `1000` | one thousand |
+| `3.14` | three point one four | | `1st` | first |
+| `50%` | fifty percent | | `$20` | twenty dollars |
+
+A four-digit number reads as a **year** (two halves) unless it ends in `00` or
+its last two digits are below ten — `1234` is "twelve thirty four" but `1005` is
+"one thousand five". A digit inside a word (`mp3`, `x64`) is left alone.
+
+> **English only.** The expansion lives in the English G2P, so it also fixes
+> piper's EN voices. German, French and Spanish have their own G2P front ends
+> and still drop numeric tokens — `82` phonemizes to nothing there. Each needs
+> its own number grammar (German compounds "zweiundachtzig" rather than reading
+> the digits in order), so this is not a shared routine.
+
+### Phoneme dialects — one G2P, several models
+
+The G2P emits **espeak-style IPA** (`tʃ`, `oʊ`, `ɜː`, length marks), which is
+what piper expects. Kokoro was trained on [misaki](https://github.com/hexgrad/misaki),
+its own G2P, whose alphabet differs: `ʧ`, `O`, `ɜɹ`, and **no length marks at
+all**. Both spellings exist in Kokoro's vocabulary, so feeding it the espeak
+forms neither errors nor drops anything — the model just receives tokens it was
+never trained on and drifts, which is the "sounds British / old English" of #316
+(`ː` is the RP length mark).
+
+CrispASR converts per backend (`src/core/phoneme_dialect.h`):
+
+| Dialect | Spelling | Used by |
+|---|---|---|
+| `EspeakIpa` | `tʃ`, `oʊ`, `ɜː`, `ɾ`, `ɚ`, length marks | piper — and the G2P's own output |
+| `Misaki` | `ʧ`, `O`, `ɜɹ`, `T`, `əɹ`, no length marks | kokoro |
+
+`CRISPASR_KOKORO_MISAKI_IPA=0` restores the raw espeak spelling for A/B.
+
+### Phoneme parity with misaki
+
+Alphabet alone is not enough: CrispASR's CMUdict-based G2P and misaki disagree
+about stress and unstressed vowels, so kokoro was fed pronunciations it was not
+trained on even after the spelling was fixed. Five further pieces close that gap,
+each measured against misaki 0.9.4:
+
+| stage | 10k frequency list | 400-sentence prose corpus |
+|---|---|---|
+| CMUdict + alphabet conversion | — | 81.6% |
+| **+ misaki's own lexicon** (Tier 0) | — | 88.5%\* |
+| **+ morphological fallback** (`-s`/`-ed`/`-ing` from the stem) | — | 98.1%\* |
+| **+ contextual function words** (`the`/`to`/`a`) | — | 90.8% |
+| **+ Unicode punctuation** in the tokenizer | — | 93.0% |
+| **+ capitalisation stress + phrase-final variants** | **99.30%** | **99.12%** |
+
+\* measured on a harder obscure-word corpus at that stage.
+
+Three of those deserve a note because they are not obvious:
+
+- **Capitalisation, not grammar, drives stress.** misaki derives it from the
+  token's case (`lowercase` → the lexicon form, `Titlecase` → insert secondary
+  stress, `ALLCAPS` → primary): `and` / `And` / `AND` → `ænd` / `ˌænd` / `ˈænd`.
+  No part-of-speech tagger is involved.
+- **`the`/`to`/`a` depend on the FOLLOWING word.** `the apple` is `ði`, `the box`
+  is `ðə`; `to open` is `tʊ`, `to walk` is `tə`. Reading the citation form
+  everywhere is the "old English" diction of #316.
+- **misaki's `'None'` lexicon key is not a POS tag** — it is the phrase-final
+  reading, chosen when nothing follows (`…is she?` → `ʃˌi`). 32 entries.
+
+What is left needs a POS tagger and is deliberately not guessed: `that` wants
+`ðˈæt` as a determiner but `ðæt` as a conjunction, and `DEFAULT` is measurably
+the better single choice (68% vs 31%). Same for `used`, `read`, `desert`.
+
+### Driving the phonemes directly (`--tts-phonemes`)
+
+```bash
+crispasr --tts "unused" --tts-phonemes "həlˈO wˈɜɹld" --backend kokoro \
+         -m kokoro-82m-q8_0.gguf --voice kokoro-voice-af_heart.gguf -o out.wav
+```
+
+Synthesizes the phoneme string verbatim, skipping the G2P. This is the seam
+between text processing and the acoustic model: feeding another
+implementation's phonemes through our model separates "our G2P is wrong" from
+"our model is wrong" in a single run — which is exactly how #316 was diagnosed.
+kokoro only; other backends refuse rather than silently synthesizing the text,
+so an A/B cannot be misread.
+
 The `--g2p-dict` flag selects the dictionary source:
 
 ```bash
