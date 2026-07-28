@@ -100,6 +100,22 @@ comment and a throwaway harness. It refuses on backends without a phonemes-in
 entry point rather than silently synthesizing the text, because a silent fallback
 makes an A/B look like the phonemes changed nothing.
 
+## 2026-07-28 — #249: MOSS-TTS-Local 4B stop-runaway root-caused to prompt tokenization
+
+The 4B's binary stop head ran away (q6_k/q8_0 always, q4_k a per-text coin-flip),
+so only q4_k had shipped. Root cause found by diffing our forward against the HF
+reference AND a second working ggml port: we tokenized the whole generation prompt
+as **one string**, but BPE is non-compositional, so the user text embedded in the
+template merged ~2 tokens differently from the reference (which encodes each segment
+separately). Those interior tokens are amplified by the layer-10 attention sink,
+drifting the backbone hidden enough to keep the stop gap high. The forward was
+correct all along (f16≡f32, flash≡eager, every op machine-precision) — a long,
+wrong detour through "irreducible numerics" before checking prompt-token parity.
+Fix: piece-wise prompt assembly (`mtl_generate_grid`), mirroring
+`processing_moss_tts.py`. Validated: channel-0 ids == reference `input_ids` exactly,
+and q4_k + f16 now stop 4/4 at 11–39 frames → **q6_k/q8_0 are now shippable.** Full
+deep-dive + the meta-lesson in `LEARNINGS.md`.
+
 ## 2026-07-27 — #314: opencore-amr's `register` keyword breaks every clang C++17 build
 
 Reported from Termux/aarch64 with clang 21: `-DCRISPASR_AMR_FETCH=ON` dies with
