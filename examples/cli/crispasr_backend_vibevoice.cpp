@@ -96,7 +96,12 @@ public:
     bool init(const whisper_params& p) override {
         vibevoice_context_params cp = vibevoice_context_default_params();
         cp.n_threads = p.n_threads;
-        cp.max_new_tokens = p.max_new_tokens > 0 ? p.max_new_tokens : cp.max_new_tokens;
+        // #315: only force a cap when the user explicitly set --max-new-tokens;
+        // otherwise pass 0 so vibevoice_resolve_max_new_tokens() scales the ASR
+        // budget by audio duration (whisper_params.max_new_tokens defaults to
+        // 512, so the old `> 0` test always forced 512 and truncated long-form).
+        // Mirrors every other AR backend adapter (canary/funasr/mimo/moonshine…).
+        cp.max_new_tokens = p.max_new_tokens_explicit ? p.max_new_tokens : 0;
         cp.verbosity = p.no_prints ? 0 : 1;
         cp.use_gpu = crispasr_backend_should_use_gpu(p);
         cp.tts_steps = p.tts_steps;
