@@ -6,6 +6,50 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-28 — v0.8.24 release: fixes that had never run
+
+83 commits since v0.8.23. The theme that emerged from writing the notes was not
+the individual bugs but a pattern across them — **four separate fixes that had
+shipped and never executed**, each green in CI the whole time:
+
+- **#308's capitalisation fix lived in a dead copy.** `src/CMakeLists.txt` prefers
+  the shared `crisp_punc/` library and builds the `src/` copy only as a fallback,
+  so `crisp_punc/src/fireredpunc.cpp` is what links — and the fix had gone into
+  the other file. Instrumenting the patched file produced NO output, and that
+  silence was the diagnosis. `tests/test-punc-copies-in-sync.cpp` now fails if
+  they diverge.
+- **The G2P dictionary auto-download had never fired.** Every download in
+  `phonemizer.cpp` is behind `#ifdef CRISPASR_BUILD`, defined only on
+  `crispasr-lib` — never on `kokoro`, which is where that file compiles. So
+  CMUdict never downloaded either, and a user without a pre-seeded cache got no
+  English dictionary at all and fell through to letter-to-sound rules
+  (`this` → `θˈɪs`). A large part of what #316 sounded like.
+- **#314's guard job ran one compiler family.** `linux-amr-fetch` existed
+  precisely for the AMR fetch path and stayed green while the path was broken,
+  because it installs g++ only and GCC downgrades to a warning the `register`
+  error clang raises. Now a `{gcc, clang}` matrix — both arms green on this tag.
+- **`bump-version.sh` staged a hardcoded file list that had drifted.** Caught
+  during this very cut: `python/crispasr/__init__.py` was added to
+  `sync-version.py` in `e3ed11eb` and never here, so the first `0.8.24` bump
+  committed 6 files instead of 7 and would have tagged a tree whose
+  `crispasr.__version__` still read `0.8.23`. Fixed by computing the staged set
+  from a before/after `git diff --name-only` rather than listing it.
+
+Transferable: a test or guard that has never failed is not evidence it works. All
+four were invisible because the thing meant to catch them was itself inert — a
+dead file, an undefined macro, a single-compiler matrix, a stale list. The
+recurring tell is **instrumenting the code you believe is running and getting
+nothing back**. See `LEARNINGS.md` and the release notes for the per-issue detail.
+
+Shipped in the release: #316 Kokoro English G2P (58% → 99.1% agreement with
+misaki, plus `--tts-phonemes` on every binding), #249 MOSS-TTS 4B stop runaway
+(the input tokens were wrong, not the forward pass), #304 CosyVoice3 cross-lingual,
+#300 VibeVoice speaker turns + timings and a new ABI accessor, #312 the Subtitle
+Edit voice-clone regression, #313 Rust on crates.io + bundled Python wheels,
+#314 and #315.
+
+---
+
 ## 2026-07-28 — #316 follow-up 2: the G2P dictionary auto-download was dead code
 
 Wiring the misaki lexicon to download from upstream turned up why users see worse
