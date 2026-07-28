@@ -29,9 +29,22 @@ from pathlib import Path
 
 LIB_GLOBS = ("lib*.so", "lib*.so.*", "*.so", "*.dylib", "*.dll")
 
+# Shared objects that must NEVER be vendored into a wheel: the C runtime and its
+# friends. Copying these in is how you get two libcs in one process.
+LINUX_CORE = (
+    "libc.so", "libm.so", "libdl.so", "libpthread.so", "librt.so",
+    "libgcc_s.so", "libstdc++.so", "ld-linux", "libresolv.so", "libutil.so",
+    "libnsl.so", "libanl.so", "libcrypt.so",
+)
+
 
 def find_lib_dir(bundle: Path) -> Path:
-    for sub in ("lib", "src", "."):
+    # `bin` FIRST because that is where the Windows bundle puts its DLLs; `src`
+    # holds the static import libs (src/Release/*.lib) which are not loadable, so
+    # probing src before bin found a directory with no shared object in it and
+    # bailed out — v0.8.24's three Windows wheels all died here with
+    # "no shared libraries found".
+    for sub in ("lib", "bin", "src", "."):
         d = bundle / sub if sub != "." else bundle
         if d.is_dir() and any(_is_lib(p) for p in d.iterdir()):
             return d
@@ -68,10 +81,89 @@ def copy_libs(lib_dir: Path, pkg: Path) -> list[str]:
     return copied
 
 
-def compile_helpers(pkg: Path, include_dir: Path) -> None:
+def vendor_linux_deps(pkg: Path) -> tuple[list[str], list[str]]:
+    """Copy the staged libraries' EXTERNAL dependencies into the package.
+
+    The release bundle is relocatable but NOT self-contained: `libcrispasr.so`
+    and `libwhisper.so` carry a DT_NEEDED on `libopenblas.so.0` (and on
+    libespeak-ng / libfdk-aac / libasound) which the bundle does not ship. On a
+    CI runner that happens to have them installed nothing looks wrong; on a
+    user's machine `pip install crispasr` then fails at import with
+    "libopenblas.so.0: cannot open shared object file" — exactly what v0.8.24's
+    smoke test caught on linux-x86_64 and linux-arm64.
+
+    This is auditwheel's job, done explicitly: walk `ldd` transitively, copy in
+    everything that is not core-libc, and repoint each copy's RUNPATH at
+    `$ORIGIN` so its own dependencies resolve from inside the wheel too (the
+    loader uses each library's OWN RUNPATH, not the one that pulled it in — the
+    easy thing to get wrong here).
+
+    Returns (vendored, unresolved). A non-empty `unresolved` means the wheel
+    would be broken on any machine lacking those libraries; the caller fails.
+    """
+    if not shutil.which("ldd"):
+        print("stage_libs: no ldd, skipping dependency vendoring", flush=True)
+        return [], []
+    have_patchelf = shutil.which("patchelf") is not None
+    if not have_patchelf:
+        print("stage_libs: WARNING patchelf not found — vendored libraries will "
+              "keep their original RUNPATH and may not find each other",
+              flush=True)
+
+    staged = {p.name for p in pkg.iterdir() if _is_lib(p)}
+    queue = [p for p in pkg.iterdir() if _is_lib(p)]
+    seen: set[str] = set()
+    vendored: list[str] = []
+    unresolved: list[str] = []
+
+    while queue:
+        lib = queue.pop()
+        try:
+            out = subprocess.run(["ldd", str(lib)], capture_output=True,
+                                 text=True, check=False).stdout
+        except OSError:
+            continue
+        for line in out.splitlines():
+            line = line.strip()
+            if "=>" not in line:
+                continue
+            soname, _, rest = line.partition("=>")
+            soname, rest = soname.strip(), rest.strip()
+            if not soname or soname in seen:
+                continue
+            seen.add(soname)
+            if any(soname.startswith(c) for c in LINUX_CORE) or soname in staged:
+                continue
+            if rest.startswith("not found"):
+                unresolved.append(soname)
+                continue
+            path = rest.split(" (")[0].strip()
+            if not path or not os.path.isfile(path):
+                continue
+            dst = pkg / soname
+            shutil.copyfile(os.path.realpath(path), dst)
+            shutil.copymode(os.path.realpath(path), dst)
+            os.chmod(dst, os.stat(dst).st_mode | 0o200)  # copied libs are 0444
+            if have_patchelf:
+                subprocess.run(["patchelf", "--set-rpath", "$ORIGIN", str(dst)],
+                               check=False)
+            staged.add(soname)
+            vendored.append(soname)
+            queue.append(dst)
+    return vendored, unresolved
+
+
+def compile_helpers(pkg: Path, include_dir: Path, extra_includes: list[Path]) -> None:
     """Compile `_helpers.c` into the package dir. Best-effort: the legacy
     whisper `CrispASR` class uses it, but the modern `Session` API does not, so
-    a failure only degrades that one class — never fail the wheel over it."""
+    a failure only degrades that one class — never fail the wheel over it.
+
+    `extra_includes` matters more than it looks: `crispasr.h` line 4 includes
+    `ggml.h`, which lives in the bundle's `ggml/include`, NOT next to
+    `crispasr.h`. Passing only the latter made every wheel — on every platform —
+    print "helpers compile failed: 'ggml.h' file not found" and ship without the
+    legacy class. Because the failure is deliberately non-fatal it was a warning
+    nobody read."""
     src = pkg / "_helpers.c"
     if not src.exists():
         print("stage_libs: no _helpers.c, skipping helpers", flush=True)
@@ -80,6 +172,7 @@ def compile_helpers(pkg: Path, include_dir: Path) -> None:
         print(f"stage_libs: no crispasr.h under {include_dir}, skipping helpers",
               flush=True)
         return
+    inc_flags = [f"-I{include_dir}"] + [f"-I{p}" for p in extra_includes]
     system = platform.system()
     try:
         if system == "Windows":
@@ -92,8 +185,9 @@ def compile_helpers(pkg: Path, include_dir: Path) -> None:
                 return
             out = pkg / "crispasr_helpers.dll"
             subprocess.run(
-                ["cl", "/nologo", "/LD", str(src), f"/I{include_dir}",
-                 str(implib), f"/Fe:{out}"],
+                ["cl", "/nologo", "/LD", str(src)]
+                + [f"/I{p}" for p in [include_dir] + extra_includes]
+                + [str(implib), f"/Fe:{out}"],
                 check=True,
             )
         else:
@@ -102,8 +196,8 @@ def compile_helpers(pkg: Path, include_dir: Path) -> None:
             rpath = "@loader_path" if system == "Darwin" else "$ORIGIN"
             cc = os.environ.get("CC", "cc")
             subprocess.run(
-                [cc, "-shared", "-fPIC", str(src), f"-I{include_dir}",
-                 f"-L{pkg}", "-lcrispasr", f"-Wl,-rpath,{rpath}", "-o", str(out)],
+                [cc, "-shared", "-fPIC", str(src)] + inc_flags
+                + [f"-L{pkg}", "-lcrispasr", f"-Wl,-rpath,{rpath}", "-o", str(out)],
                 check=True,
             )
             if system == "Darwin":
@@ -137,8 +231,28 @@ def main() -> int:
     for n in copied:
         print(f"  {n}", flush=True)
 
+    # crispasr.h includes ggml.h, which the bundle keeps in a separate tree.
     include_dir = bundle / "include"
-    compile_helpers(pkg, include_dir)
+    extra_includes = [d for d in (bundle / "ggml" / "include", bundle / "ggml")
+                      if d.is_dir()]
+
+    if platform.system() == "Linux":
+        vendored, unresolved = vendor_linux_deps(pkg)
+        if vendored:
+            print(f"stage_libs: vendored {len(vendored)} external deps:", flush=True)
+            for n in sorted(vendored):
+                print(f"  {n}", flush=True)
+        if unresolved:
+            # Failing here is the point. These are libraries the staged objects
+            # NEED and neither the bundle nor this machine has; shipping the
+            # wheel anyway just moves the ImportError to the user.
+            print("stage_libs: ERROR unresolved dependencies — the wheel would "
+                  "fail to import on any machine without them:", flush=True)
+            for n in sorted(unresolved):
+                print(f"  {n}", flush=True)
+            raise SystemExit(1)
+
+    compile_helpers(pkg, include_dir, extra_includes)
     return 0
 
 

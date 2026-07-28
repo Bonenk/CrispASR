@@ -115,6 +115,20 @@ jobs:
           tar xzf "bundle_dl/${{ matrix.asset }}.tar.gz" -C bundle
           echo "BUNDLE_DIR=bundle/${{ matrix.asset }}" >> "$GITHUB_ENV"
 
+      # The bundle is relocatable but NOT self-contained: libcrispasr.so has a
+      # DT_NEEDED on libopenblas.so.0 / libespeak-ng / libfdk-aac / libasound,
+      # none of which it ships. stage_libs vendors them into the wheel, but it
+      # can only copy what exists on this runner — so install them first, and
+      # patchelf so each vendored copy gets RUNPATH=$ORIGIN. Without this the
+      # wheel imports fine here and dies on a user's machine with
+      # "libopenblas.so.0: cannot open shared object file" (v0.8.24).
+      - name: Runtime deps to vendor into the wheel (linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            patchelf libopenblas0 libespeak-ng1 libfdk-aac2 libasound2
+
       - name: Stage libs into the package
         shell: bash
         run: python python/tools/stage_libs.py --bundle "$BUNDLE_DIR"
@@ -237,6 +251,20 @@ jobs:
           mkdir -p bundle
           tar xzf "bundle_dl/${{ matrix.asset }}.tar.gz" -C bundle
           echo "BUNDLE_DIR=bundle/${{ matrix.asset }}" >> "$GITHUB_ENV"
+
+      # The bundle is relocatable but NOT self-contained: libcrispasr.so has a
+      # DT_NEEDED on libopenblas.so.0 / libespeak-ng / libfdk-aac / libasound,
+      # none of which it ships. stage_libs vendors them into the wheel, but it
+      # can only copy what exists on this runner — so install them first, and
+      # patchelf so each vendored copy gets RUNPATH=$ORIGIN. Without this the
+      # wheel imports fine here and dies on a user's machine with
+      # "libopenblas.so.0: cannot open shared object file" (v0.8.24).
+      - name: Runtime deps to vendor into the wheel (linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            patchelf libopenblas0 libespeak-ng1 libfdk-aac2 libasound2
 
       - name: Stage libs into the package
         shell: bash
