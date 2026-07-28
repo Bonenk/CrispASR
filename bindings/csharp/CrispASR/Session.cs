@@ -673,6 +673,16 @@ namespace CrispASR
         }
     }
 
+    /// <summary>#316: synthesize these phonemes verbatim, skipping the G2P. Empty clears. kokoro and piper only (rc=-2).</summary>
+    public void SetTtsPhonemes(string phonemes)
+    {
+        int rc = NativeMethods.crispasr_session_set_tts_phonemes(_handle, phonemes ?? "");
+        if (rc == -2)
+            throw new InvalidOperationException("backend has no phonemes-in entry point (kokoro and piper do)");
+        if (rc != 0)
+            throw new InvalidOperationException($"set_tts_phonemes failed (rc={rc})");
+    }
+
     // ====================================================================
     // Data types
     // ====================================================================

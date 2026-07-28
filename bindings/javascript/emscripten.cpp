@@ -43,6 +43,8 @@ int crispasr_session_set_speaker_name(CrispasrSession* s, const char* name);
 int crispasr_session_n_speakers(CrispasrSession* s);
 const char* crispasr_session_get_speaker_name(CrispasrSession* s, int i);
 int crispasr_session_set_instruct(CrispasrSession* s, const char* instruct);
+// #316: synthesize these phonemes verbatim, skipping the G2P. Empty clears. kokoro and piper only (rc=-2).
+int crispasr_session_set_tts_phonemes(struct crispasr_session* s, const char* phonemes);
 int crispasr_session_is_custom_voice(CrispasrSession* s);
 int crispasr_session_is_voice_design(CrispasrSession* s);
 float* crispasr_session_synthesize(CrispasrSession* s, const char* text, int* out_n_samples);
@@ -604,6 +606,14 @@ EMSCRIPTEN_BINDINGS(whisper) {
                              if (!g_tts_session)
                                  return -1;
                              return crispasr_session_set_instruct(g_tts_session, instruct.c_str());
+                         }));
+
+    // #316: drive the acoustic model with phonemes, skipping the G2P.
+    // kokoro and piper; -2 from any other backend.
+    emscripten::function("ttsSetPhonemes", emscripten::optional_override([](const std::string& phonemes) {
+                             if (!g_tts_session)
+                                 return -1;
+                             return crispasr_session_set_tts_phonemes(g_tts_session, phonemes.c_str());
                          }));
 
     // qwen3-tts variant detection (returns false also when the active

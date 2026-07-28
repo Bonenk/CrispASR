@@ -71,6 +71,7 @@ int              crispasr_session_set_speaker_id(CrispasrSession* s, int id);
 int              crispasr_session_n_speakers(CrispasrSession* s);
 const char*      crispasr_session_get_speaker_name(CrispasrSession* s, int i);
 int              crispasr_session_set_instruct(CrispasrSession* s, const char* instruct);
+int              crispasr_session_set_tts_phonemes(CrispasrSession* s, const char* phonemes);
 int              crispasr_session_is_custom_voice(CrispasrSession* s);
 int              crispasr_session_is_voice_design(CrispasrSession* s);
 float*           crispasr_session_synthesize(CrispasrSession* s, const char* text, int* out_n_samples);
@@ -961,6 +962,25 @@ func (s *CrispasrSession) SetInstruct(instruct string) error {
 		return errors.New("backend is not a VoiceDesign variant; SetInstruct only applies to qwen3-tts VoiceDesign")
 	default:
 		return fmt.Errorf("crispasr_session_set_instruct failed (rc=%d)", int(rc))
+	}
+}
+
+// SetTTSPhonemes synthesizes the given phonemes verbatim instead of
+// phonemizing the text — the seam between text processing and the acoustic
+// model. Use it to reproduce another implementation's pronunciation exactly, or
+// to tell a G2P bug from a model bug (#316). Empty clears.
+// Honoured by kokoro and piper; other backends return a soft no-op error.
+func (s *CrispasrSession) SetTTSPhonemes(phonemes string) error {
+	cps := C.CString(phonemes)
+	defer C.free(unsafe.Pointer(cps))
+	rc := C.crispasr_session_set_tts_phonemes(s.handle, cps)
+	switch rc {
+	case 0:
+		return nil
+	case -2:
+		return errors.New("backend has no phonemes-in entry point; SetTTSPhonemes applies to kokoro and piper")
+	default:
+		return fmt.Errorf("SetTTSPhonemes failed (rc=%d)", int(rc))
 	}
 }
 

@@ -72,6 +72,10 @@ namespace CrispASR
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int crispasr_session_set_instruct(
+
+        // #316: synthesize these phonemes verbatim, skipping the G2P. Empty clears. kokoro and piper only (rc=-2).
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_session_set_tts_phonemes(IntPtr session, [MarshalAs(UnmanagedType.LPUTF8Str)] string phonemes);
             IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string instruct);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

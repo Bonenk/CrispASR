@@ -2724,6 +2724,14 @@ catch_discover_tests(test-punc-copies-in-sync
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-kokoro-g2p-live — #316 end-to-end: a number must be audible, and
+# --tts-phonemes must drive the model instead of the text. The G2P defect was
+# invisible to every tensor-level check (crispasr-diff for kokoro is phoneme-IN),
+# so only a real synthesis + ASR round-trip proves it. SKIPs without models.
+add_test(NAME test-kokoro-g2p-live
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-kokoro-g2p-live.sh)
+set_tests_properties(test-kokoro-g2p-live PROPERTIES LABELS "live;tts;kokoro" TIMEOUT 900)
+
 # ─── test-tts-phonemes-policy — which backends --tts-phonemes may drive (#316).
 # The CLI guard began as a hardcoded backend-name check that wrongly excluded
 # piper. Header-only policy, no model.

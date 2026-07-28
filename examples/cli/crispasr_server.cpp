@@ -41,6 +41,7 @@
 #include "crispasr_cache.h"              // ensure_cached_file() for resolving the punc model
 #include "crispasr_punc_loader.h"        // shared --punc-model alias resolution (CLI parity)
 #include "crispasr_truecase_loader.h"    // shared --truecase-model resolution + apply (CLI parity)
+#include "crispasr_phonemes_policy.h"    // #316
 #include "crispasr_punctuation_policy.h" // crispasr_should_auto_enable_punctuation()
 
 #include "common-crispasr.h"           // read_audio_data
@@ -2018,6 +2019,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     //     "response_format": "wav"|"pcm"|"f32"|"mp3"|"aac"|"opus" (optional, default "wav")
     //     "consent_attestation":  "<text>",              (REQUIRED when `voice` is a .wav clone)
     //     "spoken_disclaimer":    true|false,            (optional, default true)
+    //     "phonemes":        "<IPA>",              (optional; kokoro/piper — skips the G2P)
     //     "marking_attestation":  "<text>",              (required to HONOR spoken_disclaimer:false
     //                                                     on a clone; without it the opt-out is
     //                                                     denied, not the request — see below)
@@ -2104,6 +2106,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         std::string voice_name = body.value("voice", "");
         std::string consent_attestation = body.value("consent_attestation", "");
         std::string instructions = body.value("instructions", "");
+        // #316: drive the acoustic model with these phonemes, skipping the G2P.
+        // kokoro and piper only; refused elsewhere rather than silently
+        // synthesizing `input`, which would make an A/B look like the phonemes
+        // changed nothing.
+        std::string tts_phonemes = body.value("phonemes", "");
         // #201: transcript of a .wav clone reference (TADA on-the-fly cloning,
         // gated by CRISPASR_TADA_WAV_CLONE). Passed through to the backend as
         // tts_ref_text; a companion <name>.txt in --voice-dir is the fallback.
@@ -2229,6 +2236,14 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             rp.tts_ref_text = ref_text;
         if (!instructions.empty())
             rp.tts_instruct = instructions;
+        if (!tts_phonemes.empty()) {
+            if (!crispasr_phonemes_policy::backend_supports(backend_name)) {
+                json_error(res, 400, crispasr_phonemes_policy::unsupported_message(backend_name),
+                           "unsupported_phonemes", "phonemes");
+                return;
+            }
+            rp.tts_phonemes = tts_phonemes;
+        }
         // #249/#304: forward a target language to the TTS backend. MOSS-TTS sets
         // its "- Language:" prompt field from it; CosyVoice3 compares it to the
         // voice's own language to engage cross-lingual synthesis (dropping the

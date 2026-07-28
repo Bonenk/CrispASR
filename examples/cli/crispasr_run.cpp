@@ -2006,6 +2006,16 @@ int crispasr_run_backend(const whisper_params& params_in) {
     // (usage exit 2), distinct from a stage that ran and failed (exit 30-32).
     // --require-word-timestamps has no precondition — it is a property of the
     // output (native word timing OR the forced aligner satisfy it).
+    // #316: --tts-phonemes needs a backend with a phonemes-in entry point (see
+    // crispasr_phonemes_policy.h). Checked HERE, before any model is loaded,
+    // because it depends only on the requested backend name — failing after a
+    // multi-second load would be rude, and it made the refusal untestable
+    // without that backend's weights on disk.
+    if (!params.tts_phonemes.empty() && !crispasr_phonemes_policy::backend_supports(params.backend)) {
+        fprintf(stderr, "crispasr: error: %s\n", crispasr_phonemes_policy::unsupported_message(params.backend).c_str());
+        return 2;
+    }
+
     if (params.require_vad && !(params.vad || !params.vad_model.empty())) {
         fprintf(stderr, "crispasr: error: --require-vad needs VAD to be requested (pass --vad or --vad-model/-vm).\n");
         return 2;
@@ -2944,13 +2954,6 @@ int crispasr_run_backend(const whisper_params& params_in) {
     if (!params.tts_text.empty()) {
         if (!(backend->capabilities() & CAP_TTS)) {
             fprintf(stderr, "crispasr: error: backend '%s' does not support TTS\n", backend_name.c_str());
-            return 14;
-        }
-        // #316: --tts-phonemes needs a phonemes-in entry point; see
-        // crispasr_phonemes_policy.h for which backends have one.
-        if (!params.tts_phonemes.empty() && !crispasr_phonemes_policy::backend_supports(backend_name)) {
-            fprintf(stderr, "crispasr: error: %s\n",
-                    crispasr_phonemes_policy::unsupported_message(backend_name).c_str());
             return 14;
         }
 

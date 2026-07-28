@@ -3871,6 +3871,37 @@ class CrispasrSession {
     }
   }
 
+  /// Synthesize [phonemes] verbatim instead of phonemizing the text — the seam
+  /// between text processing and the acoustic model. Use it to reproduce another
+  /// implementation's pronunciation exactly, or to tell a G2P bug from a model
+  /// bug (#316). An empty string clears it.
+  ///
+  /// Honoured by `kokoro` and `piper`; other backends soft no-op (rc = -2).
+  void setTtsPhonemes(String phonemes) {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_set_tts_phonemes')) {
+      throw UnsupportedError(
+          'setTtsPhonemes API not available in this libcrispasr build');
+    }
+    final fn = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Pointer<Utf8>),
+        int Function(
+            Pointer<Void>, Pointer<Utf8>)>('crispasr_session_set_tts_phonemes');
+    final p = phonemes.toNativeUtf8();
+    try {
+      final rc = fn(_handle, p);
+      if (rc == -2) {
+        throw StateError(
+            'backend $_backend has no phonemes-in entry point; setTtsPhonemes applies to kokoro and piper');
+      }
+      if (rc != 0) {
+        throw Exception('setTtsPhonemes failed (rc=$rc) for backend $_backend');
+      }
+    } finally {
+      calloc.free(p);
+    }
+  }
+
   /// Whether the loaded model is a qwen3-tts CustomVoice variant
   /// (use [setSpeakerName] for it).
   bool isCustomVoice() {

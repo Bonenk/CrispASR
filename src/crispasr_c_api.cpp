@@ -1985,6 +1985,12 @@ struct crispasr_session {
 #endif
 #ifdef CA_HAVE_KOKORO
     kokoro_context* kokoro_ctx = nullptr;
+
+    // #316: synthesize these phonemes verbatim instead of running the G2P over
+    // the text. The seam between text processing and the acoustic model — set
+    // it to reproduce another implementation's pronunciation exactly, or to
+    // tell a G2P bug from a model bug. Honoured by kokoro and piper.
+    std::string tts_phonemes;
 #endif
 #ifdef CA_HAVE_VOXTRAL_TTS
     voxtral_tts_context* voxtral_tts_ctx = nullptr;
@@ -7949,6 +7955,19 @@ CA_EXPORT int crispasr_session_tada_set_makeref_models(crispasr_session* s, cons
 // Returns 0 on success, -1 if the session isn't valid, -2 if the name
 // is unknown for the active backend, -3 if the active backend has no
 // preset-speaker contract.
+// #316: drive the acoustic model with these phonemes, skipping the G2P.
+// Empty string clears it. Returns 0, -1 on a bad session, or -2 when the active
+// backend has no phonemes-in entry point (kokoro and piper do) — a soft no-op
+// like the other setters, so a caller can probe without special-casing.
+CA_EXPORT int crispasr_session_set_tts_phonemes(crispasr_session* s, const char* phonemes) {
+    if (!s)
+        return -1;
+    s->tts_phonemes = phonemes ? phonemes : "";
+    if (s->tts_phonemes.empty())
+        return 0;
+    return (s->backend == "kokoro" || s->backend == "piper") ? 0 : -2;
+}
+
 CA_EXPORT int crispasr_session_set_speaker_name(crispasr_session* s, const char* name) {
     if (!s || !name)
         return -1;
@@ -8274,7 +8293,9 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
         const std::string tts_lang = !s->target_language.empty() ? s->target_language : s->source_language;
         if (!tts_lang.empty() && tts_lang != "auto")
             kokoro_set_language(s->kokoro_ctx, tts_lang.c_str());
-        float* pcm = kokoro_synthesize(s->kokoro_ctx, text, out_n_samples);
+        float* pcm = s->tts_phonemes.empty()
+                         ? kokoro_synthesize(s->kokoro_ctx, text, out_n_samples)
+                         : kokoro_synthesize_phonemes(s->kokoro_ctx, s->tts_phonemes.c_str(), out_n_samples);
         if (!pcm && s->last_synth_error.empty()) {
             s->last_synth_error = "kokoro synthesis failed — "
                                   "this is usually because the built-in phonemizer could not "
