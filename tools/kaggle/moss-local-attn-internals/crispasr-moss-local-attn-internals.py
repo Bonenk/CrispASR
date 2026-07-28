@@ -12,7 +12,7 @@
 # Also compare our layer-0 attn output (post o_proj) to the HF reference module out.
 
 # %% [code]
-import json, os, subprocess, sys, gc, math
+import json, os, subprocess, sys, gc, math, shutil
 from pathlib import Path
 import numpy as np
 
@@ -83,13 +83,16 @@ with kh.build_heartbeat("download"):
     CODEC = robust_download("cstr/moss-tts-local-v1.5-GGUF", "moss-tts-local-v1.5-codec.gguf", str(MODELS), TOKEN)
     F16 = robust_download("cstr/moss-tts-local-v1.5-GGUF", "moss-tts-local-v1.5-f16.gguf", str(MODELS), TOKEN)
 
-# ── our layer-0 attention-internals dump ──────────────────────────────────────
-fa_path = WORK / "ours_fa0.txt"
-sub_path = WORK / "ours_sub0.txt"
-env = {**os.environ, "CRISPASR_CORE_ATTN_DUMP_FA_LAYER": "0",
+# ── our layer-L attention-internals dump (L=10: the divergence layer) ──────────
+LAYER = int(os.environ.get("CRISPASR_DIAG_LAYER", "10"))
+fa_path = WORK / "ours_fa.txt"
+sub_path = WORK / "ours_sub.txt"
+lay_path = WORK / "ours_layers.txt"  # every block's output (input to L = block L-1)
+env = {**os.environ, "CRISPASR_CORE_ATTN_DUMP_FA_LAYER": str(LAYER),
        "CRISPASR_MOSS_TTS_LOCAL_DUMP_FA_PATH": str(fa_path),
-       "CRISPASR_MOSS_TTS_LOCAL_DUMP_SUBLAYER": "0",
-       "CRISPASR_MOSS_TTS_LOCAL_DUMP_SUBLAYER_PATH": str(sub_path)}
+       "CRISPASR_MOSS_TTS_LOCAL_DUMP_SUBLAYER": str(LAYER),
+       "CRISPASR_MOSS_TTS_LOCAL_DUMP_SUBLAYER_PATH": str(sub_path),
+       "CRISPASR_MOSS_TTS_LOCAL_DUMP_LAYERS": str(lay_path)}
 with kh.build_heartbeat("ours.synth"):
     try:
         subprocess.run([str(CLI), "--backend", "moss-tts-local", "-m", F16, "--codec-model", CODEC,
@@ -125,7 +128,8 @@ def read_sub(path):
 
 fa = read_ne(fa_path)
 subo = read_sub(sub_path)
-step("ours.done", fa_keys=list(fa.keys()), sub_keys=list(subo.keys()))
+ours_blocks = read_sub(lay_path)  # {"blk_N": vec}
+step("ours.done", fa_keys=list(fa.keys()), sub_keys=list(subo.keys()), n_blocks=len(ours_blocks))
 
 # ── reference-free flash-vs-eager check ───────────────────────────────────────
 result = {"flash_vs_eager": None}
@@ -183,14 +187,20 @@ def mk(name):
     return hook
 
 
-lyr0 = model.transformer.layers[0]
-attn_mod = getattr(lyr0, "self_attn", None) or getattr(lyr0, "attn", None)
+layers = model.transformer.layers
+lyrL = layers[LAYER]
+attn_mod = getattr(lyrL, "self_attn", None) or getattr(lyrL, "attn", None)
 if attn_mod is not None:
     attn_mod.register_forward_hook(mk("attn_out"))
     for sub in ("q_norm", "k_norm", "v_proj"):
         m = getattr(attn_mod, sub, None)
         if m is not None:
             m.register_forward_hook(mk(sub))
+# block outputs for L-1 (the INPUT to layer L) and L (the output), to measure
+# whether layer L amplifies its input divergence
+for bl in (LAYER - 1, LAYER):
+    if 0 <= bl < len(layers):
+        layers[bl].register_forward_hook(mk(f"blk_{bl}"))
 msg = proc.build_user_message(text=TEXT)
 feat = proc([msg], mode="generation")
 input_ids = feat["input_ids"] if isinstance(feat, dict) else feat.input_ids
@@ -233,27 +243,54 @@ result["prerope"] = {
     "sizes": {"oq": None if oq is None else len(oq), "ref_q": None if ref.get("q_norm") is None else len(ref["q_norm"]),
               "ok": None if ok is None else len(ok), "ov": None if ov is None else len(ov)},
 }
-result["attn_out_vs_ref"] = cos(subo.get("sub_attn_0"), ref.get("attn_out"))
+result["attn_out_vs_ref"] = cos(subo.get(f"sub_attn_{LAYER}"), ref.get("attn_out"))
 
+# block-level divergence: input to layer L (= block L-1 output) vs its output.
+# This tells us whether layer L AMPLIFIES a tiny input difference or the ops
+# themselves diverge given a nearly-identical input.
+in_cos = cos(ours_blocks.get(f"blk_{LAYER-1}"), ref.get(f"blk_{LAYER-1}"))
+in_l2 = l2r(ours_blocks.get(f"blk_{LAYER-1}"), ref.get(f"blk_{LAYER-1}"))
+out_cos = cos(ours_blocks.get(f"blk_{LAYER}"), ref.get(f"blk_{LAYER}"))
+result["block"] = {"layer": LAYER, "input_cos": in_cos, "input_l2rel": in_l2, "output_cos": out_cos}
 pr = result["prerope"]
-BAD = 0.999  # cosine below this = a real divergence at this stage
+qk_l2 = max([x for x in (pr["Q_vs_qnorm"]["l2rel"], pr["K_vs_knorm"]["l2rel"]) if x is not None] or [None])
 
+# Amplification ratio: how much bigger is the post-qk-norm Q/K divergence than the
+# raw input (block L-1) divergence? A matmul/norm shouldn't inflate it much.
+amp = (qk_l2 / in_l2) if (qk_l2 and in_l2) else None
+result["amplification"] = {"input_l2rel": in_l2, "prerope_qk_l2rel": qk_l2, "ratio_qk_over_input": amp}
 
-def bad(x):
-    return x is not None and x < BAD
-
-
-if bad(pr["V_vs_vproj"]["cos"]):
-    verdict = f"V_PROJ diverges (cos {pr['V_vs_vproj']['cos']}) — value projection / weight-layout bug"
-elif bad(pr["Q_vs_qnorm"]["cos"]) or bad(pr["K_vs_knorm"]["cos"]):
-    verdict = (f"PROJECTION+QK-NORM diverges pre-RoPE (Q cos {pr['Q_vs_qnorm']['cos']}, "
-               f"K cos {pr['K_vs_knorm']['cos']}) — q/k proj or qk-norm is the bug")
-elif result["flash_vs_eager"] and result["flash_vs_eager"]["cos_last"] >= 0.9995:
-    verdict = (f"BY ELIMINATION = RoPE: pre-RoPE Q/K/V all match ref "
-               f"(Q {pr['Q_vs_qnorm']['cos']}, K {pr['K_vs_knorm']['cos']}, V {pr['V_vs_vproj']['cos']}), "
-               f"flash==eager, yet attn_out vs ref = {result['attn_out_vs_ref']} -> RoPE differs")
+if in_l2 is not None and qk_l2 is not None:
+    if qk_l2 > 5 * in_l2 and qk_l2 > 0.05:
+        verdict = (f"OP BUG at layer {LAYER}: qk-norm/proj INFLATES the input divergence "
+                   f"{amp:.0f}x (input l2rel {in_l2:.4g} -> pre-RoPE Q/K l2rel {qk_l2:.4g}). "
+                   f"A matmul/rms_norm can't do that on nearly-parallel input -> real op/norm bug.")
+    elif qk_l2 <= 3 * in_l2:
+        verdict = (f"AMPLIFICATION (not an op bug): pre-RoPE Q/K track the input divergence "
+                   f"(input l2rel {in_l2:.4g}, qk l2rel {qk_l2:.4g}, ratio {amp:.1f}); "
+                   f"attn_out cos {result['attn_out_vs_ref']} -> the blow-up is in the softmax "
+                   f"(peaked/attention-sink at layer {LAYER}), i.e. irreducible sensitivity.")
+    else:
+        verdict = (f"PARTIAL: qk l2rel {qk_l2:.4g} vs input {in_l2:.4g} (ratio {amp:.1f}) — "
+                   f"some norm/proj amplification; inspect Q vs K.")
 else:
-    verdict = "inconclusive — check sizes/layout in result"
+    verdict = "inconclusive — missing block or FA tensors (check keys/sizes)"
 (WORK / "attn_internals.json").write_text(json.dumps({"verdict": verdict, **result}, indent=2))
-step("done", verdict=verdict, prerope=result["prerope"], attn_out_vs_ref=result["attn_out_vs_ref"])
+step("done", verdict=verdict, block=result["block"], amplification=result["amplification"],
+     attn_out_vs_ref=result["attn_out_vs_ref"])
 print("DONE", verdict, flush=True)
+
+# ── refresh the ccache dataset (gotcha #22): tar to a single file so it lands in
+# page 1 of kernel-output, and keep /kaggle/working minimal ──────────────────
+try:
+    for cand in ("/kaggle/working/.ccache", "/kaggle/temp/.ccache", str(Path.home() / ".ccache")):
+        if Path(cand).exists():
+            subprocess.run(f"tar cf /kaggle/working/ccache.tar -C {Path(cand).parent} {Path(cand).name}",
+                           shell=True, timeout=600)
+            # keep /kaggle/working small so ccache.tar lands in output page 1 (#22)
+            if cand.startswith("/kaggle/working"):
+                shutil.rmtree(cand, ignore_errors=True)
+            step("ccache.tar", src=cand, size_mb=round(Path("/kaggle/working/ccache.tar").stat().st_size / 1e6, 1))
+            break
+except Exception as e:  # noqa: BLE001
+    step("ccache.tar.err", err=repr(e)[:150])
