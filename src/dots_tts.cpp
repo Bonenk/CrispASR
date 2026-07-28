@@ -1647,7 +1647,7 @@ static int g_dots_fused_override = -1;
 static void dots_flow_match_core(dots_tts_context* ctx, const float* input_seq, const float* cfg_seq, int fm_total_len,
                                  int latent_start, const float* attn_mask_add, const int32_t* pos_ids,
                                  const float* noise, int num_steps, float cfg_scale, float* out_latent,
-                                 const float* g_cond = nullptr) {
+                                 const float* g_cond = nullptr, int cfg_interval_override = 0) {
     const int dit_dim = (int)ctx->dit.hidden_size;
     const int latent_dim = ctx->latent_dim;
     const int patch_size = fm_total_len - latent_start;
@@ -1672,7 +1672,7 @@ static void dots_flow_match_core(dots_tts_context* ctx, const float* input_seq, 
     // the uncond forward. Only active when K>1, so at the default both forwards run
     // every step and the result is byte-for-byte the legacy path. Gated
     // CRISPASR_DOTS_CFG_INTERVAL.
-    const int cfg_interval = [] {
+    const int cfg_interval = cfg_interval_override > 0 ? cfg_interval_override : [] {
         const char* e = std::getenv("CRISPASR_DOTS_CFG_INTERVAL");
         const int k = e ? atoi(e) : 1;
         return k < 1 ? 1 : k;
@@ -2745,7 +2745,7 @@ float* dots_tts_synthesize(struct dots_tts_context* ctx, const char* text, int* 
             dots_bench_stage b2("flow_match");
             dots_flow_match_core(ctx, seq_c.data(), seq_u.data(), fm_total_len, latent_start, mask.data(), pos.data(),
                                  noise.data(), ode_steps, cfg_scale, z_norm.data(),
-                                 ctx->has_voice ? ctx->g_cond.data() : nullptr);
+                                 ctx->has_voice ? ctx->g_cond.data() : nullptr, fast_profile ? 2 : 0);
         }
 
         // Denormalize for penc + vocoder; keep z_norm for FM history.
