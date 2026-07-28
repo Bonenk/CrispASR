@@ -345,5 +345,5 @@ honoured.
 | GitHub release | ✅ | 27 assets, same coverage as v0.8.23 |
 | Docker | ✅ | |
 | crates.io | ✅ | `crispasr` + `crispasr-sys` |
+| pub.dev | ✅ | `crispasr` 0.8.24 — the first pub.dev release since 0.8.22; its automated-publishing tag pattern had been rejecting `v<version>` tags, which is why 0.8.23 never published |
 | PyPI | ❌ **0.8.23** | bundled-wheel smoke test failed; see above |
-| pub.dev | ❌ **0.8.22** | its automated-publishing tag pattern expects `crispasr-v<version>`, so a `v<version>` tag is rejected before upload — a pub.dev-side setting. 0.8.23 did not publish either. |
