@@ -37,6 +37,23 @@ LINUX_CORE = (
     "libnsl.so", "libanl.so", "libcrypt.so",
 )
 
+# GPU driver + runtime libraries. These come from the HOST by definition — a
+# wheel that shipped the user's NVIDIA driver would be both wrong and unusable —
+# so they are neither vendored nor treated as a missing dependency. The GPU
+# wheels carry a `+cuda` / `+vulkan` local version precisely because the user
+# supplies this half.
+#
+# Getting this wrong is not hypothetical: failing on any unresolved dep is right
+# for libopenblas and broke the previously-working linux-CUDA wheel, which
+# legitimately has libcuda.so.1 / libcudart.so.12 / libcublas.so.12 unresolved on
+# a runner with no CUDA installed.
+LINUX_HOST_PROVIDED = (
+    "libcuda.so", "libcudart.so", "libcublas", "libcufft", "libcurand",
+    "libcusparse", "libcusolver", "libnvrtc", "libnvidia-", "libcudnn",
+    "libamdhip", "libhip", "libhsa-runtime", "librocblas", "libroc",
+    "libOpenCL.so", "libvulkan.so",
+)
+
 
 def find_lib_dir(bundle: Path) -> Path:
     # `bin` FIRST because that is where the Windows bundle puts its DLLs; `src`
@@ -81,7 +98,7 @@ def copy_libs(lib_dir: Path, pkg: Path) -> list[str]:
     return copied
 
 
-def vendor_linux_deps(pkg: Path) -> tuple[list[str], list[str]]:
+def vendor_linux_deps(pkg: Path) -> tuple[list[str], list[str], list[str]]:
     """Copy the staged libraries' EXTERNAL dependencies into the package.
 
     The release bundle is relocatable but NOT self-contained: `libcrispasr.so`
@@ -98,12 +115,13 @@ def vendor_linux_deps(pkg: Path) -> tuple[list[str], list[str]]:
     loader uses each library's OWN RUNPATH, not the one that pulled it in — the
     easy thing to get wrong here).
 
-    Returns (vendored, unresolved). A non-empty `unresolved` means the wheel
-    would be broken on any machine lacking those libraries; the caller fails.
+    Returns (vendored, unresolved, host_provided). A non-empty `unresolved`
+    means the wheel would be broken on any machine lacking those libraries; the
+    caller fails. `host_provided` is reported but never fatal.
     """
     if not shutil.which("ldd"):
         print("stage_libs: no ldd, skipping dependency vendoring", flush=True)
-        return [], []
+        return [], [], []
     have_patchelf = shutil.which("patchelf") is not None
     if not have_patchelf:
         print("stage_libs: WARNING patchelf not found — vendored libraries will "
@@ -115,6 +133,7 @@ def vendor_linux_deps(pkg: Path) -> tuple[list[str], list[str]]:
     seen: set[str] = set()
     vendored: list[str] = []
     unresolved: list[str] = []
+    host_provided: list[str] = []
 
     while queue:
         lib = queue.pop()
@@ -134,6 +153,9 @@ def vendor_linux_deps(pkg: Path) -> tuple[list[str], list[str]]:
             seen.add(soname)
             if any(soname.startswith(c) for c in LINUX_CORE) or soname in staged:
                 continue
+            if any(soname.startswith(c) for c in LINUX_HOST_PROVIDED):
+                host_provided.append(soname)
+                continue
             if rest.startswith("not found"):
                 unresolved.append(soname)
                 continue
@@ -150,7 +172,7 @@ def vendor_linux_deps(pkg: Path) -> tuple[list[str], list[str]]:
             staged.add(soname)
             vendored.append(soname)
             queue.append(dst)
-    return vendored, unresolved
+    return vendored, unresolved, host_provided
 
 
 def compile_helpers(pkg: Path, include_dir: Path, extra_includes: list[Path]) -> None:
@@ -237,11 +259,14 @@ def main() -> int:
                       if d.is_dir()]
 
     if platform.system() == "Linux":
-        vendored, unresolved = vendor_linux_deps(pkg)
+        vendored, unresolved, host_provided = vendor_linux_deps(pkg)
         if vendored:
             print(f"stage_libs: vendored {len(vendored)} external deps:", flush=True)
             for n in sorted(vendored):
                 print(f"  {n}", flush=True)
+        if host_provided:
+            print("stage_libs: expected from the host (not vendored): "
+                  + ", ".join(sorted(set(host_provided))), flush=True)
         if unresolved:
             # Failing here is the point. These are libraries the staged objects
             # NEED and neither the bundle nor this machine has; shipping the
