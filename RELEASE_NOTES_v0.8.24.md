@@ -302,11 +302,17 @@ honoured.
   `crispasr.lib` directly under `build\src\`, which the import-lib probe missed —
   it only looked for the MSVC multi-config `src\Release\` layout used by the
   release bundle. Both are detected now.
-- **Python wheels now bundle the native library.** `pip install crispasr` gets a
-  working `libcrispasr` for linux x86_64/arm64, macOS arm64 (Metal) and Windows
-  x86_64, reusing the relocatable bundles the release already attaches. GPU wheels
-  (`+cuda`, `+vulkan`) are served from a PEP 503 index on GitHub Pages via
-  `--extra-index-url`; a pure-Python sdist remains the fallback elsewhere.
+- **Native-library-bundled Python wheels are implemented but did NOT ship in this
+  release.** The workflow builds wheels that carry `libcrispasr` for linux
+  x86_64/arm64, macOS arm64 (Metal) and Windows x86_64, with GPU wheels
+  (`+cuda`, `+vulkan`) on a PEP 503 index. Its first real tag run failed its own
+  install-and-load smoke test on every platform but linux-CUDA — the linux bundle
+  needs a `libopenblas.so.0` the wheel does not carry, and the macOS bundle is
+  linked against a newer Metal SDK than it is loaded on
+  (`_OBJC_CLASS_$_MTLResidencySetDescriptor`). The smoke test did its job and the
+  publish step was correctly skipped, so **PyPI stays at 0.8.23** — the existing
+  unbundled wheel, which is unaffected. Tracked in `PLAN.md`; `pip install
+  crispasr` continues to expect a system `libcrispasr` as before.
 
 ## Also in this release
 
@@ -331,3 +337,13 @@ honoured.
   down in `docs/contributing.md`.
 - Heteronyms (`read`, `desert`, `live`) resolve to a single pronunciation; a real
   POS tagger is the only fix.
+
+## Registry status for this release
+
+| registry | v0.8.24 | |
+|---|---|---|
+| GitHub release | ✅ | 27 assets, same coverage as v0.8.23 |
+| Docker | ✅ | |
+| crates.io | ✅ | `crispasr` + `crispasr-sys` |
+| PyPI | ❌ **0.8.23** | bundled-wheel smoke test failed; see above |
+| pub.dev | ❌ **0.8.22** | its automated-publishing tag pattern expects `crispasr-v<version>`, so a `v<version>` tag is rejected before upload — a pub.dev-side setting. 0.8.23 did not publish either. |
