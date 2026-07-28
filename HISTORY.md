@@ -6,6 +6,38 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-28 — #316 follow-up 2: the G2P dictionary auto-download was dead code
+
+Wiring the misaki lexicon to download from upstream turned up why users see worse
+pronunciation than the code implies: `phonemizer.cpp` guards every auto-download
+behind `#ifdef CRISPASR_BUILD`, and that macro is set only on `crispasr-lib`, and
+only under `BUILD_SHARED_LIBS` — never on the `kokoro` target where
+phonemizer.cpp is actually compiled. So the block has never been true in any
+configuration, and **CMUdict never auto-downloaded either**. A user without a
+pre-seeded `~/.cache/crispasr/cmudict.dict` got no English dictionary at all and
+fell through to the letter-to-sound rules, which render "this" as `θˈɪs` — a
+large part of what #316 sounded like, and entirely separate from the alphabet and
+number bugs.
+
+Fixed by defining `CRISPASR_BUILD` on the kokoro target. crispasr_cache.cpp lives
+in crispasr-lib, which links kokoro, so kokoro cannot link it back; kokoro is a
+static library, so the reference resolves at the final executable — except in
+`test-kokoro-params`, which links kokoro ALONE and now compiles that one
+translation unit itself.
+
+With it enabled, the misaki lexicon is fetched from **upstream** rather than a
+CrispASR mirror: raw.githubusercontent.com/hexgrad/misaki pinned to a commit,
+parsed by a new `load_misaki_json()`. CrispASR therefore redistributes nothing —
+the user receives the data from hexgrad under hexgrad's terms, the same route
+`ensure_cmudict_loaded()` already used for cmusphinx/cmudict — and the
+Apache-2.0-in-an-MIT-repo question does not arise at all. Verified end to end
+from an empty cache: both files download, 178,399 entries + 32 phrase-final load,
+and "…with 82 million parameters" comes back correct through ASR. Sentence-corpus
+parity from the JSON path is 99.14%, marginally ahead of the generated TSV.
+
+Pinning matters: `main` can change a pronunciation under us, and a G2P that
+shifts silently between runs is not reproducible.
+
 ## 2026-07-28 — #316 follow-up: traced the lexicon's provenance to espeak-ng
 
 The misaki lexicon that took kokoro's phoneme parity to 99% is Apache-2.0 by the

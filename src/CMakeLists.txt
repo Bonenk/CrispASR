@@ -1810,6 +1810,24 @@ endif()
 # phonemizer.cpp lives here — only kokoro calls phonemize_builtin_*.
 add_library(kokoro STATIC kokoro.h kokoro.cpp phonemizer.cpp phonemizer.h)
 set_target_properties(kokoro PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# #316: enable the G2P dictionary auto-download in phonemizer.cpp.
+#
+# CRISPASR_HAS_CACHE was referenced there but DEFINED NOWHERE, so every
+# auto-download in that file — CMUdict included — was dead code. A user without
+# a pre-seeded ~/.cache/crispasr/cmudict.dict silently got no English dictionary
+# at all and fell through to the letter-to-sound rules ("this" -> θˈɪs), which
+# is a large part of what #316 sounded like.
+#
+# The gate is CRISPASR_BUILD, which guards both the #include and the
+# CRISPASR_HAS_CACHE define — and it was only ever set on crispasr-lib, and only
+# under BUILD_SHARED_LIBS, so it was never true where phonemizer.cpp is
+# compiled.
+#
+# crispasr_cache.cpp lives in crispasr-lib, which links THIS target, so we
+# cannot link it back without a cycle. kokoro is a static library, so the
+# reference stays unresolved until the final executable — which always links
+# crispasr-lib — resolves it.
+target_compile_definitions(kokoro PRIVATE CRISPASR_BUILD)
 target_include_directories(kokoro PUBLIC .)
 target_compile_features   (kokoro PUBLIC cxx_std_17)
 target_link_libraries     (kokoro PUBLIC crispasr-core ggml ggml-base ggml-cpu)

@@ -765,6 +765,162 @@ struct ipa_dict {
 };
 
 // Load espeak/open-dict-data format: "word\t/IPA/\n"
+// #316: read misaki's lexicon JSON directly, so CrispASR can auto-download it
+// from UPSTREAM instead of re-hosting it. The shape is a flat object whose
+// values are either a phoneme string or a POS-keyed object:
+//
+//   {"believe": "bəlˈiv",
+//    "that":    {"DEFAULT": "ðæt", "DT": "ðˈæt"},
+//    "this":    {"DEFAULT": "ðɪs", "None": "ðˈɪs"}}
+//
+// "None" is NOT a part-of-speech tag — it is misaki's phrase-final reading,
+// chosen when nothing follows the word — so it is collected separately into
+// `final_out`. Every other POS key is dropped: we ship no tagger, and DEFAULT is
+// what misaki itself falls back to.
+//
+// A targeted scanner rather than a JSON library: the file is machine-generated
+// and this avoids pulling a parser into the phonemizer for one call site.
+// Returns the number of DEFAULT entries loaded.
+inline int load_misaki_json(ipa_dict& out, ipa_dict& final_out, const std::string& path) {
+    FILE* f = fopen(path.c_str(), "rb");
+    if (!f)
+        return 0;
+    std::string buf;
+    char chunk[65536];
+    size_t n;
+    while ((n = fread(chunk, 1, sizeof(chunk), f)) > 0)
+        buf.append(chunk, n);
+    fclose(f);
+
+    auto read_string = [&](size_t& i, std::string& sv) -> bool {
+        if (i >= buf.size() || buf[i] != '"')
+            return false;
+        i++;
+        sv.clear();
+        while (i < buf.size()) {
+            const char c = buf[i];
+            if (c == '"') {
+                i++;
+                return true;
+            }
+            if (c == '\\' && i + 1 < buf.size()) {
+                // The lexicon has no \u escapes; pass the escaped char through.
+                sv += buf[i + 1];
+                i += 2;
+                continue;
+            }
+            sv += c;
+            i++;
+        }
+        return false;
+    };
+
+    int count = 0;
+    size_t i = 0;
+    // Skip to the opening brace of the top-level object.
+    while (i < buf.size() && buf[i] != '{')
+        i++;
+    if (i < buf.size())
+        i++;
+    while (i < buf.size()) {
+        while (i < buf.size() && (unsigned char)buf[i] <= ' ')
+            i++;
+        if (i >= buf.size() || buf[i] == '}')
+            break;
+        if (buf[i] == ',') {
+            i++;
+            continue;
+        }
+        std::string key;
+        if (!read_string(i, key))
+            break;
+        while (i < buf.size() && ((unsigned char)buf[i] <= ' ' || buf[i] == ':'))
+            i++;
+        std::string lower = key;
+        for (auto& c : lower)
+            c = (char)tolower((unsigned char)c);
+        if (i < buf.size() && buf[i] == '"') {
+            std::string val;
+            if (!read_string(i, val))
+                break;
+            if (!val.empty() && !out.entries.count(lower)) {
+                out.entries[lower] = val;
+                count++;
+            }
+        } else if (i < buf.size() && buf[i] == '{') {
+            // POS-keyed object: take DEFAULT, and "None" as the phrase-final form.
+            //
+            // …except for a handful of words where DEFAULT measurably loses. We
+            // ship no part-of-speech tagger, so the collapse must pick ONE
+            // reading, and which one is a measurable question: each entry below
+            // won >=75% of its occurrences over 2500 sentences of running prose
+            // (n>=3). Words where DEFAULT already wins are deliberately left
+            // alone even when they are frequent error sources — "that" wants
+            // ðˈæt 31% of the time but ðæt 68%, so flipping it would lose two
+            // tokens for every one gained. Mirrors POS_OVERRIDES in
+            // tools/convert-misaki-lexicon.py; keep the two in step.
+            struct PosOverride {
+                const char* word;
+                const char* tag;
+            };
+            static const PosOverride kOverrides[] = {
+                {"live", "VERB"},     // the verb (lˈɪv) dominates; DEFAULT is the adjective
+                {"contents", "NOUN"}, // the noun (kˈɑntɛnts) dominates
+                {"thee", "None"},
+            };
+            const char* want = nullptr;
+            for (const auto& o : kOverrides)
+                if (lower == o.word)
+                    want = o.tag;
+            i++;
+            std::string dflt, fin, chosen;
+            while (i < buf.size()) {
+                while (i < buf.size() && (unsigned char)buf[i] <= ' ')
+                    i++;
+                if (i >= buf.size() || buf[i] == '}') {
+                    i++;
+                    break;
+                }
+                if (buf[i] == ',') {
+                    i++;
+                    continue;
+                }
+                std::string tag;
+                if (!read_string(i, tag))
+                    break;
+                while (i < buf.size() && ((unsigned char)buf[i] <= ' ' || buf[i] == ':'))
+                    i++;
+                if (i < buf.size() && buf[i] == '"') {
+                    std::string val;
+                    if (!read_string(i, val))
+                        break;
+                    if (tag == "DEFAULT")
+                        dflt = val;
+                    else if (tag == "None")
+                        fin = val;
+                    if (want && tag == want)
+                        chosen = val;
+                } else {
+                    // null or another literal — skip to the next delimiter.
+                    while (i < buf.size() && buf[i] != ',' && buf[i] != '}')
+                        i++;
+                }
+            }
+            const std::string& pick = chosen.empty() ? dflt : chosen;
+            if (!pick.empty() && !out.entries.count(lower)) {
+                out.entries[lower] = pick;
+                count++;
+            }
+            if (!fin.empty() && !final_out.entries.count(lower))
+                final_out.entries[lower] = fin;
+        } else {
+            while (i < buf.size() && buf[i] != ',' && buf[i] != '}')
+                i++;
+        }
+    }
+    return count;
+}
+
 inline int load_ipa_dict_file(ipa_dict& dict, const std::string& path) {
     FILE* f = fopen(path.c_str(), "r");
     if (!f)

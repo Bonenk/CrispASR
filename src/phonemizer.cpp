@@ -240,25 +240,49 @@ static void ensure_misaki_lexicon_loaded() {
             path = std::string(home) + "/.cache/crispasr/misaki-us.txt";
     }
     if (!path.empty()) {
-        int n = g2p_en::load_ipa_dict_file(g_g2p_misaki_ctx.espeak_ipa, path);
+        // A .json path is misaki's own file; anything else is the TSV that
+        // tools/convert-misaki-lexicon.py emits.
+        const bool is_json = path.size() > 5 && path.compare(path.size() - 5, 5, ".json") == 0;
+        int n = is_json ? g2p_en::load_misaki_json(g_g2p_misaki_ctx.espeak_ipa, g_g2p_misaki_ctx.phrase_final, path)
+                        : g2p_en::load_ipa_dict_file(g_g2p_misaki_ctx.espeak_ipa, path);
         if (n > 0) {
             g_g2p_misaki_ctx.espeak_ipa.loaded = true;
+            g_g2p_misaki_ctx.phrase_final.loaded = !g_g2p_misaki_ctx.phrase_final.entries.empty();
             fprintf(stderr, "g2p: loaded misaki lexicon (%d entries) from %s\n", n, path.c_str());
         }
     }
 #ifdef CRISPASR_HAS_CACHE
     if (!g_g2p_misaki_ctx.espeak_ipa.loaded) {
-        // Same route as the other G2P dicts. Apache-2.0 (hexgrad/misaki), so
-        // redistribution is fine with the attribution the file header carries.
-        static const char* MISAKI_URL = "https://huggingface.co/datasets/cstr/g2p-dicts/resolve/main/misaki_us.txt";
-        std::string p2 =
-            crispasr_cache::ensure_cached_file("misaki-us.txt", MISAKI_URL, /*quiet=*/true, "crispasr", "");
-        if (!p2.empty()) {
-            int n = g2p_en::load_ipa_dict_file(g_g2p_misaki_ctx.espeak_ipa, p2);
-            if (n > 0) {
-                g_g2p_misaki_ctx.espeak_ipa.loaded = true;
-                fprintf(stderr, "g2p: loaded misaki lexicon (%d entries) from %s\n", n, p2.c_str());
-            }
+        // Fetch from UPSTREAM, not from a CrispASR mirror. The user receives the
+        // lexicon from hexgrad/misaki under hexgrad's own terms, so CrispASR
+        // redistributes nothing and no relicensing question arises — the same
+        // route ensure_cmudict_loaded() already uses for cmusphinx/cmudict.
+        //
+        // Pinned to a commit: `main` can change a pronunciation under us, and a
+        // G2P that shifts silently between runs is not reproducible.
+        //
+        // misaki is Apache-2.0. Its lexicon is largely espeak-ng-generated
+        // (measured 2026-07-28: silver 87% identical to espeak `en-us` output,
+        // gold 48%) — the same category as the espeak_*.tsv dicts above, which
+        // this file already treats as factual phonetic data rather than
+        // GPL-covered.
+        static const char* MISAKI_REV = "fba1236595f2d2bf21d414ba6e57d25256afada3";
+        const std::string base =
+            std::string("https://raw.githubusercontent.com/hexgrad/misaki/") + MISAKI_REV + "/misaki/data/";
+        int total = 0;
+        // gold FIRST so it wins: load_misaki_json keeps the first entry seen.
+        for (const char* which : {"us_gold.json", "us_silver.json"}) {
+            std::string p2 = crispasr_cache::ensure_cached_file(std::string("misaki-") + which, base + which,
+                                                                /*quiet=*/true, "crispasr", "");
+            if (p2.empty())
+                continue;
+            total += g2p_en::load_misaki_json(g_g2p_misaki_ctx.espeak_ipa, g_g2p_misaki_ctx.phrase_final, p2);
+        }
+        if (total > 0) {
+            g_g2p_misaki_ctx.espeak_ipa.loaded = true;
+            g_g2p_misaki_ctx.phrase_final.loaded = !g_g2p_misaki_ctx.phrase_final.entries.empty();
+            fprintf(stderr, "g2p: misaki lexicon %d entries (%zu phrase-final) from hexgrad/misaki@%.7s\n", total,
+                    g_g2p_misaki_ctx.phrase_final.entries.size(), MISAKI_REV);
         }
     }
 #endif
