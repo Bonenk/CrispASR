@@ -2717,6 +2717,14 @@ catch_discover_tests(test-punc-copies-in-sync
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-tts-phonemes-policy — which backends --tts-phonemes may drive (#316).
+# The CLI guard began as a hardcoded backend-name check that wrongly excluded
+# piper. Header-only policy, no model.
+add_executable(test-tts-phonemes-policy test-tts-phonemes-policy.cpp)
+target_include_directories(test-tts-phonemes-policy PRIVATE ${PROJECT_SOURCE_DIR}/examples/cli)
+target_link_libraries(test-tts-phonemes-policy PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-tts-phonemes-policy TEST_SPEC "[unit]" PROPERTIES LABELS "unit")
+
 # ─── test-kokoro-g2p-316 — number expansion + Kokoro's phoneme alphabet (#316).
 # Kokoro dropped numbers and drifted British; both were G2P defects that
 # crispasr-diff cannot see (it is phoneme-IN, so it starts downstream of them).

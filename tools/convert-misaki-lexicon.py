@@ -11,8 +11,30 @@ misaki's own entries takes that to ~91% (measured; see docs/tts.md).
             data/us_gold.json    ~90 k entries, hand-checked
             data/us_silver.json  ~93 k entries, lower confidence
 
-Both are Apache-2.0, so redistribution is fine WITH attribution — the emitted
-file carries the notice in its header, and the registry entry must too.
+misaki is Apache-2.0, but DO NOT ASSUME THAT SETTLES THE DATA. Traced
+2026-07-28 by comparing the lexicons against espeak-ng 1.52 `en-us` output,
+alphabet-normalised, on random samples of 120 words each:
+
+    us_silver.json   87% byte-identical to espeak-ng output
+    us_gold.json     48%   (i.e. roughly half hand-corrected away from it)
+
+and the word sets are largely disjoint from CMUdict (only 39% of CMUdict
+appears; 72% of misaki does not), so it is not a CMUdict derivative. The
+gold/silver naming carries its usual meaning: silver is machine-generated,
+gold is the human-verified subset.
+
+**espeak-ng is GPL-3.0, and that includes its pronunciation dictionary.** A
+lexicon 87% identical to its output is at least arguably derived from that GPL
+data, which upstream may not have had the right to relicense as Apache-2.0.
+Nothing here depends on resolving that, because CrispASR does NOT redistribute
+this file: you generate it locally from your own `pip install misaki`, and the
+runtime falls back to the CMUdict path when it is absent. Publishing it — to
+cstr/g2p-dicts or anywhere — is a deliberate decision that needs upstream
+clarification first, not a default. Engineering judgement, not legal advice.
+
+Note the practical consequence: since silver ≈ espeak output, a user who has
+espeak-ng installed already gets equivalent coverage for those words through
+CrispASR's existing espeak path. The lexicon's real value is `gold`.
 
 Gold wins over silver on conflict. POS-dependent entries ({"DEFAULT": …,
 "NOUN": …}) collapse to DEFAULT: our G2P has no part-of-speech tagger, and
@@ -96,6 +118,13 @@ def main() -> int:
     ap.add_argument("--misaki-data", default=None, help="misaki's data/ directory")
     ap.add_argument("--out", default="misaki-us.txt")
     ap.add_argument("--gb", action="store_true", help="use the British lexicon instead")
+    ap.add_argument(
+        "--gold-only",
+        action="store_true",
+        help="emit only the hand-verified gold lexicon. silver is 87%% identical to "
+        "espeak-ng output (GPL-3.0 data); gold is 48%%. Smaller and slower to miss, "
+        "but the least espeak-derived subset — see the provenance note above.",
+    )
     args = ap.parse_args()
 
     data = args.misaki_data or find_misaki_data()
@@ -106,7 +135,7 @@ def main() -> int:
         gold_raw = json.load(fh)
     with open(os.path.join(data, f"{prefix}_silver.json"), encoding="utf-8") as fh:
         silver_raw = json.load(fh)
-    merged = {**silver, **gold}  # gold wins
+    merged = dict(gold) if args.gold_only else {**silver, **gold}  # gold wins
     # Phrase-final variants ("None" key) — a separate, much smaller lexicon.
     final = {**load(os.path.join(data, f"{prefix}_silver.json"), "None"),
              **load(os.path.join(data, f"{prefix}_gold.json"), "None")}

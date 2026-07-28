@@ -27,7 +27,8 @@
 #include "crispasr_separate_cli.h"
 #include "crispasr_vad_cli.h"
 #include "crispasr_output.h"
-#include "crispasr_strict.h" // #311: shared strict-pipeline reqs (also used by the server)
+#include "crispasr_strict.h"          // #311: shared strict-pipeline reqs (also used by the server)
+#include "crispasr_phonemes_policy.h" // #316: who can be driven by phonemes
 #include "crispasr_punctuation_policy.h"
 #include "crispasr_punc_loader.h"
 #include "crispasr_truecase_loader.h"
@@ -2945,15 +2946,11 @@ int crispasr_run_backend(const whisper_params& params_in) {
             fprintf(stderr, "crispasr: error: backend '%s' does not support TTS\n", backend_name.c_str());
             return 14;
         }
-        // #316: --tts-phonemes is only wired into backends with a phonemes-in
-        // entry point. Say so rather than silently synthesizing the text — a
-        // silent fallback would make an A/B look like the phonemes changed
-        // nothing, which is the exact wrong conclusion to hand someone.
-        if (!params.tts_phonemes.empty() && backend_name != "kokoro") {
-            fprintf(stderr,
-                    "crispasr: error: --tts-phonemes is not supported by backend '%s' "
-                    "(kokoro only); refusing to fall back to text so an A/B cannot be misread.\n",
-                    backend_name.c_str());
+        // #316: --tts-phonemes needs a phonemes-in entry point; see
+        // crispasr_phonemes_policy.h for which backends have one.
+        if (!params.tts_phonemes.empty() && !crispasr_phonemes_policy::backend_supports(backend_name)) {
+            fprintf(stderr, "crispasr: error: %s\n",
+                    crispasr_phonemes_policy::unsupported_message(backend_name).c_str());
             return 14;
         }
 
