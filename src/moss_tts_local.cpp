@@ -322,10 +322,15 @@ static ggml_cgraph* mtl_build_graph_llm_kv(moss_tts_local_context* ctx, int n_pa
         ggml_set_input(causal_mask);
     }
 
-    const core_attn::KvSelfAttnParams kvp = {
+    core_attn::KvSelfAttnParams kvp = {
         n_q,   n_kv, hd,         n_q / n_kv, (int)hp.llm_max_pos,        hp.llm_rope_theta,
         32.0f, 1.0f, attn_scale, eps,        core_attn::GQA_MANUAL_CONT,
     };
+    // #249: the 4B's 2-way stop head flips on a sub-ε score error at the layer-10
+    // near-tied softmax; use eager attention with F32-forced scores (the same path
+    // llama.cpp uses for LM decode) instead of flash_attn_ext. Correctness over the
+    // flash perf path here — CRISPASR_CORE_ATTN_EAGER_F32=0 forces flash back.
+    kvp.eager_f32_attn = true;
 
     // #249 per-layer diff: on the prompt prefill, expose each block's output so
     // mtl_run_backbone can dump it and compare to the reference per layer.
@@ -1108,7 +1113,9 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
     const int n_vq = (int)hp.n_vq;
     const int d = (int)hp.llm_hidden;
     const int aud_v = (int)hp.audio_vocab_size;
-    const int max_frames = sp.max_new_frames > 0 ? sp.max_new_frames : 4096;
+    int max_frames = sp.max_new_frames > 0 ? sp.max_new_frames : 4096;
+    if (const char* mf = getenv("CRISPASR_MOSS_TTS_LOCAL_MAX_FRAMES")) // #249 diag: bound runaways for A/B tests
+        max_frames = atoi(mf) > 0 ? atoi(mf) : max_frames;
     const int stride = 1 + n_vq;
     Rng rng(sp.seed ? sp.seed : ctx->seed);
     // CRISPASR_MOSS_TTS_LOCAL_GREEDY_TEXT=1 forces the binary stop head greedy
