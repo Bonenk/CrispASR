@@ -97,81 +97,55 @@ that genuinely need the punctuation pass, silently deleting their commas. Print
 what the stage actually receives instead of inferring it from a flag whose job is
 to change the output.
 
-## MOSS-TTS-Local 4B stop runaway is a *backbone forward* bug at layer 10, not the head/quant (#249, 2026-07)
+## MOSS-TTS-Local 4B stop runaway was a PROMPT-TOKENIZATION bug — non-compositional BPE, not the forward (#249, 2026-07)
 
-The 4B's binary continue/stop head fires unreliably (q6_k/q8_0 run away, q4_k is
-a coin-flip per text) so those quants couldn't ship. A long methodical diff
-against the HF reference (`OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5`,
-`trust_remote_code`) localized it precisely — do this, in order, next time:
+The 4B's binary continue/stop head ran away (q6_k/q8_0 always, q4_k a per-text
+coin-flip). **Root cause: we built the whole generation prompt as one string and
+tokenized it in one `moss_tts_local_tokenize` call.** BPE is not compositional —
+`encode(A+B) ≠ encode(A)+encode(B)` at merge boundaries — so encoding the user text
+embedded in the `…- Text:\n{text}\n</user_inst>…` template merged the text boundary
+**~2 tokens differently** from the reference processor, which encodes each segment
+separately and splices special-token ids in directly. Fix: piece-wise assembly
+mirroring `processing_moss_tts.py` (`moss_tts_local.cpp` `mtl_generate_grid`: encode
+`"user\n"`, `"<user_inst>\n- Reference(s):\n"`, `"None"`, the fields block, the text
+ALONE, `"\n</user_inst>"`, `"\n"`, `"assistant\n"` each on their own, `im_start`/
+`im_end`/`audio_start` as literal ids). Result: channel-0 ids now == the reference
+`input_ids` exactly (62/62, 69/69), and **q4_k AND f16 both stop 4/4** at 11–39
+frames — the higher-precision quants are shippable.
 
-1. **Reference stop reliability** (CPU, `attn_implementation="eager"` — no
-   flash_attn on Kaggle). It stops reliably at ~frame 15–19 (and at f16 too), so
-   the runaway is OURS, not model fragility.
-2. **The stop head is NOT the bug.** The reference OVERWRITES `local_text_lm_head`
-   at load with `text_lm_head[[assistant_slot,audio_end]]` — but only at
-   `__init__` on random weights; `from_pretrained` then loads the STORED head
-   over it and does not re-derive (`live_equals_stored: True`). So the checkpoint
-   head IS what inference uses, and our converter shipping it verbatim is correct.
-   (Reverted a wrong "derive from embed rows" converter fix once this showed.)
-3. **Teacher-forcing** (feed the reference's own frames into our C++, compare
-   per-frame stop logits) proved a real FORWARD divergence — matches for 11
-   frames, then our backbone under-collapses at the wind-down (frame 13: ref gap
-   4.5, ours 9.4).
-4. **Frame-0 per-component + per-layer diff** (dump `global_hidden`/`lh`, and each
-   Qwen3 block's hidden on the prompt prefill): local transformer OK, **backbone
-   diverges — the block output steps at layer 10** and compounds to cos 0.991 by
-   layer 35. All hparams/RoPE(`ext_factor=0`)/QK-norm verified correct.
-5. **Per-SUBLAYER diff (attn vs MLP output, pre-residual, per layer) pinned the
-   *nature*:** the block-output error grows smoothly (l2rel 0.3%→4.6% over layers
-   0–9) then **jumps ~5× at layer 10 (attn cos 0.972, mlp cos 0.977 — both, ~equally)**
-   and persists. This rules out a single miscomputed op (a RoPE/QK-norm/GQA bug
-   would hit attention only) and rules out massive-activation corruption
-   (`ours_max ≈ ref_max` at every layer; the 23% error is spread across many tiny
-   channels, top |Δ|≈0.1, not concentrated in a few outliers).
-6. **It is NOT precision.** Converting the backbone to an **f32 GGUF** and re-running
-   the sublayer diff gave results **byte-identical** to f16 (sub_attn_10 cos
-   `0.972033` in both). So f16 weights are not the cause — the divergence is
-   deterministic, not rounding. (f32-KV still measurably moves the *generation-time*
-   stop and ships as the 4B default via `CRISPASR_KV_QUANT`, but it's a mitigation.)
-7. **Layer-0 attention-internals diff (with an EXACT input) exonerated every
-   discrete op — there is no port bug.** Tapping the shared `core_attn` FA hook +
-   HF sub-module hooks at layer 0 (input = the embeddings, so any divergence is the
-   layer's own): post-QK-norm **pre-RoPE Q/K are byte-exact** to the reference's
-   `q_norm`/`k_norm` (l2rel 0.0); **V** matches `v_proj` (l2rel 5e-6); our
-   `flash_attn_ext` **== numpy eager** softmax (cos 1.0); and — checked *locally* in
-   numpy from the dumped Q — our `ggml_rope_ext` output **== standard HF half-split
-   rope byte-exact** (cos 1.0, vs 0.68 for interleaved), so the "RoPE by
-   elimination" lead was WRONG. Positions match too: the reference's no-mask path
-   (`qwen3_decoder.py`) sets an all-ones mask then `cumsum(ones)-1 = 0..T-1`,
-   identical to ours. The layer-0 attn-output deviation is only **cos 0.999995 (a
-   ~5e-6 accumulation-level difference**, which l2rel merely re-expresses as 0.3%).
-8. **Conclusion: the runaway is amplified irreducible ggml-vs-torch f32
-   accumulation, not a fixable op.** ~5e-6/op differences compound through the
-   residual stream and blow up ~1000× at a numerically sensitive backbone layer
-   (~10 — consistent with peaked/attention-sink softmax where a sub-ε logit shift
-   flips which key wins), which is enough to flip the model's fragile 2-way stop
-   margin. The audio is robust to this; only the binary stop is fragile — exactly
-   why the reference stops ~18 and we run to ~55 despite identical math. Practical
-   consequence: don't keep hunting an op (there isn't one) and don't reach for
-   higher precision — f16 and f32 weights give **byte-identical** divergence, so no
-   tensor's precision is the lever. **CONFIRMED at layer 10 (not inferred):** with
-   the block-9 input only 0.63% off (cos 0.999984), pre-RoPE Q/K diverge just 1.06%
-   (ratio 1.7× — the qk-norm/projection do NOT inflate) and our flash-attn is
-   byte-exact to eager (cos 1.0), yet the attn *output* is cos 0.972 (l2rel 23%).
-   The 1%→23% jump can only be the **softmax**: layer 10's attention is saturated
-   (attention-sink), so a sub-percent Q·K shift flips which key wins. It is a
-   correct-but-ill-conditioned function, not a miscomputed one. The reference stop
-   itself has NO threshold/hysteresis (`do_sample=True, text_temperature=1.0,
-   text_top_k=50, text_top_p=1.0`, per-frame multinomial on the 2-way head — and
-   ours already matches it exactly), so there is no stop-side knob either: the
-   reference's gap *collapses* to ~0.5 at the natural end while ours stays ~9 (from
-   the teacher-force trace), and quant noise only occasionally jitters ours into a
-   sampled stop (why q4_k is least-bad and q6_k/q8_0 stall).
-   LESSON: when a marginal decision (a 2-way sampled stop) misbehaves, diff the
-   *hidden-state trajectory* per-layer AND split each block into attn/MLP — and
-   before blaming precision, re-run at f32: identical numbers mean the bug is
-   logic, not rounding. Diagnostic envs live in `moss_tts_local.cpp`
-   (`CRISPASR_MOSS_TTS_LOCAL_{DUMP_STOP,DUMP_HIDDEN,DUMP_LAYERS,DUMP_SUBLAYER,FORCE_FRAMES,GREEDY_TEXT}`).
+**Why it hid so well, and the diagnostic tarpit it created:**
+- The last prompt token is `<audio_start>` (a special), tokenized correctly either
+  way, so **last-position Q/K is byte-exact** — the check that "confirmed" the input.
+- The interior mis-tokenized text tokens are weighted ~0 by early-layer attention
+  but **amplified by the layer-10 attention-sink softmax**, so the backbone hidden
+  drifts (cos 0.99998 @ block 9 → 0.9996 @ block 10 → 0.991 @ 35) and the fragile
+  2-way stop gap stays high → runaway. That layer-10 blow-up looked exactly like a
+  forward/numerics bug.
+- Every forward check therefore passed: f16≡f32 GGUF (byte-identical divergence),
+  our `flash_attn_ext`≡numpy-eager (cos 1.0), `ggml_rope_ext`≡HF half-split rope
+  byte-exact, pre-RoPE Q/K byte-exact to `q_norm`/`k_norm`, V≈5e-6, the KV-cache
+  round-trip + manual GQA expand preserved K to 1e-7, positions `0..T-1`, and the
+  eager-F32 attention path (added, then reverted) was byte-identical to flash on CPU
+  (`GGML_PREC_F32` is a CPU no-op). **All true, all irrelevant** — the forward was
+  correct; the *input tokens* were wrong.
+
+**LESSON (the expensive one): when a forward diverges from a reference but every
+discrete op is machine-precision-correct, the bug is in the INPUT, not the forward.**
+I burned ~a dozen Kaggle builds and wrongly concluded "irreducible ggml-vs-torch f32
+accumulation / ship q4_k" before checking prompt-token parity. Two things would have
+caught it on day one: (1) diff the FULL input-token grid against the reference
+processor, not just the last position (specials tokenize fine; interior text drifts);
+(2) when a from-scratch port disagrees with the reference and the ops check out, diff
+against a *second* independent port — a working C++/ggml port (mudler/moss-tts.cpp)
+whose own code comments named this exact "big-string encode drifts ~2 tokens" bug,
+plus the OpenMOSS llama.cpp fork, pinned it in one systematic file-by-file pass
+(delegated to a fork agent). Corollary: a reference's own emphasis is a clue — the HF
+README said "the tokenized generation prompt matches the reference processor exactly …
+so the model stops where it should"; that sentence WAS the answer. Diagnostic envs
+live in `moss_tts_local.cpp`
+(`CRISPASR_MOSS_TTS_LOCAL_{DUMP_STOP,DUMP_HIDDEN,DUMP_LAYERS,DUMP_SUBLAYER,DUMP_PROMPT_IDS,FORCE_FRAMES,GREEDY_TEXT}`);
+the eager-F32 attention path stays available via `CRISPASR_CORE_ATTN_EAGER_F32=1`
+(helps GPU where `GGML_PREC_F32` is real, but is not the fix here).
 
 ## Cross-lingual TTS needs the target language plumbed through /v1/audio/speech (#249/#304, 2026-07)
 
