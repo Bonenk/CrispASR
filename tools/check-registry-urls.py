@@ -149,13 +149,33 @@ def main() -> int:
         for backend, url in gated:
             print(f"    {backend}: {url}")
     print()
-    if bad:
-        print(f"{len(bad)} of {len(uniq)} registry URLs do NOT resolve:", file=sys.stderr)
-        for backend, url, status, _ in bad:
-            print(f"  {backend}: HTTP {status} {url}", file=sys.stderr)
+    # Split "the artifact is GONE" from "the network misbehaved". Both used to
+    # exit 1, which forced the CI job to `continue-on-error: true` to survive HF
+    # flakiness — and that made this check unable to go red at all, including for
+    # a genuinely deleted model. 404/410 is a definitive answer from a server
+    # that responded; status 0 (retries exhausted) and 5xx are not.
+    missing = [r for r in bad if r[2] in (404, 410)]
+    flaky = [r for r in bad if r[2] not in (404, 410)]
+
+    if flaky:
+        print(f"{len(flaky)} URL(s) could not be checked (transient — not a failure):",
+              file=sys.stderr)
+        for backend, url, status, note in flaky:
+            label = "no response" if status == 0 else f"HTTP {status}"
+            print(f"  ::warning::{backend}: {label} {url} {note}", file=sys.stderr)
+
+    if missing:
+        print(f"\n{len(missing)} of {len(uniq)} registry URLs are GONE:", file=sys.stderr)
+        for backend, url, status, _ in missing:
+            print(f"  ::error::{backend}: HTTP {status} {url}", file=sys.stderr)
         print("\nAn unreachable URL means `-m auto` / --auto-download fails for that\n"
               "backend. Either publish the artifact or remove the entry.", file=sys.stderr)
         return 1
+
+    if flaky:
+        print(f"OK: {len(uniq) - len(flaky)} URLs resolve; {len(flaky)} unverified "
+              "(transient).")
+        return 0
     print(f"OK: all {len(uniq)} registry URLs resolve.")
     return 0
 
