@@ -322,15 +322,10 @@ static ggml_cgraph* mtl_build_graph_llm_kv(moss_tts_local_context* ctx, int n_pa
         ggml_set_input(causal_mask);
     }
 
-    core_attn::KvSelfAttnParams kvp = {
+    const core_attn::KvSelfAttnParams kvp = {
         n_q,   n_kv, hd,         n_q / n_kv, (int)hp.llm_max_pos,        hp.llm_rope_theta,
         32.0f, 1.0f, attn_scale, eps,        core_attn::GQA_MANUAL_CONT,
     };
-    // #249: the 4B's 2-way stop head flips on a sub-ε score error at the layer-10
-    // near-tied softmax; use eager attention with F32-forced scores (the same path
-    // llama.cpp uses for LM decode) instead of flash_attn_ext. Correctness over the
-    // flash perf path here — CRISPASR_CORE_ATTN_EAGER_F32=0 forces flash back.
-    kvp.eager_f32_attn = true;
 
     // #249 per-layer diff: on the prompt prefill, expose each block's output so
     // mtl_run_backbone can dump it and compare to the reference per layer.
@@ -1073,36 +1068,6 @@ extern "C" const char* moss_tts_local_token_text(moss_tts_local_context* ctx, in
     return ctx->vocab.id_to_token[id].c_str();
 }
 
-static std::string mtl_tok_str(const moss_tts_local_context* ctx, uint32_t id) {
-    if (id < ctx->vocab.id_to_token.size())
-        return ctx->vocab.id_to_token[id];
-    return "";
-}
-
-// Prompt (same template as the 8B; token ids from hparams). No voice cloning yet
-// (needs the v2 codec encoder — Phase 3).
-static std::string mtl_build_prompt(const moss_tts_local_context* ctx, const char* text,
-                                    const moss_tts_local_synth_params& sp) {
-    const auto& hp = ctx->model.hparams;
-    const std::string im_start = mtl_tok_str(ctx, hp.tok_im_start);
-    const std::string im_end = mtl_tok_str(ctx, hp.tok_im_end);
-    const std::string audio_start = mtl_tok_str(ctx, hp.tok_audio_start);
-    const std::string instruction = sp.instruction ? std::string(sp.instruction) : "None";
-    const std::string language = sp.language ? std::string(sp.language) : "None";
-    std::string body;
-    body += "<user_inst>\n";
-    body += "- Reference(s):\nNone\n";
-    body += "- Instruction:\n" + instruction + "\n";
-    body += "- Tokens:\nNone\n";
-    body += "- Quality:\nNone\n";
-    body += "- Sound Event:\nNone\n";
-    body += "- Ambient Sound:\nNone\n";
-    body += "- Language:\n" + language + "\n";
-    body += "- Text:\n" + std::string(text ? text : "") + "\n";
-    body += "</user_inst>";
-    return im_start + "user\n" + body + im_end + "\n" + im_start + "assistant\n" + audio_start;
-}
-
 // ===========================================================================
 // Generate: depth-first RVQ code grid
 // ===========================================================================
@@ -1155,18 +1120,58 @@ static bool mtl_generate_grid(moss_tts_local_context* ctx, const char* text, con
             fprintf(stderr, "DUMPSTOP force_frames=%zu\n", forced.size());
     }
 
-    std::string prompt = mtl_build_prompt(ctx, text, sp);
-    int n_ids = 0;
-    int32_t* ids = moss_tts_local_tokenize(ctx, prompt.c_str(), &n_ids);
-    if (!ids || n_ids <= 0) {
-        free(ids);
-        return false;
+    // #249: PIECE-WISE prompt assembly. BPE is NOT compositional — encode(A+B) !=
+    // encode(A)+encode(B) at merge boundaries — so tokenizing the whole prompt as
+    // one string drifted ~2 tokens near the text segment. Those interior tokens are
+    // weighted ~0 by early-layer attention but amplified by the layer-10 attention
+    // sink, drifting the backbone hidden enough to break the 4B binary stop head
+    // (runaway). Encode each text segment SEPARATELY and splice the special-token
+    // ids in directly, mirroring the reference processor
+    // (processing_moss_tts.py `_build_generation_or_voice_clone_codes`).
+    std::vector<int32_t> id_vec;
+    auto enc = [&](const std::string& s) {
+        int n = 0;
+        int32_t* p = moss_tts_local_tokenize(ctx, s.c_str(), &n);
+        if (p) {
+            id_vec.insert(id_vec.end(), p, p + n);
+            free(p);
+        }
+    };
+    {
+        const std::string instruction = sp.instruction ? std::string(sp.instruction) : "None";
+        const std::string language = sp.language ? std::string(sp.language) : "None";
+        const std::string after_ref = "\n- Instruction:\n" + instruction +
+                                      "\n- Tokens:\nNone\n- Quality:\nNone\n- Sound Event:\nNone"
+                                      "\n- Ambient Sound:\nNone\n- Language:\n" +
+                                      language + "\n- Text:\n";
+        id_vec.push_back((int32_t)hp.tok_im_start);
+        enc("user\n");
+        enc("<user_inst>\n- Reference(s):\n");
+        enc("None"); // text-only reference value, encoded alone
+        enc(after_ref);
+        enc(text ? text : ""); // the user's text, encoded ALONE (this is the boundary that drifted)
+        enc("\n</user_inst>");
+        id_vec.push_back((int32_t)hp.tok_im_end);
+        enc("\n");
+        id_vec.push_back((int32_t)hp.tok_im_start);
+        enc("assistant\n");
+        id_vec.push_back((int32_t)hp.tok_audio_start);
     }
-    const int prompt_len = n_ids;
+    const int prompt_len = (int)id_vec.size();
+    if (prompt_len <= 0)
+        return false;
+    // #249 confirm: dump the channel-0 prompt ids to diff against the reference
+    // processor's input_ids[:,0] (proves piece-wise parity).
+    if (const char* pp = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_PROMPT_IDS")) {
+        if (FILE* pf = fopen(pp, "w")) {
+            for (int32_t t : id_vec)
+                fprintf(pf, "%d ", t);
+            fclose(pf);
+        }
+    }
     std::vector<int32_t> grid((size_t)prompt_len * stride, (int32_t)hp.audio_pad_code);
     for (int r = 0; r < prompt_len; r++)
-        grid[(size_t)r * stride] = ids[r];
-    free(ids);
+        grid[(size_t)r * stride] = id_vec[r];
 
     if (!mtl_kv_init(ctx, prompt_len + max_frames + 8))
         return false;
