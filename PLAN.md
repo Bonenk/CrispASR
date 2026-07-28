@@ -1,5 +1,49 @@
 # CrispASR — Pending work
 
+## OPEN after the v0.8.24 release (2026-07-28) — two registries did not publish
+
+The GitHub release is complete and verified (27 assets, same coverage as v0.8.23;
+the downloaded macOS CLI reports 0.8.24 / sha 5ebe79f6 and carries
+`--tts-phonemes`). crates.io and Docker published. Two did not:
+
+**1. PyPI still 0.8.23 — bundled wheels fail their own smoke test.**
+`release-python-wheels.yml` (new in e3ed11eb) had its first real tag run and the
+install-and-load check failed on every platform except linux-CUDA, so
+`publish-pypi` was correctly skipped. The check did its job; the wheels are wrong:
+
+  * linux-x86_64 / linux-arm64 — `OSError: libopenblas.so.0: cannot open shared
+    object file`. The relocatable bundle expects a system OpenBLAS; a wheel must
+    carry it (auditwheel repair, or stage the .so alongside libcrispasr and
+    rpath to `$ORIGIN`).
+  * macos-arm64 — `Symbol not found: _OBJC_CLASS_$_MTLResidencySetDescriptor` on
+    dlopen. Built against a newer Metal SDK than the loading runner; needs a
+    deployment target pinned (or weak-linked Metal) on the bundle build, not on
+    the wheel job.
+  * windows-x86_64 CPU + both GPU wheels — also red, cause not yet read.
+  * Non-fatal but adjacent: `stage_libs` cannot compile `_helpers.c` because the
+    bundle's `include/` has `crispasr.h` but no `ggml.h`, so the legacy CrispASR
+    class is missing from the wheel even when the rest works. The bundle's
+    include set is incomplete.
+
+Note the local verification in e3ed11eb ("verified end-to-end on macOS-arm64")
+was real but insufficient: it tested the wheel on the machine that built it, so
+neither the SDK skew nor the missing system library could appear.
+
+**2. pub.dev still 0.8.22 — tag pattern mismatch, needs an admin-page change.**
+Publishing is rejected before upload: "this token has 'refs/tags/v0.8.24' ...
+Expected tag 'crispasr-v0.8.24'". The admin page holds pub.dev's monorepo default
+`{{package}}-v{{version}}` while this repo tags `v<version>`. pub.dev validates
+the ref the workflow RUNS on, so no workflow edit can fix it. Either set the
+pattern to `v{{version}}` at https://pub.dev/packages/crispasr/admin (matches
+this workflow and everything else), or start pushing `crispasr-v<version>`
+alongside — a tagging-convention decision, deliberately NOT taken unilaterally.
+0.8.23 never published either, for the separate stale-CHANGELOG reason now fixed.
+
+Both are now visible instead of silent: `publish-summary` fails the run unless
+every registry reports `ok` or `skipped`, reading job OUTPUTS rather than
+`needs.<job>.result` (which reports 'success' for a failed continue-on-error job
+— the first version of that gate was itself green while pub.dev failed).
+
 ## LANDED 2026-07-27 — #300 vibevoice diarization + the #308 punctuation audit
 
 Merged to `main`; listed here because three follow-ups are still open (below).
