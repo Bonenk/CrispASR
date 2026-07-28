@@ -522,6 +522,18 @@ extern "C" {
         text: *const c_char,
         out_n_samples: *mut c_int,
     ) -> *mut f32;
+    // Speech-to-Speech — audio in -> audio out via a single model pass. Supported
+    // on S2S-capable backends (lfm2-audio, mini-omni2, sidon, voxcpm2-vae). Returns
+    // malloc'd f32 PCM (free with `crispasr_pcm_free`); `out_text`, if non-null,
+    // receives the malloc'd intermediate transcript (free with
+    // `crispasr_session_translate_text_free`). Returns null on failure / unsupported.
+    pub fn crispasr_session_speech_to_speech(
+        s: *mut CrispasrSession,
+        in_samples: *const f32,
+        n_in_samples: c_int,
+        out_text: *mut *mut c_char,
+        out_n_samples: *mut c_int,
+    ) -> *mut f32;
     pub fn crispasr_pcm_free(pcm: *mut f32);
     // Drop the kokoro per-session phoneme cache. No-op for non-kokoro
     // backends. Returns 0 on success, -1 if `s` is null. (PLAN #56 #5)

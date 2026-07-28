@@ -908,6 +908,49 @@ impl Session {
         Ok(out)
     }
 
+    /// Speech-to-speech: input PCM in → output PCM out via a single model
+    /// pass. Requires an S2S-capable backend (`lfm2-audio`, `mini-omni2`,
+    /// `sidon`, `voxcpm2-vae`). Input PCM must be at the backend's native
+    /// input rate (see [`Session::input_sample_rate`]).
+    ///
+    /// Returns the output PCM plus the optional intermediate transcript the
+    /// model produced on the way (`None` if the backend doesn't surface one).
+    /// Errors if the backend has no S2S capability or the pass fails.
+    pub fn speech_to_speech(&self, pcm: &[f32]) -> Result<(Vec<f32>, Option<String>), String> {
+        let mut n: c_int = 0;
+        let mut text_ptr: *mut c_char = std::ptr::null_mut();
+        let ptr = unsafe {
+            crispasr_sys::crispasr_session_speech_to_speech(
+                self.handle,
+                pcm.as_ptr(),
+                pcm.len() as c_int,
+                &mut text_ptr as *mut *mut c_char,
+                &mut n as *mut c_int,
+            )
+        };
+        if ptr.is_null() || n <= 0 {
+            if !text_ptr.is_null() {
+                unsafe { crispasr_sys::crispasr_session_translate_text_free(text_ptr) };
+            }
+            return Err(format!(
+                "speech_to_speech returned no audio for backend {:?} (S2S may be unsupported)",
+                self.backend()
+            ));
+        }
+        let out = unsafe { std::slice::from_raw_parts(ptr, n as usize).to_vec() };
+        unsafe { crispasr_sys::crispasr_pcm_free(ptr) };
+        let transcript = if text_ptr.is_null() {
+            None
+        } else {
+            let s = unsafe { CStr::from_ptr(text_ptr) }
+                .to_string_lossy()
+                .into_owned();
+            unsafe { crispasr_sys::crispasr_session_translate_text_free(text_ptr) };
+            Some(s)
+        };
+        Ok((out, transcript))
+    }
+
     /// Drop the kokoro per-session phoneme cache. No-op for non-kokoro
     /// backends. Useful for long-running daemons that resynthesize across
     /// many speakers and want bounded memory. (PLAN #56 #5)
