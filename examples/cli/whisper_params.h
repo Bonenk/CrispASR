@@ -402,6 +402,16 @@ struct whisper_params {
     std::string tts_ref_text;
     std::string tts_ref_asr;  // ASR backend for auto-transcribing ref audio (default: whisper)
     std::string tts_instruct; // VoiceDesign: natural-language voice description
+
+    // #316: bypass the G2P and feed these phonemes to the TTS backend verbatim.
+    // The phoneme string is the boundary between text processing and the
+    // acoustic model, so being able to drive it directly is what lets you tell a
+    // G2P bug from a model bug — and it is how you reproduce another
+    // implementation's pronunciation exactly. Honoured by kokoro; backends
+    // without a phonemes-in entry point report it rather than silently
+    // synthesizing the text.
+    // CLI: --tts-phonemes "<IPA>"
+    std::string tts_phonemes;
     bool tts_trim_silence = false;
 
     // --make-ref: create a TADA voice reference GGUF from --voice <audio.wav>

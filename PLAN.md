@@ -33,6 +33,26 @@ Merged to `main`; listed here because three follow-ups are still open (below).
    the punc pair has a sync test. Extending the test (or deleting the fallbacks)
    is unclaimed.
 
+## OPEN follow-ups from #316 (kokoro G2P, landed 2026-07-28)
+
+- **Numbers are expanded for ENGLISH only.** `core/num2words_en.h` is wired into
+  `g2p_en`, so kokoro/piper EN are fixed; `g2p_de` / `g2p_fr` / `g2p_es` still
+  phonemize `82` to the empty string and drop it. Each needs its own grammar
+  (German compounds: "zweiundachtzig"), so it is not a shared routine. Verify
+  the same way: `core_num2words_de::expand("82")` against a reference G2P.
+- **misaki's reduced vowels `ᵊ` / `ᵻ` are not modelled.** We emit plain `ə`/`ɪ`
+  where misaki reduces. Measured worth: exact whole-word phoneme match goes
+  58.3% → ~63% if handled. It is context-dependent (misaki uses both forms), so
+  it needs the rule, not a blanket substitution.
+- **The rest of the gap is dictionary-level**, not spelling: CMUdict stress
+  placement and unstressed-vowel choices vs misaki's lexicon (~190 stress
+  differences and ~130 ɪ/ə swaps over a 1508-word corpus). Closing it means
+  shipping misaki's lexicon, not more conversion rules.
+- Reproduce any of this with
+  `tools/` + `misaki` (pip): run both G2Ps over a word list and diff symbol
+  inventories — the invariant that matters is that we never emit a symbol
+  outside the model's vocab or outside the reference's inventory.
+
 ## NOW — VAD + mel front-end parallelization campaign (#305 → fleet-wide)
 
 Started from #305 (reporter: whisper-vad-asmr + firered-vad slow / single-core).

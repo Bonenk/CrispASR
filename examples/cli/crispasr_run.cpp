@@ -2945,6 +2945,17 @@ int crispasr_run_backend(const whisper_params& params_in) {
             fprintf(stderr, "crispasr: error: backend '%s' does not support TTS\n", backend_name.c_str());
             return 14;
         }
+        // #316: --tts-phonemes is only wired into backends with a phonemes-in
+        // entry point. Say so rather than silently synthesizing the text — a
+        // silent fallback would make an A/B look like the phonemes changed
+        // nothing, which is the exact wrong conclusion to hand someone.
+        if (!params.tts_phonemes.empty() && backend_name != "kokoro") {
+            fprintf(stderr,
+                    "crispasr: error: --tts-phonemes is not supported by backend '%s' "
+                    "(kokoro only); refusing to fall back to text so an A/B cannot be misread.\n",
+                    backend_name.c_str());
+            return 14;
+        }
 
         // Initialize AudioSeal neural watermark if --watermark-model is set
         if (!params.watermark_model.empty()) {
