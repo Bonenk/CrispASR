@@ -1381,6 +1381,24 @@ impl Session {
         Ok(())
     }
 
+    /// Synthesize `phonemes` verbatim instead of phonemizing the text — the
+    /// seam between text processing and the acoustic model. Use it to reproduce
+    /// another implementation's pronunciation exactly, or to tell a G2P bug from
+    /// a model bug (#316). An empty string clears it.
+    ///
+    /// Honoured by `kokoro` and `piper`; other backends soft no-op (`rc = -2`).
+    pub fn set_tts_phonemes(&self, phonemes: &str) -> Result<(), String> {
+        let c = CString::new(phonemes).map_err(|e| e.to_string())?;
+        let rc = unsafe { crispasr_sys::crispasr_session_set_tts_phonemes(self.handle, c.as_ptr()) };
+        if rc == -2 {
+            return Err("backend has no phonemes-in entry point (kokoro and piper do)".to_string());
+        }
+        if rc != 0 {
+            return Err(format!("set_tts_phonemes failed (rc={})", rc));
+        }
+        Ok(())
+    }
+
     /// Select + load a punctuation-restoration model (`auto`/`firered`/`fullstop`/
     /// `punctuate-all`/`pcs`/path; `"none"`/`""` unloads). Auto-downloads on first use.
     pub fn set_punc_model(&self, punc_model: &str) -> Result<(), String> {

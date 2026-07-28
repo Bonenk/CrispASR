@@ -1924,6 +1924,24 @@ class Session:
         if rc != 0:
             raise RuntimeError(f"set_instruct failed (rc={rc}) for backend {self.backend!r}")
 
+    def set_tts_phonemes(self, phonemes: str) -> None:
+        """Synthesize these phonemes verbatim instead of phonemizing the text — the seam between text processing and the acoustic model. Use it to reproduce another implementation's pronunciation exactly, or to tell a G2P bug from a model bug (#316). Empty clears. Honoured by kokoro and piper; other backends soft no-op (rc=-2).
+
+        Args:
+            phonemes: IPA string in the backend's own alphabet, or "" to clear.
+        """
+        if not hasattr(self._lib, "crispasr_session_set_tts_phonemes"):
+            raise RuntimeError("set_tts_phonemes API not present in this libcrispasr build")
+        self._lib.crispasr_session_set_tts_phonemes.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        self._lib.crispasr_session_set_tts_phonemes.restype = ctypes.c_int
+        rc = self._lib.crispasr_session_set_tts_phonemes(self._session, phonemes.encode("utf-8"))
+        if rc == -2:
+            raise RuntimeError(
+                f"backend {self.backend!r} has no phonemes-in entry point (kokoro and piper do)"
+            )
+        if rc != 0:
+            raise RuntimeError(f"set_tts_phonemes failed (rc={rc})")
+
     def clear_phoneme_cache(self) -> None:
         """Drop the kokoro per-session phoneme cache.
 

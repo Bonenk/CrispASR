@@ -42,6 +42,8 @@ public final class CrispasrSession implements AutoCloseable {
         int     crispasr_session_n_speakers(Pointer session);
         String  crispasr_session_get_speaker_name(Pointer session, int i);
         int     crispasr_session_set_instruct(Pointer session, String instruct);
+        // #316: synthesize these phonemes verbatim, skipping the G2P. Empty clears. kokoro and piper only (rc=-2 otherwise).
+        int          crispasr_session_set_tts_phonemes(Pointer session, String phonemes);
         int     crispasr_session_is_custom_voice(Pointer session);
         int     crispasr_session_is_voice_design(Pointer session);
         Pointer crispasr_session_synthesize(Pointer session, String text, IntByReference outNSamples);
@@ -666,6 +668,13 @@ public final class CrispasrSession implements AutoCloseable {
         if (rc == -3) throw new IllegalStateException(
                 "backend is not a VoiceDesign variant; setInstruct only applies to qwen3-tts VoiceDesign models");
         if (rc != 0) throw new IllegalStateException("set_instruct failed (rc=" + rc + ")");
+    }
+
+    /** #316: synthesize these phonemes verbatim, skipping the G2P. Empty clears. kokoro and piper only (rc=-2 otherwise). */
+    public void setTtsPhonemes(String phonemes) {
+        int rc = Lib.INSTANCE.crispasr_session_set_tts_phonemes(handle, phonemes == null ? "" : phonemes);
+        if (rc == -2) throw new RuntimeException("backend has no phonemes-in entry point (kokoro and piper do)");
+        if (rc != 0) throw new RuntimeException("set_tts_phonemes failed (rc=" + rc + ")");
     }
 
     /**

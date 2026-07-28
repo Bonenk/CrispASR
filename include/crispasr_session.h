@@ -373,6 +373,12 @@ CRISPASR_SESSION_API int crispasr_session_set_speaker_id(crispasr_session* s, in
 CRISPASR_SESSION_API int crispasr_session_n_speakers(crispasr_session* s);
 CRISPASR_SESSION_API const char* crispasr_session_get_speaker_name(crispasr_session* s, int i);
 CRISPASR_SESSION_API int crispasr_session_set_instruct(crispasr_session* s, const char* instruct);
+// #316: synthesize `phonemes` verbatim instead of phonemizing the text — the
+// seam between text processing and the acoustic model. Use it to reproduce
+// another implementation's pronunciation exactly, or to separate "the G2P is
+// wrong" from "the model is wrong". Empty clears. Returns -2 (soft no-op) when
+// the active backend exposes no phonemes-in call; kokoro and piper do.
+CRISPASR_SESSION_API int crispasr_session_set_tts_phonemes(crispasr_session* s, const char* phonemes);
 CRISPASR_SESSION_API int crispasr_session_is_custom_voice(crispasr_session* s);
 CRISPASR_SESSION_API int crispasr_session_is_voice_design(crispasr_session* s);
 // UNMARKED synthesis — hard-refused unless crispasr_session_accept_marking_responsibility() was called first.
