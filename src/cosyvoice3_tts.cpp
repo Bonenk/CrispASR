@@ -5845,8 +5845,7 @@ float* cv3_synth_with_voice(cosyvoice3_tts_context* ctx, const char* text, const
     // makes the AR decoder render the leftover reference tail before the target
     // (a residual of the same leak). The flow below still uses the truncated
     // `prompt_tokens` (aligned to ref_mel) for timbre in both cases.
-    const std::vector<int32_t> lm_prompt_tokens =
-        cross_lingual ? std::vector<int32_t>() : voice->prompt_speech_tokens;
+    const std::vector<int32_t> lm_prompt_tokens = cross_lingual ? std::vector<int32_t>() : voice->prompt_speech_tokens;
     std::vector<float> lm_embeds;
     int n_lm = 0;
     if (!cv3_build_lm_input_embeds(ctx, text_ids, lm_prompt_tokens, lm_embeds, n_lm))
