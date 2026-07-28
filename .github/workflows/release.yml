@@ -831,8 +831,19 @@ jobs:
         # Mirrors CrispEmbed's macos-arm64 posture; meaningful speedup on
         # the larger ASR encoder bodies (Voxtral 4B, Qwen3-ASR).
         run: |
+          # CMAKE_OSX_DEPLOYMENT_TARGET is load-bearing. Without it clang targets
+          # whatever macOS the runner happens to be on, and STRONG-links APIs
+          # newer than the oldest macOS we claim to support — so the bundle only
+          # loads on that macOS or newer. v0.8.24 shipped exactly that: built on
+          # macos-latest, it failed to dlopen on macos-14 with
+          #   Symbol not found: _OBJC_CLASS_$_MTLResidencySetDescriptor
+          # (a macOS 15 Metal API), which broke the macOS wheel and would break
+          # anyone on an older macOS using the bundle directly. 11.0 matches the
+          # macosx_11_0_arm64 tag the wheel declares; ggml's @available guards
+          # then take effect at runtime instead of at link time.
           cmake -S . -B build-libs \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DBUILD_SHARED_LIBS=ON \
             -DGGML_METAL=ON \
             -DGGML_METAL_EMBED_LIBRARY=ON \

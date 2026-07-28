@@ -24,19 +24,18 @@ name: Release language wrappers
 #               https://pub.dev/packages/crispasr/admin pointing to this repo
 #               + tag pattern `v{{version}}`.
 #
-#               ⚠ AS OF v0.8.24 THIS IS NOT WHAT pub.dev IS SET TO. The publish
-#               is rejected before upload with:
-#                 "publishing is configured to only be allowed from actions with
-#                  specific ref pattern, this token has 'refs/tags/v0.8.24' ...
-#                  Expected tag 'crispasr-v0.8.24'"
-#               i.e. the admin page still holds pub.dev's monorepo default,
-#               `{{package}}-v{{version}}`. Nothing in this repo can override it —
-#               pub.dev checks the ref the workflow RUNS on. Either set the
-#               pattern to `v{{version}}` on the admin page (one click, matches
-#               this workflow and the rest of the release), or switch this repo to
-#               pushing `crispasr-v<version>` tags as well. Until then the Dart
-#               wrapper must be published manually and pub.dev stays behind — it
-#               is currently at 0.8.22.
+#               (The pattern was `{{package}}-v{{version}}` — pub.dev's monorepo
+#               default — until 2026-07-28, which rejected every `v*` tag and is
+#               why 0.8.23 and 0.8.24 did not publish. Now `v{{version}}`.)
+#
+#   ⚠ RE-RUNNING A PUBLISH BY HAND: dispatch with `--ref <the tag>`, NOT
+#     `--ref main`:
+#         gh workflow run "Release language wrappers" --ref v0.8.24 -f tag=v0.8.24
+#     pub.dev authenticates via the OIDC claim of the ref the RUN is on, not the
+#     ref that gets checked out. A dispatch from main checks out the right tag and
+#     still fails with "publishing is only allowed from 'tag' refType, this token
+#     has 'branch' refType". crates.io does not care, which is what makes this
+#     easy to miss — the Rust half succeeds and only the Dart half fails.
 #
 # The non-PyPI jobs use `continue-on-error: true` so a single misconfigured
 # registry doesn't fail the whole workflow — the others still attempt to
