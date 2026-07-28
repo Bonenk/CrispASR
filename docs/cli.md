@@ -92,6 +92,7 @@ crispasr --list-backends
 | `-l LANG`, `--language LANG` | ISO-639-1 code (default: `en`) |
 | `--tts "TEXT"` | Synthesize speech from text (requires `CAP_TTS` backend). Output via `--tts-output` |
 | `--tts-output FNAME` | Output path for TTS WAV (default: `tts_output.wav`) |
+| `--tts-phonemes "IPA"` | Synthesize these phonemes verbatim, skipping the G2P — the seam for telling a G2P bug from a model bug (#316). `kokoro` and `piper` only; any other backend exits 2 rather than silently synthesizing `--tts` instead. See [tts.md](tts.md#driving-the-phonemes-directly---tts-phonemes) |
 | `--tts-stream` | Stream s16le mono PCM to stdout per sentence (pipe to a player); logs stay on stderr. See [streaming.md](streaming.md#streaming-synthesized-audio-out) |
 | `--s2s` | Speech-to-speech mode: audio in → audio out (requires `CAP_S2S` backend, e.g. `lfm2-audio`, `mini-omni2`, `sidon`, `voxcpm2-vae`) |
 | `--s2s-output FNAME` | Output path for S2S WAV |

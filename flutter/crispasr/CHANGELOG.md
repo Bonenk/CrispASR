@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.8.24
+
+- **`Session.setTtsPhonemes(String)`** — synthesize a phoneme string verbatim,
+  skipping the grapheme-to-phoneme stage. Honoured by `kokoro` and `piper`;
+  other backends throw rather than silently synthesizing the text instead.
+- **`SessionSegment.speaker`** — the native per-segment speaker label, in the
+  `"(Speaker N) "` form, or `""` when the backend does not diarize natively.
+  The ordinals are chunk-local: `Speaker 1` from one `transcribe` call is not
+  necessarily the same voice as `Speaker 1` from the next.
+- Native improvements that ship with this release (no Dart API change):
+  - **English pronunciation for Kokoro** substantially fixed — numbers were
+    silently dropped from synthesized text, and the phonemes were in the wrong
+    alphabet for the model. Agreement with Kokoro's own G2P goes from 58% to
+    99.1%.
+  - **MOSS-TTS 4B** no longer generates past its stop token.
+  - **CosyVoice3 cross-lingual synthesis** — a clone reading a target language
+    no longer carries the reference voice's accent.
+  - **VibeVoice** speaker turns and per-utterance timings are now parsed out of
+    the model's answer instead of being returned as one raw JSON blob.
+  - Punctuation restoration no longer double-capitalizes or doubles a full stop.
+
+## 0.8.23
+
+- No Dart API change. Ships the native v0.8.23 improvements: the restored
+  Windows CPU binary, F5-TTS Chinese synthesis, VibeVoice voice-pack
+  correctness, broader NVIDIA GPU coverage, faster VAD, the opt-in
+  `--strict-pipeline` mode, and several TTS-on-Vulkan fixes.
+
 ## 0.8.22
 
 - **TTS provenance opt-out now requires a marking attestation.** Synthesis is
