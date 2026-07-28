@@ -37,11 +37,50 @@ trade-off:
 | **`tada-1b`** | HumeAI TADA 1B: Llama-3.2-1B backbone + per-token flow-matching diffusion head + TADA codec → 24 kHz. **English-only.** `-m auto` downloads model + default `tada-ref.gguf`. | Yes (`--voice <tada-ref.gguf>`, English voice refs only) | ~1.7 GB Q4_K + ~1 GB codec |
 | **`tada` / `tada-3b-ml`** | HumeAI TADA 3B Multilingual: same architecture, 3B params. Supports **ar, ch, de, es, fr, it, ja, pl, pt** in addition to English. `-l <lang>` auto-downloads `tada-ref-<lang>.gguf`. | Yes (`--voice <tada-ref.gguf>`) | ~4 GB Q4_K + ~1 GB codec |
 | **`lfm2-audio`** | LiquidAI LFM2.5-Audio 1.5B: FastConformer encoder + LFM2 hybrid conv+attention backbone + 6L depthformer (8-codebook Mimi) + ISTFT detokenizer → 24 kHz. Interleaved text+audio generation. Also does ASR and speech-to-speech. LFM Open License v1.0 ($10M revenue cap). | No | ~1.5 GB Q4_K (JP) / ~1.6 GB Q5_K (EN) + ~157 MB detokenizer companion |
-| **`dots-tts`** | rednote-hilab dots.tts-soar: Qwen2.5-1.5B LLM + 24L VAESemanticEncoder + 18L DiT flow-matching head (16-step Euler CFG) + BigVGAN vocoder → 48 kHz. Continuous-latent AR (patch-by-patch). Apache-2.0. **The CFG flow-match needs F16 — a full-q8 core derails; use the F16 core or a mixed-quant (`crispasr-quantize` keeps the DiT at F16, quantizes the LLM+PatchEncoder to Q8_0 → ~3.1 GB).** | TODO (CAM++ speaker; text-only today) | ~4.6 GB F16 / ~3.1 GB mixed-Q8 core + 345 MB vocoder companion |
+| **`dots-tts`** | rednote-hilab dots.tts-soar: Qwen2.5-1.5B LLM + 24L VAESemanticEncoder + 18L DiT flow-matching head (16-step Euler CFG) + BigVGAN vocoder → 48 kHz. Continuous-latent AR (patch-by-patch). Apache-2.0. **The CFG flow-match needs an F16 DiT — a full-q8 core derails; use the mixed quant (`crispasr-quantize` keeps the DiT at F16, quantizes the LLM+PatchEncoder to Q8_0 or Q4_K).** CAM++ reference-WAV voice cloning is supported when the speaker companion is present. | Yes (`--voice ref.wav --i-have-rights`) | ~3.1 GB mixed-Q8 / ~2.2 GB mixed-Q4_K core + 330–345 MB vocoder companion |
 | **`mini-omni2`** | gpt-omni/mini-omni2: Whisper-small encoder + Qwen2-0.5B LLM with 8-stream architecture + SNAC 24 kHz decoder → 24 kHz. Also does ASR and speech-to-speech. MIT license. Requires `--codec-model snac-24khz.gguf` companion. | No | ~1.0 GB Q4_K + ~80 MB SNAC companion |
 | **`voxtral-tts`** | Mistral Voxtral-4B-TTS-2603: Ministral-3B AR backbone (26L GQA, NORMAL/adjacent-pair RoPE) + 3L bidirectional flow-matching acoustic transformer (8-step Euler ODE + CFG α=1.2, no positional encoding) + Voxtral codec decoder (ALiBi sliding-window attention + reflect-causal conv + ConvTranspose upsampling) → 24 kHz. 20 preset voices across 9 languages (en/fr/de/es/it/pt/nl/ar/hi); strong on French technical text. CC-BY-NC-4.0. | No (20 preset voices via `--voice <name>`, e.g. `fr_female`) | ~2.4 GB Q4_K / ~4.3 GB Q8_0 / ~8.2 GB F16 via `-m auto` |
 
 All backends write mono WAV via `--tts-output` (22 kHz for piper/fastpitch/bananamind-tts, 16 kHz for speecht5, 24 kHz for most others, 44.1 kHz for melotts/dia/parler-tts/zonos-tts, 48 kHz for voxcpm2-tts).
+
+## dots.tts — voice cloning and performance
+
+`dots-tts` supports zero-shot voice cloning from a reference WAV. Place the
+CAM++ speaker companion (`dots-tts-soar-spk-f16.gguf`) beside the core model,
+then pass the reference recording with the consent attestation:
+
+```bash
+crispasr --backend dots-tts \
+  -m dots-tts-soar-q4_k.gguf \
+  --codec-model dots-tts-soar-vocoder-q8_0.gguf \
+  --voice reference.wav --i-have-rights \
+  --tts "Hello from CrispASR." --tts-output cloned.wav
+```
+
+The speaker companion is loaded only when `--voice` is supplied. Without it,
+the same backend produces text-conditioned speech using its default model
+conditioning. If the speaker companion is missing, the CLI warns and ignores
+the voice prompt; it does not silently claim that cloning succeeded.
+
+The practical low-memory choice is the mixed Q4_K core: the LLM and
+PatchEncoder are quantized, while the DiT, projections, embeddings, and
+conditioning statistics remain at the precision required by the flow-matching
+loop. The Q8 core is the safer quality/size default; do not quantize the DiT.
+
+The dominant cost is the DiT flow-match, not tokenization or the recurrent
+LLM step. A local Apple M1 measurement using the Q4_K core, Q8 vocoder, Metal,
+and an eight-patch cap took 24.2 s at 16 Euler steps: about 13.7 s in
+flow-match, 10.4 s in the BigVGAN vocoder, and under 0.5 s in the LLM and
+PatchEncoder. With the same seed and cap, `CRISPASR_DOTS_ODE_STEPS=8` took
+16.2 s (1.49x faster); this is a speed/quality trade-off, not a parity-preserving
+optimization. Full utterances add patch-by-patch AR cost, so benchmark with a
+known patch/audio cap and inspect the generated WAV.
+
+For further experiments, `CRISPASR_DOTS_FUSED_STEP=0` restores the legacy DiT
+path for A/B testing; the persistent fused graph is the default on CPU/Metal.
+`CRISPASR_DOTS_CFG_INTERVAL=2` skips some unconditional CFG evaluations but is
+approximate and should remain opt-in until the decoded output is checked.
+`CRISPASR_DOTS_TTS_BENCH=1` prints the stage timings used above.
 
 ## TADA — multilingual and voice cloning
 

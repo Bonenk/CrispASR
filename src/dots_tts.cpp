@@ -1815,6 +1815,7 @@ static ggml_tensor* dots_conv1d(ggml_context* ctx, ggml_tensor* x, ggml_tensor* 
     int K = (int)w->ne[0];
     int Cout = (int)w->ne[2];
     int T_in = (int)x->ne[1];
+
     ggml_tensor* xT = ggml_cont(ctx, ggml_transpose(ctx, x)); // (T, C_in)
     if (causal) {
         int pad = (K - 1) * dilation; // full left-pad, then crop right
@@ -2631,6 +2632,12 @@ float* dots_tts_synthesize(struct dots_tts_context* ctx, const char* text, int* 
     int patch_size = ctx->patch_size;
     int dit_dim = (int)ctx->dit.hidden_size;
     int ode_steps = ctx->params.ode_steps > 0 ? ctx->params.ode_steps : 16;
+    // Explicit low-latency profile for constrained local inference. Keep the
+    // quality-oriented 16-step default unchanged; callers can still override
+    // this profile with CRISPASR_DOTS_ODE_STEPS.
+    const bool fast_profile = std::getenv("CRISPASR_DOTS_FAST") != nullptr;
+    if (fast_profile && ctx->params.ode_steps <= 0)
+        ode_steps = 8;
     if (const char* e = std::getenv("CRISPASR_DOTS_ODE_STEPS")) {
         int s = std::atoi(e);
         if (s > 0)

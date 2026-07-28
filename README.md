@@ -211,7 +211,7 @@ quick-start commands and engine selection guidance.
 | piper | — | — | 22 | — | — |
 | pocket-tts | yes | temp | 24 | yes | — |
 | tada | yes | temp | 24 | yes | — |
-| dots-tts | yes | — | 48 | yes | — |
+| dots-tts | yes (`--voice ref.wav`) | 16-step CFG Euler | 48 | yes | — |
 
 \* CustomVoice variant only; Base uses baked speakers via `--voice <name>`.
 
