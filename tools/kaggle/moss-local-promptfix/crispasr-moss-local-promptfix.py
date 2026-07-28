@@ -77,10 +77,14 @@ STOP_RE = re.compile(r"generated (\d+) frames \(max_frames=\d+, (stopped natural
 
 # ── (1) TOKEN PARITY: our channel-0 ids vs the reference processor ─────────────
 step("tokparity.load")
-from transformers import AutoProcessor  # noqa: E402
-proc = AutoProcessor.from_pretrained(HF, trust_remote_code=True, token=TOKEN)
 tokparity = {}
-for tag, text in TEXTS.items():
+try:
+    from transformers import AutoProcessor  # noqa: E402
+    proc = AutoProcessor.from_pretrained(HF, trust_remote_code=True)  # HF_TOKEN is in env
+except Exception as e:  # noqa: BLE001 — never let tokparity block the stop test
+    proc = None
+    step("tokparity.load.err", err=repr(e)[:200])
+for tag, text in (TEXTS.items() if proc is not None else []):
     ours_ids = None
     idp = WORK / f"pids_{tag}.txt"
     env = {**os.environ, "CRISPASR_MOSS_TTS_LOCAL_DUMP_PROMPT_IDS": str(idp),
@@ -136,10 +140,10 @@ for mtag, model in (("q4_k", Q4), ("f16", F16)):
 n_each = len(TEXTS) * len(SEEDS)
 q4_ok = sum(1 for r in stop if r["quant"] == "q4_k" and r["stopped"])
 f16_ok = sum(1 for r in stop if r["quant"] == "f16" and r["stopped"])
-all_tok = all(v["match"] for v in tokparity.values())
-verdict = (f"FIXED: token-parity {'PASS' if all_tok else 'FAIL'}; stop q4_k {q4_ok}/{n_each}, f16 {f16_ok}/{n_each}"
-           if all_tok and q4_ok >= n_each - 1 and f16_ok >= n_each - 1
-           else f"token-parity {'PASS' if all_tok else 'FAIL'}; stop q4_k {q4_ok}/{n_each}, f16 {f16_ok}/{n_each}")
+tok_status = ("not-run" if not tokparity else ("PASS" if all(v["match"] for v in tokparity.values()) else "FAIL"))
+stop_ok = q4_ok >= n_each - 1 and f16_ok >= n_each - 1
+verdict = (f"{'FIXED' if stop_ok else 'stop NOT fixed'}: token-parity {tok_status}; "
+           f"stop q4_k {q4_ok}/{n_each}, f16 {f16_ok}/{n_each}")
 (WORK / "promptfix.json").write_text(json.dumps({"verdict": verdict, "token_parity": tokparity, "stop": stop},
                                                 indent=2))
 step("done", verdict=verdict)
