@@ -339,9 +339,27 @@ static ggml_cgraph* mtl_build_graph_llm_kv(moss_tts_local_context* ctx, int n_pa
         if (const char* s = getenv("CRISPASR_MOSS_TTS_LOCAL_DUMP_SUBLAYER"))
             dump_sub = atoi(s);
     }
+    // #249 gold-standard test: inject the REFERENCE's exact block-(L-1) output as
+    // the input to block L, so block L computes from a byte-identical input. If
+    // block L's output then matches the reference, layer L is correct and the
+    // divergence is pure amplification of accumulated drift; if it still diverges,
+    // there is a real per-layer op bug. inject_in is filled in mtl_run_backbone.
+    int inject_layer = -1;
+    if (n_past == 0) {
+        if (const char* s = getenv("CRISPASR_MOSS_TTS_LOCAL_INJECT_LAYER"))
+            inject_layer = atoi(s);
+    }
+    ggml_tensor* inject_in = nullptr;
+    if (inject_layer >= 0) {
+        inject_in = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, d, T);
+        ggml_set_name(inject_in, "inject_in");
+        ggml_set_input(inject_in);
+    }
     ggml_tensor* cur = embeds;
     for (uint32_t il = 0; il < hp.llm_layers; il++) {
         const auto& b = m.blocks[il];
+        if ((int)il == inject_layer && inject_in)
+            cur = inject_in; // block L reads the reference's exact input
         ggml_tensor* residual = cur;
         ggml_tensor* x = ggml_mul(ctx0, ggml_rms_norm(ctx0, cur, eps), b.attn_norm_w);
         ggml_tensor* attn = core_attn::kv_self_attn(
@@ -448,6 +466,24 @@ static float* mtl_run_backbone(moss_tts_local_context* ctx, const float* inputs_
     if (n_tokens > 1)
         ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "causal_mask"), mask.data(), 0,
                                 mask.size() * sizeof(ggml_fp16_t));
+    // #249 gold-standard test: load the reference block-(L-1) output (all positions,
+    // layout [pos][dim] == our (d, T) ggml order) into the injection tensor.
+    if (n_past == 0) {
+        if (ggml_tensor* it = ggml_graph_get_tensor(gf, "inject_in")) {
+            const char* ip = getenv("CRISPASR_MOSS_TTS_LOCAL_INJECT_PATH");
+            if (ip) {
+                std::vector<float> buf((size_t)d * n_tokens);
+                if (FILE* f = fopen(ip, "rb")) {
+                    const size_t got = fread(buf.data(), sizeof(float), buf.size(), f);
+                    fclose(f);
+                    if (got == buf.size())
+                        ggml_backend_tensor_set(it, buf.data(), 0, buf.size() * sizeof(float));
+                    else
+                        fprintf(stderr, "moss_tts_local[inject] short read %zu/%zu\n", got, buf.size());
+                }
+            }
+        }
+    }
     if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS)
         return nullptr;
     ggml_tensor* h_t = ggml_graph_get_tensor(gf, "hidden_last");
