@@ -57,6 +57,7 @@ def _find_lib():
 
     override = os.environ.get("CRISPASR_LIB_PATH")
     if override and Path(override).exists():
+        _register_dll_dir(Path(override).parent)
         return override
 
     search = [
@@ -80,9 +81,42 @@ def _find_lib():
         for name in candidates:
             p = d / name
             if p.exists():
+                _register_dll_dir(p.parent)
                 return str(p)
     # Fall back to bare name; ctypes will use the system loader path.
     return candidates[0]
+
+
+def _register_dll_dir(directory: Path) -> None:
+    """Windows only: make `directory` searchable for DEPENDENT DLLs.
+
+    `crispasr.dll` needs `ggml.dll`, `ggml-base.dll` and `ggml-cpu.dll`, which a
+    platform wheel ships right beside it. Since Python 3.8 the directory of a DLL
+    loaded by full path is NOT searched for that DLL's own dependencies, so
+    `ctypes.CDLL(<path>/crispasr.dll)` raises "DLL load failed while importing"
+    even though every dependency is present in the same folder.
+    `os.add_dll_directory` is the documented remedy.
+
+    No-op off Windows, and deliberately quiet: on a system install the loader
+    already resolves these, so a failure here must not break a working setup.
+    """
+    if os.name != "nt":
+        return
+    add = getattr(os, "add_dll_directory", None)  # Python 3.8+
+    if add is None:
+        return
+    key = str(directory)
+    if key in _dll_dirs:
+        return
+    try:
+        add(key)          # keep the cookie alive for the process lifetime
+        _dll_dirs[key] = True
+    except OSError:
+        pass
+
+
+# Directories already handed to os.add_dll_directory (Windows).
+_dll_dirs: dict = {}
 
 
 # Whisper sampling strategies

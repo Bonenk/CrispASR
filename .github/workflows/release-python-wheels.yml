@@ -91,11 +91,16 @@ jobs:
             asset: libcrispasr-macos-arm64
             plat: macosx_11_0_arm64
             smoke: true
+          # smoke was false here, which is why nothing noticed that the Windows
+          # wheel had never contained a library at all (stage_libs could not find
+          # bin/) — the job went green on a build that packaged nothing loadable.
+          # Windows also needs os.add_dll_directory for crispasr.dll to find the
+          # ggml DLLs beside it, and only an install-and-load test can catch that.
           - name: windows-x86_64
             runner: windows-latest
             asset: libcrispasr-windows-x86_64
             plat: win_amd64
-            smoke: false
+            smoke: true
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -148,7 +153,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m venv /tmp/wt && . /tmp/wt/bin/activate
+          # A venv puts its activate script under bin/ on POSIX and Scripts/ on
+          # Windows; hardcoding bin/ is why this could not run on windows-latest.
+          python -m venv .wt
+          if [ -f .wt/bin/activate ]; then . .wt/bin/activate; else . .wt/Scripts/activate; fi
           pip install python/dist/*.whl
           python - <<'PY'
           import crispasr._binding as b
@@ -157,6 +165,10 @@ jobs:
           print("resolved lib:", lib)
           # must be the copy bundled inside the installed package
           assert "site-packages" in lib and Path(lib).exists(), lib
+          # The real test: loading it pulls in the ggml libraries beside it. On
+          # Windows that only works because _find_lib registered the package dir
+          # via os.add_dll_directory — a bare CDLL of a full path does not search
+          # the DLL's own directory for its dependencies on Python 3.8+.
           import ctypes; ctypes.CDLL(lib)
           print("CDLL load OK")
           PY
