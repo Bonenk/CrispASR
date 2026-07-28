@@ -16,9 +16,17 @@ install-and-load check failed on every platform except linux-CUDA, so
     carry it (auditwheel repair, or stage the .so alongside libcrispasr and
     rpath to `$ORIGIN`).
   * macos-arm64 — `Symbol not found: _OBJC_CLASS_$_MTLResidencySetDescriptor` on
-    dlopen. Built against a newer Metal SDK than the loading runner; needs a
-    deployment target pinned (or weak-linked Metal) on the bundle build, not on
-    the wheel job.
+    dlopen. MEASURED on the shipped v0.8.24 asset:
+
+        otool -l lib/libggml-metal.dylib  ->  minos 26.0   sdk 26.5
+        nm -u  lib/libggml-metal.dylib    ->  _OBJC_CLASS_$_MTLResidencySetDescriptor
+
+    i.e. `libcrispasr-macos-arm64` REQUIRES macOS 26.0 and cannot be loaded on
+    anything older — nearly every Mac. This is not a wheel bug; it breaks the
+    downloadable bundle for almost all macOS users, and it is silent because CI
+    only ever loads it on the runner that built it. Cause: the bundle job set no
+    CMAKE_OSX_DEPLOYMENT_TARGET, so clang targeted the macos-latest runner.
+    Fixed by pinning 11.0 (matching the macosx_11_0_arm64 wheel tag).
   * windows-x86_64 CPU + both GPU wheels — also red, cause not yet read.
   * Non-fatal but adjacent: `stage_libs` cannot compile `_helpers.c` because the
     bundle's `include/` has `crispasr.h` but no `ggml.h`, so the legacy CrispASR
