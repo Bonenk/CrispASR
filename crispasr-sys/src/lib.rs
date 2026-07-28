@@ -548,6 +548,10 @@ extern "C" {
         s: *mut CrispasrSession,
         attestation: *const c_char,
     ) -> c_int;
+    // Sample rate the backend expects for input PCM (16000 for Whisper-family,
+    // the model's native rate otherwise; 0 on error). Pair with s2s/synthesize to
+    // feed input at the right rate.
+    pub fn crispasr_session_input_sample_rate(s: *mut CrispasrSession) -> c_int;
     pub fn crispasr_pcm_free(pcm: *mut f32);
     // Drop the kokoro per-session phoneme cache. No-op for non-kokoro
     // backends. Returns 0 on success, -1 if `s` is null. (PLAN #56 #5)
