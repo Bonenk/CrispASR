@@ -534,6 +534,20 @@ extern "C" {
         out_text: *mut *mut c_char,
         out_n_samples: *mut c_int,
     ) -> *mut f32;
+    // UNMARKED synthesis (no watermark/disclosure). Hard-refused unless
+    // `crispasr_session_accept_marking_responsibility` was called first. Returns
+    // malloc'd f32 PCM (free with `crispasr_pcm_free`); null on refusal/failure.
+    pub fn crispasr_session_synthesize_raw(
+        s: *mut CrispasrSession,
+        text: *const c_char,
+        out_n_samples: *mut c_int,
+    ) -> *mut f32;
+    // Attest that the integrator accepts AI-content marking/disclosure
+    // responsibility (EU AI Act Art. 50). REQUIRED before `synthesize_raw`.
+    pub fn crispasr_session_accept_marking_responsibility(
+        s: *mut CrispasrSession,
+        attestation: *const c_char,
+    ) -> c_int;
     pub fn crispasr_pcm_free(pcm: *mut f32);
     // Drop the kokoro per-session phoneme cache. No-op for non-kokoro
     // backends. Returns 0 on success, -1 if `s` is null. (PLAN #56 #5)

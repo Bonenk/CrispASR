@@ -951,6 +951,40 @@ impl Session {
         Ok((out, transcript))
     }
 
+    /// Attest that the integrator accepts AI-content marking/disclosure
+    /// responsibility (EU AI Act Art. 50). **Required** before
+    /// [`Session::synthesize_raw`] will return unmarked audio; the default
+    /// [`Session::synthesize`] is watermarked and needs no attestation.
+    /// `attestation` is a free-text acknowledgement recorded for audit.
+    pub fn accept_marking_responsibility(&self, attestation: &str) -> Result<(), String> {
+        let c = CString::new(attestation).map_err(|e| e.to_string())?;
+        // The C side records the attestation; the return is informational
+        // (mirrors the Python/Dart bindings, which ignore it).
+        unsafe { crispasr_sys::crispasr_session_accept_marking_responsibility(self.handle, c.as_ptr()) };
+        Ok(())
+    }
+
+    /// UNMARKED synthesis (no watermark / disclosure), for callers that embed
+    /// the mark themselves after post-processing. Hard-refused (returns `Err`)
+    /// unless [`Session::accept_marking_responsibility`] was called first.
+    /// Prefer [`Session::synthesize`] for the default watermarked output.
+    pub fn synthesize_raw(&self, text: &str) -> Result<Vec<f32>, String> {
+        let ctext = CString::new(text).map_err(|e| e.to_string())?;
+        let mut n: c_int = 0;
+        let ptr = unsafe {
+            crispasr_sys::crispasr_session_synthesize_raw(self.handle, ctext.as_ptr(), &mut n as *mut c_int)
+        };
+        if ptr.is_null() || n <= 0 {
+            return Err(format!(
+                "synthesize_raw returned no audio for backend {:?} (call accept_marking_responsibility first?)",
+                self.backend()
+            ));
+        }
+        let out = unsafe { std::slice::from_raw_parts(ptr, n as usize).to_vec() };
+        unsafe { crispasr_sys::crispasr_pcm_free(ptr) };
+        Ok(out)
+    }
+
     /// Drop the kokoro per-session phoneme cache. No-op for non-kokoro
     /// backends. Useful for long-running daemons that resynthesize across
     /// many speakers and want bounded memory. (PLAN #56 #5)
