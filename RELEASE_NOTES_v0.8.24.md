@@ -302,17 +302,17 @@ honoured.
   `crispasr.lib` directly under `build\src\`, which the import-lib probe missed —
   it only looked for the MSVC multi-config `src\Release\` layout used by the
   release bundle. Both are detected now.
-- **Native-library-bundled Python wheels are implemented but did NOT ship in this
-  release.** The workflow builds wheels that carry `libcrispasr` for linux
-  x86_64/arm64, macOS arm64 (Metal) and Windows x86_64, with GPU wheels
-  (`+cuda`, `+vulkan`) on a PEP 503 index. Its first real tag run failed its own
-  install-and-load smoke test on every platform but linux-CUDA — the linux bundle
-  needs a `libopenblas.so.0` the wheel does not carry, and the macOS bundle is
-  linked against a newer Metal SDK than it is loaded on
-  (`_OBJC_CLASS_$_MTLResidencySetDescriptor`). The smoke test did its job and the
-  publish step was correctly skipped, so **PyPI stays at 0.8.23** — the existing
-  unbundled wheel, which is unaffected. Tracked in `PLAN.md`; `pip install
-  crispasr` continues to expect a system `libcrispasr` as before.
+- **Python wheels now bundle the native library.** `pip install crispasr` gets a
+  working `libcrispasr` for linux x86_64/arm64, macOS arm64 (Metal) and Windows
+  x86_64; GPU wheels (`+cuda`, `+vulkan`) are served from a PEP 503 index on
+  GitHub Pages via `--extra-index-url`, and a pure-Python sdist remains the
+  fallback elsewhere. This is the first release where that actually works — the
+  first tag run failed its own install-and-load test on six of seven platforms,
+  and fixing it turned up four separate defects (Linux wheels missing
+  `libopenblas.so.0`; the Windows wheel containing no library at all, with its
+  smoke test switched off so nothing said so; the CUDA driver wrongly treated as
+  a missing dependency; and `_helpers.c` failing to compile on *every* wheel ever
+  built, silently dropping the legacy `CrispASR` class).
 
 ## Also in this release
 
@@ -346,4 +346,21 @@ honoured.
 | Docker | ✅ | |
 | crates.io | ✅ | `crispasr` + `crispasr-sys` |
 | pub.dev | ✅ | `crispasr` 0.8.24 — the first pub.dev release since 0.8.22; its automated-publishing tag pattern had been rejecting `v<version>` tags, which is why 0.8.23 never published |
-| PyPI | ❌ **0.8.23** | bundled-wheel smoke test failed; see above |
+| PyPI | ✅ | bundled CPU wheels for linux x86_64/arm64, macOS arm64, Windows x86_64, plus the sdist; GPU wheels on the Pages index |
+
+### ⚠ macOS users: re-download `libcrispasr-macos-arm64.tar.gz` if you took it early
+
+The macOS library bundle first attached to this release was built with no
+deployment target, so it targeted the CI runner's OS and **required macOS 26.0**:
+
+```
+otool -l lib/libggml-metal.dylib   →   minos 26.0   sdk 26.5
+nm -u  lib/libggml-metal.dylib     →   _OBJC_CLASS_$_MTLResidencySetDescriptor
+```
+
+On anything older it fails to load with `Symbol not found:
+_OBJC_CLASS_$_MTLResidencySetDescriptor`. The asset has been rebuilt in place
+with `CMAKE_OSX_DEPLOYMENT_TARGET=11.0`: `minos` is now **11.0** and that symbol
+is **weakly** bound, so older systems skip Metal residency sets at runtime
+instead of failing to load, while macOS 26 still uses them. Nothing else about
+the bundle changed. Only this one asset was replaced.
