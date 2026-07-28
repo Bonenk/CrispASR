@@ -1,56 +1,63 @@
 # CrispASR — Pending work
 
-## OPEN after the v0.8.24 release (2026-07-28) — two registries did not publish
+## RESOLVED 2026-07-28 — v0.8.24 shipped to all three registries
 
-The GitHub release is complete and verified (27 assets, same coverage as v0.8.23;
-the downloaded macOS CLI reports 0.8.24 / sha 5ebe79f6 and carries
-`--tts-phonemes`). crates.io and Docker published. Two did not:
+GitHub, Docker, crates.io, pub.dev and PyPI are all on 0.8.24. Getting the last
+two there exposed real defects rather than configuration noise:
 
-**1. PyPI still 0.8.23 — bundled wheels fail their own smoke test.**
-`release-python-wheels.yml` (new in e3ed11eb) had its first real tag run and the
-install-and-load check failed on every platform except linux-CUDA, so
-`publish-pypi` was correctly skipped. The check did its job; the wheels are wrong:
+**pub.dev (was stuck at 0.8.22, so 0.8.23 never shipped either).** Two causes:
+the admin-page tag pattern held pub.dev's monorepo default
+`{{package}}-v{{version}}` and rejected every `v*` tag (fixed on the pub.dev
+side), and a manual re-run must be dispatched with `--ref <tag>`, never
+`--ref main` — pub.dev authenticates the OIDC claim of the ref the RUN is on,
+not the one checked out, and otherwise fails with "only allowed from 'tag'
+refType". crates.io does not care, so the Rust half succeeds and only Dart fails.
 
-  * linux-x86_64 / linux-arm64 — `OSError: libopenblas.so.0: cannot open shared
-    object file`. The relocatable bundle expects a system OpenBLAS; a wheel must
-    carry it (auditwheel repair, or stage the .so alongside libcrispasr and
-    rpath to `$ORIGIN`).
-  * macos-arm64 — `Symbol not found: _OBJC_CLASS_$_MTLResidencySetDescriptor` on
-    dlopen. MEASURED on the shipped v0.8.24 asset:
+**PyPI — bundled wheels went 1/7 green to 7/7.** Four independent defects:
+  * Windows: `stage_libs` probed lib/src/. and the Windows bundle keeps DLLs in
+    `bin/`; `src/` holds non-loadable import libs. All three Windows wheels died
+    at staging. Worse, its smoke test was `smoke: false`, so once staging
+    succeeded the job would have gone green on a wheel containing no library.
+  * Windows again: `ctypes.CDLL(<path>)` does not search the DLL's own directory
+    for dependencies on Python 3.8+, so crispasr.dll could not find the ggml DLLs
+    beside it. `_find_lib` now calls `os.add_dll_directory`. Smoke test enabled
+    (and made portable — it hardcoded `bin/activate`, impossible on Windows).
+  * Linux: the bundle is relocatable but NOT self-contained (DT_NEEDED on
+    libopenblas / libespeak-ng / libfdk-aac / libasound). stage_libs now vendors
+    external deps with patchelf RUNPATH=$ORIGIN and FAILS on anything unresolved.
+  * GPU: "fail on unresolved" is wrong for libcuda.so.1 (the NVIDIA driver) and
+    the CUDA runtime — those are host-provided by definition. Classified
+    separately; this regressed the CUDA wheel for one run before being fixed.
+  * Every platform, all along: `crispasr.h` includes `ggml.h` from the bundle's
+    `ggml/include`, which was never on the include path, so `_helpers.c` failed
+    to compile on every wheel ever built and the legacy `CrispASR` class was
+    silently absent. The failure is deliberately non-fatal, so it was a warning
+    nobody read.
 
-        otool -l lib/libggml-metal.dylib  ->  minos 26.0   sdk 26.5
-        nm -u  lib/libggml-metal.dylib    ->  _OBJC_CLASS_$_MTLResidencySetDescriptor
+**macOS bundle required macOS 26.0** — not a wheel bug. Measured on the shipped
+asset: `minos 26.0 / sdk 26.5` and a hard undefined
+`_OBJC_CLASS_$_MTLResidencySetDescriptor`, because the bundle job set no
+`CMAKE_OSX_DEPLOYMENT_TARGET` and so targeted the macos-latest runner. Anyone on
+an older macOS could not load the downloadable library at all, silently, because
+CI only ever loads it on the machine that built it. Rebuilt at 11.0: `minos 11.0`
+and the symbol is now **weak**, so old systems skip residency sets at runtime and
+macOS 26 still uses them.
 
-    i.e. `libcrispasr-macos-arm64` REQUIRES macOS 26.0 and cannot be loaded on
-    anything older — nearly every Mac. This is not a wheel bug; it breaks the
-    downloadable bundle for almost all macOS users, and it is silent because CI
-    only ever loads it on the runner that built it. Cause: the bundle job set no
-    CMAKE_OSX_DEPLOYMENT_TARGET, so clang targeted the macos-latest runner.
-    Fixed by pinning 11.0 (matching the macosx_11_0_arm64 wheel tag).
-  * windows-x86_64 CPU + both GPU wheels — also red, cause not yet read.
-  * Non-fatal but adjacent: `stage_libs` cannot compile `_helpers.c` because the
-    bundle's `include/` has `crispasr.h` but no `ggml.h`, so the legacy CrispASR
-    class is missing from the wheel even when the rest works. The bundle's
-    include set is incomplete.
+**New: `Release` takes an `only: <job>` dispatch input.** Rebuilding one broken
+asset used to mean re-running all 27 build jobs and rewriting every asset, which
+is why such fixes wait for the next version instead. Now a single job can be
+rebuilt and only its asset replaced; tag pushes are unaffected. Used immediately
+for the macOS bundle above.
 
-Note the local verification in e3ed11eb ("verified end-to-end on macOS-arm64")
-was real but insufficient: it tested the wheel on the machine that built it, so
-neither the SDK skew nor the missing system library could appear.
+Verified as a consumer, not by reading a green check: `pip install crispasr==0.8.24`
+from PyPI, `_find_lib` resolves the in-wheel dylib, `ctypes.CDLL` loads it,
+`registry_lookup('kokoro')` returns `kokoro-82m-q8_0.gguf` through the ABI, and
+the legacy class imports.
 
-**2. pub.dev still 0.8.22 — tag pattern mismatch, needs an admin-page change.**
-Publishing is rejected before upload: "this token has 'refs/tags/v0.8.24' ...
-Expected tag 'crispasr-v0.8.24'". The admin page holds pub.dev's monorepo default
-`{{package}}-v{{version}}` while this repo tags `v<version>`. pub.dev validates
-the ref the workflow RUNS on, so no workflow edit can fix it. Either set the
-pattern to `v{{version}}` at https://pub.dev/packages/crispasr/admin (matches
-this workflow and everything else), or start pushing `crispasr-v<version>`
-alongside — a tagging-convention decision, deliberately NOT taken unilaterally.
-0.8.23 never published either, for the separate stale-CHANGELOG reason now fixed.
-
-Both are now visible instead of silent: `publish-summary` fails the run unless
-every registry reports `ok` or `skipped`, reading job OUTPUTS rather than
+**Still open:** the `publish-summary` gate now reads job OUTPUTS rather than
 `needs.<job>.result` (which reports 'success' for a failed continue-on-error job
-— the first version of that gate was itself green while pub.dev failed).
+— the first version of that gate was green while pub.dev failed). Worth auditing
+other workflows for the same `continue-on-error` + `result` combination.
 
 ## LANDED 2026-07-27 — #300 vibevoice diarization + the #308 punctuation audit
 
