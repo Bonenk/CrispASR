@@ -9,6 +9,15 @@ on:
         description: 'Tag to build + release (e.g. v0.4.5)'
         required: true
         type: string
+      only:
+        description: >-
+          Rebuild ONLY this job and re-upload just its asset
+          (e.g. build-libs-macos-arm64). Empty = the whole release.
+          The publish step attaches whatever was produced, so the other
+          assets on the release are left untouched.
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -63,6 +72,7 @@ jobs:
           esac
 
   build-linux:
+    if: ${{ !inputs.only || inputs.only == 'build-linux' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
@@ -103,6 +113,7 @@ jobs:
 
   # ── WebAssembly build (browser: ASR + TTS, all backends) ─────────────────────
   build-wasm:
+    if: ${{ !inputs.only || inputs.only == 'build-wasm' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -149,6 +160,7 @@ jobs:
   # CPU; users on Skylake-X / Ice Lake / Tiger Lake / Sapphire Rapids
   # / Zen 4 can opt into the faster build.
   build-linux-x86_64-avx512:
+    if: ${{ !inputs.only || inputs.only == 'build-linux-x86_64-avx512' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
@@ -199,6 +211,7 @@ jobs:
   # plus sm_120 virtual for future compat. Ships as a self-contained tarball
   # alongside crispasr-quantize so users can convert + run in one download.
   build-linux-x86_64-cuda:
+    if: ${{ !inputs.only || inputs.only == 'build-linux-x86_64-cuda' }}
     runs-on: ubuntu-22.04
     env:
       CUDA_VERSION: "12.8.0"
@@ -264,6 +277,7 @@ jobs:
   # Volta (V100) users must take the cuda12 tarball above. Targets sm_75 (T4),
   # sm_86 (A100/3090), sm_89 (L4/4090), sm_120 (Blackwell) plus sm_120 virtual.
   build-linux-x86_64-cuda13:
+    if: ${{ !inputs.only || inputs.only == 'build-linux-x86_64-cuda13' }}
     runs-on: ubuntu-22.04
     env:
       CUDA_VERSION: "13.0.0"
@@ -327,6 +341,7 @@ jobs:
   # (gfx1201 support was added in ROCm 6.3). Prefer this over Vulkan on Linux
   # AMD: HIP has full flash-attention, tinyBLAS INT8 VNNI, and MFMA paths.
   build-linux-x86_64-hip:
+    if: ${{ !inputs.only || inputs.only == 'build-linux-x86_64-hip' }}
     runs-on: ubuntu-22.04
     container:
       image: rocm/dev-ubuntu-22.04:6.3
@@ -388,6 +403,7 @@ jobs:
   # FFI consumers (Rust crispasr-sys, Dart, Python ctypes) that need AMD GPU
   # acceleration without rebuilding from source.
   build-libs-linux-x86_64-hip:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-linux-x86_64-hip' }}
     runs-on: ubuntu-22.04
     container:
       image: rocm/dev-ubuntu-22.04:6.3
@@ -473,6 +489,7 @@ jobs:
   # where the CUDA release binary is incompatible. Ships libvulkan
   # dynamically linked — the host must have a Vulkan-capable driver.
   build-linux-x86_64-vulkan:
+    if: ${{ !inputs.only || inputs.only == 'build-linux-x86_64-vulkan' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
@@ -534,6 +551,7 @@ jobs:
   # as x86_64) for consistent CPU code paths and easy A/B comparison;
   # `libopenblas-dev` has aarch64 binaries in Ubuntu's apt repo.
   build-linux-arm64:
+    if: ${{ !inputs.only || inputs.only == 'build-linux-arm64' }}
     runs-on: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@v6
@@ -571,6 +589,7 @@ jobs:
           fail_on_unmatched_files: false
 
   build-python-linux:
+    if: ${{ !inputs.only || inputs.only == 'build-python-linux' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
@@ -649,6 +668,7 @@ jobs:
   # ggml backend libs + libcrispasr_helpers.so + $ORIGIN RPATH so the
   # tarball is self-contained.
   build-python-linux-arm64:
+    if: ${{ !inputs.only || inputs.only == 'build-python-linux-arm64' }}
     runs-on: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@v6
@@ -716,6 +736,7 @@ jobs:
           fail_on_unmatched_files: false
 
   build-macos:
+    if: ${{ !inputs.only || inputs.only == 'build-macos' }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -762,6 +783,7 @@ jobs:
   # has no dylib and none of the @rpath problems the desktop lib bundles had — the
   # archive drops straight into an Xcode/Flutter project.
   build-xcframework:
+    if: ${{ !inputs.only || inputs.only == 'build-xcframework' }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -818,6 +840,7 @@ jobs:
   # `<bundle>/ggml/src/libggml*`), so consumers point CRISPASR_SYS_LIB_DIR
   # at the extracted dir and the cmake-build fallback is bypassed.
   build-libs-macos-arm64:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-macos-arm64' }}
     runs-on: macos-latest # arm64 since macos-13 was retired
     steps:
       - uses: actions/checkout@v6
@@ -920,6 +943,7 @@ jobs:
   # at the extract dir instead of cmake-building from source. CPU + OpenBLAS
   # only — GPU-aware variants (CUDA/Vulkan) are a separate matrix slot.
   build-libs-linux-x86_64:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-linux-x86_64' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
@@ -994,6 +1018,7 @@ jobs:
   # downstream consumers (crispasr-sys / Dart / wrapper bindings) pull
   # from. See that job's comment for the per-CPU rationale.
   build-libs-linux-x86_64-avx512:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-linux-x86_64-avx512' }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v6
@@ -1063,6 +1088,7 @@ jobs:
   # GPU variants for arm64 (CUDA-Jetson, Vulkan-mobile) are out of scope
   # for this round — add separate jobs when there's user demand.
   build-libs-linux-arm64:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-linux-arm64' }}
     runs-on: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@v6
@@ -1138,6 +1164,7 @@ jobs:
   # extract the tarball, set CRISPASR_SYS_LIB_DIR, and link against the .lib
   # at build time while loading the .dll at runtime.
   build-libs-windows-x86_64:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-windows-x86_64' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -1204,6 +1231,7 @@ jobs:
   # need GPU-accelerated FFI on Windows (Flutter desktop, Rust crispasr-sys
   # with --features=vulkan, etc.) point CRISPASR_SYS_LIB_DIR here.
   build-libs-windows-x86_64-vulkan:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-windows-x86_64-vulkan' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -1301,6 +1329,7 @@ jobs:
   # link against a libcrispasr-cuda tarball typically have CUDA
   # already.
   build-libs-linux-x86_64-cuda:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-linux-x86_64-cuda' }}
     runs-on: ubuntu-22.04
     env:
       CUDA_VERSION: "12.8.0"
@@ -1388,6 +1417,7 @@ jobs:
   # tarball is self-contained for downstream Windows consumers — matches
   # the existing build-windows-cuda EXE bundle's pattern.
   build-libs-windows-x86_64-cuda:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-windows-x86_64-cuda' }}
     # Pin to windows-2022 — CUDA 12.8 doesn't support VS 2026 (MSVC 14.51).
     runs-on: windows-2022
     env:
@@ -1485,6 +1515,7 @@ jobs:
   # using the wrong build on a legacy host: silent instant exit
   # (STATUS_ILLEGAL_INSTRUCTION) with no error message.
   build-libs-windows-x86_64-cpu-legacy:
+    if: ${{ !inputs.only || inputs.only == 'build-libs-windows-x86_64-cpu-legacy' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -1542,6 +1573,7 @@ jobs:
 
   # ── Windows CPU (AVX2 — Haswell/2013+ baseline) ──────────────────────────────
   build-windows-cpu:
+    if: ${{ !inputs.only || inputs.only == 'build-windows-cpu' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -1597,6 +1629,7 @@ jobs:
   # AMD pre-Excavator. Symptoms of using the wrong build: silent instant exit
   # (STATUS_ILLEGAL_INSTRUCTION) with no error message.
   build-windows-cpu-legacy:
+    if: ${{ !inputs.only || inputs.only == 'build-windows-cpu-legacy' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -1638,6 +1671,7 @@ jobs:
 
   # ── Windows CUDA (dynamic, requires NVIDIA driver on target machine) ─────────
   build-windows-cuda:
+    if: ${{ !inputs.only || inputs.only == 'build-windows-cuda' }}
     # Pin to windows-2022 — CUDA 12.8 doesn't support VS 2026 (MSVC 14.51).
     runs-on: windows-2022
     env:
@@ -1711,6 +1745,7 @@ jobs:
 
   # ── Windows Vulkan (dynamic, works on NVIDIA/AMD/Intel with a Vulkan driver) ─
   build-windows-vulkan:
+    if: ${{ !inputs.only || inputs.only == 'build-windows-vulkan' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -1791,6 +1826,7 @@ jobs:
   # Qwen3-ASR) haven't been verified on 32-bit ARM and would need separate
   # validation before shipping armeabi-v7a.
   build-android-arm64:
+    if: ${{ !inputs.only || inputs.only == 'build-android-arm64' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
