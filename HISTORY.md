@@ -6,6 +6,27 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-07-28 — #316 follow-up: traced the lexicon's provenance to espeak-ng
+
+The misaki lexicon that took kokoro's phoneme parity to 99% is Apache-2.0 by the
+package's licence, but upstream documents no provenance for the DATA and ships no
+NOTICE. Traced it by measurement: `us_silver.json` is **87% byte-identical to
+espeak-ng 1.52 `en-us` output** and `us_gold.json` 48%, while the word sets are
+largely disjoint from CMUdict (39% of CMUdict present, 72% of misaki absent) — so
+it is not a CMUdict derivative, silver is espeak-generated, and gold is the
+hand-verified subset. espeak-ng is GPL-3.0 including its dictionary, so
+redistributing silver under Apache-2.0 is a question upstream may not have had the
+right to answer.
+
+Nothing in CrispASR depends on it: the file is generated locally from the user's
+own install and the runtime degrades to the CMUdict path without it. Added
+`--gold-only` for the least espeak-derived subset, which costs 0.58 points
+(99.12% -> 98.54%). Also fixed a related error in the same change — the
+`--tts-phonemes` guard hardcoded "kokoro only", but piper's runtime has had
+`piper_tts_synthesize_phonemes()` all along and its adapter reached it only by
+accident; the policy is now explicit, piper honours the flag, and
+tests/test-tts-phonemes-policy.cpp pins it.
+
 ## 2026-07-28 — #316: Kokoro skipped numbers and drifted British — both in the G2P
 
 Reported as "speaks like old English" and "it just skips the 82". Two separate
