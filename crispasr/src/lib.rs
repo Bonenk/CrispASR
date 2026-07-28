@@ -951,6 +951,14 @@ impl Session {
         Ok((out, transcript))
     }
 
+    /// The sample rate (Hz) the backend expects for input PCM — `16000` for
+    /// Whisper-family backends, the model's native rate otherwise, `0` on
+    /// error. Feed [`Session::speech_to_speech`] (and TTS voice-clone input)
+    /// at this rate rather than resampling twice.
+    pub fn input_sample_rate(&self) -> i32 {
+        unsafe { crispasr_sys::crispasr_session_input_sample_rate(self.handle) as i32 }
+    }
+
     /// Attest that the integrator accepts AI-content marking/disclosure
     /// responsibility (EU AI Act Art. 50). **Required** before
     /// [`Session::synthesize_raw`] will return unmarked audio; the default
