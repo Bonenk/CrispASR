@@ -7,6 +7,7 @@ import com.sun.jna.Pointer;
 import com.sun.jna.ptr.DoubleByReference;
 import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.LongByReference;
+import com.sun.jna.ptr.PointerByReference;
 
 /**
  * Minimal TTS surface for the Java binding. Exposes the unified
@@ -47,6 +48,13 @@ public final class CrispasrSession implements AutoCloseable {
         int     crispasr_session_is_custom_voice(Pointer session);
         int     crispasr_session_is_voice_design(Pointer session);
         Pointer crispasr_session_synthesize(Pointer session, String text, IntByReference outNSamples);
+        // UNMARKED synthesis — refused unless crispasr_session_accept_marking_responsibility() was called first.
+        Pointer crispasr_session_synthesize_raw(Pointer session, String text, IntByReference outNSamples);
+        int     crispasr_session_accept_marking_responsibility(Pointer session, String attestation);
+        // Speech-to-speech (lfm2-audio, mini-omni2, sidon, voxcpm2-vae). outText receives the intermediate transcript.
+        Pointer crispasr_session_speech_to_speech(Pointer session, float[] inSamples, int nInSamples,
+                                                  PointerByReference outText, IntByReference outNSamples);
+        int     crispasr_session_input_sample_rate(Pointer session);
         void    crispasr_pcm_free(Pointer pcm);
         int     crispasr_session_kokoro_clear_phoneme_cache(Pointer session);
         int     crispasr_session_set_source_language(Pointer session, String lang);
@@ -708,6 +716,91 @@ public final class CrispasrSession implements AutoCloseable {
         } finally {
             Lib.INSTANCE.crispasr_pcm_free(pcm);
         }
+    }
+
+    /**
+     * UNMARKED synthesis — identical to {@link #synthesize(String)} but skips
+     * the audible/inaudible watermark. Hard-refused (returns no audio) unless
+     * {@link #acceptMarkingResponsibility(String)} was called first. Under the
+     * EU AI Act (Art. 50) the integrator becomes responsible for marking the
+     * output as AI-generated.
+     */
+    public float[] synthesizeRaw(String text) {
+        IntByReference n = new IntByReference(0);
+        Pointer pcm = Lib.INSTANCE.crispasr_session_synthesize_raw(handle, text, n);
+        if (pcm == null || n.getValue() <= 0) {
+            throw new IllegalStateException("synthesizeRaw returned no audio "
+                    + "(did you call acceptMarkingResponsibility()?)");
+        }
+        try {
+            return pcm.getFloatArray(0, n.getValue());
+        } finally {
+            Lib.INSTANCE.crispasr_pcm_free(pcm);
+        }
+    }
+
+    /**
+     * Attest that the integrator takes responsibility for marking generated
+     * audio as AI-generated (EU AI Act Art. 50). REQUIRED before
+     * {@link #synthesizeRaw(String)} will produce audio.
+     */
+    public void acceptMarkingResponsibility(String attestation) {
+        int rc = Lib.INSTANCE.crispasr_session_accept_marking_responsibility(
+                handle, attestation == null ? "" : attestation);
+        if (rc != 0) {
+            throw new IllegalStateException(
+                    "accept_marking_responsibility failed (rc=" + rc + ")");
+        }
+    }
+
+    /** Result of {@link #speechToSpeech(float[])}: output PCM plus the intermediate transcript. */
+    public static final class SpeechToSpeechResult {
+        /** 24 kHz mono float32 PCM produced by the backend. */
+        public final float[] pcm;
+        /** Intermediate transcript of the input speech (may be {@code null}). */
+        public final String text;
+
+        SpeechToSpeechResult(float[] pcm, String text) {
+            this.pcm = pcm;
+            this.text = text;
+        }
+    }
+
+    /**
+     * Speech-to-speech: transform input PCM to output PCM, returning the
+     * intermediate transcript alongside. Requires an S2S-capable backend
+     * (lfm2-audio / mini-omni2 / sidon / voxcpm2-vae).
+     *
+     * @param inSamples input float32 PCM at {@link #inputSampleRate()}
+     */
+    public SpeechToSpeechResult speechToSpeech(float[] inSamples) {
+        IntByReference n = new IntByReference(0);
+        PointerByReference outText = new PointerByReference();
+        Pointer pcm = Lib.INSTANCE.crispasr_session_speech_to_speech(
+                handle, inSamples, inSamples.length, outText, n);
+        if (pcm == null || n.getValue() <= 0) {
+            throw new IllegalStateException(
+                    "speechToSpeech returned no audio (backend may not support S2S)");
+        }
+        String text = null;
+        Pointer tp = outText.getValue();
+        if (tp != null) {
+            text = tp.getString(0);
+            Lib.INSTANCE.crispasr_session_translate_text_free(tp);
+        }
+        try {
+            return new SpeechToSpeechResult(pcm.getFloatArray(0, n.getValue()), text);
+        } finally {
+            Lib.INSTANCE.crispasr_pcm_free(pcm);
+        }
+    }
+
+    /**
+     * Sample rate the backend expects for input PCM (e.g. 16000 for
+     * Whisper-family backends). Returns 0 on error.
+     */
+    public int inputSampleRate() {
+        return Lib.INSTANCE.crispasr_session_input_sample_rate(handle);
     }
 
     /**
