@@ -368,6 +368,43 @@ namespace CrispASR
             }
         }
 
+        /// <summary>
+        /// Speech-to-speech: audio in → audio out through a single model pass,
+        /// on backends with S2S capability (lfm2-audio, mini-omni2, sidon,
+        /// voxcpm2-vae). Input is 16 kHz mono float32 PCM. Returns the output
+        /// PCM plus the intermediate ASR transcript (may be <c>null</c>).
+        /// </summary>
+        public (float[] pcm, string? transcript) SpeechToSpeech(float[] input)
+        {
+            var ptr = NativeMethods.crispasr_session_speech_to_speech(
+                Handle, input, input.Length, out IntPtr textPtr, out int nSamples);
+            if (ptr == IntPtr.Zero || nSamples <= 0)
+                throw new InvalidOperationException(
+                    "SpeechToSpeech returned no audio (backend may not support S2S)");
+            try
+            {
+                var pcm = new float[nSamples];
+                Marshal.Copy(ptr, pcm, 0, nSamples);
+                string? transcript = null;
+                if (textPtr != IntPtr.Zero)
+                {
+                    transcript = Marshal.PtrToStringUTF8(textPtr);
+                    NativeMethods.crispasr_session_translate_text_free(textPtr);
+                }
+                return (pcm, transcript);
+            }
+            finally
+            {
+                NativeMethods.crispasr_pcm_free(ptr);
+            }
+        }
+
+        /// <summary>
+        /// The sample rate the backend expects for input PCM (16000 for
+        /// Whisper-family backends, 0 on error).
+        /// </summary>
+        public int InputSampleRate() => NativeMethods.crispasr_session_input_sample_rate(Handle);
+
         // ----------------------------------------------------------------
         // ASR Transcription
         // ----------------------------------------------------------------
@@ -381,6 +418,24 @@ namespace CrispASR
         {
             var r = NativeMethods.crispasr_session_transcribe_lang(Handle, pcm, pcm.Length, language);
             if (r == IntPtr.Zero) throw new InvalidOperationException("Transcription failed");
+            try { return ExtractSegments(r); }
+            finally { NativeMethods.crispasr_session_result_free(r); }
+        }
+
+        /// <summary>
+        /// Chunked-encode transcribe (issue #208): forces the Parakeet backend
+        /// through its bounded overlapping-window long-form path so long audio
+        /// transcribes in bounded time without dropping sections. Inert
+        /// (== <see cref="TranscribeLang"/>) on non-Parakeet backends.
+        /// <paramref name="chunkSeconds"/> &lt;= 0 keeps the per-model default
+        /// window; <paramref name="overlapSeconds"/> &lt; 0 keeps the default overlap.
+        /// </summary>
+        public Segment[] TranscribeChunked(float[] pcm, int chunkSeconds = 0, int overlapSeconds = -1,
+                                           string? language = null)
+        {
+            var r = NativeMethods.crispasr_session_transcribe_chunked_lang(
+                Handle, pcm, pcm.Length, chunkSeconds, overlapSeconds, language);
+            if (r == IntPtr.Zero) throw new InvalidOperationException("Chunked transcription failed");
             try { return ExtractSegments(r); }
             finally { NativeMethods.crispasr_session_result_free(r); }
         }
