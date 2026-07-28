@@ -75,6 +75,8 @@ jobs:
     name: Publish Rust wrapper to crates.io
     runs-on: ubuntu-latest
     continue-on-error: true
+    outputs:
+      status: ${{ steps.record.outputs.status }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -86,6 +88,7 @@ jobs:
       # crates.io's API returns 403 to requests without a User-Agent, so the
       # probe MUST send one — otherwise it always reads as "does not exist".
       - name: crates.io config check
+        id: cfg
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
@@ -141,6 +144,7 @@ jobs:
       # crispasr-sys must be on crates.io before the high-level crate's version
       # dep resolves, hence the ordering and the index wait below.
       - name: Publish crispasr-sys
+        id: pub_sys
         if: steps.crate_ver.outputs.sys_exists != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
@@ -151,15 +155,35 @@ jobs:
         run: sleep 30
 
       - name: Publish crispasr
+        id: pub_wrap
         if: steps.crate_ver.outputs.wrap_exists != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --no-verify --manifest-path crispasr/Cargo.toml --allow-dirty
 
+      # Job-level outputs, because `needs.<job>.result` CANNOT express this: with
+      # continue-on-error the result is reported as 'success' even when the job
+      # failed, so a summary keyed on it is itself a check that cannot go red.
+      - name: Record outcome
+        id: record
+        if: always()
+        run: |
+          if [ "${{ steps.cfg.outcome }}" != "success" ]; then
+              echo "status=skipped" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          for o in "${{ steps.pub_sys.outcome }}" "${{ steps.pub_wrap.outcome }}"; do
+              case "$o" in
+                  failure|cancelled) echo "status=failed" >> "$GITHUB_OUTPUT"; exit 0 ;;
+              esac
+          done
+          echo "status=ok" >> "$GITHUB_OUTPUT"
+
   publish-pub-dev:
     name: Publish Dart wrapper to pub.dev
     runs-on: ubuntu-latest
     continue-on-error: true
+    outputs:
+      status: ${{ steps.record.outputs.status }}
     environment:
       name: pub.dev
       url: https://pub.dev/packages/crispasr
@@ -176,6 +200,7 @@ jobs:
       # is interactive only). Probe and bail fast if the package is
       # missing.
       - name: pub.dev bootstrap check
+        id: cfg
         run: |
           if ! curl -sf -o /dev/null https://pub.dev/api/packages/crispasr; then
             echo "::warning::pub.dev package 'crispasr' does not exist yet."
@@ -217,11 +242,24 @@ jobs:
         uses: dart-lang/setup-dart@v1
 
       - name: Publish
+        id: pub
         if: steps.pub_check.outputs.exists != 'true'
         working-directory: flutter/crispasr
         run: |
           dart pub get
           dart pub publish --force
+
+      - name: Record outcome
+        id: record
+        if: always()
+        run: |
+          if [ "${{ steps.cfg.outcome }}" != "success" ]; then
+              echo "status=skipped" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          case "${{ steps.pub.outcome }}" in
+              failure|cancelled) echo "status=failed" >> "$GITHUB_OUTPUT" ;;
+              *)                 echo "status=ok"     >> "$GITHUB_OUTPUT" ;;
+          esac
 
   # ── Did anything actually publish? ──────────────────────────────────────────
   #
@@ -233,6 +271,13 @@ jobs:
   #
   # This job restores the signal without coupling the registries: they still run
   # independently, and the run turns red if any of them failed.
+  #
+  # It reads each job's `status` OUTPUT, not `needs.<job>.result`. That distinction
+  # is the whole point: `continue-on-error: true` makes a FAILED job report
+  # `result == 'success'`, so the first version of this gate passed while pub.dev
+  # was failing — a check that could not go red, which is the bug it exists to
+  # catch. Verified against the real thing: the v0.8.24 dispatch had crates.io
+  # publishing and pub.dev rejected, and only the output-based version goes red.
   publish-summary:
     name: Publish summary (fails if any registry did not publish)
     runs-on: ubuntu-latest
@@ -240,13 +285,18 @@ jobs:
     if: always()
     steps:
       - name: Report
+        env:
+          CRATES: ${{ needs.publish-crates-io.outputs.status }}
+          PUBDEV: ${{ needs.publish-pub-dev.outputs.status }}
         run: |
-          echo "crates.io : ${{ needs.publish-crates-io.result }}"
-          echo "pub.dev   : ${{ needs.publish-pub-dev.result }}"
+          echo "crates.io : ${CRATES:-unknown}"
+          echo "pub.dev   : ${PUBDEV:-unknown}"
           failed=0
-          for r in "${{ needs.publish-crates-io.result }}" "${{ needs.publish-pub-dev.result }}"; do
-              case "$r" in
-                  success|skipped) ;;
+          for s in "$CRATES" "$PUBDEV"; do
+              case "$s" in
+                  ok|skipped) ;;
+                  # empty means the job died before recording — treat as failure,
+                  # never as success; that is how this went unnoticed before.
                   *) failed=1 ;;
               esac
           done
