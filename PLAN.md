@@ -54,6 +54,12 @@ upstream may not have had the right to relicense as Apache-2.0. This is
 engineering judgement, not legal advice — but it means publishing the file to
 `cstr/g2p-dicts` needs upstream clarification FIRST, not a default.
 
+**RESOLVED 2026-07-28 by not redistributing at all:** the runtime now fetches
+misaki's JSON straight from raw.githubusercontent.com/hexgrad/misaki, pinned to
+commit fba12365. CrispASR hosts nothing, so the Apache-2.0/GPL question is
+upstream's to answer, not ours. `tools/convert-misaki-lexicon.py` remains for
+offline/air-gapped use.
+
 Nothing currently depends on resolving it: `tools/convert-misaki-lexicon.py`
 generates the file from the user's own `pip install misaki`, and
 `phonemize_misaki_en()` returns false when it is absent so kokoro falls back to
