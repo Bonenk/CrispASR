@@ -24,11 +24,29 @@ name: Release language wrappers
 #               https://pub.dev/packages/crispasr/admin pointing to this repo
 #               + tag pattern `v{{version}}`.
 #
+#               ⚠ AS OF v0.8.24 THIS IS NOT WHAT pub.dev IS SET TO. The publish
+#               is rejected before upload with:
+#                 "publishing is configured to only be allowed from actions with
+#                  specific ref pattern, this token has 'refs/tags/v0.8.24' ...
+#                  Expected tag 'crispasr-v0.8.24'"
+#               i.e. the admin page still holds pub.dev's monorepo default,
+#               `{{package}}-v{{version}}`. Nothing in this repo can override it —
+#               pub.dev checks the ref the workflow RUNS on. Either set the
+#               pattern to `v{{version}}` on the admin page (one click, matches
+#               this workflow and the rest of the release), or switch this repo to
+#               pushing `crispasr-v<version>` tags as well. Until then the Dart
+#               wrapper must be published manually and pub.dev stays behind — it
+#               is currently at 0.8.22.
+#
 # The non-PyPI jobs use `continue-on-error: true` so a single misconfigured
 # registry doesn't fail the whole workflow — the others still attempt to
 # publish. Each job also runs a fast precheck that prints a clear
 # "skipping: <registry> not configured" message instead of letting `cargo`
 # / `twine` emit cryptic auth errors deep in the log.
+#
+# `publish-summary` (last job) then re-fails the RUN if any registry did not
+# publish. Without it, continue-on-error made the workflow report success while
+# both publishes failed — which is precisely what happened on v0.8.24.
 
 # Bootstrap is complete (crispasr-sys + crispasr on crates.io, crispasr on
 # pub.dev — all first-published manually 2026-07), so the tag trigger is live:
@@ -106,15 +124,27 @@ jobs:
             echo "wrap_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # On CI (clean checkout) build.rs runs cmake to build libcrispasr for the
-      # verification build — submodules must be present (checkout above uses
-      # submodules: recursive). crispasr-sys must be on crates.io before the
-      # high-level crate's version dep resolves.
+      # --no-verify is REQUIRED, not a shortcut. `cargo publish` verifies by
+      # unpacking the tarball to target/package/ and building it there — but the
+      # package deliberately does NOT vendor the C/C++ sources, so build.rs finds
+      # no parent CMakeLists.txt and panics with the actionable message added in
+      # 6ad6d444 ("set CRISPASR_LIB_DIR, or depend via git"). That message is
+      # correct for a crates.io consumer and fatal for the verification build, so
+      # making off-repo consumers work is exactly what broke publishing: v0.8.24
+      # failed here with "failed to verify package tarball".
+      #
+      # A tarball that cannot self-build is the documented contract for this
+      # crate, so there is nothing for verification to prove. What DOES need
+      # proving — that the FFI compiles against the real ABI — is covered by CI
+      # on every push (cargo check on both crates), not by this step.
+      #
+      # crispasr-sys must be on crates.io before the high-level crate's version
+      # dep resolves, hence the ordering and the index wait below.
       - name: Publish crispasr-sys
         if: steps.crate_ver.outputs.sys_exists != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --manifest-path crispasr-sys/Cargo.toml --allow-dirty
+        run: cargo publish --no-verify --manifest-path crispasr-sys/Cargo.toml --allow-dirty
 
       - name: Wait for crispasr-sys to index
         if: steps.crate_ver.outputs.sys_exists != 'true'
@@ -124,7 +154,7 @@ jobs:
         if: steps.crate_ver.outputs.wrap_exists != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --manifest-path crispasr/Cargo.toml --allow-dirty
+        run: cargo publish --no-verify --manifest-path crispasr/Cargo.toml --allow-dirty
 
   publish-pub-dev:
     name: Publish Dart wrapper to pub.dev
@@ -192,3 +222,36 @@ jobs:
         run: |
           dart pub get
           dart pub publish --force
+
+  # ── Did anything actually publish? ──────────────────────────────────────────
+  #
+  # The jobs above are `continue-on-error: true` so one misconfigured registry
+  # does not stop the others from trying. That is the right behaviour, but on its
+  # own it made the WORKFLOW report success while BOTH publishes failed — which
+  # is how v0.8.24 tagged with neither crates.io nor pub.dev updated, and nothing
+  # anywhere said so. A green check that cannot go red is not a check.
+  #
+  # This job restores the signal without coupling the registries: they still run
+  # independently, and the run turns red if any of them failed.
+  publish-summary:
+    name: Publish summary (fails if any registry did not publish)
+    runs-on: ubuntu-latest
+    needs: [publish-crates-io, publish-pub-dev]
+    if: always()
+    steps:
+      - name: Report
+        run: |
+          echo "crates.io : ${{ needs.publish-crates-io.result }}"
+          echo "pub.dev   : ${{ needs.publish-pub-dev.result }}"
+          failed=0
+          for r in "${{ needs.publish-crates-io.result }}" "${{ needs.publish-pub-dev.result }}"; do
+              case "$r" in
+                  success|skipped) ;;
+                  *) failed=1 ;;
+              esac
+          done
+          if [ "$failed" = "1" ]; then
+              echo "::error::at least one wrapper registry did not publish — see the job logs above"
+              exit 1
+          fi
+          echo "all configured registries published (or were already up to date)"
