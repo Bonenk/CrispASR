@@ -931,12 +931,14 @@ static inline ggml_tensor* kv_self_attn(ggml_context* ctx0, ggml_cgraph* gf, ggm
     // ---- Permute Q to (hd, T, n_q) for flash-attn ----
     Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
 
-    // ---- Attention: flash by default, or explicit eager with F32-forced scores
-    // (CRISPASR_CORE_ATTN_EAGER_F32=1). The eager path — the same one llama.cpp
-    // uses for LM decode — forces `ggml_mul_mat_set_prec(scores, GGML_PREC_F32)` so
-    // the QK^T scores stay accurate enough that a near-degenerate softmax does NOT
-    // flip which key wins. flash_attn_ext's reduced-precision scores flip it, which
-    // is the MOSS-TTS-Local 4B backbone divergence at layer 10 (#249). ----
+    // ---- Attention: flash by default, or explicit eager (CRISPASR_CORE_ATTN_EAGER_F32
+    // =1). The eager path is the full-scores softmax llama.cpp uses for LM decode:
+    // mul_mat QK^T -> soft_max_ext -> mul_mat V. Unlike flash_attn_ext's streaming
+    // (online) softmax, it computes the whole score row before normalizing, so at a
+    // near-degenerate (attention-sink) softmax it can land on a different side of a
+    // sub-ε tie — the candidate mechanism for the MOSS-TTS-Local 4B layer-10
+    // divergence (#249). ggml_mul_mat_set_prec(F32) additionally forces F32 score
+    // accumulation on CUDA/Metal (a no-op on CPU, which is already F32). ----
     // env overrides the per-call param: unset -> use p.eager_f32_attn; 0/1 forces.
     static const int s_eager_env = []() {
         const char* s = std::getenv("CRISPASR_CORE_ATTN_EAGER_F32");
@@ -951,7 +953,11 @@ static inline ggml_tensor* kv_self_attn(ggml_context* ctx0, ggml_cgraph* gf, ggm
         ggml_mul_mat_set_prec(scores, GGML_PREC_F32);
         scores = ggml_soft_max_ext(ctx0, scores, causal_mask, p.attn_scale, 0.0f);
         ggml_tensor* Vt = ggml_cont(ctx0, ggml_transpose(ctx0, Vfull)); // (Lk, hd, n_q)
-        attn = ggml_mul_mat(ctx0, Vt, scores);                          // (hd, T, n_q)
+        attn = ggml_mul_mat(ctx0, Vt, scores);                          // (hd, T, n_q) = [d, query, head]
+        // Match flash_attn_ext's (hd, n_q, T) = [d, head, query] layout so the shared
+        // reshape_2d(hd*n_q, T) below packs [head,query] correctly (else it scrambles
+        // heads with queries — cos -0.05).
+        attn = ggml_cont(ctx0, ggml_permute(ctx0, attn, 0, 2, 1, 3)); // (hd, n_q, T)
     } else {
         attn = ggml_flash_attn_ext(ctx0, Q, Kfull, Vfull, causal_mask, p.attn_scale, /*max_bias*/ 0.0f,
                                    /*logit_softcap*/ 0.0f);
