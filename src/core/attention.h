@@ -617,6 +617,15 @@ struct KvSelfAttnParams {
     // Default false → legacy F16 fast path on Metal/CPU. Caller sets it true only
     // for the Vulkan-native graph.
     bool force_kv_read_f32 = false;
+    // Use explicit eager attention (mul_mat + soft_max_ext) with the QK^T scores
+    // forced to GGML_PREC_F32, instead of ggml_flash_attn_ext. Slower, but the F32
+    // scores are precise enough that a near-degenerate softmax doesn't flip which
+    // key wins — required for MOSS-TTS-Local's 4B backbone, whose 2-way stop head
+    // is sensitive to a sub-ε score error at layer ~10 (#249). This is the same
+    // eager+F32 attention llama.cpp uses for LM decode. Default false →
+    // flash_attn_ext perf path for every other (non-sensitive) backend. Env
+    // CRISPASR_CORE_ATTN_EAGER_F32 overrides per-run for A/B testing.
+    bool eager_f32_attn = false;
 };
 
 // KV-cached self-attention. Writes the new K/V into the persistent cache
@@ -922,9 +931,31 @@ static inline ggml_tensor* kv_self_attn(ggml_context* ctx0, ggml_cgraph* gf, ggm
     // ---- Permute Q to (hd, T, n_q) for flash-attn ----
     Q = ggml_cont(ctx0, ggml_permute(ctx0, Q, 0, 2, 1, 3));
 
-    // ---- Flash attention + reshape + output projection ----
-    ggml_tensor* attn = ggml_flash_attn_ext(ctx0, Q, Kfull, Vfull, causal_mask, p.attn_scale, /*max_bias*/ 0.0f,
-                                            /*logit_softcap*/ 0.0f);
+    // ---- Attention: flash by default, or explicit eager with F32-forced scores
+    // (CRISPASR_CORE_ATTN_EAGER_F32=1). The eager path — the same one llama.cpp
+    // uses for LM decode — forces `ggml_mul_mat_set_prec(scores, GGML_PREC_F32)` so
+    // the QK^T scores stay accurate enough that a near-degenerate softmax does NOT
+    // flip which key wins. flash_attn_ext's reduced-precision scores flip it, which
+    // is the MOSS-TTS-Local 4B backbone divergence at layer 10 (#249). ----
+    // env overrides the per-call param: unset -> use p.eager_f32_attn; 0/1 forces.
+    static const int s_eager_env = []() {
+        const char* s = std::getenv("CRISPASR_CORE_ATTN_EAGER_F32");
+        if (!s || !*s)
+            return -1;
+        return std::strcmp(s, "0") != 0 ? 1 : 0;
+    }();
+    const bool use_eager = (s_eager_env >= 0) ? (s_eager_env == 1) : p.eager_f32_attn;
+    ggml_tensor* attn;
+    if (use_eager) {
+        ggml_tensor* scores = ggml_mul_mat(ctx0, Kfull, Q); // (Lk, T, n_q)
+        ggml_mul_mat_set_prec(scores, GGML_PREC_F32);
+        scores = ggml_soft_max_ext(ctx0, scores, causal_mask, p.attn_scale, 0.0f);
+        ggml_tensor* Vt = ggml_cont(ctx0, ggml_transpose(ctx0, Vfull)); // (Lk, hd, n_q)
+        attn = ggml_mul_mat(ctx0, Vt, scores);                          // (hd, T, n_q)
+    } else {
+        attn = ggml_flash_attn_ext(ctx0, Q, Kfull, Vfull, causal_mask, p.attn_scale, /*max_bias*/ 0.0f,
+                                   /*logit_softcap*/ 0.0f);
+    }
     if (dbg_dump) {
         ggml_set_name(attn, "DBG_fa_out");
         ggml_set_output(attn);
