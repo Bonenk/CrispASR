@@ -117,12 +117,21 @@ against the HF reference (`OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5`,
    flips which key wins), which is enough to flip the model's fragile 2-way stop
    margin. The audio is robust to this; only the binary stop is fragile — exactly
    why the reference stops ~18 and we run to ~55 despite identical math. Practical
-   consequence: don't keep hunting an op (there isn't one). The real fix is
-   **stop-robustness** (match the reference's exact stop threshold/hysteresis, or
-   force the backbone attention to accumulate closer to torch), not a weight or
-   graph correction. **UNTESTED caveat:** flash-vs-eager was verified equal only at
-   layer 0; a single kernel at `DUMP_FA_LAYER=10` (the peaked layer) would confirm
-   ggml flash doesn't diverge from eager under saturation before fully closing this.
+   consequence: don't keep hunting an op (there isn't one) and don't reach for
+   higher precision — f16 and f32 weights give **byte-identical** divergence, so no
+   tensor's precision is the lever. **CONFIRMED at layer 10 (not inferred):** with
+   the block-9 input only 0.63% off (cos 0.999984), pre-RoPE Q/K diverge just 1.06%
+   (ratio 1.7× — the qk-norm/projection do NOT inflate) and our flash-attn is
+   byte-exact to eager (cos 1.0), yet the attn *output* is cos 0.972 (l2rel 23%).
+   The 1%→23% jump can only be the **softmax**: layer 10's attention is saturated
+   (attention-sink), so a sub-percent Q·K shift flips which key wins. It is a
+   correct-but-ill-conditioned function, not a miscomputed one. The reference stop
+   itself has NO threshold/hysteresis (`do_sample=True, text_temperature=1.0,
+   text_top_k=50, text_top_p=1.0`, per-frame multinomial on the 2-way head — and
+   ours already matches it exactly), so there is no stop-side knob either: the
+   reference's gap *collapses* to ~0.5 at the natural end while ours stays ~9 (from
+   the teacher-force trace), and quant noise only occasionally jitters ours into a
+   sampled stop (why q4_k is least-bad and q6_k/q8_0 stall).
    LESSON: when a marginal decision (a 2-way sampled stop) misbehaves, diff the
    *hidden-state trajectory* per-layer AND split each block into attn/MLP — and
    before blaming precision, re-run at f32: identical numbers mean the bug is
