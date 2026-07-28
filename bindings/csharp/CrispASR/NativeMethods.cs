@@ -216,6 +216,21 @@ namespace CrispASR
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern void crispasr_pcm_free(IntPtr pcm);
 
+        // Speech-to-speech — audio in → audio out via a single model pass
+        // (lfm2-audio, mini-omni2, sidon, voxcpm2-vae). Returns malloc'd float32
+        // PCM (free via crispasr_pcm_free); outText, when non-null, receives the
+        // intermediate transcript (malloc'd, free via
+        // crispasr_session_translate_text_free).
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr crispasr_session_speech_to_speech(
+            IntPtr s, float[] inSamples, int nInSamples,
+            out IntPtr outText, out int outNSamples);
+
+        // Sample rate the backend expects for input PCM (16000 for
+        // Whisper-family backends, 0 on error).
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_session_input_sample_rate(IntPtr s);
+
         // ---- ASR transcription ----
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr crispasr_session_transcribe(
@@ -224,6 +239,19 @@ namespace CrispASR
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr crispasr_session_transcribe_lang(
             IntPtr s, float[] pcm, int nSamples,
+            [MarshalAs(UnmanagedType.LPUTF8Str)] string? language);
+
+        // Chunked-encode transcribe (issue #208): forces the Parakeet backend
+        // through its bounded overlapping-window long-form path. chunkSeconds<=0
+        // keeps the per-model default window; overlapSeconds<0 keeps the default
+        // overlap. Inert (== transcribe[_lang]) on non-Parakeet backends.
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr crispasr_session_transcribe_chunked(
+            IntPtr s, float[] pcm, int nSamples, int chunkSeconds, int overlapSeconds);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern IntPtr crispasr_session_transcribe_chunked_lang(
+            IntPtr s, float[] pcm, int nSamples, int chunkSeconds, int overlapSeconds,
             [MarshalAs(UnmanagedType.LPUTF8Str)] string? language);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
