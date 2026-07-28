@@ -902,7 +902,7 @@ jobs:
         with:
           tag_name: ${{ needs.determine-tag.outputs.tag_name }}
           files: crispasr-${{ needs.determine-tag.outputs.tag_name }}-xcframework.zip
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
 
   android:
     if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' ||

@@ -220,7 +220,12 @@ jobs:
     name: model-registry URLs resolve
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
-    continue-on-error: true
+    # continue-on-error was REMOVED. It existed because the checker exited 1 on
+    # any unreachable URL, including a transient HF connection reset — but it
+    # also meant this job could never go red, so a genuinely deleted model would
+    # have been reported in a log nobody opens. check-registry-urls.py now fails
+    # only on 404/410 (a server that answered "gone") and downgrades timeouts,
+    # resets and 5xx to warnings, so the job can be strict without being flaky.
     steps:
       - uses: actions/checkout@v6
       - name: Set up Python
