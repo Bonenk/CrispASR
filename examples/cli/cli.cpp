@@ -520,6 +520,7 @@ static bool whisper_params_parse_arg_backend_vad(int argc, char** argv, int& i, 
         params.diarize_cluster_threshold = std::stof(ARGV_NEXT);
     } else if (arg == "--diarize-max-speakers") {
         params.diarize_max_speakers = std::stoi(ARGV_NEXT);
+        params.diarize_max_speakers_explicit = true;
     } else if (arg == "--diarize-num-speakers") {
         // >0 pins the speaker count for --diarize-method foxnose, skipping
         // automatic estimation entirely.
