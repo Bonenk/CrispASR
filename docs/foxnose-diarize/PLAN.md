@@ -59,38 +59,52 @@ Clustering + smoothing + pipeline: **375 assertions over 57 hermetic cases**
 (no model, no audio, no network), including an end-to-end synthetic
 2-speaker timeline at **DER 0.0**.
 
-## ⚠ The open problem: automatic speaker counting
+## Speaker counting — solved by switching estimator
 
-The embedder and the clustering are fine. Counting is not. Measured on
-`samples/multispeaker.wav` (31.5 s; opens with all 11 s of `samples/jfk.wav`
-then changes speaker):
+The upstream estimator (PCA + full-covariance GMM BIC, refined by silhouette)
+does not work on real speaker embeddings. Silhouette saturates and climbs
+monotonically to whatever ceiling it is given: within-speaker cosine is only
+~0.595 while cross-speaker is ~0.100, so splitting a real speaker keeps
+cutting the intra-cluster term while the inter-cluster term barely moves.
 
-| config | speakers | turns |
+Replaced by the **eigengap** of the normalised Laplacian — the standard
+estimator for spectral diarization. It reads cluster structure off the
+spectrum rather than scoring partitions, so saturation does not arise.
+
+One thing it needs that the upstream affinity does not provide: the cosine
+affinity `(cos+1)/2` is DENSE, sitting near 0.5 even for unrelated windows, so
+the graph is nearly complete, the spectrum has one dominant eigenvalue, and
+the largest gap is always at k=1 — a naive eigengap reports one speaker for
+everything. Row-wise thresholding (keep each row's strongest 15%, attenuate
+the rest by 0.01 rather than deleting them so the graph stays connected, then
+symmetrise with an elementwise max) restores the block structure.
+
+Measured:
+
+| | synthetic, 5 true-k cases | real audio, `max_speakers=8` |
 |---|---|---|
-| `num_speakers=2` (pinned) | 2 | **correct** — boundary at 10.5 s vs the true 11 s |
-| auto, `max_speakers=4` | 2 | **correct**, same turns |
-| auto, `max_speakers=8` | 8 | wrong, heavy flicker |
-| auto, `max_speakers=8`, `FULL_K_SEARCH=1` | 8 | gate does not help |
+| BIC + silhouette (upstream) | 4/5 exact | **7-8 speakers** — saturated |
+| eigengap, no thresholding | 0/5 — always k=1 | — |
+| **eigengap + row thresholding** | **5/5 exact** | **2 speakers, correct turns** |
 
-Root cause: **silhouette saturates and rises monotonically to the ceiling on
-real speaker embeddings.** Within-speaker cosine is only ~0.595 while
-cross-speaker is ~0.100 (measured, tests/test_wespeaker_live.cpp), so
-splitting one speaker into sub-clusters cuts the intra-cluster term `a`
-sharply while the inter-cluster term `b` barely moves. The
-`+ 0.04 * log(k)` bonus then pushes the choice to the top of the allowed
-range. Upstream defaults `max_speakers` to 20, which is why their README
-concedes it "struggles with 8+ speakers".
+Eigengap is also cheaper: one eigendecomposition instead of a GMM sweep plus
+`max_k` spectral runs for silhouette scoring. It wins on quality AND speed, so
+it is the DEFAULT; `CRISPASR_DIARIZE_COUNT=bic` restores the upstream path,
+which is gated rather than deleted.
 
-Two earlier findings, both already fixed or gated:
+Because eigengap is robust to a loose bound, `--diarize-max-speakers` no
+longer has to be defensively small: the foxnose default went back from 4 to 8,
+so a genuine 5-6 speaker meeting is reachable again.
+
+Two earlier findings, both still in force for the gated BIC path:
 
 * the upstream component ceiling of `n/2 + 1` is far too loose for a FULL
-  covariance (not estimable from fewer than `d+1` points), so BIC fell
-  monotonically — bounded by `n/(d+1)`;
+  covariance (not estimable from fewer than `d+1` points) — bounded by
+  `n/(d+1)`;
 * the `[k-2, k+3]` window recovers an under-count but not a large over-count
-  — `CRISPASR_DIARIZE_FULL_K_SEARCH=1` scores the whole range instead (5/5
-  vs 4/5 exact on synthetic data), gated off pending DER.
+  — `CRISPASR_DIARIZE_FULL_K_SEARCH=1` scores the whole range instead.
 
-### What would settle it
+### What would still settle it properly
 
 A DER number on labelled audio. There is none in the repo and none in
 `cstr/crispasr-regression-fixtures` — this was checked. VoxConverse dev (what

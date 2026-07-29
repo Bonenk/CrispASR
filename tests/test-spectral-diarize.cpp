@@ -381,27 +381,50 @@ TEST_CASE("cluster_speakers: auto-detects the blob count", "[unit][spectral]") {
 //
 // The default stays faithful to upstream; the DER harness decides whether to
 // flip it. This test pins BOTH arms so neither can regress unnoticed.
-TEST_CASE("cluster_speakers: full-k search recovers a BIC over-count", "[unit][spectral]") {
+TEST_CASE("cluster_speakers: eigengap (the default) recovers the true count", "[unit][spectral]") {
+    // The BIC + silhouette estimator over-counts here: it anchors at 8 and its
+    // [k-2, k+3] window can never reach 3. Eigengap reads the count off the
+    // Laplacian spectrum instead and gets it right, which is why it is the
+    // default (see count_method_from_env()).
     const int k = 3, per = 25, d = 32;
     auto x = make_blobs(k, per, d, 1.0f, 66, 6.0f);
     const int n = k * per;
 
+    unsetenv("CRISPASR_DIARIZE_COUNT");
     unsetenv("CRISPASR_DIARIZE_FULL_K_SEARCH");
-    SpeakerEstimate est_default;
-    auto lab_default = cluster_speakers(x.data(), n, d, 1, 10, 0, &est_default);
-    const size_t k_default = std::set<int>(lab_default.begin(), lab_default.end()).size();
+    SpeakerEstimate est;
+    auto lab = cluster_speakers(x.data(), n, d, 1, 10, 0, &est);
+    INFO("default estimator gave k = " << est.best_k << " via " << est.reason);
+    CHECK(std::string(est.reason) == "eigengap");
+    CHECK(partition_matches_blobs(lab, k, per));
+}
+
+// Regression guard for the GATED legacy path and its known weakness. BIC
+// over-counts on low-rank embedding sets; the [k-2, k+3] window climbs down
+// from a small over-count but not a large one (true k=3 anchored at 8 leaves
+// the window at [6,10]). Silhouette itself is reliable — it scored the true k
+// at 1.0390 against 0.68/0.79 for its neighbours — so searching the full range
+// recovers it. Both arms are pinned so neither regresses unnoticed.
+TEST_CASE("cluster_speakers: full-k search rescues the legacy BIC over-count", "[unit][spectral]") {
+    const int k = 3, per = 25, d = 32;
+    auto x = make_blobs(k, per, d, 1.0f, 66, 6.0f);
+    const int n = k * per;
+
+    setenv("CRISPASR_DIARIZE_COUNT", "bic", 1);
+    unsetenv("CRISPASR_DIARIZE_FULL_K_SEARCH");
+    SpeakerEstimate est_window;
+    auto lab_window = cluster_speakers(x.data(), n, d, 1, 10, 0, &est_window);
+    const size_t k_window = std::set<int>(lab_window.begin(), lab_window.end()).size();
 
     setenv("CRISPASR_DIARIZE_FULL_K_SEARCH", "1", 1);
     SpeakerEstimate est_full;
     auto lab_full = cluster_speakers(x.data(), n, d, 1, 10, 0, &est_full);
     unsetenv("CRISPASR_DIARIZE_FULL_K_SEARCH");
+    unsetenv("CRISPASR_DIARIZE_COUNT");
 
-    INFO("default k = " << k_default << ", full-search k = " << est_full.best_k);
-    // The gate must actually reach the truth.
-    CHECK(partition_matches_blobs(lab_full, k, per));
-    // And it must be doing something different from the default here, or the
-    // gate has silently stopped working.
-    CHECK(k_default != (size_t)k);
+    INFO("bic+window k = " << k_window << ", bic+full-search k = " << est_full.best_k);
+    CHECK(partition_matches_blobs(lab_full, k, per)); // the gate reaches the truth
+    CHECK(k_window != (size_t)k);                     // and the window still does not
 }
 
 TEST_CASE("cluster_speakers: is deterministic", "[unit][spectral]") {

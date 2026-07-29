@@ -45,7 +45,12 @@ static int mkstemps(char* t, int s) {
 
 // #324: conservative ceiling for foxnose speaker-count estimation. See the
 // comment at its use site — this is an empirical value, not a guess.
-static constexpr int kFoxnoseDefaultMaxSpeakers = 4;
+// Was 4 while the BIC + silhouette estimator saturated at whatever ceiling it
+// was given. The eigengap estimator (now the default) is robust to a loose
+// bound — measured 2 speakers at max=8 on samples/multispeaker.wav where BIC
+// reported 8 — so this no longer has to be defensively small, and a genuine
+// 5-6 speaker meeting is reachable again.
+static constexpr int kFoxnoseDefaultMaxSpeakers = 8;
 #endif
 
 namespace {
