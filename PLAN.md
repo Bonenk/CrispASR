@@ -17,7 +17,19 @@ A/B-verified on Kaggle before pushing, both compilers, 8/8: Debug rc 134 -> 0 an
 Release segments BYTE-IDENTICAL, so the precondition fix does not move output.
 Confirmed in CI afterwards: ubuntu-22-gcc (Debug) and gcc-arm64 (Debug) now pass.
 
-**2. OPEN — `core_adaln` fails ONLY in CI's ubuntu-22-clang legs.**
+**2. NARROWED (mitigated, root cause upstream) — `core_adaln` under -march=native.**
+
+UPDATE after pinning GGML_NATIVE=OFF: both clang legs went GREEN. That is positive
+evidence, not just an absence — the trigger IS native-ISA codegen on the runner's
+CPU. My earlier "NOT -march=native" conclusion was a FALSE NEGATIVE: the box I
+reproduced on advertises avx512f/bw/cd/dq/vl but NOT VNNI or BF16, which GitHub's
+Ice Lake runners do and which ggml has dedicated kernels for. Compiling those
+paths there is possible; executing them is not. So the honest statement is: a ggml
+CPU kernel selected only under -march=native on a VNNI/BF16-capable CPU (clang 14)
+computes a small mul_mat/norm chain wrongly — max|Δ| ~2.0, not rounding. That is
+an upstream ggml issue, not core/adaln.h, which is plain graph construction.
+
+Original elimination trail, kept because it is what narrowed it:
 tests/test-core-adaln.cpp compares the modulate6 + apply_norm_modulation graph
 against a plain-float reference, tolerance 1e-4. In CI's clang legs (Debug AND
 Release) it reports max|Δ| 0.658075 and 1.962485 — four orders out, so not FP
@@ -38,8 +50,8 @@ ggml has dedicated paths for both), and CI drives the test through ctest rather
 than standalone. I can compile those paths on Kaggle but cannot execute them, so
 the discrepancy is not reproducible with the hardware available here.
 
-Mitigation, NOT a fix: build.yml's x86 gcc and clang jobs now pass
--DGGML_NATIVE=OFF, matching what the arm64 job in the same file already did and
+Mitigation (and, as it turns out, confirmation): build.yml's x86 gcc and clang
+jobs now pass -DGGML_NATIVE=OFF, matching what the arm64 job in the same file already did and
 what release.yml uses for every shipped binary. CI builds stop depending on
 whichever CPU the runner happens to be. Shipped artifacts were never affected
 (release.yml pins GGML_NATIVE=OFF). If this recurs, the next step is a per-op
