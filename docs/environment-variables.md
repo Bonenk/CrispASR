@@ -717,6 +717,17 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
 
 - `CRISPASR_MP3_ENCODER`
 
+### Diarization — foxnose (#324)
+
+- `CRISPASR_DIARIZE_COUNT` — speaker-count estimator: `bic` (default, the
+  upstream GMM/BIC + silhouette sweep) or `eigengap`. Eigengap is better on
+  well-separated synthetic data and cheaper, but under-counts on real speech
+  (11.4 % vs 5.3 % DER on VoxConverse) — see `docs/foxnose-diarize/PLAN.md`
+- `CRISPASR_DIARIZE_FULL_K_SEARCH` — score the full `[min, max]` speaker range
+  on silhouette instead of a `[k-2, k+3]` window around the BIC anchor
+- `CRISPASR_WESPEAKER_BENCH` — per-stage embedder timings (fbank / resnet)
+- `CRISPASR_WESPEAKER_DEBUG` — embedder diagnostics
+
 ### GigaAM-v3
 
 - `CRISPASR_GIGAAM_BENCH` — per-stage timings (mel / encoder / decode)
