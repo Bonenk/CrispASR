@@ -60,12 +60,28 @@ RMS_NORM+MUL fusion, `540ffc4f`/`e9eaaef3` concat f16/bf16.
 
 ## Two collisions to resolve BEFORE any sync
 
-1. **`col2im_1d` now exists upstream** (`fda9d536`, by Pascal). We have our own
-   implementation (PR #160), and `ggml-metal-device.m:1372` literally carries the
-   marker `// CrispASR patch (PR #160 col2im_1d) — MUST RE-APPLY after ggml bump`.
-   Upstream's op and ours will collide on signature and dispatch.
-   **Consequence: `upstream-prs/20-col2im-1d-new-op.md` is superseded — do not file
-   it.** Adopt upstream's op and delete ours rather than maintaining a duplicate.
+1. **`col2im_1d` now exists upstream** (`fda9d536`, by Pascal) — and it is NOT the
+   same op as ours despite an identical name and signature. Verified against both
+   headers during the 2026-07-29 merge:
+
+       upstream  scatter-add, p0 = crop from BOTH sides, T_out = (T_in-1)*s0 + K - 2*p0
+       ours #160 gather,      p0 = LEFT offset,          T_out = (T_in-1)*s0 + K -   p0
+
+   `src/core/conv.h:166` (`convt1d_decomp`) depends on OUR gather/left-offset
+   semantics — it passes `crop_left` as `p0` and trims `crop_right` with a view.
+   Swapping in upstream's op silently changes ConvTranspose1d output LENGTH in every
+   TTS decoder that uses it. It compiles, links, and produces wrong audio.
+
+   **CORRECTION**: an earlier draft of this file said "adopt upstream's and delete
+   ours". That was wrong — it was written from the commit subject before the two
+   headers were compared. Adopting upstream's op REQUIRES rewriting `convt1d_decomp`
+   to pass p0=0 and do both crops with views, and that rewrite must be validated
+   against TTS audio (f5-tts, cosyvoice3, TADA, vocoders) before CrispASR's pin
+   moves. Until then the merge keeps BOTH ops disambiguated, not one silently
+   replacing the other.
+
+   `upstream-prs/20-col2im-1d-new-op.md` is still superseded as an OUTBOUND PR —
+   upstream has its own op now, so there is nothing to file.
 
 2. **`conv_transpose_1d` arrives twice.** `a056a26f` is *our own* merged PR
    (ggml#1477); we also carry the change locally, so the tightened `i_min`/`i_max`
