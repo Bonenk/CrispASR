@@ -304,6 +304,10 @@ struct whisper_params {
     // contract as max_new_tokens_explicit (#292).
     bool diarize_max_speakers_explicit = false;
 
+    // Set by the unified runner: foxnose diarization happens in one global
+    // pass after transcription, so the per-slice path must stand down.
+    bool diarize_foxnose_global = false;
+
     // #324: `--diarize-method foxnose` consumes --diarize-embedder itself, as
     // the WeSpeaker model for its own spectral clustering. The generic
     // TitaNet remap must therefore NOT also try to load that path — it is a

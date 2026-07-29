@@ -42,6 +42,10 @@ static int mkstemps(char* t, int s) {
 #else
 #include <sys/stat.h>
 #include <unistd.h>
+
+// #324: conservative ceiling for foxnose speaker-count estimation. See the
+// comment at its use site — this is an empirical value, not a guess.
+static constexpr int kFoxnoseDefaultMaxSpeakers = 4;
 #endif
 
 namespace {
@@ -721,6 +725,36 @@ bool crispasr_compute_sherpa_cache(const float* full_audio, int n_samples, const
     return true;
 }
 
+bool crispasr_apply_foxnose_global(std::vector<crispasr_segment>& all_segs, const std::vector<float>& samples,
+                                   const whisper_params& params) {
+    if (!params.diarize || !params.diarize_embedder_is_foxnose() || all_segs.empty() || samples.empty())
+        return false;
+    if (params.diarize_embedder.empty()) {
+        fprintf(stderr, "crispasr[diarize]: foxnose needs --diarize-embedder <wespeaker.gguf>\n");
+        return false;
+    }
+
+    CrispasrDiarizeOptions opts;
+    opts.method = CrispasrDiarizeMethod::FoxNose;
+    opts.n_threads = params.n_threads;
+    opts.slice_t0_cs = 0; // all_segs timestamps are absolute
+    opts.foxnose_embedder_path = params.diarize_embedder;
+    opts.max_speakers = params.diarize_max_speakers_explicit ? params.diarize_max_speakers : kFoxnoseDefaultMaxSpeakers;
+    opts.num_speakers = params.diarize_num_speakers;
+
+    auto lib_segs = lib_view(all_segs);
+    std::vector<CrispasrDiarizeTurn> turns;
+    const float* pcm = samples.data();
+    if (!crispasr_diarize_segments(pcm, pcm, (int)samples.size(), /*is_stereo=*/false, lib_segs, opts, &turns))
+        return false;
+    apply_int_speakers_to_crispasr_segments(lib_segs, all_segs);
+    split_segments_on_foxnose_turns(all_segs, turns, /*slice_t0_cs=*/0);
+    if (!params.no_prints)
+        fprintf(stderr, "crispasr[diarize]: foxnose global pass — %zu turn(s) over %.1f s\n", turns.size(),
+                samples.size() / 16000.0);
+    return true;
+}
+
 bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<float>& right, bool is_stereo,
                             int64_t slice_t0_cs, std::vector<crispasr_segment>& segs, const whisper_params& params,
                             const CrispasrPyannoteCache* pyannote_cache, const CrispasrSherpaCache* sherpa_cache) {
@@ -732,10 +766,6 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
         // Historical defaults: stereo → "energy", mono → "vad-turns".
         method = is_stereo ? "energy" : "vad-turns";
     }
-
-    // #324: conservative ceiling for foxnose speaker-count estimation. See the
-    // comment at its use site — this is an empirical value, not a guess.
-    static constexpr int kFoxnoseDefaultMaxSpeakers = 4;
 
     // Shared in-process methods go through the library.
     CrispasrDiarizeMethod lib_method;
@@ -749,6 +779,12 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
     } else if (method == "pyannote") {
         lib_method = CrispasrDiarizeMethod::Pyannote;
     } else if (method == "foxnose" || method == "foxnose-diarize") {
+        // The unified runner diarizes foxnose GLOBALLY after transcription
+        // (crispasr_apply_foxnose_global) so speaker identities are consistent
+        // across slices. Doing it per slice as well would reload the embedder
+        // for every slice and produce labels the global pass then overwrites.
+        if (params.diarize_foxnose_global)
+            return true;
         lib_method = CrispasrDiarizeMethod::FoxNose;
     } else {
         use_lib = false;

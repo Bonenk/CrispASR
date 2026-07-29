@@ -1103,13 +1103,13 @@ speaker cuts the intra-cluster term while the inter-cluster term barely moves.
 20; an explicit flag always wins. Prefer `--diarize-num-speakers` when the
 count is known. See `docs/foxnose-diarize/PLAN.md`.
 
-**⚠ Speaker labels are not consistent across slices.** Long audio is cut into
-slices and each is diarized independently, restarting its numbering from 0, so
-`speaker 0` in one slice is not `speaker 0` in the next. The pyannote path
-solves this with a global cache computed once over the full audio (#107);
-FoxNose needs the same treatment. Until then this method is trustworthy only
-on audio short enough to form a single slice. Segments spanning several
-speakers ARE split at word-aligned turn boundaries within a slice.
+Speaker identity is consistent across slices: on the unified `crispasr_run`
+path FoxNose runs in ONE global pass after transcription
+(`crispasr_apply_foxnose_global`), taking the final segment list as its speech
+regions, and segments spanning several speakers are then split at word-aligned
+turn boundaries. Diarizing per slice cannot work — each slice clusters
+independently and restarts numbering at 0 — which is the same problem the
+pyannote path solves with a pre-computed posterior cache (#107).
 
 Env gates: `CRISPASR_DIARIZE_FULL_K_SEARCH=1` (score the full speaker range on
 silhouette instead of a window around the BIC anchor),
