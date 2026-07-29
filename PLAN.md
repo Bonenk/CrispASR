@@ -1,38 +1,54 @@
 # CrispASR — Pending work
 
-## OPEN 2026-07-29 — turning the unit tier on found two REAL pre-existing failures
+## 2026-07-29 — the unit tier found two real failures: one FIXED, one OPEN
 
-CI executed 1 of 162 unit tests until e17ce606/49e56eee. Running the tier
-immediately surfaced two genuine failures that had been invisible — which is the
-point, but they need fixing and neither is mine:
+CI executed 1 of 162 unit tests until e17ce606/49e56eee. Turning the tier on
+surfaced two genuine failures. The whole tier costs 19.8 s for 1132 tests.
 
-**1. `core_adaln` disagrees with its own reference under clang — by 2.0.**
-`tests/test-core-adaln.cpp` builds the `core_adaln::modulate6` +
-`apply_norm_modulation` ggml graph and compares it against a plain-float
-reference, tolerance 1e-4. Under gcc it passes. Under clang (Release AND Debug):
+**1. FIXED — VAD fed a transpose VIEW to a matmul (470df103).**
+whisper_vad_build_lstm_layer did `ggml_mul_mat(w, ggml_transpose(ctx0, cur))`.
+ggml_transpose swaps nb[0]/nb[1], so the row stride became sizeof(float) and
+llamafile_sgemm's `ldb` collapsed to 1 against k = lstm_hidden_size (128),
+tripping its `ldb >= k` precondition. Release defines NDEBUG, so the assert was
+compiled out and the matmul RAN ANYWAY with a violated precondition, producing
+plausible-looking segments — which is why nobody noticed. Fixed with ggml_cont
+(the idiom used five times in src/audioseal.cpp; the VAD was the outlier).
+A/B-verified on Kaggle before pushing, both compilers, 8/8: Debug rc 134 -> 0 and
+Release segments BYTE-IDENTICAL, so the precondition fix does not move output.
+Confirmed in CI afterwards: ubuntu-22-gcc (Debug) and gcc-arm64 (Debug) now pass.
 
-    apply_silu=true   max|Δ| = 0.658075
-    apply_silu=false  max|Δ| = 1.962485
+**2. OPEN — `core_adaln` fails ONLY in CI's ubuntu-22-clang legs.**
+tests/test-core-adaln.cpp compares the modulate6 + apply_norm_modulation graph
+against a plain-float reference, tolerance 1e-4. In CI's clang legs (Debug AND
+Release) it reports max|Δ| 0.658075 and 1.962485 — four orders out, so not FP
+contraction. Everywhere else it passes. NOT root-caused. Ruled out by
+measurement, not argument:
 
-Four orders of magnitude out is not FP contraction or FMA rounding. A numerical
-difference that large appearing only under a different compiler is the signature
-of UNDEFINED BEHAVIOUR — an uninitialised read, an aliasing violation, or a graph
-built over a tensor whose contents were never set. `core_adaln` is production DiT
-modulation: f5-tts and cosyvoice3 both use it, so if the graph (rather than the
-test harness) is at fault this is a live correctness bug on the clang builds we
-ship. Diagnose with the header's own debug path first; do NOT delegate it —
-runtime graph code.
+  * NOT clang-in-general — passes under clang on Kaggle, Debug and Release.
+  * NOT the clang VERSION — CI is Clang 14.0.0; Kaggle installed the SAME
+    14.0.0-1ubuntu1.1 and passed.
+  * NOT -march=native / AVX-512 — reproduced the native build on a box with
+    avx512f/bw/cd/dq/vl and it passed (so not a false negative from a weak CPU).
+  * NOT llamafile_sgemm — GGML_NATIVE=ON + GGML_LLAMAFILE=OFF also passes, so it
+    does NOT share a root cause with the VAD bug above.
+  * NOT the sanitizers' view — core_adaln passes under ASan/UBSan/TSan (gcc).
 
-**2. `test-vad` aborts in Debug (gcc and gcc-arm64; Release passes).**
-"Subprocess aborted", so an assert/abort rather than a comparison. The model IS
-tracked (`models/for-tests-silero-v6.2.0-ggml.bin`), so this is not a missing
-fixture — it is a Debug-only path in the VAD code. Note `build.yml` already ran
-this test in isolation via `ctest -R ^test-vad$`, which is presumably how it
-stayed green: that leg is Release.
+What remains: GitHub's runners expose ISA the Kaggle box does not (VNNI, BF16 —
+ggml has dedicated paths for both), and CI drives the test through ctest rather
+than standalone. I can compile those paths on Kaggle but cannot execute them, so
+the discrepancy is not reproducible with the hardware available here.
 
-Until both are fixed, the build.yml legs (Debug/clang) are red. They only run on
-ggml/.gitmodules/build.yml changes, so ordinary work is unaffected; the every-push
-guard is ci.yml's `linux-unit` (gcc/Release), where both tests currently pass.
+Mitigation, NOT a fix: build.yml's x86 gcc and clang jobs now pass
+-DGGML_NATIVE=OFF, matching what the arm64 job in the same file already did and
+what release.yml uses for every shipped binary. CI builds stop depending on
+whichever CPU the runner happens to be. Shipped artifacts were never affected
+(release.yml pins GGML_NATIVE=OFF). If this recurs, the next step is a per-op
+dump inside the failing CI leg — the harness for it is
+tools/kaggle/adaln-vad-diag/.
+
+**Also fixed:** the sanitized legs run in a container that had no python3, so
+test-release-workflow failed there with "/usr/bin/env: 'python3': No such file or
+directory" as soon as the tier began running. python3 added to its apt line.
 
 ## RESOLVED 2026-07-28 — v0.8.24 shipped to all three registries
 

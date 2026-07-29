@@ -252,7 +252,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake . -DWHISPER_SDL2=ON -DCMAKE_BUILD_TYPE=${{ matrix.build }}
+          cmake . -DWHISPER_SDL2=ON -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DGGML_NATIVE=OFF
           make
           # -L "gh|unit": this job already BUILDS all 192 test targets, so running the
           # unit tier costs seconds. CI used to execute 1 of 162 unit tests (found
@@ -318,7 +318,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake . -DWHISPER_SDL2=ON -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
+          cmake . -DWHISPER_SDL2=ON -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DGGML_NATIVE=OFF
           make
           # -L "gh|unit": this job already BUILDS all 192 test targets, so running the
           # unit tier costs seconds. CI used to execute 1 of 162 unit tests (found
@@ -355,7 +355,11 @@ jobs:
             sed -i "s|archive.ubuntu.com|azure.archive.ubuntu.com|g" /etc/apt/sources.list
             sed -i "s|security.ubuntu.com|azure.archive.ubuntu.com|g" /etc/apt/sources.list
             for i in 1 2 3 4 5; do apt update && break || sleep 10; done
-            apt install -y build-essential cmake git curl
+            # python3: test-release-workflow is a python test and this container
+            # (unlike the runner) had none, so it failed with "/usr/bin/env:
+            # 'python3': No such file or directory" the moment the unit tier
+            # started running here.
+            apt install -y build-essential cmake git curl python3
             cmake . -DCMAKE_BUILD_TYPE=Debug \
               -DWHISPER_SANITIZE_${{ matrix.sanitizer }}=ON \
               -DGGML_OPENMP=OFF
