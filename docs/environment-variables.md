@@ -717,6 +717,16 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
 
 - `CRISPASR_MP3_ENCODER`
 
+### GigaAM-v3
+
+- `CRISPASR_GIGAAM_BENCH` — per-stage timings (mel / encoder / decode)
+- `CRISPASR_GIGAAM_DEBUG` — encoder output min/max/mean
+- `CRISPASR_GIGAAM_FLASH` — `ggml_flash_attn_ext` in the encoder (opt-in; the
+  manual QK^T path is what the per-stage diff was validated on)
+- `CRISPASR_GIGAAM_FORCE_SCALAR` — scalar LSTM/joint loops instead of cblas
+- `CRISPASR_GIGAAM_QUANT_ALL` — let `crispasr-quantize` quantize the heads and
+  the pre-encode convs too (default keeps them at source precision)
+
 ### Nemotron
 
 - `CRISPASR_NEMOTRON_BENCH`
