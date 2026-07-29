@@ -214,9 +214,10 @@ def make_affected(src, dst):
 SEG_RE = re.compile(r"\[([\d:.]+)\s*-->\s*([\d:.]+)\]\s*(.*)")
 
 
-def decode(binary, model, wav):
+def decode(binary, model, wav, print_special=False):
     env_prefix = f"LD_LIBRARY_PATH={Path(binary).parent}:$LD_LIBRARY_PATH "
-    r = sh(env_prefix + f"{binary} -m {model} -f {wav} -l en -t 4", timeout=1800)
+    ps = " -ps" if print_special else ""
+    r = sh(env_prefix + f"{binary} -m {model} -f {wav} -l en -t 4{ps}", timeout=2400)
     segs = []
     for line in r.stdout.splitlines():
         m = SEG_RE.search(line)
@@ -245,9 +246,17 @@ def main():
     if results["control_vocab"].get("old_code_collides") is not False:
         die("premise", msg="control model unexpectedly collides", facts=results["control_vocab"])
 
-    wav = str(CLONE / "samples" / "jfk.wav")
-    if not Path(wav).exists():
-        die("fixture", err=f"{wav} missing from the clone")
+    # Fixture choice is the whole experiment. A single-utterance 11 s clip fits one
+    # 30 s window and terminates on end-of-audio, so a broken EOT changes NOTHING —
+    # run 1 of this kernel produced byte-identical output on all four cells and the
+    # "fix has an effect" check failed for that reason, not because the bug is absent.
+    # multispeaker.wav is 31.5 s across two windows with several utterances, so the
+    # decoder must actually end segments at timestamps — the path the bug breaks.
+    FIXTURES = [("jfk", CLONE / "samples" / "jfk.wav"),
+                ("multispeaker", CLONE / "samples" / "multispeaker.wav")]
+    for nm, pth in FIXTURES:
+        if not pth.exists():
+            die("fixture", err=f"{pth} missing from the clone")
 
     # Once, not per build: a second call re-extracts the seed tar over the cache the
     # first build just populated.
@@ -259,23 +268,75 @@ def main():
 
     for label in ("before", "after"):
         for mname, mpath in (("control", control), ("affected", affected)):
-            key = f"{mname}_{label}"
-            with kh.build_heartbeat(f"decode.{key}", 30):
-                results[key] = decode(bins[label], mpath, wav)
-            kh.step(f"decode.{key}", rc=results[key]["rc"],
-                    n_segments=results[key]["n_segments"],
-                    text=results[key]["text"][:120])
+            for fname, fpath in FIXTURES:
+                key = f"{mname}_{label}_{fname}"
+                with kh.build_heartbeat(f"decode.{key}", 30):
+                    results[key] = decode(bins[label], mpath, str(fpath))
+                kh.step(f"decode.{key}", rc=results[key]["rc"],
+                        n_segments=results[key]["n_segments"],
+                        text=results[key]["text"][:100])
 
-    cb, ca = results["control_before"], results["control_after"]
-    ab, aa = results["affected_before"], results["affected_after"]
-    checks = {
-        "control_unchanged": cb["segments"] == ca["segments"],
-        "fix_has_effect": ab["segments"] != aa["segments"],
-        "affected_now_matches_control": aa["segments"] == ca["segments"],
-        "all_runs_succeeded": all(x["rc"] == 0 for x in (cb, ca, ab, aa)),
-    }
-    results["checks"] = checks
-    results["verdict"] = "PASS" if all(checks.values()) else "FAIL"
+    # Special-token stream on the affected model: shows the EOT/SOT handling directly
+    # rather than inferring it from the transcript.
+    for label in ("before", "after"):
+        key = f"affected_{label}_multispeaker_ps"
+        with kh.build_heartbeat(f"decode.{key}", 30):
+            results[key] = decode(bins[label], affected,
+                                  str(CLONE / "samples" / "multispeaker.wav"), print_special=True)
+
+    per_fixture = {}
+    for fname, _ in FIXTURES:
+        cb = results[f"control_before_{fname}"]
+        ca = results[f"control_after_{fname}"]
+        ab = results[f"affected_before_{fname}"]
+        aa = results[f"affected_after_{fname}"]
+        per_fixture[fname] = {
+            "control_unchanged": cb["segments"] == ca["segments"],
+            "affected_changed": ab["segments"] != aa["segments"],
+            "affected_matches_control": aa["segments"] == ca["segments"],
+            "all_ok": all(x["rc"] == 0 for x in (cb, ca, ab, aa)),
+            "n_segments": {"control": ca["n_segments"], "affected_before": ab["n_segments"],
+                           "affected_after": aa["n_segments"]},
+        }
+    results["per_fixture"] = per_fixture
+
+    no_regression = all(f["control_unchanged"] and f["affected_matches_control"]
+                        for f in per_fixture.values())
+    all_ok = all(f["all_ok"] for f in per_fixture.values())
+    demonstrated = any(f["affected_changed"] for f in per_fixture.values())
+
+    if not all_ok:
+        results["verdict"] = "ERROR"
+    elif not no_regression:
+        results["verdict"] = "REGRESSION"
+    elif demonstrated:
+        results["verdict"] = "FIXED"          # observable decode difference, corrected
+    else:
+        results["verdict"] = "LATENT"         # safe, but no fixture exposed a difference
+    results["verdict_note"] = {
+        "FIXED": "affected model decoded differently before/after and now matches the control",
+        "LATENT": "no regression anywhere, but no fixture produced an observable difference",
+        "REGRESSION": "the fix changed something it should not have",
+        "ERROR": "a decode run failed",
+    }[results["verdict"]]
+
+    print("\n=== PR #322 VERDICT:", results["verdict"], "===", flush=True)
+    print("   ", results["verdict_note"], flush=True)
+    for fname, f in per_fixture.items():
+        print(f"\n  [{fname}] segments control={f['n_segments']['control']} "
+              f"affected_before={f['n_segments']['affected_before']} "
+              f"affected_after={f['n_segments']['affected_after']}", flush=True)
+        for k, v in f.items():
+            if isinstance(v, bool):
+                print(f"      {'PASS' if v else 'FAIL'}  {k}", flush=True)
+    for key in sorted(k for k in results if k.startswith(("control_", "affected_"))):
+        rr = results[key]
+        if not isinstance(rr, dict) or "segments" not in rr:
+            continue
+        print(f"\n--- {key}: rc={rr['rc']} segments={rr['n_segments']}", flush=True)
+        for sg in rr["segments"][:8]:
+            print(f"    [{sg['t0']} --> {sg['t1']}] {sg['text'][:90]}", flush=True)
+    kh.step("verdict", result=results["verdict"], per_fixture=per_fixture)
 
     RESULTS.write_text(json.dumps(results, indent=2))
     print("\n=== PR #322 VERDICT:", results["verdict"], "===", flush=True)
