@@ -8,6 +8,7 @@
 // library is linked in.
 std::unique_ptr<CrispasrBackend> crispasr_make_whisper_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_nemotron_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_gigaam_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_parakeet_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_canary_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_canary_qwen_backend();
@@ -108,6 +109,8 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
     // affects the model-registry lookup + CLI dispatch.
     if (name == "whisper" || name == "tiron")
         return crispasr_make_whisper_backend();
+    if (name == "gigaam" || name == "gigaam-v3" || name == "gigaam3")
+        return crispasr_make_gigaam_backend();
     if (name == "nemotron" || name == "nemotron-streaming" || name == "nemotron-3.5" || name == "nemotron-asr" ||
         name == "nemotron-speech-streaming")
         return crispasr_make_nemotron_backend();
@@ -288,6 +291,7 @@ std::vector<std::string> crispasr_list_backends() {
     return {
         "whisper",
         "nemotron",
+        "gigaam",
         "parakeet",
         "reazonspeech",
         "canary",
@@ -748,6 +752,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "miotts";
     if (contains_ci("piano") && contains_ci("transcription"))
         return "piano-transcription";
+    if (contains_ci("gigaam"))
+        return "gigaam";
     if (contains_ci("ggml-") && contains_ci(".bin"))
         return "whisper";
 
@@ -772,6 +778,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "sidon";
             else if (a == "nemotron" || a == "nemotron-asr" || a == "nemotron-streaming")
                 result = "nemotron";
+            else if (a == "gigaam")
+                result = "gigaam";
             else if (a == "parakeet")
                 result = "parakeet";
             else if (a == "parakeet-tdt" || a == "parakeet-ja" || a == "parakeet_ja")

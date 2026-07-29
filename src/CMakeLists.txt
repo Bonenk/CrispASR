@@ -1062,6 +1062,38 @@ if(APPLE)
 endif()
 
 # ---------------------------------------------------------------------------
+# GigaAM-v3 — ai-sage/GigaAM-v3 (rotary Conformer encoder + CTC / RNN-T head)
+# ---------------------------------------------------------------------------
+add_library(gigaam STATIC
+            gigaam.h
+            gigaam.cpp
+            )
+target_include_directories(gigaam PUBLIC . ../include)
+target_compile_features   (gigaam PUBLIC cxx_std_17)
+set_target_properties(gigaam PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries     (gigaam PUBLIC ggml ggml-base Threads::Threads crispasr-core)
+if(NOT MSVC)
+    target_compile_options(gigaam PRIVATE -O3)
+endif()
+if(GGML_METAL)
+    target_compile_definitions(gigaam PRIVATE GGML_USE_METAL)
+    target_link_libraries(gigaam PUBLIC ggml-metal)
+endif()
+if(GGML_CUDA)
+    target_compile_definitions(gigaam PRIVATE GGML_USE_CUDA)
+    target_link_libraries(gigaam PUBLIC ggml-cuda)
+endif()
+# Accelerate cblas_sgemv for the LSTM predictor + joint head (same rationale
+# as nemotron: the transducer steps are tiny per-token GEMVs).
+if(APPLE)
+    if(NOT ACCELERATE_LIB)
+        find_library(ACCELERATE_LIB Accelerate REQUIRED)
+    endif()
+    target_link_libraries(gigaam PUBLIC ${ACCELERATE_LIB})
+    target_compile_definitions(gigaam PRIVATE HAVE_ACCELERATE ACCELERATE_NEW_LAPACK)
+endif()
+
+# ---------------------------------------------------------------------------
 # Parakeet TDT — nvidia/parakeet-tdt-0.6b-v3 (FastConformer encoder + TDT decoder)
 # ---------------------------------------------------------------------------
 add_library(parakeet STATIC
@@ -2619,6 +2651,9 @@ endif()
 # `target_link_libraries(crispasr-lib PUBLIC <target>)` below, (3) add the
 # `crispasr_<backend>_*` wrappers to crispasr_c_api.cpp.
 # ---------------------------------------------------------------------------
+if (TARGET gigaam)
+    target_link_libraries(crispasr-lib PUBLIC gigaam)
+endif()
 if (TARGET nemotron)
     target_link_libraries(crispasr-lib PUBLIC nemotron)
 endif()

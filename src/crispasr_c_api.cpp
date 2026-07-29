@@ -68,6 +68,10 @@
 #include "nemotron.h"
 #define CA_HAVE_NEMOTRON 1
 #endif
+#if __has_include("gigaam.h")
+#include "gigaam.h"
+#define CA_HAVE_GIGAAM 1
+#endif
 #if __has_include("canary.h")
 #include "canary.h"
 #define CA_HAVE_CANARY 1
@@ -1400,6 +1404,8 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
         backend = "whisper";
     else if (strcmp(arch, "parakeet") == 0 || strcmp(arch, "parakeet-tdt") == 0)
         backend = "parakeet";
+    else if (strcmp(arch, "gigaam") == 0)
+        backend = "gigaam";
     else if (strcmp(arch, "canary") == 0)
         backend = "canary";
     else if (strcmp(arch, "canary_qwen") == 0 || strcmp(arch, "canary-qwen") == 0)
@@ -1816,6 +1822,9 @@ struct crispasr_session {
 #endif
 #ifdef CA_HAVE_NEMOTRON
     nemotron_context* nemotron_ctx = nullptr;
+#endif
+#ifdef CA_HAVE_GIGAAM
+    gigaam_context* gigaam_ctx = nullptr;
 #endif
 #ifdef CA_HAVE_CANARY
     canary_context* canary_ctx = nullptr;
@@ -2431,6 +2440,21 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         pp.use_flash = g_open_flash_attn_tls;
         s->parakeet_ctx = parakeet_init_from_file(model_path, pp);
         if (!s->parakeet_ctx) {
+            delete s;
+            return nullptr;
+        }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_GIGAAM
+    if (s->backend == "gigaam") {
+        gigaam_context_params gp = gigaam_context_default_params();
+        gp.n_threads = s->n_threads;
+        gp.verbosity = g_open_verbosity_tls;
+        gp.use_gpu = g_open_use_gpu_tls;
+        gp.use_flash = g_open_flash_attn_tls;
+        s->gigaam_ctx = gigaam_init_from_file(model_path, gp);
+        if (!s->gigaam_ctx) {
             delete s;
             return nullptr;
         }
@@ -3916,6 +3940,10 @@ CA_EXPORT int crispasr_session_input_sample_rate(crispasr_session* s) {
     if (s->nemotron_ctx)
         return nemotron_sample_rate(s->nemotron_ctx);
 #endif
+#ifdef CA_HAVE_GIGAAM
+    if (s->gigaam_ctx)
+        return gigaam_sample_rate(s->gigaam_ctx);
+#endif
 #ifdef CA_HAVE_CTC
     if (s->ctc_ctx)
         return canary_ctc_sample_rate(s->ctc_ctx);
@@ -3984,6 +4012,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #endif
 #ifdef CA_HAVE_NEMOTRON
     list += ",nemotron";
+#endif
+#ifdef CA_HAVE_GIGAAM
+    list += ",gigaam";
 #endif
 #ifdef CA_HAVE_CANARY
     list += ",canary";
@@ -5379,6 +5410,35 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         }
         r->segments.push_back(std::move(seg));
         parakeet_result_free(pr);
+        return r;
+    }
+#endif
+#ifdef CA_HAVE_GIGAAM
+    if (s->backend == "gigaam" && s->gigaam_ctx) {
+        // GigaAM-v3 is Russian-only, so the sticky source_language is not a
+        // steering knob here; it is ignored on purpose.
+        gigaam_result* gr = gigaam_transcribe_ex(s->gigaam_ctx, pcm, n_samples, 0);
+        if (!gr) {
+            delete r;
+            return nullptr;
+        }
+        crispasr_session_seg seg;
+        seg.text = gr->text ? gr->text : "";
+        if (gr->n_words > 0) {
+            seg.t0 = gr->words[0].t0;
+            seg.t1 = gr->words[gr->n_words - 1].t1;
+            seg.words.reserve(gr->n_words);
+            for (int i = 0; i < gr->n_words; ++i) {
+                crispasr_session_seg::word w;
+                w.text = gr->words[i].text;
+                w.t0 = gr->words[i].t0;
+                w.t1 = gr->words[i].t1;
+                w.p = gr->words[i].p > 0.0f ? gr->words[i].p : 1.0f;
+                seg.words.push_back(std::move(w));
+            }
+        }
+        r->segments.push_back(std::move(seg));
+        gigaam_result_free(gr);
         return r;
     }
 #endif
@@ -9619,6 +9679,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_NEMOTRON
     if (s->nemotron_ctx)
         nemotron_free(s->nemotron_ctx);
+#endif
+#ifdef CA_HAVE_GIGAAM
+    if (s->gigaam_ctx)
+        gigaam_free(s->gigaam_ctx);
 #endif
 #ifdef CA_HAVE_CANARY
     if (s->canary_ctx)
