@@ -51,13 +51,31 @@ GitHub merges them and the LAST wins — every "ubuntu-22-clang" job actually ra
 ubuntu-22.04-arm. Chasing "clang" and then "AVX-512" on x86 was chasing a label.
 The cmake line (`-mcpu=native+dotprod+i8mm+sve+nosme`) was the tell.
 
-**STILL OPEN (two, both flagged not fixed):**
-  * vec.cpp:334 f16 tail is `svmad_f16_x(pg, hx, hy, sum1)` — `_x` leaves inactive
-    lanes UNSPECIFIED after an accumulating loop, i.e. correct only by codegen
-    luck. Upstream reworked that path (ggml_sve_f16_fma_widened); not cherry-picked
-    (larger change, different code path).
-  * the `ubuntu-22-clang` matrix bug means clang-on-x86 has NEVER been tested.
-    Fixing it adds two never-run jobs, so it is a coverage decision, not a cleanup.
+**BOTH FOLLOW-UPS NOW CLOSED (b4dcd8dd):**
+
+  * **F16 SVE accumulation** — cherry-picked upstream f69bdbb3 "ggml: fixed Arm SVE
+    usage bug in vec.h, vec.cpp (llama/22841)" (Martin Klacer + Milos Puzovic, Arm,
+    2026-05-28); pin 392ac397 -> 52165e4c. Upstream did NOT simply swap
+    svmad_f16_x for a merging variant: F16 accumulators became paired F32
+    (sum_lo/sum_hi) and every FMA goes through ggml_sve_f16_fma_widened(), which
+    widens F16->F32 before accumulating. The tail reuses that helper, so no
+    predicated FMA remains to get wrong — the zeroed lanes contribute 0*0. A
+    precision fix that removes the hazard structurally rather than patching it.
+
+    CHECKED AND DELIBERATELY NOT CHANGED: vec.h:396 / :513 still use svmad_f32_m /
+    svmad_f16_x, but each is immediately followed by a PREDICATED STORE
+    (svst1_*(pg, ...)), so inactive lanes are never written back. Upstream carries
+    them verbatim. Pattern-matching a bug is not the same as having one.
+
+  * **The ubuntu-22-clang matrix** — `arch` was two bare `include:` entries sharing
+    no key with `build:`, which GitHub merges into every combination, so the LAST
+    won and every such job ran on ubuntu-22.04-arm. clang-on-x86 had NEVER been
+    tested and the arm64 runs were labelled as x86 — which is precisely what sent
+    this investigation chasing "a clang bug" and then AVX-512 for three rounds.
+    `arch` is now a real matrix dimension (4 jobs, correctly labelled
+    "(Debug, amd64)" etc.); `include:` only maps arch -> runner.
+
+    Two of those four jobs are coverage that did not previously exist.
 
 **Also fixed:** the sanitized legs run in a container that had no python3, so
 test-release-workflow failed there with "/usr/bin/env: 'python3': No such file or
