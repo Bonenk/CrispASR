@@ -5097,7 +5097,15 @@ static ggml_tensor* whisper_vad_build_lstm_layer(ggml_context* ctx0, const whisp
     const whisper_vad_model& model = vctx.model;
     const int hdim = model.hparams.lstm_hidden_size;
 
-    struct ggml_tensor* x_t = ggml_transpose(ctx0, cur);
+    // ggml_transpose returns a NON-CONTIGUOUS view: it swaps nb[0]/nb[1], so the
+    // row stride of x_t becomes sizeof(float) and llamafile_sgemm's `ldb` collapses
+    // to 1 while k is lstm_hidden_size (128) — tripping its `ldb >= k` precondition
+    // (ggml-cpu/llamafile/sgemm.cpp). Release defines NDEBUG, so that assert is
+    // compiled out and the matmul RAN ANYWAY with a violated precondition; only a
+    // Debug build aborted, and the Debug leg had never run because CI executed 1 of
+    // 162 unit tests until 2026-07-29. ggml_cont materialises the transpose, which
+    // is the idiom the rest of this codebase already uses (src/audioseal.cpp, 5x).
+    struct ggml_tensor* x_t = ggml_cont(ctx0, ggml_transpose(ctx0, cur));
 
     // Create operations using the input-to-hidden weights.
     struct ggml_tensor* inp_gate = ggml_mul_mat(ctx0, model.lstm_ih_weight, x_t);
