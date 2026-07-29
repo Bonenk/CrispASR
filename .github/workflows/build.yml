@@ -252,7 +252,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake . -DWHISPER_SDL2=ON -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DGGML_NATIVE=OFF
+          cmake . -DWHISPER_SDL2=ON -DCMAKE_BUILD_TYPE=${{ matrix.build }}
           make
           # -L "gh|unit": this job already BUILDS all 192 test targets, so running the
           # unit tier costs seconds. CI used to execute 1 of 162 unit tests (found
@@ -318,7 +318,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake . -DWHISPER_SDL2=ON -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang -DGGML_NATIVE=OFF
+          cmake . -DWHISPER_SDL2=ON -DCMAKE_BUILD_TYPE=${{ matrix.build }} -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
           make
           # -L "gh|unit": this job already BUILDS all 192 test targets, so running the
           # unit tier costs seconds. CI used to execute 1 of 162 unit tests (found

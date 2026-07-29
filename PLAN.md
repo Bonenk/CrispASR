@@ -17,46 +17,47 @@ A/B-verified on Kaggle before pushing, both compilers, 8/8: Debug rc 134 -> 0 an
 Release segments BYTE-IDENTICAL, so the precondition fix does not move output.
 Confirmed in CI afterwards: ubuntu-22-gcc (Debug) and gcc-arm64 (Debug) now pass.
 
-**2. NARROWED (mitigated, root cause upstream) — `core_adaln` under -march=native.**
+**2. FIXED — ggml SVE used data from inactive lanes (fb7972ae).**
+ggml_vec_dot_f32's SVE tail did `sum1 = svmad_f32_m(pg, ax1, ay1, sum1)`.
+svmad_..._m computes a*b + c but MERGES ON THE FIRST OPERAND, so inactive lanes
+took ax1 — zeroed by the predicated load — wiping the lanes the preceding leftover
+loop had accumulated. Correct form merges on the accumulator:
 
-UPDATE after pinning GGML_NATIVE=OFF: both clang legs went GREEN. That is positive
-evidence, not just an absence — the trigger IS native-ISA codegen on the runner's
-CPU. My earlier "NOT -march=native" conclusion was a FALSE NEGATIVE: the box I
-reproduced on advertises avx512f/bw/cd/dq/vl but NOT VNNI or BF16, which GitHub's
-Ice Lake runners do and which ggml has dedicated kernels for. Compiling those
-paths there is possible; executing them is not. So the honest statement is: a ggml
-CPU kernel selected only under -march=native on a VNNI/BF16-capable CPU (clang 14)
-computes a small mul_mat/norm chain wrongly — max|Δ| ~2.0, not rounding. That is
-an upstream ggml issue, not core/adaln.h, which is plain graph construction.
+    sum1 = svmla_f32_m(pg, sum1, ax1, ay1);
 
-Original elimination trail, kept because it is what narrowed it:
-tests/test-core-adaln.cpp compares the modulate6 + apply_norm_modulation graph
-against a plain-float reference, tolerance 1e-4. In CI's clang legs (Debug AND
-Release) it reports max|Δ| 0.658075 and 1.962485 — four orders out, so not FP
-contraction. Everywhere else it passes. NOT root-caused. Ruled out by
-measurement, not argument:
+Bites only when n >= epr && n % epr != 0, so ordinary LLM dims (multiples of 32)
+never hit it; core_adaln's dim=6 does (epr=4 at VL=128: 4 lanes accumulated, tail
+zeroes 2).
 
-  * NOT clang-in-general — passes under clang on Kaggle, Debug and Release.
-  * NOT the clang VERSION — CI is Clang 14.0.0; Kaggle installed the SAME
-    14.0.0-1ubuntu1.1 and passed.
-  * NOT -march=native / AVX-512 — reproduced the native build on a box with
-    avx512f/bw/cd/dq/vl and it passed (so not a false negative from a weak CPU).
-  * NOT llamafile_sgemm — GGML_NATIVE=ON + GGML_LLAMAFILE=OFF also passes, so it
-    does NOT share a root cause with the VAD bug above.
-  * NOT the sanitizers' view — core_adaln passes under ASan/UBSan/TSan (gcc).
+ALREADY FIXED UPSTREAM: 6aab1bcb "ggml-cpu: fix SVE leftover path in
+ggml_vec_dot_f32 (llama/24699)" (Tarek Dakhran, 2026-06-26), found there via 2D
+convolutions with kernel size 9. Our vendored snapshot predated it. Cherry-picked
+onto CrispStrobe/ggml crispstrobe-ops with authorship intact (bfe8ea22 ->
+392ac397) and the pin bumped. So for this one we were BEHIND upstream, not ahead —
+no PR to file, and nothing to add to tools/upstream-prs.
 
-What remains: GitHub's runners expose ISA the Kaggle box does not (VNNI, BF16 —
-ggml has dedicated paths for both), and CI drives the test through ctest rather
-than standalone. I can compile those paths on Kaggle but cannot execute them, so
-the discrepancy is not reproducible with the hardware available here.
+Verified on real SVE2 hardware before and after, per stage:
+    before  native(+sve)  all six views 0.21-1.32, out 0.658/1.962
+    after   native(+sve)  every stage 0.000000
+    control no-sve / GGML_NATIVE=OFF   0.000000 both times
 
-Mitigation (and, as it turns out, confirmation): build.yml's x86 gcc and clang
-jobs now pass -DGGML_NATIVE=OFF, matching what the arm64 job in the same file already did and
-what release.yml uses for every shipped binary. CI builds stop depending on
-whichever CPU the runner happens to be. Shipped artifacts were never affected
-(release.yml pins GGML_NATIVE=OFF). If this recurs, the next step is a per-op
-dump inside the failing CI leg — the harness for it is
-tools/kaggle/adaln-vad-diag/.
+The GGML_NATIVE=OFF mitigation added while this was unexplained has been REVERTED:
+with the root cause fixed it would only blind CI to the exact class of bug it just
+caught. Harness: .github/workflows/diag-arm-sve-adaln.yml (dispatch-only).
+
+**Why it took three wrong turns**, worth remembering: the job that failed is named
+`ubuntu-22-clang`, but its matrix `include:` entries do not key on `build:`, so
+GitHub merges them and the LAST wins — every "ubuntu-22-clang" job actually ran on
+ubuntu-22.04-arm. Chasing "clang" and then "AVX-512" on x86 was chasing a label.
+The cmake line (`-mcpu=native+dotprod+i8mm+sve+nosme`) was the tell.
+
+**STILL OPEN (two, both flagged not fixed):**
+  * vec.cpp:334 f16 tail is `svmad_f16_x(pg, hx, hy, sum1)` — `_x` leaves inactive
+    lanes UNSPECIFIED after an accumulating loop, i.e. correct only by codegen
+    luck. Upstream reworked that path (ggml_sve_f16_fma_widened); not cherry-picked
+    (larger change, different code path).
+  * the `ubuntu-22-clang` matrix bug means clang-on-x86 has NEVER been tested.
+    Fixing it adds two never-run jobs, so it is a coverage decision, not a cleanup.
 
 **Also fixed:** the sanitized legs run in a container that had no python3, so
 test-release-workflow failed there with "/usr/bin/env: 'python3': No such file or
