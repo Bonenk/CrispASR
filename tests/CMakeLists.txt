@@ -2732,6 +2732,22 @@ add_test(NAME test-kokoro-g2p-live
     COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-kokoro-g2p-live.sh)
 set_tests_properties(test-kokoro-g2p-live PROPERTIES LABELS "live;tts;kokoro" TIMEOUT 900)
 
+# ─── test-whisper-special-tokens — serialized-vs-legacy special-token layout (#322).
+# Whisper had NO id-level coverage at all: it is absent from the regression manifest
+# and no test asserted a token id, so token_eot resolving to the wrong value was
+# invisible. Header-only predicate, no model.
+add_executable(test-whisper-special-tokens test-whisper-special-tokens.cpp)
+target_include_directories(test-whisper-special-tokens PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-whisper-special-tokens PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-whisper-special-tokens
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-tts-phonemes-policy — which backends --tts-phonemes may drive (#316).
 # The CLI guard began as a hardcoded backend-name check that wrongly excluded
 # piper. Header-only policy, no model.

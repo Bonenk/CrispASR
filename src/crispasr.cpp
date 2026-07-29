@@ -7,7 +7,8 @@
 #include "ggml-backend.h"
 #include "crispasr_imatrix.h"
 #include "ggml-cpu.h"
-#include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/gpu_backend_pref.h"       // crispasr_init_gpu_backend (#214)
+#include "core/whisper_special_tokens.h" // serialized-vs-legacy special ids (#322)
 
 #ifdef CRISPASR_USE_COREML
 #include "coreml/whisper-encoder.h"
@@ -2141,16 +2142,28 @@ static bool whisper_model_load(struct whisper_model_loader* loader, whisper_cont
             return false;
         };
 
-        auto has_token = [&](const char* token) { return vocab.token_to_id.find(token) != vocab.token_to_id.end(); };
+        auto find_token = [&](const char* token) {
+            const auto it = vocab.token_to_id.find(token);
+            return it == vocab.token_to_id.end() ? core_whisper_specials::kAbsent : (int)it->second;
+        };
 
-        // Probe without assigning: set_token_id() mutates its destination, so calling it here would
-        // leave a partially-resolved id behind when the && short-circuits, and the legacy fixup below
-        // would then increment an id that is already correct.
-        const bool has_serialized_specials = has_token("<|endoftext|>") && has_token("<|startoftranscript|>");
+        // Look the ids up, then DECIDE — the decision is a pure function over plain
+        // ints (core/whisper_special_tokens.h), so it has nothing to mutate. #322 was
+        // a probe that assigned its destination and then reported "not found", leaving
+        // token_eot resolved while the flag said legacy; the fixup below then
+        // incremented an already-correct id. Separating lookup from decision makes
+        // that class of bug unrepresentable rather than merely fixed.
+        core_whisper_specials::Serialized ser;
+        ser.eot = find_token("<|endoftext|>");
+        ser.sot = find_token("<|startoftranscript|>");
+        ser.beg = find_token("<|0.00|>");
+        const bool has_serialized_specials = core_whisper_specials::use_serialized(ser);
 
         if (has_serialized_specials) {
-            set_token_id(vocab.token_eot, "<|endoftext|>");
-            set_token_id(vocab.token_sot, "<|startoftranscript|>");
+            // Guaranteed present by use_serialized(), including <|0.00|> -> token_beg.
+            vocab.token_eot = ser.eot;
+            vocab.token_sot = ser.sot;
+            vocab.token_beg = ser.beg;
             set_token_id(vocab.token_translate, "<|translate|>");
             set_token_id(vocab.token_transcribe, "<|transcribe|>");
             set_token_id(vocab.token_solm, "<|startoflm|>");
@@ -2159,7 +2172,6 @@ static bool whisper_model_load(struct whisper_model_loader* loader, whisper_cont
                 set_token_id(vocab.token_nosp, "<|nocaptions|>");
             }
             set_token_id(vocab.token_not, "<|notimestamps|>");
-            set_token_id(vocab.token_beg, "<|0.00|>");
 
             // Tiron: detect a contiguous run of <|speaker1|>, <|speaker2|>, ...
             // starting above the timestamp block.
