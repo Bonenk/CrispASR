@@ -227,3 +227,57 @@ pyannote cache has there.
 | `CRISPASR_DIARIZE_FULL_K_SEARCH=1` | score the full `[min,max]` speaker range on silhouette instead of `[k-2, k+3]` |
 | `CRISPASR_WESPEAKER_BENCH=1` | per-stage embedder timings |
 | `CRISPASR_WESPEAKER_DEBUG=1` | embedder diagnostics |
+
+## Performance — what was measured, and what not to bother trying
+
+All numbers: M1, Release, `esrit.wav` (215.1 s, 3 VAD regions, 352 embedding
+windows), through the real `crispasr --diarize-method foxnose` path. The
+machine was noisy early on, so every A/B below was re-run interleaved on a
+quiet machine; the paired numbers repeat to ~1%.
+
+Where the time goes on a 215 s file (~45 s wall, ~4.8x realtime):
+
+| stage | share |
+|---|---|
+| WeSpeaker ResNet34 forward | ~70% (94% of the embedder) |
+| speaker-count estimation (GMM/BIC + silhouette) | ~12% (58 s -> 51 s when `--diarize-num-speakers` pins it) |
+| Kaldi fbank | ~4% |
+| VAD, clustering, smoothing, I/O | remainder |
+
+### Levers that were tried and LOST — do not re-litigate without new evidence
+
+| lever | result |
+|---|---|
+| **Metal / GPU** (`use_gpu = true`) | **2.0x SLOWER** — 89.6 / 89.6 s vs 45.1 / 44.6 s CPU, interleaved. The graph is submitted 352 times, once per 1.2 s window, and each one is tiny (80 mels x ~120 frames). Per-dispatch overhead and the host<->device round trip swamp the conv work. This is why `crispasr_diarize.cpp` deliberately does NOT set `cp.use_gpu`. It would likely flip if the windows were batched — see below. |
+| **F16 conv kernels** | **2.2x SLOWER** — 297 vs 133 ms/window. Correctness is fine now (our fork's `00285218` removed the `src1->type == F32` assert; cosine 0.99999724 vs the oracle) and the GGUF drops 23.9 -> 13.3 MB, but ggml's CPU conv path is far slower on F16 input. The converter keeps 4-D kernels at F32 and says so. |
+| **Persistent graph + `gallocr`** (the `bananamind_tts` / `beat_this` trick) | **~0.1% available.** Instrumented build/alloc/compute per call: **0.050 ms build, 0.049 ms alloc, 103.430 ms compute.** There is no per-call overhead to remove. The graph is already rebuilt-and-thrown-away for free. |
+| **More threads** | wash. `-t 4` 44.72 / 44.58 s vs `-t 8` 45.05 / 44.60 s. The M1's 4 E-cores contribute nothing; the default `n_threads = 4` is already right. |
+
+BLAS is not a factor on this path: with `use_gpu = false` the embedder runs on
+a plain `ggml_backend_cpu_init()` backend and never schedules to the BLAS
+backend, even though the binary reports `backends: cpu,metal,blas`.
+
+### The lever that is actually left: stop embedding the same audio twice
+
+`kEmbeddingWindowSeconds = 1.2` with `kEmbeddingStepSeconds = 0.6` means every
+sample except the first and last half-window goes through ResNet34 **twice** —
+352 windows x 1.2 s = 422 s of audio pushed through the net for 211 s of
+speech, exactly 2x by construction.
+
+ResNet34 here is fully convolutional in time, so in principle the net could run
+**once per VAD region** and TSTP could then pool over each window's slice of
+the layer4 time axis. That is close to a 2x cut of the dominant 70%.
+
+It is NOT a free refactor and must not be assumed equivalent:
+
+* conv padding at a *region* edge is not the padding at a *window* edge, so
+  embeddings near boundaries will change;
+* layer4 is downsampled 8x in time, so a 1.2 s window is only ~15 frames there
+  and window boundaries no longer land on frame boundaries;
+* it changes memory from O(window) to O(region), which matters on long files.
+
+So it needs a DER run on the VoxConverse shard (see the benchmark section
+above), not a cosine check. A cheaper variant with the same shape: batch N
+windows into one graph along `ne[3]` — the `parakeet` / `nemotron` batched
+decode trick — which changes no arithmetic at all, improves CPU GEMM shapes,
+and is the change most likely to make the GPU path win instead of lose.
