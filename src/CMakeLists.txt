@@ -1094,6 +1094,29 @@ if(APPLE)
 endif()
 
 # ---------------------------------------------------------------------------
+# WeSpeaker ResNet34-LM — speaker embedding (#324 FoxNose diarization)
+# ---------------------------------------------------------------------------
+add_library(wespeaker STATIC
+            wespeaker.h
+            wespeaker.cpp
+            )
+target_include_directories(wespeaker PUBLIC . ../include)
+target_compile_features   (wespeaker PUBLIC cxx_std_17)
+set_target_properties(wespeaker PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries     (wespeaker PUBLIC ggml ggml-base Threads::Threads crispasr-core)
+if(NOT MSVC)
+    target_compile_options(wespeaker PRIVATE -O3)
+endif()
+if(GGML_METAL)
+    target_compile_definitions(wespeaker PRIVATE GGML_USE_METAL)
+    target_link_libraries(wespeaker PUBLIC ggml-metal)
+endif()
+if(GGML_CUDA)
+    target_compile_definitions(wespeaker PRIVATE GGML_USE_CUDA)
+    target_link_libraries(wespeaker PUBLIC ggml-cuda)
+endif()
+
+# ---------------------------------------------------------------------------
 # Parakeet TDT — nvidia/parakeet-tdt-0.6b-v3 (FastConformer encoder + TDT decoder)
 # ---------------------------------------------------------------------------
 add_library(parakeet STATIC
@@ -2653,6 +2676,9 @@ endif()
 # ---------------------------------------------------------------------------
 if (TARGET gigaam)
     target_link_libraries(crispasr-lib PUBLIC gigaam)
+endif()
+if (TARGET wespeaker)
+    target_link_libraries(crispasr-lib PUBLIC wespeaker)
 endif()
 if (TARGET nemotron)
     target_link_libraries(crispasr-lib PUBLIC nemotron)

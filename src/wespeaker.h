@@ -1,0 +1,86 @@
+// wespeaker.h — public C API for the WeSpeaker ResNet34-LM ggml runtime.
+//
+// Speaker-embedding model: 16 kHz mono PCM -> a 256-dim embedding. Used by
+// the diarization clustering stack as an alternative to TitaNet.
+//
+// ⚠ The upstream weights (Wespeaker/wespeaker-voxceleb-resnet34-LM) are
+// CC-BY-4.0. Any redistributed GGUF must carry the licence tag + attribution;
+// see THIRD_PARTY_NOTICES.txt.
+//
+// Models come from GGUF files produced by:
+//   python models/convert-wespeaker-to-gguf.py \
+//       --model Wespeaker/wespeaker-voxceleb-resnet34-LM --output X.gguf
+
+#pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct wespeaker_context;
+
+struct wespeaker_context_params {
+    int n_threads;
+    int verbosity; // 0=silent 1=normal 2=verbose
+    bool use_gpu;  // false => force CPU backend
+};
+
+struct wespeaker_context_params wespeaker_context_default_params(void);
+
+struct wespeaker_context* wespeaker_init_from_file(const char* path_model, struct wespeaker_context_params params);
+
+void wespeaker_free(struct wespeaker_context* ctx);
+
+// ---- Model introspection ----
+
+int wespeaker_embed_dim(struct wespeaker_context* ctx);   // 256
+int wespeaker_sample_rate(struct wespeaker_context* ctx); // 16000
+int wespeaker_n_mels(struct wespeaker_context* ctx);      // 80
+
+// Minimum input length in samples. The stem downsamples time by 8, so a clip
+// shorter than this produces an empty final feature map and cannot be
+// embedded. Callers should skip such windows (FoxNose's MIN_SEGMENT_DURATION
+// of 0.4 s is comfortably above it).
+int wespeaker_min_samples(struct wespeaker_context* ctx);
+
+// ---- Embedding ----
+
+// Compute the speaker embedding for raw 16 kHz mono PCM in [-1, 1].
+// `out_embedding` must have room for wespeaker_embed_dim() floats.
+//
+// The embedding is returned RAW, exactly as the reference model emits it —
+// no L2 normalisation. Callers that need unit vectors (cosine affinity,
+// spherical centroids) normalise at their own layer, which is what the
+// upstream clustering does.
+//
+// Returns 0 on success, non-zero on failure (including audio too short).
+int wespeaker_embed(struct wespeaker_context* ctx, const float* samples, int n_samples, float* out_embedding);
+
+// ---- Stage-level entry points (for crispasr-diff) ----
+
+// Kaldi fbank (80 mel, 25/10 ms, hamming) AFTER per-utterance CMN — i.e. the
+// exact tensor the network consumes. Returns a malloc'd (T_frames, n_mels)
+// row-major buffer the caller must free(), or nullptr.
+float* wespeaker_compute_fbank(struct wespeaker_context* ctx, const float* samples, int n_samples, int* out_T,
+                               int* out_n_mels);
+
+// Per-stage capture callback. `data` is a row-major buffer of ne2*ne1*ne0
+// floats with ne0 the fastest axis, matching the ggml layout:
+//   feature maps -> (ne2=channels, ne1=freq, ne0=time) i.e. time fastest
+//   stats/embedding -> 1-D, ne1 = ne2 = 1
+// Stage names match tools/reference_backends/wespeaker.py: "stem_out",
+// "layer1_out".."layer4_out", "stats", "embedding".
+typedef void (*wespeaker_stage_cb)(const char* name, const float* data, int ne0, int ne1, int ne2, void* userdata);
+
+// Like wespeaker_embed, but invokes `cb` for every intermediate stage.
+// `out_embedding` may be nullptr if only the callback output is wanted.
+int wespeaker_embed_staged(struct wespeaker_context* ctx, const float* samples, int n_samples, wespeaker_stage_cb cb,
+                           void* userdata, float* out_embedding);
+
+#ifdef __cplusplus
+}
+#endif
