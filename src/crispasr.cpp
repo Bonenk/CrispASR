@@ -2141,10 +2141,16 @@ static bool whisper_model_load(struct whisper_model_loader* loader, whisper_cont
             return false;
         };
 
-        const bool has_serialized_specials =
-            set_token_id(vocab.token_eot, "<|endoftext|>") && set_token_id(vocab.token_sot, "<|startoftranscript|>");
+        auto has_token = [&](const char* token) { return vocab.token_to_id.find(token) != vocab.token_to_id.end(); };
+
+        // Probe without assigning: set_token_id() mutates its destination, so calling it here would
+        // leave a partially-resolved id behind when the && short-circuits, and the legacy fixup below
+        // would then increment an id that is already correct.
+        const bool has_serialized_specials = has_token("<|endoftext|>") && has_token("<|startoftranscript|>");
 
         if (has_serialized_specials) {
+            set_token_id(vocab.token_eot, "<|endoftext|>");
+            set_token_id(vocab.token_sot, "<|startoftranscript|>");
             set_token_id(vocab.token_translate, "<|translate|>");
             set_token_id(vocab.token_transcribe, "<|transcribe|>");
             set_token_id(vocab.token_solm, "<|startoflm|>");
