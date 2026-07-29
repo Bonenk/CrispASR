@@ -834,7 +834,7 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
                 }
 
                 // Global embedding-based re-clustering (issue #107 P3).
-                if (!rp.diarize_embedder.empty() && !pcmf32.empty()) {
+                if (!rp.diarize_embedder.empty() && !pcmf32.empty() && !rp.diarize_embedder_is_foxnose()) {
                     auto embedder = crispasr_make_speaker_embedder(rp.diarize_embedder, rp.n_threads, rp.cache_dir);
                     if (embedder) {
                         crispasr_remap_speakers_via_embeddings(result.segs, pcmf32.data(), n_samples, embedder.get(),

@@ -40,6 +40,12 @@ enum class CrispasrDiarizeMethod {
     Xcorr,
     VadTurns,
     Pyannote,
+    /// #324: WeSpeaker embeddings + spectral clustering (the FoxNose recipe).
+    /// Needs `foxnose_embedder_path`. Unlike the other methods this one
+    /// derives speaker TURNS from the audio and then attributes each caller
+    /// segment to the turn it overlaps most, so it can split a single ASR
+    /// segment's speaker assignment only at segment granularity.
+    FoxNose,
 };
 
 // One ASR segment, in / out. Caller fills the centisecond range;
@@ -63,6 +69,16 @@ struct CrispasrDiarizeOptions {
     /// original audio, so the lib can convert each segment's absolute
     /// t0/t1 into a buffer-relative sample index.
     int64_t slice_t0_cs = 0;
+
+    // ── FoxNose (#324) ────────────────────────────────────────────────
+    /// GGUF path for the speaker-embedding model (WeSpeaker ResNet34-LM).
+    /// Ignored unless `method == FoxNose`; required when it is.
+    std::string foxnose_embedder_path;
+    /// Speaker-count bounds for automatic estimation.
+    int min_speakers = 1;
+    int max_speakers = 20;
+    /// > 0 pins the speaker count and skips estimation entirely.
+    int num_speakers = 0;
 };
 
 /// Run the selected diarizer over `segs`, mutating their `speaker` field.

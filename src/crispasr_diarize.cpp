@@ -9,6 +9,9 @@
 #include "crispasr_diarize.h"
 #include "crispasr_diarize_internal.h"
 #include "pyannote_seg.h"
+#include "wespeaker.h"
+
+#include "core/foxnose_pipeline.h"
 
 #include <algorithm>
 #include <cmath>
@@ -386,6 +389,83 @@ std::vector<SpeakerRun> group_words_into_speaker_runs(const std::vector<int>& wo
 
 } // namespace crispasr_diarize_internal
 
+namespace {
+
+// #324 FoxNose: embed sliding windows of each caller segment with WeSpeaker,
+// cluster them, smooth the label sequence, then attribute every caller
+// segment to the speaker turn it overlaps most.
+//
+// The caller's segments ARE the speech regions — they come from ASR/VAD
+// upstream — so this method deliberately does not run a VAD of its own.
+// Re-segmenting would both duplicate work and desynchronise the labels from
+// the segments the caller is going to attach them to.
+struct FoxnoseEmbedder {
+    wespeaker_context* ctx = nullptr;
+};
+
+int foxnose_embed_cb(void* ud, const float* pcm, int n, float* out) {
+    auto* e = static_cast<FoxnoseEmbedder*>(ud);
+    return wespeaker_embed(e->ctx, pcm, n, out);
+}
+
+bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOptions& opts,
+                   std::vector<CrispasrDiarizeSegment>& segs) {
+    if (opts.foxnose_embedder_path.empty()) {
+        fprintf(stderr, "crispasr_diarize: foxnose needs --diarize-embedder <wespeaker.gguf>\n");
+        return false;
+    }
+    if (segs.empty() || !left || n_samples <= 0)
+        return true;
+
+    wespeaker_context_params cp = wespeaker_context_default_params();
+    cp.n_threads = opts.n_threads;
+    cp.verbosity = 0;
+    wespeaker_context* ctx = wespeaker_init_from_file(opts.foxnose_embedder_path.c_str(), cp);
+    if (!ctx) {
+        fprintf(stderr, "crispasr_diarize: failed to load embedder '%s'\n", opts.foxnose_embedder_path.c_str());
+        return false;
+    }
+    const int sr = wespeaker_sample_rate(ctx);
+    const int dim = wespeaker_embed_dim(ctx);
+
+    // Caller timestamps are absolute; the buffer starts at slice_t0_cs.
+    std::vector<core_foxnose::Speech> speech;
+    speech.reserve(segs.size());
+    for (const auto& g : segs) {
+        const double a = (double)(g.t0_cs - opts.slice_t0_cs) / 100.0;
+        const double b = (double)(g.t1_cs - opts.slice_t0_cs) / 100.0;
+        speech.push_back({std::max(0.0, a), std::max(0.0, b)});
+    }
+
+    FoxnoseEmbedder emb{ctx};
+    core_foxnose::Params p;
+    p.min_speakers = opts.min_speakers;
+    p.max_speakers = opts.max_speakers;
+    p.num_speakers = opts.num_speakers;
+    core_foxnose::Result res = core_foxnose::diarize(left, n_samples, sr, speech, foxnose_embed_cb, &emb, dim, p);
+    wespeaker_free(ctx);
+
+    if (res.turns.empty())
+        return true; // nothing to say; leave speaker = -1
+
+    for (size_t i = 0; i < segs.size(); i++) {
+        const double a = speech[i].start, b = speech[i].end;
+        double best = 0.0;
+        int best_spk = -1;
+        for (const auto& t : res.turns) {
+            const double ov = std::min(b, t.end) - std::max(a, t.start);
+            if (ov > best) {
+                best = ov;
+                best_spk = t.speaker;
+            }
+        }
+        segs[i].speaker = best_spk;
+    }
+    return true;
+}
+
+} // namespace
+
 bool crispasr_diarize_segments(const float* left, const float* right, int n_samples, bool is_stereo,
                                std::vector<CrispasrDiarizeSegment>& segs, const CrispasrDiarizeOptions& opts) {
     if (segs.empty() || !left || n_samples <= 0)
@@ -407,6 +487,8 @@ bool crispasr_diarize_segments(const float* left, const float* right, int n_samp
         return true;
     case CrispasrDiarizeMethod::Pyannote:
         return apply_pyannote(left, n_samples, opts.slice_t0_cs, segs, opts.pyannote_model_path, opts.n_threads);
+    case CrispasrDiarizeMethod::FoxNose:
+        return apply_foxnose(left, n_samples, opts, segs);
     }
     return false;
 }
