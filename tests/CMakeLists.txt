@@ -1612,6 +1612,43 @@ catch_discover_tests(test-gigaam-params
     PROPERTIES LABELS "unit;gigaam"
 )
 
+# ─── test-wespeaker — live integration tests for the WeSpeaker embedder
+add_executable(test-wespeaker
+    test_wespeaker_live.cpp
+)
+target_include_directories(test-wespeaker PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+)
+target_link_libraries(test-wespeaker PRIVATE
+    Catch2::Catch2WithMain
+    wespeaker
+)
+catch_discover_tests(test-wespeaker
+    TEST_SPEC "[wespeaker]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
+# ─── test-wespeaker-params — Catch2 unit tests for wespeaker_context_params
+# defaults and null-guard coverage. No GGUF required. ──────────────────────────
+add_executable(test-wespeaker-params
+    test-wespeaker-params.cpp
+)
+target_include_directories(test-wespeaker-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-wespeaker-params PRIVATE
+    Catch2::Catch2WithMain
+    wespeaker
+)
+catch_discover_tests(test-wespeaker-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;wespeaker"
+)
+
 # ─── test-nemotron-params — Catch2 unit tests for nemotron_context_params defaults
 # and null-guard coverage. No GGUF required. ───────────────────────────────────
 add_executable(test-nemotron-params
