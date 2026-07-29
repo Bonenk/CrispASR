@@ -148,10 +148,11 @@ add_library(crispasr-lib
             crispasr_aligner.cpp
             # Built-in G2P phonemizers (EN/DE/FR/ES) live in the kokoro
             # target (phonemizer.cpp) — only kokoro calls them.
-            # HF download + filesystem cache (shared with CLI). Consumed
-            # by the library's VAD / LID / diarize auto-download paths
-            # and by the CLI's `-m auto` resolver.
-            crispasr_cache.cpp
+            # HF download + filesystem cache (`crispasr_cache.cpp`) lives in
+            # crispasr-core, NOT here — kokoro's phonemizer.cpp calls
+            # crispasr_cache::ensure_cached_file (#316 CMUdict auto-download) and
+            # only links crispasr-core, so a static build (BUILD_SHARED_LIBS=OFF)
+            # left crispasr-diff's link unresolved when it lived here (#316 AUR).
             # Known-model registry lookup (backend → canonical GGUF URL).
             # CLI keeps the TTY prompting shim; the library does the
             # non-interactive resolve.
@@ -620,11 +621,11 @@ target_link_libraries(crispasr-lib PUBLIC glint)
 # tests don't have to remember to add it. Mirrors how Threads::Threads
 # already flows through.
 if (WIN32)
-    # winhttp: HF auto-download in crispasr_cache.cpp
     # mfplat/mfreadwrite/mfuuid: Media Foundation AAC decoder in crispasr_audio.cpp
     # ole32: CoInitializeEx for MF
+    # (winhttp for crispasr_cache.cpp now flows from crispasr-core — it moved there.)
     # MSVC auto-links via #pragma comment(lib,...) but MinGW/Clang/lld ignores those.
-    target_link_libraries(crispasr-lib PUBLIC winhttp mfplat mfreadwrite mfuuid ole32)
+    target_link_libraries(crispasr-lib PUBLIC mfplat mfreadwrite mfuuid ole32)
 endif()
 
 if (ANDROID AND CRISPASR_MEDIA_NDK)
@@ -864,8 +865,22 @@ add_library(crispasr-core STATIC
             # No-op unless CRISPASR_IMATRIX_OUT is set (see docs/quantize.md).
             crispasr_imatrix.h
             crispasr_imatrix.cpp
+            # HF download + filesystem cache. Lives HERE (not crispasr-lib) for
+            # the same reason as imatrix: backend static libs call it — kokoro's
+            # phonemizer.cpp uses crispasr_cache::ensure_cached_file (#316 CMUdict
+            # auto-download) and links only crispasr-core, so a static build must
+            # find the symbol in the leaf lib, not the higher crispasr-lib (#316).
+            crispasr_cache.h
+            crispasr_cache.cpp
             )
 target_include_directories(crispasr-core PUBLIC . ../include)
+if (WIN32)
+    # crispasr_cache.cpp's HF auto-download uses WinHTTP. MSVC auto-links via
+    # #pragma comment(lib,"winhttp.lib"); MinGW/Clang/lld ignore that, so link it
+    # explicitly here now that crispasr_cache lives in crispasr-core. PUBLIC so any
+    # target that links crispasr-core (backend static libs, tests) inherits it.
+    target_link_libraries(crispasr-core PUBLIC winhttp)
+endif()
 # PLAN #51a: gguf_loader uses ggml_backend_buffer_init from
 # ggml-backend-impl.h to register a custom mmap-owning CPU buffer. The
 # header lives in ggml/src/ rather than ggml/include/, so we expose it
@@ -1823,10 +1838,14 @@ set_target_properties(kokoro PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # under BUILD_SHARED_LIBS, so it was never true where phonemizer.cpp is
 # compiled.
 #
-# crispasr_cache.cpp lives in crispasr-lib, which links THIS target, so we
-# cannot link it back without a cycle. kokoro is a static library, so the
-# reference stays unresolved until the final executable — which always links
-# crispasr-lib — resolves it.
+# crispasr_cache.cpp now lives in crispasr-core (the leaf lib kokoro already
+# links), NOT crispasr-lib. Originally it was in crispasr-lib and the reference
+# was left for the final executable to resolve — but a static build
+# (BUILD_SHARED_LIBS=OFF) links crispasr-lib BEFORE kokoro, so the linker
+# discarded crispasr_cache.o before phonemizer.o referenced it and crispasr-diff
+# failed to link (#316 AUR report). Moving the symbol to crispasr-core — which
+# every backend static lib depends on — resolves it in all link configs with no
+# cycle (mirrors crispasr_imatrix).
 target_compile_definitions(kokoro PRIVATE CRISPASR_BUILD)
 target_include_directories(kokoro PUBLIC .)
 target_compile_features   (kokoro PUBLIC cxx_std_17)
