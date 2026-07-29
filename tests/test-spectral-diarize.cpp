@@ -381,11 +381,12 @@ TEST_CASE("cluster_speakers: auto-detects the blob count", "[unit][spectral]") {
 //
 // The default stays faithful to upstream; the DER harness decides whether to
 // flip it. This test pins BOTH arms so neither can regress unnoticed.
-TEST_CASE("cluster_speakers: eigengap (the default) recovers the true count", "[unit][spectral]") {
-    // The BIC + silhouette estimator over-counts here: it anchors at 8 and its
-    // [k-2, k+3] window can never reach 3. Eigengap reads the count off the
-    // Laplacian spectrum instead and gets it right, which is why it is the
-    // default (see count_method_from_env()).
+TEST_CASE("cluster_speakers: default estimator is bic", "[unit][spectral]") {
+    // The DEFAULT is the upstream BIC estimator. Eigengap looks better here —
+    // it recovers this synthetic case, which BIC does not — but that is
+    // exactly the trap: on real speech it under-counts and scores 11.4% DER
+    // against BIC's 5.3% on VoxConverse. This test pins the default so a
+    // synthetic win cannot quietly flip it again.
     const int k = 3, per = 25, d = 32;
     auto x = make_blobs(k, per, d, 1.0f, 66, 6.0f);
     const int n = k * per;
@@ -393,18 +394,18 @@ TEST_CASE("cluster_speakers: eigengap (the default) recovers the true count", "[
     unsetenv("CRISPASR_DIARIZE_COUNT");
     unsetenv("CRISPASR_DIARIZE_FULL_K_SEARCH");
     SpeakerEstimate est;
-    auto lab = cluster_speakers(x.data(), n, d, 1, 10, 0, &est);
-    INFO("default estimator gave k = " << est.best_k << " via " << est.reason);
-    CHECK(std::string(est.reason) == "eigengap");
-    CHECK(partition_matches_blobs(lab, k, per));
+    cluster_speakers(x.data(), n, d, 1, 10, 0, &est);
+    CHECK(std::string(est.reason) != "eigengap");
+
+    // ...and eigengap remains selectable, and still solves this case.
+    setenv("CRISPASR_DIARIZE_COUNT", "eigengap", 1);
+    SpeakerEstimate est_eg;
+    auto lab_eg = cluster_speakers(x.data(), n, d, 1, 10, 0, &est_eg);
+    unsetenv("CRISPASR_DIARIZE_COUNT");
+    CHECK(std::string(est_eg.reason) == "eigengap");
+    CHECK(partition_matches_blobs(lab_eg, k, per));
 }
 
-// Regression guard for the GATED legacy path and its known weakness. BIC
-// over-counts on low-rank embedding sets; the [k-2, k+3] window climbs down
-// from a small over-count but not a large one (true k=3 anchored at 8 leaves
-// the window at [6,10]). Silhouette itself is reliable — it scored the true k
-// at 1.0390 against 0.68/0.79 for its neighbours — so searching the full range
-// recovers it. Both arms are pinned so neither regresses unnoticed.
 TEST_CASE("cluster_speakers: full-k search rescues the legacy BIC over-count", "[unit][spectral]") {
     const int k = 3, per = 25, d = 32;
     auto x = make_blobs(k, per, d, 1.0f, 66, 6.0f);

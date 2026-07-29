@@ -1092,22 +1092,20 @@ RNG stream. The gates are therefore known-answer unit tests (375 assertions
 over 57 hermetic cases) plus DER, not label equality. Output IS deterministic
 across runs — everything is explicitly seeded.
 
-**Speaker counting uses the eigengap**, not the upstream GMM/BIC + silhouette
-sweep. That estimator saturates on real speaker embeddings — silhouette climbs
-monotonically to whatever ceiling it is given, because within-speaker cosine
-(~0.6) is far below 1 while cross-speaker (~0.1) is far above 0, so splitting a
-real speaker keeps looking like an improvement. Measured on
-`samples/multispeaker.wav` with `max_speakers=8`: BIC reports 7-8 speakers,
-eigengap reports the correct 2. On synthetic data with known k, eigengap is
-5/5 exact against BIC's 4/5.
+**Speaker counting uses the upstream GMM/BIC + silhouette sweep by default.**
+`CRISPASR_DIARIZE_COUNT=eigengap` selects an eigengap-of-the-Laplacian
+estimator instead (with row-wise affinity thresholding, without which the
+dense cosine affinity puts the largest gap at k=1 and it reports one speaker
+for everything). Eigengap is better on well-separated synthetic data and
+cheaper, but it UNDER-counts on real speech and scores materially worse:
+pooled DER over 8 VoxConverse dev files against human labels is 5.3% for
+`bic` and 11.4% for `eigengap`, against upstream Python's 3.1%.
 
-The eigengap needs a sparsified affinity: `(cos+1)/2` is dense (~0.5 even for
-unrelated windows), so the graph is near-complete, one eigenvalue dominates and
-the largest gap always falls at k=1. Row-wise thresholding — keep each row's
-strongest 15%, attenuate the rest rather than deleting them so the graph stays
-connected, then symmetrise — restores the block structure.
-`CRISPASR_DIARIZE_COUNT=bic` selects the upstream estimator, which is gated
-rather than removed.
+**Benchmarked accuracy.** Most of the 5.3% vs 3.1% difference is false alarm
+(26.1 s vs 4.7 s) from the benchmark driver handing the pipeline whole files
+with no VAD, where upstream runs Silero first; substituting upstream's false
+alarm gives 3.4%, i.e. parity within ~0.3 points. With the speaker count
+pinned equal on both sides, the two agree with ZERO speaker confusion.
 
 Speaker identity is consistent across slices: on the unified `crispasr_run`
 path FoxNose runs in ONE global pass after transcription

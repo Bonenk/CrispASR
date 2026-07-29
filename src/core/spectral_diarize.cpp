@@ -590,19 +590,28 @@ int estimate_speakers_eigengap(const float* affinity, int n, int min_k, int max_
 }
 
 CountMethod count_method_from_env() {
-    // Eigengap is the DEFAULT because it wins on every case measured, and the
-    // old path's failure mode is severe rather than marginal:
+    // DEFAULT IS BIC — the upstream estimator.
     //
-    //   synthetic (5 true-k cases)   bic 4/5 exact      eigengap 5/5 exact
-    //   real audio, max_speakers=8   bic 8 speakers     eigengap 2, correct
+    // An earlier revision defaulted to eigengap on the strength of five
+    // synthetic blob configurations (5/5 vs 4/5) and one 31.5 s clip. Both
+    // were unrepresentative, and a real benchmark reversed the verdict.
+    // Pooled DER over 8 VoxConverse dev files against HUMAN labels
+    // (0.25 s collar, optimal 1:1 mapping):
     //
-    // It is also cheaper — one eigendecomposition instead of a GMM sweep plus
-    // max_k spectral runs for silhouette scoring. CRISPASR_DIARIZE_COUNT=bic
-    // restores the upstream estimator; the path is gated, not deleted.
+    //     upstream Python diarize 0.1.2   3.1 %
+    //     this port, bic                  5.3 %
+    //     this port, eigengap            11.4 %
+    //
+    // Eigengap systematically UNDER-counts on real speech — reference
+    // 4/7/2/5/5/4/4/5 speakers against 3/5/2/3/3/2/2/3 — and the confusion
+    // term triples. It is retained behind CRISPASR_DIARIZE_COUNT=eigengap
+    // because it is genuinely better on well-separated data and costs less,
+    // but it is not the default and synthetic evidence must not be used to
+    // make it one again.
     const char* e = std::getenv("CRISPASR_DIARIZE_COUNT");
-    if (e && *e && std::string(e) == "bic")
-        return CountMethod::Bic;
-    return CountMethod::Eigengap;
+    if (e && *e && std::string(e) == "eigengap")
+        return CountMethod::Eigengap;
+    return CountMethod::Bic;
 }
 
 std::vector<int> spectral_labels(const float* affinity, int n, int k, unsigned seed) {

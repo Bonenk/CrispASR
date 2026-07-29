@@ -59,50 +59,50 @@ Clustering + smoothing + pipeline: **375 assertions over 57 hermetic cases**
 (no model, no audio, no network), including an end-to-end synthetic
 2-speaker timeline at **DER 0.0**.
 
-## Speaker counting — solved by switching estimator
+## ⚠ Real-data benchmark — and a reversed conclusion
 
-The upstream estimator (PCA + full-covariance GMM BIC, refined by silhouette)
-does not work on real speaker embeddings. Silhouette saturates and climbs
-monotonically to whatever ceiling it is given: within-speaker cosine is only
-~0.595 while cross-speaker is ~0.100, so splitting a real speaker keeps
-cutting the intra-cluster term while the inter-cluster term barely moves.
+**8 VoxConverse dev files, human labels, 0.25 s collar, optimal 1:1 mapping.**
+Pooled over 1109 s of scored reference speech:
 
-Replaced by the **eigengap** of the normalised Laplacian — the standard
-estimator for spectral diarization. It reads cluster structure off the
-spectrum rather than scoring partitions, so saturation does not arise.
+| system | miss | FA | confusion | **DER** |
+|---|---|---|---|---|
+| upstream Python `diarize` 0.1.2 | 0.6 | 4.7 | 29.0 | **3.1 %** |
+| this port, `bic` (upstream estimator) | 0.0 | 26.1 | 32.7 | **5.3 %** |
+| this port, `eigengap` | 0.0 | 26.1 | 101.3 | **11.4 %** |
 
-One thing it needs that the upstream affinity does not provide: the cosine
-affinity `(cos+1)/2` is DENSE, sitting near 0.5 even for unrelated windows, so
-the graph is nearly complete, the spectrum has one dominant eigenvalue, and
-the largest gap is always at k=1 — a naive eigengap reports one speaker for
-everything. Row-wise thresholding (keep each row's strongest 15%, attenuate
-the rest by 0.01 rather than deleting them so the graph stays connected, then
-symmetrise with an elementwise max) restores the block structure.
+### The eigengap default was wrong and has been reverted
 
-Measured:
+An earlier revision made eigengap the default on the strength of five
+synthetic blob configurations (5/5 exact vs BIC's 4/5) and one 31.5 s clip.
+Both were unrepresentative — `samples/multispeaker.wav` is the same speech
+re-read by different speakers, an unusually easy case — and the real benchmark
+reversed the verdict.
 
-| | synthetic, 5 true-k cases | real audio, `max_speakers=8` |
-|---|---|---|
-| BIC + silhouette (upstream) | 4/5 exact | **7-8 speakers** — saturated |
-| eigengap, no thresholding | 0/5 — always k=1 | — |
-| **eigengap + row thresholding** | **5/5 exact** | **2 speakers, correct turns** |
+Eigengap systematically UNDER-counts on real speech:
 
-Eigengap is also cheaper: one eigendecomposition instead of a GMM sweep plus
-`max_k` spectral runs for silhouette scoring. It wins on quality AND speed, so
-it is the DEFAULT; `CRISPASR_DIARIZE_COUNT=bic` restores the upstream path,
-which is gated rather than deleted.
+    reference speakers   4  7  2  5  5  4  4  5
+    eigengap             3  5  2  3  3  2  2  3
+    bic                  4  6  3  5  4  3  2  5
 
-Because eigengap is robust to a loose bound, `--diarize-max-speakers` no
-longer has to be defensively small: the foxnose default went back from 4 to 8,
-so a genuine 5-6 speaker meeting is reachable again.
+and the confusion term triples. It is retained behind
+`CRISPASR_DIARIZE_COUNT=eigengap` — it is genuinely better on well-separated
+data and costs less — but it is NOT the default, and synthetic evidence must
+not be used to make it one again. The unit test now pins the default.
 
-Two earlier findings, both still in force for the gated BIC path:
+### The remaining gap to upstream is the benchmark harness, not the diarizer
 
-* the upstream component ceiling of `n/2 + 1` is far too loose for a FULL
-  covariance (not estimable from fewer than `d+1` points) — bounded by
-  `n/(d+1)`;
-* the `[k-2, k+3]` window recovers an under-count but not a large over-count
-  — `CRISPASR_DIARIZE_FULL_K_SEARCH=1` scores the whole range instead.
+Our false alarm is 26.1 s against upstream's 4.7 s, and the cause is known:
+the benchmark driver hands our pipeline the WHOLE FILE as one speech region,
+so silence is windowed and labelled, while upstream runs its own Silero VAD
+first. Substituting upstream's false-alarm figure:
+
+    this port, bic, with upstream's FA     3.4 %
+    upstream Python                        3.1 %
+
+i.e. parity within ~0.3 points once the speech-detection difference is removed.
+The real CLI path does not have this handicap — it takes the caller's ASR/VAD
+segments as its speech regions. Giving the benchmark driver a VAD stage is the
+obvious next step, and would let the two be compared on equal terms.
 
 ## Blueprint parity — measured end to end
 
