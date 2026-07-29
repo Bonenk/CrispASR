@@ -3007,6 +3007,11 @@ endif()
 if (TARGET pyannote-seg)
     target_link_libraries(crispasr-lib PUBLIC pyannote-seg)
 endif()
+# WeSpeaker is likewise not a backend — crispasr_diarize.cpp consumes it for
+# the "foxnose" method (#324).
+if (TARGET wespeaker)
+    target_link_libraries(crispasr-lib PUBLIC wespeaker)
+endif()
 # Silero LID engine used by crispasr_lid.cpp's native Silero path.
 if (TARGET silero-lid)
     target_link_libraries(crispasr-lib PUBLIC silero-lid)

@@ -648,6 +648,8 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
         lib_method = CrispasrDiarizeMethod::VadTurns;
     } else if (method == "pyannote") {
         lib_method = CrispasrDiarizeMethod::Pyannote;
+    } else if (method == "foxnose" || method == "foxnose-diarize") {
+        lib_method = CrispasrDiarizeMethod::FoxNose;
     } else {
         use_lib = false;
     }
@@ -696,6 +698,13 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
         opts.slice_t0_cs = slice_t0_cs;
         if (lib_method == CrispasrDiarizeMethod::Pyannote)
             opts.pyannote_model_path = resolve_pyannote_model(params);
+        if (lib_method == CrispasrDiarizeMethod::FoxNose) {
+            // Reuses the existing --diarize-embedder / --diarize-max-speakers
+            // knobs rather than inventing parallel ones.
+            opts.foxnose_embedder_path = params.diarize_embedder;
+            opts.max_speakers = params.diarize_max_speakers > 0 ? params.diarize_max_speakers : 20;
+            opts.num_speakers = params.diarize_num_speakers;
+        }
 
         auto lib_segs = lib_view(segs);
         const int n = (int)left.size();

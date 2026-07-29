@@ -549,7 +549,8 @@ static void crispasr_apply_global_speaker_stages(std::vector<crispasr_segment>& 
     if (crispasr_apply_tiron_linking(all_segs, samples, params))
         return;
 
-    const bool want_cluster = params.diarize && !params.diarize_embedder.empty();
+    const bool want_cluster =
+        params.diarize && !params.diarize_embedder.empty() && !params.diarize_embedder_is_foxnose();
     const bool want_ident = !params.speaker_db.empty() && params.speaker_db_consent && !params.expect_speakers.empty();
     if ((!want_cluster && !want_ident) || all_segs.empty() || samples.empty())
         return;
