@@ -128,6 +128,7 @@ from the GGUF metadata. Jump to the [TTS table](#text-to-speech-models) for the 
 | **funasr** | [`FunAudioLLM/Fun-ASR-Nano-2512`](https://huggingface.co/cstr/funasr-nano-GGUF) | 70-block SANM encoder + 2-block Transformer adaptor + Qwen3-0.6B LLM | zh, yue, en, ja, ko | FunASR Model License v1.1 (commercial OK w/ attribution) |
 | **fun-asr-mlt-nano** | [`FunAudioLLM/Fun-ASR-MLT-Nano-2512`](https://huggingface.co/cstr/funasr-mlt-nano-GGUF) | Same architecture, multilingual decoder | 31 langs incl. de, fr, es, pt, ru, ar, hi, vi, th, ko | FunASR Model License v1.1 |
 | **paraformer** | [`funasr/paraformer-zh`](https://huggingface.co/cstr/paraformer-zh-GGUF) | 50-block SANM encoder + CIF predictor + 16-block NAR decoder (single-pass, non-autoregressive); character-level vocab (8404); 220M params | zh, en | FunASR Model License (commercial OK w/ attribution) |
+| **gigaam** | [`ai-sage/GigaAM-v3`](https://huggingface.co/cstr/gigaam-v3-GGUF) (base [`ai-sage/GigaAM-v3`](https://huggingface.co/ai-sage/GigaAM-v3)) | 16-layer rotary Conformer (220M) + CTC or RNN-T head; four revisions — `e2e_rnnt` / `e2e_ctc` emit punctuation + casing + ITN from a SentencePiece vocab, `rnnt` / `ctc` emit bare lowercase Cyrillic ([more](docs/architecture.md#gigaam)) | ru | MIT |
 | **sensevoice** | [`FunAudioLLM/SenseVoiceSmall`](https://huggingface.co/cstr/sensevoice-small-GGUF) | 70-block SANM encoder + CTC head; emits transcript + language ID + emotion + audio-event in one forward pass (non-AR, 15× faster than Whisper-Large); structured C ABI + `-oj` JSON expose the four tags as separate fields | 50+ langs; native LID + emotion + audio-event tags | FunASR Model License v1.1 |
 
 ### Speech-to-speech audio upscaling and restoration
@@ -380,6 +381,7 @@ Full reference + tuning knobs (cluster threshold, max speakers, pluggable embedd
 | funasr | ✔ | ✔ | LLM output (Qwen3-0.6B decoder). Chinese chars carry full-width period; mlt-nano variant adds Latin-script casing + punctuation. |
 | sensevoice | ✔ | ✔ | CTC output with native ITN — toggle via `--punctuation` / `--no-punctuation`, controls Arabic-digit vs spelled-out numerals + comma/period emission. |
 | paraformer | **no** | **no** | NAR character-level output — add `--punc-model` |
+| gigaam | ✔ (`e2e_*`) | ✔ (`e2e_*`) | The `e2e_*` revisions carry punctuation + casing + inverse text normalization in the SentencePiece vocabulary. The charwise `ctc` / `rnnt` revisions emit lowercase Cyrillic with no punctuation — but auto-restoration is still suppressed for them, because the auto-enabled FireRedPunc is a Chinese/English model and injects full-width CJK punctuation into Russian. Use an `e2e_*` revision for punctuated output, or pass an explicit `--punc-model`. |
 | glm-asr | ✔ | ✔ | LLM output |
 | kyutai-stt | ✔ | ✔ | LLM output |
 | moonshine | ✔ | ✔ | Encoder-decoder output |
@@ -430,6 +432,7 @@ crispasr --backend parakeet -m parakeet.gguf --vad --flush-after 1 -osrt -f long
 | Highest-quality offline speech-LLM | **voxtral** |
 | Apache-licensed speech-LLM | **granite**, **voxtral**, **qwen3**, **omniasr-llm** |
 | **Lightweight CTC-only** (fast, no decoder) | **wav2vec2**, **fc-ctc**, **data2vec**, **omniasr** |
+| **Russian** | **gigaam** (`e2e_rnnt` — 8.4 % avg WER, punctuation + ITN), **whisper**, **qwen3** |
 | **Mandarin + Chinese dialects** | **firered-asr**, **qwen3**, **glm-asr**, **funasr**, **paraformer**, **sensevoice** |
 | **Multilingual (31 langs) speech-LLM** | **fun-asr-mlt-nano**, **qwen3**, **omniasr-llm**, **gemma4-e2b** |
 | **Multilingual (50+ langs) + LID + emotion + audio-event in one pass** | **sensevoice** (encoder-only CTC, non-AR, 15× faster than Whisper-Large) |

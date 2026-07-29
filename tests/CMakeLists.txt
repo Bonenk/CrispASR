@@ -849,6 +849,26 @@ catch_discover_tests(test-paraformer
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-gigaam — live integration tests for the GigaAM-v3 backend
+add_executable(test-gigaam
+    test_gigaam_live.cpp
+)
+target_include_directories(test-gigaam PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+)
+target_link_libraries(test-gigaam PRIVATE
+    Catch2::Catch2WithMain
+    gigaam
+)
+catch_discover_tests(test-gigaam
+    TEST_SPEC "[gigaam]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test - nemotron — live integration tests for nemotron ASR
 add_executable(test-nemotron
     test_nemotron_live.cpp
@@ -1573,6 +1593,23 @@ target_link_libraries(test-mimoasr-params PRIVATE
 catch_discover_tests(test-mimoasr-params
     TEST_SPEC "[unit]"
     PROPERTIES LABELS "unit;mimo_asr"
+)
+
+# ─── test-gigaam-params — Catch2 unit tests for gigaam_context_params defaults
+# and null-guard coverage. No GGUF required. ───────────────────────────────────
+add_executable(test-gigaam-params
+    test-gigaam-params.cpp
+)
+target_include_directories(test-gigaam-params PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-gigaam-params PRIVATE
+    Catch2::Catch2WithMain
+    gigaam
+)
+catch_discover_tests(test-gigaam-params
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;gigaam"
 )
 
 # ─── test-nemotron-params — Catch2 unit tests for nemotron_context_params defaults

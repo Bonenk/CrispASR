@@ -610,6 +610,22 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
     // because the duration head provides an independent advance mechanism.
     // Default: keep joint.* and decoder.embed.* at source precision for RNNT
     // models (n_tdt_durations==0). Override with CRISPASR_PARAKEET_QUANT_ALL=1.
+    // GigaAM-v3: the RNN-T head is the same blank-vs-token argmax as parakeet's
+    // (a 1025-way decision where a flipped blank sends the greedy decoder into a
+    // non-terminating emission loop), and both heads are tiny — joint.* +
+    // decoder.embed.* together are under 2 MB against a 220 M-param encoder, so
+    // keeping them at source precision costs nothing. The CTC head (head.ctc.*)
+    // is the same argument, one matmul wide. Override with
+    // CRISPASR_GIGAAM_QUANT_ALL=1.
+    const bool is_gigaam = (arch == "gigaam");
+    const char* env_gigaam_all = std::getenv("CRISPASR_GIGAAM_QUANT_ALL");
+    const bool gigaam_quant_all = is_gigaam && env_gigaam_all && *env_gigaam_all && *env_gigaam_all != '0';
+    if (is_gigaam && !gigaam_quant_all) {
+        printf("%s: gigaam — keeping joint.*, decoder.*, head.ctc.* and encoder.pre.* at source "
+               "precision (override with CRISPASR_GIGAAM_QUANT_ALL=1)\n",
+               __func__);
+    }
+
     const bool is_parakeet = (arch == "parakeet");
     bool parakeet_is_rnnt = false;
     if (is_parakeet) {
@@ -807,6 +823,12 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             !(is_miotts && sname.find("codec.") == 0) &&
             !(is_parakeet && parakeet_is_rnnt && !parakeet_quant_all &&
               (sname.find("joint.") == 0 || sname.find("decoder.embed") == 0)) &&
+            // encoder.pre.* stays unquantized for the same reason it is F32 in the
+            // converter: the mel is un-normalized log-mel, so the subsampling convs
+            // carry large values whose rounding error cascades through all 16 blocks.
+            !(is_gigaam && !gigaam_quant_all &&
+              (sname.find("joint.") == 0 || sname.find("decoder.") == 0 || sname.find("head.ctc.") == 0 ||
+               sname.find("encoder.pre.") == 0 || sname.find("preprocessor.") == 0)) &&
             !(is_tada && !tada_quant_all && (sname.find("talker.token_embd") == 0 || sname.find("tada.") == 0)) &&
             ([&]() {
                 if (!is_tada || tada_quant_all || (tada_keep_head == 0 && tada_keep_tail == 0))
