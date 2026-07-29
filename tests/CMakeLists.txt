@@ -1632,6 +1632,22 @@ catch_discover_tests(test-wespeaker
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-der — DER scorer + synthetic end-to-end pipeline test (#324)
+add_executable(test-der
+    test-der.cpp
+)
+target_include_directories(test-der PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-der PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-core
+)
+catch_discover_tests(test-der
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;der"
+)
+
 # ─── test-diarize-smooth — hermetic unit tests for temporal label smoothing
 add_executable(test-diarize-smooth
     test-diarize-smooth.cpp
