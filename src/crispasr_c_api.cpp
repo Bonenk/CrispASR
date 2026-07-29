@@ -5417,6 +5417,10 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
     if (s->backend == "gigaam" && s->gigaam_ctx) {
         // GigaAM-v3 is Russian-only, so the sticky source_language is not a
         // steering knob here; it is ignored on purpose.
+        // The transducer's per-frame symbol cap is this backend's only decode
+        // knob — forward it here too, not just in the CLI adapter (#292: a fix
+        // made in one surface never reaches bindings/server).
+        gigaam_set_max_symbols(s->gigaam_ctx, s->max_new_tokens);
         gigaam_result* gr = gigaam_transcribe_ex(s->gigaam_ctx, pcm, n_samples, 0);
         if (!gr) {
             delete r;
