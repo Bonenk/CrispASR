@@ -409,7 +409,7 @@ int foxnose_embed_cb(void* ud, const float* pcm, int n, float* out) {
 }
 
 bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOptions& opts,
-                   std::vector<CrispasrDiarizeSegment>& segs) {
+                   std::vector<CrispasrDiarizeSegment>& segs, std::vector<CrispasrDiarizeTurn>* out_turns) {
     if (opts.foxnose_embedder_path.empty()) {
         fprintf(stderr, "crispasr_diarize: foxnose needs --diarize-embedder <wespeaker.gguf>\n");
         return false;
@@ -445,6 +445,13 @@ bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOption
     core_foxnose::Result res = core_foxnose::diarize(left, n_samples, sr, speech, foxnose_embed_cb, &emb, dim, p);
     wespeaker_free(ctx);
 
+    if (out_turns) {
+        out_turns->clear();
+        out_turns->reserve(res.turns.size());
+        for (const auto& t : res.turns)
+            out_turns->push_back({t.start, t.end, t.speaker});
+    }
+
     if (res.turns.empty())
         return true; // nothing to say; leave speaker = -1
 
@@ -467,7 +474,8 @@ bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOption
 } // namespace
 
 bool crispasr_diarize_segments(const float* left, const float* right, int n_samples, bool is_stereo,
-                               std::vector<CrispasrDiarizeSegment>& segs, const CrispasrDiarizeOptions& opts) {
+                               std::vector<CrispasrDiarizeSegment>& segs, const CrispasrDiarizeOptions& opts,
+                               std::vector<CrispasrDiarizeTurn>* out_turns) {
     if (segs.empty() || !left || n_samples <= 0)
         return true; // nothing to do, but not an error
 
@@ -488,7 +496,7 @@ bool crispasr_diarize_segments(const float* left, const float* right, int n_samp
     case CrispasrDiarizeMethod::Pyannote:
         return apply_pyannote(left, n_samples, opts.slice_t0_cs, segs, opts.pyannote_model_path, opts.n_threads);
     case CrispasrDiarizeMethod::FoxNose:
-        return apply_foxnose(left, n_samples, opts, segs);
+        return apply_foxnose(left, n_samples, opts, segs, out_turns);
     }
     return false;
 }

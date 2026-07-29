@@ -7,8 +7,8 @@ of numerics.
 
 ## NOW — active work
 
-Embedder, clustering, smoothing, pipeline, DER harness and CLI wiring all
-landed. **Automatic speaker counting is the open problem** (below). Not yet
+Embedder, clustering, smoothing, pipeline, DER harness, CLI wiring and
+word-aligned segment splitting all landed. **Automatic speaker counting is the open problem** (below). Not yet
 done: WeSpeaker GGUF upload + CC-BY attribution, THIRD_PARTY_NOTICES entry,
 docs/architecture.md section, session ABI, real-audio DER.
 
@@ -109,10 +109,29 @@ caller's segments ARE the speech regions (they come from ASR/VAD upstream), so
 FoxNose deliberately runs no VAD of its own — re-segmenting would duplicate
 work and desynchronise labels from the segments they attach to.
 
-**Consequence worth knowing:** labels are attributed at SEGMENT granularity.
-An ASR that emits one 26 s segment spanning several speakers gets a single
-label, however good the underlying turns are. Splitting segments at turn
-boundaries (as the pyannote path does) is the follow-up.
+Segment splitting IS implemented (`split_segments_on_foxnose_turns`): the
+method now returns its derived turns through `crispasr_diarize_segments`'s
+`out_turns`, and the CLI splits any caller segment spanning several speakers
+at word-aligned boundaries. It reuses the same `group_words_into_speaker_runs`
+grouping and sub-segment emission as the pyannote splitter — only the per-word
+labelling differs (turn-interval lookup instead of posterior scoring).
+Measured effect on `samples/multispeaker.wav`: before, both ASR segments
+collapsed to `(speaker 0)`; after, the first slice correctly reads
+0 -> 1 -> 0 across the ~11 s boundary.
+
+### ⚠ Remaining: labels are not consistent ACROSS slices
+
+Long audio is cut into slices and each slice is diarized independently, so
+each restarts its speaker numbering from 0. On `samples/multispeaker.wav`
+(2 slices) the whole-file pipeline puts 26.7-31.5 s on SPEAKER_01, but the
+CLI's second slice labels it `speaker 0` — locally right, globally wrong.
+
+This is precisely the problem the pyannote path solved with a global cache
+(`crispasr_compute_pyannote_cache`, #107): compute the speaker timeline ONCE
+over the full audio, then score each slice against it. FoxNose needs the same
+treatment — run the pipeline over the whole buffer up front and pass the turns
+down per slice. Until then, this method is only trustworthy on audio short
+enough to be a single slice.
 
 `--diarize-embedder` was already claimed by the TitaNet remap at THREE call
 sites (cli.cpp, crispasr_run.cpp, crispasr_server.cpp). They now all ask

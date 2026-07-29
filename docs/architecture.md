@@ -1103,10 +1103,13 @@ speaker cuts the intra-cluster term while the inter-cluster term barely moves.
 20; an explicit flag always wins. Prefer `--diarize-num-speakers` when the
 count is known. See `docs/foxnose-diarize/PLAN.md`.
 
-**⚠ Labels are attributed at segment granularity.** An ASR emitting one long
-segment spanning several speakers receives a single label however good the
-underlying turns are. Splitting segments at turn boundaries — as the pyannote
-path does with word timestamps — is the outstanding follow-up.
+**⚠ Speaker labels are not consistent across slices.** Long audio is cut into
+slices and each is diarized independently, restarting its numbering from 0, so
+`speaker 0` in one slice is not `speaker 0` in the next. The pyannote path
+solves this with a global cache computed once over the full audio (#107);
+FoxNose needs the same treatment. Until then this method is trustworthy only
+on audio short enough to form a single slice. Segments spanning several
+speakers ARE split at word-aligned turn boundaries within a slice.
 
 Env gates: `CRISPASR_DIARIZE_FULL_K_SEARCH=1` (score the full speaker range on
 silhouette instead of a window around the BIC anchor),
