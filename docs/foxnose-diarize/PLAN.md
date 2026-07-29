@@ -119,24 +119,35 @@ Measured effect on `samples/multispeaker.wav`: before, both ASR segments
 collapsed to `(speaker 0)`; after, the first slice correctly reads
 0 -> 1 -> 0 across the ~11 s boundary.
 
-### ⚠ Remaining: labels are not consistent ACROSS slices
+### Cross-slice speaker identity (fixed)
 
-Long audio is cut into slices and each slice is diarized independently, so
-each restarts its speaker numbering from 0. On `samples/multispeaker.wav`
-(2 slices) the whole-file pipeline puts 26.7-31.5 s on SPEAKER_01, but the
-CLI's second slice labels it `speaker 0` — locally right, globally wrong.
+Per-slice diarization cannot give consistent identities: each slice clusters
+independently and restarts numbering at 0, so `speaker 0` in one slice is a
+different person from `speaker 0` in the next. On `samples/multispeaker.wav`
+(2 slices) the final turn came out `speaker 0` where the whole-file pipeline
+says SPEAKER_01.
 
-This is precisely the problem the pyannote path solved with a global cache
-(`crispasr_compute_pyannote_cache`, #107): compute the speaker timeline ONCE
-over the full audio, then score each slice against it. FoxNose needs the same
-treatment — run the pipeline over the whole buffer up front and pass the turns
-down per slice. Until then, this method is only trustworthy on audio short
-enough to be a single slice.
+Fixed by running FoxNose in ONE global pass after transcription
+(`crispasr_apply_foxnose_global`), using the final segment list as its speech
+regions. The pyannote path solves the same problem with a pre-computed
+posterior cache (#107); FoxNose does it afterwards instead, because it needs
+the segments as speech regions and they do not exist beforehand. The per-slice
+path stands down via `params.diarize_foxnose_global`, so the embedder is
+loaded once rather than per slice.
 
-`--diarize-embedder` was already claimed by the TitaNet remap at THREE call
-sites (cli.cpp, crispasr_run.cpp, crispasr_server.cpp). They now all ask
-`params.diarize_embedder_is_foxnose()` so a fourth cannot drift — the
-multi-surface trap, caught by an end-to-end run rather than by review.
+Result on `samples/multispeaker.wav` — CLI output now matches the whole-file
+pipeline's turns exactly:
+
+| CLI | pipeline truth |
+|---|---|
+| 0.28-10.84 speaker 0 | 0.00-10.50 SPEAKER_00 |
+| 11.64-15.88 speaker 1 | 10.50-15.90 SPEAKER_01 |
+| 17.04-26.80 speaker 0 | 15.90-26.70 SPEAKER_00 |
+| 26.52-31.52 speaker 1 | 26.70-31.50 SPEAKER_01 |
+
+Note this runs on the `crispasr_run` unified path. The legacy `cli.cpp`
+whisper path still diarizes per slice; it is the same fallback situation the
+pyannote cache has there.
 
 ## Env gates
 
