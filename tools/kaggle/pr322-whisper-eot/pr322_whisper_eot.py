@@ -320,6 +320,9 @@ def main():
         "ERROR": "a decode run failed",
     }[results["verdict"]]
 
+    # Persist BEFORE printing: v2 computed everything correctly and then died in a
+    # leftover print loop, so the run showed ERROR despite valid results on disk.
+    RESULTS.write_text(json.dumps(results, indent=2))
     print("\n=== PR #322 VERDICT:", results["verdict"], "===", flush=True)
     print("   ", results["verdict_note"], flush=True)
     for fname, f in per_fixture.items():
@@ -339,15 +342,6 @@ def main():
     kh.step("verdict", result=results["verdict"], per_fixture=per_fixture)
 
     RESULTS.write_text(json.dumps(results, indent=2))
-    print("\n=== PR #322 VERDICT:", results["verdict"], "===", flush=True)
-    for k, v in checks.items():
-        print(f"  {'PASS' if v else 'FAIL'}  {k}", flush=True)
-    for key in ("control_before", "control_after", "affected_before", "affected_after"):
-        rr = results[key]
-        print(f"\n--- {key}: rc={rr['rc']} segments={rr['n_segments']}", flush=True)
-        for s in rr["segments"][:6]:
-            print(f"    [{s['t0']} --> {s['t1']}] {s['text']}", flush=True)
-    kh.step("verdict", **{"result": results["verdict"], **checks})
 
     try:
         kh.export_ccache_tar()
