@@ -1,0 +1,87 @@
+// src/core/foxnose_pipeline.h — the FoxNose diarization pipeline (#324).
+//
+// Ties the pieces together: speech segments -> sliding embedding windows ->
+// speaker clustering -> temporal smoothing -> merged speaker turns.
+//
+// The embedder is INJECTED rather than linked in. That keeps this module free
+// of any model dependency, lets the wiring layer choose WeSpeaker or TitaNet,
+// and — the reason it matters most — makes the whole pipeline unit-testable
+// with a synthetic embedder whose speaker identities are known by
+// construction. Weight-free orchestration is exactly the code crispasr-diff
+// cannot see (HARD RULE #3b).
+//
+// Clean-room; see core/spectral_diarize.h for the provenance argument.
+
+#pragma once
+
+#include <string>
+#include <vector>
+
+namespace core_foxnose {
+
+// ── Tuned constants (upstream recipe) ─────────────────────────────────────
+
+// Windows shorter than this are not embedded at all — too little speech for a
+// stable speaker vector. Such VAD segments inherit the nearest speaker.
+constexpr float kMinSegmentSeconds = 0.4f;
+// Sliding window over long segments, and its hop.
+constexpr float kEmbeddingWindowSeconds = 1.2f;
+constexpr float kEmbeddingStepSeconds = 0.6f;
+// A segment up to this multiple of the window length is embedded whole
+// instead of being slid over.
+constexpr float kSingleWindowFactor = 1.5f;
+// Adjacent turns of the same speaker closer than this are merged.
+constexpr float kMergeGapSeconds = 0.7f;
+
+// ── Types ─────────────────────────────────────────────────────────────────
+
+// A speech region from VAD, in seconds.
+struct Speech {
+    double start = 0.0;
+    double end = 0.0;
+};
+
+// One diarized turn.
+struct Turn {
+    double start = 0.0;
+    double end = 0.0;
+    int speaker = 0; // dense index; render as SPEAKER_%02d
+};
+
+struct Params {
+    int min_speakers = 1;
+    int max_speakers = 20;
+    int num_speakers = 0; // > 0 pins the count and skips estimation
+    unsigned seed = 42;
+};
+
+// Embed `n` samples of 16 kHz mono PCM into `out` (embed_dim floats).
+// Return 0 on success; any non-zero result makes the window be skipped, which
+// is the correct behaviour for audio the model refuses (too short, silent).
+using EmbedFn = int (*)(void* userdata, const float* pcm, int n_samples, float* out);
+
+struct Result {
+    std::vector<Turn> turns;
+    int n_speakers = 0;
+    std::string reason; // how the speaker count was decided
+    int n_windows = 0;  // embedding windows actually produced
+    int n_skipped = 0;  // windows the embedder rejected
+};
+
+// ── Pipeline ──────────────────────────────────────────────────────────────
+
+// Split one speech region into embedding windows, following the upstream
+// rule: skip below kMinSegmentSeconds; embed whole when the region is no
+// longer than kSingleWindowFactor * kEmbeddingWindowSeconds; otherwise slide.
+std::vector<Speech> window_speech(const Speech& seg);
+
+// Convert overlapping windows into the non-overlapping timeline the labels
+// are attached to: boundaries sit at the midpoints between adjacent window
+// centres, clamped into the parent region.
+std::vector<Speech> window_boundaries(const Speech& seg, const std::vector<Speech>& windows);
+
+// Run the whole pipeline over pre-computed speech regions.
+Result diarize(const float* pcm, int n_samples, int sample_rate, const std::vector<Speech>& speech, EmbedFn embed,
+               void* userdata, int embed_dim, const Params& params);
+
+} // namespace core_foxnose
