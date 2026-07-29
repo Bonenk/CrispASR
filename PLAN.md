@@ -1,5 +1,39 @@
 # CrispASR — Pending work
 
+## OPEN 2026-07-29 — turning the unit tier on found two REAL pre-existing failures
+
+CI executed 1 of 162 unit tests until e17ce606/49e56eee. Running the tier
+immediately surfaced two genuine failures that had been invisible — which is the
+point, but they need fixing and neither is mine:
+
+**1. `core_adaln` disagrees with its own reference under clang — by 2.0.**
+`tests/test-core-adaln.cpp` builds the `core_adaln::modulate6` +
+`apply_norm_modulation` ggml graph and compares it against a plain-float
+reference, tolerance 1e-4. Under gcc it passes. Under clang (Release AND Debug):
+
+    apply_silu=true   max|Δ| = 0.658075
+    apply_silu=false  max|Δ| = 1.962485
+
+Four orders of magnitude out is not FP contraction or FMA rounding. A numerical
+difference that large appearing only under a different compiler is the signature
+of UNDEFINED BEHAVIOUR — an uninitialised read, an aliasing violation, or a graph
+built over a tensor whose contents were never set. `core_adaln` is production DiT
+modulation: f5-tts and cosyvoice3 both use it, so if the graph (rather than the
+test harness) is at fault this is a live correctness bug on the clang builds we
+ship. Diagnose with the header's own debug path first; do NOT delegate it —
+runtime graph code.
+
+**2. `test-vad` aborts in Debug (gcc and gcc-arm64; Release passes).**
+"Subprocess aborted", so an assert/abort rather than a comparison. The model IS
+tracked (`models/for-tests-silero-v6.2.0-ggml.bin`), so this is not a missing
+fixture — it is a Debug-only path in the VAD code. Note `build.yml` already ran
+this test in isolation via `ctest -R ^test-vad$`, which is presumably how it
+stayed green: that leg is Release.
+
+Until both are fixed, the build.yml legs (Debug/clang) are red. They only run on
+ggml/.gitmodules/build.yml changes, so ordinary work is unaffected; the every-push
+guard is ci.yml's `linux-unit` (gcc/Release), where both tests currently pass.
+
 ## RESOLVED 2026-07-28 — v0.8.24 shipped to all three registries
 
 GitHub, Docker, crates.io, pub.dev and PyPI are all on 0.8.24. Getting the last
