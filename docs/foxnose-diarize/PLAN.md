@@ -104,6 +104,42 @@ Two earlier findings, both still in force for the gated BIC path:
 * the `[k-2, k+3]` window recovers an under-count but not a large over-count
   — `CRISPASR_DIARIZE_FULL_K_SEARCH=1` scores the whole range instead.
 
+## Blueprint parity — measured end to end
+
+The upstream Python pipeline (`pip install diarize==0.1.2`) was run on the same
+`samples/multispeaker.wav` and compared against this port.
+
+**With the speaker count pinned to 2 on both sides**, the speaker assignment is
+identical and the boundaries agree within ~1 s:
+
+| upstream Python | this port |
+|---|---|
+| 0.30-10.60 SPEAKER_00 (3 pieces, VAD-split) | 0.00-10.50 SPEAKER_00 |
+| 11.50-15.60 SPEAKER_01 | 10.50-15.90 SPEAKER_01 |
+| 16.30-26.60 SPEAKER_00 (3 pieces) | 15.90-26.70 SPEAKER_00 |
+| 27.50-31.50 SPEAKER_01 | 26.70-31.50 SPEAKER_01 |
+
+Scored with the DER harness (0.25 s collar, optimal 1:1 mapping), treating the
+upstream output as reference:
+
+    missed        0.00 s
+    false alarm   1.05 s
+    confusion     0.00 s
+    DER           3.93 %
+
+**Zero speaker confusion**: wherever both assign a speaker, they agree. The
+entire residual is false alarm, and it is explained — upstream runs its own
+Silero VAD and drops silence gaps, while this port tiles the caller's speech
+regions contiguously. That is a difference in where the speech segmentation
+comes from, not a diarization disagreement.
+
+**On automatic counting this port is better than upstream.** On the same clip
+upstream emits 11 speakers across 25 segments (its default `max_speakers=20`);
+this port emits 2. The gated `CRISPASR_DIARIZE_COUNT=bic` path reproduces
+upstream's failure mode (7-8 speakers), which is what confirms the port is
+faithful — the improvement comes from the eigengap switch, not from a
+divergence in the shared parts.
+
 ### What would still settle it properly
 
 A DER number on labelled audio. There is none in the repo and none in

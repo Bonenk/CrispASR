@@ -296,6 +296,20 @@ std::string resolve_pyannote_model(const whisper_params& params) {
     return mp;
 }
 
+// #324: resolve the WeSpeaker embedder path, auto-downloading the canonical
+// GGUF on first use when the user passed "auto" (or left it as the registry
+// default). ⚠ CC-BY-4.0 weights — see THIRD_PARTY_NOTICES.txt.
+std::string resolve_foxnose_embedder(const whisper_params& params) {
+    std::string mp = params.diarize_embedder;
+    if (mp.empty() || mp == "auto") {
+        mp = crispasr_cache::ensure_cached_file(
+            "wespeaker-resnet34-lm.gguf",
+            "https://huggingface.co/cstr/wespeaker-resnet34-lm-GGUF/resolve/main/wespeaker-resnet34-lm.gguf",
+            params.no_prints, "crispasr[diarize]", params.cache_dir);
+    }
+    return mp;
+}
+
 // Assign speakers from a pre-computed global sherpa timeline.
 // Same logic as assign_speakers_from_sherpa but also splits segments
 // at speaker-turn boundaries when word timestamps are available.
@@ -743,7 +757,7 @@ bool crispasr_apply_foxnose_global(std::vector<crispasr_segment>& all_segs, cons
     opts.method = CrispasrDiarizeMethod::FoxNose;
     opts.n_threads = params.n_threads;
     opts.slice_t0_cs = 0; // all_segs timestamps are absolute
-    opts.foxnose_embedder_path = params.diarize_embedder;
+    opts.foxnose_embedder_path = resolve_foxnose_embedder(params);
     opts.max_speakers = params.diarize_max_speakers_explicit ? params.diarize_max_speakers : kFoxnoseDefaultMaxSpeakers;
     opts.num_speakers = params.diarize_num_speakers;
 
@@ -842,7 +856,7 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
         if (lib_method == CrispasrDiarizeMethod::FoxNose) {
             // Reuses the existing --diarize-embedder / --diarize-max-speakers
             // knobs rather than inventing parallel ones.
-            opts.foxnose_embedder_path = params.diarize_embedder;
+            opts.foxnose_embedder_path = resolve_foxnose_embedder(params);
             // MEASURED (docs/foxnose-diarize/PLAN.md): silhouette saturates
             // and climbs monotonically to the ceiling on real speaker
             // embeddings, so a loose bound is actively harmful — on
