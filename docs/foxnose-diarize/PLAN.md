@@ -89,20 +89,41 @@ and the confusion term triples. It is retained behind
 data and costs less — but it is NOT the default, and synthetic evidence must
 not be used to make it one again. The unit test now pins the default.
 
-### The remaining gap to upstream is the benchmark harness, not the diarizer
+### With VAD, this port is at parity with upstream
 
-Our false alarm is 26.1 s against upstream's 4.7 s, and the cause is known:
-the benchmark driver hands our pipeline the WHOLE FILE as one speech region,
-so silence is windowed and labelled, while upstream runs its own Silero VAD
-first. Substituting upstream's false-alarm figure:
+The first benchmark handed our pipeline WHOLE FILES as a single speech region
+while upstream ran Silero VAD first, charging us 26.1 s of false alarm the real
+CLI path never incurs (it takes the caller's ASR/VAD segments). Re-run with the
+same Silero VAD and upstream's parameters (threshold 0.45, min speech 200 ms,
+min silence 50 ms, pad 20 ms):
 
-    this port, bic, with upstream's FA     3.4 %
-    upstream Python                        3.1 %
+| system | miss | FA | confusion | **DER** |
+|---|---|---|---|---|
+| upstream Python `diarize` 0.1.2 | 0.6 | 4.7 | 29.0 | **3.07 %** |
+| **this port, `bic` + Silero VAD** | 0.0 | 9.0 | **26.5** | **3.18 %** |
+| this port, `bic`, no VAD | 0.0 | 26.1 | 32.7 | 5.27 % |
 
-i.e. parity within ~0.3 points once the speech-detection difference is removed.
-The real CLI path does not have this handicap — it takes the caller's ASR/VAD
-segments as its speech regions. Giving the benchmark driver a VAD stage is the
-obvious next step, and would let the two be compared on equal terms.
+0.11 points apart, and our speaker CONFUSION is actually lower (26.5 s vs
+29.0 s) — the residual gap is false alarm, not diarization. Estimated speaker
+counts now differ on one file of eight:
+
+    reference   4 7 2 5 5 4 4 5
+    this port   4 6 2 5 4 4 2 5
+    upstream    4 7 2 5 4 4 2 5
+
+### Reproducing the benchmark
+
+```bash
+# 1. audio + human labels (one dev shard, 44 files; 8 used here)
+python - <<'EOF'
+from huggingface_hub import hf_hub_download
+hf_hub_download('diarizers-community/voxconverse','data/dev-00000-of-00005.parquet',
+                repo_type='dataset', local_dir='voxconverse')
+EOF
+# 2. the upstream reference implementation, in its own venv
+python -m venv foxvenv && ./foxvenv/bin/pip install diarize==0.1.2
+# 3. score both with tools/der_score.py (0.25 s collar, optimal 1:1 mapping)
+```
 
 ## Blueprint parity — measured end to end
 

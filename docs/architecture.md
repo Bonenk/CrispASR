@@ -1101,11 +1101,14 @@ cheaper, but it UNDER-counts on real speech and scores materially worse:
 pooled DER over 8 VoxConverse dev files against human labels is 5.3% for
 `bic` and 11.4% for `eigengap`, against upstream Python's 3.1%.
 
-**Benchmarked accuracy.** Most of the 5.3% vs 3.1% difference is false alarm
-(26.1 s vs 4.7 s) from the benchmark driver handing the pipeline whole files
-with no VAD, where upstream runs Silero first; substituting upstream's false
-alarm gives 3.4%, i.e. parity within ~0.3 points. With the speaker count
-pinned equal on both sides, the two agree with ZERO speaker confusion.
+**Benchmarked accuracy.** Over 8 VoxConverse dev files against human labels
+(0.25 s collar, optimal 1:1 mapping), with Silero VAD supplying speech regions
+to both sides: **this port 3.18 % DER, upstream Python 3.07 %** — 0.11 points
+apart, with our speaker confusion actually lower (26.5 s vs 29.0 s). Feeding
+whole files with no VAD instead costs 2 points of pure false alarm (5.27 %),
+which is a property of the benchmark driver, not of the diarizer: the real CLI
+path takes the caller's ASR/VAD segments. With the speaker count pinned equal
+on both sides the two agree with ZERO speaker confusion.
 
 Speaker identity is consistent across slices: on the unified `crispasr_run`
 path FoxNose runs in ONE global pass after transcription
