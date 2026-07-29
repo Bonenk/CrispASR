@@ -1047,6 +1047,71 @@ translation, `x-en` for English-target. Pick whichever matches your
 direction (`-sl`/`-tl`) — the auto-download path picks `en-x` by
 default; load `x-en` explicitly with `-m <path>` for X→English.
 
+### foxnose-diarize
+
+Speaker diarization via `--diarize-method foxnose` (#324), an alternative to
+the pyannote path. Ported from the recipe in
+[FoxNoseTech/diarize](https://github.com/FoxNoseTech/diarize); the algorithms
+are standard published methods and the implementation is independent, so the
+tree stays MIT (see below).
+
+```
+speech regions (the caller's segments — no separate VAD)
+  -> sliding windows: skip < 0.4 s, embed whole if <= 1.8 s, else 1.2 s / 0.6 s hop
+  -> WeSpeaker ResNet34-LM  ->  256-d embedding per window
+  -> speaker count: cosine-p10 veto -> PCA(8) -> full-covariance GMM BIC sweep
+                    -> silhouette refinement (score = sil + 0.04*log k)
+  -> spectral clustering on (cos+1)/2 affinity -> spherical centroid refinement
+  -> temporal smoothing: Viterbi (0.18 switch penalty) -> restore sustained runs
+                         -> collapse A-B-A islands <= 1.2 s
+  -> merge adjacent same-speaker turns closer than 0.7 s
+```
+
+Components: `src/wespeaker.{h,cpp}` (embedder),
+`src/core/spectral_diarize.{h,cpp}` (counting + clustering),
+`src/core/diarize_smooth.{h,cpp}` (temporal), `src/core/foxnose_pipeline.{h,cpp}`
+(orchestration), `src/core/der.h` (the metric).
+
+The pipeline takes its embedder as a function pointer rather than linking one
+in, which keeps `core/` model-free and — more usefully — makes the whole
+orchestration testable with a synthetic embedder whose speakers are known by
+construction. A model-driven test cannot separate "the pipeline is wrong" from
+"the embedder is weak".
+
+**Licensing.** The WeSpeaker *weights* are CC-BY-4.0 (not Apache-2.0 as some
+downstream projects state), so redistributing the GGUF requires attribution —
+see `THIRD_PARTY_NOTICES.txt`. The upstream *code* is Apache-2.0 and none of it
+is incorporated: `clustering.py` is a sequence of scikit-learn calls rather
+than implementations, so there was nothing to translate, and what was taken is
+the recipe and its tuned constants — parameters and facts, not copyrightable
+expression.
+
+**Parity.** Bit-exact agreement with scikit-learn is unachievable: its
+k-means++ seeding, GMM initialisation and ARPACK eigensolver all ride its own
+RNG stream. The gates are therefore known-answer unit tests (375 assertions
+over 57 hermetic cases) plus DER, not label equality. Output IS deterministic
+across runs — everything is explicitly seeded.
+
+**⚠ Automatic speaker counting is the weak link.** Measured on
+`samples/multispeaker.wav`: with the count pinned, or with `max_speakers <= 4`,
+the turns are correct (boundary at 10.5 s against a true 11 s). With
+`max_speakers = 8` it reports 8 speakers with heavy flicker. Silhouette
+saturates and climbs monotonically to the ceiling on real embeddings, because
+within-speaker cosine is only ~0.595 against ~0.100 cross-speaker — splitting a
+speaker cuts the intra-cluster term while the inter-cluster term barely moves.
+`--diarize-max-speakers` therefore defaults to 4 here rather than upstream's
+20; an explicit flag always wins. Prefer `--diarize-num-speakers` when the
+count is known. See `docs/foxnose-diarize/PLAN.md`.
+
+**⚠ Labels are attributed at segment granularity.** An ASR emitting one long
+segment spanning several speakers receives a single label however good the
+underlying turns are. Splitting segments at turn boundaries — as the pyannote
+path does with word timestamps — is the outstanding follow-up.
+
+Env gates: `CRISPASR_DIARIZE_FULL_K_SEARCH=1` (score the full speaker range on
+silhouette instead of a window around the BIC anchor),
+`CRISPASR_WESPEAKER_BENCH=1`, `CRISPASR_WESPEAKER_DEBUG=1`.
+
 ### gigaam
 
 ai-sage/GigaAM-v3 — Russian ASR. A 16-layer **rotary** Conformer encoder

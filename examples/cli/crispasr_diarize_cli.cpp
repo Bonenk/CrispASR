@@ -637,6 +637,10 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
         method = is_stereo ? "energy" : "vad-turns";
     }
 
+// #324: conservative ceiling for foxnose speaker-count estimation. See the
+// comment at its use site — this is an empirical value, not a guess.
+static constexpr int kFoxnoseDefaultMaxSpeakers = 4;
+
     // Shared in-process methods go through the library.
     CrispasrDiarizeMethod lib_method;
     bool use_lib = true;
@@ -702,7 +706,15 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
             // Reuses the existing --diarize-embedder / --diarize-max-speakers
             // knobs rather than inventing parallel ones.
             opts.foxnose_embedder_path = params.diarize_embedder;
-            opts.max_speakers = params.diarize_max_speakers > 0 ? params.diarize_max_speakers : 20;
+            // MEASURED (docs/foxnose-diarize/PLAN.md): silhouette saturates
+            // and climbs monotonically to the ceiling on real speaker
+            // embeddings, so a loose bound is actively harmful — on
+            // samples/multispeaker.wav a bound of 8 yields 8 speakers with
+            // heavy flicker while a bound of 4 yields the correct 2. Upstream
+            // defaults to 20. Default conservatively; an explicit
+            // --diarize-max-speakers always wins.
+            opts.max_speakers =
+                params.diarize_max_speakers_explicit ? params.diarize_max_speakers : kFoxnoseDefaultMaxSpeakers;
             opts.num_speakers = params.diarize_num_speakers;
         }
 

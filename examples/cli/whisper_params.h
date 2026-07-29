@@ -299,6 +299,10 @@ struct whisper_params {
     float diarize_cluster_threshold = 0.5f; // cosine merge threshold
     int diarize_max_speakers = 8;           // upper bound for cluster count
     int diarize_num_speakers = 0;           // >0 pins the count (foxnose)
+    // Set when the user passed --diarize-max-speakers explicitly, so a
+    // per-method default never SHRINKS or GROWS a value they chose. Same
+    // contract as max_new_tokens_explicit (#292).
+    bool diarize_max_speakers_explicit = false;
 
     // #324: `--diarize-method foxnose` consumes --diarize-embedder itself, as
     // the WeSpeaker model for its own spectral clustering. The generic
