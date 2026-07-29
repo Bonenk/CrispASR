@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ggml v0.17 sync — the TTS gate.
+ggml v0.17 sync — the TTS gate BASELINE (old pin, main).
 
 The sync is green everywhere mechanical: full test-backend-ops on CPU + Metal,
 six-job fork CI (including Vulkan executed on lavapipe), and 12863 ops on a real
@@ -29,6 +29,10 @@ notes flag, not just to be numerous:
 Follows the kaggle_harness regime (clone in-kernel, heartbeat around long ops,
 HF token from the dataset).
 """
+# Runs the IDENTICAL backend list and harness as ggml-v017-tts-gate but against
+# main (pin 52165e4c). Without this, a red backend on the sync branch cannot be
+# told apart from one that was already red — and a WER near the gate cannot be
+# called a regression or not.
 import json
 import os
 import re
@@ -40,10 +44,10 @@ from pathlib import Path
 WORK = Path("/kaggle/working")
 TMP = Path("/kaggle/temp")
 TMP.mkdir(parents=True, exist_ok=True)
-RESULTS = WORK / "tts_gate_results.json"
+RESULTS = WORK / "tts_baseline_results.json"
 
 CRISPASR_URL = "https://github.com/CrispStrobe/CrispASR.git"
-BRANCH = os.environ.get("CRISPASR_BRANCH", "sync/ggml-v0.17")
+BRANCH = os.environ.get("CRISPASR_BRANCH", "main")
 REPO = TMP / "CrispASR"
 BUILD = TMP / "build-regression"
 
