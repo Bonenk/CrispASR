@@ -1632,6 +1632,22 @@ catch_discover_tests(test-wespeaker
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-diarize-smooth — hermetic unit tests for temporal label smoothing
+add_executable(test-diarize-smooth
+    test-diarize-smooth.cpp
+)
+target_include_directories(test-diarize-smooth PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-diarize-smooth PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-core
+)
+catch_discover_tests(test-diarize-smooth
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;diarize_smooth"
+)
+
 # ─── test-spectral-diarize — hermetic unit tests for the speaker-clustering
 # numerics. No model, no audio (#324). ────────────────────────────────────────
 add_executable(test-spectral-diarize

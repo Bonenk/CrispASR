@@ -861,6 +861,8 @@ add_library(crispasr-core STATIC
             # and it depends on nothing but the standard library.
             core/spectral_diarize.h
             core/spectral_diarize.cpp
+            core/diarize_smooth.h
+            core/diarize_smooth.cpp
             core/audio_resample.h
             core/audio_resample.cpp
             # Importance-matrix (imatrix) activation-stats collector. Lives in
