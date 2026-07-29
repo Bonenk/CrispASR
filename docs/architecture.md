@@ -1092,16 +1092,22 @@ RNG stream. The gates are therefore known-answer unit tests (375 assertions
 over 57 hermetic cases) plus DER, not label equality. Output IS deterministic
 across runs — everything is explicitly seeded.
 
-**⚠ Automatic speaker counting is the weak link.** Measured on
-`samples/multispeaker.wav`: with the count pinned, or with `max_speakers <= 4`,
-the turns are correct (boundary at 10.5 s against a true 11 s). With
-`max_speakers = 8` it reports 8 speakers with heavy flicker. Silhouette
-saturates and climbs monotonically to the ceiling on real embeddings, because
-within-speaker cosine is only ~0.595 against ~0.100 cross-speaker — splitting a
-speaker cuts the intra-cluster term while the inter-cluster term barely moves.
-`--diarize-max-speakers` therefore defaults to 4 here rather than upstream's
-20; an explicit flag always wins. Prefer `--diarize-num-speakers` when the
-count is known. See `docs/foxnose-diarize/PLAN.md`.
+**Speaker counting uses the eigengap**, not the upstream GMM/BIC + silhouette
+sweep. That estimator saturates on real speaker embeddings — silhouette climbs
+monotonically to whatever ceiling it is given, because within-speaker cosine
+(~0.6) is far below 1 while cross-speaker (~0.1) is far above 0, so splitting a
+real speaker keeps looking like an improvement. Measured on
+`samples/multispeaker.wav` with `max_speakers=8`: BIC reports 7-8 speakers,
+eigengap reports the correct 2. On synthetic data with known k, eigengap is
+5/5 exact against BIC's 4/5.
+
+The eigengap needs a sparsified affinity: `(cos+1)/2` is dense (~0.5 even for
+unrelated windows), so the graph is near-complete, one eigenvalue dominates and
+the largest gap always falls at k=1. Row-wise thresholding — keep each row's
+strongest 15%, attenuate the rest rather than deleting them so the graph stays
+connected, then symmetrise — restores the block structure.
+`CRISPASR_DIARIZE_COUNT=bic` selects the upstream estimator, which is gated
+rather than removed.
 
 Speaker identity is consistent across slices: on the unified `crispasr_run`
 path FoxNose runs in ONE global pass after transcription

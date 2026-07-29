@@ -9,7 +9,9 @@
 #include <limits>
 #include <numeric>
 #include <cstdlib>
+#include <functional>
 #include <random>
+#include <string>
 
 namespace core_spectral {
 
@@ -494,6 +496,115 @@ bool gmm_bic(const float* x, int n, int d, int k, int n_init, int max_iter, unsi
     return true;
 }
 
+// Row-wise threshold + symmetrise, the sparsification the eigengap needs.
+//
+// The cosine affinity is DENSE: (cos+1)/2 sits around 0.5 even for unrelated
+// windows, so the graph is nearly complete, its spectrum has one dominant
+// eigenvalue, and the largest gap is always at k=1 — the eigengap reports one
+// speaker for everything. Keeping only each row's strongest links (the rest
+// attenuated, not deleted, so the graph stays connected) restores the block
+// structure the spectrum is supposed to expose. This is the row-thresholding
+// step from the standard spectral-diarization refinement sequence.
+std::vector<float> refine_affinity_rows(const float* affinity, int n, float keep_fraction, float attenuate) {
+    std::vector<float> a((size_t)n * n);
+    std::copy(affinity, affinity + (size_t)n * n, a.begin());
+    const int keep = std::max(1, (int)std::lround(keep_fraction * n));
+    std::vector<float> row((size_t)n);
+    for (int i = 0; i < n; i++) {
+        std::copy(a.begin() + (size_t)i * n, a.begin() + (size_t)(i + 1) * n, row.begin());
+        std::nth_element(row.begin(), row.begin() + (n - keep), row.end());
+        const float thresh = row[(size_t)(n - keep)];
+        for (int j = 0; j < n; j++)
+            if (a[(size_t)i * n + j] < thresh)
+                a[(size_t)i * n + j] *= attenuate;
+    }
+    // Row thresholding breaks symmetry; restore it with the elementwise max
+    // so a strong link surviving in either direction survives in both.
+    for (int i = 0; i < n; i++)
+        for (int j = i + 1; j < n; j++) {
+            const float m = std::max(a[(size_t)i * n + j], a[(size_t)j * n + i]);
+            a[(size_t)i * n + j] = a[(size_t)j * n + i] = m;
+        }
+    return a;
+}
+
+int estimate_speakers_eigengap(const float* affinity, int n, int min_k, int max_k, unsigned seed,
+                               std::vector<float>* out_eigenvalues) {
+    if (out_eigenvalues)
+        out_eigenvalues->clear();
+    min_k = std::max(1, min_k);
+    if (n <= 1)
+        return min_k;
+    // Need one eigenvalue beyond max_k to see the gap AT max_k.
+    const int want = std::min(n, std::max(min_k + 1, max_k + 1));
+
+    const std::vector<float> aff = refine_affinity_rows(affinity, n, 0.15f, 0.01f);
+
+    std::vector<double> dinv((size_t)n);
+    for (int i = 0; i < n; i++) {
+        double deg = 0.0;
+        for (int j = 0; j < n; j++)
+            deg += aff[(size_t)i * n + j];
+        dinv[(size_t)i] = deg > kTiny ? 1.0 / std::sqrt(deg) : 0.0;
+    }
+    std::vector<double> l((size_t)n * n);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            l[(size_t)i * n + j] = dinv[(size_t)i] * aff[(size_t)i * n + j] * dinv[(size_t)j];
+
+    const std::vector<double> q = top_eigenvectors(l, n, want, seed);
+    const int k_have = std::min(want, n);
+
+    // Rayleigh quotient per converged eigenvector: lambda_c = q_c^T L q_c
+    // (q is orthonormal, so no normalisation term is needed).
+    std::vector<double> lam((size_t)k_have, 0.0);
+    std::vector<double> lq((size_t)n);
+    for (int c = 0; c < k_have; c++) {
+        for (int i = 0; i < n; i++) {
+            double acc = 0.0;
+            for (int j = 0; j < n; j++)
+                acc += l[(size_t)i * n + j] * q[(size_t)j * k_have + c];
+            lq[(size_t)i] = acc;
+        }
+        double num = 0.0;
+        for (int i = 0; i < n; i++)
+            num += q[(size_t)i * k_have + c] * lq[(size_t)i];
+        lam[(size_t)c] = num;
+    }
+    std::sort(lam.begin(), lam.end(), std::greater<double>());
+    if (out_eigenvalues)
+        for (double v : lam)
+            out_eigenvalues->push_back((float)v);
+
+    int best_k = min_k;
+    double best_gap = -1.0;
+    const int hi = std::min({max_k, k_have - 1, n - 1});
+    for (int k = std::max(1, min_k); k <= hi; k++) {
+        const double gap = lam[(size_t)(k - 1)] - lam[(size_t)k];
+        if (gap > best_gap) {
+            best_gap = gap;
+            best_k = k;
+        }
+    }
+    return best_k;
+}
+
+CountMethod count_method_from_env() {
+    // Eigengap is the DEFAULT because it wins on every case measured, and the
+    // old path's failure mode is severe rather than marginal:
+    //
+    //   synthetic (5 true-k cases)   bic 4/5 exact      eigengap 5/5 exact
+    //   real audio, max_speakers=8   bic 8 speakers     eigengap 2, correct
+    //
+    // It is also cheaper — one eigendecomposition instead of a GMM sweep plus
+    // max_k spectral runs for silhouette scoring. CRISPASR_DIARIZE_COUNT=bic
+    // restores the upstream estimator; the path is gated, not deleted.
+    const char* e = std::getenv("CRISPASR_DIARIZE_COUNT");
+    if (e && *e && std::string(e) == "bic")
+        return CountMethod::Bic;
+    return CountMethod::Eigengap;
+}
+
 std::vector<int> spectral_labels(const float* affinity, int n, int k, unsigned seed) {
     if (n <= 0)
         return {};
@@ -747,7 +858,18 @@ std::vector<int> cluster_speakers(const float* x, int n, int d, int min_speakers
         return run(num_speakers);
     }
 
-    SpeakerEstimate est = estimate_speakers(x, n, d, min_speakers, max_speakers, seed);
+    SpeakerEstimate est;
+    if (count_method_from_env() == CountMethod::Eigengap) {
+        std::vector<float> aff0 = cosine_affinity(x, n, d);
+        est.best_k = estimate_speakers_eigengap(aff0.data(), n, min_speakers, max_speakers, seed);
+        est.reason = "eigengap";
+        if (out_estimate)
+            *out_estimate = est;
+        // The eigengap already reads cluster structure off the spectrum, so
+        // the silhouette pass — which is what saturates — is skipped.
+        return run(est.best_k);
+    }
+    est = estimate_speakers(x, n, d, min_speakers, max_speakers, seed);
     if (out_estimate)
         *out_estimate = est;
     const int k = est.best_k;

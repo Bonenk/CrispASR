@@ -111,6 +111,31 @@ float silhouette_precomputed(const float* distance, int n, const std::vector<int
 // change k). Returns relabelled, densely-numbered labels.
 std::vector<int> refine_spherical(const float* x, int n, int d, const std::vector<int>& labels, int max_iter = 8);
 
+// Estimate the speaker count from the EIGENGAP of the normalised Laplacian:
+// build L_sym = D^-1/2 A D^-1/2, take its leading eigenvalues in descending
+// order, and pick the k in [min_k, max_k] with the largest drop from
+// lambda_k to lambda_{k+1}.
+//
+// This is the standard alternative to a GMM/BIC sweep for spectral speaker
+// diarization, and it exists here because BIC + silhouette measurably fails
+// on real speaker embeddings: silhouette saturates and climbs monotonically
+// to whatever ceiling it is given, because within-speaker cosine (~0.6) is
+// far below 1 while cross-speaker (~0.1) is far above 0, so splitting a real
+// speaker keeps looking like an improvement. The eigengap reads cluster
+// structure off the spectrum instead of scoring partitions, so saturation
+// does not arise.
+//
+// `out_eigenvalues` optionally receives the leading eigenvalues (descending).
+int estimate_speakers_eigengap(const float* affinity, int n, int min_k, int max_k, unsigned seed = 42,
+                               std::vector<float>* out_eigenvalues = nullptr);
+
+// Which speaker-count estimator cluster_speakers() uses.
+// CRISPASR_DIARIZE_COUNT=bic|eigengap. DEFAULT IS EIGENGAP — see the
+// measurements at count_method_from_env(); the upstream BIC + silhouette path
+// saturates on real speaker embeddings and is retained behind `bic`.
+enum class CountMethod { Bic, Eigengap };
+CountMethod count_method_from_env();
+
 // ── High-level entry points ───────────────────────────────────────────────
 
 // Estimate the number of speakers in `x` (n, d) via the single-speaker
