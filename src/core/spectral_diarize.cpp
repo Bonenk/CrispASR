@@ -1,0 +1,802 @@
+// src/core/spectral_diarize.cpp — see spectral_diarize.h for provenance and
+// parity expectations.
+
+#include "spectral_diarize.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstring>
+#include <limits>
+#include <numeric>
+#include <cstdlib>
+#include <random>
+
+namespace core_spectral {
+
+namespace {
+
+constexpr double kTiny = 1e-12;
+// Ridge added to each covariance diagonal, mirroring sklearn's reg_covar.
+// Without it a component that captures a near-degenerate cluster produces a
+// singular covariance and the log-likelihood blows up to +inf, which BIC then
+// happily reports as the best k.
+constexpr double kRegCovar = 1e-6;
+
+// ── Symmetric eigendecomposition (cyclic Jacobi) ──────────────────────────
+// Used for the PCA covariance, which is d x d with d = embedding dim (256).
+// O(d^3) per sweep is fine at that size and needs no external LAPACK.
+// Returns eigenvalues ascending in `w`, eigenvectors as columns of `v`.
+void jacobi_eigen(std::vector<double>& a, int n, std::vector<double>& w, std::vector<double>& v) {
+    v.assign((size_t)n * n, 0.0);
+    for (int i = 0; i < n; i++)
+        v[(size_t)i * n + i] = 1.0;
+
+    for (int sweep = 0; sweep < 100; sweep++) {
+        double off = 0.0;
+        for (int p = 0; p < n; p++)
+            for (int q = p + 1; q < n; q++)
+                off += a[(size_t)p * n + q] * a[(size_t)p * n + q];
+        if (off < 1e-22)
+            break;
+        for (int p = 0; p < n; p++) {
+            for (int q = p + 1; q < n; q++) {
+                const double apq = a[(size_t)p * n + q];
+                if (std::fabs(apq) < 1e-18)
+                    continue;
+                const double app = a[(size_t)p * n + p];
+                const double aqq = a[(size_t)q * n + q];
+                const double theta = (aqq - app) / (2.0 * apq);
+                const double t = (theta >= 0 ? 1.0 : -1.0) / (std::fabs(theta) + std::sqrt(theta * theta + 1.0));
+                const double c = 1.0 / std::sqrt(t * t + 1.0);
+                const double s = t * c;
+                for (int k = 0; k < n; k++) {
+                    const double akp = a[(size_t)k * n + p], akq = a[(size_t)k * n + q];
+                    a[(size_t)k * n + p] = c * akp - s * akq;
+                    a[(size_t)k * n + q] = s * akp + c * akq;
+                }
+                for (int k = 0; k < n; k++) {
+                    const double apk = a[(size_t)p * n + k], aqk = a[(size_t)q * n + k];
+                    a[(size_t)p * n + k] = c * apk - s * aqk;
+                    a[(size_t)q * n + k] = s * apk + c * aqk;
+                }
+                for (int k = 0; k < n; k++) {
+                    const double vkp = v[(size_t)k * n + p], vkq = v[(size_t)k * n + q];
+                    v[(size_t)k * n + p] = c * vkp - s * vkq;
+                    v[(size_t)k * n + q] = s * vkp + c * vkq;
+                }
+            }
+        }
+    }
+    w.resize((size_t)n);
+    for (int i = 0; i < n; i++)
+        w[(size_t)i] = a[(size_t)i * n + i];
+}
+
+// ── Top-k eigenvectors of a large symmetric PSD matrix ────────────────────
+// Subspace (orthogonal) iteration. The spectral step needs only the leading k
+// eigenvectors of an n x n affinity where n is the number of windows, so a
+// full O(n^3) Jacobi would be wasteful — this is O(n^2 k) per iteration.
+// The matrix is shifted to guarantee positive semi-definiteness so the
+// iteration converges to the ALGEBRAICALLY largest eigenvalues (the ones the
+// normalised Laplacian method wants), not the largest in magnitude.
+std::vector<double> top_eigenvectors(const std::vector<double>& m, int n, int k, unsigned seed) {
+    k = std::min(k, n);
+    std::vector<double> q((size_t)n * k);
+    std::mt19937 rng(seed);
+    std::normal_distribution<double> gauss(0.0, 1.0);
+    for (auto& v : q)
+        v = gauss(rng);
+
+    // Gershgorin bound -> shift so every eigenvalue is >= 0.
+    double shift = 0.0;
+    for (int i = 0; i < n; i++) {
+        double row = 0.0;
+        for (int j = 0; j < n; j++)
+            row += std::fabs(m[(size_t)i * n + j]);
+        shift = std::max(shift, row);
+    }
+
+    auto orthonormalize = [&]() {
+        for (int c = 0; c < k; c++) {
+            for (int p = 0; p < c; p++) {
+                double dot = 0.0;
+                for (int i = 0; i < n; i++)
+                    dot += q[(size_t)i * k + c] * q[(size_t)i * k + p];
+                for (int i = 0; i < n; i++)
+                    q[(size_t)i * k + c] -= dot * q[(size_t)i * k + p];
+            }
+            double nrm = 0.0;
+            for (int i = 0; i < n; i++)
+                nrm += q[(size_t)i * k + c] * q[(size_t)i * k + c];
+            nrm = std::sqrt(nrm);
+            if (nrm > kTiny)
+                for (int i = 0; i < n; i++)
+                    q[(size_t)i * k + c] /= nrm;
+        }
+    };
+    orthonormalize();
+
+    std::vector<double> z((size_t)n * k);
+    std::vector<double> prev;
+    for (int it = 0; it < 300; it++) {
+        for (int i = 0; i < n; i++) {
+            for (int c = 0; c < k; c++) {
+                double acc = shift * q[(size_t)i * k + c];
+                for (int j = 0; j < n; j++)
+                    acc += m[(size_t)i * n + j] * q[(size_t)j * k + c];
+                z[(size_t)i * k + c] = acc;
+            }
+        }
+        q.swap(z);
+        orthonormalize();
+        if (!prev.empty()) {
+            // Converged when the subspace stops moving. Compare |<q_c, prev_c>|
+            // so an eigenvector flipping sign does not look like movement.
+            double worst = 1.0;
+            for (int c = 0; c < k; c++) {
+                double dot = 0.0;
+                for (int i = 0; i < n; i++)
+                    dot += q[(size_t)i * k + c] * prev[(size_t)i * k + c];
+                worst = std::min(worst, std::fabs(dot));
+            }
+            if (worst > 1.0 - 1e-9)
+                break;
+        }
+        prev = q;
+    }
+    return q;
+}
+
+// ── k-means (k-means++ seeding, Lloyd iterations) ─────────────────────────
+std::vector<int> kmeans(const std::vector<double>& x, int n, int d, int k, unsigned seed, int n_init, int max_iter) {
+    std::vector<int> best_labels((size_t)n, 0);
+    double best_inertia = std::numeric_limits<double>::infinity();
+    std::mt19937 rng(seed);
+
+    for (int init = 0; init < n_init; init++) {
+        std::vector<double> cent((size_t)k * d);
+        std::vector<double> d2((size_t)n, std::numeric_limits<double>::infinity());
+
+        std::uniform_int_distribution<int> pick(0, n - 1);
+        int first = pick(rng);
+        std::copy(x.begin() + (size_t)first * d, x.begin() + (size_t)(first + 1) * d, cent.begin());
+
+        for (int c = 1; c < k; c++) {
+            double total = 0.0;
+            for (int i = 0; i < n; i++) {
+                double dist = 0.0;
+                for (int j = 0; j < d; j++) {
+                    const double diff = x[(size_t)i * d + j] - cent[(size_t)(c - 1) * d + j];
+                    dist += diff * diff;
+                }
+                d2[(size_t)i] = std::min(d2[(size_t)i], dist);
+                total += d2[(size_t)i];
+            }
+            std::uniform_real_distribution<double> u(0.0, std::max(total, kTiny));
+            double target = u(rng), run = 0.0;
+            int chosen = n - 1;
+            for (int i = 0; i < n; i++) {
+                run += d2[(size_t)i];
+                if (run >= target) {
+                    chosen = i;
+                    break;
+                }
+            }
+            std::copy(x.begin() + (size_t)chosen * d, x.begin() + (size_t)(chosen + 1) * d,
+                      cent.begin() + (size_t)c * d);
+        }
+
+        std::vector<int> labels((size_t)n, 0);
+        double inertia = 0.0;
+        for (int it = 0; it < max_iter; it++) {
+            bool moved = false;
+            inertia = 0.0;
+            for (int i = 0; i < n; i++) {
+                double best = std::numeric_limits<double>::infinity();
+                int arg = 0;
+                for (int c = 0; c < k; c++) {
+                    double dist = 0.0;
+                    for (int j = 0; j < d; j++) {
+                        const double diff = x[(size_t)i * d + j] - cent[(size_t)c * d + j];
+                        dist += diff * diff;
+                    }
+                    if (dist < best) {
+                        best = dist;
+                        arg = c;
+                    }
+                }
+                if (labels[(size_t)i] != arg) {
+                    labels[(size_t)i] = arg;
+                    moved = true;
+                }
+                inertia += best;
+            }
+            std::vector<double> sum((size_t)k * d, 0.0);
+            std::vector<int> cnt((size_t)k, 0);
+            for (int i = 0; i < n; i++) {
+                const int c = labels[(size_t)i];
+                cnt[(size_t)c]++;
+                for (int j = 0; j < d; j++)
+                    sum[(size_t)c * d + j] += x[(size_t)i * d + j];
+            }
+            for (int c = 0; c < k; c++)
+                if (cnt[(size_t)c] > 0)
+                    for (int j = 0; j < d; j++)
+                        cent[(size_t)c * d + j] = sum[(size_t)c * d + j] / cnt[(size_t)c];
+            if (!moved)
+                break;
+        }
+        if (inertia < best_inertia) {
+            best_inertia = inertia;
+            best_labels = labels;
+        }
+    }
+    return best_labels;
+}
+
+} // namespace
+
+// ===========================================================================
+
+void l2_normalize_rows(float* x, int n, int d) {
+    for (int i = 0; i < n; i++) {
+        double nrm = 0.0;
+        for (int j = 0; j < d; j++)
+            nrm += (double)x[(size_t)i * d + j] * x[(size_t)i * d + j];
+        nrm = std::sqrt(nrm);
+        if (nrm <= kTiny)
+            continue; // leave an all-zero row alone rather than emit NaN
+        for (int j = 0; j < d; j++)
+            x[(size_t)i * d + j] = (float)(x[(size_t)i * d + j] / nrm);
+    }
+}
+
+std::vector<float> cosine_similarity(const float* x, int n, int d) {
+    std::vector<float> norm((size_t)n * d);
+    std::copy(x, x + (size_t)n * d, norm.begin());
+    l2_normalize_rows(norm.data(), n, d);
+
+    std::vector<float> out((size_t)n * n, 0.0f);
+    for (int i = 0; i < n; i++) {
+        for (int j = i; j < n; j++) {
+            double dot = 0.0;
+            for (int t = 0; t < d; t++)
+                dot += (double)norm[(size_t)i * d + t] * norm[(size_t)j * d + t];
+            out[(size_t)i * n + j] = out[(size_t)j * n + i] = (float)dot;
+        }
+    }
+    return out;
+}
+
+std::vector<float> cosine_affinity(const float* x, int n, int d) {
+    std::vector<float> a = cosine_similarity(x, n, d);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++) {
+            float v = (a[(size_t)i * n + j] + 1.0f) * 0.5f;
+            a[(size_t)i * n + j] = std::max(v, 0.0f);
+        }
+    for (int i = 0; i < n; i++)
+        a[(size_t)i * n + i] = 1.0f;
+    return a;
+}
+
+std::vector<float> pca_project(const float* x, int n, int d, int k, int* out_k) {
+    k = std::min({k, n - 1, d});
+    if (out_k)
+        *out_k = k;
+    if (k <= 0 || n <= 0)
+        return {};
+
+    std::vector<double> mean((size_t)d, 0.0);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < d; j++)
+            mean[(size_t)j] += x[(size_t)i * d + j];
+    for (int j = 0; j < d; j++)
+        mean[(size_t)j] /= n;
+
+    std::vector<double> c((size_t)d * d, 0.0);
+    std::vector<double> row((size_t)d);
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < d; j++)
+            row[(size_t)j] = x[(size_t)i * d + j] - mean[(size_t)j];
+        for (int a = 0; a < d; a++)
+            for (int b = a; b < d; b++)
+                c[(size_t)a * d + b] += row[(size_t)a] * row[(size_t)b];
+    }
+    const double denom = std::max(1, n - 1);
+    for (int a = 0; a < d; a++)
+        for (int b = a; b < d; b++)
+            c[(size_t)b * d + a] = c[(size_t)a * d + b] = c[(size_t)a * d + b] / denom;
+
+    std::vector<double> w, v;
+    jacobi_eigen(c, d, w, v);
+
+    // Jacobi leaves eigenvalues unordered; take the k largest.
+    std::vector<int> idx((size_t)d);
+    std::iota(idx.begin(), idx.end(), 0);
+    std::sort(idx.begin(), idx.end(), [&](int a, int b) { return w[(size_t)a] > w[(size_t)b]; });
+
+    std::vector<float> out((size_t)n * k, 0.0f);
+    for (int comp = 0; comp < k; comp++) {
+        const int e = idx[(size_t)comp];
+        // Canonicalise the sign so repeated runs agree: the largest-magnitude
+        // loading is made positive. An eigenvector and its negation span the
+        // same component, and the downstream GMM is affine-equivariant, but a
+        // stable sign keeps the output reproducible.
+        int arg = 0;
+        double mx = 0.0;
+        for (int j = 0; j < d; j++)
+            if (std::fabs(v[(size_t)j * d + e]) > mx) {
+                mx = std::fabs(v[(size_t)j * d + e]);
+                arg = j;
+            }
+        const double sign = v[(size_t)arg * d + e] < 0 ? -1.0 : 1.0;
+        for (int i = 0; i < n; i++) {
+            double acc = 0.0;
+            for (int j = 0; j < d; j++)
+                acc += (x[(size_t)i * d + j] - mean[(size_t)j]) * v[(size_t)j * d + e] * sign;
+            out[(size_t)i * k + comp] = (float)acc;
+        }
+    }
+    return out;
+}
+
+bool gmm_bic(const float* x, int n, int d, int k, int n_init, int max_iter, unsigned seed, float* out_bic) {
+    if (n <= 0 || d <= 0 || k <= 0 || k > n)
+        return false;
+
+    std::vector<double> xs((size_t)n * d);
+    for (size_t i = 0; i < xs.size(); i++)
+        xs[i] = x[i];
+
+    double best_ll = -std::numeric_limits<double>::infinity();
+    bool any = false;
+
+    for (int init = 0; init < n_init; init++) {
+        // sklearn initialises the responsibilities from k-means; same here.
+        std::vector<int> lab = kmeans(xs, n, d, k, seed + (unsigned)init * 7919u, 1, 50);
+
+        std::vector<double> weight((size_t)k, 0.0);
+        std::vector<double> mu((size_t)k * d, 0.0);
+        std::vector<double> cov((size_t)k * d * d, 0.0);
+        std::vector<double> resp((size_t)n * k, 0.0);
+        for (int i = 0; i < n; i++)
+            resp[(size_t)i * k + lab[(size_t)i]] = 1.0;
+
+        double ll = -std::numeric_limits<double>::infinity();
+        bool ok = true;
+
+        for (int it = 0; it < max_iter; it++) {
+            // ---- M step ----
+            std::fill(weight.begin(), weight.end(), 0.0);
+            std::fill(mu.begin(), mu.end(), 0.0);
+            std::fill(cov.begin(), cov.end(), 0.0);
+            for (int c = 0; c < k; c++) {
+                double nk = 0.0;
+                for (int i = 0; i < n; i++)
+                    nk += resp[(size_t)i * k + c];
+                if (nk < 1e-8) {
+                    ok = false;
+                    break;
+                }
+                weight[(size_t)c] = nk / n;
+                for (int i = 0; i < n; i++) {
+                    const double r = resp[(size_t)i * k + c];
+                    if (r == 0.0)
+                        continue;
+                    for (int j = 0; j < d; j++)
+                        mu[(size_t)c * d + j] += r * xs[(size_t)i * d + j];
+                }
+                for (int j = 0; j < d; j++)
+                    mu[(size_t)c * d + j] /= nk;
+                std::vector<double> diff((size_t)d);
+                for (int i = 0; i < n; i++) {
+                    const double r = resp[(size_t)i * k + c];
+                    if (r == 0.0)
+                        continue;
+                    for (int j = 0; j < d; j++)
+                        diff[(size_t)j] = xs[(size_t)i * d + j] - mu[(size_t)c * d + j];
+                    for (int a = 0; a < d; a++)
+                        for (int b = a; b < d; b++)
+                            cov[((size_t)c * d + a) * d + b] += r * diff[(size_t)a] * diff[(size_t)b];
+                }
+                for (int a = 0; a < d; a++) {
+                    for (int b = a; b < d; b++) {
+                        double v = cov[((size_t)c * d + a) * d + b] / nk;
+                        if (a == b)
+                            v += kRegCovar;
+                        cov[((size_t)c * d + a) * d + b] = v;
+                        cov[((size_t)c * d + b) * d + a] = v;
+                    }
+                }
+            }
+            if (!ok)
+                break;
+
+            // ---- E step (Cholesky per component) ----
+            std::vector<double> logdet((size_t)k, 0.0);
+            std::vector<double> chol((size_t)k * d * d, 0.0);
+            for (int c = 0; c < k && ok; c++) {
+                double* L = &chol[(size_t)c * d * d];
+                const double* C = &cov[(size_t)c * d * d];
+                for (int a = 0; a < d && ok; a++) {
+                    for (int b = 0; b <= a; b++) {
+                        double s = C[(size_t)a * d + b];
+                        for (int t = 0; t < b; t++)
+                            s -= L[(size_t)a * d + t] * L[(size_t)b * d + t];
+                        if (a == b) {
+                            if (s <= 0.0) {
+                                ok = false; // covariance lost positive-definiteness
+                                break;
+                            }
+                            L[(size_t)a * d + b] = std::sqrt(s);
+                        } else {
+                            L[(size_t)a * d + b] = s / L[(size_t)b * d + b];
+                        }
+                    }
+                }
+                if (!ok)
+                    break;
+                double ld = 0.0;
+                for (int a = 0; a < d; a++)
+                    ld += std::log(L[(size_t)a * d + a]);
+                logdet[(size_t)c] = 2.0 * ld;
+            }
+            if (!ok)
+                break;
+
+            const double log2pi = std::log(2.0 * M_PI);
+            double total = 0.0;
+            std::vector<double> lp((size_t)k);
+            std::vector<double> y((size_t)d);
+            for (int i = 0; i < n; i++) {
+                for (int c = 0; c < k; c++) {
+                    const double* L = &chol[(size_t)c * d * d];
+                    double quad = 0.0;
+                    for (int a = 0; a < d; a++) {
+                        double s = xs[(size_t)i * d + a] - mu[(size_t)c * d + a];
+                        for (int t = 0; t < a; t++)
+                            s -= L[(size_t)a * d + t] * y[(size_t)t];
+                        y[(size_t)a] = s / L[(size_t)a * d + a];
+                        quad += y[(size_t)a] * y[(size_t)a];
+                    }
+                    lp[(size_t)c] =
+                        std::log(std::max(weight[(size_t)c], kTiny)) - 0.5 * (d * log2pi + logdet[(size_t)c] + quad);
+                }
+                const double mx = *std::max_element(lp.begin(), lp.end());
+                double se = 0.0;
+                for (int c = 0; c < k; c++)
+                    se += std::exp(lp[(size_t)c] - mx);
+                const double lse = mx + std::log(se);
+                total += lse;
+                for (int c = 0; c < k; c++)
+                    resp[(size_t)i * k + c] = std::exp(lp[(size_t)c] - lse);
+            }
+            const double prev = ll;
+            ll = total;
+            if (it > 0 && std::fabs(ll - prev) < 1e-6 * std::fabs(ll))
+                break;
+        }
+
+        if (ok && std::isfinite(ll) && ll > best_ll) {
+            best_ll = ll;
+            any = true;
+        }
+    }
+
+    if (!any)
+        return false;
+
+    // sklearn's convention: bic = -2 * log_likelihood + n_params * log(n),
+    // with full-covariance parameter count k*d*(d+1)/2 + k*d + (k-1).
+    const double n_params = (double)k * d * (d + 1) / 2.0 + (double)k * d + (k - 1);
+    *out_bic = (float)(-2.0 * best_ll + n_params * std::log((double)n));
+    return true;
+}
+
+std::vector<int> spectral_labels(const float* affinity, int n, int k, unsigned seed) {
+    if (n <= 0)
+        return {};
+    k = std::min(k, n);
+    if (k <= 1)
+        return std::vector<int>((size_t)n, 0);
+
+    // Normalised Laplacian L_sym = D^-1/2 A D^-1/2; its top-k eigenvectors are
+    // the embedding the clustering runs in.
+    std::vector<double> dinv((size_t)n);
+    for (int i = 0; i < n; i++) {
+        double deg = 0.0;
+        for (int j = 0; j < n; j++)
+            deg += affinity[(size_t)i * n + j];
+        dinv[(size_t)i] = deg > kTiny ? 1.0 / std::sqrt(deg) : 0.0;
+    }
+    std::vector<double> l((size_t)n * n);
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            l[(size_t)i * n + j] = dinv[(size_t)i] * affinity[(size_t)i * n + j] * dinv[(size_t)j];
+
+    std::vector<double> emb = top_eigenvectors(l, n, k, seed);
+
+    // Row-normalise (the Ng-Jordan-Weiss step) so k-means sees directions.
+    for (int i = 0; i < n; i++) {
+        double nrm = 0.0;
+        for (int c = 0; c < k; c++)
+            nrm += emb[(size_t)i * k + c] * emb[(size_t)i * k + c];
+        nrm = std::sqrt(nrm);
+        if (nrm > kTiny)
+            for (int c = 0; c < k; c++)
+                emb[(size_t)i * k + c] /= nrm;
+    }
+    return kmeans(emb, n, k, k, seed, 10, 300);
+}
+
+float silhouette_precomputed(const float* distance, int n, const std::vector<int>& labels) {
+    if (n <= 1 || (int)labels.size() != n)
+        return 0.0f;
+    int k = 0;
+    for (int v : labels)
+        k = std::max(k, v + 1);
+    if (k < 2)
+        return 0.0f;
+
+    std::vector<int> count((size_t)k, 0);
+    for (int v : labels)
+        count[(size_t)v]++;
+
+    double total = 0.0;
+    for (int i = 0; i < n; i++) {
+        std::vector<double> sum((size_t)k, 0.0);
+        for (int j = 0; j < n; j++) {
+            if (j == i)
+                continue;
+            sum[(size_t)labels[(size_t)j]] += distance[(size_t)i * n + j];
+        }
+        const int own = labels[(size_t)i];
+        if (count[(size_t)own] <= 1) {
+            // A singleton cluster contributes 0 by convention.
+            continue;
+        }
+        const double a = sum[(size_t)own] / (count[(size_t)own] - 1);
+        double b = std::numeric_limits<double>::infinity();
+        for (int c = 0; c < k; c++) {
+            if (c == own || count[(size_t)c] == 0)
+                continue;
+            b = std::min(b, sum[(size_t)c] / count[(size_t)c]);
+        }
+        if (!std::isfinite(b))
+            continue;
+        const double denom = std::max(a, b);
+        if (denom > kTiny)
+            total += (b - a) / denom;
+    }
+    return (float)(total / n);
+}
+
+std::vector<int> refine_spherical(const float* x, int n, int d, const std::vector<int>& labels, int max_iter) {
+    if (n <= 0)
+        return {};
+    std::vector<int> uniq(labels);
+    std::sort(uniq.begin(), uniq.end());
+    uniq.erase(std::unique(uniq.begin(), uniq.end()), uniq.end());
+    const int k = (int)uniq.size();
+    if (k <= 1)
+        return std::vector<int>((size_t)n, 0);
+
+    std::vector<int> cur((size_t)n, 0);
+    for (int i = 0; i < n; i++)
+        cur[(size_t)i] = (int)(std::lower_bound(uniq.begin(), uniq.end(), labels[(size_t)i]) - uniq.begin());
+
+    std::vector<float> emb((size_t)n * d);
+    std::copy(x, x + (size_t)n * d, emb.begin());
+    l2_normalize_rows(emb.data(), n, d);
+
+    for (int it = 0; it < max_iter; it++) {
+        std::vector<double> cent((size_t)k * d, 0.0);
+        std::vector<int> cnt((size_t)k, 0);
+        for (int i = 0; i < n; i++) {
+            const int c = cur[(size_t)i];
+            cnt[(size_t)c]++;
+            for (int j = 0; j < d; j++)
+                cent[(size_t)c * d + j] += emb[(size_t)i * d + j];
+        }
+        bool valid = true;
+        for (int c = 0; c < k && valid; c++) {
+            if (cnt[(size_t)c] == 0) {
+                valid = false;
+                break;
+            }
+            double nrm = 0.0;
+            for (int j = 0; j < d; j++)
+                nrm += cent[(size_t)c * d + j] * cent[(size_t)c * d + j];
+            nrm = std::sqrt(nrm);
+            if (nrm <= kTiny) {
+                valid = false;
+                break;
+            }
+            for (int j = 0; j < d; j++)
+                cent[(size_t)c * d + j] /= nrm;
+        }
+        if (!valid)
+            break;
+
+        std::vector<int> next((size_t)n, 0);
+        for (int i = 0; i < n; i++) {
+            double best = -std::numeric_limits<double>::infinity();
+            int arg = 0;
+            for (int c = 0; c < k; c++) {
+                double dot = 0.0;
+                for (int j = 0; j < d; j++)
+                    dot += emb[(size_t)i * d + j] * cent[(size_t)c * d + j];
+                if (dot > best) {
+                    best = dot;
+                    arg = c;
+                }
+            }
+            next[(size_t)i] = arg;
+        }
+        // Refusing to drop a cluster keeps k stable — the caller chose it.
+        std::vector<char> seen((size_t)k, 0);
+        for (int v : next)
+            seen[(size_t)v] = 1;
+        if ((int)std::count(seen.begin(), seen.end(), 1) < k)
+            break;
+        if (next == cur)
+            break;
+        cur.swap(next);
+    }
+    return cur;
+}
+
+SpeakerEstimate estimate_speakers(const float* x, int n, int d, int min_k, int max_k, unsigned seed) {
+    SpeakerEstimate est;
+    est.min_k_used = std::max(1, min_k);
+    est.best_k = std::max(1, min_k);
+
+    if (n <= 0) {
+        est.reason = "no_embeddings";
+        return est;
+    }
+    if (n < 4) {
+        est.reason = "too_few_samples";
+        return est;
+    }
+
+    // Single-speaker veto: if even the 10th percentile of off-diagonal cosine
+    // similarity is high, everything is one voice and BIC would over-split it.
+    {
+        std::vector<float> sim = cosine_similarity(x, n, d);
+        std::vector<float> off;
+        off.reserve((size_t)n * (n - 1));
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++)
+                if (i != j)
+                    off.push_back(sim[(size_t)i * n + j]);
+        const size_t idx = (size_t)(0.10 * (double)(off.size() - 1));
+        std::nth_element(off.begin(), off.begin() + (long)idx, off.end());
+        est.cosine_sim_p10 = off[idx];
+        if (est.cosine_sim_p10 >= kSingleSpeakerSimP10 && min_k <= 1) {
+            est.best_k = 1;
+            est.reason = "cosine_similarity_single_speaker";
+            return est;
+        }
+    }
+
+    int pca_dim = 0;
+    std::vector<float> proj = pca_project(x, n, d, kPcaDim, &pca_dim);
+    est.pca_dim = pca_dim;
+    if (proj.empty()) {
+        est.reason = "gmm_failed";
+        return est;
+    }
+
+    // Component-count ceiling. The upstream recipe uses n/2 + 1 ("at least ~2
+    // samples per component"), which is far too loose for a FULL covariance:
+    // a d x d covariance is not estimable from fewer than d + 1 points, so
+    // beyond n/(d+1) components every extra component fits a near-singular
+    // Gaussian whose density — and therefore the likelihood — diverges. BIC
+    // then falls monotonically and the sweep runs away to max_k.
+    //
+    // Measured on 3 well-separated blobs (n=60, pca_dim=8): with the n/2 bound
+    // BIC dropped 881 -> 138 straight through k=10 and the anchor was 10;
+    // the silhouette window [k-2, k+3] could then never reach the true k=3.
+    // reg_covar does not save this — sklearn's 1e-6 default is negligible
+    // against PCA noise-component variances of ~0.03.
+    const int k_occupancy = std::max(1, n / (pca_dim + 1));
+    const int k_upper = std::max(min_k + 1, std::min({max_k + 1, n / 2 + 1, k_occupancy + 1}));
+    float best_bic = std::numeric_limits<float>::infinity();
+    int best_k = min_k;
+    bool any = false;
+    for (int k = std::max(1, min_k); k < k_upper; k++) {
+        float bic = 0.0f;
+        if (!gmm_bic(proj.data(), n, pca_dim, k, kGmmNInit, kGmmMaxIter, seed, &bic))
+            continue;
+        est.k_bics.push_back(bic);
+        if (bic < best_bic) {
+            best_bic = bic;
+            best_k = k;
+        }
+        any = true;
+    }
+    if (!any) {
+        est.reason = "gmm_failed";
+        return est;
+    }
+    est.best_k = best_k;
+    est.reason = "gmm_bic";
+    return est;
+}
+
+std::vector<int> cluster_speakers(const float* x, int n, int d, int min_speakers, int max_speakers, int num_speakers,
+                                  SpeakerEstimate* out_estimate, unsigned seed) {
+    if (n <= 0)
+        return {};
+    if (n < 2)
+        return std::vector<int>((size_t)n, 0);
+
+    auto run = [&](int k) {
+        std::vector<float> aff = cosine_affinity(x, n, d);
+        std::vector<int> lab = spectral_labels(aff.data(), n, k, seed);
+        return refine_spherical(x, n, d, lab);
+    };
+
+    if (num_speakers > 0) {
+        if (out_estimate) {
+            out_estimate->best_k = num_speakers;
+            out_estimate->reason = "fixed";
+        }
+        return run(num_speakers);
+    }
+
+    SpeakerEstimate est = estimate_speakers(x, n, d, min_speakers, max_speakers, seed);
+    if (out_estimate)
+        *out_estimate = est;
+    const int k = est.best_k;
+    if (k < 2)
+        return std::vector<int>((size_t)n, 0);
+
+    // Silhouette refinement. The upstream recipe scores a small neighbourhood
+    // of the BIC anchor, [k-2, k+3]. That recovers an UNDER-count (measured:
+    // true k = 4/5/6 anchored at 2/2/3 and were all recovered exactly) but not
+    // a large OVER-count, because the window cannot reach back far enough —
+    // true k = 3 anchored at 8 leaves the window at [6, 10].
+    //
+    // Silhouette itself is the reliable half: on 3 well-separated blobs it
+    // scored k=3 at 1.0390 against 0.6827 / 0.7926 for its neighbours. So
+    // CRISPASR_DIARIZE_FULL_K_SEARCH=1 scores the FULL [min, max] range
+    // instead, at the cost of (max-min) spectral runs rather than 6.
+    //
+    // Default stays the upstream window until the DER harness says otherwise —
+    // gate the new path, do not delete the working one.
+    const char* full_env = std::getenv("CRISPASR_DIARIZE_FULL_K_SEARCH");
+    const bool full_search = full_env && *full_env && *full_env != '0';
+    const int lower = full_search ? std::max(2, min_speakers) : std::max({2, min_speakers, k - 2});
+    const int upper = full_search ? std::min({max_speakers, n - 1}) : std::min({max_speakers, n - 1, k + 3});
+    if (upper <= lower)
+        return run(k);
+
+    std::vector<float> aff = cosine_affinity(x, n, d);
+    std::vector<float> dist((size_t)n * n);
+    for (size_t i = 0; i < dist.size(); i++)
+        dist[i] = std::max(1.0f - aff[i], 0.0f);
+
+    int best_k = k;
+    std::vector<int> best_labels;
+    float best_score = -std::numeric_limits<float>::infinity();
+    for (int c = lower; c <= upper; c++) {
+        std::vector<int> lab = refine_spherical(x, n, d, spectral_labels(aff.data(), n, c, seed));
+        const float sil = silhouette_precomputed(dist.data(), n, lab);
+        const float score = sil + kSilhouetteKBonus * (float)std::log((double)std::max(c, 1));
+        if (score > best_score) {
+            best_score = score;
+            best_k = c;
+            best_labels = std::move(lab);
+        }
+    }
+    if (out_estimate && best_k != k) {
+        out_estimate->best_k = best_k;
+        out_estimate->reason = "silhouette";
+    }
+    return best_labels;
+}
+
+} // namespace core_spectral

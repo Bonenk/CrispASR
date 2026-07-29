@@ -1632,6 +1632,23 @@ catch_discover_tests(test-wespeaker
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-spectral-diarize — hermetic unit tests for the speaker-clustering
+# numerics. No model, no audio (#324). ────────────────────────────────────────
+add_executable(test-spectral-diarize
+    test-spectral-diarize.cpp
+)
+target_include_directories(test-spectral-diarize PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-spectral-diarize PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-core
+)
+catch_discover_tests(test-spectral-diarize
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;spectral"
+)
+
 # ─── test-wespeaker-params — Catch2 unit tests for wespeaker_context_params
 # defaults and null-guard coverage. No GGUF required. ──────────────────────────
 add_executable(test-wespeaker-params

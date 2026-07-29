@@ -856,6 +856,11 @@ add_library(crispasr-core STATIC
             core/pinyin_g2p.cpp
             core/kaldi_fbank.h
             core/kaldi_fbank.cpp
+            # Speaker-count estimation + spectral clustering (#324). Lives in
+            # crispasr-core because both the diarizer and its unit tests use it
+            # and it depends on nothing but the standard library.
+            core/spectral_diarize.h
+            core/spectral_diarize.cpp
             core/audio_resample.h
             core/audio_resample.cpp
             # Importance-matrix (imatrix) activation-stats collector. Lives in
