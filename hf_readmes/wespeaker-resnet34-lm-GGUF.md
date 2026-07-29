@@ -41,10 +41,13 @@ files, keep the attribution.
 | `wespeaker-resnet34-lm-f32.gguf` | 26.5 MB | reference precision |
 | `wespeaker-resnet34-lm.gguf` | 23.9 MB | conv kernels F32, linear F16 — **recommended** |
 
-Conv kernels stay F32 in both: ggml's CPU `conv_2d_direct` trips
-`GGML_ASSERT(src1->type == GGML_TYPE_F32)` with an F16 kernel. F16 on the 2-D
-linear is fine and yields an identical embedding (cosine 0.99999744 vs
-0.99999747).
+Conv kernels stay F32 in both, and that is a **speed** choice. An F16 conv
+kernel is numerically fine (cosine 0.99999724 against the PyTorch oracle) and
+would shrink the file to 13.3 MB, but ggml's CPU conv path is 2.2× slower on
+it — 297 ms vs 133 ms per 1.2 s window, measured back to back over the same
+352 windows on an M1. ResNet34 is ~94% of embedding time, so 10 MB of disk is
+not worth it. F16 on the 2-D linear is free and yields an identical embedding
+(cosine 0.99999744 vs 0.99999747).
 
 ## Architecture
 

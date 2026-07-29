@@ -184,9 +184,20 @@ def convert(src: Path, out_path: Path, quant: str | None = None, all_f32: bool =
     def emit(name: str, arr: np.ndarray, force_f32: bool = False) -> None:
         nonlocal n_f16, n_f32, n_quant
         raw = None
-        # Conv kernels stay F32: ggml's CPU conv_2d_direct trips
-        # GGML_ASSERT(src1->type == GGML_TYPE_F32) with an F16 kernel (see the
-        # note in wespeaker.cpp). They are 4-D; the only 2-D weight is seg1.
+        # Conv kernels stay F32 as a SPEED choice, not a correctness one.
+        # ggml used to assert (src1->type == GGML_TYPE_F32) here, but our fork's
+        # 00285218 builds the conv_2d im2col patch in vec_dot_type, so an F16
+        # kernel now runs and is numerically fine: cosine 0.99999724 against the
+        # upstream oracle, and the GGUF drops 23.9 MB -> 13.3 MB.
+        # It is just much slower. Measured back to back in one loop over the
+        # same 352 windows of a 215 s file, M1, CPU backend:
+        #     F32 kernels  133 ms/window
+        #     F16 kernels  297 ms/window   (2.2x)
+        # ResNet34 is ~94% of the embedder's time and the embedder is ~70% of a
+        # diarization run, so paying 2.2x there to save 10 MB on disk is the
+        # wrong trade. Re-measure before flipping this; if the CPU F16 conv path
+        # ever gets a direct kernel the arithmetic could reverse.
+        # The kernels are 4-D; the only 2-D weight is seg1.
         if force_f32 or all_f32 or arr.ndim <= 1 or arr.ndim == 4:
             arr = arr.astype(np.float32)
             n_f32 += 1
