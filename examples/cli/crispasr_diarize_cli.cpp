@@ -537,6 +537,102 @@ void split_segments_on_pyannote_turns(std::vector<crispasr_segment>& segs, const
     segs = std::move(out);
 }
 
+// #324: split segments at FoxNose turn boundaries.
+//
+// The pyannote splitter above scores each word against pyannote's frame
+// posteriors, which FoxNose does not have — it produces explicit TURNS
+// instead. Everything after per-word labelling is identical, so this reuses
+// group_words_into_speaker_runs and the same sub-segment emission.
+//
+// Without this, labels attach at the caller's segment granularity: an ASR
+// emitting one 26 s segment across several speakers gets ONE label, however
+// good the turns are.
+void split_segments_on_foxnose_turns(std::vector<crispasr_segment>& segs, const std::vector<CrispasrDiarizeTurn>& turns,
+                                     int64_t slice_t0_cs) {
+    if (turns.empty() || segs.empty())
+        return;
+
+    // Speaker covering the centre of [t0, t1] (centiseconds, absolute).
+    auto speaker_at = [&](int64_t t0, int64_t t1) -> int {
+        const double mid = ((double)(t0 + t1) * 0.5 - (double)slice_t0_cs) / 100.0;
+        for (const auto& t : turns)
+            if (mid >= t.start_s && mid < t.end_s)
+                return t.speaker;
+        return -1;
+    };
+
+    std::vector<crispasr_segment> out;
+    out.reserve(segs.size());
+    for (auto& seg : segs) {
+        if (seg.words.empty()) {
+            out.push_back(std::move(seg));
+            continue;
+        }
+        std::vector<int> word_spk(seg.words.size(), -1);
+        int last_known = -1;
+        for (size_t i = 0; i < seg.words.size(); i++) {
+            const auto& w = seg.words[i];
+            int spk = (w.t1 > w.t0) ? speaker_at(w.t0, w.t1) : -1;
+            if (spk < 0)
+                spk = last_known; // keep unaligned words attached to their neighbour
+            word_spk[i] = spk;
+            if (spk >= 0)
+                last_known = spk;
+        }
+        for (size_t i = 0; i < word_spk.size() && word_spk[i] < 0; i++)
+            for (size_t j = i + 1; j < word_spk.size(); j++)
+                if (word_spk[j] >= 0) {
+                    word_spk[i] = word_spk[j];
+                    break;
+                }
+
+        constexpr int64_t MIN_RUN_CS = 50;
+        std::vector<int64_t> word_t0(seg.words.size()), word_t1(seg.words.size());
+        for (size_t i = 0; i < seg.words.size(); i++) {
+            word_t0[i] = seg.words[i].t0 > 0 ? seg.words[i].t0 : seg.t0;
+            word_t1[i] = seg.words[i].t1 > 0 ? seg.words[i].t1 : seg.t1;
+        }
+        const auto runs =
+            crispasr_diarize_internal::group_words_into_speaker_runs(word_spk, word_t0, word_t1, MIN_RUN_CS);
+
+        int first_spk = -1;
+        bool multi = false;
+        for (const auto& r : runs) {
+            if (r.speaker < 0)
+                continue;
+            if (first_spk < 0)
+                first_spk = r.speaker;
+            else if (r.speaker != first_spk) {
+                multi = true;
+                break;
+            }
+        }
+        if (!multi) {
+            out.push_back(std::move(seg));
+            continue;
+        }
+
+        for (size_t ri = 0; ri < runs.size(); ri++) {
+            const size_t rs = runs[ri].start, re = runs[ri].end;
+            crispasr_segment sub;
+            sub.t0 = seg.words[rs].t0 > 0 ? seg.words[rs].t0 : seg.t0;
+            sub.t1 = seg.words[re - 1].t1 > 0 ? seg.words[re - 1].t1 : seg.t1;
+            sub.speaker_turn_next = (ri + 1 < runs.size());
+            sub.words.assign(seg.words.begin() + (long)rs, seg.words.begin() + (long)re);
+            for (size_t j = rs; j < re; j++) {
+                if (!sub.text.empty() && !sub.words[j - rs].text.empty())
+                    sub.text += ' ';
+                sub.text += seg.words[j].text;
+            }
+            sub.tokens.clear(); // no per-word alignment; dividing them would be arbitrary
+            if (runs[ri].speaker >= 0)
+                sub.speaker = "(speaker " + std::to_string(runs[ri].speaker) + ") ";
+            out.push_back(std::move(sub));
+        }
+    }
+    segs = std::move(out);
+}
+
 } // namespace
 
 bool crispasr_compute_pyannote_cache(const float* full_audio, int n_samples, const whisper_params& params,
@@ -637,9 +733,9 @@ bool crispasr_apply_diarize(const std::vector<float>& left, const std::vector<fl
         method = is_stereo ? "energy" : "vad-turns";
     }
 
-// #324: conservative ceiling for foxnose speaker-count estimation. See the
-// comment at its use site — this is an empirical value, not a guess.
-static constexpr int kFoxnoseDefaultMaxSpeakers = 4;
+    // #324: conservative ceiling for foxnose speaker-count estimation. See the
+    // comment at its use site — this is an empirical value, not a guess.
+    static constexpr int kFoxnoseDefaultMaxSpeakers = 4;
 
     // Shared in-process methods go through the library.
     CrispasrDiarizeMethod lib_method;
@@ -722,7 +818,8 @@ static constexpr int kFoxnoseDefaultMaxSpeakers = 4;
         const int n = (int)left.size();
         const float* l = left.data();
         const float* r = (is_stereo && !right.empty()) ? right.data() : l;
-        if (!crispasr_diarize_segments(l, r, n, is_stereo, lib_segs, opts)) {
+        std::vector<CrispasrDiarizeTurn> foxnose_turns;
+        if (!crispasr_diarize_segments(l, r, n, is_stereo, lib_segs, opts, &foxnose_turns)) {
             // pyannote model load failed — try sherpa subprocess fallback
             // when we can (mono input is what sherpa is best at).
             if (lib_method == CrispasrDiarizeMethod::Pyannote) {
@@ -736,6 +833,12 @@ static constexpr int kFoxnoseDefaultMaxSpeakers = 4;
             return false;
         }
         apply_int_speakers_to_crispasr_segments(lib_segs, segs);
+        // #324 phase 2: FoxNose derives real speaker TURNS from the audio, so
+        // a caller segment spanning several speakers can be split at word-
+        // aligned boundaries instead of collapsing to one label. Segments
+        // without word timestamps keep their segment-level label.
+        if (lib_method == CrispasrDiarizeMethod::FoxNose)
+            split_segments_on_foxnose_turns(segs, foxnose_turns, slice_t0_cs);
         return true;
     }
 

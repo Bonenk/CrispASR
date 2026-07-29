@@ -81,6 +81,15 @@ struct CrispasrDiarizeOptions {
     int num_speakers = 0;
 };
 
+/// A speaker turn derived from the audio, independent of the caller's
+/// segmentation. Only the FoxNose method produces these; the others label
+/// caller segments directly and leave the vector empty.
+struct CrispasrDiarizeTurn {
+    double start_s = 0.0; ///< relative to the sample buffer, not absolute
+    double end_s = 0.0;
+    int speaker = 0;
+};
+
 /// Run the selected diarizer over `segs`, mutating their `speaker` field.
 /// `right` may alias `left` when `is_stereo == false`; methods that need
 /// stereo data fall back to single-speaker labelling in that case.
@@ -89,8 +98,13 @@ struct CrispasrDiarizeOptions {
 /// failed to load (currently only Pyannote). All other methods always
 /// succeed — they may leave `speaker = -1` when they have no information
 /// to pick a label.
+/// `out_turns`, when non-null, receives the speaker turns the method derived
+/// from the audio (FoxNose only). Callers with word timestamps can use them to
+/// split a segment that spans several speakers — labelling alone is limited to
+/// the caller's own segment granularity.
 bool crispasr_diarize_segments(const float* left, const float* right, int n_samples, bool is_stereo,
-                               std::vector<CrispasrDiarizeSegment>& segs, const CrispasrDiarizeOptions& opts);
+                               std::vector<CrispasrDiarizeSegment>& segs, const CrispasrDiarizeOptions& opts,
+                               std::vector<CrispasrDiarizeTurn>* out_turns = nullptr);
 
 /// Free the cached pyannote segmentation context (§176e). Call at shutdown
 /// or when the model is no longer needed.
