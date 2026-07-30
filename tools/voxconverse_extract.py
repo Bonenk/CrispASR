@@ -36,7 +36,12 @@ def main():
     if missing:
         raise SystemExit(f"parquet is missing columns: {sorted(missing)}")
 
-    ref = {}
+    # MERGE with any existing ref.json: the dataset ships as several shards and
+    # the natural way to build a full corpus is to run this once per shard.
+    # Overwriting instead would leave wav/ complete but ref.json covering only
+    # the last shard — a mismatch that silently shrinks the evaluation set.
+    ref_path = os.path.join(args.out, "ref.json")
+    ref = json.load(open(ref_path)) if os.path.exists(ref_path) else {}
     for i in range(t.num_rows):
         raw = t.column("audio")[i].as_py()["bytes"]
         name = hashlib.sha1(raw).hexdigest()[:8]
@@ -53,8 +58,13 @@ def main():
             )
         ]
 
-    with open(os.path.join(args.out, "ref.json"), "w") as f:
+    with open(ref_path, "w") as f:
         json.dump(ref, f, indent=1)
+
+    n_wav = len([f for f in os.listdir(os.path.join(args.out, "wav")) if f.endswith(".wav")])
+    if n_wav != len(ref):
+        raise SystemExit(f"ref.json has {len(ref)} entries but wav/ has {n_wav} files — refusing to leave a "
+                         f"corpus whose labels and audio disagree")
 
     total = 0.0
     for n in ref:

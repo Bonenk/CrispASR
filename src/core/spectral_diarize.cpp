@@ -568,18 +568,11 @@ std::vector<float> refine_affinity_rows(const float* affinity, int n, float keep
     return a;
 }
 
-int estimate_speakers_eigengap(const float* affinity, int n, int min_k, int max_k, unsigned seed,
-                               std::vector<float>* out_eigenvalues) {
-    if (out_eigenvalues)
-        out_eigenvalues->clear();
-    min_k = std::max(1, min_k);
-    if (n <= 1)
-        return min_k;
-    // Need one eigenvalue beyond max_k to see the gap AT max_k.
-    const int want = std::min(n, std::max(min_k + 1, max_k + 1));
-
-    const std::vector<float> aff = refine_affinity_rows(affinity, n, 0.15f, 0.01f);
-
+// Leading eigenvalues (descending) of the normalised Laplacian D^-1/2 A D^-1/2.
+// Shared by the fixed-binarisation eigengap estimator and by the NME-SC sweep,
+// which differ only in how A was binarised beforehand — duplicating it once per
+// caller is how the powerset table ended up wrong in two places.
+static std::vector<double> laplacian_eigenvalues(const float* aff, int n, int want, unsigned seed) {
     std::vector<double> dinv((size_t)n);
     for (int i = 0; i < n; i++) {
         double deg = 0.0;
@@ -612,6 +605,104 @@ int estimate_speakers_eigengap(const float* affinity, int n, int min_k, int max_
         lam[(size_t)c] = num;
     }
     std::sort(lam.begin(), lam.end(), std::greater<double>());
+    return lam;
+}
+
+// ── NME-SC: auto-tuned binarisation + eigengap ────────────────────────────
+//
+// estimate_speakers_eigengap above binarises the affinity at a HARDCODED 15%
+// of neighbours per row and reads the eigengap off that one graph. The choice
+// of binarisation is not incidental — it decides how many clusters the
+// spectrum appears to have — and no single value suits every recording. That
+// is the whole premise of NME-SC (Park et al., "Auto-Tuning Spectral
+// Clustering for Speaker Diarization Using Normalized Maximum Eigengap"): try
+// several p, and pick the one whose graph gives the cleanest verdict.
+//
+// For each candidate p:
+//     binarise to p neighbours per row -> normalised Laplacian eigenvalues
+//     g_p = the largest eigengap, k_p = the k where it occurs
+//     r(p) = p / g_p
+// and take k from the p minimising r(p). Low r means "few neighbours needed to
+// produce a large gap", i.e. structure the graph agrees on rather than
+// structure a dense graph smeared into existence.
+//
+// Sweeping p costs one eigendecomposition per candidate, so the grid is
+// geometric (~12 points) rather than exhaustive.
+int estimate_speakers_nme_sc(const float* affinity, int n, int min_k, int max_k, unsigned seed, NmeScDiag* out) {
+    min_k = std::max(1, min_k);
+    if (out)
+        *out = NmeScDiag{};
+    if (n <= 2)
+        return min_k;
+
+    const int want = std::min(n, std::max(min_k + 1, max_k + 1));
+    const int hi_p = std::max(2, n / 2);
+
+    // Geometric grid over the neighbour count, deduplicated and clamped.
+    std::vector<int> ps;
+    for (double v = 2.0; v <= (double)hi_p + 0.5; v *= 1.6) {
+        const int p = (int)std::lround(v);
+        if (ps.empty() || ps.back() != p)
+            ps.push_back(std::min(p, hi_p));
+    }
+    if (ps.empty())
+        ps.push_back(std::min(2, hi_p));
+
+    int best_k = min_k;
+    double best_r = std::numeric_limits<double>::infinity();
+    int best_p = ps.front();
+    for (int p : ps) {
+        // TRUE binarisation (attenuate = 0), not the 0.01 attenuation the fixed
+        // eigengap path uses. With a dense weak background left in place the
+        // maximum eigengap grows monotonically with p, so p/g_p is minimised at
+        // the smallest p every time and the sweep degenerates to k=1. Zeroing
+        // the non-neighbours is what makes r(p) have an interior minimum at
+        // all — it is the method, not an implementation detail.
+        const std::vector<float> aff = refine_affinity_rows(affinity, n, (float)p / (float)n, 0.0f);
+        const std::vector<double> lam = laplacian_eigenvalues(aff.data(), n, want, seed);
+        const int k_have = (int)lam.size();
+        const int hi = std::min({max_k, k_have - 1, n - 1});
+        double g = -1.0;
+        int k_at = min_k;
+        for (int k = min_k; k <= hi; k++) {
+            const double gap = lam[(size_t)(k - 1)] - lam[(size_t)k];
+            if (gap > g) {
+                g = gap;
+                k_at = k;
+            }
+        }
+        if (g <= kTiny)
+            continue; // a degenerate graph says nothing about k
+        const double r = (double)p / g;
+        if (out)
+            out->curve.push_back({p, k_at, (float)g, (float)r});
+        if (r < best_r) {
+            best_r = r;
+            best_k = k_at;
+            best_p = p;
+        }
+    }
+    if (out) {
+        out->best_p = best_p;
+        out->best_k = best_k;
+        out->best_r = (float)best_r;
+    }
+    return best_k;
+}
+
+int estimate_speakers_eigengap(const float* affinity, int n, int min_k, int max_k, unsigned seed,
+                               std::vector<float>* out_eigenvalues) {
+    if (out_eigenvalues)
+        out_eigenvalues->clear();
+    min_k = std::max(1, min_k);
+    if (n <= 1)
+        return min_k;
+    // Need one eigenvalue beyond max_k to see the gap AT max_k.
+    const int want = std::min(n, std::max(min_k + 1, max_k + 1));
+
+    const std::vector<float> aff = refine_affinity_rows(affinity, n, 0.15f, 0.01f);
+    std::vector<double> lam = laplacian_eigenvalues(aff.data(), n, want, seed);
+    const int k_have = (int)lam.size();
     if (out_eigenvalues)
         for (double v : lam)
             out_eigenvalues->push_back((float)v);
@@ -648,9 +739,21 @@ CountMethod count_method_from_env() {
     // because it is genuinely better on well-separated data and costs less,
     // but it is not the default and synthetic evidence must not be used to
     // make it one again.
+    // CRISPASR_DIARIZE_COUNT=nme-sc selects NME-SC, which is the same eigengap
+    // read but over an AUTO-TUNED binarisation rather than a hardcoded 15%.
+    // The fixed binarisation is a plausible reason plain eigengap under-counts
+    // above, so this is the variant worth measuring — but it is opt-in until
+    // it has been scored on speaker-count accuracy over a held-out split, not
+    // on DER over the handful of files that happened to be to hand. See
+    // tools/diarize_eval.py.
     const char* e = std::getenv("CRISPASR_DIARIZE_COUNT");
-    if (e && *e && std::string(e) == "eigengap")
-        return CountMethod::Eigengap;
+    if (e && *e) {
+        const std::string v(e);
+        if (v == "eigengap")
+            return CountMethod::Eigengap;
+        if (v == "nme-sc" || v == "nmesc")
+            return CountMethod::NmeSc;
+    }
     return CountMethod::Bic;
 }
 
@@ -926,6 +1029,23 @@ std::vector<int> cluster_speakers(const float* x, int n, int d, int min_speakers
     }
 
     SpeakerEstimate est;
+    if (count_method_from_env() == CountMethod::NmeSc) {
+        std::vector<float> aff0 = cosine_affinity(x, n, d);
+        NmeScDiag diag;
+        est.best_k = estimate_speakers_nme_sc(aff0.data(), n, min_speakers, max_speakers, seed, &diag);
+        est.reason = "nme-sc";
+        if (out_estimate)
+            *out_estimate = est;
+        if (std::getenv("CRISPASR_DIARIZE_DEBUG")) {
+            fprintf(stderr, "  nme-sc: p*=%d k=%d r=%.4f\n", diag.best_p, diag.best_k, diag.best_r);
+            for (const auto& pt : diag.curve)
+                fprintf(stderr, "    p=%-4d k=%-2d gap=%.4f  r=%.4f%s\n", pt.p, pt.k, pt.gap, pt.ratio,
+                        pt.p == diag.best_p ? "   <-- chosen" : "");
+        }
+        // Like eigengap, this reads structure off the spectrum, so the
+        // silhouette pass (which is what over-merges) is skipped.
+        return run(est.best_k);
+    }
     if (count_method_from_env() == CountMethod::Eigengap) {
         std::vector<float> aff0 = cosine_affinity(x, n, d);
         est.best_k = estimate_speakers_eigengap(aff0.data(), n, min_speakers, max_speakers, seed);
