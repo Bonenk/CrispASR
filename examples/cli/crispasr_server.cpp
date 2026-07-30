@@ -1460,6 +1460,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             rp.diarize_method = form_string(req, "diarize_method", "energy");
         rp.diarize_embedder = form_string(req, "diarize_embedder", rp.diarize_embedder);
         rp.diarize_cluster_threshold = form_float(req, "diarize_cluster_threshold", rp.diarize_cluster_threshold);
+        rp.diarize_cluster_threshold_explicit = req.has_file("diarize_cluster_threshold");
         rp.diarize_max_speakers = form_int(req, "diarize_max_speakers", rp.diarize_max_speakers);
         rp.vad = form_bool(req, "vad", rp.vad);
         rp.vad_threshold = form_float(req, "vad_threshold", rp.vad_threshold);
@@ -1656,6 +1657,7 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             rp.diarize_method = "energy";
         rp.diarize_embedder = form_string(req, "diarize_embedder", rp.diarize_embedder);
         rp.diarize_cluster_threshold = form_float(req, "diarize_cluster_threshold", rp.diarize_cluster_threshold);
+        rp.diarize_cluster_threshold_explicit = req.has_file("diarize_cluster_threshold");
         rp.diarize_max_speakers = form_int(req, "diarize_max_speakers", rp.diarize_max_speakers);
         rp.vad = form_bool(req, "vad", rp.vad);
         rp.vad_threshold = form_float(req, "vad_threshold", rp.vad_threshold);

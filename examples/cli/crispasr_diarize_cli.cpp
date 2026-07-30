@@ -15,6 +15,8 @@
 #include "speaker_db.h"
 #include "whisper_params.h"
 
+#include "core/spectral_diarize.h"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -978,7 +980,39 @@ void crispasr_remap_speakers_via_embeddings(std::vector<crispasr_segment>& segs,
 
     const float thr = params.diarize_cluster_threshold;
     const int max_spk = params.diarize_max_speakers > 0 ? params.diarize_max_speakers : 8;
-    std::vector<int> labels = crispasr_agglomerative_cluster(embeddings, (int)embed_idx.size(), d, thr, max_spk);
+    const int n_emb = (int)embed_idx.size();
+
+    // #326: estimate the speaker COUNT instead of letting the cap decide it.
+    //
+    // This used to be single-linkage agglomerative with a fixed 0.5 cosine
+    // merge threshold and a hard max_speakers cap. Single linkage chains, and
+    // a fixed threshold does not adapt to the embedder's spread on a given
+    // recording, so on real audio the merge loop never got below the cap and
+    // the CAP became the answer. On the VoxConverse dev shard it pinned to
+    // --diarize-max-speakers 8 on 4 of 8 files (esrit 8 hypothesised vs 5
+    // real, mesob 8 vs 4, nnqfq 8 vs 5, fsaal 8 vs 7), and mesob alone scored
+    // 33.03% DER.
+    //
+    // core_spectral::cluster_speakers (#324) estimates the count first — PCA
+    // + full-covariance GMM/BIC, refined on silhouette — then runs
+    // Ng-Jordan-Weiss spectral clustering and a spherical refinement. It is
+    // the same clusterer that gets --diarize-method foxnose to 7.32% on these
+    // files, so this is reuse of validated in-tree code, not a new heuristic.
+    //
+    // --diarize-cluster-threshold still works, but only when the caller
+    // actually passes it: the threshold is meaningless to the spectral path,
+    // so honouring its DEFAULT would just reinstate the bug.
+    std::vector<int> labels;
+    if (params.diarize_cluster_threshold_explicit) {
+        labels = crispasr_agglomerative_cluster(embeddings, n_emb, d, thr, max_spk);
+    } else {
+        core_spectral::SpeakerEstimate est;
+        labels = core_spectral::cluster_speakers(embeddings.data(), n_emb, d, /*min_speakers=*/1, max_spk,
+                                                 /*num_speakers=*/params.diarize_num_speakers, &est);
+        if (std::getenv("CRISPASR_DIARIZE_DEBUG"))
+            fprintf(stderr, "crispasr[diarize]: n_emb=%d dim=%d -> k=%d (%s, cos_p10=%.4f, pca=%d)\n", n_emb, d,
+                    est.best_k, est.reason, est.cosine_sim_p10, est.pca_dim);
+    }
 
     // Rewrite segment speakers from clustering output. Segments that
     // couldn't be embedded (too short) keep their existing pyannote-

@@ -518,6 +518,7 @@ static bool whisper_params_parse_arg_backend_vad(int argc, char** argv, int& i, 
         params.speaker_db_consent = true;
     } else if (arg == "--diarize-cluster-threshold") {
         params.diarize_cluster_threshold = std::stof(ARGV_NEXT);
+        params.diarize_cluster_threshold_explicit = true;
     } else if (arg == "--diarize-max-speakers") {
         params.diarize_max_speakers = std::stoi(ARGV_NEXT);
         params.diarize_max_speakers_explicit = true;

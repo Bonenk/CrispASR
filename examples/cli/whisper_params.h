@@ -303,6 +303,12 @@ struct whisper_params {
     // per-method default never SHRINKS or GROWS a value they chose. Same
     // contract as max_new_tokens_explicit (#292).
     bool diarize_max_speakers_explicit = false;
+    // Set when the user passed --diarize-cluster-threshold explicitly. The
+    // embedder path otherwise estimates the speaker count with spectral
+    // clustering (#326) and the cosine threshold is not consulted at all;
+    // honouring it only when asked for keeps that knob working for anyone who
+    // tuned it, without letting its default decide the answer.
+    bool diarize_cluster_threshold_explicit = false;
 
     // Set by the unified runner: foxnose diarization happens in one global
     // pass after transcription, so the per-slice path must stand down.

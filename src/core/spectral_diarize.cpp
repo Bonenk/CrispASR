@@ -841,8 +841,26 @@ SpeakerEstimate estimate_speakers(const float* x, int n, int d, int min_k, int m
         }
     }
 
+    // Projection dimensionality. kPcaDim (8) assumes enough embeddings that a
+    // full covariance in 8 dims is estimable; the ceiling below allows only
+    // n/(pca_dim+1) components, so on a SHORT recording that silently forces
+    // the answer to one speaker. Measured: a VoxConverse file with 4 real
+    // speakers yielded 17 embedding windows, giving 17/9 = 1 — k=1 was the
+    // only candidate the sweep ever scored, and DER came out at 46.20%.
+    //
+    // So when the ceiling would bite, spend dimensions to buy components
+    // instead: drop pca_dim until at least kMinReachableK components are
+    // representable. This is deliberately a no-op whenever n is already large
+    // enough (n >= 4 * (kPcaDim + 1) = 36), so the well-populated case that
+    // #324 tuned is untouched — of the 8 VoxConverse dev files only the n=17
+    // one changes.
+    constexpr int kMinReachableK = 4;
+    int want_dim = kPcaDim;
+    if (n / (kPcaDim + 1) < kMinReachableK)
+        want_dim = std::max(2, n / kMinReachableK - 1);
+
     int pca_dim = 0;
-    std::vector<float> proj = pca_project(x, n, d, kPcaDim, &pca_dim);
+    std::vector<float> proj = pca_project(x, n, d, want_dim, &pca_dim);
     est.pca_dim = pca_dim;
     if (proj.empty()) {
         est.reason = "gmm_failed";
