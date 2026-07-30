@@ -41,7 +41,7 @@ One dev shard alone is 44 files / 4.2 h with 1-17 speakers.
     --max-speakers N   report how many files are unwinnable under that cap
 """
 
-import argparse, concurrent.futures, hashlib, json, os, subprocess, sys, tempfile
+import argparse, concurrent.futures, hashlib, json, os, shutil, subprocess, sys, tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from der_score import score
@@ -82,6 +82,12 @@ def main():
     ap.add_argument("--subset", type=int, default=0)
     ap.add_argument("--max-speakers", type=int, default=8)
     ap.add_argument("--json-out", default="")
+    ap.add_argument(
+        "--workdir",
+        default="",
+        help="where per-file transcripts are written (default: system temp). Point this at a disk with "
+        "room: a full system volume gets runs killed mid-sweep, which looks like a crash and is not one.",
+    )
     args = ap.parse_args()
 
     ref = json.load(open(args.ref))
@@ -93,7 +99,15 @@ def main():
         for k in by_split:
             by_split[k] = by_split[k][: args.subset]
 
-    workdir = tempfile.mkdtemp(prefix="diarize-eval-")
+    if args.workdir:
+        os.makedirs(args.workdir, exist_ok=True)
+        workdir = tempfile.mkdtemp(prefix="diarize-eval-", dir=args.workdir)
+    else:
+        workdir = tempfile.mkdtemp(prefix="diarize-eval-")
+    free_gb = shutil.disk_usage(workdir).free / 2**30
+    if free_gb < 2.0:
+        print(f"warning: only {free_gb:.1f} GB free on the work volume ({workdir}); "
+              f"use --workdir to point somewhere with room", file=sys.stderr)
     results = {}
     todo = [(n, os.path.join(args.wav_dir, n + ".wav")) for k in by_split for n in by_split[k]]
 
