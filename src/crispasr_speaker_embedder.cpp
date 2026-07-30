@@ -135,23 +135,22 @@ std::unique_ptr<CrispasrSpeakerEmbedder> crispasr_make_speaker_embedder(const st
     if (model_spec.empty())
         return nullptr;
 
-    // Speaker embedders run ONE small graph per speech segment, and at that
-    // size ggml's per-graph thread sync costs more than the work it splits.
-    // Measured on the diarization path (215 s file, 8-core M1), embedding time
-    // went the WRONG way as -t rose: the wespeaker ResNet34 took 57 ms per
-    // 1.2 s window at 1 thread and 320 ms at 8, and end-to-end diarization
-    // overhead grew from 1.5 s to 7.0 s. So the caller's -t is deliberately
-    // NOT forwarded here: extra cores belong to running several segments at
-    // once (see core_foxnose::Params::n_workers), not to splitting one tiny
-    // graph. CRISPASR_SPEAKER_EMBED_THREADS overrides for A/B.
-    int embed_threads = 1;
+    // The caller's thread count is forwarded as-is. An earlier revision forced
+    // this to 1, on the theory that a per-segment graph is too small to amortise
+    // ggml's thread sync — that theory came from a SEQUENTIAL -t 1/4/8 loop on a
+    // contended box, i.e. a load ramp, and interleaving the arms disproved it
+    // (threads help these graphs: 20.5 s -> 10.3 s from 1 to 4 on the wespeaker
+    // path). Unlike core_foxnose, this path embeds one segment at a time, so
+    // intra-graph threads are the ONLY parallelism it has; taking them away
+    // would be a straight regression.
+    //
+    // CRISPASR_SPEAKER_EMBED_THREADS overrides, for A/B against a
+    // cross-segment-parallel version if one is ever written.
     if (const char* e = std::getenv("CRISPASR_SPEAKER_EMBED_THREADS")) {
         const int v = std::atoi(e);
         if (v > 0)
-            embed_threads = v;
+            n_threads = v;
     }
-    (void)n_threads;
-    n_threads = embed_threads;
 
     // Dispatch order:
     //   1. Model spec or resolved path mentions "indextts" -> IndexTTS-
