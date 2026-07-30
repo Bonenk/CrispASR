@@ -70,12 +70,17 @@ Result diarize(const float* pcm, int n_samples, int sample_rate, const std::vect
     std::vector<float> scratch((size_t)embed_dim);
 
     // Enumerate the windows first, then embed them concurrently. Each window is
-    // an independent forward pass, and the model is small enough that running
-    // ONE window across many ggml threads is far worse than running many
-    // windows one thread each: measured on a 1.2 s window, ResNet34 took 57 ms
-    // at 1 thread and 320 ms at 8, because per-graph thread sync dwarfs the
-    // work. So the parallelism belongs here, across windows, not inside the
-    // graph. Order of results is kept identical to the serial version — the
+    // an independent forward pass, so this is the axis with the most headroom:
+    // measured interleaved on an 85 s file, threads x workers gave 4x1 10.27 s,
+    // 8x1 10.80 s, 2x4 8.67 s, 1x8 8.09 s — i.e. spending cores on whole
+    // windows beats spending them inside one graph.
+    //
+    // (An earlier version of this comment claimed intra-graph threads made it
+    // 5x SLOWER. That came from a sequential -t 1/4/8 loop on a box whose load
+    // was ramping, so it read the load as the thread count. Threads do help —
+    // 20.5 s to 10.3 s from 1 to 4 — parallel windows just help more.)
+    //
+    // Order of results is kept identical to the serial version — the
     // clusterer's output depends on row order.
     struct Win {
         Speech w;
