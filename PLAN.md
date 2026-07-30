@@ -145,9 +145,9 @@ prove a new code path EXECUTES (count its invocations) before reporting any
 measurement taken through it. A "no difference" result is the expected shape of
 both "behaviour-preserving" and "never ran".
 
-### VERDICT: gate FAILED, stays off
+### VERDICT: a real trade — 1.78x cheaper, +0.30 DER. Opt-in, default OFF.
 
-Run against the wired path, 8 VoxConverse dev files:
+Measured against the wired path (856a6dd7), 8 VoxConverse dev files:
 
     file    GT   per-window   shared-trunk
     jyirt    4     7.24%(4)     11.05%(3)   <-- loses a speaker
@@ -155,27 +155,29 @@ Run against the wired path, 8 VoxConverse dev files:
     other 6            ==            ==
     MEAN            7.32%         7.62%
 
-+0.30 DER for an unmeasured speed win, so it stays behind
-CRISPASR_DIARIZE_SPAN_EMBED. Six files are byte-identical and two move, which
-is itself the proof the path is now live — when it was inert ALL eight were
-identical.
+Speed, interleaved CPU time (user+sys, which survives a loaded box where wall
+clock does not), 85 s file, 1 worker: 70.2 s -> 41.2 s total, against a 4.2 s
+ASR-only baseline, so diarization CPU goes 66.0 s -> 37.0 s = **1.78x**. Trunk
+passes drop 135 -> 18.
 
-The likely cause is span-level CMN: `jyirt` drops from 4 speakers to 3, i.e.
-normalising over ~19.8 s of span instead of 1.2 s of window flattened the
-between-speaker differences the clusterer needs. That points at a cheaper
-variant rather than abandoning the idea — work per span is (N+1)/2N of the
-per-window cost, so even kWindowsPerSpan=4 is still 1.6x while cutting the CMN
-drift 8-fold:
+So it is not a dud and not free: a third less diarization CPU for a third of a
+DER point. Shipped as CRISPASR_DIARIZE_SPAN_EMBED=1, default OFF, because
+accuracy is the better default for a diarizer and the user who wants throughput
+can say so.
 
-    N=32 -> 1.94x   N=8 -> 1.78x   N=4 -> 1.60x   N=2 -> 1.33x
+⚠ Span size does NOT drive the accuracy cost — do not tune it. jyirt scores
+exactly 11.05% with 3 speakers at N=2, 4, 8, 16 AND 32; at N=2 a span is 1.8 s
+against a 1.2 s window, so CMN drift cannot be the mechanism. It is a threshold
+flip in speaker COUNTING on a file with only 17 embeddings (the same borderline
+file that needed the adaptive pca_dim fix): the embeddings move just enough for
+the estimator to pick k=3 instead of k=4, and once it does the DER is the same
+however the spans are cut. Since accuracy is flat in N, larger N is strictly
+better for speed — hence the default of 32. CRISPASR_DIARIZE_SPAN_WINDOWS
+overrides it for investigation.
 
-STILL UNMEASURED: the speed win itself. The CPU-time A/B that read "flat" was
-taken while the path was inert, so it measured nothing. Redo with user+sys, not
-wall.
-
-NEXT: try kWindowsPerSpan=8 and 4, re-run the DER gate, and only then measure
-speed. If no span size holds 7.32%, delete the feature rather than ship a knob
-nobody should turn on.
+OPEN: whether the count flip can be fixed at the estimator rather than the
+embedder. If a borderline 17-embedding file can be made to hold k=4 under both
+paths, this becomes a free 1.78x and the default should flip.
 Span size is fixed at kWindowsPerSpan=32 deliberately: CMN over the span makes
 it part of the answer, so it must never depend on the worker count.
 

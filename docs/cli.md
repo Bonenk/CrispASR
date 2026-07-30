@@ -997,6 +997,23 @@ input and `vad-turns` for mono — the historical behaviour.
 > consistent across the entire file. Before #110, `sherpa`/`ecapa`
 > ran per-slice, producing local IDs that could reset between slices.
 
+#### Trading accuracy for throughput (`CRISPASR_DIARIZE_SPAN_EMBED=1`)
+
+`foxnose` slides a 1.2 s window at a 0.6 s hop, so every sample goes through the
+embedding network twice. Setting `CRISPASR_DIARIZE_SPAN_EMBED=1` runs one
+network pass per *span* of 32 windows and takes each window as a slice of it.
+
+Measured on the VoxConverse dev shard: **1.78x less diarization CPU** (66.0 s ->
+37.0 s on an 85 s file), for **+0.30 mean DER** (7.32% -> 7.62%). Six of eight
+files come out identical; one borderline file loses a speaker, because the
+slightly different embeddings flip the speaker-count estimate from 4 to 3.
+
+Off by default — accuracy is the better default for a diarizer. Turn it on when
+you are throughput-bound and can accept that. Span size
+(`CRISPASR_DIARIZE_SPAN_WINDOWS`, default 32) does **not** affect the accuracy
+cost — it is identical from N=2 to N=32 — so there is nothing to tune: larger is
+simply faster.
+
 ### `--diarize-embedder MODEL` — globally stable speaker IDs
 
 The pyannote method's per-pass local tracks (spk0 / spk1 / spk2) are
