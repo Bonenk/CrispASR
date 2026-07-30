@@ -38,7 +38,9 @@ REPO = TEMP / "CrispASR"
 
 # ── clone + harness (must come from the clone, not a bundled sibling) ────────
 if not REPO.exists():
-    subprocess.check_call(["git", "clone", "--depth", "1", CRISPASR_URL, str(REPO)])
+    # --recursive: the build needs the bundled ggml submodule, and a plain
+    # --depth 1 clone leaves cmake dying on a missing ggml/CMakeLists.txt.
+    subprocess.check_call(["git", "clone", "--depth", "1", "--recursive", CRISPASR_URL, str(REPO)])
 sys.path.insert(0, str(REPO / "tools" / "kaggle"))
 import kaggle_harness as kh  # noqa: E402
 
@@ -52,12 +54,15 @@ kh.step("hf_token", status="ok" if token else "MISSING")
 with kh.build_heartbeat("build", 30):
     kh.install_build_toolchain()
     build = REPO / "build"
+    # cache_and_link_flags() folds in ccache/mold AND -DCRISPASR_NO_C2PA_NATIVE
+    # (the c2pa-audio submodule is irrelevant here and breaks generate).
     subprocess.check_call(
         ["cmake", "-S", str(REPO), "-B", str(build), "-DCMAKE_BUILD_TYPE=Release",
-         "-DCRISPASR_BUILD_TESTS=OFF", "-DGGML_CUDA=OFF"],
+         "-DCRISPASR_BUILD_TESTS=OFF", "-DGGML_CUDA=OFF"] + kh.cache_and_link_flags(),
     )
-    subprocess.check_call(["cmake", "--build", str(build), "--target", "crispasr-cli",
-                           "-j", str(os.cpu_count() or 4)])
+    kh.sh_with_progress(
+        f"stdbuf -oL -eL cmake --build {build} --target crispasr-cli -j{kh.safe_build_jobs(gpu=False)}"
+    )
 cli = build / "bin" / "crispasr"
 if not cli.exists():
     raise SystemExit(f"build produced no {cli}")
