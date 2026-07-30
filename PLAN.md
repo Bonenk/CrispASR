@@ -67,11 +67,35 @@ pyannote_seg is the least ggml-native runtime we ship. Not applied:
      recurrence dereferences `tensor->data`. Probably correct to leave alone:
      see [[feedback_many_tiny_graphs_gpu_loses]].
 
-PLAN, in order: (c) batch chunks into one graph for SincNet + LSTM input
-projections + classifier, keeping only the recurrence per-chunk; then (d)
-measure F16 `R`; then chunk geometry — 120 s chunk with 5 s context is 8%
-redundant compute against today's 17%.
-GATE: posteriors must stay byte-identical across `-t`, and DER must not move.
+RESOLVED 2026-07-30. (b) is FIXED; (c) and (d) are measured NOT worth doing.
+
+  * (b) DONE — each chunk worker now gets `n_threads / n_workers` instead of 1.
+    Only bites when chunks < cores, which is every short file: an 85 s file
+    (2 chunks) on 8 cores went 1375 ms (-t 1) -> 788 ms (-t 4). Long files are
+    unaffected (49 chunks already saturate). Posteriors stay byte-identical
+    across -t 1/2/4/8, verified on a 2888 s file.
+
+  * (d) F16 `R` — TRIED AND REVERTED. 173.6 s of LSTM CPU against 146-162 s for
+    F32, interleaved. The motivating arithmetic ("512x128 restreamed 171k x 4
+    layers x 2 directions ~= 350 GB") was wrong in the way that matters: all of
+    R is 2 MB, so it is L2-resident and there was no DRAM bandwidth to reclaim,
+    while widening each element costs real cycles in the inner loop. Note this
+    is the SECOND F16 loss in this subsystem for a DIFFERENT reason than
+    wespeaker's (compute-bound conv im2col) — the shared lesson is only that
+    F16 must be measured, never assumed either way.
+
+  * (c) batched chunk graph — NOT DONE, and should not be without new evidence.
+    The case for it was that 49 single-threaded graphs waste ggml's thread pool
+    and GEMM shape. But after (b) there is no idle capacity to recover: on a
+    2888 s file the chunked path spends 181.5 s of CPU in 22.8 s of wall on 8
+    cores, i.e. every core is busy. Batching cannot add parallelism, only
+    per-op efficiency, and a -t 1 sweep of chunk size (30/60/90/120/240 s, the
+    setting that controls how many separate graphs there are) showed total work
+    varying no more than the round-to-round noise on a loaded box. The
+    restructure is also not free: uniform-length windows would be required for
+    a batch dimension, which changes what InstanceNorm normalises over.
+    Revisit only if a profile shows per-op overhead, not on the a-priori
+    argument.
 
 ### 3. Not worth doing, measured
 
