@@ -226,7 +226,7 @@ SWEEP_REPO = os.environ.get("CRISPASR_SWEEP_REPO", "cstr/crispasr-kaggle-progres
 # kernel SKIP backends that already have a result file. "latest" currently holds
 # 60 finished backends from an earlier pin, so reusing it would skip nearly the
 # whole sweep and say nothing about the tree under test.
-RUN_TAG = os.environ.get("CRISPASR_SWEEP_RUN", "ggml-v0.17")
+RUN_TAG = os.environ.get("CRISPASR_SWEEP_RUN", "ggml-v0.17b")
 SWEEP_PREFIX = f"full-backend-sweep/{RUN_TAG}"
 # Optional subset filter: CRISPASR_SWEEP_ONLY="f5-tts,chatterbox,..." runs ONLY
 # those backends (skips all others) — for targeted re-tests of a fixed subset.
