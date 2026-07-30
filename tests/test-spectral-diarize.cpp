@@ -30,6 +30,28 @@ using namespace core_spectral;
 
 namespace {
 
+// Portable N(0,1). std::mt19937 is identical everywhere but
+// std::normal_distribution is NOT — libc++ (macOS) and libstdc++ (Linux) draw
+// different sequences from the same engine and seed, so these fixtures produced
+// DIFFERENT data per platform and the assertions below silently tested different
+// inputs. Box-Muller over the raw engine keeps the fixtures byte-identical
+// everywhere. (src/core/spectral_diarize.cpp carries the same helpers for the
+// same reason.)
+inline double test_uniform01(std::mt19937& rng) {
+    const uint64_t hi = (uint64_t)(rng() >> 5); // 27 bits
+    const uint64_t lo = (uint64_t)(rng() >> 6); // 26 bits
+    return (double)((hi << 26) | lo) * (1.0 / 9007199254740992.0);
+}
+
+inline float test_normal(std::mt19937& rng, float sigma = 1.0f) {
+    double u1 = test_uniform01(rng);
+    if (u1 < 1e-300)
+        u1 = 1e-300;
+    const double u2 = test_uniform01(rng);
+    return (float)(sigma * std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * 3.14159265358979323846 * u2));
+}
+
+
 // `k` isotropic Gaussian blobs. Centres point in RANDOM directions rather than
 // along coordinate axes: axis-aligned centres make the between-blob signal
 // rank (k-1), so for small k the PCA-8 projection the GMM consumes is a couple
@@ -39,10 +61,11 @@ namespace {
 // max_k. Random directions reproduce what real speaker embeddings look like.
 std::vector<float> make_blobs(int k, int per, int d, float sigma, unsigned seed, float separation = 10.0f) {
     std::mt19937 rng(seed);
-    std::normal_distribution<float> g(0.0f, 1.0f), noise(0.0f, sigma);
+    auto g = [&rng]() { return test_normal(rng); };
+    auto noise = [&rng, sigma]() { return test_normal(rng, sigma); };
     std::vector<float> cent((size_t)k * d);
     for (auto& v : cent)
-        v = g(rng);
+        v = g();
     for (int c = 0; c < k; c++) {
         double nr = 0.0;
         for (int j = 0; j < d; j++)
@@ -56,7 +79,7 @@ std::vector<float> make_blobs(int k, int per, int d, float sigma, unsigned seed,
         for (int i = 0; i < per; i++) {
             const size_t row = (size_t)(c * per + i);
             for (int j = 0; j < d; j++)
-                x[row * d + j] = cent[(size_t)c * d + j] + noise(rng);
+                x[row * d + j] = cent[(size_t)c * d + j] + noise();
         }
     return x;
 }
@@ -130,10 +153,10 @@ TEST_CASE("pca_project: preserves pairwise distances when k == rank", "[unit][sp
     // tolerance (HARD RULE #2c). A transposed eigenvector matrix breaks it.
     const int n = 12, d = 5, k = 2;
     std::mt19937 rng(7);
-    std::normal_distribution<float> g(0.0f, 1.0f);
+    auto g = [&rng]() { return test_normal(rng); };
     std::vector<float> plane((size_t)n * d, 0.0f);
     for (int i = 0; i < n; i++) {
-        const float u = g(rng), v = g(rng);
+        const float u = g(), v = g();
         plane[(size_t)i * d + 0] = u;
         plane[(size_t)i * d + 1] = v;
         plane[(size_t)i * d + 2] = 0.5f * u - 0.25f * v; // dependent coords
@@ -296,11 +319,11 @@ TEST_CASE("estimate_speakers: one voice trips the cosine veto", "[unit][spectral
     // ever consulting BIC (which would over-split the cloud).
     const int n = 30, d = 8;
     std::mt19937 rng(3);
-    std::normal_distribution<float> jitter(0.0f, 0.05f);
+    auto jitter = [&rng]() { return test_normal(rng, 0.05f); };
     std::vector<float> x((size_t)n * d, 0.0f);
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < d; j++)
-            x[(size_t)i * d + j] = jitter(rng);
+            x[(size_t)i * d + j] = jitter();
         x[(size_t)i * d + 0] += 1.0f;
     }
     auto e = estimate_speakers(x.data(), n, d, 1, 10);
@@ -392,7 +415,7 @@ TEST_CASE("cluster_speakers: default estimator is bic", "[unit][spectral]") {
     const int n = k * per;
 
     unsetenv("CRISPASR_DIARIZE_COUNT");
-    unsetenv("CRISPASR_DIARIZE_FULL_K_SEARCH");
+    unsetenv("CRISPASR_DIARIZE_BIC_WINDOW");
     SpeakerEstimate est;
     cluster_speakers(x.data(), n, d, 1, 10, 0, &est);
     CHECK(std::string(est.reason) != "eigengap");
@@ -411,21 +434,25 @@ TEST_CASE("cluster_speakers: full-k search rescues the legacy BIC over-count", "
     auto x = make_blobs(k, per, d, 1.0f, 66, 6.0f);
     const int n = k * per;
 
+    // The gate is INVERTED versus when this test was written: the full range is
+    // now the default and CRISPASR_DIARIZE_BIC_WINDOW=1 opts back into the
+    // anchored [k-2, k+3] window. Both arms are still pinned, and the claim is
+    // unchanged — the window strands above the truth, the full range reaches it.
     setenv("CRISPASR_DIARIZE_COUNT", "bic", 1);
-    unsetenv("CRISPASR_DIARIZE_FULL_K_SEARCH");
+
+    setenv("CRISPASR_DIARIZE_BIC_WINDOW", "1", 1);
     SpeakerEstimate est_window;
     auto lab_window = cluster_speakers(x.data(), n, d, 1, 10, 0, &est_window);
     const size_t k_window = std::set<int>(lab_window.begin(), lab_window.end()).size();
+    unsetenv("CRISPASR_DIARIZE_BIC_WINDOW");
 
-    setenv("CRISPASR_DIARIZE_FULL_K_SEARCH", "1", 1);
     SpeakerEstimate est_full;
     auto lab_full = cluster_speakers(x.data(), n, d, 1, 10, 0, &est_full);
-    unsetenv("CRISPASR_DIARIZE_FULL_K_SEARCH");
     unsetenv("CRISPASR_DIARIZE_COUNT");
 
-    INFO("bic+window k = " << k_window << ", bic+full-search k = " << est_full.best_k);
-    CHECK(partition_matches_blobs(lab_full, k, per)); // the gate reaches the truth
-    CHECK(k_window != (size_t)k);                     // and the window still does not
+    INFO("bic+window k = " << k_window << ", bic+full-search (default) k = " << est_full.best_k);
+    CHECK(partition_matches_blobs(lab_full, k, per)); // the default reaches the truth
+    CHECK(k_window != (size_t)k);                     // and the anchored window does not
 }
 
 TEST_CASE("cluster_speakers: is deterministic", "[unit][spectral]") {
