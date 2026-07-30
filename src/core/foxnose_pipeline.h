@@ -82,6 +82,12 @@ using EmbedWindowsFn = int (*)(void* userdata, int worker, const float* pcm, int
 // the span, so span size is part of the answer, not just of the schedule.
 constexpr int kWindowsPerSpan = 32;
 
+// Windows per span, overridable so the accuracy/speed trade can be swept
+// without a rebuild. Work per span is (N+1)/2N of the per-window cost — N=32
+// is 1.94x, N=8 1.78x, N=4 1.60x — while a smaller N keeps CMN closer to the
+// per-window normalisation that the clusterer was tuned on.
+int windows_per_span();
+
 struct Result {
     std::vector<Turn> turns;
     int n_speakers = 0;

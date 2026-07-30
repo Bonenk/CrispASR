@@ -510,13 +510,12 @@ bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOption
     p.max_speakers = opts.max_speakers;
     p.num_speakers = opts.num_speakers;
     p.n_workers = (int)emb.ctx.size();
-    // Shared-trunk windowing: OFF because it FAILED its accuracy gate. It runs
-    // one trunk pass per span instead of per window (~1.9x less work at
-    // kWindowsPerSpan=32) but normalises CMN over the span rather than the
-    // window, and on the VoxConverse dev shard that cost 7.32% -> 7.62% mean
-    // DER, with one file dropping from 4 detected speakers to 3. Kept behind
-    // CRISPASR_DIARIZE_SPAN_EMBED=1 because a smaller span may recover the
-    // accuracy and still be worth ~1.6x — see PLAN.md "#324 shared-trunk".
+    // Shared-trunk windowing: one trunk pass per span instead of per window.
+    // Measured 1.78x less diarization CPU (66.0 s -> 37.0 s on an 85 s file,
+    // 135 trunk passes -> 18) for +0.30 mean DER on the VoxConverse dev shard
+    // (7.32% -> 7.62%; 6 of 8 files identical, one loses a speaker). Default
+    // OFF because accuracy is the better default for a diarizer; opt in with
+    // CRISPASR_DIARIZE_SPAN_EMBED=1. See PLAN.md "#324 shared-trunk".
     core_foxnose::EmbedWindowsFn span_fn = nullptr;
     if (const char* e = std::getenv("CRISPASR_DIARIZE_SPAN_EMBED"))
         if (*e && *e != '0')

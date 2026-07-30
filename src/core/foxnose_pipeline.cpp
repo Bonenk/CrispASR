@@ -9,10 +9,23 @@
 #include <atomic>
 #include <thread>
 #include <cmath>
+#include <cstdlib>
 #include <map>
 #include <set>
 
 namespace core_foxnose {
+
+int windows_per_span() {
+    static const int v = [] {
+        if (const char* e = std::getenv("CRISPASR_DIARIZE_SPAN_WINDOWS")) {
+            const int n = std::atoi(e);
+            if (n > 0)
+                return n;
+        }
+        return kWindowsPerSpan;
+    }();
+    return v;
+}
 
 std::vector<Speech> window_speech(const Speech& seg) {
     const double dur = seg.end - seg.start;
@@ -115,7 +128,7 @@ Result diarize(const float* pcm, int n_samples, int sample_rate, const std::vect
         for (int i = 0; i < n_win;) {
             int j = i;
             while (j + 1 < n_win && wins[(size_t)(j + 1)].parent == wins[(size_t)i].parent &&
-                   (j + 1 - i) < kWindowsPerSpan)
+                   (j + 1 - i) < windows_per_span())
                 j++;
             spans.push_back({i, j});
             i = j + 1;
