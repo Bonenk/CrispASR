@@ -145,19 +145,37 @@ prove a new code path EXECUTES (count its invocations) before reporting any
 measurement taken through it. A "no difference" result is the expected shape of
 both "behaviour-preserving" and "never ran".
 
-It stays OFF because it is not behaviour-preserving and validation against the
-REAL path is still outstanding: CMN moves from the window to the span, and
-interior windows see real neighbouring audio instead of zero padding. The
-8-file DER gate and an interleaved timing were re-launched against the wired
-path but a parallel session held this box between load 17 and 86.
+### VERDICT: gate FAILED, stays off
 
-TO FINISH — needs load < ~3:
-  1. 8-file DER with and without CRISPASR_DIARIZE_SPAN_EMBED=1, scored with
-     tools/der_score.py. Gate: mean must not exceed 7.32%.
-  2. Interleaved CPU-time A/B on esrit.wav (352 windows). Use user+sys, not
-     wall: the change removes WORK, and CPU time survives a loaded box far
-     better than wall-clock does.
-  3. If both hold, flip the default in apply_foxnose and delete the env gate.
+Run against the wired path, 8 VoxConverse dev files:
+
+    file    GT   per-window   shared-trunk
+    jyirt    4     7.24%(4)     11.05%(3)   <-- loses a speaker
+    mesob    4    15.61%(2)     14.19%(2)   <-- better
+    other 6            ==            ==
+    MEAN            7.32%         7.62%
+
++0.30 DER for an unmeasured speed win, so it stays behind
+CRISPASR_DIARIZE_SPAN_EMBED. Six files are byte-identical and two move, which
+is itself the proof the path is now live — when it was inert ALL eight were
+identical.
+
+The likely cause is span-level CMN: `jyirt` drops from 4 speakers to 3, i.e.
+normalising over ~19.8 s of span instead of 1.2 s of window flattened the
+between-speaker differences the clusterer needs. That points at a cheaper
+variant rather than abandoning the idea — work per span is (N+1)/2N of the
+per-window cost, so even kWindowsPerSpan=4 is still 1.6x while cutting the CMN
+drift 8-fold:
+
+    N=32 -> 1.94x   N=8 -> 1.78x   N=4 -> 1.60x   N=2 -> 1.33x
+
+STILL UNMEASURED: the speed win itself. The CPU-time A/B that read "flat" was
+taken while the path was inert, so it measured nothing. Redo with user+sys, not
+wall.
+
+NEXT: try kWindowsPerSpan=8 and 4, re-run the DER gate, and only then measure
+speed. If no span size holds 7.32%, delete the feature rather than ship a knob
+nobody should turn on.
 Span size is fixed at kWindowsPerSpan=32 deliberately: CMN over the span makes
 it part of the answer, so it must never depend on the worker count.
 
