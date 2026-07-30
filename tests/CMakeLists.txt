@@ -494,6 +494,23 @@ catch_discover_tests(test-stream-partial-decode
 # internal helper with synthetic log-softmax posteriors; no model, no
 # audio. Links against libcrispasr so it tests the actually-shipped
 # logic rather than a fork of it.
+# The pyannote-seg powerset class layout (core/powerset.h). Header-only, so
+# this needs no library — but it guards the table whose two swapped entries
+# cost ~15 DER points in production.
+add_executable(test-powerset
+    test-powerset.cpp
+)
+target_include_directories(test-powerset PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-powerset PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-powerset
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;diarize"
+)
+
 add_executable(test-diarize-pyannote
     test-diarize-pyannote.cpp
 )
