@@ -4,7 +4,8 @@ Merge: `CrispStrobe/ggml` `crispstrobe-ops` (bfe8ea22 + 2 SVE cherry-picks)
 ← `ggml-org/ggml` master (9be31331). **435 commits, 19 conflicted files, 53 hunks.**
 
 Branch: `sync/upstream-v0.17` on `CrispStrobe/ggml`.
-**CrispASR's submodule pin has NOT moved** — see "Pin decision" at the end.
+CrispASR's submodule pin moves to `a0f7289d` — see "Pin decision" at the end
+for what backs that.
 
 An earlier revision of this file was an inventory written mid-merge that stopped
 at three resolved files. All 19 are now resolved and the tree builds and passes.
@@ -97,7 +98,7 @@ case return `[2,8]` instead of `[2,10]` and the test fails. The causal case
 still passes there — `crop_left=0` makes both semantics identical — which is
 exactly why the symmetric case is in the suite.
 
-## The fork now has CI, and it immediately found three bugs
+## The fork now has CI, and it immediately found real bugs
 
 Upstream's `ci.yml` runs CUDA/Vulkan/Metal on **self-hosted** runners this fork
 does not have, so those backends were never built on our branches at all.
@@ -149,16 +150,63 @@ no compile error and no test failure — this is the only thing that catches tha
 Writing the manifest immediately caught an entry for a Metal `norm_affine`
 kernel that never existed (NORM_AFFINE is deliberately CPU + CUDA only).
 
-## Pin decision
+## The TTS gate — passed, with one detour
 
-**Do not bump CrispASR's `ggml` submodule pin yet.** The pin stays at
-`52165e4c`. The merge is validated on CPU and Metal, and CI covers the other
-backends' *compilation*, but no GPU-executed CUDA test has run, and the
-`conv.h` rewrite + pin bump are **coupled** — the rewrite is wrong against the
-old ggml and the old callsite is wrong against the new one. They must land in a
-single commit, gated on a CrispASR CI run that builds CUDA and Vulkan and on the
-TTS regression (f5-tts, cosyvoice3, TADA, vocoders), since every decoder's
-ConvTranspose1d goes through the rewritten function.
+`tools/kaggle/ggml-v017-tts-gate` synthesises through the real decoders and
+WER-checks the result against parakeet; `ggml-v017-tts-baseline` runs the
+identical harness against main. Attribution comes from the diff, not from a guess
+about which failures were "probably already there".
+
+Getting a trustworthy answer took two false alarms, both the harness's fault:
+
+1. melotts read 0.0 → 0.1111 ("lazy dog" → "lazy duck"). `run_one.py` never
+   passed `--seed`, and melotts seeds from `std::random_device()` when none is
+   given, so its WER was a fresh sample every run. Fixed by pinning the seed.
+2. piper then read 0.1111 → 0.3333. `piper_tts.cpp` had **no seed field at all**
+   and called `std::random_device` unconditionally, so `--seed` never reached it.
+   Across four runs it produced 0.2222 / 0.2222 / 0.1111 / 0.3333 — pure noise
+   around its 0.15 threshold. An audit found piper was the only stochastic TTS
+   backend like this; melotts, f5-tts, dia-tts and voxcpm2 all plumb a seed.
+
+Both fixes went to **main**, not this branch: they make the existing gate mean
+what it claims, independent of any ggml work.
+
+With a deterministic harness on both sides (P100, identical code except the pin,
+`conv.h` and the tests):
+
+    kokoro-82m-en     0.3333 -> 0.3333   IDENTICAL
+    pocket-tts-en     0.0    -> 0.0      IDENTICAL
+    melotts-en-v3     0.1111 -> 0.1111   IDENTICAL
+    csm-1b            0.0    -> 0.0      IDENTICAL
+    tada-codec / f5-tts / cosyvoice3 / piper   fail identically on both
+
+    differences attributable to the v0.17 sync: NONE
+
+Both crop patterns are covered and unchanged: symmetric (kokoro, melotts) and
+causal (pocket-tts, csm).
+
+The four red backends are pre-existing and unrelated to col2im: tada-codec's
+synth fails, f5-tts and cosyvoice3 are zero-shot cloners whose manifest entries
+carry `voice_preset: "default"` but no reference audio ("failed to load reference
+audio 'default'"), and piper now deterministically misses its 0.15 threshold at
+seed 1234. That last one is newly *actionable* rather than newly broken — it needs
+either a recalibrated threshold or a better seed.
+
+## Pin decision — bumped
+
+The pin moves to `a0f7289d`. What backs it:
+
+    M1, CPU + Metal + BLAS   test-backend-ops 39601 lines, 0 failures
+    fork CI, both branches   6/6 — cpu x64+arm64, Metal, Vulkan (lavapipe,
+                             executed), CUDA, carried-patch guard
+    Kaggle P100 (sm_60)      12863 ops OK, 0 failures on real hardware
+    CrispASR unit tier       1210/1210 passed
+    full crispasr-cli        builds clean (560 targets)
+    TTS A/B                  no attributable differences
+
+The pin bump and the `conv.h` rewrite are **coupled** — each is wrong against the
+other's ggml — so they land as one commit, together with the test that pins the
+behaviour and the negative control that proves the test can fail.
 
 ## Backported ahead of the sync
 
@@ -172,7 +220,7 @@ current pin without waiting for this sync to land.
 
 ## Still outstanding
 
-- CUDA execution has now run on sm_60 (P100) only; sm_75+ untested, and Vulkan
+- CUDA execution has run on sm_60 (P100) only; sm_75+ untested, and Vulkan
   has executed only against lavapipe, not a real GPU.
 - The k-quant GET_ROWS broadcast fix is on the sync branch but NOT yet
   backported to `crispstrobe-ops`; it is latent there too.
