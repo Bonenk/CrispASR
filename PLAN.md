@@ -192,11 +192,23 @@ So do NOT tune kSilhouetteKBonus to "fix" this. It would be overfitting to one
 file, and it would be tuning the very constant that is the only reason the
 baseline looks right here.
 
-WORTH KNOWING INDEPENDENTLY OF THIS FEATURE: on a borderline file the speaker
-count rests on a 0.8% score gap decided by a tuning constant. Our DER on such
-files is partly luck, in BOTH paths. A more robust counting criterion would
-help the DEFAULT path too — that is the real open problem, and it is bigger
-than the span embedder.
+WORTH KNOWING INDEPENDENTLY OF THIS FEATURE: on SOME files the speaker count
+rests on a margin small enough that a tuning constant decides it. Survey so far
+(CRISPASR_DIARIZE_DEBUG=1, margin = winning score over runner-up):
+
+    file    GT   winner        margin
+    jyirt    4   k=3 (WRONG)     0.8%   <- decided by kSilhouetteKBonus*log(k)
+    esrit    5   k=5 (right)     9.5%   <- decisive
+
+So this is file-dependent, NOT systemic — do not over-read it from jyirt alone.
+The other six files are uncollected: the box sat at load 130-197 from a parallel
+session and managed one file per ~10 minutes.
+
+FINISH THE SURVEY before acting on it. If several files land under a few
+percent, a more robust counting criterion is worth building and would improve
+the DEFAULT path (bigger than the span embedder). If jyirt is the outlier,
+leave the estimator alone. Either way the answer comes from the data, not from
+the one file that happened to be interesting.
 
 Span size is fixed at kWindowsPerSpan=32 deliberately: CMN over the span makes
 it part of the answer, so it must never depend on the worker count.
