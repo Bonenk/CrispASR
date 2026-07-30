@@ -29,6 +29,14 @@ Usage
 `{wav}` and `{out}` are substituted per file; the command must write {out}.json
 in CrispASR's JSON layout. Add --jobs N to run files concurrently.
 
+Corpus
+------
+tools/voxconverse_extract.py builds one from the HF dataset
+`diarizers-community/voxconverse` (CC, no login): dev is 5 parquet shards
+(~216 files) and test is 11 (~232). Develop against dev's TUNE/HOLDOUT and keep
+**test** untouched, so there is still an honest number left to quote at the end.
+One dev shard alone is 44 files / 4.2 h with 1-17 speakers.
+
     --subset N     evaluate only the first N files of each split (smoke runs)
     --max-speakers N   report how many files are unwinnable under that cap
 """
@@ -92,15 +100,24 @@ def main():
     def work(item):
         return run_one(item[0], item[1], args.cmd, workdir)
 
+    done = 0
+    total = len(todo)
+
+    def note(name, err):
+        nonlocal done
+        done += 1
+        print(f"  [{done}/{total}] {name}{'  FAILED' if err else ''}", file=sys.stderr, flush=True)
+
     if args.jobs > 1:
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
             for name, hyp, err in ex.map(work, todo):
                 results[name] = (hyp, err)
+                note(name, err)
     else:
         for item in todo:
             name, hyp, err = work(item)
             results[name] = (hyp, err)
-            print(f"  ran {name}", file=sys.stderr)
+            note(name, err)
 
     rows = []
     for n in names:
