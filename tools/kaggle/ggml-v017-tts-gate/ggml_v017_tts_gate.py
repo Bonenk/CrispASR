@@ -49,18 +49,7 @@ BUILD = TMP / "build-regression"
 
 # Order matters: cheapest / most load-bearing first, so a quota or timeout kill
 # still leaves a usable verdict instead of nothing.
-# Full sweep: every tts_backends entry in the manifest, read from the clone so a
-# new entry is picked up without editing this kernel. Ordered cheapest-first
-# (approx_size_mb) so a quota or timeout kill still leaves a usable verdict.
 _env = os.environ.get("TTS_GATE_BACKENDS", "").strip()
-if _env:
-    BACKENDS = [b.strip() for b in _env.split(",") if b.strip()]
-else:
-    with (REPO / "tests" / "regression" / "manifest.json").open() as _f:
-        _m = json.load(_f)
-    BACKENDS = [e["name"] for e in sorted(
-        _m["tts_backends"],
-        key=lambda e: e["gguf"].get("approx_size_mb", 1 << 30))]
 
 # --recurse-submodules is the whole point: it is what pins the ggml under test.
 if not REPO.exists():
@@ -91,6 +80,19 @@ def sh(cmd, cwd=None, timeout=3600, env=None):
 
 
 kh.step("clone.done")
+
+# Full sweep: every tts_backends entry in the manifest, read from the CLONE (so a
+# new entry needs no kernel edit). Must come after the clone — reading it at module
+# scope raced ahead of the checkout. Cheapest-first by approx_size_mb, so a quota
+# or timeout kill still leaves a usable partial verdict.
+if _env:
+    BACKENDS = [b.strip() for b in _env.split(",") if b.strip()]
+else:
+    with (REPO / "tests" / "regression" / "manifest.json").open() as _f:
+        _m = json.load(_f)
+    BACKENDS = [e["name"] for e in sorted(
+        _m["tts_backends"], key=lambda e: e["gguf"].get("approx_size_mb", 1 << 30))]
+print(f"sweeping {len(BACKENDS)} TTS backends: {', '.join(BACKENDS)}", flush=True)
 rc, sha = sh("git rev-parse HEAD", cwd=REPO)
 rc, gsha = sh("git -C ggml rev-parse HEAD", cwd=REPO)
 results["crispasr_sha"] = sha.strip()
