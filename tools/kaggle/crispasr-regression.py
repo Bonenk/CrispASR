@@ -54,6 +54,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -899,11 +900,87 @@ def run_rebake() -> list[dict]:
     return results
 
 
+# ─────────────────────────── cell 6b (code) ──────────────────────────
+step("cell_6b_begin")
+# ── VALIDATE mode: TTS -> ASR roundtrips ─────────────────────────────────
+#
+# The manifest has carried a `tts_backends` section for a while, but this suite
+# only ever iterated `backends` — so the 21 WER-gated TTS roundtrips were in the
+# manifest and never run by the thing called "the full regression suite".
+# run_one.tts_roundtrip_for already implements one (synthesise the phrase,
+# transcribe it with the pinned ASR backend, assert WER <= wer_max) and returns a
+# failure count, handling `advisory: true` entries internally by reporting and
+# returning 0. Driving it here is what makes the sweep actually full.
+def run_validate_tts() -> list[dict]:
+    sys.path.insert(0, str(REPO / "tests" / "regression"))
+    import run_one  # noqa: E402
+
+    entries = [e for e in MANIFEST.get("tts_backends", [])
+               if not want or e["name"] in want]
+    if not entries:
+        return []
+
+    print(f"\nProcessing {len(entries)} TTS backend(s):")
+    for e in entries:
+        print(f"  - {e['name']:30s} (gguf ~{e['gguf'].get('approx_size_mb','?')} MB)")
+
+    crispasr_bin = BUILD / "bin" / "crispasr"
+    out = []
+    for entry in entries:
+        name = entry["name"]
+        print(f"\n========== tts-roundtrip :: {name} ==========")
+        t0 = time.time()
+        work = Path(tempfile.mkdtemp(prefix=f"tts-{name}-"))
+        try:
+            failures = run_one.tts_roundtrip_for(name, MANIFEST, work, crispasr_bin)
+            out.append({
+                "backend": name,
+                "mode": "validate-tts",
+                "ok": failures == 0,
+                "advisory": bool(entry.get("advisory", False)),
+                "elapsed_s": round(time.time() - t0, 2),
+            })
+            print(f"  -> ok={failures == 0}")
+        # SystemExit too: run_one.die() raises it, and one bad entry must not
+        # abort the remaining backends the way a bare `except Exception` would.
+        except (Exception, SystemExit) as exc:
+            out.append({
+                "backend": name,
+                "mode": "validate-tts",
+                "ok": False,
+                "advisory": bool(entry.get("advisory", False)),
+                "elapsed_s": round(time.time() - t0, 2),
+                "error": f"{type(exc).__name__}: {exc}",
+            })
+            print(f"  -> ERROR  {type(exc).__name__}: {exc}")
+        finally:
+            # Same eviction discipline as the ASR pass: TTS GGUFs are large
+            # (tada 2.2 GB, f5 953 MB) and /kaggle/working does not hold them all.
+            #
+            # Evict THIS entry's repos only. HF_HOME is shared (set in cell 2), so
+            # the per-job work dir holds nothing and a blanket models--* wipe would
+            # also evict the pinned ASR ground-truth model — re-downloading
+            # parakeet for all 21 entries instead of once.
+            shutil.rmtree(work, ignore_errors=True)
+            repos = {entry["gguf"]["repo"]}
+            for key in ("voice", "codec"):
+                if isinstance(entry.get(key), dict) and "repo" in entry[key]:
+                    repos.add(entry[key]["repo"])
+            hub = Path(os.environ["HF_HOME"]) / "hub"
+            for repo in repos:
+                d = hub / ("models--" + repo.replace("/", "--"))
+                if d.is_dir():
+                    shutil.rmtree(d, ignore_errors=True)
+                    print(f"  freed {d.name}", flush=True)
+    return out
+
+
 # ─────────────────────────── cell 7 (code) ───────────────────────────
 step("cell_7_begin")
 # ── Dispatch + upload ─────────────────────────────────────────────────────
 if MODE == "validate":
     RESULTS_DATA = run_validate()
+    RESULTS_DATA += run_validate_tts()
 elif MODE == "rebake":
     RESULTS_DATA = run_rebake()
 else:
@@ -918,8 +995,12 @@ print(f"\nResults: {results_jsonl}")
 
 # Summary line for stdout (so a Kaggle screenshot is self-contained).
 n_ok = sum(1 for r in RESULTS_DATA if r.get("ok"))
-n_fail = sum(1 for r in RESULTS_DATA if not r.get("ok"))
-print(f"\nSUMMARY  mode={MODE}  ok={n_ok}/{len(RESULTS_DATA)}  fail={n_fail}")
+# `advisory: true` entries report but never gate (weak / high-variance models).
+n_fail = sum(1 for r in RESULTS_DATA
+             if not r.get("ok") and not r.get("advisory"))
+n_advisory = sum(1 for r in RESULTS_DATA
+                 if not r.get("ok") and r.get("advisory"))
+print(f"\nSUMMARY  mode={MODE}  ok={n_ok}/{len(RESULTS_DATA)}  fail={n_fail}  advisory={n_advisory}")
 for r in RESULTS_DATA:
     flag = "✓" if r.get("ok") else "✗"
     print(f"  {flag} {r['backend']:30s} {r['elapsed_s']:6.1f}s  {r.get('error', '')}")
