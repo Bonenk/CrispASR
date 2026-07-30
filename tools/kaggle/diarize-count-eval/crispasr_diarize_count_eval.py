@@ -43,10 +43,10 @@ sys.path.insert(0, str(REPO / "tools" / "kaggle"))
 import kaggle_harness as kh  # noqa: E402
 
 kh.init_progress()
-kh.step("clone", "ok", repo=str(REPO))
+kh.step("clone", status="ok", repo=str(REPO))
 
 token = kh.resolve_hf_token()
-kh.step("hf_token", "ok" if token else "MISSING")
+kh.step("hf_token", status="ok" if token else "MISSING")
 
 # ── build (CPU only; the diarizer never uses the GPU) ────────────────────────
 with kh.build_heartbeat("build", 30):
@@ -61,7 +61,7 @@ with kh.build_heartbeat("build", 30):
 cli = build / "bin" / "crispasr"
 if not cli.exists():
     raise SystemExit(f"build produced no {cli}")
-kh.step("build", "ok")
+kh.step("build", status="ok")
 
 # ── corpus: HF parquet -> wav/ + ref.json ────────────────────────────────────
 from huggingface_hub import hf_hub_download  # noqa: E402
@@ -79,7 +79,7 @@ with kh.build_heartbeat("corpus", 30):
         subprocess.check_call([sys.executable, str(REPO / "tools" / "voxconverse_extract.py"),
                                "--parquet", p, "--out", str(CORPUS)])
 ref = json.load(open(CORPUS / "ref.json"))
-kh.step("corpus", "ok", files=len(ref))
+kh.step("corpus", status="ok", files=len(ref))
 
 # ── models ──────────────────────────────────────────────────────────────────
 asr = hf_hub_download(repo_id="ggerganov/whisper.cpp", filename="ggml-tiny.bin",
@@ -87,7 +87,7 @@ asr = hf_hub_download(repo_id="ggerganov/whisper.cpp", filename="ggml-tiny.bin",
 emb = hf_hub_download(repo_id="cstr/wespeaker-resnet34-lm-GGUF",
                       filename="wespeaker-resnet34-lm.gguf",
                       token=token, cache_dir=str(TEMP / "hf"))
-kh.step("models", "ok")
+kh.step("models", status="ok")
 
 # ── the A/B ─────────────────────────────────────────────────────────────────
 CMD = (
@@ -113,11 +113,11 @@ for arm, env_extra in (("bic", {}), ("nme-sc", {"CRISPASR_DIARIZE_COUNT": "nme-s
     (WORK / f"eval_{arm}.txt").write_text(r.stdout + "\n--- stderr tail ---\n" + r.stderr[-4000:])
     tune = [l for l in r.stdout.splitlines() if l.startswith("tune ")]
     summary[arm] = tune[0] if tune else f"NO RESULT (rc={r.returncode})"
-    kh.step(f"eval:{arm}", "ok" if tune else "FAILED", line=summary[arm])
+    kh.step(f"eval:{arm}", status="ok" if tune else "FAILED", line=summary[arm])
     print(f"[{arm}] {summary[arm]}", flush=True)
 
 (WORK / "summary.json").write_text(json.dumps(summary, indent=1))
 print("\n=== TUNE split, speaker-count accuracy is the metric ===")
 for arm, line in summary.items():
     print(f"{arm:8} {line}")
-kh.step("done", "ok")
+kh.step("done", status="ok")
