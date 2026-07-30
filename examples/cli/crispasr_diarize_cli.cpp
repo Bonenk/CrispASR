@@ -42,6 +42,7 @@ static int mkstemps(char* t, int s) {
 #else
 #include <sys/stat.h>
 #include <unistd.h>
+#endif
 
 // #324: conservative ceiling for foxnose speaker-count estimation. See the
 // comment at its use site — this is an empirical value, not a guess.
@@ -51,7 +52,6 @@ static int mkstemps(char* t, int s) {
 // reported 8 — so this no longer has to be defensively small, and a genuine
 // 5-6 speaker meeting is reachable again.
 static constexpr int kFoxnoseDefaultMaxSpeakers = 8;
-#endif
 
 namespace {
 
