@@ -94,22 +94,69 @@ Result diarize(const float* pcm, int n_samples, int sample_rate, const std::vect
     }
 
     const int n_win = (int)wins.size();
-    const int n_workers = std::max(1, std::min(params.n_workers, n_win));
     std::vector<float> all((size_t)n_win * embed_dim);
     std::vector<char> ok((size_t)n_win, 0);
 
-    if (n_workers == 1) {
+    // Unit of work: a SPAN of consecutive windows from one speech region when
+    // the caller offers a span embedder (they then share one trunk pass),
+    // otherwise a single window. Spans are cut at a fixed size and never
+    // straddle a region, so the split — and therefore the embeddings — do not
+    // depend on how many workers happen to be available.
+    struct Span {
+        int first, last; // inclusive range into `wins`
+    };
+    std::vector<Span> spans;
+    if (embed_windows) {
+        for (int i = 0; i < n_win;) {
+            int j = i;
+            while (j + 1 < n_win && wins[(size_t)(j + 1)].parent == wins[(size_t)i].parent &&
+                   (j + 1 - i) < kWindowsPerSpan)
+                j++;
+            spans.push_back({i, j});
+            i = j + 1;
+        }
+    } else {
+        spans.reserve((size_t)n_win);
         for (int i = 0; i < n_win; i++)
-            ok[i] = embed(userdata, 0, pcm + wins[i].a, (int)(wins[i].b - wins[i].a), &all[(size_t)i * embed_dim]) == 0;
+            spans.push_back({i, i});
+    }
+
+    const int n_spans = (int)spans.size();
+    const int n_workers = std::max(1, std::min(params.n_workers, n_spans));
+
+    auto do_span = [&](int si, int worker) {
+        const Span& sp = spans[(size_t)si];
+        if (!embed_windows) {
+            const int i = sp.first;
+            ok[(size_t)i] = embed(userdata, worker, pcm + wins[(size_t)i].a,
+                                  (int)(wins[(size_t)i].b - wins[(size_t)i].a), &all[(size_t)i * embed_dim]) == 0;
+            return;
+        }
+        const long base = wins[(size_t)sp.first].a;
+        const long end = wins[(size_t)sp.last].b;
+        const int cnt = sp.last - sp.first + 1;
+        std::vector<int> ws((size_t)cnt), we((size_t)cnt);
+        for (int k = 0; k < cnt; k++) {
+            ws[(size_t)k] = (int)(wins[(size_t)(sp.first + k)].a - base);
+            we[(size_t)k] = (int)(wins[(size_t)(sp.first + k)].b - base);
+        }
+        const bool good = embed_windows(userdata, worker, pcm + base, (int)(end - base), ws.data(), we.data(), cnt,
+                                        &all[(size_t)sp.first * embed_dim]) == 0;
+        for (int k = 0; k < cnt; k++)
+            ok[(size_t)(sp.first + k)] = good;
+    };
+
+    if (n_workers == 1) {
+        for (int si = 0; si < n_spans; si++)
+            do_span(si, 0);
     } else {
         std::atomic<int> next{0};
         auto run = [&](int worker) {
             for (;;) {
-                const int i = next.fetch_add(1);
-                if (i >= n_win)
+                const int si = next.fetch_add(1);
+                if (si >= n_spans)
                     return;
-                ok[i] = embed(userdata, worker, pcm + wins[i].a, (int)(wins[i].b - wins[i].a),
-                              &all[(size_t)i * embed_dim]) == 0;
+                do_span(si, worker);
             }
         };
         std::vector<std::thread> pool;
