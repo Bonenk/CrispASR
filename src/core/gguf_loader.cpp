@@ -980,6 +980,23 @@ bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backe
             return true;
         const size_t align = ggml_backend_get_alignment(be);
 
+        // Size tensors by the BUFFER TYPE's alloc size, not ggml_nbytes().
+        //
+        // ggml_backend_tensor_alloc() asserts that
+        //   addr + ggml_backend_buffer_get_alloc_size(buf, t) <= base + buf_size
+        // and CUDA's alloc size EXCEEDS ggml_nbytes for quantized tensors — it
+        // pads each row up to MATRIX_ROW_PADDING so MMQ can over-read safely.
+        // Sizing the buffer with ggml_nbytes therefore left the last tensor of
+        // every chunk short by that padding, and the write went past the end.
+        //
+        // ggml only started asserting this in v0.17, so the overrun was silent
+        // before: it surfaced as moonshine-tiny (q4_k) aborting at load on CUDA
+        // while passing on Metal, whose alloc size equals ggml_nbytes.
+        // Everything using load_weights_split with quantized weights on CUDA was
+        // affected, not just moonshine.
+        ggml_backend_buffer_type_t buft = ggml_backend_get_default_buffer_type(be);
+        auto tensor_size = [&](const ggml_tensor* t) { return ggml_backend_buft_get_alloc_size(buft, t); };
+
         // Partition tensors into chunks that each fit under max_alloc_chunk.
         struct Chunk {
             std::vector<ggml_tensor*> ts;
@@ -987,7 +1004,7 @@ bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backe
         };
         std::vector<Chunk> chunks(1);
         for (ggml_tensor* t : tensors) {
-            const size_t nb = ggml_nbytes(t);
+            const size_t nb = tensor_size(t);
             const size_t next = round_up(chunks.back().aligned_total, align) + nb;
             if (next > max_alloc_chunk && !chunks.back().ts.empty()) {
                 // Start a new chunk.
@@ -1014,7 +1031,7 @@ bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backe
             for (ggml_tensor* t : chunk.ts) {
                 cursor = round_up(cursor, align);
                 ggml_backend_tensor_alloc(buf, t, base + cursor);
-                cursor += ggml_nbytes(t);
+                cursor += tensor_size(t);
             }
             out_bufs.push_back(buf);
         }
