@@ -131,19 +131,32 @@ number; distrust any monotonic curve measured in loop order.
 fbank and one trunk pass per 32-window span, each window a slice of the trunk
 output. Enable with `CRISPASR_DIARIZE_SPAN_EMBED=1` (07da3f45).
 
-It is OFF because it is not behaviour-preserving and validation could not be
-finished: CMN moves from the window to the span, and interior windows see real
-neighbouring audio instead of zero padding. jyirt agrees exactly with the
-per-window path (DER 7.24%, 4 speakers, GT 4); the other 7 files and the speed
-win are UNMEASURED, because a parallel session held this box at load 24-136 and
-three interleaved wall-clock rounds disagreed in both directions (36.5/43.9,
-63.7/46.6, 49.8/69.6).
+⚠ 07da3f45 shipped this INERT and I did not notice. Only the signature change
+landed in core_foxnose::diarize; the loop body was applied with a Python
+str.replace whose target clang-format had already rewrapped, so it matched
+nothing and failed silently. `embed_windows` was accepted and ignored, and
+every "verification" of that commit therefore compared the per-window path
+with itself and found it identical for that reason. 856a6dd7 wires it for
+real — confirmed by counting bench stages: 134 `resnet` calls become 17
+`resnet_windows` calls on the same file.
+
+LESSON: str.replace/sed silently no-op on a miss. Use a tool that errors, and
+prove a new code path EXECUTES (count its invocations) before reporting any
+measurement taken through it. A "no difference" result is the expected shape of
+both "behaviour-preserving" and "never ran".
+
+It stays OFF because it is not behaviour-preserving and validation against the
+REAL path is still outstanding: CMN moves from the window to the span, and
+interior windows see real neighbouring audio instead of zero padding. The
+8-file DER gate and an interleaved timing were re-launched against the wired
+path but a parallel session held this box between load 17 and 86.
 
 TO FINISH — needs load < ~3:
-  1. 8-file DER: for f in the vox shard, run with and without
-     CRISPASR_DIARIZE_SPAN_EMBED=1, score with tools/der_score.py. Gate: mean
-     must not exceed 7.32%.
-  2. Interleaved timing on esrit.wav (352 windows), both arms in one loop.
+  1. 8-file DER with and without CRISPASR_DIARIZE_SPAN_EMBED=1, scored with
+     tools/der_score.py. Gate: mean must not exceed 7.32%.
+  2. Interleaved CPU-time A/B on esrit.wav (352 windows). Use user+sys, not
+     wall: the change removes WORK, and CPU time survives a loaded box far
+     better than wall-clock does.
   3. If both hold, flip the default in apply_foxnose and delete the env gate.
 Span size is fixed at kWindowsPerSpan=32 deliberately: CMN over the span makes
 it part of the answer, so it must never depend on the worker count.
