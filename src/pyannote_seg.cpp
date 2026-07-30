@@ -321,6 +321,17 @@ static bool bilstm_forward_ggml(pyannote_seg_context* ctx, ggml_backend_t be, co
     }
 
     // Sequential recurrence — contiguous dots over H (autovectorized).
+    //
+    // This is the hot loop of the whole model: a 4H x H matvec per timestep,
+    // per direction, per layer.
+    //
+    // ⚠ An F16 copy of R was tried here and LOST: 173.6 s of LSTM CPU time
+    // against 146-162 s for F32, interleaved on a 2888 s file. The reasoning
+    // that motivated it — "512x128 F32 restreamed 171k x 4 layers x 2
+    // directions is ~350 GB, so halve it" — ignores that all of R is only 2 MB
+    // and therefore L2-resident, so there was no DRAM bandwidth to win back,
+    // while the per-element widening costs real cycles in the inner loop.
+    // Don't re-try without a new argument.
     auto run_dir = [&](int dir) {
         const float* R_dir = (const float*)lstm.R->data + (size_t)dir * 4 * H * H;
         std::vector<float> h(H, 0.f), cc(H, 0.f), gates(4 * H);
@@ -587,7 +598,16 @@ static float* pyannote_seg_run_ggml(pyannote_seg_context* ctx, const float* samp
                 failed.store(true);
                 break;
             }
-            ggml_backend_cpu_set_n_threads(be, 1);
+            // Hand each worker the cores that inter-chunk parallelism cannot
+            // use. With more chunks than threads this is 1 and everything is
+            // busy anyway; with FEWER chunks than threads — any short file —
+            // pinning workers to 1 thread would leave most of the machine idle
+            // (a 2-chunk file on 8 cores used 2). ggml partitions matmul and
+            // conv by output row, so no output element is split across
+            // threads and the result does not depend on this number; the
+            // byte-identity of the posteriors across -t is asserted below by
+            // measurement, not assumed.
+            ggml_backend_cpu_set_n_threads(be, std::max(1, ctx->n_threads / ch.n_workers));
             backends.push_back(be);
         }
         if (!failed.load()) {
