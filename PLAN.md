@@ -235,6 +235,33 @@ and only secondarily for DER.
 Span size is fixed at kWindowsPerSpan=32 deliberately: CMN over the span makes
 it part of the answer, so it must never depend on the worker count.
 
+### 4. RUNNING — speaker-count estimator A/B (BIC+silhouette vs NME-SC)
+
+The survey said the estimator is BIASED, not fragile: 4 of 8 files wrong, three
+of them under-counts by 6-14% margins. NME-SC is the candidate because it
+auto-tunes the affinity binarisation that estimate_speakers_eigengap currently
+hardcodes at 15% — and that parameter is what decides how many clusters the
+spectrum appears to have.
+
+  * Implemented, opt-in: CRISPASR_DIARIZE_COUNT=nme-sc (spectral_diarize.cpp).
+  * Corpus: VoxConverse dev, all 5 shards — 216 files, 20.3 h, 1-20 speakers,
+    101 tune / 115 holdout (tools/voxconverse_extract.py).
+  * Metric: speaker-COUNT accuracy first, DER second. DER cannot see this
+    failure — one file predicts 2 speakers against a true 5 and still scores
+    6.88% DER.
+  * Harness: tools/diarize_eval.py, --split tune so holdout is not computed
+    at all.
+  * Venue: Kaggle, chr1str/crispasr-diarize-count-eval. The local box sat
+    between load 13 and 197 for the whole session and killed the sweep three
+    times; the kernel pulls the HF parquet directly so there is no 20 GB
+    dataset upload.
+
+WHEN IT LANDS: if NME-SC wins on tune COUNT accuracy, re-run with --split
+holdout and quote that. If it does not, say so and leave the default alone —
+the point of building this harness was to be able to be wrong cheaply.
+⚠ Do not read holdout before tune has decided; do not tune any constant
+against a file you already looked at.
+
 ### 3. Not worth doing, measured
 
   * VAD-gating the segmenter the way foxnose does: VoxConverse is 96.9% speech,
