@@ -12,6 +12,7 @@
 #include "wespeaker.h"
 
 #include "core/foxnose_pipeline.h"
+#include "core/powerset.h"
 
 #include <algorithm>
 #include <cmath>
@@ -149,14 +150,14 @@ void apply_vad_turns(std::vector<CrispasrDiarizeSegment>& segs) {
 // EXPERIMENTAL — segmentation only, NOT full diarization. See issue #107.
 //
 // Runs the GGUF-packed pyannote segmentation net from src/pyannote_seg.*
-// over the mono buffer. Output is 7 class posteriors per frame:
-//   0 = silence, 1 = spk0, 2 = spk1, 3 = spk0+1,
-//   4 = spk2,    5 = spk0+2, 6 = spk1+2
+// over the mono buffer. Output is 7 powerset class posteriors per frame —
+// see core/powerset.h for the layout; do not restate it here, a second copy
+// of that table is what caused the class 3/4 swap.
 // For each ASR segment, count the dominant speaker across its frames
 // and assign the most-frequent one.
 //
 // What this path DOES handle correctly (post-#107 within-pass fixes):
-//   * Overlap classes (3 = spk0+spk1, 5 = spk0+spk2, 6 = spk1+spk2) now
+//   * Overlap classes (4 = spk0+spk1, 5 = spk0+spk2, 6 = spk1+spk2) now
 //     contribute activity to BOTH speakers they cover, instead of being
 //     collapsed onto one via a class→single-speaker LUT.
 //   * Per-frame, per-speaker activity is posterior-weighted (exp the
@@ -247,23 +248,47 @@ bool apply_pyannote(const float* mono, int n_samples, int64_t slice_t0_cs, std::
 
 namespace crispasr_diarize_internal {
 
-// Class layout of pyannote-seg-3.0:
+// Class layout of pyannote-seg-3.0. The head is a POWERSET over 3 local
+// speakers, and pyannote builds it with itertools.combinations ordered by
+// increasing subset size — every singleton first, then every pair:
 //   0 = silence
 //   1 = spk0 only
 //   2 = spk1 only
-//   3 = spk0 + spk1
-//   4 = spk2 only
+//   3 = spk2 only
+//   4 = spk0 + spk1
 //   5 = spk0 + spk2
 //   6 = spk1 + spk2
+//
+// ⚠ This table used to have 3 and 4 swapped (3 read as "spk0+spk1" and 4 as
+// "spk2 only"), which silently mis-attributed every frame of the THIRD local
+// speaker to the first two as if they were talking over each other. Measured
+// against VoxConverse dev ground truth, the implied overlap fraction gives the
+// layout away — the old table only agrees with reality if a speaker can be
+// active most of a file yet never once alone:
+//
+//   file    GT overlap   as {4,5,6} (this table)   as {3,5,6} (old table)
+//   fsaal        0.42%                     0.17%                   62.65%
+//   jyirt        0.09%                     0.00%                   28.32%
+//   mesob       28.84%                    34.05%                    0.00%
+//   nnqfq       14.40%                    10.14%                   48.40%
+//
 // Per-speaker activity mask: which output classes include each speaker.
 // Used to sum per-frame activity probability across all classes that
 // involve a given speaker — overlap classes contribute to BOTH speakers
 // they cover, fixing the previous LUT collapse (#107).
-static const float SPK_MASK[3][7] = {
-    {0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f}, // spk0 active: classes 1, 3, 5
-    {0.0f, 0.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f}, // spk1 active: classes 2, 3, 6
-    {0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f}, // spk2 active: classes 4, 5, 6
+//
+// Derived from core/powerset.h rather than written out, because writing it out
+// is exactly how 3 and 4 got swapped in the first place.
+struct SpkMask {
+    float m[core_powerset::kSpeakers][core_powerset::kClasses];
+    constexpr SpkMask() : m() {
+        for (int s = 0; s < core_powerset::kSpeakers; s++)
+            for (int c = 0; c < core_powerset::kClasses; c++)
+                m[s][c] = core_powerset::covers(c, s) ? 1.0f : 0.0f;
+    }
 };
+static constexpr SpkMask kSpkMask{};
+static const auto& SPK_MASK = kSpkMask.m;
 
 int score_speaker_for_range(const float* log_probs, int T, double frame_dur_s, int64_t start_cs, int64_t end_cs) {
     if (!log_probs || T <= 0 || frame_dur_s <= 0.0)
