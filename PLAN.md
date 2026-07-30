@@ -125,10 +125,28 @@ been a straight regression for the pyannote path, which has no cross-segment
 parallelism to fall back on. Interleave the arms; print the load next to every
 number; distrust any monotonic curve measured in loop order.
 
-NEXT on this path: the 1.2 s window at 0.6 s hop means every sample is embedded
-TWICE. Running the ResNet once per VAD region and pooling TSTP per window slice
-is worth ~2x on the dominant stage — but it changes conv padding at region
-edges, so it needs the DER gate, not a cosine check.
+### 2c. Shared-trunk window embedding — WRITTEN, GATED OFF, needs a quiet box
+
+`wespeaker_embed_windows()` + `core_foxnose::EmbedWindowsFn` land the 2x: one
+fbank and one trunk pass per 32-window span, each window a slice of the trunk
+output. Enable with `CRISPASR_DIARIZE_SPAN_EMBED=1` (07da3f45).
+
+It is OFF because it is not behaviour-preserving and validation could not be
+finished: CMN moves from the window to the span, and interior windows see real
+neighbouring audio instead of zero padding. jyirt agrees exactly with the
+per-window path (DER 7.24%, 4 speakers, GT 4); the other 7 files and the speed
+win are UNMEASURED, because a parallel session held this box at load 24-136 and
+three interleaved wall-clock rounds disagreed in both directions (36.5/43.9,
+63.7/46.6, 49.8/69.6).
+
+TO FINISH — needs load < ~3:
+  1. 8-file DER: for f in the vox shard, run with and without
+     CRISPASR_DIARIZE_SPAN_EMBED=1, score with tools/der_score.py. Gate: mean
+     must not exceed 7.32%.
+  2. Interleaved timing on esrit.wav (352 windows), both arms in one loop.
+  3. If both hold, flip the default in apply_foxnose and delete the env gate.
+Span size is fixed at kWindowsPerSpan=32 deliberately: CMN over the span makes
+it part of the answer, so it must never depend on the worker count.
 
 ### 3. Not worth doing, measured
 
