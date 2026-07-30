@@ -66,6 +66,7 @@
 #include <cstring>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 // ===========================================================================
@@ -339,14 +340,20 @@ struct wespeaker_graph {
     ggml_tensor* input = nullptr;
 };
 
-static wespeaker_graph build_graph(wespeaker_context* ctx, int T, bool with_stages) {
+// `wins`, when non-empty, asks for ONE embedding per (start, end) frame range
+// instead of one over the whole input. The trunk runs once and each range is
+// then sliced out of its output — see wespeaker_embed_windows.
+static wespeaker_graph build_graph(wespeaker_context* ctx, int T, bool with_stages,
+                                   const std::vector<std::pair<int, int>>& wins = {}) {
     const auto& m = ctx->model;
     const auto& hp = m.hparams;
 
     ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
     wespeaker_graph g;
     g.ctx0 = ggml_init(ip);
-    g.gf = ggml_new_graph_custom(g.ctx0, 4096, false);
+    // The trunk is ~250 nodes; each extra window adds ~12 for its slice, TSTP
+    // and projection.
+    g.gf = ggml_new_graph_custom(g.ctx0, 1024 + 16 * wins.size(), false);
 
     // ne = [W=time, H=freq, C=1, N=1]
     g.input = ggml_new_tensor_4d(g.ctx0, GGML_TYPE_F32, T, (int64_t)hp.n_mels, 1, 1);
@@ -374,13 +381,40 @@ static wespeaker_graph build_graph(wespeaker_context* ctx, int T, bool with_stag
         snap(h, nm);
     }
 
-    ggml_tensor* stats = build_tstp(g.ctx0, h, hp.tstp_eps, hp.tstp_unbiased_var, (int)h->ne[0]);
-    snap(stats, "stats");
+    auto project = [&](ggml_tensor* x, int n_time) {
+        ggml_tensor* st = build_tstp(g.ctx0, x, hp.tstp_eps, hp.tstp_unbiased_var, n_time);
+        return std::make_pair(st, ggml_add(g.ctx0, ggml_mul_mat(g.ctx0, m.seg1_w, st), m.seg1_b));
+    };
 
-    ggml_tensor* emb = ggml_add(g.ctx0, ggml_mul_mat(g.ctx0, m.seg1_w, stats), m.seg1_b);
-    ggml_set_name(emb, "embedding");
-    ggml_set_output(emb);
-    ggml_build_forward_expand(g.gf, emb);
+    if (wins.empty()) {
+        auto pr = project(h, (int)h->ne[0]);
+        snap(pr.first, "stats");
+        ggml_set_name(pr.second, "embedding");
+        ggml_set_output(pr.second);
+        ggml_build_forward_expand(g.gf, pr.second);
+        return g;
+    }
+
+    // Windowed: the trunk downsamples time by the same factor the strides
+    // imply, so map frame ranges onto trunk columns by proportion rather than
+    // hard-coding 8 — that keeps this correct if the stride pattern changes.
+    const int64_t hT = h->ne[0];
+    for (size_t i = 0; i < wins.size(); i++) {
+        int64_t a = (int64_t)wins[i].first * hT / std::max(1, T);
+        int64_t b = (int64_t)wins[i].second * hT / std::max(1, T);
+        a = std::min(std::max<int64_t>(a, 0), hT - 1);
+        b = std::min(std::max(b, a + 1), hT);
+        // ggml_mean wants a contiguous operand, and the slice is small
+        // (~15 x 10 x 256), so materialise it.
+        ggml_tensor* v = ggml_cont(
+            g.ctx0, ggml_view_3d(g.ctx0, h, b - a, h->ne[1], h->ne[2], h->nb[1], h->nb[2], (size_t)a * h->nb[0]));
+        ggml_tensor* e = project(v, (int)(b - a)).second;
+        char nm[32];
+        snprintf(nm, sizeof(nm), "embedding%zu", i);
+        ggml_set_name(e, nm);
+        ggml_set_output(e);
+        ggml_build_forward_expand(g.gf, e);
+    }
     return g;
 }
 
@@ -603,6 +637,86 @@ extern "C" int wespeaker_embed_staged(struct wespeaker_context* ctx, const float
 
     wespeaker_bench_stage _b("resnet");
     return run_graph(ctx, feat.data(), T, cb, userdata, out_embedding);
+}
+
+// Embed several windows of ONE contiguous span with a single trunk pass.
+//
+// The sliding window is 1.2 s at a 0.6 s hop, so embedding each window
+// separately pushes every sample through ResNet34 TWICE. Here the fbank and the
+// whole convolutional trunk run once over the span and each window is a slice
+// of the trunk's output, which is where the 2x goes.
+//
+// This is NOT bit-identical to calling wespeaker_embed() per window, and cannot
+// be: cepstral mean normalisation is now computed over the span rather than the
+// window, and interior windows see their neighbours' audio through the convs'
+// receptive field instead of zero padding. Both arguably give the model MORE
+// context, but "arguably better" is not a licence to skip the check — gate any
+// change here on DER, not on cosine against the per-window path.
+extern "C" int wespeaker_embed_windows(struct wespeaker_context* ctx, const float* samples, int n_samples,
+                                       const int* win_start, const int* win_end, int n_win, float* out_embeddings) {
+    if (!ctx || !samples || n_samples <= 0 || !win_start || !win_end || n_win <= 0 || !out_embeddings)
+        return 1;
+    if (n_samples < wespeaker_min_samples(ctx))
+        return 2;
+
+    int T = 0;
+    std::vector<float> feat;
+    {
+        wespeaker_bench_stage _b("fbank");
+        feat = wespeaker_fbank(ctx, samples, n_samples, T);
+    }
+    if (feat.empty() || T <= 0)
+        return 1;
+
+    // Sample offsets -> fbank frames. frame f starts at f * frame_shift.
+    const int hop = (int)(ctx->model.hparams.sample_rate / 1000 * ctx->model.hparams.frame_shift_ms);
+    std::vector<std::pair<int, int>> wins;
+    wins.reserve((size_t)n_win);
+    for (int i = 0; i < n_win; i++) {
+        int a = hop > 0 ? win_start[i] / hop : 0;
+        int b = hop > 0 ? (win_end[i] + hop - 1) / hop : T;
+        a = std::min(std::max(a, 0), T - 1);
+        b = std::min(std::max(b, a + 1), T);
+        wins.emplace_back(a, b);
+    }
+
+    wespeaker_bench_stage _b("resnet_windows");
+    if (!ensure_sched(ctx))
+        return 1;
+    wespeaker_graph g = build_graph(ctx, T, false, wins);
+    if (!g.ctx0)
+        return 1;
+    ggml_backend_sched_reset(ctx->sched);
+    if (!ggml_backend_sched_alloc_graph(ctx->sched, g.gf)) {
+        ggml_free(g.ctx0);
+        return 1;
+    }
+    {
+        const int F = (int)ctx->model.hparams.n_mels;
+        std::vector<float> in((size_t)T * F);
+        for (int t = 0; t < T; t++)
+            for (int f = 0; f < F; f++)
+                in[(size_t)f * T + t] = feat[(size_t)t * F + f];
+        ggml_backend_tensor_set(g.input, in.data(), 0, in.size() * sizeof(float));
+    }
+    int rc = 0;
+    if (ggml_backend_sched_graph_compute(ctx->sched, g.gf) != GGML_STATUS_SUCCESS) {
+        rc = 1;
+    } else {
+        const int dim = (int)ctx->model.hparams.embed_dim;
+        for (int i = 0; i < n_win && rc == 0; i++) {
+            char nm[32];
+            snprintf(nm, sizeof(nm), "embedding%d", i);
+            ggml_tensor* e = ggml_graph_get_tensor(g.gf, nm);
+            if (!e) {
+                rc = 1;
+                break;
+            }
+            ggml_backend_tensor_get(e, out_embeddings + (size_t)i * dim, 0, (size_t)dim * sizeof(float));
+        }
+    }
+    ggml_free(g.ctx0);
+    return rc;
 }
 
 extern "C" int wespeaker_embed(struct wespeaker_context* ctx, const float* samples, int n_samples,
