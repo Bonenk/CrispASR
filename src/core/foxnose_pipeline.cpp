@@ -6,6 +6,8 @@
 #include "spectral_diarize.h"
 
 #include <algorithm>
+#include <atomic>
+#include <thread>
 #include <cmath>
 #include <map>
 #include <set>
@@ -67,20 +69,66 @@ Result diarize(const float* pcm, int n_samples, int sample_rate, const std::vect
     std::vector<int> win_parent;   // index into `speech`
     std::vector<float> scratch((size_t)embed_dim);
 
+    // Enumerate the windows first, then embed them concurrently. Each window is
+    // an independent forward pass, and the model is small enough that running
+    // ONE window across many ggml threads is far worse than running many
+    // windows one thread each: measured on a 1.2 s window, ResNet34 took 57 ms
+    // at 1 thread and 320 ms at 8, because per-graph thread sync dwarfs the
+    // work. So the parallelism belongs here, across windows, not inside the
+    // graph. Order of results is kept identical to the serial version — the
+    // clusterer's output depends on row order.
+    struct Win {
+        Speech w;
+        int parent;
+        long a, b;
+    };
+    std::vector<Win> wins;
     for (size_t p = 0; p < speech.size(); p++) {
         for (const Speech& w : window_speech(speech[p])) {
             const long a = std::lround(w.start * sample_rate);
             const long b = std::lround(w.end * sample_rate);
             if (a < 0 || b > n_samples || b <= a)
                 continue;
-            if (embed(userdata, pcm + a, (int)(b - a), scratch.data()) != 0) {
-                res.n_skipped++;
-                continue;
-            }
-            emb.insert(emb.end(), scratch.begin(), scratch.end());
-            win_times.push_back(w);
-            win_parent.push_back((int)p);
+            wins.push_back({w, (int)p, a, b});
         }
+    }
+
+    const int n_win = (int)wins.size();
+    const int n_workers = std::max(1, std::min(params.n_workers, n_win));
+    std::vector<float> all((size_t)n_win * embed_dim);
+    std::vector<char> ok((size_t)n_win, 0);
+
+    if (n_workers == 1) {
+        for (int i = 0; i < n_win; i++)
+            ok[i] = embed(userdata, 0, pcm + wins[i].a, (int)(wins[i].b - wins[i].a), &all[(size_t)i * embed_dim]) == 0;
+    } else {
+        std::atomic<int> next{0};
+        auto run = [&](int worker) {
+            for (;;) {
+                const int i = next.fetch_add(1);
+                if (i >= n_win)
+                    return;
+                ok[i] = embed(userdata, worker, pcm + wins[i].a, (int)(wins[i].b - wins[i].a),
+                              &all[(size_t)i * embed_dim]) == 0;
+            }
+        };
+        std::vector<std::thread> pool;
+        pool.reserve((size_t)n_workers - 1);
+        for (int t = 1; t < n_workers; t++)
+            pool.emplace_back(run, t);
+        run(0);
+        for (auto& t : pool)
+            t.join();
+    }
+
+    for (int i = 0; i < n_win; i++) {
+        if (!ok[i]) {
+            res.n_skipped++;
+            continue;
+        }
+        emb.insert(emb.end(), all.begin() + (size_t)i * embed_dim, all.begin() + (size_t)(i + 1) * embed_dim);
+        win_times.push_back(wins[i].w);
+        win_parent.push_back(wins[i].parent);
     }
     res.n_windows = (int)win_times.size();
     if (win_times.empty())

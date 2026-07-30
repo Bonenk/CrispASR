@@ -136,7 +136,10 @@ struct Synth {
     int sample_rate = 16000;
 };
 
-int synth_embed(void* ud, const float* pcm, int n, float* out) {
+// `worker` is unused: this fake embedder is stateless, so every worker slot
+// can share it. A real one needs one context per worker.
+int synth_embed(void* ud, int worker, const float* pcm, int n, float* out) {
+    (void)worker;
     // The "audio" carries its speaker in sample 0; the embedder returns that
     // speaker's centre plus deterministic noise keyed to the window, so the
     // pipeline sees a realistic but exactly-known embedding space.
