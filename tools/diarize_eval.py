@@ -80,6 +80,13 @@ def main():
     ap.add_argument("--collar", type=float, default=0.25)
     ap.add_argument("--jobs", type=int, default=1)
     ap.add_argument("--subset", type=int, default=0)
+    ap.add_argument(
+        "--split",
+        choices=["tune", "holdout", "both"],
+        default="both",
+        help="which split to RUN. Use 'tune' while developing: not computing holdout at all is a stronger "
+        "guarantee than computing it and promising not to look.",
+    )
     ap.add_argument("--max-speakers", type=int, default=8)
     ap.add_argument("--json-out", default="")
     ap.add_argument(
@@ -95,6 +102,10 @@ def main():
     by_split = {"tune": [], "holdout": []}
     for n in names:
         by_split[split_of(n)].append(n)
+    if args.split != "both":
+        for k in list(by_split):
+            if k != args.split:
+                by_split[k] = []
     if args.subset:
         for k in by_split:
             by_split[k] = by_split[k][: args.subset]
