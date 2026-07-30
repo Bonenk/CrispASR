@@ -1,5 +1,84 @@
 # CrispASR — Pending work
 
+## NOW — #326 diarization: accuracy first, then the ggml work
+
+Two things landed already (e517273d, 15aad6f8): pyannote now infers in parallel
+60 s chunks (2888 s file, M1 -t 8: 18.1 s vs 49.8–56.1 s), and `SPK_MASK` had
+powerset classes 3 and 4 swapped, worth 15 DER points. See
+`docs/diarization-speakers.md` "#326".
+
+Where the paths actually stand, measured end to end on 8 VoxConverse dev files
+with `tools/der_score.py` (whisper-tiny segments, 0.25 s collar):
+
+| path | mean DER |
+|---|---|
+| raw posteriors, no clustering (the chunking A/B harness only) | 33.37% |
+| `--diarize-method pyannote --diarize-embedder auto` | 15.74% |
+| `--diarize-method foxnose` (#324) | 7.32% |
+
+### 1. Over-clustering in the pyannote+embedder path (BIGGEST WIN, do first)
+
+`crispasr_remap_speakers_via_embeddings` clusters TitaNet embeddings with
+`crispasr_agglomerative_cluster` — **single-linkage, fixed 0.5 cosine
+threshold, hard `max_speakers` cap**. Single linkage chains, and a fixed
+threshold does not adapt, so the merge loop never gets below the cap and the
+cap decides the answer. It hit `--diarize-max-speakers 8` on 4 of 8 files:
+
+    esrit 8 hyp vs 5 real | mesob 8 vs 4 | nnqfq 8 vs 5 | fsaal 8 vs 7
+
+mesob is the worst file at 33.03% DER with 8 hypothesised speakers against 4.
+
+We already have a better clusterer in-tree and validated: `core_spectral::
+cluster_speakers` from #324 — PCA + full-covariance GMM/BIC to *estimate* the
+count, then Ng-Jordan-Weiss spectral clustering, then spherical refinement.
+That is what gets foxnose to 7.32% on the same files.
+
+PLAN: route the pyannote+embedder path through `core_spectral::cluster_speakers`
+instead of single-linkage. Keep `--diarize-cluster-threshold` meaningful for
+callers who set it explicitly, but stop letting the cap pick the speaker count.
+GATE: mean DER over the 8 files must beat 15.74%; per-file speaker counts should
+stop pinning to the cap. Watch tiams/jyirt, which currently do NOT hit the cap
+(4 hyp vs 5 and 4 vs 4) — they are the regression risk.
+
+### 2. Batch the pyannote chunks into one graph (the ggml work)
+
+After chunking, all 8 cores are busy (181.5 s CPU / 22.8 s wall on a 2888 s
+file), so there is no scheduling win left — only less work, or better work.
+Aggregate CPU by stage over 49 chunks: **LSTM 121.0 s (67%), SincNet 59.7 s
+(33%), classifier 0.8 s**.
+
+pyannote_seg is the least ggml-native runtime we ship. Not applied:
+
+  a. The LSTM recurrence is not ggml at all — a hand-written scalar loop over
+     timesteps. Only the input projection `W@x` is a `mul_mat` (~2/3 of the
+     LSTM FLOPs). The scalar third is what serialises.
+  b. Each chunk worker runs ggml with `n_threads = 1`. Chunking traded intra-op
+     threading for inter-chunk threading, so every conv and GEMM is now
+     single-threaded — wasteful whenever chunks < cores (short files).
+  c. No batching across chunks: 49 separate graphs instead of ONE graph with
+     chunks on a batch dimension. This is the parakeet/nemotron `ne[3]` trick
+     we already use elsewhere, and it fixes (a)-adjacent and (b) at once by
+     handing ggml 49×-taller GEMMs and the full thread pool.
+  d. No quantisation — all F32. The recurrence is a bandwidth-bound 512×128
+     matvec per timestep; F16 on `R` is a real candidate. ⚠ Do NOT assume the
+     wespeaker result transfers: F16 lost 2.2× there, but that was compute-bound
+     conv im2col, this is bandwidth-bound matvec. Measure it.
+  e. No GPU — the loader hard-forces `ggml_backend_cpu_init()` because the
+     recurrence dereferences `tensor->data`. Probably correct to leave alone:
+     see [[feedback_many_tiny_graphs_gpu_loses]].
+
+PLAN, in order: (c) batch chunks into one graph for SincNet + LSTM input
+projections + classifier, keeping only the recurrence per-chunk; then (d)
+measure F16 `R`; then chunk geometry — 120 s chunk with 5 s context is 8%
+redundant compute against today's 17%.
+GATE: posteriors must stay byte-identical across `-t`, and DER must not move.
+
+### 3. Not worth doing, measured
+
+  * VAD-gating the segmenter the way foxnose does: VoxConverse is 96.9% speech,
+    so ~3% available. Would matter on sparse real-world audio, not here.
+  * GPU for the segmenter — see (e).
+
 ## 2026-07-29 — the unit tier found two real failures: one FIXED, one OPEN
 
 CI executed 1 of 162 unit tests until e17ce606/49e56eee. Turning the tier on
