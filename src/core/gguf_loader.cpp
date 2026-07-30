@@ -704,6 +704,23 @@ static bool load_weights_impl(const char* path, ggml_backend_t backend, IncludeT
                         // so the additive data_off+off+nbytes wraps and passes. Compare
                         // subtractively.
                         const size_t nb = ggml_nbytes(t);
+                        // A mmap'd buffer binds tensors at their PACKED GGUF file
+                        // offsets, so a backend whose alloc size exceeds
+                        // ggml_nbytes (CUDA pads quantized rows) cannot use this
+                        // path at all — there is nowhere to put the padding, and
+                        // ggml_backend_tensor_alloc would assert. No such backend
+                        // advertises buffer_from_host_ptr today (CUDA reports
+                        // false; this is Metal's path), so this is a guard, not a
+                        // live fix: refuse into the legacy copy path instead of
+                        // silently overrunning if that ever changes.
+                        if (ggml_backend_buft_get_alloc_size(ggml_backend_buffer_get_type(out.buf), t) != nb) {
+                            fprintf(stderr,
+                                    "%s: backend pads '%s' beyond its packed size — "
+                                    "mmap binding impossible, using legacy loader\n",
+                                    tag, ggml_get_name(t));
+                            bounds_ok = false;
+                            break;
+                        }
                         if (data_off > leaked_size || off > leaked_size - data_off ||
                             nb > leaked_size - data_off - off) {
                             fprintf(stderr,
