@@ -224,7 +224,7 @@ pyannote cache has there.
 
 | var | effect |
 |---|---|
-| `CRISPASR_DIARIZE_FULL_K_SEARCH=1` | score the full `[min,max]` speaker range on silhouette instead of `[k-2, k+3]` |
+| `CRISPASR_DIARIZE_BIC_WINDOW=1` | score silhouette only in `[k-2, k+3]` around the BIC anchor instead of the full `[min,max]` range (the default) |
 | `CRISPASR_WESPEAKER_BENCH=1` | per-stage embedder timings |
 | `CRISPASR_WESPEAKER_DEBUG=1` | embedder diagnostics |
 

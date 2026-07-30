@@ -723,8 +723,11 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
   upstream GMM/BIC + silhouette sweep) or `eigengap`. Eigengap is better on
   well-separated synthetic data and cheaper, but under-counts on real speech
   (11.4 % vs 5.3 % DER on VoxConverse) — see `docs/foxnose-diarize/PLAN.md`
-- `CRISPASR_DIARIZE_FULL_K_SEARCH` — score the full `[min, max]` speaker range
-  on silhouette instead of a `[k-2, k+3]` window around the BIC anchor
+- `CRISPASR_DIARIZE_BIC_WINDOW` — score silhouette only in a `[k-2, k+3]` window
+  around the BIC anchor instead of the full `[min, max]` range. The full range is
+  the default: the BIC anchor is unreliable in both directions (measured errors
+  of +5 / -3 / -3 on 4/5/6 well-separated blobs) and when it over-counts the
+  window is stranded above the truth and cannot climb back to it
 - `CRISPASR_WESPEAKER_BENCH` — per-stage embedder timings (fbank / resnet)
 - `CRISPASR_WESPEAKER_DEBUG` — embedder diagnostics
 

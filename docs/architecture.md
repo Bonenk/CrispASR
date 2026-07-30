@@ -1118,8 +1118,8 @@ turn boundaries. Diarizing per slice cannot work — each slice clusters
 independently and restarts numbering at 0 — which is the same problem the
 pyannote path solves with a pre-computed posterior cache (#107).
 
-Env gates: `CRISPASR_DIARIZE_FULL_K_SEARCH=1` (score the full speaker range on
-silhouette instead of a window around the BIC anchor),
+Env gates: `CRISPASR_DIARIZE_BIC_WINDOW=1` (restrict silhouette to a window
+around the BIC anchor instead of the full speaker range, which is the default),
 `CRISPASR_WESPEAKER_BENCH=1`, `CRISPASR_WESPEAKER_DEBUG=1`.
 
 ### gigaam

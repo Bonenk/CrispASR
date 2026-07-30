@@ -18,6 +18,48 @@ namespace core_spectral {
 namespace {
 
 constexpr double kTiny = 1e-12;
+
+// ── Portable RNG draws ────────────────────────────────────────────────────
+//
+// std::mt19937 is specified bit-for-bit by the standard, but the DISTRIBUTIONS
+// are not: libc++ (macOS) and libstdc++ (Linux) yield different sequences from
+// the same engine and the same seed. That made the whole diarizer
+// platform-dependent — on four well-separated blobs the estimator returned
+// k=4 on macOS and k=9 on Linux, because the random projection in
+// top_eigenvectors and the k-means++ seeding both diverged, and the silhouette
+// pass then scored a different winner.
+//
+// Drawing straight from the engine makes every result reproducible across
+// platforms and standard libraries. Same seed in, same clustering out.
+inline double rng_uniform01(std::mt19937& rng) {
+    // 53 significant bits from two draws, in [0, 1).
+    const uint64_t hi = (uint64_t)(rng() >> 5);                    // 27 bits
+    const uint64_t lo = (uint64_t)(rng() >> 6);                    // 26 bits
+    return (double)((hi << 26) | lo) * (1.0 / 9007199254740992.0); // 2^-53
+}
+
+// Inclusive [lo, hi]. Rejects the trailing partial block so the modulo is
+// unbiased, which std::uniform_int_distribution also does — just not portably.
+inline int rng_uniform_int(std::mt19937& rng, int lo, int hi) {
+    if (hi <= lo)
+        return lo;
+    const uint32_t span = (uint32_t)(hi - lo) + 1u;
+    const uint32_t limit = 0xFFFFFFFFu - (0xFFFFFFFFu % span);
+    uint32_t v;
+    do {
+        v = (uint32_t)rng();
+    } while (v >= limit);
+    return lo + (int)(v % span);
+}
+
+// Box-Muller, so the normal draw is fully determined by the uniforms above.
+inline double rng_normal(std::mt19937& rng) {
+    double u1 = rng_uniform01(rng);
+    if (u1 < 1e-300)
+        u1 = 1e-300;
+    const double u2 = rng_uniform01(rng);
+    return std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * 3.14159265358979323846 * u2);
+}
 // Ridge added to each covariance diagonal, mirroring sklearn's reg_covar.
 // Without it a component that captures a near-degenerate cluster produces a
 // singular covariance and the log-likelihood blows up to +inf, which BIC then
@@ -85,9 +127,8 @@ std::vector<double> top_eigenvectors(const std::vector<double>& m, int n, int k,
     k = std::min(k, n);
     std::vector<double> q((size_t)n * k);
     std::mt19937 rng(seed);
-    std::normal_distribution<double> gauss(0.0, 1.0);
     for (auto& v : q)
-        v = gauss(rng);
+        v = rng_normal(rng);
 
     // Gershgorin bound -> shift so every eigenvalue is >= 0.
     double shift = 0.0;
@@ -159,8 +200,7 @@ std::vector<int> kmeans(const std::vector<double>& x, int n, int d, int k, unsig
         std::vector<double> cent((size_t)k * d);
         std::vector<double> d2((size_t)n, std::numeric_limits<double>::infinity());
 
-        std::uniform_int_distribution<int> pick(0, n - 1);
-        int first = pick(rng);
+        const int first = rng_uniform_int(rng, 0, n - 1);
         std::copy(x.begin() + (size_t)first * d, x.begin() + (size_t)(first + 1) * d, cent.begin());
 
         for (int c = 1; c < k; c++) {
@@ -174,8 +214,8 @@ std::vector<int> kmeans(const std::vector<double>& x, int n, int d, int k, unsig
                 d2[(size_t)i] = std::min(d2[(size_t)i], dist);
                 total += d2[(size_t)i];
             }
-            std::uniform_real_distribution<double> u(0.0, std::max(total, kTiny));
-            double target = u(rng), run = 0.0;
+            double target = rng_uniform01(rng) * std::max(total, kTiny);
+            double run = 0.0;
             int chosen = n - 1;
             for (int i = 0; i < n; i++) {
                 run += d2[(size_t)i];
@@ -892,16 +932,35 @@ std::vector<int> cluster_speakers(const float* x, int n, int d, int min_speakers
     // true k = 3 anchored at 8 leaves the window at [6, 10].
     //
     // Silhouette itself is the reliable half: on 3 well-separated blobs it
-    // scored k=3 at 1.0390 against 0.6827 / 0.7926 for its neighbours. So
-    // CRISPASR_DIARIZE_FULL_K_SEARCH=1 scores the FULL [min, max] range
-    // instead, at the cost of (max-min) spectral runs rather than 6.
+    // scored k=3 at 1.0390 against 0.6827 / 0.7926 for its neighbours.
     //
-    // Default stays the upstream window until the DER harness says otherwise —
-    // gate the new path, do not delete the working one.
-    const char* full_env = std::getenv("CRISPASR_DIARIZE_FULL_K_SEARCH");
-    const bool full_search = full_env && *full_env && *full_env != '0';
-    const int lower = full_search ? std::max(2, min_speakers) : std::max({2, min_speakers, k - 2});
-    const int upper = full_search ? std::min({max_speakers, n - 1}) : std::min({max_speakers, n - 1, k + 3});
+    // The full range is now the DEFAULT, and the [k-2, k+3] window is the opt-in.
+    // That inverts the earlier gate, on measurement:
+    //
+    // On 4/5/6 well-separated blobs (per=25, d=32, sep=6.0) the BIC anchor came
+    // out at 9/2/3 — errors of +5, -3, -3 — while the silhouette scored over the
+    // FULL range peaked at exactly 4/5/6 every time (k=4: 0.4471 at the truth vs
+    // 0.1050 at k=8). The anchor is unreliable in BOTH directions, and when it
+    // over-counts the window is stranded above the answer and cannot climb back:
+    // anchor 9 leaves [7,10], which simply does not contain 4.
+    //
+    // A guard on "anchor == max" is not enough — the same run anchored at 9 with
+    // max 10, one short of the ceiling, and was stranded just the same. There is
+    // no bound on how far BIC over-counts, so any lower bound derived from the
+    // anchor can strand the search. Dropping that dependency removes the whole
+    // failure mode instead of moving its threshold.
+    //
+    // Cost is (max-min) spectral runs instead of 6 — 9 vs 6 at the default
+    // max_speakers=10. The upper bound stays anchored so absurdly high k are
+    // still never scored.
+    //
+    // CRISPASR_DIARIZE_BIC_WINDOW=1 restores the old anchored window for A/B
+    // work; the DER harness should confirm this on real meetings.
+    const char* win_env = std::getenv("CRISPASR_DIARIZE_BIC_WINDOW");
+    const bool anchored_window = win_env && *win_env && *win_env != '0';
+
+    const int lower = anchored_window ? std::max({2, min_speakers, k - 2}) : std::max(2, min_speakers);
+    const int upper = anchored_window ? std::min({max_speakers, n - 1, k + 3}) : std::min({max_speakers, n - 1});
     if (upper <= lower)
         return run(k);
 
