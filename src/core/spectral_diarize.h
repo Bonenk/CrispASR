@@ -130,11 +130,31 @@ int estimate_speakers_eigengap(const float* affinity, int n, int min_k, int max_
                                std::vector<float>* out_eigenvalues = nullptr);
 
 // Which speaker-count estimator cluster_speakers() uses.
-// CRISPASR_DIARIZE_COUNT=bic|eigengap. DEFAULT IS BIC (the upstream
+// CRISPASR_DIARIZE_COUNT=bic|eigengap|nme-sc. DEFAULT IS BIC (the upstream
 // estimator) — eigengap wins on synthetic data but under-counts on real
 // speech and scores materially worse on VoxConverse. See the measurements at
 // count_method_from_env() before changing this.
-enum class CountMethod { Bic, Eigengap };
+// Per-candidate trace of the NME-SC sweep, for diagnosis.
+struct NmeScDiag {
+    struct Point {
+        int p;       // neighbours kept per row
+        int k;       // k at that p's largest eigengap
+        float gap;   // the gap itself
+        float ratio; // p / gap — minimised
+    };
+    std::vector<Point> curve;
+    int best_p = 0;
+    int best_k = 1;
+    float best_r = 0.0f;
+};
+
+// NME-SC speaker counting: sweep the affinity binarisation instead of fixing
+// it, and take k from the p minimising p / max-eigengap. See the comment at the
+// definition. `out` may be null.
+int estimate_speakers_nme_sc(const float* affinity, int n, int min_k, int max_k, unsigned seed = 42,
+                             NmeScDiag* out = nullptr);
+
+enum class CountMethod { Bic, Eigengap, NmeSc };
 CountMethod count_method_from_env();
 
 // ── High-level entry points ───────────────────────────────────────────────
