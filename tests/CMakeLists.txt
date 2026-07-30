@@ -259,6 +259,24 @@ catch_discover_tests(test-params
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-lid-speech-prefix — keep request-level LID on speech, not silence ───
+add_executable(test-lid-speech-prefix
+    test-lid-speech-prefix.cpp
+)
+target_include_directories(test-lid-speech-prefix PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-lid-speech-prefix PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-lid-speech-prefix
+    TEST_SPEC "[unit][lid]"
+    PROPERTIES LABELS "unit;lid"
+)
+
 # ─── test - cpu-ops-to-f32 — Catch2 unit tests for core_cpu::to_f32 ───────────────
 # The quantized-safe CPU weight reader. Verifies F32/F16/Q8_0/Q4_K round-trip so a
 # quantized weight is dequantized (not read as garbage / over-read). Header-only
