@@ -644,6 +644,10 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         return result;
     }
 
+    // Keep this fact before disabling VAD below; it selects speech-only input
+    // for the request-level LID pass.
+    const bool have_vad_slices = rp.vad || !rp.vad_import_json.empty();
+
     // VAD (if any) already ran above — disable it for the backend so
     // whisper_full doesn't re-run Silero on every slice (#132).
     rp.vad = false;
@@ -656,14 +660,28 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
         // Match file-mode `-l auto`: run LID once per uploaded audio sample
         // before dispatching chunks to backends that need explicit language.
         if (want_auto_lang && !has_native_lid && !lid_disabled) {
+            std::vector<float> lid_speech;
+            const float* lid_samples = pcmf32.data();
+            int lid_n_samples = (int)pcmf32.size();
+            if (have_vad_slices) {
+                lid_speech = crispasr_lid_speech_prefix(pcmf32, slices);
+                if (!lid_speech.empty()) {
+                    lid_samples = lid_speech.data();
+                    lid_n_samples = (int)lid_speech.size();
+                }
+            }
+            const bool used_speech_lid = !lid_speech.empty();
             crispasr_lid_result lid;
-            if (crispasr_detect_language_cli(pcmf32.data(), (int)pcmf32.size(), rp, lid)) {
+            if (crispasr_detect_language_cli(lid_samples, lid_n_samples, rp, lid)) {
                 rp.language = lid.lang_code;
                 if (rp.source_lang.empty() || rp.source_lang == "auto")
                     rp.source_lang = lid.lang_code;
                 if (!rp.no_prints) {
                     fprintf(stderr, "crispasr-server: LID -> language = '%s' (%s, p=%.3f)\n", lid.lang_code.c_str(),
                             lid.source.c_str(), lid.confidence);
+                    if (used_speech_lid)
+                        fprintf(stderr, "crispasr-server: LID input = %.2fs speech from %zu VAD slice(s)\n",
+                                (double)lid_n_samples / 16000.0, slices.size());
                 }
             } else if (rp.language == "auto") {
                 if (!rp.no_prints) {
