@@ -151,6 +151,9 @@ struct wespeaker_context {
 
     std::vector<uint8_t> compute_meta;
     int n_threads = 4;
+    // False on a worker clone: it borrows another context's weights and must
+    // not free them. See wespeaker_init_worker.
+    bool owns_model = true;
 };
 
 static ggml_tensor* require(wespeaker_model& m, const char* name) {
@@ -478,6 +481,11 @@ extern "C" struct wespeaker_context* wespeaker_init_from_file(const char* path_m
     ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : nullptr;
     if (!ctx->backend)
         ctx->backend = ctx->backend_cpu;
+    // n_threads used to be stored and never applied, so every context silently
+    // ran at ggml's default no matter what the caller asked for — and any
+    // attempt to run several contexts at once oversubscribed the machine by
+    // that default factor.
+    ggml_backend_cpu_set_n_threads(ctx->backend_cpu, ctx->n_threads);
     if (params.verbosity > 0)
         fprintf(stderr, "wespeaker: backend = %s\n", ggml_backend_name(ctx->backend));
 
@@ -491,14 +499,39 @@ extern "C" struct wespeaker_context* wespeaker_init_from_file(const char* path_m
     return ctx;
 }
 
+// A second context over the SAME weights, for embedding several windows at
+// once. Only the per-call machinery is duplicated — backend, scheduler and
+// graph scratch, none of which is re-entrant — while model.ctx/buf/tensors are
+// borrowed. Loading the GGUF once per worker instead would cost a re-read per
+// worker (painful when the model sits on slow storage) and N times the RAM,
+// for weights that are read-only during a forward pass.
+extern "C" struct wespeaker_context* wespeaker_init_worker(struct wespeaker_context* src) {
+    if (!src)
+        return nullptr;
+    auto* ctx = new wespeaker_context();
+    ctx->params = src->params;
+    ctx->n_threads = src->n_threads;
+    ctx->model = src->model; // shares ctx/buf/tensors — see owns_model
+    ctx->owns_model = false;
+    ctx->backend_cpu = ggml_backend_cpu_init();
+    if (!ctx->backend_cpu) {
+        delete ctx;
+        return nullptr;
+    }
+    ctx->backend = ctx->backend_cpu;
+    ggml_backend_cpu_set_n_threads(ctx->backend_cpu, ctx->n_threads);
+    ctx->compute_meta.resize(src->compute_meta.size());
+    return ctx;
+}
+
 extern "C" void wespeaker_free(struct wespeaker_context* ctx) {
     if (!ctx)
         return;
     if (ctx->sched)
         ggml_backend_sched_free(ctx->sched);
-    if (ctx->model.buf)
+    if (ctx->owns_model && ctx->model.buf)
         ggml_backend_buffer_free(ctx->model.buf);
-    if (ctx->model.ctx)
+    if (ctx->owns_model && ctx->model.ctx)
         ggml_free(ctx->model.ctx);
     if (ctx->backend_cpu && ctx->backend_cpu != ctx->backend)
         ggml_backend_free(ctx->backend_cpu);

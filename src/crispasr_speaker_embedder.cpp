@@ -135,6 +135,24 @@ std::unique_ptr<CrispasrSpeakerEmbedder> crispasr_make_speaker_embedder(const st
     if (model_spec.empty())
         return nullptr;
 
+    // Speaker embedders run ONE small graph per speech segment, and at that
+    // size ggml's per-graph thread sync costs more than the work it splits.
+    // Measured on the diarization path (215 s file, 8-core M1), embedding time
+    // went the WRONG way as -t rose: the wespeaker ResNet34 took 57 ms per
+    // 1.2 s window at 1 thread and 320 ms at 8, and end-to-end diarization
+    // overhead grew from 1.5 s to 7.0 s. So the caller's -t is deliberately
+    // NOT forwarded here: extra cores belong to running several segments at
+    // once (see core_foxnose::Params::n_workers), not to splitting one tiny
+    // graph. CRISPASR_SPEAKER_EMBED_THREADS overrides for A/B.
+    int embed_threads = 1;
+    if (const char* e = std::getenv("CRISPASR_SPEAKER_EMBED_THREADS")) {
+        const int v = std::atoi(e);
+        if (v > 0)
+            embed_threads = v;
+    }
+    (void)n_threads;
+    n_threads = embed_threads;
+
     // Dispatch order:
     //   1. Model spec or resolved path mentions "indextts" -> IndexTTS-
     //      BigVGAN ECAPA-TDNN adapter.

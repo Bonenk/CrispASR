@@ -53,12 +53,21 @@ struct Params {
     int max_speakers = 20;
     int num_speakers = 0; // > 0 pins the count and skips estimation
     unsigned seed = 42;
+    // How many windows may be embedded concurrently. Each concurrent slot must
+    // have its OWN embedder state; see EmbedFn's `worker` argument. 1 keeps the
+    // old serial behaviour.
+    int n_workers = 1;
 };
 
 // Embed `n` samples of 16 kHz mono PCM into `out` (embed_dim floats).
 // Return 0 on success; any non-zero result makes the window be skipped, which
 // is the correct behaviour for audio the model refuses (too short, silent).
-using EmbedFn = int (*)(void* userdata, const float* pcm, int n_samples, float* out);
+//
+// `worker` is in [0, Params::n_workers) and says WHICH embedder state to use.
+// diarize() may call this from several threads at once with distinct `worker`
+// values, and never twice concurrently with the same one — so an
+// implementation only needs one context per worker, not a lock.
+using EmbedFn = int (*)(void* userdata, int worker, const float* pcm, int n_samples, float* out);
 
 struct Result {
     std::vector<Turn> turns;

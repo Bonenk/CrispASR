@@ -37,6 +37,11 @@ void wespeaker_free(struct wespeaker_context* ctx);
 
 // ---- Model introspection ----
 
+// A second context sharing `src`'s weights, so several windows can be embedded
+// concurrently. Each concurrent caller needs its own; free every one with
+// wespeaker_free(), and free the workers BEFORE the context they borrow from.
+struct wespeaker_context* wespeaker_init_worker(struct wespeaker_context* src);
+
 int wespeaker_embed_dim(struct wespeaker_context* ctx);   // 256
 int wespeaker_sample_rate(struct wespeaker_context* ctx); // 16000
 int wespeaker_n_mels(struct wespeaker_context* ctx);      // 80

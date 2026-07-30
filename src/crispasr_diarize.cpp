@@ -424,13 +424,19 @@ namespace {
 // upstream — so this method deliberately does not run a VAD of its own.
 // Re-segmenting would both duplicate work and desynchronise the labels from
 // the segments the caller is going to attach them to.
+// One wespeaker context per concurrent worker. wespeaker_embed builds and
+// computes a graph against context-owned scratch, so contexts cannot be
+// shared across threads; the pipeline guarantees one live call per worker
+// index, so no locking is needed either.
 struct FoxnoseEmbedder {
-    wespeaker_context* ctx = nullptr;
+    std::vector<wespeaker_context*> ctx;
 };
 
-int foxnose_embed_cb(void* ud, const float* pcm, int n, float* out) {
+int foxnose_embed_cb(void* ud, int worker, const float* pcm, int n, float* out) {
     auto* e = static_cast<FoxnoseEmbedder*>(ud);
-    return wespeaker_embed(e->ctx, pcm, n, out);
+    if (worker < 0 || worker >= (int)e->ctx.size())
+        return -1;
+    return wespeaker_embed(e->ctx[worker], pcm, n, out);
 }
 
 bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOptions& opts,
@@ -442,13 +448,42 @@ bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOption
     if (segs.empty() || !left || n_samples <= 0)
         return true;
 
+    // ONE ggml thread per context, and parallelism across windows instead.
+    // A 1.2 s window is far too small to amortise ggml's per-graph thread
+    // sync: measured on this model, ResNet34 took 57 ms at 1 thread and
+    // 320 ms at 8, so raising -t made diarization 4.4x SLOWER end to end.
+    // See core_foxnose::Params::n_workers.
     wespeaker_context_params cp = wespeaker_context_default_params();
-    cp.n_threads = opts.n_threads;
+    cp.n_threads = 1; // one thread per worker; parallelism comes from n_workers
+    // Same override the pluggable embedders honour, so the pre-#324-perf
+    // behaviour (all of -t inside one graph, one window at a time) stays
+    // reachable for an interleaved A/B.
+    if (const char* e = std::getenv("CRISPASR_SPEAKER_EMBED_THREADS")) {
+        const int v = std::atoi(e);
+        if (v > 0)
+            cp.n_threads = v;
+    }
     cp.verbosity = 0;
+
     wespeaker_context* ctx = wespeaker_init_from_file(opts.foxnose_embedder_path.c_str(), cp);
     if (!ctx) {
         fprintf(stderr, "crispasr_diarize: failed to load embedder '%s'\n", opts.foxnose_embedder_path.c_str());
         return false;
+    }
+    FoxnoseEmbedder emb;
+    emb.ctx.push_back(ctx);
+    // Extra workers SHARE these weights — one GGUF read, one copy in RAM.
+    int want_workers = std::max(1, opts.n_threads);
+    if (const char* e = std::getenv("CRISPASR_DIARIZE_EMBED_WORKERS")) {
+        const int v = std::atoi(e);
+        if (v > 0)
+            want_workers = v;
+    }
+    for (int i = 1; i < want_workers; i++) {
+        wespeaker_context* c = wespeaker_init_worker(ctx);
+        if (!c)
+            break; // fewer workers is slower, not wrong
+        emb.ctx.push_back(c);
     }
     const int sr = wespeaker_sample_rate(ctx);
     const int dim = wespeaker_embed_dim(ctx);
@@ -462,13 +497,15 @@ bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOption
         speech.push_back({std::max(0.0, a), std::max(0.0, b)});
     }
 
-    FoxnoseEmbedder emb{ctx};
     core_foxnose::Params p;
     p.min_speakers = opts.min_speakers;
     p.max_speakers = opts.max_speakers;
     p.num_speakers = opts.num_speakers;
+    p.n_workers = (int)emb.ctx.size();
     core_foxnose::Result res = core_foxnose::diarize(left, n_samples, sr, speech, foxnose_embed_cb, &emb, dim, p);
-    wespeaker_free(ctx);
+    // Workers borrow ctx's weights, so they must go first.
+    for (size_t i = emb.ctx.size(); i-- > 0;)
+        wespeaker_free(emb.ctx[i]);
 
     if (out_turns) {
         out_turns->clear();
