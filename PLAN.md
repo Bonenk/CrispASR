@@ -97,6 +97,39 @@ RESOLVED 2026-07-30. (b) is FIXED; (c) and (d) are measured NOT worth doing.
     Revisit only if a profile shows per-op overhead, not on the a-priori
     argument.
 
+### 2b. DONE — the embedder, which is where the time actually is (#324)
+
+With segmentation fixed, the speaker embedder is the dominant diarization cost.
+Two fixes landed (fe0c0b3e, 6a5b0100):
+
+  * `wespeaker_context::n_threads` was STORED AND NEVER APPLIED —
+    `ggml_backend_cpu_set_n_threads` appears nowhere in wespeaker.cpp, so every
+    context ran at ggml's default whatever `-t` said. Confirmed before fixing:
+    -t 8 vs -t 1 gave 41.9/39.8, 41.0/42.7, 44.1/44.7 ms per window.
+  * core_foxnose now embeds windows CONCURRENTLY (Params::n_workers, EmbedFn
+    gains a worker index, results written into a preallocated array so row
+    order is untouched). Workers share weights through wespeaker_init_worker()
+    rather than reloading the GGUF each.
+
+    threads x workers, 85 s file, -t 8, interleaved, 3 rounds:
+      4x1 (old) 10.27 10.46 11.28 | 8x1 10.80 10.74 11.91 | 4x2 9.56 10.03 10.38
+      2x4 8.67 9.25 9.83          | 1x8 8.09 8.65 9.58  <- ships
+    215 s file: diarization 23.8 -> 19.2 s and 33.8 -> 25.6 s. DER unchanged
+    file-for-file (7.32%), labels identical across -t.
+
+⚠ METHODOLOGY, the expensive lesson of this series: a sequential -t 1/4/8 loop
+on a box whose load is ramping reads as a thread-scaling curve. It produced a
+confident, WRONG "threads make embedders 5x slower" diagnosis, which in turn
+justified forcing the pluggable embedder to 1 thread — a change that would have
+been a straight regression for the pyannote path, which has no cross-segment
+parallelism to fall back on. Interleave the arms; print the load next to every
+number; distrust any monotonic curve measured in loop order.
+
+NEXT on this path: the 1.2 s window at 0.6 s hop means every sample is embedded
+TWICE. Running the ResNet once per VAD region and pooling TSTP per window slice
+is worth ~2x on the dominant stage — but it changes conv padding at region
+edges, so it needs the DER gate, not a cosine check.
+
 ### 3. Not worth doing, measured
 
   * VAD-gating the segmenter the way foxnose does: VoxConverse is 96.9% speech,
