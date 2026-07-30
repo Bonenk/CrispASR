@@ -679,6 +679,8 @@ def run_validate() -> list[dict]:
         name = entry["name"]
         print(f"\n========== validate :: {name} ==========")
         t0 = time.time()
+        gguf_local = None  # reset per iteration: the finally-block eviction below
+                           # must never see a stale path from the previous backend
         try:
             from huggingface_hub import hf_hub_download
             gguf_local = Path(hf_hub_download(
@@ -686,11 +688,18 @@ def run_validate() -> list[dict]:
                 filename=entry["gguf"]["file"],
                 revision=entry["gguf"]["revision"],
             ))
-            ref_local = Path(hf_hub_download(
-                repo_id=MANIFEST["fixtures"]["repo"],
-                filename=entry["fixture_ref_path"],
-                revision=MANIFEST["fixtures"]["revision"],
-            ))
+            # `skip_diff: true` entries are transcript-only and carry no
+            # reference dump — 38 of 45 backends. Downloading a fixture for them
+            # raised KeyError: 'fixture_ref_path' and failed the backend before it
+            # ever ran. run_one.py already treats skip_diff this way.
+            skip_diff = bool(entry.get("skip_diff", False))
+            ref_local = None
+            if not skip_diff:
+                ref_local = Path(hf_hub_download(
+                    repo_id=MANIFEST["fixtures"]["repo"],
+                    filename=entry["fixture_ref_path"],
+                    revision=MANIFEST["fixtures"]["revision"],
+                ))
             if "fixture_sample_path" in entry:
                 sample = Path(hf_hub_download(
                     repo_id=MANIFEST["fixtures"]["repo"],
@@ -705,11 +714,15 @@ def run_validate() -> list[dict]:
 
             actual = run_one.run_transcript(crispasr_bin, gguf_local, sample)
             transcript_ok = (actual == entry["expected_transcript"])
-            stages = run_one.run_diff(
-                diff_bin, entry["backend_id"], gguf_local, ref_local, sample)
-            passes, fails, missing, extras = run_one.evaluate_stage_thresholds(
-                stages, entry["diff_thresholds"])
-            ok = transcript_ok and not fails and not missing
+            if skip_diff:
+                stages, passes, fails, missing, extras = {}, [], [], [], {}
+                ok = transcript_ok
+            else:
+                stages = run_one.run_diff(
+                    diff_bin, entry["backend_id"], gguf_local, ref_local, sample)
+                passes, fails, missing, extras = run_one.evaluate_stage_thresholds(
+                    stages, entry["diff_thresholds"])
+                ok = transcript_ok and not fails and not missing
             results.append({
                 "backend": name,
                 "mode": "validate",
@@ -717,7 +730,7 @@ def run_validate() -> list[dict]:
                 "elapsed_s": round(time.time() - t0, 2),
                 "transcript_match": transcript_ok,
                 "transcript_actual": actual if not transcript_ok else None,
-                "stages": {s: stages.get(s) for s in entry["diff_thresholds"]},
+                "stages": {s: stages.get(s) for s in entry.get("diff_thresholds", {})},
                 "extras": dict(extras),
                 "missing": missing,
             })
@@ -732,6 +745,29 @@ def run_validate() -> list[dict]:
                 "error": f"{type(exc).__name__}: {exc}",
             })
             print(f"  -> ERROR  {type(exc).__name__}: {exc}")
+        finally:
+            # Free the model before the next backend. The 45-backend sweep pulls
+            # far more than /kaggle/working holds — the previous run died partway
+            # through with "No space left on device (os error 28)" and every
+            # remaining backend then failed on disk rather than on merit.
+            # Keeping one model at a time is what makes a full sweep possible;
+            # the ASR ground-truth model and fixtures are small and are re-used,
+            # so only the backend under test is evicted.
+            try:
+                import shutil as _sh
+                for _p in (locals().get("gguf_local"),):
+                    if _p is None:
+                        continue
+                    # hf_hub_download returns .../snapshots/<rev>/<file>; drop the
+                    # whole models--* tree so blobs go too, not just the symlink.
+                    _root = Path(_p)
+                    while _root.parent != _root and not _root.name.startswith("models--"):
+                        _root = _root.parent
+                    if _root.name.startswith("models--") and _root.is_dir():
+                        _sh.rmtree(_root, ignore_errors=True)
+                        print(f"  freed {_root.name}", flush=True)
+            except Exception as _e:
+                print(f"  cleanup skipped: {_e}", flush=True)
 
     return results
 
