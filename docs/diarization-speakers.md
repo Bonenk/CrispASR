@@ -296,10 +296,29 @@ Two properties worth relying on:
   alone; the thread count only picks how many chunks are in flight. `-t 1`,
   `2`, `4` and `8` produce byte-identical posteriors on a 2888 s file.
 * **Accuracy does not regress.** On the VoxConverse dev shard (8 files, DER vs
-  human labels, no embedder re-clustering, so these are the weak raw-pyannote
-  numbers) every chunked setting beat the single scan:
+  human labels) every chunked setting beat the single scan:
   whole-file 33.37%, 60/ctx2 32.88%, **60/ctx5 30.67%**, 60/ctx10 31.87%,
   120/ctx5 31.08%, 120/ctx10 29.88%.
+
+  ⚠ Read those as a RELATIVE A/B of the segmenter only, never as pipeline
+  quality. They score the raw powerset posteriors with the local speaker
+  tracks taken as global identity — no embedder, no clustering. The shard
+  averages 4.5 speakers per file and the segmentation head models at most 3
+  LOCALLY, so ~30% is that harness's floor, not the product's. Scored end to
+  end on the same files and the same scorer, what actually ships is:
+
+  | path | mean DER |
+  |---|---|
+  | raw posteriors, no clustering (the A/B harness above) | 33.37% |
+  | `--diarize-method pyannote --diarize-embedder auto` | **15.74%** |
+  | `--diarize-method foxnose` (#324) | **7.32%** |
+
+  foxnose is the one to reach for. The pyannote+TitaNet path over-clusters: it
+  hit the `--diarize-max-speakers 8` cap on 4 of the 8 files (esrit 8 vs 5 real,
+  mesob 8 vs 4, nnqfq 8 vs 5), which is where most of its remaining DER lives.
+  (The 7.32% here is foxnose labelling whisper-tiny's ASR segments; #324's
+  3.18% scored foxnose's own turns directly, without ASR segmentation as a
+  ceiling. Different measurement, not a regression.)
 
 This also moves toward pyannote's own design rather than away from it:
 upstream infers on a sliding 10 s window, and one continuous 48-minute scan
