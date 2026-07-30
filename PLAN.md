@@ -192,23 +192,45 @@ So do NOT tune kSilhouetteKBonus to "fix" this. It would be overfitting to one
 file, and it would be tuning the very constant that is the only reason the
 baseline looks right here.
 
-WORTH KNOWING INDEPENDENTLY OF THIS FEATURE: on SOME files the speaker count
-rests on a margin small enough that a tuning constant decides it. Survey so far
-(CRISPASR_DIARIZE_DEBUG=1, margin = winning score over runner-up):
+WORTH KNOWING INDEPENDENTLY OF THIS FEATURE — and it is NOT what I first
+claimed. Full survey, all 8 files, default path (CRISPASR_DIARIZE_DEBUG=1;
+margin = winning score over the runner-up, relative):
 
-    file    GT   winner        margin
-    jyirt    4   k=3 (WRONG)     0.8%   <- decided by kSilhouetteKBonus*log(k)
-    esrit    5   k=5 (right)     9.5%   <- decisive
+    file    GT   chosen   margin   verdict
+    esrit    5      5       8.7%   correct
+    fsaal    7      6       6.1%   WRONG
+    jyirt    4      4       1.9%   correct  <- the only tight call
+    mesob    4      2      14.1%   WRONG
+    nnqfq    5      5       3.6%   correct
+    rcxzg    4      4       7.2%   correct
+    tiams    5      3       9.6%   WRONG
+    willh    2      3      12.5%   WRONG
 
-So this is file-dependent, NOT systemic — do not over-read it from jyirt alone.
-The other six files are uncollected: the box sat at load 130-197 from a parallel
-session and managed one file per ~10 minutes.
+    1 of 8 decided on a <3% margin.  4 of 8 pick the WRONG count.
 
-FINISH THE SURVEY before acting on it. If several files land under a few
-percent, a more robust counting criterion is worth building and would improve
-the DEFAULT path (bigger than the span embedder). If jyirt is the outlier,
-leave the estimator alone. Either way the answer comes from the data, not from
-the one file that happened to be interesting.
+So the estimator is not FRAGILE, it is BIASED: it is confidently wrong half the
+time, by margins of 6-14%. Two things follow.
+
+  * Making the tie-break more robust buys nothing. Only one file is close, and
+    that one is already right. Do not tune kSilhouetteKBonus, and do not build
+    an eigengap tie-breaker: neither addresses a 14% margin in the wrong
+    direction.
+  * The silhouette criterion itself is the weak link. mesob merges 4 speakers
+    into 2 and prefers that by 14.1%; tiams merges 5 into 3 by 9.6%. Both are
+    UNDER-counts, as is fsaal (6 vs 7); willh is the lone over-count. A
+    criterion that systematically prefers too few clusters on real speech is a
+    modelling problem, not a threshold problem.
+
+⚠ Also corrects my own arithmetic: I repeatedly described jyirt's margin as
+"0.8%". 0.0083 absolute on a 0.4331 score is 1.9% relative. The conclusion it
+was used to support ("our DER is partly luck") was wrong twice over — wrong
+number, and wrong shape of problem.
+
+NOTE the counts being wrong does NOT scale linearly into DER: the shard still
+scores 7.32% mean, because a merged speaker costs only the frames of the
+speaker that got absorbed. willh picks 3 against a true 2 and still scores
+6.23%. So this is worth fixing for correctness of the reported speaker count,
+and only secondarily for DER.
 
 Span size is fixed at kWindowsPerSpan=32 deliberately: CMN over the span makes
 it part of the answer, so it must never depend on the worker count.
