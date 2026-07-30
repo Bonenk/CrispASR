@@ -515,13 +515,22 @@ bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOption
     // 135 trunk passes -> 18) for +0.30 mean DER on the VoxConverse dev shard
     // (7.32% -> 7.62%; 6 of 8 files identical, one loses a speaker). Default
     // OFF because accuracy is the better default for a diarizer; opt in with
-    // CRISPASR_DIARIZE_SPAN_EMBED=1. See PLAN.md "#324 shared-trunk".
+    // CRISPASR_DIARIZE_SPAN_EMBED=1.
+    //
+    // The cost is intrinsic, not a tuning problem: sharing a trunk pass means
+    // adjacent windows share convolutional context, so the embedding space
+    // smooths and a speaker with little airtime merges into a neighbour. Raw
+    // silhouette then prefers the smaller k by a wide margin. See PLAN.md
+    // "#324 shared-trunk" for the score curves.
     core_foxnose::EmbedWindowsFn span_fn = nullptr;
     if (const char* e = std::getenv("CRISPASR_DIARIZE_SPAN_EMBED"))
         if (*e && *e != '0')
             span_fn = foxnose_embed_windows_cb;
     core_foxnose::Result res =
         core_foxnose::diarize(left, n_samples, sr, speech, foxnose_embed_cb, &emb, dim, p, span_fn);
+    if (std::getenv("CRISPASR_DIARIZE_DEBUG"))
+        fprintf(stderr, "crispasr[diarize]: foxnose windows=%d skipped=%d -> %d speakers (%s), %zu turns\n",
+                res.n_windows, res.n_skipped, res.n_speakers, res.reason.c_str(), res.turns.size());
     // Workers borrow ctx's weights, so they must go first.
     for (size_t i = emb.ctx.size(); i-- > 0;)
         wespeaker_free(emb.ctx[i]);

@@ -994,6 +994,9 @@ std::vector<int> cluster_speakers(const float* x, int n, int d, int min_speakers
         std::vector<int> lab = refine_spherical(x, n, d, spectral_labels(aff.data(), n, c, seed));
         const float sil = silhouette_precomputed(dist.data(), n, lab);
         const float score = sil + kSilhouetteKBonus * (float)std::log((double)std::max(c, 1));
+        if (std::getenv("CRISPASR_DIARIZE_DEBUG"))
+            fprintf(stderr, "  spectral: k=%d silhouette=%.4f score=%.4f%s\n", c, sil, score,
+                    c == k ? "   (bic anchor)" : "");
         if (score > best_score) {
             best_score = score;
             best_k = c;

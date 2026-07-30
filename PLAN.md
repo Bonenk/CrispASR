@@ -165,19 +165,39 @@ DER point. Shipped as CRISPASR_DIARIZE_SPAN_EMBED=1, default OFF, because
 accuracy is the better default for a diarizer and the user who wants throughput
 can say so.
 
-⚠ Span size does NOT drive the accuracy cost — do not tune it. jyirt scores
-exactly 11.05% with 3 speakers at N=2, 4, 8, 16 AND 32; at N=2 a span is 1.8 s
-against a 1.2 s window, so CMN drift cannot be the mechanism. It is a threshold
-flip in speaker COUNTING on a file with only 17 embeddings (the same borderline
-file that needed the adaptive pca_dim fix): the embeddings move just enough for
-the estimator to pick k=3 instead of k=4, and once it does the DER is the same
-however the spans are cut. Since accuracy is flat in N, larger N is strictly
-better for speed — hence the default of 32. CRISPASR_DIARIZE_SPAN_WINDOWS
-overrides it for investigation.
+⚠ Neither span size NOR the estimator is the lever. Both were investigated to
+the bottom; both are dead ends.
 
-OPEN: whether the count flip can be fixed at the estimator rather than the
-embedder. If a borderline 17-embedding file can be made to hold k=4 under both
-paths, this becomes a free 1.78x and the default should flip.
+Span size: jyirt scores exactly 11.05% with 3 speakers at N=2, 4, 8, 16 AND 32.
+At N=2 a span is 1.8 s against a 1.2 s window, so the CMN drift I assumed
+cannot be the mechanism. (An earlier revision of this plan said "17
+embeddings" — wrong, that was the pyannote path's ASR-segment count. foxnose
+gives this file n=134.) Since accuracy is flat in N, larger N is strictly
+faster — hence the default of 32. CRISPASR_DIARIZE_SPAN_WINDOWS overrides it.
+
+The actual mechanism, from the silhouette curve (CRISPASR_DIARIZE_DEBUG=1):
+
+    k   per-window sil / score     shared-trunk sil / score
+    3      0.3809 / 0.4248            0.4141 / 0.4581  <- wins
+    4      0.3777 / 0.4331 <- wins    0.3469 / 0.4023
+
+RAW SILHOUETTE PREFERS k=3 IN BOTH PATHS. Per-window only reaches the correct
+k=4 because the `kSilhouetteKBonus * log(k)` term flips a 0.8% gap.
+Shared-trunk prefers k=3 by 19% — it is MORE confident, and confidently wrong.
+Sharing a trunk pass means adjacent windows share convolutional context, so the
+embedding space smooths and a speaker with little airtime merges into a
+neighbour. That is intrinsic to the method, not a constant that wants tuning.
+
+So do NOT tune kSilhouetteKBonus to "fix" this. It would be overfitting to one
+file, and it would be tuning the very constant that is the only reason the
+baseline looks right here.
+
+WORTH KNOWING INDEPENDENTLY OF THIS FEATURE: on a borderline file the speaker
+count rests on a 0.8% score gap decided by a tuning constant. Our DER on such
+files is partly luck, in BOTH paths. A more robust counting criterion would
+help the DEFAULT path too — that is the real open problem, and it is bigger
+than the span embedder.
+
 Span size is fixed at kWindowsPerSpan=32 deliberately: CMN over the span makes
 it part of the answer, so it must never depend on the worker count.
 
