@@ -58,7 +58,7 @@ std::vector<Speech> window_boundaries(const Speech& seg, const std::vector<Speec
 }
 
 Result diarize(const float* pcm, int n_samples, int sample_rate, const std::vector<Speech>& speech, EmbedFn embed,
-               void* userdata, int embed_dim, const Params& params) {
+               void* userdata, int embed_dim, const Params& params, EmbedWindowsFn embed_windows) {
     Result res;
     if (!pcm || n_samples <= 0 || !embed || embed_dim <= 0 || speech.empty())
         return res;

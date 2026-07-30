@@ -69,6 +69,19 @@ struct Params {
 // implementation only needs one context per worker, not a lock.
 using EmbedFn = int (*)(void* userdata, int worker, const float* pcm, int n_samples, float* out);
 
+// Optional fast path: embed SEVERAL windows of one contiguous span at once,
+// sharing whatever work they have in common (for a convolutional trunk that is
+// most of it, since the windows overlap 50%). `ws`/`we` are sample offsets
+// relative to `pcm`. Return 0 on success; non-zero marks the whole span failed
+// and those windows are skipped. Null => diarize() embeds window by window.
+using EmbedWindowsFn = int (*)(void* userdata, int worker, const float* pcm, int n_samples, const int* ws,
+                               const int* we, int n_win, float* out);
+
+// Windows per trunk pass when EmbedWindowsFn is used. Fixed, so the result does
+// not depend on the worker count: cepstral mean normalisation is computed over
+// the span, so span size is part of the answer, not just of the schedule.
+constexpr int kWindowsPerSpan = 32;
+
 struct Result {
     std::vector<Turn> turns;
     int n_speakers = 0;
@@ -91,6 +104,6 @@ std::vector<Speech> window_boundaries(const Speech& seg, const std::vector<Speec
 
 // Run the whole pipeline over pre-computed speech regions.
 Result diarize(const float* pcm, int n_samples, int sample_rate, const std::vector<Speech>& speech, EmbedFn embed,
-               void* userdata, int embed_dim, const Params& params);
+               void* userdata, int embed_dim, const Params& params, EmbedWindowsFn embed_windows = nullptr);
 
 } // namespace core_foxnose

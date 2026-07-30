@@ -432,6 +432,14 @@ struct FoxnoseEmbedder {
     std::vector<wespeaker_context*> ctx;
 };
 
+int foxnose_embed_windows_cb(void* ud, int worker, const float* pcm, int n, const int* ws, const int* we, int n_win,
+                             float* out) {
+    auto* e = static_cast<FoxnoseEmbedder*>(ud);
+    if (worker < 0 || worker >= (int)e->ctx.size())
+        return -1;
+    return wespeaker_embed_windows(e->ctx[worker], pcm, n, ws, we, n_win, out);
+}
+
 int foxnose_embed_cb(void* ud, int worker, const float* pcm, int n, float* out) {
     auto* e = static_cast<FoxnoseEmbedder*>(ud);
     if (worker < 0 || worker >= (int)e->ctx.size())
@@ -502,7 +510,16 @@ bool apply_foxnose(const float* left, int n_samples, const CrispasrDiarizeOption
     p.max_speakers = opts.max_speakers;
     p.num_speakers = opts.num_speakers;
     p.n_workers = (int)emb.ctx.size();
-    core_foxnose::Result res = core_foxnose::diarize(left, n_samples, sr, speech, foxnose_embed_cb, &emb, dim, p);
+    // Shared-trunk windowing: OFF by default until DER says otherwise. It is a
+    // ~2x on the dominant stage but it CHANGES the embeddings (CMN over the
+    // span, real audio instead of zero padding at window edges), so it is not
+    // a free refactor. CRISPASR_DIARIZE_SPAN_EMBED=1 to evaluate.
+    core_foxnose::EmbedWindowsFn span_fn = nullptr;
+    if (const char* e = std::getenv("CRISPASR_DIARIZE_SPAN_EMBED"))
+        if (*e && *e != '0')
+            span_fn = foxnose_embed_windows_cb;
+    core_foxnose::Result res =
+        core_foxnose::diarize(left, n_samples, sr, speech, foxnose_embed_cb, &emb, dim, p, span_fn);
     // Workers borrow ctx's weights, so they must go first.
     for (size_t i = emb.ctx.size(); i-- > 0;)
         wespeaker_free(emb.ctx[i]);

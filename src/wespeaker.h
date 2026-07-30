@@ -65,6 +65,19 @@ int wespeaker_min_samples(struct wespeaker_context* ctx);
 // Returns 0 on success, non-zero on failure (including audio too short).
 int wespeaker_embed(struct wespeaker_context* ctx, const float* samples, int n_samples, float* out_embedding);
 
+// Embed `n_win` windows of ONE contiguous span with a single pass of the
+// convolutional trunk, instead of one pass per window. win_start/win_end are
+// sample offsets into `samples`; out_embeddings receives n_win * embed_dim
+// floats. Returns 0 on success.
+//
+// The sliding window overlaps 50%, so per-window embedding pushes every sample
+// through the trunk twice; this does it once. NOT bit-identical to looping
+// wespeaker_embed(): CMN is computed over the span, and interior windows see
+// real neighbouring audio through the convs instead of zero padding. Validate
+// changes here on DER.
+int wespeaker_embed_windows(struct wespeaker_context* ctx, const float* samples, int n_samples, const int* win_start,
+                            const int* win_end, int n_win, float* out_embeddings);
+
 // ---- Stage-level entry points (for crispasr-diff) ----
 
 // Kaldi fbank (80 mel, 25/10 ms, hamming) AFTER per-utterance CMN — i.e. the
