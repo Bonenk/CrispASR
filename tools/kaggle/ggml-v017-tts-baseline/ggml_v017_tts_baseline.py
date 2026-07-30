@@ -66,7 +66,14 @@ if not REPO.exists():
          "--recurse-submodules", "--shallow-submodules", CRISPASR_URL, str(REPO)],
         check=True, timeout=2400)
 
-sys.path.insert(0, str(REPO / "tools" / "kaggle"))
+# Prefer the harness from the clone; fall back to the copy bundled beside this
+# script (kaggle_usage.md, "MUST follow"): a CPU-only worker has no internet and
+# the clone above can fail outright.
+_h = REPO / "tools" / "kaggle"
+if (_h / "kaggle_harness.py").exists():
+    sys.path.insert(0, str(_h))
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaggle_harness as kh  # noqa: E402
 
 kh.init_progress()

@@ -39,7 +39,14 @@ CLONE = TMP / "CrispASR"
 if not CLONE.exists():
     subprocess.run(["git", "clone", "--depth", "1", CRISPASR_URL, str(CLONE)],
                    check=False, timeout=1200)
-sys.path.insert(0, str(CLONE / "tools" / "kaggle"))
+# Prefer the harness from the clone; fall back to the copy bundled beside this
+# script (kaggle_usage.md, "MUST follow") — a CPU-only worker has no internet and
+# the clone can fail outright.
+_h = CLONE / "tools" / "kaggle"
+if (_h / "kaggle_harness.py").exists():
+    sys.path.insert(0, str(_h))
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaggle_harness as kh  # noqa: E402
 
 kh.init_progress()

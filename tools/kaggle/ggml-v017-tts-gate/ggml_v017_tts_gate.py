@@ -43,17 +43,24 @@ TMP.mkdir(parents=True, exist_ok=True)
 RESULTS = WORK / "tts_gate_results.json"
 
 CRISPASR_URL = "https://github.com/CrispStrobe/CrispASR.git"
-BRANCH = os.environ.get("CRISPASR_BRANCH", "sync/ggml-v0.17")
+BRANCH = os.environ.get("CRISPASR_BRANCH", "main")
 REPO = TMP / "CrispASR"
 BUILD = TMP / "build-regression"
 
 # Order matters: cheapest / most load-bearing first, so a quota or timeout kill
 # still leaves a usable verdict instead of nothing.
-BACKENDS = [b.strip() for b in os.environ.get(
-    "TTS_GATE_BACKENDS",
-    "kokoro-82m-en,pocket-tts-en,tada-codec,melotts-en-v3,"
-    "piper-lessac-en,csm-1b,f5-tts-v1-base,cosyvoice3-0.5b"
-).split(",") if b.strip()]
+# Full sweep: every tts_backends entry in the manifest, read from the clone so a
+# new entry is picked up without editing this kernel. Ordered cheapest-first
+# (approx_size_mb) so a quota or timeout kill still leaves a usable verdict.
+_env = os.environ.get("TTS_GATE_BACKENDS", "").strip()
+if _env:
+    BACKENDS = [b.strip() for b in _env.split(",") if b.strip()]
+else:
+    with (REPO / "tests" / "regression" / "manifest.json").open() as _f:
+        _m = json.load(_f)
+    BACKENDS = [e["name"] for e in sorted(
+        _m["tts_backends"],
+        key=lambda e: e["gguf"].get("approx_size_mb", 1 << 30))]
 
 # --recurse-submodules is the whole point: it is what pins the ggml under test.
 if not REPO.exists():
@@ -62,7 +69,14 @@ if not REPO.exists():
          "--recurse-submodules", "--shallow-submodules", CRISPASR_URL, str(REPO)],
         check=True, timeout=2400)
 
-sys.path.insert(0, str(REPO / "tools" / "kaggle"))
+# Prefer the harness from the clone; fall back to the copy bundled beside this
+# script (kaggle_usage.md, "MUST follow"): a CPU-only worker has no internet and
+# the clone above can fail outright.
+_h = REPO / "tools" / "kaggle"
+if (_h / "kaggle_harness.py").exists():
+    sys.path.insert(0, str(_h))
+else:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
 import kaggle_harness as kh  # noqa: E402
 
 kh.init_progress()
