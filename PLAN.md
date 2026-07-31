@@ -235,7 +235,7 @@ and only secondarily for DER.
 Span size is fixed at kWindowsPerSpan=32 deliberately: CMN over the span makes
 it part of the answer, so it must never depend on the worker count.
 
-### 4. RUNNING — speaker-count estimator A/B (BIC+silhouette vs NME-SC)
+### 4. RESOLVED — NME-SC LOSES. Default unchanged.
 
 The survey said the estimator is BIASED, not fragile: 4 of 8 files wrong, three
 of them under-counts by 6-14% margins. NME-SC is the candidate because it
@@ -256,11 +256,37 @@ spectrum appears to have.
     times; the kernel pulls the HF parquet directly so there is no 20 GB
     dataset upload.
 
-WHEN IT LANDS: if NME-SC wins on tune COUNT accuracy, re-run with --split
-holdout and quote that. If it does not, say so and leave the default alone —
-the point of building this harness was to be able to be wrong cheaply.
-⚠ Do not read holdout before tune has decided; do not tune any constant
-against a file you already looked at.
+RESULT (Kaggle chr1str/crispasr-diarize-count-eval v4, 40-file tune subset,
+--diarize-max-speakers 8):
+
+                    count exact   within1   under   over     DER
+    BIC+silhouette   18/40 (45%)   34/40      15      7    33.06%
+    NME-SC           17/40 (42%)   31/40      11     12    39.26%
+
+    of 17 files where the counts differ: NME-SC closer on 6, worse on 10
+    mean |k - gt|: BIC 1.10, NME-SC 1.15
+
+The hypothesis was directionally right and still lost. NME-SC DOES cut
+under-counting (15 -> 11), which is exactly the failure it was chosen to
+address — but it converts those into over-counts (7 -> 12) and ends up worse on
+every aggregate. Auto-tuning the binarisation moves the error, it does not
+remove it.
+
+DECISION: default unchanged. NME-SC stays opt-in
+(CRISPASR_DIARIZE_COUNT=nme-sc). HOLDOUT WAS NOT COMPUTED and must stay
+unspent — it is worth more as an untouched set than as a second opinion on a
+hypothesis that already failed on tune.
+
+⚠ CALIBRATION — the 8-file shard used earlier in this series was EASY.
+Same code scores 7.32% DER there and 33.06% here. The 8 files top out at 7
+speakers; full dev reaches 20, and 20 of the 216 exceed the default cap of 8
+outright. Treat every "7.3%" in the #324/#326 history as a number from an
+unrepresentative subset, not as pipeline quality.
+
+STILL OPEN: speaker counting is the weak link — 45% exact on real data. NME-SC
+is not the answer; something that fixes over- and under-counting together is.
+Next candidate would have to be argued from the error structure above, not from
+a paper's abstract.
 
 ### 3. Not worth doing, measured
 
