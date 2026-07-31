@@ -95,16 +95,25 @@ emb = hf_hub_download(repo_id="cstr/wespeaker-resnet34-lm-GGUF",
 kh.step("models", status="ok")
 
 # ── the A/B ─────────────────────────────────────────────────────────────────
+# --diarize-max-speakers stays at the SHIPPING DEFAULT of 8, not 20.
+#
+# A first run used 20 so that files with up to 20 speakers were countable. That
+# made the silhouette scan evaluate 19 candidate k instead of 7, each an O(n^2)
+# eigendecomposition, and the longest tune file has ~1800 embedding windows —
+# the BIC arm alone took 6.4 h. Two reasons 8 is the better measurement anyway:
+# it is what users actually get, and the cap applies identically to BOTH arms so
+# the comparison stays fair. diarize_eval.py flags the files the cap makes
+# unwinnable rather than letting them read as model error.
 CMD = (
     f"{cli} -m {asr} -f {{wav}} -t {os.cpu_count() or 4} --diarize "
-    f"--diarize-method foxnose --diarize-embedder {emb} --diarize-max-speakers 20 "
+    f"--diarize-method foxnose --diarize-embedder {emb} "
     f"-oj -of {{out}}"
 )
 BASE = [
     sys.executable, str(REPO / "tools" / "diarize_eval.py"),
     "--wav-dir", str(CORPUS / "wav"), "--ref", str(CORPUS / "ref.json"),
     "--workdir", str(TEMP / "evalwork"), "--jobs", "2",
-    "--max-speakers", "20", "--split", "tune", "--cmd", CMD,
+    "--max-speakers", "8", "--split", "tune", "--cmd", CMD,
 ]
 
 summary = {}
