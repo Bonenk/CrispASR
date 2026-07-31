@@ -89,6 +89,24 @@ against the upstream Python pipeline's own output (same pinned speaker count,
 0.25 s collar) with **zero speaker confusion** — the residual is entirely
 false alarm from a different speech-segmentation source.
 
+⚠ **That is a PARITY number, not an accuracy one.** It says this port
+reproduces the reference implementation; it does not say either is 96% right.
+Measured against HUMAN labels on VoxConverse dev (40 files, `--diarize-max-
+speakers 8`, whisper-tiny segments, 0.25 s collar):
+
+| | value |
+|---|---|
+| DER | **33.1%** |
+| speaker count exactly right | **18/40 (45%)** |
+| within ±1 speaker | 34/40 |
+
+Estimating the number of speakers is the weak link, not the embeddings — the
+embedding matches the PyTorch oracle to cosine 0.99999747. Pass
+`--diarize-num-speakers N` when you know the count and the picture improves
+sharply. Numbers near 3–7% DER quoted elsewhere in this project's history came
+from an 8-file subset that turned out to be unrepresentative: identical code
+scores 7.3% there and 33.1% on the fuller corpus.
+
 ## Usage
 
 ```bash
