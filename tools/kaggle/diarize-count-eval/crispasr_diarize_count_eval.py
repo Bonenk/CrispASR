@@ -10,8 +10,9 @@ found wrong on 4 of 8 files while DER still averaged 7.32%, because merging two
 speakers only costs the frames of the one absorbed — so DER alone cannot see
 this failure. See tools/diarize_eval.py.
 
-Runs the TUNE split only. Holdout is deliberately not computed: not calculating
-it is a stronger guarantee than calculating it and promising not to look.
+Runs a 40-file SUBSET of the TUNE split. Holdout is deliberately not computed:
+not calculating it is a stronger guarantee than calculating it and promising not
+to look. If the subset shows an effect, the full tune split is the next run.
 
 Kernel notes (tools/../kaggle_usage.md):
   * GPU is enabled ONLY because Kaggle CPU workers get no internet (#3) and a
@@ -116,11 +117,19 @@ CMD = (
     f"--diarize-method foxnose --diarize-embedder {emb} "
     f"-oj -of {{out}}"
 )
+# SUBSET of the tune split, not all 101. A full arm cost 6.2 h and returned
+# nothing; if NME-SC has a real effect on speaker counting it will show on 40
+# files, and learning that in an hour beats learning nothing in seven. The
+# subset is the FIRST 40 tune files by name, so it is deterministic and the
+# same 40 in both arms.
+SUBSET = int(os.environ.get("DIARIZE_EVAL_SUBSET", "40"))
+
 BASE = [
     sys.executable, str(REPO / "tools" / "diarize_eval.py"),
     "--wav-dir", str(CORPUS / "wav"), "--ref", str(CORPUS / "ref.json"),
     "--workdir", str(TEMP / "evalwork"), "--jobs", str(JOBS),
-    "--max-speakers", "8", "--split", "tune", "--cmd", CMD,
+    "--max-speakers", "8", "--split", "tune", "--subset", str(SUBSET),
+    "--cmd", CMD,
 ]
 
 summary = {}
