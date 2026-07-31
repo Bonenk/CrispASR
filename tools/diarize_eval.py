@@ -54,21 +54,31 @@ def split_of(name, holdout_frac=0.5):
 
 
 def run_one(name, wav, cmd_tpl, workdir):
-    out = os.path.join(workdir, name)
-    cmd = cmd_tpl.replace("{wav}", wav).replace("{out}", out)
-    r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    path = out + ".json"
-    if r.returncode != 0 or not os.path.exists(path):
-        return name, None, (r.stderr or "")[-400:]
+    # NOTHING in here may raise. A 101-file sweep died after 6 hours because an
+    # exception in one file propagated out of ThreadPoolExecutor.map and took
+    # the whole arm with it — losing the other 100 results AND the reason. A
+    # per-file failure must be recorded and stepped over, never fatal.
     try:
+        out = os.path.join(workdir, name)
+        cmd = cmd_tpl.replace("{wav}", wav).replace("{out}", out)
+        # errors="replace": decoding is done on the CHILD's output, and a
+        # transcript carrying odd bytes would otherwise raise UnicodeDecodeError
+        # inside communicate() — a failure of the harness, not of the run.
+        r = subprocess.run(cmd, shell=True, capture_output=True, text=True, errors="replace")
+        path = out + ".json"
+        if r.returncode != 0 or not os.path.exists(path):
+            return name, None, f"rc={r.returncode} " + (r.stderr or "")[-400:]
         segs = json.load(open(path))["transcription"]
-    except Exception as e:
-        return name, None, f"unparseable output: {e}"
-    hyp = [
-        (s["offsets"]["from"] / 1000.0, s["offsets"]["to"] / 1000.0, s["speaker"])
-        for s in segs
-        if s.get("speaker") not in (None, "", "?")
-    ]
+    except Exception as e:  # noqa: BLE001 — deliberately total
+        return name, None, f"{type(e).__name__}: {e}"
+    try:
+        hyp = [
+            (s["offsets"]["from"] / 1000.0, s["offsets"]["to"] / 1000.0, s["speaker"])
+            for s in segs
+            if s.get("speaker") not in (None, "", "?")
+        ]
+    except Exception as e:  # noqa: BLE001
+        return name, None, f"bad segments: {type(e).__name__}: {e}"
     return name, hyp, None
 
 
@@ -154,7 +164,12 @@ def main():
             rows.append({"file": n, "split": split_of(n), "gt": gt, "hyp_k": None, "der": None, "error": err})
             continue
         turns = [(s["start"], s["end"], s["speaker"]) for s in ref[n]]
-        d = score(turns, hyp, collar=args.collar)
+        try:
+            d = score(turns, hyp, collar=args.collar)
+        except Exception as e:  # noqa: BLE001
+            rows.append({"file": n, "split": split_of(n), "gt": gt, "hyp_k": None, "der": None,
+                         "error": f"scoring: {type(e).__name__}: {e}"})
+            continue
         rows.append(
             {
                 "file": n,
@@ -178,8 +193,10 @@ def main():
         over = sum(1 for r in rs if r["hyp_k"] > r["gt"])
         unwin = sum(1 for r in rs if r.get("unwinnable"))
         der = sum(r["der"] for r in rs) / n
+        nfail = len([r for r in rows if r["split"] == split and r.get("der") is None])
         print(
-            f"{split:8} n={n:3d}  DER {der*100:6.2f}%  |  count exact {exact}/{n} ({exact/n*100:.0f}%)"
+            f"{split:8} n={n:3d}{f' (+{nfail} FAILED)' if nfail else ''}  DER {der*100:6.2f}%"
+            f"  |  count exact {exact}/{n} ({exact/n*100:.0f}%)"
             f"  within1 {within1}/{n}  under {under}  over {over}"
             + (f"  [{unwin} unwinnable at max-speakers={args.max_speakers}]" if unwin else "")
         )
