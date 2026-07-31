@@ -104,15 +104,22 @@ kh.step("models", status="ok")
 # it is what users actually get, and the cap applies identically to BOTH arms so
 # the comparison stays fair. diarize_eval.py flags the files the cap makes
 # unwinnable rather than letting them read as model error.
+# Threads per file x concurrent files must not exceed the box. The first run
+# used -t cpu_count WITH --jobs 2 on a 4-CPU worker: 8 threads on 4 cores,
+# every file fighting the other for the same cores.
+NCPU = os.cpu_count() or 4
+JOBS = 2
+THREADS = max(1, NCPU // JOBS)
+
 CMD = (
-    f"{cli} -m {asr} -f {{wav}} -t {os.cpu_count() or 4} --diarize "
+    f"{cli} -m {asr} -f {{wav}} -t {THREADS} --diarize "
     f"--diarize-method foxnose --diarize-embedder {emb} "
     f"-oj -of {{out}}"
 )
 BASE = [
     sys.executable, str(REPO / "tools" / "diarize_eval.py"),
     "--wav-dir", str(CORPUS / "wav"), "--ref", str(CORPUS / "ref.json"),
-    "--workdir", str(TEMP / "evalwork"), "--jobs", "2",
+    "--workdir", str(TEMP / "evalwork"), "--jobs", str(JOBS),
     "--max-speakers", "8", "--split", "tune", "--cmd", CMD,
 ]
 
@@ -121,12 +128,23 @@ for arm, env_extra in (("bic", {}), ("nme-sc", {"CRISPASR_DIARIZE_COUNT": "nme-s
     env = dict(os.environ)
     env.update(env_extra)
     out_json = WORK / f"eval_{arm}.json"
-    with kh.build_heartbeat(f"eval:{arm}", 30):
-        r = subprocess.run(BASE + ["--json-out", str(out_json)], env=env,
-                           capture_output=True, text=True)
-    (WORK / f"eval_{arm}.txt").write_text(r.stdout + "\n--- stderr tail ---\n" + r.stderr[-4000:])
-    tune = [l for l in r.stdout.splitlines() if l.startswith("tune ")]
-    summary[arm] = tune[0] if tune else f"NO RESULT (rc={r.returncode})"
+    # NOT capture_output. The first run buffered 101 files of output into a
+    # variable that was only written after the arm returned — the arm failed,
+    # the kernel was killed, and six hours produced heartbeats and no reason.
+    # Tee to the kernel log (live) AND to a file (retrievable).
+    log_path = WORK / f"eval_{arm}.txt"
+    with kh.build_heartbeat(f"eval:{arm}", 30), open(log_path, "w", buffering=1) as lf:
+        proc = subprocess.Popen(BASE + ["--json-out", str(out_json)], env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, errors="replace", bufsize=1)
+        captured = []
+        for line in proc.stdout:
+            print(f"[{arm}] {line.rstrip()}", flush=True)
+            lf.write(line)
+            captured.append(line)
+        rc = proc.wait()
+    tune = [l for l in captured if l.startswith("tune ")]
+    summary[arm] = tune[0].rstrip() if tune else f"NO RESULT (rc={rc})"
     kh.step(f"eval:{arm}", status="ok" if tune else "FAILED", line=summary[arm])
     print(f"[{arm}] {summary[arm]}", flush=True)
 

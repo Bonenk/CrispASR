@@ -138,10 +138,18 @@ def main():
     done = 0
     total = len(todo)
 
+    # Append each result as it lands. A sweep that is killed at hour six must
+    # still leave behind what it finished — the Kaggle run that motivated this
+    # lost 101 files of work AND the reason, because everything was held in
+    # memory until a final write that never happened.
+    inc = open(args.json_out + ".partial", "w", buffering=1) if args.json_out else None
+
     def note(name, err):
         nonlocal done
         done += 1
-        print(f"  [{done}/{total}] {name}{'  FAILED' if err else ''}", file=sys.stderr, flush=True)
+        print(f"  [{done}/{total}] {name}{'  FAILED: ' + err[:120] if err else ''}", file=sys.stderr, flush=True)
+        if inc:
+            inc.write(json.dumps({"file": name, "error": err}) + "\n")
 
     if args.jobs > 1:
         with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as ex:
