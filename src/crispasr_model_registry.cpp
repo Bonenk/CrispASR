@@ -347,11 +347,12 @@ constexpr Entry k_registry[] = {
      "vibevoice-voice-emma.gguf",
      "https://huggingface.co/cstr/vibevoice-realtime-0.5b-GGUF/resolve/main/vibevoice-voice-emma.gguf",
      "~3 MB"},
-    // 17.3 GB, not the "~14 GB" this entry used to claim — which is over the
-    // VRAM of every 16 GB card, so `-m auto` hard-fails there. Q4_K (5.7 GB) is
-    // published alongside it via --model-quant q4_k.
-    {"kugelaudio", "kugelaudio-0-open-f16.gguf",
-     "https://huggingface.co/cstr/kugelaudio-0-open-GGUF/resolve/main/kugelaudio-0-open-f16.gguf", "~17.3 GB", nullptr,
+    // Q4_K, like every other multi-GB entry here. The F16 this used to default to
+    // is 17.3 GB (not the "~14 GB" it claimed) — over the VRAM of a 16 GB card,
+    // so `-m auto` downloaded 17 GB and then hard-failed to allocate. Still
+    // reachable with --model-quant f16 for anyone with the VRAM.
+    {"kugelaudio", "kugelaudio-0-open-q4_k.gguf",
+     "https://huggingface.co/cstr/kugelaudio-0-open-GGUF/resolve/main/kugelaudio-0-open-q4_k.gguf", "~5.7 GB", nullptr,
      nullptr},
     {"firered-asr", "firered-asr2-aed-q4_k.gguf",
      "https://huggingface.co/cstr/firered-asr2-aed-GGUF/resolve/main/firered-asr2-aed-q4_k.gguf", "~918 MB", nullptr, nullptr},
