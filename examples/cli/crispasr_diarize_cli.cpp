@@ -11,6 +11,7 @@
 #include "crispasr_diarize_internal.h"
 #include "crispasr_speaker_cluster.h"
 #include "crispasr_speaker_embedder.h"
+#include "crispasr_subprocess.h"
 #include "pyannote_seg.h"
 #include "speaker_db.h"
 #include "whisper_params.h"
@@ -34,8 +35,6 @@
 #include <io.h>
 #include <sys/stat.h>
 #define close _close
-#define popen _popen
-#define pclose _pclose
 #define mkdir(d, m) _mkdir(d)
 static int mkstemps(char* t, int s) {
     (void)s;
@@ -142,6 +141,17 @@ struct SherpaSegment {
     int speaker;
 };
 
+std::vector<std::string> make_sherpa_args(const std::string& bin, const whisper_params& params,
+                                          const std::string& wav_path) {
+    return {
+        bin,
+        "--clustering.num-clusters=" + std::to_string(params.sherpa_num_clusters),
+        "--segmentation.pyannote-model=" + params.sherpa_segment_model,
+        "--embedding.model=" + params.sherpa_embedding_model,
+        wav_path,
+    };
+}
+
 // Parse a line emitted by sherpa-onnx-offline-speaker-diarization.
 //   "0.320 -- 3.680 speaker_00 duration=3.360"   — newer format
 //   "0.320 3.680 0"                               — older format
@@ -215,7 +225,7 @@ bool apply_sherpa(const std::vector<float>& mono, int64_t slice_t0_cs, std::vect
         return false;
     }
 
-    if (bin.find('/') != std::string::npos) {
+    if (bin.find('/') != std::string::npos || bin.find('\\') != std::string::npos) {
         struct stat st;
         if (::stat(bin.c_str(), &st) != 0) {
             fprintf(stderr,
@@ -232,30 +242,29 @@ bool apply_sherpa(const std::vector<float>& mono, int64_t slice_t0_cs, std::vect
         return false;
     }
 
-    std::ostringstream cmd;
-    // clang-format off
-    cmd << bin
-        << " --clustering.num-clusters=" << params.sherpa_num_clusters
-        << " --segmentation.pyannote-model='" << params.sherpa_segment_model << "'"
-        << " --embedding.model='" << params.sherpa_embedding_model << "'"
-        << " '" << wav_path << "'";
-    // clang-format on
+    const auto args = make_sherpa_args(bin, params, wav_path);
     if (!params.no_prints)
-        fprintf(stderr, "crispasr[diarize]: %s\n", cmd.str().c_str());
-    cmd << " 2>/dev/null";
+        fprintf(stderr, "crispasr[diarize]: %s\n", crispasr_cli_process::join_cmdline(args).c_str());
 
-    std::unique_ptr<FILE, int (*)(FILE*)> pipe(popen(cmd.str().c_str(), "r"), pclose);
-    if (!pipe) {
-        fprintf(stderr, "crispasr[diarize]: failed to spawn sherpa subprocess\n");
+    const int timeout_sec =
+        crispasr_cli_process::timeout_from_audio_samples("CRISPASR_SHERPA_TIMEOUT_SEC", (int)mono.size());
+    const auto run = crispasr_cli_process::run_capture_stdout(args, timeout_sec);
+    if (run.timed_out) {
+        fprintf(stderr, "crispasr[diarize]: sherpa subprocess timed out after %d s\n", timeout_sec);
         std::remove(wav_path.c_str());
         return false;
     }
-
+    if (run.exit_code != 0) {
+        fprintf(stderr, "crispasr[diarize]: sherpa subprocess failed with exit code %d\n", run.exit_code);
+        std::remove(wav_path.c_str());
+        return false;
+    }
     std::vector<SherpaSegment> parsed;
-    char linebuf[1024];
-    while (fgets(linebuf, sizeof(linebuf), pipe.get())) {
+    std::istringstream lines(run.output);
+    std::string line;
+    while (std::getline(lines, line)) {
         SherpaSegment s;
-        if (parse_sherpa_line(linebuf, s))
+        if (parse_sherpa_line(line, s))
             parsed.push_back(s);
     }
     std::remove(wav_path.c_str());
@@ -713,25 +722,28 @@ bool crispasr_compute_sherpa_cache(const float* full_audio, int n_samples, const
         return false;
     }
 
-    std::ostringstream cmd;
-    cmd << bin << " --clustering.num-clusters=" << params.sherpa_num_clusters << " --segmentation.pyannote-model='"
-        << params.sherpa_segment_model << "'" << " --embedding.model='" << params.sherpa_embedding_model << "'" << " '"
-        << wav_path << "'";
+    const auto args = make_sherpa_args(bin, params, wav_path);
     if (!params.no_prints)
-        fprintf(stderr, "crispasr[diarize]: %s\n", cmd.str().c_str());
-    cmd << " 2>/dev/null";
+        fprintf(stderr, "crispasr[diarize]: %s\n", crispasr_cli_process::join_cmdline(args).c_str());
 
-    std::unique_ptr<FILE, int (*)(FILE*)> pipe(popen(cmd.str().c_str(), "r"), pclose);
-    if (!pipe) {
-        fprintf(stderr, "crispasr[diarize]: failed to spawn sherpa subprocess for global cache\n");
+    const int timeout_sec = crispasr_cli_process::timeout_from_audio_samples("CRISPASR_SHERPA_TIMEOUT_SEC", n_samples);
+    const auto run = crispasr_cli_process::run_capture_stdout(args, timeout_sec);
+    if (run.timed_out) {
+        fprintf(stderr, "crispasr[diarize]: sherpa global run timed out after %d s\n", timeout_sec);
+        std::remove(wav_path.c_str());
+        return false;
+    }
+    if (run.exit_code != 0) {
+        fprintf(stderr, "crispasr[diarize]: sherpa global run failed with exit code %d\n", run.exit_code);
         std::remove(wav_path.c_str());
         return false;
     }
 
-    char linebuf[1024];
-    while (fgets(linebuf, sizeof(linebuf), pipe.get())) {
+    std::istringstream lines(run.output);
+    std::string line;
+    while (std::getline(lines, line)) {
         SherpaSegment s;
-        if (parse_sherpa_line(linebuf, s))
+        if (parse_sherpa_line(line, s))
             out.segments.push_back({s.t0_s, s.t1_s, s.speaker});
     }
     std::remove(wav_path.c_str());
