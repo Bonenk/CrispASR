@@ -79,12 +79,44 @@ codec = hf_hub_download(repo_id=CODEC_REPO, filename=CODEC_FILE, token=token,
                         local_dir=str(TMP / "codec"))
 print(f"codec: {codec} ({Path(codec).stat().st_size/1e9:.2f} GB)", flush=True)
 
-kh.step("roundtrip")
-with kh.build_heartbeat("roundtrip", 30.0):
-    rc, out = sh(f"{TMP}/roundtrip {codec} 24", timeout=3600)
+# 1. cheap smoke test — does the encoder invert at all?
+kh.step("roundtrip.codes")
+with kh.build_heartbeat("roundtrip.codes", 30.0):
+    rc, out = sh(f"{TMP}/roundtrip {codec} --codes", timeout=3600)
 print(out, flush=True)
-res["rc"] = rc
-res["output"] = out[-4000:]
+res["codes_rc"] = rc
+res["codes_output"] = out[-3000:]
+
+# 2. the acceptance test (HARD RULE 3): real speech -> encode -> decode -> ASR.
+# Codes-vs-codes agreement cannot decide this — random codes decode to audio off
+# the manifold the encoder was trained on, and RVQ is lossy regardless. Only the
+# decoded output settles whether encode() is right.
+kh.step("roundtrip.speech")
+wav_in = REPO / "samples" / "jfk.wav"
+wav_out = TMP / "moss_reconstructed.wav"
+with kh.build_heartbeat("roundtrip.speech", 30.0):
+    rc, out = sh(f"{TMP}/roundtrip {codec} {wav_in} {wav_out}", timeout=5400)
+print(out, flush=True)
+res["speech_rc"] = rc
+res["speech_output"] = out[-3000:]
+
+if rc == 0 and wav_out.exists():
+    import shutil
+    shutil.copy(str(wav_out), str(WORK / "moss_reconstructed.wav"))  # for a human listen
+    kh.step("asr")
+    # Build the CLI and transcribe the reconstruction. If encode() is correct the
+    # words survive the round-trip; if the latent is misaligned they will not.
+    with kh.build_heartbeat("cli.build"):
+        kh.sh_with_progress(f"stdbuf -oL -eL cmake --build {BUILD} --target crispasr-cli "
+                            f"-j{kh.safe_build_jobs(gpu=False)}")
+    asr = BUILD / "bin" / "crispasr"
+    for label, path in (("original", wav_in), ("reconstructed", wav_out)):
+        rc2, out2 = sh(f"{asr} --backend parakeet -m auto --auto-download -f {path} --no-prints",
+                       timeout=3600)
+        text = out2.strip().splitlines()[-1] if out2.strip() else ""
+        print(f"[{label}] rc={rc2} :: {text}", flush=True)
+        res[f"asr_{label}"] = text
+res["rc"] = res.get("speech_rc", 1)
 (WORK / "moss_codec_roundtrip.json").write_text(json.dumps(res, indent=2))
 kh.step("done", rc=rc)
 if rc != 0:
