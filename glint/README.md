@@ -69,4 +69,4 @@ and rewrites *only* the marker line below — the prose above is
 maintained here by hand and does not auto-update, so a codec added
 upstream will not be described until this file is edited.
 
-Synced at upstream commit: `248970b09e48cc64a5268a77e48b5b6847869ee6` (fix(simd): include <intrin.h> for MSVC, and detect AVX not AVX2).
+Synced at upstream commit: `8652b3887e6c38f57671ec6f350f5473fb230d12` (feat(rust): publishable glint-audio / glint-audio-sys crates + crates.io trusted publishing).
