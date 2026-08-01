@@ -22,10 +22,16 @@ REPO = TEMP / "CrispASR"
 MODELS = TEMP / "codec-models"
 MODELS.mkdir(parents=True, exist_ok=True)
 
-CRISPASR_REF = os.environ.get("CRISPASR_REF", "feat/moss-tts-local-4b")
+# feat/moss-tts-local-4b was merged long ago; cloning it pinned this kernel to a
+# stale converter, so a re-run would silently reproduce the old decode-only GGUF.
+CRISPASR_REF = os.environ.get("CRISPASR_REF", "main")
 HF_CODEC = os.environ.get("MOSS_CODEC", "OpenMOSS-Team/MOSS-Audio-Tokenizer-v2")
 GGUF_REPO = os.environ.get("MOSS_GGUF_REPO", "cstr/moss-tts-local-v1.5-GGUF")
-CODEC_NAME = "moss-tts-local-v1.5-codec.gguf"
+# The encoder-carrying codec is roughly twice the size and is useless until
+# encode() lands, so it does NOT overwrite the shipped decode-only file yet:
+# Subtitle Edit downloads that path. Ship it under a dev name, validate cloning
+# against it, and only then promote it over the published one.
+CODEC_NAME = os.environ.get("MOSS_CODEC_NAME", "moss-tts-local-v1.5-codec-enc.gguf")
 HFBASE = "https://huggingface.co"
 
 
