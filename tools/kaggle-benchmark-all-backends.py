@@ -127,13 +127,18 @@ TTS_BACKENDS = [
     ("tada",              "TADA 3B",                 300, "Q4_K, multilingual AR TTS"),
     ("voxcpm2-tts",       "VoxCPM2 TTS",             300, "F16, VAE encoder + LLM"),
     ("vibevoice-1.5b",    "VibeVoice 1.5B TTS",      300, "Q4_K ~1.6GB; was mis-listed as ASR"),
-    # 900s, not 420: across three sweeps this landed TIMEOUT / FAIL@370s / TIMEOUT,
-    # i.e. it sits right on its budget and we learn nothing either way — a killed
-    # process leaves no stderr, so "is it broken or merely slow?" stayed open.
-    # Give it room to finish once; if it completes, the answer is "slow" and the
-    # budget was the bug. If it fails with room to spare, we finally get the error.
-    ("kugelaudio",        "KugelAudio",              900, "Q4_K ~5.7GB (F16 ~14GB) — large, slow"),
+    # The 900 s budget bought the answer: not slow, OOM. `-m auto` gets the F16,
+    # which is 17.3 GB — more VRAM than any Kaggle GPU has, so it could never
+    # have passed at any timeout. Pinned to Q4_K (5.7 GB) below via QUANT_OVERRIDE.
+    ("kugelaudio",        "KugelAudio",              900, "Q4_K ~5.7GB (F16 17.3GB does not fit 16GB VRAM)"),
 ]
+
+# Backends whose registry default does not fit the GPU this sweep runs on. `-m
+# auto` alone would download many GB and then fail to allocate, which reads as a
+# backend regression when it is a hardware limit.
+QUANT_OVERRIDE = {
+    "kugelaudio": "q4_k",
+}
 
 # Text MT backends (translate a sentence; not ASR/TTS but part of the backend
 # set). Tested only when BENCHMARK_MT=1 since they need text in/out, not audio.
@@ -697,6 +702,8 @@ if BENCHMARK_TTS == "1":
         outfile = f"/tmp/tts-bench-{backend}.wav"
         cmd = [CRISPASR, "--backend", backend, "-m", "auto", "--auto-download",
                "--tts-output", outfile, "--no-prints"]
+        if backend in QUANT_OVERRIDE:
+            cmd += ["--model-quant", QUANT_OVERRIDE[backend]]
 
         # Per-backend voice/speaker overrides. Several TTS backends REQUIRE a
         # reference voice or speaker and produce 0-byte output without one — the
