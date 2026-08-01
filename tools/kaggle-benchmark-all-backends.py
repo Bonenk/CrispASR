@@ -127,7 +127,12 @@ TTS_BACKENDS = [
     ("tada",              "TADA 3B",                 300, "Q4_K, multilingual AR TTS"),
     ("voxcpm2-tts",       "VoxCPM2 TTS",             300, "F16, VAE encoder + LLM"),
     ("vibevoice-1.5b",    "VibeVoice 1.5B TTS",      300, "Q4_K ~1.6GB; was mis-listed as ASR"),
-    ("kugelaudio",        "KugelAudio",              420, "Q4_K ~5.7GB (F16 ~14GB) — large, slow; bumped timeout"),
+    # 900s, not 420: across three sweeps this landed TIMEOUT / FAIL@370s / TIMEOUT,
+    # i.e. it sits right on its budget and we learn nothing either way — a killed
+    # process leaves no stderr, so "is it broken or merely slow?" stayed open.
+    # Give it room to finish once; if it completes, the answer is "slow" and the
+    # budget was the bug. If it fails with room to spare, we finally get the error.
+    ("kugelaudio",        "KugelAudio",              900, "Q4_K ~5.7GB (F16 ~14GB) — large, slow"),
 ]
 
 # Text MT backends (translate a sentence; not ASR/TTS but part of the backend
