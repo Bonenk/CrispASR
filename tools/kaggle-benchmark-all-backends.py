@@ -23,7 +23,14 @@ from datetime import datetime
 from pathlib import Path
 
 WORK = "/kaggle/working"
-BUILD_DIR = f"{WORK}/CrispASR/build"
+# Clone and build under /kaggle/temp, NOT /kaggle/working. `kaggle kernels output`
+# is page-capped at 500 files and does not auto-continue, so a repo checkout in
+# the working dir buries everything that sorts after it — including the kernel
+# log, which is the only place a failing backend's stderr appears. That is why
+# kugelaudio's failure could not be read back after a 6-hour sweep. /kaggle/working
+# should hold only artifacts worth retrieving.
+SCRATCH = "/kaggle/temp" if os.path.isdir("/kaggle/temp") else "/tmp"
+BUILD_DIR = f"{SCRATCH}/CrispASR/build"
 CRISPASR = f"{BUILD_DIR}/bin/crispasr"
 QUANTIZE = f"{BUILD_DIR}/bin/crispasr-quantize"
 RESULTS_DIR = f"{WORK}/results"
@@ -141,7 +148,7 @@ print("✓ Dependencies installed")
 
 # ─────────────────────────── cell 3 (code) ───────────────────────────
 # ── Clone and build CrispASR ───────────────────────────────────────────────
-CRISPASR_DIR = f"{WORK}/CrispASR"
+CRISPASR_DIR = f"{SCRATCH}/CrispASR"
 
 def run(cmd, timeout=600, stream_stderr=False):
     """Run shell command, return (success, stdout, stderr, elapsed).
@@ -572,6 +579,8 @@ def benchmark_backend(backend, display_name, timeout, notes):
 
     if not ok:
         result["status"] = "TIMEOUT" if "TIMEOUT" in stderr else "CRASH"
+        if stderr:
+            result["stderr_tail"] = stderr[-1500:]
         print(f"  ✗ {result['status']} after {elapsed:.1f}s  (wall)")
         # Show useful stderr lines (skip download progress bars)
         if stderr:
@@ -723,6 +732,12 @@ if BENCHMARK_TTS == "1":
             status = "PASS" if ok else "FAIL"
             tts_r = {"backend": backend, "name": name, "wall_s": round(wall, 1),
                      "status": status, "wav_bytes": sz}
+            # Carry the failure reason IN the streamed record. The kernel log is
+            # the only other place it exists, and that is page-capped and easily
+            # unreachable — kugelaudio failed a 6-hour sweep with nothing but
+            # "wav_bytes: 0" to show for it.
+            if not ok and proc.stderr:
+                tts_r["stderr_tail"] = proc.stderr[-1500:]
             print(f"  {status} — {wall:.1f}s, {sz} bytes")
             if not ok and proc.stderr:
                 print(f"  stderr: {proc.stderr[-300:]}")
