@@ -1657,6 +1657,14 @@ struct crispasr_session {
     // warns once, and hands the caller the disclaimer to prepend themselves.
     bool voice_is_clone = false;
     std::string voice_path;
+    // Cached disclosure PCM. The disclaimer is a fixed sentence in the session's
+    // neutral voice, so it is identical for every clip — but the documented
+    // recipe (fetch -> set_voice -> synthesize -> prepend) is per-clip, which
+    // without this would charge a full TTS forward pass per clip for
+    // byte-identical audio. The CLI caches it via std::call_once for the same
+    // reason. Invalidated by set_voice(), since a different preset voice would
+    // change what "neutral" means.
+    std::vector<float> disclaimer_pcm;
     // One-shot latches for the two audit lines, so a long-running session
     // logs each condition once rather than per synthesis call.
     bool warned_clone_unmarked = false;
@@ -7742,6 +7750,9 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
     // What the ABI does instead is leave an audit trail.
     s->voice_is_clone = ends_with_wav(path);
     s->voice_path = path;
+    // Any voice change invalidates the cached neutral-voice disclosure.
+    s->disclaimer_pcm.clear();
+    s->disclaimer_pcm.shrink_to_fit();
     if (s->voice_is_clone && !s->logged_clone_consent) {
         s->logged_clone_consent = true;
         std::time_t t = std::time(nullptr);
@@ -8830,7 +8841,26 @@ CA_EXPORT float* crispasr_session_get_disclaimer_pcm(crispasr_session* s, int* o
                               "then set the voice.";
         return nullptr;
     }
-    return crispasr_session_synthesize_raw_impl(s, crispasr_session_disclaimer_text(), out_n_samples);
+    // Synthesize once per session, then hand out copies. The caller owns and
+    // frees each buffer, so the cache holds the samples rather than the pointer.
+    if (s->disclaimer_pcm.empty()) {
+        int n = 0;
+        float* fresh = crispasr_session_synthesize_raw_impl(s, crispasr_session_disclaimer_text(), &n);
+        if (!fresh || n <= 0) {
+            free(fresh);
+            return nullptr;
+        }
+        s->disclaimer_pcm.assign(fresh, fresh + n);
+        free(fresh);
+    }
+    const size_t n = s->disclaimer_pcm.size();
+    float* out = (float*)malloc(n * sizeof(float));
+    if (!out)
+        return nullptr;
+    std::memcpy(out, s->disclaimer_pcm.data(), n * sizeof(float));
+    if (out_n_samples)
+        *out_n_samples = (int)n;
+    return out;
 }
 
 CA_EXPORT void crispasr_pcm_free(float* pcm) {

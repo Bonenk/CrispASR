@@ -816,18 +816,23 @@ extern "C" char* sensevoice_transcribe(sensevoice_context* ctx, const float* sam
     // sensevoice_transcribe_structured() keeps language/event/itn as fields,
     // this one keeps nothing but the words.
     const sv_prefix pre = sv_parse_prefix(s);
-    if (pre.consumed > 0)
-        s.erase(0, pre.consumed);
-    // Trim the SentencePiece ▁ artefact on the first post-prefix token, matching
-    // the structured path.
-    const size_t lead = s.find_first_not_of(" \t");
-    if (lead != std::string::npos && lead > 0)
-        s.erase(0, lead);
-    char* out = (char*)std::malloc(s.size() + 1);
+    // Resolve the prefix and the SentencePiece ▁ artefact on the first
+    // post-prefix token into ONE offset. Erasing them in turn would memmove the
+    // whole transcript twice before the copy below copies it a third time.
+    // find_first_not_of, not a advance-past-whitespace loop: when everything
+    // after the prefix is whitespace the structured path leaves it alone
+    // (lead == npos short-circuits its erase), and the two entry points must
+    // not disagree about that.
+    size_t off = pre.consumed;
+    const size_t lead = s.find_first_not_of(" \t", off);
+    if (lead != std::string::npos)
+        off = lead;
+    const size_t n = s.size() - off;
+    char* out = (char*)std::malloc(n + 1);
     if (!out)
         return nullptr;
-    std::memcpy(out, s.data(), s.size());
-    out[s.size()] = '\0';
+    std::memcpy(out, s.data() + off, n);
+    out[n] = '\0';
     return out;
 }
 
