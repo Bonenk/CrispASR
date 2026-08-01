@@ -98,7 +98,15 @@ def main():
     # ── upload with hang-tolerance + server-side verify ────────────────────
     from huggingface_hub import HfApi
     api = HfApi(token=hf_token)
-    api.create_repo(GGUF_REPO, repo_type="model", exist_ok=True)
+    # Only create the repo if it is genuinely absent. exist_ok=True still POSTs
+    # to /api/repos/create, and a fine-grained token that may write to existing
+    # repos but not create new ones gets 401 there — which killed this kernel
+    # AFTER a clean 4.25 GB conversion, before the upload was even attempted.
+    # exist_ok only swallows a 409 Conflict, not a 401.
+    try:
+        api.repo_info(GGUF_REPO, repo_type="model")
+    except Exception:  # noqa: BLE001 — absent, or not visible to this token
+        api.create_repo(GGUF_REPO, repo_type="model", exist_ok=True)
 
     def landed():
         try:
