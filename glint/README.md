@@ -69,4 +69,4 @@ and rewrites *only* the marker line below — the prose above is
 maintained here by hand and does not auto-update, so a codec added
 upstream will not be described until this file is edited.
 
-Synced at upstream commit: `46c242faa18903b68fe8eac6119a0fa10f989d5d` (fix(ci): cargo package/publish need --allow-dirty for the vendored tree).
+Synced at upstream commit: `5227708db602fb9dba723ae412d20f0f5d5765c3` (chore(dart_pure): glint_audio_pure 0.6.2 — description within pub.dev's limit).
