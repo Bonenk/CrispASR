@@ -78,8 +78,12 @@ constexpr std::array<StageSpec, 6> DECODER_STAGES = {{
 // `moss-tts-local-codec.encoder_present`); older decode-only files simply
 // report cloning as unavailable.
 //
-// Dimensions were read from the upstream tensor shapes rather than assumed from
-// symmetry, and the chain checks out end to end (Linear weight is [out, in]):
+// VERIFIED against the upstream blueprint, not inferred: config.json's
+// encoder_kwargs gives every field directly, and modeling_moss_audio_tokenizer.py
+// gives the quantizer rule. Contexts are round(frame_rate * context_duration)
+// with durations 1/2/4/8/10/10 s against rates 400/200/100/50/25/12.5 Hz ->
+// 400/400/400/400/250/125, and the patch sizes are stated as 240 then 2.
+// The chain also checks out end to end (Linear weight is [out, in]):
 //
 //   raw 96 kHz --patch 240--> 400 Hz, 240ch      (enc.1 input_dim 240)
 //   enc.1  iproj[768,240] oproj[384,768]  x2 ->  768  = enc.3  input_dim
@@ -589,8 +593,14 @@ bool encoder_ready(const Codec* c) {
 // attention masks, only the stage set and the patch direction differ. The
 // quantizer is the residual half of what decode() sums: project into the RVQ
 // space, then for each quantizer take the nearest codebook entry by COSINE
-// similarity (both sides L2-normalised, as the v1 codec runtime does) and
-// subtract that entry's contribution before moving to the next.
+// similarity and subtract that entry's contribution before moving to the next.
+//
+// The rule is MossAudioTokenizerLFQ.decode_latents: L2-normalise both sides,
+// then argmin of squared distance. For unit vectors that is 2 - 2*(e.c), so
+// argmin distance IS argmax cosine — the mul_mat + argmax below is the same
+// function, not an approximation of it. Note the normalisation is used ONLY to
+// pick the index: the reconstruction takes the RAW codebook row
+// (decode_code_wo_out_proj) before out_proj, which is what get_rows does here.
 std::vector<int32_t> encode(Codec* c, const float* interleaved, int64_t n_samples, int& n_vq_out, int& t_audio_out) {
     n_vq_out = 0;
     t_audio_out = 0;
