@@ -347,12 +347,19 @@ constexpr Entry k_registry[] = {
      "vibevoice-voice-emma.gguf",
      "https://huggingface.co/cstr/vibevoice-realtime-0.5b-GGUF/resolve/main/vibevoice-voice-emma.gguf",
      "~3 MB"},
-    // Q4_K, like every other multi-GB entry here. The F16 this used to default to
-    // is 17.3 GB (not the "~14 GB" it claimed) — over the VRAM of a 16 GB card,
-    // so `-m auto` downloaded 17 GB and then hard-failed to allocate. Still
-    // reachable with --model-quant f16 for anyone with the VRAM.
-    {"kugelaudio", "kugelaudio-0-open-q4_k.gguf",
-     "https://huggingface.co/cstr/kugelaudio-0-open-GGUF/resolve/main/kugelaudio-0-open-q4_k.gguf", "~5.7 GB", nullptr,
+    // F16 (17.3 GB, not the "~14 GB" this once claimed), and it stays F16 because
+    // the published Q4_K is BROKEN, not merely lossy: measured on Kaggle it
+    // stutters and loops — "The quick brown fast The quick brown the quick brown
+    // fox jobs over the lazy job ..." (WER 0.72, 13.7 s of audio for a 7.5 s
+    // sentence) where F16 gives WER 0.056. Defaulting to it would trade a loud
+    // OOM for silently broken speech.
+    // The real cost: 17.3 GB does not fit a 16 GB card, so `-m auto` downloads
+    // 17 GB and then fails to allocate. The fix is a quant that fits AND holds up
+    // (Q6_K/Q8_0, likely keeping the DiT head + VAE decoder in F16 — the usual
+    // shape for this family), not the Q4_K we have. Until then the loader at
+    // least says what happened and that --no-gpu exists.
+    {"kugelaudio", "kugelaudio-0-open-f16.gguf",
+     "https://huggingface.co/cstr/kugelaudio-0-open-GGUF/resolve/main/kugelaudio-0-open-f16.gguf", "~17.3 GB", nullptr,
      nullptr},
     {"firered-asr", "firered-asr2-aed-q4_k.gguf",
      "https://huggingface.co/cstr/firered-asr2-aed-GGUF/resolve/main/firered-asr2-aed-q4_k.gguf", "~918 MB", nullptr, nullptr},
