@@ -482,6 +482,21 @@ static void wyoming_handle_connection(socket_t fd) {
             if (data.contains("voice") && data["voice"].is_object())
                 voice_name = data["voice"].value("name", "");
 
+            // Reject a control character in the caller's voice name before it
+            // reaches a log or a file open. Downstream loggers (the GGUF
+            // loader, the kokoro adapter, ggml) echo the name raw, so a newline
+            // in it forges records. See crispasr_voice_clone_policy.h.
+            if (crispasr_voice::voice_name_has_control_chars(voice_name)) {
+                fprintf(stderr, "wyoming: rejected a voice name containing control characters\n");
+                json astart;
+                astart["rate"] = g_backend->tts_sample_rate();
+                astart["width"] = 2;
+                astart["channels"] = 1;
+                wyoming_send(fd, "audio-start", astart);
+                wyoming_send(fd, "audio-stop", json::object());
+                continue;
+            }
+
             whisper_params rp = g_params;
             if (!voice_name.empty() && voice_name != "default")
                 rp.tts_voice = voice_name;
