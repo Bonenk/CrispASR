@@ -38,10 +38,17 @@
 // A rename cannot silently turn real_person into synthetic — it can only turn a
 // known answer back into a question.
 //
-// The durable fix is a `crispasr.voice.speaker_identity` stamp in the published
-// GGUFs, which this project controls for its own cstr/ mirrors. Until those are
-// re-converted, this table is the legacy fallback — exactly the role
-// architecture_is_recording_derived() plays for unstamped voice packs.
+// The durable fix EXISTS NOW: a `crispasr.voice.speaker_identity` stamp in the
+// GGUF itself, written by `models/convert-*.py --speaker-identity` and read by
+// crispasr_voice::read_model_speaker_identity(). A stamped checkpoint answers
+// for itself and survives being renamed, re-quantised or moved.
+//
+// This table is therefore the LEGACY FALLBACK — exactly the role
+// architecture_is_recording_derived() plays for unstamped voice packs — and it
+// stays until the published cstr/ mirrors are re-converted with the flag. Note
+// the two are combined by strongest-duty, not by precedence: a stamp can
+// upgrade a table answer but cannot silently cancel one. See
+// resolve_speaker_identity().
 
 #pragma once
 

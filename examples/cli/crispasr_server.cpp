@@ -2205,7 +2205,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             return;
         }
         const crispasr_voice::SpeakerIdentity speaker_identity = crispasr_voice::resolve_speaker_identity(
-            identity_override, clone_decision.pack_identity, backend->declared_speaker_identity(params.model));
+            identity_override, clone_decision.pack_identity, backend->declared_speaker_identity(params.model),
+            crispasr_voice::read_model_speaker_identity(params.model));
         const bool needs_spoken_disclosure =
             crispasr_voice::requires_spoken_disclosure(is_voice_clone, speaker_identity);
         if (crispasr_voice::should_warn_unknown_identity(is_voice_clone, speaker_identity) &&

@@ -123,24 +123,55 @@ inline SpeakerIdentity parse_speaker_identity(const std::string& raw, bool* out_
     return SpeakerIdentity::Unknown;
 }
 
-// Resolve whose voice this is, most-specific first.
+// How strong a duty each value implies. RealPerson > Synthetic > Unknown.
+inline int duty_rank(SpeakerIdentity id) {
+    switch (id) {
+    case SpeakerIdentity::RealPerson:
+        return 2;
+    case SpeakerIdentity::Synthetic:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+// Resolve whose voice this is.
 //
 //   1. an explicit operator override (--speaker-identity / "speaker_identity")
-//   2. what the voice pack or bank entry declares
-//   3. what the backend declares for its built-in presets
-//   4. Unknown
+//      wins outright, in BOTH directions.
+//   2. otherwise: the STRONGEST duty any declared source claims — the voice
+//      pack or bank entry, the model's own stamp, and the researched backend
+//      table.
 //
-// The override outranks the declaration deliberately: the operator may have
-// read the model card the pack was built before anyone wrote, and is the one
-// carrying the duty. It can move the answer in BOTH directions — someone who
-// knows a "synthetic" label is wrong must be able to say so.
+// The override is absolute because it is an explicit human decision by the
+// party carrying the duty: someone who knows a "synthetic" label is wrong has
+// to be able to say so, and someone who knows a "real_person" label is wrong
+// does too. A flag that can only add duties gets ignored for the other half.
+//
+// The declared sources are combined by STRONGEST rather than by precedence,
+// which is the one non-obvious rule here. They are independent machine-recorded
+// claims about the same fact, and the failure that costs a disclosure is one of
+// them silently overriding another downward — a stale stamp saying "synthetic"
+// on a model the table knows is a real person, say. Taking the strongest means
+// a stamp can only ever upgrade a weaker answer, and disagreement fails toward
+// disclosure. The escape hatch for a genuinely wrong strong claim is rule 1,
+// which requires a human to type it.
+//
+// (Precedence would be the natural design if these were versions of one claim.
+// They are not: the pack knows about itself, the stamp knows about the
+// checkpoint, and the table is research about the upstream model. Any of the
+// three can be the only one that has heard of a given voice.)
 inline SpeakerIdentity resolve_speaker_identity(SpeakerIdentity override_value, SpeakerIdentity pack_value,
-                                                SpeakerIdentity backend_value) {
+                                                SpeakerIdentity backend_value,
+                                                SpeakerIdentity model_value = SpeakerIdentity::Unknown) {
     if (override_value != SpeakerIdentity::Unknown)
         return override_value;
-    if (pack_value != SpeakerIdentity::Unknown)
-        return pack_value;
-    return backend_value;
+    SpeakerIdentity best = pack_value;
+    if (duty_rank(model_value) > duty_rank(best))
+        best = model_value;
+    if (duty_rank(backend_value) > duty_rank(best))
+        best = backend_value;
+    return best;
 }
 
 // Does this output need the spoken Art. 50(4) disclosure?

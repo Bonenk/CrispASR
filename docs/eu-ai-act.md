@@ -543,17 +543,39 @@ point:
   `real_person`. Inheriting "synthetic" would assume the answer on the one
   variant there is reason to doubt.
 
-**Matching is on the checkpoint file name, and that has a stated cost.** One
-backend serves many models with different answers, and there is no metadata that
-separates them (`convert-orpheus-to-gguf.py` writes `general.name =
-"orpheus-<variant>"` for all of them). This is the thing rule 3 says not to do —
-used here because the alternative is no answer, and because the failure is
-**safe**: a renamed file matches nothing, falls to `unknown`, and warns. A
+**Two sources, and how they combine.**
+
+1. **The stamp** — `crispasr.voice.speaker_identity` in the checkpoint's own
+   GGUF metadata, written by `models/convert-*.py --speaker-identity` and read
+   by `crispasr_voice::read_model_speaker_identity()`. A stamped model answers
+   for itself and survives being renamed, re-quantised or moved. This is the
+   durable mechanism; the published `cstr/` mirrors need re-converting with the
+   flag to carry it.
+2. **The table** — the legacy fallback for everything published before the
+   stamp existed, matching on the checkpoint file name.
+
+The file-name matching is the thing rule 3 says not to do. It is used because
+one backend serves many models with different answers and there is no other
+metadata separating them (`convert-orpheus-to-gguf.py` writes
+`general.name = "orpheus-<variant>"` for all of them), and because the failure
+is **safe**: a renamed file matches nothing, falls to `unknown`, and warns. A
 rename cannot turn `real_person` into `synthetic`; it can only turn a known
-answer back into a question. The durable fix is stamping
-`crispasr.voice.speaker_identity` into the published `cstr/` GGUFs, which this
-project controls — the same stamp-then-legacy-fallback shape as
-`architecture_is_recording_derived()`.
+answer back into a question.
+
+**Declared sources combine by strongest duty, not by precedence** — the one
+non-obvious rule. The pack, the model stamp and the table are independent claims
+about the same fact, and any of the three can be the only one that has heard of
+a given voice. Precedence would let a stale stamp saying `synthetic` silently
+cancel a researched `real_person` verdict, which is exactly the failure that
+costs a disclosure. Taking the strongest means a stamp can only ever *upgrade* a
+weaker answer, and disagreement fails toward disclosing. The escape hatch for a
+genuinely wrong strong claim is the operator override, which is absolute in both
+directions and requires a human to type it.
+
+The stamp is guarded end-to-end by `tests/test-speaker-identity-gguf.cpp`, which
+writes a real GGUF and reads it back through the same function the CLI and
+server call — because a read path nothing consults is the inert-fix failure mode
+(#324), and a pure test cannot see it.
 
 **Guessing `synthetic` to quiet the warning is the costly error**, because it is
 silent and it is wrong in the direction that removes a disclosure. Note that of
