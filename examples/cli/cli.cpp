@@ -1303,7 +1303,8 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.tts_voice.c_str());
     fprintf(
         stderr,
-        "             --i-have-rights                    required for voice cloning (.wav); attests consent\n"
+        "             --i-have-rights                    required for voice cloning and for --make-ref; attests "
+        "consent\n"
         "             --accept-license TAG                accept a restricted model licence (SPDX tag, or 'all');\n"
         "                                                required before downloading cc-by-nc-*/gemma/llama* weights\n"
         "                                                 of the cloned speaker or that it is your own voice\n"

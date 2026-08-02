@@ -2865,6 +2865,24 @@ catch_discover_tests(test-marking-policy
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-voice-clone-policy — what counts as a voice CLONE (the predicate the
+# speaker-consent gate and the Art. 50(4) audible-disclosure gate both hang off),
+# plus which containers can carry a C2PA manifest (the watertight marking floor).
+# Both are pure predicates in examples/cli/crispasr_voice_clone_policy.h and
+# crispasr_marking_policy.h — no models, no voice files, no server — so the
+# gates are guarded on the tier CI actually runs.
+add_executable(test-voice-clone-policy test-voice-clone-policy.cpp)
+target_include_directories(test-voice-clone-policy PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-voice-clone-policy PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-voice-clone-policy
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-no-emotion-recognition — CrispASR ships no voice-based emotion
 # inference on any surface. SenseVoice-Small is upstream an emotion classifier
 # too; we parse its `<|HAPPY|>` marker only to strip it. Shipping the capability

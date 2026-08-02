@@ -49,7 +49,7 @@ live transcription + TTS + language detection, auto-deployed from `hf-space/`.
 - [Architecture](docs/architecture.md) — layered layout, `src/core/` primitives, regression discipline
 - [Contributing — adding a new backend](docs/contributing.md) — 5-file recipe, ground-truth diff workflow
 - [Regression matrix](docs/regression-matrix.md) — `tools/test-all-backends.py` capability tiers
-- [**EU AI Act**](docs/eu-ai-act.md) — synthetic-audio marking (watermark + C2PA + spoken disclaimer), the speaker-biometrics boundary, why there is no emotion recognition, and what stays your duty as deployer
+- [**EU AI Act**](docs/eu-ai-act.md) — synthetic-audio marking (watermark + C2PA + spoken disclaimer), what counts as a voice clone, the speaker-biometrics boundary, why there is no emotion recognition, and what stays your duty as deployer
 - [Quantize models](docs/quantize.md) — `crispasr-quantize` for all backends
 - [GPU backend selection](#gpu-backend-selection)
 - [Debugging & profiling](#debugging--profiling)
