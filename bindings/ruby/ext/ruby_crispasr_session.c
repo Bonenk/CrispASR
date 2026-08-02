@@ -53,6 +53,9 @@ extern float* crispasr_session_speech_to_speech(struct CrispasrSession* s, const
                                                 char** out_text, int* out_n_samples);
 extern int crispasr_session_input_sample_rate(struct CrispasrSession* s);
 extern void crispasr_pcm_free(float* pcm);
+/* AI-content marking (EU AI Act Art. 50(2)) — the other half of synthesize_raw. */
+extern void crispasr_watermark_embed(float* pcm, int n_samples, float alpha);
+extern float crispasr_watermark_detect(const float* pcm, int n_samples);
 extern int crispasr_session_kokoro_clear_phoneme_cache(struct CrispasrSession* s);
 extern int crispasr_session_set_source_language(struct CrispasrSession* s, const char* lang);
 extern int crispasr_session_set_target_language(struct CrispasrSession* s, const char* lang);
@@ -777,6 +780,53 @@ static VALUE rb_session_accept_marking_responsibility(VALUE self, VALUE handle, 
     struct CrispasrSession* s = (struct CrispasrSession*)NUM2ULL(handle);
     int rc = crispasr_session_accept_marking_responsibility(s, NIL_P(attestation) ? "" : StringValueCStr(attestation));
     return INT2NUM(rc);
+}
+
+// CrispASR::Session.watermark_embed(pcm_array) -> Array<Float>
+//   The other half of synthesize_raw. Opting out of automatic marking makes
+//   marking the result the caller's duty under EU AI Act Art. 50(2), and this
+//   is what discharges it: post-process the unmarked PCM, then mark the
+//   finished buffer. Uses the robust, reliably detectable default strength
+//   (alpha <= 0); AudioSeal instead when a model is loaded.
+//   Returns a new marked array — Ruby Floats are boxed, so in-place would mean
+//   mutating boxed objects the caller may share.
+static VALUE rb_watermark_embed(VALUE self, VALUE pcm_arr) {
+    (void)self;
+    Check_Type(pcm_arr, T_ARRAY);
+    long n = RARRAY_LEN(pcm_arr);
+    if (n <= 0)
+        return rb_ary_new_capa(0);
+    float* buf = (float*)malloc(sizeof(float) * (size_t)n);
+    if (!buf)
+        rb_raise(rb_eNoMemError, "alloc failed");
+    for (long i = 0; i < n; i++)
+        buf[i] = (float)NUM2DBL(rb_ary_entry(pcm_arr, i));
+    crispasr_watermark_embed(buf, (int)n, -1.0f);
+    VALUE out = rb_ary_new_capa(n);
+    for (long i = 0; i < n; i++)
+        rb_ary_push(out, DBL2NUM((double)buf[i]));
+    free(buf);
+    return out;
+}
+
+// CrispASR::Session.watermark_detect(pcm_array) -> Float in [0, 1]
+//   A weak diagnostic, not proof: the spread-spectrum null mean is 0.5, not 0,
+//   and a negative result on a short clip is mostly evidence the clip was
+//   short. See docs/eu-ai-act.md §6.7 before reading anything into the number.
+static VALUE rb_watermark_detect(VALUE self, VALUE pcm_arr) {
+    (void)self;
+    Check_Type(pcm_arr, T_ARRAY);
+    long n = RARRAY_LEN(pcm_arr);
+    if (n <= 0)
+        return DBL2NUM(0.0);
+    float* buf = (float*)malloc(sizeof(float) * (size_t)n);
+    if (!buf)
+        rb_raise(rb_eNoMemError, "alloc failed");
+    for (long i = 0; i < n; i++)
+        buf[i] = (float)NUM2DBL(rb_ary_entry(pcm_arr, i));
+    float score = crispasr_watermark_detect(buf, (int)n);
+    free(buf);
+    return DBL2NUM((double)score);
 }
 
 // CrispASR::Session.speech_to_speech(handle, pcm_array)
@@ -1837,6 +1887,8 @@ void init_ruby_crispasr_session(VALUE* mWhisper) {
     rb_define_singleton_method(mSession, "speaker_db_count", rb_speaker_db_count, 1);
     rb_define_singleton_method(mSession, "speaker_db_match", rb_speaker_db_match, 3);
     rb_define_singleton_method(mSession, "speaker_db_enroll", rb_speaker_db_enroll, 4);
+    rb_define_singleton_method(mSession, "watermark_embed", rb_watermark_embed, 1);
+    rb_define_singleton_method(mSession, "watermark_detect", rb_watermark_detect, 1);
 
     // Mic (PLAN #62d) — CrispASR::Mic.{open(rate, channels) { |pcm| ... }, start, stop, close, default_device_name}.
     mMic = rb_define_module_under(mCrispASR, "Mic");

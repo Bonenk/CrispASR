@@ -3042,8 +3042,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // real recording — NOT merely "the path ends in .wav", which missed the
         // inline-bake rewrite above and every .gguf-only cloning backend
         // (chatterbox has no .wav path at all). See crispasr_voice_clone_policy.h.
-        const crispasr_voice::CloneDecision clone_decision =
-            crispasr_voice::classify_voice(params.tts_voice, params.tts_voice_dir, params.tts_voice_baked_from_wav);
+        const crispasr_voice::CloneDecision clone_decision = crispasr_voice::classify_voice(
+            params.tts_voice, params.tts_voice_dir, params.tts_voice_baked_from_wav, backend->voice_bank_path());
         const bool is_voice_clone = clone_decision.is_clone;
         if (is_voice_clone && !params.tts_voice_clone_consent) {
             fprintf(stderr,

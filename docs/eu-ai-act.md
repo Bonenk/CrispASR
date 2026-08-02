@@ -343,9 +343,38 @@ someone's recording is exactly as much a deepfake as the recording. The suffix
 is an implementation detail.
 
 4. its **`general.architecture`** names a producer that only ever bakes from a
-   recording (`chatterbox-voice`, `qwen3tts.voicepack`) — the legacy fallback
-   for packs made before the stamp existed, which cannot be retro-stamped once
-   published.
+   recording (`chatterbox-voice`, `qwen3tts.voicepack`, `cosyvoice3-voices`) —
+   the legacy fallback for packs made before the stamp existed, which cannot be
+   retro-stamped once published; or
+5. it is an **entry in a multi-voice bank** that says so —
+   `crispasr.voice.<name>.cloned_from_recording`.
+
+**Case 5 is the one a file-shaped predicate cannot see.** cosyvoice3 keeps every
+voice inside one `voices.gguf`, discovered as a sibling of the model (or
+`CRISPASR_COSYVOICE3_VOICES_PATH`), and `--voice` selects an entry *by name*. So
+`--voice fleurs-en` named no file, `resolve_voice_path()` had nothing to
+resolve, no metadata was read, and a zero-shot voice clone scored as a preset —
+on the CLI, the server, Wyoming and the ABI at once. `--voice victim.wav` on the
+same backend *was* gated, which is exactly why this looked covered. The
+backend's own source header calls the bundle "baked voice-clone bundles".
+
+Only the backend knows which bundle it resolved, so it hands the path over:
+`CrispasrBackend::voice_bank_path()`. **Any future backend that selects voices
+by name from a container must override it**, or its clones ship unattested and
+undisclosed. cosyvoice3 is the only one today (`rg '_n_voices\(|init_voices'`).
+
+A bank is not all-or-nothing, hence the per-entry key: the default manifest
+bakes upstream's `asset/zero_shot_prompt.wav` and a user's manifest adds their
+own recordings, into the same file. A bank-wide flag would have to gate both or
+free both. The `crispasr.voice.bank_stamped` sentinel is what lets an *absent*
+per-voice key mean "preset" instead of "baked before the stamp existed" — only
+bundles without it fall back to the producer architecture.
+
+Note the deliberate difference from the tada-ref case: cosyvoice3 bundles gate
+by architecture even though the built-in manifest is upstream's asset, because
+CrispASR ships no cosyvoice3 bank and auto-downloads none. There is no shipped
+preset to break — the operator bakes the bundle themselves, which is the moment
+to ask for the attestation.
 
 **Not every pack is a clone.** kokoro and vibevoice packs are converted from
 upstream voicepacks and `.pt` prompts with no recording involved; gating those
@@ -360,8 +389,34 @@ preset** — re-bake it to gate it. Cases (1) and (2) never depend on the stamp.
 
 Every producer that consumes a recording now gates and stamps at bake time:
 `--make-ref`, `models/bake-chatterbox-voice-from-wav.py`,
-`models/bake-qwen3-tts-voice-pack.py` and
-`models/convert-tada-ref-to-gguf.py` all require `--i-have-rights`.
+`models/bake-qwen3-tts-voice-pack.py`,
+`models/convert-tada-ref-to-gguf.py`,
+`models/convert-cosyvoice3-voices-to-gguf.py` and
+`models/convert-kugelaudio-voice-to-gguf.py` all require `--i-have-rights`.
+
+The last two were found by the audit of 2026-08-02 and had **neither the gate
+nor the stamp**, so their output read as a preset — the failure above, at the
+other end. Enumerate them the way the surfaces are enumerated: not from this
+list, but by asking which scripts read audio and write a GGUF —
+
+```
+rg -l 'GGUFWriter' models/ tools/ | xargs rg -l 'load_wav|torchaudio.load|--audio'
+```
+
+`convert-kugelaudio-voice-to-gguf.py` is the reason the stamp exists at all
+rather than a producer allowlist: it has two modes, `--audio` (a clone) and
+`--voice-pt` (an upstream preset), writing the same `general.architecture`. No
+architecture-level rule can tell them apart.
+
+**`POST /v1/voices` is a producer too.** It stores an uploaded recording as a
+reusable voiceprint in `--voice-dir`, which is `--make-ref` over HTTP, and it
+shipped with no attestation and no audit line — anyone who could reach the
+endpoint could enroll a third party's voice, leaving only a byte count in the
+log. It now requires a `consent_attestation` form field and emits
+`[CONSENT] scope=voice-upload`. Synthesis was always gated (a bare name resolves
+to `<voice-dir>/<name>.wav` and scores as a recording reference), so this was
+never unmarked output; what was missing was consent asked at the point the
+recording entered the system, which is the project's own stated rule.
 
 Baking is itself the cloning step. `--make-ref` sat *before* the TTS block's
 consent gate and returned early, which made it the one way to build a reusable
@@ -436,25 +491,48 @@ surfaces generate text, and the distinction between them matters:
 | ASR transcription | Not synthetic. A record of what a human actually said. |
 | Translation (`/v1/translate`, `--translate`) | Generated, but semantics-preserving; read here as Art. 50(2) standard assistive processing (§6.1). |
 | Punctuation restoration, truecasing, ITN | Assistive editing of an existing transcript. |
-| **`POST /v1/chat/completions`** (`--chat-model`) | **Open-ended generation. Not assistive editing, and not exempt.** |
+| **All four chat surfaces below** | **Open-ended generation. Not assistive editing, and not exempt.** |
 
-The chat endpoint is opt-in — it exists only when the operator passes
-`--chat-model`, and it serves whatever general-purpose LLM GGUF they point it
-at. **CrispASR does not mark its output**, and there is no watermark-equivalent
-for short-form text that survives a copy-paste; the Commission's own guidance
-and the Code of Practice on AI-generated content acknowledge that machine-
-readable text marking is weaker and less settled than the audio case (metadata
-that travels with the response, not a signal inside the words).
+There are **four** of them, not one. This section named only the HTTP endpoint
+until the audit of 2026-08-02, which is the §6.1 table failure repeated in a
+different section — the surfaces were enumerated from prose, and the prose was a
+summary of the previous audit:
 
-So this is a **stated gap, not a discharged duty**. If you enable `--chat-model`
-and put its output in front of users, the Art. 50(2) marking duty and any
-Art. 50(1) interaction disclosure are yours. Marking metadata on the response is
-the practical option today.
+| Surface | Art. 50(2) marking | Art. 50(1) disclosure |
+|---|---|---|
+| `POST /v1/chat/completions` (`--chat-model`) | `X-Crispasr-Ai-Generated: true` + `X-Crispasr-Ai-Disclosure` response headers, on both the buffered and SSE branches | header carries the text; showing it is the client's job |
+| `crispasr-chat` (installed binary, interactive REPL + one-shot) | not marked — plain text on stdout | prints the disclosure to stderr at startup, both modes |
+| `crispasr_chat_*` C ABI (`include/crispasr_chat.h`) | **yours** | `crispasr_chat_ai_disclosure_text()` |
+| `CrispasrChatSession` (Flutter, `chat.dart`) | **yours** | `CrispasrChatSession.aiDisclosureText()` |
 
-Enabling a conversational endpoint also changes the §6.3 answer: "a CLI
-transcription tool is obvious" does not cover a chat API. And note that shipping
-a text-generating endpoint does not make this project a GPAI provider — the
-model is the operator's choice and its provider's responsibility (§7).
+The chat capability is opt-in everywhere — the endpoint exists only with
+`--chat-model`, the binary only if you run it — and it serves whatever
+general-purpose LLM GGUF the operator points it at.
+
+**Marking is still weak here and this document will not pretend otherwise.**
+There is no watermark-equivalent for short-form text that survives a
+copy-paste; the Commission's guidance and the Code of Practice on AI-generated
+content both treat machine-readable text marking as less settled than the audio
+case, and point at metadata travelling with the content rather than a signal
+inside the words. Response headers are that metadata. A client that drops them
+publishes unmarked text, and **marking what you then do with the text remains
+your duty** — the headers make the default better, they do not discharge
+Art. 50(2) for you. On the ABI and in Flutter, nothing marks at all.
+
+The disclosure string is one canonical value in the C ABI so the four surfaces
+cannot drift apart. Render it **visibly**: Art. 50(5) requires disclosures to
+meet accessibility requirements.
+
+The Flutter binding is why Art. 50(1) is not theoretical here. §6.3's answer —
+"a CLI transcription tool is obvious to a reasonably well-informed person" —
+does not carry to a chat bubble in a mobile app, and it is exactly there that
+nothing was said. `crispasr-chat` discloses anyway, despite a terminal launched
+with `-m model.gguf` being about as obvious as it gets: it ships as the
+reference for downstream wrappers, and a reference that omits the disclosure
+teaches every wrapper to omit it.
+
+Shipping a text-generating endpoint does not make this project a GPAI provider —
+the model is the operator's choice and its provider's responsibility (§7).
 
 ### 6.7 Reading `--detect-watermark` (it is a diagnostic, not proof)
 
@@ -531,11 +609,13 @@ original providers, not with a downstream requantizer. Model cards in
 | Denoise / source separation | Art. 50(2) assistive exemption | — |
 | TTS synthesis (52 engines) | **Art. 50(2)** — marked | watermark + C2PA, default-on, watertight floor on CLI, server *and* Wyoming |
 | Wyoming TTS (`--wyoming-port`) | **Art. 50(2) + 50(4)** | watermark always forced; clones disclaimed, and refused without operator `--i-have-rights` |
-| Voice cloning (`.wav` ref, inline bake, or stamped pack) | **Art. 50(2) + 50(4)** | + spoken disclaimer + `--i-have-rights`; `test-voice-clone-policy` |
-| Voice-pack baking (`--make-ref` + all 3 Python bakers) | The cloning step itself | `--i-have-rights`; stamps `crispasr.voice.cloned_from_recording` |
+| Voice cloning (`.wav` ref, inline bake, stamped pack, **or bank entry**) | **Art. 50(2) + 50(4)** | + spoken disclaimer + `--i-have-rights`; `test-voice-clone-policy` |
+| Multi-voice **banks** (cosyvoice3 `voices.gguf`) | Every entry is a baked clone | `voice_bank_path()` on all 4 surfaces; per-entry stamp; `test-compliance-wiring` |
+| Voice-pack baking (`--make-ref` + all 5 Python bakers) | The cloning step itself | `--i-have-rights`; stamps `crispasr.voice.cloned_from_recording` |
+| Voice upload (`POST /v1/voices`) | Enrollment = the cloning step | `consent_attestation`; `[CONSENT] scope=voice-upload` |
 | `--detect-watermark` | Diagnostic, **not** a gate | reports an exact p-value; "DETECTED" needs p < 0.01 (§6.7) |
 | Speech restoration / upscaling / S2S | **Art. 50(2)** — marked | watermark via S2S path, same per-response floor |
-| **LLM chat (`--chat-model`)** | **Art. 50(2) synthetic text** | **not marked — stated gap, deployer duty (§6.6)** |
+| **LLM chat** (endpoint, `crispasr-chat`, C ABI, Flutter) | **Art. 50(2) synthetic text + 50(1) interaction** | response headers + `crispasr_chat_ai_disclosure_text()`; **text marking stays a weak, partly deployer duty (§6.6)** |
 | Session-scoped diarization | Not biometric identification | embeddings discarded, no names |
 | Named voiceprint profiles | Kept outside Annex III(1)(a) | `--speaker-db-consent`, closed roster, offline-only |
 | Voice-based emotion inference | Art. 5(1)(f) / Annex III(1)(c) | **removed**; `test-no-emotion-recognition` |
@@ -548,8 +628,10 @@ original providers, not with a downstream requantizer. Model cards in
 Things CrispASR cannot do for you:
 
 - [ ] **Art. 50(4)** — show or speak an AI-generated label for any synthetic voice you publish. Default-on at the CLI and server; **your job** on the C ABI, WASM and bindings, using `crispasr_session_disclaimer_text()` / `crispasr_session_get_disclaimer_pcm()` (§6.2).
-- [ ] **Art. 50(1)** — disclose AI interaction in conversational products. A server started with `--chat-model` is one.
-- [ ] **Art. 50(2) for text** — if you enable `POST /v1/chat/completions`, marking its output is yours; CrispASR marks audio only (§6.6).
+- [ ] **Art. 50(1)** — disclose AI interaction in conversational products. All four chat surfaces are ones (§6.6). Use `crispasr_chat_ai_disclosure_text()` / `CrispasrChatSession.aiDisclosureText()` and render it **visibly**; the ABI and Flutter cannot show it for you.
+- [ ] **Art. 50(2) for text** — the chat endpoint sends `X-Crispasr-Ai-Generated`, but a client that drops the header publishes unmarked text, and the C ABI and Flutter mark nothing. Marking what you publish is yours (§6.6).
+- [ ] **Re-bake cosyvoice3 voice banks** — a bundle baked before `crispasr.voice.bank_stamped` gates every entry by producer architecture, which is conservative but blunt. Re-bake with the current script for per-entry accuracy (§6.2).
+- [ ] **`POST /v1/voices` now requires `consent_attestation`** — a breaking API change. Clients that enroll voices need the extra form field.
 - [ ] **Re-bake old TADA references** — `chatterbox-voice` and `qwen3tts.voicepack` legacy packs are caught by architecture, but a `crispasr.reference` pack baked before the stamp reads as a preset (§6.2).
 - [ ] **Don't treat `--detect-watermark` as proof either way** — it is a weak diagnostic with a stated error rate, not evidence of provenance (§6.7).
 - [ ] **Art. 4** — ensure the people operating the system have adequate AI literacy.
@@ -571,6 +653,10 @@ rots:
 |---|---|
 | Spoken-disclaimer opt-out policy | `examples/cli/crispasr_marking_policy.h` (+ `tests/test-marking-policy.cpp`) |
 | **What counts as a voice clone** | `examples/cli/crispasr_voice_clone_policy.h` (pure) + `crispasr_voice_provenance.h` (resolve + read the stamp) (+ `tests/test-voice-clone-policy.cpp`) |
+| **Are the gates actually wired up?** | `tests/test-compliance-wiring.cpp` — source-level, guards the *joins*: every surface's `classify_voice` call, every baker's gate + stamp, the upload gate, binding watermark strength, the chat disclosures |
+| **Multi-voice banks** | `CrispasrBackend::voice_bank_path()` (`crispasr_backend.h`), overridden by `crispasr_backend_cosyvoice3.cpp`; read by `crispasr_voice::read_bank_provenance()`; `s->cosyvoice3_voices_path` on the ABI |
+| Chat / synthetic-text disclosure | `crispasr_chat_ai_disclosure_text()` in `src/chat.cpp`; call sites in `crispasr_chat_main.cpp`, `crispasr_server.cpp` (`X-Crispasr-Ai-*`), `flutter/crispasr/lib/src/chat.dart` |
+| Voice upload consent gate | `POST /v1/voices` in `crispasr_server.cpp` (`consent_attestation`, `[CONSENT] scope=voice-upload`) |
 | Which containers carry a manifest | `crispasr_marking::container_marking_for_format()` in `crispasr_marking_policy.h` |
 | Voice-pack clone provenance stamp | written by `tada_encoder_write_ref_gguf()` + all 3 `models/*` voice bakers; read by `crispasr_voice::read_pack_provenance()` |
 | Legacy pack classification by producer | `crispasr_voice::architecture_is_recording_derived()` |
@@ -585,7 +671,27 @@ rots:
 | Speaker-DB consent gate | `src/speaker_db.cpp`, `crispasr_speaker_db_open/enroll2` |
 | Emotion-recognition exclusion | `tests/test-no-emotion-recognition.cpp` |
 
-A fourth rule earned by the audit of 2026-08-02, alongside the three below:
+Two more rules earned by the second audit of 2026-08-02, alongside the four
+below:
+
+6. **Guard the joins, not just the predicate.** Every failure in this document's
+   history — Wyoming marking nothing, `--make-ref` asking nothing, chatterbox
+   packs, cosyvoice3 banks — happened while `test-voice-clone-policy` and
+   `test-marking-policy` were green, because none of them was a predicate bug.
+   They were missing call sites, unstamped bakers and ungated endpoints. That is
+   what `tests/test-compliance-wiring.cpp` is for, and why it is deliberately
+   coarse: it cannot prove the gate is called *correctly*, only that the call is
+   still there, which is the failure mode that actually recurs.
+
+5. **A voice does not have to be a file.** The gate reads `--voice`. Any other
+   route by which a voice reaches a backend — an entry in a bundle, an env var,
+   a config file — is invisible to it until it is plumbed in, and returns
+   "preset" in the meantime. cosyvoice3's `voices.gguf` is the found case;
+   `CRISPASR_KOKORO_VOICE_GGUF` is the shape of the next one. When adding a
+   backend, ask how a voice gets in, not just what `--voice` looks like.
+
+A fourth rule earned by the first audit of 2026-08-02, alongside the three
+below:
 
 4. **Enumerate surfaces from the code, not from this document.** The Wyoming
    server marked nothing for four releases purely because §6.1's table did not

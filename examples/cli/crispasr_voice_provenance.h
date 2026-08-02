@@ -54,6 +54,39 @@ inline bool pack_declares_clone(const std::string& path) {
     return read_pack_provenance(path).declares_clone;
 }
 
+// Read what a multi-voice BANK says about one entry.
+//
+// A bank is a single GGUF holding many voices, selected by name (cosyvoice3's
+// voices.gguf). The gate never sees its path — the backend discovers it as a
+// sibling of the model or from an env var — so it has to be handed in; see
+// CrispasrBackend::voice_bank_path().
+//
+// Precedence: the per-voice stamp, then the bank-wide one. `has_stamps` reports
+// whether the bundle carries provenance metadata at all, which is what
+// distinguishes "this entry is explicitly not a clone" from "this bundle
+// predates the stamp and cannot say" — only the latter falls back to the
+// producer architecture.
+inline crispasr_voice::BankFacts read_bank_provenance(const std::string& bank_path, const std::string& voice_name) {
+    crispasr_voice::BankFacts f;
+    if (bank_path.empty() || voice_name.empty())
+        return f;
+    std::error_code ec;
+    if (!std::filesystem::exists(bank_path, ec))
+        return f;
+    gguf_context* meta = core_gguf::open_metadata(bank_path.c_str());
+    if (!meta)
+        return f;
+    f.architecture = core_gguf::kv_str(meta, "general.architecture", "");
+    // Sentinel written by every current baker: "this bundle stamps its entries",
+    // so an absent per-voice key means "not a clone" rather than "unknown".
+    f.has_stamps = core_gguf::kv_bool(meta, bank_stamped_key(), false);
+    const std::string per_voice = bank_provenance_key_for(voice_name);
+    f.declares_clone =
+        core_gguf::kv_bool(meta, per_voice.c_str(), false) || core_gguf::kv_bool(meta, provenance_key(), false);
+    core_gguf::free_metadata(meta);
+    return f;
+}
+
 // Resolve the value a caller passed to the file a backend will open.
 //
 // An absolute/relative path is returned as-is. A BARE name (the server's
@@ -87,15 +120,25 @@ inline std::string resolve_voice_path(const std::string& voice, const std::strin
 // `baked_from_wav_this_run` is the runtime's own knowledge that it baked this
 // voice from a user recording during this run — it outranks anything the file
 // says, and is the reason the TADA inline clone is gated at all.
+//
+// `bank_path` is the multi-voice bundle the backend will select from, when it
+// has one (CrispasrBackend::voice_bank_path()). Without it a bank entry is a
+// bare name that names no file, and the whole gate silently returns "preset" —
+// which is how cosyvoice3's voice-clone bundles went ungated on every surface.
 inline CloneDecision classify_voice(const std::string& voice, const std::string& voice_dir,
-                                    bool baked_from_wav_this_run) {
+                                    bool baked_from_wav_this_run, const std::string& bank_path = std::string()) {
     const std::string resolved = resolve_voice_path(voice, voice_dir);
     // Skip the GGUF read when the answer can't depend on it — avoids opening a
     // file per request on the server's hot path for presets passed by name.
     if (baked_from_wav_this_run || is_recording_reference(resolved))
         return classify(resolved, baked_from_wav_this_run, /*pack_declares_clone=*/false);
     const PackProvenance p = read_pack_provenance(resolved);
-    return classify(resolved, baked_from_wav_this_run, p.declares_clone, p.architecture);
+    // Only a name that resolved to no file can be a bank entry. A real path was
+    // already answered for by the pack read above, and asking the bank about it
+    // would let an unrelated bundle's metadata classify someone else's file.
+    const bool is_bank_entry = !bank_path.empty() && !is_voice_pack(resolved) && !is_recording_reference(resolved);
+    const BankFacts bank = is_bank_entry ? read_bank_provenance(bank_path, resolved) : BankFacts();
+    return classify(resolved, baked_from_wav_this_run, p.declares_clone, p.architecture, bank);
 }
 
 } // namespace crispasr_voice

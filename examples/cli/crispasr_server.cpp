@@ -2160,8 +2160,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // both, so a bare name and every .gguf-only cloning backend (chatterbox
         // has no .wav path at all) cleared this gate untouched.
         // See crispasr_voice_clone_policy.h.
-        const crispasr_voice::CloneDecision clone_decision =
-            crispasr_voice::classify_voice(voice_name, params.tts_voice_dir, /*baked_from_wav_this_run=*/false);
+        // ... and a name that resolves to no file at all may still be an entry
+        // inside the backend's multi-voice bank, which is where cosyvoice3 keeps
+        // every one of its voice clones.
+        const crispasr_voice::CloneDecision clone_decision = crispasr_voice::classify_voice(
+            voice_name, params.tts_voice_dir, /*baked_from_wav_this_run=*/false, backend->voice_bank_path());
         const bool is_voice_clone = clone_decision.is_clone;
         if (is_voice_clone && consent_attestation.empty()) {
             json_error(res, 400,
@@ -2868,8 +2871,23 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     svr.Get("/v1/audio/voices", handle_list_voices);
 
     // -----------------------------------------------------------------------
-    // POST /v1/voices — upload a voice file (multipart: "voice" file + optional "name" field)
+    // POST /v1/voices — upload a voice file (multipart: "voice" file +
+    // "consent_attestation" + optional "name" field)
     // Returns 201 on success: {"name": "...", "format": "wav", "size_bytes": N}
+    //
+    // This is the network equivalent of --make-ref: it takes a recording of a
+    // real person and stores it as a reusable voiceprint the server will clone
+    // from. The project's rule is that baking IS the cloning step, which is why
+    // --make-ref and all three Python voice bakers demand --i-have-rights — so
+    // the attestation is taken HERE, where the recording enters the system, not
+    // only at /v1/audio/speech where it is replayed.
+    //
+    // It shipped without one: an upload was accepted from anyone who could
+    // reach the endpoint, and the only trace it left was a byte count. The
+    // synthesis gate did catch the resulting clone (a bare name resolves to
+    // <voice-dir>/<name>.wav and scores as a recording-reference), so this was
+    // never unmarked output — but consent for a third party's voice was never
+    // asked for, and no [CONSENT] line existed to show it had been.
     // -----------------------------------------------------------------------
     svr.Post("/v1/voices", [&](const Request& req, Response& res) {
         if (!require_auth(req, res))
@@ -2892,6 +2910,24 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         const auto& voice_file = req.get_file_value("voice");
         if (voice_file.content.size() < 44) {
             json_error(res, 400, "uploaded file is too small to be a valid audio file");
+            return;
+        }
+
+        // Speaker-consent gate. Hard refusal, matching /v1/audio/speech rather
+        // than #312's deny-the-opt-out rule: #312 is about a MARKING opt-out,
+        // where serving the stronger default is always available. There is no
+        // safe default for "may I keep a recording of this person's voice" —
+        // either the attestation exists or the upload must not happen.
+        const std::string upload_consent =
+            req.has_file("consent_attestation") ? req.get_file_value("consent_attestation").content : std::string();
+        if (upload_consent.empty()) {
+            json_error(res, 400,
+                       "uploading a voice reference requires a 'consent_attestation' form field. "
+                       "Storing a recording as a reusable voiceprint is the cloning step itself. "
+                       "This field should contain a statement attesting that you have the consent "
+                       "of the speaker whose voice this is, or that it is your own voice. "
+                       "Example: consent_attestation=\"I have the speaker's consent\"",
+                       "consent_required", "consent_attestation");
             return;
         }
 
@@ -2946,6 +2982,20 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         resp["size_bytes"] = voice_file.content.size();
         res.status = 201;
         res.set_content(resp.dump(), "application/json");
+        // Audit trail for the enrollment itself, in the same [CONSENT] format
+        // the CLI and /v1/audio/speech emit — so "when was this voiceprint
+        // created and on whose attestation" is answerable from the log, not
+        // just "what was synthesized with it afterwards".
+        {
+            char ts[64];
+            auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+            std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+            fprintf(stderr,
+                    "[CONSENT] ts=%s scope=voice-upload voice=%s clone_reason=recording-reference bytes=%zu "
+                    "attestation=\"%s\"\n",
+                    ts, log_sanitize(voice_name).c_str(), voice_file.content.size(),
+                    log_sanitize(upload_consent).c_str());
+        }
         fprintf(stderr, "crispasr-server: uploaded voice '%s' (%zu bytes)\n", voice_name.c_str(),
                 voice_file.content.size());
     });
@@ -3162,6 +3212,19 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             json_error(res, 500, std::string("chat reset failed: ") + rerr.message, "chat_reset_failed");
             return;
         }
+
+        // EU AI Act Art. 50(2) marking for synthetic TEXT. There is no
+        // watermark-equivalent that survives a copy-paste of a sentence, so the
+        // Commission's own guidance points at metadata travelling with the
+        // response — which for an HTTP API means headers. Set on both the
+        // buffered and the SSE branch, before either writes a body.
+        //
+        // This is weaker than the audio case and the docs say so (§6.6): a
+        // client that drops the headers publishes unmarked text, and marking
+        // what you then do with it stays the deployer's duty. Weak marking that
+        // travels is still strictly better than none, and it costs two headers.
+        res.set_header("X-Crispasr-Ai-Generated", "true");
+        res.set_header("X-Crispasr-Ai-Disclosure", crispasr_chat_ai_disclosure_text());
 
         const auto now_unix = []() -> int64_t {
             return (int64_t)std::chrono::duration_cast<std::chrono::seconds>(

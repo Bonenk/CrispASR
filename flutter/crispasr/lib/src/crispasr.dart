@@ -5516,12 +5516,19 @@ class CrispasrWatermark {
 
   /// Embed a watermark into float32 mono PCM (in-place).
   ///
-  /// [alpha] controls spread-spectrum strength (0.005 default); ignored
-  /// when AudioSeal is loaded.
+  /// [alpha] controls spread-spectrum strength; ignored when AudioSeal is
+  /// loaded. The default (`<= 0`) selects the band-limited strength that makes
+  /// the mark reliably *detectable* — the property EU AI Act Art. 50(2)
+  /// requires, and the reason this is the call `synthesizeRaw` callers use to
+  /// discharge marking themselves.
+  ///
+  /// This defaulted to `0.005`, which the C ABI documents as too faint to
+  /// reliably detect on real speech. An explicit positive alpha is used
+  /// verbatim and bypasses the robust default; only pass one to A/B strength.
   ///
   /// Returns a new [Float32List] with the watermark applied.
   static Float32List embed(Float32List pcm,
-      {double alpha = 0.005, DynamicLibrary? lib}) {
+      {double alpha = -1.0, DynamicLibrary? lib}) {
     lib ??= DynamicLibrary.open(CrispASR.defaultLibName());
     final fn = lib.lookupFunction<Void Function(Pointer<Float>, Int32, Float),
         void Function(Pointer<Float>, int, double)>('crispasr_watermark_embed');

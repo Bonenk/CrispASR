@@ -3636,8 +3636,21 @@ def watermark_load_model(gguf_path: str) -> None:
         raise RuntimeError(f"crispasr_watermark_load_model failed (rc={rc})")
 
 
-def watermark_embed(pcm: "numpy.ndarray", alpha: float = 0.005) -> None:
-    """Embed an AI-generated watermark into float32 PCM in-place."""
+def watermark_embed(pcm: "numpy.ndarray", alpha: float = -1.0) -> None:
+    """Embed an AI-generated watermark into float32 PCM in-place.
+
+    ``alpha`` controls spread-spectrum strength; ignored when AudioSeal is
+    loaded. The default (``<= 0``) selects the band-limited strength that makes
+    the mark reliably *detectable*, which is the property EU AI Act Art. 50(2)
+    requires — this is the call :func:`Session.synthesize_raw` callers use to
+    discharge marking themselves, so it has to produce a findable mark.
+
+    This defaulted to ``0.005`` — the strength the C ABI documents as "too
+    faint to reliably detect on real speech". An explicit positive alpha is
+    passed through verbatim and bypasses the robust default, so every caller
+    that relied on the default was emitting audio it could not detect a
+    watermark in. Only pass a literal alpha to A/B watermark strength.
+    """
     import numpy as np
     if pcm.dtype != np.float32:
         raise TypeError("pcm must be float32")

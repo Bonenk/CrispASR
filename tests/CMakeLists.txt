@@ -2902,6 +2902,27 @@ catch_discover_tests(test-no-emotion-recognition
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-compliance-wiring — the EU AI Act gates are WIRED UP on every surface
+# that can reach them. The pure predicates live in test-voice-clone-policy and
+# test-marking-policy, and both stayed green through every failure this guards:
+# Wyoming marking nothing for four releases, --make-ref demanding no
+# attestation, cosyvoice3 voice BANKS bypassing the clone gate on all four
+# surfaces. None of those were predicate bugs — they were missing call sites,
+# unstamped bakers and ungated endpoints. Source-level on purpose: the
+# behavioural version needs models and sockets, i.e. the live tier CI does not
+# run, and a gate CI can't run is a gate that ships wrong (#312).
+add_executable(test-compliance-wiring test-compliance-wiring.cpp)
+target_compile_definitions(test-compliance-wiring PRIVATE
+    CRISPASR_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+target_link_libraries(test-compliance-wiring PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-compliance-wiring
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-abi-clone-disclosure — the ABI watermarks cloned output (Art. 50(2))
 # but does not prepend the spoken disclosure the CLI/server add (Art. 50(4)),
 # because neutral-voice synthesis isn't portable once a clone voice is applied

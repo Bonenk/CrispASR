@@ -75,6 +75,10 @@ public:
 
     int tts_sample_rate() const override { return 24000; }
 
+    // The voices.gguf this backend resolved at load. `--voice <name>` selects an
+    // entry inside it, so this is the only path the clone gate can read.
+    std::string voice_bank_path() const override { return voices_path_; }
+
     std::vector<crispasr_segment> transcribe(const float* /*samples*/, int /*n_samples*/, int64_t /*t_offset_cs*/,
                                              const whisper_params& /*params*/) override {
         fprintf(stderr, "crispasr[cosyvoice3-tts]: transcription is not supported by this backend\n");
@@ -184,6 +188,11 @@ public:
             fprintf(stderr, "crispasr[cosyvoice3-tts]: failed to load voices '%s'\n", voices_path.c_str());
             return false;
         }
+        // Hand the bundle to the voice-clone gate. Every entry in here was baked
+        // from a reference recording, and --voice names one of them rather than
+        // a file, so without this the gate sees an unresolvable bare name and
+        // calls a zero-shot voice clone a preset. See voice_bank_path().
+        voices_path_ = voices_path;
         if (!p.no_prints) {
             int nv = cosyvoice3_tts_n_voices(ctx_);
             fprintf(stderr, "crispasr[cosyvoice3-tts]: %d voice(s) available:", nv);
@@ -267,6 +276,7 @@ private:
     struct cosyvoice3_tts_context* ctx_ = nullptr;
     std::string campplus_path_;
     std::string s3tok_path_;
+    std::string voices_path_;
     bool cloning_models_loaded_ = false;
     std::mutex cloning_models_mutex_;
 };

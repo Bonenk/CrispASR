@@ -231,6 +231,14 @@ namespace CrispASR
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int crispasr_session_input_sample_rate(IntPtr s);
 
+        // AI-content marking (EU AI Act Art. 50(2)) — the other half of
+        // synthesize_raw. alpha <= 0 selects the reliably detectable default.
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern void crispasr_watermark_embed(float[] pcm, int nSamples, float alpha);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern float crispasr_watermark_detect(float[] pcm, int nSamples);
+
         // ---- ASR transcription ----
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern IntPtr crispasr_session_transcribe(

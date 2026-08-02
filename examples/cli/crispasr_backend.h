@@ -217,6 +217,20 @@ public:
             cb(v.data(), (int)v.size(), true);
     }
 
+    // Path to the multi-voice BANK this backend selects `--voice` entries from,
+    // or empty when `--voice` names a file directly (the usual case).
+    //
+    // This exists for the voice-clone gate, not for synthesis. cosyvoice3 keeps
+    // every voice inside one bundle discovered as a sibling of the model, so
+    // `--voice fleurs-en` names no file on disk; the gate read no metadata and
+    // classified a zero-shot voice clone as a preset, on every surface. The
+    // backend is the only thing that knows which bundle it resolved, so it has
+    // to hand the path over. See crispasr_voice_provenance.h.
+    //
+    // Any future backend that selects voices by name from a container MUST
+    // override this, or its clones ship unattested and undisclosed.
+    virtual std::string voice_bank_path() const { return {}; }
+
     // Sample rate of `synthesize()` output PCM. Defaults to 24 kHz since most
     // TTS backends (kokoro, qwen3-tts, vibevoice, chatterbox, orpheus, indextts)
     // produce 24 kHz. Backends that emit a different rate (e.g. voxcpm2-tts at

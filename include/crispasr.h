@@ -886,8 +886,14 @@ CRISPASR_API int crispasr_lcs_dedup_prefix_count(const int32_t* prev_tail_tokens
 CRISPASR_API float crispasr_watermark_detect(const float* pcm, int n_samples);
 
 // Embed watermark into float32 mono PCM (in-place).
-// `alpha` controls spread-spectrum strength (0.005 default); ignored
-// when AudioSeal is loaded.
+//
+// `alpha` controls spread-spectrum strength; ignored when AudioSeal is loaded.
+// PASS alpha <= 0 — that selects the band-limited default (~0.05) which is
+// what makes the mark reliably DETECTABLE, the property EU AI Act Art. 50(2)
+// actually requires. An explicit positive alpha is used verbatim, so passing
+// the old 0.005 documented here produces a mark too faint to find again on
+// real speech: marking that cannot be detected is not marking. Only pass a
+// literal alpha if you are deliberately A/B-ing watermark strength.
 CRISPASR_API void crispasr_watermark_embed(float* pcm, int n_samples, float alpha);
 
 // C2PA (Content Credentials) signing of an in-memory audio CONTAINER (WAV/MP3

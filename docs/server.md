@@ -397,6 +397,32 @@ actually accepts a given voice depends on the backend's own resolution
 (e.g. CustomVoice models only accept names baked into the GGUF
 metadata — the `<voice-dir>` files are irrelevant to those).
 
+**Voice upload — requires a consent attestation:**
+
+```bash
+curl -X POST http://localhost:8080/v1/voices \
+  -F voice=@speaker.wav \
+  -F name=vivian \
+  -F consent_attestation="I have the speaker's consent" \
+  -F transcript="the reference transcript"   # optional, Qwen3-TTS ICL prefill
+# 201 {"name": "vivian", "format": "wav", "size_bytes": 220544}
+```
+
+`consent_attestation` is **mandatory** — a missing or empty field is a `400`
+with `code=consent_required`. Storing a recording as a reusable voiceprint *is*
+the cloning step, the same act the CLI gates behind `--i-have-rights` and every
+voice baker gates at bake time; taking the attestation only later, at
+`/v1/audio/speech`, would mean a third party's voice could be enrolled by anyone
+who could reach the endpoint. The upload emits an
+`[CONSENT] scope=voice-upload …` audit line. See
+[`eu-ai-act.md`](eu-ai-act.md) §6.2.
+
+> **Breaking change.** This field is new; clients that provisioned voices
+> without it get a `400` until they add it.
+
+Requires `--voice-dir`; names must match `[a-zA-Z0-9_-]+`; an existing name
+needs `?force=true`. `DELETE /v1/voices/{name}` removes one.
+
 ### Voice file conventions
 
 ```
@@ -516,8 +542,8 @@ audio is watermarked by default, same as TTS (process-level opt-out via
 |---|---|
 | Streaming response (chunked / SSE) | Pending — see PLAN §70 (couples with chunked-VAE for the full latency win). |
 | `mp3` / `aac` / `opus` encoding | **Done** — encoded in-tree by glint, no build deps (`response_format=mp3\|aac\|opus`; `opus` = Ogg Opus). `flac` output still pending. |
-| `POST /v1/voices` (multipart upload for runtime provisioning) | Pending — security review (size limits, content-type validation, disk quota). |
-| `DELETE /v1/voices/{name}` | Pending alongside upload. |
+| `POST /v1/voices` (multipart upload for runtime provisioning) | **Done** — gated on `consent_attestation` (see above). Disk quota and content-type validation still pending. |
+| `DELETE /v1/voices/{name}` | **Done**. |
 | Native-backend `speed` (duration knobs vs server-side resample) | Pending — backend-by-backend. |
 
 ## Translation endpoint

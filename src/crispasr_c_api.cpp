@@ -2081,6 +2081,11 @@ struct crispasr_session {
     std::string cosyvoice3_ref_text; // ref transcription for *.wav cloning
     std::string cosyvoice3_camp_path;
     std::string cosyvoice3_s3tok_path;
+    // The voices bundle cosyvoice3 resolved at open. set_voice() classifies a
+    // bank entry from this file; without it a bare bank name (the header's own
+    // example, "fleurs-en") names nothing on disk and every zero-shot clone in
+    // the bundle read as a preset — no [CONSENT] line, no Art. 50(4) warning.
+    std::string cosyvoice3_voices_path;
     bool cosyvoice3_cloning_models_loaded = false;
     std::mutex cosyvoice3_cloning_mutex;
 #endif
@@ -3543,6 +3548,7 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         }
         s->cosyvoice3_camp_path = std::move(cv3_camp);
         s->cosyvoice3_s3tok_path = std::move(cv3_s3tok);
+        s->cosyvoice3_voices_path = std::move(cv3_voices);
         return s;
     }
 #endif
@@ -7759,8 +7765,12 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
     // predicate reads the baker's crispasr.voice.cloned_from_recording stamp.
     // (`ends_with_wav` is still used by the arms below for backend routing —
     // that is a file-format question, not a legal one.)
-    s->voice_is_clone =
-        crispasr_voice::classify_voice(path, /*voice_dir=*/std::string(), /*baked_from_wav_this_run=*/false).is_clone;
+    // The bank path matters here for the same reason it does on the CLI: with
+    // cosyvoice3 loaded, `path` is usually an entry name inside voices.gguf
+    // rather than a file, and every entry in that bundle is a baked clone.
+    s->voice_is_clone = crispasr_voice::classify_voice(path, /*voice_dir=*/std::string(),
+                                                       /*baked_from_wav_this_run=*/false, s->cosyvoice3_voices_path)
+                            .is_clone;
     s->voice_path = path;
     // Any voice change invalidates the cached neutral-voice disclosure.
     s->disclaimer_pcm.clear();
