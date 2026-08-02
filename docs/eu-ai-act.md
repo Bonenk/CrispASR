@@ -510,21 +510,60 @@ pack's or bank entry's `crispasr.voice.speaker_identity`, then the backend's
 has to be able to say so, or the flag is only usable for adding duties and gets
 ignored for the other half.
 
-**Everything ships at `unknown` today.** This is the mechanism; the per-backend
-verdicts are a separate, evidence-based exercise — reading each provider's own
-model card — and land as `declared_speaker_identity()` overrides and GGUF
-stamps. An unresearched backend claims nothing. **Guessing `synthetic` to quiet
-the warning is the costly error**, because it is silent and it is wrong in the
-direction that removes a disclosure.
+**The verdicts so far.** The sibling project CrispTTS ran the model-card
+exercise over its own 27 entries (13 `real_person` / 7 `synthetic` /
+7 `unknown`). Its findings were ported here, model by model, in
+`examples/cli/crispasr_speaker_identity_models.h` — one reviewable table with
+the evidence beside each answer, rather than 50 adapter overrides:
 
-The sibling project CrispTTS ran that exercise over its own 27 model entries and
-found 13 `real_person` / 7 `synthetic` / 7 `unknown` — the majority of the
-resolved ones being real people, which is why guessing the other way would have
-been expensive. Several of its entries drive CrispASR backends, so its findings
-are the natural first input here.
+| backend / checkpoint | verdict | why |
+|---|---|---|
+| `piper` (all voices) | **real_person** | every registry voice is one named donor: the Lessac corpus, Thorsten Müller, Kerstin |
+| `orpheus` + `kartoffel-orpheus-de-natural` | **real_person** | card: fine-tuned "primarily on natural human speech recordings"; its 19 speakers were *extracted* from podcasts/lectures/OER |
+| `kokoro` (English packs) | synthetic | upstream documents the voicepacks as designed/blended style vectors |
+| `orpheus` base (Canopy) | unknown | 100k+ h of "permissive" audio disclosed, nothing about tara/leah/jess/… |
+| `orpheus` + `lex-au` German FT | unknown | no training-data documentation |
+| everything else | unknown | not read yet |
 
-Enforcement: `examples/cli/crispasr_speaker_identity.h` (pure) +
-`tests/test-speaker-identity.cpp`; wiring guarded by
+**Three of CrispTTS's verdicts deliberately did *not* port**, because they are
+different weights reached through a different handler — checking that was the
+point:
+
+- **`fastpitch`** — CrispASR ships `fastpitch-en` (NVIDIA, English, single
+  speaker), not the German NeMo model CrispTTS marks `real_person`.
+- **`speecht5`** — CrispASR ships the base `microsoft/speecht5_tts`, whose
+  speaker comes from a 512-d x-vector *the operator supplies* via `--voice`. The
+  identity is per-invocation, so no backend-level verdict can be right; pass
+  `--speaker-identity`.
+- **`kokoro-de-hui-*`** — a **conflict**, held at `unknown`. CrispTTS marks
+  kokoro `synthetic`, which is right for the English packs, but CrispASR's
+  German backbone is `kokoro-de-hui-base`, trained on HUI-Audio-Corpus-German —
+  the same named-narrator corpus (Bernd, Hokuspokus, Friedrich, Eva, Karlsson,
+  Sonja) that CrispTTS itself cites when marking the NeMo FastPitch German model
+  `real_person`. Inheriting "synthetic" would assume the answer on the one
+  variant there is reason to doubt.
+
+**Matching is on the checkpoint file name, and that has a stated cost.** One
+backend serves many models with different answers, and there is no metadata that
+separates them (`convert-orpheus-to-gguf.py` writes `general.name =
+"orpheus-<variant>"` for all of them). This is the thing rule 3 says not to do —
+used here because the alternative is no answer, and because the failure is
+**safe**: a renamed file matches nothing, falls to `unknown`, and warns. A
+rename cannot turn `real_person` into `synthetic`; it can only turn a known
+answer back into a question. The durable fix is stamping
+`crispasr.voice.speaker_identity` into the published `cstr/` GGUFs, which this
+project controls — the same stamp-then-legacy-fallback shape as
+`architecture_is_recording_derived()`.
+
+**Guessing `synthetic` to quiet the warning is the costly error**, because it is
+silent and it is wrong in the direction that removes a disclosure. Note that of
+CrispTTS's 13 resolved-away-from-unknown models, *all* went to `real_person` —
+the convenient guess would have been wrong every time.
+
+Enforcement: `examples/cli/crispasr_speaker_identity.h` (mechanism) +
+`crispasr_speaker_identity_models.h` (verdicts) +
+`tests/test-speaker-identity.cpp`, which pins each verdict so flipping one is a
+failing test somebody has to justify; wiring guarded by
 `tests/test-compliance-wiring.cpp`.
 
 ### 6.3 Art. 50(1) — disclosure of AI interaction
@@ -701,7 +740,8 @@ Things CrispASR cannot do for you:
 - [ ] **Art. 50(2) for text** — the chat endpoint sends `X-Crispasr-Ai-Generated`, but a client that drops the header publishes unmarked text, and the C ABI and Flutter mark nothing. Marking what you publish is yours (§6.6).
 - [ ] **Re-bake cosyvoice3 voice banks** — a bundle baked before `crispasr.voice.bank_stamped` gates every entry by producer architecture, which is conservative but blunt. Re-bake with the current script for per-entry accuracy (§6.2).
 - [ ] **`POST /v1/voices` now requires `consent_attestation`** — a breaking API change. Clients that enroll voices need the extra form field.
-- [ ] **Answer the `speaker_identity` question for the presets you ship** (§6.2a). CrispASR defaults every backend to `unknown` and warns once per model; if the preset voice you use is an identifiable person, pass `--speaker-identity real_person` (or `"speaker_identity"` / `crispasr_session_set_speaker_identity()`) so the audible disclosure is added. Do not silence the warning with `synthetic` unless you have read the model card.
+- [ ] **Answer the `speaker_identity` question for the presets you ship** (§6.2a). `piper` and `kartoffel-orpheus-de-natural` now disclose by default; anything CrispASR has not researched warns once per model. If the preset voice you use is an identifiable person, pass `--speaker-identity real_person` (or `"speaker_identity"` / `crispasr_session_set_speaker_identity()`). Do not silence the warning with `synthetic` unless you have read the model card — every model CrispTTS resolved away from `unknown` turned out to be a real person.
+- [ ] **`piper` and `kartoffel-orpheus-de-natural` output now carries a spoken AI disclosure** where it previously did not. If you post-process or measure that audio, strip it with `--no-spoken-disclaimer --accept-marking-responsibility` rather than letting the prefix skew your results.
 - [ ] **Re-bake old TADA references** — `chatterbox-voice` and `qwen3tts.voicepack` legacy packs are caught by architecture, but a `crispasr.reference` pack baked before the stamp reads as a preset (§6.2).
 - [ ] **Don't treat `--detect-watermark` as proof either way** — it is a weak diagnostic with a stated error rate, not evidence of provenance (§6.7).
 - [ ] **Art. 4** — ensure the people operating the system have adequate AI literacy.
@@ -723,7 +763,8 @@ rots:
 |---|---|
 | Spoken-disclaimer opt-out policy | `examples/cli/crispasr_marking_policy.h` (+ `tests/test-marking-policy.cpp`) |
 | **What counts as a voice clone** | `examples/cli/crispasr_voice_clone_policy.h` (pure) + `crispasr_voice_provenance.h` (resolve + read the stamp) (+ `tests/test-voice-clone-policy.cpp`) |
-| **Whose voice a PRESET voice is** | `examples/cli/crispasr_speaker_identity.h` (pure) (+ `tests/test-speaker-identity.cpp`); per-backend verdicts live in `declared_speaker_identity()` overrides and the `crispasr.voice.speaker_identity` stamp |
+| **Whose voice a PRESET voice is** | `examples/cli/crispasr_speaker_identity.h` (mechanism, pure) (+ `tests/test-speaker-identity.cpp`) |
+| **Which model is whose voice** | `examples/cli/crispasr_speaker_identity_models.h` — the researched verdicts, with evidence and an OPEN QUESTIONS backlog. Pinned by `test-speaker-identity.cpp`, so flipping one is a failing test |
 | **Are the gates actually wired up?** | `tests/test-compliance-wiring.cpp` — source-level, guards the *joins*: every surface's `classify_voice` call, every baker's gate + stamp, the upload gate, binding watermark strength, the chat disclosures |
 | **Multi-voice banks** | `CrispasrBackend::voice_bank_path()` (`crispasr_backend.h`), overridden by `crispasr_backend_cosyvoice3.cpp`; read by `crispasr_voice::read_bank_provenance()`; `s->cosyvoice3_voices_path` on the ABI |
 | Chat / synthetic-text disclosure | `crispasr_chat_ai_disclosure_text()` in `src/chat.cpp`; call sites in `crispasr_chat_main.cpp`, `crispasr_server.cpp` (`X-Crispasr-Ai-*`), `flutter/crispasr/lib/src/chat.dart` |

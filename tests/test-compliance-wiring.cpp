@@ -111,12 +111,41 @@ TEST_CASE("every synthesis surface passes the bank to classify_voice", "[unit][c
 // mechanism is guarded in test-speaker-identity.cpp; this is the plumbing.
 // ---------------------------------------------------------------------------
 
-TEST_CASE("the backend base class offers a speaker-identity hook", "[unit][compliance]") {
+TEST_CASE("the backend base class resolves identity per checkpoint", "[unit][compliance]") {
     const std::string src = read_file("examples/cli/crispasr_backend.h");
-    REQUIRE(contains(src, "virtual crispasr_voice::SpeakerIdentity declared_speaker_identity() const"));
-    // Unknown by default: the mechanism ships before the research does, and an
-    // unresearched backend must claim nothing rather than claim "synthetic".
-    REQUIRE(contains(src, "return crispasr_voice::SpeakerIdentity::Unknown;"));
+    // Takes the model path, because one backend serves several checkpoints with
+    // different answers — `orpheus` runs both Canopy's base model and
+    // Kartoffel's German fine-tune. A no-argument hook cannot tell them apart
+    // and would have to pick one verdict for both.
+    REQUIRE(contains(src, "virtual crispasr_voice::SpeakerIdentity declared_speaker_identity(const std::string& "
+                          "model_path) const"));
+    REQUIRE(contains(src, "crispasr_voice::identity_for_model(name(), model_path)"));
+}
+
+TEST_CASE("every surface passes the actual checkpoint to the lookup", "[unit][compliance]") {
+    // Passing an empty string here would compile, resolve every model to
+    // Unknown, and look exactly like "nothing is researched yet" — a fix that
+    // ships inert. Pin the argument.
+    REQUIRE(contains(read_file("examples/cli/crispasr_run.cpp"), "declared_speaker_identity(params.model)"));
+    REQUIRE(contains(read_file("examples/cli/crispasr_server.cpp"), "declared_speaker_identity(params.model)"));
+    REQUIRE(contains(read_file("examples/cli/wyoming.cpp"), "declared_speaker_identity(g_params.model)"));
+}
+
+TEST_CASE("the verdict table records its evidence", "[unit][compliance]") {
+    // These are research results, not code. The value of the table is the
+    // reasoning beside each entry — a bare `return RealPerson;` is unreviewable
+    // and gets flipped by whoever finds it inconvenient.
+    const std::string src = read_file("examples/cli/crispasr_speaker_identity_models.h");
+    // The SECTION BANNER, not a bare mention: "OPEN QUESTIONS" also appears as
+    // a cross-reference inside the orpheus branch, so matching the short string
+    // stayed green with the backlog itself deleted. The red-proof caught that.
+    REQUIRE(contains(src, "OPEN QUESTIONS — models whose card has NOT been read"));
+    // The conflict found while porting CrispTTS's research must stay visible:
+    // kokoro is synthetic upstream, but CrispASR's German backbone is trained
+    // on a named-narrator corpus.
+    REQUIRE(contains(src, "HUI-Audio-Corpus-German"));
+    // And the cost of matching on a file name has to be stated, not hidden.
+    REQUIRE(contains(src, "WHAT MATCHING ON A FILE NAME COSTS"));
 }
 
 TEST_CASE("every synthesis surface resolves the speaker identity", "[unit][compliance]") {

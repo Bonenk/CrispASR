@@ -11,14 +11,21 @@
 // Pure predicate, so it is guarded on the tier CI actually runs, for the same
 // reason as test-marking-policy.cpp and test-voice-clone-policy.cpp.
 //
-// NOTE ON SCOPE: this file tests the MECHANISM. It deliberately asserts nothing
-// about which backend is which — those verdicts come from reading each
-// provider's model card, land as declared_speaker_identity() overrides and GGUF
-// stamps, and get their own coverage. Pinning a verdict here that nobody has
-// researched would be the same mistake as guessing "synthetic" to quiet a
-// warning.
+// TWO KINDS OF TEST LIVE HERE, and the difference matters when one fails:
+//
+//   * The MECHANISM (first half) — three values, two duties, a resolution
+//     order. Changing one of these is a design decision.
+//   * The RESEARCHED VERDICTS (second half) — claims about specific shipped
+//     models, each backed by the provider's own documentation. Changing one of
+//     these is a research decision, and it should require someone to justify a
+//     failing test rather than quietly editing a table.
+//
+// A model nobody has read stays Unknown in both halves. Pinning a verdict here
+// that nobody researched would be the same mistake as guessing "synthetic" to
+// quiet a warning: silent, and wrong in the direction that removes a duty.
 
 #include "crispasr_speaker_identity.h"
+#include "crispasr_speaker_identity_models.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -197,4 +204,84 @@ TEST_CASE("the warning names what to do about it", "[unit][compliance]") {
     REQUIRE(w.find("Art. 50(4)") != std::string::npos);
     // An unnamed model still produces a usable line rather than a dangling quote.
     REQUIRE(crispasr_voice::unknown_identity_warning("").find("<unknown-model>") != std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// The researched verdicts (crispasr_speaker_identity_models.h).
+//
+// Unlike the mechanism above, these ARE claims about specific shipped models,
+// each backed by the provider's own documentation. They are pinned here so a
+// verdict cannot be changed silently: flipping one is a research decision and
+// should show up as a failing test that someone has to justify.
+// ---------------------------------------------------------------------------
+
+using crispasr_voice::identity_for_model;
+
+TEST_CASE("piper voices are named human donors", "[unit][compliance]") {
+    // Every piper voice in the registry is one identifiable person: the Lessac
+    // corpus, Thorsten Müller, Kerstin. Releasing your voice under CC0 is
+    // consent to publish — it is not a reason to stop telling listeners the
+    // audio is synthetic.
+    REQUIRE(identity_for_model("piper", "piper-en_US-lessac-medium-f16.gguf") == SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_model("piper", "piper-de_DE-thorsten-medium-f16.gguf") == SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_model("piper", "/models/piper-de_DE-kerstin-low-f16.gguf") == SpeakerIdentity::RealPerson);
+}
+
+TEST_CASE("kokoro voicepacks are designed, not people", "[unit][compliance]") {
+    REQUIRE(identity_for_model("kokoro", "kokoro-82m-q8_0.gguf") == SpeakerIdentity::Synthetic);
+}
+
+TEST_CASE("the kokoro German HUI backbone is NOT inherited as synthetic", "[unit][compliance]") {
+    // The conflict this project found while porting CrispTTS's research.
+    // CrispTTS marks kokoro synthetic, which is right for the English packs.
+    // But CrispASR's German backbone is trained on HUI-Audio-Corpus-German,
+    // whose narrators are NAMED — the same corpus CrispTTS itself cites when
+    // marking the NeMo FastPitch German model real_person. Inheriting
+    // "synthetic" here would assume the answer on the one variant there is a
+    // reason to doubt. Held at Unknown until someone reads it.
+    REQUIRE(identity_for_model("kokoro", "kokoro-de-hui-base-q8_0.gguf") == SpeakerIdentity::Unknown);
+}
+
+TEST_CASE("orpheus is decided per checkpoint, not per backend", "[unit][compliance]") {
+    // One backend, several models, different answers — which is why the table
+    // is keyed on (backend, checkpoint) and not on the backend alone.
+    REQUIRE(identity_for_model("orpheus", "kartoffel-orpheus-de-natural-q8_0.gguf") == SpeakerIdentity::RealPerson);
+    // Canopy Labs disclose 100k+ h of "permissive" audio and nothing about the
+    // origin of tara/leah/jess/leo/dan/mia/zac/zoe.
+    REQUIRE(identity_for_model("orpheus", "orpheus-3b-0.1-ft-q8_0.gguf") == SpeakerIdentity::Unknown);
+    // lex-au's German fine-tune: no training-data documentation.
+    REQUIRE(identity_for_model("orpheus", "Orpheus-3b-German-FT-Q8_0.gguf") == SpeakerIdentity::Unknown);
+    // The kartoffel SYNTHETIC variant is a different checkpoint whose card
+    // nobody has read. It must NOT inherit the natural variant's verdict, and
+    // it must not be guessed synthetic from its repo name either.
+    REQUIRE(identity_for_model("orpheus", "kartoffel-orpheus-de-synthetic-q8_0.gguf") == SpeakerIdentity::Unknown);
+}
+
+TEST_CASE("matching is case-insensitive and path-tolerant", "[unit][compliance]") {
+    REQUIRE(identity_for_model("orpheus", "/mnt/storage/KARTOFFEL-ORPHEUS-DE-NATURAL-q8_0.gguf") ==
+            SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_model("piper", "/a/b/c/PIPER-de_DE-thorsten-high-f16.gguf") == SpeakerIdentity::RealPerson);
+}
+
+TEST_CASE("a renamed checkpoint fails SAFE, to unknown", "[unit][compliance]") {
+    // The cost of matching on a file name, stated. A rename cannot turn
+    // real_person into synthetic — it can only turn a known answer back into a
+    // question, which warns. The durable fix is a GGUF stamp.
+    REQUIRE(identity_for_model("orpheus", "my-model.gguf") == SpeakerIdentity::Unknown);
+    REQUIRE(identity_for_model("orpheus", "") == SpeakerIdentity::Unknown);
+}
+
+TEST_CASE("unresearched backends claim nothing", "[unit][compliance]") {
+    // Different weights from the models CrispTTS researched, or simply not read
+    // yet. Unknown is a backlog entry, not an opinion — and specifically not
+    // "synthetic", which would silently remove a disclosure.
+    for (const char* b : {"fastpitch", "speecht5", "melotts", "bananamind-tts", "bark", "csm", "parler-tts"}) {
+        INFO("backend=" << b);
+        REQUIRE(identity_for_model(b, "whatever-q8_0.gguf") == SpeakerIdentity::Unknown);
+    }
+}
+
+TEST_CASE("an unknown backend name is unknown, not a crash", "[unit][compliance]") {
+    REQUIRE(identity_for_model("", "") == SpeakerIdentity::Unknown);
+    REQUIRE(identity_for_model("some-future-backend", "x.gguf") == SpeakerIdentity::Unknown);
 }
