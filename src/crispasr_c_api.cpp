@@ -1658,6 +1658,12 @@ struct crispasr_session {
     // crispasr_session_get_disclaimer_pcm), so instead it records the fact,
     // warns once, and hands the caller the disclaimer to prepend themselves.
     bool voice_is_clone = false;
+    // Whose voice the current voice is, as DECLARED by its pack or bank entry,
+    // and the integrator's override. Independent of voice_is_clone: a preset
+    // that is a real person owes the Art. 50(4) disclosure without owing the
+    // consent attestation. See crispasr_speaker_identity.h.
+    crispasr_voice::SpeakerIdentity voice_pack_identity = crispasr_voice::SpeakerIdentity::Unknown;
+    crispasr_voice::SpeakerIdentity speaker_identity_override = crispasr_voice::SpeakerIdentity::Unknown;
     std::string voice_path;
     // Cached disclosure PCM. The disclaimer is a fixed sentence in the session's
     // neutral voice, so it is identical for every clip — but the documented
@@ -7768,9 +7774,10 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
     // The bank path matters here for the same reason it does on the CLI: with
     // cosyvoice3 loaded, `path` is usually an entry name inside voices.gguf
     // rather than a file, and every entry in that bundle is a baked clone.
-    s->voice_is_clone = crispasr_voice::classify_voice(path, /*voice_dir=*/std::string(),
-                                                       /*baked_from_wav_this_run=*/false, s->cosyvoice3_voices_path)
-                            .is_clone;
+    const crispasr_voice::CloneDecision voice_decision = crispasr_voice::classify_voice(
+        path, /*voice_dir=*/std::string(), /*baked_from_wav_this_run=*/false, s->cosyvoice3_voices_path);
+    s->voice_is_clone = voice_decision.is_clone;
+    s->voice_pack_identity = voice_decision.pack_identity;
     s->voice_path = path;
     // Any voice change invalidates the cached neutral-voice disclosure.
     s->disclaimer_pcm.clear();
@@ -8767,21 +8774,28 @@ CA_EXPORT int crispasr_session_accept_marking_responsibility(crispasr_session* s
 // posture depending on which surface you call — this line is what stops that
 // asymmetry from being silent. Not a refusal, and not repeated per call.
 static void crispasr_session_warn_unmarked_clone(crispasr_session* s) {
-    if (!s || !s->voice_is_clone || s->marking_responsibility_accepted || s->warned_clone_unmarked)
+    if (!s || s->marking_responsibility_accepted || s->warned_clone_unmarked)
+        return;
+    // Art. 50(4) is owed for a clone OR for a preset voice that belongs to an
+    // identifiable person — the audience cannot tell the two apart, and
+    // Art. 3(60) does not ask them to. See crispasr_speaker_identity.h.
+    const crispasr_voice::SpeakerIdentity identity = crispasr_voice::resolve_speaker_identity(
+        s->speaker_identity_override, s->voice_pack_identity, crispasr_voice::SpeakerIdentity::Unknown);
+    if (!crispasr_voice::requires_spoken_disclosure(s->voice_is_clone, identity))
         return;
     s->warned_clone_unmarked = true;
     std::time_t t = std::time(nullptr);
     char ts[64];
     std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
     fprintf(stderr,
-            "[MARKING] ts=%s scope=abi voice_clone=yes watermark=yes spoken_disclaimer=no\n"
-            "  crispasr: warning: cloned-voice output is watermarked, but the ABI does not prepend the\n"
+            "[MARKING] ts=%s scope=abi voice_clone=%s speaker_identity=%s watermark=yes spoken_disclaimer=no\n"
+            "  crispasr: warning: this output is watermarked, but the ABI does not prepend the\n"
             "  spoken AI-disclosure that the CLI and server add. If you publish this audio you owe an\n"
             "  audible or visible \"AI-generated\" label yourself. Use\n"
             "  crispasr_session_get_disclaimer_pcm() (before set_voice) or\n"
             "  crispasr_session_disclaimer_text(); call\n"
             "  crispasr_session_accept_marking_responsibility() to silence this.\n",
-            ts);
+            ts, s->voice_is_clone ? "yes" : "no", crispasr_voice::to_string(identity));
 }
 
 // Synthesize WITHOUT the watermark — an explicit provenance opt-out for callers
@@ -8821,6 +8835,36 @@ CA_EXPORT float* crispasr_session_synthesize(crispasr_session* s, const char* te
         crispasr_watermark_embed(pcm, *out_n_samples, -1.0f);
     }
     return pcm;
+}
+
+// Declare whose voice the current PRESET voice is: "real_person", "synthetic"
+// or "unknown"/NULL. Outranks whatever the voice pack declares.
+//
+// This exists because `is a clone` and `is a real person` are different
+// questions, and the ABI could only answer the first. A preset voice shipped
+// inside a model can be an identifiable individual — a named donor, a corpus
+// speaker — and synthesizing with it produces a deep fake under Art. 3(60)
+// whether or not a recording ever passed through one of our bakers.
+//
+// Setting real_person makes the Art. 50(4) reminder below fire for a non-cloned
+// voice. It does NOT require a consent attestation: whether that donor agreed
+// to the model being trained is a licensing question settled upstream, which
+// you cannot attest to and this ABI will not pretend you can.
+//
+// Returns 0, -1 on a bad session, -2 on an unrecognised value (which is left
+// unchanged rather than silently becoming "unknown").
+CA_EXPORT int crispasr_session_set_speaker_identity(crispasr_session* s, const char* identity) {
+    if (!s)
+        return -1;
+    bool recognised = true;
+    const crispasr_voice::SpeakerIdentity parsed =
+        crispasr_voice::parse_speaker_identity(identity ? identity : "", &recognised);
+    if (!recognised)
+        return -2;
+    s->speaker_identity_override = parsed;
+    // A changed answer can turn the reminder on; let it fire again.
+    s->warned_clone_unmarked = false;
+    return 0;
 }
 
 // The canonical spoken AI-disclosure text, identical to the one the CLI and

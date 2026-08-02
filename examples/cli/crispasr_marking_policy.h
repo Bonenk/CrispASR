@@ -44,15 +44,27 @@ struct Decision {
     std::string scope;
 };
 
+// `needs_spoken_disclaimer` is crispasr_voice::requires_spoken_disclosure(),
+// i.e. a clone OR a preset voice that belongs to an identifiable person. It
+// used to be `is_voice_clone` alone, which silently excluded every real-person
+// preset from a duty that Art. 3(60) attaches to the audio, not to the pipeline
+// that made it (see crispasr_speaker_identity.h).
+//
+// The opt-out policy below is unchanged and deliberately does not care WHICH of
+// the two put a disclaimer there: once one is owed, dropping it needs the same
+// attestation either way.
+//
 // `server_accepted` / `server_attestation` are the launch-time
 // --accept-marking-responsibility state (whisper_params::
 // tts_marking_responsibility_accepted / tts_marking_attestation).
-inline Decision decide(bool is_voice_clone, bool requested_spoken_disclaimer, const std::string& request_attestation,
-                       bool server_accepted, const std::string& server_attestation) {
+inline Decision decide(bool needs_spoken_disclaimer, bool requested_spoken_disclaimer,
+                       const std::string& request_attestation, bool server_accepted,
+                       const std::string& server_attestation) {
     Decision d;
-    // Non-clone output carries no spoken disclaimer in the first place, so
-    // "spoken_disclaimer": false is a no-op rather than an opt-out to police.
-    if (!is_voice_clone)
+    // Output that carries no spoken disclaimer in the first place has nothing to
+    // opt out of, so "spoken_disclaimer": false is a no-op rather than a policy
+    // decision to police.
+    if (!needs_spoken_disclaimer)
         return d;
     if (requested_spoken_disclaimer) {
         d.apply_spoken_disclaimer = true;
@@ -169,19 +181,30 @@ struct RawSurfaceDecision {
     bool force_watermark = true;
 };
 
-// `is_clone`          — crispasr_voice::classify_voice(...).is_clone
-// `operator_consent`  — whisper_params::tts_voice_clone_consent, i.e. the
-//                       server was launched with --i-have-rights. The only
-//                       attestation a protocol with no consent field can have.
-inline RawSurfaceDecision decide_raw_surface(bool is_clone, bool operator_consent) {
+// `is_clone`                — crispasr_voice::classify_voice(...).is_clone.
+//                             Governs the CONSENT gate: only cloning asks this
+//                             operator to attest to a speaker's permission.
+// `operator_consent`        — whisper_params::tts_voice_clone_consent, i.e. the
+//                             server was launched with --i-have-rights. The only
+//                             attestation a protocol with no consent field can
+//                             have.
+// `needs_spoken_disclaimer` — crispasr_voice::requires_spoken_disclosure(), i.e.
+//                             a clone OR a real-person preset. Governs the
+//                             Art. 50(4) audible label, which is a different
+//                             duty with a different trigger.
+//
+// The two are separate parameters because a real-person PRESET discloses
+// without being gated: whether that voice's donor consented to the model being
+// trained is a licensing question settled upstream, which this operator cannot
+// attest to. Refusing them would be theatre; not disclosing them would be the
+// bug. See crispasr_speaker_identity.h.
+inline RawSurfaceDecision decide_raw_surface(bool is_clone, bool operator_consent, bool needs_spoken_disclaimer) {
     RawSurfaceDecision d;
-    if (!is_clone)
-        return d; // preset voice: mark it, nothing to disclose or gate
-    if (!operator_consent) {
+    if (is_clone && !operator_consent) {
         d.refuse = true;
         return d;
     }
-    d.apply_spoken_disclaimer = true;
+    d.apply_spoken_disclaimer = needs_spoken_disclaimer;
     return d;
 }
 

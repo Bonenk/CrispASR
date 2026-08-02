@@ -74,6 +74,8 @@
 
 #pragma once
 
+#include "crispasr_speaker_identity.h" // SpeakerIdentity, carried on BankFacts
+
 #include <string>
 
 namespace crispasr_voice {
@@ -239,12 +241,22 @@ struct CloneDecision {
     // "pack-architecture" / "bank-provenance" / "bank-architecture" /
     // "" (none).
     const char* reason = "";
+    // What the pack or bank entry DECLARED about whose voice it is — not the
+    // final answer. Callers resolve it against --speaker-identity and the
+    // backend default via resolve_speaker_identity(); it rides along here
+    // because classify_voice() already has the metadata open and re-reading it
+    // per request on the server's hot path would be the obvious way to make
+    // this expensive.
+    SpeakerIdentity pack_identity = SpeakerIdentity::Unknown;
 };
 
 // What a multi-voice BANK says about the entry being selected. Filled in by
 // read_bank_provenance() (crispasr_voice_provenance.h) when the backend selects
 // voices by name from a bundle rather than by path; all-default otherwise.
 struct BankFacts {
+    // Whose voice this entry is (crispasr.voice.<name>.speaker_identity, then
+    // the bank-wide key). Independent of declares_clone.
+    SpeakerIdentity identity = SpeakerIdentity::Unknown;
     // The per-voice stamp for this entry, falling back to the bank-wide one.
     bool declares_clone = false;
     // The bundle carries provenance metadata at all. False means it predates

@@ -3068,6 +3068,33 @@ int crispasr_run_backend(const whisper_params& params_in) {
                     params.tts_voice.c_str(), clone_decision.reason, params.tts_consent_attestation.c_str());
         }
 
+        // Art. 50(4) applies to a PRESET voice too when that voice is an
+        // identifiable person: the audience cannot tell which pipeline made the
+        // audio, and Art. 3(60) does not ask them to. Resolve whose voice this
+        // is — operator override, then the pack's declaration, then the
+        // backend's — and disclose on either ground. Notably this does NOT feed
+        // the consent gate above; see crispasr_speaker_identity.h.
+        bool identity_recognised = true;
+        const crispasr_voice::SpeakerIdentity identity_override =
+            crispasr_voice::parse_speaker_identity(params.tts_speaker_identity, &identity_recognised);
+        if (!identity_recognised) {
+            // Report the typo rather than silently treating it as Unknown: the
+            // operator meant to answer this question, and "real-person" landing
+            // as "unknown" would drop the disclosure they asked for.
+            fprintf(stderr,
+                    "crispasr: warning: unrecognised --speaker-identity '%s'; treating as 'unknown'. "
+                    "Expected real_person, synthetic or unknown.\n",
+                    params.tts_speaker_identity.c_str());
+        }
+        const crispasr_voice::SpeakerIdentity speaker_identity = crispasr_voice::resolve_speaker_identity(
+            identity_override, clone_decision.pack_identity, backend->declared_speaker_identity());
+        const bool needs_spoken_disclosure =
+            crispasr_voice::requires_spoken_disclosure(is_voice_clone, speaker_identity);
+        if (crispasr_voice::should_warn_unknown_identity(is_voice_clone, speaker_identity) &&
+            crispasr_voice::claim_unknown_identity_warning(backend_name)) {
+            fprintf(stderr, "%s\n", crispasr_voice::unknown_identity_warning(backend_name).c_str());
+        }
+
         // Sample rate of the synthesized PCM — backend-declared. Most TTS
         // backends emit 24 kHz; voxcpm2-tts emits 48 kHz. Hard-coding 24 kHz
         // here is why voxcpm2 output played at half-speed before this fix.
@@ -3105,7 +3132,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 fwrite(s16.data(), sizeof(int16_t), s16.size(), stdout);
                 fflush(stdout);
             };
-            if (is_voice_clone && !params.tts_no_spoken_disclaimer) {
+            if (needs_spoken_disclosure && !params.tts_no_spoken_disclaimer) {
                 const auto& disc = crispasr_tts_get_disclaimer(backend.get(), params);
                 if (!disc.empty()) {
                     std::vector<float> d(disc.begin(), disc.end());
@@ -3160,12 +3187,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
             return 15;
         }
 
-        // Prepend spoken AI-disclosure for voice-cloned output. The
-        // disclaimer is synthesized with the neutral/default voice (not
-        // the cloned voice) and cached. 300ms silence gap.
-        // Skipped when --no-spoken-disclaimer is set; watermark + C2PA
-        // provenance remain regardless.
-        if (is_voice_clone && !params.tts_no_spoken_disclaimer) {
+        // Prepend the spoken AI-disclosure — for a voice clone, and for a preset
+        // voice that belongs to an identifiable person (Art. 50(4) attaches to
+        // the audio, not to the pipeline). The disclaimer is synthesized with
+        // the neutral/default voice (not the cloned voice) and cached. 300ms
+        // silence gap. Skipped when --no-spoken-disclaimer is set; watermark +
+        // C2PA provenance remain regardless.
+        if (needs_spoken_disclosure && !params.tts_no_spoken_disclaimer) {
             crispasr_tts_prepend_disclaimer(audio, backend.get(), params);
         }
 

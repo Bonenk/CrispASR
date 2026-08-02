@@ -497,6 +497,17 @@ struct whisper_params {
     // See crispasr_voice_clone_policy.h.
     bool tts_voice_baked_from_wav = false;
 
+    // Operator override for whose voice a PRESET voice is: "real_person",
+    // "synthetic" or "unknown"/empty. Outranks the pack's declaration and the
+    // backend's default (crispasr_speaker_identity.h).
+    //
+    // real_person turns on the Art. 50(4) spoken disclosure for a non-cloned
+    // voice, and deliberately does NOT turn on the --i-have-rights gate: the
+    // donor's consent to the model being trained is a licensing matter settled
+    // upstream that this operator cannot attest to.
+    // CLI: --speaker-identity   Server: "speaker_identity"
+    std::string tts_speaker_identity;
+
     // Skip the spoken AI-disclosure prefix on voice-cloned output.
     // Machine-readable provenance (watermark + C2PA) is always retained.
     // CLI: --no-spoken-disclaimer   Server: "spoken_disclaimer": false

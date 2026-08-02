@@ -515,11 +515,26 @@ static void wyoming_handle_connection(socket_t fd) {
                 std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
             }
 
+            // Whose voice is this? The protocol has no field for a per-request
+            // override, so the answer comes from the pack/bank declaration and
+            // the backend, with the operator's launch-time --speaker-identity as
+            // the only override available — the same shape as the consent gate
+            // below. A real-person PRESET is disclosed but not refused.
+            const crispasr_voice::SpeakerIdentity speaker_identity = crispasr_voice::resolve_speaker_identity(
+                crispasr_voice::parse_speaker_identity(rp.tts_speaker_identity), clone_decision.pack_identity,
+                g_backend->declared_speaker_identity());
+            const bool needs_spoken_disclosure =
+                crispasr_voice::requires_spoken_disclosure(clone_decision.is_clone, speaker_identity);
+            if (crispasr_voice::should_warn_unknown_identity(clone_decision.is_clone, speaker_identity) &&
+                crispasr_voice::claim_unknown_identity_warning(g_backend->name())) {
+                fprintf(stderr, "%s\n", crispasr_voice::unknown_identity_warning(g_backend->name()).c_str());
+            }
+
             // What this container-less surface must do about it. Named and
             // unit-tested in crispasr_marking_policy.h rather than spelled out
             // here, so the rule can go red in CI without a model or a socket.
-            const crispasr_marking::RawSurfaceDecision marking =
-                crispasr_marking::decide_raw_surface(clone_decision.is_clone, rp.tts_voice_clone_consent);
+            const crispasr_marking::RawSurfaceDecision marking = crispasr_marking::decide_raw_surface(
+                clone_decision.is_clone, rp.tts_voice_clone_consent, needs_spoken_disclosure);
 
             // Consent gate. The protocol carries no per-request attestation, so
             // the operator's launch-time --i-have-rights is the only one there
@@ -550,11 +565,20 @@ static void wyoming_handle_connection(socket_t fd) {
                 // voice. Not opt-out-able here — see the file header.
                 if (marking.apply_spoken_disclaimer && !pcmf32.empty()) {
                     crispasr_tts_prepend_disclaimer(pcmf32, g_backend, rp);
-                    fprintf(stderr,
-                            "[CONSENT] ts=%s surface=wyoming voice=%s clone_reason=%s attestation=\"%s\" "
-                            "spoken_disclaimer=yes\n",
-                            ts, wyoming_log_sanitize(rp.tts_voice).c_str(), clone_decision.reason,
-                            wyoming_log_sanitize(rp.tts_consent_attestation).c_str());
+                    if (clone_decision.is_clone) {
+                        fprintf(stderr,
+                                "[CONSENT] ts=%s surface=wyoming voice=%s clone_reason=%s attestation=\"%s\" "
+                                "spoken_disclaimer=yes\n",
+                                ts, wyoming_log_sanitize(rp.tts_voice).c_str(), clone_decision.reason,
+                                wyoming_log_sanitize(rp.tts_consent_attestation).c_str());
+                    } else {
+                        // Real-person preset: disclosed, not consent-gated, so
+                        // the [CONSENT] line above would be the wrong record.
+                        fprintf(stderr,
+                                "[MARKING] ts=%s surface=wyoming voice=%s speaker_identity=real_person "
+                                "spoken_disclaimer=yes\n",
+                                ts, wyoming_log_sanitize(rp.tts_voice).c_str());
+                    }
                 }
 
                 // Art. 50(2): the watertight floor. force=true because raw PCM

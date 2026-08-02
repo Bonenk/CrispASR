@@ -29,6 +29,10 @@ struct PackProvenance {
     // general.architecture — names the producer, used to classify LEGACY packs
     // that predate the stamp. Empty when unreadable.
     std::string architecture;
+    // Whose voice this is (crispasr.voice.speaker_identity). INDEPENDENT of
+    // declares_clone: a pack can be a non-clone preset and still be a real
+    // person, which is the whole reason this field exists.
+    SpeakerIdentity identity = SpeakerIdentity::Unknown;
 };
 
 // Read both provenance signals in ONE metadata open. Returns an empty result
@@ -46,6 +50,7 @@ inline PackProvenance read_pack_provenance(const std::string& path) {
         return p;
     p.declares_clone = core_gguf::kv_bool(meta, provenance_key(), false);
     p.architecture = core_gguf::kv_str(meta, "general.architecture", "");
+    p.identity = parse_speaker_identity(core_gguf::kv_str(meta, speaker_identity_key(), ""));
     core_gguf::free_metadata(meta);
     return p;
 }
@@ -83,6 +88,12 @@ inline crispasr_voice::BankFacts read_bank_provenance(const std::string& bank_pa
     const std::string per_voice = bank_provenance_key_for(voice_name);
     f.declares_clone =
         core_gguf::kv_bool(meta, per_voice.c_str(), false) || core_gguf::kv_bool(meta, provenance_key(), false);
+    // Per-entry identity, else the bank-wide one. Same precedence as the clone
+    // stamp above, for the same reason: one bundle, voices of differing status.
+    const std::string per_voice_identity = speaker_identity_key_for(voice_name);
+    f.identity = parse_speaker_identity(core_gguf::kv_str(meta, per_voice_identity.c_str(), ""));
+    if (f.identity == SpeakerIdentity::Unknown)
+        f.identity = parse_speaker_identity(core_gguf::kv_str(meta, speaker_identity_key(), ""));
     core_gguf::free_metadata(meta);
     return f;
 }
@@ -130,15 +141,22 @@ inline CloneDecision classify_voice(const std::string& voice, const std::string&
     const std::string resolved = resolve_voice_path(voice, voice_dir);
     // Skip the GGUF read when the answer can't depend on it — avoids opening a
     // file per request on the server's hot path for presets passed by name.
-    if (baked_from_wav_this_run || is_recording_reference(resolved))
+    if (baked_from_wav_this_run || is_recording_reference(resolved)) {
+        // A raw recording carries no metadata to declare an identity, and does
+        // not need one: it is a clone, so it is disclosed and gated regardless.
         return classify(resolved, baked_from_wav_this_run, /*pack_declares_clone=*/false);
+    }
     const PackProvenance p = read_pack_provenance(resolved);
     // Only a name that resolved to no file can be a bank entry. A real path was
     // already answered for by the pack read above, and asking the bank about it
     // would let an unrelated bundle's metadata classify someone else's file.
     const bool is_bank_entry = !bank_path.empty() && !is_voice_pack(resolved) && !is_recording_reference(resolved);
     const BankFacts bank = is_bank_entry ? read_bank_provenance(bank_path, resolved) : BankFacts();
-    return classify(resolved, baked_from_wav_this_run, p.declares_clone, p.architecture, bank);
+    CloneDecision d = classify(resolved, baked_from_wav_this_run, p.declares_clone, p.architecture, bank);
+    // Whichever source actually described this voice is the one that can speak
+    // for its identity: a bank entry's own key, else the pack's.
+    d.pack_identity = is_bank_entry ? bank.identity : p.identity;
+    return d;
 }
 
 } // namespace crispasr_voice

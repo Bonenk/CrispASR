@@ -2902,6 +2902,24 @@ catch_discover_tests(test-no-emotion-recognition
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-speaker-identity — whose voice a PRESET voice is, and which duty that
+# triggers. `is_clone == false` was answering two questions at once: correctly
+# "no consent attestation owed by this operator", and incorrectly "nothing to
+# disclose". A preset shipped inside a model can be an identifiable individual,
+# and Art. 3(60) attaches to the audio resembling that person rather than to the
+# pipeline that made it. Pure predicate, guarded on the tier CI actually runs.
+add_executable(test-speaker-identity test-speaker-identity.cpp)
+target_include_directories(test-speaker-identity PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-speaker-identity PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-speaker-identity
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-compliance-wiring — the EU AI Act gates are WIRED UP on every surface
 # that can reach them. The pure predicates live in test-voice-clone-policy and
 # test-marking-policy, and both stayed green through every failure this guards:

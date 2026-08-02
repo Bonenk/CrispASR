@@ -102,6 +102,85 @@ TEST_CASE("every synthesis surface passes the bank to classify_voice", "[unit][c
 }
 
 // ---------------------------------------------------------------------------
+// Whose voice a PRESET voice is reaches the disclosure decision, on every
+// surface.
+//
+// `is_clone == false` used to mean both "no consent owed" (right) and "nothing
+// to disclose" (wrong). A preset shipped inside a model can be an identifiable
+// person, and Art. 3(60) does not care which pipeline produced the audio. The
+// mechanism is guarded in test-speaker-identity.cpp; this is the plumbing.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("the backend base class offers a speaker-identity hook", "[unit][compliance]") {
+    const std::string src = read_file("examples/cli/crispasr_backend.h");
+    REQUIRE(contains(src, "virtual crispasr_voice::SpeakerIdentity declared_speaker_identity() const"));
+    // Unknown by default: the mechanism ships before the research does, and an
+    // unresearched backend must claim nothing rather than claim "synthetic".
+    REQUIRE(contains(src, "return crispasr_voice::SpeakerIdentity::Unknown;"));
+}
+
+TEST_CASE("every synthesis surface resolves the speaker identity", "[unit][compliance]") {
+    SECTION("CLI") {
+        const std::string src = read_file("examples/cli/crispasr_run.cpp");
+        REQUIRE(contains(src, "resolve_speaker_identity"));
+        REQUIRE(contains(src, "needs_spoken_disclosure"));
+        // ...and USES it: the disclaimer must key on the resolved answer, not
+        // on is_voice_clone. A resolve whose result is never read is the exact
+        // shape of a fix that ships inert.
+        REQUIRE(contains(src, "if (needs_spoken_disclosure && !params.tts_no_spoken_disclaimer)"));
+        REQUIRE_FALSE(contains(src, "if (is_voice_clone && !params.tts_no_spoken_disclaimer)"));
+    }
+    SECTION("HTTP server") {
+        const std::string src = read_file("examples/cli/crispasr_server.cpp");
+        REQUIRE(contains(src, "resolve_speaker_identity"));
+        REQUIRE(contains(src, "crispasr_marking::decide(needs_spoken_disclosure,"));
+    }
+    SECTION("Wyoming") {
+        const std::string src = read_file("examples/cli/wyoming.cpp");
+        REQUIRE(contains(src, "resolve_speaker_identity"));
+        REQUIRE(contains(src, "clone_decision.is_clone, rp.tts_voice_clone_consent, needs_spoken_disclosure"));
+    }
+    SECTION("C ABI") {
+        const std::string src = read_file("src/crispasr_c_api.cpp");
+        REQUIRE(contains(src, "crispasr_session_set_speaker_identity"));
+        REQUIRE(contains(src, "s->voice_pack_identity = voice_decision.pack_identity;"));
+        REQUIRE(contains(src, "requires_spoken_disclosure(s->voice_is_clone, identity)"));
+    }
+}
+
+TEST_CASE("the identity is readable from a pack and a bank entry", "[unit][compliance]") {
+    const std::string src = read_file("examples/cli/crispasr_voice_provenance.h");
+    REQUIRE(contains(src, "speaker_identity_key()"));
+    REQUIRE(contains(src, "speaker_identity_key_for(voice_name)"));
+    // Carried out of classify_voice so the server's hot path does not reopen
+    // the GGUF per request just to ask a second question about it.
+    REQUIRE(contains(src, "d.pack_identity = is_bank_entry ? bank.identity : p.identity;"));
+}
+
+TEST_CASE("the operator can answer the question on every surface", "[unit][compliance]") {
+    // A warning nobody can act on is one they learn to ignore, and this one
+    // fires on every unresearched preset backend in the project.
+    // Matched WITH the closing quote: a bare "--speaker-identity" substring
+    // survives renaming the flag to "--speaker-identity-disabled", which the
+    // red-proof duly demonstrated on an earlier draft of this line.
+    REQUIRE(contains(read_file("examples/cli/cli.cpp"), "arg == \"--speaker-identity\""));
+    REQUIRE(contains(read_file("examples/cli/crispasr_server.cpp"), "body.value(\"speaker_identity\""));
+    REQUIRE(contains(read_file("include/crispasr_session.h"), "crispasr_session_set_speaker_identity"));
+    REQUIRE(contains(read_file("include/crispasr.h"), "crispasr_session_set_speaker_identity"));
+}
+
+TEST_CASE("consent stays keyed on cloning alone", "[unit][compliance]") {
+    // The other half of the split, and the one that is easy to get wrong in the
+    // "safe" direction: making a real-person preset demand --i-have-rights
+    // would gate every documented preset example behind an attestation the
+    // operator cannot truthfully give.
+    const std::string policy = read_file("examples/cli/crispasr_speaker_identity.h");
+    REQUIRE(contains(policy, "inline bool requires_consent_attestation(bool is_clone, SpeakerIdentity /*identity*/) {\n"
+                             "    return is_clone;\n"
+                             "}"));
+}
+
+// ---------------------------------------------------------------------------
 // Every producer that consumes a recording gates and stamps.
 //
 // Baking IS the cloning step: everything downstream just replays the pack. A

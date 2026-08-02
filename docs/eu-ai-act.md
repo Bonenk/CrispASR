@@ -381,6 +381,10 @@ upstream voicepacks and `.pt` prompts with no recording involved; gating those
 behind a speaker-consent attestation nobody can meaningfully give would break
 every documented example. So an unrecognised architecture stays a preset.
 
+**But "not a clone" is not the same as "nothing to disclose"** — see §6.2a. That
+sentence above is a true statement about *this project's conversion step* and
+says nothing about whose voice the upstream voicepack was built from.
+
 `crispasr.reference` (TADA) is deliberately **not** on the list: the shipped
 `tada-ref-<lang>` packs and user `--make-ref` output share it, and gating the
 shipped ones would break `-l de` auto-download. Those are covered by the stamp
@@ -459,6 +463,69 @@ personality-rights and GDPR matter rather than an AI Act duty; the caller is an
 integrator who has read the header; and #312 is the standing lesson on what a
 hard refusal does to a surface with many downstream clients. The audit trail is
 the deliverable there, not the block.
+
+### 6.2a Whose voice is a *preset* voice? (`speaker_identity`)
+
+Everything in §6.2 answers "did a recording pass through one of our bakers".
+That is the right question for the **consent** gate and the wrong one for
+Art. 50(4). A deep fake under Art. 3(60) is AI-generated audio "resembling
+existing persons … which would falsely appear to a person to be authentic", and
+nothing in that turns on our pipeline. A preset voice shipped inside a model can
+be an identifiable individual — a named donor, or a corpus speaker such as
+VCTK's `p225` — and synthesizing with it produces exactly that content.
+
+So `is_clone == false` was doing two jobs: correctly meaning "no consent
+attestation owed by this operator", and incorrectly meaning "nothing to
+disclose".
+
+**Consent and disclosure are different duties with different holders.** A
+`real_person` preset is **disclosed** and is **not** consent-gated. Whether the
+donor agreed to their recordings being used to build the model is a licensing
+question settled upstream, between them and whoever trained it; the operator
+downstream cannot attest to it, and demanding `--i-have-rights` for a stock
+voice would be theatre that breaks every documented example. What the operator
+owes is the audience knowing the audio is synthetic. Cloning is where both
+apply, because there the operator *is* the one taking a specific person's voice.
+
+| | consent gate | audible disclosure |
+|---|---|---|
+| clone | ✅ | ✅ |
+| `real_person` preset | — | ✅ |
+| `synthetic` preset | — | — |
+| `unknown` preset | — | — + warns once |
+
+**Three values, and `unknown` is deliberately one of them.** Collapsing it into
+`synthetic` would silently assert the answer that happens to require no work, on
+exactly the models nobody has checked. Collapsing it into `real_person` would
+prepend a spoken sentence to every stock TTS voice in the project and train
+operators to reach for `--no-spoken-disclaimer`, which is worse than the
+disease. So `unknown` warns once per model, names what to do about it, and does
+not force a disclosure — a question handed to the deployer, not a verdict.
+
+Resolution is most-specific-first: `--speaker-identity` /
+`"speaker_identity"` / `crispasr_session_set_speaker_identity()`, then the
+pack's or bank entry's `crispasr.voice.speaker_identity`, then the backend's
+`declared_speaker_identity()`, then `unknown`. The override moves the answer in
+**both** directions on purpose — someone who knows a `synthetic` label is wrong
+has to be able to say so, or the flag is only usable for adding duties and gets
+ignored for the other half.
+
+**Everything ships at `unknown` today.** This is the mechanism; the per-backend
+verdicts are a separate, evidence-based exercise — reading each provider's own
+model card — and land as `declared_speaker_identity()` overrides and GGUF
+stamps. An unresearched backend claims nothing. **Guessing `synthetic` to quiet
+the warning is the costly error**, because it is silent and it is wrong in the
+direction that removes a disclosure.
+
+The sibling project CrispTTS ran that exercise over its own 27 model entries and
+found 13 `real_person` / 7 `synthetic` / 7 `unknown` — the majority of the
+resolved ones being real people, which is why guessing the other way would have
+been expensive. Several of its entries drive CrispASR backends, so its findings
+are the natural first input here.
+
+Enforcement: `examples/cli/crispasr_speaker_identity.h` (pure) +
+`tests/test-speaker-identity.cpp`; wiring guarded by
+`tests/test-compliance-wiring.cpp`.
 
 ### 6.3 Art. 50(1) — disclosure of AI interaction
 
@@ -610,6 +677,8 @@ original providers, not with a downstream requantizer. Model cards in
 | TTS synthesis (52 engines) | **Art. 50(2)** — marked | watermark + C2PA, default-on, watertight floor on CLI, server *and* Wyoming |
 | Wyoming TTS (`--wyoming-port`) | **Art. 50(2) + 50(4)** | watermark always forced; clones disclaimed, and refused without operator `--i-have-rights` |
 | Voice cloning (`.wav` ref, inline bake, stamped pack, **or bank entry**) | **Art. 50(2) + 50(4)** | + spoken disclaimer + `--i-have-rights`; `test-voice-clone-policy` |
+| **Preset voice that is a real person** | **Art. 50(2) + 50(4)** — a deep fake without being a clone | `speaker_identity=real_person` → spoken disclaimer, **no** consent gate; `test-speaker-identity` (§6.2a) |
+| Preset voice, provenance unresearched | Art. 50(2) | `unknown` — warns once per model, names the fix; **not** treated as synthetic |
 | Multi-voice **banks** (cosyvoice3 `voices.gguf`) | Every entry is a baked clone | `voice_bank_path()` on all 4 surfaces; per-entry stamp; `test-compliance-wiring` |
 | Voice-pack baking (`--make-ref` + all 5 Python bakers) | The cloning step itself | `--i-have-rights`; stamps `crispasr.voice.cloned_from_recording` |
 | Voice upload (`POST /v1/voices`) | Enrollment = the cloning step | `consent_attestation`; `[CONSENT] scope=voice-upload` |
@@ -632,6 +701,7 @@ Things CrispASR cannot do for you:
 - [ ] **Art. 50(2) for text** — the chat endpoint sends `X-Crispasr-Ai-Generated`, but a client that drops the header publishes unmarked text, and the C ABI and Flutter mark nothing. Marking what you publish is yours (§6.6).
 - [ ] **Re-bake cosyvoice3 voice banks** — a bundle baked before `crispasr.voice.bank_stamped` gates every entry by producer architecture, which is conservative but blunt. Re-bake with the current script for per-entry accuracy (§6.2).
 - [ ] **`POST /v1/voices` now requires `consent_attestation`** — a breaking API change. Clients that enroll voices need the extra form field.
+- [ ] **Answer the `speaker_identity` question for the presets you ship** (§6.2a). CrispASR defaults every backend to `unknown` and warns once per model; if the preset voice you use is an identifiable person, pass `--speaker-identity real_person` (or `"speaker_identity"` / `crispasr_session_set_speaker_identity()`) so the audible disclosure is added. Do not silence the warning with `synthetic` unless you have read the model card.
 - [ ] **Re-bake old TADA references** — `chatterbox-voice` and `qwen3tts.voicepack` legacy packs are caught by architecture, but a `crispasr.reference` pack baked before the stamp reads as a preset (§6.2).
 - [ ] **Don't treat `--detect-watermark` as proof either way** — it is a weak diagnostic with a stated error rate, not evidence of provenance (§6.7).
 - [ ] **Art. 4** — ensure the people operating the system have adequate AI literacy.
@@ -653,6 +723,7 @@ rots:
 |---|---|
 | Spoken-disclaimer opt-out policy | `examples/cli/crispasr_marking_policy.h` (+ `tests/test-marking-policy.cpp`) |
 | **What counts as a voice clone** | `examples/cli/crispasr_voice_clone_policy.h` (pure) + `crispasr_voice_provenance.h` (resolve + read the stamp) (+ `tests/test-voice-clone-policy.cpp`) |
+| **Whose voice a PRESET voice is** | `examples/cli/crispasr_speaker_identity.h` (pure) (+ `tests/test-speaker-identity.cpp`); per-backend verdicts live in `declared_speaker_identity()` overrides and the `crispasr.voice.speaker_identity` stamp |
 | **Are the gates actually wired up?** | `tests/test-compliance-wiring.cpp` — source-level, guards the *joins*: every surface's `classify_voice` call, every baker's gate + stamp, the upload gate, binding watermark strength, the chat disclosures |
 | **Multi-voice banks** | `CrispasrBackend::voice_bank_path()` (`crispasr_backend.h`), overridden by `crispasr_backend_cosyvoice3.cpp`; read by `crispasr_voice::read_bank_provenance()`; `s->cosyvoice3_voices_path` on the ABI |
 | Chat / synthetic-text disclosure | `crispasr_chat_ai_disclosure_text()` in `src/chat.cpp`; call sites in `crispasr_chat_main.cpp`, `crispasr_server.cpp` (`X-Crispasr-Ai-*`), `flutter/crispasr/lib/src/chat.dart` |
