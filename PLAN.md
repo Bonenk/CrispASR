@@ -294,6 +294,74 @@ a paper's abstract.
     so ~3% available. Would matter on sparse real-world audio, not here.
   * GPU for the segmenter — see (e).
 
+## OPEN 2026-08-02 — test-vad-export-live is a live test wearing a unit label
+
+`ctest -L unit` fails on a developer machine and passes in CI, which is the
+wrong way round. Found while running the tier for the EU AI Act audit
+(13e40ed2); it is unrelated to that change and reproduces with it stashed.
+
+    1353 - test-vad-export-live (Timeout)    regression-227 unit vad
+
+**Why the two environments disagree.** `tests/test_vad_export_live.sh` looks for
+a whisper model and SKIPs cleanly without one, so CI — which has none — skips
+the model-dependent half and the test passes in milliseconds. The search list
+ends in a hardcoded path:
+
+    for m in ggml-base.bin models/ggml-base.en.bin /Volumes/backups/ai/CrispASR/ggml-base.bin
+
+That last entry is one person's external volume. On that machine the model IS
+found, the skip does not happen, and the script proceeds to make **14 full CLI
+runs** — load the model, transcribe JFK — against a `TIMEOUT 120`.
+
+**The cost is wait, not compute.** One run, measured:
+
+    real 45.01   user 1.88   sys 2.00
+
+1.9 s of CPU for 45 s of wall clock. The model is 148 MB on `/Volumes/backups`
+(an external volume), and the box was at load average 43 at the time. So the
+test is not slow because VAD is expensive — it is slow because it reads a large
+file off a slow mount 14 times while competing for a machine that is busy. On an
+idle box with a local model it would finish inside the budget, which is why this
+has not been noticed before.
+
+**The `/Volumes/` fallback is NOT the bug** — checked before blaming it. Eight
+test scripts use that convention to find local models and it is the intended
+way in alongside `CRISPASR_MODEL_WHISPER` / `tests/env-live-tests.sh`. What
+distinguishes this one is the label:
+
+| script | model-gated | label |
+|---|---|---|
+| test-speaker-id-live | yes | `live;diarize;speaker` |
+| test-surface-parity | yes | `live;parity;improvements` |
+| test-server-tts | yes | `live;server;tts` |
+| **test-strict-pipeline** | yes | **`unit;regression-311`** |
+| **test-vad-export-live** | yes | **`unit;vad;regression-227`** |
+
+Every other model-dependent script is `live`. The two exceptions are exactly the
+two that "SKIP cleanly without a model" — and that skip is what made the `unit`
+label look harmless. One of them has `-live` in its own filename.
+
+**Two things to fix:**
+
+1. **Split, don't just relabel.** The model-free half (argument validation, the
+   `--vad-import /nonexistent` must-not-be-silently-ignored check, wire-format
+   round-trip) is real coverage that CI should keep running — it is the half
+   that caught #227's actual bug. The transcribing half becomes `live`. Moving
+   the whole file to `live` would hand CI a green tier that tests strictly less
+   than it does today; leaving it as-is keeps CI claiming coverage it skips.
+   Same treatment for `test-strict-pipeline`, whose model-gated A/B is the part
+   that matters and the part CI never runs.
+2. **Raise the timeout on the live half.** 120 s does not cover 14 model-loading
+   runs on any plausible machine once a model is genuinely present.
+
+**The general point, which is the reason to write this down:** a test whose
+coverage silently depends on whether a file happens to exist reports green in CI
+while testing almost nothing there, and the skip counter is the only place it
+says so. This is the sibling failure mode to the one
+`tests/test-compliance-wiring.cpp` exists for: not a gate that is wrong, but a
+gate that is not running where you think it is. Worth a sweep for other `unit`
+tests that can skip their way to green.
+
 ## 2026-07-29 — the unit tier found two real failures: one FIXED, one OPEN
 
 CI executed 1 of 162 unit tests until e17ce606/49e56eee. Turning the tier on
