@@ -2042,6 +2042,15 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     //     "consent_attestation":  "<text>",              (REQUIRED when `voice` is a .wav clone)
     //     "spoken_disclaimer":    true|false,            (optional, default true)
     //     "phonemes":        "<IPA>",              (optional; kokoro/piper — skips the G2P)
+    //     "language":        "de",                       (optional; the language to SPEAK.
+    //                                                     `target_lang` is an alias. cosyvoice3,
+    //                                                     qwen3-tts and moss-tts act on it;
+    //                                                     language-agnostic backends ignore it)
+    //     "source_lang":     "en",                       (optional; the language the CLONING
+    //                                                     REFERENCE is spoken in. `ref_lang` is an
+    //                                                     alias. Only needed when it cannot be
+    //                                                     inferred from the reference transcript —
+    //                                                     see #329)
     //     "marking_attestation":  "<text>",              (required to HONOR spoken_disclaimer:false
     //                                                     on a clone; without it the opt-out is
     //                                                     denied, not the request — see below)
@@ -2334,6 +2343,15 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             const std::string tts_lang = body.value("language", body.value("target_lang", std::string()));
             if (!tts_lang.empty())
                 rp.language = tts_lang;
+            // #329: and the language the REFERENCE clip is spoken in. Without it
+            // CosyVoice3 has to infer that from the reference transcript, which
+            // only ever answered for non-Latin scripts — so an English reference
+            // plus "language": "de" silently stayed zero-shot and came back with
+            // the English accent the caller was trying to get rid of.
+            // `ref_lang` is an alias.
+            const std::string ref_lang = body.value("source_lang", body.value("ref_lang", std::string()));
+            if (!ref_lang.empty())
+                rp.source_lang = ref_lang;
         }
         if (body.contains("seed") && body["seed"].is_number_integer())
             rp.seed = body["seed"].get<uint64_t>();

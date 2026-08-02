@@ -1074,10 +1074,12 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.backend.c_str());
     fprintf(stderr, "  --list-backends                   list backends compiled into this binary and exit\n");
     fprintf(stderr, "  --list-backends-json              same as --list-backends but JSON-formatted, for tooling\n");
-    fprintf(stderr, "  -sl LANG,  --source-lang LANG     [%-7s] source language (canary AST)\n",
+    fprintf(stderr, "  -sl LANG,  --source-lang LANG     [%-7s] source language (canary AST; TTS: the\n",
             params.source_lang.c_str());
-    fprintf(stderr, "  -tl LANG,  --target-lang LANG     [%-7s] target language (canary AST)\n",
+    fprintf(stderr, "                                              language a --voice clone reference is spoken in)\n");
+    fprintf(stderr, "  -tl LANG,  --target-lang LANG     [%-7s] target language (canary AST; TTS: the\n",
             params.target_lang.c_str());
+    fprintf(stderr, "                                              language to speak, overrides -l)\n");
     fprintf(stderr, "             --no-punctuation       [%-7s] disable punctuation (canary, cohere)\n",
             params.punctuation ? "false" : "true");
     fprintf(stderr,

@@ -1128,6 +1128,13 @@ flags. Pick by what you have for input and what you need out:
 | `-sl LANG`, `--source-lang LANG` | Source language (canary AST source; explicit pin overrides LID) |
 | `-tl LANG`, `--target-lang LANG` | Target language (canary AST; set different from `-sl` for X→Y translation) |
 | `-tr`, `--translate` | Translate to English (whisper, canary) — boolean toggle, no string arg |
+
+On a **TTS** backend the same two flags mean the synthesis languages: `-tl` is
+the language to SPEAK (overriding `-l`), and `-sl` is the language the
+`--voice` cloning reference is spoken in, which cosyvoice3 uses to decide
+whether to switch to cross-lingual synthesis. See
+[`docs/tts.md`](tts.md#output-language-and-cross-lingual-cloning--tl---sl).
+
 | `--no-punctuation` | Disable punctuation in the output. Native for cohere/canary, post-processed for everyone else |
 
 ### Text-to-text translate (m2m100, WMT21, MADLAD-400)

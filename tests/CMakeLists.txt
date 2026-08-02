@@ -4075,6 +4075,17 @@ catch_discover_tests(test-btc-vocab
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-tts-lang — cross-lingual language tags + reference LID (hermetic, unit)
+add_executable(test-tts-lang test-tts-lang.cpp)
+target_include_directories(test-tts-lang PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-tts-lang PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-tts-lang
+    TEST_SPEC "[tts-lang]"
+    PROPERTIES
+        LABELS unit
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test-rvc-svc — live integration tests (session C-ABI, the only surface)
 add_executable(test-rvc-svc test_rvc_svc_live.cpp)
 target_include_directories(test-rvc-svc PRIVATE

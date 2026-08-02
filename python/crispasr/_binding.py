@@ -2021,6 +2021,29 @@ class Session:
         if rc != 0:
             raise RuntimeError(f"set_target_language failed (rc={rc})")
 
+    def set_tts_reference_language(self, lang: str) -> None:
+        """Language a voice-cloning reference clip is spoken in (issue #329).
+
+        Cross-lingual TTS backends (cosyvoice3) compare it to the requested
+        output language — :meth:`set_target_language`, falling back to
+        :meth:`set_source_language` — and drop the reference transcript when
+        they differ, so the clone speaks the target language rather than
+        carrying the reference's accent.
+
+        Optional: the backend otherwise infers the reference language from the
+        voice-bank entry or the reference transcript. That inference cannot
+        answer for a short transcript, and when it cannot, the requested target
+        language has no effect — set this to make it explicit. Empty string
+        clears.
+        """
+        if not hasattr(self._lib, "crispasr_session_set_tts_reference_language"):
+            raise RuntimeError("session-state API not present in this libcrispasr build")
+        self._lib.crispasr_session_set_tts_reference_language.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        self._lib.crispasr_session_set_tts_reference_language.restype = ctypes.c_int
+        rc = self._lib.crispasr_session_set_tts_reference_language(self._handle, lang.encode("utf-8"))
+        if rc != 0:
+            raise RuntimeError(f"set_tts_reference_language failed (rc={rc})")
+
     def set_punctuation(self, enable: bool) -> None:
         """Toggle punctuation + capitalisation in the output (canary/cohere
         natively; LLM backends via post-process strip). Default True."""

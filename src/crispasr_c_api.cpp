@@ -1683,8 +1683,12 @@ struct crispasr_session {
     // args still win when supplied; these are the fallback.
     std::string source_language; // canary/cohere/voxtral source-lang hint
     std::string target_language; // canary/cohere/voxtral target-lang (≠ source ⇒ translate)
-    bool punctuation = true;     // canary/cohere per-call arg + post-process gate
-    bool translate = false;      // whisper sticky --translate (others: use src/tgt mismatch)
+    // #329: the language a voice-cloning REFERENCE clip is spoken in. Distinct
+    // from source_language, which for TTS already serves as the output-language
+    // fallback when target_language is unset.
+    std::string tts_reference_language;
+    bool punctuation = true; // canary/cohere per-call arg + post-process gate
+    bool translate = false;  // whisper sticky --translate (others: use src/tgt mismatch)
 
     // Acoustic language detected by the last transcribe (whisper only —
     // whisper_full_lang_id → whisper_lang_str, an ISO-639-1 code). Set on
@@ -8322,6 +8326,25 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
             v.size() >= 4 && (v.compare(v.size() - 4, 4, ".wav") == 0 || v.compare(v.size() - 4, 4, ".WAV") == 0);
         if (is_wav && !crispasr_session_ensure_cosyvoice3_cloning_models(s))
             return nullptr;
+        // #304/#329 cross-lingual. The session ABI reimplements each backend's
+        // synthesize inline rather than calling the CLI adapter, so the adapter's
+        // language wiring never reached bindings / server / Flutter — a
+        // cosyvoice3 clone from those surfaces ignored the requested language
+        // outright and always came out with the reference's accent.
+        //
+        // Output language: target_language → source_language, the same fallback
+        // every other TTS backend here uses. Reference-clip language: the
+        // dedicated setter, else source_language *when target_language is set* —
+        // at that point target is already serving as the output language, so
+        // source carries the CLI's `-sl` meaning with no ambiguity.
+        {
+            const std::string out_lang = !s->target_language.empty() ? s->target_language : s->source_language;
+            cosyvoice3_tts_set_target_language(s->cosyvoice3_ctx, out_lang.c_str());
+            const std::string ref_lang = !s->tts_reference_language.empty() ? s->tts_reference_language
+                                         : !s->target_language.empty()      ? s->source_language
+                                                                            : std::string();
+            cosyvoice3_tts_set_reference_language(s->cosyvoice3_ctx, ref_lang.c_str());
+        }
         int n = 0;
         float* pcm = is_wav ? cosyvoice3_tts_synth_from_wav(s->cosyvoice3_ctx, text, v.c_str(),
                                                             s->cosyvoice3_ref_text.c_str(), &n)
@@ -10445,6 +10468,23 @@ CA_EXPORT int crispasr_session_set_target_language(crispasr_session* s, const ch
     if (!s)
         return -1;
     s->target_language = (lang ? lang : "");
+    return 0;
+}
+
+// #329 — the language a voice-cloning REFERENCE clip is spoken in (ISO-ish,
+// "" clears). Only cross-lingual-capable TTS backends read it (cosyvoice3
+// today): when it differs from the requested output language the reference
+// transcript is dropped so the clone speaks the target language instead of
+// carrying the reference's accent. Optional — the backend otherwise infers it
+// from the voice-bank entry or the reference transcript, which cannot answer
+// for a short transcript. This is the session mirror of the CLI's
+// `--source-lang`; it exists as its own setter because for TTS
+// crispasr_session_set_source_language already doubles as the output-language
+// fallback.
+CA_EXPORT int crispasr_session_set_tts_reference_language(crispasr_session* s, const char* lang) {
+    if (!s)
+        return -1;
+    s->tts_reference_language = (lang ? lang : "");
     return 0;
 }
 
