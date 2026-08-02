@@ -2126,6 +2126,15 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         std::string requested_model = body.value("model", "");
 
         std::string voice_name = body.value("voice", "");
+        // Before anything logs, resolves or opens this name. A control character
+        // in it forges log records at every downstream site that echoes it —
+        // the GGUF loader, the kokoro adapter, ggml — none of which know the
+        // string came off a socket. See crispasr_voice_clone_policy.h; the
+        // path-traversal guard further down is a separate concern.
+        if (crispasr_voice::voice_name_has_control_chars(voice_name)) {
+            json_error(res, 400, "'voice' must not contain control characters", "invalid_voice", "voice");
+            return;
+        }
         std::string consent_attestation = body.value("consent_attestation", "");
         std::string instructions = body.value("instructions", "");
         // #316: drive the acoustic model with these phonemes, skipping the G2P.
@@ -2611,8 +2620,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                 "crispasr-server: synthesized %.1fs audio in %.2fs (RTF=%.2f) "
                 "voice='%s' speed=%.2f format=%s model='%s' chunks=%zu sr=%dHz\n",
                 audio_s, elapsed_s, elapsed_s > 0 ? elapsed_s / audio_s : 0.0,
-                voice_name.empty() ? "<startup>" : voice_name.c_str(), speed, response_format.c_str(),
-                requested_model.empty() ? "<unset>" : requested_model.c_str(), chunks.size(), sr_out);
+                voice_name.empty() ? "<startup>" : log_sanitize(voice_name).c_str(), speed, response_format.c_str(),
+                requested_model.empty() ? "<unset>" : log_sanitize(requested_model).c_str(), chunks.size(), sr_out);
 
         if (response_format == "f32") {
             std::string buf((const char*)pcm.data(), pcm.size() * sizeof(float));

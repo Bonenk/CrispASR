@@ -67,6 +67,32 @@ inline bool ends_with_ci(const std::string& s, const std::string& suffix) {
     return true;
 }
 
+// Does this voice name carry control characters?
+//
+// Rejected at the network ingress of every surface that accepts a caller-chosen
+// voice, because the name is echoed into logs by code far away that has no idea
+// it is handling untrusted input: the GGUF loader ("failed to open GGUF file
+// '<name>'"), the kokoro adapter ("failed to read voice pack '<name>'"), and
+// ggml itself, which this project does not patch. A newline in the name forges
+// whole log records — including the [CONSENT] audit lines that are supposed to
+// be the evidence that a clone was gated.
+//
+// Sanitizing at each fprintf is the losing move: there are many, they live in
+// several libraries, and the next one added won't know to do it. Rejecting at
+// ingress is one check that makes every downstream site safe, including the
+// ones in third-party code. No legitimate voice name — a bare name, a preset, a
+// path — contains a control character.
+//
+// This is deliberately NOT a general path guard. Each surface keeps its own
+// (the server rejects "..", absolute and home paths; the CLI accepts real paths
+// because the operator typed them). This is only about what can reach a log.
+inline bool voice_name_has_control_chars(const std::string& voice) {
+    for (unsigned char c : voice)
+        if (c < 0x20 || c == 0x7f)
+            return true;
+    return false;
+}
+
 // A raw reference recording handed straight to a cloning backend.
 //
 // NOT just .wav: zonos accepts .mp3 and .flac references

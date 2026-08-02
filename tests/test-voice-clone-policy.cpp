@@ -196,3 +196,38 @@ TEST_CASE("an unknown format falls back to WAV, matching the handler", "[unit][c
     REQUIRE(container_marking_for_format("").carries_c2pa);
     REQUIRE(container_marking_for_format("something-new").carries_c2pa);
 }
+
+// ---------------------------------------------------------------------------
+// voice_name_has_control_chars — the log-injection guard at network ingress.
+//
+// The voice name a caller sends is echoed into logs by code that has no idea it
+// is untrusted: the GGUF loader, the kokoro adapter, and ggml (which this
+// project does not patch). A newline in it forges whole records — including the
+// [CONSENT] audit lines that exist to prove a clone was gated. One check at
+// ingress makes every downstream site safe; sanitizing at each fprintf does not
+// scale and cannot reach third-party code.
+// ---------------------------------------------------------------------------
+
+using crispasr_voice::voice_name_has_control_chars;
+
+TEST_CASE("legitimate voice names carry no control characters", "[unit][voice-clone]") {
+    REQUIRE_FALSE(voice_name_has_control_chars(""));
+    REQUIRE_FALSE(voice_name_has_control_chars("af_heart"));
+    REQUIRE_FALSE(voice_name_has_control_chars("kokoro-voice-af_heart.gguf"));
+    REQUIRE_FALSE(voice_name_has_control_chars("/srv/voices/my ref.wav"));
+    REQUIRE_FALSE(voice_name_has_control_chars("Sprecherin_Über_Alles.wav")); // UTF-8 stays valid
+}
+
+TEST_CASE("a newline in a voice name is rejected", "[unit][voice-clone]") {
+    // The forged-audit-record case: everything after the \n would read as its
+    // own [CONSENT] line saying the clone was approved.
+    REQUIRE(voice_name_has_control_chars("evil\n[CONSENT] ts=FORGED action=\"APPROVED\""));
+    REQUIRE(voice_name_has_control_chars("evil\r\nfoo"));
+}
+
+TEST_CASE("other control characters are rejected too", "[unit][voice-clone]") {
+    REQUIRE(voice_name_has_control_chars(std::string("nul\0byte", 8)));
+    REQUIRE(voice_name_has_control_chars("tab\there"));
+    REQUIRE(voice_name_has_control_chars("esc\x1b[31m")); // ANSI escape into a terminal
+    REQUIRE(voice_name_has_control_chars("del\x7f"));     // 0x7f is not < 0x20
+}
