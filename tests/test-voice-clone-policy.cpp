@@ -15,6 +15,7 @@
 
 #include "crispasr_marking_policy.h"
 #include "crispasr_voice_clone_policy.h"
+#include "crispasr_watermark_stats.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -92,6 +93,67 @@ TEST_CASE("BYPASS 4: non-wav reference recordings are clones too", "[unit][compl
         REQUIRE(plain(v).is_clone);
         REQUIRE(std::string(plain(v).reason) == "recording-reference");
     }
+}
+
+TEST_CASE("BYPASS 5: legacy packs are classified by producer architecture", "[unit][compliance]") {
+    // A pack baked before the provenance stamp existed cannot be retro-stamped
+    // once published. Fall back to what the pack IS: these architectures have
+    // exactly one producer in-repo and it takes a user WAV.
+    for (const char* arch : {"chatterbox-voice", "qwen3tts.voicepack"}) {
+        INFO("arch=" << arch);
+        const CloneDecision d = classify("legacy.gguf", false, /*pack_declares_clone=*/false, arch);
+        REQUIRE(d.is_clone);
+        REQUIRE(std::string(d.reason) == "pack-architecture");
+    }
+}
+
+TEST_CASE("preset architectures stay ungated", "[unit][compliance]") {
+    // Converted from upstream voicepacks / .pt files — no recording involved.
+    // Gating these would demand a speaker-consent attestation nobody can give
+    // and break every documented preset example.
+    for (const char* arch : {"kokoro-voice", "vibevoice-voice", "", "some-future-arch"}) {
+        INFO("arch=" << arch);
+        REQUIRE_FALSE(classify("preset.gguf", false, false, arch).is_clone);
+    }
+    // tada refs are ambiguous (shipped tada-ref-<lang> AND user --make-ref share
+    // the architecture), so they are covered by the stamp, not by the arch list.
+    REQUIRE_FALSE(classify("tada-ref-de.gguf", false, false, "crispasr.reference").is_clone);
+    REQUIRE(classify("myref.gguf", false, /*stamped=*/true, "crispasr.reference").is_clone);
+}
+
+// ---------------------------------------------------------------------------
+// Watermark score statistics. The detector is a 32-bin sign-agreement test, so
+// unwatermarked audio scores 0.5 on average and its tail is exactly computable.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("the old 0.65 threshold was a 1-in-18 false positive", "[unit][compliance]") {
+    // 0.65 needs 21/32 agreements, which clean audio reaches by chance 5.5% of
+    // the time — and it was reported as "AI-GENERATED WATERMARK DETECTED".
+    // Measured on real speech: 4.8% of 55 unwatermarked clips. This is the bug.
+    const double p = crispasr_wm_stats::p_value(21.0f / 32.0f, 32);
+    REQUIRE(p > 0.05);
+    REQUIRE(p < 0.06);
+    REQUIRE(crispasr_wm_stats::classify(0.6562f, 32) != crispasr_wm_stats::Verdict::Detected);
+}
+
+TEST_CASE("binomial tail matches the exact distribution", "[unit][compliance]") {
+    REQUIRE(crispasr_wm_stats::null_tail_probability(0, 32) == 1.0);
+    REQUIRE(crispasr_wm_stats::null_tail_probability(33, 32) == 0.0);
+    // Symmetry: P(X >= 16) for n=32 is just over half (the median mass).
+    REQUIRE(crispasr_wm_stats::null_tail_probability(16, 32) > 0.5);
+    // Known values, cross-checked against Python's math.comb.
+    REQUIRE(crispasr_wm_stats::null_tail_probability(26, 32) < 0.0003);
+    REQUIRE(crispasr_wm_stats::null_tail_probability(26, 32) > 0.0002);
+}
+
+TEST_CASE("verdict bands: chance-level scores are never evidence", "[unit][compliance]") {
+    using V = crispasr_wm_stats::Verdict;
+    REQUIRE(crispasr_wm_stats::classify(0.0f, 32) == V::NotDetected);
+    REQUIRE(crispasr_wm_stats::classify(0.5f, 32) == V::NotDetected);    // the null MEAN
+    REQUIRE(crispasr_wm_stats::classify(0.5625f, 32) == V::NotDetected); // p = 0.30
+    REQUIRE(crispasr_wm_stats::classify(0.6875f, 32) == V::Inconclusive);
+    REQUIRE(crispasr_wm_stats::classify(0.75f, 32) == V::Detected); // p = 0.0035
+    REQUIRE(crispasr_wm_stats::classify(1.0f, 32) == V::Detected);
 }
 
 TEST_CASE("suffix helpers are case-insensitive and anchored", "[unit][compliance]") {
