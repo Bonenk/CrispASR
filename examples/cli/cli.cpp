@@ -653,6 +653,11 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         // voice this clones, or it is my own voice."
         params.tts_voice_clone_consent = true;
         params.tts_consent_attestation = "CLI --i-have-rights flag";
+    } else if (arg == "--speaker-identity") {
+        // Whose voice a PRESET voice is: real_person | synthetic | unknown.
+        // Answers the Art. 50(4) question the model card usually leaves open;
+        // validated at use so a typo can't silently weaken the duty.
+        params.tts_speaker_identity = ARGV_NEXT;
     } else if (arg == "--no-spoken-disclaimer") {
         params.tts_no_spoken_disclaimer = true;
     } else if (arg == "--no-watermark") {
@@ -1308,6 +1313,9 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
         "             --accept-license TAG                accept a restricted model licence (SPDX tag, or 'all');\n"
         "                                                required before downloading cc-by-nc-*/gemma/llama* weights\n"
         "                                                 of the cloned speaker or that it is your own voice\n"
+        "             --speaker-identity VALUE            whose voice a PRESET voice is: real_person | synthetic |\n"
+        "                                                unknown. real_person adds the audible AI disclosure\n"
+        "                                                (Art. 50(4)); it does NOT require --i-have-rights\n"
         "             --no-spoken-disclaimer              skip audible AI-disclosure prefix on voice-cloned\n"
         "                                                 output (watermark + C2PA provenance still applied)\n"
         "             --no-watermark                     disable AI-content audio watermark on TTS output;\n"

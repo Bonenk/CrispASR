@@ -13,6 +13,8 @@
 
 #pragma once
 
+#include "crispasr_speaker_identity.h" // declared_speaker_identity() — Art. 50(4)
+
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -215,6 +217,23 @@ public:
         auto v = synthesize(text, p);
         if (!v.empty())
             cb(v.data(), (int)v.size(), true);
+    }
+
+    // Whose voice this backend's BUILT-IN preset voices belong to.
+    //
+    // Unknown by default, and that default claims nothing: it means nobody has
+    // read this provider's model card yet, not that the voice is synthetic.
+    // Overriding it is a research result — the upstream documentation says who
+    // the training or donor voices were — and the wrong direction to guess is
+    // Synthetic, because that silently removes an Art. 50(4) disclosure.
+    //
+    // A RealPerson preset is disclosed but NOT consent-gated; see
+    // crispasr_speaker_identity.h for why those are different duties.
+    //
+    // A pack or bank entry that declares its own crispasr.voice.speaker_identity
+    // outranks this, and --speaker-identity outranks both.
+    virtual crispasr_voice::SpeakerIdentity declared_speaker_identity() const {
+        return crispasr_voice::SpeakerIdentity::Unknown;
     }
 
     // Path to the multi-voice BANK this backend selects `--voice` entries from,

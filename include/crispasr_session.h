@@ -386,6 +386,15 @@ CRISPASR_SESSION_API float* crispasr_session_synthesize_raw(crispasr_session* s,
 CRISPASR_SESSION_API float* crispasr_session_synthesize(crispasr_session* s, const char* text, int* out_n_samples);
 // Attest acceptance of AI-content marking/disclosure duty (required for _raw); recorded for audit.
 CRISPASR_SESSION_API int crispasr_session_accept_marking_responsibility(crispasr_session* s, const char* attestation);
+// Declare whose voice the current PRESET voice is: "real_person" | "synthetic" |
+// "unknown". A preset can be an identifiable individual (a named donor, a corpus
+// speaker), which makes its output a deep fake under Art. 3(60) even though no
+// recording passed through a baker — so "not a clone" is not the same as
+// "nothing to disclose". Setting real_person makes the Art. 50(4) reminder fire
+// for a non-cloned voice; it does NOT require a consent attestation, because the
+// donor's agreement to the training is settled upstream and you cannot attest to
+// it. Returns 0, -1 on a bad session, -2 on an unrecognised value.
+CRISPASR_SESSION_API int crispasr_session_set_speaker_identity(crispasr_session* s, const char* identity);
 
 // ─── Spoken AI-disclosure for voice clones (EU AI Act Art. 50(4)) ──────
 //

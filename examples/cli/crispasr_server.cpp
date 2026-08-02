@@ -2190,8 +2190,31 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         // the reasoning behind it, live in crispasr_marking_policy.h so they can
         // be unit-tested (tests/test-marking-policy.cpp) rather than only through
         // a live server with a model loaded.
+        // Whose voice is this? A PRESET voice that belongs to an identifiable
+        // person needs the same audible disclosure a clone does — and does NOT
+        // need consent_attestation, which is why this is resolved after the gate
+        // above rather than folded into it. Per-request override, then the
+        // pack/bank declaration, then the backend's.
+        // See crispasr_speaker_identity.h.
+        bool identity_recognised = true;
+        const crispasr_voice::SpeakerIdentity identity_override =
+            crispasr_voice::parse_speaker_identity(body.value("speaker_identity", std::string()), &identity_recognised);
+        if (!identity_recognised) {
+            json_error(res, 400, "unrecognised 'speaker_identity'. Expected one of: real_person, synthetic, unknown.",
+                       "invalid_speaker_identity", "speaker_identity");
+            return;
+        }
+        const crispasr_voice::SpeakerIdentity speaker_identity = crispasr_voice::resolve_speaker_identity(
+            identity_override, clone_decision.pack_identity, backend->declared_speaker_identity());
+        const bool needs_spoken_disclosure =
+            crispasr_voice::requires_spoken_disclosure(is_voice_clone, speaker_identity);
+        if (crispasr_voice::should_warn_unknown_identity(is_voice_clone, speaker_identity) &&
+            crispasr_voice::claim_unknown_identity_warning(backend_name)) {
+            fprintf(stderr, "%s\n", crispasr_voice::unknown_identity_warning(backend_name).c_str());
+        }
+
         const crispasr_marking::Decision marking =
-            crispasr_marking::decide(is_voice_clone, spoken_disclaimer, body.value("marking_attestation", ""),
+            crispasr_marking::decide(needs_spoken_disclosure, spoken_disclaimer, body.value("marking_attestation", ""),
                                      params.tts_marking_responsibility_accepted, params.tts_marking_attestation);
         if (is_voice_clone) {
             auto now = std::chrono::system_clock::now();
@@ -2213,13 +2236,27 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                 fprintf(stderr, "[MARKING] ts=%s scope=%s no_spoken_disclaimer=yes attestation=\"%s\"\n", ts,
                         marking.scope.c_str(), log_sanitize(marking.attestation).c_str());
             }
+        } else if (needs_spoken_disclosure) {
+            // A real-person PRESET: disclosed, not gated, so there is no
+            // [CONSENT] line above to carry the record. Without this the only
+            // trace of an Art. 50(4) disclosure on a non-clone would be the
+            // audio itself.
+            char ts[64];
+            auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+            std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+            fprintf(stderr,
+                    "[MARKING] ts=%s scope=request voice=%s speaker_identity=real_person spoken_disclaimer=%s\n", ts,
+                    log_sanitize(voice_name).c_str(), marking.apply_spoken_disclaimer ? "yes" : "no");
         }
         const bool apply_spoken_disclaimer = marking.apply_spoken_disclaimer;
         // Tell the client what it got. Called once the response is committed to
         // being a 200 (buffered: after synthesis; streaming: before the first
         // chunk), so an error response never claims a disclaimer it never made.
-        auto set_marking_headers = [&marking, is_voice_clone](Response& r) {
-            if (!is_voice_clone)
+        // Keyed on whether a disclosure was OWED, not on cloning: a real-person
+        // preset gets one, and a client that reads these headers to decide
+        // whether to show a visual label needs to hear about it.
+        auto set_marking_headers = [&marking, needs_spoken_disclosure](Response& r) {
+            if (!needs_spoken_disclosure)
                 return;
             r.set_header("X-Crispasr-Spoken-Disclaimer", marking.apply_spoken_disclaimer ? "applied" : "skipped");
             if (marking.optout_denied)
