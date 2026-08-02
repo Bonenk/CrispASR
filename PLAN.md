@@ -294,7 +294,35 @@ a paper's abstract.
     so ~3% available. Would matter on sparse real-world audio, not here.
   * GPU for the segmenter — see (e).
 
-## OPEN 2026-08-02 — test-vad-export-live is a live test wearing a unit label
+## DONE 2026-08-02 — test-vad-export-live was a live test wearing a unit label
+
+Fixed as described below, and the split immediately surfaced a **second bug the
+old timeout had been hiding**: Test 4 asserted `elapsed < 10s` as a proxy for
+"the ASR model load was skipped". Measured on this box: 1.5s of CPU but
+5.8–15.7s of *wall* under load, so the assertion failed on a busy machine and
+claimed the model had loaded when it plainly had not. Nobody had seen it,
+because the run timed out in the live section further down before reaching a
+verdict on the unit section.
+
+The property it was reaching for is already asserted directly: the command runs
+with `-m /nonexistent/model.gguf`, so the export file existing at all *is* the
+proof that model load was skipped. The wall-clock gate added nothing but
+flakiness and is now reported as `[INFO]`, not asserted.
+
+Both scripts (`test_vad_export_live.sh`, `test_strict_pipeline.sh`) now take a
+tier argument and register twice: `test-vad-export` / `test-strict-pipeline`
+(`unit`, model-free, 120s / 60s) and `test-vad-export-live` /
+`test-strict-pipeline-live` (`live`, 600s). `live` re-runs the cheap half on
+purpose so the tiers cannot drift into testing different things.
+
+The general lesson stands and is worth keeping: **a wall-clock threshold is a
+measurement of the machine, not of the code.** When the property is "this
+expensive thing did not happen", assert the observable consequence instead —
+here, that a run against a nonexistent model still produced output.
+
+Original diagnosis, kept for the reasoning:
+
+## (was) OPEN — test-vad-export-live is a live test wearing a unit label
 
 `ctest -L unit` fails on a developer machine and passes in CI, which is the
 wrong way round. Found while running the tier for the EU AI Act audit
@@ -341,7 +369,7 @@ Every other model-dependent script is `live`. The two exceptions are exactly the
 two that "SKIP cleanly without a model" — and that skip is what made the `unit`
 label look harmless. One of them has `-live` in its own filename.
 
-**Two things to fix:**
+**Two things to fix** (both done):
 
 1. **Split, don't just relabel.** The model-free half (argument validation, the
    `--vad-import /nonexistent` must-not-be-silently-ignored check, wire-format
