@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "crispasr_speaker_identity.h" // declared_speaker_identity() — Art. 50(4)
+#include "crispasr_speaker_identity_models.h" // declared_speaker_identity() — the researched verdicts
 
 #include <cstdint>
 #include <functional>
@@ -221,19 +221,26 @@ public:
 
     // Whose voice this backend's BUILT-IN preset voices belong to.
     //
-    // Unknown by default, and that default claims nothing: it means nobody has
-    // read this provider's model card yet, not that the voice is synthetic.
-    // Overriding it is a research result — the upstream documentation says who
-    // the training or donor voices were — and the wrong direction to guess is
-    // Synthetic, because that silently removes an Art. 50(4) disclosure.
+    // The default is a lookup in crispasr_speaker_identity_models.h, keyed on
+    // (backend name, checkpoint) — because one backend serves many checkpoints
+    // with different answers (`orpheus` runs both Canopy's base model and
+    // Kartoffel's German fine-tune), and because these are research results
+    // that belong in one reviewable table rather than scattered across 50
+    // adapters. A backend only overrides this if it can do better from its own
+    // loaded metadata.
+    //
+    // Unresearched models resolve to Unknown, and that claims nothing: it means
+    // nobody has read the provider's card yet, not that the voice is synthetic.
+    // Guessing Synthetic is the costly direction — it silently removes an
+    // Art. 50(4) disclosure.
     //
     // A RealPerson preset is disclosed but NOT consent-gated; see
     // crispasr_speaker_identity.h for why those are different duties.
     //
     // A pack or bank entry that declares its own crispasr.voice.speaker_identity
     // outranks this, and --speaker-identity outranks both.
-    virtual crispasr_voice::SpeakerIdentity declared_speaker_identity() const {
-        return crispasr_voice::SpeakerIdentity::Unknown;
+    virtual crispasr_voice::SpeakerIdentity declared_speaker_identity(const std::string& model_path) const {
+        return crispasr_voice::identity_for_model(name(), model_path);
     }
 
     // Path to the multi-voice BANK this backend selects `--voice` entries from,
