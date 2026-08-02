@@ -212,9 +212,24 @@ substantially altered audio marks it, by default, on every surface:
 |---|---|
 | CLI (`--tts-output`, `--tts-stream`) | audio watermark + C2PA manifest |
 | HTTP server (`/v1/audio/speech`) | audio watermark + C2PA manifest |
+| Wyoming server (`--wyoming-port`) | audio watermark, always forced (raw PCM ⇒ no manifest possible) |
 | C ABI (`crispasr_session_synthesize`, `_streaming`, `_speech_to_speech`) | audio watermark |
 | WASM / JS (`ttsSynthesize`, `ttsSpeechToSpeech`) | audio watermark; `c2paSign()` available |
 | All language bindings | inherit the C ABI — they cannot reach an unmarked path by accident |
+
+**This table is the thing that rots.** Wyoming (`--wyoming-port`, Home Assistant
+Assist) shipped for four releases marking nothing at all — no watermark, no
+clone classification, no spoken disclaimer, no consent gate — because it was
+added for #172 and never entered this list, and the compliance work was
+organised by walking the list. A client sending `{"voice":{"name":"x"}}` got
+back unmarked, undisclosed cloned speech. Existing coverage
+(`tests/test-server-wyoming.py`) exercised only the protocol handshake, so it
+stayed green throughout.
+
+Enumerate surfaces by **grepping for emitters** — `->synthesize(`,
+`speech_to_speech(`, anything writing audio — not by reading this table. The
+table is a summary of what was found; it is not evidence that nothing else
+exists.
 
 Two marking technologies, deliberately:
 
@@ -239,6 +254,7 @@ is forced back on.
 |---|---|
 | CLI | `crispasr_enforce_cli_watermark_floor()` — per process, keyed on the output file extension. `--no-watermark` on a `.opus` output is overridden, with a printed notice. |
 | Server | `crispasr_marking::container_marking_for_format()` — per *response*, since `response_format` is chosen per request. `pcm` / `f32` / `aac` / `opus` and the raw streaming path force the watermark on. |
+| Wyoming | `crispasr_marking::decide_raw_surface()` — unconditional. The protocol emits raw PCM inside `audio-chunk` events, so no manifest is ever possible and no opt-out reaches it. |
 
 The server's floor is per-response rather than per-process deliberately:
 mutating the process-global flag would race across `--server-workers` threads.
@@ -294,6 +310,16 @@ It is on by default and skipping it requires an attestation
 (`--no-spoken-disclaimer` + `--accept-marking-responsibility` at the CLI;
 `"marking_attestation"` in the request body, or a server launched with
 `--accept-marking-responsibility`, on the API).
+
+**On the Wyoming surface it cannot be skipped at all.** That protocol has no
+field a client could put an attestation in, and #312's rule is that an opt-out
+requires one — so there is no opt-out to honour, and every clone served over
+Wyoming carries the audible disclosure. For the same reason the *consent* gate
+there falls back to the operator's launch-time `--i-have-rights`: a clone
+requested from a server started without it is refused rather than served
+ungated, matching the HTTP surface's hard refusal when `consent_attestation` is
+missing. The rule is `crispasr_marking::decide_raw_surface()`, unit-tested in
+`tests/test-marking-policy.cpp`.
 
 **What counts as a clone.** Both this gate and the speaker-consent gate
 (`--i-have-rights` / `consent_attestation`) hang off one predicate, in
@@ -503,7 +529,8 @@ original providers, not with a downstream requantizer. Model cards in
 | Text translation | Minimal risk; semantics-preserving | — |
 | Language identification | Not biometric categorisation | — |
 | Denoise / source separation | Art. 50(2) assistive exemption | — |
-| TTS synthesis (52 engines) | **Art. 50(2)** — marked | watermark + C2PA, default-on, watertight floor on CLI *and* server |
+| TTS synthesis (52 engines) | **Art. 50(2)** — marked | watermark + C2PA, default-on, watertight floor on CLI, server *and* Wyoming |
+| Wyoming TTS (`--wyoming-port`) | **Art. 50(2) + 50(4)** | watermark always forced; clones disclaimed, and refused without operator `--i-have-rights` |
 | Voice cloning (`.wav` ref, inline bake, or stamped pack) | **Art. 50(2) + 50(4)** | + spoken disclaimer + `--i-have-rights`; `test-voice-clone-policy` |
 | Voice-pack baking (`--make-ref` + all 3 Python bakers) | The cloning step itself | `--i-have-rights`; stamps `crispasr.voice.cloned_from_recording` |
 | `--detect-watermark` | Diagnostic, **not** a gate | reports an exact p-value; "DETECTED" needs p < 0.01 (§6.7) |
@@ -550,12 +577,23 @@ rots:
 | Watermark score → p-value / verdict | `examples/cli/crispasr_watermark_stats.h` (+ `tests/test-voice-clone-policy.cpp`) |
 | Watermark embed / detect | `examples/cli/crispasr_watermark.h`, `crispasr_watermark_dispatch.h` |
 | Watertight CLI marking floor | `crispasr_enforce_cli_watermark_floor()` in `examples/cli/crispasr_run.cpp` |
+| **Container-less surfaces (Wyoming)** | `crispasr_marking::decide_raw_surface()` in `crispasr_marking_policy.h` (+ `tests/test-marking-policy.cpp`); call site in `examples/cli/wyoming.cpp` (+ `tests/test-wyoming-marking.py`) |
 | C2PA signing | `src/core/crispasr_c2pa.h`, `third_party/c2pa-audio` |
 | ABI marking attestation | `crispasr_session_accept_marking_responsibility()` in `src/crispasr_c_api.cpp` |
 | Voice-clone consent gate | `--i-have-rights` (`crispasr_run.cpp`); `consent_attestation` (`crispasr_server.cpp`); `[CONSENT]` audit line only on the ABI |
 | ABI clone disclosure | `crispasr_session_{disclaimer_text,get_disclaimer_pcm}()` (+ `tests/test-abi-clone-disclosure.cpp`) |
 | Speaker-DB consent gate | `src/speaker_db.cpp`, `crispasr_speaker_db_open/enroll2` |
 | Emotion-recognition exclusion | `tests/test-no-emotion-recognition.cpp` |
+
+A fourth rule earned by the audit of 2026-08-02, alongside the three below:
+
+4. **Enumerate surfaces from the code, not from this document.** The Wyoming
+   server marked nothing for four releases purely because §6.1's table did not
+   list it, and every audit since had walked that table. A prose list of
+   surfaces is a summary of the last audit, never evidence about this one —
+   grep for the emitters (`->synthesize(`, `speech_to_speech(`, audio writers)
+   and reconcile the result against the table. A new surface inherits no
+   marking; it has to be wired up, and only a grep will tell you it exists.
 
 A third rule earned by the audit of 2026-08-02, alongside the two below:
 
