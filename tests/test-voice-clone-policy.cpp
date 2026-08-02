@@ -122,6 +122,115 @@ TEST_CASE("preset architectures stay ungated", "[unit][compliance]") {
 }
 
 // ---------------------------------------------------------------------------
+// BYPASS 6: voices selected by name from a multi-voice BANK.
+//
+// cosyvoice3 keeps every voice inside one voices.gguf, discovered as a sibling
+// of the model (or CRISPASR_COSYVOICE3_VOICES_PATH) and selected by name. So
+// --voice named no file, resolve_voice_path() had nothing to resolve, no
+// metadata was read, and a zero-shot voice clone scored as a preset — on the
+// CLI, the server, Wyoming and the ABI at once. `--voice victim.wav` on the
+// same backend WAS gated, which is why this looked covered.
+// ---------------------------------------------------------------------------
+
+using crispasr_voice::BankFacts;
+
+// A bank entry: a bare name, no file behind it, plus what the bundle says.
+static CloneDecision bank_entry(const std::string& name, const BankFacts& facts) {
+    return classify(name, /*baked_from_wav_this_run=*/false, /*pack_declares_clone=*/false,
+                    /*pack_architecture=*/std::string(), facts);
+}
+
+TEST_CASE("BYPASS 6: a bare bank name was invisible to the gate", "[unit][compliance]") {
+    // This is the bug, pinned: with nothing known about the bundle, the name
+    // "fleurs-en" is exactly what the old gate saw and it returned "preset".
+    REQUIRE_FALSE(bank_entry("fleurs-en", BankFacts()).is_clone);
+    // Handing the bank's facts in is the whole fix.
+    BankFacts f;
+    f.has_stamps = true;
+    f.declares_clone = true;
+    f.architecture = "cosyvoice3-voices";
+    const CloneDecision d = bank_entry("fleurs-en", f);
+    REQUIRE(d.is_clone);
+    REQUIRE(std::string(d.reason) == "bank-provenance");
+}
+
+TEST_CASE("a bank baked before the stamp is classified by its producer", "[unit][compliance]") {
+    // No provenance metadata at all: the bundle cannot say. Its architecture
+    // can — convert-cosyvoice3-voices-to-gguf.py bakes every entry from a WAV,
+    // and CrispASR ships no cosyvoice3 bank, so there is no preset to break.
+    BankFacts legacy;
+    legacy.has_stamps = false;
+    legacy.architecture = "cosyvoice3-voices";
+    const CloneDecision d = bank_entry("zero_shot", legacy);
+    REQUIRE(d.is_clone);
+    REQUIRE(std::string(d.reason) == "bank-architecture");
+}
+
+TEST_CASE("a stamped bank's explicit 'not a clone' is not overridden", "[unit][compliance]") {
+    // The reason has_stamps exists. Once a bundle stamps its entries, an absent
+    // per-voice key MEANS preset — falling back to the producer architecture
+    // there would override an explicit answer with a guess, and re-gate every
+    // preset entry in a mixed bundle.
+    BankFacts stamped_preset;
+    stamped_preset.has_stamps = true;
+    stamped_preset.declares_clone = false;
+    stamped_preset.architecture = "cosyvoice3-voices";
+    REQUIRE_FALSE(bank_entry("some-preset", stamped_preset).is_clone);
+}
+
+TEST_CASE("a bank can hold a clone and a preset at once", "[unit][compliance]") {
+    // The mixed-bundle case the per-voice key exists for: the upstream default
+    // manifest entry and a user's own recording land in the SAME voices.gguf.
+    BankFacts as_clone;
+    as_clone.has_stamps = true;
+    as_clone.declares_clone = true;
+    BankFacts as_preset;
+    as_preset.has_stamps = true;
+    as_preset.declares_clone = false;
+    REQUIRE(bank_entry("my-recording", as_clone).is_clone);
+    REQUIRE_FALSE(bank_entry("shipped-demo", as_preset).is_clone);
+}
+
+TEST_CASE("an unknown bank architecture stays a preset", "[unit][compliance]") {
+    // Same defaulting rule as packs: an unrecognised producer is most likely a
+    // third-party or future preset, and defaulting unknown-to-clone would gate
+    // arbitrary bundles on a guess.
+    BankFacts unknown;
+    unknown.has_stamps = false;
+    unknown.architecture = "some-future-bank";
+    REQUIRE_FALSE(bank_entry("whatever", unknown).is_clone);
+}
+
+TEST_CASE("bank facts never weaken a decision the file already earned", "[unit][compliance]") {
+    // A recording reference stays a clone no matter what an unrelated bundle
+    // says, and runtime knowledge still outranks everything.
+    BankFacts inert;
+    inert.has_stamps = true;
+    inert.declares_clone = false;
+    REQUIRE(classify("victim.wav", false, false, std::string(), inert).is_clone);
+    REQUIRE(std::string(classify("victim.wav", false, false, std::string(), inert).reason) == "recording-reference");
+    REQUIRE(classify("baked.gguf", true, false, std::string(), inert).is_clone);
+    REQUIRE(classify("stamped.gguf", false, true, std::string(), inert).is_clone);
+}
+
+TEST_CASE("cosyvoice3-voices is on the recording-derived producer list", "[unit][compliance]") {
+    using crispasr_voice::architecture_is_recording_derived;
+    REQUIRE(architecture_is_recording_derived("cosyvoice3-voices"));
+    REQUIRE(architecture_is_recording_derived("chatterbox-voice"));
+    REQUIRE(architecture_is_recording_derived("qwen3tts.voicepack"));
+    REQUIRE_FALSE(architecture_is_recording_derived("kokoro-voice"));
+    REQUIRE_FALSE(architecture_is_recording_derived(""));
+}
+
+TEST_CASE("the per-voice bank key is namespaced by entry name", "[unit][compliance]") {
+    // Pinned because the baker writes this key and the gate reads it back; a
+    // drift between the two spellings fails open, silently.
+    REQUIRE(crispasr_voice::bank_provenance_key_for("fleurs-en") == "crispasr.voice.fleurs-en.cloned_from_recording");
+    REQUIRE(std::string(crispasr_voice::bank_stamped_key()) == "crispasr.voice.bank_stamped");
+    REQUIRE(std::string(crispasr_voice::provenance_key()) == "crispasr.voice.cloned_from_recording");
+}
+
+// ---------------------------------------------------------------------------
 // Watermark score statistics. The detector is a 32-bin sign-agreement test, so
 // unwatermarked audio scores 0.5 on average and its tail is exactly computable.
 // ---------------------------------------------------------------------------

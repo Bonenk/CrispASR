@@ -506,8 +506,8 @@ static void wyoming_handle_connection(socket_t fd) {
             // to the same file a path would, and a .gguf baked from someone's
             // recording is as much a deepfake as the recording. Same predicate
             // as the CLI and the HTTP surface (crispasr_voice_clone_policy.h).
-            const crispasr_voice::CloneDecision clone_decision =
-                crispasr_voice::classify_voice(rp.tts_voice, rp.tts_voice_dir, /*baked_from_wav_this_run=*/false);
+            const crispasr_voice::CloneDecision clone_decision = crispasr_voice::classify_voice(
+                rp.tts_voice, rp.tts_voice_dir, /*baked_from_wav_this_run=*/false, g_backend->voice_bank_path());
 
             char ts[64];
             {

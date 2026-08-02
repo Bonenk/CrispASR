@@ -56,6 +56,9 @@ public final class CrispasrSession implements AutoCloseable {
                                                   PointerByReference outText, IntByReference outNSamples);
         int     crispasr_session_input_sample_rate(Pointer session);
         void    crispasr_pcm_free(Pointer pcm);
+        // AI-content marking (EU AI Act Art. 50(2)) — the other half of synthesize_raw.
+        void    crispasr_watermark_embed(float[] pcm, int nSamples, float alpha);
+        float   crispasr_watermark_detect(float[] pcm, int nSamples);
         int     crispasr_session_kokoro_clear_phoneme_cache(Pointer session);
         int     crispasr_session_set_source_language(Pointer session, String lang);
         int     crispasr_session_set_target_language(Pointer session, String lang);
@@ -751,6 +754,40 @@ public final class CrispasrSession implements AutoCloseable {
             throw new IllegalStateException(
                     "accept_marking_responsibility failed (rc=" + rc + ")");
         }
+    }
+
+    /**
+     * Embed the AI-content watermark into mono float32 PCM, in place.
+     *
+     * <p>The other half of {@link #synthesizeRaw(String)}: opting out of
+     * automatic marking makes marking the result the integrator's duty under
+     * EU AI Act Art. 50(2), and this is what discharges it. Do the
+     * post-processing you opted out for — resample, mix, concatenate — then
+     * mark the finished buffer.
+     *
+     * <p>Uses the robust, reliably detectable default strength; AudioSeal
+     * instead when a model has been loaded. Static because marking is a
+     * property of the samples, not of the session that produced them.
+     */
+    public static void watermarkEmbed(float[] pcm) {
+        if (pcm == null || pcm.length == 0) {
+            return;
+        }
+        Lib.INSTANCE.crispasr_watermark_embed(pcm, pcm.length, -1.0f);
+    }
+
+    /**
+     * Confidence in [0, 1] that {@code pcm} carries the watermark.
+     *
+     * <p>A weak diagnostic, not proof: the spread-spectrum detector's null mean
+     * is 0.5, not 0, and a negative result on a short clip is mostly evidence
+     * that the clip was short. See {@code docs/eu-ai-act.md} §6.7.
+     */
+    public static float watermarkDetect(float[] pcm) {
+        if (pcm == null || pcm.length == 0) {
+            return 0.0f;
+        }
+        return Lib.INSTANCE.crispasr_watermark_detect(pcm, pcm.length);
     }
 
     /** Result of {@link #speechToSpeech(float[])}: output PCM plus the intermediate transcript. */

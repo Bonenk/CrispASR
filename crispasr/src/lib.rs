@@ -974,10 +974,43 @@ impl Session {
         Ok(())
     }
 
+    /// Embed the AI-content watermark into f32 mono PCM, in place.
+    ///
+    /// The other half of [`Session::synthesize_raw`]: opting out of automatic
+    /// marking makes marking the result *your* duty (EU AI Act Art. 50(2)), and
+    /// this is what discharges it. Do the post-processing you opted out for —
+    /// resample, mix, concatenate — then call this on the finished buffer.
+    ///
+    /// Uses the robust, reliably detectable default strength; AudioSeal instead
+    /// if a model was loaded. Associated function, not a method: marking is a
+    /// property of the samples, not of the session that produced them.
+    pub fn watermark_embed(pcm: &mut [f32]) {
+        if pcm.is_empty() {
+            return;
+        }
+        unsafe {
+            crispasr_sys::crispasr_watermark_embed(pcm.as_mut_ptr(), pcm.len() as c_int, -1.0)
+        };
+    }
+
+    /// Confidence in `[0, 1]` that `pcm` carries the watermark.
+    ///
+    /// A weak diagnostic, not proof: the spread-spectrum detector's null mean is
+    /// 0.5, not 0, and a negative result on a short clip is mostly evidence that
+    /// the clip was short. See `docs/eu-ai-act.md` §6.7 before reading anything
+    /// into a number from here.
+    pub fn watermark_detect(pcm: &[f32]) -> f32 {
+        if pcm.is_empty() {
+            return 0.0;
+        }
+        unsafe { crispasr_sys::crispasr_watermark_detect(pcm.as_ptr(), pcm.len() as c_int) }
+    }
+
     /// UNMARKED synthesis (no watermark / disclosure), for callers that embed
     /// the mark themselves after post-processing. Hard-refused (returns `Err`)
     /// unless [`Session::accept_marking_responsibility`] was called first.
     /// Prefer [`Session::synthesize`] for the default watermarked output.
+    /// Mark the result with [`Session::watermark_embed`].
     pub fn synthesize_raw(&self, text: &str) -> Result<Vec<f32>, String> {
         let ctext = CString::new(text).map_err(|e| e.to_string())?;
         let mut n: c_int = 0;

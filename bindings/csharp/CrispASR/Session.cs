@@ -369,6 +369,40 @@ namespace CrispASR
         }
 
         /// <summary>
+        /// Embed the AI-content watermark into mono float32 PCM, in place.
+        /// <para>
+        /// The other half of <see cref="SynthesizeRaw"/>: opting out of automatic
+        /// marking makes marking the result your duty under EU AI Act Art. 50(2),
+        /// and this is what discharges it. Do the post-processing you opted out
+        /// for — resample, mix, concatenate — then mark the finished buffer.
+        /// </para>
+        /// <para>
+        /// Uses the robust, reliably detectable default strength; AudioSeal
+        /// instead when a model has been loaded. Static because marking is a
+        /// property of the samples, not of the session that produced them.
+        /// </para>
+        /// </summary>
+        public static void WatermarkEmbed(float[] pcm)
+        {
+            if (pcm == null || pcm.Length == 0)
+                return;
+            NativeMethods.crispasr_watermark_embed(pcm, pcm.Length, -1.0f);
+        }
+
+        /// <summary>
+        /// Confidence in [0, 1] that <paramref name="pcm"/> carries the watermark.
+        /// A weak diagnostic, not proof: the spread-spectrum detector's null mean
+        /// is 0.5, not 0, and a negative result on a short clip is mostly evidence
+        /// that the clip was short. See <c>docs/eu-ai-act.md</c> §6.7.
+        /// </summary>
+        public static float WatermarkDetect(float[] pcm)
+        {
+            if (pcm == null || pcm.Length == 0)
+                return 0.0f;
+            return NativeMethods.crispasr_watermark_detect(pcm, pcm.Length);
+        }
+
+        /// <summary>
         /// Speech-to-speech: audio in → audio out through a single model pass,
         /// on backends with S2S capability (lfm2-audio, mini-omni2, sidon,
         /// voxcpm2-vae). Input is 16 kHz mono float32 PCM. Returns the output

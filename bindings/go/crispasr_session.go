@@ -2401,11 +2401,18 @@ func WatermarkLoadModel(ggufPath string) error {
 
 // WatermarkEmbed embeds an AI-generated watermark into PCM audio in-place.
 // Uses AudioSeal if a model was loaded, otherwise spread-spectrum.
+//
+// Passes alpha <= 0, which selects the band-limited default strength that makes
+// the mark reliably DETECTABLE — the property EU AI Act Art. 50(2) requires, and
+// the reason this is the call SynthesizeRaw users need to discharge marking
+// themselves. It used to hardcode 0.005, the strength the C ABI documents as
+// too faint to reliably detect on real speech: an explicit positive alpha is
+// used verbatim and bypasses the robust default.
 func WatermarkEmbed(pcm []float32) {
 	if len(pcm) == 0 {
 		return
 	}
-	C.crispasr_watermark_embed((*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm)), 0.005)
+	C.crispasr_watermark_embed((*C.float)(unsafe.Pointer(&pcm[0])), C.int(len(pcm)), -1.0)
 }
 
 // WatermarkDetect returns a confidence score [0, 1] indicating whether
