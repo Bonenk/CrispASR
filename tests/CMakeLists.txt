@@ -671,24 +671,61 @@ if(CRISPASR_BUILD_EXAMPLES AND NOT WIN32)
     # wire format and the chunk-gate rule; only this catches a flag reaching a
     # code path that ignores it (--vad-import was silently a no-op without
     # --backend). SKIPs cleanly when no whisper model is available.
+    # Split into two tiers (2026-08-02). One entry labelled `unit` ran the whole
+    # script: in CI, which has no whisper model, it SKIPPED everything below
+    # Test 4 and reported green for coverage it never ran; on a developer
+    # machine where a model was findable it made 14 model-loading CLI runs and
+    # blew the 120s timeout. Green where it tested nothing, red where it tested
+    # everything. The model-free half stays in `unit` because it is the half
+    # that caught #227's actual bug; the transcribing half moves to `live`.
+    add_test(NAME test-vad-export
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test_vad_export_live.sh
+            $<TARGET_FILE:crispasr-cli>
+            ${PROJECT_SOURCE_DIR}
+            unit)
+    # 120s: model-free, but it is still a CLI-surface test that runs the binary
+    # four times with Silero VAD, not a Catch2 microtest. Measured 32s wall
+    # (6s CPU) on a box at load 32; CI is far less contended.
+    set_tests_properties(test-vad-export PROPERTIES
+        LABELS "unit;vad;regression-227"
+        TIMEOUT 120)
+
     add_test(NAME test-vad-export-live
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test_vad_export_live.sh
             $<TARGET_FILE:crispasr-cli>
-            ${PROJECT_SOURCE_DIR})
+            ${PROJECT_SOURCE_DIR}
+            live)
+    # 600s, not 120s: 14 runs that each load a model off whatever storage the
+    # developer keeps it on. Measured 45s wall for ONE run on an external
+    # volume under load (1.9s of that was CPU) — the cost here is I/O and
+    # scheduling, not VAD.
     set_tests_properties(test-vad-export-live PROPERTIES
-        LABELS "unit;vad;regression-227"
-        TIMEOUT 120)
+        LABELS "live;vad;regression-227"
+        TIMEOUT 600)
 
     # #311: strict failure semantics for required VAD / aligner / punctuation.
     # Model-free config-validation + help always run; the strict-vs-permissive
     # A/B is gated on a loadable whisper model and SKIPs cleanly without one.
+    # Split for the same reason as test-vad-export above: as one `unit` entry
+    # this reported green in CI while skipping the model-gated A/B, which is
+    # the half that actually exercises --strict-pipeline against a real run.
     add_test(NAME test-strict-pipeline
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test_strict_pipeline.sh
             $<TARGET_FILE:crispasr-cli>
-            ${PROJECT_SOURCE_DIR})
+            ${PROJECT_SOURCE_DIR}
+            unit)
     set_tests_properties(test-strict-pipeline PROPERTIES
         LABELS "unit;regression-311"
-        TIMEOUT 180)
+        TIMEOUT 60)
+
+    add_test(NAME test-strict-pipeline-live
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test_strict_pipeline.sh
+            $<TARGET_FILE:crispasr-cli>
+            ${PROJECT_SOURCE_DIR}
+            live)
+    set_tests_properties(test-strict-pipeline-live PROPERTIES
+        LABELS "live;regression-311"
+        TIMEOUT 600)
 endif()
 
 if(CRISPASR_BUILD_EXAMPLES AND NOT WIN32)
