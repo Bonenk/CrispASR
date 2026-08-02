@@ -3799,6 +3799,19 @@ set_tests_properties(test-server-wyoming PROPERTIES
     LABELS "live;server;wyoming"
     TIMEOUT 300)
 
+# ─── test-wyoming-marking — live: EU AI Act Art. 50 on the Wyoming surface.
+# The policy lives in crispasr_marking::decide_raw_surface() and is unit-tested
+# in test-marking-policy; this pins what a unit test cannot reach — that the
+# synthesize handler actually CALLS it. The original bug was a missing call
+# site, which a green policy test would never have caught. Needs a kokoro GGUF;
+# SKIPs otherwise.
+add_test(NAME test-wyoming-marking
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test-wyoming-marking.py
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-wyoming-marking PROPERTIES
+    LABELS "live;server;wyoming;marking"
+    TIMEOUT 900)
+
 # ─── test-server-tts — live: /v1/audio/speech + /v1/voices smoke, incl. the
 # PR #177 streaming path (stream=true per-chunk PCM, mp3 rejection, log marker).
 # Needs a qwen3-tts CustomVoice GGUF + tokenizer (set CRISPASR_MODELS); SKIPs

@@ -19,6 +19,27 @@
 // TTS path: on synthesize, call backend->synthesize() under model_mutex,
 // convert float32 PCM → int16 LE, stream back as audio-chunk events.
 //
+// MARKING (EU AI Act Art. 50) — this surface emits RAW PCM inside audio-chunk
+// events. There is no container, so a C2PA manifest is impossible and the audio
+// watermark is the ONLY provenance signal available. That makes it exactly the
+// case docs/eu-ai-act.md §6.1 calls the watertight floor: the mark is embedded
+// unconditionally, with force=true, and no opt-out reaches this path.
+//
+// This surface shipped for four releases with none of it — no watermark, no
+// clone classification, no spoken disclaimer, no consent gate — because the
+// compliance work was organised per-surface from a list in prose that Wyoming
+// was never added to. A Home Assistant client sending {"voice":{"name":"x"}}
+// got back unmarked, undisclosed cloned speech. When you add a surface that
+// emits synthesized audio, it inherits nothing: wire it up here-equivalent.
+//
+// Consent (Art. 50(4) / personality rights) cannot be carried per-request: the
+// Wyoming protocol has no field for it. So the operator's launch-time
+// --i-have-rights is the only attestation available, and a clone requested
+// without it is REFUSED (empty audio stream + audit line) — matching the HTTP
+// surface, which also hard-refuses a clone with no consent_attestation.
+// The spoken disclaimer is likewise never opt-out-able here, because there is
+// no attested request field to opt out with.
+//
 // Resampling: linear interpolation — good enough for TTS preview and HA
 // playback; Wyoming clients receive whatever rate we announce in audio-start
 // and handle presentation resampling themselves.
@@ -26,6 +47,10 @@
 #include "wyoming.h"
 
 #include "../json.hpp"
+#include "crispasr_marking_policy.h"
+#include "crispasr_tts_disclaimer.h"
+#include "crispasr_voice_provenance.h"
+#include "crispasr_watermark_dispatch.h"
 
 #include <algorithm>
 #include <atomic>
@@ -34,6 +59,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -68,6 +94,23 @@ using json = nlohmann::json;
 // ---------------------------------------------------------------------------
 
 namespace {
+
+// Strip control characters before a client-supplied string reaches the audit
+// log. The Wyoming `voice.name` is fully attacker-controlled and lands in a
+// [CONSENT] line; without this a newline in it forges audit records — and the
+// whole point of that line is to be evidence. Mirrors log_sanitize() in
+// crispasr_server.cpp, which is static to that TU.
+static std::string wyoming_log_sanitize(const std::string& s, size_t cap = 256) {
+    std::string o;
+    o.reserve(s.size() < cap ? s.size() : cap);
+    for (size_t i = 0; i < s.size() && i < cap; i++) {
+        unsigned char c = (unsigned char)s[i];
+        o += (c < 0x20 || c == 0x7f) ? '?' : (char)c;
+    }
+    if (s.size() > cap)
+        o += "...";
+    return o;
+}
 
 static bool recv_exact(socket_t fd, void* buf, size_t n) {
     auto* p = (uint8_t*)buf;
@@ -443,6 +486,43 @@ static void wyoming_handle_connection(socket_t fd) {
             if (!voice_name.empty() && voice_name != "default")
                 rp.tts_voice = voice_name;
 
+            // Art. 50(4): is this a clone? Classified by PROVENANCE, not by the
+            // string the client sent — a bare name resolves against --voice-dir
+            // to the same file a path would, and a .gguf baked from someone's
+            // recording is as much a deepfake as the recording. Same predicate
+            // as the CLI and the HTTP surface (crispasr_voice_clone_policy.h).
+            const crispasr_voice::CloneDecision clone_decision =
+                crispasr_voice::classify_voice(rp.tts_voice, rp.tts_voice_dir, /*baked_from_wav_this_run=*/false);
+
+            char ts[64];
+            {
+                auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+                std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+            }
+
+            // What this container-less surface must do about it. Named and
+            // unit-tested in crispasr_marking_policy.h rather than spelled out
+            // here, so the rule can go red in CI without a model or a socket.
+            const crispasr_marking::RawSurfaceDecision marking =
+                crispasr_marking::decide_raw_surface(clone_decision.is_clone, rp.tts_voice_clone_consent);
+
+            // Consent gate. The protocol carries no per-request attestation, so
+            // the operator's launch-time --i-have-rights is the only one there
+            // is; without it a clone is refused rather than served ungated.
+            if (marking.refuse) {
+                fprintf(stderr,
+                        "[CONSENT] ts=%s surface=wyoming voice=%s clone_reason=%s attestation=\"\" "
+                        "action=\"REFUSED (start the server with --i-have-rights to clone over Wyoming)\"\n",
+                        ts, wyoming_log_sanitize(rp.tts_voice).c_str(), clone_decision.reason);
+                json astart;
+                astart["rate"] = g_backend->tts_sample_rate();
+                astart["width"] = 2;
+                astart["channels"] = 1;
+                wyoming_send(fd, "audio-start", astart);
+                wyoming_send(fd, "audio-stop", json::object());
+                continue;
+            }
+
             std::vector<float> pcmf32;
             int tts_rate = 24000;
 
@@ -450,6 +530,24 @@ static void wyoming_handle_connection(socket_t fd) {
                 std::lock_guard<std::mutex> lock(*g_mutex);
                 tts_rate = g_backend->tts_sample_rate();
                 pcmf32 = g_backend->synthesize(synth_text, rp);
+
+                // Art. 50(4): audible AI disclosure, prepended in the NEUTRAL
+                // voice. Not opt-out-able here — see the file header.
+                if (marking.apply_spoken_disclaimer && !pcmf32.empty()) {
+                    crispasr_tts_prepend_disclaimer(pcmf32, g_backend, rp);
+                    fprintf(stderr,
+                            "[CONSENT] ts=%s surface=wyoming voice=%s clone_reason=%s attestation=\"%s\" "
+                            "spoken_disclaimer=yes\n",
+                            ts, wyoming_log_sanitize(rp.tts_voice).c_str(), clone_decision.reason,
+                            wyoming_log_sanitize(rp.tts_consent_attestation).c_str());
+                }
+
+                // Art. 50(2): the watertight floor. force=true because raw PCM
+                // can carry no C2PA manifest, so the watermark is the only mark
+                // this surface can produce — --no-watermark must not strip it.
+                // Embedded AFTER the disclaimer so the whole clip is marked.
+                if (!pcmf32.empty())
+                    crispasr_wm_dispatch::embed(pcmf32.data(), (int)pcmf32.size(), tts_rate, marking.force_watermark);
             }
 
             // Stream PCM back as Wyoming audio events

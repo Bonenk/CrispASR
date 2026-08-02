@@ -82,3 +82,57 @@ TEST_CASE("an attestation on a request that keeps the disclaimer changes nothing
     REQUIRE_FALSE(d.optout_honored);
     REQUIRE_FALSE(d.optout_denied);
 }
+
+// ---------------------------------------------------------------------------
+// decide_raw_surface — container-less surfaces (Wyoming audio-chunk PCM).
+//
+// The Wyoming server shipped for four releases with no watermark, no clone
+// classification, no spoken disclaimer and no consent gate, because the marking
+// work was organised from a list of surfaces in prose that it was never on.
+// These cases pin the rule so it can go red here rather than only in a live
+// server with a model loaded.
+// ---------------------------------------------------------------------------
+
+using crispasr_marking::decide_raw_surface;
+
+TEST_CASE("a container-less surface always forces the watermark", "[unit][marking]") {
+    // No container ⇒ no C2PA manifest is possible ⇒ the watermark is the only
+    // mark obtainable, so --no-watermark must never reach it. True on every
+    // arm, including the refusal.
+    REQUIRE(decide_raw_surface(/*is_clone=*/false, /*operator_consent=*/false).force_watermark);
+    REQUIRE(decide_raw_surface(false, true).force_watermark);
+    REQUIRE(decide_raw_surface(true, true).force_watermark);
+    REQUIRE(decide_raw_surface(true, false).force_watermark);
+}
+
+TEST_CASE("a preset voice is marked but neither gated nor disclaimed", "[unit][marking]") {
+    auto d = decide_raw_surface(/*is_clone=*/false, /*operator_consent=*/false);
+    REQUIRE_FALSE(d.refuse);
+    REQUIRE_FALSE(d.apply_spoken_disclaimer);
+    REQUIRE(d.force_watermark);
+}
+
+TEST_CASE("a clone with no operator consent is refused", "[unit][marking]") {
+    // The protocol carries no consent field, so the operator's launch-time
+    // --i-have-rights is the only attestation there can be. Without it the
+    // alternative is emitting an ungated clone of a real person.
+    auto d = decide_raw_surface(/*is_clone=*/true, /*operator_consent=*/false);
+    REQUIRE(d.refuse);
+    REQUIRE_FALSE(d.apply_spoken_disclaimer);
+}
+
+TEST_CASE("a consented clone is served WITH the audible disclosure", "[unit][marking]") {
+    // Art. 50(4). Not opt-out-able on this surface: opting out requires an
+    // attestation (#312) and there is no request field to carry one.
+    auto d = decide_raw_surface(/*is_clone=*/true, /*operator_consent=*/true);
+    REQUIRE_FALSE(d.refuse);
+    REQUIRE(d.apply_spoken_disclaimer);
+    REQUIRE(d.force_watermark);
+}
+
+TEST_CASE("operator consent never silences the disclosure", "[unit][marking]") {
+    // --i-have-rights attests the RIGHT to clone; it says nothing about telling
+    // the listener the audio is synthetic. Conflating the two would make every
+    // Home Assistant clone undisclosed.
+    REQUIRE(decide_raw_surface(true, true).apply_spoken_disclaimer);
+}
