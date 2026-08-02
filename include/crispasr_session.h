@@ -643,6 +643,13 @@ CRISPASR_SESSION_API int crispasr_kokoro_resolve_fallback_voice_abi(const char*,
 CRISPASR_SESSION_API int crispasr_session_kokoro_clear_phoneme_cache(crispasr_session*);
 CRISPASR_SESSION_API int crispasr_session_set_source_language(crispasr_session* s, const char* lang);
 CRISPASR_SESSION_API int crispasr_session_set_target_language(crispasr_session* s, const char* lang);
+// #329 — the language a voice-cloning REFERENCE clip is spoken in (ISO-ish;
+// "" or NULL clears). Cross-lingual TTS backends (cosyvoice3) compare it to the
+// requested output language and, when they differ, drop the reference
+// transcript so the clone speaks the target language instead of carrying the
+// reference's accent. Optional: the backend otherwise infers it from the voice
+// bank or the reference transcript, which cannot answer for a short one.
+CRISPASR_SESSION_API int crispasr_session_set_tts_reference_language(crispasr_session* s, const char* lang);
 CRISPASR_SESSION_API int crispasr_session_set_punctuation(crispasr_session* s, int enable);
 // Select + load a punctuation-restoration model (alias auto|firered|fullstop|
 // punctuate-all|pcs, or a .gguf path; "none"/NULL unloads). Auto-downloads on

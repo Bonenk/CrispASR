@@ -1073,6 +1073,29 @@ impl Session {
         Ok(())
     }
 
+    /// Language a voice-cloning reference clip is spoken in (issue #329).
+    ///
+    /// Cross-lingual TTS backends (cosyvoice3) compare it to the requested
+    /// output language — [`set_target_language`](Session::set_target_language),
+    /// falling back to [`set_source_language`](Session::set_source_language) —
+    /// and drop the reference transcript when they differ, so the clone speaks
+    /// the target language instead of carrying the reference's accent.
+    ///
+    /// Optional: the backend otherwise infers the reference language from the
+    /// voice-bank entry or the reference transcript. That inference cannot
+    /// answer for a short transcript, and when it cannot, the requested target
+    /// language has no effect — set this to make it explicit.
+    pub fn set_tts_reference_language(&self, lang: &str) -> Result<(), String> {
+        let c = CString::new(lang).map_err(|e| e.to_string())?;
+        let rc = unsafe {
+            crispasr_sys::crispasr_session_set_tts_reference_language(self.handle, c.as_ptr())
+        };
+        if rc != 0 {
+            return Err(format!("set_tts_reference_language failed (rc={})", rc));
+        }
+        Ok(())
+    }
+
     /// Toggle punctuation + capitalisation in the output (canary/cohere
     /// natively; LLM backends via post-process strip). Default true.
     pub fn set_punctuation(&self, enable: bool) -> Result<(), String> {

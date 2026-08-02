@@ -577,6 +577,10 @@ extern "C" {
         s: *mut CrispasrSession,
         lang: *const c_char,
     ) -> c_int;
+    pub fn crispasr_session_set_tts_reference_language(
+        s: *mut CrispasrSession,
+        lang: *const c_char,
+    ) -> c_int;
     pub fn crispasr_session_set_punctuation(s: *mut CrispasrSession, enable: c_int) -> c_int;
     pub fn crispasr_session_set_punc_model(
         s: *mut CrispasrSession,

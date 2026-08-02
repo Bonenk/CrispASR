@@ -218,6 +218,12 @@ public:
                                    ? params.target_lang
                                    : (params.language != "auto" ? params.language : std::string());
         cosyvoice3_tts_set_target_language(ctx_, tgt_lang.c_str());
+        // #329: --source-lang names the language of the REFERENCE clip. Without
+        // it the backend infers one from the voice-bank name or the reference
+        // transcript, which cannot always answer — and when it cannot, the
+        // target language is silently ignored and the clone keeps the
+        // reference's accent (exactly the report in #329).
+        cosyvoice3_tts_set_reference_language(ctx_, params.source_lang.c_str());
 
         int n = 0;
         float* pcm = nullptr;
