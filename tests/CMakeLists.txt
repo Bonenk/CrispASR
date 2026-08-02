@@ -2957,6 +2957,27 @@ catch_discover_tests(test-speaker-identity
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-speaker-identity-gguf — the speaker-identity stamp survives a real
+# GGUF round trip. test-speaker-identity is pure and cannot notice a read path
+# that is never reached; this writes an actual metadata-only GGUF, hands it to
+# the reader the CLI and server call, and checks the value comes back. #324 is
+# the standing reason: a fix landed inert and every test stayed green.
+add_executable(test-speaker-identity-gguf test-speaker-identity-gguf.cpp)
+target_include_directories(test-speaker-identity-gguf PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+)
+target_link_libraries(test-speaker-identity-gguf PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+    ggml
+)
+catch_discover_tests(test-speaker-identity-gguf
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-compliance-wiring — the EU AI Act gates are WIRED UP on every surface
 # that can reach them. The pure predicates live in test-voice-clone-policy and
 # test-marking-policy, and both stayed green through every failure this guards:

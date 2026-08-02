@@ -15,6 +15,8 @@
 #include "crispasr_voice_clone_policy.h"
 
 #include <filesystem>
+#include <map>
+#include <mutex>
 #include <string>
 
 namespace crispasr_voice {
@@ -96,6 +98,48 @@ inline crispasr_voice::BankFacts read_bank_provenance(const std::string& bank_pa
         f.identity = parse_speaker_identity(core_gguf::kv_str(meta, speaker_identity_key(), ""));
     core_gguf::free_metadata(meta);
     return f;
+}
+
+// Whose voice does this MODEL declare it produces?
+//
+// The durable half of the identity answer, and the one that retires the
+// file-name matching in crispasr_speaker_identity_models.h: a checkpoint that
+// carries `crispasr.voice.speaker_identity` says so itself and survives being
+// renamed, re-quantised or moved. The converters write it (see
+// models/convert-*.py --speaker-identity); the table stays as the legacy
+// fallback for checkpoints published before the stamp existed, exactly as
+// architecture_is_recording_derived() does for unstamped voice packs.
+//
+// MEMOISED, because this is called per synthesis request on the server and a
+// GGUF metadata open per request on a hot path is the kind of thing that gets
+// noticed as a latency regression long before anyone connects it to a
+// compliance gate. Keyed by path; a model file does not change identity under a
+// running process.
+inline SpeakerIdentity read_model_speaker_identity(const std::string& model_path) {
+    if (model_path.empty())
+        return SpeakerIdentity::Unknown;
+    struct Cache {
+        std::mutex mu;
+        std::map<std::string, SpeakerIdentity> seen;
+    };
+    static Cache cache;
+    {
+        std::lock_guard<std::mutex> lock(cache.mu);
+        auto it = cache.seen.find(model_path);
+        if (it != cache.seen.end())
+            return it->second;
+    }
+    SpeakerIdentity id = SpeakerIdentity::Unknown;
+    std::error_code ec;
+    if (std::filesystem::exists(model_path, ec)) {
+        if (gguf_context* meta = core_gguf::open_metadata(model_path.c_str())) {
+            id = parse_speaker_identity(core_gguf::kv_str(meta, speaker_identity_key(), ""));
+            core_gguf::free_metadata(meta);
+        }
+    }
+    std::lock_guard<std::mutex> lock(cache.mu);
+    cache.seen[model_path] = id;
+    return id;
 }
 
 // Resolve the value a caller passed to the file a backend will open.

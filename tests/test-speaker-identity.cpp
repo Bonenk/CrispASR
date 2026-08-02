@@ -285,3 +285,66 @@ TEST_CASE("an unknown backend name is unknown, not a crash", "[unit][compliance]
     REQUIRE(identity_for_model("", "") == SpeakerIdentity::Unknown);
     REQUIRE(identity_for_model("some-future-backend", "x.gguf") == SpeakerIdentity::Unknown);
 }
+
+// ---------------------------------------------------------------------------
+// Combining declared sources: STRONGEST duty wins, the override is absolute.
+//
+// The non-obvious rule, and the one worth pinning. The pack, the model stamp
+// and the researched table are independent claims about the same fact, not
+// versions of one claim — any of the three can be the only one that has heard
+// of a given voice. Precedence between them would let a stale "synthetic" stamp
+// silently cancel a researched real_person verdict, which is the exact failure
+// that costs a disclosure.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("a model stamp can upgrade an unresearched backend", "[unit][compliance]") {
+    // The point of stamping: a checkpoint carries its own answer and stops
+    // depending on file-name matching.
+    REQUIRE(resolve_speaker_identity(SpeakerIdentity::Unknown, SpeakerIdentity::Unknown, SpeakerIdentity::Unknown,
+                                     /*model=*/SpeakerIdentity::RealPerson) == SpeakerIdentity::RealPerson);
+}
+
+TEST_CASE("no declared source can silently downgrade another", "[unit][compliance]") {
+    // A stamp saying "synthetic" on a checkpoint the table knows is a real
+    // person must not remove the disclosure. Disagreement fails toward
+    // disclosing.
+    REQUIRE(resolve_speaker_identity(SpeakerIdentity::Unknown, SpeakerIdentity::Unknown,
+                                     /*backend=*/SpeakerIdentity::RealPerson,
+                                     /*model=*/SpeakerIdentity::Synthetic) == SpeakerIdentity::RealPerson);
+    // ...in every direction between the three declared sources.
+    REQUIRE(resolve_speaker_identity(SpeakerIdentity::Unknown, /*pack=*/SpeakerIdentity::Synthetic,
+                                     /*backend=*/SpeakerIdentity::Unknown,
+                                     /*model=*/SpeakerIdentity::RealPerson) == SpeakerIdentity::RealPerson);
+    REQUIRE(resolve_speaker_identity(SpeakerIdentity::Unknown, /*pack=*/SpeakerIdentity::RealPerson,
+                                     /*backend=*/SpeakerIdentity::Synthetic,
+                                     /*model=*/SpeakerIdentity::Synthetic) == SpeakerIdentity::RealPerson);
+}
+
+TEST_CASE("synthetic still beats unknown", "[unit][compliance]") {
+    // "Strongest duty" is not "always real_person": a source that positively
+    // says synthetic resolves the question and silences the warning.
+    REQUIRE(resolve_speaker_identity(SpeakerIdentity::Unknown, SpeakerIdentity::Unknown, SpeakerIdentity::Unknown,
+                                     /*model=*/SpeakerIdentity::Synthetic) == SpeakerIdentity::Synthetic);
+    REQUIRE_FALSE(should_warn_unknown_identity(
+        false, resolve_speaker_identity(SpeakerIdentity::Unknown, SpeakerIdentity::Unknown, SpeakerIdentity::Unknown,
+                                        SpeakerIdentity::Synthetic)));
+}
+
+TEST_CASE("the operator override still overrules every declared source", "[unit][compliance]") {
+    // Rule 1 is the escape hatch for a wrong strong claim, and it has to keep
+    // working downward or a mis-stamped model becomes unfixable without
+    // re-converting it.
+    REQUIRE(resolve_speaker_identity(/*override=*/SpeakerIdentity::Synthetic, SpeakerIdentity::RealPerson,
+                                     SpeakerIdentity::RealPerson,
+                                     SpeakerIdentity::RealPerson) == SpeakerIdentity::Synthetic);
+    REQUIRE(resolve_speaker_identity(/*override=*/SpeakerIdentity::RealPerson, SpeakerIdentity::Synthetic,
+                                     SpeakerIdentity::Synthetic,
+                                     SpeakerIdentity::Synthetic) == SpeakerIdentity::RealPerson);
+}
+
+TEST_CASE("duty_rank orders the values", "[unit][compliance]") {
+    REQUIRE(crispasr_voice::duty_rank(SpeakerIdentity::RealPerson) >
+            crispasr_voice::duty_rank(SpeakerIdentity::Synthetic));
+    REQUIRE(crispasr_voice::duty_rank(SpeakerIdentity::Synthetic) >
+            crispasr_voice::duty_rank(SpeakerIdentity::Unknown));
+}

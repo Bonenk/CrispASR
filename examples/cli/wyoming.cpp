@@ -522,7 +522,8 @@ static void wyoming_handle_connection(socket_t fd) {
             // below. A real-person PRESET is disclosed but not refused.
             const crispasr_voice::SpeakerIdentity speaker_identity = crispasr_voice::resolve_speaker_identity(
                 crispasr_voice::parse_speaker_identity(rp.tts_speaker_identity), clone_decision.pack_identity,
-                g_backend->declared_speaker_identity(g_params.model));
+                g_backend->declared_speaker_identity(g_params.model),
+                crispasr_voice::read_model_speaker_identity(g_params.model));
             const bool needs_spoken_disclosure =
                 crispasr_voice::requires_spoken_disclosure(clone_decision.is_clone, speaker_identity);
             if (crispasr_voice::should_warn_unknown_identity(clone_decision.is_clone, speaker_identity) &&

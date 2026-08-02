@@ -131,6 +131,42 @@ TEST_CASE("every surface passes the actual checkpoint to the lookup", "[unit][co
     REQUIRE(contains(read_file("examples/cli/wyoming.cpp"), "declared_speaker_identity(g_params.model)"));
 }
 
+TEST_CASE("the model stamp reaches the resolver on every surface", "[unit][compliance]") {
+    // The durable half of the identity answer. A reader nothing consults is the
+    // inert-fix failure mode (#324), so pin the call at each join.
+    REQUIRE(contains(read_file("examples/cli/crispasr_run.cpp"),
+                     "crispasr_voice::read_model_speaker_identity(params.model)"));
+    REQUIRE(contains(read_file("examples/cli/crispasr_server.cpp"),
+                     "crispasr_voice::read_model_speaker_identity(params.model)"));
+    REQUIRE(
+        contains(read_file("examples/cli/wyoming.cpp"), "crispasr_voice::read_model_speaker_identity(g_params.model)"));
+}
+
+TEST_CASE("a converter can write the stamp the runtime reads", "[unit][compliance]") {
+    // A read path with no writer is a feature nobody can use. The key spelling
+    // has to match on both sides or the whole thing fails open, silently.
+    const std::string conv = read_file("models/convert-orpheus-to-gguf.py");
+    REQUIRE(contains(conv, "--speaker-identity"));
+    // The WRITE CALL, not the key name: the flag's own help text quotes the key
+    // too, so matching the bare string stayed green with the add_string()
+    // deleted. Fourth time the red-proof has caught a guard of mine matching
+    // prose instead of code — the pattern is "assert the token that only exists
+    // when the behaviour does".
+    REQUIRE(contains(conv, "w.add_string(\"crispasr.voice.speaker_identity\", args.speaker_identity)"));
+    // Never written as a guess: an omitted or "unknown" value writes no key.
+    REQUIRE(contains(conv, "if args.speaker_identity and args.speaker_identity != \"unknown\":"));
+}
+
+TEST_CASE("declared sources combine by strongest duty", "[unit][compliance]") {
+    // The rule that keeps a stale stamp from cancelling a researched verdict.
+    // Guarded here as well as in the pure test because it is the kind of thing
+    // a later "simplification" turns back into precedence.
+    const std::string src = read_file("examples/cli/crispasr_speaker_identity.h");
+    REQUIRE(contains(src, "duty_rank"));
+    REQUIRE(contains(src, "if (duty_rank(model_value) > duty_rank(best))"));
+    REQUIRE(contains(src, "if (duty_rank(backend_value) > duty_rank(best))"));
+}
+
 TEST_CASE("the verdict table records its evidence", "[unit][compliance]") {
     // These are research results, not code. The value of the table is the
     // reasoning beside each entry — a bare `return RealPerson;` is unreviewable
