@@ -62,6 +62,7 @@
 #include "crispasr_voice_provenance.h"
 #include "crispasr_watermark.h"
 #include "crispasr_watermark_dispatch.h"
+#include "crispasr_watermark_stats.h"
 #include "core/crispasr_wav_writer.h"
 #include "crispasr_mp3_writer.h"  // MP3 output via in-tree glint encoder
 #include "crispasr_aac_writer.h"  // AAC-LC (ADTS) output via in-tree glint encoder
@@ -2161,14 +2162,39 @@ int crispasr_run_backend(const whisper_params& params_in) {
 
         float confidence = crispasr_wm_dispatch::detect(pcm.data(), n_samples, (int)wav_sr);
 
+        const bool neural = crispasr_wm_dispatch::get_ctx() != nullptr;
+        const double dur_s = wav_sr > 0 ? (double)n_samples / (double)wav_sr : 0.0;
+
         fprintf(stdout, "File: %s\n", wav_path.c_str());
+        fprintf(stdout, "Detector: %s\n", neural ? "AudioSeal (neural)" : "spread-spectrum (built-in)");
+        fprintf(stdout, "Analysed: %.2f s\n", dur_s);
         fprintf(stdout, "Watermark confidence: %.4f\n", confidence);
-        if (confidence > 0.65f) {
-            fprintf(stdout, "Result: AI-GENERATED WATERMARK DETECTED\n");
-        } else if (confidence >= 0.4f) {
-            fprintf(stdout, "Result: UNCERTAIN\n");
+
+        if (neural) {
+            // AudioSeal returns a probability, not a bin-agreement fraction —
+            // the binomial null in crispasr_watermark_stats.h does not apply.
+            fprintf(stdout, "Result: %s\n",
+                    confidence > 0.5f ? "AI-GENERATED WATERMARK DETECTED"
+                                      : "No watermark detected (this does NOT mean the audio is human-made)");
         } else {
-            fprintf(stdout, "Result: No watermark detected\n");
+            // Spread-spectrum: the score is the fraction of CRISPASR_WATERMARK_NBINS
+            // pseudo-random bins agreeing with the embedder's sign pattern, so
+            // unwatermarked audio scores 0.5 on average — NOT 0. Report the exact
+            // probability of reaching this score by chance instead of a bare
+            // threshold: the old `> 0.65` bar is p = 0.055, i.e. it called roughly
+            // one in eighteen clean files watermarked, in the past tense.
+            const double p = crispasr_wm_stats::p_value(confidence, CRISPASR_WATERMARK_NBINS);
+            const auto verdict = crispasr_wm_stats::classify(confidence, CRISPASR_WATERMARK_NBINS);
+            fprintf(stdout, "Chance of this score without a watermark: %.2g\n", p);
+            fprintf(stdout, "Result: %s\n", crispasr_wm_stats::verdict_line(verdict));
+            if (verdict != crispasr_wm_stats::Verdict::Detected && dur_s < 10.0) {
+                fprintf(stdout,
+                        "Note: %.1f s is short for this detector — it averages spectra across frames, so\n"
+                        "      confidence grows with duration (measured: 78%% of 1 s clips vs 100%% of 10 s\n"
+                        "      clips clear the old bar). Use --watermark-model auto (AudioSeal) for a\n"
+                        "      sensitive check, and treat a negative here as inconclusive, not as proof.\n",
+                        dur_s);
+            }
         }
 
         crispasr_wm_dispatch::shutdown();
@@ -3187,10 +3213,23 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // PCM (which has already been watermarked) and warn if confidence
         // is too low. This catches edge cases where the embed silently
         // failed or the audio is too short / silent to hold a watermark.
-        {
-            float conf = crispasr_wm_dispatch::detect(audio.data(), (int)audio.size(), sr_in);
-            if (conf < 0.6f) {
-                fprintf(stderr, "crispasr: warning: watermark verification LOW (confidence=%.3f)\n", conf);
+        // Only meaningful for the spread-spectrum detector, and only on audio
+        // long enough to score: the detector averages spectra across frames, so
+        // a short clip scores near chance (0.5) even when the embed worked
+        // perfectly. The old bare `< 0.6` bar therefore warned on most clips
+        // under a couple of seconds — a warning that fires on healthy output
+        // teaches operators to ignore it. Gate on duration and say what the
+        // number means. See crispasr_watermark_stats.h.
+        if (!crispasr_wm_dispatch::is_disabled() && crispasr_wm_dispatch::get_ctx() == nullptr) {
+            const double dur_s = sr_in > 0 ? (double)audio.size() / (double)sr_in : 0.0;
+            const float conf = crispasr_wm_dispatch::detect(audio.data(), (int)audio.size(), sr_in);
+            const auto verdict = crispasr_wm_stats::classify(conf, CRISPASR_WATERMARK_NBINS);
+            if (dur_s >= 5.0 && verdict == crispasr_wm_stats::Verdict::NotDetected) {
+                fprintf(stderr,
+                        "crispasr: warning: watermark self-check did not find the mark it just embedded "
+                        "(score=%.3f over %.1fs, p=%.2g). The file is still marked if C2PA signing "
+                        "succeeded; re-run --detect-watermark to confirm.\n",
+                        conf, dur_s, crispasr_wm_stats::p_value(conf, CRISPASR_WATERMARK_NBINS));
             }
         }
 

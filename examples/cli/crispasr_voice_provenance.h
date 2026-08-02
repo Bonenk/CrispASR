@@ -23,18 +23,35 @@ namespace crispasr_voice {
 // recording. False for presets, for unstamped packs, and for anything
 // unreadable — an unreadable pack is not evidence of a clone, and the backend
 // is about to fail on it anyway.
-inline bool pack_declares_clone(const std::string& path) {
+struct PackProvenance {
+    // The pack carries the baker's crispasr.voice.cloned_from_recording stamp.
+    bool declares_clone = false;
+    // general.architecture — names the producer, used to classify LEGACY packs
+    // that predate the stamp. Empty when unreadable.
+    std::string architecture;
+};
+
+// Read both provenance signals in ONE metadata open. Returns an empty result
+// for non-packs, missing files, and anything unreadable — an unreadable pack is
+// not evidence of a clone, and the backend is about to fail on it anyway.
+inline PackProvenance read_pack_provenance(const std::string& path) {
+    PackProvenance p;
     if (path.empty() || !is_voice_pack(path))
-        return false;
+        return p;
     std::error_code ec;
     if (!std::filesystem::exists(path, ec))
-        return false;
+        return p;
     gguf_context* meta = core_gguf::open_metadata(path.c_str());
     if (!meta)
-        return false;
-    const bool cloned = core_gguf::kv_bool(meta, provenance_key(), false);
+        return p;
+    p.declares_clone = core_gguf::kv_bool(meta, provenance_key(), false);
+    p.architecture = core_gguf::kv_str(meta, "general.architecture", "");
     core_gguf::free_metadata(meta);
-    return cloned;
+    return p;
+}
+
+inline bool pack_declares_clone(const std::string& path) {
+    return read_pack_provenance(path).declares_clone;
 }
 
 // Resolve the value a caller passed to the file a backend will open.
@@ -75,9 +92,10 @@ inline CloneDecision classify_voice(const std::string& voice, const std::string&
     const std::string resolved = resolve_voice_path(voice, voice_dir);
     // Skip the GGUF read when the answer can't depend on it — avoids opening a
     // file per request on the server's hot path for presets passed by name.
-    const bool need_pack_read = !baked_from_wav_this_run && !is_recording_reference(resolved);
-    const bool declares = need_pack_read && pack_declares_clone(resolved);
-    return classify(resolved, baked_from_wav_this_run, declares);
+    if (baked_from_wav_this_run || is_recording_reference(resolved))
+        return classify(resolved, baked_from_wav_this_run, /*pack_declares_clone=*/false);
+    const PackProvenance p = read_pack_provenance(resolved);
+    return classify(resolved, baked_from_wav_this_run, p.declares_clone, p.architecture);
 }
 
 } // namespace crispasr_voice

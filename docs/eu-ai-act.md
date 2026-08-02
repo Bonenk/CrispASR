@@ -316,19 +316,31 @@ server accepted a bare name, so `{"voice": "victim"}` reached the same file as
 someone's recording is exactly as much a deepfake as the recording. The suffix
 is an implementation detail.
 
-**Not every pack is a clone.** kokoro / qwen3-tts / miotts / vibevoice ship
-synthetic or upstream-licensed preset voices as `.gguf`, and `tada-ref-<lang>`
-packs are shipped references. Gating those behind a speaker-consent attestation
-nobody can meaningfully give would break every documented example, so packs are
-presets by default and clones when they say so. The honest cost: **a pack baked
-by a CrispASR older than that stamp carries no provenance and reads as a
-preset.** Re-bake it to gate it. Cases (1) and (2) don't depend on the stamp.
+4. its **`general.architecture`** names a producer that only ever bakes from a
+   recording (`chatterbox-voice`, `qwen3tts.voicepack`) — the legacy fallback
+   for packs made before the stamp existed, which cannot be retro-stamped once
+   published.
 
-Baking is itself the cloning step, so it is gated too: `--make-ref` and
-`models/bake-chatterbox-voice-from-wav.py` both require `--i-have-rights`.
-`--make-ref` sat *before* the TTS block's consent gate and returned early, which
-made it the one way to build a reusable voiceprint with no attestation demanded
-anywhere.
+**Not every pack is a clone.** kokoro and vibevoice packs are converted from
+upstream voicepacks and `.pt` prompts with no recording involved; gating those
+behind a speaker-consent attestation nobody can meaningfully give would break
+every documented example. So an unrecognised architecture stays a preset.
+
+`crispasr.reference` (TADA) is deliberately **not** on the list: the shipped
+`tada-ref-<lang>` packs and user `--make-ref` output share it, and gating the
+shipped ones would break `-l de` auto-download. Those are covered by the stamp
+going forward, so **a TADA reference baked before the stamp reads as a
+preset** — re-bake it to gate it. Cases (1) and (2) never depend on the stamp.
+
+Every producer that consumes a recording now gates and stamps at bake time:
+`--make-ref`, `models/bake-chatterbox-voice-from-wav.py`,
+`models/bake-qwen3-tts-voice-pack.py` and
+`models/convert-tada-ref-to-gguf.py` all require `--i-have-rights`.
+
+Baking is itself the cloning step. `--make-ref` sat *before* the TTS block's
+consent gate and returned early, which made it the one way to build a reusable
+voiceprint with no attestation demanded anywhere; the two Python voice-pack
+bakers had no gate at all.
 
 Note the deliberate `#312` design: an unattested opt-out is **denied, not
 refused**. You still get your audio — with the default disclaimer — plus
@@ -418,6 +430,50 @@ transcription tool is obvious" does not cover a chat API. And note that shipping
 a text-generating endpoint does not make this project a GPAI provider — the
 model is the operator's choice and its provider's responsibility (§7).
 
+### 6.7 Reading `--detect-watermark` (it is a diagnostic, not proof)
+
+The built-in spread-spectrum detector is a **sign-agreement test** over 32
+pseudo-random spectral bins. On audio with no watermark each bin is a coin
+flip, so the score is `Binomial(32, 0.5) / 32` — it averages **0.5, not 0**.
+
+The verdict used to be `score > 0.65 => "AI-GENERATED WATERMARK DETECTED"`.
+That bar is 21/32 agreements, which clean audio reaches by chance **5.5% of the
+time** — about one unwatermarked file in eighteen was reported as watermarked,
+in the confident past tense. Measured on real speech (55 clips from
+`samples/*.wav`): 4.8% false positives, matching the theory.
+
+It now reports the exact probability of reaching that score without a
+watermark, and asserts detection only at **p < 0.01**:
+
+| Verdict | Condition |
+|---|---|
+| `AI-GENERATED WATERMARK DETECTED` | p < 0.01 (≥ 24/32 bins) |
+| `INCONCLUSIVE` | p < 0.20 — leaning positive, not evidence |
+| `No watermark detected` | consistent with unwatermarked audio |
+
+**Raising the bar cannot make this instrument strong**, and the docs should not
+pretend otherwise. Measured true-positive rate on freshly watermarked speech:
+
+| clip length | > 0.65 (p = 5.5%) | > 0.71875 (p = 1.0%) |
+|---|---|---|
+| 1.0 s | 78% | 18% |
+| 2.5 s | 86% | 43% |
+| 5.0 s | 80% | 40% |
+| 10.0 s | 100% | 60% |
+
+So more clips now land in `INCONCLUSIVE` — which is the correct answer, because
+the detector genuinely cannot tell. Two consequences worth internalising:
+
+- **A negative result is not evidence the audio is human-made.** It is mostly
+  evidence the clip was short.
+- **Use `--watermark-model auto` (AudioSeal) when the answer matters.** That is
+  the sensitive detector; its score is a probability, so the p-value bands above
+  do not apply to it and are not used.
+
+None of this affects *marking*: embedding is unconditional and the watertight
+floor (§6.1) does not consult the detector. This is about not overclaiming when
+reading a file back.
+
 ---
 
 ## 7. General-purpose AI models (Ch. V)
@@ -449,7 +505,8 @@ original providers, not with a downstream requantizer. Model cards in
 | Denoise / source separation | Art. 50(2) assistive exemption | — |
 | TTS synthesis (52 engines) | **Art. 50(2)** — marked | watermark + C2PA, default-on, watertight floor on CLI *and* server |
 | Voice cloning (`.wav` ref, inline bake, or stamped pack) | **Art. 50(2) + 50(4)** | + spoken disclaimer + `--i-have-rights`; `test-voice-clone-policy` |
-| Voice-pack baking (`--make-ref`, chatterbox baker) | The cloning step itself | `--i-have-rights`; stamps `crispasr.voice.cloned_from_recording` |
+| Voice-pack baking (`--make-ref` + all 3 Python bakers) | The cloning step itself | `--i-have-rights`; stamps `crispasr.voice.cloned_from_recording` |
+| `--detect-watermark` | Diagnostic, **not** a gate | reports an exact p-value; "DETECTED" needs p < 0.01 (§6.7) |
 | Speech restoration / upscaling / S2S | **Art. 50(2)** — marked | watermark via S2S path, same per-response floor |
 | **LLM chat (`--chat-model`)** | **Art. 50(2) synthetic text** | **not marked — stated gap, deployer duty (§6.6)** |
 | Session-scoped diarization | Not biometric identification | embeddings discarded, no names |
@@ -466,7 +523,8 @@ Things CrispASR cannot do for you:
 - [ ] **Art. 50(4)** — show or speak an AI-generated label for any synthetic voice you publish. Default-on at the CLI and server; **your job** on the C ABI, WASM and bindings, using `crispasr_session_disclaimer_text()` / `crispasr_session_get_disclaimer_pcm()` (§6.2).
 - [ ] **Art. 50(1)** — disclose AI interaction in conversational products. A server started with `--chat-model` is one.
 - [ ] **Art. 50(2) for text** — if you enable `POST /v1/chat/completions`, marking its output is yours; CrispASR marks audio only (§6.6).
-- [ ] **Re-bake old voice packs** — a pack baked before `crispasr.voice.cloned_from_recording` existed reads as a preset, so the consent and disclosure gates won't fire on it (§6.2).
+- [ ] **Re-bake old TADA references** — `chatterbox-voice` and `qwen3tts.voicepack` legacy packs are caught by architecture, but a `crispasr.reference` pack baked before the stamp reads as a preset (§6.2).
+- [ ] **Don't treat `--detect-watermark` as proof either way** — it is a weak diagnostic with a stated error rate, not evidence of provenance (§6.7).
 - [ ] **Art. 4** — ensure the people operating the system have adequate AI literacy.
 - [ ] **GDPR** — voice is personal data, and biometric data when used to identify. The named-voiceprint path is Art. 9 special-category: explicit consent, retention and deletion policy, transparency. Applies independently of the AI Act.
 - [ ] Don't repurpose diarization or speaker matching for surveillance, law-enforcement identification, or scraped audio. Out of scope and unsupported.
@@ -487,7 +545,9 @@ rots:
 | Spoken-disclaimer opt-out policy | `examples/cli/crispasr_marking_policy.h` (+ `tests/test-marking-policy.cpp`) |
 | **What counts as a voice clone** | `examples/cli/crispasr_voice_clone_policy.h` (pure) + `crispasr_voice_provenance.h` (resolve + read the stamp) (+ `tests/test-voice-clone-policy.cpp`) |
 | Which containers carry a manifest | `crispasr_marking::container_marking_for_format()` in `crispasr_marking_policy.h` |
-| Voice-pack clone provenance stamp | written by `tada_encoder_write_ref_gguf()` and `models/bake-chatterbox-voice-from-wav.py`; read by `crispasr_voice::pack_declares_clone()` |
+| Voice-pack clone provenance stamp | written by `tada_encoder_write_ref_gguf()` + all 3 `models/*` voice bakers; read by `crispasr_voice::read_pack_provenance()` |
+| Legacy pack classification by producer | `crispasr_voice::architecture_is_recording_derived()` |
+| Watermark score → p-value / verdict | `examples/cli/crispasr_watermark_stats.h` (+ `tests/test-voice-clone-policy.cpp`) |
 | Watermark embed / detect | `examples/cli/crispasr_watermark.h`, `crispasr_watermark_dispatch.h` |
 | Watertight CLI marking floor | `crispasr_enforce_cli_watermark_floor()` in `examples/cli/crispasr_run.cpp` |
 | C2PA signing | `src/core/crispasr_c2pa.h`, `third_party/c2pa-audio` |

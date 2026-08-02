@@ -96,6 +96,38 @@ inline const char* provenance_key() {
     return "crispasr.voice.cloned_from_recording";
 }
 
+// LEGACY PACKS — packs baked before the stamp existed carry no provenance, and
+// cannot be retro-stamped once published. For those, fall back to what the pack
+// IS: its `general.architecture` names the producer that made it, and some
+// producers only ever consume a reference recording.
+//
+// Listed here are the architectures whose ONLY producer in this repo takes a
+// user WAV, and for which no preset pack exists to break:
+//
+//   chatterbox-voice     models/bake-chatterbox-voice-from-wav.py  (--input WAV)
+//   qwen3tts.voicepack   models/bake-qwen3-tts-voice-pack.py       (name:wav:text)
+//
+// Deliberately NOT listed:
+//   kokoro-voice, vibevoice-voice   — converted from upstream voicepacks/.pt,
+//                                     no recording involved. Presets.
+//   crispasr.reference (tada)       — AMBIGUOUS: both the shipped
+//                                     tada-ref-<lang> packs and user --make-ref
+//                                     output use it, and gating the shipped ones
+//                                     would break `-l de` auto-download. Covered
+//                                     going forward by the stamp instead; a
+//                                     tada ref baked before it reads as a preset.
+//   dots-tts-spk                    — a CAM++ speaker ENCODER (model weights),
+//                                     never passed as --voice.
+//
+// This is classification by producer, not by filename: renaming a pack changes
+// nothing. An unknown architecture is left as a preset — every recording-derived
+// producer in this repo is enumerated above, so an unrecognised one is most
+// likely a third-party or future preset, and defaulting unknown-to-clone would
+// gate arbitrary packs on a guess.
+inline bool architecture_is_recording_derived(const std::string& arch) {
+    return arch == "chatterbox-voice" || arch == "qwen3tts.voicepack";
+}
+
 // The attestation recorded at bake time, when the baker had one. Audit trail
 // only — an attestation in the pack does NOT satisfy the synthesis-time gate,
 // because consent to bake and consent to publish this particular utterance are
@@ -109,7 +141,8 @@ struct CloneDecision {
     // consent attestation, prepend the spoken AI disclosure, emit [CONSENT].
     bool is_clone = false;
     // Stable token naming WHY, for the audit line and for tests. One of
-    // "recording-reference" / "baked-from-wav" / "pack-provenance" / "" (none).
+    // "recording-reference" / "baked-from-wav" / "pack-provenance" /
+    // "pack-architecture" / "" (none).
     const char* reason = "";
 };
 
@@ -120,7 +153,10 @@ struct CloneDecision {
 //                            recording during this run (the TADA inline clone),
 //                            so its .gguf suffix is an artefact of a WAV clone.
 // `pack_declares_clone`     — the pack's provenance_key(), read from the file.
-inline CloneDecision classify(const std::string& voice, bool baked_from_wav_this_run, bool pack_declares_clone) {
+// `pack_architecture`       — the pack's general.architecture, for legacy packs
+//                            baked before the stamp existed.
+inline CloneDecision classify(const std::string& voice, bool baked_from_wav_this_run, bool pack_declares_clone,
+                              const std::string& pack_architecture = std::string()) {
     CloneDecision d;
     if (voice.empty())
         return d;
@@ -140,6 +176,13 @@ inline CloneDecision classify(const std::string& voice, bool baked_from_wav_this
     if (pack_declares_clone) {
         d.is_clone = true;
         d.reason = "pack-provenance";
+        return d;
+    }
+    // Legacy fallback: no stamp, but the producer named by the pack's
+    // architecture only ever bakes from a recording.
+    if (architecture_is_recording_derived(pack_architecture)) {
+        d.is_clone = true;
+        d.reason = "pack-architecture";
         return d;
     }
     return d;
