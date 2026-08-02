@@ -73,7 +73,7 @@ obligation attaches to placing a high-risk system on the market at all.
 | Practice | CrispASR |
 |---|---|
 | **Art. 5(1)(f)** — inferring emotions of natural persons in **workplace or education** settings | **Capability removed entirely.** See §4.1. |
-| **Art. 5(1)(g)** — biometric categorisation to deduce race, political opinions, trade-union membership, religion, sex life or sexual orientation | Not implemented. CrispASR infers no protected attribute. See §4.2 on language ID. |
+| **Art. 5(1)(g)** — biometric categorisation to deduce race, political opinions, trade-union membership, religion, sex life or sexual orientation | Not implemented. CrispASR infers no protected attribute. See §4.3 on language ID. |
 | **Art. 5(1)(h)** — real-time remote biometric identification in publicly accessible spaces for law enforcement | Not implemented, and structurally prevented: the named-voiceprint path refuses to run in streaming/live mode at all. See [`diarization-speakers.md`](diarization-speakers.md). |
 | Art. 5(1)(a)–(e) — subliminal manipulation, exploitation of vulnerability, social scoring, crime prediction, untargeted facial scraping | Out of scope for a speech runtime. |
 
@@ -124,7 +124,34 @@ Guarded by `tests/test-no-emotion-recognition.cpp` (unit tier — no model
 needed). SenseVoice keeps its ASR, its 50+ language coverage and its native
 language ID, which is what it was worth having for.
 
-### 4.2 Why language identification is not biometric categorisation
+### 4.2 What is *not* emotion recognition, and why
+
+Three things in the tree look adjacent to §4.1 and are not the same thing.
+Stated explicitly so the next reader doesn't have to re-derive it:
+
+- **Emotion *conditioning* in TTS.** chatterbox's `exaggeration` scalar, Zonos's
+  8-dimensional emotion vector, Irodori's emoji prosody control,
+  kartoffel-orpheus's `{Speaker} - {Emotion}: text` syntax. These *generate*
+  expressive speech from an operator-supplied parameter. Art. 3(39) is about
+  "identifying or inferring emotions **of natural persons** on the basis of
+  their biometric data" — there is no natural person and no inference. Steering
+  a synthetic voice is not recognition, in the same way a `<angry>` tag in a
+  screenplay isn't.
+- **SenseVoice audio-event tags.** `<|Speech|>`, `<|BGM|>`, `<|Applause|>`, and
+  also `<|Laughter|>` and `<|Cry|>`, surfaced as `audio_event`. Recital 18
+  excludes "the mere detection of readily apparent expressions, gestures or
+  movements ... unless they are used for identifying or inferring emotions."
+  Detecting that laughter occurred in a recording is an acoustic-event label;
+  it is not a claim about the speaker's emotional state, and nothing here maps
+  it to one. **Don't build that mapping downstream** — the moment you read
+  `Laughter` as "happy", you are the one operating an emotion recognition
+  system, and §4.1's analysis becomes yours.
+- **`sensevoice_result.raw`.** Holds the unfiltered model output, marker
+  included, for byte-exact diff-harness parity against the FunASR reference.
+  Nothing in CrispASR reads it and nothing should; it is a parity-testing field,
+  not a workaround.
+
+### 4.3 Why language identification is not biometric categorisation
 
 CrispASR infers the *language being spoken*, not a property of the speaker.
 Art. 5(1)(g) bites on categorisation that *deduces* race, ethnic origin or
@@ -143,7 +170,7 @@ problem. Don't.
 | Annex III point | Status |
 |---|---|
 | **1(a)** remote biometric identification | **Deliberately not implemented.** See below. |
-| **1(b)** biometric categorisation by sensitive attributes | Not implemented (§4.2). |
+| **1(b)** biometric categorisation by sensitive attributes | Not implemented (§4.3). |
 | **1(c)** emotion recognition | **Removed** (§4.1). |
 
 Point 1(a) is the one a diarization feature could drift into. The constraints
@@ -203,9 +230,29 @@ Two marking technologies, deliberately:
   `--watermark-model auto` for the stronger option.
 
 **The watertight floor.** Opting out is possible but cannot produce a fully
-unmarked file. `crispasr_enforce_cli_watermark_floor()` forces the watermark on
-whenever the chosen container can't carry a C2PA manifest — so `--no-watermark`
-on a `.opus` output is overridden, with a printed notice. Any opt-out
+unmarked file, on either surface. The rule is the same in both places: the
+audio watermark may be dropped only when a C2PA manifest still marks the
+output, so whenever the chosen container can't carry a manifest the watermark
+is forced back on.
+
+| Surface | Enforcement |
+|---|---|
+| CLI | `crispasr_enforce_cli_watermark_floor()` — per process, keyed on the output file extension. `--no-watermark` on a `.opus` output is overridden, with a printed notice. |
+| Server | `crispasr_marking::container_marking_for_format()` — per *response*, since `response_format` is chosen per request. `pcm` / `f32` / `aac` / `opus` and the raw streaming path force the watermark on. |
+
+The server's floor is per-response rather than per-process deliberately:
+mutating the process-global flag would race across `--server-workers` threads.
+
+This used to be a CLI-only guarantee. The server had no floor at all, so
+`--no-watermark --accept-marking-responsibility` plus
+`"response_format": "mp3"` returned audio with no watermark and — because C2PA
+signing was hardcoded to the WAV branch — no manifest either, while the CLI in
+the same configuration forced the mark back on. Same operator, same
+attestation, two different floors. The server now signs every container that
+can carry a manifest (WAV and MP3 today) and forces the watermark on the ones
+that can't.
+
+Any opt-out
 (`--no-watermark` / `--no-c2pa` / `--no-spoken-disclaimer`) additionally requires
 `--accept-marking-responsibility`, which writes a `[MARKING]` audit line
 recording that the operator took the disclosure duty on themselves. The server
@@ -247,6 +294,41 @@ It is on by default and skipping it requires an attestation
 (`--no-spoken-disclaimer` + `--accept-marking-responsibility` at the CLI;
 `"marking_attestation"` in the request body, or a server launched with
 `--accept-marking-responsibility`, on the API).
+
+**What counts as a clone.** Both this gate and the speaker-consent gate
+(`--i-have-rights` / `consent_attestation`) hang off one predicate, in
+`examples/cli/crispasr_voice_clone_policy.h`. A voice is a clone when:
+
+1. it is a **`.wav` reference** handed straight to a cloning backend;
+2. this run **baked it from a recording** — the TADA one-command flow bakes
+   `ref.wav` into a temp `.gguf` and rewrites `--voice` to it; or
+3. the **pack declares** it (`crispasr.voice.cloned_from_recording`), which the
+   bakers stamp into any pack they derive from a real recording.
+
+That predicate used to be spelled *"the path ends in `.wav`"*, inline, in two
+places. It was wrong in three ways, and each one silently produced an
+unattested, undisclosed clone of a real person's voice: the rewrite in (2)
+erased the evidence before the gate ran; **chatterbox clones only through a
+baked `.gguf`** and has no `.wav` path at all, so a headline cloning backend
+could never trip either gate (the same held for `--make-ref` output); and the
+server accepted a bare name, so `{"voice": "victim"}` reached the same file as
+`{"voice": "victim.wav"}` while scoring as "not a clone". A `.gguf` baked from
+someone's recording is exactly as much a deepfake as the recording. The suffix
+is an implementation detail.
+
+**Not every pack is a clone.** kokoro / qwen3-tts / miotts / vibevoice ship
+synthetic or upstream-licensed preset voices as `.gguf`, and `tada-ref-<lang>`
+packs are shipped references. Gating those behind a speaker-consent attestation
+nobody can meaningfully give would break every documented example, so packs are
+presets by default and clones when they say so. The honest cost: **a pack baked
+by a CrispASR older than that stamp carries no provenance and reads as a
+preset.** Re-bake it to gate it. Cases (1) and (2) don't depend on the stamp.
+
+Baking is itself the cloning step, so it is gated too: `--make-ref` and
+`models/bake-chatterbox-voice-from-wav.py` both require `--i-have-rights`.
+`--make-ref` sat *before* the TTS block's consent gate and returned early, which
+made it the one way to build a reusable voiceprint with no attestation demanded
+anywhere.
 
 Note the deliberate `#312` design: an unattested opt-out is **denied, not
 refused**. You still get your audio — with the default disclaimer — plus
@@ -294,7 +376,7 @@ S2S backends is not — that one is on you.
 
 ### 6.4 Art. 50(3) — emotion recognition / biometric categorisation
 
-Not applicable: CrispASR implements neither (§4.1, §4.2). Had the emotion field
+Not applicable: CrispASR implements neither (§4.1, §4.3). Had the emotion field
 been kept, every deployer would have inherited a duty to inform exposed persons
 of its operation, on every recording.
 
@@ -304,6 +386,37 @@ All disclosures must be given at or before first interaction, be clear and
 distinguishable, and conform to applicable accessibility requirements. The spoken
 disclaimer is audible; if your product has a visual surface, mirror it there —
 audio-only disclosure is not accessible to a deaf user.
+
+### 6.6 Synthetic *text* — the one Art. 50(2) surface CrispASR does not mark
+
+Art. 50(2) covers systems generating synthetic "audio, image, video **or text**".
+Everything above is about audio, because that is what this project is for. Two
+surfaces generate text, and the distinction between them matters:
+
+| Surface | Reading |
+|---|---|
+| ASR transcription | Not synthetic. A record of what a human actually said. |
+| Translation (`/v1/translate`, `--translate`) | Generated, but semantics-preserving; read here as Art. 50(2) standard assistive processing (§6.1). |
+| Punctuation restoration, truecasing, ITN | Assistive editing of an existing transcript. |
+| **`POST /v1/chat/completions`** (`--chat-model`) | **Open-ended generation. Not assistive editing, and not exempt.** |
+
+The chat endpoint is opt-in — it exists only when the operator passes
+`--chat-model`, and it serves whatever general-purpose LLM GGUF they point it
+at. **CrispASR does not mark its output**, and there is no watermark-equivalent
+for short-form text that survives a copy-paste; the Commission's own guidance
+and the Code of Practice on AI-generated content acknowledge that machine-
+readable text marking is weaker and less settled than the audio case (metadata
+that travels with the response, not a signal inside the words).
+
+So this is a **stated gap, not a discharged duty**. If you enable `--chat-model`
+and put its output in front of users, the Art. 50(2) marking duty and any
+Art. 50(1) interaction disclosure are yours. Marking metadata on the response is
+the practical option today.
+
+Enabling a conversational endpoint also changes the §6.3 answer: "a CLI
+transcription tool is obvious" does not cover a chat API. And note that shipping
+a text-generating endpoint does not make this project a GPAI provider — the
+model is the operator's choice and its provider's responsibility (§7).
 
 ---
 
@@ -334,12 +447,15 @@ original providers, not with a downstream requantizer. Model cards in
 | Text translation | Minimal risk; semantics-preserving | — |
 | Language identification | Not biometric categorisation | — |
 | Denoise / source separation | Art. 50(2) assistive exemption | — |
-| TTS synthesis (52 engines) | **Art. 50(2)** — marked | watermark + C2PA, default-on, watertight floor |
-| Voice cloning | **Art. 50(2) + 50(4)** | + spoken disclaimer + `--i-have-rights` |
-| Speech restoration / upscaling / S2S | **Art. 50(2)** — marked | watermark via S2S path |
+| TTS synthesis (52 engines) | **Art. 50(2)** — marked | watermark + C2PA, default-on, watertight floor on CLI *and* server |
+| Voice cloning (`.wav` ref, inline bake, or stamped pack) | **Art. 50(2) + 50(4)** | + spoken disclaimer + `--i-have-rights`; `test-voice-clone-policy` |
+| Voice-pack baking (`--make-ref`, chatterbox baker) | The cloning step itself | `--i-have-rights`; stamps `crispasr.voice.cloned_from_recording` |
+| Speech restoration / upscaling / S2S | **Art. 50(2)** — marked | watermark via S2S path, same per-response floor |
+| **LLM chat (`--chat-model`)** | **Art. 50(2) synthetic text** | **not marked — stated gap, deployer duty (§6.6)** |
 | Session-scoped diarization | Not biometric identification | embeddings discarded, no names |
 | Named voiceprint profiles | Kept outside Annex III(1)(a) | `--speaker-db-consent`, closed roster, offline-only |
 | Voice-based emotion inference | Art. 5(1)(f) / Annex III(1)(c) | **removed**; `test-no-emotion-recognition` |
+| Emotion *conditioning* in TTS; audio-event tags | Not Art. 3(39) — no person, no inference | §4.2 |
 
 ---
 
@@ -348,7 +464,9 @@ original providers, not with a downstream requantizer. Model cards in
 Things CrispASR cannot do for you:
 
 - [ ] **Art. 50(4)** — show or speak an AI-generated label for any synthetic voice you publish. Default-on at the CLI and server; **your job** on the C ABI, WASM and bindings, using `crispasr_session_disclaimer_text()` / `crispasr_session_get_disclaimer_pcm()` (§6.2).
-- [ ] **Art. 50(1)** — disclose AI interaction in conversational products.
+- [ ] **Art. 50(1)** — disclose AI interaction in conversational products. A server started with `--chat-model` is one.
+- [ ] **Art. 50(2) for text** — if you enable `POST /v1/chat/completions`, marking its output is yours; CrispASR marks audio only (§6.6).
+- [ ] **Re-bake old voice packs** — a pack baked before `crispasr.voice.cloned_from_recording` existed reads as a preset, so the consent and disclosure gates won't fire on it (§6.2).
 - [ ] **Art. 4** — ensure the people operating the system have adequate AI literacy.
 - [ ] **GDPR** — voice is personal data, and biometric data when used to identify. The named-voiceprint path is Art. 9 special-category: explicit consent, retention and deletion policy, transparency. Applies independently of the AI Act.
 - [ ] Don't repurpose diarization or speaker matching for surveillance, law-enforcement identification, or scraped audio. Out of scope and unsupported.
@@ -367,6 +485,9 @@ rots:
 | Concern | File |
 |---|---|
 | Spoken-disclaimer opt-out policy | `examples/cli/crispasr_marking_policy.h` (+ `tests/test-marking-policy.cpp`) |
+| **What counts as a voice clone** | `examples/cli/crispasr_voice_clone_policy.h` (pure) + `crispasr_voice_provenance.h` (resolve + read the stamp) (+ `tests/test-voice-clone-policy.cpp`) |
+| Which containers carry a manifest | `crispasr_marking::container_marking_for_format()` in `crispasr_marking_policy.h` |
+| Voice-pack clone provenance stamp | written by `tada_encoder_write_ref_gguf()` and `models/bake-chatterbox-voice-from-wav.py`; read by `crispasr_voice::pack_declares_clone()` |
 | Watermark embed / detect | `examples/cli/crispasr_watermark.h`, `crispasr_watermark_dispatch.h` |
 | Watertight CLI marking floor | `crispasr_enforce_cli_watermark_floor()` in `examples/cli/crispasr_run.cpp` |
 | C2PA signing | `src/core/crispasr_c2pa.h`, `third_party/c2pa-audio` |
@@ -375,6 +496,14 @@ rots:
 | ABI clone disclosure | `crispasr_session_{disclaimer_text,get_disclaimer_pcm}()` (+ `tests/test-abi-clone-disclosure.cpp`) |
 | Speaker-DB consent gate | `src/speaker_db.cpp`, `crispasr_speaker_db_open/enroll2` |
 | Emotion-recognition exclusion | `tests/test-no-emotion-recognition.cpp` |
+
+A third rule earned by the audit of 2026-08-02, alongside the two below:
+
+3. **Classify by provenance, not by filename.** Every one of that audit's
+   findings was the same mistake — a compliance predicate spelled as a string
+   suffix (`ends with ".wav"`, `response_format == "wav"`). Suffixes are
+   rewritten, resolved, re-encoded and renamed by code that has no idea a gate
+   depends on them. Ask what the thing *is*.
 
 Two rules learned the hard way, both worth keeping:
 

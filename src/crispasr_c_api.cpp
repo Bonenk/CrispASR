@@ -832,6 +832,8 @@ CA_EXPORT void crispasr_vad_free(float* spans) {
 // crispasr_watermark_load_model(), otherwise falls back to the built-in
 // spread-spectrum watermark.
 
+#include "../examples/cli/crispasr_voice_clone_policy.h"
+#include "../examples/cli/crispasr_voice_provenance.h"
 #include "../examples/cli/crispasr_watermark.h"
 #include "audioseal.h"
 
@@ -7748,7 +7750,17 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
     // many downstream clients (a 400 on unattested requests took out voice
     // cloning for every Subtitle Edit build up to v5.1.0-rc16, for four days).
     // What the ABI does instead is leave an audit trail.
-    s->voice_is_clone = ends_with_wav(path);
+    //
+    // That trail only exists if the clone is RECOGNISED. `ends_with_wav` alone
+    // missed every .gguf voice pack baked from a real recording — chatterbox
+    // clones only that way and has no .wav path at all — so its [CONSENT] line
+    // and the Art. 50(4) [MARKING] warning below silently never fired for the
+    // pack-based clone paths. Classify by provenance instead: the shared
+    // predicate reads the baker's crispasr.voice.cloned_from_recording stamp.
+    // (`ends_with_wav` is still used by the arms below for backend routing —
+    // that is a file-format question, not a legal one.)
+    s->voice_is_clone =
+        crispasr_voice::classify_voice(path, /*voice_dir=*/std::string(), /*baked_from_wav_this_run=*/false).is_clone;
     s->voice_path = path;
     // Any voice change invalidates the cached neutral-voice disclosure.
     s->disclaimer_pcm.clear();

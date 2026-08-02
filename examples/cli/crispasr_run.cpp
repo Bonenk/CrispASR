@@ -58,6 +58,8 @@
 #include "core/crispasr_c2pa.h"
 #include "crispasr_tts_chunking.h"
 #include "crispasr_tts_disclaimer.h"
+#include "crispasr_voice_clone_policy.h"
+#include "crispasr_voice_provenance.h"
 #include "crispasr_watermark.h"
 #include "crispasr_watermark_dispatch.h"
 #include "core/crispasr_wav_writer.h"
@@ -2742,7 +2744,9 @@ int crispasr_run_backend(const whisper_params& params_in) {
             // Bake to a temp ref GGUF in the cache dir, keyed so repeat runs reuse it.
             std::string tmp = crispasr_cache::dir(params.cache_dir) + "/tada-inline-voice.gguf";
             if (tada_encoder_write_ref_gguf(tmp.c_str(), result, params.tts_ref_text.c_str(),
-                                            params.language.empty() ? nullptr : params.language.c_str()) != 0) {
+                                            params.language.empty() ? nullptr : params.language.c_str(),
+                                            /*cloned_from_recording=*/true,
+                                            params.tts_consent_attestation.c_str()) != 0) {
                 fprintf(stderr, "crispasr[tada-clone]: failed to write reference GGUF\n");
                 return 20;
             }
@@ -2761,6 +2765,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
                 fprintf(stderr, "crispasr[tada-clone]: baked voice ref (%d tokens) → %s\n", result.n_tokens,
                         tmp.c_str());
             params.tts_voice = tmp; // backend init() now sees a .gguf reference
+            // The rewrite above erases the ONLY evidence this voice is a clone:
+            // the consent + spoken-disclosure gates below classify by suffix, so
+            // `--voice victim.wav` silently became a .gguf and stopped being a
+            // clone — no --i-have-rights demanded, no [CONSENT] line, no audible
+            // AI disclosure, on the flow docs/tts.md documents as the one-command
+            // clone. Remember it explicitly instead.
+            params.tts_voice_baked_from_wav = true;
         }
     }
 
@@ -2858,6 +2869,22 @@ int crispasr_run_backend(const whisper_params& params_in) {
             fprintf(stderr, "crispasr[%s]: requires --ref-text \"transcript of the audio\"\n", verb);
             return 20;
         }
+        // --make-ref extracts a reusable voiceprint from a person's recording —
+        // the clone itself, one step ahead of synthesis. It sat before the TTS
+        // block's consent gate and returned early, so it was the one way to build
+        // a clone with no attestation demanded anywhere. --align only emits word
+        // timestamps and stays ungated.
+        if (params.make_ref && !params.tts_voice_clone_consent) {
+            fprintf(stderr,
+                    "crispasr[make-ref]: building a voice reference requires the --i-have-rights flag.\n"
+                    "\n"
+                    "  --make-ref extracts a reusable voiceprint from '%s'. By passing\n"
+                    "  --i-have-rights you attest:\n"
+                    "  \"I have the consent of the speaker whose voice this clones,\n"
+                    "   or it is my own voice.\"\n",
+                    params.tts_voice.c_str());
+            return 17;
+        }
 
         const std::string out_path = params.make_ref_output.empty() ? "tada-ref-custom.gguf" : params.make_ref_output;
 
@@ -2951,8 +2978,13 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // --make-ref: write the voice reference GGUF.
         fprintf(stderr, "crispasr[make-ref]: %d tokens × %d-d → %s\n", result.n_tokens, result.embed_dim,
                 out_path.c_str());
+        // Stamped as a clone: this pack came from a real recording, and the
+        // synthesis-time gates read the stamp back rather than guessing from the
+        // .gguf suffix (which is how --make-ref output used to reach a backend
+        // with no attestation demanded and no audible disclosure attached).
         rc = tada_encoder_write_ref_gguf(out_path.c_str(), result, params.tts_ref_text.c_str(),
-                                         params.language.empty() ? nullptr : params.language.c_str());
+                                         params.language.empty() ? nullptr : params.language.c_str(),
+                                         /*cloned_from_recording=*/true, params.tts_consent_attestation.c_str());
         if (rc != 0) {
             fprintf(stderr, "crispasr[make-ref]: failed to write GGUF (rc=%d)\n", rc);
             return 20;
@@ -2979,19 +3011,25 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // Honor the --no-watermark opt-out (equivalent to CRISPASR_NO_WATERMARK).
         crispasr_wm_dispatch::set_disabled(params.tts_no_watermark);
 
-        // Voice-cloning consent gate: if the voice is a .wav reference
-        // (i.e. voice cloning), require --i-have-rights attestation.
-        const bool is_voice_clone = !params.tts_voice.empty() && params.tts_voice.size() >= 4 &&
-                                    (params.tts_voice.compare(params.tts_voice.size() - 4, 4, ".wav") == 0 ||
-                                     params.tts_voice.compare(params.tts_voice.size() - 4, 4, ".WAV") == 0);
+        // Voice-cloning consent gate. A clone is a .wav reference, a voice baked
+        // from one during this run, or a pack that declares it was derived from a
+        // real recording — NOT merely "the path ends in .wav", which missed the
+        // inline-bake rewrite above and every .gguf-only cloning backend
+        // (chatterbox has no .wav path at all). See crispasr_voice_clone_policy.h.
+        const crispasr_voice::CloneDecision clone_decision =
+            crispasr_voice::classify_voice(params.tts_voice, params.tts_voice_dir, params.tts_voice_baked_from_wav);
+        const bool is_voice_clone = clone_decision.is_clone;
         if (is_voice_clone && !params.tts_voice_clone_consent) {
-            fprintf(stderr, "crispasr: error: voice cloning requires the --i-have-rights flag.\n"
-                            "\n"
-                            "  By passing --i-have-rights you attest:\n"
-                            "  \"I have the consent of the speaker whose voice this clones,\n"
-                            "   or it is my own voice.\"\n"
-                            "\n"
-                            "  Usage: crispasr --tts \"text\" --voice speaker.wav --i-have-rights\n");
+            fprintf(stderr,
+                    "crispasr: error: voice cloning requires the --i-have-rights flag.\n"
+                    "\n"
+                    "  By passing --i-have-rights you attest:\n"
+                    "  \"I have the consent of the speaker whose voice this clones,\n"
+                    "   or it is my own voice.\"\n"
+                    "\n"
+                    "  Usage: crispasr --tts \"text\" --voice speaker.wav --i-have-rights\n"
+                    "  (this voice is a clone: %s)\n",
+                    clone_decision.reason);
             return 17;
         }
         if (is_voice_clone) {
@@ -3000,8 +3038,8 @@ int crispasr_run_backend(const whisper_params& params_in) {
             auto t = std::chrono::system_clock::to_time_t(now);
             char ts[64];
             std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
-            fprintf(stderr, "[CONSENT] ts=%s voice=%s attestation=\"%s\"\n", ts, params.tts_voice.c_str(),
-                    params.tts_consent_attestation.c_str());
+            fprintf(stderr, "[CONSENT] ts=%s voice=%s clone_reason=%s attestation=\"%s\"\n", ts,
+                    params.tts_voice.c_str(), clone_decision.reason, params.tts_consent_attestation.c_str());
         }
 
         // Sample rate of the synthesized PCM — backend-declared. Most TTS

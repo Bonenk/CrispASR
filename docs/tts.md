@@ -143,11 +143,15 @@ next to your TADA model GGUF, then:
 
 ```bash
 # Step 1 — bake the ref GGUF (one-time per speaker):
+# --i-have-rights is required: baking IS the cloning step. The pack is
+# stamped as clone-derived so step 2 still gets the consent gate and the
+# spoken AI disclosure.
 crispasr --backend tada-3b-ml -m auto \
     --make-ref \
     --voice speaker_10s.wav \
     --ref-text "Exact words spoken in the audio." \
-    --make-ref-output tada-ref-custom.gguf
+    --make-ref-output tada-ref-custom.gguf \
+    --i-have-rights
 
 # Step 2 — synthesise with that voice:
 crispasr --backend tada-3b-ml -m auto \
@@ -846,8 +850,18 @@ experimental — it ships its own caveats (see "Known issues" later).
 # the VoiceEncoder + S3Tokenizer paths and 24 kHz for the prompt mel.
 python models/bake-chatterbox-voice-from-wav.py \
     --input samples/jfk.wav \
-    --output my_voice.gguf
+    --output my_voice.gguf \
+    --i-have-rights
 ```
+
+`--i-have-rights` is required — baking is the cloning step, and everything
+downstream just replays the pack. The baker stamps
+`crispasr.voice.cloned_from_recording` into the output so the runtime's
+consent gate and Art. 50(4) spoken disclosure recognise the `.gguf` as a
+clone at synthesis time. Chatterbox has **no `.wav` cloning path**, so
+before that stamp existed a baked voice could never trip either gate; see
+[`eu-ai-act.md`](eu-ai-act.md#62-art-504--deepfake-disclosure). A pack baked
+by an older CrispASR carries no stamp and reads as a preset — re-bake it.
 
 The baker runs upstream `ChatterboxTTS.prepare_conditionals(wav)` and
 writes five tensors plus two scalar metadata keys, using the same
@@ -863,7 +877,8 @@ size is ~150-200 KB regardless of reference WAV length.
 ./build/bin/crispasr --backend chatterbox -m auto \
     --voice my_voice.gguf \
     --tts "Cloned voice synthesising arbitrary text." \
-    --tts-output cloned.wav
+    --tts-output cloned.wav \
+    --i-have-rights
 ```
 
 `--voice` is per-call cached, so server callers (`--server` mode) can
