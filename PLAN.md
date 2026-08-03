@@ -1,93 +1,60 @@
 # CrispASR — Pending work
 
-## NOW — #326 diarization: accuracy first, then the ggml work
+## NOW — #326 diarization: the count estimator is the last accuracy item
 
-Two things landed already (e517273d, 15aad6f8): pyannote now infers in parallel
-60 s chunks (2888 s file, M1 -t 8: 18.1 s vs 49.8–56.1 s), and `SPK_MASK` had
-powerset classes 3 and 4 swapped, worth 15 DER points. See
-`docs/diarization-speakers.md` "#326".
+Landed: parallel 60 s chunked pyannote inference (e517273d), the `SPK_MASK`
+powerset transposition worth 15 DER points (15aad6f8), and the over-clustering
+fix (a719c89d). See `docs/diarization-speakers.md` "#326".
 
-Where the paths actually stand, measured end to end on 8 VoxConverse dev files
-with `tools/der_score.py` (whisper-tiny segments, 0.25 s collar):
+Measured end to end on the 8 VoxConverse dev files, whisper-tiny segments,
+0.25 s collar, `tools/der_voxconverse.py`:
 
 | path | mean DER |
 |---|---|
 | raw posteriors, no clustering (the chunking A/B harness only) | 33.37% |
-| `--diarize-method pyannote --diarize-embedder auto` | 15.74% |
+| `--diarize-method pyannote --diarize-embedder auto` | **7.81%** |
 | `--diarize-method foxnose` (#324) | 7.32% |
 
-### 1. Over-clustering in the pyannote+embedder path (BIGGEST WIN, do first)
+Reproduce either arm in one command:
 
-`crispasr_remap_speakers_via_embeddings` clusters TitaNet embeddings with
-`crispasr_agglomerative_cluster` — **single-linkage, fixed 0.5 cosine
-threshold, hard `max_speakers` cap**. Single linkage chains, and a fixed
-threshold does not adapt, so the merge loop never gets below the cap and the
-cap decides the answer. It hit `--diarize-max-speakers 8` on 4 of 8 files:
+    python tools/der_voxconverse.py --prepare <voxconverse>/data --audio-dir /tmp/vox
+    python tools/der_voxconverse.py --audio-dir /tmp/vox --model ggml-tiny.bin \
+        --args "--diarize --diarize-method pyannote --diarize-embedder auto"
 
-    esrit 8 hyp vs 5 real | mesob 8 vs 4 | nnqfq 8 vs 5 | fsaal 8 vs 7
+### 1. DONE (a719c89d) — over-clustering, 15.74% -> 7.81%
 
-mesob is the worst file at 33.03% DER with 8 hypothesised speakers against 4.
+Archived to HISTORY. Independently re-measured 2026-08-03 from a clean corpus
+extraction: mean 7.81%, per-file counts 5/6/3/4/5/4/3/3 — identical to the
+commit's numbers, so both the fix and the harness are confirmed.
 
-We already have a better clusterer in-tree and validated: `core_spectral::
-cluster_speakers` from #324 — PCA + full-covariance GMM/BIC to *estimate* the
-count, then Ng-Jordan-Weiss spectral clustering, then spherical refinement.
-That is what gets foxnose to 7.32% on the same files.
+### 2. OPEN — the speaker-count estimator now UNDER-counts
 
-PLAN: route the pyannote+embedder path through `core_spectral::cluster_speakers`
-instead of single-linkage. Keep `--diarize-cluster-threshold` meaningful for
-callers who set it explicitly, but stop letting the cap pick the speaker count.
-GATE: mean DER over the 8 files must beat 15.74%; per-file speaker counts should
-stop pinning to the cap. Watch tiams/jyirt, which currently do NOT hit the cap
-(4 hyp vs 5 and 4 vs 4) — they are the regression risk.
+The cap no longer decides the count, but the BIC estimator that replaced it is
+wrong on half the shard in the other direction:
 
-## CLAIMED 2026-08-03 — §1 above, the pyannote+embedder over-clustering fix
+    file    GT  hyp   DER%
+    esrit    5    5    3.29
+    fsaal    7    6    3.80   under
+    jyirt    4    3    9.33   under
+    mesob    4    4   16.90   <- worst file, count is RIGHT
+    nnqfq    5    5    3.59
+    rcxzg    4    4    9.71
+    tiams    5    3    9.61   under
+    willh    2    3    6.23   over
 
-**Another agent: do not start §1.** Worktree
-`.claude/worktrees/fix-324-vad-diarize-gaps`. Delete this section when it lands,
-or if it goes stale for more than a day.
+Two separate threads, and it matters not to conflate them:
 
-**Scope.** `crispasr_remap_speakers_via_embeddings` only — route it through
-`core_spectral::cluster_speakers` behind an env gate, keep single-linkage as the
-fallback path. Plus the VoxConverse dev extraction needed to score it.
+  a. **Count.** 4 of 8 wrong, 3 of those under. HISTORY's estimator survey
+     ("the estimator is not FRAGILE, it is BIASED") measured the same shape
+     with margins of 6-14%, so this is not a tie-breaking problem and a
+     silhouette tweak will not fix it. NME-SC was already tried and LOST
+     (archived). Next candidate is calibrating the BIC penalty against
+     embedding-window count, since the errors concentrate on short files.
+  b. **mesob has the RIGHT count and the WORST DER (16.90%).** Nothing to do
+     with counting — it is confusion within 4 correctly-estimated speakers.
+     Diagnose separately; a count fix cannot touch it.
 
-**Touches:** `examples/cli/crispasr_diarize_cli.cpp`, `src/core/spectral_diarize.*`
-(read-only if possible), a DER harness script under `tools/`. Does NOT touch the
-foxnose path, the pyannote posterior cache, or anything under `models/`.
-
-**Gate before landing:** mean DER over the 8 files must beat 15.74%, per-file
-speaker counts must stop pinning to `--diarize-max-speakers`, and tiams/jyirt
-(currently uncapped at 4v5 and 4v4) must not regress. If it does not clear the
-gate it ships gated OFF with the numbers recorded, not reverted.
-
-## CLAIMED 2026-08-03 — stamping speaker_identity into the published cstr/ GGUFs
-
-**Another agent: do not start this one.** Worktree
-`wt/hf-speaker-identity-stamp`. Delete this section when it lands, or if it goes
-stale for more than a day.
-
-**What.** Everything CrispASR has published to `cstr/*` on HF predates the
-`crispasr.voice.speaker_identity` stamp, so the runtime falls back to matching
-on the checkpoint FILE NAME (`crispasr_speaker_identity_models.h`). That
-fallback fails safe — a rename resolves to `unknown` and warns — but it is a
-fallback, and rule 3 says not to classify by filename. Stamping the published
-files retires it for everything already out there.
-
-**How.** `models/stamp-published-voices.sh <dir>` asks
-`crispasr --print-speaker-identity` per file (the same resolution the Art. 50(4)
-disclosure gate runs) and skips anything that resolves to `unknown`. No verdict
-is restated in a script; there is one source of truth and it is the binary.
-
-**Scope.** Voice packs and single-speaker checkpoints whose verdict is
-established — `cstr/kokoro-voices-GGUF` (7 packs), `cstr/piper-*`,
-`cstr/fastpitch-en-GGUF`, `cstr/bananamind-tts-GGUF`,
-`cstr/parler-tts-mini-v1.1-GGUF`, `cstr/csm-1b-GGUF`,
-`cstr/kartoffel-orpheus-3b-german-{natural,synthetic}-GGUF`. NOT `bark` or
-`melotts`: their providers do not document preset provenance, both were checked
-against four and three primary sources respectively, and writing a guess is the
-one error that silently removes a disclosure.
-
-**Touches:** HF repos under `cstr/` (upload only), `hf_readmes/*.md`. Does not
-touch runtime code — the reader and the tables already shipped (`64c9de2e`).
+GATE for any count change: mean DER must beat 7.81% AND mesob must not regress.
 
 ## OPEN follow-ups from #300 / #308 (landed 2026-07-27, see HISTORY)
 

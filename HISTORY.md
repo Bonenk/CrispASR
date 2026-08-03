@@ -6,6 +6,51 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## 2026-08-03 — #326 §1 verified from a clean corpus, and the harness that does it
+
+`a719c89d` claimed the pyannote+embedder path went 15.74% -> 7.81% DER by
+routing `crispasr_remap_speakers_via_embeddings` through
+`core_spectral::cluster_speakers`. PLAN.md still described that work as the next
+thing to do, which is how it got picked up again a week later.
+
+Re-measured independently, from a fresh VoxConverse extraction and a harness
+written without reference to the original run:
+
+    file    GT  hyp   DER%
+    esrit    5    5    3.29
+    fsaal    7    6    3.80
+    jyirt    4    3    9.33
+    mesob    4    4   16.90
+    nnqfq    5    5    3.59
+    rcxzg    4    4    9.71
+    tiams    5    3    9.61
+    willh    2    3    6.23
+    MEAN              7.81
+
+Mean and per-file counts (5/6/3/4/5/4/3/3) reproduce the commit EXACTLY, so the
+fix and the measurement are both confirmed. Nothing to change in the runtime.
+
+The durable output is `tools/der_voxconverse.py`: `--prepare` pulls the 8 dev
+files AND their human labels out of the HuggingFace parquet shards, so the whole
+benchmark now runs from two commands instead of being a "~1-2 GB audio download
+plus RTTM wiring" task that docs/foxnose-diarize/PLAN.md had been deferring
+since #324. It asserts the extracted reference speaker counts against a pinned
+table, and treats a non-zero CLI exit as a FAIL rather than a skipped file —
+a dropped arm would otherwise flatter the mean it is missing from.
+
+What the numbers actually say now: the cap no longer picks the count, but the
+BIC estimator that replaced it under-counts on 3 of 8 (fsaal 6v7, jyirt 3v4,
+tiams 3v5) and over-counts on 1. And the worst file, mesob at 16.90%, has the
+RIGHT count — its error is confusion among 4 correctly-estimated speakers, a
+different problem that no count fix can touch. Both are carried in PLAN NOW §2.
+
+Method note: three separate PLAN entries were stale in the same direction today
+(#324's five "not yet done" items, all landed; #326 §1, landed a week earlier;
+and a "one FIXED, one OPEN" title whose body ended "BOTH FOLLOW-UPS NOW
+CLOSED"). Stale-open is the expensive direction of plan drift — it spends a
+session re-deriving finished work. Verify the claim before scheduling against it.
+
+
 ## 2026-08-03 — PLAN compaction: completed threads archived
 
 Moved out of `PLAN.md` so it reads as a plan again. Nothing here is open; each
