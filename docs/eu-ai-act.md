@@ -516,41 +516,85 @@ exercise over its own 27 entries (13 `real_person` / 7 `synthetic` /
 `examples/cli/crispasr_speaker_identity_models.h` — one reviewable table with
 the evidence beside each answer, rather than 50 adapter overrides:
 
+Every TTS backend CrispASR ships has now been checked against its provider's own
+documentation. **The backlog is empty**; what remains at `unknown` is unknown
+from evidence of absence, not from not having looked.
+
 | backend / checkpoint | verdict | why |
 |---|---|---|
-| `piper` (all voices) | **real_person** | every registry voice is one named donor: the Lessac corpus, Thorsten Müller, Kerstin |
-| `orpheus` + `kartoffel-orpheus-de-natural` | **real_person** | card: fine-tuned "primarily on natural human speech recordings"; its 19 speakers were *extracted* from podcasts/lectures/OER |
-| `kokoro` (English packs) | synthetic | upstream documents the voicepacks as designed/blended style vectors |
+| `piper` (all voices) | **real_person** | each voice is one named donor: the Lessac corpus, Thorsten Müller, Kerstin |
+| `fastpitch` | **real_person** | `nvidia/tts_en_fastpitch`: *"trained on LJSpeech"* — 13,100 clips of one LibriVox narrator, Linda Johnson |
+| `bananamind-tts` | **real_person** | card: en-us on LJSpeech (Linda Johnson), de-de on ThorstenVoice, credited *"Voice: Thorsten Müller"* |
+| `parler-tts` | **real_person** | LibriTTS-R + MLS (LibriVox-derived), *"trained on 34 speakers, characterized by name"* — pseudonymous corpus readers, the VCTK `p225` case |
+| `orpheus` + `kartoffel-orpheus-de-natural` | **real_person** | *"primarily on natural human speech recordings"*; its 19 speakers were *extracted* from podcasts/lectures/OER |
+| `orpheus` + `kartoffel-…-de-synthetic` | synthetic | a different checkpoint: *"trained on synthetic German speech"* |
+| `csm` | synthetic | *"a base generation model … has not been fine-tuned on any specific voice"* |
 | `orpheus` base (Canopy) | unknown | 100k+ h of "permissive" audio disclosed, nothing about tara/leah/jess/… |
 | `orpheus` + `lex-au` German FT | unknown | no training-data documentation |
-| everything else | unknown | not read yet |
+| `bark` | unknown | Suno's README documents 100+ presets and says nothing about provenance |
+| `melotts` | unknown | no training-data statement on the card |
+| `speecht5` | unknown *structurally* | the voice is a 512-d x-vector **the operator supplies**; answer per run |
+| `kokoro` (any checkpoint) | — | a backbone, not a voice. See the pack table below |
 
-**Three of CrispTTS's verdicts deliberately did *not* port**, because they are
-different weights reached through a different handler — checking that was the
-point:
+**Voice packs decide the answer for kokoro.** Its own card is explicit: *"This is
+a base model, not a voice. It pairs with a German voice pack."*
 
-- **`fastpitch`** — CrispASR ships `fastpitch-en` (NVIDIA, English, single
-  speaker), not the German NeMo model CrispTTS marks `real_person`.
-- **`speecht5`** — CrispASR ships the base `microsoft/speecht5_tts`, whose
-  speaker comes from a 512-d x-vector *the operator supplies* via `--voice`. The
-  identity is per-invocation, so no backend-level verdict can be right; pass
-  `--speaker-identity`.
-- **`kokoro-de-hui-*`** — a **conflict**, held at `unknown`. CrispTTS marks
-  kokoro `synthetic`, which is right for the English packs, but CrispASR's
-  German backbone is `kokoro-de-hui-base`, trained on HUI-Audio-Corpus-German —
-  the same named-narrator corpus (Bernd, Hokuspokus, Friedrich, Eva, Karlsson,
-  Sonja) that CrispTTS itself cites when marking the NeMo FastPitch German model
-  `real_person`. Inheriting "synthetic" would assume the answer on the one
-  variant there is reason to doubt.
+| voice pack | verdict | why |
+|---|---|---|
+| `df_eva`, `dm_bernd` | **real_person** | per-speaker packs from HUI-Audio-Corpus-German, carrying the narrators' own names; HUI is built from librivox.org recordings |
+| `df_victoria`, `dm_martin` | synthetic | kikiri fine-tunes over `kikiri-german-base-51speakers-synthetic`: *"Trained entirely on synthetic (TTS-generated) audio"* |
+| `af_heart`, `ef_dora`, `ff_siwis` | synthetic | hexgrad's shipped style vectors, designed rather than any one person |
+
+That resolves the **kokoro conflict**: CrispTTS marks kokoro `synthetic`, which
+is right for the English packs and wrong for `df_eva` / `dm_bernd`. Moving the
+answer from the checkpoint to the pack is what made both true at once. It has a
+practical edge — the documented German cascade is
+`df_victoria → df_eva → ff_siwis`, so a missing default silently moves a user
+from a synthetic voice to a real HUI narrator, and the disclosure has to follow
+the pack rather than the run.
+
+**Two of CrispTTS's verdicts still do not port**, because they are different
+weights reached through a different handler — checking that was the point.
+`fastpitch` (CrispASR ships NVIDIA's English LJSpeech model, not the German NeMo
+one) and `speecht5` (CrispASR ships the base model, whose speaker the operator
+supplies) were each re-researched from scratch. FastPitch landed on
+`real_person` anyway, by a different route.
+
+Worth noting for anyone tempted to shortcut this: of every model whose
+provenance has now been resolved across both projects, **the ones that resolved
+away from `unknown` went overwhelmingly to `real_person`.** Two donors — Linda
+Johnson (LJSpeech) and Thorsten Müller — each turn up in *two* different
+CrispASR backends by independent routes. Guessing "synthetic" would have been
+wrong nearly every time.
+
+One near-miss worth recording: a web summary described Bark's presets as "fully
+synthetic", and that phrasing is **not** in Suno's own README. It stayed
+`unknown`. A third-party paraphrase is not a provider statement, and this is the
+direction where being wrong removes a disclosure.
 
 **Two sources, and how they combine.**
 
-1. **The stamp** — `crispasr.voice.speaker_identity` in the checkpoint's own
-   GGUF metadata, written by `models/convert-*.py --speaker-identity` and read
-   by `crispasr_voice::read_model_speaker_identity()`. A stamped model answers
-   for itself and survives being renamed, re-quantised or moved. This is the
-   durable mechanism; the published `cstr/` mirrors need re-converting with the
-   flag to carry it.
+1. **The stamp** — `crispasr.voice.speaker_identity` in the checkpoint's or
+   pack's own GGUF metadata, read by
+   `crispasr_voice::read_model_speaker_identity()` /
+   `read_pack_provenance()`. A stamped file answers for itself and survives
+   being renamed, re-quantised or moved. Written either at conversion time
+   (`models/convert-*.py --speaker-identity`) or, for anything already
+   published, by **`models/stamp-speaker-identity.py`**, which rewrites the KV
+   block of an existing GGUF and copies the tensors through untouched:
+
+   ```bash
+   python models/stamp-speaker-identity.py \
+       --input kokoro-voice-df_eva.gguf --output kokoro-voice-df_eva-stamped.gguf \
+       --speaker-identity real_person \
+       --evidence "HUI-Audio-Corpus-German narrator 'eva'; HUI is librivox-derived"
+   ```
+
+   That tool exists because re-converting a 3.5 GB checkpoint to add one string
+   is a price that means it never gets done, so the answer would live in the
+   file-name table for good. `unknown` is deliberately not writable: absence of
+   the key *is* unknown, and writing it would turn "nobody established this"
+   into a claim the file makes about itself.
 2. **The table** — the legacy fallback for everything published before the
    stamp existed, matching on the checkpoint file name.
 
@@ -763,7 +807,8 @@ Things CrispASR cannot do for you:
 - [ ] **Re-bake cosyvoice3 voice banks** — a bundle baked before `crispasr.voice.bank_stamped` gates every entry by producer architecture, which is conservative but blunt. Re-bake with the current script for per-entry accuracy (§6.2).
 - [ ] **`POST /v1/voices` now requires `consent_attestation`** — a breaking API change. Clients that enroll voices need the extra form field.
 - [ ] **Answer the `speaker_identity` question for the presets you ship** (§6.2a). `piper` and `kartoffel-orpheus-de-natural` now disclose by default; anything CrispASR has not researched warns once per model. If the preset voice you use is an identifiable person, pass `--speaker-identity real_person` (or `"speaker_identity"` / `crispasr_session_set_speaker_identity()`). Do not silence the warning with `synthetic` unless you have read the model card — every model CrispTTS resolved away from `unknown` turned out to be a real person.
-- [ ] **`piper` and `kartoffel-orpheus-de-natural` output now carries a spoken AI disclosure** where it previously did not. If you post-process or measure that audio, strip it with `--no-spoken-disclaimer --accept-marking-responsibility` rather than letting the prefix skew your results.
+- [ ] **These now carry a spoken AI disclosure where they previously did not**: `piper` (all voices), `fastpitch`, `bananamind-tts`, `parler-tts`, `orpheus` + `kartoffel-orpheus-de-natural`, and the kokoro packs `df_eva` / `dm_bernd`. If you post-process or measure that audio, strip it with `--no-spoken-disclaimer --accept-marking-responsibility` rather than letting the prefix skew your results.
+- [ ] **Stamp anything you publish yourself** with `models/stamp-speaker-identity.py` (§6.2a) so the answer travels with the file instead of depending on its name.
 - [ ] **Re-bake old TADA references** — `chatterbox-voice` and `qwen3tts.voicepack` legacy packs are caught by architecture, but a `crispasr.reference` pack baked before the stamp reads as a preset (§6.2).
 - [ ] **Don't treat `--detect-watermark` as proof either way** — it is a weak diagnostic with a stated error rate, not evidence of provenance (§6.7).
 - [ ] **Art. 4** — ensure the people operating the system have adequate AI literacy.

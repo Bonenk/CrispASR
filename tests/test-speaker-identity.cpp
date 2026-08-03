@@ -227,8 +227,14 @@ TEST_CASE("piper voices are named human donors", "[unit][compliance]") {
     REQUIRE(identity_for_model("piper", "/models/piper-de_DE-kerstin-low-f16.gguf") == SpeakerIdentity::RealPerson);
 }
 
-TEST_CASE("kokoro voicepacks are designed, not people", "[unit][compliance]") {
-    REQUIRE(identity_for_model("kokoro", "kokoro-82m-q8_0.gguf") == SpeakerIdentity::Synthetic);
+TEST_CASE("a kokoro CHECKPOINT declares nothing about whose voice it is", "[unit][compliance]") {
+    // A kokoro model is a backbone, not a voice — CrispASR's own card says so:
+    // "This is a base model, not a voice. It pairs with a German voice pack."
+    // Which person you hear is decided entirely by the style pack, so the model
+    // must claim nothing. An earlier revision returned Synthetic here, which
+    // under strongest-duty resolution would have OVERRIDDEN a real-person pack.
+    REQUIRE(identity_for_model("kokoro", "kokoro-82m-q8_0.gguf") == SpeakerIdentity::Unknown);
+    REQUIRE(identity_for_model("kokoro", "kokoro-de-hui-base-q8_0.gguf") == SpeakerIdentity::Unknown);
 }
 
 TEST_CASE("the kokoro German HUI backbone is NOT inherited as synthetic", "[unit][compliance]") {
@@ -251,10 +257,12 @@ TEST_CASE("orpheus is decided per checkpoint, not per backend", "[unit][complian
     REQUIRE(identity_for_model("orpheus", "orpheus-3b-0.1-ft-q8_0.gguf") == SpeakerIdentity::Unknown);
     // lex-au's German fine-tune: no training-data documentation.
     REQUIRE(identity_for_model("orpheus", "Orpheus-3b-German-FT-Q8_0.gguf") == SpeakerIdentity::Unknown);
-    // The kartoffel SYNTHETIC variant is a different checkpoint whose card
-    // nobody has read. It must NOT inherit the natural variant's verdict, and
-    // it must not be guessed synthetic from its repo name either.
-    REQUIRE(identity_for_model("orpheus", "kartoffel-orpheus-de-synthetic-q8_0.gguf") == SpeakerIdentity::Unknown);
+    // The kartoffel SYNTHETIC variant: a genuinely different checkpoint,
+    // "trained on synthetic German speech with explicit emotion and outburst
+    // control". Read, not inferred from the repo name — a name is a convention,
+    // not a provenance statement, and this is the direction where being wrong
+    // removes a disclosure.
+    REQUIRE(identity_for_model("orpheus", "kartoffel-orpheus-de-synthetic-q8_0.gguf") == SpeakerIdentity::Synthetic);
 }
 
 TEST_CASE("matching is case-insensitive and path-tolerant", "[unit][compliance]") {
@@ -271,11 +279,40 @@ TEST_CASE("a renamed checkpoint fails SAFE, to unknown", "[unit][compliance]") {
     REQUIRE(identity_for_model("orpheus", "") == SpeakerIdentity::Unknown);
 }
 
-TEST_CASE("unresearched backends claim nothing", "[unit][compliance]") {
-    // Different weights from the models CrispTTS researched, or simply not read
-    // yet. Unknown is a backlog entry, not an opinion — and specifically not
-    // "synthetic", which would silently remove a disclosure.
-    for (const char* b : {"fastpitch", "speecht5", "melotts", "bananamind-tts", "bark", "csm", "parler-tts"}) {
+TEST_CASE("single-donor backends are real people", "[unit][compliance]") {
+    // fastpitch  nvidia/tts_en_fastpitch, "trained on LJSpeech" — 13,100 clips
+    //            of ONE LibriVox narrator, Linda Johnson.
+    // bananamind Banaxi-Tech card: en-us on LJSpeech (Linda Johnson again),
+    //            de-de on ThorstenVoice, credited "Voice: Thorsten Müller" —
+    //            the same donor as piper-de_DE-thorsten, reached twice.
+    // parler-tts LibriTTS-R + MLS, both LibriVox-derived, with 34 speakers
+    //            "characterized by name" — pseudonymous corpus readers, the
+    //            VCTK p225 case.
+    REQUIRE(identity_for_model("fastpitch", "fastpitch-en-q8_0.gguf") == SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_model("bananamind-tts", "bananamind-tts-en-q8_0.gguf") == SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_model("bananamind-tts", "bananamind-tts-de-q8_0.gguf") == SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_model("parler-tts", "parler-mini-v1.1-q8_0.gguf") == SpeakerIdentity::RealPerson);
+}
+
+TEST_CASE("csm has no preset persona", "[unit][compliance]") {
+    // sesame/csm-1b: "a base generation model ... it has not been fine-tuned on
+    // any specific voice". Its cloning path takes a context recording as
+    // --voice, which the CLONE gate catches, not this table.
+    REQUIRE(identity_for_model("csm", "csm-1b-q4_k.gguf") == SpeakerIdentity::Synthetic);
+}
+
+TEST_CASE("genuinely undocumented backends stay unknown", "[unit][compliance]") {
+    // Not from lack of looking — these providers do not say. Recorded so the
+    // check is not repeated, and specifically NOT downgraded to "synthetic",
+    // which would silently remove a disclosure.
+    //
+    // bark     Suno's README documents 100+ presets and a prompt library and
+    //          says nothing about their provenance. The "fully synthetic"
+    //          phrasing circulating for it is third-party summary, not Suno's.
+    // melotts  MyShell's card carries no training-data statement at all.
+    // speecht5 Structurally unanswerable per model: the voice is a 512-d
+    //          x-vector the OPERATOR supplies via --voice.
+    for (const char* b : {"bark", "melotts", "speecht5"}) {
         INFO("backend=" << b);
         REQUIRE(identity_for_model(b, "whatever-q8_0.gguf") == SpeakerIdentity::Unknown);
     }
@@ -347,4 +384,52 @@ TEST_CASE("duty_rank orders the values", "[unit][compliance]") {
             crispasr_voice::duty_rank(SpeakerIdentity::Synthetic));
     REQUIRE(crispasr_voice::duty_rank(SpeakerIdentity::Synthetic) >
             crispasr_voice::duty_rank(SpeakerIdentity::Unknown));
+}
+
+// ---------------------------------------------------------------------------
+// Voice-pack verdicts. kokoro's answer lives here, not on the checkpoint.
+// ---------------------------------------------------------------------------
+
+using crispasr_voice::identity_for_voice_pack;
+
+TEST_CASE("the HUI-narrator kokoro packs are real people", "[unit][compliance]") {
+    // The resolution of the conflict that held kokoro-de at unknown. df_eva and
+    // dm_bernd are per-speaker style packs from HUI-Audio-Corpus-German — a
+    // librivox.org-derived corpus — and they carry the narrators' own names.
+    // Eva and Bernd are the same donors CrispTTS cites for its real_person NeMo
+    // FastPitch German verdict.
+    REQUIRE(identity_for_voice_pack("kokoro-voice-df_eva.gguf") == SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_voice_pack("kokoro-voice-dm_bernd.gguf") == SpeakerIdentity::RealPerson);
+}
+
+TEST_CASE("the kikiri kokoro packs are synthetic, on their base's evidence", "[unit][compliance]") {
+    // Person-shaped names ("Victoria Asztaller (synthetic)", "Martin Harbecke
+    // (synthetic)") over kikiri-german-base-51speakers-synthetic, whose card
+    // states: "Trained entirely on synthetic (TTS-generated) audio". The name
+    // is not the evidence; the base's training data is.
+    REQUIRE(identity_for_voice_pack("kokoro-voice-df_victoria.gguf") == SpeakerIdentity::Synthetic);
+    REQUIRE(identity_for_voice_pack("kokoro-voice-dm_martin.gguf") == SpeakerIdentity::Synthetic);
+}
+
+TEST_CASE("hexgrad's own kokoro packs are designed voices", "[unit][compliance]") {
+    REQUIRE(identity_for_voice_pack("kokoro-voice-af_heart.gguf") == SpeakerIdentity::Synthetic);
+    REQUIRE(identity_for_voice_pack("kokoro-voice-ef_dora.gguf") == SpeakerIdentity::Synthetic);
+    REQUIRE(identity_for_voice_pack("kokoro-voice-ff_siwis.gguf") == SpeakerIdentity::Synthetic);
+}
+
+TEST_CASE("an unrecognised pack falls through to unknown", "[unit][compliance]") {
+    REQUIRE(identity_for_voice_pack("") == SpeakerIdentity::Unknown);
+    REQUIRE(identity_for_voice_pack("somebody-elses-pack.gguf") == SpeakerIdentity::Unknown);
+}
+
+TEST_CASE("the German cascade crosses an identity boundary", "[unit][compliance]") {
+    // Worth pinning as one case because it is the practical consequence: the
+    // documented German fallback order is df_victoria -> df_eva -> ff_siwis, so
+    // a missing default silently moves the user from a synthetic voice to a
+    // real HUI narrator. The disclosure has to follow the pack, not the run.
+    REQUIRE(identity_for_voice_pack("kokoro-voice-df_victoria.gguf") == SpeakerIdentity::Synthetic);
+    REQUIRE(identity_for_voice_pack("kokoro-voice-df_eva.gguf") == SpeakerIdentity::RealPerson);
+    REQUIRE(requires_spoken_disclosure(/*is_clone=*/false, identity_for_voice_pack("kokoro-voice-df_eva.gguf")));
+    REQUIRE_FALSE(
+        requires_spoken_disclosure(/*is_clone=*/false, identity_for_voice_pack("kokoro-voice-df_victoria.gguf")));
 }
