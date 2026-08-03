@@ -28,6 +28,7 @@ void             crispasr_session_close(CrispasrSession* s);
 int              crispasr_session_set_codec_path(CrispasrSession* s, const char* path);
 int              crispasr_session_set_source_language(CrispasrSession* s, const char* lang);
 int              crispasr_session_set_target_language(CrispasrSession* s, const char* lang);
+int              crispasr_session_set_tts_reference_language(CrispasrSession* s, const char* lang);
 int              crispasr_session_set_punctuation(CrispasrSession* s, int enable);
 int              crispasr_session_set_punc_model(CrispasrSession* s, const char* punc_model);
 int              crispasr_session_set_hotwords(CrispasrSession* s, const char* hotwords, float boost);
@@ -415,6 +416,26 @@ func (s *CrispasrSession) SetTargetLanguage(lang string) error {
 	rc := C.crispasr_session_set_target_language(s.handle, cl)
 	if rc != 0 {
 		return errors.New("crispasr_session_set_target_language failed")
+	}
+	return nil
+}
+
+// SetTTSReferenceLanguage declares the language a voice-cloning REFERENCE clip
+// is spoken in (issue #329). Cross-lingual TTS backends (cosyvoice3) compare it
+// to the requested output language — SetTargetLanguage, falling back to
+// SetSourceLanguage — and drop the reference transcript when they differ, so the
+// clone speaks the target language instead of carrying the reference's accent.
+//
+// Optional: the backend otherwise infers it from the voice bank or the reference
+// transcript, and that inference declines rather than guesses on a short
+// transcript. When it declines, the requested target language has no effect —
+// set this to make it explicit. Empty string clears.
+func (s *CrispasrSession) SetTTSReferenceLanguage(lang string) error {
+	cl := C.CString(lang)
+	defer C.free(unsafe.Pointer(cl))
+	rc := C.crispasr_session_set_tts_reference_language(s.handle, cl)
+	if rc != 0 {
+		return errors.New("crispasr_session_set_tts_reference_language failed")
 	}
 	return nil
 }

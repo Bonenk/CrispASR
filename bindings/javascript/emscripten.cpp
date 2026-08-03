@@ -102,6 +102,7 @@ CrispasrSession* crispasr_session_open_with_params(const char* model_path, const
 const char* crispasr_session_backend(CrispasrSession* s);
 int crispasr_session_set_source_language(CrispasrSession* s, const char* lang);
 int crispasr_session_set_target_language(CrispasrSession* s, const char* lang);
+int crispasr_session_set_tts_reference_language(CrispasrSession* s, const char* lang);
 int crispasr_session_set_punctuation(CrispasrSession* s, int enable);
 int crispasr_session_set_punc_model(CrispasrSession* s, const char* punc_model);
 int crispasr_session_set_hotwords(CrispasrSession* s, const char* hotwords, float boost);
@@ -834,6 +835,13 @@ EMSCRIPTEN_BINDINGS(whisper) {
     emscripten::function("sessionSetTargetLanguage", emscripten::optional_override([](const std::string& lang) {
                              return g_tts_session ? crispasr_session_set_target_language(g_tts_session, lang.c_str())
                                                   : -1;
+                         }));
+    // #329: the language the cloning REFERENCE is spoken in (not the output
+    // language) — cosyvoice3 drops the reference transcript when they differ.
+    emscripten::function("sessionSetTtsReferenceLanguage", emscripten::optional_override([](const std::string& lang) {
+                             return g_tts_session
+                                        ? crispasr_session_set_tts_reference_language(g_tts_session, lang.c_str())
+                                        : -1;
                          }));
     emscripten::function("sessionSetPunctuation", emscripten::optional_override([](bool enable) {
                              return g_tts_session ? crispasr_session_set_punctuation(g_tts_session, enable ? 1 : 0)

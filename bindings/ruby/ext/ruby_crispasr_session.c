@@ -60,6 +60,7 @@ extern float crispasr_watermark_detect(const float* pcm, int n_samples);
 extern int crispasr_session_kokoro_clear_phoneme_cache(struct CrispasrSession* s);
 extern int crispasr_session_set_source_language(struct CrispasrSession* s, const char* lang);
 extern int crispasr_session_set_target_language(struct CrispasrSession* s, const char* lang);
+extern int crispasr_session_set_tts_reference_language(struct CrispasrSession* s, const char* lang);
 extern int crispasr_session_set_punctuation(struct CrispasrSession* s, int enable);
 extern int crispasr_session_set_translate(struct CrispasrSession* s, int enable);
 extern int crispasr_session_set_temperature(struct CrispasrSession* s, float temperature, unsigned long long seed);
@@ -390,6 +391,19 @@ static VALUE rb_session_set_target_language(VALUE self, VALUE handle, VALUE lang
     int rc = crispasr_session_set_target_language(s, NIL_P(lang) ? "" : StringValueCStr(lang));
     if (rc != 0)
         rb_raise(rb_eRuntimeError, "set_target_language failed (rc=%d)", rc);
+    return Qnil;
+}
+
+/* #329: the language a voice-cloning REFERENCE clip is spoken in. Cross-lingual
+ * TTS backends (cosyvoice3) drop the reference transcript when it differs from
+ * the requested output language, so the clone speaks that language instead of
+ * carrying the reference's accent. Optional — otherwise inferred from the voice
+ * bank or the reference transcript. */
+static VALUE rb_session_set_tts_reference_language(VALUE self, VALUE handle, VALUE lang) {
+    struct CrispasrSession* s = (struct CrispasrSession*)NUM2ULL(handle);
+    int rc = crispasr_session_set_tts_reference_language(s, NIL_P(lang) ? "" : StringValueCStr(lang));
+    if (rc != 0)
+        rb_raise(rb_eRuntimeError, "set_tts_reference_language failed (rc=%d)", rc);
     return Qnil;
 }
 
@@ -1834,6 +1848,7 @@ void init_ruby_crispasr_session(VALUE* mWhisper) {
     rb_define_singleton_method(mSession, "clear_phoneme_cache", rb_session_clear_phoneme_cache, 1);
     rb_define_singleton_method(mSession, "set_source_language", rb_session_set_source_language, 2);
     rb_define_singleton_method(mSession, "set_target_language", rb_session_set_target_language, 2);
+    rb_define_singleton_method(mSession, "set_tts_reference_language", rb_session_set_tts_reference_language, 2);
     rb_define_singleton_method(mSession, "set_punctuation", rb_session_set_punctuation, 2);
     rb_define_singleton_method(mSession, "set_translate", rb_session_set_translate, 2);
     rb_define_singleton_method(mSession, "set_temperature", rb_session_set_temperature, 3);

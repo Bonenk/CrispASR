@@ -64,6 +64,7 @@ public final class CrispasrSession implements AutoCloseable {
         int     crispasr_session_kokoro_clear_phoneme_cache(Pointer session);
         int     crispasr_session_set_source_language(Pointer session, String lang);
         int     crispasr_session_set_target_language(Pointer session, String lang);
+        int     crispasr_session_set_tts_reference_language(Pointer session, String lang);
         int     crispasr_session_set_punctuation(Pointer session, int enable);
         int     crispasr_session_set_translate(Pointer session, int enable);
         int     crispasr_session_set_temperature(Pointer session, float temperature, long seed);
@@ -399,6 +400,18 @@ public final class CrispasrSession implements AutoCloseable {
     public void setTargetLanguage(String lang) {
         int rc = Lib.INSTANCE.crispasr_session_set_target_language(handle, lang == null ? "" : lang);
         if (rc != 0) throw new IllegalStateException("set_target_language failed (rc=" + rc + ")");
+    }
+
+    /**
+     * Language a voice-cloning REFERENCE clip is spoken in (#329). Cross-lingual TTS backends
+     * (cosyvoice3) drop the reference transcript when it differs from the requested output
+     * language, so the clone speaks that language rather than carrying the reference's accent.
+     * Optional — otherwise inferred from the voice bank or the reference transcript, and that
+     * inference declines rather than guesses on a short transcript.
+     */
+    public void setTtsReferenceLanguage(String lang) {
+        int rc = Lib.INSTANCE.crispasr_session_set_tts_reference_language(handle, lang == null ? "" : lang);
+        if (rc != 0) throw new IllegalStateException("set_tts_reference_language failed (rc=" + rc + ")");
     }
 
     /** Toggle punctuation + capitalisation. Default true. */
