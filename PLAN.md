@@ -56,10 +56,71 @@ Two separate threads, and it matters not to conflate them:
 
 GATE for any count change: mean DER must beat 7.81% AND mesob must not regress.
 
-## CLAIMED 2026-08-03 — stamp the last three cstr/ repos
+## OPEN 2026-08-03 — cstr/parler-tts-mini-v1.1-GGUF ships each weight twice
 
-**Another agent: do not start this one.** Worktree `wt/stamp-last-three`. Delete
-this section when it lands, or if it goes stale for more than a day. Everything needed is built and proven, this is bandwidth.
+The repo holds two complete copies of the same three quants under two name
+prefixes, ~3.5 GB of duplicate data:
+
+    parler-mini-v1.1-{f16,q4_k,q8_0}.gguf        1841.7 / 595.6 / 1026.1 MB
+    parler-tts-mini-v1.1-{f16,q4_k,q8_0}.gguf    1841.7 / 595.6 / 1026.1 MB
+
+Byte-for-byte identical sizes, so almost certainly a rename that kept both.
+Check which prefix the registry resolves (`src/crispasr_model_registry.cpp` says
+`parler-mini-v1.1-q8_0.gguf`) before deleting the other set — and confirm no
+external doc or script points at the `parler-tts-` names.
+
+Noticed while sizing repos for the stamping run below; not acted on, because
+deleting published files needs more certainty than a size match.
+
+## OPEN 2026-08-03 — stamp the kartoffel repos (needs ~15 GB free; this box has 11)
+
+Unclaimed. Everything needed is built and proven; this is blocked on disk, not
+on work.
+
+**Do NOT stamp parler or csm.** Checked: the verdict table resolves `parler-tts`
+and `csm` by BACKEND NAME (`crispasr_speaker_identity_models.h`), which is
+already independent of the filename — renaming one changes nothing, so stamping
+them moves 14 GB for no behavioural gain.
+
+`kartoffel-orpheus-de-{natural,synthetic}` is the opposite case: one `orpheus`
+backend serves several checkpoints, so the verdict keys on a filename substring
+and a rename drops `natural` from real_person to unknown — silently losing an
+Art. 50(4) disclosure. That is the case the stamp exists for.
+
+**Why it is not done.** `stamp-speaker-identity.py` rewrites rather than patches,
+so it needs source AND output live: 13.2 GB peak for the f16, 7 GB for the q8_0.
+This machine has 11 GB on `/` and 5.9 GB on `/Volumes/backups`, and other agents
+build here — filling the disk would take them down with it. Not worth a
+rename-robustness gain.
+
+**When there is room**, stream it one file at a time rather than
+`snapshot_download`-ing 24 GB:
+
+    for f in kartoffel-orpheus-de-natural-{q4_k,q8_0,f16}.gguf; do
+      hf download cstr/kartoffel-orpheus-3b-german-natural-GGUF "$f" --local-dir src/
+      python models/stamp-speaker-identity.py --input src/$f --output out/$f \
+        --speaker-identity real_person \
+        --evidence "card: fine-tuned primarily on natural human speech recordings; 19 speakers extracted from podcasts/lectures/OER"
+      # verify tensors with a RAW BYTE comparison, then upload, then rm both
+    done
+
+The synthetic sibling takes `--speaker-identity synthetic` and the evidence
+"card: trained on synthetic German speech with emotion and outburst control".
+
+⚠ Verify with `.tobytes()`, not `np.array_equal` — the latter returns False
+whenever NaNs are present and will call a byte-identical file corrupt.
+
+**Scope narrowed after checking where the stamp actually buys anything.** The
+verdict table resolves `parler-tts` and `csm` by BACKEND NAME
+(`crispasr_speaker_identity_models.h`), which is already independent of the
+filename — renaming one of those checkpoints changes nothing. Stamping them
+would move 14 GB for no behavioural gain.
+
+`kartoffel-orpheus-de-{natural,synthetic}` is the opposite case: one `orpheus`
+backend serves several checkpoints, so the verdict keys on a filename substring
+and a rename drops `natural` from real_person to unknown — silently losing an
+Art. 50(4) disclosure. That is exactly what the stamp exists to fix, so those
+two repos (24 GB) get it and the others do not. Everything needed is built and proven, this is bandwidth.
 
 Stamp `crispasr.voice.speaker_identity` into the repos whose verdict is
 established but which were left for size: `cstr/parler-tts-mini-v1.1-GGUF`
