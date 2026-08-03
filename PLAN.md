@@ -307,10 +307,13 @@ to counsel before it appears in a compliance claim.
    is an LLM decoder and is the likely one to need the flag. Method:
    `FIREREDPUNC_DEBUG=1 … | grep PUNCDBG` and read `in=` — do NOT use
    `--no-punctuation`, it strips after the fact and inverts the answer.
-3. **`src/fireredpunc.cpp` vs `crisp_punc/` duplication is contained, not
-   removed.** The same shape exists for `crisp_lid/` and `crisp_truecase/`; only
-   the punc pair has a sync test. Extending the test (or deleting the fallbacks)
-   is unclaimed.
+3. **`src/fireredpunc.cpp` vs `crisp_punc/` duplication — CLAIMED 2026-08-03**,
+   worktree `wt/copies-in-sync`. Surveying all 14 duplicated pairs first found
+   real drift the existing test does not cover: `src/pcs.cpp` is MISSING the
+   `__has_include("imatrix.h")` hook and the `PCS_DUMP_LOGITS` diff-harness dump
+   that `crisp_punc/src/pcs.cpp` has — 32 lines, and the shared copy's own
+   comment says "Do NOT let this file diverge between the two repos". Same shape
+   as #308. Syncing it and extending the test to every pair.
 
 ## OPEN follow-ups from #316 (kokoro G2P, landed 2026-07-28)
 
