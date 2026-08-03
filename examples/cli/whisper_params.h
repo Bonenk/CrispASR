@@ -596,6 +596,7 @@ struct whisper_params {
     float tts_exaggeration = -1.0f; // chatterbox expressiveness
     int tts_speaker_id = -1;        // piper multi-speaker model
     int tts_max_speech_tokens = -1; // chatterbox max AR tokens
+    int tts_min_speech_tokens = -1; // moss-tts min AR audio frames (exact-window fill)
 
     // CLI: --tts-play plays synthesised output on the local default speaker.
     // --tts-play-device N selects a non-default device by index (-1 = default).
