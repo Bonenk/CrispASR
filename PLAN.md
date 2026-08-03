@@ -201,11 +201,20 @@ comb band. Provenance of every null clip gets checked, not assumed.
 
 ## OPEN follow-ups from #316 (kokoro G2P, landed 2026-07-28)
 
-- **Numbers are expanded for ENGLISH only.** `core/num2words_en.h` is wired into
-  `g2p_en`, so kokoro/piper EN are fixed; `g2p_de` / `g2p_fr` / `g2p_es` still
-  phonemize `82` to the empty string and drop it. Each needs its own grammar
-  (German compounds: "zweiundachtzig"), so it is not a shared routine. Verify
-  the same way: `core_num2words_de::expand("82")` against a reference G2P.
+- **Numbers: EN and DE done, FR/ES still drop them.** `core/num2words_en.h` →
+  `g2p_en` and `core/num2words_de.h` → `g2p_de` (`4825f4df`, hermetic
+  `tests/test-num2words-de.cpp`, 55 assertions). German needed four rules
+  English does not have: units-first compounds (82 = zweiundachtzig), the
+  irregular stems (sechzehn/siebzehn/sechzig/siebzig/dreißig), INVERTED
+  separators ("1.000" is a thousand, "3,14" is a decimal), and years that switch
+  to the cardinal reading at 2000. **`g2p_fr` / `g2p_es` still phonemize `82` to
+  the empty string and drop it** — same fix, different traps: French
+  soixante-dix / quatre-vingts / quatre-vingt-dix, Spanish dieciséis /
+  veintiuno / quinientos / setecientos / novecientos, and both use the comma as
+  decimal mark like German. Mirror `num2words_de.h` + its test file.
+  ⚠ Known limitation carried by the German side: ordinals emit the citation
+  form, so "Am 1. Mai" reads "erste" where German inflects to "ersten". Case is
+  not recoverable inside a G2P.
 - **misaki's reduced vowels `ᵊ` / `ᵻ` are not modelled.** We emit plain `ə`/`ɪ`
   where misaki reduces. Measured worth: exact whole-word phoneme match goes
   58.3% → ~63% if handled. It is context-dependent (misaki uses both forms), so
@@ -303,15 +312,24 @@ attention→SGEMM + BLAS-thread-pin, per-layer weight hoist. Validated on Kaggle
 (`#296` comments 5062263388 / 5062697259).
 
 **Explicitly PROMISED on the issue — must follow through:**
-1. **OpenBLAS in the shipped binaries.** The speedup only reaches users if the
-   release binary links a real OpenBLAS. Status: Linux release jobs already
-   `apt-get install libopenblas-dev` (engages); **Linux tarball does not bundle
-   `libopenblas.so`** (self-containment) and **Windows CLI jobs set up NO BLAS**
-   (`build-windows-cpu*` in `.github/workflows/release.yml` — needs vcpkg
-   `openblas` + `-DCMAKE_TOOLCHAIN_FILE` + bundling `openblas.dll`). Until Windows
-   is wired, the #296 reporter (Windows) still gets the scalar fallback. Verify
-   each shipped artifact actually loads OpenBLAS (`-- mel-band-roformer: linking
-   OpenBLAS` at configure; `ldd`/`dumpbin /dependents` on the packaged binary).
+1. **OpenBLAS in the shipped binaries — AUDITED against the published v0.8.25
+   artifacts, not the workflow source (`b0c548e7`).**
+   - **Windows: DELIVERED.** `crispasr-windows-x86_64-cpu.zip` ships
+     `openblas.dll` (1.78 MB) beside the exe. The reporter's platform has the
+     fast path; this bullet's old "Windows CLI jobs set up NO BLAS" is stale.
+   - **Linux: was BROKEN, and worse than a slow fallback.** apt's OpenBLAS is
+     dynamic, so the binary carries `NEEDED libopenblas.so.0` while the tarball
+     shipped only crispasr, crispasr-quantize and libc2pa_c.so — on a host
+     without OpenBLAS it does not start at all (`error while loading shared
+     libraries`). Read off the real tarball with objdump. Fixed by
+     `scripts/bundle-openblas.sh` (the OpenBLAS half of `bundle-c2pa.sh`; RUNPATH
+     is already `$ORIGIN`), wired into the x86_64 + arm64 Package steps.
+   - **Both platforms could ship a degraded binary on a GREEN run** — the Windows
+     vcpkg step is `continue-on-error` and CMake falls back to scalar silently.
+     Both Package steps now assert the ARTIFACT and fail with `::error::`.
+   ⚠ **UNVALIDATED until the next release run**: the bundling copy branch cannot
+   execute on macOS. The no-op branch, the detection branch against the real
+   shipped Linux binary, and the YAML parse were verified locally.
 2. **GPU / ggml-graph port** (the real long-term fix, promised as "a GPU path is
    tracked"). Rewrite the forward (transformer + iSTFT) as a ggml graph → SIMD +
    threads + GPU everywhere, eliminating the scalar/BLAS/OpenMP scaffolding. Same
@@ -443,6 +461,19 @@ _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
 **Still open:** Upstream the ggml empty-key fix to ggml-org (outbound public PR, left for a human)
 
+## DONE 2026-08-03 — #329 target language, reachable from every binding
+
+`crispasr_session_set_tts_reference_language` shipped in the C ABI + Python +
+Rust with the #329 fix (`14be8056`); Go, C#, Java, Ruby, JS and Dart had the
+sibling `set_target_language` but not this one, so cross-lingual cloning was
+reachable from them only implicitly. Closed in `76c30f9c`, mirroring each
+binding's own setter (the `e49b292f` speaker_identity pattern).
+
+Nothing was blocked meanwhile: those bindings could already reach cross-lingual
+via `set_source_language` + `set_target_language`, because the session reads
+source as the reference language whenever target is set. Full write-up in
+`docs/issue-329/PLAN.md`.
+
 ## Scoped next items (for a new agent picking up)
 
 The qwen3-tts CP_DIRECT fused graph (#245) and the defaults-audit generalisation are DONE — see HISTORY. Genuinely-open items below.
@@ -491,7 +522,7 @@ chunk_seconds=4` → 4 slices returned; feeding them back via `vad_import` →
 identical transcript + same 4 segments; malformed → `invalid_request_error`; no
 flag → no field. Documented in `docs/server.md`.
 
-## Backend-wiring audit — remaining blind spot (OPEN, SMALL)
+## Backend-wiring audit — blind spot CLOSED (2026-08-03, `79d758c6`)
 
 `tools/check-backend-wiring.py` now checks two directions: every CLI backend
 has its c_api/factory/matrix wiring, and every backend the c_api ADVERTISES is
@@ -508,25 +539,33 @@ its object dropped by the linker), proven by removing the c_api arm and
 watching the audit fail. Demangle first: C++-linkage runtimes like `sidon` only
 appear as `__Z20sidon_init_from_file...`.
 
-Still open: a backend in NEITHER the CLI roster NOR the c_api list is invisible
-to all three checks. Two candidate signals for THAT were measured and both are
-too noisy to gate on as-is:
+**CLOSED (2026-08-03)** by the fourth check — the `src/*.h` declares
+`<x>_init_from_file` signal, made gateable by `tools/backend-components.txt`.
+The allowlist was the actual work, exactly as predicted: each component named
+once, with its consumer, so "this is a sub-module, not a backend" is a recorded
+decision instead of a silent omission.
 
-- registry keys not matching a backend name: **103 of 196** — most are
-  legitimate model variants (`crepe-tiny`, `btc-chords-majmin`, the
-  fastconformer-aligner language set, component GGUFs).
-- `src/*.h` declaring `<x>_init_from_file` with no matching backend name:
-  **21 of 76** — most are components, not backends (`miocodec`,
-  `snac_decoder`, `tada_codec`, `wavtok_decoder`, `mimo_tokenizer`,
-  `chatterbox_s3gen`, `lid_*`, `ma_sound`), and the naive match also misses
-  aliases (`fastpitch_tts` -> `fastpitch`, `irodori_tts` -> `irodori-tts`).
+Measured at close: **20 of 82 stems unmatched**, every one probed against the
+binary rather than classified by name.
+- **3 are REAL backends under an alias** (`canary-ctc`, `irodori-tts`,
+  `t5-translate`) — deliberately NOT allowlisted, because `cli_resolves()`
+  already asks the binary and allowlisting would hide a regression if an alias
+  broke.
+- **17 are genuine components** — parent-driven codecs, the voice-conversion
+  stages, the two text-LID models behind `crispasr_text_detect_language`,
+  granite's sub-runtimes, audioseal, ma_sound. `openvoice2` looked like a
+  candidate backend until grep showed melotts drives it as a tone-color
+  converter.
+- **0 genuine orphans**, so it ships REQUIRED (fails the run), not advisory.
 
-**Do not ship either as a required check** — a gate with 21 false positives
-trains everyone to ignore the audit, which is worse than no gate. The workable
-version needs the empirical `cli_resolves()` probe (already in the script)
-plus an explicit component allowlist in the repo, so "this is a sub-module,
-not a backend" is a recorded decision rather than a silent omission. Estimated
-small; the allowlist is the actual work.
+Verified it can go RED, not just green: removing `openvoice2` from the allowlist
+names it and exits 1; restoring it exits 0.
+
+The other candidate signal — registry keys not matching a backend name, **103 of
+196** — remains too noisy and is still NOT shipped. Most are legitimate model
+variants (`crepe-tiny`, `btc-chords-majmin`, the fastconformer-aligner language
+set, component GGUFs). It would need its own allowlist to be worth anything, and
+that one is 100+ entries rather than 17.
 
 ## Delivery bugs found by CometBeat against the released v0.8.17 dylib (2026-07-20)
 
