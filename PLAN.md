@@ -56,7 +56,27 @@ Two separate threads, and it matters not to conflate them:
 
 GATE for any count change: mean DER must beat 7.81% AND mesob must not regress.
 
-## OPEN 2026-08-03 — cstr/parler-tts-mini-v1.1-GGUF ships each weight twice
+## CLAIMED 2026-08-03 — the parler registry entry points at a tokenizer-broken file
+
+**Another agent: do not start this one.** Worktree `wt/parler-registry-bpe`.
+
+Not a duplicate-file cleanup, which is what the entry below assumed. The two
+name prefixes in `cstr/parler-tts-mini-v1.1-GGUF` hold **byte-identical
+tensors** (741/741 verified) and differ by exactly one KV, +32 bytes:
+
+    parler-tts-mini-v1.1-*   has  parler.tokenizer.is_bpe = true
+    parler-mini-v1.1-*       LACKS it
+
+`src/parler_tts.cpp:493` reads that key with a default of **false**, and false
+means "Viterbi unigram" instead of "BPE merge" — a different prompt tokenizer,
+so different tokens and different speech.
+
+**The registry names the file that is missing it** (`parler-mini-v1.1-q8_0.gguf`,
+`crispasr_model_registry.cpp:1163`), so `-m auto` downloads the one that
+tokenizes wrongly. Fixing the registry to the `parler-tts-` names, then removing
+the stale set.
+
+## SUPERSEDED — cstr/parler-tts-mini-v1.1-GGUF ships each weight twice
 
 The repo holds two complete copies of the same three quants under two name
 prefixes, ~3.5 GB of duplicate data:
