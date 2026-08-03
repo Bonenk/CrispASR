@@ -4113,6 +4113,17 @@ catch_discover_tests(test-btc-vocab
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-num2words-de — German number expansion for the built-in G2P (hermetic, unit)
+add_executable(test-num2words-de test-num2words-de.cpp)
+target_include_directories(test-num2words-de PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-num2words-de PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-num2words-de
+    TEST_SPEC "[num2words-de]"
+    PROPERTIES
+        LABELS unit
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test-tts-lang — cross-lingual language tags + reference LID (hermetic, unit)
 add_executable(test-tts-lang test-tts-lang.cpp)
 target_include_directories(test-tts-lang PRIVATE ${PROJECT_SOURCE_DIR}/src)
