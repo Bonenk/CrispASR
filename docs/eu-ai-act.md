@@ -746,7 +746,14 @@ entry selected by name, a preset), the field reads `ref_sha256=none` — an hone
 A `run_id` ties the record to the `[CONSENT-OUTPUT]` line emitted after
 synthesis, which carries the output path and `out_sha256` of the file as
 written — watermarked and C2PA-signed, the artefact that actually leaves the
-machine. On the server a per-request `req` id does the same job across
+machine. Verified end to end on a chatterbox clone (`clone_reason=pack-architecture`,
+a legacy pack with no provenance stamp, classified by architecture):
+
+    [CONSENT]        ... ref_sha256=85bbf5ec…  ref_is=resolved-voice  run_id=5baf6d93d54903fc
+    [CONSENT-OUTPUT] ... out_sha256=4cbeb3ce…  seconds=6.30           run_id=5baf6d93d54903fc
+
+Both hashes reproduce an independent `shasum -a 256`, and the shared `run_id`
+is what joins them. On the server a per-request `req` id does the same job across
 concurrent requests, and is returned to the client as `X-Crispasr-Request-Id`.
 So a disputed clip can be walked back to the attestation that authorised it.
 
