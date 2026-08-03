@@ -137,7 +137,9 @@ verdict is restated. Verify tensors are byte-identical afterwards with a RAW
 BYTE comparison — `np.array_equal` returns False whenever NaNs are present and
 will report a good file as corrupt.
 
-## OPEN 2026-08-03 — the fastpitch runtime cannot execute an F16 build
+## CLAIMED 2026-08-03 — the fastpitch runtime cannot execute an F16 build
+
+**Another agent: do not start this one.** Worktree `wt/fastpitch-runtime-f16`.
 
 Not the converter (that is fixed). A *correctly written* f16 fastpitch model
 loads and then aborts inside `ggml_backend_sched_graph_compute`, from
