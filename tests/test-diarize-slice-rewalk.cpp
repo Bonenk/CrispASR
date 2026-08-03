@@ -28,6 +28,7 @@
 #include "whisper_params.h"
 
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
