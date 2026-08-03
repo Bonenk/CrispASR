@@ -252,6 +252,82 @@ one error that silently removes a disclosure.
 **Touches:** HF repos under `cstr/` (upload only), `hf_readmes/*.md`. Does not
 touch runtime code — the reader and the tables already shipped (`64c9de2e`).
 
+## CLAIMED 2026-08-03 — bind the consent record to the audio it authorises
+
+**Another agent: do not start this one.** Worktree
+`.claude/worktrees/fix-324-vad-diarize-gaps`. Delete this section when it lands,
+or if it goes stale for more than a day.
+
+**Touches:** the four `[CONSENT]` emit sites (`crispasr_run.cpp`,
+`crispasr_server.cpp` x2, `wyoming.cpp`), a new shared record header, and
+docs/eu-ai-act.md. Does NOT touch any gate — the consent GATE already works on
+all four surfaces and is well tested; this is about the record it writes.
+
+### Why not the hash-chained log the sibling projects built
+
+CrispTTS hash-chains its consent log (SHA-256 per line + a sibling `.anchor`
+file, since a chain cannot detect truncation of its own tail; Art. 17 erasure
+handled by re-chaining survivors plus a `[CHAIN-REBUILT]` marker). It is well
+built. Porting it is still the wrong first move here, for four reasons:
+
+1. **We would be chaining the wrong layer.** Our record identifies the voice by
+   NAME (`voice=alice.wav`), never by content — there is no hash of the
+   reference anywhere in the tree. That file can be swapped a minute later and
+   the record still "verifies". A chain protects the SEQUENCE of records; if
+   each record is an unbound assertion, a perfectly chained log of them proves
+   nothing. CrispTTS's log is worth chaining *because* it already ties to a
+   hash.
+2. **The threat model does not support it.** This is a self-attestation BY the
+   operator, who controls the binary, the file and the anchor. A chain does not
+   defend against the party it is recording. It defends against a third party
+   editing the file without the tooling — the narrow case. CrispTTS says
+   "tamper-evidence, not tamper-proofing" and is right; the risk is readers
+   hearing the stronger claim.
+3. **Persisting more creates the liability.** CrispTTS had to build erasure,
+   retention pruning and rebuild records BECAUSE they persist identifying data,
+   then prove re-chaining cannot launder later edits. Every field stored is a
+   field that must be deletable on request.
+4. **Library vs application.** CrispTTS and Susurrus are applications. CrispASR
+   is a library + CLI embedded by others (four bindings, an HTTP server,
+   Wyoming). The right shape for an embedded component is to emit a clean
+   structured record and let the host own durability; a bespoke chained log
+   duplicates journald/CloudWatch/SIEM and is weaker than any of them.
+
+Real tamper-resistance is a STORAGE decision — append-only permissions,
+object-lock/WORM, shipping off-box — and the library must not pretend to
+substitute for it.
+
+### The work, in priority order
+
+1. **`ref_sha256=` in every `[CONSENT]` line.** SHA-256 of the file the backend
+   will actually open (`resolve_voice_path()` output), via the header-only
+   `crispasr::sha` already vendored for C2PA. This is the change that turns the
+   record from an assertion into evidence, and a hash carries far less
+   data-protection weight than the recording or a name.
+2. **Correlate the record to the output it authorised.** A per-process `run_id`
+   in the `[CONSENT]` line and in the post-synthesis audit line, so a disputed
+   clip can be walked back to the attestation. On the server add a request id —
+   today a consent line and its output are unlinkable.
+3. **`--consent-log <path>`, JSON Lines, default off.** Today the only route is
+   redirecting stderr, which interleaves the record with model-load noise and
+   progress output. A separable sink is what lets operators route it into
+   infrastructure that IS append-only.
+4. **Document the division of responsibility** in docs/eu-ai-act.md: the
+   operator is the controller, this is their artefact, tamper-resistance is
+   theirs to provide, and here is the field to key erasure on.
+
+### Below the line, probably never in-library
+
+Hash chaining. The one real case is the Docker server run as an appliance where
+no host audit infrastructure exists and the operator wants to show a regulator
+the log was not casually edited. Revisit only then, and only after (1).
+
+⚠ Legal note: as read here, Art. 50(4) is a DISCLOSURE duty, which CrispASR
+already discharges unconditionally through marking. The consent attestation goes
+to GDPR lawful basis, where the accountability duty sits with the operator as
+controller, not with the tool. Engineering judgement, not legal advice — put it
+to counsel before it appears in a compliance claim.
+
 ## OPEN follow-ups from #300 / #308 (landed 2026-07-27, see HISTORY)
 
 1. **C# and WASM bindings are source-only-verified.** No `dotnet` or emsdk on the
