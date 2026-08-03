@@ -3136,6 +3136,7 @@ catch_discover_tests(test-vibevoice-transcript
 add_executable(test_watermark test_watermark.cpp)
 target_include_directories(test_watermark PRIVATE
     ${PROJECT_SOURCE_DIR}/examples/cli
+    ${PROJECT_SOURCE_DIR}/src   # core/crispasr_watermark.h
 )
 target_link_libraries(test_watermark PRIVATE
     Catch2::Catch2WithMain

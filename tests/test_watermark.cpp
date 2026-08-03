@@ -3,7 +3,7 @@
 // Verifies embed + detect round-trip, detection threshold semantics,
 // and robustness against simple transformations (volume scaling).
 
-#include "crispasr_watermark.h"
+#include "core/crispasr_watermark.h"
 
 #include <catch2/catch_test_macros.hpp>
 

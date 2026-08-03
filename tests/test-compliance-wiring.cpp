@@ -237,6 +237,50 @@ TEST_CASE("bindings surface a bad value instead of swallowing it", "[unit][compl
     REQUIRE(contains(read_file("flutter/crispasr/lib/src/crispasr.dart"), "'real_person', 'synthetic' or 'unknown'"));
 }
 
+TEST_CASE("the converters share one definition of the stamp", "[unit][compliance]") {
+    // Seven converters can write this key. Seven hand-written copies would be
+    // seven chances for one to drift from crispasr_voice::speaker_identity_key()
+    // — and a drift fails OPEN: the stamp is simply never found, and nothing
+    // errors. One module, one spelling.
+    const std::string helper = read_file("models/_speaker_identity_arg.py");
+    REQUIRE(contains(helper, "IDENTITY_KEY = \"crispasr.voice.speaker_identity\""));
+    REQUIRE(contains(helper, "WRITABLE = (\"real_person\", \"synthetic\")"));
+    // Writes nothing when no value was given: absence means "not established",
+    // and a converter must never assert a verdict nobody made.
+    REQUIRE(contains(helper, "if not value:\n        return False"));
+
+    for (const char* conv : {
+             "models/convert-kokoro-voice-to-gguf.py",
+             "models/convert-piper-to-gguf.py",
+             "models/convert-fastpitch-to-gguf.py",
+             "models/convert-bananamind-tts-to-gguf.py",
+             "models/convert-parler-to-gguf.py",
+             "models/convert-csm-to-gguf.py",
+         }) {
+        INFO("converter=" << conv);
+        const std::string src = read_file(conv);
+        REQUIRE(contains(src, "add_speaker_identity_arg("));
+        REQUIRE(contains(src, "stamp_speaker_identity("));
+    }
+}
+
+TEST_CASE("marking primitives live at the core layer", "[unit][compliance]") {
+    // crispasr_watermark.h used to sit under examples/cli/, so src/ reached
+    // into the examples tree to find it (src/crispasr_c_api.cpp, and then
+    // src/csm_tts.cpp when the diff harness needed marking — the second
+    // instance is what made it worth fixing). It now lives next to
+    // crispasr_c2pa.h, which is where marking primitives belong.
+    REQUIRE(read_file("src/core/crispasr_watermark.h").find("crispasr_watermark_embed_impl") != std::string::npos);
+    for (const char* f : {"src/crispasr_c_api.cpp", "src/csm_tts.cpp", "examples/cli/crispasr_run.cpp",
+                          "examples/cli/crispasr_server.cpp", "examples/cli/crispasr_watermark_dispatch.h"}) {
+        INFO("includer=" << f);
+        const std::string src = read_file(f);
+        REQUIRE(contains(src, "#include \"core/crispasr_watermark.h\""));
+        // No path back into the examples tree from anywhere.
+        REQUIRE_FALSE(contains(src, "../examples/cli/crispasr_watermark.h"));
+    }
+}
+
 TEST_CASE("published GGUFs can be stamped without re-converting", "[unit][compliance]") {
     // The stamp is only real if it can reach files that are ALREADY published.
     // Re-converting a 3.5 GB checkpoint to add one string is a price that means

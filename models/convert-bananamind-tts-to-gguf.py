@@ -37,6 +37,13 @@ from pathlib import Path
 
 import numpy as np
 
+# EU AI Act Art. 50(4): whose voice this checkpoint's preset speakers are.
+# Shared with every other converter so the metadata key cannot drift — a drift
+# fails OPEN (the stamp is simply never found) and nothing errors.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _speaker_identity_arg import add_speaker_identity_arg, stamp_speaker_identity
+
+
 try:
     from gguf import GGUFWriter, GGMLQuantizationType
 except ImportError:
@@ -289,6 +296,7 @@ def main():
     parser.add_argument("--ftype", default="f16",
                         choices=["f16", "f32"],
                         help="Weight storage type")
+    add_speaker_identity_arg(parser)
     args = parser.parse_args()
 
     # ── Resolve model files ──
@@ -375,6 +383,7 @@ def main():
 
     print(f"\nWriting GGUF: {args.output}")
     writer = GGUFWriter(str(args.output), arch="bananamind_tts")
+    stamp_speaker_identity(writer, args)
 
     # ── KV metadata ──
 

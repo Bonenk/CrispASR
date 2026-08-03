@@ -56,7 +56,7 @@
 #include "crispasr_tts_disclaimer.h"
 #include "crispasr_voice_clone_policy.h"
 #include "crispasr_voice_provenance.h"
-#include "crispasr_watermark.h"
+#include "core/crispasr_watermark.h"
 #include "crispasr_watermark_dispatch.h"
 #include "core/crispasr_wav_writer.h"
 #include "core/worker_pool.h"     // improvements Phase 4b: concurrent ASR worker pool

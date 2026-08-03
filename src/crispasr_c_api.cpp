@@ -834,7 +834,7 @@ CA_EXPORT void crispasr_vad_free(float* spans) {
 
 #include "../examples/cli/crispasr_voice_clone_policy.h"
 #include "../examples/cli/crispasr_voice_provenance.h"
-#include "../examples/cli/crispasr_watermark.h"
+#include "core/crispasr_watermark.h"
 #include "audioseal.h"
 
 // Global AudioSeal context for C ABI callers.
