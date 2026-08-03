@@ -294,6 +294,36 @@ a paper's abstract.
     so ~3% available. Would matter on sparse real-world audio, not here.
   * GPU for the segmenter — see (e).
 
+## CLAIMED 2026-08-03 — stamping speaker_identity into the published cstr/ GGUFs
+
+**Another agent: do not start this one.** Worktree
+`wt/hf-speaker-identity-stamp`. Delete this section when it lands, or if it goes
+stale for more than a day.
+
+**What.** Everything CrispASR has published to `cstr/*` on HF predates the
+`crispasr.voice.speaker_identity` stamp, so the runtime falls back to matching
+on the checkpoint FILE NAME (`crispasr_speaker_identity_models.h`). That
+fallback fails safe — a rename resolves to `unknown` and warns — but it is a
+fallback, and rule 3 says not to classify by filename. Stamping the published
+files retires it for everything already out there.
+
+**How.** `models/stamp-published-voices.sh <dir>` asks
+`crispasr --print-speaker-identity` per file (the same resolution the Art. 50(4)
+disclosure gate runs) and skips anything that resolves to `unknown`. No verdict
+is restated in a script; there is one source of truth and it is the binary.
+
+**Scope.** Voice packs and single-speaker checkpoints whose verdict is
+established — `cstr/kokoro-voices-GGUF` (7 packs), `cstr/piper-*`,
+`cstr/fastpitch-en-GGUF`, `cstr/bananamind-tts-GGUF`,
+`cstr/parler-tts-mini-v1.1-GGUF`, `cstr/csm-1b-GGUF`,
+`cstr/kartoffel-orpheus-3b-german-{natural,synthetic}-GGUF`. NOT `bark` or
+`melotts`: their providers do not document preset provenance, both were checked
+against four and three primary sources respectively, and writing a guess is the
+one error that silently removes a disclosure.
+
+**Touches:** HF repos under `cstr/` (upload only), `hf_readmes/*.md`. Does not
+touch runtime code — the reader and the tables already shipped (`64c9de2e`).
+
 ## DONE 2026-08-02 — test-vad-export-live was a live test wearing a unit label
 
 Fixed as described below, and the split immediately surfaced a **second bug the
