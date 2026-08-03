@@ -41,18 +41,19 @@ Released under **CC-BY-4.0** (NeMo model license).
 | `fastpitch-en-q8_0.gguf` | Q8_0 | ~120 MB | Near-lossless |
 | `fastpitch-en-q4_k.gguf` | Q4_K | ~70 MB | Best size/quality balance |
 
-> **The F16 build was withdrawn (2026-08-03).** The file published here was
-> corrupt — `models/convert-fastpitch-to-gguf.py` handed a float32 array to
-> `add_tensor(raw_dtype=F16)`, which labels bytes rather than converting them,
-> so it held half the weights reinterpreted as garbage (943,872 NaNs) and would
-> not even open. Rebuilding it correctly then showed a second problem: the
-> fastpitch **runtime** aborts on an F16 build, because `ndim >= 2` marks 138
-> tensors F16 where the quantized path touches 25 and leaves the rest F32.
+> **The F16 build was rebuilt (2026-08-03), after being briefly withdrawn.**
+> The file previously published here was corrupt: the converter handed a
+> float32 array to `add_tensor(raw_dtype=F16)`, which labels bytes rather than
+> converting them, so it held half the weights reinterpreted as garbage
+> (943,872 NaNs) and would not open.
 >
-> **Use `q8_0` (recommended) or `q4_k`.** Both were produced from good weights,
-> are unaffected, and are what the examples below use. The converter now
-> refuses `--ftype f16` rather than emitting a file whose only behaviour is to
-> abort.
+> Rebuilding it exposed a second issue that briefly looked fatal — every run
+> aborted in ggml graph compute. It was two tensors: ggml's Metal binary ops
+> require the second operand to be F32, and `enc.pos_emb` / `dec.pos_emb` are
+> added straight to the hidden state, so converting them to F16 killed the
+> graph. They are kept F32 now; a matmul weight may be F16, an addend may not.
+>
+> The current f16 synthesises correctly and ASR-round-trips clean.
 
 
 ## Quick start

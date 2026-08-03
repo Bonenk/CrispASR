@@ -137,27 +137,21 @@ verdict is restated. Verify tensors are byte-identical afterwards with a RAW
 BYTE comparison — `np.array_equal` returns False whenever NaNs are present and
 will report a good file as corrupt.
 
-## CLAIMED 2026-08-03 — the fastpitch runtime cannot execute an F16 build
+## RESOLVED 2026-08-03 — fastpitch F16: it was two tensors, not the runtime
 
-**Another agent: do not start this one.** Worktree `wt/fastpitch-runtime-f16`.
+I filed this as "the runtime cannot execute an F16 build". Wrong. The abort is
+`ggml_metal_op_bin` asserting `src[1]->type == GGML_TYPE_F32` — ggml's Metal
+binary ops require the SECOND operand to be F32 — and `enc.pos_emb` /
+`dec.pos_emb` are added straight to the hidden state
+(`ggml_add(x, pos_slice)`, fastpitch_tts.cpp:539 and :711). The converter's
+`ndim >= 2 -> F16` rule caught them.
 
-Not the converter (that is fixed). A *correctly written* f16 fastpitch model
-loads and then aborts inside `ggml_backend_sched_graph_compute`, from
-`synthesize_internal` in `src/fastpitch.cpp`. q8_0 and q4_k of the same weights
-synthesise fine (6.72 s, rms 0.10).
+Keeping those two F32 makes f16 work: synthesises in 6.71 s against q8_0's
+6.72 s, ASR-round-trips clean. The rule to remember is narrower than "no F16
+here" — **a matmul weight may be F16; an addend may not.**
 
-The difference is coverage: `--ftype f16` marks every `ndim >= 2` tensor F16 —
-138 of them — where the quantized path touches 25 and leaves the other 113 F32.
-Some of those 113 feed ops with no F16 path in this graph.
-
-**To fix:** find which ops abort (start with the conv1d / attention projections
-the quant path leaves alone), then either add F16 support or make the converter
-keep exactly those tensors F32. Do NOT just widen the exclusion list by trial
-and error — the q8_0 selection is the working reference for which tensors the
-graph is happy to receive non-F32.
-
-Until then `--ftype f16` refuses, with `--allow-unsupported-f16` for whoever
-picks this up. `cstr/fastpitch-en-GGUF`'s f16 has been withdrawn.
+`cstr/fastpitch-en-GGUF`'s f16 is restored and correct. The `--ftype f16`
+refusal added a few hours ago is removed, along with its override flag.
 
 ## RESOLVED 2026-08-03 — cstr/fastpitch-en-GGUF: the F16 weights were ~944k NaNs
 

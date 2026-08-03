@@ -100,3 +100,27 @@ def test_the_shipped_converter_casts():
     assert "gguf.quants.quantize(arr.astype(np.float32), qt)" in src
     # ...and the conversion has to come BEFORE the write, not after it.
     assert src.index("arr = arr.astype(np.float16)") < src.index("writer.add_tensor(name, arr, raw_dtype=qt)")
+
+
+def test_fastpitch_keeps_position_tables_f32():
+    """A matmul WEIGHT may be F16; an ADDEND may not.
+
+    ggml's Metal binary ops assert `src[1]->type == GGML_TYPE_F32`
+    (ggml-metal-ops.cpp, ggml_metal_op_bin). fastpitch adds sinusoidal position
+    tables straight to the hidden state — `ggml_add(x, pos_slice)` in
+    fastpitch_tts.cpp — and `enc.pos_emb` / `dec.pos_emb` are 2-D, so the
+    converter's `ndim >= 2 -> F16` rule turned them F16 and aborted every run.
+
+    That abort is why f16 was written off as "the runtime cannot execute an F16
+    build". It could: it was two tensors. Guarding the rule so the next person
+    widening the F16 selection sees why these are excluded.
+    """
+    import ast
+    import pathlib
+
+    path = pathlib.Path(__file__).parent.parent / "models" / "convert-fastpitch-to-gguf.py"
+    src = path.read_text()
+    ast.parse(src)
+    assert 'name.endswith("pos_emb") or ".pos_emb" in name' in src
+    # ...and it must come after the generic F16 choice, or it cannot override it.
+    assert src.index("qt = GGMLQuantizationType.F16") < src.index('name.endswith("pos_emb")')

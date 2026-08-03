@@ -657,9 +657,6 @@ def main():
                         default="nvidia/tts_hifigan",
                         help="HuggingFace HiFi-GAN model name")
     parser.add_argument("--output", required=True, help="Output .gguf path")
-    parser.add_argument("--allow-unsupported-f16", action="store_true",
-                        help="emit an f16 build anyway. The fastpitch runtime aborts on one; "
-                             "this exists for work on runtime F16 support, not for publishing.")
     parser.add_argument("--ftype", default="f16",
                         choices=["f16", "f32", "q8_0"],
                         help="Weight storage type")
@@ -667,28 +664,6 @@ def main():
                         help="Use NeMo model API instead of direct .nemo loading")
     add_speaker_identity_arg(parser)
     args = parser.parse_args()
-
-    # --ftype f16 produces a file the fastpitch RUNTIME cannot execute.
-    #
-    # Measured, not assumed: a correctly-written f16 build loads and then aborts
-    # inside ggml_backend_sched_graph_compute during synthesize_internal, while
-    # q8_0 and q4_k of the same weights synthesise fine. The difference is
-    # coverage — `arr.ndim >= 2` marks 138 tensors F16, where the quant path
-    # touches 25 and leaves the other 113 F32. Some of those 113 feed ops that
-    # have no F16 path here.
-    #
-    # This was invisible until now because the published f16 was ALSO corrupt
-    # (see the dtype comment below) and did not even open, so nobody reached the
-    # crash. Refusing beats emitting a file whose only behaviour is to abort;
-    # the override exists for whoever fixes the runtime.
-    if args.ftype == "f16" and not args.allow_unsupported_f16:
-        sys.exit(
-            "--ftype f16 is not supported by the fastpitch runtime: the resulting "
-            "model loads and then aborts in ggml graph compute.\n"
-            "Use --ftype q8_0 (recommended) or f32.\n"
-            "Pass --allow-unsupported-f16 if you are working on runtime F16 support."
-        )
-
 
     # ── Load FastPitch ──
     if args.nemo:
@@ -903,6 +878,20 @@ def main():
 
         # 1D biases and norms always F32
         if arr.ndim <= 1 or "norm" in name or name.endswith(".bias"):
+            qt = GGMLQuantizationType.F32
+
+        # ...and so are the sinusoidal position tables.
+        #
+        # ggml's Metal binary ops assert `src[1]->type == GGML_TYPE_F32`
+        # (ggml-metal-ops.cpp, ggml_metal_op_bin). enc.pos_emb / dec.pos_emb are
+        # 2-D, so the `ndim >= 2` rule above turned them F16, and they are added
+        # to the hidden state (`ggml_add(x, pos_slice)` in fastpitch_tts.cpp) —
+        # which aborted the whole run. A matmul WEIGHT may be F16; a tensor that
+        # is an ADDEND may not.
+        #
+        # This is why --ftype f16 was believed impossible for fastpitch. It is
+        # not: it was two tensors.
+        if name.endswith("pos_emb") or ".pos_emb" in name:
             qt = GGMLQuantizationType.F32
 
         # CONVERT TO THE DECLARED TYPE BEFORE WRITING.
