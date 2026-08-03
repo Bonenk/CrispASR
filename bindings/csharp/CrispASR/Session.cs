@@ -189,6 +189,15 @@ namespace CrispASR
         public void SetTargetLanguage(string? lang)
             => Check(NativeMethods.crispasr_session_set_target_language(Handle, lang ?? ""), "set_target_language");
 
+        /// <summary>Language a voice-cloning reference clip is spoken in (#329). Cross-lingual TTS
+        /// backends (cosyvoice3) drop the reference transcript when it differs from the requested
+        /// output language, so the clone speaks that language instead of carrying the reference's
+        /// accent. Optional — inferred from the voice bank or reference transcript otherwise, and
+        /// that inference declines rather than guesses on a short transcript.</summary>
+        public void SetTtsReferenceLanguage(string? lang)
+            => Check(NativeMethods.crispasr_session_set_tts_reference_language(Handle, lang ?? ""),
+                     "set_tts_reference_language");
+
         /// <summary>Toggle punctuation + capitalisation. Default true.</summary>
         public void SetPunctuation(bool enable)
             => Check(NativeMethods.crispasr_session_set_punctuation(Handle, enable ? 1 : 0), "set_punctuation");

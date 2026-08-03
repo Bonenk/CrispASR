@@ -106,6 +106,10 @@ namespace CrispASR
             IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string lang);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_session_set_tts_reference_language(
+            IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string lang);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int crispasr_session_set_punctuation(IntPtr s, int enable);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
