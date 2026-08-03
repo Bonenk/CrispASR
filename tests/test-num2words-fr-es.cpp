@@ -144,6 +144,27 @@ TEST_CASE("num2words-es: expansion and separators", "[unit][num2words-es]") {
     REQUIRE(core_num2words_es::expand("Hola") == "Hola");
 }
 
+TEST_CASE("num2words-fr: the currency unit is spoken", "[unit][num2words-fr]") {
+    REQUIRE(core_num2words_fr::expand("\u20ac50") == "cinquante euros");
+    REQUIRE(core_num2words_fr::expand("50\u20ac") == "cinquante euros");
+    REQUIRE(core_num2words_fr::expand("50 \u20ac") == "cinquante euros");
+    REQUIRE(core_num2words_fr::expand("1\u20ac") == "un euro");
+    REQUIRE(core_num2words_fr::expand("$50") == "cinquante dollars");
+    REQUIRE(core_num2words_fr::expand("\u00a350") == "cinquante livres");
+}
+
+TEST_CASE("num2words-es: the currency unit is spoken, and uno apocopates", "[unit][num2words-es]") {
+    REQUIRE(core_num2words_es::expand("\u20ac50") == "cincuenta euros");
+    REQUIRE(core_num2words_es::expand("50\u20ac") == "cincuenta euros");
+    REQUIRE(core_num2words_es::expand("50 \u20ac") == "cincuenta euros");
+    // The dollar singular carries an accent the plural loses.
+    REQUIRE(core_num2words_es::expand("$50") == "cincuenta d\u00f3lares");
+    REQUIRE(core_num2words_es::expand("$1") == "un d\u00f3lar");
+    // A unit noun triggers the same apocopation `mil` does.
+    REQUIRE(core_num2words_es::expand("1\u20ac") == "un euro");
+    REQUIRE(core_num2words_es::expand("21\u20ac") == "veinti\u00fan euros");
+}
+
 // ── The regressions ─────────────────────────────────────────────────────────
 
 TEST_CASE("num2words-fr: #316 regression — French G2P must not DROP numbers", "[unit][num2words-fr]") {

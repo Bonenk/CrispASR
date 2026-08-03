@@ -38,6 +38,8 @@
 // phonemes for the wrong word and no numeric check can see it.
 #pragma once
 
+#include "core/currency_symbols.h" // #316: the unit beside the number
+
 #include <cctype>
 #include <cstdint>
 #include <string>
@@ -179,6 +181,24 @@ inline std::string ordinal(int64_t n) {
     }
 }
 
+// Currency unit as it is SPOKEN, after the amount.
+// Spanish: the dollar singular carries an accent the plural loses
+// (dólar / dólares).
+inline std::string currency_word(core_currency::sym s, bool one) {
+    switch (s) {
+    case core_currency::sym::eur:
+        return one ? "euro" : "euros";
+    case core_currency::sym::usd:
+        return one ? "dólar" : "dólares";
+    case core_currency::sym::gbp:
+        return one ? "libra" : "libras";
+    case core_currency::sym::jpy:
+        return one ? "yen" : "yenes";
+    default:
+        return std::string();
+    }
+}
+
 // Rewrite every numeric token as words.
 //
 // Separators: ',' is the decimal mark. Thousands group with a space (the RAE
@@ -266,6 +286,28 @@ inline std::string expand(const std::string& text) {
         if (i < n && text[i] == '%') {
             words += " por ciento";
             i++;
+        }
+
+        // #316: the currency UNIT, which used to vanish exactly like the digits
+        // did. Both written forms occur: "€50" and "50 €".
+        {
+            const bool one = (value == 1 && frac_part.empty());
+            size_t sym_len = 0;
+            core_currency::sym cs = core_currency::at_postfix(text, i, sym_len);
+            if (cs == core_currency::sym::none && i + 1 < n && text[i] == ' ')
+                cs = core_currency::at_postfix(text, i + 1, sym_len);
+            if (cs != core_currency::sym::none) {
+                i += sym_len + (text[i] == ' ' ? 1 : 0);
+            } else {
+                cs = core_currency::take_prefix(out);
+            }
+            const std::string unit = currency_word(cs, one);
+            if (!unit.empty()) {
+                // A unit noun is masculine-or-not but always a NOUN, so `uno`
+                // apocopates here the same way it does before `mil`.
+                words = detail::apocopate(words);
+                words += " " + unit;
+            }
         }
 
         if (!out.empty() && out.back() != ' ')
