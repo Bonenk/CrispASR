@@ -37,6 +37,8 @@
 // phonemes for the wrong word and no numeric check can see it.
 #pragma once
 
+#include "core/currency_symbols.h" // #316: the unit beside the number
+
 #include <cctype>
 #include <cstdint>
 #include <string>
@@ -172,6 +174,23 @@ inline std::string ordinal(int64_t n) {
     return c + "ième";
 }
 
+// Currency unit as it is SPOKEN, after the amount.
+// French pluralises regularly.
+inline std::string currency_word(core_currency::sym s, bool one) {
+    switch (s) {
+    case core_currency::sym::eur:
+        return one ? "euro" : "euros";
+    case core_currency::sym::usd:
+        return one ? "dollar" : "dollars";
+    case core_currency::sym::gbp:
+        return one ? "livre" : "livres";
+    case core_currency::sym::jpy:
+        return one ? "yen" : "yens";
+    default:
+        return std::string();
+    }
+}
+
 // Rewrite every numeric token as words.
 //
 // Separators: ',' is the decimal mark; thousands are grouped with a SPACE
@@ -265,6 +284,24 @@ inline std::string expand(const std::string& text) {
         if (i < n && text[i] == '%') {
             words += " pour cent";
             i++;
+        }
+
+        // #316: the currency UNIT, which used to vanish exactly like the digits
+        // did. Both written forms occur: "€50" and "50 €".
+        {
+            const bool one = (value == 1 && frac_part.empty());
+            size_t sym_len = 0;
+            core_currency::sym cs = core_currency::at_postfix(text, i, sym_len);
+            if (cs == core_currency::sym::none && i + 1 < n && text[i] == ' ')
+                cs = core_currency::at_postfix(text, i + 1, sym_len);
+            if (cs != core_currency::sym::none) {
+                i += sym_len + (text[i] == ' ' ? 1 : 0);
+            } else {
+                cs = core_currency::take_prefix(out);
+            }
+            const std::string unit = currency_word(cs, one);
+            if (!unit.empty())
+                words += " " + unit;
         }
 
         if (!out.empty() && out.back() != ' ')

@@ -39,6 +39,8 @@
 // perfectly well-formed, just for the wrong word.
 #pragma once
 
+#include "core/currency_symbols.h" // #316: the unit beside the number
+
 #include <cctype>
 #include <cstdint>
 #include <string>
@@ -177,6 +179,24 @@ inline std::string year(int64_t n) {
     return out;
 }
 
+// Currency unit as it is SPOKEN, after the amount.
+// German currency units are INVARIABLE: "ein Euro", "fuenfzig Euro" —
+// never "Euros". Same for Dollar, Pfund and Yen.
+inline std::string currency_word(core_currency::sym s, bool one) {
+    switch (s) {
+    case core_currency::sym::eur:
+        return one ? "Euro" : "Euro";
+    case core_currency::sym::usd:
+        return one ? "Dollar" : "Dollar";
+    case core_currency::sym::gbp:
+        return one ? "Pfund" : "Pfund";
+    case core_currency::sym::jpy:
+        return one ? "Yen" : "Yen";
+    default:
+        return std::string();
+    }
+}
+
 // Rewrite every numeric token in `text` as words, leaving the rest untouched.
 //
 // German separator convention (rule 3 above): '.' groups thousands, ',' is the
@@ -279,6 +299,30 @@ inline std::string expand(const std::string& text) {
         if (i < n && text[i] == '%') {
             words += " Prozent";
             i++;
+        }
+
+        // #316: the currency UNIT, which used to vanish exactly like the digits
+        // did. Both written forms occur: "€50" and "50 €".
+        {
+            const bool one = (value == 1 && frac_part.empty());
+            size_t sym_len = 0;
+            core_currency::sym cs = core_currency::at_postfix(text, i, sym_len);
+            if (cs == core_currency::sym::none && i + 1 < n && text[i] == ' ')
+                cs = core_currency::at_postfix(text, i + 1, sym_len);
+            if (cs != core_currency::sym::none) {
+                i += sym_len + (text[i] == ' ' ? 1 : 0);
+            } else {
+                cs = core_currency::take_prefix(out);
+            }
+            const std::string unit = currency_word(cs, one);
+            if (!unit.empty()) {
+                // Attributive form before the unit noun: "ein Euro", not "eins
+                // Euro". Only a TRAILING standalone "eins" changes — 21 is
+                // "einundzwanzig Euro" and must not be touched.
+                if (words.size() >= 4 && words.compare(words.size() - 4, 4, "eins") == 0)
+                    words = words.substr(0, words.size() - 1);
+                words += " " + unit;
+            }
         }
 
         if (!out.empty() && out.back() != ' ')

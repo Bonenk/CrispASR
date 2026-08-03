@@ -112,6 +112,25 @@ TEST_CASE("num2words-de: signs, percent and non-numeric tokens", "[unit][num2wor
     REQUIRE(expand("") == "");
 }
 
+TEST_CASE("num2words-de: the currency unit is spoken, and is invariable", "[unit][num2words-de]") {
+    // The unit vanished exactly like the digits did — it is in no dictionary
+    // and no letter-to-sound rule. Both written forms occur.
+    REQUIRE(expand("\u20ac50") == "f\u00fcnfzig Euro");
+    REQUIRE(expand("50\u20ac") == "f\u00fcnfzig Euro");
+    REQUIRE(expand("50 \u20ac") == "f\u00fcnfzig Euro");
+    REQUIRE(expand("$50") == "f\u00fcnfzig Dollar");
+    REQUIRE(expand("\u00a350") == "f\u00fcnfzig Pfund");
+
+    // German units do NOT pluralise: 50 Euro, never 50 Euros.
+    REQUIRE(expand("2\u20ac") == "zwei Euro");
+
+    // …but the NUMBER takes its attributive form before the noun: ein Euro,
+    // not eins Euro. Only a trailing standalone "eins" changes.
+    REQUIRE(expand("1\u20ac") == "ein Euro");
+    REQUIRE(expand("101\u20ac") == "einhundertein Euro");
+    REQUIRE(expand("21\u20ac") == "einundzwanzig Euro"); // untouched
+}
+
 TEST_CASE("num2words-de: #316 regression — German G2P must not DROP numbers", "[unit][num2words-de]") {
     // The bug: g2p_de had no number path, digits are in no dictionary and no
     // letter-to-sound rule, so a numeric token phonemized to "" and vanished.
