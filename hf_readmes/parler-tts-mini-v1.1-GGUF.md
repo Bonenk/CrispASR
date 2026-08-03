@@ -33,6 +33,19 @@ Single GGUF contains all three components (T5 encoder + decoder + DAC codec).
 | `parler-tts-mini-v1.1-q4_k.gguf` | Q4_K | 569 MB | Smallest (DAC codec kept at F16) |
 | `parler-mini-v1.1-ref.gguf`      | —    | 286 KB | CrispASR `crispasr-diff` per-stage F32 PyTorch reference (not a model) |
 
+> **A duplicate, tokenizer-broken file set was removed (2026-08-03).** The repo
+> also carried `parler-mini-v1.1-{f16,q4_k,q8_0}.gguf`. Their tensors were
+> byte-identical to the files above (741/741 verified), but they were missing
+> the `parler.tokenizer.is_bpe` metadata key — and CrispASR defaults that to
+> `false`, which selects a Viterbi **unigram** tokenizer instead of **BPE**.
+> Prompts therefore tokenized differently, and the model spoke differently.
+>
+> CrispASR's model registry pointed at the broken `parler-mini-v1.1-q8_0.gguf`,
+> so `-m auto` downloaded it. Both the registry and this repo now use the
+> `parler-tts-` names. `parler-mini-v1.1-ref.gguf` is unrelated — it is the
+> diff-harness reference, not a model, and is unaffected.
+
+
 ## Quick start
 
 ```bash
