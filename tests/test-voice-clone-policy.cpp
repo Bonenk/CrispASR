@@ -340,3 +340,39 @@ TEST_CASE("other control characters are rejected too", "[unit][voice-clone]") {
     REQUIRE(voice_name_has_control_chars("esc\x1b[31m")); // ANSI escape into a terminal
     REQUIRE(voice_name_has_control_chars("del\x7f"));     // 0x7f is not < 0x20
 }
+
+// ---------------------------------------------------------------------------
+// Per-frame detector bands (ported from CrispTTS Phase 28).
+//
+// The score here is NOT a bin count, so the binomial null above does not apply
+// to it. These guard the property that matters: the two band sets stay separate
+// and the calibrated decision point lands where the docs and CLI say it does.
+// The statistic itself is measured, not unit-tested — tools/watermark_detect_ab.cpp.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("per-frame bands hinge on the documented 0.65 decision point", "[unit][compliance]") {
+    using V = crispasr_wm_stats::Verdict;
+    REQUIRE(crispasr_wm_stats::kFramesDetected == 0.65f);
+    REQUIRE(crispasr_wm_stats::classify_frames(0.66f) == V::Detected);
+    REQUIRE(crispasr_wm_stats::classify_frames(0.65f) == V::Inconclusive);
+    REQUIRE(crispasr_wm_stats::classify_frames(0.51f) == V::Inconclusive);
+    REQUIRE(crispasr_wm_stats::classify_frames(0.50f) == V::NotDetected);
+    REQUIRE(crispasr_wm_stats::classify_frames(0.0f) == V::NotDetected);
+}
+
+TEST_CASE("the binomial null is not applied to the per-frame score", "[unit][compliance]") {
+    // 0.75 is 24/32 under the sign test — p < 0.01, so "Detected". Under the
+    // per-frame statistic it is simply a confidence above the bar. Both say
+    // Detected here, but for different reasons; the point is that the two
+    // classifiers are distinct entry points so a caller cannot silently run the
+    // binomial tail over a score that has no n.
+    using V = crispasr_wm_stats::Verdict;
+    REQUIRE(crispasr_wm_stats::classify(0.75f, 32) == V::Detected);
+    REQUIRE(crispasr_wm_stats::classify_frames(0.75f) == V::Detected);
+    // Where they genuinely disagree: 0.60 is 19/32, p ~ 0.19 -> Inconclusive
+    // under the sign test, and below the calibrated bar -> Inconclusive here.
+    // But 0.55 is 18/32 (p ~ 0.30, NotDetected) while the per-frame scale puts
+    // 0.55 above chance -> Inconclusive. Different scales, different answers.
+    REQUIRE(crispasr_wm_stats::classify(0.55f, 32) == V::NotDetected);
+    REQUIRE(crispasr_wm_stats::classify_frames(0.55f) == V::Inconclusive);
+}

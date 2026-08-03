@@ -731,47 +731,88 @@ the model is the operator's choice and its provider's responsibility (§7).
 
 ### 6.7 Reading `--detect-watermark` (it is a diagnostic, not proof)
 
-The built-in spread-spectrum detector is a **sign-agreement test** over 32
-pseudo-random spectral bins. On audio with no watermark each bin is a coin
-flip, so the score is `Binomial(32, 0.5) / 32` — it averages **0.5, not 0**.
+The built-in detector answers two questions about the spread-spectrum comb, and
+a mark has to answer both:
 
-The verdict used to be `score > 0.65 => "AI-GENERATED WATERMARK DETECTED"`.
-That bar is 21/32 agreements, which clean audio reaches by chance **5.5% of the
-time** — about one unwatermarked file in eighteen was reported as watermarked,
-in the confident past tense. Measured on real speech (55 clips from
-`samples/*.wav`): 4.8% false positives, matching the theory.
+* **Consistency** — is the comb's excess over its spectral neighbours steady
+  across frames? A one-sample *t* over the per-frame readings.
+* **Specificity** — is that specific to *our* pattern, or would any pattern
+  score as well on this audio? The same statistic for 15 decoy sign patterns
+  over the same bins, from keys never embedded with, standardised by their
+  median and MAD.
 
-It now reports the exact probability of reaching that score without a
-watermark, and asserts detection only at **p < 0.01**:
+Neither alone works. On a stationary tone a raw *t* of 11.4 means nothing
+because every decoy scores just as extremely — only the specificity check
+separates them. But specificity alone rejects real marks at 44.1 kHz, where the
+comb sits in a low-energy region and the decoy spread grows.
 
 | Verdict | Condition |
 |---|---|
-| `AI-GENERATED WATERMARK DETECTED` | p < 0.01 (≥ 24/32 bins) |
-| `INCONCLUSIVE` | p < 0.20 — leaning positive, not evidence |
+| `AI-GENERATED WATERMARK DETECTED` | confidence > 0.65 (both bars met) |
+| `INCONCLUSIVE` | above chance, below the bar |
 | `No watermark detected` | consistent with unwatermarked audio |
 
-**Raising the bar cannot make this instrument strong**, and the docs should not
-pretend otherwise. Measured true-positive rate on freshly watermarked speech:
+#### What this replaced, and why
 
-| clip length | > 0.65 (p = 5.5%) | > 0.71875 (p = 1.0%) |
+Until 2026-08-03 the detector was a **sign-agreement test**: it averaged the
+spectrum over all frames, compared 32 bins against their neighbours, and scored
+each `+1`/`-1` by the *sign* of the difference, discarding its size. Under the
+null that is a coin flip per bin, so the score averaged 0.5 (not 0) with a
+standard deviation of `sqrt(32)/(2*32)` = 0.088 — leaving the 0.65 threshold
+just 1.7 sigma above chance.
+
+We answered that honestly, by reporting an exact binomial p-value and asserting
+detection only at p < 0.01. But a p-value can only **trade** the two error
+rates, never remove them, and the trade was brutal: at p < 0.01 the
+true-positive rate on 1 s clips fell to 18%.
+
+CrispTTS hit the same defect independently and replaced the *statistic* instead.
+Two things make the new form better: it keeps the **magnitude** of each
+difference rather than only its sign, and its sample count is the number of
+**frames** — hundreds to thousands — rather than 32.
+
+Measured here on 1265 one-second clips of genuinely unmarked human speech
+(VoxConverse dev + JFK, native 16 kHz), scored against the same clips after the
+**unchanged** embedder marked them (`tools/watermark_detect_ab.cpp`):
+
+| clip length | sign FP / TP | per-frame FP / TP |
 |---|---|---|
-| 1.0 s | 78% | 18% |
-| 2.5 s | 86% | 43% |
-| 5.0 s | 80% | 40% |
-| 10.0 s | 100% | 60% |
+| 1.0 s | 5.2% / 68.6% | **0.9% / 97.0%** |
+| 2.5 s | 5.1% / 79.8% | **1.4% / 100.0%** |
+| 5.0 s | 4.0% / 88.0% | **2.0% / 100.0%** |
+| 10.0 s | 4.9% / 100.0% | **3.3% / 100.0%** |
 
-So more clips now land in `INCONCLUSIVE` — which is the correct answer, because
-the detector genuinely cannot tell. Two consequences worth internalising:
+Better on **both** error rates at every clip length, which is why it is the
+default. Both columns are at the same 0.65 threshold; the sign test's 4-5% false
+positives reproduce its documented 4.8%, which is what says the harness is
+measuring the right thing.
 
-- **A negative result is not evidence the audio is human-made.** It is mostly
-  evidence the clip was short.
-- **Use `--watermark-model auto` (AudioSeal) when the answer matters.** That is
-  the sensitive detector; its score is a probability, so the p-value bands above
-  do not apply to it and are not used.
+`CRISPASR_WATERMARK_DETECT=sign` restores the old statistic for A/B and for
+re-reading a score the way an older release reported it. The p-value is printed
+only on that path — the per-frame score is a calibrated confidence with no bin
+count, so quoting a binomial tail over it would invent an `n` that was never
+scored.
 
-None of this affects *marking*: embedding is unconditional and the watertight
-floor (§6.1) does not consult the detector. This is about not overclaiming when
-reading a file back.
+#### What is still true
+
+* **The embed is unchanged.** Audio marked by any earlier CrispASR release —
+  and by CrispTTS and Susurrus, which share the comb — still verifies. Changing
+  the embed to suit a detector would break that, and it is a release-blocking
+  property.
+* **A negative result is not evidence the audio is human-made.** It is evidence
+  that this comb was not found. Someone who never marked their audio, or who
+  stripped the mark, produces the same reading.
+* **`--watermark-model auto` (AudioSeal) is still the sensitive detector** when
+  the answer matters. Its output is a probability on its own scale; neither the
+  binomial bands nor the per-frame bands apply to it.
+* **None of this affects *marking*.** Embedding is unconditional and the
+  watertight floor (§6.1) does not consult the detector, so a detector error
+  here is a reading error and nothing else. That is worth stating because it is
+  not free: CrispTTS verifies after embedding and deletes the output when
+  verification fails, which makes a false negative destroy a user's file. We
+  deliberately do not couple the two — the detector's accuracy improving is a
+  reason to trust the *diagnostic* more, not a reason to start gating delivery
+  on it.
 
 ---
 
@@ -810,7 +851,7 @@ original providers, not with a downstream requantizer. Model cards in
 | Multi-voice **banks** (cosyvoice3 `voices.gguf`) | Every entry is a baked clone | `voice_bank_path()` on all 4 surfaces; per-entry stamp; `test-compliance-wiring` |
 | Voice-pack baking (`--make-ref` + all 5 Python bakers) | The cloning step itself | `--i-have-rights`; stamps `crispasr.voice.cloned_from_recording` |
 | Voice upload (`POST /v1/voices`) | Enrollment = the cloning step | `consent_attestation`; `[CONSENT] scope=voice-upload` |
-| `--detect-watermark` | Diagnostic, **not** a gate | reports an exact p-value; "DETECTED" needs p < 0.01 (§6.7) |
+| `--detect-watermark` | Diagnostic, **not** a gate | per-frame *t* + decoy specificity; "DETECTED" needs both bars, confidence > 0.65 (§6.7) |
 | Speech restoration / upscaling / S2S | **Art. 50(2)** — marked | watermark via S2S path, same per-response floor |
 | **LLM chat** (endpoint, `crispasr-chat`, C ABI, Flutter) | **Art. 50(2) synthetic text + 50(1) interaction** | response headers + `crispasr_chat_ai_disclosure_text()`; **text marking stays a weak, partly deployer duty (§6.6)** |
 | Session-scoped diarization | Not biometric identification | embeddings discarded, no names |

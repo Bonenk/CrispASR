@@ -2954,6 +2954,16 @@ catch_discover_tests(test-voice-clone-policy
     PROPERTIES LABELS "unit"
 )
 
+# ─── watermark-detect-ab — measurement harness, NOT a ctest test.
+# Produces the FP/TP table that decides which detection statistic ships as the
+# default. Deliberately not registered with catch_discover_tests: it needs a
+# corpus of real unmarked speech that the repo does not carry, and a harness
+# whose verdict depends on which wavs are lying around must never gate CI.
+# Usage: build/bin/watermark-detect-ab <wav>...  (see the file header for the
+# two corpus rules — no already-marked audio, no upsampled clips).
+add_executable(watermark-detect-ab ${PROJECT_SOURCE_DIR}/tools/watermark_detect_ab.cpp)
+target_include_directories(watermark-detect-ab PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
 # ─── test-no-emotion-recognition — CrispASR ships no voice-based emotion
 # inference on any surface. SenseVoice-Small is upstream an emotion classifier
 # too; we parse its `<|HAPPY|>` marker only to strip it. Shipping the capability
