@@ -1,5 +1,70 @@
 # CrispASR — Pending work
 
+## Start here
+
+Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
+`LEARNINGS.md`.
+
+**Before you pick something up:** re-read this section on `origin/main`, add a
+`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+to main before you start**. Several agents run here at once; a claim that lands
+with the work is a claim that did nothing. Delete it when the work lands, or if
+it goes stale for more than a day.
+
+### Ready to take — scoped, unblocked, nobody on them
+
+| # | Task | Size | Where |
+|---|---|---|---|
+| 1 | **Delete the duplicated fallback copies** instead of keeping 14 files in sync | M | §"OPEN follow-ups from #300 / #308" item 3 |
+| 2 | **`CAP_PUNCTUATION_NATIVE` audit** for `lfm2-audio`, `fastconformer-ctc`, `wav2vec2` | S | same section, item 2 |
+| 3 | **#326 speaker-count estimator** — the last diarization accuracy item | M | §"NOW — #326" |
+| 4 | **VAD + mel front-end parallelization** — remaining backends | M | §"NOW — VAD + mel" |
+| 5 | **Diff harness: per-step talker logits** — validates the sampler over verified logits | M | §"Diff-harness extensions" |
+| 6 | **Diff harness: replay-token dual-mode** — makes sampling-dependent stages diff deterministically | M | §"Diff-harness extensions" |
+
+### Blocked, and on what
+
+| Task | Blocked by |
+|---|---|
+| **Stamp the kartoffel repos** (§below) | Disk. `/Volumes/backups` has ~1.8 GB free of 1.9 TB; `ai/cache` alone is 347 GB. Needs ~15 GB. Everything else it needs is built and proven. |
+
+### Machine state a newcomer will trip over
+
+- **Disk is effectively full** (above). It is also a hazard: several agents build
+  here concurrently and a full disk kills processes rather than failing cleanly.
+- **Load spikes to 100+.** Time-based test assertions and tight ctest timeouts
+  fail here for reasons that have nothing to do with the code. A `TIMEOUT` is a
+  backstop against a hang, not an assertion about speed — size it for the worst
+  machine, not the median one.
+- **Worktrees need `git submodule update --init --recursive ggml
+  third_party/c2pa-audio`.** `ggml` is a submodule, so a fresh worktree has it
+  empty and cannot configure, let alone build.
+- **`ls build/src/libcrispasr*.dylib | head -1` picks a STALE versioned dylib.**
+  Use `ls -t`. Two binding-parity tests "failed" on this until the tell was
+  noticed: another agent's brand-new symbol was missing too.
+
+### Conventions worth knowing before you write a test
+
+Earned the hard way; each cost a real bug getting through.
+
+1. **A gate CI cannot run is a gate that ships wrong.** Compliance and policy
+   logic belongs in weight-free headers with unit tests, not only behind a live
+   server.
+2. **Prove the gate can go red.** Re-introduce the thing it forbids and watch it
+   fail. Every guard in `tests/test-compliance-wiring.cpp` and
+   `tests/test-copies-in-sync.cpp` was verified this way — and that pass has
+   caught more broken *tests* than broken code.
+3. **Assert the token that only exists when the behaviour does.** Never one that
+   also appears in prose, a help string, a comment, or an unrelated function.
+   Four separate guards passed while the behaviour was gutted because they
+   matched a substring that survived.
+4. **Guard the joins, not just the predicate.** Every compliance failure in this
+   repo's history happened while the pure predicate tests were green: missing
+   call sites, unstamped bakers, ungated endpoints.
+5. **A hand-maintained list needs a machine check that it is complete.** The
+   copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
+   missing one.
+
 ## NOW — #326 diarization: the count estimator is the last accuracy item
 
 Landed: parallel 60 s chunked pyannote inference (e517273d), the `SPK_MASK`
@@ -55,24 +120,6 @@ Two separate threads, and it matters not to conflate them:
      Diagnose separately; a count fix cannot touch it.
 
 GATE for any count change: mean DER must beat 7.81% AND mesob must not regress.
-
-## DONE 2026-08-03 — the parler registry pointed at a tokenizer-broken file
-
-Not a duplicate-file cleanup, which is what the entry below assumed. The two
-name prefixes in `cstr/parler-tts-mini-v1.1-GGUF` hold **byte-identical
-tensors** (741/741 verified) and differ by exactly one KV, +32 bytes:
-
-    parler-tts-mini-v1.1-*   has  parler.tokenizer.is_bpe = true
-    parler-mini-v1.1-*       LACKS it
-
-`src/parler_tts.cpp:493` reads that key with a default of **false**, and false
-means "Viterbi unigram" instead of "BPE merge" — a different prompt tokenizer,
-so different tokens and different speech.
-
-**The registry names the file that is missing it** (`parler-mini-v1.1-q8_0.gguf`,
-`crispasr_model_registry.cpp:1163`), so `-m auto` downloads the one that
-tokenizes wrongly. Fixing the registry to the `parler-tts-` names, then removing
-the stale set.
 
 ## OPEN 2026-08-03 — stamp the kartoffel repos (needs ~15 GB free; this box has 11)
 
@@ -136,99 +183,6 @@ It asks `crispasr --print-speaker-identity` per file and skips unknowns, so no
 verdict is restated. Verify tensors are byte-identical afterwards with a RAW
 BYTE comparison — `np.array_equal` returns False whenever NaNs are present and
 will report a good file as corrupt.
-
-## RESOLVED 2026-08-03 — fastpitch F16: it was two tensors, not the runtime
-
-I filed this as "the runtime cannot execute an F16 build". Wrong. The abort is
-`ggml_metal_op_bin` asserting `src[1]->type == GGML_TYPE_F32` — ggml's Metal
-binary ops require the SECOND operand to be F32 — and `enc.pos_emb` /
-`dec.pos_emb` are added straight to the hidden state
-(`ggml_add(x, pos_slice)`, fastpitch_tts.cpp:539 and :711). The converter's
-`ndim >= 2 -> F16` rule caught them.
-
-Keeping those two F32 makes f16 work: synthesises in 6.71 s against q8_0's
-6.72 s, ASR-round-trips clean. The rule to remember is narrower than "no F16
-here" — **a matmul weight may be F16; an addend may not.**
-
-`cstr/fastpitch-en-GGUF`'s f16 is restored and correct. The `--ftype f16`
-refusal added a few hours ago is removed, along with its override flag.
-
-## RESOLVED 2026-08-03 — cstr/fastpitch-en-GGUF: the F16 weights were ~944k NaNs
-
-Found while stamping the published GGUFs (below); **not** caused by that — the
-NaNs are in the file as downloaded from HF, and the stamped copy is byte-identical.
-
-    fastpitch-en-f16.gguf     943,872 NaNs across 138 tensors
-    fastpitch-en-q4_k.gguf              0
-    fastpitch-en-q8_0.gguf              0
-
-Only the F16 variant. The quantized ones derive from the same upstream weights
-and are clean, so the source is fine and the **F16 write path is broken** — or
-that file was produced by a different route than the other two.
-
-138 tensors is not a stray denormal: it is `dec.layer.*.attn.{out,qkv}.weight`
-and `dec.layer.*.ffn.conv{1,2}.weight` across the decoder stack. Whatever wrote
-it corrupted a whole class of tensors.
-
-**Do not just requantize from the F16** — check `models/convert-fastpitch-to-gguf.py`'s
-`--outtype f16` path against the q8_0 path first, then re-publish. Worth an ASR
-round-trip on output from the F16 file to see whether it produces audio at all;
-if it does, that is a second question (NaNs that never reach the output).
-
-Nobody would have noticed from the model card: the repo README recommends q8_0.
-
-## DONE 2026-08-03 — stamping speaker_identity into the published cstr/ GGUFs
-
-**Landed.** 25 files across 5 repos, verified live from HF.
-
-| repo | files | verdict |
-|---|---|---|
-| `cstr/kokoro-voices-GGUF` | 7 | per pack: `df_eva`/`dm_bernd` real_person, rest synthetic |
-| `cstr/piper-voices-GGUF` | 10 | real_person |
-| `cstr/piper-en_US-lessac-medium-GGUF` | 1 | real_person |
-| `cstr/fastpitch-en-GGUF` | 3 | real_person |
-| `cstr/bananamind-tts-GGUF` | 4 | real_person |
-
-Every file: tensor data byte-identical to what was published, no KV lost, the
-verdict's evidence recorded in `crispasr.voice.speaker_identity_evidence`.
-
-Proven behaviourally before uploading, not just structurally — synthesis with a
-stamped `df_eva` and ASR round-trip:
-
-    df_eva       5.47s  "This audio was generated by artificial intelligence." + text
-    df_victoria  2.70s  text only
-
-and the point of stamping, with the file renamed so the name table cannot match:
-stamped -> `real_person`, unstamped -> `unknown`.
-
-**Still unstamped, deliberately:** `bark` and `melotts` (providers do not
-document preset provenance — four and three primary sources checked), and the
-large `parler` / `csm` / `kartoffel` repos, whose verdicts are recorded in the
-table and which are bandwidth-bound rather than blocked.
-
-**What.** Everything CrispASR has published to `cstr/*` on HF predates the
-`crispasr.voice.speaker_identity` stamp, so the runtime falls back to matching
-on the checkpoint FILE NAME (`crispasr_speaker_identity_models.h`). That
-fallback fails safe — a rename resolves to `unknown` and warns — but it is a
-fallback, and rule 3 says not to classify by filename. Stamping the published
-files retires it for everything already out there.
-
-**How.** `models/stamp-published-voices.sh <dir>` asks
-`crispasr --print-speaker-identity` per file (the same resolution the Art. 50(4)
-disclosure gate runs) and skips anything that resolves to `unknown`. No verdict
-is restated in a script; there is one source of truth and it is the binary.
-
-**Scope.** Voice packs and single-speaker checkpoints whose verdict is
-established — `cstr/kokoro-voices-GGUF` (7 packs), `cstr/piper-*`,
-`cstr/fastpitch-en-GGUF`, `cstr/bananamind-tts-GGUF`,
-`cstr/parler-tts-mini-v1.1-GGUF`, `cstr/csm-1b-GGUF`,
-`cstr/kartoffel-orpheus-3b-german-{natural,synthetic}-GGUF`. NOT `bark` or
-`melotts`: their providers do not document preset provenance, both were checked
-against four and three primary sources respectively, and writing a guess is the
-one error that silently removes a disclosure.
-
-**Touches:** HF repos under `cstr/` (upload only), `hf_readmes/*.md`. Does not
-touch runtime code — the reader and the tables already shipped (`64c9de2e`).
 
 ## Why not the hash-chained log the sibling projects built
 
@@ -307,17 +261,37 @@ to counsel before it appears in a compliance claim.
    is an LLM decoder and is the likely one to need the flag. Method:
    `FIREREDPUNC_DEBUG=1 … | grep PUNCDBG` and read `in=` — do NOT use
    `--no-punctuation`, it strips after the fact and inverts the answer.
-3. **`src/fireredpunc.cpp` vs `crisp_punc/` duplication — DONE 2026-08-03.**
-   `tests/test-punc-copies-in-sync` covered 1 of the 14 files that exist twice.
-   Extending it to all 14 found two already drifted: `src/pcs.cpp` was missing
-   the `__has_include("imatrix.h")` hook and the `PCS_DUMP_LOGITS` dump (32
-   lines — while the shared copy's own comment read "Do NOT let this file
-   diverge between the two repos"), and `src/lid_cld3.cpp` spelled out the
-   std::map that `gguf_loader.h:107` asks copies to declare as
-   `core_gguf::tensor_map`. Both synced. The test now also asserts the pair LIST
-   is complete, so a newly duplicated file cannot be silently unguarded — that
-   was how pcs.cpp stayed uncovered. Deleting the fallbacks outright is still
-   unclaimed and is the better long-term answer.
+3. **Delete the duplicated fallback copies** (READY — this is "Ready to take" #1).
+
+   Fourteen `.cpp`/`.h` files exist twice: once in `crisp_punc/src`,
+   `crisp_lid/src`, `crisp_truecase/src` (what the shared libraries build, and
+   what CrispEmbed consumes via `add_subdirectory`) and once in `src/` (what
+   `src/CMakeLists.txt` builds when those directories are absent from a
+   checkout). They are the same implementations twice.
+
+   `tests/test-copies-in-sync.cpp` now makes the duplication *safe* — it byte-
+   compares all 14 pairs and asserts the pair list is exhaustive — but safe is
+   not the same as gone. Two copies had already drifted before that test existed
+   (see HISTORY 2026-08-03), and #308's capitalisation fix was dead code for
+   months for the same reason.
+
+   **The task:** make the fallbacks unnecessary, then remove them.
+
+   - Find out whether a partial checkout without `crisp_punc/`, `crisp_lid/`,
+     `crisp_truecase/` is still a real distribution mode. `src/CMakeLists.txt`
+     branches on their absence — check whether anything actually ships that way,
+     or whether the submodules are always present now.
+   - If nobody needs it: delete the `src/` copies, drop the CMake fallback
+     branches, and delete `tests/test-copies-in-sync.cpp` with them. A guard for
+     a hazard that no longer exists is dead weight.
+   - If someone does need it: the copies must stay, and so must the test.
+     Say who needs it, in this file, so the next person does not re-derive it.
+
+   **Do not** simply delete the `src/` copies and see if the build goes green —
+   the fallback branch only compiles when the shared directories are *missing*,
+   so a normal build will pass either way. Test by moving the three directories
+   aside and configuring from clean.
+
 
 ## OPEN follow-ups from #316 (kokoro G2P, landed 2026-07-28)
 
@@ -582,22 +556,9 @@ _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
 **Still open:** Upstream the ggml empty-key fix to ggml-org (outbound public PR, left for a human)
 
-## DONE 2026-08-03 — #329 target language, reachable from every binding
+## Diff-harness extensions (detail for "Ready to take" #5 and #6)
 
-`crispasr_session_set_tts_reference_language` shipped in the C ABI + Python +
-Rust with the #329 fix (`14be8056`); Go, C#, Java, Ruby, JS and Dart had the
-sibling `set_target_language` but not this one, so cross-lingual cloning was
-reachable from them only implicitly. Closed in `76c30f9c`, mirroring each
-binding's own setter (the `e49b292f` speaker_identity pattern).
-
-Nothing was blocked meanwhile: those bindings could already reach cross-lingual
-via `set_source_language` + `set_target_language`, because the session reads
-source as the reference language whenever target is set. Full write-up in
-`docs/issue-329/PLAN.md`.
-
-## Scoped next items (for a new agent picking up)
-
-The qwen3-tts CP_DIRECT fused graph (#245) and the defaults-audit generalisation are DONE — see HISTORY. Genuinely-open items below.
+Both validate the TTS port against the Python reference. Neither is claimed.
 
 ### Diff-harness extension: per-step talker logits (#1, GPU-preferred)
 
@@ -614,93 +575,6 @@ The qwen3-tts CP_DIRECT fused graph (#245) and the defaults-audit generalisation
 **How:** (a) Python dumper captures `sampled_token_ids` as a 1D int32 tensor in the reference GGUF; (b) C++ diff harness reads them and feeds the backend's step function instead of sampling; (c) compare downstream stages (codec, vocoder) vs the Python reference that used those tokens.
 
 **Files:** `tools/reference_backends/<tts_backend>.py` + `crispasr_diff_main.cpp`.
-
-### #227 — VAD info reuse — DONE (CLI: feat/vad-export-import; server: feat/server-vad-reuse)
-
-**What:** Run ASR multiple times on the same audio with different backends without re-computing VAD — expose VAD segment boundaries for reuse.
-
-**Shipped:** `--vad-export FILE` writes the computed slice boundaries as JSON;
-`--vad-import FILE` reads them instead of running VAD (skips the VAD model
-entirely). Serializer/parser live in the library (`crispasr_serialize_vad_slices`
-/ `crispasr_parse_vad_slices` in `src/crispasr_vad.{h,cpp}`) so they're
-unit-tested and reusable; CLI wiring in `examples/cli/crispasr_run.cpp` +
-`cli.cpp` + `whisper_params.h`. Import clamps to the current buffer, drops
-out-of-range slices, and rescales when the sample rate differs. Unit test
-`tests/test-vad-boundaries.cpp` (6 cases, round-trip + tolerant-parse +
-malformed-reject). Verified e2e: `--vad-export` then `--vad-import` on jfk.wav
-(moonshine-tiny) → byte-identical transcript, VAD skipped. Documented in
-`docs/cli.md`.
-
-**Server surface also DONE** (multi-surface trap — `do_transcribe` has its own
-slice loop). File paths would be an arbitrary read/write on the server host, so
-the HTTP mapping is inline: `vad_export=true` returns the boundaries in the
-response under `vad_segments`; `vad_import=<that object>` reuses them and skips
-VAD. Same wire format as the CLI's files (both go through the shared
-`crispasr_{serialize,parse}_vad_slices`), so boundaries are interchangeable
-between CLI and server. Opt-in — no `vad_segments` field unless requested.
-Verified live (`crispasr --server --backend moonshine` + curl): `vad_export=true
-chunk_seconds=4` → 4 slices returned; feeding them back via `vad_import` →
-identical transcript + same 4 segments; malformed → `invalid_request_error`; no
-flag → no field. Documented in `docs/server.md`.
-
-## Backend-wiring audit — blind spot CLOSED (2026-08-03, `79d758c6`)
-
-`tools/check-backend-wiring.py` now checks two directions: every CLI backend
-has its c_api/factory/matrix wiring, and every backend the c_api ADVERTISES is
-reachable from the CLI. A backend in **neither** list is still invisible to
-both — which is exactly how mel-band-roformer stayed session-unreachable while
-being the default `--separate` model (fixed in 4eccc60cb).
-
-**PARTLY CLOSED (2026-07-20)** by a third check: declared backends vs symbols
-actually present in the built `libcrispasr.dylib`. Symbol presence is ground
-truth, so it has no alias false positives — 0 violations across the 63 backends
-that map to a runtime header, versus 21/76 noise from name-matching. It catches
-the state mel-band-roformer was in once registered (in `--list-backends`, but
-its object dropped by the linker), proven by removing the c_api arm and
-watching the audit fail. Demangle first: C++-linkage runtimes like `sidon` only
-appear as `__Z20sidon_init_from_file...`.
-
-**CLOSED (2026-08-03)** by the fourth check — the `src/*.h` declares
-`<x>_init_from_file` signal, made gateable by `tools/backend-components.txt`.
-The allowlist was the actual work, exactly as predicted: each component named
-once, with its consumer, so "this is a sub-module, not a backend" is a recorded
-decision instead of a silent omission.
-
-Measured at close: **20 of 82 stems unmatched**, every one probed against the
-binary rather than classified by name.
-- **3 are REAL backends under an alias** (`canary-ctc`, `irodori-tts`,
-  `t5-translate`) — deliberately NOT allowlisted, because `cli_resolves()`
-  already asks the binary and allowlisting would hide a regression if an alias
-  broke.
-- **17 are genuine components** — parent-driven codecs, the voice-conversion
-  stages, the two text-LID models behind `crispasr_text_detect_language`,
-  granite's sub-runtimes, audioseal, ma_sound. `openvoice2` looked like a
-  candidate backend until grep showed melotts drives it as a tone-color
-  converter.
-- **0 genuine orphans**, so it ships REQUIRED (fails the run), not advisory.
-
-Verified it can go RED, not just green: removing `openvoice2` from the allowlist
-names it and exits 1; restoring it exits 0.
-
-**Advisory tier cleaned up too (2026-08-03).** The run reported 4 advisory gaps;
-investigating each showed **3 were the audit's own false positives**. Prose names
-a backend the way a reader would — `crepe` appears as "CREPE", `tabcnn` as
-"TabCNN", `beat-this` as "Beat This!" — and the README check was a raw
-case-sensitive substring test, so it called three documented backends
-undocumented (they are under `--pitch`, `--tab`, `--beats`). Three noise out of
-four is exactly the ratio that teaches people to ignore an audit, which is what
-this whole section exists to avoid. The match now normalises case and separators
-on both sides; probed against fabricated names to confirm it did not simply go
-blind. The 4th, **kokoro missing from `tests/env-live-tests.sh`, was real** —
-`test-kokoro-g2p-live.sh` reads `CRISPASR_KOKORO_MODEL`/`_VOICE` and silently
-skips without them, so the G2P path that used to drop numbers was never
-exercised by a `source tests/env-live-tests.sh` run. Advisory gaps: 4 → 0.
-
-The other candidate signal — registry keys not matching a backend name, **103 of
-196** — remains too noisy and is still NOT shipped. Most are legitimate model
-variants (`crepe-tiny`, `btc-chords-majmin`, the fastconformer-aligner language
-set, component GGUFs). It would need its own allowlist to be worth anything, and
-that one is 100+ entries rather than 17.
 
 ## Delivery bugs found by CometBeat against the released v0.8.17 dylib (2026-07-20)
 
