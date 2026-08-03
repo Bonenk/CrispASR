@@ -595,6 +595,14 @@ direction where being wrong removes a disclosure.
    file-name table for good. `unknown` is deliberately not writable: absence of
    the key *is* unknown, and writing it would turn "nobody established this"
    into a claim the file makes about itself.
+
+   Seven converters accept `--speaker-identity` (`convert-orpheus`,
+   `convert-kokoro-voice`, `convert-piper`, `convert-fastpitch`,
+   `convert-bananamind-tts`, `convert-parler`, `convert-csm`). They share one
+   definition of the flag and the key — `models/_speaker_identity_arg.py` —
+   because seven hand-written copies would be seven chances for one to drift
+   from `crispasr_voice::speaker_identity_key()`, and a drift **fails open**:
+   the stamp is simply never found and nothing errors.
 2. **The table** — the legacy fallback for everything published before the
    stamp existed, matching on the checkpoint file name.
 

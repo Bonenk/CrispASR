@@ -39,13 +39,11 @@
 // test-csm-params found immediately. The impl is `inline`, so this adds no link
 // dependency at all.
 //
-// LAYERING SMELL, stated rather than hidden: a marking primitive that src/ needs
-// lives under examples/cli/. src/crispasr_c_api.cpp reaches it the same way, so
-// this follows the existing precedent instead of inventing a second one — but
-// the right home is src/core/, next to crispasr_c2pa.h. Moving it is a
-// mechanical change across ~6 includers and is deliberately not bundled into a
-// compliance fix.
-#include "../examples/cli/crispasr_watermark.h"
+// The header lives in src/core/ next to crispasr_c2pa.h, which is where marking
+// primitives belong. It used to live under examples/cli/, so src/ reached into
+// the examples tree to find it — this call site was the second instance of that
+// inversion and the reason it got moved.
+#include "core/crispasr_watermark.h"
 
 #include "ggml-backend.h"
 #include "ggml-cpu.h"

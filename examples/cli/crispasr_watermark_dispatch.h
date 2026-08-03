@@ -9,7 +9,7 @@
 #pragma once
 
 #include "audioseal.h"
-#include "crispasr_watermark.h"
+#include "core/crispasr_watermark.h"
 
 #include <cstdio>
 #include <cstdlib>

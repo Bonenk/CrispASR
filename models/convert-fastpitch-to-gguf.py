@@ -44,6 +44,13 @@ from pathlib import Path
 
 import numpy as np
 
+# EU AI Act Art. 50(4): whose voice this checkpoint's preset speakers are.
+# Shared with every other converter so the metadata key cannot drift — a drift
+# fails OPEN (the stamp is simply never found) and nothing errors.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _speaker_identity_arg import add_speaker_identity_arg, stamp_speaker_identity
+
+
 try:
     from gguf import GGUFWriter, GGMLQuantizationType
 except ImportError:
@@ -654,6 +661,7 @@ def main():
                         help="Weight storage type")
     parser.add_argument("--use-nemo-api", action="store_true",
                         help="Use NeMo model API instead of direct .nemo loading")
+    add_speaker_identity_arg(parser)
     args = parser.parse_args()
 
     # ── Load FastPitch ──
@@ -728,6 +736,7 @@ def main():
     # ── Write GGUF ──
     print(f"\nWriting GGUF: {args.output}")
     writer = GGUFWriter(str(args.output), arch="fastpitch")
+    stamp_speaker_identity(writer, args)
 
     # KV metadata
     writer.add_uint32("fastpitch.n_mel_channels",
