@@ -2956,6 +2956,22 @@ catch_discover_tests(test-voice-clone-policy
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-speech-window — PR #330's min/max speech-token window arithmetic.
+# Pure policy (examples/cli/crispasr_speech_window.h): no model, no audio, so
+# the "can this window actually be delivered" reasoning is guarded on the tier
+# CI runs. The decode loop itself is covered by the moss live tests.
+add_executable(test-speech-window test-speech-window.cpp)
+target_include_directories(test-speech-window PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-speech-window PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-speech-window
+    TEST_SPEC "[pr330]"
+    PROPERTIES LABELS "unit;pr330"
+)
+
 # ─── watermark-detect-ab — measurement harness, NOT a ctest test.
 # Produces the FP/TP table that decides which detection statistic ships as the
 # default. Deliberately not registered with catch_discover_tests: it needs a
