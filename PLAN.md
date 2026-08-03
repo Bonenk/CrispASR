@@ -149,39 +149,6 @@ one error that silently removes a disclosure.
 **Touches:** HF repos under `cstr/` (upload only), `hf_readmes/*.md`. Does not
 touch runtime code — the reader and the tables already shipped (`64c9de2e`).
 
-## CLAIMED 2026-08-03 — port CrispTTS Phase 28's watermark detector statistic
-
-**Another agent: do not start this one.** Worktree
-`.claude/worktrees/fix-324-vad-diarize-gaps`. Delete this section when it lands,
-or if it goes stale for more than a day.
-
-**Why.** `crispasr_watermark_stats.h` scores the spread-spectrum mark by the
-SIGN of each of 32 bins' excess over its neighbours. Under the null that is a
-coin flip per bin, so we answered it with an exact binomial p-value and a
-three-way verdict — honest, but it manages the weakness rather than removing
-it, and docs/eu-ai-act.md 6.7 prices it: at p < 0.01 the true-positive rate on
-1 s clips is 18%. CrispTTS Phase 28 replaced the STATISTIC instead and measured
-FP 1.9% / TP 99.4% against 8.6% / 97.0%, i.e. better in both directions at once.
-
-**Scope.** Detector only. The EMBED is untouched — that is what keeps audio
-marked by CrispASR, CrispTTS and Susurrus mutually verifiable, and it is a
-release-blocking property, not a nicety.
-
-**Touches:** `examples/cli/crispasr_watermark_stats.h`, its unit test, a
-corpus/A-B script under `tools/`, `docs/eu-ai-act.md` 6.7. Does NOT touch
-`crispasr_wm_dispatch`, the AudioSeal path, the marking floor, or any gate —
-`--detect-watermark` is diagnostic here and must stay that way.
-
-**Gate before flipping the default:** must beat the binomial path on FP *and*
-TP, including the 1.0 s column where the current one collapses to 18%. Losing
-on either => ships gated OFF with the numbers recorded, not reverted. Plus: a
-clip marked by the current embedder must still verify.
-
-⚠ Corpus trap, inherited from CrispTTS: their first "null" corpus put the null
-maximum above every positive because it contained actual watermarked output
-plus clips upsampled 16k->44.1k, whose 8 kHz spectral cliff lands inside the
-comb band. Provenance of every null clip gets checked, not assumed.
-
 ## OPEN follow-ups from #300 / #308 (landed 2026-07-27, see HISTORY)
 
 1. **C# and WASM bindings are source-only-verified.** No `dotnet` or emsdk on the
