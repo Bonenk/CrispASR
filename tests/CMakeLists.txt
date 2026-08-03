@@ -683,12 +683,19 @@ if(CRISPASR_BUILD_EXAMPLES AND NOT WIN32)
             $<TARGET_FILE:crispasr-cli>
             ${PROJECT_SOURCE_DIR}
             unit)
-    # 120s: model-free, but it is still a CLI-surface test that runs the binary
-    # four times with Silero VAD, not a Catch2 microtest. Measured 32s wall
-    # (6s CPU) on a box at load 32; CI is far less contended.
+    # 300s: model-free, but still a CLI-surface test that runs the binary four
+    # times with Silero VAD, not a Catch2 microtest. ~6s of CPU; the wall clock
+    # is entirely down to what else the machine is doing. Measured 32s at load
+    # 32, and it blew a 120s budget at load 51 — so the first number was a
+    # measurement of one moment, not a bound.
+    #
+    # This is a BACKSTOP against a hang, not an assertion about speed (Test 4
+    # inside the script makes exactly that mistake and was fixed for it). Set it
+    # generously: a timeout that fires on a busy laptop teaches people to re-run
+    # the suite rather than read it.
     set_tests_properties(test-vad-export PROPERTIES
         LABELS "unit;vad;regression-227"
-        TIMEOUT 120)
+        TIMEOUT 300)
 
     add_test(NAME test-vad-export-live
         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test_vad_export_live.sh

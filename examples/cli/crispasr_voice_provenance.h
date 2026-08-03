@@ -12,6 +12,7 @@
 #pragma once
 
 #include "core/gguf_loader.h"
+#include "crispasr_speaker_identity_models.h" // identity_for_voice_pack — legacy pack fallback
 #include "crispasr_voice_clone_policy.h"
 
 #include <filesystem>
@@ -200,6 +201,15 @@ inline CloneDecision classify_voice(const std::string& voice, const std::string&
     // Whichever source actually described this voice is the one that can speak
     // for its identity: a bank entry's own key, else the pack's.
     d.pack_identity = is_bank_entry ? bank.identity : p.identity;
+    // Legacy fallback for packs published before the stamp existed — the same
+    // role the model table plays for checkpoints. Only consulted when the pack
+    // said nothing; a stamped pack always answers for itself.
+    //
+    // This is where kokoro's answer lives: its checkpoint is a backbone, not a
+    // voice, so `--voice kokoro-voice-df_eva.gguf` is the only thing that knows
+    // you are about to hear a specific HUI narrator.
+    if (d.pack_identity == SpeakerIdentity::Unknown)
+        d.pack_identity = identity_for_voice_pack(resolved);
     return d;
 }
 

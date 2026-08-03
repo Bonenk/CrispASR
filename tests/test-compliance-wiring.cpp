@@ -157,6 +157,24 @@ TEST_CASE("a converter can write the stamp the runtime reads", "[unit][complianc
     REQUIRE(contains(conv, "if args.speaker_identity and args.speaker_identity != \"unknown\":"));
 }
 
+TEST_CASE("published GGUFs can be stamped without re-converting", "[unit][compliance]") {
+    // The stamp is only real if it can reach files that are ALREADY published.
+    // Re-converting a 3.5 GB checkpoint to add one string is a price that means
+    // it does not get done, so the answer would stay in the file-name table for
+    // good.
+    const std::string tool = read_file("models/stamp-speaker-identity.py");
+    REQUIRE(contains(tool, "IDENTITY_KEY = \"crispasr.voice.speaker_identity\""));
+    // "unknown" must not be writable: absence of the key IS unknown, and
+    // writing it would turn "nobody established this" into a claim the file
+    // makes about itself.
+    REQUIRE(contains(tool, "WRITABLE = (\"real_person\", \"synthetic\")"));
+    // GGUFReader exposes the file header as pseudo-fields; copying them emits
+    // duplicate keys. Caught by round-tripping a real file, not by reading the
+    // code — the output still loads, so nothing fails loudly.
+    REQUIRE(contains(tool, "HEADER_PSEUDO_FIELDS"));
+    REQUIRE(contains(tool, "skip = HEADER_PSEUDO_FIELDS |"));
+}
+
 TEST_CASE("declared sources combine by strongest duty", "[unit][compliance]") {
     // The rule that keeps a stale stamp from cancelling a researched verdict.
     // Guarded here as well as in the pure test because it is the kind of thing
@@ -176,10 +194,14 @@ TEST_CASE("the verdict table records its evidence", "[unit][compliance]") {
     // a cross-reference inside the orpheus branch, so matching the short string
     // stayed green with the backlog itself deleted. The red-proof caught that.
     REQUIRE(contains(src, "OPEN QUESTIONS — models whose card has NOT been read"));
-    // The conflict found while porting CrispTTS's research must stay visible:
-    // kokoro is synthetic upstream, but CrispASR's German backbone is trained
-    // on a named-narrator corpus.
+    // The conflict found while porting CrispTTS's research, and its resolution:
+    // kokoro is synthetic upstream, but CrispASR reaches HUI's named narrators
+    // through df_eva / dm_bernd. The evidence has to stay next to the verdict.
     REQUIRE(contains(src, "HUI-Audio-Corpus-German"));
+    REQUIRE(contains(src, "identity_for_voice_pack"));
+    // Each Unknown must record that the provider was CHECKED, not skipped —
+    // otherwise "unknown" stops meaning anything and gets cleared as backlog.
+    REQUIRE(contains(src, "third-party write-ups describe them as"));
     // And the cost of matching on a file name has to be stated, not hidden.
     REQUIRE(contains(src, "WHAT MATCHING ON A FILE NAME COSTS"));
 }

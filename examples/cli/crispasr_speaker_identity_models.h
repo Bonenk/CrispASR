@@ -97,20 +97,67 @@ inline SpeakerIdentity identity_for_model(const std::string& backend, const std:
     if (backend == "piper")
         return SpeakerIdentity::RealPerson;
 
-    // ── kokoro ───────────────────────────────────────────────────────────
-    // hexgrad/Kokoro-82M's voicepacks are style vectors, documented upstream as
-    // designed/blended rather than any one person.
+    // ── fastpitch ────────────────────────────────────────────────────────
+    // nvidia/tts_en_fastpitch: "This model is trained on LJSpeech sampled at
+    // 22050Hz". LJSpeech is 13,100 clips of ONE narrator — Linda Johnson,
+    // recorded 2016-17 for LibriVox — and CrispASR ships only the English
+    // single-speaker checkpoint (n_speakers=1).
     //
-    // EXCEPT the German fine-tune, which is left Unknown deliberately — see the
-    // OPEN QUESTIONS note at the bottom of this file. Its base is trained on
-    // HUI-Audio-Corpus-German, whose narrators are NAMED, and inheriting
-    // "synthetic" from the English verdict would be assuming the answer on the
-    // one variant where there is a reason to doubt it.
-    if (backend == "kokoro") {
-        if (contains_ci(model_path, "hui"))
-            return SpeakerIdentity::Unknown;
+    // NOTE this is NOT the verdict CrispTTS reached for its German NeMo
+    // FastPitch (HUI narrators). Different weights, independently checked,
+    // same answer by a different route.
+    if (backend == "fastpitch")
+        return SpeakerIdentity::RealPerson;
+
+    // ── bananamind-tts ───────────────────────────────────────────────────
+    // Banaxi-Tech/BananaMind-TTS-V2.1-Preview, both shipped variants:
+    //   en-us  LJSpeech — Linda Johnson again, the same donor as fastpitch.
+    //   de-de  "ThorstenVoice Dataset 2022.10", card credits "Voice: Thorsten
+    //          Müller" — the same donor as piper-de_DE-thorsten, reached by a
+    //          second route.
+    // The card is explicit that these are fixed recorded voices: "Fixed voices
+    // only; this is not voice cloning", "No speaker embeddings or reference
+    // audio conditioning".
+    if (backend == "bananamind-tts")
+        return SpeakerIdentity::RealPerson;
+
+    // ── parler-tts ───────────────────────────────────────────────────────
+    // Trained on LibriTTS-R and MLS — both LibriVox-derived, i.e. real
+    // volunteer narrators — and the card states it "was also trained on 34
+    // speakers, characterized by name (e.g. Jon, Lea, Gary, Jenna, Mike,
+    // Laura)" to keep speaker identity consistent across generations.
+    //
+    // Whether "Jon" is that reader's real name does not change the analysis:
+    // it is a consistent reproduction of one identifiable corpus speaker,
+    // pseudonymous exactly like VCTK's p225 or CMU ARCTIC's bdl. Classified by
+    // what the checkpoint CAN speak as, not by the safest thing an operator
+    // might prompt it for — the rule CrispTTS applied to SauerkrautTTS.
+    if (backend == "parler-tts")
+        return SpeakerIdentity::RealPerson;
+
+    // ── csm ──────────────────────────────────────────────────────────────
+    // sesame/csm-1b: "The model open sourced here is a base generation model.
+    // It is capable of producing a variety of voices, but it has not been
+    // fine-tuned on any specific voice." No preset persona to disclose.
+    //
+    // CSM's actual cloning path takes a context recording as --voice, which is
+    // a recording-reference and is caught by the CLONE gate, not here.
+    if (backend == "csm")
         return SpeakerIdentity::Synthetic;
-    }
+
+    // ── kokoro ───────────────────────────────────────────────────────────
+    // Deliberately Unknown at the MODEL level, for every checkpoint including
+    // the German HUI backbone: a kokoro model is a backbone, not a voice.
+    // CrispASR's own card is explicit — "This is a base model, not a voice. It
+    // pairs with a German voice pack". The backbone is multispeaker (HUI, 51
+    // speakers); which person you hear is decided entirely by the style pack.
+    //
+    // So the answer lives in identity_for_voice_pack() below. Returning
+    // Synthetic here — which an earlier revision did, inheriting hexgrad's
+    // English verdict — would have overridden a real-person PACK through
+    // strongest-duty resolution's weakest link: a wrong positive claim.
+    if (backend == "kokoro")
+        return SpeakerIdentity::Unknown;
 
     // ── orpheus ──────────────────────────────────────────────────────────
     // One backend, several checkpoints, different answers.
@@ -123,13 +170,22 @@ inline SpeakerIdentity identity_for_model(const std::string& backend, const std:
     if (backend == "orpheus") {
         if (contains_ci(model_path, "kartoffel-orpheus-de-natural"))
             return SpeakerIdentity::RealPerson;
-        // Everything else on this backend stays Unknown, including:
+        // The SYNTHETIC sibling is a genuinely different checkpoint: "trained
+        // on synthetic German speech with explicit emotion and outburst
+        // control" (its own card). Its four speakers — Martin, Luca, Anne,
+        // Emma — are personas over generated audio, not extracted people.
+        //
+        // Checked rather than inferred from the repo name. "synthetic" in a
+        // repo name is a naming convention, not a provenance statement, and
+        // this is the direction where being wrong removes a disclosure.
+        if (contains_ci(model_path, "kartoffel-orpheus-de-synthetic"))
+            return SpeakerIdentity::Synthetic;
+        // Everything else on this backend stays Unknown:
         //   orpheus-3b-0.1-ft   Canopy Labs disclose 100k+ h of "permissive /
         //                       non-copyrighted" audio and nothing at all about
         //                       the origin of tara, leah, jess, leo, dan, mia,
         //                       zac, zoe. HF card, GitHub repo and web checked.
         //   Orpheus-3b-German-FT (lex-au)   No training-data documentation.
-        //   kartoffel-orpheus-de-synthetic  NOT researched — see OPEN QUESTIONS.
         return SpeakerIdentity::Unknown;
     }
 
@@ -138,44 +194,85 @@ inline SpeakerIdentity identity_for_model(const std::string& backend, const std:
     return SpeakerIdentity::Unknown;
 }
 
+// Whose voice is a VOICE PACK?
+//
+// The companion to identity_for_model(), for backends where the checkpoint is a
+// backbone and the pack decides who you hear — kokoro is the case this exists
+// for. Same legacy-fallback role: a pack carrying its own
+// crispasr.voice.speaker_identity stamp answers for itself and never reaches
+// here.
+//
+// Matched on the pack file name, with the same safe failure as above: an
+// unrecognised pack falls through to Unknown and warns.
+inline SpeakerIdentity identity_for_voice_pack(const std::string& pack_path) {
+    if (pack_path.empty())
+        return SpeakerIdentity::Unknown;
+
+    // ── German packs recovered from the deleted Tundragoon/Kokoro-German ──
+    // df_eva and dm_bernd are per-speaker style packs extracted from
+    // HUI-Audio-Corpus-German, whose narrators are named — and these two carry
+    // the narrators' names. HUI is built from librivox.org recordings, so Eva
+    // and Bernd are real volunteers who read audiobooks.
+    //
+    // These are the same donors CrispTTS cites when marking the NeMo FastPitch
+    // German model real_person. The "kokoro is synthetic" verdict is right for
+    // hexgrad's English packs and wrong for these two; resolving that conflict
+    // is what moved kokoro's answer from the model to the pack.
+    if (contains_ci(pack_path, "df_eva") || contains_ci(pack_path, "dm_bernd"))
+        return SpeakerIdentity::RealPerson;
+
+    // ── kikiri German packs ──────────────────────────────────────────────
+    // df_victoria and dm_martin are fine-tunes of
+    // kikiri-german-base-51speakers-synthetic, whose card states: "Trained
+    // entirely on synthetic (TTS-generated) audio — real human recordings may
+    // improve naturalness".
+    //
+    // Their cards label the speakers "Victoria Asztaller (synthetic)" and
+    // "Martin Harbecke (synthetic)". Person-shaped names, explicitly marked
+    // synthetic by the provider, over a base with no human recordings in it.
+    if (contains_ci(pack_path, "df_victoria") || contains_ci(pack_path, "dm_martin"))
+        return SpeakerIdentity::Synthetic;
+
+    // ── hexgrad's own packs ──────────────────────────────────────────────
+    // af_heart, ef_dora, ff_siwis: Kokoro-82M's shipped style vectors,
+    // documented upstream as designed/blended rather than any one person.
+    if (contains_ci(pack_path, "af_heart") || contains_ci(pack_path, "ef_dora") || contains_ci(pack_path, "ff_siwis"))
+        return SpeakerIdentity::Synthetic;
+
+    return SpeakerIdentity::Unknown;
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // OPEN QUESTIONS — models whose card has NOT been read, or where the evidence
-// points somewhere the current verdict does not. Listed so they are picked up
-// rather than rediscovered, and so "unknown" is visibly a backlog rather than
-// an opinion.
+// points somewhere the current verdict does not.
 //
-//   kokoro-de-hui-*     CONFLICT. The sibling project CrispTTS classifies
-//                       kokoro as synthetic, and for the English voicepacks
-//                       that is right. But this project's German backbone is
-//                       `kokoro-de-hui-base`, trained on HUI-Audio-Corpus-
-//                       German — the same corpus, with the same NAMED narrators
-//                       (Bernd, Hokuspokus, Friedrich, Eva, Karlsson, Sonja),
-//                       that CrispTTS itself cites when marking the NeMo
-//                       FastPitch German model real_person. Whether a Kokoro
-//                       style vector derived from that corpus is recognisably
-//                       one of them is a real question and is not answered
-//                       here. Held at Unknown rather than inheriting either
-//                       neighbouring verdict.
+// EMPTY as of 2026-08-03: every TTS backend CrispASR ships has been checked
+// against its provider's own documentation. Kept as a section, not deleted,
+// because the next backend added starts here.
 //
-//   fastpitch           CrispASR ships fastpitch-en (NVIDIA, English, single
-//                       speaker) — NOT the German NeMo model CrispTTS marks
-//                       real_person. Different weights, so that verdict does
-//                       not port. NVIDIA's English FastPitch is conventionally
-//                       trained on LJSpeech, which is one identifiable narrator
-//                       — a strong hypothesis, deliberately not asserted here
-//                       without reading the card.
+// The seven that resolved to Unknown did so from evidence of ABSENCE, and the
+// check is recorded beside each so it is not re-litigated:
 //
-//   speecht5            CrispASR ships microsoft/speecht5_tts, whose speaker
-//                       comes from a 512-d x-vector the OPERATOR supplies via
-//                       --voice. The identity is therefore per-invocation, not
-//                       per-model, and no backend-level verdict can be right.
-//                       CrispTTS's real_person applies to a German fine-tune
-//                       with CMU ARCTIC x-vectors baked in, which is a
-//                       different model. Operators pass --speaker-identity.
+//   orpheus base (Canopy)   100k+ h of "permissive / non-copyrighted" audio
+//                           disclosed, nothing about tara/leah/jess/leo/dan/
+//                           mia/zac/zoe. HF card, GitHub and web checked.
+//   orpheus lex-au German   No training-data documentation.
+//   bark                    Suno's README documents 100+ presets and a prompt
+//                           library, and says nothing about their provenance.
+//                           NOTE: third-party write-ups describe them as
+//                           "fully synthetic"; that phrasing is not in Suno's
+//                           own README, and a summary is not a provider
+//                           statement. Held at Unknown for that reason.
+//   melotts                 MyShell's card carries no training-data statement.
+//   speecht5                Structurally unanswerable per model — the voice is
+//                           a 512-d x-vector the OPERATOR supplies via --voice.
+//                           Answer it per run with --speaker-identity.
+//   (kokoro checkpoints)    Not unknown-by-ignorance: a kokoro model is a
+//                           backbone, and the answer belongs to the pack.
 //
-//   melotts, bananamind-tts   No training-data documentation found.
-//
-//   bark, csm, parler-tts, and the rest   Not yet examined.
+// WHEN ADDING A BACKEND: read the provider's card before touching this file.
+// Unknown is the correct default and costs only a warning. Synthetic is a
+// claim, and the one that silently removes a disclosure.
 // ─────────────────────────────────────────────────────────────────────────
 
 } // namespace crispasr_voice
