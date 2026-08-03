@@ -10,8 +10,8 @@
 - **Done** — branch `feat/329-tts-target-lang`. Four defects fixed + the whole
   knob documented (it was undocumented on every surface, which is most of why
   the reporter could not find it).
-- **Not done** — a live cross-lingual A/B on real cosyvoice3 weights
-  (en reference → de output, before/after). See "Open" below.
+- **Done** — live cross-lingual A/B on real cosyvoice3 weights, en → de. See
+  "Live A/B" below.
 
 ## What was actually wrong
 
@@ -125,13 +125,59 @@ with expansion: false
 
 2 failed / 9 cases. With the fix restored: 68 assertions, 9 cases, all passed.
 
+## Live A/B — en reference → de output
+
+M1 Metal, `cosyvoice3-llm-q4_k` + `flow-q8_0` + `hift-f16` + `s3tok-f16` +
+`campplus-f16`, seed 42, `--voice samples/jfk.wav --ref-text "<JFK transcript>"
+--i-have-rights --no-spoken-disclaimer --accept-marking-responsibility`,
+text `"Der Bundeskanzler sprach gestern über die wirtschaftliche Lage in
+Europa."`
+
+Arm A is `-tl` omitted, which executes **exactly the code path a pre-fix
+`-tl de` took** — the flag resolved the reference to "unknown" and was
+discarded. Arm B is `-tl de`.
+
+| | speech tokens | duration | whisper LID | speaker cos vs ref |
+|---|---:|---:|---|---:|
+| **A** — no `-tl` (= pre-fix `-tl de`) | 262 | 10.48 s | de **0.615** | 0.778 |
+| **B** — `-tl de` (fixed) | 122 | 4.88 s | de **0.966** | 0.689 |
+| un-cloned floor (bank voice, same text) | — | 2.32 s | — | 0.436 |
+
+**The new path executes** (the thing a byte-comparison cannot prove):
+
+```
+cosyvoice3_tts: cross-lingual (voice=runtime[en] → target=de): dropping
+reference transcript + LM reference speech tokens (flow keeps them for timbre)
+```
+
+`voice=runtime[en]` is the fix itself — the Latin-script English reference
+transcript is now identified. Pre-fix that read `""` and the branch was
+unreachable.
+
+**Content survives.** Both arms round-trip to the input sentence verbatim
+(`whisper large-v3-turbo -l auto`), WER 0. The fix does not damage what is said.
+
+**Arm A renders 2.1× the speech tokens for the same sentence** — 10.48 s of
+continuously-voiced audio (per-500 ms RMS never drops to silence) for text that
+takes 4.88 s, while whisper recovers only the German sentence from it. That is
+the reference-transcript leak the cross-lingual path exists to remove, and the
+clearest hard number here.
+
+**Cloning survives the transcript drop** — 0.689 vs a 0.436 un-cloned floor, so
+dropping the LM's reference speech tokens did not throw the voice away (the flow
+still gets them for timbre, as designed).
+
+Read with care:
+
+- Arm A's *higher* 0.778 is confounded: 5.6 s of its audio is extra
+  reference-like material, which inflates a similarity score against the
+  reference. It is not evidence of a better clone.
+- Whisper's LID confidence (0.62 → 0.97) is a **proxy** for accent, not a
+  measurement of it. I did not listen to the audio.
+- One sentence, one seed, one language pair.
+
 ## Open
 
-- **Live cross-lingual A/B on real weights.** Synthesize the same German
-  sentence from an English reference with and without the fix, ASR-round-trip
-  both, and compare. The unit test proves the *predicate* flipped; only the
-  round-trip proves the audio improved (HARD RULE #3). Needs the cosyvoice3
-  bundle + a clean box.
 - Only cosyvoice3 acts on `source_lang`. If another cross-lingual cloning
   backend lands, it reads the same session field.
 - Subtitle Edit still has to surface the field; nothing here can add a menu to
