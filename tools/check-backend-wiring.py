@@ -100,6 +100,26 @@ def main():
     refs_dir = sorted(p.name for p in (ROOT / "tools/reference_backends").glob("*.py"))
     adapters = {p.name for p in (ROOT / "examples/cli").glob("crispasr_backend_*.cpp")}
 
+    # Prose names a backend the way a READER would, not the way the CLI does:
+    # `crepe` appears as "CREPE", `tabcnn` as "TabCNN", `beat-this` as
+    # "Beat This!". A raw case-sensitive substring test called all three
+    # undocumented when the README documents every one of them, under `--pitch`,
+    # `--tab` and `--beats`. Three false positives out of four advisory gaps is
+    # exactly the noise ratio that teaches people to ignore the audit.
+    #
+    # So compare case-insensitively, and also with separators removed on BOTH
+    # sides so "beat-this" finds "Beat This!". Kept as explicit variants rather
+    # than stripping the whole document once, to limit the chance of a short
+    # name matching inside an unrelated word.
+    def mentioned(haystack, name):
+        hay = haystack.lower()
+        if name.lower() in hay:
+            return True
+        if name.replace("-", " ").replace("_", " ").lower() in hay:
+            return True
+        squash = lambda t: t.replace("-", "").replace("_", "").replace(" ", "")
+        return squash(name.lower()) in squash(hay)
+
     def in_available_backends(name):
         # entries look like:  list += ",moss-transcribe";  or packed:
         # list += ",granite,granite-4.1,granite-4.1-plus";
@@ -265,7 +285,7 @@ def main():
             required_fail.append((name, req_missing))
 
         adv_missing = []
-        if name not in readme:
+        if not mentioned(readme, name):
             adv_missing.append("README")
         if not any_file_has(tests_dir, name):
             adv_missing.append("test")

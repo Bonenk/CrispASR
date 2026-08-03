@@ -690,6 +690,20 @@ binary rather than classified by name.
 Verified it can go RED, not just green: removing `openvoice2` from the allowlist
 names it and exits 1; restoring it exits 0.
 
+**Advisory tier cleaned up too (2026-08-03).** The run reported 4 advisory gaps;
+investigating each showed **3 were the audit's own false positives**. Prose names
+a backend the way a reader would — `crepe` appears as "CREPE", `tabcnn` as
+"TabCNN", `beat-this` as "Beat This!" — and the README check was a raw
+case-sensitive substring test, so it called three documented backends
+undocumented (they are under `--pitch`, `--tab`, `--beats`). Three noise out of
+four is exactly the ratio that teaches people to ignore an audit, which is what
+this whole section exists to avoid. The match now normalises case and separators
+on both sides; probed against fabricated names to confirm it did not simply go
+blind. The 4th, **kokoro missing from `tests/env-live-tests.sh`, was real** —
+`test-kokoro-g2p-live.sh` reads `CRISPASR_KOKORO_MODEL`/`_VOICE` and silently
+skips without them, so the G2P path that used to drop numbers was never
+exercised by a `source tests/env-live-tests.sh` run. Advisory gaps: 4 → 0.
+
 The other candidate signal — registry keys not matching a backend name, **103 of
 196** — remains too noisy and is still NOT shipped. Most are legitimate model
 variants (`crepe-tiny`, `btc-chords-majmin`, the fastconformer-aligner language
