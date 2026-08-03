@@ -885,6 +885,33 @@ catch_discover_tests(test-diarize-align-order
     PROPERTIES LABELS "unit;diarize;issue267"
 )
 
+# ─── test-diarize-slice-rewalk — issue #324: the server diarizes the MERGED
+# segment list by re-walking the slices, and the turn splitter GROWS each
+# slice's sub-range. Guards that the re-walk never drops a sub-segment.
+# Compiles crispasr_diarize_cli.cpp directly, like test-diarize-align-order.
+add_executable(test-diarize-slice-rewalk
+    test-diarize-slice-rewalk.cpp
+    ${PROJECT_SOURCE_DIR}/examples/cli/crispasr_diarize_cli.cpp
+)
+target_include_directories(test-diarize-slice-rewalk PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-diarize-slice-rewalk PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+    common
+    pyannote-seg
+    titanet
+)
+catch_discover_tests(test-diarize-slice-rewalk
+    TEST_SPEC "[issue324]"
+    PROPERTIES LABELS "unit;diarize;issue324"
+)
+
 # ─── test-miotts-live — live integration tests for MioTTS backend
 add_executable(test-miotts-live
     test_miotts_live.cpp

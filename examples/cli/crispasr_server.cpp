@@ -804,6 +804,15 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
             try {
                 const bool have_stereo = pcmf32s.size() == 2 && !pcmf32s[0].empty() && !pcmf32s[1].empty();
 
+                // #324: foxnose diarizes in one global pass after transcription
+                // (below) so speaker identities are consistent across slices —
+                // the per-slice path must stand down. Mirrors crispasr_run.cpp.
+                // Without this the server clustered each VAD slice on its own,
+                // restarting the numbering every few seconds and reloading the
+                // WeSpeaker embedder once per slice.
+                if (rp.diarize_embedder_is_foxnose())
+                    rp.diarize_foxnose_global = true;
+
                 // Pre-compute global caches for cross-slice consistency.
                 CrispasrPyannoteCache pyannote_cache;
                 if (rp.diarize_method == "pyannote" && !pcmf32.empty()) {
@@ -818,24 +827,17 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
                 const CrispasrPyannoteCache* pya_ptr = pyannote_cache.valid() ? &pyannote_cache : nullptr;
                 const CrispasrSherpaCache* shp_ptr = sherpa_cache.valid() ? &sherpa_cache : nullptr;
 
-                // Apply diarize per-slice. We re-walk the slices and apply
-                // diarize to the corresponding range of result.segs.
-                size_t seg_offset = 0;
-                for (size_t i = 0; i < slices.size(); ++i) {
-                    const auto& sl = slices[i];
-                    // Count how many segments belong to this slice (by timestamp range).
-                    size_t seg_count = 0;
-                    for (size_t j = seg_offset; j < result.segs.size(); ++j) {
-                        // Segments from the next slice will have t0 >= next slice's t0_cs.
-                        if (i + 1 < slices.size() && result.segs[j].t0 >= slices[i + 1].t0_cs)
-                            break;
-                        seg_count++;
-                    }
-
-                    if (seg_count > 0) {
-                        std::vector<crispasr_segment> slice_segs(result.segs.begin() + (ptrdiff_t)seg_offset,
-                                                                 result.segs.begin() +
-                                                                     (ptrdiff_t)(seg_offset + seg_count));
+                // Apply diarize per-slice. The CLI does this inside its slice
+                // loop, where the slice owns its segment vector; the server
+                // transcribes first, so it re-walks the merged list and hands
+                // each slice its own sub-range. #324: the turn splitter GROWS
+                // that sub-range, so the shared helper rebuilds the list
+                // instead of copying a fixed count back in place — writing back
+                // only the original count dropped every sub-segment past it,
+                // i.e. exactly the text around each speaker change.
+                crispasr_diarize_merged_by_slice(
+                    result.segs, slices,
+                    [&](const crispasr_audio_slice& sl, std::vector<crispasr_segment>& slice_segs) {
                         if (have_stereo) {
                             std::vector<float> sl_l(pcmf32s[0].begin() + sl.start, pcmf32s[0].begin() + sl.end);
                             std::vector<float> sl_r(pcmf32s[1].begin() + sl.start, pcmf32s[1].begin() + sl.end);
@@ -846,15 +848,20 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
                             crispasr_apply_diarize(mono_slice, mono_slice,
                                                    /*is_stereo=*/false, sl.t0_cs, slice_segs, rp, pya_ptr, shp_ptr);
                         }
-                        // Copy back the diarized segments.
-                        for (size_t j = 0; j < seg_count; ++j)
-                            result.segs[seg_offset + j] = std::move(slice_segs[j]);
-                    }
-                    seg_offset += seg_count;
-                }
+                    });
+
+                // #324: foxnose diarizes in ONE global pass over the whole
+                // audio (the per-slice call above stood down via
+                // diarize_foxnose_global), so its speaker numbering is
+                // consistent across slices instead of restarting at 0 in every
+                // VAD slice. Mirrors crispasr_apply_global_speaker_stages in
+                // the CLI runner; foxnose owns the labels, so the TitaNet remap
+                // below must not re-run.
+                const bool foxnose_global_ran = crispasr_apply_foxnose_global(result.segs, pcmf32, rp);
 
                 // Global embedding-based re-clustering (issue #107 P3).
-                if (!rp.diarize_embedder.empty() && !pcmf32.empty() && !rp.diarize_embedder_is_foxnose()) {
+                if (!foxnose_global_ran && !rp.diarize_embedder.empty() && !pcmf32.empty() &&
+                    !rp.diarize_embedder_is_foxnose()) {
                     auto embedder = crispasr_make_speaker_embedder(rp.diarize_embedder, rp.n_threads, rp.cache_dir);
                     if (embedder) {
                         crispasr_remap_speakers_via_embeddings(result.segs, pcmf32.data(), n_samples, embedder.get(),
