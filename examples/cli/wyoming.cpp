@@ -47,6 +47,7 @@
 #include "wyoming.h"
 
 #include "../json.hpp"
+#include "crispasr_consent_record.h"
 #include "crispasr_marking_policy.h"
 #include "crispasr_tts_disclaimer.h"
 #include "crispasr_voice_provenance.h"
@@ -110,6 +111,16 @@ static std::string wyoming_log_sanitize(const std::string& s, size_t cap = 256) 
     if (s.size() > cap)
         o += "...";
     return o;
+}
+
+// SHA-256 of the reference this request would clone, or "none" when the voice
+// names no readable file (a bank entry, a bare preset). Wyoming resolves a bare
+// --voice against --voice-dir exactly as the other surfaces do, so the hash has
+// to be taken of the RESOLVED path or a bare name would record nothing.
+static std::string ref_sha_or_none(const whisper_params& rp) {
+    const std::string resolved = crispasr_voice::resolve_voice_path(rp.tts_voice, rp.tts_voice_dir);
+    const std::string h = crispasr_consent::file_sha256(resolved);
+    return h.empty() ? std::string("none") : h;
 }
 
 static bool recv_exact(socket_t fd, void* buf, size_t n) {
@@ -541,10 +552,15 @@ static void wyoming_handle_connection(socket_t fd) {
             // the operator's launch-time --i-have-rights is the only one there
             // is; without it a clone is refused rather than served ungated.
             if (marking.refuse) {
-                fprintf(stderr,
-                        "[CONSENT] ts=%s surface=wyoming voice=%s clone_reason=%s attestation=\"\" "
-                        "action=\"REFUSED (start the server with --i-have-rights to clone over Wyoming)\"\n",
-                        ts, wyoming_log_sanitize(rp.tts_voice).c_str(), clone_decision.reason);
+                crispasr_consent::emit(
+                    "CONSENT", ts,
+                    {{"surface", "wyoming"},
+                     {"voice", wyoming_log_sanitize(rp.tts_voice)},
+                     {"clone_reason", clone_decision.reason},
+                     {"attestation", "", /*quoted=*/true},
+                     {"ref_sha256", ref_sha_or_none(rp)},
+                     {"action", "REFUSED (start the server with --i-have-rights to clone over Wyoming)",
+                      /*quoted=*/true}});
                 json astart;
                 astart["rate"] = g_backend->tts_sample_rate();
                 astart["width"] = 2;
@@ -567,11 +583,14 @@ static void wyoming_handle_connection(socket_t fd) {
                 if (marking.apply_spoken_disclaimer && !pcmf32.empty()) {
                     crispasr_tts_prepend_disclaimer(pcmf32, g_backend, rp);
                     if (clone_decision.is_clone) {
-                        fprintf(stderr,
-                                "[CONSENT] ts=%s surface=wyoming voice=%s clone_reason=%s attestation=\"%s\" "
-                                "spoken_disclaimer=yes\n",
-                                ts, wyoming_log_sanitize(rp.tts_voice).c_str(), clone_decision.reason,
-                                wyoming_log_sanitize(rp.tts_consent_attestation).c_str());
+                        crispasr_consent::emit(
+                            "CONSENT", ts,
+                            {{"surface", "wyoming"},
+                             {"voice", wyoming_log_sanitize(rp.tts_voice)},
+                             {"clone_reason", clone_decision.reason},
+                             {"attestation", wyoming_log_sanitize(rp.tts_consent_attestation), /*quoted=*/true},
+                             {"spoken_disclaimer", "yes"},
+                             {"ref_sha256", ref_sha_or_none(rp)}});
                     } else {
                         // Real-person preset: disclosed, not consent-gated, so
                         // the [CONSENT] line above would be the wrong record.

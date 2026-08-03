@@ -2945,6 +2945,8 @@ catch_discover_tests(test-marking-policy
 add_executable(test-voice-clone-policy test-voice-clone-policy.cpp)
 target_include_directories(test-voice-clone-policy PRIVATE
     ${PROJECT_SOURCE_DIR}/examples/cli
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/third_party/c2pa-audio/src
 )
 target_link_libraries(test-voice-clone-policy PRIVATE
     Catch2::Catch2WithMain

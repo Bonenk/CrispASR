@@ -489,7 +489,15 @@ TEST_CASE("uploading a voice reference requires a consent attestation", "[unit][
     // voiceprint — the network equivalent of --make-ref, which demands
     // --i-have-rights. It accepted uploads from anyone who could reach the
     // endpoint and logged only a byte count.
-    REQUIRE(contains(src, "scope=voice-upload"));
+    // The record is built from structured fields now (crispasr_consent_record.h)
+    // rather than one format string, so the assertion follows the field the
+    // emitted line still carries — `scope=voice-upload` — in its new shape.
+    // Deleting the record still fails this, which is the property that matters.
+    REQUIRE(contains(src, "\"scope\", \"voice-upload\""));
+    // And the record must be bound to the bytes that were uploaded, not merely
+    // to a byte count: hashing the buffer is what makes the attestation
+    // checkable against the recording later.
+    REQUIRE(contains(src, "bytes_sha256(voice_file.content.data()"));
     REQUIRE(contains(src, "uploading a voice reference requires a 'consent_attestation' form field"));
 }
 

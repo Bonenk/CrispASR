@@ -88,7 +88,8 @@ int main(int argc, char** argv) {
         Rates sign, frames;
         for (const auto& pcm : files) {
             for (size_t off = 0; off + (size_t)clip_n <= pcm.size(); off += (size_t)clip_n) {
-                std::vector<float> clean(pcm.begin() + (std::ptrdiff_t)off, pcm.begin() + (std::ptrdiff_t)(off + clip_n));
+                std::vector<float> clean(pcm.begin() + (std::ptrdiff_t)off,
+                                         pcm.begin() + (std::ptrdiff_t)(off + clip_n));
                 // Skip near-silence: neither detector claims anything about it
                 // and it is not what a false positive means here.
                 double rms = 0.0;

@@ -3,9 +3,10 @@
 
 #include "crispasr.h"
 #include "grammar-parser.h"
-#include "whisper_params.h"            // struct whisper_params (shared with crispasr_*)
-#include "crispasr_backend.h"          // crispasr_run_backend() dispatch entry point
-#include "crispasr_diagnostics.h"      // --version / --diagnostics + verbose banner (#31)
+#include "whisper_params.h"       // struct whisper_params (shared with crispasr_*)
+#include "crispasr_backend.h"     // crispasr_run_backend() dispatch entry point
+#include "crispasr_diagnostics.h" // --version / --diagnostics + verbose banner (#31)
+#include "crispasr_consent_record.h"
 #include "crispasr_diarize_cli.h"      // crispasr_apply_diarize / pyannote cache (#107)
 #include "crispasr_speaker_embedder.h" // pluggable speaker embedder (#107 P3)
 #include "crispasr_stream_punc.h"      // streaming punctuation mode helpers (#112)
@@ -650,6 +651,9 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.c2pa_cert = ARGV_NEXT;
     } else if (arg == "--c2pa-key") {
         params.c2pa_key = ARGV_NEXT;
+    } else if (arg == "--consent-log") {
+        params.consent_log = ARGV_NEXT;
+        crispasr_consent::set_log_path(params.consent_log);
     } else if (arg == "--i-have-rights") {
         // Voice-cloning consent attestation. Required when --voice points
         // to a .wav reference file (i.e. voice cloning). By passing this
@@ -1314,6 +1318,9 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.tts_voice.c_str());
     fprintf(
         stderr,
+        "  --consent-log PATH                [       ] append every [CONSENT] audit record to PATH as JSON Lines,\n"
+        "                                              in addition to stderr. Tamper-resistance is the storage's\n"
+        "                                              job (append-only perms / WORM / SIEM), not this flag's.\n"
         "             --i-have-rights                    required for voice cloning and for --make-ref; attests "
         "consent\n"
         "             --accept-license TAG                accept a restricted model licence (SPDX tag, or 'all');\n"
