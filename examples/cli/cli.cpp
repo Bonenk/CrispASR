@@ -642,6 +642,10 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         params.watermark_model = ARGV_NEXT;
     } else if (arg == "--detect-watermark") {
         params.detect_watermark_file = ARGV_NEXT;
+    } else if (arg == "--print-speaker-identity") {
+        // Whose voice does this file produce? Prints real_person / synthetic /
+        // unknown and exits — the same answer the disclosure gate uses.
+        params.print_speaker_identity_file = ARGV_NEXT;
     } else if (arg == "--c2pa-cert") {
         params.c2pa_cert = ARGV_NEXT;
     } else if (arg == "--c2pa-key") {
@@ -2423,6 +2427,13 @@ int main(int argc, char** argv) {
     // or input files — route directly to the backend (which handles it
     // and exits before any model resolution).
     if (!params.detect_watermark_file.empty()) {
+        return crispasr_run_backend(params);
+    }
+
+    // --print-speaker-identity is the same shape: it inspects a FILE, not a
+    // session, so it must be routed before the "no input files" guard below.
+    // Missing this is why the verb returned 2 the first time it was run.
+    if (!params.print_speaker_identity_file.empty()) {
         return crispasr_run_backend(params);
     }
 

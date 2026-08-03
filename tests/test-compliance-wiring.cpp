@@ -237,6 +237,32 @@ TEST_CASE("bindings surface a bad value instead of swallowing it", "[unit][compl
     REQUIRE(contains(read_file("flutter/crispasr/lib/src/crispasr.dart"), "'real_person', 'synthetic' or 'unknown'"));
 }
 
+TEST_CASE("the verdict has one source, queryable from the binary", "[unit][compliance]") {
+    // --print-speaker-identity resolves a file with the SAME code the
+    // disclosure gate uses, so a packaging script never has to restate a
+    // verdict. That matters more than it looks: the verdicts already live in
+    // C++, in GGUF stamps and in the docs, and a fourth copy in a shell script
+    // is the one that silently drifts.
+    const std::string run = read_file("examples/cli/crispasr_run.cpp");
+    REQUIRE(contains(run, "params.print_speaker_identity_file"));
+    REQUIRE(contains(run, "crispasr_voice::read_model_speaker_identity(path)"));
+    REQUIRE(contains(run, "crispasr_voice::identity_for_voice_pack(path)"));
+
+    // It has to be ROUTED before the "no input files" guard — it inspects a
+    // file, not a session. Missing that made the verb exit 2 on first run.
+    REQUIRE(
+        contains(read_file("examples/cli/cli.cpp"),
+                 "if (!params.print_speaker_identity_file.empty()) {\n        return crispasr_run_backend(params);"));
+
+    // The bulk stamper asks the binary rather than deciding for itself, and
+    // skips unknowns instead of guessing — writing a guess is the one error
+    // that silently removes a disclosure.
+    const std::string driver = read_file("models/stamp-published-voices.sh");
+    REQUIRE(contains(driver, "--print-speaker-identity"));
+    REQUIRE(contains(driver, "SKIP (unknown"));
+    REQUIRE_FALSE(contains(driver, "real_person)")); // no restated verdict table
+}
+
 TEST_CASE("the converters share one definition of the stamp", "[unit][compliance]") {
     // Seven converters can write this key. Seven hand-written copies would be
     // seven chances for one to drift from crispasr_voice::speaker_identity_key()
@@ -331,7 +357,13 @@ TEST_CASE("the verdict table records its evidence", "[unit][compliance]") {
                      "d.pack_identity = identity_for_voice_pack(resolved);"));
     // Each Unknown must record that the provider was CHECKED, not skipped —
     // otherwise "unknown" stops meaning anything and gets cleared as backlog.
-    REQUIRE(contains(src, "third-party write-ups describe them as"));
+    // Matched on the REASONING, not on a prose fragment: an earlier version
+    // pinned an exact sentence and went red the moment the evidence note was
+    // reworded, which trains people to edit the test instead of reading it.
+    // Single-line tokens: comment text wraps, so a phrase that reads as one
+    // sentence in the source may not exist as one contiguous string.
+    REQUIRE(contains(src, "provider statement"));
+    REQUIRE(contains(src, "Checked, "));
     // And the cost of matching on a file name has to be stated, not hidden.
     REQUIRE(contains(src, "WHAT MATCHING ON A FILE NAME COSTS"));
 }

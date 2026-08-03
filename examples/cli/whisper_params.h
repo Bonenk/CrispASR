@@ -474,6 +474,12 @@ struct whisper_params {
     // the result, and exits. Exposes the detection API for end users.
     std::string detect_watermark_file;
 
+    // --print-speaker-identity PATH: standalone verb. Resolves whose voice a
+    // model or voice pack produces and prints it, then exits. One source of
+    // truth for the answer — a script that restated the verdicts would be a
+    // third copy to drift from the C++ table.
+    std::string print_speaker_identity_file;
+
     // C2PA (Content Credentials) signing — compile-time gated on
     // CRISPASR_HAVE_C2PA. Paths to self-signed or CA-issued X.509 cert
     // and key. Generate with: scripts/generate-c2pa-cert.sh
