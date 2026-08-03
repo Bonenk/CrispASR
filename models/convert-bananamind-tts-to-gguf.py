@@ -501,6 +501,20 @@ def main():
                 or ".var" in name:
             qt = GGMLQuantizationType.F32
 
+        # add_tensor() with an explicit raw_dtype does NOT convert — it labels
+        # the array's bytes with the type you name. Passing an f32 array as F16
+        # writes f32 bytes tagged F16, and a reader takes the first half of them
+        # and reinterprets each 4-byte float as two 2-byte ones. See
+        # tests/test_gguf_dtype_cast.py; this shipped for real in
+        # cstr/fastpitch-en-GGUF's f16 build (943,872 NaNs).
+        #
+        # Latent here rather than shipped: every published bananamind file is
+        # f32 or q8_0, so --ftype f16 was never exercised.
+        if qt == GGMLQuantizationType.F16:
+            arr = arr.astype(np.float16)
+        elif qt == GGMLQuantizationType.F32:
+            arr = arr.astype(np.float32)
+
         writer.add_tensor(name, arr, raw_dtype=qt)
         n_tensors += 1
         n_params += arr.size

@@ -56,23 +56,44 @@ Two separate threads, and it matters not to conflate them:
 
 GATE for any count change: mean DER must beat 7.81% AND mesob must not regress.
 
-## CLAIMED 2026-08-03 — fastpitch F16 NaNs + stamping the last three cstr/ repos
+## STILL OPEN 2026-08-03 — stamp the last three cstr/ repos
 
-**Another agent: do not start either.** Worktree `wt/fastpitch-f16-nan`. Delete
-this section when it lands, or if it goes stale for more than a day.
+Unclaimed; take it. Everything needed is built and proven, this is bandwidth.
 
-1. Root-cause and fix the F16 NaNs below, then re-publish
-   `cstr/fastpitch-en-GGUF`. Touches `models/convert-fastpitch-to-gguf.py`.
-2. Stamp `crispasr.voice.speaker_identity` into the three remaining repos whose
-   verdict is established but which were left for bandwidth:
-   `cstr/parler-tts-mini-v1.1-GGUF` (real_person), `cstr/csm-1b-GGUF`
-   (synthetic), `cstr/kartoffel-orpheus-3b-german-{natural,synthetic}-GGUF`
-   (real_person / synthetic). Upload only; no runtime code.
+Stamp `crispasr.voice.speaker_identity` into the repos whose verdict is
+established but which were left for size: `cstr/parler-tts-mini-v1.1-GGUF`
+(real_person), `cstr/csm-1b-GGUF` (synthetic),
+`cstr/kartoffel-orpheus-3b-german-{natural,synthetic}-GGUF` (real_person /
+synthetic). Upload only, no runtime code:
 
-Not touching `crispasr_watermark_stats.h` or anything under the detector-port
-claim below.
+    ./models/stamp-published-voices.sh <downloaded-dir>
 
-## OPEN 2026-08-03 — cstr/fastpitch-en-GGUF: the F16 weights are ~944k NaNs
+It asks `crispasr --print-speaker-identity` per file and skips unknowns, so no
+verdict is restated. Verify tensors are byte-identical afterwards with a RAW
+BYTE comparison — `np.array_equal` returns False whenever NaNs are present and
+will report a good file as corrupt.
+
+## OPEN 2026-08-03 — the fastpitch runtime cannot execute an F16 build
+
+Not the converter (that is fixed). A *correctly written* f16 fastpitch model
+loads and then aborts inside `ggml_backend_sched_graph_compute`, from
+`synthesize_internal` in `src/fastpitch.cpp`. q8_0 and q4_k of the same weights
+synthesise fine (6.72 s, rms 0.10).
+
+The difference is coverage: `--ftype f16` marks every `ndim >= 2` tensor F16 —
+138 of them — where the quantized path touches 25 and leaves the other 113 F32.
+Some of those 113 feed ops with no F16 path in this graph.
+
+**To fix:** find which ops abort (start with the conv1d / attention projections
+the quant path leaves alone), then either add F16 support or make the converter
+keep exactly those tensors F32. Do NOT just widen the exclusion list by trial
+and error — the q8_0 selection is the working reference for which tensors the
+graph is happy to receive non-F32.
+
+Until then `--ftype f16` refuses, with `--allow-unsupported-f16` for whoever
+picks this up. `cstr/fastpitch-en-GGUF`'s f16 has been withdrawn.
+
+## RESOLVED 2026-08-03 — cstr/fastpitch-en-GGUF: the F16 weights were ~944k NaNs
 
 Found while stamping the published GGUFs (below); **not** caused by that — the
 NaNs are in the file as downloaded from HF, and the stamped copy is byte-identical.

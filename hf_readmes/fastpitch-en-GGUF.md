@@ -41,6 +41,20 @@ Released under **CC-BY-4.0** (NeMo model license).
 | `fastpitch-en-q8_0.gguf` | Q8_0 | ~120 MB | Near-lossless |
 | `fastpitch-en-q4_k.gguf` | Q4_K | ~70 MB | Best size/quality balance |
 
+> **The F16 build was withdrawn (2026-08-03).** The file published here was
+> corrupt — `models/convert-fastpitch-to-gguf.py` handed a float32 array to
+> `add_tensor(raw_dtype=F16)`, which labels bytes rather than converting them,
+> so it held half the weights reinterpreted as garbage (943,872 NaNs) and would
+> not even open. Rebuilding it correctly then showed a second problem: the
+> fastpitch **runtime** aborts on an F16 build, because `ndim >= 2` marks 138
+> tensors F16 where the quantized path touches 25 and leaves the rest F32.
+>
+> **Use `q8_0` (recommended) or `q4_k`.** Both were produced from good weights,
+> are unaffected, and are what the examples below use. The converter now
+> refuses `--ftype f16` rather than emitting a file whose only behaviour is to
+> abort.
+
+
 ## Quick start
 
 ```bash
