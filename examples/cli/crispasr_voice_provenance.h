@@ -143,6 +143,24 @@ inline SpeakerIdentity read_model_speaker_identity(const std::string& model_path
     return id;
 }
 
+// The `general.architecture` a GGUF declares about itself, or empty.
+//
+// Used by --print-speaker-identity to pick the right verdict table for a file
+// it was handed with no session attached. Cheap: metadata open, one string.
+inline std::string read_gguf_architecture(const std::string& path) {
+    if (path.empty())
+        return {};
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec))
+        return {};
+    gguf_context* meta = core_gguf::open_metadata(path.c_str());
+    if (!meta)
+        return {};
+    std::string arch = core_gguf::kv_str(meta, "general.architecture", "");
+    core_gguf::free_metadata(meta);
+    return arch;
+}
+
 // Resolve the value a caller passed to the file a backend will open.
 //
 // An absolute/relative path is returned as-is. A BARE name (the server's

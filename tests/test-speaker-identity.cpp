@@ -433,3 +433,44 @@ TEST_CASE("the German cascade crosses an identity boundary", "[unit][compliance]
     REQUIRE_FALSE(
         requires_spoken_disclosure(/*is_clone=*/false, identity_for_voice_pack("kokoro-voice-df_victoria.gguf")));
 }
+
+
+// ---------------------------------------------------------------------------
+// Architecture -> backend name, for callers with a file and no session.
+//
+// --print-speaker-identity inspects a FILE. It has no CrispasrBackend to ask
+// for name(), so it derives one from what the file declares. Without this it
+// consulted only the voice-pack table and reported `unknown` for every piper,
+// fastpitch and bananamind MODEL — silently, and the bulk stamper then skipped
+// all of them. Caught by running the verb against the real published repos
+// before uploading, not by reading the code.
+// ---------------------------------------------------------------------------
+
+using crispasr_voice::backend_for_architecture;
+
+TEST_CASE("architectures that already match the backend name pass through", "[unit][compliance]") {
+    REQUIRE(backend_for_architecture("piper") == "piper");
+    REQUIRE(backend_for_architecture("fastpitch") == "fastpitch");
+    REQUIRE(backend_for_architecture("orpheus") == "orpheus");
+    REQUIRE(backend_for_architecture("kokoro-voice") == "kokoro-voice");
+}
+
+TEST_CASE("the architectures that differ are mapped", "[unit][compliance]") {
+    // Underscore vs hyphen, and a -tts suffix. Listed explicitly rather than
+    // normalised with a rule, so a future mismatch is a visible edit.
+    REQUIRE(backend_for_architecture("bananamind_tts") == "bananamind-tts");
+    REQUIRE(backend_for_architecture("csm-tts") == "csm");
+}
+
+TEST_CASE("a mapped architecture reaches its verdict", "[unit][compliance]") {
+    // The join that was broken: arch -> backend -> verdict. Asserting the map
+    // alone would not have caught it, because the map was not there at all.
+    REQUIRE(identity_for_model(backend_for_architecture("piper"), "piper-de_DE-eva_k-x_low-f16.gguf") ==
+            SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_model(backend_for_architecture("bananamind_tts"), "bananamind-tts-de-q8_0.gguf") ==
+            SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_model(backend_for_architecture("csm-tts"), "csm-1b-q4_k.gguf") == SpeakerIdentity::Synthetic);
+    // ...and an unmapped architecture stays unknown rather than crashing.
+    REQUIRE(identity_for_model(backend_for_architecture("some-future-arch"), "x.gguf") == SpeakerIdentity::Unknown);
+    REQUIRE(backend_for_architecture("").empty());
+}

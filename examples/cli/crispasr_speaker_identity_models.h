@@ -194,6 +194,26 @@ inline SpeakerIdentity identity_for_model(const std::string& backend, const std:
     return SpeakerIdentity::Unknown;
 }
 
+// Map a GGUF's `general.architecture` to the backend name identity_for_model()
+// keys on.
+//
+// Needed by --print-speaker-identity, which inspects a FILE with no session and
+// therefore no CrispasrBackend to ask for name(). Without it that verb consulted
+// only the voice-pack table and reported `unknown` for every piper, fastpitch
+// and bananamind MODEL — silently, and the bulk stamper then skipped them all.
+// Caught by running it against the real published repos before uploading.
+//
+// Most architectures already equal the backend name; the ones that differ do so
+// for the usual reason (underscore vs hyphen, or a `-tts` suffix), and they are
+// listed rather than normalised so a future mismatch is a visible edit here.
+inline std::string backend_for_architecture(const std::string& arch) {
+    if (arch == "bananamind_tts")
+        return "bananamind-tts";
+    if (arch == "csm-tts")
+        return "csm";
+    return arch;
+}
+
 // Whose voice is a VOICE PACK?
 //
 // The companion to identity_for_model(), for backends where the checkpoint is a
