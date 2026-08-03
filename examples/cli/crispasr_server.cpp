@@ -2399,6 +2399,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             rp.tts_speaker_id = body["speaker_id"].get<int>();
         if (body.contains("max_speech_tokens") && body["max_speech_tokens"].is_number_integer())
             rp.tts_max_speech_tokens = body["max_speech_tokens"].get<int>();
+        if (body.contains("min_speech_tokens") && body["min_speech_tokens"].is_number_integer())
+            rp.tts_min_speech_tokens = body["min_speech_tokens"].get<int>();
 
         // Wire speed into params so backends with native duration control
         // (e.g. melotts length_scale, piper noise_w) can use it directly.
