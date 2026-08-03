@@ -777,15 +777,29 @@ Measured here on 1265 one-second clips of genuinely unmarked human speech
 
 | clip length | sign FP / TP | per-frame FP / TP |
 |---|---|---|
-| 1.0 s | 5.2% / 68.6% | **0.9% / 97.0%** |
-| 2.5 s | 5.1% / 79.8% | **1.4% / 100.0%** |
-| 5.0 s | 4.0% / 88.0% | **2.0% / 100.0%** |
+| 1.0 s | 5.2% / 68.6% | **0.9% / 96.8%** |
+| 2.5 s | 5.1% / 79.8% | **1.2% / 99.6%** |
+| 5.0 s | 4.0% / 88.0% | **1.6% / 99.6%** |
 | 10.0 s | 4.9% / 100.0% | **3.3% / 100.0%** |
 
 Better on **both** error rates at every clip length, which is why it is the
 default. Both columns are at the same 0.65 threshold; the sign test's 4-5% false
 positives reproduce its documented 4.8%, which is what says the harness is
 measuring the right thing.
+
+A third condition — the real pattern must also out-score the single **strongest**
+decoy, not merely the decoy median (`t_true > 0.70 * max|t_decoy|`) — guards the
+case a median comparison cannot see: audio where our pattern scores high *and so
+does every decoy*, which is what highly structured or tonal signals do. Upstream
+measured it removing a stationary-tone false positive at no cost to true
+positives. **On this corpus it is close to a wash**, because 1265 clips of real
+speech contain no such signal: false positives improve slightly (1.4% -> 1.2% at
+2.5 s, 2.0% -> 1.6% at 5 s) and true positives pay a fraction of a point
+(100.0% -> 99.6%). It is kept for the failure mode it closes and for parity with
+the sibling projects that share the comb, not on the strength of these numbers —
+on directly-measured tonal signals here, neither setting false-positives at all,
+though the term does widen the margin (a three-tone reads 0.38 -> 0.28 against a
+0.65 bar) and marked tones still verify at 0.97-0.9995.
 
 `CRISPASR_WATERMARK_DETECT=sign` restores the old statistic for A/B and for
 re-reading a score the way an older release reported it. The p-value is printed

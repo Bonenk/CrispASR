@@ -128,9 +128,9 @@ inline Verdict classify(float score, int n_bins) {
 // scored against the same clips after the UNCHANGED embedder marked them:
 //
 //   clip    sign FP/TP @0.65      frames FP/TP @0.65
-//   1.0 s      5.2% / 68.6%          0.9% / 97.0%
-//   2.5 s      5.1% / 79.8%          1.4% / 100.0%
-//   5.0 s      4.0% / 88.0%          2.0% / 100.0%
+//   1.0 s      5.2% / 68.6%          0.9% / 96.8%
+//   2.5 s      5.1% / 79.8%          1.2% / 99.6%
+//   5.0 s      4.0% / 88.0%          1.6% / 99.6%
 //  10.0 s      4.9% / 100.0%         3.3% / 100.0%
 //
 // Better on BOTH error rates at every clip length, which is why this is the

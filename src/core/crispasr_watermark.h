@@ -450,6 +450,22 @@ inline constexpr int kDetectMinFrames = 20;
 inline constexpr double kDetectMinScale = 0.75; // floor on the decoy MAD scale
 inline constexpr double kDetectTMin = 3.0;      // consistency bar
 inline constexpr double kDetectZMin = 1.0;      // specificity bar
+// The real pattern must also out-score the single STRONGEST decoy, not merely
+// the decoy median — the condition that removes the stationary-tone false
+// positive the median comparison lets through. CrispTTS measured FP
+// 1.89% -> 0.00% with TP unchanged at 99.37%, i.e. no true positive pays for
+// it. 0.70 is the midpoint of the observed gap (tone 0.59, weakest real mark
+// 0.84), so neither margin is thin.
+// Overridable so the term can be A/B'd without editing the header. ⚠ Setting it
+// near zero makes it non-binding only while `t_true` is POSITIVE: the ratio
+// carries t_true's sign, so a tiny divisor amplifies a negative into a large
+// negative and the term binds harder, not less. That never flips a verdict
+// (both readings sit far below the bar), but do not read a near-zero override
+// as "disabled" — it is "disabled for marks, exaggerated for non-marks".
+#ifndef CRISPASR_WM_MAX_DECOY_RATIO
+#define CRISPASR_WM_MAX_DECOY_RATIO 0.70
+#endif
+inline constexpr double kDetectMaxDecoyRatio = CRISPASR_WM_MAX_DECOY_RATIO;
 // Squash so the decision point (a ratio of 1.0 on the binding constraint) lands
 // exactly on the 0.65 score threshold the docs and CLI already speak in.
 inline constexpr double kTScale = 0.35;
@@ -591,8 +607,20 @@ inline float crispasr_watermark_detect_frames_impl(const float* pcm, int n_sampl
     const double scale = std::max(1.4826 * mad, crispasr_wm::kDetectMinScale);
     const double z = (t_all[0] - centre) / scale;
 
-    // The BINDING constraint decides — a mark must clear both bars.
-    const double ratio = std::min(t_all[0] / crispasr_wm::kDetectTMin, z / crispasr_wm::kDetectZMin);
+    // Third condition: beat the STRONGEST decoy, not just the typical one. On a
+    // stationary tone the real pattern scores high and so does every decoy — a
+    // median comparison cannot see that, a maximum comparison can. The tone
+    // scores 0.59 on this ratio (t_true 11.44 against a decoy maximum of 19.44:
+    // every absent pattern beats the real one, which is the tell), while the
+    // weakest genuine mark scores 0.84, so 0.70 sits mid-gap.
+    double strongest_decoy = 0.0;
+    for (size_t i = 1; i < t_all.size(); i++)
+        strongest_decoy = std::max(strongest_decoy, std::fabs(t_all[i]));
+    const double decoy_ratio = t_all[0] / std::max(strongest_decoy, 1e-9);
+
+    // The BINDING constraint decides — a mark must clear all three bars.
+    const double ratio = std::min({t_all[0] / crispasr_wm::kDetectTMin, z / crispasr_wm::kDetectZMin,
+                                   decoy_ratio / crispasr_wm::kDetectMaxDecoyRatio});
     return (float)crispasr_wm::t_to_confidence(ratio);
 }
 
