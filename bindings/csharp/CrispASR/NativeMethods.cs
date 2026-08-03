@@ -209,6 +209,12 @@ namespace CrispASR
             out int outNSamples);
 
         // Attest acceptance of AI-content marking/disclosure duty (EU AI Act Art. 50).
+        // Whose voice a PRESET voice is (EU AI Act Art. 50(4)). 0 ok, -1 bad
+        // session, -2 unrecognised value.
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_session_set_speaker_identity(
+            IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string identity);
+
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int crispasr_session_accept_marking_responsibility(
             IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string attestation);

@@ -157,6 +157,86 @@ TEST_CASE("a converter can write the stamp the runtime reads", "[unit][complianc
     REQUIRE(contains(conv, "if args.speaker_identity and args.speaker_identity != \"unknown\":"));
 }
 
+TEST_CASE("the diff harness marks the audio it writes", "[unit][compliance]") {
+    // Found by re-enumerating emitters from code rather than from the surface
+    // table (rule 4). crispasr-diff is an INSTALLED binary, and
+    // CRISPASR_CSM_WAV_OUT makes it write a real, playable WAV of synthesized
+    // speech straight from csm_tts_diag_synth_wav() — a hand-rolled RIFF writer
+    // that never touched the marking path.
+    //
+    // It is a developer diagnostic, which is exactly the reasoning that left
+    // the Wyoming server marking nothing for four releases. The file does not
+    // know what you meant to use it for.
+    const std::string src = read_file("src/csm_tts.cpp");
+    REQUIRE(contains(src, "crispasr_watermark_embed_impl(pcm, n);"));
+    // Before the peak-normalise, so the mark scales with the signal instead of
+    // being applied on top of a rescaled one.
+    const size_t mark = src.find("crispasr_watermark_embed_impl(pcm, n);");
+    const size_t norm = src.find("Peak-normalise to 0.95");
+    REQUIRE(mark != std::string::npos);
+    REQUIRE(norm != std::string::npos);
+    REQUIRE(mark < norm);
+}
+
+TEST_CASE("every binding can answer the speaker-identity question", "[unit][compliance]") {
+    // The mechanism shipped reachable only from the C ABI: all ten bindings
+    // could HEAR the Art. 50(4) reminder for a real-person preset and none of
+    // them could answer it. Same shape as the earlier gap where a binding could
+    // opt out of marking (synthesize_raw) but had no way to mark the result —
+    // a duty you can be told about and cannot discharge is not a mechanism.
+    struct Binding {
+        const char* file;
+        const char* needle;
+    };
+    static const Binding kBindings[] = {
+        {"python/crispasr/_binding.py", "def set_speaker_identity(self, identity: str)"},
+        {"bindings/go/crispasr_session.go", "func (s *CrispasrSession) SetSpeakerIdentity(identity string) error"},
+        {"crispasr/src/lib.rs", "pub fn set_speaker_identity(&self, identity: &str)"},
+        {"crispasr-sys/src/lib.rs", "pub fn crispasr_session_set_speaker_identity("},
+        {"bindings/ruby/ext/ruby_crispasr_session.c", "\"set_speaker_identity\", rb_session_set_speaker_identity"},
+        {"bindings/java/src/main/java/io/github/ggerganov/whispercpp/CrispasrSession.java",
+         "public void setSpeakerIdentity(String identity)"},
+        {"bindings/csharp/CrispASR/Session.cs", "public void SetSpeakerIdentity(string identity)"},
+        {"flutter/crispasr/lib/src/crispasr.dart", "void setSpeakerIdentity(String identity)"},
+        {"bindings/javascript/emscripten.cpp", "\"ttsSetSpeakerIdentity\""},
+    };
+    for (const auto& b : kBindings) {
+        INFO("binding=" << b.file);
+        REQUIRE(contains(read_file(b.file), b.needle));
+    }
+}
+
+TEST_CASE("bindings surface a bad value instead of swallowing it", "[unit][compliance]") {
+    // The ABI returns -2 for an unrecognised value precisely so a binding can
+    // report it. A binding that ignores the code turns "real-person" (a typo
+    // for real_person) into "unknown" — silently dropping the disclosure the
+    // integrator was trying to declare.
+    //
+    // Matched on each binding's ERROR MESSAGE, not on "-2": that literal
+    // already appears 5x in _binding.py and 4x in the Go file for unrelated
+    // reasons, so a `contains("if rc == -2:")` guard stayed green with this
+    // check gutted. The red-proof caught it. Assert the token that exists only
+    // when the behaviour does.
+    // Python and Go assert the CONDITION PAIRED WITH the message. Asserting the
+    // message alone was still too weak: flipping `-2` to another code leaves the
+    // message present but unreachable, and the guard stayed green. Two rounds of
+    // red-proof to get this one honest.
+    REQUIRE(contains(read_file("python/crispasr/_binding.py"),
+                     "if rc == -2:\n            raise ValueError(\n"
+                     "                f\"unrecognised speaker_identity {identity!r}; \""));
+    REQUIRE(contains(read_file("bindings/go/crispasr_session.go"),
+                     "case -2:\n\t\treturn fmt.Errorf(\"unrecognised speaker_identity %q "
+                     "(expected real_person, synthetic or unknown)\", identity)"));
+    REQUIRE(contains(read_file("crispasr/src/lib.rs"),
+                     "unrecognised speaker_identity {identity:?} (expected real_person, synthetic or unknown)"));
+    REQUIRE(contains(read_file("bindings/ruby/ext/ruby_crispasr_session.c"),
+                     "unrecognised speaker_identity (expected real_person, synthetic or unknown)"));
+    REQUIRE(contains(read_file("bindings/java/src/main/java/io/github/ggerganov/whispercpp/CrispasrSession.java"),
+                     "(expected real_person, synthetic or unknown)"));
+    REQUIRE(contains(read_file("bindings/csharp/CrispASR/Session.cs"), "(expected real_person, synthetic or unknown)"));
+    REQUIRE(contains(read_file("flutter/crispasr/lib/src/crispasr.dart"), "'real_person', 'synthetic' or 'unknown'"));
+}
+
 TEST_CASE("published GGUFs can be stamped without re-converting", "[unit][compliance]") {
     // The stamp is only real if it can reach files that are ALREADY published.
     // Re-converting a 3.5 GB checkpoint to add one string is a price that means
@@ -199,6 +279,12 @@ TEST_CASE("the verdict table records its evidence", "[unit][compliance]") {
     // through df_eva / dm_bernd. The evidence has to stay next to the verdict.
     REQUIRE(contains(src, "HUI-Audio-Corpus-German"));
     REQUIRE(contains(src, "identity_for_voice_pack"));
+    // ...and it has to be CALLED. Asserting the name against the models header
+    // (where it is defined) proved nothing: deleting the call site left the
+    // definition, and the guard stayed green. Pin the call, in the file that
+    // makes it.
+    REQUIRE(contains(read_file("examples/cli/crispasr_voice_provenance.h"),
+                     "d.pack_identity = identity_for_voice_pack(resolved);"));
     // Each Unknown must record that the provider was CHECKED, not skipped —
     // otherwise "unknown" stops meaning anything and gets cleared as backlog.
     REQUIRE(contains(src, "third-party write-ups describe them as"));

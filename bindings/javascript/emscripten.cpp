@@ -52,6 +52,8 @@ float* crispasr_session_synthesize(CrispasrSession* s, const char* text, int* ou
 // the marking attestation gate, speech-to-speech, the input-rate probe, and two setters.
 float* crispasr_session_synthesize_raw(CrispasrSession* s, const char* text, int* out_n_samples);
 int crispasr_session_accept_marking_responsibility(CrispasrSession* s, const char* attestation);
+// Whose voice a PRESET voice is (EU AI Act Art. 50(4)); -2 on a bad value.
+int crispasr_session_set_speaker_identity(CrispasrSession* s, const char* identity);
 float* crispasr_session_speech_to_speech(CrispasrSession* s, const float* in_samples, int n_in_samples, char** out_text,
                                          int* out_n_samples);
 int crispasr_session_input_sample_rate(CrispasrSession* s);
@@ -702,6 +704,19 @@ EMSCRIPTEN_BINDINGS(whisper) {
             });
         }));
 #endif
+
+    // Declare whose voice a PRESET voice is: "real_person" | "synthetic" |
+    // "unknown". Cloning is not the only way to produce a deep fake — a preset
+    // voice shipped inside a model can be an identifiable individual, and
+    // Art. 3(60) attaches to the audio resembling that person rather than to
+    // which pipeline made it. Setting real_person makes the Art. 50(4) reminder
+    // fire for a non-cloned voice; it does NOT require a consent attestation.
+    // Returns 0, -1 on no session, -2 on an unrecognised value.
+    emscripten::function("ttsSetSpeakerIdentity", emscripten::optional_override([](const std::string& identity) {
+                             return g_tts_session
+                                        ? crispasr_session_set_speaker_identity(g_tts_session, identity.c_str())
+                                        : -1;
+                         }));
 
     // #321 parity: attest AI-content marking/disclosure responsibility (EU AI Act
     // Art. 50). REQUIRED before ttsSynthesizeRaw() will return unmarked audio.

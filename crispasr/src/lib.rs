@@ -974,6 +974,35 @@ impl Session {
         Ok(())
     }
 
+    /// Declare whose voice a PRESET voice is: `"real_person"`,
+    /// `"synthetic"` or `"unknown"`.
+    ///
+    /// Cloning is not the only way to produce a deep fake: a preset voice
+    /// shipped inside a model can be an identifiable individual — a named
+    /// donor, or a corpus speaker such as VCTK's `p225` — and EU AI Act
+    /// Art. 3(60) attaches to the audio resembling that person, not to which
+    /// pipeline produced it. Setting `real_person` makes the Art. 50(4)
+    /// reminder fire for a non-cloned voice.
+    ///
+    /// It does **not** require a consent attestation: whether that donor
+    /// agreed to the model being trained is a licensing matter settled
+    /// upstream, which you cannot attest to.
+    ///
+    /// Returns `Err` on an unrecognised value rather than silently
+    /// downgrading it to `unknown`.
+    pub fn set_speaker_identity(&self, identity: &str) -> Result<(), String> {
+        let c = CString::new(identity).map_err(|e| e.to_string())?;
+        let rc =
+            unsafe { crispasr_sys::crispasr_session_set_speaker_identity(self.handle, c.as_ptr()) };
+        match rc {
+            0 => Ok(()),
+            -2 => Err(format!(
+                "unrecognised speaker_identity {identity:?} (expected real_person, synthetic or unknown)"
+            )),
+            _ => Err(format!("set_speaker_identity failed (rc={rc})")),
+        }
+    }
+
     /// Embed the AI-content watermark into f32 mono PCM, in place.
     ///
     /// The other half of [`Session::synthesize_raw`]: opting out of automatic
