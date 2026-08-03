@@ -257,13 +257,24 @@ inline SpeakerIdentity identity_for_voice_pack(const std::string& pack_path) {
 //                           disclosed, nothing about tara/leah/jess/leo/dan/
 //                           mia/zac/zoe. HF card, GitHub and web checked.
 //   orpheus lex-au German   No training-data documentation.
-//   bark                    Suno's README documents 100+ presets and a prompt
-//                           library, and says nothing about their provenance.
-//                           NOTE: third-party write-ups describe them as
-//                           "fully synthetic"; that phrasing is not in Suno's
-//                           own README, and a summary is not a provider
-//                           statement. Held at Unknown for that reason.
-//   melotts                 MyShell's card carries no training-data statement.
+//   bark                    Checked, 2026-08-03: the HF card, the GitHub
+//                           README, the repo's own model-card.md and the
+//                           linked Notion prompt library. None of the four
+//                           says where the 100+ presets came from. The only
+//                           adjacent sentence is about CLONING ("not
+//                           straightforward to voice clone known people"),
+//                           which is a different question.
+//                           NOTE: third-party write-ups describe the presets
+//                           as "fully synthetic"; that phrasing is in none of
+//                           Suno's own documents, and a summary is not a
+//                           provider statement. Held at Unknown for that
+//                           reason, not for lack of looking.
+//   melotts                 Checked, 2026-08-03: the HF card, the GitHub
+//                           README and docs/training.md. The training guide
+//                           explains how to train YOUR OWN model and discloses
+//                           nothing about the shipped EN-US / EN-BR /
+//                           EN-Default / EN_INDIA / ES / FR / ZH / JP / KR
+//                           speakers.
 //   speecht5                Structurally unanswerable per model — the voice is
 //                           a 512-d x-vector the OPERATOR supplies via --voice.
 //                           Answer it per run with --speaker-identity.

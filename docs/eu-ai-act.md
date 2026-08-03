@@ -596,6 +596,21 @@ direction where being wrong removes a disclosure.
    the key *is* unknown, and writing it would turn "nobody established this"
    into a claim the file makes about itself.
 
+   To stamp a whole directory of already-published files:
+
+   ```bash
+   ./models/stamp-published-voices.sh /path/to/gguf-dir
+   ```
+
+   It asks `crispasr --print-speaker-identity` for each file — the same
+   resolution the disclosure gate runs — and **skips anything that resolves to
+   `unknown`** rather than guessing. It never touches the network; re-uploading
+   is a separate, deliberate step.
+
+   `crispasr --print-speaker-identity FILE` is also the answer to "will this
+   disclose?": it prints `real_person` / `synthetic` / `unknown` and exits 3 on
+   unknown.
+
    Seven converters accept `--speaker-identity` (`convert-orpheus`,
    `convert-kokoro-voice`, `convert-piper`, `convert-fastpitch`,
    `convert-bananamind-tts`, `convert-parler`, `convert-csm`). They share one

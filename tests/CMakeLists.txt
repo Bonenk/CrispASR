@@ -3629,9 +3629,19 @@ if(APPLE AND TARGET ggml-metal)
     foreach(T 33 65 66 67 97 129 130 131 132 257)
         add_test(NAME metal_norm_T${T}
             COMMAND test_metal_norm_repro ${T} 512)
+        # 120s, not 30s. Measured on an IDLE box: 0.85s per test warm, 3.5s for
+        # the first (cold Metal pipeline cache) — so 30s looked like ~8x
+        # headroom. It is not: these are GPU tests, they contend with each
+        # other and with anything else using the GPU, and on a loaded machine
+        # (load 32-51 here) the whole set times out while passing in isolation.
+        #
+        # A ctest TIMEOUT is a backstop against a hang, not an assertion about
+        # speed — the same distinction test-vad-export's Test 4 got wrong one
+        # level down. Size it for the worst machine that will run it, not the
+        # median one.
         set_tests_properties(metal_norm_T${T} PROPERTIES
             LABELS "unit;metal"
-            TIMEOUT 30)
+            TIMEOUT 120)
     endforeach()
 endif()
 

@@ -2109,6 +2109,41 @@ int crispasr_run_backend(const whisper_params& params_in) {
         }
     }
 
+    // ── --print-speaker-identity: whose voice does this file produce? ─────
+    // Standalone verb, resolved with the SAME code the disclosure gate uses:
+    // the stamp inside the file first, then the researched legacy table. Runs
+    // before any backend/model resolution — it inspects a file, not a session.
+    //
+    // Exists so a script never has to restate a verdict. Anything that needs to
+    // know (the stamping driver, a packaging step, an operator asking "will
+    // this disclose?") asks the binary and gets the answer the runtime will
+    // actually act on, instead of keeping a third copy of the table that drifts.
+    //
+    // Prints one of real_person / synthetic / unknown on stdout. Exit 0 when
+    // the answer is established, 3 when it is unknown — so a shell driver can
+    // skip unknowns with `if crispasr --print-speaker-identity f; then ...`.
+    if (!params.print_speaker_identity_file.empty()) {
+        const std::string& path = params.print_speaker_identity_file;
+        // The stamp is authoritative wherever it exists; the tables are the
+        // legacy fallback for files published before it. Same strongest-duty
+        // combination the synthesis path applies, so this cannot report an
+        // answer weaker than the one that will be enforced.
+        const crispasr_voice::SpeakerIdentity stamped = crispasr_voice::read_model_speaker_identity(path);
+        const crispasr_voice::PackProvenance pack = crispasr_voice::read_pack_provenance(path);
+        const crispasr_voice::SpeakerIdentity table = crispasr_voice::identity_for_voice_pack(path);
+        const crispasr_voice::SpeakerIdentity id = crispasr_voice::resolve_speaker_identity(
+            /*override=*/crispasr_voice::parse_speaker_identity(params.tts_speaker_identity),
+            /*pack=*/pack.identity == crispasr_voice::SpeakerIdentity::Unknown ? table : pack.identity,
+            /*backend=*/crispasr_voice::SpeakerIdentity::Unknown, stamped);
+        printf("%s\n", crispasr_voice::to_string(id));
+        if (!params.no_prints) {
+            fprintf(stderr, "crispasr: '%s' -> speaker_identity=%s (stamp=%s, table=%s)\n", path.c_str(),
+                    crispasr_voice::to_string(id), crispasr_voice::to_string(stamped),
+                    crispasr_voice::to_string(table));
+        }
+        return id == crispasr_voice::SpeakerIdentity::Unknown ? 3 : 0;
+    }
+
     // ── --detect-watermark: standalone watermark detection verb ───────────
     // Reads a WAV file, runs watermark detection, prints the result, exits.
     // This is handled before any backend/model resolution so no GGUF is
