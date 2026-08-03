@@ -340,6 +340,8 @@ curl http://localhost:8080/v1/audio/speech \
 | `seed` | `0` | RNG seed for sampling. `0` = non-deterministic. Same-seed + same-text produces bit-identical audio on all sampling-capable TTS backends (qwen3-tts, chatterbox, vibevoice, orpheus). |
 | `temperature` | server's `--temperature` | Sampling temperature for AR TTS backends. `0` = greedy; backends apply their own default (e.g. 0.8 for qwen3-tts) when the global default of 0.0 is unchanged. |
 | `max_new_tokens` | server's `--max-new-tokens` | AR token generation cap. `<= 0` clears the override and uses the backend default. |
+| `max_speech_tokens` | backend default | MOSS-TTS / moss-tts-local hard cap on generated audio frames (~12.5 frames/sec). The decode loop is forced to end once this many frames are produced, so it bounds the worst-case synthesis length even when the model never emits its end token. Per request. |
+| `min_speech_tokens` | backend default | MOSS-TTS / moss-tts-local minimum number of generated audio frames (~12.5 frames/sec). The decode loop is forbidden from ending until this many frames are produced. **Setting `min_speech_tokens == max_speech_tokens` yields exact-duration synthesis** — the model generates precisely that window of audio (within one frame ≈ 80 ms) with no post-hoc tempo change, which is what game-dubbing / lip-sync work needs. Per request. |
 | `frequency_penalty` | `0.0` | Opt-in repeated generated-token penalty for AR TTS backends. `0.0` disabled. |
 | `top_p` | backend default | Nucleus-sampling cutoff for AR TTS backends (tada, chatterbox). Applied per request; omit to keep the backend default. |
 | `top_k` | backend default | Top-k sampling cutoff (`0` = disabled). Honoured by tada. Per request. |

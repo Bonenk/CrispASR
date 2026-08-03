@@ -185,6 +185,8 @@ public:
             sp.max_new_frames = params.max_new_tokens;
         if (params.tts_max_speech_tokens >= 0)
             sp.max_audio_frames = params.tts_max_speech_tokens;
+        if (params.tts_min_speech_tokens >= 0)
+            sp.min_audio_frames = params.tts_min_speech_tokens;
         if (params.tts_top_p >= 0.0f)
             sp.audio_top_p = params.tts_top_p;
         if (params.tts_top_k >= 0)

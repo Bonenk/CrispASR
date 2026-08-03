@@ -169,6 +169,11 @@ public:
         // 1s ≈ 12.5 tokens, so max_audio_frames is the token-level AR cap.
         if (params.tts_max_speech_tokens >= 0)
             sp.max_audio_frames = params.tts_max_speech_tokens;
+        // min_speech_tokens maps to min_audio_frames: when both min and max are
+        // set to the same value, the model is forced to generate exactly that
+        // many frames — exact-duration synthesis (lip-sync / game dubbing).
+        if (params.tts_min_speech_tokens >= 0)
+            sp.min_audio_frames = params.tts_min_speech_tokens;
         if (params.tts_top_p >= 0.0f)
             sp.audio_top_p = params.tts_top_p;
         if (params.tts_top_k >= 0)
