@@ -2130,7 +2130,15 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // answer weaker than the one that will be enforced.
         const crispasr_voice::SpeakerIdentity stamped = crispasr_voice::read_model_speaker_identity(path);
         const crispasr_voice::PackProvenance pack = crispasr_voice::read_pack_provenance(path);
-        const crispasr_voice::SpeakerIdentity table = crispasr_voice::identity_for_voice_pack(path);
+        // Both tables: this file may be a voice PACK or a MODEL, and the verb
+        // has no session to ask which. The model table keys on a backend name,
+        // so derive it from what the file declares about itself.
+        crispasr_voice::SpeakerIdentity table = crispasr_voice::identity_for_voice_pack(path);
+        if (table == crispasr_voice::SpeakerIdentity::Unknown) {
+            const std::string arch = crispasr_voice::read_gguf_architecture(path);
+            if (!arch.empty())
+                table = crispasr_voice::identity_for_model(crispasr_voice::backend_for_architecture(arch), path);
+        }
         const crispasr_voice::SpeakerIdentity id = crispasr_voice::resolve_speaker_identity(
             /*override=*/crispasr_voice::parse_speaker_identity(params.tts_speaker_identity),
             /*pack=*/pack.identity == crispasr_voice::SpeakerIdentity::Unknown ? table : pack.identity,
