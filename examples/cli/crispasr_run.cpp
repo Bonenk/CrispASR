@@ -2226,17 +2226,34 @@ int crispasr_run_backend(const whisper_params& params_in) {
             // probability of reaching this score by chance instead of a bare
             // threshold: the old `> 0.65` bar is p = 0.055, i.e. it called roughly
             // one in eighteen clean files watermarked, in the past tense.
-            const double p = crispasr_wm_stats::p_value(confidence, CRISPASR_WATERMARK_NBINS);
-            const auto verdict = crispasr_wm_stats::classify(confidence, CRISPASR_WATERMARK_NBINS);
-            fprintf(stdout, "Chance of this score without a watermark: %.2g\n", p);
-            fprintf(stdout, "Result: %s\n", crispasr_wm_stats::verdict_line(verdict));
-            if (verdict != crispasr_wm_stats::Verdict::Detected && dur_s < 10.0) {
-                fprintf(stdout,
-                        "Note: %.1f s is short for this detector — it averages spectra across frames, so\n"
-                        "      confidence grows with duration (measured: 78%% of 1 s clips vs 100%% of 10 s\n"
-                        "      clips clear the old bar). Use --watermark-model auto (AudioSeal) for a\n"
-                        "      sensitive check, and treat a negative here as inconclusive, not as proof.\n",
-                        dur_s);
+            if (crispasr_watermark_detect_uses_frames()) {
+                // Per-frame t + decoy specificity. The score is a calibrated
+                // confidence, not a bin count, so the binomial null does not
+                // apply and no p-value is printed — quoting one would invent an
+                // n that was never scored.
+                const auto verdict = crispasr_wm_stats::classify_frames(confidence);
+                fprintf(stdout, "Statistic: per-frame t + decoy specificity\n");
+                fprintf(stdout, "Result: %s\n", crispasr_wm_stats::verdict_line(verdict));
+                if (verdict != crispasr_wm_stats::Verdict::Detected && dur_s < 1.0) {
+                    fprintf(stdout,
+                            "Note: %.2f s is below the %d-frame minimum this statistic needs; it returns 0\n"
+                            "      rather than guess. A negative is not evidence the audio is human-made.\n",
+                            dur_s, crispasr_wm::kDetectMinFrames);
+                }
+            } else {
+                const double p = crispasr_wm_stats::p_value(confidence, CRISPASR_WATERMARK_NBINS);
+                const auto verdict = crispasr_wm_stats::classify(confidence, CRISPASR_WATERMARK_NBINS);
+                fprintf(stdout, "Statistic: bin-sign agreement (legacy)\n");
+                fprintf(stdout, "Chance of this score without a watermark: %.2g\n", p);
+                fprintf(stdout, "Result: %s\n", crispasr_wm_stats::verdict_line(verdict));
+                if (verdict != crispasr_wm_stats::Verdict::Detected && dur_s < 10.0) {
+                    fprintf(stdout,
+                            "Note: %.1f s is short for this detector — it averages spectra across frames, so\n"
+                            "      confidence grows with duration (measured: 69%% of 1 s clips vs 100%% of 10 s\n"
+                            "      clips clear the 0.65 bar). Unset CRISPASR_WATERMARK_DETECT to use the\n"
+                            "      per-frame statistic, which reads 97%% at 1 s with fewer false positives.\n",
+                            dur_s);
+                }
             }
         }
 
@@ -3295,13 +3312,28 @@ int crispasr_run_backend(const whisper_params& params_in) {
         if (!crispasr_wm_dispatch::is_disabled() && crispasr_wm_dispatch::get_ctx() == nullptr) {
             const double dur_s = sr_in > 0 ? (double)audio.size() / (double)sr_in : 0.0;
             const float conf = crispasr_wm_dispatch::detect(audio.data(), (int)audio.size(), sr_in);
-            const auto verdict = crispasr_wm_stats::classify(conf, CRISPASR_WATERMARK_NBINS);
-            if (dur_s >= 5.0 && verdict == crispasr_wm_stats::Verdict::NotDetected) {
-                fprintf(stderr,
-                        "crispasr: warning: watermark self-check did not find the mark it just embedded "
-                        "(score=%.3f over %.1fs, p=%.2g). The file is still marked if C2PA signing "
-                        "succeeded; re-run --detect-watermark to confirm.\n",
-                        conf, dur_s, crispasr_wm_stats::p_value(conf, CRISPASR_WATERMARK_NBINS));
+            const bool frames = crispasr_watermark_detect_uses_frames();
+            const auto verdict = frames ? crispasr_wm_stats::classify_frames(conf)
+                                        : crispasr_wm_stats::classify(conf, CRISPASR_WATERMARK_NBINS);
+            // The per-frame statistic finds a fresh embed on ~100% of clips at
+            // 2.5 s and up, so the 5 s guard it needed is only about the legacy
+            // path. Keep it there; the self-check is a diagnostic either way and
+            // must never be read as the marking gate (embedding is unconditional).
+            const double min_dur = frames ? 2.5 : 5.0;
+            if (dur_s >= min_dur && verdict == crispasr_wm_stats::Verdict::NotDetected) {
+                if (frames) {
+                    fprintf(stderr,
+                            "crispasr: warning: watermark self-check did not find the mark it just embedded "
+                            "(score=%.3f over %.1fs). The file is still marked if C2PA signing succeeded; "
+                            "re-run --detect-watermark to confirm.\n",
+                            conf, dur_s);
+                } else {
+                    fprintf(stderr,
+                            "crispasr: warning: watermark self-check did not find the mark it just embedded "
+                            "(score=%.3f over %.1fs, p=%.2g). The file is still marked if C2PA signing "
+                            "succeeded; re-run --detect-watermark to confirm.\n",
+                            conf, dur_s, crispasr_wm_stats::p_value(conf, CRISPASR_WATERMARK_NBINS));
+                }
             }
         }
 

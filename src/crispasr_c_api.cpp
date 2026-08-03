@@ -870,7 +870,9 @@ CA_EXPORT float crispasr_watermark_detect(const float* pcm, int n_samples) {
         if (probs)
             free(probs);
     }
-    return ::crispasr_watermark_detect_impl(pcm, n_samples);
+    // Selector, not the sign test directly — the CLI dispatch uses the same one
+    // so both surfaces always report the same statistic (HARD RULE #6).
+    return ::crispasr_watermark_detect_select(pcm, n_samples);
 }
 
 CA_EXPORT void crispasr_watermark_embed(float* pcm, int n_samples, float alpha) {
