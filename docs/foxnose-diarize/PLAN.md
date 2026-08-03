@@ -8,9 +8,23 @@ of numerics.
 ## NOW — active work
 
 Embedder, clustering, smoothing, pipeline, DER harness, CLI wiring and
-word-aligned segment splitting all landed. **Automatic speaker counting is the open problem** (below). Not yet
-done: WeSpeaker GGUF upload + CC-BY attribution, THIRD_PARTY_NOTICES entry,
-docs/architecture.md section, session ABI, real-audio DER.
+word-aligned segment splitting all landed. **Automatic speaker counting is the
+open problem** (below).
+
+The old "not yet done" list here was stale — re-verified 2026-08-03, all five
+had in fact landed:
+
+| claimed missing | actual state |
+|---|---|
+| WeSpeaker GGUF upload + CC-BY attribution | uploaded; `api.model_info("cstr/wespeaker-resnet34-lm-GGUF").cardData["license"]` returns `cc-by-4.0` |
+| THIRD_PARTY_NOTICES entry | present (7 WeSpeaker mentions) |
+| docs/architecture.md section | present (6 foxnose mentions) |
+| session ABI | `foxnose_embedder_path` in `crispasr_c_api.cpp` (`crispasr_diarize_opts_abi`) |
+| registry auto-download | `{"wespeaker", "wespeaker-resnet34-lm.gguf", …}` in `crispasr_model_registry.cpp` |
+
+Only **real-audio DER** was genuinely open, and it is now the root `PLAN.md`
+NOW item (§1: route the pyannote+embedder path through the same
+`core_spectral::cluster_speakers` that gets foxnose to 7.32%).
 
 ### Post-release server fixes (reporter follow-up on v0.8.25)
 
