@@ -3994,6 +3994,46 @@ class CrispasrSession {
   /// Act Art. 50). REQUIRED before [synthesizeRaw] will return unmarked audio;
   /// the default [synthesize] is watermarked and needs no attestation.
   /// [attestation] is a human-readable affirmation recorded for audit.
+  /// Declare whose voice a PRESET voice is: `real_person`, `synthetic` or
+  /// `unknown`.
+  ///
+  /// Cloning is not the only way to produce a deep fake: a preset voice
+  /// shipped inside a model can be an identifiable individual (a named donor,
+  /// a corpus speaker), and EU AI Act Art. 3(60) attaches to the audio
+  /// resembling that person rather than to which pipeline made it. Setting
+  /// `real_person` makes the Art. 50(4) reminder fire for a non-cloned voice.
+  ///
+  /// It does NOT require a consent attestation — whether the donor agreed to
+  /// the model being trained is a licensing matter settled upstream that you
+  /// cannot attest to.
+  ///
+  /// Throws [ArgumentError] on an unrecognised value rather than silently
+  /// treating it as `unknown`.
+  void setSpeakerIdentity(String identity) {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_set_speaker_identity')) {
+      throw UnsupportedError(
+          'speaker-identity API not available in this libcrispasr build');
+    }
+    final fn = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Pointer<Utf8>),
+        int Function(Pointer<Void>, Pointer<Utf8>)>(
+      'crispasr_session_set_speaker_identity',
+    );
+    final p = identity.toNativeUtf8();
+    try {
+      final rc = fn(_handle, p);
+      if (rc == -2) {
+        throw ArgumentError(
+            "unrecognised speaker_identity '$identity'; expected "
+            "'real_person', 'synthetic' or 'unknown'");
+      }
+      if (rc != 0) throw StateError('setSpeakerIdentity failed (rc=$rc)');
+    } finally {
+      calloc.free(p);
+    }
+  }
+
   void acceptMarkingResponsibility([String attestation = '']) {
     if (_closed) throw StateError('CrispasrSession is closed');
     if (!_lib.providesSymbol('crispasr_session_accept_marking_responsibility')) {

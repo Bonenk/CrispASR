@@ -137,6 +137,10 @@ ALL_SYMBOLS = [
     "crispasr_session_set_temperature",
     "crispasr_session_set_top_p",
     "crispasr_session_set_tts_reference_language",
+    # EU AI Act Art. 50(4): whose voice a PRESET voice is. Listed here so the
+    # parity suite proves every binding can actually resolve it — the mechanism
+    # shipped reachable only from the C ABI once already.
+    "crispasr_session_set_speaker_identity",
     "crispasr_session_set_translate",
     "crispasr_session_set_tts_seed",
     "crispasr_session_set_tts_steps",
@@ -210,7 +214,7 @@ def test_symbol_resolves(lib, symbol):
 
 def test_symbol_count(lib):
     """Sanity-check accidental edits to the maintained symbol set."""
-    assert len(ALL_SYMBOLS) == 153, f"expected 153 symbols, got {len(ALL_SYMBOLS)}"
+    assert len(ALL_SYMBOLS) == 154, f"expected 154 symbols, got {len(ALL_SYMBOLS)}"
 
 
 def test_python_binding_imports():

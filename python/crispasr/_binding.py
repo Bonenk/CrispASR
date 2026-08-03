@@ -2703,6 +2703,33 @@ class Session:
         self._lib.crispasr_session_accept_marking_responsibility.restype = ctypes.c_int
         self._lib.crispasr_session_accept_marking_responsibility(self._handle, attestation.encode("utf-8"))
 
+    def set_speaker_identity(self, identity: str) -> None:
+        """Declare whose voice a PRESET voice is: "real_person", "synthetic" or
+        "unknown". A preset shipped inside a model can be an identifiable
+        individual, which makes its output a deep fake under EU AI Act
+        Art. 3(60) even though nothing was cloned — so "not a clone" is not
+        the same as "nothing to disclose". Setting real_person makes the
+        Art. 50(4) reminder fire for a non-cloned voice; it does NOT require a
+        consent attestation, because the donor's agreement to the training is
+        settled upstream and you cannot attest to it.
+
+        Raises :class:`ValueError` on an unrecognised value rather than
+        silently downgrading it to "unknown" — a typo must not quietly remove
+        a duty you meant to declare.
+        """
+        if not hasattr(self._lib, "crispasr_session_set_speaker_identity"):
+            raise RuntimeError("speaker-identity API not present in this libcrispasr build")
+        self._lib.crispasr_session_set_speaker_identity.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        self._lib.crispasr_session_set_speaker_identity.restype = ctypes.c_int
+        rc = self._lib.crispasr_session_set_speaker_identity(self._handle, identity.encode("utf-8"))
+        if rc == -2:
+            raise ValueError(
+                f"unrecognised speaker_identity {identity!r}; "
+                "expected 'real_person', 'synthetic' or 'unknown'"
+            )
+        if rc != 0:
+            raise RuntimeError(f"set_speaker_identity failed (rc={rc})")
+
     def synthesize_raw(self, text: str) -> "np.ndarray":
         """UNMARKED synthesis (no watermark), for callers that post-process
         before embedding the mark themselves. Hard-refused unless

@@ -345,6 +345,37 @@ namespace CrispASR
                      "accept_marking_responsibility");
 
         /// <summary>
+        /// Declare whose voice a PRESET voice is: <c>real_person</c>,
+        /// <c>synthetic</c> or <c>unknown</c>.
+        /// <para>
+        /// Cloning is not the only way to produce a deep fake: a preset voice
+        /// shipped inside a model can be an identifiable individual — a named
+        /// donor, or a corpus speaker such as VCTK's <c>p225</c> — and EU AI Act
+        /// Art. 3(60) attaches to the audio resembling that person, not to which
+        /// pipeline produced it. Setting <c>real_person</c> makes the Art. 50(4)
+        /// reminder fire for a non-cloned voice.
+        /// </para>
+        /// <para>
+        /// It does <b>not</b> require a consent attestation: whether that donor
+        /// agreed to the model being trained is a licensing matter settled
+        /// upstream that you cannot attest to.
+        /// </para>
+        /// </summary>
+        /// <exception cref="ArgumentException">
+        /// Thrown on an unrecognised value, rather than silently downgrading it
+        /// to <c>unknown</c>.
+        /// </exception>
+        public void SetSpeakerIdentity(string identity)
+        {
+            int rc = NativeMethods.crispasr_session_set_speaker_identity(Handle, identity ?? "");
+            if (rc == -2)
+                throw new ArgumentException(
+                    $"unrecognised speaker_identity '{identity}' " +
+                    "(expected real_person, synthetic or unknown)", nameof(identity));
+            Check(rc, "set_speaker_identity");
+        }
+
+        /// <summary>
         /// UNMARKED synthesis (no watermark), for callers that post-process before
         /// embedding the mark themselves. Hard-refused (throws) unless
         /// <see cref="AcceptMarkingResponsibility"/> was called first. Prefer

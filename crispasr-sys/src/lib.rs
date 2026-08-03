@@ -551,6 +551,14 @@ extern "C" {
         s: *mut CrispasrSession,
         attestation: *const c_char,
     ) -> c_int;
+    // Declare whose voice a PRESET voice is: "real_person" | "synthetic" |
+    // "unknown". A preset can be an identifiable individual, which makes its
+    // output a deep fake under Art. 3(60) without any cloning. Returns 0, -1 on
+    // a bad session, -2 on an unrecognised value.
+    pub fn crispasr_session_set_speaker_identity(
+        s: *mut CrispasrSession,
+        identity: *const c_char,
+    ) -> c_int;
     // Sample rate the backend expects for input PCM (16000 for Whisper-family,
     // the model's native rate otherwise; 0 on error). Pair with s2s/synthesize to
     // feed input at the right rate.

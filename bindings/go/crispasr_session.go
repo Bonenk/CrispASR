@@ -77,6 +77,7 @@ int              crispasr_session_is_voice_design(CrispasrSession* s);
 float*           crispasr_session_synthesize(CrispasrSession* s, const char* text, int* out_n_samples);
 float*           crispasr_session_synthesize_raw(CrispasrSession* s, const char* text, int* out_n_samples);
 int              crispasr_session_accept_marking_responsibility(CrispasrSession* s, const char* attestation);
+int              crispasr_session_set_speaker_identity(CrispasrSession* s, const char* identity);
 float*           crispasr_session_speech_to_speech(CrispasrSession* s, const float* in_samples, int n_in_samples,
                                                     char** out_text, int* out_n_samples);
 void             crispasr_session_translate_text_free(char* text);
@@ -1034,6 +1035,37 @@ func (s *CrispasrSession) Synthesize(text string) ([]float32, error) {
 	src := unsafe.Slice((*float32)(unsafe.Pointer(ptr)), int(n))
 	copy(samples, src)
 	return samples, nil
+}
+
+// SetSpeakerIdentity declares whose voice a PRESET voice is: "real_person",
+// "synthetic" or "unknown".
+//
+// Cloning is not the only way to produce a deep fake. A preset voice shipped
+// inside a model can be an identifiable individual — a named donor, a corpus
+// speaker — and EU AI Act Art. 3(60) attaches to the audio resembling that
+// person, not to which pipeline made it. Setting real_person makes the
+// Art. 50(4) reminder fire for a non-cloned voice.
+//
+// It does NOT require a consent attestation: whether that donor agreed to the
+// model being trained is a licensing matter settled upstream that you cannot
+// attest to.
+//
+// Returns an error on an unrecognised value rather than silently downgrading
+// it to "unknown".
+func (s *CrispasrSession) SetSpeakerIdentity(identity string) error {
+	if s == nil || s.handle == nil {
+		return errors.New("session is closed")
+	}
+	cid := C.CString(identity)
+	defer C.free(unsafe.Pointer(cid))
+	switch rc := C.crispasr_session_set_speaker_identity(s.handle, cid); rc {
+	case 0:
+		return nil
+	case -2:
+		return fmt.Errorf("unrecognised speaker_identity %q (expected real_person, synthetic or unknown)", identity)
+	default:
+		return fmt.Errorf("crispasr_session_set_speaker_identity failed (rc=%d)", int(rc))
+	}
 }
 
 // AcceptMarkingResponsibility attests that the caller accepts AI-content

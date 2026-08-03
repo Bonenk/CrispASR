@@ -49,6 +49,7 @@ extern int crispasr_session_is_voice_design(struct CrispasrSession* s);
 extern float* crispasr_session_synthesize(struct CrispasrSession* s, const char* text, int* out_n_samples);
 extern float* crispasr_session_synthesize_raw(struct CrispasrSession* s, const char* text, int* out_n_samples);
 extern int crispasr_session_accept_marking_responsibility(struct CrispasrSession* s, const char* attestation);
+extern int crispasr_session_set_speaker_identity(struct CrispasrSession* s, const char* identity);
 extern float* crispasr_session_speech_to_speech(struct CrispasrSession* s, const float* in_samples, int n_in_samples,
                                                 char** out_text, int* out_n_samples);
 extern int crispasr_session_input_sample_rate(struct CrispasrSession* s);
@@ -779,6 +780,24 @@ static VALUE rb_session_synthesize_raw(VALUE self, VALUE handle, VALUE text) {
 static VALUE rb_session_accept_marking_responsibility(VALUE self, VALUE handle, VALUE attestation) {
     struct CrispasrSession* s = (struct CrispasrSession*)NUM2ULL(handle);
     int rc = crispasr_session_accept_marking_responsibility(s, NIL_P(attestation) ? "" : StringValueCStr(attestation));
+    return INT2NUM(rc);
+}
+
+// CrispASR::Session.set_speaker_identity(handle, identity) -> Integer rc
+//   Declare whose voice a PRESET voice is: "real_person", "synthetic" or
+//   "unknown". A preset shipped inside a model can be an identifiable
+//   individual, which makes its output a deep fake under EU AI Act Art. 3(60)
+//   even though nothing was cloned. Setting real_person makes the Art. 50(4)
+//   reminder fire for a non-cloned voice; it does NOT require a consent
+//   attestation. Raises ArgumentError on an unrecognised value rather than
+//   silently downgrading it to "unknown".
+static VALUE rb_session_set_speaker_identity(VALUE self, VALUE handle, VALUE identity) {
+    (void)self;
+    struct CrispasrSession* s = (struct CrispasrSession*)NUM2ULL(handle);
+    int rc = crispasr_session_set_speaker_identity(s, NIL_P(identity) ? "" : StringValueCStr(identity));
+    if (rc == -2)
+        rb_raise(rb_eArgError,
+                 "unrecognised speaker_identity (expected real_person, synthetic or unknown)");
     return INT2NUM(rc);
 }
 
@@ -1887,6 +1906,7 @@ void init_ruby_crispasr_session(VALUE* mWhisper) {
     rb_define_singleton_method(mSession, "speaker_db_count", rb_speaker_db_count, 1);
     rb_define_singleton_method(mSession, "speaker_db_match", rb_speaker_db_match, 3);
     rb_define_singleton_method(mSession, "speaker_db_enroll", rb_speaker_db_enroll, 4);
+    rb_define_singleton_method(mSession, "set_speaker_identity", rb_session_set_speaker_identity, 2);
     rb_define_singleton_method(mSession, "watermark_embed", rb_watermark_embed, 1);
     rb_define_singleton_method(mSession, "watermark_detect", rb_watermark_detect, 1);
 

@@ -51,6 +51,8 @@ public final class CrispasrSession implements AutoCloseable {
         // UNMARKED synthesis — refused unless crispasr_session_accept_marking_responsibility() was called first.
         Pointer crispasr_session_synthesize_raw(Pointer session, String text, IntByReference outNSamples);
         int     crispasr_session_accept_marking_responsibility(Pointer session, String attestation);
+        // Whose voice a PRESET voice is (EU AI Act Art. 50(4)); -2 on a bad value.
+        int     crispasr_session_set_speaker_identity(Pointer session, String identity);
         // Speech-to-speech (lfm2-audio, mini-omni2, sidon, voxcpm2-vae). outText receives the intermediate transcript.
         Pointer crispasr_session_speech_to_speech(Pointer session, float[] inSamples, int nInSamples,
                                                   PointerByReference outText, IntByReference outNSamples);
@@ -753,6 +755,37 @@ public final class CrispasrSession implements AutoCloseable {
         if (rc != 0) {
             throw new IllegalStateException(
                     "accept_marking_responsibility failed (rc=" + rc + ")");
+        }
+    }
+
+    /**
+     * Declare whose voice a PRESET voice is: {@code "real_person"},
+     * {@code "synthetic"} or {@code "unknown"}.
+     *
+     * <p>Cloning is not the only way to produce a deep fake: a preset voice
+     * shipped inside a model can be an identifiable individual — a named donor,
+     * or a corpus speaker such as VCTK's {@code p225} — and EU AI Act
+     * Art. 3(60) attaches to the audio resembling that person, not to which
+     * pipeline produced it. Setting {@code real_person} makes the Art. 50(4)
+     * reminder fire for a non-cloned voice.
+     *
+     * <p>It does <b>not</b> require a consent attestation: whether that donor
+     * agreed to the model being trained is a licensing matter settled upstream
+     * that you cannot attest to.
+     *
+     * @throws IllegalArgumentException on an unrecognised value, rather than
+     *         silently downgrading it to {@code unknown}.
+     */
+    public void setSpeakerIdentity(String identity) {
+        int rc = Lib.INSTANCE.crispasr_session_set_speaker_identity(
+                handle, identity == null ? "" : identity);
+        if (rc == -2) {
+            throw new IllegalArgumentException(
+                    "unrecognised speaker_identity '" + identity
+                            + "' (expected real_person, synthetic or unknown)");
+        }
+        if (rc != 0) {
+            throw new IllegalStateException("set_speaker_identity failed (rc=" + rc + ")");
         }
     }
 
