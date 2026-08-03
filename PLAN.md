@@ -251,20 +251,21 @@ touch runtime code — the reader and the tables already shipped (`64c9de2e`).
 
 ## OPEN follow-ups from #316 (kokoro G2P, landed 2026-07-28)
 
-- **Numbers: EN and DE done, FR/ES still drop them.** `core/num2words_en.h` →
-  `g2p_en` and `core/num2words_de.h` → `g2p_de` (`4825f4df`, hermetic
-  `tests/test-num2words-de.cpp`, 55 assertions). German needed four rules
-  English does not have: units-first compounds (82 = zweiundachtzig), the
-  irregular stems (sechzehn/siebzehn/sechzig/siebzig/dreißig), INVERTED
-  separators ("1.000" is a thousand, "3,14" is a decimal), and years that switch
-  to the cardinal reading at 2000. **`g2p_fr` / `g2p_es` still phonemize `82` to
-  the empty string and drop it** — same fix, different traps: French
-  soixante-dix / quatre-vingts / quatre-vingt-dix, Spanish dieciséis /
-  veintiuno / quinientos / setecientos / novecientos, and both use the comma as
-  decimal mark like German. Mirror `num2words_de.h` + its test file.
-  ⚠ Known limitation carried by the German side: ordinals emit the citation
-  form, so "Am 1. Mai" reads "erste" where German inflects to "ersten". Case is
-  not recoverable inside a G2P.
+- **Numbers: DONE for all four built-in G2Ps** (en `num2words_en.h`, de
+  `num2words_de.h` `ce7c8226`, fr+es `num2words_fr.h`/`num2words_es.h`
+  `ddb08ae1`). Every one of them used to phonemize `82` to the empty string and
+  drop it silently. Hermetic coverage in `tests/test-num2words-de.cpp` (55
+  assertions) and `tests/test-num2words-fr-es.cpp` (87).
+  Each language needed rules the others do not have, and two were caught only by
+  running the tables: **French** 80 000 came out "quatre-vingt**s** mille" (the
+  plural s must drop before a SCALE word, not just before another digit group),
+  and **Spanish** 21 000 came out "veintiuno mil" (`uno` apocopates before a
+  masculine noun and `mil` counts → "veintiún mil").
+  ⚠ Two deliberate limitations: German ordinals emit the citation form, so
+  "Am 1. Mai" reads "erste" where German inflects to "ersten" (case is not
+  recoverable inside a G2P); Spanish ordinals are lexical to décimo and fall back
+  to the cardinal above, rather than inventing "vigésimo primero" forms a TTS
+  voice has rarely been trained on.
 - **misaki's reduced vowels `ᵊ` / `ᵻ` are not modelled.** We emit plain `ə`/`ɪ`
   where misaki reduces. Measured worth: exact whole-word phoneme match goes
   58.3% → ~63% if handled. It is context-dependent (misaki uses both forms), so
