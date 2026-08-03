@@ -729,6 +729,53 @@ teaches every wrapper to omit it.
 Shipping a text-generating endpoint does not make this project a GPAI provider —
 the model is the operator's choice and its provider's responsibility (§7).
 
+### 6.6a The consent record — what it binds to, and whose artefact it is
+
+A clone writes a `[CONSENT]` audit record on every surface. Two things about it
+are worth stating plainly, because both are easy to assume wrongly.
+
+**It binds to the audio, not to a name.** The record carries
+`ref_sha256=<hex>` — the SHA-256 of the file the backend actually opened, after
+`--voice-dir` resolution, so a bare `--voice alice` records the same evidence a
+full path does. Before this the record said `voice=alice.wav` and nothing more,
+which is an assertion rather than evidence: that file can be swapped a minute
+later and the line still reads true. Where no file is involved (a voice-bank
+entry selected by name, a preset), the field reads `ref_sha256=none` — an honest
+"not applicable", never a zero hash that would look like a real one.
+
+A `run_id` ties the record to the `[CONSENT-OUTPUT]` line emitted after
+synthesis, which carries the output path and `out_sha256` of the file as
+written — watermarked and C2PA-signed, the artefact that actually leaves the
+machine. On the server a per-request `req` id does the same job across
+concurrent requests, and is returned to the client as `X-Crispasr-Request-Id`.
+So a disputed clip can be walked back to the attestation that authorised it.
+
+**It is the operator's artefact, not ours.** CrispASR is a tool; the operator is
+the controller. `--consent-log <path>` (or `CRISPASR_CONSENT_LOG`) appends every
+record as JSON Lines in addition to stderr, and is **off by default** — turning
+on a persistent record of who attested what is the operator's decision, and it
+is theirs to retain and erase.
+
+The reason the separate sink exists at all: stderr here is interleaved with
+model-load noise, download progress bars and warnings, which makes it a poor
+evidential artefact however carefully each line is written.
+
+**What this does not claim.** It is not tamper-proofing, and the code says so.
+The attestation is made *by* the operator, who controls the process, its output
+and any file it writes — no in-process mechanism defends against the party it is
+recording. Real tamper-resistance is a storage decision: append-only
+permissions, object-lock/WORM, or shipping the sink off-box to something the
+operator cannot rewrite. The sibling projects hash-chain their consent logs;
+CrispASR deliberately does not, because chaining protects the *sequence* of
+records and the first thing to fix was that each record was unbound to any
+audio. Chaining unbound assertions yields a perfectly verifiable log that proves
+nothing. See `PLAN.md` for the full reasoning.
+
+**Data minimisation.** The record carries a hash of the reference, never the
+recording, and never a speaker name. Every field stored is a field that must be
+erasable on request, and a hash is far easier to justify retaining than the
+audio it was taken from.
+
 ### 6.7 Reading `--detect-watermark` (it is a diagnostic, not proof)
 
 The built-in detector answers two questions about the spread-spectrum comb, and

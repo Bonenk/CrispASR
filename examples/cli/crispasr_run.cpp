@@ -58,6 +58,7 @@
 #include "core/crispasr_c2pa.h"
 #include "crispasr_tts_chunking.h"
 #include "crispasr_tts_disclaimer.h"
+#include "crispasr_consent_record.h"
 #include "crispasr_voice_clone_policy.h"
 #include "crispasr_voice_provenance.h"
 #include "core/crispasr_watermark.h"
@@ -2850,6 +2851,10 @@ int crispasr_run_backend(const whisper_params& params_in) {
             if (!params.no_prints)
                 fprintf(stderr, "crispasr[tada-clone]: baked voice ref (%d tokens) → %s\n", result.n_tokens,
                         tmp.c_str());
+            // Remember the recording BEFORE the rewrite: consent was given for
+            // that file, so it is what the audit record hashes. The baked pack
+            // is derived and not byte-stable across runs.
+            params.tts_voice_source_recording = params.tts_voice;
             params.tts_voice = tmp; // backend init() now sees a .gguf reference
             // The rewrite above erases the ONLY evidence this voice is a clone:
             // the consent + spoken-disclosure gates below classify by suffix, so
@@ -3097,6 +3102,10 @@ int crispasr_run_backend(const whisper_params& params_in) {
         // Honor the --no-watermark opt-out (equivalent to CRISPASR_NO_WATERMARK).
         crispasr_wm_dispatch::set_disabled(params.tts_no_watermark);
 
+        // Consent-record sink: --consent-log set this at parse time; the env
+        // var covers wrappers that cannot add a flag. Explicit flag wins.
+        crispasr_consent::init_log_path_from_env();
+
         // Voice-cloning consent gate. A clone is a .wav reference, a voice baked
         // from one during this run, or a pack that declares it was derived from a
         // real recording — NOT merely "the path ends in .wav", which missed the
@@ -3119,13 +3128,31 @@ int crispasr_run_backend(const whisper_params& params_in) {
             return 17;
         }
         if (is_voice_clone) {
-            // Log consent attestation with timestamp for audit trail
+            // Log consent attestation with timestamp for audit trail.
+            // `ref_sha256` binds the record to the BYTES that were cloned, not
+            // just the name they were cloned under — a name is not evidence,
+            // because the file can be swapped afterwards and the line still
+            // reads true. Hash whatever the backend will actually open (the
+            // --voice-dir resolution), so a bare name records the same thing a
+            // full path would. See crispasr_consent_record.h.
             auto now = std::chrono::system_clock::now();
             auto t = std::chrono::system_clock::to_time_t(now);
             char ts[64];
             std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
-            fprintf(stderr, "[CONSENT] ts=%s voice=%s clone_reason=%s attestation=\"%s\"\n", ts,
-                    params.tts_voice.c_str(), clone_decision.reason, params.tts_consent_attestation.c_str());
+            // For an inline bake, hash the ORIGINAL recording rather than the
+            // temp pack it was baked into — that is the file consent covers.
+            const std::string ref_target =
+                !params.tts_voice_source_recording.empty()
+                    ? params.tts_voice_source_recording
+                    : crispasr_voice::resolve_voice_path(params.tts_voice, params.tts_voice_dir);
+            std::string ref = crispasr_consent::file_sha256(ref_target);
+            crispasr_consent::emit(
+                "CONSENT", ts,
+                {{"voice", params.tts_voice},
+                 {"clone_reason", clone_decision.reason},
+                 {"attestation", params.tts_consent_attestation, /*quoted=*/true},
+                 {"ref_sha256", ref.empty() ? "none" : ref},
+                 {"ref_is", params.tts_voice_source_recording.empty() ? "resolved-voice" : "source-recording"}});
         }
 
         // Art. 50(4) applies to a PRESET voice too when that voice is an
@@ -3335,6 +3362,24 @@ int crispasr_run_backend(const whisper_params& params_in) {
                             conf, dur_s, crispasr_wm_stats::p_value(conf, CRISPASR_WATERMARK_NBINS));
                 }
             }
+        }
+
+        // Close the loop on the consent record: the same run_id appears on the
+        // [CONSENT] line above, so a disputed clip can be walked back to the
+        // attestation that authorised it. Emitted for CLONES only — a preset
+        // needs no attestation, so there would be nothing to correlate to.
+        // out_sha256 is of the file as WRITTEN (watermarked, C2PA-signed), which
+        // is the artefact that leaves the machine.
+        if (is_voice_clone) {
+            auto now = std::chrono::system_clock::now();
+            auto t = std::chrono::system_clock::to_time_t(now);
+            char ts[64];
+            std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
+            std::string out_hash = crispasr_consent::file_sha256(out_path);
+            crispasr_consent::emit("CONSENT-OUTPUT", ts,
+                                   {{"output", out_path},
+                                    {"out_sha256", out_hash.empty() ? "none" : out_hash},
+                                    {"seconds", std::to_string((double)audio.size() / (double)sr_in)}});
         }
 
         if (!params.no_prints)

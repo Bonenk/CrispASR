@@ -54,6 +54,7 @@
 #include "crispasr_marking_policy.h" // #312: who may skip the spoken AI-disclaimer
 #include "crispasr_tts_chunking.h"
 #include "crispasr_tts_disclaimer.h"
+#include "crispasr_consent_record.h"
 #include "crispasr_voice_clone_policy.h"
 #include "crispasr_voice_provenance.h"
 #include "core/crispasr_watermark.h"
@@ -1151,6 +1152,17 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
 
     crispasr_install_fatal_signal_handlers();
 
+    // Consent-record sink. --consent-log already set this during arg parsing;
+    // the env var is the route for a container where adding a flag to the
+    // entrypoint is awkward. Explicit flag wins.
+    if (!params.consent_log.empty())
+        crispasr_consent::set_log_path(params.consent_log);
+    crispasr_consent::init_log_path_from_env();
+    if (!crispasr_consent::log_path().empty())
+        fprintf(stderr,
+                "crispasr-server: consent records -> %s (JSON Lines; append-only storage is yours to provide)\n",
+                crispasr_consent::log_path().c_str());
+
     // #261: compare the build's CPU instruction-set baseline against this host.
     // If they mismatch, the CPU-only paths (VAD / diarization) would raise
     // SIGILL — log a loud banner now and refuse those requests below (soft
@@ -2101,6 +2113,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     // --voice / --instruct.
     // -----------------------------------------------------------------------
     svr.Post("/v1/audio/speech", [&](const Request& req, Response& res) {
+        // Mint the per-request correlation id first, so every audit record this
+        // handler emits carries it. Without it a [CONSENT] line and the response
+        // it authorised are unlinkable on a server serving many requests.
+        crispasr_consent::new_request_id();
+        res.set_header("X-Crispasr-Request-Id", crispasr_consent::request_correlation_id());
         if (!require_auth(req, res))
             return;
         if (!ready.load()) {
@@ -2240,9 +2257,19 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
             // The audit line records what this response ACTUALLY carries, not
             // what was asked for — a denied opt-out reads spoken_disclaimer=yes.
-            fprintf(stderr, "[CONSENT] ts=%s voice=%s clone_reason=%s attestation=\"%s\" spoken_disclaimer=%s\n", ts,
-                    log_sanitize(voice_name).c_str(), clone_decision.reason, log_sanitize(consent_attestation).c_str(),
-                    marking.apply_spoken_disclaimer ? "yes" : "no");
+            // ref_sha256 binds it to the bytes cloned (see
+            // crispasr_consent_record.h); req is the per-request correlation id,
+            // without which a consent line and the response it authorised are
+            // unlinkable on a server serving many.
+            const std::string resolved_ref = crispasr_voice::resolve_voice_path(voice_name, params.tts_voice_dir);
+            std::string ref_hash = crispasr_consent::file_sha256(resolved_ref);
+            crispasr_consent::emit("CONSENT", ts,
+                                   {{"voice", log_sanitize(voice_name)},
+                                    {"clone_reason", clone_decision.reason},
+                                    {"attestation", log_sanitize(consent_attestation), /*quoted=*/true},
+                                    {"spoken_disclaimer", marking.apply_spoken_disclaimer ? "yes" : "no"},
+                                    {"ref_sha256", ref_hash.empty() ? "none" : ref_hash},
+                                    {"req", crispasr_consent::request_correlation_id()}});
             if (marking.optout_denied) {
                 fprintf(stderr,
                         "[MARKING] ts=%s scope=request no_spoken_disclaimer=DENIED "
@@ -2953,6 +2980,11 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     // asked for, and no [CONSENT] line existed to show it had been.
     // -----------------------------------------------------------------------
     svr.Post("/v1/voices", [&](const Request& req, Response& res) {
+        // Mint the per-request correlation id first, so every audit record this
+        // handler emits carries it. Without it a [CONSENT] line and the response
+        // it authorised are unlinkable on a server serving many requests.
+        crispasr_consent::new_request_id();
+        res.set_header("X-Crispasr-Request-Id", crispasr_consent::request_correlation_id());
         if (!require_auth(req, res))
             return;
         // CAP_TTS gate (documented CAP_TTS-only; matches the GET /v1/voices guard).
@@ -3053,11 +3085,18 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
             char ts[64];
             auto t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
             std::strftime(ts, sizeof(ts), "%Y-%m-%dT%H:%M:%S%z", std::localtime(&t));
-            fprintf(stderr,
-                    "[CONSENT] ts=%s scope=voice-upload voice=%s clone_reason=recording-reference bytes=%zu "
-                    "attestation=\"%s\"\n",
-                    ts, log_sanitize(voice_name).c_str(), voice_file.content.size(),
-                    log_sanitize(upload_consent).c_str());
+            // Hash the UPLOADED BYTES, not the file that was written: this is
+            // the recording the attestation is about, and hashing it here binds
+            // the two before anything on disk can be swapped.
+            crispasr_consent::emit(
+                "CONSENT", ts,
+                {{"scope", "voice-upload"},
+                 {"voice", log_sanitize(voice_name)},
+                 {"clone_reason", "recording-reference"},
+                 {"bytes", std::to_string(voice_file.content.size())},
+                 {"attestation", log_sanitize(upload_consent), /*quoted=*/true},
+                 {"ref_sha256", crispasr_consent::bytes_sha256(voice_file.content.data(), voice_file.content.size())},
+                 {"req", crispasr_consent::request_correlation_id()}});
         }
         fprintf(stderr, "crispasr-server: uploaded voice '%s' (%zu bytes)\n", voice_name.c_str(),
                 voice_file.content.size());

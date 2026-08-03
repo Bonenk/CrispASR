@@ -494,6 +494,14 @@ struct whisper_params {
     bool tts_voice_clone_consent = false;
     std::string tts_consent_attestation;
 
+    // --consent-log <path> / CRISPASR_CONSENT_LOG. When set, every [CONSENT]
+    // record is ALSO appended as one JSON object per line. Default off: turning
+    // on a persistent record of who attested what is the operator's decision,
+    // and it is their artefact to retain and erase, not ours. Tamper-resistance
+    // comes from where they put the file (append-only perms, WORM, a SIEM) —
+    // see crispasr_consent_record.h.
+    std::string consent_log;
+
     // Set when THIS run baked `tts_voice` from a user-supplied recording (the
     // TADA inline-clone path bakes a .wav into a temp .gguf and rewrites
     // tts_voice to point at it). Without this the rewrite erased the only
@@ -502,6 +510,11 @@ struct whisper_params {
     // cloning command in the CLI as "not a clone".
     // See crispasr_voice_clone_policy.h.
     bool tts_voice_baked_from_wav = false;
+    // The RECORDING that bake started from, before tts_voice was rewritten to
+    // point at the baked pack. Consent was given for this file, so this is what
+    // the audit record must hash — the pack is a derived artefact, and hashing
+    // it would bind the record to something the speaker never saw.
+    std::string tts_voice_source_recording;
 
     // Operator override for whose voice a PRESET voice is: "real_person",
     // "synthetic" or "unknown"/empty. Outranks the pack's declaration and the

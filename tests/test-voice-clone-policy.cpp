@@ -15,6 +15,7 @@
 
 #include "crispasr_marking_policy.h"
 #include "crispasr_voice_clone_policy.h"
+#include "crispasr_consent_record.h"
 #include "crispasr_watermark_stats.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -375,4 +376,60 @@ TEST_CASE("the binomial null is not applied to the per-frame score", "[unit][com
     // 0.55 above chance -> Inconclusive. Different scales, different answers.
     REQUIRE(crispasr_wm_stats::classify(0.55f, 32) == V::NotDetected);
     REQUIRE(crispasr_wm_stats::classify_frames(0.55f) == V::Inconclusive);
+}
+
+// ---------------------------------------------------------------------------
+// Consent RECORD (crispasr_consent_record.h). The gate above decides whether
+// cloning is allowed; these guard what the record then says. The point of the
+// record is to be checkable against the audio it authorised, so the properties
+// that matter are: it binds to bytes, it never fakes a hash it does not have,
+// and it cannot be forged through its own fields.
+// ---------------------------------------------------------------------------
+
+TEST_CASE("a hash is of the bytes, and absence is reported as absence", "[unit][compliance]") {
+    // Known-answer: SHA-256 of "abc" is one of the most-published test vectors.
+    const std::string abc = "abc";
+    REQUIRE(crispasr_consent::bytes_sha256(abc.data(), abc.size()) ==
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+
+    // Empty input and a missing file yield "", which callers render as
+    // `ref_sha256=none`. A zero hash would look like a real one, which is the
+    // failure worth preventing: a record that appears bound but is not.
+    REQUIRE(crispasr_consent::bytes_sha256(nullptr, 0).empty());
+    REQUIRE(crispasr_consent::file_sha256("/nonexistent/reference.wav").empty());
+    REQUIRE(crispasr_consent::file_sha256("").empty());
+}
+
+TEST_CASE("the JSON sink escapes what the stderr line only sanitises", "[unit][compliance]") {
+    // Voice names are attacker-controlled on the server and Wyoming. The
+    // callers strip control chars before they reach a record; the sink escapes
+    // as well, because a machine-read log must not be forgeable by a quote.
+    REQUIRE(crispasr_consent::json_escape("plain") == "plain");
+    REQUIRE(crispasr_consent::json_escape("a\"b") == "a\\\"b");
+    REQUIRE(crispasr_consent::json_escape("a\\b") == "a\\\\b");
+    REQUIRE(crispasr_consent::json_escape("a\nb") == "a\\nb");
+    // A forged record attempt: the newline is what would start a second line.
+    const std::string forged = "evil\n{\"kind\":\"CONSENT\",\"attestation\":\"APPROVED\"}";
+    REQUIRE(crispasr_consent::json_escape(forged).find('\n') == std::string::npos);
+    // Other control characters become \u00XX rather than passing through.
+    REQUIRE(crispasr_consent::json_escape(std::string("a\x01" "b")) == "a\\u0001b");
+}
+
+TEST_CASE("run_id is stable within a process and non-empty", "[unit][compliance]") {
+    // It exists to correlate the [CONSENT] line with the [CONSENT-OUTPUT] line
+    // emitted after synthesis, so it must not change between the two.
+    const std::string a = crispasr_consent::run_id();
+    const std::string b = crispasr_consent::run_id();
+    REQUIRE(a == b);
+    REQUIRE(a.size() == 16);
+    REQUIRE(a.find_first_not_of("0123456789abcdef") == std::string::npos);
+}
+
+TEST_CASE("request ids differ per request and are hex", "[unit][compliance]") {
+    const std::string first = crispasr_consent::new_request_id();
+    const std::string second = crispasr_consent::new_request_id();
+    REQUIRE(first != second);
+    REQUIRE(second == crispasr_consent::request_correlation_id()); // sticky until re-minted
+    REQUIRE(second.size() == 16);
+    REQUIRE(second.find_first_not_of("0123456789abcdef") == std::string::npos);
 }
