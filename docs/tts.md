@@ -1131,7 +1131,7 @@ the voice you want in text via `--instruct`.
 
 # Explicit model path:
 ./build/bin/crispasr --backend parler-tts \
-    -m parler-mini-v1.1-q8_0.gguf \
+    -m parler-tts-mini-v1.1-q8_0.gguf \
     --instruct "A young male speaker with an energetic tone." \
     --tts "Welcome to CrispASR text-to-speech." \
     --tts-output welcome.wav

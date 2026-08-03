@@ -291,7 +291,7 @@ TEST_CASE("single-donor backends are real people", "[unit][compliance]") {
     REQUIRE(identity_for_model("fastpitch", "fastpitch-en-q8_0.gguf") == SpeakerIdentity::RealPerson);
     REQUIRE(identity_for_model("bananamind-tts", "bananamind-tts-en-q8_0.gguf") == SpeakerIdentity::RealPerson);
     REQUIRE(identity_for_model("bananamind-tts", "bananamind-tts-de-q8_0.gguf") == SpeakerIdentity::RealPerson);
-    REQUIRE(identity_for_model("parler-tts", "parler-mini-v1.1-q8_0.gguf") == SpeakerIdentity::RealPerson);
+    REQUIRE(identity_for_model("parler-tts", "parler-tts-mini-v1.1-q8_0.gguf") == SpeakerIdentity::RealPerson);
 }
 
 TEST_CASE("csm has no preset persona", "[unit][compliance]") {

@@ -56,9 +56,7 @@ Two separate threads, and it matters not to conflate them:
 
 GATE for any count change: mean DER must beat 7.81% AND mesob must not regress.
 
-## CLAIMED 2026-08-03 — the parler registry entry points at a tokenizer-broken file
-
-**Another agent: do not start this one.** Worktree `wt/parler-registry-bpe`.
+## DONE 2026-08-03 — the parler registry pointed at a tokenizer-broken file
 
 Not a duplicate-file cleanup, which is what the entry below assumed. The two
 name prefixes in `cstr/parler-tts-mini-v1.1-GGUF` hold **byte-identical
@@ -75,22 +73,6 @@ so different tokens and different speech.
 `crispasr_model_registry.cpp:1163`), so `-m auto` downloads the one that
 tokenizes wrongly. Fixing the registry to the `parler-tts-` names, then removing
 the stale set.
-
-## SUPERSEDED — cstr/parler-tts-mini-v1.1-GGUF ships each weight twice
-
-The repo holds two complete copies of the same three quants under two name
-prefixes, ~3.5 GB of duplicate data:
-
-    parler-mini-v1.1-{f16,q4_k,q8_0}.gguf        1841.7 / 595.6 / 1026.1 MB
-    parler-tts-mini-v1.1-{f16,q4_k,q8_0}.gguf    1841.7 / 595.6 / 1026.1 MB
-
-Byte-for-byte identical sizes, so almost certainly a rename that kept both.
-Check which prefix the registry resolves (`src/crispasr_model_registry.cpp` says
-`parler-mini-v1.1-q8_0.gguf`) before deleting the other set — and confirm no
-external doc or script points at the `parler-tts-` names.
-
-Noticed while sizing repos for the stamping run below; not acted on, because
-deleting published files needs more certainty than a size match.
 
 ## OPEN 2026-08-03 — stamp the kartoffel repos (needs ~15 GB free; this box has 11)
 
