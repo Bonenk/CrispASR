@@ -56,9 +56,10 @@ Two separate threads, and it matters not to conflate them:
 
 GATE for any count change: mean DER must beat 7.81% AND mesob must not regress.
 
-## STILL OPEN 2026-08-03 — stamp the last three cstr/ repos
+## CLAIMED 2026-08-03 — stamp the last three cstr/ repos
 
-Unclaimed; take it. Everything needed is built and proven, this is bandwidth.
+**Another agent: do not start this one.** Worktree `wt/stamp-last-three`. Delete
+this section when it lands, or if it goes stale for more than a day. Everything needed is built and proven, this is bandwidth.
 
 Stamp `crispasr.voice.speaker_identity` into the repos whose verdict is
 established but which were left for size: `cstr/parler-tts-mini-v1.1-GGUF`
