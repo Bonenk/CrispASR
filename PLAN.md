@@ -56,6 +56,22 @@ Two separate threads, and it matters not to conflate them:
 
 GATE for any count change: mean DER must beat 7.81% AND mesob must not regress.
 
+## CLAIMED 2026-08-03 — fastpitch F16 NaNs + stamping the last three cstr/ repos
+
+**Another agent: do not start either.** Worktree `wt/fastpitch-f16-nan`. Delete
+this section when it lands, or if it goes stale for more than a day.
+
+1. Root-cause and fix the F16 NaNs below, then re-publish
+   `cstr/fastpitch-en-GGUF`. Touches `models/convert-fastpitch-to-gguf.py`.
+2. Stamp `crispasr.voice.speaker_identity` into the three remaining repos whose
+   verdict is established but which were left for bandwidth:
+   `cstr/parler-tts-mini-v1.1-GGUF` (real_person), `cstr/csm-1b-GGUF`
+   (synthetic), `cstr/kartoffel-orpheus-3b-german-{natural,synthetic}-GGUF`
+   (real_person / synthetic). Upload only; no runtime code.
+
+Not touching `crispasr_watermark_stats.h` or anything under the detector-port
+claim below.
+
 ## OPEN 2026-08-03 — cstr/fastpitch-en-GGUF: the F16 weights are ~944k NaNs
 
 Found while stamping the published GGUFs (below); **not** caused by that — the
