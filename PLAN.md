@@ -230,18 +230,7 @@ one error that silently removes a disclosure.
 **Touches:** HF repos under `cstr/` (upload only), `hf_readmes/*.md`. Does not
 touch runtime code — the reader and the tables already shipped (`64c9de2e`).
 
-## CLAIMED 2026-08-03 — bind the consent record to the audio it authorises
-
-**Another agent: do not start this one.** Worktree
-`.claude/worktrees/fix-324-vad-diarize-gaps`. Delete this section when it lands,
-or if it goes stale for more than a day.
-
-**Touches:** the four `[CONSENT]` emit sites (`crispasr_run.cpp`,
-`crispasr_server.cpp` x2, `wyoming.cpp`), a new shared record header, and
-docs/eu-ai-act.md. Does NOT touch any gate — the consent GATE already works on
-all four surfaces and is well tested; this is about the record it writes.
-
-### Why not the hash-chained log the sibling projects built
+## Why not the hash-chained log the sibling projects built
 
 CrispTTS hash-chains its consent log (SHA-256 per line + a sibling `.anchor`
 file, since a chain cannot detect truncation of its own tail; Art. 17 erasure
