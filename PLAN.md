@@ -42,6 +42,15 @@ it goes stale for more than a day.
 - **`ls build/src/libcrispasr*.dylib | head -1` picks a STALE versioned dylib.**
   Use `ls -t`. Two binding-parity tests "failed" on this until the tell was
   noticed: another agent's brand-new symbol was missing too.
+- **CI runs are cancelled constantly, and `cancelled` is not `success`.** With
+  several agents pushing to `main` every few minutes, each push cancels the
+  previous commit's in-flight Lint/CI/Ruby — a run can sit at `cancelled` all
+  day and never verify anything. Do not chase green on HEAD. Verify locally
+  (`ctest -L unit`, `tools/format.sh --check`, `tools/check-readme-langs.py`,
+  `tools/check-kaggle-harness-sync.py`) and treat a LATER run that *contains*
+  your commit as the real signal. Gotcha when scripting that check: `gh run
+  list` returns a full 40-char `headSha`, so comparing an 8-char prefix matches
+  nothing and makes a wait-loop exit instantly, looking like "it finished".
 
 ### Conventions worth knowing before you write a test
 

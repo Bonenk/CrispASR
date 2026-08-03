@@ -36,6 +36,69 @@ chunk_seconds=4` → 4 slices returned; feeding them back via `vad_import` →
 identical transcript + same 4 segments; malformed → `invalid_request_error`; no
 flag → no field. Documented in `docs/server.md`.
 
+## 2026-08-03 — #329 cross-lingual cloning, and the silent-drop class in the G2Ps
+
+Two threads, the same shape both times: a feature present, wired and shipped —
+and completely dead for the majority of real inputs, with nothing anywhere
+reporting a problem.
+
+**#329 — a gate that ANDs "both sides known", fed by a detector that mostly says
+"unknown".** CosyVoice3 goes cross-lingual when the target language differs from
+the reference clip's: `!tgt.empty() && !ref.empty() && tgt != ref`. The `ref`
+side came from a script detector that knew only Hangul, Kana, Han and Cyrillic,
+so **every Latin-script pair** — en↔de, en↔fr, es↔it, i.e. all of subtitle
+dubbing — resolved to `""` and could never satisfy the AND. `-tl de` on an
+English reference did nothing and said nothing, which is why the reporter read
+it as "this engine has no language option". Live A/B on real weights: the
+pre-fix path emits **2.1× the speech tokens for the same sentence** (262 vs 122;
+10.48 s vs 4.88 s of continuously-voiced audio) — the reference-transcript leak
+the cross-lingual path exists to remove. Three further things hid the knob: no
+way to STATE the reference language; the session ABI's cosyvoice3 arm never
+called `set_target_language` at all, so bindings/Flutter/Android had no
+cross-lingual by any route; and qwen3-tts discarded `-tl` for want of a
+capability bit. `src/core/tts_lang.h`, `tests/test-tts-lang.cpp`,
+`docs/issue-329/PLAN.md`.
+
+**#316 — first the numbers, then the units beside them.** `g2p_de`, `g2p_fr` and
+`g2p_es` had no number path at all: digits are in no pronunciation dictionary
+and no letter-to-sound rule, so a numeric token phonemized to the EMPTY string
+and vanished. German kokoro/piper omitted every price, date and quantity —
+`"Ich habe 82 Euro"` came out `ɪç hɑːbə  ɔʏ̯roː`. One `num2words_*.h` per
+language, each needing rules the others do not have: German's units-first
+compounds and inverted `,`/`.` separators, French's vigesimal 70/80/90,
+Spanish's fused `veinti-` range and four irregular hundreds.
+
+Then, rather than assume numbers were the only member of the class, a ten-line
+probe fed candidate tokens through all four G2Ps looking for empty output — and
+found the CURRENCY SYMBOL failing identically (`"€50"` → `"€ fünfzig"`, the €
+never reaching the audio; `"50€"` glued onto the word so the token stopped
+matching the dictionary). `core/currency_symbols.h` shares the symbol detection;
+the words stay per-language because German units are invariable, Spanish loses
+an accent in the plural, and the number itself takes its attributive form before
+a unit noun.
+
+**Four bugs in this arc were caught only by running the tables, and every one
+produced a real, well-formed word** — invisible to any phoneme, cosine or
+diff-harness check: French `80000` → "quatre-vingt**s** mille", Spanish `21000`
+→ "veintiuno mil", German "eins Dollar", Spanish "uno dólar".
+
+**Two audits, one of them auditing itself.** The backend-wiring blind spot closed
+with `tools/backend-components.txt`: of 20 unmatched runtime stems, 3 were real
+alias-reachable backends deliberately NOT allowlisted (allowlisting would hide a
+regression if an alias broke), 17 were components, 0 were orphans — so it ships
+REQUIRED. Its advisory tier then reported 4 gaps and **3 were the audit's own
+false positives**: a case-sensitive substring test against prose that names
+backends the way a reader does ("CREPE", "TabCNN", "Beat This!"). The 4th was
+real — kokoro absent from `env-live-tests.sh` while its live test silently
+skipped. Separately, #296's OpenBLAS promise was audited against the PUBLISHED
+v0.8.25 artifacts rather than the workflow source: Windows was already
+delivered, but the Linux tarball carried `NEEDED libopenblas.so.0` without
+bundling it, so it would not START on a host lacking OpenBLAS.
+
+The durable lesson is in LEARNINGS: *a gate that ANDs "both sides known" is only
+as alive as its weakest detector* — measure what fraction of real inputs a
+detector actually answers for, not just its accuracy on the ones it does.
+
 ## 2026-08-03 — copies-in-sync: the guard covered 1 of 14 files, two had drifted
 
 Archived from PLAN.md's #300/#308 follow-ups. The remaining work — deleting
