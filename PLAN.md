@@ -307,13 +307,17 @@ to counsel before it appears in a compliance claim.
    is an LLM decoder and is the likely one to need the flag. Method:
    `FIREREDPUNC_DEBUG=1 … | grep PUNCDBG` and read `in=` — do NOT use
    `--no-punctuation`, it strips after the fact and inverts the answer.
-3. **`src/fireredpunc.cpp` vs `crisp_punc/` duplication — CLAIMED 2026-08-03**,
-   worktree `wt/copies-in-sync`. Surveying all 14 duplicated pairs first found
-   real drift the existing test does not cover: `src/pcs.cpp` is MISSING the
-   `__has_include("imatrix.h")` hook and the `PCS_DUMP_LOGITS` diff-harness dump
-   that `crisp_punc/src/pcs.cpp` has — 32 lines, and the shared copy's own
-   comment says "Do NOT let this file diverge between the two repos". Same shape
-   as #308. Syncing it and extending the test to every pair.
+3. **`src/fireredpunc.cpp` vs `crisp_punc/` duplication — DONE 2026-08-03.**
+   `tests/test-punc-copies-in-sync` covered 1 of the 14 files that exist twice.
+   Extending it to all 14 found two already drifted: `src/pcs.cpp` was missing
+   the `__has_include("imatrix.h")` hook and the `PCS_DUMP_LOGITS` dump (32
+   lines — while the shared copy's own comment read "Do NOT let this file
+   diverge between the two repos"), and `src/lid_cld3.cpp` spelled out the
+   std::map that `gguf_loader.h:107` asks copies to declare as
+   `core_gguf::tensor_map`. Both synced. The test now also asserts the pair LIST
+   is complete, so a newly duplicated file cannot be silently unguarded — that
+   was how pcs.cpp stayed uncovered. Deleting the fallbacks outright is still
+   unclaimed and is the better long-term answer.
 
 ## OPEN follow-ups from #316 (kokoro G2P, landed 2026-07-28)
 
