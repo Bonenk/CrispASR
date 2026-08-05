@@ -241,6 +241,18 @@ namespace CrispASR
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int crispasr_session_input_sample_rate(IntPtr s);
 
+        // #332: output-side counterparts. output_sample_rate is the rate of
+        // the PCM synthesize / speech_to_speech return (0 = no audio output);
+        // the channel getters are 1 (mono) for every current backend.
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_session_output_sample_rate(IntPtr s);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_session_input_channels(IntPtr s);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_session_output_channels(IntPtr s);
+
         // AI-content marking (EU AI Act Art. 50(2)) — the other half of
         // synthesize_raw. alpha <= 0 selects the reliably detectable default.
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]

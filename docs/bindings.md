@@ -5,6 +5,23 @@ All wrappers are thin shells over the same C-ABI surface in
 diarize, LID, align, download — is one function call in every
 language.
 
+## Session audio-format getters (#332)
+
+Four read-only getters describe the PCM a session consumes and produces, so
+callers don't hard-code per-backend rates:
+
+| C-ABI getter | Returns |
+|---|---|
+| `crispasr_session_input_sample_rate(s)` | Rate (Hz) the backend expects for input PCM — 16000 for Whisper-family, the model's native rate otherwise. Pair with `crispasr_audio_load_at_rate` to avoid a double resample. |
+| `crispasr_session_output_sample_rate(s)` | Rate (Hz) of the PCM `synthesize` / `synthesize_streaming` / `get_disclaimer_pcm` / `speech_to_speech` return — the "backend-native rate" those calls document. `0` = the backend produces no audio output (ASR-only). |
+| `crispasr_session_input_channels(s)` | `1` (mono) for every current backend. Source separation is the stereo exception and has its own surface (`separate*`). |
+| `crispasr_session_output_channels(s)` | `1` (mono), or `0` when the backend produces no audio output. |
+
+All return `0` on a NULL/invalid session. Exposed as `output_sample_rate` /
+`input_channels` / `output_channels` (Rust, Ruby), `outputSampleRate()` /
+`inputChannels()` / `outputChannels()` (Java, C# `OutputSampleRate()` etc.),
+and `sessionOutputSampleRate()` etc. in the WASM/JS binding.
+
 ## Session setter reference
 
 All generation-control setters are available in every binding. Each

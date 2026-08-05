@@ -57,6 +57,10 @@ int crispasr_session_set_speaker_identity(CrispasrSession* s, const char* identi
 float* crispasr_session_speech_to_speech(CrispasrSession* s, const float* in_samples, int n_in_samples, char** out_text,
                                          int* out_n_samples);
 int crispasr_session_input_sample_rate(CrispasrSession* s);
+// #332: output-side counterparts (rate of synthesize/s2s PCM; mono channels).
+int crispasr_session_output_sample_rate(CrispasrSession* s);
+int crispasr_session_input_channels(CrispasrSession* s);
+int crispasr_session_output_channels(CrispasrSession* s);
 int crispasr_session_set_g2p_dict(CrispasrSession* s, const char* source);
 int crispasr_session_set_speaker_id(CrispasrSession* s, int id);
 void crispasr_pcm_free(float* pcm);
@@ -913,6 +917,17 @@ EMSCRIPTEN_BINDINGS(whisper) {
     // Whisper-family; feed it to S2S/transcribe input). 0 when no session is open.
     emscripten::function("sessionInputSampleRate", emscripten::optional_override([]() {
                              return g_tts_session ? crispasr_session_input_sample_rate(g_tts_session) : 0;
+                         }));
+    // #332: rate of the PCM ttsSynthesize/speech-to-speech produce (0 = the
+    // backend has no audio output), plus the mono channel-count getters.
+    emscripten::function("sessionOutputSampleRate", emscripten::optional_override([]() {
+                             return g_tts_session ? crispasr_session_output_sample_rate(g_tts_session) : 0;
+                         }));
+    emscripten::function("sessionInputChannels", emscripten::optional_override([]() {
+                             return g_tts_session ? crispasr_session_input_channels(g_tts_session) : 0;
+                         }));
+    emscripten::function("sessionOutputChannels", emscripten::optional_override([]() {
+                             return g_tts_session ? crispasr_session_output_channels(g_tts_session) : 0;
                          }));
     emscripten::function("sessionSetBestOf", emscripten::optional_override([](int n) {
                              return g_tts_session ? crispasr_session_set_best_of(g_tts_session, n) : -1;

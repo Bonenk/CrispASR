@@ -959,6 +959,27 @@ impl Session {
         unsafe { crispasr_sys::crispasr_session_input_sample_rate(self.handle) as i32 }
     }
 
+    /// The sample rate (Hz) of the PCM that [`Session::synthesize`] /
+    /// [`Session::speech_to_speech`] produce for this backend — the
+    /// "backend-native rate" their docs refer to. `0` when the backend
+    /// produces no audio output (ASR-only). (#332)
+    pub fn output_sample_rate(&self) -> i32 {
+        unsafe { crispasr_sys::crispasr_session_output_sample_rate(self.handle) as i32 }
+    }
+
+    /// Channel count for audio input (transcribe / s2s / voice references):
+    /// `1` (mono) for every current backend. Source separation is the stereo
+    /// exception and has its own surface. `0` on error. (#332)
+    pub fn input_channels(&self) -> i32 {
+        unsafe { crispasr_sys::crispasr_session_input_channels(self.handle) as i32 }
+    }
+
+    /// Channel count for synthesized / s2s output audio: `1` (mono) for every
+    /// current backend, `0` when the backend produces no audio output. (#332)
+    pub fn output_channels(&self) -> i32 {
+        unsafe { crispasr_sys::crispasr_session_output_channels(self.handle) as i32 }
+    }
+
     /// Attest that the integrator accepts AI-content marking/disclosure
     /// responsibility (EU AI Act Art. 50). **Required** before
     /// [`Session::synthesize_raw`] will return unmarked audio; the default

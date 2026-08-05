@@ -25,6 +25,7 @@
 
 #include <atomic>
 #include <climits> // INT_MIN (parakeet att_context_* sentinels) — issue #257
+#include <cstddef> // offsetof (diarize ABI layout static_asserts) — issue #332
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -4002,6 +4003,191 @@ CA_EXPORT int crispasr_session_set_pcm_sample_rate(crispasr_session* s, int rate
     return 0;
 }
 
+// #332: the sample rate of the PCM produced by crispasr_session_synthesize /
+// _synthesize_raw / _synthesize_streaming / _get_disclaimer_pcm /
+// _speech_to_speech for this session's backend. Before this getter callers
+// had to hard-code "backend-native sample rate" per backend.
+//
+// This is the session-ABI mirror of the CLI adapters' tts_sample_rate()
+// (examples/cli/crispasr_backend.h — default 24 kHz, overridden per backend).
+// Keep the two in sync: a new TTS backend whose adapter overrides
+// tts_sample_rate() needs the same rate here, and one that keeps the 24 kHz
+// default needs nothing (the fallthrough below covers every audio-producing
+// ctx). Returns 0 for a NULL session or a backend with no audio output
+// (ASR-only) — "0 = no audio", mirroring input_sample_rate's NULL contract.
+//
+// Note melotts: the CLI adapter reports 22050 after an OpenVoice2 clone pass
+// converts its output; the session ABI has no OV2 path, so the model hparam
+// is always the right answer here.
+CA_EXPORT int crispasr_session_output_sample_rate(crispasr_session* s) {
+    if (!s)
+        return 0;
+        // Rate is a model hparam — ask the context (CLI-adapter fallbacks kept).
+#ifdef CA_HAVE_BANANAMIND_TTS
+    if (s->bananamind_tts_ctx)
+        return bananamind_tts_sample_rate(s->bananamind_tts_ctx);
+#endif
+#ifdef CA_HAVE_F5TTS
+    if (s->f5tts_ctx)
+        return f5_tts_sample_rate(s->f5tts_ctx);
+#endif
+#ifdef CA_HAVE_FASTPITCH
+    if (s->fastpitch_ctx)
+        return fastpitch_tts_sample_rate(s->fastpitch_ctx);
+#endif
+#ifdef CA_HAVE_IRODORI_TTS
+    if (s->irodori_ctx)
+        return irodori_tts_sample_rate(s->irodori_ctx);
+#endif
+#ifdef CA_HAVE_MELOTTS
+    if (s->melotts_ctx)
+        return melotts_sample_rate(s->melotts_ctx);
+#endif
+#ifdef CA_HAVE_MOSS_TTS
+    if (s->moss_tts_ctx)
+        return moss_tts_sampling_rate(s->moss_tts_ctx);
+#endif
+#ifdef CA_HAVE_MOSS_TTS_LOCAL
+    if (s->moss_tts_local_ctx)
+        return moss_tts_local_sampling_rate(s->moss_tts_local_ctx);
+#endif
+#ifdef CA_HAVE_PIPER
+    if (s->piper_ctx)
+        return piper_tts_sample_rate(s->piper_ctx);
+#endif
+        // Fixed non-24 kHz rates (same constants as the CLI adapters).
+#ifdef CA_HAVE_DIA
+    if (s->dia_tts_ctx)
+        return 44100;
+#endif
+#ifdef CA_HAVE_PARLER
+    if (s->parler_ctx)
+        return 44100;
+#endif
+#ifdef CA_HAVE_PARLER_TTS
+    if (s->parler_tts_ctx)
+        return 44100;
+#endif
+#ifdef CA_HAVE_ZONOS
+    if (s->zonos_ctx)
+        return 44100;
+#endif
+#ifdef CA_HAVE_DOTS_TTS
+    if (s->dots_tts_ctx)
+        return 48000;
+#endif
+#ifdef CA_HAVE_SIDON
+    if (s->sidon_ctx)
+        return 48000;
+#endif
+#ifdef CA_HAVE_VOXCPM2
+    if (s->voxcpm2_ctx)
+        return 48000;
+#endif
+#ifdef CA_HAVE_VOXCPM2_VAE
+    if (s->voxcpm2_vae_ctx)
+        return 48000;
+#endif
+#ifdef CA_HAVE_SPEECHT5
+    if (s->speecht5_ctx)
+        return 16000;
+#endif
+        // Every remaining audio-producing ctx uses the 24 kHz adapter default.
+#ifdef CA_HAVE_BARK
+    if (s->bark_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_CHATTERBOX
+    if (s->chatterbox_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_COSYVOICE3
+    if (s->cosyvoice3_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_CSM
+    if (s->csm_tts_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_INDEXTTS
+    if (s->indextts_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_KOKORO
+    if (s->kokoro_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_KUGELAUDIO
+    if (s->kugelaudio_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_LFM2_AUDIO
+    if (s->lfm2_audio_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_MINI_OMNI2
+    if (s->mini_omni2_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_MIOTTS
+    if (s->miotts_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_OMNIVOICE
+    if (s->omnivoice_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_ORPHEUS
+    if (s->orpheus_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_OUTETTS
+    if (s->outetts_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_POCKET
+    if (s->pocket_tts_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_QWEN3_TTS
+    if (s->qwen3_tts_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_TADA
+    if (s->tada_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_VIBEVOICE
+    if (s->vibevoice_ctx)
+        return 24000;
+#endif
+#ifdef CA_HAVE_VOXTRAL_TTS
+    if (s->voxtral_tts_ctx)
+        return 24000;
+#endif
+    return 0; // ASR-only backend: no audio output
+}
+
+// #332: channel counts for the session's audio input and output. Everything
+// the session ABI transcribes, synthesizes or s2s-transforms today is MONO;
+// source separation is the stereo exception and has its own surface
+// (crispasr_session_separate + separate_sample_rate). Exposed as getters
+// rather than documented constants so a future multi-channel backend is an
+// additive change for callers, not a silent contract break.
+// Return 0 on a NULL session; output_channels is 0 when the backend
+// produces no audio output (same contract as output_sample_rate).
+CA_EXPORT int crispasr_session_input_channels(crispasr_session* s) {
+    if (!s)
+        return 0;
+    return 1;
+}
+
+CA_EXPORT int crispasr_session_output_channels(crispasr_session* s) {
+    if (!s)
+        return 0;
+    return crispasr_session_output_sample_rate(s) > 0 ? 1 : 0;
+}
+
 // CTC vocabulary access (Omni CTC backend). Surfaces the SentencePiece pieces
 // already loaded from the GGUF so callers can detokenize a greedy CTC decode
 // over crispasr_session_result_logits. Returns 0 / "" for other backends.
@@ -7097,6 +7283,16 @@ struct crispasr_diarize_opts_abi {
     int32_t num_speakers;              // >0 pins the count
     int32_t _pad2;
 };
+
+// #332: pin the ABI layout the hand-written binding mirrors replicate byte
+// for byte. If an append changes these numbers, every mirror listed above
+// must change in the same commit — and each mirror's own layout test
+// (crispasr-sys `diarize_abi_layout`, flutter's 48-byte buffer) with it.
+static_assert(sizeof(crispasr_diarize_seg_abi) == 24, "diarize seg ABI layout changed — update every binding mirror");
+static_assert(sizeof(crispasr_diarize_opts_abi) == 48, "diarize opts ABI layout changed — update every binding mirror");
+static_assert(offsetof(crispasr_diarize_opts_abi, pyannote_model_path) == 16, "diarize opts ABI layout drifted");
+static_assert(offsetof(crispasr_diarize_opts_abi, foxnose_embedder_path) == 24, "diarize opts ABI layout drifted");
+static_assert(offsetof(crispasr_diarize_opts_abi, min_speakers) == 32, "diarize opts ABI layout drifted");
 
 CA_EXPORT int crispasr_diarize_segments_abi(const float* left_pcm, const float* right_pcm, int32_t n_samples,
                                             int32_t is_stereo, crispasr_diarize_seg_abi* segs, int32_t n_segs,
