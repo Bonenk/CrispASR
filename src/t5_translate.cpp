@@ -614,6 +614,35 @@ static bool alloc_cross_kv(t5_translate_context* c, int T_enc) {
 
 // ── Encoder graph ────────────────────────────────────────────────
 
+// ── #333 diff-harness capture ────────────────────────────────────
+//
+// OFF unless CRISPASR_T5_DIFF=1 (crispasr-diff sets it before loading), so the
+// shipping graphs are byte-for-byte what they were: marking a tensor as an
+// output perturbs buffer elision, which is exactly the hazard LEARNINGS records
+// for the Metal scheduler.
+static bool t5_diff_capture() {
+    static const bool on = [] {
+        const char* v = std::getenv("CRISPASR_T5_DIFF");
+        return v && *v && std::strcmp(v, "0") != 0;
+    }();
+    return on;
+}
+
+// Which encoder blocks get a snapshot. Four is deliberate — the first two catch
+// a structural error immediately, and mid/last show whether an error grows.
+// Dumping all 32 would be ~1 GB of reference GGUF for no extra signal.
+static const char* t5_enc_stage_name(int il, int n_layers) {
+    if (il == 0)
+        return "enc_blk_first";
+    if (il == 1)
+        return "enc_blk_second";
+    if (il == n_layers / 2)
+        return "enc_blk_mid";
+    if (il == n_layers - 1)
+        return "enc_blk_last";
+    return nullptr;
+}
+
 static ggml_cgraph* build_encoder_graph(t5_translate_context* c, int T) {
     const auto& m = c->model;
     const auto& hp = m.hp;
@@ -644,6 +673,20 @@ static ggml_cgraph* build_encoder_graph(t5_translate_context* c, int T) {
 
     // Embedding (no positional — T5 uses relative position bias)
     ggml_tensor* cur = ggml_get_rows(ctx0, m.shared_embed, inp);
+
+    // #333 diff harness. `ggml_set_output` is not optional here: without it
+    // ggml reuses the buffer and a later layer overwrites the value we wanted
+    // to read back, so the snapshot silently becomes some other stage's output.
+    // Gated so the shipping path allocates nothing extra.
+    const bool dbg = t5_diff_capture();
+    if (dbg) {
+        ggml_set_name(cur, "enc_embed");
+        ggml_set_output(cur);
+        ggml_build_forward_expand(gf, cur);
+        ggml_set_name(pos_bias, "enc_pos_bias");
+        ggml_set_output(pos_bias);
+        ggml_build_forward_expand(gf, pos_bias);
+    }
 
     for (int il = 0; il < hp.enc_n_layers; il++) {
         const auto& l = m.enc_layers[il];
@@ -691,6 +734,15 @@ static ggml_cgraph* build_encoder_graph(t5_translate_context* c, int T) {
         cur = ggml_mul_mat(ctx0, l.ffn_down, ggml_mul(ctx0, gate, up));
 
         cur = ggml_add(ctx0, cur, residual);
+
+        if (dbg) {
+            const char* nm = t5_enc_stage_name(il, hp.enc_n_layers);
+            if (nm) {
+                ggml_set_name(cur, nm);
+                ggml_set_output(cur);
+                ggml_build_forward_expand(gf, cur);
+            }
+        }
     }
 
     cur = t5_rms_norm(ctx0, cur, m.enc_final_rms, hp.layer_norm_eps);
@@ -775,6 +827,8 @@ static ggml_cgraph* build_decoder_graph(t5_translate_context* c, int n_tokens, i
     ggml_context* ctx0 = ggml_init(ip);
     ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 16384, false);
 
+    const bool dbg = t5_diff_capture();
+
     ggml_tensor* inp = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, n_tokens);
     ggml_set_name(inp, "dec_tokens");
     ggml_set_input(inp);
@@ -800,6 +854,11 @@ static ggml_cgraph* build_decoder_graph(t5_translate_context* c, int n_tokens, i
 
     // Embedding
     ggml_tensor* cur = ggml_get_rows(ctx0, m.shared_embed, inp);
+    if (dbg) {
+        ggml_set_name(cur, "dec_embed");
+        ggml_set_output(cur);
+        ggml_build_forward_expand(gf, cur);
+    }
 
     for (int il = 0; il < hp.dec_n_layers; il++) {
         const auto& l = m.dec_layers[il];
@@ -881,9 +940,24 @@ static ggml_cgraph* build_decoder_graph(t5_translate_context* c, int n_tokens, i
         cur = ggml_mul_mat(ctx0, l.ffn_down, ggml_mul(ctx0, gate, up));
 
         cur = ggml_add(ctx0, cur, residual);
+
+        if (dbg) {
+            const char* nm = (il == 0) ? "dec_blk_first" : (il == hp.dec_n_layers - 1 ? "dec_blk_last" : nullptr);
+            if (nm) {
+                ggml_set_name(cur, nm);
+                ggml_set_output(cur);
+                ggml_build_forward_expand(gf, cur);
+            }
+        }
     }
 
     cur = t5_rms_norm(ctx0, cur, m.dec_final_rms, hp.layer_norm_eps);
+
+    if (dbg) {
+        ggml_set_name(cur, "dec_out");
+        ggml_set_output(cur);
+        ggml_build_forward_expand(gf, cur);
+    }
 
     if (n_tokens > 1)
         cur = ggml_view_2d(ctx0, cur, D, 1, cur->nb[1], (size_t)(n_tokens - 1) * cur->nb[1]);
@@ -1199,4 +1273,197 @@ extern "C" char* t5_translate(struct t5_translate_context* ctx, const char* text
     char* out = (char*)malloc(result.size() + 1);
     std::memcpy(out, result.c_str(), result.size() + 1);
     return out;
+}
+
+// ── #333: per-stage parity vs the PyTorch blueprint ──────────────
+//
+// Self-contained, following the dots-tts / voxtral-tts pattern the dev guide
+// recommends for LLM stacks: this loads the runtime AND the reference GGUF and
+// compares inline, so the harness needs no per-stage C API.
+//
+// The FIRST thing it does is take `enc_tokens` from the reference and feed
+// those exact ids to our encoder. That is the structural gate: if we
+// re-tokenized here, a SentencePiece disagreement would show up as a smooth
+// per-layer "numeric drift" and send someone hunting a GELU LUT for hours
+// (LEARNINGS: gate input alignment before trusting any per-layer cosine).
+extern "C" int t5_translate_diff(const char* model_gguf, const char* ref_gguf, int verbosity) {
+    // Must be set before the graphs are built, or nothing is marked as output.
+#ifdef _WIN32
+    _putenv_s("CRISPASR_T5_DIFF", "1");
+#else
+    setenv("CRISPASR_T5_DIFF", "1", 1);
+#endif
+
+    t5_translate_context_params p = t5_translate_context_default_params();
+    p.verbosity = verbosity;
+    t5_translate_context* c = t5_translate_init_from_file(model_gguf, p);
+    if (!c) {
+        std::fprintf(stderr, "t5_diff: failed to load model %s\n", model_gguf);
+        return 2;
+    }
+    core_gguf::WeightLoad rw;
+    if (!core_gguf::load_weights(ref_gguf, c->backend, "ref", rw)) {
+        std::fprintf(stderr, "t5_diff: failed to load reference %s\n", ref_gguf);
+        t5_translate_free(c);
+        return 2;
+    }
+
+    int n_pass = 0, n_fail = 0, n_skip = 0;
+
+    auto fetch = [&](const char* name) -> std::vector<float> {
+        ggml_tensor* t = ggml_get_tensor(rw.ctx, name);
+        if (!t)
+            return {};
+        std::vector<float> v((size_t)ggml_nelements(t));
+        ggml_backend_tensor_get(t, v.data(), 0, v.size() * sizeof(float));
+        return v;
+    };
+
+    // Cosine AND both magnitudes. Cosine is scale-blind — a stage wrong by a
+    // uniform factor passes it and every correlation-style metric, which is why
+    // |mine| / |ref| are printed next to it rather than on request.
+    auto report = [&](const char* tag, const std::vector<float>& got, const std::vector<float>& ref) {
+        if (ref.empty()) {
+            std::printf("t5 %-16s  (absent from reference — skipped)\n", tag);
+            n_skip++;
+            return;
+        }
+        if (got.size() != ref.size()) {
+            std::printf("t5 %-16s  SHAPE MISMATCH mine=%zu ref=%zu  FAIL\n", tag, got.size(), ref.size());
+            n_fail++;
+            return;
+        }
+        double dot = 0, na = 0, nb = 0, maxabs = 0;
+        for (size_t i = 0; i < got.size(); i++) {
+            dot += (double)got[i] * ref[i];
+            na += (double)got[i] * got[i];
+            nb += (double)ref[i] * ref[i];
+            const double d = std::fabs((double)got[i] - ref[i]);
+            if (d > maxabs)
+                maxabs = d;
+        }
+        const double cos = (na > 0 && nb > 0) ? dot / (std::sqrt(na) * std::sqrt(nb)) : 0.0;
+        const bool pass = cos > 0.99;
+        std::printf("t5 %-16s n=%-8zu cos=%.6f  max_abs=%.5f  |mine|=%.4f |ref|=%.4f  %s\n", tag, got.size(), cos,
+                    maxabs, std::sqrt(na), std::sqrt(nb), pass ? "PASS" : "FAIL");
+        if (pass)
+            n_pass++;
+        else
+            n_fail++;
+    };
+
+    // ── input alignment ──
+    std::vector<float> tok_f = fetch("enc_tokens");
+    if (tok_f.empty()) {
+        std::fprintf(stderr, "t5_diff: reference has no enc_tokens — cannot align inputs, refusing to "
+                             "report per-layer numbers that would be meaningless\n");
+        t5_translate_free(c);
+        return 2;
+    }
+    std::vector<int> ids(tok_f.size());
+    for (size_t i = 0; i < tok_f.size(); i++)
+        ids[i] = (int)std::lround(tok_f[i]);
+    const int T = (int)ids.size();
+    const auto& hp = c->model.hp;
+    std::printf("t5 diff: %d source tokens, d_model=%d, %d/%d enc/dec layers\n", T, hp.d_model, hp.enc_n_layers,
+                hp.dec_n_layers);
+
+    // ── encoder ──
+    ggml_cgraph* gf = build_encoder_graph(c, T);
+    ggml_backend_sched_reset(c->sched);
+    if (!ggml_backend_sched_alloc_graph(c->sched, gf)) {
+        t5_translate_free(c);
+        return 2;
+    }
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "enc_tokens"), ids.data(), 0, T * sizeof(int32_t));
+    std::vector<int32_t> buckets((size_t)T * T);
+    for (int q = 0; q < T; q++)
+        for (int k = 0; k < T; k++)
+            buckets[(size_t)q * T + k] =
+                t5_relative_position_bucket(k - q, true, hp.rel_attn_num_buckets, hp.rel_attn_max_dist);
+    ggml_backend_tensor_set(ggml_graph_get_tensor(gf, "enc_pos_bucket"), buckets.data(), 0,
+                            buckets.size() * sizeof(int32_t));
+    if (ggml_backend_sched_graph_compute(c->sched, gf) != GGML_STATUS_SUCCESS) {
+        t5_translate_free(c);
+        return 2;
+    }
+
+    auto snap = [&](const char* name) -> std::vector<float> {
+        ggml_tensor* t = ggml_graph_get_tensor(gf, name);
+        if (!t)
+            return {};
+        std::vector<float> v((size_t)ggml_nelements(t));
+        ggml_backend_tensor_get(t, v.data(), 0, v.size() * sizeof(float));
+        return v;
+    };
+
+    for (const char* nm :
+         {"enc_embed", "enc_pos_bias", "enc_blk_first", "enc_blk_second", "enc_blk_mid", "enc_blk_last", "enc_out"})
+        report(nm, snap(nm), fetch(nm));
+
+    std::vector<float> enc_out = snap("enc_out");
+
+    // ── cross K/V: the encoder-decoder joint, where these ports go wrong ──
+    if (!compute_cross_kv(c, enc_out.data(), T)) {
+        std::fprintf(stderr, "t5_diff: cross-KV computation failed\n");
+        t5_translate_free(c);
+        return 2;
+    }
+    {
+        // The cache is F16 on the device; pull block 0 back and widen for the
+        // comparison. The F16 store is itself part of what we are checking.
+        auto pull = [&](ggml_tensor* t) {
+            const size_t n = (size_t)ggml_nelements(t);
+            std::vector<ggml_fp16_t> h(n);
+            ggml_backend_tensor_get(t, h.data(), 0, n * sizeof(ggml_fp16_t));
+            std::vector<float> f(n);
+            ggml_fp16_to_fp32_row(h.data(), f.data(), (int)n);
+            return f;
+        };
+        report("cross_k_blk0", pull(c->cross_kv_k[0]), fetch("cross_k_blk0"));
+        report("cross_v_blk0", pull(c->cross_kv_v[0]), fetch("cross_v_blk0"));
+    }
+
+    // ── decoder, step 0 ──
+    const int start = hp.dec_start_token_id;
+    ggml_cgraph* dg = build_decoder_graph(c, 1, 0);
+    ggml_backend_sched_reset(c->sched);
+    if (!ggml_backend_sched_alloc_graph(c->sched, dg)) {
+        t5_translate_free(c);
+        return 2;
+    }
+    ggml_backend_tensor_set(ggml_graph_get_tensor(dg, "dec_tokens"), &start, 0, sizeof(int32_t));
+    int32_t b0 = t5_relative_position_bucket(0, false, hp.rel_attn_num_buckets, hp.rel_attn_max_dist);
+    ggml_backend_tensor_set(ggml_graph_get_tensor(dg, "dec_pos_bucket"), &b0, 0, sizeof(int32_t));
+    if (ggml_backend_sched_graph_compute(c->sched, dg) != GGML_STATUS_SUCCESS) {
+        t5_translate_free(c);
+        return 2;
+    }
+    auto dsnap = [&](const char* name) -> std::vector<float> {
+        ggml_tensor* t = ggml_graph_get_tensor(dg, name);
+        if (!t)
+            return {};
+        std::vector<float> v((size_t)ggml_nelements(t));
+        ggml_backend_tensor_get(t, v.data(), 0, v.size() * sizeof(float));
+        return v;
+    };
+    for (const char* nm : {"dec_embed", "dec_blk_first", "dec_blk_last", "dec_out"})
+        report(nm, dsnap(nm), fetch(nm));
+
+    std::vector<float> logits = dsnap("logits");
+    std::vector<float> ref_logits = fetch("logits_step0");
+    report("logits_step0", logits, ref_logits);
+
+    // The argmax is what actually steers the decode, so agreement there is a
+    // stronger statement than the cosine — and a disagreement with a high
+    // cosine means near-ties, which is the expected quantization signature.
+    if (!logits.empty() && logits.size() == ref_logits.size()) {
+        const int a = (int)(std::max_element(logits.begin(), logits.end()) - logits.begin());
+        const int b = (int)(std::max_element(ref_logits.begin(), ref_logits.end()) - ref_logits.begin());
+        std::printf("t5 %-16s mine=%d ref=%d  %s\n", "argmax_step0", a, b, a == b ? "MATCH" : "DIFFER");
+    }
+
+    std::printf("t5 diff: %d pass, %d fail, %d skipped\n", n_pass, n_fail, n_skip);
+    t5_translate_free(c);
+    return n_fail == 0 ? 0 : 1;
 }

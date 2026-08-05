@@ -92,6 +92,7 @@
 #include "tada_encoder.h"
 #include "tada_tts.h"
 #include "dots_tts.h"
+#include "t5_translate.h"
 #include "miocodec.h"
 #include "miotts.h"
 #include "crepe.h"
@@ -1148,6 +1149,13 @@ static int tiron_diff(const std::string& model, const std::string& ref_path, con
 }
 
 int main(int argc, char** argv) {
+    // #333: madlad/t5 is a TEXT model — there is no audio to pass, so it is
+    // dispatched before the 5-arg gate rather than made to carry a dummy path.
+    if (argc >= 4) {
+        const std::string b = argv[1];
+        if (b == "madlad" || b == "t5")
+            return t5_translate_diff(argv[2], argv[3], /*verbosity=*/2);
+    }
     if (argc < 5) {
         fprintf(stderr,
                 "usage: %s <backend> <model.gguf> <reference.gguf> <audio.wav>\n"
@@ -1157,7 +1165,8 @@ int main(int argc, char** argv) {
                 "granite-4.1, "
                 "granite-nle, parakeet, gigaam, wespeaker, chatterbox, voxcpm2-tts, "
                 "canary, cohere, gemma4, mimo-tokenizer, mimo-asr, orpheus, moonshine, moonshine-streaming, "
-                "kyutai-stt, parler-tts, moss-audio\n"
+                "kyutai-stt, parler-tts, moss-audio, madlad\n"
+                "                (madlad/t5 is a text model: pass only <model.gguf> <reference.gguf>)\n"
                 "  model.gguf    crispasr-compatible model weights\n"
                 "  reference.gguf  archive produced by tools/dump_reference.py\n"
                 "  audio.wav     16 kHz mono WAV\n",
