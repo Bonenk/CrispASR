@@ -1,29 +1,31 @@
 # %% [markdown]
-# # CrispASR — build the missing madlad400-3b-mt F16 and Q8_0 GGUFs (issue #333)
+# # CrispASR — madlad400-3b-mt: the missing F16/Q8_0 + a per-stage reference (#333)
 #
-# `cstr/madlad400-3b-mt-GGUF` ships ONLY `madlad400-3b-mt-q4_k.gguf`, but its
-# README lists F16 and Q8_0 and its own copy-paste examples tell you to download
-# `…-q8_0.gguf` — which 404s. That is what #333 reports.
+# `cstr/madlad400-3b-mt-GGUF` ships ONLY `madlad400-3b-mt-q4_k.gguf`, while its
+# README lists F16 and Q8_0 and its own copy-paste quickstart tells you to
+# download `…-q8_0.gguf` — which 404s. That is what #333 reports.
 #
-# This runs on Kaggle rather than locally for one reason: the source is an
-# 11.76 GB fp32 safetensors and the artifacts are ~5.7 GB + ~3.1 GB, so it is
-# ~21 GB of transfer on a fast HF link. There is no GPU compute here at all —
-# the converter is numpy and `crispasr-quantize` streams tensors — but Kaggle
-# CPU workers get no internet, so a GPU kernel is the only way to get the link.
+# This does more than fill the gap. madlad had no diff-harness coverage at all
+# until now, so every published quant was "it loaded and the text looked fine".
+# This run produces the reference archive and reports **per-stage cosine parity
+# for all three quants against the PyTorch blueprint**, so the answer on the
+# issue can be a number instead of an assurance.
 #
-# Order matters and follows the port-pipeline rule "never crash before a
-# produced artifact is checkpointed to HF":
+#     download source (11.76 GB fp32)
+#       → convert F16 → validate → upload
+#       → dump madlad-ref.gguf (needs the source, so BEFORE deleting it) → upload
+#       → rm source
+#       → quantize Q8_0 → validate → upload
+#       → crispasr-diff F16 / Q8_0 / Q4_K vs the reference → parity table
 #
-#     download source → convert F16 → VALIDATE → upload F16 → delete source
-#                     → quantize Q8_0 → VALIDATE → upload Q8_0 → delete F16
+# Ordering is the port-pipeline rule "never crash before a produced artifact is
+# checkpointed to HF": each artifact is uploaded the moment it exists and is
+# validated, so a failure in a later step cannot lose an earlier one.
 #
-# so a failure in the quantize step cannot lose the F16 that was already paid
-# for. Every artifact is validated by an actual translation before it is
-# uploaded — a GGUF that loads is not a GGUF that works.
-#
-# NOT done here: a `-ref.gguf`. That needs `tools/reference_backends/madlad.py`
-# and a `madlad` arm in `crispasr_diff_main.cpp`, neither of which exists yet —
-# see the note at the bottom of this file.
+# It BUILDS FROM SOURCE rather than using a release tarball: the madlad arm in
+# `crispasr-diff` and `tools/reference_backends/madlad.py` are newer than
+# v0.8.25. That is what `chr1str/crispasr-ccache` is attached for — a warm
+# ccache turns a ~20 min build into ~3 min.
 
 # %% [code]
 import json
@@ -35,16 +37,18 @@ import sys
 from pathlib import Path
 
 WORK = Path("/kaggle/working")
+TEMP = Path("/kaggle/temp")
+TEMP.mkdir(parents=True, exist_ok=True)
 
-# ── Kaggle regime: clone CrispASR + import the harness (bundled = fallback) ────
-# gotcha #26: a SCRIPT kernel runs only its code_file, so the harness and the
-# converter must come from the in-kernel clone, not from bundled siblings.
+# ── Kaggle regime: clone + harness from the CLONE, not from bundled siblings ──
+# gotcha #26: a script kernel runs only its code_file. gotcha #22: keep
+# /kaggle/working tiny so `kernels output` isn't page-capped past our artifacts.
 CRISPASR_URL = "https://github.com/CrispStrobe/CrispASR.git"
-REPO = Path("/kaggle/temp/CrispASR")  # gotcha #22: keep /kaggle/working small
-REPO.parent.mkdir(parents=True, exist_ok=True)
+REPO = TEMP / "CrispASR"
 if not REPO.exists():
     try:
-        subprocess.check_call(["git", "clone", "--depth", "1", CRISPASR_URL, str(REPO)])
+        subprocess.check_call(["git", "clone", "--depth", "1", "--recursive",
+                               CRISPASR_URL, str(REPO)])
         sys.path.insert(0, str(REPO / "tools" / "kaggle"))
     except Exception:
         pass
@@ -57,73 +61,93 @@ step = kh.step
 step("script.start", issue=333)
 
 CONVERTER = REPO / "models" / "convert-madlad-to-gguf.py"
-if not CONVERTER.is_file():
-    step("fatal.converter-missing", path=str(CONVERTER))
-    raise SystemExit("converter missing — the clone failed; refusing to continue")
+DUMPER = REPO / "tools" / "dump_reference.py"
+for f in (CONVERTER, DUMPER):
+    if not f.is_file():
+        step("fatal.clone-incomplete", missing=str(f))
+        raise SystemExit(f"{f} missing — the clone failed; refusing to continue (HARD RULE #8)")
 
-# ── HF auth (gotcha #26b: listing the dataset does nothing on its own) ─────────
 TOKEN = kh.resolve_hf_token("HF_TOKEN")
 if not TOKEN:
     step("fatal.no-token")
-    raise SystemExit("no HF token — uploads would fail after ~30 min of work")
+    raise SystemExit("no HF token — every upload would fail after ~40 min of work")
 step("hf_token.resolved")
 
 step("install-deps.begin")
 subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet",
-                       "huggingface_hub", "hf_transfer"])
+                       "huggingface_hub", "hf_transfer", "sentencepiece", "safetensors", "gguf"])
 os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
-from huggingface_hub import HfApi, snapshot_download  # noqa: E402
+from huggingface_hub import HfApi, hf_hub_download, snapshot_download  # noqa: E402
 
 step("install-deps.done")
 
-# ── binaries: madlad landed in v0.8.16, so the v0.8.6 tarball other kernels
-# use is TOO OLD and would fail `--backend madlad` at validation time. ─────────
-RELEASE = "v0.8.25"
-TARBALL = "crispasr-linux-x86_64.tar.gz"
-BIN = Path("/kaggle/temp/bin")
-BIN.mkdir(parents=True, exist_ok=True)
-CRISPASR = BIN / "crispasr"
-QUANT = BIN / "crispasr-quantize"
-step("binary-download.begin", release=RELEASE)
-subprocess.check_call(
-    f"wget -q https://github.com/CrispStrobe/CrispASR/releases/download/{RELEASE}/{TARBALL} "
-    f"-O /kaggle/temp/c.tar.gz && tar -xzf /kaggle/temp/c.tar.gz -C {BIN} --strip-components=1",
-    shell=True)
-for b in (CRISPASR, QUANT):
+# ── build (warm ccache from the attached dataset) ─────────────────────────────
+step("toolchain.begin")
+kh.install_build_toolchain()
+# gotcha #22: move ccache out of /kaggle/working so it can't flood the outputs.
+CC = TEMP / ".ccache"
+if (WORK / ".ccache").exists() and not CC.exists():
+    shutil.move(str(WORK / ".ccache"), str(CC))
+os.environ["CCACHE_DIR"] = str(CC)
+step("toolchain.done")
+
+BUILD = REPO / "build"
+step("build.begin")
+with kh.build_heartbeat("cmake-configure", 30):
+    kh.sh(f"cmake -S {REPO} -B {BUILD} -DCMAKE_BUILD_TYPE=Release "
+          f"-DCRISPASR_BUILD_TESTS=OFF -DCRISPASR_BUILD_SERVER=OFF "
+          f"-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache")
+with kh.build_heartbeat("cmake-build", 30):
+    kh.sh(f"cmake --build {BUILD} -j {kh.safe_build_jobs(gpu=True)} "
+          f"--target crispasr-cli crispasr-quantize crispasr-diff")
+CRISPASR = BUILD / "bin" / "crispasr"
+QUANT = BUILD / "bin" / "crispasr-quantize"
+DIFF = BUILD / "bin" / "crispasr-diff"
+for b in (CRISPASR, QUANT, DIFF):
     if not b.is_file():
         step("fatal.binary-missing", which=b.name)
-        raise SystemExit(f"{b.name} not in {TARBALL}")
-    b.chmod(0o755)
-step("binary-download.done")
+        raise SystemExit(f"{b.name} did not build — judge by the artifact, not the exit code")
+step("build.done", ccache_hits=kh.sh("ccache -s | head -5", check=False))
+kh.export_ccache_tar(str(WORK / "ccache.tar"))
 
-# ── staging: /kaggle/working is ~20 GB and we peak around 21 GB. /tmp is the
-# ~70 GB ephemeral layer (gotcha #18 — and do NOT trust disk_usage's number). ──
+# ── staging on the ~70 GB ephemeral layer, not the ~20 GB working mount (#18) ─
 MODELS = Path("/tmp/madlad")
 MODELS.mkdir(parents=True, exist_ok=True)
+SRC = Path("/tmp/madlad-src")
 
+SRC_REPO = "google/madlad400-3b-mt"
+DST_REPO = "cstr/madlad400-3b-mt-GGUF"
+F16 = MODELS / "madlad400-3b-mt-f16.gguf"
+Q8 = MODELS / "madlad400-3b-mt-q8_0.gguf"
+Q4 = MODELS / "madlad400-3b-mt-q4_k.gguf"
+REF = MODELS / "madlad400-3b-mt-ref.gguf"
 
-def free_gb(p=None):
-    try:
-        return round(shutil.disk_usage(str(p or MODELS)).free / 1e9, 1)
-    except Exception:
-        return -1.0
+MADLAD_TEXT = "Hello world, how are you today?"
+os.environ["MADLAD_TEXT"] = MADLAD_TEXT
+os.environ["MADLAD_TL"] = "de"
 
 
 def gb(p):
     return round(Path(p).stat().st_size / 1e9, 2)
 
 
-SRC_REPO = "google/madlad400-3b-mt"
-DST_REPO = "cstr/madlad400-3b-mt-GGUF"
-F16 = MODELS / "madlad400-3b-mt-f16.gguf"
-Q8 = MODELS / "madlad400-3b-mt-q8_0.gguf"
+def free_gb(p="/tmp"):
+    try:
+        return round(shutil.disk_usage(p).free / 1e9, 1)
+    except Exception:
+        return -1.0
 
-# ── validation: a translation, not a load ─────────────────────────────────────
-# Each case is (source text, -sl, -tl, [substrings any ONE of which must appear]).
-# Kept deliberately loose: greedy decode from a quantized 3B will not be
-# word-identical run to run, and the point is "did it translate", not BLEU.
+
+summary = {"issue": 333, "source": SRC_REPO, "target": DST_REPO, "artifacts": {}, "parity": {}}
+
+
+def save():
+    (WORK / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
+
+
+# ── validation: three real translations, not a load ───────────────────────────
 CASES = [
-    ("Hello world, how are you today?", "en", "de", ["hallo", "welt", "wie geht"]),
+    (MADLAD_TEXT, "en", "de", ["hallo", "welt", "wie geht", "heute"]),
     ("Machine learning is changing the world.", "en", "fr", ["apprentissage", "monde", "machine"]),
     ("Bonjour le monde!", "fr", "en", ["hello", "world", "good"]),
 ]
@@ -134,127 +158,155 @@ def _norm(s):
 
 
 def validate(model_path, label):
-    """Translate three ways. Every case must produce output AND look translated."""
     step(f"{label}.validate.begin", gb=gb(model_path))
-    results = []
+    rows = []
     for text, sl, tl, wants in CASES:
         with kh.build_heartbeat(f"{label}.translate.{sl}-{tl}", 30):
-            p = subprocess.run(
-                [str(CRISPASR), "--backend", "madlad", "-m", str(model_path),
-                 "--text", text, "-sl", sl, "-tl", tl],
-                capture_output=True, text=True, timeout=1800)
+            p = subprocess.run([str(CRISPASR), "--backend", "madlad", "-m", str(model_path),
+                                "--text", text, "-sl", sl, "-tl", tl],
+                               capture_output=True, text=True, timeout=1800)
         out = _norm(p.stdout)
-        # An empty transcript or a non-zero exit is a FAIL, never a pass with a
-        # shrug — a crash that exits fast must not read as success (gotcha #24).
+        # A non-zero exit or an empty transcript is a FAIL, never a quiet pass —
+        # a fast crash must not read as success (kaggle_usage #24).
         ok = p.returncode == 0 and bool(out.strip())
-        hit = any(w in out for w in wants)
-        # It must not simply echo the source back untranslated.
-        echoed = _norm(text).strip() in out
-        results.append({"pair": f"{sl}->{tl}", "exit": p.returncode, "ok": ok,
-                        "matched": hit, "echoed": echoed, "out": p.stdout.strip()[:200],
-                        "err": p.stderr.strip()[-200:] if p.returncode else ""})
-        step(f"{label}.translate.{sl}-{tl}", exit=p.returncode, matched=hit,
-             echoed=echoed, out=p.stdout.strip()[:120])
-    passed = all(r["ok"] and r["matched"] and not r["echoed"] for r in results)
+        rows.append({"pair": f"{sl}->{tl}", "exit": p.returncode, "ok": ok,
+                     "matched": any(w in out for w in wants),
+                     "echoed": _norm(text).strip() in out,
+                     "out": p.stdout.strip()[:200]})
+        step(f"{label}.translate.{sl}-{tl}", **{k: rows[-1][k] for k in ("exit", "matched", "echoed")},
+             out=p.stdout.strip()[:120])
+    passed = all(r["ok"] and r["matched"] and not r["echoed"] for r in rows)
     step(f"{label}.validate.done", passed=passed)
-    return passed, results
+    return passed, rows
 
 
 def upload(path, msg):
-    step("upload.begin", file=Path(path).name, gb=gb(path), repo=DST_REPO)
+    step("upload.begin", file=Path(path).name, gb=gb(path))
     with kh.build_heartbeat(f"upload.{Path(path).name}", 30):
         HfApi().upload_file(path_or_fileobj=str(path), path_in_repo=Path(path).name,
-                            repo_id=DST_REPO, repo_type="model", token=TOKEN,
-                            commit_message=msg)
+                            repo_id=DST_REPO, repo_type="model", token=TOKEN, commit_message=msg)
     step("upload.done", file=Path(path).name)
 
 
-summary = {"release": RELEASE, "source": SRC_REPO, "target": DST_REPO, "artifacts": {}}
-
-
-def record(name, **kw):
-    summary["artifacts"][name] = kw
-    (WORK / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
-
-
 # ── 1. source ─────────────────────────────────────────────────────────────────
-step("source-download.begin", repo=SRC_REPO, free_gb=free_gb("/tmp"))
-SRC = Path("/tmp/madlad-src")
+step("source-download.begin", free_gb=free_gb())
 with kh.build_heartbeat("source-download", 30):
     snapshot_download(repo_id=SRC_REPO, local_dir=str(SRC), token=TOKEN,
-                      allow_patterns=["model.safetensors", "config.json",
-                                      "spiece.model", "tokenizer*.json",
-                                      "special_tokens_map.json", "added_tokens.json"])
-step("source-download.done", free_gb=free_gb("/tmp"),
-     src_gb=round(sum(f.stat().st_size for f in SRC.rglob("*") if f.is_file()) / 1e9, 2))
+                      allow_patterns=["model.safetensors", "config.json", "spiece.model",
+                                      "tokenizer*.json", "special_tokens_map.json",
+                                      "added_tokens.json", "generation_config.json"])
+step("source-download.done", free_gb=free_gb())
 
-# ── 2. convert → F16 ──────────────────────────────────────────────────────────
-step("convert.begin", free_gb=free_gb("/tmp"))
+# ── 2. F16 ────────────────────────────────────────────────────────────────────
+step("convert.begin", free_gb=free_gb())
 with kh.build_heartbeat("convert-f16", 30):
-    p = subprocess.run([sys.executable, str(CONVERTER), "--input", str(SRC),
-                        "--output", str(F16)], capture_output=True, text=True, timeout=7200)
+    p = subprocess.run([sys.executable, str(CONVERTER), "--input", str(SRC), "--output", str(F16)],
+                       capture_output=True, text=True, timeout=7200)
 if p.returncode != 0 or not F16.is_file():
     step("fatal.convert-failed", exit=p.returncode, tail=p.stdout[-600:], err=p.stderr[-600:])
     raise SystemExit("F16 conversion failed")
-step("convert.done", f16_gb=gb(F16), free_gb=free_gb("/tmp"))
+step("convert.done", f16_gb=gb(F16), free_gb=free_gb())
 
-ok_f16, res_f16 = validate(F16, "f16")
-record("f16", size_gb=gb(F16), validated=ok_f16, cases=res_f16)
-if not ok_f16:
+ok, rows = validate(F16, "f16")
+summary["artifacts"]["f16"] = {"size_gb": gb(F16), "validated": ok, "cases": rows}
+save()
+if not ok:
     step("fatal.f16-invalid")
     raise SystemExit("F16 failed validation — refusing to upload a broken artifact")
+upload(F16, "add F16 (#333: the README listed it but the repo never had it)")
+summary["artifacts"]["f16"]["uploaded"] = True
+save()
 
-upload(F16, "add F16 (issue #333: the README listed it but the repo never had it)")
-record("f16", size_gb=gb(F16), validated=True, uploaded=True, cases=res_f16)
+# ── 3. reference archive — BEFORE the source is deleted ───────────────────────
+step("refdump.begin", free_gb=free_gb())
+with kh.build_heartbeat("refdump", 30):
+    p = subprocess.run([sys.executable, str(DUMPER), "--backend", "madlad",
+                        "--model-dir", str(SRC), "--output", str(REF),
+                        "--audio", str(REPO / "samples" / "jfk.wav")],
+                       capture_output=True, text=True, timeout=7200, cwd=str(REPO / "tools"))
+ref_ok = p.returncode == 0 and REF.is_file()
+step("refdump.done", exit=p.returncode, ok=ref_ok,
+     ref_mb=round(REF.stat().st_size / 1e6, 1) if ref_ok else 0,
+     tail=p.stdout[-800:], err=p.stderr[-800:] if p.returncode else "")
+if ref_ok:
+    upload(REF, "add per-stage reference archive for crispasr-diff (#333)")
+    summary["artifacts"]["ref"] = {"size_mb": round(REF.stat().st_size / 1e6, 1), "uploaded": True}
+else:
+    # Not fatal: the quants are the issue, the reference is the bonus.
+    summary["artifacts"]["ref"] = {"failed": True, "tail": p.stdout[-400:], "err": p.stderr[-400:]}
+save()
 
-# The source is 11.76 GB and is not needed again — drop it before the quant so
-# the peak stays well inside the ~70 GB ephemeral layer.
 shutil.rmtree(SRC, ignore_errors=True)
-step("source.deleted", free_gb=free_gb("/tmp"))
+step("source.deleted", free_gb=free_gb())
 
-# ── 3. quantize → Q8_0 ────────────────────────────────────────────────────────
-# No madlad/t5 rule in examples/crispasr-quantize/main.cpp, so this takes the
-# generic path — the same one that produced the published Q4_K. Validation
-# below is what proves that was the right call for Q8_0 too.
-step("quantize.begin", free_gb=free_gb("/tmp"))
+# ── 4. Q8_0 ───────────────────────────────────────────────────────────────────
+# No t5/madlad rule in examples/crispasr-quantize/main.cpp, so this takes the
+# generic path — the same one that produced the published Q4_K. The validation
+# and the parity table below are what prove that was the right call.
+step("quantize.begin", free_gb=free_gb())
 with kh.build_heartbeat("quantize-q8_0", 30):
     p = subprocess.run([str(QUANT), str(F16), str(Q8), "q8_0"],
                        capture_output=True, text=True, timeout=7200)
 if p.returncode != 0 or not Q8.is_file():
-    step("fatal.quantize-failed", exit=p.returncode, tail=p.stdout[-600:], err=p.stderr[-600:])
+    step("fatal.quantize-failed", exit=p.returncode, tail=p.stdout[-600:])
     raise SystemExit("Q8_0 quantization failed (F16 is already on HF, so nothing is lost)")
-step("quantize.done", q8_gb=gb(Q8), free_gb=free_gb("/tmp"))
+step("quantize.done", q8_gb=gb(Q8), free_gb=free_gb())
 
-ok_q8, res_q8 = validate(Q8, "q8_0")
-record("q8_0", size_gb=gb(Q8), validated=ok_q8, cases=res_q8)
-if not ok_q8:
+ok, rows = validate(Q8, "q8_0")
+summary["artifacts"]["q8_0"] = {"size_gb": gb(Q8), "validated": ok, "cases": rows}
+save()
+if not ok:
     step("fatal.q8-invalid")
     raise SystemExit("Q8_0 failed validation — refusing to upload a broken artifact")
+upload(Q8, "add Q8_0 (#333)")
+summary["artifacts"]["q8_0"]["uploaded"] = True
+save()
 
-upload(Q8, "add Q8_0 (issue #333)")
-record("q8_0", size_gb=gb(Q8), validated=True, uploaded=True, cases=res_q8)
+# ── 5. per-stage parity for all three quants ──────────────────────────────────
+# This is the part that turns "it loaded" into a number. Q4_K is pulled back
+# from HF so the file people already have is measured too.
+if ref_ok:
+    step("q4k-download.begin")
+    try:
+        got = hf_hub_download(repo_id=DST_REPO, filename=Q4.name, local_dir=str(MODELS), token=TOKEN)
+        Q4 = Path(got)
+        step("q4k-download.done", gb=gb(Q4))
+    except Exception as e:
+        step("q4k-download.failed", err=str(e)[:200])
 
-step("script.done", artifacts=list(summary["artifacts"]))
-print(json.dumps(summary, indent=2, ensure_ascii=False))
+    for label, path in (("f16", F16), ("q8_0", Q8), ("q4_k", Q4)):
+        if not Path(path).is_file():
+            continue
+        step(f"diff.{label}.begin")
+        with kh.build_heartbeat(f"diff.{label}", 30):
+            p = subprocess.run([str(DIFF), "madlad", str(path), str(REF)],
+                               capture_output=True, text=True, timeout=3600)
+        # Parse the per-stage lines the diff prints:
+        #   t5 enc_out          n=...  cos=0.999998  max_abs=...  |mine|=... |ref|=...  PASS
+        stages = {}
+        for line in p.stdout.splitlines():
+            m = re.match(r"t5 (\S+)\s+n=\S+\s+cos=([-\d.]+)\s+max_abs=([\d.]+)\s+"
+                         r"\|mine\|=([\d.]+) \|ref\|=([\d.]+)\s+(PASS|FAIL)", line)
+            if m:
+                stages[m.group(1)] = {"cos": float(m.group(2)), "max_abs": float(m.group(3)),
+                                      "mine": float(m.group(4)), "ref": float(m.group(5)),
+                                      "verdict": m.group(6)}
+        am = re.search(r"argmax_step0\s+mine=(\d+) ref=(\d+)\s+(MATCH|DIFFER)", p.stdout)
+        summary["parity"][label] = {
+            "exit": p.returncode,
+            "stages": stages,
+            "argmax_step0": {"mine": int(am.group(1)), "ref": int(am.group(2)), "verdict": am.group(3)}
+            if am else None,
+            "worst_cos": min((v["cos"] for v in stages.values()), default=None),
+            "stdout_tail": p.stdout[-1500:],
+        }
+        step(f"diff.{label}.done", exit=p.returncode, n_stages=len(stages),
+             worst_cos=summary["parity"][label]["worst_cos"],
+             argmax=summary["parity"][label]["argmax_step0"])
+        save()
+else:
+    step("diff.skipped", why="no reference archive")
 
-# %% [markdown]
-# ## What this does NOT do, and why
-#
-# **No `-ref.gguf`.** Baking one is not a step this kernel can just add: the
-# diff harness has no madlad arm at all — there is no
-# `tools/reference_backends/madlad.py`, madlad is not in `REGISTERED_BACKENDS`
-# in `tools/dump_reference.py`, and `examples/cli/crispasr_diff_main.cpp` has no
-# `else if (backend_name == "madlad")`. Writing that dumper is the actual work;
-# running it is the easy part. Two things to know before someone does:
-#
-# - the source is **fp32 and 11.76 GB** against Kaggle's ~13 GB RAM, so the
-#   dumper has to load lazily (`safe_open(..., framework="pt")`, one layer at a
-#   time) — a plain `T5ForConditionalGeneration.from_pretrained` will OOM;
-# - T5 is encoder-decoder, so the stages worth dumping are the encoder stack,
-#   the decoder self-attention, and the **cross-attention** — that last one is
-#   where an encoder-decoder port usually goes wrong and is exactly what a
-#   per-stage diff would catch.
-#
-# **No Q4_K rebuild.** `madlad400-3b-mt-q4_k.gguf` is already published and in
-# the model registry, so `-m auto` has always worked; #333 is only about the two
-# files the README promised and the repo never had.
+save()
+step("script.done", artifacts=list(summary["artifacts"]), parity=list(summary["parity"]))
+print(json.dumps(summary, indent=2, ensure_ascii=False)[:6000])
