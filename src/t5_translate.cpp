@@ -1425,6 +1425,19 @@ extern "C" int t5_translate_diff(const char* model_gguf, const char* ref_gguf, i
     }
 
     // ── decoder, step 0 ──
+    //
+    // The self-attention KV cache has to be allocated before a decoder graph is
+    // built: `build_decoder_graph` writes this step's K/V into `c->kv_k`/`kv_v`
+    // with `ggml_cpy` into a position view, so a null cache is a null deref in
+    // layer 0. `t5_translate()` does this on its own path and the omission here
+    // segfaulted the first run of this function — the encoder stages all
+    // reported first, which is exactly why the stage-by-stage output is worth
+    // having.
+    if (!alloc_kv_cache(c, 64)) {
+        std::fprintf(stderr, "t5_diff: failed to allocate the decoder KV cache\n");
+        t5_translate_free(c);
+        return 2;
+    }
     const int start = hp.dec_start_token_id;
     ggml_cgraph* dg = build_decoder_graph(c, 1, 0);
     ggml_backend_sched_reset(c->sched);
