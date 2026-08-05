@@ -154,8 +154,14 @@ pub struct CrispasrDiarizeSegAbi {
 }
 
 /// ABI options for [`crispasr_diarize_segments_abi`]. `method` is a
-/// value in 0..3: 0 = Energy, 1 = Xcorr, 2 = VadTurns, 3 = Pyannote.
-/// `pyannote_model_path` is required for Pyannote, ignored otherwise.
+/// value in 0..4: 0 = Energy, 1 = Xcorr, 2 = VadTurns, 3 = Pyannote,
+/// 4 = FoxNose. `pyannote_model_path` is required for Pyannote,
+/// `foxnose_embedder_path` for FoxNose; each is ignored otherwise.
+///
+/// This layout is hand-maintained and MUST match
+/// `crispasr_diarize_opts_abi` in `src/crispasr_c_api.cpp`, which is
+/// APPEND-ONLY: the C side reads every field unconditionally, so a
+/// short struct here is an out-of-bounds read even for methods 0..3.
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct CrispasrDiarizeOptsAbi {
@@ -163,6 +169,15 @@ pub struct CrispasrDiarizeOptsAbi {
     pub n_threads: c_int,
     pub slice_t0_cs: i64,
     pub pyannote_model_path: *const c_char,
+    // #324 FoxNose (method 4). Ignored by the other methods.
+    pub foxnose_embedder_path: *const c_char,
+    /// 0 -> 1
+    pub min_speakers: c_int,
+    /// 0 -> 8
+    pub max_speakers: c_int,
+    /// >0 pins the speaker count and skips estimation
+    pub num_speakers: c_int,
+    pub _pad2: c_int,
 }
 
 extern "C" {
@@ -1012,4 +1027,28 @@ extern "C" {
         i_word: c_int,
         i_alt: c_int,
     ) -> c_float;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Guards the hand-maintained mirrors of the APPEND-ONLY structs in
+    // src/crispasr_c_api.cpp. The C side reads every field unconditionally,
+    // so a short layout here is an out-of-bounds read even for methods
+    // that ignore the trailing fields (#332).
+    #[test]
+    fn diarize_abi_layout() {
+        use std::mem::{offset_of, size_of};
+        assert_eq!(size_of::<CrispasrDiarizeSegAbi>(), 24);
+        assert_eq!(size_of::<CrispasrDiarizeOptsAbi>(), 48);
+        assert_eq!(offset_of!(CrispasrDiarizeOptsAbi, slice_t0_cs), 8);
+        assert_eq!(offset_of!(CrispasrDiarizeOptsAbi, pyannote_model_path), 16);
+        assert_eq!(
+            offset_of!(CrispasrDiarizeOptsAbi, foxnose_embedder_path),
+            24
+        );
+        assert_eq!(offset_of!(CrispasrDiarizeOptsAbi, min_speakers), 32);
+        assert_eq!(offset_of!(CrispasrDiarizeOptsAbi, num_speakers), 40);
+    }
 }

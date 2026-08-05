@@ -74,6 +74,33 @@ Earned the hard way; each cost a real bug getting through.
    copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
    missing one.
 
+## OPEN follow-ups from #332 (Rust/Dart diarize ABI, landed 2026-08-05)
+
+The landed part: `DiarizeMethod::FoxNose` + options exposed in the Rust crate
+and Dart, and the real bug behind the report — the hand-maintained Rust and
+Dart mirrors of the APPEND-ONLY `crispasr_diarize_opts_abi` were never updated
+when #324 appended the FoxNose fields, so every `diarize_segments` call from
+those bindings had the C side read 24 bytes past the caller's allocation.
+Both mirrors now carry the 48-byte layout; `crispasr-sys` has a size/offset
+layout test, the flutter smoke test pins the `DiarizeMethod` indexes, and the
+c_api struct comment now lists every hand-written mirror to update on the next
+append.
+
+Still open from the issue's asks:
+
+1. **`crispasr_session_output_sample_rate()` (+ channels getters).**
+   `synthesize` / `speech_to_speech` return PCM "at the backend-native sample
+   rate" but no ABI getter exposes that rate, so callers hard-code it.
+   `input_channels()` is trivially 1 today (separation is the stereo
+   exception, and it has its own `separate_sample_rate`); the output-rate
+   getter is the real gap. Touches the C API + every binding (multi-surface
+   trap — session ABI, CLI unaffected).
+2. **Same-benchmark DER for the pyannote+embedder path** — already tracked as
+   the #326 NOW item below; the issue asked for cross-method benchmarks, and
+   foxnose-vs-upstream numbers exist in `docs/foxnose-diarize/PLAN.md` while
+   the pyannote path has throughput numbers (#326) but no DER on the same 8
+   VoxConverse files.
+
 ## NOW — #326 diarization: the count estimator is the last accuracy item
 
 Landed: parallel 60 s chunked pyannote inference (e517273d), the `SPK_MASK`
