@@ -74,6 +74,57 @@ Earned the hard way; each cost a real bug getting through.
    copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
    missing one.
 
+## LANDED 2026-08-05 — #334 cosyvoice3 WAV cloning (85d60ba9, 88c02788)
+
+Reported as "long delay, pitch shifting and accent issues", blamed on sample
+rate. **The sample rate was a red herring** and that is worth remembering: the
+C++ speech tokens are byte-exact vs `speech_tokenizer_v3.onnx` (201/201) at
+every reference rate, and our polyphase resampler tracks torchaudio to inside
+the tokenizer's own sensitivity. What is real:
+
+- **s3tok token ids are NOT stable across resamplers.** ONNX on a sox-16 kHz
+  file vs the same audio resampled from 24 kHz agrees on only ~62% of tokens —
+  and torchaudio scores the same 62%. The FSQ codes are near-ties, so a −51 dB
+  difference flips a third of them. Any future "our tokens don't match" report
+  must first ask *which 16 kHz signal*.
+- **The talker had no minimum length.** Upstream masks the stop token while
+  `i < min_len = (target text tokens) × 2`. Without it one unlucky step-0
+  sample ends the decode ("AR decode produced 0 tokens", no audio); short of
+  that the model spends fewer than 2 frames per text token, which is the
+  reporter's chipmunk. Ported + gated `CRISPASR_COSYVOICE3_NO_MIN_LEN=1`.
+- **The actual trigger is a `--ref-text` that doesn't transcribe the clip.**
+  17.7 s of audio labelled with one sentence → collapse. Now warned against
+  the same 2..20 speech-tokens-per-text-token band the decode uses.
+- **The clone front-end re-ran per sentence chunk.** s3tok + CAMPPlus + prompt
+  mel on every `synthesize()`; cached per (path, size, mtime, transcript).
+  3-sentence `--tts` 66.0 s → 45.7 s, byte-identical.
+- **`resample_polyphase` truncated its filter on every downsample** — the
+  input window was `±num_zeros` where the filter spans `half_len/L` input
+  samples. The pre-existing DC test had a 5e-4 margin over a 5.4e-4 defect.
+- **RL talker published + wired**: `cosyvoice3-llm-rl-{f16,q4_k}.gguf` on
+  `cstr/cosyvoice3-0.5b-2512-GGUF`, `--backend cosyvoice3-tts-rl`.
+
+### OPEN follow-ups
+
+1. **Auto-transcribe the reference when `--ref-text` is missing.** cosyvoice3
+   hard-errors today; f5-tts already auto-transcribes (its
+   `transcribe_ref_audio` + `crispasr_ref_cache` are `static` in
+   `crispasr_backend_f5_tts.cpp` and would need hoisting to a shared header,
+   then mirroring at the session C-ABI, which returns -2 for a WAV with no
+   transcript). This removes the whole mismatch class rather than warning
+   about it — the single highest-value item left on #334.
+2. **The clone front-end is a harness-blind zone.** `tools/reference_backends/
+   cosyvoice3_tts.py` has s3tok stages but no CAMPPlus `spk_emb` and no
+   `prompt_feat_24k`, and `cosyvoice3_tts_extract_{spk_emb,ref_mel,
+   speech_tokens}` have no caller at all. The CAMPPlus converter maps an
+   ANONYMOUS initializer tail by order/shape — exactly the kind of guess that
+   yields a plausible-but-wrong embedding. Wire those two stages in.
+3. **The 10 s prompt-mel cap is ours, not upstream's.** `compute_prompt_feat_24k`
+   is called with `max_samples = 10 * 24000`, so a longer reference gives the
+   flow a 10 s prompt while the LM keeps the full token set (deliberate, see
+   the #310 comment). A 17.7 s reference round-trips fine, so this is not a
+   bug — but it is an untested divergence worth an A/B.
+
 ## #333 madlad400 — DONE 2026-08-05 (F16 + Q8_0 published, port validated)
 
 Reporter: only `q4_k` was on `cstr/madlad400-3b-mt-GGUF`, though the README
