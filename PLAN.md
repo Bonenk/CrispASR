@@ -86,6 +86,67 @@ Earned the hard way; each cost a real bug getting through.
    copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
    missing one.
 
+## OPEN 2026-08-05 — #333 madlad400: the repo has q4_k only; F16 and Q8_0 were never uploaded
+
+Reporter: "Only the q4_k model appears to be available, even though the README
+itself mentions f16 and q8_0." Confirmed against the HF API —
+`cstr/madlad400-3b-mt-GGUF` contains exactly `README.md` and
+`madlad400-3b-mt-q4_k.gguf`. Worse than a stale table: the card's own
+copy-paste examples (lines 44/47/52/57) all say `…-q8_0.gguf`, so anyone
+following the quickstart 404s. `-m auto` is unaffected — the registry points at
+q4_k — so this only bites manual downloads, which is everyone reading the card.
+
+**Kernel written and ready to push: `tools/kaggle/madlad-quants/`.** Not run
+yet — pushing burns GPU quota and it publishes to a public repo, so it wants a
+deliberate go-ahead.
+
+Why Kaggle at all: there is no GPU compute in this job (the converter is numpy,
+`crispasr-quantize` streams tensors at ~500 MB RAM) — it is 11.76 GB of source
+down and ~8.8 GB of artifacts up, and Kaggle CPU workers have no internet, so a
+GPU kernel is the only way to get the fast link.
+
+What it does, in this order, so a late failure cannot lose an early artifact:
+
+    download google/madlad400-3b-mt (11.76 GB fp32)
+      → convert-madlad-to-gguf.py → F16 (~5.7 GB) → VALIDATE → upload → rm source
+      → crispasr-quantize q8_0     → Q8_0 (~3.1 GB) → VALIDATE → upload → done
+
+Notes for whoever runs it:
+
+- **It pins release v0.8.25, not the v0.8.6 the other quant kernels use.** madlad
+  landed in v0.8.16, so the older tarball has no `--backend madlad` and would
+  fail at validation after doing all the work.
+- **Validation is three real translations** (en→de, en→fr, fr→en), and each must
+  exit 0, produce non-empty output, hit an expected substring, and NOT echo the
+  source back. A GGUF that loads is not a GGUF that works.
+- `examples/crispasr-quantize/main.cpp` has **no `t5`/madlad rule**, so Q8_0
+  takes the generic path — the same one that produced the published Q4_K. The
+  validation step is what proves that was right.
+- Peak disk ~21 GB, staged under `/tmp` (~70 GB ephemeral layer), not
+  `/kaggle/working` (~20 GB cap).
+
+**If we decide NOT to produce the files, the card must be corrected instead** —
+promising two artifacts that do not exist, in the quickstart, is the actual
+defect the reporter hit.
+
+### The `-ref.gguf` idea — not free, and worth doing on its own
+
+Baking a per-stage reference alongside the quants was floated. The kernel cannot
+just add it: **madlad has no diff-harness arm at all** — no
+`tools/reference_backends/madlad.py`, not in `REGISTERED_BACKENDS`, and no
+`else if (backend_name == "madlad")` in `examples/cli/crispasr_diff_main.cpp`.
+Writing the dumper is the work; running it is the easy part. Two constraints to
+design around:
+
+- the source is **fp32 and 11.76 GB** against Kaggle's ~13 GB RAM, so the dumper
+  must load lazily (`safe_open(..., framework="pt")`, one layer at a time) — a
+  plain `from_pretrained` will OOM;
+- T5 is encoder-decoder, so the stages that matter are the encoder stack, the
+  decoder self-attention and the **cross-attention** — the last is where
+  encoder-decoder ports usually go wrong and is precisely what a per-stage diff
+  would catch. madlad has no per-stage coverage today, so this has real value
+  beyond the issue.
+
 ## OPEN 2026-08-05 — miotts writes a 24 kHz WAV header for 44.1 kHz audio
 
 Reported from another session as "docs say 44.1 kHz, adapter says 24 kHz".
