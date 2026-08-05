@@ -1308,6 +1308,21 @@ added via `[archive addComputePipelineFunctionsWithDescriptor:]`;
 the source of the `crispasr_metal_pipeline_cache_open/_flush` log lines seen on every
 CLI/server run. The whole "TO DO" below matches what shipped.
 
+**Write-path decision (2026-08-05, CrispEmbed G8=F10 coordination).** The flush
+runs only at `ggml_metal_device_free`; CrispASR binaries exit normally so it
+fires on every CLI/server run and the archive grows unboundedly (the shared dev
+box reached 683 MB; open costs ~1 ms/MB and CrispEmbed measured no first-encode
+benefit even from the full-size archive). Decided: KEEP flush-at-device-free
+(no flush-per-run — it adds a per-run serialise and accelerates growth; no
+per-engine scoping — it fragments the cache and multiplies disk), and ADOPT the
+CrispEmbed T18/G4 open-time cap: `src/core/metal_pipeline_cache_policy.h`,
+applied in `crispasr_init_gpu_backend()`. `CRISPASR_METAL_PIPELINE_CACHE_MAX_MB`
+(default 64, `0` = uncapped) — when the largest archive exceeds the cap, ggml's
+own `GGML_METAL_PIPELINE_CACHE_DISABLE` is set, which skips the open AND leaves
+`dev->binary_archive` nil so the flush no-ops: an oversized archive stops
+growing too. CrispEmbed's `_exit()`ing one-shot CLIs deliberately never write
+(decided on their side). Unit-tested in `tests/test-gpu-backend-pref.cpp`.
+
 <details><summary>original TODO (all satisfied — kept for reference)</summary>
 
 **Problem:** ggml-metal JIT-compiles MSL pipelines lazily per unique tensor shape on first use, cached in-memory only. Every fresh process pays 30–60 s of MTLLibrary + MTLComputePipelineState compile before the first `ggml_metal_encode`. Hits every `flutter test`/CLI run (~30–60 s startup tax), every CI sweep (~25 min single-process multi-backend; projected ~5 min warm), and every end-user macOS/iOS app launch.
