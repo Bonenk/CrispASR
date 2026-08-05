@@ -109,18 +109,37 @@ produced and validated everything. Reference archive:
   (`tests/regression/README.md`). It works where it is and the kernel points at
   it, but it should be moved or mirrored, and pinned by `fixture_ref_path` so CI
   can use it.
-- **Greedy decode does not always terminate cleanly on short inputs.** The
-  fr→en validation case translated correctly ("Hello world!") and then ran on
-  into a long repeat loop of digits. Validation passed — it asks whether the
-  model translated, which it did — but that is a real decode-quality signal
-  worth its own look (`core_repeat` / `core_ngram::fix_loops` exist for exactly
-  this and madlad does not use them).
-- **No `t5`/madlad rule in `examples/crispasr-quantize/main.cpp`.** Q8_0 took
-  the generic path and measures fine, so nothing is broken — but the numbers
-  above are the first evidence anyone has that the generic path is right for
-  this architecture, and a rule that keeps the embedding/lm_head at higher
-  precision might close the Q4_K gap (its worst stages are `enc_out` 0.9937 and
-  `cross_v` 0.9933).
+- ~~Greedy decode does not always terminate cleanly~~ **RESOLVED, and it was
+  NOT a port bug.** The hypothesis was that the runaway pointed at the runtime,
+  since the blueprint presumably stopped. Measured instead of assumed, and the
+  answer is the opposite: **the PyTorch reference runs away identically** —
+  60 tokens, no EOS, byte-identical string
+  (`'Hello world! – 100000000000…'`). Ruled out along the way, each with its own
+  arm: quantization (reproduces at F16, where parity is 1.000000), the KV cache
+  (`CRISPASR_T5_NO_KV_REUSE=1` full re-forward gives the identical string), the
+  tokenizer (runtime independently emits the same 11 ids ending in EOS=2, and
+  `enc_embed` is cos=1.000000), the EOS id (config, GGUF and runtime all say 2),
+  and the graph (14/14 stages, argmax MATCH). The port reproduces the model
+  faithfully **including its failure mode**, which is itself evidence of
+  fidelity.
+  Shipped anyway as a decode-policy improvement: `core_repeat::tail_is_repetition`
+  in the greedy loop, which trims the repeated tail and stops
+  ("Hello world! – 10" instead of "…– 100000000000…"). **Gated
+  `CRISPASR_T5_REPEAT_BREAK=0`, because it deliberately DEVIATES from the
+  blueprint** — anyone diffing against HF needs the old behaviour back. Both
+  sentences the reference terminates cleanly on are byte-identical with it on
+  and off.
+- ~~No `t5`/madlad rule in `crispasr-quantize`~~ **DONE.** The port pipeline's
+  step 3 asks for it and I had filed it instead of doing it.
+  `shared.embed.weight` and `lm_head.weight` now stay at source precision
+  (`CRISPASR_T5_QUANT_ALL=1` overrides). Those two carry the whole 256K
+  vocabulary and are the only tensors whose rounding lands straight on the
+  output distribution — MADLAD is `tie_word_embeddings=false`, so `lm_head` is a
+  SECOND 256000×1024 matrix, not an alias. The per-stage table says exactly why:
+  Q4_K's worst stages are `enc_embed` 0.9974 and `enc_out` 0.9937, both
+  embedding-driven, while the 32+32 mat-mul blocks quantize cleanly (0.99998+ at
+  every depth). ⚠ The published Q4_K/Q8_0 predate the rule — re-quantizing with
+  it should lift those two stages and is worth a run.
 - The kernel builds from source (the diff arm postdates v0.8.25) and the ccache
   dataset did **not** warm — `ccache_hits: 0` on both runs, ~11 min of build
   each time. `kh.export_ccache_tar()` now writes `ccache.tar` to the output, so
