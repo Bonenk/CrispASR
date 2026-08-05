@@ -330,11 +330,49 @@ TEST_CASE("de: the closed class loses its stress in running text", "[g2p_de][uni
     }
 }
 
-TEST_CASE("de: the un-stressing is opt-in", "[g2p_de][unit][stress]") {
-    // Kept and gated, not defaulted: it takes token agreement with espeak's
-    // sentence output from 45.9% to 87.1%, but the ASR round-trip could not
-    // resolve a difference (90.6% -> 89.4% over 16 clips, ~3 words). See the
-    // note on the flag.
+TEST_CASE("de: the un-stressing is on, on source evidence", "[g2p_de][unit][stress]") {
+    // Default ON since dida-80b/kokoro-deutsch's own dataset script was found:
+    // it phonemizes the WHOLE SENTENCE through misaki's
+    // EspeakG2P(language="de"), so espeak's sentence-level de-stressing is in
+    // the training data and the citation form our per-word dictionary stores is
+    // a spelling the model never saw. Token agreement with that recipe:
+    // 41.2% -> 81.2%. CRISPASR_G2P_DE_UNSTRESS=0 restores the old forms.
     g2p_de::context ctx;
-    CHECK_FALSE(ctx.unstress_function_words);
+    CHECK(ctx.unstress_function_words);
+}
+
+// ── #316: symbols the German Kokoro vocabulary cannot receive ───────────────
+
+#include "core/phoneme_dialect.h"
+
+TEST_CASE("de: ʏ is not in the model vocabulary and must not reach it", "[g2p_de][unit][vocab]") {
+    // A symbol the vocabulary lacks is not approximated by
+    // kokoro_phonemes_to_ids — it is DROPPED, so the sound leaves the
+    // utterance. `ʏ` is in every München, Frühstück, fünf, Glück and zurück,
+    // and we were deleting the vowel out of all of them. Measured on the real
+    // model: "Frühstück" came back from the ASR as "Frisch" and "Küche" as
+    // "Kerre"; with the substitution they are "Frühstück" and "Kühe".
+    //
+    // dida-80b's own dataset script makes the same one ("ʏ → y … the duration
+    // difference is learned from audio"), which is what confirms it is the
+    // intended spelling rather than a workaround of ours.
+    const std::string in = "mˈʏnçən frˈyːʃtʏk";
+    const std::string out = core_phoneme::convert(in, core_phoneme::Dialect::DeVocab);
+    CHECK(out.find("ʏ") == std::string::npos);
+    CHECK(out == "mˈynçən frˈyːʃtyk");
+    // The non-syllabic mark is not in the vocabulary either; dropping it leaves
+    // the two vowels of the diphthong, which is what we want.
+    CHECK(core_phoneme::convert("tsaɪ̯tʊŋ", core_phoneme::Dialect::DeVocab) == "tsaɪtʊŋ");
+}
+
+TEST_CASE("de: the misaki tied-sequence collapse is a separate, opt-in step", "[g2p_de][unit][vocab]") {
+    // What the published recipe does (misaki's EspeakG2P e2m map). Kept
+    // separate from the vocabulary fixups because the evidence differs: the
+    // fixups are unambiguous, this one made the round-trip worse on the model
+    // we ship. Both apply the fixups.
+    CHECK(core_phoneme::convert("tsvˈaɪ", core_phoneme::Dialect::MisakiDe) == "ʦvˈI");
+    CHECK(core_phoneme::convert("hˈaʊzə", core_phoneme::Dialect::MisakiDe) == "hˈWzə");
+    CHECK(core_phoneme::convert("mˈʏnçən", core_phoneme::Dialect::MisakiDe) == "mˈynçən");
+    // ...and DeVocab leaves the diphthongs alone.
+    CHECK(core_phoneme::convert("tsvˈaɪ", core_phoneme::Dialect::DeVocab) == "tsvˈaɪ");
 }
