@@ -304,3 +304,37 @@ TEST_CASE("de: a quoted word is looked up without its quotes", "[g2p_de][unit][p
     const std::string bare = g2p_de::text_to_ipa(ctx, "ab");
     CHECK(quoted == bare);
 }
+
+// ── #316: the citation-form stress our per-word dictionary bakes in ─────────
+
+#include "core/g2p_de_unstressed.h"
+
+TEST_CASE("de: the closed class loses its stress in running text", "[g2p_de][unit][stress]") {
+    // Every one of these is espeak's own answer, taken from it in two carrier
+    // frames by tools/gen-g2p-de-unstressed.py. espeak says `zˈiː` for "sie"
+    // alone and `ziː` inside a sentence; our dictionary was generated one word
+    // at a time, so it only ever had the first.
+    CHECK(core_g2p_de_unstressed::lookup("sie") == "ziː");
+    CHECK(core_g2p_de_unstressed::lookup("der") == "dɛɾ");
+    CHECK(core_g2p_de_unstressed::lookup("nach") == "nɑːx");
+    CHECK(core_g2p_de_unstressed::lookup("und") == "ʊnt");
+    // A content word is not in the class and must never be reduced.
+    CHECK(core_g2p_de_unstressed::lookup("hause").empty());
+    CHECK(core_g2p_de_unstressed::lookup("wissenschaftlerin").empty());
+    // Every entry is the citation form minus its stress marks and nothing else
+    // — the generator rejects a candidate whose SEGMENTS change.
+    for (const auto& kv : core_g2p_de_unstressed::table()) {
+        CHECK(kv.second.find("ˈ") == std::string::npos);
+        CHECK(kv.second.find("ˌ") == std::string::npos);
+        CHECK(!kv.second.empty());
+    }
+}
+
+TEST_CASE("de: the un-stressing is opt-in", "[g2p_de][unit][stress]") {
+    // Kept and gated, not defaulted: it takes token agreement with espeak's
+    // sentence output from 45.9% to 87.1%, but the ASR round-trip could not
+    // resolve a difference (90.6% -> 89.4% over 16 clips, ~3 words). See the
+    // note on the flag.
+    g2p_de::context ctx;
+    CHECK_FALSE(ctx.unstress_function_words);
+}

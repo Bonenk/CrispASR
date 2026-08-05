@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "core/g2p_de_unstressed.h"
 #include "core/num2words_de.h" // #316: spell digits out before phonemizing
 
 #include <cstdio>
@@ -635,6 +636,26 @@ struct context {
     // espeak's, and that consumer has never been fed punctuation, so the flag
     // is the caller's to set. See g2p_en::style.
     bool emit_punctuation = false;
+
+    // Read the German closed class the way espeak reads it IN A SENTENCE.
+    // `espeak_de.tsv` was generated one word at a time, so every entry is the
+    // citation form — and espeak stresses "sie" as `zˈiː` alone but `ziː` in a
+    // sentence. We therefore put a primary stress on every article, pronoun,
+    // preposition and auxiliary, which is the German shape of the #316 English
+    // bug. Turning this on takes token agreement with espeak's sentence output
+    // from 45.9% to 87.1%.
+    //
+    // OFF by default anyway, and the reason is worth reading before you flip
+    // it: the phoneme-level win did NOT show up in the ASR round-trip
+    // (90.6% -> 89.4% word accuracy over 8 sentences x 2 voices — a ~3-word
+    // difference, i.e. inside the noise of that sample). So the evidence says
+    // "the phonemes are much closer to the reference" and says NOTHING about
+    // whether it sounds better, because word accuracy measures intelligibility
+    // and this change is about naturalness. The English half of #316 had a
+    // metric that could see the defect (an ASR hearing "eye" for "I"); this
+    // one does not, and a listening test is what would settle it.
+    // CRISPASR_G2P_DE_UNSTRESS=1 enables it. See core/g2p_de_unstressed.h.
+    bool unstress_function_words = false;
 };
 
 // ── Tokenizer ───────────────────────────────────────────────────────
@@ -727,9 +748,17 @@ inline std::string text_to_ipa(const context& ctx, const std::string& text) {
             pending_space = true;
             continue;
         }
-        const std::string ph = word_to_ipa(ctx, w);
+        std::string ph = word_to_ipa(ctx, w);
         if (ph.empty())
             continue;
+        if (ctx.unstress_function_words) {
+            std::string lower;
+            for (char c : w)
+                lower += (char)tolower((unsigned char)c);
+            const std::string un = core_g2p_de_unstressed::lookup(lower);
+            if (!un.empty())
+                ph = un;
+        }
         if (!ipa.empty() && (pending_space || ipa.back() != ' '))
             ipa += ' ';
         pending_space = false;
