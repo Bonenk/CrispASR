@@ -385,6 +385,15 @@ bool phonemize_builtin_de(const std::string& lang, const std::string& text, std:
         ensure_de_dict_loaded();
     }
     g_g2p_de_ctx.emit_punctuation = tts_punctuation;
+    // #316: read the German closed class the way espeak reads it in a SENTENCE,
+    // not the citation form our per-word dictionary stores. Opt-in — it moves
+    // token agreement with espeak 45.9% -> 87.1% but did not move the ASR
+    // round-trip, so it is kept and gated rather than defaulted or deleted.
+    static const bool de_unstress = [] {
+        const char* v = std::getenv("CRISPASR_G2P_DE_UNSTRESS");
+        return v && *v && std::strcmp(v, "0") != 0;
+    }();
+    g_g2p_de_ctx.unstress_function_words = de_unstress;
     out = g2p_de::text_to_ipa(g_g2p_de_ctx, text);
     return !out.empty();
 }
