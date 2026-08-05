@@ -140,6 +140,19 @@ def free_gb(p="/tmp"):
 
 summary = {"issue": 333, "source": SRC_REPO, "target": DST_REPO, "artifacts": {}, "parity": {}}
 
+# ── resumable: what is already on the repo? ───────────────────────────────────
+# The first run of this kernel produced and uploaded F16 and Q8_0 and then died
+# in the reference dump on a wrong tensor key. Re-running everything to get the
+# parity table would redo ~15 minutes of conversion and quantization for files
+# that are already published, so each produce-step is skipped when its artifact
+# exists and the file is fetched for the diff phase instead.
+try:
+    HAVE = {f.rfilename for f in HfApi().model_info(DST_REPO, token=TOKEN).siblings}
+except Exception as e:
+    HAVE = set()
+    step("repo-listing.failed", err=str(e)[:200])
+step("repo-listing", present=sorted(HAVE))
+
 
 def save():
     (WORK / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False))
@@ -198,24 +211,32 @@ with kh.build_heartbeat("source-download", 30):
 step("source-download.done", free_gb=free_gb())
 
 # ── 2. F16 ────────────────────────────────────────────────────────────────────
-step("convert.begin", free_gb=free_gb())
-with kh.build_heartbeat("convert-f16", 30):
+if F16.name in HAVE:
+    step("convert.skipped", why="already on the repo")
+    with kh.build_heartbeat("f16-download", 30):
+        F16 = Path(hf_hub_download(repo_id=DST_REPO, filename=F16.name,
+                                   local_dir=str(MODELS), token=TOKEN))
+    summary["artifacts"]["f16"] = {"size_gb": gb(F16), "preexisting": True}
+    save()
+else:
+  step("convert.begin", free_gb=free_gb())
+  with kh.build_heartbeat("convert-f16", 30):
     p = subprocess.run([sys.executable, str(CONVERTER), "--input", str(SRC), "--output", str(F16)],
                        capture_output=True, text=True, timeout=7200)
-if p.returncode != 0 or not F16.is_file():
+  if p.returncode != 0 or not F16.is_file():
     step("fatal.convert-failed", exit=p.returncode, tail=p.stdout[-600:], err=p.stderr[-600:])
     raise SystemExit("F16 conversion failed")
-step("convert.done", f16_gb=gb(F16), free_gb=free_gb())
+  step("convert.done", f16_gb=gb(F16), free_gb=free_gb())
 
-ok, rows = validate(F16, "f16")
-summary["artifacts"]["f16"] = {"size_gb": gb(F16), "validated": ok, "cases": rows}
-save()
-if not ok:
+  ok, rows = validate(F16, "f16")
+  summary["artifacts"]["f16"] = {"size_gb": gb(F16), "validated": ok, "cases": rows}
+  save()
+  if not ok:
     step("fatal.f16-invalid")
     raise SystemExit("F16 failed validation — refusing to upload a broken artifact")
-upload(F16, "add F16 (#333: the README listed it but the repo never had it)")
-summary["artifacts"]["f16"]["uploaded"] = True
-save()
+  upload(F16, "add F16 (#333: the README listed it but the repo never had it)")
+  summary["artifacts"]["f16"]["uploaded"] = True
+  save()
 
 # ── 3. reference archive — BEFORE the source is deleted ───────────────────────
 step("refdump.begin", free_gb=free_gb())
@@ -243,24 +264,32 @@ step("source.deleted", free_gb=free_gb())
 # No t5/madlad rule in examples/crispasr-quantize/main.cpp, so this takes the
 # generic path — the same one that produced the published Q4_K. The validation
 # and the parity table below are what prove that was the right call.
-step("quantize.begin", free_gb=free_gb())
-with kh.build_heartbeat("quantize-q8_0", 30):
+if Q8.name in HAVE:
+    step("quantize.skipped", why="already on the repo")
+    with kh.build_heartbeat("q8-download", 30):
+        Q8 = Path(hf_hub_download(repo_id=DST_REPO, filename=Q8.name,
+                                  local_dir=str(MODELS), token=TOKEN))
+    summary["artifacts"]["q8_0"] = {"size_gb": gb(Q8), "preexisting": True}
+    save()
+else:
+  step("quantize.begin", free_gb=free_gb())
+  with kh.build_heartbeat("quantize-q8_0", 30):
     p = subprocess.run([str(QUANT), str(F16), str(Q8), "q8_0"],
                        capture_output=True, text=True, timeout=7200)
-if p.returncode != 0 or not Q8.is_file():
+  if p.returncode != 0 or not Q8.is_file():
     step("fatal.quantize-failed", exit=p.returncode, tail=p.stdout[-600:])
     raise SystemExit("Q8_0 quantization failed (F16 is already on HF, so nothing is lost)")
-step("quantize.done", q8_gb=gb(Q8), free_gb=free_gb())
+  step("quantize.done", q8_gb=gb(Q8), free_gb=free_gb())
 
-ok, rows = validate(Q8, "q8_0")
-summary["artifacts"]["q8_0"] = {"size_gb": gb(Q8), "validated": ok, "cases": rows}
-save()
-if not ok:
+  ok, rows = validate(Q8, "q8_0")
+  summary["artifacts"]["q8_0"] = {"size_gb": gb(Q8), "validated": ok, "cases": rows}
+  save()
+  if not ok:
     step("fatal.q8-invalid")
     raise SystemExit("Q8_0 failed validation — refusing to upload a broken artifact")
-upload(Q8, "add Q8_0 (#333)")
-summary["artifacts"]["q8_0"]["uploaded"] = True
-save()
+  upload(Q8, "add Q8_0 (#333)")
+  summary["artifacts"]["q8_0"]["uploaded"] = True
+  save()
 
 # ── 5. per-stage parity for all three quants ──────────────────────────────────
 # This is the part that turns "it loaded" into a number. Q4_K is pulled back
