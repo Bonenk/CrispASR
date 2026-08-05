@@ -352,6 +352,23 @@ catch_discover_tests(test-audio-resample
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-cosyvoice3-prompt-policy — #334 decode floor + ref-text length band ──
+# Header-only policy, no weights: the diff harness ends at the logits and
+# cannot see either law.
+add_executable(test-cosyvoice3-prompt-policy
+    test-cosyvoice3-prompt-policy.cpp
+)
+target_include_directories(test-cosyvoice3-prompt-policy PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-cosyvoice3-prompt-policy PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-cosyvoice3-prompt-policy
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-core-rvq — core_rvq::encode_euclidean vs full-distance reference ─────
 # Proves the 2·x·E−‖E‖² shootout selects the same codes as a direct argmin
 # (the correctness property behind §176l routing kyutai through core_rvq).
