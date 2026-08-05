@@ -781,7 +781,8 @@ struct ipa_dict {
 // A targeted scanner rather than a JSON library: the file is machine-generated
 // and this avoids pulling a parser into the phonemizer for one call site.
 // Returns the number of DEFAULT entries loaded.
-inline int load_misaki_json(ipa_dict& out, ipa_dict& final_out, const std::string& path) {
+inline int load_misaki_json(ipa_dict& out, ipa_dict& final_out, const std::string& path,
+                            ipa_dict* letters_out = nullptr) {
     FILE* f = fopen(path.c_str(), "rb");
     if (!f)
         return 0;
@@ -839,10 +840,17 @@ inline int load_misaki_json(ipa_dict& out, ipa_dict& final_out, const std::strin
         std::string lower = key;
         for (auto& c : lower)
             c = (char)tolower((unsigned char)c);
+        // A single UPPERCASE key is the LETTER's reading ("A" -> ˈA), which is
+        // a different word from the lowercase entry ("a" -> the article). They
+        // collide once the key is lowercased, so the letter goes in its own
+        // table — spelling out an acronym needs it and nothing else does.
+        const bool is_letter_key = key.size() == 1 && key[0] >= 'A' && key[0] <= 'Z';
         if (i < buf.size() && buf[i] == '"') {
             std::string val;
             if (!read_string(i, val))
                 break;
+            if (letters_out && is_letter_key && !val.empty())
+                letters_out->entries[lower] = val;
             if (!val.empty() && !out.entries.count(lower)) {
                 out.entries[lower] = val;
                 count++;
@@ -1015,6 +1023,14 @@ struct context {
     // when NOTHING follows the word ("…is she?" -> ʃˌi). 32 entries; empty
     // unless the companion dict is loaded.
     ipa_dict phrase_final;
+
+    // #316 follow-up: the 26 LETTER readings ("a" -> ˈA, "x" -> ˈɛks), used to
+    // spell out an acronym the way misaki's `get_NNP` does. Separate from
+    // `espeak_ipa` because the letter and the word collide once the lexicon key
+    // is lowercased ("A" the letter vs "a" the article). Empty for the espeak
+    // dicts, and everything below is a no-op when it is empty — so this stays
+    // Kokoro-only without needing its own flag.
+    ipa_dict letters;
 
     // #316 follow-up: carry punctuation through into the phoneme string.
     // Kokoro's vocabulary contains `,.;:!?…—"«»“”` and misaki emits them, so
@@ -1470,7 +1486,53 @@ inline std::string word_to_ipa(const context& ctx, const std::string& word) {
 
 // Phonemize one word token. A hyphenated compound is phonemized part by part
 // and joined the way misaki joins it (one primary stress, no gap).
+// misaki's `get_NNP` over this context's letters table, or "" when it cannot
+// answer (no table, or a letter missing from it) — in which case the caller
+// keeps its normal lookup chain.
+inline std::string spell_out(const context& ctx, const std::string& word) {
+    if (ctx.letters.entries.empty())
+        return std::string();
+    return core_g2p_ctxwords::spell_out(word, [&ctx](const std::string& c) -> std::string {
+        auto it = ctx.letters.entries.find(c);
+        return it == ctx.letters.entries.end() ? std::string() : it->second;
+    });
+}
+
+// Should this token be READ OUT as letters? Two shapes, both misaki's:
+//   - a dotted acronym: U.S.A., e.g., Ph.D.
+//   - an ALLCAPS word that is in no dictionary. misaki lowercases an ALLCAPS
+//     word and looks THAT up first, so "HELLO" is still "hello"; only a
+//     genuinely unknown one is spelled. We mirror that by checking the same
+//     tiers `word_to_ipa` consults before its rule-based fallback.
+inline bool wants_spelling(const context& ctx, const std::string& w) {
+    if (ctx.letters.entries.empty())
+        return false;
+    if (core_g2p_ctxwords::is_dotted_acronym(w))
+        return true;
+    if (w.size() < 2 || core_g2p_ctxwords::classify_caps(w) != core_g2p_ctxwords::Caps::Upper)
+        return false;
+    std::string lower;
+    for (char c : w) {
+        if (!isalpha((unsigned char)c))
+            return false;
+        lower += (char)tolower((unsigned char)c);
+    }
+    if (ctx.espeak_ipa.entries.count(lower))
+        return false;
+    if (ctx.inflect_fallback && !ctx.inflect_fallback(lower).empty())
+        return false;
+    std::string upper = lower;
+    for (auto& c : upper)
+        c = (char)toupper((unsigned char)c);
+    return !ctx.dict.entries.count(upper);
+}
+
 inline std::string token_to_ipa(const context& ctx, const style& st, const std::string& w) {
+    if (st.context_words && wants_spelling(ctx, w)) {
+        const std::string spelled = spell_out(ctx, w);
+        if (!spelled.empty())
+            return spelled;
+    }
     if (!st.join_hyphenated || w.find('-') == std::string::npos)
         return word_to_ipa(ctx, w);
     std::vector<std::string> parts;
@@ -1520,6 +1582,30 @@ inline std::string text_to_ipa(const context& ctx, const std::string& text, cons
             continue;
         toks[i].text += ".";
         toks.erase(toks.begin() + (long)i + 1);
+    }
+    // An acronym's dots belong to it, too. `U.S.A.` arrives as six tokens and
+    // used to phonemize as `jˈu.ˈɛs.ɐ.` — full stops INSIDE the word, so the
+    // model pauses between the letters, and the trailing "a" read as the
+    // article. Merge a run of at least two `<1-2 letters> .` pairs back into
+    // one token; `token_to_ipa` then spells it out. Gated on the letters table,
+    // so the espeak/piper dicts (which have none) never take this path.
+    if (!ctx.letters.entries.empty()) {
+        for (size_t i = 0; i + 3 < toks.size(); i++) {
+            size_t j = i, pairs = 0;
+            while (j + 1 < toks.size() && !toks[j].punct && toks[j].text.size() <= 2 &&
+                   toks[j].text.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") ==
+                       std::string::npos &&
+                   toks[j + 1].punct && toks[j + 1].text == "." && !toks[j + 1].space_before &&
+                   (j == i || !toks[j].space_before)) {
+                pairs++;
+                j += 2;
+            }
+            if (pairs < 2)
+                continue;
+            for (size_t k = i + 1; k < j; k++)
+                toks[i].text += toks[k].text;
+            toks.erase(toks.begin() + (long)i + 1, toks.begin() + (long)j);
+        }
     }
     std::vector<std::string> words;
     std::vector<bool> is_punct;

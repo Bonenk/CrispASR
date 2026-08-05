@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
     const std::string dir = argv[1];
     int total = 0;
     for (const char* w : {"us_gold.json", "us_silver.json"})
-        total += g2p_en::load_misaki_json(C.espeak_ipa, C.phrase_final, dir + "/" + w);
+        total += g2p_en::load_misaki_json(C.espeak_ipa, C.phrase_final, dir + "/" + w, &C.letters);
     if (total == 0) { fprintf(stderr, "no lexicon under %s\n", dir.c_str()); return 1; }
     C.espeak_ipa.loaded = true;
     C.phrase_final.loaded = !C.phrase_final.entries.empty();
