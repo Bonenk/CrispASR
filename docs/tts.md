@@ -338,6 +338,60 @@ any `crispasr --server` instance whose loaded backend declares
 `whisper_params`. Long-form input is auto-chunked on sentence
 boundaries.
 
+## CosyVoice3 — voice cloning from a WAV
+
+```bash
+./build/bin/crispasr --backend cosyvoice3-tts -m auto \
+    --voice ref.wav --ref-text "<exact transcript of ref.wav>" --i-have-rights \
+    --tts "Text to speak." --tts-output out.wav
+```
+
+**`--ref-text` must be a complete, exact transcription of `ref.wav`** — this is
+the one input that will quietly ruin the output if you get it wrong (issue
+#334). The talker LM is conditioned on the pair *(reference transcript,
+reference speech)* and infers the speaker's rate from it. Hand it 18 s of audio
+labelled with one sentence and it concludes the speaker says a sentence in 18 s,
+then either stops immediately — `AR decode produced 0 tokens`, no audio — or
+crams the line you asked for into far too few 40 ms frames, which is heard as
+rushed, pitched-up speech. Upstream's decode only ever spends between 2 and 20
+speech tokens per text token, so the runtime checks the reference against that
+same band and warns when the pairing cannot be a transcript:
+
+```
+cosyvoice3_tts: WARNING: the reference clip holds 17.72 s of speech but
+--ref-text is only 7 token(s) long (63.3 speech frames per text token; a
+matching transcript lands between 2 and 20). …
+```
+
+If you cannot transcribe the whole clip, **trim the clip to the part you did
+transcribe** — a clean 4–10 s excerpt clones better than 20 s with an
+approximate transcript.
+
+### Reference sample rate
+
+Any rate works and none is preferred: the reference is resampled internally to
+16 kHz for the speech tokenizer and the CAMPPlus speaker encoder, and to 24 kHz
+for the prompt mel. 8/16/22.05/24/32/44.1/48 kHz references of the same
+recording all round-trip to the same transcript with the same speaking rate.
+The output is always 24 kHz mono regardless of the reference.
+
+### Base vs RL talker
+
+`FunAudioLLM/Fun-CosyVoice3-0.5B-2512` ships two talker checkpoints: `llm.pt`
+(pre-trained) and `llm.rl.pt` (reinforcement-learning tuned for stability and
+pronunciation accuracy). Only the talker differs — flow, HiFT, CAMPPlus, the
+speech tokenizer and the voice bank are shared. Convert the RL talker with:
+
+```bash
+python models/convert-cosyvoice3-to-gguf.py \
+    --input FunAudioLLM/Fun-CosyVoice3-0.5B-2512 --output-dir out \
+    --llm-checkpoint llm.rl.pt --skip flow --skip hift   # → cosyvoice3-llm-rl-f16.gguf
+```
+
+Then quantize it and drop it beside the shared companions; `-m
+…/cosyvoice3-llm-rl-q4_k.gguf` picks the companions up by name, so no other
+flag changes.
+
 ## Output language and cross-lingual cloning (`-tl` / `-sl`)
 
 Issue #329: *"there is usually an option to select the target language, but I

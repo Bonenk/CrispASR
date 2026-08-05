@@ -386,6 +386,14 @@ suffixes.
 - `CRISPASR_COSYVOICE3_FLOW_STEPS`
 - `CRISPASR_COSYVOICE3_HIFT_PATH`
 - `CRISPASR_COSYVOICE3_KV_BUCKET`
+- `CRISPASR_COSYVOICE3_NO_CLONE_CACHE` — re-extract the `--voice ref.wav`
+  speaker (s3tokenizer + CAMPPlus + prompt mel) on every synthesis instead of
+  once per reference. Output-identical; the cached path is ~30% faster on a
+  multi-sentence `--tts` (#334).
+- `CRISPASR_COSYVOICE3_NO_MIN_LEN` — drop the decode's minimum-length floor
+  (2 speech tokens per target text token, upstream's `min_token_text_ratio`).
+  Without the floor a single unlucky sample at step 0 ends the decode with no
+  audio at all (#334).
 - `CRISPASR_COSYVOICE3_VOICES_PATH`
 
 ### CosyVoice3 (diff-harness assets)
