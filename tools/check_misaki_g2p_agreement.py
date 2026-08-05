@@ -21,6 +21,22 @@ Sentences where misaki itself emits `❓` (a word its lexicon does not have and
 no fallback was configured for) are counted separately: we produce a
 pronunciation there and misaki does not, so they are not our disagreements.
 
+READ THE CLASSIFICATION, NOT JUST THE HEADLINE. The raw agreement number is
+pessimistic in a specific, measurable way: a whole line counts as disagreeing
+when the two tokenisations diverge, and on ordinary prose most of those
+divergences are misaki being WRONG. Its `resolve_tokens` glues the words on
+either side of a `--` into one nonsense word (`service--and` -> `sˈɜɹvəsænd`),
+which no TTS should say. `--classify` splits the residual so you can see which
+side owns it.
+
+`--tagger-value` answers the recurring question "should we port a
+part-of-speech tagger / all of misaki?" by running misaki against ITSELF with
+the tag withheld. Measured 2026-08-05 on 500 sentences of prose: the tagger
+moves 5.42% of misaki's own tokens, but 90% of that is `in`, `a` and `I` —
+which core/g2p_ctxwords.h already handles with no tagger at all. The genuinely
+tag-dependent remainder is 0.34% (`that`, `read`, `object`, `console`). That is
+the entire prize for porting spaCy's en_core_web_sm.
+
 Exit code 0 always — this is a measurement, not a gate. The gate is
 tests/test-kokoro-misaki-wiring.cpp.
 """
@@ -149,12 +165,107 @@ def report(name: str, ref: list[str], got: list[str], verbose: bool) -> None:
             print(f"{'':10s}  {n:4d}  {x}  ->  {y}")
 
 
+STRESS_MARKS = "\u02c8\u02cc"
+PUNCT_CHARS = set(',.;:!?\u2026\u2014\u201c\u201d\u00ab\u00bb"()')
+
+
+def classify(lines: list[str], ref: list[str], got: list[str]) -> None:
+    """Split the residual by cause. The point is which SIDE owns each bucket."""
+    buckets: Counter = Counter()
+    total = 0
+    misaligned_dash = misaligned_unk = misaligned_other = 0
+    for src, a, b in zip(lines, ref, got):
+        A, B = a.split(), b.split()
+        if len(A) != len(B):
+            n = max(len(A), len(B))
+            buckets["tokenisation (whole line misaligned)"] += n
+            total += n
+            if "\u2753" in a:
+                misaligned_unk += 1
+            elif "--" in src:
+                misaligned_dash += 1
+            else:
+                misaligned_other += 1
+            continue
+        for x, y in zip(A, B):
+            if "\u2753" in x:
+                continue
+            total += 1
+            if x == y:
+                continue
+            sx = "".join(c for c in x if c not in STRESS_MARKS)
+            sy = "".join(c for c in y if c not in STRESS_MARKS)
+            px = "".join(c for c in sx if c not in PUNCT_CHARS)
+            py = "".join(c for c in sy if c not in PUNCT_CHARS)
+            if px == py and sx != sy:
+                buckets["punctuation attachment"] += 1
+            elif px == py:
+                buckets["stress only"] += 1
+            else:
+                buckets["segments differ"] += 1
+    bad = sum(buckets.values())
+    print(f"\nresidual, classified ({total} scorable tokens, {bad} disagreeing):")
+    for k, v in buckets.most_common():
+        print(f"  {v:5d}  ({100 * v / max(1, total):5.2f}%)  {k}")
+    print(
+        f"\n  of the misaligned LINES: {misaligned_dash} are the `--` convention (misaki glues the\n"
+        f"  words either side into one nonsense token — OUR output is the correct one),\n"
+        f"  {misaligned_unk} are misaki's own \u2753, {misaligned_other} are anything else.\n"
+        f"  Only that last figure is a tokenizer bug worth chasing."
+    )
+
+
+def tagger_value(lines: list[str]) -> None:
+    """What would a part-of-speech tagger buy? Ask misaki, with its tag withheld."""
+    from misaki import en  # type: ignore
+
+    tagged = [en.G2P(trf=False, british=False, fallback=None)(l)[0] for l in lines]
+    orig = en.Lexicon.get_word
+    # "" is a tag no rule matches — the closest thing to shipping no tagger.
+    en.Lexicon.get_word = lambda self, word, tag, stress, ctx: orig(self, word, "", stress, ctx)
+    try:
+        untagged = [en.G2P(trf=False, british=False, fallback=None)(l)[0] for l in lines]
+    finally:
+        en.Lexicon.get_word = orig
+
+    total = changed = 0
+    which: Counter = Counter()
+    for src, a, b in zip(lines, tagged, untagged):
+        A, B = a.split(), b.split()
+        if len(A) != len(B):
+            continue
+        for w, x, y in zip(src.split(), A, B):
+            if "\u2753" in x:
+                continue
+            total += 1
+            if x != y:
+                changed += 1
+                which[w.strip('\u201c\u201d",.;:!?').lower()] += 1
+    print("\nmisaki WITH its spaCy tagger vs the SAME misaki with the tag withheld:")
+    print(f"  {total} tokens, {changed} changed by the tagger ({100 * changed / max(1, total):.2f}%)")
+    # The three misaki needs a tagger for and we do not: core/g2p_ctxwords.h
+    # special-cases them off capitalisation and the following vowel instead.
+    free = sum(n for w, n in which.items() if w in ("a", "an", "i", "in", "the", "to", "am"))
+    print(f"  ...of which {free} ({100 * free / max(1, changed):.0f}%) are a/an/i/in/the/to/am,")
+    print("     which core/g2p_ctxwords.h already gets right WITHOUT a tagger.")
+    print(f"  Genuinely tag-dependent remainder: {changed - free} tokens "
+          f"({100 * (changed - free) / max(1, total):.2f}% of the corpus).")
+    for w, n in which.most_common(10):
+        print(f"      {n:4d}  {w}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--corpus", required=True, type=Path, help="one sentence per line")
     ap.add_argument("--lexicon-dir", type=Path, help="misaki/data (default: the installed package)")
     ap.add_argument("--limit", type=int, default=0, help="use only the first N lines")
     ap.add_argument("--verbose", action="store_true", help="list the top disagreements")
+    ap.add_argument("--classify", action="store_true", help="split the residual by cause, and by who owns it")
+    ap.add_argument(
+        "--tagger-value",
+        action="store_true",
+        help="run misaki against itself with the POS tag withheld — what a tagger would buy",
+    )
     args = ap.parse_args()
 
     lines = [l.strip() for l in args.corpus.read_text(encoding="utf-8").splitlines() if l.strip()]
@@ -169,7 +280,10 @@ def main() -> int:
         binary = build_dumper(Path(td))
         ref = run_misaki(lines)
         print(f"{len(lines)} sentences, misaki lexicon at {data_dir}\n")
-        report("misaki", ref, run_ours(binary, data_dir, "misaki", lines), args.verbose)
+        ours = run_ours(binary, data_dir, "misaki", lines)
+        report("misaki", ref, ours, args.verbose)
+        if args.classify:
+            classify(lines, ref, ours)
         print()
         report("piper", ref, run_ours(binary, data_dir, "piper", lines), args.verbose)
         print(
@@ -177,6 +291,8 @@ def main() -> int:
             "\nit is the control, not a target. It should score far lower; when it does not,"
             "\nthe misaki conventions have stopped being applied (which is #316 round 2)."
         )
+    if args.tagger_value:
+        tagger_value(lines)
     return 0
 
 

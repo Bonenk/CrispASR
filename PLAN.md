@@ -406,13 +406,46 @@ is unchanged except the three LTS corrections and the double-space collapse.
   English case — which is exactly why the old path keeps its gate. If a de/fr/es
   report comes in, `CRISPASR_KOKORO_PUNCT=0` is the first thing to try.
 
-**Still open** — all measured against misaki on the same corpus, all needing a
-part-of-speech tagger we do not ship:
-- `that` as a determiner wants `ðˈæt`, as a complementiser `ðæt` (20 hits/500).
-  DEFAULT wins 68% of occurrences, so collapsing it the other way loses more
-  than it gains — see the POS_OVERRIDES note in `load_misaki_json`.
+**"Would it just be easier to port misaki?" — measured, and the answer is no,
+because this IS the port.** Asked at the end of round 2 and worth writing down,
+because the headline agreement number invites exactly the wrong conclusion.
+
+`python tools/check_misaki_g2p_agreement.py --corpus … --classify --tagger-value`
+answers it in one command. On the 500-sentence corpus:
+
+| residual bucket | tokens | who owns it |
+|---|---|---|
+| tokenisation (whole line misaligned) | 504 (5.27%) | **misaki** — 14 of the 20 misaligned lines are the Gutenberg `--` convention, where its `resolve_tokens` glues the words either side into one nonsense token (`service--and` → `sˈɜɹvəsænd`). Ours is the correct output. 5 more are its own `❓`. **1 line is genuinely our tokenizer.** |
+| segments differ | 40 (0.42%) | mixed |
+| stress only | 38 (0.40%) | mostly POS |
+| punctuation attachment | 12 (0.13%) | Gutenberg `,--` |
+
+So the 95.75% headline is pessimistic by construction: it charges us for a whole
+line whenever misaki mis-tokenises. On aligned lines, excluding misaki's own
+failures, agreement is **99.0%** — 90 disagreeing tokens out of ~9,000.
+
+And the remaining prize is smaller than it looks. `--tagger-value` runs misaki
+against ITSELF with the tag withheld, which is precisely our situation:
+
+    5.42% of misaki's tokens change when it has a tagger
+    ...but 90% of those are `in`, `a` and `I` — which core/g2p_ctxwords.h
+       already gets right from capitalisation + the following vowel, no tagger
+    genuinely tag-dependent remainder: 0.34%  (`that`, `read`, `object`,
+       `console`, `use`, `lived`)
+
+**0.34% is the entire return on porting spaCy's `en_core_web_sm`** — a 12 MB
+neural tok2vec + tagger pipeline. That is a bad trade, and it is the only part
+of misaki still missing: `en.py` itself is ported (lexicon, `get_special_case`,
+`apply_stress`, the `_s`/`_ed`/`_ing` stemmers, `get_NNP`, `resolve_tokens`
+compound de-stressing, `token_context`, the phrase-final `None` key, `ɾ`→`T`).
+If someone does want the last third of a percent, a closed-class rule for `that`
+alone is ~24 of the ~32 tokens and needs no model.
+
+**Still open, then, and deliberately:**
+- `that` as a determiner wants `ðˈæt`, as a complementiser `ðæt` (23 hits/500).
+  DEFAULT wins 68% of occurrences over a wider sample, so a blanket flip loses
+  two for every one gained — see the POS_OVERRIDES note in `load_misaki_json`.
 - `read`, `used`, `by`, `am`, `object`, `console`, `use` are the same shape.
-  Together with `that` they are ~40 of the ~400 residual tokens.
 
 ## OPEN follow-ups from #316 (kokoro G2P, landed 2026-07-28)
 
