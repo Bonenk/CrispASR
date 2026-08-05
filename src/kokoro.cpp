@@ -3247,6 +3247,18 @@ bool phonemize_cached(kokoro_context* ctx, const std::string& lang, const std::s
     static const bool skip_builtin = g2p_strategy && strcmp(g2p_strategy, "espeak-only") == 0;
     static const bool skip_espeak = g2p_strategy && strcmp(g2p_strategy, "builtin-only") == 0;
 
+    // #316 round 2: keep punctuation in the phoneme string for the non-English
+    // built-in G2Ps. English is settled — misaki emits the marks and the ASR
+    // round-trip proves the difference. de/fr/es have no equivalent reference,
+    // so this is A/B'd by round-trip on kokoro-de-hui-base and gated:
+    // CRISPASR_KOKORO_PUNCT=0 restores the old drop-everything behaviour.
+    // Never remove the gate — it is the bisection mechanism.
+    static const bool kokoro_punct = [] {
+        const char* v = crispasr_env::get("CRISPASR_KOKORO_PUNCT");
+        return !(v && *v && strcmp(v, "0") == 0);
+    }();
+    auto kokoro_punctuation = [] { return kokoro_punct; };
+
     // Lambda: try builtin phonemizers for the given language.
     auto try_builtin = [&]() -> bool {
         if (skip_builtin)
@@ -3261,11 +3273,11 @@ bool phonemize_cached(kokoro_context* ctx, const std::string& lang, const std::s
             if (!ok)
                 ok = crispasr::phonemize_builtin_en(lang, text, out, /*misaki_style=*/true);
         } else if (lang == "de")
-            ok = crispasr::phonemize_builtin_de(lang, text, out);
+            ok = crispasr::phonemize_builtin_de(lang, text, out, kokoro_punctuation());
         else if (lang == "fr" || lang == "fr-fr")
-            ok = crispasr::phonemize_builtin_fr(lang, text, out);
+            ok = crispasr::phonemize_builtin_fr(lang, text, out, kokoro_punctuation());
         else if (lang == "es" || lang == "es-es")
-            ok = crispasr::phonemize_builtin_es(lang, text, out);
+            ok = crispasr::phonemize_builtin_es(lang, text, out, kokoro_punctuation());
         return ok && !out.empty();
     };
 

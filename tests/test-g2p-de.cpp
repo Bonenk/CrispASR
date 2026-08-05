@@ -63,11 +63,13 @@ TEST_CASE("German LTS: consonant specifics", "[g2p_de][lts]") {
     }
     SECTION("initial sp → ʃp") {
         std::string ipa = g2p_de::lts_word_to_ipa("sprechen");
-        CHECK(ipa.find("\xCA\x83""p") != std::string::npos);
+        CHECK(ipa.find("\xCA\x83"
+                       "p") != std::string::npos);
     }
     SECTION("initial st → ʃt") {
         std::string ipa = g2p_de::lts_word_to_ipa("stunde");
-        CHECK(ipa.find("\xCA\x83""t") != std::string::npos);
+        CHECK(ipa.find("\xCA\x83"
+                       "t") != std::string::npos);
     }
     SECTION("ng → ŋ") {
         std::string ipa = g2p_de::lts_word_to_ipa("lang");
@@ -147,14 +149,16 @@ TEST_CASE("German LTS: open-syllable lengthening", "[g2p_de][vowel_length]") {
     }
     SECTION("open syllable ö: 'mögen' → øː") {
         std::string ipa = g2p_de::lts_word_to_ipa("m\xC3\xB6gen"); // mögen
-        CHECK(ipa.find("\xC3\xB8\xCB\x90") != std::string::npos); // øː
+        CHECK(ipa.find("\xC3\xB8\xCB\x90") != std::string::npos);  // øː
     }
     SECTION("closed syllable ö: 'möchte' → œ") {
-        std::string ipa = g2p_de::lts_word_to_ipa("m\xC3\xB6""chte"); // möchte
-        CHECK(ipa.find("\xC5\x93") != std::string::npos); // œ
+        std::string ipa = g2p_de::lts_word_to_ipa("m\xC3\xB6"
+                                                  "chte"); // möchte
+        CHECK(ipa.find("\xC5\x93") != std::string::npos);  // œ
     }
     SECTION("open syllable ü: 'über' → yː") {
-        std::string ipa = g2p_de::lts_word_to_ipa("\xC3\xBC""ber"); // über
+        std::string ipa = g2p_de::lts_word_to_ipa("\xC3\xBC"
+                                                  "ber");  // über
         CHECK(ipa.find("y\xCB\x90") != std::string::npos); // yː
     }
 }
@@ -192,7 +196,12 @@ TEST_CASE("German compound splitting", "[g2p_de][compound]") {
         std::string ipa = g2p_de::word_to_ipa(ctx, "autobahn");
         // Should contain parts from both dictionary entries
         bool has_ipa_chars = false;
-        for (unsigned char c : ipa) { if (c >= 0x80) { has_ipa_chars = true; break; } }
+        for (unsigned char c : ipa) {
+            if (c >= 0x80) {
+                has_ipa_chars = true;
+                break;
+            }
+        }
         CHECK(has_ipa_chars);
     }
 }
@@ -239,11 +248,59 @@ TEST_CASE("German IPA dict loading", "[g2p_de][dict]") {
         std::string ipa = g2p_de::word_to_ipa(ctx, "hallo");
         CHECK(!ipa.empty());
         bool has_ipa = false;
-        for (unsigned char c : ipa) { if (c >= 0x80) { has_ipa = true; break; } }
+        for (unsigned char c : ipa) {
+            if (c >= 0x80) {
+                has_ipa = true;
+                break;
+            }
+        }
         CHECK(has_ipa);
     }
     SECTION("loanword: Restaurant") {
         std::string ipa = g2p_de::word_to_ipa(ctx, "Restaurant");
         CHECK(!ipa.empty());
     }
+}
+
+// ── #316 round 2: punctuation is the consumer's choice ──────────────────────
+//
+// Kokoro's 178-symbol vocabulary contains `,.;:!?` and they are how it pauses;
+// dropping them delivered a paragraph in one breath. English proved it against
+// misaki; this is the same defect in the same shape, one language over. Off by
+// default so piper — whose espeak inventory has never been fed punctuation — is
+// unchanged.
+
+TEST_CASE("de: punctuation is dropped by default, kept on request", "[g2p_de][unit][punct]") {
+    g2p_de::context ctx;
+    const std::string plain = g2p_de::text_to_ipa(ctx, "a b, c.");
+    CHECK(plain.find(',') == std::string::npos);
+    CHECK(plain.find('.') == std::string::npos);
+    // A dropped mark still separates its neighbours — with ONE space, not the
+    // two the old loop emitted around every comma.
+    CHECK(plain.find("  ") == std::string::npos);
+
+    ctx.emit_punctuation = true;
+    const std::string kept = g2p_de::text_to_ipa(ctx, "a b, c.");
+    CHECK(kept.find(',') != std::string::npos);
+    CHECK(kept.find('.') != std::string::npos);
+    // A mark sits flush against the word before it and is followed by a space.
+    CHECK(kept.find(" ,") == std::string::npos);
+    CHECK(kept.find(", ") != std::string::npos);
+}
+
+TEST_CASE("de: the hyphen is a separator, never a mark", "[g2p_de][unit][punct]") {
+    g2p_de::context ctx;
+    ctx.emit_punctuation = true;
+    // No TTS vocabulary here has an ASCII hyphen, and misaki drops it.
+    CHECK(g2p_de::text_to_ipa(ctx, "a-b").find('-') == std::string::npos);
+}
+
+TEST_CASE("de: a quoted word is looked up without its quotes", "[g2p_de][unit][punct]") {
+    // The tokenizer split on ,.!?;:- only, so a quoted word reached every
+    // lookup tier WEARING its quotes and fell through to the letter-to-sound
+    // rules — the same defect that made English read "dramatic" as DRAM-atic.
+    g2p_de::context ctx;
+    const std::string quoted = g2p_de::text_to_ipa(ctx, "\"ab\"");
+    const std::string bare = g2p_de::text_to_ipa(ctx, "ab");
+    CHECK(quoted == bare);
 }
