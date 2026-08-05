@@ -11,18 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-08-05 — CrispEmbed G8=F10 twins (cross-repo coordinator)
-
-Worktree `.claude/worktrees/feat-g8-gpu-pref`. Two items: (a) sync the T18
-`--gpu-backend cpu` short-circuit LOGIC from CrispEmbed's
-`src/core/gpu_backend_pref.h` into this repo's copy (the flag currently falls
-through to Metal — the loops only match GPU/iGPU devices; sync logic not
-bytes, pcs.cpp rule); (b) the PLAN #88 pipeline-cache WRITE-path decision for
-`_exit()`ing one-shot binaries (flush-per-run vs scope-per-engine vs retire —
-the patch lives in the shared ggml fork, so the decision is coordinated with
-CrispEmbed). Verifying locally per this file's rules (ctest -L unit,
-format/check scripts); CI-cancelled is not a signal.
-
 ### Ready to take — scoped, unblocked, nobody on them
 
 | # | Task | Size | Where |
