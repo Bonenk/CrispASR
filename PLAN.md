@@ -388,13 +388,21 @@ corpus, all needing a part-of-speech tagger we do not ship):
   than it gains — see the POS_OVERRIDES note in `load_misaki_json`.
 - `read`, `used`, `by`, `am`, `object`, `console`, `use` are the same shape.
   Together with `that` they are ~40 of the ~400 residual tokens.
-- **ALLCAPS out-of-lexicon words are not spelled out.** misaki's `get_NNP`
-  reads `XXXVIII` letter by letter (`ˌɛksˌɛksvˌiˌIˌIˈI`); we send it through
-  the letter-to-sound rules (`ksksvˈɪɪɪ`). The lexicon HAS the letter readings,
-  under uppercase keys that `load_misaki_json` currently folds into the
-  lowercase word entries — so this needs a separate letters table, not a rule.
-  Worth doing for acronyms in real text (URLs, "PDF", "USB"), ~4 tokens/500
-  sentences in a novel.
+- **Acronyms are not spelled out — the one loose end I would do next.** misaki's
+  `get_NNP` reads an out-of-lexicon ALLCAPS word letter by letter (`XXXVIII` ->
+  `ˌɛksˌɛksvˌiˌIˌIˈI`, last letter primary-stressed); we send it through the
+  letter-to-sound rules (`ksksvˈɪɪɪ`). The DOTTED form is worse and more common:
+  `U.S.A.` comes out `jˈu.ˈɛs.ɐ.` — the periods survive as full stops, so the
+  model pauses inside the acronym, and the final `a` is read as the ARTICLE
+  rather than the letter. misaki's rule for that shape is
+  `'.' in word.strip('.') and word.replace('.','').isalpha() and
+  len(max(word.split('.'), key=len)) < 3` -> `get_NNP`.
+  Both need the same thing: the lexicon HAS the letter readings, but under
+  UPPERCASE keys that `load_misaki_json` folds into the lowercase word entries
+  ("A" the letter and "a" the article collide). So it is a separate letters
+  table plus ~20 lines of `get_NNP`, not a rule. Only ~4 tokens per 500
+  sentences of a novel, but URLs, "PDF", "USB", "e.g." are ordinary in the text
+  people actually send a TTS.
 - **de/fr/es drop punctuation exactly like English did** (`g2p_de.h`,
   `g2p_fr.h`, `g2p_es.h` each have their own tokenizer and their own
   punctuation-skipping join). Kokoro ships de/fr/es voices, so the same
