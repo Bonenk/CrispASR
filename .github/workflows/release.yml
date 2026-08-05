@@ -6,8 +6,15 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to build + release (e.g. v0.4.5)'
-        required: true
+        description: >-
+          Tag to build + release (e.g. v0.4.5). LEAVE EMPTY for a dry run:
+          everything builds and uploads as workflow artifacts, and nothing is
+          published. Every attach step below is guarded on this, because the
+          packaging (bundled libs, RUNPATH) is only observable in the staged
+          artifact — CrispEmbed shipped three broken releases before it could
+          be inspected without publishing one.
+        required: false
+        default: ''
         type: string
       only:
         description: >-
@@ -123,6 +130,7 @@ jobs:
           path: release/crispasr-linux-x86_64.tar.gz
 
       - name: Attach crispasr-linux-x86_64.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -161,6 +169,7 @@ jobs:
           path: release/crispasr-wasm.tar.gz
 
       - name: Attach crispasr-wasm.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -221,6 +230,7 @@ jobs:
           path: release/crispasr-linux-x86_64-avx512.tar.gz
 
       - name: Attach crispasr-linux-x86_64-avx512.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -296,6 +306,7 @@ jobs:
           path: release/crispasr-linux-x86_64-cuda.tar.gz
 
       - name: Attach crispasr-linux-x86_64-cuda.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -370,6 +381,7 @@ jobs:
           path: release/crispasr-linux-x86_64-cuda13.tar.gz
 
       - name: Attach crispasr-linux-x86_64-cuda13.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -442,6 +454,7 @@ jobs:
           path: release/crispasr-linux-x86_64-hip.tar.gz
 
       - name: Attach crispasr-linux-x86_64-hip.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -527,6 +540,7 @@ jobs:
           path: release/libcrispasr-linux-x86_64-hip.tar.gz
 
       - name: Attach libcrispasr-linux-x86_64-hip.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -597,6 +611,7 @@ jobs:
           path: release/crispasr-linux-x86_64-vulkan.tar.gz
 
       - name: Attach crispasr-linux-x86_64-vulkan.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -654,6 +669,7 @@ jobs:
           path: release/crispasr-linux-arm64.tar.gz
 
       - name: Attach crispasr-linux-arm64.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -729,6 +745,7 @@ jobs:
           path: release/crispasr-python-linux-x86_64.tar.gz
 
       - name: Attach crispasr-python-linux-x86_64.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -801,6 +818,7 @@ jobs:
           path: release/crispasr-python-linux-arm64.tar.gz
 
       - name: Attach crispasr-python-linux-arm64.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -836,6 +854,7 @@ jobs:
           path: release/crispasr-macos.tar.gz
 
       - name: Attach crispasr-macos.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -891,6 +910,7 @@ jobs:
           path: release-ios/*xcframework.zip
 
       - name: Attach xcframework to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1002,6 +1022,7 @@ jobs:
           path: release/libcrispasr-macos-arm64.tar.gz
 
       - name: Attach libcrispasr-macos-arm64.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1079,6 +1100,7 @@ jobs:
           path: release/libcrispasr-linux-x86_64.tar.gz
 
       - name: Attach libcrispasr-linux-x86_64.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1149,6 +1171,7 @@ jobs:
           path: release/libcrispasr-linux-x86_64-avx512.tar.gz
 
       - name: Attach libcrispasr-linux-x86_64-avx512.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1223,6 +1246,7 @@ jobs:
           path: release/libcrispasr-linux-arm64.tar.gz
 
       - name: Attach libcrispasr-linux-arm64.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1291,6 +1315,7 @@ jobs:
           path: release/libcrispasr-windows-x86_64.tar.gz
 
       - name: Attach libcrispasr-windows-x86_64.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1387,6 +1412,7 @@ jobs:
           path: release/libcrispasr-windows-x86_64-vulkan.tar.gz
 
       - name: Attach libcrispasr-windows-x86_64-vulkan.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1477,6 +1503,7 @@ jobs:
           path: release/libcrispasr-linux-x86_64-cuda.tar.gz
 
       - name: Attach libcrispasr-linux-x86_64-cuda.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1574,6 +1601,7 @@ jobs:
           path: release/libcrispasr-windows-x86_64-cuda.tar.gz
 
       - name: Attach libcrispasr-windows-x86_64-cuda.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1637,6 +1665,7 @@ jobs:
           path: release/libcrispasr-windows-x86_64-cpu-legacy.tar.gz
 
       - name: Attach libcrispasr-windows-x86_64-cpu-legacy.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1697,6 +1726,7 @@ jobs:
           path: release/crispasr-windows-x86_64-cpu.zip
 
       - name: Attach crispasr-windows-x86_64-cpu.zip to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1742,6 +1772,7 @@ jobs:
           path: release/crispasr-windows-x86_64-cpu-legacy.zip
 
       - name: Attach crispasr-windows-x86_64-cpu-legacy.zip to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1816,6 +1847,7 @@ jobs:
           path: release/crispasr-windows-x86_64-cuda.zip
 
       - name: Attach crispasr-windows-x86_64-cuda.zip to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1875,6 +1907,7 @@ jobs:
           path: release/crispasr-windows-x86_64-vulkan.zip
 
       - name: Attach crispasr-windows-x86_64-vulkan.zip to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1961,6 +1994,7 @@ jobs:
           path: release/crispasr-android-arm64-v8a.tar.gz
 
       - name: Attach crispasr-android-arm64-v8a.tar.gz to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -1995,6 +2029,7 @@ jobs:
         run: find artifacts -maxdepth 3 -type f | sort
 
       - name: Create GitHub Release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
@@ -2009,6 +2044,7 @@ jobs:
           generate_release_notes: false
 
       - name: Set release notes body
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ inputs.tag || github.ref_name }}
