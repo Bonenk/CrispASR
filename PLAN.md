@@ -302,6 +302,106 @@ to counsel before it appears in a compliance claim.
    aside and configuring from clean.
 
 
+## NOW — #316 round 2: the round-1 rules were never switched on
+
+Reporter re-tested 0.8.25 (2026-08-03) and it still "doesn't sound natural":
+"the strange pronunciation of *dramatic*" and "the unnecessary emphasis on *I*
+and *a*". All three are reproduced, root-caused and fixed on
+`fix/316-kokoro-prosody`.
+
+**Measured, 500 sentences of running prose, misaki 0.9.4 as the reference**
+(`tools/check_misaki_g2p_agreement.py`, which compiles a dumper against the real
+headers so it measures the code path the product uses):
+
+| | shipped 0.8.25 | this branch |
+|---|---|---|
+| token agreement (tokens misaki phonemizes) | 67.0% | **95.7%** |
+| exact sentences, misaki-clean | 0.3% | **82.1%** |
+
+The reporter's own paragraph now comes out **byte-identical to misaki**, and the
+ASR round-trip separates the two arms without needing an ear:
+
+    before:  "...and moody atmosphere EYE built into the prompt instead of
+              bright flat commercial product photography."
+    after:   "...and moody atmosphere I built into the prompt. Instead of
+              bright, flat, commercial product photography,"
+
+Whisper heard the *noun* "eye" for the pronoun, which is what primary stress on
+`ˈI` does to it — the reporter's "unnecessary emphasis on I", objectively. And
+every comma and sentence boundary in the second transcript is one Whisper
+recovered from prosody that did not exist in the first.
+
+Four defects, in descending order of how audible they are:
+
+1. **`context_words` was never set by anything.** Round 1 wrote
+   `core/g2p_ctxwords.h` (the/to/a/an/in + capitalisation stress + the
+   phrase-final lexicon), gated it behind `g2p_en::context::context_words`,
+   tested it — and no call site ever turned it on. It shipped inert in 0.8.24
+   *and* 0.8.25. So `the` stayed `ði` in every position (the original "old
+   English" complaint the release claimed to fix), `to` stayed `tu`, the pronoun
+   `I` kept PRIMARY stress where misaki gives secondary, and the article `a` was
+   read as **the letter**, `ˈA` = stressed "eɪ". That last one IS the reporter's
+   "unnecessary emphasis on a", and it was one line away the whole time.
+   The tests could not catch it: they called `core_g2p_ctxwords::lookup()`
+   directly, never `text_to_ipa`. `tests/test-kokoro-misaki-wiring.cpp` now goes
+   through `crispasr::phonemize_misaki_en` — the function kokoro.cpp calls.
+2. **Punctuation was dropped from the phoneme string.** `,` `.` `;` `:` `!` `?`
+   `…` `—` `"` `«»` `“”` are all in Kokoro's 178-symbol vocabulary and misaki
+   emits them; they are how the model knows to pause. The reporter's two-sentence
+   paragraph reached the model as 250-odd phonemes with not one mark in it —
+   delivered in a single breath. (`kokoro_synthesize` does no sentence splitting,
+   so nothing downstream put the pauses back.) The old join also emitted TWO
+   spaces around every dropped mark, i.e. two space tokens.
+3. **A quoted word never reached the lexicon.** The tokenizer split on
+   `,.!?;:-` only, so `"dramatic"` was looked up as the literal string
+   `"dramatic"`, missed every tier, and came back out of the letter-to-sound
+   rules as `dɹˈæmætɪk` — DRAM-atic, first-syllable stress, against misaki's
+   `dɹəmˈæTɪk`. That is the reported "strange pronunciation of dramatic". Fixed
+   for every consumer, so piper gained three corrections in the same 500
+   sentences (`[Illustration:` and `library!"` were falling to LTS there too).
+4. **`high-contrast` was two words with two primary stresses and a gap through
+   the middle.** misaki resolves a compound to one token, `hˌIkˈɑntɹˌæst`
+   (`resolve_tokens` demotes the lighter half). Ported as
+   `core_g2p_ctxwords::join_compound`.
+5. **Three smaller ones the corpus surfaced.** An abbreviation's period is part
+   of the word — splitting it off gave every `Mr. Darcy` a full-stop pause; the
+   merge is driven off misaki's own seven dotted lexicon entries, with `no.`
+   excluded ("she said no." is a sentence, not a number) and `etc.` requiring a
+   word to follow. `_` and `/` join `-` as silent separators (misaki's
+   SUBTOKEN_JUNKS), so Gutenberg-style `_you_` reaches the lexicon instead of
+   coming out of the letter-to-sound rules as `jˈW` — that one fixed piper too.
+   And a mark never takes a leading space, because a dropped silent separator
+   used to put one there and in Kokoro's vocabulary a space is a real token.
+
+**Consumer conventions are now separate from the dictionary** (`g2p_en::style`).
+They have to be: ONE `g2p_en::context` serves both piper and Kokoro's
+no-lexicon fallback, so `phonemize_builtin_en(..., misaki_style=true)` lets
+Kokoro keep its punctuation on the CMUdict path without piper inheriting it.
+That conflation is what made a per-context flag the wrong shape in round 1.
+Everything Kokoro-specific is off by default; piper's output over 500 sentences
+is unchanged except the three LTS corrections and the double-space collapse.
+
+**Still open after this round** (all measured against misaki on the same
+corpus, all needing a part-of-speech tagger we do not ship):
+- `that` as a determiner wants `ðˈæt`, as a complementiser `ðæt` (20 hits/500).
+  DEFAULT wins 68% of occurrences, so collapsing it the other way loses more
+  than it gains — see the POS_OVERRIDES note in `load_misaki_json`.
+- `read`, `used`, `by`, `am`, `object`, `console`, `use` are the same shape.
+  Together with `that` they are ~40 of the ~400 residual tokens.
+- **ALLCAPS out-of-lexicon words are not spelled out.** misaki's `get_NNP`
+  reads `XXXVIII` letter by letter (`ˌɛksˌɛksvˌiˌIˌIˈI`); we send it through
+  the letter-to-sound rules (`ksksvˈɪɪɪ`). The lexicon HAS the letter readings,
+  under uppercase keys that `load_misaki_json` currently folds into the
+  lowercase word entries — so this needs a separate letters table, not a rule.
+  Worth doing for acronyms in real text (URLs, "PDF", "USB"), ~4 tokens/500
+  sentences in a novel.
+- **de/fr/es drop punctuation exactly like English did** (`g2p_de.h`,
+  `g2p_fr.h`, `g2p_es.h` each have their own tokenizer and their own
+  punctuation-skipping join). Kokoro ships de/fr/es voices, so the same
+  one-breath delivery applies to them. NOT changed here: there is no misaki
+  reference for those languages, so it needs a listening/round-trip A/B on
+  `kokoro-de-hui-base` before any default flips.
+
 ## OPEN follow-ups from #316 (kokoro G2P, landed 2026-07-28)
 
 - **Numbers: DONE for all four built-in G2Ps** (en `num2words_en.h`, de

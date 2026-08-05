@@ -3259,7 +3259,7 @@ bool phonemize_cached(kokoro_context* ctx, const std::string& lang, const std::s
             // when the lexicon is not installed.
             ok = crispasr::phonemize_misaki_en(lang, text, out);
             if (!ok)
-                ok = crispasr::phonemize_builtin_en(lang, text, out);
+                ok = crispasr::phonemize_builtin_en(lang, text, out, /*misaki_style=*/true);
         } else if (lang == "de")
             ok = crispasr::phonemize_builtin_de(lang, text, out);
         else if (lang == "fr" || lang == "fr-fr")

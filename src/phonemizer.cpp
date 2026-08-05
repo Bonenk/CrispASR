@@ -229,6 +229,12 @@ static void ensure_misaki_lexicon_loaded() {
     if (g_g2p_misaki_tried)
         return;
     g_g2p_misaki_tried = true;
+    // Kokoro reads misaki's output, so this context follows misaki's rules:
+    // contextual function words, punctuation carried through, hyphenated
+    // compounds kept whole. Nothing set these before, so the whole
+    // contextual-word layer shipped inert — "the" stayed `ði` everywhere and
+    // the article "a" was read as the LETTER, `ˈA` (#316).
+    g2p_en::configure_for_misaki(g_g2p_misaki_ctx);
     std::string path;
     if (const char* env = std::getenv("CRISPASR_MISAKI_DICT_PATH"); env && *env) {
         path = env;
@@ -337,7 +343,7 @@ bool phonemize_misaki_en(const std::string& lang, const std::string& text, std::
     return !out.empty();
 }
 
-bool phonemize_builtin_en(const std::string& lang, const std::string& text, std::string& out) {
+bool phonemize_builtin_en(const std::string& lang, const std::string& text, std::string& out, bool misaki_style) {
     // Only handles English
     if (!lang.empty() && lang.find("en") == std::string::npos && lang != "auto")
         return false;
@@ -346,7 +352,11 @@ bool phonemize_builtin_en(const std::string& lang, const std::string& text, std:
         ensure_cmudict_loaded();
         ensure_neural_g2p_loaded();
     }
-    out = g2p_en::text_to_ipa(g_g2p_ctx, text);
+    // #316: this ONE context serves two consumers — piper, which wants espeak's
+    // conventions, and Kokoro's fallback for when the misaki lexicon could not
+    // be fetched. The dictionary is the same; the output conventions are not,
+    // and Kokoro needs its punctuation whichever dictionary it ended up with.
+    out = g2p_en::text_to_ipa(g_g2p_ctx, text, misaki_style ? g2p_en::misaki_style() : g_g2p_ctx.consumer());
     return !out.empty();
 }
 

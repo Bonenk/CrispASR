@@ -3141,6 +3141,19 @@ catch_discover_tests(test-kokoro-g2p-316
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-kokoro-misaki-wiring — #316: the rules reach the PRODUCT ──────────
+# The one above tests the G2P headers; this one goes through
+# crispasr::phonemize_misaki_en, which is what kokoro.cpp calls. That gap is
+# how the contextual-word rules shipped inert for a release. Hermetic: a tiny
+# lexicon via CRISPASR_MISAKI_DICT_PATH, no download, no model.
+add_executable(test-kokoro-misaki-wiring test-kokoro-misaki-wiring.cpp)
+target_include_directories(test-kokoro-misaki-wiring PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-kokoro-misaki-wiring PRIVATE Catch2::Catch2WithMain kokoro)
+catch_discover_tests(test-kokoro-misaki-wiring
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-vibevoice-transcript — Catch2 unit tests for the VibeVoice-ASR
 # answer parser (#300). Header-only (examples/cli/vibevoice_transcript_parse.h):
 # Start/End/Speaker/Content -> utterances (+ assign_tokens, which splits the
