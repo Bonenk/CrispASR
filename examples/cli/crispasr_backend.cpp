@@ -208,8 +208,13 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
         return crispasr_make_voxcpm2_tts_backend();
     if (name == "voxcpm2-vae" || name == "voxcpm2_vae" || name == "voxcpm2-upscaler")
         return crispasr_make_voxcpm2_vae_backend();
+    // `cosyvoice3-tts-rl` is the same engine pointed at upstream's OTHER talker
+    // checkpoint (llm.rl.pt — reinforcement-learning tuned for stability and
+    // pronunciation accuracy). Flow, HiFT, CAMPPlus, the speech tokenizer and
+    // the voice bank are shared, so the alias exists only so `-m auto` fetches
+    // the RL LLM GGUF instead of the base one (#334).
     if (name == "cosyvoice3" || name == "cosyvoice3-tts" || name == "cosyvoice3_tts" || name == "cv3" ||
-        name == "cv3-tts")
+        name == "cv3-tts" || name == "cosyvoice3-rl" || name == "cosyvoice3-tts-rl" || name == "cv3-rl")
         return crispasr_make_cosyvoice3_tts_backend();
     if (name == "m2m100" || name == "m2m-100" || name == "translate" || name == "m2m100-wmt21" || name == "wmt21" ||
         name == "m2m100-1.2b")
@@ -350,6 +355,7 @@ std::vector<std::string> crispasr_list_backends() {
         "voxcpm2-tts",
         "voxcpm2-vae",
         "cosyvoice3-tts",
+        "cosyvoice3-tts-rl",
         "m2m100",
         "m2m100-wmt21",
         "madlad",
@@ -825,6 +831,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
                 result = "voxcpm2-tts";
             else if (a == "cosyvoice3" || a == "cosyvoice3-tts" || a == "cosyvoice3_tts" || a == "cosyvoice3-llm")
                 result = "cosyvoice3-tts";
+            else if (a == "cosyvoice3-rl" || a == "cosyvoice3-tts-rl" || a == "cv3-rl")
+                result = "cosyvoice3-tts-rl";
             else if (a == "fastpitch" || a == "fastpitch-tts" || a == "fastpitch_tts")
                 result = "fastpitch";
             else if (a == "bananamind_tts" || a == "bananamind-tts")
