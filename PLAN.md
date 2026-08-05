@@ -381,34 +381,38 @@ That conflation is what made a per-context flag the wrong shape in round 1.
 Everything Kokoro-specific is off by default; piper's output over 500 sentences
 is unchanged except the three LTS corrections and the double-space collapse.
 
-**Still open after this round** (all measured against misaki on the same
-corpus, all needing a part-of-speech tagger we do not ship):
+**Also done in this round, each on its own evidence:**
+- **Acronyms.** misaki's `get_NNP`, both entry
+  shapes (dotted acronym and out-of-lexicon ALLCAPS), byte-identical to misaki
+  on `U.S.A.` / `e.g.` / `Ph.D.` / `XXXVIII` / `PDF` / `USB` — and on the two
+  that must NOT change, `NASA` and `HELLO` (misaki lowercases an ALLCAPS word
+  and looks THAT up first). The letter readings needed their own
+  `context::letters` table, because "A" the letter and "a" the article collide
+  once `load_misaki_json` lowercases the key. That table is also the gate: it is
+  empty for the espeak dicts, every path is a no-op when it is empty, so piper
+  is byte-identical over 500 sentences with no flag of its own.
+- **de/fr/es punctuation.** Each of `g2p_de.h` / `g2p_fr.h` / `g2p_es.h` has its
+  own tokenizer and its own punctuation-skipping join, and all three had the
+  same defect plus the same quoted-word one. They now take
+  `context::emit_punctuation` (default OFF, so piper is unchanged) and Kokoro
+  asks for it, gated `CRISPASR_KOKORO_PUNCT=0`. There is no misaki reference for
+  these languages, so the default was flipped on a round-trip A/B rather than on
+  parity: **`kokoro-de-hui-base`, 3 sentences × 2 voices (df_eva, dm_bernd),
+  back-to-back under the same load, ASR'd with ggml-base — word accuracy
+  70.6% -> 78.4%, commas recovered 16 -> 20, 5 of 6 clips improved.** The long
+  paragraph tried first went 72.2% -> 75.0%.
+  ⚠ One clip regressed (1/df_eva, 61.1% -> 50.0%). Recorded rather than smoothed
+  over: this is one German model and one ASR, so the evidence is weaker than the
+  English case — which is exactly why the old path keeps its gate. If a de/fr/es
+  report comes in, `CRISPASR_KOKORO_PUNCT=0` is the first thing to try.
+
+**Still open** — all measured against misaki on the same corpus, all needing a
+part-of-speech tagger we do not ship:
 - `that` as a determiner wants `ðˈæt`, as a complementiser `ðæt` (20 hits/500).
   DEFAULT wins 68% of occurrences, so collapsing it the other way loses more
   than it gains — see the POS_OVERRIDES note in `load_misaki_json`.
 - `read`, `used`, `by`, `am`, `object`, `console`, `use` are the same shape.
   Together with `that` they are ~40 of the ~400 residual tokens.
-- **Acronyms are not spelled out — the one loose end I would do next.** misaki's
-  `get_NNP` reads an out-of-lexicon ALLCAPS word letter by letter (`XXXVIII` ->
-  `ˌɛksˌɛksvˌiˌIˌIˈI`, last letter primary-stressed); we send it through the
-  letter-to-sound rules (`ksksvˈɪɪɪ`). The DOTTED form is worse and more common:
-  `U.S.A.` comes out `jˈu.ˈɛs.ɐ.` — the periods survive as full stops, so the
-  model pauses inside the acronym, and the final `a` is read as the ARTICLE
-  rather than the letter. misaki's rule for that shape is
-  `'.' in word.strip('.') and word.replace('.','').isalpha() and
-  len(max(word.split('.'), key=len)) < 3` -> `get_NNP`.
-  Both need the same thing: the lexicon HAS the letter readings, but under
-  UPPERCASE keys that `load_misaki_json` folds into the lowercase word entries
-  ("A" the letter and "a" the article collide). So it is a separate letters
-  table plus ~20 lines of `get_NNP`, not a rule. Only ~4 tokens per 500
-  sentences of a novel, but URLs, "PDF", "USB", "e.g." are ordinary in the text
-  people actually send a TTS.
-- **de/fr/es drop punctuation exactly like English did** (`g2p_de.h`,
-  `g2p_fr.h`, `g2p_es.h` each have their own tokenizer and their own
-  punctuation-skipping join). Kokoro ships de/fr/es voices, so the same
-  one-breath delivery applies to them. NOT changed here: there is no misaki
-  reference for those languages, so it needs a listening/round-trip A/B on
-  `kokoro-de-hui-base` before any default flips.
 
 ## OPEN follow-ups from #316 (kokoro G2P, landed 2026-07-28)
 

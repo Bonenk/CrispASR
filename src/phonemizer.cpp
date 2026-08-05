@@ -377,13 +377,14 @@ static void ensure_de_dict_loaded() {
         fprintf(stderr, "g2p: loaded German IPA dict (%d entries)\n", n);
 }
 
-bool phonemize_builtin_de(const std::string& lang, const std::string& text, std::string& out) {
+bool phonemize_builtin_de(const std::string& lang, const std::string& text, std::string& out, bool tts_punctuation) {
     if (!lang.empty() && lang.find("de") == std::string::npos)
         return false;
     {
         std::lock_guard<std::mutex> g(g_g2p_de_mu);
         ensure_de_dict_loaded();
     }
+    g_g2p_de_ctx.emit_punctuation = tts_punctuation;
     out = g2p_de::text_to_ipa(g_g2p_de_ctx, text);
     return !out.empty();
 }
@@ -403,13 +404,14 @@ static void ensure_fr_dict_loaded() {
         fprintf(stderr, "g2p: loaded French IPA dict (%d entries)\n", n);
 }
 
-bool phonemize_builtin_fr(const std::string& lang, const std::string& text, std::string& out) {
+bool phonemize_builtin_fr(const std::string& lang, const std::string& text, std::string& out, bool tts_punctuation) {
     if (!lang.empty() && lang.find("fr") == std::string::npos)
         return false;
     {
         std::lock_guard<std::mutex> g(g_g2p_fr_mu);
         ensure_fr_dict_loaded();
     }
+    g_g2p_fr_ctx.emit_punctuation = tts_punctuation;
     out = g2p_fr::text_to_ipa(g_g2p_fr_ctx, text);
     return !out.empty();
 }
@@ -429,13 +431,14 @@ static void ensure_es_dict_loaded() {
         fprintf(stderr, "g2p: loaded Spanish IPA dict (%d entries)\n", n);
 }
 
-bool phonemize_builtin_es(const std::string& lang, const std::string& text, std::string& out) {
+bool phonemize_builtin_es(const std::string& lang, const std::string& text, std::string& out, bool tts_punctuation) {
     if (!lang.empty() && lang.find("es") == std::string::npos)
         return false;
     {
         std::lock_guard<std::mutex> g(g_g2p_es_mu);
         ensure_es_dict_loaded();
     }
+    g_g2p_es_ctx.emit_punctuation = tts_punctuation;
     out = g2p_es::text_to_ipa(g_g2p_es_ctx, text);
     return !out.empty();
 }
