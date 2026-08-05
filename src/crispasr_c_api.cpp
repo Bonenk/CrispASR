@@ -7083,8 +7083,14 @@ struct crispasr_diarize_opts_abi {
     int64_t slice_t0_cs;
     const char* pyannote_model_path; // required for method 3, ignored otherwise
     // #324 FoxNose (method 4). APPEND-ONLY: bindings lay this struct out by
-    // hand (bindings/go/crispasr_session.go's cgo preamble), so new fields go
-    // at the END and every hand-written layout is updated in the same commit.
+    // hand, so new fields go at the END and EVERY hand-written layout is
+    // updated in the same commit:
+    //   - bindings/go/crispasr_session.go (cgo preamble)
+    //   - crispasr-sys/src/lib.rs (CrispasrDiarizeOptsAbi + layout test)
+    //   - flutter/crispasr/lib/src/crispasr.dart (diarizeSegments 48-byte buf)
+    // (#332: the Rust and Dart mirrors were missed when #324 appended the
+    // FoxNose fields — the C side reads every field unconditionally, so a
+    // short caller struct is an out-of-bounds read.)
     const char* foxnose_embedder_path; // required for method 4
     int32_t min_speakers;              // 0 -> 1
     int32_t max_speakers;              // 0 -> 8

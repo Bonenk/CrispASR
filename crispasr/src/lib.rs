@@ -1993,7 +1993,11 @@ pub struct RegistryEntry {
 }
 
 /// Role of one artifact in a canonical model download bundle.
+///
+/// Mirrors the append-only `crispasr_registry_artifact_kind` C enum, so
+/// new kinds may appear in minor releases — match with a `_` arm (#332).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RegistryArtifactKind {
     Primary,
     Companion,
@@ -2315,8 +2319,11 @@ pub fn align_words(
 // Language identification (shared C-ABI, 0.4.6+)
 // =========================================================================
 
+/// Mirrors the append-only C LID-method enum, so new methods may appear
+/// in minor releases — match with a `_` arm (#332).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i32)]
+#[non_exhaustive]
 pub enum LidMethod {
     /// Whisper encoder + language head. Needs a multilingual ggml-*.bin model.
     Whisper = 0,
@@ -2508,8 +2515,11 @@ impl DiarizeSegment {
     }
 }
 
+/// Mirrors the append-only `CrispasrDiarizeMethod` C enum, so new methods
+/// may appear in minor releases — match with a `_` arm (#332).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(i32)]
+#[non_exhaustive]
 pub enum DiarizeMethod {
     /// Stereo only. |L| vs |R| energy per segment, 1.1× margin.
     Energy = 0,
@@ -2520,9 +2530,18 @@ pub enum DiarizeMethod {
     /// Mono-friendly, ML-based. Runs the GGUF pyannote segmentation net;
     /// requires a model path.
     Pyannote = 3,
+    /// Mono-friendly, ML-based (#324): WeSpeaker embeddings + spectral
+    /// clustering (the FoxNose recipe). Requires
+    /// [`DiarizeOptions::foxnose_embedder_path`]. Unlike the other methods
+    /// it derives speaker turns from the audio and attributes each caller
+    /// segment to the turn it overlaps most.
+    FoxNose = 4,
 }
 
+/// Construct via [`Default`] and set fields as needed — the struct grows
+/// alongside the append-only C ABI (#332).
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct DiarizeOptions {
     pub method: DiarizeMethod,
     /// GGUF path. Required for `Pyannote`, ignored otherwise.
@@ -2533,6 +2552,15 @@ pub struct DiarizeOptions {
     /// audio, so the diarizer can map absolute segment timestamps back
     /// to sample indices.
     pub slice_t0: f64,
+    /// GGUF path for the speaker-embedding model (WeSpeaker ResNet34-LM).
+    /// Required for `FoxNose`, ignored otherwise.
+    pub foxnose_embedder_path: Option<String>,
+    /// FoxNose speaker-count lower bound for automatic estimation (0 -> 1).
+    pub min_speakers: i32,
+    /// FoxNose speaker-count upper bound for automatic estimation (0 -> 8).
+    pub max_speakers: i32,
+    /// FoxNose: > 0 pins the speaker count and skips estimation entirely.
+    pub num_speakers: i32,
 }
 
 impl Default for DiarizeOptions {
@@ -2542,6 +2570,10 @@ impl Default for DiarizeOptions {
             pyannote_model_path: None,
             n_threads: 4,
             slice_t0: 0.0,
+            foxnose_embedder_path: None,
+            min_speakers: 0,
+            max_speakers: 0,
+            num_speakers: 0,
         }
     }
 }
@@ -2549,13 +2581,14 @@ impl Default for DiarizeOptions {
 /// Assign a speaker index to each of `segs`, mutating each
 /// [`DiarizeSegment::speaker`] in place.
 ///
-/// Four methods — see [`DiarizeMethod`]. `left` is mono PCM for
+/// Five methods — see [`DiarizeMethod`]. `left` is mono PCM for
 /// mono-only methods, otherwise the left channel of a stereo pair.
 /// When `is_stereo` is true, `right` must be `Some`. All PCM is 16 kHz
 /// float32.
 ///
-/// Returns `Ok(())` on success. Only [`DiarizeMethod::Pyannote`] can
-/// fail (model load failure).
+/// Returns `Ok(())` on success. Only the model-backed methods
+/// ([`DiarizeMethod::Pyannote`], [`DiarizeMethod::FoxNose`]) can fail
+/// (model load failure).
 pub fn diarize_segments(
     segs: &mut [DiarizeSegment],
     left: &[f32],
@@ -2574,6 +2607,13 @@ pub fn diarize_segments(
         ),
         _ => None,
     };
+    let foxnose_c = match (&opts.foxnose_embedder_path, opts.method) {
+        (Some(p), DiarizeMethod::FoxNose) => Some(
+            CString::new(p.as_str())
+                .map_err(|e| format!("foxnose_embedder_path contains NUL: {e}"))?,
+        ),
+        _ => None,
+    };
 
     let abi_opts = crispasr_sys::CrispasrDiarizeOptsAbi {
         method: opts.method as i32,
@@ -2583,6 +2623,14 @@ pub fn diarize_segments(
             .as_ref()
             .map(|c| c.as_ptr())
             .unwrap_or(std::ptr::null()),
+        foxnose_embedder_path: foxnose_c
+            .as_ref()
+            .map(|c| c.as_ptr())
+            .unwrap_or(std::ptr::null()),
+        min_speakers: opts.min_speakers,
+        max_speakers: opts.max_speakers,
+        num_speakers: opts.num_speakers,
+        _pad2: 0,
     };
 
     let mut abi_segs: Vec<crispasr_sys::CrispasrDiarizeSegAbi> = segs
@@ -2618,7 +2666,7 @@ pub fn diarize_segments(
             }
             Ok(())
         }
-        1 => Err("pyannote model load failed".to_string()),
+        1 => Err("diarize model load failed (pyannote / foxnose embedder)".to_string()),
         -1 => Err("invalid arguments to crispasr_diarize_segments_abi".to_string()),
         other => Err(format!("crispasr_diarize_segments_abi returned {other}")),
     }
