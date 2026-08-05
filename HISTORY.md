@@ -6,6 +6,288 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## #316 Kokoro G2P, round 2 — archived from PLAN.md 2026-08-05
+
+Landed `619e74b6..4b875be0`. Round 1 is the entry further down
+("#316 — first the numbers, then the units beside them" and the round-2 summary
+above it); this is the working detail, moved out of PLAN.md when it closed.
+
+### The round-1 rules were never switched on
+
+Reporter re-tested 0.8.25 (2026-08-03) and it still "doesn't sound natural":
+"the strange pronunciation of *dramatic*" and "the unnecessary emphasis on *I*
+and *a*". All three are reproduced, root-caused and fixed on
+`fix/316-kokoro-prosody`.
+
+**Measured, 500 sentences of running prose, misaki 0.9.4 as the reference**
+(`tools/check_misaki_g2p_agreement.py`, which compiles a dumper against the real
+headers so it measures the code path the product uses):
+
+| | shipped 0.8.25 | this branch |
+|---|---|---|
+| token agreement (tokens misaki phonemizes) | 67.0% | **95.7%** |
+| exact sentences, misaki-clean | 0.3% | **82.1%** |
+
+The reporter's own paragraph now comes out **byte-identical to misaki**, and the
+ASR round-trip separates the two arms without needing an ear:
+
+    before:  "...and moody atmosphere EYE built into the prompt instead of
+              bright flat commercial product photography."
+    after:   "...and moody atmosphere I built into the prompt. Instead of
+              bright, flat, commercial product photography,"
+
+Whisper heard the *noun* "eye" for the pronoun, which is what primary stress on
+`ˈI` does to it — the reporter's "unnecessary emphasis on I", objectively. And
+every comma and sentence boundary in the second transcript is one Whisper
+recovered from prosody that did not exist in the first.
+
+Four defects, in descending order of how audible they are:
+
+1. **`context_words` was never set by anything.** Round 1 wrote
+   `core/g2p_ctxwords.h` (the/to/a/an/in + capitalisation stress + the
+   phrase-final lexicon), gated it behind `g2p_en::context::context_words`,
+   tested it — and no call site ever turned it on. It shipped inert in 0.8.24
+   *and* 0.8.25. So `the` stayed `ði` in every position (the original "old
+   English" complaint the release claimed to fix), `to` stayed `tu`, the pronoun
+   `I` kept PRIMARY stress where misaki gives secondary, and the article `a` was
+   read as **the letter**, `ˈA` = stressed "eɪ". That last one IS the reporter's
+   "unnecessary emphasis on a", and it was one line away the whole time.
+   The tests could not catch it: they called `core_g2p_ctxwords::lookup()`
+   directly, never `text_to_ipa`. `tests/test-kokoro-misaki-wiring.cpp` now goes
+   through `crispasr::phonemize_misaki_en` — the function kokoro.cpp calls.
+2. **Punctuation was dropped from the phoneme string.** `,` `.` `;` `:` `!` `?`
+   `…` `—` `"` `«»` `“”` are all in Kokoro's 178-symbol vocabulary and misaki
+   emits them; they are how the model knows to pause. The reporter's two-sentence
+   paragraph reached the model as 250-odd phonemes with not one mark in it —
+   delivered in a single breath. (`kokoro_synthesize` does no sentence splitting,
+   so nothing downstream put the pauses back.) The old join also emitted TWO
+   spaces around every dropped mark, i.e. two space tokens.
+3. **A quoted word never reached the lexicon.** The tokenizer split on
+   `,.!?;:-` only, so `"dramatic"` was looked up as the literal string
+   `"dramatic"`, missed every tier, and came back out of the letter-to-sound
+   rules as `dɹˈæmætɪk` — DRAM-atic, first-syllable stress, against misaki's
+   `dɹəmˈæTɪk`. That is the reported "strange pronunciation of dramatic". Fixed
+   for every consumer, so piper gained three corrections in the same 500
+   sentences (`[Illustration:` and `library!"` were falling to LTS there too).
+4. **`high-contrast` was two words with two primary stresses and a gap through
+   the middle.** misaki resolves a compound to one token, `hˌIkˈɑntɹˌæst`
+   (`resolve_tokens` demotes the lighter half). Ported as
+   `core_g2p_ctxwords::join_compound`.
+5. **Three smaller ones the corpus surfaced.** An abbreviation's period is part
+   of the word — splitting it off gave every `Mr. Darcy` a full-stop pause; the
+   merge is driven off misaki's own seven dotted lexicon entries, with `no.`
+   excluded ("she said no." is a sentence, not a number) and `etc.` requiring a
+   word to follow. `_` and `/` join `-` as silent separators (misaki's
+   SUBTOKEN_JUNKS), so Gutenberg-style `_you_` reaches the lexicon instead of
+   coming out of the letter-to-sound rules as `jˈW` — that one fixed piper too.
+   And a mark never takes a leading space, because a dropped silent separator
+   used to put one there and in Kokoro's vocabulary a space is a real token.
+
+**Consumer conventions are now separate from the dictionary** (`g2p_en::style`).
+They have to be: ONE `g2p_en::context` serves both piper and Kokoro's
+no-lexicon fallback, so `phonemize_builtin_en(..., misaki_style=true)` lets
+Kokoro keep its punctuation on the CMUdict path without piper inheriting it.
+That conflation is what made a per-context flag the wrong shape in round 1.
+Everything Kokoro-specific is off by default; piper's output over 500 sentences
+is unchanged except the three LTS corrections and the double-space collapse.
+
+**Also done in this round, each on its own evidence:**
+- **Acronyms.** misaki's `get_NNP`, both entry
+  shapes (dotted acronym and out-of-lexicon ALLCAPS), byte-identical to misaki
+  on `U.S.A.` / `e.g.` / `Ph.D.` / `XXXVIII` / `PDF` / `USB` — and on the two
+  that must NOT change, `NASA` and `HELLO` (misaki lowercases an ALLCAPS word
+  and looks THAT up first). The letter readings needed their own
+  `context::letters` table, because "A" the letter and "a" the article collide
+  once `load_misaki_json` lowercases the key. That table is also the gate: it is
+  empty for the espeak dicts, every path is a no-op when it is empty, so piper
+  is byte-identical over 500 sentences with no flag of its own.
+- **de/fr/es punctuation.** Each of `g2p_de.h` / `g2p_fr.h` / `g2p_es.h` has its
+  own tokenizer and its own punctuation-skipping join, and all three had the
+  same defect plus the same quoted-word one. They now take
+  `context::emit_punctuation` (default OFF, so piper is unchanged) and Kokoro
+  asks for it, gated `CRISPASR_KOKORO_PUNCT=0`. There is no misaki reference for
+  these languages, so the default was flipped on a round-trip A/B rather than on
+  parity. That first A/B used ggml-base as the ASR and read 70.6% -> 78.4%;
+  **re-measured on large-v3-turbo with a bigger set it is 85.9% -> 90.6%** —
+  see the German section below, which also corrects the absolute level.
+
+**"Would it just be easier to port misaki?" — measured, and the answer is no,
+because this IS the port.** Asked at the end of round 2 and worth writing down,
+because the headline agreement number invites exactly the wrong conclusion.
+
+`python tools/check_misaki_g2p_agreement.py --corpus … --classify --tagger-value`
+answers it in one command. On the 500-sentence corpus:
+
+| residual bucket | tokens | who owns it |
+|---|---|---|
+| tokenisation (whole line misaligned) | 504 (5.27%) | **misaki** — 14 of the 20 misaligned lines are the Gutenberg `--` convention, where its `resolve_tokens` glues the words either side into one nonsense token (`service--and` → `sˈɜɹvəsænd`). Ours is the correct output. 5 more are its own `❓`. **1 line is genuinely our tokenizer.** |
+| segments differ | 40 (0.42%) | mixed |
+| stress only | 38 (0.40%) | mostly POS |
+| punctuation attachment | 12 (0.13%) | Gutenberg `,--` |
+
+So the 95.75% headline is pessimistic by construction: it charges us for a whole
+line whenever misaki mis-tokenises. On aligned lines, excluding misaki's own
+failures, agreement is **99.0%** — 90 disagreeing tokens out of ~9,000.
+
+And the remaining prize is smaller than it looks. `--tagger-value` runs misaki
+against ITSELF with the tag withheld, which is precisely our situation:
+
+    5.42% of misaki's tokens change when it has a tagger
+    ...but 90% of those are `in`, `a` and `I` — which core/g2p_ctxwords.h
+       already gets right from capitalisation + the following vowel, no tagger
+    genuinely tag-dependent remainder: 0.34%  (`that`, `read`, `object`,
+       `console`, `use`, `lived`)
+
+**0.34% is the entire return on porting spaCy's `en_core_web_sm`** — a 12 MB
+neural tok2vec + tagger pipeline. That is a bad trade, and it is the only part
+of misaki still missing: `en.py` itself is ported (lexicon, `get_special_case`,
+`apply_stress`, the `_s`/`_ed`/`_ing` stemmers, `get_NNP`, `resolve_tokens`
+compound de-stressing, `token_context`, the phrase-final `None` key, `ɾ`→`T`).
+If someone does want the last third of a percent, a closed-class rule for `that`
+alone is ~24 of the ~32 tokens and needs no model.
+
+### German, measured properly (2026-08-05)
+
+The first German A/B used **ggml-base** as the ASR and I quoted it as
+70.6% -> 78.4%. Re-run with **large-v3-turbo** on a bigger set, most of that
+spread was the ASR, not the TTS. The A/B rule's "a noisy box fabricates wins" is
+usually about machine load; this is the same failure with the *reference model*
+as the noise source. Corrected table — `kokoro-de-hui-base` q8_0, 8 sentences ×
+2 voices (df_eva, dm_bernd), each synthesis its own process:
+
+| arm | word accuracy | median | min |
+|---|---|---|---|
+| B builtin, no punctuation (what 0.8.25 shipped) | 85.9% | 88.9% | 58.3% |
+| C espeak, no punctuation | 87.1% | 88.9% | 66.7% |
+| **A builtin + punctuation (shipped default)** | **90.6%** | 91.7% | 70.0% |
+| D builtin + punctuation + unstressed function words | 89.4% | 90.9% | 75.0% |
+
+**The punctuation default is confirmed: +4.7 pts (B→A)**, on a better ASR and a
+bigger sample than the number it replaces. German sits at ~90%, not the ~78% I
+first reported. Our builtin G2P is 1.2 pts behind espeak with punctuation held
+constant (B vs C) — small, and builtin stays the default because espeak is an
+optional system dependency.
+
+**A real German defect found on the way, now gated OFF.** `espeak_de.tsv` was
+generated by running espeak over a word list ONE WORD AT A TIME, so every entry
+is the citation form — and espeak stresses a word in isolation that it leaves
+unstressed in a sentence:
+
+    espeak "sie"                       ->  zˈiː
+    espeak "sie ging dann nach Hause"  ->  ziː ɡˈɪŋ dan nɑːx hˈaʊzə
+
+So we put a primary stress on every article, pronoun, preposition and auxiliary.
+That is the German shape of the #316 English bug — a per-word lexicon can only
+store `the` as `ði`, never `ðə`. The rule is purely LEXICAL (espeak reads even a
+sentence-initial "Der" as `dɛɾ`), so it is recoverable from espeak itself:
+`tools/gen-g2p-de-unstressed.py` derives 72 entries by comparing each
+candidate's isolated reading against two carrier frames and accepting only a
+pure stress loss. Token agreement with espeak's sentence output:
+**45.9% -> 87.1%**.
+
+**Then the training recipe was found, and it settles the question.**
+`dida-80b/kokoro-deutsch` (the repo, not the gated model card) ships
+`scripts/prepare_dataset.py`, and it phonemizes with
+
+    from misaki import espeak
+    g2p = espeak.EspeakG2P(language="de")
+
+i.e. **whole sentences through espeak**, so espeak's sentence-level de-stressing
+IS the training data and our citation form is a spelling the model never saw.
+The newer `kikiri-tts` models say the same thing in their card ("G2P: misaki
+0.9.4 + espeak-ng"). So un-stressing ships **ON** on source evidence, not on the
+round-trip — which could not resolve it either way (−1.2 pts, ~3 words over 16
+clips). `CRISPASR_G2P_DE_UNSTRESS=0` reverts.
+
+### Reading the recipe turned up two more things
+
+`misaki/espeak.py::EspeakG2P` is:
+
+    EspeakBackend(language="de", preserve_punctuation=True, with_stress=True,
+                  tie='^', language_switch='remove-flags')
+
+then a map collapsing every TIED sequence to one codepoint: `t^s`→`ʦ`,
+`a^ɪ`→`I`, `a^ʊ`→`W`, `ɔ^ɪ`→`Y`, `t^ʃ`→`ʧ`, `d^ʒ`→`ʤ`, `e^ɪ`→`A`, `o^ʊ`→`O`.
+`preserve_punctuation=True` independently confirms the punctuation fix above.
+
+**(1) `ʏ` IS NOT IN THE GERMAN MODEL'S VOCABULARY — we were deleting it.**
+Found by scanning our German output against the GGUF's own
+`tokenizer.ggml.tokens`: two symbols we emit are absent, `ʏ` (U+028F) and the
+non-syllabic mark (U+032F). An absent symbol is not approximated by
+`kokoro_phonemes_to_ids`, it is **dropped** — so the vowel left every München,
+Frühstück, fünf, Stück, Glück, Küche, zurück. dida-80b hit the same wall and
+made the same substitution in their dataset script (`ʏ → y`, "the duration
+difference is learned from audio"), which is what confirms it. Same class as
+round 1's "the digits phonemized to the empty string and vanished".
+Measured on the real model, same binary, same voice, `--tts-phonemes` for the
+old spelling:
+
+    before:  "Menjen und FRISCH, fünf Stück Glück in der KERRE."
+    after:   "Männchen und FRÜHSTÜCK, fünf Stück Glück in der Kühe."
+
+Shipped ON unconditionally for German (`Dialect::DeVocab`) — an approximate
+vowel always beats a deleted one.
+
+**(2) The tied-alphabet collapse is right by the recipe and WRONG on the model
+we ship — gated OFF (`CRISPASR_KOKORO_DE_MISAKI_ALPHABET=1`).** Applying it took
+agreement with the recipe from 81.2% to 85.9% — on one sentence, byte-identical
+to it — and the ASR round-trip got 5.3 pts *worse*. Not a dropped-symbol
+problem: `ʦ ʣ W I Y A O Q ʧ ʤ` are all in the model's vocabulary, checked.
+The likeliest reading is that the hui base we ship predates this part of the
+recipe (the training repo's commits stop in April; the misaki fork was updated
+in July), so it is probably right for the newer `kikiri-tts` models and wrong
+here. Kept and gated rather than deleted, per the A/B rule. ⚠ It also has a
+real limitation of its own: our dictionary has no ties, so `ts`→`ʦ` is a
+blanket rewrite that cannot tell an affricate from a compound seam.
+**The clean fix for both is to regenerate `espeak_de.tsv` with `--tie`** — that
+removes the ambiguity and lets the collapse be exact.
+
+⚠ fr/es almost certainly have the same citation-stress defect, and possibly the
+same out-of-vocabulary symbols. The vocabulary scan is three lines and worth
+running for every non-English Kokoro model we ship.
+
+⚠ fr/es almost certainly have the same citation-stress defect (same dictionary
+provenance; the same generator would work). Not investigated.
+
+**Still open, then, and deliberately:**
+- `that` as a determiner wants `ðˈæt`, as a complementiser `ðæt` (23 hits/500).
+  DEFAULT wins 68% of occurrences over a wider sample, so a blanket flip loses
+  two for every one gained — see the POS_OVERRIDES note in `load_misaki_json`.
+- `read`, `used`, `by`, `am`, `object`, `console`, `use` are the same shape.
+
+### Round-1 follow-ups, as they stood when round 2 closed
+
+- **Numbers: DONE for all four built-in G2Ps** (en `num2words_en.h`, de
+  `num2words_de.h` `ce7c8226`, fr+es `num2words_fr.h`/`num2words_es.h`
+  `ddb08ae1`). Every one of them used to phonemize `82` to the empty string and
+  drop it silently. Hermetic coverage in `tests/test-num2words-de.cpp` (55
+  assertions) and `tests/test-num2words-fr-es.cpp` (87).
+  Each language needed rules the others do not have, and two were caught only by
+  running the tables: **French** 80 000 came out "quatre-vingt**s** mille" (the
+  plural s must drop before a SCALE word, not just before another digit group),
+  and **Spanish** 21 000 came out "veintiuno mil" (`uno` apocopates before a
+  masculine noun and `mil` counts → "veintiún mil").
+  ⚠ Two deliberate limitations: German ordinals emit the citation form, so
+  "Am 1. Mai" reads "erste" where German inflects to "ersten" (case is not
+  recoverable inside a G2P); Spanish ordinals are lexical to décimo and fall back
+  to the cardinal above, rather than inventing "vigésimo primero" forms a TTS
+  voice has rarely been trained on.
+- **misaki's reduced vowels `ᵊ` / `ᵻ` are not modelled.** We emit plain `ə`/`ɪ`
+  where misaki reduces. Measured worth: exact whole-word phoneme match goes
+  58.3% → ~63% if handled. It is context-dependent (misaki uses both forms), so
+  it needs the rule, not a blanket substitution.
+- **The rest of the gap is dictionary-level**, not spelling: CMUdict stress
+  placement and unstressed-vowel choices vs misaki's lexicon (~190 stress
+  differences and ~130 ɪ/ə swaps over a 1508-word corpus). Closing it means
+  shipping misaki's lexicon, not more conversion rules.
+- Reproduce any of this with
+  `tools/` + `misaki` (pip): run both G2Ps over a word list and diff symbol
+  inventories — the invariant that matters is that we never emit a symbol
+  outside the model's vocab or outside the reference's inventory.
+
+
+---
+
 ## #227 — VAD info reuse (archived from PLAN.md 2026-08-03)
 
 ### #227 — VAD info reuse — DONE (CLI: feat/vad-export-import; server: feat/server-vad-reuse)
