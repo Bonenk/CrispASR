@@ -194,6 +194,15 @@ TTS backends need extra wiring beyond ASR:
    it's not 24000 (default). The CLI uses this for WAV header + any
    downstream resampling.
 
+   **Also register the rate in `crispasr_session_output_sample_rate()`
+   (`src/crispasr_c_api.cpp`) — the session ABI cannot reach the CLI
+   adapter, so the getter keeps its own per-backend table (#332).** Every
+   audio-producing ctx must appear there: a backend at the 24 kHz default
+   adds its ctx to the 24 kHz fallthrough list; a non-24 kHz backend adds
+   the explicit rate (or its `<name>_sample_rate(ctx)` getter when the
+   rate is a model hparam). A ctx missing from the table makes the
+   session report "no audio output" (0) for a backend that synthesizes.
+
 4. **Codec companion loading**: if your backend needs a separate codec
    GGUF (SNAC, DAC, Mimi), handle `params.tts_codec_model` in `init()`:
    ```cpp
@@ -322,6 +331,42 @@ owned buffer then free via `crispasr_pcm_free`; free any `out_text` via
 - `bindings/javascript/emscripten.cpp` — WASM/JS (built with emcc).
 The canonical surface is `include/crispasr_session.h`; `docs/bindings.md` has the
 per-wrapper setter table.
+
+### Append-only ABI structs — update EVERY hand-written mirror in the same commit
+
+Some ABI entry points take struct pointers whose layout is defined only in
+`src/crispasr_c_api.cpp` (`crispasr_diarize_seg_abi`, `crispasr_diarize_opts_abi`)
+or in `include/crispasr_session.h` (`crispasr_vad_abi_opts`). Bindings that
+cannot include a C header lay these structs out **by hand**, byte for byte:
+the Go cgo preamble, `crispasr-sys/src/lib.rs` (`#[repr(C)]` mirrors), and the
+flutter binding's offset-written buffers in `crispasr.dart`.
+
+The C side reads **every field unconditionally**, so a mirror that is one
+append behind makes the C side read past the caller's allocation — undefined
+behaviour on every call, not just calls that use the new fields. This is not
+hypothetical: #324 appended the FoxNose fields to `crispasr_diarize_opts_abi`
+and updated only the Go mirror; #332 found the Rust and Dart mirrors 24 bytes
+short, with a garbage pointer handed to `std::string` on the C side.
+
+Rules when you touch one of these structs:
+
+1. **Append at the END; never reorder or insert.** The structs are
+   append-only by contract — old mirrors must stay prefix-compatible
+   while they're being caught up (they aren't safe, but they're findable).
+2. **Update every mirror in the same commit.** The authoritative mirror
+   list lives in the comment next to the struct in `crispasr_c_api.cpp`;
+   extend that list when a new binding grows a mirror.
+3. **Keep the layout guards in sync**: the `static_assert`s next to the
+   struct in `crispasr_c_api.cpp` pin the canonical sizes/offsets, and each
+   mirror carries its own guard — `crispasr-sys`'s `diarize_abi_layout`
+   test, flutter's `DiarizeMethod` index-parity smoke test, and
+   `tests/test-session-abi-nulls.cpp` (which calls the ABI through a
+   fourth hand-written mirror, so a silent layout change fails a unit
+   test even if a binding is missed).
+4. **Enum values that cross the ABI are append-only too** — the Dart
+   `DiarizeMethod`/`LidMethod` enums dispatch on `.index`, and the Rust
+   enums on `as i32`; a reorder or mid-enum insertion silently routes
+   calls to the wrong method. The index-parity tests pin this.
 
 **C# is CI-tested** (`.github/workflows/bindings-csharp.yml`) — it compiles the
 binding against the ABI and runs `CrispASR.Tests`. Do not let it drift; it was

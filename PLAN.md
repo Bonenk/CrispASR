@@ -88,13 +88,17 @@ append.
 
 Still open from the issue's asks:
 
-1. **`crispasr_session_output_sample_rate()` (+ channels getters).**
-   `synthesize` / `speech_to_speech` return PCM "at the backend-native sample
-   rate" but no ABI getter exposes that rate, so callers hard-code it.
-   `input_channels()` is trivially 1 today (separation is the stereo
-   exception, and it has its own `separate_sample_rate`); the output-rate
-   getter is the real gap. Touches the C API + every binding (multi-surface
-   trap — session ABI, CLI unaffected).
+1. ~~**`crispasr_session_output_sample_rate()` (+ channels getters).**~~
+   **DONE** (second #332 landing): `crispasr_session_output_sample_rate` /
+   `input_channels` / `output_channels` in the C ABI (per-backend rate table
+   mirroring the CLI adapters' `tts_sample_rate()`, 0 = no audio output),
+   wired through Rust / Ruby / JS / Java / C# (the surfaces that expose
+   `input_sample_rate`), pinned by `tests/test-session-abi-nulls.cpp` and
+   documented in `docs/bindings.md` §"Session audio-format getters".
+   **A new TTS backend must add its ctx to the getter's table** —
+   `docs/contributing.md` §5b.3 records the duty. Go / Dart / Python don't
+   expose `input_sample_rate` either; extend all four getters together there
+   if anyone asks.
 2. **Same-benchmark DER for the pyannote+embedder path** — already tracked as
    the #326 NOW item below; the issue asked for cross-method benchmarks, and
    foxnose-vs-upstream numbers exist in `docs/foxnose-diarize/PLAN.md` while

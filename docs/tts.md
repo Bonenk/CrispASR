@@ -41,7 +41,7 @@ trade-off:
 | **`mini-omni2`** | gpt-omni/mini-omni2: Whisper-small encoder + Qwen2-0.5B LLM with 8-stream architecture + SNAC 24 kHz decoder → 24 kHz. Also does ASR and speech-to-speech. MIT license. Requires `--codec-model snac-24khz.gguf` companion. | No | ~1.0 GB Q4_K + ~80 MB SNAC companion |
 | **`voxtral-tts`** | Mistral Voxtral-4B-TTS-2603: Ministral-3B AR backbone (26L GQA, NORMAL/adjacent-pair RoPE) + 3L bidirectional flow-matching acoustic transformer (8-step Euler ODE + CFG α=1.2, no positional encoding) + Voxtral codec decoder (ALiBi sliding-window attention + reflect-causal conv + ConvTranspose upsampling) → 24 kHz. 20 preset voices across 9 languages (en/fr/de/es/it/pt/nl/ar/hi); strong on French technical text. CC-BY-NC-4.0. | No (20 preset voices via `--voice <name>`, e.g. `fr_female`) | ~2.4 GB Q4_K / ~4.3 GB Q8_0 / ~8.2 GB F16 via `-m auto` |
 
-All backends write mono WAV via `--tts-output` (22 kHz for piper/fastpitch/bananamind-tts, 16 kHz for speecht5, 24 kHz for most others, 44.1 kHz for melotts/dia/parler-tts/zonos-tts, 48 kHz for voxcpm2-tts).
+All backends write mono WAV via `--tts-output` (22 kHz for piper/fastpitch/bananamind-tts, 16 kHz for speecht5, 44.1 kHz for melotts/dia/parler-tts/zonos-tts, 48 kHz for voxcpm2-tts/dots-tts/irodori-tts/moss-tts-local/sidon, 24 kHz for most others). Programmatic callers don't need this table: `crispasr_session_output_sample_rate()` returns the active backend's output rate, with `crispasr_session_input_channels()` / `output_channels()` alongside (everything is mono today) — #332.
 
 ## dots.tts — voice cloning and performance
 

@@ -57,6 +57,10 @@ public final class CrispasrSession implements AutoCloseable {
         Pointer crispasr_session_speech_to_speech(Pointer session, float[] inSamples, int nInSamples,
                                                   PointerByReference outText, IntByReference outNSamples);
         int     crispasr_session_input_sample_rate(Pointer session);
+        // #332: output-side counterparts (rate of synthesize/s2s PCM; mono channels).
+        int     crispasr_session_output_sample_rate(Pointer session);
+        int     crispasr_session_input_channels(Pointer session);
+        int     crispasr_session_output_channels(Pointer session);
         void    crispasr_pcm_free(Pointer pcm);
         // AI-content marking (EU AI Act Art. 50(2)) — the other half of synthesize_raw.
         void    crispasr_watermark_embed(float[] pcm, int nSamples, float alpha);
@@ -884,6 +888,31 @@ public final class CrispasrSession implements AutoCloseable {
      */
     public int inputSampleRate() {
         return Lib.INSTANCE.crispasr_session_input_sample_rate(handle);
+    }
+
+    /**
+     * Sample rate of the PCM synthesize/speechToSpeech produce for this
+     * backend. Returns 0 when the backend has no audio output (ASR-only). (#332)
+     */
+    public int outputSampleRate() {
+        return Lib.INSTANCE.crispasr_session_output_sample_rate(handle);
+    }
+
+    /**
+     * Channel count for audio input: 1 (mono) for every current backend,
+     * 0 on error. Source separation is the stereo exception and has its own
+     * surface. (#332)
+     */
+    public int inputChannels() {
+        return Lib.INSTANCE.crispasr_session_input_channels(handle);
+    }
+
+    /**
+     * Channel count for synthesized / s2s output audio: 1 (mono), or 0 when
+     * the backend has no audio output. (#332)
+     */
+    public int outputChannels() {
+        return Lib.INSTANCE.crispasr_session_output_channels(handle);
     }
 
     /**

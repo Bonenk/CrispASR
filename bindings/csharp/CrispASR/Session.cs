@@ -479,6 +479,24 @@ namespace CrispASR
         /// </summary>
         public int InputSampleRate() => NativeMethods.crispasr_session_input_sample_rate(Handle);
 
+        /// <summary>
+        /// Sample rate of the PCM Synthesize/SpeechToSpeech produce for this
+        /// backend; 0 when the backend has no audio output (ASR-only). (#332)
+        /// </summary>
+        public int OutputSampleRate() => NativeMethods.crispasr_session_output_sample_rate(Handle);
+
+        /// <summary>
+        /// Channel count for audio input: 1 (mono) for every current backend,
+        /// 0 on error. Source separation is the stereo exception. (#332)
+        /// </summary>
+        public int InputChannels() => NativeMethods.crispasr_session_input_channels(Handle);
+
+        /// <summary>
+        /// Channel count for synthesized / s2s output audio: 1 (mono), or 0
+        /// when the backend has no audio output. (#332)
+        /// </summary>
+        public int OutputChannels() => NativeMethods.crispasr_session_output_channels(Handle);
+
         // ----------------------------------------------------------------
         // ASR Transcription
         // ----------------------------------------------------------------

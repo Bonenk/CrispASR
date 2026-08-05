@@ -259,6 +259,25 @@ catch_discover_tests(test-params
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-session-abi-nulls — model-free session-ABI contracts (#332) ─────────
+#
+# NULL-session getters return their documented no-data values (a crash here
+# takes down the host VM of every binding), the diarize ABI rejects invalid
+# arguments, and the model-free diarize methods (Energy / VadTurns / slice_t0
+# mapping / FoxNose load-failure) behave through the same 48-byte options
+# mirror the language bindings hand-maintain.
+add_executable(test-session-abi-nulls
+    test-session-abi-nulls.cpp
+)
+target_link_libraries(test-session-abi-nulls PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-session-abi-nulls
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-lid-speech-prefix — keep request-level LID on speech, not silence ───
 add_executable(test-lid-speech-prefix
     test-lid-speech-prefix.cpp

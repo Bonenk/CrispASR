@@ -578,6 +578,12 @@ extern "C" {
     // the model's native rate otherwise; 0 on error). Pair with s2s/synthesize to
     // feed input at the right rate.
     pub fn crispasr_session_input_sample_rate(s: *mut CrispasrSession) -> c_int;
+    // #332: output-side counterparts. output_sample_rate is the rate of the
+    // PCM synthesize / speech_to_speech return (0 = backend has no audio
+    // output); the channel getters are 1 (mono) for every current backend.
+    pub fn crispasr_session_output_sample_rate(s: *mut CrispasrSession) -> c_int;
+    pub fn crispasr_session_input_channels(s: *mut CrispasrSession) -> c_int;
+    pub fn crispasr_session_output_channels(s: *mut CrispasrSession) -> c_int;
     pub fn crispasr_pcm_free(pcm: *mut f32);
     // Embed the AI-content watermark into f32 mono PCM, in place. The other
     // half of `synthesize_raw`: opting out of automatic marking obliges the
