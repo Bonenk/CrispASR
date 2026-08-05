@@ -1233,6 +1233,19 @@ extern "C" char* t5_translate(struct t5_translate_context* ctx, const char* text
             dec_ids.push_back((int)t);
         }
     } else {
+        // A/B lever for the incremental KV path. With it set, every step
+        // re-forwards the WHOLE decoder prefix from offset 0 instead of
+        // appending one token to the cache — mathematically the same answer,
+        // and much slower, so it exists only to answer "is the cache the
+        // problem?" without needing the 11.76 GB reference checkpoint.
+        // Divergence between the two IS a cache/position bug; agreement means
+        // the model genuinely does not stop and the fix belongs in the decode
+        // policy instead.
+        static const bool no_kv_reuse = [] {
+            const char* v = std::getenv("CRISPASR_T5_NO_KV_REUSE");
+            return v && *v && std::strcmp(v, "0") != 0;
+        }();
+
         int offset = prompt_len;
         for (int step = 0; step < max_new_tokens; step++) {
             // NaN-robust argmax (see lfm2_audio note): seed -inf, skip non-finite,
@@ -1259,7 +1272,8 @@ extern "C" char* t5_translate(struct t5_translate_context* ctx, const char* text
                                                                          : "?");
             }
 
-            logits = run_decoder_step(ctx, &best_id, 1, offset);
+            logits = no_kv_reuse ? run_decoder_step(ctx, dec_ids.data(), (int)dec_ids.size(), 0)
+                                 : run_decoder_step(ctx, &best_id, 1, offset);
             if (logits.empty())
                 return nullptr;
             offset++;

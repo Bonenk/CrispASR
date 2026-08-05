@@ -257,6 +257,36 @@ else:
     summary["artifacts"]["ref"] = {"failed": True, "tail": p.stdout[-400:], "err": p.stderr[-400:]}
 save()
 
+# ── does the BLUEPRINT itself run away on a short input? (#333) ───────────────
+# Our runtime emits "Hello world! – 1000000…" for fr→en "Bonjour le monde!" —
+# correct translation, then a digit loop to the token cap. Two arms of our own
+# already agree (incremental KV vs full re-forward each step), and F16 per-stage
+# parity is 1.000000 with a matching step-0 argmax, so the runtime reproduces
+# the model faithfully at every point we can measure. The one thing that decides
+# whether this is a PORT bug or the MODEL's behaviour is what the PyTorch
+# blueprint does on the same input, and only this kernel has the checkpoint.
+step("decode-probe.begin")
+probe = {}
+for text, tl in (("Bonjour le monde!", "en"), ("Hello world, how are you today?", "de"),
+                 ("Machine learning is changing the world.", "fr")):
+    env = dict(os.environ, MADLAD_TEXT=text, MADLAD_TL=tl)
+    out = MODELS / f"probe-{tl}.gguf"
+    with kh.build_heartbeat(f"decode-probe.{tl}", 30):
+        pr = subprocess.run([sys.executable, str(DUMPER), "--backend", "madlad",
+                             "--model-dir", str(SRC), "--output", str(out),
+                             "--max-new-tokens", "60",
+                             "--audio", str(REPO / "samples" / "jfk.wav")],
+                            capture_output=True, text=True, timeout=3600, env=env,
+                            cwd=str(REPO / "tools"))
+    line = [l for l in pr.stdout.splitlines() if "madlad reference:" in l]
+    probe[f"{tl}:{text[:32]}"] = {"exit": pr.returncode, "report": line,
+                                  "err": pr.stderr[-300:] if pr.returncode else ""}
+    step(f"decode-probe.{tl}", exit=pr.returncode, report=line)
+    out.unlink(missing_ok=True)
+summary["blueprint_decode_probe"] = probe
+save()
+step("decode-probe.done")
+
 shutil.rmtree(SRC, ignore_errors=True)
 step("source.deleted", free_gb=free_gb())
 
