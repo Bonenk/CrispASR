@@ -249,7 +249,8 @@ static void ensure_misaki_lexicon_loaded() {
         // A .json path is misaki's own file; anything else is the TSV that
         // tools/convert-misaki-lexicon.py emits.
         const bool is_json = path.size() > 5 && path.compare(path.size() - 5, 5, ".json") == 0;
-        int n = is_json ? g2p_en::load_misaki_json(g_g2p_misaki_ctx.espeak_ipa, g_g2p_misaki_ctx.phrase_final, path)
+        int n = is_json ? g2p_en::load_misaki_json(g_g2p_misaki_ctx.espeak_ipa, g_g2p_misaki_ctx.phrase_final, path,
+                                                   &g_g2p_misaki_ctx.letters)
                         : g2p_en::load_ipa_dict_file(g_g2p_misaki_ctx.espeak_ipa, path);
         if (n > 0) {
             g_g2p_misaki_ctx.espeak_ipa.loaded = true;
@@ -282,7 +283,8 @@ static void ensure_misaki_lexicon_loaded() {
                                                                 /*quiet=*/true, "crispasr", "");
             if (p2.empty())
                 continue;
-            total += g2p_en::load_misaki_json(g_g2p_misaki_ctx.espeak_ipa, g_g2p_misaki_ctx.phrase_final, p2);
+            total += g2p_en::load_misaki_json(g_g2p_misaki_ctx.espeak_ipa, g_g2p_misaki_ctx.phrase_final, p2,
+                                              &g_g2p_misaki_ctx.letters);
         }
         if (total > 0) {
             g_g2p_misaki_ctx.espeak_ipa.loaded = true;

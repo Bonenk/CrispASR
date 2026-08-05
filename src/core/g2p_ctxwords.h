@@ -33,6 +33,8 @@
 #pragma once
 
 #include <algorithm>
+#include <cctype>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -207,6 +209,65 @@ inline int stress_weight(const std::string& ps) {
         i += n;
     }
     return w;
+}
+
+// ── spelling a word out letter by letter ────────────────────────────────────
+//
+// misaki's `get_NNP`: an out-of-lexicon ALLCAPS word, and any dotted acronym,
+// is read as its letters — `U.S.A.` is `jˌuˈɛsˈA`, not whatever the
+// letter-to-sound rules make of "u.s.a.". The stress pattern is the whole
+// point: every letter is demoted to secondary and the LAST one is promoted
+// back to primary, so the run reads as one word with one peak.
+//
+// `letter_ipa` returns the reading of a single lowercase letter ("a" -> "ˈA")
+// or "" when the caller has no letters table, in which case this returns "" and
+// the caller keeps its existing fallback chain.
+inline std::string spell_out(const std::string& word,
+                             const std::function<std::string(const std::string&)>& letter_ipa) {
+    std::string ps;
+    for (char c : word) {
+        if (!isalpha((unsigned char)c))
+            continue; // misaki drops the dots and keeps the letters
+        const std::string one = letter_ipa(std::string(1, (char)tolower((unsigned char)c)));
+        if (one.empty())
+            return std::string(); // an unknown letter aborts the whole word
+        ps += one;
+    }
+    if (ps.empty())
+        return ps;
+    // apply_stress(ps, 0): with a primary somewhere, drop every secondary and
+    // demote the primaries.
+    if (ps.find("ˈ") != std::string::npos)
+        ps = replace_all(replace_all(ps, "ˌ", ""), "ˈ", "ˌ");
+    // …then the LAST secondary becomes primary (misaki's rsplit/join).
+    const size_t last = ps.rfind("ˌ");
+    if (last != std::string::npos)
+        ps = ps.substr(0, last) + "ˈ" + ps.substr(last + std::char_traits<char>::length("ˌ"));
+    return ps;
+}
+
+// Is this token the dotted-acronym shape misaki spells out? Its rule
+// (`get_special_case`): there is a dot INSIDE the word, everything that is not
+// a dot is a letter, and the longest run between dots is under 3 characters —
+// so `U.S.`, `e.g.` and `Ph.D.` qualify and `Mr.` (no interior dot) does not.
+inline bool is_dotted_acronym(const std::string& word) {
+    size_t first = word.find_first_not_of('.');
+    size_t last = word.find_last_not_of('.');
+    if (first == std::string::npos || word.find('.', first) > last)
+        return false;
+    size_t run = 0, longest = 0;
+    for (char c : word) {
+        if (c == '.') {
+            longest = run > longest ? run : longest;
+            run = 0;
+            continue;
+        }
+        if (!isalpha((unsigned char)c))
+            return false;
+        run++;
+    }
+    longest = run > longest ? run : longest;
+    return longest > 0 && longest < 3;
 }
 
 // Join the parts of a hyphenated compound the way misaki's `resolve_tokens`
