@@ -59,6 +59,32 @@ cross-lingual by any route; and qwen3-tts discarded `-tl` for want of a
 capability bit. `src/core/tts_lang.h`, `tests/test-tts-lang.cpp`,
 `docs/issue-329/PLAN.md`.
 
+**#316 round 2 — the rules shipped, switched off.** The reporter came back on
+0.8.25: still "strange pronunciation of *dramatic*", still "unnecessary emphasis
+on *I* and *a*". Round 1 had written the contextual function-word rules
+(`the`/`to`/`a`/`in` + capitalisation stress + the phrase-final lexicon), tested
+them, and left them behind `g2p_en::context::context_words` — which **nothing
+anywhere set**. Two releases read `the` as `ði` in every position and the article
+"a" as the LETTER, `ˈA` with primary stress. The unit tests could not see it:
+they called `core_g2p_ctxwords::lookup()` directly, never `text_to_ipa`. Three
+more defects sat behind that one: punctuation was dropped from the phoneme string
+entirely (Kokoro's vocabulary contains `,.;:!?…—"«»“”` and misaki emits them —
+without them a paragraph arrives as one breath), a quoted word reached the
+lexicon still wearing its quotes and fell through to the letter-to-sound rules
+(`"dramatic"` → `dɹˈæmætɪk`, DRAM-atic), and a hyphenated compound was two words
+with two primary stresses. Token agreement with misaki 67.0% → 95.7% over 500
+sentences of prose; the reporter's own paragraph now byte-identical to misaki's
+output. The evidence that settles it is the ASR round-trip: before, Whisper
+transcribed the pronoun as the noun **"eye"** and found no comma anywhere; after,
+it reads "atmosphere I built into the prompt." with every clause boundary
+recovered from prosody. Durable lesson, third time now: a feature behind a flag
+nobody sets is not shipped, and a test that calls the helper instead of the
+product cannot tell you which. `tests/test-kokoro-misaki-wiring.cpp` goes through
+`crispasr::phonemize_misaki_en` for exactly that reason, and was watched failing
+before the fix. `g2p_en::style` now separates the CONSUMER's conventions from the
+dictionary, because one context serves both piper and Kokoro's fallback and
+conflating them is what made a per-context flag the wrong shape.
+
 **#316 — first the numbers, then the units beside them.** `g2p_de`, `g2p_fr` and
 `g2p_es` had no number path at all: digits are in no pronunciation dictionary
 and no letter-to-sound rule, so a numeric token phonemized to the EMPTY string
