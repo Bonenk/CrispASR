@@ -126,10 +126,28 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
 
     def _W(name: str) -> "torch.Tensor":
         """One tensor, fp32, then let it go. Never cache — that is the whole
-        point of this file (11.76 GB of weights vs ~13 GB of RAM)."""
+        point of this file (11.76 GB of weights vs ~13 GB of RAM).
+
+        Fails with the near-misses listed, because a wrong key here costs a
+        whole Kaggle run to discover: the first version of this file guessed
+        `shared.weight` and died 14 minutes in with a bare KeyError."""
         if name not in keys:
-            raise KeyError(f"{name} not in {st_path.name}")
+            stem = name.split(".")[-2] if "." in name else name
+            near = sorted(k for k in keys if stem in k)[:8]
+            raise KeyError(f"{name} not in {st_path.name}. Similar keys: {near}")
         return handle.get_tensor(name).float()
+
+    def _W_any(*names: str) -> "torch.Tensor":
+        """First key that exists. The embedding is stored under one of three
+        names depending on how the checkpoint was saved, which is exactly what
+        `models/convert-madlad-to-gguf.py` already accounts for — this mirrors
+        its list rather than assuming one of them."""
+        for n in names:
+            if n in keys:
+                return handle.get_tensor(n).float()
+        raise KeyError(f"none of {names} in {st_path.name}")
+
+    EMBED = ("shared.weight", "encoder.embed_tokens.weight", "decoder.embed_tokens.weight")
 
     def rms(x, w):
         # fp32, no mean subtraction. T5LayerNorm.
@@ -165,7 +183,7 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
     put("enc_tokens", enc_ids.float())
 
     # ── encoder ───────────────────────────────────────────────────────────────
-    x = _W("shared.weight")[enc_ids]  # (T, D)
+    x = _W_any(*EMBED)[enc_ids]  # (T, D)
     put("enc_embed", x)
 
     q_pos = torch.arange(T)[:, None]
@@ -210,7 +228,7 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
 
     # ── decoder, greedy ───────────────────────────────────────────────────────
     dec_bias_w = _W("decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight")
-    lm_w = _W("shared.weight") if TIED else _W("lm_head.weight")
+    lm_w = _W_any(*EMBED) if TIED else _W("lm_head.weight")
 
     dec_ids = [START]
     gen: list[int] = []
@@ -221,7 +239,7 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
 
     for step in range(n_steps):
         L = len(dec_ids)
-        y = _W("shared.weight")[torch.tensor(dec_ids, dtype=torch.long)]
+        y = _W_any(*EMBED)[torch.tensor(dec_ids, dtype=torch.long)]
         if step == 0:
             put("dec_embed", y)
         dq = torch.arange(L)[:, None]
