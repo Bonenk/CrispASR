@@ -7288,11 +7288,22 @@ struct crispasr_diarize_opts_abi {
 // for byte. If an append changes these numbers, every mirror listed above
 // must change in the same commit — and each mirror's own layout test
 // (crispasr-sys `diarize_abi_layout`, flutter's 48-byte buffer) with it.
-static_assert(sizeof(crispasr_diarize_seg_abi) == 24, "diarize seg ABI layout changed — update every binding mirror");
-static_assert(sizeof(crispasr_diarize_opts_abi) == 48, "diarize opts ABI layout changed — update every binding mirror");
-static_assert(offsetof(crispasr_diarize_opts_abi, pyannote_model_path) == 16, "diarize opts ABI layout drifted");
-static_assert(offsetof(crispasr_diarize_opts_abi, foxnose_embedder_path) == 24, "diarize opts ABI layout drifted");
-static_assert(offsetof(crispasr_diarize_opts_abi, min_speakers) == 32, "diarize opts ABI layout drifted");
+//
+// The numbers are the 64-bit layout, which is what every binding mirror
+// targets — so each assertion is conditioned on a 64-bit pointer. wasm32 has
+// 4-byte pointers and a legitimately smaller struct; asserting the 64-bit
+// numbers there broke all three Build WASM legs on main.
+static constexpr bool k_abi_is_64bit = sizeof(void*) == 8;
+static_assert(!k_abi_is_64bit || sizeof(crispasr_diarize_seg_abi) == 24,
+              "diarize seg ABI layout changed — update every binding mirror");
+static_assert(!k_abi_is_64bit || sizeof(crispasr_diarize_opts_abi) == 48,
+              "diarize opts ABI layout changed — update every binding mirror");
+static_assert(!k_abi_is_64bit || offsetof(crispasr_diarize_opts_abi, pyannote_model_path) == 16,
+              "diarize opts ABI layout drifted");
+static_assert(!k_abi_is_64bit || offsetof(crispasr_diarize_opts_abi, foxnose_embedder_path) == 24,
+              "diarize opts ABI layout drifted");
+static_assert(!k_abi_is_64bit || offsetof(crispasr_diarize_opts_abi, min_speakers) == 32,
+              "diarize opts ABI layout drifted");
 
 CA_EXPORT int crispasr_diarize_segments_abi(const float* left_pcm, const float* right_pcm, int32_t n_samples,
                                             int32_t is_stereo, crispasr_diarize_seg_abi* segs, int32_t n_segs,
