@@ -74,66 +74,57 @@ Earned the hard way; each cost a real bug getting through.
    copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
    missing one.
 
-## OPEN 2026-08-05 — #333 madlad400: the repo has q4_k only; F16 and Q8_0 were never uploaded
+## #333 madlad400 — DONE 2026-08-05 (F16 + Q8_0 published, port validated)
 
-Reporter: "Only the q4_k model appears to be available, even though the README
-itself mentions f16 and q8_0." Confirmed against the HF API —
-`cstr/madlad400-3b-mt-GGUF` contains exactly `README.md` and
-`madlad400-3b-mt-q4_k.gguf`. Worse than a stale table: the card's own
-copy-paste examples (lines 44/47/52/57) all say `…-q8_0.gguf`, so anyone
-following the quickstart 404s. `-m auto` is unaffected — the registry points at
-q4_k — so this only bites manual downloads, which is everyone reading the card.
+Reporter: only `q4_k` was on `cstr/madlad400-3b-mt-GGUF`, though the README
+listed F16 and Q8_0 — and the card's own quickstart told you to download
+`…-q8_0.gguf`, which 404'd. Both files are now published, and madlad went from
+having **no diff-harness coverage at all** to a full per-stage table.
 
-**Kernel written and ready to push: `tools/kaggle/madlad-quants/`.** Not run
-yet — pushing burns GPU quota and it publishes to a public repo, so it wants a
-deliberate go-ahead.
+**Per-stage cosine vs the PyTorch blueprint** (`crispasr-diff madlad <gguf>
+<ref>`; 14 stages, encoder → cross-attention → decoder → step-0 logits):
 
-Why Kaggle at all: there is no GPU compute in this job (the converter is numpy,
-`crispasr-quantize` streams tensors at ~500 MB RAM) — it is 11.76 GB of source
-down and ~8.8 GB of artifacts up, and Kaggle CPU workers have no internet, so a
-GPU kernel is the only way to get the fast link.
+| | worst cosine | step-0 argmax |
+|---|---|---|
+| F16 | **1.000000** (every stage) | MATCH |
+| Q8_0 | 0.999894 | MATCH |
+| Q4_K | 0.993328 | MATCH |
 
-What it does, in this order, so a late failure cannot lose an early artifact:
+F16 at 1.000000 on all 14 says the T5 port is faithful to HF's semantics; the
+quants then degrade exactly in the expected order, and all three still pick the
+same first token. `enc_pos_bias` is bit-exact (max_abs 0.00000) at every
+precision, which is the relative-position-bucket logic — encoder-bidirectional
+vs decoder-causal — confirming itself.
 
-    download google/madlad400-3b-mt (11.76 GB fp32)
-      → convert-madlad-to-gguf.py → F16 (~5.7 GB) → VALIDATE → upload → rm source
-      → crispasr-quantize q8_0     → Q8_0 (~3.1 GB) → VALIDATE → upload → done
+Shipped: `tools/reference_backends/madlad.py` (lazy per-tensor walk of the
+11.76 GB fp32 checkpoint), `t5_translate_diff()` in `src/t5_translate.cpp`, the
+`madlad`/`t5` arm in `crispasr-diff`, and `tools/kaggle/madlad-quants/` which
+produced and validated everything. Reference archive:
+`cstr/madlad400-3b-mt-GGUF/madlad400-3b-mt-ref.gguf` (1.5 MB).
 
-Notes for whoever runs it:
+**Follow-ups this left open:**
 
-- **It pins release v0.8.25, not the v0.8.6 the other quant kernels use.** madlad
-  landed in v0.8.16, so the older tarball has no `--backend madlad` and would
-  fail at validation after doing all the work.
-- **Validation is three real translations** (en→de, en→fr, fr→en), and each must
-  exit 0, produce non-empty output, hit an expected substring, and NOT echo the
-  source back. A GGUF that loads is not a GGUF that works.
-- `examples/crispasr-quantize/main.cpp` has **no `t5`/madlad rule**, so Q8_0
-  takes the generic path — the same one that produced the published Q4_K. The
-  validation step is what proves that was right.
-- Peak disk ~21 GB, staged under `/tmp` (~70 GB ephemeral layer), not
-  `/kaggle/working` (~20 GB cap).
-
-**If we decide NOT to produce the files, the card must be corrected instead** —
-promising two artifacts that do not exist, in the quickstart, is the actual
-defect the reporter hit.
-
-### The `-ref.gguf` idea — not free, and worth doing on its own
-
-Baking a per-stage reference alongside the quants was floated. The kernel cannot
-just add it: **madlad has no diff-harness arm at all** — no
-`tools/reference_backends/madlad.py`, not in `REGISTERED_BACKENDS`, and no
-`else if (backend_name == "madlad")` in `examples/cli/crispasr_diff_main.cpp`.
-Writing the dumper is the work; running it is the easy part. Two constraints to
-design around:
-
-- the source is **fp32 and 11.76 GB** against Kaggle's ~13 GB RAM, so the dumper
-  must load lazily (`safe_open(..., framework="pt")`, one layer at a time) — a
-  plain `from_pretrained` will OOM;
-- T5 is encoder-decoder, so the stages that matter are the encoder stack, the
-  decoder self-attention and the **cross-attention** — the last is where
-  encoder-decoder ports usually go wrong and is precisely what a per-stage diff
-  would catch. madlad has no per-stage coverage today, so this has real value
-  beyond the issue.
+- ⚠ **The reference archive is in the MODEL repo, not
+  `cstr/crispasr-regression-fixtures`**, which is where the convention puts them
+  (`tests/regression/README.md`). It works where it is and the kernel points at
+  it, but it should be moved or mirrored, and pinned by `fixture_ref_path` so CI
+  can use it.
+- **Greedy decode does not always terminate cleanly on short inputs.** The
+  fr→en validation case translated correctly ("Hello world!") and then ran on
+  into a long repeat loop of digits. Validation passed — it asks whether the
+  model translated, which it did — but that is a real decode-quality signal
+  worth its own look (`core_repeat` / `core_ngram::fix_loops` exist for exactly
+  this and madlad does not use them).
+- **No `t5`/madlad rule in `examples/crispasr-quantize/main.cpp`.** Q8_0 took
+  the generic path and measures fine, so nothing is broken — but the numbers
+  above are the first evidence anyone has that the generic path is right for
+  this architecture, and a rule that keeps the embedding/lm_head at higher
+  precision might close the Q4_K gap (its worst stages are `enc_out` 0.9937 and
+  `cross_v` 0.9933).
+- The kernel builds from source (the diff arm postdates v0.8.25) and the ccache
+  dataset did **not** warm — `ccache_hits: 0` on both runs, ~11 min of build
+  each time. `kh.export_ccache_tar()` now writes `ccache.tar` to the output, so
+  refreshing `chr1str/crispasr-ccache` from it would pay for itself.
 
 ## OPEN 2026-08-05 — miotts writes a 24 kHz WAV header for 44.1 kHz audio
 
