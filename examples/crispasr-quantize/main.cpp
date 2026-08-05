@@ -626,6 +626,26 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                __func__);
     }
 
+    // t5 / MADLAD-400 (#333). Two tensors carry the whole 256K-token vocabulary
+    // and are the only ones whose rounding lands directly on the output
+    // distribution: `shared.embed.weight` (every decoder step reads a row of it)
+    // and `lm_head.weight` (the logits ARE a product with it — MADLAD is
+    // tie_word_embeddings=false, so this is a second 256000x1024 matrix, not an
+    // alias). They are ~40% of the file, so keeping them at source precision
+    // costs real size — but the per-stage diff says exactly where the Q4_K loss
+    // is concentrated: enc_embed 0.9974 and enc_out 0.9937 against 1.000000 at
+    // F16, and those are embedding-driven. The 32+32 mat-mul blocks quantize
+    // cleanly (0.99998+ at every depth), which is the usual shape: quantize the
+    // big stacks, keep the load-bearing lookup tables.
+    const bool is_t5 = (arch == "t5");
+    const char* env_t5_all = std::getenv("CRISPASR_T5_QUANT_ALL");
+    const bool t5_quant_all = is_t5 && env_t5_all && *env_t5_all && *env_t5_all != '0';
+    if (is_t5 && !t5_quant_all) {
+        printf("%s: t5 — keeping shared.embed.* and lm_head.* at source precision "
+               "(override with CRISPASR_T5_QUANT_ALL=1)\n",
+               __func__);
+    }
+
     const bool is_parakeet = (arch == "parakeet");
     bool parakeet_is_rnnt = false;
     if (is_parakeet) {
@@ -829,6 +849,7 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             !(is_gigaam && !gigaam_quant_all &&
               (sname.find("joint.") == 0 || sname.find("decoder.") == 0 || sname.find("head.ctc.") == 0 ||
                sname.find("encoder.pre.") == 0 || sname.find("preprocessor.") == 0)) &&
+            !(is_t5 && !t5_quant_all && (sname.find("shared.embed") == 0 || sname.find("lm_head") == 0)) &&
             !(is_tada && !tada_quant_all && (sname.find("talker.token_embd") == 0 || sname.find("tada.") == 0)) &&
             ([&]() {
                 if (!is_tada || tada_quant_all || (tada_keep_head == 0 && tada_keep_tail == 0))

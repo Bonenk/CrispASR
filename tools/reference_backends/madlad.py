@@ -66,6 +66,7 @@ DEFAULT_STAGES = [
     "dec_out",
     "logits_step0",
     "greedy_tokens",
+    "greedy_hit_eos",
     "generated_text",
 ]
 
@@ -291,8 +292,16 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str],
         gen.append(nxt)
         dec_ids.append(nxt)
 
+    # Did the BLUEPRINT stop on its own? This is the question that decides
+    # whether a runaway decode in the C++ is a port bug or the model's own
+    # behaviour, and it costs nothing to record here (#333).
+    hit_eos = len(gen) < n_steps
+    print(f"  madlad reference: {len(gen)} tokens, "
+          f"{'hit EOS' if hit_eos else f'RAN TO THE {n_steps}-STEP CAP (no EOS)'}")
     if "greedy_tokens" in stages:
         out["greedy_tokens"] = np.asarray(gen, dtype=np.float32)
+    if "greedy_hit_eos" in stages:
+        out["greedy_hit_eos"] = np.asarray([1.0 if hit_eos else 0.0], dtype=np.float32)
     if "generated_text" in stages:
         txt = sp.decode(gen)
         print(f"  madlad reference: {txt!r}")
