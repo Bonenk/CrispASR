@@ -85,6 +85,18 @@ before the fix. `g2p_en::style` now separates the CONSUMER's conventions from th
 dictionary, because one context serves both piper and Kokoro's fallback and
 conflating them is what made a per-context flag the wrong shape.
 
+Two more landed on top. **Acronyms** — `U.S.A.` phonemized as `jˈu.ˈɛs.ɐ.`, so
+the model paused INSIDE the word and the trailing "a" was read as the article;
+misaki's `get_NNP` spells the letters and promotes only the last one, and the
+readings needed their own table because "A" the letter and "a" the article
+collide once the lexicon key is lowercased. That table is also what keeps the
+path off for piper — it is empty there, so no flag was needed. **de/fr/es** had
+the identical punctuation defect (three separate tokenizers, three separate
+join loops) and Kokoro ships voices for all three; with no misaki to compare
+against, the default was flipped on a round-trip A/B instead — German word
+accuracy 70.6% → 78.4% over 3 sentences × 2 voices, one clip regressing, the
+old path kept behind `CRISPASR_KOKORO_PUNCT=0`.
+
 **#316 — first the numbers, then the units beside them.** `g2p_de`, `g2p_fr` and
 `g2p_es` had no number path at all: digits are in no pronunciation dictionary
 and no letter-to-sound rule, so a numeric token phonemized to the EMPTY string
