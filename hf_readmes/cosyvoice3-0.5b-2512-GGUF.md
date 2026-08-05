@@ -79,7 +79,17 @@ crispasr -m cosyvoice3-llm-rl-q4_k.gguf --backend cosyvoice3-tts \
     --tts "The northern lights can be heard as well as seen." --tts-output out.wav
 ```
 
-Both are published here; keep whichever you prefer and delete the other.
+CrispASR also ships `--backend cosyvoice3-tts-rl` (aliases `cosyvoice3-rl`,
+`cv3-rl`): the same engine, wired so that `-m auto` fetches the RL talker and
+reuses the shared companions.
+
+```bash
+crispasr --backend cosyvoice3-tts-rl -m auto \
+    --voice fleurs-en --i-have-rights \
+    --tts "The northern lights can be heard as well as seen." --tts-output out.wav
+```
+
+Both talkers are published here; keep whichever you prefer and delete the other.
 
 Pick **one LLM + one flow + HiFT + voices**. The smallest viable
 combo is `llm-q4_k + flow-q8_0 + hift-f16 + voices` at **745 MB
