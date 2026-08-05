@@ -316,6 +316,26 @@ catch_discover_tests(test-cpu-ops-to-f32
     PROPERTIES LABELS "unit"
 )
 
+# The --gpu-backend cpu short-circuit (CrispEmbed T18 sync) + the Metal
+# pipeline-cache cap policy (PLAN #88 follow-up). Header-only helpers; links
+# ggml for the backend registry. The legacy-arm case is the red-gate proof:
+# CRISPASR_GPU_PREF_CPU_LEGACY=1 reproduces the pre-fix fall-through.
+add_executable(test-gpu-backend-pref
+    test-gpu-backend-pref.cpp
+)
+target_include_directories(test-gpu-backend-pref PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+)
+target_link_libraries(test-gpu-backend-pref PRIVATE
+    Catch2::Catch2WithMain
+    ggml
+)
+catch_discover_tests(test-gpu-backend-pref
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # Regression guard for polyphase resampler gain compensation.
 add_executable(test-audio-resample
     test-audio-resample.cpp

@@ -2338,11 +2338,17 @@ int main(int argc, char** argv) {
         crispasr_print_full_diagnostics(stderr);
     }
 
-    if (params.use_gpu && params.gpu_backend != "cpu") {
-        ggml_backend_load_all();
+    if (params.use_gpu) {
+        if (params.gpu_backend != "cpu") {
+            ggml_backend_load_all();
+        }
         // Issue #214 — propagate --gpu-backend preference so every
         // backend's init picks the right GPU device instead of the
-        // highest-priority one (CUDA over Vulkan).
+        // highest-priority one (CUDA over Vulkan). "cpu" is propagated
+        // too: crispasr_init_gpu_backend() short-circuits on it, where it
+        // previously fell through to ggml_backend_init_best() — i.e. the
+        // statically-linked Metal backend, which load_all-skipping alone
+        // never prevented.
         if (!params.gpu_backend.empty()) {
             crispasr_set_gpu_backend_pref(params.gpu_backend.c_str());
         }
