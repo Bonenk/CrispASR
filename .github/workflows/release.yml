@@ -81,7 +81,7 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ libopenblas-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ patchelf libopenblas-dev
 
       - name: Build
         run: |
@@ -101,13 +101,20 @@ jobs:
           # dynamic OpenBLAS), so without this the tarball does not START on a
           # machine that lacks it. RUNPATH is $ORIGIN, so a copy beside the
           # binary resolves. Verified against the published v0.8.25 artifact.
-          bash scripts/bundle-openblas.sh release/crispasr-linux-x86_64 || true
           # Assert the SHIPPED artifact, not the configure log: a silent scalar
           # fallback used to be indistinguishable from a green run.
           if objdump -p release/crispasr-linux-x86_64/crispasr | grep -q 'NEEDED.*libopenblas'; then
             test -f release/crispasr-linux-x86_64/libopenblas.so.0 || {
               echo "::error::crispasr needs libopenblas.so.0 but it is not bundled — the tarball will not run without OpenBLAS installed"; exit 1; }
           fi
+          # Self-contained: rewrite RUNPATH to $ORIGIN (v0.8.25 shipped a leaked
+          # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
+          # could not find its own bundled libc2pa_c.so) and copy in the non-system
+          # dependency closure — libopenblas AND libgomp, per CrispASR #296.
+          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64
+          # Then assert it: any DT_NEEDED that is neither bundled nor base-system
+          # means the loader dies before main() and the process exits 127 silently.
+          python3 scripts/check-bundled-deps.py release/crispasr-linux-x86_64
           cd release && tar czf crispasr-linux-x86_64.tar.gz crispasr-linux-x86_64/
 
       - uses: actions/upload-artifact@v4
@@ -180,7 +187,7 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ libopenblas-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ patchelf libopenblas-dev
 
       - name: Build
         run: |
@@ -197,6 +204,14 @@ jobs:
           cp build/bin/crispasr release/crispasr-linux-x86_64-avx512/
           cp build/bin/crispasr-quantize release/crispasr-linux-x86_64-avx512/
           bash scripts/bundle-c2pa.sh release/crispasr-linux-x86_64-avx512 || true
+          # Self-contained: rewrite RUNPATH to $ORIGIN (v0.8.25 shipped a leaked
+          # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
+          # could not find its own bundled libc2pa_c.so) and copy in the non-system
+          # dependency closure — libopenblas AND libgomp, per CrispASR #296.
+          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-avx512
+          # Then assert it: any DT_NEEDED that is neither bundled nor base-system
+          # means the loader dies before main() and the process exits 127 silently.
+          python3 scripts/check-bundled-deps.py release/crispasr-linux-x86_64-avx512
           cd release && tar czf crispasr-linux-x86_64-avx512.tar.gz \
               crispasr-linux-x86_64-avx512/
 
@@ -233,7 +248,7 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ libopenblas-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ patchelf libopenblas-dev
 
       - name: Install CUDA Toolkit 12.8.0
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -264,6 +279,14 @@ jobs:
           cp build/bin/crispasr release/crispasr-linux-x86_64-cuda/
           cp build/bin/crispasr-quantize release/crispasr-linux-x86_64-cuda/
           bash scripts/bundle-c2pa.sh release/crispasr-linux-x86_64-cuda || true
+          # Self-contained: rewrite RUNPATH to $ORIGIN (v0.8.25 shipped a leaked
+          # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
+          # could not find its own bundled libc2pa_c.so) and copy in the non-system
+          # dependency closure — libopenblas AND libgomp, per CrispASR #296.
+          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-cuda
+          # Then assert it: any DT_NEEDED that is neither bundled nor base-system
+          # means the loader dies before main() and the process exits 127 silently.
+          python3 scripts/check-bundled-deps.py release/crispasr-linux-x86_64-cuda \n              --allow 'libcuda.so.*' --allow 'libcudart.so.*' --allow 'libcublas*.so.*' --allow 'libnv*.so.*'
           cd release && tar czf crispasr-linux-x86_64-cuda.tar.gz crispasr-linux-x86_64-cuda/
           ls -lh crispasr-linux-x86_64-cuda.tar.gz
 
@@ -299,7 +322,7 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ libopenblas-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ patchelf libopenblas-dev
 
       - name: Install CUDA Toolkit 13.0.0
         uses: Jimver/cuda-toolkit@v0.2.35
@@ -330,6 +353,14 @@ jobs:
           cp build/bin/crispasr release/crispasr-linux-x86_64-cuda13/
           cp build/bin/crispasr-quantize release/crispasr-linux-x86_64-cuda13/
           bash scripts/bundle-c2pa.sh release/crispasr-linux-x86_64-cuda13 || true
+          # Self-contained: rewrite RUNPATH to $ORIGIN (v0.8.25 shipped a leaked
+          # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
+          # could not find its own bundled libc2pa_c.so) and copy in the non-system
+          # dependency closure — libopenblas AND libgomp, per CrispASR #296.
+          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-cuda13
+          # Then assert it: any DT_NEEDED that is neither bundled nor base-system
+          # means the loader dies before main() and the process exits 127 silently.
+          python3 scripts/check-bundled-deps.py release/crispasr-linux-x86_64-cuda13 \n              --allow 'libcuda.so.*' --allow 'libcudart.so.*' --allow 'libcublas*.so.*' --allow 'libnv*.so.*'
           cd release && tar czf crispasr-linux-x86_64-cuda13.tar.gz crispasr-linux-x86_64-cuda13/
           ls -lh crispasr-linux-x86_64-cuda13.tar.gz
 
@@ -369,7 +400,7 @@ jobs:
         # The slim rocm/dev image ships the HIP compiler + runtime but NOT the
         # math libraries; GGML_HIP needs hipBLAS/rocBLAS (and their cmake config
         # files) or `find_package(hipblas)` fails at configure time (#196).
-        run: apt-get install -y cmake g++ hipblas-dev rocblas-dev
+        run: apt-get install -y cmake g++ patchelf hipblas-dev rocblas-dev
 
       - name: Build
         run: |
@@ -394,6 +425,14 @@ jobs:
           cp build/bin/crispasr release/crispasr-linux-x86_64-hip/
           cp build/bin/crispasr-quantize release/crispasr-linux-x86_64-hip/
           bash scripts/bundle-c2pa.sh release/crispasr-linux-x86_64-hip || true
+          # Self-contained: rewrite RUNPATH to $ORIGIN (v0.8.25 shipped a leaked
+          # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
+          # could not find its own bundled libc2pa_c.so) and copy in the non-system
+          # dependency closure — libopenblas AND libgomp, per CrispASR #296.
+          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-hip
+          # Then assert it: any DT_NEEDED that is neither bundled nor base-system
+          # means the loader dies before main() and the process exits 127 silently.
+          python3 scripts/check-bundled-deps.py release/crispasr-linux-x86_64-hip \n              --allow 'libamdhip64.so.*' --allow 'librocblas.so.*' --allow 'libhsa*.so.*'
           cd release && tar czf crispasr-linux-x86_64-hip.tar.gz crispasr-linux-x86_64-hip/
           ls -lh crispasr-linux-x86_64-hip.tar.gz
 
@@ -511,7 +550,7 @@ jobs:
       - name: Install deps + Vulkan SDK
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++ libopenblas-dev
+          sudo apt-get install -y cmake g++ patchelf libopenblas-dev
           # Install LunarG Vulkan SDK (provides libvulkan-dev + glslc).
           # Ubuntu 22.04 doesn't ship a glslc package; the SDK is the
           # reliable way to get both headers and the shader compiler.
@@ -541,6 +580,14 @@ jobs:
           cp build/bin/crispasr release/crispasr-linux-x86_64-vulkan/
           cp build/bin/crispasr-quantize release/crispasr-linux-x86_64-vulkan/
           bash scripts/bundle-c2pa.sh release/crispasr-linux-x86_64-vulkan || true
+          # Self-contained: rewrite RUNPATH to $ORIGIN (v0.8.25 shipped a leaked
+          # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
+          # could not find its own bundled libc2pa_c.so) and copy in the non-system
+          # dependency closure — libopenblas AND libgomp, per CrispASR #296.
+          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-vulkan
+          # Then assert it: any DT_NEEDED that is neither bundled nor base-system
+          # means the loader dies before main() and the process exits 127 silently.
+          python3 scripts/check-bundled-deps.py release/crispasr-linux-x86_64-vulkan \n              --allow 'libvulkan.so.*'
           cd release && tar czf crispasr-linux-x86_64-vulkan.tar.gz crispasr-linux-x86_64-vulkan/
           ls -lh crispasr-linux-x86_64-vulkan.tar.gz
 
@@ -571,7 +618,7 @@ jobs:
           ref: ${{ inputs.tag || github.ref }}
 
       - name: Install deps
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ libopenblas-dev
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ patchelf libopenblas-dev
 
       - name: Build
         run: |
@@ -587,11 +634,18 @@ jobs:
           bash scripts/bundle-c2pa.sh release/crispasr-linux-arm64 || true
           # #296, same as the x86_64 tarball: apt's OpenBLAS is dynamic, so
           # without this the arm64 tarball will not start on a host that lacks it.
-          bash scripts/bundle-openblas.sh release/crispasr-linux-arm64 || true
           if objdump -p release/crispasr-linux-arm64/crispasr | grep -q 'NEEDED.*libopenblas'; then
             test -f release/crispasr-linux-arm64/libopenblas.so.0 || {
               echo "::error::crispasr needs libopenblas.so.0 but it is not bundled — the tarball will not run without OpenBLAS installed"; exit 1; }
           fi
+          # Self-contained: rewrite RUNPATH to $ORIGIN (v0.8.25 shipped a leaked
+          # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
+          # could not find its own bundled libc2pa_c.so) and copy in the non-system
+          # dependency closure — libopenblas AND libgomp, per CrispASR #296.
+          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-arm64
+          # Then assert it: any DT_NEEDED that is neither bundled nor base-system
+          # means the loader dies before main() and the process exits 127 silently.
+          python3 scripts/check-bundled-deps.py release/crispasr-linux-arm64
           cd release && tar czf crispasr-linux-arm64.tar.gz crispasr-linux-arm64/
 
       - uses: actions/upload-artifact@v4
