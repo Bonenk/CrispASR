@@ -99,11 +99,15 @@ Still open from the issue's asks:
    `docs/contributing.md` §5b.3 records the duty. Go / Dart / Python don't
    expose `input_sample_rate` either; extend all four getters together there
    if anyone asks.
-2. **Same-benchmark DER for the pyannote+embedder path** — already tracked as
-   the #326 NOW item below; the issue asked for cross-method benchmarks, and
-   foxnose-vs-upstream numbers exist in `docs/foxnose-diarize/PLAN.md` while
-   the pyannote path has throughput numbers (#326) but no DER on the same 8
-   VoxConverse files.
+2. ~~**Same-benchmark DER for the pyannote+embedder path**~~ — **already
+   existed**; the note here originally claimed the pyannote path had no DER
+   on the shared benchmark, which was wrong. The cross-method table lives in
+   the #326 NOW section below and in `docs/diarization-speakers.md` "#326":
+   pyannote+embedder **7.81 %** vs foxnose **7.32 %** mean DER on the same 8
+   VoxConverse dev files (whisper-tiny segments, 0.25 s collar), with the
+   3.18 %-vs-7.32 % foxnose discrepancy explained there (own turns vs ASR
+   segments as speech regions). Nothing left to run for #332; the estimator
+   under-count remains #326's open accuracy item.
 
 ## NOW — #326 diarization: the count estimator is the last accuracy item
 
