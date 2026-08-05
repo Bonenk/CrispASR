@@ -3496,7 +3496,11 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
     }
 #endif
 #ifdef CA_HAVE_COSYVOICE3
-    if (s->backend == "cosyvoice3-tts" || s->backend == "cosyvoice3" || s->backend == "cosyvoice3-llm") {
+    // `cosyvoice3-tts-rl` names the same engine with upstream's RL talker
+    // checkpoint; only the LLM GGUF differs, so it collapses to one backend
+    // here exactly like the other aliases (#334).
+    if (s->backend == "cosyvoice3-tts" || s->backend == "cosyvoice3" || s->backend == "cosyvoice3-llm" ||
+        s->backend == "cosyvoice3-tts-rl" || s->backend == "cosyvoice3-rl") {
         s->backend = "cosyvoice3-tts";
         cosyvoice3_tts_context_params p = cosyvoice3_tts_context_default_params();
         p.n_threads = s->n_threads;
@@ -4414,7 +4418,7 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
     list += ",voxcpm2-vae";
 #endif
 #ifdef CA_HAVE_COSYVOICE3
-    list += ",cosyvoice3-tts";
+    list += ",cosyvoice3-tts,cosyvoice3-tts-rl";
 #endif
 #ifdef CA_HAVE_INDEXTTS
     list += ",indextts";

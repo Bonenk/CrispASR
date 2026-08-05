@@ -1218,6 +1218,17 @@ constexpr Entry k_registry[] = {
      "cosyvoice3-flow-q8_0.gguf",
      "https://huggingface.co/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/main/cosyvoice3-flow-q8_0.gguf",
      "~361 MB"},
+    // Same engine, upstream's OTHER talker: llm.rl.pt, reinforcement-learning
+    // tuned for speech quality, pronunciation accuracy and generation
+    // stability. Only the LLM differs — flow / HiFT / CAMPPlus / s3tok /
+    // voices are the shared companions below, so `--backend cosyvoice3-tts-rl
+    // -m auto` swaps one 384 MB file (#334).
+    {"cosyvoice3-tts-rl", "cosyvoice3-llm-rl-q4_k.gguf",
+     "https://huggingface.co/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/main/cosyvoice3-llm-rl-q4_k.gguf",
+     "~384 MB",
+     "cosyvoice3-flow-q8_0.gguf",
+     "https://huggingface.co/cstr/cosyvoice3-0.5b-2512-GGUF/resolve/main/cosyvoice3-flow-q8_0.gguf",
+     "~361 MB"},
     // FastPitch: NVIDIA non-autoregressive parallel TTS (single speaker,
     // English, 22 kHz). ~60M params (FastPitch + HiFi-GAN in one GGUF).
     // Deterministic — no sampling, same input always produces same output.
@@ -1342,6 +1353,7 @@ constexpr ExtraList k_extras[] = {
     {"dots-tts", k_dots_tts_extras},
     {"vibevoice-tts", k_vibevoice_tts_extras},
     {"cosyvoice3-tts", k_cosyvoice3_tts_extras},
+    {"cosyvoice3-tts-rl", k_cosyvoice3_tts_extras},
     {"qwen3-tts", k_qwen3_tts_base_extras},
     {"qwen3-tts-1.7b-base", k_qwen3_tts_base_extras},
     {"tada", k_tada_3b_extras},

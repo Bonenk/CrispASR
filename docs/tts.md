@@ -378,19 +378,30 @@ The output is always 24 kHz mono regardless of the reference.
 ### Base vs RL talker
 
 `FunAudioLLM/Fun-CosyVoice3-0.5B-2512` ships two talker checkpoints: `llm.pt`
-(pre-trained) and `llm.rl.pt` (reinforcement-learning tuned for stability and
-pronunciation accuracy). Only the talker differs — flow, HiFT, CAMPPlus, the
-speech tokenizer and the voice bank are shared. Convert the RL talker with:
+(pre-trained) and `llm.rl.pt` (reinforcement-learning tuned by the authors for
+speech quality, pronunciation accuracy and generation stability). Only the
+talker differs — flow, HiFT, CAMPPlus, the speech tokenizer and the voice bank
+are shared, so the RL build swaps exactly one 384 MB file:
+
+```bash
+./build/bin/crispasr --backend cosyvoice3-tts-rl -m auto \
+    --voice fleurs-en --i-have-rights \
+    --tts "The northern lights can be heard as well as seen." --tts-output out.wav
+```
+
+`cosyvoice3-tts-rl` is the same engine; the alias exists so `-m auto` fetches
+`cosyvoice3-llm-rl-q4_k.gguf` instead of the base talker. Both live in
+[`cstr/cosyvoice3-0.5b-2512-GGUF`](https://huggingface.co/cstr/cosyvoice3-0.5b-2512-GGUF)
+(F16 and Q4_K), and pointing `-m` at either file directly works too — the
+companions are found by name.
+
+To rebuild either talker from the upstream checkpoint:
 
 ```bash
 python models/convert-cosyvoice3-to-gguf.py \
     --input FunAudioLLM/Fun-CosyVoice3-0.5B-2512 --output-dir out \
     --llm-checkpoint llm.rl.pt --skip flow --skip hift   # → cosyvoice3-llm-rl-f16.gguf
 ```
-
-Then quantize it and drop it beside the shared companions; `-m
-…/cosyvoice3-llm-rl-q4_k.gguf` picks the companions up by name, so no other
-flag changes.
 
 ## Output language and cross-lingual cloning (`-tl` / `-sl`)
 
