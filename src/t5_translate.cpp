@@ -13,6 +13,7 @@
 
 #include "t5_translate.h"
 #include "core/beam_decode.h"
+#include "core/repeat_break.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (§232 t5 GPU path)
 #include "core/crispasr_env.h"
@@ -1265,6 +1266,34 @@ extern "C" char* t5_translate(struct t5_translate_context* ctx, const char* text
             if (best_id == hp.eos_token_id)
                 break;
             dec_ids.push_back(best_id);
+
+            // #333: stop a degenerate greedy cycle instead of burning the whole
+            // token budget on it. MADLAD does this on short inputs — fr→en
+            // "Bonjour le monde!" translates correctly and then emits a digit
+            // loop to the cap.
+            //
+            // ⚠ This DEVIATES FROM THE BLUEPRINT ON PURPOSE, which is why it is
+            // gated. The PyTorch reference was measured on the same input and
+            // runs away identically (60 tokens, no EOS, byte-identical string),
+            // so this is not a parity fix — the port already matches. It is a
+            // product decision that a repeated 1-8 token cycle is never the
+            // wanted output. CRISPASR_T5_REPEAT_BREAK=0 restores exact
+            // blueprint behaviour for anyone diffing against HF.
+            static const bool repeat_break = [] {
+                const char* v = std::getenv("CRISPASR_T5_REPEAT_BREAK");
+                return !(v && *v && std::strcmp(v, "0") == 0);
+            }();
+            if (repeat_break && (int)dec_ids.size() - prompt_len >= 8 && core_repeat::tail_is_repetition(dec_ids)) {
+                if (ctx->params.verbosity >= 1)
+                    fprintf(stderr,
+                            "t5: decode loop detected after %d tokens — stopping early "
+                            "(CRISPASR_T5_REPEAT_BREAK=0 to disable)\n",
+                            (int)dec_ids.size() - prompt_len);
+                // Drop the repeated tail so the caller gets the good prefix.
+                while ((int)dec_ids.size() > prompt_len + 1 && core_repeat::tail_is_repetition(dec_ids, 2, 8))
+                    dec_ids.pop_back();
+                break;
+            }
 
             if (ctx->params.verbosity >= 2) {
                 fprintf(stderr, "t5[dec]: step=%d tok=%d '%s'\n", step, best_id,
