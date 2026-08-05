@@ -510,17 +510,66 @@ candidate's isolated reading against two carrier frames and accepting only a
 pure stress loss. Token agreement with espeak's sentence output:
 **45.9% -> 87.1%**.
 
-**It ships OFF (`CRISPASR_G2P_DE_UNSTRESS=1`), and the reason matters more than
-the flag.** That 41-point phoneme win did not appear in the round-trip: arm D is
-1.2 pts *below* arm A, which over 16 clips is about three words — inside the
-noise. So the evidence says the phonemes are much closer to the reference and
-says **nothing** about whether it sounds better, because word accuracy measures
-INTELLIGIBILITY and this change is about NATURALNESS. The English half of #316
-had a metric that could see its defect (an ASR hearing "eye" for "I"); this one
-does not. Kept and gated per the A/B rule rather than defaulted (not proven) or
-deleted (plausible, and the phoneme evidence is strong). What would settle it is
-a listening test, or knowing what dida-80b actually trained on — its model card
-is gated, so that could not be read.
+**Then the training recipe was found, and it settles the question.**
+`dida-80b/kokoro-deutsch` (the repo, not the gated model card) ships
+`scripts/prepare_dataset.py`, and it phonemizes with
+
+    from misaki import espeak
+    g2p = espeak.EspeakG2P(language="de")
+
+i.e. **whole sentences through espeak**, so espeak's sentence-level de-stressing
+IS the training data and our citation form is a spelling the model never saw.
+The newer `kikiri-tts` models say the same thing in their card ("G2P: misaki
+0.9.4 + espeak-ng"). So un-stressing ships **ON** on source evidence, not on the
+round-trip — which could not resolve it either way (−1.2 pts, ~3 words over 16
+clips). `CRISPASR_G2P_DE_UNSTRESS=0` reverts.
+
+### Reading the recipe turned up two more things
+
+`misaki/espeak.py::EspeakG2P` is:
+
+    EspeakBackend(language="de", preserve_punctuation=True, with_stress=True,
+                  tie='^', language_switch='remove-flags')
+
+then a map collapsing every TIED sequence to one codepoint: `t^s`→`ʦ`,
+`a^ɪ`→`I`, `a^ʊ`→`W`, `ɔ^ɪ`→`Y`, `t^ʃ`→`ʧ`, `d^ʒ`→`ʤ`, `e^ɪ`→`A`, `o^ʊ`→`O`.
+`preserve_punctuation=True` independently confirms the punctuation fix above.
+
+**(1) `ʏ` IS NOT IN THE GERMAN MODEL'S VOCABULARY — we were deleting it.**
+Found by scanning our German output against the GGUF's own
+`tokenizer.ggml.tokens`: two symbols we emit are absent, `ʏ` (U+028F) and the
+non-syllabic mark (U+032F). An absent symbol is not approximated by
+`kokoro_phonemes_to_ids`, it is **dropped** — so the vowel left every München,
+Frühstück, fünf, Stück, Glück, Küche, zurück. dida-80b hit the same wall and
+made the same substitution in their dataset script (`ʏ → y`, "the duration
+difference is learned from audio"), which is what confirms it. Same class as
+round 1's "the digits phonemized to the empty string and vanished".
+Measured on the real model, same binary, same voice, `--tts-phonemes` for the
+old spelling:
+
+    before:  "Menjen und FRISCH, fünf Stück Glück in der KERRE."
+    after:   "Männchen und FRÜHSTÜCK, fünf Stück Glück in der Kühe."
+
+Shipped ON unconditionally for German (`Dialect::DeVocab`) — an approximate
+vowel always beats a deleted one.
+
+**(2) The tied-alphabet collapse is right by the recipe and WRONG on the model
+we ship — gated OFF (`CRISPASR_KOKORO_DE_MISAKI_ALPHABET=1`).** Applying it took
+agreement with the recipe from 81.2% to 85.9% — on one sentence, byte-identical
+to it — and the ASR round-trip got 5.3 pts *worse*. Not a dropped-symbol
+problem: `ʦ ʣ W I Y A O Q ʧ ʤ` are all in the model's vocabulary, checked.
+The likeliest reading is that the hui base we ship predates this part of the
+recipe (the training repo's commits stop in April; the misaki fork was updated
+in July), so it is probably right for the newer `kikiri-tts` models and wrong
+here. Kept and gated rather than deleted, per the A/B rule. ⚠ It also has a
+real limitation of its own: our dictionary has no ties, so `ts`→`ʦ` is a
+blanket rewrite that cannot tell an affricate from a compound seam.
+**The clean fix for both is to regenerate `espeak_de.tsv` with `--tie`** — that
+removes the ambiguity and lets the collapse be exact.
+
+⚠ fr/es almost certainly have the same citation-stress defect, and possibly the
+same out-of-vocabulary symbols. The vocabulary scan is three lines and worth
+running for every non-English Kokoro model we ship.
 
 ⚠ fr/es almost certainly have the same citation-stress defect (same dictionary
 provenance; the same generator would work). Not investigated.

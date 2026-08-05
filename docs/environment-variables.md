@@ -139,6 +139,7 @@ These are not tied to a single backend.
 | `CRISPASR_KOKORO_G2P` | Kokoro G2P backend selection. |
 | `CRISPASR_KOKORO_MISAKI_IPA` | `0` disables the espeak-IPA → misaki-alphabet conversion Kokoro needs (#316), restoring the raw G2P spelling for A/B. On by default. |
 | `CRISPASR_G2P_DE_UNSTRESS` | `1` reads the German closed class the way espeak reads it in a SENTENCE (`sie` → `ziː`) instead of the citation form our per-word dictionary stores (`zˈiː`). Off by default: it takes phoneme agreement with espeak from 45.9% to 87.1%, but the ASR round-trip could not resolve a difference, and that metric measures intelligibility rather than naturalness (#316). |
+| `CRISPASR_KOKORO_DE_MISAKI_ALPHABET` | `1` applies misaki's tied-sequence collapse for German (`tsvˈaɪ` → `ʦvˈI`), which is what the published training recipe does. Off by default: it made the ASR round-trip worse on the `kokoro-de-hui-base` model we ship, which appears to predate that part of the recipe (#316). The `ʏ`→`y` vocabulary fixup is applied either way. |
 | `CRISPASR_KOKORO_PUNCT` | `0` drops punctuation from the phoneme string for the German/French/Spanish built-in G2Ps, restoring pre-0.8.26 behaviour for A/B. On by default: Kokoro's vocabulary contains `,.;:!?` and they are how it pauses (#316). English is not gated — it is settled against misaki. |
 
 ### Watermark / provenance

@@ -3324,6 +3324,29 @@ bool phonemize_cached(kokoro_context* ctx, const std::string& lang, const std::s
         const bool is_en = lang.empty() || lang.rfind("en", 0) == 0;
         if (is_en && misaki_ipa)
             out = core_phoneme::convert(out, core_phoneme::Dialect::Misaki);
+        // #316 German. Two separate things, and only the first is on:
+        //
+        // (a) VOCABULARY FIXUPS — always. `ʏ` is not in the German model's
+        //     178-token vocabulary, and a missing symbol is DROPPED, not
+        //     approximated, so we were deleting the vowel out of every
+        //     München, Frühstück, fünf, Glück and zurück. dida-80b's own
+        //     dataset script makes the same `ʏ`→`y` substitution.
+        //
+        // (b) misaki's TIED-SEQUENCE COLLAPSE (`ʦvˈI` for `tsvˈaɪ`) — opt-in,
+        //     CRISPASR_KOKORO_DE_MISAKI_ALPHABET=1. It is what the published
+        //     training recipe does and it moves our phonemes measurably closer
+        //     to it, but on the hui base we ship it made the ASR round-trip
+        //     WORSE, so it does not get the default on evidence we have.
+        //     See PLAN.md — this needs a listening test, and it is likely to
+        //     be right for the newer kikiri-tts models.
+        if (lang.rfind("de", 0) == 0) {
+            static const bool de_alphabet = [] {
+                const char* v = crispasr_env::get("CRISPASR_KOKORO_DE_MISAKI_ALPHABET");
+                return v && *v && strcmp(v, "0") != 0;
+            }();
+            out = core_phoneme::convert(out,
+                                        de_alphabet ? core_phoneme::Dialect::MisakiDe : core_phoneme::Dialect::DeVocab);
+        }
         ctx->phon_cache.insert(key, out);
         return true;
     }

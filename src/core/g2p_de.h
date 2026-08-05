@@ -645,17 +645,13 @@ struct context {
     // bug. Turning this on takes token agreement with espeak's sentence output
     // from 45.9% to 87.1%.
     //
-    // OFF by default anyway, and the reason is worth reading before you flip
-    // it: the phoneme-level win did NOT show up in the ASR round-trip
-    // (90.6% -> 89.4% word accuracy over 8 sentences x 2 voices — a ~3-word
-    // difference, i.e. inside the noise of that sample). So the evidence says
-    // "the phonemes are much closer to the reference" and says NOTHING about
-    // whether it sounds better, because word accuracy measures intelligibility
-    // and this change is about naturalness. The English half of #316 had a
-    // metric that could see the defect (an ASR hearing "eye" for "I"); this
-    // one does not, and a listening test is what would settle it.
-    // CRISPASR_G2P_DE_UNSTRESS=1 enables it. See core/g2p_de_unstressed.h.
-    bool unstress_function_words = false;
+    // ON by default since the training recipe was found: dida-80b/kokoro-deutsch
+    // phonemizes the WHOLE SENTENCE through espeak (misaki's
+    // `EspeakG2P(language="de")`), so espeak's sentence-level de-stressing is
+    // in the training data and the citation form is a spelling the model never
+    // saw. That is source evidence, not a preference.
+    // CRISPASR_G2P_DE_UNSTRESS=0 restores the citation forms for A/B.
+    bool unstress_function_words = true;
 };
 
 // ── Tokenizer ───────────────────────────────────────────────────────
