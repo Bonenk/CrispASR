@@ -171,21 +171,41 @@ is just not what the candidate count controls.
 - **UTF-8 truncation bug** in the probe log (`%.60s` cut mid-character, killed
   the Kaggle run via Python's stderr decode). Fixed + guarded.
 
+- **`prefers_vad()` for cohere** — and it was a bigger deal than "a plausible
+  quality win". The model transcribes SILENCE as speech: 10 s of pure digital
+  silence returns *"And I'm going to go ahead and do that."*, and 20 s of
+  trailing silence appends that same sentence to an otherwise perfect
+  `jfk.wav` transcript. (Low-level noise and a 440 Hz tone produce nothing, so
+  it is silence specifically.) A/B'd on real speech before flipping: on a 60 s
+  FLEURS clip the un-VAD'd run also cut mid-sentence, garbled a clause and
+  **dropped a whole sentence** the VAD run recovers — so it is content
+  recovery, not just a silence guard. Uses the existing >30 s safeguard.
+- **The cheaper probe** — encode once, decode per candidate. The two encode
+  blocks were already brace-delimited, so it is two `{` → `if (!reuse_enc) {`
+  with no re-indentation, and the cross-KV free/realloc lives *inside* the
+  second block so skipping it keeps the allocation live. 14-candidate A/B,
+  back-to-back and repeated in reverse order: **12 s → 4–5 s, byte-identical
+  output**. Gated `CRISPASR_COHERE_PROBE_REUSE_ENC=0`.
+- **`tools/gguf-add-merges.py`** — passed `sub_type=` to a `MetadataDetails`
+  that the installed gguf-py does not have, so it raised TypeError and could
+  not run at all. Now passes it only when the field exists; verified on a
+  synthetic glm-asr GGUF (merges land ARRAY/STRING, both pair- and string-form
+  inputs normalise, arch/vocab/tensors pass through).
+
 ### Open follow-ups
 
-1. **`prefers_vad()` for cohere.** cohereX makes VAD default because the model
-   hallucinates text over non-speech; our chunker splits at RMS minima but never
-   *drops* silence. Untested here, but a plausible quality win.
-2. **A cheaper probe.** The encoder output is language-independent, so one
-   encode + N decodes would replace N encodes — worth ~14× on the base model's
-   37 s. There is a clean seam at `const int T_enc = T_enc_total;` in
-   `cohere_transcribe_ex`. Still not attempted: extracting ~370 lines of
-   encoder/cross-KV graph code is only safe with a cohere GGUF to A/B against,
-   which the Mac now has (`cohere-transcribe-q4_k`, 1.5 GB).
-3. **`tools/gguf-add-merges.py` is broken** against the installed gguf-py: it
-   passes `sub_type=` to `MetadataDetails`, which that version does not have, so
-   it raises TypeError. One-line fix (drop the kwarg — the array element type is
-   inferred), untested here for want of a GLM-ASR GGUF.
+None tracked for cohere. Two things deliberately NOT done, with reasons:
+
+1. **Fresh-conversion vs published-f16 tensor equality** was never checked (it
+   would cost a 4.14 GB download to compare a converter run against an artifact
+   produced by an older converter). The republished files are guaranteed
+   byte-identical to their *pre-rewrite* selves by the tool's per-tensor sha256
+   `--verify`, which is the property that actually matters.
+2. **Silence-hallucination below the 30 s threshold** still bites: a 10 s
+   all-silence file transcribes as a sentence, because the auto-VAD safeguard
+   only arms on long audio. Fixing that means arming VAD on short audio too,
+   which costs a model download and latency on every short clip — a trade worth
+   deciding deliberately rather than folding into this work.
 
 ## LANDED 2026-08-05 — #334 cosyvoice3 WAV cloning (85d60ba9, 88c02788)
 
