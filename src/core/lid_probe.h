@@ -65,6 +65,24 @@ inline size_t utf8_length(const std::string& s) {
     return n;
 }
 
+// First `max_bytes` bytes, cut back to a codepoint boundary.
+//
+// For logging a probe transcript. printf's "%.60s" truncates at 60 BYTES and
+// will happily slice a multi-byte character in half, putting invalid UTF-8 on
+// stderr — which is not cosmetic: it crashed a Kaggle run outright, because
+// Python's subprocess decodes stderr as UTF-8 and raised UnicodeDecodeError
+// on the Greek candidate's severed lead byte (0xce). Any consumer that reads
+// our stderr as text hits the same thing, and only for non-Latin languages.
+inline std::string utf8_prefix(const std::string& s, size_t max_bytes) {
+    if (s.size() <= max_bytes)
+        return s;
+    size_t cut = max_bytes;
+    // A continuation byte is 10xxxxxx; walk back to the lead byte.
+    while (cut > 0 && ((unsigned char)s[cut] & 0xC0) == 0x80)
+        cut--;
+    return s.substr(0, cut);
+}
+
 // Whitespace-separated tokens, for languages that use spaces.
 inline std::vector<std::string> whitespace_tokens(const std::string& s) {
     std::vector<std::string> out;
