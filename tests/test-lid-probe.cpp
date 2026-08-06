@@ -18,6 +18,58 @@ TEST_CASE("lid_probe: utf8 length counts codepoints, not bytes", "[unit][lid]") 
     REQUIRE(std::string("مرحبا").size() == 10);
 }
 
+// Helper: is every byte sequence in `s` valid UTF-8? Deliberately strict —
+// that is exactly what a downstream text decoder does.
+static bool is_valid_utf8(const std::string& s) {
+    size_t i = 0;
+    while (i < s.size()) {
+        const unsigned char c = (unsigned char)s[i];
+        size_t n;
+        if ((c & 0x80) == 0x00)
+            n = 1;
+        else if ((c & 0xE0) == 0xC0)
+            n = 2;
+        else if ((c & 0xF0) == 0xE0)
+            n = 3;
+        else if ((c & 0xF8) == 0xF0)
+            n = 4;
+        else
+            return false;
+        if (i + n > s.size())
+            return false;
+        for (size_t k = 1; k < n; k++)
+            if (((unsigned char)s[i + k] & 0xC0) != 0x80)
+                return false;
+        i += n;
+    }
+    return true;
+}
+
+TEST_CASE("lid_probe: truncating a probe log never emits invalid UTF-8", "[unit][lid]") {
+    // Regression. The probe logged its per-candidate transcript with "%.60s",
+    // which cuts at 60 BYTES. For Greek/Arabic/CJK that lands mid-character
+    // and puts a severed lead byte on stderr. Not cosmetic: it killed a Kaggle
+    // run when Python decoded our stderr (UnicodeDecodeError on 0xce, Greek).
+    // Only non-Latin languages could trigger it — which is why local Latin
+    // testing never saw it.
+    const std::string greek = "Και γι' αυτό, αδελφέ Αμερικανέ, μη ρωτάτε τι μπορεί να κάνει";
+    const std::string arabic = "العاصفة شبه الاستوائية جيري تغادر الحافلات المحطة الداخلية";
+    const std::string cjk = "そして、私の仲間のアメリカ人よ、あなたの国があなたのために";
+
+    for (const auto& s : {greek, arabic, cjk}) {
+        REQUIRE(is_valid_utf8(s)); // the fixtures themselves are sane
+        for (size_t n = 1; n <= s.size() + 4; n++) {
+            const std::string cut = utf8_prefix(s, n);
+            REQUIRE(cut.size() <= s.size());
+            REQUIRE(is_valid_utf8(cut));
+            REQUIRE(s.compare(0, cut.size(), cut) == 0); // a true prefix
+        }
+    }
+    // ASCII and short strings pass through untouched.
+    REQUIRE(utf8_prefix("hello", 60) == "hello");
+    REQUIRE(utf8_prefix("", 10).empty());
+}
+
 TEST_CASE("lid_probe: no-space languages tokenise by character", "[unit][lid]") {
     REQUIRE(is_no_space_language("zh"));
     REQUIRE(is_no_space_language("ja"));

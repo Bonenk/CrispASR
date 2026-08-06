@@ -3398,8 +3398,11 @@ bool cohere_detect_language(struct cohere_context* ctx, const float* samples, in
             best_lang = lang;
         }
         if (params.verbosity > 0) {
-            fprintf(stderr, "cohere[lid]: %-3s len=%-4zu agree=%.2f div=%.2f score=%-8.0f :: %.60s\n", lang.c_str(),
-                    core_lid_probe::utf8_length(text), agree, core_lid_probe::diversity(text, lang), s, text.c_str());
+            // utf8_prefix, NOT "%.60s": a byte-truncated multi-byte character
+            // puts invalid UTF-8 on stderr and breaks any consumer decoding it.
+            const std::string shown = core_lid_probe::utf8_prefix(text, 60);
+            fprintf(stderr, "cohere[lid]: %-3s len=%-4zu agree=%.2f div=%.2f score=%-8.0f :: %s\n", lang.c_str(),
+                    core_lid_probe::utf8_length(text), agree, core_lid_probe::diversity(text, lang), s, shown.c_str());
         }
     }
 
