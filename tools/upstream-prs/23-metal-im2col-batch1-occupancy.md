@@ -45,3 +45,27 @@ bit-identical output before merge.
 gives better occupancy (e.g. `N==1`, or whenever `N*KH*KW < max_threads`) and
 drop the fork env var. CUDA is unaffected — `im2col_cuda` already parallelizes
 threads over `IC*KH*KW`, not `N`.
+
+---
+
+**SUPERSEDED 2026-08-06 — re-derived against the v0.17 dispatch as
+`kernel_im2col_flat`** (fork commit `89a2039d`, branch `sync/upstream-v0.17`;
+this OW-blocked patch targets the pre-v0.17 dispatch and no longer applies —
+the v0.17 sync dropped the OCC variant, see `SYNC-v0.17-CONFLICTS.md`). The
+successor covers this draft's batch-1 case via the predicate
+`N*KH*KW < 128` AND a second pathological class this draft missed: the
+`ggml_conv_2d_dw` lowering (IC==1, N=C*batch), whose per-thread N/ntg0 loop
+strides a full plane on both src and dst (~0.4 GB/s on M1; 70% of the
+CrispEmbed PP-OCRv6 medium recognizer graph by per-op profile). One thread
+per dst element from a `(ceil(OW*CHW/256), OH, N)` grid; row-local 32-bit
+divmods only — a first cut with a fully flat int64-divmod index was SLOWER
+than the broken kernel (Apple GPUs emulate int64 division), which is worth
+stating in the PR to preempt the "why not one flat index" review question.
+Fresh M1 numbers, outputs byte-identical: PP-OCRv6 medium recognize
+13.4-14.0 s -> 5.8-6.2 s (2.3x), layout_detect (RT-DETR, N==1 convs)
+1.6x. CrispASR-side numbers (melotts HiFi-GAN, moonshine) still need
+re-measuring after a pin bump to >= `89a2039d` — the old 2-3x/1.65x figures
+above were measured on the pre-v0.17 variant. Re-draft the upstream PR from
+`kernel_im2col_flat`; keep this file's CUDA note (still true) and the
+auto-select-no-env-var guidance (the fork's `CRISPASR_METAL_IM2COL_FLAT`
+opt-out stays fork-only).
