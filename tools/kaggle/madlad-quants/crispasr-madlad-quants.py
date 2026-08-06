@@ -366,6 +366,58 @@ if ref_ok:
 else:
     step("diff.skipped", why="no reference archive")
 
+# ── 6. requant with the t5 rule, and measure whether it is worth the size ────
+# The published Q4_K/Q8_0 predate examples/crispasr-quantize/main.cpp's t5 rule
+# (shared.embed.* and lm_head.* stay at source precision). Those two tensors
+# carry the 256K vocabulary and are exactly where the per-stage table says Q4_K
+# loses — enc_embed 0.9974, enc_out 0.9937 against 1.000000 at F16. Keeping them
+# wide should lift those stages; it also makes the file bigger, and that trade
+# needs numbers rather than a preference.
+#
+# Only uploads when parity actually improves. A bigger file that measures the
+# same is a worse artifact, not a better one.
+if ref_ok and F16.is_file():
+    step("requant.begin")
+    for qtype in ("q8_0", "q4_k"):
+        newf = MODELS / f"madlad400-3b-mt-{qtype}.new.gguf"
+        with kh.build_heartbeat(f"requant.{qtype}", 30):
+            pq = subprocess.run([str(QUANT), str(F16), str(newf), qtype],
+                                capture_output=True, text=True, timeout=7200)
+        if pq.returncode != 0 or not newf.is_file():
+            step(f"requant.{qtype}.failed", exit=pq.returncode, tail=pq.stdout[-400:])
+            continue
+        with kh.build_heartbeat(f"requant.{qtype}.diff", 30):
+            pd = subprocess.run([str(DIFF), "madlad", str(newf), str(REF)],
+                                capture_output=True, text=True, timeout=3600)
+        stages = {}
+        for line in pd.stdout.splitlines():
+            m = re.match(r"t5 (\S+)\s+n=\S+\s+cos=([-\d.]+)", line)
+            if m:
+                stages[m.group(1)] = float(m.group(2))
+        worst_new = min(stages.values()) if stages else None
+        before = summary["parity"].get(qtype, {})
+        worst_old = before.get("worst_cos")
+        ok_val, val_rows = validate(newf, f"{qtype}-requant")
+        better = (worst_new is not None and worst_old is not None and worst_new > worst_old)
+        summary.setdefault("requant", {})[qtype] = {
+            "size_gb_old": before.get("size_gb"), "size_gb_new": gb(newf),
+            "worst_cos_old": worst_old, "worst_cos_new": worst_new,
+            "stages_new": stages, "validated": ok_val, "better": better,
+        }
+        step(f"requant.{qtype}.measured", worst_old=worst_old, worst_new=worst_new,
+             gb_new=gb(newf), better=better, validated=ok_val)
+        save()
+        if better and ok_val:
+            upload(newf, f"re-quantize {qtype} with the t5 rule "
+                         f"(embeddings/lm_head at source precision) — #333")
+            summary["requant"][qtype]["uploaded"] = True
+        else:
+            step(f"requant.{qtype}.not-uploaded",
+                 why="parity did not improve" if not better else "failed validation")
+        newf.unlink(missing_ok=True)
+        save()
+    step("requant.done")
+
 save()
 step("script.done", artifacts=list(summary["artifacts"]), parity=list(summary["parity"]))
 print(json.dumps(summary, indent=2, ensure_ascii=False)[:6000])
