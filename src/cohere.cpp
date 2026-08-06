@@ -539,6 +539,18 @@ struct cohere_context {
     // Cached T_enc from last encode call, needed by decode graph builder.
     int cached_T_enc = 0;
 
+    // Probe-LID encoder reuse. The encoder output and the cross-attention KV
+    // depend only on the AUDIO; the language enters solely through the decoder
+    // prompt. So probing N languages over one clip can encode once and decode
+    // N times — and encode is 87% of a pass (881 ms vs 113 ms decode, M1
+    // q4_k-imatrix on 11 s), so it is nearly the whole cost.
+    //
+    // INVARIANT: reuse_encoder may only be set while calling transcribe_ex
+    // repeatedly over the SAME samples. cohere_detect_language is the only
+    // place that sets it, and it clears it again in the same function.
+    bool reuse_encoder = false;
+    int reused_T_enc = 0;
+
     // Mel spectrogram buffer
     std::vector<float> mel_buf;
 
@@ -2347,7 +2359,16 @@ struct cohere_result* cohere_transcribe_ex(struct cohere_context* ctx, const flo
     const int CHUNK_SAMPLES = 30 * hp.sample_rate;
     const bool do_chunked = (n_samples > CHUNK_SAMPLES);
 
-    int T_enc_total = 0;
+    // Skip the encoder + cross-KV entirely when the caller guarantees the same
+    // audio as the previous call (probe LID — see cohere_context::reuse_encoder).
+    // Both blocks below are gated on this; the cross-KV buffer is freed and
+    // reallocated INSIDE the second one, so skipping it keeps the previous
+    // allocation live, which is exactly what we want to reuse.
+    const bool reuse_enc = ctx->reuse_encoder && ctx->reused_T_enc > 0 && ctx->cross_kv_buf != nullptr;
+
+    int T_enc_total = reuse_enc ? ctx->reused_T_enc : 0;
+    if (reuse_enc)
+        COHERE_VLOG2(vb, "cohere: reusing encoder output  T_enc=%d\n", T_enc_total);
 
     // Per-chunk K/V CPU storage: partial_k[il][chunk] and partial_v[il][chunk]
     // K chunk: [head_dim, T_c, n_heads] layout (F32; converted to F16 on upload)
@@ -2364,7 +2385,7 @@ struct cohere_result* cohere_transcribe_ex(struct cohere_context* ctx, const flo
     cohere_prof_state prof_state;
     bool do_prof = !do_chunked && (crispasr_env::get("CRISPASR_COHERE_PROF") != nullptr);
 
-    {
+    if (!reuse_enc) {
         cohere_bench_stage _b_enc("encoder (all chunks)");
         int n_chunks = 0;
         for (int sample_offset = 0; sample_offset < n_samples; sample_offset += CHUNK_SAMPLES) {
@@ -2602,7 +2623,7 @@ struct cohere_result* cohere_transcribe_ex(struct cohere_context* ctx, const flo
     }
 
     // Assemble cross-KV from per-chunk CPU data and upload to backend buffer.
-    {
+    if (!reuse_enc) {
         cohere_bench_stage _b_ckv("cross-kv assembly");
         t0 = ggml_time_us();
 
@@ -2697,6 +2718,7 @@ struct cohere_result* cohere_transcribe_ex(struct cohere_context* ctx, const flo
     }
 
     const int T_enc = T_enc_total;
+    ctx->reused_T_enc = T_enc_total; // so the next call may reuse this encode
 
     // --- Decoder prompt ---
     cohere_bench_stage _b_dec("decoder (total)");
@@ -3381,8 +3403,22 @@ bool cohere_detect_language(struct cohere_context* ctx, const float* samples, in
     double best_score = 0.0;
     double total_score = 0.0;
 
+    // Encode once, decode per candidate. The encoder output and cross-KV are
+    // language-independent, and encode is ~87% of a pass, so this is worth
+    // roughly (N+7)/(8N) of the naive cost. CRISPASR_COHERE_PROBE_REUSE_ENC=0
+    // restores one full encode per candidate.
+    const char* reuse_env = crispasr_env::get("CRISPASR_COHERE_PROBE_REUSE_ENC");
+    const bool want_reuse =
+        !(reuse_env && (reuse_env[0] == '0' || reuse_env[0] == 'n' || reuse_env[0] == 'N' || reuse_env[0] == 'f'));
+    const bool saved_reuse = ctx->reuse_encoder;
+    const int saved_reused_T = ctx->reused_T_enc;
+    ctx->reuse_encoder = false; // first candidate always encodes
+    ctx->reused_T_enc = 0;
+
     for (const auto& lang : langs) {
         struct cohere_result* r = cohere_transcribe_ex(ctx, samples, probe_n, lang.c_str(), 0);
+        // Every candidate after the first reuses the first one's encode.
+        ctx->reuse_encoder = want_reuse;
         const std::string text = (r && r->text) ? std::string(r->text) : std::string();
         if (r)
             cohere_result_free(r);
@@ -3411,6 +3447,9 @@ bool cohere_detect_language(struct cohere_context* ctx, const float* samples, in
     ctx->frequency_penalty = saved_freq;
     ctx->beam_size = saved_beam;
     ctx->params.verbosity = saved_verbosity;
+    // Clear the reuse invariant: the next transcribe() is real audio, not a probe.
+    ctx->reuse_encoder = saved_reuse;
+    ctx->reused_T_enc = saved_reused_T;
 
     if (best_lang.empty() || best_score <= 0.0)
         return false;
