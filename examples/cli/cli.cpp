@@ -1346,9 +1346,8 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
         "                                                 opt-out (--no-watermark / --no-spoken-disclaimer /\n"
         "                                                 --no-c2pa): you affirm AI-content marking/disclosure\n"
         "                                                 duty is yours.\n");
-    fprintf(stderr,
-            "             --ref-text \"TEXT\"        reference transcription (qwen3-tts/f5-tts; auto-transcribed "
-            "if omitted)\n");
+    fprintf(stderr, "             --ref-text \"TEXT\"        reference transcription (qwen3-tts/f5-tts/cosyvoice3-tts; "
+                    "auto-transcribed if omitted)\n");
     fprintf(stderr, "             --ref-asr BACKEND       [%-7s] ASR backend for auto-transcribing ref audio\n",
             params.tts_ref_asr.empty() ? "whisper" : params.tts_ref_asr.c_str());
     fprintf(stderr, "             --instruct \"TEXT\"        natural-language voice/style description "

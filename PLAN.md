@@ -106,13 +106,16 @@ the tokenizer's own sensitivity. What is real:
 
 ### OPEN follow-ups
 
-1. **Auto-transcribe the reference when `--ref-text` is missing.** cosyvoice3
-   hard-errors today; f5-tts already auto-transcribes (its
-   `transcribe_ref_audio` + `crispasr_ref_cache` are `static` in
-   `crispasr_backend_f5_tts.cpp` and would need hoisting to a shared header,
-   then mirroring at the session C-ABI, which returns -2 for a WAV with no
-   transcript). This removes the whole mismatch class rather than warning
-   about it — the single highest-value item left on #334.
+1. ~~Auto-transcribe the reference when `--ref-text` is missing.~~ **DONE.**
+   `examples/cli/crispasr_tts_ref_text.h` hoists f5-tts's transcriber + the
+   ref-text cache; cosyvoice3 now auto-transcribes instead of hard-erroring
+   (cached as `<voice>.cv3reftext`). Measured on a 17.7 s reference: a
+   one-sentence guess lost the requested line entirely, auto-transcribed it
+   came out in full. **Still CLI/server only** — `crispasr_session_set_voice`
+   keeps returning -2 for a WAV with no transcript, because the session C-ABI
+   cannot construct a second `CrispasrBackend` for ASR. That is the same
+   limit f5-tts has always had, so bindings callers must still pass a
+   transcript; lifting it means giving the library its own ASR entry point.
 2. **The clone front-end is a harness-blind zone.** `tools/reference_backends/
    cosyvoice3_tts.py` has s3tok stages but no CAMPPlus `spk_emb` and no
    `prompt_feat_24k`, and `cosyvoice3_tts_extract_{spk_emb,ref_mel,
