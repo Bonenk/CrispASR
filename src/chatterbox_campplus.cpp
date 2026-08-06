@@ -816,6 +816,19 @@ static std::vector<float> unit_forward(const UnitCache& u, const float* in, int 
 // voice bank (whose embeddings come from the ONNX model in Python) was fine.
 // Zeroing the same bias in the ONNX reference reproduces the C++ output at
 // cos 0.999998, which is what pins the cause to this one term.
+//
+// The three consumers of this code ship TWO different export shapes, so read
+// the checkpoint rather than assuming either. Verified by listing the tensor
+// names in each published GGUF:
+//   chatterbox / chatterbox-turbo s3gen — 15 transit tensors, no transit
+//       `linear.bias`, and an explicit `s3.se.xv.out_nl.bn.*`
+//   dots.tts spk                        — 18 transit tensors, no transit
+//       `linear.bias`, explicit `…xvector.out_nonlinear.batchnorm.*`
+//   cosyvoice3 campplus                 — transit3 `linear.bias` present, NO
+//       out_nonlinear parameters at all (folded)
+// So this bias is a no-op for chatterbox and dots.tts — they are bit-identical
+// — and it is the whole fix for cosyvoice3. This code was written against the
+// un-folded shape and had simply never met a folded one.
 static std::vector<float> bn_relu_conv1d(const BNFolded& bn, const float* in, int C_in, int T,
                                          const std::vector<float>& lin_w, const std::vector<float>& lin_b, int kw,
                                          int C_out, int s, int p) {

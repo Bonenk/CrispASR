@@ -133,11 +133,31 @@ the tokenizer's own sensitivity. What is real:
    ⚠ Every WAV clone had been conditioned on the wrong timbre while the baked
    voice bank was fine (its embeddings come from the ONNX model in Python) —
    which is why this read as "cloning quality" rather than as a bug.
-   The bias is applied only when the checkpoint carries one, so a GGUF
-   without it is untouched; chatterbox / dots.tts share this code and their
-   converters do not emit transit biases, but if a future export folds a BN
-   the same way, they now pick it up too.
-3. **The 10 s prompt-mel cap is ours, not upstream's.** `compute_prompt_feat_24k`
+   The bias is applied only when the checkpoint carries one.
+   **Cross-backend blast radius — VERIFIED, not assumed** (the first commit
+   message claimed "their converters emit no transit bias", which was
+   reasoning, not a check; chatterbox's GGUF is not even produced by an
+   in-tree converter). Listing the tensor names in each published GGUF over a
+   ranged HTTP read of the header:
+   | GGUF | transit tensors | transit `linear.bias` | out_nonlinear BN |
+   |---|---|---|---|
+   | chatterbox / -turbo s3gen | 15 | none | `s3.se.xv.out_nl.bn.*` present |
+   | dots.tts spk | 18 | none | `…out_nonlinear.batchnorm.*` present |
+   | cosyvoice3 campplus | — | **transit3 present** | **absent (folded)** |
+   So chatterbox and dots.tts are bit-identical, and cosyvoice3 is the only
+   folded export. The C++ was written against the un-folded shape and had
+   never met the other one.
+3. **Re-validation after the CAMPPlus fix — DONE.** Every #334 measurement
+   before it was taken through a cos-0.737 speaker embedding, so the
+   clone-quality claims needed re-running. Same reference at 8/16/22.05/24/
+   32/44.1/48 kHz, matching `--ref-text`: all seven ASR-round-trip to the
+   identical transcript, durations 7.62–8.94 s, and speaker similarity to the
+   reference (Resemblyzer) is 0.744–0.776, spread **0.032**, mean 0.762.
+   Timbre is now rate-invariant as well as content — the earlier conclusions
+   hold, and the direct 24 kHz comparison moved 0.7245 → 0.7537. (Absolute
+   values are dragged down in every arm by the prepended spoken disclaimer,
+   which is in a different voice; the spread and the delta are the signal.)
+4. **The 10 s prompt-mel cap is ours, not upstream's.** `compute_prompt_feat_24k`
    is called with `max_samples = 10 * 24000`, so a longer reference gives the
    flow a 10 s prompt while the LM keeps the full token set (deliberate, see
    the #310 comment). A 17.7 s reference round-trips fine, so this is not a

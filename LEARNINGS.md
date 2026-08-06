@@ -14109,3 +14109,74 @@ settled it. The sequence, and the lessons:
    only the "other" backend crashed — and I first misattributed it to a stale
    build. When a blanket replace targets a name, exclude the definitions of the
    wrappers you're routing THROUGH.
+
+## A public API with no caller is a harness-blind zone announcing itself — and an ONNX export may FOLD a BatchNorm your C++ still expects as tensors (#334 CosyVoice3 CAMPPlus, 2026-08-06)
+
+CosyVoice3's WAV voice cloning was reported as "unnatural foreign accent". The
+per-stage harness ended at the talker/flow/HiFT and every stage passed. The
+speaker embedding — the single tensor that decides *whose voice comes out* —
+had no stage at all, and was wrong: **cos 0.737** against `campplus.onnx`.
+
+**The bug.** CAMPPlus ends
+`transit3.linear(Conv1d, bias=False) → out_nonlinear(BN + ReLU) → StatsPool`.
+An ONNX exporter is free to fold that trailing BatchNorm into the preceding
+convolution, and CosyVoice3's export does: the graph carries a bare
+`/xvector/out_nonlinear/relu/Relu` with **no BN parameters anywhere**, while
+`/xvector/transit3/linear/Conv` gained a fused weight *and a fused bias*
+(transit1/transit2 keep named, bias-free weights because no BN follows them).
+Our `bn_relu_conv1d` never applied a conv bias, so the fold was silently
+dropped and the last 512 channels reached the pooling un-normalised.
+
+Read the checkpoint, don't assume the shape. The three consumers of this same
+C++ ship **two different export shapes** — chatterbox and dots.tts keep
+`out_nonlinear`'s BN as explicit tensors (and have no transit bias, so the fix
+is bit-identical for them); only CosyVoice3 folds. Code written against one
+shape had simply never met the other. A GGUF's tensor-name list settles this in
+seconds without downloading the file: GGUF puts the tensor table in the header,
+so a ranged HTTP read of the first few MB plus a 30-line parser lists every
+name in a multi-GB artifact on HuggingFace.
+
+### Three things that let it hide, all reusable
+
+1. **`cosyvoice3_tts_extract_{spk_emb,ref_mel,speech_tokens}` had no caller
+   anywhere in the tree.** Three public C APIs, exported, documented, dead. That
+   is not a tidiness problem — it is a *measurement* problem: an API nothing
+   calls is a computation nothing checks. Grep for callers of the entry points
+   your harness is supposed to cover; the ones with zero are your blind zone,
+   and they are cheap to find. (Sibling of [[prove the new path executes]]:
+   there the path shipped inert, here the *check* was never wired up.)
+
+2. **A value-bijection is not a slot check.** I first "verified" the converter
+   by matching all 617 GGUF tensors 1:1 to ONNX initializers *by value* — unique
+   match both ways, nothing dropped, nothing duplicated. That proves the weight
+   SET is intact and says nothing about which slot each landed in, and it nearly
+   ended the investigation. Only the end-to-end embedding comparison found the
+   bug — and the bug was not a mis-assignment at all, it was a term the forward
+   never applied, which no weight audit could ever have seen.
+
+3. **The ground truth was in the graph the whole time.** The converter assigns
+   an anonymous initializer tail (`onnx::Conv_4619`) by hard-coded index plus a
+   shape assertion — a guess that a same-shaped neighbour would satisfy. But a
+   torch ONNX export keeps the full scope path on the *node*:
+   `node.name == '/xvector/block2/tdnnd3/linear1/Conv'`, with the initializer as
+   input slot 1 (weight) or 2 (bias). Walk the nodes and every anonymous tensor
+   names itself. Prefer that to index arithmetic — and note that slot 2 existing
+   at all is exactly the signal that a BN was folded in.
+
+### The diagnostic that pinned it
+
+Guessing which term was wrong would have been slow. Instead: **break the
+reference the same way and see if it matches.** Zero the suspect bias in the
+ONNX model, re-run, compare to the C++ output — cos **0.999998**, norms 19.937
+vs 19.939. That converts "something in a 3000-node network is off" into proof
+about one tensor, and it is cheap for any reference you can edit and re-run.
+(Fixed: 0.999997 against the unmodified reference.)
+
+### Why it read as "quality", not as a bug
+
+The baked voice bank's embeddings are produced by `campplus.onnx` in Python at
+build time, so bank voices were always correct; only the runtime `--voice
+ref.wav` path went through the broken code. A wrong-but-plausible 192-d vector
+does not crash, does not NaN, and does not look wrong in any summary statistic
+— it clones a slightly different person. When a user reports "cloning quality"
+and the presets are fine, suspect the runtime-only half of the front end.
