@@ -189,8 +189,12 @@ def main():
     # --- GGUF writer ----------------------------------------------------------
     writer, GGMLQt = get_writer(args.output, "cohere-transcribe")
 
-    # Architecture metadata
-    writer.add_string ("general.architecture",             "cohere-transcribe")
+    # Architecture metadata. NOTE: GGUFWriter(path, arch) already writes
+    # `general.architecture`; writing it again here raised
+    # "ValueError: Duplicated key name 'general.architecture'" on gguf-py
+    # versions that reject duplicates. Older versions only warned and
+    # overwrote, which is why this survived unnoticed — the converter has
+    # never been run end-to-end on a strict version until now.
     writer.add_string ("general.name",                     "Cohere Transcribe 03-2026")
     writer.add_uint32 ("cohere_transcribe.vocab_size",     vocab_size)
     # encoder
