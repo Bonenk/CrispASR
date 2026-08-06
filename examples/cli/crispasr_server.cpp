@@ -675,7 +675,10 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
             }
             const bool used_speech_lid = !lid_speech.empty();
             crispasr_lid_result lid;
-            if (crispasr_detect_language_cli(lid_samples, lid_n_samples, rp, lid)) {
+            // Backend self-probe first (see crispasr_lid_cli.h); external LID
+            // only when it declines.
+            const bool probed = crispasr_backend_probe_language(*backend, lid_samples, lid_n_samples, rp, lid);
+            if (probed || crispasr_detect_language_cli(lid_samples, lid_n_samples, rp, lid)) {
                 rp.language = lid.lang_code;
                 if (rp.source_lang.empty() || rp.source_lang == "auto")
                     rp.source_lang = lid.lang_code;

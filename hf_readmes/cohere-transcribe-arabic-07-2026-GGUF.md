@@ -77,6 +77,42 @@ build/bin/crispasr --backend cohere -m cohere-transcribe-arabic-q4_k.gguf audio.
 
 ---
 
+## Supported languages: `en` and `ar` only
+
+This finetune's `config.json` lists exactly two: `en`, `ar`. That matters more
+than it sounds, because **nothing else can tell you**. The finetune keeps the
+base tokenizer, so all 183 ISO-639-1 `<|xx|>` tokens are present in the vocab —
+`<|de|>`, `<|ru|>`, `<|ja|>` all decode without error. And Cohere Transcribe
+answers a wrong language *fluently* rather than failing. On one 8 s Arabic
+clip, `-l ru` added a hallucinated leading word, `-l ja` swapped the quotation
+marks for brackets, and `-l de` changed the diacritics — all plausible, none
+flagged.
+
+So CrispASR reads the whitelist from the GGUF and substitutes loudly:
+
+```
+cohere: language 'de' is not supported by this model — using 'en' instead. Supported: en, ar
+```
+
+The GGUFs here carry `cohere_transcribe.supported_languages`. For any Cohere
+GGUF converted before that key existed, declare it at runtime instead:
+
+```bash
+CRISPASR_COHERE_LANGS=en,ar build/bin/crispasr --backend cohere -m old.gguf audio.wav -l auto
+```
+
+With the list present and `-l auto`, CrispASR identifies the language by
+**probing this model itself** — one short decode per candidate, no whisper-tiny
+download — and can therefore only ever return `en` or `ar`:
+
+```
+cohere[lid]: en  len=64   agree=1.00 div=0.79 score=158  :: The city is located in the city of Jerry, a large city of Je
+cohere[lid]: ar  len=82   agree=1.00 div=1.00 score=328  :: العاصفة شبه الاستوائية "جيري" تغا
+crispasr: LID -> language = 'ar' (cohere-probe, p=0.675)
+```
+
+---
+
 ## Architecture
 
 | Component | Details |

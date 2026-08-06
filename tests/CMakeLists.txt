@@ -2081,6 +2081,56 @@ catch_discover_tests(test-cohere-params
     PROPERTIES LABELS "unit;cohere"
 )
 
+# ─── test-cohere-lang — Catch2 unit tests for Cohere Transcribe language
+# resolution (cohere_lang.h). Header-only, no GGUF, no link against cohere. ────
+add_executable(test-cohere-lang
+    test-cohere-lang.cpp
+)
+target_include_directories(test-cohere-lang PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-cohere-lang PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-cohere-lang
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;cohere"
+)
+
+# ─── test-cohere-lang-gguf — round-trips the supported-language list through a
+# real GGUF (converter writes it, core_gguf reads it). No model weights. ──────
+add_executable(test-cohere-lang-gguf
+    test-cohere-lang-gguf.cpp
+)
+target_include_directories(test-cohere-lang-gguf PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-cohere-lang-gguf PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-core
+    ggml
+)
+catch_discover_tests(test-cohere-lang-gguf
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;cohere"
+)
+
+# ─── test-lid-probe — Catch2 unit tests for probe-based LID scoring
+# (core/lid_probe.h). Header-only, fixed strings, no model. ────────────────────
+add_executable(test-lid-probe
+    test-lid-probe.cpp
+)
+target_include_directories(test-lid-probe PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-lid-probe PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-lid-probe
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit;lid"
+)
+
 # ─── test-fastpitch-params — Catch2 unit tests for fastpitch_tts_params defaults
 # and null-guard coverage. No GGUF required. ───────────────────────────────────
 add_executable(test-fastpitch-params

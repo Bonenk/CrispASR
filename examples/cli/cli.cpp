@@ -1113,8 +1113,9 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             params.return_logits ? "true" : "false");
     fprintf(
         stderr,
-        "  --lid-backend NAME                [%-7s] language-detect backend: whisper|silero|firered (for non-native "
-        "backends)\n",
+        "  --lid-backend NAME                [%-7s] language-detect backend: whisper|silero|firered|ecapa|probe|off "
+        "(for non-native backends). 'probe' asks the ASR model itself (cohere), which needs no second model and can "
+        "only return a language that model supports\n",
         params.lid_backend.c_str());
     fprintf(stderr, "  --lid-model FNAME                 [%-7s] optional LID model path (default ggml-tiny.bin)\n",
             params.lid_model.c_str());

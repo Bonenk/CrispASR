@@ -10,6 +10,8 @@
 #include "cohere.h"
 #include "core/crispasr_env.h"
 #include "cohere-arch.h"
+#include "cohere_lang.h"
+#include "core/lid_probe.h"
 #include "ggml.h"
 #include "ggml-cpu.h"
 #include "ggml-alloc.h"
@@ -374,6 +376,14 @@ struct cohere_hparams {
     int n_freqs() const { return n_fft / 2 + 1; } // 257
     int pre_conv_ch = 256;
     int pre_sub_fac = 8; // 3 × stride-2 → ×8 downsampling
+    // Longest window the model was trained on (config.json max_audio_clip_s).
+    // 35 s for every release so far; the chunker keeps a margin below it.
+    int max_audio_clip_s = 35;
+
+    // From config.json `supported_languages`. EMPTY means the GGUF predates the
+    // metadata key — "unknown", not "none": callers must not treat it as a
+    // restriction. See cohere_lang.h.
+    std::vector<std::string> supported_languages;
 };
 
 // ---------------------------------------------------------------------------
@@ -1143,6 +1153,39 @@ static bool cohere_load_model(cohere_model& model, cohere_vocab& vocab, const ch
     hp.n_fft = (int)core_gguf::kv_u32(gguf_ctx, CT_KEY_AUDIO_N_FFT, 0);
     hp.hop_length = (int)core_gguf::kv_u32(gguf_ctx, CT_KEY_AUDIO_HOP, 0);
     hp.win_length = (int)core_gguf::kv_u32(gguf_ctx, CT_KEY_AUDIO_WIN, 0);
+    hp.max_audio_clip_s = (int)core_gguf::kv_u32(gguf_ctx, CT_KEY_MAX_AUDIO_CLIP_S, 35);
+
+    // The model's own language list. Absent in GGUFs converted before the key
+    // existed — an empty vector then means "unknown", and cohere_lang::resolve
+    // passes the request through untouched.
+    hp.supported_languages = core_gguf::kv_str_array(gguf_ctx, CT_KEY_SUPPORTED_LANGS);
+
+    // Escape hatch for the GGUFs already in circulation, which were converted
+    // before that key existed: declare the model's language set without
+    // reconverting 1.5 GB. Overrides the GGUF when both are present.
+    //   CRISPASR_COHERE_LANGS=en,ar
+    if (const char* env = crispasr_env::get("CRISPASR_COHERE_LANGS")) {
+        std::vector<std::string> from_env;
+        std::string cur;
+        for (const char* p = env;; p++) {
+            if (*p == ',' || *p == '\0') {
+                if (!cur.empty())
+                    from_env.push_back(cur);
+                cur.clear();
+                if (*p == '\0')
+                    break;
+            } else {
+                cur += *p;
+            }
+        }
+        if (!from_env.empty()) {
+            hp.supported_languages = std::move(from_env);
+            fprintf(stderr, "cohere: supported languages overridden by CRISPASR_COHERE_LANGS=%s\n", env);
+        }
+    }
+
+    for (auto& code : hp.supported_languages)
+        code = cohere_lang::normalize(code);
 
     // Load vocabulary
     {
@@ -2068,6 +2111,19 @@ int cohere_n_vocab(struct cohere_context* ctx) {
     return ctx->vocab.n_vocab();
 }
 
+int cohere_n_supported_languages(struct cohere_context* ctx) {
+    return ctx ? (int)ctx->model.hparams.supported_languages.size() : 0;
+}
+
+const char* cohere_supported_language(struct cohere_context* ctx, int i) {
+    if (!ctx)
+        return nullptr;
+    const auto& langs = ctx->model.hparams.supported_languages;
+    if (i < 0 || i >= (int)langs.size())
+        return nullptr;
+    return langs[i].c_str();
+}
+
 const char* cohere_token_to_str(struct cohere_context* ctx, int id) {
     if (id < 0 || id >= (int)ctx->vocab.id_to_token.size())
         return "<unk>";
@@ -2167,6 +2223,29 @@ struct cohere_result* cohere_transcribe_ex(struct cohere_context* ctx, const flo
     COHERE_VLOG2(vb, "cohere: transcribe started   n_samples=%d  audio=%.2fs\n", n_samples,
                  (double)n_samples / hp.sample_rate);
 
+    // --- Resolve the language BEFORE anything else ---
+    //
+    // Cohere Transcribe never fails on a wrong language — it transcribes
+    // fluently in whichever one the prompt names — and an unsupported code has
+    // no `<|xx|>` token at all, so the prompt builder below used to drop both
+    // language slots and decode with none. Callers reach here with codes the
+    // model may not know: `-l auto` is the CLI default and external LID knows
+    // 99 languages against this model's 14 (or the Arabic finetune's two).
+    // Substitute a supported code loudly instead. Resolving here — before the
+    // chunk loop — also means the recursive per-chunk calls see an already-
+    // resolved code and stay quiet.
+    const std::string lang_resolved = [&]() -> std::string {
+        auto r = cohere_lang::resolve(hp.supported_languages, lang ? lang : "");
+        // Unconditional, not gated on verbosity: this SWITCHES THE OUTPUT
+        // LANGUAGE. A substitution the user cannot see is the defect being
+        // fixed, so --no-prints must not be able to hide it. Only fires on a
+        // genuine mismatch, so it is not chatter.
+        if (r.substituted)
+            fprintf(stderr, "cohere: %s\n", r.reason.c_str());
+        return r.lang;
+    }();
+    lang = lang_resolved.empty() ? nullptr : lang_resolved.c_str();
+
     // --- Long-audio chunking: encode AND decode each <=30s window independently ---
     //
     // The previous approach assembled a single giant cross-KV for all chunks and ran
@@ -2180,7 +2259,11 @@ struct cohere_result* cohere_transcribe_ex(struct cohere_context* ctx, const flo
     // 30 s window so cuts land at quiet points instead of slicing
     // mid-word (PLAN #80b, ported from nano-cohere-transcribe).
     {
-        const int CHUNK_S = 30 * hp.sample_rate;
+        // 30 s, but never within 5 s of the model's own training window
+        // (config.json max_audio_clip_s = 35 for every release so far, so this
+        // is a no-op today and a guard for a future model with a shorter one).
+        const int chunk_seconds = std::min(30, std::max(5, hp.max_audio_clip_s - 5));
+        const int CHUNK_S = chunk_seconds * hp.sample_rate;
         if (n_samples > CHUNK_S) {
             const size_t search_window_samples = (size_t)5 * (size_t)hp.sample_rate;
             const size_t energy_win_samples = 1600; // 100 ms at 16 kHz
@@ -2621,6 +2704,26 @@ struct cohere_result* cohere_transcribe_ex(struct cohere_context* ctx, const flo
     const char* lang_tok = lang ? lang : "en";
     char lang_tok_str[32];
     snprintf(lang_tok_str, sizeof(lang_tok_str), "<|%s|>", lang_tok);
+
+    // The remove_if below strips any token this vocab lacks. Harmless for the
+    // optional slots, but for the two source/target-language slots it meant an
+    // unrecognised code decoded with NO language at all.
+    //
+    // Note this catches LESS than it looks: the vocab carries all 183 ISO
+    // 639-1 `<|xx|>` tokens regardless of what the model supports, so every
+    // real language code passes here and only non-ISO input (`<|auto|>`) is
+    // caught. cohere_lang::resolve() above is what actually constrains the
+    // code to the model's own list. Keep both: this is the backstop for a
+    // GGUF carrying no list at all.
+    if (tid(lang_tok_str) == -1) {
+        fprintf(stderr, "cohere: no '%s' token in this model's vocab — falling back to '<|en|>'\n", lang_tok_str);
+        snprintf(lang_tok_str, sizeof(lang_tok_str), "<|en|>");
+        if (tid(lang_tok_str) == -1) {
+            fprintf(stderr, "cohere: error: this model's vocab has no language tokens at all "
+                            "(not even '<|en|>') — refusing to decode without a language slot\n");
+            return nullptr;
+        }
+    }
 
     const char* pnc_tok = ctx->params.no_punctuation ? "<|nopnc|>" : "<|pnc|>";
     std::vector<int> prompt = {
@@ -3220,6 +3323,99 @@ char* cohere_transcribe(struct cohere_context* ctx, const float* samples, int n_
     r->text = nullptr;
     cohere_result_free(r);
     return text;
+}
+
+// ---- Probe-based language identification ----
+
+struct cohere_lid_params cohere_lid_default_params(void) {
+    struct cohere_lid_params p;
+    p.probe_seconds = 20.0f;
+    p.max_new_tokens = 48;
+    p.text_lid = nullptr;
+    p.text_lid_user = nullptr;
+    p.verbosity = 0;
+    return p;
+}
+
+bool cohere_detect_language(struct cohere_context* ctx, const float* samples, int n_samples,
+                            struct cohere_lid_params params, char* out_lang, int out_lang_size, float* out_confidence) {
+    if (!ctx || !samples || n_samples <= 0 || !out_lang || out_lang_size < 3)
+        return false;
+
+    const auto& langs = ctx->model.hparams.supported_languages;
+    if (langs.empty()) {
+        // No candidate set to probe over. Guessing one would re-create exactly
+        // the bug this work exists to fix, so say so and let the caller use an
+        // external detector.
+        if (params.verbosity > 0)
+            fprintf(stderr, "cohere[lid]: this GGUF carries no supported-language list — "
+                            "cannot probe; reconvert it or use an external LID\n");
+        return false;
+    }
+
+    const auto& hp = ctx->model.hparams;
+    if (params.probe_seconds <= 0.0f)
+        params.probe_seconds = 20.0f;
+    if (params.max_new_tokens <= 0)
+        params.max_new_tokens = 48;
+
+    // Probe a leading clip short enough to stay in one window (no chunking).
+    const int max_probe = (int)(params.probe_seconds * (float)hp.sample_rate);
+    const int probe_n = n_samples < max_probe ? n_samples : max_probe;
+
+    // A probe must be deterministic and cheap regardless of what the caller
+    // configured for real transcription: sampling would make the comparison
+    // between candidates noise, and a beam would multiply the cost by its width.
+    const int saved_max_new = ctx->max_new_tokens;
+    const float saved_temp = ctx->decode_temperature;
+    const float saved_freq = ctx->frequency_penalty;
+    const int saved_beam = ctx->beam_size;
+    const int saved_verbosity = ctx->params.verbosity;
+    ctx->max_new_tokens = params.max_new_tokens;
+    ctx->decode_temperature = 0.0f;
+    ctx->frequency_penalty = 0.0f;
+    ctx->beam_size = 1;
+    ctx->params.verbosity = 0;
+
+    std::string best_lang;
+    double best_score = 0.0;
+    double total_score = 0.0;
+
+    for (const auto& lang : langs) {
+        struct cohere_result* r = cohere_transcribe_ex(ctx, samples, probe_n, lang.c_str(), 0);
+        const std::string text = (r && r->text) ? std::string(r->text) : std::string();
+        if (r)
+            cohere_result_free(r);
+
+        double agree = 0.0;
+        if (params.text_lid && !text.empty())
+            agree = (double)params.text_lid(text.c_str(), lang.c_str(), params.text_lid_user);
+
+        const double s = core_lid_probe::score(text, lang, agree);
+        total_score += s;
+        if (s > best_score) {
+            best_score = s;
+            best_lang = lang;
+        }
+        if (params.verbosity > 0) {
+            fprintf(stderr, "cohere[lid]: %-3s len=%-4zu agree=%.2f div=%.2f score=%-8.0f :: %.60s\n", lang.c_str(),
+                    core_lid_probe::utf8_length(text), agree, core_lid_probe::diversity(text, lang), s, text.c_str());
+        }
+    }
+
+    ctx->max_new_tokens = saved_max_new;
+    ctx->decode_temperature = saved_temp;
+    ctx->frequency_penalty = saved_freq;
+    ctx->beam_size = saved_beam;
+    ctx->params.verbosity = saved_verbosity;
+
+    if (best_lang.empty() || best_score <= 0.0)
+        return false;
+
+    snprintf(out_lang, (size_t)out_lang_size, "%s", best_lang.c_str());
+    if (out_confidence)
+        *out_confidence = total_score > 0.0 ? (float)(best_score / total_score) : 0.0f;
+    return true;
 }
 
 // ---- Stage-level entry points for crispasr-diff ----
