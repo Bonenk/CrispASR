@@ -4249,6 +4249,21 @@ if (CRISPASR_FUZZ)
     target_link_options(crispasr-fuzz-tokenizer PRIVATE -fsanitize=fuzzer)
 endif()
 
+# ─── test-arch-backend-map — general.architecture → backend table (hermetic, unit)
+# Guards issue #335: the C ABI and the CLI each had their own copy of this map
+# and they drifted, so Session::open() could not open models the CLI could.
+# Links crispasr-lib to drive the real `crispasr_detect_backend_from_gguf`
+# export over a synthesised metadata-only GGUF — no model files.
+add_executable(test-arch-backend-map test-arch-backend-map.cpp)
+target_include_directories(test-arch-backend-map PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-arch-backend-map PRIVATE Catch2::Catch2WithMain crispasr-lib)
+catch_discover_tests(test-arch-backend-map
+    TEST_SPEC "[arch-map]"
+    PROPERTIES
+        LABELS unit
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test-btc-vocab — chord vocabulary + positional encoding (hermetic, unit)
 add_executable(test-btc-vocab test-btc-vocab.cpp)
 target_include_directories(test-btc-vocab PRIVATE ${PROJECT_SOURCE_DIR}/src)

@@ -74,6 +74,35 @@ Earned the hard way; each cost a real bug getting through.
    copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
    missing one.
 
+## LANDED 2026-08-06 — #335 `Session::open()` could not open granite-speech
+
+Root cause is NOT granite-specific. The `general.architecture` → backend table
+existed **twice** — `examples/cli/crispasr_backend.cpp` pass 2 and
+`crispasr_detect_backend_from_gguf()` in `src/crispasr_c_api.cpp` — and the two
+had drifted by **113 architecture strings**. Every granite-speech GGUF carries
+`general.architecture = "granite_speech"` (underscore; that is what
+`models/convert-granite-speech-to-gguf.py` writes, confirmed by range-reading
+the header of the published `granite-speech-4.1-2b-plus-q4_k.gguf`), and the
+C-ABI copy only knew the hyphen spelling → detect returned `""` →
+`crispasr_session_open` returned NULL for every binding. The CLI never noticed
+because its **filename** pass matches `granite`+`speech` and short-circuits
+pass 2 — so **auto-detect working in the CLI proves nothing about the
+bindings**, and that is the durable lesson here.
+
+granite was one of many: nemotron, moonshine, kokoro, piper, melotts,
+sensevoice, funasr, paraformer, glm-asr, kyutai-stt, mini-omni2, csm, dia,
+bark, speecht5, fastpitch, pocket-tts, gemma4-e2b, mimo-asr, voxtral-tts,
+piano-transcription and more were CLI-only too — no binding could auto-detect
+any of them.
+
+Fix: one shared table, `src/core/arch_backend_map.h`, read by both surfaces.
+`tests/test-arch-backend-map.cpp` pins it and drives the real C-ABI export over
+a synthesised metadata-only GGUF (hermetic, no models) — deleting the
+`granite_speech` row makes it fail with `"" == "granite"`, rc=0, which is the
+reported bug exactly. Verified on the reporter's own artifact:
+`crispasr_session_open()` returns a live handle reporting backend `granite` and
+transcribes `samples/jfk.wav` correctly through the session ABI.
+
 ## LANDED 2026-08-06 — cohere: the language whitelist, + probe LID
 
 Prompted by reading [bakrianoo/cohereX](https://github.com/bakrianoo/cohereX)

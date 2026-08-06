@@ -14,6 +14,7 @@
 
 #include "crispasr_session.h"
 #include "core/win_compat.h"
+#include "core/arch_backend_map.h" // #335: general.architecture → backend table, SHARED with the CLI
 #include "core/bpe.h"
 #include "core/asr_segment_group.h" // issue #257: output-segment grouping (parakeet --chunk-seconds)
 #include "core/audio_chunking.h"    // fix/session-long-audio: energy-minima slicing for session auto-chunk
@@ -1404,120 +1405,14 @@ CA_EXPORT int crispasr_detect_backend_from_gguf(const char* path, char* out_name
     }
 
     // Map known architecture strings to CrispASR backend names.
-    const char* backend = "";
-    if (strcmp(arch, "whisper") == 0)
-        backend = "whisper";
-    else if (strcmp(arch, "parakeet") == 0 || strcmp(arch, "parakeet-tdt") == 0)
-        backend = "parakeet";
-    else if (strcmp(arch, "gigaam") == 0)
-        backend = "gigaam";
-    else if (strcmp(arch, "canary") == 0)
-        backend = "canary";
-    else if (strcmp(arch, "canary_qwen") == 0 || strcmp(arch, "canary-qwen") == 0)
-        backend = "canary-qwen";
-    else if (strcmp(arch, "lfm2-audio") == 0)
-        backend = "lfm2-audio";
-    else if (strcmp(arch, "sidon") == 0)
-        backend = "sidon";
-    else if (strcmp(arch, "cohere-transcribe") == 0)
-        backend = "cohere";
-    else if (strcmp(arch, "qwen3-asr") == 0 || strcmp(arch, "qwen3asr") == 0)
-        backend = "qwen3";
-    else if (strcmp(arch, "higgs-stt") == 0)
-        backend = "higgs-stt";
-    else if (strcmp(arch, "voxtral") == 0)
-        backend = "voxtral";
-    else if (strcmp(arch, "voxtral4b") == 0)
-        backend = "voxtral4b";
-    else if (strcmp(arch, "arkasr") == 0)
-        backend = "ark-asr";
-    else if (strcmp(arch, "granite-speech") == 0)
-        backend = "granite";
-    else if (strcmp(arch, "granite_nle") == 0 || strcmp(arch, "granite-nle") == 0)
-        backend = "granite-4.1-nar";
-    else if (strcmp(arch, "fastconformer-ctc") == 0)
-        backend = "fastconformer-ctc";
-    else if (strcmp(arch, "canary-ctc") == 0)
-        backend = "canary-ctc";
-    else if (strcmp(arch, "wav2vec2") == 0)
-        backend = "wav2vec2";
-    else if (strcmp(arch, "firered-asr") == 0 || strcmp(arch, "firered") == 0)
-        backend = "firered-asr";
-    // Both the Omni ASR CTC and LLM converters write general.architecture="omniasr-ctc"
-    // (see models/convert-omniasr-{ctc,llm}-to-gguf.py); the "omniasr" backend prefix-matches
-    // every omniasr-* variant and reads model_type from the GGUF to route CTC vs LLM.
-    else if (strcmp(arch, "omniasr-ctc") == 0 || strcmp(arch, "omniasr-llm") == 0 || strcmp(arch, "omniasr") == 0)
-        backend = "omniasr";
-    else if (strcmp(arch, "vibevoice-asr") == 0 || strcmp(arch, "vibevoice") == 0 || strcmp(arch, "vibevoice-tts") == 0)
-        backend = "vibevoice";
-    else if (strcmp(arch, "qwen3-tts") == 0 || strcmp(arch, "qwen3_tts") == 0)
-        backend = "qwen3-tts";
-    else if (strcmp(arch, "moss-tts-local") == 0 || strcmp(arch, "moss_tts_local") == 0)
-        backend = "moss-tts-local";
-    else if (strcmp(arch, "miotts") == 0 || strcmp(arch, "mio-tts") == 0)
-        backend = "miotts";
-    else if (strcmp(arch, "moss-tts") == 0 || strcmp(arch, "moss_tts") == 0 || strcmp(arch, "moss-tts-delay") == 0)
-        backend = "moss-tts";
-    else if (strcmp(arch, "omnivoice") == 0 || strcmp(arch, "omnivoice-tts") == 0)
-        backend = "omnivoice";
-    else if (strcmp(arch, "orpheus") == 0)
-        backend = "orpheus";
-    else if (strcmp(arch, "chatterbox") == 0 || strcmp(arch, "chatterbox_turbo") == 0 ||
-             strcmp(arch, "kartoffelbox") == 0)
-        backend = "chatterbox";
-    else if (strcmp(arch, "outetts") == 0)
-        backend = "outetts";
-    else if (strcmp(arch, "voxcpm2-vae") == 0 || strcmp(arch, "voxcpm2_vae") == 0)
-        backend = "voxcpm2-vae";
-    else if (strcmp(arch, "voxcpm2") == 0 || strcmp(arch, "voxcpm2-tts") == 0)
-        backend = "voxcpm2-tts";
-    else if (strcmp(arch, "cosyvoice3-llm") == 0 || strcmp(arch, "cosyvoice3") == 0 ||
-             strcmp(arch, "cosyvoice3-tts") == 0)
-        backend = "cosyvoice3-tts";
-    else if (strcmp(arch, "indextts") == 0)
-        backend = "indextts";
-    else if (strcmp(arch, "f5-tts") == 0 || strcmp(arch, "f5tts") == 0)
-        backend = "f5-tts";
-    else if (strcmp(arch, "irodori-tts") == 0 || strcmp(arch, "irodori_tts") == 0)
-        backend = "irodori-tts";
-    else if (strcmp(arch, "m2m100") == 0)
-        backend = "m2m100";
-    else if (strcmp(arch, "parler-tts") == 0 || strcmp(arch, "parler_tts") == 0 || strcmp(arch, "parlertts") == 0)
-        backend = "parler-tts";
-    else if (strcmp(arch, "tada") == 0 || strcmp(arch, "tada-tts") == 0 || strcmp(arch, "tada-1b") == 0 ||
-             strcmp(arch, "tada-tts-1b") == 0 || strcmp(arch, "tada-3b-ml") == 0)
-        backend = "tada";
-    else if (strcmp(arch, "t5") == 0)
-        backend = "madlad";
-    else if (strcmp(arch, "moss_audio") == 0 || strcmp(arch, "moss-audio") == 0)
-        backend = "moss-audio";
-    else if (strcmp(arch, "moss_transcribe") == 0 || strcmp(arch, "moss-transcribe") == 0)
-        backend = "moss-transcribe";
-    else if (strcmp(arch, "moss_transcribe_diarize") == 0 || strcmp(arch, "moss-transcribe-diarize") == 0 ||
-             strcmp(arch, "moss_diarize") == 0 || strcmp(arch, "moss-diarize") == 0)
-        backend = "moss-diarize";
-    else if (strcmp(arch, "kugelaudio") == 0 || strcmp(arch, "kugelaudio-tts") == 0)
-        backend = "kugelaudio";
-    else if (strcmp(arch, "zonos") == 0 || strcmp(arch, "zonos-tts") == 0)
-        backend = "zonos";
-    else if (strcmp(arch, "dots-tts") == 0 || strcmp(arch, "dots_tts") == 0 || strcmp(arch, "dots.tts") == 0)
-        backend = "dots-tts";
-    // Non-transcribe task backends. These were auto-detected in the CLI
-    // (examples/cli/crispasr_backend.cpp) but never here, so every binding
-    // (Dart, Python, Go, wasm) got 0 from detect and a null session unless it
-    // passed the backend explicitly — the multi-surface dispatch trap again.
-    else if (strcmp(arch, "crepe") == 0)
-        backend = "crepe";
-    else if (strcmp(arch, "htdemucs") == 0)
-        backend = "htdemucs";
-    else if (strcmp(arch, "mel-band-roformer") == 0)
-        backend = "mel-band-roformer";
-    else if (strcmp(arch, "btc") == 0)
-        backend = "btc-chords";
-    else if (strcmp(arch, "rvc") == 0)
-        backend = "rvc-svc";
-    else if (strcmp(arch, "beat-this") == 0)
-        backend = "beat-this";
+    //
+    // The table is SHARED with the CLI's own detector (src/core/arch_backend_map.h).
+    // Issue #335: the two used to be independent copies that had drifted by 113
+    // architecture strings — e.g. every granite-speech GGUF carries
+    // `general.architecture = "granite_speech"` (underscore, what the converter
+    // writes) while this copy only knew the hyphen spelling, so the CLI opened
+    // the model via its filename pass and every binding got a NULL session.
+    const char* backend = core_arch::backend_for_arch(arch);
 
     std::strncpy(out_name, backend, out_cap - 1);
     out_name[out_cap - 1] = '\0';
