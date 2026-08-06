@@ -201,11 +201,13 @@ None tracked for cohere. Two things deliberately NOT done, with reasons:
    produced by an older converter). The republished files are guaranteed
    byte-identical to their *pre-rewrite* selves by the tool's per-tensor sha256
    `--verify`, which is the property that actually matters.
-2. **Silence-hallucination below the 30 s threshold** still bites: a 10 s
-   all-silence file transcribes as a sentence, because the auto-VAD safeguard
-   only arms on long audio. Fixing that means arming VAD on short audio too,
-   which costs a model download and latency on every short clip — a trade worth
-   deciding deliberately rather than folding into this work.
+2. ~~Silence-hallucination below the 30 s threshold~~ — **fixed** (99d8e60b),
+   and not the way I expected. Measuring first showed the defect is narrower
+   than "silence in a short clip": 23 s of speech + trailing silence is CLEAN.
+   Only an all-silent span fabricates, which means it needed no VAD at all —
+   just a digital-silence gate in `cohere_transcribe_ex`, free and with no
+   extra model. Threshold sits below one int16 LSB so one non-zero sample
+   disables it; the quietest real speech to hand peaks ~3800x higher.
 
 ## LANDED 2026-08-05 — #334 cosyvoice3 WAV cloning (85d60ba9, 88c02788)
 
