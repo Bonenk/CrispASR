@@ -1,5 +1,33 @@
 # CrispASR — Claude Code project instructions
 
+## ⛔ READ FIRST — `crispasr-crispembed-dev.md`
+
+**Before writing any code, read the development guide in full**: it sits beside
+this repo's checkout (on the Mac: `~/code/crispasr-crispembed-dev.md`). It is
+~1000 lines and is *not* summarised anywhere — this file deliberately does not
+restate it.
+
+It is the method: the HARD RULES, the convert → quantize → dump-reference →
+diff → parity port pipeline, the ggml/GPU portability gotchas, the A/B
+discipline, the machine + storage layout for both boxes. Skipping it is how the
+recurring bugs recur. If a rule here and a rule there disagree, **the dev guide
+wins** — this file is a router, not a source.
+
+## Where everything lives
+
+| Need | Read |
+|---|---|
+| How to work here (method, rules, patterns) | `crispasr-crispembed-dev.md` — **all of it, first** |
+| A specific past lesson ("has this bitten us?") | `LEARNINGS.md` — grep it, never read it whole (800 KB, 227 lessons) |
+| Is this backend fast / which quant ships | `PERFORMANCE.md` |
+| What is in flight right now | `PLAN.md` — and claim your task there before starting |
+| What already shipped | `HISTORY.md` — archive; consult only to confirm a claim |
+| Adding a backend | `docs/contributing.md` (12-point checklist) |
+
+**Budget your reading.** These total >2 MB. Only the dev guide is meant to be
+read end to end; everything else is grep-first, and `PLAN.md`/`HISTORY.md`
+prose is frequently stale — audit against the CODE, never the note.
+
 ## Build
 
 ```bash
