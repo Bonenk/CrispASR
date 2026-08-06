@@ -118,14 +118,14 @@ public:
     // Cohere Transcribe accepts 14 (the Arabic finetune, two), so an external
     // detector can hand back a language this model was never trained on.
     //
-    // Automatic only for a SMALL language set, for accuracy as much as cost.
-    // Verified right on the two-language Arabic finetune (Arabic clip -> ar
-    // p=0.675; jfk.wav -> en p=0.647), but a forced 14-candidate probe on
-    // jfk.wav picked 'fr': the model TRANSLATES when handed a language it was
-    // not given, so fluent French output is not evidence of French audio, and
-    // JFK's chiasmus is repetitive enough that the diversity term punished the
-    // correct answer. Raise the ceiling with CRISPASR_COHERE_PROBE_MAX_LANGS
-    // or force it with --lid-backend probe, but measure first.
+    // Automatic only for a SMALL language set, purely for COST: one encode +
+    // decode per candidate is ~37 s for 14 on an M1, against ~1 s for
+    // whisper-tiny. Accuracy holds at 14 — measured on the real base model,
+    // jfk.wav -> en (p=0.169) and an Arabic clip -> ar (p=0.254) — so
+    // --lid-backend probe is safe to force, just slower.
+    // (An earlier note here claimed accuracy degraded at 14. That was an
+    // artifact of forcing a 14-language list onto the TWO-language Arabic
+    // finetune, which translates when asked for a language it lacks.)
     bool detect_language(const float* samples, int n_samples, const whisper_params& p, std::string& out_lang,
                          float& out_confidence) override {
         if (!ctx_ || !samples || n_samples <= 0)

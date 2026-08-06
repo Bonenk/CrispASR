@@ -124,34 +124,35 @@ TEST_CASE("lid_probe: an empty probe scores zero", "[unit][lid]") {
     REQUIRE(score("", "en", 1.0) == 0.0);
 }
 
-TEST_CASE("lid_probe: KNOWN LIMITATION — a fluent translation beats repetitive truth", "[unit][lid]") {
-    // Measured, not hypothetical. Forcing a 14-candidate probe on samples/jfk.wav
-    // picked 'fr' over 'en'. Two things went wrong at once, and BOTH are
-    // properties of the scoring, not of the runtime:
+TEST_CASE("lid_probe: a fluent translation CAN outscore the truth", "[unit][lid]") {
+    // The scoring's one soft spot, with the measured numbers behind it.
     //
-    //  1. Cohere Transcribe TRANSLATES when prompted with a language it was not
-    //     given. The 'fr' probe returned real French, which the text LID then
-    //     confirmed at 1.00 — so "the output is fluent language X" turns out
-    //     not to be evidence that the AUDIO is language X.
-    //  2. JFK's line is a chiasmus ("ask not what your country can do for you,
-    //     ask what you can do for your country"). The TRUE language is
-    //     legitimately repetitive, so diversity^2 penalised the right answer.
+    // Asking Cohere Transcribe for a language it was NOT trained on can produce
+    // a clean translation rather than garbage, and a text LID then confirms it
+    // at 1.00 — so "the output is fluent language X" is not evidence that the
+    // AUDIO is X. Pair that with a source line that is legitimately repetitive
+    // (JFK's chiasmus, "ask not what your country can do for you, ask what you
+    // can do for your country") and diversity^2 penalises the correct answer.
     //
-    // The numbers below are the ones the probe actually logged on that run
-    // (length, agreement, diversity) — not reconstructed strings. This test
-    // pins the WRONG answer deliberately: if a future scoring change flips it,
-    // that is an improvement, and the test should be inverted together with a
-    // fresh measurement on real audio — never edited to match a guess.
-    const double fr = score_from(108, 1.00, 0.88); // clean French translation
-    const double en = score_from(108, 1.00, 0.73); // correct English, but a chiasmus
-    REQUIRE(fr > en);                              // observed: 336 vs 228 → picked 'fr'
+    // Measured by forcing a 14-language list onto the TWO-language Arabic
+    // finetune: its 'fr' probe returned real French at div 0.88 and beat the
+    // correct 'en' at div 0.73.
+    const double fr = score_from(108, 1.00, 0.88);
+    const double en = score_from(108, 1.00, 0.73);
+    REQUIRE(fr > en); // 336 vs 228
 
-    // And why the ≤4-language auto gate is the real safety net: on the actual
-    // two-language model the same scoring was right both times, because the
-    // wrong-language decode DEGENERATED ("the city of Jerry, a large city of
-    // Jerry") instead of translating cleanly.
-    REQUIRE(score_from(82, 1.00, 1.00) > score_from(64, 1.00, 0.79));  // ar 328 > en 158, Arabic clip
-    REQUIRE(score_from(108, 1.00, 0.73) > score_from(59, 1.00, 0.73)); // en 228 > ar 125, English clip
+    // ⚠ But do NOT read that as "the probe degrades at 14 candidates". On the
+    // REAL 14-language base model (cohere-transcribe-q4_k, republished with its
+    // whitelist) the forced 14-way probe is correct on both clips: its 'fr'
+    // probe does not translate, it code-switches ("Et so, my fellow
+    // Americans…", agree 0.00, score 57). The earlier failure was an artifact
+    // of demanding languages the model does not have.
+    REQUIRE(score_from(108, 1.00, 0.73) > score_from(107, 0.00, 0.73)); // jfk: en 228 > fr 57
+    REQUIRE(score_from(73, 1.00, 1.00) > score_from(91, 1.00, 0.50));   // arabic: ar 292 > en 91
+
+    // Two-language model, both directions.
+    REQUIRE(score_from(82, 1.00, 1.00) > score_from(64, 1.00, 0.79));  // ar 328 > en 158
+    REQUIRE(score_from(108, 1.00, 0.73) > score_from(59, 1.00, 0.73)); // en 228 > ar 125
 }
 
 TEST_CASE("lid_probe: agreement can overturn a length advantage", "[unit][lid]") {
