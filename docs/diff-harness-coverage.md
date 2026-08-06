@@ -112,6 +112,15 @@ code starts working.
 - `chatterbox` — `tools/bootstrap_ref_env.sh chatterbox` then `python tools/dump_reference.py --backend chatterbox --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/chatterbox-ref.gguf`
 - `cohere` — `tools/bootstrap_ref_env.sh cohere` then `python tools/dump_reference.py --backend cohere --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/cohere-ref.gguf`
 - `cosyvoice3-tts` — `tools/bootstrap_ref_env.sh cosyvoice3-tts` then `python tools/dump_reference.py --backend cosyvoice3-tts --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/cosyvoice3-tts-ref.gguf`
+  - The `clone_*` stages (#334) cover the WAV-clone front end — the CAMPPlus
+    speaker embedding, the 24 kHz prompt mel and the speech tokens — and need
+    `campplus.onnx` + `speech_tokenizer_v3.onnx` (`CV3_CAMPPLUS_ONNX` /
+    `CV3_S3TOK_ONNX` if they are not beside the checkpoint). `--audio` must be
+    the same WAV on both sides; the C++ half reads it through the same
+    `--voice` path a real clone uses. This is the zone that found the dropped
+    transit3 conv bias: the embedding was cos 0.737 against ONNX, which is
+    wrong but entirely plausible-looking, and nothing else in the harness
+    could see it.
 - `crepe` — `tools/bootstrap_ref_env.sh crepe` then `python tools/dump_reference.py --backend crepe --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/crepe-ref.gguf`
 - `dots-tts` — `tools/bootstrap_ref_env.sh dots-tts` then `python tools/dump_reference.py --backend dots-tts --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/dots-tts-ref.gguf`
 - `firered-asr` — `tools/bootstrap_ref_env.sh firered-asr` then `python tools/dump_reference.py --backend firered-asr --model-dir <dir> --audio samples/jfk.wav --output /Volumes/backups/ai/firered-asr-ref.gguf`

@@ -116,12 +116,27 @@ the tokenizer's own sensitivity. What is real:
    cannot construct a second `CrispasrBackend` for ASR. That is the same
    limit f5-tts has always had, so bindings callers must still pass a
    transcript; lifting it means giving the library its own ASR entry point.
-2. **The clone front-end is a harness-blind zone.** `tools/reference_backends/
-   cosyvoice3_tts.py` has s3tok stages but no CAMPPlus `spk_emb` and no
-   `prompt_feat_24k`, and `cosyvoice3_tts_extract_{spk_emb,ref_mel,
-   speech_tokens}` have no caller at all. The CAMPPlus converter maps an
-   ANONYMOUS initializer tail by order/shape — exactly the kind of guess that
-   yields a plausible-but-wrong embedding. Wire those two stages in.
+2. ~~The clone front-end is a harness-blind zone.~~ **DONE, and it found a
+   real bug.** `clone_{spk_emb,prompt_feat_24k,speech_tokens}` stages now
+   exist on both sides and give the three `cosyvoice3_tts_extract_*` APIs
+   their first caller. First run: prompt mel 0.999948, speech tokens
+   1.000000 — and **spk_emb 0.737** against `campplus.onnx`.
+   Cause: CAMPPlus ends `transit3.linear(Conv1d, bias=False) →
+   out_nonlinear(BN+ReLU) → StatsPool`, and the ONNX exporter FOLDED that
+   trailing BN into the conv — the graph has a bare
+   `/xvector/out_nonlinear/relu/Relu` with no BN parameters, while
+   `/xvector/transit3/linear/Conv` gained a fused weight and a fused BIAS
+   (transit1/2 keep bias-free named weights, no BN follows them).
+   `bn_relu_conv1d` never applied a conv bias, so the fold was silently
+   dropped. Zeroing that bias in the ONNX reference reproduces the old C++
+   output at cos 0.999998 — that is what pins it. Fixed → 0.999997.
+   ⚠ Every WAV clone had been conditioned on the wrong timbre while the baked
+   voice bank was fine (its embeddings come from the ONNX model in Python) —
+   which is why this read as "cloning quality" rather than as a bug.
+   The bias is applied only when the checkpoint carries one, so a GGUF
+   without it is untouched; chatterbox / dots.tts share this code and their
+   converters do not emit transit biases, but if a future export folds a BN
+   the same way, they now pick it up too.
 3. **The 10 s prompt-mel cap is ours, not upstream's.** `compute_prompt_feat_24k`
    is called with `max_samples = 10 * 24000`, so a longer reference gives the
    flow a 10 s prompt while the LM keeps the full token set (deliberate, see
