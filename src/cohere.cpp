@@ -2258,6 +2258,38 @@ struct cohere_result* cohere_transcribe_ex(struct cohere_context* ctx, const flo
     }();
     lang = lang_resolved.empty() ? nullptr : lang_resolved.c_str();
 
+    // --- Digital-silence gate ---
+    //
+    // Handed a span with no signal at all, this model does not return nothing —
+    // it INVENTS speech. 10 s of zeros decodes to "And I'm going to go ahead and
+    // do that.", and because the chunk loop below re-enters this function per
+    // chunk, a long file whose trailing 30 s window is silent gets that sentence
+    // appended to an otherwise perfect transcript. (VAD suppresses it, but VAD
+    // only auto-arms above 30 s, and requires a model download.)
+    //
+    // Gate exactly that: no signal in, empty transcript out. The threshold sits
+    // below one int16 LSB so a single non-zero sample disables it — see
+    // audio_chunking::is_digitally_silent for the measured headroom against real
+    // quiet speech. CRISPASR_COHERE_SILENCE_GATE=0 restores the old behaviour.
+    {
+        const char* gate_env = crispasr_env::get("CRISPASR_COHERE_SILENCE_GATE");
+        const bool gate_on =
+            !(gate_env && (gate_env[0] == '0' || gate_env[0] == 'n' || gate_env[0] == 'N' || gate_env[0] == 'f'));
+        if (gate_on && audio_chunking::is_digitally_silent(samples, (size_t)n_samples)) {
+            COHERE_VLOG(vb, "cohere: %.2fs of digital silence — returning an empty transcript\n",
+                        (double)n_samples / hp.sample_rate);
+            cohere_result* empty = (cohere_result*)calloc(1, sizeof(cohere_result));
+            if (!empty)
+                return nullptr;
+            empty->text = (char*)calloc(1, 1); // "" — NOT nullptr; callers read it
+            if (!empty->text) {
+                free(empty);
+                return nullptr;
+            }
+            return empty;
+        }
+    }
+
     // --- Long-audio chunking: encode AND decode each <=30s window independently ---
     //
     // The previous approach assembled a single giant cross-KV for all chunks and ran
