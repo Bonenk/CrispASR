@@ -47,6 +47,9 @@ Regenerate both with `python tools/gen-learnings-index.py` after adding a sectio
 TOPICS = [
     ("Security & untrusted input",
      r"untrusted|memory-safety|fuzzer|DoS|auth check|buffer from|parser that"),
+    ("Compliance, provenance & marking (EU AI Act)",
+     r"AI Act|consent|watermark|provenance|marking|attestation|C2PA|deep fake|"
+     r"speaker.identity|disclosure|clone gate"),
     ("Build, CI, release & packaging",
      r"\bCI\b|workflow|release|tag is|cmake|cmake-js|linker|MSVC|Windows|cgo|LDFLAGS|ctest|"
      r"GitHub Action|compiler family|libcommon|HF Space|upload|Kaggle|crates|wheel|ccache|near-full disk"),
@@ -122,6 +125,10 @@ OVERRIDES = {
     "Specific bugs that cost us a day each": _D,
     "Audit script ≠ behavior test": _D,
     "`git apply --3way` STAGES its result": _D,
+    "#311 --strict-pipeline SHIPPED": _M,
+    "glint MP3+AAC TTS output": "Mel, codecs & the audio front-end",
+    "indextts long-ref crash FIXED": PORTS,
+    "PR #244 dequant-cache fix MERGED": _G,
 }
 
 # Families to cross-reference. Order matters only for readability.
@@ -154,6 +161,18 @@ MODELS = [
     ("titanet / speaker-id", r"TitaNet|Speaker verification"),
     ("audioseal", r"AudioSeal"),
     ("cohere", r"\b[Cc]ohere\b"),  # \b matters: bare "cohere" also matches "coherent"
+    ("voxtral", r"[Vv]oxtral"),
+    ("granite", r"[Gg]ranite"),
+    ("ark-asr", r"ARK-ASR|ark[-_]asr|arkasr"),
+    ("higgs-stt", r"[Hh]iggs"),
+    ("dots-tts", r"dots\.tts|dots-tts|dots_tts"),
+    ("irodori", r"[Ii]rodori"),
+    ("f5-tts", r"F5-TTS|f5-tts|f5_tts"),
+    ("kokoro", r"[Kk]okoro"),
+    ("kugelaudio", r"[Kk]ugelaudio"),
+    ("zonos", r"[Zz]onos"),
+    ("omniasr / omnivoice", r"[Oo]mniASR|omniasr|[Oo]mniVoice|omnivoice"),
+    ("glm / mimo / mega", r"glm-asr|mimo[-_]asr|mega[-_]asr"),
 ]
 
 
