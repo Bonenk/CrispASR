@@ -63,9 +63,13 @@ than the broken kernel (Apple GPUs emulate int64 division), which is worth
 stating in the PR to preempt the "why not one flat index" review question.
 Fresh M1 numbers, outputs byte-identical: PP-OCRv6 medium recognize
 13.4-14.0 s -> 5.8-6.2 s (2.3x), layout_detect (RT-DETR, N==1 convs)
-1.6x. CrispASR-side numbers (melotts HiFi-GAN, moonshine) still need
-re-measuring after a pin bump to >= `89a2039d` — the old 2-3x/1.65x figures
-above were measured on the pre-v0.17 variant. Re-draft the upstream PR from
+1.6x. CrispASR-side numbers re-measured 2026-08-06 after the pin bump to
+`89a2039d` (interleaved M1 pairs, PERFORMANCE.md top entry): melotts
+hifigan_decode 2.02 s -> 1.10 s (**1.85x**, round-trip clean), moonshine
+transcript byte-identical with RTF neutral-to-slightly-better, paraformer
+transcript byte-identical with its two im2col nodes 8.5-9.1 ->
+0.4-1.0 ms/node (9-20x, wall-invisible at its share). The old 2-3x/1.65x
+figures above were the pre-v0.17 variant. Re-draft the upstream PR from
 `kernel_im2col_flat`; keep this file's CUDA note (still true) and the
 auto-select-no-env-var guidance (the fork's `CRISPASR_METAL_IM2COL_FLAT`
 opt-out stays fork-only).
