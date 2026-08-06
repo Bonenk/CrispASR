@@ -137,33 +137,55 @@ no three-surface edit needed.
 model and **cannot return a language the model does not support**. Verified on
 the Arabic finetune: Arabic clip → `ar` p=0.675, `jfk.wav` → `en` p=0.647.
 
-⚠ **It degrades as the candidate set grows and I could not fix that.** Forcing
-14 candidates on `jfk.wav` picked **`fr`**, for two compounding reasons worth
-remembering: the model *translates* when handed a language it wasn't given
-(so "fluent French out" is not evidence of French in — cld3 confirmed the
-translation at 1.00), and JFK's chiasmus is legitimately repetitive, so
-diversity² punished the correct answer. Hence the ≤4-language auto ceiling
-(`CRISPASR_COHERE_PROBE_MAX_LANGS`), which is an accuracy gate, not just a cost
-one. Pinned as a deliberately-failing-direction test in `test-lid-probe.cpp`
-using the logged (len, agree, div) triples.
+Measured again on the **real 14-language base model** (`cohere-transcribe-q4_k`,
+after republishing): the forced 14-way probe is **correct on both clips** —
+`jfk.wav` → `en` (228, p=0.169), Arabic clip → `ar` (292, p=0.254). The ≤4
+ceiling (`CRISPASR_COHERE_PROBE_MAX_LANGS`) is therefore a **cost** gate: 14
+probes take 37 s on an M1 against ~1 s for whisper-tiny.
+
+⚠ **I first documented the opposite and it was wrong.** The "forcing 14
+candidates picks `fr`" result came from forcing a 14-language list onto the
+**two-language Arabic finetune** — a model with no French, which *translates*
+rather than degrading, and cld3 then confirms the translation at 1.00. The real
+base model's `fr` probe code-switches instead ("Et so, my fellow Americans…",
+agreement 0.00, score 57) and loses. I had flagged that extrapolation as
+"suggestive, not conclusive" and shipped the conclusion anyway. **The lesson is
+narrow and reusable: a forced/mismatched capability list does not simulate a
+model that genuinely has that capability.** The scoring soft spot itself is real
+and stays documented (a fluent translation *can* outscore repetitive truth); it
+is just not what the candidate count controls.
+
+### Closed since (2026-08-06, same day)
+
+- **Metadata republished — all 10 GGUFs**, via `tools/gguf-add-cohere-langs.py`
+  (tensors passed through, per-tensor sha256 verified) on Kaggle kernel
+  `chr1str/cohere-langs-republish`. Confirmed independently by range-reading each
+  live file's KV section: Arabic ×4 = `['en','ar']`, base ×6 = the 14. The fix is
+  no longer inert; `CRISPASR_COHERE_LANGS` is now only for third-party GGUFs.
+- **Converter runs end-to-end** (2104 tensors, 4.14 GB, key + `max_clip_s`
+  present, output transcribes and enforces its own whitelist). Running it
+  surfaced a pre-existing bug: it wrote `general.architecture` twice, which
+  strict gguf-py versions reject.
+- **Server and session C-ABI surfaces exercised**, not just compiled — probe
+  fires and substitution warns on both.
+- **UTF-8 truncation bug** in the probe log (`%.60s` cut mid-character, killed
+  the Kaggle run via Python's stderr decode). Fixed + guarded.
 
 ### Open follow-ups
 
-1. **Republish the metadata.** Both GGUF repos need reconverting (or a metadata
-   rewrite) so `cohere_transcribe.supported_languages` actually ships; until
-   then users need `CRISPASR_COHERE_LANGS=en,ar`. The cards already document
-   both.
-2. **Measure the probe on the real 14-language base model** before recommending
-   `--lid-backend probe` for it. Every number above is from the *Arabic*
-   finetune with a forced language list — suggestive, not conclusive.
-3. **`prefers_vad()` for cohere.** cohereX makes VAD default because the model
+1. **`prefers_vad()` for cohere.** cohereX makes VAD default because the model
    hallucinates text over non-speech; our chunker splits at RMS minima but never
    *drops* silence. Untested here, but a plausible quality win.
-4. **A cheaper probe.** The encoder output is language-independent, so one
-   encode + N decodes would replace N encodes. There is a clean seam at
-   `const int T_enc = T_enc_total;` in `cohere_transcribe_ex`. Not attempted:
-   extracting ~370 lines of encoder/cross-KV graph code with no cohere GGUF on
-   the Mac to A/B against is how silent breakage ships.
+2. **A cheaper probe.** The encoder output is language-independent, so one
+   encode + N decodes would replace N encodes — worth ~14× on the base model's
+   37 s. There is a clean seam at `const int T_enc = T_enc_total;` in
+   `cohere_transcribe_ex`. Still not attempted: extracting ~370 lines of
+   encoder/cross-KV graph code is only safe with a cohere GGUF to A/B against,
+   which the Mac now has (`cohere-transcribe-q4_k`, 1.5 GB).
+3. **`tools/gguf-add-merges.py` is broken** against the installed gguf-py: it
+   passes `sub_type=` to `MetadataDetails`, which that version does not have, so
+   it raises TypeError. One-line fix (drop the kwarg — the array element type is
+   inferred), untested here for want of a GLM-ASR GGUF.
 
 ## LANDED 2026-08-05 — #334 cosyvoice3 WAV cloning (85d60ba9, 88c02788)
 
