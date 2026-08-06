@@ -157,3 +157,11 @@ Transformer decoder FFN uses **ReLU** (not SiLU/Swish).
 | Multilingual ASR + speech translation + explicit language control | `canary-main` ([cstr/canary-1b-v2-GGUF](https://huggingface.co/cstr/canary-1b-v2-GGUF)) |
 | Multilingual subword forced alignment of any transcript | `nfa-align` ([cstr/canary-ctc-aligner-GGUF](https://huggingface.co/cstr/canary-ctc-aligner-GGUF)) |
 | English-only character-level forced alignment (~30 ms MAE) | `cohere-align` (uses wav2vec2-large-xlsr-53-english) |
+
+## Provenance and EU AI Act Art. 53 note
+
+- **Upstream model:** [CohereLabs/cohere-transcribe-03-2026](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026) — published by `CohereLabs`.
+- **Upstream licence:** `apache-2.0`. This repository redistributes under the same terms; it grants no rights the upstream licence does not.
+- **What was done here:** format conversion and/or quantisation only (GGUF). No training, no fine-tuning, no merging, no distillation, no change to architecture, vocabulary or capability. Only the numeric representation of the upstream weights differs.
+- **Training data:** documented — where it is documented at all — by the upstream provider; see the upstream model card. No training data was used, added or selected by this repository.
+- **Provider status:** under Regulation (EU) 2024/1689 the upstream authors remain the provider of this model. Converting the serialisation format does not make this repository the provider of a new general-purpose AI model, and no such claim is made. Questions about training content, copyright policy or model capability belong upstream.
