@@ -626,23 +626,33 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
                __func__);
     }
 
-    // t5 / MADLAD-400 (#333). Two tensors carry the whole 256K-token vocabulary
-    // and are the only ones whose rounding lands directly on the output
-    // distribution: `shared.embed.weight` (every decoder step reads a row of it)
-    // and `lm_head.weight` (the logits ARE a product with it — MADLAD is
-    // tie_word_embeddings=false, so this is a second 256000x1024 matrix, not an
-    // alias). They are ~40% of the file, so keeping them at source precision
-    // costs real size — but the per-stage diff says exactly where the Q4_K loss
-    // is concentrated: enc_embed 0.9974 and enc_out 0.9937 against 1.000000 at
-    // F16, and those are embedding-driven. The 32+32 mat-mul blocks quantize
-    // cleanly (0.99998+ at every depth), which is the usual shape: quantize the
-    // big stacks, keep the load-bearing lookup tables.
+    // t5 / MADLAD-400 (#333). Keeping `shared.embed.weight` and
+    // `lm_head.weight` at source precision is OPT-IN, because it was measured
+    // and it LOSES.
+    //
+    // The reasoning that motivated it was: those two carry the whole 256K
+    // vocabulary, Q4_K's worst stages were enc_embed 0.9974 and enc_out 0.9937,
+    // therefore the loss is embedding-driven. Wrong. Re-quantizing with them
+    // held wide and diffing against the reference archive:
+    //
+    //     q8_0   3.38 -> 3.62 GB   worst cos 0.999922 -> 0.999920
+    //     q4_k   2.04 -> 2.41 GB   worst cos 0.992929 -> 0.992606
+    //
+    // Bigger and no better. The new worst stages say why — cross_v_blk0,
+    // enc_out, cross_k_blk0 — i.e. the error is what ACCUMULATES through 32
+    // encoder blocks, not what the embedding lookup rounds off. A wide
+    // embedding cannot fix a stack that has already drifted.
+    //
+    // Kept and inverted rather than deleted: a different T5 checkpoint (tied
+    // embeddings, a smaller vocabulary, an imatrix run) could land differently,
+    // and the lever costs nothing switched off.
     const bool is_t5 = (arch == "t5");
-    const char* env_t5_all = std::getenv("CRISPASR_T5_QUANT_ALL");
-    const bool t5_quant_all = is_t5 && env_t5_all && *env_t5_all && *env_t5_all != '0';
-    if (is_t5 && !t5_quant_all) {
+    const char* env_t5_keep = std::getenv("CRISPASR_T5_KEEP_EMBED");
+    const bool t5_keep_embed = is_t5 && env_t5_keep && *env_t5_keep && *env_t5_keep != '0';
+    if (t5_keep_embed) {
         printf("%s: t5 — keeping shared.embed.* and lm_head.* at source precision "
-               "(override with CRISPASR_T5_QUANT_ALL=1)\n",
+               "(CRISPASR_T5_KEEP_EMBED=1; measured BIGGER and no better on madlad400 — "
+               "see the note in this file)\n",
                __func__);
     }
 
@@ -849,7 +859,7 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             !(is_gigaam && !gigaam_quant_all &&
               (sname.find("joint.") == 0 || sname.find("decoder.") == 0 || sname.find("head.ctc.") == 0 ||
                sname.find("encoder.pre.") == 0 || sname.find("preprocessor.") == 0)) &&
-            !(is_t5 && !t5_quant_all && (sname.find("shared.embed") == 0 || sname.find("lm_head") == 0)) &&
+            !(t5_keep_embed && (sname.find("shared.embed") == 0 || sname.find("lm_head") == 0)) &&
             !(is_tada && !tada_quant_all && (sname.find("talker.token_embd") == 0 || sname.find("tada.") == 0)) &&
             ([&]() {
                 if (!is_tada || tada_quant_all || (tada_keep_head == 0 && tada_keep_tail == 0))

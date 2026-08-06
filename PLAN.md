@@ -198,21 +198,28 @@ produced and validated everything. Reference archive:
   blueprint** — anyone diffing against HF needs the old behaviour back. Both
   sentences the reference terminates cleanly on are byte-identical with it on
   and off.
-- ~~No `t5`/madlad rule in `crispasr-quantize`~~ **DONE.** The port pipeline's
-  step 3 asks for it and I had filed it instead of doing it.
-  `shared.embed.weight` and `lm_head.weight` now stay at source precision
-  (`CRISPASR_T5_QUANT_ALL=1` overrides). Those two carry the whole 256K
-  vocabulary and are the only tensors whose rounding lands straight on the
-  output distribution — MADLAD is `tie_word_embeddings=false`, so `lm_head` is a
-  SECOND 256000×1024 matrix, not an alias. The per-stage table says exactly why:
-  Q4_K's worst stages are `enc_embed` 0.9974 and `enc_out` 0.9937, both
-  embedding-driven, while the 32+32 mat-mul blocks quantize cleanly (0.99998+ at
-  every depth). ⚠ The published Q4_K/Q8_0 predate the rule — re-quantizing with
-  it should lift those two stages and is worth a run.
-- The kernel builds from source (the diff arm postdates v0.8.25) and the ccache
-  dataset did **not** warm — `ccache_hits: 0` on both runs, ~11 min of build
-  each time. `kh.export_ccache_tar()` now writes `ccache.tar` to the output, so
-  refreshing `chr1str/crispasr-ccache` from it would pay for itself.
+- **`t5` quantizer rule: written, MEASURED, and defaulted OFF because it loses.**
+  The port pipeline's step 3 asks for a per-arch rule, so I added one keeping
+  `shared.embed.weight` and `lm_head.weight` at source precision — reasoning
+  that Q4_K's worst stages (`enc_embed` 0.9974, `enc_out` 0.9937) were
+  embedding-driven. **That reasoning was wrong.** Re-quantized from the F16 and
+  diffed against the reference archive:
+
+  | | size | worst cosine |
+  |---|---|---|
+  | q8_0 | 3.38 → 3.62 GB | 0.999922 → 0.999920 |
+  | q4_k | 2.04 → 2.41 GB | 0.992929 → 0.992606 |
+
+  Bigger and no better, so neither was published — the kernel's
+  "upload only if parity improves" gate held. The new worst stages say why:
+  `cross_v_blk0`, `enc_out`, `cross_k_blk0`, i.e. the error is what ACCUMULATES
+  through 32 encoder blocks, not what the embedding lookup rounds off. A wide
+  embedding cannot repair a stack that has already drifted.
+  Kept and inverted rather than deleted (`CRISPASR_T5_KEEP_EMBED=1`): a
+  different T5 checkpoint — tied embeddings, smaller vocabulary, or an imatrix
+  run — could land differently, and the lever costs nothing switched off.
+  **The published q4_k/q8_0 are the generic-path files and remain the
+  measured-best.**
 
 ## OPEN 2026-08-05 — miotts writes a 24 kHz WAV header for 44.1 kHz audio
 
