@@ -342,20 +342,29 @@ boundaries.
 
 ```bash
 ./build/bin/crispasr --backend cosyvoice3-tts -m auto \
-    --voice ref.wav --ref-text "<exact transcript of ref.wav>" --i-have-rights \
+    --voice ref.wav --i-have-rights \
     --tts "Text to speak." --tts-output out.wav
 ```
 
-**`--ref-text` must be a complete, exact transcription of `ref.wav`** — this is
-the one input that will quietly ruin the output if you get it wrong (issue
-#334). The talker LM is conditioned on the pair *(reference transcript,
-reference speech)* and infers the speaker's rate from it. Hand it 18 s of audio
-labelled with one sentence and it concludes the speaker says a sentence in 18 s,
-then either stops immediately — `AR decode produced 0 tokens`, no audio — or
-crams the line you asked for into far too few 40 ms frames, which is heard as
-rushed, pitched-up speech. Upstream's decode only ever spends between 2 and 20
-speech tokens per text token, so the runtime checks the reference against that
-same band and warns when the pairing cannot be a transcript:
+**Leave `--ref-text` off unless you have an exact transcript.** The reference
+is auto-transcribed (whisper by default, `--ref-asr` to pick another backend)
+and the result is cached beside the clip as `<voice>.cv3reftext`, so only the
+first run pays for ASR.
+
+The reason this matters is issue #334: a transcript that does not match the
+clip is the one input that quietly ruins the output. The talker LM is
+conditioned on the pair *(reference transcript, reference speech)* and infers
+the speaker's rate from it. Hand it 18 s of audio labelled with one sentence
+and it concludes the speaker says a sentence in 18 s, then either stops
+immediately — `AR decode produced 0 tokens`, no audio — or crams the line you
+asked for into far too few 40 ms frames, which is heard as rushed, pitched-up
+speech. Measured on a 17.7 s reference: with a one-sentence guess the requested
+line vanished from the output entirely; auto-transcribed, it came out in full.
+
+If you do pass `--ref-text`, it must be a complete, exact transcription.
+Upstream's decode only ever spends between 2 and 20 speech tokens per text
+token, so the runtime checks what you passed against that same band and warns
+when the pairing cannot be a transcript:
 
 ```
 cosyvoice3_tts: WARNING: the reference clip holds 17.72 s of speech but
@@ -363,9 +372,9 @@ cosyvoice3_tts: WARNING: the reference clip holds 17.72 s of speech but
 matching transcript lands between 2 and 20). …
 ```
 
-If you cannot transcribe the whole clip, **trim the clip to the part you did
-transcribe** — a clean 4–10 s excerpt clones better than 20 s with an
-approximate transcript.
+If you cannot transcribe the whole clip, either drop `--ref-text` and let the
+backend do it, or **trim the clip to the part you did transcribe** — a clean
+4–10 s excerpt clones better than 20 s with an approximate transcript.
 
 ### Reference sample rate
 
