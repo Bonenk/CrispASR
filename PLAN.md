@@ -74,6 +74,68 @@ Earned the hard way; each cost a real bug getting through.
    copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
    missing one.
 
+## LANDED 2026-08-06 — cohere: the language whitelist, + probe LID
+
+Prompted by reading [bakrianoo/cohereX](https://github.com/bakrianoo/cohereX)
+(a WhisperX-shaped Python wrapper around the same model). Nothing to take from
+its runtime — we have the native port, CTC alignment and native diarization —
+but it validates `-l` against the model's `config.json` and we did not.
+
+**The bug.** Cohere Transcribe answers a wrong language *fluently* instead of
+failing, and we had no whitelist, so an unsupported `-l` was accepted in
+silence. Reachable without user error: `-l auto` is the CLI default and
+whisper-tiny LID knows 99 languages against this model's 14 — or the Arabic
+finetune's **two**.
+
+**The thing I got wrong first, and the reason this needed metadata.** I assumed
+`<|ru|>` was absent from the vocab and silently dropped by the prompt builder's
+`remove_if`. Measured on the published Arabic GGUF: the tokenizer carries **183
+`<|xx|>` tokens — the whole of ISO 639-1** — while the model supports two. So
+every real code is well-formed and a vocab check catches nothing. On one 8 s
+Arabic clip: `-l ru` added a hallucinated leading word, `-l ja` swapped the
+quote marks for brackets, `-l de` changed the diacritics. All plausible, none
+flagged. `config.json`'s `supported_languages` is the ONLY available signal —
+which is why it now rides in the GGUF (`cohere_transcribe.supported_languages`)
+rather than being inferred. (The `remove_if` backstop stays, but it only ever
+fires for non-ISO input: `<|auto|>` genuinely is absent.)
+
+Fixing it in `cohere_transcribe_ex` covers CLI + session ABI + server at once —
+no three-surface edit needed.
+
+**Probe LID** (`--lid-backend probe`, cohereX's `langid.py` idea): transcribe a
+20 s clip once per supported language, score
+`len × (1 + 3·text-LID-agreement) × distinct-token-ratio²`. Needs no second
+model and **cannot return a language the model does not support**. Verified on
+the Arabic finetune: Arabic clip → `ar` p=0.675, `jfk.wav` → `en` p=0.647.
+
+⚠ **It degrades as the candidate set grows and I could not fix that.** Forcing
+14 candidates on `jfk.wav` picked **`fr`**, for two compounding reasons worth
+remembering: the model *translates* when handed a language it wasn't given
+(so "fluent French out" is not evidence of French in — cld3 confirmed the
+translation at 1.00), and JFK's chiasmus is legitimately repetitive, so
+diversity² punished the correct answer. Hence the ≤4-language auto ceiling
+(`CRISPASR_COHERE_PROBE_MAX_LANGS`), which is an accuracy gate, not just a cost
+one. Pinned as a deliberately-failing-direction test in `test-lid-probe.cpp`
+using the logged (len, agree, div) triples.
+
+### Open follow-ups
+
+1. **Republish the metadata.** Both GGUF repos need reconverting (or a metadata
+   rewrite) so `cohere_transcribe.supported_languages` actually ships; until
+   then users need `CRISPASR_COHERE_LANGS=en,ar`. The cards already document
+   both.
+2. **Measure the probe on the real 14-language base model** before recommending
+   `--lid-backend probe` for it. Every number above is from the *Arabic*
+   finetune with a forced language list — suggestive, not conclusive.
+3. **`prefers_vad()` for cohere.** cohereX makes VAD default because the model
+   hallucinates text over non-speech; our chunker splits at RMS minima but never
+   *drops* silence. Untested here, but a plausible quality win.
+4. **A cheaper probe.** The encoder output is language-independent, so one
+   encode + N decodes would replace N encodes. There is a clean seam at
+   `const int T_enc = T_enc_total;` in `cohere_transcribe_ex`. Not attempted:
+   extracting ~370 lines of encoder/cross-KV graph code with no cohere GGUF on
+   the Mac to A/B against is how silent breakage ships.
+
 ## LANDED 2026-08-05 — #334 cosyvoice3 WAV cloning (85d60ba9, 88c02788)
 
 Reported as "long delay, pitch shifting and accent issues", blamed on sample

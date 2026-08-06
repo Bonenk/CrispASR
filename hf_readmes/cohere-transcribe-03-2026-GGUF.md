@@ -84,6 +84,19 @@ huggingface-cli download cstr/cohere-transcribe-03-2026-GGUF \
 
 ## Implementation Notes (Critical for Correctness)
 
+### The language whitelist is metadata, not vocab
+`config.json` lists 14 supported languages (`en fr de es it pt nl pl el ar ja
+zh vi ko`), but the tokenizer carries **all 183 ISO-639-1 `<|xx|>` tokens**. So
+`<|ru|>` decodes without error, and the model answers a wrong language
+*fluently* rather than failing — there is no runtime signal at all. The
+whitelist therefore has to travel with the weights: these GGUFs carry it as
+`cohere_transcribe.supported_languages`, and CrispASR substitutes loudly when
+`-l` names something outside it. For a GGUF converted before that key existed,
+declare it with `CRISPASR_COHERE_LANGS=en,fr,de,…`.
+
+This matters most because `-l auto` runs an external detector that knows 99
+languages against a model that accepts 14.
+
 ### Mel normalization
 Per-feature normalization uses **biased standard deviation** `std = sqrt(mean(diff²) + ε)`, matching the ONNX reference. Using the Bessel-corrected (unbiased) formula produces a `sqrt(T) ≈ 20×` larger denominator for T ≈ 417 frames and completely corrupts the encoder output.
 

@@ -828,7 +828,31 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             fprintf(stderr, "crispasr: %s is %s-only — skipping language detection\n", backend.name(), sole_lang);
     }
 
+    // Some backends can identify the language with the model already loaded
+    // (cohere probes its own supported set). Prefer that over an external
+    // detector when the user did not name one explicitly: it downloads
+    // nothing, and — the real reason — it can only return a language the
+    // backend actually supports, whereas whisper-tiny LID knows 99 and will
+    // happily hand back one the model was never trained on.
+    bool probed_ok = false;
     if (want_auto_lang && !has_native_lid && !lid_disabled) {
+        crispasr_lid_result probe;
+        if (crispasr_backend_probe_language(backend, samples.data(), (int)samples.size(), params, probe)) {
+            lid_info.lang_code = probe.lang_code;
+            lid_info.confidence = probe.confidence;
+            lid_info.source = probe.source;
+            params.language = probe.lang_code;
+            if (params.source_lang.empty())
+                params.source_lang = probe.lang_code;
+            probed_ok = true;
+            if (!params.no_prints) {
+                fprintf(stderr, "crispasr: LID -> language = '%s' (%s, p=%.3f)\n", probe.lang_code.c_str(),
+                        probe.source.c_str(), probe.confidence);
+            }
+        }
+    }
+
+    if (want_auto_lang && !has_native_lid && !lid_disabled && !probed_ok) {
         crispasr_lid_result lid;
         if (crispasr_detect_language_cli(samples.data(), (int)samples.size(), params, lid)) {
             lid_info.lang_code = lid.lang_code;
@@ -4451,7 +4475,12 @@ int crispasr_run_backend(const whisper_params& params_in) {
                                     params.lid_backend == "none";
         if (want_auto_lang && !has_native_lid && !lid_disabled) {
             crispasr_lid_result lid;
-            if (crispasr_detect_language_cli(samples.data(), (int)samples.size(),
+            // Backend self-probe first (see crispasr_lid_cli.h); external LID
+            // only when it declines.
+            const bool probed = crispasr_backend_probe_language(*backend, samples.data(),
+                                                                (int)samples.size(), params, lid);
+            if (probed ||
+                crispasr_detect_language_cli(samples.data(), (int)samples.size(),
                                           params, lid)) {
                 params.language = lid.lang_code;
                 if (params.source_lang.empty()) {
