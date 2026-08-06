@@ -180,6 +180,27 @@ public:
         return true;
     }
 
+    bool prefers_vad() const override {
+        // Cohere Transcribe transcribes NON-SPEECH as fabricated text, and our
+        // chunker splits long audio at RMS minima without ever DROPPING the
+        // quiet parts. Measured on the Arabic q4_k-imatrix build:
+        //
+        //   10 s of pure digital silence  -> "And I'm going to go ahead and do that."
+        //   jfk.wav + 20 s of silence     -> that same sentence appended to an
+        //                                    otherwise perfect transcript
+        //
+        // With --vad both go away (the second returns the clean transcript, the
+        // first returns nothing). VAD also fixes the OTHER failure of fixed
+        // windows: on a 60 s FLEURS clip the un-VAD'd run cut mid-sentence,
+        // garbled a clause ("how acidic, basic, alkaline the cabbage juice is"
+        // for "...the chemical is") and DROPPED a whole sentence that the VAD
+        // run recovered. So this is a content win, not only a silence guard.
+        //
+        // Only arms the long-audio safeguard in crispasr_run.cpp, and only when
+        // the user passed no --vad / --vad-model / --chunk-seconds.
+        return true;
+    }
+
     void warmup() override {
         if (!ctx_)
             return;
