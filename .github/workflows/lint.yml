@@ -23,6 +23,10 @@ on:
       # README language drift check (issue #50)
       - 'README.md'
       - 'tools/check-readme-langs.py'
+      # LEARNINGS index drift: a new section shifts every cited line number
+      - 'LEARNINGS.md'
+      - 'docs/LEARNINGS-INDEX.md'
+      - 'tools/gen-learnings-index.py'
       # Release-tooling consistency (release-consistency job). A version bump
       # touches NONE of the C++ paths above, so without these the check would
       # never run on the commits it exists to guard.
@@ -59,6 +63,10 @@ on:
       # README language drift check (issue #50)
       - 'README.md'
       - 'tools/check-readme-langs.py'
+      # LEARNINGS index drift: a new section shifts every cited line number
+      - 'LEARNINGS.md'
+      - 'docs/LEARNINGS-INDEX.md'
+      - 'tools/gen-learnings-index.py'
       # Release-tooling consistency (release-consistency job). A version bump
       # touches NONE of the C++ paths above, so without these the check would
       # never run on the commits it exists to guard.
@@ -302,6 +310,14 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+
+      # BEFORE the network-dependent step on purpose: this check is hermetic, and
+      # a flaky HF call in a later step must not be able to stop it from running.
+      # docs/LEARNINGS-INDEX.md cites LEARNINGS.md line numbers, so ANY inserted
+      # section shifts them; an index that silently points at the wrong lesson is
+      # worse than no index, so this is a hard gate, not an advisory.
+      - name: Check LEARNINGS.md index is current
+        run: python tools/gen-learnings-index.py --check
 
       - name: Install huggingface_hub
         run: pip install --quiet 'huggingface_hub>=0.20'
