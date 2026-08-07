@@ -30,7 +30,7 @@ base_model: CohereLabs/cohere-transcribe-03-2026
 
 GGUF weights for **[CohereLabs/cohere-transcribe-03-2026](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026)** — Cohere's open-source 2B-parameter ASR model, #1 on the [Open ASR Leaderboard](https://huggingface.co/spaces/hf-audio/open_asr_leaderboard) (avg WER 5.42, as of March 2026).
 
-This conversion enables high-performance CPU inference via **[CrispASR](https://github.com/CrispStrobe/CrispASR/tree/ggml)** — a crispasr-style C++ runtime for the Cohere Conformer-encoder / Transformer-decoder architecture.
+This conversion enables high-performance CPU inference via **[CrispASR](https://github.com/CrispStrobe/CrispASR)** — a crispasr-style C++ runtime for the Cohere Conformer-encoder / Transformer-decoder architecture.
 
 > **License**: Apache 2.0 (inherited from source model). See [original model card](https://huggingface.co/CohereLabs/cohere-transcribe-03-2026) for full terms.
 
@@ -56,10 +56,10 @@ This conversion enables high-performance CPU inference via **[CrispASR](https://
 ### 1. Build CrispASR
 
 ```bash
-git clone -b ggml https://github.com/CrispStrobe/CrispASR
+git clone --recursive https://github.com/CrispStrobe/CrispASR
 cd CrispASR && mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j$(nproc) cohere-main
+cmake --build . -j $(nproc) --target crispasr-cli
 ```
 
 ### 2. Download a GGUF
@@ -73,7 +73,7 @@ huggingface-cli download cstr/cohere-transcribe-03-2026-GGUF \
 ### 3. Transcribe
 
 ```bash
-./bin/cohere-main \
+./bin/crispasr --backend cohere \
     -m cohere-transcribe-q4_k.gguf \
     -f audio.wav \
     -l en \
@@ -152,7 +152,7 @@ Transformer decoder FFN uses **ReLU** (not SiLU/Swish).
 
 | Need | Right tool |
 | --- | --- |
-| **Lowest English WER** (Open ASR Leaderboard #1) | **`cohere-main`** ← this repo |
+| **Lowest English WER** (Open ASR Leaderboard #1) | **`--backend cohere`** ← this repo |
 | Multilingual ASR + free word timestamps | `parakeet-main` ([cstr/parakeet-tdt-0.6b-v3-GGUF](https://huggingface.co/cstr/parakeet-tdt-0.6b-v3-GGUF)) |
 | Multilingual ASR + speech translation + explicit language control | `canary-main` ([cstr/canary-1b-v2-GGUF](https://huggingface.co/cstr/canary-1b-v2-GGUF)) |
 | Multilingual subword forced alignment of any transcript | `nfa-align` ([cstr/canary-ctc-aligner-GGUF](https://huggingface.co/cstr/canary-ctc-aligner-GGUF)) |
