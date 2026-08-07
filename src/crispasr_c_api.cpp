@@ -8568,6 +8568,18 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
 #endif
 #ifdef CA_HAVE_OMNIVOICE
     if (s->omnivoice_ctx) {
+        // #13273, and it is #329's bug one backend over: this session ABI
+        // reimplements each backend's synthesize inline instead of calling the
+        // CLI adapter, so the adapter's language wiring never reached bindings,
+        // Flutter or Android — omnivoice there ignored the requested language
+        // outright. Output language: target_language → source_language, the
+        // same fallback every other TTS backend in this function uses.
+        // Unrecognized values are the runtime's business (it warns and falls
+        // back to language-agnostic), so the -2 return is not an error here.
+        {
+            const std::string out_lang = !s->target_language.empty() ? s->target_language : s->source_language;
+            omnivoice_set_language(s->omnivoice_ctx, out_lang.c_str());
+        }
         float* pcm = omnivoice_synthesize(s->omnivoice_ctx, text, out_n_samples);
         if (!pcm && s->last_synth_error.empty()) {
             s->last_synth_error = "omnivoice synthesis failed — "

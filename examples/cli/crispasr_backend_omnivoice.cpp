@@ -148,6 +148,25 @@ public:
             omnivoice_set_num_steps(ctx_, params.tts_num_steps);
         }
 
+        // #13273: and the target language, for the same reason. The server owns
+        // ONE backend instance for the whole session and passes the per-request
+        // language in `params`, so applying it only in init() meant
+        // SubtitleEdit's language menu could never change anything after the
+        // first line — the menu was decoration. Prefer -tl (TTS-explicit), else
+        // -l; "auto" is the CLI's no-op sentinel and resolve() clears on it.
+        // Same shape as crispasr_backend_cosyvoice3.cpp.
+        const std::string tgt_lang = !params.target_lang.empty() ? params.target_lang : params.language;
+        omnivoice_set_language(ctx_, tgt_lang.c_str());
+
+        // Same omission, found while A/B-ing the above: /v1/audio/speech accepts
+        // a per-request `seed` and omnivoice dropped it, so re-rendering one
+        // subtitle line could not be made reproducible. 0 is the "leave it
+        // alone" default (the runtime's own default is 42), so this changes
+        // nothing unless a caller actually asks.
+        if (params.seed != 0) {
+            omnivoice_set_seed(ctx_, params.seed);
+        }
+
         int n_samples = 0;
         float* pcm = omnivoice_synthesize(ctx_, text.c_str(), &n_samples);
         if (pcm && n_samples > 0) {

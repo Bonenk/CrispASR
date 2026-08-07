@@ -33,7 +33,8 @@
 #include "core/wav_reader.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h"
-#include "core/tts_ref_cache.h" // shared content-addressed reference-voice cache (issue #265)
+#include "core/omnivoice_lang.h" // ISO-639-3 resolution for the <|lang_start|> tag (#13273)
+#include "core/tts_ref_cache.h"  // shared content-addressed reference-voice cache (issue #265)
 #include "core/crispasr_env.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
@@ -3477,10 +3478,38 @@ int omnivoice_set_voice_prompt(struct omnivoice_context* ctx, const char* wav_pa
     return 0;
 }
 
+// The stored value goes VERBATIM into `<|lang_start|>…<|lang_end|>`, so resolve
+// it here rather than at the call sites — this is the one funnel every surface
+// (CLI, server, session ABI, bindings) passes through, and #13273 was three
+// separate surfaces each getting the wiring wrong on its own.
+//
+// Mirrors the blueprint's `_resolve_language()`: a valid ISO 639-3 ID passes
+// through, an English name maps to its ID, anything else becomes None
+// (language-agnostic) — never itself. Passing an unrecognized string through
+// is the silent failure: the prompt still builds, the graph still computes, and
+// the model is conditioned on tokens it never saw in that slot.
 int omnivoice_set_language(struct omnivoice_context* ctx, const char* lang) {
     if (!ctx)
         return -1;
-    ctx->language = lang ? lang : "";
+
+    const std::string requested = lang ? lang : "";
+    const auto resolved = core_omnivoice_lang::resolve(requested);
+    ctx->language = resolved.id;
+
+    if (resolved.status == core_omnivoice_lang::Status::unrecognized) {
+        // Not fatal — synthesis proceeds language-agnostic, exactly as upstream
+        // does — but say so, because the caller asked for something specific
+        // and is not getting it. Silence here is what made the SubtitleEdit
+        // language menu look like it worked.
+        const std::string hint = core_omnivoice_lang::suggest(requested);
+        fprintf(stderr, "crispasr[omnivoice]: language '%s' is not one of the model's %d language IDs",
+                requested.c_str(), core_omnivoice_lang::kLangTableN);
+        if (!hint.empty())
+            fprintf(stderr, " — did you mean '%s'?", hint.c_str());
+        fprintf(stderr, "\ncrispasr[omnivoice]: falling back to language-agnostic synthesis. Pass an ISO "
+                        "639-3 id (e.g. 'en', 'de', 'arb') or an English name (e.g. 'German').\n");
+        return -2;
+    }
     return 0;
 }
 

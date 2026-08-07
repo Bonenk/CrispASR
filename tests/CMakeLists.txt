@@ -4308,6 +4308,24 @@ catch_discover_tests(test-tts-lang
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-omnivoice-lang — the OmniVoice language knob (#13273), predicate AND
+# joins. The resolver mirrors the blueprint's _resolve_language(); the join half
+# is source-level because the behavioural version needs a 1.2 GB model and a
+# socket. The original bug was three missing call sites, so a predicate-only
+# test here would have been green throughout.
+add_executable(test-omnivoice-lang test-omnivoice-lang.cpp)
+target_include_directories(test-omnivoice-lang PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_compile_definitions(test-omnivoice-lang PRIVATE
+    CRISPASR_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+target_link_libraries(test-omnivoice-lang PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-omnivoice-lang
+    TEST_SPEC "[unit]"
+    PROPERTIES
+        LABELS unit
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test-rvc-svc — live integration tests (session C-ABI, the only surface)
 add_executable(test-rvc-svc test_rvc_svc_live.cpp)
 target_include_directories(test-rvc-svc PRIVATE
