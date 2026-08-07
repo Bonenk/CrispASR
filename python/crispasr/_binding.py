@@ -1932,7 +1932,7 @@ class Session:
             raise RuntimeError(f"set_speaker_id failed (rc={rc}) for backend {self.backend!r}")
 
     def set_instruct(self, instruct: str) -> None:
-        """Set the natural-language voice description (qwen3-tts VoiceDesign).
+        """Set the voice description / style instruct (qwen3-tts, parler, omnivoice).
 
         VoiceDesign generates speech in a voice **described by a
         natural-language instruction** — no reference WAV, no preset
@@ -1943,9 +1943,24 @@ class Session:
 
         Required for qwen3-tts VoiceDesign before
         :meth:`synthesize`. Re-callable; latest call wins. Raises if
-        the active backend isn't VoiceDesign.
+        the active backend has no instruct contract.
 
         Detect VoiceDesign via :meth:`is_voice_design`.
+
+        .. warning::
+           **omnivoice does not take free prose.** It was trained on a
+           closed 48-item vocabulary — a gender, age, pitch, style,
+           accent or Chinese dialect, comma-separated, at most one per
+           category — and the string reaches its prompt literally, so
+           anything else is rejected rather than ignored::
+
+               s.set_instruct("female, elderly, british accent")   # ok
+               s.set_instruct("a gruff pirate")                    # raises
+
+           Casing and separator width are normalised for you, and the
+           whole instruct is unified to the language of the text being
+           spoken (``"male, elderly"`` becomes ``男，老年`` for Chinese
+           text). See docs/tts.md for the full vocabulary.
         """
         if not hasattr(self._lib, "crispasr_session_set_instruct"):
             raise RuntimeError("set_instruct API not present in this libcrispasr build")
