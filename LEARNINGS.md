@@ -62,6 +62,28 @@ an upstream-documented upside makes the guess defensible where accuracy figures
 alone would not have. Record the asymmetry as the justification, so the day a
 wrong tag *is* shown to hurt, the reason to retract is already written down.
 
+**3c. Fixing a knob is not finishing the review — check its SIBLINGS in the
+blueprint before closing.** `_resolve_instruct` sits ten lines below
+`_resolve_language` in the same file, does the same job for the same prompt
+slot, and we had mirrored neither. It even carried the identical per-call bug
+(applied in `init()` only, so the server's per-request field was dead) in the
+*same function* I had just edited to fix that exact bug for language. Two
+habits: after mirroring one upstream resolver, grep the blueprint for its
+neighbours (`def _resolve_`, `def _normalize_`) and check each; and when a bug
+class is "value X never reaches the prompt", re-read the whole prompt builder
+for the other values, not just the one that was reported. The report names one
+symptom; the defect class is what you are actually fixing.
+
+**3d. Prompt-token parity is cheap and I skipped it anyway.** I verified our
+resolver reproduced the blueprint's *logic* and called that done. The check that
+actually matters is one command — run the real HF tokenizer on the prompt string
+and diff the ids — and it is what turned a "probably fine" into proof
+(byte-identical for de/en/arb/zh/None/denoise) *and* surfaced the instruct
+defect, because that comparison is where `'Male, British Accent'` visibly shares
+no token with `'male, british accent'`. Logic parity is an argument;
+token parity is evidence. Print the prompt ids under a debug env var so it stays
+one command forever.
+
 **4. An auto-generated UI list is a contract the runtime never signed.**
 SubtitleEdit's 646-entry language dropdown was generated from the model's own
 `lang_map.py`, which made it look authoritative — while our runtime dropped

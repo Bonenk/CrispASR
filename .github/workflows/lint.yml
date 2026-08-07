@@ -27,12 +27,15 @@ on:
       - 'LEARNINGS.md'
       - 'docs/LEARNINGS-INDEX.md'
       - 'tools/gen-learnings-index.py'
-      # OmniVoice language table: the generated header must match its vendored
-      # source. A wrong id is not cosmetic — it is what the model is conditioned
-      # on (#13273).
+      # OmniVoice prompt vocabularies: the generated headers must match their
+      # vendored sources. Neither is cosmetic — both are what the model is
+      # conditioned on (#13273).
       - 'src/core/omnivoice_lang_table.h'
+      - 'src/core/omnivoice_instruct_table.h'
       - 'third_party/omnivoice/lang_map.py'
+      - 'third_party/omnivoice/voice_design.py'
       - 'tools/gen-omnivoice-lang-map.py'
+      - 'tools/gen-omnivoice-instruct-map.py'
       # Release-tooling consistency (release-consistency job). A version bump
       # touches NONE of the C++ paths above, so without these the check would
       # never run on the commits it exists to guard.
@@ -73,12 +76,15 @@ on:
       - 'LEARNINGS.md'
       - 'docs/LEARNINGS-INDEX.md'
       - 'tools/gen-learnings-index.py'
-      # OmniVoice language table: the generated header must match its vendored
-      # source. A wrong id is not cosmetic — it is what the model is conditioned
-      # on (#13273).
+      # OmniVoice prompt vocabularies: the generated headers must match their
+      # vendored sources. Neither is cosmetic — both are what the model is
+      # conditioned on (#13273).
       - 'src/core/omnivoice_lang_table.h'
+      - 'src/core/omnivoice_instruct_table.h'
       - 'third_party/omnivoice/lang_map.py'
+      - 'third_party/omnivoice/voice_design.py'
       - 'tools/gen-omnivoice-lang-map.py'
+      - 'tools/gen-omnivoice-instruct-map.py'
       # Release-tooling consistency (release-consistency job). A version bump
       # touches NONE of the C++ paths above, so without these the check would
       # never run on the commits it exists to guard.
@@ -338,6 +344,9 @@ jobs:
       - name: Check OmniVoice language table is current
         run: python tools/gen-omnivoice-lang-map.py --check
 
+      - name: Check OmniVoice instruct table is current
+        run: python tools/gen-omnivoice-instruct-map.py --check
+
       - name: Install huggingface_hub
         run: pip install --quiet 'huggingface_hub>=0.20'
 
@@ -347,6 +356,10 @@ jobs:
       - name: Report OmniVoice upstream language-map drift
         continue-on-error: true
         run: python tools/gen-omnivoice-lang-map.py --check-upstream
+
+      - name: Report OmniVoice upstream instruct-map drift
+        continue-on-error: true
+        run: python tools/gen-omnivoice-instruct-map.py --check-upstream
 
       - name: Check README language columns vs HF cards
         env:

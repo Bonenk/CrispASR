@@ -4326,6 +4326,24 @@ catch_discover_tests(test-omnivoice-lang
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-omnivoice-instruct — the sibling of the language knob (#13273), found
+# by checking our runtime against the blueprint rather than by a report. The
+# instruct is a CLOSED 48-item vocabulary that upstream validates and rejects
+# on; we passed it through raw, and 'Male, British Accent' shares not one token
+# with the trained 'male, british accent'.
+add_executable(test-omnivoice-instruct test-omnivoice-instruct.cpp)
+target_include_directories(test-omnivoice-instruct PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_compile_definitions(test-omnivoice-instruct PRIVATE
+    CRISPASR_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+target_link_libraries(test-omnivoice-instruct PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-omnivoice-instruct
+    TEST_SPEC "[unit]"
+    PROPERTIES
+        LABELS unit
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test-rvc-svc — live integration tests (session C-ABI, the only surface)
 add_executable(test-rvc-svc test_rvc_svc_live.cpp)
 target_include_directories(test-rvc-svc PRIVATE

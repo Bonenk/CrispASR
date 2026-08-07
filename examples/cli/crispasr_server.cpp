@@ -58,6 +58,7 @@
 #include "crispasr_voice_clone_policy.h"
 #include "crispasr_voice_provenance.h"
 #include "core/crispasr_watermark.h"
+#include "core/omnivoice_instruct.h" // #13273: validate `instructions` at the edge
 #include "crispasr_watermark_dispatch.h"
 #include "core/crispasr_wav_writer.h"
 #include "core/worker_pool.h"     // improvements Phase 4b: concurrent ASR worker pool
@@ -2173,6 +2174,18 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         }
         std::string consent_attestation = body.value("consent_attestation", "");
         std::string instructions = body.value("instructions", "");
+        // #13273: omnivoice's instruct is a CLOSED 48-item vocabulary and
+        // upstream rejects anything else. Validate at the edge so a bad value
+        // is a 400 naming the offending item, not a 500 from a synthesis that
+        // failed three layers down. Free: the validator is a weight-free header.
+        if (!instructions.empty() && backend_name == "omnivoice") {
+            const auto parsed = core_omnivoice_instruct::parse(instructions);
+            if (parsed.status != core_omnivoice_instruct::Status::ok &&
+                parsed.status != core_omnivoice_instruct::Status::cleared) {
+                json_error(res, 400, parsed.error, "invalid_instructions", "instructions");
+                return;
+            }
+        }
         // #316: drive the acoustic model with these phonemes, skipping the G2P.
         // kokoro and piper only; refused elsewhere rather than silently
         // synthesizing `input`, which would make an A/B look like the phonemes

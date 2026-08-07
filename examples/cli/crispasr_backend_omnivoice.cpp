@@ -114,9 +114,14 @@ public:
             }
         }
 
-        // Style instruct
+        // Style instruct. Upstream rejects an unsupported item rather than
+        // ignoring it, so a bad --tts-instruct must fail the run — silently
+        // synthesising with no voice design is the bug, not the fallback.
         if (!p.tts_instruct.empty()) {
-            omnivoice_set_instruct(ctx_, p.tts_instruct.c_str());
+            if (omnivoice_set_instruct(ctx_, p.tts_instruct.c_str()) != 0) {
+                fprintf(stderr, "crispasr[omnivoice]: --instruct was rejected (see above)\n");
+                return false;
+            }
         }
 
         // Speaking-rate multiplier (--tts-speed): scales the estimated target
@@ -165,6 +170,16 @@ public:
         // nothing unless a caller actually asks.
         if (params.seed != 0) {
             omnivoice_set_seed(ctx_, params.seed);
+        }
+
+        // And the instruct, for the third time the same reason: the server maps
+        // a per-request "instructions" field onto params.tts_instruct, and
+        // applying it only in init() left that field dead on every line after
+        // the first. Rejection is already reported by the runtime; returning
+        // empty here surfaces it as a failed synthesis rather than silently
+        // dropping the voice design.
+        if (omnivoice_set_instruct(ctx_, params.tts_instruct.c_str()) != 0) {
+            return {};
         }
 
         int n_samples = 0;
