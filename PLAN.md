@@ -33,9 +33,19 @@ AND joins, all four join assertions watched red first.
   cross-lingual drop-ref path to port #329 into. Needs a listener, not another
   metric.
 
-**Still open, SE-side:** `OmniVoiceCrispAsr.Speak()` accepts the language and
-never puts it in the payload; the server launch args carry no `-l`. Reported on
-the issue — until that lands the menu stays decoration regardless.
+**SE-side gap, no longer blocking:** `OmniVoiceCrispAsr.Speak()` accepts the
+language and never puts it in the payload. Worked around on our side —
+omnivoice guesses the language from the target text when nobody supplies one
+(`CRISPASR_OMNIVOICE_AUTO_LANG`, default ON; explicit always wins), verified
+byte-identical to an explicit `-l de` against the exact SE request shape.
+Sending the field is still better (exact, covers languages the detector does
+not); snippet is on the issue, but nothing here waits on it.
+
+**Honest residual, closed cheaply:** the style-token live test pins ids from a
+tokenizer run; a red test alone could not say which side moved. Now it can —
+the test header records the upstream revision (`c5fdb5cc`) + tokenizer.json
+sha256 and the one-command disambiguation, all 9 pins re-derived byte-identical
+2026-08-07. Vendoring the 7 MB tokenizer.json remains not worth it.
 
 ### Ready to take — scoped, unblocked, nobody on them
 

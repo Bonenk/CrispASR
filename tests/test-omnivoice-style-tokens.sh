@@ -16,6 +16,25 @@
 # that sounds fine while being conditioned on something nobody asked for
 # (#13273). Note Qwen2 has no BOS, which is why no id leads these sequences.
 #
+# Provenance of the pinned ids (so a red test can tell WHICH side moved
+# without vendoring the 7 MB tokenizer.json):
+#
+#   k2-fsa/OmniVoice  revision c5fdb5ccb189668d56333f77ba2629f4cd7535f4
+#   tokenizer.json    sha256 408f669b7e2b045fdf54201d815bd364e6667dbd845115da81239c40bc6dcfd1
+#
+# All 9 sequences re-derived byte-identical from that exact file on
+# 2026-08-07 (tokenizers 0.23.1). If this test goes red:
+#
+#   hf download k2-fsa/OmniVoice tokenizer.json --local-dir /tmp/ov-tok
+#   shasum -a 256 /tmp/ov-tok/tokenizer.json
+#
+#   same sha256      -> upstream is unchanged; OUR tokenizer/export/assembly
+#                       drifted — fix our side, do not touch the pins.
+#   different sha256 -> upstream shipped a new tokenizer; re-derive the pins
+#                       from the new file AND regenerate the GGUF vocabulary
+#                       (models/convert-omnivoice-to-gguf.py embeds
+#                       tokenizer.json), then update BOTH shas above.
+#
 # SKIPs cleanly (exit 0) when no model is configured — the ids are useless
 # without the vocabulary they came from.
 #

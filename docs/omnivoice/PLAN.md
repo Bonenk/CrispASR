@@ -74,7 +74,10 @@ now gates:
   the real vocabulary. The unit tests pin the style STRING; this pins what it
   tokenizes to, which is what the model consumes and the one link no hermetic
   test can see. 9 cases, ids from the reference Qwen2Tokenizer. Verified it goes
-  red (one wrong id → rc=1).
+  red (one wrong id → rc=1). Pin provenance recorded in the test header
+  (upstream rev `c5fdb5cc` + tokenizer.json sha256, re-derived byte-identical
+  2026-08-07) so a red run can tell whether our side or upstream moved without
+  vendoring the 7 MB tokenizer.json.
 - `tests/test-omnivoice-surface-parity.sh` (live) — CLI / server / session must
   produce identical codes for the same request. Source guards catch a MISSING
   call site; only this catches one that is present and wrong. Compares CODES,
