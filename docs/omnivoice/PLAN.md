@@ -3,6 +3,83 @@
 Branch: `fix/omnivoice-254-voiceclone-rtf` (rebased onto `main` on top of the
 stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
+## LANDED 2026-08-07 — SubtitleEdit-13273: the language menu was decoration
+
+The reporter: "we have a menu where you can select the target language … nothing
+changes when you select it, and you can hear the strong accent of the original."
+Correct on the first half, and it was dead on **three** surfaces at once, each
+for its own reason — the classic multi-surface dispatch trap (dev guide point 6).
+
+**What was broken**
+
+1. `crispasr_backend_omnivoice.cpp::synthesize()` applied only `tts_num_steps`
+   per call; `omnivoice_set_language` ran ONLY in `init()`. The server owns one
+   backend instance for the whole session, so after the first line the menu
+   could never change anything — even though `crispasr_server.cpp` has parsed
+   `language`/`target_lang` into `rp.language` since #249/#304.
+2. `crispasr_c_api.cpp` — the session's omnivoice arm was a bare
+   `omnivoice_synthesize()`. `set_target_language` never reached it, so
+   bindings / Flutter / Android had no language knob by any route. This is
+   #329's cosyvoice3 bug, one backend over.
+3. `omnivoice.cpp` dropped the string VERBATIM into `<|lang_start|>…<|lang_end|>`.
+   The blueprint (`_resolve_language`, `omnivoice/models/omnivoice.py:1472`) is
+   ID-passthrough → lowercase-name lookup → **None**, and we did none of it, so
+   `de-DE` / `German` / a typo conditioned the model on tokens it never saw in
+   that slot while looking like it worked.
+
+**The fix.** `src/core/omnivoice_lang.h` mirrors `_resolve_language()` over a
+generated 646-ID table (`tools/gen-omnivoice-lang-map.py` ← upstream
+`lang_map.py`; regenerate rather than hand-edit). The runtime resolves centrally
+inside `omnivoice_set_language`, so no surface can forget to; unrecognized
+values warn with a did-you-mean and fall back to language-agnostic. Both the
+adapter and the session arm now apply it per call.
+
+**Verified at the CODE level, not the WAV level** — output is watermarked and
+carries a spoken disclaimer, so `cmp` on the audio measures the watermark. Use
+`CRISPASR_OMNIVOICE_DUMP_CODES` + `--no-spoken-disclaimer`. All three surfaces,
+English `jfk.wav` reference → German target:
+
+| comparison | result | what it proves |
+|---|---|---|
+| `-l de` vs none | DIFFERENT | the tag reaches the model |
+| `-l German` vs `-l de` | **IDENTICAL** | name→ID resolution is exact |
+| `-l de-DE` vs none | **IDENTICAL** | unrecognized really is agnostic, not a poisoned prompt |
+| session vs CLI, same lang | **IDENTICAL** | surface parity restored |
+| server vs CLI, same lang | **IDENTICAL** | three sequential requests on ONE process each honoured their own language |
+
+**⚠ NEGATIVE RESULT — the accent half of the report is NOT fixed, and probably
+cannot be here.** Two findings:
+
+- *No measurable accent change.* whisper-large-v3-turbo LID over 3 German
+  sentences: sentence 1 went 0.927 → 0.998 with the tag, but sentences 2 and 3
+  were already 0.9993 / 0.9996 untagged and the tag moved neither (0.9996 /
+  0.9995 — one slightly DOWN). The sentence-1 gap was one-clip noise, exactly
+  what the A/B rule warns about. Content round-trips clean on every arm, so the
+  tag is safe; it is just not demonstrably an accent lever. LID is also a poor
+  accent metric by construction — it is trained to be accent-robust. A real
+  verdict needs a listener, which the reporter now can be, because the knob
+  finally does something.
+- *#329's fix does not transfer, by design.* OmniVoice has no cross-lingual
+  drop-ref path: `create_voice_clone_prompt` either takes `ref_text` or
+  auto-transcribes it, and `_combine_text` lays `ref_text + " " + target` into
+  ONE stream whose tokens are positioned before the reference audio frames.
+  Dropping the transcript while keeping the audio desynchronizes the two — a
+  structural break, not a mode. Do not port the cosyvoice3 behaviour here
+  without new evidence; the language tag is the only lever the architecture
+  exposes.
+
+**Adjacent bug fixed in passing:** `/v1/audio/speech` advertises a per-request
+`seed` and the omnivoice adapter dropped it, so re-rendering one subtitle line
+could not be reproduced. Now applied when non-zero (0 = the runtime's own
+default 42, so nothing changes unless a caller asks). Verified: `--seed 999`
+differs from the default and is byte-identical across two runs.
+
+**Still open, SE-side (not ours):** `OmniVoiceCrispAsr.Speak()` accepts
+`TtsLanguage? language` and never sends it — the payload is
+`{input, response_format, speed}` — and the server launch args carry no `-l`.
+Until that lands, the menu stays decoration no matter what CrispASR does. Its
+sibling `OmniVoiceTtsCpp` already passes `--lang <iso>`. Reported on the issue.
+
 ## NOW — active work
 
 **Status (2026-07-16): OmniVoice RTF #4 — fused stage0 step graph, branch

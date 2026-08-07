@@ -13,7 +13,7 @@ trade-off:
 | **`miotts`** | MioTTS-0.6B (Qwen3 LLM + MioCodec-v2). EN/JA. Single GGUF, 44.1 kHz output. Codec-aware mixed quantization (LLM Q4_K + codec F16). | Yes — `--voice preset.emb.gguf` (preset speaker embeddings) | 502 MB Q4_K via `-m auto` |
 | **`moss-tts`** | MOSS-TTS-v1.5 (MossTTSDelay): Qwen3-8B backbone emitting 32 RVQ audio codebooks under a delay pattern, decoded by a 1.6B transformer codec. Needs the codec companion (`--codec-model`, or auto-downloaded/sibling). | Yes — `--voice ref.wav` (the codec encoder clones the reference speaker) | ~5 GB Q4_K backbone + ~3.5 GB F16 codec via `-m auto` |
 | **`moss-tts-local`** | MOSS-TTS-Local-Transformer-v1.5 (MossTTSLocal, 4B): Qwen3-4B backbone + a 1-layer local/depth transformer that autoregressively emits 12 RVQ codebooks per frame (RQ-Transformer; no delay pattern), decoded to 48 kHz stereo by MOSS-Audio-Tokenizer-v2 (downmixed to mono). Needs the codec companion (`--codec-model`, or auto-downloaded/sibling). | `--voice ref.wav --i-have-rights` (needs the encoder-carrying codec, `--codec-model moss-tts-local-v1.5-codec-enc.gguf`; the plain `-codec.gguf` is decode-only and falls back to the default voice) | ~9.1 GB F16 backbone + ~2.1 GB codec via `-m auto` (F16 is the reliable target; Q4_K long-form runs away) |
-| **`omnivoice`** | 600+ languages. Qwen3-0.6B backbone with masked iterative 8-codebook TTS (SoundStorm-style). Zero-shot voice cloning from reference audio. Supports finetunes (omnivoice-singing). | Yes (`--voice <wav> --ref-text "..."`) | ~1.2 GB F16 + ~400 MB tokenizer |
+| **`omnivoice`** | 600+ languages, selected with `-l` / `-tl` (or `"language"` on `/v1/audio/speech`) — see the language note below. Qwen3-0.6B backbone with masked iterative 8-codebook TTS (SoundStorm-style). Zero-shot voice cloning from reference audio. Supports finetunes (omnivoice-singing). | Yes (`--voice <wav> --ref-text "..."`) | ~1.2 GB F16 + ~400 MB tokenizer |
 | **`vibevoice-tts`** | Lowest-latency streaming TTS, designed for realtime. | Preset voice packs | ~636 MB via `-m auto` |
 | **`vibevoice-1.5b`** | Base VibeVoice TTS model with WAV cloning. | Yes (`CRISPASR_VIBEVOICE_VOICE_AUDIO=<wav>` or `--voice <wav>`) | ~1.6 GB via `-m auto` |
 | **`orpheus`** | Llama-3.2-3B talker + SNAC 24 kHz codec. 8 baked English speakers; expressive output. Greedy loops — pass `--temperature 0.6`. | Preset names via `--voice tara/leah/...` | ~3.5 GB via `-m auto` (talker Q8 + 26 MB SNAC) |
@@ -493,6 +493,37 @@ Passing `-sl` resolves it. Before #329, detection covered only Hangul / Kana /
 Han / Cyrillic, so **every Latin-script pair** — en↔de, en↔fr, es↔it, the ones a
 subtitle-dubbing workflow actually asks for — landed in that unknown case, with
 no message and no way to override it.
+
+### OmniVoice: ISO 639-3 ids, and what the tag can and cannot do
+
+OmniVoice carries the language as a literal string in its prompt, so the value
+has to be one the model was trained on: an **ISO 639-3 id** from its own
+646-entry map, or the English name for one. `-l de`, `-l German` and
+`{"language": "German"}` all produce byte-identical output; anything else —
+`de-DE`, `en_US`, a typo — is not a language the model knows and falls back to
+language-agnostic synthesis with a warning naming the nearest match:
+
+```
+crispasr[omnivoice]: language 'de-DE' is not one of the model's 646 language IDs — did you mean 'de'?
+crispasr[omnivoice]: falling back to language-agnostic synthesis. Pass an ISO 639-3 id (e.g. 'en', 'de', 'arb') or an English name (e.g. 'German').
+```
+
+Two things that surprise people:
+
+- **Macrolanguage codes are absent.** The map lists individual languages, so
+  Arabic is `arb` (Standard), `arz` (Egyptian), `ary` (Moroccan) and ~20 more —
+  there is no `ar`. Same shape for other macrolanguages. This is the model's
+  vocabulary, not a gap in ours.
+- **The tag is not an accent control.** Unlike CosyVoice3, OmniVoice has no
+  cross-lingual mode: a voice clone always conditions on the
+  (reference transcript, reference audio) pair, and dropping the transcript
+  would desynchronize it from the audio. So cloning an English speaker onto
+  German text may still carry the speaker's accent, and `-tl de` is not
+  guaranteed to remove it — measured over three German sentences, whisper LID
+  could not tell the tagged and untagged output apart. If accent-free output in
+  the target language matters more than exact timbre, use a reference clip
+  already spoken in that language, or use CosyVoice3 with `-sl` (above), which
+  does have a transcript-dropping cross-lingual path.
 
 ## G2P Phonemization (`--g2p-dict`)
 
