@@ -37,6 +37,7 @@
 #include <unordered_set>
 
 #include "omnivoice_lang_table.h"
+#include "tts_lang.h" // core_tts_lang::detect — the auto_detect() fallback below
 
 namespace core_omnivoice_lang {
 
@@ -134,6 +135,43 @@ inline std::string suggest(const std::string& language) {
     if (it != detail::index().name_to_id.end())
         return it->second;
 
+    return std::string();
+}
+
+// Last-resort fallback for when NOBODY supplied a language: guess one from the
+// text about to be spoken, and use it only if it lands on an id the model
+// actually knows. Returns "" whenever it is not confident — "" is the status
+// quo (language-agnostic), so a silent no-answer is always safe.
+//
+// Why guessing is acceptable here, when it usually is not: measured on an
+// English reference cloned onto German text, a *wrong* tag (`-l en`) costs
+// nothing detectable — the ASR round-trip is word-perfect and whisper still
+// LIDs the output as German at 0.98, the same band as the correct tag and no
+// tag. So the downside of a bad guess is bounded, while the upside is the one
+// upstream documents ("performance is slightly better if you specify the
+// language"). That asymmetry is the whole argument; if a future measurement
+// shows a wrong tag DOES degrade output, this fallback should go back to
+// opt-in, because its failure mode is the thing that justifies it.
+//
+// `core_tts_lang::detect` is deliberately conservative: script detection first
+// (Hangul/Kana/Han/Cyrillic), then a Latin function-word detector that needs
+// several words of evidence and returns "" when thin. Short subtitle lines
+// therefore mostly land on "" and behave exactly as they do today.
+//
+// ⚠ Pass the TARGET text only. Passing the combined stream (reference
+// transcript + target) would let an English reference clip drag the guess to
+// English on German subtitles — the exact failure this exists to avoid.
+inline std::string auto_detect(const std::string& target_text) {
+    const std::string guess = core_tts_lang::detect(target_text);
+    if (guess.empty())
+        return std::string();
+
+    // The detector speaks ISO-639-1-ish 2-letter codes; the model speaks its
+    // own 639-3 id set. Most common codes are in both, but not all (there is
+    // no "ar"), and a code the model never saw is worse than no tag.
+    const Resolved r = resolve(guess);
+    if (r.status == Status::id_passthrough || r.status == Status::name_resolved)
+        return r.id;
     return std::string();
 }
 

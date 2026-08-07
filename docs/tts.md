@@ -508,6 +508,13 @@ crispasr[omnivoice]: language 'de-DE' is not one of the model's 646 language IDs
 crispasr[omnivoice]: falling back to language-agnostic synthesis. Pass an ISO 639-3 id (e.g. 'en', 'de', 'arb') or an English name (e.g. 'German').
 ```
 
+**If you request nothing, the language is guessed from the text.** An explicit
+`-l` / `-tl` / `"language"` always wins; the guess only fills the gap that used
+to be filled by "language-agnostic", and only when it is confident enough to
+land on an id the model knows (short lines usually are not, and stay agnostic).
+`CRISPASR_OMNIVOICE_AUTO_LANG=0` turns it off. This is why OmniVoice speaks
+German subtitles as German through a client that never sends a language field.
+
 Two things that surprise people:
 
 - **Macrolanguage codes are absent.** The map lists individual languages, so

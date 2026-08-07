@@ -149,6 +149,42 @@ TEST_CASE("omnivoice lang: the generated table is well-formed", "[unit][omnivoic
 // The joins: every synthesis surface applies the resolved language.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// The auto-detect fallback (only fires when nobody supplied a language).
+// ---------------------------------------------------------------------------
+
+TEST_CASE("omnivoice lang: auto_detect maps a guess onto a real model id", "[unit][omnivoice]") {
+    using core_omnivoice_lang::auto_detect;
+    // Enough evidence, and the guessed code exists in the model's map.
+    REQUIRE(auto_detect("Ich möchte heute Abend über die Straße gehen und frische Brötchen kaufen.") == "de");
+    REQUIRE(auto_detect("我们明天一起去公园散步吧") == "zh");
+}
+
+// "" is the status quo, so an unsure detector must be free to say nothing —
+// this is what keeps short subtitle lines behaving exactly as they do today.
+TEST_CASE("omnivoice lang: auto_detect stays silent when unsure", "[unit][omnivoice]") {
+    using core_omnivoice_lang::auto_detect;
+    REQUIRE(auto_detect("").empty());
+    REQUIRE(auto_detect("Ok.").empty());
+    REQUIRE(auto_detect("12:45").empty());
+}
+
+// A guess the model cannot use is worse than no guess: the detector speaks
+// 2-letter codes and the model speaks its own 639-3 set, which has no "ar".
+// Whatever the detector returns must survive resolve() or be dropped.
+TEST_CASE("omnivoice lang: auto_detect never emits an id the model lacks", "[unit][omnivoice]") {
+    using core_omnivoice_lang::auto_detect;
+    for (const char* sample :
+         {"Ich möchte heute Abend über die Straße gehen und frische Brötchen kaufen.", "我们明天一起去公园散步吧",
+          "Привет, как у тебя сегодня дела?", "The quick brown fox jumps over the lazy dog again.", "Ok.", ""}) {
+        const std::string got = auto_detect(sample);
+        INFO("sample '" << sample << "' -> '" << got << "'");
+        REQUIRE((got.empty() || core_omnivoice_lang::is_valid_id(got)));
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 // The runtime resolves centrally, so no caller can forget to. Asserting the
 // call inside omnivoice_set_language specifically (not merely "the file
 // mentions the header") is what makes this guard able to go red.
@@ -158,6 +194,21 @@ TEST_CASE("omnivoice lang: the runtime resolves before building the prompt", "[u
     REQUIRE(contains(src, "core_omnivoice_lang::resolve("));
     // And the prompt keeps reading the stored (now resolved) value.
     REQUIRE(contains(src, "<|lang_start|>"));
+
+    // The auto fallback must detect over the TARGET text. `combined_text` has
+    // the reference transcript glued to its front, so guessing from it would
+    // pull every German subtitle toward an English reference clip's language —
+    // silently, and only when cloning, which is when it matters most.
+    const size_t call = src.find("core_omnivoice_lang::auto_detect(");
+    INFO("the auto-detect fallback call was not found");
+    REQUIRE(call != std::string::npos);
+    REQUIRE(src.compare(call, std::string("core_omnivoice_lang::auto_detect(text)").size(),
+                        "core_omnivoice_lang::auto_detect(text)") == 0);
+
+    // Per call, into a local — writing the guess back to ctx->language would
+    // leak line N's detection onto line N+1 on a reused server context, which
+    // is the very bug this change set exists to fix.
+    REQUIRE(!contains(src, "ctx->language = core_omnivoice_lang::auto_detect"));
 }
 
 // The bug SubtitleEdit hit. The server owns ONE backend instance for the whole

@@ -74,6 +74,13 @@ const char* env_str(const char* k) {
     const char* v = crispasr_env::get(k);
     return (v && *v) ? v : nullptr;
 }
+// For default-ON gates: unset means `dflt`, an explicit "0" always disables.
+bool env_bool_default(const char* k, bool dflt) {
+    const char* v = crispasr_env::get(k);
+    if (!v || !*v)
+        return dflt;
+    return std::strcmp(v, "0") != 0;
+}
 
 // ---------------------------------------------------------------------------
 // Bench instrumentation
@@ -1607,7 +1614,27 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     std::string style_text;
     if (ctx->ref_T > 0)
         style_text += "<|denoise|>";
-    std::string lang_str = ctx->language.empty() ? "None" : ctx->language;
+    // The language the caller asked for wins outright. Only when nobody set one
+    // do we guess from the text (#13273): SubtitleEdit's language menu is still
+    // not wired to the payload upstream, so without this every dubbed line
+    // arrives language-agnostic no matter what the user picked.
+    //
+    // Computed PER CALL into a local — never written back to ctx->language.
+    // The server reuses one context across requests, so a sticky guess would
+    // leak line N's detected language onto line N+1, which is the exact
+    // per-call-vs-init bug this whole change exists to fix.
+    //
+    // ⚠ Detect over `text` (the target), NOT `combined_text` — the latter has
+    // the reference transcript glued to its front, so an English reference clip
+    // would pull every German subtitle's guess to English.
+    std::string eff_lang = ctx->language;
+    if (eff_lang.empty() && env_bool_default("CRISPASR_OMNIVOICE_AUTO_LANG", true)) {
+        eff_lang = core_omnivoice_lang::auto_detect(text);
+        if (debug && !eff_lang.empty())
+            fprintf(stderr, "omnivoice: no language requested; detected '%s' from the target text\n", eff_lang.c_str());
+    }
+
+    std::string lang_str = eff_lang.empty() ? "None" : eff_lang;
     std::string instruct_str = ctx->instruct.empty() ? "None" : ctx->instruct;
     style_text += "<|lang_start|>" + lang_str + "<|lang_end|>";
     style_text += "<|instruct_start|>" + instruct_str + "<|instruct_end|>";
