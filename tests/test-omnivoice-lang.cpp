@@ -209,6 +209,13 @@ TEST_CASE("omnivoice lang: the runtime resolves before building the prompt", "[u
     // leak line N's detection onto line N+1 on a reused server context, which
     // is the very bug this change set exists to fix.
     REQUIRE(!contains(src, "ctx->language = core_omnivoice_lang::auto_detect"));
+
+    // Every feature path is env-gated so it can be A/B'd and bisected without a
+    // rebuild, and gates are never removed. This one guesses on the user's
+    // behalf, so the escape hatch matters more than usual: assert both that the
+    // gate exists and that it defaults ON (an accidental flip to `false` would
+    // be invisible — output would simply revert to language-agnostic).
+    REQUIRE(contains(src, "env_bool_default(\"CRISPASR_OMNIVOICE_AUTO_LANG\", true)"));
 }
 
 // The bug SubtitleEdit hit. The server owns ONE backend instance for the whole

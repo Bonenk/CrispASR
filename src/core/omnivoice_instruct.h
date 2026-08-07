@@ -94,13 +94,29 @@ inline std::string ascii_lower(const std::string& s) {
     return out;
 }
 
+// Exactly Python's `[一-鿿]`, decoded properly rather than sniffed from
+// the lead byte. The lead-byte shortcut (0xE4..0xE9) looks equivalent — those
+// are the leads of U+4000..U+9FFF — but it over-matches U+4000..U+4DFF by 3584
+// codepoints (CJK Ext-A and the Yijing hexagrams). That window decides whether
+// an instruct renders as "male, elderly" or "男，老年", so it has to be exact.
 inline bool has_cjk(const std::string& s) {
-    // U+4E00..U+9FFF in UTF-8 is E4 B8 80 .. E9 BF BF — a 3-byte sequence whose
-    // lead byte is in [0xE4, 0xE9]. Enough to separate the two vocabularies.
-    for (size_t i = 0; i < s.size(); i++) {
+    for (size_t i = 0; i < s.size();) {
         const unsigned char c = (unsigned char)s[i];
-        if (c >= 0xE4 && c <= 0xE9)
-            return true;
+        if (c < 0x80) {
+            i += 1;
+        } else if ((c & 0xE0) == 0xC0) {
+            i += 2;
+        } else if ((c & 0xF0) == 0xE0) {
+            if (i + 2 >= s.size())
+                break; // truncated sequence — nothing more to classify
+            const unsigned cp = ((unsigned)(c & 0x0F) << 12) | ((unsigned)((unsigned char)s[i + 1] & 0x3F) << 6) |
+                                (unsigned)((unsigned char)s[i + 2] & 0x3F);
+            if (cp >= 0x4E00 && cp <= 0x9FFF)
+                return true;
+            i += 3;
+        } else {
+            i += 4;
+        }
     }
     return false;
 }
