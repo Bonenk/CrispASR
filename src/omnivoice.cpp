@@ -1641,6 +1641,19 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     std::vector<int32_t> style_ids = tokenize(ctx->vocab, style_text);
     int T_style = (int)style_ids.size();
 
+    // The style prefix is where the language conditioning actually lives, and a
+    // BPE difference here is invisible in every downstream metric — the graph
+    // still computes, the audio still sounds like speech. Print the ids so
+    // prompt-token parity against the HF tokenizer stays a one-command check
+    // (dev-guide step 0 for any AR model):
+    //   AutoTokenizer.from_pretrained(<lm-src>)(style_text).input_ids
+    if (debug) {
+        fprintf(stderr, "omnivoice: style '%s' -> %d ids:", style_text.c_str(), T_style);
+        for (int id : style_ids)
+            fprintf(stderr, " %d", id);
+        fprintf(stderr, "\n");
+    }
+
     // 4. Build the full input sequence
     // Layout: [style_tokens | text_tokens | ref_audio_tokens? | target_mask_tokens]
     int T_ref = ctx->ref_T;
