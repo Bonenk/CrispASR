@@ -795,6 +795,13 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
 ### OmniVoice
 
 - `CRISPASR_OMNIVOICE_ACENC_BISECT`
+- `CRISPASR_OMNIVOICE_AUTO_LANG` — **default on.** When no language was requested
+  (`-l` / `-tl` / the server's `"language"` / `set_target_language`), guess one
+  from the text being spoken and use it if it maps to an id the model knows.
+  An explicitly requested language always wins; a low-confidence guess resolves
+  to nothing and behaves exactly as before. `=0` restores the old
+  always-language-agnostic behaviour. Exists because SubtitleEdit's language
+  menu is not yet wired to its request payload (#13273).
 - `CRISPASR_OMNIVOICE_BENCH`
 - `CRISPASR_OMNIVOICE_CFG_INTERVAL`
 - `CRISPASR_OMNIVOICE_CHUNK`

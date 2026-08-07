@@ -51,6 +51,17 @@ into ONE stream positioned before the reference audio frames — dropping the te
 desynchronizes it from the audio. Same symptom, different architecture, and
 porting the fix would have been a structural break dressed as a feature.
 
+**3b. Before rejecting a heuristic, measure its HARM side — that is usually the
+number that decides.** The follow-up question was "can we just guess the
+language when the client doesn't send one?", and the instinct is no, guessing is
+how you ship silent wrongness. But the deciding measurement is not "how often is
+the guess right", it is "what does a wrong guess cost". Deliberately mis-tagging
+German text `-l en` produced a word-perfect ASR round-trip and whisper LID `de`
+at 0.984 — the same band as the correct tag and no tag. A bounded downside plus
+an upstream-documented upside makes the guess defensible where accuracy figures
+alone would not have. Record the asymmetry as the justification, so the day a
+wrong tag *is* shown to hurt, the reason to retract is already written down.
+
 **4. An auto-generated UI list is a contract the runtime never signed.**
 SubtitleEdit's 646-entry language dropdown was generated from the model's own
 `lang_map.py`, which made it look authoritative — while our runtime dropped

@@ -74,11 +74,48 @@ could not be reproduced. Now applied when non-zero (0 = the runtime's own
 default 42, so nothing changes unless a caller asks). Verified: `--seed 999`
 differs from the default and is byte-identical across two runs.
 
-**Still open, SE-side (not ours):** `OmniVoiceCrispAsr.Speak()` accepts
-`TtsLanguage? language` and never sends it — the payload is
-`{input, response_format, speed}` — and the server launch args carry no `-l`.
-Until that lands, the menu stays decoration no matter what CrispASR does. Its
-sibling `OmniVoiceTtsCpp` already passes `--lang <iso>`. Reported on the issue.
+**SE-side gap, worked around (2026-08-07, follow-up):** `OmniVoiceCrispAsr.Speak()`
+accepts `TtsLanguage? language` and never sends it — the payload is
+`{input, response_format, speed}` — and the launch args carry no `-l`. Rather
+than leave the fix blocked on someone else's release, omnivoice now **guesses
+the language from the target text when nobody supplied one**
+(`CRISPASR_OMNIVOICE_AUTO_LANG`, default ON;
+`core_omnivoice_lang::auto_detect` = `core_tts_lang::detect` → `resolve`).
+
+*The measurement that justifies guessing, and would retract it.* Guessing is
+normally the wrong instinct; here it is defensible only because the **harm side
+was measured and is benign**. German text deliberately mis-tagged `-l en`:
+ASR round-trip word-perfect, whisper LID still `de` at 0.984 — the same band as
+the correct tag (0.947) and no tag (0.998), i.e. no ordering at all. So a bad
+guess costs nothing detectable, while the upside is what upstream documents
+("performance is slightly better if you specify the language"). **If a later
+measurement shows a wrong tag DOES degrade output, flip this back to opt-in** —
+the asymmetry is the entire argument, not the detection accuracy.
+
+Verified end to end (codes, `--no-spoken-disclaimer`):
+
+| arm | vs | result |
+|---|---|---|
+| no `-l` at all, fallback on | explicit `-l de` | **IDENTICAL** |
+| `CRISPASR_OMNIVOICE_AUTO_LANG=0` | old untagged behaviour | **IDENTICAL** (clean opt-out) |
+| explicit `-l en` on German text | the pre-existing `-l en` result | **IDENTICAL** (the guess never overrides) |
+| **SE-shaped POST** `{input, response_format}`, no language field | explicit `-l de` | **IDENTICAL** |
+
+Two implementation details that are load-bearing, both guarded in
+`tests/test-omnivoice-lang.cpp`:
+
+- **Detect over the TARGET text, not `combined_text`.** The combined stream has
+  the reference transcript glued to its front, so guessing from it would drag
+  every German subtitle toward an English reference clip's language — silently,
+  and only when cloning, which is exactly when it matters.
+- **Per call, into a local — never written back to `ctx->language`.** The server
+  reuses one context across requests; a sticky guess would leak line N's
+  detection onto line N+1, which is the per-call-vs-init bug this whole change
+  set exists to fix.
+
+Sending the field is still better than being guessed at (explicit wins, and it
+covers the languages the detector does not know), so the SE-side change is still
+worth having — it is just no longer a blocker. Reported on the issue.
 
 ## NOW — active work
 
