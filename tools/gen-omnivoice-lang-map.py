@@ -9,25 +9,49 @@ BCP-47 tags. ``OmniVoice.generate()`` runs every user-supplied value through
 ``src/core/omnivoice_lang.h`` and generate its table here so the two cannot
 drift by hand-editing.
 
+The source is VENDORED at ``third_party/omnivoice/lang_map.py`` (byte-identical
+to upstream) so that ``--check`` is hermetic: a gate that needs the network is a
+gate that goes flaky and then gets disabled. Upstream drift is a separate,
+best-effort question -- ``--check-upstream`` answers it by comparing git blob
+hashes against the GitHub API, and only that step needs a network.
+
 Usage:
-    python tools/gen-omnivoice-lang-map.py                    # fetch upstream
-    python tools/gen-omnivoice-lang-map.py --source lang_map.py
-    python tools/gen-omnivoice-lang-map.py --check            # what CI runs
+    python tools/gen-omnivoice-lang-map.py             # regenerate from vendored
+    python tools/gen-omnivoice-lang-map.py --check     # hermetic; what CI gates on
+    python tools/gen-omnivoice-lang-map.py --check-upstream   # advisory drift check
+    python tools/gen-omnivoice-lang-map.py --update-vendored  # take a new revision
+    python tools/gen-omnivoice-lang-map.py --source /path/to/lang_map.py
 """
 
 import argparse
 import ast
+import hashlib
+import json
 import pathlib
 import sys
 import urllib.request
 
-UPSTREAM = (
+UPSTREAM_RAW = (
     "https://raw.githubusercontent.com/k2-fsa/OmniVoice/main/"
+    "omnivoice/utils/lang_map.py"
+)
+UPSTREAM_API = (
+    "https://api.github.com/repos/k2-fsa/OmniVoice/contents/"
     "omnivoice/utils/lang_map.py"
 )
 
 HERE = pathlib.Path(__file__).resolve().parent
-OUT = HERE.parent / "src" / "core" / "omnivoice_lang_table.h"
+ROOT = HERE.parent
+OUT = ROOT / "src" / "core" / "omnivoice_lang_table.h"
+VENDORED = ROOT / "third_party" / "omnivoice" / "lang_map.py"
+
+
+def git_blob_sha1(data: bytes) -> str:
+    """git's object id for a blob — what the GitHub contents API returns as .sha."""
+    h = hashlib.sha1()
+    h.update(b"blob %d\0" % len(data))
+    h.update(data)
+    return h.hexdigest()
 
 
 def load_mapping(source: str) -> dict:
@@ -95,17 +119,73 @@ def render(mapping: dict) -> str:
     return "\n".join(lines)
 
 
+def check_upstream() -> int:
+    """Advisory: has upstream's lang_map.py moved since we vendored it?
+
+    Compares git blob hashes, which is exact only because the vendored copy is
+    byte-identical to upstream. Best-effort by design — a GitHub hiccup must not
+    be able to red a lint run, so every failure mode here degrades to "skip".
+    """
+    local = git_blob_sha1(VENDORED.read_bytes())
+    try:
+        with urllib.request.urlopen(UPSTREAM_API, timeout=30) as r:
+            remote = json.load(r)["sha"]
+    except Exception as exc:  # network, rate limit, schema change — all advisory
+        print(f"upstream drift check skipped ({type(exc).__name__}: {exc})")
+        return 0
+
+    if local == remote:
+        print(f"third_party/omnivoice/lang_map.py: in sync with upstream ({local[:12]})")
+        return 0
+
+    print(
+        f"NOTE: upstream lang_map.py has moved (vendored {local[:12]} != "
+        f"upstream {remote[:12]}).\n"
+        "      Take the new revision with: "
+        "python tools/gen-omnivoice-lang-map.py --update-vendored\n"
+        "      Read the diff before committing — a NEW language is an addition we "
+        "want, but a CHANGED id for an existing name silently alters what every "
+        "caller of that name synthesises."
+    )
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--source", default=UPSTREAM, help="path or URL to lang_map.py")
+    ap.add_argument(
+        "--source",
+        default=str(VENDORED),
+        help="path or URL to lang_map.py (default: the vendored copy)",
+    )
     ap.add_argument(
         "--check",
         action="store_true",
-        help="fail if the committed header differs from a fresh render",
+        help="hermetic: fail if the committed header differs from a fresh render",
+    )
+    ap.add_argument(
+        "--check-upstream",
+        action="store_true",
+        help="advisory: report (never fail) if upstream lang_map.py has moved",
+    )
+    ap.add_argument(
+        "--update-vendored",
+        action="store_true",
+        help="refetch upstream into third_party/ and regenerate the header",
     )
     args = ap.parse_args()
 
-    rendered = render(load_mapping(args.source))
+    if args.check_upstream:
+        return check_upstream()
+
+    source = args.source
+    if args.update_vendored:
+        data = urllib.request.urlopen(UPSTREAM_RAW, timeout=60).read()
+        VENDORED.write_bytes(data)
+        print(f"refetched {VENDORED} (blob {git_blob_sha1(data)})")
+        print("→ update the hashes + date in third_party/omnivoice/README.md")
+        source = str(VENDORED)
+
+    rendered = render(load_mapping(source))
 
     if args.check:
         if not OUT.exists():
@@ -117,7 +197,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
-        print(f"{OUT.name}: up to date")
+        print(f"{OUT.name}: up to date ({len(load_mapping(source))} languages)")
         return 0
 
     OUT.write_text(rendered, encoding="utf-8")

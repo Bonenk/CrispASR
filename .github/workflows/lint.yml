@@ -27,6 +27,12 @@ on:
       - 'LEARNINGS.md'
       - 'docs/LEARNINGS-INDEX.md'
       - 'tools/gen-learnings-index.py'
+      # OmniVoice language table: the generated header must match its vendored
+      # source. A wrong id is not cosmetic — it is what the model is conditioned
+      # on (#13273).
+      - 'src/core/omnivoice_lang_table.h'
+      - 'third_party/omnivoice/lang_map.py'
+      - 'tools/gen-omnivoice-lang-map.py'
       # Release-tooling consistency (release-consistency job). A version bump
       # touches NONE of the C++ paths above, so without these the check would
       # never run on the commits it exists to guard.
@@ -67,6 +73,12 @@ on:
       - 'LEARNINGS.md'
       - 'docs/LEARNINGS-INDEX.md'
       - 'tools/gen-learnings-index.py'
+      # OmniVoice language table: the generated header must match its vendored
+      # source. A wrong id is not cosmetic — it is what the model is conditioned
+      # on (#13273).
+      - 'src/core/omnivoice_lang_table.h'
+      - 'third_party/omnivoice/lang_map.py'
+      - 'tools/gen-omnivoice-lang-map.py'
       # Release-tooling consistency (release-consistency job). A version bump
       # touches NONE of the C++ paths above, so without these the check would
       # never run on the commits it exists to guard.
@@ -319,8 +331,22 @@ jobs:
       - name: Check LEARNINGS.md index is current
         run: python tools/gen-learnings-index.py --check
 
+      # Also hermetic, and also before the network steps. The table is generated
+      # from third_party/omnivoice/lang_map.py, which is vendored precisely so
+      # this gate never needs the network — the ids in it decide what the model
+      # is conditioned on, so a hand-edit has to be caught (#13273).
+      - name: Check OmniVoice language table is current
+        run: python tools/gen-omnivoice-lang-map.py --check
+
       - name: Install huggingface_hub
         run: pip install --quiet 'huggingface_hub>=0.20'
+
+      # Advisory only — prints a NOTE and exits 0 when upstream moves. Whether to
+      # take a new revision is a judgement call (a changed id for an existing
+      # language would alter what callers synthesise), so it must not auto-fail.
+      - name: Report OmniVoice upstream language-map drift
+        continue-on-error: true
+        run: python tools/gen-omnivoice-lang-map.py --check-upstream
 
       - name: Check README language columns vs HF cards
         env:
