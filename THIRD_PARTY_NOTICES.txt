@@ -354,6 +354,25 @@ purposes.
 
 
 ────────────────────────────────────────────────────────────────────────────────
+OmniVoice language map (https://github.com/k2-fsa/OmniVoice)
+Apache License 2.0
+────────────────────────────────────────────────────────────────────────────────
+
+Copyright 2026 Xiaomi Corp. (authors: Han Zhu)
+
+third_party/omnivoice/lang_map.py is a verbatim, unmodified copy of
+omnivoice/utils/lang_map.py at commit c8c0a6257b9b652dc7d239df9d911dbb1f9dabdf.
+The Apache-2.0 header and copyright notice are retained in the file itself.
+
+It is vendored as the generator input for src/core/omnivoice_lang_table.h (the
+ISO 639-3 language ids the OmniVoice prompt is conditioned on), so that the
+CI drift gate is hermetic. The generated header is a derived data table, not a
+translation of any OmniVoice source code; the CrispASR runtime is an
+independent implementation. Licensed under the Apache License, Version 2.0;
+full text at http://www.apache.org/licenses/LICENSE-2.0
+
+
+────────────────────────────────────────────────────────────────────────────────
 RUNTIME-ONLY COMPONENTS (not bundled in binaries)
 ────────────────────────────────────────────────────────────────────────────────
 
