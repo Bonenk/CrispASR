@@ -4144,6 +4144,32 @@ set_tests_properties(test-qwen3-tts-seed-live PROPERTIES
     LABELS "live;server;tts;qwen3-tts;determinism"
     TIMEOUT 300)
 
+# ─── test-omnivoice-style-tokens — live: prompt-token parity (#13273). The unit
+# tests pin the style STRING; this pins what it tokenizes to against the real
+# vocabulary, which is what the model consumes and the one link no hermetic test
+# can see. Expected ids came from the reference Qwen2Tokenizer. SKIPs without a
+# model, since the ids are meaningless without their vocabulary.
+add_test(NAME test-omnivoice-style-tokens
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-omnivoice-style-tokens.sh
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-omnivoice-style-tokens PROPERTIES
+    LABELS "live;tts;omnivoice;parity"
+    TIMEOUT 900)
+
+# ─── test-omnivoice-surface-parity — live: CLI / server / session C-ABI must
+# produce the same codes for the same request (#13273). The session ABI
+# reimplements synthesize inline and the server does its own parsing, so a knob
+# can be live on one surface and dead on the others — which is what happened to
+# both language and instruct. Source guards catch a MISSING call site; only this
+# catches one that is present and wrong. Compares CODES, never the watermarked
+# WAV. SKIPs without a model.
+add_test(NAME test-omnivoice-surface-parity
+    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-omnivoice-surface-parity.sh
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-omnivoice-surface-parity PROPERTIES
+    LABELS "live;server;tts;omnivoice;parity"
+    TIMEOUT 3600)
+
 # ─── test-omnivoice-seed — live: #281 seed determinism at the AR codes stage.
 # Same seed → byte-identical omnivoice_synthesize_codes output; different seed →
 # different. Text→codes only (no DAC decode), so cheap. SKIPs (exit 0) without

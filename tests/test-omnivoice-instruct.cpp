@@ -203,6 +203,24 @@ TEST_CASE("omnivoice instruct: a bad --tts-instruct fails init", "[unit][omnivoi
     REQUIRE(contains(body, "return false"));
 }
 
+// The third backend to be missing from a session-ABI dispatch for the same
+// reason. `crispasr_session_set_instruct` existed and handled qwen3-tts and
+// parler; omnivoice fell through to `return -3` — "this backend has no instruct
+// contract" — which is why voice design was unreachable from every binding.
+TEST_CASE("omnivoice instruct: the session ABI dispatches to omnivoice", "[unit][omnivoice]") {
+    const std::string src = read_file("src/crispasr_c_api.cpp");
+    const size_t fn = src.find("crispasr_session_set_instruct(crispasr_session* s, const char* instruct) {");
+    INFO("crispasr_session_set_instruct not found");
+    REQUIRE(fn != std::string::npos);
+    // Bound the search to the function body so a mention elsewhere in this
+    // 10k-line file cannot make the guard pass.
+    const size_t end = src.find("\n}\n", fn);
+    REQUIRE(end != std::string::npos);
+    const std::string body = src.substr(fn, end - fn);
+    REQUIRE(contains(body, "s->omnivoice_ctx"));
+    REQUIRE(contains(body, "omnivoice_set_instruct(s->omnivoice_ctx, instruct)"));
+}
+
 TEST_CASE("omnivoice instruct: the server rejects a bad value with 400", "[unit][omnivoice]") {
     const std::string src = read_file("examples/cli/crispasr_server.cpp");
     REQUIRE(contains(src, "core/omnivoice_instruct.h"));

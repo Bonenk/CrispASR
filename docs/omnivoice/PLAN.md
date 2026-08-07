@@ -59,9 +59,29 @@ Suggestion text is the one deliberate non-parity: upstream uses difflib's
 Ratcliff/Obershelp, we use an LCS ratio at the same 0.6 cutoff. It changes no
 model input, only the error string — noted in the header.
 
-**Still open (a gap, not a bug):** there is no `crispasr_session_set_tts_instruct`
-at all, so the session ABI cannot set an instruct for any backend. That is a new
-public symbol rather than a fix, so it is not in this change.
+**Correction + closed (2026-08-07, follow-up):** I reported "there is no session
+instruct setter at all". Wrong — `crispasr_session_set_instruct` has existed all
+along, handling qwen3-tts and parler; **omnivoice fell through to `return -3`**,
+i.e. "this backend has no instruct contract". So it was the same wiring bug a
+third time, not a missing feature. Now dispatched, which makes voice design
+reachable from every binding (the Python `set_instruct` needed no change beyond
+its docstring). Guarded by a source test scoped to the function body.
+
+**Coverage after the audit.** Two things had been verified by hand only and are
+now gates:
+
+- `tests/test-omnivoice-style-tokens.sh` (live) — prompt-token parity against
+  the real vocabulary. The unit tests pin the style STRING; this pins what it
+  tokenizes to, which is what the model consumes and the one link no hermetic
+  test can see. 9 cases, ids from the reference Qwen2Tokenizer. Verified it goes
+  red (one wrong id → rc=1).
+- `tests/test-omnivoice-surface-parity.sh` (live) — CLI / server / session must
+  produce identical codes for the same request. Source guards catch a MISSING
+  call site; only this catches one that is present and wrong. Compares CODES,
+  never the watermarked WAV, and every comparison includes an arm whose expected
+  answer is IDENTICAL (an all-DIFFERENT suite is what a broken harness produces).
+
+Both SKIP cleanly without a model; env registered in `tests/env-live-tests.sh`.
 
 ## LANDED 2026-08-07 — SubtitleEdit-13273: the language menu was decoration
 

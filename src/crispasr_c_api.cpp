@@ -8352,12 +8352,19 @@ CA_EXPORT const char* crispasr_session_get_speaker_name(crispasr_session* s, int
     return nullptr;
 }
 
-// Set the natural-language voice description for instruct-tuned TTS
-// backends (qwen3-tts VoiceDesign today). Required before
+// Set the voice description / style instruct for instruct-capable TTS
+// backends: qwen3-tts VoiceDesign, parler-tts, omnivoice. Required before
 // crispasr_session_synthesize when the loaded backend is VoiceDesign.
 //
-// Returns 0 on success, -1 on invalid args, -3 if the active backend
-// has no instruct contract (or isn't a VoiceDesign variant).
+// ⚠ The contract differs by backend. qwen3-tts and parler take free
+// natural-language prose; **omnivoice takes a closed 48-item vocabulary**
+// ("male", "elderly", "british accent", "河南话", …, comma-separated, at most
+// one per category) and REJECTS anything else, because the string reaches its
+// prompt literally. See docs/tts.md.
+//
+// Returns 0 on success, -1 on invalid args, -2 if the backend rejected the
+// value (omnivoice: unsupported item / category conflict; the reason is
+// printed to stderr), -3 if the active backend has no instruct contract.
 CA_EXPORT int crispasr_session_set_instruct(crispasr_session* s, const char* instruct) {
     if (!s || !instruct)
         return -1;
@@ -8374,6 +8381,18 @@ CA_EXPORT int crispasr_session_set_instruct(crispasr_session* s, const char* ins
         s->parler_description = instruct;
         return parler_tts_set_description(s->parler_tts_ctx, instruct);
     }
+#endif
+#ifdef CA_HAVE_OMNIVOICE
+    // #13273, and the THIRD backend to be missing from a session-ABI dispatch
+    // for the same reason: this ABI reimplements each backend inline instead of
+    // calling the CLI adapter, so omnivoice voice design was unreachable from
+    // bindings, Flutter and Android — `set_instruct` simply returned -3 as if
+    // the backend had no instruct contract at all. It has one; it is just a
+    // CLOSED 48-item vocabulary rather than free prose (see
+    // core/omnivoice_instruct.h), so an unsupported item comes back -2 with the
+    // reason on stderr rather than being silently ignored.
+    if (s->omnivoice_ctx)
+        return omnivoice_set_instruct(s->omnivoice_ctx, instruct);
 #endif
     return -3;
 }
