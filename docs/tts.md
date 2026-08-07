@@ -532,6 +532,42 @@ Two things that surprise people:
   already spoken in that language, or use CosyVoice3 with `-sl` (above), which
   does have a transcript-dropping cross-lingual path.
 
+### OmniVoice: `--instruct` is a closed vocabulary, and it is validated
+
+Voice design (`--instruct`, server `"instructions"`) is not free prose for this
+backend. OmniVoice was trained on a fixed 48-item vocabulary in one exact
+spelling, and the string reaches the prompt literally — `Male, British Accent`
+and `male, british accent` share **no** token ids, so an unnormalised value is
+a different request as far as the model is concerned.
+
+CrispASR mirrors upstream's resolver: items are lowercased, half/full-width
+commas are both accepted, and everything is unified into one language before it
+reaches the prompt. Anything outside the vocabulary is **rejected** — the CLI
+exits non-zero, the server returns `400 invalid_instructions` — rather than
+being dropped, because a voice-design request that silently does nothing is the
+failure this replaced:
+
+```
+crispasr[omnivoice]: unsupported instruct item 'britsh accent' — did you mean 'british accent'?
+```
+
+The categories, at most one item from each:
+
+| category | items |
+|---|---|
+| gender | `male`, `female` |
+| age | `child`, `teenager`, `young adult`, `middle-aged`, `elderly` |
+| pitch | `very low pitch`, `low pitch`, `moderate pitch`, `high pitch`, `very high pitch` |
+| style | `whisper` |
+| accent (English only) | `american accent`, `british accent`, `australian accent`, `canadian accent`, `indian accent`, `chinese accent`, `japanese accent`, `korean accent`, `portuguese accent`, `russian accent` |
+| dialect (Chinese only) | `河南话`, `陕西话`, `四川话`, `贵州话`, `云南话`, `桂林话`, `济南话`, `石家庄话`, `甘肃话`, `宁夏话`, `青岛话`, `东北话` |
+
+Each item has a Chinese counterpart (`male` ↔ `男`), and the whole instruct is
+unified to one language before synthesis: a dialect forces Chinese, an accent
+forces English, otherwise it follows the language of the text being spoken. So
+`--instruct "male, elderly"` on Chinese text becomes `男，老年`. Mixing a
+dialect with an accent is rejected — they belong to different speech.
+
 ## G2P Phonemization (`--g2p-dict`)
 
 TTS backends that use IPA phonemes (piper, kokoro) need a

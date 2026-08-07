@@ -3,6 +3,66 @@
 Branch: `fix/omnivoice-254-voiceclone-rtf` (rebased onto `main` on top of the
 stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
+## LANDED 2026-08-07 — `--instruct` had the SAME three defects, found by blueprint review
+
+Not from a report. After the language fix I went back and diffed our runtime
+against the blueprint properly, including the step I had skipped —
+**prompt-token parity** (dev-guide step 0). The language path came out clean
+(below); its sibling did not.
+
+**The language path, now actually proven.** Our style ids vs
+`AutoTokenizer.from_pretrained(<lm-src>)`: `de`/`en`/`arb`/`zh`, `None`, and the
+`<|denoise|>` clone variant are all byte-identical. Also confirmed: Qwen2's
+tokenizer has no BOS, so the blueprint's `add_special_tokens=True` on the style
+path (vs `False` on the text path) is a no-op, not a divergence; the uncond CFG
+arm is target-audio-only in both, so the tag lives only in the cond branch; and
+`normalize_text` is language-dependent but defaults off and the official CLI
+never passes it. One thing I had wrong: treating `"auto"` as cleared is not an
+addition on top of the blueprint — `demo.py:186` does exactly that.
+`CRISPASR_OMNIVOICE_DEBUG` now prints the style ids so this stays a one-command
+check.
+
+**`_resolve_instruct` sits ten lines below `_resolve_language`, and we mirrored
+neither.** The instruct is a CLOSED 48-item vocabulary (6 mutually-exclusive
+categories, each item with an EN/ZH counterpart). Upstream lowercases, repairs
+half/full-width separators, unifies to one language and **raises** on anything
+else. We stored the raw string and dropped it into `<|instruct_start|>`:
+
+    'Male, British Accent'  -> [151672, 36421, 11,  7855, 81809, 151673]
+    'male, british accent'  -> [151672, 36476, 11, 93927, 29100, 151673]
+
+Not one shared id, for what a user considers the same request. And it had the
+*same* per-call bug: `omnivoice_set_instruct` ran only in `init()`, so the
+server's per-request `"instructions"` field was dead after the first line —
+identical to the language defect, in the same function, missed the first time.
+
+**Fixed, mirroring upstream (rejection, not degradation).**
+`src/core/omnivoice_instruct.h` + a generated table from the vendored
+`voice_design.py`. Two-phase on purpose: `parse()` is text-independent
+(validation, conflict checks) and runs at set time; `render()` needs the text,
+because a dialect forces Chinese, an accent forces English, and otherwise it
+follows whether the *target text* is Chinese — so it runs per synthesis. Baking
+the rendered string at set time would freeze one line's EN/ZH choice onto every
+later line on a reused context.
+
+Verified against the blueprint resolver and the HF tokenizer:
+
+| input | resolved | our style ids |
+|---|---|---|
+| `Male, British Accent` (EN text) | `male, british accent` | match HF exactly |
+| `Male, Elderly` (**Chinese** text) | `男，老年` | match HF exactly |
+| `britsh accent` | rejected | CLI rc=13, server `400 invalid_instructions`, with did-you-mean |
+| `male, female` | rejected | conflict, 400 |
+| three different instructs, one server process | each applied | codes DIFFERENT per request |
+
+Suggestion text is the one deliberate non-parity: upstream uses difflib's
+Ratcliff/Obershelp, we use an LCS ratio at the same 0.6 cutoff. It changes no
+model input, only the error string — noted in the header.
+
+**Still open (a gap, not a bug):** there is no `crispasr_session_set_tts_instruct`
+at all, so the session ABI cannot set an instruct for any backend. That is a new
+public symbol rather than a fix, so it is not in this change.
+
 ## LANDED 2026-08-07 — SubtitleEdit-13273: the language menu was decoration
 
 The reporter: "we have a menu where you can select the target language … nothing

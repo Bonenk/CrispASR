@@ -33,8 +33,9 @@
 #include "core/wav_reader.h"
 #include "core/gguf_loader.h"
 #include "core/gpu_backend_pref.h"
-#include "core/omnivoice_lang.h" // ISO-639-3 resolution for the <|lang_start|> tag (#13273)
-#include "core/tts_ref_cache.h"  // shared content-addressed reference-voice cache (issue #265)
+#include "core/omnivoice_instruct.h" // closed-vocabulary voice-design validation (#13273)
+#include "core/omnivoice_lang.h"     // ISO-639-3 resolution for the <|lang_start|> tag (#13273)
+#include "core/tts_ref_cache.h"      // shared content-addressed reference-voice cache (issue #265)
 #include "core/crispasr_env.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
@@ -392,7 +393,9 @@ struct omnivoice_context {
 
     // Language / instruct
     std::string language;
-    std::string instruct;
+    // Validated at set time; the final string is rendered per synthesis because
+    // the EN/ZH choice depends on the text being spoken (see omnivoice_instruct.h).
+    core_omnivoice_instruct::Parsed instruct;
 
     // Speaking-rate multiplier for the target-length estimate (>1 faster/shorter).
     float speed = 1.0f;
@@ -1635,7 +1638,12 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
     }
 
     std::string lang_str = eff_lang.empty() ? "None" : eff_lang;
-    std::string instruct_str = ctx->instruct.empty() ? "None" : ctx->instruct;
+    // Render the validated instruct for THIS text: a dialect forces Chinese, an
+    // accent forces English, otherwise it follows whether the target text is
+    // Chinese. Text-dependent, so it cannot be baked in at set time.
+    const std::string instruct_rendered =
+        core_omnivoice_instruct::render(ctx->instruct, core_omnivoice_instruct::text_is_zh(text));
+    std::string instruct_str = instruct_rendered.empty() ? "None" : instruct_rendered;
     style_text += "<|lang_start|>" + lang_str + "<|lang_end|>";
     style_text += "<|instruct_start|>" + instruct_str + "<|instruct_end|>";
     std::vector<int32_t> style_ids = tokenize(ctx->vocab, style_text);
@@ -3553,10 +3561,24 @@ int omnivoice_set_language(struct omnivoice_context* ctx, const char* lang) {
     return 0;
 }
 
+// Upstream `_resolve_instruct()` RAISES on an unsupported item, a
+// dialect+accent mix, or two items from one category, and we mirror that rather
+// than degrade: the instruct is a closed 48-item vocabulary, and a voice-design
+// request that silently does nothing is exactly the failure this fixes. On
+// rejection the previous instruct is CLEARED, so a bad value can never leave a
+// stale one conditioning later lines on a reused server context.
 int omnivoice_set_instruct(struct omnivoice_context* ctx, const char* instruct) {
     if (!ctx)
         return -1;
-    ctx->instruct = instruct ? instruct : "";
+
+    core_omnivoice_instruct::Parsed parsed = core_omnivoice_instruct::parse(instruct ? instruct : "");
+    if (parsed.status != core_omnivoice_instruct::Status::ok &&
+        parsed.status != core_omnivoice_instruct::Status::cleared) {
+        fprintf(stderr, "crispasr[omnivoice]: %s\n", parsed.error.c_str());
+        ctx->instruct = core_omnivoice_instruct::Parsed{};
+        return -2;
+    }
+    ctx->instruct = std::move(parsed);
     return 0;
 }
 
