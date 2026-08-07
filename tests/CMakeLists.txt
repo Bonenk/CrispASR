@@ -4344,6 +4344,21 @@ catch_discover_tests(test-omnivoice-instruct
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-omnivoice-prompt — the assembled style prefix, i.e. the last thing the
+# model sees before tokenization. The resolvers had unit tests; the string they
+# feed was only ever checked by hand against the HF tokenizer, which needs a
+# 1.2 GB model and an eyeball. Every string here was verified byte-for-byte
+# against AutoTokenizer and the ids are recorded in the file (#13273).
+add_executable(test-omnivoice-prompt test-omnivoice-prompt.cpp)
+target_include_directories(test-omnivoice-prompt PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-omnivoice-prompt PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-omnivoice-prompt
+    TEST_SPEC "[unit]"
+    PROPERTIES
+        LABELS unit
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test-rvc-svc — live integration tests (session C-ABI, the only surface)
 add_executable(test-rvc-svc test_rvc_svc_live.cpp)
 target_include_directories(test-rvc-svc PRIVATE

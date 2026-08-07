@@ -35,6 +35,7 @@
 #include "core/gpu_backend_pref.h"
 #include "core/omnivoice_instruct.h" // closed-vocabulary voice-design validation (#13273)
 #include "core/omnivoice_lang.h"     // ISO-639-3 resolution for the <|lang_start|> tag (#13273)
+#include "core/omnivoice_prompt.h"   // style-prefix assembly, unit-testable (#13273)
 #include "core/tts_ref_cache.h"      // shared content-addressed reference-voice cache (issue #265)
 #include "core/crispasr_env.h"
 #include "ggml-alloc.h"
@@ -1614,9 +1615,6 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
 
     // 3. Build style prefix. When cloning, a <|denoise|> token leads the style
     //    (Python create_voice_clone_prompt), then language + instruct.
-    std::string style_text;
-    if (ctx->ref_T > 0)
-        style_text += "<|denoise|>";
     // The language the caller asked for wins outright. Only when nobody set one
     // do we guess from the text (#13273): SubtitleEdit's language menu is still
     // not wired to the payload upstream, so without this every dubbed line
@@ -1637,15 +1635,16 @@ static ov_gen_result generate_iterative(omnivoice_context* ctx, const std::strin
             fprintf(stderr, "omnivoice: no language requested; detected '%s' from the target text\n", eff_lang.c_str());
     }
 
-    std::string lang_str = eff_lang.empty() ? "None" : eff_lang;
     // Render the validated instruct for THIS text: a dialect forces Chinese, an
     // accent forces English, otherwise it follows whether the target text is
     // Chinese. Text-dependent, so it cannot be baked in at set time.
     const std::string instruct_rendered =
         core_omnivoice_instruct::render(ctx->instruct, core_omnivoice_instruct::text_is_zh(text));
-    std::string instruct_str = instruct_rendered.empty() ? "None" : instruct_rendered;
-    style_text += "<|lang_start|>" + lang_str + "<|lang_end|>";
-    style_text += "<|instruct_start|>" + instruct_str + "<|instruct_end|>";
+
+    // Assembly lives in a weight-free header so the exact prompt string is
+    // unit-testable (tests/test-omnivoice-prompt.cpp) instead of only
+    // observable by loading the model and reading the debug print below.
+    const std::string style_text = core_omnivoice_prompt::build_style_text(ctx->ref_T > 0, eff_lang, instruct_rendered);
     std::vector<int32_t> style_ids = tokenize(ctx->vocab, style_text);
     int T_style = (int)style_ids.size();
 
