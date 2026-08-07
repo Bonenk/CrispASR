@@ -11,6 +11,33 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-08-07 — #13273 omnivoice language knob is dead on every surface
+
+Worktree `.claude/worktrees/omnivoice-lang`, branch `fix/omnivoice-lang-13273`.
+SubtitleEdit-13273: the OmniVoice target-language menu is decoration. Four
+breaks, all verified by reading the path:
+
+1. SE's `OmniVoiceCrispAsr.Speak()` accepts `TtsLanguage? language` and never
+   sends it (payload is `{input, response_format, speed}`); its launch args
+   carry no `-l`. SE-side — report upstream, not ours to fix.
+2. `crispasr_backend_omnivoice.cpp::synthesize()` applies only
+   `params.tts_num_steps` per call. `omnivoice_set_language` runs ONLY in
+   `init()`, so a persistent server can never change language per request even
+   though `crispasr_server.cpp:2380` parses `language`/`target_lang` into
+   `rp.language`. `crispasr_backend_cosyvoice3.cpp:217-230` is the template.
+3. `crispasr_c_api.cpp:8570` — the session omnivoice arm is a bare
+   `omnivoice_synthesize()`; `set_target_language` never reaches it. Exactly
+   the #329 cosyvoice3 bug (checklist point 6).
+4. `omnivoice.cpp:1609` drops the string verbatim into `<|lang_start|>`. The
+   blueprint (`_resolve_language`, `omnivoice/models/omnivoice.py:1472`) is
+   ID-passthrough → lowercase-name lookup → **None**. No table, no test, no
+   ref-dump stage on our side.
+
+Open question the code cannot answer: whether the lang tag alone kills the
+reference accent, or whether the clone path also needs the #329
+reference-transcript drop (`omnivoice.cpp:1583` prepends `ref_text` into the
+combined stream). Settled by live A/B, not by reading.
+
 ### Ready to take — scoped, unblocked, nobody on them
 
 | # | Task | Size | Where |
