@@ -3077,6 +3077,9 @@ static int run_encode_diff(omnivoice_context* ctx, const char* ref_path) {
         return -1;
     }
     fprintf(stderr, "omnivoice encode-diff vs %s\n", ref_path);
+    // Failed main-chain stages; the return value reflects this so callers can
+    // gate on it (a diff that prints FAIL but exits 0 is not a gate).
+    int n_fail = 0;
 
     // --- Stage HuBERT frontend: feed ref wav16k_pad (isolates resampling) →
     //     hb_featextract + hb_featproj. Uses a separate archive via env. ---
@@ -3214,11 +3217,15 @@ static int run_encode_diff(omnivoice_context* ctx, const char* ref_path) {
             if ((int)mine.size() == T * C && T_out == T) {
                 float cmin, cmean, mabs;
                 higgs_cos(mine.data(), (const float*)r_ac->data, T, C, cmin, cmean, mabs);
+                const bool ok = cmin >= 0.999f;
+                if (!ok)
+                    n_fail++;
                 fprintf(stderr, "  acoustic_enc (→e_acoustic): cos_min=%.6f cos_mean=%.6f max_abs=%.3e  %s\n", cmin,
-                        cmean, mabs, cmin >= 0.999f ? "PASS" : "FAIL");
+                        cmean, mabs, ok ? "PASS" : "FAIL");
             } else {
                 fprintf(stderr, "  acoustic_enc: shape mismatch mine=%zu (T_out=%d) ref=(%d,%d)\n", mine.size(), T_out,
                         T, C);
+                n_fail++;
             }
         } else {
             fprintf(stderr, "  acoustic_enc: ref missing input_wav24k/e_acoustic\n");
@@ -3235,10 +3242,14 @@ static int run_encode_diff(omnivoice_context* ctx, const char* ref_path) {
             if ((int)mine.size() == T * C) {
                 float cmin, cmean, mabs;
                 higgs_cos(mine.data(), (const float*)r_es->data, T, C, cmin, cmean, mabs);
+                const bool ok = cmin >= 0.999f;
+                if (!ok)
+                    n_fail++;
                 fprintf(stderr, "  encoder_semantic (→e_semantic): cos_min=%.6f cos_mean=%.6f max_abs=%.3e  %s\n", cmin,
-                        cmean, mabs, cmin >= 0.999f ? "PASS" : "FAIL");
+                        cmean, mabs, ok ? "PASS" : "FAIL");
             } else {
                 fprintf(stderr, "  encoder_semantic: size mismatch mine=%zu ref=%d\n", mine.size(), T * C);
+                n_fail++;
             }
         } else {
             fprintf(stderr, "  encoder_semantic: ref missing sem_ds/e_semantic\n");
@@ -3268,8 +3279,11 @@ static int run_encode_diff(omnivoice_context* ctx, const char* ref_path) {
             higgs_linear(fc_w, fc_b, cat.data(), T, H, H, mine);
             float cmin, cmean, mabs;
             higgs_cos(mine.data(), (const float*)r_emb->data, T, H, cmin, cmean, mabs);
+            const bool ok = cmin >= 0.999f;
+            if (!ok)
+                n_fail++;
             fprintf(stderr, "  concat+fc (→emb_fc): cos_min=%.6f cos_mean=%.6f max_abs=%.3e  %s\n", cmin, cmean, mabs,
-                    cmin >= 0.999f ? "PASS" : "FAIL");
+                    ok ? "PASS" : "FAIL");
         } else {
             fprintf(stderr, "  concat+fc: ref missing e_acoustic/e_semantic/emb_fc or fc weights\n");
         }
@@ -3305,7 +3319,13 @@ static int run_encode_diff(omnivoice_context* ctx, const char* ref_path) {
                         match++;
                         per_cb[k]++;
                     }
-            fprintf(stderr, "  RVQ (emb_fc→codes): %ld/%ld exact (%.1f%%)  per-cb:", match, tot, 100.0 * match / tot);
+            // 99.5%: measured 99.9% on the pinned fixture; the handful of
+            // off-by-one codes are borderline nearest-centroid ties.
+            const bool ok = match * 1000 >= tot * 995;
+            if (!ok)
+                n_fail++;
+            fprintf(stderr, "  RVQ (emb_fc→codes): %ld/%ld exact (%.1f%%)  %s  per-cb:", match, tot,
+                    100.0 * match / tot, ok ? "PASS" : "FAIL");
             for (int k = 0; k < NQ; k++)
                 fprintf(stderr, " %d/%d", per_cb[k], T);
             fprintf(stderr, "\n    mine cb0[:12]:");
@@ -3340,14 +3360,23 @@ static int run_encode_diff(omnivoice_context* ctx, const char* ref_path) {
                 for (size_t i = 0; i < refc.size(); i++)
                     if (mine[i] == refc[i])
                         match++;
-                fprintf(stderr, "  FULL wav→codes: %ld/%zu exact (%.1f%%), T=%d\n", match, refc.size(),
-                        100.0 * match / refc.size(), T_out);
+                // 95%: measured 99.0% on the pinned fixture; the residual is
+                // our resampler vs torchaudio's Hann sinc, not a port bug.
+                // The corrupt-tokenizer failure mode sits at 15%.
+                const bool ok = match * 100 >= (long)refc.size() * 95;
+                if (!ok)
+                    n_fail++;
+                fprintf(stderr, "  FULL wav→codes: %ld/%zu exact (%.1f%%), T=%d  %s\n", match, refc.size(),
+                        100.0 * match / refc.size(), T_out, ok ? "PASS" : "FAIL");
             } else {
                 fprintf(stderr, "  FULL wav→codes: T_out=%d ref T=%d (align)\n", T_out, T);
+                n_fail++;
             }
         }
     }
-    return 0;
+    if (n_fail > 0)
+        fprintf(stderr, "omnivoice encode-diff: %d stage(s) FAILED\n", n_fail);
+    return n_fail == 0 ? 0 : 1;
 }
 
 } // namespace

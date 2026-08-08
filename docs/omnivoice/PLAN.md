@@ -3,6 +3,38 @@
 Branch: `fix/omnivoice-254-voiceclone-rtf` (rebased onto `main` on top of the
 stranded GPU commit `feat/omnivoice-gpu` = "run the LLM on GPU").
 
+## LANDED 2026-08-08 — encode diff wired to the harness front door, and the gate can finally go red
+
+`crispasr-diff omnivoice` was a stub (loaded the model, printed the ref token
+count, compared nothing, exited 0) while the REAL per-stage comparison —
+`omnivoice_encode_diff()`, #254 — hid behind `CRISPASR_OMNIVOICE_ENCODE_DIFF`
+in the CLI adapter. Worse, `run_encode_diff` returned 0 unconditionally: a run
+with the corrupt tokenizer printed `acoustic_enc … FAIL` and `FULL wav→codes
+15.0%` and still exited clean. Both fixed:
+
+- The diff-main branch now resolves the audio tokenizer
+  (`CRISPASR_OMNIVOICE_TOKENIZER_GGUF` env, else next-to-model candidates) and
+  runs the encode diff as a counted harness stage.
+- `run_encode_diff` counts main-chain failures and returns nonzero. New
+  explicit gates: RVQ ≥ 99.5% exact (measured 99.9%), FULL wav→codes ≥ 95%
+  (measured 99.0%; residual = our resampler vs torchaudio Hann sinc, the
+  documented optional item — corrupt-tokenizer failure mode sits at 15%).
+
+Current metrics (M1, q4_k LLM + f16 tokenizer `710ef610`, vs
+`omnivoice-encode-ref.gguf`): acoustic_enc / encoder_semantic / concat+fc all
+cos_min=1.000000, RVQ 2197/2200, FULL 2178/2200. Verified red-first: corrupt
+tokenizer → 2 stages FAILED, `crispasr-diff` rc=6, CLI env path rc=1.
+
+**⚠ Local-disk trap, defused:** `/Volumes/backups/ai/crispasr-gguf/` still had
+the CORRUPT Jul-11 `omnivoice-tokenizer-f16.gguf` under the canonical name the
+env-live-tests default and next-to-model discovery both resolve — the clean
+regen only existed as `-fixed`. HF has shipped the fixed bytes under the
+canonical name since Jul 14 (verified `710ef610` == HF LFS oid). Locally the
+corrupt file is renamed `*.CORRUPT-block4-zeroed` and the canonical name is now
+a hard link to the fixed file. Also stale in the #254 log below: "Ship the GGUF
+fix" HAS shipped (HF replaced); the registry carries URLs, not shas, so no
+registry bump was ever needed.
+
 ## LANDED 2026-08-07 — `--instruct` had the SAME three defects, found by blueprint review
 
 Not from a report. After the language fix I went back and diffed our runtime

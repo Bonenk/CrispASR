@@ -7486,9 +7486,11 @@ int main(int argc, char** argv) {
         nemotron_free(ctx);
 
     } else if (backend_name == "omnivoice") {
-        // OmniVoice: masked iterative TTS. Minimal diff harness — load
-        // model, compare text embeddings. Full pipeline diff pending
-        // audio tokenizer implementation.
+        // OmniVoice: voice-clone ENCODE path (WAV → HiggsAudioV2 codes),
+        // stage-by-stage vs a Python reference (omnivoice-encode-ref.gguf,
+        // tools/dump_omnivoice_encode_reference.py). The comparison itself
+        // lives in the runtime (omnivoice_encode_diff, #254); this wires it
+        // to the harness front door and propagates its verdict.
         auto cp = omnivoice_context_default_params();
         cp.n_threads = 4;
         cp.verbosity = 0;
@@ -7498,13 +7500,39 @@ int main(int argc, char** argv) {
             return 4;
         }
 
-        // Stage: text_input_ids — verify tokenisation matches
-        auto ids_pair = ref.get_f32("text_input_ids");
-        if (ids_pair.first && ids_pair.second > 0) {
-            fprintf(stderr, "  text_input_ids: %d tokens in reference\n", (int)ids_pair.second);
+        // Audio-tokenizer GGUF: env override, else next to the model
+        // (same candidates the CLI adapter probes).
+        std::string tok_path;
+        if (const char* env_tok = crispasr_env::get("CRISPASR_OMNIVOICE_TOKENIZER_GGUF")) {
+            tok_path = env_tok;
+        } else {
+            std::string dir = model_path.substr(0, model_path.find_last_of("/\\") + 1);
+            for (const char* name :
+                 {"omnivoice-tokenizer.gguf", "omnivoice-tokenizer-f16.gguf", "omnivoice-audio-tokenizer.gguf"}) {
+                if (file_exists(dir + name)) {
+                    tok_path = dir + name;
+                    break;
+                }
+            }
+        }
+        if (tok_path.empty() || omnivoice_set_tokenizer_path(ctx, tok_path.c_str()) != 0) {
+            fprintf(stderr,
+                    "omnivoice: audio tokenizer GGUF not found/loadable ('%s') — set "
+                    "CRISPASR_OMNIVOICE_TOKENIZER_GGUF or place omnivoice-tokenizer-f16.gguf next to the model\n",
+                    tok_path.c_str());
+            omnivoice_free(ctx);
+            return 4;
         }
 
+        int rc = omnivoice_encode_diff(ctx, ref_path.c_str());
         omnivoice_free(ctx);
+        if (rc == 0) {
+            printf("[PASS] encode_path             (per-stage detail on stderr)\n");
+            n_pass++;
+        } else {
+            printf("[FAIL] encode_path             (per-stage detail on stderr)\n");
+            n_fail++;
+        }
 
     } else if (backend_name == "canary-qwen") {
         auto cp = canary_qwen_context_default_params();
