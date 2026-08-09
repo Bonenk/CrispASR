@@ -51,9 +51,9 @@ sha256 and the one-command disambiguation, all 9 pins re-derived byte-identical
 
 | # | Task | Size | Where |
 |---|---|---|---|
-| 0 | **firered-asr has no `fix_loops` at all** — Mandarin + 20 dialects, and its only guard is greedy-path-only | S | §W1b, "post-decode text hardening" |
-| 0b | **Aligner collapse sentinel** — we ship timestamp collapse undetected | M | §W3, same section |
-| 0c | **VAD failover** — no escape hatch when VAD returns ~no speech on a long clip | S | §W4, same section |
+| 0 | **Aligner collapse sentinel** — we ship timestamp collapse undetected | M | §W3, "post-decode text hardening" |
+| 0b | **VAD failover** — no escape hatch when VAD returns ~no speech on a long clip | S | §W4, same section |
+| 0c | **Line-length hallucination cutoff** for CJK subtitle lines | S | §W2, same section |
 | 1 | **Delete the duplicated fallback copies** instead of keeping 14 files in sync | M | §"OPEN follow-ups from #300 / #308" item 3 |
 | 2 | **`CAP_PUNCTUATION_NATIVE` audit** for `lfm2-audio`, `fastconformer-ctc`, `wav2vec2` | S | same section, item 2 |
 | 3 | **#326 speaker-count estimator** — the last diarization accuracy item | M | §"NOW — #326" |
@@ -188,7 +188,7 @@ aligner, not from a space split.
 `fix_loops` still normalises whitespace to single spaces on rejoin — that was
 already true and `test-ngram-loop-fix.cpp:86` pins it. Not changed here.
 
-### W1b — firered-asr has NO `fix_loops` at all (found while doing W1)
+### W1b — firered-asr had NO `fix_loops` at all — DONE 2026-08-09
 
 Turned up checking W1's blast radius. `src/firered_asr.cpp` does not even
 `#include "core/ngram_loop_fix.h"`; the only mention is a comment at :2270
@@ -200,8 +200,24 @@ That substitute is **greedy-only by construction** (wired into the
 `beam_size == 1` branch only, since beam search self-terminates), so a firered
 run with `beam_size > 1` has neither guard. firered-asr is Mandarin + 20+
 Chinese dialects (README.md:110) — i.e. precisely the script W1 is about, on
-the backend with the least coverage. Small: add the call on the adapter's
-output. Do NOT assume the decode-time break makes it redundant.
+the backend with the least coverage.
+
+**Landed.** `examples/cli/crispasr_backend_firered_asr.cpp` now runs
+`fix_loops_keep_indices` over the token texts (filtering `seg.tokens` in
+lockstep, mirroring the canary-qwen path at `crispasr_c_api.cpp:5675`) and
+`fix_loops` over `seg.text`.
+
+Guard: `tests/test-loopfix-wiring.cpp`. A pure-predicate test could never have
+caught this — the predicate was always correct, the *join* was missing — so
+this one is a source scan asserting each AR adapter contains the CALL, not the
+`#include` (an include nothing invokes is precisely the state firered shipped
+in). **Proven red**: stashing the firered change makes it fail naming that
+exact file; restored and green after. Costs nothing, needs no model.
+
+The list of six adapters in that test pins *observed* wiring — it is not a
+claim that every adapter needs the collapse (CTC/RNN-T backends do not loop
+this way; higgs-stt and moss-transcribe call it in-library, which the test
+checks separately).
 
 ### W2 — absolute line-length cutoff as a hallucination catch-all
 
