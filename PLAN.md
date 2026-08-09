@@ -245,6 +245,48 @@ None tracked for cohere. Two things deliberately NOT done, with reasons:
    extra model. Threshold sits below one int16 LSB so one non-zero sample
    disables it; the quietest real speech to hand peaks ~3800x higher.
 
+## OPEN 2026-08-09 — #337 qwen3-tts GPU talker diverges from CPU and degenerates
+
+Reported on HIP (RX 7900 XTX, ROCm 6.4.4): the talker picks a different token
+from CPU at frame 0 and then runs to the KV ceiling — 3796 frames / 303.76 s
+instead of <10 s — with **exit code 0** and a valid WAV. Reporter ruled out
+quantization, model size, flash-attn, HIP graph capture and the voice
+reference, each with a paired test.
+
+**It is NOT HIP-specific — it reproduces on Metal.** Measured here on the 0.6B
+q8_0 base + the baked default voice pack, same failing text, with the new
+`CRISPASR_QWEN3_TTS_GREEDY=1`:
+
+| | frames | first divergence | continuation |
+|---|---|---|---|
+| CPU  | 92  | — | varied |
+| Metal | 107 | **frame 6** | `142,142, 1657×4, 668×8 …` |
+
+Both backends are deterministic run-to-run under greedy (verified twice each),
+so the divergence is real, not sampling. Metal does not run away — it stops at
+107 frames — but it enters the same repetition attractor the HIP report ends
+in. So this is debuggable on hardware we have.
+
+⚠ **A CPU-vs-GPU token table means nothing without greedy.** The talker
+hardcoded top_k=50 / temp=0.9, and `qwen3_tts_set_temperature` reached the code
+predictor but NOT the talker, so `--temperature` was silently inert there. The
+RNG stream is identical across backends (fixed-seed xorshift), but the pick is
+a multinomial draw over a softmax of 50 logits, so any float difference can
+move it. Both fixed in 83db1d7a's follow-up.
+
+### Next steps
+
+1. Bisect WHERE the logits first differ at frame 6 — talker forward vs code
+   predictor — using `CRISPASR_QWEN3_TTS_DUMP_DIR` per-stage dumps on both
+   backends. The frame-0 agreement (frames 0–5 identical) says the prefill and
+   the early KV path are fine; something accumulates.
+2. Check the usual GPU suspects from LEARNINGS in order: weight-less first op
+   on the sched, a non-contiguous `get_rows` index (CUDA/HIP assert on that,
+   Metal tolerates it), and cached-graph input aliasing across steps.
+3. The runaway itself is a separate, backend-independent defect: hitting the KV
+   ceiling returned success. Now logged as an explicit ERROR naming the
+   consequence; making it a non-zero exit is still open.
+
 ## LANDED 2026-08-05 — #334 cosyvoice3 WAV cloning (85d60ba9, 88c02788)
 
 Reported as "long delay, pitch shifting and accent issues", blamed on sample

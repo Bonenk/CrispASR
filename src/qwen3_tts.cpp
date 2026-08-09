@@ -6942,8 +6942,29 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
     // and min_new_tokens=2 (no codec_eos for the first two frames).
     // Without these the talker can argmax-attract to a silence token at
     // frame 0 and emit ~5 s of leading silence.
-    const int talker_top_k = 50;
-    const float talker_temp = 0.9f;
+    //
+    // #337: two problems with the sampler being hardcoded here.
+    //
+    // (a) `qwen3_tts_set_temperature` reached the code predictor (see
+    //     cp_generate) but NOT the talker, so `--temperature` silently did
+    //     nothing to the decision that actually picks each frame. Read it the
+    //     same way, with the same `> 0 ? : 0.9f` fallback, so an untouched
+    //     caller keeps the reference behaviour.
+    //
+    // (b) With top-k=50 sampling there is no way to compare two backends.
+    //     The RNG stream is identical (deterministic xorshift, fixed seed), but
+    //     the pick is a multinomial draw over a softmax of the top 50 logits,
+    //     so ANY float difference — including the legitimate ones every backend
+    //     has — can move it. A frame-0 token mismatch between CPU and GPU is
+    //     therefore not, on its own, evidence of a miscompute.
+    //     CRISPASR_QWEN3_TTS_GREEDY=1 forces top_k=1, i.e. argmax, which makes
+    //     the frame sequence a pure function of the logits: two backends then
+    //     agree if and only if their logits agree, and a divergence IS a
+    //     miscompute. Same lever as CRISPASR_COSYVOICE3_GREEDY, which is what
+    //     settled the #304 native-Vulkan post-mortem (see LEARNINGS).
+    const bool talker_greedy = crispasr_env::get("CRISPASR_QWEN3_TTS_GREEDY") != nullptr;
+    const int talker_top_k = talker_greedy ? 1 : 50;
+    const float talker_temp = ctx->params.temperature > 0 ? ctx->params.temperature : 0.9f;
     const float talker_repetition_penalty = 1.05f;
     const int min_new_frames = 2;
     const int suppress_lo = (int)hp.vocab_size - 1024; // 2048 with default config
@@ -7078,7 +7099,20 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
 
         // 6. Talker forward on the (1, d) input → next logits + hidden_last.
         if (n_past >= ctx->kv_max_ctx - 1) {
-            fprintf(stderr, "qwen3_tts: talker kv cache full at frame %d (n_past=%d)\n", frame, n_past);
+            // #337: this is a RUNAWAY, not a normal stop — the talker never
+            // emitted EOS and we are cutting it off at the context ceiling.
+            // The audio that comes back is tens of times longer than the text
+            // warrants and is not usable output, so say so in those terms. It
+            // used to read as an informational note, and the call still
+            // returned a valid WAV with exit code 0, which is how a 300 s
+            // runaway looked exactly like a successful 8 s synthesis to any
+            // caller that was not scraping stderr.
+            fprintf(stderr,
+                    "qwen3_tts: ERROR: talker ran to the KV ceiling without emitting EOS — stopped at frame %d "
+                    "(n_past=%d, %.1f s of audio). The output is a runaway and should be discarded. If this "
+                    "reproduces on GPU but not with --gpu-backend cpu, re-run both with "
+                    "CRISPASR_QWEN3_TTS_GREEDY=1 to remove sampling from the comparison.\n",
+                    frame, n_past, (double)frame * 0.08);
             break;
         }
         const double t_talker = bench ? now_ms() : 0.0;
