@@ -217,6 +217,15 @@ inline bool is_note_only(const std::string& s) {
         }
         if (matched)
             continue;
+        // cppcheck flags this as a possible out-of-bounds read because it does
+        // not model `std::string::compare(pos, len, s)`: that compares the
+        // substring [pos, pos + min(len, size() - pos)), so when fewer than L
+        // bytes remain the compared substring is SHORTER than `nt` and the
+        // result cannot be 0. A match therefore implies `i + L <= t.size()`,
+        // `i += L` keeps `i <= t.size()`, and the loop condition re-checks
+        // before we get here — so `i < t.size()` holds at this line. Suppressed
+        // rather than guarded, because a guard here would be dead code.
+        // cppcheck-suppress containerOutOfBounds
         const unsigned char c = (unsigned char)t[i];
         if (c == ' ' || c == '.' || c == ',' || c == '-' || c == '~')
             i++;

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.8.26
+
+* CosyVoice3 voice cloning was conditioned on the wrong speaker embedding
+  (cosine 0.737 against upstream's CAMPPlus ONNX): the export folds
+  `out_nonlinear`'s BatchNorm into the preceding convolution and the fused bias
+  was dropped. Now 0.999997. Baked bank voices were never affected (#334).
+* CosyVoice3 `--ref-text` is now optional — the reference is auto-transcribed
+  and cached — and the decode has upstream's minimum-length floor, so it can no
+  longer end at step 0 with no audio (#334).
+* New CosyVoice3 RL talker: `--backend cosyvoice3-tts-rl` (#334).
+* Voxtral TTS could index its embedding table out of bounds on some inputs: a
+  Tekken vocabulary blob may serialize more pieces than the checkpoint
+  activates. Bounded, in both `voxtral-tts` and `voxtral4b` (#338).
+* qwen3-tts could emit 300 s of audio for one sentence — the frame budget was
+  the KV cache ceiling rather than anything derived from the input text (#337).
+* madlad400 F16 and Q8_0 artifacts published; F16 verified at cosine 1.000000
+  on all 14 stages against the PyTorch reference (#333).
+* Kokoro punctuation was being discarded, in German, French and Spanish too,
+  and the contextual G2P rules had shipped switched off (#316).
+* `-tl` / `--target-lang` was silently discarded by cosyvoice3 and omnivoice
+  (#329).
+* Rust and Dart diarize ABI mirrors were 24 bytes short; FoxNose exposed, plus
+  `session_output_sample_rate` and channel getters (#332).
+
 ## 0.8.25
 
 * New ASR backend: GigaAM-v3 (Russian, CTC + RNN-T, punctuation-native `e2e` heads).
