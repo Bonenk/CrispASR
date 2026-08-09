@@ -17,7 +17,7 @@ per-backend porting detail (Per-model port notes + the family cross-reference).
 Reach for the topic groups when you are stuck on a *technique*, and the
 cross-reference when you already know which model you are touching.
 
-## Index by topic (274 lessons)
+## Index by topic (275 lessons)
 
 **Security & untrusted input** (2)
 
@@ -169,7 +169,7 @@ cross-reference when you already know which model you are touching.
 - L13831 — A "GPU" model can be silently running on CPU — audit for hot graphs pinned to backend_cpu and CLI adapters that never forward use_gpu
 - L17319 — PR #244 dequant-cache fix MERGED
 
-**GPU portability — Metal / CUDA / Vulkan** (23)
+**GPU portability — Metal / CUDA / Vulkan** (24)
 
 - L1004 — When the full system needs an unavailable resource (model / GPU), factor the risky logic into a pure helper and prove IT on synthetic data
 - L1119 — Verify a roadmap "broken/OPEN" claim empirically before implementing it — the codebase may have outgrown the note
@@ -194,6 +194,7 @@ cross-reference when you already know which model you are touching.
 - L14189 — "Backend miscomputes my pipeline" ≠ "op X is broken": arbitrate with test-backend-ops, and beware aggregate precision (#304 native-Vulkan post-mortem)
 - L16107 — Chatterbox GPU UNet performance fix
 - L16346 — cosyvoice3 \"CUDA test FAIL\" was a registry-alias + flow-quant discovery bug, NOT a CUDA bug
+- L17637 — "GPU picks a different token than CPU" is usually NOT a miscompute in an AR audio model — dump the LOGITS, and don't reach for the repetition detector
 
 **Quantization** (10)
 
@@ -363,7 +364,7 @@ lookup, not a partition.
 - **voxcpm2** (4) — L8340, L8544, L8667, L17516
 - **openvoice2** (1) — L12277
 - **glm-asr** (1) — L13539
-- **qwen3** (16) — L1170, L3044, L3747, L4390, L7069, L7670, L8340, L8734, L10716, L13498, L13596, L13689, L14372, L14708, L15126, L17134
+- **qwen3** (17) — L1170, L3044, L3747, L4390, L7069, L7670, L8340, L8734, L10716, L13498, L13596, L13689, L14372, L14708, L15126, L17134, L17637
 - **madlad / T5** (1) — L6964
 - **mini-omni2** (2) — L2690, L2705
 - **titanet / speaker-id** (1) — L8137
