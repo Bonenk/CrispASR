@@ -35,8 +35,28 @@ was justified by, now measured rather than argued.
 noisy-but-speechless audio may read differently to an energy VAD, so this
 demonstrates the wiring and the direction, not a tuned threshold.
 
-**§W3 is still unmeasured** — the alignment sentinel needs an aligner model and
-a real transcript to exercise; only its unit fixtures have run.
+**§W3 measured end-to-end 2026-08-09**, with `canary-ctc-aligner-q4_k.gguf` on
+real audio via `--align-only`:
+
+| Case | Result |
+|---|---|
+| correct English transcript vs `samples/jfk.wav` (negative control) | sentinel **silent**; 22 words, plausible timestamps ending 10.08–10.16 s in an 11 s clip |
+| Japanese transcript vs the same English-vocab aligner | sentinel **fires**: `zero-position words 28/28 (1.000 > 0.100); coverage 0.000 < 0.050 of 11.000s` |
+
+The positive case is the real documented failure, not a synthetic one: the
+aligner returned **all 28 words at `t0 == t1 == 0`** and exited **0**. The SRT
+shows 27 of 28 cues as `00:00:00,000 --> 00:00:00,000` (the 28th is the
+formatter clamping the last cue to the clip end). Text intact, every timestamp
+worthless, and before this sentinel nothing said a word about it. Two of the
+five signals fired independently, which is the design working as intended.
+
+⚠ **Trap that nearly produced a false bug report on our own code:** the first
+check said the sentinel had NOT fired. It had. The CLI echoes the transcript
+through `%.80s`, which truncated the Japanese mid-UTF-8 and left an invalid
+byte in the captured output — so `grep` classified the file as binary and
+silently suppressed every match. Use `grep -a` on any captured CrispASR output
+containing non-Latin text, or verify in Python. A binary-suppressed grep looks
+exactly like "the feature did not run".
 
 Survey of https://github.com/meizhong986/WhisperJAV (Python orchestration over
 faster-whisper; nothing ports at the code level, the *algorithms* do). It is
