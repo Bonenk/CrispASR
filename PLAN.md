@@ -51,6 +51,9 @@ sha256 and the one-command disambiguation, all 9 pins re-derived byte-identical
 
 | # | Task | Size | Where |
 |---|---|---|---|
+| 0 | **`fix_loops` is a no-op on CJK** — verified bug, the loop guard is dead on the Chinese-first backends | S | §W1, "post-decode text hardening" |
+| 0b | **Aligner collapse sentinel** — we ship timestamp collapse undetected | M | §W3, same section |
+| 0c | **VAD failover** — no escape hatch when VAD returns ~no speech on a long clip | S | §W4, same section |
 | 1 | **Delete the duplicated fallback copies** instead of keeping 14 files in sync | M | §"OPEN follow-ups from #300 / #308" item 3 |
 | 2 | **`CAP_PUNCTUATION_NATIVE` audit** for `lfm2-audio`, `fastconformer-ctc`, `wav2vec2` | S | same section, item 2 |
 | 3 | **#326 speaker-count estimator** — the last diarization accuracy item | M | §"NOW — #326" |
@@ -109,6 +112,124 @@ Earned the hard way; each cost a real bug getting through.
 5. **A hand-maintained list needs a machine check that it is complete.** The
    copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
    missing one.
+
+## CLAIMED 2026-08-09 — §W1 CJK loop-fix no-op
+
+Worktree: `/Users/christianstrobele/code/CrispASR` (main checkout). Taking §W1
+only — `src/core/ngram_loop_fix.h` + a new `tests/test-ngram-loopfix-cjk.cpp`.
+W2–W7 are unclaimed. Delete this block when W1 lands.
+
+## NOW 2026-08-09 — post-decode text hardening (WhisperJAV survey)
+
+Survey of https://github.com/meizhong986/WhisperJAV (Python orchestration over
+faster-whisper; nothing ports at the code level, the *algorithms* do). It is
+worth taking seriously because JAV audio is an adversarial worst case for
+Whisper — long-form, heavy non-verbal vocalisation, low SNR — so its
+post-processing stack is far ahead of ours. Full survey in `LEARNINGS.md`.
+
+**The survey immediately found a live bug, verified, see W1.**
+
+### W1 — `core_ngram::fix_loops` is a NO-OP on CJK (BUG, take first)
+
+`src/core/ngram_loop_fix.h:68` `split_words()` splits on ASCII whitespace only.
+Japanese/Chinese has none, so the entire segment is one "word", `collapse()`
+can never fire, and the guard is inert. Compiled the header standalone
+2026-08-09:
+
+```
+ああああああああ            → UNCHANGED
+はい、はい、はい、はい、      → UNCHANGED
+謝謝觀看，謝謝觀看，謝謝觀看， → UNCHANGED     ← *the* canonical Whisper zh hallucination
+hey hey hey hey hey         → "hey hey hey"  (changed)
+```
+
+`core_ngram::` is consumed by `src/firered_asr.cpp` and
+`src/moss_transcribe.cpp` — both Chinese-first models — plus
+`src/moss_transcribe_diarize.cpp`, `src/moonshine.cpp`, `src/crispasr_c_api.cpp`.
+The guard is dead exactly where the failure mode is worst. Same class as
+"prove the new code path EXECUTES": wired, never fires.
+
+Also: `fix_loops()` re-joins survivors with single spaces, so on mixed CJK/Latin
+it would rewrite original spacing if it ever did split. Any fix must not
+normalise whitespace on text it does not otherwise change.
+
+**Port**: WhisperJAV `modules/repetition_cleaner.py:174` `_detect_generic_repetition`
+— script-agnostic, needs no word tokenizer. For substring lengths 2..50, candidate
+starts limited to offsets `0..sub_len-1` (a repeating unit must begin within its
+own length), count non-overlapping occurrences, and if
+`count*sub_len / len(text) >= coverage_threshold` (~0.5) reduce to 1–2 copies
+(2 if the unit is short, else 1). O(n·L²) worst case, but subtitle-line sized.
+Operate on Unicode code points, not bytes. Gate on "segment contains no
+whitespace" or "majority CJK" so Latin text keeps today's word-level path
+byte-for-byte.
+
+**Red first.** The current code *passes* a naive test vacuously — the fixture
+must be one that fails today. Watch all four cases above go red before fixing.
+
+### W2 — absolute line-length cutoff as a hallucination catch-all
+
+`repetition_cleaner.py` Layer 3. A CJK subtitle line past N chars is essentially
+always a repetition hallucination; truncate at the last `。`/`、`, with a floor
+at 75% of the cap so an early boundary does not over-cut. Catches loops no
+pattern matched. Small.
+
+### W3 — aligner collapse sentinel (silent corruption, we have NO guard)
+
+`modules/alignment_sentinel.py`. Detects a forced aligner mapping a whole
+scene's words into a ~100 ms window — text correct, timestamps garbage — then
+redistributes at a target CPS. Five independent signatures:
+
+| signature | threshold |
+|---|---|
+| word coverage of scene | < 5% |
+| aggregate chars/sec | > 50 (physically impossible) |
+| word span with substantial text | < 0.5 s |
+| words at exactly `(0.0, 0.0)` | > 10% |
+| words with `start == end` | > 40% |
+
+Grepped `src/align.cpp`, `src/crispasr_aligner.cpp`, `examples/nfa-align`:
+nothing for coverage / CPS / degenerate spans. We ship this undetected.
+Medium; the detector is weight-free and unit-testable, recovery is separable.
+
+### W4 — VAD failover when the VAD obviously failed
+
+`modules/vad_failover.py`, 57 lines. Clip > 120 s and VAD returns < 1% speech
+coverage — or ≤ 2 segments on a clip ≥ 4× the threshold — means the VAD is
+wrong; fall back to full-clip transcription. We have seven VAD backends
+(`crispasr_vad`, `silero`, `marblenet`, `webrtc`, `firered_vad`, `pyannote_seg`)
+and no escape hatch. Small, high value on long-form.
+
+### W5 — cross-segment dedup / merge
+
+`modules/cross_subtitle_processor.py`. Merge consecutive segments whose text
+similarity ≥ threshold when the gap is under a cap. Per-segment loop fixes
+cannot see a phrase repeating *across* segment boundaries — which is exactly
+how long-form Whisper context drift presents. Medium.
+
+### W6 — non-verbal drop + short-segment logprob margin
+
+`modules/segment_filters.py`. Tightens the logprob threshold by a margin for
+segments ≤ 1.6 s: short segments have noisier `avg_logprob`, so a flat
+threshold under-filters them. We apply `logprob_thold` / `no_speech_thold`
+uniformly by duration (`src/crispasr.cpp:8499`). The `♪`-only / `[Music]` /
+`(laughs)` drop is a small language-neutral win on top.
+
+### W7 — sensitivity presets
+
+Named threshold bundles (conservative / balanced / aggressive) over
+`entropy_thold` / `logprob_thold` / `no_speech_thold` / `temperature_inc`,
+instead of four floats users must tune blind. Small.
+
+### Deliberately NOT porting
+
+- **The hallucination phrase blacklist** (`data/hallucination_filters/`,
+  150 KB `filter_list_v08.json` + `regexp_v09.json`). Heavily JA- and
+  JAV-specific, a maintenance liability, and real false-positive risk — its
+  first regex strips *all* parenthesised content. If we ever want this, take
+  the shape (categories + per-pattern confidence + aggressiveness multiplier),
+  never the payload.
+- Speech-enhancement backends, the ensemble/two-pass orchestrator, translation,
+  the webview GUI. Orchestration-layer, or things we already do differently.
 
 ## LANDED 2026-08-06 — #335 `Session::open()` could not open granite-speech
 
