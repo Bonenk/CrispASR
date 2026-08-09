@@ -4678,6 +4678,40 @@ class CrispasrSession {
     }
   }
 
+  /// Apply a named bundle of the four decoder fallback thresholds:
+  /// `"conservative"`, `"balanced"` (the shipped defaults, a no-op) or
+  /// `"aggressive"`. `"strict"`/`"default"`/`"loose"` are aliases. Mirrors the
+  /// CLI's `--sensitivity`.
+  ///
+  /// The four thresholds interact — a decode is only retried when the logprob
+  /// *and* no-speech bars are both crossed — so they move as a set. A later
+  /// [setFallbackThresholds] overrides this.
+  ///
+  /// Throws [ArgumentError] for an unrecognised preset: a typo must not be
+  /// silently treated as `"balanced"`. Gracefully degrades on older dylibs
+  /// that don't have the symbol.
+  void setSensitivity(String preset) {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_set_sensitivity')) {
+      return;
+    }
+    final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Utf8>),
+        int Function(Pointer<Void>, Pointer<Utf8>)>(
+        'crispasr_session_set_sensitivity');
+    final p = preset.toNativeUtf8();
+    try {
+      final rc = fn(_handle, p);
+      if (rc == -2) {
+        throw ArgumentError(
+            'unknown sensitivity preset "$preset" '
+            '(expected: conservative, balanced, aggressive)');
+      }
+      if (rc != 0) throw Exception('setSensitivity failed (rc=$rc)');
+    } finally {
+      calloc.free(p);
+    }
+  }
+
   /// Open a streaming decode session against this session's backend.
   ///
   /// Backed by `crispasr_session_stream_open` on the C side, which

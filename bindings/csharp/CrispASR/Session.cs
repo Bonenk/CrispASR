@@ -177,6 +177,29 @@ namespace CrispASR
         public void SetHotwords(string hotwords, float boost)
             => Check(NativeMethods.crispasr_session_set_hotwords(Handle, hotwords, boost), "set_hotwords");
 
+        /// <summary>
+        /// Apply a named bundle of the four decoder fallback thresholds:
+        /// "conservative", "balanced" (the shipped defaults, a no-op) or
+        /// "aggressive". "strict"/"default"/"loose" are aliases. Mirrors the
+        /// CLI's --sensitivity.
+        /// </summary>
+        /// <exception cref="ArgumentException">The preset is unrecognised.</exception>
+        public void SetSensitivity(string preset)
+        {
+            // Deliberately NOT routed through Check(): that helper treats
+            // rc == -2 as success, because for most setters -2 means "this
+            // backend does not support the knob". Here -2 means "unknown
+            // preset", and swallowing it would silently decode at the default
+            // thresholds after a typo — exactly what this API exists to prevent.
+            int rc = NativeMethods.crispasr_session_set_sensitivity(Handle, preset);
+            if (rc == -2)
+                throw new ArgumentException(
+                    $"unknown sensitivity preset '{preset}' (expected: conservative, balanced, aggressive)",
+                    nameof(preset));
+            if (rc != 0)
+                throw new InvalidOperationException($"set_sensitivity failed (rc={rc})");
+        }
+
         /// <summary>Select the G2P pronunciation dictionary for TTS.</summary>
         public void SetG2pDict(string source)
             => Check(NativeMethods.crispasr_session_set_g2p_dict(Handle, source), "set_g2p_dict");

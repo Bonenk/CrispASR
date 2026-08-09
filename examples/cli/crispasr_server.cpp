@@ -23,6 +23,7 @@
 // Adapted from examples/server/server.cpp for multi-backend support.
 
 #include "crispasr_backend.h"
+#include "core/asr_sensitivity.h" // §W7 --sensitivity presets over the HTTP API
 #include "crispasr_diarize_cli.h"
 #include "tiron_link.h" // #295: tiron cross-window speaker linking (shared with the CLI)
 #include "crispasr_gap_fill.h"
@@ -1507,6 +1508,28 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         rp.best_of = form_int(req, "best_of", rp.best_of);
         rp.beam_size = form_int(req, "beam_size", rp.beam_size);
         rp.return_logits = form_bool(req, "return_logits", rp.return_logits);
+        // `sensitivity` is applied FIRST so an explicit entropy/logprob/
+        // no_speech/temperature_inc field in the same request still wins —
+        // same last-wins rule as the CLI, where --sensitivity is overridden by
+        // a later -et/-lpt/-nth. An unknown preset is ignored with a warning
+        // rather than failing the request, since the four fields below can
+        // still fully specify the decode.
+        {
+            const std::string sens = form_string(req, "sensitivity", "");
+            if (!sens.empty()) {
+                core_sensitivity::Preset sp;
+                if (core_sensitivity::parse_preset(sens, sp)) {
+                    const auto st = core_sensitivity::preset(sp);
+                    rp.entropy_thold = st.entropy_thold;
+                    rp.logprob_thold = st.logprob_thold;
+                    rp.no_speech_thold = st.no_speech_thold;
+                    rp.temperature_inc = st.temperature_inc;
+                } else {
+                    fprintf(stderr, "crispasr[server]: ignoring unknown sensitivity '%s' (expected: %s)\n",
+                            sens.c_str(), core_sensitivity::preset_list());
+                }
+            }
+        }
         rp.entropy_thold = form_float(req, "entropy_thold", rp.entropy_thold);
         rp.logprob_thold = form_float(req, "logprob_thold", rp.logprob_thold);
         rp.no_speech_thold = form_float(req, "no_speech_thold", rp.no_speech_thold);
@@ -1618,6 +1641,9 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     //   grammar_rule     (optional) — root rule for grammar
     //   best_of          (optional) — whisper best-of-N sampling
     //   beam_size        (optional) — whisper beam search size
+    //   sensitivity      (optional) — conservative|balanced|aggressive: the four
+    //                      threshold fields below as one bundle. Applied first,
+    //                      so an explicit field in the same request still wins.
     //   entropy_thold    (optional) — entropy threshold for decoder fail
     //   no_speech_thold  (optional) — no-speech probability threshold
     //   chunk_seconds    (optional) — max chunk duration for long audio
@@ -1699,6 +1725,28 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         rp.best_of = form_int(req, "best_of", rp.best_of);
         rp.beam_size = form_int(req, "beam_size", rp.beam_size);
         rp.return_logits = form_bool(req, "return_logits", rp.return_logits);
+        // `sensitivity` is applied FIRST so an explicit entropy/logprob/
+        // no_speech/temperature_inc field in the same request still wins —
+        // same last-wins rule as the CLI, where --sensitivity is overridden by
+        // a later -et/-lpt/-nth. An unknown preset is ignored with a warning
+        // rather than failing the request, since the four fields below can
+        // still fully specify the decode.
+        {
+            const std::string sens = form_string(req, "sensitivity", "");
+            if (!sens.empty()) {
+                core_sensitivity::Preset sp;
+                if (core_sensitivity::parse_preset(sens, sp)) {
+                    const auto st = core_sensitivity::preset(sp);
+                    rp.entropy_thold = st.entropy_thold;
+                    rp.logprob_thold = st.logprob_thold;
+                    rp.no_speech_thold = st.no_speech_thold;
+                    rp.temperature_inc = st.temperature_inc;
+                } else {
+                    fprintf(stderr, "crispasr[server]: ignoring unknown sensitivity '%s' (expected: %s)\n",
+                            sens.c_str(), core_sensitivity::preset_list());
+                }
+            }
+        }
         rp.entropy_thold = form_float(req, "entropy_thold", rp.entropy_thold);
         rp.logprob_thold = form_float(req, "logprob_thold", rp.logprob_thold);
         rp.no_speech_thold = form_float(req, "no_speech_thold", rp.no_speech_thold);

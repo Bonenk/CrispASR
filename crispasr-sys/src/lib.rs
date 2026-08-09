@@ -620,6 +620,10 @@ extern "C" {
         hotwords: *const c_char,
         boost: c_float,
     ) -> c_int;
+    pub fn crispasr_session_set_sensitivity(
+        s: *mut CrispasrSession,
+        preset: *const c_char,
+    ) -> c_int;
     pub fn crispasr_session_set_g2p_dict(s: *mut CrispasrSession, source: *const c_char) -> c_int;
     pub fn crispasr_session_set_speaker_id(s: *mut CrispasrSession, id: c_int) -> c_int;
     pub fn crispasr_session_set_translate(s: *mut CrispasrSession, enable: c_int) -> c_int;
