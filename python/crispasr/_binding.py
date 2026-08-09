@@ -2386,6 +2386,38 @@ class Session:
         if rc != 0:
             raise RuntimeError(f"set_fallback_thresholds failed (rc={rc})")
 
+    def set_sensitivity(self, preset: str) -> None:
+        """Apply a named bundle of the four decoder fallback thresholds.
+
+        One of "conservative", "balanced" (the shipped defaults, always a
+        no-op) or "aggressive"; "strict"/"default"/"loose" are aliases.
+        Mirrors the CLI's --sensitivity.
+
+        conservative tightens the entropy and logprob bars and LOWERS
+        no_speech_thold, so borderline audio is discarded rather than guessed
+        at -- fewer hallucinations, some marginal speech lost. aggressive does
+        the opposite: quiet or whispered audio still produces text.
+
+        The four thresholds interact (a decode is only retried when the
+        logprob AND no-speech bars are both crossed), which is why they move
+        as a set. A later set_fallback_thresholds() overrides this.
+
+        Raises ValueError for an unrecognised preset -- a typo is never
+        silently treated as "balanced".
+        """
+        if not hasattr(self._lib, "crispasr_session_set_sensitivity"):
+            return
+        self._lib.crispasr_session_set_sensitivity.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        self._lib.crispasr_session_set_sensitivity.restype = ctypes.c_int
+        rc = self._lib.crispasr_session_set_sensitivity(self._handle, str(preset).encode("utf-8"))
+        if rc == -2:
+            raise ValueError(
+                f"unknown sensitivity preset {preset!r} "
+                "(expected: conservative, balanced, aggressive)"
+            )
+        if rc != 0:
+            raise RuntimeError(f"set_sensitivity failed (rc={rc})")
+
     def set_alt_n(self, n: int) -> None:
         """Set per-token top-N alternative-candidate capture for whisper greedy decode. 0 = off."""
         if not hasattr(self._lib, "crispasr_session_set_alt_n"):
