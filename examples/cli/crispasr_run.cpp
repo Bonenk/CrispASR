@@ -473,26 +473,35 @@ std::vector<crispasr_segment> merge_segments(std::vector<std::vector<crispasr_se
     int dropped = 0;
     const auto kept = core_seg_hygiene::apply_all(view, hy, &dropped);
 
-    // Rebuild by matching the surviving views back onto the originals in order,
-    // so every field the hygiene view does not carry (speaker, words, tokens,
-    // chunk_id) is preserved rather than reconstructed. apply_all only removes
-    // and rewrites `text`/`t1`, never reorders, so a forward scan is exact.
-    std::vector<crispasr_segment> res;
-    res.reserve(kept.size());
+    // Map each surviving view back onto its original, so every field the view
+    // does not carry (speaker, words, tokens, chunk_id) is preserved rather
+    // than reconstructed. apply_all only removes segments and rewrites
+    // text/t1 — it never reorders — so a forward scan on t0 is exact.
+    //
+    // Resolve the whole mapping BEFORE touching `out`: the bail-out below
+    // returns `out` unchanged, which is only true if nothing has been moved
+    // out of it yet. Matching first, mutating second, keeps that promise.
+    std::vector<size_t> pick;
+    pick.reserve(kept.size());
     size_t oi = 0;
     for (const auto& k : kept) {
         while (oi < out.size() && out[oi].t0 != k.t0)
             oi++;
         if (oi >= out.size())
             break;
-        crispasr_segment seg = std::move(out[oi]);
-        seg.text = k.text;
-        seg.t1 = k.t1; // a merged run spans to the end of its last member
-        res.push_back(std::move(seg));
-        oi++;
+        pick.push_back(oi++);
     }
-    if (res.size() != kept.size()) // defensive: never silently lose content
+    if (pick.size() != kept.size()) // unmatched view: never silently lose content
         return out;
+
+    std::vector<crispasr_segment> res;
+    res.reserve(pick.size());
+    for (size_t i = 0; i < pick.size(); i++) {
+        crispasr_segment seg = std::move(out[pick[i]]);
+        seg.text = kept[i].text;
+        seg.t1 = kept[i].t1; // a merged run spans to the end of its last member
+        res.push_back(std::move(seg));
+    }
     if (dropped > 0 || res.size() != out.size())
         fprintf(stderr, "crispasr[hygiene]: %zu -> %zu segments (%d dropped)\n", out.size(), res.size(), dropped);
     return res;

@@ -353,10 +353,11 @@ documented-but-unparseable drift.
 1. **Session C-ABI does not get W2/W5/W6.** `crispasr_c_api.cpp` reimplements
    each backend's transcribe inline; the hygiene runs in the CLI's
    `merge_segments()` only. Bindings and server see no change. S/M.
-2. **No wiring guard for the hygiene call.** `tests/test-loopfix-wiring.cpp` is
-   the pattern — a source scan asserting `merge_segments` still contains the
-   `core_seg_hygiene::apply_all` call. Without it this can go inert exactly the
-   way firered's `fix_loops` did (§W1b). S.
+2. ~~No wiring guard for the hygiene call.~~ **DONE** — the `[seg-hygiene]
+   [wiring]` case in `tests/test-segment-hygiene.cpp` source-scans
+   `crispasr_run.cpp` for the `config_from_env` + `apply_all` CALLS (not the
+   `#include` — that is exactly the state §W1b found firered in) and requires
+   them inside `merge_segments`. Proven red by stubbing the call out.
 3. **The sentinel and failover thresholds have never been measured against real
    field data.** They are reasoned, not fitted. If either turns out to fire on
    real audio, the numbers are the thing to revisit, not the structure.
