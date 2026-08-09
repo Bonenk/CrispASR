@@ -2713,8 +2713,21 @@ int crispasr_run_backend(const whisper_params& params_in) {
             const float slice_chunk = params.vad_export_raw         ? 0.0f
                                       : params.chunk_seconds > 0.0f ? params.chunk_seconds
                                                                     : 30.0f;
-            auto slices =
-                crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, (int)slice_chunk, params);
+            bool export_vad_load_failed = false;
+            auto slices = crispasr_compute_audio_slices(samples.data(), (int)samples.size(), SR, (int)slice_chunk,
+                                                        params, &export_vad_load_failed);
+            // #311 follow-up: --vad-export is a separate verb from the
+            // transcribe path, and only that path carried the strict check. A
+            // VAD model that failed to load here still wrote a file full of
+            // fixed chunk boundaries labelled as if VAD had produced them —
+            // and, with --strict-pipeline, still exited 0.
+            if (export_vad_load_failed && crispasr_compute_strict_reqs(params).vad) {
+                fprintf(stderr,
+                        "crispasr: error: required VAD model '%s' failed to load for '%s' "
+                        "(--require-vad/--strict-pipeline) — refusing to export fixed chunks as VAD output.\n",
+                        params.vad_model.c_str(), fname.c_str());
+                return CRISPASR_STRICT_RC_VAD;
+            }
             // Multi-file: each input gets its own export path derived
             // from the input name. Single-file: use the explicit path.
             std::string export_path = params.vad_export_file;

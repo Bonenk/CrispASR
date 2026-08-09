@@ -2835,6 +2835,26 @@ catch_discover_tests(test-vad-keywords
     PROPERTIES LABELS "unit;vad-keywords"
 )
 
+# ─── test-vad-load-failure — #311 follow-up: a VAD model that fails to DOWNLOAD
+# was indistinguishable from "no VAD requested", so --strict-pipeline could not
+# fire on it. Source-level contract pin; no network, no model.
+add_executable(test-vad-load-failure
+    test-vad-load-failure.cpp
+)
+target_include_directories(test-vad-load-failure PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_compile_definitions(test-vad-load-failure PRIVATE
+    CRISPASR_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+target_link_libraries(test-vad-load-failure PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-vad-load-failure
+    TEST_SPEC "[vad-load-failure]"
+    PROPERTIES LABELS "unit;vad-load-failure"
+)
+
 # ─── test-segment-hygiene — §W2 length cap, §W5 repeat merge, §W6 filters.
 # All three live downstream of the logits, where crispasr-diff reads
 # cos 1.000000 whether they work or not. This is the only check they get.
