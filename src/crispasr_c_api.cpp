@@ -20,10 +20,11 @@
 #include "core/audio_chunking.h"    // fix/session-long-audio: energy-minima slicing for session auto-chunk
 #include "session_autochunk.h"      // fix/session-long-audio: pure auto-chunk applicability decision
 #include "core/asr_sensitivity.h"   // §W7 sensitivity presets
-#include "core/ngram_loop_fix.h"    // fix/session-long-audio: collapse decode loops in merged chunks (issue #218)
-#include "parakeet_orchestrate.h"   // improvements Phase 1: shared parakeet transcribe orchestration
-#include "core/gpu_backend_pref.h"  // crispasr_set_gpu_backend_pref (#214)
-#include "core/audio_resample.h"    // Sidon S2S input-rate conversion
+#include "core/ngram_loop_fix.h"
+#include "core/segment_hygiene.h" // §W2/§W5/§W6 opt-in segment cleanup    // fix/session-long-audio: collapse decode loops in merged chunks (issue #218)
+#include "parakeet_orchestrate.h" // improvements Phase 1: shared parakeet transcribe orchestration
+#include "core/gpu_backend_pref.h" // crispasr_set_gpu_backend_pref (#214)
+#include "core/audio_resample.h"   // Sidon S2S input-rate conversion
 
 #include <atomic>
 #include <climits> // INT_MIN (parakeet att_context_* sentinels) — issue #257
@@ -1641,6 +1642,15 @@ struct crispasr_session {
     // doesn't pay the [vocab × frames] copy; when on, the result carries the
     // logit grid for downstream forced alignment.
     bool return_logits = false;
+    // PLAN.md §W5: set while transcribing a VAD-STITCHED buffer. On that path
+    // the timestamps reaching transcribe_lang are stitched-timeline — silence
+    // has been removed and replaced with uniform 0.1 s joins — so every pair of
+    // segments looks 10 cs apart and the repeat-merge would collapse utterances
+    // that are actually minutes apart in the real audio. The merge is therefore
+    // deferred until crispasr_session_transcribe_vad_lang has remapped the
+    // timestamps back to the real timeline. Cap and filter are
+    // timestamp-independent and still run inline.
+    bool hygiene_defer_merge = false;
 
     // Whisper text-suppression + prompt-carry extras (whisper-only).
     // Map 1-to-1 onto wparams.suppress_nst / suppress_regex /
@@ -4726,6 +4736,66 @@ static crispasr_session_result* transcribe_autochunk(crispasr_session* s, const 
 // Defined further down next to crispasr_session_set_punc_model.
 static void apply_session_punc_model(crispasr_session* s, crispasr_session_result* r);
 
+// PLAN.md §W2/§W5/§W6 for the session ABI.
+//
+// The session reimplements every backend's transcribe inline and does NOT call
+// the CLI adapter, so the hygiene wired into the CLI's merge_segments() reaches
+// nothing here — bindings and the server would silently miss it. This is that
+// arm.
+//
+// Runs BEFORE apply_session_punc_model, matching the CLI where merge_segments()
+// precedes apply_punc_model(). Surface parity is the point: the two orders
+// produce different text (the length cap prefers to cut at a sentence mark, so
+// whether punctuation exists yet changes where the cut lands), and this repo
+// has a surface-parity harness that would flag the divergence.
+//
+// `include_merge` is false on the VAD-stitched path — see hygiene_defer_merge.
+static void apply_session_hygiene(crispasr_session_result* r, bool include_merge) {
+    if (!r || r->segments.empty())
+        return;
+    auto hy = core_seg_hygiene::config_from_env();
+    if (!include_merge)
+        hy.merge.enabled = false;
+    if (!core_seg_hygiene::any_enabled(hy))
+        return;
+
+    std::vector<core_seg_hygiene::Seg> view;
+    view.reserve(r->segments.size());
+    for (const auto& s : r->segments)
+        view.push_back({s.text, s.t0, s.t1, 0.0f, false});
+
+    int dropped = 0;
+    const auto kept = core_seg_hygiene::apply_all(view, hy, &dropped);
+
+    // Resolve the mapping before mutating, so the bail-out really does leave
+    // r->segments untouched (a moved-from vector is not "unchanged").
+    std::vector<size_t> pick;
+    pick.reserve(kept.size());
+    size_t oi = 0;
+    for (const auto& k : kept) {
+        while (oi < r->segments.size() && r->segments[oi].t0 != k.t0)
+            oi++;
+        if (oi >= r->segments.size())
+            break;
+        pick.push_back(oi++);
+    }
+    if (pick.size() != kept.size())
+        return; // unmatched view: keep the originals rather than lose content
+
+    std::vector<crispasr_session_seg> res;
+    res.reserve(pick.size());
+    for (size_t i = 0; i < pick.size(); i++) {
+        crispasr_session_seg seg = std::move(r->segments[pick[i]]);
+        seg.text = kept[i].text;
+        seg.t1 = kept[i].t1;
+        res.push_back(std::move(seg));
+    }
+    if (dropped > 0 || res.size() != r->segments.size())
+        fprintf(stderr, "crispasr[hygiene]: %zu -> %zu segments (%d dropped)\n", r->segments.size(), res.size(),
+                dropped);
+    r->segments = std::move(res);
+}
+
 CA_EXPORT crispasr_session_result* crispasr_session_transcribe_lang(crispasr_session* s, const float* pcm,
                                                                     int n_samples, const char* language) {
     if (!s || !pcm || n_samples <= 0)
@@ -4737,6 +4807,7 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_lang(crispasr_ses
     const int n_runs = (s->best_of > 1 && s->backend != "whisper") ? s->best_of : 1;
     if (n_runs <= 1) {
         crispasr_session_result* r = transcribe_autochunk(s, pcm, n_samples, language);
+        apply_session_hygiene(r, !s->hygiene_defer_merge);
         apply_session_punc_model(s, r);
         _fire_segment_callbacks(s, r);
         return r;
@@ -4767,6 +4838,7 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_lang(crispasr_ses
             delete candidate;
         }
     }
+    apply_session_hygiene(best, !s->hygiene_defer_merge);
     apply_session_punc_model(s, best);
     _fire_segment_callbacks(s, best);
     return best;
@@ -7114,6 +7186,15 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_vad_lang(crispasr
     // Multiple slices ⇒ stitch with 0.1s silence gaps, transcribe once,
     // remap timestamps back to original-audio positions.
     auto stitched = crispasr_stitch_vad_slices(pcm, n_samples, sample_rate, slices);
+    // §W5: the inner transcribe sees stitched-timeline timestamps, where every
+    // gap is a uniform 0.1 s join. Defer the repeat-merge until after the remap
+    // below, or it would collapse utterances that are minutes apart.
+    struct DeferGuard {
+        crispasr_session* s;
+        bool prev;
+        ~DeferGuard() { s->hygiene_defer_merge = prev; }
+    } defer_guard{s, s->hygiene_defer_merge};
+    s->hygiene_defer_merge = true;
     crispasr_session_result* r =
         crispasr_session_transcribe_lang(s, stitched.samples.data(), (int)stitched.samples.size(), language);
     if (!r)
@@ -7127,6 +7208,10 @@ CA_EXPORT crispasr_session_result* crispasr_session_transcribe_vad_lang(crispasr
             w.t1 = crispasr_vad_remap_timestamp(stitched.mapping, w.t1);
         }
     }
+    // Timestamps are now on the real timeline, so the deferred merge can run
+    // against true inter-segment gaps. Cap and filter already ran inline and
+    // are idempotent, so re-running the full pass here is safe.
+    apply_session_hygiene(r, true);
     return r;
 }
 

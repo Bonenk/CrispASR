@@ -269,10 +269,22 @@ user-visible text and a wrong deletion is worse than a surviving artifact, so
 none may switch on by surprise. Dropped counts print to stderr — silent loss is
 the failure mode.
 
-**Not yet wired into the session C-ABI.** `crispasr_c_api.cpp` reimplements
-every backend's transcribe inline and does not call the CLI adapter, so
-bindings/server do NOT get this yet. Deliberate: the CLI path proves the shape
-first. Tracked below.
+**Both surfaces wired.** `crispasr_c_api.cpp` reimplements every backend's
+transcribe inline and never calls the CLI adapter, so it needs its own arm —
+`apply_session_hygiene()`, called from the two `transcribe_lang` paths and from
+`transcribe_vad_lang`. The other three public entries are thin wrappers over
+those. It runs BEFORE `apply_session_punc_model`, matching the CLI where
+`merge_segments()` precedes `apply_punc_model()`; the order is not cosmetic,
+since the length cap prefers to cut at a sentence mark and whether punctuation
+exists yet moves the cut.
+
+⚠ **The VAD path defers the merge** (`hygiene_defer_merge`).
+`crispasr_session_transcribe_vad_lang` transcribes a STITCHED buffer — silence
+removed, replaced with uniform 0.1 s joins — so every segment pair looks 10 cs
+apart and the repeat-merge would collapse utterances that are minutes apart in
+the real audio. Cap and filter are timestamp-independent and still run inline;
+the merge waits until after `crispasr_vad_remap_timestamp` restores the real
+timeline. Do not "simplify" this back into one call.
 
 ### W3 — aligner collapse sentinel — DONE 2026-08-09
 
@@ -350,9 +362,10 @@ documented-but-unparseable drift.
 
 ### Follow-ups left open by this round
 
-1. **Session C-ABI does not get W2/W5/W6.** `crispasr_c_api.cpp` reimplements
-   each backend's transcribe inline; the hygiene runs in the CLI's
-   `merge_segments()` only. Bindings and server see no change. S/M.
+1. ~~Session C-ABI does not get W2/W5/W6.~~ **DONE** — `apply_session_hygiene()`
+   with the VAD deferred-merge handling above. The `[seg-hygiene][wiring]`
+   guard now requires the session arm to be defined AND called (>=3 sites),
+   proven red by deleting the call sites — the §W1b state exactly.
 2. ~~No wiring guard for the hygiene call.~~ **DONE** — the `[seg-hygiene]
    [wiring]` case in `tests/test-segment-hygiene.cpp` source-scans
    `crispasr_run.cpp` for the `config_from_env` + `apply_all` CALLS (not the

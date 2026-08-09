@@ -457,3 +457,31 @@ TEST_CASE("merge_segments actually calls the hygiene pass", "[seg-hygiene][wirin
     // Within a reasonable body length of the function head.
     REQUIRE(call - fn < 4000);
 }
+
+TEST_CASE("the session ABI has its own hygiene arm", "[seg-hygiene][wiring]") {
+    // crispasr_c_api.cpp REIMPLEMENTS every backend's transcribe inline and
+    // never calls the CLI adapter, so the merge_segments() wiring above reaches
+    // nothing here — bindings and the server would silently miss all of §W2,
+    // §W5 and §W6. This asserts the session arm exists and is actually invoked,
+    // not merely defined.
+    const std::string path = std::string(CRISPASR_SOURCE_DIR) + "/src/crispasr_c_api.cpp";
+    std::ifstream f(path, std::ios::binary);
+    REQUIRE(f.good());
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    const std::string src = ss.str();
+
+    REQUIRE(src.find("core_seg_hygiene::apply_all(") != std::string::npos);
+    // Defined AND called — a helper nobody invokes is the §W1b failure exactly.
+    REQUIRE(src.find("static void apply_session_hygiene(") != std::string::npos);
+    size_t calls = 0;
+    for (size_t p = src.find("apply_session_hygiene("); p != std::string::npos;
+         p = src.find("apply_session_hygiene(", p + 1))
+        calls++;
+    REQUIRE(calls >= 4); // 1 definition + >=3 call sites
+
+    // The VAD path must DEFER the merge: it transcribes a stitched buffer where
+    // every gap is a uniform 0.1 s join, so merging before the timestamps are
+    // remapped would collapse utterances that are minutes apart.
+    REQUIRE(src.find("hygiene_defer_merge") != std::string::npos);
+}
