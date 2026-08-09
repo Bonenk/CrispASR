@@ -6838,6 +6838,33 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
     const int n_groups = (int)hp.n_code_groups; // 16
     int max_frames =
         ctx->params.max_codec_steps > 0 ? ctx->params.max_codec_steps : (ctx->kv_max_ctx > 0 ? ctx->kv_max_ctx : 1500);
+    // #337: the only bound used to be the KV cache, so ANY input was allowed
+    // 4096 frames — 340 s of audio for one sentence. That is what turned a
+    // degenerate trajectory into a 303 s "successful" synthesis.
+    //
+    // The trajectory itself is not a miscompute: measured CPU-vs-Metal under
+    // greedy, the talker logits agree to cos 0.99992 at frame 0 (normal
+    // backend arithmetic — neither --no-flash-attn nor CRISPASR_KV_QUANT_*=f32
+    // moves it past the 5th decimal), the AR loop amplifies that, the argmax
+    // flips around frame 5, and the two backends then follow different but
+    // individually plausible trajectories. One of them happened not to
+    // terminate. So the fix is not to chase an op — it is to stop letting a
+    // bad trajectory run 40x longer than the text can justify, the same
+    // max_token_text_ratio bound upstream TTS models carry (cf. cosyvoice3
+    // #334).
+    //
+    // Sized from measurement, not taste: across five utterances on this model
+    // the healthy output ran 1.35-2.61 frames per input codepoint, so 12 is
+    // ~5x the worst observed, and the floor keeps very short inputs (where the
+    // ratio is meaningless) untouched. It only ever tightens the KV ceiling.
+    // `max_codec_steps` and CRISPASR_QWEN3_TTS_MAX_FRAMES both still override.
+    int n_codepoints = 0;
+    for (const char* q = text ? text : ""; *q; ++q)
+        n_codepoints += ((*q & 0xC0) != 0x80); // count UTF-8 lead bytes
+    const int text_cap = std::max(240, n_codepoints * 12);
+    const bool capped_by_text = text_cap < max_frames;
+    if (capped_by_text)
+        max_frames = text_cap;
     if (const char* mf = crispasr_env::get("CRISPASR_QWEN3_TTS_MAX_FRAMES")) {
         const int v = std::atoi(mf);
         if (v > 0)
@@ -6975,6 +7002,42 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
     std::vector<float> next_emb_row_buf(d);
     std::vector<float> next_emb(d, 0.0f);
     for (frame = 0; frame < max_frames; frame++) {
+        // #337 bisection instrumentation, mirroring glm_ocr's *_DUMP_LOGITS.
+        // Dumped BEFORE the repetition penalty and the suppress mask, so a
+        // cross-backend diff isolates the talker FORWARD from the sampling
+        // policy — the penalty reads `talker_history`, which itself diverges
+        // once the backends pick different tokens, and would confound every
+        // frame after the first disagreement.
+        //
+        // These are the genuine logits the loop then samples, read back from
+        // the graph output — not a `ggml_set_output` snapshot of an
+        // intermediate, which the guide warns can read cos≈1.0 on the Metal
+        // sched while the real forward is wrong.
+        if (const char* dump_dir = crispasr_env::get("CRISPASR_QWEN3_TTS_DUMP_LOGITS")) {
+            char path[1024];
+            std::snprintf(path, sizeof(path), "%s/talker_%04d.f32", dump_dir, frame);
+            if (FILE* lf = std::fopen(path, "wb")) {
+                std::fwrite(logits, sizeof(float), (size_t)hp.vocab_size, lf);
+                std::fclose(lf);
+            }
+            int top[5] = {0, 0, 0, 0, 0};
+            for (int k = 0; k < 5; k++) {
+                float best = -INFINITY;
+                for (int i = 0; i < (int)hp.vocab_size; i++) {
+                    bool taken = false;
+                    for (int j = 0; j < k; j++)
+                        taken = taken || (top[j] == i);
+                    if (!taken && logits[i] > best) {
+                        best = logits[i];
+                        top[k] = i;
+                    }
+                }
+            }
+            fprintf(stderr, "qwen3_tts: LOGITS frame=%d top5=", frame);
+            for (int k = 0; k < 5; k++)
+                fprintf(stderr, " %d:%.5f", top[k], logits[top[k]]);
+            fprintf(stderr, "  gap01=%.6f\n", logits[top[0]] - logits[top[1]]);
+        }
         apply_repetition_penalty(logits, (int)hp.vocab_size, talker_history, talker_repetition_penalty);
         // 1. Sample codebook-0 from talker logits.
         for (int i = suppress_lo; i < (int)hp.vocab_size; i++) {
@@ -7098,6 +7161,15 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
         }
 
         // 6. Talker forward on the (1, d) input → next logits + hidden_last.
+        if (frame + 1 >= max_frames && capped_by_text) {
+            fprintf(stderr,
+                    "qwen3_tts: ERROR: talker hit the text-proportional frame cap (%d frames for %d input "
+                    "codepoints, %.1f s of audio) without emitting EOS. The output is a runaway and should be "
+                    "discarded. If this reproduces on GPU but not with --gpu-backend cpu, that is expected "
+                    "backend arithmetic amplified by the decode loop, not a miscompute — see issue #337. Raise "
+                    "CRISPASR_QWEN3_TTS_MAX_FRAMES if the text genuinely needs more.\n",
+                    max_frames, n_codepoints, (double)max_frames * 0.08);
+        }
         if (n_past >= ctx->kv_max_ctx - 1) {
             // #337: this is a RUNAWAY, not a normal stop — the talker never
             // emitted EOS and we are cutting it off at the context ceiling.

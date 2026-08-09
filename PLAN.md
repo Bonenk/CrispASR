@@ -245,47 +245,61 @@ None tracked for cohere. Two things deliberately NOT done, with reasons:
    extra model. Threshold sits below one int16 LSB so one non-zero sample
    disables it; the quietest real speech to hand peaks ~3800x higher.
 
-## OPEN 2026-08-09 — #337 qwen3-tts GPU talker diverges from CPU and degenerates
+## LANDED 2026-08-09 — #337 qwen3-tts "GPU runaway" is NOT a miscompute
 
-Reported on HIP (RX 7900 XTX, ROCm 6.4.4): the talker picks a different token
-from CPU at frame 0 and then runs to the KV ceiling — 3796 frames / 303.76 s
-instead of <10 s — with **exit code 0** and a valid WAV. Reporter ruled out
-quantization, model size, flash-attn, HIP graph capture and the voice
-reference, each with a paired test.
+Reported on HIP: the talker picks a different token from CPU at frame 0, then
+runs to the KV ceiling — 3796 frames / 303.76 s for one sentence — with exit
+code 0 and a valid WAV. Reporter ruled out quantization, model size,
+flash-attn, HIP graph capture and the voice reference, each with a paired test.
 
-**It is NOT HIP-specific — it reproduces on Metal.** Measured here on the 0.6B
-q8_0 base + the baked default voice pack, same failing text, with the new
-`CRISPASR_QWEN3_TTS_GREEDY=1`:
+**Three measurements, and the second one overturned the first conclusion.**
 
-| | frames | first divergence | continuation |
-|---|---|---|---|
-| CPU  | 92  | — | varied |
-| Metal | 107 | **frame 6** | `142,142, 1657×4, 668×8 …` |
+1. His CPU-vs-GPU token table was confounded: the talker hardcoded top_k=50 /
+   temp=0.9, and `qwen3_tts_set_temperature` reached the code predictor but NOT
+   the talker. The RNG stream is identical across backends, but the pick is a
+   multinomial draw over a softmax of 50 logits, so any float difference moves
+   it. Added `CRISPASR_QWEN3_TTS_GREEDY=1` (top_k=1) and wired the temperature.
+2. Under greedy on M1, CPU and Metal diverge — I first read that as "the bug
+   reproduces on Metal, so it is a GPU-path defect". **Wrong.** Dumping the raw
+   talker logits (`CRISPASR_QWEN3_TTS_DUMP_LOGITS`, the glm_ocr `*_DUMP_LOGITS`
+   pattern) shows cos **0.99992** at frame 0 — better than the 0.998–0.999 band
+   the guide calls normal for GPU-vs-CPU — decaying to 0.990 by frame 3 and
+   0.84 by frame 5 as the AR loop amplifies it. Neither `--no-flash-attn`
+   (bit-identical) nor `CRISPASR_KV_QUANT_{K,V}=f32` (5th decimal) moves it.
+   This is the voxtral-tts pattern in the guide verbatim: an AR pipeline
+   reproduces the reference at frame 0 then diverges as rounding amplifies —
+   NOT a bug. The two backends simply follow different plausible trajectories
+   after the argmax flips at frame 5; one of them didn't terminate.
+3. `core_repeat::tail_is_repetition` looked like the fix — 3 backends use it,
+   qwen3-tts never adopted it, and the degenerate output repeats. **Rejected by
+   measurement**: healthy CPU output repeats a codec frame **7×** mid-utterance
+   (period-1 `[1657]`) against the degenerate run's 8×. Structurally identical.
+   The helper was written for TEXT tokens; at 12 Hz a held sound legitimately
+   repeats, so it cannot discriminate here. Shipping the library default would
+   have truncated good audio — a worse bug than the one being fixed.
 
-Both backends are deterministic run-to-run under greedy (verified twice each),
-so the divergence is real, not sampling. Metal does not run away — it stops at
-107 frames — but it enters the same repetition attractor the HIP report ends
-in. So this is debuggable on hardware we have.
+**The actual defect** is that `max_frames` was the KV ceiling, so any input was
+allowed 4096 frames (340 s). Now bounded by the text, the same
+max_token_text_ratio idea upstream TTS models carry and that #334 ported for
+cosyvoice3: `max(240, codepoints × 12)`. Sized from measurement — five
+utterances ran 1.35–2.61 frames per codepoint, so 12 is ~5× the worst observed;
+verified all five are untouched (79–124 frames against caps of 528–804) and the
+cap branch is reachable. It only ever tightens the ceiling; `max_codec_steps`
+and `CRISPASR_QWEN3_TTS_MAX_FRAMES` still override.
 
-⚠ **A CPU-vs-GPU token table means nothing without greedy.** The talker
-hardcoded top_k=50 / temp=0.9, and `qwen3_tts_set_temperature` reached the code
-predictor but NOT the talker, so `--temperature` was silently inert there. The
-RNG stream is identical across backends (fixed-seed xorshift), but the pick is
-a multinomial draw over a softmax of 50 logits, so any float difference can
-move it. Both fixed in 83db1d7a's follow-up.
+Hitting either bound now prints an explicit ERROR saying the output is a
+runaway and should be discarded, and that a GPU-only reproduction is expected
+arithmetic rather than a miscompute.
 
-### Next steps
+### Still open
 
-1. Bisect WHERE the logits first differ at frame 6 — talker forward vs code
-   predictor — using `CRISPASR_QWEN3_TTS_DUMP_DIR` per-stage dumps on both
-   backends. The frame-0 agreement (frames 0–5 identical) says the prefill and
-   the early KV path are fine; something accumulates.
-2. Check the usual GPU suspects from LEARNINGS in order: weight-less first op
-   on the sched, a non-contiguous `get_rows` index (CUDA/HIP assert on that,
-   Metal tolerates it), and cached-graph input aliasing across steps.
-3. The runaway itself is a separate, backend-independent defect: hitting the KV
-   ceiling returned success. Now logged as an explicit ERROR naming the
-   consequence; making it a non-zero exit is still open.
+- Making a runaway a non-zero exit rather than a log line. Deliberately not
+  done: it changes the contract for callers who may be relying on truncated
+  output.
+- The reporter's HIP run diverged at frame 0 under SAMPLING; whether it also
+  diverges at frame 0 under greedy is unknown and worth asking — a frame-0
+  greedy divergence would point at the prefill and would be a different story
+  from what Metal shows.
 
 ## LANDED 2026-08-05 — #334 cosyvoice3 WAV cloning (85d60ba9, 88c02788)
 
