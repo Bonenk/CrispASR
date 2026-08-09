@@ -2781,6 +2781,26 @@ catch_discover_tests(test-ngram-loop-fix-cjk
     PROPERTIES LABELS "unit;ngram-loop;cjk"
 )
 
+# ─── test-loopfix-wiring — do the adapters CALL the collapse? (PLAN.md §W1b)
+# The header's own tests were always green while firered-asr never invoked it
+# at all. Source scan: no model, no audio.
+add_executable(test-loopfix-wiring
+    test-loopfix-wiring.cpp
+)
+target_include_directories(test-loopfix-wiring PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_compile_definitions(test-loopfix-wiring PRIVATE
+    CRISPASR_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+target_link_libraries(test-loopfix-wiring PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-loopfix-wiring
+    TEST_SPEC "[loopfix-wiring]"
+    PROPERTIES LABELS "unit;ngram-loop"
+)
+
 # ─── test-uroman — Catch2 unit tests for core/uroman.h romanization.
 # Validates Arabic + Cyrillic romanization for CTC forced alignment (#252).
 add_executable(test-uroman
