@@ -16,6 +16,28 @@ WhisperJAV and noted it had stopped being updated. Answered on that issue.
 C ABI only; the other seven binding surfaces (Go, Java, C#, Ruby,
 JS/emscripten, Flutter) still lack it. Mirror `set_fallback_thresholds`.
 
+**§W4 measured end-to-end 2026-08-09** — it was written from reasoning, so it
+was worth checking against the real CLI rather than only the unit predicate.
+Two controls through `crispasr --vad -vm webrtc --vad-export` (webrtc needs no
+model, so this is reproducible with no download):
+
+| Case | Slices | Audio reaching the model |
+|---|---|---|
+| 301 s, 1 s of speech, `CRISPASR_VAD_FAILOVER=0` (old behaviour) | 1 | **1.1 s of 301 s — 0.4%** |
+| same file, failover on (new default) | 11 | 301 s — 100% |
+| 154 s of continuous real speech (negative control) | 6 | 154 s — 100%, failover correctly silent |
+
+So on the failure case the user was losing 99.6% of their audio with no error,
+and the healthy case is untouched. That is the asymmetry the whole heuristic
+was justified by, now measured rather than argued.
+
+⚠ Caveat on the fixture: the silence is digital zeros, not room tone. Real
+noisy-but-speechless audio may read differently to an energy VAD, so this
+demonstrates the wiring and the direction, not a tuned threshold.
+
+**§W3 is still unmeasured** — the alignment sentinel needs an aligner model and
+a real transcript to exercise; only its unit fixtures have run.
+
 Survey of https://github.com/meizhong986/WhisperJAV (Python orchestration over
 faster-whisper; nothing ports at the code level, the *algorithms* do). It is
 worth taking seriously because JAV audio is an adversarial worst case for
