@@ -2781,6 +2781,40 @@ catch_discover_tests(test-ngram-loop-fix-cjk
     PROPERTIES LABELS "unit;ngram-loop;cjk"
 )
 
+# ─── test-align-sentinel — forced-alignment collapse detector (PLAN.md §W3).
+# ctc_forced_align() emits t0==t1==0 for out-of-vocab words and for words the
+# Viterbi path never visits, inside a SUCCESSFUL return. Nothing checked for it.
+add_executable(test-align-sentinel
+    test-align-sentinel.cpp
+)
+target_include_directories(test-align-sentinel PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-align-sentinel PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-align-sentinel
+    TEST_SPEC "[align-sentinel]"
+    PROPERTIES LABELS "unit;align-sentinel"
+)
+
+# ─── test-vad-failover — "the VAD obviously failed" predicate (PLAN.md §W4).
+# The must-NOT-fire cases carry the weight: a false positive re-transcribes
+# silence, a false negative loses the user's entire transcript.
+add_executable(test-vad-failover
+    test-vad-failover.cpp
+)
+target_include_directories(test-vad-failover PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-vad-failover PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-vad-failover
+    TEST_SPEC "[vad-failover]"
+    PROPERTIES LABELS "unit;vad-failover"
+)
+
 # ─── test-loopfix-wiring — do the adapters CALL the collapse? (PLAN.md §W1b)
 # The header's own tests were always green while firered-asr never invoked it
 # at all. Source scan: no model, no audio.
