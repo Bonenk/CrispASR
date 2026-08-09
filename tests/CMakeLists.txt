@@ -2855,6 +2855,21 @@ catch_discover_tests(test-vad-load-failure
     PROPERTIES LABELS "unit;vad-load-failure"
 )
 
+# ─── test-session-setter-parity — docs/contributing.md says session setters are
+# kept at FULL PARITY across nine wrappers, and nothing enforced it.
+add_executable(test-session-setter-parity
+    test-session-setter-parity.cpp
+)
+target_include_directories(test-session-setter-parity PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_compile_definitions(test-session-setter-parity PRIVATE
+    CRISPASR_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+target_link_libraries(test-session-setter-parity PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-session-setter-parity
+    TEST_SPEC "[setter-parity]"
+    PROPERTIES LABELS "unit;setter-parity"
+)
+
 # ─── test-segment-hygiene — §W2 length cap, §W5 repeat merge, §W6 filters.
 # All three live downstream of the logits, where crispasr-diff reads
 # cos 1.000000 whether they work or not. This is the only check they get.

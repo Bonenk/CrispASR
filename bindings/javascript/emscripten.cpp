@@ -110,6 +110,7 @@ int crispasr_session_set_tts_reference_language(CrispasrSession* s, const char* 
 int crispasr_session_set_punctuation(CrispasrSession* s, int enable);
 int crispasr_session_set_punc_model(CrispasrSession* s, const char* punc_model);
 int crispasr_session_set_hotwords(CrispasrSession* s, const char* hotwords, float boost);
+int crispasr_session_set_sensitivity(CrispasrSession* s, const char* preset);
 int crispasr_session_set_translate(CrispasrSession* s, int enable);
 int crispasr_session_set_temperature(CrispasrSession* s, float temperature, unsigned long long seed);
 int crispasr_session_set_tts_seed(CrispasrSession* s, unsigned long long seed);
@@ -461,6 +462,14 @@ EMSCRIPTEN_BINDINGS(whisper) {
                              return g_asr_session
                                         ? crispasr_session_set_hotwords(g_asr_session, w.c_str(), (float)boost)
                                         : -1;
+                         }));
+    // Named bundle of the four decoder fallback thresholds:
+    // "conservative" | "balanced" | "aggressive". Returns -2 for an unknown
+    // preset (JS callers should treat that as an error, not a no-op) and -1
+    // when no session is open.
+    emscripten::function("asrSetSensitivity", emscripten::optional_override([](const std::string& preset) {
+                             return g_asr_session ? crispasr_session_set_sensitivity(g_asr_session, preset.c_str())
+                                                  : -1;
                          }));
     emscripten::function("asrSetAsk", emscripten::optional_override([](const std::string& prompt) {
                              return g_asr_session ? crispasr_session_set_ask(g_asr_session, prompt.c_str()) : -1;

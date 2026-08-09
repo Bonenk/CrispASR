@@ -39,6 +39,7 @@ public final class CrispasrSession implements AutoCloseable {
         int     crispasr_session_set_speaker_id(Pointer session, int id);
         int     crispasr_session_set_punc_model(Pointer session, String puncModel);
         int     crispasr_session_set_hotwords(Pointer session, String hotwords, float boost);
+        int     crispasr_session_set_sensitivity(Pointer session, String preset);
         int     crispasr_session_set_g2p_dict(Pointer session, String source);
         int     crispasr_session_n_speakers(Pointer session);
         String  crispasr_session_get_speaker_name(Pointer session, int i);
@@ -663,6 +664,28 @@ public final class CrispasrSession implements AutoCloseable {
     public void setHotwords(String hotwords, float boost) {
         int rc = Lib.INSTANCE.crispasr_session_set_hotwords(handle, hotwords, boost);
         if (rc != 0) throw new IllegalStateException("set_hotwords failed (rc=" + rc + ")");
+    }
+
+    /**
+     * Apply a named bundle of the four decoder fallback thresholds:
+     * {@code "conservative"}, {@code "balanced"} (the shipped defaults, a no-op)
+     * or {@code "aggressive"}. {@code "strict"}/{@code "default"}/{@code "loose"}
+     * are aliases. Mirrors the CLI's {@code --sensitivity}.
+     *
+     * <p>The four thresholds interact — a decode is only retried when the logprob
+     * <em>and</em> no-speech bars are both crossed — so they move as a set. A later
+     * {@link #setFallbackThresholds} overrides this.
+     *
+     * @throws IllegalArgumentException if the preset is unrecognised; a typo is
+     *     never silently treated as {@code "balanced"}.
+     */
+    public void setSensitivity(String preset) {
+        int rc = Lib.INSTANCE.crispasr_session_set_sensitivity(handle, preset);
+        if (rc == -2) {
+            throw new IllegalArgumentException(
+                "unknown sensitivity preset '" + preset + "' (expected: conservative, balanced, aggressive)");
+        }
+        if (rc != 0) throw new IllegalStateException("set_sensitivity failed (rc=" + rc + ")");
     }
 
     /** Select the G2P pronunciation dictionary for TTS ({@code olaph}/{@code open-dict}/path). */

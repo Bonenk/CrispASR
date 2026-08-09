@@ -94,6 +94,10 @@ namespace CrispASR
             IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string hotwords, float boost);
 
         [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+        internal static extern int crispasr_session_set_sensitivity(
+            IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string preset);
+
+        [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
         internal static extern int crispasr_session_set_g2p_dict(
             IntPtr s, [MarshalAs(UnmanagedType.LPUTF8Str)] string source);
 

@@ -1620,6 +1620,30 @@ impl Session {
         Ok(())
     }
 
+    /// Apply a named bundle of the four decoder fallback thresholds:
+    /// `"conservative"`, `"balanced"` (the shipped defaults, a no-op) or
+    /// `"aggressive"`. `"strict"`/`"default"`/`"loose"` are aliases. Mirrors the
+    /// CLI's `--sensitivity`.
+    ///
+    /// The four thresholds interact — a decode is only retried when the logprob
+    /// *and* no-speech bars are both crossed — so they move as a set. A later
+    /// [`Session::set_fallback_thresholds`] overrides this. An unrecognised
+    /// preset is rejected rather than silently treated as `"balanced"`.
+    pub fn set_sensitivity(&self, preset: &str) -> Result<(), String> {
+        let c = CString::new(preset).map_err(|e| e.to_string())?;
+        let rc = unsafe { crispasr_sys::crispasr_session_set_sensitivity(self.handle, c.as_ptr()) };
+        if rc == -2 {
+            return Err(format!(
+                "unknown sensitivity preset {:?} (expected: conservative, balanced, aggressive)",
+                preset
+            ));
+        }
+        if rc != 0 {
+            return Err(format!("set_sensitivity failed (rc={})", rc));
+        }
+        Ok(())
+    }
+
     /// Select the G2P pronunciation dictionary for TTS (`olaph`/`open-dict`/path).
     pub fn set_g2p_dict(&self, source: &str) -> Result<(), String> {
         let c = CString::new(source).map_err(|e| e.to_string())?;

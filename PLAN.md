@@ -51,7 +51,6 @@ sha256 and the one-command disambiguation, all 9 pins re-derived byte-identical
 
 | # | Task | Size | Where |
 |---|---|---|---|
-| 0 | **`crispasr_session_set_sensitivity` in the other 7 bindings** — Go, Java, C#, Ruby, JS/emscripten, Flutter. Python + the C ABI are done; `set_fallback_thresholds` is the template to mirror | S | §"WhisperJAV port" in `HISTORY.md` |
 | 1 | **Delete the duplicated fallback copies** instead of keeping 14 files in sync | M | §"OPEN follow-ups from #300 / #308" item 3 |
 | 2 | **`CAP_PUNCTUATION_NATIVE` audit** for `lfm2-audio`, `fastconformer-ctc`, `wav2vec2` | S | same section, item 2 |
 | 3 | **#326 speaker-count estimator** — the last diarization accuracy item | M | §"NOW — #326" |
