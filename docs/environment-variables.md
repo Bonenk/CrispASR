@@ -975,6 +975,11 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
 - `CRISPASR_QWEN3_TTS_CODEC_GPU`
 - `CRISPASR_QWEN3_TTS_CODEC_TRACE`
 - `CRISPASR_QWEN3_TTS_EMBD_CHECK`
+- `CRISPASR_QWEN3_TTS_GREEDY` — force the talker's codebook-0 sampler to argmax
+  (top_k=1). The frame sequence then depends only on the logits, so two
+  backends agree if and only if their logits agree — this is the lever for
+  telling a GPU miscompute apart from a sampling difference, and without it a
+  CPU-vs-GPU token comparison proves nothing (#337).
 - `CRISPASR_QWEN3_TTS_MAX_FRAMES`
 - `CRISPASR_QWEN3_TTS_SKIP_REF_DECODE`
 
