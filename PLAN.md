@@ -51,7 +51,7 @@ sha256 and the one-command disambiguation, all 9 pins re-derived byte-identical
 
 | # | Task | Size | Where |
 |---|---|---|---|
-| 0 | **`fix_loops` is a no-op on CJK** — verified bug, the loop guard is dead on the Chinese-first backends | S | §W1, "post-decode text hardening" |
+| 0 | **firered-asr has no `fix_loops` at all** — Mandarin + 20 dialects, and its only guard is greedy-path-only | S | §W1b, "post-decode text hardening" |
 | 0b | **Aligner collapse sentinel** — we ship timestamp collapse undetected | M | §W3, same section |
 | 0c | **VAD failover** — no escape hatch when VAD returns ~no speech on a long clip | S | §W4, same section |
 | 1 | **Delete the duplicated fallback copies** instead of keeping 14 files in sync | M | §"OPEN follow-ups from #300 / #308" item 3 |
@@ -113,12 +113,6 @@ Earned the hard way; each cost a real bug getting through.
    copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
    missing one.
 
-## CLAIMED 2026-08-09 — §W1 CJK loop-fix no-op
-
-Worktree: `/Users/christianstrobele/code/CrispASR` (main checkout). Taking §W1
-only — `src/core/ngram_loop_fix.h` + a new `tests/test-ngram-loopfix-cjk.cpp`.
-W2–W7 are unclaimed. Delete this block when W1 lands.
-
 ## NOW 2026-08-09 — post-decode text hardening (WhisperJAV survey)
 
 Survey of https://github.com/meizhong986/WhisperJAV (Python orchestration over
@@ -129,7 +123,7 @@ post-processing stack is far ahead of ours. Full survey in `LEARNINGS.md`.
 
 **The survey immediately found a live bug, verified, see W1.**
 
-### W1 — `core_ngram::fix_loops` is a NO-OP on CJK (BUG, take first)
+### W1 — `core_ngram::fix_loops` was a NO-OP on CJK — DONE 2026-08-09
 
 `src/core/ngram_loop_fix.h:68` `split_words()` splits on ASCII whitespace only.
 Japanese/Chinese has none, so the entire segment is one "word", `collapse()`
@@ -143,11 +137,14 @@ can never fire, and the guard is inert. Compiled the header standalone
 hey hey hey hey hey         → "hey hey hey"  (changed)
 ```
 
-`core_ngram::` is consumed by `src/firered_asr.cpp` and
-`src/moss_transcribe.cpp` — both Chinese-first models — plus
-`src/moss_transcribe_diarize.cpp`, `src/moonshine.cpp`, `src/crispasr_c_api.cpp`.
-The guard is dead exactly where the failure mode is worst. Same class as
-"prove the new code path EXECUTES": wired, never fires.
+Real caller list, verified by grep (an earlier draft of this section named
+`firered_asr` — wrong, see W1b): `src/moss_transcribe.cpp:1503`,
+`src/moss_transcribe_diarize.cpp:1504`, `src/higgs_stt.cpp:1674`, and six sites
+in `src/crispasr_c_api.cpp` covering cohere, granite and glm-asr. Of those,
+**moss-transcribe is zh/en and glm-asr is Mandarin + Chinese dialects +
+Cantonese** (README.md:107, :126) — the guard was dead on its two most
+CJK-exposed consumers. Same class as "prove the new code path EXECUTES":
+wired, never fires.
 
 Also: `fix_loops()` re-joins survivors with single spaces, so on mixed CJK/Latin
 it would rewrite original spacing if it ever did split. Any fix must not
@@ -163,8 +160,48 @@ Operate on Unicode code points, not bytes. Gate on "segment contains no
 whitespace" or "majority CJK" so Latin text keeps today's word-level path
 byte-for-byte.
 
-**Red first.** The current code *passes* a naive test vacuously — the fixture
-must be one that fails today. Watch all four cases above go red before fixing.
+**Landed.** `split_codepoints` / `decode_codepoint` / `is_cjk_codepoint` /
+`wants_codepoint_collapse` / `fix_loops_codepoints` in
+`src/core/ngram_loop_fix.h`, called per surviving token from `fix_loops`. The
+*same* `collapse_indices()` runs over code points instead of words — one
+algorithm, two tokenizations — rather than WhisperJAV's
+"replace-the-line-with-the-dominant-unit" form, which eats a good prefix
+(`今日はいい天気ですね。` + `あ`×30 would have become `ああ`). Gate:
+≥8 code points AND ≥60% CJK, so Latin and short natural reduplication
+(`ええ`, `はいはい`, `Mississippi`) are untouched.
+
+Guard: `tests/test-ngram-loop-fix-cjk.cpp`, 9 cases / 30 assertions. **Watched
+red first — 6 of 9 failed before the fix**, and the 3 that passed were the
+must-not-change invariants (natural CJK, Latin, edge cases), which is the point.
+`test-ngram-loop-fix.cpp` (Latin, 36 assertions) unchanged and still green.
+The gate can still go red on demand: the last case asserts
+`CRISPASR_NGRAM_LOOPFIX_OFF=1` restores the raw text *and* that clearing it
+restores the collapse — both directions, so a silently-dead path fails.
+
+**Known limitation, deliberate:** `fix_loops_keep_indices` is untouched. It
+reports *membership* for parallel per-word arrays (SRT/VTT word timings), and
+the CJK path rewrites token *content*, not membership — so word-level output on
+CJK is still uncollapsed. On these scripts a whitespace-delimited "word" is not
+a linguistic unit anyway; doing this properly needs word timings from the
+aligner, not from a space split.
+
+`fix_loops` still normalises whitespace to single spaces on rejoin — that was
+already true and `test-ngram-loop-fix.cpp:86` pins it. Not changed here.
+
+### W1b — firered-asr has NO `fix_loops` at all (found while doing W1)
+
+Turned up checking W1's blast radius. `src/firered_asr.cpp` does not even
+`#include "core/ngram_loop_fix.h"`; the only mention is a comment at :2270
+saying so out loud — *"firered's CLI adapter has no `core_ngram::fix_loops`, so
+this also cleans the garbage tail"*, justifying the decode-time
+`core_repeat::tail_is_repetition` break as a substitute.
+
+That substitute is **greedy-only by construction** (wired into the
+`beam_size == 1` branch only, since beam search self-terminates), so a firered
+run with `beam_size > 1` has neither guard. firered-asr is Mandarin + 20+
+Chinese dialects (README.md:110) — i.e. precisely the script W1 is about, on
+the backend with the least coverage. Small: add the call on the adapter's
+output. Do NOT assume the decode-time break makes it redundant.
 
 ### W2 — absolute line-length cutoff as a hallucination catch-all
 
