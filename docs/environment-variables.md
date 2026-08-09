@@ -975,6 +975,10 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
 - `CRISPASR_QWEN3_TTS_CODEC_GPU`
 - `CRISPASR_QWEN3_TTS_CODEC_TRACE`
 - `CRISPASR_QWEN3_TTS_EMBD_CHECK`
+- `CRISPASR_QWEN3_TTS_DUMP_LOGITS=<dir>` — write the raw per-frame talker
+  logits (f32, before the repetition penalty and the suppress mask) plus a
+  top-5 line to stderr. The instrument for a cross-backend diff: tokens
+  alone cannot tell a miscompute from amplified rounding (#337).
 - `CRISPASR_QWEN3_TTS_GREEDY` — force the talker's codebook-0 sampler to argmax
   (top_k=1). The frame sequence then depends only on the logits, so two
   backends agree if and only if their logits agree — this is the lever for

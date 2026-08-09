@@ -17633,3 +17633,83 @@ Rest of the 2026-08-02 audit came back clean: CLI, HTTP server, C ABI (incl. `_s
 `--i-have-rights`, emotion removal (no consumer of `sensevoice_result.raw`), speaker-DB
 roster fail-closed. S2S backends read no `tts_voice`, so S2S can't clone. Node addon has
 no TTS. HF Space routes via `/v1/audio/speech` and shows a visible label.
+
+## "GPU picks a different token than CPU" is usually NOT a miscompute in an AR audio model — dump the LOGITS, and don't reach for the repetition detector (#337 qwen3-tts, 2026-08-09)
+
+A user reported qwen3-tts on HIP sampling a different first token than CPU and
+then running to the KV ceiling — 3796 frames / 303.76 s for one sentence, exit
+code 0, valid WAV. Excellent report: quantization, model size, flash-attn, HIP
+graph capture and the voice reference each ruled out with a paired test. The
+conclusion still turned out to be the opposite of what it looked like, and each
+step of getting there is reusable.
+
+### 1. A token comparison under sampling proves nothing
+
+The talker hardcoded `top_k=50, temp=0.9`. The RNG stream is identical across
+backends (fixed-seed xorshift), so this looks comparable — but the pick is a
+multinomial draw over a softmax of the top 50 logits, and *any* float
+difference can move it. Before comparing two backends by their token streams,
+force argmax (`CRISPASR_QWEN3_TTS_GREEDY`, sibling of the cosyvoice3 one that
+settled #304). Only then does "the tokens differ" mean "the logits differ".
+
+Related bug found on the way: `qwen3_tts_set_temperature` reached the code
+predictor but not the talker, so `--temperature` was silently inert on the
+decision that picks each frame. **When a knob exists, grep every consumer** —
+same shape as the "N engines share a decode helper" trap.
+
+### 2. Then dump the LOGITS, not the tokens — and read the whole vector
+
+Greedy divergence still is not evidence. Per-frame raw talker logits (the
+glm_ocr `*_DUMP_LOGITS` pattern) gave the real picture:
+
+| frame | cos(CPU, Metal) | max_abs | argmax |
+|---|---|---|---|
+| 0 | **0.999924** | 0.44 | same |
+| 3 | 0.990327 | 6.56 | same |
+| 5 | 0.840977 | 19.6 | **flips** |
+| 7 | 0.685161 | 25.3 | different |
+
+cos 0.99992 at frame 0 is *better* than the 0.998–0.999 this guide calls normal
+for GPU-vs-CPU. Neither `--no-flash-attn` (bit-identical output) nor
+`CRISPASR_KV_QUANT_{K,V}=f32` (changes the 5th decimal) moves it, so there is no
+precision knob to turn and no op to blame. This is the voxtral-tts note in this
+guide, verbatim: an AR pipeline reproduces the reference at frame 0 and diverges
+as rounding amplifies through the loop — **not a bug**. After the argmax flips,
+the two backends follow different but individually plausible trajectories.
+
+Dump the logits BEFORE the repetition penalty and any suppress mask: the
+penalty reads the generated history, which itself diverges once the picks
+differ, and would confound every frame after the first disagreement. And prefer
+a genuine graph output that the loop already reads back over a
+`ggml_set_output` snapshot, which this guide warns can read cos≈1.0 on the
+Metal sched while the real forward is wrong.
+
+### 3. The repetition detector is the wrong instrument for audio codec tokens
+
+`core_repeat::tail_is_repetition` was the obvious fix — three backends use it,
+qwen3-tts never adopted it, and the degenerate output visibly repeats
+(`142,142, 1657×4, 668×8 …`). Measuring the healthy arm killed it:
+
+```
+healthy CPU  ("quick brown fox"): period-1 [1657] repeated 7x, mid-utterance
+degenerate Metal                : period-1 [668]  repeated 8x, mid-utterance
+```
+
+Structurally identical. That helper was written for TEXT tokens, where a
+verbatim 4× phrase repeat really is a decode loop; at 12 Hz a **held sound
+legitimately repeats a codec frame**. Shipping the library default would have
+truncated good audio — a worse bug than the runaway. *Measure the healthy arm
+before adopting a detector tuned on a different token alphabet.*
+
+### 4. What the defect actually was
+
+`max_frames` was the KV ceiling, so any input was allowed 4096 frames (340 s).
+The fix is the bound upstream TTS models already carry (`max_token_text_ratio`,
+which #334 ported for cosyvoice3): frames proportional to the input text, sized
+from measurement — five utterances ran 1.35–2.61 frames per codepoint, so 12
+with a 240 floor is ~5× the worst observed and clips none of them.
+
+**The generalisable point:** when a decoder can diverge for legitimate reasons,
+the defence is a bound derived from the input, not a detector for the symptom.
+And a runaway that returns exit 0 with a valid file is worse than one that
+crashes — say plainly, in the log, that the output should be discarded.
