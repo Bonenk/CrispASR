@@ -11,6 +11,7 @@
 #include "crispasr_speaker_embedder.h" // pluggable speaker embedder (#107 P3)
 #include "crispasr_stream_punc.h"      // streaming punctuation mode helpers (#112)
 #include "crispasr_cache.h"            // crispasr_cache::ensure_cached_file (for --hf-repo, #128)
+#include "core/asr_sensitivity.h"      // --sensitivity presets (PLAN.md §W7)
 #include "core/gpu_backend_pref.h"     // crispasr_set_gpu_backend_pref (#214)
 #include "core/win_compat.h"           // setenv/unsetenv shims for MSVC
 #include "crispasr_model_mgr_cli.h"
@@ -223,6 +224,30 @@ static bool whisper_params_parse_arg_general(int argc, char** argv, int& i, whis
         params.audio_ctx = std::stoi(ARGV_NEXT);
     } else if (arg == "-wt" || arg == "--word-thold") {
         params.word_thold = std::stof(ARGV_NEXT);
+    } else if (arg == "--sensitivity") {
+        // PLAN.md §W7. Applied HERE, in argv order, so a later explicit -et /
+        // -lpt / -nth on the same command line overrides it — and an EARLIER
+        // one is deliberately overridden by the preset, which is the same
+        // last-flag-wins rule every other option in this parser follows.
+        const std::string name = ARGV_NEXT;
+        core_sensitivity::Preset p;
+        if (!core_sensitivity::parse_preset(name, p)) {
+            fprintf(stderr, "error: unknown --sensitivity '%s' (expected: %s)\n", name.c_str(),
+                    core_sensitivity::preset_list());
+            // exit rather than `return false`: this parser is a chain of
+            // "did I handle this arg" helpers, so returning false means
+            // UNHANDLED — the caller would then print "unknown argument:
+            // --sensitivity", which is wrong (the flag is known, its value is
+            // not) and dump the full usage over the real message. Non-zero
+            // because a mistyped preset silently decoding at the wrong
+            // thresholds is exactly what this flag exists to prevent.
+            exit(1);
+        }
+        const auto t = core_sensitivity::preset(p);
+        params.entropy_thold = t.entropy_thold;
+        params.logprob_thold = t.logprob_thold;
+        params.no_speech_thold = t.no_speech_thold;
+        params.temperature_inc = t.temperature_inc;
     } else if (arg == "-et" || arg == "--entropy-thold") {
         params.entropy_thold = std::stof(ARGV_NEXT);
     } else if (arg == "-lpt" || arg == "--logprob-thold") {
@@ -986,6 +1011,8 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(stderr, "  -lpt N,    --logprob-thold N      [%-7.2f] log probability threshold for decoder fail\n",
             params.logprob_thold);
     fprintf(stderr, "  -nth N,    --no-speech-thold N    [%-7.2f] no speech threshold\n", params.no_speech_thold);
+    fprintf(stderr, "             --sensitivity S       [%-7s] preset for the four thresholds above: %s\n", "balanced",
+            core_sensitivity::preset_list());
     fprintf(stderr, "  -tp,       --temperature N        [%-7.2f] The sampling temperature, between 0 and 1\n",
             params.temperature);
     fprintf(stderr, "             --seed N               [%-7d] RNG seed for sampling (0 = non-deterministic)\n",

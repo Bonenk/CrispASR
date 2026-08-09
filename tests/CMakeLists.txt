@@ -2815,6 +2815,43 @@ catch_discover_tests(test-vad-failover
     PROPERTIES LABELS "unit;vad-failover"
 )
 
+# ─── test-segment-hygiene — §W2 length cap, §W5 repeat merge, §W6 filters.
+# All three live downstream of the logits, where crispasr-diff reads
+# cos 1.000000 whether they work or not. This is the only check they get.
+add_executable(test-segment-hygiene
+    test-segment-hygiene.cpp
+)
+target_include_directories(test-segment-hygiene PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_compile_definitions(test-segment-hygiene PRIVATE
+    CRISPASR_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+target_link_libraries(test-segment-hygiene PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-segment-hygiene
+    TEST_SPEC "[seg-hygiene]"
+    PROPERTIES LABELS "unit;seg-hygiene"
+)
+
+# ─── test-asr-sensitivity — named decode-threshold bundles (PLAN.md §W7).
+# Pins each preset's DIRECTION against balanced, and that balanced still equals
+# the decoder's shipped defaults (crispasr.cpp:6523).
+add_executable(test-asr-sensitivity
+    test-asr-sensitivity.cpp
+)
+target_include_directories(test-asr-sensitivity PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-asr-sensitivity PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-asr-sensitivity
+    TEST_SPEC "[sensitivity]"
+    PROPERTIES LABELS "unit;sensitivity"
+)
+
 # ─── test-loopfix-wiring — do the adapters CALL the collapse? (PLAN.md §W1b)
 # The header's own tests were always green while firered-asr never invoked it
 # at all. Source scan: no model, no audio.
