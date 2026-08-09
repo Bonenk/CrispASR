@@ -113,6 +113,14 @@ Earned the hard way; each cost a real bug getting through.
    copies-in-sync guard covered 1 of 14 files for months — not a wrong entry, a
    missing one.
 
+## CLAIMED 2026-08-09 — §W2–W7 post-decode text hardening
+
+Worktree `.claude/worktrees/feat-whisperjav-hardening`, branch
+`feat/whisperjav-hardening`. Taking the remaining WhisperJAV items: W3 aligner
+sentinel, W4 VAD failover, W2 line cutoff, W5 cross-segment dedup, W6 segment
+filters, W7 sensitivity presets. W1/W1b already landed on main. Delete this
+block when the branch merges.
+
 ## NOW 2026-08-09 — post-decode text hardening (WhisperJAV survey)
 
 Survey of https://github.com/meizhong986/WhisperJAV (Python orchestration over
