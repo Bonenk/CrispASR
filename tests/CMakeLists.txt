@@ -2815,6 +2815,26 @@ catch_discover_tests(test-vad-failover
     PROPERTIES LABELS "unit;vad-failover"
 )
 
+# ─── test-vad-keywords — --help and the resolver are two hand-maintained lists
+# that must agree. They had already drifted: help named 2 of 6 keywords, so
+# whisper-vad / marblenet / webrtc / auto were undiscoverable.
+add_executable(test-vad-keywords
+    test-vad-keywords.cpp
+)
+target_include_directories(test-vad-keywords PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_compile_definitions(test-vad-keywords PRIVATE
+    CRISPASR_SOURCE_DIR="${PROJECT_SOURCE_DIR}"
+)
+target_link_libraries(test-vad-keywords PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-vad-keywords
+    TEST_SPEC "[vad-keywords]"
+    PROPERTIES LABELS "unit;vad-keywords"
+)
+
 # ─── test-segment-hygiene — §W2 length cap, §W5 repeat merge, §W6 filters.
 # All three live downstream of the logits, where crispasr-diff reads
 # cos 1.000000 whether they work or not. This is the only check they get.
