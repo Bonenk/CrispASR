@@ -352,6 +352,24 @@ catch_discover_tests(test-audio-resample
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-voxtral-tekken-vocab — #338 active-vocabulary bound ─────────────────
+# Header-only, no weights: a Tekken blob may serialize more pieces than the
+# checkpoint's embedding table has rows, and an id past the table becomes an
+# out-of-bounds ggml_get_rows.
+add_executable(test-voxtral-tekken-vocab
+    test-voxtral-tekken-vocab.cpp
+)
+target_include_directories(test-voxtral-tekken-vocab PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-voxtral-tekken-vocab PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-voxtral-tekken-vocab
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-cosyvoice3-prompt-policy — #334 decode floor + ref-text length band ──
 # Header-only policy, no weights: the diff harness ends at the logits and
 # cannot see either law.
