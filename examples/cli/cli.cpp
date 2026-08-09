@@ -1465,8 +1465,8 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
     fprintf(stderr, "\nVoice Activity Detection (VAD) options:\n");
     fprintf(stderr, "             --vad                           [%-7s] enable Voice Activity Detection (VAD)\n",
             params.vad ? "true" : "false");
-    fprintf(stderr, "  -vm FNAME, --vad-model FNAME               [%-7s] VAD model (path, 'firered', or 'silero')\n",
-            params.vad_model.c_str());
+    fprintf(stderr, "  -vm FNAME, --vad-model FNAME               [%-7s] VAD model: a path, or one of %s\n",
+            params.vad_model.c_str(), crispasr_vad_model_keywords());
     fprintf(stderr, "  -vt N,     --vad-threshold N               [%-7.2f] VAD threshold for speech recognition\n",
             params.vad_threshold);
     fprintf(stderr, "  -vspd N,   --vad-min-speech-duration-ms  N [%-7d] VAD min speech duration (ms)\n",
