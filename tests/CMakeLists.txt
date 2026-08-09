@@ -2762,6 +2762,25 @@ catch_discover_tests(test-ngram-loop-fix
     PROPERTIES LABELS "unit;ngram-loop"
 )
 
+# ─── test-ngram-loop-fix-cjk — the code-point half of the same collapse.
+# Separate file because every fixture in test-ngram-loop-fix.cpp is Latin, and
+# that was the bug: split_words() splits on ASCII whitespace, so the guard was
+# inert on Japanese/Chinese — the scripts moss_transcribe and glm-asr emit
+# (PLAN.md §W1).
+add_executable(test-ngram-loop-fix-cjk
+    test-ngram-loop-fix-cjk.cpp
+)
+target_include_directories(test-ngram-loop-fix-cjk PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-ngram-loop-fix-cjk PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-ngram-loop-fix-cjk
+    TEST_SPEC "[cjk]"
+    PROPERTIES LABELS "unit;ngram-loop;cjk"
+)
+
 # ─── test-uroman — Catch2 unit tests for core/uroman.h romanization.
 # Validates Arabic + Cyrillic romanization for CTC forced alignment (#252).
 add_executable(test-uroman
