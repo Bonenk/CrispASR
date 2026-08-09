@@ -19,6 +19,7 @@
 #include "core/asr_segment_group.h" // issue #257: output-segment grouping (parakeet --chunk-seconds)
 #include "core/audio_chunking.h"    // fix/session-long-audio: energy-minima slicing for session auto-chunk
 #include "session_autochunk.h"      // fix/session-long-audio: pure auto-chunk applicability decision
+#include "core/asr_sensitivity.h"   // §W7 sensitivity presets
 #include "core/ngram_loop_fix.h"    // fix/session-long-audio: collapse decode loops in merged chunks (issue #218)
 #include "parakeet_orchestrate.h"   // improvements Phase 1: shared parakeet transcribe orchestration
 #include "core/gpu_backend_pref.h"  // crispasr_set_gpu_backend_pref (#214)
@@ -11460,6 +11461,24 @@ CA_EXPORT int crispasr_session_set_fallback_thresholds(crispasr_session* s, floa
         temperature_inc = 1.0f;
     s->temperature_inc = temperature_inc;
     return 0;
+}
+
+// PLAN.md §W7. The session ABI reimplements every surface inline and does NOT
+// call the CLI, so the preset has to land here too or bindings and the server
+// get a knob the CLI has and they do not.
+//
+// Deliberately expressed in terms of the setter above rather than assigning the
+// fields directly: the temperature_inc clamp is a real invariant and a second
+// copy of it is a second place to forget it.
+CA_EXPORT int crispasr_session_set_sensitivity(crispasr_session* s, const char* preset_name) {
+    if (!s || !preset_name || !*preset_name)
+        return -1;
+    core_sensitivity::Preset p;
+    if (!core_sensitivity::parse_preset(preset_name, p))
+        return -2; // unknown name — never silently fall back to a default
+    const auto t = core_sensitivity::preset(p);
+    return crispasr_session_set_fallback_thresholds(s, t.entropy_thold, t.logprob_thold, t.no_speech_thold,
+                                                    t.temperature_inc);
 }
 
 // Per-token top-N alternative-candidate capture (whisper greedy

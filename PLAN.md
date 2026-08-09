@@ -227,59 +227,139 @@ claim that every adapter needs the collapse (CTC/RNN-T backends do not loop
 this way; higgs-stt and moss-transcribe call it in-library, which the test
 checks separately).
 
-### W2 — absolute line-length cutoff as a hallucination catch-all
+### W2 / W5 / W6 — segment hygiene — DONE 2026-08-09
 
-`repetition_cleaner.py` Layer 3. A CJK subtitle line past N chars is essentially
-always a repetition hallucination; truncate at the last `。`/`、`, with a floor
-at 75% of the cap so an early boundary does not over-cut. Catches loops no
-pattern matched. Small.
+One header, `src/core/segment_hygiene.h`, because all three are the same kind of
+thing: a transform on the assembled segment list, downstream of the logits,
+where `crispasr-diff` reads cos 1.000000 whether they work or not. That
+harness-blind zone is why they get hermetic unit tests
+(`tests/test-segment-hygiene.cpp`, 30 cases) — it is the only check available.
 
-### W3 — aligner collapse sentinel (silent corruption, we have NO guard)
+- **W2 `cap_length`** — truncate a runaway line, backing up to the last
+  `。．.！!？?、,` but never below 75% of the cap, so an early boundary cannot
+  throw away a legitimate line. Counts CODE POINTS: a byte cap cuts mid-character
+  and produces mojibake, and reads 3x short on CJK.
+- **W6 `should_drop` / `looks_nonverbal`** — logprob gate with a margin that
+  LOOSENS for segments ≤1.6 s (a short segment's mean logprob is noisier, so it
+  gets more room, not less), plus `[Music]` / `（喘ぎ声）` / `♪` dropping.
+- **W5 `merge_repeats`** — collapse runs of ≥3 near-identical adjacent segments
+  within a 2 s gap, keeping the first text and the run's full span. Similarity is
+  LCS over code points. Compares each candidate against the run's FIRST text, not
+  its predecessor, so a slowly-drifting chain cannot merge unboundedly.
 
-`modules/alignment_sentinel.py`. Detects a forced aligner mapping a whole
-scene's words into a ~100 ms window — text correct, timestamps garbage — then
-redistributes at a target CPS. Five independent signatures:
+**Two corrections to WhisperJAV, both pinned by a test:**
 
-| signature | threshold |
-|---|---|
-| word coverage of scene | < 5% |
-| aggregate chars/sec | > 50 (physically impossible) |
-| word span with substantial text | < 0.5 s |
-| words at exactly `(0.0, 0.0)` | > 10% |
-| words with `start == end` | > 40% |
+1. Its non-verbal filter substring-matches a keyword list against the whole
+   line, so "The music started and everyone danced." is deleted as a music
+   marker. Ours only considers a line that is ENTIRELY a bracketed descriptor.
+2. Its bracket handling is ASCII-only. A Japanese marker is written `（喘ぎ声）`
+   or `【笑い】` — so the ASCII test fires on exactly zero real Japanese markers
+   while claiming to support them. Found by the test suite, not by reading.
 
-Grepped `src/align.cpp`, `src/crispasr_aligner.cpp`, `examples/nfa-align`:
-nothing for coverage / CPS / degenerate spans. We ship this undetected.
-Medium; the detector is weight-free and unit-testable, recovery is separable.
+**Wiring.** All three run from `merge_segments()` in `crispasr_run.cpp` — the
+structural chokepoint all four `merge_segments(...)` call sites pass through.
+Patching the four sites by hand is the shape of bug the copies-in-sync guard
+exists for. It must also be here rather than per-slice: a repetition straddling
+a slice boundary is only visible once the slices are flat.
 
-### W4 — VAD failover when the VAD obviously failed
+**Every stage is OFF unless its env var is set** (`CRISPASR_SEG_MAX_CHARS`,
+`_DROP_NONVERBAL`, `_LOGPROB_THOLD`, `_LOGPROB_MARGIN`, `_MERGE_REPEATS`,
+`_MERGE_SIMILARITY`, `_MERGE_GAP_CS`, `_MERGE_MIN_RUN`). Each can delete
+user-visible text and a wrong deletion is worse than a surviving artifact, so
+none may switch on by surprise. Dropped counts print to stderr — silent loss is
+the failure mode.
 
-`modules/vad_failover.py`, 57 lines. Clip > 120 s and VAD returns < 1% speech
-coverage — or ≤ 2 segments on a clip ≥ 4× the threshold — means the VAD is
-wrong; fall back to full-clip transcription. We have seven VAD backends
-(`crispasr_vad`, `silero`, `marblenet`, `webrtc`, `firered_vad`, `pyannote_seg`)
-and no escape hatch. Small, high value on long-form.
+**Not yet wired into the session C-ABI.** `crispasr_c_api.cpp` reimplements
+every backend's transcribe inline and does not call the CLI adapter, so
+bindings/server do NOT get this yet. Deliberate: the CLI path proves the shape
+first. Tracked below.
 
-### W5 — cross-segment dedup / merge
+### W3 — aligner collapse sentinel — DONE 2026-08-09
 
-`modules/cross_subtitle_processor.py`. Merge consecutive segments whose text
-similarity ≥ threshold when the gap is under a cap. Per-segment loop fixes
-cannot see a phrase repeating *across* segment boundaries — which is exactly
-how long-form Whisper context drift presents. Medium.
+`src/core/align_sentinel.h` + `tests/test-align-sentinel.cpp` (10 cases).
 
-### W6 — non-verbal drop + short-segment logprob margin
+The failure is REAL in our code, not a ported hypothetical. `ctc_forced_align()`
+cannot fail loudly — it returns `{}` only when the whole call is unusable — while
+two paths inside it emit `t0 == t1 == 0` for individual words inside a
+SUCCESSFUL return: `wranges[wi].cs < 0` (characters absent from the CTC vocab,
+documented in `align.h`'s `@return`) and `t0_frame < 0` (the Viterbi path never
+visited the word). Feed a Chinese transcript to a Latin-vocab CTC model and
+EVERY word comes back that way.
 
-`modules/segment_filters.py`. Tightens the logprob threshold by a margin for
-segments ≤ 1.6 s: short segments have noisier `avg_logprob`, so a flat
-threshold under-filters them. We apply `logprob_thold` / `no_speech_thold`
-uniformly by duration (`src/crispasr.cpp:8499`). The `♪`-only / `[Music]` /
-`(laughs)` drop is a small language-neutral win on top.
+Five signals — (0,0) ratio >10%, zero-length-span ratio >40%, chars/sec >50,
+coverage <5%, span <0.5 s — each with its own precondition so a short clip, a
+two-word clip, or unknown audio duration is not condemned. chars/sec counts code
+points; on bytes it reads 3x high and would flag every correct Japanese
+alignment.
 
-### W7 — sensitivity presets
+Wired at `crispasr_align_words()`, the ONE join all three aligner backends
+(qwen3-fa, wav2vec2, canary-ctc) funnel through, so CLI + session ABI + bindings
++ server are covered by one call. **The offset is subtracted before assessing** —
+a chunk at 30 s would otherwise present silent-zero words as (30.0, 30.0), a
+plausible-looking position, and the signal could never fire.
 
-Named threshold bundles (conservative / balanced / aggressive) over
-`entropy_thold` / `logprob_thold` / `no_speech_thold` / `temperature_inc`,
-instead of four floats users must tune blind. Small.
+Detect + warn by default. `CRISPASR_ALIGN_SENTINEL_REDISTRIBUTE=1` opts into
+repair, `=0` disables. Repair is opt-in because this is a new heuristic against a
+failure we have never measured in the field; a wrong auto-repair would be just as
+invisible as the collapse it replaces.
+
+Mutation-checked: a sentinel that never fires (= today's `main`) fails 7 of 10
+cases, and the 3 that pass are the must-not-fire ones.
+
+### W4 — VAD failover — DONE 2026-08-09
+
+`src/core/vad_failover.h` + `tests/test-vad-failover.cpp` (10 cases). Wired into
+`crispasr_compute_vad_slices` — again the single shared entry point.
+
+**Placed after the merge and BEFORE the re-chunk.** The re-chunk splits long
+segments at `chunk_seconds`, so one 10-minute monologue becomes ~20 slices;
+measuring segment COUNT after that reports a healthy number for any input and the
+few-segment signal could never fire.
+
+Falls back to `crispasr_fixed_chunk_slices`, not one giant slice — "transcribe
+everything" has to stay inside the chunk length the backend's context expects.
+`CRISPASR_VAD_FAILOVER=0` disables.
+
+**Deliberate correction to WhisperJAV.** Its few-segment rule is
+`len(segments) <= 2 and duration >= 480` with no coverage condition, which
+misfires on a 10-minute continuous monologue detected as ONE segment at 99%
+coverage and needlessly re-transcribes it. Verified by building their exact rule
+against our fixtures — it fails the monologue test. Ours also requires
+coverage <10%.
+
+### W7 — sensitivity presets — DONE 2026-08-09
+
+`src/core/asr_sensitivity.h` + `tests/test-asr-sensitivity.cpp` (8 cases).
+`--sensitivity conservative|balanced|aggressive` on the CLI,
+`crispasr_session_set_sensitivity()` on the session ABI (both surfaces, because
+the C-ABI does not call the CLI).
+
+The four thresholds INTERACT: `crispasr.cpp:8499` requires `avg_logprob <
+logprob_thold` AND `no_speech_prob < no_speech_thold` together, so moving one
+alone produces a combination that does not mean what its name says. The tests pin
+each preset's DIRECTION against balanced and that the two sit on OPPOSITE sides
+of it — asserting each against balanced separately would still allow both to
+drift the same way.
+
+`balanced` is byte-identical to the shipped defaults, and a test pins those
+defaults against `crispasr.cpp:6523` so a change there without a change here
+fails. An unknown name is REJECTED (CLI errors, ABI returns -2) rather than
+silently treated as balanced, so a typo is visible. A test also round-trips every
+name advertised in `--help` through the parser, guarding the classic
+documented-but-unparseable drift.
+
+### Follow-ups left open by this round
+
+1. **Session C-ABI does not get W2/W5/W6.** `crispasr_c_api.cpp` reimplements
+   each backend's transcribe inline; the hygiene runs in the CLI's
+   `merge_segments()` only. Bindings and server see no change. S/M.
+2. **No wiring guard for the hygiene call.** `tests/test-loopfix-wiring.cpp` is
+   the pattern — a source scan asserting `merge_segments` still contains the
+   `core_seg_hygiene::apply_all` call. Without it this can go inert exactly the
+   way firered's `fix_loops` did (§W1b). S.
+3. **The sentinel and failover thresholds have never been measured against real
+   field data.** They are reasoned, not fitted. If either turns out to fire on
+   real audio, the numbers are the thing to revisit, not the structure.
 
 ### Deliberately NOT porting
 

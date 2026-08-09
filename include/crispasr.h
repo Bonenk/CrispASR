@@ -612,6 +612,14 @@ CRISPASR_API int crispasr_session_set_grammar_text(struct crispasr_session* s, c
 CRISPASR_API int crispasr_session_set_fallback_thresholds(struct crispasr_session* s, float entropy_thold,
                                                           float logprob_thold, float no_speech_thold,
                                                           float temperature_inc);
+// Apply a named bundle of the four thresholds above: "conservative",
+// "balanced" (== the shipped defaults, always a no-op) or "aggressive".
+// "strict"/"default"/"loose" are accepted aliases. Mirrors the CLI's
+// --sensitivity. Returns 0 on success, -1 on a null/empty argument, -2 for an
+// unrecognised name — an unknown preset is REJECTED rather than silently
+// treated as balanced, so a typo is visible. Call before transcribing; a later
+// crispasr_session_set_fallback_thresholds() overrides it.
+CRISPASR_API int crispasr_session_set_sensitivity(struct crispasr_session* s, const char* preset_name);
 CRISPASR_API int crispasr_session_set_alt_n(struct crispasr_session* s, int n);
 CRISPASR_API int crispasr_session_set_whisper_decode_extras(struct crispasr_session* s, int suppress_nst,
                                                             const char* suppress_regex, int carry_initial_prompt);

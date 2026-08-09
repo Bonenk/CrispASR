@@ -65,6 +65,7 @@
 #include "crispasr_watermark_dispatch.h"
 #include "crispasr_watermark_stats.h"
 #include "core/crispasr_wav_writer.h"
+#include "core/segment_hygiene.h" // PLAN.md §W2/§W5/§W6 opt-in segment cleanup
 #include "crispasr_mp3_writer.h"  // MP3 output via in-tree glint encoder
 #include "crispasr_aac_writer.h"  // AAC-LC (ADTS) output via in-tree glint encoder
 #include "crispasr_mp4_writer.h"  // AAC/Opus-in-MP4 muxer (C2PA-capable container)
@@ -437,6 +438,17 @@ int warn_unsupported(const CrispasrBackend& backend, const whisper_params& p) {
 }
 
 // Merge individual-slice results into a flat list preserving time order.
+//
+// PLAN.md §W2/§W5/§W6 hygiene runs HERE rather than at the four
+// `merge_segments(...)` call sites, because this is the structural chokepoint
+// they all pass through — a hand-patched list of call sites is the exact shape
+// of bug the copies-in-sync guard was built for (it covered 1 of 14 files for
+// months). Every stage is opt-in via env; with none set this is byte-for-byte
+// the old function.
+//
+// It also has to be here rather than per-slice: §W5 collapses runs of
+// near-identical segments, and a loop that straddles a slice boundary is only
+// visible once the slices are flat.
 std::vector<crispasr_segment> merge_segments(std::vector<std::vector<crispasr_segment>>&& per_slice,
                                              const std::vector<crispasr_audio_slice>& /*slices*/) {
     std::vector<crispasr_segment> out;
@@ -448,7 +460,42 @@ std::vector<crispasr_segment> merge_segments(std::vector<std::vector<crispasr_se
         for (auto& s : v)
             out.push_back(std::move(s));
     }
-    return out;
+
+    const auto hy = core_seg_hygiene::config_from_env();
+    if (!core_seg_hygiene::any_enabled(hy))
+        return out;
+
+    std::vector<core_seg_hygiene::Seg> view;
+    view.reserve(out.size());
+    for (const auto& s : out)
+        view.push_back({s.text, s.t0, s.t1, 0.0f, false});
+
+    int dropped = 0;
+    const auto kept = core_seg_hygiene::apply_all(view, hy, &dropped);
+
+    // Rebuild by matching the surviving views back onto the originals in order,
+    // so every field the hygiene view does not carry (speaker, words, tokens,
+    // chunk_id) is preserved rather than reconstructed. apply_all only removes
+    // and rewrites `text`/`t1`, never reorders, so a forward scan is exact.
+    std::vector<crispasr_segment> res;
+    res.reserve(kept.size());
+    size_t oi = 0;
+    for (const auto& k : kept) {
+        while (oi < out.size() && out[oi].t0 != k.t0)
+            oi++;
+        if (oi >= out.size())
+            break;
+        crispasr_segment seg = std::move(out[oi]);
+        seg.text = k.text;
+        seg.t1 = k.t1; // a merged run spans to the end of its last member
+        res.push_back(std::move(seg));
+        oi++;
+    }
+    if (res.size() != kept.size()) // defensive: never silently lose content
+        return out;
+    if (dropped > 0 || res.size() != out.size())
+        fprintf(stderr, "crispasr[hygiene]: %zu -> %zu segments (%d dropped)\n", out.size(), res.size(), dropped);
+    return res;
 }
 
 bool crispasr_words_have_positive_span(const std::vector<crispasr_word>& words) {
