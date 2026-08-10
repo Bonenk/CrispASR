@@ -1105,7 +1105,39 @@ Both validate the TTS port against the Python reference. Neither is claimed.
 
 **How:** (a) add `talker_logits_step_N` capture to the Python reference dumper (`tools/reference_backends/qwen3_tts.py`) via a `generate`-time hook; (b) add matching C++ stage to `crispasr_diff_main.cpp`; (c) run on the TTS diff harness.
 
-**HALF DONE 2026-08-09 (#337).** The C++ side exists: `CRISPASR_QWEN3_TTS_DUMP_LOGITS=<dir>`
+**C++ SIDE DONE 2026-08-10 (#337), and it settled the report.** Three levers,
+which only work together:
+`CRISPASR_QWEN3_TTS_GREEDY=1` (argmax), `CRISPASR_QWEN3_TTS_REPLAY_CODES=<file>`
+(16 codec ids per frame — teacher forcing), and
+`CRISPASR_QWEN3_TTS_DUMP_LOGITS=<dir>` (raw per-frame logits, before the
+repetition penalty and suppress mask).
+
+**Result: CPU vs Metal, fully pinned, worst cos 0.999870, mean 0.999940,
+0/49 argmax disagreements.** Given identical history the backends agree at
+every step, so the free-running divergence is entirely trajectory divergence
+seeded by ~1e-4 arithmetic. That is the rigorous version of the #337 verdict;
+the earlier free-running comparison suggested it but could not separate the two.
+
+⚠ **Partial teacher forcing is a trap.** Replaying codebook 0 alone leaves the
+15 residual codebooks sampled (`code_pred_generate_15` MUST sample — greedy
+there is documented to produce silent output), so the per-frame input embedding
+still diverges and the "teacher-forced" diff bottoms out at cos 0.849 — pure
+artefact. Pin all 16 or measure nothing.
+
+⚠ **Every per-synthesis dump must be tagged.** One `--tts` run generates twice
+(the utterance, then the spoken AI disclaimer). `talker_%04d.f32` and
+`generated_codes` were both frame-only names, so the disclaimer OVERWROTE the
+utterance's dumps and a directory held two utterances with no way to tell.
+Both now carry `_s%02d`. This produced one entirely bogus cross-backend table
+before it was spotted — the tell was `argmax_gpu[k] == argmax_cpu[k-2]`.
+
+**Still open:** the Python reference hook. `_hooks.py` references an
+`_iter_capture` that was never written, so per-step capture needs it first.
+`qwen_tts` imports from the clone at `~/code/Qwen3-TTS` (PYTHONPATH, no pip
+install); the HF weights are NOT cached locally. That turns the diff from
+cross-BACKEND into cross-IMPLEMENTATION against the blueprint.
+
+The superseded note: `CRISPASR_QWEN3_TTS_DUMP_LOGITS=<dir>`
 writes raw per-frame talker logits (f32), dumped BEFORE the repetition penalty
 and the suppress mask so a diff isolates the forward from the sampling policy.
 It already paid for itself — it is what proved the reported "GPU miscompute"

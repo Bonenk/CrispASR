@@ -6830,6 +6830,10 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
         }
     }
 
+    // Which synthesis this is within the process (see the dump naming below).
+    static int g_qwen3_tts_synth_counter = 0;
+    const int g_qwen3_tts_synth_index = g_qwen3_tts_synth_counter++;
+
     const bool bench = env_bool("CRISPASR_QWEN3_TTS_BENCH");
     const bool dbg = env_bool("CRISPASR_QWEN3_TTS_DEBUG");
     const char* dump_dir = env_str("CRISPASR_QWEN3_TTS_DUMP_DIR");
@@ -6997,6 +7001,54 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
     const int suppress_lo = (int)hp.vocab_size - 1024; // 2048 with default config
     std::vector<int32_t> talker_history;
     talker_history.reserve((size_t)max_frames);
+
+    // #337 / diff-harness replay mode. `CRISPASR_QWEN3_TTS_REPLAY_TOKENS=<file>`
+    // (whitespace-separated codebook-0 ids) makes the loop USE those ids instead
+    // of its own sample, while still computing — and, with DUMP_LOGITS, writing —
+    // the logits at every step. That is teacher forcing, and without it a
+    // per-step logits comparison is meaningless: two runs that pick different
+    // tokens at step k are conditioned on different history from k+1 onward, so
+    // everything after the first disagreement measures the divergence rather
+    // than the arithmetic. Replay pins both sides to one trajectory, which is
+    // what turns "the tokens differ" into "the logits differ, by this much, at
+    // this step". Ends the decode when the list runs out.
+    // `CRISPASR_QWEN3_TTS_REPLAY_CODES=<file>` is the STRONGER form: 16
+    // whitespace-separated ids per frame, pinning the ENTIRE frame rather than
+    // codebook 0 alone. That distinction matters and is easy to get wrong —
+    // `code_pred_generate_15` must sample (documented: greedy there produces a
+    // degenerate silent codec output), so with only cb0 replayed the other 15
+    // codebooks still diverge per backend, the per-frame input embedding
+    // differs from the next step onward, and a "teacher-forced" logits diff
+    // silently measures that instead of the arithmetic. Measured: cb0-only
+    // replay bottoms out at cos 0.849 across 49 steps, which says nothing about
+    // the backends until the whole frame is pinned.
+    std::vector<int32_t> replay_codes; // 16 per frame
+    if (const char* rc = crispasr_env::get("CRISPASR_QWEN3_TTS_REPLAY_CODES")) {
+        if (FILE* rf = std::fopen(rc, "r")) {
+            long v = 0;
+            while (std::fscanf(rf, "%ld", &v) == 1)
+                replay_codes.push_back((int32_t)v);
+            std::fclose(rf);
+            fprintf(stderr, "qwen3_tts: replaying %zu full frames (16 codes each) from %s\n", replay_codes.size() / 16,
+                    rc);
+        } else {
+            fprintf(stderr, "qwen3_tts: could not open CRISPASR_QWEN3_TTS_REPLAY_CODES='%s'\n", rc);
+        }
+    }
+
+    std::vector<int32_t> replay_tokens;
+    if (const char* rp = crispasr_env::get("CRISPASR_QWEN3_TTS_REPLAY_TOKENS")) {
+        if (FILE* rf = std::fopen(rp, "r")) {
+            long v = 0;
+            while (std::fscanf(rf, "%ld", &v) == 1)
+                replay_tokens.push_back((int32_t)v);
+            std::fclose(rf);
+            fprintf(stderr, "qwen3_tts: replaying %zu codebook-0 tokens from %s (sampling disabled)\n",
+                    replay_tokens.size(), rp);
+        } else {
+            fprintf(stderr, "qwen3_tts: could not open CRISPASR_QWEN3_TTS_REPLAY_TOKENS='%s'\n", rp);
+        }
+    }
     // Pre-allocated scratch buffers for the per-frame embed lookups.
     std::vector<float> last_id_hidden_buf(d);
     std::vector<float> next_emb_row_buf(d);
@@ -7015,7 +7067,13 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
         // sched while the real forward is wrong.
         if (const char* dump_dir = crispasr_env::get("CRISPASR_QWEN3_TTS_DUMP_LOGITS")) {
             char path[1024];
-            std::snprintf(path, sizeof(path), "%s/talker_%04d.f32", dump_dir, frame);
+            // Tag with the synthesis index, not just the frame. One `--tts` run
+            // generates more than once — the spoken AI disclaimer is a second
+            // full synthesis in the same process — and a frame-only name lets
+            // the later call OVERWRITE the earlier one's dumps, so a directory
+            // ends up holding frames from two different utterances with no way
+            // to tell which is which. Cost me one bogus cross-backend table.
+            std::snprintf(path, sizeof(path), "%s/talker_s%02d_%04d.f32", dump_dir, g_qwen3_tts_synth_index, frame);
             if (FILE* lf = std::fopen(path, "wb")) {
                 std::fwrite(logits, sizeof(float), (size_t)hp.vocab_size, lf);
                 std::fclose(lf);
@@ -7048,7 +7106,32 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
         if (frame < min_new_frames) {
             logits[eos] = -INFINITY;
         }
-        int cb0 = top_k_sample(logits, (int)hp.vocab_size, talker_top_k, talker_temp, &rng);
+        int cb0;
+        if (!replay_codes.empty()) {
+            if ((size_t)(frame + 1) * 16 > replay_codes.size()) {
+                if (dbg)
+                    fprintf(stderr, "qwen3_tts: replay-codes list exhausted at frame %d\n", frame);
+                free(logits);
+                logits = nullptr;
+                free(past_hidden);
+                past_hidden = nullptr;
+                break;
+            }
+            cb0 = replay_codes[(size_t)frame * 16];
+        } else if (!replay_tokens.empty()) {
+            if (frame >= (int)replay_tokens.size()) {
+                if (dbg)
+                    fprintf(stderr, "qwen3_tts: replay list exhausted at frame %d\n", frame);
+                free(logits);
+                logits = nullptr;
+                free(past_hidden);
+                past_hidden = nullptr;
+                break;
+            }
+            cb0 = replay_tokens[(size_t)frame];
+        } else {
+            cb0 = top_k_sample(logits, (int)hp.vocab_size, talker_top_k, talker_temp, &rng);
+        }
         if (crispasr_env::get("CRISPASR_QWEN3_TTS_EMBD_CHECK"))
             fprintf(stderr, "qwen3_tts: frame=%d cb0=%d rng=%llu\n", frame, cb0, (unsigned long long)rng);
         free(logits);
@@ -7087,6 +7170,14 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
         if (!code_pred_generate_15(ctx, past_hidden, last_id_hidden_buf.data(), cb1_15, &rng, frame)) {
             free(past_hidden);
             return false;
+        }
+        if (!replay_codes.empty()) {
+            // Overwrite AFTER the call so the predictor's own forward still
+            // runs (and can still be dumped/diffed); only its sampled output
+            // is pinned, which is what makes the next frame's input embedding
+            // identical across backends.
+            for (int i = 0; i < 15; i++)
+                cb1_15[i] = replay_codes[(size_t)frame * 16 + 1 + i];
         }
         if (bench) {
             t_loop_code_pred += now_ms() - t_cp;
@@ -7215,7 +7306,12 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
         fprintf(stderr, "qwen3_tts: produced %d frames × 16 codebooks = %zu codes\n", frame, all_codes.size());
     }
     if (dump_dir && !all_codes.empty()) {
-        dump_i32(dump_dir, "generated_codes", all_codes.data(), all_codes.size());
+        // Per-synthesis name, same reason as the logits dump: the spoken
+        // disclaimer is a second generation in the same process and an
+        // untagged name lets it overwrite the utterance's codes.
+        char gc_name[64];
+        std::snprintf(gc_name, sizeof(gc_name), "generated_codes_s%02d", g_qwen3_tts_synth_index);
+        dump_i32(dump_dir, gc_name, all_codes.data(), all_codes.size());
     }
 
     if (out_frames) {
