@@ -1056,24 +1056,44 @@ _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
 **Still open:** Upstream the ggml empty-key fix to ggml-org (outbound public PR, left for a human)
 
-**OPEN 2026-08-09 — `linux-fuzz-smoke` found a live SEGV in vendored stb_vorbis.**
-ASAN reports `SEGV in vorbis_deinit() at examples/stb_vorbis.c:4223`, reached
-through `crispasr_audio_load` (`src/crispasr_audio.cpp:2801`) from
-`tests/fuzz/fuzz_audio_load.cpp` on a mutated OGG. Reachable from a PUBLIC API
-on untrusted input, so it is worth a real fix rather than a suppression.
+**FIXED 2026-08-10 — the stb_vorbis SEGV `linux-fuzz-smoke` found.**
+`vorbis_deinit` walked `comment_list_length` entries of a NULL `comment_list`.
+`comment_list_length` is read straight from the file at
+`examples/stb_vorbis.c:3660` and set BEFORE the array is allocated, so the
+allocation-failure return one line later (an attacker-sized count makes
+`setup_malloc` return NULL) left the two out of step. Reachable from the public
+`crispasr_audio_load` on untrusted input.
 
-⚠ It is STOCHASTIC, which is why it has not been chased: a 45 s libFuzzer run
-mutates from `samples/` seeds, so it surfaces on some runs and not others. It
-failed on `c48c9489` — a documentation-only commit — and passed on the four
-commits before it and on `61fa5973` after, which is what establishes it as
-pre-existing rather than a regression. Do NOT read a green fuzz job as evidence
-the crash is gone.
+⚠ An earlier CrispASR patch had already hardened the SIBLING path here — the
+partially-filled array whose unassigned slots were freed as if valid — by
+zeroing the allocation. It could not help when the allocation never happened.
+Fixing the case you can see and leaving its neighbour is the recurring shape:
+the guard now lives in `vorbis_deinit` (defends every path in, present and
+future) rather than at the Nth caller, plus the length is reset on the error
+path so the struct's invariant holds.
 
-The crash input was written on the runner as `crash-958fb6f3cbdca00907fde6ee057c5c1632c0487c`;
-if that run's artifacts have expired, re-run the job with a longer budget to
-regenerate one before starting. v0.8.26 shipped with this open, deliberately —
-it is not a regression and a rushed patch inside a release commit is worse than
-a tracked bug.
+**Reproduced deterministically rather than waiting for the fuzzer.** The crash
+input is 102 hand-crafted bytes — an Ogg page carrying a Vorbis ident header
+and a comment header declaring `comment_list_length = 0x3FFFFFFF`. Kept as
+`tests/fuzz/regressions/ogg-huge-comment-count.ogg`, and the smoke-fuzz job now
+copies `tests/fuzz/regressions/` into its corpus, so every fixed crash becomes a
+deterministic gate instead of a coin flip. Before/after on matching builds: 2
+SEGV lines → 0.
+
+⚠ `libcrispasr` is a SHARED library — the fuzz harness picks it up by rpath, so
+"rebuild the harness" tests the new code with an old-looking binary. Rebuild the
+dylib when doing a before/after, or the control silently becomes a second copy
+of the experiment. (Cost me one invalid control here.)
+
+The job also now uploads the crashing input on failure. It previously kept only
+the stack trace, which for a stochastic job means the reproduction is gone.
+
+**Noted, not fixed:** on macOS the same input flows past stb_vorbis into the
+AudioToolbox fallback (`crispasr_at_decode` → `ExtAudioFileOpenURL`) and
+libFuzzer reports an out-of-memory there. That is a resource limit inside
+Apple's decoder on malformed input, not memory corruption, and that path does
+not exist on the Linux CI. Worth a size sanity-check before handing a file to
+AudioToolbox if anyone wants it.
 
 ## Diff-harness extensions (detail for "Ready to take" #5 and #6)
 
