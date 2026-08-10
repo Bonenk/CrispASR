@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.27
+
+* **Linux users on 0.8.26 should upgrade**: that release published only one of
+  its seven Linux binary tarballs (plain x86_64, arm64, CUDA, CUDA 13, Vulkan
+  and HIP all failed to build). Two shell bugs in the release workflow, fixed
+  (#339).
+* Fixed a null-pointer crash in the audio loader on a malformed Ogg file: a
+  Vorbis comment header declares its entry count before the array is
+  allocated, so an attacker-sized count left a non-zero length with a null
+  pointer that the teardown path then indexed. Reachable from
+  `crispasr_audio_load` on untrusted input.
+* qwen3-tts: `--temperature` now reaches the talker (it had only ever reached
+  the code predictor), plus greedy/replay/logit-dump levers for cross-backend
+  diagnosis (#337).
+
 ## 0.8.26
 
 * CosyVoice3 voice cloning was conditioned on the wrong speaker embedding
