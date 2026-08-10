@@ -27,6 +27,11 @@ on:
       - 'LEARNINGS.md'
       - 'docs/LEARNINGS-INDEX.md'
       - 'tools/gen-learnings-index.py'
+      # Shell inside workflow run blocks. release.yml only executes on a tag
+      # push, so its first run IS the release — #339 shipped a literal \n into
+      # four jobs and cost every Linux tarball of v0.8.26.
+      - '.github/workflows/**'
+      - 'tools/check-workflow-run-blocks.py'
       # OmniVoice prompt vocabularies: the generated headers must match their
       # vendored sources. Neither is cosmetic — both are what the model is
       # conditioned on (#13273).
@@ -76,6 +81,11 @@ on:
       - 'LEARNINGS.md'
       - 'docs/LEARNINGS-INDEX.md'
       - 'tools/gen-learnings-index.py'
+      # Shell inside workflow run blocks. release.yml only executes on a tag
+      # push, so its first run IS the release — #339 shipped a literal \n into
+      # four jobs and cost every Linux tarball of v0.8.26.
+      - '.github/workflows/**'
+      - 'tools/check-workflow-run-blocks.py'
       # OmniVoice prompt vocabularies: the generated headers must match their
       # vendored sources. Neither is cosmetic — both are what the model is
       # conditioned on (#13273).
@@ -336,6 +346,14 @@ jobs:
       # worse than no index, so this is a hard gate, not an advisory.
       - name: Check LEARNINGS.md index is current
         run: python tools/gen-learnings-index.py --check
+
+      # Also hermetic, also before the network step. release.yml is the least
+      # exercised code here — a tag push is its first execution — so its static
+      # shell errors have to be caught somewhere that runs on every commit.
+      - name: Lint shell in workflow run blocks
+        run: |
+          pip install --quiet pyyaml
+          python tools/check-workflow-run-blocks.py
 
       # Also hermetic, and also before the network steps. The table is generated
       # from third_party/omnivoice/lang_map.py, which is vendored precisely so
