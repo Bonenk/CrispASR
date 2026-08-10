@@ -1056,6 +1056,25 @@ _Completed work archived to HISTORY.md (PLAN compaction 2026-07-17)._
 
 **Still open:** Upstream the ggml empty-key fix to ggml-org (outbound public PR, left for a human)
 
+**OPEN 2026-08-09 — `linux-fuzz-smoke` found a live SEGV in vendored stb_vorbis.**
+ASAN reports `SEGV in vorbis_deinit() at examples/stb_vorbis.c:4223`, reached
+through `crispasr_audio_load` (`src/crispasr_audio.cpp:2801`) from
+`tests/fuzz/fuzz_audio_load.cpp` on a mutated OGG. Reachable from a PUBLIC API
+on untrusted input, so it is worth a real fix rather than a suppression.
+
+⚠ It is STOCHASTIC, which is why it has not been chased: a 45 s libFuzzer run
+mutates from `samples/` seeds, so it surfaces on some runs and not others. It
+failed on `c48c9489` — a documentation-only commit — and passed on the four
+commits before it and on `61fa5973` after, which is what establishes it as
+pre-existing rather than a regression. Do NOT read a green fuzz job as evidence
+the crash is gone.
+
+The crash input was written on the runner as `crash-958fb6f3cbdca00907fde6ee057c5c1632c0487c`;
+if that run's artifacts have expired, re-run the job with a longer budget to
+regenerate one before starting. v0.8.26 shipped with this open, deliberately —
+it is not a regression and a rushed patch inside a release commit is worse than
+a tracked bug.
+
 ## Diff-harness extensions (detail for "Ready to take" #5 and #6)
 
 Both validate the TTS port against the Python reference. Neither is claimed.
@@ -1065,6 +1084,14 @@ Both validate the TTS port against the Python reference. Neither is claimed.
 **What:** Dump talker LLM logits at each generation step in both Python reference and C++ runtime, compare — validates the text-decoder input so the sampler is a faithful port over verified logits.
 
 **How:** (a) add `talker_logits_step_N` capture to the Python reference dumper (`tools/reference_backends/qwen3_tts.py`) via a `generate`-time hook; (b) add matching C++ stage to `crispasr_diff_main.cpp`; (c) run on the TTS diff harness.
+
+**HALF DONE 2026-08-09 (#337).** The C++ side exists: `CRISPASR_QWEN3_TTS_DUMP_LOGITS=<dir>`
+writes raw per-frame talker logits (f32), dumped BEFORE the repetition penalty
+and the suppress mask so a diff isolates the forward from the sampling policy.
+It already paid for itself — it is what proved the reported "GPU miscompute"
+was cos 0.99992 at frame 0, i.e. ordinary backend arithmetic amplified by the
+AR loop. What remains is (a): the Python reference hook, which turns a
+cross-BACKEND comparison into a cross-IMPLEMENTATION one against the blueprint.
 
 **Test:** needs a TTS model (qwen3-tts or tada). 0.6B Q8_0 (941 MB) fits on VPS; TTS gen slow on CPU (~105x RTF) — use short "Hi." input, 2-3 frames.
 
