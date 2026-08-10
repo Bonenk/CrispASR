@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.8.28
+
+* **HIP/ROCm on Linux**: first release since 0.8.25 with a
+  `crispasr-linux-x86_64-hip` tarball. The packaging step rewrote `RUNPATH`
+  before asking `ldd` what the binaries needed, so ROCm's OpenMP runtime
+  (`libomp.so`, reachable only through that `RUNPATH`) was silently dropped and
+  the archive never built (#339).
+* The same defect in two more artifact kinds, neither reported (#341):
+  `libcrispasr-linux-x86_64-hip` shipped needing an unbundled `libomp.so`, and
+  the Python binding tarballs needed `libgomp.so.1` and `libblas.so.3` — so
+  `import crispasr` failed in the loader on any host without OpenBLAS and gcc's
+  OpenMP. Both are now bundled and gated.
+* GPU archives no longer copy the build machine's CUDA/ROCm install into the
+  tarball, and carry those toolkit directories in their own `RUNPATH` instead —
+  so they resolve without the `/etc/ld.so.conf.d` post-install step.
+* CLI tarballs now ship `LICENSE` and `THIRD_PARTY_NOTICES.txt`, which now also
+  declare the bundled OpenMP runtimes (`libgomp`, `libomp`).
+
 ## 0.8.27
 
 * **Linux users on 0.8.26 should upgrade**: that release published only one of
