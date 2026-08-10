@@ -979,6 +979,13 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
   logits (f32, before the repetition penalty and the suppress mask) plus a
   top-5 line to stderr. The instrument for a cross-backend diff: tokens
   alone cannot tell a miscompute from amplified rounding (#337).
+- `CRISPASR_QWEN3_TTS_REPLAY_CODES=<file>` — 16 whitespace-separated codec ids
+  per frame; the decode uses them instead of sampling. Teacher forcing, and
+  the ONLY way to compare two backends step by step: pin the whole frame or
+  the 15 residual codebooks (which must be sampled) diverge and the diff
+  measures trajectory, not arithmetic (#337).
+- `CRISPASR_QWEN3_TTS_REPLAY_TOKENS=<file>` — the weaker form: codebook-0 ids
+  only. Useful for forcing a trajectory, NOT sufficient for a logits diff.
 - `CRISPASR_QWEN3_TTS_GREEDY` — force the talker's codebook-0 sampler to argmax
   (top_k=1). The frame sequence then depends only on the logits, so two
   backends agree if and only if their logits agree — this is the lever for
