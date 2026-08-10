@@ -24,22 +24,55 @@ closed issue. Reported by MassimoDePietro when he closed it:
 > prepare that as a separate PR together with a reproducible parity test.
 
 **He is sending a PR — do not implement this ahead of him.** Wait for it, then
-review. What to look for, so the review is fast:
+review against the spec below.
 
-`tekken_pre_tokenize()` (`src/voxtral_tts.cpp:402`) is a hand-rolled version of
-the tekken.json regex, and its `is_alpha` says **any byte >= 0x80 is a letter** —
-its own comment admits it "approximates `\p{L}` without a full Unicode table".
-So every non-letter multibyte codepoint is misfiled into the letter run instead
-of the `[^\s\p{L}\p{N}]+` punctuation branch: curly apostrophe U+2019 (`dell'arte`),
-en/em dash, `«»`, `…`, NBSP, `€`, `°`. He qualified on **Italian**, which hits
-U+2019 constantly — consistent with a handful of mismatches rather than a flood.
+**MEASURED 2026-08-10 against `mistral-common` 1.11.0** and the published
+`tekken.json`, driving the real runtime (a harness that `#include`s
+`src/voxtral_tts.cpp`, so the shipped tokenizer, not a copy): **3 mismatches /
+63 strings, 0 out-of-range ids.** He saw 5/57 on his corpus — same class.
 
-Also settled by the same comment, and worth recording because the fix shipped
-without it: the published `tekken.json` really does carry **150,000 BPE entries**
-against `default_vocab_size = 131072` / `default_num_special_tokens = 1000`, so
-130,072 are active and **19,928 form the inactive tail**. The bound was
-load-bearing, not theoretical — that was the one thing 83db1d7a's commit message
-flagged as unverified.
+⚠ **My first guess was wrong and is recorded here so nobody re-runs it.** I
+assumed `is_alpha`'s "any byte >= 0x80 is a letter" approximation was the cause.
+It is not: every accented, curly-quote, guillemet, CJK and emoji case MATCHED,
+including all the Italian (`L’Italia`, `dell’arte`, `un po’ d’acqua`). BPE
+recovers the same ids despite the sloppy classification. Two real defects, both
+in `tekken_pre_tokenize()` (`src/voxtral_tts.cpp:402`):
+
+**A. A run of whitespace must give its LAST space to the next token.** The
+tekken letter alternative opens with `[^\r\n\p{L}\p{N}]?` — one optional
+non-alphanumeric character. So the run splits, with one space leading the word:
+
+| input | crispasr | mistral-common |
+|---|---|---|
+| `a  b` | `['a', '  ', 'b']` | `['a', ' ', ' b']` |
+| `a   b` | `['a', '   ', 'b']` | `['a', '  ', ' b']` |
+| `  a` | `['  ', 'a']` | `[' ', ' a']` |
+
+The C++ eats the whole run greedily first. Note trailing whitespace is already
+CORRECT (`a `, `a  ` both match) — `\s+(?!\S)` covers end-of-string, and there
+is no following token to donate to.
+
+**B. A space before PUNCTUATION must attach to the punctuation.** The tekken
+punctuation alternative is ` ?[^\s\p{L}\p{N}]+[\r\n/]*`, also leading-space. The
+C++ attaches its optional leading character only when a LETTER follows
+(`if (k < n && is_alpha(text[k]))`), never before punctuation:
+
+| input | crispasr | mistral-common |
+|---|---|---|
+| `a [b` | `['a', ' ', '[b']` | `['a', ' [', 'b']` |
+| `a - b` | `['a', ' ', '-', ' b']` | `['a', ' -', ' b']` |
+
+Confirmed NOT broken, so the PR should not churn them: single space before a
+word, trailing whitespace, and digits (the real pattern is a bare `\p{N}`, one
+token per digit — the comment above the function claims ` ?\p{N}+`, which is
+wrong, but the CODE already splits singly and matches).
+
+Also settled, and worth recording because the bound fix shipped without it:
+`tekken.json` really does carry **150,000 entries** against
+`default_vocab_size = 131072` / `default_num_special_tokens = 1000` → 130,072
+active, **19,928 inactive tail**. Verified directly from the published file, not
+just taken from the report — that was the one thing 83db1d7a flagged unverified.
+The harness also confirms the bound works: 0 out-of-range ids across the corpus.
 
 ## LANDED 2026-08-07 — #13273 omnivoice language knob, dead on three surfaces
 
