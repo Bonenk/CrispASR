@@ -130,4 +130,38 @@ out4="$("$stage4/app4" 2>&1)" || { echo "$out4"; fail "staged app4 does not run"
 [ "$out4" = "dep=42" ] || fail "staged app4 printed '$out4', expected 'dep=42'"
 echo "  ok: an already-staged dependency is not missing, and resolves once \$ORIGIN is set"
 
+# ── 5. a declared host-toolkit directory is not bundled, but IS reachable ────
+# Resolving the HIP closure honestly copied 2.2 GB of the build image's ROCm
+# install into a 97 MB tarball. CRISPASR_BUNDLE_HOST_DIRS says "this belongs to
+# the user's toolkit"; CRISPASR_BUNDLE_EXTRA_RPATH is what makes that true
+# rather than merely asserted. Both halves are checked here, because the first
+# without the second is just the original bug with better manners.
+priv5="$WORK/opt-fake-toolkit/lib"
+stage5="$WORK/stage5"
+mkdir -p "$priv5" "$stage5"
+cc -shared -fPIC -o "$priv5/libcrispasrtesthost.so" "$WORK/dep.c"
+cc -o "$WORK/app5" "$WORK/app.c" -L"$priv5" -lcrispasrtesthost -Wl,-rpath,"$priv5"
+cp "$WORK/app5" "$stage5/app5"
+
+CRISPASR_BUNDLE_HOST_DIRS="$WORK/opt-fake-toolkit" \
+CRISPASR_BUNDLE_EXTRA_RPATH="$priv5" \
+    bash "$BUNDLE" "$stage5" > "$WORK/bundle5.log" 2>&1 || {
+    cat "$WORK/bundle5.log"; fail "a declared host-toolkit dependency must not fail the bundler"; }
+
+if [ -f "$stage5/libcrispasrtesthost.so" ]; then
+    fail "a host-toolkit library must not be copied into the archive"
+fi
+grep -q "host   libcrispasrtesthost.so" "$WORK/bundle5.log" || {
+    cat "$WORK/bundle5.log"; fail "the decision not to ship it must be visible in the log"; }
+
+rp5="$(patchelf --print-rpath "$stage5/app5")"
+[ "$rp5" = "\$ORIGIN:$priv5" ] || fail "RUNPATH is '$rp5', expected \$ORIGIN plus the toolkit dir"
+
+# $ORIGIN must stay FIRST, or a host copy of a soname we DO ship would win.
+case "$rp5" in '$ORIGIN'*) : ;; *) fail "\$ORIGIN must come first in '$rp5'" ;; esac
+
+out5="$("$stage5/app5" 2>&1)" || { echo "$out5"; fail "app5 cannot reach its host-provided dependency"; }
+[ "$out5" = "dep=42" ] || fail "app5 printed '$out5', expected 'dep=42'"
+echo "  ok: host-toolkit dependency left out of the archive and still resolvable"
+
 echo "PASS: bundle-linux-runtime"
