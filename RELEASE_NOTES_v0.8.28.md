@@ -112,11 +112,36 @@ bundled … users must have libopenblas installed".
   the mode the input's own documentation recommends for inspecting packaging
   without publishing, and it was red every time.
 
-## Known gaps
+## A toolkit directory is host-provided, not 2.2 GB of tarball
 
-- The bundling policy for ROCm's own maths libraries is inconsistent and
-  deliberately left alone here: `libamdhip64`, `librocblas` and `libhsa*` are
-  treated as host-provided, while `libhipblas`, `libhipblaslt` and `librocsolver`
-  — from the same ROCm install — are bundled. That is the behaviour the shipping
-  CLI tarball already had; making it consistent either way is a size/contract
-  decision, not a bug fix.
+Worth recording because the fix above, working correctly, produced something
+unshippable. The first honest HIP tarball was **729 MB compressed, 2.2 GB
+unpacked** — against 97 MB in v0.8.25 — because resolving the closure properly
+means copying the build machine's ROCm install: `librocsolver.so.0` alone is
+1.65 GB.
+
+None of it belongs in the archive. Only `libhipblas.so.2` and `libomp.so` are in
+the binaries' own `DT_NEEDED`; everything else was transitive. And `libamdhip64`
+has never been bundled, so the archive has always required a ROCm install *and*
+the loader to find it — that contract is unchanged, it is just written down now.
+
+A packaging leg can declare `CRISPASR_BUNDLE_HOST_DIRS=/opt/rocm`: libraries
+resolving under it are the user's, reported in the log rather than silently
+skipped. `CRISPASR_BUNDLE_EXTRA_RPATH` then puts that directory in the archive's
+own `RUNPATH`, after `$ORIGIN`, so those libraries resolve **whether or not the
+user performed the `/etc/ld.so.conf.d` post-install step** — strictly more
+robust than the `$ORIGIN`-only `RUNPATH` that shipped previously. Declaring a
+directory rather than a list of sonames is what stops this rotting: the name
+list would need six ROCm entries today and different ones next release.
+
+The CUDA legs get the same treatment — `libcusolver`, `libcusparse` and
+`libcufft` were not on the name list either.
+
+Archive sizes are back at their historical values (HIP 96 MB, libs HIP 88 MB).
+
+## Verification
+
+The whole release was built as a dry run before this tag: all 30 jobs green,
+every artifact produced and inspected rather than counted. The HIP and Python
+tarballs were downloaded and re-checked against `check-bundled-deps.py` outside
+CI.
