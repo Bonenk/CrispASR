@@ -11,6 +11,36 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## OPEN 2026-08-10 — voxtral-tts pre-tokenizer: 5/57 mismatches vs mistral-common
+
+Carried out of **#338, which is now CLOSED** — the bound fix (83db1d7a) resolved
+what that issue was about, so this would otherwise live only in a comment on a
+closed issue. Reported by MassimoDePietro when he closed it:
+
+> After the fix in `83db1d7a`, the out-of-range issue is gone, but my comparison
+> against `mistral-common` still finds 5 mismatches across 57 backend
+> tokenizations, apparently caused by separate pre-tokenization differences. I
+> already have a local fix that brings the same comparison to 0/57, so I'll
+> prepare that as a separate PR together with a reproducible parity test.
+
+**He is sending a PR — do not implement this ahead of him.** Wait for it, then
+review. What to look for, so the review is fast:
+
+`tekken_pre_tokenize()` (`src/voxtral_tts.cpp:402`) is a hand-rolled version of
+the tekken.json regex, and its `is_alpha` says **any byte >= 0x80 is a letter** —
+its own comment admits it "approximates `\p{L}` without a full Unicode table".
+So every non-letter multibyte codepoint is misfiled into the letter run instead
+of the `[^\s\p{L}\p{N}]+` punctuation branch: curly apostrophe U+2019 (`dell'arte`),
+en/em dash, `«»`, `…`, NBSP, `€`, `°`. He qualified on **Italian**, which hits
+U+2019 constantly — consistent with a handful of mismatches rather than a flood.
+
+Also settled by the same comment, and worth recording because the fix shipped
+without it: the published `tekken.json` really does carry **150,000 BPE entries**
+against `default_vocab_size = 131072` / `default_num_special_tokens = 1000`, so
+130,072 are active and **19,928 form the inactive tail**. The bound was
+load-bearing, not theoretical — that was the one thing 83db1d7a's commit message
+flagged as unverified.
+
 ## LANDED 2026-08-07 — #13273 omnivoice language knob, dead on three surfaces
 
 Full write-up: `docs/omnivoice/PLAN.md` §LANDED 2026-08-07. Fixed the CLI
