@@ -118,6 +118,15 @@ jobs:
             smoke: true
     steps:
       - uses: actions/checkout@v6
+        # Check out the TAG being packaged, not the default branch. The wheel
+        # version comes from the checked-out pyproject/VERSION, so building
+        # from main while packaging an older tag produces wheels labelled with
+        # main's version and attaches them to that older release — a wrong
+        # artifact under a version number, which is worse than a missing one.
+        # Hit for real: a workflow_dispatch with tag=v0.8.26 while main was
+        # 0.8.27 put three 0.8.27-labelled wheels on the v0.8.26 release.
+        with:
+          ref: ${{ needs.setup.outputs.tag }}
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -198,6 +207,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        # Check out the TAG being packaged, not the default branch. The wheel
+        # version comes from the checked-out pyproject/VERSION, so building
+        # from main while packaging an older tag produces wheels labelled with
+        # main's version and attaches them to that older release — a wrong
+        # artifact under a version number, which is worse than a missing one.
+        # Hit for real: a workflow_dispatch with tag=v0.8.26 while main was
+        # 0.8.27 put three 0.8.27-labelled wheels on the v0.8.26 release.
+        with:
+          ref: ${{ needs.setup.outputs.tag }}
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -262,6 +280,15 @@ jobs:
             local: vulkan
     steps:
       - uses: actions/checkout@v6
+        # Check out the TAG being packaged, not the default branch. The wheel
+        # version comes from the checked-out pyproject/VERSION, so building
+        # from main while packaging an older tag produces wheels labelled with
+        # main's version and attaches them to that older release — a wrong
+        # artifact under a version number, which is worse than a missing one.
+        # Hit for real: a workflow_dispatch with tag=v0.8.26 while main was
+        # 0.8.27 put three 0.8.27-labelled wheels on the v0.8.26 release.
+        with:
+          ref: ${{ needs.setup.outputs.tag }}
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
