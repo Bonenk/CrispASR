@@ -392,54 +392,10 @@ static void tekken_bpe_encode(const voxtral_tts_vocab& v, const uint8_t* data, s
     }
 }
 
-// Tekken regex pre-tokenizer, hand-rolled. The tekken.json pattern
-// (`[^\r\n\p{L}\p{N}]?[\p{Lu}...]*[\p{Ll}...]+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+`)
-// attaches an optional single leading non-alphanumeric byte (typically a space)
-// to the following letter/number run — so "Hello world" → ["Hello", " world"] not
-// ["Hello", " ", "world"]. Skipping this lets greedy BPE merge across word
-// boundaries and mis-tokenise. UTF-8 continuation/lead bytes (≥0x80) are treated
-// as letters (approximates \p{L} without a full Unicode table).
+// Pre-tokenizer lives in voxtral_tekken_vocab.h so the runtime and its
+// tests share one implementation (the #338 lesson).
 static std::vector<std::string> tekken_pre_tokenize(const std::string& text) {
-    std::vector<std::string> out;
-    const size_t n = text.size();
-    auto is_alpha = [](unsigned char c) { return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c >= 0x80; };
-    auto is_digit = [](unsigned char c) { return c >= '0' && c <= '9'; };
-    auto is_ws = [](unsigned char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; };
-    size_t i = 0;
-    while (i < n) {
-        const unsigned char c = (unsigned char)text[i];
-        // Optional single leading non-alnum/non-newline byte before a word/number.
-        size_t k = i;
-        if (!is_alpha(c) && !is_digit(c) && c != '\n' && c != '\r')
-            k = i + 1;
-        if (k < n && is_alpha((unsigned char)text[k])) {
-            size_t j = k;
-            while (j < n && is_alpha((unsigned char)text[j]))
-                j++;
-            out.push_back(text.substr(i, j - i));
-            i = j;
-        } else if (k < n && is_digit((unsigned char)text[k])) {
-            size_t j = k;
-            while (j < n && is_digit((unsigned char)text[j]))
-                j++;
-            out.push_back(text.substr(i, j - i));
-            i = j;
-        } else if (is_ws(c)) {
-            size_t j = i;
-            while (j < n && is_ws((unsigned char)text[j]))
-                j++;
-            out.push_back(text.substr(i, j - i));
-            i = j;
-        } else {
-            size_t j = i;
-            while (j < n && !is_alpha((unsigned char)text[j]) && !is_digit((unsigned char)text[j]) &&
-                   !is_ws((unsigned char)text[j]))
-                j++;
-            out.push_back(text.substr(i, j - i));
-            i = j;
-        }
-    }
-    return out;
+    return voxtral_tekken::pre_tokenize(text);
 }
 
 static std::vector<int32_t> voxtral_tts_tokenize(voxtral_tts_context* ctx, const std::string& text) {

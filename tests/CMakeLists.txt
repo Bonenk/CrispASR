@@ -352,6 +352,27 @@ catch_discover_tests(test-audio-resample
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-voxtral-pretokenize — the tekken regex split (#338 follow-up) ───────
+# Header-only, no weights, no network: expectations are generated from the
+# published `config.pattern` via Python's `regex`, so this pins the SPLIT
+# without carrying the 15 MB vocabulary. Live id-level parity against
+# mistral-common is tools/check-voxtral-tokenizer-parity.py.
+add_executable(test-voxtral-pretokenize
+    test-voxtral-pretokenize.cpp
+)
+target_include_directories(test-voxtral-pretokenize PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-voxtral-pretokenize PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-voxtral-pretokenize
+    TEST_SPEC "[pretokenize]"
+    PROPERTIES
+        LABELS unit
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test-voxtral-tekken-vocab — #338 active-vocabulary bound ─────────────────
 # Header-only, no weights: a Tekken blob may serialize more pieces than the
 # checkpoint's embedding table has rows, and an id past the table becomes an
