@@ -93,14 +93,22 @@ Linux)
     # is skipped by name, so the ggml sonames the libraries resolve through the
     # build tree are not re-copied over the SOVERSION symlinks.
     bash "$HERE/../scripts/bundle-linux-runtime.sh" "$OUT/lib"
+    # This overwrites what the bundler just set, so it has to carry the same
+    # host-toolkit entries forward — otherwise a leg that declares
+    # CRISPASR_BUNDLE_EXTRA_RPATH gets it silently erased one line later, which
+    # is the shape of the bug this whole area is about.
+    LIB_RPATH='$ORIGIN:$ORIGIN/../lib'
+    if [ -n "${CRISPASR_BUNDLE_EXTRA_RPATH:-}" ]; then
+        LIB_RPATH="$LIB_RPATH:${CRISPASR_BUNDLE_EXTRA_RPATH}"
+    fi
     for lib in "$OUT"/lib/*.so*; do
         [ -f "$lib" ] || continue
         [ -L "$lib" ] && continue
-        # Overwrites the plain $ORIGIN the bundler just set: a consumer reaching
-        # the bundle through the src/ symlink sees $ORIGIN as the symlinked dir.
-        patchelf --set-rpath '$ORIGIN:$ORIGIN/../lib' "$lib" 2>/dev/null || true
+        # $ORIGIN twice: a consumer reaching the bundle through the src/ symlink
+        # sees $ORIGIN as the symlinked dir.
+        patchelf --set-rpath "$LIB_RPATH" "$lib" 2>/dev/null || true
     done
-    echo "  rpaths → \$ORIGIN (Linux)"
+    echo "  rpaths → $LIB_RPATH (Linux)"
     ;;
 *)
     echo "  (no rpath step for $(uname -s))"

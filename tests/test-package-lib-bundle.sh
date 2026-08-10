@@ -99,4 +99,33 @@ if v != 7:
 print("  ok: relocated bundle dlopens and calls through to the bundled dependency")
 PY
 
+# 5. the host-toolkit RUNPATH survives this script's own rpath rewrite.
+#    package-lib-bundle.sh sets rpaths AFTER calling the bundler, so a leg that
+#    declares CRISPASR_BUNDLE_EXTRA_RPATH would have had it erased one line
+#    later — the same shape as the defect this file exists for.
+OUT2="$WORK/bundle2"
+host="$WORK/opt-fake-toolkit/lib"
+mkdir -p "$OUT2/src" "$OUT2/ggml/src" "$host"
+cc -shared -fPIC -o "$host/libcrispasrtesthost.so" "$WORK/ext.c"
+cc -shared -fPIC -Wl,-soname,libcrispasr.so.1 \
+   -o "$OUT2/src/libcrispasr.so.1.0.0" "$WORK/main.c" \
+   -L"$host" -lcrispasrtesthost -Wl,-rpath,"$host"
+ln -s libcrispasr.so.1.0.0 "$OUT2/src/libcrispasr.so.1"
+cc -shared -fPIC -o "$OUT2/ggml/src/libcrispasrtestggml.so" "$WORK/ggml.c"
+
+CRISPASR_BUNDLE_HOST_DIRS="$WORK/opt-fake-toolkit" \
+CRISPASR_BUNDLE_EXTRA_RPATH="$host" \
+    bash "$PKG" "$OUT2" > "$WORK/pkg2.log" 2>&1 || {
+    cat "$WORK/pkg2.log"; fail "packaging with a host toolkit failed"; }
+
+if [ -f "$OUT2/lib/libcrispasrtesthost.so" ]; then
+    fail "a host-toolkit library must not be copied into the bundle"
+fi
+rp="$(patchelf --print-rpath "$OUT2/lib/libcrispasr.so.1.0.0")"
+case "$rp" in
+    "\$ORIGIN:\$ORIGIN/../lib:$host") : ;;
+    *) fail "bundle RUNPATH is '$rp' — the host toolkit entry was dropped" ;;
+esac
+echo "  ok: the host-toolkit RUNPATH survives the bundle's own rpath rewrite"
+
 echo "PASS: package-lib-bundle"

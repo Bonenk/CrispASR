@@ -48,6 +48,25 @@
 # check-bundled-deps.py with --allow so the contract is recorded rather than
 # assumed.
 #
+# HOST TOOLKIT DIRECTORIES. Naming those runtimes one soname at a time does not
+# scale: resolving the HIP closure honestly pulled in 2.2 GB of the build
+# machine's ROCm install — librocsolver.so.0 alone is 1.65 GB — for a tarball
+# that had been 97 MB. Every one of those files belongs to the ROCm install the
+# user must already have, since libamdhip64 has never been bundled and the
+# archive has always depended on finding it. So a leg may declare
+#
+#   CRISPASR_BUNDLE_HOST_DIRS=/opt/rocm    (colon-separated path prefixes)
+#
+# and anything resolving under one is host-provided: not copied, not fatal.
+# Pair it with
+#
+#   CRISPASR_BUNDLE_EXTRA_RPATH=/opt/rocm/lib:/opt/rocm/lib/llvm/lib
+#
+# which is appended after $ORIGIN, so those libraries are found through the
+# archive's own RUNPATH instead of relying on the user having configured
+# /etc/ld.so.conf.d — which is a documented post-install step, not something the
+# packages do. Strictly more robust than the $ORIGIN-only RUNPATH that shipped.
+#
 # Usage: scripts/bundle-linux-runtime.sh <staged-dir>
 set -euo pipefail
 
@@ -69,6 +88,22 @@ skip_lib() {
         libcuda.so.*|libcudart.so.*|libcublas*.so.*|libnv*.so.*) return 0 ;;
         libamdhip64.so.*|librocblas.so.*|libhsa*.so.*|libvulkan.so.*) return 0 ;;
     esac
+    return 1
+}
+
+# Path-based counterpart to skip_lib: a library RESOLVED under one of these
+# prefixes belongs to a toolkit the user installs, not to us. Naming them
+# individually does not scale — ROCm alone would need six sonames today and a
+# different six next release.
+HOST_DIRS="${CRISPASR_BUNDLE_HOST_DIRS:-}"
+host_provided_path() {
+    [ -n "$HOST_DIRS" ] || return 1
+    local d
+    local IFS=:
+    for d in $HOST_DIRS; do
+        [ -n "$d" ] || continue
+        case "$1" in "$d"*) return 0 ;; esac
+    done
     return 1
 }
 
@@ -109,6 +144,13 @@ while [ "$i" -lt "${#queue[@]}" ]; do
         [ -n "$lib" ] || continue
         base=$(basename "$lib")
         skip_lib "$base" && continue
+        # Resolved inside a declared host toolkit: the user's copy, not ours.
+        # Reported, because "we chose not to ship this" must be visible in the
+        # log — a library that silently is not there is what #339 was.
+        if host_provided_path "$lib"; then
+            echo "  host   $base  (from $lib — host toolkit, not bundled)"
+            continue
+        fi
         [ -e "$DEST/$base" ] && continue
         cp -Lf "$lib" "$DEST/$base"
         echo "  bundle $base  (from $lib)"
@@ -128,14 +170,22 @@ fi
 # ── 2. RUNPATH -> $ORIGIN ────────────────────────────────────────────────────
 # Unconditional, and last: an inherited build-tree RUNPATH is at best useless
 # and at worst points somewhere that exists on the build machine only.
+#
+# $ORIGIN always comes first, so a bundled library wins over a host copy of the
+# same soname. The extra entries only cover what the archive deliberately does
+# not carry.
+NEW_RPATH='$ORIGIN'
+if [ -n "${CRISPASR_BUNDLE_EXTRA_RPATH:-}" ]; then
+    NEW_RPATH="\$ORIGIN:${CRISPASR_BUNDLE_EXTRA_RPATH}"
+fi
 for f in "$DEST"/*; do
     [ -f "$f" ] || continue
     [ -L "$f" ] && continue
     is_elf "$f" || continue
     before=$(patchelf --print-rpath "$f" 2>/dev/null || echo "")
-    patchelf --set-rpath '$ORIGIN' "$f" 2>/dev/null || {
+    patchelf --set-rpath "$NEW_RPATH" "$f" 2>/dev/null || {
         echo "bundle-linux-runtime: patchelf failed on $(basename "$f")" >&2; exit 1; }
-    echo "  rpath  $(basename "$f"): '${before}' -> '\$ORIGIN'"
+    echo "  rpath  $(basename "$f"): '${before}' -> '${NEW_RPATH}'"
 done
 
 echo "bundle-linux-runtime: $DEST — $copied librar(ies) bundled, rpaths normalised"

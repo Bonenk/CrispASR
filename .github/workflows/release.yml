@@ -314,7 +314,14 @@ jobs:
           # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
           # could not find its own bundled libc2pa_c.so) and copy in the non-system
           # dependency closure — libopenblas AND libgomp, per CrispASR #296.
-          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-cuda
+          # CUDA's own libraries are the user's toolkit, not ours — the same
+          # contract libcudart and libcublas have always had here. Declaring the
+          # directory rather than naming sonames keeps a future libcusolver or
+          # libcufft (hundreds of MB each, and not on the name list) out of the
+          # tarball, and EXTRA_RPATH makes them findable through our own RUNPATH.
+          CRISPASR_BUNDLE_HOST_DIRS=/usr/local/cuda \
+          CRISPASR_BUNDLE_EXTRA_RPATH=/usr/local/cuda/lib64 \
+            bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-cuda
           # Then assert it: any DT_NEEDED that is neither bundled nor base-system
           # means the loader dies before main() and the process exits 127 silently.
           python3 scripts/check-bundled-deps.py release/crispasr-linux-x86_64-cuda \
@@ -396,7 +403,14 @@ jobs:
           # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
           # could not find its own bundled libc2pa_c.so) and copy in the non-system
           # dependency closure — libopenblas AND libgomp, per CrispASR #296.
-          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-cuda13
+          # CUDA's own libraries are the user's toolkit, not ours — the same
+          # contract libcudart and libcublas have always had here. Declaring the
+          # directory rather than naming sonames keeps a future libcusolver or
+          # libcufft (hundreds of MB each, and not on the name list) out of the
+          # tarball, and EXTRA_RPATH makes them findable through our own RUNPATH.
+          CRISPASR_BUNDLE_HOST_DIRS=/usr/local/cuda \
+          CRISPASR_BUNDLE_EXTRA_RPATH=/usr/local/cuda/lib64 \
+            bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-cuda13
           # Then assert it: any DT_NEEDED that is neither bundled nor base-system
           # means the loader dies before main() and the process exits 127 silently.
           python3 scripts/check-bundled-deps.py release/crispasr-linux-x86_64-cuda13 \
@@ -476,11 +490,22 @@ jobs:
           # /home/runner/... path, and crispasr-quantize had no $ORIGIN at all, so it
           # could not find its own bundled libc2pa_c.so) and copy in the non-system
           # dependency closure — libopenblas AND libgomp, per CrispASR #296.
-          bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-hip
+          # ROCm's own libraries are the user's, not ours: resolving the closure
+          # honestly pulled in 2.2 GB of the build image's ROCm install
+          # (librocsolver.so.0 is 1.65 GB) for a tarball that had been 97 MB, and
+          # all of it is transitive — only libhipblas.so.2 and libomp.so are in
+          # our binaries' DT_NEEDED. libamdhip64 has never been bundled, so the
+          # archive already required a ROCm install; EXTRA_RPATH makes it findable
+          # through our own RUNPATH instead of relying on the user having done the
+          # /etc/ld.so.conf.d post-install step.
+          CRISPASR_BUNDLE_HOST_DIRS=/opt/rocm \
+          CRISPASR_BUNDLE_EXTRA_RPATH=/opt/rocm/lib:/opt/rocm/lib/llvm/lib \
+            bash scripts/bundle-linux-runtime.sh release/crispasr-linux-x86_64-hip
           # Then assert it: any DT_NEEDED that is neither bundled nor base-system
           # means the loader dies before main() and the process exits 127 silently.
           python3 scripts/check-bundled-deps.py release/crispasr-linux-x86_64-hip \
-            --allow 'libamdhip64.so.*' --allow 'librocblas.so.*' --allow 'libhsa*.so.*'
+            --allow 'libamdhip64.so.*' --allow 'librocblas.so.*' --allow 'libhsa*.so.*' \
+            --allow 'libhipblas.so.*' --allow 'libomp.so*'
           # Ship the licence text with the binaries. Every Windows, Android and
           # libcrispasr artifact already did; no CLI tarball did, and these bundle
           # third-party shared libraries (libgomp, and libomp on HIP) whose terms
@@ -568,14 +593,17 @@ jobs:
           # level too high, pointing outside the bundle — and shipped anyway,
           # because the gate only checked dependencies were PRESENT, never that
           # RUNPATH could find them. Fails the release rather than the consumer.
-          bash tools/package-lib-bundle.sh "$OUT"
+          CRISPASR_BUNDLE_HOST_DIRS=/opt/rocm \
+          CRISPASR_BUNDLE_EXTRA_RPATH=/opt/rocm/lib:/opt/rocm/lib/llvm/lib \
+            bash tools/package-lib-bundle.sh "$OUT"
           # And assert the result. verify-lib-bundle.sh (inside the script above)
           # gates INTRA-bundle resolvability only — a dependency absent from the
           # bundle entirely is outside what it asks, which is how the HIP bundle
           # shipped needing an unbundled libomp.so (#341). This is the same gate
           # the CLI tarballs have had since #296.
           python3 scripts/check-bundled-deps.py "$OUT/lib" \
-            --allow 'libamdhip64.so.*' --allow 'librocblas.so.*' --allow 'libhsa*.so.*'
+            --allow 'libamdhip64.so.*' --allow 'librocblas.so.*' --allow 'libhsa*.so.*' \
+            --allow 'libhipblas.so.*' --allow 'libomp.so*'
           cp include/crispasr.h "$OUT/include/"
           cp ggml/include/*.h   "$OUT/ggml/include/" 2>/dev/null || true
           cp LICENSE "$OUT/"
@@ -1587,7 +1615,9 @@ jobs:
           # level too high, pointing outside the bundle — and shipped anyway,
           # because the gate only checked dependencies were PRESENT, never that
           # RUNPATH could find them. Fails the release rather than the consumer.
-          bash tools/package-lib-bundle.sh "$OUT"
+          CRISPASR_BUNDLE_HOST_DIRS=/usr/local/cuda \
+          CRISPASR_BUNDLE_EXTRA_RPATH=/usr/local/cuda/lib64 \
+            bash tools/package-lib-bundle.sh "$OUT"
           # And assert the result. verify-lib-bundle.sh (inside the script above)
           # gates INTRA-bundle resolvability only — a dependency absent from the
           # bundle entirely is outside what it asks, which is how the HIP bundle
