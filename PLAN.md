@@ -1131,11 +1131,31 @@ utterance's dumps and a directory held two utterances with no way to tell.
 Both now carry `_s%02d`. This produced one entirely bogus cross-backend table
 before it was spotted — the tell was `argmax_gpu[k] == argmax_cpu[k-2]`.
 
-**Still open:** the Python reference hook. `_hooks.py` references an
-`_iter_capture` that was never written, so per-step capture needs it first.
-`qwen_tts` imports from the clone at `~/code/Qwen3-TTS` (PYTHONPATH, no pip
-install); the HF weights are NOT cached locally. That turns the diff from
-cross-BACKEND into cross-IMPLEMENTATION against the blueprint.
+**Python reference side DONE 2026-08-10.** `_hooks.capture_per_call()` written
+(the module referenced an `_iter_capture` that never existed) — one capture per
+call instead of first-call-only. `tools/reference_backends/qwen3_tts.py` now
+emits `talker_logits_step0..15` and, at last, `generated_codes`: that stage had
+been in DEFAULT_STAGES since the backend was written and was NEVER produced,
+because the ids only exist inside `generate_voice_clone` (the outer call returns
+audio). Captured by wrapping `tts.model.generate`.
+
+Verified by running it: 17 tensors, `generated_codes (19, 16) int32` — exactly
+the layout `CRISPASR_QWEN3_TTS_REPLAY_CODES` consumes — and
+`talker_logits_step0 (1, 147, 3072)` = the PREFILL, with steps 1+ the AR steps
+at `(1, 1, 3072)`. Note that indexing when diffing: step0 is not frame 0.
+
+⚠ **Env:** the shared conda base has transformers 5.x; upstream Qwen3-TTS pins
+4.57.3 and importing `qwen_tts` against 5.x dies on `check_model_inputs()`.
+Do NOT downgrade the base. `tools/reference_envs/qwen3-tts/requirements.txt`
+now scaffolds it; a `--system-site-packages` venv inherits torch and shadows
+only transformers. `qwen_tts` comes from the clone at `~/code/Qwen3-TTS` via
+PYTHONPATH, not pip.
+
+**Still open:** the C++ `crispasr-diff` stage that CONSTRUCTS the same prompt as
+the reference (same voice-clone ref audio, ref text and synth text) so the two
+sides are comparable, then replays `generated_codes` and compares
+`talker_logits_step*`. Both halves now exist and produce the right shapes; what
+is missing is the harness that makes them meet.
 
 The superseded note: `CRISPASR_QWEN3_TTS_DUMP_LOGITS=<dir>`
 writes raw per-frame talker logits (f32), dumped BEFORE the repetition penalty
