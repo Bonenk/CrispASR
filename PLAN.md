@@ -245,6 +245,35 @@ None tracked for cohere. Two things deliberately NOT done, with reasons:
    extra model. Threshold sits below one int16 LSB so one non-zero sample
    disables it; the quietest real speech to hand peaks ~3800x higher.
 
+## LANDED 2026-08-10 — #339 fallout: a red Release run silently killed every GPU wheel
+
+The reported bug was six of seven Linux tarballs failing in v0.8.26 (two shell
+bugs in `release.yml`, fixed by the parallel session in 43231d0d). Verifying the
+asset SET rather than the count turned up a SECOND, unreported casualty:
+
+`release-python-wheels.yml` triggers on `workflow_run: [Release]` and gated on
+`github.event.workflow_run.conclusion == 'success'`. The six failing tarball
+legs reddened the run, so the whole wheel pipeline **skipped** — and the GPU
+wheels it publishes to the gh-pages PEP503 index
+(`crispstrobe.github.io/CrispASR/whl/{cuda,vulkan}/`) have been stale at 0.8.25
+since 2026-08-01. Nothing reported it: a skipped workflow is not a failure.
+
+The wheels repackage `libcrispasr-<platform>[-cuda|-vulkan]`, and every one of
+those assets built fine in v0.8.26 — so the inputs existed the whole time. The
+gate now accepts `failure` as well as `success`; each matrix leg already fails
+loudly if the asset it downloads is missing, which is the real precondition.
+
+⚠ **Two process lessons, both now in the dev guide.** (1) "A red Release run is
+often fine" is true for ASSETS and false for anything triggered by
+`workflow_run` — check what a downstream consumer gates on before calling a red
+run cosmetic. (2) Verify the asset SET, not the count: v0.8.26 published 21
+assets and was approved on that basis; the six missing tarballs were an
+absence, which a count cannot show. There is a normalised `comm -23` recipe in
+the guide, and it was proved red against v0.8.26 before being trusted.
+
+**Backfill:** `release-python-wheels.yml` takes a `tag` input, so v0.8.26's
+wheels can be regenerated with `workflow_dispatch` rather than re-tagging.
+
 ## LANDED 2026-08-09 — #337 qwen3-tts "GPU runaway" is NOT a miscompute
 
 Reported on HIP: the talker picks a different token from CPU at frame 0, then

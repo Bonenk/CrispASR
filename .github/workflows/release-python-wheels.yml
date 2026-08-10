@@ -56,9 +56,24 @@ jobs:
   # and expose the tag to every downstream job.
   setup:
     runs-on: ubuntu-latest
+    # Run whenever the Release workflow FINISHED, not only when it was green.
+    #
+    # The old gate was `workflow_run.conclusion == 'success'`, and it cost
+    # v0.8.26 every GPU wheel: six Linux TARBALL legs failed, the Release run
+    # went red, and this whole pipeline skipped — even though the
+    # `libcrispasr-*` assets these wheels actually repackage had all built
+    # fine. Release legs attach independently, so a red run does not mean the
+    # inputs are missing; it means SOME leg failed. Coupling wheels to the
+    # aggregate conclusion turns any unrelated failure into a silent wheel
+    # outage, and "silent" is the problem — nothing reported it for four days.
+    #
+    # The real precondition is "the libcrispasr asset I repackage exists",
+    # which each matrix leg already checks when it downloads. So proceed on any
+    # completed run and let the legs fail loudly on a genuinely missing asset.
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success' ||
+      github.event.workflow_run.conclusion == 'failure'
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
