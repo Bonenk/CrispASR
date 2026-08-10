@@ -1151,11 +1151,37 @@ now scaffolds it; a `--system-site-packages` venv inherits torch and shadows
 only transformers. `qwen_tts` comes from the clone at `~/code/Qwen3-TTS` via
 PYTHONPATH, not pip.
 
-**Still open:** the C++ `crispasr-diff` stage that CONSTRUCTS the same prompt as
-the reference (same voice-clone ref audio, ref text and synth text) so the two
-sides are comparable, then replays `generated_codes` and compares
-`talker_logits_step*`. Both halves now exist and produce the right shapes; what
-is missing is the harness that makes them meet.
+**Prep landed 2026-08-10:** `qwen3_tts_sum_frame_embed()` factors the 16-codebook
+embedding sum out of the AR loop so a harness entry point can build the SAME
+per-step talker input without a second copy — duplicating it is how a harness
+drifts from the runtime it checks, which is what #338 was. Verified
+output-neutral: PCM byte-identical before/after (the WAV bytes differ only in
+the C2PA/watermark metadata, which carries a per-run id — compare PCM, not the
+container, when checking a refactor here).
+
+**Still open, and here is the actual blocker.** A per-step talker input is
+NOT just the codec-embedding sum:
+
+    next_emb[step] = sum_{cb=0..15} embed_cb(frame[cb]) + trailing_text_hidden[step]
+
+The `trailing` term is prompt-derived state computed from the synth text inside
+the generate path. So a harness stage cannot simply prefill from the
+reference's `talker_inputs_embeds` and then step — it also needs `trailing`,
+which the reference does not currently dump and the runtime does not expose.
+That dependency is why this stage does not exist yet; it is not just wiring.
+
+Two ways forward, pick one before writing code:
+1. Dump `trailing_text_hidden` as a reference stage too, and pass it into a
+   `qwen3_tts_talker_logits_replay(embeds, n_tokens, codes16, n_frames,
+   trailing, n_trail)` entry point. Most faithful, and it makes the
+   dependency explicit in the archive.
+2. Have the runtime construct the whole prompt itself from the same text +
+   voice wav the reference used, and use the reference's
+   `talker_inputs_embeds` ONLY as a structural gate (cos ≈ 1 before trusting
+   any logits — the guide's input-alignment rule). Less plumbing, but it
+   assumes the two prompt builders agree, which is the thing being tested.
+
+Option 2's gate is worth having either way.
 
 The superseded note: `CRISPASR_QWEN3_TTS_DUMP_LOGITS=<dir>`
 writes raw per-frame talker logits (f32), dumped BEFORE the repetition penalty
