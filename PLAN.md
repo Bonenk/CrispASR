@@ -11,68 +11,34 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## OPEN 2026-08-10 — voxtral-tts pre-tokenizer: 5/57 mismatches vs mistral-common
+## LANDED 2026-08-10 — voxtral-tts pre-tokenizer parity (c69ac61b, from #338)
 
-Carried out of **#338, which is now CLOSED** — the bound fix (83db1d7a) resolved
-what that issue was about, so this would otherwise live only in a comment on a
-closed issue. Reported by MassimoDePietro when he closed it:
+Carried out of #338 after it closed. Reporter measured 5/57 vs `mistral-common`;
+reproduced and fixed. **0 mismatches across ~16k strings**, 0 out-of-range ids.
 
-> After the fix in `83db1d7a`, the out-of-range issue is gone, but my comparison
-> against `mistral-common` still finds 5 mismatches across 57 backend
-> tokenizations, apparently caused by separate pre-tokenization differences. I
-> already have a local fix that brings the same comparison to 0/57, so I'll
-> prepare that as a separate PR together with a reproducible parity test.
+Three defects in `tekken_pre_tokenize`, now in `voxtral_tekken_vocab.h`:
 
-**He is sending a PR — do not implement this ahead of him.** Wait for it, then
-review against the spec below.
+1. A whitespace run swallowed its last character — the letter and punctuation
+   alternatives each open with an optional leading slot, so `a  b` is
+   `["a"," "," b"]`. The slots DIFFER (letter takes any non-alnum, punctuation
+   takes a literal space only, `\p{N}` takes none), which is why this needed
+   the reference rather than a reading of the pattern.
+2. Every byte >= 0x80 counted as a letter. Bites on punctuation ADJACENCY, not
+   on letters — BPE recovers the same ids for accented text, which is why my
+   first guess at this was wrong. ASCII-only fuzz 0/4000; mixed 233/4000, 232
+   containing multibyte punctuation.
+3. `\p{N}` is one codepoint; digit runs were grouped. INVISIBLE to id-level
+   parity on this checkpoint (no multi-digit piece, so BPE re-splits to the same
+   ids). Only the generated split test caught it.
 
-**MEASURED 2026-08-10 against `mistral-common` 1.11.0** and the published
-`tekken.json`, driving the real runtime (a harness that `#include`s
-`src/voxtral_tts.cpp`, so the shipped tokenizer, not a copy): **3 mismatches /
-63 strings, 0 out-of-range ids.** He saw 5/57 on his corpus — same class.
+**Two checks, because they fail on different things** — the durable lesson:
+- `tests/test-voxtral-pretokenize.cpp` — hermetic, pins the SPLIT from the
+  published `config.pattern` via Python `regex`. Caught (3).
+- `tools/check-voxtral-tokenizer-parity.py` — live, pins the IDS through BPE +
+  the #338 bound vs `mistral-common`. Caught (1) and (2).
 
-⚠ **My first guess was wrong and is recorded here so nobody re-runs it.** I
-assumed `is_alpha`'s "any byte >= 0x80 is a letter" approximation was the cause.
-It is not: every accented, curly-quote, guillemet, CJK and emoji case MATCHED,
-including all the Italian (`L’Italia`, `dell’arte`, `un po’ d’acqua`). BPE
-recovers the same ids despite the sloppy classification. Two real defects, both
-in `tekken_pre_tokenize()` (`src/voxtral_tts.cpp:402`):
-
-**A. A run of whitespace must give its LAST space to the next token.** The
-tekken letter alternative opens with `[^\r\n\p{L}\p{N}]?` — one optional
-non-alphanumeric character. So the run splits, with one space leading the word:
-
-| input | crispasr | mistral-common |
-|---|---|---|
-| `a  b` | `['a', '  ', 'b']` | `['a', ' ', ' b']` |
-| `a   b` | `['a', '   ', 'b']` | `['a', '  ', ' b']` |
-| `  a` | `['  ', 'a']` | `[' ', ' a']` |
-
-The C++ eats the whole run greedily first. Note trailing whitespace is already
-CORRECT (`a `, `a  ` both match) — `\s+(?!\S)` covers end-of-string, and there
-is no following token to donate to.
-
-**B. A space before PUNCTUATION must attach to the punctuation.** The tekken
-punctuation alternative is ` ?[^\s\p{L}\p{N}]+[\r\n/]*`, also leading-space. The
-C++ attaches its optional leading character only when a LETTER follows
-(`if (k < n && is_alpha(text[k]))`), never before punctuation:
-
-| input | crispasr | mistral-common |
-|---|---|---|
-| `a [b` | `['a', ' ', '[b']` | `['a', ' [', 'b']` |
-| `a - b` | `['a', ' ', '-', ' b']` | `['a', ' -', ' b']` |
-
-Confirmed NOT broken, so the PR should not churn them: single space before a
-word, trailing whitespace, and digits (the real pattern is a bare `\p{N}`, one
-token per digit — the comment above the function claims ` ?\p{N}+`, which is
-wrong, but the CODE already splits singly and matches).
-
-Also settled, and worth recording because the bound fix shipped without it:
-`tekken.json` really does carry **150,000 entries** against
-`default_vocab_size = 131072` / `default_num_special_tokens = 1000` → 130,072
-active, **19,928 inactive tail**. Verified directly from the published file, not
-just taken from the report — that was the one thing 83db1d7a flagged unverified.
-The harness also confirms the bound works: 0 out-of-range ids across the corpus.
+Reporter was told on the issue in case his in-flight PR overlaps; his harness is
+still wanted (real corpora, other languages, mistral-common version drift).
 
 ## LANDED 2026-08-07 — #13273 omnivoice language knob, dead on three surfaces
 
