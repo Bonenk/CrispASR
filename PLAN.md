@@ -349,6 +349,40 @@ Dry runs of a single leg are now readable: `validate-version` compared VERSION
 against the branch name when `tag` was empty and failed on every dry run, which
 is the mode the input's own documentation recommends.
 
+**Then I went looking for the same shape elsewhere, and found two more (#341).**
+Both verified against the DOWNLOADED v0.8.27 assets, not inferred:
+`libcrispasr-linux-x86_64-hip` needs `libomp.so` + `libhipblas.so.2`;
+`crispasr-python-linux-{x86_64,arm64}` needs `libgomp.so.1` + `libblas.so.3`.
+Neither carried them, and neither leg ran `check-bundled-deps.py` at all — the
+python legs did the RUNPATH half inline with no closure step and no gate, so
+`import crispasr` died in the loader on any host without OpenBLAS and gcc's
+OpenMP.
+
+⚠ **A tolerance that `exit(0)`s is not a tolerance, it is a stop.**
+`verify-lib-bundle.sh` DID fail to dlopen the HIP bundle on `libomp.so` — and
+`libomp` is on its EXTERNAL list, so it printed "dlopen deferred: external
+driver absent in CI" and exited 0, skipping the rest of the verification too.
+The list was written for gcc's versioned `libgomp.so.1` on the default loader
+path and silently generalised to ROCm clang's unversioned `libomp.so`, which
+exists only under `/opt/rocm/lib/llvm/lib`. When adding to an allowlist, ask
+what a shipped artifact looks like if the entry is wrong.
+
+⚠ **Two gates asking different questions is not two gates.**
+`verify-lib-bundle.sh` gates INTRA-bundle resolvability — for every library the
+bundle ships, every dependency whose soname is ALSO shipped must be reachable.
+A dependency missing from the bundle entirely is outside the question, so it was
+never asked in five years of libs bundles. `check-bundled-deps.py` now runs on
+all five Linux libs legs and both python legs.
+
+⚠ **Licence text was not travelling with the binaries.** Every Windows, Android
+and libcrispasr artifact shipped LICENSE + THIRD_PARTY_NOTICES; no CLI tarball
+did, on any platform — while bundling `libgomp` (GPLv3 + GCC Runtime Library
+Exception) since #296. The RLE covers LINKING it into an MIT binary; shipping
+the `.so` is separately a GPLv3 conveyance with a §6 source obligation, so the
+notices now carry a source pointer and a written offer. `libomp` is Apache-2.0
+WITH LLVM-exception — notice only. The notices file also claimed OpenBLAS was
+"not bundled", false since #296.
+
 ## LANDED 2026-08-10 — #339 fallout: a red Release run silently killed every GPU wheel
 
 The reported bug was six of seven Linux tarballs failing in v0.8.26 (two shell

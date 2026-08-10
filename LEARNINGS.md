@@ -74,6 +74,45 @@ whole defect in one line.
 a ctest SKIP reads exactly like a PASS in the summary. A gate that cannot run is
 a gate that cannot go red.
 
+**5. Having found one, ask which other artifacts have the same shape.** The CLI
+tarball was the reported one. The same defect was sitting in the library bundles
+(`libomp.so`, `libhipblas.so.2`) and the Python binding tarballs (`libgomp.so.1`,
+`libblas.so.3`) — three artifact kinds, one release, two of them unreported and
+one of them the thing `import crispasr` loads. Both were confirmed by
+**downloading the published assets and running the checker over them**, which
+takes minutes and is not the same as reading the workflow.
+
+**6. A tolerance that `exit(0)`s is a stop, not a tolerance.**
+`verify-lib-bundle.sh` did fail to dlopen the HIP bundle — on `libomp.so`, which
+is on its list of externally-provided sonames, so it printed *"dlopen deferred:
+external driver absent in CI"* and exited 0, skipping the remainder of the
+verification as well. The list was written for gcc's versioned `libgomp.so.1` on
+the default loader path and silently generalised to ROCm clang's unversioned
+`libomp.so`, which lives only in `/opt/rocm/lib/llvm/lib`. Before adding a name
+to an allowlist, ask what a shipped artifact looks like if the entry is wrong —
+and prefer `continue` to `exit(0)`, so one tolerated case does not discard the
+checks that follow it.
+
+**7. Two gates asking the same question twice is one gate.**
+`verify-lib-bundle.sh` checks INTRA-bundle resolvability: for every library the
+bundle ships, every dependency whose soname is ALSO shipped must be reachable
+via rpath. That is a real check — it caught v0.8.18 — and it is silent by
+construction about a dependency missing from the bundle entirely. Two scripts
+existed; only one question was being asked. Write down what each gate does NOT
+cover, next to what it does.
+
+**8. Bundling a library is a licensing act, not just a packaging one.** The
+Linux archives have bundled `libgomp` since #296 and shipped no licence text at
+all — not even CrispASR's own. Distinguish the two permissions: the GCC Runtime
+Library Exception is what lets an MIT-licensed binary LINK libgomp (no copyleft
+reaches your source); shipping the `libgomp.so.1` FILE is separately conveying a
+GPLv3 work, with GPLv3 §6's corresponding-source obligation attached. LLVM's
+`libomp` (Apache-2.0 WITH LLVM-exception) is notice-only. If conveying GPL code
+is unwanted, static-linking libgomp keeps the exception and leaves no GPL file
+to convey. ⚠ And check the notices file against reality when you change
+packaging: ours still said OpenBLAS was "not bundled — users must have
+libopenblas installed" two releases after that stopped being true.
+
 ## A watermarked TTS output cannot be A/B'd with `cmp` — and whisper LID is not an accent metric (omnivoice, 2026-08-07)
 
 Four transferable things from SubtitleEdit-13273, where OmniVoice's target-language
