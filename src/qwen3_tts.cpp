@@ -6796,6 +6796,46 @@ extern "C" float* qwen3_tts_run_code_pred_step(struct qwen3_tts_context* ctx, co
 // *out_frames receives the number of frames produced. The non-streaming path
 // passes a no-op on_frame, so this loop is byte-identical to the previous
 // inline qwen3_tts_synthesize_codes body for the codes it produces.
+// Sum the 16 codebook embeddings for one frame into `out` (d floats).
+//
+// Factored out of the AR loop so the diff-harness replay entry point below can
+// build the SAME per-step talker input without a second copy of this logic.
+// Duplicating it is exactly how a harness drifts from the runtime it is meant
+// to check — the reason #338 existed at all — so both call this.
+//
+// `codes16[0]` indexes the talker's token_embd; `codes16[1..15]` index the code
+// predictor's per-codebook tables. Uses the dequantised row caches when they
+// are populated, falling back to a graph lookup otherwise (identical order and
+// arithmetic either way).
+static bool qwen3_tts_sum_frame_embed(qwen3_tts_context* ctx, const int32_t* codes16, int n_groups, int d,
+                                      std::vector<float>& row_buf, float* out) {
+    std::fill(out, out + d, 0.0f);
+    const bool embd_cache_enabled = !env_bool("CRISPASR_QWEN3_TTS_NO_EMBD_CACHE");
+    for (int cb = 0; cb < n_groups; cb++) {
+        int32_t code = codes16[cb];
+        bool ok = false;
+        if (embd_cache_enabled && cb == 0 && ctx->token_embd_cache) {
+            ok = ctx->token_embd_cache.get_row_into(code, row_buf.data());
+        } else if (embd_cache_enabled && cb > 0 && cb - 1 < (int)ctx->codec_embd_cache.size() &&
+                   ctx->codec_embd_cache[cb - 1]) {
+            ok = ctx->codec_embd_cache[cb - 1].get_row_into(code, row_buf.data());
+        } else {
+            ggml_tensor* w = (cb == 0) ? ctx->talker.token_embd_w : ctx->code_pred.codec_embd[cb - 1];
+            float* row = lookup_rows(ctx, w, &code, 1);
+            if (row) {
+                std::memcpy(row_buf.data(), row, (size_t)d * sizeof(float));
+                free(row);
+                ok = true;
+            }
+        }
+        if (!ok)
+            return false;
+        for (int j = 0; j < d; j++)
+            out[j] += row_buf[j];
+    }
+    return true;
+}
+
 template <typename OnFrame>
 static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text, std::vector<int32_t>& all_codes,
                                         int* out_frames, OnFrame on_frame) {
@@ -7195,33 +7235,14 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
         //    sum_{cb=0..15}(codec_embd_for_cb(frame[cb])) + trailing[step]
         //    where trailing[step] = trailing_text_hidden[gen_step] if gen_step
         //    < M else tts_pad_embed (only the latter when codec_lens > text_lens).
-        std::fill(next_emb.data(), next_emb.data() + d, 0.0f);
         const double t_next = bench ? now_ms() : 0.0;
         {
-            for (int cb = 0; cb < n_groups; cb++) {
-                int32_t code = (cb == 0) ? cb0 : cb1_15[cb - 1];
-                bool ok = false;
-                if (embd_cache_enabled && cb == 0 && ctx->token_embd_cache) {
-                    ok = ctx->token_embd_cache.get_row_into(code, next_emb_row_buf.data());
-                } else if (embd_cache_enabled && cb > 0 && cb - 1 < (int)ctx->codec_embd_cache.size() &&
-                           ctx->codec_embd_cache[cb - 1]) {
-                    ok = ctx->codec_embd_cache[cb - 1].get_row_into(code, next_emb_row_buf.data());
-                } else {
-                    ggml_tensor* w = (cb == 0) ? ctx->talker.token_embd_w : ctx->code_pred.codec_embd[cb - 1];
-                    float* row = lookup_rows(ctx, w, &code, 1);
-                    if (row) {
-                        std::memcpy(next_emb_row_buf.data(), row, (size_t)d * sizeof(float));
-                        free(row);
-                        ok = true;
-                    }
-                }
-                if (!ok) {
-                    return false;
-                }
-                for (int j = 0; j < d; j++) {
-                    next_emb[j] += next_emb_row_buf[j];
-                }
-            }
+            int32_t frame_codes[16];
+            frame_codes[0] = (int32_t)cb0;
+            for (int i = 0; i < 15 && i + 1 < 16; i++)
+                frame_codes[i + 1] = cb1_15[i];
+            if (!qwen3_tts_sum_frame_embed(ctx, frame_codes, n_groups, d, next_emb_row_buf, next_emb.data()))
+                return false;
         }
 
         // Add trailing_text_hidden[gen_step] (or last row if past M).
