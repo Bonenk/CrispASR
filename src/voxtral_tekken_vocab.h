@@ -104,4 +104,205 @@ inline DecodeStats decode_blob(const std::vector<uint8_t>& blob, int n_specials,
     return st;
 }
 
+// Tekken regex pre-tokenizer, hand-rolled. The tekken.json pattern
+// (`[^\r\n\p{L}\p{N}]?[\p{Lu}...]*[\p{Ll}...]+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+`)
+// attaches an optional single leading non-alphanumeric byte (typically a space)
+// to the following letter/number run — so "Hello world" → ["Hello", " world"] not
+// ["Hello", " ", "world"]. Skipping this lets greedy BPE merge across word
+// boundaries and mis-tokenise. UTF-8 continuation/lead bytes (≥0x80) are treated
+// as letters (approximates \p{L} without a full Unicode table).
+// Decode one UTF-8 scalar at `i`. Returns the codepoint and advances `len`.
+// Malformed input degrades to a single byte, which keeps the tokenizer total.
+inline uint32_t utf8_at(const std::string& s, size_t i, size_t& len) {
+    const unsigned char c = (unsigned char)s[i];
+    const size_t n = s.size();
+    if (c < 0x80) {
+        len = 1;
+        return c;
+    }
+    auto cont = [&](size_t k) { return i + k < n && ((unsigned char)s[i + k] & 0xC0) == 0x80; };
+    if ((c & 0xE0) == 0xC0 && cont(1)) {
+        len = 2;
+        return ((c & 0x1Fu) << 6) | ((unsigned char)s[i + 1] & 0x3Fu);
+    }
+    if ((c & 0xF0) == 0xE0 && cont(1) && cont(2)) {
+        len = 3;
+        return ((c & 0x0Fu) << 12) | (((unsigned char)s[i + 1] & 0x3Fu) << 6) | ((unsigned char)s[i + 2] & 0x3Fu);
+    }
+    if ((c & 0xF8) == 0xF0 && cont(1) && cont(2) && cont(3)) {
+        len = 4;
+        return ((c & 0x07u) << 18) | (((unsigned char)s[i + 1] & 0x3Fu) << 12) |
+               (((unsigned char)s[i + 2] & 0x3Fu) << 6) | ((unsigned char)s[i + 3] & 0x3Fu);
+    }
+    len = 1;
+    return c;
+}
+
+// `\p{L}`-ish, by exclusion. Treating every byte >= 0x80 as a letter — what
+// this did before — is right for the scripts but wrong for the punctuation and
+// symbols that live above ASCII, and those are what break a run: an en dash or
+// a curly quote adjacent to other punctuation split the `[^\s\p{L}\p{N}]+`
+// alternative in two. Measured against mistral-common, that was the entire
+// residual mismatch class once whitespace was fixed (233/4000 on a punctuation
+// fuzz, 232 of them containing multibyte punctuation).
+//
+// This is deliberately an exclusion list, not a Unicode table: the scripts we
+// synthesize are letters by default, and only the well-known punctuation and
+// symbol blocks are carved out. A full \p{L} would need real Unicode data.
+inline bool cp_is_letter(uint32_t cp) {
+    if (cp < 0x80)
+        return (cp >= 'A' && cp <= 'Z') || (cp >= 'a' && cp <= 'z');
+    // Latin-1 punctuation/symbols, minus the three letters living among them
+    // (ª U+00AA, µ U+00B5, º U+00BA) and keeping ² ³ ¹ out as No.
+    if (cp >= 0x00A0 && cp <= 0x00BF)
+        return cp == 0x00AA || cp == 0x00B5 || cp == 0x00BA;
+    if (cp == 0x00D7 || cp == 0x00F7) // multiplication / division sign
+        return false;
+    if (cp >= 0x2000 && cp <= 0x206F) // General Punctuation: – — ' ' " " …
+        return false;
+    if (cp >= 0x20A0 && cp <= 0x20CF) // Currency Symbols: €
+        return false;
+    if (cp >= 0x2100 && cp <= 0x214F) // Letterlike Symbols: ™ ® ℃
+        return false;
+    if (cp >= 0x2190 && cp <= 0x2BFF) // arrows, math, misc symbols, dingbats
+        return false;
+    if (cp >= 0x3000 && cp <= 0x303F) // CJK punctuation: 、。「」
+        return false;
+    if (cp >= 0xFE30 && cp <= 0xFE4F) // CJK compatibility forms
+        return false;
+    if (cp >= 0xFF01 && cp <= 0xFF20) // fullwidth punctuation and digits
+        return false;
+    if (cp >= 0xFF3B && cp <= 0xFF40)
+        return false;
+    if (cp >= 0xFF5B && cp <= 0xFF65)
+        return false;
+    if (cp >= 0x1F000 && cp <= 0x1FAFF) // emoji and pictographs
+        return false;
+    return true;
+}
+
+inline std::vector<std::string> pre_tokenize(const std::string& text) {
+    std::vector<std::string> out;
+    const size_t n = text.size();
+
+    // Everything below steps by CODEPOINT, not by byte: classification is a
+    // property of the scalar, and a byte-wise walk would stop a punctuation run
+    // at the lead byte of an en dash and resume on its continuation bytes.
+    auto clen = [&](size_t p) {
+        size_t l = 0;
+        utf8_at(text, p, l);
+        return l;
+    };
+    auto is_letter = [&](size_t p) {
+        size_t l = 0;
+        return cp_is_letter(utf8_at(text, p, l));
+    };
+    auto is_digit = [&](size_t p) {
+        size_t l = 0;
+        const uint32_t cp = utf8_at(text, p, l);
+        return cp >= '0' && cp <= '9';
+    };
+    auto is_ws = [&](size_t p) {
+        size_t l = 0;
+        const uint32_t cp = utf8_at(text, p, l);
+        return cp == ' ' || cp == '\t' || cp == '\n' || cp == '\r';
+    };
+    auto is_nl = [&](size_t p) { return text[p] == '\n' || text[p] == '\r'; };
+    auto is_punct = [&](size_t p) { return !is_letter(p) && !is_digit(p) && !is_ws(p); };
+
+    size_t i = 0;
+    while (i < n) {
+        if (is_ws(i)) {
+            // Three tekken alternatives compete for a whitespace run, and which
+            // one wins decides who owns its LAST character:
+            //     \s*[\r\n]+  — a run containing a newline ends at that newline
+            //     \s+(?!\S)   — otherwise the run keeps all BUT its last
+            //                    character (or all of it at end of input)
+            //     \s+          — that leftover character, if nothing claims it
+            // The leftover is then offered to the next token's optional leading
+            // slot, and the slots differ: the letter alternative accepts any
+            // non-alphanumeric (` b`, `\tb`), the punctuation alternative accepts
+            // a literal space only (` [` but not `\t[`), and `\p{N}` accepts
+            // nothing, so a digit leaves the space standing alone. Consuming the
+            // whole run — what this did before #339-era testing — mistokenised
+            // every multi-space gap and every " (" / " [" / " -" (#338).
+            size_t j = i;
+            while (j < n && is_ws(j))
+                j += clen(j);
+
+            size_t last_nl = std::string::npos;
+            for (size_t t = i; t < j; t++)
+                if (is_nl(t))
+                    last_nl = t;
+            if (last_nl != std::string::npos) {
+                out.push_back(text.substr(i, last_nl - i + 1));
+                i = last_nl + 1;
+                continue;
+            }
+            if (j == n) {
+                out.push_back(text.substr(i, j - i));
+                i = j;
+                continue;
+            }
+            // Whitespace here is always single-byte, so j-1 is its last char.
+            if (j - i >= 2) {
+                out.push_back(text.substr(i, j - i - 1));
+                i = j - 1;
+            }
+            if (is_letter(i + 1)) {
+                size_t e = i + 1;
+                while (e < n && is_letter(e))
+                    e += clen(e);
+                out.push_back(text.substr(i, e - i));
+                i = e;
+            } else if (text[i] == ' ' && is_punct(i + 1)) {
+                size_t e = i + 1;
+                while (e < n && is_punct(e))
+                    e += clen(e);
+                out.push_back(text.substr(i, e - i));
+                i = e;
+            } else {
+                out.push_back(text.substr(i, 1));
+                i++;
+            }
+            continue;
+        }
+
+        // `\p{N}` is a SINGLE codepoint with no leading slot — digits neither
+        // group into runs nor absorb a preceding space. With this checkpoint's
+        // vocabulary the difference is invisible in token ids (no multi-digit
+        // piece exists, so BPE re-splits a grouped run into the same ids), which
+        // is why an id-level parity sweep passes either way. It is still the
+        // wrong split, and it would surface the moment a vocabulary carried one.
+        if (is_digit(i)) {
+            out.push_back(text.substr(i, clen(i)));
+            i += clen(i);
+            continue;
+        }
+
+        // Optional single leading non-alphanumeric, non-newline scalar before a
+        // word: `[^\r\n\p{L}\p{N}]?`.
+        size_t k = i;
+        if (!is_letter(i) && !is_nl(i))
+            k = i + clen(i);
+
+        if (k < n && is_letter(k)) {
+            size_t e = k;
+            while (e < n && is_letter(e))
+                e += clen(e);
+            out.push_back(text.substr(i, e - i));
+            i = e;
+        } else {
+            size_t e = i;
+            while (e < n && is_punct(e))
+                e += clen(e);
+            if (e == i) // never stall
+                e += clen(i);
+            out.push_back(text.substr(i, e - i));
+            i = e;
+        }
+    }
+    return out;
+}
+
 } // namespace voxtral_tekken
