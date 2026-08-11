@@ -7128,6 +7128,15 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
     std::vector<float> next_emb_row_buf(d);
     std::vector<float> next_emb(d, 0.0f);
     for (frame = 0; frame < max_frames; frame++) {
+        // In replay mode, stop before evaluating a probe frame beyond the
+        // supplied teacher-forcing trajectory.  Checking after the forward
+        // pass dumped one extra logits file, making a complete replay look
+        // like an off-by-one parity failure.
+        if (!replay_codes.empty() && (size_t)(frame + 1) * 16 > replay_codes.size())
+            break;
+        if (!replay_tokens.empty() && frame >= (int)replay_tokens.size())
+            break;
+
         // #337 bisection instrumentation, mirroring glm_ocr's *_DUMP_LOGITS.
         // Dumped BEFORE the repetition penalty and the suppress mask, so a
         // cross-backend diff isolates the talker FORWARD from the sampling
@@ -7182,26 +7191,8 @@ static bool qwen3_tts_generate_codes_ar(qwen3_tts_context* ctx, const char* text
         }
         int cb0;
         if (!replay_codes.empty()) {
-            if ((size_t)(frame + 1) * 16 > replay_codes.size()) {
-                if (dbg)
-                    fprintf(stderr, "qwen3_tts: replay-codes list exhausted at frame %d\n", frame);
-                free(logits);
-                logits = nullptr;
-                free(past_hidden);
-                past_hidden = nullptr;
-                break;
-            }
             cb0 = replay_codes[(size_t)frame * 16];
         } else if (!replay_tokens.empty()) {
-            if (frame >= (int)replay_tokens.size()) {
-                if (dbg)
-                    fprintf(stderr, "qwen3_tts: replay list exhausted at frame %d\n", frame);
-                free(logits);
-                logits = nullptr;
-                free(past_hidden);
-                past_hidden = nullptr;
-                break;
-            }
             cb0 = replay_tokens[(size_t)frame];
         } else {
             cb0 = top_k_sample(logits, (int)hp.vocab_size, talker_top_k, talker_temp, &rng);
