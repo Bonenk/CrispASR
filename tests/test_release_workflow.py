@@ -148,6 +148,29 @@ class TestReleaseWorkflow(unittest.TestCase):
             "Vulkan job must produce crispasr-linux-x86_64-vulkan.tar.gz",
         )
 
+    def test_windows_cuda_publishes_complete_and_split_assets(self):
+        """Windows CUDA releases must support both install styles (#342)."""
+        if self.data is None:
+            self.skipTest("pyyaml not installed")
+        job = self.data.get("jobs", {}).get("build-windows-cuda", {})
+        self.assertTrue(job, "build-windows-cuda job must exist")
+        steps_text = str(job.get("steps", []))
+        for asset in (
+            "crispasr-windows-x86_64-cuda.zip",
+            "crispasr-windows-x86_64-cuda-non-cuda.zip",
+            "cudart64_*.dll",
+            "cublas64_*.dll",
+            "cublasLt64_*.dll",
+            "crispasr-windows-x86_64-cuda-runtime-sha256.txt",
+        ):
+            with self.subTest(asset=asset):
+                self.assertIn(asset, steps_text)
+        self.assertIn(
+            "Expected exactly three CUDA runtime DLLs",
+            steps_text,
+            "split packaging must fail if the CUDA runtime set is incomplete",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
