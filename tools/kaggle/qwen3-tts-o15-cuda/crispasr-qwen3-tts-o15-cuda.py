@@ -94,7 +94,7 @@ kh.step("cuda_arch", arch=arch)
 BUILD.mkdir(parents=True, exist_ok=True)
 cmake_args = (
     [
-        "cmake", "-S", str(REPO), "-B", str(BUILD),
+        "cmake", "-G", "Ninja", "-S", str(REPO), "-B", str(BUILD),
         "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=ON",
         "-DCRISPASR_BUILD_TESTS=OFF",
     ]
