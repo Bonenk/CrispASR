@@ -33,6 +33,9 @@ RESULTS = WORK / "results"
 RESULTS.mkdir(parents=True, exist_ok=True)
 
 CRISPASR_REF = os.environ.get("CRISPASR_REF", "fix/337-qwen3-tts-hip")
+CRISPASR_COMMIT = os.environ.get(
+    "CRISPASR_COMMIT", "e6a179b6958cccc0f3f22a9be7e577d12c1d9218"
+)
 CRISPASR_REPO = os.environ.get(
     "CRISPASR_REPO", "https://github.com/CrispStrobe/CrispASR.git"
 )
@@ -64,6 +67,8 @@ run(
         CRISPASR_REPO, str(REPO),
     ]
 )
+run(["git", "-C", str(REPO), "fetch", "--depth", "1", "origin", CRISPASR_COMMIT])
+run(["git", "-C", str(REPO), "checkout", "--detach", CRISPASR_COMMIT])
 run(["git", "-C", str(REPO), "submodule", "update", "--init", "--recursive"])
 
 sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
