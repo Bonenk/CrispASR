@@ -420,5 +420,13 @@ kh.step(
     off_ms=off["ms_per_frame"], on_ms=on["ms_per_frame"],
     sha=sha, issue337_replay_ok=replay_ok,
 )
+# Keep the shared CUDA compiler cache current after a real build.  The harness
+# writes one archive so Kaggle's output file cap cannot truncate the cache.
+ccache_tar = kh.export_ccache_tar()
+kh.step(
+    "ccache_export",
+    ok=bool(ccache_tar and Path(ccache_tar).exists()),
+    path=ccache_tar,
+)
 kh._push_progress_to_hf(force=True)
 kh.step("script.end")
