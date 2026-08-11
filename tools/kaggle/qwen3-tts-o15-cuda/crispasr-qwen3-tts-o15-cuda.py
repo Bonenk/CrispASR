@@ -64,6 +64,7 @@ run(
         CRISPASR_REPO, str(REPO),
     ]
 )
+run(["git", "-C", str(REPO), "submodule", "update", "--init", "--recursive"])
 
 sys.path.insert(0, os.path.join(str(REPO), "tools", "kaggle"))
 try:
