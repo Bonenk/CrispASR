@@ -1,6 +1,6 @@
 {
-  "id": "${KAGGLE_ACCOUNT}/crispasr-qwen3-o15-fix",
-  "title": "crispasr-qwen3-o15-fix",
+  "id": "${KAGGLE_ACCOUNT}/crispasr-qwen3-tts-337-hip",
+  "title": "crispasr-qwen3-tts-337-hip",
   "code_file": "crispasr-qwen3-tts-o15-cuda.py",
   "language": "python",
   "kernel_type": "script",
