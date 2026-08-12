@@ -195,8 +195,30 @@ bool is_gpu_tensor_with_prefix(const char* tensor_name, void* user);
 // LayerSplitConfig{ "blk.", *N }.
 bool is_gpu_tensor_blk(const char* tensor_name, void* user);
 
+// Free a backend buffer that came from one of this loader's weight-loading
+// entry points, releasing the host mmap behind it when there is one.
+//
+// USE THIS INSTEAD OF ggml_backend_buffer_free() FOR ANY BUFFER OBTAINED FROM
+// load_weights() / load_weights_filtered() / load_weights_split(), including
+// after the buffer has been moved into a model struct. On a non-CPU backend
+// advertising `buffer_from_host_ptr` (Apple-Silicon Metal), load_weights hands
+// the device a host mmap it does not own — `buffer_from_host_ptr` has no
+// deallocator parameter, so freeing the backend buffer alone leaves the whole
+// weight file mapped, resident and dirty for the life of the process.
+//
+// Semantics:
+//   * A null handle is a no-op, and the caller's handle is nulled on return,
+//     so a second call cannot double-free or double-unmap.
+//   * A buffer with no recorded mapping is the ordinary case — the CPU mmap
+//     path unmaps through its own free callback and the legacy alloc+copy
+//     path maps nothing — and is released like any other backend buffer.
+//   * The backend buffer is freed before the region is unmapped, so a
+//     device-side view of the pages never outlives them.
+void release_weight_buffer(ggml_backend_buffer_t& buf);
+
 // Free a WeightLoad's resources. Call when the model is being destroyed
-// and the buffer/context are not held elsewhere.
+// and the buffer/context are not held elsewhere. Releases every buffer
+// through release_weight_buffer().
 void free_weights(WeightLoad& wl);
 
 // PLAN #60g: hint the kernel that the mmap'd weight region is now being
