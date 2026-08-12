@@ -405,6 +405,38 @@ static void unmap_region(void* base, size_t size) {
 #endif
 }
 
+// Issue #276 overflow chunks. A partition larger than the 1.5 GiB chunk limit
+// is allocated as several backend buffers; only the first goes into
+// WeightLoad::buf / ::buf_cpu, and the rest were left for the caller to free
+// out of WeightLoad::split_bufs. Every one of the eighteen backends that calls
+// load_weights_split() moves buf and buf_cpu into its own model struct and
+// drops the vector, so those chunks were freed by nobody. An obligation that
+// no caller has ever honoured belongs somewhere else.
+//
+// The overflow chunks are therefore owned here, keyed to the first buffer of
+// their own partition, and released with it. split_bufs still lists them so a
+// caller can see how a load was partitioned, but it is no longer a set of
+// handles the caller must free.
+static std::mutex g_split_mu;
+static std::map<ggml_backend_buffer_t, std::vector<ggml_backend_buffer_t>> g_split_extra;
+
+static void register_split_extra(ggml_backend_buffer_t primary, const std::vector<ggml_backend_buffer_t>& extra) {
+    if (!primary || extra.empty())
+        return;
+    std::lock_guard<std::mutex> lk(g_split_mu);
+    auto& slot = g_split_extra[primary];
+    slot.insert(slot.end(), extra.begin(), extra.end());
+}
+static std::vector<ggml_backend_buffer_t> take_split_extra(ggml_backend_buffer_t primary) {
+    std::lock_guard<std::mutex> lk(g_split_mu);
+    auto it = g_split_extra.find(primary);
+    if (it == g_split_extra.end())
+        return {};
+    std::vector<ggml_backend_buffer_t> extra = std::move(it->second);
+    g_split_extra.erase(it);
+    return extra;
+}
+
 // Issue #94 (chatterbox-turbo segfault during init on macOS / Apple
 // Silicon): the legacy alloc+copy load path takes 30-60 s for the
 // chatterbox-turbo T3 (658 MB Q8_0) on slow disks and reproducibly
@@ -939,6 +971,9 @@ void release_weight_buffer(ggml_backend_buffer_t& buf) {
     // erase, a concurrent load could receive a new buffer at the same address
     // and register it, and the erase would then drop a live mapping's record.
     const gpu_mmap_handle h = take_gpu_mmap(buf);
+    // Overflow chunks of the same partition (issue #276) are released with it.
+    for (ggml_backend_buffer_t extra : take_split_extra(buf))
+        ggml_backend_buffer_free(extra);
     // Free the backend buffer first. Metal's shared-storage MTLBuffer is a
     // view onto these pages, so unmapping them while the buffer is alive would
     // leave the GPU addressing unmapped memory. Freeing first inherits ggml's
@@ -951,11 +986,11 @@ void release_weight_buffer(ggml_backend_buffer_t& buf) {
 }
 
 void free_weights(WeightLoad& wl) {
+    // Issue #276: the overflow chunks in split_bufs are released with the
+    // primary buffer of their partition, so freeing them again here would be
+    // a double free. Clearing the vector drops the now-dangling handles.
     release_weight_buffer(wl.buf);
     release_weight_buffer(wl.buf_cpu);
-    // Issue #276: free any overflow chunk buffers from split allocation.
-    for (auto& b : wl.split_bufs)
-        release_weight_buffer(b);
     wl.split_bufs.clear();
     if (wl.ctx) {
         ggml_free(wl.ctx);
@@ -1045,7 +1080,17 @@ bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backe
     // than that need to be split across multiple backend buffers. We chunk
     // tensors into groups of <= 1.5 GiB each and allocate one buffer per
     // chunk; the 1.5 GiB limit leaves headroom for alignment padding.
-    static constexpr size_t max_alloc_chunk = (size_t)1536 * 1024 * 1024; // 1.5 GiB
+    //
+    // CRISPASR_GGUF_MAX_ALLOC_CHUNK (bytes) lowers the limit. A driver with a
+    // tighter cap than AMD's is the field use; the test use is that reaching
+    // the chunked path otherwise costs a multi-gigabyte allocation, so without
+    // this the branch that produces overflow buffers has no coverage at all.
+    size_t max_alloc_chunk = (size_t)1536 * 1024 * 1024; // 1.5 GiB
+    if (const char* v = std::getenv("CRISPASR_GGUF_MAX_ALLOC_CHUNK")) {
+        const long long parsed = std::atoll(v);
+        if (parsed > 0)
+            max_alloc_chunk = (size_t)parsed;
+    }
 
     auto round_up = [](size_t n, size_t a) { return (n + a - 1) & ~(a - 1); };
     auto bind_partition = [&](ggml_backend_t be, const std::vector<ggml_tensor*>& tensors,
@@ -1128,17 +1173,20 @@ bool load_weights_split(const char* path, ggml_backend_t gpu_backend, ggml_backe
         return false;
     }
 
-    // First buffer of each partition goes into the canonical fields;
-    // any overflow chunks go into split_bufs for lifetime management.
+    // First buffer of each partition goes into the canonical fields; the
+    // overflow chunks are owned by this loader and released with the primary
+    // buffer of their own partition. split_bufs lists them for inspection.
     if (!gpu_bufs.empty()) {
         out.buf = gpu_bufs[0];
-        for (size_t i = 1; i < gpu_bufs.size(); i++)
-            out.split_bufs.push_back(gpu_bufs[i]);
+        const std::vector<ggml_backend_buffer_t> extra(gpu_bufs.begin() + 1, gpu_bufs.end());
+        register_split_extra(out.buf, extra);
+        out.split_bufs.insert(out.split_bufs.end(), extra.begin(), extra.end());
     }
     if (!cpu_bufs.empty()) {
         out.buf_cpu = cpu_bufs[0];
-        for (size_t i = 1; i < cpu_bufs.size(); i++)
-            out.split_bufs.push_back(cpu_bufs[i]);
+        const std::vector<ggml_backend_buffer_t> extra(cpu_bufs.begin() + 1, cpu_bufs.end());
+        register_split_extra(out.buf_cpu, extra);
+        out.split_bufs.insert(out.split_bufs.end(), extra.begin(), extra.end());
     }
 
     // Copy tensor data from the file. Use mmap when available for zero-
