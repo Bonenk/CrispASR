@@ -4539,6 +4539,20 @@ set_tests_properties(test-release-workflow PROPERTIES
     LABELS "unit;ci"
     TIMEOUT 30)
 
+# Configure-level guard for the #261/#302 portable CPU contract. The cache is
+# the only authoritative proof that every optional ggml x86 ISA stayed OFF;
+# source-text checks cannot catch a newly-defaulted ggml option. Bash is not a
+# baseline dependency on Windows, where test-release-workflow still guards all
+# release-job call sites.
+if(UNIX)
+    add_test(NAME test-portable-cpu-config
+        COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/test-portable-cpu-config.sh
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+    set_tests_properties(test-portable-cpu-config PROPERTIES
+        LABELS "unit;ci"
+        TIMEOUT 60)
+endif()
+
 # ─── test_diarized_json — Catch2 unit tests for the diarized_json formatter
 # (issue #206) and max_len display segment splitting (issue #205).
 # Pure functions, no backend dependency.
