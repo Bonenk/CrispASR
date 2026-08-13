@@ -467,6 +467,68 @@ catch_discover_tests(test-gguf-bounds
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-gguf-release — contract of core_gguf::release_weight_buffer ──────────
+# The entry point that frees a weight buffer AND unmaps the host region behind
+# it. These cases need no GPU: the CPU mmap path, the legacy alloc+copy path
+# (which registers no mapping and must still be released cleanly), repeat calls
+# and the null handle.
+add_executable(test-gguf-release test-gguf-release.cpp)
+target_include_directories(test-gguf-release PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+)
+target_link_libraries(test-gguf-release PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+    ggml
+)
+catch_discover_tests(test-gguf-release
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
+# ─── test-gguf-mapping-released — the weight mmap must not outlive the model ───
+# Asks the kernel which regions still name the weight file after the weights
+# are freed. Exact rather than a footprint threshold, so there is nothing to
+# settle and nothing to poll. The zero-copy leg self-skips where no device
+# advertises buffer_from_host_ptr.
+add_executable(test-gguf-mapping-released test-gguf-mapping-released.cpp)
+target_include_directories(test-gguf-mapping-released PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+)
+target_link_libraries(test-gguf-mapping-released PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+    ggml
+)
+catch_discover_tests(test-gguf-mapping-released
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
+# ─── test-crisp-audio-mapping-released — the same oracle, one step out ─────────
+# crisp_audio takes its weight buffer from core_gguf::load_weights and owns it
+# from there, so the release has to happen in crisp_audio_free(). Drives the
+# public C API on a synthetic one-layer tower and asks the kernel which regions
+# still name the GGUF. The GPU legs self-skip where no device advertises
+# buffer_from_host_ptr; the CPU leg runs everywhere.
+add_executable(test-crisp-audio-mapping-released test-crisp-audio-mapping-released.cpp)
+target_include_directories(test-crisp-audio-mapping-released PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/ggml/include
+)
+target_link_libraries(test-crisp-audio-mapping-released PRIVATE
+    Catch2::Catch2WithMain
+    crisp_audio
+    crispasr-lib
+    ggml
+)
+catch_discover_tests(test-crisp-audio-mapping-released
+    TEST_SPEC "[unit]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-gguf-split-alloc — regression guard for issue #276 ───────────────────
 # Verifies load_weights_split() correctly partitions tensors across GPU/CPU
 # backend buffers, respects the is_gpu predicate, and that free_weights cleans
