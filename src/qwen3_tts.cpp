@@ -6516,7 +6516,7 @@ extern "C" int qwen3_tts_load_voice_pack(struct qwen3_tts_context* ctx, const ch
     }
 
     if (ctx->vp_buf_w) {
-        ggml_backend_buffer_free(ctx->vp_buf_w);
+        core_gguf::release_weight_buffer(ctx->vp_buf_w);
     }
     if (ctx->vp_ctx_w) {
         ggml_free(ctx->vp_ctx_w);
@@ -7886,7 +7886,7 @@ extern "C" void qwen3_tts_free(struct qwen3_tts_context* ctx) {
         ggml_free(ctx->cp_cpu_ctx);
     }
     if (ctx->codec.buf_w) {
-        ggml_backend_buffer_free(ctx->codec.buf_w);
+        core_gguf::release_weight_buffer(ctx->codec.buf_w);
     }
     if (ctx->codec.ctx_w) {
         ggml_free(ctx->codec.ctx_w);
@@ -7904,13 +7904,13 @@ extern "C" void qwen3_tts_free(struct qwen3_tts_context* ctx) {
         ggml_free(ctx->codec.ctx_conv32);
     }
     if (ctx->vp_buf_w) {
-        ggml_backend_buffer_free(ctx->vp_buf_w);
+        core_gguf::release_weight_buffer(ctx->vp_buf_w);
     }
     if (ctx->vp_ctx_w) {
         ggml_free(ctx->vp_ctx_w);
     }
     if (ctx->buf_w) {
-        ggml_backend_buffer_free(ctx->buf_w);
+        core_gguf::release_weight_buffer(ctx->buf_w);
     }
     if (ctx->ctx_w) {
         ggml_free(ctx->ctx_w);
