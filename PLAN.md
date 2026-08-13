@@ -1,14 +1,5 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-08-13 — #302 Pascal Windows TTS startup regression
-
-Worktree: `.claude/worktrees/fix-302-p100-regression` (branch
-`fix/302-p100-regression`). Reproduce the v0.8.28 OmniVoice startup failure
-reported on Windows 10 / Quadro P5000, trace the regression from the previously
-working v0.8.23 release through build and runtime history, fix the actual
-compatibility break, and validate the CUDA path end to end on Kaggle P100 with
-decoded-output proof.
-
 ## CLAIMED 2026-08-13 — PR #347 GGUF weight-mapping release review
 
 Worktree: `.claude/worktrees/review-pr-352`.

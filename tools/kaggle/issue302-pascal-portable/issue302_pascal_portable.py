@@ -133,7 +133,11 @@ common = [
     "--i-have-rights", "--no-watermark", "--no-c2pa",
     "--accept-marking-responsibility", "--no-spoken-disclaimer", "-t", "4",
 ]
-runtime_env = {**os.environ, "OMNIVOICE_CODEC_GPU": "1", "CRISPASR_VERBOSE": "1"}
+runtime_env = {
+    **os.environ,
+    "CRISPASR_OMNIVOICE_CODEC_GPU": "1",
+    "CRISPASR_VERBOSE": "1",
+}
 
 # Reproduce the reporter's failing phase first: persistent server startup with
 # a WAV voice clone configured. It must get beyond model/backend enumeration.
@@ -215,4 +219,3 @@ RESULT.write_text(json.dumps(result, indent=2))
 kh.export_ccache_tar()
 kh.step("done", **result)
 print(json.dumps(result, indent=2), flush=True)
-
