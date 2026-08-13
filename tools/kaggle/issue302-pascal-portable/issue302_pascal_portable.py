@@ -31,7 +31,7 @@ CLI = BUILD / "bin" / "crispasr"
 REF = TMP / "issue302-ref-24k.wav"
 OUT = WORK / "issue302-omnivoice.wav"
 RESULT = WORK / "issue302-result.json"
-BRANCH = os.environ.get("CRISPASR_BRANCH", "fix/302-p100-regression")
+BRANCH = os.environ.get("CRISPASR_BRANCH", "main")
 TEXT = "The quick brown fox jumps over the lazy dog."
 
 
