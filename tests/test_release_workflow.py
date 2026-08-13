@@ -12,6 +12,7 @@ Run:
 """
 
 import os
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -170,6 +171,41 @@ class TestReleaseWorkflow(unittest.TestCase):
             steps_text,
             "split packaging must fail if the CUDA runtime set is incomplete",
         )
+
+    def test_gpu_and_legacy_artifacts_use_portable_cpu_baseline(self):
+        """GPU init must not SIGILL on the old CPU paired with a Pascal GPU (#302)."""
+        required_jobs = (
+            "build-linux-x86_64-cuda",
+            "build-linux-x86_64-cuda13",
+            "build-linux-x86_64-hip",
+            "build-libs-linux-x86_64-hip",
+            "build-linux-x86_64-vulkan",
+            "build-libs-windows-x86_64-vulkan",
+            "build-libs-linux-x86_64-cuda",
+            "build-libs-windows-x86_64-cuda",
+            "build-libs-windows-x86_64-cpu-legacy",
+            "build-windows-cpu-legacy",
+            "build-windows-cuda",
+            "build-windows-vulkan",
+        )
+        for job_name in required_jobs:
+            with self.subTest(job=job_name):
+                match = re.search(
+                    rf"(?ms)^  {re.escape(job_name)}:\n"
+                    rf"(?P<body>.*?)(?=^  [a-zA-Z0-9_-]+:\n|\Z)",
+                    self.text,
+                )
+                self.assertIsNotNone(match, f"release job {job_name} must exist")
+                self.assertIn(
+                    "-DCRISPASR_PORTABLE_CPU=ON",
+                    match.group("body"),
+                    f"{job_name} must use the generic CPU baseline",
+                )
+
+        portable_docker = (REPO / ".devops" / "main-cuda-portable.Dockerfile").read_text()
+        self.assertIn("-DCRISPASR_PORTABLE_CPU=ON", portable_docker)
+        cuda_smoke = (REPO / ".github" / "workflows" / "win-cuda-smoke.yml").read_text()
+        self.assertIn("-DCRISPASR_PORTABLE_CPU=ON", cuda_smoke)
 
 
 if __name__ == "__main__":

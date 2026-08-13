@@ -296,7 +296,7 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF \
             -DGGML_CUDA=ON \
             -DGGML_OPENBLAS=ON \
-            -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON \
+            -DCRISPASR_PORTABLE_CPU=ON \
             -DCMAKE_CUDA_ARCHITECTURES="60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" \
             -DCRISPASR_BUILD_TESTS=OFF \
             -DCRISPASR_BUILD_EXAMPLES=ON \
@@ -385,7 +385,7 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF \
             -DGGML_CUDA=ON \
             -DGGML_OPENBLAS=ON \
-            -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON \
+            -DCRISPASR_PORTABLE_CPU=ON \
             -DCMAKE_CUDA_ARCHITECTURES="75-real;86-real;89-real;120a-real;120-virtual" \
             -DCRISPASR_BUILD_TESTS=OFF \
             -DCRISPASR_BUILD_EXAMPLES=ON \
@@ -473,7 +473,7 @@ jobs:
             -DCMAKE_C_COMPILER=hipcc \
             -DCMAKE_CXX_COMPILER=hipcc \
             -DAMDGPU_TARGETS="gfx906;gfx908;gfx90a;gfx1030;gfx1035;gfx1100;gfx1101;gfx1102;gfx1201" \
-            -DGGML_NATIVE=OFF \
+            -DCRISPASR_PORTABLE_CPU=ON \
             -DCRISPASR_BUILD_TESTS=OFF \
             -DCRISPASR_BUILD_EXAMPLES=ON \
             -DCRISPASR_BUILD_SERVER=OFF \
@@ -561,7 +561,7 @@ jobs:
             -DCMAKE_C_COMPILER=hipcc \
             -DCMAKE_CXX_COMPILER=hipcc \
             -DAMDGPU_TARGETS="gfx906;gfx908;gfx90a;gfx1030;gfx1035;gfx1100;gfx1101;gfx1102;gfx1201" \
-            -DGGML_NATIVE=OFF \
+            -DCRISPASR_PORTABLE_CPU=ON \
             -DCRISPASR_BUILD_TESTS=OFF \
             -DCRISPASR_BUILD_EXAMPLES=OFF \
             -DCRISPASR_BUILD_SERVER=OFF \
@@ -658,7 +658,7 @@ jobs:
             -DBUILD_SHARED_LIBS=OFF \
             -DGGML_VULKAN=ON \
             -DGGML_OPENBLAS=ON \
-            -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON \
+            -DCRISPASR_PORTABLE_CPU=ON \
             -DCRISPASR_BUILD_TESTS=OFF \
             -DCRISPASR_BUILD_EXAMPLES=ON \
             -DCRISPASR_BUILD_SERVER=OFF \
@@ -1486,8 +1486,7 @@ jobs:
             -DCRISPASR_BUILD_SERVER=OFF ^
             -DGGML_VULKAN=ON ^
             -DGGML_CUDA=OFF ^
-            -DGGML_NATIVE=OFF ^
-            -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
+            -DCRISPASR_PORTABLE_CPU=ON ^
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build-libs --config Release -j %NUMBER_OF_PROCESSORS% --target crispasr-lib
 
@@ -1587,7 +1586,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=ON \
             -DGGML_CUDA=ON \
-            -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON \
+            -DCRISPASR_PORTABLE_CPU=ON \
             -DCMAKE_CUDA_ARCHITECTURES="60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" \
             -DCRISPASR_BUILD_TESTS=OFF \
             -DCRISPASR_BUILD_EXAMPLES=OFF \
@@ -1682,8 +1681,7 @@ jobs:
             -DCRISPASR_BUILD_SERVER=OFF ^
             -DGGML_CUDA=ON ^
             -DCMAKE_CUDA_ARCHITECTURES="60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" ^
-            -DGGML_NATIVE=OFF ^
-            -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
+            -DCRISPASR_PORTABLE_CPU=ON ^
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build-libs --config Release -j %NUMBER_OF_PROCESSORS% --target crispasr-lib
 
@@ -1743,12 +1741,10 @@ jobs:
           files: release/libcrispasr-windows-x86_64-cuda.tar.gz
           fail_on_unmatched_files: true
 
-  # ── Windows x86_64 shared libs + headers (CPU legacy SSE4.2) ─────────────────
-  # For dev hosts on pre-Haswell CPUs (Sandy/Ivy Bridge i5/i7-3xxx, AMD
-  # pre-Excavator). Same layout as build-libs-windows-x86_64 but built
-  # with -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF. Symptoms of
-  # using the wrong build on a legacy host: silent instant exit
-  # (STATUS_ILLEGAL_INSTRUCTION) with no error message.
+  # ── Windows x86_64 shared libs + headers (generic CPU legacy) ────────────────
+  # Generic x86-64/SSE2 floor for Westmere-era workstations and newer. Keep the
+  # full optional-ISA set controlled by CRISPASR_PORTABLE_CPU: GGML_NATIVE=OFF
+  # alone silently defaults AVX/BMI2 and is not portable (#261/#302).
   build-libs-windows-x86_64-cpu-legacy:
     if: ${{ !inputs.only || inputs.only == 'build-libs-windows-x86_64-cpu-legacy' }}
     runs-on: windows-latest
@@ -1758,7 +1754,7 @@ jobs:
           submodules: recursive
           ref: ${{ inputs.tag || github.ref }}
 
-      - name: Build (shared libs, CPU legacy SSE4.2)
+      - name: Build (shared libs, generic CPU legacy)
         run: |
           cmake -S . -B build-libs `
             -DCMAKE_BUILD_TYPE=Release `
@@ -1766,9 +1762,7 @@ jobs:
             -DCRISPASR_BUILD_TESTS=OFF `
             -DCRISPASR_BUILD_EXAMPLES=OFF `
             -DCRISPASR_BUILD_SERVER=OFF `
-            -DGGML_NATIVE=OFF `
-            -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF `
-            -DGGML_AVX=ON `
+            -DCRISPASR_PORTABLE_CPU=ON `
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build-libs --config Release -j $env:NUMBER_OF_PROCESSORS --target crispasr-lib
 
@@ -1868,10 +1862,10 @@ jobs:
           files: release/crispasr-windows-x86_64-cpu.zip
           fail_on_unmatched_files: true
 
-  # ── Windows CPU legacy (SSE4.2 — Sandy Bridge/2011+, no AVX2/FMA/F16C) ───────
-  # For CPUs that predate Haswell: Ivy Bridge (i5-3xxx, i7-3xxx), Sandy Bridge,
-  # AMD pre-Excavator. Symptoms of using the wrong build: silent instant exit
-  # (STATUS_ILLEGAL_INSTRUCTION) with no error message.
+  # ── Windows CPU legacy (generic x86-64/SSE2) ────────────────────────────────
+  # For Westmere-era workstations and newer. The old "SSE4.2" job actually set
+  # GGML_AVX=ON and left BMI2 to ggml's default, so it could still SIGILL on the
+  # machines its name promised to support (#261/#302).
   build-windows-cpu-legacy:
     if: ${{ !inputs.only || inputs.only == 'build-windows-cpu-legacy' }}
     runs-on: windows-latest
@@ -1886,9 +1880,7 @@ jobs:
           cmake -S . -B build `
             -DCMAKE_BUILD_TYPE=Release `
             -DBUILD_SHARED_LIBS=OFF `
-            -DGGML_NATIVE=OFF `
-            -DGGML_AVX2=OFF -DGGML_FMA=OFF -DGGML_F16C=OFF `
-            -DGGML_AVX=ON `
+            -DCRISPASR_PORTABLE_CPU=ON `
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build --config Release --target crispasr-cli crispasr-quantize -j $env:NUMBER_OF_PROCESSORS
 
@@ -1956,8 +1948,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release ^
             -DGGML_CUDA=ON ^
             -DCMAKE_CUDA_ARCHITECTURES="60-real;61-real;70-real;75-real;86-real;89-real;120-real;120-virtual" ^
-            -DGGML_NATIVE=OFF ^
-            -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
+            -DCRISPASR_PORTABLE_CPU=ON ^
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build --target crispasr-cli crispasr-quantize -j %NUMBER_OF_PROCESSORS%
 
@@ -2069,8 +2060,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release ^
             -DGGML_VULKAN=ON ^
             -DGGML_CUDA=OFF ^
-            -DGGML_NATIVE=OFF ^
-            -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
+            -DCRISPASR_PORTABLE_CPU=ON ^
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build --target crispasr-cli crispasr-quantize -j %NUMBER_OF_PROCESSORS%
 
