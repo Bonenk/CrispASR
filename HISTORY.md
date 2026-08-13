@@ -10,24 +10,28 @@ technical deep-dives are in `LEARNINGS.md`.
 
 The v0.8.28 Windows CUDA and Vulkan OmniVoice packages could terminate during
 startup with `0xC000001D` on an older HP Z800 host with a Quadro P5000.  The
-Pascal CUDA architecture was present; the failure was in the host CPU backend.
-GPU startup still registers ggml-cpu, while every Windows GPU release artifact
-was compiled for Haswell (`AVX2/FMA/F16C`, plus ggml's default `BMI2`).  The
-so-called legacy jobs disabled AVX2 but still enabled AVX and BMI2.  The same
-latent packaging defect had previously appeared in #261, but its fix covered
-only the portable Docker image.  A ggml update between v0.8.23 and v0.8.28 added
-more eager CPU initialization, explaining why an unsupported host instruction
-could begin executing earlier even though the release flags did not change.
+Pascal CUDA architecture was present. GPU startup still registers ggml-cpu,
+and the Z800's likely Westmere Xeon generation has SSE4.2 but no AVX. However,
+the same AVX2/FMA/F16C/BMI2 release baseline worked for this reporter in v0.8.23,
+so treating that baseline alone as the regression was too broad.
 
-Landed a central `CRISPASR_PORTABLE_CPU` CMake contract and applied it to every
-CUDA, HIP, Vulkan, and legacy release artifact.  It disables all 15 optional
-x86 ISA switches, including AVX, BMI2, and the AVX-512/AMX families.  Configure
-and release-workflow tests prevent an artifact from silently drifting back to
-a newer host baseline.  The portable Docker build and Windows CUDA smoke probe
-use the same contract.
+The release-to-release delta identified ggml commit `dd2aaf04`: it moved a new
+UE4M3 lookup-table fill into unconditional `ggml_cpu_init()`. That made GPU-only
+startup execute newly compiled CPU work even though only NVFP4 CPU dot products
+consume the table. Fork commit `4d9a5c3d` makes initialization thread-safe and
+lazy at the two real consumers (x86 and ARM NVFP4 dot products), with
+`GGML_CPU_EAGER_UE4M3_LUT=1` preserving the old path for A/B diagnosis.
 
-The dedicated Kaggle P100 acceptance kernel built the exact commit for `sm_60`,
-confirmed all 15 ISA switches were off, started the persistent OmniVoice server
+An initial containment change put every GPU artifact on a generic x86-64
+baseline. It was superseded before release: CUDA, HIP, and Vulkan artifacts keep
+their optimized CPU helpers, while only explicitly legacy/portable artifacts
+use `CRISPASR_PORTABLE_CPU`. Thus the one suspected startup operation is gated
+without imposing a global CPU performance regression. Exact confirmation still
+requires the reporter's exception address; the ProcDump/WinDbg recipe is in
+`docs/windows-illegal-instruction-dumps.md`.
+
+The dedicated Kaggle P100 acceptance kernel built the containment commit for
+`sm_60`, confirmed all 15 ISA switches were off, started the persistent OmniVoice server
 with a WAV clone, synthesized 4.759 seconds on CUDA, and round-tripped it through
 Whisper base as `The quick brown fox jumps over the lazy dog.` (1.0 word
 overlap).  This proves the full Pascal CUDA path rather than only compilation.
