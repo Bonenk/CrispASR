@@ -85,6 +85,8 @@
 #include <fcntl.h>
 #include <io.h>
 #endif
+#include <condition_variable>
+#include <deque>
 #include <fstream>
 #include <memory>
 #include <mutex>
@@ -1481,21 +1483,24 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     // Atomic so parallel workers can safely increment it.
     std::atomic<size_t> slices_done{0};
 
-    auto process_slice = [&](size_t i, CrispasrBackend& be) {
+    // Slice i's encoder input range (slice ± optional acoustic context).
+    auto slice_ext_range = [&](size_t i, int& ext_start, int& ext_end, int64_t& ext_t0_cs) {
         const auto& sl = slices[i];
-
-        // Optionally extend the slice with acoustic context.
-        int ext_start = sl.start;
-        int ext_end = sl.end;
+        ext_start = sl.start;
+        ext_end = sl.end;
         if (use_chunk_context) {
             const int ctx_samples = (int)(kChunkContextS * SR);
             ext_start = std::max(0, sl.start - ctx_samples);
             ext_end = std::min((int)samples.size(), sl.end + ctx_samples);
         }
-        const int64_t ext_t0_cs = (int64_t)((double)ext_start / SR * 100.0);
+        ext_t0_cs = (int64_t)((double)ext_start / SR * 100.0);
+    };
 
-        std::vector<crispasr_segment> segs =
-            be.transcribe(samples.data() + ext_start, ext_end - ext_start, ext_t0_cs, params);
+    // Everything after the model call: logits capture, context trimming,
+    // storage, progress. Shared by the sequential, worker-pool and pipelined
+    // paths so all three produce identical per_slice contents.
+    auto finish_slice = [&](size_t i, std::vector<crispasr_segment> segs, CrispasrBackend& be) {
+        const auto& sl = slices[i];
         if (params.return_logits) {
             if (const auto* logits = be.last_ctc_logits())
                 per_slice_logits[i] = *logits;
@@ -1674,6 +1679,13 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         }
     };
 
+    auto process_slice = [&](size_t i, CrispasrBackend& be) {
+        int ext_start = 0, ext_end = 0;
+        int64_t ext_t0_cs = 0;
+        slice_ext_range(i, ext_start, ext_end, ext_t0_cs);
+        finish_slice(i, be.transcribe(samples.data() + ext_start, ext_end - ext_start, ext_t0_cs, params), be);
+    };
+
     const int n_workers = params.return_logits ? 1 : std::min(params.n_processors, (int32_t)slices.size());
 
     auto merged_ctc_logits = [&]() {
@@ -1694,7 +1706,114 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         return merged;
     };
 
-    if (n_workers > 1 && slices.size() > 1) {
+    // Encode ∥ decode pipelining over slices. Backends that expose a split
+    // transcribe run the encoder (GPU) for slice N+1 on a worker thread while
+    // this thread runs the decoder (CPU) for slice N. Same shape of win as the
+    // worker pool below, but with ONE model resident instead of N — so it is
+    // preferred whenever the user has not explicitly asked for -p workers.
+    //
+    // Skipped when return_logits is set: last_ctc_logits() is per-backend state
+    // read right after the model call, and only the serial path can attribute it
+    // to the right slice.
+    //
+    // Not every slice necessarily qualifies (a slice long enough to take a
+    // backend's multi-window route does not), and the pipeline must never fall
+    // back to transcribe() while the producer is running — that would encode on
+    // two threads at once. So the slice list is walked in RUNS of consecutive
+    // qualifying slices: each run gets its own producer thread that is joined
+    // before anything else touches the model, and non-qualifying slices are
+    // processed sequentially in between.
+    const bool split_pipeline_available =
+        slices.size() > 1 && n_workers <= 1 && !params.return_logits && backend.supports_split_transcribe();
+    bool use_split_pipeline = split_pipeline_available;
+    if (const char* e = getenv("CRISPASR_SLICE_PIPELINE"))
+        use_split_pipeline = atoi(e) != 0 && slices.size() > 1 && backend.supports_split_transcribe();
+
+    // Run slices [lo, hi) through the encode ∥ decode pipeline.
+    auto pipeline_run = [&](size_t lo, size_t hi) {
+        struct pending {
+            CrispasrBackend::encoded_slice enc;
+            int64_t t0_cs = 0;
+            bool ok = false;
+        };
+        std::deque<pending> q;
+        std::mutex m;
+        std::condition_variable cv_full, cv_empty;
+        std::vector<size_t> failed_slices;
+        const size_t kCap = 2;
+
+        std::thread producer([&] {
+            for (size_t i = lo; i < hi; i++) {
+                int ext_start = 0, ext_end = 0;
+                int64_t ext_t0_cs = 0;
+                slice_ext_range(i, ext_start, ext_end, ext_t0_cs);
+                pending p;
+                p.t0_cs = ext_t0_cs;
+                p.enc = backend.encode_slice(samples.data() + ext_start, ext_end - ext_start, params);
+                p.ok = (p.enc.h != nullptr);
+                std::unique_lock<std::mutex> lk(m);
+                cv_full.wait(lk, [&] { return q.size() < kCap; });
+                q.push_back(p);
+                cv_empty.notify_one();
+            }
+        });
+
+        for (size_t i = lo; i < hi; i++) {
+            pending p;
+            {
+                std::unique_lock<std::mutex> lk(m);
+                cv_empty.wait(lk, [&] { return !q.empty(); });
+                p = q.front();
+                q.pop_front();
+                cv_full.notify_one();
+            }
+            if (!p.ok) {
+                // Unexpected encode failure (e.g. VRAM OOM) on a slice that did
+                // qualify. Defer to AFTER the join: the fallback re-encodes, and
+                // that must not overlap the producer.
+                failed_slices.push_back(i);
+                continue;
+            }
+            finish_slice(i, backend.decode_slice(p.enc, p.t0_cs, params), backend);
+        }
+
+        producer.join();
+
+        // Single-threaded again: retry anything the encoder dropped.
+        for (size_t i : failed_slices)
+            process_slice(i, backend);
+    };
+
+    if (use_split_pipeline) {
+        std::vector<char> qualifies(slices.size(), 0);
+        size_t n_ok = 0;
+        for (size_t i = 0; i < slices.size(); i++) {
+            int es = 0, ee = 0;
+            int64_t et = 0;
+            slice_ext_range(i, es, ee, et);
+            qualifies[i] = backend.can_split_slice(ee - es, params) ? 1 : 0;
+            n_ok += qualifies[i];
+        }
+        if (!params.no_prints && params.verbose)
+            fprintf(stderr, "crispasr: pipelining encode/decode over %zu/%zu slices\n", n_ok, slices.size());
+
+        size_t i = 0;
+        while (i < slices.size()) {
+            if (!qualifies[i]) {
+                process_slice(i, backend);
+                i++;
+                continue;
+            }
+            size_t j = i;
+            while (j < slices.size() && qualifies[j])
+                j++;
+            if (j - i >= 2)
+                pipeline_run(i, j);
+            else
+                process_slice(i, backend); // lone qualifying slice: nothing to overlap
+            i = j;
+        }
+    } else if (n_workers > 1 && slices.size() > 1) {
         // Parallel slice processing with separate backend instances
         if (!params.no_prints) {
             fprintf(stderr, "crispasr: parallel processing %zu slices with %d workers\n", slices.size(), n_workers);

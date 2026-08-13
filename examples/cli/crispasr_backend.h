@@ -178,6 +178,40 @@ public:
     // until the next transcribe() / shutdown().
     virtual const crispasr_ctc_logits* last_ctc_logits() const { return nullptr; }
 
+    // ---- Optional split transcribe (encode ∥ decode pipelining) ----
+    //
+    // Encoder-decoder backends typically run the encoder on the GPU and the
+    // decoder on the CPU. Processing N slices with transcribe() serialises the
+    // two, leaving one processor idle at all times. A backend that can hand out
+    // its intermediate encoder state lets the caller overlap the encode of
+    // slice N+1 with the decode of slice N — the same throughput win as a
+    // worker pool, without the N-times model memory.
+    //
+    // Contract: encode_slice() may be called on a WORKER thread while
+    // decode_slice() runs on another, so a backend may only advertise this when
+    // its encode and decode paths touch disjoint state. Calls are issued in
+    // slice order and decodes happen in the same order. The handle is opaque
+    // and must be consumed by exactly one decode_slice(), which frees it;
+    // release_encoded() frees an unconsumed handle on an error path.
+    struct encoded_slice {
+        void* h = nullptr; // backend-owned; null = encode failed
+    };
+    virtual bool supports_split_transcribe() const { return false; }
+    // Whether THIS slice length can go through encode_slice/decode_slice. A
+    // backend may route long inputs through a multi-window path that the split
+    // pair does not reproduce. The caller must check every slice up front and
+    // fall back to the fully sequential path if any slice says no — mixing
+    // transcribe() into a running pipeline would encode on two threads at once.
+    virtual bool can_split_slice(int /*n_samples*/, const whisper_params& /*params*/) const { return false; }
+    virtual encoded_slice encode_slice(const float* /*samples*/, int /*n_samples*/, const whisper_params& /*params*/) {
+        return {};
+    }
+    virtual std::vector<crispasr_segment> decode_slice(encoded_slice /*enc*/, int64_t /*t_offset_cs*/,
+                                                       const whisper_params& /*params*/) {
+        return {};
+    }
+    virtual void release_encoded(encoded_slice /*enc*/) {}
+
     // Optional stereo-aware overload for backends that can split stereo
     // channels for diarization (currently: whisper). Default
     // implementation falls through to mono transcribe(); override when
