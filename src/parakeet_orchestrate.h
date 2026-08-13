@@ -111,6 +111,39 @@ inline int parakeet_effective_single_pass_cap_s(const parakeet_strategy_in& in, 
     return in.stream_threshold_s > 0 ? std::min(in.stream_threshold_s, bounded) : in.stream_threshold_s;
 }
 
+// Default LONGFORM window (s) — the size of each silence-split piece once audio
+// exceeds the effective single-pass cap. DISTINCT from that cap: it only affects
+// audio that was going to be split anyway, so lowering it costs no seamless
+// single-pass coverage. Effective window is min(this, cap), which keeps
+// CRISPASR_PARAKEET_STREAM_THRESHOLD=N behaving as before for N <= 90.
+//
+// The two used to be one number and could not be tuned independently: lowering
+// it to get cheaper LONGFORM windows also pushed mid-length audio off the
+// seamless single-pass path (127 s file: 0.91 % WER as one pass vs 1.21 % once
+// split in two). Hence the split — the cap stays 300.
+//
+// This is a THROUGHPUT knob only. The FastConformer encoder materialises an
+// O(T^2) relative-position bias, so covering the same audio in k windows costs
+// ~T^2/k instead of T^2. Smaller windows are strictly less encoder work and the
+// direction is hardware-independent — measured 300 -> 90: 1.85x on Metal, 1.53x
+// on CPU (-ng), same M1 Pro. It saturates around 60-90 s where the linear
+// conv/FFN terms take over, so 90 sits at the knee.
+//
+// It is deliberately NOT a coverage knob. Window size used to change how much
+// speech went missing (a 300 s window dropped 233 of 2175 words on one 12 min
+// file while being word-exact on another), which made the number look
+// load-bearing. Issue #350's gap_fill_segments repairs dropped spans whichever
+// strategy produced them, and with it in place WER is flat across window sizes —
+// two ~12 min LibriSpeech concatenations, M1 Pro / parakeet-tdt-0.6b-v3 Q4_K /
+// Metal:
+//          300 s    150 s    90 s     60 s
+//   A      1.87 %   1.81 %   1.87 %   1.93 %
+//   B      1.24 %   1.56 %   1.38 %   1.24 %
+// Non-monotonic and inside run-to-run noise. So tune this for speed and memory;
+// coverage is gap_fill_segments' job.
+// Override with CRISPASR_PARAKEET_LONGFORM_WINDOW.
+constexpr int kParakeetLongformWindowS = 90;
+
 // Pure routing decision — no model, no side effects. Mirrors the adapter:
 //   - non-JA + explicit --chunk-seconds>0            → CHUNK_SEGMENTED
 //   - longform on + threshold>0 + n > threshold       → LONGFORM
