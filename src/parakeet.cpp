@@ -1363,7 +1363,12 @@ struct parakeet_emitted_token {
 //
 // Returns whether to use ggml decode, and builds the persistent `gdec` when so.
 // Shared by every parakeet decode variant (greedy, beam, maes, rnnt).
-static bool parakeet_init_ggml_decoder(parakeet_context* ctx, core_rnnt_ggml::Decoder& gdec) {
+// Whether the TDT/RNNT decode runs as ggml graphs on ctx->backend (as opposed
+// to the cblas CPU path). Split out of parakeet_init_ggml_decoder so callers
+// can ask the question WITHOUT building the decoder — the long-form pipeline
+// needs it to decide whether encode and decode may overlap on two threads
+// (they may not when both drive ctx->backend). Keep the two in lockstep.
+static bool parakeet_ggml_decode_active(const parakeet_context* ctx) {
     bool ggml_dec = !ggml_backend_is_cpu(ctx->backend);
     // ggml decode wins on CUDA/Vulkan (slow CPU BLAS: P100 5-12x) but LOSES on
     // Metal, where Apple Accelerate cblas beats the small-matmul GPU decode (M1
@@ -1374,6 +1379,15 @@ static bool parakeet_init_ggml_decoder(parakeet_context* ctx, core_rnnt_ggml::De
 #endif
     if (const char* e = crispasr_env::get("CRISPASR_PARAKEET_GGML_DECODE"))
         ggml_dec = (e[0] == '1');
+    return ggml_dec;
+}
+
+extern "C" int parakeet_decode_uses_backend(struct parakeet_context* ctx) {
+    return (ctx && parakeet_ggml_decode_active(ctx)) ? 1 : 0;
+}
+
+static bool parakeet_init_ggml_decoder(parakeet_context* ctx, core_rnnt_ggml::Decoder& gdec) {
+    bool ggml_dec = parakeet_ggml_decode_active(ctx);
     if (ggml_dec && crispasr_env::get("CRISPASR_RNNT_GGML_PERSTEP") == nullptr) {
         const auto& p = ctx->model.predictor;
         const auto& j = ctx->model.joint;

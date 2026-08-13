@@ -11,11 +11,15 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -148,10 +152,19 @@ int find_silence_cut(const float* s, int n, int target, int window, int sr) {
     return best_pos;
 }
 
-// Silence-split single-pass longform (mirrors the adapter's transcribe_longform).
-std::vector<parakeet_seg> transcribe_longform(parakeet_context* ctx, const float* samples, int n_samples,
-                                              int64_t t_offset_cs, int cap_samples) {
-    std::vector<parakeet_seg> out;
+// One silence-split longform window. The boundaries depend only on the PCM, so
+// the whole plan can be computed up front — which is what lets the encoder run
+// ahead of the decoder (see transcribe_longform).
+struct lf_window {
+    int ext_s, ext_e;          // encoder input range (window ± 2 s context)
+    int64_t ext_t0;            // absolute start of ext_s, centiseconds
+    int64_t left_cs, right_cs; // keep words with left_cs <= t0 < right_cs
+};
+
+// Reproduces the original serial loop's window sequence exactly.
+std::vector<lf_window> plan_longform_windows(const float* samples, int n_samples, int64_t t_offset_cs,
+                                             int cap_samples) {
+    std::vector<lf_window> plan;
     const int SR = 16000;
     const int search = 5 * SR;
     const int ctxs = 2 * SR;
@@ -165,44 +178,16 @@ std::vector<parakeet_seg> transcribe_longform(parakeet_context* ctx, const float
             if (end <= pos)
                 end = std::min(n_samples, pos + cap_samples);
         }
-        const int ext_s = std::max(0, pos - ctxs);
-        const int ext_e = std::min(n_samples, end + ctxs);
-        const int64_t ext_t0 = t_offset_cs + (int64_t)((double)ext_s / SR * 100.0);
-        const int64_t left_cs = (pos == 0) ? INT64_MIN : t_offset_cs + (int64_t)((double)pos / SR * 100.0);
-        const int64_t right_cs = (end == n_samples) ? INT64_MAX : t_offset_cs + (int64_t)((double)end / SR * 100.0);
-
-        parakeet_result* r = parakeet_transcribe_ex(ctx, samples + ext_s, ext_e - ext_s, ext_t0);
-        if (r) {
-            parakeet_seg full = result_to_seg(r, ext_t0);
-            parakeet_result_free(r);
-
-            parakeet_seg seg;
-            seg.t0 = left_cs == INT64_MIN ? full.t0 : left_cs;
-            seg.t1 = seg.t0;
-            std::string text;
-            for (auto& w : full.words) {
-                if (w.t0 >= left_cs && w.t0 < right_cs) {
-                    if (!text.empty())
-                        text += ' ';
-                    text += w.text;
-                    seg.words.push_back(std::move(w));
-                }
-            }
-            for (auto& tk : full.tokens) {
-                if (tk.t0 >= left_cs && tk.t0 < right_cs)
-                    seg.tokens.push_back(std::move(tk));
-            }
-            seg.text = std::move(text);
-            if (!seg.words.empty()) {
-                seg.t0 = seg.words.front().t0;
-                seg.t1 = seg.words.back().t1;
-            }
-            if (!seg.text.empty() || !seg.words.empty())
-                out.push_back(std::move(seg));
-        }
+        lf_window w;
+        w.ext_s = std::max(0, pos - ctxs);
+        w.ext_e = std::min(n_samples, end + ctxs);
+        w.ext_t0 = t_offset_cs + (int64_t)((double)w.ext_s / SR * 100.0);
+        w.left_cs = (pos == 0) ? INT64_MIN : t_offset_cs + (int64_t)((double)pos / SR * 100.0);
+        w.right_cs = (end == n_samples) ? INT64_MAX : t_offset_cs + (int64_t)((double)end / SR * 100.0);
+        plan.push_back(w);
         pos = end;
     }
-    return out;
+    return plan;
 }
 
 // Normalize a word for boundary-dedup comparison: lowercase + drop ASCII
@@ -407,6 +392,118 @@ int gap_fill_segments(parakeet_context* ctx, const float* samples, int n_samples
         }
     }
     return total;
+}
+
+// Trim one window's decode to its non-overlapping span and append it. Shared by
+// the serial and pipelined paths so both produce byte-identical segments.
+// Consumes `r` (frees it).
+void append_window_seg(parakeet_result* r, const lf_window& w, std::vector<parakeet_seg>& out) {
+    if (!r)
+        return;
+    parakeet_seg full = result_to_seg(r, w.ext_t0);
+    parakeet_result_free(r);
+
+    parakeet_seg seg;
+    seg.t0 = w.left_cs == INT64_MIN ? full.t0 : w.left_cs;
+    seg.t1 = seg.t0;
+    std::string text;
+    for (auto& word : full.words) {
+        if (word.t0 >= w.left_cs && word.t0 < w.right_cs) {
+            if (!text.empty())
+                text += ' ';
+            text += word.text;
+            seg.words.push_back(std::move(word));
+        }
+    }
+    for (auto& tk : full.tokens) {
+        if (tk.t0 >= w.left_cs && tk.t0 < w.right_cs)
+            seg.tokens.push_back(std::move(tk));
+    }
+    seg.text = std::move(text);
+    if (!seg.words.empty()) {
+        seg.t0 = seg.words.front().t0;
+        seg.t1 = seg.words.back().t1;
+    }
+    if (!seg.text.empty() || !seg.words.empty())
+        out.push_back(std::move(seg));
+}
+
+// Silence-split single-pass longform (mirrors the adapter's transcribe_longform).
+//
+// The windows are independent: each is encoded from raw PCM and the merge is a
+// pure timestamp filter. The encoder runs on ctx->backend (GPU) and the TDT
+// decoder on the CPU (cblas), so running them strictly in sequence left one of
+// the two idle at all times — measured 0.42 cores on an 11.2 min file, with the
+// stage sum equal to wall time (encoder 67 %, decode 32 %).
+//
+// So: a producer thread encodes window N+1 while this thread decodes window N.
+// Order is preserved (single producer, single consumer, FIFO), and the queue is
+// bounded so at most two encoder buffers are resident (~4.5 MB each at 90 s).
+//
+// Safety: the two threads touch DISJOINT parakeet_context state — the encoder
+// owns sched/compute_meta/cached_enc_*, the decoder owns pred_w/joint_w and
+// reads the model. That stops being true when the decoder is itself a ggml
+// graph on ctx->backend (CUDA/Vulkan default), so pipelining is disabled when
+// parakeet_decode_uses_backend() says so. CRISPASR_PARAKEET_PIPELINE=0/1
+// forces it off/on.
+std::vector<parakeet_seg> transcribe_longform(parakeet_context* ctx, const float* samples, int n_samples,
+                                              int64_t t_offset_cs, int cap_samples) {
+    std::vector<parakeet_seg> out;
+    const std::vector<lf_window> plan = plan_longform_windows(samples, n_samples, t_offset_cs, cap_samples);
+    if (plan.empty())
+        return out;
+
+    bool pipeline = plan.size() > 1 && parakeet_decode_uses_backend(ctx) == 0;
+    if (const char* e = getenv("CRISPASR_PARAKEET_PIPELINE"))
+        pipeline = atoi(e) != 0 && plan.size() > 1;
+
+    if (!pipeline) {
+        for (const auto& w : plan)
+            append_window_seg(parakeet_transcribe_ex(ctx, samples + w.ext_s, w.ext_e - w.ext_s, w.ext_t0), w, out);
+        return out;
+    }
+
+    struct enc_item {
+        float* buf = nullptr; // malloc'd by parakeet_encode; nullptr = encode failed
+        int T_enc = 0;
+        int d_model = 0;
+    };
+
+    std::deque<enc_item> q;
+    std::mutex m;
+    std::condition_variable cv_full, cv_empty;
+    size_t produced = 0;
+    const size_t kQueueCap = 2;
+
+    std::thread producer([&] {
+        for (const auto& w : plan) {
+            enc_item it;
+            it.buf = parakeet_encode(ctx, samples + w.ext_s, w.ext_e - w.ext_s, &it.T_enc, &it.d_model);
+            std::unique_lock<std::mutex> lk(m);
+            cv_full.wait(lk, [&] { return q.size() < kQueueCap; });
+            q.push_back(it);
+            ++produced;
+            cv_empty.notify_one();
+        }
+    });
+
+    for (size_t i = 0; i < plan.size(); ++i) {
+        enc_item it;
+        {
+            std::unique_lock<std::mutex> lk(m);
+            cv_empty.wait(lk, [&] { return !q.empty(); });
+            it = q.front();
+            q.pop_front();
+            cv_full.notify_one();
+        }
+        if (!it.buf)
+            continue; // encode failed for this window; keep going, order intact
+        append_window_seg(parakeet_decode_frames(ctx, it.buf, it.T_enc, it.d_model, plan[i].ext_t0), plan[i], out);
+        free(it.buf);
+    }
+
+    producer.join();
+    return out;
 }
 
 struct resolved_strategy {
