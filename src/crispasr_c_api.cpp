@@ -5308,8 +5308,12 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             const char* e = getenv("CRISPASR_SESSION_UNIFIED_DISPATCH");
             return !(e && e[0] == '0'); // default on; only an explicit "0" disables
         }();
-        if (_unified) {
-            const bool is_ja = parakeet_vocab_is_japanese(s->parakeet_ctx) != 0;
+        const bool is_ja = parakeet_vocab_is_japanese(s->parakeet_ctx) != 0;
+        // The shared orchestrator owns the non-JA long-form repair from #350.
+        // Keep JA on the established slice/gap-fill path until that path is
+        // deliberately hoisted too; routing JA through the generic streamed
+        // branch loses the interior-content guarantee from issue #89.
+        if (_unified && !is_ja) {
             parakeet_orchestrate_opts oo;
             oo.chunk_seconds_explicit = s->parakeet_force_chunk_seconds > 0;
             oo.chunk_seconds = s->parakeet_force_chunk_seconds > 0 ? s->parakeet_force_chunk_seconds : 0;
@@ -5491,7 +5495,6 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         // JA-model detection matches the CLI adapter (is_ja_model_). Issue #257:
         // detect by vocab CONTENT, not size — small-vocab English models
         // (parakeet-tdt-1.1b, vocab 1024) were misclassified as Japanese.
-        const bool is_ja = parakeet_vocab_is_japanese(s->parakeet_ctx) != 0;
         int chunk_s = 20;       // non-JA overlapping-window length (s)
         int overlap_s = 8;      // window overlap (s)
         int stream_chunk_s = 0; // JA streamed window (s); 0 = library per-model default
