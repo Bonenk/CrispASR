@@ -1,5 +1,12 @@
 # CrispASR — Pending work
 
+## CLAIMED 2026-08-13 — PR #352 Parakeet language-safe review
+
+Worktree: `.claude/worktrees/review-pr-352`.
+Review PR #352 end to end, validate that its long-form routing and gap repair
+do not regress any language path, add targeted unit/live coverage where needed,
+and merge or improve the change after local/SSD validation.
+
 ## Start here
 
 Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
