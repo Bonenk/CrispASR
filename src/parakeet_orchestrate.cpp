@@ -601,6 +601,31 @@ resolved_strategy resolve_strategy(parakeet_context* ctx, int n_samples, bool is
 
 } // namespace
 
+bool parakeet_slice_is_single_pass(parakeet_context* ctx, int n_samples, bool is_ja,
+                                   const parakeet_orchestrate_opts& opts) {
+    if (!ctx || n_samples <= 0)
+        return false;
+    // The simulated-OOM hook makes single-pass fail on purpose; the split path
+    // has no streamed retry of its own, so leave those runs on transcribe().
+    if (getenv("CRISPASR_PARAKEET_SIMULATE_ENCODE_OOM"))
+        return false;
+    return resolve_strategy(ctx, n_samples, is_ja, opts, /*quiet=*/true).strat == parakeet_strategy::SINGLE_PASS;
+}
+
+std::vector<parakeet_seg> parakeet_decode_frames_to_segments(parakeet_context* ctx, const float* enc_frames, int T_enc,
+                                                             int d_model, int64_t t_offset_cs) {
+    std::vector<parakeet_seg> out;
+    if (!ctx || !enc_frames || T_enc <= 0)
+        return out;
+    parakeet_result* r = parakeet_decode_frames(ctx, enc_frames, T_enc, d_model, t_offset_cs);
+    if (!r)
+        return out;
+    // Same tail as the SINGLE_PASS branch of parakeet_transcribe_segments().
+    out.push_back(result_to_seg(r, t_offset_cs));
+    parakeet_result_free(r);
+    return out;
+}
+
 std::vector<parakeet_seg> parakeet_transcribe_segments(parakeet_context* ctx, const float* samples, int n_samples,
                                                        int64_t t_offset_cs, bool is_ja,
                                                        const parakeet_orchestrate_opts& opts) {

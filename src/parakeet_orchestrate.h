@@ -252,6 +252,23 @@ inline bool parakeet_singlepass_fits_budget(int T_enc, int n_heads, double budge
 // pass parakeet_vocab_is_japanese(ctx)). Reads the same CRISPASR_PARAKEET_*
 // env knobs the adapter did, so behaviour is byte-identical to the pre-hoist
 // adapter path.
+// True when parakeet_transcribe_segments() would take the plain SINGLE_PASS
+// route for this input — exactly one encode + one decode, so the caller may
+// substitute parakeet_encode() + parakeet_decode_frames_to_segments() and get
+// an identical result. False for LONGFORM / STREAMED / CHUNK_SEGMENTED inputs,
+// which do their own multi-window merging and must go through transcribe().
+bool parakeet_slice_is_single_pass(struct parakeet_context* ctx, int n_samples, bool is_ja,
+                                   const parakeet_orchestrate_opts& opts);
+
+// Second half of the SINGLE_PASS path: decode already-encoded frames into the
+// neutral segment shape. Pairs with parakeet_encode() so a caller processing
+// many short slices can overlap the encode of slice N+1 (GPU) with the decode
+// of slice N (CPU). Produces exactly what parakeet_transcribe_segments() would
+// have returned for a slice that took SINGLE_PASS, so the two are
+// interchangeable. Does NOT free `enc_frames`.
+std::vector<parakeet_seg> parakeet_decode_frames_to_segments(struct parakeet_context* ctx, const float* enc_frames,
+                                                             int T_enc, int d_model, int64_t t_offset_cs);
+
 std::vector<parakeet_seg> parakeet_transcribe_segments(struct parakeet_context* ctx, const float* samples,
                                                        int n_samples, int64_t t_offset_cs, bool is_ja,
                                                        const parakeet_orchestrate_opts& opts);
