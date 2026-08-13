@@ -27,6 +27,7 @@
 #include "crispasr_session.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
