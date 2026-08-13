@@ -1,5 +1,13 @@
 # CrispASR — Pending work
 
+## CLAIMED 2026-08-13 — #302 atomic UE4M3 startup regression fix
+
+Worktree: `.claude/worktrees/fix-302-ue4m3-lazy` (branch
+`fix/302-ue4m3-lazy`). Replace the broad portable-CPU release workaround with
+lazy, thread-safe UE4M3 LUT initialization in the shared ggml fork; restore
+optimized GPU artifacts, validate eager/deferred equivalence and Windows CUDA
+packaging, and document how to capture the reporter's exact fault address.
+
 ## CLAIMED 2026-08-13 — PR #347 GGUF weight-mapping release review
 
 Worktree: `.claude/worktrees/review-pr-352`.
