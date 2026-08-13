@@ -1,6 +1,13 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-08-13 — PR #352 Parakeet language-safe review
+## CLAIMED 2026-08-13 — PR #352 JA parity follow-up
+
+Worktree: `.claude/worktrees/review-pr-352`.
+Repair the JA regression found by SSD-backed live A/B testing after PR #352,
+preserving the established JA slice/gap-fill path while retaining the non-JA
+long-form fix, then rerun both language live tests before updating main.
+
+## CLAIMED 2026-08-13 — PR #347 GGUF weight-mapping release review
 
 Worktree: `.claude/worktrees/review-pr-352`.
 Review PR #352 end to end, validate that its long-form routing and gap repair
