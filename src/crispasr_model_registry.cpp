@@ -1495,8 +1495,8 @@ static std::string effective_license(const Entry& e) {
     if (e.license)
         return e.license;
     const std::string b = e.backend ? e.backend : "";
-    if (b == "parakeet" || b == "parakeet-ja" || b.rfind("parakeet-", 0) == 0 || b == "canary" ||
-        b == "canary-qwen" || b.rfind("fastconformer-", 0) == 0)
+    if (b == "parakeet" || b == "parakeet-ja" || b.rfind("parakeet-", 0) == 0 || b == "canary" || b == "canary-qwen" ||
+        b.rfind("fastconformer-", 0) == 0)
         return "CC-BY-4.0 (see the original NVIDIA model card)";
     if (b == "fastpitch")
         return "CC-BY-4.0 (see the original model card)";
@@ -1512,11 +1512,11 @@ static std::string effective_license(const Entry& e) {
         return "llama3.2 (see https://huggingface.co/HumeAI/tada-3b-ml/blob/main/LICENSE)";
     if (b.rfind("orpheus", 0) == 0)
         return "llama3.2 (see https://huggingface.co/unsloth/orpheus-3b-0.1-ft)";
-    if (b.rfind("lex-au-orpheus", 0) == 0 || b.rfind("kartoffel-orpheus", 0) == 0 ||
-        b.rfind("kartoffelbox", 0) == 0)
+    if (b.rfind("lex-au-orpheus", 0) == 0 || b.rfind("kartoffel-orpheus", 0) == 0 || b.rfind("kartoffelbox", 0) == 0)
         return "llama3.2 (see the upstream Orpheus model card)";
     if (b == "lfm2-audio")
-        return "lfm1.0 (commercial use threshold and attribution; see https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B)";
+        return "lfm1.0 (commercial use threshold and attribution; see "
+               "https://huggingface.co/LiquidAI/LFM2.5-Audio-1.5B)";
     if (b == "funasr" || b == "fun-asr-mlt-nano" || b == "sensevoice" || b == "paraformer")
         return "funasr-v1.1 (attribution required; see the original FunAudioLLM model card)";
     return "";
@@ -1580,8 +1580,9 @@ static bool license_requires_acceptance_tag(const std::string& tag) {
         return true;
     if (tag.rfind("llama", 0) == 0)
         return true;
-    static const char* restricted[] = {"gemma", "gemma-terms", "qwen-research", "mistral-ai-research", "lfm1.0",
-                                       "lfm-open-1.0", "funasr-v1.1", "pocket-tts-terms", "other", nullptr};
+    static const char* restricted[] = {"gemma",  "gemma-terms",  "qwen-research", "mistral-ai-research",
+                                       "lfm1.0", "lfm-open-1.0", "funasr-v1.1",   "pocket-tts-terms",
+                                       "other",  nullptr};
     for (const char** p = restricted; *p; ++p)
         if (tag == *p)
             return true;
@@ -1667,9 +1668,8 @@ bool crispasr_license_accepted(const std::string& license, const std::string& ac
     return license_accepted(license, accepted);
 }
 
-std::string crispasr_managed_download(const std::string& filename, const std::string& url,
-                                      const std::string& license, bool quiet, const char* label,
-                                      const std::string& cache_dir_override,
+std::string crispasr_managed_download(const std::string& filename, const std::string& url, const std::string& license,
+                                      bool quiet, const char* label, const std::string& cache_dir_override,
                                       const std::string& accepted_license) {
     CrispasrRegistryEntry artifact;
     artifact.filename = filename;
