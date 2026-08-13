@@ -306,10 +306,10 @@ public:
             const std::string base = (p.backend == "tada-1b" || p.backend == "tada-tts-1b")
                                          ? "https://huggingface.co/cstr/tada-tts-1b-GGUF/resolve/main/"
                                          : "https://huggingface.co/cstr/tada-tts-3b-ml-GGUF/resolve/main/";
-            return crispasr_managed_download(
-                fname, base + fname,
-                "llama3.2 (TADA-derived auxiliary model; see https://huggingface.co/HumeAI/tada-3b-ml/blob/main/LICENSE)",
-                p.no_prints, "crispasr[tada]", p.cache_dir, p.accept_license);
+            return crispasr_managed_download(fname, base + fname,
+                                             "llama3.2 (TADA-derived auxiliary model; see "
+                                             "https://huggingface.co/HumeAI/tada-3b-ml/blob/main/LICENSE)",
+                                             p.no_prints, "crispasr[tada]", p.cache_dir, p.accept_license);
         }
         return std::string();
     }

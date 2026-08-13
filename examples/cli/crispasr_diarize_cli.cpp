@@ -320,7 +320,8 @@ std::string resolve_foxnose_embedder(const whisper_params& params) {
         if (crispasr_registry_lookup("wespeaker", entry)) {
             if (crispasr_license_requires_acceptance(entry.license) &&
                 !crispasr_license_accepted(entry.license, params.accept_license)) {
-                fprintf(stderr, "crispasr[diarize]: refusing restricted WeSpeaker weights without --accept-license %s\n",
+                fprintf(stderr,
+                        "crispasr[diarize]: refusing restricted WeSpeaker weights without --accept-license %s\n",
                         crispasr_license_tag(entry.license).c_str());
                 return {};
             }
