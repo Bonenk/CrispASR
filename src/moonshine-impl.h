@@ -1,7 +1,5 @@
 #pragma once
 
-#include "core/gguf_loader.h"
-
 #include "ggml.h"
 #include "ggml-backend.h"
 
@@ -131,9 +129,8 @@ struct moonshine_model {
 
     moonshine_model() = default;
     ~moonshine_model() {
-        // Weight buffers from core_gguf::load_weights / load_weights_split.
-        core_gguf::release_weight_buffer(buf_w);
-        core_gguf::release_weight_buffer(buf_w_cpu);
+        ggml_backend_buffer_free(buf_w);
+        ggml_backend_buffer_free(buf_w_cpu);
         ggml_free(ctx_w);
     }
 

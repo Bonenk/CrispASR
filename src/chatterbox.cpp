@@ -914,11 +914,11 @@ struct chatterbox_context {
         if (voice_ctx_w)
             ggml_free(voice_ctx_w);
         if (voice_buf_w)
-            core_gguf::release_weight_buffer(voice_buf_w);
+            ggml_backend_buffer_free(voice_buf_w);
         if (ctx_w)
             ggml_free(ctx_w);
         if (buf_w)
-            core_gguf::release_weight_buffer(buf_w);
+            ggml_backend_buffer_free(buf_w);
         if (backend && backend != backend_cpu)
             ggml_backend_free(backend);
         if (backend_cpu)
@@ -4019,7 +4019,7 @@ static int chatterbox_load_voice_gguf(chatterbox_context* ctx, const char* path)
         ctx->voice_ctx_w = nullptr;
     }
     if (ctx->voice_buf_w) {
-        core_gguf::release_weight_buffer(ctx->voice_buf_w);
+        ggml_backend_buffer_free(ctx->voice_buf_w);
         ctx->voice_buf_w = nullptr;
     }
     ctx->voice_tensors.clear();
@@ -4242,7 +4242,7 @@ static int chatterbox_install_native_voice(chatterbox_context* ctx, const float 
         ctx->voice_ctx_w = nullptr;
     }
     if (ctx->voice_buf_w) {
-        core_gguf::release_weight_buffer(ctx->voice_buf_w);
+        ggml_backend_buffer_free(ctx->voice_buf_w);
         ctx->voice_buf_w = nullptr;
     }
     ctx->voice_tensors.clear();
