@@ -960,8 +960,8 @@ CLD3 is the smallest+fastest option (440 KB F16, 109 langs, Apache-2.0)
 but inherits CLD3's known short-input quirks (`"Hello world"` lands on
 `ky 0.72` consistently — too short to disambiguate; the C++ port
 faithfully reproduces upstream's `pycld3` behaviour). GlotLID-V3 covers
-the most languages (2102 ISO 639-3 + script). LID-176 is **CC-BY-SA-3.0
-(viral)** — pick CLD3 or GlotLID for non-SA distribution.
+the most languages (2102 ISO 639-3 + script). LID-176 is **CC-BY-NC-4.0
+(non-commercial)** — pick CLD3 or GlotLID for commercial distribution.
 
 ## Diarization
 
@@ -1420,6 +1420,24 @@ int open0  = crispasr_session_tab_string_open_midi(s, 0);  // for capo/transpose
 until the next call or session close.
 
 ### Model and licence
+
+#### Managed model downloads
+
+CrispASR records the upstream licence for every managed registry artifact and
+prints it when the artifact is loaded. Restricted terms (including Llama,
+Gemma, FunASR, CC-BY-NC/SA, Pocket TTS and other custom licences) require an
+exact acceptance tag before auto-download:
+
+```bash
+crispasr --backend tada -m auto --auto-download \
+  --accept-license llama3.2 -f input.wav
+```
+
+`--accept-license all` is also supported. This is an explicit acknowledgement
+gate, not a technical enforcement mechanism: downstream distributors remain
+responsible for carrying the upstream licence, attribution, acceptable-use and
+non-commercial terms. Explicit local paths and caller-supplied URLs are not
+managed downloads and are left under the caller's control.
 
 Weights are **CC BY 4.0** from the EGSet12 record
 (<https://zenodo.org/records/11406378>) — commercial use permitted,

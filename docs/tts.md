@@ -18,7 +18,7 @@ trade-off:
 | **`vibevoice-1.5b`** | Base VibeVoice TTS model with WAV cloning. | Yes (`CRISPASR_VIBEVOICE_VOICE_AUDIO=<wav>` or `--voice <wav>`) | ~1.6 GB via `-m auto` |
 | **`orpheus`** | Llama-3.2-3B talker + SNAC 24 kHz codec. 8 baked English speakers; expressive output. Greedy loops — pass `--temperature 0.6`. | Preset names via `--voice tara/leah/...` | ~3.5 GB via `-m auto` (talker Q8 + 26 MB SNAC) |
 | **`chatterbox`** | T3 AR + S3Gen flow-matching + HiFTGenerator. Built-in voice baked into the T3 GGUF; clones via a baked voice GGUF (see workflow below). EN/AR/DE variants share runtime. | Yes (`--voice <voice.gguf>`, baked from a WAV with `models/bake-chatterbox-voice-from-wav.py`) | ~880 MB via `-m auto` (T3 Q8 + S3Gen Q8) |
-| **`outetts`** | OuteTTS-0.3-1B: OLMo-1B LLM + WavTokenizer single-codebook VQ-GAN. Lightweight (1B params), CC BY 4.0 license. 24 kHz output. | Yes (`--voice <speaker.json>`, created with `tools/reference_backends/outetts_create_speaker.py`) | ~2.5 GB via `-m auto` (talker F16 + WavTokenizer decoder) |
+| **`outetts`** | OuteTTS-0.3-1B: OLMo-1B LLM + WavTokenizer single-codebook VQ-GAN. CC-BY-NC-SA-4.0 (non-commercial, ShareAlike). 24 kHz output. | Yes (`--voice <speaker.json>`, created with `tools/reference_backends/outetts_create_speaker.py`) | ~2.5 GB via `-m auto` (talker F16 + WavTokenizer decoder) |
 | **`f5-tts`** | F5-TTS v1 Base: 22-layer DiT flow-matching TTS + Vocos iSTFT vocoder. MIT license. High-quality zero-shot voice cloning from 3-15s reference audio. 24 kHz output. English + Chinese (built-in pinyin g2p, #294). | Yes (`--voice <ref.wav> --ref-text "transcript"`) | ~953 MB via `-m auto` (single F16 GGUF, DiT + Vocos) |
 | **`irodori-tts`** | Irodori-TTS: RF-DiT flow-matching TTS with LowRankAdaLN + JointAttention + half-RoPE + SwiGLU. 48 kHz via Semantic-DACVAE-Japanese-32dim codec. MIT license. Japanese-focused (llm-jp-3 tokenizer). Zero-shot voice cloning from any reference WAV (DAC-VAE encoder + speaker CFG); emoji emotion control; duration predictor for output length. **VoiceDesign** (600M-v3): adds caption encoder for style/emotion control via text descriptions (`--instruct "calm adult male, deep voice"`); independent text/speaker/caption CFG. | Yes (`--voice <ref.wav> --i-have-rights`) | ~526 MB Q4_K (VoiceDesign) / ~852 MB Q4_K (base) + DAC-VAE codec |
 | **`indextts`** | IndexTTS-1.5: GPT-2 AR (24L/1280d) mel-code generator + BigVGAN vocoder. Designed for Chinese+English. Zero-shot voice cloning from any reference WAV. | Yes (`--voice <ref.wav>`) | ~2.4 GB via `-m auto` (GPT F16 + BigVGAN F16) |
@@ -32,7 +32,7 @@ trade-off:
 | **`bananamind-tts`** | BananaMind-TTS-V2.1 13M: Tacotron-lite (char tokenizer + Conv1d+BN+ReLU encoder + BiLSTM + AR GRU decoder with location-sensitive attention + postnet) + HiFi-GAN @ 22 kHz. English (LJ Speech) and German (ThorstenVoice). Apache-2.0. Runtime is designed as a template for standard Tacotron2 ports — add `decoder_rnn_type=lstm` to the GGUF to switch to the LSTM decoder path ([architecture notes](architecture.md#bananamind-tts)). | No (fixed voice per locale) | ~40 MB Q8_0 / ~50 MB F32 per locale |
 | **`parler-tts`** | Parler TTS Mini v1.1 (~900M): T5 encoder + MusicGen decoder + DAC 44.1 kHz. Apache-2.0. Prompt-conditioned: describe the voice in natural language via `--instruct`. | No (prompt-conditioned) | ~900 MB via `-m auto` (Q8_0 GGUF) |
 | **`voxcpm2-tts`** | VoxCPM2: 2B Qwen2 backbone + flow matching + BigVGAN @ 48 kHz (decimated to 24 kHz). Zero-shot voice cloning via `--voice <ref.wav>`. | Yes | ~2.4 GB via `-m auto` |
-| **`pocket-tts`** | Kyutai Pocket TTS 100M: continuous-latent AR @ 12.5 Hz + one-step LSD flow head + Mimi VAE decoder → 24 kHz. MIT / CC-BY-4.0. Voice cloning via `--voice ref.wav`. | Yes (`--voice`) | ~220 MB via `-m auto` (F16 GGUF) |
+| **`pocket-tts`** | Kyutai Pocket TTS 100M: continuous-latent AR @ 12.5 Hz + one-step LSD flow head + Mimi VAE decoder → 24 kHz. CC-BY-4.0 plus gated-use conditions. Voice cloning via `--voice ref.wav`. | Yes (`--voice`) | ~220 MB via `-m auto` (F16 GGUF) |
 | **`kugelaudio`** | KugelAudio-0-Open: 7B Qwen2.5 backbone + 4-layer DiT diffusion head (20-step SDE-DPMSolver++) + acoustic VAE decoder → 24 kHz. 23 languages. MIT. | Pre-encoded voices (`--voice voice.gguf`) | ~17.3 GB F16 via `-m auto` — needs >16 GB VRAM, else `--no-gpu`. The ~5.7 GB Q4_K is **not** a usable substitute: it stutters and loops (WER 0.72 vs 0.056 for F16) |
 | **`tada-1b`** | HumeAI TADA 1B: Llama-3.2-1B backbone + per-token flow-matching diffusion head + TADA codec → 24 kHz. **English-only.** `-m auto` downloads model + default `tada-ref.gguf`. | Yes (`--voice <tada-ref.gguf>`, English voice refs only) | ~1.7 GB Q4_K + ~1 GB codec |
 | **`tada` / `tada-3b-ml`** | HumeAI TADA 3B Multilingual: same architecture, 3B params. Supports **ar, ch, de, es, fr, it, ja, pl, pt** in addition to English. `-l <lang>` auto-downloads `tada-ref-<lang>.gguf`. | Yes (`--voice <tada-ref.gguf>`) | ~4 GB Q4_K + ~1 GB codec |
@@ -93,6 +93,12 @@ non-English text:
 | `tada` / `tada-3b-ml` | HumeAI/tada-3b-ml | en + ar, ch, de, es, fr, it, ja, pl, pt |
 
 ### Use case (a) — built-in default voice for a language
+
+TADA uses Llama 3.2 materials and is distributed under the Llama 3.2
+Community License. Managed model and auxiliary downloads therefore require
+`--accept-license llama3.2`; redistribution must retain the Llama notice and
+follow its acceptable-use terms. The language reference packs are derived
+from CC-BY-4.0 FLEURS clips and retain that attribution requirement.
 
 Pass `-l <lang>` with the `tada-3b-ml` backend. CrispASR auto-downloads
 `tada-ref-<lang>.gguf` from `cstr/tada-tts-3b-ml-GGUF` on first use (<200 KB
@@ -957,6 +963,11 @@ that SNAC decodes to 24 kHz PCM. 8 baked English speakers (`tara`,
 `leah`, `jess`, `leo`, `dan`, `mia`, `zac`, `zoe`). The talker GGUF
 and the SNAC codec live in two separate HF repos and download
 together via `-m auto`.
+
+The talker is derived from Llama 3.2. Use `--accept-license llama3.2` before
+the first managed download and preserve the Llama 3.2 Community License and
+its attribution/acceptable-use terms when redistributing it. The SNAC codec
+is MIT-licensed.
 
 ```bash
 # First run pulls ~3.5 GB (Q8_0 talker) + 26 MB (SNAC codec) into

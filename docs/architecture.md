@@ -977,7 +977,7 @@ key to select the LSTM path.
 
 ### pocket-tts
 
-Kyutai Pocket TTS (100M, MIT / CC-BY-4.0). Continuous-latent AR TTS —
+Kyutai Pocket TTS (100M, CC-BY-4.0 plus gated-use conditions). Continuous-latent AR TTS —
 architecturally unique: no codebook, no RVQ, no softmax.
 
 Pipeline: SentencePiece (4000 vocab) → 4001×1024 embedding LUT →
