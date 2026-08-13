@@ -1,12 +1,5 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-08-13 — PR #347 GGUF weight-mapping release review
-
-Worktree: `.claude/worktrees/review-pr-347`.
-Audit PR #347 end to end for GGUF mmap, split-allocation, rejected-load, and
-cross-backend lifetime regressions; add or improve unit/live coverage and merge
-only after local/SSD validation.
-
 ## Start here
 
 Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
