@@ -1362,6 +1362,26 @@ catch_discover_tests(test-parakeet-ja-longform
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test - parakeet-longform — issue #350 regression guard (non-JA 30-300 s)
+add_executable(test-parakeet-longform
+    test_parakeet_longform_live.cpp
+)
+target_include_directories(test-parakeet-longform PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-parakeet-longform PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-parakeet-longform
+    TEST_SPEC "[parakeet-longform]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test - context - bias — Catch2 unit tests for CTC-WS phrase-boost trie (PLAN #98)
 add_executable(test-context-bias
     test_context_bias.cpp
