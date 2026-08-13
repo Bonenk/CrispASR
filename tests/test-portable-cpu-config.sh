@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Configure-only regression guard for the generic x86-64 CPU baseline used by
-# GPU/legacy release artifacts (#261, #302). No compiler or model execution is
+# Configure-only regression guard for the opt-in generic x86-64 CPU baseline
+# used by legacy/portable artifacts (#261). No compiler or model execution is
 # needed: the CMake cache is the contract that controls ggml-cpu's emitted ISA.
 
 set -euo pipefail

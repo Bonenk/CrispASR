@@ -172,9 +172,9 @@ class TestReleaseWorkflow(unittest.TestCase):
             "split packaging must fail if the CUDA runtime set is incomplete",
         )
 
-    def test_gpu_and_legacy_artifacts_use_portable_cpu_baseline(self):
-        """GPU init must not SIGILL on the old CPU paired with a Pascal GPU (#302)."""
-        required_jobs = (
+    def test_gpu_artifacts_keep_optimized_cpu_and_legacy_stays_portable(self):
+        """#302's atomic ggml fix must not slow every prebuilt GPU artifact."""
+        gpu_jobs = (
             "build-linux-x86_64-cuda",
             "build-linux-x86_64-cuda13",
             "build-linux-x86_64-hip",
@@ -183,12 +183,10 @@ class TestReleaseWorkflow(unittest.TestCase):
             "build-libs-windows-x86_64-vulkan",
             "build-libs-linux-x86_64-cuda",
             "build-libs-windows-x86_64-cuda",
-            "build-libs-windows-x86_64-cpu-legacy",
-            "build-windows-cpu-legacy",
             "build-windows-cuda",
             "build-windows-vulkan",
         )
-        for job_name in required_jobs:
+        for job_name in gpu_jobs:
             with self.subTest(job=job_name):
                 match = re.search(
                     rf"(?ms)^  {re.escape(job_name)}:\n"
@@ -196,16 +194,39 @@ class TestReleaseWorkflow(unittest.TestCase):
                     self.text,
                 )
                 self.assertIsNotNone(match, f"release job {job_name} must exist")
-                self.assertIn(
+                self.assertNotIn(
                     "-DCRISPASR_PORTABLE_CPU=ON",
                     match.group("body"),
-                    f"{job_name} must use the generic CPU baseline",
+                    f"{job_name} must retain its optimized CPU helper",
                 )
+
+        for job_name in (
+            "build-libs-windows-x86_64-cpu-legacy",
+            "build-windows-cpu-legacy",
+        ):
+            match = re.search(
+                rf"(?ms)^  {re.escape(job_name)}:\n"
+                rf"(?P<body>.*?)(?=^  [a-zA-Z0-9_-]+:\n|\Z)",
+                self.text,
+            )
+            self.assertIsNotNone(match, f"release job {job_name} must exist")
+            self.assertIn("-DCRISPASR_PORTABLE_CPU=ON", match.group("body"))
 
         portable_docker = (REPO / ".devops" / "main-cuda-portable.Dockerfile").read_text()
         self.assertIn("-DCRISPASR_PORTABLE_CPU=ON", portable_docker)
         cuda_smoke = (REPO / ".github" / "workflows" / "win-cuda-smoke.yml").read_text()
-        self.assertIn("-DCRISPASR_PORTABLE_CPU=ON", cuda_smoke)
+        self.assertNotIn("-DCRISPASR_PORTABLE_CPU=ON", cuda_smoke)
+
+    def test_ue4m3_lut_is_lazy_with_explicit_eager_ab_switch(self):
+        cpu_source = (REPO / "ggml" / "src" / "ggml-cpu" / "ggml-cpu.c").read_text()
+        startup = cpu_source[cpu_source.index("void ggml_cpu_init(void)") :]
+        self.assertIn('getenv("GGML_CPU_EAGER_UE4M3_LUT")', startup)
+        self.assertIn("ggml_cpu_init_ue4m3_table_unlocked();", startup)
+
+        for arch in ("x86", "arm"):
+            quants = (REPO / "ggml" / "src" / "ggml-cpu" / "arch" / arch / "quants.c").read_text()
+            nvfp4 = quants[quants.index("void ggml_vec_dot_nvfp4_q8_0") :]
+            self.assertIn("ggml_cpu_ensure_ue4m3_table();", nvfp4)
 
 
 if __name__ == "__main__":
