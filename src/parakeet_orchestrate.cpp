@@ -409,6 +409,99 @@ int gap_fill_segments(parakeet_context* ctx, const float* samples, int n_samples
     return total;
 }
 
+struct resolved_strategy {
+    parakeet_strategy strat = parakeet_strategy::SINGLE_PASS;
+    int stream_threshold_s = 300;                     // single-pass cap
+    int longform_window_s = kParakeetLongformWindowS; // LONGFORM piece size
+    int stream_chunk_s = 0;
+    int stream_overlap_s = 2;
+};
+
+// Single source of truth for "which long-audio route does this input take", and
+// with what window. Split out of parakeet_transcribe_segments() so the cap and
+// the LONGFORM window can be reasoned about (and overridden) independently.
+// `quiet` suppresses the memory-policy notice for predicate-only callers.
+resolved_strategy resolve_strategy(parakeet_context* ctx, int n_samples, bool is_ja,
+                                   const parakeet_orchestrate_opts& opts, bool quiet) {
+    const int SR = 16000;
+    resolved_strategy rs;
+    // Single-pass cap. JA keeps its own 12 s cap (issue #89 — the JA models
+    // degenerate past their trained window); non-JA keeps the historical 300 s
+    // so mid-length audio stays on the seamless single-pass path.
+    rs.stream_threshold_s = is_ja ? kParakeetBoundedWindowJaS : 300;
+    bool longform_enabled = !is_ja;
+    bool threshold_from_env = false;
+    if (const char* e = getenv("CRISPASR_PARAKEET_STREAM_THRESHOLD")) {
+        rs.stream_threshold_s = std::max(0, atoi(e));
+        threshold_from_env = true;
+    }
+    if (const char* e = getenv("CRISPASR_PARAKEET_LONGFORM"))
+        longform_enabled = atoi(e) != 0;
+    if (const char* e = getenv("CRISPASR_PARAKEET_STREAM_CHUNK"))
+        rs.stream_chunk_s = std::max(2, atoi(e));
+    if (const char* e = getenv("CRISPASR_PARAKEET_STREAM_OVERLAP"))
+        rs.stream_overlap_s = std::max(0, atoi(e));
+
+    parakeet_strategy_in sin;
+    sin.n_samples = n_samples;
+    sin.sample_rate = SR;
+    sin.is_ja = is_ja;
+    sin.chunk_seconds_explicit = opts.chunk_seconds_explicit;
+    sin.chunk_seconds = opts.chunk_seconds;
+    sin.stream_threshold_s = rs.stream_threshold_s;
+    sin.longform_enabled = longform_enabled;
+    sin.chunked_requested = opts.chunked_requested;
+    // Issue #350: a chunked-entry-point caller that left the length to the
+    // per-model default gets the bounded cap, not the 300 s single-pass one.
+    rs.stream_threshold_s = parakeet_effective_single_pass_cap_s(sin, threshold_from_env);
+    sin.stream_threshold_s = rs.stream_threshold_s;
+
+    // LONGFORM window — independent of the cap (see kParakeetLongformWindowS).
+    // Clamped to the effective cap so a lowered CRISPASR_PARAKEET_STREAM_THRESHOLD
+    // still shrinks the windows exactly as it did before the two were split.
+    if (const char* e = getenv("CRISPASR_PARAKEET_LONGFORM_WINDOW"))
+        rs.longform_window_s = std::max(4, atoi(e));
+    if (rs.stream_threshold_s > 0)
+        rs.longform_window_s = std::min(rs.longform_window_s, rs.stream_threshold_s);
+
+    rs.strat = parakeet_pick_strategy(sin);
+
+    // Phase 2: proactive encoder memory policy. When single-pass is chosen but
+    // its estimated O(T^2) rel-pos bias would exceed a user-set VRAM budget,
+    // switch to the streamed (bounded-window) encoder BEFORE allocating —
+    // instead of allocate → OOM → reactive fallback. Opt-in: default budget 0
+    // = disabled → single-pass as before (the reactive fallback still backstops).
+    //   CRISPASR_PARAKEET_MEM_POLICY = auto (default) | off | single | streamed
+    //   CRISPASR_PARAKEET_VRAM_BUDGET_MB : budget (MiB); 0/unset = disabled
+    //   CRISPASR_PARAKEET_MEM_COEFF : O(T^2) estimate coefficient (default 8.0)
+    if (rs.strat == parakeet_strategy::SINGLE_PASS) {
+        const char* pol = getenv("CRISPASR_PARAKEET_MEM_POLICY");
+        const bool mode_off = pol && strcmp(pol, "off") == 0;
+        const bool mode_force_single = pol && strcmp(pol, "single") == 0;
+        const bool mode_force_streamed = pol && strcmp(pol, "streamed") == 0;
+        if (mode_force_streamed) {
+            rs.strat = parakeet_strategy::STREAMED;
+        } else if (!mode_off && !mode_force_single) {
+            double budget = 0.0, coeff = 8.0;
+            if (const char* e = getenv("CRISPASR_PARAKEET_VRAM_BUDGET_MB"))
+                budget = atof(e);
+            if (const char* e = getenv("CRISPASR_PARAKEET_MEM_COEFF"))
+                coeff = atof(e);
+            const int T_enc = parakeet_est_enc_frames(ctx, n_samples);
+            const int H = parakeet_n_heads(ctx);
+            if (!parakeet_singlepass_fits_budget(T_enc, H, budget, coeff)) {
+                if (!opts.no_prints && !quiet)
+                    fprintf(stderr,
+                            "crispasr[parakeet]: single-pass est %.0f MiB > budget %.0f MiB (T=%d, H=%d); "
+                            "using streamed encoding (set CRISPASR_PARAKEET_MEM_POLICY=single to force)\n",
+                            parakeet_est_singlepass_peak_mb(T_enc, H, coeff), budget, T_enc, H);
+                rs.strat = parakeet_strategy::STREAMED;
+            }
+        }
+    }
+    return rs;
+}
+
 } // namespace
 
 std::vector<parakeet_seg> parakeet_transcribe_segments(parakeet_context* ctx, const float* samples, int n_samples,
@@ -441,78 +534,21 @@ std::vector<parakeet_seg> parakeet_transcribe_segments(parakeet_context* ctx, co
         return out;
     }
 
-    int stream_threshold_s = is_ja ? kParakeetBoundedWindowJaS : 300;
-    bool longform_enabled = !is_ja;
-    int stream_chunk_s = 0;
-    int stream_overlap_s = 2;
-    bool threshold_from_env = false;
-    if (const char* e = getenv("CRISPASR_PARAKEET_STREAM_THRESHOLD")) {
-        stream_threshold_s = std::max(0, atoi(e));
-        threshold_from_env = true;
-    }
-    if (const char* e = getenv("CRISPASR_PARAKEET_LONGFORM"))
-        longform_enabled = atoi(e) != 0;
-    if (const char* e = getenv("CRISPASR_PARAKEET_STREAM_CHUNK"))
-        stream_chunk_s = std::max(2, atoi(e));
-    if (const char* e = getenv("CRISPASR_PARAKEET_STREAM_OVERLAP"))
-        stream_overlap_s = std::max(0, atoi(e));
-
-    parakeet_strategy_in sin;
-    sin.n_samples = n_samples;
-    sin.sample_rate = SR;
-    sin.is_ja = is_ja;
-    sin.chunk_seconds_explicit = opts.chunk_seconds_explicit;
-    sin.chunk_seconds = opts.chunk_seconds;
-    sin.stream_threshold_s = stream_threshold_s;
-    sin.longform_enabled = longform_enabled;
-    sin.chunked_requested = opts.chunked_requested;
-    // Issue #350: a chunked-entry-point caller that left the length to the
-    // per-model default gets the bounded cap, not the 300 s single-pass one.
-    stream_threshold_s = parakeet_effective_single_pass_cap_s(sin, threshold_from_env);
-    sin.stream_threshold_s = stream_threshold_s;
-    parakeet_strategy strat = parakeet_pick_strategy(sin);
-
-    // Phase 2: proactive encoder memory policy. When single-pass is chosen but
-    // its estimated O(T^2) rel-pos bias would exceed a user-set VRAM budget,
-    // switch to the streamed (bounded-window) encoder BEFORE allocating —
-    // instead of allocate → OOM → reactive fallback. Opt-in: default budget 0
-    // = disabled → single-pass as before (the reactive fallback still backstops).
-    //   CRISPASR_PARAKEET_MEM_POLICY = auto (default) | off | single | streamed
-    //   CRISPASR_PARAKEET_VRAM_BUDGET_MB : budget (MiB); 0/unset = disabled
-    //   CRISPASR_PARAKEET_MEM_COEFF : O(T^2) estimate coefficient (default 8.0)
-    if (strat == parakeet_strategy::SINGLE_PASS) {
-        const char* pol = getenv("CRISPASR_PARAKEET_MEM_POLICY");
-        const bool mode_off = pol && strcmp(pol, "off") == 0;
-        const bool mode_force_single = pol && strcmp(pol, "single") == 0;
-        const bool mode_force_streamed = pol && strcmp(pol, "streamed") == 0;
-        if (mode_force_streamed) {
-            strat = parakeet_strategy::STREAMED;
-        } else if (!mode_off && !mode_force_single) {
-            double budget = 0.0, coeff = 8.0;
-            if (const char* e = getenv("CRISPASR_PARAKEET_VRAM_BUDGET_MB"))
-                budget = atof(e);
-            if (const char* e = getenv("CRISPASR_PARAKEET_MEM_COEFF"))
-                coeff = atof(e);
-            const int T_enc = parakeet_est_enc_frames(ctx, n_samples);
-            const int H = parakeet_n_heads(ctx);
-            if (!parakeet_singlepass_fits_budget(T_enc, H, budget, coeff)) {
-                if (!opts.no_prints)
-                    fprintf(stderr,
-                            "crispasr[parakeet]: single-pass est %.0f MiB > budget %.0f MiB (T=%d, H=%d); "
-                            "using streamed encoding (set CRISPASR_PARAKEET_MEM_POLICY=single to force)\n",
-                            parakeet_est_singlepass_peak_mb(T_enc, H, coeff), budget, T_enc, H);
-                strat = parakeet_strategy::STREAMED;
-            }
-        }
-    }
+    const resolved_strategy rs = resolve_strategy(ctx, n_samples, is_ja, opts, /*quiet=*/false);
+    const parakeet_strategy strat = rs.strat;
+    const int stream_chunk_s = rs.stream_chunk_s;
+    const int stream_overlap_s = rs.stream_overlap_s;
 
     // Issue #350: JA is left alone — it has its own #89 machinery (VAD/energy
     // slices capped at 12 s plus a 1 s-threshold gap-fill) on the paths that
-    // drive it, and none of this issue's measurements cover it.
+    // drive it, and none of that issue's measurements cover it.
     const bool repair = !is_ja;
 
+    // The LONGFORM piece size is the WINDOW, not the single-pass cap. The two
+    // are independent: the window is a throughput knob, gap_fill_segments is
+    // what makes coverage robust.
     if (strat == parakeet_strategy::LONGFORM) {
-        out = transcribe_longform(ctx, samples, n_samples, t_offset_cs, stream_threshold_s * SR);
+        out = transcribe_longform(ctx, samples, n_samples, t_offset_cs, rs.longform_window_s * SR);
         if (repair)
             gap_fill_segments(ctx, samples, n_samples, t_offset_cs, out, kParakeetBoundedWindowS, kParakeetGapFillMinCs,
                               opts.no_prints);
