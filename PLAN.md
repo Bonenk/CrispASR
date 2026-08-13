@@ -1,12 +1,5 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-08-13 — #348 Chatterbox Multilingual V3
-
-Worktree: `.claude/worktrees/fix-348-chatterbox-v3`.
-Audit the existing Chatterbox port against the reporter's V3 request, trace the
-actual V3 inference recipe, and determine whether a compatible port or a
-validated diagnosis is required.
-
 ## Start here
 
 Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
