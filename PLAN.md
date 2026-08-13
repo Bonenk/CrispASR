@@ -11,12 +11,14 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-08-11 — #337 Qwen3-TTS HIP frame-0 divergence
+## CLAIMED 2026-08-13 — #337 Qwen3-TTS HIP prefill divergence (second pass)
 
 Worktree: `.claude/worktrees/fix-337-qwen3-tts-hip`.
-Trace and fix the HIP-vs-CPU talker divergence, add a regression guard for the
-first sampled token / normal termination, and validate the real GPU path when
-available.
+The first-pass single-backend allocator fix was disproven on RX 7900 XTX:
+the reporter confirms it is byte-identical to the scheduler path and CPU-vs-HIP
+full-frame replay still diverges at prefill. Reproduce with the diff harness,
+bisect the first divergent talker tensor/op under identical teacher-forced
+history, then fix and validate on the real HIP path via the Kaggle regime.
 
 ## LANDED 2026-08-10 — voxtral-tts pre-tokenizer parity (c69ac61b, from #338)
 
