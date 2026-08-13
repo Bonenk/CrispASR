@@ -1,16 +1,5 @@
 # CrispASR — Pending work
 
-## CLAIMED 2026-08-13 — #348 Chatterbox Multilingual V3 full parity port
-
-Worktree: `.claude/worktrees/fix-348-chatterbox-v3` (branch
-`fix/348-chatterbox-v3`). Audit the upstream V3 production inference path line
-by line; convert the V3 T3 and S3Gen checkpoints to F16 GGUF; quantize with
-`crispasr-quantize` and explicit high-precision carve-outs for sensitive
-tensors; generate and publish a Python-blueprint `-ref.gguf`; iterate with
-`crispasr-diff` through per-stage cosine and magnitude parity; then validate
-real CLI/session synthesis, cross-lingual voice-clone TTS→ASR roundtrips, and
-CUDA on Kaggle before answering issue #348.
-
 ## CLAIMED 2026-08-13 — PR #347 GGUF weight-mapping release review
 
 Worktree: `.claude/worktrees/review-pr-352`.
