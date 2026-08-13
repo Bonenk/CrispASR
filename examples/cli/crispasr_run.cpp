@@ -1056,7 +1056,7 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
         if (effective_chunk_seconds == 0 && (backend.capabilities() & CAP_UNBOUNDED_INPUT)) {
             fprintf(stderr,
                     "crispasr: %s backend — full-audio / library-internal streaming "
-                    "(use --chunk-seconds N if OOM, --vad for long files)\n",
+                    "(use --chunk-seconds N if OOM; --vad to skip silence)\n",
                     backend.name());
         } else if (params.chunk_seconds_explicit && params.chunk_seconds > 0 &&
                    (backend.capabilities() & CAP_UNBOUNDED_INPUT) && (int)samples.size() > params.chunk_seconds * SR) {

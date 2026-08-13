@@ -3441,18 +3441,36 @@ static std::string spiece_to_text(const std::string& piece) {
 // Split encode / decode API
 // ---------------------------------------------------------------------------
 
+// NOTE on BENCH/DEBUG in the split path: parakeet_encode() and
+// parakeet_decode_frames() carry the same "mel"/"encoder"/"decode" stages as
+// parakeet_transcribe_ex() so the two paths report identically. When a caller
+// PIPELINES them (encode on a worker thread, decode on another) the stages
+// genuinely overlap, so their sum exceeds wall time — that gap is the win, not
+// a measurement error. Set CRISPASR_PARAKEET_PIPELINE=0 for a serial baseline.
 extern "C" float* parakeet_encode(struct parakeet_context* ctx, const float* samples, int n_samples, int* out_T_enc,
                                   int* out_d_model) {
     if (!ctx || !samples || n_samples <= 0)
         return nullptr;
     int T_mel = 0;
-    auto mel = parakeet_compute_mel_impl(ctx, samples, n_samples, T_mel);
+    std::vector<float> mel;
+    {
+        parakeet_bench_stage _b("mel");
+        mel = parakeet_compute_mel_impl(ctx, samples, n_samples, T_mel);
+    }
     if (mel.empty())
         return nullptr;
+    if (crispasr_env::get("CRISPASR_PARAKEET_DEBUG"))
+        fprintf(stderr, "parakeet: mel OK (%d frames)\n", T_mel);
     int T_enc = 0;
-    auto enc = parakeet_encode_mel(ctx, mel.data(), (int)ctx->model.hparams.n_mels, T_mel, &T_enc);
+    std::vector<float> enc;
+    {
+        parakeet_bench_stage _b("encoder");
+        enc = parakeet_encode_mel(ctx, mel.data(), (int)ctx->model.hparams.n_mels, T_mel, &T_enc);
+    }
     if (enc.empty())
         return nullptr;
+    if (crispasr_env::get("CRISPASR_PARAKEET_DEBUG"))
+        fprintf(stderr, "parakeet: encoder OK (%d frames)\n", T_enc);
     const int d = (int)ctx->model.hparams.d_model;
     float* out = (float*)malloc(enc.size() * sizeof(float));
     memcpy(out, enc.data(), enc.size() * sizeof(float));
@@ -3604,6 +3622,9 @@ extern "C" struct parakeet_result* parakeet_decode_frames(struct parakeet_contex
     if (!ctx || !enc_frames || T_enc <= 0)
         return nullptr;
 
+    // Same "decode" stage parakeet_transcribe_ex() reports, so the split
+    // encode/decode path is measurable with the same CRISPASR_PARAKEET_BENCH.
+    parakeet_bench_stage _b_dec("decode");
     const bool use_ctc = ctx->decode_ctc && ctx->model.has_ctc;
     const bool use_rnnt = !use_ctc && ctx->model.hparams.n_tdt_durations == 0;
     const bool use_beam = !use_ctc && ctx->decode_beam_size > 1;
@@ -3620,6 +3641,13 @@ extern "C" struct parakeet_result* parakeet_decode_frames(struct parakeet_contex
                : use_beam ? parakeet_tdt_beam_decode(ctx, enc_frames, T_enc, d_model, ctx->decode_beam_size)
                           : (getenv("CRISPASR_TDT_BATCH") ? parakeet_tdt_decode_batched(ctx, enc_frames, T_enc, d_model)
                                                           : parakeet_tdt_decode(ctx, enc_frames, T_enc, d_model)));
+
+    if (crispasr_env::get("CRISPASR_PARAKEET_DEBUG"))
+        fprintf(stderr, "parakeet: %s%s decode OK (%d tokens)\n",
+                use_ctc    ? "CTC"
+                : use_rnnt ? "RNNT"
+                           : "TDT",
+                use_beam ? " beam" : "", (int)emitted.size());
 
     // Build result (same as the tail of parakeet_transcribe_ex)
     auto* r = (parakeet_result*)calloc(1, sizeof(parakeet_result));
