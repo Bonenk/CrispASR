@@ -216,6 +216,7 @@ class TestReleaseWorkflow(unittest.TestCase):
         self.assertIn("-DCRISPASR_PORTABLE_CPU=ON", portable_docker)
         cuda_smoke = (REPO / ".github" / "workflows" / "win-cuda-smoke.yml").read_text()
         self.assertNotIn("-DCRISPASR_PORTABLE_CPU=ON", cuda_smoke)
+        self.assertIn("ggml-cpu ^", cuda_smoke)
 
     def test_ue4m3_lut_is_lazy_with_explicit_eager_ab_switch(self):
         cpu_source = (REPO / "ggml" / "src" / "ggml-cpu" / "ggml-cpu.c").read_text()
