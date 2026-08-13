@@ -26,7 +26,8 @@
 - [x] Repeat conversion/parity/live roundtrips with CUDA in the dedicated
   `chr1str/crispasr-chatterbox-v3-issue-348-cuda-parity` Kaggle kernel,
   preserving JSONL progress, logs, JSON summaries, and WAV artifacts.
-- [ ] Rebase, merge only with green CI, then answer #348 with linked evidence.
+- [x] Rebase-merged PR #354 at `278e3fbf` after every required GitHub check
+  passed; answer #348 with linked evidence.
 
 ## Acceptance gates
 

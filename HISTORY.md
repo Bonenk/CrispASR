@@ -6,6 +6,24 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## #348 Chatterbox Multilingual V3 parity port — shipped 2026-08-13
+
+PR #354 landed as a six-commit rebase at `278e3fbf`. The port pins the exact
+upstream code and model revisions, converts separate V3 T3 and S3Gen F16 GGUFs,
+and quantizes them with Q8 floors for the sensitive S3 tokenizer projection and
+T3 speech head. Published F16/Q8/Q4 artifacts are paired explicitly in the
+registry; the published German/JFK Python `-ref.gguf` is the release oracle.
+
+The canonical Q4 native diff passed 32 stages with zero failures and two
+intentional skips. A generated reference/clone/baseline loop transcribed the
+complete German target and measured TitaNet `cos(C,R)=0.792725` over
+`cos(B,R)=0.431873`. The Kaggle P100/SM60 release gate reproduced all tensor
+names, shapes, types, and provenance; passed the same 32/0/2 CPU-oracle to CUDA
+diff; produced finite, non-silent audio in all 23 supported languages; returned
+nonempty ASR in the nine-language roundtrip subset; and independently measured
+`cos(C,R)=0.769132` over `cos(B,R)=0.491945`. The merged head passed every
+required GitHub check, including 1,605 Linux unit assertions and static analysis.
+
 ## #302 Pascal Windows GPU startup regression — fixed 2026-08-13
 
 The v0.8.28 Windows CUDA and Vulkan OmniVoice packages could terminate during
