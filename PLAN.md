@@ -11,6 +11,13 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-08-13 — #344 MOSS valid-frame metadata review and validation
+
+Worktree: `.claude/worktrees/fix-344-moss-valid-frame-metadata`.
+Audit PR #345, verify the additive C ABI and failure contracts, and run the
+hermetic plus available model-backed/live tests before deciding whether any
+changes are needed.
+
 ## CLAIMED 2026-08-11 — #337 Qwen3-TTS HIP frame-0 divergence
 
 Worktree: `.claude/worktrees/fix-337-qwen3-tts-hip`.
