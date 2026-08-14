@@ -128,7 +128,7 @@ typedef struct crispasr_chat_generate_params {
     float min_p;           // 0.0 = disabled               (default: 0.05)
     float repeat_penalty;  // 1.0 = disabled               (default: 1.1)
     int32_t repeat_last_n; // -1 = ctx size, 0 = disabled  (default: 64)
-    uint32_t seed;         // RNG seed; 0 = random         (default: 0)
+    uint32_t seed;         // 0xFFFFFFFF = random          (default: 0, fixed)
 
     // Stop sequences: NULL = none. Generation halts (output is truncated
     // BEFORE the match) the first time any of these substrings appears
