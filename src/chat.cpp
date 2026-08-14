@@ -362,12 +362,25 @@ int32_t generate_loop(crispasr_chat_session* s, const std::vector<llama_token>& 
                       std::string& out, crispasr_chat_error* err) {
     // -- Prefill the prompt prefix in one (or several) batches. --
     if (!prompt_new.empty()) {
+        // llama_decode asserts rather than erroring when a batch holds more
+        // than n_batch tokens, so walk the prompt in n_batch-sized pieces.
+        // Pieces decoded in order into the same sequence continue the KV
+        // cache, so positions need no bookkeeping here.
         // Mutable copy because llama_batch_get_one takes a non-const ptr.
         std::vector<llama_token> tokens = prompt_new;
-        llama_batch batch = llama_batch_get_one(tokens.data(), (int32_t)tokens.size());
-        if (llama_decode(s->ctx, batch) != 0) {
-            set_err(err, 10, "llama_decode failed during prefill");
-            return 10;
+        const int32_t n_total = (int32_t)tokens.size();
+        const int32_t n_piece_max = std::max<int32_t>(1, (int32_t)llama_n_batch(s->ctx));
+        for (int32_t off = 0; off < n_total; off += n_piece_max) {
+            const int32_t n_piece = std::min(n_piece_max, n_total - off);
+            llama_batch batch = llama_batch_get_one(tokens.data() + off, n_piece);
+            if (llama_decode(s->ctx, batch) != 0) {
+                // Drop the partial prefill rather than leaving the session
+                // holding a prompt prefix its history does not describe.
+                llama_memory_clear(llama_get_memory(s->ctx), /*data=*/true);
+                s->history.clear();
+                set_err(err, 10, "llama_decode failed during prefill");
+                return 10;
+            }
         }
         s->history.insert(s->history.end(), prompt_new.begin(), prompt_new.end());
     }
