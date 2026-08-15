@@ -60,8 +60,14 @@ class ScriptedBackend : public CrispasrBackend {
         const int64_t win1 = t_offset_cs + (int64_t)n_samples * 100 / kSampleRate;
         crispasr_segment seg;
         for (const auto& w : script_) {
-            if (w.t0 >= win0 && w.t1 <= win1)
+            if (w.t0 >= win0 && w.t1 <= win1) {
                 seg.words.push_back(w);
+                crispasr_token tk;
+                tk.text = w.text;
+                tk.t0 = w.t0;
+                tk.t1 = w.t1;
+                seg.tokens.push_back(tk);
+            }
         }
         if (seg.words.empty())
             return {};
@@ -125,6 +131,12 @@ TEST_CASE("issue #356: recovery inside a straddling segment splits it, output mo
     REQUIRE(segs[2].text == "暮らすのは好きなんです。");
     REQUIRE(segs[0].t1 <= segs[1].t0);
     REQUIRE(segs[1].t1 <= segs[2].t0);
+
+    // The fill's tokens ride along with the kept words: token-level outputs
+    // read seg.tokens, and a recovery with an empty list vanishes from them.
+    REQUIRE(segs[1].tokens.size() == 3);
+    REQUIRE(segs[1].tokens.front().text == "日本にもそんないない");
+    REQUIRE(segs[1].tokens.back().text == "えっと。");
 }
 
 TEST_CASE("issue #356: segment enclosing two recoveries is split at each", "[unit][gap-fill][issue-356]") {

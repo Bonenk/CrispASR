@@ -185,10 +185,25 @@ inline void crispasr_gap_fill_slice(CrispasrBackend& be, const whisper_params& p
                 return false;
             };
             for (auto& fseg : fill) {
+                const size_t first_kept = rec.words.size();
                 for (auto& w : fseg.words) {
                     const int64_t mid = (w.t0 + w.t1) / 2;
                     if (mid >= g.first - kCoverSlopCs && mid < g.second + kCoverSlopCs && !mid_is_covered(mid))
                         rec.words.push_back(std::move(w));
+                }
+                // The fill's tokens ride along with the kept words — the
+                // token-level outputs (JSON full, karaoke) read seg.tokens and
+                // a recovery with an empty list vanishes from them. A token
+                // joins at most one word, so a shared word boundary doesn't
+                // duplicate it; a token with no timestamp (t0 == -1) has no
+                // word to join and stays out.
+                for (auto& tk : fseg.tokens) {
+                    for (size_t i = first_kept; i < rec.words.size(); i++) {
+                        if (tk.t0 >= rec.words[i].t0 && tk.t0 <= rec.words[i].t1) {
+                            rec.tokens.push_back(std::move(tk));
+                            break;
+                        }
+                    }
                 }
             }
             if (rec.words.empty())
