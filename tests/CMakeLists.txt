@@ -4078,6 +4078,26 @@ catch_discover_tests(test-chat-ggml
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-chat-abort — cancellation over the crispasr_chat_* C ABI
+#
+# Loads the same GGUF chat model (env CRISPASR_CHAT_TEST_MODEL → path) and
+# verifies crispasr_chat_set_abort_callback: the abort code and partial
+# output on both generate paths, clearing with NULL, reuse after an abort,
+# a NULL session, and an abort between prompt batches.
+# Skipped when the env var is unset so unrelated builds stay green.
+add_executable(test-chat-abort test-chat-abort.cpp)
+target_link_libraries(test-chat-abort PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-chat-abort
+    TEST_SPEC "[chat]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test_metal_norm_repro — ggml_norm Metal vs CPU bit-exactness ────────────
 # Standalone repro for the kernel_norm cross-simdgroup reduction bug
 # (see tools/upstream-prs/08-metal-norm-cross-simdgroup). Sweeps a
