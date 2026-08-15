@@ -199,6 +199,29 @@ CRISPASR_CHAT_API const char* crispasr_chat_template_name(crispasr_chat_session_
 // Returns the context window in tokens.
 CRISPASR_CHAT_API int32_t crispasr_chat_n_ctx(crispasr_chat_session_t s);
 
+// Tokens the model's own tokenizer produces for `messages` once the
+// session's chat template has been applied — the prompt length a FRESH
+// session prefills for the same `messages`, so it can be compared
+// straight against `crispasr_chat_n_ctx` when sizing a context window.
+//
+// The number covers the whole prompt: the template's control tokens, the
+// leading BOS the tokenizer adds to a new sequence, and the trailing
+// generation prompt that opens the assistant turn — everything
+// `crispasr_chat_generate` decodes before it samples its first token, and
+// nothing it generates afterwards. An empty `messages` array therefore
+// still counts the template's own opening. A session part-way through a
+// conversation re-decodes only the suffix its history does not already
+// hold, so there the count is an upper bound.
+//
+// Pure query: it neither touches the KV cache nor extends the history, so
+// it can be called freely between generations. It does take the session
+// lock, so it waits for a generation in flight to finish.
+//
+// Returns a negative value on failure and fills `err`. Mirrors
+// `whisper_token_count` on the ASR surface.
+CRISPASR_CHAT_API int32_t crispasr_chat_count_tokens(crispasr_chat_session_t s, const crispasr_chat_message* messages,
+                                                     size_t n_messages, crispasr_chat_error* err);
+
 // Pre-flight memory estimate for a GGUF chat model on disk. Returns the
 // approximate working-set in bytes (weights + KV cache + activations) or
 // 0 if it could not be estimated. Mirrors the shape of crispasr's
