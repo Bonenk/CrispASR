@@ -70,6 +70,14 @@ inline std::string crispasr_rebuild_text_from_words(const std::vector<crispasr_w
 // recovery is simply clamped at the recovery's start. Runs to a fixpoint so a
 // span enclosing several recoveries is split at each one; every split strictly
 // reduces the word count of the segment being split, so it terminates.
+//
+// The property that has to hold is about WORDS, not segment spans:
+// crispasr_make_disp_segments builds every SRT/VTT cue from the word
+// timestamps of a segment that has words and never reads seg.t0/seg.t1 there,
+// so what must come out non-decreasing is the word stream read in segment
+// order. Splitting delivers that because it moves words; clamping alone does
+// not, which is why an overlap that cannot be split is merged rather than
+// clamped (see the interleave branch below).
 inline void crispasr_gap_fill_resolve_overlaps(std::vector<crispasr_segment>& segs) {
     const auto by_time = [](const crispasr_segment& a, const crispasr_segment& b) {
         return a.t0 != b.t0 ? a.t0 < b.t0 : a.t1 < b.t1;
@@ -83,6 +91,49 @@ inline void crispasr_gap_fill_resolve_overlaps(std::vector<crispasr_segment>& se
             crispasr_segment& cur = segs[i];
             if (cur.t0 >= prev.t1)
                 continue;
+            // prev owns a word that STARTS inside cur. The two genuinely
+            // interleave, so no split of prev can put them in reading order,
+            // and the clamp below would strand that word's text in a cue that
+            // has already ended while leaving the word stream non-monotone —
+            // #356 all over again, just invisible to a check on segment spans.
+            // Reachable whenever a recovered word runs up to kEdgePadCs past
+            // the next first-pass word's start, which the refill window
+            // explicitly allows. Merge instead: absorb cur's words and tokens
+            // into prev and re-sort by time. That is the resolution the other
+            // two gap-fill implementations already use (the library's
+            // parakeet_orchestrate.cpp gap_fill_segments and the session's
+            // transcribe_ja_sliced both insert recovered words INTO a segment),
+            // which is exactly why neither of them can produce this defect.
+            // Segment count strictly decreases, so this terminates.
+            //
+            // Only when cur carries words: a text-only cur has no word list to
+            // fold in and merging would have to invent a position for its text,
+            // so that case falls through to the clamp. It needs two first-pass
+            // segments to overlap each other, which gap-fill does not produce.
+            bool interleaved = false;
+            for (const auto& w : prev.words)
+                if (w.t0 >= cur.t0 && w.t0 < cur.t1) {
+                    interleaved = true;
+                    break;
+                }
+            if (interleaved && !cur.words.empty()) {
+                for (auto& w : cur.words)
+                    prev.words.push_back(std::move(w));
+                for (auto& t : cur.tokens)
+                    prev.tokens.push_back(std::move(t));
+                std::stable_sort(prev.words.begin(), prev.words.end(),
+                                 [](const crispasr_word& a, const crispasr_word& b) { return a.t0 < b.t0; });
+                std::stable_sort(prev.tokens.begin(), prev.tokens.end(),
+                                 [](const crispasr_token& a, const crispasr_token& b) { return a.t0 < b.t0; });
+                prev.text = crispasr_rebuild_text_from_words(prev.words);
+                prev.t0 = prev.words.front().t0;
+                prev.t1 = std::max(prev.t1, cur.t1);
+                for (const auto& w : prev.words)
+                    prev.t1 = std::max(prev.t1, w.t1);
+                segs.erase(segs.begin() + (std::ptrdiff_t)i);
+                changed = true;
+                break; // re-sort and re-scan
+            }
             // prev spans past cur's start. Split when prev still has words on
             // the far side of cur; otherwise just cap prev's span.
             if (!prev.words.empty() && prev.words.back().t0 >= cur.t1) {
@@ -90,30 +141,50 @@ inline void crispasr_gap_fill_resolve_overlaps(std::vector<crispasr_segment>& se
                 std::vector<crispasr_word> head_words, tail_words;
                 for (auto& w : prev.words)
                     (w.t0 >= cur.t1 ? tail_words : head_words).push_back(std::move(w));
-                std::vector<crispasr_token> head_tokens, tail_tokens;
-                for (auto& t : prev.tokens)
-                    (t.t0 >= cur.t1 ? tail_tokens : head_tokens).push_back(std::move(t));
+                // A token with no timestamp (t0 == -1) joins no word; it rides
+                // with whichever half survives rather than being dropped.
+                std::vector<crispasr_token> head_tokens, tail_tokens, untimed_tokens;
+                for (auto& t : prev.tokens) {
+                    if (t.t0 < 0)
+                        untimed_tokens.push_back(std::move(t));
+                    else
+                        (t.t0 >= cur.t1 ? tail_tokens : head_tokens).push_back(std::move(t));
+                }
                 tail.words = std::move(tail_words);
                 tail.tokens = std::move(tail_tokens);
                 tail.text = crispasr_rebuild_text_from_words(tail.words);
                 tail.t0 = tail.words.front().t0;
                 tail.t1 = tail.words.back().t1;
                 if (head_words.empty()) {
-                    // Nothing left of the recovery — prev *is* the tail.
+                    // Nothing left of the recovery — prev *is* the tail, so the
+                    // head's tokens have no other home.
+                    for (auto& t : head_tokens)
+                        untimed_tokens.push_back(std::move(t));
+                    tail.tokens.insert(tail.tokens.begin(), std::make_move_iterator(untimed_tokens.begin()),
+                                       std::make_move_iterator(untimed_tokens.end()));
                     prev = std::move(tail);
                 } else {
                     prev.words = std::move(head_words);
                     prev.tokens = std::move(head_tokens);
+                    prev.tokens.insert(prev.tokens.begin(), std::make_move_iterator(untimed_tokens.begin()),
+                                       std::make_move_iterator(untimed_tokens.end()));
                     prev.text = crispasr_rebuild_text_from_words(prev.words);
                     prev.t0 = prev.words.front().t0;
                     prev.t1 = prev.words.back().t1;
+                    // tinydiarize: the flag means "a speaker turn follows this
+                    // segment". The tail is what now follows the head, so only
+                    // the tail may keep it — copying it onto both halves plants
+                    // a spurious turn marker mid-utterance.
+                    prev.speaker_turn_next = false;
                     segs.push_back(std::move(tail));
                 }
                 changed = true;
                 break; // re-sort and re-scan
             }
             // No words past the recovery (or no words at all): clamp. A head
-            // word ending inside cur (boundary tolerance) resolves here too.
+            // word ending inside cur (boundary tolerance) resolves here too —
+            // the interleave branch above already took every case where a whole
+            // word of prev would have been stranded on the far side.
             prev.t1 = std::max(prev.t0, cur.t0);
         }
     }
