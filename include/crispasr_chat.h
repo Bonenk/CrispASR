@@ -12,6 +12,11 @@
 //   server pattern is one session per worker thread; multiple sessions
 //   over one process are fully supported.
 //
+//   `crispasr_chat_close` is the exception, and the one call meant to be
+//   made from another thread: it waits for every call already inside the
+//   session to return before it frees anything. See its own note below for
+//   what that does and does not promise.
+//
 // Memory
 // ------
 //   The KV cache persists across `crispasr_chat_generate` calls inside
@@ -167,6 +172,35 @@ CRISPASR_CHAT_API crispasr_chat_session_t crispasr_chat_open(const char* model_p
                                                              crispasr_chat_error* err);
 
 // Free the session and its KV cache. Safe to call with NULL.
+//
+// THE CALLER MUST ORDER THIS AGAINST EVERY OTHER CALL ON THE SAME HANDLE.
+// Like `fclose` and `llama_free`, this is not a synchronisation point: it is
+// undefined behaviour for a call on `s` to be entered unordered with respect
+// to the close, and no amount of checking inside this library can change
+// that, because the check itself lives in the memory being freed. Keep the
+// handle behind your own lock, or set it aside so nothing can reach it, and
+// close it after that. Every binding shipped with CrispASR does exactly this,
+// and it is where the real lifetime safety comes from.
+//
+// What this call adds, on top of that, is the one thing the caller cannot do
+// for itself: it waits for calls that are ALREADY RUNNING inside the session.
+// A generation holds the session for as long as it decodes, so a caller that
+// wants to shut down mid-answer would otherwise have to choose between
+// blocking its own shutdown path and freeing the context out from under a
+// running `llama_decode`. Instead this retires the handle, waits for every
+// admitted call to stop touching session state, and only then frees.
+//
+// A call that reaches the session while the close is waiting is declined with
+// a non-zero `code`; the three accessors that report a NULL session as
+// "nothing here" (`_template_name`, `_n_ctx`, `_last_stop_reason`) answer the
+// same way. Treat that as a diagnostic for a caller that has ALREADY broken
+// the ordering rule above, not as a guarantee — a call descheduled just
+// before it reaches the session can be freed out from under instead, and a
+// second close racing the first can end up on destroyed locks. Both are the
+// same use-after-free the rule exists to prevent. Close exactly once.
+//
+// Cancel first if you do not want to wait: register an abort callback, ask it
+// to stop, and the generation returns in a token or two.
 CRISPASR_CHAT_API void crispasr_chat_close(crispasr_chat_session_t s);
 
 // Clear the KV cache so the next _generate re-prefills from scratch. Call
