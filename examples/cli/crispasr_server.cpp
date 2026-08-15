@@ -3236,11 +3236,19 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
     // stream=true   → 200 text/event-stream, SSE deltas + "data: [DONE]"
     //
     // Backed by the shared crispasr_chat_* C ABI (one process-wide session
-    // for params.chat_model). The session's internal mutex serialises
-    // overlapping requests; concurrent requests will queue, not crash.
+    // for params.chat_model). Overlapping requests queue on chat_call_mutex
+    // below — one whole request at a time, not one C call at a time.
     // -----------------------------------------------------------------------
     std::shared_ptr<crispasr_chat_session> chat_sess(nullptr, &crispasr_chat_close);
     std::mutex chat_init_mutex;
+    // One /v1/chat/completions request at a time on the process-wide session.
+    // The session's own mutex serialises each C call, but a request is two of
+    // them — reset, then generate — and the KV cache they share is
+    // session-global. A second request whose reset lands between this one's
+    // reset and its generate makes this one prefill onto a cache it did not
+    // clear, and answer with the other request's history in context. The whole
+    // transaction takes one lock.
+    std::mutex chat_call_mutex;
     auto ensure_chat_session = [&]() -> crispasr_chat_session_t {
         std::lock_guard<std::mutex> g(chat_init_mutex);
         if (chat_sess) {
@@ -3375,6 +3383,8 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         const std::string model_id = params.chat_model; // for "model" field in response
         // Each session is multi-turn safe via reset; each /v1/chat/completions
         // call is treated as a stateless conversation, so flush KV cache.
+        std::lock_guard<std::mutex> chat_guard(chat_call_mutex);
+
         crispasr_chat_error rerr{};
         if (crispasr_chat_reset(s, &rerr) != 0) {
             json_error(res, 500, std::string("chat reset failed: ") + rerr.message, "chat_reset_failed");
