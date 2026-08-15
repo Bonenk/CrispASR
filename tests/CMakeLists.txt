@@ -4100,6 +4100,30 @@ catch_discover_tests(test-chat-abort
         WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
 
+# ─── test-chat-close — session teardown under load
+#
+# Loads the same GGUF chat model (env CRISPASR_CHAT_TEST_MODEL → path) and
+# verifies crispasr_chat_close against a generation in flight: that it waits
+# for the running call rather than freeing under it, that a call arriving
+# after the retirement is declined rather than run, and that the accessors
+# answer a retiring session the way they answer a NULL one. Threads, because
+# the whole contract is about one.
+# Skipped when the env var is unset so unrelated builds stay green.
+find_package(Threads REQUIRED)
+add_executable(test-chat-close test-chat-close.cpp)
+target_link_libraries(test-chat-close PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+    Threads::Threads
+)
+catch_discover_tests(test-chat-close
+    TEST_SPEC "[chat]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
 # ─── test_metal_norm_repro — ggml_norm Metal vs CPU bit-exactness ────────────
 # Standalone repro for the kernel_norm cross-simdgroup reduction bug
 # (see tools/upstream-prs/08-metal-norm-cross-simdgroup). Sweeps a

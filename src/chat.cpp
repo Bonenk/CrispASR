@@ -10,6 +10,15 @@
 //   on the same handle serialise. Multiple sessions in the same process
 //   run independently.
 //
+//   That mutex cannot also govern teardown. `crispasr_chat_close` frees
+//   the context, the model and the session itself, and a generation holds
+//   the mutex for as long as it decodes — seconds — so a close that merely
+//   took the mutex would still free the session under a second call that
+//   was already blocked behind that generation. Teardown therefore runs on
+//   its own short-lived lock and a count of the calls currently inside the
+//   session: `close` retires the handle so no further call enters, waits
+//   for the count to fall to zero, and only then frees.
+//
 // KV cache
 //   Persisted across `crispasr_chat_generate` calls inside one session
 //   so a multi-turn chat doesn't re-prefill the history. `_reset` calls
@@ -21,6 +30,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <condition_variable>
 #include <cstdarg>
 #include <cstdint>
 #include <cstdio>
@@ -186,9 +196,65 @@ struct crispasr_chat_session {
 
     // Mutex serialising one-call-at-a-time per session.
     std::mutex mu;
+
+    // Teardown accounting, held only long enough to read `retiring` and move
+    // `in_use` — never across a native call, so counting a call in does not
+    // serialise it against anything.
+    std::mutex life;
+    std::condition_variable idle;
+    int32_t in_use = 0;
+    bool retiring = false;
 };
 
 namespace {
+
+// Holds the session open for the span of one call. Every entry point that
+// dereferences a session takes one; `crispasr_chat_close` waits for the
+// count to reach zero before it frees anything.
+//
+// A hold taken on a session already retired is refused rather than granted,
+// so a call that reaches the session during a close is declined instead of
+// running against memory about to be freed. That is a diagnostic for a caller
+// that has already broken the header's ordering rule, not a guarantee: this
+// check lives in the memory being freed, so a call descheduled just before it
+// locks `s_->life` can have the session freed underneath it and then lock a
+// destroyed mutex. Closing that window needs storage that outlives the
+// session, which is the caller's own lock — see crispasr_chat_close.
+class session_hold {
+public:
+    explicit session_hold(crispasr_chat_session* s) : s_(s) {
+        if (!s_) {
+            return;
+        }
+        std::lock_guard<std::mutex> g(s_->life);
+        if (s_->retiring) {
+            s_ = nullptr;
+            return;
+        }
+        s_->in_use += 1;
+    }
+
+    ~session_hold() {
+        if (!s_) {
+            return;
+        }
+        std::lock_guard<std::mutex> g(s_->life);
+        s_->in_use -= 1;
+        if (s_->in_use == 0) {
+            s_->idle.notify_all();
+        }
+    }
+
+    session_hold(const session_hold&) = delete;
+    session_hold& operator=(const session_hold&) = delete;
+
+    // False when the session is retiring, i.e. a close is already waiting to
+    // free it and this call must not proceed.
+    bool held() const { return s_ != nullptr; }
+
+private:
+    crispasr_chat_session* s_;
+};
 
 // The public callback returns false to abort; every call site asks the
 // opposite question, so invert once here.
@@ -312,6 +378,22 @@ extern "C" void crispasr_chat_close(crispasr_chat_session_t s) {
     if (!s) {
         return;
     }
+    {
+        std::unique_lock<std::mutex> lk(s->life);
+        if (s->retiring) {
+            // A second close that got this far while the first is still
+            // waiting. Returning is better than freeing twice, but it is a
+            // partial mitigation for a caller that has already broken the
+            // rule, not support for closing twice: a second close blocked on
+            // `life` can be beaten to the delete by the first and wake on a
+            // destroyed mutex. Close exactly once.
+            return;
+        }
+        // Retire first, so a call arriving from here on is declined rather
+        // than counted in and waited for, and the wait below terminates.
+        s->retiring = true;
+        s->idle.wait(lk, [s] { return s->in_use == 0; });
+    }
     if (s->ctx) {
         llama_free(s->ctx);
     }
@@ -326,6 +408,11 @@ extern "C" int32_t crispasr_chat_reset(crispasr_chat_session_t s, crispasr_chat_
         set_err(err, 1, "session is null");
         return 1;
     }
+    session_hold hold(s);
+    if (!hold.held()) {
+        set_err(err, 5, "session is closing");
+        return 5;
+    }
     std::lock_guard<std::mutex> guard(s->mu);
     llama_memory_clear(llama_get_memory(s->ctx), /*data=*/true);
     s->history.clear();
@@ -333,11 +420,16 @@ extern "C" int32_t crispasr_chat_reset(crispasr_chat_session_t s, crispasr_chat_
 }
 
 extern "C" const char* crispasr_chat_template_name(crispasr_chat_session_t s) {
-    return s ? s->tmpl.c_str() : nullptr;
+    // The hold covers the read, not the pointer: what comes back points into
+    // the session's own string and dies with the session, exactly as before.
+    // Copy it before the next close, as the header says.
+    session_hold hold(s);
+    return hold.held() ? s->tmpl.c_str() : nullptr;
 }
 
 extern "C" int32_t crispasr_chat_n_ctx(crispasr_chat_session_t s) {
-    return s ? s->n_ctx : 0;
+    session_hold hold(s);
+    return hold.held() ? s->n_ctx : 0;
 }
 
 extern "C" int32_t crispasr_chat_count_tokens(crispasr_chat_session_t s, const crispasr_chat_message* messages,
@@ -348,6 +440,11 @@ extern "C" int32_t crispasr_chat_count_tokens(crispasr_chat_session_t s, const c
     }
     if (n_messages > 0 && !messages) {
         set_err(err, 1, "messages is null but n_messages > 0");
+        return -1;
+    }
+    session_hold hold(s);
+    if (!hold.held()) {
+        set_err(err, 5, "session is closing");
         return -1;
     }
     std::lock_guard<std::mutex> guard(s->mu);
@@ -379,6 +476,10 @@ extern "C" int32_t crispasr_chat_count_tokens(crispasr_chat_session_t s, const c
 extern "C" void crispasr_chat_set_abort_callback(crispasr_chat_session_t s, crispasr_chat_abort_callback cb,
                                                  void* user) {
     if (!s) {
+        return;
+    }
+    session_hold hold(s);
+    if (!hold.held()) {
         return;
     }
     std::lock_guard<std::mutex> guard(s->mu);
@@ -634,6 +735,11 @@ extern "C" char* crispasr_chat_generate(crispasr_chat_session_t s, const crispas
         set_err(err, 1, "session is null");
         return nullptr;
     }
+    session_hold hold(s);
+    if (!hold.held()) {
+        set_err(err, 5, "session is closing");
+        return nullptr;
+    }
     if (n_messages > 0 && !messages) {
         set_err(err, 1, "messages is null but n_messages > 0");
         return nullptr;
@@ -671,6 +777,11 @@ extern "C" int32_t crispasr_chat_generate_stream(crispasr_chat_session_t s, cons
     if (!s) {
         set_err(err, 1, "session is null");
         return 1;
+    }
+    session_hold hold(s);
+    if (!hold.held()) {
+        set_err(err, 5, "session is closing");
+        return 5;
     }
     if (n_messages > 0 && !messages) {
         set_err(err, 1, "messages is null but n_messages > 0");
