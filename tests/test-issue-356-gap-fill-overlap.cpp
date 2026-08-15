@@ -46,7 +46,7 @@ crispasr_segment make_segment(std::vector<crispasr_word> words) {
 // requested window. This is exactly the contract gap-fill relies on when it
 // re-transcribes a hole in isolation.
 class ScriptedBackend : public CrispasrBackend {
-  public:
+public:
     explicit ScriptedBackend(std::vector<crispasr_word> script) : script_(std::move(script)) {}
 
     const char* name() const override { return "scripted"; }
@@ -77,7 +77,7 @@ class ScriptedBackend : public CrispasrBackend {
         return {seg};
     }
 
-  private:
+private:
     std::vector<crispasr_word> script_;
 };
 
