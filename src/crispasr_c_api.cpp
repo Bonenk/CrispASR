@@ -21,6 +21,7 @@
 #include "session_autochunk.h"      // fix/session-long-audio: pure auto-chunk applicability decision
 #include "core/asr_sensitivity.h"   // §W7 sensitivity presets
 #include "core/ngram_loop_fix.h"
+#include "core/asr_time_order.h"
 #include "core/segment_hygiene.h" // §W2/§W5/§W6 opt-in segment cleanup    // fix/session-long-audio: collapse decode loops in merged chunks (issue #218)
 #include "parakeet_orchestrate.h" // improvements Phase 1: shared parakeet transcribe orchestration
 #include "core/gpu_backend_pref.h" // crispasr_set_gpu_backend_pref (#214)
@@ -4755,6 +4756,13 @@ static void apply_session_punc_model(crispasr_session* s, crispasr_session_resul
 static void apply_session_hygiene(crispasr_session_result* r, bool include_merge) {
     if (!r || r->segments.empty())
         return;
+    // Issue #356: the same time-order check the CLI runs inside
+    // merge_segments() and the server runs after its slice-append loop. It sits
+    // ABOVE the env gate below on purpose — the hygiene stages are opt-in, but a
+    // transcript that comes back out of order is a bug on every configuration,
+    // and this is the one place every session result passes through. Reports
+    // only; reordering here would hide the producing bug.
+    core_time_order::warn_if_backward(r->segments, "session transcribe");
     auto hy = core_seg_hygiene::config_from_env();
     if (!include_merge)
         hy.merge.enabled = false;
