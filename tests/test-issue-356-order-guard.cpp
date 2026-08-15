@@ -17,6 +17,8 @@
 
 #include "crispasr_output.h"
 
+#include "core/asr_time_order.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <vector>
@@ -112,4 +114,48 @@ TEST_CASE("issue #356: empty segments are skipped, not treated as position 0", "
     segs.push_back(text_only("", 0, 0));
     segs.push_back(with_words({make_word("b", 700, 800)}));
     REQUIRE(crispasr_first_backward_segment(segs) == -1);
+}
+
+// The session C ABI carries its own segment struct (crispasr_session_seg, a
+// private type in src/crispasr_c_api.cpp) and reimplements every backend's
+// transcribe inline, so it cannot call the CLI's copy of anything — which is
+// exactly why apply_session_hygiene exists. The predicate is shared through
+// src/core/asr_time_order.h instead of being duplicated; this pins that it
+// still compiles and behaves on a session-shaped segment, so the two surfaces
+// cannot drift the way #308's punctuation fix did.
+namespace {
+
+struct SessionLikeWord {
+    std::string text;
+    int64_t t0 = 0;
+    int64_t t1 = 0;
+};
+
+struct SessionLikeSeg {
+    std::string text;
+    int64_t t0 = 0;
+    int64_t t1 = 0;
+    std::vector<SessionLikeWord> words;
+};
+
+} // namespace
+
+TEST_CASE("issue #356: the guard is shared with the session ABI's segment type", "[unit][order-guard][issue-356]") {
+    std::vector<SessionLikeSeg> segs;
+    segs.push_back({"in order", 100, 300, {{"a", 100, 150}, {"b", 200, 300}}});
+    segs.push_back({"still fine", 400, 500, {{"c", 400, 500}}});
+    REQUIRE(core_time_order::first_backward(segs) == -1);
+
+    segs.push_back({"backwards", 200, 250, {{"d", 200, 250}}});
+    int64_t prev = 0, cur = 0;
+    REQUIRE(core_time_order::first_backward(segs, &prev, &cur) == 2);
+    REQUIRE(prev == 400);
+    REQUIRE(cur == 200);
+
+    // And the CLI type resolves to the same template, not a second copy.
+    std::vector<crispasr_segment> cli;
+    cli.push_back(with_words({make_word("a", 400, 500)}));
+    cli.push_back(with_words({make_word("b", 200, 250)}));
+    REQUIRE(core_time_order::first_backward(cli) == crispasr_first_backward_segment(cli));
+    REQUIRE(crispasr_first_backward_segment(cli) == 1);
 }
