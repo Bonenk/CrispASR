@@ -194,10 +194,10 @@ CRISPASR_CHAT_API crispasr_chat_session_t crispasr_chat_open(const char* model_p
 // a non-zero `code`; the two accessors that report a NULL session as
 // "nothing here" (`_template_name`, `_n_ctx`) answer the same way. Treat that
 // as a diagnostic for a caller that has ALREADY broken the ordering rule
-// above, not as a guarantee — a call descheduled just
-// before it reaches the session can be freed out from under instead, and a
-// second close racing the first can end up on destroyed locks. Both are the
-// same use-after-free the rule exists to prevent. Close exactly once.
+// above, not as a guarantee — a call descheduled just before it reaches the
+// session can be freed out from under instead, and a second close racing the
+// first can end up on destroyed locks. Both are the same use-after-free the
+// rule exists to prevent. Close exactly once.
 //
 // Cancel first if you do not want to wait: register an abort callback, ask it
 // to stop, and the generation returns in a token or two.
