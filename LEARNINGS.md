@@ -56,8 +56,25 @@ exactly as the siblings do).
 writers checked time order: `merge_segments` concatenates slice results with no
 check, and the `core_seg_hygiene` pass is opt-in and documents itself as "never
 reorders". So a producer bug travelled all the way to a downstream subtitle
-complaint. `crispasr_first_backward_segment` now runs unconditionally at both
-chokepoints. Two properties made it shippable rather than noise: it walks the
+complaint. The predicate (`src/core/asr_time_order.h`) now runs unconditionally
+at all THREE chokepoints. Getting to three took a second pass: the first wiring
+covered the CLI's `merge_segments` and the server's slice-append loop and
+stopped, which left out the one surface that has a function existing *for* this
+purpose — `apply_session_hygiene` in `crispasr_c_api.cpp`, whose own comment
+says "the session reimplements every backend's transcribe inline and does NOT
+call the CLI adapter, so the hygiene wired into the CLI's merge_segments()
+reaches nothing here — bindings and the server would silently miss it. This is
+that arm." **When you add anything to `merge_segments`, `apply_session_hygiene`
+is its mirror; grep for that comment before calling a cross-surface fix done.**
+Sharing the predicate needed it in `src/core/` (templated over the segment
+type), because `src/` cannot include `examples/cli` and the two surfaces carry
+different structs — copying it would have been the "TWO copies — patch both"
+trap from `docs/contributing.md`. Watch the once-per-process flag in a shared
+header: a function-local `static` inside a TEMPLATE is one object per
+instantiation, so it has to live in a non-template function or each surface
+gets its own and warns twice.
+
+Two properties made it shippable rather than noise: it walks the
 values the writers use (words, falling back to spans only for a text-only
 segment), and it deliberately does NOT flag cues that merely overlap at a refill
 seam — that is word-timestamp jitter bounded by `kEdgePadCs`, not a reordering.
