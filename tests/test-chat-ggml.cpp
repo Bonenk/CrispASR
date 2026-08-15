@@ -530,6 +530,7 @@ TEST_CASE("crispasr_chat_count_tokens matches what a prefill really decodes", "[
     out = crispasr_chat_generate(s, overflowing, 1, &gp, &over_err);
     REQUIRE(out == nullptr);
     REQUIRE(over_err.code != 0);
+    REQUIRE(over_err.code != CRISPASR_CHAT_ERR_ABORTED);
 
     crispasr_chat_close(s);
 }

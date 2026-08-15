@@ -77,6 +77,11 @@ extern "C" {
 // Every entry point that can fail accepts a `crispasr_chat_error*` (may be
 // NULL). On success the struct is left untouched. On failure `code` is
 // set non-zero and `message` carries a short null-terminated diagnostic.
+//
+// `CRISPASR_CHAT_ERR_ABORTED` (below) is the one code with a stable,
+// documented meaning — a caller has to tell a cancellation apart from a
+// fault. Every other non-zero value is a diagnostic aid, not a contract:
+// read `message`, don't switch on the number.
 typedef struct crispasr_chat_error {
     int32_t code;
     char message[256];
@@ -187,6 +192,49 @@ CRISPASR_CHAT_API int32_t crispasr_chat_generate_stream(crispasr_chat_session_t 
                                                         const crispasr_chat_generate_params* params,
                                                         crispasr_chat_on_token on_token, void* user,
                                                         crispasr_chat_error* err);
+
+// ---------------------------------------------------------------------------
+// Cancellation
+// ---------------------------------------------------------------------------
+// Returned by `crispasr_chat_generate_stream`, and written to `err.code` by
+// both generate entry points, when a registered abort callback stopped the
+// run. Distinct from every failure code so a caller cannot read a
+// cancellation as a decode fault — or, on the one-shot path, a NULL return
+// as an allocation failure.
+#define CRISPASR_CHAT_ERR_ABORTED 40
+
+// Return true to let the generation continue, false to abort it. Matches
+// the `whisper_encoder_begin_callback` convention on the ASR surface.
+// `user` is the pointer handed to `crispasr_chat_set_abort_callback`.
+//
+// Called on the generating thread: once before each prompt batch during
+// prefill, and once before each sampled token. On the CPU backend it is
+// additionally called from inside a running compute graph, so it can be
+// invoked many times per batch there and must be cheap and non-blocking.
+// On Metal and CUDA an in-flight batch runs to completion, so a cancel
+// takes effect at the next prompt-batch or token boundary.
+//
+// The callback must not call back into the same session — the session
+// mutex is held for the whole generation and re-entering deadlocks.
+typedef bool (*crispasr_chat_abort_callback)(void* user);
+
+// Register `cb` on the session; `user` is forwarded verbatim on every
+// call. Passing cb = NULL clears the callback. A NULL session is a no-op.
+//
+// Register before starting a generation and have the callback read your
+// own flag: this call takes the session lock, so calling it while a
+// generation is running blocks until that generation finishes rather than
+// cancelling it.
+//
+// On abort `crispasr_chat_generate` returns NULL and
+// `crispasr_chat_generate_stream` returns `CRISPASR_CHAT_ERR_ABORTED`,
+// having already delivered the partial text through `on_token`; both set
+// `err.code` to `CRISPASR_CHAT_ERR_ABORTED`. An abort flushes the session
+// back to its just-opened state — KV cache and history cleared — so the
+// next `_generate` prefills from scratch whatever messages it is given
+// and no `crispasr_chat_reset` is needed first.
+CRISPASR_CHAT_API void crispasr_chat_set_abort_callback(crispasr_chat_session_t s, crispasr_chat_abort_callback cb,
+                                                        void* user);
 
 // ---------------------------------------------------------------------------
 // Memory + introspection

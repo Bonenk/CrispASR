@@ -178,9 +178,34 @@ struct crispasr_chat_session {
     // a divergent history triggers a full reset.
     std::vector<llama_token> history;
 
+    // Caller's cancellation hook, consulted between prompt batches and
+    // before each sampled token. Also handed to llama_set_abort_callback,
+    // which reaches the CPU backend's in-graph check.
+    crispasr_chat_abort_callback abort_cb = nullptr;
+    void* abort_user = nullptr;
+
     // Mutex serialising one-call-at-a-time per session.
     std::mutex mu;
 };
+
+namespace {
+
+// The public callback returns false to abort; every call site asks the
+// opposite question, so invert once here.
+bool abort_requested(crispasr_chat_session* s) {
+    return s->abort_cb && !s->abort_cb(s->abort_user);
+}
+
+// Adapter for llama_set_abort_callback, whose callback returns true to
+// abort. A static trampoline rather than a cast of the caller's function
+// pointer: the two types differ in meaning, and casting them would be
+// undefined behaviour the moment ggml called through it.
+bool abort_trampoline(void* data) {
+    auto* s = static_cast<crispasr_chat_session*>(data);
+    return s && abort_requested(s);
+}
+
+} // namespace
 
 // ---------------------------------------------------------------------------
 // Default params
@@ -351,6 +376,21 @@ extern "C" int32_t crispasr_chat_count_tokens(crispasr_chat_session_t s, const c
     return (int32_t)tokens.size();
 }
 
+extern "C" void crispasr_chat_set_abort_callback(crispasr_chat_session_t s, crispasr_chat_abort_callback cb,
+                                                 void* user) {
+    if (!s) {
+        return;
+    }
+    std::lock_guard<std::mutex> guard(s->mu);
+    s->abort_cb = cb;
+    s->abort_user = user;
+    // Registering after open still reaches every backend that supports an
+    // in-graph abort — llama_context::set_abort_callback re-registers on
+    // each of them. Only the CPU backend implements it today, so the
+    // checks in generate_loop are what cover the accelerated tiers.
+    llama_set_abort_callback(s->ctx, cb ? &abort_trampoline : nullptr, cb ? s : nullptr);
+}
+
 // ---------------------------------------------------------------------------
 // Generation core — shared by one-shot and streaming variants.
 // ---------------------------------------------------------------------------
@@ -407,13 +447,29 @@ int32_t generate_loop(crispasr_chat_session* s, const std::vector<llama_token>& 
         const int32_t n_total = (int32_t)tokens.size();
         const int32_t n_piece_max = std::max<int32_t>(1, (int32_t)llama_n_batch(s->ctx));
         for (int32_t off = 0; off < n_total; off += n_piece_max) {
+            // Checked between pieces so a cancel during a long prefill costs
+            // one prompt batch rather than the whole prompt.
+            if (abort_requested(s)) {
+                llama_memory_clear(llama_get_memory(s->ctx), /*data=*/true);
+                s->history.clear();
+                set_err(err, CRISPASR_CHAT_ERR_ABORTED, "generation aborted by callback during prefill");
+                return CRISPASR_CHAT_ERR_ABORTED;
+            }
             const int32_t n_piece = std::min(n_piece_max, n_total - off);
             llama_batch batch = llama_batch_get_one(tokens.data() + off, n_piece);
             if (llama_decode(s->ctx, batch) != 0) {
+                // On the CPU backend the abort lands inside the graph, so a
+                // decode that failed under an abort request is a cancel
+                // rather than a fault.
+                const bool cancelled = abort_requested(s);
                 // Drop the partial prefill rather than leaving the session
                 // holding a prompt prefix its history does not describe.
                 llama_memory_clear(llama_get_memory(s->ctx), /*data=*/true);
                 s->history.clear();
+                if (cancelled) {
+                    set_err(err, CRISPASR_CHAT_ERR_ABORTED, "generation aborted by callback during prefill");
+                    return CRISPASR_CHAT_ERR_ABORTED;
+                }
                 set_err(err, 10, "llama_decode failed during prefill");
                 return 10;
             }
@@ -436,6 +492,19 @@ int32_t generate_loop(crispasr_chat_session* s, const std::vector<llama_token>& 
     const int32_t max_tokens = gp.max_tokens > 0 ? gp.max_tokens : 256;
     llama_token new_token = 0;
     for (int32_t i = 0; i < max_tokens; ++i) {
+        // Before sampling, and outside the piece branch below: on Metal and
+        // CUDA a running batch cannot be interrupted, so this is the only
+        // place a cancel is honoured on those backends.
+        if (abort_requested(s)) {
+            // The cache holds half an assistant turn that no later prompt
+            // can reuse, so flush it rather than hand the next call a
+            // prefix it would have to diverge from anyway.
+            llama_memory_clear(llama_get_memory(s->ctx), /*data=*/true);
+            s->history.clear();
+            set_err(err, CRISPASR_CHAT_ERR_ABORTED, "generation aborted by callback");
+            return CRISPASR_CHAT_ERR_ABORTED;
+        }
+
         new_token = llama_sampler_sample(smpl.get(), s->ctx, -1);
 
         if (llama_vocab_is_eog(s->vocab, new_token)) {
@@ -466,6 +535,17 @@ int32_t generate_loop(crispasr_chat_session* s, const std::vector<llama_token>& 
         // Decode the just-sampled token to advance the KV cache.
         llama_batch batch = llama_batch_get_one(&new_token, 1);
         if (llama_decode(s->ctx, batch) != 0) {
+            // As in prefill: an in-graph abort on the CPU backend surfaces
+            // here as a failed decode, and is a cancel rather than a fault.
+            const bool cancelled = abort_requested(s);
+            // A failed decode drops this sequence's cache entries, so the
+            // history no longer describes what is in the cache — clear both.
+            llama_memory_clear(llama_get_memory(s->ctx), /*data=*/true);
+            s->history.clear();
+            if (cancelled) {
+                set_err(err, CRISPASR_CHAT_ERR_ABORTED, "generation aborted by callback");
+                return CRISPASR_CHAT_ERR_ABORTED;
+            }
             set_err(err, 12, "llama_decode failed during generation");
             return 12;
         }
