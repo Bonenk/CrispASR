@@ -2670,6 +2670,32 @@ catch_discover_tests(test-issue-114-chunk-context-gate
     PROPERTIES LABELS "unit;chunk-context;issue-114"
 )
 
+# ─── test-issue-356-gap-fill-overlap — issue #356 regression guard
+#
+# Pins crispasr_gap_fill_resolve_overlaps: the #89 gap-fill second pass used to
+# append recoveries inside the span of the segment they were recovered from and
+# sort by t0 only, so SRT/VTT cues jumped backwards by up to the hole length.
+# Covering segments must be split at each recovery so the list is monotone with
+# no text lost. Scripted fake backend; pure CPU, no model load.
+add_executable(test-issue-356-gap-fill-overlap
+    test-issue-356-gap-fill-overlap.cpp
+)
+target_include_directories(test-issue-356-gap-fill-overlap PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-issue-356-gap-fill-overlap PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-issue-356-gap-fill-overlap
+    TEST_SPEC "[issue-356]"
+    PROPERTIES LABELS "unit;gap-fill;issue-356"
+)
+
 # ─── test-parakeet-ja-detect — issue #257 regression guard
 #
 # Pins crispasr_parakeet::vocab_looks_japanese so the JA-model detection keys on
