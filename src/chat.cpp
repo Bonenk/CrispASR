@@ -174,8 +174,8 @@ struct crispasr_chat_session {
     int32_t n_threads_batch = 1;
 
     // History of tokens already in the KV cache for this conversation.
-    // We tokenise + decode only the NEW prefix on each _generate call;
-    // a divergent history triggers a full reset.
+    // We tokenise + decode only the NEW suffix on each _generate call;
+    // a divergent history is truncated back to the shared prefix.
     std::vector<llama_token> history;
 
     // Caller's cancellation hook, consulted between prompt batches and
@@ -554,8 +554,9 @@ int32_t generate_loop(crispasr_chat_session* s, const std::vector<llama_token>& 
 }
 
 // Prefill helper: build the chat-templated prompt, tokenize, and return
-// the NEW token suffix (the part not already in `s->history`). If the
-// new prompt diverges from history we wipe the KV cache and start over.
+// the NEW token suffix (the part not already in `s->history`). Where the
+// new prompt diverges from the history, the KV cache is truncated to
+// their common prefix so only the divergent tail is re-decoded.
 int32_t prepare_prompt(crispasr_chat_session* s, const crispasr_chat_message* messages, size_t n_messages,
                        std::vector<llama_token>& out_new, crispasr_chat_error* err) {
     if (n_messages == 0) {
@@ -569,16 +570,16 @@ int32_t prepare_prompt(crispasr_chat_session* s, const crispasr_chat_message* me
         set_err(err, 20, "llama_chat_apply_template failed for template '%s'", s->tmpl.c_str());
         return 20;
     }
-    // First message on a fresh session adds BOS; afterwards we want to
-    // continue mid-stream so add_special=false.
-    const bool fresh = s->history.empty();
-    std::vector<llama_token> full = tokenize(s->vocab, formatted, /*add_special=*/fresh, /*parse_special=*/true);
+    // `messages` is the whole conversation, so it is tokenized exactly as
+    // a just-opened session would tokenize it, leading BOS included. That
+    // is what makes it comparable to the history token for token below.
+    std::vector<llama_token> full = tokenize(s->vocab, formatted, /*add_special=*/true, /*parse_special=*/true);
     if (full.empty()) {
         set_err(err, 21, "tokenize produced no tokens");
         return 21;
     }
 
-    if (fresh) {
+    if (s->history.empty()) {
         out_new = std::move(full);
         return 0;
     }
@@ -592,10 +593,28 @@ int32_t prepare_prompt(crispasr_chat_session* s, const crispasr_chat_message* me
         }
     }
     if (common < s->history.size()) {
-        // History diverged — flush KV cache and re-prefill from scratch.
-        llama_memory_clear(llama_get_memory(s->ctx), /*data=*/true);
-        s->history.clear();
-        out_new = std::move(full);
+        // The history diverged, but everything before `common` is prompt
+        // the cache already holds and the new prompt still asks for — a
+        // fixed instruction block, in the usual case. Drop only the tail.
+        if (common == full.size()) {
+            // The new prompt is a strict prefix of the history: with no
+            // suffix left to decode, generation would sample from logits
+            // belonging to a token that is no longer the last one. Hold a
+            // token back so at least one is always decoded.
+            --common;
+        }
+        // A cache type that refuses a partial removal reports false and
+        // leaves its contents alone, so the full clear stays the fallback.
+        if (common > 0 && llama_memory_seq_rm(llama_get_memory(s->ctx), 0, (llama_pos)common, -1)) {
+            s->history.resize(common);
+        } else {
+            llama_memory_clear(llama_get_memory(s->ctx), /*data=*/true);
+            s->history.clear();
+            common = 0;
+        }
+        // The cache holds exactly the tokens the history now names, either
+        // way, so the suffix decodes onto a prefix that describes it.
+        out_new.assign(full.begin() + (ptrdiff_t)common, full.end());
         return 0;
     }
     // History is a clean prefix; only decode the new suffix.

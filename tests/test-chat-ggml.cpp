@@ -534,3 +534,89 @@ TEST_CASE("crispasr_chat_count_tokens matches what a prefill really decodes", "[
 
     crispasr_chat_close(s);
 }
+
+TEST_CASE("crispasr_chat branches two prompts off a shared system prefix", "[chat][gguf]") {
+    const char* model = test_model_path();
+    if (!model) {
+        SKIP("CRISPASR_CHAT_TEST_MODEL not set; skipping shared-prefix reuse");
+    }
+
+    // Two questions under one instruction block: the second diverges from
+    // the first at the user turn, so only the instruction block is
+    // reusable. Reusing it must not change a single sampled token.
+    const char* system = "You are a terse assistant. Answer with one word and nothing else.";
+    crispasr_chat_message first[] = {{"system", system}, {"user", "Name a colour."}};
+    crispasr_chat_message second[] = {{"system", system}, {"user", "Name a fruit."}};
+
+    const std::string ref_first = generate_on_fresh_session(model, first, 2);
+    const std::string ref_second = generate_on_fresh_session(model, second, 2);
+    REQUIRE_FALSE(ref_first.empty());
+    REQUIRE_FALSE(ref_second.empty());
+
+    crispasr_chat_session_t s = open_session(model, /*n_ctx=*/1024, /*n_batch=*/512);
+    const std::string reused_first = generate_text(s, first, 2);
+    const std::string reused_second = generate_text(s, second, 2);
+    // Back to the first question. Its tokens are still in the history the
+    // second turn was branched off, so a session whose history no longer
+    // describes its cache keeps the second turn's tokens here and answers
+    // the wrong question.
+    const std::string reused_again = generate_text(s, first, 2);
+    crispasr_chat_close(s);
+
+    REQUIRE(reused_first == ref_first);
+    REQUIRE(reused_second == ref_second);
+    REQUIRE(reused_again == ref_first);
+}
+
+TEST_CASE("crispasr_chat extends a growing conversation", "[chat][gguf]") {
+    const char* model = test_model_path();
+    if (!model) {
+        SKIP("CRISPASR_CHAT_TEST_MODEL not set; skipping append-only reuse");
+    }
+
+    // The append-only case: the second prompt contains the whole first
+    // prompt plus the reply it produced, so nothing in the cache is stale.
+    const char* system = "You are a terse assistant. Answer with one word and nothing else.";
+    crispasr_chat_message first[] = {{"system", system}, {"user", "Name a colour."}};
+
+    crispasr_chat_session_t s = open_session(model, /*n_ctx=*/1024, /*n_batch=*/512);
+    const std::string reply = generate_text(s, first, 2);
+    REQUIRE_FALSE(reply.empty());
+
+    crispasr_chat_message grown[] = {
+        {"system", system},
+        {"user", "Name a colour."},
+        {"assistant", reply.c_str()},
+        {"user", "Name a fruit."},
+    };
+    const std::string continued = generate_text(s, grown, 4);
+    crispasr_chat_close(s);
+
+    REQUIRE(continued == generate_on_fresh_session(model, grown, 4));
+}
+
+TEST_CASE("crispasr_chat regenerates a prompt that is a prefix of its history", "[chat][gguf]") {
+    const char* model = test_model_path();
+    if (!model) {
+        SKIP("CRISPASR_CHAT_TEST_MODEL not set; skipping prefix-of-history regeneration");
+    }
+
+    // Asking the same question twice: the second prompt is a strict prefix
+    // of the history, whose tail is the first reply. With no prompt token
+    // left to decode the model would sample from the logits of the last
+    // token of that reply and continue it, so one token must always be
+    // re-decoded.
+    const char* system = "You are a terse assistant. Answer with one word and nothing else.";
+    crispasr_chat_message ask[] = {{"system", system}, {"user", "Name a colour."}};
+
+    const std::string reference = generate_on_fresh_session(model, ask, 2);
+    REQUIRE_FALSE(reference.empty());
+
+    crispasr_chat_session_t s = open_session(model, /*n_ctx=*/1024, /*n_batch=*/512);
+    const std::string once = generate_text(s, ask, 2);
+    const std::string twice = generate_text(s, ask, 2);
+    crispasr_chat_close(s);
+
+    REQUIRE(once == reference);
+    REQUIRE(twice == reference);
+}
