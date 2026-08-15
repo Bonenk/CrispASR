@@ -26,9 +26,11 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <vector>
 
@@ -574,6 +576,19 @@ extern "C" const char* crispasr_chat_ai_disclosure_text(void) {
 // activations from there. Activations stay an approximation — getting
 // it exact would require building the graph, and the pre-flight guard
 // just wants "≤ available RAM / VRAM, with margin".
+//
+// `no_alloc` requires `use_mmap = false`. With mmap on, llama_model::load_tensors
+// takes the branch that wraps a backend buffer directly over the mapped file
+// region, and that branch opens with GGML_ASSERT(!ml.no_alloc) — the two are
+// mutually exclusive by construction. With mmap off it takes the branch
+// `no_alloc` was written for: a zero-byte dummy buffer that every weight tensor
+// points at, then an early return before any tensor data is read. llama.cpp's
+// own device-memory probe sets the same pair.
+//
+// `vocab_only` is NOT a substitute. load_hparams returns as soon as it sees that
+// flag, before it reads the context length, embedding length and block count —
+// precisely the three values the KV term below is built from — so the estimate
+// would silently collapse to file size + overhead while reporting success.
 extern "C" size_t crispasr_chat_memory_estimate(const char* model_path, const crispasr_chat_open_params* params,
                                                 crispasr_chat_error* err) {
     if (!model_path || !*model_path) {
@@ -583,9 +598,9 @@ extern "C" size_t crispasr_chat_memory_estimate(const char* model_path, const cr
     ensure_llama_backend_init();
 
     llama_model_params mparams = llama_model_default_params();
-    mparams.use_mmap = true;
+    mparams.use_mmap = false; // required by no_alloc — see above
     mparams.vocab_only = false;
-    mparams.no_alloc = true;  // metadata only — tensor data not faulted in
+    mparams.no_alloc = true;  // metadata only — tensor data not read
     mparams.n_gpu_layers = 0; // we don't want to provision a backend
     llama_model* model = llama_model_load_from_file(model_path, mparams);
     if (!model) {
@@ -594,23 +609,39 @@ extern "C" size_t crispasr_chat_memory_estimate(const char* model_path, const cr
     }
 
     // Approximation: weights size ≈ on-disk file size (mmap-friendly).
-    size_t weights = 0;
-    if (FILE* f = std::fopen(model_path, "rb")) {
-        std::fseek(f, 0, SEEK_END);
-        const long off = std::ftell(f);
-        if (off > 0) {
-            weights = (size_t)off;
-        }
-        std::fclose(f);
+    //
+    // std::filesystem::file_size, not fseek/ftell: ftell returns `long`, which
+    // is 32-bit on 64-bit Windows, so every GGUF over 2 GiB — which is most of
+    // the ones worth guarding against — would fail to be represented and leave
+    // the weights term at zero while the estimate still reported success. An
+    // estimate that omits the model it is deciding whether to load is worse
+    // than no estimate, so a size we cannot read is an error, not a zero.
+    std::error_code ec;
+    const std::uintmax_t file_bytes = std::filesystem::file_size(std::filesystem::path(model_path), ec);
+    if (ec || file_bytes > (std::uintmax_t)SIZE_MAX) {
+        llama_model_free(model);
+        set_err(err, 3, "could not read the model file's size");
+        return 0;
     }
+    const size_t weights = (size_t)file_bytes;
 
     // KV cache: n_ctx * n_layer * (n_embd_k + n_embd_v) * sizeof(fp16).
     // The exposed accessors give us what we need without llama-impl.
-    const int32_t n_ctx = params && params->n_ctx > 0 ? params->n_ctx : llama_model_n_ctx_train(model);
+    //
+    // Rounded up to a multiple of 256 the way llama_context's own constructor
+    // rounds it (GGML_PAD(cparams.n_ctx, 256)), so a request of, say, 1000
+    // tokens is sized as the 1024 the runtime will actually allocate.
+    const int32_t n_ctx_req = params && params->n_ctx > 0 ? params->n_ctx : llama_model_n_ctx_train(model);
+    // Widened before rounding: the padded value of a context near INT32_MAX
+    // does not fit back into an int32_t.
+    const uint64_t n_ctx = ((uint64_t)std::max(0, n_ctx_req) + 255u) & ~(uint64_t)255u;
     const int32_t n_layer = llama_model_n_layer(model);
-    const int32_t n_embd_k = llama_model_n_embd(model); // overestimate for non-GQA
-    const size_t kv_bytes = (size_t)std::max(0, n_ctx) * (size_t)std::max(0, n_layer) * (size_t)std::max(0, n_embd_k) *
-                            2 * 2; // 2 caches × fp16
+    // n_embd is the full attention width; on a grouped-query model the per-layer
+    // K/V width is a fraction of it, so this over-reports there. Over-reporting is
+    // the safe direction for a "will this fit?" guard.
+    const int32_t n_embd_k = llama_model_n_embd(model);
+    const size_t kv_bytes =
+        (size_t)n_ctx * (size_t)std::max(0, n_layer) * (size_t)std::max(0, n_embd_k) * 2 * 2; // 2 caches × fp16
 
     // Activations + overhead: rule-of-thumb 256 MB margin.
     constexpr size_t overhead = 256ull * 1024ull * 1024ull;

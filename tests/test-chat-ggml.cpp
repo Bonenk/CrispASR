@@ -22,7 +22,9 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 namespace {
 
@@ -165,4 +167,66 @@ TEST_CASE("crispasr_chat long-prompt output is independent of the prompt batch s
     const std::string many_batches = generate_over_long_prompt(model, /*n_batch=*/512);
     REQUIRE_FALSE(one_batch.empty());
     REQUIRE(one_batch == many_batches);
+}
+
+TEST_CASE("crispasr_chat_memory_estimate sizes weights plus a context-scaled KV cache", "[chat][gguf]") {
+    const char* model = test_model_path();
+    if (!model) {
+        SKIP("CRISPASR_CHAT_TEST_MODEL not set; skipping memory estimate");
+    }
+
+    // std::filesystem, not fseek/ftell: ftell's `long` is 32-bit on 64-bit
+    // Windows, so this oracle would report nothing for the GGUFs over 2 GiB
+    // that the estimate exists to guard against.
+    std::error_code ec;
+    const std::uintmax_t file_size = std::filesystem::file_size(std::filesystem::path(model), ec);
+    REQUIRE_FALSE(ec);
+    REQUIRE(file_size > 0);
+
+    // Default params (NULL) — the model's own trained context.
+    crispasr_chat_error err{};
+    const size_t at_default = crispasr_chat_memory_estimate(model, nullptr, &err);
+    REQUIRE(err.code == 0);
+    REQUIRE(at_default > file_size);
+
+    // The KV term is linear in n_ctx, so doubling the context doubles the
+    // amount by which the estimate grows. A load path that returned before
+    // reading the context / layer / embedding metadata would leave every
+    // difference at zero and fail here while still reporting success.
+    auto estimate_at = [&](int32_t n_ctx) {
+        crispasr_chat_open_params p;
+        crispasr_chat_open_params_default(&p);
+        p.n_ctx = n_ctx;
+        crispasr_chat_error e{};
+        const size_t bytes = crispasr_chat_memory_estimate(model, &p, &e);
+        REQUIRE(e.code == 0);
+        return bytes;
+    };
+
+    const size_t at_1k = estimate_at(1024);
+    const size_t at_2k = estimate_at(2048);
+    const size_t at_4k = estimate_at(4096);
+
+    REQUIRE(at_1k > file_size);
+    REQUIRE(at_2k > at_1k);
+    REQUIRE(at_4k > at_2k);
+    REQUIRE(at_4k - at_2k == 2 * (at_2k - at_1k));
+
+    // Everything outside the KV term is context-independent, so back it out
+    // and the remainder still has to cover the weights on disk.
+    const size_t kv_per_1k = at_2k - at_1k;
+    REQUIRE(at_1k - kv_per_1k > file_size);
+
+    // llama_context rounds the requested context up to a multiple of 256
+    // before it allocates, so the estimate has to size the context the runtime
+    // will really take, not the one that was asked for.
+    REQUIRE(estimate_at(1000) == at_1k);
+    REQUIRE(estimate_at(1024) == at_1k);
+    REQUIRE(estimate_at(1025) > at_1k);
+    REQUIRE(estimate_at(1025) == estimate_at(1280));
+
+    // A missing path is rejected rather than estimated.
+    crispasr_chat_error bad{};
+    REQUIRE(crispasr_chat_memory_estimate(nullptr, nullptr, &bad) == 0);
+    REQUIRE(bad.code != 0);
 }
