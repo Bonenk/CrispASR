@@ -17,7 +17,9 @@ sparse words straddle the hole, so its span enclosed every recovery.
 PR #357 (niksedk) split the covering segment at each recovery; `308cddfb` then
 replaced its clamp fallback with a merge for the interleaved case, which the
 clamp left both non-monotone and word-stranding; `4edb2e10` added the
-unconditional time-order guard the issue asked for. Verified live on
+unconditional time-order guard the issue asked for, and `9f1bddbb` wired that
+guard into the session C ABI as well (its first pass covered the CLI and server
+arms only). Verified live on
 parakeet-tdt-0.6b-ja-q8_0 over a 240 s clip: 4 backward cues (worst 11.36 s)
 before, 0 after, with the character multiset unchanged. See LEARNINGS.md for
 why a guard written against segment spans passed the buggy list.
