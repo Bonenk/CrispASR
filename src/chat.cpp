@@ -115,13 +115,11 @@ size_t find_first_stop(const std::string& acc, const char* const* stop, size_t n
 
 // Build the prompt string by applying the model's chat template via
 // llama.cpp's pre-defined list (chatml / llama3 / gemma / qwen / …).
-// Returns false on failure.
+// With n == 0 the result is the template's own opening — for add_ass that
+// is the bare assistant prefix, which is what a token count of an empty
+// conversation should report. Returns false on failure.
 bool apply_chat_template(const char* tmpl, const crispasr_chat_message* msgs, size_t n, bool add_ass,
                          std::string& out) {
-    if (n == 0) {
-        out.clear();
-        return true;
-    }
     // llama.cpp's signature expects llama_chat_message (same shape as ours).
     std::vector<llama_chat_message> chat;
     chat.reserve(n);
@@ -317,6 +315,42 @@ extern "C" int32_t crispasr_chat_n_ctx(crispasr_chat_session_t s) {
     return s ? s->n_ctx : 0;
 }
 
+extern "C" int32_t crispasr_chat_count_tokens(crispasr_chat_session_t s, const crispasr_chat_message* messages,
+                                              size_t n_messages, crispasr_chat_error* err) {
+    if (!s) {
+        set_err(err, 1, "session is null");
+        return -1;
+    }
+    if (n_messages > 0 && !messages) {
+        set_err(err, 1, "messages is null but n_messages > 0");
+        return -1;
+    }
+    std::lock_guard<std::mutex> guard(s->mu);
+
+    // Same rendering and same tokenizer flags prepare_prompt uses on a
+    // fresh session, so the number is the prompt that session prefills.
+    std::string formatted;
+    if (!apply_chat_template(s->tmpl.c_str(), messages, n_messages, /*add_ass=*/true, formatted)) {
+        set_err(err, 20, "llama_chat_apply_template failed for template '%s'", s->tmpl.c_str());
+        return -1;
+    }
+    if (formatted.empty()) {
+        // The template rendered to nothing, which several of the vendored ones
+        // do for an empty message array: they emit only from inside their loop
+        // over the messages and have no `add_ass` opening of their own. A fresh
+        // session would prefill nothing here, so nothing is what this reports.
+        // Failing instead would make a legitimate query model-dependent, and
+        // inventing a token would count one the model never sees.
+        return 0;
+    }
+    const std::vector<llama_token> tokens = tokenize(s->vocab, formatted, /*add_special=*/true, /*parse_special=*/true);
+    if (tokens.empty()) {
+        set_err(err, 21, "tokenize produced no tokens for a non-empty prompt");
+        return -1;
+    }
+    return (int32_t)tokens.size();
+}
+
 // ---------------------------------------------------------------------------
 // Generation core — shared by one-shot and streaming variants.
 // ---------------------------------------------------------------------------
@@ -444,6 +478,12 @@ int32_t generate_loop(crispasr_chat_session* s, const std::vector<llama_token>& 
 // new prompt diverges from history we wipe the KV cache and start over.
 int32_t prepare_prompt(crispasr_chat_session* s, const crispasr_chat_message* messages, size_t n_messages,
                        std::vector<llama_token>& out_new, crispasr_chat_error* err) {
+    if (n_messages == 0) {
+        // Nothing to answer: the template would render a bare assistant
+        // prefix and the model would continue from nowhere.
+        set_err(err, 21, "no messages to prefill");
+        return 21;
+    }
     std::string formatted;
     if (!apply_chat_template(s->tmpl.c_str(), messages, n_messages, /*add_ass=*/true, formatted)) {
         set_err(err, 20, "llama_chat_apply_template failed for template '%s'", s->tmpl.c_str());
