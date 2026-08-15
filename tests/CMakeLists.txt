@@ -2696,6 +2696,33 @@ catch_discover_tests(test-issue-356-gap-fill-overlap
     PROPERTIES LABELS "unit;gap-fill;issue-356"
 )
 
+# ─── test-issue-356-order-guard — issue #356 time-order guard
+#
+# Pins crispasr_first_backward_segment, the check merge_segments and the server
+# run over every finished transcript. #356 shipped because nothing between the
+# gap-fill producer and the SRT/VTT writers verified time order. The guard has
+# to read WORD timestamps (what crispasr_make_disp_segments uses) rather than
+# segment spans, or it passes the very list that caused the bug.
+add_executable(test-issue-356-order-guard
+    test-issue-356-order-guard.cpp
+    ${PROJECT_SOURCE_DIR}/examples/cli/crispasr_output.cpp
+)
+target_include_directories(test-issue-356-order-guard PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-issue-356-order-guard PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-issue-356-order-guard
+    TEST_SPEC "[issue-356]"
+    PROPERTIES LABELS "unit;order-guard;issue-356"
+)
+
 # ─── test-parakeet-ja-detect — issue #257 regression guard
 #
 # Pins crispasr_parakeet::vocab_looks_japanese so the JA-model detection keys on

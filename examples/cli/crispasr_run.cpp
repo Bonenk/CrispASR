@@ -461,9 +461,15 @@ std::vector<crispasr_segment> merge_segments(std::vector<std::vector<crispasr_se
             out.push_back(std::move(s));
     }
 
+    // Issue #356: the structural chokepoint every slice result passes through
+    // is also the last place a producer's ordering mistake can be caught before
+    // it reaches the writers. Diagnostic only — this reports, it never reorders,
+    // because a reorder here would paper over the producing bug.
     const auto hy = core_seg_hygiene::config_from_env();
-    if (!core_seg_hygiene::any_enabled(hy))
+    if (!core_seg_hygiene::any_enabled(hy)) {
+        crispasr_warn_if_segments_backward(out, "slice merge");
         return out;
+    }
 
     std::vector<core_seg_hygiene::Seg> view;
     view.reserve(out.size());
@@ -491,8 +497,10 @@ std::vector<crispasr_segment> merge_segments(std::vector<std::vector<crispasr_se
             break;
         pick.push_back(oi++);
     }
-    if (pick.size() != kept.size()) // unmatched view: never silently lose content
+    if (pick.size() != kept.size()) { // unmatched view: never silently lose content
+        crispasr_warn_if_segments_backward(out, "slice merge");
         return out;
+    }
 
     std::vector<crispasr_segment> res;
     res.reserve(pick.size());
@@ -504,6 +512,7 @@ std::vector<crispasr_segment> merge_segments(std::vector<std::vector<crispasr_se
     }
     if (dropped > 0 || res.size() != out.size())
         fprintf(stderr, "crispasr[hygiene]: %zu -> %zu segments (%d dropped)\n", out.size(), res.size(), dropped);
+    crispasr_warn_if_segments_backward(res, "slice merge + hygiene");
     return res;
 }
 

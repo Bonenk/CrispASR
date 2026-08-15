@@ -764,6 +764,11 @@ static transcription_result do_transcribe(const httplib::MultipartFormData& audi
             }
         }
 
+        // Issue #356: same guard as the CLI's merge_segments. The server has no
+        // merge step of its own — it appends each slice's segments straight into
+        // the response — so the check belongs right after that loop.
+        crispasr_warn_if_segments_backward(result.segs, "slice append");
+
         // Tiron (#295): if the transcript carries <|speakerN|> markers, link them
         // to global SPEAKER_NN with the library-shared linker (same as the CLI)
         // and skip the generic diarizer. Opt-in via diarize / diarize_embedder.
