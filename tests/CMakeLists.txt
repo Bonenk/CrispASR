@@ -4063,7 +4063,9 @@ target_link_libraries(test_qwen3_tts_talker PRIVATE qwen3_tts)
 #
 # Loads a small GGUF chat model (env CRISPASR_CHAT_TEST_MODEL → path) and
 # verifies open / generate (one-shot) / generate_stream / reset / close,
-# plus prefill of a prompt longer than the prompt batch.
+# prefill of a prompt longer than the prompt batch, token counting
+# against the prompt a prefill really decodes, and reuse of the KV cache
+# across prompts that share a prefix with the session's history.
 # Skipped when the env var is unset so unrelated builds stay green.
 add_executable(test-chat-ggml test-chat-ggml.cpp)
 target_link_libraries(test-chat-ggml PRIVATE

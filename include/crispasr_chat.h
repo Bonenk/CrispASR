@@ -18,6 +18,12 @@
 //   one session, so multi-turn chats don't re-prefill the full history.
 //   Use `crispasr_chat_reset` to flush.
 //
+//   Reuse depends on the caller passing the WHOLE conversation in
+//   `messages` on every call, not just the new turn: the session compares
+//   the templated prompt against the tokens it already holds and decodes
+//   only what is new. Passing just the latest turn is not wrong — it
+//   simply shares no prefix, so every call re-prefills from scratch.
+//
 // Strings out of this ABI come from malloc — free with
 // `crispasr_chat_string_free`.
 //
