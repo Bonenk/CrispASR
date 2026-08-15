@@ -89,6 +89,37 @@ void require_monotone(const std::vector<crispasr_segment>& segs) {
     }
 }
 
+// The property #356 is actually about. --output-srt / --output-vtt go through
+// crispasr_make_disp_segments, which — for any segment that carries words —
+// builds every cue from the WORD timestamps in segment order and never reads
+// seg.t0/seg.t1. So a list whose segment spans are monotone can still emit
+// backward-jumping cues; what has to be non-decreasing is the word stream read
+// in segment order. require_monotone above is the weaker, structural check.
+void require_words_monotone_in_reading_order(const std::vector<crispasr_segment>& segs) {
+    int64_t prev_t0 = -1;
+    std::string prev_text;
+    for (size_t i = 0; i < segs.size(); i++) {
+        for (const auto& w : segs[i].words) {
+            INFO("segment " << i << ": word '" << w.text << "' at [" << w.t0 << ".." << w.t1 << "] follows '"
+                            << prev_text << "' starting at " << prev_t0);
+            REQUIRE(w.t0 >= prev_t0);
+            prev_t0 = w.t0;
+            prev_text = w.text;
+        }
+    }
+}
+
+// A segment's span must still contain the words whose text it carries.
+void require_words_inside_their_cue(const std::vector<crispasr_segment>& segs) {
+    for (size_t i = 0; i < segs.size(); i++)
+        for (const auto& w : segs[i].words) {
+            INFO("segment " << i << " [" << segs[i].t0 << ".." << segs[i].t1 << "] text='" << segs[i].text
+                            << "' carries word '" << w.text << "' at [" << w.t0 << ".." << w.t1 << "]");
+            REQUIRE(w.t0 <= segs[i].t1);
+            REQUIRE(w.t1 >= segs[i].t0);
+        }
+}
+
 std::string joined_text(const std::vector<crispasr_segment>& segs) {
     std::string all;
     for (const auto& s : segs)
@@ -125,6 +156,7 @@ TEST_CASE("issue #356: recovery inside a straddling segment splits it, output mo
     // covering segment must have been split around the recovery instead of
     // being left spanning it.
     require_monotone(segs);
+    require_words_monotone_in_reading_order(segs);
     REQUIRE(segs.size() == 3);
     REQUIRE(segs[0].text == "まずね");
     REQUIRE(segs[1].text == "日本にもそんないないです。えっと。");
@@ -152,6 +184,7 @@ TEST_CASE("issue #356: segment enclosing two recoveries is split at each", "[uni
     crispasr_gap_fill_resolve_overlaps(segs);
 
     require_monotone(segs);
+    require_words_monotone_in_reading_order(segs);
     REQUIRE(segs.size() == 5);
     REQUIRE(segs[0].text == "head");
     REQUIRE(segs[1].text == "first-recovery");
@@ -226,4 +259,113 @@ TEST_CASE("issue #356: no text is lost when splitting", "[unit][gap-fill][issue-
 
     require_monotone(segs);
     REQUIRE(joined_text(segs) == before);
+}
+
+TEST_CASE("issue #356: a recovery ending past the next word's start is merged, not clamped",
+          "[unit][gap-fill][issue-356]") {
+    // The clamp fallback used to fire here: the covering segment's LAST word
+    // starts at 600, the recovery ends at 620, so `words.back().t0 >= cur.t1`
+    // is false and there is nothing to split off. Capping the covering
+    // segment's t1 at 500 left "omega" (600..900) inside a cue ending at 500
+    // AND left the word stream reading 100, 600, 500 — i.e. #356 itself,
+    // hidden from a check on segment spans.
+    std::vector<crispasr_segment> segs;
+    segs.push_back(make_segment({
+        make_word("alpha", 100, 150),
+        make_word("omega", 600, 900),
+    }));
+    segs.push_back(make_segment({make_word("beta", 500, 620)}));
+
+    crispasr_gap_fill_resolve_overlaps(segs);
+
+    require_words_monotone_in_reading_order(segs);
+    require_monotone(segs);
+    require_words_inside_their_cue(segs);
+    REQUIRE(segs.size() == 1);
+    REQUIRE(segs[0].text == "alpha beta omega");
+    REQUIRE(segs[0].t0 == 100);
+    REQUIRE(segs[0].t1 == 900);
+}
+
+TEST_CASE("issue #356: the merge case is reachable end-to-end through gap_fill_slice", "[unit][gap-fill][issue-356]") {
+    // Nothing synthetic about the shape: the refill window for a hole runs to
+    // g.second + kEdgePadCs (0.2 s), so a recovered word may legitimately end
+    // after the next first-pass word starts. Slice 0..1000 cs, hole 150..600.
+    const crispasr_audio_slice sl = {0, 1000 * kSampleRate / 100, 0, 1000};
+    std::vector<float> samples((size_t)sl.end, 0.0f);
+
+    std::vector<crispasr_segment> segs;
+    segs.push_back(make_segment({
+        make_word("alpha", 100, 150),
+        make_word("omega", 600, 900),
+    }));
+
+    // mid = 560 — inside the hole and not covered by the merged first-pass
+    // intervals ([100,150], [600,900]), so gap-fill keeps it.
+    ScriptedBackend be({make_word("beta", 500, 620)});
+    whisper_params params;
+
+    crispasr_gap_fill_slice(be, params, samples.data(), sl.end, kSampleRate, sl, segs);
+
+    require_words_monotone_in_reading_order(segs);
+    require_monotone(segs);
+    require_words_inside_their_cue(segs);
+    REQUIRE(joined_text(segs) == "alpha beta omega");
+}
+
+TEST_CASE("issue #356: splitting keeps the speaker turn on the tail only", "[unit][gap-fill][issue-356]") {
+    // tinydiarize's speaker_turn_next means "a turn follows THIS segment". The
+    // tail is what follows the head, so copying the segment's metadata onto
+    // both halves would announce a turn in the middle of one utterance.
+    std::vector<crispasr_segment> segs;
+    auto covering = make_segment({
+        make_word("head", 100, 150),
+        make_word("tail", 1400, 1500),
+    });
+    covering.speaker = "speaker 1";
+    covering.speaker_turn_next = true;
+    covering.chunk_id = 7;
+    segs.push_back(std::move(covering));
+    segs.push_back(make_segment({make_word("recovery", 300, 500)}));
+
+    crispasr_gap_fill_resolve_overlaps(segs);
+
+    require_words_monotone_in_reading_order(segs);
+    REQUIRE(segs.size() == 3);
+    REQUIRE(segs[0].text == "head");
+    REQUIRE(segs[2].text == "tail");
+    REQUIRE_FALSE(segs[0].speaker_turn_next);
+    REQUIRE(segs[2].speaker_turn_next);
+    // Everything else the split copies is still carried by both halves.
+    REQUIRE(segs[0].speaker == "speaker 1");
+    REQUIRE(segs[2].speaker == "speaker 1");
+    REQUIRE(segs[0].chunk_id == 7);
+    REQUIRE(segs[2].chunk_id == 7);
+}
+
+TEST_CASE("issue #356: untimed tokens survive a split that empties the head", "[unit][gap-fill][issue-356]") {
+    // A token with t0 == -1 joins no word, so the t0-based partition would put
+    // it in the head — and the head-is-empty branch discards the head outright.
+    std::vector<crispasr_segment> segs;
+    auto covering = make_segment({make_word("late-words", 800, 1000)});
+    covering.t0 = 200; // span inflated to the left
+    crispasr_token untimed;
+    untimed.text = "no-timestamp";
+    covering.tokens.push_back(untimed);
+    crispasr_token timed;
+    timed.text = "late";
+    timed.t0 = 800;
+    timed.t1 = 1000;
+    covering.tokens.push_back(timed);
+    segs.push_back(std::move(covering));
+    segs.push_back(make_segment({make_word("recovery", 250, 600)}));
+
+    crispasr_gap_fill_resolve_overlaps(segs);
+
+    require_monotone(segs);
+    REQUIRE(segs.size() == 2);
+    REQUIRE(segs[1].text == "late-words");
+    REQUIRE(segs[1].tokens.size() == 2);
+    REQUIRE(segs[1].tokens.front().text == "no-timestamp");
+    REQUIRE(segs[1].tokens.back().text == "late");
 }
