@@ -11,6 +11,8 @@
 #include <iomanip>
 #include <sstream>
 
+#include <cstdlib>
+
 // ---------------------------------------------------------------------------
 // Timestamp + path helpers
 // ---------------------------------------------------------------------------
@@ -345,6 +347,65 @@ static std::vector<std::string> pack_text_to_maxlen(const std::string& text, int
     if (!cur.empty())
         out.push_back(cur);
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// Issue #356: time-order guard
+// ---------------------------------------------------------------------------
+
+int crispasr_first_backward_segment(const std::vector<crispasr_segment>& segments, int64_t* prev_cs, int64_t* cur_cs) {
+    int64_t prev = INT64_MIN;
+    for (size_t i = 0; i < segments.size(); i++) {
+        const auto& seg = segments[i];
+        // Mirror crispasr_make_disp_segments: word timestamps drive every cue
+        // for a segment that has words; only a text-only segment is placed by
+        // its own span.
+        if (seg.words.empty()) {
+            if (seg.text.empty())
+                continue; // writers skip it
+            if (seg.t0 < prev) {
+                if (prev_cs)
+                    *prev_cs = prev;
+                if (cur_cs)
+                    *cur_cs = seg.t0;
+                return (int)i;
+            }
+            prev = seg.t0;
+            continue;
+        }
+        for (const auto& w : seg.words) {
+            if (w.text.empty())
+                continue;
+            if (w.t0 < prev) {
+                if (prev_cs)
+                    *prev_cs = prev;
+                if (cur_cs)
+                    *cur_cs = w.t0;
+                return (int)i;
+            }
+            prev = w.t0;
+        }
+    }
+    return -1;
+}
+
+void crispasr_warn_if_segments_backward(const std::vector<crispasr_segment>& segments, const char* where) {
+    static bool warned = false;
+    if (warned)
+        return;
+    if (const char* e = getenv("CRISPASR_ORDER_WARN"))
+        if (atoi(e) == 0)
+            return;
+    int64_t prev = 0, cur = 0;
+    const int i = crispasr_first_backward_segment(segments, &prev, &cur);
+    if (i < 0)
+        return;
+    warned = true;
+    fprintf(stderr,
+            "crispasr: warning: transcript is not in time order after %s -- segment %d starts at %s, "
+            "after %s was already emitted. Subtitle output will contain overlapping cues; please report "
+            "this with the audio (see issue #356).\n",
+            where, i, crispasr_to_timestamp(cur, true).c_str(), crispasr_to_timestamp(prev, true).c_str());
 }
 
 std::vector<crispasr_disp_segment> crispasr_make_disp_segments(const std::vector<crispasr_segment>& segments,
