@@ -97,6 +97,7 @@ OVERRIDES = {
     "Two writers on one output field": _M,
     "A feature has ~8 front-ends": _M,
     "Regression transcripts need WER tolerance": _P,
+    "A guard has to assert the property the CONSUMER reads": _P,
     "Deterministic DROPOUT of whole words/tokens": _P,
     "A converter that embeds a tokenizer MUST embed the merges": "Tokenizers, prompts, language & text",
     "A gate that ANDs": _M,

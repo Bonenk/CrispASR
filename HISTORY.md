@@ -6,6 +6,22 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## #356 gap-fill recoveries emitted inside the segment they came from — fixed 2026-08-15
+
+Reported downstream as SubtitleEdit/subtitleedit#13548: on a 634 s Japanese file
+18 of 289 SRT cues started before the previous cue ended, jumping backwards by up
+to 10.5 s. The #89 gap-fill second pass appended each recovery to the slice's
+segment list and sorted by `t0`, but the first pass emits one segment whose
+sparse words straddle the hole, so its span enclosed every recovery.
+
+PR #357 (niksedk) split the covering segment at each recovery; `308cddfb` then
+replaced its clamp fallback with a merge for the interleaved case, which the
+clamp left both non-monotone and word-stranding; `4edb2e10` added the
+unconditional time-order guard the issue asked for. Verified live on
+parakeet-tdt-0.6b-ja-q8_0 over a 240 s clip: 4 backward cues (worst 11.36 s)
+before, 0 after, with the character multiset unchanged. See LEARNINGS.md for
+why a guard written against segment spans passed the buggy list.
+
 ## #348 Chatterbox Multilingual V3 parity port — shipped 2026-08-13
 
 PR #354 landed as a six-commit rebase at `278e3fbf`. The port pins the exact
