@@ -757,6 +757,14 @@ CA_EXPORT int crispasr_vad_segments(const char* vad_model_path, const float* pcm
 //
 //   -1  bad arguments
 //   -2  allocation failed
+//   -3  the VAD model could not be loaded
+//
+// -3 exists because 0 and "the model never loaded" were the same answer.
+// crispasr_compute_vad_slices takes an `out_load_failed` flag for exactly this
+// reason — it was added after a failed VAD download was reported as success for
+// years — and this wrapper was dropping it, so a missing or unreadable model
+// returned 0 slices and every binding read that as "this audio has no speech".
+// A caller cannot tell those apart from the outside, so the ABI has to.
 CA_EXPORT int crispasr_vad_slices(const char* vad_model_path, const float* pcm, int n_samples, int sample_rate,
                                   float threshold, int min_speech_ms, int min_silence_ms, int speech_pad_ms,
                                   float max_chunk_duration_s, int n_threads, float** out_spans) {
@@ -784,8 +792,11 @@ CA_EXPORT int crispasr_vad_slices(const char* vad_model_path, const float* pcm, 
     if (n_threads > 0)
         opts.n_threads = n_threads;
 
+    bool load_failed = false;
     std::vector<crispasr_audio_slice> slices =
-        crispasr_compute_vad_slices(pcm, n_samples, sample_rate, vad_model_path, opts);
+        crispasr_compute_vad_slices(pcm, n_samples, sample_rate, vad_model_path, opts, &load_failed);
+    if (load_failed)
+        return -3; // distinct from 0 = loaded fine, found no speech
     const int n = (int)slices.size();
     if (n == 0)
         return 0;

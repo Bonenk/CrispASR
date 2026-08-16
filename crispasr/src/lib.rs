@@ -3281,7 +3281,13 @@ pub fn vad_slices(
         )
     };
     if n < 0 {
-        return Err(format!("crispasr_vad_slices failed (rc={n})"));
+        let why = match n {
+            -1 => " (bad arguments)",
+            -2 => " (allocation failed)",
+            -3 => " (the VAD model could not be loaded)",
+            _ => "",
+        };
+        return Err(format!("crispasr_vad_slices failed (rc={n}){why}"));
     }
     let mut spans = Vec::with_capacity(n as usize);
     for i in 0..n as isize {

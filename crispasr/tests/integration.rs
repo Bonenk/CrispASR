@@ -678,7 +678,14 @@ fn titanet_cosine_sim_orthogonal() {
 #[test]
 fn kokoro_lang_helpers() {
     assert!(crispasr::kokoro_lang_is_german("de"));
-    assert!(crispasr::kokoro_lang_is_german("deu"));
+    assert!(crispasr::kokoro_lang_is_german("de-DE"));
+    assert!(crispasr::kokoro_lang_is_german("de_AT"));
+    // NOT "deu": the C predicate is documented as "de" followed by '\0', '-'
+    // or '_' (src/kokoro.h), CrispASR's language surface is ISO 639-1, and
+    // nothing in the tree maps 639-3 down to it. This case asserted "deu" for
+    // as long as the suite could not run — see the rpath fix in
+    // crispasr/build.rs — so it never failed out loud.
+    assert!(!crispasr::kokoro_lang_is_german("deu"));
     assert!(!crispasr::kokoro_lang_is_german("en"));
     // "en" always has a native Kokoro voice
     assert!(crispasr::kokoro_lang_has_native_voice("en"));
@@ -722,7 +729,32 @@ fn vad_slices_null_model() {
         30.0,
         1,
     );
-    assert!(result.is_err());
+    // -3, not 0. A model that cannot be loaded must not look like "this audio
+    // contains no speech" — crispasr_compute_vad_slices has carried an
+    // out_load_failed flag for exactly this reason and the C ABI wrapper was
+    // discarding it, so every binding read a broken install as silence.
+    let msg = result.unwrap_err();
+    assert!(
+        msg.contains("could not be loaded"),
+        "a missing VAD model must be reported as a load failure, got: {msg}"
+    );
+}
+
+#[test]
+fn vad_slices_real_model_is_not_a_load_failure() {
+    // The positive control for the case above: with a model that DOES load, the
+    // same call must succeed. Without this the assertion above passes for a
+    // wrapper that simply errors on everything.
+    let Some(model) = std::env::var("CRISPASR_VAD_MODEL")
+        .ok()
+        .filter(|p| !p.is_empty() && Path::new(p).exists())
+    else {
+        eprintln!("SKIP: set CRISPASR_VAD_MODEL to a VAD model");
+        return;
+    };
+    let pcm = vec![0.0f32; 16000];
+    let result = crispasr::vad_slices(&model, &pcm, 16000, 0.5, 250, 100, 30, 30.0, 1);
+    assert!(result.is_ok(), "a loadable VAD model must not error: {result:?}");
 }
 
 // -------------------------------------------------------------------------
