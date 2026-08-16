@@ -3761,6 +3761,18 @@ catch_discover_tests(test_tts_provenance
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-tts-ref-cache — #334 CLI-writes / session-reads contract ──────────
+# The reference-transcript cache couples two layers that never compile
+# together: the CLI writes it, crispasr_c_api.cpp reads it, and the suffix and
+# tag agree only by convention. Header-only, no model needed.
+add_executable(test-tts-ref-cache test-tts-ref-cache.cpp)
+target_include_directories(test-tts-ref-cache PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-tts-ref-cache PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-tts-ref-cache
+    TEST_SPEC "[issue-334]"
+    PROPERTIES LABELS "unit;tts"
+)
+
 # ─── test-align-stdin — #317 `--align-only --text-file -` ───────────────────
 # Live: needs a CTC aligner GGUF and a speech clip, so it SKIPs (77) without
 # them. Asserts stdin is a transport and not a separate feature — piping a
