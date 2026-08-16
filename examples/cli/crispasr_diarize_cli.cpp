@@ -20,6 +20,7 @@
 #include "core/spectral_diarize.h"
 
 #include <algorithm>
+#include <chrono>
 #include <atomic> // cross-segment embed workers (#326)
 #include <thread>
 #include <array>
@@ -301,11 +302,20 @@ bool apply_sherpa(const std::vector<float>& mono, int64_t slice_t0_cs, std::vect
 std::string resolve_pyannote_model(const whisper_params& params) {
     std::string mp = params.sherpa_segment_model;
     if (mp.empty() || mp == "auto") {
+        // MIT, and the GGUF repo is ungated — same licence as the upstream
+        // pyannote/segmentation-3.0 it was exported from.
+        //
+        // This was tagged "other", which the registry treats as restricted (a
+        // correct default for an unknown licence — see the `restricted[]` list
+        // in crispasr_model_registry.cpp). The effect was that `--diarize-method
+        // pyannote` with the default "auto" refused to fetch its own
+        // segmentation model and printed a licence warning, so pyannote
+        // diarization did not work out of the box at all: it fell through to
+        // "sherpa needs --sherpa-segment-model" and produced no speaker turns.
         mp = crispasr_managed_download(
             "pyannote-seg-3.0.gguf",
-            "https://huggingface.co/cstr/pyannote-v3-segmentation-GGUF/resolve/main/pyannote-seg-3.0.gguf",
-            "other (see https://huggingface.co/cstr/pyannote-v3-segmentation-GGUF)", params.no_prints,
-            "crispasr[diarize]", params.cache_dir, params.accept_license);
+            "https://huggingface.co/cstr/pyannote-v3-segmentation-GGUF/resolve/main/pyannote-seg-3.0.gguf", "mit",
+            params.no_prints, "crispasr[diarize]", params.cache_dir, params.accept_license);
     }
     if (mp.size() < 5 || mp.compare(mp.size() - 5, 5, ".gguf") != 0)
         return {}; // not GGUF → caller can fall back to sherpa subprocess
@@ -1036,6 +1046,12 @@ static void crispasr_embed_segments(const std::vector<crispasr_segment>& segs, c
                                     CrispasrSpeakerEmbedder* embedder, int d, std::vector<size_t>& embed_idx,
                                     std::vector<float>& embeddings) {
     constexpr int64_t MIN_EMBED_CS = 25; // 0.25 s
+    // This stage is the dominant diarization cost on files with many segments
+    // (#326), and its share swings enormously with segment count — it is ~3% of
+    // a 600 s single-speaker run and was ~60% of the 2888 s file in that report.
+    // Without a per-stage number, "is the embedder slow here?" is unanswerable
+    // from a total runtime, and any speedup claim is unfalsifiable.
+    const auto embed_t0 = std::chrono::steady_clock::now();
 
     // Decide which segments are embeddable first, so the workers below split a
     // known list and the output order does not depend on thread scheduling.
@@ -1108,6 +1124,13 @@ static void crispasr_embed_segments(const std::vector<crispasr_segment>& segs, c
             continue;
         embed_idx.push_back(jobs[j].seg_i);
         embeddings.insert(embeddings.end(), out[j].begin(), out[j].end());
+    }
+
+    if (std::getenv("CRISPASR_DIARIZE_DEBUG")) {
+        const double ms =
+            std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - embed_t0).count();
+        fprintf(stderr, "crispasr[diarize]: embed %zu segments in %.0f ms (%.1f ms/seg, %zu worker%s)\n", jobs.size(),
+                ms, jobs.empty() ? 0.0 : ms / (double)jobs.size(), workers.size(), workers.size() == 1 ? "" : "s");
     }
 }
 
