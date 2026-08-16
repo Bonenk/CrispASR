@@ -20,6 +20,7 @@
 // makes the rate comparable across scripts at all.
 #include "core/omnivoice_duration.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 using namespace core_omnivoice_duration;
@@ -118,4 +119,75 @@ TEST_CASE("omnivoice duration: weights are script-aware", "[omnivoice][duration]
     // Multi-byte decoding must actually work: same string, weight must exceed
     // what a naive per-byte count of ASCII weight would give.
     REQUIRE(duration_text_weight("你好") == 6.0);
+}
+
+// ===========================================================================
+// Parity with upstream's RuleDurationEstimator (k2-fsa/OmniVoice)
+// ===========================================================================
+//
+// The weights are a port of omnivoice/utils/duration.py, and the port had
+// drifted. Upstream dispatches on the Unicode CATEGORY first — P*/S* -> 0.5,
+// Z* -> 0.2, M* -> 0.0, N* -> 3.5 — and only then consults its script ranges.
+// This port hardcoded ranges, so anything punctuation-like outside ASCII/CJK
+// fell through to the 1.0 "letter-ish" default and was costed as a spoken
+// character.
+//
+// The expected values below are what upstream's own Python produces for these
+// exact strings, checked by running it — not by reading our implementation
+// back to itself. What it cost in practice:
+//
+//   "Москва — большой …"       51.3 here vs 50.8 upstream  (em-dash)
+//   "मैं आज बाज़ार …"           41.6 vs 40.3                (danda)
+//   "مرحبا، كيف حالك اليوم؟"   29.1 vs 27.1                (Arabic , and ?)
+//
+// Devanagari matras and Arabic/Hebrew vowel marks were the worst of it: costed
+// as full characters instead of silent, so those languages were systematically
+// over-length.
+
+static double W(const char* s) {
+    return core_omnivoice_duration::duration_text_weight(s);
+}
+
+TEST_CASE("omnivoice duration: weights match upstream on real prose", "[unit][duration][omnivoice]") {
+    CHECK(W("Hello, world.") == Catch::Approx(11.2));
+    CHECK(W("Папа у Васи силён в математике, учится папа за Васю весь год.") == Catch::Approx(51.2));
+    CHECK(W("Москва — большой и очень красивый город с богатой историей.") == Catch::Approx(50.8));
+    CHECK(W("Привет! Как дела? Всё хорошо…") == Catch::Approx(24.3));
+    CHECK(W("Цена — 1500 рублей (со скидкой).") == Catch::Approx(36.0));
+    CHECK(W("मैं आज बाज़ार जा रहा हूँ और वहाँ से फल खरीदूँगा।") == Catch::Approx(40.3));
+    CHECK(W("שלום, מה שלומך היום?") == Catch::Approx(24.1));
+    CHECK(W("مرحبا، كيف حالك اليوم؟") == Catch::Approx(27.1));
+    CHECK(W("今日はいい天気ですね。散歩に行きましょう。") == Catch::Approx(48.4));
+}
+
+TEST_CASE("omnivoice duration: the character classes that had drifted", "[unit][duration][omnivoice]") {
+    using core_omnivoice_duration::duration_cp_weight;
+    // Punctuation outside ASCII is a pause, not a syllable.
+    CHECK(duration_cp_weight(0x2014) == Catch::Approx(0.5)); // em dash
+    CHECK(duration_cp_weight(0x2026) == Catch::Approx(0.5)); // ellipsis
+    CHECK(duration_cp_weight(0x00AB) == Catch::Approx(0.5)); // « guillemet, ubiquitous in Russian
+    CHECK(duration_cp_weight(0x0964) == Catch::Approx(0.5)); // danda — ends every Hindi sentence
+    CHECK(duration_cp_weight(0x060C) == Catch::Approx(0.5)); // Arabic comma
+
+    // Combining marks are silent modifiers.
+    CHECK(duration_cp_weight(0x0941) == Catch::Approx(0.0)); // Devanagari vowel sign U
+    CHECK(duration_cp_weight(0x05B4) == Catch::Approx(0.0)); // Hebrew hiriq
+    CHECK(duration_cp_weight(0x064E) == Catch::Approx(0.0)); // Arabic fatha
+
+    // …but a letter sitting inside a mark block is NOT silent. Sweeping the
+    // whole range to catch the marks silenced these, which the codepoint sweep
+    // caught only because it compares every codepoint rather than a sample.
+    CHECK(duration_cp_weight(0x093D) == Catch::Approx(1.8)); // Devanagari avagraha (Lo)
+    CHECK(duration_cp_weight(0x00B5) == Catch::Approx(1.0)); // µ micro sign (Ll)
+    CHECK(duration_cp_weight(0x00AA) == Catch::Approx(1.0)); // ª ordinal indicator (Lo)
+
+    // Digits are spoken as words in any script.
+    CHECK(duration_cp_weight(0x0966) == Catch::Approx(3.5)); // Devanagari zero
+    CHECK(duration_cp_weight(0x0660) == Catch::Approx(3.5)); // Arabic-Indic zero
+
+    // Zero-width and bidi controls carry no speech. ⚠ Upstream returns 2.2 for
+    // these (its category dispatch misses Cf, so they land in the kana range);
+    // matching that would cost a spoken syllable per invisible character.
+    CHECK(duration_cp_weight(0x200D) == Catch::Approx(0.0)); // ZWJ
+    CHECK(duration_cp_weight(0x202B) == Catch::Approx(0.0)); // RLE
 }
