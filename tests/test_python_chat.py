@@ -821,20 +821,7 @@ class TestChatStopSequences(unittest.TestCase):
         from crispasr import ChatSession
         cls.chat = ChatSession(CHAT_MODEL, lib_path=LIB_PATH,
                                n_ctx=2048, n_batch=256, n_ubatch=256)
-        # The pinned literals below describe one model's greedy reply. Confirm
-        # this is that model before asserting them; otherwise skip, so a
-        # different (perfectly valid) gate model reads as "not the pinned
-        # baseline" instead of four failures about a separator.
-        cls.chat.reset()
-        baseline = cls.chat.generate(COUNTING, max_tokens=64, temperature=0.0)
-        if baseline != COUNTING_BASELINE_REPLY:
-            cls.chat.close()
-            del cls.chat
-            raise unittest.SkipTest(
-                "stop-sequence literals are pinned to the model whose greedy reply is "
-                f"{COUNTING_BASELINE_REPLY!r} (e.g. gemma-3-1b-it-Q4_K_M); this model "
-                f"replies {baseline!r}. Behaviour is covered model-independently by "
-                "tests/test-chat-ggml.cpp.")
+
 
     @classmethod
     def tearDownClass(cls):
@@ -844,11 +831,29 @@ class TestChatStopSequences(unittest.TestCase):
     def setUp(self):
         self.chat.reset()
 
+    def _require_pinned_baseline(self):
+        """Skip unless the gated model is the one the literals below describe.
+
+        Called only by the cases that assert an exact string, so the
+        model-independent ones (empty stop list, prefill-only) still run on any
+        gate model.
+        """
+        self.chat.reset()
+        baseline = self.chat.generate(COUNTING, max_tokens=64, temperature=0.0)
+        self.chat.reset()
+        if baseline != COUNTING_BASELINE_REPLY:
+            self.skipTest(
+                "literal stop-sequence assertions are pinned to the model whose greedy reply is "
+                f"{COUNTING_BASELINE_REPLY!r} (e.g. gemma-3-1b-it-Q4_K_M); this model "
+                f"replies {baseline!r}. Behaviour is covered model-independently by "
+                "tests/test-chat-ggml.cpp.")
+
     def generate(self, **kwargs):
         self.chat.reset()
         return self.chat.generate(COUNTING, max_tokens=64, temperature=0.0, **kwargs)
 
     def test_a_stop_sequence_truncates_the_reply_before_the_match(self):
+        self._require_pinned_baseline()
         full = self.generate()
         # Without this the case is vacuous: a reply that never reaches the
         # stop string would pass whether or not stop sequences work at all.
@@ -860,6 +865,7 @@ class TestChatStopSequences(unittest.TestCase):
         self.assertEqual(stopped, "1\n2\n3\n4\n")
 
     def test_several_stop_sequences_stop_at_the_earliest_match(self):
+        self._require_pinned_baseline()
         full = self.generate()
         self.assertIn("4", full)
         self.assertIn("7", full)
@@ -898,6 +904,7 @@ class TestChatStopSequences(unittest.TestCase):
         self.assertNotEqual(self.generate(), "")
 
     def test_the_stream_delivers_the_chunk_the_one_shot_path_truncates(self):
+        self._require_pinned_baseline()
         params = dict(max_tokens=64, temperature=0.0, stop=["7", "4"])
         one_shot = self.generate(stop=["7", "4"])
 

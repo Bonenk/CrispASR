@@ -1361,6 +1361,46 @@ const COUNTING_PROMPT: &str =
 /// byte.
 const COUNTING_STOPPED_AT_FOUR: &str = "1\n2\n3\n";
 
+/// The full greedy reply the literals above describe.
+///
+/// Those literals are one MODEL's output, not a property of the stop feature,
+/// while the gate accepts any small chat GGUF. On smollm2-360m-instruct the same
+/// prompt answers "1 2 3 4 " with SPACES, so the stop cases failed on the
+/// separator while every behavioural assertion beside them passed — a red for a
+/// reason unrelated to the code under test, which is worse than no test because
+/// it teaches you to ignore the suite.
+///
+/// The cross-binding oracle is worth keeping (Python, Go, Java and Dart pin the
+/// same strings, so four marshallings of one C feature are held byte-identical),
+/// so rather than weaken the assertions, check the precondition they encode:
+/// confirm this IS the pinned model, and skip with a reason if not.
+const COUNTING_BASELINE_REPLY: &str = "1\n2\n3\n4\n5\n6\n7\n8\n";
+
+/// True when `chat` is the model the pinned literals describe. Called only
+/// by the cases that assert an exact string, so the model-independent ones
+/// (empty stop list, prefill-only) still run on any gate model. Prints why when
+/// it is not, so a skipped case reads as "different model" rather than silence.
+fn is_pinned_stop_baseline(chat: &ChatSession) -> bool {
+    let msgs = one_turn(COUNTING_PROMPT);
+    let baseline = match chat.generate_with_options(&msgs, &greedy(64)) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("SKIP: baseline generate failed: {e}");
+            return false;
+        }
+    };
+    let _ = chat.reset();
+    if baseline != COUNTING_BASELINE_REPLY {
+        eprintln!(
+            "SKIP: stop-sequence literals are pinned to the model whose greedy reply is {COUNTING_BASELINE_REPLY:?} \
+             (e.g. gemma-3-1b-it-Q4_K_M); this model replies {baseline:?}. Behaviour is covered \
+             model-independently by tests/test-chat-ggml.cpp."
+        );
+        return false;
+    }
+    true
+}
+
 /// `greedy`, plus stop sequences.
 fn greedy_with_stop(max_tokens: i32, stop: &[&str]) -> ChatGenerateOptions {
     ChatGenerateOptions {
@@ -1379,6 +1419,9 @@ fn chat_stop_sequence_truncates_before_the_match() {
         }
     };
     let chat = open_chat(&model_path);
+    if !is_pinned_stop_baseline(&chat) {
+        return;
+    }
     let msgs = one_turn(COUNTING_PROMPT);
 
     let full = chat
@@ -1416,6 +1459,9 @@ fn chat_stop_sequences_stop_at_the_earliest_match() {
         }
     };
     let chat = open_chat(&model_path);
+    if !is_pinned_stop_baseline(&chat) {
+        return;
+    }
     let msgs = one_turn(COUNTING_PROMPT);
 
     let full = chat
@@ -1519,6 +1565,9 @@ fn chat_stream_delivers_the_chunk_the_one_shot_path_truncates() {
         }
     };
     let chat = open_chat(&model_path);
+    if !is_pinned_stop_baseline(&chat) {
+        return;
+    }
     let msgs = one_turn(COUNTING_PROMPT);
     let params = greedy_with_stop(64, &["7", "4"]);
 
