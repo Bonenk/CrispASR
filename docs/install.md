@@ -58,6 +58,36 @@ readelf -d crispasr | grep NEEDED
 > tarballs below are still statically linked, because flipping the release leg
 > needs an A/B on real CUDA, HIP and Vulkan hardware first.
 
+## Windows CUDA: split downloads (#342)
+
+The Windows CUDA packages bundle three NVIDIA runtime DLLs — `cudart64_*.dll`,
+`cublas64_*.dll` and `cublasLt64_*.dll` — so they work on a host that never
+added the CUDA `bin` directory to `PATH`. They also dominate the download, and
+they change far less often than we cut releases. Re-fetching them for every
+version is wasted bandwidth, which is painful if github.com is slow for you.
+
+So each release ships both forms:
+
+| asset | contains |
+|---|---|
+| `crispasr-windows-x86_64-cuda.zip` | CLI, self-contained |
+| `crispasr-windows-x86_64-cuda-non-cuda.zip` | CLI, **without** the three DLLs |
+| `libcrispasr-windows-x86_64-cuda.tar.gz` | shared libs + headers, self-contained |
+| `libcrispasr-windows-x86_64-cuda-non-cuda.tar.gz` | shared libs + headers, **without** the three DLLs |
+| `cudart64_*.dll`, `cublas64_*.dll`, `cublasLt64_*.dll` | the three DLLs, on their own |
+| `crispasr-windows-x86_64-cuda-runtime-sha256.txt` | SHA-256 of each of the three |
+
+To upgrade without re-downloading the runtime: take the `-non-cuda` archive,
+unpack it, and copy the three DLLs you already have next to `crispasr.exe`
+(for the libs package, into `bin\`).
+
+The three DLLs are published **once** per release and shared by both packages —
+sound only because every CUDA-bundling job pins the same toolkit (12.8.0).
+`tools/check-cuda-split-packaging.py` enforces that, along with the rule that
+any job bundling them must also ship a split archive and attach it to the
+release. Check the SHA-256 manifest before reusing DLLs from an older download;
+a CUDA version bump changes the filenames, which is your signal to re-fetch.
+
 ## Prerequisites
 
 - C++17 compiler (GCC 10+, Clang 12+, MSVC 19.30+)
