@@ -3761,6 +3761,27 @@ catch_discover_tests(test_tts_provenance
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-embed-parallel — #326 cross-segment embedding ─────────────────────
+# The embedder now runs segments across workers. The risk is ORDER, not speed:
+# embeddings feed a clusterer positionally, so a worker appending out of order
+# would shuffle speaker labels. Deterministic fake embedder, no model needed.
+add_executable(test-embed-parallel
+    test-embed-parallel.cpp
+    ${PROJECT_SOURCE_DIR}/examples/cli/crispasr_diarize_cli.cpp
+)
+target_include_directories(test-embed-parallel PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-embed-parallel PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-embed-parallel
+    TEST_SPEC "[issue-326]"
+    PROPERTIES LABELS "unit;diarize"
+)
+
 # ─── test-subprocess-quoting — #328 Windows sherpa hang ─────────────────────
 # Both quoters compile everywhere now, so the Windows rules can be round-tripped
 # against a reference CommandLineToArgvW on any host. That is the point: the
