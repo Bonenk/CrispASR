@@ -47,6 +47,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 // External text-normalizer hook is available on macOS host + Linux only:
 //   * iOS / tvOS / watchOS / visionOS: system() is __API_UNAVAILABLE(ios)
@@ -67,7 +68,6 @@
 
 #if INDEXTTS_HAS_SUBPROCESS
 #include <unistd.h> // unlink, close, write (external normalizer hook only)
-#include "core/ggml_cpu_backend.h"
 #endif
 
 namespace {

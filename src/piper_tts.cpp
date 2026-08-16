@@ -50,6 +50,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 #if defined(HAVE_ACCELERATE)
 #include <Accelerate/Accelerate.h>
@@ -96,7 +97,6 @@ struct piper_tts_bench_stage {
 #include <espeak-ng/speak_lib.h>
 #elif defined(CRISPASR_ESPEAK_DLOPEN)
 #include "espeak_dlopen.h"
-#include "core/ggml_cpu_backend.h"
 #endif
 
 // ── JSON-lite parser for phoneme_id_map ────────────────────────────

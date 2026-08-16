@@ -66,6 +66,7 @@
 #include <sys/stat.h> // #334 clone-voice cache key (size + mtime)
 #include <unordered_map>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 #ifdef __APPLE__
 #include <TargetConditionals.h>
@@ -73,7 +74,6 @@
 
 #ifndef _WIN32
 #include <unistd.h>
-#include "core/ggml_cpu_backend.h"
 #endif
 
 namespace {
@@ -1102,8 +1102,8 @@ extern "C" struct cosyvoice3_tts_context* cosyvoice3_tts_init_from_file(const ch
         core_cpu_backend::set_n_threads(ctx->backend, ctx->n_threads);
     }
     if (params.verbosity >= 1) {
-        fprintf(stderr, "cosyvoice3_tts: using %s backend: %s\n", core_cpu_backend::is_cpu(ctx->backend) ? "CPU" : "GPU",
-                ggml_backend_name(ctx->backend));
+        fprintf(stderr, "cosyvoice3_tts: using %s backend: %s\n",
+                core_cpu_backend::is_cpu(ctx->backend) ? "CPU" : "GPU", ggml_backend_name(ctx->backend));
     }
 
     // ---- Weight pass ----
