@@ -549,6 +549,11 @@ var chatCountingMessages = []whisper.ChatMessage{
 // marshallings of one C feature, agreeing byte for byte.
 const chatCountingStoppedAtFour = "1\n2\n3\n"
 
+// chatCountingBaselineReply is the full greedy reply the literals above
+// describe. openStopChatSession confirms the gated model actually produces it
+// before any case asserts a truncation of it.
+const chatCountingBaselineReply = "1\n2\n3\n4\n5\n6\n7\n8\n"
+
 // openStopChatSession opens the gated model with the context and batch sizes
 // the Rust and Python suites pin, so the text below is comparable across all
 // three bindings rather than merely reproducible in this one.
@@ -567,7 +572,38 @@ func openStopChatSession(t *testing.T) *whisper.ChatSession {
 		t.Fatalf("ChatOpen(%s): %v", modelPath, err)
 	}
 	t.Cleanup(sess.Close)
+
 	return sess
+}
+
+// requirePinnedStopBaseline skips the caller unless the gated model is the one
+// the stop-sequence literals describe.
+//
+// Those literals are one MODEL's greedy reply, not a property of the stop
+// feature, while the gate accepts any small chat GGUF. On
+// smollm2-360m-instruct this prompt answers "1 2 3 4 " with SPACES, so the
+// literal cases failed on the separator while every behavioural assertion
+// beside them passed — a red for a reason unrelated to the code under test.
+//
+// The cross-binding oracle is worth keeping (Rust, Python, Java and Dart pin
+// the same strings), so rather than weaken the assertions this checks the
+// precondition they encode. Called only by the cases that assert a literal, so
+// the model-independent ones (empty stop list, prefill-only) still run
+// everywhere.
+func requirePinnedStopBaseline(t *testing.T, sess *whisper.ChatSession) {
+	t.Helper()
+	baseline, err := sess.Generate(chatCountingMessages, greedyChatParams(64))
+	if err != nil {
+		t.Skipf("Skipping literal stop-sequence assertions, baseline generate failed: %v", err)
+	}
+	if err := sess.Reset(); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+	if baseline != chatCountingBaselineReply {
+		t.Skipf("Skipping literal stop-sequence assertions: they are pinned to the model whose greedy reply "+
+			"is %q (e.g. gemma-3-1b-it-Q4_K_M); this model replies %q. Behaviour is covered "+
+			"model-independently by tests/test-chat-ggml.cpp.", chatCountingBaselineReply, baseline)
+	}
 }
 
 // stopChatParams is greedyChatParams with stop sequences attached.
@@ -582,6 +618,7 @@ func stopChatParams(maxTokens int, stop ...string) *whisper.ChatGenerateParams {
 func Test_Chat_StopSequenceTruncatesBeforeTheMatch(t *testing.T) {
 	assert := assert.New(t)
 	sess := openStopChatSession(t)
+	requirePinnedStopBaseline(t, sess)
 
 	full, err := sess.Generate(chatCountingMessages, greedyChatParams(64))
 	assert.NoError(err)
@@ -604,6 +641,7 @@ func Test_Chat_StopSequenceTruncatesBeforeTheMatch(t *testing.T) {
 func Test_Chat_StopSequencesEarliestMatchWins(t *testing.T) {
 	assert := assert.New(t)
 	sess := openStopChatSession(t)
+	requirePinnedStopBaseline(t, sess)
 
 	full, err := sess.Generate(chatCountingMessages, greedyChatParams(64))
 	assert.NoError(err)
@@ -683,6 +721,7 @@ func Test_Chat_PrefillOnlySuppressesGeneration(t *testing.T) {
 func Test_Chat_StreamDeliversTheChunkTheOneShotPathTruncates(t *testing.T) {
 	assert := assert.New(t)
 	sess := openStopChatSession(t)
+	requirePinnedStopBaseline(t, sess)
 	params := stopChatParams(64, "7", "4")
 
 	oneShot, err := sess.Generate(chatCountingMessages, params)

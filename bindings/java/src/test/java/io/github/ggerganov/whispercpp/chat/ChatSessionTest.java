@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.sun.jna.Memory;
 import com.sun.jna.Pointer;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,23 @@ class ChatSessionTest {
      */
     private static final String COUNTING_STOPPED_AT_FOUR = "1\n2\n3\n";
 
+    /**
+     * The full greedy reply the literals above describe. Those literals are one
+     * MODEL's output, not a property of the stop feature, while the gate accepts
+     * any small chat GGUF. On smollm2-360m-instruct this prompt answers
+     * "1 2 3 4 " with SPACES, so the stop cases failed on the separator while
+     * every behavioural assertion beside them passed — a red for a reason
+     * unrelated to the code under test.
+     *
+     * The cross-binding oracle is worth keeping (Rust, Python, Go and Dart pin
+     * the same strings), so rather than weaken the assertions we check the
+     * precondition they encode and skip when it does not hold.
+     */
+    private static final String COUNTING_BASELINE_REPLY = "1\n2\n3\n4\n5\n6\n7\n8\n";
+
+    /** Whether the gated model is the one COUNTING_STOPPED_AT_FOUR describes. */
+    private static boolean pinnedStopBaseline;
+
     private static String modelPath;
     private static ChatSession session;
 
@@ -83,6 +101,19 @@ class ChatSessionTest {
         session = ChatSession.open(modelPath, new ChatOpenParams().nCtx(1024).nThreads(4));
         countingSession = ChatSession.open(modelPath,
                 new ChatOpenParams().nCtx(2048).nBatch(256).nUbatch(256));
+        String baseline = countingSession.generate(COUNTING_TURNS, greedy(64));
+        countingSession.reset();
+        pinnedStopBaseline = COUNTING_BASELINE_REPLY.equals(baseline);
+        if (!pinnedStopBaseline) {
+            System.err.println("stop-sequence literals are pinned to the model whose greedy reply is "
+                    + escape(COUNTING_BASELINE_REPLY) + " (e.g. gemma-3-1b-it-Q4_K_M); this model replies "
+                    + escape(baseline) + ". Those cases will be skipped; behaviour is covered "
+                    + "model-independently by tests/test-chat-ggml.cpp.");
+        }
+    }
+
+    private static String escape(String s) {
+        return s == null ? "null" : "\"" + s.replace("\n", "\\n") + "\"";
     }
 
     @AfterAll
@@ -417,6 +448,8 @@ class ChatSessionTest {
 
     @Test
     void aStopSequenceTruncatesBeforeTheMatch() {
+        Assumptions.assumeTrue(pinnedStopBaseline,
+                "gated model is not the one the stop-sequence literals pin");
         countingSession.reset();
         String full = countingSession.generate(COUNTING_TURNS, greedy(64));
         // Without this the case is vacuous: a reply that never reached the stop
@@ -439,6 +472,8 @@ class ChatSessionTest {
      */
     @Test
     void stopSequencesStopAtTheEarliestMatchInTheOutput() {
+        Assumptions.assumeTrue(pinnedStopBaseline,
+                "gated model is not the one the stop-sequence literals pin");
         countingSession.reset();
         String full = countingSession.generate(COUNTING_TURNS, greedy(64));
         assertTrue(full.contains("4") && full.contains("7"),
@@ -496,6 +531,8 @@ class ChatSessionTest {
      */
     @Test
     void theStreamDeliversTheChunkTheOneShotPathTruncates() {
+        Assumptions.assumeTrue(pinnedStopBaseline,
+                "gated model is not the one the stop-sequence literals pin");
         countingSession.reset();
         String oneShot = countingSession.generate(COUNTING_TURNS, greedy(64).stop("7", "4"));
 
