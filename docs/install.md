@@ -3,6 +3,62 @@
 This page covers the full build matrix. For a quick sanity build, see
 the **Quick install** section in the [README](../README.md).
 
+## Prebuilt Linux tarballs — which one to download (#355)
+
+The GitHub releases carry several Linux x86-64 tarballs. **They are not
+interchangeable, and the GPU ones cannot fall back to CPU.**
+
+| tarball | needs on the host | falls back to CPU? |
+|---|---|---|
+| `crispasr-linux-x86_64.tar.gz` | nothing beyond base glibc | n/a — it *is* the CPU build |
+| `crispasr-linux-x86_64-avx512.tar.gz` | an AVX-512 CPU | n/a |
+| `crispasr-linux-x86_64-cuda.tar.gz` | **NVIDIA driver** (`libcuda.so.1`) + CUDA 12 runtime (`libcudart.so.12`, `libcublas.so.12`) | **no** |
+| `crispasr-linux-x86_64-cuda13.tar.gz` | NVIDIA driver + CUDA 13 runtime | **no** |
+| `crispasr-linux-x86_64-hip.tar.gz` | ROCm runtime | **no** |
+| `crispasr-linux-x86_64-vulkan.tar.gz` | a Vulkan loader + ICD | **no** |
+
+The GPU runtimes are deliberately **not** bundled — shipping a driver library
+would be wrong (it must match the kernel module) and redistributing the CUDA
+runtime has its own terms. `scripts/bundle-linux-runtime.sh` skips them by
+name and `scripts/check-bundled-deps.py` allow-lists them per leg, so this is a
+reviewed decision rather than an oversight.
+
+The consequence is worth stating plainly, because it surprises people:
+
+```
+$ ./crispasr --help
+./crispasr: error while loading shared libraries: libcuda.so.1:
+cannot open shared object file: No such file or directory
+$ echo $?
+127
+```
+
+Those libraries are hard `DT_NEEDED` entries, so **the dynamic loader fails
+before `main()` runs**. CrispASR's "auto-select the best backend, fall back to
+CPU" logic lives inside `main()` and never gets the chance. A container that has
+the CUDA toolkit but no GPU passthrough, or a host whose driver was removed,
+will restart in a loop with exit 127 and no CrispASR output at all.
+
+**If you might run without a GPU, use `crispasr-linux-x86_64.tar.gz`.** It is
+the same CLI; it just has no GPU backend compiled in. Shipping both and picking
+at startup is a reasonable pattern for images that must run on either.
+
+Verify what a given tarball actually requires before deploying it:
+
+```bash
+readelf -d crispasr | grep NEEDED
+```
+
+> **Why not make the GPU build degrade gracefully?** ggml supports it —
+> `GGML_BACKEND_DL=ON` builds each backend as a `dlopen`-ed module, so a missing
+> CUDA driver would leave the CUDA backend unregistered instead of killing the
+> process. It is not a packaging switch for this tree: the runtime calls
+> `ggml_backend_cpu_init` / `ggml_backend_is_cpu` / `ggml_backend_cpu_set_*`
+> directly at 406 sites across 104 files, every one of which has to move to the
+> backend registry first (with `GGML_BACKEND_DL` even the CPU backend is a
+> module), and every backend then needs revalidating on real CUDA, Vulkan, HIP
+> and Metal hardware. Tracked in #355.
+
 ## Prerequisites
 
 - C++17 compiler (GCC 10+, Clang 12+, MSVC 19.30+)
