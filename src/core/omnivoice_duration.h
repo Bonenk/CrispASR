@@ -40,6 +40,37 @@
 
 namespace core_omnivoice_duration {
 
+// True for combining marks across the scripts this estimator covers.
+//
+// The avagraha signs (U+093D and friends) sit inside these blocks but are
+// LETTERS (category Lo), so they are excluded — sweeping the whole range would
+// silence a real consonant.
+inline bool duration_cp_is_combining_mark(uint32_t cp) {
+    if (cp == 0x093D || cp == 0x09BD || cp == 0x0ABD || cp == 0x0B3D || cp == 0x0C3D || cp == 0x0CBD || cp == 0x0D3D)
+        return false;
+    return (cp >= 0x0300 && cp <= 0x036F) || (cp >= 0x1DC0 && cp <= 0x1DFF) || (cp >= 0x20D0 && cp <= 0x20FF) ||
+           (cp >= 0x0483 && cp <= 0x0489) ||                                   // Cyrillic
+           (cp >= 0x0591 && cp <= 0x05C7) ||                                   // Hebrew
+           (cp >= 0x0610 && cp <= 0x061A) || (cp >= 0x064B && cp <= 0x065F) || // Arabic
+           cp == 0x0670 || (cp >= 0x06D6 && cp <= 0x06ED) ||                   //
+           (cp >= 0x0900 && cp <= 0x0903) || (cp >= 0x093A && cp <= 0x094F) || // Devanagari
+           (cp >= 0x0951 && cp <= 0x0957) || (cp >= 0x0962 && cp <= 0x0963) || //
+           (cp >= 0x0981 && cp <= 0x0983) || (cp >= 0x09BC && cp <= 0x09CD) || // Bengali
+           cp == 0x09D7 || (cp >= 0x09E2 && cp <= 0x09E3) ||                   //
+           (cp >= 0x0A70 && cp <= 0x0A71) || (cp >= 0x0C62 && cp <= 0x0C63) || //
+           (cp >= 0x0CE2 && cp <= 0x0CE3) || (cp >= 0x0D62 && cp <= 0x0D63) || //
+           (cp >= 0x0A01 && cp <= 0x0A03) || (cp >= 0x0A3C && cp <= 0x0A51) || // Gurmukhi
+           (cp >= 0x0A81 && cp <= 0x0A83) || (cp >= 0x0ABC && cp <= 0x0ACD) || // Gujarati
+           (cp >= 0x0B01 && cp <= 0x0B03) || (cp >= 0x0B3C && cp <= 0x0B57) || // Oriya
+           cp == 0x0B82 || (cp >= 0x0BBE && cp <= 0x0BCD) ||                   // Tamil
+           (cp >= 0x0C00 && cp <= 0x0C04) || (cp >= 0x0C3E && cp <= 0x0C56) || // Telugu
+           (cp >= 0x0C81 && cp <= 0x0C83) || (cp >= 0x0CBC && cp <= 0x0CD6) || // Kannada
+           (cp >= 0x0D00 && cp <= 0x0D03) || (cp >= 0x0D3B && cp <= 0x0D4D) || // Malayalam
+           (cp >= 0x0D81 && cp <= 0x0D83) || (cp >= 0x0DCA && cp <= 0x0DDF) || // Sinhala
+           (cp >= 0x0E31 && cp <= 0x0E3A) || (cp >= 0x0E47 && cp <= 0x0E4E) || // Thai
+           (cp >= 0x0EB1 && cp <= 0x0EBC) || (cp >= 0x0EC8 && cp <= 0x0ECD);   // Lao
+}
+
 // Per-codepoint "phonetic weight" (relative speech duration). Adapted from
 // OmniVoice's rule-based estimator (omnivoice/utils/duration.py — Apache-2.0,
 // © Xiaomi/k2-fsa; C++ mirror in ServeurpersoCom/omnivoice.cpp — MIT). Weights:
@@ -53,8 +84,78 @@ inline double duration_cp_weight(uint32_t cp) {
         return 1.0; // ASCII letters
     if (cp < 0x80)
         return (cp == 0x20 || cp == 0x09 || cp == 0x0A || cp == 0x0D) ? 0.2 : 0.5;
-    if ((cp >= 0x0300 && cp <= 0x036F) || (cp >= 0x1DC0 && cp <= 0x1DFF) || (cp >= 0x20D0 && cp <= 0x20FF))
-        return 0.0; // combining marks — silent
+    // Combining marks are silent modifiers (upstream: category M* -> 0.0).
+    // This port covered only the Latin/Greek combining blocks, so Devanagari
+    // matras, Hebrew niqqud and Arabic harakat were each costed as a full
+    // spoken character — 1.8 and 1.5 respectively instead of 0. Vowel marks are
+    // extremely common in those scripts, so their utterances came out
+    // systematically over-long. Verified codepoint-by-codepoint against
+    // omnivoice/utils/duration.py.
+    //
+    // Written as a helper rather than one long || chain: the first attempt
+    // folded the avagraha exclusion in as a ternary and silently changed the
+    // precedence of the whole chain, so even Latin combining accents stopped
+    // being silent. The codepoint sweep caught it (divergences went UP, 707 ->
+    // 947); a condition this long is not reviewable inline.
+    if (duration_cp_is_combining_mark(cp))
+        return 0.0;
+
+    // Zero-width and bidi format controls carry no speech.
+    //
+    // ⚠ Deliberate divergence: upstream returns 2.2 for these. Its category
+    // dispatch handles M/P/S/Z/N but not Cf, so they fall through to the binary
+    // search and land in the kana range — a zero-width joiner costed as a spoken
+    // Japanese syllable. Copying that would be bug-for-bug parity at the user's
+    // expense, and these characters appear in ordinary Indic and Arabic text.
+    if (cp == 0x00AD || (cp >= 0x200B && cp <= 0x200F) || (cp >= 0x202A && cp <= 0x202E) ||
+        (cp >= 0x2060 && cp <= 0x2064) || cp == 0xFEFF)
+        return 0.0;
+
+    // Digits outside ASCII are still spoken as words (upstream: category N).
+    if ((cp >= 0x0660 && cp <= 0x0669) || (cp >= 0x06F0 && cp <= 0x06F9) || // Arabic-Indic
+        (cp >= 0x0966 && cp <= 0x096F) || (cp >= 0x09E6 && cp <= 0x09EF) || // Devanagari, Bengali
+        (cp >= 0x0A66 && cp <= 0x0A6F) || (cp >= 0x0AE6 && cp <= 0x0AEF) || (cp >= 0x0B66 && cp <= 0x0B6F) ||
+        (cp >= 0x0BE6 && cp <= 0x0BEF) || (cp >= 0x0C66 && cp <= 0x0C6F) || (cp >= 0x0CE6 && cp <= 0x0CEF) ||
+        (cp >= 0x0D66 && cp <= 0x0D6F) || (cp >= 0x0E50 && cp <= 0x0E59) || // Thai
+        (cp >= 0x0ED0 && cp <= 0x0ED9) ||                                   // Lao
+        (cp >= 0x00B2 && cp <= 0x00B3) || cp == 0x00B9 || (cp >= 0x00BC && cp <= 0x00BE) ||
+        (cp >= 0x2150 && cp <= 0x218F) ||                                 // fractions, roman numerals
+        (cp >= 0x09F4 && cp <= 0x09F9) || (cp >= 0x0BF0 && cp <= 0x0BF2)) // Bengali/Tamil numerals
+        return 3.5;
+    // Unicode punctuation / symbols / separators outside ASCII.
+    //
+    // Upstream decides these by unicodedata.category BEFORE consulting its
+    // script ranges: category P* or S* -> 0.5, Z* -> 0.2, M* -> 0.0. This port
+    // matched only the ASCII and CJK cases, so every other punctuation mark —
+    // the em-dash, the ellipsis, and the guillemets Russian quotes with — fell
+    // through to the 1.0 "letter-ish" default and was costed as a spoken
+    // character. Verified against omnivoice/utils/duration.py: "Москва — …"
+    // weighed 51.3 here against upstream's 50.8.
+    if (cp == 0x00A0 || (cp >= 0x2000 && cp <= 0x200A) || cp == 0x202F || cp == 0x205F)
+        return 0.2; // Zs — no-break/en/em/thin spaces
+    if (cp == 0x00AD)
+        return 0.0; // soft hyphen (Cf, silent)
+    // ⚠ ª (0xAA), µ (0xB5) and º (0xBA) sit in this block but are LETTERS.
+    if (cp == 0x00AA || cp == 0x00B5 || cp == 0x00BA)
+        return 1.0;
+    if ((cp >= 0x00A1 && cp <= 0x00BF) || cp == 0x00D7 || cp == 0x00F7)
+        return 0.5; // Latin-1 punctuation + symbols, incl. « » ¿ ¡
+    if ((cp >= 0x2010 && cp <= 0x205E) || (cp >= 0x2E00 && cp <= 0x2E7F) || (cp >= 0x02B0 && cp <= 0x02FF))
+        return 0.5; // General + Supplemental Punctuation and Sk modifiers: – — … ‘ ’ “ ” ˂ ˃
+    if ((cp >= 0x20A0 && cp <= 0x20CF) || (cp >= 0x2100 && cp <= 0x2BFF))
+        return 0.5; // currency, letterlike, arrows, math, misc symbols
+    // Script-specific punctuation living INSIDE a script's own block, so the
+    // range checks below would otherwise charge it as a spoken character. These
+    // are not exotic: every Hindi sentence ends in a danda and every Arabic one
+    // uses ، and ؟, which cost 1.8 and 1.5 here against upstream's 0.5.
+    if ((cp >= 0x0964 && cp <= 0x0965) || // danda, double danda
+        (cp >= 0x060C && cp <= 0x060F) || cp == 0x061B || (cp >= 0x061E && cp <= 0x061F) ||
+        (cp >= 0x066A && cp <= 0x066D) || cp == 0x06D4 ||               // Arabic
+        cp == 0x05BE || cp == 0x05C0 || cp == 0x05C3 || cp == 0x05C6 || // Hebrew
+        (cp >= 0x05F3 && cp <= 0x05F4) ||                               //
+        cp == 0x0E4F || (cp >= 0x0E5A && cp <= 0x0E5B) ||               // Thai
+        cp == 0x0DF4 || cp == 0x0C77 || cp == 0x0C84)                   // Sinhala, Telugu, Kannada
+        return 0.5;
     if (cp == 0x3000)
         return 0.2; // ideographic space
     if ((cp >= 0x3001 && cp <= 0x303F) || (cp >= 0xFF00 && cp <= 0xFF0F) || (cp >= 0xFF1A && cp <= 0xFF20) ||
