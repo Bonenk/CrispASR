@@ -53,7 +53,12 @@ jobs:
             -DCRISPASR_BUILD_SERVER=OFF \
             -DGGML_CUDA=OFF \
             -DCRISPASR_OPUS_FETCH=ON
-          cmake --build build -j"$(nproc)" --target crispasr
+          # crispasr-lib, not crispasr: with CRISPASR_BUILD_EXAMPLES=OFF the
+          # `crispasr` target does not exist here at all (it is the CLI's
+          # OUTPUT_NAME, defined with the examples), and Make fails with
+          # "No rule to make target 'crispasr'". crispasr-lib is the shared
+          # library the sys crate links.
+          cmake --build build -j"$(nproc)" --target crispasr-lib
 
       - name: cargo check (both crates)
         env:
