@@ -6,6 +6,22 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## #353 parakeet long-form throughput — merged 2026-08-16
+
+PR #353 (davideme) decouples the LONGFORM window (new `kParakeetLongformWindowS`
+= 90 s) from the 300 s single-pass cap and overlaps encode with decode, both
+across long-form windows and across dispatcher slices. Reported 2.1-2.3x
+long-form throughput on an M1 Pro with WER unchanged or better; CI fully green.
+
+`e33eba8c` then fixed three defects the split path carried: a SIGABRT from the
+#89 gap-fill re-entering `be.transcribe()` on the consumer thread mid-pipeline
+(two threads on one ggml scheduler), five CLI flags silently dropped because the
+split pair skipped `transcribe()`'s sticky-parameter prologue, and issue #350's
+span repair skipped because it skipped the epilogue. Gating conditions moved
+into one pure predicate with a red-verified guard; the PR's byte-identity and
+26/26-slice pipelining both preserved. See LEARNINGS.md for why splitting a
+function drops its prologue and epilogue.
+
 ## #356 gap-fill recoveries emitted inside the segment they came from — fixed 2026-08-15
 
 Reported downstream as SubtitleEdit/subtitleedit#13548: on a 634 s Japanese file
