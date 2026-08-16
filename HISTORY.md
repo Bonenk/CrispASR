@@ -6,6 +6,24 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## #343 / #361 / #362 docs TOC and the chat ABI bindings — merged 2026-08-16
+
+Three community PRs. #343 (Juste-Leo2) adds a TOC and section links to
+`docs/tts.md` and fixes a dead anchor in `cli.md`; merged at `8da6a531`, taking
+main's corrected outetts / pocket-tts licence strings over the branch's older
+text. #361 and #362 (mculbert) make the `crispasr_chat_*` C ABI cancellable,
+countable and safe to tear down, then bind it from Python, Go, Java, Dart and
+Rust; #362 is a superset of #361, merged at `f9de92b2` and `f409a5b2`.
+
+#361 fixed three paths that aborted the host process (a prompt over `n_batch`,
+`memory_estimate` on every model, and `close` under load) and made shared-prefix
+KV reuse actually reachable. Verified here on a different model than the
+author's, with the close-wait guard red-verified by deletion.
+
+`462d8a6d` then closed the CI gap the bindings landed with — five bindings, one
+compiled — via a text-level drift check over the header, plus path filters and
+the orphaned Python suite. See LEARNINGS.md.
+
 ## #353 parakeet long-form throughput — merged 2026-08-16
 
 PR #353 (davideme) decouples the LONGFORM window (new `kParakeetLongformWindowS`
