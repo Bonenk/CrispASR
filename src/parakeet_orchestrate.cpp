@@ -601,6 +601,16 @@ resolved_strategy resolve_strategy(parakeet_context* ctx, int n_samples, bool is
 
 } // namespace
 
+int parakeet_repair_segments(parakeet_context* ctx, const float* samples, int n_samples, int64_t t_offset_cs,
+                             std::vector<parakeet_seg>& segs, bool no_prints) {
+    if (!ctx || !samples || n_samples <= 0)
+        return 0;
+    // Same constants the SINGLE_PASS branch of parakeet_transcribe_segments()
+    // passes, so a split pass repairs identically to a whole one.
+    return gap_fill_segments(ctx, samples, n_samples, t_offset_cs, segs, kParakeetBoundedWindowS, kParakeetGapFillMinCs,
+                             no_prints);
+}
+
 bool parakeet_slice_is_single_pass(parakeet_context* ctx, int n_samples, bool is_ja,
                                    const parakeet_orchestrate_opts& opts) {
     if (!ctx || n_samples <= 0)

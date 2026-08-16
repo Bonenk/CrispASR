@@ -211,6 +211,23 @@ public:
         return {};
     }
     virtual void release_encoded(encoded_slice /*enc*/) {}
+    // Called on the CALLER's thread once before a run of encode_slice/
+    // decode_slice pairs, never concurrently with them.
+    //
+    // transcribe() typically applies per-call settings (sampling, beam,
+    // hotwords, attention context) to backend state on every call; the split
+    // pair cannot, because encode_slice runs on a worker thread and mutating
+    // decode state there would race the decoder. Without this hook those flags
+    // are silently dropped whenever the pipeline engages — measured on
+    // parakeet: `--vad --beam-size 4` decoded greedily.
+    virtual void begin_split_run(const whisper_params& /*params*/) {}
+    // Post-decode repair that needs the model AND the raw audio, so it cannot
+    // run inside decode_slice: it re-encodes, and the producer is still
+    // encoding at that point. The caller invokes it after the pipeline has
+    // joined, before the segments are trimmed and stored, which is where
+    // transcribe() applies it. Default is no-op.
+    virtual void repair_slice(const float* /*samples*/, int /*n_samples*/, int64_t /*t_offset_cs*/,
+                              std::vector<crispasr_segment>& /*segs*/, const whisper_params& /*params*/) {}
 
     // Optional stereo-aware overload for backends that can split stereo
     // channels for diarization (currently: whisper). Default

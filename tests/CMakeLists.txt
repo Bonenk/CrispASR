@@ -2723,6 +2723,31 @@ catch_discover_tests(test-issue-356-order-guard
     PROPERTIES LABELS "unit;order-guard;issue-356"
 )
 
+# ─── test-issue-353-split-pipeline — #353 encode/decode pipeline gating
+#
+# Pins every condition under which the dispatcher may overlap a backend's
+# encode_slice with decode_slice. Two were missing when the pipeline landed: the
+# env override re-derived the decision without return_logits / worker-pool, and
+# nothing covered the per-slice #89 gap-fill that re-enters be.transcribe() on
+# the consumer thread — which aborted the process on a ggml assert.
+add_executable(test-issue-353-split-pipeline
+    test-issue-353-split-pipeline.cpp
+)
+target_include_directories(test-issue-353-split-pipeline PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/examples
+    ${PROJECT_SOURCE_DIR}/examples/cli
+)
+target_link_libraries(test-issue-353-split-pipeline PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-issue-353-split-pipeline
+    TEST_SPEC "[issue-353]"
+    PROPERTIES LABELS "unit;split-pipeline;issue-353"
+)
+
 # ─── test-parakeet-ja-detect — issue #257 regression guard
 #
 # Pins crispasr_parakeet::vocab_looks_japanese so the JA-model detection keys on
