@@ -427,11 +427,11 @@ RegistryBundle? registryDefaultBundle(String backend, {DynamicLibrary? lib}) {
   final info = lib.lookupFunction<
       Int32 Function(Pointer<Utf8>, Pointer<Uint8>, Int32, Pointer<Uint8>,
           Int32, Pointer<Int32>),
-      int Function(Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>,
-          int, Pointer<Int32>)>(infoSymbol);
+      int Function(Pointer<Utf8>, Pointer<Uint8>, int, Pointer<Uint8>, int,
+          Pointer<Int32>)>(infoSymbol);
   try {
-    final count = info(backendPtr, canonicalBuf, 256, licenseBuf, 1024,
-        requiresAcceptancePtr);
+    final count = info(
+        backendPtr, canonicalBuf, 256, licenseBuf, 1024, requiresAcceptancePtr);
     if (count == 0) return null;
     if (count < 0) {
       throw StateError('Default registry bundle lookup failed (rc=$count).');
@@ -452,8 +452,7 @@ RegistryBundle? registryDefaultBundle(String backend, {DynamicLibrary? lib}) {
         final rc = artifactFn(backendPtr, index, kindPtr, filenameBuf, 256,
             urlBuf, 2048, sizeBuf, 64);
         if (rc != 0 || kindPtr.value < 0 || kindPtr.value > 2) {
-          throw StateError(
-              'Default registry bundle artifact $index failed '
+          throw StateError('Default registry bundle artifact $index failed '
               '(rc=$rc, kind=${kindPtr.value}).');
         }
         artifacts.add(RegistryArtifact(
@@ -2791,13 +2790,13 @@ class CrispasrSession {
             : null;
     // #300: native per-segment speaker label; probe like the others so a
     // newer package keeps working against an older dylib.
-    final segSpkFn =
-        _lib.providesSymbol('crispasr_session_result_segment_speaker')
-            ? _lib.lookupFunction<
-                Pointer<Utf8> Function(Pointer<Void>, Int32),
-                Pointer<Utf8> Function(Pointer<Void>,
-                    int)>('crispasr_session_result_segment_speaker')
-            : null;
+    final segSpkFn = _lib
+            .providesSymbol('crispasr_session_result_segment_speaker')
+        ? _lib.lookupFunction<
+            Pointer<Utf8> Function(Pointer<Void>, Int32),
+            Pointer<Utf8> Function(
+                Pointer<Void>, int)>('crispasr_session_result_segment_speaker')
+        : null;
     final nWords = _lib.lookupFunction<Int32 Function(Pointer<Void>, Int32),
         int Function(Pointer<Void>, int)>('crispasr_session_result_n_words');
     final wordText = _lib.lookupFunction<
@@ -4089,8 +4088,7 @@ class CrispasrSession {
       throw UnsupportedError(
           'speaker-identity API not available in this libcrispasr build');
     }
-    final fn = _lib.lookupFunction<
-        Int32 Function(Pointer<Void>, Pointer<Utf8>),
+    final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Utf8>),
         int Function(Pointer<Void>, Pointer<Utf8>)>(
       'crispasr_session_set_speaker_identity',
     );
@@ -4110,12 +4108,12 @@ class CrispasrSession {
 
   void acceptMarkingResponsibility([String attestation = '']) {
     if (_closed) throw StateError('CrispasrSession is closed');
-    if (!_lib.providesSymbol('crispasr_session_accept_marking_responsibility')) {
+    if (!_lib
+        .providesSymbol('crispasr_session_accept_marking_responsibility')) {
       throw UnsupportedError(
           'marking-attestation API not available in this libcrispasr build');
     }
-    final fn = _lib.lookupFunction<
-        Int32 Function(Pointer<Void>, Pointer<Utf8>),
+    final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Utf8>),
         int Function(Pointer<Void>, Pointer<Utf8>)>(
       'crispasr_session_accept_marking_responsibility',
     );
@@ -4709,15 +4707,15 @@ class CrispasrSession {
     if (!_lib.providesSymbol('crispasr_session_set_sensitivity')) {
       return;
     }
-    final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>, Pointer<Utf8>),
-        int Function(Pointer<Void>, Pointer<Utf8>)>(
-        'crispasr_session_set_sensitivity');
+    final fn = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Pointer<Utf8>),
+        int Function(
+            Pointer<Void>, Pointer<Utf8>)>('crispasr_session_set_sensitivity');
     final p = preset.toNativeUtf8();
     try {
       final rc = fn(_handle, p);
       if (rc == -2) {
-        throw ArgumentError(
-            'unknown sensitivity preset "$preset" '
+        throw ArgumentError('unknown sensitivity preset "$preset" '
             '(expected: conservative, balanced, aggressive)');
       }
       if (rc != 0) throw Exception('setSensitivity failed (rc=$rc)');
@@ -5908,13 +5906,12 @@ List<SessionSegment> drainStreamedSegments({String? libPath}) {
           : null;
   // #300: native per-segment speaker label; probe like the others so a
   // newer package keeps working against an older dylib.
-  final segSpkFn =
-      lib.providesSymbol('crispasr_session_result_segment_speaker')
-          ? lib.lookupFunction<
-              Pointer<Utf8> Function(Pointer<Void>, Int32),
-              Pointer<Utf8> Function(Pointer<Void>,
-                  int)>('crispasr_session_result_segment_speaker')
-          : null;
+  final segSpkFn = lib.providesSymbol('crispasr_session_result_segment_speaker')
+      ? lib.lookupFunction<
+          Pointer<Utf8> Function(Pointer<Void>, Int32),
+          Pointer<Utf8> Function(
+              Pointer<Void>, int)>('crispasr_session_result_segment_speaker')
+      : null;
 
   final out = <SessionSegment>[];
   for (var i = 0; i < nSegs; i++) {
