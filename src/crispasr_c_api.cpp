@@ -18,6 +18,7 @@
 #include "core/bpe.h"
 #include "core/asr_segment_group.h" // issue #257: output-segment grouping (parakeet --chunk-seconds)
 #include "core/audio_chunking.h"    // fix/session-long-audio: energy-minima slicing for session auto-chunk
+#include "core/tts_ref_cache.h"     // #334: reuse the CLI-side reference-transcript cache
 #include "session_autochunk.h"      // fix/session-long-audio: pure auto-chunk applicability decision
 #include "core/asr_sensitivity.h"   // §W7 sensitivity presets
 #include "core/ngram_loop_fix.h"
@@ -8050,8 +8051,43 @@ CA_EXPORT int crispasr_session_set_voice(crispasr_session* s, const char* path, 
         // is consumed at synthesize time by cosyvoice3_tts_synth_from_wav.
         s->cosyvoice3_voice = path;
         s->cosyvoice3_ref_text = ref_text_or_null ? ref_text_or_null : "";
-        if (ends_with_wav(path) && s->cosyvoice3_ref_text.empty())
+        if (ends_with_wav(path) && s->cosyvoice3_ref_text.empty()) {
+            // #334: the CLI auto-transcribes a reference clip when --ref-text is
+            // omitted and caches the result beside the WAV. That cache is
+            // library-side (core/tts_ref_cache.h) and mtime-validated against
+            // the clip, so the session can reuse it even though it cannot run
+            // ASR itself — the CLI helper builds a second CrispasrBackend,
+            // which this layer has no access to.
+            //
+            // So: a clip already prepared through the CLI now clones through
+            // the session API too, instead of failing on a transcript that has
+            // in fact already been computed and is sitting next to the file.
+            const std::string cache_path = crispasr_ref_cache::path_for(path, crispasr_ref_cache::kCv3RefTextSuffix);
+            std::vector<uint32_t> shape;
+            std::vector<uint8_t> payload;
+            if (!crispasr_ref_cache::disabled() &&
+                crispasr_ref_cache::load(cache_path, path, crispasr_ref_cache::kCv3RefTextSuffix, shape, payload) &&
+                !payload.empty()) {
+                s->cosyvoice3_ref_text.assign((const char*)payload.data(), payload.size());
+                fprintf(stderr, "crispasr[cosyvoice3-tts]: using cached ref transcript '%s': '%s'\n",
+                        cache_path.c_str(), s->cosyvoice3_ref_text.c_str());
+                return 0;
+            }
+            // Still nothing. Say what to do — a bare -2 was the trap #334's
+            // reporter hit from the other direction, and a transcript that does
+            // not match the clip is worse than no transcript at all.
+            fprintf(stderr,
+                    "crispasr[cosyvoice3-tts]: cloning from '%s' needs a transcript of that clip, and none "
+                    "was given.\n"
+                    "  Pass the exact transcript as the ref_text argument, or run the clip through the CLI "
+                    "once\n"
+                    "  (crispasr --backend cosyvoice3-tts --voice %s ...) which transcribes it and caches the\n"
+                    "  result at '%s' for this API to reuse.\n"
+                    "  An approximate transcript is worse than none: the talker infers the speaker's rate from\n"
+                    "  it and will rush or truncate the line (#334).\n",
+                    path, path, cache_path.c_str());
             return -2; // WAV cloning needs a reference transcription
+        }
         return 0;
     }
 #endif
