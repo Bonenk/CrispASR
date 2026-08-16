@@ -63,6 +63,15 @@ on:
       - 'tools/kaggle/**/kaggle_harness.py'
       - 'tools/kaggle/kaggle_harness.py'
       - 'tools/check-kaggle-harness-sync.py'
+      # chat ABI binding coverage — the guarded files, so the check runs on the
+      # commits that can break it rather than incidentally on an unrelated .cpp.
+      - 'include/crispasr_chat.h'
+      - 'python/crispasr/_binding.py'
+      - 'bindings/go/chat.go'
+      - 'crispasr-sys/src/lib.rs'
+      - 'flutter/crispasr/lib/src/chat.dart'
+      - 'bindings/java/src/main/java/io/github/ggerganov/whispercpp/chat/**'
+      - 'tools/check-chat-binding-coverage.py'
   pull_request:
     branches: [main, master]
     paths:
@@ -84,6 +93,16 @@ on:
       # Shell inside workflow run blocks. release.yml only executes on a tag
       # push, so its first run IS the release — #339 shipped a literal \n into
       # four jobs and cost every Linux tarball of v0.8.26.
+      # chat ABI binding coverage. '**.h' above catches a header edit, but a
+      # commit that only DELETES a symbol from one binding touches no .h at
+      # all — and that is precisely the drift this guards. A guard that cannot
+      # run on the commits it exists to guard is not a guard.
+      - 'python/crispasr/_binding.py'
+      - 'bindings/go/chat.go'
+      - 'crispasr-sys/src/lib.rs'
+      - 'flutter/crispasr/lib/src/chat.dart'
+      - 'bindings/java/src/main/java/io/github/ggerganov/whispercpp/chat/**'
+      - 'tools/check-chat-binding-coverage.py'
       - '.github/workflows/**'
       - 'tools/check-workflow-run-blocks.py'
       # OmniVoice prompt vocabularies: the generated headers must match their
@@ -281,6 +300,24 @@ jobs:
           python-version: '3.11'
       - name: Check bundled harness copies match canonical
         run: python tools/check-kaggle-harness-sync.py
+
+  # include/crispasr_chat.h is hand-mirrored into five languages and CI compiles
+  # one of them: bindings-go.yml is the only binding workflow reaching the chat
+  # surface, bindings/java is built only by build.yml (PR filter: ggml /
+  # .gitmodules), and there is no PR-time cargo, dart or Java job. So an entry
+  # point could land bound in Go and missing from the other four with every
+  # required check green. Text-level drift check, no toolchain, runs in seconds.
+  chat-binding-coverage:
+    name: chat ABI bound by every binding
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Every chat entry point is bound in all five bindings
+        run: python tools/check-chat-binding-coverage.py
 
   # The wiring audit checks a registry ROW EXISTS; nothing checked the URL
   # resolves. A registry entry naming a HuggingFace repo that had never been

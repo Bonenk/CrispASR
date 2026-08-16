@@ -81,6 +81,16 @@ jobs:
         run: |
           python -m pytest tests/test_backend_config.py -v || \
           python -m unittest tests/test_backend_config.py -v
+      # Chat binding (#362). 891 lines of tests that nothing invoked: this file
+      # is not named by any workflow and regression.yml pytests two files by
+      # name rather than a directory, so it could only ever run by hand. With
+      # neither a library nor a model it still exercises the ctypes ABI struct
+      # definitions, the param defaults and the UTF-8 chunk assembly — 5 cases
+      # — and skips the rest, so it is safe in a job that builds nothing.
+      - name: Run no-model Python chat-binding tests
+        run: |
+          python -m pytest tests/test_python_chat.py -v || \
+          python -m unittest tests/test_python_chat.py -v
       # Perf-regression compare logic (docs/perf-sweep/PLAN.md TODO-4). Model-free —
       # guards the hard/soft-gate logic used by the nightly perf snapshot step below.
       - name: Run perf-baseline compare unit tests
