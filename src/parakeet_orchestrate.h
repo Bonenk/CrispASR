@@ -266,6 +266,18 @@ bool parakeet_slice_is_single_pass(struct parakeet_context* ctx, int n_samples, 
 // of slice N (CPU). Produces exactly what parakeet_transcribe_segments() would
 // have returned for a slice that took SINGLE_PASS, so the two are
 // interchangeable. Does NOT free `enc_frames`.
+// The post-decode span repair that parakeet_transcribe_segments() applies at the
+// end of its SINGLE_PASS branch (issue #350: the TDT decoder silently drops
+// whole sections of audio). Exposed because a caller that split that branch into
+// parakeet_encode() + parakeet_decode_frames_to_segments() would otherwise lose
+// it — the repair is not part of the decode, it is the tail of the pass.
+//
+// ⚠ It RE-ENCODES the gaps it finds, so it must run single-threaded: never
+// inside a decode that is overlapped with an encode on another thread. Returns
+// the number of words recovered (0 = `segs` untouched).
+int parakeet_repair_segments(struct parakeet_context* ctx, const float* samples, int n_samples, int64_t t_offset_cs,
+                             std::vector<parakeet_seg>& segs, bool no_prints);
+
 std::vector<parakeet_seg> parakeet_decode_frames_to_segments(struct parakeet_context* ctx, const float* enc_frames,
                                                              int T_enc, int d_model, int64_t t_offset_cs);
 

@@ -10,6 +10,7 @@
 #include "crispasr_backend.h"
 #include "crispasr_cache.h"
 #include "crispasr_gap_fill.h"
+#include "crispasr_split_pipeline.h"
 #include "tada_encoder.h"
 
 #include <sys/stat.h>
@@ -1508,7 +1509,18 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     // Everything after the model call: logits capture, context trimming,
     // storage, progress. Shared by the sequential, worker-pool and pipelined
     // paths so all three produce identical per_slice contents.
-    auto finish_slice = [&](size_t i, std::vector<crispasr_segment> segs, CrispasrBackend& be) {
+    // Per-slice progress, split out of finish_slice so the pipelined path can
+    // report as each slice DECODES while still storing segments after the join.
+    auto tick_slice_progress = [&]() {
+        if (params.print_progress && slices.size() > 1) {
+            const size_t done = slices_done.fetch_add(1) + 1;
+            const int pct = (int)(done * 100 / slices.size());
+            fprintf(stderr, "crispasr: progress = %3d%% (%zu/%zu slices)\n", pct, done, slices.size());
+        }
+    };
+
+    auto finish_slice = [&](size_t i, std::vector<crispasr_segment> segs, CrispasrBackend& be,
+                            bool report_progress = true) {
         const auto& sl = slices[i];
         if (params.return_logits) {
             if (const auto* logits = be.last_ctc_logits())
@@ -1680,12 +1692,10 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
 
         // Per-slice progress for unified backends (whisper uses its own
         // encoder-level callback). Print to stderr so it doesn't mix
-        // with transcript output.
-        if (params.print_progress && slices.size() > 1) {
-            const size_t done = slices_done.fetch_add(1) + 1;
-            const int pct = (int)(done * 100 / slices.size());
-            fprintf(stderr, "crispasr: progress = %3d%% (%zu/%zu slices)\n", pct, done, slices.size());
-        }
+        // with transcript output. The pipelined path already ticked it at
+        // decode time, so it passes report_progress=false here.
+        if (report_progress)
+            tick_slice_progress();
     };
 
     auto process_slice = [&](size_t i, CrispasrBackend& be) {
@@ -1732,11 +1742,24 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
     // qualifying slices: each run gets its own producer thread that is joined
     // before anything else touches the model, and non-qualifying slices are
     // processed sequentially in between.
-    const bool split_pipeline_available =
-        slices.size() > 1 && n_workers <= 1 && !params.return_logits && backend.supports_split_transcribe();
-    bool use_split_pipeline = split_pipeline_available;
-    if (const char* e = getenv("CRISPASR_SLICE_PIPELINE"))
-        use_split_pipeline = atoi(e) != 0 && slices.size() > 1 && backend.supports_split_transcribe();
+    //
+    // The conditions live in crispasr_split_pipeline.h so there is one place to
+    // add one and a unit test per condition. Two were missing here: the env
+    // override dropped return_logits / worker-pool, and NOTHING covered the #89
+    // gap-fill that finish_slice runs when vad_slice_cap_seconds() > 0 — that
+    // one re-enters be.transcribe() on the consumer thread and aborts the
+    // process on a ggml assert when the producer is mid-encode.
+    crispasr_split::Inputs split_in;
+    split_in.multiple_slices = slices.size() > 1;
+    split_in.backend_supports_split = backend.supports_split_transcribe();
+    split_in.worker_pool_requested = n_workers > 1;
+    split_in.return_logits = params.return_logits;
+    {
+        const char* gf = getenv("CRISPASR_GAP_FILL");
+        const bool gap_fill_on = !gf || atoi(gf) != 0;
+        split_in.post_pass_reenters_model = backend.vad_slice_cap_seconds() > 0 && gap_fill_on;
+    }
+    const bool use_split_pipeline = crispasr_split::enabled(split_in, getenv("CRISPASR_SLICE_PIPELINE"));
 
     // Run slices [lo, hi) through the encode ∥ decode pipeline.
     auto pipeline_run = [&](size_t lo, size_t hi) {
@@ -1767,6 +1790,23 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
             }
         });
 
+        // Join on every exit path. Without this an exception escaping the loop
+        // below reaches ~std::thread with the producer still joinable, which is
+        // std::terminate.
+        struct join_guard {
+            std::thread& t;
+            ~join_guard() {
+                if (t.joinable())
+                    t.join();
+            }
+        } jg{producer};
+
+        // Decoded segments are held until the producer has joined: the repair
+        // pass below re-encodes, so it cannot run while the producer is
+        // encoding — and it has to run BEFORE finish_slice trims and stores,
+        // which is where transcribe() applies it. Progress is still ticked here
+        // so a pipelined run reports as it goes rather than all at the end.
+        std::vector<std::vector<crispasr_segment>> decoded(hi - lo);
         for (size_t i = lo; i < hi; i++) {
             pending p;
             {
@@ -1783,17 +1823,34 @@ int process_one_input(CrispasrBackend& backend, const std::string& fname_inp, co
                 failed_slices.push_back(i);
                 continue;
             }
-            finish_slice(i, backend.decode_slice(p.enc, p.t0_cs, params), backend);
+            decoded[i - lo] = backend.decode_slice(p.enc, p.t0_cs, params);
+            tick_slice_progress();
         }
 
         producer.join();
 
-        // Single-threaded again: retry anything the encoder dropped.
+        // Single-threaded again: repair, then store; then retry anything the
+        // encoder dropped (process_slice re-encodes too, hence also here).
+        for (size_t i = lo; i < hi; i++) {
+            if (std::find(failed_slices.begin(), failed_slices.end(), i) != failed_slices.end())
+                continue;
+            int ext_start = 0, ext_end = 0;
+            int64_t ext_t0_cs = 0;
+            slice_ext_range(i, ext_start, ext_end, ext_t0_cs);
+            backend.repair_slice(samples.data() + ext_start, ext_end - ext_start, ext_t0_cs, decoded[i - lo], params);
+            finish_slice(i, std::move(decoded[i - lo]), backend, /*report_progress=*/false);
+        }
         for (size_t i : failed_slices)
             process_slice(i, backend);
     };
 
     if (use_split_pipeline) {
+        // Per-call settings that transcribe() would apply on every call —
+        // sampling, beam, attention context, hotwords. The split pair cannot do
+        // it (encode_slice runs on the producer thread), so it happens once
+        // here, on this thread, before any producer starts. Without it
+        // `--beam-size 4` decoded greedily.
+        backend.begin_split_run(params);
         std::vector<char> qualifies(slices.size(), 0);
         size_t n_ok = 0;
         for (size_t i = 0; i < slices.size(); i++) {
