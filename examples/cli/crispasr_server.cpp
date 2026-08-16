@@ -69,6 +69,8 @@
 #include "../server/httplib.h"
 #include "../json.hpp"
 
+#include <algorithm> // std::any_of — reaches us transitively today, which is
+                     // exactly how #355 broke the Windows build
 #include <atomic>
 #include <cerrno>
 #include <chrono>
@@ -1891,6 +1893,21 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
                 response_format.c_str());
 
         // Format response.
+        // Diarization is expensive — on the 48-minute file in #326 it was the
+        // dominant cost of the request. `text` and the default `json` have
+        // nowhere to put a speaker label, so asking for both means paying for a
+        // stage whose result is then thrown away. That was silent; say it.
+        if (rp.diarize && (response_format == "text" || response_format == "json")) {
+            const bool labelled = std::any_of(result.segs.begin(), result.segs.end(),
+                                              [](const crispasr_segment& s) { return !s.speaker.empty(); });
+            if (labelled) {
+                fprintf(stderr,
+                        "crispasr-server: diarization produced speaker labels but response_format='%s' "
+                        "cannot carry them — use 'diarized_json', or 'verbose_json' / 'srt' / 'vtt'\n",
+                        response_format.c_str());
+            }
+        }
+
         if (response_format == "text") {
             res.set_content(crispasr_segments_to_text(result.segs), "text/plain; charset=utf-8");
         } else if (response_format == "srt") {
