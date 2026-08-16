@@ -1706,31 +1706,69 @@ jobs:
                 Copy-Item -Destination "$OUT\ggml\src\Release\"
             }
           }
-          # CUDA runtime DLLs — bundled so the tarball is self-contained
-          # on Windows hosts that haven't added CUDA bin to PATH.
-          Copy-Item "$env:CUDA_PATH\bin\cudart64_*.dll"   "$OUT\bin\" -ErrorAction SilentlyContinue
-          Copy-Item "$env:CUDA_PATH\bin\cublas64_*.dll"   "$OUT\bin\" -ErrorAction SilentlyContinue
-          Copy-Item "$env:CUDA_PATH\bin\cublasLt64_*.dll" "$OUT\bin\" -ErrorAction SilentlyContinue
           Copy-Item include\crispasr.h "$OUT\include\"
           Get-ChildItem ggml\include\*.h -ErrorAction SilentlyContinue |
             Copy-Item -Destination "$OUT\ggml\include\"
           Copy-Item LICENSE "$OUT\"
           Copy-Item THIRD_PARTY_NOTICES.txt "$OUT\"
+
+          # Split archive first, before the CUDA runtime DLLs go in — #342.
+          # This is the largest asset in the release, so it is the one where a
+          # slow connection hurts most. The CUDA runtime changes far less often
+          # than we cut releases, so re-downloading it every time is waste.
+          $SPLIT = "release\libcrispasr-windows-x86_64-cuda-non-cuda"
+          Copy-Item $OUT $SPLIT -Recurse
+          @'
+          This archive intentionally excludes the CUDA runtime DLLs.
+          For a self-contained install, use libcrispasr-windows-x86_64-cuda.tar.gz.
+          For an incremental install, copy the three separate *64_*.dll release assets
+          into bin\: cudart64_*.dll, cublas64_*.dll, and cublasLt64_*.dll.
+
+          They are published once per release alongside
+          crispasr-windows-x86_64-cuda-runtime-sha256.txt, and are the same files
+          the CLI package uses - both are built against CUDA 12.8.0, so one copy
+          serves both. Verify with that manifest before reusing an older download.
+          '@ | Set-Content "$SPLIT\README-CUDA.txt"
+
+          # CUDA runtime DLLs — bundled so the tarball is self-contained
+          # on Windows hosts that haven't added CUDA bin to PATH.
+          Copy-Item "$env:CUDA_PATH\bin\cudart64_*.dll"   "$OUT\bin\" -ErrorAction SilentlyContinue
+          Copy-Item "$env:CUDA_PATH\bin\cublas64_*.dll"   "$OUT\bin\" -ErrorAction SilentlyContinue
+          Copy-Item "$env:CUDA_PATH\bin\cublasLt64_*.dll" "$OUT\bin\" -ErrorAction SilentlyContinue
+
+          # -ErrorAction SilentlyContinue above means a wrong CUDA_PATH would
+          # produce a silently CPU-only "cuda" package. Fail loudly instead.
+          $bundled = @(Get-ChildItem "$OUT\bin\cudart64_*.dll","$OUT\bin\cublas64_*.dll","$OUT\bin\cublasLt64_*.dll" -ErrorAction SilentlyContinue)
+          if ($bundled.Count -ne 3) {
+            throw "Expected exactly three CUDA runtime DLLs (cudart, cublas, cublasLt) in $OUT\bin, found $($bundled.Count)"
+          }
+          if (Get-ChildItem "$SPLIT\bin\cudart64_*.dll","$SPLIT\bin\cublas64_*.dll","$SPLIT\bin\cublasLt64_*.dll" -ErrorAction SilentlyContinue) {
+            throw "The split archive must not contain CUDA runtime DLLs"
+          }
+
           cd release
           tar -czf libcrispasr-windows-x86_64-cuda.tar.gz libcrispasr-windows-x86_64-cuda
-          Get-Item libcrispasr-windows-x86_64-cuda.tar.gz | Format-List Name,Length
+          tar -czf libcrispasr-windows-x86_64-cuda-non-cuda.tar.gz libcrispasr-windows-x86_64-cuda-non-cuda
+          Get-Item libcrispasr-windows-x86_64-cuda.tar.gz,libcrispasr-windows-x86_64-cuda-non-cuda.tar.gz | Format-List Name,Length
 
       - uses: actions/upload-artifact@v4
         with:
           name: libcrispasr-windows-x86_64-cuda
           path: release/libcrispasr-windows-x86_64-cuda.tar.gz
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libcrispasr-windows-x86_64-cuda-split
+          path: release/libcrispasr-windows-x86_64-cuda-non-cuda.tar.gz
+
       - name: Attach libcrispasr-windows-x86_64-cuda.tar.gz to release
         if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
-          files: release/libcrispasr-windows-x86_64-cuda.tar.gz
+          files: |
+            release/libcrispasr-windows-x86_64-cuda.tar.gz
+            release/libcrispasr-windows-x86_64-cuda-non-cuda.tar.gz
           fail_on_unmatched_files: true
 
   # ── Windows x86_64 shared libs + headers (generic CPU legacy) ────────────────
