@@ -38,6 +38,7 @@
 #include "core/omnivoice_prompt.h"   // style-prefix assembly, unit-testable (#13273)
 #include "core/tts_ref_cache.h"      // shared content-addressed reference-voice cache (issue #265)
 #include "core/crispasr_env.h"
+#include "core/omnivoice_duration.h"
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 #include "ggml-cpu.h"
@@ -1146,119 +1147,12 @@ static std::vector<int32_t> tokenize(const ov_vocab& vocab, const std::string& t
 // Estimate target audio length (frames) from text length
 // ---------------------------------------------------------------------------
 
-// Per-codepoint "phonetic weight" (relative speech duration). Adapted from
-// OmniVoice's rule-based estimator (omnivoice/utils/duration.py — Apache-2.0,
-// © Xiaomi/k2-fsa; C++ mirror in ServeurpersoCom/omnivoice.cpp — MIT). Weights:
-// mark 0, separator 0.2, punct/symbol 0.5, digit 3.5 (spoken as words),
-// latin/cyrillic/greek 1.0, arabic/hebrew/thai 1.5, indic 1.8, kana 2.2,
-// hangul 2.5, cjk 3.0.
-static double duration_cp_weight(uint32_t cp) {
-    if ((cp >= 0x30 && cp <= 0x39) || (cp >= 0xFF10 && cp <= 0xFF19))
-        return 3.5; // digits — spoken as words
-    if ((cp >= 0x41 && cp <= 0x5A) || (cp >= 0x61 && cp <= 0x7A))
-        return 1.0; // ASCII letters
-    if (cp < 0x80)
-        return (cp == 0x20 || cp == 0x09 || cp == 0x0A || cp == 0x0D) ? 0.2 : 0.5;
-    if ((cp >= 0x0300 && cp <= 0x036F) || (cp >= 0x1DC0 && cp <= 0x1DFF) || (cp >= 0x20D0 && cp <= 0x20FF))
-        return 0.0; // combining marks — silent
-    if (cp == 0x3000)
-        return 0.2; // ideographic space
-    if ((cp >= 0x3001 && cp <= 0x303F) || (cp >= 0xFF00 && cp <= 0xFF0F) || (cp >= 0xFF1A && cp <= 0xFF20) ||
-        (cp >= 0xFF3B && cp <= 0xFF40) || (cp >= 0xFF5B && cp <= 0xFF65))
-        return 0.5; // CJK punctuation
-    if (cp >= 0x00C0 && cp <= 0x024F)
-        return 1.0; // Latin extended
-    if (cp >= 0x0370 && cp <= 0x03FF)
-        return 1.0; // Greek
-    if (cp >= 0x0400 && cp <= 0x04FF)
-        return 1.0; // Cyrillic
-    if (cp >= 0x0590 && cp <= 0x06FF)
-        return 1.5; // Hebrew + Arabic
-    if (cp >= 0x0E00 && cp <= 0x0EFF)
-        return 1.5; // Thai + Lao
-    if (cp >= 0x0900 && cp <= 0x0DFF)
-        return 1.8; // Indic (Devanagari..Sinhala)
-    if (cp >= 0x3040 && cp <= 0x30FF)
-        return 2.2; // Hiragana + Katakana
-    if ((cp >= 0xAC00 && cp <= 0xD7AF) || (cp >= 0x1100 && cp <= 0x11FF))
-        return 2.5; // Hangul
-    if ((cp >= 0x4E00 && cp <= 0x9FFF) || (cp >= 0x3400 && cp <= 0x4DBF) || (cp >= 0x20000 && cp <= 0x2FA1F))
-        return 3.0; // CJK ideographs
-    return 1.0;     // default letter-ish
-}
-
-static double duration_text_weight(const std::string& text) {
-    double w = 0.0;
-    for (size_t i = 0; i < text.size();) {
-        unsigned char c = text[i];
-        uint32_t cp;
-        int adv;
-        if (c < 0x80) {
-            cp = c;
-            adv = 1;
-        } else if (c < 0xE0) {
-            cp = c & 0x1F;
-            adv = 2;
-        } else if (c < 0xF0) {
-            cp = c & 0x0F;
-            adv = 3;
-        } else {
-            cp = c & 0x07;
-            adv = 4;
-        }
-        for (int k = 1; k < adv && i + (size_t)k < text.size(); k++)
-            cp = (cp << 6) | ((unsigned char)text[i + k] & 0x3F);
-        w += duration_cp_weight(cp);
-        i += adv;
-    }
-    return w;
-}
-
-// Estimate target length (in ref_dur's unit) from a reference (text, dur) pair,
-// mirroring RuleDurationEstimator.estimate_duration:
-//   speed = weight(ref_text) / ref_dur;  est = weight(target) / speed
-// with a power-curve BOOST when the linear estimate is short (< low_threshold):
-//   est = low_threshold * (est/low_threshold)^(1/boost_strength)
-// The boost lengthens short clips so they don't render too fast / skip
-// characters (#254). Defaults (low_threshold=50, boost_strength=3) match Python.
-static double duration_estimate(const std::string& target_text, const std::string& ref_text, double ref_dur,
-                                double low_threshold = 50.0, double boost_strength = 3.0) {
-    if (ref_dur <= 0.0 || ref_text.empty())
-        return 0.0;
-    double ref_weight = duration_text_weight(ref_text);
-    if (ref_weight == 0.0)
-        return 0.0;
-    double speed = ref_weight / ref_dur;
-    double est = duration_text_weight(target_text) / speed;
-    if (est < low_threshold)
-        return low_threshold * std::pow(est / low_threshold, 1.0 / boost_strength);
-    return est;
-}
-
-// Target audio length (frames). With a voice prompt the anchor IS the reference
-// (ref_text → ref_T frames) so the length tracks the reference speaker's actual
-// rate (fixes "duration doesn't change with a reference voice", #254). Without
-// one, fall back to the canonical "Nice to meet you." ≈ 25-frame anchor.
-// OMNIVOICE_FRAMES_PER_CHAR overrides the no-ref frames/weighted-char rate.
-static int estimate_target_tokens(const std::string& text, const std::string& ref_text = std::string(), int ref_T = 0,
-                                  float speed = 1.0f) {
-    std::string rt;
-    double rd;
-    if (ref_T > 0 && !ref_text.empty()) {
-        rt = ref_text;
-        rd = (double)ref_T;
-    } else {
-        rt = "Nice to meet you.";
-        rd = 25.0;
-        if (const char* e = crispasr_env::get("CRISPASR_OMNIVOICE_FRAMES_PER_CHAR")) {
-            float v = (float)atof(e);
-            if (v > 0.0f)
-                rd = v * duration_text_weight(rt); // env = frames per weighted char
-        }
-    }
-    double est = duration_estimate(text, rt, rd) / speed;
-    return std::max((int)est, 10);
-}
+// Extracted to src/core/omnivoice_duration.h so it can be unit-tested, and so
+// the #363 reference-rate guard lives with the weights it depends on.
+using core_omnivoice_duration::duration_estimate;
+using core_omnivoice_duration::duration_text_weight;
+using core_omnivoice_duration::estimate_target_tokens;
+using core_omnivoice_duration::ref_rate_is_plausible;
 
 // ---------------------------------------------------------------------------
 // Time steps for masked iterative schedule

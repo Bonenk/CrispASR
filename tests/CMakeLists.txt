@@ -3761,6 +3761,22 @@ catch_discover_tests(test_tts_provenance
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-omnivoice-duration — #363 reference-rate guard ────────────────────
+# Pure header, no model: the target-length estimator decides whether a phrase
+# fits before any generation happens, which is what made #363 a truncation
+# rather than a mistiming.
+add_executable(test-omnivoice-duration test-omnivoice-duration.cpp)
+target_include_directories(test-omnivoice-duration PRIVATE
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-omnivoice-duration PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-omnivoice-duration
+    TEST_SPEC "[duration]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-glint-simd-detect — regression guard for #327 ─────────────────────
 # glint/src/simd.hpp is included first in that TU on purpose, so it must be
 # self-sufficient; on MSVC that reproduces #327 (missing <intrin.h> for
