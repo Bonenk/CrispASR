@@ -1318,6 +1318,28 @@ int crispasr_run_server(whisper_params& params, const std::string& host, int por
         int n_workers = std::max(1, params.server_workers);
         if (const char* e = std::getenv("CRISPASR_SERVER_WORKERS"))
             n_workers = std::max(1, atoi(e));
+
+        // #358: the pool serves pure-ASR requests only (explicit language, no
+        // aligner, no post-processing) — synthesis always runs serialised under
+        // model_mutex. On a backend that can synthesise, someone raising this
+        // flag to get concurrent TTS instead gets N full model instances and no
+        // extra throughput; 4 workers with the 1.7B qwen3-tts is 4 x ~1.95 GiB
+        // and overruns an M1's Metal working-set limit, which surfaces as an
+        // allocation failure rather than as "that flag does not apply here".
+        //
+        // Note only, no behaviour change: there is no capability meaning "can
+        // transcribe" (ASR is implicit), so a backend advertising CAP_TTS may
+        // still be a genuine ASR backend for which the pool is doing its job.
+        // Refusing to build it on that guess would be a throughput regression.
+        if (n_workers > 1 && (backend->capabilities() & CAP_TTS)) {
+            fprintf(stderr,
+                    "crispasr-server: note — the worker pool serves pure-ASR requests only; "
+                    "synthesis on '%s' stays serialised on one model instance regardless of "
+                    "--server-workers %d, and each worker is a full model copy. For concurrent TTS, "
+                    "run N processes behind a load balancer.\n",
+                    backend_name.c_str(), n_workers);
+        }
+
         if (n_workers > 1) {
             std::vector<std::unique_ptr<AsrWorker>> workers;
             for (int i = 0; i < n_workers; ++i) {
