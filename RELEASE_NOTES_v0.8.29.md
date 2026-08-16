@@ -2,14 +2,22 @@
 
 125 commits. The theme is **things that did not work at all** — not slowly, not
 imprecisely, but not at all — found by reading the issue tracker rather than the
-code. Three of them had been shipping broken for months behind a plausible
-symptom: speaker diarization refused to download its own model, the Windows
-`glint` build depended on which MSVC toolset you happened to have, and a
-long-form transcript could silently drop 45 contiguous seconds of speech.
+code:
 
-**If you use `--diarize`, `--backend cosyvoice3-tts`, parakeet on audio longer
-than 30 s, or any language binding, this release changes behaviour you have been
-living with.**
+* `--diarize-method pyannote` refused to download its own segmentation model, so
+  it produced no speaker turns for anyone.
+* `verbose_json` discarded every speaker label it was asked to produce, after
+  paying for the diarization that computed them.
+* Parakeet long-form could silently drop 45 contiguous seconds of a 230 s
+  transcript.
+* Every GGUF load leaked its weight mapping.
+
+**If you use `--diarize`, parakeet on audio longer than 30 s, or any language
+binding, this release changes behaviour you have been living with.**
+
+Where a section covers something already released, it says so — this release
+adds regression coverage for several earlier fixes, and knowing which ones you
+already have is more useful than a longer list.
 
 ---
 
@@ -136,31 +144,30 @@ remaining backend.
 
 ## Text-to-speech
 
-### CosyVoice3 — four distinct fixes (#334)
+### CosyVoice3 — cloning through the session API (#334)
 
-Reported as "long delay, pitch shifting and accent issues". Each symptom had its
-own cause:
+The four fixes behind that report — the CAMPPlus fused-bias bug that made every
+WAV clone use a wrong speaker embedding (cos 0.737 → 0.999997), the missing
+minimum decode length behind the "chipmunk effect", the per-reference caching
+that cut a three-sentence request from 66.0 s to 45.7 s, and a resampler that
+truncated its filter on every downsample — **shipped in v0.8.26**. If you are on
+v0.8.26 or later you already have them.
 
-- **The accent.** The speaker embedding was computed wrong — cos **0.737**
-  against upstream's `campplus.onnx`, on every `--voice ref.wav` clone.
-  CosyVoice3's ONNX export folds a trailing BatchNorm back into
-  `transit3.linear`, gaining a fused weight *and* a fused bias; our code never
-  applied a bias on that convolution, so the last 512 channels reached the
-  statistics pooling un-normalised. Now **0.999997**. Baked bank voices were
-  always fine — their embeddings are computed in Python at build time — which is
-  why only WAV cloning was affected.
-- **The chipmunk effect.** No minimum decode length, so an unlucky stop token at
-  step 0 ended the decode or crammed the line into far too few frames. Upstream's
-  `min_token_text_ratio` floor is now ported.
-- **The delay.** The speaker was re-extracted from the WAV on *every* synthesis.
-  Now cached per reference: a three-sentence request went 66.0 s → 45.7 s with
-  byte-identical output.
-- **A resampler defect** that truncated its filter on every downsample.
+What is new here is the last gap that thread left open: the session C ABI
+required a transcript for a WAV and returned `-2` without one, because it cannot
+run ASR itself. It still cannot — but the CLI already caches its auto-transcript
+beside the clip, and that cache lives in `core/` so every consumer can share it.
+A clip prepared once through the CLI now clones through Python, Rust and Go too:
 
-`--ref-text` is now optional — the clip is transcribed for you and cached beside
-it. And as of this release the **session C ABI reuses that cache**, so a clip
-prepared once through the CLI clones through Python/Rust/Go too instead of
-failing with `-2`.
+| | |
+|---|---|
+| session `set_voice(wav)`, no cache | `-2`, now with an explanation |
+| CLI run without `--ref-text` | auto-transcribes, caches it |
+| same session call, unchanged | succeeds — ASR round-trip returns the requested line exactly |
+
+The bare `-2` is now an explanation, which matters here because an *approximate*
+transcript is worse than none: the talker infers the speaker's rate from it and
+rushes or truncates the line.
 
 ### OmniVoice — fragments at the ends of phrases (#363)
 
@@ -193,26 +200,42 @@ honoured, and locale-independent config reads in the converters.
 
 ## Windows
 
-### The MSVC build depended on luck (#327)
+**Both fixes in this section shipped in v0.8.25.** What is new in v0.8.29 is
+that they are now guarded, because both were the kind of defect a green build
+does not catch.
+
+### The MSVC `glint` build depended on luck (#327, fixed in v0.8.25)
 
 `glint/src/simd.hpp` called `__cpuidex` without including `<intrin.h>`. Our
 `windows-latest` job builds glint and passed throughout, because some MSVC
-toolsets pull that header in transitively — so whether this compiled was down to
-your toolset. Two more bugs were found in the same six lines: the branch gated an
+toolsets pull that header in transitively — so whether this compiled came down
+to your toolset. Two further bugs sat in the same six lines: the branch gated an
 AVX1-only code path on the **AVX2** bit, so every Sandy/Ivy Bridge part silently
 ran SSE2 under MSVC while GCC ran it with AVX; and it enabled AVX without
 checking `OSXSAVE`/`XGETBV`.
 
-### Sherpa diarization hung forever on Windows CUDA (#328)
+None of it had a test, and `tools/sync-glint.sh` overwrites `glint/` wholesale
+from upstream — so the fix survived only as long as upstream kept it. The new
+`test-glint-simd-detect` lives in `tests/` for that reason, includes `simd.hpp`
+first so the header must be self-sufficient, and cross-checks the x86 result
+against `__builtin_cpu_supports` (the arm that would have caught the AVX2-bit
+bug: two toolchains must agree about the same machine).
+
+### Sherpa diarization hung forever on Windows CUDA (#328, fixed in v0.8.25)
 
 The subprocess command line was built with POSIX single quotes, which `cmd.exe`
 does not interpret, so sherpa received literal apostrophes inside its model
 paths; the command also appended `2>/dev/null`, which is not Windows
-redirection. Now spawned via `CreateProcessA` with MSVC quoting and a timeout —
-and the timeout was implemented on the POSIX side too, where the parameter had
-been accepted and silently ignored.
+redirection. Fixed by spawning through `CreateProcessA` with MSVC quoting and a
+timeout — implemented on the POSIX side too, where the parameter had been
+accepted and silently ignored.
 
----
+The two quoters lived in the arms of an `#ifdef _WIN32`, so the Windows rules
+never compiled on Linux or macOS. CI *did* compile them on `windows-latest` —
+green, the whole time it was emitting command lines `cmd.exe` could not parse —
+but nothing ever ran them. They are now ordinary functions compiled everywhere,
+round-tripped against a reference implementation of `CommandLineToArgvW`'s
+documented algorithm, so the quoting is checked on every CI host.
 
 ## Packaging
 
