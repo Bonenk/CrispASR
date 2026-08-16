@@ -173,6 +173,10 @@ CRISPASR_SESSION_API float crispasr_detect_language(whisper_context* ctx, const 
 CRISPASR_SESSION_API int crispasr_vad_segments(const char* vad_model_path, const float* pcm, int n_samples,
                                                int sample_rate, float threshold, int min_speech_ms, int min_silence_ms,
                                                int n_threads, bool use_gpu, float** out_spans);
+// Returns the slice count (>= 0), or negative on error: -1 bad arguments,
+// -2 allocation failed, -3 the VAD model could not be loaded. -3 matters
+// because 0 ("loaded fine, found no speech") used to be the answer for a
+// missing model too, which made every binding read a broken install as silence.
 CRISPASR_SESSION_API int crispasr_vad_slices(const char* vad_model_path, const float* pcm, int n_samples,
                                              int sample_rate, float threshold, int min_speech_ms, int min_silence_ms,
                                              int speech_pad_ms, float max_chunk_duration_s, int n_threads,
