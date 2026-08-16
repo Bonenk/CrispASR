@@ -166,6 +166,76 @@ public:
         return out;
     }
 
+    // ---- Split transcribe: encode ∥ decode across dispatcher slices ----
+    //
+    // Used by the VAD / chunk slice loop, where each slice is short enough to be
+    // exactly one encode + one decode — i.e. transcribe()'s SINGLE_PASS path cut
+    // in half. The encoder runs on ctx_'s ggml backend (GPU) and the TDT decoder
+    // on the CPU via cblas, so the caller can overlap them.
+    //
+    // Only advertised when the decoder really is the CPU path: on CUDA/Vulkan
+    // parakeet_decode_frames() is itself a ggml graph on ctx_'s backend and
+    // would race the encoder. JA models are excluded because they never take the
+    // plain single-pass route (#89).
+    struct enc_state {
+        float* buf = nullptr;
+        int T_enc = 0;
+        int d_model = 0;
+    };
+
+    bool supports_split_transcribe() const override {
+        return ctx_ != nullptr && !is_ja_model_ && parakeet_decode_uses_backend(ctx_) == 0;
+    }
+
+    // A slice qualifies only when transcribe() would run it as ONE pass. A
+    // longer slice takes the LONGFORM/STREAMED multi-window route, whose
+    // per-window context and merging this split path does not reproduce.
+    bool can_split_slice(int n_samples, const whisper_params& params) const override {
+        if (!ctx_ || n_samples <= 0)
+            return false;
+        parakeet_orchestrate_opts oo;
+        oo.chunk_seconds_explicit = params.chunk_seconds_explicit;
+        oo.chunk_seconds = params.chunk_seconds;
+        oo.chunk_overlap_seconds = params.chunk_overlap_seconds;
+        oo.no_prints = params.no_prints;
+        return parakeet_slice_is_single_pass(ctx_, n_samples, is_ja_model_, oo);
+    }
+
+    encoded_slice encode_slice(const float* samples, int n_samples, const whisper_params& params) override {
+        encoded_slice e;
+        if (!ctx_ || !samples || n_samples <= 0 || !can_split_slice(n_samples, params))
+            return e;
+        auto* st = new enc_state();
+        st->buf = parakeet_encode(ctx_, samples, n_samples, &st->T_enc, &st->d_model);
+        if (!st->buf) { // encode failed (e.g. VRAM OOM) — caller falls back to transcribe()
+            delete st;
+            return e;
+        }
+        e.h = st;
+        return e;
+    }
+
+    std::vector<crispasr_segment> decode_slice(encoded_slice e, int64_t t_offset_cs,
+                                               const whisper_params& /*params*/) override {
+        std::vector<crispasr_segment> out;
+        auto* st = static_cast<enc_state*>(e.h);
+        if (!st)
+            return out;
+        for (const auto& ps : parakeet_decode_frames_to_segments(ctx_, st->buf, st->T_enc, st->d_model, t_offset_cs))
+            out.push_back(seg_from_parakeet_seg(ps));
+        free(st->buf);
+        delete st;
+        return out;
+    }
+
+    void release_encoded(encoded_slice e) override {
+        auto* st = static_cast<enc_state*>(e.h);
+        if (!st)
+            return;
+        free(st->buf);
+        delete st;
+    }
+
     // Convert a neutral parakeet_seg (from the shared orchestration) into the
     // CLI crispasr_segment type.
     static crispasr_segment seg_from_parakeet_seg(const parakeet_seg& ps) {
