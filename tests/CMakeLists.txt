@@ -3761,6 +3761,24 @@ catch_discover_tests(test_tts_provenance
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-subprocess-quoting — #328 Windows sherpa hang ─────────────────────
+# Both quoters compile everywhere now, so the Windows rules can be round-tripped
+# against a reference CommandLineToArgvW on any host. That is the point: the
+# #ifdef used to make the Windows path unverifiable on the machines it was
+# written on. Pure strings, no subprocess spawned.
+add_executable(test-subprocess-quoting test-subprocess-quoting.cpp)
+target_include_directories(test-subprocess-quoting PRIVATE
+    ${PROJECT_SOURCE_DIR}/examples/cli
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-subprocess-quoting PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-subprocess-quoting
+    TEST_SPEC "[quoting]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test-omnivoice-duration — #363 reference-rate guard ────────────────────
 # Pure header, no model: the target-length estimator decides whether a phrase
 # fits before any generation happens, which is what made #363 a truncation
