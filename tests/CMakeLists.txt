@@ -921,7 +921,7 @@ endif()
 # cross-speaker low cosine; GEMM vs TITANET_FORCE_SCALAR equivalence).
 add_executable(test-titanet test-titanet.cpp)
 target_include_directories(test-titanet PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(test-titanet PRIVATE titanet crispasr-core ggml ggml-base ggml-cpu)
+target_link_libraries(test-titanet PRIVATE titanet crispasr-core ggml ggml-base crispasr_link_ggml_cpu)
 
 # test-crepe-parity — runs the CREPE ggml graph on a deterministic tone sweep
 # and dumps the 360-bin activations for tools/crepe_numpy_parity.py to score.
@@ -929,7 +929,7 @@ target_link_libraries(test-titanet PRIVATE titanet crispasr-core ggml ggml-base 
 # it needs a model — but it is the acceptance gate for src/crepe.cpp.
 add_executable(test-crepe-parity test_crepe_parity.cpp)
 target_include_directories(test-crepe-parity PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(test-crepe-parity PRIVATE crepe crispasr-core ggml ggml-base ggml-cpu)
+target_link_libraries(test-crepe-parity PRIVATE crepe crispasr-core ggml ggml-base crispasr_link_ggml_cpu)
 
 # ─── test-crepe-live — ctest-registered CREPE pitch/F0 integration test.
 # Gated on CRISPASR_MODEL_CREPE; SKIPs cleanly when unset. Complements (does
@@ -3884,28 +3884,28 @@ catch_discover_tests(test-core-wordpiece
 # ─── test-beat-this-stages — per-stage graph parity vs the torch reference ────
 add_executable(test-beat-this-stages test_beat_this_stages.cpp)
 target_include_directories(test-beat-this-stages PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(test-beat-this-stages PRIVATE beat-this crispasr-core ggml ggml-base ggml-cpu)
+target_link_libraries(test-beat-this-stages PRIVATE beat-this crispasr-core ggml ggml-base crispasr_link_ggml_cpu)
 
 # ─── test-beat-this-track — windowing + postprocessing vs the reference ──────
 # Needs a model + the long fixture from tools/gen_beat_this_track_ref.py; the
 # 101-frame front-end fixture is a single chunk and exercises no seams.
 add_executable(test-beat-this-track test_beat_this_track.cpp)
 target_include_directories(test-beat-this-track PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(test-beat-this-track PRIVATE beat-this crispasr-core ggml ggml-base ggml-cpu)
+target_link_libraries(test-beat-this-track PRIVATE beat-this crispasr-core ggml ggml-base crispasr_link_ggml_cpu)
 
 # ─── test-beat-this-frontend — log-mel vs torchaudio ──────────────────────────
 # Needs a model + fixtures, so not a ctest case; it is the acceptance gate for
 # the front end. Generate fixtures with tools/gen_beat_this_frontend_ref.py.
 add_executable(test-beat-this-frontend test_beat_this_frontend.cpp)
 target_include_directories(test-beat-this-frontend PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(test-beat-this-frontend PRIVATE beat-this crispasr-core ggml ggml-base ggml-cpu)
+target_link_libraries(test-beat-this-frontend PRIVATE beat-this crispasr-core ggml ggml-base crispasr_link_ggml_cpu)
 
 # ─── test-core-gru — core/gru.h vs a real PyTorch nn.GRU fixture ──────────────
 # Parity case skips unless CRISPASR_GRU_REF points at a fixture from
 # tools/gen_gru_reference.py, so CI needs neither torch nor network.
 add_executable(test-core-gru test-core-gru.cpp)
 target_include_directories(test-core-gru PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(test-core-gru PRIVATE Catch2::Catch2WithMain ggml ggml-base ggml-cpu)
+target_link_libraries(test-core-gru PRIVATE Catch2::Catch2WithMain ggml ggml-base crispasr_link_ggml_cpu)
 catch_discover_tests(test-core-gru
     TEST_PREFIX "core-gru: "
     PROPERTIES LABELS "unit;core"

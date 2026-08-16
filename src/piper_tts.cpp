@@ -96,6 +96,7 @@ struct piper_tts_bench_stage {
 #include <espeak-ng/speak_lib.h>
 #elif defined(CRISPASR_ESPEAK_DLOPEN)
 #include "espeak_dlopen.h"
+#include "core/ggml_cpu_backend.h"
 #endif
 
 // ── JSON-lite parser for phoneme_id_map ────────────────────────────
@@ -2255,13 +2256,13 @@ struct piper_tts_context* piper_tts_init_from_file(const char* path_model, struc
     ctx->n_threads = params.n_threads;
 
     // Backend init
-    ctx->backend_cpu = ggml_backend_cpu_init();
+    ctx->backend_cpu = core_cpu_backend::init();
     if (!ctx->backend_cpu) {
         fprintf(stderr, "piper_tts: failed to init CPU backend\n");
         delete ctx;
         return nullptr;
     }
-    ggml_backend_cpu_set_n_threads(ctx->backend_cpu, params.n_threads);
+    core_cpu_backend::set_n_threads(ctx->backend_cpu, params.n_threads);
 
     ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : ctx->backend_cpu;
     if (!ctx->backend)

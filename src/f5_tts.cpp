@@ -49,6 +49,7 @@
 #include <random>
 #include <string>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -2102,13 +2103,13 @@ struct f5_tts_context* f5_tts_init_from_file(const char* path_model, struct f5_t
     ctx->speed = params.speed;
 
     // Initialize backends
-    ctx->backend_cpu = ggml_backend_cpu_init();
+    ctx->backend_cpu = core_cpu_backend::init();
     if (!ctx->backend_cpu) {
         fprintf(stderr, "f5_tts: failed to init CPU backend\n");
         delete ctx;
         return nullptr;
     }
-    ggml_backend_cpu_set_n_threads(ctx->backend_cpu, params.n_threads);
+    core_cpu_backend::set_n_threads(ctx->backend_cpu, params.n_threads);
 
     ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : ctx->backend_cpu;
     if (!ctx->backend)

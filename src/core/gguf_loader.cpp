@@ -29,6 +29,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "core/ggml_cpu_backend.h"
 #endif
 
 namespace core_gguf {
@@ -260,7 +261,7 @@ struct MappedFile {
 // reason this buffer type exists. Tensors must be bound with
 // ggml_backend_tensor_alloc(); we do not provide an init_tensor path.
 //
-// We reuse ggml_backend_cpu_buffer_type() so ggml_backend_buffer_is_host()
+// We reuse core_cpu_backend::buffer_type() so ggml_backend_buffer_is_host()
 // returns true on this buffer (some scheduler paths key off that).
 struct mmap_buffer_ctx {
     void* mmap_base = nullptr;   // page-aligned start of the mmap
@@ -589,7 +590,7 @@ static bool load_weights_impl(const char* path, ggml_backend_t backend, IncludeT
     // a 16 GB Mac and thrashing swap. Default-on as of issue #94 (slow /
     // failing chatterbox-turbo load on macOS); opt out with
     // `CRISPASR_GGUF_MMAP=0`.
-    if (mmap_loader_enabled() && ggml_backend_is_cpu(backend)) {
+    if (mmap_loader_enabled() && core_cpu_backend::is_cpu(backend)) {
         MappedFile mf(path, /*writable=*/true);
         if (mf.ok) {
             const size_t data_off = gguf_get_data_offset(gctx);
@@ -630,7 +631,7 @@ static bool load_weights_impl(const char* path, ggml_backend_t backend, IncludeT
             if (!include_tensor && mlock_enabled())
                 try_mlock(tag, mctx->mmap_base, mctx->mmap_size);
 
-            out.buf = ggml_backend_buffer_init(ggml_backend_cpu_buffer_type(), mmap_buffer_iface, mctx, buf_size);
+            out.buf = ggml_backend_buffer_init(core_cpu_backend::buffer_type(), mmap_buffer_iface, mctx, buf_size);
             if (!out.buf) {
                 fprintf(stderr, "%s: failed to wrap mmap in backend buffer\n", tag);
 #if defined(_WIN32)
@@ -709,7 +710,7 @@ static bool load_weights_impl(const char* path, ggml_backend_t backend, IncludeT
     // (deallocator=nil) and `buffer_from_host_ptr` offers no way to hand it
     // ownership, so the caller must release through that entry point rather
     // than through ggml_backend_buffer_free().
-    if (mmap_loader_enabled() && !ggml_backend_is_cpu(backend)) {
+    if (mmap_loader_enabled() && !core_cpu_backend::is_cpu(backend)) {
         ggml_backend_dev_t dev = ggml_backend_get_device(backend);
         ggml_backend_dev_props props{};
         ggml_backend_dev_get_props(dev, &props);

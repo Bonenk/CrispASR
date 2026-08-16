@@ -594,14 +594,14 @@ lfm2_audio_context* lfm2_audio_init_from_file(const char* path_model, lfm2_audio
     }
     ctx->use_gpu = params.use_gpu;
     // Initialize backend: GPU if available and requested, else CPU
-    ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : ggml_backend_cpu_init();
+    ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : core_cpu_backend::init();
     if (!ctx->backend)
-        ctx->backend = ggml_backend_cpu_init();
-    ctx->backend_cpu = ggml_backend_cpu_init();
+        ctx->backend = core_cpu_backend::init();
+    ctx->backend_cpu = core_cpu_backend::init();
     if (ctx->backend_cpu)
-        ggml_backend_cpu_set_n_threads(ctx->backend_cpu, params.n_threads);
-    if (ggml_backend_is_cpu(ctx->backend))
-        ggml_backend_cpu_set_n_threads(ctx->backend, params.n_threads);
+        core_cpu_backend::set_n_threads(ctx->backend_cpu, params.n_threads);
+    if (core_cpu_backend::is_cpu(ctx->backend))
+        core_cpu_backend::set_n_threads(ctx->backend, params.n_threads);
     ctx->compute_meta.resize(256ULL * 1024 * 1024); // 256 MB scratch for prefill
     ctx->decode_meta.resize(64ULL * 1024 * 1024);   // 64 MB scratch for T=1 decode
 
@@ -2112,6 +2112,7 @@ static std::vector<int32_t> lfm2_depthformer_sample_frame(lfm2_audio_context* ct
 // ISTFT-based audio decoder: Mimi codes → PCM at 24 kHz.
 // Uses the detokenizer model weights if loaded, otherwise returns nullptr.
 #include "core/istft.h"
+#include "core/ggml_cpu_backend.h"
 
 // Helper: embed audio codes via audio_embedding and sum across codebooks.
 // Returns (hidden,) float vector = sum_c audio_embd[code_c + c * audio_vocab].

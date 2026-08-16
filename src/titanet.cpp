@@ -35,6 +35,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 // The TitaNet speaker-embedding forward is entirely hand-rolled CPU scalar
 // math. The pointwise convs (1×1 matmuls) + the ASP TDNN/attention matmuls are
@@ -657,9 +658,9 @@ extern "C" struct titanet_context* titanet_init(const char* model_path, int n_th
     // ggml compute path (default): upload the folded cache to a CPU backend
     // buffer once. On failure fall back to the legacy scalar path.
     if (!titanet_use_legacy()) {
-        ctx->backend_cpu = ggml_backend_cpu_init();
+        ctx->backend_cpu = core_cpu_backend::init();
         if (ctx->backend_cpu) {
-            ggml_backend_cpu_set_n_threads(ctx->backend_cpu, ctx->n_threads);
+            core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->n_threads);
             if (!titanet_upload_ggml_weights(ctx)) {
                 fprintf(stderr, "titanet: ggml weight upload failed, using legacy path\n");
                 if (ctx->g.buf)

@@ -1515,6 +1515,7 @@ static void cohere_fft_r2c(const float* in, int N, float* out) {
 
 #include "core/mel.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/ggml_cpu_backend.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -1995,7 +1996,7 @@ struct cohere_context* cohere_init_from_file(const char* path_model, struct cohe
             }
         }
         if (!ctx->ggml_backend) {
-            ctx->ggml_backend = params.use_gpu ? crispasr_init_gpu_backend() : ggml_backend_cpu_init();
+            ctx->ggml_backend = params.use_gpu ? crispasr_init_gpu_backend() : core_cpu_backend::init();
         }
         if (!ctx->ggml_backend) {
             fprintf(stderr, "cohere: failed to initialize any ggml backend\n");
@@ -2005,17 +2006,17 @@ struct cohere_context* cohere_init_from_file(const char* path_model, struct cohe
     }
 
     // Always have a CPU backend available as scheduler fallback for unsupported ops
-    ctx->ggml_backend_cpu = ggml_backend_cpu_init();
-    bool using_gpu = !ggml_backend_is_cpu(ctx->ggml_backend);
+    ctx->ggml_backend_cpu = core_cpu_backend::init();
+    bool using_gpu = !core_cpu_backend::is_cpu(ctx->ggml_backend);
     const int vb = params.verbosity;
     COHERE_VLOG(vb, "cohere: backend: %s%s\n", ggml_backend_name(ctx->ggml_backend), using_gpu ? "" : " (CPU-only)");
 
     // Apply thread count only when explicitly requested via env var
     if (crispasr_env::get("CRISPASR_COHERE_THREADS")) {
         COHERE_VLOG(vb, "cohere: applying n_threads=%d to CPU backend [COHERE_THREADS override]\n", params.n_threads);
-        ggml_backend_cpu_set_n_threads(ctx->ggml_backend_cpu, params.n_threads);
+        core_cpu_backend::set_n_threads(ctx->ggml_backend_cpu, params.n_threads);
         if (!using_gpu) {
-            ggml_backend_cpu_set_n_threads(ctx->ggml_backend, params.n_threads);
+            core_cpu_backend::set_n_threads(ctx->ggml_backend, params.n_threads);
         }
     } else {
         COHERE_VLOG(vb, "cohere: n_threads param=%d (use COHERE_THREADS=N to override)\n", params.n_threads);

@@ -35,6 +35,7 @@
 #include <numeric>
 #include <string>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 // ===========================================================================
 // GGUF loading helpers
@@ -114,7 +115,7 @@ bool wav2vec2_load(const char* fname, wav2vec2_model& model) {
     // Phase 2: load tensors via core_gguf (backend-buffer-backed)
     // This puts all weights in a ggml_backend_buffer so the graph
     // scheduler can reference them without cross-context issues.
-    model.backend = ggml_backend_cpu_init();
+    model.backend = core_cpu_backend::init();
     if (!model.backend) {
         fprintf(stderr, "[wav2vec2] failed to init CPU backend\n");
         return false;
@@ -967,7 +968,7 @@ std::vector<float> wav2vec2_compute_logits_graph(const wav2vec2_model& m, const 
         std::vector<uint8_t> compute_meta;
         ggml_cgraph* gf = wav2vec2_build_transformer_graph(m, T, compute_meta);
         if (gf) {
-            ggml_backend_cpu_set_n_threads(m.backend, n_threads);
+            core_cpu_backend::set_n_threads(m.backend, n_threads);
             ggml_backend_t backends[1] = {m.backend};
             ggml_backend_sched_t sched = ggml_backend_sched_new(backends, nullptr, 1, 16384, false, false);
 

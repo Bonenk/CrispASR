@@ -605,6 +605,7 @@ static void parakeet_fft_r2c(const float* in, int N, float* out) {
 #include "core/mel.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
 #include "core/rnnt_ggml.h"        // §232 GPU transducer decode (shared)
+#include "core/ggml_cpu_backend.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -1369,12 +1370,12 @@ struct parakeet_emitted_token {
 // needs it to decide whether encode and decode may overlap on two threads
 // (they may not when both drive ctx->backend). Keep the two in lockstep.
 static bool parakeet_ggml_decode_active(const parakeet_context* ctx) {
-    bool ggml_dec = !ggml_backend_is_cpu(ctx->backend);
+    bool ggml_dec = !core_cpu_backend::is_cpu(ctx->backend);
     // ggml decode wins on CUDA/Vulkan (slow CPU BLAS: P100 5-12x) but LOSES on
     // Metal, where Apple Accelerate cblas beats the small-matmul GPU decode (M1
     // parakeet total ~16x cblas vs ~11x ggml). Default OFF on Metal (LEARNINGS 34).
 #if defined(GGML_USE_METAL)
-    if (ggml_dec && ggml_backend_is_metal(ctx->backend))
+    if (ggml_dec && core_cpu_backend::is_metal(ctx->backend))
         ggml_dec = false;
 #endif
     if (const char* e = crispasr_env::get("CRISPASR_PARAKEET_GGML_DECODE"))
@@ -2861,11 +2862,11 @@ static std::vector<parakeet_emitted_token> parakeet_ctc_decode(parakeet_context*
 
 static ggml_backend_t pick_backend() {
     ggml_backend_t b = crispasr_init_gpu_backend();
-    return b ? b : ggml_backend_cpu_init();
+    return b ? b : core_cpu_backend::init();
 }
 
 static ggml_backend_t pick_backend(bool use_gpu) {
-    return use_gpu ? pick_backend() : ggml_backend_cpu_init();
+    return use_gpu ? pick_backend() : core_cpu_backend::init();
 }
 
 // ===========================================================================
@@ -2888,7 +2889,7 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
     ctx->n_threads = params.n_threads > 0 ? params.n_threads : 4;
 
     ctx->backend = pick_backend(params.use_gpu);
-    ctx->backend_cpu = ggml_backend_cpu_init();
+    ctx->backend_cpu = core_cpu_backend::init();
     if (!ctx->backend)
         ctx->backend = ctx->backend_cpu;
 

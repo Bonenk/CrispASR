@@ -406,3 +406,35 @@ Output lands in `build-android/<ABI>/src/libcrispasr.so`.
 cross-compiler produces binaries linked against Android's bionic libc,
 suitable for embedding in Android apps via JNI. Termux uses its own
 linker and packages — use the native Termux build above instead.
+
+### Progress on the graceful-degradation fix (#355)
+
+The groundwork for `GGML_BACKEND_DL` is in the tree; it is **not enabled**, and
+the default build is unchanged. Three things blocked it; two are now done:
+
+1. **CMake** — every per-model library linked `ggml-cuda` / `ggml-metal`
+   explicitly (125 sites), and under DL those are `MODULE` targets that cannot
+   be linked. They now route through `crispasr_link_ggml_*` interface targets
+   that are empty in a DL build and the real backend otherwise. ✅
+2. **CPU-backend symbols** — under DL even the CPU backend is a module, so
+   `ggml_backend_cpu_init`, `ggml_backend_is_cpu`, `ggml_backend_cpu_set_n_threads`,
+   `ggml_backend_cpu_buffer_type`, `ggml_backend_cpu_reg`, `ggml_backend_is_metal`
+   and `ggml_backend_cpu_set_threadpool` are not linkable. All 426 call sites go
+   through `src/core/ggml_cpu_backend.h`, whose non-DL branch is the identical
+   direct call. ✅
+3. **Direct CPU graph execution** — six symbols remain, across ~23 sites:
+   `ggml_graph_compute` (4), `ggml_graph_compute_with_ctx` (18),
+   `ggml_graph_plan`, `ggml_threadpool_new` / `_free`, and
+   `ggml_get_type_traits_cpu`. ❌
+
+Step 3 is not mechanical. Replacing `ggml_graph_compute_with_ctx(ctx, gf, n)`
+with `ggml_backend_graph_compute()` moves where a graph executes and how its
+threads are managed, on 22 hot paths — precisely the kind of change this repo
+requires an A/B against real hardware for, on each of CUDA, HIP, Vulkan and
+Metal. Separately, ggml's CPU registry does not expose the threadpool setter
+through `get_proc_address` (only `set_n_threads`), so a DL build cannot install
+the shared worker pool at all without a fork patch.
+
+So: a DL build now configures and compiles everything except those six symbols.
+Finishing it needs hardware access for the per-backend A/B, and flipping the
+`-cuda` release leg to `BUILD_SHARED_LIBS=ON` after that.

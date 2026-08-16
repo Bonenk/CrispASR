@@ -61,6 +61,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 namespace {
 
@@ -564,15 +565,15 @@ static bool load_model(omnivoice_context* ctx, const char* path) {
         const bool force_cpu = e && *e && *e != '0';
         ctx->backend = (ctx->use_gpu && !force_cpu) ? crispasr_init_gpu_backend() : nullptr;
         if (!ctx->backend)
-            ctx->backend = ggml_backend_cpu_init();
+            ctx->backend = core_cpu_backend::init();
     }
     if (!ctx->backend) {
         fprintf(stderr, "omnivoice: failed to init backend\n");
         gguf_free(gf);
         return false;
     }
-    if (ggml_backend_is_cpu(ctx->backend))
-        ggml_backend_cpu_set_n_threads(ctx->backend, ctx->n_threads);
+    if (core_cpu_backend::is_cpu(ctx->backend))
+        core_cpu_backend::set_n_threads(ctx->backend, ctx->n_threads);
     if (ctx->verbosity >= 1)
         fprintf(stderr, "omnivoice: compute backend = %s\n", ggml_backend_name(ctx->backend));
 
@@ -872,9 +873,9 @@ static bool load_tokenizer(omnivoice_context* ctx, const char* path) {
     const bool codec_gpu = ctx->use_gpu && codec_gpu_enabled(ctx);
     tok.backend = codec_gpu ? crispasr_init_gpu_backend() : nullptr;
     if (!tok.backend)
-        tok.backend = ggml_backend_cpu_init();
-    if (ggml_backend_is_cpu(tok.backend))
-        ggml_backend_cpu_set_n_threads(tok.backend, ctx->n_threads);
+        tok.backend = core_cpu_backend::init();
+    if (core_cpu_backend::is_cpu(tok.backend))
+        core_cpu_backend::set_n_threads(tok.backend, ctx->n_threads);
     if (ctx->verbosity >= 1)
         fprintf(stderr, "omnivoice: codec backend = %s\n", ggml_backend_name(tok.backend));
     tok.buf_w = ggml_backend_alloc_ctx_tensors(tok.ctx_w, tok.backend);
@@ -3776,7 +3777,7 @@ int omnivoice_encode_diff(struct omnivoice_context* ctx, const char* ref_gguf_pa
 void omnivoice_set_n_threads(struct omnivoice_context* ctx, int n_threads) {
     if (ctx && n_threads > 0) {
         ctx->n_threads = n_threads;
-        if (ctx->backend && ggml_backend_is_cpu(ctx->backend))
-            ggml_backend_cpu_set_n_threads(ctx->backend, n_threads);
+        if (ctx->backend && core_cpu_backend::is_cpu(ctx->backend))
+            core_cpu_backend::set_n_threads(ctx->backend, n_threads);
     }
 }

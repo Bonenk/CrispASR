@@ -93,6 +93,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 namespace {
 
@@ -1615,7 +1616,7 @@ static float* run_talker_kv_dynamic(qwen3_tts_context* c, const float* embeds, i
     // for bisecting backend changes, but is not the default GPU path because
     // it is the source of the frame-0 corruption in #337.
     const bool use_direct =
-        !crispasr_env::get("CRISPASR_QWEN3_TTS_TALKER_SCHED") && !ggml_backend_is_cpu(c->backend) && c->kv_k &&
+        !crispasr_env::get("CRISPASR_QWEN3_TTS_TALKER_SCHED") && !core_cpu_backend::is_cpu(c->backend) && c->kv_k &&
         c->kv_k->buffer &&
         ggml_backend_buffer_get_type(c->kv_k->buffer) == ggml_backend_get_default_buffer_type(c->backend);
     ggml_gallocr_t direct_alloc = nullptr;
@@ -5883,13 +5884,13 @@ extern "C" struct qwen3_tts_context* qwen3_tts_init_codec_only(const char* codec
     c->params = params;
     c->n_threads = params.n_threads > 0 ? params.n_threads : 4;
 
-    c->backend_cpu = ggml_backend_cpu_init();
+    c->backend_cpu = core_cpu_backend::init();
     if (!c->backend_cpu) {
         fprintf(stderr, "qwen3_tts: failed to init CPU backend\n");
         delete c;
         return nullptr;
     }
-    ggml_backend_cpu_set_n_threads(c->backend_cpu, c->n_threads);
+    core_cpu_backend::set_n_threads(c->backend_cpu, c->n_threads);
     c->backend = params.use_gpu ? crispasr_init_gpu_backend() : c->backend_cpu;
     if (!c->backend) {
         c->backend = c->backend_cpu;
@@ -6022,13 +6023,13 @@ extern "C" struct qwen3_tts_context* qwen3_tts_init_from_file(const char* path_m
         gguf_free(g);
     }
 
-    c->backend_cpu = ggml_backend_cpu_init();
+    c->backend_cpu = core_cpu_backend::init();
     if (!c->backend_cpu) {
         fprintf(stderr, "qwen3_tts: failed to init CPU backend\n");
         delete c;
         return nullptr;
     }
-    ggml_backend_cpu_set_n_threads(c->backend_cpu, c->n_threads);
+    core_cpu_backend::set_n_threads(c->backend_cpu, c->n_threads);
     c->backend = params.use_gpu ? crispasr_init_gpu_backend() : c->backend_cpu;
     if (!c->backend) {
         c->backend = c->backend_cpu;
@@ -7930,7 +7931,7 @@ extern "C" void qwen3_tts_set_n_threads(struct qwen3_tts_context* ctx, int n_thr
     }
     ctx->n_threads = n_threads;
     if (ctx->backend_cpu) {
-        ggml_backend_cpu_set_n_threads(ctx->backend_cpu, n_threads);
+        core_cpu_backend::set_n_threads(ctx->backend_cpu, n_threads);
     }
 }
 

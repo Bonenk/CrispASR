@@ -204,6 +204,7 @@ static bool ggml_graph_compute_helper(struct ggml_cgraph* graph, int n_threads, 
 // instances (e.g. Ruby bindings) don't race on shared threadpool fields.
 #include <mutex>
 #include <unordered_map>
+#include "core/ggml_cpu_backend.h"
 struct cpu_pool_entry {
     ggml_threadpool_t pool = nullptr;
     int n_threads = 0;
@@ -215,24 +216,24 @@ static void whisper_ensure_cpu_threadpool(ggml_backend_sched_t sched, int n_thre
     std::lock_guard<std::mutex> lock(g_cpu_pools_mtx);
     for (int i = 0; i < ggml_backend_sched_get_n_backends(sched); ++i) {
         ggml_backend_t backend = ggml_backend_sched_get_backend(sched, i);
-        if (!ggml_backend_is_cpu(backend))
+        if (!core_cpu_backend::is_cpu(backend))
             continue;
 
         auto& entry = g_cpu_pools[backend];
         if (entry.pool && entry.n_threads >= n_threads) {
-            ggml_backend_cpu_set_threadpool(backend, entry.pool);
+            core_cpu_backend::set_threadpool(backend, entry.pool);
             continue;
         }
         // (Re)create with the requested size.
         if (entry.pool) {
-            ggml_backend_cpu_set_threadpool(backend, nullptr);
+            core_cpu_backend::set_threadpool(backend, nullptr);
             ggml_threadpool_free(entry.pool);
         }
         struct ggml_threadpool_params tpp = ggml_threadpool_params_default(n_threads);
         entry.pool = ggml_threadpool_new(&tpp);
         entry.n_threads = entry.pool ? n_threads : 0;
         if (entry.pool) {
-            ggml_backend_cpu_set_threadpool(backend, entry.pool);
+            core_cpu_backend::set_threadpool(backend, entry.pool);
         }
     }
 }
@@ -247,7 +248,7 @@ static void whisper_release_cpu_threadpool(ggml_backend_t backend) {
     if (it == g_cpu_pools.end())
         return;
     if (it->second.pool) {
-        ggml_backend_cpu_set_threadpool(backend, nullptr);
+        core_cpu_backend::set_threadpool(backend, nullptr);
         ggml_threadpool_free(it->second.pool);
     }
     g_cpu_pools.erase(it);
@@ -1928,7 +1929,7 @@ static buft_list_t make_buft_list(whisper_context_params& params) {
     }
 
     // CPU
-    buft_list.emplace_back(cpu_dev, ggml_backend_cpu_buffer_type());
+    buft_list.emplace_back(cpu_dev, core_cpu_backend::buffer_type());
 
     return buft_list;
 }
@@ -1939,7 +1940,7 @@ static bool weight_buft_supported(const whisper_hparams& hparams, ggml_tensor* w
 
     if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
         ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU ||
-        (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type())) {
+        (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == core_cpu_backend::buffer_type())) {
         // GPU and default CPU backend support all operators
         op_supported = true;
     } else {
@@ -5011,7 +5012,7 @@ static bool weight_buft_supported(const whisper_vad_hparams& hparams, ggml_tenso
 
     if (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_GPU ||
         ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_IGPU ||
-        (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == ggml_backend_cpu_buffer_type())) {
+        (ggml_backend_dev_type(dev) == GGML_BACKEND_DEVICE_TYPE_CPU && buft == core_cpu_backend::buffer_type())) {
         // GPU and default CPU backend support all operators
         op_supported = true;
     } else {
