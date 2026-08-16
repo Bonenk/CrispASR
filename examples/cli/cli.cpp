@@ -610,6 +610,14 @@ static bool whisper_params_parse_arg_streaming_tts(int argc, char** argv, int& i
         // Also drive the native-knob path (f5 ode_steps, chatterbox cfm_steps),
         // which reads tts_num_steps; previously only vibevoice honoured this.
         params.tts_num_steps = params.tts_steps;
+    } else if (arg == "--tts-min-speech-tokens") {
+        // #360: the floor was reachable ONLY from /v1/audio/speech — no CLI
+        // flag, no session ABI, no binding — while every other TTS knob has at
+        // least the CLI. Units are the backend's AR decode step (MOSS: codec
+        // frames at 12.5 Hz, so 80 ms each), not samples and not milliseconds.
+        params.tts_min_speech_tokens = std::stoi(ARGV_NEXT);
+        if (params.tts_min_speech_tokens < 0)
+            params.tts_min_speech_tokens = 0;
     } else if (arg == "--tts-cfg-scale") {
         params.tts_cfg_scale = std::stof(ARGV_NEXT);
         if (params.tts_cfg_scale < 0.0f)
@@ -1435,6 +1443,11 @@ static void whisper_print_usage(int /*argc*/, char** argv, const whisper_params&
             "             --tts-steps N            [%-7d] diffusion/ODE steps (vibevoice 10-20; irodori 40; "
             "chatterbox/f5/tada)\n",
             params.tts_steps);
+    fprintf(stderr,
+            "             --tts-min-speech-tokens N [%-6d] floor on generated audio length (moss-tts, "
+            "moss-tts-local). Units are the backend's AR decode step, NOT samples or ms: one codec frame, "
+            "12.5 Hz on the shipped models, so 80 ms each and N=25 floors at ~2 s. -1 = model default\n",
+            params.tts_min_speech_tokens);
     fprintf(
         stderr,
         "             --tts-cfg-scale X        [%-7s] TTS CFG guidance scale (vibevoice/chatterbox/f5/tada/irodori; "

@@ -3615,6 +3615,20 @@ class CrispasrSession {
     }
   }
 
+  /// Floor on generated audio length (MOSS TTS). Units are codec frames at 12.5 Hz (80 ms each), so n=25 floors at ~2 s. Other backends no-op (rc=-2).
+  void setMinSpeechTokens(int n) {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_set_min_speech_tokens')) return;
+    final fn = _lib.lookupFunction<
+        Int32 Function(Pointer<Void>, Int32),
+        int Function(
+            Pointer<Void>, int)>('crispasr_session_set_min_speech_tokens');
+    final rc = fn(_handle, n);
+    if (rc != 0 && rc != -2) {
+      throw Exception('setMinSpeechTokens failed (rc=$rc)');
+    }
+  }
+
   /// Per-phoneme length-scale / speaking-rate scalar for TTS
   /// backends with a duration model. Honoured by kokoro today
   /// (PLAN #88); other backends silently no-op. 1.0 = upstream
