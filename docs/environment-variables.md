@@ -1090,10 +1090,48 @@ All three optimisation gates are output-equivalent: the per-stage diff reports
 
 - `CRISPASR_TITANET_BENCH`
 - `CRISPASR_TITANET_DUMP`
+- `CRISPASR_TITANET_DUMP_MEL`
 - `CRISPASR_TITANET_FORCE_SCALAR`
 - `CRISPASR_TITANET_GGML`
+- `CRISPASR_TITANET_GPU`
 - `CRISPASR_TITANET_LEGACY`
 - `CRISPASR_TITANET_REF_MEL`
+
+Three compute paths exist and all are kept working; the default is the fastest
+one measured per platform.
+
+| path | selected by | measured, M1, 2 s segment |
+| --- | --- | --- |
+| legacy (Accelerate / hand-rolled) | default where `HAVE_ACCELERATE` | **71.7 ms** |
+| ggml graph, CPU | default elsewhere; `CRISPASR_TITANET_GGML=1` | 277.3 ms |
+| ggml graph, GPU | `CRISPASR_TITANET_GGML=1 CRISPASR_TITANET_GPU=1` | 31.9 ms *(but see below)* |
+
+All three agree to cosine **1.000000** with each other and **0.999996** against
+NVIDIA's `nemo_en_titanet_large.onnx` export fed the same mel — so the choice is
+purely about speed.
+
+⚠ **`CRISPASR_TITANET_GPU=1` is opt-in because it loses on real workloads
+despite winning the micro-benchmark.** Diarization embeds one segment per call
+at *variable* lengths, so every call reshapes the graph and the GPU allocator
+re-reserves; and `CRISPASR_SPEAKER_EMBED_WORKERS` runs several embedders at once,
+which contend for the one GPU. End-to-end on a 600 s clip, 47 segments:
+
+```
+workers=4, legacy   9994 ms    <- default, fastest
+workers=1, legacy  12673 ms
+workers=1, GPU     15275 ms
+workers=4, GPU     49866 ms
+```
+
+Keep it for evaluating a discrete GPU (where the balance may differ) or for
+`CRISPASR_SPEAKER_EMBED_WORKERS=1` on a machine with weak CPU cores. Bucketing
+segment lengths so the graph shape stops changing is the work that would make
+this path win generally.
+
+`CRISPASR_TITANET_DUMP_MEL=<path>` writes the computed mel as `[T][n_mels]`
+float32 — the counterpart to `CRISPASR_TITANET_REF_MEL`. Feeding that dump to an
+upstream ONNX export separates the front-end from the network, which a single
+end-to-end cosine cannot do.
 
 ### VibeVoice
 
