@@ -754,8 +754,9 @@ sidon_context* sidon_init_from_file(const char* path, sidon_context_params param
     // Vulkan shares one backend instance so decoder weights and the predictor
     // output never cross Vulkan queues/devices merely because the stages have
     // separate schedulers.
-    ctx->decoder_backend =
-        ctx->predictor_vulkan ? ctx->backend : (params.use_gpu ? crispasr_init_gpu_backend() : core_cpu_backend::init());
+    ctx->decoder_backend = ctx->predictor_vulkan
+                               ? ctx->backend
+                               : (params.use_gpu ? crispasr_init_gpu_backend() : core_cpu_backend::init());
     if (!ctx->decoder_backend)
         ctx->decoder_backend = core_cpu_backend::init();
     ctx->backend_cpu = core_cpu_backend::init();
