@@ -42,6 +42,7 @@
 #include <numeric>
 #include <string>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 // ===========================================================================
 // Bench instrumentation — `WAV2VEC2_BENCH=1` for per-stage timings.
@@ -150,7 +151,7 @@ bool wav2vec2_load(const char* fname, wav2vec2_model& model) {
     // for ops that need direct weight pointer access (via read_f32_vec).
     model.backend = crispasr_init_gpu_backend();
     if (!model.backend)
-        model.backend = ggml_backend_cpu_init();
+        model.backend = core_cpu_backend::init();
     if (!model.backend) {
         fprintf(stderr, "[wav2vec2] failed to init any backend\n");
         return false;
@@ -556,10 +557,10 @@ static void ggml_linear_f32(std::vector<uint8_t>& scratch, ggml_tensor* W, const
     ggml_cgraph* gf = ggml_new_graph(ctx);
     ggml_build_forward_expand(gf, out);
 
-    if (be && !ggml_backend_is_cpu(be)) {
+    if (be && !core_cpu_backend::is_cpu(be)) {
         // Use scheduler with GPU primary + CPU fallback
-        ggml_backend_t cpu = ggml_backend_cpu_init();
-        ggml_backend_cpu_set_n_threads(cpu, n_threads);
+        ggml_backend_t cpu = core_cpu_backend::init();
+        core_cpu_backend::set_n_threads(cpu, n_threads);
         ggml_backend_t bks[2] = {be, cpu};
         ggml_backend_sched_t sc = ggml_backend_sched_new(bks, nullptr, 2, 64, false, false);
         ggml_backend_sched_set_tensor_backend(sc, W, be);
@@ -1127,7 +1128,7 @@ static std::vector<float> wav2vec2_compute_logits_graph(const wav2vec2_model& m,
 
     if (verbose) {
         fprintf(stderr, "wav2vec2: backend=%s, gpu=%s, hidden=%d, layers=%d, heads=%d\n", ggml_backend_name(m.backend),
-                ggml_backend_is_cpu(m.backend) ? "no" : "yes", H, (int)hp.num_hidden_layers,
+                core_cpu_backend::is_cpu(m.backend) ? "no" : "yes", H, (int)hp.num_hidden_layers,
                 (int)hp.num_attention_heads);
         fprintf(stderr, "wav2vec2: audio=%d samples (%.1fs)\n", n_samples, n_samples / 16000.0f);
     }
@@ -1160,9 +1161,9 @@ static std::vector<float> wav2vec2_compute_logits_graph(const wav2vec2_model& m,
     ggml_backend_t cnn_cpu = nullptr;
     int cnn_n_be = 1;
     ggml_backend_t cnn_bks[2] = {m.backend, nullptr};
-    if (!ggml_backend_is_cpu(m.backend)) {
-        cnn_cpu = ggml_backend_cpu_init();
-        ggml_backend_cpu_set_n_threads(cnn_cpu, n_threads);
+    if (!core_cpu_backend::is_cpu(m.backend)) {
+        cnn_cpu = core_cpu_backend::init();
+        core_cpu_backend::set_n_threads(cnn_cpu, n_threads);
         cnn_bks[cnn_n_be++] = cnn_cpu;
     }
     ggml_backend_sched_t cnn_sc = ggml_backend_sched_new(cnn_bks, nullptr, cnn_n_be, 128, false, false);
@@ -1173,8 +1174,8 @@ static std::vector<float> wav2vec2_compute_logits_graph(const wav2vec2_model& m,
     std::vector<float> cnn_buf(audio.begin(), audio.end());
     uint32_t L_cur = (uint32_t)n_samples, C_cur = 1;
 
-    if (ggml_backend_is_cpu(m.backend))
-        ggml_backend_cpu_set_n_threads(m.backend, n_threads);
+    if (core_cpu_backend::is_cpu(m.backend))
+        core_cpu_backend::set_n_threads(m.backend, n_threads);
 
     for (uint32_t li = 0; li < hp.num_feat_extract_layers; li++) {
         uint32_t C_out = hp.conv_dim[li];
@@ -1467,15 +1468,15 @@ static std::vector<float> wav2vec2_compute_logits_graph(const wav2vec2_model& m,
         std::vector<uint8_t> compute_meta;
         ggml_cgraph* gf = wav2vec2_build_transformer_graph(m, T, compute_meta, /*include_pos_conv=*/false);
         if (gf) {
-            if (ggml_backend_is_cpu(m.backend))
-                ggml_backend_cpu_set_n_threads(m.backend, n_threads);
+            if (core_cpu_backend::is_cpu(m.backend))
+                core_cpu_backend::set_n_threads(m.backend, n_threads);
             // Dual-backend scheduler: GPU primary + CPU fallback for unsupported ops
             ggml_backend_t enc_cpu = nullptr;
             int enc_n_be = 1;
             ggml_backend_t backends[2] = {m.backend, nullptr};
-            if (!ggml_backend_is_cpu(m.backend)) {
-                enc_cpu = ggml_backend_cpu_init();
-                ggml_backend_cpu_set_n_threads(enc_cpu, n_threads);
+            if (!core_cpu_backend::is_cpu(m.backend)) {
+                enc_cpu = core_cpu_backend::init();
+                core_cpu_backend::set_n_threads(enc_cpu, n_threads);
                 backends[enc_n_be++] = enc_cpu;
             }
             ggml_backend_sched_t sched = ggml_backend_sched_new(backends, nullptr, enc_n_be, 16384, false, false);

@@ -31,6 +31,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -306,13 +307,13 @@ extern "C" struct ark_asr_context* ark_asr_init_from_file(const char* path_model
     ctx->id_im_end = (int32_t)hp.eos_token_id;
 
     // Backends
-    ctx->backend_cpu = ggml_backend_cpu_init();
+    ctx->backend_cpu = core_cpu_backend::init();
     if (!ctx->backend_cpu) {
         fprintf(stderr, "ark_asr: failed to init CPU backend\n");
         delete ctx;
         return nullptr;
     }
-    ggml_backend_cpu_set_n_threads(ctx->backend_cpu, ctx->n_threads);
+    core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->n_threads);
     // GPU default. Validated verbatim on M1 Metal (en jfk + de De-Abwasch,
     // 2026-06-29): ~5.6x faster prefill, ~neutral per-token decode (single-token
     // decode is bandwidth/dispatch-bound on unified memory), ~1.7x faster overall

@@ -73,6 +73,7 @@
 
 #ifndef _WIN32
 #include <unistd.h>
+#include "core/ggml_cpu_backend.h"
 #endif
 
 namespace {
@@ -1053,13 +1054,13 @@ extern "C" struct cosyvoice3_tts_context* cosyvoice3_tts_init_from_file(const ch
     gguf_free(gctx);
 
     // ---- Backend init ----
-    ctx->backend_cpu = ggml_backend_cpu_init();
+    ctx->backend_cpu = core_cpu_backend::init();
     if (!ctx->backend_cpu) {
         fprintf(stderr, "cosyvoice3_tts: failed to init CPU backend\n");
         delete ctx;
         return nullptr;
     }
-    ggml_backend_cpu_set_n_threads(ctx->backend_cpu, ctx->n_threads);
+    core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->n_threads);
     // The original diff-validation implementation pinned every CosyVoice3
     // stage to CPU even when the caller requested GPU execution.  Besides the
     // AR LLM, the flow estimator runs 22 transformer blocks twice for every
@@ -1097,11 +1098,11 @@ extern "C" struct cosyvoice3_tts_context* cosyvoice3_tts_init_from_file(const ch
             ctx->backend = ctx->backend_cpu;
         }
     }
-    if (ggml_backend_is_cpu(ctx->backend)) {
-        ggml_backend_cpu_set_n_threads(ctx->backend, ctx->n_threads);
+    if (core_cpu_backend::is_cpu(ctx->backend)) {
+        core_cpu_backend::set_n_threads(ctx->backend, ctx->n_threads);
     }
     if (params.verbosity >= 1) {
-        fprintf(stderr, "cosyvoice3_tts: using %s backend: %s\n", ggml_backend_is_cpu(ctx->backend) ? "CPU" : "GPU",
+        fprintf(stderr, "cosyvoice3_tts: using %s backend: %s\n", core_cpu_backend::is_cpu(ctx->backend) ? "CPU" : "GPU",
                 ggml_backend_name(ctx->backend));
     }
 
@@ -1283,7 +1284,7 @@ extern "C" void cosyvoice3_tts_set_n_threads(struct cosyvoice3_tts_context* ctx,
         return;
     ctx->n_threads = n_threads > 0 ? n_threads : 4;
     if (ctx->backend_cpu)
-        ggml_backend_cpu_set_n_threads(ctx->backend_cpu, ctx->n_threads);
+        core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->n_threads);
 }
 
 extern "C" void cosyvoice3_tts_set_seed(struct cosyvoice3_tts_context* ctx, uint64_t seed) {
@@ -5380,7 +5381,7 @@ bool cv3_load_voice_bundle_from_file(const char* path, std::vector<cv3_voice>& v
     }
     gguf_free(gctx);
 
-    ggml_backend_t backend = ggml_backend_cpu_init();
+    ggml_backend_t backend = core_cpu_backend::init();
     if (!backend)
         return false;
     core_gguf::WeightLoad wl;

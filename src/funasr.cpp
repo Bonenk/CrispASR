@@ -36,6 +36,7 @@
 #include <unordered_map>
 #include <vector>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -441,7 +442,7 @@ static bool funasr_load_model(funasr_model& model, funasr_vocab& vocab, const ch
         const char* s = crispasr_env::get("CRISPASR_FUNASR_LLM_CPU");
         return s && *s && *s != '0';
     }();
-    if (!ggml_backend_is_cpu(backend) && cpu_backend && force_llm_cpu) {
+    if (!core_cpu_backend::is_cpu(backend) && cpu_backend && force_llm_cpu) {
         auto is_gpu = [](const char* name, void*) -> bool { return std::strncmp(name, "funasr.", 7) == 0; };
         if (!core_gguf::load_weights_split(path, backend, cpu_backend, is_gpu, nullptr, "funasr", wl))
             return false;
@@ -2081,14 +2082,14 @@ extern "C" funasr_context* funasr_init_from_file(const char* path, funasr_contex
     ctx->params = params;
     ctx->n_threads = params.n_threads > 0 ? params.n_threads : 4;
 
-    ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : ggml_backend_cpu_init();
+    ctx->backend = params.use_gpu ? crispasr_init_gpu_backend() : core_cpu_backend::init();
     if (!ctx->backend)
-        ctx->backend = ggml_backend_cpu_init();
-    ctx->backend_cpu = ggml_backend_cpu_init();
+        ctx->backend = core_cpu_backend::init();
+    ctx->backend_cpu = core_cpu_backend::init();
     if (ctx->backend_cpu)
-        ggml_backend_cpu_set_n_threads(ctx->backend_cpu, ctx->n_threads);
-    if (ggml_backend_is_cpu(ctx->backend))
-        ggml_backend_cpu_set_n_threads(ctx->backend, ctx->n_threads);
+        core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->n_threads);
+    if (core_cpu_backend::is_cpu(ctx->backend))
+        core_cpu_backend::set_n_threads(ctx->backend, ctx->n_threads);
 
     if (!funasr_load_model(ctx->model, ctx->vocab, path, ctx->backend, ctx->backend_cpu)) {
         delete ctx;

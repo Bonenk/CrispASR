@@ -519,6 +519,7 @@ static void canary_fft_r2c(const float* in, int N, float* out) {
 // the FFT function pointer differs between parakeet/canary/canary_ctc/cohere.
 #include "core/mel.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
+#include "core/ggml_cpu_backend.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -1213,11 +1214,11 @@ static ggml_backend_t pick_backend() {
     // that initialises. This replaces the old Metal/CUDA-specific
     // #ifdef chain and adds Vulkan support for free.
     ggml_backend_t b = crispasr_init_gpu_backend();
-    return b ? b : ggml_backend_cpu_init();
+    return b ? b : core_cpu_backend::init();
 }
 
 static ggml_backend_t pick_backend(bool use_gpu) {
-    return use_gpu ? pick_backend() : ggml_backend_cpu_init();
+    return use_gpu ? pick_backend() : core_cpu_backend::init();
 }
 
 // ===========================================================================
@@ -1367,7 +1368,7 @@ extern "C" struct canary_context* canary_init_from_file(const char* path_model, 
     ctx->n_threads = params.n_threads > 0 ? params.n_threads : 4;
 
     ctx->backend = pick_backend(params.use_gpu);
-    ctx->backend_cpu = ggml_backend_cpu_init();
+    ctx->backend_cpu = core_cpu_backend::init();
     if (!ctx->backend)
         ctx->backend = ctx->backend_cpu;
 

@@ -41,6 +41,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 // ===========================================================================
 // Bench instrumentation — `VIBEVOICE_BENCH=1` for per-stage timings.
@@ -316,15 +317,15 @@ extern "C" struct vibevoice_context* vibevoice_init_from_file(const char* path_m
     // Backend selection: GPU first, CPU fallback. The scheduler requires
     // a CPU backend to be present as the final backend when the primary
     // backend is Metal/CUDA/Vulkan.
-    ctx->backend = hp.d_lm > 0 ? (params.use_gpu ? crispasr_init_gpu_backend() : ggml_backend_cpu_init())
-                               : ggml_backend_cpu_init();
+    ctx->backend = hp.d_lm > 0 ? (params.use_gpu ? crispasr_init_gpu_backend() : core_cpu_backend::init())
+                               : core_cpu_backend::init();
     if (!ctx->backend)
-        ctx->backend = ggml_backend_cpu_init();
-    ctx->backend_cpu = ggml_backend_cpu_init();
+        ctx->backend = core_cpu_backend::init();
+    ctx->backend_cpu = core_cpu_backend::init();
     if (ctx->backend_cpu)
-        ggml_backend_cpu_set_n_threads(ctx->backend_cpu, params.n_threads > 0 ? params.n_threads : 4);
-    if (ctx->backend && ggml_backend_is_cpu(ctx->backend))
-        ggml_backend_cpu_set_n_threads(ctx->backend, params.n_threads > 0 ? params.n_threads : 4);
+        core_cpu_backend::set_n_threads(ctx->backend_cpu, params.n_threads > 0 ? params.n_threads : 4);
+    if (ctx->backend && core_cpu_backend::is_cpu(ctx->backend))
+        core_cpu_backend::set_n_threads(ctx->backend, params.n_threads > 0 ? params.n_threads : 4);
     if (!ctx->backend) {
         delete ctx;
         return nullptr;
@@ -954,7 +955,7 @@ static std::vector<float> run_token_embedding_lookup(vibevoice_context* ctx, con
             // Pin to the weight's backend: host-resident weight + GPU main
             // backend would otherwise hit the no-auto-copy sched rule.
             e1.be = (it->second->buffer && ggml_backend_buffer_is_host(it->second->buffer) &&
-                     !ggml_backend_is_cpu(ctx->backend))
+                     !core_cpu_backend::is_cpu(ctx->backend))
                         ? ctx->backend_cpu
                         : ctx->backend;
             size_t mem1 = 16 * ggml_tensor_overhead() + ggml_graph_overhead();
