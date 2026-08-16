@@ -2941,6 +2941,33 @@ class Session:
             self._lib.crispasr_session_translate_text_free(text_out)
         return arr, transcript
 
+    def input_sample_rate(self) -> int:
+        """Sample rate this backend expects for input PCM, in Hz.
+
+        :meth:`speech_to_speech` and the other PCM entry points want audio at
+        the backend's native rate, and it varies by backend — so telling
+        callers to resample to it, without giving them a way to ask what it
+        is, is not actionable (issue #321).
+        """
+        if not hasattr(self._lib, "crispasr_session_input_sample_rate"):
+            raise RuntimeError("input_sample_rate not present in this libcrispasr build")
+        self._lib.crispasr_session_input_sample_rate.argtypes = [ctypes.c_void_p]
+        self._lib.crispasr_session_input_sample_rate.restype = ctypes.c_int
+        return int(self._lib.crispasr_session_input_sample_rate(self._handle))
+
+    def output_sample_rate(self) -> int:
+        """Sample rate of PCM this backend returns, in Hz.
+
+        The counterpart to :meth:`input_sample_rate`: what
+        :meth:`speech_to_speech` and :meth:`synthesize` hand back. 24 kHz for
+        conversational S2S, 48 kHz for Sidon and VoxCPM2 AudioVAE.
+        """
+        if not hasattr(self._lib, "crispasr_session_output_sample_rate"):
+            raise RuntimeError("output_sample_rate not present in this libcrispasr build")
+        self._lib.crispasr_session_output_sample_rate.argtypes = [ctypes.c_void_p]
+        self._lib.crispasr_session_output_sample_rate.restype = ctypes.c_int
+        return int(self._lib.crispasr_session_output_sample_rate(self._handle))
+
     def close(self) -> None:
         if getattr(self, "_handle", None):
             self._lib.crispasr_session_close(self._handle)

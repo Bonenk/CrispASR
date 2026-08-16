@@ -4660,6 +4660,40 @@ class CrispasrSession {
     return fn(_handle);
   }
 
+  /// Sample rate (Hz) this backend expects for input PCM.
+  ///
+  /// [speechToSpeech] and the other PCM entry points want audio at the
+  /// backend's native rate, and it varies by backend — so telling callers to
+  /// resample without giving them a way to ask the rate is not actionable
+  /// (issue #321).
+  ///
+  /// Returns 0 on a dylib that predates the symbol, matching
+  /// [separateSampleRate]: a capability probe that never throws.
+  int get inputSampleRate {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_input_sample_rate')) {
+      return 0;
+    }
+    final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>),
+        int Function(Pointer<Void>)>('crispasr_session_input_sample_rate');
+    return fn(_handle);
+  }
+
+  /// Sample rate (Hz) of PCM this backend returns — what [speechToSpeech]
+  /// and [synthesize] hand back. 24 kHz for conversational S2S, 48 kHz for
+  /// Sidon and VoxCPM2 AudioVAE.
+  ///
+  /// Returns 0 on a dylib that predates the symbol.
+  int get outputSampleRate {
+    if (_closed) throw StateError('CrispasrSession is closed');
+    if (!_lib.providesSymbol('crispasr_session_output_sample_rate')) {
+      return 0;
+    }
+    final fn = _lib.lookupFunction<Int32 Function(Pointer<Void>),
+        int Function(Pointer<Void>)>('crispasr_session_output_sample_rate');
+    return fn(_handle);
+  }
+
   /// Set hotwords for contextual biasing.
   ///
   /// [hotwords] is a comma-separated list of words/phrases. For CTC/TDT
