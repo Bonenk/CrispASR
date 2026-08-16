@@ -51,10 +51,10 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 #ifdef __APPLE__
 #include <Accelerate/Accelerate.h> // vDSP_conv, vvsinf, vDSP_vsq — Step C-1
-#include "core/ggml_cpu_backend.h"
 #endif
 
 // ===========================================================================

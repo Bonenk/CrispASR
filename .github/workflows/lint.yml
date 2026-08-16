@@ -74,6 +74,8 @@ on:
       - 'tools/check-chat-binding-coverage.py'
       - 'tools/check-doc-anchors.py'
       - 'tools/check-cuda-split-packaging.py'
+      - 'tools/check-cpu-backend-include.py'
+      - 'src/core/ggml_cpu_backend.h'
       - 'docs/**.md'
   pull_request:
     branches: [main, master]
@@ -108,6 +110,8 @@ on:
       - 'tools/check-chat-binding-coverage.py'
       - 'tools/check-doc-anchors.py'
       - 'tools/check-cuda-split-packaging.py'
+      - 'tools/check-cpu-backend-include.py'
+      - 'src/core/ggml_cpu_backend.h'
       - 'docs/**.md'
       - '.github/workflows/**'
       - 'tools/check-workflow-run-blocks.py'
@@ -324,6 +328,28 @@ jobs:
           python-version: '3.11'
       - name: Every in-repo #fragment points at a real heading
         run: python tools/check-doc-anchors.py
+
+  # A mechanical rewrite put `#include "core/ggml_cpu_backend.h"` after the
+  # first include already in each file, which in seven of them was inside a
+  # conditional — `#ifndef _WIN32`, `#ifdef __APPLE__`, `HAVE_ACCELERATE`. Every
+  # use of the namespace is at top level, so it compiled on macOS (where all of
+  # those hold) and failed on Windows. No local build can catch that: the guards
+  # hiding it are the ones satisfied on the machine doing the building. This
+  # reads the conditional nesting instead of evaluating it, so one run covers
+  # every platform.
+  cpu-backend-include:
+    name: core_cpu_backend header reachable everywhere
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      # Quoted: the '::' followed by a space would otherwise read as a nested
+      # YAML mapping and the whole workflow stops parsing.
+      - name: 'Every core_cpu_backend:: user includes the header unconditionally'
+        run: python tools/check-cpu-backend-include.py
 
   # #342 asks for the three Windows CUDA runtime DLLs as separate downloads, so
   # a release that only changed CrispASR does not force everyone to re-fetch

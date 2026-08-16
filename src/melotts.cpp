@@ -40,10 +40,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 #if defined(HAVE_ACCELERATE)
 #include <Accelerate/Accelerate.h>
-#include "core/ggml_cpu_backend.h"
 static bool melotts_use_scalar() {
     static int v = -1;
     if (v < 0)

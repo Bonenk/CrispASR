@@ -61,6 +61,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "core/ggml_cpu_backend.h"
 
 #ifdef CRISPASR_HAVE_ESPEAK_NG
 #include <espeak-ng/speak_lib.h>
@@ -3024,7 +3025,6 @@ std::string g_espeak_voice;
 // ---------------------------------------------------------------------------
 #ifndef _WIN32
 #include <dlfcn.h>
-#include "core/ggml_cpu_backend.h"
 #endif
 
 static std::mutex g_mecab_mu;

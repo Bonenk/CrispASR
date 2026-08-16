@@ -18,6 +18,13 @@
 #include <map>
 #include <mutex>
 
+// core_cpu_backend:: is used unconditionally below (the zero-copy CPU mmap
+// path), so this include must NOT sit in the POSIX arm of the block that
+// follows — it did, and Windows built without it. MSVC caught that;
+// Clang and GCC did not, because they happened to reach the header
+// transitively.
+#include "core/ggml_cpu_backend.h"
+
 #if defined(_WIN32)
 #include <io.h>
 #ifndef NOMINMAX
@@ -29,7 +36,6 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include "core/ggml_cpu_backend.h"
 #endif
 
 namespace core_gguf {
