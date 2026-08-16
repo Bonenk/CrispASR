@@ -3761,6 +3761,24 @@ catch_discover_tests(test_tts_provenance
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-glint-simd-detect — regression guard for #327 ─────────────────────
+# glint/src/simd.hpp is included first in that TU on purpose, so it must be
+# self-sufficient; on MSVC that reproduces #327 (missing <intrin.h> for
+# __cpuidex) as a compile error rather than as luck. Needs glint/src on the
+# include path because simd.hpp is an internal header, not a public one.
+add_executable(test-glint-simd-detect test-glint-simd-detect.cpp)
+target_include_directories(test-glint-simd-detect PRIVATE
+    ${PROJECT_SOURCE_DIR}/glint/src
+    ${PROJECT_SOURCE_DIR}/glint/include
+)
+target_link_libraries(test-glint-simd-detect PRIVATE
+    Catch2::Catch2WithMain
+)
+catch_discover_tests(test-glint-simd-detect
+    TEST_SPEC "[simd]"
+    PROPERTIES LABELS "unit"
+)
+
 # ─── test_audioseal — Catch2 unit tests for AudioSeal ggml watermark.
 #API surface tests run unconditionally. Live model tests require
 #AUDIOSEAL_GGUF env var pointing at an audioseal.gguf.
