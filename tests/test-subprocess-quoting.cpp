@@ -8,11 +8,17 @@
 // spawning through CreateProcessA with MSVC quoting.
 //
 // The reason it shipped is the interesting part, and it is what this file is
-// for. The two quoters lived in the arms of an `#ifdef _WIN32`, so the Windows
-// rules were never compiled on Linux or macOS — the maintainer has no Windows
-// machine, and the only hosts that could exercise that code were the ones
-// already broken by it. Correctness was unobservable everywhere it was
-// developed.
+// for. Note what was NOT the reason: ci.yml's `windows` job builds
+// crispasr-cli, which pulls in crispasr_diarize_cli.cpp and therefore this
+// header, so the Windows quoter did compile on every push. It compiled green
+// while emitting command lines cmd.exe could not parse.
+//
+// Nothing ever ran it. That job's ctest is filtered to
+// `speaker|cluster|centroid|whisper_params`, and there was no test of the
+// quoting anywhere at all. Meanwhile the `#ifdef _WIN32` kept the Windows rules
+// from even compiling on Linux or macOS, so the developer machines could not
+// have caught it either. A compile proves the syntax; only a parse proves the
+// argument survives.
 //
 // Both quoters are now compiled unconditionally, which makes them ordinary pure
 // functions. These cases round-trip them against reference *parsers* — an
