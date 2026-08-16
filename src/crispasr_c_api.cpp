@@ -1618,6 +1618,11 @@ struct crispasr_session {
     // one. Only effective when temperature > 0. Default 1 (no resampling).
     int best_of = 1;
     int max_new_tokens = 0;
+    // #360: floor on generated audio length for the MOSS TTS backends, applied
+    // at the synth-params site the way `language` is. -1 = leave the model's
+    // own default (0 = no floor). Not a runtime setter because moss exposes
+    // none; the CLI does the same thing with params.tts_min_speech_tokens.
+    int tts_min_speech_tokens = -1;
     float frequency_penalty = 0.0f;
     float temperature = 0.0f; // 0 = greedy / backend default
     uint64_t seed = 0;        // 0 = time-based
@@ -8650,6 +8655,8 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
 #ifdef CA_HAVE_MOSS_TTS
     if (s->moss_tts_ctx) {
         moss_tts_synth_params p = moss_tts_synth_default_params();
+        if (s->tts_min_speech_tokens >= 0)
+            p.min_audio_frames = s->tts_min_speech_tokens;
         const std::string tts_lang = !s->target_language.empty() ? s->target_language : s->source_language;
         std::string lang_en;
         if (!tts_lang.empty() && tts_lang != "auto") {
@@ -8676,6 +8683,8 @@ static float* crispasr_session_synthesize_raw_impl(crispasr_session* s, const ch
 #ifdef CA_HAVE_MOSS_TTS_LOCAL
     if (s->moss_tts_local_ctx) {
         moss_tts_local_synth_params p = moss_tts_local_synth_default_params();
+        if (s->tts_min_speech_tokens >= 0)
+            p.min_audio_frames = s->tts_min_speech_tokens;
         const std::string tts_lang = !s->target_language.empty() ? s->target_language : s->source_language;
         std::string lang_en;
         if (!tts_lang.empty() && tts_lang != "auto") {
@@ -11402,6 +11411,40 @@ CA_EXPORT int crispasr_session_set_max_speech_tokens(crispasr_session* s, int n)
 #ifdef CA_HAVE_CHATTERBOX
     if (s->chatterbox_ctx) {
         chatterbox_set_max_speech_tokens((chatterbox_context*)s->chatterbox_ctx, n);
+        touched++;
+    }
+#endif
+    return touched > 0 ? 0 : -2;
+}
+
+// Issue #360: floor on generated audio length, the counterpart to
+// set_max_speech_tokens. Reachable from the CLI (--tts-min-speech-tokens) and
+// from /v1/audio/speech ("min_speech_tokens") since they landed, but never
+// from the session ABI — so every binding was missing it while its `max`
+// sibling was present, which is what the reporter noticed.
+//
+// UNITS: the backend's own AR decode step, NOT samples and NOT milliseconds.
+// For the MOSS TTS backends that is one audio-codec frame, and the shipped
+// models run the codec at sampling_rate / downsample_rate = 24000 / 1920 =
+// 12.5 Hz, so one frame is 80 ms and n = 25 is a 2 s floor. Implemented by
+// masking the audio-delay/end token until n frames have been emitted, so it
+// bounds the DECODE, not the returned buffer.
+//
+// Returns -2 when the loaded backend has no such knob, like every other
+// optional setter here.
+CA_EXPORT int crispasr_session_set_min_speech_tokens(crispasr_session* s, int n) {
+    if (!s)
+        return -1;
+    int touched = 0;
+#ifdef CA_HAVE_MOSS_TTS
+    if (s->moss_tts_ctx) {
+        s->tts_min_speech_tokens = n;
+        touched++;
+    }
+#endif
+#ifdef CA_HAVE_MOSS_TTS_LOCAL
+    if (s->moss_tts_local_ctx) {
+        s->tts_min_speech_tokens = n;
         touched++;
     }
 #endif

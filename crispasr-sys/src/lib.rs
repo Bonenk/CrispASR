@@ -686,6 +686,7 @@ extern "C" {
         exaggeration: c_float,
     ) -> c_int;
     pub fn crispasr_session_set_max_speech_tokens(s: *mut CrispasrSession, n: c_int) -> c_int;
+    pub fn crispasr_session_set_min_speech_tokens(s: *mut CrispasrSession, n: c_int) -> c_int;
     pub fn crispasr_session_set_length_scale(s: *mut CrispasrSession, scale: c_float) -> c_int;
     pub fn crispasr_session_set_best_of(s: *mut CrispasrSession, n: c_int) -> c_int;
     pub fn crispasr_session_set_beam_size(s: *mut CrispasrSession, n: c_int) -> c_int;

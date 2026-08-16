@@ -49,6 +49,7 @@ int              crispasr_session_set_cfg_weight(CrispasrSession* s, float cfg_w
 int              crispasr_session_set_tts_noise_temp(CrispasrSession* s, float noise_temp);
 int              crispasr_session_set_exaggeration(CrispasrSession* s, float exaggeration);
 int              crispasr_session_set_max_speech_tokens(CrispasrSession* s, int n);
+int              crispasr_session_set_min_speech_tokens(CrispasrSession* s, int n);
 int              crispasr_session_set_length_scale(CrispasrSession* s, float scale);
 int              crispasr_session_set_g2p_dict(CrispasrSession* s, const char* source);
 int              crispasr_session_set_best_of(CrispasrSession* s, int n);
@@ -671,6 +672,15 @@ func (s *CrispasrSession) SetMaxSpeechTokens(n int) error {
 	rc := C.crispasr_session_set_max_speech_tokens(s.handle, C.int(n))
 	if rc != 0 && rc != -2 {
 		return errors.New("crispasr_session_set_max_speech_tokens failed")
+	}
+	return nil
+}
+
+// SetMinSpeechTokens sets the floor on generated audio length (MOSS TTS). Units are codec frames at 12.5 Hz (80 ms each), so n=25 floors at ~2 s; other backends no-op (rc=-2).
+func (s *CrispasrSession) SetMinSpeechTokens(n int) error {
+	rc := C.crispasr_session_set_min_speech_tokens(s.handle, C.int(n))
+	if rc != 0 && rc != -2 {
+		return errors.New("crispasr_session_set_min_speech_tokens failed")
 	}
 	return nil
 }

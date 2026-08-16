@@ -1445,6 +1445,15 @@ impl Session {
         Ok(())
     }
 
+    /// Set the floor on generated audio length (MOSS TTS). Units are codec frames at 12.5 Hz (80 ms each), so n=25 floors at ~2 s; other backends no-op (rc=-2).
+    pub fn set_min_speech_tokens(&self, n: i32) -> Result<(), String> {
+        let rc = unsafe { crispasr_sys::crispasr_session_set_min_speech_tokens(self.handle, n) };
+        if rc != 0 && rc != -2 {
+            return Err(format!("set_min_speech_tokens failed (rc={})", rc));
+        }
+        Ok(())
+    }
+
     /// Set the per-phoneme length-scale / speaking-rate scalar. Honoured by
     /// kokoro today; other backends silently no-op. 1.0 = upstream default.
     pub fn set_length_scale(&self, scale: f32) -> Result<(), String> {

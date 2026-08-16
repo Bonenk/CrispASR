@@ -2301,6 +2301,16 @@ class Session:
         if rc != 0 and rc != -2:
             raise RuntimeError(f"set_max_speech_tokens failed (rc={rc})")
 
+    def set_min_speech_tokens(self, n: int) -> None:
+        """Set the floor on generated audio length (MOSS TTS). Units are codec frames at 12.5 Hz (80 ms each), so n=25 floors at ~2 s; other backends no-op (rc=-2)."""
+        if not hasattr(self._lib, "crispasr_session_set_min_speech_tokens"):
+            return
+        self._lib.crispasr_session_set_min_speech_tokens.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        self._lib.crispasr_session_set_min_speech_tokens.restype = ctypes.c_int
+        rc = self._lib.crispasr_session_set_min_speech_tokens(self._handle, int(n))
+        if rc != 0 and rc != -2:
+            raise RuntimeError(f"set_min_speech_tokens failed (rc={rc})")
+
     def set_length_scale(self, scale: float) -> None:
         """Set the per-phoneme length-scale / speaking-rate scalar. Honoured by kokoro."""
         if not hasattr(self._lib, "crispasr_session_set_length_scale"):
