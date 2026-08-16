@@ -257,6 +257,14 @@ pub struct CtcLogits {
 }
 
 /// A loaded session over a CrispASR model of any backend.
+/// One stem from [`Session::separate`]: its name (`vocals`, `drums`, …) and
+/// its interleaved-stereo PCM at [`Session::separate_sample_rate`].
+#[derive(Debug, Clone)]
+pub struct Stem {
+    pub name: String,
+    pub pcm: Vec<f32>,
+}
+
 pub struct Session {
     handle: *mut crispasr_sys::CrispasrSession,
     n_threads: c_int,
@@ -933,7 +941,9 @@ impl Session {
                 unsafe { crispasr_sys::crispasr_session_translate_text_free(text_ptr) };
             }
             return Err(format!(
-                "speech_to_speech returned no audio for backend {:?} (S2S may be unsupported)",
+                "speech_to_speech returned no audio for backend {:?} (S2S may be unsupported). \
+                 Separation models (htdemucs, mel-band-roformer) are not S2S — use \
+                 Session::separate() instead (#359).",
                 self.backend()
             ));
         }
@@ -949,6 +959,73 @@ impl Session {
             Some(s)
         };
         Ok((out, transcript))
+    }
+
+    /// Source separation: split stereo audio into its stems (#359).
+    ///
+    /// This is the verb for `htdemucs` and `mel-band-roformer`. They are NOT
+    /// speech-to-speech models, so [`Session::speech_to_speech`] returns no
+    /// audio for them — the C ABI has always had a separate five-function
+    /// surface for this, and it simply was not bound here.
+    ///
+    /// `pcm_stereo` is INTERLEAVED stereo at the model's own rate, which is
+    /// not 16 kHz: call [`Session::separate_sample_rate`] after loading (44100
+    /// for the shipped separation models). Each returned stem is interleaved
+    /// stereo of the same length.
+    ///
+    /// The C side owns the stem buffers only until the next call, so this
+    /// copies them out before returning.
+    pub fn separate(&self, pcm_stereo: &[f32]) -> Result<Vec<Stem>, String> {
+        // The C API counts PER-CHANNEL frames, not floats.
+        let n_frames = (pcm_stereo.len() / 2) as c_int;
+        if n_frames == 0 {
+            return Err("separate needs interleaved stereo PCM".to_string());
+        }
+        let n_stems = unsafe {
+            crispasr_sys::crispasr_session_separate(self.handle, pcm_stereo.as_ptr(), n_frames)
+        };
+        if n_stems <= 0 {
+            return Err(format!(
+                "separate returned no stems for backend {:?} (is it a separation model?)",
+                self.backend()
+            ));
+        }
+        let mut stems = Vec::with_capacity(n_stems as usize);
+        for i in 0..n_stems {
+            let name_ptr =
+                unsafe { crispasr_sys::crispasr_session_separate_stem_name(self.handle, i) };
+            let name = if name_ptr.is_null() {
+                format!("stem{}", i)
+            } else {
+                unsafe { CStr::from_ptr(name_ptr) }
+                    .to_string_lossy()
+                    .into_owned()
+            };
+            let mut n_out: c_int = 0;
+            let ptr = unsafe {
+                crispasr_sys::crispasr_session_separate_stem(
+                    self.handle,
+                    i,
+                    &mut n_out as *mut c_int,
+                )
+            };
+            if ptr.is_null() || n_out <= 0 {
+                return Err(format!("stem {} ({}) came back empty", i, name));
+            }
+            // n_out is per-channel; the buffer is interleaved stereo.
+            let pcm =
+                unsafe { std::slice::from_raw_parts(ptr, (n_out as usize) * 2).to_vec() };
+            stems.push(Stem { name, pcm });
+        }
+        Ok(stems)
+    }
+
+    /// Sample rate (Hz) of the stems from [`Session::separate`], and the rate
+    /// its input must be at. `0` before a separation backend is loaded — which
+    /// is what a caller sees if they reach for the ASR-side rate accessors on
+    /// a separation model.
+    pub fn separate_sample_rate(&self) -> i32 {
+        unsafe { crispasr_sys::crispasr_session_separate_sample_rate(self.handle) as i32 }
     }
 
     /// The sample rate (Hz) the backend expects for input PCM — `16000` for

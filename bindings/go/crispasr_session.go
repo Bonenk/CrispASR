@@ -32,6 +32,12 @@ int              crispasr_session_set_tts_reference_language(CrispasrSession* s,
 int              crispasr_session_set_punctuation(CrispasrSession* s, int enable);
 int              crispasr_session_set_punc_model(CrispasrSession* s, const char* punc_model);
 int              crispasr_session_set_hotwords(CrispasrSession* s, const char* hotwords, float boost);
+// Source separation (#359): stereo interleaved PCM in at the model's own rate.
+int              crispasr_session_separate(CrispasrSession* s, const float* pcm_stereo, int n_samples);
+int              crispasr_session_separate_n_stems(CrispasrSession* s);
+const char*      crispasr_session_separate_stem_name(CrispasrSession* s, int stem_idx);
+const float*     crispasr_session_separate_stem(CrispasrSession* s, int stem_idx, int* out_n_samples);
+int              crispasr_session_separate_sample_rate(CrispasrSession* s);
 int              crispasr_session_set_sensitivity(CrispasrSession* s, const char* preset);
 int              crispasr_session_set_translate(CrispasrSession* s, int enable);
 int              crispasr_session_set_temperature(CrispasrSession* s, float temperature, unsigned long long seed);
@@ -1175,7 +1181,8 @@ func (s *CrispasrSession) SpeechToSpeech(samples []float32) (*SpeechToSpeechResu
 		C.int(len(samples)),
 		&textOut, &nOut)
 	if ptr == nil || nOut <= 0 {
-		return nil, errors.New("crispasr_session_speech_to_speech: no audio produced")
+		return nil, errors.New("crispasr_session_speech_to_speech: no audio produced " +
+			"(separation models like htdemucs / mel-band-roformer are not S2S — use Separate() instead, #359)")
 	}
 	defer C.crispasr_pcm_free(ptr)
 	out := make([]float32, int(nOut))
@@ -1187,6 +1194,63 @@ func (s *CrispasrSession) SpeechToSpeech(samples []float32) (*SpeechToSpeechResu
 		C.crispasr_session_translate_text_free(textOut)
 	}
 	return &SpeechToSpeechResult{PCM: out, Transcript: transcript}, nil
+}
+
+// Stem is one separated source from Separate: its name ("vocals", "drums", …)
+// and interleaved-stereo PCM at SeparateSampleRate.
+type Stem struct {
+	Name string
+	PCM  []float32
+}
+
+// Separate splits stereo audio into its stems (#359).
+//
+// This is the verb for htdemucs and mel-band-roformer. They are not
+// speech-to-speech models, so SpeechToSpeech returns no audio for them — the C
+// ABI has always had a separate five-function surface, and it was not bound
+// here.
+//
+// pcmStereo is INTERLEAVED stereo at the model's own rate, which is not
+// 16 kHz: read SeparateSampleRate after loading (44100 for the shipped
+// separation models). Each stem comes back interleaved stereo. The C side owns
+// the stem buffers only until the next call, so they are copied out here.
+func (s *CrispasrSession) Separate(pcmStereo []float32) ([]Stem, error) {
+	if len(pcmStereo) < 2 {
+		return nil, errors.New("Separate: needs interleaved stereo PCM")
+	}
+	// The C API counts PER-CHANNEL frames, not floats.
+	nFrames := len(pcmStereo) / 2
+	nStems := C.crispasr_session_separate(
+		s.handle,
+		(*C.float)(unsafe.Pointer(&pcmStereo[0])),
+		C.int(nFrames))
+	if nStems <= 0 {
+		return nil, errors.New("crispasr_session_separate: no stems produced (is this a separation model?)")
+	}
+	stems := make([]Stem, 0, int(nStems))
+	for i := 0; i < int(nStems); i++ {
+		name := C.GoString(C.crispasr_session_separate_stem_name(s.handle, C.int(i)))
+		if name == "" {
+			name = fmt.Sprintf("stem%d", i)
+		}
+		var nOut C.int
+		ptr := C.crispasr_session_separate_stem(s.handle, C.int(i), &nOut)
+		if ptr == nil || nOut <= 0 {
+			return nil, fmt.Errorf("crispasr_session_separate: stem %d (%s) came back empty", i, name)
+		}
+		// nOut is per-channel; the buffer is interleaved stereo.
+		n := int(nOut) * 2
+		out := make([]float32, n)
+		copy(out, unsafe.Slice((*float32)(unsafe.Pointer(ptr)), n))
+		stems = append(stems, Stem{Name: name, PCM: out})
+	}
+	return stems, nil
+}
+
+// SeparateSampleRate is the rate (Hz) of the stems from Separate, and the rate
+// its input must be at. 0 before a separation backend is loaded.
+func (s *CrispasrSession) SeparateSampleRate() int {
+	return int(C.crispasr_session_separate_sample_rate(s.handle))
 }
 
 // KokoroResolved is the result of KokoroResolveForLang. Mirrors the

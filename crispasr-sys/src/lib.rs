@@ -552,6 +552,26 @@ extern "C" {
         out_text: *mut *mut c_char,
         out_n_samples: *mut c_int,
     ) -> *mut f32;
+    // Source separation (#359). Stereo interleaved PCM in at the model's own
+    // rate (44100 Hz for htdemucs / mel-band-roformer); returns the stem count.
+    // Stem buffers are owned by the session and valid only until the next
+    // separate() call or close, so a safe wrapper must copy them out.
+    pub fn crispasr_session_separate(
+        s: *mut CrispasrSession,
+        pcm_stereo: *const f32,
+        n_samples: c_int,
+    ) -> c_int;
+    pub fn crispasr_session_separate_n_stems(s: *mut CrispasrSession) -> c_int;
+    pub fn crispasr_session_separate_stem_name(
+        s: *mut CrispasrSession,
+        stem_idx: c_int,
+    ) -> *const c_char;
+    pub fn crispasr_session_separate_stem(
+        s: *mut CrispasrSession,
+        stem_idx: c_int,
+        out_n_samples: *mut c_int,
+    ) -> *const f32;
+    pub fn crispasr_session_separate_sample_rate(s: *mut CrispasrSession) -> c_int;
     // UNMARKED synthesis (no watermark/disclosure). Hard-refused unless
     // `crispasr_session_accept_marking_responsibility` was called first. Returns
     // malloc'd f32 PCM (free with `crispasr_pcm_free`); null on refusal/failure.
