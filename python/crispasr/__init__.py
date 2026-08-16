@@ -2,6 +2,9 @@
 
 from ._binding import (
     AlignedWord,
+    ChatAborted,
+    ChatMessage,
+    ChatSession,
     CrispASR,
     DiarizeMethod,
     DiarizeSegment,
@@ -38,6 +41,9 @@ from ._binding import (
 
 __all__ = [
     "AlignedWord",
+    "ChatAborted",
+    "ChatMessage",
+    "ChatSession",
     "CrispASR",
     "DiarizeMethod",
     "DiarizeSegment",
