@@ -6,6 +6,23 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## #355-#360 community issue sweep — 2026-08-16
+
+Five open issues worked end to end. #360 (`f57b65a2`): the TTS speech-token
+floor was reachable only from `/v1/audio/speech` — no CLI flag, no session ABI,
+no binding — while its `max` sibling was on all ten surfaces; now on all ten
+plus `--tts-min-speech-tokens`, with the units documented (MOSS codec frames at
+12.5 Hz) and confirmed live at 1.92 s → 4.08 s for floor=49. #359
+(`9831b40e`): source separation was bound in Python and Dart but not Rust or
+Go, so a Rust caller reaching for htdemucs found only `speech_to_speech`;
+`separate()` added to both, live on mel-band-roformer. #358: answered with
+measured concurrency (serialised, FIFO) and warm-server RTF 1.09. #355
+(`2eb54888`): confirmed against the shipped binary, documented the artifact
+matrix; the graceful-degradation fix needs `GGML_BACKEND_DL`, which is a
+406-site refactor across 104 files, so it stays open. #337: no AMD hardware, so
+bounded rather than fixed — the length trigger does not reproduce on Metal at
+T=419.
+
 ## #343 / #361 / #362 docs TOC and the chat ABI bindings — merged 2026-08-16
 
 Three community PRs. #343 (Juste-Leo2) adds a TOC and section links to
