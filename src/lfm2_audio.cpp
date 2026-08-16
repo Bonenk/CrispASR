@@ -1850,7 +1850,7 @@ static std::vector<int32_t> lfm2_depthformer_sample_frame(lfm2_audio_context* ct
 
     ggml_cgraph* gf0 = ggml_new_graph(ctx0);
     ggml_build_forward_expand(gf0, proj_out);
-    ggml_graph_compute_with_ctx(ctx0, gf0, ctx->n_threads);
+    core_cpu_backend::compute(ctx0, gf0, ctx->n_threads);
 
     // Extract projected values
     std::vector<float> proj_data(codebooks * depth_dim);
@@ -2052,7 +2052,7 @@ static std::vector<int32_t> lfm2_depthformer_sample_frame(lfm2_audio_context* ct
             if (vs)
                 ggml_build_forward_expand(gf, vs);
         }
-        ggml_graph_compute_with_ctx(sc, gf, ctx->n_threads);
+        core_cpu_backend::compute(sc, gf, ctx->n_threads);
 
         // Update KV cache from snapshots
         for (int il = 0; il < depth_n_layers; il++) {
@@ -2089,7 +2089,7 @@ static std::vector<int32_t> lfm2_depthformer_sample_frame(lfm2_audio_context* ct
             ggml_tensor* emb_out = ggml_dup(sc, emb);
             ggml_cgraph* gf2 = ggml_new_graph(sc);
             ggml_build_forward_expand(gf2, emb_out);
-            ggml_graph_compute_with_ctx(sc, gf2, 1);
+            core_cpu_backend::compute(sc, gf2, 1);
             memcpy(prev_emb.data(), emb_out->data, sizeof(float) * depth_dim);
         }
 
@@ -2288,7 +2288,7 @@ static float* lfm2_detokenize(lfm2_audio_context* ctx, const std::vector<std::ve
         ggml_tensor* o = ggml_dup(ec, rows);
         ggml_cgraph* g = ggml_new_graph(ec);
         ggml_build_forward_expand(g, o);
-        ggml_graph_compute_with_ctx(ec, g, 1);
+        core_cpu_backend::compute(ec, g, 1);
         const float* od = (const float*)o->data;
         for (int j = 0; j < h; j++) {
             float s = 0;
@@ -2379,7 +2379,7 @@ static float* lfm2_detokenize(lfm2_audio_context* ctx, const std::vector<std::ve
     ggml_tensor* out = ggml_dup(c0, lin);
     ggml_set_name(out, "do");
     ggml_build_forward_expand(gf, out);
-    ggml_graph_compute_with_ctx(c0, gf, ctx->n_threads);
+    core_cpu_backend::compute(c0, gf, ctx->n_threads);
 
     // 4. Split log_mag + angle → ISTFT → PCM
     const float* od = (const float*)out->data;

@@ -49,15 +49,14 @@ Verify what a given tarball actually requires before deploying it:
 readelf -d crispasr | grep NEEDED
 ```
 
-> **Why not make the GPU build degrade gracefully?** ggml supports it —
-> `GGML_BACKEND_DL=ON` builds each backend as a `dlopen`-ed module, so a missing
-> CUDA driver would leave the CUDA backend unregistered instead of killing the
-> process. It is not a packaging switch for this tree: the runtime calls
-> `ggml_backend_cpu_init` / `ggml_backend_is_cpu` / `ggml_backend_cpu_set_*`
-> directly at 406 sites across 104 files, every one of which has to move to the
-> backend registry first (with `GGML_BACKEND_DL` even the CPU backend is a
-> module), and every backend then needs revalidating on real CUDA, Vulkan, HIP
-> and Metal hardware. Tracked in #355.
+> **Can the GPU build degrade gracefully instead?** Yes, if you build it
+> yourself: `-DGGML_BACKEND_DL=ON -DBUILD_SHARED_LIBS=ON` makes each backend a
+> `dlopen`-ed module, so a missing CUDA driver leaves the CUDA backend
+> unregistered instead of killing the process. This works and is verified on
+> Metal and CPU — see [the #355 section](#graceful-degradation-via-ggml_backend_dl-355)
+> for the measured transcripts and the two throughput caveats. The prebuilt
+> tarballs below are still statically linked, because flipping the release leg
+> needs an A/B on real CUDA, HIP and Vulkan hardware first.
 
 ## Prerequisites
 
@@ -407,10 +406,13 @@ cross-compiler produces binaries linked against Android's bionic libc,
 suitable for embedding in Android apps via JNI. Termux uses its own
 linker and packages — use the native Termux build above instead.
 
-### Progress on the graceful-degradation fix (#355)
+### Graceful degradation via `GGML_BACKEND_DL` (#355)
 
-The groundwork for `GGML_BACKEND_DL` is in the tree; it is **not enabled**, and
-the default build is unchanged. Three things blocked it; two are now done:
+`-DGGML_BACKEND_DL=ON -DBUILD_SHARED_LIBS=ON` now **configures, links and runs**.
+It is opt-in: the default build is unchanged, and the release tarballs still ship
+statically linked (see "flipping the release leg" below).
+
+Three things blocked it, all now resolved:
 
 1. **CMake** — every per-model library linked `ggml-cuda` / `ggml-metal`
    explicitly (125 sites), and under DL those are `MODULE` targets that cannot
@@ -422,19 +424,48 @@ the default build is unchanged. Three things blocked it; two are now done:
    and `ggml_backend_cpu_set_threadpool` are not linkable. All 426 call sites go
    through `src/core/ggml_cpu_backend.h`, whose non-DL branch is the identical
    direct call. ✅
-3. **Direct CPU graph execution** — six symbols remain, across ~23 sites:
-   `ggml_graph_compute` (4), `ggml_graph_compute_with_ctx` (18),
-   `ggml_graph_plan`, `ggml_threadpool_new` / `_free`, and
-   `ggml_get_type_traits_cpu`. ❌
+3. **Direct CPU graph execution** — `ggml_graph_compute`,
+   `ggml_graph_compute_with_ctx`, `ggml_graph_plan`, `ggml_threadpool_new` /
+   `_free` and `ggml_get_type_traits_cpu`, across ~23 sites. These now go
+   through the same header, which under DL routes them to a `thread_local` CPU
+   backend obtained from the registry (`thread_local` because a ggml backend is
+   not safe for concurrent use and several of these sites run on worker
+   threads). ✅
 
-Step 3 is not mechanical. Replacing `ggml_graph_compute_with_ctx(ctx, gf, n)`
-with `ggml_backend_graph_compute()` moves where a graph executes and how its
-threads are managed, on 22 hot paths — precisely the kind of change this repo
-requires an A/B against real hardware for, on each of CUDA, HIP, Vulkan and
-Metal. Separately, ggml's CPU registry does not expose the threadpool setter
-through `get_proc_address` (only `set_n_threads`), so a DL build cannot install
-the shared worker pool at all without a fork patch.
+`tests/test-cpu-backend-shim.cpp` is the equivalence gate: the same 7 cases
+compile unchanged in both modes and assert arithmetic, not just return codes.
+Both report *27 assertions in 7 test cases*.
 
-So: a DL build now configures and compiles everything except those six symbols.
-Finishing it needs hardware access for the per-backend A/B, and flipping the
-`-cuda` release leg to `BUILD_SHARED_LIBS=ON` after that.
+Measured on an M1 with `parakeet-tdt-0.6b-v3-q4_k` + Silero VAD over a 300 s
+FLEURS clip, all four runs producing 608 words:
+
+| build | device | transcript |
+| --- | --- | --- |
+| default | Metal | **X** |
+| DL, `libggml-metal.so` present | Metal | **X** — byte-identical |
+| default, `-ng` | CPU | **Y** |
+| DL, `libggml-metal.so` removed | CPU | **Y** — byte-identical |
+
+X and Y differ in two tokens. That is the ordinary CPU-vs-Metal reduction-order
+divergence — it is present in the default build too, which is exactly what the
+`-ng` row is there to show. DL itself changes nothing.
+
+Removing the module is the #355 scenario in miniature: the process does not die,
+it logs `load_backend: loaded CPU backend` and transcribes.
+
+**Two limitations keep this opt-in rather than default.** ggml's CPU registry
+does not expose the threadpool setter through `get_proc_address` (only
+`set_n_threads` — see `ggml_backend_cpu_get_proc_address`), so a DL build cannot
+install the shared worker pool and falls back to ggml's own per-call threading.
+For the same reason `ggml_graph_plan` has no DL equivalent, so the hot paths
+that size a work buffer once and reuse it across frames re-plan per call
+instead. Neither is a correctness issue and neither has been measured; both are
+throughput risks on the per-frame VAD and wav2vec2 paths.
+
+`tests/test_ggml_audio_ops_*` are not built under DL. They call
+`ggml_backend_metal_init()` by symbol on purpose — naming one exact backend with
+no scheduler fallback is the point of those tests — and routing them through the
+registry would pick "best available" instead.
+
+Flipping the `-cuda` release leg to `BUILD_SHARED_LIBS=ON` still needs an A/B on
+real CUDA, HIP and Vulkan hardware; only Metal and CPU are verified above.

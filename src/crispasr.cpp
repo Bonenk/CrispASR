@@ -227,10 +227,9 @@ static void whisper_ensure_cpu_threadpool(ggml_backend_sched_t sched, int n_thre
         // (Re)create with the requested size.
         if (entry.pool) {
             core_cpu_backend::set_threadpool(backend, nullptr);
-            ggml_threadpool_free(entry.pool);
+            core_cpu_backend::threadpool_free(entry.pool);
         }
-        struct ggml_threadpool_params tpp = ggml_threadpool_params_default(n_threads);
-        entry.pool = ggml_threadpool_new(&tpp);
+        entry.pool = core_cpu_backend::threadpool_new(n_threads);
         entry.n_threads = entry.pool ? n_threads : 0;
         if (entry.pool) {
             core_cpu_backend::set_threadpool(backend, entry.pool);
@@ -249,7 +248,7 @@ static void whisper_release_cpu_threadpool(ggml_backend_t backend) {
         return;
     if (it->second.pool) {
         core_cpu_backend::set_threadpool(backend, nullptr);
-        ggml_threadpool_free(it->second.pool);
+        core_cpu_backend::threadpool_free(it->second.pool);
     }
     g_cpu_pools.erase(it);
 }
@@ -5270,10 +5269,7 @@ static bool whisper_vad_init_context(whisper_vad_context* vctx) {
     // This avoids creating/destroying a disposable threadpool on every
     // chunk (~250 per 8 s audio).  After many server requests the
     // accumulated malloc/free fragmentation degrades performance (#132).
-    {
-        struct ggml_threadpool_params tpp = ggml_threadpool_params_default(1);
-        vctx->threadpool = ggml_threadpool_new(&tpp);
-    }
+    { vctx->threadpool = core_cpu_backend::threadpool_new(1); }
 
     return true;
 }
@@ -5675,7 +5671,7 @@ bool whisper_vad_detect_speech(struct whisper_vad_context* vctx, const float* sa
     // ggml_graph_compute directly per chunk.  This bypasses the scheduler
     // overhead and all threadpool creation entirely.
 
-    struct ggml_cplan cplan = ggml_graph_plan(gf, /*n_threads=*/1, vctx->threadpool);
+    struct ggml_cplan cplan = core_cpu_backend::plan(gf, /*n_threads=*/1, vctx->threadpool);
 
     // Persistent work buffer — reused across calls via vctx member.
     if (vctx->work_buf.size() < cplan.work_size) {
@@ -5705,7 +5701,7 @@ bool whisper_vad_detect_speech(struct whisper_vad_context* vctx, const float* sa
         ggml_backend_tensor_set(frame, window.data(), 0, ggml_nelements(frame) * sizeof(float));
 
         // Direct graph compute — no scheduler, no threadpool churn.
-        if (ggml_graph_compute(gf, &cplan) != GGML_STATUS_SUCCESS) {
+        if (core_cpu_backend::compute_planned(gf, &cplan, 1) != GGML_STATUS_SUCCESS) {
             CRISPASR_LOG_ERROR("%s: failed to compute VAD graph\n", __func__);
             break;
         }
@@ -6008,7 +6004,7 @@ void whisper_vad_free(whisper_vad_context* ctx) {
         }
 
         if (ctx->threadpool) {
-            ggml_threadpool_free(ctx->threadpool);
+            core_cpu_backend::threadpool_free(ctx->threadpool);
         }
 
         delete[] ctx->model.hparams.encoder_in_channels;
