@@ -3761,6 +3761,21 @@ catch_discover_tests(test_tts_provenance
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-align-stdin — #317 `--align-only --text-file -` ───────────────────
+# Live: needs a CTC aligner GGUF and a speech clip, so it SKIPs (77) without
+# them. Asserts stdin is a transport and not a separate feature — piping a
+# transcript must give byte-identical output to passing the same bytes as a
+# file, including SRT re-timing where the file path reads the .srt extension and
+# stdin has to sniff the content instead.
+add_test(NAME test-align-stdin
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test-align-stdin.sh
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
+set_tests_properties(test-align-stdin PROPERTIES
+    ENVIRONMENT "CRISPASR_BIN=$<TARGET_FILE:crispasr-cli>"
+    LABELS "live;align;issue-317"
+    TIMEOUT 600
+    SKIP_RETURN_CODE 77)
+
 # ─── test-embed-parallel — #326 cross-segment embedding ─────────────────────
 # The embedder now runs segments across workers. The risk is ORDER, not speed:
 # embeddings feed a clusterer positionally, so a worker appending out of order

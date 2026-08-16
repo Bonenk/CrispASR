@@ -2570,25 +2570,51 @@ int crispasr_run_backend(const whisper_params& params_in) {
             return s;
         };
         if (!params.text_file.empty()) {
-            FILE* tf = fopen(params.text_file.c_str(), "rb");
-            if (!tf) {
-                fprintf(stderr, "crispasr[align-only]: cannot open text file '%s'\n", params.text_file.c_str());
-                return 10;
-            }
-            fseek(tf, 0, SEEK_END);
-            long sz = ftell(tf);
-            fseek(tf, 0, SEEK_SET);
-            std::string raw(sz, '\0');
-            if ((long)fread(&raw[0], 1, sz, tf) != sz) {
-                fprintf(stderr, "crispasr[align-only]: short read from '%s'\n", params.text_file.c_str());
+            std::string raw;
+            // "-" means stdin (#317). An embedder like Subtitle Edit already
+            // holds the transcript in memory and would otherwise have to spill
+            // it to a temp file purely to hand it over — a temp file it then
+            // owns, has to name uniquely, and has to clean up. Piping is one
+            // less thing to get wrong, and costs nothing when unused.
+            if (params.text_file == "-") {
+                char buf[65536];
+                size_t n;
+                while ((n = fread(buf, 1, sizeof(buf), stdin)) > 0)
+                    raw.append(buf, n);
+                if (ferror(stdin)) {
+                    fprintf(stderr, "crispasr[align-only]: error reading transcript from stdin\n");
+                    return 10;
+                }
+                if (raw.empty()) {
+                    fprintf(stderr, "crispasr[align-only]: --text-file - was given but stdin was empty.\n");
+                    return 10;
+                }
+            } else {
+                FILE* tf = fopen(params.text_file.c_str(), "rb");
+                if (!tf) {
+                    fprintf(stderr, "crispasr[align-only]: cannot open text file '%s'\n", params.text_file.c_str());
+                    return 10;
+                }
+                fseek(tf, 0, SEEK_END);
+                long sz = ftell(tf);
+                fseek(tf, 0, SEEK_SET);
+                raw.assign((size_t)sz, '\0');
+                if ((long)fread(&raw[0], 1, sz, tf) != sz) {
+                    fprintf(stderr, "crispasr[align-only]: short read from '%s'\n", params.text_file.c_str());
+                    fclose(tf);
+                    return 10;
+                }
                 fclose(tf);
-                return 10;
             }
-            fclose(tf);
 
-            // Detect .srt by extension: cue texts kept, timestamps/indices stripped.
+            // Detect .srt by extension: cue texts kept, timestamps/indices
+            // stripped. Stdin has no extension, so sniff the content instead —
+            // an SRT always opens with a cue index line followed by a timing
+            // line containing "-->".
             const std::string& p = params.text_file;
             is_srt_input = (p.size() >= 4 && (p.substr(p.size() - 4) == ".srt" || p.substr(p.size() - 4) == ".SRT"));
+            if (p == "-")
+                is_srt_input = raw.find(" --> ") != std::string::npos;
             if (is_srt_input) {
                 for (auto& cue : crispasr_parse_srt_cues(raw))
                     segment_texts.push_back(trim(std::move(cue)));
@@ -2613,7 +2639,16 @@ int crispasr_run_backend(const whisper_params& params_in) {
             if (!t.empty())
                 segment_texts.push_back(std::move(t));
         } else {
-            fprintf(stderr, "crispasr[align-only]: requires --ref-text or --text-file.\n");
+            // #317: two people hit this and read it as the aligner failing. It
+            // is not — alignment needs a transcript to align, and only the
+            // caller has one. Say what to pass, since the answer is short.
+            fprintf(stderr, "crispasr[align-only]: no transcript given — alignment needs the text to align.\n"
+                            "  --text-file <file.txt>   one segment per line\n"
+                            "  --text-file <file.srt>   re-time existing cues (text kept, timings discarded)\n"
+                            "  --text-file -            read the transcript from stdin\n"
+                            "  --ref-text \"...\"         a single segment inline\n"
+                            "Only -am (the aligner model) is needed besides; -m/--backend, --vad and\n"
+                            "--max-len belong to transcription and are unused here.\n");
             return 10;
         }
 
