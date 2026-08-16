@@ -28,8 +28,11 @@
 
 #include <cstring>
 
-#ifndef GGML_BACKEND_DL
+// ggml-cpu.h is included in BOTH branches: `ggml_cplan` is a plain struct and
+// the declarations cost nothing. Only the symbols are unlinkable under DL.
 #include "ggml-cpu.h"
+
+#ifndef GGML_BACKEND_DL
 #ifdef GGML_USE_METAL
 #include "ggml-metal.h"
 #endif
@@ -44,11 +47,16 @@ namespace core_cpu_backend {
 inline ggml_backend_t init() {
     return ggml_backend_cpu_init();
 }
+// Null-tolerant in BOTH branches. Under DL the registry lookup can legitimately
+// fail, so call sites are allowed to pass null; the direct path must then not
+// abort inside ggml. test-cpu-backend-shim caught this asymmetry.
 inline bool is_cpu(ggml_backend_t b) {
-    return ggml_backend_is_cpu(b);
+    return b && ggml_backend_is_cpu(b);
 }
 inline void set_n_threads(ggml_backend_t b, int n) {
-    ggml_backend_cpu_set_n_threads(b, n);
+    if (b) {
+        ggml_backend_cpu_set_n_threads(b, n);
+    }
 }
 inline ggml_backend_buffer_type_t buffer_type() {
     return ggml_backend_cpu_buffer_type();
@@ -57,7 +65,9 @@ inline ggml_backend_reg_t reg() {
     return ggml_backend_cpu_reg();
 }
 inline void set_threadpool(ggml_backend_t b, ggml_threadpool_t tp) {
-    ggml_backend_cpu_set_threadpool(b, tp);
+    if (b) {
+        ggml_backend_cpu_set_threadpool(b, tp);
+    }
 }
 inline bool is_metal(ggml_backend_t b) {
 #ifdef GGML_USE_METAL
@@ -68,12 +78,60 @@ inline bool is_metal(ggml_backend_t b) {
 #endif
 }
 
+// Compute a graph on the CPU. Direct call: identical to every existing site.
+inline enum ggml_status compute(ggml_context* ctx, ggml_cgraph* gf, int n_threads) {
+    return ggml_graph_compute_with_ctx(ctx, gf, n_threads);
+}
+
+// The CPU backend's quantise-from-F32 kernel for `type`, or nullptr when it has
+// none. Callers already fall back to ggml_get_type_traits()->from_float_ref,
+// which lives in ggml-base and is always linkable.
+inline ggml_from_float_t from_float_for(enum ggml_type type) {
+    const auto* t = ggml_get_type_traits_cpu(type);
+    return t ? t->from_float : nullptr;
+}
+
+// Plan + compute, kept separate so a hot loop can size its work buffer once and
+// reuse it across frames (the VAD per-frame and wav2vec2 per-layer paths).
+inline ggml_cplan plan(ggml_cgraph* gf, int n_threads, ggml_threadpool_t pool = nullptr) {
+    return ggml_graph_plan(gf, n_threads, pool);
+}
+inline enum ggml_status compute_planned(ggml_cgraph* gf, ggml_cplan* p, int /*n_threads*/) {
+    return ggml_graph_compute(gf, p);
+}
+
+// Shared CPU worker pool. Reused across calls so a per-frame graph does not
+// spawn and join threads every time.
+inline ggml_threadpool_t threadpool_new(int n_threads) {
+    ggml_threadpool_params tpp = ggml_threadpool_params_default(n_threads);
+    return ggml_threadpool_new(&tpp);
+}
+inline void threadpool_free(ggml_threadpool_t p) {
+    ggml_threadpool_free(p);
+}
+
 #else
 
 // Dynamic backends: the CPU backend is a module like any other, reached
-// through the registry. ggml_backend_load_all() must have run first — it does,
-// from crispasr_c_api.cpp and the CLI entry points.
+// through the registry.
+//
+// The registry is empty until ggml_backend_load_all() has dlopen'd the modules.
+// Relying on the entry points to have done that first is exactly the kind of
+// ordering assumption that holds until it doesn't: nothing enforces it, and the
+// failure is silent — cpu_device() returns null, every wrapper takes its
+// null-guard, and compute() quietly returns GGML_STATUS_FAILED instead of
+// computing. test-cpu-backend-shim hit precisely that, failing 5 of 7 cases
+// under DL while passing all 7 without it.
+//
+// So load here instead, on first use. The function-local static makes it exactly
+// once and thread-safe, and it is idempotent with the entry points' own call —
+// whichever runs first wins and the other is a no-op.
 inline ggml_backend_dev_t cpu_device() {
+    static const bool loaded = [] {
+        ggml_backend_load_all();
+        return true;
+    }();
+    (void)loaded;
     return ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
 }
 
@@ -136,6 +194,67 @@ inline bool is_metal(ggml_backend_t b) {
     const char* n = r ? ggml_backend_reg_name(r) : nullptr;
     return n && std::strcmp(n, "Metal") == 0;
 }
+
+// Compute a graph on the CPU, through a backend instead of the unlinkable
+// ggml_graph_compute_with_ctx. Execution stays on the CPU — this routes the
+// same work through the CPU backend module rather than moving it anywhere.
+//
+// The backend is thread_local, not a shared static: a ggml backend is not safe
+// for concurrent use, and several of these call sites run inside worker threads.
+// One instance per thread, created on first use and reused after that.
+inline enum ggml_status compute(ggml_context* ctx, ggml_cgraph* gf, int n_threads) {
+    (void)ctx; // the backend owns its own plan; no scratch context needed
+    static thread_local ggml_backend_t tls = nullptr;
+    if (!tls) {
+        tls = init();
+        if (!tls) {
+            return GGML_STATUS_FAILED;
+        }
+    }
+    set_n_threads(tls, n_threads);
+    return ggml_backend_graph_compute(tls, gf);
+}
+
+// Not reachable under DL — ggml_get_type_traits_cpu lives in the CPU module.
+// Returning nullptr sends the caller down its existing from_float_ref path,
+// which is what it already does when the CPU backend has no kernel for a type.
+inline ggml_from_float_t from_float_for(enum ggml_type) {
+    return nullptr;
+}
+
+// ggml_graph_plan is a CPU-module symbol, so under DL there is no caller-owned
+// plan to make. Report a zero work_size: every call site guards its work-buffer
+// allocation on `work_size > 0`, so they allocate nothing and the backend does
+// its own planning inside compute_planned below.
+//
+// ⚠ That costs the optimisation those sites exist for — "no scheduler, no
+// threadpool churn" per frame becomes a fresh plan per call. Measured cost is
+// unknown on this path; it is one more reason the DL build stays opt-in.
+inline ggml_cplan plan(ggml_cgraph*, int, ggml_threadpool_t = nullptr) {
+    ggml_cplan p = {};
+    return p;
+}
+inline enum ggml_status compute_planned(ggml_cgraph* gf, ggml_cplan*, int n_threads) {
+    static thread_local ggml_backend_t tls = nullptr;
+    if (!tls) {
+        tls = init();
+        if (!tls) {
+            return GGML_STATUS_FAILED;
+        }
+    }
+    set_n_threads(tls, n_threads);
+    return ggml_backend_graph_compute(tls, gf);
+}
+
+// No shared pool under DL. ggml_threadpool_new lives in the CPU module, and
+// even if it were reachable the registry does not expose the setter that would
+// attach it (see set_threadpool above). Returning nullptr makes every caller
+// take its existing "no pool" branch — they all guard on the pointer — so the
+// backend falls back to ggml's own per-call threading.
+inline ggml_threadpool_t threadpool_new(int) {
+    return nullptr;
+}
+inline void threadpool_free(ggml_threadpool_t) {}
 
 #endif
 

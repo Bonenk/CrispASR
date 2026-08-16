@@ -2945,10 +2945,7 @@ static bool materialize_tensor_copy(ggml_tensor* dst, ggml_tensor* src, std::vec
 
     const ggml_to_float_t to_float = ggml_get_type_traits(src->type)->to_float;
     ggml_from_float_t from_float = nullptr;
-    const auto* dst_cpu_traits = ggml_get_type_traits_cpu(dst->type);
-    if (dst_cpu_traits) {
-        from_float = dst_cpu_traits->from_float;
-    }
+    from_float = core_cpu_backend::from_float_for(dst->type);
     if (!from_float) {
         from_float = ggml_get_type_traits(dst->type)->from_float_ref;
     }

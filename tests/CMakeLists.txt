@@ -2748,6 +2748,29 @@ catch_discover_tests(test-issue-353-split-pipeline
     PROPERTIES LABELS "unit;split-pipeline;issue-353"
 )
 
+# ─── test-cpu-backend-shim — #355 CPU-backend access shim
+#
+# Pins src/core/ggml_cpu_backend.h. Compiles unchanged with or without
+# GGML_BACKEND_DL, so `cmake -DGGML_BACKEND_DL=ON` runs these same cases
+# against the registry path — the only way the two branches can be held
+# equivalent.
+add_executable(test-cpu-backend-shim
+    test-cpu-backend-shim.cpp
+)
+target_include_directories(test-cpu-backend-shim PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/ggml/include
+    ${PROJECT_SOURCE_DIR}/src
+)
+target_link_libraries(test-cpu-backend-shim PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-cpu-backend-shim
+    TEST_SPEC "[cpu-shim]"
+    PROPERTIES LABELS "unit;cpu-shim;issue-355"
+)
+
 # ─── test-parakeet-ja-detect — issue #257 regression guard
 #
 # Pins crispasr_parakeet::vocab_looks_japanese so the JA-model detection keys on
@@ -3972,7 +3995,7 @@ target_include_directories(test-core-cross-attn PRIVATE
 )
 target_link_libraries(test-core-cross-attn PRIVATE
     Catch2::Catch2WithMain
-    ggml ggml-base ggml-cpu
+    ggml ggml-base crispasr_link_ggml_cpu
 )
 catch_discover_tests(test-core-cross-attn
     TEST_SPEC "[unit]"
@@ -3988,7 +4011,7 @@ target_include_directories(test-core-adaln PRIVATE
 )
 target_link_libraries(test-core-adaln PRIVATE
     Catch2::Catch2WithMain
-    ggml ggml-base ggml-cpu
+    ggml ggml-base crispasr_link_ggml_cpu
 )
 catch_discover_tests(test-core-adaln
     TEST_SPEC "[unit]"
@@ -4004,7 +4027,7 @@ target_include_directories(test-core-seanet PRIVATE
 )
 target_link_libraries(test-core-seanet PRIVATE
     Catch2::Catch2WithMain
-    ggml ggml-base ggml-cpu
+    ggml ggml-base crispasr_link_ggml_cpu
 )
 catch_discover_tests(test-core-seanet
     TEST_SPEC "[unit]"
@@ -4022,7 +4045,7 @@ target_include_directories(test-fastconv PRIVATE
 )
 target_link_libraries(test-fastconv PRIVATE
     Catch2::Catch2WithMain
-    ggml ggml-base ggml-cpu
+    ggml ggml-base crispasr_link_ggml_cpu
 )
 catch_discover_tests(test-fastconv
     TEST_SPEC "[unit]"
@@ -4213,8 +4236,8 @@ if(APPLE AND TARGET ggml-metal)
     target_link_libraries(test_metal_norm_repro PRIVATE
         ggml
         ggml-base
-        ggml-cpu
-        ggml-metal
+        crispasr_link_ggml_cpu
+        crispasr_link_ggml_metal
     )
     # T values that triggered the original bug; each must return rc=0.
     foreach(T 33 65 66 67 97 129 130 131 132 257)
@@ -4241,6 +4264,15 @@ endif()
 # These run conv_transpose_1d and col2im_1d directly on a single GPU backend
 # without a CPU fallback scheduler. They catch ggml bumps that drop CrispASR's
 # backend kernels or dtype support for audio codec/vocoder paths.
+#
+# Not built under GGML_BACKEND_DL. Unlike the rest of the tree these call
+# ggml_backend_metal_init() / ggml_backend_cpu_init() by symbol on purpose —
+# naming one exact backend with no scheduler fallback IS the test. Under DL
+# those symbols live inside dlopen'd modules, and routing them through the
+# registry would pick "best available", which is precisely the ambiguity these
+# tests exist to remove. The DL build is a packaging mode, not a backend, so
+# nothing is lost: the default build still runs them on every backend present.
+if(NOT GGML_BACKEND_DL)
 function(add_ggml_audio_ops_backend_test TEST_TARGET BACKEND_DEF BACKEND_TARGET)
     add_executable(${TEST_TARGET} test_ggml_audio_ops_backend.cpp)
     target_include_directories(${TEST_TARGET} PRIVATE
@@ -4250,7 +4282,7 @@ function(add_ggml_audio_ops_backend_test TEST_TARGET BACKEND_DEF BACKEND_TARGET)
     target_link_libraries(${TEST_TARGET} PRIVATE
         ggml
         ggml-base
-        ggml-cpu
+        crispasr_link_ggml_cpu
         ${BACKEND_TARGET}
     )
     add_test(NAME ${TEST_TARGET} COMMAND ${TEST_TARGET})
@@ -4280,6 +4312,7 @@ if(TARGET ggml-cuda)
         ggml-cuda)
     set_tests_properties(test_ggml_audio_ops_cuda PROPERTIES LABELS "unit;ggml;backend;cuda")
 endif()
+endif() # NOT GGML_BACKEND_DL
 
 # ─── test - backends — integration tests for all CrispASR backends ────────────
 #Requires network(downloads models).Not run in CI by default.
