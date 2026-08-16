@@ -159,7 +159,7 @@ stage that fails to load or produce its output then returns **HTTP 400** with
 an `{"error": {...}}` body instead of a degraded `200`. A stage that ran and
 legitimately produced nothing (VAD detected no speech) stays a success. This
 mirrors the CLI's `--strict-pipeline` family (see
-[`cli.md`](cli.md#strict-pipeline--require-aux-stages-to-succeed-strict-pipeline-311));
+[`cli.md`](cli.md#strict-pipeline--require-aux-stages-to-succeed---strict-pipeline-311));
 the strict decision is shared code (`crispasr_strict.h`), so the two front-ends
 cannot drift.
 

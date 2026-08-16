@@ -72,6 +72,8 @@ on:
       - 'flutter/crispasr/lib/src/chat.dart'
       - 'bindings/java/src/main/java/io/github/ggerganov/whispercpp/chat/**'
       - 'tools/check-chat-binding-coverage.py'
+      - 'tools/check-doc-anchors.py'
+      - 'docs/**.md'
   pull_request:
     branches: [main, master]
     paths:
@@ -103,6 +105,8 @@ on:
       - 'flutter/crispasr/lib/src/chat.dart'
       - 'bindings/java/src/main/java/io/github/ggerganov/whispercpp/chat/**'
       - 'tools/check-chat-binding-coverage.py'
+      - 'tools/check-doc-anchors.py'
+      - 'docs/**.md'
       - '.github/workflows/**'
       - 'tools/check-workflow-run-blocks.py'
       # OmniVoice prompt vocabularies: the generated headers must match their
@@ -300,6 +304,24 @@ jobs:
           python-version: '3.11'
       - name: Check bundled harness copies match canonical
         run: python tools/check-kaggle-harness-sync.py
+
+  # Markdown anchors rot silently: a heading is reworded, every link to it keeps
+  # rendering, and the only symptom is that clicking does nothing. One pass found
+  # six dead ones — three in the README pointing at a renamed TTS section, two at
+  # content that had moved into docs/, and one that had simply mis-derived the
+  # slug of a heading containing both an em-dash and a `--flag`. That last is why
+  # this is a script and not a careful reader.
+  doc-anchors:
+    name: doc anchors resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Every in-repo #fragment points at a real heading
+        run: python tools/check-doc-anchors.py
 
   # include/crispasr_chat.h is hand-mirrored into five languages and CI compiles
   # one of them: bindings-go.yml is the only binding workflow reaching the chat
