@@ -1046,6 +1046,12 @@ static double cs_to_sec(int64_t cs) {
     return cs / 100.0;
 }
 
+// Defined below, next to diarized_json which has always used it. Declared here
+// so verbose_json can emit the same "A"/"B" labels rather than the raw internal
+// "(speaker 0) " — two formats of one API disagreeing about what a speaker is
+// called would be worse than the omission this fixes (#326).
+static std::string normalise_speaker(const std::string& raw);
+
 std::string crispasr_segments_to_openai_verbose_json(const std::vector<crispasr_segment>& segs, double duration_s,
                                                      const std::string& language, const std::string& task,
                                                      float temperature) {
@@ -1086,6 +1092,16 @@ std::string crispasr_segments_to_openai_verbose_json(const std::vector<crispasr_
 
         // no_speech_prob — not available from most backends, emit 0.
         js << "      \"no_speech_prob\": 0.0";
+
+        // Speaker label, when diarization produced one (#326). Not part of
+        // OpenAI's verbose_json schema, which is why it is emitted only when
+        // non-empty: a client that does not know the field never sees it, and
+        // one that asked for --diarize is not silently charged for a stage
+        // whose entire output this format used to discard. `diarized_json`
+        // remains the richer format; this is so the standard one stops lying.
+        if (!s.speaker.empty()) {
+            js << ",\n      \"speaker\": \"" << json_escape(normalise_speaker(s.speaker)) << "\"";
+        }
 
         // Word-level timestamps if available.
         if (!s.words.empty()) {
