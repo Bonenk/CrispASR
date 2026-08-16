@@ -1510,3 +1510,84 @@ fn chat_stream_delivers_the_chunk_the_one_shot_path_truncates() {
         "the streamed text must extend the one-shot text, got {streamed:?}"
     );
 }
+
+// ---- Source separation (#359) ----
+//
+// Reported as "there is no clear way to utilize models like htdemucs from
+// libraries". The C ABI has always had a five-function separation surface and
+// Python and Dart bound it; Rust and Go did not, so the only separation-shaped
+// verb a Rust caller could find was speech_to_speech — which is not what these
+// models do, and which answers with "returned no audio ... (S2S may be
+// unsupported)" and a 0 sample rate. Exactly the report.
+//
+// Gate: SEPARATE_MODEL=/path/to/mel-band-roformer-or-htdemucs.gguf
+
+fn separate_model() -> Option<String> {
+    let p = std::env::var("SEPARATE_MODEL").unwrap_or_default();
+    if !p.is_empty() && Path::new(&p).exists() {
+        Some(p)
+    } else {
+        None
+    }
+}
+
+#[test]
+fn separate_returns_named_stems_at_the_models_own_rate() {
+    let Some(model) = separate_model() else {
+        eprintln!("SKIP: set SEPARATE_MODEL to a separation GGUF");
+        return;
+    };
+    let s = crispasr::Session::open(&model).expect("open separation model");
+
+    // The rate accessor is the thing a caller needs BEFORE they can feed it
+    // anything, and its absence is why the reporter saw 0.
+    let sr = s.separate_sample_rate();
+    assert!(sr > 0, "separate_sample_rate must be known once loaded, got {sr}");
+
+    // 2 s of interleaved stereo at the model's own rate. Not silence: a quiet
+    // tone, so a backend that returns its input unchanged is still exercised.
+    let n_frames = (sr as usize) * 2;
+    let mut pcm = Vec::with_capacity(n_frames * 2);
+    for i in 0..n_frames {
+        let t = i as f32 / sr as f32;
+        let v = (t * 220.0 * std::f32::consts::TAU).sin() * 0.2;
+        pcm.push(v);
+        pcm.push(v);
+    }
+
+    let stems = s.separate(&pcm).expect("separate should produce stems");
+    assert!(!stems.is_empty(), "expected at least one stem");
+    for st in &stems {
+        assert!(!st.name.is_empty(), "every stem is named");
+        assert_eq!(
+            st.pcm.len() % 2,
+            0,
+            "stem {} must be interleaved stereo",
+            st.name
+        );
+        assert!(!st.pcm.is_empty(), "stem {} came back empty", st.name);
+        assert!(
+            st.pcm.iter().all(|v| v.is_finite()),
+            "stem {} has non-finite samples",
+            st.name
+        );
+    }
+    eprintln!(
+        "separate: {} stems at {} Hz: {:?}",
+        stems.len(),
+        sr,
+        stems.iter().map(|s| s.name.as_str()).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn separate_rejects_input_that_is_not_stereo() {
+    let Some(model) = separate_model() else {
+        eprintln!("SKIP: set SEPARATE_MODEL to a separation GGUF");
+        return;
+    };
+    let s = crispasr::Session::open(&model).expect("open separation model");
+    // The C API counts PER-CHANNEL frames; handing it fewer than one frame is
+    // a caller error, not something to pass to the model.
+    assert!(s.separate(&[]).is_err());
+}
