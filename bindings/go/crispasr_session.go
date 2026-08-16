@@ -38,6 +38,8 @@ int              crispasr_session_separate_n_stems(CrispasrSession* s);
 const char*      crispasr_session_separate_stem_name(CrispasrSession* s, int stem_idx);
 const float*     crispasr_session_separate_stem(CrispasrSession* s, int stem_idx, int* out_n_samples);
 int              crispasr_session_separate_sample_rate(CrispasrSession* s);
+int              crispasr_session_input_sample_rate(CrispasrSession* s);
+int              crispasr_session_output_sample_rate(CrispasrSession* s);
 int              crispasr_session_set_sensitivity(CrispasrSession* s, const char* preset);
 int              crispasr_session_set_translate(CrispasrSession* s, int enable);
 int              crispasr_session_set_temperature(CrispasrSession* s, float temperature, unsigned long long seed);
@@ -1194,6 +1196,22 @@ func (s *CrispasrSession) SpeechToSpeech(samples []float32) (*SpeechToSpeechResu
 		C.crispasr_session_translate_text_free(textOut)
 	}
 	return &SpeechToSpeechResult{PCM: out, Transcript: transcript}, nil
+}
+
+// InputSampleRate is the rate (Hz) this backend expects for input PCM.
+//
+// SpeechToSpeech and the other PCM entry points want audio at the backend's
+// native rate, and it varies by backend — so "resample to the native rate"
+// was not actionable from Go, C# or Ruby until this was bound (#321).
+func (s *CrispasrSession) InputSampleRate() int {
+	return int(C.crispasr_session_input_sample_rate(s.handle))
+}
+
+// OutputSampleRate is the rate (Hz) of PCM this backend returns — what
+// SpeechToSpeech and Synthesize hand back. 24 kHz for conversational S2S,
+// 48 kHz for Sidon and VoxCPM2 AudioVAE.
+func (s *CrispasrSession) OutputSampleRate() int {
+	return int(C.crispasr_session_output_sample_rate(s.handle))
 }
 
 // Stem is one separated source from Separate: its name ("vocals", "drums", …)
