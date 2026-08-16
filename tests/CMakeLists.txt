@@ -4140,7 +4140,10 @@ target_link_libraries(test_qwen3_tts_talker PRIVATE qwen3_tts)
 # ─── test-chat-ggml — end-to-end smoke for the crispasr_chat_* C ABI
 #
 # Loads a small GGUF chat model (env CRISPASR_CHAT_TEST_MODEL → path) and
-# verifies open / generate (one-shot) / generate_stream / reset / close.
+# verifies open / generate (one-shot) / generate_stream / reset / close,
+# prefill of a prompt longer than the prompt batch, token counting
+# against the prompt a prefill really decodes, and reuse of the KV cache
+# across prompts that share a prefix with the session's history.
 # Skipped when the env var is unset so unrelated builds stay green.
 add_executable(test-chat-ggml test-chat-ggml.cpp)
 target_link_libraries(test-chat-ggml PRIVATE
@@ -4148,6 +4151,50 @@ target_link_libraries(test-chat-ggml PRIVATE
     crispasr-lib
 )
 catch_discover_tests(test-chat-ggml
+    TEST_SPEC "[chat]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
+# ─── test-chat-abort — cancellation over the crispasr_chat_* C ABI
+#
+# Loads the same GGUF chat model (env CRISPASR_CHAT_TEST_MODEL → path) and
+# verifies crispasr_chat_set_abort_callback: the abort code and partial
+# output on both generate paths, clearing with NULL, reuse after an abort,
+# a NULL session, and an abort between prompt batches.
+# Skipped when the env var is unset so unrelated builds stay green.
+add_executable(test-chat-abort test-chat-abort.cpp)
+target_link_libraries(test-chat-abort PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+)
+catch_discover_tests(test-chat-abort
+    TEST_SPEC "[chat]"
+    PROPERTIES
+        LABELS live
+        SKIP_RETURN_CODE 4
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
+
+# ─── test-chat-close — session teardown under load
+#
+# Loads the same GGUF chat model (env CRISPASR_CHAT_TEST_MODEL → path) and
+# verifies crispasr_chat_close against a generation in flight: that it waits
+# for the running call rather than freeing under it, that a call arriving
+# after the retirement is declined rather than run, and that the accessors
+# answer a retiring session the way they answer a NULL one. Threads, because
+# the whole contract is about one.
+# Skipped when the env var is unset so unrelated builds stay green.
+find_package(Threads REQUIRED)
+add_executable(test-chat-close test-chat-close.cpp)
+target_link_libraries(test-chat-close PRIVATE
+    Catch2::Catch2WithMain
+    crispasr-lib
+    Threads::Threads
+)
+catch_discover_tests(test-chat-close
     TEST_SPEC "[chat]"
     PROPERTIES
         LABELS live
