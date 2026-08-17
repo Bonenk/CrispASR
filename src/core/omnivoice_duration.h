@@ -224,7 +224,20 @@ inline int estimate_target_tokens(const std::string& text, const std::string& re
                 rd = v * duration_text_weight(rt); // env = frames per weighted char
         }
     }
-    double est = duration_estimate(text, rt, rd) / speed;
-    return std::max((int)est, 10);
+    // Mirrors upstream _estimate_target_tokens exactly:
+    //
+    //     if speed > 0 and speed != 1.0:
+    //         est = est / speed
+    //     return max(1, int(est))
+    //
+    // The guard is not cosmetic. Dividing unconditionally meant --tts-speed 0
+    // produced est = inf and, cast to int, a target of 2147483647 frames; a
+    // negative speed produced a negative estimate that only the floor caught.
+    // And the floor was 10 here against upstream's 1, which diverged on
+    // whitespace-only input (10 frames vs 9).
+    double est = duration_estimate(text, rt, rd);
+    if (speed > 0.0f && speed != 1.0f)
+        est /= (double)speed;
+    return std::max(1, (int)est);
 }
 } // namespace core_omnivoice_duration
