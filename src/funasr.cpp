@@ -1312,14 +1312,17 @@ static bool funasr_kv_init(funasr_context* ctx, int max_ctx) {
     ggml_backend_t kv_backend = (ctx->model.buf_cpu)
                                     ? ctx->backend_cpu
                                     : core_attn::kv_backend_from_env(ctx->backend, ctx->backend_cpu, "funasr");
-    ctx->kv_buf = ggml_backend_alloc_buffer(kv_backend, kbytes + vbytes);
+    // #367: size and place via ggml, not ggml_nbytes() arithmetic. CUDA's
+    // get_alloc_size() pads a quantized row up to MATRIX_ROW_PADDING (512),
+    // and these KV rows are head_dim wide (128), so each q8_0 tensor needs
+    // 408 bytes more than nbytes — the hand-sized buffer came up short and
+    // ggml_backend_tensor_alloc aborted. f16 is not quantized, so this only
+    // ever fired with CRISPASR_KV_QUANT set, and only on CUDA.
+    ctx->kv_buf = ggml_backend_alloc_ctx_tensors(ctx->kv_ctx, kv_backend);
     if (!ctx->kv_buf) {
         std::fprintf(stderr, "funasr: failed to allocate kv buffer\n");
         return false;
     }
-    char* base = (char*)ggml_backend_buffer_get_base(ctx->kv_buf);
-    ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_k, base);
-    ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_v, base + kbytes);
     // Zero-fill the KV cache. On CUDA, ggml_backend_alloc_buffer does not
     // zero memory (cudaMalloc). If the graph scheduler reads a KV slot
     // before the corresponding ggml_cpy writes it (aliasing-based race in

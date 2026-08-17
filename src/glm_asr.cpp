@@ -1260,15 +1260,18 @@ extern "C" bool glm_asr_kv_init(struct glm_asr_context* ctx, int max_ctx) {
     size_t kb = ggml_nbytes(ctx->kv_k), vb = ggml_nbytes(ctx->kv_v);
     // PLAN #69b: optional KV-on-CPU spill.
     ggml_backend_t kv_backend = core_attn::kv_backend_from_env(ctx->backend, ctx->backend_cpu, "glm_asr");
-    ctx->kv_buf = ggml_backend_alloc_buffer(kv_backend, kb + vb);
+    // #367: size and place via ggml, not ggml_nbytes() arithmetic. CUDA's
+    // get_alloc_size() pads a quantized row up to MATRIX_ROW_PADDING (512),
+    // and these KV rows are head_dim wide (128), so each q8_0 tensor needs
+    // 408 bytes more than nbytes — the hand-sized buffer came up short and
+    // ggml_backend_tensor_alloc aborted. f16 is not quantized, so this only
+    // ever fired with CRISPASR_KV_QUANT set, and only on CUDA.
+    ctx->kv_buf = ggml_backend_alloc_ctx_tensors(ctx->kv_ctx, kv_backend);
     if (!ctx->kv_buf) {
         ggml_free(ctx->kv_ctx);
         ctx->kv_ctx = nullptr;
         return false;
     }
-    char* base = (char*)ggml_backend_buffer_get_base(ctx->kv_buf);
-    ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_k, base);
-    ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_v, base + kb);
     glm_asr_kv_reset(ctx);
     if (ctx->params.verbosity >= 1) {
         fprintf(stderr, "glm_asr: kv cache %zu MiB\n", (kb + vb) >> 20);
