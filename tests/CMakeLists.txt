@@ -3761,6 +3761,17 @@ catch_discover_tests(test_tts_provenance
     PROPERTIES LABELS "unit"
 )
 
+# ─── test-asr-overlap-trim — #365 canary seam duplication ───────────────────
+# Pure header, no model: the seam decision is what duplicated phrases and ran
+# SRT timestamps backwards, and it is decidable from timings alone.
+add_executable(test-asr-overlap-trim test-asr-overlap-trim.cpp)
+target_include_directories(test-asr-overlap-trim PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-asr-overlap-trim PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-asr-overlap-trim
+    TEST_SPEC "[issue-365]"
+    PROPERTIES LABELS "unit;asr"
+)
+
 # ─── test-tts-ref-cache — #334 CLI-writes / session-reads contract ──────────
 # The reference-transcript cache couples two layers that never compile
 # together: the CLI writes it, crispasr_c_api.cpp reads it, and the suffix and

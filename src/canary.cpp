@@ -38,6 +38,7 @@
 #include "core/cpu_ops.h" // core_cpu::to_f32 (quantized-safe weight read)
 #include "core/beam_decode.h"
 #include "core/crispasr_lcs.h"
+#include "core/asr_overlap_trim.h"
 #include "core/fastconformer.h"
 
 #ifndef M_PI
@@ -1683,6 +1684,86 @@ extern "C" struct canary_result* canary_transcribe_streamed(struct canary_contex
             }
         }
 
+        // #365: fuzzy seam dedup, UNDER the LCS result.
+        //
+        // The LCS above compares token ids, so it only fires when the decoder
+        // said the same thing twice. Given a different amount of right-context
+        // an AED re-words the overlap instead — "s'est rendue compte" in one
+        // chunk, "rendu compte" in the next for the same audio — the LCS
+        // matches nothing, the whole re-transcription is appended, and the
+        // timestamps run backwards because the new chunk carries its own offset.
+        //
+        // Comparing NORMALISED words with a small edit tolerance sees through
+        // the re-wording. Restricted to the nominal overlap window, because only
+        // that much of a chunk can be duplicate by construction; and requiring a
+        // run of at least two words, so a shared "the" cannot trigger a drop.
+        //
+        // Deliberately NOT a plain time floor. Trimming the overlap by
+        // timestamp alone was measured removing real speech — the leading
+        // "Many" from "Many people don't think about them as dinosaurs" — since
+        // an AED's boundary timings overshoot and a chunk's first word can
+        // legitimately carry an early timestamp.
+        // OPT-IN (CRISPASR_CANARY_SEAM_DEDUP=1) until the net effect is proven.
+        //
+        // Measured on a 600 s clip it removes real duplication — a stray " is."
+        // cue, and the doubled "its splendors" and "versions are kept on
+        // versions are kept online" — but it also dropped a leading "Many" that
+        // I could not confirm was duplicate. Trading one defect for another is
+        // not an improvement, and the reporting file (#365, 20+ min French)
+        // could not be reproduced here, so this ships gated rather than on.
+        static const bool seam_dedup = [] {
+            const char* e = crispasr_env::get("CRISPASR_CANARY_SEAM_DEDUP");
+            return e && e[0] == '1';
+        }();
+        if (seam_dedup && !all_tokens.empty() && part->n_tokens > n_skip) {
+            const int64_t overlap_end_cs = chunk_t_offset_cs + (int64_t)overlap_seconds * 100;
+            auto split_words = [](const std::string& t) {
+                std::vector<std::string> w;
+                std::string cur;
+                for (char c : t) {
+                    if (c == ' ' || c == '\t' || c == '\n') {
+                        if (!cur.empty())
+                            w.push_back(cur), cur.clear();
+                    } else {
+                        cur.push_back(c);
+                    }
+                }
+                if (!cur.empty())
+                    w.push_back(cur);
+                return w;
+            };
+            // Accepted tail: words spoken within overlap_seconds of the seam.
+            std::string tail_text;
+            for (size_t i = all_tokens.size(); i-- > 0;) {
+                if (all_tokens[i].t1 + (int64_t)overlap_seconds * 100 < all_tokens.back().t1)
+                    break;
+                tail_text.insert(0, all_tokens[i].text);
+            }
+            // Head: this chunk's tokens that fall inside the overlap window.
+            std::string head_text;
+            int head_tokens = n_skip;
+            for (int i = n_skip; i < part->n_tokens; i++) {
+                if (part->tokens[i].t0 > overlap_end_cs)
+                    break;
+                head_text += part->tokens[i].text;
+                head_tokens++;
+            }
+            const auto tw = split_words(tail_text);
+            const auto hw = split_words(head_text);
+            const int rep = core_overlap_trim::leading_repeat_len(tw, hw);
+            if (rep > 0) {
+                // Advance past `rep` whole words of this chunk.
+                int words_seen = 0;
+                int i = n_skip;
+                for (; i < head_tokens && words_seen < rep; i++)
+                    if (part->tokens[i].text[0] == ' ' || i == n_skip)
+                        words_seen++;
+                while (i < head_tokens && part->tokens[i].text[0] != ' ')
+                    i++;
+                n_skip = std::min(i, part->n_tokens - 1);
+            }
+        }
+
         // Rebuild text for this chunk from surviving tokens (so the
         // dedupe matches the token vector exactly; trusting part->text
         // would leak the dropped prefix as a string).
@@ -1737,9 +1818,16 @@ extern "C" struct canary_result* canary_transcribe_streamed(struct canary_contex
         // surviving token's t0 (best-effort — words and tokens don't have
         // a strict 1:1 mapping but adjacent boundary-overlap words should
         // share timing with the dropped tokens).
-        if (n_skip > 0 && part->n_tokens > 0) {
-            const int64_t cutoff_t0 =
+        // Same rule for words. Under CRISPASR_CANARY_SEAM_DEDUP this also runs
+        // when the LCS found nothing (n_skip == 0) and clamps to the last
+        // accepted word, which is where the visible SRT change comes from —
+        // cues are built from WORDS, not tokens. Off by default; see the gate
+        // above for why (#365).
+        if (part->n_tokens > 0 && (seam_dedup || n_skip > 0)) {
+            int64_t cutoff_t0 =
                 (n_skip < part->n_tokens) ? part->tokens[(size_t)n_skip].t0 : part->tokens[(size_t)n_skip - 1].t1;
+            if (seam_dedup && !all_words.empty())
+                cutoff_t0 = std::max(cutoff_t0, all_words.back().t1);
             for (int i = 0; i < part->n_words; i++) {
                 if (part->words[i].t1 <= cutoff_t0)
                     continue;
