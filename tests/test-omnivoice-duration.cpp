@@ -222,3 +222,24 @@ TEST_CASE("omnivoice duration: the run table is well formed", "[unit][duration][
     }
     REQUIRE(kUpstreamWeightRuns[0].lo == 0);
 }
+
+TEST_CASE("omnivoice duration: target-token count matches upstream, edges included", "[unit][duration][omnivoice]") {
+    using core_omnivoice_duration::estimate_target_tokens;
+    const std::string ru = "Папа у Васи силён в математике, учится папа за Васю весь год.";
+
+    // Values produced by running upstream's _estimate_target_tokens with the
+    // same built-in anchor ("Nice to meet you." / 25 tokens).
+    CHECK(estimate_target_tokens(ru) == 90);
+    CHECK(estimate_target_tokens("Hello, world.") == 36);
+    CHECK(estimate_target_tokens("今日はいい天気ですね。") == 48);
+    CHECK(estimate_target_tokens(" ") == 9); // upstream floors at 1, not 10
+
+    // Upstream applies the speed divisor only for speed > 0 && != 1.0.
+    CHECK(estimate_target_tokens("Hello, world.", {}, 0, 0.5f) == 73);
+
+    // The guard is why these are here. Dividing unconditionally made
+    // --tts-speed 0 yield est=inf and a target of 2147483647 frames, and a
+    // negative speed yield a negative estimate that only the old floor caught.
+    CHECK(estimate_target_tokens("Hello, world.", {}, 0, 0.0f) == 36);
+    CHECK(estimate_target_tokens("Hello, world.", {}, 0, -1.0f) == 36);
+}
