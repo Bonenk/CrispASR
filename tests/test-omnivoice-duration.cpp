@@ -174,9 +174,9 @@ TEST_CASE("omnivoice duration: the character classes that had drifted", "[unit][
     CHECK(duration_cp_weight(0x05B4) == Catch::Approx(0.0)); // Hebrew hiriq
     CHECK(duration_cp_weight(0x064E) == Catch::Approx(0.0)); // Arabic fatha
 
-    // …but a letter sitting inside a mark block is NOT silent. Sweeping the
-    // whole range to catch the marks silenced these, which the codepoint sweep
-    // caught only because it compares every codepoint rather than a sample.
+    // …but a letter sitting inside a mark block is NOT silent. The hand-written
+    // range chain silenced these; the generated table cannot, because it asks
+    // upstream rather than guessing at block boundaries.
     CHECK(duration_cp_weight(0x093D) == Catch::Approx(1.8)); // Devanagari avagraha (Lo)
     CHECK(duration_cp_weight(0x00B5) == Catch::Approx(1.0)); // µ micro sign (Ll)
     CHECK(duration_cp_weight(0x00AA) == Catch::Approx(1.0)); // ª ordinal indicator (Lo)
@@ -184,10 +184,41 @@ TEST_CASE("omnivoice duration: the character classes that had drifted", "[unit][
     // Digits are spoken as words in any script.
     CHECK(duration_cp_weight(0x0966) == Catch::Approx(3.5)); // Devanagari zero
     CHECK(duration_cp_weight(0x0660) == Catch::Approx(3.5)); // Arabic-Indic zero
+}
 
-    // Zero-width and bidi controls carry no speech. ⚠ Upstream returns 2.2 for
-    // these (its category dispatch misses Cf, so they land in the kana range);
-    // matching that would cost a spoken syllable per invisible character.
-    CHECK(duration_cp_weight(0x200D) == Catch::Approx(0.0)); // ZWJ
-    CHECK(duration_cp_weight(0x202B) == Catch::Approx(0.0)); // RLE
+TEST_CASE("omnivoice duration: upstream-exact mode is available and differs only where documented",
+          "[unit][duration][omnivoice]") {
+    using core_omnivoice_duration::duration_cp_weight;
+    using core_omnivoice_duration::duration_cp_weight_upstream;
+
+    // The ONE deliberate divergence: format characters. Upstream's dispatch
+    // handles categories M/P/S/Z/N but not Cf, so zero-width and bidi controls
+    // fall through to its script search and land in the kana block — a
+    // zero-width joiner costed as a spoken Japanese syllable. ZWJ and ZWNJ are
+    // orthographic in Indic and Arabic text, so we silence them by default.
+    CHECK(duration_cp_weight_upstream(0x200D) == Catch::Approx(2.2)); // upstream: ZWJ
+    CHECK(duration_cp_weight_upstream(0x202B) == Catch::Approx(2.2)); // upstream: RLE
+    CHECK(duration_cp_weight(0x200D) == Catch::Approx(0.0));          // ours
+    CHECK(duration_cp_weight(0x202B) == Catch::Approx(0.0));          // ours
+
+    // Everywhere else the two agree, because ours IS the generated table.
+    for (uint32_t cp : {0x0041u, 0x0430u, 0x2014u, 0x0941u, 0x4E00u, 0x3042u, 0x0966u, 0x00B5u}) {
+        INFO("cp=" << cp);
+        CHECK(duration_cp_weight(cp) == duration_cp_weight_upstream(cp));
+    }
+}
+
+TEST_CASE("omnivoice duration: the run table is well formed", "[unit][duration][omnivoice]") {
+    // A binary search over an unsorted or overlapping table returns silently
+    // wrong weights rather than failing, so the shape is asserted here.
+    using core_omnivoice_duration::kUpstreamWeightRunCount;
+    using core_omnivoice_duration::kUpstreamWeightRuns;
+    REQUIRE(kUpstreamWeightRunCount > 1000);
+    for (int i = 0; i < kUpstreamWeightRunCount; i++) {
+        INFO("run " << i);
+        REQUIRE(kUpstreamWeightRuns[i].lo <= kUpstreamWeightRuns[i].hi);
+        if (i > 0)
+            REQUIRE(kUpstreamWeightRuns[i].lo > kUpstreamWeightRuns[i - 1].hi);
+    }
+    REQUIRE(kUpstreamWeightRuns[0].lo == 0);
 }

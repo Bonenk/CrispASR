@@ -41,6 +41,8 @@ on:
       - 'third_party/omnivoice/voice_design.py'
       - 'tools/gen-omnivoice-lang-map.py'
       - 'tools/gen-omnivoice-instruct-map.py'
+      - 'tools/gen-omnivoice-duration-table.py'
+      - 'third_party/omnivoice/duration.py'
       # Release-tooling consistency (release-consistency job). A version bump
       # touches NONE of the C++ paths above, so without these the check would
       # never run on the commits it exists to guard.
@@ -124,6 +126,8 @@ on:
       - 'third_party/omnivoice/voice_design.py'
       - 'tools/gen-omnivoice-lang-map.py'
       - 'tools/gen-omnivoice-instruct-map.py'
+      - 'tools/gen-omnivoice-duration-table.py'
+      - 'third_party/omnivoice/duration.py'
       # Release-tooling consistency (release-consistency job). A version bump
       # touches NONE of the C++ paths above, so without these the check would
       # never run on the commits it exists to guard.
@@ -472,6 +476,13 @@ jobs:
       - name: Check OmniVoice instruct table is current
         run: python tools/gen-omnivoice-instruct-map.py --check
 
+      # The duration weights decide how many frames an utterance gets, and
+      # OmniVoice fills exactly that many — so a stale table silently compresses
+      # speech rather than erroring. The previous hand-written classifier
+      # disagreed with upstream on 1110 codepoints (#363).
+      - name: Check OmniVoice duration table is current
+        run: python tools/gen-omnivoice-duration-table.py --check
+
       - name: Install huggingface_hub
         run: pip install --quiet 'huggingface_hub>=0.20'
 
@@ -481,6 +492,10 @@ jobs:
       - name: Report OmniVoice upstream language-map drift
         continue-on-error: true
         run: python tools/gen-omnivoice-lang-map.py --check-upstream
+
+      - name: Report OmniVoice upstream duration-table drift
+        continue-on-error: true
+        run: python tools/gen-omnivoice-duration-table.py --check-upstream
 
       - name: Report OmniVoice upstream instruct-map drift
         continue-on-error: true
