@@ -216,14 +216,15 @@ static bool ark_kv_init(ark_asr_context* ctx, int max_ctx) {
     ggml_backend_t kv_be = core_attn::kv_backend_from_env(ctx->backend, ctx->backend_cpu, "ark_asr");
     const size_t kbytes = ggml_nbytes(ctx->kv_k);
     const size_t vbytes = ggml_nbytes(ctx->kv_v);
-    ctx->kv_buf = ggml_backend_alloc_buffer(kv_be, kbytes + vbytes);
+    // #367: size and place via ggml, not ggml_nbytes() arithmetic. CUDA's
+    // get_alloc_size() pads a quantized row up to MATRIX_ROW_PADDING (512),
+    // and these KV rows are head_dim wide (128), so each q8_0 tensor needs
+    // 408 bytes more than nbytes — the hand-sized buffer came up short and
+    // ggml_backend_tensor_alloc aborted. f16 is not quantized, so this only
+    // ever fired with CRISPASR_KV_QUANT set, and only on CUDA.
+    ctx->kv_buf = ggml_backend_alloc_ctx_tensors(ctx->kv_ctx, kv_be);
     if (!ctx->kv_buf)
         return false;
-    {
-        char* base = (char*)ggml_backend_buffer_get_base(ctx->kv_buf);
-        ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_k, base);
-        ggml_backend_tensor_alloc(ctx->kv_buf, ctx->kv_v, base + kbytes);
-    }
     // Zero-clear so never-written tail slots can't leak NaN/garbage.
     ggml_backend_buffer_clear(ctx->kv_buf, 0);
     ctx->kv_max_ctx = max_ctx;

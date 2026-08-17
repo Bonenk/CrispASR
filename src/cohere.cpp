@@ -2051,11 +2051,17 @@ struct cohere_context* cohere_init_from_file(const char* path_model, struct cohe
                                        hp.dec_n_layers);
         // PLAN #69b: optional KV-on-CPU spill for VRAM-tight users.
         ggml_backend_t kv_backend = core_attn::kv_backend_from_env(ctx->ggml_backend, ctx->ggml_backend_cpu, "cohere");
-        ctx->kv_buf = ggml_backend_alloc_buffer(kv_backend, ggml_nbytes(ctx->kv_k) + ggml_nbytes(ctx->kv_v));
+        // #367: size and place via ggml, not ggml_nbytes() arithmetic. CUDA's
+        // get_alloc_size() pads a quantized row up to MATRIX_ROW_PADDING (512),
+        // and these KV rows are dec_head_dim wide, so a q8_0 tensor needs more
+        // than nbytes — the hand-sized buffer came up short and
+        // ggml_backend_tensor_alloc aborted. Only reachable with
+        // CRISPASR_KV_QUANT set, and only on CUDA.
+        //
+        // (The cross-attention KV below is hardcoded F16, which is never
+        // padded, so its arithmetic is safe and is left alone.)
+        ctx->kv_buf = ggml_backend_alloc_ctx_tensors(ctx->kv_ctx, kv_backend);
         ggml_backend_buffer_t kv_buf = ctx->kv_buf;
-        char* base = (char*)ggml_backend_buffer_get_base(kv_buf);
-        ggml_backend_tensor_alloc(kv_buf, ctx->kv_k, (void*)(base));
-        ggml_backend_tensor_alloc(kv_buf, ctx->kv_v, (void*)(base + ggml_nbytes(ctx->kv_k)));
 
         COHERE_VLOG(vb, "cohere: kv cache     = %.1f MiB  (dec_head_dim=%d max_ctx=%d n_heads=%d n_layers=%d)\n",
                     ggml_backend_buffer_get_size(kv_buf) / 1048576.0, hp.dec_head_dim, hp.dec_max_ctx, hp.dec_n_heads,
