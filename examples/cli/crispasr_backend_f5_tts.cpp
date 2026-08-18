@@ -204,8 +204,8 @@ public:
             if (cache_enabled && crispasr_ref_cache::load(cache_path, p.tts_voice, "f5-reftext", shape, payload)) {
                 ref_text_str.assign((const char*)payload.data(), payload.size());
                 if (!p.no_prints) {
-                    fprintf(stderr, "crispasr[f5-tts]: using cached ref transcript '%s': '%s'\n",
-                            cache_path.c_str(), ref_text_str.c_str());
+                    fprintf(stderr, "crispasr[f5-tts]: using cached ref transcript '%s': '%s'\n", cache_path.c_str(),
+                            ref_text_str.c_str());
                 }
             } else {
                 // Resample ref to 16kHz for whisper
