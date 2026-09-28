@@ -21,7 +21,7 @@ set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo "kaggle kernels push -p $DIR"
-kaggle kernels push -p "$DIR"
+python3 "$(git rev-parse --show-toplevel)/tools/kaggle/kpush.py" "$DIR"
 
 echo
 echo "Push triggered. Watch live at:"

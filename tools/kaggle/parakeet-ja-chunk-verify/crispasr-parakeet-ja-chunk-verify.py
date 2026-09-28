@@ -8,7 +8,7 @@ Expected: with the fix, auto-chunk fires at 10s (not 30s), recovering
 all 3 repetitions of the keyword. Without the fix, the 30s chunk window
 loses content because the encoder collapses *inside* each 30s chunk.
 
-Uses ${KAGGLE_ACCOUNT} account on Kaggle T4/P100.
+Uses $KAGGLE_ACCOUNT account on Kaggle T4/P100.
 """
 
 import os

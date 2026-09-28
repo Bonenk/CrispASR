@@ -57,6 +57,37 @@ class NoSecretsTest(unittest.TestCase):
         hits = scan(ROOT)
         self.assertEqual(hits, [], "credentials in tracked files:\n" + "\n".join(hits))
 
+    def test_kaggle_metadata_uses_account_placeholder(self):
+        # The Kaggle account comes from the KAGGLE_ACCOUNT secret, rendered at push
+        # time by tools/kaggle/kpush.py - never a literal owner in the repo.
+        import json
+        bad = []
+        for f in sorted(ROOT.glob("tools/kaggle/**/kernel-metadata.json")):
+            m = json.loads(f.read_text())
+            refs = [m.get("id", "")] + [x for k in ("dataset_sources", "kernel_sources", "model_sources")
+                                        for x in (m.get(k) or [])]
+            bad += [f"{f.relative_to(ROOT)}: {r}" for r in refs if r and not r.startswith("${KAGGLE_ACCOUNT}/")]
+        self.assertEqual(bad, [], "literal Kaggle owners in kernel metadata:\n" + "\n".join(bad))
+
+    def test_kaggle_account_name_not_committed(self):
+        # CI passes the KAGGLE_ACCOUNT secret; the name itself must not appear in
+        # any tracked file (skipped where the secret is unavailable, e.g. forks).
+        import os
+        name = os.environ.get("KAGGLE_ACCOUNT", "").strip()
+        if not name:
+            self.skipTest("KAGGLE_ACCOUNT not set")
+        rx = re.compile(re.escape(name), re.I)
+        files = subprocess.run(["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True).stdout.split(b"\0")
+        hits = []
+        for rel in filter(None, files):
+            try:
+                data = (ROOT / rel.decode()).read_bytes()
+            except OSError:
+                continue
+            if b"\0" not in data[:8192] and rx.search(data.decode("utf-8", "replace")):
+                hits.append(rel.decode())
+        self.assertEqual(hits, [], "Kaggle account name committed in:\n" + "\n".join(hits))
+
     def test_patterns_fire(self):
         # Positive control: each pattern must match a synthetic sample.
         samples = {
@@ -65,7 +96,7 @@ class NoSecretsTest(unittest.TestCase):
             "github token": "ghp_" + "b" * 36,
             "openai-style key": "sk-" + "c" * 40,
             "aws access key": "AKIA" + "D" * 16,
-            "private key block": "-----BEGIN RSA PRIVATE KEY-----",
+            "private key block": "-----BEGIN RSA " + "PRIVATE KEY-----",  # split: this file is scanned too
         }
         for name, s in samples.items():
             self.assertTrue(PATTERNS[name].search(s), name)

@@ -12,7 +12,7 @@ if ! command -v kaggle >/dev/null 2>&1; then
 fi
 
 echo "Pushing $(jq -r .id kernel-metadata.json) ..."
-kaggle kernels push -p "$dir"
+python3 "$(git rev-parse --show-toplevel)/tools/kaggle/kpush.py" "$dir"
 echo
 echo "Triggered. Monitor with:"
 echo "  kaggle kernels status ${KAGGLE_ACCOUNT}/crispasr-funasr-cuda-debug"

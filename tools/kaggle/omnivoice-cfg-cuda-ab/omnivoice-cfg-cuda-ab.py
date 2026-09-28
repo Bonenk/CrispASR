@@ -14,7 +14,7 @@ run is really on CUDA0; proof-of-work (#24) — every run must exit 0, decode no
 audio, and unified codes must match 2forward. A top-level guard always writes
 results.json so a failure is diagnosable.
 
-Push (${KAGGLE_ACCOUNT}): tools/kaggle/omnivoice-cfg-cuda-ab/push.sh
+Push ($KAGGLE_ACCOUNT): tools/kaggle/omnivoice-cfg-cuda-ab/push.sh
 """
 
 import json

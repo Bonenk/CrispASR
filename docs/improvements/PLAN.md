@@ -101,7 +101,7 @@ working path — per the dev-guide), with an **A/B method** and **unit tests**.
       `CRISPASR_SESSION_CHUNK_SECONDS`.
 - [ ] **F5 — run the two CUDA kernels** (`tools/kaggle/{parakeet-mem-policy-cuda,
       server-workers-cuda}/`) — prepared; user-gated on Kaggle quota. _2026-07-16:
-      push attempted, REJECTED pre-flight — `${KAGGLE_ACCOUNT}` account at its 30 h/week GPU
+      push attempted, REJECTED pre-flight — `$KAGGLE_ACCOUNT` account at its 30 h/week GPU
       quota (0 quota consumed; kernels never created, `status` → 404). Scripts
       verified launch-ready (py_compile OK, GPU+internet on, proof-of-work guards);
       re-run `bash <dir>/push.sh` once the weekly window resets._

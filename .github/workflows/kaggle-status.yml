@@ -17,8 +17,8 @@
 # (the CLI / API doesn't expose it). See tools/kaggle/README.md §4.
 # This workflow is the closest we can get to programmatic verification.
 #
-# Required secret: KAGGLE_API_TOKEN (raw token, ~38 bytes, from
-# kaggle.com → Settings → Account → "API token").
+# Required secrets: KAGGLE_ACCOUNT (Kaggle username) and KAGGLE_TOKEN (raw
+# API token from kaggle.com → Settings → Account → "API token").
 
 name: Kaggle kernel status
 
@@ -43,6 +43,12 @@ jobs:
   kaggle-status:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Account and token come from repository secrets; nothing account-specific
+    # is committed (kernel metadata carries ${KAGGLE_ACCOUNT}, rendered by
+    # tools/kaggle/kpush.py).
+    env:
+      KAGGLE_ACCOUNT: ${{ secrets.KAGGLE_ACCOUNT }}
+      KAGGLE_TOKEN: ${{ secrets.KAGGLE_TOKEN }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -52,12 +58,10 @@ jobs:
         run: pip install kaggle
 
       - name: Write Kaggle credentials
-        env:
-          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
         run: |
           mkdir -p ~/.kaggle
           # Modern token format (raw token, not JSON).
-          printf '%s' "$KAGGLE_API_TOKEN" > ~/.kaggle/access_token
+          printf '%s' "$KAGGLE_TOKEN" > ~/.kaggle/access_token
           chmod 600 ~/.kaggle/access_token
 
       - name: Check validate kernel status
@@ -91,7 +95,7 @@ jobs:
         if: github.event.inputs.trigger_run == 'true'
         run: |
           echo "Pushing validate kernel bootstrap..."
-          kaggle kernels push -p tools/kaggle
+          python3 tools/kaggle/kpush.py tools/kaggle
           echo "Done. Watch at: https://www.kaggle.com/code/${KAGGLE_ACCOUNT}/crispasr-regression-suite"
           echo
           echo "NOTE: re-push is only needed when crispasr-regression.py itself"

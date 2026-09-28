@@ -5,8 +5,8 @@ Tests all CrispASR backends that fit in Kaggle's time/disk budget.
 Head-to-head with onnx-asr for overlapping models (whisper, parakeet, canary).
 CrispASR-only RTF for the 20+ backends onnx-asr doesn't support.
 
-Push (under ${KAGGLE_ACCOUNT}):
-  export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+Push (under $KAGGLE_ACCOUNT):
+  export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
   python -m kaggle kernels push -p tools/kaggle/issue81-onnx-bench
 """
 

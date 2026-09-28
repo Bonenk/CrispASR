@@ -18,7 +18,7 @@ the fp reductions) — the gates are the whisper roundtrip transcript + rms +
 wall time.  Default flip only if fuse wins wall-time AND keeps 8/8
 (LEARNING 35).
 
-Push (${KAGGLE_ACCOUNT} is the default account; needs ${KAGGLE_ACCOUNT}/crispasr-ccache for the
+Push ($KAGGLE_ACCOUNT is the default account; needs ${KAGGLE_ACCOUNT}/crispasr-ccache for the
 warm CUDA build):
   python -m kaggle kernels push -p tools/kaggle/confucius4-gpu-verify
 """

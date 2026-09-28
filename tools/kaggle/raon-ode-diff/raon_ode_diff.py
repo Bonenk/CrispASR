@@ -7,7 +7,7 @@ eats its own output). So: give BOTH the SAME x0/cond/tokens/schedule, run each
 euler loop FREE, and diff x at every step. The first step whose cos/norm_ratio
 departs from 1.0 is where our per-step velocity is wrong for the evolving
 (partially-denoised) x distribution the snapshot probes never exercised.
-RAON_SIZE=1B; ${KAGGLE_ACCOUNT}.
+RAON_SIZE=1B; $KAGGLE_ACCOUNT.
 """
 import json, os, subprocess, sys, time
 from pathlib import Path

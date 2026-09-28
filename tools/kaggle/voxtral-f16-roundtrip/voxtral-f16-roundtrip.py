@@ -28,8 +28,8 @@ Deliberate choices, each of which is what makes the run worth its time:
     text, empty text and a truncated half must produce four DIFFERENT
     scores. A word-overlap score that cannot go low is not a check.
 
-Push (under ${KAGGLE_ACCOUNT}):
-    export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+Push (under $KAGGLE_ACCOUNT):
+    export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
     python -m kaggle kernels push -p tools/kaggle/voxtral-f16-roundtrip
 """
 

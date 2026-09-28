@@ -6,7 +6,7 @@ inputs, yet real 1B synthesis produces an RMS-hot mel. This runs a REAL synthesi
 with CRISPASR_F5_DUMP_DIR and reports the std/max of x at every ODE step, plus the
 final gen_mel (vocos_input) stats. If x grows monotonically → the ODE diverges;
 if x is normal until the vocoder → the bug is post-ODE (gen-mel slice / vocoder).
-Compares against the reference gen_mel std≈0.9. RAON_SIZE=1B|0.3B; ${KAGGLE_ACCOUNT}.
+Compares against the reference gen_mel std≈0.9. RAON_SIZE=1B|0.3B; $KAGGLE_ACCOUNT.
 """
 import json, os, subprocess, sys, time, glob
 from pathlib import Path

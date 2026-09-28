@@ -10,7 +10,7 @@ at ~step 22-23 on a HEALTHY (std 0.62) trajectory. This run, per crispasr-dc:
   (3) BLOCK LOCALIZE: at the last finite step, run the DiT with per-block taps
       on the oracle's (finite) latent and name the first block that goes
       non-finite. t-driven vs x-driven falls out of which op it is.
-No mechanism named until the dump speaks. RAON_SIZE=1B; ${KAGGLE_ACCOUNT}.
+No mechanism named until the dump speaks. RAON_SIZE=1B; $KAGGLE_ACCOUNT.
 """
 import json, os, subprocess, sys, time
 from pathlib import Path

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bake the missing regression reference dumps (${KAGGLE_ACCOUNT}).
+"""Bake the missing regression reference dumps ($KAGGLE_ACCOUNT).
 
 38 of the 45 entries in tests/regression/manifest.json are `skip_diff: true` —
 transcript-only, because their ref dump was never produced. A transcript check
@@ -19,8 +19,8 @@ is executed. That is the whole reason this file exists.
 import os, subprocess, sys, pathlib, time
 
 # rebake + upload. UPLOAD=1 needs HF_TOKEN, which the harness resolves from the
-# ${KAGGLE_ACCOUNT} token dataset (see gotcha #13: private datasets are per-account, so
-# this kernel MUST be pushed by ${KAGGLE_ACCOUNT} and reference ${KAGGLE_ACCOUNT}'s copies).
+# $KAGGLE_ACCOUNT token dataset (see gotcha #13: private datasets are per-account, so
+# this kernel MUST be pushed by $KAGGLE_ACCOUNT and reference $KAGGLE_ACCOUNT's copies).
 os.environ["CRISPASR_REGRESSION_MODE"] = "rebake"
 # UPLOAD off: the suite's HF token resolution came back anonymous on both
 # accounts (2026-09-27), so refs stage to /kaggle/working/rebake-stage/ and are

@@ -16,8 +16,8 @@ kernel metadata; the push stages a copy of the script + `kaggle_harness.py`).
   bump it for a clean run. `CRISPASR_SWEEP_REPO` overrides the dataset (default `cstr/crispasr-kaggle-progress`).
 - A combined `<RUN>/summary.json` is written at the end.
 
-## Push (${KAGGLE_ACCOUNT})
+## Push ($KAGGLE_ACCOUNT)
 ```bash
-export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
 bash tools/kaggle/full-sweep/push.sh   # stages script + harness, then pushes
 ```

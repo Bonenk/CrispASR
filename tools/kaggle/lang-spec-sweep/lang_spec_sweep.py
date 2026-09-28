@@ -174,7 +174,7 @@ def _token_from_dataset() -> str | None:
     roots = [
         Path("/kaggle/input"),
         Path("/kaggle/input/datasets"),
-        Path("/kaggle/input/datasets/${KAGGLE_ACCOUNT}"),
+        Path("/kaggle/input/datasets/$KAGGLE_ACCOUNT"),
     ]
     for root in roots:
         if not root.exists():

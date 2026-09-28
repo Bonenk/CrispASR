@@ -12,7 +12,7 @@ native q8 conv pw), JFK 11 s + JFK×5 55 s, in-process Session, warm medians:
 Acceptance: transcripts must equal base per clip. Timing: per-call series
 (reveals cached-graph warm-up on call 2+).
 
-Push (${KAGGLE_ACCOUNT}): tools/kaggle/fc-unified-graph-ab/push.sh
+Push ($KAGGLE_ACCOUNT): tools/kaggle/fc-unified-graph-ab/push.sh
 """
 
 import json

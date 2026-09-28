@@ -235,7 +235,7 @@ def main():
         # Bail out BEFORE the ~20 min build. There is no working API-side T4
         # selector for script kernels: --accelerator nvidiaTeslaT4 was accepted
         # and ignored (3 runs), and "machine_shape": "GPU_T4_X2" in the metadata
-        # was independently retested on another ${KAGGLE_ACCOUNT} kernel and still landed
+        # was independently retested on another $KAGGLE_ACCOUNT kernel and still landed
         # sm_60. So the accelerator is a lottery, and the only cheap play is to
         # lose it fast — a re-push then costs ~1 min instead of a whole run.
         RESULTS.write_text(json.dumps({

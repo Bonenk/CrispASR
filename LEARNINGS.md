@@ -2790,7 +2790,7 @@ Two traps cost a couple of cold ~25 min CUDA builds before they were caught:
    datasets owned by the account it runs under — Kaggle silently drops a
    cross-account `dataset_sources` entry (*"not valid dataset sources"*) and
    pushes the kernel **without** it. So `${KAGGLE_ACCOUNT}/crispasr-ccache` cannot attach to
-   a `${KAGGLE_ACCOUNT}` kernel. The fix is a per-account **copy** of every dataset (both
+   a `$KAGGLE_ACCOUNT` kernel. The fix is a per-account **copy** of every dataset (both
    accounts already keep their own `crispasr-hf-token`); make `crispasr-ccache`
    exist under both too. (Don't switch the kernel's account to chase a dataset.)
 

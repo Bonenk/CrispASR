@@ -8,8 +8,7 @@
   "enable_gpu": "true",
   "enable_internet": "true",
   "dataset_sources": [
-    "${KAGGLE_ACCOUNT}/crispasr-hf-token",
-    "${KAGGLE_ACCOUNT}/crispasr-ccache"
+    "${KAGGLE_ACCOUNT}/crispasr-hf-token"
   ],
   "competition_sources": [],
   "kernel_sources": [],

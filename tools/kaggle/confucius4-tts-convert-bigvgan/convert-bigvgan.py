@@ -5,7 +5,7 @@ Reuses the IndexTTS BigVGAN GGUF format: fuses weight_norm at convert time,
 writes with the same shortened tensor names so indextts_voc.cpp can load it
 directly with different hparams.
 
-Push (under ${KAGGLE_ACCOUNT}):
+Push (under $KAGGLE_ACCOUNT):
   export KAGGLE_API_TOKEN=...
   python -m kaggle kernels push -p tools/kaggle/confucius4-tts-convert-bigvgan
 """

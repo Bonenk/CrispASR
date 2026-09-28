@@ -15,7 +15,7 @@ ephemeral layer), then emit exactly ONE artifact — /kaggle/working/ccache.tar 
 so page 1 of the output contains everything needed.
 
 The tar is compiler cache and carries no account identity, so a single run
-refreshes BOTH ${KAGGLE_ACCOUNT} and ${KAGGLE_ACCOUNT} copies.
+refreshes BOTH $KAGGLE_ACCOUNT and $KAGGLE_ACCOUNT copies.
 
 Nothing but ccache.tar (and progress.jsonl) may be written to /kaggle/working —
 that is the whole point. The repo and build tree go to /kaggle/temp.

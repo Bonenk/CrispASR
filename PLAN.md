@@ -181,7 +181,7 @@ variant: Qwen3 LLM backbone over continuous speech representations + redae
 acoustic autoencoder + CAM++ speaker encoder, 16 kHz, zero-shot voice cloning.
 Porting from the OFFICIAL fp32 checkpoint (~8.5 GB); the drbaph int8 mirror is
 Hadamard-rotated comfy-kitchen weights and unsuitable as a conversion source.
-Heavy convert/refdump on Kaggle ${KAGGLE_ACCOUNT} (${KAGGLE_ACCOUNT} is taken by a parallel task).
+Heavy convert/refdump on Kaggle $KAGGLE_ACCOUNT ($KAGGLE_ACCOUNT is taken by a parallel task).
 Converter + backend + diff harness + TTS-to-ASR roundtrip acceptance.
 
 ## CLAIMED 2026-09-12 — #434 supertonic-3
@@ -192,7 +192,7 @@ text_encoder + duration_predictor + vector_estimator + vocoder, ~400 MB,
 non-AR flow matching, 44.1 kHz). Licence to be re-verified from the HF card
 before shipping. Converter + backend + diff harness (ONNX intermediates as
 reference) + TTS-to-ASR roundtrip acceptance. Heavy build/convert/validate on
-Kaggle ${KAGGLE_ACCOUNT}.
+Kaggle $KAGGLE_ACCOUNT.
 
 ## NOW — #416 Sidon quantized models decode to silence (Vulkan MMQ)
 

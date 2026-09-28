@@ -6,7 +6,7 @@ string with the HF tokenizer, and runs the T2S decode loop to generate
 semantic codes. Validates the full pipeline: model load → text projector
 MLP → GPT-2 prefill → autoregressive decode → EOS/max.
 
-Push (under ${KAGGLE_ACCOUNT}):
+Push (under $KAGGLE_ACCOUNT):
   # Kaggle CLI auth: ~/.kaggle/access_token (never commit a token; see tests/test_no_secrets.py)
   python -m kaggle kernels push -p tools/kaggle/confucius4-tts-test
 """

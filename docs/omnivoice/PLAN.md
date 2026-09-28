@@ -660,7 +660,7 @@ Per-step FORWARD (both cond+uncond), M1 Metal, clean:
   since we already process fewer tokens (238 vs their padded 256). Beating them further
   is kernel-level (port their Metal kernels) — a separate deep effort, uncertain payoff.
 
-### ✅ CUDA A/B verdict (Kaggle ${KAGGLE_ACCOUNT}, P100/T4) — the fusion WINS on CUDA
+### ✅ CUDA A/B verdict (Kaggle $KAGGLE_ACCOUNT, P100/T4) — the fusion WINS on CUDA
 `tools/kaggle/omnivoice-cfg-cuda-ab/`. Per-step forward, on_cuda=true (CUDA0),
 codes byte-identical (proof-of-work ✓):
 | config | CUDA ms/step | M1 Metal ms/step |

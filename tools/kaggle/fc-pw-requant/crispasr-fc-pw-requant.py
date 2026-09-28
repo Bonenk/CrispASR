@@ -18,7 +18,7 @@ Per repo / per quantized file:
   5. upload to the same path, delete local copies
 
 Re-runs are cheap: step 2 no-ops on already-fixed files.
-Push (under ${KAGGLE_ACCOUNT}): tools/kaggle/fc-pw-requant/push.sh
+Push (under $KAGGLE_ACCOUNT): tools/kaggle/fc-pw-requant/push.sh
 """
 
 import json

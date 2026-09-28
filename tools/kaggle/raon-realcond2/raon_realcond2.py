@@ -11,7 +11,7 @@ what actually becomes audio).
 CONTROL = CFM.sample's gen-region std per step — MUST converge (~0.9). Then
 inject CFM.sample's EXACT y0 + step_cond + tokens into C++'s euler_solve and
 compare its gen-region std. If C++ diverges where CFM.sample converges, C++'s
-sampler is the 1B bug. RAON_SIZE=1B; ${KAGGLE_ACCOUNT}.
+sampler is the 1B bug. RAON_SIZE=1B; $KAGGLE_ACCOUNT.
 """
 import json, os, subprocess, sys, time
 from pathlib import Path

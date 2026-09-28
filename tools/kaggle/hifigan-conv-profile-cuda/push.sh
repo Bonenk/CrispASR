@@ -7,7 +7,7 @@ set -euo pipefail
 dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; cd "$dir"
 command -v kaggle >/dev/null 2>&1 || { echo "kaggle CLI not found (pip install kaggle)" >&2; exit 1; }
 echo "Pushing $(python3 -c 'import json;print(json.load(open("kernel-metadata.json"))["id"])') ..."
-kaggle kernels push -p "$dir"
+python3 "$(git rev-parse --show-toplevel)/tools/kaggle/kpush.py" "$dir"
 echo; echo "Monitor:"
 echo "  kaggle kernels status ${KAGGLE_ACCOUNT}/crispasr-hifigan-conv-profile-cuda"
 echo "  kaggle kernels output ${KAGGLE_ACCOUNT}/crispasr-hifigan-conv-profile-cuda -p ./out"

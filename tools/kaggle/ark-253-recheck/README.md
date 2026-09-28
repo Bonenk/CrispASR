@@ -4,7 +4,7 @@ Kaggle GPU kernels used to diagnose issue #253 (ARK dropping transcriptions /
 looping / leaking special tokens on long real-world audio). Each is a standalone
 `kernel_type: script` — build crispasr from main, pull the ark GGUF + the
 reporter's clip, and probe one question. Set `kernel-metadata.json`'s `code_file`
-to the one you want and `kaggle kernels push -p .` (${KAGGLE_ACCOUNT}; needs GPU quota).
+to the one you want and `kaggle kernels push -p .` ($KAGGLE_ACCOUNT; needs GPU quota).
 
 | script | question it answers |
 |--------|---------------------|

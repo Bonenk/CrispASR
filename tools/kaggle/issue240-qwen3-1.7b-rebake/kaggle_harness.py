@@ -349,7 +349,7 @@ def export_ccache_tar(dest: str | os.PathLike = "/kaggle/working/ccache.tar") ->
     """Tar CCACHE_DIR into a SINGLE file for refreshing the ccache dataset.
 
     Call at the end of a kernel that did a real build, then upload `dest` as
-    ${KAGGLE_ACCOUNT}/crispasr-ccache (and the ${KAGGLE_ACCOUNT} copy — cross-account attach is
+    ${KAGGLE_ACCOUNT}/crispasr-ccache (and the $KAGGLE_ACCOUNT copy — cross-account attach is
     blocked, so each account needs its own).
 
     One file is the whole point: `kaggle kernels output` stops at 500 files
@@ -613,7 +613,7 @@ def kaggle_token_from_dataset(filename: str = "hf_token.txt") -> str | None:
     # Owner-agnostic scan: probe <filename> in EVERY mounted dataset dir, at
     # both the classic depth (<root>/<slug>/) and the newer nested depth
     # (<root>/datasets/<owner>/<slug>/). The old code only matched owner
-    # names containing "hf-token" and hard-coded ${KAGGLE_ACCOUNT}, so a ${KAGGLE_ACCOUNT} kernel on
+    # names containing "hf-token" and hard-coded $KAGGLE_ACCOUNT, so a $KAGGLE_ACCOUNT kernel on
     # the newer mount path (/kaggle/input/datasets/${KAGGLE_ACCOUNT}/crispasr-hf-token/)
     # never had its token file scanned → token silently unresolved (the
     # 2026-06-20 v2/v3 full-sweep runs). Don't filter by dir name — probe the file.

@@ -12,7 +12,7 @@ with two controls (per crispasr-dc):
   ARM 3  C++ euler (ODE probe), SAME cond + SAME x0 + SAME tokens as ARM 2.
 x0 is FIXED across ARM2/ARM3 so the only variable is the code path; ARM1 vs ARM2
 isolates the duration formula; ARM2 vs ARM3 isolates C++ euler vs reference.
-RAON_SIZE=1B; ${KAGGLE_ACCOUNT}.
+RAON_SIZE=1B; $KAGGLE_ACCOUNT.
 """
 import json, os, subprocess, sys, time
 from pathlib import Path

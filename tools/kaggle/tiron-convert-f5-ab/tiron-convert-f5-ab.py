@@ -28,7 +28,7 @@
 # only small logs + summary JSON land in /kaggle/working. ccache auto-warmed by
 # the harness onto /kaggle/temp; ccache.tar exported at the end for refresh.
 #
-# Requirements: Kaggle GPU, Internet ON. Datasets (${KAGGLE_ACCOUNT}, same account as id):
+# Requirements: Kaggle GPU, Internet ON. Datasets ($KAGGLE_ACCOUNT, same account as id):
 #   ${KAGGLE_ACCOUNT}/crispasr-hf-token, ${KAGGLE_ACCOUNT}/crispasr-ccache.
 
 # ─────────────────────────── cell 1 (code) — config ──────────────────────

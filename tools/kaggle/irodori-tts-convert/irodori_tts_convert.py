@@ -11,7 +11,7 @@ Outputs:
   - irodori-tts-500m-v3-q4_k.gguf    (~250 MB)
   - irodori-tts-ref.gguf              (reference activations for diff)
 
-Run under ${KAGGLE_ACCOUNT} account with GPU enabled.
+Run under $KAGGLE_ACCOUNT account with GPU enabled.
 """
 
 import os

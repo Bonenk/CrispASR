@@ -20,8 +20,8 @@ REQUIREMENTS:
   - ${KAGGLE_ACCOUNT}/crispasr-hf-token dataset mounted (HF token); the token's HF
     account must have accepted the google/gemma-4-E4B-it gated license.
 
-Push (under ${KAGGLE_ACCOUNT}):
-  export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+Push (under $KAGGLE_ACCOUNT):
+  export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
   python -m kaggle kernels push -p tools/kaggle/gemma4-e4b-convert
 """
 

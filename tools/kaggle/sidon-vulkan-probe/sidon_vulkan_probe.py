@@ -9,7 +9,7 @@ each has killed an experiment in this issue already:
   Q1 WHICH GPU?  T4 is sm_75 (dp4a -> integerDotProduct...Accelerated TRUE, the
      same compute capability as the reporter's GTX 1660 SUPER). P100 is sm_60:
      no dp4a, so ggml disables MMQ and the arm under test cannot run. Six
-     consecutive P100 draws on ${KAGGLE_ACCOUNT} today, and no working API-side selector,
+     consecutive P100 draws on $KAGGLE_ACCOUNT today, and no working API-side selector,
      so this is a lottery — fail fast and report the draw.
   Q2 IS VULKAN EVEN PRESENT?  Kaggle images are not general-purpose. The NVIDIA
      driver normally ships an ICD but nobody has confirmed it here. No ICD means

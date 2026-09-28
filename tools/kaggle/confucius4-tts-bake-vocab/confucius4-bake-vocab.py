@@ -6,7 +6,7 @@ tokenizer.ggml.scores from the HF tokenizer.json, re-writes as a new
 GGUF, quantizes, and uploads. The runtime can then use
 core/sentencepiece.h to tokenize at inference time.
 
-Push (under ${KAGGLE_ACCOUNT}):
+Push (under $KAGGLE_ACCOUNT):
   # Kaggle CLI auth: ~/.kaggle/access_token (never commit a token; see tests/test_no_secrets.py)
   python -m kaggle kernels push -p tools/kaggle/confucius4-tts-bake-vocab
 """

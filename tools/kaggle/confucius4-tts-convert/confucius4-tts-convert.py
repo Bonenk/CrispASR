@@ -17,7 +17,7 @@ REQUIREMENTS:
   - ${KAGGLE_ACCOUNT}/crispasr-hf-token dataset mounted (HF token for upload)
   - No GPU needed (CPU conversion only)
 
-Push (under ${KAGGLE_ACCOUNT}):
+Push (under $KAGGLE_ACCOUNT):
   # Kaggle CLI auth: ~/.kaggle/access_token (never commit a token; see tests/test_no_secrets.py)
   python -m kaggle kernels push -p tools/kaggle/confucius4-tts-convert
 """

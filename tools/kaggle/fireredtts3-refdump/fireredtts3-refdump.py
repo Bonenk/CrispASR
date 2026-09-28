@@ -11,8 +11,8 @@ via tools/dump_reference.py --backend fireredtts3, then:
     (fireredtts3/jfk_11s/ref.gguf) and the control WAV + transcript to
     cstr/fireredtts3-GGUF
 
-Push (${KAGGLE_ACCOUNT}):
-  export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+Push ($KAGGLE_ACCOUNT):
+  export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
   python -m kaggle kernels push -p tools/kaggle/fireredtts3-refdump
 """
 

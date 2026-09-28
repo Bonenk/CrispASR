@@ -16,7 +16,7 @@ POSITIVE CONTROL (a green wall must not be the comparator failing to fire):
     if cpp_block_0 already ~0 or NaN the harness (not the model) is broken.
 
 CPU torch for the reference (P100 lacks torch stft kernels); C++ runs on GPU
-(CUDA) to match the failing roundtrip config. RAON_SIZE=1B. ${KAGGLE_ACCOUNT} datasets.
+(CUDA) to match the failing roundtrip config. RAON_SIZE=1B. $KAGGLE_ACCOUNT datasets.
 """
 import json, os, subprocess, sys, time
 from pathlib import Path

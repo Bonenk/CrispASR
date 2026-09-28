@@ -26,8 +26,8 @@ which can FAIL on its own:
 Each model is attempted independently: one failing does not prevent the other
 from shipping, and the final summary names which is which.
 
-Push (under ${KAGGLE_ACCOUNT} — its crispasr-hf-token clone is the one attached):
-    export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+Push (under $KAGGLE_ACCOUNT — its crispasr-hf-token clone is the one attached):
+    export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
     python -m kaggle kernels push -p tools/kaggle/voxtral-mini-f16
 """
 

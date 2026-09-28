@@ -16,7 +16,7 @@ Also runs a broad backend smoke test (6 backends x JFK) to check
 that the ggml_backend_init_best() -> crispasr_init_gpu_backend()
 migration didn't break any backend's init path.
 
-${KAGGLE_ACCOUNT} account, T4/P100 GPU.
+$KAGGLE_ACCOUNT account, T4/P100 GPU.
 """
 
 import gc

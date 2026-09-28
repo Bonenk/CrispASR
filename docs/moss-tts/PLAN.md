@@ -12,7 +12,7 @@ Spec: `docs/moss-tts/STUDY-4B.md`. Engineering lessons: `LEARNINGS.md` (4B entry
 + `HISTORY.md`. Branch `feat/moss-tts-local-4b` rebased (29 commits, clean) + ff'd
 into `main`; rebuilt + wiring PASS + unit test 30/30 + feature-matrix current.
 
-**Validated end-to-end (Kaggle ${KAGGLE_ACCOUNT} P100, HARD RULE #3).** With the card-correct
+**Validated end-to-end (Kaggle $KAGGLE_ACCOUNT P100, HARD RULE #3).** With the card-correct
 sampling defaults, F16 synth STOPS naturally (short 15, long 124 frames — not the
 4096 runaway) and the long clip round-trips through whisper at **word-overlap
 0.969**. Full chain proven: Qwen3-4B backbone → 1-layer depth transformer →

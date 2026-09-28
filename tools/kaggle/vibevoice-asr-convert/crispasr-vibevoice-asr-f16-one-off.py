@@ -11,7 +11,7 @@
 #
 # Triggered from the Kaggle UI ("Save Version → Run All") so that
 # the UserSecretsClient call in cell 1 lands the HF_TOKEN attached
-# to your ${KAGGLE_ACCOUNT} account — that's the path we know reads cleanly
+# to your $KAGGLE_ACCOUNT account — that's the path we know reads cleanly
 # (batch / CLI-pushed runs get a different JWT that 400s on
 # GetUserSecretByLabel; see the rebake-refs kernel history).
 #

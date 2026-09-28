@@ -103,9 +103,9 @@ def test_short_path_layout_nonstandard_slug(kh, monkeypatch, tmp_path):
 # This is the layout the T19-E3 run-1 worker had ("/kaggle/input contains
 # 1 entries: ['datasets']") and the one the pre-fix resolver missed.
 
-def test_long_path_layout_${KAGGLE_ACCOUNT}(kh, monkeypatch, tmp_path):
+def test_long_path_layout_someacct(kh, monkeypatch, tmp_path):
     root = fake_input_root(monkeypatch, tmp_path)
-    put_token(root, "datasets/${KAGGLE_ACCOUNT}/crispasr-hf-token/hf_token.txt", TOK_LONG)
+    put_token(root, "datasets/someacct/crispasr-hf-token/hf_token.txt", TOK_LONG)
     assert kh.kaggle_token_from_dataset() == TOK_LONG
 
 
@@ -121,7 +121,7 @@ def test_long_path_layout_any_owner(kh, monkeypatch, tmp_path):
 def test_both_layouts_short_preferred(kh, monkeypatch, tmp_path):
     root = fake_input_root(monkeypatch, tmp_path)
     put_token(root, "crispasr-hf-token/hf_token.txt", TOK_SHORT)
-    put_token(root, "datasets/${KAGGLE_ACCOUNT}/crispasr-hf-token/hf_token.txt", TOK_LONG)
+    put_token(root, "datasets/someacct/crispasr-hf-token/hf_token.txt", TOK_LONG)
     assert kh.kaggle_token_from_dataset() == TOK_SHORT
 
 
@@ -151,7 +151,7 @@ def test_resolve_require_aborts_up_front(kh, monkeypatch, tmp_path):
 
 def test_resolve_require_passes_when_token_present(kh, monkeypatch, tmp_path):
     root = fake_input_root(monkeypatch, tmp_path)
-    put_token(root, "datasets/${KAGGLE_ACCOUNT}/crispasr-hf-token/hf_token.txt", TOK_LONG)
+    put_token(root, "datasets/someacct/crispasr-hf-token/hf_token.txt", TOK_LONG)
     assert kh.resolve_hf_token(require=True) == TOK_LONG
 
 
@@ -184,5 +184,5 @@ def test_short_empty_token_falls_through_to_long(kh, monkeypatch, tmp_path):
     # An empty/short token file must not shadow a real one elsewhere.
     root = fake_input_root(monkeypatch, tmp_path)
     put_token(root, "crispasr-hf-token/hf_token.txt", "")
-    put_token(root, "datasets/${KAGGLE_ACCOUNT}/crispasr-hf-token/hf_token.txt", TOK_LONG)
+    put_token(root, "datasets/someacct/crispasr-hf-token/hf_token.txt", TOK_LONG)
     assert kh.kaggle_token_from_dataset() == TOK_LONG

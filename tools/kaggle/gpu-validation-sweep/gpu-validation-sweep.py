@@ -9,7 +9,7 @@ Single kernel covering multiple open PLAN items that need CUDA validation:
 3. #58 MOSS-Audio GPU: basic dGPU smoke (encoder + LLM decode).
 4. #125 P0 mimo-asr CUDA: retest sched src-mutation fix (a5a518c8).
 
-Runs on ${KAGGLE_ACCOUNT} account. Attaches crispasr-ccache for fast builds.
+Runs on $KAGGLE_ACCOUNT account. Attaches crispasr-ccache for fast builds.
 """
 
 import gc

@@ -112,4 +112,4 @@ each frame = 512 samples → wav [B, 6L·512]. Trim to sr·dur.
 
 ## Worktree
 `.claude/worktrees/feat-434-supertonic`, branch `feat/434-supertonic`.
-Kaggle account: ${KAGGLE_ACCOUNT} (${KAGGLE_ACCOUNT} taken by a parallel agent).
+Kaggle account: $KAGGLE_ACCOUNT ($KAGGLE_ACCOUNT taken by a parallel agent).

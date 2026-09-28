@@ -16,7 +16,7 @@
 #   8. upload tiron-ref.gguf -> cstr/crispasr-regression-fixtures     (checkpoint)
 #
 # Validation (crispasr-diff q4_k vs the ref) is LOCAL, not here.
-# Datasets (${KAGGLE_ACCOUNT}): ${KAGGLE_ACCOUNT}/crispasr-hf-token, ${KAGGLE_ACCOUNT}/crispasr-ccache.
+# Datasets ($KAGGLE_ACCOUNT): ${KAGGLE_ACCOUNT}/crispasr-hf-token, ${KAGGLE_ACCOUNT}/crispasr-ccache.
 
 import os
 import shutil

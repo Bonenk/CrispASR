@@ -36,8 +36,8 @@ answer is a one-line registry default change and the quant carve-out is not
 touched at all. Widening the carve-out is a code change affecting every future
 conversion and is NOT the first move.
 
-Push (${KAGGLE_ACCOUNT}):
-  export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+Push ($KAGGLE_ACCOUNT):
+  export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
   python -m kaggle kernels push -p tools/kaggle/breeze-quant-ab
 """
 

@@ -484,7 +484,7 @@ m2m100 (3.7 s), madlad (12.5 s) — en→de translation produced output.
 
 - **Streaming + resume validated end-to-end.** All per-backend JSONs landed in the
   HF dataset as each backend finished; a re-push skips already-streamed backends.
-  Root cause of the earlier streaming failures (token unresolved on the ${KAGGLE_ACCOUNT}
+  Root cause of the earlier streaming failures (token unresolved on the $KAGGLE_ACCOUNT
   nested mount path) fixed in `81826457`.
 - **Genuine CUDA failures: ~7** (was reported as 10), of which `fastpitch` +
   `speecht5` (§204), `chatterbox` (§205), `lfm2-audio` (§206), and `kugelaudio` (§209) are now FIXED; `orpheus` and `cosyvoice3` (dies 0.1 s) remain — tracked

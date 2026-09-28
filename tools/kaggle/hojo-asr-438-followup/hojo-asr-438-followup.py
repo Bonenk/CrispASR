@@ -25,8 +25,8 @@ transcripts on both fixtures). It left two loose ends, and NEITHER needs the
      hypothesis holds; if the margin is large, it is a defect and parity at f16
      was hiding it.
 
-Push (${KAGGLE_ACCOUNT}):
-  export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+Push ($KAGGLE_ACCOUNT):
+  export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
   python -m kaggle kernels push -p tools/kaggle/hojo-asr-438-followup
 """
 

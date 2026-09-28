@@ -3356,7 +3356,7 @@ Two test-only deliverables from the same session:
 
 ## 2026-07-12 — §176n / §245 CUDA validation PASS (Kaggle P100/T4)
 
-Ran the two CUDA validation kernels on Kaggle (${KAGGLE_ACCOUNT}). Both reached `COMPLETE`
+Ran the two CUDA validation kernels on Kaggle ($KAGGLE_ACCOUNT). Both reached `COMPLETE`
 (the kernels `SystemExit` on failure, so COMPLETE ⇒ verdict PASS):
 - **§176n VoxCPM2** (`crispasr-voxcpm2-176n-cuda`): the default `VOXCPM2_USE_GRAPH`
   GPU path ran on the discrete-GPU mirror path (device-local VRAM), produced a
@@ -20112,7 +20112,7 @@ Not a port — a convert-and-upload. Both converters have always emitted F16
 (`crispasr-quantize` needs one as input, and the 3B card already quoted the
 F16's size and timings); the publish step was simply never in the recipe.
 `tools/kaggle/voxtral-mini-f16/` runs the EXISTING converters unchanged on
-Kaggle (${KAGGLE_ACCOUNT}, CPU session — the models are 9 GB, they cannot be built here).
+Kaggle ($KAGGLE_ACCOUNT, CPU session — the models are 9 GB, they cannot be built here).
 
 Verification is deliberately not the kernel log. `tools/verify-remote-gguf.py`
 range-reads the PUBLISHED header, re-derives the file size the tensor table
@@ -20445,7 +20445,7 @@ reverts). chatterbox s3gen 7170→7582 ms (**0.946x, a 5.4 % REGRESSION** vs
 1.25x on Zen 4) — micro-arch dependent → **stays opt-in** per rule 3a,
 numbers recorded in environment-variables.md.
 
-Follow-ups: refresh the ${KAGGLE_ACCOUNT} ccache dataset (stream404's CUDA build ran
+Follow-ups: refresh the $KAGGLE_ACCOUNT ccache dataset (stream404's CUDA build ran
 cold, ~28 min — tools/kaggle/ccache-refresh); an ARM/NEON datapoint would
 complete the SIMDCONV picture; PR #406's author gets the numbers on the PR.
 ## DONE 2026-08-29 — #400 Windows CUDA 13 package (proofs green)

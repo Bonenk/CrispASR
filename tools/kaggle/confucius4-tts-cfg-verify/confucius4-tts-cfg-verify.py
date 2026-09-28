@@ -16,7 +16,7 @@ What is under test (all on feat/confucius4-cfg):
      kernel invented an English one, so every previous run fed the T2S a prompt
      it was never trained on
 
-Push (${KAGGLE_ACCOUNT} is the default account):
+Push ($KAGGLE_ACCOUNT is the default account):
   python -m kaggle kernels push -p tools/kaggle/confucius4-tts-cfg-verify
 """
 

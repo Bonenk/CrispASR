@@ -3,4 +3,4 @@
 set -e
 # Kaggle CLI auth: ~/.kaggle/access_token (never commit a token; see tests/test_no_secrets.py)
 cd "$(dirname "$0")"
-python -m kaggle kernels push -p .
+python3 "$(git rev-parse --show-toplevel)/tools/kaggle/kpush.py" .

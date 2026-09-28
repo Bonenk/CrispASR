@@ -12,8 +12,8 @@ Steps:
   6. upload each artifact to cstr/fireredtts3-GGUF the moment it exists,
      with a license card (Apache-2.0, FireRedTeam attribution)
 
-Push (${KAGGLE_ACCOUNT}):
-  export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+Push ($KAGGLE_ACCOUNT):
+  export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
   python -m kaggle kernels push -p tools/kaggle/fireredtts3-convert
 """
 

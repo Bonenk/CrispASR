@@ -8,7 +8,7 @@ SeamlessM4T frontend + conformer stack; with `sidon.encoder_only=1` it loads
 without the DAC decoder and `sidon_extract_hidden()` returns the layer-17
 hidden states.
 
-Push (${KAGGLE_ACCOUNT} is the default account):
+Push ($KAGGLE_ACCOUNT is the default account):
   python -m kaggle kernels push -p tools/kaggle/confucius4-w2v-convert
 """
 

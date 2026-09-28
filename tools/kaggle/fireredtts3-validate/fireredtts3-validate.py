@@ -16,8 +16,8 @@ CPU-only kernel (no GPU quota):
   6. verdict: non-silent audio + word overlap vs target, judged against the
      control arm's own 0.83
 
-Push (${KAGGLE_ACCOUNT}):
-  export KAGGLE_API_TOKEN=<${KAGGLE_ACCOUNT} token>
+Push ($KAGGLE_ACCOUNT):
+  export KAGGLE_API_TOKEN=<$KAGGLE_ACCOUNT token>
   python -m kaggle kernels push -p tools/kaggle/fireredtts3-validate
 """
 

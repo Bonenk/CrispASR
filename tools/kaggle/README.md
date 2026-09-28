@@ -32,6 +32,27 @@ Two Kaggle kernels, one canonical script — the rebake kernel pulls the
 latest `crispasr-regression.py` from `main` on every run, so changes to
 the regression logic propagate without re-pushing the bootstrap.
 
+## Account, token and pushing
+
+Nothing account-specific is committed. Kernel metadata (`id`, `dataset_sources`, …)
+and kernel code use the placeholder `${KAGGLE_ACCOUNT}`; `tools/kaggle/kpush.py`
+renders it from the environment and pushes with the token from the environment:
+
+```bash
+# CI: KAGGLE_ACCOUNT / KAGGLE_TOKEN are repository secrets (see kaggle-status.yml).
+# Locally: export them from a private env file - never type a token on a command line.
+python3 tools/kaggle/kpush.py tools/kaggle/<kernel-dir>
+```
+
+`tests/test_no_secrets.py` (Secret scan workflow, every push) fails if a token, a
+literal owner in kernel metadata, or the account name itself lands in the repo.
+
+Kaggle's Terms allow ONE account per person and its Community Guidelines ban
+"abuse [of] kernel resources such as free storage" and attaching unrelated
+datasets: never switch accounts to get around quota or session limits, and do not
+keep build caches or tooling as Kaggle datasets (the build caches now live in private
+Hugging Face dataset repos).
+
 ## One-time setup
 
 Required: Kaggle CLI (`pip install kaggle`, ≥ 1.8.0).
@@ -66,7 +87,7 @@ The CLI prefers the modern access token when both files exist.
    `https://www.kaggle.com/code/<your-kaggle-username>/crispasr-regression-suite`.
    The slug `<username>` comes from the `id` field in
    `kernel-metadata.json` — edit that to your username before the
-   first push if you're not `${KAGGLE_ACCOUNT}`.
+   first push if you're not `$KAGGLE_ACCOUNT`.
 
 2. **Wait for the first run to complete cleanly** (poll the URL or
    `kaggle kernels status <id>`). The first run downloads ~1 GB
