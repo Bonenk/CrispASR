@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.8.38
+
 * **`DiarizeMethod.sortformer`** (C ABI method 5, #466) with a
   `sortformerModelPath` argument to `diarizeSegments`, which also returns
   Sortformer's audio-derived turns through `outTurns`. 0.8.37 shipped the
