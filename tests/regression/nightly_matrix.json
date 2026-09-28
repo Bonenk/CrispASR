@@ -30,6 +30,7 @@
   "piper-lessac-en",
   "pocket-tts-en",
   "bark-small",
-  "csm-1b"
+  "csm-1b",
+  "voxcpm2-tts-2b"
  ]
 }

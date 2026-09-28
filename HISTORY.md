@@ -21,6 +21,20 @@ legacy path returned all four sentences. After the fix, neither path used the
 generic slicer and their whitespace-normalized transcripts matched. The four
 arms built and ran from commits `d1b0684a` and `639329a7`; the terminal v3 log
 and summary are retained under `kaggle-out/whisper-463-parity-v3`.
+## DONE 2026-09-28 — #461 VoxCPM2 CFM performance
+
+VoxCPM2 now builds the complete CFM Euler solve as one cached graph per audio
+patch. Kaggle A/Bs measured 4% lower CFM time on Vulkan and 8% on CPU, with
+matching output; CUDA was neutral. Profiling showed that the remaining Vulkan
+cost is the LocDiT matrix multiplication kernel rather than graph dispatch. A
+split-matmul experiment was 1.9x slower and was rejected.
+
+The reporter's default seed generated the sentence twice (43 autoregressive
+steps versus 18–28 for seeds 1–5), accounting for much of the apparent wall
+time. `CRISPASR_VOXCPM2_INFERENCE_STEPS` is documented as the effective quality
+and speed control; 10/8/6/4 steps measured 62/49/36/21 ms per audio step on a
+T4 Vulkan run. `CRISPASR_VOXCPM2_CFM_FUSED=0` retains the old execution path.
+The VoxCPM2 speech roundtrip is part of the nightly regression matrix.
 
 ## DONE 2026-09-28 — Cohere Q4 hidden-F16 pointwise matrices
 
