@@ -1574,13 +1574,19 @@ end-to-end cosine cannot do.
 - `CRISPASR_VOXCPM2_CFG_BATCH=0` — run CFG's cond and uncond LocDiT forwards as two graphs
   instead of one batch-2 graph (#461; default batched: bit-identical on CPU, -38% CFM time on
   a T4).
+- `CRISPASR_VOXCPM2_CFM_FUSED=0` — run the CFM Euler loop as one LocDiT graph per denoise
+  step instead of one graph for the whole loop (#461; default fused: Vulkan -4% CFM, CPU -8%,
+  CUDA neutral; Vulkan output bit-identical, CUDA cos 1.0).
 - `CRISPASR_VOXCPM2_CFG_INTERVAL`
 - `CRISPASR_VOXCPM2_CFG_INTERVAL_DEBUG`
 - `CRISPASR_VOXCPM2_CFG_VALUE`
 - `CRISPASR_VOXCPM2_CPU_ONLY`
 - `CRISPASR_VOXCPM2_FA_CPU`
 - `CRISPASR_VOXCPM2_FORCE_SCALAR`
-- `CRISPASR_VOXCPM2_INFERENCE_STEPS`
+- `CRISPASR_VOXCPM2_INFERENCE_STEPS` — CFM Euler steps (default 10). CFM cost is linear in it
+  and is ~70% of synthesis on a GPU; on a T4 (Vulkan) 10/8/6/4 steps = 62/49/36/21 ms per audio
+  step, all intelligible on the #461 test sentence (ASR roundtrip, four seeds). Lower it on slow
+  GPUs/iGPUs; listen before shipping lower values.
 - `CRISPASR_VOXCPM2_MAX_LEN`
 - `CRISPASR_VOXCPM2_NAN_CHECK`
 - `CRISPASR_VOXCPM2_NO_BUCKET`
