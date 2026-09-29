@@ -20,9 +20,11 @@ REF = "fix/461-vae-dw"
 TEXT = "Hello, this is a short test sentence."
 BASE_ENV = {"CRISPASR_VOXCPM2_BENCH": "1", "CRISPASR_VOXCPM2_INFERENCE_STEPS": "6"}
 SHIFT = {"CRISPASR_VOXCPM2_VAE_DW_SHIFT": "1"}
-# sha256[:16] of the same arms' WAVs from run 3 (commit 29edb4cb, before the
-# host-side permute): a pure speed change must reproduce them byte for byte.
-REF_SHA = {"vk_base_1": "89541f440a8b10fe", "vk_shift_1": "c90c145bef2bac22"}
+# sha256[:16] of run 3/4's WAVs (identical in both): c90c.. = depthwise-shift
+# VAE, 8954.. = legacy conv_1d_dw VAE. Final gate for the Vulkan default: the
+# default arm must be the shift output, CRISPASR_VOXCPM2_VAE_DW_SHIFT=0 the legacy.
+SHIFT_SHA, LEGACY_SHA = "c90c145bef2bac22", "89541f440a8b10fe"
+REF_SHA = {"vk_default_1": SHIFT_SHA, "vk_default_2": SHIFT_SHA, "vk_off": LEGACY_SHA, "vk_on": SHIFT_SHA}
 res = {"errors": [], "runs": {}}
 def save(): (OUT / "result.json").write_text(json.dumps(res, indent=1))
 def sh(c, t=None): return subprocess.run(c, shell=True, capture_output=True, text=True, timeout=t)
@@ -113,17 +115,18 @@ try:
         return wav
 
     run("vk_warmup")
-    for i in (1, 2):
-        run(f"vk_base_{i}")
-        run(f"vk_shift_{i}", env=SHIFT)
-    run("cpu_shift", ["-ng"], env=SHIFT)
+    run("vk_default_1")
+    run("vk_off", env={"CRISPASR_VOXCPM2_VAE_DW_SHIFT": "0"})
+    run("vk_on", env=SHIFT)
+    run("vk_default_2")
+    res["gate_ok"] = all(res["runs"][t].get("matches_run3") for t in REF_SHA)
 
-    for tag in ("vk_base", "vk_shift", "cpu_base"):
+    for tag in ("vk_default", "vk_off", "vk_on"):
         v = [res["runs"][k]["vae_ms"] for k in res["runs"] if k.startswith(tag) and res["runs"][k]["vae_ms"]]
         res[f"{tag}_vae_ms_all"] = v
     try:
         import numpy as np
-        for a, b in (("vk_base_1", "vk_shift_1"), ("vk_base_1", "vk_base_2")):
+        for a, b in (("vk_off", "vk_default_1"),):
             A, Bw = read_wav(OUT / f"{a}.wav"), read_wav(OUT / f"{b}.wav")
             n = min(len(A), len(Bw))
             d = np.abs(A[:n] - Bw[:n])
@@ -136,7 +139,7 @@ try:
     # ASR roundtrip: whisper base.en through the same binary
     try:
         wm = hf_hub_download("ggerganov/whisper.cpp", "ggml-base.en.bin", cache_dir=str(G))
-        for tag in ("vk_base_1", "vk_shift_1", "cpu_shift"):
+        for tag in ("vk_default_1",):
             r = subprocess.run([str(B), "-m", wm, "-f", str(OUT / f"{tag}.wav"), "-np", "-nt"],
                                capture_output=True, text=True, timeout=600)
             res.setdefault("asr", {})[tag] = r.stdout.strip() or r.stderr[-300:]

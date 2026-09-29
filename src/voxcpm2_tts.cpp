@@ -3766,12 +3766,23 @@ static ggml_tensor* causal_dwconv1d_shift_ggml(ggml_context* ctx0, ggml_tensor* 
     return y;
 }
 
+// Whether the VAE decoder uses causal_dwconv1d_shift_ggml. Default: on for
+// Vulkan only, where it was measured (#461, T4: VAE graph 360 -> 116-136 ms,
+// PCM rel diff 2e-3, ASR identical); CUDA / Metal are unmeasured. The env var
+// CRISPASR_VOXCPM2_VAE_DW_SHIFT=1|0 forces it on or off for any backend.
+static bool vae_dw_shift_for(ggml_backend_t backend) {
+    const char* e = crispasr_env::get("CRISPASR_VOXCPM2_VAE_DW_SHIFT");
+    if (e && *e)
+        return *e != '0';
+    const char* name = backend ? ggml_backend_name(backend) : nullptr;
+    return name && std::strncmp(name, "Vulkan", 6) == 0;
+}
+
 static ggml_tensor* causal_conv1d_ggml(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* weight, ggml_tensor* bias,
-                                       int dilation, bool depthwise) {
+                                       int dilation, bool depthwise, bool dw_shift = false) {
     const int K = (int)weight->ne[0];
     const int pad = (K - 1) * dilation;
     ggml_tensor* y;
-    static const bool dw_shift = vox_env_bool("CRISPASR_VOXCPM2_VAE_DW_SHIFT");
     if (depthwise && dw_shift && weight->type == GGML_TYPE_F32 && x->type == GGML_TYPE_F32) {
         y = causal_dwconv1d_shift_ggml(ctx0, x, weight, dilation);
     } else if (depthwise) {
@@ -4365,8 +4376,9 @@ static std::vector<float> vae_decode_graph(voxcpm2_context* ctx, const std::vect
     auto InvAlpha = [&](const std::string& prefix) -> ggml_tensor* { return Wget(prefix + ".alpha.inv"); };
 
     // Layer 0: depthwise k=7, channels=64
+    const bool dw_shift = vae_dw_shift_for(ctx->backend);
     cur = causal_conv1d_ggml(ctx0, cur, Wget("vae.dec.layer.0"), Bias("vae.dec.layer.0"),
-                             /*dilation*/ 1, /*depthwise*/ true);
+                             /*dilation*/ 1, /*depthwise*/ true, dw_shift);
 
     const bool trace = vox_env_bool("CRISPASR_VOXCPM2_VAE_TRACE");
     if (trace) {
@@ -4446,7 +4458,8 @@ static std::vector<float> vae_decode_graph(voxcpm2_context* ctx, const std::vect
                 cur = snake1d_ggml(ctx0, cur, Alpha(rp + ".0"), InvAlpha(rp + ".0"));
             }
             // dilated depthwise conv k=7
-            cur = causal_conv1d_ggml(ctx0, cur, Wget(rp + ".1"), Bias(rp + ".1"), dilations[r], /*depthwise*/ true);
+            cur = causal_conv1d_ggml(ctx0, cur, Wget(rp + ".1"), Bias(rp + ".1"), dilations[r], /*depthwise*/ true,
+                                     dw_shift);
             // snake2
             if (Alpha(rp + ".2") && InvAlpha(rp + ".2")) {
                 cur = snake1d_ggml(ctx0, cur, Alpha(rp + ".2"), InvAlpha(rp + ".2"));
