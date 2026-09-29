@@ -87,6 +87,15 @@ catch_discover_tests(test-campplus-segpool
     TEST_SPEC "[unit][tts][campplus][segpool]"
     PROPERTIES LABELS "unit;tts;campplus")
 
+# ─── test-convt-permute — tiled ConvTranspose1d weight permute == naive loop
+# (shared by 22 backends; hermetic: CPU buffer, synthetic weights).
+add_executable(test-convt-permute test-convt-permute.cpp)
+target_include_directories(test-convt-permute PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-convt-permute PRIVATE Catch2::Catch2WithMain ggml ggml-base crispasr_link_ggml_cpu)
+catch_discover_tests(test-convt-permute
+    TEST_SPEC "[unit][core][convt]"
+    PROPERTIES LABELS "unit;core")
+
 add_executable(test-step-graph-cache test-step-graph-cache.cpp)
 target_include_directories(test-step-graph-cache PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(test-step-graph-cache PRIVATE Catch2::Catch2WithMain ggml ggml-base)

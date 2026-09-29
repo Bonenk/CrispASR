@@ -237,23 +237,36 @@ static inline std::unique_ptr<float[]> permute_convt1d_weight(ggml_tensor* src) 
     auto out = std::make_unique<float[]>((size_t)IC * K * OC);
     float* dp = out.get();
 
+    // src layout: [K, OC, IC] → src[ic][oc][k] = tmp[ic * OC * K + oc * K + k]
+    // dst layout: [IC, K*OC]  → dst[oc*K+k][ic] = dp[(oc * K + k) * IC + ic]
+    // i.e. a plain 2-D transpose of [IC rows][J = OC*K cols]. Done in 32x32
+    // tiles: the naive loop's stores stride by IC floats, and for the voxcpm2
+    // VAE (41M elements) it took ~1.1 s of every process start (#461); tiled:
+    // ~0.15 s, byte-identical.
+    const size_t J = (size_t)OC * K;
+    auto transpose = [&](auto load) {
+        const int B = 32;
+        for (int i0 = 0; i0 < IC; i0 += B) {
+            const int i1 = i0 + B < IC ? i0 + B : IC;
+            for (size_t j0 = 0; j0 < J; j0 += B) {
+                const size_t j1 = j0 + B < J ? j0 + B : J;
+                for (size_t j = j0; j < j1; j++)
+                    for (int i = i0; i < i1; i++)
+                        dp[j * IC + i] = load((size_t)i * J + j);
+            }
+        }
+    };
     if (src->type == GGML_TYPE_F32) {
         auto tmp = std::make_unique<float[]>(n_elems);
         ggml_backend_tensor_get(src, tmp.get(), 0, n_elems * sizeof(float));
-        // src layout: [K, OC, IC] → src[ic][oc][k] = tmp[ic * OC * K + oc * K + k]
-        // dst layout: [IC, K*OC]  → dst[oc*K+k][ic] = dp[(oc * K + k) * IC + ic]
-        for (int ic = 0; ic < IC; ic++)
-            for (int oc = 0; oc < OC; oc++)
-                for (int k = 0; k < K; k++)
-                    dp[(oc * K + k) * IC + ic] = tmp[ic * OC * K + oc * K + k];
+        const float* tp = tmp.get();
+        transpose([tp](size_t s) { return tp[s]; });
     } else {
         // F16 (most codec weights are F16)
         auto tmp = std::make_unique<ggml_fp16_t[]>(n_elems);
         ggml_backend_tensor_get(src, tmp.get(), 0, n_elems * sizeof(ggml_fp16_t));
-        for (int ic = 0; ic < IC; ic++)
-            for (int oc = 0; oc < OC; oc++)
-                for (int k = 0; k < K; k++)
-                    dp[(oc * K + k) * IC + ic] = ggml_fp16_to_fp32(tmp[ic * OC * K + oc * K + k]);
+        const ggml_fp16_t* tp = tmp.get();
+        transpose([tp](size_t s) { return ggml_fp16_to_fp32(tp[s]); });
     }
     return out;
 }
