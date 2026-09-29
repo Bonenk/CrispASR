@@ -32,6 +32,27 @@ Two Kaggle kernels, one canonical script — the rebake kernel pulls the
 latest `crispasr-regression.py` from `main` on every run, so changes to
 the regression logic propagate without re-pushing the bootstrap.
 
+## What belongs on Kaggle (and what doesn't)
+
+Kaggle is for work that needs a **real GPU**: CUDA or Vulkan speed and parity on
+hardware, and PyTorch references that only run in reasonable time on CUDA.
+Everything that runs on CPU goes to GitHub Actions instead, through
+`.github/workflows/heavy-cpu.yml` and `tools/ci-heavy/` (see its README). That
+covers Python reference dumps, diff harnesses, ASR roundtrips, and
+download → convert → quantize → upload. Standard runners are free for this
+public repo: 4 vCPU, 16 GB RAM, 6 h per job.
+
+Rules that follow from Kaggle's terms and guidelines (an account was banned on
+2026-09-28 for "resource abuse"):
+
+- One account per person. Never switch accounts to get around a quota or the
+  2-session GPU cap; wait instead.
+- Don't request a GPU session for its RAM, disk or internet, or to build C++
+  without using the GPU afterwards.
+- Attach only datasets the notebook really uses. No build caches or storage
+  datasets (the ccache datasets now live on HF).
+- No re-push loops. Push, wait, read `kernels_logs`.
+
 ## Account, token and pushing
 
 Nothing account-specific is committed. Kernel metadata (`id`, `dataset_sources`, …)
