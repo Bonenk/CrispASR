@@ -6322,8 +6322,10 @@ static bool vox_load_weights(voxcpm2_context* ctx, const char* path) {
                 hp.audio_start_token);
     }
 
-    // Set ggml matmul thread count
-    g_cpu_n_threads = 4; // TODO: fix ctx->params
+    // Eager-path matmul thread count (matmul_mv_ggml). Re-synced from
+    // ctx->n_threads at the start of every synthesis, so -t and
+    // voxcpm2_set_n_threads() reach it (#478: it was pinned to 4).
+    g_cpu_n_threads = ctx->n_threads > 0 ? ctx->n_threads : 4;
 
     return true;
 }
@@ -6521,19 +6523,43 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
     const auto& audio_mask_pos = pi.audio_mask_pos;
     const auto& feat_embed_pos = pi.feat_embed_pos;
 
-    // 2. TSLM prefill from the combined embeds (capture all positions for RALM).
-    double t0_prefill = vox_now_ms();
-    std::vector<float> all_pos;
-    tslm_prefill_hooks hooks;
-    hooks.max_capture_positions = N_pos;
-    hooks.all_positions = &all_pos;
-    tslm_prefill_from_embeds(ctx, pi.combined_embed.data(), N_pos, cpu_be, hooks);
+    g_cpu_n_threads = ctx->n_threads > 0 ? ctx->n_threads : g_cpu_n_threads; // -t reaches eager matmuls (#478)
 
-    // 5. Apply TSLM output norm per position.
+    // 2. TSLM prefill from the combined embeds (capture all positions for RALM).
+    // Graph mode (default): run the prompt ONCE through the same graph as the
+    // AR steps. That writes the backend KV directly - the attention the steps
+    // use, so the stop predictor keeps firing (#164) - and returns the
+    // output-normed hidden state of every position for FSQ / RALM. Before
+    // #478 the prompt went through the legacy CPU prefill AND was replayed
+    // through the graph on the first AR step: two full prefills, the first
+    // pinned to 4 threads. CRISPASR_VOXCPM2_LEGACY_PREFILL=1 restores the
+    // legacy prefill (+ replay).
+    const bool use_graph_tslm = vox_env_bool_default_on("CRISPASR_VOXCPM2_USE_GRAPH");
+    ctx->tslm_kv_synced = false;
+    double t0_prefill = vox_now_ms();
     std::vector<float> normed_all((size_t)N_pos * d_tslm);
-    for (int i = 0; i < N_pos; i++) {
-        rms_norm_cpu(all_pos.data() + (size_t)i * d_tslm, tensor_data_f32(ctx->weights.tslm_output_norm),
-                     normed_all.data() + (size_t)i * d_tslm, d_tslm, hp.rms_norm_eps);
+    bool graph_prefilled = false;
+    if (use_graph_tslm && !vox_env_bool("CRISPASR_VOXCPM2_LEGACY_PREFILL") && init_tslm_kv_backend(ctx)) {
+        ctx->tslm_kv.reset();
+        for (int t = 0; t < N_pos; t++) {
+            std::vector<float> h = tslm_step_graph(ctx, pi.combined_embed.data() + (size_t)t * d_tslm, t);
+            std::memcpy(normed_all.data() + (size_t)t * d_tslm, h.data(), (size_t)d_tslm * sizeof(float));
+            ctx->tslm_kv.n_past = t + 1;
+        }
+        ctx->tslm_kv_synced = true;
+        graph_prefilled = true;
+    }
+    if (!graph_prefilled) {
+        std::vector<float> all_pos;
+        tslm_prefill_hooks hooks;
+        hooks.max_capture_positions = N_pos;
+        hooks.all_positions = &all_pos;
+        tslm_prefill_from_embeds(ctx, pi.combined_embed.data(), N_pos, cpu_be, hooks);
+        // 5. Apply TSLM output norm per position.
+        for (int i = 0; i < N_pos; i++) {
+            rms_norm_cpu(all_pos.data() + (size_t)i * d_tslm, tensor_data_f32(ctx->weights.tslm_output_norm),
+                         normed_all.data() + (size_t)i * d_tslm, d_tslm, hp.rms_norm_eps);
+        }
     }
     // 5b. FSQ masking — Python:
     //   enc_outputs = fsq(enc_outputs) * audio_mask + enc_outputs * text_mask
@@ -6549,8 +6575,8 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
     std::vector<float> tslm_hidden(normed_all.data() + (size_t)(N_pos - 1) * d_tslm,
                                    normed_all.data() + (size_t)N_pos * d_tslm);
     if (ctx->verbosity >= 1) {
-        fprintf(stderr, "voxcpm2: TSLM prefill %.1f ms (%d positions%s)\n", vox_now_ms() - t0_prefill, N_pos,
-                have_ref ? " incl. ref" : "");
+        fprintf(stderr, "voxcpm2: TSLM prefill %.1f ms (%d positions%s, %s)\n", vox_now_ms() - t0_prefill, N_pos,
+                have_ref ? " incl. ref" : "", graph_prefilled ? "graph, KV ready" : "legacy");
     }
 
     // 6. fusion_concat_proj + multi-position RALM prefill. Python concatenates
@@ -6651,8 +6677,6 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
     // through the graph (no further CPU↔backend traffic). Resetting
     // tslm_kv_synced here ensures every synthesis call re-syncs from the
     // fresh prefill cache.
-    const bool use_graph_tslm = vox_env_bool_default_on("CRISPASR_VOXCPM2_USE_GRAPH");
-    ctx->tslm_kv_synced = false;
     ctx->ralm_kv_synced = false;
 
     // Python AR loop order (from voxcpm2.py _inference, lines 1060-1108):

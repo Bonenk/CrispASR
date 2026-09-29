@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""#478 voxcpm2 CPU prefill A/B: legacy double prefill vs single graph prefill.
+
+Before #478, graph mode (the default) prefilled the prompt twice: the legacy
+eager prefill (pinned to 4 threads) and then a replay of every position
+through the step graph on the first AR step. Now the prompt goes through the
+graph once and the eager matmuls honour -t.
+
+Arms, same binary, CPU, -t = all cores, --seed 2, CRISPASR_VOXCPM2_BENCH=1:
+  legacy   CRISPASR_VOXCPM2_LEGACY_PREFILL=1 (the pre-#478 path, incl. replay)
+  graph    default
+Cases: zero-shot, and voice cloning with samples/jfk.wav (a long prompt, like
+the report's 249 positions). Gate: every arm transcribes back to the text
+(whisper base.en via crispasr) and the graph arm is faster in total.
+
+    gh workflow run heavy-cpu.yml -f script=tools/ci-heavy/voxcpm2_prefill_ab.py -f pip="huggingface_hub"
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+OUT = Path(os.environ.get("HEAVY_OUT", "out"))
+SCR = Path(os.environ.get("HEAVY_SCRATCH", "scratch"))
+OUT.mkdir(parents=True, exist_ok=True)
+SCR.mkdir(parents=True, exist_ok=True)
+REPO = Path(__file__).resolve().parents[2]
+NT = str(os.cpu_count() or 4)
+CASES = {
+    "zero_shot": ("Hello, this is a short test sentence.", None),
+    "voice_clone": ("The quick brown fox jumps over the lazy dog, and then it runs back home again.",
+                    REPO / "samples" / "jfk.wav"),
+}
+ARMS = {"legacy": {"CRISPASR_VOXCPM2_LEGACY_PREFILL": "1"}, "graph": {}}
+res = {"threads": NT, "cases": {}}
+
+
+def run(cmd, env=None, timeout=3600):
+    t0 = time.time()
+    r = subprocess.run([str(c) for c in cmd], capture_output=True, text=True, timeout=timeout,
+                       env=dict(os.environ, **(env or {})))
+    return r, time.time() - t0
+
+
+from huggingface_hub import hf_hub_download  # noqa: E402
+
+b = SCR / "build"
+subprocess.check_call(["cmake", "-S", str(REPO), "-B", str(b), "-DCMAKE_BUILD_TYPE=Release", "-DCRISPASR_OPUS=OFF",
+                       "-DCRISPASR_AMR=OFF"], stdout=subprocess.DEVNULL)
+subprocess.check_call(["cmake", "--build", str(b), "--target", "crispasr-cli", f"-j{NT}"], stdout=subprocess.DEVNULL)
+cli = b / "bin" / "crispasr"
+model = hf_hub_download("cstr/voxcpm2-GGUF", "voxcpm2-q8_0.gguf")
+whisper = hf_hub_download("ggerganov/whisper.cpp", "ggml-base.en.bin")
+norm = lambda s: re.sub(r"[^a-z ]", "", s.lower()).split()
+
+for case, (text, voice) in CASES.items():
+    res["cases"][case] = {}
+    for arm, env in ARMS.items():
+        wav = SCR / f"{case}_{arm}.wav"
+        cmd = [cli, "--backend", "voxcpm2", "-m", model, "--tts", text, "--tts-output", wav, "--seed", "2",
+               "-t", NT, "-v"] + (["--voice", voice] if voice else [])
+        r, wall = run(cmd, env=dict(env, CRISPASR_VOXCPM2_BENCH="1"))
+        err = r.stderr
+        g = lambda pat: (re.findall(pat, err) or [None])[-1]
+        e = {"rc": r.returncode, "wall_s": round(wall, 1),
+             "synth_ms": g(r"voxcpm2_bench: synthesize\s+([\d.]+) ms"),
+             "prefill_line": g(r"(TSLM prefill [^\n]+)"),
+             "ar": g(r"(AR loop \d+ steps, [\d.]+ ms)"),
+             "tslm_step_ms": g(r"voxcpm2\[bench\]:\s+tslm_step\s+([\d.]+) ms"),
+             "replayed": bool(re.search(r"replayed \d+ prefill tokens", err)),
+             "tail": err[-1200:] if r.returncode else ""}
+        a, _ = run([cli, "-m", whisper, "-f", wav, "-np", "-nt"], timeout=600)
+        e["asr"] = a.stdout.strip()
+        e["asr_ok"] = norm(e["asr"]) == norm(text)
+        res["cases"][case][arm] = e
+        print(case, arm, {k: v for k, v in e.items() if k != "tail"}, flush=True)
+        (OUT / "result.json").write_text(json.dumps(res, indent=1))
+
+lines = [f"### voxcpm2 CPU prefill A/B (#478), -t {NT}\n",
+         "| case | arm | synth ms | TSLM prefill | AR loop | tslm_step avg | replay | ASR ok |",
+         "|---|---|---|---|---|---|---|---|"]
+ok = True
+for case, arms in res["cases"].items():
+    for arm, e in arms.items():
+        lines.append(f"| {case} | {arm} | {e['synth_ms']} | {e['prefill_line']} | {e['ar']} | {e['tslm_step_ms']} | "
+                     f"{e['replayed']} | {e['asr_ok']} |")
+        ok = ok and e["rc"] == 0 and e["asr_ok"]
+    try:
+        ok = ok and float(arms["graph"]["synth_ms"]) < float(arms["legacy"]["synth_ms"])
+    except (TypeError, ValueError):
+        ok = False
+(OUT / "summary.md").write_text("\n".join(lines) + "\n")
+print("\n".join(lines))
+sys.exit(0 if ok else 1)
