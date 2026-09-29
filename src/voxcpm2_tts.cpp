@@ -3735,12 +3735,39 @@ static ggml_tensor* snake1d_ggml(ggml_context* ctx0, ggml_tensor* x, ggml_tensor
 // retained slice is causal.
 // ---------------------------------------------------------------------------
 
+// Causal depthwise conv as K shifted multiply-adds (issue #461):
+//   y[t, c] = sum_k w[k, c] * xp[t + k*d, c],  xp = x left-padded by (K-1)*d.
+// Same algebra as ggml_conv_1d_dw + left crop, but elementwise over [T, C]
+// instead of im2col (K x the activation, F16) + a batched mat-mul whose
+// contraction is only K wide - the VAE decoder runs 18 of these at up to
+// 146k samples x 32..1024 channels per 3 s of audio.
+static ggml_tensor* causal_dwconv1d_shift_ggml(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* weight, int dilation) {
+    const int K = (int)weight->ne[0];
+    const int T = (int)x->ne[0];
+    const int C = (int)x->ne[1];
+    const int pad = (K - 1) * dilation;
+    ggml_tensor* xp = ggml_pad_ext(ctx0, x, pad, 0, 0, 0, 0, 0, 0, 0); // [T + pad, C]
+    // [K, 1, C] -> [C, K] so each tap is a contiguous [C] vector.
+    ggml_tensor* wt = ggml_cont(ctx0, ggml_transpose(ctx0, ggml_reshape_2d(ctx0, weight, K, C)));
+    ggml_tensor* y = nullptr;
+    for (int k = 0; k < K; k++) {
+        ggml_tensor* xk = ggml_view_2d(ctx0, xp, T, C, xp->nb[1], (size_t)k * dilation * ggml_element_size(xp));
+        ggml_tensor* wk = ggml_reshape_2d(ctx0, ggml_view_1d(ctx0, wt, C, (size_t)k * wt->nb[1]), 1, C);
+        ggml_tensor* term = ggml_mul(ctx0, xk, wk);
+        y = y ? ggml_add(ctx0, y, term) : term;
+    }
+    return y;
+}
+
 static ggml_tensor* causal_conv1d_ggml(ggml_context* ctx0, ggml_tensor* x, ggml_tensor* weight, ggml_tensor* bias,
                                        int dilation, bool depthwise) {
     const int K = (int)weight->ne[0];
     const int pad = (K - 1) * dilation;
     ggml_tensor* y;
-    if (depthwise) {
+    static const bool dw_shift = vox_env_bool("CRISPASR_VOXCPM2_VAE_DW_SHIFT");
+    if (depthwise && dw_shift && weight->type == GGML_TYPE_F32 && x->type == GGML_TYPE_F32) {
+        y = causal_dwconv1d_shift_ggml(ctx0, x, weight, dilation);
+    } else if (depthwise) {
         y = ggml_conv_1d_dw(ctx0, weight, x, /*s*/ 1, pad, dilation);
     } else {
         y = ggml_conv_1d(ctx0, weight, x, /*s*/ 1, pad, dilation);
