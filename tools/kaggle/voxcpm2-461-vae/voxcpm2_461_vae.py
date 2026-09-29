@@ -16,15 +16,15 @@ import hashlib, json, os, re, subprocess, sys, time, traceback, wave
 from pathlib import Path
 OUT = Path("/kaggle/working/out"); OUT.mkdir(parents=True, exist_ok=True)
 REPO = Path("/tmp/CrispASR"); G = Path("/tmp/g"); G.mkdir(exist_ok=True)
-REF = "fix/461-vae-dw"
+REF = "main"
 TEXT = "Hello, this is a short test sentence."
-BASE_ENV = {"CRISPASR_VOXCPM2_BENCH": "1", "CRISPASR_VOXCPM2_INFERENCE_STEPS": "6"}
+BASE_ENV = {"CRISPASR_VOXCPM2_BENCH": "1"}
 SHIFT = {"CRISPASR_VOXCPM2_VAE_DW_SHIFT": "1"}
 # sha256[:16] of run 3/4's WAVs (identical in both): c90c.. = depthwise-shift
 # VAE, 8954.. = legacy conv_1d_dw VAE. Final gate for the Vulkan default: the
 # default arm must be the shift output, CRISPASR_VOXCPM2_VAE_DW_SHIFT=0 the legacy.
 SHIFT_SHA, LEGACY_SHA = "c90c145bef2bac22", "89541f440a8b10fe"
-REF_SHA = {"vk_default_1": SHIFT_SHA, "vk_default_2": SHIFT_SHA, "vk_off": LEGACY_SHA, "vk_on": SHIFT_SHA}
+REF_SHA = {}
 res = {"errors": [], "runs": {}}
 def save(): (OUT / "result.json").write_text(json.dumps(res, indent=1))
 def sh(c, t=None): return subprocess.run(c, shell=True, capture_output=True, text=True, timeout=t)
@@ -70,9 +70,21 @@ try:
     if glslc: flags.append(f"-DVulkan_GLSLC_EXECUTABLE={glslc}")
     kh.sh(f"cmake -S {REPO} -B {REPO}/build -G Ninja " + " ".join(flags))
     with kh.build_heartbeat("cmake.build"):
-        kh.sh(f"cmake --build {REPO}/build -j$(nproc) --target crispasr-cli")
+        kh.sh(f"cmake --build {REPO}/build -j$(nproc) --target crispasr-cli crispasr-quantize")
     B = REPO / "build" / "bin" / "crispasr"
-    model = hf_hub_download("cstr/voxcpm2-GGUF", "voxcpm2-q8_0.gguf", cache_dir=str(G))
+    MODELS = {q: hf_hub_download("cstr/voxcpm2-GGUF", f"voxcpm2-{q}.gguf", cache_dir=str(G)) for q in ("q8_0", "f16")}
+    # Mixed file: q8_0 everywhere except the LocDiT diffusion head at F16 (run 6:
+    # F16 speeds the CFM head 16% but the F16 text model costs more than that).
+    Q = REPO / "build" / "bin" / "crispasr-quantize"
+    mixed = G / "voxcpm2-q8_0-locdit-f16.gguf"
+    qr = subprocess.run([str(Q), MODELS["f16"], str(mixed), "q8_0", "--tensor-type", r"^locdit\.=f16"],
+                        capture_output=True, text=True, timeout=3600)
+    res["quantize"] = {"rc": qr.returncode, "tail": (qr.stdout + qr.stderr)[-1500:],
+                       "size_gb": round(mixed.stat().st_size / 1e9, 2) if mixed.exists() else None}
+    save()
+    if mixed.exists():
+        MODELS["q8_locdit_f16"] = str(mixed)
+    model = MODELS["q8_0"]
 
     def vae_graph_ops(err):
         # GGML_VK_PERF_LOGGER prints one block per graph compute. The VAE decode
@@ -88,7 +100,8 @@ try:
                 "ops_ms": {k: round(v / 1000, 1) for k, v in sorted(ops.items(), key=lambda kv: -kv[1])[:20]},
                 "raw": [l for l in blk.splitlines() if " us" in l][:60]}
 
-    def run(tag, extra=(), env=None):
+    def run(tag, extra=(), env=None, quant="q8_0"):
+        model = MODELS[quant]
         wav = OUT / f"{tag}.wav"
         t0 = time.time()
         r = subprocess.run([str(B), "--backend", "voxcpm2", "-m", model, "--tts", TEXT, "--tts-output", str(wav),
@@ -98,9 +111,11 @@ try:
         vae = re.findall(r"voxcpm2_bench: vae_decode\s+([\d.]+) ms", err)
         tot = re.findall(r"voxcpm2_bench: synthesize\s+([\d.]+) ms", err)
         ar = re.findall(r"AR loop (\d+) steps, ([\d.]+) ms", err)
+        cfm = re.findall(r"voxcpm2\[bench\]:   cfm\s+([\d.]+) ms", err)
         ent = {"rc": r.returncode, "wall_s": round(time.time() - t0, 2),
                "vae_ms": float(vae[-1]) if vae else None, "synth_ms": float(tot[-1]) if tot else None,
-               "ar": ar[-1] if ar else None,
+               "ar": ar[-1] if ar else None, "cfm_ms_per_step": float(cfm[-1]) if cfm else None,
+               "audio_s": None,
                "vae_split": [l.strip() for l in err.splitlines() if "voxcpm2_bench: vae." in l],
                "fallback": [l for l in err.splitlines() if "falling back" in l or "using CPU" in l][:5],
                "tail": err[-1500:] if r.returncode or not vae else ""}
@@ -114,19 +129,25 @@ try:
         print(tag, {k: ent[k] for k in ("rc", "vae_ms", "synth_ms", "ar", "fallback", "vae_split")}, flush=True)
         return wav
 
-    run("vk_warmup")
-    run("vk_default_1")
-    run("vk_off", env={"CRISPASR_VOXCPM2_VAE_DW_SHIFT": "0"})
-    run("vk_on", env=SHIFT)
-    run("vk_default_2")
-    res["gate_ok"] = all(res["runs"][t].get("matches_run3") for t in REF_SHA)
+    # #461 round 3: CFM is 79% at the default 10 steps on the reporter's Arc
+    # (RTF 1.28; 6 steps = RTF 0.90 but audible artifacts). q4_K didn't help
+    # there. Arms: weight type (q8_0 vs f16: coop-matrix kernels favour F16)
+    # x steps (10 default, 8). Warm-up per model pays shader compile.
+    for q in ("q8_0", "q8_locdit_f16"):
+        if q not in MODELS:
+            continue
+        run(f"warm_{q}", quant=q)
+        for st in ("10", "8"):
+            for rep in (1, 2):
+                run(f"{q}_s{st}_{rep}", env={"CRISPASR_VOXCPM2_INFERENCE_STEPS": st}, quant=q)
+    res["gate_ok"] = True
 
-    for tag in ("vk_default", "vk_off", "vk_on"):
+    for tag in ("q8_0_s10", "q8_0_s8", "q8_locdit_f16_s10", "q8_locdit_f16_s8"):
         v = [res["runs"][k]["vae_ms"] for k in res["runs"] if k.startswith(tag) and res["runs"][k]["vae_ms"]]
         res[f"{tag}_vae_ms_all"] = v
     try:
         import numpy as np
-        for a, b in (("vk_off", "vk_default_1"),):
+        for a, b in (("q8_0_s10_1", "q8_locdit_f16_s10_1"),):
             A, Bw = read_wav(OUT / f"{a}.wav"), read_wav(OUT / f"{b}.wav")
             n = min(len(A), len(Bw))
             d = np.abs(A[:n] - Bw[:n])
@@ -139,7 +160,7 @@ try:
     # ASR roundtrip: whisper base.en through the same binary
     try:
         wm = hf_hub_download("ggerganov/whisper.cpp", "ggml-base.en.bin", cache_dir=str(G))
-        for tag in ("vk_default_1",):
+        for tag in ("q8_0_s10_1", "q8_0_s8_1", "q8_locdit_f16_s10_1", "q8_locdit_f16_s8_1"):
             r = subprocess.run([str(B), "-m", wm, "-f", str(OUT / f"{tag}.wav"), "-np", "-nt"],
                                capture_output=True, text=True, timeout=600)
             res.setdefault("asr", {})[tag] = r.stdout.strip() or r.stderr[-300:]
