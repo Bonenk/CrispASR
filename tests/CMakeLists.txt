@@ -662,6 +662,18 @@ if(CRISPASR_BUILD_EXAMPLES)
         TIMEOUT 120)
 endif()
 
+# ─── test-quant-override-1d — regression guard for #461 ───────────────────────
+# `--tensor-type <regex>=f16` must not lower 1-D tensors (biases/norms) below F32:
+# ggml's CPU add aborts on F32 + F16. Hermetic: hand-written GGUF, built binary.
+if(CRISPASR_BUILD_EXAMPLES)
+    add_test(NAME test-quant-override-1d
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/test-quant-override-1d.sh
+            $<TARGET_FILE:crispasr-quantize>)
+    set_tests_properties(test-quant-override-1d PROPERTIES
+        LABELS "unit;gh;regression-461"
+        TIMEOUT 120)
+endif()
+
 # ─── test - stream - finalize — Catch2 unit tests for the streaming
 # `final.text` stitcher used by `--stream-json` finalize_utterance.
 # Header-only target (no crispasr lib needed): the helper is a pure
