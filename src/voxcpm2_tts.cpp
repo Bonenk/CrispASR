@@ -48,6 +48,7 @@ static int g_cpu_n_threads = 4;
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <memory>
 #include <new>
 #include <string>
 #include <unordered_map>
@@ -3250,6 +3251,12 @@ static std::vector<float> wn_reconstruct(const float* weight_g, const float* wei
     // Output layout: w[ki + ic*ksize + oc*in_ch*ksize] = [out_ch, in_ch, k]
     int total = out_ch * in_ch * ksize;
     std::vector<float> w(total);
+    // Rows are independent and each row's norm is summed in the same order by
+    // one thread, so threading changes nothing but wall time (#461: this runs
+    // on every process start, 41M+ elements for the VAE decoder).
+#if defined(_OPENMP)
+#pragma omp parallel for schedule(static) if ((size_t)total > ((size_t)1 << 20))
+#endif
     for (int oc = 0; oc < out_ch; oc++) {
         float g = weight_g[oc];
         // Compute L2 norm across ALL (in_ch * ksize) elements for this oc
@@ -4082,6 +4089,13 @@ static bool vae_wn_init_ggml(voxcpm2_context* ctx) {
 
     // Now populate. WN convs: reconstruct from g/v, write into the tensor.
     double t_fetch = 0, t_wn = 0, t_up = 0; // CRISPASR_VOXCPM2_BENCH split (#461)
+    auto is_convt_key = [](const std::string& k) {
+        // "vae.dec.layer.{2..7}.block.1" - the six ConvTranspose1d upsamplers
+        static const std::string pre = "vae.dec.layer.", suf = ".block.1";
+        return k.size() == pre.size() + 1 + suf.size() && k.compare(0, pre.size(), pre) == 0 && k[pre.size()] >= '2' &&
+               k[pre.size()] <= '7' && k.compare(pre.size() + 1, suf.size(), suf) == 0;
+    };
+    std::map<std::string, std::unique_ptr<float[]>> host_perm;
     for (const auto& e : wn_entries) {
         auto c0 = std::chrono::steady_clock::now();
         const float* g = vae_tensor_f32(T, e.g_name);
@@ -4093,6 +4107,16 @@ static bool vae_wn_init_ggml(voxcpm2_context* ctx) {
         std::vector<float> w = wn_reconstruct(g, v, e.out_ch, e.in_ch, e.ksize);
         auto c2 = std::chrono::steady_clock::now();
         ggml_backend_tensor_set(M[e.key], w.data(), 0, w.size() * sizeof(float));
+        if (is_convt_key(e.key)) {
+            // Permute for the decomposed transposed-conv path straight from the
+            // host copy: tensor ne = [K, e.in_ch, e.out_ch] = [K, OC, IC] of
+            // core_convt's layout. Saves downloading 168 MB back from the GPU
+            // just to permute it (#461).
+            const float* wp = w.data();
+            auto buf = std::make_unique<float[]>(w.size());
+            core_convt::permute_convt1d_host([wp](size_t i) { return wp[i]; }, buf.get(), e.ksize, e.in_ch, e.out_ch);
+            host_perm[e.key] = std::move(buf);
+        }
         auto c3 = std::chrono::steady_clock::now();
         t_fetch += std::chrono::duration<double, std::milli>(c1 - c0).count();
         t_wn += std::chrono::duration<double, std::milli>(c2 - c1).count();
@@ -4178,7 +4202,33 @@ static bool vae_wn_init_ggml(voxcpm2_context* ctx) {
             srcs[b] = (it != M.end()) ? it->second : nullptr;
             dsts[b] = &perm_ptrs[b];
         }
-        core_convt::permute_convt1d_weights_batch(srcs, dsts, n, ctx->backend, &ctx->vae_perm_ctx, &ctx->vae_perm_buf);
+        voxcpm2_bench_stage st("vae.wn perm_upload");
+        bool have_all = true;
+        for (int b = 0; b < n; b++)
+            have_all = have_all && srcs[b] && host_perm.count(ggml_get_name(srcs[b]));
+        if (have_all) {
+            ggml_init_params pp = {ggml_tensor_overhead() * (size_t)n + 4096, nullptr, true};
+            ctx->vae_perm_ctx = ggml_init(pp);
+            for (int b = 0; b < n; b++) {
+                const int K = (int)srcs[b]->ne[0], OC = (int)srcs[b]->ne[1], IC = (int)srcs[b]->ne[2];
+                perm_ptrs[b] = ggml_new_tensor_2d(ctx->vae_perm_ctx, GGML_TYPE_F32, IC, K * OC);
+            }
+            ctx->vae_perm_buf = ggml_backend_alloc_ctx_tensors(ctx->vae_perm_ctx, ctx->backend);
+            if (!ctx->vae_perm_buf) {
+                ggml_free(ctx->vae_perm_ctx);
+                ctx->vae_perm_ctx = nullptr;
+                for (int b = 0; b < n; b++)
+                    perm_ptrs[b] = nullptr;
+                have_all = false;
+            } else {
+                for (int b = 0; b < n; b++)
+                    ggml_backend_tensor_set(perm_ptrs[b], host_perm[ggml_get_name(srcs[b])].get(), 0,
+                                            ggml_nbytes(perm_ptrs[b]));
+            }
+        }
+        if (!have_all)
+            core_convt::permute_convt1d_weights_batch(srcs, dsts, n, ctx->backend, &ctx->vae_perm_ctx,
+                                                      &ctx->vae_perm_buf);
         for (int b = 0; b < n; b++) {
             if (perm_ptrs[b]) {
                 std::string key = "vae.dec.layer." + std::to_string(b + 2) + ".block.1.perm";

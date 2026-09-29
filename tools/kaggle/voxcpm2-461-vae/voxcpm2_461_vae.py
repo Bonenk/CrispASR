@@ -12,7 +12,7 @@ Readouts (each can fail):
   - PCM diff A vs B: max|diff| relative to max|A|, rms ratio, sample counts
   - ASR roundtrip (whisper base.en through crispasr) on both WAVs
 """
-import json, os, re, subprocess, sys, time, traceback, wave
+import hashlib, json, os, re, subprocess, sys, time, traceback, wave
 from pathlib import Path
 OUT = Path("/kaggle/working/out"); OUT.mkdir(parents=True, exist_ok=True)
 REPO = Path("/tmp/CrispASR"); G = Path("/tmp/g"); G.mkdir(exist_ok=True)
@@ -20,6 +20,9 @@ REF = "fix/461-vae-dw"
 TEXT = "Hello, this is a short test sentence."
 BASE_ENV = {"CRISPASR_VOXCPM2_BENCH": "1", "CRISPASR_VOXCPM2_INFERENCE_STEPS": "6"}
 SHIFT = {"CRISPASR_VOXCPM2_VAE_DW_SHIFT": "1"}
+# sha256[:16] of the same arms' WAVs from run 3 (commit 29edb4cb, before the
+# host-side permute): a pure speed change must reproduce them byte for byte.
+REF_SHA = {"vk_base_1": "89541f440a8b10fe", "vk_shift_1": "c90c145bef2bac22"}
 res = {"errors": [], "runs": {}}
 def save(): (OUT / "result.json").write_text(json.dumps(res, indent=1))
 def sh(c, t=None): return subprocess.run(c, shell=True, capture_output=True, text=True, timeout=t)
@@ -101,6 +104,10 @@ try:
                "tail": err[-1500:] if r.returncode or not vae else ""}
         if env and "GGML_VK_PERF_LOGGER" in env:
             ent["vae_graph"] = vae_graph_ops(err)
+        if wav.exists():
+            ent["wav_sha"] = hashlib.sha256(wav.read_bytes()).hexdigest()[:16]
+            if tag in REF_SHA:
+                ent["matches_run3"] = ent["wav_sha"] == REF_SHA[tag]
         res["runs"][tag] = ent; save()
         print(tag, {k: ent[k] for k in ("rc", "vae_ms", "synth_ms", "ar", "fallback", "vae_split")}, flush=True)
         return wav
