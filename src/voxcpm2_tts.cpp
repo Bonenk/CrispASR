@@ -1253,7 +1253,7 @@ static std::vector<float> ralm_step_graph(voxcpm2_context* ctx, const float* hid
 // state — same value that the legacy path produces after its post-loop
 // rms_norm_cpu(... tslm_output_norm ...).
 static ggml_cgraph* build_tslm_step_graph(voxcpm2_context* ctx, int n_past, int fixed_kv_len = 0,
-                                          ggml_context* arena_ctx = nullptr) {
+                                          ggml_context* arena_ctx = nullptr, int n_tokens = 1) {
     const vox_hparams& hp = ctx->hp;
     const vox_weights& W = ctx->graph_weights();
     const int d = (int)hp.tslm_d_model;
@@ -1263,7 +1263,9 @@ static ggml_cgraph* build_tslm_step_graph(voxcpm2_context* ctx, int n_past, int 
     const int n_kv_grp = n_q / n_kv;
     const float eps = hp.rms_norm_eps;
     const float attn_scale = 1.0f / std::sqrt((float)hd);
-    const int T = 1;
+    // T > 1: batched prefill (#478) - N prompt positions in one graph, so the
+    // weights are read once instead of once per position.
+    const int T = n_tokens > 0 ? n_tokens : 1;
     const int Lk = fixed_kv_len > 0 ? fixed_kv_len : (n_past + T);
 
     // arena_ctx supplied → graph metadata persists across calls
@@ -1285,10 +1287,11 @@ static ggml_cgraph* build_tslm_step_graph(voxcpm2_context* ctx, int n_past, int 
     ggml_set_input(positions);
 
     // Bucketed (fixed_kv_len > 0) → causal_mask is required to hide the
-    // unwritten tail [n_past+1, Lk). Dynamic (fixed_kv_len == 0) → Lk
-    // tightly tracks n_past+T and the tail doesn't exist, so no mask.
+    // unwritten tail [n_past+1, Lk). Dynamic (fixed_kv_len == 0) with T == 1
+    // → Lk tightly tracks n_past+T and the tail doesn't exist, so no mask;
+    // with T > 1 query q must not see keys past n_past + q.
     ggml_tensor* causal_mask = nullptr;
-    if (fixed_kv_len > 0) {
+    if (fixed_kv_len > 0 || T > 1) {
         causal_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, Lk, T);
         ggml_set_name(causal_mask, "causal_mask");
         ggml_set_input(causal_mask);
@@ -1752,6 +1755,54 @@ static std::vector<float> tslm_prefill_ex(voxcpm2_context* ctx, const std::vecto
 //   combined_embed = text_mask * embed_tokens(tokens) + audio_mask * enc_to_lm_proj(feat_encoder(feats))
 // ).
 // `embeds` is [T * d] row-major. Captures all positions when hooks request it.
+// Batched TSLM prefill through the step graph (#478): all N prompt positions
+// in ONE graph (n_past = 0, dynamic KV write of rows [0, N), causal mask).
+// Fills the backend KV exactly like N single-position graph calls would, and
+// writes each position's output-normed hidden state to `normed_out` [N, d].
+// Returns false on any failure (caller falls back to per-position calls).
+static bool tslm_prefill_graph_batched(voxcpm2_context* ctx, const float* embeds, int N, float* normed_out) {
+    const int d = (int)ctx->hp.tslm_d_model;
+    ggml_cgraph* gf = build_tslm_step_graph(ctx, /*n_past=*/0, /*fixed_kv_len=*/0, nullptr, /*n_tokens=*/N);
+    if (!gf || !ggml_gallocr_alloc_graph(ctx->galloc, gf)) {
+        fprintf(stderr, "voxcpm2: batched prefill graph alloc failed (N=%d)\n", N);
+        return false;
+    }
+    ggml_tensor* t_in = ggml_graph_get_tensor(gf, "hidden_in");
+    ggml_tensor* t_pos = ggml_graph_get_tensor(gf, "positions");
+    ggml_tensor* t_mask = ggml_graph_get_tensor(gf, "causal_mask");
+    ggml_tensor* t_out = ggml_graph_get_tensor(gf, "hidden_out");
+    if (!t_in || !t_pos || !t_out || (N > 1 && !t_mask)) {
+        return false;
+    }
+    ggml_backend_tensor_set(t_in, embeds, 0, (size_t)N * d * sizeof(float));
+    std::vector<int32_t> pos((size_t)N);
+    for (int i = 0; i < N; i++)
+        pos[i] = i;
+    ggml_backend_tensor_set(t_pos, pos.data(), 0, pos.size() * sizeof(int32_t));
+    if (t_mask) {
+        // (Lk = N, T = N): row q sees keys k <= q.
+        std::vector<ggml_fp16_t> mask((size_t)N * N);
+        const ggml_fp16_t z = ggml_fp32_to_fp16(0.0f), ninf = ggml_fp32_to_fp16(-INFINITY);
+        for (int q = 0; q < N; q++)
+            for (int k = 0; k < N; k++)
+                mask[(size_t)q * N + k] = (k <= q) ? z : ninf;
+        ggml_backend_tensor_set(t_mask, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
+    }
+    if (ggml_tensor* half = ggml_graph_get_tensor(gf, "fsq_half")) {
+        std::vector<float> hb((size_t)ggml_nelements(half), 0.5f);
+        ggml_backend_tensor_set(half, hb.data(), 0, hb.size() * sizeof(float));
+    }
+    if (core_cpu_backend::is_cpu(ctx->backend)) {
+        core_cpu_backend::set_n_threads(ctx->backend, ctx->n_threads);
+    }
+    if (ggml_backend_graph_compute(ctx->backend, gf) != GGML_STATUS_SUCCESS) {
+        fprintf(stderr, "voxcpm2: batched prefill graph compute failed (N=%d)\n", N);
+        return false;
+    }
+    ggml_backend_tensor_get(t_out, normed_out, 0, (size_t)N * d * sizeof(float));
+    return true;
+}
+
 static std::vector<float> tslm_prefill_from_embeds(voxcpm2_context* ctx, const float* embeds, int T,
                                                    ggml_backend_t cpu_be, const tslm_prefill_hooks& hooks) {
     const vox_hparams& hp = ctx->hp;
@@ -6539,13 +6590,22 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
     double t0_prefill = vox_now_ms();
     std::vector<float> normed_all((size_t)N_pos * d_tslm);
     bool graph_prefilled = false;
+    bool prefill_batched = false;
     if (use_graph_tslm && !vox_env_bool("CRISPASR_VOXCPM2_LEGACY_PREFILL") && init_tslm_kv_backend(ctx)) {
         ctx->tslm_kv.reset();
-        for (int t = 0; t < N_pos; t++) {
-            std::vector<float> h = tslm_step_graph(ctx, pi.combined_embed.data() + (size_t)t * d_tslm, t);
-            std::memcpy(normed_all.data() + (size_t)t * d_tslm, h.data(), (size_t)d_tslm * sizeof(float));
-            ctx->tslm_kv.n_past = t + 1;
+        // One batched graph for the whole prompt; per-position graph calls
+        // (same KV, same hidden states) if it fails or with
+        // CRISPASR_VOXCPM2_PREFILL_SERIAL=1.
+        if (!vox_env_bool("CRISPASR_VOXCPM2_PREFILL_SERIAL") &&
+            tslm_prefill_graph_batched(ctx, pi.combined_embed.data(), N_pos, normed_all.data())) {
+            prefill_batched = true;
+        } else {
+            for (int t = 0; t < N_pos; t++) {
+                std::vector<float> h = tslm_step_graph(ctx, pi.combined_embed.data() + (size_t)t * d_tslm, t);
+                std::memcpy(normed_all.data() + (size_t)t * d_tslm, h.data(), (size_t)d_tslm * sizeof(float));
+            }
         }
+        ctx->tslm_kv.n_past = N_pos;
         ctx->tslm_kv_synced = true;
         graph_prefilled = true;
     }
@@ -6576,7 +6636,8 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
                                    normed_all.data() + (size_t)N_pos * d_tslm);
     if (ctx->verbosity >= 1) {
         fprintf(stderr, "voxcpm2: TSLM prefill %.1f ms (%d positions%s, %s)\n", vox_now_ms() - t0_prefill, N_pos,
-                have_ref ? " incl. ref" : "", graph_prefilled ? "graph, KV ready" : "legacy");
+                have_ref ? " incl. ref" : "",
+                graph_prefilled ? (prefill_batched ? "graph batched" : "graph per-position") : "legacy");
     }
 
     // 6. fusion_concat_proj + multi-position RALM prefill. Python concatenates

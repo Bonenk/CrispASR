@@ -7,11 +7,12 @@ through the step graph on the first AR step. Now the prompt goes through the
 graph once and the eager matmuls honour -t.
 
 Arms, same binary, CPU, -t = all cores, --seed 2, CRISPASR_VOXCPM2_BENCH=1:
-  legacy   CRISPASR_VOXCPM2_LEGACY_PREFILL=1 (the pre-#478 path, incl. replay)
-  graph    default
+  legacy          CRISPASR_VOXCPM2_LEGACY_PREFILL=1 (the pre-#478 path, incl. replay)
+  graph_serial    one graph pass, one position per call (CRISPASR_VOXCPM2_PREFILL_SERIAL=1)
+  graph_batched   default: the whole prompt in one graph
 Cases: zero-shot, and voice cloning with samples/jfk.wav (a long prompt, like
 the report's 249 positions). Gate: every arm transcribes back to the text
-(whisper base.en via crispasr) and the graph arm is faster in total.
+(whisper base.en via crispasr) and the batched arm is faster in total than legacy.
 
     gh workflow run heavy-cpu.yml -f script=tools/ci-heavy/voxcpm2_prefill_ab.py -f pip="huggingface_hub"
 """
@@ -34,7 +35,9 @@ CASES = {
     "voice_clone": ("The quick brown fox jumps over the lazy dog, and then it runs back home again.",
                     REPO / "samples" / "jfk.wav"),
 }
-ARMS = {"legacy": {"CRISPASR_VOXCPM2_LEGACY_PREFILL": "1"}, "graph": {}}
+ARMS = {"legacy": {"CRISPASR_VOXCPM2_LEGACY_PREFILL": "1"},
+        "graph_serial": {"CRISPASR_VOXCPM2_PREFILL_SERIAL": "1"},
+        "graph_batched": {}}
 res = {"threads": NT, "cases": {}}
 
 
@@ -89,7 +92,7 @@ for case, arms in res["cases"].items():
                      f"{e['replayed']} | {e['asr_ok']} |")
         ok = ok and e["rc"] == 0 and e["asr_ok"]
     try:
-        ok = ok and float(arms["graph"]["synth_ms"]) < float(arms["legacy"]["synth_ms"])
+        ok = ok and float(arms["graph_batched"]["synth_ms"]) < float(arms["legacy"]["synth_ms"])
     except (TypeError, ValueError):
         ok = False
 (OUT / "summary.md").write_text("\n".join(lines) + "\n")
