@@ -22,8 +22,6 @@ import re
 import subprocess
 import sys
 
-import yaml
-
 
 def glob_to_regex(pattern: str) -> re.Pattern:
     """GitHub path-filter glob -> regex: `**` any depth, `*` within a segment, `?` one char."""
@@ -44,6 +42,7 @@ def glob_to_regex(pattern: str) -> re.Pattern:
 
 
 def watched(workflow: str):
+    import yaml  # inside the fail-open guard: a runner without PyYAML must RUN the job
     doc = yaml.safe_load(open(workflow))
     on = doc.get('on', doc.get(True)) or {}      # YAML 1.1 reads a bare `on:` key as True
     push = on.get('push') if isinstance(on, dict) else None
@@ -72,4 +71,8 @@ def main() -> int:
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as e:  # never let a gate crash skip the heavy job
+        print(f'  scope gate error ({e!r}); running the job', file=sys.stderr)
+        print('relevant=true')

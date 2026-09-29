@@ -54,8 +54,9 @@ jobs:
           if [ "${{ github.event_name }}" != "push" ] || [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "relevant=true" >> "$GITHUB_OUTPUT"
           else
-            git fetch --no-tags origin main
-            python3 .github/scripts/branch_touches_paths.py "$GITHUB_WORKFLOW_REF_PATH" origin/main >> "$GITHUB_OUTPUT"
+            git fetch --no-tags origin main || true   # no base -> script answers true
+            python3 .github/scripts/branch_touches_paths.py "$GITHUB_WORKFLOW_REF_PATH" origin/main >> "$GITHUB_OUTPUT" \
+              || echo "relevant=true" >> "$GITHUB_OUTPUT"
           fi
         env:
           GITHUB_WORKFLOW_REF_PATH: .github/workflows/linux-isa-fallback-verify.yml
