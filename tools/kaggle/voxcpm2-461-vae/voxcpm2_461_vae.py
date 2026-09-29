@@ -96,21 +96,19 @@ try:
         ent = {"rc": r.returncode, "wall_s": round(time.time() - t0, 2),
                "vae_ms": float(vae[-1]) if vae else None, "synth_ms": float(tot[-1]) if tot else None,
                "ar": ar[-1] if ar else None,
+               "vae_split": [l.strip() for l in err.splitlines() if "voxcpm2_bench: vae." in l],
                "fallback": [l for l in err.splitlines() if "falling back" in l or "using CPU" in l][:5],
                "tail": err[-1500:] if r.returncode or not vae else ""}
         if env and "GGML_VK_PERF_LOGGER" in env:
             ent["vae_graph"] = vae_graph_ops(err)
         res["runs"][tag] = ent; save()
-        print(tag, {k: ent[k] for k in ("rc", "vae_ms", "synth_ms", "ar", "fallback")}, flush=True)
+        print(tag, {k: ent[k] for k in ("rc", "vae_ms", "synth_ms", "ar", "fallback", "vae_split")}, flush=True)
         return wav
 
     run("vk_warmup")
-    for i in (1, 2, 3):
+    for i in (1, 2):
         run(f"vk_base_{i}")
         run(f"vk_shift_{i}", env=SHIFT)
-    run("vk_base_perf", env={"GGML_VK_PERF_LOGGER": "1"})
-    run("vk_shift_perf", env={**SHIFT, "GGML_VK_PERF_LOGGER": "1"})
-    run("cpu_base", ["-ng"])
     run("cpu_shift", ["-ng"], env=SHIFT)
 
     for tag in ("vk_base", "vk_shift", "cpu_base"):
@@ -118,7 +116,7 @@ try:
         res[f"{tag}_vae_ms_all"] = v
     try:
         import numpy as np
-        for a, b in (("vk_base_1", "vk_shift_1"), ("cpu_base", "cpu_shift"), ("vk_base_1", "vk_base_2")):
+        for a, b in (("vk_base_1", "vk_shift_1"), ("vk_base_1", "vk_base_2")):
             A, Bw = read_wav(OUT / f"{a}.wav"), read_wav(OUT / f"{b}.wav")
             n = min(len(A), len(Bw))
             d = np.abs(A[:n] - Bw[:n])

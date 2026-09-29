@@ -4081,15 +4081,26 @@ static bool vae_wn_init_ggml(voxcpm2_context* ctx) {
     }
 
     // Now populate. WN convs: reconstruct from g/v, write into the tensor.
+    double t_fetch = 0, t_wn = 0, t_up = 0; // CRISPASR_VOXCPM2_BENCH split (#461)
     for (const auto& e : wn_entries) {
+        auto c0 = std::chrono::steady_clock::now();
         const float* g = vae_tensor_f32(T, e.g_name);
         const float* v = vae_tensor_f32(T, e.v_name);
         if (!g || !v) {
             continue; // optional layer; leaves the tensor zero-initialised
         }
+        auto c1 = std::chrono::steady_clock::now();
         std::vector<float> w = wn_reconstruct(g, v, e.out_ch, e.in_ch, e.ksize);
+        auto c2 = std::chrono::steady_clock::now();
         ggml_backend_tensor_set(M[e.key], w.data(), 0, w.size() * sizeof(float));
+        auto c3 = std::chrono::steady_clock::now();
+        t_fetch += std::chrono::duration<double, std::milli>(c1 - c0).count();
+        t_wn += std::chrono::duration<double, std::milli>(c2 - c1).count();
+        t_up += std::chrono::duration<double, std::milli>(c3 - c2).count();
     }
+    if (voxcpm2_bench_enabled())
+        fprintf(stderr, "  voxcpm2_bench: vae.wn f32_fetch=%.1f ms rebuild=%.1f ms upload=%.1f ms (%zu convs)\n",
+                t_fetch, t_wn, t_up, wn_entries.size());
 
     // Snake1d: populate inv_alpha + copy alpha to the compute backend.
     for (const auto& name : alpha_names) {
@@ -4208,7 +4219,12 @@ static std::vector<float> vae_decode_graph(voxcpm2_context* ctx, const std::vect
         return std::vector<float>((size_t)n_patches * (size_t)P * 1920, 0.0f);
     }
 
-    if (!vae_wn_init_ggml(ctx)) {
+    bool wn_ok;
+    {
+        voxcpm2_bench_stage st("vae.wn_init");
+        wn_ok = vae_wn_init_ggml(ctx);
+    }
+    if (!wn_ok) {
         if (ctx->verbosity >= 1)
             fprintf(stderr, "voxcpm2: vae_wn_init_ggml failed; falling back to CPU vae_decode\n");
         return vae_decode_cpu(ctx, patches);
@@ -4407,7 +4423,12 @@ static std::vector<float> vae_decode_graph(voxcpm2_context* ctx, const std::vect
     ggml_set_output(cur);
     ggml_build_forward_expand(gf, cur);
 
-    if (!ggml_gallocr_alloc_graph(ctx->galloc, gf)) {
+    bool alloc_ok;
+    {
+        voxcpm2_bench_stage st("vae.alloc");
+        alloc_ok = ggml_gallocr_alloc_graph(ctx->galloc, gf);
+    }
+    if (!alloc_ok) {
         fprintf(stderr, "voxcpm2: vae_decode_graph gallocr alloc failed; falling back to CPU\n");
         ggml_free(ctx0);
         return vae_decode_cpu(ctx, patches);
@@ -4424,7 +4445,12 @@ static std::vector<float> vae_decode_graph(voxcpm2_context* ctx, const std::vect
     if (core_cpu_backend::is_cpu(ctx->backend)) {
         core_cpu_backend::set_n_threads(ctx->backend, ctx->n_threads);
     }
-    if (ggml_backend_graph_compute(ctx->backend, gf) != GGML_STATUS_SUCCESS) {
+    ggml_status vae_st;
+    {
+        voxcpm2_bench_stage st("vae.compute");
+        vae_st = ggml_backend_graph_compute(ctx->backend, gf);
+    }
+    if (vae_st != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "voxcpm2: vae_decode_graph compute failed; falling back to CPU\n");
         ggml_free(ctx0);
         return vae_decode_cpu(ctx, patches);
