@@ -943,10 +943,10 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
             // across persistent decoder state. Kaggle parity decides whether
             // the published Q4 needs these encoder tensors retained at F16.
             !(vibevoice_asr_frontend_f16 && (sname.find("at_enc.") == 0 || sname.find("st_enc.") == 0)) &&
-            !(is_breeze && (sname == "backbone.audio_embd.weight" || sname == "backbone.codebook0_head.weight" ||
-                            sname.rfind("depth.cb_head.", 0) == 0 || sname == "te_proj.weight" ||
-                            sname == "depth.projection.weight" ||
-                            (!breeze_quant_text_embd && sname == "te.token_embd.weight"))) &&
+            !(is_breeze &&
+              (sname == "backbone.audio_embd.weight" || sname == "backbone.codebook0_head.weight" ||
+               sname.rfind("depth.cb_head.", 0) == 0 || sname == "te_proj.weight" ||
+               sname == "depth.projection.weight" || (!breeze_quant_text_embd && sname == "te.token_embd.weight"))) &&
             !(is_zonos && (sname.find("heads.") == 0 || sname.find("embeddings.") == 0 ||
                            sname.find("prefix_conditioner.") == 0)) &&
             !(is_bark &&
@@ -1116,17 +1116,21 @@ static bool crispasr_model_quantize(const std::string& fname_inp, const std::str
         }
 
         // User per-tensor override (--tensor-type <regex>=<type>). First match
-        // wins; overrides the arch guards above. A quant override on a <2-D or
-        // ill-tiled row is skipped (with a note) rather than corrupting output.
+        // wins; overrides the arch guards above. An override that would LOWER a
+        // <2-D tensor (bias, norm weight) below F32 is skipped, with a note:
+        // graphs add those as F32, and ggml's CPU add aborts on F32 + F16
+        // (#461: '^locdit\.=f16' turned the LocDiT biases F16 and CPU
+        // synthesis crashed; Vulkan happened to tolerate it). An ill-tiled row
+        // under a quant override is skipped the same way.
         for (size_t r = 0; r < g_type_overrides.size(); r++) {
             if (!std::regex_search(sname, g_type_overrides[r].first))
                 continue;
             ggml_type ov = g_type_overrides[r].second;
+            if (ggml_n_dims(t) < 2 && ov != GGML_TYPE_F32) { // raising a norm to F32 is fine
+                override_skips[r]++;
+                break;
+            }
             if (ggml_is_quantized(ov)) {
-                if (ggml_n_dims(t) < 2) {
-                    override_skips[r]++;
-                    break;
-                }
                 ggml_type fit = crispasr_row_fit(ov, ncols);
                 if (fit == GGML_TYPE_COUNT) {
                     override_skips[r]++;
