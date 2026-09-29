@@ -75,17 +75,25 @@ for case, (text, voice) in CASES.items():
                "-t", NT, "-v"] + (["--voice", voice, "--i-have-rights"] if voice else [])
         r, wall = run(cmd, env=dict(env, CRISPASR_VOXCPM2_BENCH="1"))
         err = r.stderr
-        g = lambda pat: (re.findall(pat, err) or [None])[-1]
+        # A cloned voice gets the provenance disclaimer synthesised as a separate
+        # (zero-shot) call, so take the entries of the LARGEST call: the clone.
+        prefills = re.findall(r"(TSLM prefill [\d.]+ ms \((\d+) positions[^\n]*)", err)
+        synths = [float(x) for x in re.findall(r"voxcpm2_bench: synthesize\s+([\d.]+) ms", err)]
+        ars = re.findall(r"(AR loop (\d+) steps, [\d.]+ ms)", err)
+        steps = [float(x) for x in re.findall(r"voxcpm2\[bench\]:\s+tslm_step\s+([\d.]+) ms", err)]
+        big = max(range(len(prefills)), key=lambda i: int(prefills[i][1])) if prefills else None
         e = {"rc": r.returncode, "wall_s": round(wall, 1),
-             "synth_ms": g(r"voxcpm2_bench: synthesize\s+([\d.]+) ms"),
-             "prefill_line": g(r"(TSLM prefill [^\n]+)"),
-             "ar": g(r"(AR loop \d+ steps, [\d.]+ ms)"),
-             "tslm_step_ms": g(r"voxcpm2\[bench\]:\s+tslm_step\s+([\d.]+) ms"),
+             "synth_ms": max(synths) if synths else None,
+             "prefill_line": prefills[big][0] if big is not None else None,
+             "ar": max(ars, key=lambda a: int(a[1]))[0] if ars else None,
+             "tslm_step_ms": max(steps) if steps else None,
              "replayed": bool(re.search(r"replayed \d+ prefill tokens", err)),
              "tail": err[-1200:] if r.returncode else ""}
         a, _ = run([cli, "-m", whisper, "-f", wav, "-np", "-nt"], timeout=600)
         e["asr"] = a.stdout.strip()
-        e["asr_ok"] = norm(e["asr"]) == norm(text)
+        # the spoken AI-disclaimer may precede a cloned voice's text
+        heard, want = norm(e["asr"]), norm(text)
+        e["asr_ok"] = heard[-len(want):] == want
         res["cases"][case][arm] = e
         print(case, arm, {k: v for k, v in e.items() if k != "tail"}, flush=True)
         (OUT / "result.json").write_text(json.dumps(res, indent=1))
