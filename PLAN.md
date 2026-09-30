@@ -11,6 +11,16 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-09-30 — #481 integration checklist and profile
+
+Worktree `/mnt/volume1/wt-481-wire`, branch `feat/481-wiring-profile`.
+Audit Phonon-2 against every applicable `docs/contributing.md` integration
+point, complete missing CLI/C ABI/binding/docs/live-test wiring, then profile
+the validated runtime with load excluded and warmed repeated inference.
+NOW: auditing shared Parakeet integration and model-specific language/capabilities;
+no performance default changes before a transcript-checked A/B.
+Artifacts/logs: `/mnt/volume1/tmp-overflow/issue481/wiring-profile`.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
