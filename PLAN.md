@@ -273,12 +273,6 @@ Reproduce either arm in one command:
     python tools/der_voxconverse.py --audio-dir /tmp/vox --model ggml-tiny.bin \
         --args "--diarize --diarize-method pyannote --diarize-embedder auto"
 
-### 1. DONE (a719c89d) — over-clustering, 15.74% -> 7.81%
-
-Archived to HISTORY. Independently re-measured 2026-08-03 from a clean corpus
-extraction: mean 7.81%, per-file counts 5/6/3/4/5/4/3/3 — identical to the
-commit's numbers, so both the fix and the harness are confirmed.
-
 ### 2. OPEN — the speaker-count estimator now UNDER-counts
 
 The cap no longer decides the count, but the BIC estimator that replaced it is

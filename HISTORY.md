@@ -900,6 +900,12 @@ ggml vs legacy logits on the same 30 s slice; verify the index→label
 table against the ONNX blueprint's ordering; check the mel/frontend
 scale columns, not just cosine.
 
+### #326 over-clustering fix (a719c89d) — re-measured 2026-08-03
+
+15.74% -> 7.81% mean DER. Independently re-measured from a clean corpus
+extraction: mean 7.81%, per-file counts 5/6/3/4/5/4/3/3 — identical to the
+commit's numbers, so both the fix and the harness are confirmed.
+
 ---
 
 
