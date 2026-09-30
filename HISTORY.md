@@ -6,6 +6,51 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-09-30 — #478 voxcpm2 CPU prefill: one batched graph pass, `-t` honoured
+
+The reporter (Windows CPU, 249-position voice-clone prompt, RTF 11.8) traced
+~36 of 74 s to reading the prompt. Graph mode prefilled it twice: the legacy
+eager prefill, then a replay of every position through the step graph on the
+first AR step (added for #164, because legacy-attention KV made the stop
+predictor never fire). Both passes ran one position per call, and the eager
+matmuls were pinned to 4 threads (`g_cpu_n_threads = 4; // TODO`).
+Fixed on main `66a94da4` + `0a75cbc3`:
+- graph mode prefills once: `build_tslm_step_graph(n_tokens = N)` with a causal
+  mask (`tslm_prefill_graph_batched`) writes the backend KV and returns every
+  position's output-normed hidden state for FSQ / RALM / the first step;
+- fallbacks: per-position graph (`CRISPASR_VOXCPM2_PREFILL_SERIAL=1`), legacy +
+  replay (`CRISPASR_VOXCPM2_LEGACY_PREFILL=1` or `USE_GRAPH=0`);
+- `g_cpu_n_threads` follows `ctx->n_threads` at load and per synthesis.
+CPU A/B `tools/ci-heavy/voxcpm2_prefill_ab.py` (4-core runner, 62-position
+clone): TSLM prefill 2497 → 1321 ms, `tslm_step` avg 132.9 → 42.6 ms, total
+39.5 → 36.0 s, ASR exact on every arm. Open: RALM prefill is still eager
+per-position; reporter bench pending.
+
+## DONE 2026-09-29 — #461 voxcpm2 on Vulkan: VAE decode 5.2x, mixed-precision file, quantizer fix
+
+Reporter (Arc B390 iGPU): VAE decode was 1688 of 4126 ms. It was per-process
+setup, not GPU work — the naive ConvTranspose1d weight permute (~1.1 s) plus a
+GPU round trip, counted inside the decode timer (`vae.wn_init`). Fixes on main:
+tiled transpose in `core_convt::permute_convt1d_weight` (`29edb4cb`, shared by
+22 TTS backends, byte-identical, `tests/test-convt-permute`); host-side permute
++ threaded WN rebuild (`ea63da9f`); depthwise VAE convs as shifted mul-adds,
+default on Vulkan only (`550fee38`, `CRISPASR_VOXCPM2_VAE_DW_SHIFT`). Reporter
+measured VAE 1688 → 323 ms. The diffusion head is compute-bound at the default
+10 steps: `voxcpm2-q8_0-locdit-f16.gguf` (q8_0 + F16 LocDiT) cut CFM 13% on the
+B390 (RTF 1.10 → 1.01 at 8 steps, which they confirmed sounds clean); building
+it exposed `--tensor-type` lowering 1-D biases to F16 (CPU add aborts on
+F32 + F16), fixed in `be202c47` with `tests/test-quant-override-1d.sh`.
+With #478 the reporter's run should reach ~RTF 0.85 (estimate; bench pending).
+
+## DONE 2026-09-29 — heavy-cpu.yml: CPU work off Kaggle
+
+`.github/workflows/heavy-cpu.yml` (also in CrispEmbed) runs a script from
+`tools/ci-heavy/` on a free GitHub runner (Linux x64/arm64, macOS; /mnt scratch,
+submodules, HF_TOKEN secret, artifact + summary, exit code = verdict). Kaggle
+is for real-GPU work only (tools/kaggle/README.md, "What belongs on Kaggle",
+after the 2026-09-28 account ban). #477: heavy verify workflows are scoped to a
+branch's own changes and fail open for real (proven live on a rebased branch).
+
 ## DONE 2026-09-28 — #463 Whisper no-VAD long-form parity
 
 The explicit unified `--backend whisper` adapter advertised internal chunking

@@ -1,5 +1,16 @@
 # CrispASR — Pending work
 
+## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
+
+- **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
+  on a pre-#478 build; asked to re-bench on main (estimate ~0.85). What remains is
+  the compute-bound LocDiT matmuls (22 columns) at 10 steps — only a faster Vulkan
+  kernel for that shape would move the default-quality number.
+- **#478**: reporter offered a Windows CPU bench (249-position Khmer clone). Next lever:
+  **RALM prefill** is still eager, one position per call (`ralm_prefill_multi`); a
+  batched graph like `tslm_prefill_graph_batched` would read its weights once.
+- `CRISPASR_VOXCPM2_VAE_DW_SHIFT` is default-on for Vulkan only; CUDA/Metal unmeasured.
+
 ## DONE 2026-09-28 — xcframework iOS slices for iOS 15.0 (was 16.4)
 
 Branch `feat/ios15-xcframework`, worktree `.claude/worktrees/feat-ios15`.

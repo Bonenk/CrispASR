@@ -4,6 +4,21 @@ Test audio: jfk.wav (11.0s), Q4_K quantization, greedy decode (`-bs 1`).
 
 ---
 
+## voxcpm2 — #461 (Vulkan) and #478 (CPU) (2026-09-29/30)
+
+Reporter's Arc B390 iGPU (Vulkan, seed 2, "Hello, this is a short test sentence."):
+
+| build / file | steps | VAE decode | CFM per audio step | total | RTF |
+|---|---|---|---|---|---|
+| before #461 fixes, q8_0 | 6 | 1688 ms | 90.7 ms | 4126 ms | 1.36 |
+| after, q8_0 | 10 | 316 ms | 141.5 ms | 4097 ms | 1.28 |
+| after, q8_0 | 8 | 303 ms | 110.6 ms | 3354 ms | 1.10 |
+| after, q8_0 + F16 LocDiT | 8 | 299 ms | 96.6 ms | 3085 ms | 1.01 |
+
+Kaggle T4 (Vulkan): CFM 70.2 ms (q8_0, 10 steps) → 59.4 (mixed) → 46.7 (mixed, 8).
+CPU (4-core GitHub runner, #478, 62-position voice clone): TSLM prefill 2497 →
+1321 ms, `tslm_step` avg 132.9 → 42.6 ms, total 39.5 → 36.0 s.
+
 ## Canary 180M Flash Q4_K_M — Linux CPU/Vulkan bring-up (AMD Ryzen AI MAX+ 395 / Radeon 8060S, 2026-09-25)
 
 Directly loaded
