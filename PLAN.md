@@ -11,6 +11,16 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-09-30 — #481 final CI default assertion
+
+Worktree `/mnt/volume1/wt-481-wire`, branch `fix/481-flash-default-test`.
+NOW: integration/profile is landed and dedicated Linux/macOS CI is green.
+Main unit CI passes 1959/1960; the shared flash-defaults suite still pins the
+old reported Parakeet `use_flash=false` value, although the graph was always
+flash-enabled. Align this remaining assertion with the deliberately preserved
+enabled graph default and rerun units. Main lint is green; platform builds
+have no reported source failure. Logs in `issue481/wiring-profile`.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
