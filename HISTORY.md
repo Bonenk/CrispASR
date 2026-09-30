@@ -6,6 +6,36 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-09-30 — #481 Phonon-2
+
+Phonon-2 runs through the existing Parakeet backend. The converter checks the
+upstream archive/container SHA-256 and independently expands Fermion's five-value
+encoder and int6/int8 tables; all 723 source tensors match the upstream reader
+exactly. Standard Parakeet GGUF metadata enables C ABI detection after renaming.
+`crispasr -m phonon2` selects Q8_0 (~674 MB); F16 (~1,255 MB) and Q4_K (~402 MB)
+are explicit alternatives. The upstream 164 MB transport is not the GGUF size
+or runtime RAM. Weights retain CC-BY-4.0 attribution; the reference reader is
+vendored unchanged under Apache-2.0.
+
+Independent stock Transformers reference: all 28 F16 stages pass on JFK and
+LibriSpeech (minimum cosine 0.999996 / 0.999796; norm-ratio error bounded by
+0.065% / 0.259%). CPU C ABI sessions with arbitrary filenames: F16 21/21 exact
+transcripts, Q8 19/21, Q4 15/21. Against 298 normalized reference words, Q8 has
+one edit and Q4 seven; these are conversion checks, not human-ground-truth WER
+or a reproduction of upstream GPU performance. All three CLI exports match JFK.
+
+Published [model artifacts](https://huggingface.co/cstr/phonon2-GGUF) at
+`3ed3e6ad6e7ce63affffeede37328ff756efaa2f`, with checksums and validation receipt.
+Reference/audio fixtures are pinned at `cf16f4594149db53b2eb3fff6e772ff83384a356`
+(four additions only). Phonon-2 joins the nightly matrix with a strict 0.999
+stage gate and Q8 transcript gate; rebaking uses its independent reference
+loader. Downloaded-artifact regression passed all stages and exact transcript
+using checksum-verified HTTP downloads after an initial corrupted Xet cache
+copy was isolated. Six container, eight selection and 60 registry tests pass;
+workflow lint/shell syntax and driver-schema checks pass. Details and commands
+are in `docs/phonon2.md`; logs/artifacts in
+`/mnt/volume1/tmp-overflow/issue481`. No new release tag.
+
 ## Published 2026-09-30 — v0.8.39
 
 Audited v0.8.38..main: Intel/arm64 macOS CLI packaging and C2PA relocation,

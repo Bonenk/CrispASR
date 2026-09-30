@@ -11,24 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-09-30 — #481 Phonon-2
-
-Worktree `/mnt/volume1/wt-481`, branch `feat/481-phonon2`.
-Add the Fermion five-value/int6 container to the existing Parakeet converter,
-reuse the Parakeet runtime, prove exact unpacking and per-stage/reference
-transcript parity, then evaluate F16/Q8_0/Q4_K and publish validated artifacts.
-NOW: published validated exports at `cstr/phonon2-GGUF`, revision
-`3ed3e6ad6e7ce63affffeede37328ff756efaa2f`; reference/audio fixtures at
-`cstr/crispasr-regression-fixtures`, revision
-`cf16f4594149db53b2eb3fff6e772ff83384a356` (four additions only).
-All 723 source tensors match independently; all 28 F16 stages pass on both
-clips with magnitude checks. C ABI arbitrary-name detection passes; 21-clip
-exact transcripts: F16 21/21, Q8 19/21, Q4 15/21. Q8 default: one normalized
-word edit versus reference (Q4 seven), so neither inherits upstream WER claims.
-Six format tests and 60 registry tests pass. Finishing published-artifact
-regression/CLI verification, then landing converter/registry/docs/nightly gate.
-Artifacts/logs: `/mnt/volume1/tmp-overflow/issue481`.
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
