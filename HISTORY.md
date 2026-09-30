@@ -28,7 +28,7 @@ All 28 compared frontend/encoder stages pass: Linux min cosine 0.999994, magnitu
 tests and actual CTest live run pass; the model-free CTest skips with code 77.
 The full main unit run exposed one remaining shared flash-default assertion
 pinning the old reported value (1959/1960 passed). The assertion/comment now
-pin the preserved enabled graph default; the focused 39-case suite passes.
+pin the preserved enabled graph default; the focused suite passes (15 assertions in 12 cases).
 Final full-unit CI is rerun after that test-only correction.
 
 Fair 4-thread EPYC CPU comparison, warm medians excluding model load: Q8
