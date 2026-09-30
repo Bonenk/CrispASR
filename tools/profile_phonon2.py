@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import platform
 import re
+import resource
 import statistics
 import sys
 import time
@@ -93,6 +94,8 @@ def main():
     finally:
         if session:
             session.close()
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    report["peak_rss_mb"] = peak / (1024 * 1024 if sys.platform == "darwin" else 1024)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n")
 

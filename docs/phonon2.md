@@ -72,7 +72,7 @@ does not establish multilingual accuracy after retraining.
 python tools/dump_reference.py --backend phonon2 \
   --model-dir FermionResearch/Phonon-2 --audio samples/jfk.wav \
   --output phonon2-jfk-ref.gguf
-./build/bin/crispasr-diff parakeet phonon2-f16.gguf phonon2-jfk-ref.gguf samples/jfk.wav
+./build/bin/crispasr-diff phonon2 phonon2-f16.gguf phonon2-jfk-ref.gguf samples/jfk.wav
 ```
 
 The reference uses the unmodified upstream container reader and stock
@@ -114,6 +114,8 @@ English without automatically loading Whisper for LID. Non-English language
 requests produce a warning; the model cannot honour them. Explicit language
 identification remains available. Native punctuation is advertised. `--no-flash-attn` and the C ABI open flag
 now reach the graph builder; the live guard checks the resulting node trace.
+The raw Parakeet context default now reports flash enabled, matching the
+previous graph behaviour; an explicit false selects manual attention.
 
 ## Reproducible profiling
 

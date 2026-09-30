@@ -16,7 +16,7 @@ TEST_CASE("parakeet_params: default values are sensible", "[unit][parakeet]") {
 TEST_CASE("parakeet_params: gpu/flash defaults are pinned", "[unit][parakeet]") {
     struct parakeet_context_params p = parakeet_context_default_params();
     REQUIRE(p.use_gpu == true);
-    REQUIRE(p.use_flash == false);
+    REQUIRE(p.use_flash == true);
 }
 
 TEST_CASE("parakeet_init_from_file: null path returns nullptr", "[unit][parakeet]") {

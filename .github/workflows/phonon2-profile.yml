@@ -65,6 +65,7 @@ jobs:
           repo = 'cstr/phonon2-GGUF'
           revision = '3ed3e6ad6e7ce63affffeede37328ff756efaa2f'
           checks = hf_hub_download(repo, 'SHA256SUMS.txt', revision=revision)
+          shutil.copyfile(checks, 'results/SHA256SUMS.txt')
           for line in pathlib.Path(checks).read_text().splitlines():
               expected, name = line.split()
               path = pathlib.Path(hf_hub_download(repo, name, revision=revision))
@@ -138,6 +139,7 @@ jobs:
           fi
           python -m pip freeze > results/python-packages.txt
           git rev-parse HEAD > results/commit.txt
+          git diff > results/generated-diff.patch
           cp docs/feature-matrix.md docs/feature-matrix.html src/core/backend_caps_table.h results/
       - uses: actions/upload-artifact@v7
         if: always()

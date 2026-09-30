@@ -5211,7 +5211,7 @@ int main(int argc, char** argv) {
         }
 
         wespeaker_free(ctx);
-    } else if (backend_name == "parakeet") {
+    } else if (backend_name == "parakeet" || backend_name == "phonon2") {
         auto cp = parakeet_context_default_params();
         cp.n_threads = 4;
         cp.verbosity = 0;

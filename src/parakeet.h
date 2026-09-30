@@ -24,7 +24,7 @@ bool parakeet_is_english_only(const struct parakeet_context* ctx);
 
 struct parakeet_context_params {
     int n_threads;
-    bool use_flash; // flash attention in encoder (default: false)
+    bool use_flash; // flash attention in encoder (default: true)
     int verbosity;  // 0=silent 1=normal 2=verbose
     bool use_gpu;   // false => force CPU backend
 };

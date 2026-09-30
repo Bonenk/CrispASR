@@ -3107,7 +3107,7 @@ int crispasr_run_backend(const whisper_params& params_in) {
     // fastconformer-ctc by arch ("canary-ctc") and filename, but an explicit
     // `--backend parakeet` bypasses that and dead-ends at the parakeet guard.
     // Reroute here so the transducer-only backend never gets a CTC model.
-    if (backend_name == "parakeet" && crispasr_gguf_is_pure_ctc(params.model)) {
+    if ((backend_name == "parakeet" || backend_name == "phonon2") && crispasr_gguf_is_pure_ctc(params.model)) {
         if (!params.no_prints) {
             fprintf(stderr,
                     "crispasr: '%s' is a pure-CTC model (no RNN-T decoder) — the parakeet\n"

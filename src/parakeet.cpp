@@ -2972,7 +2972,7 @@ static ggml_backend_t pick_backend(bool use_gpu) {
 extern "C" struct parakeet_context_params parakeet_context_default_params(void) {
     parakeet_context_params p = {};
     p.n_threads = std::min(4, (int)std::thread::hardware_concurrency());
-    p.use_flash = false;
+    p.use_flash = true; // preserve the previously always-enabled default graph
     p.verbosity = 1;
     p.use_gpu = true;
     return p;
