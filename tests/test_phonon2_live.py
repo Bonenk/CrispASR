@@ -7,12 +7,8 @@ import sys
 import tempfile
 import wave
 
-import numpy as np
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "python"))
-from crispasr import Session
-
 EXPECTED = "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country."
 
 
@@ -26,6 +22,8 @@ def main():
     if not model.is_file():
         print("Phonon-2 model missing: set CRISPASR_MODEL_PHONON2")
         return 1 if args.require_live else 77
+    import numpy as np
+    from crispasr import Session
     wav = ROOT / "samples/jfk.wav"
     with wave.open(str(wav)) as source:
         assert source.getframerate() == 16000 and source.getnchannels() == 1

@@ -1423,8 +1423,8 @@ struct parakeet_emitted_token {
 
 // §232 — GPU decode via the shared core_rnnt_ggml helpers (predictor LSTM +
 // joint as ggml graphs on ctx->backend). Default ON when the decode backend is a
-// GPU (P100 A/B: 5-12x faster, transcript-identical — LEARNINGS 33); cblas on
-// CPU. Override PARAKEET_GGML_DECODE=1/0; RNNT_GGML_PERSTEP = per-step path.
+// GPU (P100 A/B: 5-12x faster, transcript-identical — LEARNINGS 33);
+// Apple Accelerate on Apple CPU, scalar loops on other CPU builds. Override PARAKEET_GGML_DECODE=1/0; RNNT_GGML_PERSTEP = per-step path.
 //
 // Returns whether to use ggml decode, and builds the persistent `gdec` when so.
 // Shared by every parakeet decode variant (greedy, beam, maes, rnnt).
@@ -1792,8 +1792,14 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
     if (time_dec) {
         auto _dt1 = std::chrono::steady_clock::now();
         fprintf(stderr, "parakeet: tdt_decode %.1f ms (%s, T_enc=%d, %zu tokens, enc_proj=%.1f ms %s)\n",
-                std::chrono::duration<double, std::milli>(_dt1 - _dt0).count(), ggml_dec ? "ggml" : "cblas", T_enc,
-                emitted.size(), std::chrono::duration<double, std::milli>(_proj_t1 - _proj_t0).count(),
+                std::chrono::duration<double, std::milli>(_dt1 - _dt0).count(),
+                ggml_dec ? "ggml" :
+#if defined(HAVE_ACCELERATE)
+                         "accelerate",
+#else
+                         "scalar",
+#endif
+                T_enc, emitted.size(), std::chrono::duration<double, std::milli>(_proj_t1 - _proj_t0).count(),
                 gpu_enc_proj ? "backend" : "cpu");
     }
     return emitted;

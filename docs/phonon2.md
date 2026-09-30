@@ -146,3 +146,38 @@ and macOS Metal, checks wiring/live transcripts and F16 stage parity first,
 then records F16/Q8/Q4 timings plus Q8 stage/node traces. Linux also measures
 the independent Python reference on the same runner. Artifacts retain all raw
 samples, transcripts, model checksums, dependency versions and host details.
+
+## Runtime optimization coverage
+
+The encoder, including subsampling and all 24 FastConformer blocks, is a ggml
+scheduler graph. Mel extraction and TDT token selection are CPU code. Decoder
+execution depends on the device:
+
+| Path | Predictor and joint |
+|---|---|
+| Linux CPU | Scalar C++ loops over cached F32 weights; encoder OpenBLAS does not accelerate these loops |
+| Apple CPU / Metal | Apple Accelerate; Metal encoder with CPU decoder is the existing default |
+| CUDA / Vulkan | ggml predictor/joint graphs, built and allocated once per decode call and reused across token steps |
+
+There is no transformer KV cache in this TDT decoder: it retains the two LSTM
+hidden/cell states and reuses the predictor output across blanks. Encoder
+projections are computed ahead of the token loop; CUDA uses the measured GPU
+projection path by default, Apple uses batched SGEMM, and Linux CPU currently
+uses scalar per-frame projections. The CPU predictor/joint weight conversions
+are initialized lazily and retained by the model context.
+
+The encoder folds batch normalization into depthwise convolution weights and
+fuses Q/K/V projections at load time. Quantized models use the shared pointwise
+weight repacking rules. Attention uses ggml flash attention by default, with
+relative-position scores still computed separately; `--no-flash-attn` selects
+manual attention. CUDA also retains its backend-specific manual-attention
+policy. These are shared Parakeet optimizations, not a new Phonon-specific
+packed five-value kernel.
+
+The scheduler/context persist, but the encoder graph is rebuilt for each call
+and its buffers are allocated through the scheduler. The experimental
+`CRISPASR_PARAKEET_ENC_CACHE` remains off: the existing implementation can reuse
+stale tensor pointers and corrupt repeated-call output. The trace separates
+build, allocation and compute costs; graph caching should only be reconsidered
+if those first two costs are material. A scheduler trace materializes each
+node and perturbs execution, so its absolute timings are diagnostic only.
