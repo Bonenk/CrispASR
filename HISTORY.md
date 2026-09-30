@@ -6,6 +6,28 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-09-30 — #479 separate macOS CLI architecture downloads
+
+Release workflow now builds `crispasr-macos-arm64.tar.gz` on `macos-15`
+(Metal + Accelerate) and `crispasr-macos-x86_64.tar.gz` on `macos-15-intel`
+(CPU + Accelerate, Metal off, portable CPU baseline). Both set an explicit
+architecture and deployment target 11.0. The existing `crispasr-macos.tar.gz`
+remains an arm64 alias, preserving its original internal directory. Docs name
+both architecture assets; `only=build-macos-cli` dry-runs both CLI jobs.
+
+The new extracted-archive gate verifies each executable and the C2PA sidecar
+with `lipo`, hides build-tree libraries, and checks CLI/quantizer startup.
+Initial native runs (36712037062 Intel, 36713110484 arm64) caught an existing
+quantizer bug: its C2PA search path resolved only inside the checkout. Calling
+`crispasr_enable_c2pa` for that target gives it the CLI's sidecar search path.
+Corrected native jobs **both passed** in dry run
+[36713861682](https://github.com/CrispStrobe/CrispASR/actions/runs/36713861682),
+including quantizer startup with the original libraries unavailable. Local
+checks: actionlint 1.7.12, shellcheck, shell syntax, six package-guard cases;
+downloaded arm64 archives have identical payload hashes and file modes under
+their respective directory names. Code: `510dd8d3c` + `c218eecda`.
+No tag or release publication; new assets ship with the next release.
+
 ## PLAN compaction 2026-09-30 — finished sections moved out of PLAN.md
 
 Verbatim as they stood in PLAN.md; every issue and PR named here is closed or merged.
