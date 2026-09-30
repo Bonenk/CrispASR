@@ -32,6 +32,12 @@ class TestRegressionSelect(unittest.TestCase):
         for n in ("wav2vec2-xlsr-en", "hubert-large", "data2vec-base"):
             self.assertIn(n, got)
 
+    def test_phonon_importer_and_reference_select_the_model(self):
+        for source in ("models/phonon2_container.py", "tools/reference_backends/phonon2/fermion_container.py",
+                       "tools/reference_backends/parakeet_hf.py"):
+            with self.subTest(source=source):
+                self.assertEqual(rs.select([source], NIGHTLY), ["phonon2"])
+
     def test_shared_code_selects_core(self):
         got = rs.select(["src/core/beam_decode.h"], NIGHTLY)
         self.assertEqual(sorted(got), sorted(rs.CORE))

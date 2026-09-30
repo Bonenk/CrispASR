@@ -49,9 +49,12 @@ on:
       - 'src/**'
       - 'examples/cli/**'
       - 'models/**'
+      - 'tests/test_phonon2_container.py'
       - 'CMakeLists.txt'
       - 'ggml'
       - 'tools/regression_select.py'
+      - 'tools/reference_backends/phonon2/**'
+      - 'tools/reference_backends/parakeet_hf.py'
   # Push to main: the backends the change can touch run right away instead of
   # waiting for the nightly - e.g. #470's legacy canary load break would have
   # shown on the push, not the next morning.
@@ -61,10 +64,13 @@ on:
       - 'src/**'
       - 'examples/cli/**'
       - 'models/**'
+      - 'tests/test_phonon2_container.py'
       - 'CMakeLists.txt'
       - 'ggml'
       - 'tests/regression/**'
       - 'tools/regression_select.py'
+      - 'tools/reference_backends/phonon2/**'
+      - 'tools/reference_backends/parakeet_hf.py'
       - '.github/workflows/regression.yml'
 
 permissions:
@@ -111,6 +117,8 @@ jobs:
         run: |
           python -m pytest tests/test_backend_config.py -v || \
           python -m unittest tests/test_backend_config.py -v
+      - name: Phonon-2 container format tests
+        run: python -m unittest discover -s tests -p test_phonon2_container.py -v
       # Chat binding (#362). 891 lines of tests that nothing invoked: this file
       # is not named by any workflow and regression.yml pytests two files by
       # name rather than a directory, so it could only ever run by hand. With
@@ -281,7 +289,7 @@ jobs:
           # Also build crispasr-diff unconditionally — the binary is
           # tiny and building it costs <10 s, much less than adding
           # conditional logic per matrix backend.
-          cmake --build build-regression --target crispasr-cli crispasr-diff -j$(nproc)
+          cmake --build build-regression --target crispasr-cli crispasr-diff -j"$(nproc)"
 
       - name: Run regression for ${{ matrix.backend }}
         env:

@@ -548,6 +548,7 @@ if MODE == "rebake":
         "qwen-asr",         # qwen3-asr-0.6b
         "fireredasr",       # firered-asr2-aed, firered-lid
         "modelscope",       # funasr/sensevoice model resolution
+        "zstandard",        # phonon2 transport archive
     ]
     for _dep in OPTIONAL_REF_DEPS:
         with build_heartbeat(f"pip.install.optional.{_dep}"):
@@ -880,7 +881,9 @@ def run_rebake() -> list[dict]:
         name = entry["name"]
         print(f"\n========== rebake :: {name} ==========")
         t0 = time.time()
-        # `backend_id` is the registered name in tools/dump_reference.py;
+        # `reference_backend` may differ from the runtime backend for HF
+        # variants such as Phonon-2, which runs on Parakeet but is not a .nemo.
+        reference_backend = entry.get("reference_backend", entry["backend_id"])
         # `fixture_ref_path` is what `manifest.json` says we'll ship.
         # Default for never-done entries (no fixture_ref_path field yet):
         # use `<name>/ref.gguf`. When skip_diff flips to false the
@@ -963,7 +966,7 @@ def run_rebake() -> list[dict]:
             subprocess.call([sys.executable, "-m", "pip", "install", "--quiet", "--no-deps", "moshi"])
         cmd = [
             sys.executable, "-u", str(REPO / "tools" / "dump_reference.py"),
-            "--backend", entry["backend_id"],
+            "--backend", reference_backend,
             "--model-dir", model_dir,
             "--audio", str(sample),
             "--output", str(out_path),

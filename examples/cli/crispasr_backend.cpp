@@ -705,6 +705,8 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
         return "fastconformer-ctc";
     if (contains_ci("parakeet"))
         return "parakeet";
+    if (contains_ci("phonon2") || contains_ci("phonon-2"))
+        return "parakeet"; // #481: Phonon-2 shares the Parakeet TDT v3 graph
     if (contains_ci("reazonspeech"))
         return "parakeet";
     if (contains_ci("quds"))

@@ -6,6 +6,7 @@
   "moonshine-base",
   "moonshine-streaming-tiny",
   "parakeet-tdt-0.6b-en",
+  "phonon2",
   "canary-1b-v2",
   "firered-asr2-aed",
   "glm-asr-nano",

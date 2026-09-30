@@ -78,6 +78,7 @@ GGUF metadata keys (under `parakeet.*`):
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import sys
 import tarfile
 import tempfile
@@ -243,10 +244,16 @@ def load_hf(path: str) -> dict:
 
     p = Path(path)
     if not p.is_dir():
-        from huggingface_hub import snapshot_download
-        p = Path(snapshot_download(path, allow_patterns=["config.json", "model.safetensors", "tokenizer.json",
-                                                         "ternary.json"]))
+        from huggingface_hub import hf_hub_download, snapshot_download
+        config_path = Path(hf_hub_download(path, "config.json"))
+        remote_cfg = json.loads(config_path.read_text())
+        patterns = ["config.json", "model.safetensors", "tokenizer.json", "ternary.json"]
+        if remote_cfg.get("model_type") == "parakeet_tdt_five_value":
+            patterns = ["config.json", "phonon-2.bps.tar.zst"]
+        p = Path(snapshot_download(path, allow_patterns=patterns))
     cfg = json.loads((p / "config.json").read_text())
+    if cfg.get("model_type") == "parakeet_tdt_five_value" or "fermion" in cfg:
+        return load_phonon2(p)
     if cfg.get("model_type") != "parakeet_tdt":
         sys.exit(f"{p}: model_type {cfg.get('model_type')!r}, expected parakeet_tdt")
     raw = load_file(str(p / "model.safetensors"))
@@ -309,6 +316,49 @@ def load_hf(path: str) -> dict:
     }
     import yaml
     return {"weights": sd, "config_str": yaml.safe_dump(nemo_cfg), "vocab": vocab}
+
+
+def phonon2_reader():
+    """Load the adjacent transport reader, also when imported by a reference tool."""
+    spec = importlib.util.spec_from_file_location("phonon2_container", Path(__file__).with_name("phonon2_container.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def load_phonon2(snapshot: Path) -> dict:
+    import json
+    import librosa
+    import yaml
+
+    reader = phonon2_reader()
+    md = reader.materialize(snapshot)
+    cfg = json.loads((md / "config.json").read_text())
+    # The archive ships the actual NeMo config and the original vocabulary.
+    # Use these, rather than assuming teacher defaults or downloading weights.
+    if cfg["fermion"]["container_format"] != reader.FORMAT:
+        raise ValueError("unsupported Phonon-2 container configuration")
+    sd = {}
+    for key, arr in reader.iter_tensors(md / "model.fermion"):
+        if key.endswith("num_batches_tracked"):
+            continue  # inference BatchNorm never reads this training counter
+        if arr.ndim == 2 and ".conv.pointwise_conv" in key:
+            arr = arr[:, :, None]
+        name = hf_to_nemo_name(key)
+        if name is not None:
+            sd[name] = torch.from_numpy(arr)
+    pre = cfg["preprocessor"]
+    sr, n_fft = int(pre["sample_rate"]), int(pre["n_fft"])
+    win = int(round(pre["window_size"] * sr))
+    fb = librosa.filters.mel(sr=sr, n_fft=n_fft, n_mels=int(pre["features"]),
+                            fmin=0.0, fmax=sr / 2, norm="slaney")
+    sd["preprocessor.featurizer.fb"] = torch.from_numpy(np.asarray(fb, dtype=np.float32))[None]
+    sd["preprocessor.featurizer.window"] = torch.hann_window(win, periodic=False)
+    # NeMo stores durations under decoding; the converter reads decoder.
+    cfg["decoder"]["durations"] = cfg["decoding"]["durations"]
+    return {"weights": sd, "config_str": yaml.safe_dump(cfg), "vocab": cfg["labels"],
+            "source_model": "FermionResearch/Phonon-2", "license": "cc-by-4.0",
+            "source_sha256": cfg["fermion"]["container_sha256"]}
 
 
 def remap_name(nemo_name: str) -> str | None:
@@ -492,6 +542,12 @@ def convert(nemo_path: Path | None, out_path: Path, quant: str | None = None,
     # ----- write GGUF -----
     print(f"Writing: {out_path}")
     writer = gguf.GGUFWriter(str(out_path), arch="parakeet")
+    if nemo_data.get("source_model"):
+        writer.add_name("Phonon-2")
+        writer.add_string("general.source.huggingface.repository", nemo_data["source_model"])
+        writer.add_string("general.source.url", "https://huggingface.co/" + nemo_data["source_model"])
+        writer.add_string("general.source.sha256", nemo_data["source_sha256"])
+        writer.add_string("general.license", nemo_data["license"])
 
     # Hyper-parameters — read every value from model_config.yaml when
     # available, falling back to parakeet-tdt-0.6b-v3 defaults only as a
@@ -740,7 +796,7 @@ def parse_args() -> argparse.Namespace:
     src = p.add_mutually_exclusive_group(required=True)
     src.add_argument("--nemo", type=Path, help="path to .nemo file")
     src.add_argument("--hf", help="HF-transformers ParakeetForTDT snapshot dir or repo id "
-                                  "(e.g. moondream/parakeet-ultra, moondream/parakeet-redux)")
+                                  "(e.g. moondream/parakeet-redux, FermionResearch/Phonon-2)")
     p.add_argument("--output", required=True, type=Path, help="output GGUF path")
     p.add_argument("--quant", default=None, help="quantize linear weights (e.g. q4_k, q8_0); default: F16")
     p.add_argument("--extract-dir", default=None, type=Path,

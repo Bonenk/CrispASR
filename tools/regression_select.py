@@ -28,6 +28,11 @@ ALIASES = {
     "pocket-tts": ["pocket_tts"], "mini-omni2": ["mini_omni2"], "firered-asr": ["firered_asr"],
     "glm-asr": ["glm_asr"], "kyutai-stt": ["kyutai_stt"], "granite": ["granite_speech"],
 }
+# Model-specific importers/reference readers do not share the runtime's stem.
+MODEL_SOURCES = {
+    "phonon2": ("models/phonon2_container.py", "tools/reference_backends/phonon2/",
+                "tools/reference_backends/parakeet_hf.py"),
+}
 SHARED_PREFIXES = ("src/core/", "src/CMakeLists.txt", "CMakeLists.txt", "ggml", "cmake/",
                    "examples/cli/crispasr_run", "examples/cli/crispasr_output", "examples/cli/cli.cpp",
                    "examples/cli/CMakeLists.txt", "examples/cli/crispasr_backend.", "examples/cli/whisper_params",
@@ -54,6 +59,8 @@ def select(changed, nightly):
     if any(f.startswith(SHARED_PREFIXES) for f in changed):
         picked += [n for n in CORE if n in nightly]
     for name in nightly:
+        if name in MODEL_SOURCES and any(f.startswith(MODEL_SOURCES[name]) for f in changed):
+            picked.append(name)
         bid = ids.get(name, name)
         for stem in stems_for(bid):
             if any(f.startswith((f"src/{stem}", f"examples/cli/crispasr_backend_{stem}", f"models/convert-{stem}",

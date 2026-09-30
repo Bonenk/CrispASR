@@ -26,6 +26,23 @@ TEST_CASE("registry: lookup unknown backend returns false", "[unit][registry]") 
     REQUIRE_FALSE(found);
 }
 
+TEST_CASE("registry: Phonon-2 selects Q8 and resolves alternate GGUF quants", "[unit][registry]") {
+    CrispasrRegistryEntry e;
+    REQUIRE(crispasr_registry_lookup("phonon2", e));
+    REQUIRE(e.filename == "phonon2-q8_0.gguf");
+    REQUIRE(e.approx_size == "~674 MB");
+    REQUIRE(e.license.find("CC-BY-4.0") != std::string::npos);
+    REQUIRE(crispasr_registry_lookup("phonon2", e, "f16"));
+    REQUIRE(e.filename == "phonon2-f16.gguf");
+    REQUIRE(e.url.find("phonon2-f16.gguf") != std::string::npos);
+    REQUIRE(e.approx_size.empty());
+    REQUIRE(crispasr_registry_lookup("phonon2", e, "q4_k"));
+    REQUIRE(e.backend == "phonon2");
+    REQUIRE(e.filename == "phonon2-q4_k.gguf");
+    REQUIRE(crispasr_registry_lookup_by_filename("phonon2-q8_0.gguf", e));
+    REQUIRE(e.backend == "phonon2");
+}
+
 TEST_CASE("registry: default bundle reports the exact canonical artifacts", "[unit][registry]") {
     CrispasrRegistryBundle bundle;
     REQUIRE(crispasr_registry_default_bundle("omnivoice", bundle));

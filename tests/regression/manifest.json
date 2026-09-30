@@ -3,8 +3,8 @@
   "version": 1,
   "fixtures": {
     "repo": "cstr/crispasr-regression-fixtures",
-    "revision": "fe509cca96436bce3c48d97f0cdf9be85af853a3",
-    "_note": "Pinned. To re-bake, run `tools/kaggle-regression.py` with MODE=rebake UPLOAD=1; the new commit SHA gets pasted here as a reviewable diff. Previous: 99f005d59a0f7f4915dea5faea4d2e17b2120268 (2026-05-17). Bumped 2026-05-25 after Kaggle rebake v13 published 9 ref archives — adds parakeet-tdt-1.1b, parakeet-tdt_ctc-1.1b, parakeet-rnnt-0.6b, parakeet-rnnt-1.1b (all NEW from handover-prompts/extend-coverage-via-kaggle.md realistic goal); refreshes canary-1b-v2, moonshine-tiny/base, parakeet-tdt-0.6b-{en,ja}. Bumped 2026-09-27 from b61b03014b: adds sensevoice-small, paraformer-zh, funasr-nano jfk_11s refs (copied from the #436 final rebake in the dataset repo of the same name). Nothing removed. Bumped 2026-09-28 from e5781ed4f8: Kaggle rebake batches 4-6 (parakeet-tdt-0.6b-en, parakeet-tdt_ctc-1.1b, granite-speech-4.1-2b, qwen3-asr-0.6b, kyutai-stt-1b, mini-omni2, nemotron-3.5-asr-streaming-0.6b, wav2vec2-xlsr-en, hubert-large, data2vec-base, omniasr-ctc-1b-v2, fastconformer-ctc-large). Bumped 2026-09-28 from cafce827fc: adds cohere-transcribe/jfk_11s/ref.gguf (fresh rebake)."
+    "revision": "cf16f4594149db53b2eb3fff6e772ff83384a356",
+    "_note": "Pinned. To re-bake, run `tools/kaggle-regression.py` with MODE=rebake UPLOAD=1; the new commit SHA gets pasted here as a reviewable diff. Previous: 99f005d59a0f7f4915dea5faea4d2e17b2120268 (2026-05-17). Bumped 2026-05-25 after Kaggle rebake v13 published 9 ref archives — adds parakeet-tdt-1.1b, parakeet-tdt_ctc-1.1b, parakeet-rnnt-0.6b, parakeet-rnnt-1.1b (all NEW from handover-prompts/extend-coverage-via-kaggle.md realistic goal); refreshes canary-1b-v2, moonshine-tiny/base, parakeet-tdt-0.6b-{en,ja}. Bumped 2026-09-27 from b61b03014b: adds sensevoice-small, paraformer-zh, funasr-nano jfk_11s refs (copied from the #436 final rebake in the dataset repo of the same name). Nothing removed. Bumped 2026-09-28 from e5781ed4f8: Kaggle rebake batches 4-6 (parakeet-tdt-0.6b-en, parakeet-tdt_ctc-1.1b, granite-speech-4.1-2b, qwen3-asr-0.6b, kyutai-stt-1b, mini-omni2, nemotron-3.5-asr-streaming-0.6b, wav2vec2-xlsr-en, hubert-large, data2vec-base, omniasr-ctc-1b-v2, fastconformer-ctc-large). Bumped 2026-09-28 from cafce827fc: adds cohere-transcribe/jfk_11s/ref.gguf (fresh rebake). Bumped 2026-09-30 from fe509cca: adds Phonon-2 JFK and LibriSpeech reference/audio fixtures only; no existing fixture changed."
   },
   "backends": [
     {
@@ -134,6 +134,32 @@
       },
       "stage_threshold_default": 0.999,
       "stage_threshold_note": "Kaggle validate 2026-09-28: all 28 stages >= 0.999914 after the absent-xscaling fix 6814698f (encoder was 0.594)."
+    },
+    {
+      "name": "phonon2",
+      "backend_id": "parakeet",
+      "reference_backend": "phonon2",
+      "source_model": "FermionResearch/Phonon-2",
+      "gguf": {
+        "repo": "cstr/phonon2-GGUF",
+        "revision": "3ed3e6ad6e7ce63affffeede37328ff756efaa2f",
+        "file": "phonon2-q8_0.gguf",
+        "approx_size_mb": 674
+      },
+      "fixture_sample_path": "phonon2/jfk/audio.wav",
+      "sample": "samples/jfk.wav",
+      "expected_transcript": "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.",
+      "expected_transcript_source": "Independent upstream container reader + stock Transformers ParakeetForTDT; F16/Q8/Q4 CPU CLI/C ABI JFK exact, 2026-09-30 (#481).",
+      "fixture_ref_path": "phonon2/jfk/ref.gguf",
+      "diff_gguf": {
+        "file": "phonon2-f16.gguf"
+      },
+      "diff_thresholds": {
+        "mel_spectrogram": 0.999,
+        "encoder_output": 0.999
+      },
+      "stage_threshold_default": 0.999,
+      "stage_threshold_note": "All 28 F16 compared JFK stages pass, minimum cosine 0.999996, norm-ratio error bounded by 0.065%; Q8 default has one word edit versus reference across the broader 21-clip conversion check."
     },
     {
       "name": "canary-1b-v2",

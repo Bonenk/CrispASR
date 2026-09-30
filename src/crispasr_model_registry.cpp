@@ -735,6 +735,11 @@ constexpr Entry k_registry[] = {
     {"parakeet-redux", "parakeet-redux-q4_k.gguf",
      "https://huggingface.co/cstr/parakeet-redux-GGUF/resolve/main/parakeet-redux-q4_k.gguf", "~402 MB", nullptr,
      nullptr, nullptr, "CC-BY-4.0 (see https://huggingface.co/moondream/parakeet-redux)"},
+    // Phonon-2 (#481) — exact five-value/int6 expansion, existing Parakeet TDT
+    // runtime. Q8_0 is the fidelity/size default; Q4_K has more text drift.
+    {"phonon2", "phonon2-q8_0.gguf",
+     "https://huggingface.co/cstr/phonon2-GGUF/resolve/main/phonon2-q8_0.gguf", "~674 MB", nullptr,
+     nullptr, nullptr, "CC-BY-4.0 (see https://huggingface.co/FermionResearch/Phonon-2)"},
     // orukeet (#445) — oruk/orukeet r3, a fine-tune of parakeet-tdt-0.6b-v3
     // with the architecture unchanged (half of the encoder's depthwise conv
     // kernels replaced by fitted Gabor functions, then re-adapted). Same 25

@@ -144,6 +144,7 @@ REGISTERED_BACKENDS: Dict[str, str] = {
     # transformers-format ParakeetForTDT (#454: moondream parakeet-ultra / -redux);
     # same stage names as the NeMo "parakeet" dumper.
     "parakeet-hf": "reference_backends.parakeet_hf",
+    "phonon2":    "reference_backends.parakeet_hf",  # #481, independent upstream container reader
     # Supertonic-3 (#434): ONNX-only distribution — the reference IS the
     # onnxruntime pipeline (standalone script; run it directly, not via this
     # dispatcher). Kept here for discoverability.

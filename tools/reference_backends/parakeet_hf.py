@@ -47,6 +47,10 @@ def _load(model_dir: Path):
     if not md.is_dir():
         from huggingface_hub import snapshot_download
         md = Path(snapshot_download(str(model_dir)))
+    cfg = json.loads((md / "config.json").read_text())
+    if cfg.get("model_type") == "parakeet_tdt_five_value" or "fermion" in cfg:
+        from .phonon2 import load
+        return load(md, _converter())
     if not (md / "ternary.json").exists():
         return ParakeetForTDT.from_pretrained(str(md), torch_dtype=torch.float32).eval(), md
     # parakeet-redux: dequantise qweight/scales into ordinary .weight tensors
