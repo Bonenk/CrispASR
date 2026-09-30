@@ -6,7 +6,7 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
-## Release preparation 2026-09-30 — v0.8.39
+## Published 2026-09-30 — v0.8.39
 
 Audited v0.8.38..main: Intel/arm64 macOS CLI packaging and C2PA relocation,
 VoxCPM2 VAE setup/Vulkan depthwise convolutions and batched CPU prefill,
@@ -14,6 +14,11 @@ VoxCPM2 VAE setup/Vulkan depthwise convolutions and batched CPU prefill,
 `RELEASE_NOTES_v0.8.39.md` records platform migration, measured stage/synthesis
 results, fallback controls, security changes and linked validation evidence.
 Flutter changelog updated; version/tag created through the bump script.
+Annotated tag `v0.8.39` targets `9ba48b9d0`. Release page published with the
+full notes; binary builds run in workflow 36728733199. Tag-target unit tests
+passed 1959/1959, plus macOS, Windows, Linux x86_64, iOS, Rust/Dart bindings
+and secret scan; remaining queued checks had no reported failure at tagging.
+Release-note files are retained in the corresponding tags and removed from main.
 
 ## DONE 2026-09-30 — #479 separate macOS CLI architecture downloads
 
