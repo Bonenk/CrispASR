@@ -150,7 +150,8 @@ samples, transcripts, model checksums, dependency versions and host details.
 ## Runtime optimization coverage
 
 The encoder, including subsampling and all 24 FastConformer blocks, is a ggml
-scheduler graph. Mel extraction and TDT token selection are CPU code. Decoder
+scheduler graph, with CPU fallback for operations unsupported by the selected
+backend. Mel extraction and TDT token selection are CPU code. Decoder
 execution depends on the device:
 
 | Path | Predictor and joint |
@@ -181,3 +182,81 @@ stale tensor pointers and corrupt repeated-call output. The trace separates
 build, allocation and compute costs; graph caching should only be reconsidered
 if those first two costs are material. A scheduler trace materializes each
 node and perturbs execution, so its absolute timings are diagnostic only.
+
+## Measured CPU profile (2026-09-30)
+
+[CI run 36784469150](https://github.com/CrispStrobe/CrispASR/actions/runs/36784469150)
+measured runtime commit `9e9816631` and the independent Python reference on the
+same Linux runner: AMD EPYC 9V74, 4 vCPUs, 4 inference threads, Release build,
+OpenBLAS. The reference is stock Transformers `ParakeetForTDT` in F32 with
+PyTorch 2.7.0 CPU, loading the original Fermion container through the upstream
+reader. It is not the separate MLX implementation.
+
+One model is loaded per process; each 11/55-second shape gets a warmup followed
+by three timed calls. Loading, downloads, warmup and diagnostic callbacks are
+excluded. The 55-second clip repeats JFK five times and stays on the ordinary
+single-pass path. Every repeat produces stable nonempty output: 22/110 words.
+F16 and Q8 transcripts match the Python reference exactly at both lengths;
+Q4 matches normalized words, with a punctuation difference on the longer clip.
+This is a throughput check, not an accuracy benchmark on natural long audio.
+
+| Engine/export | 11 s audio: median / realtime | 55 s audio: median / realtime | Peak process RSS* |
+|---|---:|---:|---:|
+| Python reference F32 | 1.580 s / 6.96× | 8.042 s / 6.84× | 3,414 MiB |
+| CrispASR F16 | 3.731 s / 2.95× | 19.222 s / 2.86× | 2,249 MiB |
+| CrispASR Q8_0 | 1.760 s / 6.25× | 9.301 s / 5.91× | 1,614 MiB |
+| CrispASR Q4_K | 2.043 s / 5.38× | 10.878 s / 5.06× | 1,320 MiB |
+
+\* Peak RSS covers model load, warmup and inference in the isolated process;
+it is not file size, tensor allocation size or GPU VRAM. Q8 takes 11–16% more
+inference time than this Python reference and uses 53% less peak process RAM.
+Q4 is smaller but slower than Q8 on this host; the default remains Q8.
+
+All 28 F16 stages pass on this CPU runner: minimum cosine 0.999994 and tensor
+norm-ratio error bounded by 0.066% (RMS error divided by reference RMS).
+The local shared-library run also passes all 28 stages (minimum cosine 0.999996,
+bound 0.065%) and repeated CTest/CLI/C ABI checks. The live guard includes an
+explicit flash-off node trace.
+
+A separate warmed Q8 diagnostic call reports mel 13.5 ms, encoder 1170.7 ms
+and decoder 587.4 ms. Encoder graph build/allocation are only 0.51/0.47 ms.
+The two FFN matmul shape groups account for 50.3% of traced encoder time;
+fused Q/K/V accounts for 9.3%, flash attention 3.2%, and relative-position
+matmul 2.2%. The Linux decoder remains scalar: its encoder projection alone
+is 70.6 ms. The old trace called that path "cblas" incorrectly; the diagnostic
+label is now corrected to "scalar" ("accelerate" on Apple builds).
+
+These instrumented timings are for finding hotspots, not benchmark numbers.
+The useful next experiments are optimized CPU predictor/joint matvecs and
+encoder FFN kernels, each with transcript and stage-parity A/B. Encoder graph
+caching would save less than a millisecond in this trace and retains its known
+correctness problem; it stays off. No new performance default was selected
+from these measurements.
+
+### macOS Metal CI coverage
+
+The same successful run validates the Metal build, F16 stage parity and live
+surfaces on an Apple M1 **virtual machine** (3 vCPUs, 7 GB). Its Apple Paravirtual
+Metal device reports SIMD-group matrix multiplication unavailable. This is
+useful Metal-path validation, not physical Apple GPU performance evidence.
+With 4 inference threads, its medians are:
+
+| Export | 11 s median / realtime | 55 s median / realtime | Peak process RSS |
+|---|---:|---:|---:|
+| F16 | 13.205 s / 0.83× | 35.467 s / 1.55× | 2,578 MiB |
+| Q8_0 | 8.396 s / 1.31× | 15.167 s / 3.63× | 1,958 MiB |
+| Q4_K | 8.404 s / 1.31× | 15.955 s / 3.45× | 1,653 MiB |
+
+All 28 F16 stages pass (minimum cosine 0.999992, magnitude error bounded by
+0.069%). Q8's warmed diagnostic uses Metal for the encoder and Accelerate for
+the CPU decoder: encoder graph build/allocation 0.27/0.97 ms, versus 15.56 s
+of instrumented encoder compute and 140 ms of decode. Callback overhead and
+the virtual GPU prevent extrapolating these numbers to physical M1/M5 hardware
+or comparing them against Fermion's 174× MLX result.
+
+[The checked-in receipt](phonon2-profile-2026-09-30.json) retains every raw
+benchmark time, transcript, per-stage cosine/magnitude bound, model checksum
+and pinned revision. The linked CI run additionally retains full wiring/live
+logs, per-node traces, host details and Python dependency versions. Both Linux
+and macOS jobs passed; the earlier run's missing Python `sentencepiece`
+dependency was corrected before this measurement.

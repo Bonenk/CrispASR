@@ -4,6 +4,45 @@ Test audio: jfk.wav (11.0s), Q4_K quantization, greedy decode (`-bs 1`).
 
 ---
 
+## Phonon-2 — integration and fair CPU profile (2026-09-30, #481)
+
+Measured after wiring/live/F16 parity gates in
+[CI run 36784469150](https://github.com/CrispStrobe/CrispASR/actions/runs/36784469150).
+AMD EPYC 9V74, 4-vCPU Linux runner, 4 inference threads, Release/OpenBLAS.
+Each shape is warmed; medians of three calls exclude loading and instrumentation.
+The 55 s case is JFK repeated five times, not a natural long-audio accuracy test.
+
+| Engine/export | 11 s median | realtime | 55 s median | realtime | Peak RSS |
+|---|---:|---:|---:|---:|---:|
+| Independent Python F32 (Transformers/PyTorch CPU) | 1.580 s | 6.96× | 8.042 s | 6.84× | 3,414 MiB |
+| CrispASR F16 | 3.731 s | 2.95× | 19.222 s | 2.86× | 2,249 MiB |
+| CrispASR Q8_0 | 1.760 s | 6.25× | 9.301 s | 5.91× | 1,614 MiB |
+| CrispASR Q4_K | 2.043 s | 5.38× | 10.878 s | 5.06× | 1,320 MiB |
+
+Q8 is 11–16% slower than the Python reference here, with 53% less peak process
+RAM. F16/Q8 transcripts match that reference exactly at both lengths; Q4 has
+identical normalized words but differs in long-clip punctuation. These checks
+do not replace the 21-clip quantization validation. Q8 remains the default:
+Q4 is smaller but slower on this CPU. This is not a comparison against MLX.
+
+All 28 F16 stages pass (minimum cosine 0.999994; norm-ratio error bounded by
+0.066%). Shared-library/CLI/explicit alias/renamed-model and repeated-call
+checks pass, including flash-off node verification. A separate Q8 trace finds
+encoder ~1171 ms, scalar Linux decoder ~587 ms, mel ~14 ms. Encoder graph
+build/allocation total ~1 ms; caching is not a useful first optimization and
+the experimental encoder cache remains off. The two FFN matmul shape groups
+are ~50% of traced encoder time. Linux decoder matvecs and encoder FFN kernels
+are the next measured targets; Apple uses Accelerate, while CUDA/Vulkan use
+reused ggml decoder graphs. No new optimization default was selected.
+
+The macOS job also passes all 28 stages (min cosine 0.999992, magnitude bound
+0.069%) on a virtual M1/Apple Paravirtual Metal device without SIMD-group
+matrix support. Q8 medians are 8.396 s (11 s audio) / 15.167 s (55 s audio).
+Treat these as CI timings, not physical M1/M5 performance.
+
+See [full integration, parity and profiling details](docs/phonon2.md) and the
+[raw measurement receipt](docs/phonon2-profile-2026-09-30.json).
+
 ## voxcpm2 — #461 (Vulkan) and #478 (CPU) (2026-09-29/30)
 
 Reporter's Arc B390 iGPU (Vulkan, seed 2, "Hello, this is a short test sentence."):
