@@ -11,6 +11,14 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-09-30 — #481 Phonon-2
+
+Worktree `/mnt/volume1/wt-481`, branch `feat/481-phonon2`.
+Add the Fermion five-value/int6 container to the existing Parakeet converter,
+reuse the Parakeet runtime, prove exact unpacking and per-stage/reference
+transcript parity, then evaluate F16/Q8_0/Q4_K and publish validated artifacts.
+NOW: inspecting the container/reference and preparing local CPU validation.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
