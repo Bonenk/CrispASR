@@ -6,6 +6,15 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## Release preparation 2026-09-30 — v0.8.39
+
+Audited v0.8.38..main: Intel/arm64 macOS CLI packaging and C2PA relocation,
+VoxCPM2 VAE setup/Vulkan depthwise convolutions and batched CPU prefill,
+1-D tensor override safety, credential scanning and scoped heavy CI.
+`RELEASE_NOTES_v0.8.39.md` records platform migration, measured stage/synthesis
+results, fallback controls, security changes and linked validation evidence.
+Flutter changelog updated; version/tag created through the bump script.
+
 ## DONE 2026-09-30 — #479 separate macOS CLI architecture downloads
 
 Release workflow now builds `crispasr-macos-arm64.tar.gz` on `macos-15`

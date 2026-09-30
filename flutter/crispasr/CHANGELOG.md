@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.8.39
+
+* **VoxCPM2 synthesis:** the bundled native library processes the TSLM prompt
+  once in a batched graph, honors the requested thread count in eager matmuls,
+  reduces VAE weight setup, and enables faster depthwise VAE convolutions on
+  Vulkan. Serial and legacy prefill fallbacks remain available.
+* **Native distribution:** separate Intel and Apple Silicon macOS CLI archives;
+  the Intel archive uses CPU/Accelerate. The existing macOS filename remains
+  an arm64 alias. Fixed the macOS quantizer's bundled C2PA search path.
+* **Quantizer:** tensor-type overrides preserve scalar/one-dimensional tensor
+  precision, avoiding F16 bias/norm crashes during CPU synthesis.
+* **Maintenance:** credential scanning, branch-scoped heavy verification, and
+  CPU reference/roundtrip workflows. The Dart API is unchanged.
+
 ## 0.8.38
 
 * **`DiarizeMethod.sortformer`** (C ABI method 5, #466) with a

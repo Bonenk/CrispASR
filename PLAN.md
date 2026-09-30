@@ -11,13 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-09-30 — release v0.8.39
-
-Worktree `/mnt/volume1/wt-release-0.8.39`, branch `release/0.8.39`.
-Audit v0.8.38..main, write comprehensive release notes and the Flutter
-changelog, bump via `scripts/bump-version.sh`, verify tag-target CI, then push
-the annotated tag. Main CI and both native macOS package jobs are green.
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
