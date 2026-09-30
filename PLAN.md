@@ -17,6 +17,9 @@ Worktree `/mnt/volume1/wt-479`, branch `fix/479-macos-architectures`.
 Add explicit arm64 and x86_64 CLI archives, keep the existing macOS archive
 as an arm64 compatibility alias, and verify packaged architectures and startup
 on matching macOS runners. Intel uses CPU/Accelerate with Metal disabled.
+Implementation: `510dd8d3c`. Local actionlint 1.7.12, shellcheck, shell syntax
+and six package-guard cases pass. Intel native dry run 36712037062 is building;
+arm64 dry run follows on main. No release tag or published assets yet.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
