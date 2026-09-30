@@ -17,12 +17,16 @@ Worktree `/mnt/volume1/wt-481`, branch `feat/481-phonon2`.
 Add the Fermion five-value/int6 container to the existing Parakeet converter,
 reuse the Parakeet runtime, prove exact unpacking and per-stage/reference
 transcript parity, then evaluate F16/Q8_0/Q4_K and publish validated artifacts.
-NOW: all 723 unpacked tensors exactly match the upstream reader; six format
-unit tests pass. Current CLI/quantizer/diff/shared C ABI build passed. F16
-(1,255 MB), Q8_0 (674 MB), Q4_K (402 MB) converted. All 28 F16 diff stages
-pass on JFK and LibriSpeech; reference transcripts captured for 21 clips.
-C ABI transcript comparison across all three exports is running, including
-renamed-file detection. Shipping quant and artifact publication are pending.
+NOW: published validated exports at `cstr/phonon2-GGUF`, revision
+`3ed3e6ad6e7ce63affffeede37328ff756efaa2f`; reference/audio fixtures at
+`cstr/crispasr-regression-fixtures`, revision
+`cf16f4594149db53b2eb3fff6e772ff83384a356` (four additions only).
+All 723 source tensors match independently; all 28 F16 stages pass on both
+clips with magnitude checks. C ABI arbitrary-name detection passes; 21-clip
+exact transcripts: F16 21/21, Q8 19/21, Q4 15/21. Q8 default: one normalized
+word edit versus reference (Q4 seven), so neither inherits upstream WER claims.
+Six format tests and 60 registry tests pass. Finishing published-artifact
+regression/CLI verification, then landing converter/registry/docs/nightly gate.
 Artifacts/logs: `/mnt/volume1/tmp-overflow/issue481`.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
