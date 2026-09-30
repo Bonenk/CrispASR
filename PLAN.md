@@ -17,7 +17,10 @@ Worktree `/mnt/volume1/wt-481`, branch `feat/481-phonon2`.
 Add the Fermion five-value/int6 container to the existing Parakeet converter,
 reuse the Parakeet runtime, prove exact unpacking and per-stage/reference
 transcript parity, then evaluate F16/Q8_0/Q4_K and publish validated artifacts.
-NOW: inspecting the container/reference and preparing local CPU validation.
+NOW: importer implemented; all 723 expanded tensors exactly match the independent
+upstream reader (264 five-value, 35 int6, 424 fp16). Weight-free format tests
+pass. Building the current Parakeet CLI/diff/C ABI for staged parity checks;
+artifacts are in `/mnt/volume1/tmp-overflow/issue481`. No shipping quant chosen yet.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
