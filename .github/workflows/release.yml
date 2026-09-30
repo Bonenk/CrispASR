@@ -1030,46 +1030,129 @@ jobs:
           files: release/crispasr-python-linux-arm64.tar.gz
           fail_on_unmatched_files: true
 
+  # macOS CLI: separate downloads for Apple Silicon and Intel (#479).
   build-macos:
     if: ${{ !inputs.only || inputs.only == 'build-macos' }}
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
           ref: ${{ inputs.tag || github.ref }}
 
-      - name: Build
+      - name: Build (arm64)
         run: |
-          cmake -S . -B build -DCRISPASR_C2PA_FETCH=ON -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_METAL=ON \
+          cmake -S . -B build \
+            -DCRISPASR_C2PA_FETCH=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DGGML_METAL=ON \
+            -DGGML_NATIVE=OFF \
+            -DGGML_METAL_EMBED_LIBRARY=ON \
+            -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple \
+            -DCRISPASR_BUILD_TESTS=OFF \
+            -DCRISPASR_BUILD_SERVER=OFF \
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build --target crispasr-cli crispasr-quantize -j $(sysctl -n hw.logicalcpu)
 
-      - name: Package
+      - name: Package and verify
         run: |
-          mkdir -p release/crispasr-macos
-          cp build/bin/crispasr release/crispasr-macos/
-          cp build/bin/crispasr-quantize release/crispasr-macos/
-          bash scripts/bundle-c2pa.sh release/crispasr-macos || true
-          # Ship the licence text with the binaries. Every Windows, Android and
-          # libcrispasr artifact already did; no CLI tarball did, and these carry
-          # bundled third-party libraries whose terms require the notice to
-          # travel with them.
-          cp LICENSE release/crispasr-macos/
-          cp THIRD_PARTY_NOTICES.txt release/crispasr-macos/
-          cd release && tar czf crispasr-macos.tar.gz crispasr-macos/
+          set -euo pipefail
+          OUT=release/crispasr-macos-arm64
+          mkdir -p "$OUT"
+          cp build/bin/crispasr build/bin/crispasr-quantize "$OUT/"
+          bash scripts/bundle-c2pa.sh "$OUT"
+          cp LICENSE THIRD_PARTY_NOTICES.txt "$OUT/"
+          tar -czf "$OUT.tar.gz" -C release "crispasr-macos-arm64"
+          # Verify the extracted archive away from the build tree, including
+          # the sidecar's architecture and dyld resolution at startup.
+          # Hide original libraries so dyld cannot use a build-tree fallback.
+          mv build build-unavailable
+          mv third_party/c2pa third_party/c2pa-unavailable
+          mkdir -p package-check
+          tar -xzf "$OUT.tar.gz" -C package-check
+          bash scripts/verify-macos-cli.sh "package-check/crispasr-macos-arm64" arm64
+          # Preserve the old asset AND its internal directory for consumers
+          # already fetching crispasr-macos.tar.gz (arm64 only).
+          cp -R "$OUT" release/crispasr-macos
+          tar -czf release/crispasr-macos.tar.gz -C release crispasr-macos
 
       - uses: actions/upload-artifact@v4
         with:
-          name: crispasr-macos
-          path: release/crispasr-macos.tar.gz
+          name: crispasr-macos-arm64
+          path: |
+            release/crispasr-macos-arm64.tar.gz
+            release/crispasr-macos.tar.gz
 
-      - name: Attach crispasr-macos.tar.gz to release
+      - name: Attach macOS arm64 assets to release
         if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
-          files: release/crispasr-macos.tar.gz
+          files: |
+            release/crispasr-macos-arm64.tar.gz
+            release/crispasr-macos.tar.gz
+          fail_on_unmatched_files: true
+
+  # macOS CLI: separate downloads for Apple Silicon and Intel (#479).
+  build-macos-x86_64:
+    if: ${{ !inputs.only || inputs.only == 'build-macos-x86_64' }}
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Build (x86_64)
+        run: |
+          cmake -S . -B build \
+            -DCRISPASR_C2PA_FETCH=ON \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DGGML_METAL=OFF \
+            -DCRISPASR_PORTABLE_CPU=ON \
+            -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple \
+            -DCRISPASR_BUILD_TESTS=OFF \
+            -DCRISPASR_BUILD_SERVER=OFF \
+            -DCRISPASR_OPUS_FETCH=ON
+          cmake --build build --target crispasr-cli crispasr-quantize -j $(sysctl -n hw.logicalcpu)
+
+      - name: Package and verify
+        run: |
+          set -euo pipefail
+          OUT=release/crispasr-macos-x86_64
+          mkdir -p "$OUT"
+          cp build/bin/crispasr build/bin/crispasr-quantize "$OUT/"
+          bash scripts/bundle-c2pa.sh "$OUT"
+          cp LICENSE THIRD_PARTY_NOTICES.txt "$OUT/"
+          tar -czf "$OUT.tar.gz" -C release "crispasr-macos-x86_64"
+          # Verify the extracted archive away from the build tree, including
+          # the sidecar's architecture and dyld resolution at startup.
+          # Hide original libraries so dyld cannot use a build-tree fallback.
+          mv build build-unavailable
+          mv third_party/c2pa third_party/c2pa-unavailable
+          mkdir -p package-check
+          tar -xzf "$OUT.tar.gz" -C package-check
+          bash scripts/verify-macos-cli.sh "package-check/crispasr-macos-x86_64" x86_64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: crispasr-macos-x86_64
+          path: |
+            release/crispasr-macos-x86_64.tar.gz
+
+      - name: Attach macOS x86_64 assets to release
+        if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          files: |
+            release/crispasr-macos-x86_64.tar.gz
           fail_on_unmatched_files: true
 
   # ── Apple xcframework (iOS + simulator + macOS + tvOS/visionOS) ───────────────
@@ -2493,7 +2576,7 @@ jobs:
   # to transient permission issues). softprops won't clobber files that
   # already exist on the release.
   publish:
-    needs: [validate-version, build-linux, build-linux-cpu-legacy, build-linux-x86_64-avx512, build-linux-x86_64-cuda, build-linux-x86_64-cuda13, build-linux-x86_64-hip, build-linux-arm64, build-python-linux, build-python-linux-arm64, build-macos, build-libs-macos-arm64, build-libs-linux-x86_64, build-libs-linux-x86_64-avx512, build-libs-linux-x86_64-hip, build-libs-linux-arm64, build-libs-linux-x86_64-cuda, build-libs-windows-x86_64, build-libs-windows-x86_64-vulkan, build-libs-windows-x86_64-cuda, build-libs-windows-x86_64-cpu-legacy, build-windows-cpu, build-windows-cpu-legacy, build-windows-cuda, build-windows-cuda13, build-windows-vulkan, build-android-arm64]
+    needs: [validate-version, build-linux, build-linux-cpu-legacy, build-linux-x86_64-avx512, build-linux-x86_64-cuda, build-linux-x86_64-cuda13, build-linux-x86_64-hip, build-linux-arm64, build-python-linux, build-python-linux-arm64, build-macos, build-macos-x86_64, build-libs-macos-arm64, build-libs-linux-x86_64, build-libs-linux-x86_64-avx512, build-libs-linux-x86_64-hip, build-libs-linux-arm64, build-libs-linux-x86_64-cuda, build-libs-windows-x86_64, build-libs-windows-x86_64-vulkan, build-libs-windows-x86_64-cuda, build-libs-windows-x86_64-cpu-legacy, build-windows-cpu, build-windows-cpu-legacy, build-windows-cuda, build-windows-cuda13, build-windows-vulkan, build-android-arm64]
     if: always() && !cancelled()
     runs-on: ubuntu-latest
     steps:
