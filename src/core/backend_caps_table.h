@@ -139,6 +139,9 @@ static const BackendCaps k_backend_caps[] = {
      "timestamps-native,word-timestamps,token-confidence,diarize,temperature,beam-search,flash-attn,punctuation-toggle,"
      "auto-download,parallel-processors"},
     {"parler-tts", 73984u, "temperature,auto-download,tts"},
+    {"phonon2", 1863501u,
+     "timestamps-native,word-timestamps,token-confidence,diarize,temperature,beam-search,flash-attn,punctuation-toggle,"
+     "punctuation-native,auto-download,parallel-processors"},
     {"piano-transcription", 134225921u, "timestamps-native,auto-download,piano"},
     {"piper", 65536u, "tts"},
     {"pocket-tts", 205056u, "temperature,auto-download,tts,voice-cloning"},
@@ -195,7 +198,7 @@ static const BackendCaps k_backend_caps[] = {
      "timestamps-ctc,token-confidence,diarize,temperature,beam-search,flash-attn,punctuation-toggle,auto-download,"
      "parallel-processors"},
     {"wav2vec2", 548938u, "timestamps-ctc,token-confidence,diarize,auto-download,parallel-processors"},
-    {"whisper", 321533u,
+    {"whisper", 1370109u,
      "timestamps-native,word-timestamps,token-confidence,language-detect,translate,diarize,grammar,temperature,beam-"
      "search,flash-attn,punctuation-native,auto-download,parallel-processors,vad-internal"},
     {"xasr", 270336u, "punctuation-native,auto-download"},
