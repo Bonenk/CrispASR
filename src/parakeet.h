@@ -19,6 +19,9 @@ extern "C" {
 
 struct parakeet_context;
 
+// Model metadata declares English-only training (Phonon-2), even after renaming.
+bool parakeet_is_english_only(const struct parakeet_context* ctx);
+
 struct parakeet_context_params {
     int n_threads;
     bool use_flash; // flash attention in encoder (default: false)

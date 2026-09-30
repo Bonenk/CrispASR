@@ -19,10 +19,12 @@ namespace {
 
 class ParakeetBackend : public CrispasrBackend {
 public:
-    ParakeetBackend() = default;
+    explicit ParakeetBackend(const char* backend_name = "parakeet") : backend_name_(backend_name) {}
     ~ParakeetBackend() override { ParakeetBackend::shutdown(); }
 
-    const char* name() const override { return "parakeet"; }
+    const char* name() const override { return backend_name_; }
+
+    const char* sole_language() const override { return parakeet_is_english_only(ctx_) ? "en" : nullptr; }
 
     uint32_t capabilities() const override {
         // CAP_LANGUAGE_DETECT intentionally NOT declared: the parakeet
@@ -55,6 +57,8 @@ public:
             internal_chunking = atoi(e) != 0;
         if (internal_chunking)
             caps |= CAP_INTERNAL_CHUNKING;
+        if (parakeet_is_english_only(ctx_) || std::strcmp(backend_name_, "phonon2") == 0)
+            caps |= CAP_PUNCTUATION_NATIVE;
         return caps;
     }
 
@@ -70,6 +74,9 @@ public:
             fprintf(stderr, "crispasr[parakeet]: failed to load model '%s'\n", p.model.c_str());
             return false;
         }
+        if (parakeet_is_english_only(ctx_) && !p.language.empty() && p.language != "auto" && p.language != "en")
+            fprintf(stderr, "crispasr[phonon2]: English-only model; language=%s cannot be honoured\n",
+                    p.language.c_str());
         // Issue #89: JA-only models (vocab=3072) collapse past ~12 s on
         // real audio. Auto-chunk at 10 s instead of the global 30 s default.
         // Issue #257: detect JA by vocab content, not size — small-vocab ENGLISH
@@ -354,6 +361,7 @@ public:
     }
 
 private:
+    const char* backend_name_;
     parakeet_context* ctx_ = nullptr;
     bool is_ja_model_ = false;
 };
@@ -362,4 +370,8 @@ private:
 
 std::unique_ptr<CrispasrBackend> crispasr_make_parakeet_backend() {
     return std::unique_ptr<CrispasrBackend>(new ParakeetBackend());
+}
+
+std::unique_ptr<CrispasrBackend> crispasr_make_phonon2_backend() {
+    return std::unique_ptr<CrispasrBackend>(new ParakeetBackend("phonon2"));
 }

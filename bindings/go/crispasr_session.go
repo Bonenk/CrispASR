@@ -387,7 +387,8 @@ type CrispasrSession struct {
 }
 
 // SessionOpen opens a backend session for the given model file.
-// Detects the backend automatically from the GGUF metadata.
+// Detects the backend automatically from the GGUF metadata. Phonon-2 uses
+// the Parakeet runtime (English-only); renamed GGUF files work unchanged.
 // Returns an error if the model can't be loaded.
 func SessionOpen(modelPath string, nThreads int) (*CrispasrSession, error) {
 	cpath := C.CString(modelPath)

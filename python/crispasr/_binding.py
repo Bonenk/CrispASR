@@ -1329,6 +1329,10 @@ class Session:
     bundled libcrispasr was actually compiled with — a model whose
     backend isn't in that list will fail to open.
 
+    Phonon-2 uses the Parakeet runtime: auto-detection works after renaming,
+    and ``backend="phonon2"`` explicitly selects that alias. ``s.backend``
+    reports the shared runtime, "parakeet". Its trained language is English.
+
     Usage:
         with crispasr.Session("model.gguf") as s:
             print(f"backend: {s.backend}")

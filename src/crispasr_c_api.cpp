@@ -2642,7 +2642,9 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
         return s;
     }
 #ifdef CA_HAVE_PARAKEET
-    if (s->backend == "parakeet" || s->backend == "reazonspeech") {
+    if (s->backend == "parakeet" || s->backend == "reazonspeech" || s->backend == "phonon2") {
+        if (s->backend == "phonon2")
+            s->backend = "parakeet"; // shared transcribe/setter/free dispatch
         parakeet_context_params pp = parakeet_context_default_params();
         pp.n_threads = s->n_threads;
         pp.verbosity = g_open_verbosity_tls;
@@ -4697,7 +4699,7 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
         return -1;
     std::string list = "whisper";
 #ifdef CA_HAVE_PARAKEET
-    list += ",parakeet,reazonspeech";
+    list += ",parakeet,reazonspeech,phonon2";
 #endif
 #ifdef CA_HAVE_NEMOTRON
     list += ",nemotron";
@@ -5968,6 +5970,10 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
     }
 #ifdef CA_HAVE_PARAKEET
     if (s->backend == "parakeet" && s->parakeet_ctx) {
+        if (parakeet_is_english_only(s->parakeet_ctx) && !s->source_language.empty() && s->source_language != "auto" &&
+            s->source_language != "en")
+            fprintf(stderr, "crispasr[phonon2]: English-only model; language=%s cannot be honoured\n",
+                    s->source_language.c_str());
         // Issue #257: apply the caller-chosen local-attention window (NeMo
         // rel_pos_local_attn) before decoding. INT_MIN = unset (model default).
         if (s->parakeet_att_context_left != INT_MIN && s->parakeet_att_context_right != INT_MIN) {

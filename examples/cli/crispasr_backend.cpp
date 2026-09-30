@@ -13,6 +13,7 @@ std::unique_ptr<CrispasrBackend> crispasr_make_gigaam_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_dolphin_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_xasr_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_parakeet_backend();
+std::unique_ptr<CrispasrBackend> crispasr_make_phonon2_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_canary_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_canary_qwen_backend();
 std::unique_ptr<CrispasrBackend> crispasr_make_lfm2_audio_backend();
@@ -132,6 +133,8 @@ std::unique_ptr<CrispasrBackend> crispasr_create_backend(const std::string& name
     if (name == "nemotron" || name == "nemotron-streaming" || name == "nemotron-3.5" || name == "nemotron-asr" ||
         name == "nemotron-speech-streaming")
         return crispasr_make_nemotron_backend();
+    if (name == "phonon2")
+        return crispasr_make_phonon2_backend();
     if (name == "parakeet" || name == "reazonspeech" || name == "quds" || name == "quds-fa")
         return crispasr_make_parakeet_backend();
     if (name == "canary")
@@ -355,6 +358,7 @@ std::vector<std::string> crispasr_list_backends() {
         "dolphin",
         "xasr",
         "parakeet",
+        "phonon2",
         "reazonspeech",
         "quds-fa",
         "canary",
@@ -706,7 +710,7 @@ std::string crispasr_detect_backend_from_gguf(const std::string& model_path) {
     if (contains_ci("parakeet"))
         return "parakeet";
     if (contains_ci("phonon2") || contains_ci("phonon-2"))
-        return "parakeet"; // #481: Phonon-2 shares the Parakeet TDT v3 graph
+        return "phonon2"; // #481: model-specific caps, shared Parakeet TDT graph
     if (contains_ci("reazonspeech"))
         return "parakeet";
     if (contains_ci("quds"))

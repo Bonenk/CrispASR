@@ -87,3 +87,60 @@ changes when redistributing. The vendored reference reader is Apache-2.0;
 its license is in `tools/reference_backends/phonon2/LICENSE`. The upstream
 [NOTICE](https://huggingface.co/FermionResearch/Phonon-2/blob/main/NOTICE)
 documents the original model, changes, and training data.
+
+## Integration checklist
+
+Phonon-2 is a model variant of the existing Parakeet runtime. The contributing
+checklist applies through that shared engine:
+
+| Checklist point | Wiring |
+|---|---|
+| C runtime and stage timers | `src/parakeet.{h,cpp}`; `CRISPASR_PARAKEET_BENCH=1` |
+| CLI adapter and factory | Shared Parakeet adapter; explicit `--backend phonon2` and model filename routing |
+| CLI/library CMake linkage | Existing `parakeet` library in both CLI and shared C ABI; no duplicate runtime library |
+| C ABI dispatch, lifecycle, setters | Explicit `phonon2` alias normalizes to `parakeet`; existing transcription, hotwords, beam, temperature, attention-context and cleanup paths |
+| Architecture auto-detection | `general.architecture=parakeet`, shared `arch_backend_map.h`; works after renaming |
+| Registry | `phonon2`, Q8 default, F16/Q4 alternatives and weight license |
+| Quantization | Existing Parakeet rules, including pointwise matmuls; published exports validated |
+| Reference and diff | Independent upstream reader + Transformers; existing Parakeet stage APIs and strict pinned nightly gate |
+| Bindings | Generic C ABI reaches all bindings; Python/Go/Dart document the variant |
+| Go static linkage | Existing Parakeet library; generator checks the unchanged cgo library list |
+| Architecture/capability docs | `docs/architecture.md#phonon2`; generated feature matrix and library capability table |
+| Tests and live environment | Container/registry tests, pinned regression, `test_phonon2_live.py`, `CRISPASR_MODEL_PHONON2` |
+
+`Session(..., backend="phonon2")` explicitly opens this variant; `Session.backend`
+reports the shared runtime name, `parakeet`. The CLI uses model metadata to select
+English without automatically loading Whisper for LID. Non-English language
+requests produce a warning; the model cannot honour them. Explicit language
+identification remains available. Native punctuation is advertised. `--no-flash-attn` and the C ABI open flag
+now reach the graph builder; the live guard checks the resulting node trace.
+
+## Reproducible profiling
+
+Build both `crispasr-lib` and `crispasr-cli`. Set the model and library paths:
+
+```sh
+python tools/profile_phonon2.py --engine runtime \
+  --model phonon2-q8_0.gguf --lib build/src/libcrispasr.so \
+  --output runtime-q8.json
+CRISPASR_SCHED_PROFILE=1 CRISPASR_PARAKEET_BENCH=1 \
+CRISPASR_PARAKEET_ENC_PROBE=1 CRISPASR_PARAKEET_DECODE_TIMING=1 \
+python tools/profile_phonon2.py --engine runtime --trace \
+  --model phonon2-q8_0.gguf --lib build/src/libcrispasr.so \
+  --output trace-q8.json
+python tools/profile_phonon2.py --engine reference \
+  --model /path/to/upstream/snapshot --output reference-cpu.json
+```
+
+The benchmark loads once, warms each 11/55-second shape, checks nonempty stable
+transcripts and proportional word counts, then records three inference times
+and their median. The trace is a separate run: the scheduler callback forces
+node materialization and changes dispatch overhead. Compare timings only on
+the same host, device, thread count and load. The Python reference is stock
+Transformers on CPU, not the upstream MLX engine.
+
+The manual **Phonon-2 integration and profile** GitHub workflow runs Linux CPU
+and macOS Metal, checks wiring/live transcripts and F16 stage parity first,
+then records F16/Q8/Q4 timings plus Q8 stage/node traces. Linux also measures
+the independent Python reference on the same runner. Artifacts retain all raw
+samples, transcripts, model checksums, dependency versions and host details.

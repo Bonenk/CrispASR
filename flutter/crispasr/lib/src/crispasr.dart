@@ -2375,6 +2375,8 @@ typedef PianoNoteWithProgram = ({
 /// call or by closing the session.
 typedef Stem = ({String name, Float32List pcm});
 
+/// Unified model session. Phonon-2 auto-detects as Parakeet from GGUF metadata,
+/// including renamed files; its trained language is English.
 class CrispasrSession {
   CrispasrSession._(
     this._lib,

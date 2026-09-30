@@ -544,6 +544,7 @@ def convert(nemo_path: Path | None, out_path: Path, quant: str | None = None,
     writer = gguf.GGUFWriter(str(out_path), arch="parakeet")
     if nemo_data.get("source_model"):
         writer.add_name("Phonon-2")
+        writer.add_string("parakeet.language", "en")
         writer.add_string("general.source.huggingface.repository", nemo_data["source_model"])
         writer.add_string("general.source.url", "https://huggingface.co/" + nemo_data["source_model"])
         writer.add_string("general.source.sha256", nemo_data["source_sha256"])

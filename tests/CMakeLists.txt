@@ -6048,3 +6048,13 @@ add_executable(test-ctc-stitch test-ctc-stitch.cpp)
 target_include_directories(test-ctc-stitch PRIVATE ${PROJECT_SOURCE_DIR}/examples/cli)
 target_link_libraries(test-ctc-stitch PRIVATE Catch2::Catch2WithMain)
 catch_discover_tests(test-ctc-stitch TEST_SPEC "[ctc-stitch]" PROPERTIES LABELS "unit;omniasr")
+
+# Phonon-2 reuses Parakeet; exercise its model alias and metadata through real surfaces.
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if (Python3_Interpreter_FOUND AND TARGET crispasr-cli)
+    add_test(NAME phonon2-live
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_phonon2_live.py
+            --lib $<TARGET_FILE:crispasr-lib> --cli $<TARGET_FILE:crispasr-cli>)
+    set_tests_properties(phonon2-live PROPERTIES LABELS live SKIP_RETURN_CODE 77
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}" TIMEOUT 600)
+endif()

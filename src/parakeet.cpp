@@ -210,6 +210,7 @@ struct parakeet_model {
     // CTC head (hybrid TDT+CTC models). nullptr when not present.
     ggml_tensor* ctc_w = nullptr; // Conv1d(d_model, ctc_vocab, 1) → (ctc_vocab, d_model, 1)
     ggml_tensor* ctc_b = nullptr; // (ctc_vocab,)
+    bool english_only = false;    // model identity, independent of its filename
     bool has_ctc = false;
     uint32_t ctc_vocab_size = 0;
 
@@ -319,6 +320,10 @@ static bool parakeet_load_model(parakeet_model& model, parakeet_vocab& vocab, co
             return false;
 
         auto& hp = model.hparams;
+        model.english_only =
+            core_gguf::kv_str(gctx, "parakeet.language", "") == "en" ||
+            core_gguf::kv_str(gctx, "general.name", "") == "Phonon-2" ||
+            core_gguf::kv_str(gctx, "general.source.huggingface.repository", "") == "FermionResearch/Phonon-2";
         hp.sample_rate = core_gguf::kv_u32(gctx, "parakeet.sample_rate", hp.sample_rate);
         hp.n_mels = core_gguf::kv_u32(gctx, "parakeet.n_mels", hp.n_mels);
         hp.n_fft = core_gguf::kv_u32(gctx, "parakeet.n_fft", hp.n_fft);
@@ -631,7 +636,8 @@ static void parakeet_fft_r2c(const float* in, int N, float* out) {
 
 #include "core/mel.h"
 #include "core/gpu_backend_pref.h" // crispasr_init_gpu_backend (#214)
-#include "core/rnnt_ggml.h"        // §232 GPU transducer decode (shared)
+#include "core/sched_prof.h"
+#include "core/rnnt_ggml.h" // §232 GPU transducer decode (shared)
 #include "core/ggml_cpu_backend.h"
 
 #ifndef M_PI
@@ -902,7 +908,7 @@ static ggml_cgraph* parakeet_build_graph_encoder(parakeet_context* ctx, int T_me
         (int)hp.d_model, (int)hp.n_heads,     (int)hp.head_dim,     (int)hp.conv_kernel,
         kLayerNormEps,   hp.att_context_left, hp.att_context_right, (int)hp.global_tokens,
     };
-    bp.manual_attn = core_conformer::fc_gpu_manual_attn(ctx->backend);
+    bp.manual_attn = !ctx->params.use_flash || core_conformer::fc_gpu_manual_attn(ctx->backend);
     for (uint32_t il = 0; il < hp.n_layers; il++) {
         cur = core_conformer::build_block(ctx0, cur, pos_enc, T, m.enc[il], bp, local_mask, nullptr, window_band_mask);
     }
@@ -1045,7 +1051,7 @@ static std::vector<float> parakeet_encode_mel(parakeet_context* ctx, const float
 
     // Compute
     int64_t t_comp0 = probe_time ? ggml_time_us() : 0;
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (core_sched_prof::compute(ctx->sched, gf, "parakeet.encoder", "CRISPASR_FC_PROFILE") != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "parakeet: encoder graph compute failed\n");
         return {};
     }
@@ -2991,6 +2997,9 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
 
     parakeet_fold_batchnorm(ctx->model, ctx->backend);
 
+    if (parakeet_bench_enabled())
+        fprintf(stderr, "parakeet_bench: backend=%s threads=%d\n", ggml_backend_name(ctx->backend), ctx->n_threads);
+
     // Repack F16 conv pw1/pw2 to Q8_0 (issue #81 — the 3D conv layout dodges
     // crispasr-quantize, and the CPU F16 mul_mat path is ~6x slower than Q8_0).
     {
@@ -3238,6 +3247,7 @@ static ggml_cgraph* parakeet_build_graph_encoder_dump(parakeet_context* ctx, int
         (int)hp.d_model, (int)hp.n_heads,     (int)hp.head_dim,     (int)hp.conv_kernel,
         kLayerNormEps,   hp.att_context_left, hp.att_context_right, (int)hp.global_tokens,
     };
+    bp.manual_attn = !ctx->params.use_flash || core_conformer::fc_gpu_manual_attn(ctx->backend);
     for (uint32_t il = 0; il < hp.n_layers; il++) {
         cur = core_conformer::build_block(ctx0, cur, pos_enc, T, m.enc[il], bp, local_mask_dump);
         char nm[64];
@@ -3302,7 +3312,7 @@ extern "C" int parakeet_run_encoder_dump(struct parakeet_context* ctx, const flo
         ggml_backend_tensor_set(local_mask_in2, lm.data(), 0, lm.size() * sizeof(float));
     }
 
-    if (ggml_backend_sched_graph_compute(ctx->sched, gf) != GGML_STATUS_SUCCESS) {
+    if (core_sched_prof::compute(ctx->sched, gf, "parakeet.encoder", "CRISPASR_FC_PROFILE") != GGML_STATUS_SUCCESS) {
         fprintf(stderr, "parakeet: dump: encoder graph compute failed\n");
         return 4;
     }
@@ -4223,4 +4233,8 @@ extern "C" char* parakeet_transcribe(struct parakeet_context* ctx, const float* 
     char* out = strdup(r->text ? r->text : "");
     parakeet_result_free(r);
     return out;
+}
+
+extern "C" bool parakeet_is_english_only(const struct parakeet_context* ctx) {
+    return ctx && ctx->model.english_only;
 }

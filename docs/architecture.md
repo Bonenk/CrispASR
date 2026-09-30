@@ -2038,6 +2038,25 @@ Key architectural points:
 
 Models at `cstr/reazonspeech-nemo-v2-GGUF`: F16 (1240 MB), Q8_0 (704 MB), Q4_K (455 MB).
 
+### phonon2
+
+Fermion Research Phonon-2 is an English-only Parakeet TDT v3 derivative:
+128-bin mel, 8× subsampling, 24 FastConformer layers (width 1024, 8 heads,
+FFN 4096, convolution kernel 9), two 640-unit predictor LSTMs, and a
+640-unit ReLU joint with blank 8192 and five duration classes.
+
+Its five-value/int6 transport is independently expanded by the Parakeet
+converter; the resulting GGUF keeps `general.architecture=parakeet`. Runtime,
+CMake library linkage, quantizer rules, stage APIs and session setters are
+shared with Parakeet. `--backend phonon2` and the C ABI's explicit `phonon2`
+alias reach that same engine; automatic C ABI detection reports `parakeet`.
+CLI model metadata supplies English as the sole language, avoiding redundant
+Whisper LID even after renaming. Native punctuation is advertised.
+
+See [conversion, validation and downloads](phonon2.md). Scheduler node traces
+use `CRISPASR_SCHED_PROFILE=1`; `CRISPASR_PARAKEET_BENCH=1` gives pipeline-stage
+measurements. Profile runs must be separated from uninstrumented benchmarks.
+
 ### parakeet-ultra / parakeet-redux
 
 moondream's `parakeet-ultra` and `parakeet-redux` (CC-BY-4.0, #454) are the
