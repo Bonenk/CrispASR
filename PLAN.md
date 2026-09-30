@@ -11,6 +11,13 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-09-30 — #479 macOS architecture downloads
+
+Worktree `/mnt/volume1/wt-479`, branch `fix/479-macos-architectures`.
+Add explicit arm64 and x86_64 CLI archives, keep the existing macOS archive
+as an arm64 compatibility alias, and verify packaged architectures and startup
+on matching macOS runners. Intel uses CPU/Accelerate with Metal disabled.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
