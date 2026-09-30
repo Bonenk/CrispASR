@@ -25,24 +25,21 @@
 // NOTE on use_flash vs flash_attn naming:
 //
 // parakeet / canary / cohere shipped a pre-existing `use_flash`
-// field in their context_params before the PLAN #89 sweep. Those
-// structs default `use_flash` to FALSE (per the upstream-derived
-// defaults) — the session-API runtime override
-// (`g_open_flash_attn_tls` → `p.use_flash = ...` in
-// `crispasr_session_open_explicit`) is what enables flash-attn at
-// session-open time. So for these three the per-backend default
-// is correctly FALSE; the test pins that fact rather than
-// imposing a uniform "always true" expectation that would mask
-// an upstream behaviour change.
+// field before the PLAN #89 sweep. Canary and Cohere retain FALSE
+// factory defaults; the session API overrides them at open time.
+// Parakeet historically reported FALSE while its graph always used
+// flash attention. #481 connects the flag to the graph and reports
+// TRUE by default to preserve that existing graph behaviour; an
+// explicit false now selects manual attention (live-tested).
 //
 // Every backend without a pre-existing field got a fresh
 // `flash_attn` field defaulting to TRUE (see below).
 
 #if __has_include("parakeet.h")
 #include "parakeet.h"
-TEST_CASE("flash-attn defaults: parakeet use_flash=false (upstream)", "[unit][flash_attn]") {
+TEST_CASE("flash-attn defaults: parakeet use_flash=true (preserves graph default)", "[unit][flash_attn]") {
     auto p = parakeet_context_default_params();
-    REQUIRE(p.use_flash == false);
+    REQUIRE(p.use_flash == true);
 }
 #endif
 

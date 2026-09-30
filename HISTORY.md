@@ -26,6 +26,10 @@ passes Linux CPU and macOS Metal wiring/live/F16 gates before benchmarking.
 All 28 compared frontend/encoder stages pass: Linux min cosine 0.999994, magnitude bound 0.066%; macOS
 0.999992 / 0.069%. Local shared-library audit, Go linkage generator, parameter
 tests and actual CTest live run pass; the model-free CTest skips with code 77.
+The full main unit run exposed one remaining shared flash-default assertion
+pinning the old reported value (1959/1960 passed). The assertion/comment now
+pin the preserved enabled graph default; the focused 39-case suite passes.
+Final full-unit CI is rerun after that test-only correction.
 
 Fair 4-thread EPYC CPU comparison, warm medians excluding model load: Q8
 1.760/9.301 s on 11/55 s audio versus independent stock Python F32
