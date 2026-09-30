@@ -19,7 +19,8 @@ on:
       only:
         description: >-
           Rebuild ONLY this job and re-upload just its asset
-          (e.g. build-libs-macos-arm64). Empty = the whole release.
+          (e.g. build-libs-macos-arm64; build-macos-cli selects both CLI
+          architectures). Empty = the whole release.
           The publish step attaches whatever was produced, so the other
           assets on the release are left untouched.
         required: false
@@ -1032,7 +1033,7 @@ jobs:
 
   # macOS CLI: separate downloads for Apple Silicon and Intel (#479).
   build-macos:
-    if: ${{ !inputs.only || inputs.only == 'build-macos' }}
+    if: ${{ !inputs.only || inputs.only == 'build-macos' || inputs.only == 'build-macos-cli' }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
@@ -1098,7 +1099,7 @@ jobs:
 
   # macOS CLI: separate downloads for Apple Silicon and Intel (#479).
   build-macos-x86_64:
-    if: ${{ !inputs.only || inputs.only == 'build-macos-x86_64' }}
+    if: ${{ !inputs.only || inputs.only == 'build-macos-x86_64' || inputs.only == 'build-macos-cli' }}
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v6

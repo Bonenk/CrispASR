@@ -19,7 +19,9 @@ as an arm64 compatibility alias, and verify packaged architectures and startup
 on matching macOS runners. Intel uses CPU/Accelerate with Metal disabled.
 Implementation: `510dd8d3c`. Local actionlint 1.7.12, shellcheck, shell syntax
 and six package-guard cases pass. Intel native dry run 36712037062 is building;
-arm64 dry run follows on main. No release tag or published assets yet.
+arm64 dry run 36713110484. Relocation exposed the quantizer missing its C2PA
+sidecar search path; fixing it and rerunning both with `only=build-macos-cli`.
+No release tag or published assets yet.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
