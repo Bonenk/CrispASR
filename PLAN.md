@@ -11,23 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-09-30 — #481 integration checklist and profile
-
-Worktree `/mnt/volume1/wt-481-wire`, branch `feat/481-wiring-profile`.
-Audit Phonon-2 against every applicable `docs/contributing.md` integration
-point, complete missing CLI/C ABI/binding/docs/live-test wiring, then profile
-the validated runtime with load excluded and warmed repeated inference.
-NOW: implementation is on `feat/481-wiring-profile` (3c45f1904). Linux CPU
-and macOS Metal integration audit, live alias/renamed-model/repeated transcript
-checks and F16 stage gates passed in CI run 36782789585. Warm load-excluded
-F16/Q8/Q4 profiling and the same-host Linux Python comparison are running.
-Finishing generated capability artifacts and local shared-library validation;
-then land measured results. The flash toggle now controls the graph, preserving
-the previous enabled default. Linux decoder BLAS is not implemented (Apple
-Accelerate only); profile before considering an optimization.
-Local task venv/build are on root storage after the source disk filled.
-Artifacts/logs: `/mnt/volume1/tmp-overflow/issue481/wiring-profile`.
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)

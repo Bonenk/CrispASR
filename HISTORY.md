@@ -6,6 +6,43 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-09-30 — #481 integration checklist and profile
+
+Completed the applicable contributing checklist through the shared Parakeet
+engine: explicit `phonon2` CLI/C ABI alias, roster and generated capability
+artifacts, metadata-based English-only routing (including renamed files),
+native punctuation, binding/architecture/CLI documentation, live environment
+and registered CTest. Shared CMake linkage, architecture table, registry,
+quantization, reference stage APIs and existing session setters are reused.
+The live guard proves auto/explicit sessions, repeated transcripts, renamed
+CLI files without redundant Whisper LID and an explicit flash-off node trace.
+The forwarded flash flag now reaches both graph builders; its raw default
+reports the previously always-enabled graph behaviour. Scheduler profiling
+and backend/thread reporting are wired; Linux scalar decode is labelled
+accurately instead of the previous misleading "cblas" label.
+
+[Profile CI 36784469150](https://github.com/CrispStrobe/CrispASR/actions/runs/36784469150)
+passes Linux CPU and macOS Metal wiring/live/F16 gates before benchmarking.
+All 28 stages pass: Linux min cosine 0.999994, magnitude bound 0.066%; macOS
+0.999992 / 0.069%. Local shared-library audit, Go linkage generator, parameter
+tests and actual CTest live run pass; the model-free CTest skips with code 77.
+
+Fair 4-thread EPYC CPU comparison, warm medians excluding model load: Q8
+1.760/9.301 s on 11/55 s audio versus independent stock Python F32
+1.580/8.042 s; Q8 is 11–16% slower and uses 53% less peak process RAM
+(1614 vs 3414 MiB). F16/Q8 match reference transcripts at both lengths;
+Q4 has matching normalized words but one longer-clip punctuation difference.
+Q8 remains the default; Q4 is smaller but slower on this host. The trace finds
+~1171 ms encoder, ~587 ms scalar Linux decode and only ~1 ms graph build/alloc.
+FFN kernels and CPU decoder matvecs are the next measured targets, not the
+known-unsafe experimental graph cache. No new optimization default was chosen.
+
+The macOS runner has an Apple Paravirtual GPU without SIMD-group matrix support;
+its timings are retained as CI measurements, not physical M1/M5 performance or
+a comparison with the upstream MLX engine. `PERFORMANCE.md`, `docs/phonon2.md`
+and the checked-in JSON receipt retain measurements and scope. Full logs and
+traces: `/mnt/volume1/tmp-overflow/issue481/wiring-profile`; no release tag.
+
 ## DONE 2026-09-30 — #481 Phonon-2
 
 Phonon-2 runs through the existing Parakeet backend. The converter checks the
