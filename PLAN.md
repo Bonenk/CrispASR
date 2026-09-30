@@ -17,8 +17,12 @@ Worktree `/mnt/volume1/wt-481-wire`, branch `feat/481-wiring-profile`.
 Audit Phonon-2 against every applicable `docs/contributing.md` integration
 point, complete missing CLI/C ABI/binding/docs/live-test wiring, then profile
 the validated runtime with load excluded and warmed repeated inference.
-NOW: auditing shared Parakeet integration and model-specific language/capabilities;
-no performance default changes before a transcript-checked A/B.
+NOW: identified explicit-alias, English-only LID, capability/docs/live-test,
+scheduler-profile and flash-toggle gaps. Implementing these through the shared
+Parakeet runtime. Publishing a manual Linux CPU/macOS Metal integration/profile
+workflow; it must pass the audit/live/F16 parity gates before timing inference.
+Local source disk filled during configure; this task's venv/build moved to local
+root storage. No optimization default changes before transcript-checked A/B.
 Artifacts/logs: `/mnt/volume1/tmp-overflow/issue481/wiring-profile`.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
