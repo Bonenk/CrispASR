@@ -151,12 +151,15 @@ samples, transcripts, model checksums, dependency versions and host details.
 
 The encoder, including subsampling and all 24 FastConformer blocks, is a ggml
 scheduler graph, with CPU fallback for operations unsupported by the selected
-backend. Mel extraction and TDT token selection are CPU code. Decoder
+backend. The scheduler currently registers GPU/CPU backends, not the separate
+ggml BLAS backend. Linux encoder matmuls use ggml CPU kernels even when the
+build enables OpenBLAS; OpenBLAS accelerates the shared mel filter projection.
+Mel extraction and TDT token selection are CPU code. Decoder
 execution depends on the device:
 
 | Path | Predictor and joint |
 |---|---|
-| Linux CPU | Scalar C++ loops over cached F32 weights; encoder OpenBLAS does not accelerate these loops |
+| Linux CPU | Scalar C++ loops over cached F32 weights; the OpenBLAS build option does not accelerate these loops |
 | Apple CPU / Metal | Apple Accelerate; Metal encoder with CPU decoder is the existing default |
 | CUDA / Vulkan | ggml predictor/joint graphs, built and allocated once per decode call and reused across token steps |
 
@@ -212,9 +215,12 @@ it is not file size, tensor allocation size or GPU VRAM. Q8 takes 11–16% more
 inference time than this Python reference and uses 53% less peak process RAM.
 Q4 is smaller but slower than Q8 on this host; the default remains Q8.
 
-All 28 F16 stages pass on this CPU runner: minimum cosine 0.999994 and tensor
+All 28 compared frontend/encoder stages pass on this CPU runner: minimum cosine 0.999994 and tensor
 norm-ratio error bounded by 0.066% (RMS error divided by reference RMS).
-The local shared-library run also passes all 28 stages (minimum cosine 0.999996,
+The archive covers mel, subsampling, 24 encoder layers and two encoder-output
+checks. Predictor/joint numerical stage parity is not captured here; decoded
+transcripts provide their end-to-end validation. The local shared-library run
+also passes all 28 stages (minimum cosine 0.999996,
 bound 0.065%) and repeated CTest/CLI/C ABI checks. The live guard includes an
 explicit flash-off node trace.
 
@@ -228,7 +234,7 @@ label is now corrected to "scalar" ("accelerate" on Apple builds).
 
 These instrumented timings are for finding hotspots, not benchmark numbers.
 The useful next experiments are optimized CPU predictor/joint matvecs and
-encoder FFN kernels, each with transcript and stage-parity A/B. Encoder graph
+encoder FFN kernels (including an explicit BLAS scheduler A/B), each with transcript and stage-parity A/B. Encoder graph
 caching would save less than a millisecond in this trace and retains its known
 correctness problem; it stays off. No new performance default was selected
 from these measurements.

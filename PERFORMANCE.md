@@ -8,7 +8,8 @@ Test audio: jfk.wav (11.0s), Q4_K quantization, greedy decode (`-bs 1`).
 
 Measured after wiring/live/F16 parity gates in
 [CI run 36784469150](https://github.com/CrispStrobe/CrispASR/actions/runs/36784469150).
-AMD EPYC 9V74, 4-vCPU Linux runner, 4 inference threads, Release/OpenBLAS.
+AMD EPYC 9V74, 4-vCPU Linux runner, 4 inference threads, Release/OpenBLAS-linked build. Parakeet schedules encoder matmuls on ggml CPU kernels;
+the separate BLAS backend is not registered. OpenBLAS serves mel projection.
 Each shape is warmed; medians of three calls exclude loading and instrumentation.
 The 55 s case is JFK repeated five times, not a natural long-audio accuracy test.
 
@@ -25,7 +26,7 @@ identical normalized words but differs in long-clip punctuation. These checks
 do not replace the 21-clip quantization validation. Q8 remains the default:
 Q4 is smaller but slower on this CPU. This is not a comparison against MLX.
 
-All 28 F16 stages pass (minimum cosine 0.999994; norm-ratio error bounded by
+All 28 compared frontend/encoder stages pass (minimum cosine 0.999994; norm-ratio error bounded by
 0.066%). Shared-library/CLI/explicit alias/renamed-model and repeated-call
 checks pass, including flash-off node verification. A separate Q8 trace finds
 encoder ~1171 ms, scalar Linux decoder ~587 ms, mel ~14 ms. Encoder graph

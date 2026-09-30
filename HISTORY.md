@@ -23,7 +23,7 @@ accurately instead of the previous misleading "cblas" label.
 
 [Profile CI 36784469150](https://github.com/CrispStrobe/CrispASR/actions/runs/36784469150)
 passes Linux CPU and macOS Metal wiring/live/F16 gates before benchmarking.
-All 28 stages pass: Linux min cosine 0.999994, magnitude bound 0.066%; macOS
+All 28 compared frontend/encoder stages pass: Linux min cosine 0.999994, magnitude bound 0.066%; macOS
 0.999992 / 0.069%. Local shared-library audit, Go linkage generator, parameter
 tests and actual CTest live run pass; the model-free CTest skips with code 77.
 
@@ -35,7 +35,10 @@ Q4 has matching normalized words but one longer-clip punctuation difference.
 Q8 remains the default; Q4 is smaller but slower on this host. The trace finds
 ~1171 ms encoder, ~587 ms scalar Linux decode and only ~1 ms graph build/alloc.
 FFN kernels and CPU decoder matvecs are the next measured targets, not the
-known-unsafe experimental graph cache. No new optimization default was chosen.
+known-unsafe experimental graph cache. OpenBLAS is linked and serves mel
+projection; the encoder scheduler registers GPU/CPU, not the separate BLAS
+backend. Decoder numerical stages are not captured; transcript checks validate
+the predictor/joint end to end. No new optimization default was chosen.
 
 The macOS runner has an Apple Paravirtual GPU without SIMD-group matrix support;
 its timings are retained as CI measurements, not physical M1/M5 performance or
