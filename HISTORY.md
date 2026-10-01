@@ -23,11 +23,19 @@ contents (CLI, quantizer, C2PA sidecar and license notices). SHA256:
 - `crispasr-macos-x86_64-cpu-legacy.tar.gz`:
   `9e2ca49bbd80963f19919e2e7019fcecfe2a1508065b8d89d3267636733f6e55`
 
-The Windows Vulkan library's first SDK download lost its connection; targeted
-retry `36897826261` built and uploaded that library successfully. Other release
-assets are still being verified under the release claim in `PLAN.md`. Rust and
-Dart wrapper publication succeeded. The tag and GitHub release retain the
-release notes after their root-file archival.
+Release run `36896786413` finished with all 46 assets uploaded: the previous
+release's full download coverage plus the new Intel legacy archive. Its red
+aggregate result is solely the Windows Vulkan library's first SDK download
+losing its connection; targeted retry `36897826261` built and uploaded that
+library successfully. Final Intel upload digests match the hashes above.
+
+Python wheel run `36910849174` passed every build and publish job: four CPU
+wheels and the source distribution are listed on PyPI, and all three GPU
+wheels appear in the public CUDA/Vulkan indexes. Rust and Dart publication
+`36896786498` also passed. The redundant automatic wheel run was canceled after
+the manual publication completed. The tag and GitHub release retain the
+release notes after their root-file archival; the published notes clarify that
+Intel builds enable Apple Accelerate and disable Metal.
 
 ## DONE 2026-10-01 — Intel macOS SIMD release regression (#484)
 

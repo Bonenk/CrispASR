@@ -11,33 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-01 — v0.8.40 release
-
-Worktree `/mnt/volume1/wt-478-ralm`; Intel fix landed at `654037835`.
-#484 is validated: full quality `36867331142`, alternating timing `36872271289`,
-both Intel package variants `36868274235` attempt 2, branch CI `36865881142`
-(13/13), lint `36865884690`. Receipts/history/performance and release notes
-are prepared. CLI long warm pairs favor SIMD 1.50-1.93x with unchanged words;
-host variance and the known baseline insertion are documented.
-
-Stable release branch `release/0.8.40` at `9d50392b4` passed CI `36875335659`
-(13/13) and lint `36875340064` (10/10). All implementation, quality, timing and
-package gates are complete. Next: scripts/bump-version.sh, green checks on the
-versioned target, publish v0.8.40, verify assets, archive notes/remove claim.
-Version bump `bbe3d5a57` used the repository script. Its Flutter changelog warning
-was fixed before publication; the unpublished annotated tag is moved to this
-metadata correction. Final unpublished annotated tag points to
-`6e25ddf9e0a5dd132846c933a05e1920f0c9c7b6` (VERSION/bindings/Flutter notes agree).
-Versioned target CI `36880148726` (13/13) and lint `36880152846` (10/10)
-are green. GitHub's Actions job-delay incident delayed the final jobs.
-Published the annotated tag and release at 17:05 UTC:
-https://github.com/CrispStrobe/CrispASR/releases/tag/v0.8.40 .
-Release build `36896786413` is producing assets; verify actual uploads before
-archiving the notes and removing this claim. No new bug reports as of 15:22 UTC.
-Release publishing is explicitly authorized. Index models (#485) belong to
-another agent and are outside this release task.
-
-
 ## CLAIMED 2026-10-01 — #485 Index-Echo S2TT 2B
 
 Worktree `/mnt/volume1/wt-index-echo-2b`, branch `feat/index-echo-2b`.
