@@ -35,8 +35,11 @@ The clone harness also incorrectly requested disclaimer suppression without
 the required CLI flag; corrected by retaining the normal spoken marking.
 Candidate `9d55a79c8` preserves the eager CPU RMS reduction and SwiGLU arithmetic
 inside batched prefill to test activation-quantization sensitivity.
-[Rerun 36851585500](https://github.com/CrispStrobe/CrispASR/actions/runs/36851585500)
-repeats the unchanged parity thresholds and all speech cases.
+The queued rerun 36851585500 was superseded before starting by
+[rerun 36851832606](https://github.com/CrispStrobe/CrispASR/actions/runs/36851832606)
+at `49eb80d2f`: unchanged hidden/KV parity thresholds, all speech cases,
+candidate ASR requires every target word; imperfect eager ASR is a recorded
+baseline diagnostic (first Q4 zero-shot readback substituted "And now" for "Hello").
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
