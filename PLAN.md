@@ -112,6 +112,21 @@ parity. Full file/VAD, ja/es and two-window context reference checks are being
 added. GPU and same-host performance measurements remain pending. Artifacts
 remain private; no public model/default/release claim.
 
+Fresh F16/Q8 validation `36905507951` **passed** all stage/magnitude,
+prompt/cache, C ABI autodetection and exact decoded text/timestamp gates.
+Selective Q4 producer `36905716130` passed, producing separate experimental
+files (710,815,392-byte tower + 1,991,761,632-byte decoder), only ~2.8% less
+than Q8; quality remains unaccepted. Latest full pipeline / selective
+validation `36907324269` is running. Full Python file reference `36906318803`
+failed before inference because ARM lacked ffmpeg; feature `62c93803c`
+installs it before downloads, retry `36907733162` is queued. Same-host CPU
+F32/F16/Q8 timing `36907737439` is queued after correctness passed.
+Independent references are now published in `cstr/crispasr-regression-fixtures`
+at `0f4ac3b0c068c28a2f4f9cf00bd5c479a7d8f9c4` (only Index-Echo files added),
+with SHA256 receipts in storage. GPU proof is prepared with CPU controls and
+explicit P100 integer-MMQ coverage limits. Models remain private pending
+full-file/window/context proof and final integration; no release claim.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
