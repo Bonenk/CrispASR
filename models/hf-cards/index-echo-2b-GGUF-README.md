@@ -18,7 +18,9 @@ tags:
 
 Conversion of [IndexTeam/Index-Echo-S2TT-2B](https://huggingface.co/IndexTeam/Index-Echo-S2TT-2B)
 for the `index-echo` backend in [CrispASR](https://github.com/CrispStrobe/CrispASR).
-This card is staged pending final integration CI and publication.
+Weights have passed the independent CPU/CUDA checks below. Backend integration
+is undergoing final CI in the `feat/index-echo-2b` branch; use that branch until
+it lands on main.
 
 The released model transcribes Chinese and translates each subtitle into
 English, Japanese or Spanish. CrispASR preserves the three-line generation

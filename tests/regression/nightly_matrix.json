@@ -32,6 +32,7 @@
   "pocket-tts-en",
   "bark-small",
   "csm-1b",
-  "voxcpm2-tts-2b"
+  "voxcpm2-tts-2b",
+  "index-echo-2b"
  ]
 }

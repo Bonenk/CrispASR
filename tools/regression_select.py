@@ -31,7 +31,8 @@ ALIASES = {
 # Model-specific importers/reference readers do not share the runtime's stem.
 MODEL_SOURCES = {
     "index-echo-2b": ("models/convert-index-echo-to-gguf.py", "tools/reference_backends/index_echo.py",
-                      "tools/ci-heavy/index_echo_", "examples/talk-llama/qwen35",
+                      "tools/ci-heavy/index_echo_", "tools/index_echo_acceptance.py",
+                      "tests/test_index_echo_acceptance.py", "examples/talk-llama/qwen35",
                       "examples/talk-llama/models/qwen35"),
     "phonon2": ("models/phonon2_container.py", "tools/reference_backends/phonon2/",
                 "tools/reference_backends/parakeet_hf.py"),
