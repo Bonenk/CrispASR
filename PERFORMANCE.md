@@ -4,6 +4,38 @@ Test audio: jfk.wav (11.0s), Q4_K quantization, greedy decode (`-bs 1`).
 
 ---
 
+## Index-Echo S2TT 2B CPU — 2026-10-01 (#485)
+
+[Same-host profile](https://github.com/CrispStrobe/CrispASR/actions/runs/36907737439)
+on a four-core ARM Neoverse-N2 hosted VM, four threads, portable build
+(`GGML_NATIVE=OFF`). All timed iterations match the released Python fixture
+text and centisecond timestamps. The Python path requests F32, but
+[effective-dtype audit](https://github.com/CrispStrobe/CrispASR/actions/runs/36911946162)
+shows F32 tower/connector **and BF16 decoder**: Transformers 5.6.0 retains the
+nested text configuration. These are timings against the actual blueprint,
+not a comparison at equal arithmetic precision.
+
+| Clip | Python F32/BF16 warm | Native F16 warm | Native Q8 warm | Q8 speedup |
+|---|---:|---:|---:|---:|
+| JFK, 11 s | 23.52 s | 18.58 s | 17.58 s | 1.34× |
+| Chinese, 13.052 s | 32.91 s | 24.71 s | 22.51 s | 1.46× |
+| Partial-hop JFK, 10.988 s | 23.38 s | 18.59 s | 17.60 s | 1.33× |
+
+Warm figures are medians of two measured iterations after one initial
+iteration, in fixed Python/F16/Q8 order. Python's first JFK call is 30.95 s;
+model load is measured separately (14.52 / 2.12 / 3.04 s). Peak process RSS
+is 7.95 / 5.56 / 4.03 GiB. RSS includes the tokenizer and Python process;
+these three short clips are not an accuracy corpus or a physical-device
+throughput prediction. Native stage timing logs and every timed output are
+in the run artifact; the corrected precision labels and complete metrics
+are retained in [the receipt](docs/index-echo-cpu-2026-10-01.json).
+
+The encoder and connector use ggml graphs/schedulers; the private Qwen3.5
+core batches prefill and caches both full-attention KV and recurrent state.
+Cache is reset per window while prior-output text enters the next prompt.
+There is no Python/ONNX inference fallback. CUDA measurement is pending;
+these CPU results do not establish GPU speed or integer-MMQ coverage.
+
 ## Intel macOS release ISA — 2026-10-01 (#484)
 
 v0.8.39's Intel CLI used `CRISPASR_PORTABLE_CPU=ON`, which forcibly disables
