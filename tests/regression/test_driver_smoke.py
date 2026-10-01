@@ -26,6 +26,8 @@ from __future__ import annotations
 import json
 import sys
 import unittest
+from unittest import mock
+from types import SimpleNamespace
 from pathlib import Path
 
 
@@ -178,6 +180,22 @@ class ManifestSchemaTests(unittest.TestCase):
                     f"{entry['name']}: in-repo sample {sample} not "
                     f"present; either drop the field or check the WAV in",
                 )
+
+
+class MandatoryDiffGateTests(unittest.TestCase):
+    def test_index_echo_rejects_scale_failure_despite_perfect_cosine(self):
+        # Cosine divides magnitude out: a uniformly wrong scale can emit only
+        # PASS rows while the separate relative-L2 check makes the process fail.
+        proc = SimpleNamespace(returncode=1, stderr='', stdout=
+            '[PASS] mel_spectrogram shape=[128,100] cos_min=1.000000 cos_mean=1.000000\n'
+            '       relative_l2=151.00000000\n')
+        paths = [Path('unused')] * 4
+        with mock.patch.object(run_one.subprocess, 'run', return_value=proc):
+            with self.assertRaises(SystemExit):
+                run_one.run_diff(paths[0], 'index-echo', *paths[1:])
+            # Other backends keep their manifest-controlled cosine policy.
+            self.assertEqual(run_one.run_diff(paths[0], 'parakeet', *paths[1:]),
+                             {'mel_spectrogram': 1.0})
 
 
 class DiffParserTests(unittest.TestCase):
