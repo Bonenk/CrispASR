@@ -1142,6 +1142,16 @@ if(WIN32)
     target_compile_definitions(crispasr-llama-core PRIVATE _WIN32_WINNT=0x0602)
 endif()
 
+# Index-Echo combines the shared AuT tower and a private Qwen3.5 decoder.
+add_library(index_echo STATIC index_echo.cpp index_echo.h)
+target_include_directories(index_echo PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(index_echo PRIVATE ${CMAKE_SOURCE_DIR}/crisp_audio/include)
+target_compile_features(index_echo PUBLIC cxx_std_17)
+target_link_libraries(index_echo PUBLIC crispasr-core ggml ggml-base Threads::Threads
+                      PRIVATE crisp_audio crispasr-llama-core)
+set_target_properties(index_echo PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_link_libraries(crispasr-lib PUBLIC index_echo)
+
 # ---------------------------------------------------------------------------
 # Nemotron — nvidia/nemotron-3.5-asr-streaming-0.6b (Cache-Aware FastConformer + RNNT)
 # ---------------------------------------------------------------------------

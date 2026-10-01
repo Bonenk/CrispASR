@@ -28,6 +28,7 @@ TEST_CASE("short audio (<= window) is not chunked", "[unit][session-autochunk]")
 TEST_CASE("self-chunking backends are skipped", "[unit][session-autochunk]") {
     REQUIRE_FALSE(ac(true, "parakeet", 300, 30, false, false));
     REQUIRE_FALSE(ac(true, "reazonspeech", 300, 30, false, false));
+    REQUIRE_FALSE(ac(true, "index-echo", 300, 30, false, false));
 }
 
 TEST_CASE("disabled gate / logits / explicit-chunk skip", "[unit][session-autochunk]") {

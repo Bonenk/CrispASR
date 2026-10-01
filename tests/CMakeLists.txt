@@ -21,6 +21,11 @@ target_include_directories(test-realtime-turn-buffer PRIVATE ${PROJECT_SOURCE_DI
 target_link_libraries(test-realtime-turn-buffer PRIVATE Catch2::Catch2WithMain)
 catch_discover_tests(test-realtime-turn-buffer PROPERTIES LABELS "unit;realtime")
 
+add_executable(test-index-echo-windows test-index-echo-windows.cpp)
+target_include_directories(test-index-echo-windows PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-index-echo-windows PRIVATE Catch2::Catch2WithMain)
+catch_discover_tests(test-index-echo-windows PROPERTIES LABELS "unit;index-echo")
+
 if (EMSCRIPTEN)
 #
 #test - crispasr - js

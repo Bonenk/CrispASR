@@ -100,6 +100,10 @@
 #include "canary_qwen.h"
 #define CA_HAVE_CANARY_QWEN 1
 #endif
+#if __has_include("index_echo.h")
+#include "index_echo.h"
+#define CA_HAVE_INDEX_ECHO 1
+#endif
 #if __has_include("lfm2_audio.h")
 #include "lfm2_audio.h"
 #define CA_HAVE_LFM2_AUDIO 1
@@ -1981,6 +1985,9 @@ struct crispasr_session {
 #ifdef CA_HAVE_CANARY_QWEN
     canary_qwen_context* canary_qwen_ctx = nullptr;
 #endif
+#ifdef CA_HAVE_INDEX_ECHO
+    index_echo_context* index_echo_ctx = nullptr;
+#endif
 #ifdef CA_HAVE_LFM2_AUDIO
     lfm2_audio_context* lfm2_audio_ctx = nullptr;
 #endif
@@ -2752,6 +2759,16 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
             delete s;
             return nullptr;
         }
+        return s;
+    }
+#endif
+#ifdef CA_HAVE_INDEX_ECHO
+    if (s->backend == "index-echo") {
+        auto p = index_echo_context_default_params();
+        p.n_threads = s->n_threads; p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls; p.flash_attn = g_open_flash_attn_tls;
+        s->index_echo_ctx = index_echo_init_from_file(model_path, p);
+        if (!s->index_echo_ctx) { delete s; return nullptr; }
         return s;
     }
 #endif
@@ -4719,6 +4736,9 @@ CA_EXPORT int crispasr_session_available_backends(char* out_csv, int out_cap) {
 #ifdef CA_HAVE_CANARY_QWEN
     list += ",canary-qwen";
 #endif
+#ifdef CA_HAVE_INDEX_ECHO
+    list += ",index-echo";
+#endif
 #ifdef CA_HAVE_LFM2_AUDIO
     list += ",lfm2-audio";
 #endif
@@ -6531,6 +6551,30 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         filter_words_by_ngram_collapse(seg.words);
         canary_qwen_result_free(cqr);
         r->segments.push_back(std::move(seg));
+        return r;
+    }
+#endif
+#ifdef CA_HAVE_INDEX_ECHO
+    if (s->backend == "index-echo" && s->index_echo_ctx) {
+        if (!index_echo_set_target_lang(s->index_echo_ctx, s->target_language.empty() ? "en" : s->target_language.c_str())) {
+            fprintf(stderr, "index-echo target language must be en, ja or es\n");
+            delete r; return nullptr;
+        }
+        index_echo_set_temperature(s->index_echo_ctx, s->temperature, (uint32_t)s->seed);
+        index_echo_set_max_new_tokens(s->index_echo_ctx, s->max_new_tokens);
+        index_echo_set_glossary(s->index_echo_ctx, s->ask.c_str());
+        auto* result = index_echo_transcribe(s->index_echo_ctx, pcm, n_samples);
+        if (!result) { delete r; return nullptr; }
+        for (int i = 0; i < result->n_cues; ++i) {
+            const auto& cue = result->cues[i];
+            crispasr_session_seg segment;
+            segment.t0 = (int64_t)std::llround(cue.start_seconds * 100);
+            segment.t1 = (int64_t)std::llround(cue.end_seconds * 100);
+            segment.text = std::string(cue.transcript) + '\n' + cue.translation;
+            r->segments.push_back(std::move(segment));
+        }
+        if (result->parse_warnings) fprintf(stderr, "index-echo: %d malformed subtitle lines\n", result->parse_warnings);
+        index_echo_result_free(result);
         return r;
     }
 #endif
@@ -11558,6 +11602,10 @@ CA_EXPORT void crispasr_session_close(crispasr_session* s) {
 #ifdef CA_HAVE_CANARY_QWEN
     if (s->canary_qwen_ctx)
         canary_qwen_free(s->canary_qwen_ctx);
+#endif
+#ifdef CA_HAVE_INDEX_ECHO
+    if (s->index_echo_ctx)
+        index_echo_free(s->index_echo_ctx);
 #endif
 #ifdef CA_HAVE_LFM2_AUDIO
     if (s->lfm2_audio_ctx)

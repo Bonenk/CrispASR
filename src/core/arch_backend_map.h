@@ -72,6 +72,7 @@ inline const entry* table(size_t* n_out) {
         {"parakeet_ja",               "parakeet"},
         {"canary",                    "canary"},
         {"canary_qwen",               "canary-qwen"},
+        {"index_echo",                "index-echo"},
         {"canary-qwen",               "canary-qwen"},
         // A canary-*-ctc GGUF is a FastConformer-CTC model and runs on the
         // canary_ctc runtime, NOT the AED encoder-decoder "canary" backend

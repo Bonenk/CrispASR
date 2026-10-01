@@ -27,7 +27,7 @@ inline bool session_autochunk_applicable(bool enabled, const std::string& backen
                                          int chunk_seconds, bool return_logits, bool already_chunking) {
     if (!enabled || return_logits || already_chunking)
         return false;
-    if (backend == "parakeet" || backend == "reazonspeech")
+    if (backend == "parakeet" || backend == "reazonspeech" || backend == "index-echo")
         return false; // self-chunk in transcribe_single
     if (sr <= 0 || chunk_seconds <= 0)
         return false;

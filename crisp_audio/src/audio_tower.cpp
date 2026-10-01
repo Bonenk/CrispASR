@@ -496,12 +496,24 @@ ggml_cgraph* build_graph_qwen_omni(crisp_audio_context& ctx, int T_chunk, int nu
     ggml_tensor* cur = ggml_conv_2d(g, w.conv1_w, mel, 2, 2, 1, 1, 1, 1);
     cur = ggml_add(g, cur, bias_4d(w.conv1_b));
     cur = ggml_gelu_erf(g, cur);
+    if (getenv("CRISP_AUDIO_DUMP_STAGES")) {
+        ggml_set_name(cur, "conv1_out");
+        ggml_set_output(cur);
+    }
     cur = ggml_conv_2d(g, w.conv2_w, cur, 2, 2, 1, 1, 1, 1);
     cur = ggml_add(g, cur, bias_4d(w.conv2_b));
     cur = ggml_gelu_erf(g, cur);
+    if (getenv("CRISP_AUDIO_DUMP_STAGES")) {
+        ggml_set_name(cur, "conv2_out");
+        ggml_set_output(cur);
+    }
     cur = ggml_conv_2d(g, w.conv3_w, cur, 2, 2, 1, 1, 1, 1);
     cur = ggml_add(g, cur, bias_4d(w.conv3_b));
     cur = ggml_gelu_erf(g, cur);
+    if (getenv("CRISP_AUDIO_DUMP_STAGES")) {
+        ggml_set_name(cur, "conv3_out");
+        ggml_set_output(cur);
+    }
 
     const int T_out = (int)cur->ne[0];
     const int F_out = (int)cur->ne[1];
@@ -527,6 +539,10 @@ ggml_cgraph* build_graph_qwen_omni(crisp_audio_context& ctx, int T_chunk, int nu
         cur = ggml_get_rows(g, cur, valid_idx); // (d, N_seq)
     }
 
+    if (getenv("CRISP_AUDIO_DUMP_STAGES")) {
+        ggml_set_name(cur, "encoder_input");
+        ggml_set_output(cur);
+    }
     const float attn_scale = 1.0f / std::sqrt((float)head_dim);
     for (uint32_t il = 0; il < hp.n_layers; il++) {
         const auto& b = w.blocks[il];
@@ -912,7 +928,8 @@ float* crisp_audio_encode(struct crisp_audio_context* ctx, const float* mel_feat
     // Diff-harness stage dump: write every captured intermediate as raw F32
     // ("<dir>/<name>.f32") for tools/diff comparison. CPU-only diagnostic.
     if (const char* dump_dir = getenv("CRISP_AUDIO_DUMP_STAGES")) {
-        std::vector<std::string> names = {"ln_post_out", "proj1_out"};
+        std::vector<std::string> names = {"conv1_out", "conv2_out", "conv3_out", "encoder_input",
+                                          "ln_post_out", "proj1_out", "encoder_out"};
         for (uint32_t il = 0; il < hp.n_layers; il++) {
             char nm[32];
             snprintf(nm, sizeof(nm), "enc_blk%02u_out", il);

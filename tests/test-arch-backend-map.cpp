@@ -48,6 +48,7 @@ static const std::vector<std::pair<std::string, std::string>>& converter_archs()
         {"gigaam", "gigaam"},
         {"canary", "canary"},
         {"canary_qwen", "canary-qwen"},
+        {"index_echo", "index-echo"},
         {"canary-ctc", "fastconformer-ctc"},
         {"cohere-transcribe", "cohere"},
         {"qwen3asr", "qwen3"},
