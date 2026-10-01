@@ -285,7 +285,10 @@ off by default; quantized matmuls can pay extra dequantization costs. The explic
 public thread count is now applied to both CPU backend instances and to the
 optional encoder BLAS backend. The earlier four-thread receipt already matched
 ggml's default of four; this wiring fix makes other requested counts effective.
-Encoder caching remains off.
+Encoder caching remains off. The ggml BLAS backend sets its BLAS thread count
+to the public thread count; with OpenBLAS that setting is process-wide and also
+affects the decoder. The profiling receipt queries the actual thread count after
+inference as well as recording the startup environment.
 
 The CPU A/B workflow validates **31** frontend/encoder/transducer rows against
 an independent Transformers F32 dump: the original 28 rows plus all encoder

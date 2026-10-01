@@ -2,6 +2,12 @@ name: Phonon-2 CPU optimization A/B
 
 on:
   workflow_dispatch:
+    inputs:
+      sweep:
+        type: choice
+        options: [default, full]
+        default: default
+        description: Compare the selected default or all experimental paths
   push:
     branches: [perf/phonon2-cpu]
 
@@ -17,6 +23,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
+      CPU_AB_SWEEP: ${{ inputs.sweep || 'default' }}
       OMP_NUM_THREADS: '4'
       OPENBLAS_NUM_THREADS: '1'
       MKL_NUM_THREADS: '4'
@@ -117,20 +124,32 @@ jobs:
       - name: Parity gates then warmed CPU A/B
         shell: bash
         run: |
-          for config in scalar blas1 blas4 ggml encoder-blas combined; do
+          for config in scalar default blas1 blas4 ggml ggml-proj encoder-blas combined encoder-blas1 default-encoder-blas1; do
             export CRISPASR_PARAKEET_CPU_BLAS=0 CRISPASR_PARAKEET_GGML_DECODE=0 CRISPASR_PARAKEET_ENCODER_BLAS=0
-            export OPENBLAS_NUM_THREADS=1
+            export OPENBLAS_NUM_THREADS=1 CRISPASR_RNNT_GPU_ENC_PROJ=0 CRISPASR_PARAKEET_ENCODER_BLAS_THREADS=4
             case "$config" in
+              default) unset CRISPASR_PARAKEET_GGML_DECODE CRISPASR_RNNT_GPU_ENC_PROJ ;;
               blas1) export CRISPASR_PARAKEET_CPU_BLAS=1 ;;
               blas4) export CRISPASR_PARAKEET_CPU_BLAS=1 OPENBLAS_NUM_THREADS=4 ;;
               ggml) export CRISPASR_PARAKEET_GGML_DECODE=1 ;;
+              ggml-proj) export CRISPASR_PARAKEET_GGML_DECODE=1 CRISPASR_RNNT_GPU_ENC_PROJ=1 ;;
+              encoder-blas1) export CRISPASR_PARAKEET_ENCODER_BLAS=1 CRISPASR_PARAKEET_ENCODER_BLAS_THREADS=1 ;;
+              default-encoder-blas1)
+                unset CRISPASR_PARAKEET_GGML_DECODE CRISPASR_RNNT_GPU_ENC_PROJ
+                export CRISPASR_PARAKEET_ENCODER_BLAS=1 CRISPASR_PARAKEET_ENCODER_BLAS_THREADS=1 ;;
+
               encoder-blas) export CRISPASR_PARAKEET_ENCODER_BLAS=1 ;;
-              combined) export CRISPASR_PARAKEET_CPU_BLAS=1 CRISPASR_PARAKEET_ENCODER_BLAS=1 ;;
+              combined) export CRISPASR_PARAKEET_CPU_BLAS=1 CRISPASR_PARAKEET_ENCODER_BLAS=1 OPENBLAS_NUM_THREADS=4 ;;
             esac
             build/bin/crispasr-diff phonon2 models-live/phonon2-f16.gguf results/full-ref.gguf samples/jfk.wav \
               > "results/parity-$config.txt" 2>&1
             python tools/check_phonon2_parity.py --reference results/full-ref.gguf \
               --log "results/parity-$config.txt" --output "results/parity-$config.json"
+            # Always collect numerical parity; restrict the default sweep's
+            # timings to the baseline, selected default and one BLAS-thread probe.
+            if [[ "$CPU_AB_SWEEP" != full && "$config" != scalar && "$config" != default && "$config" != default-encoder-blas1 ]]; then
+              continue
+            fi
             for quant in f16 q8_0 q4_k; do
               python tools/profile_phonon2.py --engine runtime --lib "$PHONON2_LIB" \
                 --model "models-live/phonon2-$quant.gguf" --output "results/runtime-$config-$quant.json" \
@@ -167,6 +186,9 @@ jobs:
           git rev-parse HEAD > results/commit.txt
           git diff > results/generated-diff.patch
           cp docs/feature-matrix.md docs/feature-matrix.html src/core/backend_caps_table.h results/
+      - name: Summarize timings and transcript agreement
+        shell: bash
+        run: python tools/summarize_phonon2_cpu_ab.py results --output results/summary.json
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -219,7 +219,8 @@ struct parakeet_model {
     // CTC head (hybrid TDT+CTC models). nullptr when not present.
     ggml_tensor* ctc_w = nullptr; // Conv1d(d_model, ctc_vocab, 1) → (ctc_vocab, d_model, 1)
     ggml_tensor* ctc_b = nullptr; // (ctc_vocab,)
-    bool english_only = false;    // model identity, independent of its filename
+    bool phonon2 = false;
+    bool english_only = false; // model identity, independent of its filename
     bool has_ctc = false;
     uint32_t ctc_vocab_size = 0;
 
@@ -252,6 +253,7 @@ struct parakeet_context {
     ggml_backend_t backend = nullptr;
     ggml_backend_t backend_cpu = nullptr;
     ggml_backend_t backend_blas = nullptr;
+    int blas_threads = 0;
     ggml_backend_sched_t sched = nullptr;
 
     std::vector<uint8_t> compute_meta; // metadata buffer for graph allocation
@@ -330,10 +332,10 @@ static bool parakeet_load_model(parakeet_model& model, parakeet_vocab& vocab, co
             return false;
 
         auto& hp = model.hparams;
-        model.english_only =
-            core_gguf::kv_str(gctx, "parakeet.language", "") == "en" ||
+        model.phonon2 =
             core_gguf::kv_str(gctx, "general.name", "") == "Phonon-2" ||
             core_gguf::kv_str(gctx, "general.source.huggingface.repository", "") == "FermionResearch/Phonon-2";
+        model.english_only = model.phonon2 || core_gguf::kv_str(gctx, "parakeet.language", "") == "en";
         hp.sample_rate = core_gguf::kv_u32(gctx, "parakeet.sample_rate", hp.sample_rate);
         hp.n_mels = core_gguf::kv_u32(gctx, "parakeet.n_mels", hp.n_mels);
         hp.n_fft = core_gguf::kv_u32(gctx, "parakeet.n_fft", hp.n_fft);
@@ -1270,6 +1272,37 @@ static void joint_proj_enc(const parakeet_joint_weights& J, const float* enc_t, 
     }
 }
 
+static void joint_project_encoder_cpu(const parakeet_joint_weights& J, const float* enc, int T_enc,
+                                      std::vector<float>& all_proj_e) {
+    all_proj_e.resize((size_t)T_enc * J.joint_hidden);
+    for (int t = 0; t < T_enc; t++) {
+        float* dst = all_proj_e.data() + (size_t)t * J.joint_hidden;
+        std::copy(J.enc_b.begin(), J.enc_b.end(), dst);
+    }
+#if defined(HAVE_PARAKEET_BLAS)
+    if (parakeet_use_blas()) {
+        // Batched sgemm: all_proj_e[T_enc, Jh] += enc[T_enc, d] @ enc_w^T[d, Jh]
+        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, T_enc, J.joint_hidden, J.d_model, 1.0f, enc, J.d_model,
+                    J.enc_w.data(), J.d_model, 1.0f, all_proj_e.data(), J.joint_hidden);
+    } else
+#endif
+    {
+        // Per-frame fallback (still better than computing inside the loop
+        // where cache misses on enc[] are random due to dur_skip advances)
+        for (int t = 0; t < T_enc; t++) {
+            float* dst = all_proj_e.data() + (size_t)t * J.joint_hidden;
+            const float* enc_t = enc + (size_t)t * J.d_model;
+            for (int i = 0; i < J.joint_hidden; i++) {
+                float s = dst[i]; // already has enc_b[i]
+                const float* row = J.enc_w.data() + (size_t)i * J.d_model;
+                for (int k = 0; k < J.d_model; k++)
+                    s += row[k] * enc_t[k];
+                dst[i] = s;
+            }
+        }
+    }
+}
+
 static void joint_step(const parakeet_joint_weights& J,
                        const float* proj_enc, // [joint_hidden]
                        const float* pred_u,   // [pred_hidden]
@@ -1448,8 +1481,22 @@ struct parakeet_emitted_token {
 // can ask the question WITHOUT building the decoder — the long-form pipeline
 // needs it to decide whether encode and decode may overlap on two threads
 // (they may not when both drive ctx->backend). Keep the two in lockstep.
+// The Phonon-2 CPU sweep and 21-clip corpus cover the native x86 kernels.
+// Leave other models/ISAs and Apple Accelerate on their existing defaults.
+static bool parakeet_native_cpu_decode_default(const parakeet_context* ctx) {
+    if (crispasr_env::get("CRISPASR_PARAKEET_FORCE_SCALAR"))
+        return false;
+#if defined(HAVE_ACCELERATE)
+    (void)ctx;
+    return false;
+#else
+    return ctx->model.phonon2 && core_cpu_backend::is_cpu(ctx->backend) && core_cpu_backend::has_feature("AVX2") &&
+           core_cpu_backend::has_feature("F16C");
+#endif
+}
+
 static bool parakeet_ggml_decode_active(const parakeet_context* ctx) {
-    bool ggml_dec = !core_cpu_backend::is_cpu(ctx->backend);
+    bool ggml_dec = !core_cpu_backend::is_cpu(ctx->backend) || parakeet_native_cpu_decode_default(ctx);
     // ggml decode wins on CUDA/Vulkan (slow CPU BLAS: P100 5-12x) but LOSES on
     // Metal, where Apple Accelerate cblas beats the small-matmul GPU decode (M1
     // parakeet total ~16x cblas vs ~11x ggml). Default OFF on Metal (LEARNINGS 34).
@@ -1472,6 +1519,8 @@ static bool parakeet_ggml_decode_active(const parakeet_context* ctx) {
 static bool parakeet_gpu_encoder_projection(const parakeet_context* ctx) {
     if (const char* e = crispasr_env::get("CRISPASR_RNNT_GPU_ENC_PROJ"))
         return *e == '1';
+    if (parakeet_native_cpu_decode_default(ctx) && parakeet_ggml_decode_active(ctx))
+        return true;
 #if defined(GGML_USE_CUDA)
     // ggml_backend_is_cuda() is a CUDA-MODULE symbol: linking it into
     // libcrispasr.so fails with "undefined reference" in the release CUDA
@@ -1597,33 +1646,7 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode(parakeet_context*
         core_rnnt_ggml::decoder_project_encoder(gdec, ctx->model.joint.enc_w, ctx->model.joint.enc_b, enc, T_enc,
                                                 d_model, all_proj_e);
     if (!gpu_enc_proj) {
-        all_proj_e.resize((size_t)T_enc * J.joint_hidden);
-        for (int t = 0; t < T_enc; t++) {
-            float* dst = all_proj_e.data() + (size_t)t * J.joint_hidden;
-            std::copy(J.enc_b.begin(), J.enc_b.end(), dst);
-        }
-#if defined(HAVE_PARAKEET_BLAS)
-        if (parakeet_use_blas()) {
-            // Batched sgemm: all_proj_e[T_enc, Jh] += enc[T_enc, d] @ enc_w^T[d, Jh]
-            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, T_enc, J.joint_hidden, J.d_model, 1.0f, enc, J.d_model,
-                        J.enc_w.data(), J.d_model, 1.0f, all_proj_e.data(), J.joint_hidden);
-        } else
-#endif
-        {
-            // Per-frame fallback (still better than computing inside the loop
-            // where cache misses on enc[] are random due to dur_skip advances)
-            for (int t = 0; t < T_enc; t++) {
-                float* dst = all_proj_e.data() + (size_t)t * J.joint_hidden;
-                const float* enc_t = enc + (size_t)t * J.d_model;
-                for (int i = 0; i < J.joint_hidden; i++) {
-                    float s = dst[i]; // already has enc_b[i]
-                    const float* row = J.enc_w.data() + (size_t)i * J.d_model;
-                    for (int k = 0; k < J.d_model; k++)
-                        s += row[k] * enc_t[k];
-                    dst[i] = s;
-                }
-            }
-        }
+        joint_project_encoder_cpu(J, enc, T_enc, all_proj_e);
     }
     const auto _proj_t1 = std::chrono::steady_clock::now();
 
@@ -1852,29 +1875,8 @@ static std::vector<parakeet_emitted_token> parakeet_tdt_decode_batched(parakeet_
     std::vector<float> pred_out;
     predictor_step(W, blank_id, state, pred_out);
 
-    // Pre-compute ALL encoder projections
-    std::vector<float> all_proj_e((size_t)T_enc * Jh);
-    for (int f = 0; f < T_enc; f++)
-        std::copy(J.enc_b.begin(), J.enc_b.end(), all_proj_e.data() + (size_t)f * Jh);
-#if defined(HAVE_PARAKEET_BLAS)
-    if (parakeet_use_blas()) {
-        cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, T_enc, Jh, J.d_model, 1.0f, enc, J.d_model, J.enc_w.data(),
-                    J.d_model, 1.0f, all_proj_e.data(), Jh);
-    } else
-#endif
-    {
-        for (int f = 0; f < T_enc; f++) {
-            float* dst = all_proj_e.data() + (size_t)f * Jh;
-            const float* enc_f = enc + (size_t)f * d_model;
-            for (int i = 0; i < Jh; i++) {
-                const float* row = J.enc_w.data() + (size_t)i * J.d_model;
-                float s = dst[i];
-                for (int k = 0; k < J.d_model; k++)
-                    s += row[k] * enc_f[k];
-                dst[i] = s;
-            }
-        }
-    }
+    std::vector<float> all_proj_e;
+    joint_project_encoder_cpu(J, enc, T_enc, all_proj_e);
 
     std::vector<float> pred_proj(Jh);
     std::vector<float> mid_batch;
@@ -3039,8 +3041,11 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
                 auto reg = ggml_backend_dev_backend_reg(ggml_backend_get_device(ctx->backend_blas));
                 auto set_threads = reinterpret_cast<ggml_backend_set_n_threads_t>(
                     ggml_backend_reg_get_proc_address(reg, "ggml_backend_set_n_threads"));
+                ctx->blas_threads = ctx->n_threads;
+                if (const char* threads = crispasr_env::get("CRISPASR_PARAKEET_ENCODER_BLAS_THREADS"))
+                    ctx->blas_threads = std::clamp(atoi(threads), 1, ctx->n_threads);
                 if (set_threads)
-                    set_threads(ctx->backend_blas, ctx->n_threads);
+                    set_threads(ctx->backend_blas, ctx->blas_threads);
             }
         }
     }
@@ -3054,8 +3059,9 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
     parakeet_fold_batchnorm(ctx->model, ctx->backend);
 
     if (parakeet_bench_enabled())
-        fprintf(stderr, "parakeet_bench: backend=%s threads=%d encoder_blas=%s\n", ggml_backend_name(ctx->backend),
-                ctx->n_threads, ctx->backend_blas ? ggml_backend_name(ctx->backend_blas) : "off");
+        fprintf(stderr, "parakeet_bench: backend=%s threads=%d encoder_blas=%s blas_threads=%d\n",
+                ggml_backend_name(ctx->backend), ctx->n_threads,
+                ctx->backend_blas ? ggml_backend_name(ctx->backend_blas) : "off", ctx->blas_threads);
 
     // Repack F16 conv pw1/pw2 to Q8_0 (issue #81 — the 3D conv layout dodges
     // crispasr-quantize, and the CPU F16 mul_mat path is ~6x slower than Q8_0).
@@ -3474,11 +3480,15 @@ extern "C" float* parakeet_joint_project_encoder(struct parakeet_context* ctx, c
     if (!out)
         return nullptr;
 
-    for (int t = 0; t < T_enc; t++) {
-        std::vector<float> proj(JH);
-        joint_proj_enc(J, enc_frames + (size_t)t * d_model, proj);
-        memcpy(out + (size_t)t * JH, proj.data(), JH * sizeof(float));
-    }
+    std::vector<float> projected;
+    core_rnnt_ggml::Decoder gdec;
+    const bool backend_proj =
+        parakeet_init_ggml_decoder(ctx, gdec) && parakeet_gpu_encoder_projection(ctx) &&
+        core_rnnt_ggml::decoder_project_encoder(gdec, ctx->model.joint.enc_w, ctx->model.joint.enc_b, enc_frames, T_enc,
+                                                d_model, projected);
+    if (!backend_proj)
+        joint_project_encoder_cpu(J, enc_frames, T_enc, projected);
+    memcpy(out, projected.data(), projected.size() * sizeof(float));
     if (out_joint_hidden)
         *out_joint_hidden = JH;
     return out;

@@ -5301,15 +5301,19 @@ int main(int argc, char** argv) {
                 const int d_model = (int)ref_enc_shp[0];
                 const int T_enc = (int)ref_enc_shp[1];
 
+                // Share the full-batch projection with the joint probe: this
+                // exercises the same GEMM shape as production greedy decoding.
+                int jh = 0;
+                std::unique_ptr<float, decltype(&std::free)> projected(
+                    parakeet_joint_project_encoder(ctx, ref_enc_pair.first, T_enc, d_model, &jh), &std::free);
+
                 // 1. Encoder projection: joint.project_encoder(enc)
                 if (ref.has("encoder_output_projected")) {
-                    int jh = 0;
-                    float* proj = parakeet_joint_project_encoder(ctx, ref_enc_pair.first, T_enc, d_model, &jh);
+                    float* proj = projected.get();
                     if (proj) {
                         auto rep = ref.compare("encoder_output_projected", proj, (size_t)T_enc * jh);
                         print_row("encoder_output_projected", rep, COS_THRESHOLD);
                         record(rep);
-                        free(proj);
                     } else {
                         printf("[ERR ] encoder_output_projected  project_encoder failed\n");
                         n_fail++;
@@ -5345,8 +5349,7 @@ int main(int argc, char** argv) {
 
                         // 3. Joint output at frame 0
                         if (ref.has(joint_stage)) {
-                            int jh = 0;
-                            float* proj_enc = parakeet_joint_project_encoder(ctx, ref_enc_pair.first, 1, d_model, &jh);
+                            float* proj_enc = projected.get();
                             if (proj_enc) {
                                 int vt = 0;
                                 float* logits = parakeet_joint_step(ctx, proj_enc, pred, &vt);
@@ -5356,16 +5359,15 @@ int main(int argc, char** argv) {
                                     record(rep);
                                     free(logits);
                                 } else {
-                                    printf("[ERR ] joint_t0              joint_step failed\n");
+                                    printf("[ERR ] %-22s joint_step failed\n", joint_stage);
                                     n_fail++;
                                 }
-                                free(proj_enc);
                             }
                         }
 
                         free(pred);
                     } else {
-                        printf("[ERR ] decoder_initial       predictor_initial failed\n");
+                        printf("[ERR ] %-22s predictor_start failed\n", pred_stage);
                         n_fail++;
                     }
                 }

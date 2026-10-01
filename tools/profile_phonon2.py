@@ -72,7 +72,8 @@ def main():
               "trace_only": args.trace, "clips": [],
               "controls": {key: os.environ.get(key) for key in (
                   "CRISPASR_PARAKEET_CPU_BLAS", "CRISPASR_PARAKEET_GGML_DECODE",
-                  "CRISPASR_PARAKEET_ENCODER_BLAS", "CRISPASR_PARAKEET_FORCE_SCALAR",
+                  "CRISPASR_PARAKEET_ENCODER_BLAS", "CRISPASR_PARAKEET_ENCODER_BLAS_THREADS",
+                  "CRISPASR_RNNT_GPU_ENC_PROJ", "CRISPASR_PARAKEET_FORCE_SCALAR",
                   "OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS")}}
     try:
         for count in ([1] if args.trace else [1, 5]):
@@ -98,6 +99,17 @@ def main():
     finally:
         if session:
             session.close()
+    if args.engine == "runtime" and args.lib:
+        # Query the linked BLAS, rather than assuming its thread count still
+        # equals the startup environment (the ggml BLAS backend can change it).
+        import ctypes
+        try:
+            getter = ctypes.CDLL(args.lib).openblas_get_num_threads
+            getter.argtypes = []
+            getter.restype = ctypes.c_int
+            report["openblas_threads_after_inference"] = getter()
+        except (AttributeError, OSError):
+            pass
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     report["peak_rss_mb"] = peak / (1024 * 1024 if sys.platform == "darwin" else 1024)
     args.output.parent.mkdir(parents=True, exist_ok=True)

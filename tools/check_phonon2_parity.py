@@ -25,7 +25,7 @@ def main():
         ref_rms = float(np.sqrt(np.mean(arr * arr)))
         bound = float(rms) / ref_rms
         row = dict(stage=name, cos_min=float(cosine), relative_rms_error=bound,
-                   norm_ratio_error_bound=bound)
+                   norm_ratio_error_bound=bound * 1.01)
         assert status == "PASS" and float(cosine) >= 0.999 and bound < 0.01, row
         rows.append(row)
     expected = {"mel_spectrogram", "pre_encode_output", "encoder_output", "encoder_output_ref_mel",
