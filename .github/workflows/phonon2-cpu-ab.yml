@@ -2,6 +2,8 @@ name: Phonon-2 CPU optimization A/B
 
 on:
   workflow_dispatch:
+  push:
+    branches: [perf/phonon2-cpu]
 
 permissions:
   contents: read
