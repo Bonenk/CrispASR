@@ -38,6 +38,7 @@ resources('start')
 run(['sysctl', 'machdep.cpu.brand_string', 'machdep.cpu.features', 'machdep.cpu.leaf7_features'], 'hardware')
 if not shutil.which('ninja') or not shutil.which('ccache'):
     run(['brew', 'install', 'ninja', 'ccache'], 'tools')
+run(['bash', 'scripts/fetch-c2pa.sh'], 'fetch-c2pa')
 include = SCR / 'probe.cmake'
 include.write_text(f'''add_executable(macos-parakeet-probe "{REPO}/tools/ci-heavy/macos_intel_parakeet_probe.cpp")
 target_link_libraries(macos-parakeet-probe PRIVATE parakeet)

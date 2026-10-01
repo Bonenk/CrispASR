@@ -1118,6 +1118,13 @@ jobs:
       - name: Install build tools
         run: brew install ninja ccache
 
+      # CMake's optional fetch can disable signing on a transient HTTP error.
+      # Release archives require this sidecar: retry and fail before compiling.
+      - name: Fetch required C2PA sidecar
+        run: |
+          bash scripts/fetch-c2pa.sh
+          test -f third_party/c2pa/lib/libc2pa_c.dylib
+
       - name: Build (x86_64, ${{ matrix.isa }})
         run: |
           bash scripts/configure-macos-intel.sh build "${{ matrix.isa }}" -DCRISPASR_C2PA_FETCH=ON

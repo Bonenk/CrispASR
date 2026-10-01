@@ -36,7 +36,8 @@ fi
 echo "fetch-c2pa: downloading $ASSET"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-curl -fsSL -o "$TMP/c2pa.zip" "$URL"
+curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 \
+    --connect-timeout 30 --max-time 120 -o "$TMP/c2pa.zip" "$URL"
 mkdir -p "$DEST"
 ( cd "$DEST" && unzip -oq "$TMP/c2pa.zip" )
 
