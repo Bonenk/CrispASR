@@ -4,6 +4,29 @@ Test audio: jfk.wav (11.0s), Q4_K quantization, greedy decode (`-bs 1`).
 
 ---
 
+## Phonon-2 — gated FFN experiments (2026-10-01, #481)
+
+Q4_K FFN CPU_REPACK reduces warmed 11/55 s inference from 1.850/10.189 s to
+1.508/8.401 s (18.5%/17.6% less time) on a four-vCPU EPYC 7763, four threads.
+RSS stays about 1,318 MiB; load increases from 0.077 to 0.508 s. All words on
+21 local clips match baseline, but two punctuation changes and a failed Q4
+stage magnitude gate keep it opt-in. Q8_0 has no x86 repack kernel at our pin.
+
+On a separate EPYC 9V74, cached FFN BLAS at four threads reduces long F16 from
+20.733 to 11.918 s (42.5%), but slows short F16 from 3.966 to 6.157 s and
+regresses both Q8/Q4 shapes. Its 96 F32 matrices add 1,536 MiB of weight storage;
+F16 peak RSS rises from 2,247 to 3,823 MiB and load from 0.178 to 3.880 s.
+One/two-thread alternatives also regress quantized inference. Compare paths
+within each host; these are three-call medians excluding load and profiling,
+and 55 s repeats JFK five times. Defaults and model download sizes are unchanged.
+
+The strict 31-stage F16 gate passes all corrected BLAS configurations. Local
+BLAS1 preserves 61/63 old transcripts, with both differences closer to Python;
+human word errors remain unchanged. Q4 numerical drift is retained explicitly.
+See [full tables, quality scope and controls](docs/phonon2.md#gated-ffn-cpu-experiments-2026-10-01)
+and [raw receipts](docs/phonon2-ffn-cpu-2026-10-01.json). Corrected profile,
+13-job cross-platform CI, lint and cross-ISA probes pass. Both paths remain off.
+
 ## Phonon-2 — CPU optimization (2026-10-01, #481)
 
 Native AVX2/F16C Phonon-2 CPU builds use persistent ggml predictor/joint graphs

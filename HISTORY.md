@@ -6,6 +6,27 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-01 — Phonon-2 gated FFN CPU experiments (#481)
+
+Added FFN-only CPU_REPACK and persistent F32 BLAS weight caching behind
+`CRISPASR_PARAKEET_FFN`. The scheduler keeps CPU last, explicitly pins scoped
+BLAS matmuls, and retains short-batch CPU fallback. Added actual-placement
+tracing, exact-shape kernel probes, full-vector diagnostics, 1/2/4-thread
+manual CI, strict stage checks and receipts against independent Python F32.
+
+Q4 repacking cuts warm 11/55 s time by 18.5%/17.6% at similar RSS, with 0.43 s
+extra load. Cached BLAS cuts long F16 by 42.5%, but adds 1,536 MiB of weight
+storage and regresses short F16 and Q8/Q4. Both stay off: Q4 repacking changes
+punctuation and fails same-quant stage magnitude parity. BLAS1 preserves 61/63
+old corpus outputs; both changes move toward Python, with human word errors
+unchanged. No default, download artifact or global thread setting changes.
+
+Corrected profile run 36834441110, cross-platform CI 36834689343 (all 13 jobs),
+lint 36834688811 and cross-ISA probes 36834375261 pass. The failed first run's
+BLAS arm is excluded; completed CPU/repack arms are retained. Full results and
+limitations are in `docs/phonon2.md`, `PERFORMANCE.md` and the checked-in
+`docs/phonon2-ffn-cpu-2026-10-01.json` receipt.
+
 ## DONE 2026-10-01 — AudioSeal long-audio graph capacity (#482)
 
 AudioSeal embed/detect size graph metadata by latent-frame count instead of

@@ -308,7 +308,7 @@ does not imply bitwise equality. Magnitude bounds use relative RMS error with a
 Separate warmed Q8 traces report decoder 33.4 ms with backend projection,
 versus 684.8 ms for the original scalar decoder; backend projection is 1.6 ms. These diagnostic
 times are not benchmark medians. Encoder compute remains the main bottleneck;
-FFN kernel work is still the next target, while encoder caching stays off.
+The gated FFN experiments below target this bottleneck; encoder caching stays off.
 Single-thread encoder BLAS regresses short Q8 to 2.940 s and long Q8 to 12.456 s
 relative to the selected default. Its F16 long-clip improvement does not justify
 a general default; retain the gated experiment and its corpus output changes.
@@ -320,6 +320,91 @@ generator checks and the local auto/explicit/renamed/repeated/flash-off live gua
 also pass. The [complete receipt](phonon2-cpu-2026-10-01.json) retains raw repeated
 times, all stages, exact transcripts, corpus comparisons, host details and model
 checksums for both CPU sweeps.
+
+## Gated FFN CPU experiments (2026-10-01)
+
+Two alternatives are implemented, measured and **off by default**. Q8 remains
+recommended. GGUF downloads are unchanged; the BLAS cache consumes runtime RAM.
+Both experiments use the existing ggml graph and scheduler, with no new kernel
+fork. Trace receipts verify actual FFN buffer types and backend placement.
+
+The first sweep used an EPYC 7763 four-vCPU runner and four inference threads:
+
+| Q4_K path | Warm 11 s | Warm 55 s | Peak RSS | Cold model load |
+|---|---:|---:|---:|---:|
+| Ordinary ggml | 1.850 s | 10.189 s | 1,316 MiB | 0.077 s |
+| FFN CPU_REPACK | 1.508 s | 8.401 s | 1,318 MiB | 0.508 s |
+
+Repacking reduces warmed inference time by **18.5% / 17.6%**, with approximately
+the same RAM and an extra 0.43 s at load. At the pinned ggml revision, x86 Q8_0
+has no CPU_REPACK kernel and F16 declines repacking; both fall back. Q8 at two
+threads improves only about 5% / 3% over four, while F16/Q4 regress, so this does
+not justify changing the global thread default. The
+[first run](https://github.com/CrispStrobe/CrispASR/actions/runs/36830399630)
+failed later in its prototype BLAS arm: only its completed CPU/repack arms are
+used here. The scheduler correction keeps CPU last and explicitly pins all
+non-FFN nodes to CPU and supported cached FFN matmuls to BLAS.
+
+The corrected BLAS sweep used a different EPYC 9V74 four-vCPU runner. Compare
+within this table, not across the two hosts. Public inference and BLAS thread
+counts are both four:
+
+| Export/path | Warm 11 s | Warm 55 s | Peak RSS | Cold model load |
+|---|---:|---:|---:|---:|
+| F16 ordinary | 3.966 s | 20.733 s | 2,247 MiB | 0.178 s |
+| F16 cached FFN BLAS | 6.157 s | 11.918 s | 3,823 MiB | 3.880 s |
+| Q8_0 ordinary | 1.746 s | 9.685 s | 1,609 MiB | 0.109 s |
+| Q8_0 cached FFN BLAS | 5.964 s | 11.912 s | 3,190 MiB | 1.279 s |
+| Q4_K ordinary | 1.856 s | 10.232 s | 1,316 MiB | 0.071 s |
+| Q4_K cached FFN BLAS | 6.855 s | 12.081 s | 2,901 MiB | 1.224 s |
+| Independent Python F32 | 1.921 s | 9.650 s | 3,419 MiB | — |
+
+Cached BLAS cuts long F16 time by **42.5%**, but regresses short F16 and both
+Q8/Q4 shapes. It caches 96 F32 matrices (1,536 MiB of added weight storage).
+One- and two-thread BLAS alternatives also regress Q8/Q4. Fast isolated FFN
+GEMMs therefore do not establish a whole-model win; the regression's cause has
+not been isolated. These are three-call shape-warmed medians, excluding load
+and instrumentation. The 55 s shape repeats JFK five times.
+
+All three BLAS thread settings pass the strict 31-stage F16 reference gate:
+minimum cosine at least 0.999997, maximum global norm-error bound 0.0569%.
+The repack F16 gate exercises fallback, so it cannot validate Q4 repacking.
+Against the same Q4 baseline, local repacking's final encoder cosine is 0.995941,
+relative RMS error 3.54%, and maximum frame norm difference 1.90%; the strict
+same-quant stage gate fails. Ordinary Q4 repeats are bit-exact, while isolated
+repack GEMM differences are only about 4e-7 relative RMS. Those observations do
+not prove the cause of the larger model-level difference.
+
+For context, the 25 encoder stages captured with independent reference mel
+also compare directly with Python F32. The following are diagnostics, not a
+claim that quantized models meet the F16 acceptance thresholds:
+
+| Path | Minimum stage cosine | Maximum relative RMS error |
+|---|---:|---:|
+| Ordinary Q8_0 | 0.999211 | 1.672% |
+| Cached FFN BLAS Q8_0, one thread | 0.999962 | 0.422% |
+| Ordinary Q4_K | 0.987905 | 7.083% |
+| Cached FFN BLAS Q4_K, one thread | 0.993321 | 6.281% |
+
+The local C ABI corpus covers 21 clips per export. Cached BLAS at one thread
+preserves 61/63 original transcripts; both changes move toward Python F32.
+Reference-exact counts for F16/Q8/Q4 become 21/20/16, versus 21/19/15. Human
+word errors on the 19 labelled clips remain 13/272 for every export/path;
+this is not a measured human accuracy improvement. Q4 repacking preserves all
+words on 21 clips, with two punctuation changes and 19/21 exact transcripts.
+Its CI JFK punctuation also changes. BLAS at two/four threads preserves both
+JFK shape transcripts but has not received the full local corpus sweep.
+Short encoder batches below the BLAS minimum correctly use cached F32 on CPU.
+These checks do not establish all autoregressive states or word-timing parity.
+
+[Corrected profiling CI](https://github.com/CrispStrobe/CrispASR/actions/runs/36834441110),
+[all 13 cross-platform jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/36834689343),
+[lint](https://github.com/CrispStrobe/CrispASR/actions/runs/36834688811) and
+[cross-ISA kernel probes](https://github.com/CrispStrobe/CrispASR/actions/runs/36834375261)
+pass. The [complete receipt](phonon2-ffn-cpu-2026-10-01.json) retains host/model
+identities, raw timings, stage rows, corpus text and labelled word comparisons,
+including rejected numerical experiments. These are CPU measurements; no GPU
+or Apple performance improvement is claimed.
 
 ## CPU optimization controls
 

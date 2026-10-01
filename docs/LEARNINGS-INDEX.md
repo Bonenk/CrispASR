@@ -17,7 +17,7 @@ per-backend porting detail (Per-model port notes + the family cross-reference).
 Reach for the topic groups when you are stuck on a *technique*, and the
 cross-reference when you already know which model you are touching.
 
-## Index by topic (311 lessons)
+## Index by topic (312 lessons)
 
 **Security & untrusted input** (2)
 
@@ -139,7 +139,7 @@ cross-reference when you already know which model you are touching.
 - L18549 — Chatterbox Multilingual V3: checkpoint names, quant hashes, and a non-silent clone are not parity
 - L18898 — Device-side argmax can cost more than the readback it removes, and an unused graph output still runs
 
-**ggml graphs, allocation & caching** (45)
+**ggml graphs, allocation & caching** (46)
 
 - L30 — A float `--tensor-type` override must not reach 1-D tensors (2026-09-29, #461)
 - L1207 — Reusing a cached scheduler graph across `sched_reset`/`alloc` cycles is CPU-safe but SIGSEGVs on GPU — the reused input tensor is bound to the prior cycle's freed buffer
@@ -186,6 +186,7 @@ cross-reference when you already know which model you are touching.
 - L14605 — A "GPU" model can be silently running on CPU — audit for hot graphs pinned to backend_cpu and CLI adapters that never forward use_gpu
 - L18093 — PR #244 dequant-cache fix MERGED
 - L18658 — A binary-broadcast op with a non-F32 weight is a latent abort on EVERY ggml backend — and a graph port extended layer-by-layer silently outgrows its old verification
+- L19235 — 2026-10-01 — Phonon-2 FFN: verify scheduler placement, magnitude and whole-model cost
 
 **GPU portability — Metal / CUDA / Vulkan** (25)
 

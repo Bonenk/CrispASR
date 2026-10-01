@@ -11,49 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-01 — Phonon-2 encoder FFN CPU optimization
-
-Worktree `/mnt/volume1/wt-phonon2-ffn`, branch `perf/phonon2-ffn`.
-Baseline `dcdd82c80`: verified ggml CPU decoder/projection. Audit actual CPU
-weight buffer types and FFN kernel selection, then isolated matrix-shape and
-1/2/4-thread A/B on clean CI. Reuse existing repack loader/probe where applicable.
-Keep alternatives gated; require numerical magnitude/cosine and F16/Q8/Q4 corpus
-checks before any default change. Encoder caching and encoder BLAS stay off.
-Models/logs/receipts: `/mnt/volume1/tmp-overflow/issue481/ffn-speed`.
-
-Checkpoint: gated candidate `bb791dbec` pushed; clean CPU FFN A/B run
-[36830399630](https://github.com/CrispStrobe/CrispASR/actions/runs/36830399630)
-measures exact FFN matrix shapes, 1/2/4 threads, stage parity, load/RSS and
-11/55-second warm inference. Q8_0 has no x86 CPU_REPACK kernel at our pin;
-Q4_K does. Cached F32 BLAS adds 1536 MiB of weights, so remains opt-in.
-Local build now passes. Q4 repacking is confirmed active for all 96 FFN
-weights. Same-Q4 stage gate fails: final-layer cosine 0.99594, relative RMS
-3.54%, maximum frame norm difference 1.90%. The 21-clip corpus preserves
-all words; 19/21 exact, two punctuation changes (one closer/farther to Python).
-Do not promote repacking based only on the F16 gate (F16 falls back unchanged).
-Per-matmul probes differ only ~4e-7 relative RMS; repeating the original
-Q4 graph is bit-exact. Quantized-layer amplification remains a concern.
-Scoped BLAS required a scheduler correction: CPU must be last. Candidate
-`aebc04da5` explicitly pins all non-FFN nodes to CPU and the 96 cached FFN
-matmuls to BLAS; local execution now proves the intended placement. Same-Q4
-BLAS diagnostics also drift (final cosine 0.98952 / RMS 3.67%); keep opt-in.
-Q4 BLAS corpus running; corrected clean CI
-[36834441110](https://github.com/CrispStrobe/CrispASR/actions/runs/36834441110)
-will measure scoped BLAS versus same-host defaults. The first full sweep
-`36830399630` uses the pre-fix scheduler and cannot validate its BLAS arm.
-Corrected candidate CI `36834689343` passes all 13 jobs; lint `36834688811`
-and the cross-ISA repack probe `36834375261` also pass. Prior main Deep Lint
-rerun `36821263388` passed (the original attempt lost its hosted runner).
-First-sweep verified CPU/repack results: Q4 four-thread warm 11/55 s improves
-1.850/10.189 -> 1.508/8.401 s, RSS stays ~1318 MiB, load ~0.08 -> 0.51 s.
-Its CI JFK punctuation changes too; keep off. Q8 two threads gives only ~5%/3%
-over four; F16/Q4 regress, so no global thread-default change.
-Scoped BLAS1 now completes all 63 local corpus cases: 61/63 old exact, both
-changes closer to Python; F16/Q8/Q4 reference-exact 21/20/16 versus 21/19/15.
-Human word errors on the 19 labelled clips stay 13/272 for every quant/path.
-Short encoder batches correctly use CPU F32 fallback (25 finite stages).
-Corrected scoped-BLAS CI timings remain pending. No default has changed.
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
