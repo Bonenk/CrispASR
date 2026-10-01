@@ -48,6 +48,19 @@ Producer branch commits `beb2d3880` / `8d8150c6d` pin the 2B source to
 Conversions/reference remain experimental. Runtime wiring and stage diff are
 in progress in the feature worktree; no parity or performance claim yet.
 
+Producer `36875796033` passed: complete F16/Q8_0/Q4_K tower/decoder cohorts
+and first independent CPU F32 JFK reference are uploaded privately. Earlier
+runs `36872979780` / `36874208011` exposed publishing-token permissions and
+missing mel constants; both are corrected, incomplete tower replaced.
+Expanded reference run `36877730840` adds Chinese, non-hop-aligned tail and
+16-token teacher-forced cache traces. Runtime branch `cdd95aea6` includes
+CLI, C ABI, shared architecture detection, bounded context windows, native
+Silero companion setup, stage/magnitude diff, bench plumbing and docs.
+Build run `36875393089` compiled shared lib/CLI/diff and passed windows +
+autochunk tests; independent architecture-roster test caught one missing
+entry, fixed. New build validation is running. Stage and decoded parity,
+quant acceptance, registry/default selection and GPU proof are still pending.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
