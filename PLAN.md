@@ -25,91 +25,55 @@ The released v0.8.40 assets are already verified; Index models remain separate.
 ## CLAIMED 2026-10-01 — #485 Index-Echo S2TT 2B
 
 Worktree `/mnt/volume1/wt-index-echo-2b`, branch `feat/index-echo-2b`.
-Follow the sibling development guide: read the pinned Python inference and
-Transformer blueprints; convert, quantize and upload each artifact; dump an
-independent reference; iterate stage magnitude/cosine and decoded subtitles;
-then complete every contributing integration surface and CI before landing.
-Reuse the existing Qwen3.5 decoder and configurable shared audio tower only
-where the reference proves equivalence. Heavy work runs on GitHub CI/Kaggle.
-Models, logs and receipts: `/mnt/storage/crispasr/issue485/`.
-No generic English ASR or quantized-quality claim until validated.
+Follow the sibling development guide and contributing checklist. Heavy conversion,
+reference, validation and profiling use GH CI/Kaggle; artifacts and receipts live
+under `/mnt/storage/crispasr/issue485/`. Source checkpoint pinned to
+`5d98a34d9685869b11e9c94d01dee22a8b8e53b5`; converter pinned to
+`42d958167a748f2c04b1f888e84e7a58f609ddcb`. Source code/weights Apache-2.0.
 
-Producer branch commits `beb2d3880` / `8d8150c6d` pin the 2B source to
-`5d98a34d9685869b11e9c94d01dee22a8b8e53b5` and llama converter to
-`42d958167a748f2c04b1f888e84e7a58f609ddcb`. GH producer run
-`36872010684` stopped before downloading: CI cannot create a model repo in
-`cstr`. Maintainer credential created a private staging destination; retry
-`36872979780` uses it without requiring repository-creation permission.
-Conversions/reference remain experimental. Runtime wiring and stage diff are
-in progress in the feature worktree; no parity or performance claim yet.
+Runtime implements the audio tower/connector, private Qwen3.5 hybrid decoder,
+MRoPE, persistent attention/recurrent caches, source prompts/target languages,
+context windows and native Silero pipeline through CLI and C ABI. Corrected
+conversion `36885332024` omits absent MTP weights and checks 24 decoder layers.
+Independent source references cover JFK, Chinese and partial-hop JFK plus
+16-token cache traces. IMPORTANT correction: earlier progress called these CPU
+F32 references. Actual dtype audit `36911946162` proves F32 tower/connector and
+BF16 decoder: Transformers honors nested text-config dtype despite the wrapper's
+F32 argument. These are references from the actual released mixed-precision
+blueprint, not a fully F32 decoder. Fixtures at
+`cstr/crispasr-regression-fixtures@0f4ac3b0c068c28a2f4f9cf00bd5c479a7d8f9c4`.
 
-Producer `36875796033` passed: complete F16/Q8_0/Q4_K tower/decoder cohorts
-and first independent CPU F32 JFK reference are uploaded privately. Earlier
-runs `36872979780` / `36874208011` exposed publishing-token permissions and
-missing mel constants; both are corrected, incomplete tower replaced.
-Expanded reference run `36877730840` adds Chinese, non-hop-aligned tail and
-16-token teacher-forced cache traces. Runtime branch `cdd95aea6` includes
-CLI, C ABI, shared architecture detection, bounded context windows, native
-Silero companion setup, stage/magnitude diff, bench plumbing and docs.
-Build run `36875393089` compiled shared lib/CLI/diff and passed windows +
-autochunk tests; independent architecture-roster test caught one missing
-entry, fixed. New build validation is running. Stage and decoded parity,
-quant acceptance, registry/default selection and GPU proof are still pending.
+Direct-window validation `36905507951` passes mandatory stage/magnitude,
+prompt/cache IDs, C ABI autodetection and exact complete decoded text/timestamps
+on all three clips for F16/Q8. Worst stage cosine / relative L2: F16 .998464 /
+1.415%; Q8 .995173 / 3.561%. Plain Q4 (.781530 / 23.349%) and selective Q4
+(only 2.8% smaller than Q8) fail quality and are rejected. No Q4 default.
 
-Build-only validation `36878337862` passed (shared CLI/C ABI, architecture
-roster and window/autochunk tests). Full live run `36878866331` failed at
-decoder load: the upstream converter exported a configured, absent MTP
-layer. Conversion now uses `--no-mtp` and asserts exactly 24 layers. Runtime
-also fixes four-plane M-RoPE positions for embedded audio batches and adds
-a test through the actual decoder batch splitter. Feature `ce9bf9079`
-requires exact decoded text/timestamps, in addition to stage/magnitude and
-16-token cache parity. Regeneration `36883527997` and live validation
-`36883532484` are queued; artifacts remain private and unvalidated.
+Full source pipeline `36907733162` covers English, Japanese, Spanish and an
+83-second two-window context case. Native comparison exposed shared Silero's
+missing previous-64-sample waveform context. Scoped Index-Echo fix `8e02d2870`
+keeps the public ABI unchanged. Latest validation `36912744733` passes VAD
+classifier checks (max abs .002839), direct gates, real CLI, JFK and two-window
+exact output. It remains RED: Japanese has three 20ms timestamp differences;
+F16 Spanish has one synonym substitution; Q8 English has one 20ms difference.
+Do not call the full pipeline exact or mark the port complete.
 
-Corrected ARM conversion `36885332024` passed and uploaded all three
-cohorts, source LICENSE and a complete conversion receipt. Live x64 run
-`36883532484` passed mel, convs, all 32 encoder blocks, connector, prompt IDs,
-all 24 decoder blocks and 16/16 cached greedy tokens on JFK, Chinese and
-partial-hop JFK. It failed the cached cosine check: generic comparison
-uses the wrong GGUF axis for `(steps, vocabulary)` captures. Added explicit
-contiguous-axis mode + a non-square tensor regression. Further source audit
-found Qwen3.5 query/key normalization using clamped epsilon instead of the
-released additive squared-norm epsilon; fixed with portable RMS + scale.
-Small local graph oracle gives max error `7.63e-9` (zero heads finite).
-Feature `a880c0fda` has both fixes; full F16/Q8/Q4 validation `36899754294`
-is queued. Full decoded parity, quant acceptance and GPU/performance proof
-remain pending; no public model/default/release claim.
+Separate explicitly forced F32 decoder diagnostic references and pipeline were
+produced successfully (`36914150287`, `36913471293`), without replacing the
+released-blueprint golden. Latest consumer `36915483750` tests both F16/Q8
+against that variant. Cached-token rank/gap diagnostics preserve the exact-ID
+gate. This is to identify numerical differences, not silently relax acceptance.
 
-Full CPU run `36899754294` reproduced **exact complete decoded text and
-centisecond timestamps for F16 and Q8_0 on all three clips**. Worst per-row
-stage cosine / maximum whole-stage relative L2: F16 `0.998464` / `1.415%`;
-Q8_0 `0.995173` / `3.561%`; plain Q4_K `0.781530` / `23.349%`. Q4 changes
-translations/punctuation and is rejected. The run's original `.999` gate
-rejected cached F16 and quantized logits despite exact F16/Q8 decoded output.
-Feature `635b6cb31` applies precision-aware cosine/magnitude gates, retaining
-strict frontend, exact prompt/cache IDs and exact decoded cues. Fresh F16/Q8
-run `36905507951` is queued; selective Q4 producer `36905716130` uses separate
-filenames and the existing per-tensor override machinery. No defaults change.
-Silero timestamp postprocessing now matches the released v6.2 function on
-500 randomized fixed probability traces; this does not prove classifier
-parity. Full file/VAD, ja/es and two-window context reference checks are being
-added. GPU and same-host performance measurements remain pending. Artifacts
-remain private; no public model/default/release claim.
-
-Fresh F16/Q8 validation `36905507951` **passed** all stage/magnitude,
-prompt/cache, C ABI autodetection and exact decoded text/timestamp gates.
-Selective Q4 producer `36905716130` passed, producing separate experimental
-files (710,815,392-byte tower + 1,991,761,632-byte decoder), only ~2.8% less
-than Q8; quality remains unaccepted. Latest full pipeline / selective
-validation `36907324269` is running. Full Python file reference `36906318803`
-failed before inference because ARM lacked ffmpeg; feature `62c93803c`
-installs it before downloads, retry `36907733162` is queued. Same-host CPU
-F32/F16/Q8 timing `36907737439` is queued after correctness passed.
-Independent references are now published in `cstr/crispasr-regression-fixtures`
-at `0f4ac3b0c068c28a2f4f9cf00bd5c479a7d8f9c4` (only Index-Echo files added),
-with SHA256 receipts in storage. GPU proof is prepared with CPU controls and
-explicit P100 integer-MMQ coverage limits. Models remain private pending
-full-file/window/context proof and final integration; no release claim.
+Same-host ARM Neoverse-N2, four threads, three iterations per clip:
+`36907737439` passes all timed decoded outputs. Q8 warm medians are 1.33–1.46x
+faster than the actual mixed F32/BF16 Python blueprint; peak RSS 4.03 vs 7.95GiB.
+Audited receipt is in PERFORMANCE.md and docs/index-echo-cpu-2026-10-01.json.
+Kaggle CUDA v1 completed on a Tesla T4 (SM75): F16/Q8 per-stage and decoded-text
+checks pass against the same independent source references, with same-box CPU
+controls. Detailed logs/receipts are being harvested; timestamp comparison was
+not yet enforced by that GPU script. Broad final CI, registry/public publication,
+nightly model pins and final docs remain pending. Models stay private; no release
+or completed-port claim.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
