@@ -19,6 +19,11 @@ Test explicit SIMD versus the shipped baseline on macos-15-intel with the same
 Parakeet Q8 model, four threads, decoded-output checks and warm medians; retain
 an older-Intel baseline archive. Review current issues/PRs, land only validated
 changes, then cut the next release after green checks (maintainer authorized).
+Candidate `785919294` is pushed: shared explicit ISA configuration, SIMD and
+legacy Intel archives, and golden-transcript/magnitude A/B harness. Intel proof:
+https://github.com/CrispStrobe/CrispASR/actions/runs/36865090158 ; package dry run:
+https://github.com/CrispStrobe/CrispASR/actions/runs/36865093345 . Runtime source
+is unchanged. Results pending; do not release until validated.
 Reporter added a 12-thread/chunked binary-swap confirmation at 12:46 UTC.
 New #485 is a model request, not a release regression; no new PRs.
 
