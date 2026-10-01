@@ -1288,7 +1288,18 @@ if(APPLE)
         find_library(ACCELERATE_LIB Accelerate REQUIRED)
     endif()
     target_link_libraries(parakeet PUBLIC ${ACCELERATE_LIB})
-    target_compile_definitions(parakeet PRIVATE HAVE_ACCELERATE ACCELERATE_NEW_LAPACK)
+    target_compile_definitions(parakeet PRIVATE HAVE_ACCELERATE HAVE_PARAKEET_BLAS ACCELERATE_NEW_LAPACK)
+elseif(CRISPASR_MEL_BLAS AND NOT MSVC)
+    # Reuse the existing external-BLAS opt-out used by static bindings/WASM.
+    # Enable only OpenBLAS: reference Netlib cblas has no performance benefit.
+    find_library(PARAKEET_OPENBLAS NAMES openblas openblasp openblaso QUIET)
+    find_path(PARAKEET_CBLAS_INCLUDE_DIR cblas.h PATH_SUFFIXES openblas)
+    if(PARAKEET_OPENBLAS AND PARAKEET_CBLAS_INCLUDE_DIR)
+        target_link_libraries(parakeet PUBLIC ${PARAKEET_OPENBLAS})
+        target_include_directories(parakeet PRIVATE ${PARAKEET_CBLAS_INCLUDE_DIR})
+        target_compile_definitions(parakeet PRIVATE HAVE_PARAKEET_BLAS)
+        message(STATUS "parakeet: OpenBLAS decoder available (CRISPASR_PARAKEET_CPU_BLAS)")
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------

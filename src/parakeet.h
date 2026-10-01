@@ -232,6 +232,8 @@ float* parakeet_joint_project_encoder(struct parakeet_context* ctx, const float*
 // Output: malloc'd (1, pred_hidden) — the LSTM output after feeding blank.
 // Caller must free().
 float* parakeet_predictor_initial(struct parakeet_context* ctx, int* out_pred_hidden);
+// Production greedy start: one blank token, zero LSTM state.
+float* parakeet_predictor_sos(struct parakeet_context* ctx, int* out_pred_hidden);
 
 // Run full joint step at a single encoder frame + predictor output.
 // proj_enc: (joint_hidden,) — output of parakeet_joint_project_encoder for one frame

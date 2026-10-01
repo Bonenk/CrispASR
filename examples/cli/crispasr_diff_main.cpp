@@ -5292,7 +5292,8 @@ int main(int argc, char** argv) {
         // ──── Transducer component diff (MAES §134) ────
         // Validate predictor LSTM, encoder projection, and joint network
         // against PyTorch reference captures from parakeet-maes backend.
-        if (ref.has("encoder_output_projected") || ref.has("decoder_initial") || ref.has("joint_t0")) {
+        if (ref.has("encoder_output_projected") || ref.has("decoder_initial") || ref.has("joint_t0") ||
+            ref.has("decoder_sos")) {
             // Use reference encoder_output so we isolate transducer components
             auto ref_enc_pair = ref.get_f32("encoder_output");
             auto ref_enc_shp = ref.shape("encoder_output");
@@ -5316,12 +5317,16 @@ int main(int argc, char** argv) {
                 }
 
                 // 2. Predictor initial state (feed blank/SOS)
-                if (ref.has("decoder_initial")) {
+                const bool production_sos = ref.has("decoder_sos");
+                const char* pred_stage = production_sos ? "decoder_sos" : "decoder_initial";
+                const char* joint_stage = production_sos ? "joint_sos_t0" : "joint_t0";
+                if (ref.has(pred_stage)) {
                     int ph = 0;
-                    float* pred = parakeet_predictor_initial(ctx, &ph);
+                    float* pred =
+                        production_sos ? parakeet_predictor_sos(ctx, &ph) : parakeet_predictor_initial(ctx, &ph);
                     if (pred) {
-                        auto rep = ref.compare("decoder_initial", pred, (size_t)ph);
-                        print_row("decoder_initial", rep, COS_THRESHOLD);
+                        auto rep = ref.compare(pred_stage, pred, (size_t)ph);
+                        print_row(pred_stage, rep, COS_THRESHOLD);
                         record(rep);
 
                         // 2b. Decoder projection: joint.project_prednet(pred)
@@ -5339,15 +5344,15 @@ int main(int argc, char** argv) {
                         }
 
                         // 3. Joint output at frame 0
-                        if (ref.has("joint_t0")) {
+                        if (ref.has(joint_stage)) {
                             int jh = 0;
                             float* proj_enc = parakeet_joint_project_encoder(ctx, ref_enc_pair.first, 1, d_model, &jh);
                             if (proj_enc) {
                                 int vt = 0;
                                 float* logits = parakeet_joint_step(ctx, proj_enc, pred, &vt);
                                 if (logits) {
-                                    auto rep = ref.compare("joint_t0", logits, (size_t)vt);
-                                    print_row("joint_t0", rep, COS_THRESHOLD);
+                                    auto rep = ref.compare(joint_stage, logits, (size_t)vt);
+                                    print_row(joint_stage, rep, COS_THRESHOLD);
                                     record(rep);
                                     free(logits);
                                 } else {

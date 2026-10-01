@@ -26,7 +26,8 @@ from typing import Dict, Set
 
 import numpy as np
 
-DEFAULT_STAGES = ["raw_audio", "mel_spectrogram", "pre_encode_output", "encoder_output", "generated_text"] + [
+DEFAULT_STAGES = ["raw_audio", "mel_spectrogram", "pre_encode_output", "encoder_output", "generated_text",
+                  "encoder_output_projected", "decoder_sos", "joint_sos_t0"] + [
     f"encoder_layer_{i}" for i in range(24)
 ]
 
@@ -132,6 +133,20 @@ def dump(*, model_dir: Path, audio: np.ndarray, stages: Set[str], max_new_tokens
             model, "_get_output_attention_mask") else h.shape[1]
         if "encoder_output" in stages:
             out["encoder_output"] = h[0, :T_enc].detach().cpu().float().numpy().copy()
+        if stages & {"encoder_output_projected", "decoder_sos", "joint_sos_t0"}:
+            projected = model.encoder_projector(h)
+            if "encoder_output_projected" in stages:
+                out["encoder_output_projected"] = projected[0, :T_enc].float().cpu().numpy().copy()
+            # Capture the production start, not NeMo's legacy two-zero probe.
+            ids = torch.tensor([[model.config.blank_token_id]], dtype=torch.long)
+            raw_pred, _ = model.decoder.lstm(model.decoder.embedding(ids))
+            if "decoder_sos" in stages:
+                out["decoder_sos"] = raw_pred[0].float().cpu().numpy().copy()
+            if "joint_sos_t0" in stages:
+                pred_projected = model.decoder.decoder_projector(raw_pred)
+                logits = model.joint(decoder_hidden_states=pred_projected,
+                                     encoder_hidden_states=projected[:, :1])
+                out["joint_sos_t0"] = logits[0, 0].float().cpu().numpy().copy()
         if "generated_text" in stages:
             gen = model.generate(input_features=feats, attention_mask=mask)
             seq = gen.sequences if hasattr(gen, "sequences") else gen
