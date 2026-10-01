@@ -10,10 +10,12 @@ import wave
 
 def check_pipeline(root, out, build, library, models, cohort):
     import numpy as np
-    from huggingface_hub import hf_hub_download
+    from huggingface_hub import HfApi, hf_hub_download
     from crispasr import Session
     # Keep the third companion beside the primary, exercising runtime autoload.
-    vad_path = Path(hf_hub_download('ggml-org/whisper-vad', 'ggml-silero-v6.2.0.bin', local_dir=models))
+    vad_revision = HfApi().model_info('ggml-org/whisper-vad').sha
+    vad_path = Path(hf_hub_download('ggml-org/whisper-vad', 'ggml-silero-v6.2.0.bin',
+                                  revision=vad_revision, local_dir=models))
     oracle = json.loads((models / 'reference/pipeline.json').read_text())
     failures, decoded = [], {}
 
@@ -79,6 +81,6 @@ def check_pipeline(root, out, build, library, models, cohort):
         for segment in oracle['cases']['jfk-en']['segments']:
             if segment['text'] not in text: failures.append('real CLI decoded text mismatch')
     receipt = dict(cohort=cohort, failed=failures, cases=decoded,
-                   vad_file=vad_path.name, vad_sha256=hashlib.sha256(vad_path.read_bytes()).hexdigest())
+                   vad_file=vad_path.name, vad_revision=vad_revision, vad_sha256=hashlib.sha256(vad_path.read_bytes()).hexdigest())
     (out / f'pipeline-{cohort}.json').write_text(json.dumps(receipt, indent=2, ensure_ascii=False) + '\n')
     return failures

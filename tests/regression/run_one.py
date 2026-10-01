@@ -304,6 +304,12 @@ def run_diff(diff_bin: Path, backend_id: str, gguf: Path, ref: Path, sample: Pat
     if proc.returncode < 0:
         die(f"crispasr-diff died from signal {-proc.returncode}\n"
             f"  stderr tail: {proc.stderr[-400:]}")
+    # Index-Echo's harness also gates magnitude, exact prompt IDs and cached
+    # greedy IDs. Those failures have no cosine row; ignoring its exit status
+    # would silently drop the port's required acceptance gates.
+    if backend_id == "index-echo" and proc.returncode != 0:
+        die(f"Index-Echo mandatory diff gate failed (rc={proc.returncode})\n"
+            f"  stdout tail: {proc.stdout[-1600:]}\n  stderr tail: {proc.stderr[-400:]}")
     # crispasr-diff prints summary lines on stdout. Parse the [PASS]/[FAIL]
     # lines; ignore the diff harness's own pass/fail verdict — we apply our
     # own per-stage thresholds from the manifest.

@@ -61,8 +61,15 @@ for attempt in range(90):
     time.sleep(30)
 else:
     raise RuntimeError('Independent reference producer did not complete in 45 minutes')
+model_revision = api.model_info(destination).sha
+(OUT / 'validation-provenance.json').write_text(json.dumps(dict(
+    model_repo=destination, model_revision=model_revision,
+    source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+    ggml_commit=subprocess.check_output(['git', '-C', 'ggml', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
+    threads=4, cpu=subprocess.check_output(['uname', '-m'], text=True).strip()), indent=2) + '\n')
+
 def validate_cohort(cohort):
-    models = Path(snapshot_download(destination, local_dir=Path(os.environ['HEAVY_SCRATCH']) / 'index-echo-models',
+    models = Path(snapshot_download(destination, revision=model_revision, local_dir=Path(os.environ['HEAVY_SCRATCH']) / 'index-echo-models',
         allow_patterns=[f'index-echo-2b-{cohort}.gguf', f'index-echo-2b-decoder-{cohort}.gguf', 'reference/*']))
     os.environ['TMPDIR'] = os.environ['HEAVY_SCRATCH']
     failures = []
