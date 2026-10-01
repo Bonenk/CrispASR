@@ -28,8 +28,12 @@ Version bump `bbe3d5a57` used the repository script. Its Flutter changelog warni
 was fixed before publication; the unpublished annotated tag is moved to this
 metadata correction. Final unpublished annotated tag points to
 `6e25ddf9e0a5dd132846c933a05e1920f0c9c7b6` (VERSION/bindings/Flutter notes agree).
-Versioned target CI `36880148726`, lint `36880152846` on `release/0.8.40`;
-wait for both green before pushing the tag. No new bug reports as of 14:48 UTC.
+Versioned target CI `36880148726` (13/13) and lint `36880152846` (10/10)
+are green. GitHub's Actions job-delay incident delayed the final jobs.
+Published the annotated tag and release at 17:05 UTC:
+https://github.com/CrispStrobe/CrispASR/releases/tag/v0.8.40 .
+Release build `36896786413` is producing assets; verify actual uploads before
+archiving the notes and removing this claim. No new bug reports as of 15:22 UTC.
 Release publishing is explicitly authorized. Index models (#485) belong to
 another agent and are outside this release task.
 
