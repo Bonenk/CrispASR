@@ -23,6 +23,7 @@ def run(*args):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--build-only', action='store_true')
+parser.add_argument('--regression', action='store_true', help='Run the actual pinned nightly driver after native validation')
 parser.add_argument('--reference-subdir', choices=['reference', 'reference-f32'], default='reference')
 parser.add_argument('--pipeline', action='store_true', help='Validate released file/VAD/target/context oracle')
 parser.add_argument('--cohorts', nargs='+', choices=['f16', 'q8_0', 'q4_k', 'q4_k_selective'], default=['f16'])
@@ -49,29 +50,45 @@ if args.build_only:
     (OUT / 'summary.md').write_text('Index-Echo shared library, CLI, diff and integration unit tests built. '
                                    'Model parity remains pending.\n')
     sys.exit(0)
-from huggingface_hub import HfApi, snapshot_download
-api = HfApi(token=os.environ.get('HF_TOKEN'))
-destination = 'cstr/index-echo-2b-GGUF'
-required = {f'{args.reference_subdir}/{clip}-ref.gguf' for clip in args.clips} | {'conversion-receipt.json'}
-if args.pipeline: required.add(args.reference_subdir + '/pipeline.json')
-for attempt in range(90):
-    present = set(api.list_repo_files(destination))
-    if required <= present:
-        break
-    print('waiting for independent references:', sorted(required - present), flush=True)
-    time.sleep(30)
-else:
-    raise RuntimeError('Independent reference producer did not complete in 45 minutes')
-model_revision = api.model_info(destination).sha
+from huggingface_hub import hf_hub_download, snapshot_download
+manifest = json.loads((ROOT / 'tests/regression/manifest.json').read_text())
+entry = next(e for e in manifest['backends'] if e['name'] == 'index-echo-2b')
+destination = entry['gguf']['repo']
+model_revision = entry['gguf']['revision']
+fixtures = manifest['fixtures']
+fixture_prefix = 'index-echo-2b-f32' if args.reference_subdir == 'reference-f32' else 'index-echo-2b'
+
+
+def download_references(models):
+    # Model weights and independent reference captures have different canonical
+    # repositories and immutable pins. Never depend on temporary transfer HEAD.
+    names = {'jfk': 'jfk_11s', 'zh': 'zh', 'jfk-tail': 'jfk_tail'}
+    paths = {f'{clip}-ref.gguf': f'{fixture_prefix}/{names[clip]}/ref.gguf' for clip in args.clips}
+    if 'jfk-tail' in args.clips:
+        paths['jfk-tail.wav'] = f'{fixture_prefix}/jfk_tail/audio.wav'
+    if args.pipeline:
+        paths['pipeline.json'] = f'{fixture_prefix}/pipeline/reference.json'
+        paths['pipeline-multi.wav'] = 'index-echo-2b/pipeline/audio.wav'
+    folder = models / args.reference_subdir
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, remote in paths.items():
+        source = Path(hf_hub_download(fixtures['repo'], remote, revision=fixtures['revision'],
+                       local_dir=Path(os.environ['HEAVY_SCRATCH']) / 'index-echo-fixtures'))
+        target = folder / name
+        if not target.exists():
+            target.symlink_to(source)
+
 (OUT / 'validation-provenance.json').write_text(json.dumps(dict(
     model_repo=destination, model_revision=model_revision,
+    fixture_repo=fixtures["repo"], fixture_revision=fixtures["revision"],
     source_commit=subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
     ggml_commit=subprocess.check_output(['git', '-C', 'ggml', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
     threads=4, cpu=subprocess.check_output(['uname', '-m'], text=True).strip()), indent=2) + '\n')
 
 def validate_cohort(cohort):
     models = Path(snapshot_download(destination, revision=model_revision, local_dir=Path(os.environ['HEAVY_SCRATCH']) / 'index-echo-models',
-        allow_patterns=[f'index-echo-2b-{cohort}.gguf', f'index-echo-2b-decoder-{cohort}.gguf', args.reference_subdir + '/*']))
+        allow_patterns=[f'index-echo-2b-{cohort}.gguf', f'index-echo-2b-decoder-{cohort}.gguf']))
+    download_references(models)
     os.environ['TMPDIR'] = os.environ['HEAVY_SCRATCH']
     failures = []
     for clip in args.clips:
@@ -147,7 +164,21 @@ def validate_cohort(cohort):
     return failures
 
 
-results = {cohort: validate_cohort(cohort) for cohort in args.cohorts}
+results = {}
+for cohort in args.cohorts:
+    try:
+        results[cohort] = validate_cohort(cohort)
+    finally:
+        # Only one paired cohort coexists on the runner's temporary disk.
+        for name in (f'index-echo-2b-{cohort}.gguf', f'index-echo-2b-decoder-{cohort}.gguf'):
+            (Path(os.environ['HEAVY_SCRATCH']) / 'index-echo-models' / name).unlink(missing_ok=True)
+if args.regression:
+    sys.path.insert(0, str(ROOT / 'tests/regression'))
+    import run_one
+    failed = run_one.regression_for('index-echo-2b', manifest,
+        Path(os.environ['HEAVY_SCRATCH']) / 'index-echo-nightly', BUILD / 'bin/crispasr', BUILD / 'bin/crispasr-diff')
+    results['nightly_regression'] = ['Pinned nightly regression failed'] if failed else []
+
 (OUT / 'cohort-results.json').write_text(json.dumps(results, indent=2))
 if any(results.values()):
     raise RuntimeError('Cohort validation failed: ' + json.dumps(results))

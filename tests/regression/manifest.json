@@ -1038,7 +1038,7 @@
       "source_model_note": "Pinned source 5d98a34d9685869b11e9c94d01dee22a8b8e53b5; actual released wrapper: F32 tower/connector, BF16 decoder.",
       "gguf": {
         "repo": "cstr/index-echo-2b-GGUF",
-        "revision": "9125052af3d24f297720e25e55637f88a8e54944",
+        "revision": "b34538267099a6769111aada860d57f312894510",
         "file": "index-echo-2b-q8_0.gguf",
         "approx_size_mb": 670,
         "companion_files": [
