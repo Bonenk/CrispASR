@@ -7,14 +7,16 @@ import subprocess
 import sys
 import tarfile
 import urllib.request
-import zipfile
 from pathlib import Path
 
-import requests
+from huggingface_hub import hf_hub_download
 
 SCRIPT_VERSION = "audioseal-482-cuda-v1"
-BUILD_RUN = 36832617360
-BUILD_SHA = "5f88f631299aa74acbf433034b832cda94865f96"
+BUILD_RUN = 36835772201
+BUILD_SHA = "833ad5b58a11b1042da3b91483d13a690ea5c8bb"
+BUNDLE_REPO = "cstr/crispasr-audioseal-cuda-proof"
+BUNDLE_REVISION = "a433ef5cd2e9197f621414c29825f5306be84091"
+BUNDLE_SHA256 = "32285a273bec92c880f000dc2a86a3f2e21c262347ff2f62e19585df04e183f6"
 WORK = Path("/kaggle/working")
 SCRATCH = Path("/kaggle/temp/audioseal-482")
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -25,37 +27,14 @@ sys.path.insert(0, str(REPO / "tools/kaggle"))
 import kaggle_harness as kh
 
 kh.init_progress()
-kh.resolve_hf_token()
+hf_token = kh.resolve_hf_token()
 kh.provenance(SCRIPT_VERSION, REPO)
-gh_token = kh.kaggle_token_from_dataset("gh_token.txt")
-if not gh_token:
-    raise RuntimeError("GitHub artifact token unavailable")
-headers = {"Authorization": f"Bearer {gh_token}", "Accept": "application/vnd.github+json"}
-api_root = "https://api.github.com/repos/CrispStrobe/CrispASR/actions"
-run = requests.get(f"{api_root}/runs/{BUILD_RUN}", headers=headers, timeout=60)
-run.raise_for_status()
-run = run.json()
-if run["head_sha"] != BUILD_SHA or run["conclusion"] != "success":
-    raise RuntimeError("proof build is not the expected successful commit")
-response = requests.get(f"{api_root}/runs/{BUILD_RUN}/artifacts", headers=headers, timeout=60)
-response.raise_for_status()
-artifacts = response.json()["artifacts"]
-artifact = next(a for a in artifacts if a["name"] == f"audioseal-cuda-proof-{BUILD_SHA}" and not a["expired"])
-# Keep the API credential on api.github.com; download the signed storage URL without it.
-response = requests.get(artifact["archive_download_url"], headers=headers, timeout=60, allow_redirects=False)
-response.raise_for_status()
-archive_zip = SCRATCH / "artifact.zip"
-with requests.get(response.headers["Location"], timeout=300, stream=True) as download:
-    if download.status_code != 200:
-        raise RuntimeError(f"artifact storage download failed ({download.status_code})")
-    with archive_zip.open("wb") as dst:
-        for chunk in download.iter_content(1024 * 1024):
-            dst.write(chunk)
-with zipfile.ZipFile(archive_zip) as archive:
-    archive.extractall(SCRATCH / "artifact")
-artifact_dir = SCRATCH / "artifact"
-tar_path = artifact_dir / "audioseal-cuda-proof.tar.gz"
-if hashlib.sha256(tar_path.read_bytes()).hexdigest() != (artifact_dir / "sha256.txt").read_text().strip():
+# Stage the CI artifact privately; Kaggle needs only its existing HF credential.
+# Pin both the immutable storage revision and archive checksum.
+tar_path = Path(hf_hub_download(BUNDLE_REPO, "audioseal-cuda-proof.tar.gz",
+                               repo_type="dataset", revision=BUNDLE_REVISION,
+                               token=hf_token, local_dir=SCRATCH / "artifact"))
+if hashlib.sha256(tar_path.read_bytes()).hexdigest() != BUNDLE_SHA256:
     raise RuntimeError("proof archive checksum mismatch")
 with tarfile.open(tar_path) as archive:
     for member in archive.getmembers():
@@ -82,6 +61,7 @@ passed = result.returncode == 0 and "AUDIOSEAL_CUDA_PASS" in result.stdout
 # The model loader must select CUDA, in addition to the explicit CUDA API check.
 passed = passed and "using preferred GPU backend: CUDA" in result.stdout
 summary = {"script_version": SCRIPT_VERSION, "build_sha": BUILD_SHA, "build_run": BUILD_RUN,
+           "bundle_revision": BUNDLE_REVISION, "bundle_sha256": BUNDLE_SHA256,
            "gpu": subprocess.check_output(["nvidia-smi", "--query-gpu=name,compute_cap,driver_version",
                                              "--format=csv,noheader"], text=True).strip(),
            "model_sha256": hashlib.sha256(model.read_bytes()).hexdigest(),
