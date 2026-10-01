@@ -417,6 +417,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Vulkan SDK download retry checks
+        run: python tools/test_vulkan_sdk_download.py
+
       # CRISPASR_BUILD_TESTS stays ON here (unlike the other smoke-only
       # platform jobs) so the speaker-db unit tests below actually run.
       # This is the only CI leg that exercises the .spkr v2 Windows write

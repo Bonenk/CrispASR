@@ -1663,9 +1663,7 @@ jobs:
       - name: Install Vulkan SDK
         shell: pwsh
         run: |
-          $ver = (Invoke-RestMethod -Uri "https://vulkan.lunarg.com/sdk/latest.json").windows
-          $url = "https://sdk.lunarg.com/sdk/download/$ver/windows/vulkan_sdk.exe"
-          Invoke-WebRequest -Uri $url -OutFile vulkan_sdk.exe
+          $ver = & .\scripts\fetch-vulkan-sdk.ps1
           Start-Process -FilePath .\vulkan_sdk.exe -ArgumentList "--accept-licenses","--default-answer","--confirm-command","install" -Wait
           $sdk = "C:\VulkanSDK\$ver"
           echo "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -2441,9 +2439,7 @@ jobs:
       - name: Install Vulkan SDK
         shell: pwsh
         run: |
-          $ver = (Invoke-RestMethod -Uri "https://vulkan.lunarg.com/sdk/latest.json").windows
-          $url = "https://sdk.lunarg.com/sdk/download/$ver/windows/vulkan_sdk.exe"
-          Invoke-WebRequest -Uri $url -OutFile vulkan_sdk.exe
+          $ver = & .\scripts\fetch-vulkan-sdk.ps1
           Start-Process -FilePath .\vulkan_sdk.exe -ArgumentList "--accept-licenses","--default-answer","--confirm-command","install" -Wait
           $sdk = "C:\VulkanSDK\$ver"
           echo "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
