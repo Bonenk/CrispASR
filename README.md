@@ -79,7 +79,7 @@ and unzip it:
 | **Windows** | `crispasr-windows-x86_64-cpu.zip` | Needs AVX2 (2013+ Intel / 2015+ AMD). Older CPU → `…-cpu-legacy.zip` |
 | **Windows + NVIDIA** | `crispasr-windows-x86_64-cuda.zip` | Self-contained; a CUDA Toolkit install is **not** required. CUDA-13-native build: `…-cuda13.zip` (Turing+) |
 | **macOS, Apple Silicon** | `crispasr-macos-arm64.tar.gz` | Metal GPU + Accelerate; `crispasr-macos.tar.gz` is the arm64 compatibility alias |
-| **macOS, Intel** | `crispasr-macos-x86_64.tar.gz` | CPU + Accelerate; no Metal |
+| **macOS, Intel** | `crispasr-macos-x86_64.tar.gz` | CPU + Accelerate; requires AVX2/FMA/F16C (Haswell or newer). Older Intel Mac → `crispasr-macos-x86_64-cpu-legacy.tar.gz` |
 | **Linux** | `crispasr-linux-x86_64.tar.gz` | `…-cuda.tar.gz` / `…-vulkan.tar.gz` for GPU |
 
 Prefer to build it yourself? See [Install & build](#install--build). The `-hip`

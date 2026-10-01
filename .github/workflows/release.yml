@@ -1101,37 +1101,37 @@ jobs:
   build-macos-x86_64:
     if: ${{ !inputs.only || inputs.only == 'build-macos-x86_64' || inputs.only == 'build-macos-cli' }}
     runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - isa: avx2
+            asset: crispasr-macos-x86_64
+          - isa: legacy
+            asset: crispasr-macos-x86_64-cpu-legacy
     steps:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
           ref: ${{ inputs.tag || github.ref }}
 
-      - name: Build (x86_64)
+      - name: Install build tools
+        run: brew install ninja ccache
+
+      - name: Build (x86_64, ${{ matrix.isa }})
         run: |
-          cmake -S . -B build \
-            -DCRISPASR_C2PA_FETCH=ON \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_ARCHITECTURES=x86_64 \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DBUILD_SHARED_LIBS=OFF \
-            -DGGML_METAL=OFF \
-            -DCRISPASR_PORTABLE_CPU=ON \
-            -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=Apple \
-            -DCRISPASR_BUILD_TESTS=OFF \
-            -DCRISPASR_BUILD_SERVER=OFF \
-            -DCRISPASR_OPUS_FETCH=ON
+          bash scripts/configure-macos-intel.sh build "${{ matrix.isa }}" -DCRISPASR_C2PA_FETCH=ON
           cmake --build build --target crispasr-cli crispasr-quantize -j $(sysctl -n hw.logicalcpu)
 
       - name: Package and verify
         run: |
           set -euo pipefail
-          OUT=release/crispasr-macos-x86_64
+          OUT=release/${{ matrix.asset }}
           mkdir -p "$OUT"
           cp build/bin/crispasr build/bin/crispasr-quantize "$OUT/"
           bash scripts/bundle-c2pa.sh "$OUT"
           cp LICENSE THIRD_PARTY_NOTICES.txt "$OUT/"
-          tar -czf "$OUT.tar.gz" -C release "crispasr-macos-x86_64"
+          tar -czf "$OUT.tar.gz" -C release "${{ matrix.asset }}"
           # Verify the extracted archive away from the build tree, including
           # the sidecar's architecture and dyld resolution at startup.
           # Hide original libraries so dyld cannot use a build-tree fallback.
@@ -1139,13 +1139,13 @@ jobs:
           mv third_party/c2pa third_party/c2pa-unavailable
           mkdir -p package-check
           tar -xzf "$OUT.tar.gz" -C package-check
-          bash scripts/verify-macos-cli.sh "package-check/crispasr-macos-x86_64" x86_64
+          bash scripts/verify-macos-cli.sh "package-check/${{ matrix.asset }}" x86_64
 
       - uses: actions/upload-artifact@v4
         with:
-          name: crispasr-macos-x86_64
+          name: ${{ matrix.asset }}
           path: |
-            release/crispasr-macos-x86_64.tar.gz
+            release/${{ matrix.asset }}.tar.gz
 
       - name: Attach macOS x86_64 assets to release
         if: inputs.tag != '' || startsWith(github.ref, 'refs/tags/')
@@ -1153,7 +1153,7 @@ jobs:
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           files: |
-            release/crispasr-macos-x86_64.tar.gz
+            release/${{ matrix.asset }}.tar.gz
           fail_on_unmatched_files: true
 
   # ── Apple xcframework (iOS + simulator + macOS + tvOS/visionOS) ───────────────
