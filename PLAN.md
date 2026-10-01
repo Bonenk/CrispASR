@@ -20,9 +20,10 @@ both Intel package variants `36868274235` attempt 2, branch CI `36865881142`
 are prepared. CLI long warm pairs favor SIMD 1.50-1.93x with unchanged words;
 host variance and the known baseline insertion are documented.
 
-Next: validate a stable release branch (main checkpoints from another active
-agent cancel same-branch CI), use scripts/bump-version.sh, publish v0.8.40 after
-green target checks, verify assets, archive notes and remove this claim.
+Stable release branch `release/0.8.40` at `9d50392b4` passed CI `36875335659`
+(13/13) and lint `36875340064` (10/10). All implementation, quality, timing and
+package gates are complete. Next: scripts/bump-version.sh, green checks on the
+versioned target, publish v0.8.40, verify assets, archive notes/remove claim.
 Release publishing is explicitly authorized. Index models (#485) belong to
 another agent and are outside this release task.
 
