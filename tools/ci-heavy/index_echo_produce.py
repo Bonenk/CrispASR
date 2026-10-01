@@ -116,6 +116,9 @@ try:
                 converted.unlink()
         audio.unlink()
         decoder.unlink()
+        receipt['decoder_no_mtp'] = True
+        event('all conversion cohorts complete')
+        upload(OUT / 'receipt.json', 'conversion-receipt.json')
     for clip in ([] if args.convert_only else args.clips):
         event('independent released Python class: CPU F32 ' + clip)
         audio_path = ROOT / 'samples' / ('paraformer_zh.wav' if clip == 'zh' else 'jfk.wav')

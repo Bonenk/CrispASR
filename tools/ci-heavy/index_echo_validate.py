@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -43,7 +44,7 @@ if args.build_only:
 from huggingface_hub import HfApi, snapshot_download
 api = HfApi(token=os.environ.get('HF_TOKEN'))
 destination = 'cstr/index-echo-2b-GGUF'
-required = {f'reference/{clip}-ref.gguf' for clip in args.clips}
+required = {f'reference/{clip}-ref.gguf' for clip in args.clips} | {'conversion-receipt.json'}
 for attempt in range(90):
     present = set(api.list_repo_files(destination))
     if required <= present:
@@ -82,6 +83,23 @@ assert 'index-echo' in Session.available_backends(lib_path=str(library))
 renamed = models / 'model-without-backend-hint.gguf'
 renamed.symlink_to(models / 'index-echo-2b-f16.gguf')
 decoded = {}
+
+
+def reference_cues(text):
+    # Released timestamp / transcript / translation format, parsed independently
+    # of the native implementation. These fixtures have no optional context.
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    expected = []
+    for i in range(0, len(lines), 3):
+        match = re.fullmatch(r'\[(\d+):(\d+(?:\.\d+)?)-(\d+):(\d+(?:\.\d+)?)\]', lines[i])
+        if not match or i + 2 >= len(lines):
+            raise RuntimeError('Malformed independent decoded reference')
+        expected.append(dict(start=60 * int(match[1]) + float(match[2]),
+                             end=60 * int(match[3]) + float(match[4]),
+                             text=lines[i + 1] + '\n' + lines[i + 2]))
+    return expected
+
+
 with Session(str(renamed), lib_path=str(library), n_threads=4) as session:
     assert session.backend == 'index-echo', session.backend
     for clip in args.clips:
@@ -95,6 +113,12 @@ with Session(str(renamed), lib_path=str(library), n_threads=4) as session:
         decoded[clip] = dict(reference=reference, segments=[dict(start=s.start, end=s.end, text=s.text) for s in segments])
         if not segments or any(not s.text or s.end < s.start for s in segments):
             failures.append(clip + ': missing/invalid decoded cues')
+        expected = reference_cues(reference)
+        actual = decoded[clip]['segments']
+        if len(actual) != len(expected) or any(
+                a['text'] != e['text'] or abs(a['start'] - e['start']) > 0.0051 or
+                abs(a['end'] - e['end']) > 0.0051 for a, e in zip(actual, expected)):
+            failures.append(clip + ': decoded text/timestamp mismatch')
         # Preserve complete text and timing for review rather than hiding a
         # numerically correct but behaviorally wrong output behind cosine.
         print('decoded', clip, json.dumps(decoded[clip], ensure_ascii=False), flush=True)
@@ -103,4 +127,4 @@ with Session(str(renamed), lib_path=str(library), n_threads=4) as session:
 if failures:
     raise RuntimeError('; '.join(failures))
 (OUT / 'summary.md').write_text('F16 stage/magnitude/prompt/cache parity passed; Python Session '
-                               'metadata autodetection and decoded cues captured for review.\n')
+                               'metadata autodetection and exact decoded text/timestamp parity passed.\n')

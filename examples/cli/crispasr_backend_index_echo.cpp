@@ -13,7 +13,7 @@ public:
     const char* name() const override { return "index-echo"; }
     uint32_t capabilities() const override {
         return CAP_TIMESTAMPS_NATIVE | CAP_TRANSLATE | CAP_SRC_TGT_LANGUAGE | CAP_TEMPERATURE | CAP_FLASH_ATTN |
-               CAP_INTERNAL_CHUNKING | CAP_PUNCTUATION_NATIVE;
+               CAP_INTERNAL_CHUNKING | CAP_PUNCTUATION_NATIVE | CAP_LANGUAGE_DETECT;
     }
     bool init(const whisper_params& p) override {
         auto cp = index_echo_context_default_params();

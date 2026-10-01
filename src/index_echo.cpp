@@ -619,6 +619,8 @@ index_echo_result* index_echo_transcribe(index_echo_context* ctx, const float* s
                 raw += '\n';
             raw += text;
             auto cues = parse(text, warnings);
+            if (cues.empty() && !ctx->ask.empty() && !text.empty())
+                cues.push_back({0, length / 16000.0, text, ""});
             std::string context;
             for (auto& cue : cues) {
                 if (!cue.translation.empty()) {
