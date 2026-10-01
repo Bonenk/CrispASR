@@ -23,7 +23,22 @@ confidence exceeds 0.9 at each duration; the existing short roundtrip scores
 decoded bits are byte-identical to baseline (SHA-256 `f629c8a2efa4bbe3…`).
 Peak RSS is 409128 KiB on the loaded VPS. Live tests are registered with CTest,
 labelled `live`, skip without `CRISPASR_AUDIOSEAL_GGUF`, and run serially.
-CUDA is not validated on this CPU-only host. Receipts and parity probe:
+CUDA validation also passed on Kaggle Tesla T4 (sm_75, driver 580.159.04),
+using the CUDA 12.4.1 bundle built at `833ad5b58` in
+[Actions run 36835772201](https://github.com/CrispStrobe/CrispASR/actions/runs/36835772201).
+The proof requires an actual CUDA backend and confirms the model selects CUDA0;
+1/4/10/1 s clean detect, embed and watermark detect reuse one context. Watermark
+confidence is 0.999962–0.999984; short watermark-only CPU/GPU cosine is
+1.000000000 and norm ratio is 1.000000095, including after the longer calls.
+The reporter's RTX 5060 / CUDA 13 combination was not directly tested.
+
+General CI passed at `8fb1ba403` in
+[run 36833029925](https://github.com/CrispStrobe/CrispASR/actions/runs/36833029925);
+later checks at the CUDA bundle commit passed unit, ASAN, fuzz, backend-DL,
+Linux CPU, Windows, macOS, iOS and lint (remaining jobs were superseded).
+The standalone proof, manual CI bundle workflow and pinned private-HF transfer
+kernel remain available for reruns. GPU receipts are in `cuda-gpu-v1/`; all
+build logs, CPU receipts and parity probe are under
 `/mnt/volume1/tmp-overflow/issue482/`.
 
 ## DONE 2026-10-01 — Phonon-2 CPU decoder optimization (#481)

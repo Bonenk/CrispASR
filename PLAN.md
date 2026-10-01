@@ -11,22 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-01 — #482 CUDA validation
-
-Worktree `/mnt/volume1/wt-482`, branch `test/482-cuda`.
-CPU fix landed at `b8b55a2cb`; unit tests, 4/10 s roundtrips and short-output
-byte parity passed. Build a targeted CUDA proof bundle on GitHub Actions,
-workflow `audioseal-cuda-proof.yml`: run `36835772201`, bundle SHA
-`833ad5b58` passed with the toolkit driver stub linked explicitly, unused
-flash-attention kernels disabled, and ccache retained. Previous run
-`36832617360` compiled ggml-cuda but failed the final driver link on the
-GPU-less CI host. General CI passed in run `36833029925` at `8fb1ba403`.
-First wrapper attempt failed before compilation. Stage the checksum-verified
-bundle in a private HF dataset (Kaggle token dataset has no GitHub token), then run `tools/kaggle/audioseal-482-cuda` on Kaggle GPU hardware
-with short CPU/GPU numerical comparison
-and long embed/detect scheduler reuse. Check load/free RAM before large tasks.
-Record the GPU model, code SHA, result and CI outcome before closing this claim.
-
 ## CLAIMED 2026-10-01 — Phonon-2 encoder FFN CPU optimization
 
 Worktree `/mnt/volume1/wt-phonon2-ffn`, branch `perf/phonon2-ffn`.
