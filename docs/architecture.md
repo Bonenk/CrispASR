@@ -362,7 +362,12 @@ CPU validation against the pinned released inference class (F32 tower/connector,
 BF16 decoder) reproduces
 all decoded text and timestamps with F16 and Q8_0 on English JFK, Chinese,
 and a partial-hop JFK clip. Plain Q4_K changes decoded output and is rejected.
-These three clips establish port parity, not a broad accuracy benchmark. `crispasr-diff
+The separately forced F32 source also passes every F16 full-file, stage and
+cache gate (minimum cosine .999992, maximum relative L2 .239%). Q8 full-file
+acceptance preserves complete independently generated source-variant text,
+with at most 20ms timestamp drift. The original exact diagnostics remain
+visible, including BF16/F32 synonym and timestamp differences. These fixtures
+establish port parity, not a broad accuracy benchmark. `crispasr-diff
 index-echo` checks frontend, convolution and encoder stages, connector,
 prompt IDs, all decoder blocks, logits and a cached 16-token teacher-forced
 trace. Gates use the actual GGUF tensor precision: unquantized stages require

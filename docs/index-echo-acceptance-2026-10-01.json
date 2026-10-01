@@ -104,6 +104,18 @@
       "sha256": "ad4f838a3f90b9dc7f9ebddb4a082e61a4276f1a4d94899e3156ec3e43f74dc1"
     },
     {
+      "path": "/mnt/storage/crispasr/issue485/validation-f32-36915483750/heavy-36915483750/cohort-results.json",
+      "sha256": "18eb2ed1aa2a2d92fa5c7f90df02e9811f66caea86dbec51e6b71c396ab28d38"
+    },
+    {
+      "path": "/mnt/storage/crispasr/issue485/validation-f32-36915483750/heavy-36915483750/stage-results-f16.json",
+      "sha256": "539db208b8bb3dae7b105d67a638e4fb04dfa39b6c3889859c7e1cde9564703b"
+    },
+    {
+      "path": "/mnt/storage/crispasr/issue485/validation-f32-36915483750/heavy-36915483750/validation-provenance.json",
+      "sha256": "98b0431bd4e1a7a5b0b60bcd334b844fdad0c9555217adc58065a84492834d96"
+    },
+    {
       "path": "/mnt/storage/crispasr/issue485/validation-36912744733/heavy-36912744733/stage-results-f16.json",
       "sha256": "539db208b8bb3dae7b105d67a638e4fb04dfa39b6c3889859c7e1cde9564703b"
     },

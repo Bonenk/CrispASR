@@ -28,7 +28,7 @@ def compare_case(actual, variants, cohort):
     raise ValueError('Decoded output exceeds the declared source-precision/quantization bounds')
 
 
-def audit(validation, released_path, f32_path, dtype_path):
+def audit(validation, f32_validation, released_path, f32_path, dtype_path):
     def read(path):
         return json.loads(path.read_text())
     released, f32, dtype = map(read, (released_path, f32_path, dtype_path))
@@ -41,7 +41,12 @@ def audit(validation, released_path, f32_path, dtype_path):
         raise ValueError('All target languages and two-window context fixture are mandatory')
     provenance = read(validation / 'validation-provenance.json')
     receipts = {}
-    paths = [released_path, f32_path, dtype_path, validation / 'validation-provenance.json']
+    f32_cohorts = f32_validation / 'cohort-results.json'
+    f32_stages = f32_validation / 'stage-results-f16.json'
+    if read(f32_cohorts)['f16'] or read(f32_stages)['failed']:
+        raise ValueError('F16 must pass every exact F32 source stage/cache/direct/full-file gate')
+    paths = [released_path, f32_path, dtype_path, validation / 'validation-provenance.json',
+             f32_cohorts, f32_stages, f32_validation / 'validation-provenance.json']
     for cohort in ('f16', 'q8_0'):
         stage = validation / f'stage-results-{cohort}.json'
         paths.append(stage)
@@ -81,11 +86,12 @@ def audit(validation, released_path, f32_path, dtype_path):
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--validation', type=Path, required=True)
+    p.add_argument('--f32-validation', type=Path, required=True)
     p.add_argument('--released', type=Path, required=True)
     p.add_argument('--f32', type=Path, required=True)
     p.add_argument('--dtype-audit', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
     args = p.parse_args()
-    receipt = audit(args.validation, args.released, args.f32, args.dtype_audit)
+    receipt = audit(args.validation, args.f32_validation, args.released, args.f32, args.dtype_audit)
     args.output.write_text(json.dumps(receipt, indent=2, ensure_ascii=False) + '\n')
     print(json.dumps(receipt['cases'], indent=2))

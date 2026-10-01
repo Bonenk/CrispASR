@@ -18,7 +18,7 @@ tags:
 
 Conversion of [IndexTeam/Index-Echo-S2TT-2B](https://huggingface.co/IndexTeam/Index-Echo-S2TT-2B)
 for the `index-echo` backend in [CrispASR](https://github.com/CrispStrobe/CrispASR).
-This card is staged while full-file and GPU validation complete.
+This card is staged pending final integration CI and publication.
 
 The released model transcribes Chinese and translates each subtitle into
 English, Japanese or Spanish. CrispASR preserves the three-line generation
@@ -84,11 +84,23 @@ all decoded text and centisecond timestamps exactly.
 | F16 | 0.998464 | 1.415% |
 | Q8_0 | 0.995173 | 3.561% |
 
+A separately forced F32 decoder diagnostic now proves higher-precision math:
+[run 36915483750](https://github.com/CrispStrobe/CrispASR/actions/runs/36915483750)
+passes **every F16** stage, magnitude, cache, direct-output and full-file gate,
+including English/Japanese/Spanish and two-window context. Minimum cosine is
+0.999992; maximum stage relative L2 is 0.239%. Q8 passes stage/cache/direct
+checks against that reference too (0.997150 minimum, 3.094% maximum relative L2).
+The overall diagnostic run is red because Q8 has the documented full-file
+precision differences; this is not an all-cohort exact-parity claim.
+
 Cosine alone is scale-blind, so magnitude is gated separately. F16 stages
 require cosine >= .999 (cached logits >= .998) and relative L2 <= 2%;
 quantized learned stages require cosine >= .99 and relative L2 <= 5%.
 Frontend stages retain strict gates. Prompt IDs, cached greedy IDs and full
-decoded cues are additional mandatory checks.
+direct-window decoded cues are additional mandatory checks. Full-file quality
+acceptance separately requires the complete text of an independent source
+precision variant, with exact F16 timestamps and at most 20ms Q8 timestamp
+drift. No arbitrary text edits are accepted.
 
 Plain Q4_K is rejected: worst cosine 0.781530, relative L2 up to 23.349%, and
 changed translations/punctuation. Selective Q4 is also rejected: it fails stage/output checks and saves only
@@ -118,7 +130,11 @@ Qwen3.5 decoder converter is llama.cpp commit
 Quantization uses `crispasr-quantize`; frontend constants and small affines
 retain floating-point precision. Stage fixtures are in
 [cstr/crispasr-regression-fixtures](https://huggingface.co/cstr/crispasr-regression-fixtures)
-at `0f4ac3b0c068c28a2f4f9cf00bd5c479a7d8f9c4` under `index-echo-2b/`.
+at `374efe4d7f5c4ff5dce32deffb14e23865fa8493`: released mixed-precision
+captures under `index-echo-2b/`, separately forced F32 decoder captures under
+`index-echo-2b-f32/`. The nightly uses the F32 fixture; the original golden
+is preserved. Both source full-pipeline captures and effective-dtype audit are
+included.
 
 The model weights are Apache-2.0; the source license is included as `LICENSE`.
 CrispASR runtime code has its own repository license. This conversion is not
