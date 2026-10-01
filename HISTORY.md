@@ -6,6 +6,29 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## RELEASE 2026-10-01 — v0.8.40
+
+Published [v0.8.40](https://github.com/CrispStrobe/CrispASR/releases/tag/v0.8.40)
+at `6e25ddf9e0a5dd132846c933a05e1920f0c9c7b6`, after versioned CI
+`36880148726` (13/13) and lint `36880152846` (10/10). Includes the Intel
+macOS SIMD correction, Phonon-2, long-audio AudioSeal capacity and native CPU
+VoxCPM2 RALM prefill. Index models remain separate work.
+
+Both Intel archives passed extracted-package architecture/startup checks in
+release run `36896786413` and were downloaded to verify their published
+contents (CLI, quantizer, C2PA sidecar and license notices). SHA256:
+
+- `crispasr-macos-x86_64.tar.gz`:
+  `f1413a8a1fc5e5e7a65622d42d2c73d547257f932d6b7353501d4d22b51ccb46`
+- `crispasr-macos-x86_64-cpu-legacy.tar.gz`:
+  `9e2ca49bbd80963f19919e2e7019fcecfe2a1508065b8d89d3267636733f6e55`
+
+The Windows Vulkan library's first SDK download lost its connection; targeted
+retry `36897826261` built and uploaded that library successfully. Other release
+assets are still being verified under the release claim in `PLAN.md`. Rust and
+Dart wrapper publication succeeded. The tag and GitHub release retain the
+release notes after their root-file archival.
+
 ## DONE 2026-10-01 — Intel macOS SIMD release regression (#484)
 
 The first official Intel CLI archive in v0.8.39 selected portable/SSE2 CPU
