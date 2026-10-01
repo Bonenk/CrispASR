@@ -69,7 +69,11 @@ def main():
             return tokenizer.batch_decode(getattr(generated, "sequences", generated), skip_special_tokens=True)[0].strip()
     report = {"engine": args.engine, "model": args.model, "host": platform.platform(),
               "threads": args.threads, "load_s": time.perf_counter() - loaded,
-              "trace_only": args.trace, "clips": []}
+              "trace_only": args.trace, "clips": [],
+              "controls": {key: os.environ.get(key) for key in (
+                  "CRISPASR_PARAKEET_CPU_BLAS", "CRISPASR_PARAKEET_GGML_DECODE",
+                  "CRISPASR_PARAKEET_ENCODER_BLAS", "CRISPASR_PARAKEET_FORCE_SCALAR",
+                  "OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS")}}
     try:
         for count in ([1] if args.trace else [1, 5]):
             pcm = np.tile(audio, count)

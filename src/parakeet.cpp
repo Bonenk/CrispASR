@@ -3054,7 +3054,8 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
     parakeet_fold_batchnorm(ctx->model, ctx->backend);
 
     if (parakeet_bench_enabled())
-        fprintf(stderr, "parakeet_bench: backend=%s threads=%d\n", ggml_backend_name(ctx->backend), ctx->n_threads);
+        fprintf(stderr, "parakeet_bench: backend=%s threads=%d encoder_blas=%s\n", ggml_backend_name(ctx->backend),
+                ctx->n_threads, ctx->backend_blas ? ggml_backend_name(ctx->backend_blas) : "off");
 
     // Repack F16 conv pw1/pw2 to Q8_0 (issue #81 — the 3D conv layout dodges
     // crispasr-quantize, and the CPU F16 mul_mat path is ~6x slower than Q8_0).

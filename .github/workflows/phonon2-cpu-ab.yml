@@ -136,7 +136,7 @@ jobs:
                 --model "models-live/phonon2-$quant.gguf" --output "results/runtime-$config-$quant.json" \
                 > "results/runtime-$config-$quant.log" 2>&1
             done
-            CRISPASR_PARAKEET_BENCH=1 CRISPASR_PARAKEET_DECODE_TIMING=1 \
+            CRISPASR_SCHED_PROFILE=1 CRISPASR_PARAKEET_BENCH=1 CRISPASR_PARAKEET_DECODE_TIMING=1 \
               python tools/profile_phonon2.py --engine runtime --trace --lib "$PHONON2_LIB" \
                 --model models-live/phonon2-q8_0.gguf --output "results/trace-$config.json" \
                 > "results/trace-$config.log" 2>&1

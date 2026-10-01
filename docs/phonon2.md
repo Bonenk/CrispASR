@@ -266,3 +266,37 @@ and pinned revision. The linked CI run additionally retains full wiring/live
 logs, per-node traces, host details and Python dependency versions. Both Linux
 and macOS jobs passed; the earlier run's missing Python `sentencepiece`
 dependency was corrected before this measurement.
+
+## CPU optimization controls
+
+`CRISPASR_PARAKEET_CPU_BLAS=1` selects OpenBLAS for the cached F32 predictor
+LSTM and joint matrices, and batches the invariant encoder-to-joint projection.
+It is available when OpenBLAS development files are present at configure time
+and `CRISPASR_MEL_BLAS` is on. `=0` keeps the original Linux scalar decoder.
+Apple continues to use Accelerate. `CRISPASR_PARAKEET_FORCE_SCALAR` preserves a
+scalar fallback on either BLAS implementation, including the bulk projections.
+Set BLAS threading before starting the process; the runtime does not change the
+process-wide OpenBLAS thread count just to accelerate small decoder matvecs.
+
+`CRISPASR_PARAKEET_ENCODER_BLAS=1` registers the ggml BLAS backend before CPU
+in the encoder scheduler when running on CPU. Unsupported operations keep their
+CPU kernels. This experiment requires a built/loaded ggml BLAS backend and stays
+off by default; quantized matmuls can pay extra dequantization costs. The explicit
+public thread count is now applied to both CPU backend instances and to the
+optional encoder BLAS backend. The earlier four-thread receipt already matched
+ggml's default of four; this wiring fix makes other requested counts effective.
+Encoder caching remains off.
+
+The CPU A/B workflow validates **31** frontend/encoder/transducer rows against
+an independent Transformers F32 dump: the original 28 rows plus all encoder
+projections, the raw predictor output after the production one-blank SOS, and
+joint logits at frame zero using reference encoder activations. It checks cosine
+and relative RMS error (which bounds global norm-ratio error). The legacy NeMo
+two-zero predictor capture remains available separately. These probes do not
+capture every autoregressive state; decoded-output checks remain required.
+
+`.github/workflows/phonon2-cpu-ab.yml` compares scalar, OpenBLAS with one/four
+BLAS threads, persistent ggml CPU decode, encoder BLAS and both BLAS paths.
+Each runs in a separate process with warmed 11/55-second shapes and three timed
+repeats; diagnostic traces run separately. No new default is justified until
+same-runner timing and transcript receipts pass.
