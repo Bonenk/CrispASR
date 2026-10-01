@@ -1969,6 +1969,25 @@ int main(int argc, char** argv) {
             const float* data = index_echo_stage(ctx.get(), name.c_str(), &count);
             check(name, data, data ? count : 0);
         }
+        if (ref.has("teacherforced_logits") && logits) {
+            auto generated = ref.get_f32("generated_ids");
+            auto expected = ref.get_f32("teacherforced_logits");
+            size_t steps = vocab > 0 ? expected.second / vocab : 0;
+            std::vector<float> trace(logits.get(), logits.get() + vocab);
+            for (size_t i = 0; i + 1 < steps && i < generated.second; ++i) {
+                std::unique_ptr<float, decltype(&free)> step(
+                    index_echo_decode_token(ctx.get(), (int32_t)generated.first[i], &vocab), free);
+                if (!step) break;
+                trace.insert(trace.end(), step.get(), step.get() + vocab);
+            }
+            check("teacherforced_logits", trace.data(), trace.size());
+            if (trace.size() == expected.second) {
+                auto match = ref.compare_argmax("teacherforced_logits", trace.data(), trace.size());
+                printf("[%s] cached greedy token parity (%d/%d)\n", match.top1_match == match.top1_total ? "PASS" : "FAIL",
+                       match.top1_match, match.top1_total);
+                if (match.top1_match != match.top1_total || match.top1_total == 0) ++n_fail;
+            }
+        }
         if (old_audio) setenv("CRISP_AUDIO_DUMP_STAGES", saved_audio.c_str(), 1); else unsetenv("CRISP_AUDIO_DUMP_STAGES");
         if (old_decoder) setenv("CRISPASR_INDEX_ECHO_DUMP_STAGES", saved_decoder.c_str(), 1); else unsetenv("CRISPASR_INDEX_ECHO_DUMP_STAGES");
         std::filesystem::remove_all(directory);

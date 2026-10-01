@@ -73,10 +73,20 @@ def dump(model_dir, audio, stages, **kwargs):
     values['llm_logits'] = out.logits[0, -1].float().numpy().copy()
     for h in handles:
         h.remove()
+    trace_cache = out.past_key_values
     del out
     generated = model.llm.generate(inputs_embeds=x, attention_mask=torch.ones_like(ids),
         max_new_tokens=int(os.getenv('INDEX_ECHO_REF_MAX_TOKENS', '2000')), do_sample=False,
         eos_token_id=[model.tok.eos_token_id, model.im_end], pad_token_id=model.tok.eos_token_id)
     values['generated_ids'] = generated.numpy().astype(np.int32)
     values['generated_text'] = model.tok.decode(generated[0], skip_special_tokens=True).strip()
+    # Replay the reference's own greedy IDs through the saved initial cache.
+    # This separates recurrent/KV errors from divergent sampling decisions.
+    trace = [values['llm_logits']]
+    for i in range(min(16, generated.shape[-1]) - 1):
+        step = model.llm(input_ids=generated[:, i:i + 1], past_key_values=trace_cache,
+                         use_cache=True, logits_to_keep=1)
+        trace_cache = step.past_key_values
+        trace.append(step.logits[0, -1].float().numpy().copy())
+    values['teacherforced_logits'] = np.stack(trace)
     return values

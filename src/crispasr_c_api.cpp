@@ -6562,7 +6562,8 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
         }
         index_echo_set_temperature(s->index_echo_ctx, s->temperature, (uint32_t)s->seed);
         index_echo_set_max_new_tokens(s->index_echo_ctx, s->max_new_tokens);
-        index_echo_set_glossary(s->index_echo_ctx, s->ask.c_str());
+        index_echo_set_ask(s->index_echo_ctx, s->ask.c_str());
+        if (lang_set) fprintf(stderr, "index-echo: source-language hints are absent from the released prompt; the model infers the source language\n");
         auto* result = index_echo_transcribe(s->index_echo_ctx, pcm, n_samples);
         if (!result) { delete r; return nullptr; }
         for (int i = 0; i < result->n_cues; ++i) {

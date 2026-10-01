@@ -29,9 +29,10 @@ for test in ['test-index-echo-windows', 'test-session-autochunk', 'test-arch-bac
     run(BUILD / 'bin' / test)
 run(sys.executable, ROOT / 'tools/gen-feature-matrix.py', '--crispasr', BUILD / 'bin/crispasr')
 run(sys.executable, ROOT / 'tools/gen-backend-caps-table.py', '--crispasr', BUILD / 'bin/crispasr')
-for relative in ['docs/feature-matrix.md', 'docs/feature-matrix.json', 'src/core/backend_caps_table.h']:
+for relative in ['docs/feature-matrix.md', 'docs/feature-matrix.html', 'src/core/backend_caps_table.h']:
     source = ROOT / relative
     if source.exists(): shutil.copy2(source, OUT / source.name)
+run('cmake', '--build', BUILD, '--target', 'crispasr-lib', '-j', '4')
 if args.build_only:
     (OUT / 'summary.md').write_text('Index-Echo shared library, CLI, diff and integration unit tests built. '
                                    'Model parity remains pending.\n')

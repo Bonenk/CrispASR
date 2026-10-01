@@ -186,6 +186,7 @@ TEST_CASE("every emitted backend name is a name a surface can open", "[unit][arc
         "gigaam",
         "canary",
         "canary-qwen",
+        "index-echo",
         "fastconformer-ctc",
         "lfm2-audio",
         "mini-omni2",

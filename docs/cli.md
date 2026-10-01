@@ -904,6 +904,17 @@ causing `--max-len` to silently have no effect.
 
 ## Sampling / decoding (whisper + LLM backends)
 
+`index-echo` produces bilingual subtitle cues: transcript followed by translation.
+Set `--target-lang en`, `ja` or `es` (default `en`). Its released recipe uses
+Chinese input; other source languages are under validation. `--prompt` accepts
+comma/newline-separated glossary entries (`name:translation`), and `--ask`
+overrides the instruction. Custom instructions should preserve the timestamp,
+transcript, translation three-line format. It supports greedy or temperature
+sampling, seed and explicit `--max-new-tokens` (default 2000), with its own
+bounded windows and context history. The tower GGUF needs the decoder named
+in its metadata beside it; a Silero companion enables speech-boundary windows.
+Development artifacts are private until parity and decoded-output checks pass.
+
 | Flag | Meaning |
 |---|---|
 | `-tp F`, `--temperature F` | Sampling temperature. `0` = pure argmax (default, bit-identical). `> 0` enables multinomial sampling for whisper, voxtral, voxtral4b, qwen3, granite |

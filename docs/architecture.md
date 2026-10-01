@@ -319,6 +319,49 @@ Detailed architecture notes for backends whose design warrants more than
 a one-line summary. The [README backend table](../README.md#asr-backends)
 links here for each entry.
 
+### index-echo
+
+Index-Echo S2TT 2B combines a 32-layer AuT encoder (`d=1280`, 20 heads,
+FFN 5120, three stride-2 2D convolutions) and a residual 2048-dimensional
+connector with a Qwen3.5 2B text decoder. The decoder has 24 blocks: three
+gated delta-network blocks followed by one gated full-attention block,
+repeated six times. The published package also contains vision weights;
+the speech path does not use them. The upstream inference script documents
+Chinese transcription with English, Japanese or Spanish translation.
+English recognition is being checked separately rather than inferred from
+the requested target language.
+
+The encoder uses `crisp_audio`; the residual connector is a ggml graph.
+The decoder uses CrispASR's private llama core, including its hybrid KV and
+recurrent-state cache. Prefix tokens, audio embeddings and suffix tokens are
+prefilled into one sequence at consecutive positions. Each window clears the
+decoder cache; up to five previous windows' transcript/translation pairs
+become text context. Each new transcription call starts with empty history.
+
+The primary `index_echo` GGUF contains the tower, frontend constants and
+connector. `index_echo.decoder_file` names a sibling standard Qwen3.5 GGUF;
+both files must be present. F16, Q8_0 and Q4_K cohorts have matching companion
+names. A sibling `ggml-silero-v6.2.0.bin`, or an explicit `--vad-model`, enables
+the released speech-window merge recipe (300 ms silence, 300/500 ms padding,
+60 s maximum, short-tail merge). Without that companion, inference uses
+bounded 60 s windows. Native Silero boundaries have 10 ms resolution.
+
+The prompt preserves the released empty-think template and repeated audio-pad
+tokens. `--target-lang en|ja|es` chooses the translation language; `--prompt`
+supplies glossary entries; `--ask` overrides the instruction. Custom asks
+must retain the three-line subtitle format if parsed cues are desired.
+The frontend pads before centered STFT and keeps the attention-mask frame
+count, including partial final hops. The released Transformers 5.6.0 CPU
+encoder does not apply its constructed window mask; the conversion explicitly
+records full attention. GPU reference behavior remains to be checked.
+
+Validation is in progress on the feature branch. The independent reference
+executes the pinned released inference class in CPU F32. `crispasr-diff
+index-echo` checks frontend, convolution and encoder stages, connector,
+prompt IDs, all decoder blocks, logits and a cached 16-token teacher-forced
+trace. `INDEX_ECHO_BENCH=1` prints stage timings; speed measurements follow
+correctness validation.
+
 ### Canary
 
 `canary` is one metadata-driven encoder-decoder backend, not a backend per
