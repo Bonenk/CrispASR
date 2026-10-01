@@ -128,7 +128,7 @@ for quant in ("q8_0", "f16", "q4_k"):
             cmd = [cli, "--backend", "voxcpm2", "-m", model, "--tts", text, "--tts-output", wav,
                    "--seed", "2", "-t", "4", "-ng"]
             if case == "clone":
-                cmd += ["--voice", reference, "--i-have-rights", "--no-spoken-disclaimer"]
+                cmd += ["--voice", reference, "--i-have-rights"]
             env = {"CRISPASR_VOXCPM2_RALM_PREFILL_BATCH": "1" if arm == "batched" else "0",
                    "CRISPASR_VOXCPM2_BENCH": "1"}
             rc, log = run(cmd, f"{quant}-{case}-{arm}", env)

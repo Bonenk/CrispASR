@@ -1102,6 +1102,32 @@ static void sync_ralm_kv_cpu_to_backend(voxcpm2_context* ctx) {
     }
 }
 
+// Preserve the eager FP32 reduction/activation order during CPU prefill.
+// Small changes before a quantized matmul can cross activation-quantization
+// thresholds and accumulate over the residual layers, even at T=1.
+static void ralm_prefill_norm_cpu(ggml_tensor* dst, const ggml_tensor* src, const ggml_tensor* weight, int ith, int nth,
+                                  void* userdata) {
+    const float eps = *(const float*)userdata;
+    for (int64_t t = ith; t < src->ne[1]; t += nth) {
+        const float* x = (const float*)((const char*)src->data + t * src->nb[1]);
+        float* y = (float*)((char*)dst->data + t * dst->nb[1]);
+        rms_norm_cpu(x, (const float*)weight->data, y, (int)src->ne[0], eps);
+    }
+}
+
+static void ralm_prefill_swiglu_cpu(ggml_tensor* dst, const ggml_tensor* gate, const ggml_tensor* up, int ith, int nth,
+                                    void*) {
+    for (int64_t t = ith; t < gate->ne[1]; t += nth) {
+        const float* g = (const float*)((const char*)gate->data + t * gate->nb[1]);
+        const float* u = (const float*)((const char*)up->data + t * up->nb[1]);
+        float* y = (float*)((char*)dst->data + t * dst->nb[1]);
+        for (int64_t i = 0; i < gate->ne[0]; ++i) {
+            const float sig = 1.0f / (1.0f + std::exp(-g[i]));
+            y[i] = g[i] * sig * u[i];
+        }
+    }
+}
+
 // Build the RALM cgraph (all 8 layers, decode or causal prefill). Same structure as
 // build_tslm_step_graph but simpler: no RoPE (rope_theta=0 makes
 // ggml_rope_ext a no-op), uses RALM hparams/weights/KV. Dynamic (non-
@@ -1158,13 +1184,19 @@ static ggml_cgraph* build_ralm_step_graph(voxcpm2_context* ctx, int n_past, int 
     };
 
     ggml_tensor* cur = hidden_in;
+    const bool eager_cpu_math = !output_norm && core_cpu_backend::is_cpu(ctx->backend);
+    auto norm = [&](ggml_tensor* input, ggml_tensor* weight) {
+        if (eager_cpu_math)
+            return ggml_map_custom2(ctx0, input, weight, ralm_prefill_norm_cpu, GGML_N_TASKS_MAX,
+                                    (void*)&ctx->hp.rms_norm_eps);
+        return ggml_mul(ctx0, ggml_rms_norm(ctx0, input, eps), weight);
+    };
     for (uint32_t il = 0; il < hp.ralm_n_layers; il++) {
         const vox_lm_layer& L = W.ralm_layers[il];
         ggml_tensor* residual = cur;
 
         // Attention block (RMSNorm x scale -> kv_self_attn -> residual).
-        ggml_tensor* x = ggml_rms_norm(ctx0, cur, eps);
-        x = ggml_mul(ctx0, x, L.attn_norm_w);
+        ggml_tensor* x = norm(cur, L.attn_norm_w);
 
         ggml_tensor* attn = core_attn::kv_self_attn(ctx0, gf, x, L.attn_q_w, L.attn_k_w, L.attn_v_w, L.attn_o_w,
                                                     /*q_norm_w*/ nullptr, /*k_norm_w*/ nullptr, positions, causal_mask,
@@ -1175,9 +1207,16 @@ static ggml_cgraph* build_ralm_step_graph(voxcpm2_context* ctx, int n_past, int 
 
         // FFN block (RMSNorm x scale -> SwiGLU -> residual).
         residual = cur;
-        x = ggml_rms_norm(ctx0, cur, eps);
-        x = ggml_mul(ctx0, x, L.ffn_norm_w);
-        ggml_tensor* mlp = core_ffn::swiglu(ctx0, x, L.ffn_gate_w, L.ffn_up_w, L.ffn_down_w);
+        x = norm(cur, L.ffn_norm_w);
+        ggml_tensor* mlp;
+        if (eager_cpu_math) {
+            ggml_tensor* gate = ggml_mul_mat(ctx0, L.ffn_gate_w, x);
+            ggml_tensor* up = ggml_mul_mat(ctx0, L.ffn_up_w, x);
+            ggml_tensor* h = ggml_map_custom2(ctx0, gate, up, ralm_prefill_swiglu_cpu, GGML_N_TASKS_MAX, nullptr);
+            mlp = ggml_mul_mat(ctx0, L.ffn_down_w, h);
+        } else {
+            mlp = core_ffn::swiglu(ctx0, x, L.ffn_gate_w, L.ffn_up_w, L.ffn_down_w);
+        }
         cur = ggml_add(ctx0, residual, mlp);
     }
 
