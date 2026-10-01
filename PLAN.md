@@ -11,27 +11,6 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-01 — Phonon-2 CPU optimization
-
-Worktree `/mnt/volume1/wt-phonon2-cpu`, branch `perf/phonon2-cpu`.
-Baseline main `aa1a85f13`. First native sweep **36813752349** is green
-(`fd9b0c5f9`, AMD EPYC 7763 / 4 vCPUs): Q8 scalar 2.440/13.010 s → OpenBLAS4
-1.852/10.007 s for warmed 11/55 s shapes (~24% less time). Persistent ggml CPU
-decode is similarly fast. All six paths pass 31 F16 stages (cos ≥0.999995,
-global magnitude-error bound <0.063%); every sweep transcript matches scalar.
-Encoder BLAS4 severely regresses short audio and remains opt-in.
-Local corpus checks: BLAS1 and ggml+backend encoder projection each preserve
-63/63 original outputs (21 clips × F16/Q8/Q4). The bulk projection probe now
-uses the exact production implementation. Final candidate branch `f88850b30`
-selects ggml predictor/joint + backend projection only for Phonon-2 metadata
-on non-Apple CPU builds with AVX2/F16C; legacy overrides remain. Local candidate
-31-stage diff passes (min cosine 0.999996, magnitude bound 0.066%).
-Native CI **36818985927** (`f88850b30`) is running the default timing A/B
-and encoder BLAS with one thread. Encoder cache stays off. Go/Rust bindings
-and cgo drift checks pass; local parameter/flash-default tests pass 22 assertions.
-Local native build: `/mnt/volume1/phonon2-cpu-build`; receipts under
-`/mnt/volume1/tmp-overflow/issue481/cpu-speed`.
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)

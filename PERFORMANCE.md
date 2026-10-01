@@ -4,6 +4,53 @@ Test audio: jfk.wav (11.0s), Q4_K quantization, greedy decode (`-bs 1`).
 
 ---
 
+## Phonon-2 — CPU optimization (2026-10-01, #481)
+
+Native AVX2/F16C Phonon-2 CPU builds use persistent ggml predictor/joint graphs
+and a bulk backend encoder projection. Apple retains Accelerate; other models
+and instruction sets retain their previous defaults. The original scalar path
+and OpenBLAS experiments remain available through documented environment gates.
+Encoder BLAS scheduling stays opt-in; encoder caching stays off.
+
+The first full sweep,
+[CI 36813752349](https://github.com/CrispStrobe/CrispASR/actions/runs/36813752349),
+compares all paths on an AMD EPYC 7763 four-vCPU runner, four inference threads.
+Q8 scalar 2.440/13.010 s becomes OpenBLAS4 1.852/10.007 s on warmed 11/55 s
+shapes (24% less inference time). Persistent ggml decoding is similarly fast;
+the separate decoder trace reveals an 82 ms scalar projection still worth
+removing. Encoder BLAS4 regresses short clips and remains experimental.
+
+The selected default is verified in
+[CI 36818985927](https://github.com/CrispStrobe/CrispASR/actions/runs/36818985927):
+
+| Engine/export | Original 11 s | Default 11 s | Original 55 s | Default 55 s | Default RSS |
+|---|---:|---:|---:|---:|---:|
+| F16 | 4.364 s | 3.704 s | 22.562 s | 19.393 s | 2,258 MiB |
+| Q8_0 | 2.439 s | 1.782 s | 13.000 s | 9.856 s | 1,611 MiB |
+| Q4_K | 2.500 s | 1.860 s | 13.287 s | 10.252 s | 1,315 MiB |
+| Independent Python F32 | — | 1.798 s | — | 8.931 s | 3,406 MiB |
+
+Q8 cuts original inference time by 27%/24% (1.369×/1.319× speedup), is roughly
+tied with Python on 11 s and takes 10% longer on 55 s, using 53% less peak RAM.
+Q8 remains recommended. These are shape-warmed medians of three calls, excluding
+load/profiling; the 55 s shape repeats JFK five times. One-thread encoder BLAS
+still regresses short Q8 to 2.940 s and long Q8 to 12.456 s versus this default.
+All ten final configurations pass 31 F16 rows; the selected default's minimum
+cosine is 0.999998 and global norm-error bound 0.058%. Its projection/predictor
+SOS/joint probes each print cosine 1.000000. Full per-stage results and
+[raw receipts](docs/phonon2-cpu-2026-10-01.json) are checked in.
+
+All six first-sweep paths pass 31 F16 reference rows, including full encoder
+projection, production one-blank predictor SOS and frame-zero joint logits.
+Cosine alone is insufficient: each row also passes relative RMS error, bounding
+its global tensor norm-ratio error. Both OpenBLAS and ggml with backend projection
+preserve 63/63 original corpus outputs across F16/Q8/Q4. These probes do not
+cover every autoregressive state. Original quantization differences against
+Python remain unchanged.
+
+See [controls and complete validation scope](docs/phonon2.md). These are CPU
+measurements; they do not establish physical Apple GPU or upstream MLX parity.
+
 ## Phonon-2 — integration and fair CPU profile (2026-09-30, #481)
 
 Measured after wiring/live/F16 parity gates in

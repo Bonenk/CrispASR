@@ -6,6 +6,34 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-01 — Phonon-2 CPU decoder optimization (#481)
+
+Native AVX2/F16C Phonon-2 CPU builds select the existing persistent ggml
+predictor/joint graphs and bulk backend encoder projection. Apple keeps
+Accelerate; other models and CPU ISAs keep their previous paths. Explicit
+scalar/ggml/projection controls remain available. Linux OpenBLAS decoding and
+encoder BLAS scheduling ship as opt-in experiments. Requested thread counts
+now reach both CPU backend instances; optional BLAS threads can be limited
+separately. No encoder graph cache was enabled.
+
+The independent reference pipeline and diff harness now capture 31 rows,
+including the production one-blank predictor SOS, full encoder projection and
+frame-zero joint logits. Production and probe share the bulk CPU projection;
+component probes also follow the selected ggml path. Cosine and magnitude gates
+precede warmed timing; decoded corpus output remains the acceptance check.
+Both OpenBLAS decoding and ggml decoding with backend projection preserve all
+63 original outputs (21 clips × F16/Q8/Q4). The original quantization differences
+against Python remain: 21/21, 19/21 and 15/21 exact respectively.
+
+The first full CPU sweep on EPYC 7763 finds Q8 scalar 2.440/13.010 s →
+OpenBLAS4 1.852/10.007 s on 11/55 s shapes, with ggml decoding similarly fast.
+Encoder BLAS4 substantially regresses short audio and stays opt-in. The final
+same-host default comparison is green: Q8 2.439/13.000 s → 1.782/9.856 s
+(27%/24% less time), min cosine 0.999998 and norm-error bound 0.058%. All 13
+cross-platform CI jobs and 1,960 Linux unit tests pass. Complete measurements are recorded in
+`PERFORMANCE.md` and `docs/phonon2.md`. The manual CPU A/B workflow retains
+parity, transcript, timing, dependency and host receipts for future experiments.
+
 ## DONE 2026-09-30 — #481 integration checklist and profile
 
 Completed the applicable contributing checklist through the shared Parakeet

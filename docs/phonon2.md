@@ -267,39 +267,131 @@ logs, per-node traces, host details and Python dependency versions. Both Linux
 and macOS jobs passed; the earlier run's missing Python `sentencepiece`
 dependency was corrected before this measurement.
 
+## Verified native CPU default (2026-10-01)
+
+[Final CPU CI 36818985927](https://github.com/CrispStrobe/CrispASR/actions/runs/36818985927)
+passes wiring/live guards, independent reference generation, all ten experimental
+31-stage parity gates and warmed timing for the scalar baseline, selected default
+and default plus single-thread encoder BLAS. AMD EPYC 7763, four vCPUs, four
+inference threads; medians of three calls after shape-specific warmup. Loading
+and instrumentation are excluded. The 55-second shape repeats JFK five times.
+
+| Engine/export | Original, 11 s | New default, 11 s | Original, 55 s | New default, 55 s | New peak RSS |
+|---|---:|---:|---:|---:|---:|
+| F16 | 4.364 s | 3.704 s | 22.562 s | 19.393 s | 2,258 MiB |
+| Q8_0 | 2.439 s | 1.782 s | 13.000 s | 9.856 s | 1,611 MiB |
+| Q4_K | 2.500 s | 1.860 s | 13.287 s | 10.252 s | 1,315 MiB |
+| Independent Python F32 | — | 1.798 s | — | 8.931 s | 3,406 MiB |
+
+Q8 takes **27% less time on 11 seconds and 24% less on 55 seconds** than the
+original scalar runtime (1.369×/1.319× speedup). It is approximately tied with
+Python on the short shape and takes 10% more time on the longer shape, while
+using 53% less peak process RAM. Q8 remains the recommended export: Q4 is
+smaller but slower here. Every timed configuration's transcript matches its
+same-quant scalar baseline at both lengths.
+
+The selected default passes all 31 F16 rows against the independent Python F32
+reference. Cosines below are printed to six decimal places; a value of 1.000000
+does not imply bitwise equality. Magnitude bounds use relative RMS error with a
+1% rounding margin and bound the global tensor norm, not every individual row.
+
+| Stage group | Minimum cosine | Maximum global norm-error bound |
+|---|---:|---:|
+| Mel | 1.000000 | 0.00914% |
+| Subsampling | 1.000000 | 0.02277% |
+| 24 encoder layers | 0.999998 | 0.05417% |
+| Encoder output (runtime/reference mel) | 0.999998 | 0.05789% |
+| Full encoder projection | 1.000000 | 0.01531% |
+| Production predictor SOS | 1.000000 | 0.00541% |
+| Frame-zero joint logits | 1.000000 | 0.00532% |
+
+Separate warmed Q8 traces report decoder 33.4 ms with backend projection,
+versus 684.8 ms for the original scalar decoder; backend projection is 1.6 ms. These diagnostic
+times are not benchmark medians. Encoder compute remains the main bottleneck;
+FFN kernel work is still the next target, while encoder caching stays off.
+Single-thread encoder BLAS regresses short Q8 to 2.940 s and long Q8 to 12.456 s
+relative to the selected default. Its F16 long-clip improvement does not justify
+a general default; retain the gated experiment and its corpus output changes.
+
+[Cross-platform CI 36819484240](https://github.com/CrispStrobe/CrispASR/actions/runs/36819484240)
+passes all 13 jobs, including 1,960 Linux unit tests, dynamic backend loading,
+Vulkan, ASan, Windows, macOS, iOS and Android. Go/Rust binding checks, linkage
+generator checks and the local auto/explicit/renamed/repeated/flash-off live guard
+also pass. The [complete receipt](phonon2-cpu-2026-10-01.json) retains raw repeated
+times, all stages, exact transcripts, corpus comparisons, host details and model
+checksums for both CPU sweeps.
+
 ## CPU optimization controls
 
-`CRISPASR_PARAKEET_CPU_BLAS=1` selects OpenBLAS for the cached F32 predictor
-LSTM and joint matrices, and batches the invariant encoder-to-joint projection.
-It is available when OpenBLAS development files are present at configure time
-and `CRISPASR_MEL_BLAS` is on. `=0` keeps the original Linux scalar decoder.
-Apple continues to use Accelerate. `CRISPASR_PARAKEET_FORCE_SCALAR` preserves a
-scalar fallback on either BLAS implementation, including the bulk projections.
-Set BLAS threading before starting the process; the runtime does not change the
-process-wide OpenBLAS thread count just to accelerate small decoder matvecs.
+On Phonon-2 CPU builds with AVX2 and F16C, prediction and joint decoding use
+persistent ggml graphs by default, including one bulk encoder-to-joint projection.
+Apple retains Accelerate; other CPU models and instruction sets retain their
+previous paths. `CRISPASR_PARAKEET_GGML_DECODE=0` restores the scalar decoder
+on Linux. `CRISPASR_RNNT_GPU_ENC_PROJ=0` independently restores the CPU
+projection. These controls also allow A/B comparisons against the original.
+
+To select the experimental OpenBLAS decoder, set both
+`CRISPASR_PARAKEET_GGML_DECODE=0` and `CRISPASR_PARAKEET_CPU_BLAS=1`.
+It uses the cached F32 predictor LSTM and joint matrices, and batches the
+invariant encoder projection. OpenBLAS development files must be present at
+configure time and `CRISPASR_MEL_BLAS` enabled. `CRISPASR_PARAKEET_FORCE_SCALAR`
+disables automatic CPU ggml selection and CPU BLAS, preserving the original
+scalar path; an explicit `GGML_DECODE=1` still overrides automatic selection.
+Set BLAS threading before starting the process; the decoder does not change the
+process-wide OpenBLAS thread count for small matvecs.
 
 `CRISPASR_PARAKEET_ENCODER_BLAS=1` registers the ggml BLAS backend before CPU
-in the encoder scheduler when running on CPU. Unsupported operations keep their
-CPU kernels. This experiment requires a built/loaded ggml BLAS backend and stays
-off by default; quantized matmuls can pay extra dequantization costs. The explicit
-public thread count is now applied to both CPU backend instances and to the
-optional encoder BLAS backend. The earlier four-thread receipt already matched
-ggml's default of four; this wiring fix makes other requested counts effective.
-Encoder caching remains off. The ggml BLAS backend sets its BLAS thread count
-to the public thread count; with OpenBLAS that setting is process-wide and also
-affects the decoder. The profiling receipt queries the actual thread count after
-inference as well as recording the startup environment.
+in the encoder scheduler. Unsupported operations keep CPU kernels. This
+experiment requires a built/loaded ggml BLAS backend and stays off by default.
+Quantized matmuls can pay extra dequantization costs. The public thread count
+now reaches both CPU backend instances and optional encoder BLAS. The earlier
+four-thread receipt already matched ggml's default of four; other requested
+counts now take effect. `CRISPASR_PARAKEET_ENCODER_BLAS_THREADS=1` overrides
+BLAS threads within the public thread limit. The ggml BLAS backend changes
+OpenBLAS threading process-wide, also affecting a BLAS decoder; profiling
+records the actual count after inference. Encoder caching remains off.
 
 The CPU A/B workflow validates **31** frontend/encoder/transducer rows against
 an independent Transformers F32 dump: the original 28 rows plus all encoder
 projections, the raw predictor output after the production one-blank SOS, and
 joint logits at frame zero using reference encoder activations. It checks cosine
-and relative RMS error (which bounds global norm-ratio error). The legacy NeMo
-two-zero predictor capture remains available separately. These probes do not
-capture every autoregressive state; decoded-output checks remain required.
+and relative RMS error, which bounds global tensor norm-ratio error. The legacy
+NeMo two-zero probe remains available separately. These probes do not capture
+every autoregressive state; decoded-output checks remain required.
 
-`.github/workflows/phonon2-cpu-ab.yml` compares scalar, OpenBLAS with one/four
-BLAS threads, persistent ggml CPU decode, encoder BLAS and both BLAS paths.
-Each runs in a separate process with warmed 11/55-second shapes and three timed
-repeats; diagnostic traces run separately. No new default is justified until
-same-runner timing and transcript receipts pass.
+`.github/workflows/phonon2-cpu-ab.yml` offers a manual selected-default or full
+experimental sweep. Each configuration runs in a separate process with warmed
+11/55-second shapes and three timed repeats; diagnostic traces run separately.
+The first full sweep is retained in
+[CI run 36813752349](https://github.com/CrispStrobe/CrispASR/actions/runs/36813752349):
+AMD EPYC 7763, four vCPUs, four inference threads. This is a different CPU from
+the September 30 receipt, so compare paths within each run.
+
+| Decoder / encoder configuration | Q8, 11 s median | Q8, 55 s median |
+|---|---:|---:|
+| Original scalar / ggml CPU | 2.440 s | 13.010 s |
+| OpenBLAS, one thread / ggml CPU | 1.885 s | 10.307 s |
+| OpenBLAS, four threads / ggml CPU | 1.852 s | 10.007 s |
+| Persistent ggml, scalar projection / ggml CPU | 1.869 s | 10.304 s |
+| Scalar / encoder BLAS, four threads | 6.826 s | 14.815 s |
+| OpenBLAS / encoder BLAS, four threads | 6.705 s | 11.881 s |
+
+All first-sweep configurations pass 31-stage parity and unchanged transcripts
+for all three exports at both lengths. The OpenBLAS decoder cuts Q8 time by
+24%. The ggml decoder is similarly fast but the separate trace still spends
+82 ms in the scalar encoder projection. This motivates the bulk backend
+projection used by the selected native CPU path. Both OpenBLAS and the ggml
+path with backend projection also preserve all **63** original corpus outputs
+(21 clips × F16/Q8/Q4). This is equality with the original runtime; original
+Python transcript agreement is 21/21, 19/21 and 15/21 respectively.
+
+The four-thread encoder BLAS experiment regresses short clips substantially
+and stays opt-in. Its long F16 improvement does not justify a general default.
+The dedicated final comparison additionally checks the native default and a
+one-thread encoder BLAS experiment on the same host as their scalar baseline.
+
+The single-thread encoder BLAS corpus experiment preserves 61/63 original
+outputs: one Q8 name spelling and one Q4 comma change, both toward the Python
+reference. Exact Python agreement becomes 21/21 F16, 20/21 Q8 and 16/21 Q4.
+These are recorded as output changes, not accuracy regressions; the experimental
+path remains separate from the default that preserves every original output.

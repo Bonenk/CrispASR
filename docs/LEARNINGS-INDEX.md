@@ -17,7 +17,7 @@ per-backend porting detail (Per-model port notes + the family cross-reference).
 Reach for the topic groups when you are stuck on a *technique*, and the
 cross-reference when you already know which model you are touching.
 
-## Index by topic (310 lessons)
+## Index by topic (311 lessons)
 
 **Security & untrusted input** (2)
 
@@ -315,7 +315,7 @@ cross-reference when you already know which model you are touching.
 - L14882 — `git apply --3way` STAGES its result — a later `git add X && git commit` sweeps it up
 - L17160 — CrispEmbed #31 WASM OCR e2e
 
-**Per-model port notes** (44)
+**Per-model port notes** (45)
 
 - L848 — A model's capability list cannot be inferred from its vocabulary — and forcing a fake list does not simulate having the capability
 - L3453 — Multi-stream token architecture (Mini-Omni2)
@@ -361,6 +361,7 @@ cross-reference when you already know which model you are touching.
 - L18218 — TADA TTS time embedding bugs
 - L18266 — Four bugs that together caused empty/garbage transcripts; all patched in src/vibevoice.cpp +…
 - L18491 — "Verified byte-identical at 225 s" verified a clip, not a length — and a decoder that drops spans needs a repair pass, not a better cap
+- L19206 — 2026-10-01 — Parakeet / Phonon-2 CPU decoding: probe the production projection and SOS
 
 **Uncategorised** (9)
 
@@ -385,7 +386,7 @@ lookup, not a partition.
 - **vibevoice** (15) — L270, L1093, L2244, L3151, L5745, L6514, L9025, L13377, L13412, L13455, L14131, L15587, L15607, L15838, L18266
 - **tada** (9) — L1574, L1947, L2291, L2341, L2355, L13526, L13789, L16515, L18218
 - **whisper** (23) — L768, L2460, L3438, L4238, L4422, L4495, L4657, L5164, L6105, L8076, L8444, L13288, L15146, L15652, L15695, L15761, L16203, L16751, L17092, L17848, L17908, L18024, L18718
-- **parakeet / TDT** (19) — L55, L539, L1301, L2460, L2493, L3562, L4495, L4867, L6965, L8959, L11277, L11362, L12402, L13960, L15103, L15146, L16203, L18024, L18491
+- **parakeet / TDT** (20) — L55, L539, L1301, L2460, L2493, L3562, L4495, L4867, L6965, L8959, L11277, L11362, L12402, L13960, L15103, L15146, L16203, L18024, L18491, L19206
 - **moss** (13) — L1028, L1224, L1716, L1918, L2093, L2099, L2390, L2415, L2440, L3562, L14766, L15521, L15539
 - **firered** (9) — L1885, L5073, L5164, L5745, L5912, L6776, L13907, L15652, L15695
 - **funasr / sensevoice / SANM** (2) — L9508, L11772

@@ -228,8 +228,8 @@ int parakeet_test_audio(struct parakeet_context* ctx, const float* samples, int 
 float* parakeet_joint_project_encoder(struct parakeet_context* ctx, const float* enc_frames, int T_enc, int d_model,
                                       int* out_joint_hidden);
 
-// Run predictor on blank/SOS token (initial state).
-// Output: malloc'd (1, pred_hidden) — the LSTM output after feeding blank.
+// Legacy NeMo capture: two blank steps from zero LSTM state (SOS + pad).
+// Output: malloc'd (1, pred_hidden).
 // Caller must free().
 float* parakeet_predictor_initial(struct parakeet_context* ctx, int* out_pred_hidden);
 // Production greedy start: one blank token, zero LSTM state.

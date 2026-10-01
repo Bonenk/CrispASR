@@ -8,8 +8,6 @@ on:
         options: [default, full]
         default: default
         description: Compare the selected default or all experimental paths
-  push:
-    branches: [perf/phonon2-cpu]
 
 permissions:
   contents: read

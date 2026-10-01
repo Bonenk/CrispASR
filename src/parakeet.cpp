@@ -1469,10 +1469,11 @@ struct parakeet_emitted_token {
     float p;     // softmax probability of the emitted token [0, 1]
 };
 
-// §232 — GPU decode via the shared core_rnnt_ggml helpers (predictor LSTM +
-// joint as ggml graphs on ctx->backend). Default ON when the decode backend is a
-// GPU (P100 A/B: 5-12x faster, transcript-identical — LEARNINGS 33);
-// Apple Accelerate on Apple CPU; opt-in BLAS or scalar loops on other CPU builds. Override PARAKEET_GGML_DECODE=1/0; RNNT_GGML_PERSTEP = per-step path.
+// Predictor LSTM and joint decoding share persistent core_rnnt_ggml graphs.
+// Default on CUDA/Vulkan and native AVX2/F16C Phonon-2 CPU builds; Apple keeps
+// Accelerate and other CPU models keep their existing scalar/BLAS defaults.
+// CRISPASR_PARAKEET_GGML_DECODE=1/0 overrides selection; RNNT_GGML_PERSTEP
+// selects the legacy per-step graph path.
 //
 // Returns whether to use ggml decode, and builds the persistent `gdec` when so.
 // Shared by every parakeet decode variant (greedy, beam, maes, rnnt).
@@ -1513,9 +1514,9 @@ static bool parakeet_ggml_decode_active(const parakeet_context* ctx) {
 // first operation was still the T*640*1024 encoder projection in a scalar CPU
 // loop on non-Apple builds. The Q4 P100 A/B cut varied-audio TDT wall time from
 // 2.56 s to 1.15 s with an identical 301-word transcript, so use the backend
-// projection by default on the measured CUDA path. Other GPU backends remain
-// opt-in until they have the same transcript and timing evidence; `=0` retains
-// the measured scalar fallback everywhere.
+// projection by default on the measured CUDA path and native Phonon-2 CPU
+// path. Other GPU backends remain opt-in until transcript and timing evidence
+// supports them; `=0` retains the CPU scalar/BLAS projection fallback.
 static bool parakeet_gpu_encoder_projection(const parakeet_context* ctx) {
     if (const char* e = crispasr_env::get("CRISPASR_RNNT_GPU_ENC_PROJ"))
         return *e == '1';
