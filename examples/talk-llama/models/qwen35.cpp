@@ -1,6 +1,7 @@
 #include "models.h"
 
 #include "llama-memory-recurrent.h"
+#include "qwen35-norm.h"
 
 llm_build_qwen35::llm_build_qwen35(const llama_model& model, const llm_graph_params& params)
     : llm_build_delta_net_base(params), model(model) {
@@ -286,10 +287,8 @@ ggml_tensor* llm_build_qwen35::build_layer_attn_linear(llm_graph_input_rs* inp, 
     cb(k_conv, "k_conv", il);
     cb(v_conv, "v_conv", il);
 
-    const float eps_norm = hparams.f_norm_rms_eps;
-
-    q_conv = ggml_l2_norm(ctx0, q_conv, eps_norm);
-    k_conv = ggml_l2_norm(ctx0, k_conv, eps_norm);
+    q_conv = llama_qwen35::l2_norm(ctx0, q_conv);
+    k_conv = llama_qwen35::l2_norm(ctx0, k_conv);
 
     //q_conv = ggml_cont_4d(ctx0, q_conv, head_k_dim, num_k_heads, n_seq_tokens, n_seqs);
     //k_conv = ggml_cont_4d(ctx0, k_conv, head_k_dim, num_k_heads, n_seq_tokens, n_seqs);
