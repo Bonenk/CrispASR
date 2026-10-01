@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.8.40
+
+* **Native ASR:** Phonon-2 English recognition through the shared Parakeet
+  engine, with model metadata detection and registry selection. Q8_0 is the
+  recommended export; native CPU decoder optimizations retain fallback gates.
+* **AudioSeal:** graph and scheduler capacity scale with audio length, fixing
+  embedding/detection aborts on clips longer than approximately two seconds.
+* **VoxCPM2:** batched RALM prefill defaults on for native AVX2/F16C CPU F16/Q8
+  models. Q4 remains opt-in after failing strict state/speech parity checks.
+* **Native distribution:** the standard Intel macOS CLI restores AVX2/FMA/F16C
+  kernels with Accelerate; a separate CPU-legacy archive keeps the SSE2 floor.
+  Both Intel archive variants require and bundle the matching C2PA sidecar.
+
 ## 0.8.39
 
 * **VoxCPM2 synthesis:** the bundled native library processes the TSLM prompt

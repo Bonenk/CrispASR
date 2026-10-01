@@ -24,6 +24,9 @@ Stable release branch `release/0.8.40` at `9d50392b4` passed CI `36875335659`
 (13/13) and lint `36875340064` (10/10). All implementation, quality, timing and
 package gates are complete. Next: scripts/bump-version.sh, green checks on the
 versioned target, publish v0.8.40, verify assets, archive notes/remove claim.
+Version bump `bbe3d5a57` used the repository script. Its Flutter changelog warning
+was fixed before publication; the unpublished annotated tag is moved to this
+metadata correction. Validate the final versioned target on the release branch.
 Release publishing is explicitly authorized. Index models (#485) belong to
 another agent and are outside this release task.
 
