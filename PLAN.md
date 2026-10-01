@@ -38,7 +38,12 @@ Checkpoint: gated candidate `bb791dbec` pushed; clean CPU FFN A/B run
 measures exact FFN matrix shapes, 1/2/4 threads, stage parity, load/RSS and
 11/55-second warm inference. Q8_0 has no x86 CPU_REPACK kernel at our pin;
 Q4_K does. Cached F32 BLAS adds 1536 MiB of weights, so remains opt-in.
-Local build in progress; no measured win or default change claimed.
+Local build now passes. Q4 repacking is confirmed active for all 96 FFN
+weights. Same-Q4 stage gate fails: final-layer cosine 0.99594, relative RMS
+3.54%, maximum frame norm difference 1.90%. The 21-clip corpus preserves
+all words; 19/21 exact, two punctuation changes (one closer/farther to Python).
+Do not promote repacking based only on the F16 gate (F16 falls back unchanged).
+Investigating per-matmul parity; cached BLAS speed/parity still pending CI.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
