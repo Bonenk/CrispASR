@@ -13,38 +13,32 @@ it goes stale for more than a day.
 
 ## CLAIMED 2026-10-01 — #484 Intel macOS SIMD / v0.8.40 release
 
-Worktree `/mnt/volume1/wt-478-ralm` (reused clean worktree; new allocation hit disk capacity), branch `fix/484-macos-simd`.
-The v0.8.39 Intel release disables AVX2/FMA/F16C via portable CPU mode.
-Test explicit SIMD versus the shipped baseline on macos-15-intel with the same
-Parakeet Q8 model, four threads, decoded-output checks and warm medians; retain
-an older-Intel baseline archive. Review current issues/PRs, land only validated
-changes, then cut the next release after green checks (maintainer authorized).
-Candidate `785919294` is pushed: shared explicit ISA configuration, SIMD and
-legacy Intel archives, and golden-transcript/magnitude A/B harness. Intel proof:
-https://github.com/CrispStrobe/CrispASR/actions/runs/36865090158 ; package dry run:
-https://github.com/CrispStrobe/CrispASR/actions/runs/36865093345 . Runtime source
-is unchanged. Cross-platform CI: run `36865881142`; lint: `36865884690`.
-Legacy Intel package passed relocation/architecture/startup checks. First Intel
-proof `36865090158` passes short Q8 golden text and encoder gates (cosine
-0.999759738, norm ratio 1.000731459), but stops on a pre-existing long-fixture
-baseline insertion: one extra "and" in the sixth repetition. Candidate runtime
-is unchanged. Harness `62b91ad67` accepts only the exact golden or this specific
-observed variant, requires no candidate error increase, and skips automatic LID
-for the English fixture. Rerun `36867331142` is dispatched. SIMD package and
-cross-platform CI remain in flight. Release notes are drafted in the worktree.
-SIMD package `36865093345` compiled but failed correctly at packaging because
-CMake's optional C2PA fetch got an HTTP error and disabled signing. Fix
-`e11b9595e` fetches/retries the required sidecar before compiling; fresh package
-run `36868274235` is dispatched. Intel ISA/runtime configuration is unchanged;
-CPU A/B `36867331142` continues. All 13 cross-platform checks in `36865881142`
-passed; clang-tidy is still running. Package rerun's legacy arm stopped before
-compiling on six HTTP 504 responses; SIMD arm fetched the same pinned archive
-successfully and is building. The first legacy package is already validated.
-Retry only the failed fetch/build job after the workflow completes.
-Results pending; do not release until validated. Index models (#485) are
-explicitly assigned to another agent by the maintainer; leave that work alone.
-Reporter added a 12-thread/chunked binary-swap confirmation at 12:46 UTC.
-New #485 is a model request, not a release regression; no new PRs.
+Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/484-macos-simd` (reused isolated
+worktree; original checkout stays untouched). Build fix landed at `654037835`:
+standard Intel AVX2/FMA/F16C + Accelerate archive, separate SSE2 legacy archive,
+shared release/proof configuration, and mandatory C2PA fetch with retries.
+
+Full Intel proof `36867331142` **PASS** at `62b91ad67`: F16/Q8/Q4 encoder
+cosine AND magnitude, short golden text, four repeated 66-second Q8 CLI calls
+per arm. Both arms retain the same known extra "and" in the sixth repetition
+(133 words instead of the 132-word ideal); candidate adds no error. Q8 encoder
+cosine 0.999759738, norm ratio 1.000731459; F16 0.999999499 / 1.000050282;
+Q4 0.999200258 / 1.002500181. Timing was noisy, so the raw 3.36x Q8 long median
+is not a settled speed claim. Alternating already-tested binaries on a fresh
+Intel runner: `36872271289` (no compilation; both orderings, warmup + three pairs).
+
+All 13 branch CI jobs `36865881142` and all lint jobs `36865884690` passed.
+SIMD package in `36868274235` passed relocation/architecture/startup at
+`e11b9595e`; legacy package initially passed in `36865093345`. Updated legacy
+job stopped before compiling on repeated HTTP 504; focused attempt 2 fetched
+successfully and is building. Runtime and ISA settings are identical between
+these tested revisions; later changes only harden dependency fetch/preflight.
+
+Next: finish alternating timing and legacy retry; retain receipts, release
+notes and history; wait for green main checks; bump with the release script,
+then publish v0.8.40 and verify assets. Maintainer explicitly authorized this.
+Index models (#485) belong to another agent. No new bug reports or PRs at 13:48.
+
 
 ## CLAIMED 2026-10-01 — #485 Index-Echo S2TT 2B
 
