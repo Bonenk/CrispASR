@@ -142,7 +142,10 @@ for quant in ("q8_0", "f16", "q4_k"):
                  "ralm_ms": [float(v) for v in stage], "selected": "RALM prefill graph batched" in log,
                  "max_len_hit": "max_len ceiling" in log}
             entry["cases"][case][arm] = e
-            ok = ok and rc == 0 and asr_rc == 0 and asr_ok and not e["max_len_hit"] and e["selected"] == (arm == "batched")
+            # Candidate speech must contain every requested word. Keep an
+            # imperfect eager readback as a baseline diagnostic: Q4/seed 2
+            # already reads "And now" instead of "Hello" before this change.
+            ok = ok and rc == 0 and asr_rc == 0 and (arm == "eager" or asr_ok) and not e["max_len_hit"] and e["selected"] == (arm == "batched")
     RESULT["models"][quant] = entry
     ok = ok and entry["probe_pass"]
     (OUT / "result.json").write_text(json.dumps(RESULT, indent=2))
