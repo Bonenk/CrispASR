@@ -958,9 +958,6 @@ static ggml_cgraph* parakeet_build_graph_encoder(parakeet_context* ctx, int T_me
 
 // make_pos_enc moved to core_conformer::make_pos_enc in src/core/fastconformer.h.
 
-// Run the encoder once. Returns enc_out as a flat row-major [T_enc, d_model].
-// Caller computes T_enc as ceil(T_mel / subsampling_factor) (approximately —
-// the actual value depends on the conv arithmetic and is reported back).
 static void parakeet_pin_ffn_blas(parakeet_context* ctx, ggml_cgraph* gf) {
     if (!ctx->ffn_blas || !ctx->model.buf_ffn_f32)
         return;
@@ -994,6 +991,9 @@ static void parakeet_trace_ffn(parakeet_context* ctx, ggml_cgraph* gf) {
         fprintf(stderr, "parakeet_ffn: %s count=%d\n", row.first.c_str(), row.second);
 }
 
+// Run the encoder once. Returns enc_out as a flat row-major [T_enc, d_model].
+// Caller computes T_enc as ceil(T_mel / subsampling_factor) (approximately —
+// the actual value depends on the conv arithmetic and is reported back).
 static std::vector<float> parakeet_encode_mel(parakeet_context* ctx, const float* mel, int n_mels, int T_mel,
                                               int* out_T_enc) {
     if (n_mels != (int)ctx->model.hparams.n_mels) {
