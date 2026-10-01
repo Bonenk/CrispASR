@@ -33,7 +33,9 @@ def check_pipeline(root, out, build, library, models, cohort):
     lib.whisper_vad_probs.restype = ctypes.POINTER(ctypes.c_float)
     lib.whisper_vad_free.argtypes = [ctypes.c_void_p]
     vad = lib.whisper_vad_init_from_file_with_params(str(vad_path).encode(), VADParams(1, False, 0))
-    if not vad:
+    lib.crispasr_silero_enable_context.argtypes = [ctypes.c_void_p]
+    lib.crispasr_silero_enable_context.restype = ctypes.c_bool
+    if not vad or not lib.crispasr_silero_enable_context(vad):
         raise RuntimeError('Native Silero companion could not load')
     companion = models / vad_path.name
     assert not companion.exists(), 'Direct-window fixtures must not autoload VAD'
@@ -67,7 +69,7 @@ def check_pipeline(root, out, build, library, models, cohort):
                     failures.append(name + ': full-pipeline decoded mismatch')
                 decoded[name] = dict(segments=actual, reference=golden, elapsed_seconds=elapsed,
                                      vad_cosine=cosine, vad_max_abs=delta, vad_probabilities=probs.tolist())
-                print('full pipeline', cohort, name, json.dumps(decoded[name], ensure_ascii=False), flush=True)
+                print('full pipeline', cohort, name, json.dumps({k:v for k,v in decoded[name].items() if k != 'vad_probabilities'}, ensure_ascii=False), flush=True)
     finally:
         lib.whisper_vad_free(vad)
         companion.unlink()

@@ -3,6 +3,7 @@
 #include "core/gguf_loader.h"
 #include "core/ggml_cpu_backend.h"
 #include "core/index_echo_windows.h"
+#include "core/silero_context.h"
 #include "core/index_echo_batch.h"
 #include "crispasr.h"
 #include "ggml-alloc.h"
@@ -412,6 +413,10 @@ bool index_echo_set_vad_model(index_echo_context* ctx, const char* path) {
     auto* vad = whisper_vad_init_from_file_with_params(path, params);
     if (!vad)
         return false;
+    if (!crispasr_silero_enable_context(vad)) {
+        whisper_vad_free(vad);
+        return false;
+    }
     if (ctx->vad)
         whisper_vad_free(ctx->vad);
     ctx->vad = vad;
