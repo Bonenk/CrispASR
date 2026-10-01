@@ -11,6 +11,15 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-01 — Phonon-2 CPU optimization
+
+Worktree `/mnt/volume1/wt-phonon2-cpu`, branch `perf/phonon2-cpu`.
+Baseline main `aa1a85f13`. A/B existing scalar and persistent ggml CPU decoder;
+then gate CPU BLAS matvec/projection and encoder experiments behind runtime
+switches. Require independent numerical component parity, F16/Q8/Q4 decoded
+output checks, and warmed same-host timings before selecting defaults.
+Experimental encoder graph caching remains off. Use native CI for final receipts.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
