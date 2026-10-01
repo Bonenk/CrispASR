@@ -27,6 +27,9 @@ def main():
                 clip['speedup_vs_default_t4'] = baseline['median_s'] / clip['median_s']
                 clip['exact_default_transcript'] = clip['transcript'] == baseline['transcript']
                 clip['same_default_words'] = re.findall(r'\w+', clip['transcript'].lower()) == re.findall(r'\w+', baseline['transcript'].lower())
+            stage_path = args.results / f'stages-{config}-{quant}.json'
+            if stage_path.exists():
+                row['same_quant_stage_parity'] = json.loads(stage_path.read_text())
             configs[config]['quants'][quant] = row
             times = ' / '.join(f"{c['median_s']:.4f}s ({c['speedup_vs_default_t4']:.3f}x)" for c in row['clips'])
             print(config, quant, times, 'exact=', all(c['exact_default_transcript'] for c in row['clips']),

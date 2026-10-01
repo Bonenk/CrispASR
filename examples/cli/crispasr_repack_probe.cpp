@@ -75,6 +75,7 @@ struct Arm {
     bool repacked = false;
     const char* buft_name = "";
     std::vector<double> times;
+    std::vector<float> output;
     double checksum = 0;
 
     ~Arm() {
@@ -183,6 +184,7 @@ void finish_arm(Arm& a) {
     for (float v : out)
         sum += v;
     a.checksum = sum;
+    a.output = std::move(out);
 }
 
 struct Stats {
@@ -359,6 +361,8 @@ int main(int argc, char** argv) {
 
         double f32_best = 0, f32_med = 0;
         for (auto ty : types) {
+            if (!type_sel.empty() && type_sel != ty.n)
+                continue;
             Arm def, rep;
             if (!build_arm(def, ty.t, s, n_threads, nullptr, "default"))
                 continue;
@@ -407,10 +411,12 @@ int main(int argc, char** argv) {
                 Arm* first = (i % 2) ? &rep : &def;
                 Arm* second = (i % 2) ? &def : &rep;
                 double t0 = now_ms();
-                ggml_backend_graph_compute(first->backend, first->gf);
+                if (ggml_backend_graph_compute(first->backend, first->gf) != GGML_STATUS_SUCCESS)
+                    return 1;
                 first->times.push_back(now_ms() - t0);
                 double t1 = now_ms();
-                ggml_backend_graph_compute(second->backend, second->gf);
+                if (ggml_backend_graph_compute(second->backend, second->gf) != GGML_STATUS_SUCCESS)
+                    return 1;
                 second->times.push_back(now_ms() - t1);
             }
             finish_arm(def);
@@ -419,6 +425,28 @@ int main(int argc, char** argv) {
             Stats ds = summarise(def.times);
             Stats rs = summarise(rep.times);
             double rel_err = def.checksum == 0 ? 0 : std::abs(rep.checksum - def.checksum) / std::abs(def.checksum);
+            // A checksum can hide cancelling errors. Compare every output
+            // vector as well; this diagnoses numerical kernel differences.
+            double error2 = 0, reference2 = 0, min_cosine = 1, max_norm_error = 0;
+            for (int64_t col = 0; col < s.M; ++col) {
+                double dot = 0, dn = 0, rn = 0;
+                for (int64_t row = 0; row < s.N; ++row) {
+                    const size_t idx = (size_t)col * s.N + row;
+                    const double d = def.output[idx], r = rep.output[idx];
+                    error2 += (r - d) * (r - d);
+                    dot += d * r;
+                    dn += d * d;
+                    rn += r * r;
+                }
+                reference2 += dn;
+                if (dn > 0 && rn > 0) {
+                    min_cosine = std::min(min_cosine, dot / std::sqrt(dn * rn));
+                    max_norm_error = std::max(max_norm_error, std::abs(std::sqrt(rn / dn) - 1));
+                }
+            }
+            printf("PARITY %s %lld %lld %lld cos_min=%.9f rms_relative=%.9g norm_error_max=%.9g\n", ty.n,
+                   (long long)s.K, (long long)s.N, (long long)s.M, min_cosine,
+                   reference2 > 0 ? std::sqrt(error2 / reference2) : 0, max_norm_error);
             char verdict[200];
             if (f32_best > 0)
                 snprintf(verdict, sizeof verdict,

@@ -82,11 +82,13 @@ def main():
                 row = dict(stage=name, min_cosine=float(cosine.min()),
                            max_norm_ratio_error=float(np.max(np.abs(got_norm[valid] / ref_norm[valid] - 1))),
                            relative_rms_error=relative_rms)
-                assert row['min_cosine'] >= .999 and row['max_norm_ratio_error'] < .01 and relative_rms < .01, row
+                row['passed'] = row['min_cosine'] >= .999 and row['max_norm_ratio_error'] < .01 and relative_rms < .01
                 rows.append(row)
-        report = dict(mode=args.mode, threads=args.threads, stages=rows)
+        report = dict(mode=args.mode, threads=args.threads, model=args.model,
+                      reference=args.reference, baseline=str(args.baseline), stages=rows)
         args.output.with_suffix('.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report, indent=2))
+        assert all(row['passed'] for row in rows), 'FFN stage parity gate failed; see complete JSON report'
 
 
 if __name__ == '__main__':
