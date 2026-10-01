@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import shutil
 import sys
 import time
 
@@ -74,6 +75,9 @@ def upload(path, remote=None):
 
 
 try:
+    if args.pipeline_only and not shutil.which('ffmpeg'):
+        run('sudo', 'apt-get', 'update', '-qq')
+        run('sudo', 'apt-get', 'install', '-y', '-qq', 'ffmpeg')
     event('download pinned source')
     source = Path(snapshot_download(SOURCE, revision=REVISION, local_dir=SCRATCH / 'source',
         allow_patterns=['audio_config.json', 'audio_tower.safetensors', 'connector.safetensors',
