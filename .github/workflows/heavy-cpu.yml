@@ -49,6 +49,7 @@ on:
 
 permissions:
   contents: read
+  actions: read  # timing-only scripts may download an already-tested build
 
 # One run per script at a time; a second dispatch queues instead of racing.
 concurrency:
@@ -65,6 +66,7 @@ jobs:
       PIP_EXTRA: ${{ inputs.pip }}
       TIMEOUT_MIN: ${{ inputs.timeout_minutes }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
