@@ -28,6 +28,16 @@ short-after-long reuse, an independent torch F16 forward, TTS/ASR (zero-shot
 and synthetic-reference cloning), and warmed 249-position timing medians.
 Gate `CRISPASR_VOXCPM2_RALM_PREFILL_BATCH=1`; CPU only, default still eager.
 
+First run finished: F16 states/KV/continuation and the independent torch oracle
+passed (relative errors below 2.2e-6); warmed 249-position prefill 6068.5 →
+4066.1 ms. Q8/Q4 exceeded the 1% relative-error gate, so no default flip.
+The clone harness also incorrectly requested disclaimer suppression without
+the required CLI flag; corrected by retaining the normal spoken marking.
+Candidate `9d55a79c8` preserves the eager CPU RMS reduction and SwiGLU arithmetic
+inside batched prefill to test activation-quantization sensitivity.
+[Rerun 36851585500](https://github.com/CrispStrobe/CrispASR/actions/runs/36851585500)
+repeats the unchanged parity thresholds and all speech cases.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
