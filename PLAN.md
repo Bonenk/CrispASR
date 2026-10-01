@@ -68,6 +68,16 @@ autochunk tests; independent architecture-roster test caught one missing
 entry, fixed. New build validation is running. Stage and decoded parity,
 quant acceptance, registry/default selection and GPU proof are still pending.
 
+Build-only validation `36878337862` passed (shared CLI/C ABI, architecture
+roster and window/autochunk tests). Full live run `36878866331` failed at
+decoder load: the upstream converter exported a configured, absent MTP
+layer. Conversion now uses `--no-mtp` and asserts exactly 24 layers. Runtime
+also fixes four-plane M-RoPE positions for embedded audio batches and adds
+a test through the actual decoder batch splitter. Feature `ce9bf9079`
+requires exact decoded text/timestamps, in addition to stage/magnitude and
+16-token cache parity. Regeneration `36883527997` and live validation
+`36883532484` are queued; artifacts remain private and unvalidated.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
