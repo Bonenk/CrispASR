@@ -1953,6 +1953,22 @@ static bool ralm_prefill_graph_batched(voxcpm2_context* ctx, const float* input,
     return true;
 }
 
+// Only the native x86 F16/Q8 matrix paths have passed the state/KV,
+// continuation and speech gates. Other quants/ISAs remain opt-in.
+static bool ralm_prefill_batch_default(const voxcpm2_context* ctx) {
+    if (!core_cpu_backend::is_cpu(ctx->backend) || !core_cpu_backend::has_feature("AVX2") ||
+        !core_cpu_backend::has_feature("F16C"))
+        return false;
+    for (const auto& layer : ctx->graph_weights().ralm_layers) {
+        for (const ggml_tensor* weight : {layer.attn_q_w, layer.attn_k_w, layer.attn_v_w, layer.attn_o_w,
+                                          layer.ffn_gate_w, layer.ffn_up_w, layer.ffn_down_w}) {
+            if (!weight || (weight->type != GGML_TYPE_F16 && weight->type != GGML_TYPE_Q8_0))
+                return false;
+        }
+    }
+    return true;
+}
+
 // Multi-position RALM prefill with causal attention (batched or eager).
 // Input: [T * d] row-major (T vectors of d dimensions).
 // Returns: [T * d] row-major output hidden states (pre-output-norm).
@@ -1966,8 +1982,10 @@ static std::vector<float> ralm_prefill_multi(voxcpm2_context* ctx, const float* 
     std::vector<float> all_out((size_t)T * d);
     // CPU-only until real GPU parity is measured. USE_GRAPH=0 keeps the
     // complete eager A/B path, including its prefill and continuation.
-    if (core_cpu_backend::is_cpu(ctx->backend) && vox_env_bool_default_on("CRISPASR_VOXCPM2_USE_GRAPH") &&
-        vox_env_bool("CRISPASR_VOXCPM2_RALM_PREFILL_BATCH")) {
+    const bool batch = crispasr_env::get("CRISPASR_VOXCPM2_RALM_PREFILL_BATCH")
+                           ? vox_env_bool("CRISPASR_VOXCPM2_RALM_PREFILL_BATCH")
+                           : ralm_prefill_batch_default(ctx);
+    if (core_cpu_backend::is_cpu(ctx->backend) && vox_env_bool_default_on("CRISPASR_VOXCPM2_USE_GRAPH") && batch) {
         if (ralm_prefill_graph_batched(ctx, input, T, all_out.data())) {
             if (voxcpm2_bench_enabled())
                 fprintf(stderr, "voxcpm2: RALM prefill graph batched (%d positions)\n", T);
