@@ -1102,11 +1102,11 @@ static void sync_ralm_kv_cpu_to_backend(voxcpm2_context* ctx) {
     }
 }
 
-// Build the per-step RALM cgraph (all 8 layers, T=1). Same structure as
+// Build the RALM cgraph (all 8 layers, decode or causal prefill). Same structure as
 // build_tslm_step_graph but simpler: no RoPE (rope_theta=0 makes
 // ggml_rope_ext a no-op), uses RALM hparams/weights/KV. Dynamic (non-
-// bucketed) build only — RALM's max_ctx is small and per-step cost is low.
-static ggml_cgraph* build_ralm_step_graph(voxcpm2_context* ctx, int n_past) {
+// bucketed) build only. Prefill returns pre-output-norm states for its callers.
+static ggml_cgraph* build_ralm_step_graph(voxcpm2_context* ctx, int n_past, int n_tokens = 1, bool output_norm = true) {
     const vox_hparams& hp = ctx->hp;
     const vox_weights& W = ctx->graph_weights();
     const int d = (int)hp.ralm_d_model;
@@ -1116,7 +1116,7 @@ static ggml_cgraph* build_ralm_step_graph(voxcpm2_context* ctx, int n_past) {
     const int n_kv_grp = n_q / n_kv;
     const float eps = hp.rms_norm_eps;
     const float attn_scale = 1.0f / std::sqrt((float)hd);
-    const int T = 1;
+    const int T = n_tokens;
     const int Lk = n_past + T;
 
     ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), /*no_alloc=*/true};
@@ -1130,6 +1130,13 @@ static ggml_cgraph* build_ralm_step_graph(voxcpm2_context* ctx, int n_past) {
     ggml_tensor* positions = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, T);
     ggml_set_name(positions, "ralm_positions");
     ggml_set_input(positions);
+
+    ggml_tensor* causal_mask = nullptr;
+    if (T > 1) {
+        causal_mask = ggml_new_tensor_2d(ctx0, GGML_TYPE_F16, Lk, T);
+        ggml_set_name(causal_mask, "ralm_causal_mask");
+        ggml_set_input(causal_mask);
+    }
 
     // No RoPE: set rope_theta = 0.0f so ggml_rope_ext rotates by zero.
     const core_attn::KvSelfAttnParams kvp = {
@@ -1159,12 +1166,11 @@ static ggml_cgraph* build_ralm_step_graph(voxcpm2_context* ctx, int n_past) {
         ggml_tensor* x = ggml_rms_norm(ctx0, cur, eps);
         x = ggml_mul(ctx0, x, L.attn_norm_w);
 
-        ggml_tensor* attn =
-            core_attn::kv_self_attn(ctx0, gf, x, L.attn_q_w, L.attn_k_w, L.attn_v_w, L.attn_o_w,
-                                    /*q_norm_w*/ nullptr, /*k_norm_w*/ nullptr, positions, /*causal_mask*/ nullptr,
-                                    ctx->ralm_kv_k, ctx->ralm_kv_v, (int)il, n_past, kvp,
-                                    /*qkv_w=*/nullptr, /*fixed_kv_len=*/Lk,
-                                    /*kv_indices=*/nullptr);
+        ggml_tensor* attn = core_attn::kv_self_attn(ctx0, gf, x, L.attn_q_w, L.attn_k_w, L.attn_v_w, L.attn_o_w,
+                                                    /*q_norm_w*/ nullptr, /*k_norm_w*/ nullptr, positions, causal_mask,
+                                                    ctx->ralm_kv_k, ctx->ralm_kv_v, (int)il, n_past, kvp,
+                                                    /*qkv_w=*/nullptr, /*fixed_kv_len=*/Lk,
+                                                    /*kv_indices=*/nullptr);
         cur = ggml_add(ctx0, residual, attn);
 
         // FFN block (RMSNorm x scale -> SwiGLU -> residual).
@@ -1176,8 +1182,10 @@ static ggml_cgraph* build_ralm_step_graph(voxcpm2_context* ctx, int n_past) {
     }
 
     // Final RMSNorm x ralm_output_norm.
-    cur = ggml_rms_norm(ctx0, cur, eps);
-    cur = ggml_mul(ctx0, cur, W.ralm_output_norm);
+    if (output_norm) {
+        cur = ggml_rms_norm(ctx0, cur, eps);
+        cur = ggml_mul(ctx0, cur, W.ralm_output_norm);
+    }
     ggml_set_name(cur, "ralm_hidden_out");
     ggml_set_output(cur);
     ggml_build_forward_expand(gf, cur);
@@ -1855,15 +1863,80 @@ static std::vector<float> ralm_prefill(voxcpm2_context* ctx, const std::vector<f
     return hidden;
 }
 
+// Prefill the backend KV directly, returning pre-output-norm states to match
+// the eager helper. Keep the host prefix too, for eager continuation/fallback.
+static bool ralm_prefill_graph_batched(voxcpm2_context* ctx, const float* input, int T, float* output) {
+    if (T <= 0 || T > ctx->ralm_kv.max_ctx || !init_ralm_kv_backend(ctx))
+        return false;
+    const int d = (int)ctx->hp.ralm_d_model;
+    ggml_cgraph* gf = build_ralm_step_graph(ctx, 0, T, /*output_norm=*/false);
+    if (!gf || !ggml_gallocr_alloc_graph(ctx->galloc, gf))
+        return false;
+    ggml_tensor* t_in = ggml_graph_get_tensor(gf, "ralm_hidden_in");
+    ggml_tensor* t_out = ggml_graph_get_tensor(gf, "ralm_hidden_out");
+    ggml_tensor* t_mask = ggml_graph_get_tensor(gf, "ralm_causal_mask");
+    if (!t_in || !t_out || (T > 1 && !t_mask))
+        return false;
+    ggml_backend_tensor_set(t_in, input, 0, (size_t)T * d * sizeof(float));
+    if (t_mask) {
+        std::vector<ggml_fp16_t> mask((size_t)T * T);
+        const ggml_fp16_t zero = ggml_fp32_to_fp16(0.0f);
+        const ggml_fp16_t ninf = ggml_fp32_to_fp16(-INFINITY);
+        for (int q = 0; q < T; ++q)
+            for (int k = 0; k < T; ++k)
+                mask[(size_t)q * T + k] = k <= q ? zero : ninf;
+        ggml_backend_tensor_set(t_mask, mask.data(), 0, mask.size() * sizeof(ggml_fp16_t));
+    }
+    if (core_cpu_backend::is_cpu(ctx->backend))
+        core_cpu_backend::set_n_threads(ctx->backend, ctx->n_threads);
+    if (ggml_backend_graph_compute(ctx->backend, gf) != GGML_STATUS_SUCCESS)
+        return false;
+    ggml_backend_tensor_get(t_out, output, 0, (size_t)T * d * sizeof(float));
+
+    const int hd = (int)ctx->hp.ralm_head_dim;
+    const int n_kv = (int)ctx->hp.ralm_n_kv;
+    std::vector<float> rows((size_t)T * hd);
+    for (int layer = 0; layer < (int)ctx->hp.ralm_n_layers; ++layer) {
+        for (int head = 0; head < n_kv; ++head) {
+            for (int kind = 0; kind < 2; ++kind) {
+                ggml_tensor* cache = kind == 0 ? ctx->ralm_kv_k : ctx->ralm_kv_v;
+                auto& host = kind == 0 ? ctx->ralm_kv.k_cache[layer] : ctx->ralm_kv.v_cache[layer];
+                const size_t offset = (size_t)layer * cache->nb[3] + (size_t)head * cache->nb[2];
+                ggml_backend_tensor_get(cache, rows.data(), offset, rows.size() * sizeof(float));
+                for (int t = 0; t < T; ++t)
+                    std::memcpy(host.data() + ((size_t)t * n_kv + head) * hd, rows.data() + (size_t)t * hd,
+                                (size_t)hd * sizeof(float));
+            }
+        }
+    }
+    ctx->ralm_kv.n_past = T;
+    ctx->ralm_kv_synced = true;
+    return true;
+}
+
 // Multi-position RALM prefill — processes T tokens sequentially with causal attention.
 // Input: [T * d] row-major (T vectors of d dimensions).
 // Returns: [T * d] row-major output hidden states (pre-output-norm).
 static std::vector<float> ralm_prefill_multi(voxcpm2_context* ctx, const float* input, int T, ggml_backend_t cpu_be) {
+    voxcpm2_bench_stage bench("ralm_prefill");
     const vox_hparams& hp = ctx->hp;
     int d = (int)hp.ralm_d_model;
     ctx->ralm_kv.reset();
+    ctx->ralm_kv_synced = false;
 
     std::vector<float> all_out((size_t)T * d);
+    // CPU-only until real GPU parity is measured. USE_GRAPH=0 keeps the
+    // complete eager A/B path, including its prefill and continuation.
+    if (core_cpu_backend::is_cpu(ctx->backend) && vox_env_bool_default_on("CRISPASR_VOXCPM2_USE_GRAPH") &&
+        vox_env_bool("CRISPASR_VOXCPM2_RALM_PREFILL_BATCH")) {
+        if (ralm_prefill_graph_batched(ctx, input, T, all_out.data())) {
+            if (voxcpm2_bench_enabled())
+                fprintf(stderr, "voxcpm2: RALM prefill graph batched (%d positions)\n", T);
+            return all_out;
+        }
+        ctx->ralm_kv.reset();
+        fprintf(stderr, "voxcpm2: RALM batched prefill failed; using eager prefill\n");
+    }
     std::vector<float> hidden(d);
 
     for (int t = 0; t < T; t++) {
@@ -6738,7 +6811,7 @@ static float* vox_synthesize_internal(voxcpm2_context* ctx, const char* text, co
     // through the graph (no further CPU↔backend traffic). Resetting
     // tslm_kv_synced here ensures every synthesis call re-syncs from the
     // fresh prefill cache.
-    ctx->ralm_kv_synced = false;
+    // ralm_prefill_multi sets ralm_kv_synced when it fills backend KV directly.
 
     // Python AR loop order (from voxcpm2.py _inference, lines 1060-1108):
     //   1. Build mu → CFM solve → LocEnc → enc_to_lm → collect patch
