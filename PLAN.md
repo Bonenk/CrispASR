@@ -96,6 +96,22 @@ Feature `a880c0fda` has both fixes; full F16/Q8/Q4 validation `36899754294`
 is queued. Full decoded parity, quant acceptance and GPU/performance proof
 remain pending; no public model/default/release claim.
 
+Full CPU run `36899754294` reproduced **exact complete decoded text and
+centisecond timestamps for F16 and Q8_0 on all three clips**. Worst per-row
+stage cosine / maximum whole-stage relative L2: F16 `0.998464` / `1.415%`;
+Q8_0 `0.995173` / `3.561%`; plain Q4_K `0.781530` / `23.349%`. Q4 changes
+translations/punctuation and is rejected. The run's original `.999` gate
+rejected cached F16 and quantized logits despite exact F16/Q8 decoded output.
+Feature `635b6cb31` applies precision-aware cosine/magnitude gates, retaining
+strict frontend, exact prompt/cache IDs and exact decoded cues. Fresh F16/Q8
+run `36905507951` is queued; selective Q4 producer `36905716130` uses separate
+filenames and the existing per-tensor override machinery. No defaults change.
+Silero timestamp postprocessing now matches the released v6.2 function on
+500 randomized fixed probability traces; this does not prove classifier
+parity. Full file/VAD, ja/es and two-window context reference checks are being
+added. GPU and same-host performance measurements remain pending. Artifacts
+remain private; no public model/default/release claim.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
