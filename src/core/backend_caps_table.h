@@ -85,6 +85,8 @@ static const BackendCaps k_backend_caps[] = {
     {"hojo-asr", 270864u, "language-detect,beam-search,punctuation-native,auto-download"},
     {"htdemucs", 5251072u, "auto-download,separate"},
     {"hubert", 548938u, "timestamps-ctc,token-confidence,diarize,auto-download,parallel-processors"},
+    {"index-echo", 1316145u,
+     "timestamps-native,language-detect,translate,temperature,flash-attn,punctuation-native,src-tgt-language"},
     {"indextts", 206080u, "temperature,flash-attn,auto-download,tts,voice-cloning"},
     {"irodori-tts", 204800u, "auto-download,tts,voice-cloning"},
     {"kartoffel-orpheus-de-natural", 75008u, "temperature,flash-attn,auto-download,tts"},
