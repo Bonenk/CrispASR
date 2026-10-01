@@ -82,6 +82,20 @@ requires exact decoded text/timestamps, in addition to stage/magnitude and
 16-token cache parity. Regeneration `36883527997` and live validation
 `36883532484` are queued; artifacts remain private and unvalidated.
 
+Corrected ARM conversion `36885332024` passed and uploaded all three
+cohorts, source LICENSE and a complete conversion receipt. Live x64 run
+`36883532484` passed mel, convs, all 32 encoder blocks, connector, prompt IDs,
+all 24 decoder blocks and 16/16 cached greedy tokens on JFK, Chinese and
+partial-hop JFK. It failed the cached cosine check: generic comparison
+uses the wrong GGUF axis for `(steps, vocabulary)` captures. Added explicit
+contiguous-axis mode + a non-square tensor regression. Further source audit
+found Qwen3.5 query/key normalization using clamped epsilon instead of the
+released additive squared-norm epsilon; fixed with portable RMS + scale.
+Small local graph oracle gives max error `7.63e-9` (zero heads finite).
+Feature `a880c0fda` has both fixes; full F16/Q8/Q4 validation `36899754294`
+is queued. Full decoded parity, quant acceptance and GPU/performance proof
+remain pending; no public model/default/release claim.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
