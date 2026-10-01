@@ -152,9 +152,11 @@ for quant in ("q8_0", "f16", "q4_k"):
             # words anywhere, never score just a possibly truncated tail.
             asr_ok = any(heard_words[i:i + len(want)] == want for i in range(len(heard_words) - len(want) + 1))
             stage = re.findall(r"voxcpm2_bench: ralm_prefill\s+([\d.]+) ms", log)
+            batch_calls = len(re.findall(r"RALM prefill graph batched", log))
             e = {"rc": rc, "asr_rc": asr_rc, "asr_ok": asr_ok,
                  "heard_words": heard_words,
                  "ralm_ms": [float(v) for v in stage], "selected": "RALM prefill graph batched" in log,
+                 "n_prefills": len(stage), "n_batched_prefills": batch_calls,
                  "max_len_hit": "max_len ceiling" in log}
             entry["cases"][case][arm] = e
             # Candidate speech must contain every requested word. Keep an
@@ -164,7 +166,8 @@ for quant in ("q8_0", "f16", "q4_k"):
             if arm == "default" and not entry["default_batch"]:
                 speech_ok = heard_words == entry["cases"][case]["eager"]["heard_words"]
             expected_batch = arm == "batched" or (arm == "default" and entry["default_batch"])
-            ok = ok and rc == 0 and asr_rc == 0 and speech_ok and not e["max_len_hit"] and e["selected"] == expected_batch
+            selection_ok = len(stage) > 0 and batch_calls == (len(stage) if expected_batch else 0)
+            ok = ok and rc == 0 and asr_rc == 0 and speech_ok and not e["max_len_hit"] and selection_ok
     RESULT["models"][quant] = entry
     ok = ok and entry["default_pass"] and (entry["probe_pass"] or entry["experimental_parity_failure"])
     (OUT / "result.json").write_text(json.dumps(RESULT, indent=2))

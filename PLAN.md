@@ -11,57 +11,16 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-01 — #478 batched RALM prefill
-
-Worktree `/mnt/volume1/wt-478-ralm`, branch `perf/478-ralm-prefill`.
-Audit the Python inference and eager RALM KV semantics, then add a gated batched
-prefill with eager fallback. Validate hidden states and KV with cosine AND
-magnitude, decode continuation, and TTS/ASR roundtrips on F16 and shipped quants.
-Use clean GitHub Actions for large-model CPU A/B; check load/free RAM before
-large local tasks. Keep the current default until speed and output are proven.
-Receipts: `/mnt/volume1/tmp-overflow/issue478-ralm/`.
-
-Checkpoint: opt-in CPU candidate `c29750c09` is on `perf/478-ralm-prefill`.
-[Heavy CPU run 36848523918](https://github.com/CrispStrobe/CrispASR/actions/runs/36848523918)
-is checking F16/Q8_0/Q4_K hidden/KV/continuation parity, causal isolation,
-short-after-long reuse, an independent torch F16 forward, TTS/ASR (zero-shot
-and synthetic-reference cloning), and warmed 249-position timing medians.
-Gate `CRISPASR_VOXCPM2_RALM_PREFILL_BATCH=1`; CPU only, default still eager.
-
-First run finished: F16 states/KV/continuation and the independent torch oracle
-passed (relative errors below 2.2e-6); warmed 249-position prefill 6068.5 →
-4066.1 ms. Q8/Q4 exceeded the 1% relative-error gate, so no default flip.
-The clone harness also incorrectly requested disclaimer suppression without
-the required CLI flag; corrected by retaining the normal spoken marking.
-Candidate `9d55a79c8` preserves the eager CPU RMS reduction and SwiGLU arithmetic
-inside batched prefill to test activation-quantization sensitivity.
-The queued rerun 36851585500 was superseded before building by
-[rerun 36851832606](https://github.com/CrispStrobe/CrispASR/actions/runs/36851832606)
-at `49eb80d2f`: unchanged hidden/KV parity thresholds, all speech cases,
-candidate ASR requires every target word; imperfect eager ASR is a recorded
-baseline diagnostic (first Q4 zero-shot readback substituted "And now" for "Hello").
-
-Second run: Q8_0 and F16 passed all state/KV/continuation cases and both speech
-roundtrips; warmed 249-position medians were 4675.4 → 1155.0 ms (Q8, 4.05x)
-and 7642.5 → 3632.1 ms (F16, 2.10x). Preserving eager CPU arithmetic made
-single-position Q4 exact too, but multi-position Q4 still exceeded 1% relative
-error (T=10: 1.0604%), so it stays opt-in even though its speech cases passed.
-Candidate `11ca781f7` selects batching by default only for F16/Q8_0 RALM matrices
-on AVX2/F16C CPUs; other ISAs/quants keep eager, GPUs keep eager.
-[Default proof 36854994459](https://github.com/CrispStrobe/CrispASR/actions/runs/36854994459)
-checks default vs explicit arms, `USE_GRAPH=0` fallback, all prompt lengths,
-all three speech arms per quant, and retains generated WAVs. Q4's unchanged
-strict parity failure is an explicit experimental result, never a default-pass claim.
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
   on a pre-#478 build; asked to re-bench on main (estimate ~0.85). What remains is
   the compute-bound LocDiT matmuls (22 columns) at 10 steps — only a faster Vulkan
   kernel for that shape would move the default-quality number.
-- **#478**: reporter offered a Windows CPU bench (249-position Khmer clone). Next lever:
-  **RALM prefill** is still eager, one position per call (`ralm_prefill_multi`); a
-  batched graph like `tslm_prefill_graph_batched` would read its weights once.
+- **#478**: native AVX2/F16C CPU F16/Q8 RALM batching is now validated and default
+  (see `HISTORY.md` / `PERFORMANCE.md`). Reporter Windows/249-position Khmer
+  measurement remains external. Q4 batching stays opt-in: up to 1.83% state
+  error and one extra-word readback; GPU and other CPU ISAs need their own proof.
 - `CRISPASR_VOXCPM2_VAE_DW_SHIFT` is default-on for Vulkan only; CUDA/Metal unmeasured.
 
 ## DEFERRED 2026-09-24 — #456 nyra-forced-aligner

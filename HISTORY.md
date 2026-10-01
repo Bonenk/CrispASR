@@ -6,6 +6,41 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-01 — VoxCPM2 native CPU RALM prefill (#478)
+
+RALM prefill batches the causal prefix and populates both backend and host KV.
+CPU prefill preserves eager RMS reduction and SwiGLU arithmetic: standard
+ggml arithmetic had small F16 differences but quantization amplified them
+enough to fail Q8/Q4 state checks. Decode and GPU graph computation retain
+their existing implementations.
+
+Default batching requires F16/Q8_0 RALM matrices and AVX2/F16C CPU kernels.
+`CRISPASR_VOXCPM2_RALM_PREFILL_BATCH=0` restores eager prefill; other quants/ISAs
+stay opt-in with `1`. GPU prefill stays eager. Q4_K is faster when opted in,
+but fails strict hidden-state parity (up to 1.83% relative error) and has extra
+trailing words in one readback, so its default is unchanged.
+
+[Default proof 36854994459](https://github.com/CrispStrobe/CrispASR/actions/runs/36854994459)
+passes at `11ca781f7`: F16/Q8 states, KV and decode continuation at
+1/10/62/249/4 positions, causal isolation, short-after-long reuse, exact
+default-vs-explicit selection and `CRISPASR_VOXCPM2_USE_GRAPH=0` eager fallback. Independent
+PyTorch F16 output/KV relative error is below 2e-6. Zero-shot and a model-generated
+reference clone exercise eager, opt-in and default arms; validated default
+readbacks retain every requested word. Experimental Q4 failures are recorded
+separately, not included in the default-pass claim. Generated WAVs are retained.
+
+Same-host medians of three warmed 249-position pairs on a four-vCPU Xeon
+6973P-C (four threads): Q8_0 4116.5 → 899.2 ms (4.58x), F16 6159.5 →
+3549.8 ms (1.74x). The 40-position Q8 clone prefill is 603.9 → 160.4 ms.
+These are prefill measurements, not whole-synthesis or reporter-Windows timings.
+All thirteen [cross-platform CI jobs](https://github.com/CrispStrobe/CrispASR/actions/runs/36856513752)
+pass, including Windows, macOS, ASAN, fuzz and backend-DL.
+
+The first two runs exposed parity and harness failures; they are retained
+for diagnosis and are not reported as full passes. Local receipts live under
+`/mnt/volume1/tmp-overflow/issue478-ralm/`; `PERFORMANCE.md`, the environment
+reference and `docs/voxcpm2-ralm-prefill-2026-10-01.json` record the final scope.
+
 ## DONE 2026-10-01 — Phonon-2 gated FFN CPU experiments (#481)
 
 Added FFN-only CPU_REPACK and persistent F32 BLAS weight caching behind

@@ -114,7 +114,7 @@ Treat these as CI timings, not physical M1/M5 performance.
 See [full integration, parity and profiling details](docs/phonon2.md) and the
 [raw measurement receipt](docs/phonon2-profile-2026-09-30.json).
 
-## voxcpm2 — #461 (Vulkan) and #478 (CPU) (2026-09-29/30)
+## voxcpm2 — #461 (Vulkan) and #478 (CPU) (2026-09-29 to 2026-10-01)
 
 Reporter's Arc B390 iGPU (Vulkan, seed 2, "Hello, this is a short test sentence."):
 
@@ -128,6 +128,39 @@ Reporter's Arc B390 iGPU (Vulkan, seed 2, "Hello, this is a short test sentence.
 Kaggle T4 (Vulkan): CFM 70.2 ms (q8_0, 10 steps) → 59.4 (mixed) → 46.7 (mixed, 8).
 CPU (4-core GitHub runner, #478, 62-position voice clone): TSLM prefill 2497 →
 1321 ms, `tslm_step` avg 132.9 → 42.6 ms, total 39.5 → 36.0 s.
+
+RALM prefill also batches the causal prefix on validated native x86 CPU paths.
+Four-thread, same-host medians of three warmed eager/batched pairs at 249
+positions on a four-vCPU Xeon 6973P-C GitHub runner in
+[run 36854994459](https://github.com/CrispStrobe/CrispASR/actions/runs/36854994459):
+
+| RALM matrices | eager | batched | prefill speedup |
+|---|---:|---:|---:|
+| Q8_0 | 4116.5 ms | 899.2 ms | 4.58× |
+| F16 | 6159.5 ms | 3549.8 ms | 1.74× |
+
+The generated-reference Q8 clone's 40-position RALM prefill drops from 603.9
+to 160.4 ms with the new default. These are prefill timings, not whole-synthesis
+speedups or a measurement of the reporter's Windows machine.
+
+Hidden states, KV, next-step decoding, causal isolation and short-after-long
+reuse pass at 1/10/62/249/4 positions for Q8/F16. Both formats pass zero-shot
+and synthetic-reference TTS→ASR; F16 also agrees with an independent PyTorch
+forward using the same weights (relative error < 2e-6). CPU prefill preserves
+the eager RMS reduction and SwiGLU arithmetic because small upstream changes
+can be amplified by activation quantization.
+
+Default batching requires F16/Q8_0 RALM matrices and AVX2/F16C CPU kernels.
+`CRISPASR_VOXCPM2_RALM_PREFILL_BATCH=0` restores eager prefill; other quants/ISAs
+are opt-in with `1`. Q4_K's hidden-state error exceeds the unchanged 1% limit
+(1.83% at 249 positions), and one opt-in speech readback adds trailing words.
+Its default stays eager and preserves the baseline readback.
+GPU prefill stays eager pending actual GPU validation.
+`CRISPASR_VOXCPM2_USE_GRAPH=0` also retains eager prefill. The proof scripts and
+logs record experimental Q4 failure separately from the validated default paths.
+The default/explicit arms and graph-disabled fallback also pass; all thirteen
+cross-platform CI jobs pass. See the
+[checked-in measurement receipt](docs/voxcpm2-ralm-prefill-2026-10-01.json).
 
 ## Canary 180M Flash Q4_K_M — Linux CPU/Vulkan bring-up (AMD Ryzen AI MAX+ 395 / Radeon 8060S, 2026-09-25)
 
