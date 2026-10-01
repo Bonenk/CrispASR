@@ -3,6 +3,7 @@
 #include "core/gguf_loader.h"
 #include "core/ggml_cpu_backend.h"
 #include "core/index_echo_windows.h"
+#include "core/index_echo_batch.h"
 #include "crispasr.h"
 #include "ggml-alloc.h"
 #include "llama.h"
@@ -130,12 +131,17 @@ bool decode(index_echo_context* ctx, const llama_token* ids, const float* embd, 
         int n = std::min(kBatch, count - start);
         llama_batch batch = llama_batch_init(n, embd ? dim : 0, 1);
         batch.n_tokens = n;
+        const auto rope = llama_model_rope_type(ctx->model);
+        int position_axes = embd && (rope == LLAMA_ROPE_TYPE_MROPE || rope == LLAMA_ROPE_TYPE_IMROPE) ? 4 : 1;
+        if (!core_index_echo::positions(batch, ctx->position, position_axes)) {
+            llama_batch_free(batch);
+            return false;
+        }
         for (int i = 0; i < n; ++i) {
             if (embd)
                 memcpy(batch.embd + (size_t)i * dim, embd + (size_t)(start + i) * dim, dim * sizeof(float));
             else
                 batch.token[i] = ids[start + i];
-            batch.pos[i] = ctx->position + i;
             batch.n_seq_id[i] = 1;
             batch.seq_id[i][0] = 0;
             batch.logits[i] = i == n - 1;

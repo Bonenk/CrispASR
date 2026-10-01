@@ -26,6 +26,11 @@ target_include_directories(test-index-echo-windows PRIVATE ${PROJECT_SOURCE_DIR}
 target_link_libraries(test-index-echo-windows PRIVATE Catch2::Catch2WithMain)
 catch_discover_tests(test-index-echo-windows PROPERTIES LABELS "unit;index-echo")
 
+add_executable(test-index-echo-batch test-index-echo-batch.cpp)
+target_include_directories(test-index-echo-batch PRIVATE ${PROJECT_SOURCE_DIR}/src)
+target_link_libraries(test-index-echo-batch PRIVATE Catch2::Catch2WithMain crispasr-llama-core)
+catch_discover_tests(test-index-echo-batch PROPERTIES LABELS "unit;index-echo")
+
 if (EMSCRIPTEN)
 #
 #test - crispasr - js
