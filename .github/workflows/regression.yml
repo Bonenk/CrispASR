@@ -55,6 +55,7 @@ on:
       - 'tools/regression_select.py'
       - 'tools/reference_backends/phonon2/**'
       - 'tools/reference_backends/parakeet_hf.py'
+      - 'tools/reference_backends/index_echo.py'
   # Push to main: the backends the change can touch run right away instead of
   # waiting for the nightly - e.g. #470's legacy canary load break would have
   # shown on the push, not the next morning.
@@ -71,6 +72,7 @@ on:
       - 'tools/regression_select.py'
       - 'tools/reference_backends/phonon2/**'
       - 'tools/reference_backends/parakeet_hf.py'
+      - 'tools/reference_backends/index_echo.py'
       - '.github/workflows/regression.yml'
 
 permissions:

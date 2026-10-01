@@ -591,3 +591,17 @@ TEST_CASE("registry: outetts has entry", "[unit][registry]") {
     CrispasrRegistryEntry e;
     REQUIRE(crispasr_registry_lookup("outetts", e));
 }
+
+TEST_CASE("registry: Index-Echo downloads a matching pair and source VAD", "[unit][registry]") {
+    CrispasrRegistryBundle bundle;
+    REQUIRE(crispasr_registry_default_bundle("index-echo", bundle));
+    REQUIRE_FALSE(bundle.requires_license_acceptance);
+    REQUIRE(bundle.artifacts.size() == 3);
+    REQUIRE(bundle.artifacts[0].filename == "index-echo-2b-q8_0.gguf");
+    REQUIRE(bundle.artifacts[1].filename == "index-echo-2b-decoder-q8_0.gguf");
+    REQUIRE(bundle.artifacts[2].filename == "ggml-silero-v6.2.0.bin");
+    CrispasrRegistryEntry entry;
+    REQUIRE(crispasr_registry_lookup("index-echo", entry, "f16"));
+    REQUIRE(entry.filename == "index-echo-2b-f16.gguf");
+    REQUIRE(entry.companion_filename == "index-echo-2b-decoder-f16.gguf");
+}

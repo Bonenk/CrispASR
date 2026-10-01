@@ -198,6 +198,22 @@ class MandatoryDiffGateTests(unittest.TestCase):
                              {'mel_spectrogram': 1.0})
 
 
+class BilingualTranscriptTests(unittest.TestCase):
+    def test_srt_checks_all_cues_and_both_languages(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp:
+            model = Path(temp) / "model.gguf"
+            def emit(command, **kwargs):
+                prefix = Path(command[command.index("-of") + 1])
+                prefix.with_suffix(".srt").write_text(
+                    "1\n00:00:00,430 --> 00:00:04,570\n原文一。\nTranslation one.\n\n"
+                    "2\n00:00:05,230 --> 00:00:07,470\n原文二。\nTranslation two.\n")
+                return SimpleNamespace(stdout="Translation two.", stderr="", returncode=0)
+            with mock.patch.object(run_one.subprocess, "run", side_effect=emit):
+                text = run_one.run_transcript(Path("cli"), model, Path("audio"), srt=True)
+            self.assertEqual(text, "原文一。 Translation one. 原文二。 Translation two.")
+
+
 class DiffParserTests(unittest.TestCase):
     """parse_diff_stdout() — given a captured crispasr-diff stdout,
     pull cos_min per stage. Don't care about [PASS]/[FAIL] verdict

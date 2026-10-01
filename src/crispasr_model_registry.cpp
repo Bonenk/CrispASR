@@ -177,6 +177,17 @@ constexpr Entry k_registry[] = {
     {"granite-4.1-nar", "granite-speech-4.1-2b-nar-q4_k.gguf",
      "https://huggingface.co/cstr/granite-speech-4.1-2b-nar-GGUF/resolve/main/granite-speech-4.1-2b-nar-q4_k.gguf",
      "~3.2 GB", nullptr, nullptr},
+    // Index-Echo S2TT 2B (#485): paired audio tower + hybrid Qwen3.5 decoder.
+    // Q8 passes the independent stage/cache/direct-output checks; Q4 is rejected.
+    {"index-echo", "index-echo-2b-q8_0.gguf",
+     "https://huggingface.co/cstr/index-echo-2b-GGUF/resolve/main/index-echo-2b-q8_0.gguf", "~670 MiB",
+     "index-echo-2b-decoder-q8_0.gguf",
+     "https://huggingface.co/cstr/index-echo-2b-GGUF/resolve/main/index-echo-2b-decoder-q8_0.gguf", "~1.93 GiB"},
+    {"index-echo", "index-echo-2b-f16.gguf",
+     "https://huggingface.co/cstr/index-echo-2b-GGUF/resolve/main/index-echo-2b-f16.gguf", "~1.22 GiB",
+     "index-echo-2b-decoder-f16.gguf",
+     "https://huggingface.co/cstr/index-echo-2b-GGUF/resolve/main/index-echo-2b-decoder-f16.gguf", "~3.63 GiB"},
+
     {"qwen3", "qwen3-asr-0.6b-q4_k.gguf",
      "https://huggingface.co/cstr/qwen3-asr-0.6b-GGUF/resolve/main/qwen3-asr-0.6b-q4_k.gguf", "~500 MB", nullptr, nullptr},
     {"qwen3-1.7b", "qwen3-asr-1.7b-q4_k.gguf",
@@ -1654,7 +1665,15 @@ constexpr ExtraCompanion k_confucius4_tts_extras[] = {
     {nullptr, nullptr},
 };
 
+// Source full-file recipe requires Silero's speech-boundary windows.
+constexpr ExtraCompanion k_index_echo_extras[] = {
+    {"ggml-silero-v6.2.0.bin",
+     "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v6.2.0.bin"},
+    {nullptr, nullptr},
+};
+
 constexpr ExtraList k_extras[] = {
+    {"index-echo", k_index_echo_extras},
     {"kokoro", k_kokoro_extras},
     {"dots-tts", k_dots_tts_extras},
     {"confucius4-tts", k_confucius4_tts_extras},

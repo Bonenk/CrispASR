@@ -190,13 +190,25 @@ def strip_ai_disclaimer(transcript: str) -> str:
     return transcript
 
 
-def run_transcript(crispasr_bin: Path, gguf: Path, sample: Path) -> str:
+def run_transcript(crispasr_bin: Path, gguf: Path, sample: Path, *, srt: bool = False) -> str:
     """Run `crispasr -m gguf -f sample`, return the transcript line.
 
     The CLI prints the transcript on its own line near the end, after
     the "transcribed N s audio in M s (Kx realtime)" status line.
     Grab the last non-empty non-status line.
     """
+    if srt:
+        # Bilingual backends emit several cues/lines. Checking the final stdout
+        # line would silently discard earlier cues and every source transcript.
+        import tempfile
+        with tempfile.TemporaryDirectory(prefix="regression-srt-", dir=gguf.parent) as temp:
+            prefix = Path(temp) / "decoded"
+            subprocess.run([str(crispasr_bin), "-m", str(gguf), "-f", str(sample),
+                            "-osrt", "-of", str(prefix)], capture_output=True,
+                           text=True, check=True, timeout=600)
+            cues = prefix.with_suffix(".srt").read_text()
+            return " ".join(line.strip() for line in cues.splitlines()
+                            if line.strip() and not line.strip().isdigit() and "-->" not in line)
     proc = subprocess.run(
         [str(crispasr_bin), "-m", str(gguf), "-f", str(sample)],
         capture_output=True,
@@ -416,7 +428,8 @@ def regression_for(name: str, manifest: dict, work_dir: Path,
 
     # ----- 1. Transcript -----
     print(f"\n[transcript] {name}")
-    actual = run_transcript(crispasr_bin, gguf_local, sample)
+    actual = run_transcript(crispasr_bin, gguf_local, sample,
+                            srt=entry.get("transcript_format") == "srt")
     # WER-normalised gate, shared with the Kaggle suite; see transcript_gate.
     ok, lines = transcript_gate(entry, actual)
     for ln in lines:

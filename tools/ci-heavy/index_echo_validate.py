@@ -32,9 +32,9 @@ run('cmake', '-S', ROOT, '-B', BUILD, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release
     '-DBUILD_SHARED_LIBS=ON', '-DCRISPASR_BUILD_SERVER=OFF', '-DGGML_NATIVE=OFF')
 run('cmake', '--build', BUILD, '--target', 'crispasr-cli', 'crispasr-lib', 'crispasr-diff',
     'test-index-echo-windows', 'test-index-echo-batch', 'test-session-autochunk', 'test-arch-backend-map',
-    'test-crispasr-diff-compare', '-j', '4')
+    'test-crispasr-diff-compare', 'test-registry', 'test-index-echo-live', '-j', '4')
 for test in ['test-index-echo-windows', 'test-index-echo-batch', 'test-session-autochunk', 'test-arch-backend-map',
-             'test-crispasr-diff-compare']:
+             'test-crispasr-diff-compare', 'test-registry']:
     run(BUILD / 'bin' / test)
 run(sys.executable, ROOT / 'tools/gen-feature-matrix.py', '--crispasr', BUILD / 'bin/crispasr')
 run(sys.executable, ROOT / 'tools/gen-backend-caps-table.py', '--crispasr', BUILD / 'bin/crispasr')
@@ -85,6 +85,9 @@ def validate_cohort(cohort):
         print(clip, 'stage diff rc:', result.returncode, log_path.read_text()[-16000:], flush=True)
         if result.returncode: failures.append(clip)
     (OUT / f'stage-results-{cohort}.json').write_text(json.dumps(dict(failed=list(failures)), indent=2))
+
+    subprocess.run([str(BUILD / 'bin/test-index-echo-live')], cwd=ROOT, check=True,
+                   env=dict(os.environ, CRISPASR_MODEL_INDEX_ECHO=str(models / f'index-echo-2b-{cohort}.gguf')))
 
     # Open a model with an arbitrary filename through the actual Python Session,
     # which tests shared metadata detection and the shipped C ABI, not CLI heuristics.

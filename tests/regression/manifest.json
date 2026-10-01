@@ -1030,6 +1030,32 @@
       },
       "stage_threshold_default": 0.999,
       "stage_threshold_note": "Kaggle validate 2026-09-28 (CPU, F16 diff): encoder_output 0.999982. crispasr-diff's nemotron branch emits no mel stage."
+    },
+    {
+      "name": "index-echo-2b",
+      "backend_id": "index-echo",
+      "source_model": "IndexTeam/Index-Echo-S2TT-2B",
+      "source_model_note": "Pinned source 5d98a34d9685869b11e9c94d01dee22a8b8e53b5; actual released wrapper: F32 tower/connector, BF16 decoder.",
+      "gguf": {
+        "repo": "cstr/index-echo-2b-GGUF",
+        "revision": "9125052af3d24f297720e25e55637f88a8e54944",
+        "file": "index-echo-2b-q8_0.gguf",
+        "approx_size_mb": 670,
+        "companion_files": [
+          "index-echo-2b-decoder-q8_0.gguf"
+        ]
+      },
+      "sample": "samples/jfk.wav",
+      "transcript_format": "srt",
+      "expected_transcript": "And so my fellow Americans, So, my fellow Americans, ask not what your country can do for you, do not ask what your country can do for you, ask what you can do for your country. ask what you can do for your country.",
+      "expected_transcript_source": "Independent released mixed-precision blueprint; F16/Q8 direct-window CPU and CUDA exact text/timestamps, 2026-10-01 (#485). No VAD companion in this direct-window fixture.",
+      "fixture_ref_path": "index-echo-2b/jfk_11s/ref.gguf",
+      "diff_thresholds": {
+        "mel_spectrogram": 0.999,
+        "teacherforced_logits": 0.99
+      },
+      "stage_threshold_default": 0.99,
+      "stage_threshold_note": "Native diff also enforces magnitude <=5%, strict frontend/prompt/cache IDs and mandatory exit status; observed Q8 worst stage-row cosine .995173, relative L2 <=3.561%."
     }
   ],
   "tts_backends_note": "TTS->ASR roundtrip regression. Each entry synthesises tts_phrase via the TTS backend, transcribes the output with the pinned ASR backend (parakeet by default — high-accuracy English ground truth), and asserts WER <= wer_max. Catches silent decode regressions like the voxcpm2 BF16 noise bug that the encoder/mel diff harness can miss. WER ignores punctuation and case after normalisation, so a kokoro tts_phrase that comes back as 'the quick brown fox jumps over the lazy dog.' is still WER=0.",
