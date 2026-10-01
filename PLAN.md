@@ -11,6 +11,16 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-01 — Phonon-2 encoder FFN CPU optimization
+
+Worktree `/mnt/volume1/wt-phonon2-ffn`, branch `perf/phonon2-ffn`.
+Baseline `dcdd82c80`: verified ggml CPU decoder/projection. Audit actual CPU
+weight buffer types and FFN kernel selection, then isolated matrix-shape and
+1/2/4-thread A/B on clean CI. Reuse existing repack loader/probe where applicable.
+Keep alternatives gated; require numerical magnitude/cosine and F16/Q8/Q4 corpus
+checks before any default change. Encoder caching and encoder BLAS stay off.
+Models/logs/receipts: `/mnt/volume1/tmp-overflow/issue481/ffn-speed`.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
