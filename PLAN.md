@@ -26,8 +26,9 @@ uses the exact production implementation. Final candidate branch `f88850b30`
 selects ggml predictor/joint + backend projection only for Phonon-2 metadata
 on non-Apple CPU builds with AVX2/F16C; legacy overrides remain. Local candidate
 31-stage diff passes (min cosine 0.999996, magnitude bound 0.066%).
-Next native CI push verifies default timings and tests encoder BLAS with one
-thread; encoder cache stays off. Go/Rust bindings and cgo drift checks pass.
+Native CI **36818985927** (`f88850b30`) is running the default timing A/B
+and encoder BLAS with one thread. Encoder cache stays off. Go/Rust bindings
+and cgo drift checks pass; local parameter/flash-default tests pass 22 assertions.
 Local native build: `/mnt/volume1/phonon2-cpu-build`; receipts under
 `/mnt/volume1/tmp-overflow/issue481/cpu-speed`.
 
