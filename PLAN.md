@@ -11,6 +11,16 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-01 — #478 batched RALM prefill
+
+Worktree `/mnt/volume1/wt-478-ralm`, branch `perf/478-ralm-prefill`.
+Audit the Python inference and eager RALM KV semantics, then add a gated batched
+prefill with eager fallback. Validate hidden states and KV with cosine AND
+magnitude, decode continuation, and TTS/ASR roundtrips on F16 and shipped quants.
+Use clean GitHub Actions for large-model CPU A/B; check load/free RAM before
+large local tasks. Keep the current default until speed and output are proven.
+Receipts: `/mnt/volume1/tmp-overflow/issue478-ralm/`.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
