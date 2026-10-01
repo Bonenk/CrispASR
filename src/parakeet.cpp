@@ -963,9 +963,13 @@ static void parakeet_pin_ffn_blas(parakeet_context* ctx, ggml_cgraph* gf) {
         return;
     for (int i = 0; i < ggml_graph_n_nodes(gf); ++i) {
         ggml_tensor* node = ggml_graph_node(gf, i);
+        // ggml requires CPU last in the scheduler roster. Explicit placement
+        // prevents BLAS priority from capturing non-FFN encoder matmuls.
+        ggml_backend_t backend = ctx->backend;
         if (node->op == GGML_OP_MUL_MAT && node->src[0] && node->src[0]->buffer == ctx->model.buf_ffn_f32 &&
             ggml_backend_supports_op(ctx->backend_blas, node))
-            ggml_backend_sched_set_tensor_backend(ctx->sched, node, ctx->backend_blas);
+            backend = ctx->backend_blas;
+        ggml_backend_sched_set_tensor_backend(ctx->sched, node, backend);
     }
 }
 
@@ -1027,13 +1031,11 @@ static std::vector<float> parakeet_encode_mel(parakeet_context* ctx, const float
     if (!ctx->sched) {
         ggml_backend_t backends[3];
         int n_be = 0;
-        if (ctx->backend_blas && !ctx->ffn_blas)
+        if (ctx->backend_blas)
             backends[n_be++] = ctx->backend_blas;
         backends[n_be++] = ctx->backend;
         if (ctx->backend != ctx->backend_cpu)
             backends[n_be++] = ctx->backend_cpu;
-        if (ctx->backend_blas && ctx->ffn_blas)
-            backends[n_be++] = ctx->backend_blas;
         ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 8192, false, false);
         crispasr_imatrix_install(ctx->sched); // no-op unless CRISPASR_IMATRIX_OUT is set
     }
@@ -3463,13 +3465,11 @@ extern "C" int parakeet_run_encoder_dump(struct parakeet_context* ctx, const flo
     if (!ctx->sched) {
         ggml_backend_t backends[3];
         int n_be = 0;
-        if (ctx->backend_blas && !ctx->ffn_blas)
+        if (ctx->backend_blas)
             backends[n_be++] = ctx->backend_blas;
         backends[n_be++] = ctx->backend;
         if (ctx->backend != ctx->backend_cpu)
             backends[n_be++] = ctx->backend_cpu;
-        if (ctx->backend_blas && ctx->ffn_blas)
-            backends[n_be++] = ctx->backend_blas;
         ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 8192, false, false);
         crispasr_imatrix_install(ctx->sched); // no-op unless CRISPASR_IMATRIX_OUT is set
     }

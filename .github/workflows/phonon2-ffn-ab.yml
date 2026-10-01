@@ -2,6 +2,12 @@ name: Phonon-2 encoder FFN CPU A/B
 
 on:
   workflow_dispatch:
+    inputs:
+      sweep:
+        description: Full thread/repack sweep or scoped BLAS versus the default
+        type: choice
+        options: [full, blas]
+        default: full
 
 permissions:
   contents: read
@@ -121,7 +127,7 @@ jobs:
         shell: bash
         run: |
           python -m pip install 'torch==2.7.0' --index-url https://download.pytorch.org/whl/cpu
-          python -m pip install 'transformers @ git+https://github.com/huggingface/transformers.git@41fc5b47f6ac7ce1220fbaf673eeec21761c4ae0' librosa soundfile pyyaml safetensors sentencepiece
+          python -m pip install 'transformers @ https://github.com/huggingface/transformers/archive/41fc5b47f6ac7ce1220fbaf673eeec21761c4ae0.tar.gz' librosa soundfile pyyaml safetensors sentencepiece
           python - <<'PY'
           from huggingface_hub import snapshot_download
           snapshot_download('FermionResearch/Phonon-2', revision='9c7fef3584499a88fe8d394427f45851bbb8b446',
@@ -138,7 +144,11 @@ jobs:
         shell: bash
         run: |
           export CRISPASR_PARAKEET_ENCODER_BLAS=0
-          for config in ggml-t4 ggml-t1 ggml-t2 repack-t1 repack-t2 repack-t4 blas-t1 blas-t2 blas-t4; do
+          configs="ggml-t4 ggml-t1 ggml-t2 repack-t1 repack-t2 repack-t4 blas-t1 blas-t2 blas-t4"
+          if [[ "${{ inputs.sweep }}" == blas ]]; then
+            configs="ggml-t4 blas-t1 blas-t2 blas-t4"
+          fi
+          for config in $configs; do
             export CRISPASR_PARAKEET_FFN=ggml OPENBLAS_NUM_THREADS=1
             export CRISPASR_PARAKEET_FFN_BLAS_THREADS=1
             threads="${config##*-t}"
