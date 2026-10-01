@@ -5214,6 +5214,14 @@ int main(int argc, char** argv) {
     } else if (backend_name == "parakeet" || backend_name == "phonon2") {
         auto cp = parakeet_context_default_params();
         cp.n_threads = 4;
+        if (const char* threads = std::getenv("CRISPASR_PARAKEET_DIFF_THREADS")) {
+            const int value = std::atoi(threads);
+            if (value <= 0) {
+                fprintf(stderr, "CRISPASR_PARAKEET_DIFF_THREADS must be positive\n");
+                return 4;
+            }
+            cp.n_threads = value;
+        }
         cp.verbosity = 0;
         parakeet_context* ctx = parakeet_init_from_file(model_path.c_str(), cp);
         if (!ctx) {

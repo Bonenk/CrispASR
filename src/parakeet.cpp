@@ -226,6 +226,9 @@ struct parakeet_model {
 
     ggml_context* ctx = nullptr;
     ggml_backend_buffer_t buf = nullptr;
+    ggml_backend_buffer_t buf_default_partition = nullptr; // optional FFN repack loader partition
+    ggml_context* ctx_ffn_f32 = nullptr;
+    ggml_backend_buffer_t buf_ffn_f32 = nullptr; // optional once-per-load BLAS weights
 
     // F32 conv_dw_w copies (created during BN fold, avoids per-forward F16→F32 cast)
     ggml_context* ctx_f32 = nullptr;
@@ -254,6 +257,7 @@ struct parakeet_context {
     ggml_backend_t backend_cpu = nullptr;
     ggml_backend_t backend_blas = nullptr;
     int blas_threads = 0;
+    bool ffn_blas = false; // pin only cached FFN matmuls to BLAS
     ggml_backend_sched_t sched = nullptr;
 
     std::vector<uint8_t> compute_meta; // metadata buffer for graph allocation
@@ -322,6 +326,23 @@ static ggml_tensor* require(parakeet_model& m, const char* name) {
 // ===========================================================================
 // Model loading
 // ===========================================================================
+
+// These weights are consumed only by the four FFN MUL_MATs per encoder layer.
+// Exclude pointwise/attention/decoder weights: they have other consumers and
+// some are copied or converted at load, incompatible with repacked bytes.
+static bool parakeet_is_ffn_weight(const char* name, void*) {
+    if (!name || std::strncmp(name, "encoder.layers.", 15) != 0)
+        return false;
+    const char* suffix = std::strchr(name + 15, '.');
+    return suffix &&
+           (std::strcmp(suffix, ".ff1.linear1.weight") == 0 || std::strcmp(suffix, ".ff1.linear2.weight") == 0 ||
+            std::strcmp(suffix, ".ff2.linear1.weight") == 0 || std::strcmp(suffix, ".ff2.linear2.weight") == 0);
+}
+
+static bool parakeet_ffn_mode(const char* mode) {
+    const char* e = crispasr_env::get("CRISPASR_PARAKEET_FFN");
+    return e && std::strcmp(e, mode) == 0;
+}
 
 static bool parakeet_load_model(parakeet_model& model, parakeet_vocab& vocab, const char* path,
                                 ggml_backend_t backend) {
@@ -417,11 +438,15 @@ static bool parakeet_load_model(parakeet_model& model, parakeet_vocab& vocab, co
 
     // ---- pass 2: load tensor data via the shared helper ----
     core_gguf::WeightLoad wl;
-    if (!core_gguf::load_weights(path, backend, "parakeet", wl)) {
+    const bool repack = parakeet_ffn_mode("repack") && core_cpu_backend::is_cpu(backend);
+    const bool loaded =
+        repack ? core_gguf::load_weights_repack(path, backend, parakeet_is_ffn_weight, nullptr, "parakeet.ffn", wl)
+               : core_gguf::load_weights(path, backend, "parakeet", wl);
+    if (!loaded)
         return false;
-    }
     model.ctx = wl.ctx;
     model.buf = wl.buf;
+    model.buf_default_partition = wl.buf_cpu;
     model.tensors = std::move(wl.tensors);
 
     // Pure-CTC guard. A NeMo EncDecCTCModelBPE (parakeet-ctc-*,
@@ -936,6 +961,39 @@ static ggml_cgraph* parakeet_build_graph_encoder(parakeet_context* ctx, int T_me
 // Run the encoder once. Returns enc_out as a flat row-major [T_enc, d_model].
 // Caller computes T_enc as ceil(T_mel / subsampling_factor) (approximately —
 // the actual value depends on the conv arithmetic and is reported back).
+static void parakeet_pin_ffn_blas(parakeet_context* ctx, ggml_cgraph* gf) {
+    if (!ctx->ffn_blas || !ctx->model.buf_ffn_f32)
+        return;
+    for (int i = 0; i < ggml_graph_n_nodes(gf); ++i) {
+        ggml_tensor* node = ggml_graph_node(gf, i);
+        if (node->op == GGML_OP_MUL_MAT && node->src[0] && node->src[0]->buffer == ctx->model.buf_ffn_f32 &&
+            ggml_backend_supports_op(ctx->backend_blas, node))
+            ggml_backend_sched_set_tensor_backend(ctx->sched, node, ctx->backend_blas);
+    }
+}
+
+static void parakeet_trace_ffn(parakeet_context* ctx, ggml_cgraph* gf) {
+    const char* e = crispasr_env::get("CRISPASR_PARAKEET_FFN_TRACE");
+    if (!e || e[0] != '1')
+        return;
+    std::map<std::string, int> counts;
+    for (int i = 0; i < ggml_graph_n_nodes(gf); ++i) {
+        ggml_tensor* node = ggml_graph_node(gf, i);
+        if (node->op != GGML_OP_MUL_MAT || !node->src[0] ||
+            !parakeet_is_ffn_weight(ggml_get_name(node->src[0]), nullptr))
+            continue;
+        ggml_tensor* w = node->src[0];
+        ggml_backend_t be = ggml_backend_sched_get_tensor_backend(ctx->sched, node);
+        char key[256];
+        snprintf(key, sizeof(key), "%s [%lldx%lld] buffer=%s extra=%s backend=%s", ggml_type_name(w->type),
+                 (long long)w->ne[0], (long long)w->ne[1], w->buffer ? ggml_backend_buffer_name(w->buffer) : "none",
+                 w->extra ? "yes" : "no", be ? ggml_backend_name(be) : "none");
+        counts[key]++;
+    }
+    for (const auto& row : counts)
+        fprintf(stderr, "parakeet_ffn: %s count=%d\n", row.first.c_str(), row.second);
+}
+
 static std::vector<float> parakeet_encode_mel(parakeet_context* ctx, const float* mel, int n_mels, int T_mel,
                                               int* out_T_enc) {
     if (n_mels != (int)ctx->model.hparams.n_mels) {
@@ -969,11 +1027,13 @@ static std::vector<float> parakeet_encode_mel(parakeet_context* ctx, const float
     if (!ctx->sched) {
         ggml_backend_t backends[3];
         int n_be = 0;
-        if (ctx->backend_blas)
+        if (ctx->backend_blas && !ctx->ffn_blas)
             backends[n_be++] = ctx->backend_blas;
         backends[n_be++] = ctx->backend;
         if (ctx->backend != ctx->backend_cpu)
             backends[n_be++] = ctx->backend_cpu;
+        if (ctx->backend_blas && ctx->ffn_blas)
+            backends[n_be++] = ctx->backend_blas;
         ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 8192, false, false);
         crispasr_imatrix_install(ctx->sched); // no-op unless CRISPASR_IMATRIX_OUT is set
     }
@@ -1031,12 +1091,14 @@ static std::vector<float> parakeet_encode_mel(parakeet_context* ctx, const float
 
     int64_t t_alloc0 = probe_time ? ggml_time_us() : 0;
     ggml_backend_sched_reset(ctx->sched);
+    parakeet_pin_ffn_blas(ctx, gf);
     if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
         fprintf(stderr, "parakeet: failed to alloc encoder graph\n");
         return {};
     }
     int64_t t_alloc_us = probe_time ? ggml_time_us() - t_alloc0 : 0;
 
+    parakeet_trace_ffn(ctx, gf);
     // Set inputs
     ggml_tensor* mel_in = ggml_graph_get_tensor(gf, "mel");
     ggml_backend_tensor_set(mel_in, mel, 0, (size_t)n_mels * T_mel * sizeof(float));
@@ -1162,6 +1224,39 @@ static std::vector<float> tensor_to_f32(ggml_tensor* t) {
         tr->to_float(raw.data(), out.data(), n);
     }
     return out;
+}
+
+static bool parakeet_cache_ffn_f32(parakeet_model& model, ggml_backend_t backend) {
+    std::vector<std::pair<ggml_tensor**, ggml_tensor*>> jobs;
+    const size_t count = model.enc.size() * 4;
+    model.ctx_ffn_f32 = ggml_init({count * ggml_tensor_overhead(), nullptr, true});
+    if (!model.ctx_ffn_f32)
+        return false;
+    size_t bytes = 0;
+    for (auto& layer : model.enc) {
+        for (ggml_tensor** slot : {&layer.ff1_l1_w, &layer.ff1_l2_w, &layer.ff2_l1_w, &layer.ff2_l2_w}) {
+            ggml_tensor* src = *slot;
+            if (!src || ggml_n_dims(src) != 2 || !ggml_is_contiguous(src))
+                return false;
+            ggml_tensor* dst = ggml_new_tensor_2d(model.ctx_ffn_f32, GGML_TYPE_F32, src->ne[0], src->ne[1]);
+            ggml_set_name(dst, ggml_get_name(src));
+            jobs.emplace_back(slot, dst);
+            bytes += ggml_nbytes(dst);
+        }
+    }
+    model.buf_ffn_f32 = ggml_backend_alloc_ctx_tensors(model.ctx_ffn_f32, backend);
+    if (!model.buf_ffn_f32)
+        return false;
+    // Convert one matrix at a time; do not hold another model-sized F32 vector.
+    // Original slots remain intact until every copy has been populated.
+    for (const auto& job : jobs) {
+        auto values = tensor_to_f32(*job.first);
+        ggml_backend_tensor_set(job.second, values.data(), 0, values.size() * sizeof(float));
+    }
+    for (const auto& job : jobs)
+        *job.first = job.second;
+    fprintf(stderr, "parakeet.ffn: cached %zu F32 matmul weights, %zu MiB\n", jobs.size(), bytes / 1048576);
+    return true;
 }
 
 static void lstm_step_layer(const float* x, // [in_dim]
@@ -3036,7 +3131,8 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
     // through a registered BLAS backend; all other operations retain CPU kernels.
     if (core_cpu_backend::is_cpu(ctx->backend)) {
         const char* e = crispasr_env::get("CRISPASR_PARAKEET_ENCODER_BLAS");
-        if (e && e[0] == '1') {
+        ctx->ffn_blas = parakeet_ffn_mode("blas");
+        if ((e && e[0] == '1') || ctx->ffn_blas) {
             ctx->backend_blas = ggml_backend_init_by_name("BLAS", nullptr);
             if (ctx->backend_blas) {
                 auto reg = ggml_backend_dev_backend_reg(ggml_backend_get_device(ctx->backend_blas));
@@ -3045,6 +3141,11 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
                 ctx->blas_threads = ctx->n_threads;
                 if (const char* threads = crispasr_env::get("CRISPASR_PARAKEET_ENCODER_BLAS_THREADS"))
                     ctx->blas_threads = std::clamp(atoi(threads), 1, ctx->n_threads);
+                if (ctx->ffn_blas) {
+                    ctx->blas_threads = 1;
+                    if (const char* threads = crispasr_env::get("CRISPASR_PARAKEET_FFN_BLAS_THREADS"))
+                        ctx->blas_threads = std::clamp(atoi(threads), 1, ctx->n_threads);
+                }
                 if (set_threads)
                     set_threads(ctx->backend_blas, ctx->blas_threads);
             }
@@ -3057,6 +3158,16 @@ extern "C" struct parakeet_context* parakeet_init_from_file(const char* path_mod
         return nullptr;
     }
 
+    if (ctx->ffn_blas) {
+        if (!ctx->backend_blas) {
+            fprintf(stderr, "parakeet.ffn: BLAS backend unavailable; retaining ordinary CPU weights\n");
+            ctx->ffn_blas = false;
+        } else if (!parakeet_cache_ffn_f32(ctx->model, ctx->backend)) {
+            fprintf(stderr, "parakeet.ffn: failed to cache F32 weights\n");
+            parakeet_free(ctx);
+            return nullptr;
+        }
+    }
     parakeet_fold_batchnorm(ctx->model, ctx->backend);
 
     if (parakeet_bench_enabled())
@@ -3095,6 +3206,12 @@ extern "C" void parakeet_free(struct parakeet_context* ctx) {
         ggml_backend_sched_free(ctx->sched);
     ctx->model.pw_q8.free();
     ctx->model.qkv_fused.free();
+    if (ctx->model.buf_ffn_f32)
+        ggml_backend_buffer_free(ctx->model.buf_ffn_f32);
+    if (ctx->model.ctx_ffn_f32)
+        ggml_free(ctx->model.ctx_ffn_f32);
+    if (ctx->model.buf_default_partition)
+        core_gguf::release_weight_buffer(ctx->model.buf_default_partition);
     if (ctx->model.buf_f32)
         ggml_backend_buffer_free(ctx->model.buf_f32);
     if (ctx->model.ctx_f32)
@@ -3346,11 +3463,13 @@ extern "C" int parakeet_run_encoder_dump(struct parakeet_context* ctx, const flo
     if (!ctx->sched) {
         ggml_backend_t backends[3];
         int n_be = 0;
-        if (ctx->backend_blas)
+        if (ctx->backend_blas && !ctx->ffn_blas)
             backends[n_be++] = ctx->backend_blas;
         backends[n_be++] = ctx->backend;
         if (ctx->backend != ctx->backend_cpu)
             backends[n_be++] = ctx->backend_cpu;
+        if (ctx->backend_blas && ctx->ffn_blas)
+            backends[n_be++] = ctx->backend_blas;
         ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 8192, false, false);
         crispasr_imatrix_install(ctx->sched); // no-op unless CRISPASR_IMATRIX_OUT is set
     }
@@ -3361,10 +3480,12 @@ extern "C" int parakeet_run_encoder_dump(struct parakeet_context* ctx, const flo
     ggml_cgraph* gf = parakeet_build_graph_encoder_dump(ctx, T_mel);
 
     ggml_backend_sched_reset(ctx->sched);
+    parakeet_pin_ffn_blas(ctx, gf);
     if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
         fprintf(stderr, "parakeet: dump: failed to alloc encoder graph\n");
         return 3;
     }
+    parakeet_trace_ffn(ctx, gf);
 
     ggml_tensor* mel_in = ggml_graph_get_tensor(gf, "mel");
     ggml_backend_tensor_set(mel_in, mel, 0, (size_t)n_mels * T_mel * sizeof(float));

@@ -40,7 +40,8 @@ def main():
         parser.error("use at least three measurements")
     if not args.trace and any(os.environ.get(k, "0") != "0" for k in
                               ("CRISPASR_SCHED_PROFILE", "CRISPASR_FC_PROFILE", "CRISPASR_PARAKEET_BENCH",
-                               "CRISPASR_PARAKEET_ENC_PROBE", "CRISPASR_PARAKEET_DECODE_TIMING")):
+                               "CRISPASR_PARAKEET_ENC_PROBE", "CRISPASR_PARAKEET_DECODE_TIMING",
+                               "CRISPASR_PARAKEET_FFN_TRACE")):
         parser.error("disable instrumentation for benchmark measurements")
     with wave.open(str(ROOT / "samples/jfk.wav")) as wav:
         assert wav.getframerate() == 16000 and wav.getnchannels() == 1
@@ -71,6 +72,7 @@ def main():
               "threads": args.threads, "load_s": time.perf_counter() - loaded,
               "trace_only": args.trace, "clips": [],
               "controls": {key: os.environ.get(key) for key in (
+                  "CRISPASR_PARAKEET_FFN", "CRISPASR_PARAKEET_FFN_BLAS_THREADS",
                   "CRISPASR_PARAKEET_CPU_BLAS", "CRISPASR_PARAKEET_GGML_DECODE",
                   "CRISPASR_PARAKEET_ENCODER_BLAS", "CRISPASR_PARAKEET_ENCODER_BLAS_THREADS",
                   "CRISPASR_RNNT_GPU_ENC_PROJ", "CRISPASR_PARAKEET_FORCE_SCALAR",

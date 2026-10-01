@@ -92,10 +92,19 @@ struct Arm {
 };
 
 // Build one arm. `extra_buft` is null for the default-buffer-type arm.
-bool build_arm(Arm& a, ggml_type wt, Shape s, int n_threads, ggml_backend_buffer_type_t extra_buft, const char* label) {
+bool build_arm(Arm& a, ggml_type wt, Shape s, int n_threads, ggml_backend_buffer_type_t extra_buft, const char* label,
+               const char* backend_name = "CPU") {
     a.label = label;
-    a.backend = ggml_backend_cpu_init();
-    ggml_backend_cpu_set_n_threads(a.backend, n_threads);
+    a.backend = ggml_backend_init_by_name(backend_name, nullptr);
+    if (!a.backend) {
+        fprintf(stderr, "backend '%s' unavailable\n", backend_name);
+        return false;
+    }
+    auto reg = ggml_backend_dev_backend_reg(ggml_backend_get_device(a.backend));
+    auto set_threads =
+        (ggml_backend_set_n_threads_t)ggml_backend_reg_get_proc_address(reg, "ggml_backend_set_n_threads");
+    if (set_threads)
+        set_threads(a.backend, n_threads);
 
     ggml_backend_buffer_type_t wbuft = extra_buft ? extra_buft : ggml_backend_get_default_buffer_type(a.backend);
     a.buft_name = ggml_backend_buft_name(wbuft);
@@ -197,6 +206,7 @@ int main(int argc, char** argv) {
     int reps = 25;
     std::string arm_sel = "both";
     std::string type_sel;
+    std::string backend_sel = "CPU";
     std::vector<Shape> shapes;
 
     for (int i = 1; i < argc; i++) {
@@ -214,6 +224,10 @@ int main(int argc, char** argv) {
             const char* v = next();
             if (v)
                 arm_sel = v;
+        } else if (a == "--backend") {
+            const char* v = next();
+            if (v)
+                backend_sel = v;
         } else if (a == "--type") {
             const char* v = next();
             if (v)
@@ -225,9 +239,14 @@ int main(int argc, char** argv) {
                 shapes.push_back({K, N, M});
         } else if (a == "-h" || a == "--help") {
             printf("usage: crispasr-repack-probe [--threads N] [--reps N] [--shape K,N,M]...\n"
-                   "                              [--arm both|default|repack] [--type NAME]\n");
+                   "                              [--arm both|default|repack] [--type NAME] [--backend CPU|BLAS]\n");
             return 0;
         }
+    }
+    if (n_threads <= 0 || reps < 3 || (backend_sel != "CPU" && backend_sel != "BLAS") ||
+        (backend_sel == "BLAS" && arm_sel != "default")) {
+        fprintf(stderr, "require positive threads, >=3 reps; BLAS requires --arm default\n");
+        return 1;
     }
     if (shapes.empty()) {
         // hFT-Transformer-ish FFN and attention projection shapes, plus one
@@ -237,7 +256,7 @@ int main(int argc, char** argv) {
         shapes.push_back({2048, 512, 256});
     }
 
-    printf("== crispasr-repack-probe ==\n");
+    printf("== crispasr-repack-probe backend=%s ==\n", backend_sel.c_str());
     printf("ISA as ggml sees it: avx2=%d avx512=%d avx512_vnni=%d amx_int8=%d "
            "neon=%d dotprod=%d matmul_int8(i8mm)=%d sve=%d\n",
            ggml_cpu_has_avx2(), ggml_cpu_has_avx512(), ggml_cpu_has_avx512_vnni(), ggml_cpu_has_amx_int8(),
@@ -282,7 +301,7 @@ int main(int argc, char** argv) {
         }
         printf("measuring extra buffer type: %s\n", extra.empty() ? "(none)" : ggml_backend_buft_name(extra[0]));
     }
-    if (extra.empty()) {
+    if (extra.empty() && arm_sel != "default") {
         printf("\nRESULT: no extra buffer type on this host. The repack fast path\n"
                "cannot be selected here at all; the question is untestable on this ISA.\n");
         return 0;
@@ -292,8 +311,8 @@ int main(int argc, char** argv) {
         ggml_type t;
         const char* n;
     } types[] = {
-        {GGML_TYPE_F32, "f32"},   {GGML_TYPE_Q8_0, "q8_0"}, {GGML_TYPE_Q4_0, "q4_0"},
-        {GGML_TYPE_Q4_K, "q4_K"}, {GGML_TYPE_Q6_K, "q6_K"},
+        {GGML_TYPE_F16, "f16"},   {GGML_TYPE_F32, "f32"},   {GGML_TYPE_Q8_0, "q8_0"},
+        {GGML_TYPE_Q4_0, "q4_0"}, {GGML_TYPE_Q4_K, "q4_K"}, {GGML_TYPE_Q6_K, "q6_K"},
     };
 
     if (arm_sel == "default" || arm_sel == "repack") {
@@ -307,7 +326,8 @@ int main(int argc, char** argv) {
                 if (!type_sel.empty() && type_sel != ty.n)
                     continue;
                 Arm a;
-                if (!build_arm(a, ty.t, s, n_threads, want_repack ? extra[0] : nullptr, arm_sel.c_str()))
+                if (!build_arm(a, ty.t, s, n_threads, want_repack ? extra[0] : nullptr, arm_sel.c_str(),
+                               backend_sel.c_str()))
                     return 1;
                 if (!a.usable) {
                     printf("ARM %s %s %lld %lld %lld %d - - - declined\n", arm_sel.c_str(), ty.n, (long long)s.K,
@@ -315,10 +335,12 @@ int main(int argc, char** argv) {
                     continue;
                 }
                 for (int i = 0; i < 3; i++)
-                    ggml_backend_graph_compute(a.backend, a.gf);
+                    if (ggml_backend_graph_compute(a.backend, a.gf) != GGML_STATUS_SUCCESS)
+                        return 1;
                 for (int i = 0; i < reps; i++) {
                     double t0 = now_ms();
-                    ggml_backend_graph_compute(a.backend, a.gf);
+                    if (ggml_backend_graph_compute(a.backend, a.gf) != GGML_STATUS_SUCCESS)
+                        return 1;
                     a.times.push_back(now_ms() - t0);
                 }
                 finish_arm(a);
@@ -349,10 +371,12 @@ int main(int argc, char** argv) {
             // shape?" is the question behind the hFT/O&F disagreement.
             if (!rep.usable) {
                 for (int i = 0; i < 3; i++)
-                    ggml_backend_graph_compute(def.backend, def.gf);
+                    if (ggml_backend_graph_compute(def.backend, def.gf) != GGML_STATUS_SUCCESS)
+                        return 1;
                 for (int i = 0; i < reps; i++) {
                     double t0 = now_ms();
-                    ggml_backend_graph_compute(def.backend, def.gf);
+                    if (ggml_backend_graph_compute(def.backend, def.gf) != GGML_STATUS_SUCCESS)
+                        return 1;
                     def.times.push_back(now_ms() - t0);
                 }
                 finish_arm(def);
@@ -373,8 +397,10 @@ int main(int argc, char** argv) {
             }
 
             for (int i = 0; i < 3; i++) { // warmup, both arms
-                ggml_backend_graph_compute(def.backend, def.gf);
-                ggml_backend_graph_compute(rep.backend, rep.gf);
+                if (ggml_backend_graph_compute(def.backend, def.gf) != GGML_STATUS_SUCCESS)
+                    return 1;
+                if (ggml_backend_graph_compute(rep.backend, rep.gf) != GGML_STATUS_SUCCESS)
+                    return 1;
             }
             // Interleaved round-robin, alternating which arm goes first.
             for (int i = 0; i < reps; i++) {
