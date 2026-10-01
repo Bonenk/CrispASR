@@ -57,8 +57,18 @@ Q4 BLAS corpus running; corrected clean CI
 [36834441110](https://github.com/CrispStrobe/CrispASR/actions/runs/36834441110)
 will measure scoped BLAS versus same-host defaults. The first full sweep
 `36830399630` uses the pre-fix scheduler and cannot validate its BLAS arm.
-All 13 candidate cross-platform jobs and normal lint passed before the fix;
-repeat applicable checks after the correction. No default has changed.
+Corrected candidate CI `36834689343` passes all 13 jobs; lint `36834688811`
+and the cross-ISA repack probe `36834375261` also pass. Prior main Deep Lint
+rerun `36821263388` passed (the original attempt lost its hosted runner).
+First-sweep verified CPU/repack results: Q4 four-thread warm 11/55 s improves
+1.850/10.189 -> 1.508/8.401 s, RSS stays ~1318 MiB, load ~0.08 -> 0.51 s.
+Its CI JFK punctuation changes too; keep off. Q8 two threads gives only ~5%/3%
+over four; F16/Q4 regress, so no global thread-default change.
+Scoped BLAS1 now completes all 63 local corpus cases: 61/63 old exact, both
+changes closer to Python; F16/Q8/Q4 reference-exact 21/20/16 versus 21/19/15.
+Human word errors on the 19 labelled clips stay 13/272 for every quant/path.
+Short encoder batches correctly use CPU F32 fallback (25 finite stages).
+Corrected scoped-BLAS CI timings remain pending. No default has changed.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
