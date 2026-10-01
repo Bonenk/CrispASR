@@ -17,7 +17,7 @@ per-backend porting detail (Per-model port notes + the family cross-reference).
 Reach for the topic groups when you are stuck on a *technique*, and the
 cross-reference when you already know which model you are touching.
 
-## Index by topic (312 lessons)
+## Index by topic (313 lessons)
 
 **Security & untrusted input** (2)
 
@@ -294,7 +294,7 @@ cross-reference when you already know which model you are touching.
 - L18290 — voxcpm2 CausalTransposeConv1d kwargs gotcha
 - L18756 — The #52 fallback died silently when name and description split — and the encoder half of a symmetric codec never inherited it
 
-**Process, triage & documentation discipline** (19)
+**Process, triage & documentation discipline** (20)
 
 - L346 — One red job hides every job behind it — five days of a 33-job nightly that never ran
 - L1000 — When instrumenting the suspect file produces NO output, you are editing the wrong file — look for a second copy
@@ -315,6 +315,7 @@ cross-reference when you already know which model you are touching.
 - L14255 — Issue triage discipline: check the codebase before leaving issues open
 - L14882 — `git apply --3way` STAGES its result — a later `git add X && git commit` sweeps it up
 - L17160 — CrispEmbed #31 WASM OCR e2e
+- L19267 — 313. Index-Echo: audit effective nested dtypes and Silero waveform history
 
 **Per-model port notes** (45)
 
