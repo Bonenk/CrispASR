@@ -14,11 +14,17 @@ it goes stale for more than a day.
 ## CLAIMED 2026-10-01 — Phonon-2 CPU optimization
 
 Worktree `/mnt/volume1/wt-phonon2-cpu`, branch `perf/phonon2-cpu`.
-Baseline main `aa1a85f13`. A/B existing scalar and persistent ggml CPU decoder;
-then gate CPU BLAS matvec/projection and encoder experiments behind runtime
-switches. Require independent numerical component parity, F16/Q8/Q4 decoded
-output checks, and warmed same-host timings before selecting defaults.
-Experimental encoder graph caching remains off. Use native CI for final receipts.
+Baseline main `aa1a85f13`. Gated OpenBLAS decoder/projection and registered
+CPU encoder BLAS paths implemented at `c1c2683a9`; explicit thread counts now
+reach both CPU instances. The diff harness now captures the production one-blank
+predictor SOS and joint logits, retaining the legacy NeMo two-zero probe.
+Native Linux A/B run **36813752349** (branch `fd9b0c5f9`) is in flight:
+31-stage cosine + magnitude gates, then F16/Q8/Q4 scalar / BLAS(1,4 threads) /
+ggml / encoder-BLAS / combined warmed comparisons and separate decode traces.
+Local native build in `/mnt/volume1/phonon2-cpu-build` is in flight; baseline
+portable VPS timings were discarded because unrelated jobs contend for CPU.
+No optimization default changed; encoder caching stays off. Next: review parity,
+transcripts and same-runner receipts, validate bindings and CPU fallback builds.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 

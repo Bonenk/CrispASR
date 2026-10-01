@@ -1,5 +1,0 @@
-set(TARGET nfa-align)
-add_executable(${TARGET} main.cpp)
-include(DefaultTargetOptions)
-target_include_directories(${TARGET} PRIVATE ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(${TARGET} PRIVATE canary_ctc common Threads::Threads)

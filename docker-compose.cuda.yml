@@ -1,7 +1,0 @@
-services:
-  crispasr:
-    image: ${CRISPASR_IMAGE_CUDA:-crispasr-local:main-cuda}
-    build:
-      context: .
-      dockerfile: .devops/main-cuda.Dockerfile
-    gpus: all
