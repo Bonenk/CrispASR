@@ -2,8 +2,6 @@ name: Phonon-2 encoder FFN CPU A/B
 
 on:
   workflow_dispatch:
-  push:
-    branches: [perf/phonon2-ffn]
 
 permissions:
   contents: read
@@ -140,7 +138,7 @@ jobs:
         shell: bash
         run: |
           export CRISPASR_PARAKEET_ENCODER_BLAS=0
-          for config in ggml-t1 ggml-t2 ggml-t4 repack-t1 repack-t2 repack-t4 blas-t1 blas-t2 blas-t4; do
+          for config in ggml-t4 ggml-t1 ggml-t2 repack-t1 repack-t2 repack-t4 blas-t1 blas-t2 blas-t4; do
             export CRISPASR_PARAKEET_FFN=ggml OPENBLAS_NUM_THREADS=1
             export CRISPASR_PARAKEET_FFN_BLAS_THREADS=1
             threads="${config##*-t}"
@@ -155,6 +153,15 @@ jobs:
             python tools/check_phonon2_parity.py --reference results/full-ref.gguf \
               --log "results/parity-$config.txt" --output "results/parity-$config.json"
             for quant in $quants; do
+              baseline=()
+              if [[ "$config" != ggml-t4 ]]; then
+                baseline=(--baseline "results/stages-ggml-t4-$quant.npz")
+              fi
+              python tools/check_phonon2_ffn_stages.py --lib "$PHONON2_LIB" \
+                --model "models-live/phonon2-$quant.gguf" --reference results/full-ref.gguf \
+                --mode "$CRISPASR_PARAKEET_FFN" --threads "$threads" \
+                --output "results/stages-$config-$quant.npz" "${baseline[@]}" \
+                > "results/stages-$config-$quant.log" 2>&1
               python tools/profile_phonon2.py --engine runtime --threads "$threads" --lib "$PHONON2_LIB" \
                 --model "models-live/phonon2-$quant.gguf" --output "results/runtime-$config-$quant.json" \
                 > "results/runtime-$config-$quant.log" 2>&1
