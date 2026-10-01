@@ -24,8 +24,14 @@ legacy Intel archives, and golden-transcript/magnitude A/B harness. Intel proof:
 https://github.com/CrispStrobe/CrispASR/actions/runs/36865090158 ; package dry run:
 https://github.com/CrispStrobe/CrispASR/actions/runs/36865093345 . Runtime source
 is unchanged. Cross-platform CI: run `36865881142`; lint: `36865884690`.
-Intel proof is running, package dry run is building the legacy arm; SIMD arm
-awaits runner capacity. Release notes are drafted in the feature worktree.
+Legacy Intel package passed relocation/architecture/startup checks. First Intel
+proof `36865090158` passes short Q8 golden text and encoder gates (cosine
+0.999759738, norm ratio 1.000731459), but stops on a pre-existing long-fixture
+baseline insertion: one extra "and" in the sixth repetition. Candidate runtime
+is unchanged. Harness `62b91ad67` accepts only the exact golden or this specific
+observed variant, requires no candidate error increase, and skips automatic LID
+for the English fixture. Rerun `36867331142` is dispatched. SIMD package and
+cross-platform CI remain in flight. Release notes are drafted in the worktree.
 Results pending; do not release until validated. Index models (#485) are
 explicitly assigned to another agent by the maintainer; leave that work alone.
 Reporter added a 12-thread/chunked binary-swap confirmation at 12:46 UTC.
