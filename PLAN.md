@@ -21,6 +21,13 @@ Use clean GitHub Actions for large-model CPU A/B; check load/free RAM before
 large local tasks. Keep the current default until speed and output are proven.
 Receipts: `/mnt/volume1/tmp-overflow/issue478-ralm/`.
 
+Checkpoint: opt-in CPU candidate `c29750c09` is on `perf/478-ralm-prefill`.
+[Heavy CPU run 36848523918](https://github.com/CrispStrobe/CrispASR/actions/runs/36848523918)
+is checking F16/Q8_0/Q4_K hidden/KV/continuation parity, causal isolation,
+short-after-long reuse, an independent torch F16 forward, TTS/ASR (zero-shot
+and synthetic-reference cloning), and warmed 249-position timing medians.
+Gate `CRISPASR_VOXCPM2_RALM_PREFILL_BATCH=1`; CPU only, default still eager.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
