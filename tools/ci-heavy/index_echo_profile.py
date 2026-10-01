@@ -84,6 +84,9 @@ if args.worker == 'python':
     torch.set_grad_enabled(False)
     started = time.perf_counter()
     model = module.AudioTransModel(str(source), device='cpu', dtype=torch.float32)
+    sys.path.insert(0, str(ROOT / 'tools'))
+    from reference_backends.index_echo import precision_audit
+    parameter_dtypes = precision_audit(model)
 else:
     sys.path.insert(0, str(ROOT / 'python'))
     from crispasr import Session
@@ -93,6 +96,7 @@ else:
                     lib_path=os.environ['INDEX_ECHO_PROFILE_LIB'], n_threads=4)
 result = dict(arm=args.worker, precision='CPU F32' if args.worker=='python' else args.worker,
               load_seconds=time.perf_counter()-started, clips={})
+if args.worker == 'python': result['parameter_dtypes'] = parameter_dtypes
 try:
     for clip in ['jfk','zh','jfk-tail']:
         audio = models/'reference/jfk-tail.wav' if clip=='jfk-tail' else ROOT/'samples'/('paraformer_zh.wav' if clip=='zh' else 'jfk.wav')

@@ -14,6 +14,20 @@ DEFAULT_STAGES = ['mel_spectrogram', 'encoder_input', 'encoder_output', 'connect
                   'prompt_ids', 'llm_logits', 'generated_ids']
 
 
+def precision_audit(model):
+    """Report effective parameter dtypes, including nested text configuration."""
+    result = {}
+    for name in ['tower', 'connector', 'llm']:
+        module = getattr(model, name)
+        counts = {}
+        for parameter in module.parameters():
+            dtype = str(parameter.dtype)
+            counts[dtype] = counts.get(dtype, 0) + parameter.numel()
+        result[name] = dict(parameter_elements=counts, module_class=type(module).__name__)
+    result['embedding_dtype'] = str(model.llm.get_input_embeddings().weight.dtype)
+    return result
+
+
 def dump(model_dir, audio, stages, **kwargs):
     import soundfile as sf
     import torch
@@ -24,7 +38,8 @@ def dump(model_dir, audio, stages, **kwargs):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     model = module.AudioTransModel(str(root), device='cpu', dtype=torch.float32)
-    values = {}
+    import json
+    values = {'parameter_dtypes': json.dumps(precision_audit(model), sort_keys=True)}
     handles = []
     def hook(name, last=False, transform=None):
         def capture(mod, inputs, output):
@@ -138,7 +153,8 @@ def dump_pipeline(model_dir, output_dir, sample_dir):
             return value
 
     silero_vad.load_silero_vad = lambda *a, **kw: RecordingVAD(original_loader(*a, **kw))
-    result = dict(precision='CPU F32', model_load_seconds=load_seconds, cases={})
+    result = dict(precision='requested CPU F32', parameter_dtypes=precision_audit(model),
+                  model_load_seconds=load_seconds, cases={})
     try:
         for name, audio, lang in cases:
             probabilities.clear()

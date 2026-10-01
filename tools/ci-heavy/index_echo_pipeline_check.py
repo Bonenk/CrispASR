@@ -15,7 +15,7 @@ def check_pipeline(root, out, build, library, models, cohort):
     # Keep the third companion beside the primary, exercising runtime autoload.
     vad_revision = HfApi().model_info('ggml-org/whisper-vad').sha
     vad_path = Path(hf_hub_download('ggml-org/whisper-vad', 'ggml-silero-v6.2.0.bin',
-                                  revision=vad_revision, local_dir=models))
+                                  revision=vad_revision, local_dir=models / 'vad-companion'))
     oracle = json.loads((models / 'reference/pipeline.json').read_text())
     failures, decoded = [], {}
 
@@ -35,6 +35,9 @@ def check_pipeline(root, out, build, library, models, cohort):
     vad = lib.whisper_vad_init_from_file_with_params(str(vad_path).encode(), VADParams(1, False, 0))
     if not vad:
         raise RuntimeError('Native Silero companion could not load')
+    companion = models / vad_path.name
+    assert not companion.exists(), 'Direct-window fixtures must not autoload VAD'
+    companion.symlink_to(vad_path)
     try:
         with Session(str(models / f'index-echo-2b-{cohort}.gguf'), lib_path=str(library), n_threads=4) as session:
             for name, expected in oracle['cases'].items():
@@ -63,16 +66,21 @@ def check_pipeline(root, out, build, library, models, cohort):
                         abs(a['end'] - e['end']) > .0051 for a, e in zip(actual, golden)):
                     failures.append(name + ': full-pipeline decoded mismatch')
                 decoded[name] = dict(segments=actual, reference=golden, elapsed_seconds=elapsed,
-                                     vad_cosine=cosine, vad_max_abs=delta)
+                                     vad_cosine=cosine, vad_max_abs=delta, vad_probabilities=probs.tolist())
                 print('full pipeline', cohort, name, json.dumps(decoded[name], ensure_ascii=False), flush=True)
     finally:
         lib.whisper_vad_free(vad)
+        companion.unlink()
     # Real CLI default language flow: metadata/caps must avoid unrelated LID.
     prefix = out / f'pipeline-{cohort}-cli'
-    with (out / f'pipeline-{cohort}-cli.log').open('w') as log:
-        result = subprocess.run([str(build / 'bin/crispasr'), '-m', str(models / f'index-echo-2b-{cohort}.gguf'),
-            '-f', str(root / 'samples/jfk.wav'), '-l', 'auto', '-osrt', '-of', str(prefix), '-t', '4', '-ng'],
-            cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=3600)
+    companion.symlink_to(vad_path)
+    try:
+        with (out / f'pipeline-{cohort}-cli.log').open('w') as log:
+            result = subprocess.run([str(build / 'bin/crispasr'), '-m', str(models / f'index-echo-2b-{cohort}.gguf'),
+                '-f', str(root / 'samples/jfk.wav'), '-l', 'auto', '-osrt', '-of', str(prefix), '-t', '4', '-ng'],
+                cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=3600)
+    finally:
+        companion.unlink()
     srt = prefix.with_suffix('.srt')
     if result.returncode or not srt.exists():
         failures.append('real CLI failed')
