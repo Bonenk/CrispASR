@@ -66,22 +66,38 @@ exact output. It remains RED: Japanese has three 20ms timestamp differences;
 F16 Spanish has one synonym substitution; Q8 English has one 20ms difference.
 Do not call the full pipeline exact or mark the port complete.
 
-Separate explicitly forced F32 decoder diagnostic references and pipeline were
-produced successfully (`36914150287`, `36913471293`), without replacing the
-released-blueprint golden. Latest consumer `36915483750` tests both F16/Q8
-against that variant. Cached-token rank/gap diagnostics preserve the exact-ID
-gate. This is to identify numerical differences, not silently relax acceptance.
+Separate explicitly forced F32 decoder source fixtures/pipeline were produced
+successfully (`36914150287`, `36913471293`) without replacing the released
+mixed-precision golden. Consumer `36915483750` passes **every F16** stage,
+magnitude, prompt/cache, direct-output and full-file gate: minimum cosine
+.999992, maximum relative L2 .239%. Q8 passes stages/cache/direct decoded cues
+(.997150 minimum, 3.094% maximum relative L2); exact full-file diagnostic
+remains red for the known 20ms/Spanish precision differences. The retained
+acceptance audit requires exact F16 F32-source proof, full independent source
+variant text and at most 20ms Q8 timestamps; arbitrary text edits are rejected.
+Nightly fixtures now pin `374efe4d7f5c4ff5dce32deffb14e23865fa8493`, with forced
+F32 diagnostics under `index-echo-2b-f32/` and original mixed captures retained.
 
 Same-host ARM Neoverse-N2, four threads, three iterations per clip:
 `36907737439` passes all timed decoded outputs. Q8 warm medians are 1.33–1.46x
 faster than the actual mixed F32/BF16 Python blueprint; peak RSS 4.03 vs 7.95GiB.
 Audited receipt is in PERFORMANCE.md and docs/index-echo-cpu-2026-10-01.json.
-Kaggle CUDA v1 completed on a Tesla T4 (SM75): F16/Q8 per-stage and decoded-text
-checks pass against the same independent source references, with same-box CPU
-controls. Detailed logs/receipts are being harvested; timestamp comparison was
-not yet enforced by that GPU script. Broad final CI, registry/public publication,
-nightly model pins and final docs remain pending. Models stay private; no release
-or completed-port claim.
+Kaggle CUDA v1 completed on **two Tesla T4 GPUs (SM75)**: all F16/Q8 stage/cache
+checks pass; complete SRTs match same-box CPU controls and independent source
+timestamps. Q8 is 4.5–5.3x realtime excluding load on the three short clips.
+This is cold direct-window CUDA proof, not full-file GPU/VAD or a warm median.
+
+Validated F16/Q8 weights and numerical/performance receipts are now public at
+`cstr/index-echo-2b-GGUF`; rejected Q4 downloads removed from HEAD. The card
+explicitly requires the feature branch until landing. Registry bundle, nightly
+entry/matrix, Python/Go/Flutter docs and live repeat-file test are wired in that
+branch. URL check passes all four pair URLs; tiny local registry build passes
+5,418 assertions in 61 cases; regression-driver/bounds/selector tests pass.
+CI caught the live target missing the library containing Silero; fixed link
+and final shared/model/live validation `36918771685` is running. Broad CI
+`36918938903` and lint `36918943060` are pending/running. Generated capability
+artifacts, transfer-reference cleanup, final docs/landing remain pending.
+No completed-port/release claim yet.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
