@@ -11,6 +11,17 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-01 — Windows Vulkan SDK download retries
+
+Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/vulkan-sdk-download-retry`.
+v0.8.40's Windows Vulkan library job failed before compilation when the SDK
+server closed the download connection; a targeted rerun succeeded. Both Windows
+release jobs currently fetch version metadata and the installer without retry
+handling. Add shared bounded retries that cover transport errors, discard
+partial downloads, and preserve failure on exhaustion. Validate with injected
+HTTP/connection failures on Windows and an actual Vulkan package dry run.
+The released v0.8.40 assets are already verified; Index models remain separate.
+
 ## CLAIMED 2026-10-01 — #485 Index-Echo S2TT 2B
 
 Worktree `/mnt/volume1/wt-index-echo-2b`, branch `feat/index-echo-2b`.
