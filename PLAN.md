@@ -23,7 +23,11 @@ Candidate `785919294` is pushed: shared explicit ISA configuration, SIMD and
 legacy Intel archives, and golden-transcript/magnitude A/B harness. Intel proof:
 https://github.com/CrispStrobe/CrispASR/actions/runs/36865090158 ; package dry run:
 https://github.com/CrispStrobe/CrispASR/actions/runs/36865093345 . Runtime source
-is unchanged. Results pending; do not release until validated.
+is unchanged. Cross-platform CI: run `36865881142`; lint: `36865884690`.
+Intel proof is running, package dry run is building the legacy arm; SIMD arm
+awaits runner capacity. Release notes are drafted in the feature worktree.
+Results pending; do not release until validated. Index models (#485) are
+explicitly assigned to another agent by the maintainer; leave that work alone.
 Reporter added a 12-thread/chunked binary-swap confirmation at 12:46 UTC.
 New #485 is a model request, not a release regression; no new PRs.
 
