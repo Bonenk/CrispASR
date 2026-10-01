@@ -49,17 +49,17 @@ def main():
                                              ct.POINTER(fp), ct.c_int, ip, ip]
     lib.parakeet_run_encoder_dump.restype = ct.c_int
     mel = next(t.data for t in GGUFReader(args.reference).tensors if t.name == 'mel_spectrogram')
-    mel = np.ascontiguousarray(mel.reshape(128, -1), dtype=np.float32)
+    mel = np.ascontiguousarray(mel.reshape(-1, 128), dtype=np.float32)
     params = lib.parakeet_context_default_params()
     params.n_threads, params.use_gpu, params.verbosity = args.threads, False, 0
     ctx = lib.parakeet_init_from_file(os.fsencode(args.model), params)
     assert ctx, 'model load failed'
     try:
-        capacity = (mel.shape[1] + 7) // 8
+        capacity = (mel.shape[0] + 7) // 8
         arrays = [np.empty((capacity, 1024), dtype=np.float32) for _ in range(25)]
         pointers = (fp * len(arrays))(*(arr.ctypes.data_as(fp) for arr in arrays))
         frames, width = ct.c_int(), ct.c_int()
-        status = lib.parakeet_run_encoder_dump(ctx, mel.ctypes.data_as(fp), 128, mel.shape[1],
+        status = lib.parakeet_run_encoder_dump(ctx, mel.ctypes.data_as(fp), 128, mel.shape[0],
                                                pointers, len(arrays), ct.byref(frames), ct.byref(width))
         assert status == 0 and 0 < frames.value <= capacity and width.value == 1024
         stages = {'pre_encode_output': arrays[0][:frames.value]}
