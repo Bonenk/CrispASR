@@ -26,7 +26,10 @@ package gates are complete. Next: scripts/bump-version.sh, green checks on the
 versioned target, publish v0.8.40, verify assets, archive notes/remove claim.
 Version bump `bbe3d5a57` used the repository script. Its Flutter changelog warning
 was fixed before publication; the unpublished annotated tag is moved to this
-metadata correction. Validate the final versioned target on the release branch.
+metadata correction. Final unpublished annotated tag points to
+`6e25ddf9e0a5dd132846c933a05e1920f0c9c7b6` (VERSION/bindings/Flutter notes agree).
+Versioned target CI `36880148726`, lint `36880152846` on `release/0.8.40`;
+wait for both green before pushing the tag. No new bug reports as of 14:48 UTC.
 Release publishing is explicitly authorized. Index models (#485) belong to
 another agent and are outside this release task.
 
