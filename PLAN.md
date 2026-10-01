@@ -13,7 +13,7 @@ it goes stale for more than a day.
 
 ## CLAIMED 2026-10-01 — #484 Intel macOS SIMD / v0.8.40 release
 
-Worktree `/mnt/volume1/wt-484-macos`, branch `fix/484-macos-simd`.
+Worktree `/mnt/volume1/wt-478-ralm` (reused clean worktree; new allocation hit disk capacity), branch `fix/484-macos-simd`.
 The v0.8.39 Intel release disables AVX2/FMA/F16C via portable CPU mode.
 Test explicit SIMD versus the shipped baseline on macos-15-intel with the same
 Parakeet Q8 model, four threads, decoded-output checks and warm medians; retain
