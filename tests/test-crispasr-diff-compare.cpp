@@ -61,3 +61,23 @@ TEST_CASE("diff compare: an unwritten (all-zero) candidate fails", "[diff]") {
 
     std::remove(path.c_str());
 }
+
+TEST_CASE("diff compare: GGUF rows use the contiguous feature dimension", "[diff]") {
+    // A non-square (2 tokens, 3 features) capture is stored with GGUF shape
+    // {3, 2}. Comparing width 2 instead creates three unrelated short rows.
+    const std::vector<float> values = {1, 2, 3, 4, 5, 6};
+    const auto path = write_ref(values, 2, 3);
+    crispasr_diff::Ref ref;
+    REQUIRE(ref.load(path));
+    REQUIRE(ref.shape("stage") == std::vector<int64_t>{3, 2});
+    auto same = ref.compare("stage", values.data(), values.size(), crispasr_diff::Ref::COS_FIRST_DIM);
+    CHECK(same.n_rows == 2);
+    CHECK(same.is_pass(0.999f));
+    auto missing_token = values;
+    std::fill(missing_token.begin() + 3, missing_token.end(), 0.0f);
+    auto missing = ref.compare("stage", missing_token.data(), missing_token.size(), crispasr_diff::Ref::COS_FIRST_DIM);
+    CHECK(missing.n_rows == 2);
+    CHECK(missing.cos_min_row == 1);
+    CHECK_FALSE(missing.is_pass(0.999f));
+    std::remove(path.c_str());
+}

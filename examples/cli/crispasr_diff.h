@@ -144,7 +144,10 @@ public:
     // reference tensor, and cos_min / cos_mean reflect per-row cosine
     // similarity. When cmp_type == L2, rows aren't used and cos_* are
     // left at their defaults.
-    enum CompareMode { COS_LAST_DIM, L2_ONLY };
+    // GGUF reverses NumPy dimensions: ne[0] is the contiguous feature/vocab
+    // width. Use COS_FIRST_DIM for row-major (tokens, features) captures.
+    // Preserve COS_LAST_DIM for existing callers with historical layouts.
+    enum CompareMode { COS_LAST_DIM, L2_ONLY, COS_FIRST_DIM };
     Report compare(const std::string& name, const float* data, size_t n_elem, CompareMode mode = COS_LAST_DIM) const;
 
     // Convenience: compare the argmax-over-last-dim of `data` against

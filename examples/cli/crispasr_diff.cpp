@@ -270,9 +270,10 @@ Report Ref::compare(const std::string& name, const float* data, size_t n_elem, C
         }
     }
 
-    // Cosine similarity over the last dimension (rows)
-    if (mode == COS_LAST_DIM && !r.shape.empty()) {
-        const int row_w = (int)r.shape.back();
+    // Choose the contiguous row width explicitly; GGUF ne[0] is the
+    // innermost NumPy dimension for normal row-major captures.
+    if (mode != L2_ONLY && !r.shape.empty()) {
+        const int row_w = (int)(mode == COS_FIRST_DIM ? r.shape.front() : r.shape.back());
         if (row_w > 0) {
             const size_t n_rows = n / row_w;
             r.cos_min = 1.0f;

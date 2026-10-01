@@ -1903,7 +1903,7 @@ int main(int argc, char** argv) {
                 ++n_fail;
                 return;
             }
-            auto report = ref.compare(name, data, count);
+            auto report = ref.compare(name, data, count, crispasr_diff::Ref::COS_FIRST_DIM);
             print_row(name.c_str(), report, COS_THRESHOLD);
             record(report);
             // Cosine alone accepts a uniformly rescaled tensor. Gate magnitude
