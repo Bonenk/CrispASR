@@ -36,7 +36,11 @@ SIMD package `36865093345` compiled but failed correctly at packaging because
 CMake's optional C2PA fetch got an HTTP error and disabled signing. Fix
 `e11b9595e` fetches/retries the required sidecar before compiling; fresh package
 run `36868274235` is dispatched. Intel ISA/runtime configuration is unchanged;
-CPU A/B `36867331142` continues. Windows/macOS/iOS/Linux unit checks passed.
+CPU A/B `36867331142` continues. All 13 cross-platform checks in `36865881142`
+passed; clang-tidy is still running. Package rerun's legacy arm stopped before
+compiling on six HTTP 504 responses; SIMD arm fetched the same pinned archive
+successfully and is building. The first legacy package is already validated.
+Retry only the failed fetch/build job after the workflow completes.
 Results pending; do not release until validated. Index models (#485) are
 explicitly assigned to another agent by the maintainer; leave that work alone.
 Reporter added a 12-thread/chunked binary-swap confirmation at 12:46 UTC.
