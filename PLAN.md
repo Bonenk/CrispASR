@@ -11,6 +11,15 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-01 — #482 CUDA validation
+
+Worktree `/mnt/volume1/wt-482`, branch `test/482-cuda`.
+CPU fix landed at `b8b55a2cb`; unit tests, 4/10 s roundtrips and short-output
+byte parity passed. Build a targeted CUDA proof bundle on GitHub Actions,
+then run it on Kaggle GPU hardware with short CPU/GPU numerical comparison
+and long embed/detect scheduler reuse. Check load/free RAM before large tasks.
+Record the GPU model, code SHA, result and CI outcome before closing this claim.
+
 ## CLAIMED 2026-10-01 — Phonon-2 encoder FFN CPU optimization
 
 Worktree `/mnt/volume1/wt-phonon2-ffn`, branch `perf/phonon2-ffn`.
