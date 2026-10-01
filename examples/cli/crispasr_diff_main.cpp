@@ -1923,7 +1923,8 @@ int main(int argc, char** argv) {
             const bool frontend =
                 name == "mel_spectrogram" || name == "conv1_out" || name == "conv2_out" || name == "conv3_out";
             // The guide's F16-vs-F32 range is .998-.999. Cached weak logits
-            // reach .99846 while all greedy IDs and complete decoded cues agree.
+            // reach .99846 against the released nested-BF16 decoder; all
+            // greedy IDs and complete direct-window decoded cues agree.
             const float threshold = quantized && !frontend           ? 0.99f
                                     : name == "teacherforced_logits" ? 0.998f
                                                                      : COS_THRESHOLD;
@@ -2037,6 +2038,21 @@ int main(int argc, char** argv) {
                        match.top1_match == match.top1_total ? "PASS" : "FAIL", match.top1_match, match.top1_total);
                 if (match.top1_match != match.top1_total || match.top1_total == 0)
                     ++n_fail;
+                // Diagnose precision near-ties without weakening the exact-ID
+                // gate: how highly does the oracle rank our selected token?
+                for (size_t row = 0; row < steps; ++row) {
+                    const float* mine = trace.data() + row * vocab;
+                    const float* gold = expected.first + row * vocab;
+                    int chosen = (int)(std::max_element(mine, mine + vocab) - mine);
+                    int oracle = (int)(std::max_element(gold, gold + vocab) - gold);
+                    if (chosen == oracle)
+                        continue;
+                    int rank = 1;
+                    for (int token = 0; token < vocab; ++token)
+                        rank += gold[token] > gold[chosen];
+                    printf("[INFO] cache step %zu: native=%d oracle=%d source_rank=%d source_gap=%.8f\n", row, chosen,
+                           oracle, rank, gold[oracle] - gold[chosen]);
+                }
             }
         }
         if (old_audio)
