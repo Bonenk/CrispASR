@@ -13,8 +13,8 @@ from pathlib import Path
 import requests
 
 SCRIPT_VERSION = "audioseal-482-cuda-v1"
-BUILD_RUN = 36831983459
-BUILD_SHA = "aca0b7be33081813692e445558d2d0189ccf9fd1"
+BUILD_RUN = 36832617360
+BUILD_SHA = "5f88f631299aa74acbf433034b832cda94865f96"
 WORK = Path("/kaggle/working")
 SCRATCH = Path("/kaggle/temp/audioseal-482")
 SCRATCH.mkdir(parents=True, exist_ok=True)
