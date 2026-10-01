@@ -4,6 +4,56 @@ Test audio: jfk.wav (11.0s), Q4_K quantization, greedy decode (`-bs 1`).
 
 ---
 
+## Intel macOS release ISA — 2026-10-01 (#484)
+
+v0.8.39's Intel CLI used `CRISPASR_PORTABLE_CPU=ON`, which forcibly disables
+AVX2/FMA/F16C. The standard Intel archive now enables these explicitly with
+`GGML_NATIVE=OFF`, Apple Accelerate, and Metal off. The separate
+`crispasr-macos-x86_64-cpu-legacy.tar.gz` retains the SSE2 baseline.
+Runtime/ggml sources were unchanged between the reporter's v0.8.38/v0.8.39
+commits; the build configuration accounts for the observed regression.
+
+[Alternating timing proof](https://github.com/CrispStrobe/CrispASR/actions/runs/36872271289)
+uses the same already-validated binaries on an Intel Core i7-8700B hosted
+macOS VM, four threads, both execution orderings, one warmup then three pairs.
+
+| Q8 fixture | Legacy warm median | SIMD warm median | Warm pair speedups |
+|---|---:|---:|---:|
+| JFK, 11 s | 18.33 s | 8.19 s | 1.38x / 5.03x / 2.24x |
+| JFK repeated six times, 66 s | 95.08 s | 51.07 s | 1.76x / 1.93x / 1.50x |
+
+The host has substantial timing variation. Every warmed pair favors SIMD,
+but these figures do not predict the reporter's 455-second Russian clip or a
+quiet physical Mac. The initial compilation-run Q8 median ratio of 3.36x is
+retained in the receipt and is not a settled speed claim. CLI timers exclude
+model loading; long audio is a repetition fixture, not an accuracy corpus.
+
+[Full quality proof](https://github.com/CrispStrobe/CrispASR/actions/runs/36867331142)
+compares the final encoder state and decoded text from both ISA builds:
+
+| Model | Encoder cosine | SIMD / baseline norm | Relative L2 |
+|---|---:|---:|---:|
+| F16 | 0.999999499 | 1.000050282 | 0.001002134 |
+| Q8_0 | 0.999759738 | 1.000731459 | 0.021941089 |
+| Q4_K | 0.999200258 | 1.002500181 | 0.040121499 |
+
+All short transcripts have the exact normalized golden words. Both Q8 arms
+produce the same 133 normalized words on every 66-second call: the existing
+gap-fill path adds one "and" in the sixth repetition versus the 132-word ideal.
+The candidate adds no transcription error. The comparison explicitly checks
+finite values, shape, cosine, magnitude and real decoded output; ISA rounding
+is not byte-identical, particularly for quantized weights.
+
+Both Intel archive variants passed extracted-bundle architecture, CLI and
+quantizer startup checks with original build/C2PA directories hidden in
+[package run](https://github.com/CrispStrobe/CrispASR/actions/runs/36868274235).
+The legacy job required a focused retry after HTTP 504 errors. C2PA is now
+fetched with bounded retries and required before Intel release compilation.
+No physical pre-AVX2 Mac was available; legacy compile flags and its real
+inference path were checked on the Intel runner.
+
+[Full metrics, provenance and hashes](docs/macos-intel-parakeet-2026-10-01.json).
+
 ## Phonon-2 — gated FFN experiments (2026-10-01, #481)
 
 Q4_K FFN CPU_REPACK reduces warmed 11/55 s inference from 1.850/10.189 s to

@@ -11,33 +11,20 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-01 — #484 Intel macOS SIMD / v0.8.40 release
+## CLAIMED 2026-10-01 — v0.8.40 release
 
-Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/484-macos-simd` (reused isolated
-worktree; original checkout stays untouched). Build fix landed at `654037835`:
-standard Intel AVX2/FMA/F16C + Accelerate archive, separate SSE2 legacy archive,
-shared release/proof configuration, and mandatory C2PA fetch with retries.
+Worktree `/mnt/volume1/wt-478-ralm`; Intel fix landed at `654037835`.
+#484 is validated: full quality `36867331142`, alternating timing `36872271289`,
+both Intel package variants `36868274235` attempt 2, branch CI `36865881142`
+(13/13), lint `36865884690`. Receipts/history/performance and release notes
+are prepared. CLI long warm pairs favor SIMD 1.50-1.93x with unchanged words;
+host variance and the known baseline insertion are documented.
 
-Full Intel proof `36867331142` **PASS** at `62b91ad67`: F16/Q8/Q4 encoder
-cosine AND magnitude, short golden text, four repeated 66-second Q8 CLI calls
-per arm. Both arms retain the same known extra "and" in the sixth repetition
-(133 words instead of the 132-word ideal); candidate adds no error. Q8 encoder
-cosine 0.999759738, norm ratio 1.000731459; F16 0.999999499 / 1.000050282;
-Q4 0.999200258 / 1.002500181. Timing was noisy, so the raw 3.36x Q8 long median
-is not a settled speed claim. Alternating already-tested binaries on a fresh
-Intel runner: `36872271289` (no compilation; both orderings, warmup + three pairs).
-
-All 13 branch CI jobs `36865881142` and all lint jobs `36865884690` passed.
-SIMD package in `36868274235` passed relocation/architecture/startup at
-`e11b9595e`; legacy package initially passed in `36865093345`. Updated legacy
-job stopped before compiling on repeated HTTP 504; focused attempt 2 fetched
-successfully and is building. Runtime and ISA settings are identical between
-these tested revisions; later changes only harden dependency fetch/preflight.
-
-Next: finish alternating timing and legacy retry; retain receipts, release
-notes and history; wait for green main checks; bump with the release script,
-then publish v0.8.40 and verify assets. Maintainer explicitly authorized this.
-Index models (#485) belong to another agent. No new bug reports or PRs at 13:48.
+Next: validate a stable release branch (main checkpoints from another active
+agent cancel same-branch CI), use scripts/bump-version.sh, publish v0.8.40 after
+green target checks, verify assets, archive notes and remove this claim.
+Release publishing is explicitly authorized. Index models (#485) belong to
+another agent and are outside this release task.
 
 
 ## CLAIMED 2026-10-01 — #485 Index-Echo S2TT 2B

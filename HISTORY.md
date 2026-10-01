@@ -6,6 +6,27 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-01 — Intel macOS SIMD release regression (#484)
+
+The first official Intel CLI archive in v0.8.39 selected portable/SSE2 CPU
+kernels, disabling AVX2/FMA/F16C. Parakeet and the pinned ggml sources did not
+change between the reporter's two builds. Shared explicit release/proof flags
+restore SIMD in the standard Intel asset without host-native tuning; a new
+`crispasr-macos-x86_64-cpu-legacy.tar.gz` keeps the older-Intel baseline.
+
+Quality proof `36867331142` passes F16/Q8/Q4 encoder cosine AND magnitude,
+short golden text and repeated 66-second Q8 CLI output. Both arms retain the
+same known one-word insertion in the repeated fixture. Alternating warm pairs
+in `36872271289` all favor SIMD; 66-second speedups are 1.50-1.93x on a noisy
+hosted i7-8700B VM. These are fixture results, not the reporter's Russian clip.
+See `PERFORMANCE.md` and `docs/macos-intel-parakeet-2026-10-01.json` for all
+metrics, hashes, timing limitations and excluded failed runs.
+
+Both archive variants passed architecture/relocation/startup in `36868274235`
+(attempt 2 after an HTTP 504 fetch failure). Intel releases now require the
+matching C2PA sidecar before compiling, with bounded download retries. Branch
+CI `36865881142` passed all 13 jobs; lint `36865884690` passed all jobs.
+
 ## DONE 2026-10-01 — VoxCPM2 native CPU RALM prefill (#478)
 
 RALM prefill batches the causal prefix and populates both backend and host KV.
