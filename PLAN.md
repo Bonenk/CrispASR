@@ -33,6 +33,13 @@ Keep alternatives gated; require numerical magnitude/cosine and F16/Q8/Q4 corpus
 checks before any default change. Encoder caching and encoder BLAS stay off.
 Models/logs/receipts: `/mnt/volume1/tmp-overflow/issue481/ffn-speed`.
 
+Checkpoint: gated candidate `bb791dbec` pushed; clean CPU FFN A/B run
+[36830399630](https://github.com/CrispStrobe/CrispASR/actions/runs/36830399630)
+measures exact FFN matrix shapes, 1/2/4 threads, stage parity, load/RSS and
+11/55-second warm inference. Q8_0 has no x86 CPU_REPACK kernel at our pin;
+Q4_K does. Cached F32 BLAS adds 1536 MiB of weights, so remains opt-in.
+Local build in progress; no measured win or default change claimed.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
