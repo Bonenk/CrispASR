@@ -18,6 +18,7 @@ from huggingface_hub import HfApi, snapshot_download
 from index_echo_produce_constants import SOURCE, REVISION, LLAMA_REVISION, DESTINATION
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
+parser.add_argument('--fp32-decoder', action='store_true', help='Fully F32 diagnostic oracle; original blueprint retains nested BF16')
 parser.add_argument('--reference-only', action='store_true')
 parser.add_argument('--convert-only', action='store_true')
 parser.add_argument('--audit-only', action='store_true', help='Audit effective blueprint dtypes without generation')
@@ -28,6 +29,10 @@ parser.add_argument('--clips', nargs='+', choices=['jfk', 'zh', 'jfk-tail'], def
 args = parser.parse_args()
 if sum([args.reference_only, args.convert_only, args.quant_only, args.pipeline_only, args.audit_only]) > 1:
     parser.error('--reference-only, --convert-only and --quant-only and --pipeline-only are mutually exclusive')
+if args.fp32_decoder and not (args.reference_only or args.pipeline_only):
+    parser.error('--fp32-decoder requires --reference-only or --pipeline-only')
+REFERENCE_DIR = 'reference-f32' if args.fp32_decoder else 'reference'
+if args.fp32_decoder: os.environ['INDEX_ECHO_REF_FP32_DECODER'] = '1'
 SCRATCH = Path(os.environ['HEAVY_SCRATCH']) / 'index-echo'
 OUT = Path(os.environ['HEAVY_OUT'])
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -154,17 +159,17 @@ try:
             audio_path = OUT / 'jfk-tail.wav'
             with wave.open(str(audio_path), 'wb') as wav:
                 wav.setparams(params); wav.writeframes(pcm)
-            upload(audio_path, 'reference/jfk-tail.wav')
+            upload(audio_path, REFERENCE_DIR + '/jfk-tail.wav')
         ref = OUT / f'index-echo-2b-{clip}-ref.gguf'
         run(sys.executable, ROOT / 'tools/dump_reference.py', '--backend', 'index-echo',
             '--model-dir', source, '--audio', audio_path, '--output', ref)
-        upload(ref, f'reference/{clip}-ref.gguf')
+        upload(ref, f'{REFERENCE_DIR}/{clip}-ref.gguf')
     if args.pipeline_only:
         sys.path.insert(0, str(ROOT / 'tools'))
         from reference_backends.index_echo import dump_pipeline
         pipeline, multi = dump_pipeline(source, OUT, ROOT / 'samples')
-        upload(multi, 'reference/' + multi.name)
-        upload(pipeline, 'reference/' + pipeline.name)
+        upload(multi, REFERENCE_DIR + '/' + multi.name)
+        upload(pipeline, REFERENCE_DIR + '/' + pipeline.name)
     if args.audit_only:
         import importlib.util
         import torch

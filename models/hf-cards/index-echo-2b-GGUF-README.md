@@ -72,7 +72,7 @@ Word timestamps, beam search and live streaming are not exposed by this recipe.
 ## Validation and quantization
 
 [CPU validation run 36905507951](https://github.com/CrispStrobe/CrispASR/actions/runs/36905507951)
-passes F16 and Q8_0 against independent CPU F32 captures from the released
+passes F16 and Q8_0 against independent CPU captures (F32 tower/connector, BF16 decoder) from the released
 Python inference class: English JFK, Chinese and a partial-hop JFK clip.
 Checks cover mel/convolutions, all 32 audio blocks, the connector, prompt IDs,
 all 24 decoder blocks, logits and 16 cached teacher-forced steps. The actual

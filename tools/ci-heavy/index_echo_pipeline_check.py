@@ -8,7 +8,7 @@ import time
 import wave
 
 
-def check_pipeline(root, out, build, library, models, cohort):
+def check_pipeline(root, out, build, library, models, cohort, reference_subdir):
     import numpy as np
     from huggingface_hub import HfApi, hf_hub_download
     from crispasr import Session
@@ -16,7 +16,7 @@ def check_pipeline(root, out, build, library, models, cohort):
     vad_revision = HfApi().model_info('ggml-org/whisper-vad').sha
     vad_path = Path(hf_hub_download('ggml-org/whisper-vad', 'ggml-silero-v6.2.0.bin',
                                   revision=vad_revision, local_dir=models / 'vad-companion'))
-    oracle = json.loads((models / 'reference/pipeline.json').read_text())
+    oracle = json.loads((models / reference_subdir / 'pipeline.json').read_text())
     failures, decoded = [], {}
 
     class VADParams(ctypes.Structure):
@@ -43,7 +43,7 @@ def check_pipeline(root, out, build, library, models, cohort):
     try:
         with Session(str(models / f'index-echo-2b-{cohort}.gguf'), lib_path=str(library), n_threads=4) as session:
             for name, expected in oracle['cases'].items():
-                audio = (models / 'reference' if expected['audio'] == 'pipeline-multi.wav' else root / 'samples') / expected['audio']
+                audio = (models / reference_subdir if expected['audio'] == 'pipeline-multi.wav' else root / 'samples') / expected['audio']
                 with wave.open(str(audio), 'rb') as wav:
                     assert wav.getframerate() == 16000 and wav.getnchannels() == 1 and wav.getsampwidth() == 2
                     pcm = np.frombuffer(wav.readframes(wav.getnframes()), dtype=np.int16).astype(np.float32) / 32768

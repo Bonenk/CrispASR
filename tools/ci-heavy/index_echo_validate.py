@@ -23,6 +23,7 @@ def run(*args):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--build-only', action='store_true')
+parser.add_argument('--reference-subdir', choices=['reference', 'reference-f32'], default='reference')
 parser.add_argument('--pipeline', action='store_true', help='Validate released file/VAD/target/context oracle')
 parser.add_argument('--cohorts', nargs='+', choices=['f16', 'q8_0', 'q4_k', 'q4_k_selective'], default=['f16'])
 parser.add_argument('--clips', nargs='+', choices=['jfk', 'zh', 'jfk-tail'], default=['jfk', 'zh', 'jfk-tail'])
@@ -51,8 +52,8 @@ if args.build_only:
 from huggingface_hub import HfApi, snapshot_download
 api = HfApi(token=os.environ.get('HF_TOKEN'))
 destination = 'cstr/index-echo-2b-GGUF'
-required = {f'reference/{clip}-ref.gguf' for clip in args.clips} | {'conversion-receipt.json'}
-if args.pipeline: required.add('reference/pipeline.json')
+required = {f'{args.reference_subdir}/{clip}-ref.gguf' for clip in args.clips} | {'conversion-receipt.json'}
+if args.pipeline: required.add(args.reference_subdir + '/pipeline.json')
 for attempt in range(90):
     present = set(api.list_repo_files(destination))
     if required <= present:
@@ -70,14 +71,14 @@ model_revision = api.model_info(destination).sha
 
 def validate_cohort(cohort):
     models = Path(snapshot_download(destination, revision=model_revision, local_dir=Path(os.environ['HEAVY_SCRATCH']) / 'index-echo-models',
-        allow_patterns=[f'index-echo-2b-{cohort}.gguf', f'index-echo-2b-decoder-{cohort}.gguf', 'reference/*']))
+        allow_patterns=[f'index-echo-2b-{cohort}.gguf', f'index-echo-2b-decoder-{cohort}.gguf', args.reference_subdir + '/*']))
     os.environ['TMPDIR'] = os.environ['HEAVY_SCRATCH']
     failures = []
     for clip in args.clips:
-        audio = models / 'reference/jfk-tail.wav' if clip == 'jfk-tail' else ROOT / 'samples' / ('paraformer_zh.wav' if clip == 'zh' else 'jfk.wav')
+        audio = models / args.reference_subdir / 'jfk-tail.wav' if clip == 'jfk-tail' else ROOT / 'samples' / ('paraformer_zh.wav' if clip == 'zh' else 'jfk.wav')
         log_path = OUT / f'{cohort}-{clip}-diff.log'
         command = [str(BUILD / 'bin/crispasr-diff'), 'index-echo', str(models / f'index-echo-2b-{cohort}.gguf'),
-                   str(models / f'reference/{clip}-ref.gguf'), str(audio)]
+                   str(models / f'{args.reference_subdir}/{clip}-ref.gguf'), str(audio)]
         with log_path.open('w') as log:
             result = subprocess.run(command, env=dict(os.environ, CRISPASR_DIFF_NO_GPU='1'),
                                     stdout=log, stderr=subprocess.STDOUT, timeout=3600)
@@ -116,12 +117,12 @@ def validate_cohort(cohort):
     with Session(str(renamed), lib_path=str(library), n_threads=4) as session:
         assert session.backend == 'index-echo', session.backend
         for clip in args.clips:
-            audio = models / 'reference/jfk-tail.wav' if clip == 'jfk-tail' else ROOT / 'samples' / ('paraformer_zh.wav' if clip == 'zh' else 'jfk.wav')
+            audio = models / args.reference_subdir / 'jfk-tail.wav' if clip == 'jfk-tail' else ROOT / 'samples' / ('paraformer_zh.wav' if clip == 'zh' else 'jfk.wav')
             with wave.open(str(audio), 'rb') as wav:
                 assert wav.getframerate() == 16000 and wav.getnchannels() == 1 and wav.getsampwidth() == 2
                 pcm = np.frombuffer(wav.readframes(wav.getnframes()), dtype=np.int16).astype(np.float32) / 32768
             segments = session.transcribe(pcm)
-            reader = GGUFReader(models / f'reference/{clip}-ref.gguf')
+            reader = GGUFReader(models / f'{args.reference_subdir}/{clip}-ref.gguf')
             reference = reader.fields['crispasr.ref.generated_text'].contents()
             decoded[clip] = dict(reference=reference, segments=[dict(start=s.start, end=s.end, text=s.text) for s in segments])
             if not segments or any(not s.text or s.end < s.start for s in segments):
@@ -139,7 +140,7 @@ def validate_cohort(cohort):
     (OUT / f'decoded-{cohort}.json').write_text(json.dumps(decoded, indent=2, ensure_ascii=False))
     if args.pipeline:
         from index_echo_pipeline_check import check_pipeline
-        failures.extend(check_pipeline(ROOT, OUT, BUILD, library, models, cohort))
+        failures.extend(check_pipeline(ROOT, OUT, BUILD, library, models, cohort, args.reference_subdir))
     return failures
 
 

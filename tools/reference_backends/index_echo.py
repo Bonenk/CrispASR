@@ -38,6 +38,8 @@ def dump(model_dir, audio, stages, **kwargs):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     model = module.AudioTransModel(str(root), device='cpu', dtype=torch.float32)
+    if os.getenv('INDEX_ECHO_REF_FP32_DECODER') == '1':
+        model.llm.to(torch.float32)
     import json
     values = {'parameter_dtypes': json.dumps(precision_audit(model), sort_keys=True)}
     handles = []
@@ -81,6 +83,7 @@ def dump(model_dir, audio, stages, **kwargs):
     mask = ids == model.pad_id
     assert int(mask.sum()) == emb.shape[0]
     x[mask] = emb.to(x.dtype)
+    values['target_lang'] = lang
     values['prompt_ids'] = ids.numpy().astype(np.int32)
     for i, layer in enumerate(model.llm.model.layers):
         handles.append(layer.register_forward_hook(hook(f'llm_block_{i}', last=True)))
@@ -98,7 +101,7 @@ def dump(model_dir, audio, stages, **kwargs):
     # Replay the reference's own greedy IDs through the saved initial cache.
     # This separates recurrent/KV errors from divergent sampling decisions.
     trace = [values['llm_logits']]
-    for i in range(min(16, generated.shape[-1]) - 1):
+    for i in range(min(int(os.getenv('INDEX_ECHO_TRACE_TOKENS', '16')), generated.shape[-1]) - 1):
         step = model.llm(input_ids=generated[:, i:i + 1], past_key_values=trace_cache,
                          use_cache=True, logits_to_keep=1)
         trace_cache = step.past_key_values
@@ -127,6 +130,8 @@ def dump_pipeline(model_dir, output_dir, sample_dir):
     spec.loader.exec_module(module)
     started = time.perf_counter()
     model = module.AudioTransModel(str(model_dir), device='cpu', dtype=torch.float32)
+    if os.getenv('INDEX_ECHO_REF_FP32_DECODER') == '1':
+        model.llm.to(torch.float32)
     load_seconds = time.perf_counter() - started
     jfk, rate = sf.read(sample_dir / 'jfk.wav', dtype='float32')
     assert rate == 16000

@@ -1908,6 +1908,9 @@ int main(int argc, char** argv) {
             index_echo_init_from_file(model_path.c_str(), cp), index_echo_free);
         if (!ctx)
             return 4;
+        const std::string target = ref.meta("target_lang");
+        if (!target.empty() && !index_echo_set_target_lang(ctx.get(), target.c_str()))
+            return 4;
         auto check = [&](const std::string& name, const float* data, size_t count) {
             auto expected = ref.get_f32(name);
             if (!data || !expected.first || expected.second != count) {
