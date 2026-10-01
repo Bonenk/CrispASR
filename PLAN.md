@@ -52,6 +52,15 @@ where the reference proves equivalence. Heavy work runs on GitHub CI/Kaggle.
 Models, logs and receipts: `/mnt/storage/crispasr/issue485/`.
 No generic English ASR or quantized-quality claim until validated.
 
+Producer branch commits `beb2d3880` / `8d8150c6d` pin the 2B source to
+`5d98a34d9685869b11e9c94d01dee22a8b8e53b5` and llama converter to
+`42d958167a748f2c04b1f888e84e7a58f609ddcb`. GH producer run
+`36872010684` stopped before downloading: CI cannot create a model repo in
+`cstr`. Maintainer credential created a private staging destination; retry
+`36872979780` uses it without requiring repository-creation permission.
+Conversions/reference remain experimental. Runtime wiring and stage diff are
+in progress in the feature worktree; no parity or performance claim yet.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
