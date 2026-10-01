@@ -42,6 +42,18 @@ explicitly assigned to another agent by the maintainer; leave that work alone.
 Reporter added a 12-thread/chunked binary-swap confirmation at 12:46 UTC.
 New #485 is a model request, not a release regression; no new PRs.
 
+## CLAIMED 2026-10-01 — #485 Index-Echo S2TT 2B
+
+Worktree `/mnt/volume1/wt-index-echo-2b`, branch `feat/index-echo-2b`.
+Follow the sibling development guide: read the pinned Python inference and
+Transformer blueprints; convert, quantize and upload each artifact; dump an
+independent reference; iterate stage magnitude/cosine and decoded subtitles;
+then complete every contributing integration surface and CI before landing.
+Reuse the existing Qwen3.5 decoder and configurable shared audio tower only
+where the reference proves equivalence. Heavy work runs on GitHub CI/Kaggle.
+Models, logs and receipts: `/mnt/storage/crispasr/issue485/`.
+No generic English ASR or quantized-quality claim until validated.
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
