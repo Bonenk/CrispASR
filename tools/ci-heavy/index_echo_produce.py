@@ -14,10 +14,7 @@ import time
 
 from huggingface_hub import HfApi, snapshot_download
 
-SOURCE = 'IndexTeam/Index-Echo-S2TT-2B'
-REVISION = '5d98a34d9685869b11e9c94d01dee22a8b8e53b5'
-LLAMA_REVISION = '42d958167a748f2c04b1f888e84e7a58f609ddcb'
-DESTINATION = 'cstr/index-echo-2b-GGUF'
+from index_echo_produce_constants import SOURCE, REVISION, LLAMA_REVISION, DESTINATION
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
 parser.add_argument('--reference-only', action='store_true')
