@@ -42,7 +42,8 @@ def run(*args, cwd=ROOT):
 
 
 api = HfApi(token=os.environ['HF_TOKEN'])
-api.create_repo(DESTINATION, private=True, exist_ok=True)
+# Maintainer creates the private destination once; CI publishing credentials
+# may write existing repositories without permission to create new ones.
 # Refuse to overwrite a previously published validated model repository.
 if not api.repo_info(DESTINATION).private:
     raise RuntimeError('Producer destination must be private until validated')
