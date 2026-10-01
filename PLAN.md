@@ -14,17 +14,22 @@ it goes stale for more than a day.
 ## CLAIMED 2026-10-01 — Phonon-2 CPU optimization
 
 Worktree `/mnt/volume1/wt-phonon2-cpu`, branch `perf/phonon2-cpu`.
-Baseline main `aa1a85f13`. Gated OpenBLAS decoder/projection and registered
-CPU encoder BLAS paths implemented at `c1c2683a9`; explicit thread counts now
-reach both CPU instances. The diff harness now captures the production one-blank
-predictor SOS and joint logits, retaining the legacy NeMo two-zero probe.
-Native Linux A/B run **36813752349** (branch `fd9b0c5f9`) is in flight:
-31-stage cosine + magnitude gates, then F16/Q8/Q4 scalar / BLAS(1,4 threads) /
-ggml / encoder-BLAS / combined warmed comparisons and separate decode traces.
-Local native build in `/mnt/volume1/phonon2-cpu-build` is in flight; baseline
-portable VPS timings were discarded because unrelated jobs contend for CPU.
-No optimization default changed; encoder caching stays off. Next: review parity,
-transcripts and same-runner receipts, validate bindings and CPU fallback builds.
+Baseline main `aa1a85f13`. First native sweep **36813752349** is green
+(`fd9b0c5f9`, AMD EPYC 7763 / 4 vCPUs): Q8 scalar 2.440/13.010 s → OpenBLAS4
+1.852/10.007 s for warmed 11/55 s shapes (~24% less time). Persistent ggml CPU
+decode is similarly fast. All six paths pass 31 F16 stages (cos ≥0.999995,
+global magnitude-error bound <0.063%); every sweep transcript matches scalar.
+Encoder BLAS4 severely regresses short audio and remains opt-in.
+Local corpus checks: BLAS1 and ggml+backend encoder projection each preserve
+63/63 original outputs (21 clips × F16/Q8/Q4). The bulk projection probe now
+uses the exact production implementation. Final candidate branch `f88850b30`
+selects ggml predictor/joint + backend projection only for Phonon-2 metadata
+on non-Apple CPU builds with AVX2/F16C; legacy overrides remain. Local candidate
+31-stage diff passes (min cosine 0.999996, magnitude bound 0.066%).
+Next native CI push verifies default timings and tests encoder BLAS with one
+thread; encoder cache stays off. Go/Rust bindings and cgo drift checks pass.
+Local native build: `/mnt/volume1/phonon2-cpu-build`; receipts under
+`/mnt/volume1/tmp-overflow/issue481/cpu-speed`.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
