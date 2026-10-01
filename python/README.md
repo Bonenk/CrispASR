@@ -59,14 +59,14 @@ for seg in s.transcribe_pcm(pcm_f32, sample_rate=16000):
     print(seg.text)
 ```
 
-## API
-
-- `CrispASR` — Whisper-compatible high-level API
 Index-Echo uses the same `Session` API. Open the tower GGUF with its matching
 decoder beside it, then call `s.set_target_language("en")` (also `ja` or `es`).
 Each segment contains `transcript\ntranslation` and generated subtitle times.
 Place Silero v6.2 beside the pair for the released full-file window recipe.
 
+## API
+
+- `CrispASR` — Whisper-compatible high-level API
 - `Session` — unified API across all backends compiled into `libcrispasr`
 - `ChatSession` — text → text chat over a GGUF chat model: one-shot and streaming generation, prompt-token counting, and cancellation through an abort predicate
 - `align_words(...)` — word-level CTC alignment
