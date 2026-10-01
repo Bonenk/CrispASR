@@ -1914,7 +1914,7 @@ static bool ralm_prefill_graph_batched(voxcpm2_context* ctx, const float* input,
     return true;
 }
 
-// Multi-position RALM prefill — processes T tokens sequentially with causal attention.
+// Multi-position RALM prefill with causal attention (batched or eager).
 // Input: [T * d] row-major (T vectors of d dimensions).
 // Returns: [T * d] row-major output hidden states (pre-output-norm).
 static std::vector<float> ralm_prefill_multi(voxcpm2_context* ctx, const float* input, int T, ggml_backend_t cpu_be) {

@@ -1590,6 +1590,10 @@ end-to-end cosine cannot do.
 - `CRISPASR_VOXCPM2_MAX_LEN`
 - `CRISPASR_VOXCPM2_NAN_CHECK`
 - `CRISPASR_VOXCPM2_NO_BUCKET`
+- `CRISPASR_VOXCPM2_RALM_PREFILL_BATCH` — `1` enables causal batched RALM
+  prefill on CPU (#478). Default **off**. Requires `CRISPASR_VOXCPM2_USE_GRAPH`;
+  `0` retains the eager per-position prefill for comparison. GPU backends keep
+  the eager prefill until their parity is validated.
 - `CRISPASR_VOXCPM2_USE_GRAPH` — persistent-graph decode. **Default ON**; `0` opts out.
 - `CRISPASR_VOXCPM2_USE_REF`
 - `CRISPASR_VOXCPM2_VAE_ENC_DIFF`
