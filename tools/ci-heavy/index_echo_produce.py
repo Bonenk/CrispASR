@@ -47,6 +47,11 @@ api = HfApi(token=os.environ['HF_TOKEN'])
 # Refuse to overwrite a previously published validated model repository.
 if not api.repo_info(DESTINATION).private:
     raise RuntimeError('Producer destination must be private until validated')
+# Verify publishing rights before downloading or converting multi-GB weights.
+api.upload_file(path_or_fileobj=b'---\nlicense: apache-2.0\n---\n\n# Index-Echo S2TT 2B\n\n'
+                b'Private development artifacts for CrispASR issue #485. '
+                b'Runtime parity and decoded-output validation are pending.\n',
+                path_in_repo='README.md', repo_id=DESTINATION)
 
 
 def upload(path, remote=None):
