@@ -4296,6 +4296,13 @@ catch_discover_tests(test_audioseal
     PROPERTIES LABELS "unit"
 )
 
+# Keep duration/capacity regressions discoverable by live-test runs. Each test
+# skips when CRISPASR_AUDIOSEAL_GGUF is absent; inference runs serially.
+catch_discover_tests(test_audioseal
+    TEST_SPEC "[live]"
+    PROPERTIES LABELS "live" TIMEOUT 900 RUN_SERIAL TRUE
+)
+
 # ─── test_audioseal_cosine — standalone cosine comparison against PyTorch ref.
 # Not a Catch2 test — standalone main(). Run manually after generating
 # reference with Python. Requires AUDIOSEAL_GGUF env var.

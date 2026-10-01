@@ -172,3 +172,51 @@ TEST_CASE("audioseal embed+detect round-trip", "[audioseal][live]") {
     std::free(watermarked);
     audioseal_free(ctx);
 }
+
+TEST_CASE("audioseal long audio grows graph and reused scheduler", "[audioseal][live]") {
+    const char* path = get_gguf_path();
+    if (!path) {
+        SKIP("CRISPASR_AUDIOSEAL_GGUF not set");
+        return;
+    }
+    auto p = audioseal_default_params();
+    p.verbosity = 0;
+    auto* ctx = audioseal_init_from_file(path, p);
+    REQUIRE(ctx != nullptr);
+
+    // Grow the detector first (including its optional message branch), then
+    // the larger generator on the same context; finally reuse it for a short clip.
+    for (int seconds : {4, 10, 1}) {
+        auto pcm = make_sine_16k(seconds * 16000);
+        int n = 0;
+        uint8_t message[16] = {};
+        float* clean = audioseal_detect(ctx, pcm.data(), (int)pcm.size(), &n, message);
+        REQUIRE(clean != nullptr);
+        REQUIRE(n == (int)pcm.size());
+        std::free(clean);
+
+        float* wm = audioseal_embed(ctx, pcm.data(), (int)pcm.size(), nullptr);
+        REQUIRE(wm != nullptr);
+        double energy = 0;
+        for (size_t i = 0; i < pcm.size(); ++i) {
+            REQUIRE(std::isfinite(wm[i]));
+            double d = wm[i] - pcm[i];
+            energy += d * d;
+        }
+        REQUIRE(energy > 0);
+        float* probs = audioseal_detect(ctx, wm, (int)pcm.size(), &n, message);
+        REQUIRE(probs != nullptr);
+        REQUIRE(n == (int)pcm.size());
+        double avg = 0;
+        for (int i = 0; i < n; ++i) {
+            REQUIRE(std::isfinite(probs[i]));
+            avg += probs[i];
+        }
+        avg /= n;
+        INFO("duration=" << seconds << "s probability=" << avg);
+        REQUIRE(avg > 0.9);
+        std::free(probs);
+        std::free(wm);
+    }
+    audioseal_free(ctx);
+}

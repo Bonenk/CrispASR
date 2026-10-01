@@ -253,6 +253,7 @@ struct audioseal_ctx {
     ggml_backend_t backend = nullptr;
     ggml_backend_t backend_cpu = nullptr;
     ggml_backend_sched_t sched = nullptr;
+    size_t sched_capacity = 0;
     ggml_context* ctx_w = nullptr;
     ggml_backend_buffer_t buf_w = nullptr;
     std::map<std::string, ggml_tensor*> tensors;
@@ -699,9 +700,6 @@ struct audioseal_ctx* audioseal_init_from_file(const char* path, struct audiosea
         core_convt::permute_convt1d_weights_batch(srcs, dsts, n, c->backend, &c->ctx_perm, &c->buf_perm);
     }
 
-    // Allocate compute scratch (generous for ~5M param model)
-    c->compute_meta.resize(256 * 1024 * 1024); // 256 MB
-
     if (params.verbosity > 0) {
         fprintf(stderr,
                 "audioseal: loaded from '%s' — generator=%s detector=%s "
@@ -730,18 +728,52 @@ uint32_t audioseal_nbits(const struct audioseal_ctx* ctx) {
     return ctx ? ctx->hp.nbits : 16;
 }
 
+// Each unrolled LSTM layer creates at most 32 tensors per latent frame
+// (including views/reshapes and output concatenation). Embedding has four
+// layers; detection has two. Reserve another 1024 tensors for convolutions,
+// weights/inputs, message branches and debug outputs. The frame ceiling also
+// covers encoder rounding without depending on a fixed audio duration.
+static size_t prepare_graph(audioseal_ctx* ctx, int n_samples, size_t lstm_layers) {
+    if (ctx->sched)
+        ggml_backend_sched_reset(ctx->sched);
+    const size_t hop = std::max<size_t>(ctx->hp.hop_length, 1);
+    const size_t frames = ((size_t)n_samples + hop - 1) / hop;
+    const size_t capacity = 1024 + 32 * lstm_layers * frames;
+    ctx->compute_meta.resize(capacity * ggml_tensor_overhead() + ggml_graph_overhead_custom(capacity, false));
+    return capacity;
+}
+
+// The scheduler hash table covers both nodes AND leaves. It is shared by
+// embed/detect, so grow it whenever a later call builds a larger graph.
+static bool prepare_scheduler(audioseal_ctx* ctx, ggml_cgraph* gf) {
+    // All leaves are model weights, the four pre-permuted decoder weights,
+    // and the audio/message inputs. Counting all loaded weights is an upper
+    // bound even when only the generator or detector is used.
+    const size_t required = (size_t)ggml_graph_n_nodes(gf) + ctx->tensors.size() + 16;
+    if (!ctx->sched || ctx->sched_capacity < required) {
+        if (ctx->sched)
+            ggml_backend_sched_free(ctx->sched);
+        ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
+        const int n_be = (ctx->backend != ctx->backend_cpu) ? 2 : 1;
+        ctx->sched_capacity = required + 128;
+        ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, ctx->sched_capacity, false, false);
+    }
+    return ctx->sched && ggml_backend_sched_alloc_graph(ctx->sched, gf);
+}
+
 float* audioseal_embed(struct audioseal_ctx* ctx, const float* pcm, int n_samples, const uint8_t* message) {
     if (!ctx || !pcm || n_samples <= 0 || !ctx->has_generator)
         return nullptr;
     audioseal_bench_stage _bs_total("embed_total");
 
     // Build compute graph
+    const size_t graph_capacity = prepare_graph(ctx, n_samples, 4);
     ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
     ggml_context* ctx0 = ggml_init(ip);
     if (!ctx0)
         return nullptr;
 
-    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 8192, false);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, graph_capacity, false);
 
     // Input tensor: (T, 1) mono audio in (T, C) layout
     ggml_tensor* x_in = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_samples, 1);
@@ -795,13 +827,7 @@ float* audioseal_embed(struct audioseal_ctx* ctx, const float* pcm, int n_sample
     ggml_build_forward_expand(gf, output);
 
     // Allocate + compute
-    if (!ctx->sched) {
-        ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
-        int n_be = (ctx->backend != ctx->backend_cpu) ? 2 : 1;
-        ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 8192, false, false);
-    }
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    if (!prepare_scheduler(ctx, gf)) {
         fprintf(stderr, "audioseal: sched alloc graph failed\n");
         ggml_free(ctx0);
         return nullptr;
@@ -872,12 +898,13 @@ float* audioseal_detect(struct audioseal_ctx* ctx, const float* pcm, int n_sampl
         return nullptr;
     audioseal_bench_stage _bs_total("detect_total");
 
+    const size_t graph_capacity = prepare_graph(ctx, n_samples, 2);
     ggml_init_params ip = {ctx->compute_meta.size(), ctx->compute_meta.data(), true};
     ggml_context* ctx0 = ggml_init(ip);
     if (!ctx0)
         return nullptr;
 
-    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, 8192, false);
+    ggml_cgraph* gf = ggml_new_graph_custom(ctx0, graph_capacity, false);
 
     // Input
     ggml_tensor* x_in = ggml_new_tensor_2d(ctx0, GGML_TYPE_F32, n_samples, 1);
@@ -941,13 +968,7 @@ float* audioseal_detect(struct audioseal_ctx* ctx, const float* pcm, int n_sampl
     }
 
     // Allocate + compute
-    if (!ctx->sched) {
-        ggml_backend_t backends[2] = {ctx->backend, ctx->backend_cpu};
-        int n_be = (ctx->backend != ctx->backend_cpu) ? 2 : 1;
-        ctx->sched = ggml_backend_sched_new(backends, nullptr, n_be, 8192, false, false);
-    }
-    ggml_backend_sched_reset(ctx->sched);
-    if (!ggml_backend_sched_alloc_graph(ctx->sched, gf)) {
+    if (!prepare_scheduler(ctx, gf)) {
         fprintf(stderr, "audioseal: sched alloc detect graph failed\n");
         ggml_free(ctx0);
         return nullptr;

@@ -6,15 +6,7 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-01 — #482 AudioSeal long-audio graph capacity
-
-Worktree `/mnt/volume1/wt-482`, branch `fix/482-audioseal`.
-Read the full issue (no comments). Reproduce embed/detect capacity assertions,
-size graph metadata and scheduler together from input length, and validate short
-output parity plus longer watermark roundtrips. Check load/free RAM before each
-large task; serial targeted builds and inference only.
-
-## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.

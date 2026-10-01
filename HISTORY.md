@@ -6,6 +6,26 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-01 — AudioSeal long-audio graph capacity (#482)
+
+AudioSeal embed/detect size graph metadata by latent-frame count instead of
+using a fixed 8192-node graph and 256 MiB metadata arena. The shared scheduler
+grows with the completed graph's node count plus an upper bound on weight/input
+leaves, covering longer calls and transitions between detector and generator.
+The model computation and whole-clip LSTM context are preserved.
+
+The new duration regression reproduced the original 4 s detector hash-table
+assertion (SIGABRT, exit 134) before the fix. CPU validation: all seven unit
+tests pass; all four live tests pass (480031 assertions), including 4 s and
+10 s clean detect / embed / watermark detect followed by 1 s reuse. Watermark
+confidence exceeds 0.9 at each duration; the existing short roundtrip scores
+1.0000 versus 0.0024 for clean audio. The 1 s watermark PCM, probabilities and
+decoded bits are byte-identical to baseline (SHA-256 `f629c8a2efa4bbe3…`).
+Peak RSS is 409128 KiB on the loaded VPS. Live tests are registered with CTest,
+labelled `live`, skip without `CRISPASR_AUDIOSEAL_GGUF`, and run serially.
+CUDA is not validated on this CPU-only host. Receipts and parity probe:
+`/mnt/volume1/tmp-overflow/issue482/`.
+
 ## DONE 2026-10-01 — Phonon-2 CPU decoder optimization (#481)
 
 Native AVX2/F16C Phonon-2 CPU builds select the existing persistent ggml
