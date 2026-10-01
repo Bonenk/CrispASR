@@ -19,6 +19,24 @@ class Params(ct.Structure):
                 ('verbosity', ct.c_int), ('use_gpu', ct.c_bool)]
 
 
+def compare_stages(stages, baseline):
+    rows = []
+    for name, values in stages.items():
+        ref, got = baseline[name].astype(np.float64), values.astype(np.float64)
+        assert got.shape == ref.shape and np.isfinite(got).all()
+        ref_norm, got_norm = np.linalg.norm(ref, axis=1), np.linalg.norm(got, axis=1)
+        valid = ref_norm > 1e-12
+        assert np.all(got_norm[valid] > 0)
+        cosine = np.sum(ref[valid] * got[valid], axis=1) / (ref_norm[valid] * got_norm[valid])
+        relative_rms = float(np.linalg.norm(got - ref) / np.linalg.norm(ref))
+        row = dict(stage=name, min_cosine=float(cosine.min()),
+                   max_norm_ratio_error=float(np.max(np.abs(got_norm[valid] / ref_norm[valid] - 1))),
+                   relative_rms_error=relative_rms)
+        row['passed'] = row['min_cosine'] >= .999 and row['max_norm_ratio_error'] < .01 and relative_rms < .01
+        rows.append(row)
+    return rows
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--lib', required=True)
@@ -70,22 +88,9 @@ def main():
     finally:
         lib.parakeet_free(ctx)
     if args.baseline:
-        rows = []
         with np.load(args.baseline) as baseline:
             assert set(baseline.files) == set(stages)
-            for name, values in stages.items():
-                ref, got = baseline[name].astype(np.float64), values.astype(np.float64)
-                assert got.shape == ref.shape and np.isfinite(got).all()
-                ref_norm, got_norm = np.linalg.norm(ref, axis=1), np.linalg.norm(got, axis=1)
-                valid = ref_norm > 1e-12
-                assert np.all(got_norm[valid] > 0)
-                cosine = np.sum(ref[valid] * got[valid], axis=1) / (ref_norm[valid] * got_norm[valid])
-                relative_rms = float(np.linalg.norm(got - ref) / np.linalg.norm(ref))
-                row = dict(stage=name, min_cosine=float(cosine.min()),
-                           max_norm_ratio_error=float(np.max(np.abs(got_norm[valid] / ref_norm[valid] - 1))),
-                           relative_rms_error=relative_rms)
-                row['passed'] = row['min_cosine'] >= .999 and row['max_norm_ratio_error'] < .01 and relative_rms < .01
-                rows.append(row)
+            rows = compare_stages(stages, baseline)
         report = dict(mode=args.mode, threads=args.threads, model=args.model,
                       reference=args.reference, baseline=str(args.baseline), stages=rows)
         report['passed'] = all(row['passed'] for row in rows)

@@ -4,12 +4,19 @@ import json
 from pathlib import Path
 import re
 
+import numpy as np
+from gguf import GGUFReader
+from check_phonon2_ffn_stages import compare_stages
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('results', type=Path)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
+    refs = {t.name: t.data.reshape(-1, 1024) for t in GGUFReader(str(args.results / 'full-ref.gguf')).tensors
+            if t.name == 'pre_encode_output' or t.name.startswith('encoder_layer_')}
+    assert len(refs) == 25
     configs = {}
     for path in sorted(args.results.glob('parity-*.json')):
         config = path.stem.removeprefix('parity-')
@@ -26,7 +33,11 @@ def main():
                 assert clip['audio_s'] == baseline['audio_s'] and clip['median_s'] > 0
                 clip['speedup_vs_default_t4'] = baseline['median_s'] / clip['median_s']
                 clip['exact_default_transcript'] = clip['transcript'] == baseline['transcript']
-                clip['same_default_words'] = re.findall(r'\w+', clip['transcript'].lower()) == re.findall(r'\w+', baseline['transcript'].lower())
+                clip['same_default_words'] = re.findall(r"\w+(?:'\w+)?", clip['transcript'].lower()) == re.findall(r"\w+(?:'\w+)?", baseline['transcript'].lower())
+            capture_path = args.results / f'stages-{config}-{quant}.npz'
+            if capture_path.exists():
+                with np.load(capture_path) as captures:
+                    row['encoder_stages_vs_python_f32'] = compare_stages(captures, refs)
             stage_path = args.results / f'stages-{config}-{quant}.json'
             if stage_path.exists():
                 row['same_quant_stage_parity'] = json.loads(stage_path.read_text())

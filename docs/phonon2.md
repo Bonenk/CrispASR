@@ -351,6 +351,40 @@ BLAS threads within the public thread limit. The ggml BLAS backend changes
 OpenBLAS threading process-wide, also affecting a BLAS decoder; profiling
 records the actual count after inference. Encoder caching remains off.
 
+`CRISPASR_PARAKEET_FFN=repack` selects CPU_REPACK only for the four FFN
+matmul weights in each encoder layer. Other weights use ordinary CPU buffers.
+The loader checks type/shape/ISA support and falls back when no kernel exists;
+at the pinned ggml revision, x86 accepts Q4_K but declines Q8_0 and F16. This
+experiment stays off. Repacking changes in-memory layout, not the GGUF file.
+
+`CRISPASR_PARAKEET_FFN=blas` converts the same FFN weights to F32 once per load
+and explicitly assigns only their supported matmuls to the ggml BLAS backend.
+Other encoder nodes stay on CPU; the scheduler retains its required final CPU
+backend. Phonon-2 caches 96 matrices, adding 1,536 MiB of weight storage. Missing
+BLAS falls back to ordinary CPU weights. Small batches unsupported by BLAS use
+the cached F32 weights on CPU. This experiment also stays off. It requires a
+built/loaded ggml BLAS backend and defaults to one BLAS thread;
+`CRISPASR_PARAKEET_FFN_BLAS_THREADS` selects 1 through the public thread limit.
+The BLAS thread setting affects process-wide OpenBLAS threading. FFN modes are
+mutually exclusive; scoped FFN BLAS takes precedence over broad encoder BLAS.
+Unset `CRISPASR_PARAKEET_FFN`, or use `ggml`, to retain ordinary encoder weights.
+
+`CRISPASR_PARAKEET_FFN_TRACE=1` reports actual weight type, shape, buffer,
+repack traits and scheduled backend for the FFN nodes. Use it in a separate
+instrumented process, not in warmed timing. `CRISPASR_PARAKEET_DIFF_THREADS`
+sets the stage harness thread count for thread A/B; inference uses the public
+session/CLI thread setting as usual.
+
+The manual `.github/workflows/phonon2-ffn-ab.yml` measures exact FFN shapes and
+1/2/4-thread settings, independent Python timing, strict 31-stage F16 reference
+gates, same-quant encoder diagnostics, warmed inference, load time and peak RSS.
+Its `blas` sweep compares scoped BLAS against the ordinary four-thread default;
+`full` adds CPU thread and repack configurations. Every alternative runs in its
+own process, and traces prove the intended kernel/backend was selected. The
+same-quant checker requires cosine, relative RMS and per-frame norm agreement
+by default; the experimental sweep explicitly uses `--report-only` to retain
+failed diagnostics without accepting those paths as a new default.
+
 The CPU A/B workflow validates **31** frontend/encoder/transducer rows against
 an independent Transformers F32 dump: the original 28 rows plus all encoder
 projections, the raw predictor output after the production one-blank SOS, and
