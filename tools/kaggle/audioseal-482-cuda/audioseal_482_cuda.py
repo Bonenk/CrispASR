@@ -71,7 +71,7 @@ model = SCRATCH / "audioseal.gguf"
 urllib.request.urlretrieve("https://huggingface.co/cstr/audioseal-GGUF/resolve/main/audioseal.gguf", model)
 subprocess.run(["uptime"], check=True)
 subprocess.run(["free", "-h"], check=True)
-env = dict(os.environ, LD_LIBRARY_PATH=str(bundle))
+env = dict(os.environ, LD_LIBRARY_PATH=str(bundle) + ":" + os.environ.get("LD_LIBRARY_PATH", ""))
 with kh.build_heartbeat("cuda.inference"):
     result = subprocess.run([str(bundle / "audioseal-cuda-proof"), str(model)],
                             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
