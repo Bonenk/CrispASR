@@ -35,11 +35,23 @@ The clone harness also incorrectly requested disclaimer suppression without
 the required CLI flag; corrected by retaining the normal spoken marking.
 Candidate `9d55a79c8` preserves the eager CPU RMS reduction and SwiGLU arithmetic
 inside batched prefill to test activation-quantization sensitivity.
-The queued rerun 36851585500 was superseded before starting by
+The queued rerun 36851585500 was superseded before building by
 [rerun 36851832606](https://github.com/CrispStrobe/CrispASR/actions/runs/36851832606)
 at `49eb80d2f`: unchanged hidden/KV parity thresholds, all speech cases,
 candidate ASR requires every target word; imperfect eager ASR is a recorded
 baseline diagnostic (first Q4 zero-shot readback substituted "And now" for "Hello").
+
+Second run: Q8_0 and F16 passed all state/KV/continuation cases and both speech
+roundtrips; warmed 249-position medians were 4675.4 → 1155.0 ms (Q8, 4.05x)
+and 7642.5 → 3632.1 ms (F16, 2.10x). Preserving eager CPU arithmetic made
+single-position Q4 exact too, but multi-position Q4 still exceeded 1% relative
+error (T=10: 1.0604%), so it stays opt-in even though its speech cases passed.
+Candidate `11ca781f7` selects batching by default only for F16/Q8_0 RALM matrices
+on AVX2/F16C CPUs; other ISAs/quants keep eager, GPUs keep eager.
+[Default proof 36854994459](https://github.com/CrispStrobe/CrispASR/actions/runs/36854994459)
+checks default vs explicit arms, `USE_GRAPH=0` fallback, all prompt lengths,
+all three speech arms per quant, and retains generated WAVs. Q4's unchanged
+strict parity failure is an explicit experimental result, never a default-pass claim.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
