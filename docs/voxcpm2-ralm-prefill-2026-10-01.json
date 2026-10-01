@@ -40,7 +40,9 @@
             ],
             "selected": true,
             "max_len_hit": false,
-            "all_prefills_match_selection": true
+            "all_prefills_match_selection": true,
+            "pcm_matches_explicit_arm": "batched",
+            "pcm_sha256": "933e96f091ef43ef0428abe45a0482540ae93aae3b557e0f079b7ce766a0f9ef"
           }
         },
         "clone": {
@@ -81,7 +83,9 @@
             ],
             "selected": true,
             "max_len_hit": false,
-            "all_prefills_match_selection": true
+            "all_prefills_match_selection": true,
+            "pcm_matches_explicit_arm": "batched",
+            "pcm_sha256": "0759a140fc0a97684e3c404cce0c30f96123541b9c9e7c4bf2692551cffd32c4"
           }
         }
       },
@@ -257,7 +261,9 @@
             ],
             "selected": true,
             "max_len_hit": false,
-            "all_prefills_match_selection": true
+            "all_prefills_match_selection": true,
+            "pcm_matches_explicit_arm": "batched",
+            "pcm_sha256": "bced9fcc3d5c5d36c49ef73d5a1d7a228782c3d94840d437c587dd94f6494083"
           }
         },
         "clone": {
@@ -298,7 +304,9 @@
             ],
             "selected": true,
             "max_len_hit": false,
-            "all_prefills_match_selection": true
+            "all_prefills_match_selection": true,
+            "pcm_matches_explicit_arm": "batched",
+            "pcm_sha256": "8157d2d7f3c95747f584817b56529ab5ab500424da92f9c77aca0487dc6a8024"
           }
         }
       },
@@ -491,7 +499,9 @@
             ],
             "selected": false,
             "max_len_hit": false,
-            "all_prefills_match_selection": true
+            "all_prefills_match_selection": true,
+            "pcm_matches_explicit_arm": "eager",
+            "pcm_sha256": "f9a9ff6a5f08d32a9f8d95dc8bbc905e06b10997498f7926f49d7382efb6ad9b"
           }
         },
         "clone": {
@@ -532,7 +542,9 @@
             ],
             "selected": false,
             "max_len_hit": false,
-            "all_prefills_match_selection": true
+            "all_prefills_match_selection": true,
+            "pcm_matches_explicit_arm": "eager",
+            "pcm_sha256": "f9113c7c9e0a278353b3d5cb210c3ffc53752ae1659fc3628eac2c504b5f1e3a"
           }
         }
       },

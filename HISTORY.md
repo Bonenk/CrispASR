@@ -28,6 +28,8 @@ PyTorch F16 output/KV relative error is below 2e-6. Zero-shot and a model-genera
 reference clone exercise eager, opt-in and default arms; validated default
 readbacks retain every requested word. Experimental Q4 failures are recorded
 separately, not included in the default-pass claim. Generated WAVs are retained.
+Default WAV PCM is byte-identical to explicit batching for Q8/F16 and to
+eager prefill for Q4 in both speech cases; PCM hashes are in the receipt.
 
 Same-host medians of three warmed 249-position pairs on a four-vCPU Xeon
 6973P-C (four threads): Q8_0 4116.5 → 899.2 ms (4.58x), F16 6159.5 →
