@@ -590,16 +590,9 @@ index_echo_result* index_echo_transcribe(index_echo_context* ctx, const float* s
         ctx->context.clear();
         std::vector<core_index_echo::Window> windows;
         if (ctx->vad) {
-            auto params = whisper_vad_default_params();
-            params.min_silence_duration_ms = 300;
-            auto* segments = whisper_vad_segments_from_samples(ctx->vad, params, samples, n);
-            if (!segments)
+            if (!whisper_vad_detect_speech(ctx->vad, samples, n))
                 return nullptr;
-            std::vector<std::pair<double, double>> speech;
-            for (int i = 0; i < whisper_vad_segments_n_segments(segments); ++i)
-                speech.emplace_back(whisper_vad_segments_get_segment_t0(segments, i) / 100.0,
-                                    whisper_vad_segments_get_segment_t1(segments, i) / 100.0);
-            whisper_vad_free_segments(segments);
+            auto speech = core_index_echo::speech_spans(whisper_vad_probs(ctx->vad), whisper_vad_n_probs(ctx->vad), n);
             windows = core_index_echo::windows(speech, n / 16000.0);
         } else {
             if (ctx->params.verbosity)

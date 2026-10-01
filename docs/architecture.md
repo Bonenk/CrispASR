@@ -344,7 +344,9 @@ both files must be present. F16, Q8_0 and Q4_K cohorts have matching companion
 names. A sibling `ggml-silero-v6.2.0.bin`, or an explicit `--vad-model`, enables
 the released speech-window merge recipe (300 ms silence, 300/500 ms padding,
 60 s maximum, short-tail merge). Without that companion, inference uses
-bounded 60 s windows. Native Silero boundaries have 10 ms resolution.
+bounded 60 s windows. The shared native Silero classifier feeds the released
+300 ms silence / 30 ms padding timestamp rules, including Python's rounding
+to tenths of a second before window merging.
 
 The prompt preserves the released empty-think template and repeated audio-pad
 tokens. `--target-lang en|ja|es` chooses the translation language; `--prompt`

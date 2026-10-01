@@ -36,3 +36,44 @@ TEST_CASE("Index-Echo short final window folds only when the combined span fits"
 TEST_CASE("Index-Echo silence has no windows", "[unit][index-echo]") {
     REQUIRE(windows({}, 120).empty());
 }
+
+TEST_CASE("Index-Echo native VAD spans match released Silero timestamp fixtures", "[unit][index-echo]") {
+    // Expected values captured from v6.2 get_speech_timestamps with infer.py's
+    // 300 ms silence and return_seconds=True; the classifier is held fixed.
+    std::vector<float> probabilities(43, 0.1f);
+    std::fill(probabilities.begin() + 5, probabilities.begin() + 13, 0.9f);
+    std::fill(probabilities.begin() + 24, probabilities.begin() + 32, 0.9f);
+    auto spans = core_index_echo::speech_spans(probabilities.data(), probabilities.size(), 43 * 512 - 197);
+    REQUIRE(spans.size() == 2);
+    CHECK(spans[0].first == Approx(0.1));
+    CHECK(spans[0].second == Approx(0.4));
+    CHECK(spans[1].first == Approx(0.7));
+    CHECK(spans[1].second == Approx(1.1));
+
+    probabilities.assign(36, 0.1f);
+    std::fill(probabilities.begin(), probabilities.begin() + 8, 0.9f);
+    std::fill(probabilities.begin() + 17, probabilities.begin() + 25, 0.9f);
+    spans = core_index_echo::speech_spans(probabilities.data(), probabilities.size(), 36 * 512);
+    REQUIRE(spans.size() == 1);
+    CHECK(spans[0].first == 0);
+    CHECK(spans[0].second == Approx(0.8));
+
+    probabilities.assign(20, 0.1f);
+    std::fill(probabilities.begin() + 8, probabilities.end(), 0.9f);
+    spans = core_index_echo::speech_spans(probabilities.data(), probabilities.size(), 20 * 512 - 197);
+    REQUIRE(spans.size() == 1);
+    CHECK(spans[0].first == Approx(0.2));
+    CHECK(spans[0].second == Approx(0.6));
+
+    probabilities.assign(18, 0.1f);
+    std::fill(probabilities.begin(), probabilities.begin() + 7, 0.9f);
+    CHECK(core_index_echo::speech_spans(probabilities.data(), probabilities.size(), 18 * 512).empty());
+    probabilities.assign(100, 0.1f);
+    CHECK(core_index_echo::speech_spans(probabilities.data(), probabilities.size(), 100 * 512).empty());
+}
+
+TEST_CASE("Index-Echo VAD rounding preserves Python binary-value ties", "[unit][index-echo]") {
+    CHECK(core_index_echo::speech_seconds(4000) == Approx(0.2)); // round(0.25, 1)
+    CHECK(core_index_echo::speech_seconds(5600) == Approx(0.3)); // round(0.35, 1)
+    CHECK(core_index_echo::speech_seconds(8800) == Approx(0.6)); // round(0.55, 1)
+}
