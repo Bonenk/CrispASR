@@ -43,7 +43,18 @@ weights. Same-Q4 stage gate fails: final-layer cosine 0.99594, relative RMS
 3.54%, maximum frame norm difference 1.90%. The 21-clip corpus preserves
 all words; 19/21 exact, two punctuation changes (one closer/farther to Python).
 Do not promote repacking based only on the F16 gate (F16 falls back unchanged).
-Investigating per-matmul parity; cached BLAS speed/parity still pending CI.
+Per-matmul probes differ only ~4e-7 relative RMS; repeating the original
+Q4 graph is bit-exact. Quantized-layer amplification remains a concern.
+Scoped BLAS required a scheduler correction: CPU must be last. Candidate
+`aebc04da5` explicitly pins all non-FFN nodes to CPU and the 96 cached FFN
+matmuls to BLAS; local execution now proves the intended placement. Same-Q4
+BLAS diagnostics also drift (final cosine 0.98952 / RMS 3.67%); keep opt-in.
+Q4 BLAS corpus running; corrected clean CI
+[36834441110](https://github.com/CrispStrobe/CrispASR/actions/runs/36834441110)
+will measure scoped BLAS versus same-host defaults. The first full sweep
+`36830399630` uses the pre-fix scheduler and cannot validate its BLAS arm.
+All 13 candidate cross-platform jobs and normal lint passed before the fix;
+repeat applicable checks after the correction. No default has changed.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
