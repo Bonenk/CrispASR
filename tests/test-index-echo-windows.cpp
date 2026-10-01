@@ -77,3 +77,10 @@ TEST_CASE("Index-Echo VAD rounding preserves Python binary-value ties", "[unit][
     CHECK(core_index_echo::speech_seconds(5600) == Approx(0.3)); // round(0.35, 1)
     CHECK(core_index_echo::speech_seconds(8800) == Approx(0.6)); // round(0.55, 1)
 }
+
+TEST_CASE("Index-Echo window extraction matches Python ffmpeg millisecond formatting", "[unit][index-echo]") {
+    CHECK(core_index_echo::window_samples(1.0005) == 16000);
+    CHECK(core_index_echo::window_samples(1.2345) == 19744);
+    CHECK(core_index_echo::window_samples(1.2355) == 19776);
+    CHECK(core_index_echo::window_samples(0) == 0);
+}

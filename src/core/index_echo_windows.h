@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <utility>
@@ -17,10 +18,19 @@ struct Window {
 
 // Python round(seconds, 1) rounds the original binary value, including ties.
 // Multiplying by ten first can lose that distinction (e.g. round(0.35, 1)).
-inline double speech_seconds(int samples) {
+inline double round_seconds(double seconds, int decimals) {
     char value[64];
-    std::snprintf(value, sizeof(value), "%.1f", samples / 16000.0);
+    std::snprintf(value, sizeof(value), "%.*f", decimals, seconds);
     return std::strtod(value, nullptr);
+}
+inline double speech_seconds(int samples) {
+    return round_seconds(samples / 16000.0, 1);
+}
+// Released ffmpeg seek/duration arguments use f"{seconds:.3f}". Round the
+// original double before converting to samples; llround(seconds*1000) can
+// differ at binary ties (1.0005 seconds formats to 1.000, not 1.001).
+inline int64_t window_samples(double seconds) {
+    return static_cast<int64_t>(std::llround(round_seconds(seconds, 3) * 16000));
 }
 
 // Silero v6.2 get_speech_timestamps with the released infer.py parameters:

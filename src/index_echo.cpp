@@ -597,13 +597,17 @@ index_echo_result* index_echo_transcribe(index_echo_context* ctx, const float* s
         } else {
             if (ctx->params.verbosity)
                 fprintf(stderr, "index-echo: no Silero companion; using bounded 60s windows\n");
-            for (int start = 0; start < n; start += 60 * 16000)
-                windows.push_back({start / 16000.0, std::min(n, start + 60 * 16000) / 16000.0, true});
+            for (int start = 0; start < n;) {
+                const int end = start + std::min(n - start, 60 * 16000);
+                windows.push_back({start / 16000.0, end / 16000.0, true});
+                start = end;
+            }
         }
         for (const auto& window : windows) {
             // Upstream formats ffmpeg seek/duration to milliseconds.
-            int begin = std::max(0, (int)std::llround(window.start * 1000) * 16);
-            int length = std::min(n - begin, (int)std::llround((window.end - window.start) * 1000) * 16);
+            int begin = (int)std::clamp<int64_t>(core_index_echo::window_samples(window.start), 0, n);
+            int length =
+                (int)std::clamp<int64_t>(core_index_echo::window_samples(window.end - window.start), 0, n - begin);
             if (length <= 0)
                 continue;
             int mels = 0, frames = 0, rows = 0, dim = 0, vocab = 0;
