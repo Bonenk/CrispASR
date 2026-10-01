@@ -2,7 +2,7 @@
 
 Python bindings for [CrispASR](https://github.com/CrispStrobe/CrispASR) — lightweight on-device speech recognition via ggml.
 
-Supports the ASR backends compiled into the linked CrispASR library, including Whisper, Qwen3-ASR, FastConformer, Canary, Parakeet, Cohere, Granite-Speech, Voxtral, wav2vec2, GLM-ASR, Kyutai-STT, Moonshine, FireRed, OmniASR, and VibeVoice-ASR.
+Supports the ASR backends compiled into the linked CrispASR library, including Whisper, Qwen3-ASR, FastConformer, Canary, Parakeet, Cohere, Granite-Speech, Voxtral, wav2vec2, GLM-ASR, Kyutai-STT, Moonshine, FireRed, OmniASR, VibeVoice-ASR, and Index-Echo.
 
 ## Install
 
@@ -62,6 +62,11 @@ for seg in s.transcribe_pcm(pcm_f32, sample_rate=16000):
 ## API
 
 - `CrispASR` — Whisper-compatible high-level API
+Index-Echo uses the same `Session` API. Open the tower GGUF with its matching
+decoder beside it, then call `s.set_target_language("en")` (also `ja` or `es`).
+Each segment contains `transcript\ntranslation` and generated subtitle times.
+Place Silero v6.2 beside the pair for the released full-file window recipe.
+
 - `Session` — unified API across all backends compiled into `libcrispasr`
 - `ChatSession` — text → text chat over a GGUF chat model: one-shot and streaming generation, prompt-token counting, and cancellation through an abort predicate
 - `align_words(...)` — word-level CTC alignment

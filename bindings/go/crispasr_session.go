@@ -437,7 +437,9 @@ func (s *CrispasrSession) SetSourceLanguage(lang string) error {
 
 // SetTargetLanguage sets the sticky target-language. When ≠ source on
 // canary/cohere, the backend emits a translation. For whisper, pair with
-// SetTranslate(true).
+// SetTranslate(true). Index-Echo takes en/ja/es and returns bilingual subtitle
+// segments. Open its tower GGUF with the matching decoder beside it; a sibling
+// Silero v6.2 companion enables the released full-file window recipe.
 func (s *CrispasrSession) SetTargetLanguage(lang string) error {
 	cl := C.CString(lang)
 	defer C.free(unsafe.Pointer(cl))

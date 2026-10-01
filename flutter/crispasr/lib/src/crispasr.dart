@@ -2377,6 +2377,9 @@ typedef Stem = ({String name, Float32List pcm});
 
 /// Unified model session. Phonon-2 auto-detects as Parakeet from GGUF metadata,
 /// including renamed files; its trained language is English.
+/// Index-Echo opens the tower GGUF with a matching decoder beside it. Set the
+/// target language to en/ja/es for bilingual transcript/translation segments.
+/// A sibling Silero v6.2 model enables the released speech-window recipe.
 class CrispasrSession {
   CrispasrSession._(
     this._lib,

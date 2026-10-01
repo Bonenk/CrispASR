@@ -1333,6 +1333,11 @@ class Session:
     and ``backend="phonon2"`` explicitly selects that alias. ``s.backend``
     reports the shared runtime, "parakeet". Its trained language is English.
 
+    Index-Echo auto-detects the audio tower; keep its matching decoder and
+    optional Silero companion beside it. ``set_target_language("en"|"ja"|"es")``
+    selects translation. Each segment's text contains transcript + newline +
+    translation; segment times come from the model's generated subtitles.
+
     Usage:
         with crispasr.Session("model.gguf") as s:
             print(f"backend: {s.backend}")
