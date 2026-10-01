@@ -32,6 +32,11 @@ is unchanged. Harness `62b91ad67` accepts only the exact golden or this specific
 observed variant, requires no candidate error increase, and skips automatic LID
 for the English fixture. Rerun `36867331142` is dispatched. SIMD package and
 cross-platform CI remain in flight. Release notes are drafted in the worktree.
+SIMD package `36865093345` compiled but failed correctly at packaging because
+CMake's optional C2PA fetch got an HTTP error and disabled signing. Fix
+`e11b9595e` fetches/retries the required sidecar before compiling; fresh package
+run `36868274235` is dispatched. Intel ISA/runtime configuration is unchanged;
+CPU A/B `36867331142` continues. Windows/macOS/iOS/Linux unit checks passed.
 Results pending; do not release until validated. Index models (#485) are
 explicitly assigned to another agent by the maintainer; leave that work alone.
 Reporter added a 12-thread/chunked binary-swap confirmation at 12:46 UTC.
