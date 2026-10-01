@@ -28,6 +28,8 @@ def main():
     parser.add_argument('--threads', type=int, default=4)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--baseline', type=Path)
+    parser.add_argument('--report-only', action='store_true',
+                        help='retain failed diagnostics without accepting the experiment')
     args = parser.parse_args()
     assert args.threads > 0
     model = GGUFReader(args.model)
@@ -86,9 +88,11 @@ def main():
                 rows.append(row)
         report = dict(mode=args.mode, threads=args.threads, model=args.model,
                       reference=args.reference, baseline=str(args.baseline), stages=rows)
+        report['passed'] = all(row['passed'] for row in rows)
         args.output.with_suffix('.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report, indent=2))
-        assert all(row['passed'] for row in rows), 'FFN stage parity gate failed; see complete JSON report'
+        if not args.report_only:
+            assert report['passed'], 'FFN stage parity gate failed; see complete JSON report'
 
 
 if __name__ == '__main__':
