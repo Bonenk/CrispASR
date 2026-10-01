@@ -906,7 +906,7 @@ causing `--max-len` to silently have no effect.
 
 `index-echo` produces bilingual subtitle cues: transcript followed by translation.
 Set `--target-lang en`, `ja` or `es` (default `en`). Its released recipe uses
-Chinese input; other source languages are under validation. `--prompt` accepts
+Chinese input; English JFK output matches the Python blueprint on CPU. `--prompt` accepts
 comma/newline-separated glossary entries (`name:translation`), and `--ask`
 overrides the instruction. Custom instructions should preserve the timestamp,
 transcript, translation three-line format. It supports greedy or temperature

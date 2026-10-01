@@ -328,8 +328,8 @@ gated delta-network blocks followed by one gated full-attention block,
 repeated six times. The published package also contains vision weights;
 the speech path does not use them. The upstream inference script documents
 Chinese transcription with English, Japanese or Spanish translation.
-English recognition is being checked separately rather than inferred from
-the requested target language.
+English JFK transcription with English translation matches the released
+Python model in CPU validation; broader source-language accuracy is unmeasured.
 
 The encoder uses `crisp_audio`; the residual connector is a ggml graph.
 The decoder uses CrispASR's private llama core, including its hybrid KV and
