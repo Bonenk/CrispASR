@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Native CUDA versus independent CPU F32 oracle and same-box CPU control.
+"""Native CUDA versus independent released mixed-precision CPU oracle and same-box CPU control.
 
 No torch execution: P100 can exercise native CUDA, but its quantized matmul
 uses dequant+cuBLAS rather than integer MMQ. Record that coverage limit.
@@ -57,7 +57,7 @@ with kh.build_heartbeat('build.cuda', interval_s=30):
     kh.sh_with_progress(f'cmake --build {build} --target crispasr-cli crispasr-diff -j{kh.safe_build_jobs(gpu=True)}', cwd=str(REPO))
 result = dict(script_version=SCRIPT_VERSION, source_commit=SOURCE_COMMIT,
               model_revision=revision, hardware=hardware, cuda_arch=arch,
-              quantized_integer_mmq=int(arch) >= 61, reference_device='CPU F32', cases=[])
+              quantized_integer_mmq=int(arch) >= 61, reference_device='CPU F32 tower/connector, BF16 decoder', cases=[])
 failed = []
 for cohort in ['f16', 'q8_0']:
     snapshot_download('cstr/index-echo-2b-GGUF', revision=revision, local_dir=MODELS,

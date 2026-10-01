@@ -33,8 +33,25 @@ are retained in [the receipt](docs/index-echo-cpu-2026-10-01.json).
 The encoder and connector use ggml graphs/schedulers; the private Qwen3.5
 core batches prefill and caches both full-attention KV and recurrent state.
 Cache is reset per window while prior-output text enters the next prompt.
-There is no Python/ONNX inference fallback. CUDA measurement is pending;
-these CPU results do not establish GPU speed or integer-MMQ coverage.
+There is no Python/ONNX inference fallback.
+
+CUDA proof ran on **two Tesla T4 GPUs (SM75, 15GiB each)**, with the decoder
+using its default layer distribution across both devices. All F16/Q8 stage,
+magnitude and cached-token checks pass against the independent mixed-precision
+CPU source captures. Every GPU SRT is byte-identical to its same-box native CPU
+control (text and timestamps). These are single cold calls, not warm medians.
+
+| Clip | F16 inference | Q8 inference | Q8 including load/process |
+|---|---:|---:|---:|
+| JFK, 11 s | 3.05 s | 2.23 s | 4.68 s |
+| Chinese, 13.052 s | 3.91 s | 2.92 s | 5.38 s |
+| Partial-hop JFK, 10.988 s | 3.05 s | 2.07 s | 4.53 s |
+
+Q8 is 4.5–5.3× realtime excluding load on these clips. The receipt retains
+exact per-stage times and hardware in
+[docs/index-echo-cuda-2026-10-01.json](docs/index-echo-cuda-2026-10-01.json).
+This proves CUDA execution on integer-MMQ-capable hardware; it does not isolate
+MMQ versus cuBLAS performance or establish full-file GPU/VAD parity.
 
 ## Intel macOS release ISA — 2026-10-01 (#484)
 

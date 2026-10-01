@@ -1,0 +1,409 @@
+{
+  "script_version": "2026-10-01.1",
+  "source_commit": "5e813d39bce0e79b53f956a5715a006108097fb8",
+  "model_revision": "022317a0aacb5813050abf813dde423e91a30403",
+  "hardware": "Tesla T4, 7.5, 15360 MiB\nTesla T4, 7.5, 15360 MiB",
+  "cuda_arch": "75",
+  "quantized_integer_mmq": true,
+  "reference_device": "CPU; F32 tower/connector, BF16 decoder",
+  "cases": [
+    {
+      "tag": "f16-jfk-cpu",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 31.624355121999997,
+      "actual": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "expected": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "stages_ms": {
+        "model_load": 2394.01,
+        "mel": 98.07,
+        "audio_encode": 6090.2,
+        "connector": 64.45,
+        "decoder_prefill": 2081.06,
+        "decoder_generate": 20313.17
+      }
+    },
+    {
+      "tag": "f16-jfk-cuda",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 5.828699097000026,
+      "actual": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "expected": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "stages_ms": {
+        "model_load": 2434.68,
+        "mel": 99.77,
+        "audio_encode": 231.68,
+        "connector": 4.63,
+        "decoder_prefill": 456.92,
+        "decoder_generate": 2085.96
+      }
+    },
+    {
+      "tag": "f16-zh-cpu",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 42.21725870599994,
+      "actual": [
+        "正是因为存在绝对正义，所以我们接受现实的相对正义。",
+        "It is precisely because absolute justice exists that we accept the relative justice of reality.",
+        "但是不要因为现实的相对正义，",
+        "But don't let the relative justice of reality",
+        "我们就认为这个世界没有正义。",
+        "make us believe there is no justice in this world.",
+        "因为如果当你认为这个世界没有正义，",
+        "Because if you believe there is no justice in this world,"
+      ],
+      "expected": [
+        "正是因为存在绝对正义，所以我们接受现实的相对正义。",
+        "It is precisely because absolute justice exists that we accept the relative justice of reality.",
+        "但是不要因为现实的相对正义，",
+        "But don't let the relative justice of reality",
+        "我们就认为这个世界没有正义。",
+        "make us believe there is no justice in this world.",
+        "因为如果当你认为这个世界没有正义，",
+        "Because if you believe there is no justice in this world,"
+      ],
+      "stages_ms": {
+        "model_load": 2445.41,
+        "mel": 124.78,
+        "audio_encode": 7556.09,
+        "connector": 74.23,
+        "decoder_prefill": 2108.51,
+        "decoder_generate": 29280.29
+      }
+    },
+    {
+      "tag": "f16-zh-cuda",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 6.831041013999766,
+      "actual": [
+        "正是因为存在绝对正义，所以我们接受现实的相对正义。",
+        "It is precisely because absolute justice exists that we accept the relative justice of reality.",
+        "但是不要因为现实的相对正义，",
+        "But don't let the relative justice of reality",
+        "我们就认为这个世界没有正义。",
+        "make us believe there is no justice in this world.",
+        "因为如果当你认为这个世界没有正义，",
+        "Because if you believe there is no justice in this world,"
+      ],
+      "expected": [
+        "正是因为存在绝对正义，所以我们接受现实的相对正义。",
+        "It is precisely because absolute justice exists that we accept the relative justice of reality.",
+        "但是不要因为现实的相对正义，",
+        "But don't let the relative justice of reality",
+        "我们就认为这个世界没有正义。",
+        "make us believe there is no justice in this world.",
+        "因为如果当你认为这个世界没有正义，",
+        "Because if you believe there is no justice in this world,"
+      ],
+      "stages_ms": {
+        "model_load": 2395.15,
+        "mel": 117.19,
+        "audio_encode": 225.45,
+        "connector": 4.49,
+        "decoder_prefill": 501.71,
+        "decoder_generate": 3056.21
+      }
+    },
+    {
+      "tag": "f16-jfk-tail-cpu",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 31.767309865999778,
+      "actual": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "expected": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "stages_ms": {
+        "model_load": 2450.87,
+        "mel": 99.48,
+        "audio_encode": 6075.62,
+        "connector": 63.55,
+        "decoder_prefill": 2087.48,
+        "decoder_generate": 20399.95
+      }
+    },
+    {
+      "tag": "f16-jfk-tail-cuda",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 5.8819001340002615,
+      "actual": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "expected": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "stages_ms": {
+        "model_load": 2478.42,
+        "mel": 104.44,
+        "audio_encode": 233.14,
+        "connector": 4.39,
+        "decoder_prefill": 462.56,
+        "decoder_generate": 2085.23
+      }
+    },
+    {
+      "tag": "q8_0-jfk-cpu",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 20.284620116000042,
+      "actual": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "expected": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "stages_ms": {
+        "model_load": 2410.58,
+        "mel": 99.93,
+        "audio_encode": 3314.56,
+        "connector": 27.15,
+        "decoder_prefill": 1110.8,
+        "decoder_generate": 12708.82
+      }
+    },
+    {
+      "tag": "q8_0-jfk-cuda",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 4.676290784999765,
+      "actual": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "expected": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "stages_ms": {
+        "model_load": 1934.74,
+        "mel": 102.96,
+        "audio_encode": 131.81,
+        "connector": 3.18,
+        "decoder_prefill": 219.97,
+        "decoder_generate": 1769.3
+      }
+    },
+    {
+      "tag": "q8_0-zh-cpu",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 26.760996966999755,
+      "actual": [
+        "正是因为存在绝对正义，所以我们接受现实的相对正义。",
+        "It is precisely because absolute justice exists that we accept the relative justice of reality.",
+        "但是不要因为现实的相对正义，",
+        "But don't let the relative justice of reality",
+        "我们就认为这个世界没有正义。",
+        "make us believe there is no justice in this world.",
+        "因为如果当你认为这个世界没有正义，",
+        "Because if you believe there is no justice in this world,"
+      ],
+      "expected": [
+        "正是因为存在绝对正义，所以我们接受现实的相对正义。",
+        "It is precisely because absolute justice exists that we accept the relative justice of reality.",
+        "但是不要因为现实的相对正义，",
+        "But don't let the relative justice of reality",
+        "我们就认为这个世界没有正义。",
+        "make us believe there is no justice in this world.",
+        "因为如果当你认为这个世界没有正义，",
+        "Because if you believe there is no justice in this world,"
+      ],
+      "stages_ms": {
+        "model_load": 2405.03,
+        "mel": 118.16,
+        "audio_encode": 4148.02,
+        "connector": 32.77,
+        "decoder_prefill": 1115.12,
+        "decoder_generate": 18332.58
+      }
+    },
+    {
+      "tag": "q8_0-zh-cuda",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 5.378364799999872,
+      "actual": [
+        "正是因为存在绝对正义，所以我们接受现实的相对正义。",
+        "It is precisely because absolute justice exists that we accept the relative justice of reality.",
+        "但是不要因为现实的相对正义，",
+        "But don't let the relative justice of reality",
+        "我们就认为这个世界没有正义。",
+        "make us believe there is no justice in this world.",
+        "因为如果当你认为这个世界没有正义，",
+        "Because if you believe there is no justice in this world,"
+      ],
+      "expected": [
+        "正是因为存在绝对正义，所以我们接受现实的相对正义。",
+        "It is precisely because absolute justice exists that we accept the relative justice of reality.",
+        "但是不要因为现实的相对正义，",
+        "But don't let the relative justice of reality",
+        "我们就认为这个世界没有正义。",
+        "make us believe there is no justice in this world.",
+        "因为如果当你认为这个世界没有正义，",
+        "Because if you believe there is no justice in this world,"
+      ],
+      "stages_ms": {
+        "model_load": 1964.15,
+        "mel": 118.94,
+        "audio_encode": 147.79,
+        "connector": 3.75,
+        "decoder_prefill": 227.82,
+        "decoder_generate": 2416.18
+      }
+    },
+    {
+      "tag": "q8_0-jfk-tail-cpu",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 20.28602520300001,
+      "actual": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "expected": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "stages_ms": {
+        "model_load": 2400.07,
+        "mel": 100.0,
+        "audio_encode": 3420.59,
+        "connector": 26.71,
+        "decoder_prefill": 1094.72,
+        "decoder_generate": 12678.4
+      }
+    },
+    {
+      "tag": "q8_0-jfk-tail-cuda",
+      "stage_rc": 0,
+      "decode_rc": 0,
+      "decoded_match": true,
+      "seconds_including_load": 4.526307290999739,
+      "actual": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "expected": [
+        "And so my fellow Americans,",
+        "So, my fellow Americans,",
+        "ask not what your country can do for you,",
+        "do not ask what your country can do for you,",
+        "ask what you can do for your country.",
+        "ask what you can do for your country."
+      ],
+      "stages_ms": {
+        "model_load": 1933.25,
+        "mel": 100.53,
+        "audio_encode": 130.98,
+        "connector": 3.23,
+        "decoder_prefill": 213.16,
+        "decoder_generate": 1617.96
+      }
+    }
+  ],
+  "failed": [],
+  "conclusive": true,
+  "precision_audit_run": 36911946162,
+  "timestamp_cpu_control_byte_exact": true,
+  "limitations": [
+    "One cold CLI invocation per clip/cohort/device; not a warm median benchmark.",
+    "Two Tesla T4 devices; default decoder layer distribution uses both.",
+    "Integer MMQ-capable hardware; no forced-MMQ versus cuBLAS A/B.",
+    "Direct windows without Silero; no full-file GPU proof."
+  ]
+}

@@ -91,9 +91,23 @@ Frontend stages retain strict gates. Prompt IDs, cached greedy IDs and full
 decoded cues are additional mandatory checks.
 
 Plain Q4_K is rejected: worst cosine 0.781530, relative L2 up to 23.349%, and
-changed translations/punctuation. A selective Q4 experiment is still being
-evaluated and is not a recommended download. Performance and GPU results
-will be added only after their checks finish.
+changed translations/punctuation. Selective Q4 is also rejected: it fails stage/output checks and saves only
+2.8% versus Q8. Neither Q4 recipe is a recommended download.
+
+Full-file checks exposed and fixed a Silero waveform-context discrepancy.
+With that fix, F16 full-file English/Japanese/Spanish and two-window outputs
+match the separate explicitly F32 decoder source run. The released BF16
+decoder differs by 20ms on three Japanese boundaries and chooses a Spanish
+synonym (`creamos` versus F32/native F16 `pensemos`). Q8 also shifts one English
+boundary by 20ms. Exact mixed-precision parity is therefore claimed only for
+the three direct-window fixtures, not all full-file multilingual outputs.
+
+A same-host four-core ARM Neoverse-N2 profile shows Q8 warm speedups of
+1.33–1.46× over the actual F32/BF16 Python blueprint, with peak RSS 4.03 versus
+7.95GiB. A two-Tesla-T4 CUDA run passes stage/cache checks for both cohorts;
+GPU SRTs match native CPU controls byte for byte. Q8 inference is 4.5–5.3×
+realtime on those three short clips, excluding load. See CrispASR PERFORMANCE.md
+and its JSON receipts for methodology and limitations.
 
 ## Reproducibility and license
 
