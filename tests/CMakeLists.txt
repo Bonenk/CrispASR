@@ -23,7 +23,7 @@ catch_discover_tests(test-realtime-turn-buffer PROPERTIES LABELS "unit;realtime"
 
 add_executable(test-index-echo-live test_index_echo_live.cpp)
 target_include_directories(test-index-echo-live PRIVATE ${PROJECT_SOURCE_DIR}/src)
-target_link_libraries(test-index-echo-live PRIVATE Catch2::Catch2WithMain index_echo)
+target_link_libraries(test-index-echo-live PRIVATE Catch2::Catch2WithMain index_echo crispasr-lib)
 catch_discover_tests(test-index-echo-live
     TEST_SPEC "[index-echo]"
     PROPERTIES LABELS live SKIP_RETURN_CODE 4 WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}")
