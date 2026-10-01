@@ -357,12 +357,18 @@ count, including partial final hops. The released Transformers 5.6.0 CPU
 encoder does not apply its constructed window mask; the conversion explicitly
 records full attention. GPU reference behavior remains to be checked.
 
-Validation is in progress on the feature branch. The independent reference
-executes the pinned released inference class in CPU F32. `crispasr-diff
+CPU validation against the pinned released inference class in F32 reproduces
+all decoded text and timestamps with F16 and Q8_0 on English JFK, Chinese,
+and a partial-hop JFK clip. Plain Q4_K changes decoded output and is rejected.
+These three clips establish port parity, not a broad accuracy benchmark. `crispasr-diff
 index-echo` checks frontend, convolution and encoder stages, connector,
 prompt IDs, all decoder blocks, logits and a cached 16-token teacher-forced
-trace. `INDEX_ECHO_BENCH=1` prints stage timings; speed measurements follow
-correctness validation.
+trace. Gates use the actual GGUF tensor precision: unquantized stages require
+cosine >= .999 (cached F16 logits >= .998) and relative L2 <= 2%; quantized
+learned stages require cosine >= .99 and relative L2 <= 5%. Frontend stages
+retain the strict gates. Exact prompt IDs, cached greedy IDs and complete
+decoded cues are required separately. `INDEX_ECHO_BENCH=1` prints stage
+timings; speed measurements follow correctness validation.
 
 ### Canary
 
