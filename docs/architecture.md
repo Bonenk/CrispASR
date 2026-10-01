@@ -340,12 +340,13 @@ become text context. Each new transcription call starts with empty history.
 
 The primary `index_echo` GGUF contains the tower, frontend constants and
 connector. `index_echo.decoder_file` names a sibling standard Qwen3.5 GGUF;
-both files must be present. F16, Q8_0 and Q4_K cohorts have matching companion
-names. A sibling `ggml-silero-v6.2.0.bin`, or an explicit `--vad-model`, enables
+both files must be present. The shipped F16 and Q8_0 cohorts have matching
+companion names; both Q4 experiments are rejected. A sibling `ggml-silero-v6.2.0.bin`, or an explicit `--vad-model`, enables
 the released speech-window merge recipe (300 ms silence, 300/500 ms padding,
 60 s maximum, short-tail merge). Without that companion, inference uses
 bounded 60 s windows. The shared native Silero classifier feeds the released
-300 ms silence / 30 ms padding timestamp rules, including Python's rounding
+300 ms silence / 30 ms padding timestamp rules, preserving previous-64-sample
+waveform context and Python's rounding
 to tenths of a second before window merging.
 
 The prompt preserves the released empty-think template and repeated audio-pad
@@ -357,7 +358,8 @@ count, including partial final hops. The released Transformers 5.6.0 CPU
 encoder does not apply its constructed window mask; the conversion explicitly
 records full attention. GPU reference behavior remains to be checked.
 
-CPU validation against the pinned released inference class in F32 reproduces
+CPU validation against the pinned released inference class (F32 tower/connector,
+BF16 decoder) reproduces
 all decoded text and timestamps with F16 and Q8_0 on English JFK, Chinese,
 and a partial-hop JFK clip. Plain Q4_K changes decoded output and is rejected.
 These three clips establish port parity, not a broad accuracy benchmark. `crispasr-diff
