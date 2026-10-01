@@ -928,7 +928,7 @@ float* crisp_audio_encode(struct crisp_audio_context* ctx, const float* mel_feat
     // Diff-harness stage dump: write every captured intermediate as raw F32
     // ("<dir>/<name>.f32") for tools/diff comparison. CPU-only diagnostic.
     if (const char* dump_dir = getenv("CRISP_AUDIO_DUMP_STAGES")) {
-        std::vector<std::string> names = {"conv1_out", "conv2_out", "conv3_out", "encoder_input",
+        std::vector<std::string> names = {"conv1_out",   "conv2_out", "conv3_out",  "encoder_input",
                                           "ln_post_out", "proj1_out", "encoder_out"};
         for (uint32_t il = 0; il < hp.n_layers; il++) {
             char nm[32];

@@ -1888,16 +1888,20 @@ int main(int argc, char** argv) {
     // -------- Dispatch to the right backend runner --------
     if (backend_name == "index-echo") {
         auto cp = index_echo_context_default_params();
-        cp.n_threads = 4; cp.verbosity = 0;
+        cp.n_threads = 4;
+        cp.verbosity = 0;
         cp.use_gpu = getenv("CRISPASR_DIFF_NO_GPU") == nullptr;
         std::unique_ptr<index_echo_context, decltype(&index_echo_free)> ctx(
             index_echo_init_from_file(model_path.c_str(), cp), index_echo_free);
-        if (!ctx) return 4;
+        if (!ctx)
+            return 4;
         auto check = [&](const std::string& name, const float* data, size_t count) {
             auto expected = ref.get_f32(name);
             if (!data || !expected.first || expected.second != count) {
-                printf("[FAIL] %s missing stage or shape mismatch (%zu vs %zu)\n", name.c_str(), count, expected.second);
-                ++n_fail; return;
+                printf("[FAIL] %s missing stage or shape mismatch (%zu vs %zu)\n", name.c_str(), count,
+                       expected.second);
+                ++n_fail;
+                return;
             }
             auto report = ref.compare(name, data, count);
             print_row(name.c_str(), report, COS_THRESHOLD);
@@ -1906,17 +1910,21 @@ int main(int argc, char** argv) {
             // as well: relative whole-stage L2 must be <=2% for F16 parity.
             double error = 0, power = 0;
             for (size_t i = 0; i < count; ++i) {
-                double delta = data[i] - expected.first[i]; error += delta * delta;
+                double delta = data[i] - expected.first[i];
+                error += delta * delta;
                 power += (double)expected.first[i] * expected.first[i];
             }
             double relative = std::sqrt(error / std::max(power, 1e-30));
             printf("       relative_l2=%.8f\n", relative);
-            if (!std::isfinite(relative) || relative > 0.02) ++n_fail;
+            if (!std::isfinite(relative) || relative > 0.02)
+                ++n_fail;
         };
         std::string template_path = (std::filesystem::temp_directory_path() / "index-echo-diff-XXXXXX").string();
-        std::vector<char> template_buffer(template_path.begin(), template_path.end()); template_buffer.push_back(0);
+        std::vector<char> template_buffer(template_path.begin(), template_path.end());
+        template_buffer.push_back(0);
         const char* directory = mkdtemp(template_buffer.data());
-        if (!directory) return 4;
+        if (!directory)
+            return 4;
         // Preserve the caller's diagnostic configuration after this run.
         const char* old_audio = getenv("CRISP_AUDIO_DUMP_STAGES");
         const char* old_decoder = getenv("CRISPASR_INDEX_ECHO_DUMP_STAGES");
@@ -1924,46 +1932,60 @@ int main(int argc, char** argv) {
         setenv("CRISP_AUDIO_DUMP_STAGES", directory, 1);
         setenv("CRISPASR_INDEX_ECHO_DUMP_STAGES", directory, 1);
         int mels = 0, frames = 0, rows = 0, dim = 0, vocab = 0;
-        std::unique_ptr<float, decltype(&free)> mel(index_echo_compute_mel(ctx.get(), samples.data(), (int)samples.size(), &mels, &frames), free);
+        std::unique_ptr<float, decltype(&free)> mel(
+            index_echo_compute_mel(ctx.get(), samples.data(), (int)samples.size(), &mels, &frames), free);
         check("mel_spectrogram", mel.get(), (size_t)mels * frames);
-        std::unique_ptr<float, decltype(&free)> emb(mel ? index_echo_run_encoder(ctx.get(), mel.get(), mels, frames, &rows, &dim) : nullptr, free);
+        std::unique_ptr<float, decltype(&free)> emb(
+            mel ? index_echo_run_encoder(ctx.get(), mel.get(), mels, frames, &rows, &dim) : nullptr, free);
         check("connector_output", emb.get(), (size_t)rows * dim);
         std::vector<std::pair<std::string, std::string>> names = {
-            {"conv1_out", "conv1_out"}, {"conv2_out", "conv2_out"}, {"conv3_out", "conv3_out"},
-            {"encoder_input", "encoder_input"}, {"ln_post_out", "ln_post_out"},
-            {"proj1_out", "proj1_out"}, {"encoder_out", "encoder_output"}};
+            {"conv1_out", "conv1_out"},         {"conv2_out", "conv2_out"},     {"conv3_out", "conv3_out"},
+            {"encoder_input", "encoder_input"}, {"ln_post_out", "ln_post_out"}, {"proj1_out", "proj1_out"},
+            {"encoder_out", "encoder_output"}};
         for (int i = 0; i < 32; ++i) {
-            char name[32]; snprintf(name, sizeof(name), "enc_blk%02d_out", i);
+            char name[32];
+            snprintf(name, sizeof(name), "enc_blk%02d_out", i);
             names.emplace_back(name, "encoder_layer_" + std::to_string(i));
         }
         for (const auto& name : names) {
-            std::ifstream file(std::filesystem::path(directory) / (name.first + ".f32"), std::ios::binary | std::ios::ate);
+            std::ifstream file(std::filesystem::path(directory) / (name.first + ".f32"),
+                               std::ios::binary | std::ios::ate);
             std::vector<float> buffer;
             if (file) {
                 auto bytes = file.tellg();
                 if (bytes > 0 && (size_t)bytes % sizeof(float) == 0) {
-                    buffer.resize((size_t)bytes / sizeof(float)); file.seekg(0);
-                    if (!file.read((char*)buffer.data(), bytes)) buffer.clear();
+                    buffer.resize((size_t)bytes / sizeof(float));
+                    file.seekg(0);
+                    if (!file.read((char*)buffer.data(), bytes))
+                        buffer.clear();
                 }
             }
             check(name.second, buffer.empty() ? nullptr : buffer.data(), buffer.size());
         }
-        std::unique_ptr<float, decltype(&free)> logits(emb ? index_echo_prefill(ctx.get(), emb.get(), rows, dim, &vocab) : nullptr, free);
+        std::unique_ptr<float, decltype(&free)> logits(
+            emb ? index_echo_prefill(ctx.get(), emb.get(), rows, dim, &vocab) : nullptr, free);
         check("llm_logits", logits.get(), vocab);
         if (logits) {
             auto argmax = ref.compare_argmax("llm_logits", logits.get(), vocab);
             printf("[%s] first greedy token parity (%d/%d)\n",
-                   argmax.top1_total > 0 && argmax.top1_match == argmax.top1_total ? "PASS" : "FAIL",
-                   argmax.top1_match, argmax.top1_total);
-            if (argmax.top1_total == 0 || argmax.top1_match != argmax.top1_total) ++n_fail;
+                   argmax.top1_total > 0 && argmax.top1_match == argmax.top1_total ? "PASS" : "FAIL", argmax.top1_match,
+                   argmax.top1_total);
+            if (argmax.top1_total == 0 || argmax.top1_match != argmax.top1_total)
+                ++n_fail;
         }
         int count = 0;
         const int32_t* ids = index_echo_prompt_ids(ctx.get(), &count);
         auto expected_ids = ref.get_f32("prompt_ids");
         bool ids_match = ids && expected_ids.first && expected_ids.second == (size_t)count;
-        if (ids_match) for (int i = 0; i < count; ++i) if (ids[i] != (int32_t)expected_ids.first[i]) ids_match = false;
+        if (ids_match)
+            for (int i = 0; i < count; ++i)
+                if (ids[i] != (int32_t)expected_ids.first[i])
+                    ids_match = false;
         printf("[%s] prompt_ids byte parity (%d tokens)\n", ids_match ? "PASS" : "FAIL", count);
-        if (ids_match) ++n_pass; else ++n_fail;
+        if (ids_match)
+            ++n_pass;
+        else
+            ++n_fail;
         for (int i = 0; i < 24; ++i) {
             std::string name = "llm_block_" + std::to_string(i);
             const float* data = index_echo_stage(ctx.get(), name.c_str(), &count);
@@ -1977,19 +1999,27 @@ int main(int argc, char** argv) {
             for (size_t i = 0; i + 1 < steps && i < generated.second; ++i) {
                 std::unique_ptr<float, decltype(&free)> step(
                     index_echo_decode_token(ctx.get(), (int32_t)generated.first[i], &vocab), free);
-                if (!step) break;
+                if (!step)
+                    break;
                 trace.insert(trace.end(), step.get(), step.get() + vocab);
             }
             check("teacherforced_logits", trace.data(), trace.size());
             if (trace.size() == expected.second) {
                 auto match = ref.compare_argmax("teacherforced_logits", trace.data(), trace.size());
-                printf("[%s] cached greedy token parity (%d/%d)\n", match.top1_match == match.top1_total ? "PASS" : "FAIL",
-                       match.top1_match, match.top1_total);
-                if (match.top1_match != match.top1_total || match.top1_total == 0) ++n_fail;
+                printf("[%s] cached greedy token parity (%d/%d)\n",
+                       match.top1_match == match.top1_total ? "PASS" : "FAIL", match.top1_match, match.top1_total);
+                if (match.top1_match != match.top1_total || match.top1_total == 0)
+                    ++n_fail;
             }
         }
-        if (old_audio) setenv("CRISP_AUDIO_DUMP_STAGES", saved_audio.c_str(), 1); else unsetenv("CRISP_AUDIO_DUMP_STAGES");
-        if (old_decoder) setenv("CRISPASR_INDEX_ECHO_DUMP_STAGES", saved_decoder.c_str(), 1); else unsetenv("CRISPASR_INDEX_ECHO_DUMP_STAGES");
+        if (old_audio)
+            setenv("CRISP_AUDIO_DUMP_STAGES", saved_audio.c_str(), 1);
+        else
+            unsetenv("CRISP_AUDIO_DUMP_STAGES");
+        if (old_decoder)
+            setenv("CRISPASR_INDEX_ECHO_DUMP_STAGES", saved_decoder.c_str(), 1);
+        else
+            unsetenv("CRISPASR_INDEX_ECHO_DUMP_STAGES");
         std::filesystem::remove_all(directory);
     } else if (backend_name == "voxtral") {
         auto cp = voxtral_context_default_params();

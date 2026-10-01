@@ -2765,10 +2765,15 @@ CA_EXPORT crispasr_session* crispasr_session_open_explicit(const char* model_pat
 #ifdef CA_HAVE_INDEX_ECHO
     if (s->backend == "index-echo") {
         auto p = index_echo_context_default_params();
-        p.n_threads = s->n_threads; p.verbosity = g_open_verbosity_tls;
-        p.use_gpu = g_open_use_gpu_tls; p.flash_attn = g_open_flash_attn_tls;
+        p.n_threads = s->n_threads;
+        p.verbosity = g_open_verbosity_tls;
+        p.use_gpu = g_open_use_gpu_tls;
+        p.flash_attn = g_open_flash_attn_tls;
         s->index_echo_ctx = index_echo_init_from_file(model_path, p);
-        if (!s->index_echo_ctx) { delete s; return nullptr; }
+        if (!s->index_echo_ctx) {
+            delete s;
+            return nullptr;
+        }
         return s;
     }
 #endif
@@ -6556,16 +6561,23 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
 #endif
 #ifdef CA_HAVE_INDEX_ECHO
     if (s->backend == "index-echo" && s->index_echo_ctx) {
-        if (!index_echo_set_target_lang(s->index_echo_ctx, s->target_language.empty() ? "en" : s->target_language.c_str())) {
+        if (!index_echo_set_target_lang(s->index_echo_ctx,
+                                        s->target_language.empty() ? "en" : s->target_language.c_str())) {
             fprintf(stderr, "index-echo target language must be en, ja or es\n");
-            delete r; return nullptr;
+            delete r;
+            return nullptr;
         }
         index_echo_set_temperature(s->index_echo_ctx, s->temperature, (uint32_t)s->seed);
         index_echo_set_max_new_tokens(s->index_echo_ctx, s->max_new_tokens);
         index_echo_set_ask(s->index_echo_ctx, s->ask.c_str());
-        if (lang_set) fprintf(stderr, "index-echo: source-language hints are absent from the released prompt; the model infers the source language\n");
+        if (lang_set)
+            fprintf(stderr, "index-echo: source-language hints are absent from the released prompt; the model infers "
+                            "the source language\n");
         auto* result = index_echo_transcribe(s->index_echo_ctx, pcm, n_samples);
-        if (!result) { delete r; return nullptr; }
+        if (!result) {
+            delete r;
+            return nullptr;
+        }
         for (int i = 0; i < result->n_cues; ++i) {
             const auto& cue = result->cues[i];
             crispasr_session_seg segment;
@@ -6574,7 +6586,8 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             segment.text = std::string(cue.transcript) + '\n' + cue.translation;
             r->segments.push_back(std::move(segment));
         }
-        if (result->parse_warnings) fprintf(stderr, "index-echo: %d malformed subtitle lines\n", result->parse_warnings);
+        if (result->parse_warnings)
+            fprintf(stderr, "index-echo: %d malformed subtitle lines\n", result->parse_warnings);
         index_echo_result_free(result);
         return r;
     }
