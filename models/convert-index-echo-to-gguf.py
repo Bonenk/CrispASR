@@ -44,6 +44,11 @@ def convert(root, output, decoder_name):
                'attn_window_mode': 0}
     for key, value in scalars.items():
         writer.add_uint32('crisp_audio.' + key, value)
+    # The shared tower owns the frontend constants as well as learned weights.
+    # Keep these at F32 in every quant cohort (neither is a .weight tensor).
+    writer.add_tensor('audio.mel_filters', shared._compute_mel_filters(sr=16000, n_fft=400, n_mels=128))
+    window = (0.5 - 0.5 * np.cos(2 * np.pi * np.arange(400) / 400)).astype(np.float32)
+    writer.add_tensor('audio.mel_window', np.ascontiguousarray(window))
     count = 0
     for filename in ['audio_tower.safetensors', 'connector.safetensors']:
         with safe_open(root / filename, framework='pt', device='cpu') as source:
