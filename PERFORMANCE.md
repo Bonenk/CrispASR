@@ -43,9 +43,9 @@ control (text and timestamps). These are single cold calls, not warm medians.
 
 | Clip | F16 inference | Q8 inference | Q8 including load/process |
 |---|---:|---:|---:|
-| JFK, 11 s | 3.05 s | 2.23 s | 4.68 s |
+| JFK, 11 s | 2.88 s | 2.23 s | 4.68 s |
 | Chinese, 13.052 s | 3.91 s | 2.92 s | 5.38 s |
-| Partial-hop JFK, 10.988 s | 3.05 s | 2.07 s | 4.53 s |
+| Partial-hop JFK, 10.988 s | 2.89 s | 2.07 s | 4.53 s |
 
 Q8 is 4.5–5.3× realtime excluding load on these clips. The receipt retains
 exact per-stage times and hardware in
