@@ -17,8 +17,10 @@ Worktree `/mnt/volume1/wt-482`, branch `test/482-cuda`.
 CPU fix landed at `b8b55a2cb`; unit tests, 4/10 s roundtrips and short-output
 byte parity passed. Build a targeted CUDA proof bundle on GitHub Actions,
 workflow `audioseal-cuda-proof.yml`: run `36832617360`, bundle SHA
-`5f88f6312` (normal root configuration; first wrapper attempt failed before
-compilation). Then run `tools/kaggle/audioseal-482-cuda` on Kaggle GPU hardware
+`5f88f6312` compiled/linked ggml-cuda but the proof executable failed its
+final driver link on the GPU-less CI host. The next bundle links the toolkit
+stub explicitly, skips unused flash-attention kernels, and retains ccache.
+First wrapper attempt failed before compilation. Then run `tools/kaggle/audioseal-482-cuda` on Kaggle GPU hardware
 with short CPU/GPU numerical comparison
 and long embed/detect scheduler reuse. Check load/free RAM before large tasks.
 Record the GPU model, code SHA, result and CI outcome before closing this claim.

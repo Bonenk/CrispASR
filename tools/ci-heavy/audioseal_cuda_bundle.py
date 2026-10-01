@@ -15,8 +15,9 @@ wrapper = repo / "audioseal-cuda-wrapper"
 wrapper.mkdir(exist_ok=True)
 # Several existing targets use CMAKE_SOURCE_DIR; keep the normal top-level
 # project and inject just this executable immediately after project().
-(wrapper / "proof-target.cmake").write_text(f'''add_executable(audioseal-cuda-proof "{repo}/tools/ci-heavy/audioseal_cuda_proof.cpp")
-target_link_libraries(audioseal-cuda-proof PRIVATE audioseal ggml-cuda)
+(wrapper / "proof-target.cmake").write_text(f'''find_package(CUDAToolkit REQUIRED)
+add_executable(audioseal-cuda-proof "{repo}/tools/ci-heavy/audioseal_cuda_proof.cpp")
+target_link_libraries(audioseal-cuda-proof PRIVATE audioseal ggml-cuda CUDA::cuda_driver)
 set_target_properties(audioseal-cuda-proof PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${{CMAKE_BINARY_DIR}}/bin")
 ''')
 subprocess.run(["uptime"], check=True)
@@ -27,7 +28,7 @@ with (out / "build.log").open("w") as log:
         ["cmake", "-G", "Ninja", "-S", str(repo), "-B", str(build),
          f"-DCMAKE_PROJECT_crispasr_INCLUDE={wrapper / 'proof-target.cmake'}",
          "-DCMAKE_BUILD_TYPE=Release", "-DBUILD_SHARED_LIBS=ON", "-DGGML_CUDA=ON",
-         "-DCMAKE_CUDA_ARCHITECTURES=60;75", "-DGGML_NATIVE=OFF", "-DGGML_BLAS=OFF",
+         "-DCMAKE_CUDA_ARCHITECTURES=60;75", "-DGGML_CUDA_FA=OFF", "-DGGML_NATIVE=OFF", "-DGGML_BLAS=OFF",
          "-DCRISPASR_BUILD_TESTS=OFF", "-DCRISPASR_BUILD_EXAMPLES=OFF", "-DCRISPASR_BUILD_SERVER=OFF",
          "-DCMAKE_C_COMPILER_LAUNCHER=ccache", "-DCMAKE_CXX_COMPILER_LAUNCHER=ccache",
          "-DCMAKE_CUDA_COMPILER_LAUNCHER=ccache"],

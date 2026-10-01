@@ -26,8 +26,19 @@ jobs:
           method: network
           sub-packages: '["nvcc", "cudart", "cudart-dev", "nvrtc", "nvrtc-dev"]'
           non-cuda-sub-packages: '["libcublas", "libcublas-dev"]' 
+      - uses: actions/cache/restore@v4
+        id: ccache
+        with:
+          path: ~/.cache/ccache
+          key: audioseal-cuda124-${{ runner.os }}-${{ github.sha }}
+          restore-keys: audioseal-cuda124-${{ runner.os }}-
       - name: Build targeted CUDA proof and package runtime
         run: python3 tools/ci-heavy/audioseal_cuda_bundle.py
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ~/.cache/ccache
+          key: ${{ steps.ccache.outputs.cache-primary-key }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
