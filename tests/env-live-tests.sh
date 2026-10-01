@@ -59,6 +59,9 @@ export CRISPASR_KOKORO_VOICE="${CRISPASR_KOKORO_VOICE:-$CRISPASR_MODELS_DIR/koko
 # Phonon-2: explicit/auto C ABI and CLI wiring, repeated-call and English-only LID guards.
 export CRISPASR_MODEL_PHONON2="${CRISPASR_MODEL_PHONON2:-$CRISPASR_MODELS_DIR/phonon2-q8_0.gguf}"
 
+# Index-Echo requires a same-cohort index-echo-2b-decoder companion beside this file.
+export CRISPASR_MODEL_INDEX_ECHO="${CRISPASR_MODEL_INDEX_ECHO:-$CRISPASR_MODELS_DIR/index-echo-2b-f16.gguf}"
+
 # ── Parakeet non-JA long-form guards (issues #350 / #385) ──
 # test-parakeet-longform builds its fixture from samples/jfk.wav; it only needs
 # a NON-Japanese parakeet GGUF. Without this export both the #350 coverage case

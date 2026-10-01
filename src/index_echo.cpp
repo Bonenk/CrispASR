@@ -333,6 +333,17 @@ index_echo_context* index_echo_init_from_file(const char* path, index_echo_conte
     for (const char* name : {"connector.w1.weight", "connector.w2.weight", "connector.log_alpha", "connector.beta"})
         if (!core_gguf::require(ctx->weights.tensors, name, "index-echo"))
             return nullptr;
+    const int dim = crisp_audio_output_dim(ctx->audio);
+    for (const char* name : {"connector.w1.weight", "connector.w2.weight"}) {
+        const auto* tensor = ctx->weights.tensors.at(name);
+        if (tensor->ne[0] != dim || tensor->ne[1] != dim || tensor->ne[2] != 1 || tensor->ne[3] != 1) {
+            fprintf(stderr, "index-echo: invalid connector matrix dimensions\n");
+            return nullptr;
+        }
+    }
+    for (const char* name : {"connector.log_alpha", "connector.beta"})
+        if (ggml_nelements(ctx->weights.tensors.at(name)) != 1)
+            return nullptr;
     ggml_backend_t backends[] = {ctx->backend, ctx->cpu};
     ctx->sched = ggml_backend_sched_new(backends, nullptr, ctx->cpu ? 2 : 1, 64, false, false);
     if (!ctx->sched)

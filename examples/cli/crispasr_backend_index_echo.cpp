@@ -50,7 +50,9 @@ public:
             crispasr_segment segment;
             segment.t0 = offset + (int64_t)std::llround(cue.start_seconds * 100);
             segment.t1 = offset + (int64_t)std::llround(cue.end_seconds * 100);
-            segment.text = std::string(cue.transcript) + '\n' + cue.translation;
+            segment.text = cue.transcript;
+            if (*cue.translation)
+                segment.text += std::string("\n") + cue.translation;
             out.push_back(std::move(segment));
         }
         if (result->parse_warnings)

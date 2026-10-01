@@ -37,6 +37,9 @@ for relative in ['docs/feature-matrix.md', 'docs/feature-matrix.html', 'src/core
     source = ROOT / relative
     if source.exists(): shutil.copy2(source, OUT / source.name)
 run('cmake', '--build', BUILD, '--target', 'crispasr-lib', '-j', '4')
+library = next(BUILD.rglob('libcrispasr.so'))
+run(sys.executable, ROOT / 'tools/check-backend-wiring.py', '--crispasr', BUILD / 'bin/crispasr',
+    '--lib', library, '--require-lib')
 if args.build_only:
     (OUT / 'summary.md').write_text('Index-Echo shared library, CLI, diff and integration unit tests built. '
                                    'Model parity remains pending.\n')
@@ -78,7 +81,6 @@ import numpy as np
 import wave
 from gguf import GGUFReader
 from crispasr import Session
-library = next(BUILD.rglob('libcrispasr.so'))
 assert 'index-echo' in Session.available_backends(lib_path=str(library))
 renamed = models / 'model-without-backend-hint.gguf'
 renamed.symlink_to(models / 'index-echo-2b-f16.gguf')

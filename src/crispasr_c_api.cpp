@@ -6583,7 +6583,9 @@ static crispasr_session_result* transcribe_single(crispasr_session* s, const flo
             crispasr_session_seg segment;
             segment.t0 = (int64_t)std::llround(cue.start_seconds * 100);
             segment.t1 = (int64_t)std::llround(cue.end_seconds * 100);
-            segment.text = std::string(cue.transcript) + '\n' + cue.translation;
+            segment.text = cue.transcript;
+            if (*cue.translation)
+                segment.text += std::string("\n") + cue.translation;
             r->segments.push_back(std::move(segment));
         }
         if (result->parse_warnings)
