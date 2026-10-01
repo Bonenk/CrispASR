@@ -22,10 +22,12 @@ ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
 parser.add_argument('--reference-only', action='store_true')
 parser.add_argument('--convert-only', action='store_true')
+parser.add_argument('--quant-only', action='store_true', help='Reuse the validated F16 decoder; skip references')
+parser.add_argument('--quants', nargs='+', choices=['q8_0', 'q4_k', 'q4_k_selective'], default=['q8_0', 'q4_k'])
 parser.add_argument('--clips', nargs='+', choices=['jfk', 'zh', 'jfk-tail'], default=['jfk', 'zh', 'jfk-tail'])
 args = parser.parse_args()
-if args.reference_only and args.convert_only:
-    parser.error('--reference-only and --convert-only are mutually exclusive')
+if sum([args.reference_only, args.convert_only, args.quant_only]) > 1:
+    parser.error('--reference-only, --convert-only and --quant-only are mutually exclusive')
 SCRATCH = Path(os.environ['HEAVY_SCRATCH']) / 'index-echo'
 OUT = Path(os.environ['HEAVY_OUT'])
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -75,51 +77,69 @@ def upload(path, remote=None):
 
 try:
     event('download pinned source')
-    source = Path(snapshot_download(SOURCE, revision=REVISION, local_dir=SCRATCH / 'source'))
+    source = Path(snapshot_download(SOURCE, revision=REVISION, local_dir=SCRATCH / 'source',
+        allow_patterns=['audio_config.json', 'audio_tower.safetensors', 'connector.safetensors',
+                        'llm/config.json', 'llm/LICENSE'] if args.quant_only else None))
     upload(source / 'llm' / 'LICENSE', 'LICENSE')
     if not args.reference_only:
-        llama = SCRATCH / 'llama-converter'
-        run('git', 'init', llama)
-        run('git', 'remote', 'add', 'origin', 'https://github.com/ggml-org/llama.cpp.git', cwd=llama)
-        run('git', 'fetch', '--depth=1', 'origin', LLAMA_REVISION, cwd=llama)
-        run('git', 'checkout', 'FETCH_HEAD', cwd=llama)
         audio = SCRATCH / 'index-echo-2b-f16.gguf'
         decoder = SCRATCH / 'index-echo-2b-decoder-f16.gguf'
-        run(sys.executable, ROOT / 'models/convert-index-echo-to-gguf.py',
-            '--model', source, '--output', audio)
-        upload(audio)
-        run(sys.executable, llama / 'convert_hf_to_gguf.py', source / 'llm',
-            '--outfile', decoder, '--outtype', 'f16', '--no-mtp')
-        # The released inference class uses only the 24 text layers. The HF
-        # config retains an MTP layer declaration without its weights; exporting
-        # that declaration creates an unloadable, fictitious 25th layer.
+        if args.quant_only:
+            base_revision = api.model_info(DESTINATION).sha
+            receipt['f16_base_revision'] = base_revision
+            snapshot_download(DESTINATION, revision=base_revision, local_dir=SCRATCH, allow_patterns=[decoder.name])
+        else:
+            llama = SCRATCH / 'llama-converter'
+            run('git', 'init', llama)
+            run('git', 'remote', 'add', 'origin', 'https://github.com/ggml-org/llama.cpp.git', cwd=llama)
+            run('git', 'fetch', '--depth=1', 'origin', LLAMA_REVISION, cwd=llama)
+            run('git', 'checkout', 'FETCH_HEAD', cwd=llama)
+            run(sys.executable, ROOT / 'models/convert-index-echo-to-gguf.py',
+                '--model', source, '--output', audio)
+            upload(audio)
+            run(sys.executable, llama / 'convert_hf_to_gguf.py', source / 'llm',
+                '--outfile', decoder, '--outtype', 'f16', '--no-mtp')
+            # The released inference class uses only the 24 text layers. The HF
+            # config retains an MTP layer declaration without its weights; exporting
+            # that declaration creates an unloadable, fictitious 25th layer.
+            upload(decoder)
         import gguf
         converted_decoder = gguf.GGUFReader(str(decoder))
         assert int(converted_decoder.fields['qwen35.block_count'].contents()) == 24
         assert not any(t.name.startswith('blk.24.') for t in converted_decoder.tensors)
         del converted_decoder
-        upload(decoder)
         build = SCRATCH / 'build'
         run('cmake', '-S', ROOT, '-B', build, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
             '-DCRISPASR_BUILD_TESTS=OFF', '-DCRISPASR_BUILD_SERVER=OFF', '-DGGML_NATIVE=OFF')
         run('cmake', '--build', build, '--target', 'crispasr-quantize', '-j', '4')
         quantizer = build / 'bin/crispasr-quantize'
-        for quant in ['q8_0', 'q4_k']:
+        for quant in args.quants:
             # Each audio file points to its own quantized decoder companion.
             companion = f'index-echo-2b-decoder-{quant}.gguf'
             run(sys.executable, ROOT / 'models/convert-index-echo-to-gguf.py', '--model', source,
                 '--output', audio, '--decoder-name', companion)
             for original, filename in [(audio, f'index-echo-2b-{quant}.gguf'), (decoder, companion)]:
                 converted = SCRATCH / filename
-                run(quantizer, original, converted, quant)
+                overrides = []
+                if quant == 'q4_k_selective':
+                    # Existing per-tensor overrides keep this A/B isolated from
+                    # other Qwen3.5 users. Never dequantize Q8 into a fake F16 base.
+                    rules = ([r'^audio\.conv\.[123]\.weight$=f16',
+                              r'^connector\..*\.weight$=f16', r'^audio\..*\.weight$=q8_0']
+                             if original == audio else
+                             [r'^(token_embd|output)\.weight$=f16',
+                              r'\.(ssm_.*|attn_qkv|attn_gate)\.weight$=q8_0'])
+                    overrides = [arg for rule in rules for arg in ['--tensor-type', rule]]
+                    receipt.setdefault('quant_recipes', {})[filename] = rules
+                run(quantizer, original, converted, 'q4_k' if quant == 'q4_k_selective' else quant, *overrides)
                 upload(converted)
                 converted.unlink()
         audio.unlink()
         decoder.unlink()
         receipt['decoder_no_mtp'] = True
-        event('all conversion cohorts complete')
-        upload(OUT / 'receipt.json', 'conversion-receipt.json')
-    for clip in ([] if args.convert_only else args.clips):
+        event('requested conversion cohorts complete')
+        upload(OUT / 'receipt.json', 'quant-receipt.json' if args.quant_only else 'conversion-receipt.json')
+    for clip in ([] if args.convert_only or args.quant_only else args.clips):
         event('independent released Python class: CPU F32 ' + clip)
         audio_path = ROOT / 'samples' / ('paraformer_zh.wav' if clip == 'zh' else 'jfk.wav')
         if clip == 'jfk-tail':

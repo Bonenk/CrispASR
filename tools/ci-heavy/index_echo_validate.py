@@ -23,7 +23,7 @@ def run(*args):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--build-only', action='store_true')
-parser.add_argument('--cohorts', nargs='+', choices=['f16', 'q8_0', 'q4_k'], default=['f16'])
+parser.add_argument('--cohorts', nargs='+', choices=['f16', 'q8_0', 'q4_k', 'q4_k_selective'], default=['f16'])
 parser.add_argument('--clips', nargs='+', choices=['jfk', 'zh', 'jfk-tail'], default=['jfk', 'zh', 'jfk-tail'])
 args = parser.parse_args()
 run('cmake', '-S', ROOT, '-B', BUILD, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
