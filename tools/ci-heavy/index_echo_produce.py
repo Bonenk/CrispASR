@@ -22,12 +22,13 @@ ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
 parser.add_argument('--reference-only', action='store_true')
 parser.add_argument('--convert-only', action='store_true')
+parser.add_argument('--pipeline-only', action='store_true', help='Released file/VAD/context reference')
 parser.add_argument('--quant-only', action='store_true', help='Reuse the validated F16 decoder; skip references')
 parser.add_argument('--quants', nargs='+', choices=['q8_0', 'q4_k', 'q4_k_selective'], default=['q8_0', 'q4_k'])
 parser.add_argument('--clips', nargs='+', choices=['jfk', 'zh', 'jfk-tail'], default=['jfk', 'zh', 'jfk-tail'])
 args = parser.parse_args()
-if sum([args.reference_only, args.convert_only, args.quant_only]) > 1:
-    parser.error('--reference-only, --convert-only and --quant-only are mutually exclusive')
+if sum([args.reference_only, args.convert_only, args.quant_only, args.pipeline_only]) > 1:
+    parser.error('--reference-only, --convert-only and --quant-only and --pipeline-only are mutually exclusive')
 SCRATCH = Path(os.environ['HEAVY_SCRATCH']) / 'index-echo'
 OUT = Path(os.environ['HEAVY_OUT'])
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -81,7 +82,7 @@ try:
         allow_patterns=['audio_config.json', 'audio_tower.safetensors', 'connector.safetensors',
                         'llm/config.json', 'llm/LICENSE'] if args.quant_only else None))
     upload(source / 'llm' / 'LICENSE', 'LICENSE')
-    if not args.reference_only:
+    if not args.reference_only and not args.pipeline_only:
         audio = SCRATCH / 'index-echo-2b-f16.gguf'
         decoder = SCRATCH / 'index-echo-2b-decoder-f16.gguf'
         if args.quant_only:
@@ -139,7 +140,7 @@ try:
         receipt['decoder_no_mtp'] = True
         event('requested conversion cohorts complete')
         upload(OUT / 'receipt.json', 'quant-receipt.json' if args.quant_only else 'conversion-receipt.json')
-    for clip in ([] if args.convert_only or args.quant_only else args.clips):
+    for clip in ([] if args.convert_only or args.quant_only or args.pipeline_only else args.clips):
         event('independent released Python class: CPU F32 ' + clip)
         audio_path = ROOT / 'samples' / ('paraformer_zh.wav' if clip == 'zh' else 'jfk.wav')
         if clip == 'jfk-tail':
@@ -156,6 +157,12 @@ try:
         run(sys.executable, ROOT / 'tools/dump_reference.py', '--backend', 'index-echo',
             '--model-dir', source, '--audio', audio_path, '--output', ref)
         upload(ref, f'reference/{clip}-ref.gguf')
+    if args.pipeline_only:
+        sys.path.insert(0, str(ROOT / 'tools'))
+        from reference_backends.index_echo import dump_pipeline
+        pipeline, multi = dump_pipeline(source, OUT, ROOT / 'samples')
+        upload(multi, 'reference/' + multi.name)
+        upload(pipeline, 'reference/' + pipeline.name)
     event('producer complete; runtime parity pending')
     (OUT / 'summary.md').write_text('Index-Echo 2B pinned conversion and Python reference complete. '
                                    'Artifacts are private and runtime parity is pending.\n')

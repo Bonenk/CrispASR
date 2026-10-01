@@ -90,3 +90,69 @@ def dump(model_dir, audio, stages, **kwargs):
         trace.append(step.logits[0, -1].float().numpy().copy())
     values['teacherforced_logits'] = np.stack(trace)
     return values
+
+
+def dump_pipeline(model_dir, output_dir, sample_dir):
+    """Run the released file entry point, including real Silero and context.
+
+    Keep raw rows and probabilities so native windowing and classifier drift
+    can be distinguished from decoder drift. All expectations come from the
+    released functions, not from the native parser or window helper.
+    """
+    import json
+    import time
+    import soundfile as sf
+    import torch
+    import silero_vad
+    torch.set_num_threads(int(os.getenv('INDEX_ECHO_REF_THREADS', '4')))
+    torch.set_grad_enabled(False)
+    output_dir, sample_dir = Path(output_dir), Path(sample_dir)
+    spec = importlib.util.spec_from_file_location('index_echo_pipeline_blueprint', Path(model_dir) / 'infer.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    started = time.perf_counter()
+    model = module.AudioTransModel(str(model_dir), device='cpu', dtype=torch.float32)
+    load_seconds = time.perf_counter() - started
+    jfk, rate = sf.read(sample_dir / 'jfk.wav', dtype='float32')
+    assert rate == 16000
+    multi = output_dir / 'pipeline-multi.wav'
+    sf.write(multi, np.concatenate([jfk, np.zeros(61 * rate, dtype=np.float32), jfk]), rate, subtype='PCM_16')
+    cases = [('jfk-en', sample_dir / 'jfk.wav', 'en'),
+             ('zh-en', sample_dir / 'paraformer_zh.wav', 'en'),
+             ('zh-ja', sample_dir / 'paraformer_zh.wav', 'ja'),
+             ('zh-es', sample_dir / 'paraformer_zh.wav', 'es'),
+             ('multi-en', multi, 'en')]
+    probabilities = []
+    original_loader = silero_vad.load_silero_vad
+
+    class RecordingVAD:
+        def __init__(self, wrapped):
+            self.wrapped = wrapped
+
+        def __getattr__(self, name):
+            return getattr(self.wrapped, name)
+
+        def __call__(self, *args, **kwargs):
+            value = self.wrapped(*args, **kwargs)
+            probabilities.append(value.item())
+            return value
+
+    silero_vad.load_silero_vad = lambda *a, **kw: RecordingVAD(original_loader(*a, **kw))
+    result = dict(precision='CPU F32', model_load_seconds=load_seconds, cases={})
+    try:
+        for name, audio, lang in cases:
+            probabilities.clear()
+            started = time.perf_counter()
+            rows = list(module.stream_translate(model, str(audio), target_lang=lang))
+            elapsed = time.perf_counter() - started
+            cues = [dict(start=c['g_st'], end=c['g_et'], text=c['zh'] + '\n' + (c['en'] or ''))
+                    for row in rows if '__summary__' not in row for c in row['cues']]
+            result['cases'][name] = dict(audio=audio.name, target=lang, rows=rows,
+                                        segments=cues, vad_probabilities=list(probabilities), elapsed_seconds=elapsed)
+            (output_dir / 'pipeline.json').write_text(json.dumps(result, indent=2, ensure_ascii=False) + '\n')
+            print('released full pipeline', name, elapsed, json.dumps(cues, ensure_ascii=False), flush=True)
+    finally:
+        silero_vad.load_silero_vad = original_loader
+    assert len(result['cases']['multi-en']['rows']) == 3, 'Fixture must exercise two windows plus summary'
+    assert result['cases']['multi-en']['rows'][1]['has_ctx'], 'Second window must exercise prior-output context'
+    return output_dir / 'pipeline.json', multi

@@ -23,6 +23,7 @@ def run(*args):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--build-only', action='store_true')
+parser.add_argument('--pipeline', action='store_true', help='Validate released file/VAD/target/context oracle')
 parser.add_argument('--cohorts', nargs='+', choices=['f16', 'q8_0', 'q4_k', 'q4_k_selective'], default=['f16'])
 parser.add_argument('--clips', nargs='+', choices=['jfk', 'zh', 'jfk-tail'], default=['jfk', 'zh', 'jfk-tail'])
 args = parser.parse_args()
@@ -51,6 +52,7 @@ from huggingface_hub import HfApi, snapshot_download
 api = HfApi(token=os.environ.get('HF_TOKEN'))
 destination = 'cstr/index-echo-2b-GGUF'
 required = {f'reference/{clip}-ref.gguf' for clip in args.clips} | {'conversion-receipt.json'}
+if args.pipeline: required.add('reference/pipeline.json')
 for attempt in range(90):
     present = set(api.list_repo_files(destination))
     if required <= present:
@@ -128,6 +130,9 @@ def validate_cohort(cohort):
             print('decoded', clip, json.dumps(decoded[clip], ensure_ascii=False), flush=True)
             del reader
     (OUT / f'decoded-{cohort}.json').write_text(json.dumps(decoded, indent=2, ensure_ascii=False))
+    if args.pipeline:
+        from index_echo_pipeline_check import check_pipeline
+        failures.extend(check_pipeline(ROOT, OUT, BUILD, library, models, cohort))
     return failures
 
 

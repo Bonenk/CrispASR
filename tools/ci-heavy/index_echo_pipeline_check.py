@@ -1,0 +1,84 @@
+"""Full-file oracle checks called by index_echo_validate (not a standalone job)."""
+import ctypes
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import time
+import wave
+
+
+def check_pipeline(root, out, build, library, models, cohort):
+    import numpy as np
+    from huggingface_hub import hf_hub_download
+    from crispasr import Session
+    # Keep the third companion beside the primary, exercising runtime autoload.
+    vad_path = Path(hf_hub_download('ggml-org/whisper-vad', 'ggml-silero-v6.2.0.bin', local_dir=models))
+    oracle = json.loads((models / 'reference/pipeline.json').read_text())
+    failures, decoded = [], {}
+
+    class VADParams(ctypes.Structure):
+        _fields_ = [('n_threads', ctypes.c_int), ('use_gpu', ctypes.c_bool), ('gpu_device', ctypes.c_int)]
+
+    lib = ctypes.CDLL(str(library))
+    lib.whisper_vad_init_from_file_with_params.argtypes = [ctypes.c_char_p, VADParams]
+    lib.whisper_vad_init_from_file_with_params.restype = ctypes.c_void_p
+    lib.whisper_vad_detect_speech.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_float), ctypes.c_int]
+    lib.whisper_vad_detect_speech.restype = ctypes.c_bool
+    lib.whisper_vad_n_probs.argtypes = [ctypes.c_void_p]
+    lib.whisper_vad_n_probs.restype = ctypes.c_int
+    lib.whisper_vad_probs.argtypes = [ctypes.c_void_p]
+    lib.whisper_vad_probs.restype = ctypes.POINTER(ctypes.c_float)
+    lib.whisper_vad_free.argtypes = [ctypes.c_void_p]
+    vad = lib.whisper_vad_init_from_file_with_params(str(vad_path).encode(), VADParams(1, False, 0))
+    if not vad:
+        raise RuntimeError('Native Silero companion could not load')
+    try:
+        with Session(str(models / f'index-echo-2b-{cohort}.gguf'), lib_path=str(library), n_threads=4) as session:
+            for name, expected in oracle['cases'].items():
+                audio = (models / 'reference' if expected['audio'] == 'pipeline-multi.wav' else root / 'samples') / expected['audio']
+                with wave.open(str(audio), 'rb') as wav:
+                    assert wav.getframerate() == 16000 and wav.getnchannels() == 1 and wav.getsampwidth() == 2
+                    pcm = np.frombuffer(wav.readframes(wav.getnframes()), dtype=np.int16).astype(np.float32) / 32768
+                assert lib.whisper_vad_detect_speech(vad, pcm.ctypes.data_as(ctypes.POINTER(ctypes.c_float)), len(pcm))
+                n = lib.whisper_vad_n_probs(vad)
+                probs = np.ctypeslib.as_array(lib.whisper_vad_probs(vad), shape=(n,)).copy()
+                reference_probs = np.array(expected['vad_probabilities'], dtype=np.float32)
+                if probs.shape != reference_probs.shape:
+                    raise RuntimeError('VAD frame count differs from source: ' + name)
+                delta = float(np.max(np.abs(probs - reference_probs)))
+                cosine = float(np.dot(probs, reference_probs) / max(np.linalg.norm(probs) * np.linalg.norm(reference_probs), 1e-30))
+                if delta > .01 or cosine < .999:
+                    failures.append(name + ': VAD classifier mismatch')
+                session.set_target_language(expected['target'])
+                started = time.perf_counter()
+                segments = session.transcribe(pcm)
+                elapsed = time.perf_counter() - started
+                actual = [dict(start=s.start, end=s.end, text=s.text) for s in segments]
+                golden = expected['segments']
+                if not golden or len(actual) != len(golden) or any(
+                        a['text'] != e['text'] or abs(a['start'] - e['start']) > .0051 or
+                        abs(a['end'] - e['end']) > .0051 for a, e in zip(actual, golden)):
+                    failures.append(name + ': full-pipeline decoded mismatch')
+                decoded[name] = dict(segments=actual, reference=golden, elapsed_seconds=elapsed,
+                                     vad_cosine=cosine, vad_max_abs=delta)
+                print('full pipeline', cohort, name, json.dumps(decoded[name], ensure_ascii=False), flush=True)
+    finally:
+        lib.whisper_vad_free(vad)
+    # Real CLI default language flow: metadata/caps must avoid unrelated LID.
+    prefix = out / f'pipeline-{cohort}-cli'
+    with (out / f'pipeline-{cohort}-cli.log').open('w') as log:
+        result = subprocess.run([str(build / 'bin/crispasr'), '-m', str(models / f'index-echo-2b-{cohort}.gguf'),
+            '-f', str(root / 'samples/jfk.wav'), '-l', 'auto', '-osrt', '-of', str(prefix), '-t', '4', '-ng'],
+            cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=3600)
+    srt = prefix.with_suffix('.srt')
+    if result.returncode or not srt.exists():
+        failures.append('real CLI failed')
+    else:
+        text = srt.read_text()
+        for segment in oracle['cases']['jfk-en']['segments']:
+            if segment['text'] not in text: failures.append('real CLI decoded text mismatch')
+    receipt = dict(cohort=cohort, failed=failures, cases=decoded,
+                   vad_file=vad_path.name, vad_sha256=hashlib.sha256(vad_path.read_bytes()).hexdigest())
+    (out / f'pipeline-{cohort}.json').write_text(json.dumps(receipt, indent=2, ensure_ascii=False) + '\n')
+    return failures
