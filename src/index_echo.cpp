@@ -421,7 +421,7 @@ void index_echo_set_glossary(index_echo_context* ctx, const char* raw) {
             c = '\n';
     std::istringstream lines(input);
     std::string line;
-    const std::regex mapping(R"(^(.*?)\s*(?:→|->|=>|[:：])\s*(.*)$)");
+    const std::regex mapping(R"(^(.*?)\s*(?:→|->|=>|:|：)\s*(.*)$)");
     while (std::getline(lines, line)) {
         line = trim(line);
         if (line.empty())

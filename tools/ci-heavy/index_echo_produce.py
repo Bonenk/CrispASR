@@ -21,8 +21,11 @@ DESTINATION = 'cstr/index-echo-2b-GGUF'
 ROOT = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser()
 parser.add_argument('--reference-only', action='store_true')
+parser.add_argument('--convert-only', action='store_true')
 parser.add_argument('--clips', nargs='+', choices=['jfk', 'zh', 'jfk-tail'], default=['jfk', 'zh', 'jfk-tail'])
 args = parser.parse_args()
+if args.reference_only and args.convert_only:
+    parser.error('--reference-only and --convert-only are mutually exclusive')
 SCRATCH = Path(os.environ['HEAVY_SCRATCH']) / 'index-echo'
 OUT = Path(os.environ['HEAVY_OUT'])
 SCRATCH.mkdir(parents=True, exist_ok=True)
@@ -73,6 +76,7 @@ def upload(path, remote=None):
 try:
     event('download pinned source')
     source = Path(snapshot_download(SOURCE, revision=REVISION, local_dir=SCRATCH / 'source'))
+    upload(source / 'llm' / 'LICENSE', 'LICENSE')
     if not args.reference_only:
         llama = SCRATCH / 'llama-converter'
         run('git', 'init', llama)
@@ -85,7 +89,15 @@ try:
             '--model', source, '--output', audio)
         upload(audio)
         run(sys.executable, llama / 'convert_hf_to_gguf.py', source / 'llm',
-            '--outfile', decoder, '--outtype', 'f16')
+            '--outfile', decoder, '--outtype', 'f16', '--no-mtp')
+        # The released inference class uses only the 24 text layers. The HF
+        # config retains an MTP layer declaration without its weights; exporting
+        # that declaration creates an unloadable, fictitious 25th layer.
+        import gguf
+        converted_decoder = gguf.GGUFReader(str(decoder))
+        assert int(converted_decoder.fields['qwen35.block_count'].contents()) == 24
+        assert not any(t.name.startswith('blk.24.') for t in converted_decoder.tensors)
+        del converted_decoder
         upload(decoder)
         build = SCRATCH / 'build'
         run('cmake', '-S', ROOT, '-B', build, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
@@ -104,7 +116,7 @@ try:
                 converted.unlink()
         audio.unlink()
         decoder.unlink()
-    for clip in args.clips:
+    for clip in ([] if args.convert_only else args.clips):
         event('independent released Python class: CPU F32 ' + clip)
         audio_path = ROOT / 'samples' / ('paraformer_zh.wav' if clip == 'zh' else 'jfk.wav')
         if clip == 'jfk-tail':
