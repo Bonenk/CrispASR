@@ -120,6 +120,18 @@ source headers, receipts, rejected-ref archive, live Kaggle stream and model
 card draft under `/mnt/storage/crispasr/issue485-9b/`. SDK live SSE logs work via
 get_kernel_session_logs_stream(user_name/kernel_slug, no version_label).
 
+UPDATE 08:20 UTC: Default BF16 source audit 36977491923 PASS; both complete
+JFK and Chinese outputs exactly equal corrected F32, so plain-Q8 errors are
+not explained by this precision control. F16 tail 36981378646 PASS all 76
+stage/magnitude checks and cached argmax 16/16; encoder errors isolate Q8.
+Kaggle roundtrip v1 COMPLETE: actual two Tesla T4, F16 and Q8 JFK CUDA diffs
+pass; all six real Piper roundtrips English WER 0, exact CLI/C ABI agreement.
+Full-file acceptance still pending. Terminal logs harvested before any reuse.
+Selective conversion 36981864400 PASS, separate immutable model pin
+a5353921fde9283ebd18f155cefee3c425707477, pair 12,748,447,808 bytes.
+CPU three-clip strict selective validation 36983710234 dispatched at f4263f5e2
+against corrected source fixture bca2f2a07c286a4ad2f2d1d566a3227d29c285a9.
+
 ## CLAIMED 2026-10-02 — Dia full-speech source parity
 
 Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/dia-full-generation`.
