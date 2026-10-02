@@ -51,14 +51,20 @@ four-worker mismatches, not merely four failing test cases. Earlier missing-file
 Paraformer probes had no observation because its failed-load path leaked the
 CPU handle; they are not accepted as proof. DL validation uses shared ggml libs.
 
-Final baseline `36961987735` replays exact unfixed runtime
-`f25f5cc5c13c9e2249083b677726f6cae6dd9f0f`; fixed linked/module proof
-`36961990177`, CI `36961993401` and lint `36961996140` use candidate `51faf7b27`.
-Live `36960617960` passed repeated Nemotron C ABI output at 1/4/8 threads,
-then rejected the CLI's unbracketed existing en-US markers. Strict spoken-word
-normalization is corrected; full live rerun `36962236146` uses `2e8ec52fa`
-(same production/tests as candidate, only the live helper changed).
-All final checks must pass before landing; no runner speedup claim.
+Final baseline `36961987735` passed the strict rejection guard in linked and
+module builds: each showed exactly eleven ignored-count failures at actual four
+workers. Fixed `36961990177` passed all 136 assertions across six cases in each
+mode. Candidate `51faf7b27` CI `36961993401` passed 13/13; lint `36961996140`
+passed 10/10.
+
+Live `36962236146` passed repeated Nemotron/Paraformer C ABI transcription at
+1/4/8 threads and both CLI cases at eight threads, with strict JFK spoken words.
+Dia at one thread spoke only the first sentence of a new extended prompt,
+failing that prompt's WER gate. No relaxed acceptance: run `36963803169` at
+helper `599968914` compares the unfixed and candidate four-thread long-prompt
+behavior, then runs the committed Dia regression phrase at 1/4/8 threads with
+the original .2 WER gate. Only helpers changed after the checked runtime/tests.
+No runner speedup claim; finish live quality proof before landing.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
