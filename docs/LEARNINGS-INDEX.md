@@ -17,7 +17,7 @@ per-backend porting detail (Per-model port notes + the family cross-reference).
 Reach for the topic groups when you are stuck on a *technique*, and the
 cross-reference when you already know which model you are touching.
 
-## Index by topic (316 lessons)
+## Index by topic (317 lessons)
 
 **Security & untrusted input** (2)
 
@@ -191,7 +191,7 @@ cross-reference when you already know which model you are touching.
 - L19282 — 2026-10-01 — Phonon-2 FFN: verify scheduler placement, magnitude and whole-model cost
 - L19343 — 2026-10-02 — Scheduler disposal must distinguish restored graphs from live rewires (PR #480)
 
-**GPU portability — Metal / CUDA / Vulkan** (25)
+**GPU portability — Metal / CUDA / Vulkan** (26)
 
 - L102 — A GPU decoder can spend most of its time in one scalar CPU projection before the decode loop
 - L1799 — When the full system needs an unavailable resource (model / GPU), factor the risky logic into a pure helper and prove IT on synthetic data
@@ -218,6 +218,7 @@ cross-reference when you already know which model you are touching.
 - L16928 — Chatterbox GPU UNet performance fix
 - L17167 — cosyvoice3 \"CUDA test FAIL\" was a registry-alias + flow-quant discovery bug, NOT a CUDA bug
 - L18458 — "GPU picks a different token than CPU" is usually NOT a miscompute in an AR audio model — dump the LOGITS, and don't reach for the repetition detector
+- L19362 — 2026-10-02 — CUDA package coherence includes the CPU floor and architecture coverage (#483)
 
 **Quantization** (11)
 

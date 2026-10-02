@@ -6,6 +6,23 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-02 — Windows CUDA 12.6 package pairing (#483)
+
+CUDA 12.8 remains available for native Blackwell support; new Windows CLI and
+shared-library `-cuda126` assets use CUDA Toolkit 12.6.3 and a separately named
+`cuda126-runtime.zip`. Matching DLL SHA manifests and actual runtime/version
+checks prevent silent 12.8/12.6 mixing. Library builds now use the same explicit
+AVX2 CPU floor as CLI builds; staged C ABI loading passes without toolkit/build
+paths. CUDA 12.8/13 native A100/H100 targets and general SM90 PTX are restored.
+
+Hosted CLI `36999848276`, libraries `37001913808` and actual archive hash pairing
+`37006391225` PASS for both CUDA 12 packages. The intentionally mixed runtime
+control is rejected. Full target compile probes `37000636464` (12.6) and
+`37003613203` (12.8) PASS; complete CUDA 13 release recipe `37003929359` PASS,
+including packaged imports and driverless JFK transcription. Windows CI has
+no NVIDIA GPU: no MX150/GTX1660 execution or MMQ performance claim. Receipt:
+`docs/cuda126-packaging-2026-10-02.json`.
+
 ## DONE 2026-10-02 — asynchronous browser pthread ASR/TTS
 
 Browser bindings expose callback-based model-open and transcription on the

@@ -11,35 +11,20 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-02 — #483 CUDA 12.6 and next release
+## CLAIMED 2026-10-02 — next release
 
-Worktree `/mnt/volume1/wt-483` (`fix/483-cuda126`).
-PR #480 review and permanent regression completed; see HISTORY and proof receipt. Whole PR #480 and issue #483 read,
-including all comments/reviews (none). No Index-Echo runtime edits here.
+Worktree `/mnt/volume1/wt-483` (`fix/483-cuda126`). PR #480 review and #483
+implementation/proofs are complete and landed; see HISTORY and structured
+receipts. Full CUDA 13 package verification `37003929359` PASS. All large
+builds ran hosted after checking local load/free memory; no Index runtime
+edits here. Original tested source bundle and logs archived cold.
 
-#483: CUDA 12.8 does support Pascal/Volta (NVIDIA documentation); PyTorch wheel
-policy is separate. Candidate `74d0d9145` preserves CUDA 12.8/Blackwell and
-adds coherent CUDA 12.6.3 Windows CLI and shared-library matrix assets with
-`-cuda126` suffix, separately named runtime ZIPs, SHA manifests and actual
-cudaRuntimeGetVersion + compile-toolkit-minor checks. Release dry-run CLI
-`36999848276` and library `37001913808` PASS; both probe SM61/SM75 kernels.
-Full legacy architecture compile `37000636464` PASS (all nine targets).
-Library CPU floor now matches the CLI (native off / AVX2); staged C ABI
-`whisper_version` PASS without toolkit/build directories on PATH.
-Hosted runtime SHA pairing `37006391225` PASS for both toolkits; intentionally
-mixed 12.8 CLI / 12.6 runtime rejected. Actual source checkouts CLI a40850fbf,
-libraries b56d5c1e3; marker logs and receipt JSONs archived cold.
-Fixed pre-existing CUDA 12.8/13 SM80 (A100) and SM90 (H100) omissions and
-added general SM90 PTX alongside Blackwell targets. Complete 12.8 architecture
-compile probe `37003613203` PASS; full CUDA 13 verify `37003929359` running. GTX16xx-specific MMQ performance not claimed.
-
-Resource checks performed before hosted builds; VPS load elevated and available
-RAM fell from 2.1–3.1 GiB to 409 MiB (swap nearly exhausted), so no large local build/model task. All code in separate worktrees.
-User authorizes next release only after these gates AND the other agent's
-Index-Echo 9B full acceptance/publication/integration. 9B F16 is independently accepted against F32 on CPU/CUDA and verified public
-at cstr/index-echo-9b-GGUF@dffbadf0f173446fee0364a0807803d2b2fb6f49;
-protected 2B regression and feature integration remain the other agent’s work; latest release v0.8.40. No bump/tag until Index accepted and
-integrated-main CI green.
+User authorizes the next release after the separate Index-Echo agent lands
+its accepted public 9B F16 support and integrated-main CI passes. Protected
+2B Q8 nightly `37006905046` and public 9B F16 nightly `37008624536` PASS;
+Index final integration/CUDA canonical-public check remains the other agent’s
+work. Release notes drafted; latest v0.8.40. Use scripts/bump-version.sh once
+all gates pass.
 
 ## OPEN 2026-10-02 — full-tree cppcheck: Index-Echo destructor
 
