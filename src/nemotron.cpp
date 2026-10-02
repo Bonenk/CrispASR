@@ -2821,6 +2821,7 @@ extern "C" struct nemotron_context* nemotron_init_from_file(const char* path_mod
     // Backend selection — use crispasr_init_gpu_backend() for portable GPU init
     ctx->backend = nullptr;
     ctx->backend_cpu = core_cpu_backend::init();
+    core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->n_threads);
 
     if (params.use_gpu) {
         ctx->backend = crispasr_init_gpu_backend();

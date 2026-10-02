@@ -958,6 +958,8 @@ paraformer_context_params paraformer_context_default_params() {
 }
 
 paraformer_context* paraformer_init_from_file(const char* path, paraformer_context_params params) {
+    if (!path || !path[0])
+        return nullptr;
     auto* ctx = new paraformer_context();
     ctx->n_threads = params.n_threads > 0 ? params.n_threads : 4;
     ctx->flash_attn = params.flash_attn;
@@ -969,6 +971,7 @@ paraformer_context* paraformer_init_from_file(const char* path, paraformer_conte
         delete ctx;
         return nullptr;
     }
+    core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->n_threads);
     // Backend selection (§232). Weights already load onto ctx->backend via
     // core_gguf::load_weights, so pointing that at a GPU backend is the whole fix.
     //   * CRISPASR_PARAFORMER_GPU=1 forces GPU on ANY backend; =0 forces CPU.
@@ -1003,12 +1006,12 @@ paraformer_context* paraformer_init_from_file(const char* path, paraformer_conte
     ctx->model_path = path;
     if (!core_gguf::load_weights(path, ctx->backend, "paraformer", ctx->wl)) {
         fprintf(stderr, "paraformer: failed to load '%s'\n", path);
-        delete ctx;
+        paraformer_free(ctx);
         return nullptr;
     }
 
     if (!paraformer_load_model(ctx)) {
-        delete ctx;
+        paraformer_free(ctx);
         return nullptr;
     }
 

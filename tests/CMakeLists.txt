@@ -3024,6 +3024,19 @@ catch_discover_tests(test-issue-353-split-pipeline
     PROPERTIES LABELS "unit;split-pipeline;issue-353"
 )
 
+# GNU linker interception keeps the #486 worker-count probe out of production
+# APIs and also works when the CPU backend is a dynamically loaded module.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_executable(test-model-cpu-threads test-model-cpu-threads.cpp)
+    target_include_directories(test-model-cpu-threads PRIVATE
+        ${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/ggml/include)
+    target_link_libraries(test-model-cpu-threads PRIVATE
+        Catch2::Catch2WithMain nemotron paraformer dia-tts)
+    target_link_options(test-model-cpu-threads PRIVATE "LINKER:--wrap=ggml_backend_free")
+    catch_discover_tests(test-model-cpu-threads
+        TEST_SPEC "[issue-486]" PROPERTIES LABELS "unit;model-threads;issue-486")
+endif()
+
 # ─── test-cpu-backend-shim — #355 CPU-backend access shim
 #
 # Pins src/core/ggml_cpu_backend.h. Compiles unchanged with or without

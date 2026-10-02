@@ -6,6 +6,35 @@ technical deep-dives are in `LEARNINGS.md`.
 
 ---
 
+## DONE 2026-10-02 — Model CPU thread counts (#486)
+
+Nemotron, Paraformer and Dia now apply requested thread counts to their actual
+CPU backend through the shared shim; Dia's runtime setter also updates that
+backend. Nonpositive native requests use four workers. CLI/C ABI forwarding
+was already correct. Paraformer also rejects null/empty paths and releases
+backend handles after failed weight/model loads.
+
+The unfixed runtime reproduced exactly eleven ignored-count failures in each
+linked/module build (`36961987735`): all positive requests still used four
+workers. Fixed `36961990177` passed 136 assertions in six cases per mode,
+executing real CPU graphs on the model-owned handles and checking arithmetic,
+worker counts, runtime setter behavior and failed-load cleanup. Runtime/tests
+are byte-identical to checked source `51faf7b27`: CI `36961993401` passed 13/13
+and lint `36961996140` passed 10/10.
+
+Live `36968384035` passed repeated full-JFK transcription through the C ABI at
+1/4/8 threads for Nemotron/Paraformer and both CLI cases at eight threads.
+Dia at 1/4/8 preserves the unfixed four-thread decoded output and duration.
+That is a parity pass, not a full-speech quality claim: its existing 200-step
+cap truncates the prompt (~2.1478s, WER .667). Removing the cap was rejected
+because two uncapped *unfixed* controls also repeated text (WER .852/.72).
+Production generation defaults remain unchanged; the separate source-parity
+investigation and PR #487 streaming/server follow-up remain in `PLAN.md`.
+
+Pinned models, transcripts, source hashes and exact gate scope are retained in
+`docs/cpu-threads-2026-10-02.json`. No runner speedup claim. All heavy builds and
+models ran on hosted runners after VPS load/memory checks; cold proof is on CIFS.
+
 ## DONE 2026-10-02 — Windows Vulkan SDK transport retries
 
 The first v0.8.40 Windows Vulkan library build lost its SDK download connection.

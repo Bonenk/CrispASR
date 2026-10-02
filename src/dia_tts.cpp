@@ -792,6 +792,7 @@ struct dia_tts_context* dia_tts_init_from_file(const char* path_model, struct di
     if (!ctx)
         return nullptr;
     ctx->params = params;
+    ctx->params.n_threads = params.n_threads > 0 ? params.n_threads : 4;
 
     // Initialize RNG
     if (params.seed != 0) {
@@ -843,6 +844,7 @@ struct dia_tts_context* dia_tts_init_from_file(const char* path_model, struct di
     //     Kaggle CUDA re-run confirms the fix. Mirrors LEARNING 34's
     //     ggml_backend_is_metal gate (here Metal is the *validated* one).
     ctx->backend_cpu = core_cpu_backend::init();
+    core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->params.n_threads);
     const char* gpu_env = crispasr_env::get("CRISPASR_DIA_TTS_GPU");
     const bool force_gpu = gpu_env && std::atoi(gpu_env) != 0;
     const bool force_cpu = gpu_env && std::atoi(gpu_env) == 0;
@@ -2201,8 +2203,10 @@ void dia_tts_free(struct dia_tts_context* ctx) {
 }
 
 void dia_tts_set_n_threads(struct dia_tts_context* ctx, int n_threads) {
-    if (ctx)
-        ctx->params.n_threads = n_threads;
+    if (ctx) {
+        ctx->params.n_threads = n_threads > 0 ? n_threads : 4;
+        core_cpu_backend::set_n_threads(ctx->backend_cpu, ctx->params.n_threads);
+    }
 }
 
 void dia_tts_set_temperature(struct dia_tts_context* ctx, float temperature) {
