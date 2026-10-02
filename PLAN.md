@@ -58,9 +58,10 @@ pass; cache gates fail. Acceptance remains false. Corrected GPU kernel
 translate_window captures, F16/Q8 diff/cache/direct CLI/anonymous C ABI and
 complete five-case file pipelines. Uses separate fixture namespace
 index-echo-9b-f32-generation; never overwrites rejected original reference.
-Launch rejected: maximum batch GPU session count of 2 reached. Corrected job
-NOT launched; do not claim it queued or passed, and do not bypass session cap.
-Old v1 still RUNNING at last check; harvest terminal logs before resubmission.
+Old v1 reached ERROR and terminal logs were harvested under kaggle-v1-terminal/.
+Corrected private GPU kernel crispasr-index-echo-9b-corrected-parity v1
+successfully launched after the slot freed. Prior cap rejection preserved;
+no account switching or session-cap bypass. Full 9B results still pending.
 
 TTS -> Index-Echo 9B round-trips have NOT run and are an additional remaining
 behavioral gate. Existing unrelated TTS round-trips are not 9B proof. Need
