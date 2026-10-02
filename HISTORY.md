@@ -26,6 +26,48 @@ Release dry run `36915044490` installed the real SDK, built Vulkan and packaged
 SHA256 `121917f19d3fa463fff8dfb5191d349adf42179e9db000557c681095541fbe06`).
 No release publication was requested by that dry run; v0.8.40 assets are unchanged.
 
+## DONE 2026-10-02 — Index-Echo S2TT 2B (#485)
+
+The Apache-2.0 Index-Echo model now runs natively with its 32-block audio tower/connector and
+24-block Qwen3.5 hybrid decoder, four-plane MRoPE, attention/recurrent caches,
+batched prefill, bilingual timestamped cues, English/Japanese/Spanish targets,
+five-window context and source-compatible Silero waveform context. CLI, C ABI
+metadata autodetection, registry companions, binding documentation and the
+pinned nightly entry are wired. Public `cstr/index-echo-2b-GGUF` provides matching
+tower/decoder pairs: Q8_0 default **2.589 GiB**, F16 **4.853 GiB**. Both Q4
+recipes failed quality gates and were removed from the public repository HEAD.
+The 9B checkpoint remains outside this port.
+
+The released Python wrapper actually uses an F32 tower/connector and BF16
+decoder (audited in `36911946162`). Original mixed-precision captures remain
+independent goldens. Against a separately forced F32 decoder, F16 passes every
+stage, magnitude, cache, direct-output and five-case full-file gate, including
+Japanese, Spanish and 83-second two-window context: worst cosine **.999992**,
+maximum relative L2 **.239%**. Q8 stages/cache/direct output pass too: **.997150**
+and **3.094%**. Retained exact diagnostics still expose precision-sensitive
+full-file text/timing differences. The separate acceptance receipt requires
+complete text from one independent source precision variant per case and
+at most **20ms** Q8 timestamp deviation; it does not suppress those diagnostics.
+See `docs/index-echo-acceptance-2026-10-01.json` for the explicit bounds.
+
+Four-thread ARM Neoverse-N2 warm medians show Q8 **1.33–1.46x** faster than the
+actual mixed-precision Python blueprint; peak RSS is **4.03 vs 7.95 GiB**.
+Kaggle on **two Tesla T4s** passes F16/Q8 stage, magnitude, cached-ID and complete
+SRT checks; short-clip Q8 inference is **4.5–5.3x realtime**, excluding load.
+These are cold direct-window GPU measurements, not full-file GPU/VAD or a warm
+median. `PERFORMANCE.md` and the CPU/CUDA JSON receipts retain the scope and
+individual measurements.
+
+Final native validation `36918771685` passes both cohorts, real C ABI loading,
+shipped-library symbol auditing, repeated-file live tests and integration units.
+Actual nightly-driver run `36920750591` downloads the public immutable model
+revision `b34538267099a6769111aada860d57f312894510` and fixture revision
+`374efe4d7f5c4ff5dce32deffb14e23865fa8493`: full bilingual SRT text matches,
+and mandatory C++ stage/magnitude/cache gates pass. Broad CI `36918938903`
+passes all 13 platform/build jobs; lint `36918943060` passes all 10 jobs after
+retrying a tool-install timeout. Large source captures, original failed exact
+diagnostics and CI/Kaggle artifacts stay under `/mnt/storage/crispasr/issue485/`.
+
 ## RELEASE 2026-10-01 — v0.8.40
 
 Published [v0.8.40](https://github.com/CrispStrobe/CrispASR/releases/tag/v0.8.40)
