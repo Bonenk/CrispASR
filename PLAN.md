@@ -11,6 +11,18 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-02 — #486 CPU thread counts
+
+Worktree `/mnt/volume1/wt-478-ralm`, branch `fix/486-cpu-threads`.
+Read the whole report (no comments): Nemotron and Paraformer lost CPU thread
+configuration during their scheduler migration; Dia never applies its stored
+count, including its runtime setter. Audit CLI/C ABI forwarding and fix all
+three through the shared CPU-backend shim, preserving GPU backend selection.
+Verify actual graph worker counts and decoded output, plus CPU/dynamic-backend
+builds. VPS load 9.36/6.27/5.03, available memory 2.2GiB: heavy builds/models run
+on hosted CI; logs/artifacts remain on CIFS. Index models are another agent's work.
+
+
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
