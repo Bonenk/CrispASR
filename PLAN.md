@@ -111,6 +111,27 @@ proof now requires exact decoded-output/duration parity with the unfixed Dia
 at 1/4/8 threads, alongside strict full-JFK CLI/C ABI checks. The unfixed runtime
 also matches permanent main ancestor `d5582e8f` exactly (avoid relying on an
 orphaned feature commit for future reproduction).
+Live parity run `36968384035` uses `95fce8166` (same checked runtime/tests as
+`51faf7b27`); finish it before landing the CPU-thread fix.
+
+## OPEN 2026-10-02 — Dia full-speech source parity
+
+The existing runtime silently caps generation at 200 steps (~2.1478s). Raising
+its existing `CRISPASR_DIA_MAX_STEPS` override to 1024 exposes repetition in the
+unfixed runtime: `36965187732` (novel CPU-thread phrase/seed 123, WER .852) and
+`36966653943` (documented Hello/weather phrase/seed 42, WER .72). The default-cap
+removal was rejected, not shipped. Requires a pinned source/native reference,
+teacher-forced logits and feedback/stop/quantization audit before changing the
+production generation default. This is separate from the verified #486 setter.
+
+## OPEN 2026-10-02 — PR #487 Nemotron realtime/server
+
+Read description, all comments/reviews (none) and complete diff. Contains
+WebSocket ping/header fixes plus configurable update cadence and an incremental
+mel/pre-encode window. Contributor's CPU-only four-thread evidence is useful;
+validate complete streamed text/token confidence at 1/4/8 threads, non-four-frame
+presets, long turns and real GPU backends before defaulting the window. Retain
+its full-recompute control for A/B verification. No code taken from the PR yet.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
