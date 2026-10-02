@@ -11,23 +11,16 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
-## CLAIMED 2026-10-02 — Dia/Nemotron cppcheck acceptance follow-up
+## OPEN 2026-10-02 — full-tree cppcheck: Index-Echo destructor
 
-Worktree `/mnt/volume1/wt-482`. Runtime fixes are landed and main CI 13/13,
-lint 10/10, selected regression 5/5, WASM and binding checks pass. The slow
-cppcheck queue has not completed. Previous main run `36969566590` fails only
-`examples/cli/crispasr_backend_index_echo.cpp:12/63` (`virtualCallInConstructor`:
-virtual `shutdown()` called from the destructor); that source still has the
-same pattern and belongs to the separate Index-Echo agent. Do not suppress it.
-NOW: pinned cppcheck 2.7 GH `36992014618` runs on helper source `3a87d6007`
-(ubuntu:22.04 container, seven CI-covered runtime files, existing CI options
-plus explicit C++ language for standalone headers). First run `36990965775`
-failed only because the harness classified `.h` files as C; corrected without
-runtime edits or additional suppressions. Failed receipt is preserved on CIFS.
-No Index-Echo files or new suppressions; server files keep the existing
-full-tree CI exclusion and already pass the live-server tests. Next: record
-the actual scoped verdict and retain the unrelated full-tree finding for its owner. VPS load 20.46/18.13/13.58, available RAM 1.1 GiB and swap free 6.7 MiB;
-no large local analysis/build.
+Separate Index-Echo agent owns this finding. Main baseline cppcheck
+`36969566590` fails only `virtualCallInConstructor` at
+`examples/cli/crispasr_backend_index_echo.cpp:12/63`: the destructor calls
+virtual `shutdown()`. The same pattern remains in main; no suppression or
+Index-Echo runtime edit was made here. Current full-tree run `36986270785`
+is queued behind `36984635206`. Dia/Nemotron's seven changed CI-covered files
+pass pinned cppcheck 2.7 (`36992014618`); see
+`docs/dia-nemotron-cppcheck-2026-10-02.json`. Other completed gates are in HISTORY.
 
 ## CLAIMED 2026-10-02 — #485 Index-Echo S2TT 9B
 

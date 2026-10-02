@@ -523,6 +523,14 @@
       },
       "verified": true
     },
-    "cold_receipts": "/mnt/volume1/tmp-overflow/dia-nemotron-main-integration"
+    "cold_receipts": "/mnt/volume1/tmp-overflow/dia-nemotron-main-integration",
+    "scoped_cppcheck": {
+      "run": 36992014618,
+      "url": "https://github.com/CrispStrobe/CrispASR/actions/runs/36992014618",
+      "passed": true,
+      "version": "2.7",
+      "files": 7,
+      "receipt": "docs/dia-nemotron-cppcheck-2026-10-02.json"
+    }
   }
 }

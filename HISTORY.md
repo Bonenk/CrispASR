@@ -46,9 +46,14 @@ Feature CI passes 13/13 and lint 10/10 for both. Combined main integration
 CI `36986270531` passes 13/13 (including 1,982 unit tests), lint `36986270376`
 passes 10/10, and selected regression `36986270337` passes 5/5 with byte-equal
 Nemotron transcript and encoder cosine .999982. WASM (all three modes), Docker
-and Rust/C#/Dart/Ruby bindings also pass. The separate slow cppcheck run is
-still queued; its recorded status is not a completed verdict. Tested feature
-commits are preserved in a verified cold git bundle before branch deletion.
+and Rust/C#/Dart/Ruby bindings also pass. Focused hosted cppcheck 2.7
+`36992014618` passes all seven changed CI-covered files, with explicit C++
+language for standalone headers and no new warning suppressions. Exact hashes,
+command and rejected header-classification harness are retained in
+`docs/dia-nemotron-cppcheck-2026-10-02.json`. The separate full-tree run remains
+queued behind older analysis; its earlier confirmed Index-Echo destructor
+finding is preserved in PLAN for the other agent. Tested feature commits are
+preserved in a verified cold git bundle before branch deletion.
 
 ## DONE 2026-10-02 — Model CPU thread counts (#486)
 
