@@ -362,10 +362,14 @@ static uint32_t dia_sample_token(const float* logits, uint32_t vocab_size, float
                   [](const auto& a, const auto& b) { return a.first > b.first; });
         float cumsum = 0.0f;
         for (auto& [p, idx] : sorted_probs) {
-            cumsum += p;
+            // Keep the token that crosses top_p, including the most likely
+            // token when its probability already exceeds top_p. The official
+            // sampler shifts its cumulative-probability removal mask by one.
+            const float prob = p;
             if (cumsum > top_p) {
                 p = 0.0f;
             }
+            cumsum += prob;
         }
         for (auto& [p, idx] : sorted_probs) {
             probs[idx] = p;
