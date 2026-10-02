@@ -67,8 +67,9 @@ uses canonical public dff pin, same f91 CI runtime; strict audit repeats every
 stage/cache/direct/whole-file/Piper gate. Terminal 27-file proof saved before any
 future repush; receipt appended to docs/index-echo-9b-acceptance-2026-10-02.json.
 
-NEXT: combined C++ CI37013451267 running, lint37012234246 has nine jobs green and
-clang-tidy running; WASM37012251223 four modes green/fifth finishing. Regression
+NEXT: combined C++ CI37013451267 has nine jobs PASS; x64/Android/Vulkan/ASAN remain.
+Lint37012234246 PASS10/10, WASM37012251223 PASS5/5. Final feature6953ec719
+includes public CUDA v4 proof and refreshed319-section learnings index. Regression
 37012244055 smoke/unit/preflight/select PASS; unrelated full33-backend manual
 sweep intentionally stopped after model-free checks (affected2B and9B actual
 nightlies already green37006905046/37008624536). Then ff main and delete claim/
