@@ -11,6 +11,16 @@ to main before you start**. Several agents run here at once; a claim that lands
 with the work is a claim that did nothing. Delete it when the work lands, or if
 it goes stale for more than a day.
 
+## CLAIMED 2026-10-02 — MioTTS sample rate, then Index-Echo decoder optimization
+
+Worktree `/mnt/volume1/wt-index-echo-9b`, branch
+`fix/miotts-rate-echo-profile`. Fix model-derived MioTTS output rate across
+native runtime, CLI/server adapter and session ABI; prove metadata, WAV duration
+and speech readback through hosted CI. Then profile a gated Index-Echo decoder
+optimization against accepted source/cache/full-output controls, using hosted
+builds and real Kaggle GPUs where available. Preserve current defaults until
+both speed and output pass. Large artifacts live on `/mnt/storage`.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
