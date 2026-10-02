@@ -26,45 +26,6 @@ Index final integration/CUDA canonical-public check remains the other agent’s
 work. Release notes drafted; latest v0.8.40. Use scripts/bump-version.sh once
 all gates pass.
 
-## CLAIMED 2026-10-02 — #485 Index-Echo S2TT 9B
-
-Worktree `/mnt/volume1/wt-index-echo-9b`, branch `feat/index-echo-9b`.
-All large artifacts and terminal receipts under `/mnt/storage/crispasr/issue485-9b/`.
-
-NOW: full ARM CPU acceptance `37002813123` PASS (three complete stage/cache/direct
-clips, five independent F32 whole-file/VAD/context cases, actual Piper 3/3 WER 0).
-CUDA v3 COMPLETE/PASS on two actual T4 with the same complete gates; no numerical
-or timestamp tolerance relaxed. Receipt `docs/index-echo-9b-acceptance-2026-10-02.json`.
-Protected 2B Q8 actual nightly `37006905046` PASS; new public 9B F16 actual nightly
-`37008624536` PASS, including pinned public downloads and real regression driver.
-CI `37003844831` PASS 13/13, lint `37003842265` PASS 10/10; full-tree cppcheck
-`36995998244` PASS after nonvirtual destructor cleanup. Feature `0f6f60910` rebased onto accepted CUDA package main `f848f8b16`; C++/header/CMake tree identical to CI target `1f369bfde`.
-
-Canonical PUBLIC `cstr/index-echo-9b-GGUF`, accepted F16-only pair 17.914 GiB,
-weight revision `dffbadf0f173446fee0364a0807803d2b2fb6f49`, updated card/acceptance
-`f05dd56b51f22590767472224924cbdb078aee79`. Original experimental history remains
-PRIVATE `cstr/index-echo-9b-staging-GGUF`; rejected Q8 recipes never published.
-Publication `37005611122` PASS with local/remote hashes and clean-history audit.
-
-Resident AB/BA GPU profile PASS: JFK warm native ~12.2 s versus original BF16
-~16.2 s (1.33x); Chinese ~13.9 versus ~18.9 s (1.36x). Precision and default
-placement differ and are recorded; no offloaded F32 or cold-load speed claim.
-Receipt `docs/index-echo-9b-profile-2026-10-02.json`; generation ~86% of inference.
-
-CUDA public-download v4 COMPLETE/PASS on two actual Tesla T4. Script 2026-10-02.4
-uses canonical public dff pin, same f91 CI runtime; strict audit repeats every
-stage/cache/direct/whole-file/Piper gate. Terminal 27-file proof saved before any
-future repush; receipt appended to docs/index-echo-9b-acceptance-2026-10-02.json.
-
-NEXT: combined C++ CI37013451267 has nine jobs PASS; x64/Android/Vulkan/ASAN remain.
-Lint37012234246 PASS10/10, WASM37012251223 PASS5/5. Final feature6953ec719
-includes public CUDA v4 proof and refreshed319-section learnings index. Regression
-37012244055 smoke/unit/preflight/select PASS; unrelated full33-backend manual
-sweep intentionally stopped after model-free checks (affected2B and9B actual
-nightlies already green37006905046/37008624536). Then ff main and delete claim/
-feature branch. All original proof SHAs protected remotely by both archive
-branches; model/runtime pins remain immutable. No new release/tag here.
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)

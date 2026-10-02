@@ -56,7 +56,8 @@ Protected 2B Q8 actual nightly `37006905046` and the new public 9B F16 actual
 nightly `37008624536` pass. Anonymous pinned-artifact preflight passes both.
 Weekly large ARM regression includes all three stage clips, five whole-file
 cases, Piper and the real manifest driver. CI `37003844831` passes 13/13, lint
-`37003842265` 10/10, full-tree cppcheck `36995998244` passes. Original tested
+`37003842265` 10/10, full-tree cppcheck `36995998244` passes. Rebased WASM `37012251223` passes all five modes, including both 128 MB heap
+variants and PROXY_TO_PTHREAD. Original tested
 commits remain reachable on archived proof branches through final rebasing.
 
 Resident original-default BF16 versus native F16 AB/BA on two T4 yields warm
