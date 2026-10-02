@@ -42,19 +42,35 @@ repo revision `e4384ee4d3847ed4f171e60ce7973a75d48806e3`; it must NOT become a
 investigation `36969153128` against preserved rejected dump is separate from
 behavioral acceptance (always records validated=false).
 
-Feature `4a1420406` now supports original translate_window generation hooks,
-without an extra decoder prefill or retained/replayed pre-generation cache;
-historical 2B dump recipe unchanged. Fresh source controls on official released
-Torch 2.11.0/Transformers 5.6.0: BF16 CPU/disk `36968076996` and F32 CPU/disk
-`36968365575`, Chinese clip, original 2000-token limit, no diagnostic prefill.
-These distinguish capture/placement/precision from actual source behavior.
+Feature `b1e4443dd` fixes the independently reproduced reference placement bug:
+Qwen3.5 cached GDN reads conv1d.weight directly, bypassing Accelerate's child
+forward hook. Parent preload_module_classes=['Qwen3_5GatedDeltaNet'] plus a meta
+weight guard preserve actual source math. Tiny actual-HF CPU/disk A/B
+`36970777049` PASS: unpreloaded prefill matches but cached weight is meta;
+preloaded prefill and all three cached steps exactly match resident execution.
+Receipt cold `offload-check-36970777049/`. Faulty CPU source controls
+`36968076996` / `36968365575` cancelled; neither is a valid source oracle.
+
+Initial Q8 diff `36969153128`: 75 PASS / 3 FAIL / 0 SKIP against rejected
+reference. All encoder/connector/32 decoder prefill stages and initial logits
+pass; cache gates fail. Acceptance remains false. Corrected GPU kernel
+`9dcbff7c5`, cloning guarded source `b1e4443dd`, checks independent original
+translate_window captures, F16/Q8 diff/cache/direct CLI/anonymous C ABI and
+complete five-case file pipelines. Uses separate fixture namespace
+index-echo-9b-f32-generation; never overwrites rejected original reference.
+Launch rejected: maximum batch GPU session count of 2 reached. Corrected job
+NOT launched; do not claim it queued or passed, and do not bypass session cap.
+Old v1 still RUNNING at last check; harvest terminal logs before resubmission.
+
+TTS -> Index-Echo 9B round-trips have NOT run and are an additional remaining
+behavioral gate. Existing unrelated TTS round-trips are not 9B proof. Need
+synthetic speech inputs, actual source/native translation checks and separate
+synthesis/decoded receipts after corrected reference parity is established.
 Source oracle and native model parity still PENDING, no public model/registry
 publication or performance claim. No VPS inference / large downloads. Cold
 source headers, receipts, rejected-ref archive, live Kaggle stream and model
-card draft under `/mnt/storage/crispasr/issue485-9b/`. SDK live SSE logs actually
-work via get_kernel_session_logs_stream(user_name/kernel_slug, no version_label);
-parent stream reveals hardware, child redirected reference logs available only
-at terminal. Do not replace/resubmit v1 before harvesting its terminal logs.
+card draft under `/mnt/storage/crispasr/issue485-9b/`. SDK live SSE logs work via
+get_kernel_session_logs_stream(user_name/kernel_slug, no version_label).
 
 ## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
 to main before you start**. Several agents run here at once; a claim that lands
