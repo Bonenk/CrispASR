@@ -34,16 +34,20 @@ PR #480 review and permanent regression completed; see HISTORY and proof receipt
 including all comments/reviews (none). No Index-Echo runtime edits here.
 
 #483: CUDA 12.8 does support Pascal/Volta (NVIDIA documentation); PyTorch wheel
-policy is separate. Candidate `a40850fbf` preserves CUDA 12.8/Blackwell and
+policy is separate. Candidate `b56d5c1e3` preserves CUDA 12.8/Blackwell and
 adds coherent CUDA 12.6.3 Windows CLI and shared-library matrix assets with
 `-cuda126` suffix, separately named runtime ZIPs, SHA manifests and actual
 cudaRuntimeGetVersion + compile-toolkit-minor checks. Release dry-run CLI
-`36999848276`, library `36999459313` pending; both probe SM61/SM75 kernels.
+`36999848276`, library `37001913808` pending; both probe SM61/SM75 kernels.
+Full legacy architecture compile `37000636464` PASS (all nine targets).
+Library CPU floor now matches the CLI (native off / AVX2); staged C ABI
+`whisper_version` will be called without toolkit/build directories on PATH.
+Hosted runtime SHA pairing helper ready after both archives finish.
 Full release architecture sets remain unchanged for 12.8; legacy adds SM60,
 61,70,75,80,86,89,90 + SM90 PTX. GTX16xx-specific MMQ performance not claimed.
 
 Resource checks performed before hosted builds; VPS load elevated and available
-RAM 2.1–3.1 GiB, so no large local build/model task. All code in separate worktrees.
+RAM fell from 2.1–3.1 GiB to 409 MiB (swap nearly exhausted), so no large local build/model task. All code in separate worktrees.
 User authorizes next release only after these gates AND the other agent's
 Index-Echo 9B full acceptance/publication/integration. 9B strict full-file timing
 still pending; latest release v0.8.40. No bump/tag until Index accepted and
