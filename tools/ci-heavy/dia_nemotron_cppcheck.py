@@ -16,7 +16,7 @@ files = [
 ]
 flags = [
     '--error-exitcode=1', '--enable=warning,performance,portability',
-    '--inline-suppr', '--std=c++17', '--quiet',
+    '--inline-suppr', '--std=c++17', '--language=c++', '--quiet',
 ] + ['--suppress=' + value for value in [
     'missingIncludeSystem', 'unmatchedSuppression', 'duplicateAssignExpression',
     '*:examples/server/*', '*:*httplib.h', '*:*json.hpp', '*:*miniaudio.h',
