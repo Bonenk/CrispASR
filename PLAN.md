@@ -45,6 +45,8 @@ Q4 experiment launch: private runtime revision51158bc93be3e4f2f65a3bde6296bd9a59
 
 Q4 v1 terminal logs/outputs preserved cold. F16 control PASS all checks; no quantizer/candidate ran because Kaggle token cannot create model repositories (403). Move CPU quantization/private uploads to GH37044026371 at6bc941a00 using existing INDEX_ECHO_HF_TOKEN and private staging repo. New runner proves staging write permission before build or model pull. GPU v2 will consume pinned prepared candidates only; no threshold/default/public-artifact changes. Local storage cleanup copied and hashed1.074GiB of >5h-unused artifacts, preserving15 old paths as symlinks; receipt cold.
 
+All13 CI jobs37037038753 and10 lint jobs37037042008 PASS on proven native MioTTS/Echo source. Reread kaggle_usage.md in full at user direction: CPU quantize/upload remains GH37044026371; GPU-only validator9ebb3a7e9 removes prior CPU CLI invocation and requires actual CUDA layer assignments in CLI/full-file/roundtrip logs. Kaggle v1 control PASS but auth/preparation abort retained, no candidate ran. New GPU kernelv2 is not pushed until prepared artifact pins and permission preflight are ready.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
