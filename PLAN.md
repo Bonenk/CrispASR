@@ -32,8 +32,8 @@ All large builds are hosted after load/free checks; no local model/build task.
 
 Index-Echo's twelve wiring points are audited in
 `docs/index-echo-wiring-audit-2026-10-02.md`; model notes include paired/VAD
-files and measured/scoped performance. Ruby binding37022213108 also PASS. The separate comprehensive release-note
-audit is in progress; include its result before the bump/tag.
+files and measured/scoped performance. Ruby binding37022213108 also PASS. The comprehensive release-note
+audit is complete at 2f8f24197; proceed with the authorized bump/tag.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
