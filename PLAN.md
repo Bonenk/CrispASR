@@ -41,6 +41,8 @@ Checkpoint: native ARM37034738840 and x8637036548868 MioTTS proof PASS; Echo sch
 
 Q4_K checkpoint: CUDA bundle37040196454 SUCCESS at 012188eed, including crispasr-quantize. Four predeclared mixed-Q4 candidates are on feature9efb8e6bd: plain decoder baseline; F16 token/GDN + Q8 attention/down; FFN gate/up Q4 + down Q8; and layers4–27 gate/up Q4 only. Acoustic tower/connector stay original F16. Strict canonical acceptance extended to local candidates without threshold/output/reference changes. Bundle transfer and sole-account session audit underway; no Q4 acceptance claim yet.
 
+Q4 experiment launch: private runtime revision51158bc93be3e4f2f65a3bde6296bd9a59712968, SHA2560a4f882975c802a4ff3a1932fcb3ecf838cac39c3ccecc181240e331d0432303; SDK1d01260a6/build012188eed and kernel e06a3460a version2026-10-02.1. Sole-account dateRun audit found0 active among30 recent kernels. Pushed q4-guards v1 once, hardware/F16 control/candidate verdicts pending. No default or public weight changes.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
