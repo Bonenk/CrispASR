@@ -7,7 +7,7 @@
 //
 // Architecture:
 //   Text encoder: 12-layer Llama-style transformer (byte-level, 1024-d)
-//   AR decoder: 24-layer transformer with cross-attention (2048-d, GQA 16q/4kv)
+//   AR decoder: 18-layer transformer with cross-attention (2048-d, GQA 16q/4kv)
 //   DAC codec: 9 codebooks -> 44.1 kHz PCM (shared with Zonos #130)
 //
 // Delay pattern for multi-codebook generation:
