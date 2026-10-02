@@ -26,6 +26,7 @@ p.add_argument('--threads', type=int, default=4)
 p.add_argument('--steps', type=int, default=0)
 p.add_argument('--quant', choices=('f16', 'q8_0'), default='q8_0')
 p.add_argument('--matrix', default='4,1,8')
+p.add_argument('--audio-tag', help='separate output basename for CLI recognition')
 p.add_argument('--limits', action='store_true', help='also verify C ABI setter and CLI explicit/default limits')
 a = p.parse_args()
 OUT.mkdir(parents=True, exist_ok=True)
@@ -36,7 +37,7 @@ if a.child:
     sys.path.insert(0, str(ROOT / 'python'))
     from crispasr import Session
     key, seed, text = next(c for c in PHRASES if c[0] == a.phrase)
-    tag = f'{key}-{a.threads}'
+    tag = a.audio_tag or f'{key}-{a.threads}'
     path = OUT / (tag + '.npy')
     if a.child == 'generate':
         if a.steps:
@@ -113,8 +114,8 @@ if a.limits:
     for limit in (32, 0):
         wav = OUT / f'cli-limit-{limit}.wav'
         command = [build / 'bin/crispasr-cli', '--backend', 'dia', '-m', model,
-                   '-t', '4', '--no-gpu', '--seed', '42', '--temperature', '1.2',
-                   '--tts', '[S1] ' + PHRASES[0][2], '--tts-output', wav,
+                   '-t', '4', '--no-gpu', '--seed', '123', '--temperature', '1.2',
+                   '--tts', '[S1] ' + PHRASES[1][2], '--tts-output', wav,
                    '--no-spoken-disclaimer', '--accept-marking-responsibility']
         if limit:
             command += ['--max-new-tokens', str(limit)]
@@ -129,13 +130,12 @@ if a.limits:
         else:
             assert seconds > 3, seconds
             # Reuse the independent ASR acceptance for CLI output as well.
-            np.save(OUT / 'hello-4.npy', pcm)
-            receipt_path = OUT / 'hello-4.json'
-            prior = receipt_path.read_text()
-            receipt_path.write_text(json.dumps({'phrase': PHRASES[0][2], 'audio_seconds': seconds, 'cli': True}))
+            np.save(OUT / 'cli-default.npy', pcm)
+            (OUT / 'cli-default.json').write_text(json.dumps({'phrase': PHRASES[1][2], 'audio_seconds': seconds, 'cli': True}))
             run([sys.executable, __file__, '--child', 'recognize', '--model', asr,
-                 '--lib', lib, '--phrase', 'hello', '--threads', '4'], 'cli-default-recognize')
-            (OUT / 'cli-default.json').write_text(receipt_path.read_text())
-            receipt_path.write_text(prior)
+                 '--lib', lib, '--phrase', 'fox', '--threads', '4', '--audio-tag', 'cli-default'], 'cli-default-recognize')
+            # The fox phrase requires >512 decoder steps, exposing any accidental
+            # inheritance of the frontend's generic 512-token default.
+            assert seconds > 6, seconds
         (OUT / f'cli-limit-{limit}.json').write_text(json.dumps({'max_new_tokens': limit, 'audio_seconds': seconds}))
 print('DIA_FULL_SPEECH_PASS', flush=True)
