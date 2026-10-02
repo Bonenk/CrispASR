@@ -1,6 +1,6 @@
 {
   "id": "${KAGGLE_ACCOUNT}/crispasr-nemotron-realtime-487-proof",
-  "title": "CrispASR Nemotron realtime 487",
+  "title": "CrispASR Nemotron realtime 487 proof",
   "code_file": "parity.py",
   "language": "python",
   "kernel_type": "script",
