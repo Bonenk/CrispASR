@@ -2279,13 +2279,15 @@ jobs:
             if ($probe.ExitCode -ne 0) { throw "$argument exited $($probe.ExitCode)" }
             return $output
           }
+          $expectedToolkit = "$($parts[0]).$($parts[1])"
+          $toolkitPattern = 'cuda toolkit\s*:\s*' + [regex]::Escape($expectedToolkit) + '\b'
           $version = Invoke-CrispProbe '--version' 'crispasr-cuda12-version'
-          if ($version -notmatch 'cuda toolkit\s*:\s*12\.' -or
+          if ($version -notmatch $toolkitPattern -or
               $version -notmatch 'cuda runtime ABI\s*:\s*12\b') {
             throw 'Packaged CUDA 12 --version does not identify its toolkit/runtime ABI'
           }
           $diagnostics = Invoke-CrispProbe '--diagnostics' 'crispasr-cuda12-diagnostics'
-          if ($diagnostics -notmatch 'cuda toolkit\s*:\s*12\.' -or
+          if ($diagnostics -notmatch $toolkitPattern -or
               $diagnostics -notmatch 'cuda runtime ABI\s*:\s*12\b') {
             throw 'Packaged CUDA 12 --diagnostics does not identify its toolkit/runtime ABI'
           }
