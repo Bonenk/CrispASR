@@ -99,6 +99,14 @@ Sampler fix alone is insufficient; preserved audio/logs in cold
 128-step teacher-forced audit `36973899601` launched, pinned source4a9e29b1
 and original HFcheckpoint257bc72f. Production default changes only on branch,
 no full-speech acceptance or landing yet.
+NOW: source audit36973899601 FAILED numerical gate (127 steps, conditional
+min cosine .979275, max norm error .097132; unconditional near1). Code audit
+found missing cross-attention RoPE on both cached encoder keys and decoder
+queries. Candidate121b11965 restores both; source audit36975523662 and full
+Q8 speech36975526523 rerun. Also corrected final delayed BOS masking one-step
+off-by-one: source input step15/channel8=890, old native holds BOS1026.
+Sampler36974440119 PASS13 fixtures; compiled old sampler dominant token2
+fixture emits token0 all1000 times, candidate agrees with official distribution.
 
 The existing runtime silently caps generation at 200 steps (~2.1478s). Raising
 its existing `CRISPASR_DIA_MAX_STEPS` override to 1024 exposes repetition in the
@@ -119,7 +127,8 @@ presets 0/2/3, 33s) and VAD/ordinary server checks `36972773144` running.
 Current full CPU/server parity `36973268384` and CI `36973274195` / lint
 `36973276596` running/queued; scripts now derive Q8 from pinned F16 because
 that HF revision has no Q8 file. CUDA Kaggle `crispasr-nemotron-realtime-487`
-v1 RUNNING (actual backend assertion); author source plus finite configurable
+v1 RUNNING on two actual Tesla T4/SM75 (clonedfc3088dd3; actual backend
+assertion); author source plus finite configurable
 1..300s Nemotron turn limit, default30, on branch20dd2bcaf. Earlier queued
 dispatches superseded before doing heavy work. First parity dispatch cancelled
 because its harness selected the wrong Catch test name; not acceptance evidence.
@@ -129,7 +138,13 @@ WebSocket ping/header fixes plus configurable update cadence and an incremental
 mel/pre-encode window. Contributor's CPU-only four-thread evidence is useful;
 validate complete streamed text/token confidence at 1/4/8 threads, non-four-frame
 presets, long turns and real GPU backends before defaulting the window. Retain
-its full-recompute control for A/B verification. No code taken from the PR yet.
+its full-recompute control for A/B verification. All Q8 CPU1/4/8 exact window/control tokens+confidence passed in36973268384;
+server9/9, VAD11/11, configured33s turn10/10 passed. Run then FAILED its
+auxiliary Q4/thread1 one-shot punctuation equality: full recompute and window
+both have the SAME comma difference from one-shot. No window/control mismatch.
+Preserved raw failure and all logs; exact controlled gate unchanged. Auxiliary
+one-shot now checks spoken words while recording raw punctuation differences.
+Remaining Q4/F16 x1/4/8 job36975834552 running from8887eac15.
 
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
