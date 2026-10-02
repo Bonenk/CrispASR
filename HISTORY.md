@@ -21,6 +21,11 @@ Full CI `36915036668` passed 13/13 jobs and lint `36915040448` passed 10/10 at
 `86037682fc95797da9778901e77ef1a2f1c3109a`. Rebase onto main changed only
 `PLAN.md`; the four implementation/workflow files remained byte-identical.
 
+Landed via fast-forward at `c3fe1a6e3`: main CI `36957220051` passed 13/13,
+lint `36957220126` passed 10/10, and secret scanning/Pages deployment passed.
+Ruby `36957220150` was superseded by the separate Index agent's newer main
+push while still running, with no failed step. The temporary branch was deleted.
+
 Release dry run `36915044490` installed the real SDK, built Vulkan and packaged
 `libcrispasr-windows-x86_64-vulkan` (artifact `11189199045`, 89,278,669 bytes;
 SHA256 `121917f19d3fa463fff8dfb5191d349adf42179e9db000557c681095541fbe06`).
