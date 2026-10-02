@@ -220,7 +220,14 @@ speech and exact token confidences Q8/Q4/F16, then ordinary/VAD/long-turn
 server checks. Separate proof slug preserves rejected v1 evidence. GPU proof v1 successfully launched after the other agent roundtrip job
 completed and a slot freed: crispasr-nemotron-realtime-487-proof, uploaded
 scriptversion2 from7cddcdeee. Actual twoTeslaT4/SM75 verified again,
-source7cddcdeee14757bcff0f4293aec67a78182b0294; cold CUDA build underway. Retains separate rejected-window slug/logs.
+source7cddcdeee14757bcff0f4293aec67a78182b0294. Kernel COMPLETE;
+all6baseline/candidate GPU cases PASS(2993assertions each), candidate token
+captures byte-exact to frozen b33138b057 for Q8/F16/Q4; actual full33s words
+checked at all3presets. Server9/9 and VAD11/11 passed, final long-turn
+receipt harvesting underway. Hosted Metal is NOT acceptance: old macos14 VM
+exposes Apple Paravirtual device without SIMD matrix acceleration and times
+out; separate probe36984356005 exit77 reports noMTLDevice on its VM. Stop
+redundant Mac model job36983652977; physical-Mac proof unavailable here. Retains separate rejected-window slug/logs.
 No account switching, interruption of other jobs, or session-cap bypass.
 Final runtime CI36979186151 PASS13 / lint36979189406 PASS10; earlier20dd2bcaf
 CI13/13 and lint10/10 passed. No landing until backend-specific gates pass.
