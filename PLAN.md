@@ -75,7 +75,9 @@ Canonical synthetic fixture pin `d0a7d7a8be318a5841dfdbe6ad37d3acf75523e3`,
 path index-echo-9b/roundtrip-piper; originals immutable. Portable helper at
 `0026d9b13` releases ABI weights before subsequent CLI loads (GPU VRAM safety).
 F16/CUDA round-trips still pending; dedicated genuine CUDA stage/roundtrip
-kernel prepared, clones `0026d9b13`, uses already synthesized GH WAVs.
+kernel `882a34e2a` successfully launched v1, clones `0026d9b13`, uses already
+synthesized GH WAVs. Private crispasr-index-echo-9b-roundtrip, F16 then Q8,
+actual CUDA JFK diff and three CLI/C ABI round-trips each; not a full-file proof.
 
 Corrected Kaggle v1 (two actual Tesla T4, SM75, Torch 2.10.0+cu128) uploaded
 VALID original F32 JFK generation capture: own raw greedy trace alignment True,
