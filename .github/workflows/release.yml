@@ -28,8 +28,8 @@ on:
         type: string
       cuda12_probe_arch:
         description: >-
-          Dry-run diagnostic only: override the Windows CUDA 12 architecture
-          list to shorten a package probe. Empty keeps the release matrix.
+          Dry-run diagnostic only: override the Windows CUDA 12 CLI/library
+          architecture list to shorten a package probe. Empty keeps the release matrix.
         required: false
         default: ''
         type: string
@@ -1841,7 +1841,7 @@ jobs:
           fail_on_unmatched_files: true
 
   # ── Windows x86_64 shared libs + headers (CUDA) ──────────────────────────────
-  # CUDA 12.8 toolkit (Blackwell-aware). Unlike the Linux CUDA tarball,
+  # Matching CUDA 12.8 (Blackwell) and CUDA 12.6 legacy matrix. Unlike Linux,
   # we bundle the CUDA runtime DLLs (cudart / cublas / cublasLt) so the
   # tarball is self-contained for downstream Windows consumers — matches
   # the existing build-windows-cuda EXE bundle's pattern.
@@ -1886,7 +1886,7 @@ jobs:
             -DCRISPASR_BUILD_EXAMPLES=OFF ^
             -DCRISPASR_BUILD_SERVER=OFF ^
             -DGGML_CUDA=ON ^
-            -DCMAKE_CUDA_ARCHITECTURES="${{ matrix.arch }}" ^
+            -DCMAKE_CUDA_ARCHITECTURES="${{ (inputs.tag == '' && inputs.cuda12_probe_arch) || matrix.arch }}" ^
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build-libs --config Release -j %NUMBER_OF_PROCESSORS% --target crispasr-lib
 
