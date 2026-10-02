@@ -6,7 +6,12 @@ Live work only. Completed threads move to `HISTORY.md`; technical deep-dives to
 `LEARNINGS.md`.
 
 **Before you pick something up:** re-read this section on `origin/main`, add a
-`## CLAIMED 2026-10-02 — #485 Index-Echo S2TT 9B
+`## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
+to main before you start**. Several agents run here at once; a claim that lands
+with the work is a claim that did nothing. Delete it when the work lands, or if
+it goes stale for more than a day.
+
+## CLAIMED 2026-10-02 — #485 Index-Echo S2TT 9B
 
 Worktree `/mnt/volume1/wt-index-echo-9b`, branch `feat/index-echo-9b`.
 Source pinned to `IndexTeam/Index-Echo-S2TT-9B@b8ac6fb7d3dc17cee48a52201bd3d93dc86b0dba`.
@@ -63,20 +68,19 @@ Corrected private GPU kernel crispasr-index-echo-9b-corrected-parity v1
 successfully launched after the slot freed. Prior cap rejection preserved;
 no account switching or session-cap bypass. Full 9B results still pending.
 
-TTS -> Index-Echo 9B round-trips have NOT run and are an additional remaining
-behavioral gate. Existing unrelated TTS round-trips are not 9B proof. Need
-synthetic speech inputs, actual source/native translation checks and separate
-synthesis/decoded receipts after corrected reference parity is established.
+TTS -> Index-Echo 9B CPU Q8 round-trip job `36975184748` RUNNING at feature
+`884caa16a`: real pinned Piper synthesis, three distinct sentences, non-silent
+16 kHz WAVs, target-English WER <=0.10 and exact CLI/C ABI text agreement.
+Retains WAV/synthesis/recognition logs and immutable pins. Does not substitute
+for stage/cache source parity or claim untested F16/CUDA round-trips.
+Corrected Kaggle v1 confirms two Tesla T4 (SM75), preinstalled Torch; original
+source JFK generation capture running. No acceptance results yet.
 Source oracle and native model parity still PENDING, no public model/registry
 publication or performance claim. No VPS inference / large downloads. Cold
 source headers, receipts, rejected-ref archive, live Kaggle stream and model
 card draft under `/mnt/storage/crispasr/issue485-9b/`. SDK live SSE logs work via
 get_kernel_session_logs_stream(user_name/kernel_slug, no version_label).
 
-## CLAIMED <date> — <what>` block naming your worktree, and **push that claim
-to main before you start**. Several agents run here at once; a claim that lands
-with the work is a claim that did nothing. Delete it when the work lands, or if
-it goes stale for more than a day.
 
 ## CLAIMED 2026-10-02 — Dia full-speech source parity
 
