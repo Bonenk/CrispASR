@@ -73,6 +73,13 @@ dtypes, failed controls and profile samples are in
 `docs/index-echo-9b-acceptance-2026-10-02.json` and
 `docs/index-echo-9b-profile-2026-10-02.json`.
 
+Main integration `a67c78eb2` passes CI `37016734092` 13/13, lint `37016733637`
+10/10 and WASM build `37016733853` 5/5. The actual reusable weekly ARM workflow
+`37016734351` passes the full three-clip/five-file/Piper corpus plus its pinned
+nightly driver against public weight revision dffbadf0. Canonical acceptance
+now audits that main CPU proof together with public-download CUDA v4 against
+the same public model pin; original staging proof and failed controls remain.
+
 ## DONE 2026-10-02 — asynchronous browser pthread ASR/TTS
 
 Browser bindings expose callback-based model-open and transcription on the

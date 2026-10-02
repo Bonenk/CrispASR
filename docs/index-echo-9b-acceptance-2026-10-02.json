@@ -3,7 +3,7 @@
   "accepted_cohort": "f16",
   "source_model": "IndexTeam/Index-Echo-S2TT-9B",
   "source_revision": "b8ac6fb7d3dc17cee48a52201bd3d93dc86b0dba",
-  "model_revision": "dca128e0da2c86819347b79f63da610c0b8bd472",
+  "model_revision": "dffbadf0f173446fee0364a0807803d2b2fb6f49",
   "reference_revision": "cb678dfd4806778aa55c39fe7b7a710a54cdc153",
   "artifacts": {
     "LICENSE": {
@@ -23,7 +23,7 @@
     "direct": {
       "cpu": {
         "jfk": {
-          "reference": "[00:00.00-00:02.48]\nAnd so, my fellow Americans,\nAnd so, my fellow Americans,\n[00:03.12-00:04.56]\nask not\nask not\n[00:05.16-00:07.52]\nwhat your country can do for you,\nwhat your country can do for you,\n[00:08.00-00:10.00]\nask what you can do for\nask what you can do for\n[00:09.80-00:11.00]\nyour country.\u3002\nyour country.",
+          "reference": "[00:00.00-00:02.48]\nAnd so, my fellow Americans,\nAnd so, my fellow Americans,\n[00:03.12-00:04.56]\nask not\nask not\n[00:05.16-00:07.52]\nwhat your country can do for you,\nwhat your country can do for you,\n[00:08.00-00:10.00]\nask what you can do for\nask what you can do for\n[00:09.80-00:11.00]\nyour country.。\nyour country.",
           "segments": [
             {
               "start": 0.0,
@@ -48,37 +48,37 @@
             {
               "start": 9.8,
               "end": 11.0,
-              "text": "your country.\u3002\nyour country."
+              "text": "your country.。\nyour country."
             }
           ]
         },
         "zh": {
-          "reference": "[00:00.43-00:02.25]\n\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists\n[00:02.27-00:04.57]\n\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality.\n[00:05.23-00:07.47]\n\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality\n[00:07.47-00:09.99]\n\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there is no justice in this world.\n[00:10.51-00:12.92]\n\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,",
+          "reference": "[00:00.43-00:02.25]\n正是因为存在绝对正义，\nIt is precisely because absolute justice exists\n[00:02.27-00:04.57]\n所以我们接受现实的相对正义。\nthat we accept the relative justice of reality.\n[00:05.23-00:07.47]\n但是不要因为现实的相对正义，\nBut don't let the relative justice of reality\n[00:07.47-00:09.99]\n我们就认为这个世界没有正义。\nmake us believe there is no justice in this world.\n[00:10.51-00:12.92]\n因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,",
           "segments": [
             {
               "start": 0.43,
               "end": 2.25,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists"
+              "text": "正是因为存在绝对正义，\nIt is precisely because absolute justice exists"
             },
             {
               "start": 2.27,
               "end": 4.57,
-              "text": "\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality."
+              "text": "所以我们接受现实的相对正义。\nthat we accept the relative justice of reality."
             },
             {
               "start": 5.23,
               "end": 7.47,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality"
+              "text": "但是不要因为现实的相对正义，\nBut don't let the relative justice of reality"
             },
             {
               "start": 7.47,
               "end": 9.99,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there is no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nmake us believe there is no justice in this world."
             },
             {
               "start": 10.51,
               "end": 12.92,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,"
             }
           ]
         },
@@ -120,7 +120,7 @@
             {
               "start": 9.8,
               "end": 11.0,
-              "text": "your country.\u3002\nyour country."
+              "text": "your country.。\nyour country."
             }
           ],
           "expected": [
@@ -147,7 +147,7 @@
             {
               "start": 9.8,
               "end": 11.0,
-              "text": "your country.\u3002\nyour country."
+              "text": "your country.。\nyour country."
             }
           ],
           "passed": true
@@ -158,54 +158,54 @@
             {
               "start": 0.43,
               "end": 2.25,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists"
+              "text": "正是因为存在绝对正义，\nIt is precisely because absolute justice exists"
             },
             {
               "start": 2.27,
               "end": 4.57,
-              "text": "\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality."
+              "text": "所以我们接受现实的相对正义。\nthat we accept the relative justice of reality."
             },
             {
               "start": 5.23,
               "end": 7.47,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality"
+              "text": "但是不要因为现实的相对正义，\nBut don't let the relative justice of reality"
             },
             {
               "start": 7.47,
               "end": 9.99,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there is no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nmake us believe there is no justice in this world."
             },
             {
               "start": 10.51,
               "end": 12.92,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,"
             }
           ],
           "expected": [
             {
               "start": 0.43,
               "end": 2.25,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists"
+              "text": "正是因为存在绝对正义，\nIt is precisely because absolute justice exists"
             },
             {
               "start": 2.27,
               "end": 4.57,
-              "text": "\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality."
+              "text": "所以我们接受现实的相对正义。\nthat we accept the relative justice of reality."
             },
             {
               "start": 5.23,
               "end": 7.47,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality"
+              "text": "但是不要因为现实的相对正义，\nBut don't let the relative justice of reality"
             },
             {
               "start": 7.47,
               "end": 9.99,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there is no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nmake us believe there is no justice in this world."
             },
             {
               "start": 10.51,
               "end": 12.92,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,"
             }
           ],
           "passed": true
@@ -255,7 +255,7 @@
             {
               "start": 9.8,
               "end": 11.0,
-              "text": "your country.\u3002\nyour country."
+              "text": "your country.。\nyour country."
             }
           ],
           "expected": [
@@ -282,7 +282,7 @@
             {
               "start": 9.8,
               "end": 11.0,
-              "text": "your country.\u3002\nyour country."
+              "text": "your country.。\nyour country."
             }
           ],
           "passed": true,
@@ -293,54 +293,54 @@
             {
               "start": 0.43,
               "end": 2.25,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists"
+              "text": "正是因为存在绝对正义，\nIt is precisely because absolute justice exists"
             },
             {
               "start": 2.27,
               "end": 4.57,
-              "text": "\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality."
+              "text": "所以我们接受现实的相对正义。\nthat we accept the relative justice of reality."
             },
             {
               "start": 5.23,
               "end": 7.47,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality"
+              "text": "但是不要因为现实的相对正义，\nBut don't let the relative justice of reality"
             },
             {
               "start": 7.47,
               "end": 9.99,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there is no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nmake us believe there is no justice in this world."
             },
             {
               "start": 10.51,
               "end": 12.92,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,"
             }
           ],
           "expected": [
             {
               "start": 0.43,
               "end": 2.25,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists"
+              "text": "正是因为存在绝对正义，\nIt is precisely because absolute justice exists"
             },
             {
               "start": 2.27,
               "end": 4.57,
-              "text": "\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality."
+              "text": "所以我们接受现实的相对正义。\nthat we accept the relative justice of reality."
             },
             {
               "start": 5.23,
               "end": 7.47,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality"
+              "text": "但是不要因为现实的相对正义，\nBut don't let the relative justice of reality"
             },
             {
               "start": 7.47,
               "end": 9.99,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there is no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nmake us believe there is no justice in this world."
             },
             {
               "start": 10.51,
               "end": 12.92,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,"
             }
           ],
           "passed": true,
@@ -394,7 +394,7 @@
             {
               "start": 9.8,
               "end": 11.0,
-              "text": "your country.\u3002\nyour country."
+              "text": "your country.。\nyour country."
             }
           ],
           "rows": [
@@ -406,7 +406,7 @@
               "hard_cut": false,
               "has_ctx": false,
               "prompt_ctx": "",
-              "hyp": "[00:00.00-00:02.48]\nAnd so, my fellow Americans,\nAnd so, my fellow Americans,\n[00:03.12-00:04.56]\nask not\nask not\n[00:05.16-00:07.52]\nwhat your country can do for you,\nwhat your country can do for you,\n[00:08.00-00:10.00]\nask what you can do for\nask what you can do for\n[00:09.80-00:11.00]\nyour country.\u3002\nyour country.",
+              "hyp": "[00:00.00-00:02.48]\nAnd so, my fellow Americans,\nAnd so, my fellow Americans,\n[00:03.12-00:04.56]\nask not\nask not\n[00:05.16-00:07.52]\nwhat your country can do for you,\nwhat your country can do for you,\n[00:08.00-00:10.00]\nask what you can do for\nask what you can do for\n[00:09.80-00:11.00]\nyour country.。\nyour country.",
               "cues": [
                 {
                   "st": 0.0,
@@ -443,7 +443,7 @@
                 {
                   "st": 9.8,
                   "et": 11.0,
-                  "zh": "your country.\u3002",
+                  "zh": "your country.。",
                   "en": "your country.",
                   "g_st": 9.8,
                   "g_et": 11.0
@@ -472,22 +472,22 @@
             {
               "start": 0.43000000000000005,
               "end": 4.55,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nIt is precisely because absolute justice exists that we accept relative justice in reality."
+              "text": "正是因为存在绝对正义，所以我们接受现实的相对正义。\nIt is precisely because absolute justice exists that we accept relative justice in reality."
             },
             {
               "start": 5.2299999999999995,
               "end": 7.489999999999999,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut we shouldn't, because of this relative justice in reality,"
+              "text": "但是不要因为现实的相对正义，\nBut we shouldn't, because of this relative justice in reality,"
             },
             {
               "start": 7.489999999999999,
               "end": 10.049999999999999,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nassume there is no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nassume there is no justice in this world."
             },
             {
               "start": 10.51,
               "end": 12.94,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,"
             }
           ],
           "rows": [
@@ -499,12 +499,12 @@
               "hard_cut": false,
               "has_ctx": false,
               "prompt_ctx": "",
-              "hyp": "[00:00.33-00:04.45]\n\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nIt is precisely because absolute justice exists that we accept relative justice in reality.\n[00:05.13-00:07.39]\n\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut we shouldn't, because of this relative justice in reality,\n[00:07.39-00:09.95]\n\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nassume there is no justice in this world.\n[00:10.41-00:12.84]\n\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,",
+              "hyp": "[00:00.33-00:04.45]\n正是因为存在绝对正义，所以我们接受现实的相对正义。\nIt is precisely because absolute justice exists that we accept relative justice in reality.\n[00:05.13-00:07.39]\n但是不要因为现实的相对正义，\nBut we shouldn't, because of this relative justice in reality,\n[00:07.39-00:09.95]\n我们就认为这个世界没有正义。\nassume there is no justice in this world.\n[00:10.41-00:12.84]\n因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,",
               "cues": [
                 {
                   "st": 0.33,
                   "et": 4.45,
-                  "zh": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002",
+                  "zh": "正是因为存在绝对正义，所以我们接受现实的相对正义。",
                   "en": "It is precisely because absolute justice exists that we accept relative justice in reality.",
                   "g_st": 0.43000000000000005,
                   "g_et": 4.55
@@ -512,7 +512,7 @@
                 {
                   "st": 5.13,
                   "et": 7.39,
-                  "zh": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c",
+                  "zh": "但是不要因为现实的相对正义，",
                   "en": "But we shouldn't, because of this relative justice in reality,",
                   "g_st": 5.2299999999999995,
                   "g_et": 7.489999999999999
@@ -520,7 +520,7 @@
                 {
                   "st": 7.39,
                   "et": 9.95,
-                  "zh": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002",
+                  "zh": "我们就认为这个世界没有正义。",
                   "en": "assume there is no justice in this world.",
                   "g_st": 7.489999999999999,
                   "g_et": 10.049999999999999
@@ -528,7 +528,7 @@
                 {
                   "st": 10.41,
                   "et": 12.84,
-                  "zh": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c",
+                  "zh": "因为如果当你认为这个世界没有正义，",
                   "en": "Because if you believe there is no justice in this world,",
                   "g_st": 10.51,
                   "g_et": 12.94
@@ -557,22 +557,22 @@
             {
               "start": 0.43000000000000005,
               "end": 4.55,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\n\u7d76\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u5b58\u5728\u3059\u308b\u304b\u3089\u3053\u305d\u3001\u79c1\u305f\u3061\u306f\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u3092\u53d7\u3051\u5165\u308c\u308b\u306e\u3067\u3059\u3002"
+              "text": "正是因为存在绝对正义，所以我们接受现实的相对正义。\n絶対的な正義が存在するからこそ、私たちは現実の相対的な正義を受け入れるのです。"
             },
             {
               "start": 5.2299999999999995,
               "end": 7.489999999999999,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\n\u3057\u304b\u3057\u3001\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u3042\u308b\u304b\u3089\u3068\u3044\u3063\u3066\u3001"
+              "text": "但是不要因为现实的相对正义，\nしかし、現実の相対的な正義があるからといって、"
             },
             {
               "start": 7.489999999999999,
               "end": 10.049999999999999,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\n\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3001\u3068\u8003\u3048\u308b\u3079\u304d\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002"
+              "text": "我们就认为这个世界没有正义。\nこの世界に正義がない、と考えるべきではありません。"
             },
             {
               "start": 10.49,
               "end": 12.9,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\n\u306a\u305c\u306a\u3089\u3001\u3082\u3057\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3068\u8003\u3048\u308b\u3088\u3046\u306b\u306a\u3063\u305f\u3089\u3001"
+              "text": "因为如果当你认为这个世界没有正义，\nなぜなら、もしこの世界に正義がないと考えるようになったら、"
             }
           ],
           "rows": [
@@ -584,37 +584,37 @@
               "hard_cut": false,
               "has_ctx": false,
               "prompt_ctx": "",
-              "hyp": "[00:00.33-00:04.45]\n\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\n\u7d76\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u5b58\u5728\u3059\u308b\u304b\u3089\u3053\u305d\u3001\u79c1\u305f\u3061\u306f\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u3092\u53d7\u3051\u5165\u308c\u308b\u306e\u3067\u3059\u3002\n[00:05.13-00:07.39]\n\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\n\u3057\u304b\u3057\u3001\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u3042\u308b\u304b\u3089\u3068\u3044\u3063\u3066\u3001\n[00:07.39-00:09.95]\n\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\n\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3001\u3068\u8003\u3048\u308b\u3079\u304d\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002\n[00:10.39-00:12.80]\n\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\n\u306a\u305c\u306a\u3089\u3001\u3082\u3057\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3068\u8003\u3048\u308b\u3088\u3046\u306b\u306a\u3063\u305f\u3089\u3001",
+              "hyp": "[00:00.33-00:04.45]\n正是因为存在绝对正义，所以我们接受现实的相对正义。\n絶対的な正義が存在するからこそ、私たちは現実の相対的な正義を受け入れるのです。\n[00:05.13-00:07.39]\n但是不要因为现实的相对正义，\nしかし、現実の相対的な正義があるからといって、\n[00:07.39-00:09.95]\n我们就认为这个世界没有正义。\nこの世界に正義がない、と考えるべきではありません。\n[00:10.39-00:12.80]\n因为如果当你认为这个世界没有正义，\nなぜなら、もしこの世界に正義がないと考えるようになったら、",
               "cues": [
                 {
                   "st": 0.33,
                   "et": 4.45,
-                  "zh": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002",
-                  "en": "\u7d76\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u5b58\u5728\u3059\u308b\u304b\u3089\u3053\u305d\u3001\u79c1\u305f\u3061\u306f\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u3092\u53d7\u3051\u5165\u308c\u308b\u306e\u3067\u3059\u3002",
+                  "zh": "正是因为存在绝对正义，所以我们接受现实的相对正义。",
+                  "en": "絶対的な正義が存在するからこそ、私たちは現実の相対的な正義を受け入れるのです。",
                   "g_st": 0.43000000000000005,
                   "g_et": 4.55
                 },
                 {
                   "st": 5.13,
                   "et": 7.39,
-                  "zh": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c",
-                  "en": "\u3057\u304b\u3057\u3001\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u3042\u308b\u304b\u3089\u3068\u3044\u3063\u3066\u3001",
+                  "zh": "但是不要因为现实的相对正义，",
+                  "en": "しかし、現実の相対的な正義があるからといって、",
                   "g_st": 5.2299999999999995,
                   "g_et": 7.489999999999999
                 },
                 {
                   "st": 7.39,
                   "et": 9.95,
-                  "zh": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002",
-                  "en": "\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3001\u3068\u8003\u3048\u308b\u3079\u304d\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002",
+                  "zh": "我们就认为这个世界没有正义。",
+                  "en": "この世界に正義がない、と考えるべきではありません。",
                   "g_st": 7.489999999999999,
                   "g_et": 10.049999999999999
                 },
                 {
                   "st": 10.39,
                   "et": 12.8,
-                  "zh": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c",
-                  "en": "\u306a\u305c\u306a\u3089\u3001\u3082\u3057\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3068\u8003\u3048\u308b\u3088\u3046\u306b\u306a\u3063\u305f\u3089\u3001",
+                  "zh": "因为如果当你认为这个世界没有正义，",
+                  "en": "なぜなら、もしこの世界に正義がないと考えるようになったら、",
                   "g_st": 10.49,
                   "g_et": 12.9
                 }
@@ -642,22 +642,22 @@
             {
               "start": 0.43000000000000005,
               "end": 4.55,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nPrecisamente porque existe la justicia absoluta,"
+              "text": "正是因为存在绝对正义，所以我们接受现实的相对正义。\nPrecisamente porque existe la justicia absoluta,"
             },
             {
               "start": 5.2299999999999995,
               "end": 7.489999999999999,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\naceptamos la justicia relativa de la realidad."
+              "text": "但是不要因为现实的相对正义，\naceptamos la justicia relativa de la realidad."
             },
             {
               "start": 7.489999999999999,
               "end": 10.049999999999999,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nPero no debemos pensar que no hay justicia en este mundo"
+              "text": "我们就认为这个世界没有正义。\nPero no debemos pensar que no hay justicia en este mundo"
             },
             {
               "start": 10.51,
               "end": 12.94,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nporque si crees que no hay justicia en este mundo,"
+              "text": "因为如果当你认为这个世界没有正义，\nporque si crees que no hay justicia en este mundo,"
             }
           ],
           "rows": [
@@ -669,12 +669,12 @@
               "hard_cut": false,
               "has_ctx": false,
               "prompt_ctx": "",
-              "hyp": "[00:00.33-00:04.45]\n\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nPrecisamente porque existe la justicia absoluta,\n[00:05.13-00:07.39]\n\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\naceptamos la justicia relativa de la realidad.\n[00:07.39-00:09.95]\n\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nPero no debemos pensar que no hay justicia en este mundo\n[00:10.41-00:12.84]\n\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nporque si crees que no hay justicia en este mundo,",
+              "hyp": "[00:00.33-00:04.45]\n正是因为存在绝对正义，所以我们接受现实的相对正义。\nPrecisamente porque existe la justicia absoluta,\n[00:05.13-00:07.39]\n但是不要因为现实的相对正义，\naceptamos la justicia relativa de la realidad.\n[00:07.39-00:09.95]\n我们就认为这个世界没有正义。\nPero no debemos pensar que no hay justicia en este mundo\n[00:10.41-00:12.84]\n因为如果当你认为这个世界没有正义，\nporque si crees que no hay justicia en este mundo,",
               "cues": [
                 {
                   "st": 0.33,
                   "et": 4.45,
-                  "zh": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002",
+                  "zh": "正是因为存在绝对正义，所以我们接受现实的相对正义。",
                   "en": "Precisamente porque existe la justicia absoluta,",
                   "g_st": 0.43000000000000005,
                   "g_et": 4.55
@@ -682,7 +682,7 @@
                 {
                   "st": 5.13,
                   "et": 7.39,
-                  "zh": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c",
+                  "zh": "但是不要因为现实的相对正义，",
                   "en": "aceptamos la justicia relativa de la realidad.",
                   "g_st": 5.2299999999999995,
                   "g_et": 7.489999999999999
@@ -690,7 +690,7 @@
                 {
                   "st": 7.39,
                   "et": 9.95,
-                  "zh": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002",
+                  "zh": "我们就认为这个世界没有正义。",
                   "en": "Pero no debemos pensar que no hay justicia en este mundo",
                   "g_st": 7.489999999999999,
                   "g_et": 10.049999999999999
@@ -698,7 +698,7 @@
                 {
                   "st": 10.41,
                   "et": 12.84,
-                  "zh": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c",
+                  "zh": "因为如果当你认为这个世界没有正义，",
                   "en": "porque si crees que no hay justicia en este mundo,",
                   "g_st": 10.51,
                   "g_et": 12.94
@@ -727,27 +727,27 @@
             {
               "start": 0.43000000000000005,
               "end": 2.21,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists"
+              "text": "正是因为存在绝对正义，\nIt is precisely because absolute justice exists"
             },
             {
               "start": 2.29,
               "end": 4.659999999999999,
-              "text": "\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality."
+              "text": "所以我们接受现实的相对正义。\nthat we accept the relative justice of reality."
             },
             {
               "start": 66.29,
               "end": 68.49,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality"
+              "text": "但是不要因为现实的相对正义，\nBut don't let the relative justice of reality"
             },
             {
               "start": 68.49,
               "end": 70.97,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there's no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nmake us believe there's no justice in this world."
             },
             {
               "start": 71.51,
               "end": 73.92,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there's no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there's no justice in this world,"
             }
           ],
           "rows": [
@@ -759,12 +759,12 @@
               "hard_cut": false,
               "has_ctx": false,
               "prompt_ctx": "",
-              "hyp": "[00:00.33-00:02.11]\n\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists\n[00:02.19-00:04.56]\n\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality.",
+              "hyp": "[00:00.33-00:02.11]\n正是因为存在绝对正义，\nIt is precisely because absolute justice exists\n[00:02.19-00:04.56]\n所以我们接受现实的相对正义。\nthat we accept the relative justice of reality.",
               "cues": [
                 {
                   "st": 0.33,
                   "et": 2.11,
-                  "zh": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c",
+                  "zh": "正是因为存在绝对正义，",
                   "en": "It is precisely because absolute justice exists",
                   "g_st": 0.43000000000000005,
                   "g_et": 2.21
@@ -772,7 +772,7 @@
                 {
                   "st": 2.19,
                   "et": 4.56,
-                  "zh": "\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002",
+                  "zh": "所以我们接受现实的相对正义。",
                   "en": "that we accept the relative justice of reality.",
                   "g_st": 2.29,
                   "g_et": 4.659999999999999
@@ -788,13 +788,13 @@
               "dur": 8.052,
               "hard_cut": false,
               "has_ctx": true,
-              "prompt_ctx": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists\n\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality.",
-              "hyp": "[00:00.29-00:02.49]\n\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality\n[00:02.49-00:04.97]\n\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there's no justice in this world.\n[00:05.51-00:07.92]\n\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there's no justice in this world,",
+              "prompt_ctx": "正是因为存在绝对正义，\nIt is precisely because absolute justice exists\n所以我们接受现实的相对正义。\nthat we accept the relative justice of reality.",
+              "hyp": "[00:00.29-00:02.49]\n但是不要因为现实的相对正义，\nBut don't let the relative justice of reality\n[00:02.49-00:04.97]\n我们就认为这个世界没有正义。\nmake us believe there's no justice in this world.\n[00:05.51-00:07.92]\n因为如果当你认为这个世界没有正义，\nBecause if you believe there's no justice in this world,",
               "cues": [
                 {
                   "st": 0.29,
                   "et": 2.49,
-                  "zh": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c",
+                  "zh": "但是不要因为现实的相对正义，",
                   "en": "But don't let the relative justice of reality",
                   "g_st": 66.29,
                   "g_et": 68.49
@@ -802,7 +802,7 @@
                 {
                   "st": 2.49,
                   "et": 4.97,
-                  "zh": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002",
+                  "zh": "我们就认为这个世界没有正义。",
                   "en": "make us believe there's no justice in this world.",
                   "g_st": 68.49,
                   "g_et": 70.97
@@ -810,7 +810,7 @@
                 {
                   "st": 5.51,
                   "et": 7.92,
-                  "zh": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c",
+                  "zh": "因为如果当你认为这个世界没有正义，",
                   "en": "Because if you believe there's no justice in this world,",
                   "g_st": 71.51,
                   "g_et": 73.92
@@ -860,115 +860,115 @@
             {
               "start": 9.8,
               "end": 11.0,
-              "text": "your country.\u3002\nyour country."
+              "text": "your country.。\nyour country."
             }
           ],
-          "elapsed_seconds": 124.25916878899989
+          "elapsed_seconds": 119.35635094300005
         },
         "zh-en": {
           "segments": [
             {
               "start": 0.43,
               "end": 4.55,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nIt is precisely because absolute justice exists that we accept relative justice in reality."
+              "text": "正是因为存在绝对正义，所以我们接受现实的相对正义。\nIt is precisely because absolute justice exists that we accept relative justice in reality."
             },
             {
               "start": 5.23,
               "end": 7.49,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut we shouldn't, because of this relative justice in reality,"
+              "text": "但是不要因为现实的相对正义，\nBut we shouldn't, because of this relative justice in reality,"
             },
             {
               "start": 7.49,
               "end": 10.05,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nassume there is no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nassume there is no justice in this world."
             },
             {
               "start": 10.51,
               "end": 12.94,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,"
             }
           ],
-          "elapsed_seconds": 119.5936612659998
+          "elapsed_seconds": 122.21207029199991
         },
         "zh-ja": {
           "segments": [
             {
               "start": 0.43,
               "end": 4.55,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\n\u7d76\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u5b58\u5728\u3059\u308b\u304b\u3089\u3053\u305d\u3001\u79c1\u305f\u3061\u306f\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u3092\u53d7\u3051\u5165\u308c\u308b\u306e\u3067\u3059\u3002"
+              "text": "正是因为存在绝对正义，所以我们接受现实的相对正义。\n絶対的な正義が存在するからこそ、私たちは現実の相対的な正義を受け入れるのです。"
             },
             {
               "start": 5.23,
               "end": 7.49,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\n\u3057\u304b\u3057\u3001\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u3042\u308b\u304b\u3089\u3068\u3044\u3063\u3066\u3001"
+              "text": "但是不要因为现实的相对正义，\nしかし、現実の相対的な正義があるからといって、"
             },
             {
               "start": 7.49,
               "end": 10.05,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\n\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3001\u3068\u8003\u3048\u308b\u3079\u304d\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002"
+              "text": "我们就认为这个世界没有正义。\nこの世界に正義がない、と考えるべきではありません。"
             },
             {
               "start": 10.49,
               "end": 12.9,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\n\u306a\u305c\u306a\u3089\u3001\u3082\u3057\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3068\u8003\u3048\u308b\u3088\u3046\u306b\u306a\u3063\u305f\u3089\u3001"
+              "text": "因为如果当你认为这个世界没有正义，\nなぜなら、もしこの世界に正義がないと考えるようになったら、"
             }
           ],
-          "elapsed_seconds": 124.5693908760004
+          "elapsed_seconds": 129.3226310060004
         },
         "zh-es": {
           "segments": [
             {
               "start": 0.43,
               "end": 4.55,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nPrecisamente porque existe la justicia absoluta,"
+              "text": "正是因为存在绝对正义，所以我们接受现实的相对正义。\nPrecisamente porque existe la justicia absoluta,"
             },
             {
               "start": 5.23,
               "end": 7.49,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\naceptamos la justicia relativa de la realidad."
+              "text": "但是不要因为现实的相对正义，\naceptamos la justicia relativa de la realidad."
             },
             {
               "start": 7.49,
               "end": 10.05,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nPero no debemos pensar que no hay justicia en este mundo"
+              "text": "我们就认为这个世界没有正义。\nPero no debemos pensar que no hay justicia en este mundo"
             },
             {
               "start": 10.51,
               "end": 12.94,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nporque si crees que no hay justicia en este mundo,"
+              "text": "因为如果当你认为这个世界没有正义，\nporque si crees que no hay justicia en este mundo,"
             }
           ],
-          "elapsed_seconds": 121.34007713600022
+          "elapsed_seconds": 120.23236930600024
         },
         "multi-en": {
           "segments": [
             {
               "start": 0.43,
               "end": 2.21,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists"
+              "text": "正是因为存在绝对正义，\nIt is precisely because absolute justice exists"
             },
             {
               "start": 2.29,
               "end": 4.66,
-              "text": "\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality."
+              "text": "所以我们接受现实的相对正义。\nthat we accept the relative justice of reality."
             },
             {
               "start": 66.29,
               "end": 68.49,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality"
+              "text": "但是不要因为现实的相对正义，\nBut don't let the relative justice of reality"
             },
             {
               "start": 68.49,
               "end": 70.97,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there's no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nmake us believe there's no justice in this world."
             },
             {
               "start": 71.51,
               "end": 73.92,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there's no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there's no justice in this world,"
             }
           ],
-          "elapsed_seconds": 164.70141453399992
+          "elapsed_seconds": 154.87795348200007
         }
       },
       "cuda": {
@@ -997,115 +997,115 @@
             {
               "start": 9.8,
               "end": 11.0,
-              "text": "your country.\u3002\nyour country."
+              "text": "your country.。\nyour country."
             }
           ],
-          "elapsed_seconds": 12.618506820999983
+          "elapsed_seconds": 12.50850147899996
         },
         "zh-en": {
           "segments": [
             {
               "start": 0.43,
               "end": 4.55,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nIt is precisely because absolute justice exists that we accept relative justice in reality."
+              "text": "正是因为存在绝对正义，所以我们接受现实的相对正义。\nIt is precisely because absolute justice exists that we accept relative justice in reality."
             },
             {
               "start": 5.23,
               "end": 7.49,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut we shouldn't, because of this relative justice in reality,"
+              "text": "但是不要因为现实的相对正义，\nBut we shouldn't, because of this relative justice in reality,"
             },
             {
               "start": 7.49,
               "end": 10.05,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nassume there is no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nassume there is no justice in this world."
             },
             {
               "start": 10.51,
               "end": 12.94,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there is no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there is no justice in this world,"
             }
           ],
-          "elapsed_seconds": 12.956765109000003
+          "elapsed_seconds": 12.918163490999973
         },
         "zh-ja": {
           "segments": [
             {
               "start": 0.43,
               "end": 4.55,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\n\u7d76\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u5b58\u5728\u3059\u308b\u304b\u3089\u3053\u305d\u3001\u79c1\u305f\u3061\u306f\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u3092\u53d7\u3051\u5165\u308c\u308b\u306e\u3067\u3059\u3002"
+              "text": "正是因为存在绝对正义，所以我们接受现实的相对正义。\n絶対的な正義が存在するからこそ、私たちは現実の相対的な正義を受け入れるのです。"
             },
             {
               "start": 5.23,
               "end": 7.49,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\n\u3057\u304b\u3057\u3001\u73fe\u5b9f\u306e\u76f8\u5bfe\u7684\u306a\u6b63\u7fa9\u304c\u3042\u308b\u304b\u3089\u3068\u3044\u3063\u3066\u3001"
+              "text": "但是不要因为现实的相对正义，\nしかし、現実の相対的な正義があるからといって、"
             },
             {
               "start": 7.49,
               "end": 10.05,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\n\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3001\u3068\u8003\u3048\u308b\u3079\u304d\u3067\u306f\u3042\u308a\u307e\u305b\u3093\u3002"
+              "text": "我们就认为这个世界没有正义。\nこの世界に正義がない、と考えるべきではありません。"
             },
             {
               "start": 10.49,
               "end": 12.9,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\n\u306a\u305c\u306a\u3089\u3001\u3082\u3057\u3053\u306e\u4e16\u754c\u306b\u6b63\u7fa9\u304c\u306a\u3044\u3068\u8003\u3048\u308b\u3088\u3046\u306b\u306a\u3063\u305f\u3089\u3001"
+              "text": "因为如果当你认为这个世界没有正义，\nなぜなら、もしこの世界に正義がないと考えるようになったら、"
             }
           ],
-          "elapsed_seconds": 13.387546455000006
+          "elapsed_seconds": 13.380720314000087
         },
         "zh-es": {
           "segments": [
             {
               "start": 0.43,
               "end": 4.55,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nPrecisamente porque existe la justicia absoluta,"
+              "text": "正是因为存在绝对正义，所以我们接受现实的相对正义。\nPrecisamente porque existe la justicia absoluta,"
             },
             {
               "start": 5.23,
               "end": 7.49,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\naceptamos la justicia relativa de la realidad."
+              "text": "但是不要因为现实的相对正义，\naceptamos la justicia relativa de la realidad."
             },
             {
               "start": 7.49,
               "end": 10.05,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nPero no debemos pensar que no hay justicia en este mundo"
+              "text": "我们就认为这个世界没有正义。\nPero no debemos pensar que no hay justicia en este mundo"
             },
             {
               "start": 10.51,
               "end": 12.94,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nporque si crees que no hay justicia en este mundo,"
+              "text": "因为如果当你认为这个世界没有正义，\nporque si crees que no hay justicia en este mundo,"
             }
           ],
-          "elapsed_seconds": 12.488135858999954
+          "elapsed_seconds": 12.575817458000074
         },
         "multi-en": {
           "segments": [
             {
               "start": 0.43,
               "end": 2.21,
-              "text": "\u6b63\u662f\u56e0\u4e3a\u5b58\u5728\u7edd\u5bf9\u6b63\u4e49\uff0c\nIt is precisely because absolute justice exists"
+              "text": "正是因为存在绝对正义，\nIt is precisely because absolute justice exists"
             },
             {
               "start": 2.29,
               "end": 4.66,
-              "text": "\u6240\u4ee5\u6211\u4eec\u63a5\u53d7\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\u3002\nthat we accept the relative justice of reality."
+              "text": "所以我们接受现实的相对正义。\nthat we accept the relative justice of reality."
             },
             {
               "start": 66.29,
               "end": 68.49,
-              "text": "\u4f46\u662f\u4e0d\u8981\u56e0\u4e3a\u73b0\u5b9e\u7684\u76f8\u5bf9\u6b63\u4e49\uff0c\nBut don't let the relative justice of reality"
+              "text": "但是不要因为现实的相对正义，\nBut don't let the relative justice of reality"
             },
             {
               "start": 68.49,
               "end": 70.97,
-              "text": "\u6211\u4eec\u5c31\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\u3002\nmake us believe there's no justice in this world."
+              "text": "我们就认为这个世界没有正义。\nmake us believe there's no justice in this world."
             },
             {
               "start": 71.51,
               "end": 73.92,
-              "text": "\u56e0\u4e3a\u5982\u679c\u5f53\u4f60\u8ba4\u4e3a\u8fd9\u4e2a\u4e16\u754c\u6ca1\u6709\u6b63\u4e49\uff0c\nBecause if you believe there's no justice in this world,"
+              "text": "因为如果当你认为这个世界没有正义，\nBecause if you believe there's no justice in this world,"
             }
           ],
-          "elapsed_seconds": 16.30695636900009
+          "elapsed_seconds": 16.197739956999953
         }
       }
     },
@@ -1135,13 +1135,13 @@
     "passed": true,
     "provenance": {
       "model_repo": "cstr/index-echo-9b-GGUF",
-      "model_revision": "dca128e0da2c86819347b79f63da610c0b8bd472",
+      "model_revision": "dffbadf0f173446fee0364a0807803d2b2fb6f49",
       "fixture_repo": "cstr/crispasr-regression-fixtures",
       "fixture_revision": "cb678dfd4806778aa55c39fe7b7a710a54cdc153",
       "stage_fixture_prefix": "index-echo-9b-f32-generation",
       "pipeline_fixture_prefix": "index-echo-9b-f32-zh-context",
       "pipeline_audio_path": "index-echo-9b/pipeline-zh-context/audio.wav",
-      "source_commit": "c1a9ca8fcd789935c4298c57f5a341a302e2834e",
+      "source_commit": "a67c78eb251719a3913e90cda89f84aa61b3c592",
       "ggml_commit": "2f5a80d258c46e6ac8eee95f1328c0f58376d7ee",
       "threads": 4,
       "cpu": "aarch64"
@@ -2303,7 +2303,7 @@
         ]
       }
     },
-    "run": 37002813123,
+    "run": 37016734351,
     "real_piper_roundtrips": {
       "model": "index-echo-9b-f16.gguf",
       "gpu": false,
@@ -2317,13 +2317,13 @@
             {
               "start": 0.05,
               "end": 2.52,
-              "text": "The quick brown fox jumps over the lazy dog.\u3002\nThe quick brown fox jumps over the lazy dog."
+              "text": "The quick brown fox jumps over the lazy dog.。\nThe quick brown fox jumps over the lazy dog."
             }
           ],
           "valid_segments": true,
           "audio_sha256": "2922b7cd5360b373a650d8bf1ea39de16aa3d49e7a44cdec5f350d46c15556ff",
           "seconds": 2.67025,
-          "elapsed_seconds": 67.97856532800006,
+          "elapsed_seconds": 46.80396201600024,
           "cli_rc": 0,
           "cli_abi_text_match": true,
           "passed": true
@@ -2337,13 +2337,13 @@
             {
               "start": 0.05,
               "end": 2.4,
-              "text": "Please close the window before you leave the room.\u3002\nPlease close the window before you leave the room."
+              "text": "Please close the window before you leave the room.。\nPlease close the window before you leave the room."
             }
           ],
           "valid_segments": true,
           "audio_sha256": "6a46a4c0c5b0cd48dfd71d600bcec1b4f44701500b6f3e749cde7fb73f140fa1",
           "seconds": 2.6006875,
-          "elapsed_seconds": 42.09555781900008,
+          "elapsed_seconds": 42.65402371800019,
           "cli_rc": 0,
           "cli_abi_text_match": true,
           "passed": true
@@ -2363,7 +2363,7 @@
           "valid_segments": true,
           "audio_sha256": "3171272c57adafaf73c746322a64240300d7d40f7f42dbfca8c1a9fcc335e32a",
           "seconds": 2.4729375,
-          "elapsed_seconds": 43.13723489999984,
+          "elapsed_seconds": 41.36297806899984,
           "cli_rc": 0,
           "cli_abi_text_match": true,
           "passed": true
@@ -3550,7 +3550,7 @@
           "exact_text": true,
           "vad_max_abs": 0.002838611602783203,
           "vad_cosine": 0.9999999555304057,
-          "elapsed_seconds": 124.25916878899989
+          "elapsed_seconds": 119.35635094300005
         },
         "zh-en": {
           "source_variant": "independent-all-f32",
@@ -3559,7 +3559,7 @@
           "exact_text": true,
           "vad_max_abs": 0.0010031238198280334,
           "vad_cosine": 0.999999996405047,
-          "elapsed_seconds": 119.5936612659998
+          "elapsed_seconds": 122.21207029199991
         },
         "zh-ja": {
           "source_variant": "independent-all-f32",
@@ -3568,7 +3568,7 @@
           "exact_text": true,
           "vad_max_abs": 0.0010031238198280334,
           "vad_cosine": 0.999999996405047,
-          "elapsed_seconds": 124.5693908760004
+          "elapsed_seconds": 129.3226310060004
         },
         "zh-es": {
           "source_variant": "independent-all-f32",
@@ -3577,7 +3577,7 @@
           "exact_text": true,
           "vad_max_abs": 0.0010031238198280334,
           "vad_cosine": 0.999999996405047,
-          "elapsed_seconds": 121.34007713600022
+          "elapsed_seconds": 120.23236930600024
         },
         "multi-en": {
           "source_variant": "independent-all-f32",
@@ -3586,7 +3586,7 @@
           "exact_text": true,
           "vad_max_abs": 0.0010031238198280334,
           "vad_cosine": 0.9999999948789577,
-          "elapsed_seconds": 164.70141453399992
+          "elapsed_seconds": 154.87795348200007
         }
       },
       "cuda": {
@@ -3597,7 +3597,7 @@
           "exact_text": true,
           "vad_max_abs": 0.002839803695678711,
           "vad_cosine": 0.9999999554856016,
-          "elapsed_seconds": 12.618506820999983
+          "elapsed_seconds": 12.50850147899996
         },
         "zh-en": {
           "source_variant": "independent-all-f32",
@@ -3606,7 +3606,7 @@
           "exact_text": true,
           "vad_max_abs": 0.0010026991367340088,
           "vad_cosine": 0.9999999964061769,
-          "elapsed_seconds": 12.956765109000003
+          "elapsed_seconds": 12.918163490999973
         },
         "zh-ja": {
           "source_variant": "independent-all-f32",
@@ -3615,7 +3615,7 @@
           "exact_text": true,
           "vad_max_abs": 0.0010026991367340088,
           "vad_cosine": 0.9999999964061769,
-          "elapsed_seconds": 13.387546455000006
+          "elapsed_seconds": 13.380720314000087
         },
         "zh-es": {
           "source_variant": "independent-all-f32",
@@ -3624,7 +3624,7 @@
           "exact_text": true,
           "vad_max_abs": 0.0010026991367340088,
           "vad_cosine": 0.9999999964061769,
-          "elapsed_seconds": 12.488135858999954
+          "elapsed_seconds": 12.575817458000074
         },
         "multi-en": {
           "source_variant": "independent-all-f32",
@@ -3633,7 +3633,7 @@
           "exact_text": true,
           "vad_max_abs": 0.0010026991367340088,
           "vad_cosine": 0.9999999948773856,
-          "elapsed_seconds": 16.30695636900009
+          "elapsed_seconds": 16.197739956999953
         }
       }
     },
@@ -3656,13 +3656,13 @@
           {
             "start": 0.05,
             "end": 2.52,
-            "text": "The quick brown fox jumps over the lazy dog.\u3002\nThe quick brown fox jumps over the lazy dog."
+            "text": "The quick brown fox jumps over the lazy dog.。\nThe quick brown fox jumps over the lazy dog."
           }
         ],
         "valid_segments": true,
         "audio_sha256": "2922b7cd5360b373a650d8bf1ea39de16aa3d49e7a44cdec5f350d46c15556ff",
         "seconds": 2.67025,
-        "elapsed_seconds": 4.104690304999963,
+        "elapsed_seconds": 4.032539429999929,
         "cli_rc": 0,
         "cli_abi_text_match": true,
         "passed": true
@@ -3676,13 +3676,13 @@
           {
             "start": 0.05,
             "end": 2.4,
-            "text": "Please close the window before you leave the room.\u3002\nPlease close the window before you leave the room."
+            "text": "Please close the window before you leave the room.。\nPlease close the window before you leave the room."
           }
         ],
         "valid_segments": true,
         "audio_sha256": "6a46a4c0c5b0cd48dfd71d600bcec1b4f44701500b6f3e749cde7fb73f140fa1",
         "seconds": 2.6006875,
-        "elapsed_seconds": 3.9997923690000334,
+        "elapsed_seconds": 3.9076395390000016,
         "cli_rc": 0,
         "cli_abi_text_match": true,
         "passed": true
@@ -3702,7 +3702,7 @@
         "valid_segments": true,
         "audio_sha256": "3171272c57adafaf73c746322a64240300d7d40f7f42dbfca8c1a9fcc335e32a",
         "seconds": 2.4729375,
-        "elapsed_seconds": 3.838113700000008,
+        "elapsed_seconds": 3.7533202359999223,
         "cli_rc": 0,
         "cli_abi_text_match": true,
         "passed": true
@@ -3715,68 +3715,68 @@
       "sha256": "fd4ee7d219dd5d6243c6994261493dc6e7fa8827f06f130d3ab0143b7ae6b9d5"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/f16-f32-arm-37002813123/heavy-37002813123/validation-provenance.json",
-      "sha256": "028eb46acd77d769f06beeb5b9fa0b9d8f238e48c9a00163f9ccce9d47e0c717"
+      "path": "/mnt/storage/crispasr/issue485-9b/main-full-37016734351/heavy-37016734351/validation-provenance.json",
+      "sha256": "77b84dbabffff388dcf819ce62f99f9f2a3ff6895b4b42ef0bcaea0d20c994db"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/f16-f32-arm-37002813123/heavy-37002813123/stage-results-f16.json",
+      "path": "/mnt/storage/crispasr/issue485-9b/main-full-37016734351/heavy-37016734351/stage-results-f16.json",
       "sha256": "539db208b8bb3dae7b105d67a638e4fb04dfa39b6c3889859c7e1cde9564703b"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/f16-f32-arm-37002813123/heavy-37002813123/decoded-f16.json",
+      "path": "/mnt/storage/crispasr/issue485-9b/main-full-37016734351/heavy-37016734351/decoded-f16.json",
       "sha256": "432ea4ab9061fa4897ec5cc697d9339cb093fba9504f257023ac72aa1c64a616"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/f16-f32-arm-37002813123/heavy-37002813123/cohort-results.json",
-      "sha256": "0af9042ea2f6956c6604010a7c77f511295c3e608f67007f3287412990b5f55e"
+      "path": "/mnt/storage/crispasr/issue485-9b/main-full-37016734351/heavy-37016734351/cohort-results.json",
+      "sha256": "d98a75641c2b6661ca15ba2fac23d4128942561be105e063ef4586910026e577"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v3-terminal/cuda-validation.json",
-      "sha256": "f36fefaf7f57c2cb93f319de9e4e899fee109926cc179cdd2c95d00a653e7332"
+      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v4-terminal/cuda-validation.json",
+      "sha256": "c8d36a9fb0ae656d02c1e025fe093ce2fa4d144ef312fb5e31a754521410b15d"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/f16-f32-arm-37002813123/heavy-37002813123/f16-jfk-diff.log",
-      "sha256": "29fa64c426b09e8909bf92abfaa70135b9a5494bbd604e9394a036ea0f231c5d"
+      "path": "/mnt/storage/crispasr/issue485-9b/main-full-37016734351/heavy-37016734351/f16-jfk-diff.log",
+      "sha256": "b86a33166d6d949901fca52086f2ea1e0d7a657807215ecc2999b8ffeb82eb88"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/f16-f32-arm-37002813123/heavy-37002813123/f16-jfk-tail-diff.log",
-      "sha256": "f6ab952a7b991f0d9077be4ca1e41d85f975fe3f332ff438c149869e8c7ff295"
+      "path": "/mnt/storage/crispasr/issue485-9b/main-full-37016734351/heavy-37016734351/f16-jfk-tail-diff.log",
+      "sha256": "61f09ada0b9679efc89c8317abdcd17db2e3031a576c0976e6fb9b952db6c6e3"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/f16-f32-arm-37002813123/heavy-37002813123/f16-zh-diff.log",
-      "sha256": "2c1cbc233ff31910deb8171834aeb72a38d774ac09902324370190883594e14f"
+      "path": "/mnt/storage/crispasr/issue485-9b/main-full-37016734351/heavy-37016734351/f16-zh-diff.log",
+      "sha256": "0fe00a7cf34eadeb1dfb91872d7514a5d9fedb6bb79dafea9a81059961e0bc96"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v3-terminal/f16-jfk-diff.log",
-      "sha256": "64b8afecb2c521e2d7f3f7bad450cdf3c9557428a214441672e5f8666bd58ba7"
+      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v4-terminal/f16-jfk-diff.log",
+      "sha256": "7a042dffb612a95254b5eed4258d77de78d601d7d9b7d4ea3af168fe581b993e"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v3-terminal/f16-jfk-tail-diff.log",
-      "sha256": "dce08bbaa31520dae168b12d5772662361d562227266ec28b8d674d3deb7dbc1"
+      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v4-terminal/f16-jfk-tail-diff.log",
+      "sha256": "52dde6fa9121494b1a4cdf3d2e9787e579a274bd4c3c23f7ce2483b11a832018"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v3-terminal/f16-zh-diff.log",
-      "sha256": "1433a424cc1af67e524a0e903134869dc5608898432435dc2b8bf09696c100ba"
+      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v4-terminal/f16-zh-diff.log",
+      "sha256": "33459c60cca9962a450774d20a4e920dd56e17d9ba93fe1fc12dc52f7e9d848d"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/f16-f32-arm-37002813123/heavy-37002813123/pipeline-f16.json",
-      "sha256": "95477379e25cbe483ab2e3c715b36d500c12bcabd47a2452d5593a5723c74e14"
+      "path": "/mnt/storage/crispasr/issue485-9b/main-full-37016734351/heavy-37016734351/pipeline-f16.json",
+      "sha256": "974d85361c768e3202309b73650d64c9e287822746aa4f1feeacdfaf467eca30"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v3-terminal/pipeline-f16.json",
-      "sha256": "2dd945db3992cce698b89cf4b9c19df308dc3551e7e1fba5179fa20337f4549a"
+      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v4-terminal/pipeline-f16.json",
+      "sha256": "af815158a140e9f29d00136b6aca6c608f59b5f25eeff7606d778a7cdb029f52"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v3-terminal/index-echo-9b-f16-roundtrip.json",
-      "sha256": "64b90f40ab135a112c61cbe84398226ce968ca8776ae74898669d2b149670828"
+      "path": "/mnt/storage/crispasr/issue485-9b/kaggle-validation-v4-terminal/index-echo-9b-f16-roundtrip.json",
+      "sha256": "da697d60afffa2d3febba78ffb3a218e56131ef0b5476b412120705c039438f0"
     },
     {
       "path": "/mnt/storage/crispasr/issue485-9b/conversion/conversion-receipt.json",
       "sha256": "982ce812635993aafec5ec0810571d5879fb386eb839d7ebda2e48201af21c6b"
     },
     {
-      "path": "/mnt/storage/crispasr/issue485-9b/f16-f32-arm-37002813123/heavy-37002813123/cohort-results.json",
-      "sha256": "0af9042ea2f6956c6604010a7c77f511295c3e608f67007f3287412990b5f55e"
+      "path": "/mnt/storage/crispasr/issue485-9b/main-full-37016734351/heavy-37016734351/cohort-results.json",
+      "sha256": "d98a75641c2b6661ca15ba2fac23d4128942561be105e063ef4586910026e577"
     }
   ],
   "retained_controls": {
@@ -3911,7 +3911,7 @@
               {
                 "start": 0.05,
                 "end": 2.52,
-                "text": "The quick brown fox jumps over the lazy dog.\u3002\nThe quick brown fox jumps over the lazy dog."
+                "text": "The quick brown fox jumps over the lazy dog.。\nThe quick brown fox jumps over the lazy dog."
               }
             ],
             "valid_segments": true,
@@ -3931,7 +3931,7 @@
               {
                 "start": 0.05,
                 "end": 2.4,
-                "text": "Please close the window before you leave the room.\u3002\nPlease close the window before you leave the room."
+                "text": "Please close the window before you leave the room.。\nPlease close the window before you leave the room."
               }
             ],
             "valid_segments": true,
@@ -3989,7 +3989,8 @@
           "sha256": "da697d60afffa2d3febba78ffb3a218e56131ef0b5476b412120705c039438f0"
         }
       ]
-    }
+    },
+    "metadata_revision": "a6dae125dfd4bbedb9cee5a64976f7776c83d7dd"
   },
   "integration": {
     "protected_2b_q8_nightly": {
@@ -4044,6 +4045,40 @@
       "preflight": "success",
       "select": "success",
       "full_unrelated_matrix": "cancelled after targeted live model nightlies already passed"
+    },
+    "main": {
+      "source_commit": "a67c78eb251719a3913e90cda89f84aa61b3c592",
+      "ci": {
+        "run": 37016734092,
+        "passed": true,
+        "jobs": 13
+      },
+      "lint": {
+        "run": 37016733637,
+        "passed": true,
+        "jobs": 10
+      },
+      "wasm_build": {
+        "run": 37016733853,
+        "passed": true,
+        "modes": 5
+      },
+      "large_9b_regression": {
+        "run": 37016734351,
+        "passed": true,
+        "runner": "ubuntu-24.04-arm",
+        "cohort_results": {
+          "f16": [],
+          "nightly_regression": []
+        },
+        "receipt_sha256": "d98a75641c2b6661ca15ba2fac23d4128942561be105e063ef4586910026e577"
+      }
     }
+  },
+  "original_staging_acceptance": {
+    "model_revision": "dca128e0da2c86819347b79f63da610c0b8bd472",
+    "cpu_run": 37002813123,
+    "cuda_script_version": "2026-10-02.3",
+    "artifact_hashes_identical": true
   }
 }
