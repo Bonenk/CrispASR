@@ -44,7 +44,8 @@ Independent original-class F32 source captures audit actual parameter dtypes,
 prompt/cache behavior, complete output and prior-window context. ARM CPU
 `37002813123` and real two-T4 CUDA v3 pass all three direct clips, 225 numerical
 stages plus three prompt checks, 48 cached predictions per device, anonymous
-C ABI and independent CLI exact decoding. CUDA minimum cosine .999979. Five
+C ABI and independent CLI exact decoding. CUDA minimum cosine .999979. Public-download CUDA v4 independently rechecks
+the canonical published pin and passes the same complete corpus. Five
 whole-file language/VAD/context cases match at unchanged 5.1 ms F16 bounds;
 GPU-requested VAD equals CPU bitwise. Actual Piper→9B roundtrips pass 3/3 on
 both devices with WER 0 and exact CLI/C ABI agreement. Raw BF16 timing failures,

@@ -3807,7 +3807,189 @@
     "validated": true,
     "public": true,
     "run": 37005611122,
-    "card_revision": "f05dd56b51f22590767472224924cbdb078aee79"
+    "card_revision": "f05dd56b51f22590767472224924cbdb078aee79",
+    "cuda_public_download_proof": {
+      "script_version": "2026-10-02.4",
+      "source_commit": "4584fc035c3655e3826d5796b3756e47f68c25e4",
+      "model_revision": "dffbadf0f173446fee0364a0807803d2b2fb6f49",
+      "reference_revision": "cb678dfd4806778aa55c39fe7b7a710a54cdc153",
+      "audio_revision": "d0a7d7a8be318a5841dfdbe6ad37d3acf75523e3",
+      "pipeline_reference_dtype": "independently forced all-float32",
+      "direct_reference_dtype": "float32",
+      "build_commit": "f91a31da8d586157043639d0e6039c778d2571dc",
+      "build_run": 36997586995,
+      "bundle_revision": "9ffaeaab43fece5ec5c0baeb4884e2db87625f6f",
+      "bundle_sha256": "166e8741738827fd0b997551bf27bfa93b5dcf04c898056fdedade87ba5c9f3e",
+      "hardware": "Tesla T4, 7.5, 15360 MiB\nTesla T4, 7.5, 15360 MiB",
+      "cuda_arch": "75",
+      "full_pipeline_checked": true,
+      "validated": true,
+      "failed": [],
+      "stages": {
+        "jfk": {
+          "passed": true,
+          "reported_checks": 76,
+          "numerical_checks": 75,
+          "cached_predictions": 16,
+          "cosine_min": 0.999995,
+          "relative_l2_max": 0.00099121
+        },
+        "jfk-tail": {
+          "passed": true,
+          "reported_checks": 76,
+          "numerical_checks": 75,
+          "cached_predictions": 16,
+          "cosine_min": 0.999979,
+          "relative_l2_max": 0.0019022
+        },
+        "zh": {
+          "passed": true,
+          "reported_checks": 76,
+          "numerical_checks": 75,
+          "cached_predictions": 16,
+          "cosine_min": 0.999998,
+          "relative_l2_max": 0.00100007
+        }
+      },
+      "pipeline": {
+        "jfk-en": {
+          "source_variant": "independent-all-f32",
+          "max_timestamp_error_seconds": 0.0,
+          "timestamp_tolerance_seconds": 0.0051,
+          "exact_text": true,
+          "vad_max_abs": 0.002839803695678711,
+          "vad_cosine": 0.9999999554856016,
+          "elapsed_seconds": 12.50850147899996
+        },
+        "zh-en": {
+          "source_variant": "independent-all-f32",
+          "max_timestamp_error_seconds": 1.7763568394002505e-15,
+          "timestamp_tolerance_seconds": 0.0051,
+          "exact_text": true,
+          "vad_max_abs": 0.0010026991367340088,
+          "vad_cosine": 0.9999999964061769,
+          "elapsed_seconds": 12.918163490999973
+        },
+        "zh-ja": {
+          "source_variant": "independent-all-f32",
+          "max_timestamp_error_seconds": 1.7763568394002505e-15,
+          "timestamp_tolerance_seconds": 0.0051,
+          "exact_text": true,
+          "vad_max_abs": 0.0010026991367340088,
+          "vad_cosine": 0.9999999964061769,
+          "elapsed_seconds": 13.380720314000087
+        },
+        "zh-es": {
+          "source_variant": "independent-all-f32",
+          "max_timestamp_error_seconds": 1.7763568394002505e-15,
+          "timestamp_tolerance_seconds": 0.0051,
+          "exact_text": true,
+          "vad_max_abs": 0.0010026991367340088,
+          "vad_cosine": 0.9999999964061769,
+          "elapsed_seconds": 12.575817458000074
+        },
+        "multi-en": {
+          "source_variant": "independent-all-f32",
+          "max_timestamp_error_seconds": 8.881784197001252e-16,
+          "timestamp_tolerance_seconds": 0.0051,
+          "exact_text": true,
+          "vad_max_abs": 0.0010026991367340088,
+          "vad_cosine": 0.9999999948773856,
+          "elapsed_seconds": 16.197739956999953
+        }
+      },
+      "roundtrips": {
+        "model": "index-echo-9b-f16.gguf",
+        "gpu": true,
+        "cases": {
+          "fox": {
+            "expected": "The quick brown fox jumps over the lazy dog.",
+            "english": "The quick brown fox jumps over the lazy dog.",
+            "wer": 0.0,
+            "wer_max": 0.1,
+            "segments": [
+              {
+                "start": 0.05,
+                "end": 2.52,
+                "text": "The quick brown fox jumps over the lazy dog.\u3002\nThe quick brown fox jumps over the lazy dog."
+              }
+            ],
+            "valid_segments": true,
+            "audio_sha256": "2922b7cd5360b373a650d8bf1ea39de16aa3d49e7a44cdec5f350d46c15556ff",
+            "seconds": 2.67025,
+            "elapsed_seconds": 4.032539429999929,
+            "cli_rc": 0,
+            "cli_abi_text_match": true,
+            "passed": true
+          },
+          "window": {
+            "expected": "Please close the window before you leave the room.",
+            "english": "Please close the window before you leave the room.",
+            "wer": 0.0,
+            "wer_max": 0.1,
+            "segments": [
+              {
+                "start": 0.05,
+                "end": 2.4,
+                "text": "Please close the window before you leave the room.\u3002\nPlease close the window before you leave the room."
+              }
+            ],
+            "valid_segments": true,
+            "audio_sha256": "6a46a4c0c5b0cd48dfd71d600bcec1b4f44701500b6f3e749cde7fb73f140fa1",
+            "seconds": 2.6006875,
+            "elapsed_seconds": 3.9076395390000016,
+            "cli_rc": 0,
+            "cli_abi_text_match": true,
+            "passed": true
+          },
+          "station": {
+            "expected": "We will meet at the train station tomorrow morning.",
+            "english": "We will meet at the train station tomorrow morning.",
+            "wer": 0.0,
+            "wer_max": 0.1,
+            "segments": [
+              {
+                "start": 0.05,
+                "end": 2.34,
+                "text": "We will meet at the train station tomorrow morning.\nWe will meet at the train station tomorrow morning."
+              }
+            ],
+            "valid_segments": true,
+            "audio_sha256": "3171272c57adafaf73c746322a64240300d7d40f7f42dbfca8c1a9fcc335e32a",
+            "seconds": 2.4729375,
+            "elapsed_seconds": 3.7533202359999223,
+            "cli_rc": 0,
+            "cli_abi_text_match": true,
+            "passed": true
+          }
+        },
+        "failed": [],
+        "source_stage_parity_checked": false,
+        "roundtrip_passed": true
+      },
+      "evidence": [
+        {
+          "file": "pipeline-f16-partial.json",
+          "sha256": "42d80091004807e4133e071a8bc81f724a73e7f79f7276f82bf54d5a296bd176"
+        },
+        {
+          "file": "terminal-status.json",
+          "sha256": "9fa42ecc2485c9133863126f7cb39ac50550ce4adca7ccadc14996451982e052"
+        },
+        {
+          "file": "cuda-validation.json",
+          "sha256": "c8d36a9fb0ae656d02c1e025fe093ce2fa4d144ef312fb5e31a754521410b15d"
+        },
+        {
+          "file": "pipeline-f16.json",
+          "sha256": "af815158a140e9f29d00136b6aca6c608f59b5f25eeff7606d778a7cdb029f52"
+        },
+        {
+          "file": "index-echo-9b-f16-roundtrip.json",
+          "sha256": "da697d60afffa2d3febba78ffb3a218e56131ef0b5476b412120705c039438f0"
+        }
+      ]
+    }
   },
   "integration": {
     "protected_2b_q8_nightly": {

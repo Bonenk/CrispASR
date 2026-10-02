@@ -31,7 +31,7 @@ jobs:
           cuda: '12.4.1'
           method: network
           sub-packages: '["nvcc", "cudart", "cudart-dev", "nvrtc", "nvrtc-dev"]'
-          non-cuda-sub-packages: '["libcublas", "libcublas-dev"]' 
+          non-cuda-sub-packages: '["libcublas", "libcublas-dev"]'
       - uses: actions/cache/restore@v4
         id: ccache
         with:
