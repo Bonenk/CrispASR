@@ -73,6 +73,16 @@ passes all 13 platform/build jobs; lint `36918943060` passes all 10 jobs after
 retrying a tool-install timeout. Large source captures, original failed exact
 diagnostics and CI/Kaggle artifacts stay under `/mnt/storage/crispasr/issue485/`.
 
+Merged port `cf8bcf098` also passes CI `36959052427` (13/13), lint
+`36959052406` (10/10) and the entire selected nightly regression `36959052457`,
+including Index-Echo's pinned public pair and complete bilingual cues. WASM
+builds gained 1.11 MiB (11.5–11.6%) for the native hybrid decoder and exceeded
+the old 10 MiB sanity limit. Measured 12 MiB WASM / 200 KiB JS budgets keep
+bounded growth and required exports: all three variants pass `36960265387`.
+Downloaded artifacts match the measured sizes and contain `asrOpen`; the proxy
+variant also contains `ttsSynthesizeAsync`. Sizes and SHA256 hashes are retained
+in `docs/index-echo-wasm-2026-10-02.json`. No runtime changes were needed.
+
 ## RELEASE 2026-10-01 — v0.8.40
 
 Published [v0.8.40](https://github.com/CrispStrobe/CrispASR/releases/tag/v0.8.40)

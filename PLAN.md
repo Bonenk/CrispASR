@@ -35,20 +35,6 @@ roundtrip `36960617960` uses the same runtime files at `bd1628183`; queued live
 run `36960469518` was canceled to correct its CLI punctuation option before use.
 All checks must pass before landing; no runner speedup claim.
 
-## CLAIMED 2026-10-02 — #485 WASM integration size budget
-
-Worktree `/mnt/volume1/wt-index-echo-wasm-budget`, branch
-`fix/index-echo-wasm-budget`. The 2B port is on main and native/model/nightly
-proofs pass. Merged WASM run `36959052416` compiles all three variants but
-exceeds the old 10 MiB sanity budget: 11,211,244–11,296,245 bytes versus
-10,045,300–10,127,779 in baseline `36879830550`. Parent main has identical
-WASM compilation sources to that baseline. Audit the expected native decoder
-code growth, document it and verify all three export gates with GH CI.
-Follow-up branch commit `691ef6108` sets a measured 12 MiB WASM / 200 KiB JS
-budget; required ASR/proxy-TTS export gates remain. Workflow shell lint passes
-392 steps. Three-variant WASM proof `36960265387` is queued; source size audit
-is `/mnt/storage/crispasr/issue485/wasm-size-audit.json`.
-
 ## OPEN 2026-09-30 — voxcpm2 follow-ups (#461, #478)
 
 - **#461**: reporter at RTF 1.01 (Arc B390, 8 steps, `voxcpm2-q8_0-locdit-f16.gguf`)
