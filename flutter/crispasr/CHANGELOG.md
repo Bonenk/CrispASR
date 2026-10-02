@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.8.41
+
+* **Native Index-Echo:** validated 9B F16 translation with a matching decoder,
+  metadata detection through the existing session API, and protected 2B Q8
+  regression checks. The accepted 9B pair requires approximately 17.9 GiB of
+  model storage; experimental 9B quantizations remain unpublished.
+* **Native inference:** CPU thread requests are honored by Nemotron, Paraformer
+  and Dia; Dia fixes enable complete dialogue synthesis without the hidden
+  CPU generation cap. Nemotron realtime CPU inference uses aligned windows.
+* **Windows distribution:** matching CUDA 12.6 CLI, library and runtime assets
+  alongside CUDA 12.8/13, with runtime hash checks and an explicit AVX2 library
+  CPU floor. Native A100/H100 target coverage is restored.
+* The Dart API is unchanged.
+
 ## 0.8.40
 
 * **Native ASR:** Phonon-2 English recognition through the shared Parakeet
