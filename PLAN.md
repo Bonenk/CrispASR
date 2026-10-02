@@ -31,6 +31,8 @@ MioTTS x86 proof `37029976684` is RUNNING; final resident-preset implementation/
 
 First MioTTS x86 run `37029976684` built successfully and passed native tests (10 assertions), 44.1/24 kHz/missing-key dispatch and CLI 44.1 kHz WAV. It failed speech scoring because `<en-US>` was counted as words; actual session readback is 8/9 correct words (11.1% WER after established control-tag normalization). Kept the 20% threshold, fixed scorer in `4a4c2773b`, preserved full failed logs/audio and an explicitly incomplete correction receipt on cold storage. Cancelled queued superseded ARM `37032747524` and dispatched corrected ARM proof; CLI speech acceptance still pending.
 
+Corrected ARM speech/metadata/baseline/resident-adapter proof [37033129143](https://github.com/CrispStrobe/CrispASR/actions/runs/37033129143) is RUNNING at `4a4c2773b`. Small range reads of immutable public Q8_0/Q4_K/F16 GGUF headers confirm all store 44100 Hz, n_fft=392 and hop=98; no full model downloaded locally. Release ARM baseline archive digest verified and its library layout confirmed. Echo CUDA bundle build is still RUNNING; Kaggle launch awaits completion.
+
 ## CLAIMED 2026-10-02 — next release
 
 Worktree `/mnt/volume1/wt-483` (`release/0.8.41`). PR #480 review and #483
