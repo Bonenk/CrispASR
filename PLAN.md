@@ -86,7 +86,14 @@ JFK pin `fac990e86eb1163280e62f66a989da3b6432b4bd`, namespace
 index-echo-9b-f32-generation/jfk_11s/ref.gguf. Cold corrected-reference/ includes
 effective dtype/placement receipt. Chinese, tail and full file/VAD/context
 source capture still running. Native CPU Q8 full JFK diff+actual C ABI job
-`36976243448` RUNNING at `0026d9b13` against this valid source pin; no result yet.
+`36976243448` completed: Q8 JFK 76/76 stage/magnitude checks PASS, cached
+argmax 16/16 PASS (cache cos_min .998495, mean .999620). Strict full decoded
+text gate FAILED only source transcript punctuation: F32 country.。 vs native
+country。; English target text and every timestamp match. Preserve red run,
+no altered goldens/tolerance. Released-default BF16 CPU/disk original source
+control dispatched to distinguish precision from port behavior. Chinese F32
+capture also valid, greedy alignment True, fixture pin
+1674bf03877588789b63b9ee1865bb78d7643a3b. Tail and full-file source pending.
 Recovered 2,517,383,440 root bytes (inactive old binaries) and 997,168,009 volume1
 bytes (cold trace artifacts), checksum-verified destinations and old-path
 symlinks retained. Cold cleanup receipts; no active model/DB/build moved.
