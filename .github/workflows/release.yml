@@ -1886,6 +1886,7 @@ jobs:
             -DCRISPASR_BUILD_EXAMPLES=OFF ^
             -DCRISPASR_BUILD_SERVER=OFF ^
             -DGGML_CUDA=ON ^
+            -DGGML_NATIVE=OFF -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON ^
             -DCMAKE_CUDA_ARCHITECTURES="${{ (inputs.tag == '' && inputs.cuda12_probe_arch) || matrix.arch }}" ^
             -DCRISPASR_OPUS_FETCH=ON
           cmake --build build-libs --config Release -j %NUMBER_OF_PROCESSORS% --target crispasr-lib
@@ -1957,6 +1958,32 @@ jobs:
           }
           if (Get-ChildItem "$SPLIT\bin\cudart64_*.dll","$SPLIT\bin\cublas64_*.dll","$SPLIT\bin\cublasLt64_*.dll" -ErrorAction SilentlyContinue) {
             throw "The split archive must not contain CUDA runtime DLLs"
+          }
+
+          # Match the CLI CPU floor; do not ship the hosted runner's native ISA.
+          $cache = Get-Content build-libs\CMakeCache.txt -Raw
+          foreach ($setting in @('GGML_NATIVE:BOOL=OFF', 'GGML_AVX2:BOOL=ON', 'GGML_AVX512:BOOL=OFF')) {
+            if ($cache -notmatch ('(?m)^' + [regex]::Escape($setting) + '\r?$')) {
+              throw "Unexpected packaged CPU floor: missing $setting"
+            }
+          }
+          Write-Host 'WIN_CUDA_LIB_CPU_FLOOR_OK native=off avx2=on avx512=off'
+
+          # Exercise the C ABI from the staged DLL directory with toolkit/build
+          # directories removed from PATH. The runner has no NVIDIA driver.
+          $library = @(Get-ChildItem "$OUT\bin\*crispasr*.dll")
+          if ($library.Count -ne 1) { throw "Expected one CrispASR library DLL, found $($library.Count)" }
+          $signature = '[System.Runtime.InteropServices.DllImport("' + $library[0].FullName.Replace('\', '\\') + '", CallingConvention=System.Runtime.InteropServices.CallingConvention.Cdecl)] public static extern System.IntPtr whisper_version();'
+          $savedPath = $env:PATH
+          try {
+            $env:PATH = (Resolve-Path "$OUT\bin").Path + ";$env:SystemRoot\System32;$env:SystemRoot"
+            Add-Type -MemberDefinition $signature -Name LibraryVersionProbe -Namespace CrispASR
+            $version = [System.Runtime.InteropServices.Marshal]::PtrToStringAnsi([CrispASR.LibraryVersionProbe]::whisper_version())
+            $expected = (Get-Content VERSION -Raw).Trim()
+            if ($version -ne $expected) { throw "C ABI version $version differs from $expected" }
+            Write-Host "WIN_CUDA_LIB_C_ABI_OK whisper_version=$version"
+          } finally {
+            $env:PATH = $savedPath
           }
 
           cd release
