@@ -91,7 +91,7 @@ worker proof `36965225243` are launched. VPS load 10.26/16.09/20.03, available
 1.4GiB: all builds/models remain hosted; cold logs stay on CIFS.
 
 Worker `36965225243` passed all 136 assertions in six cases in each build mode.
-Lint `36965224988` passed 10/10; CI `36965225232` is 12/13 green with no failure.
+Lint `36965224988` passed 10/10; CI `36965225232` passed all 13 jobs.
 Live `36965187732` passed ASR again but the *unfixed* uncapped Dia control
 repeated the novel CPU-thread test sentence (seed 123, WER .852), so the run
 correctly stopped before accepting a candidate. No claimed quality pass. New
